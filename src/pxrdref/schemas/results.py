@@ -46,6 +46,46 @@ class Statistics(Base):
     n_free_parameters: int
 
 
+class PhaseQuantity(Base):
+    """One phase's quantitative-analysis row (Hill & Howard, 1987).
+
+    ``cell_mass`` (= Z·M) and ``cell_volume`` are the unambiguous quantities;
+    ``z`` and ``molar_mass`` are the best-effort integer-formula-unit split
+    (``z = 1``, ``molar_mass = cell_mass`` when the composition does not reduce
+    to integers under refined occupancies).  ``weight_fraction`` never depends
+    on that split.
+    """
+
+    name: str                                       # matches Phase.name / ticks key
+    weight_fraction: float                          # W, renormalised to sum to 1
+    weight_fraction_stderr: float | None = None     # σ(W); None if scale esds absent
+    scale: float                                    # S (refined phases.{i}.scale)
+    z: int | None = None                            # formula units per cell (display)
+    molar_mass: float | None = None                 # M, g/mol per formula unit
+    cell_mass: float                                # Z·M, g/mol per unit cell
+    cell_volume: float                              # V, Å³
+    zmv: float                                       # cell_mass · V
+
+
+class QuantitativePhaseAnalysis(Base):
+    """Per-phase weight fractions from the refined Rietveld scales.
+
+    Hill & Howard (1987), J. Appl. Cryst. 20, 467: W_p ∝ S_p·(Z·M·V)_p,
+    renormalised across phases.  ``weight_fraction_stderr`` is propagated from
+    the *correlated* scale block of the covariance (not σ(S) treated as
+    independent), carrying the same conditioning as every other reported esd.
+
+    Scope (``crystalline_only``): these are fractions of the modelled
+    **crystalline** content.  An unmodelled amorphous fraction or a missing
+    phase still makes them sum to 1.  Internal-standard / amorphous
+    quantification is fenced to v2.
+    """
+
+    phases: list[PhaseQuantity]
+    method: Literal["zmv"] = "zmv"
+    crystalline_only: bool = True
+
+
 class IterationRecord(Base):
     stage: str
     iteration: int
@@ -90,6 +130,10 @@ class RefinementResult(Base):
     sigma: list[float] = Field(default_factory=list)
     # per-phase reflection tick positions (deg 2θ)
     ticks: dict[str, list[float]] = Field(default_factory=dict)
+
+    # Quantitative phase analysis (weight fractions); computed for Rietveld
+    # fits with more than the trivial single phase, None otherwise.
+    qpa: QuantitativePhaseAnalysis | None = None
 
     def plot(self, path: str | None = None, **kw):
         from ..viz.plots import plot_result

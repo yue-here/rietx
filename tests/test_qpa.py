@@ -11,6 +11,13 @@ import pytest
 
 from pxrdref import Atom, Cell, Parameter, Phase
 from pxrdref.optimize.qpa import atomic_weight, phase_zmv, weight_fractions
+from pxrdref.schemas.common import Provenance
+from pxrdref.schemas.results import (
+    PhaseQuantity,
+    QuantitativePhaseAnalysis,
+    RefinementResult,
+    Statistics,
+)
 
 from .test_schemas import make_lab6
 
@@ -75,3 +82,28 @@ def test_weight_fractions_no_covariance():
     w, sc, si = weight_fractions([100.0, 100.0], [3.0, 1.0])
     assert np.allclose(w, [0.75, 0.25])
     assert sc is None and si is None
+
+
+def _qpa_fixture() -> QuantitativePhaseAnalysis:
+    return QuantitativePhaseAnalysis(phases=[
+        PhaseQuantity(name="LaB6", weight_fraction=0.6, weight_fraction_stderr=0.01,
+                      scale=2.0, z=1, molar_mass=203.77, cell_mass=203.77,
+                      cell_volume=71.82, zmv=14634.9),
+        PhaseQuantity(name="CaF2", weight_fraction=0.4, weight_fraction_stderr=None,
+                      scale=1.0, z=4, molar_mass=78.07, cell_mass=312.30,
+                      cell_volume=163.05, zmv=50920.0),
+    ])
+
+
+def test_qpa_json_round_trip():
+    qpa = _qpa_fixture()
+    assert QuantitativePhaseAnalysis.model_validate_json(qpa.model_dump_json()) == qpa
+
+
+def test_result_with_qpa_round_trip():
+    stats = Statistics(rwp=0.05, rp=0.04, rexp=0.03, chi2=2.0, gof=1.4,
+                       n_points=1000, n_free_parameters=8)
+    result = RefinementResult(
+        status="converged", mode="rietveld", parameters=[], statistics=stats,
+        provenance=Provenance(package_version="test"), qpa=_qpa_fixture())
+    assert RefinementResult.model_validate_json(result.model_dump_json()) == result
