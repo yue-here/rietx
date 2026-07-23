@@ -10,7 +10,14 @@ from .instrument import (
     Source,
 )
 from .pattern import PatternData
-from .results import RefinedParameter, RefinementResult, StageResult, Statistics
+from .results import (
+    PhaseQuantity,
+    QuantitativePhaseAnalysis,
+    RefinedParameter,
+    RefinementResult,
+    StageResult,
+    Statistics,
+)
 from .structure import AnisoU, Atom, Cell, Phase, Structure
 
 __all__ = [
@@ -27,8 +34,10 @@ __all__ = [
     "Parameter",
     "PatternData",
     "Phase",
+    "PhaseQuantity",
     "ProfileTCHZ",
     "Provenance",
+    "QuantitativePhaseAnalysis",
     "RefinedParameter",
     "RefinementResult",
     "Source",

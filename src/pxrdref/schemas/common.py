@@ -17,11 +17,13 @@ SCHEMA_VERSION = "0.1"
 TransformKind = Literal["identity", "softplus", "exp", "logit"]
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
-#: partitions the observed intensity among reflections instead (Pawley, which
-#: puts the same per-hkl intensities *in* the parameter vector, lands in v0.3).
+#: partitions the observed intensity among reflections by an iterated
+#: fixed-point (the intensities are *not* free parameters); ``pawley`` puts the
+#: same per-hkl intensities *into* the least-squares parameter vector (Pawley,
+#: 1981), so they carry esds and overlapped groups need explicit conditioning.
 #: Defined here rather than in ``model.forward`` so the schemas can name it
 #: without importing the forward model (which imports the schemas).
-Mode = Literal["rietveld", "lebail"]
+Mode = Literal["rietveld", "lebail", "pawley"]
 
 
 class Base(BaseModel):

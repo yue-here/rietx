@@ -162,6 +162,21 @@ class RefinementPlan:
                               "instrument.profile.x", "instrument.profile.y"]),
         ])
 
+    @classmethod
+    def pawley_default(cls) -> "RefinementPlan":
+        """Pawley whole-pattern plan: cell + profile, same order as
+        :meth:`profile_only`.  The per-hkl intensities are *not* named globs —
+        they are refined as an implicit block every stage (see
+        ``model.forward.PawleyBlock``), so no ``turn_on`` frees them."""
+        return cls(stages=[
+            Stage("bkg", ["instrument.background.*"]),
+            Stage("zero", ["instrument.zero_shift"]),
+            Stage("cell", ["phases.*.cell.*"]),
+            Stage("profile_w", ["instrument.profile.w"]),
+            Stage("profile", ["instrument.profile.u", "instrument.profile.v",
+                              "instrument.profile.x", "instrument.profile.y"]),
+        ])
+
 
 PLAN_PRESETS = {
     "mccusker_default": RefinementPlan.mccusker_default,
@@ -170,6 +185,7 @@ PLAN_PRESETS = {
     "lab_calibrate": RefinementPlan.lab_calibrate,
     "lab_sample_refine": RefinementPlan.lab_sample_refine,
     "profile_only": RefinementPlan.profile_only,
+    "pawley_default": RefinementPlan.pawley_default,
 }
 
 
