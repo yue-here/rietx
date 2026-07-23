@@ -136,6 +136,16 @@ class Phase(Base):
     scale: Parameter = Field(
         default_factory=lambda: Parameter(value=1.0, vary=False, min=0.0, transform="softplus")
     )
+    # Secondary-extinction coefficient (Sabine model, model/extinction.py).
+    # Attenuates the strong low-angle reflections of a well-crystallised
+    # sample: each reflection's integrated intensity is multiplied by
+    # E(hkl) = E_B·sin²θ + E_L·cos²θ with a dimensionless x ∝ ext·|F|²·(λ/V)².
+    # ext = 0 ⇒ E ≡ 1 exactly (off by default), so it is opt-in and never
+    # perturbs a structure that does not free it.  Softplus-bounded positive
+    # (a hard zero bound stalls TRF; the staged plan seeds it off zero).
+    extinction: Parameter = Field(
+        default_factory=lambda: Parameter(value=0.0, vary=False, min=0.0, transform="softplus")
+    )
     # Sample contribution to Lorentzian width (deg 2θ units, see profiles.caglioti):
     # size term varies as 1/cosθ (Scherrer), strain term as tanθ.  Lorentzian
     # FWHMs add under convolution, so these stack on the instrument X, Y.

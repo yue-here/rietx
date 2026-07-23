@@ -91,10 +91,10 @@ guard).
 
 ## Tasks
 
-- [ ] **Schema** — `Phase.extinction: Parameter` (sibling of `scale`), default
+- [x] **Schema** — `Phase.extinction: Parameter` (sibling of `scale`), default
       `value=0.0, vary=False, min=0.0, transform="softplus"`, documented by
       physics; JSON round-trip test.
-- [ ] **Physics module** — `model/extinction.py` (`sabine_extinction`,
+- [x] **Physics module** — `model/extinction.py` (`sabine_extinction`,
       `sabine_extinction_and_dx`) + unit tests: identity at 0, monotonicity
       (E ≤ 1, ∂E/∂ext ≤ 0), angular limits, and a GSAS-II golden covering both
       Laue branches and the Xpol prefactor to ~1e-10.
@@ -131,8 +131,14 @@ guard).
   the angular-limit unit test and the GSAS-II golden both catch it.
 - **Softplus lift-off** — `ext=0` sits at the softplus floor where the internal
   gradient is ~0; the stage seed is what makes it refinable.
-- **Series/asymptote kink at x=1** — harmless for lab data (x ≪ 1) but noted;
-  the two Laue branches meet continuously in value there.
+- **Series/asymptote discontinuity at x=1** — GSAS-II's six-term x≤1 series
+  and two-term x>1 asymptote do *not* join continuously there (E_L jumps
+  ≈ 0.674 → 0.698, a ~2% step). Adopted verbatim rather than smoothed (a
+  smoothing would break the cross-code golden). Harmless for real data, where
+  x ≪ 1 keeps every reflection on the smooth series branch; a reflection would
+  have to lose ~40% of its intensity to extinction to reach x > 1. Pinned by
+  `test_series_and_asymptote_jump_at_x_equals_one` so any future change is
+  deliberate.
 - **Unpolarized Xpol** — GSAS-II's extinction prefactor is the unpolarized
   `(1+cos²2θ)/2` independent of the beam-polarization K; adopted verbatim for
   the golden, flagged for a future polarized-synchrotron refinement.
