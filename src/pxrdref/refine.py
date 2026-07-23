@@ -14,6 +14,7 @@ from .history.store import fingerprint
 from .history.tree import RefinementTree
 from .model.forward import CompiledModel, Mode, compile_model
 from .optimize.least_squares import run_least_squares
+from .optimize.qpa import compute_qpa
 from .optimize.statistics import compute_statistics
 from .params.vector import ParameterTable
 from .schemas.common import Diagnostic, Provenance
@@ -633,6 +634,18 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         pos = np.concatenate(rows) if rows else np.array([])
         ticks[name] = sorted(float(p) for p in pos if np.isfinite(p))
 
+    # Quantitative phase analysis from the refined scales.  Le Bail scales are
+    # degenerate with the extracted intensities, so QPA is Rietveld-only.  σ(W)
+    # comes from the correlated scale block of the covariance (physical_covariance
+    # reuses the same Cov_free as stderr_physical → consistent conditioning).
+    qpa = None
+    if mode == "rietveld":
+        scale_paths = [f"phases.{ip}.scale" for ip in range(len(structure.phases))]
+        scale_cov = (table.physical_covariance(theta, stderr_internal, correlation,
+                                                scale_paths)
+                     if stderr_internal is not None else None)
+        qpa = compute_qpa(structure, values, scale_cov)
+
     return RefinementResult(
         status=status, mode=mode,
         parameters=params, statistics=stats,
@@ -641,7 +654,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         two_theta=model.tt.tolist(), y_obs=model.y_obs.tolist(),
         y_calc=y_calc.tolist(), y_background=y_bkg.tolist(),
         sigma=model.sigma.tolist(),
-        ticks=ticks,
+        ticks=ticks, qpa=qpa,
     )
 
 

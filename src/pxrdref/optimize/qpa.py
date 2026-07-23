@@ -33,6 +33,8 @@ import numpy as np
 
 from ..crystallography.lattice import cell_volume
 from ..crystallography.symmetry import expand_positions, get_spacegroup
+from ..schemas.results import PhaseQuantity, QuantitativePhaseAnalysis
+from ..schemas.structure import Structure
 
 _ELEMENT_RE = re.compile(r"^([A-Za-z]{1,2})")
 
@@ -158,3 +160,39 @@ def weight_fractions(k, scales, scale_cov=None):
     cov_w_indep = jac @ np.diag(np.diag(cov)) @ jac.T
     sigma_indep = np.sqrt(np.maximum(np.diag(cov_w_indep), 0.0))
     return w, sigma_corr, sigma_indep
+
+
+def compute_qpa(structure: Structure, values: dict[str, float],
+                scale_cov=None) -> QuantitativePhaseAnalysis:
+    """Assemble the per-phase QPA rows from a decoded parameter dict.
+
+    ``values`` is the physical value dict from ``ParameterTable.decode`` (refined
+    cell, occupancies and scales); ``scale_cov`` is the physical covariance of
+    the phase scales in phase order (``None`` when no esds were estimated).
+    """
+    zmvs, scales = [], []
+    for ip, phase in enumerate(structure.phases):
+        base = f"phases.{ip}"
+        cell = tuple(values[f"{base}.cell.{n}"]
+                     for n in ("a", "b", "c", "alpha", "beta", "gamma"))
+        atoms = [(atom.species,
+                  values[f"{base}.atoms.{j}.x"], values[f"{base}.atoms.{j}.y"],
+                  values[f"{base}.atoms.{j}.z"], values[f"{base}.atoms.{j}.occ"])
+                 for j, atom in enumerate(phase.atoms)]
+        zmvs.append(phase_zmv(phase.space_group, cell, atoms))
+        scales.append(values[f"{base}.scale"])
+    w, sigma_corr, _ = weight_fractions([z.zmv for z in zmvs], scales, scale_cov)
+    rows = [
+        PhaseQuantity(
+            name=phase.name,
+            weight_fraction=float(w[ip]),
+            weight_fraction_stderr=(float(sigma_corr[ip]) if sigma_corr is not None
+                                    else None),
+            scale=float(scales[ip]),
+            z=zmvs[ip].z, molar_mass=zmvs[ip].molar_mass,
+            cell_mass=zmvs[ip].cell_mass, cell_volume=zmvs[ip].cell_volume,
+            zmv=zmvs[ip].zmv,
+        )
+        for ip, phase in enumerate(structure.phases)
+    ]
+    return QuantitativePhaseAnalysis(phases=rows)

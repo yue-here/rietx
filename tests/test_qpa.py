@@ -84,6 +84,41 @@ def test_weight_fractions_no_covariance():
     assert sc is None and si is None
 
 
+def test_weight_fractions_correlated_differs_from_independent():
+    # Strongly (positively) correlated scales: the correlated ratio propagation
+    # partly cancels, so σ_corr must differ from the naive independent σ.
+    scale_cov = np.array([[4.0, 3.5], [3.5, 4.0]])
+    w, sigma_corr, sigma_indep = weight_fractions([100.0, 100.0], [1.0, 1.0], scale_cov)
+    assert np.allclose(w, [0.5, 0.5])
+    assert not np.allclose(sigma_corr, sigma_indep)
+    assert np.all(sigma_corr < sigma_indep)  # positive correlation shrinks σ(W)
+
+
+def test_physical_covariance_block_diagonal_matches_stderr():
+    from pxrdref import Instrument
+    from pxrdref.params.vector import ParameterTable
+
+    structure = make_lab6()
+    structure.phases.append(_caf2_phase())
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+    table.set_vary(["phases.*.scale"], True)
+    theta = table.x0()
+    free = table.free_paths
+    i0, i1 = free.index("phases.0.scale"), free.index("phases.1.scale")
+    corr = np.eye(len(theta))
+    corr[i0, i1] = corr[i1, i0] = 0.7
+    stderr_internal = np.full(len(theta), 0.3)
+
+    esds = table.stderr_physical(theta, stderr_internal, corr)
+    cov = table.physical_covariance(theta, stderr_internal, corr,
+                                    ["phases.0.scale", "phases.1.scale"])
+    # The block's diagonal is exactly the reported per-parameter esds squared,
+    # so QPA σ(W) inherits the same conditioning by construction.
+    assert math.isclose(math.sqrt(cov[0, 0]), esds["phases.0.scale"], rel_tol=1e-9)
+    assert math.isclose(math.sqrt(cov[1, 1]), esds["phases.1.scale"], rel_tol=1e-9)
+    assert cov[0, 1] != 0.0  # scales are correlated off the diagonal
+
+
 def _qpa_fixture() -> QuantitativePhaseAnalysis:
     return QuantitativePhaseAnalysis(phases=[
         PhaseQuantity(name="LaB6", weight_fraction=0.6, weight_fraction_stderr=0.01,

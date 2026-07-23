@@ -132,7 +132,7 @@ class RefinementResult(Base):
     ticks: dict[str, list[float]] = Field(default_factory=dict)
 
     # Quantitative phase analysis (weight fractions); computed for Rietveld
-    # fits with more than the trivial single phase, None otherwise.
+    # fits, None for Le Bail (its scales are degenerate).
     qpa: QuantitativePhaseAnalysis | None = None
 
     def plot(self, path: str | None = None, **kw):
