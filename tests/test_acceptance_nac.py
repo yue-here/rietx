@@ -93,3 +93,77 @@ def test_nac_lebail_then_rietveld(nac_inputs):
     out = Path(__file__).parent / "output"
     out.mkdir(exist_ok=True)
     plot_result(result, path=str(out / "nac_fit.png"))
+
+
+def _min_extinction_factor(structure, instrument, data, ip: int) -> float:
+    """Smallest E(hkl) the fitted extinction applies to phase ``ip`` — the
+    physical size of the correction, wavelength/cell-independent (unlike the
+    raw ``ext`` coefficient)."""
+    import numpy as np
+
+    from pxrdref.crystallography.lattice import (
+        cell_volume,
+        d_spacings,
+        two_theta_deg,
+    )
+    from pxrdref.crystallography.structure_factor import structure_factors_squared
+    from pxrdref.model.extinction import sabine_extinction
+    from pxrdref.model.forward import compile_model
+    from pxrdref.params.vector import ParameterTable
+
+    model = compile_model(structure, instrument, data, mode="rietveld",
+                          two_theta_limits=LIMITS)
+    values = ParameterTable(structure, instrument).decode(
+        ParameterTable(structure, instrument).x0())
+    cp = model.phases[ip]
+    cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                 for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+    d = d_spacings(cp.reflections.hkl, *cell)
+    xyz, occ, biso, ua, astar = model._site_values(ip, values, cell)
+    f2 = structure_factors_squared(cp.reflections.hkl, d, cp.sites, xyz, occ, biso, ua, astar)
+    tt = two_theta_deg(d, model.line_wavelengths[0])
+    E = sabine_extinction(f2, model.line_wavelengths[0], cell_volume(*cell),
+                          tt, values[f"phases.{ip}.extinction"])
+    return float(np.nanmin(E))
+
+
+def test_nac_extinction_on_the_main_phase_is_bounded_and_unbiasing(nac_inputs):
+    """WP-0506 does-no-harm on synchrotron data, done *right* — extinction
+    freed only on the well-determined main phase.
+
+    Unlike SRM 660c (single phase, extinction → 0), NAC does *not* drive
+    extinction to zero: at λ = 0.414 Å with V ≈ 1077 Å³ the raw ``ext``
+    coefficient (≈ 336) is large for a *small* physical correction (x ∝
+    (λ/V)²), so the invariant is on the correction's *size*, not on ``ext``.
+    The correction stays bounded (min E > 0.8, ≤ ~12% on the strongest line)
+    and the cell is not biased.  Freeing extinction on the ill-determined CaF₂
+    impurity instead lets it run away (measured min E ≈ 0.31, a spurious 69%
+    attenuation on a phase contributing ~1% of the pattern) — the
+    over-flexible-correction hazard — which is why extinction is off by
+    default and opt-in *per phase*, and why the guards stay live."""
+    data, structure, instrument = nac_inputs
+
+    ref_lb = pr.Refinement(structure, instrument)
+    ref_lb.fit(data, mode="lebail", two_theta_limits=LIMITS)
+    structure2 = ref_lb.fitted_structure.model_copy(deep=True)
+    instrument2 = ref_lb.fitted_instrument.model_copy(deep=True)
+    structure2.phases[0].scale.value = 1e-6
+    structure2.phases.append(_caf2_phase())
+
+    plan = pr.RefinementPlan.mccusker_default()
+    plan.stages.append(pr.Stage("biso", ["phases.*.atoms.*.biso"]))
+    # only the main phase — the recommended usage; not the CaF2 impurity
+    plan.stages.append(pr.Stage("extinction", ["phases.0.extinction"], seed=1e-3))
+
+    ref = pr.Refinement(structure2, instrument2)
+    result = ref.fit(data, plan=plan, two_theta_limits=LIMITS)
+
+    assert result.status == "converged"
+    assert result.statistics.rwp < 0.12
+    a = ref.fitted_structure.phases[0].cell.a.value
+    assert abs(a - 10.2510) < 2e-3, f"extinction biased the NAC cell to a={a:.5f}"
+    # CaF2 extinction was never freed, so it stays exactly off
+    assert ref.fitted_structure.phases[1].extinction.value == 0.0
+    # the main-phase correction is physical, not a runaway
+    min_e = _min_extinction_factor(ref.fitted_structure, ref.fitted_instrument, data, 0)
+    assert min_e > 0.8, f"main-phase extinction attenuates {(1 - min_e) * 100:.0f}% — implausible"

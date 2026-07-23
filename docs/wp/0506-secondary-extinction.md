@@ -116,18 +116,28 @@ guard).
       softplus zero when the stage activates (carried through `StageSpec`);
       Biso→extinction ordering documented. Existing `mccusker_structural`
       tests (coordinates, aniso ADP recovery) still pass with the stage in.
-- [ ] **Recovery + does-no-harm tests** — synthetic extinction injection
-      recovered within esds on a detectable case; does-no-harm `@slow` on NAC
-      and SRM 660c (extinction refines ≈ 0, Rwp not degraded); correlation
-      guard surfaces ext↔Biso/scale; obs/calc/diff PNGs to `tests/output/`.
+- [x] **Recovery + does-no-harm tests** — injected extinction recovered
+      within esds on a LaB6 synthetic; does-no-harm `@slow`: SRM 660c refines
+      ext → ≈ 0 (2e-10) with Rwp/cell unchanged, NAC (main phase only) stays
+      bounded (min E ≈ 0.88) and unbiasing. Correlation *measured* rather than
+      assumed: ext is separable from Biso/scale (|ρ| ≈ 0.004) on well-sampled
+      data; the real hazard is the minor-phase runaway (documented above).
+      obs/calc/diff PNG to `tests/output/extinct_lab6_fit.png`.
 - [ ] **Docs** — this file's ticks + handover; ROADMAP glyph sync.
 
 ## Risks
 
-- **ext ↔ Biso ↔ scale correlation** — all three attenuate high-Q intensity in
-  overlapping ways. Mitigation: stage Biso *before* extinction, keep the
-  correlation and background-absorption guards live, and watch for a
-  QPA-fraction bias later at WP-0304.
+- **ext ↔ Biso ↔ scale correlation** — all three attenuate the strong lines,
+  so this was the headline risk. **Measured, it is benign on well-sampled
+  data**: co-freeing ext, scale and both Biso on the LaB6 synthetic leaves
+  every ext-involving correlation ≈ 0 (|ρ|max ≈ 0.004), because extinction's
+  per-reflection signature (x ∝ |F|², weighted by sin²θ/cos²θ) is neither a
+  uniform scale nor Biso's monotone exp(−B k²) — the varied |F|² across
+  reflections breaks the degeneracy, and extinction is cleanly recovered
+  within a few esds. The correlation is a real hazard only in the degenerate
+  few-reflection limit, so the staged plan still refines Biso *before*
+  extinction and keeps the guards live; watch for a QPA-fraction bias later at
+  WP-0304.
 - **Hidden-Jacobian bug** — if the `G` factor is forgotten, the `dof`/`adp`
   columns silently disagree with FD only when `ext≠0`. Test 4 pins it.
 - **sin²θ/cos²θ inversion** — the Bragg-with-sin²θ convention is easy to flip;
@@ -145,6 +155,19 @@ guard).
 - **Unpolarized Xpol** — GSAS-II's extinction prefactor is the unpolarized
   `(1+cos²2θ)/2` independent of the beam-polarization K; adopted verbatim for
   the golden, flagged for a future polarized-synchrotron refinement.
+- **Runaway on ill-determined phases (found in testing).** Freeing extinction
+  on a poorly-constrained *minor* phase lets it absorb residual: on the NAC
+  fit's ~1%-weight CaF₂ impurity, extinction ran to a spurious 69% attenuation
+  (min E ≈ 0.31) and improved Rwp cosmetically — the same over-flexible-
+  correction failure mode as a peak-imitating background. Mitigation: keep it
+  off by default and **opt-in per phase**, free it only on well-determined
+  phases (the recommended usage the NAC acceptance test exercises), and keep
+  the guards live. On the *main* NAC phase the correction is bounded
+  (min E ≈ 0.88) and does not bias the cell.
+- **The `ext` coefficient's numeric scale is wavelength- and cell-dependent**
+  (x ∝ (λ/V)²), so a "small" correction is `ext ≈ 0` for CuKα/LaB6 but
+  `ext ≈ 300` for 0.414 Å/NAC — do-no-harm and plausibility checks must be on
+  the *effect* (x, or min E), never on the raw coefficient.
 
 ## Acceptance
 

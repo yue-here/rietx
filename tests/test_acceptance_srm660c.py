@@ -143,3 +143,28 @@ def test_srm660c_lab6_rietveld(srm_inputs):
     plot_result(result, path=str(out / "srm660c_fit_highangle.png"),
                 two_theta_range=(147.5, 150.9))
     plot_for_vlm(result, full, path=str(out / "srm660c_vlm.png"))
+
+
+def test_srm660c_extinction_does_no_harm(srm_inputs):
+    """WP-0506 does-no-harm: freeing secondary extinction on a fine-powder
+    standard must refine it small and must not degrade the fit or bias the
+    cell.  SRM 660c is a NIST line-profile standard — genuine extinction is
+    negligible — so this is the guard against extinction absorbing unrelated
+    residual (the unmodelled FPA-territory aberrations here)."""
+    data, structure, instrument = srm_inputs
+    plan = _nist_calibrated_plan()
+    plan.stages.append(pr.Stage("extinction", ["phases.*.extinction"], seed=1e-3))
+
+    ref = pr.Refinement(structure, instrument)
+    result = ref.fit(data, plan=plan)
+
+    assert result.status == "converged"
+    # the fit is not degraded (adding a parameter can only help Rwp, but the
+    # cell must not move out of the v0.2 acceptance band under the new freedom)
+    assert result.statistics.rwp < 0.10
+    a = ref.fitted_structure.phases[0].cell.a.value
+    assert abs(a - A_REFERENCE) < 2e-4, f"extinction biased the cell to a={a:.6f}"
+    # extinction refines back *below* its 1e-3 seed (measured ≈ 2e-10): the
+    # data actively drove it to zero rather than letting it absorb residual
+    ext = ref.fitted_structure.phases[0].extinction.value
+    assert ext < 1e-2, f"extinction refined non-negligible ({ext:.3g}) on SRM 660c"

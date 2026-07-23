@@ -400,3 +400,114 @@ def test_angular_limits_bragg_is_sin2_laue_is_cos2():
     # (sin²θ ≈ 1) selects the Bragg component — the sin²/cos² convention
     assert E[0] == pytest.approx(e_l[0], abs=1e-3)
     assert E[1] == pytest.approx(e_b[1], abs=1e-3)
+
+# -- end-to-end recovery + correlation ---------------------------------
+
+from pathlib import Path  # noqa: E402
+
+OUT = Path(__file__).parent / "output"
+
+
+def _synthesize_extinct_lab6(ext_true: float, *, noise_seed: int = 5):
+    """A LaB6 pattern carrying a known extinction coefficient + Poisson noise."""
+    from pxrdref import Instrument, PatternData
+    from pxrdref.model.forward import compile_model
+    from pxrdref.params.vector import ParameterTable
+    from tests.test_schemas import make_lab6
+
+    structure = make_lab6()
+    structure.phases[0].scale.value = 5e-3
+    structure.phases[0].extinction.value = ext_true
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.profile.w.value = 8e-3
+    tt = np.arange(15.0, 120.0, 0.02)
+    pattern = PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    model = compile_model(structure, ins, pattern, mode="rietveld")
+    table = ParameterTable(structure, ins)
+    y = model.evaluate(table.decode(table.x0())) + 40.0  # flat background floor
+    rng = np.random.default_rng(noise_seed)
+    return PatternData(two_theta=model.tt.tolist(),
+                       intensity=rng.poisson(np.maximum(y, 1.0)).astype(float).tolist())
+
+
+def test_injected_extinction_is_recovered_within_esds():
+    """Inject a known ext into a heavy-atom (LaB6) pattern, start from ext = 0,
+    and recover it within a few esds.  Biso is held at its (correct) value so
+    the recovery isolates extinction from the Biso it correlates with — the
+    does-no-harm side is checked separately against real data."""
+    from pxrdref import Instrument, Refinement
+    from pxrdref.strategy.staged import RefinementPlan, Stage
+    from pxrdref.viz.plots import plot_result
+    from tests.test_schemas import make_lab6
+
+    ext_true = 2.5
+    pattern = _synthesize_extinct_lab6(ext_true)
+
+    structure = make_lab6()  # extinction starts at 0
+    structure.phases[0].scale.value = 4e-3
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.profile.w.value = 1.1e-2
+
+    plan = RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("cell", ["phases.*.cell.*"]),
+        Stage("profile_w", ["instrument.profile.w"]),
+        Stage("extinction", ["phases.*.extinction"], seed=1e-3),
+    ])
+    ref = Refinement(structure, ins, history=False)
+    result = ref.fit(pattern, plan=plan)
+    assert result.status == "converged"
+
+    ext = result.parameter("phases.0.extinction")
+    assert ext.stderr is not None and ext.stderr > 0
+    assert ext.value == pytest.approx(ext_true, abs=max(4 * ext.stderr, 0.05 * ext_true)), \
+        f"recovered ext={ext.value:.3f}±{ext.stderr:.3f}, truth {ext_true}"
+    # and it is resolved, not merely fitted: several esds away from zero
+    assert ext.value > 5 * ext.stderr
+
+    OUT.mkdir(exist_ok=True)
+    plot_result(result, path=str(OUT / "extinct_lab6_fit.png"))
+
+
+def test_extinction_is_separable_from_scale_and_biso_and_the_guard_stays_quiet():
+    """The WP flags ext↔Biso↔scale as the main refinement risk (all attenuate
+    the strong lines).  Measured on well-sampled LaB6 data it is *not* a
+    generic problem: co-freeing ext, scale and both Biso leaves every
+    ext-involving correlation ≈ 0, because extinction's per-reflection
+    signature (x ∝ |F|², weighted by sin²θ/cos²θ) is not a uniform scale and
+    is not the monotone exp(−B k²) of Biso — the varied |F|² across reflections
+    breaks the degeneracy.  The pairwise guard therefore correctly stays quiet;
+    the risk is real only in the degenerate few-reflection limit, which is why
+    the staged plan still refines Biso before extinction and keeps the guards
+    live (see also the does-no-harm acceptance tests on real data)."""
+    from pxrdref import Instrument
+    from pxrdref.model.forward import compile_model
+    from pxrdref.optimize.least_squares import run_least_squares
+    from pxrdref.params.vector import ParameterTable
+    from pxrdref.strategy.staged import check_guards
+    from tests.test_schemas import make_lab6
+
+    pattern = _synthesize_extinct_lab6(2.5)
+    structure = make_lab6()
+    structure.phases[0].scale.value = 5e-3
+    structure.phases[0].extinction.value = 1.0
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.profile.w.value = 9e-3
+
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    table.set_vary(["phases.0.extinction", "phases.0.scale",
+                    "phases.0.atoms.*.biso"], True)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    outcome = run_least_squares(model, table, max_iter=60)
+
+    free = table.free_paths
+    ie = free.index("phases.0.extinction")
+    corr = np.asarray(outcome.correlation)
+    worst = max(abs(corr[ie, j]) for j in range(len(free)) if j != ie)
+    assert worst < 0.5, f"extinction should be identifiable here, |ρ|max={worst:.2f}"
+
+    # and the pairwise guard (even at a lenient 0.8) flags nothing spurious
+    guard = check_guards(table, outcome, threshold=0.8)
+    assert not any("extinction" in c for c in guard.high_correlations)
