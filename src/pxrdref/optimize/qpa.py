@@ -36,36 +36,41 @@ from ..crystallography.symmetry import expand_positions, get_spacegroup
 from ..schemas.results import PhaseQuantity, QuantitativePhaseAnalysis
 from ..schemas.structure import Structure
 
-_ELEMENT_RE = re.compile(r"^([A-Za-z]{1,2})")
+_ELEMENT_RE = re.compile(r"^([A-Za-z]+)")
 
 
 def element_symbol(species: str) -> str:
     """Element symbol from a scattering-species string (``"Fe3+"`` → ``"Fe"``).
 
-    Mirrors the leading-element parse in
-    :func:`crystallography.scattering.normalize_species`; the ionic charge is
+    Takes the leading alphabetic run, then resolves it to a real element by
+    trying the two-letter prefix before the one-letter one against gemmi's
+    table.  A plain greedy two-letter parse mis-reads the valence-labelled
+    species that are legal Waasmaier-Kirfel keys — ``"Cval"`` would become the
+    non-element ``"Cv"``; here it falls back to ``"C"``, while ``"Siva"`` →
+    ``"Si"`` and ``"Fe3+"`` → ``"Fe"`` resolve directly.  The ionic charge is
     irrelevant to the atomic mass.
     """
     m = _ELEMENT_RE.match(species.strip())
     if m is None:
         raise ValueError(f"cannot parse an element from species {species!r}")
-    return m.group(1).capitalize()
+    letters = m.group(1)
+    for n in (2, 1):
+        if len(letters) >= n:
+            candidate = letters[:n].capitalize()
+            if gemmi.Element(candidate).atomic_number != 0:
+                return candidate
+    raise ValueError(f"unrecognised element in species {species!r}")
 
 
 def atomic_weight(species: str) -> float:
     """Standard atomic weight (g/mol) for a scattering species, via gemmi.
 
-    gemmi carries the IUPAC standard atomic weights; an unrecognised symbol
-    maps to gemmi's placeholder element "X" (atomic number 0, weight 1.0),
-    which we surface as an error rather than a silently near-unit mass (a
-    wrong-mass phase would poison the whole QPA ratio).
+    gemmi carries the IUPAC standard atomic weights.  :func:`element_symbol`
+    has already rejected any symbol gemmi maps to its placeholder element "X"
+    (atomic number 0, weight 1.0), so a wrong-mass phase can never silently
+    poison the QPA ratio.
     """
-    sym = element_symbol(species)
-    element = gemmi.Element(sym)
-    if element.atomic_number == 0:
-        raise ValueError(
-            f"unrecognised element {sym!r} (from species {species!r})")
-    return float(element.weight)
+    return float(gemmi.Element(element_symbol(species)).weight)
 
 
 @dataclass(frozen=True)
@@ -107,20 +112,31 @@ def _formula_units(element_counts: dict[str, float], *, tol: float = 0.02) -> in
 
 
 def phase_zmv(space_group: str, cell: tuple[float, float, float, float, float, float],
-              atoms) -> ZMV:
+              atoms, multiplicities=None) -> ZMV:
     """Z·M·V factors for one phase.
 
     ``atoms`` is an iterable of ``(species, x, y, z, occ)`` for the
     asymmetric-unit atoms; each atom's cell contribution is
-    ``occ · multiplicity``, the multiplicity being the orbit length under the
-    space group (:func:`crystallography.symmetry.expand_positions`).
+    ``occ · multiplicity``.
+
+    ``multiplicities`` (one per atom, in order) supplies the site
+    multiplicities directly — pass the counts frozen on the compiled model
+    (``len(PhaseSites.ops[j][0])``) so QPA uses exactly the orbit the forward
+    model used.  When omitted they are recomputed from the coordinates via
+    :func:`crystallography.symmetry.expand_positions`; that path must only be
+    fed coordinates that are genuinely on their site, because an atom refined
+    to within the dedup tolerance of a special position would otherwise
+    collapse its orbit and mis-weigh the cell.
     """
-    sg = get_spacegroup(space_group)
+    sg = get_spacegroup(space_group) if multiplicities is None else None
     volume = cell_volume(*cell)
     cell_mass = 0.0
     element_counts: dict[str, float] = {}
-    for species, x, y, z, occ in atoms:
-        multiplicity = len(expand_positions(sg, np.array([x, y, z], dtype=np.float64)))
+    for idx, (species, x, y, z, occ) in enumerate(atoms):
+        if multiplicities is not None:
+            multiplicity = int(multiplicities[idx])
+        else:
+            multiplicity = len(expand_positions(sg, np.array([x, y, z], dtype=np.float64)))
         count = float(occ) * multiplicity
         cell_mass += count * atomic_weight(species)
         sym = element_symbol(species)
@@ -144,16 +160,22 @@ def weight_fractions(k, scales, scale_cov=None):
     Returns ``(W, sigma_corr, sigma_indep)`` where ``sigma_indep`` uses only
     the covariance diagonal — the naïve independent-scale propagation, returned
     so callers can show that the correlated path genuinely differs.  Both esds
-    are ``None`` when ``scale_cov`` is ``None``.
+    are ``None`` when ``scale_cov`` is ``None`` or carries no variance (no scale
+    was freed) — an all-zero block is absence of information, not σ(W) = 0.
     """
     k = np.asarray(k, dtype=np.float64)
     scales = np.asarray(scales, dtype=np.float64)
     a = scales * k
     total = a.sum()
+    if total <= 0.0:
+        raise ValueError("phase scales give a non-positive scaled total "
+                         f"(Σ S·ZMV = {total}); cannot form weight fractions")
     w = a / total
     if scale_cov is None:
         return w, None, None
     cov = np.asarray(scale_cov, dtype=np.float64)
+    if not np.any(cov):
+        return w, None, None
     jac = (np.diag(k) - np.outer(w, k)) / total
     cov_w = jac @ cov @ jac.T
     sigma_corr = np.sqrt(np.maximum(np.diag(cov_w), 0.0))
@@ -163,12 +185,16 @@ def weight_fractions(k, scales, scale_cov=None):
 
 
 def compute_qpa(structure: Structure, values: dict[str, float],
-                scale_cov=None) -> QuantitativePhaseAnalysis:
+                scale_cov=None, multiplicities=None) -> QuantitativePhaseAnalysis:
     """Assemble the per-phase QPA rows from a decoded parameter dict.
 
     ``values`` is the physical value dict from ``ParameterTable.decode`` (refined
     cell, occupancies and scales); ``scale_cov`` is the physical covariance of
     the phase scales in phase order (``None`` when no esds were estimated).
+    ``multiplicities`` (one list per phase, one entry per atom) should be the
+    site multiplicities frozen on the compiled model, so QPA counts the same
+    orbits the forward model did rather than re-deriving them from refined
+    coordinates that may have drifted near a special position.
     """
     zmvs, scales = [], []
     for ip, phase in enumerate(structure.phases):
@@ -179,7 +205,8 @@ def compute_qpa(structure: Structure, values: dict[str, float],
                   values[f"{base}.atoms.{j}.x"], values[f"{base}.atoms.{j}.y"],
                   values[f"{base}.atoms.{j}.z"], values[f"{base}.atoms.{j}.occ"])
                  for j, atom in enumerate(phase.atoms)]
-        zmvs.append(phase_zmv(phase.space_group, cell, atoms))
+        mult = multiplicities[ip] if multiplicities is not None else None
+        zmvs.append(phase_zmv(phase.space_group, cell, atoms, multiplicities=mult))
         scales.append(values[f"{base}.scale"])
     w, sigma_corr, _ = weight_fractions([z.zmv for z in zmvs], scales, scale_cov)
     rows = [

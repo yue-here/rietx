@@ -644,7 +644,11 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         scale_cov = (table.physical_covariance(theta, stderr_internal, correlation,
                                                 scale_paths)
                      if stderr_internal is not None else None)
-        qpa = compute_qpa(structure, values, scale_cov)
+        # Site multiplicities frozen on the compiled model (never re-derived
+        # from refined coordinates, which could have drifted near a special
+        # position and collapsed an orbit).
+        multiplicities = [[len(op[0]) for op in cp.sites.ops] for cp in model.phases]
+        qpa = compute_qpa(structure, values, scale_cov, multiplicities)
 
     return RefinementResult(
         status=status, mode=mode,

@@ -118,3 +118,22 @@ independent-scale propagation (assert the correlated path is being used).
 - **Next**: 0304 unblocks 0305 (Brindley), 0309 (QPA table export) and 0310
   (round-robin acceptance). `compute_qpa` returns the typed object 0309 will
   tabulate and 0305 will adjust in place.
+- **2026-07-23 — review follow-up** (multi-angle code review). Fixed:
+  1. **Multiplicities are now taken frozen from the compiled model**
+     (`len(PhaseSites.ops[j][0])`) instead of re-running `expand_positions` on
+     *refined* coordinates. An atom refined within the ~1e-4 dedup tolerance of
+     a special position was collapsing its orbit (verified: (0.49996, ½, ½) in
+     P m -3 m gave mult 1 not 6), mis-weighing the cell and every W. `phase_zmv`
+     keeps the coordinate path for standalone/ideal-coord use (the ZMV unit
+     tests); `compute_qpa`/`_build_result` pass the frozen counts.
+  2. **`element_symbol` valence fallback.** A greedy 2-letter parse read the
+     Waasmaier-Kirfel valence key `"Cval"` as the non-element `"Cv"` and crashed
+     `_build_result` after a good fit; now tries the 2- then 1-letter prefix
+     against gemmi (`"Cval"`→C, `"Siva"`→Si, `"Fe3+"`→Fe).
+  3. **σ(W) degeneracy.** `weight_fractions` returns `None` esds for an all-zero
+     scale block (no scale freed ⇒ absence of information, not σ(W)=0) and
+     raises on a non-positive scaled total instead of emitting NaN.
+  4. Two-phase test now asserts the *wired* σ(W) differs from the naive
+     independent propagation from σ(S) alone (proves the correlated block is
+     used end-to-end), and unit tests cover the valence species + degenerate
+     covariance. Fast+slow suites green, ruff clean.

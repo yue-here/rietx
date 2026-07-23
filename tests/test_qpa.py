@@ -59,6 +59,13 @@ def test_atomic_weight_strips_charge():
         atomic_weight("Zz")
 
 
+def test_atomic_weight_valence_species():
+    # Waasmaier-Kirfel valence keys: a greedy 2-letter parse would read "Cval"
+    # as the non-element "Cv"; the fallback must resolve C and Si.
+    assert math.isclose(atomic_weight("Cval"), 12.011, abs_tol=0.1)
+    assert math.isclose(atomic_weight("Siva"), 28.085, abs_tol=0.1)
+
+
 def test_zmv_lab6():
     phase = make_lab6().phases[0]
     zmv = phase_zmv(phase.space_group, phase.cell.lengths_angles(), _atoms(phase))
@@ -94,6 +101,19 @@ def test_weight_fractions_no_covariance():
     w, sc, si = weight_fractions([100.0, 100.0], [3.0, 1.0])
     assert np.allclose(w, [0.75, 0.25])
     assert sc is None and si is None
+
+
+def test_weight_fractions_zero_covariance_reports_none():
+    # An all-zero scale block (no scale was freed) is absence of information,
+    # not σ(W) = 0.
+    w, sc, si = weight_fractions([100.0, 100.0], [1.0, 1.0], np.zeros((2, 2)))
+    assert np.allclose(w, [0.5, 0.5])
+    assert sc is None and si is None
+
+
+def test_weight_fractions_zero_scales_raises():
+    with pytest.raises(ValueError):
+        weight_fractions([100.0, 100.0], [0.0, 0.0], np.eye(2))
 
 
 def test_weight_fractions_correlated_differs_from_independent():
@@ -189,14 +209,16 @@ def test_two_phase_synthetic_qpa():
     tt = np.arange(15.0, 90.0, 0.02)
     blank = PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
     model = compile_model(truth, ins, blank, mode="rietveld")
-    y = model.evaluate(ParameterTable(truth, ins).decode(ParameterTable(truth, ins).x0()))
+    table = ParameterTable(truth, ins)
+    y = model.evaluate(table.decode(table.x0()))
     y = np.random.default_rng(3).poisson(np.maximum(y, 1.0)).astype(float)
     data = PatternData(two_theta=tt.tolist(), intensity=y.tolist())
 
     # refine from perturbed scales (both start equal) and a slightly-off cell
     start, start_ins = _two_phase_truth(la_scale=1e-3, caf2_scale=1e-3)
     start.phases[0].cell.a.value += 0.01
-    result = Refinement(start, start_ins).fit(data, plan="mccusker_default")
+    ref = Refinement(start, start_ins)
+    result = ref.fit(data, plan="mccusker_default")
 
     assert result.status == "converged"
     assert result.qpa is not None and len(result.qpa.phases) == 2
@@ -210,6 +232,18 @@ def test_two_phase_synthetic_qpa():
         # for the single noisy realisation) — and never wildly off
         assert abs(row.weight_fraction - w_true[ip]) < 4 * row.weight_fraction_stderr
         assert abs(row.weight_fraction - w_true[ip]) < 0.03
+
+    # The wired σ(W) must come from the *correlated* scale block, not the naive
+    # independent propagation from σ(S) alone — the two scales correlate through
+    # the shared intensity/background, so the two must differ here.
+    fitted = ref.fitted_structure
+    k = np.array([phase_zmv(p.space_group, p.cell.lengths_angles(), _atoms(p)).zmv
+                  for p in fitted.phases])
+    scales = np.array([result.parameter(f"phases.{i}.scale").value for i in range(2)])
+    sig_s = np.array([result.parameter(f"phases.{i}.scale").stderr for i in range(2)])
+    _, sigma_indep, _ = weight_fractions(k, scales, np.diag(sig_s ** 2))
+    sigma_wired = np.array([r.weight_fraction_stderr for r in result.qpa.phases])
+    assert not np.allclose(sigma_wired, sigma_indep, rtol=1e-3)
 
     out = Path(__file__).parent / "output"
     out.mkdir(exist_ok=True)
