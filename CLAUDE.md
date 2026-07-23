@@ -7,8 +7,8 @@ core, pydantic v2 schemas, gemmi for CIF/symmetry. Import name: `pxrdref`.
 
 ```sh
 uv venv --python 3.12 && uv pip install -e ".[dev]"   # setup (once)
-.venv/bin/python -m pytest                             # full suite ~21 s, incl. real-data acceptance
-.venv/bin/python -m pytest -m "not slow"               # skip acceptance
+.venv/bin/python -m pytest                             # full suite ~2 min, incl. real-data acceptance
+.venv/bin/python -m pytest -m "not slow"               # skip acceptance (~20 s)
 .venv/bin/python -m ruff check src tests examples      # lint (must be clean)
 .venv/bin/python examples/nac_11bm.py                  # end-to-end demo + plot
 .venv/bin/pxrdref watch <live-dir>                     # live viewer for a LiveSession run
@@ -175,8 +175,11 @@ corrected fractions + µR fence when every phase carries `particle_radius_um`;
 integer hkl axis + softplus `r`, identity at r=1, analytic ∂P/∂r column, and a
 Layer-1 axis diagnostic on `FitReport.texture` that fits the full nonlinear
 P(r) — the linear template is degenerate in high-symmetry crystals);
-multi-histogram, exporters and the SRM 676a acceptance remain. v2 fence: FPA,
-neutron/TOF, spherical-harmonics texture, MCP server.
+the v0.3 acceptance (WP-0310) is measured and recorded in
+`docs/milestones/v0.3.md` — SRM 676a cell anchor via c/a (+30 ppm) plus the
+IUCr QPA round robin with participant-spread-referenced tolerances; only
+multi-histogram (0308) and exporters (0309) remain before the milestone row
+flips. v2 fence: FPA, neutron/TOF, spherical-harmonics texture, MCP server.
 
 Key test data (provenance + every reference value in `tests/data/README.md`):
 - `11BM_NAC.fxye` — APS 11-BM synchrotron, λ=0.4139090 from the .prm; NAC +
@@ -187,3 +190,9 @@ Key test data (provenance + every reference value in `tests/data/README.md`):
 - `FAP.XRA` + `FAP.EXP` — GSAS-II LabData tutorial fluorapatite; the `.EXP` is
   GSAS's converged fit and supplies both the reference values and the protocol
   the test mirrors. **Cross-code consistency** check (±300 ppm), not truth.
+- `qarr/*.prn` — IUCr CPD QPA round-robin patterns (samples 1a-1h, 2, 4 + six
+  pure phases; plain 2-column ASCII, Cu Kα doublet, graphite diffracted-beam
+  mono). QPA truth is the **weighed composition**; tolerances referenced to
+  the published participant spread, never to σ(W). `corundum.prn` doubles as
+  the SRM 676a cell-anchor specimen (c/a is the certificate-grade assertion;
+  absolute axes carry lab d-scale systematics).

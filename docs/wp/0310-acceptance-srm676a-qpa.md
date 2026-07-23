@@ -1,6 +1,6 @@
 # WP-0310 — v0.3 acceptance: SRM 676a corundum + IUCr QPA round robin
 
-Milestone: v0.3 · Status: 🔶 in progress
+Milestone: v0.3 · Status: ✅ done 2026-07-24
 Depends on: WP-0304, WP-0305
 
 ## Goal
@@ -54,16 +54,20 @@ this repo plots.
 
 - [x] Acquire SRM 676a corundum + IUCr round-robin sample data; record
       provenance, licence and every reference value in `tests/data/README.md`
-- [ ] `tests/test_acceptance_srm676a.py`: corundum QPA against the certified
+- [x] `tests/test_acceptance_srm676a.py`: corundum QPA against the certified
       values, tolerance from the certificate's stated uncertainty
-- [ ] `tests/test_acceptance_qpa_roundrobin.py`: round-robin mixtures against
+- [x] `tests/test_acceptance_qpa_roundrobin.py`: round-robin mixtures against
       the weighed compositions, tolerance referenced to the published
       participant spread
-- [ ] Both marked `slow`, both writing PNGs to `tests/output/`
-- [ ] Record the measured results in `docs/milestones/v0.3.md` (create it),
+- [x] Both marked `slow`, both writing PNGs to `tests/output/`
+- [x] Record the measured results in `docs/milestones/v0.3.md` (create it),
       including what is **not** met and why — the v0.2 records are the model
       for how honest that section has to be
-- [ ] Flip the v0.3 row in [../ROADMAP.md](../ROADMAP.md) when green
+- [x] Flip the v0.3 row in [../ROADMAP.md](../ROADMAP.md) when green — set to
+      🔶 "acceptance measured", not ✅: WP-0308/0309 are in the v0.3 scope and
+      still open, and shipping the milestone without them would be the quiet
+      scope-relaxation this repo rejects (decision recorded in the milestone
+      doc; flip to ✅ when they land)
 
 ## Acceptance
 
@@ -109,3 +113,25 @@ convention) rather than absorbed into a widened band.
   explicit open licence — flagged in the README; confirm vendoring is OK before
   publishing. *Next:* write a `.prn`/`.cpi` reader, then the two acceptance
   tests (`test_acceptance_srm676a.py`, `test_acceptance_qpa_roundrobin.py`).
+- **2026-07-24** — **done; WP complete.** *Done:* both acceptance suites
+  committed and green (13 tests, all `slow` except the fast `.prn` reader
+  check), measured record in `docs/milestones/v0.3.md`, ROADMAP synced,
+  CLAUDE.md updated. Measured highlights: SRM 676a c/a **+30 ppm** vs
+  certificate (absolute axes −313/−283 ppm — uniform d-scale, asserted as
+  such); sample-1 worst 5.1 wt % with the zincite-low/corundum-high shape
+  asserted as a characterised systematic; sample 2 worst 2.9 wt % with
+  brucite March-Dollase r = 0.67; sample 4 reproduces the designed Brindley
+  failure with the µR fence firing (no accuracy band claimed). *Gotchas:*
+  (1) no `.prn` reader was needed — the CPD "col" format is plain two-column
+  ASCII and the generic xy reader covers it (the 2026-07-23 entry's "needs a
+  reader" was wrong); cpd-1e has 7-char-truncated ordinates ("8.059999"), so
+  grid-uniformity checks need atol ≈ 1e-5. (2) gemmi resolves bare
+  `F d -3 m` / `I 41/a m d` to **origin choice 1** — magnetite/zircon carry
+  explicit `:2`. (3) Softplus sample-broadening terms starting at exactly 0
+  never move without `Stage(seed=…)` (dead softplus gradient — bit me before
+  I remembered the extinction-stage precedent). (4) Brucite's H must stay in
+  the model (3.5 % of molar mass ⇒ ZMV bias if dropped) with Biso *held* —
+  freed, it pins at the 25 Å² bound. (5) The v0.3 ROADMAP row is 🔶
+  "acceptance measured", not ✅ — WP-0308/0309 are in-scope and open; flip to
+  ✅ when they land. (6) Full suite now ~2 min (was ~21 s); `-m "not slow"`
+  stays fast.

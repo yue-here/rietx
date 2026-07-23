@@ -27,18 +27,17 @@ a work session loads only what it needs:
 
 ## Current focus
 
-**v0.3** — WP-0301 through WP-0308 are done (site-constraint machinery covers
-coordinates *and* aniso ADPs; QPA weight fractions land off
-`RefinementResult.qpa`, now with the Brindley microabsorption correction and
-its µR fence; Pawley whole-pattern mode; March-Dollase preferred orientation
-with an analytic ∂P/∂r column and a Layer-1 axis diagnostic on
-`FitReport.texture`; multi-histogram joint refinement — `MultiHistogramRefinement`
-/ `refine_multi`, shared structure + N instruments over a stacked residual with
-per-histogram Rwp on `RefinementResult.histograms`). Next: any ⬜ WP with no
-unmet dependency — [0309](wp/0309-exporters.md), and the v0.3 acceptance
-[0310](wp/0310-acceptance-srm676a-qpa.md) (🔶 in progress — SRM 676a certified
-values + the IUCr round-robin patterns are now in `tests/data/qarr/`; still needs
-a `.prn`/`.cpi` reader and the two acceptance tests).
+**v0.3** — WP-0301 through WP-0308 and the acceptance WP-0310 are done
+(site-constraint machinery covers coordinates *and* aniso ADPs; QPA weight
+fractions land off `RefinementResult.qpa`, now with the Brindley
+microabsorption correction and its µR fence; Pawley whole-pattern mode;
+March-Dollase preferred orientation with an analytic ∂P/∂r column and a
+Layer-1 axis diagnostic on `FitReport.texture`; multi-histogram joint
+refinement — `MultiHistogramRefinement` / `refine_multi`, shared structure + N
+instruments over a stacked residual with per-histogram Rwp on
+`RefinementResult.histograms`; the v0.3 acceptance is measured and recorded in
+[milestones/v0.3.md](milestones/v0.3.md)). Next: [0309](wp/0309-exporters.md) —
+the last open WP; the milestone row flips to ✅ when it lands.
 
 ## Milestones
 
@@ -46,7 +45,7 @@ a `.prn`/`.cpi` reader and the two acceptance tests).
 |---|---|---|---|
 | v0.1 | Vertical slice: synchrotron CW, Rietveld + Le Bail | ✅ **shipped** ([record](milestones/v0.1.md)) | 11-BM NAC: a = 10.251285(12) Å, Rwp 9.2%, CaF₂ impurity auto-flagged |
 | v0.2 | Lab diffractometer + FitReport attribution + viz | ✅ **shipped 2026-07-22** ([record](milestones/v0.2.md)) | SRM 660c LaB6: a = 4.156895(25) Å (+28 ppm vs NIST value for this dataset, Bérar-Lelann-inflated esd), Rwp 8.7%; GSAS-II FAP tutorial: Rwp 9.73% vs GSAS's 10.05% on identical channels, cell +116 ppm (uniform d-scale convention offset) |
-| v0.3 | Multi-phase QPA, Pawley, aniso ADPs, multi-histogram | ⬜ | SRM 676a / IUCr QPA round-robin fractions |
+| v0.3 | Multi-phase QPA, Pawley, aniso ADPs, multi-histogram | 🔶 acceptance measured 2026-07-24 ([record](milestones/v0.3.md)); WP-0309 remains | SRM 676a corundum: c/a +30 ppm vs certificate (absolute axes −313/−283 ppm, uniform d-scale); IUCr round robin: sample-1 worst 5.1 wt% (traces ≤1.3), sample 2 worst 2.9 wt% with brucite March-Dollase r=0.67, sample 4 characterised as the designed Brindley failure (µR fence fires) |
 | v0.4 | JAX backend: autodiff Jacobians, CUDA, mixed precision | ⬜ | cross-backend Jacobian agreement CI |
 | v0.5 | Corrections & microstructure (absorption, Stephens, f′f″) | ⬜ | capillary/absorption vs GSAS-II consistency |
 | v0.6 | TOPAS-style bounded LM, agent surface, torch-MPS | ⬜ | solver benchmark vs scipy TRF |
@@ -68,7 +67,7 @@ a `.prn`/`.cpi` reader and the two acceptance tests).
 | [0307](wp/0307-march-dollase.md) | March-Dollase preferred orientation | ✅ 2026-07-23 | — |
 | [0308](wp/0308-multi-histogram.md) | Multi-histogram stacked residuals | ✅ 2026-07-24 | — |
 | [0309](wp/0309-exporters.md) | Exporters: reflection table, CIF+esds (structure side landed in 0303), QPA table | ⬜ | 0304 |
-| [0310](wp/0310-acceptance-srm676a-qpa.md) | Acceptance: SRM 676a + IUCr QPA round robin | 🔶 | 0304, 0305 |
+| [0310](wp/0310-acceptance-srm676a-qpa.md) | Acceptance: SRM 676a + IUCr QPA round robin | ✅ 2026-07-24 | 0304, 0305 |
 
 ### v0.4 — differentiable backend (stubs; expand before starting)
 

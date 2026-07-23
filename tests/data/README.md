@@ -59,9 +59,16 @@ diffracted-beam Soller slits; diffracted-beam **curved graphite monochromator**;
 proportional counter. Step scan 5–150° 2θ at 0.02°, 3 s/step (7251 points).
 Radiation is the Cu Kα doublet — the Sietronics `.cpi` header records
 λ = 1.54056 Å (Kα1); the diffracted-beam graphite monochromator removes Kβ but
-passes the Kα1/Kα2 doublet, so model with λ(Kα1) = 1.540560 Å,
-λ(Kα2) = 1.544390 Å. The `.prn` files carry raw counts only (no esd column →
-Poisson √max(y,1) weights per the CLAUDE.md weighting invariant).
+passes the Kα1/Kα2 doublet. The acceptance tests model it on the
+**NIST/Hölzer wavelength scale** (1.5405929/1.5444274 Å — what the `CuKa`
+preset ships): the SRM 676a certificate anchor lives on that scale, and the
+`.cpi` header's 1.54056 is the same emission line quoted at its older nominal
+value (a 22 ppm d-scale choice that would map straight onto the cell being
+compared). The `.prn` files are plain two-column ASCII (2θ°, counts) — the
+generic xy reader handles them, locked in by
+`test_acceptance_qpa_roundrobin.test_read_prn_two_column_ascii`; raw counts
+only (no esd column → Poisson √max(y,1) weights per the CLAUDE.md weighting
+invariant).
 
 **Round-robin weighed compositions** — the QPA "truth" the acceptance checks
 against (mass %, from the CPD "Weighed and Measured Values" page, released
