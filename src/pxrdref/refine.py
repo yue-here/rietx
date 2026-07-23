@@ -724,9 +724,9 @@ def _restore_lebail(states: list[ReflectionState], model: CompiledModel) -> None
         _scatter_lebail(lookup, model.phases[state.phase_index])
 
 
-#: a Pawley overlap group is reported unresolved when the best-determined
-#: member still carries a relative esd above this — the data cannot apportion
-#: the intensity even though their sum is fixed
+#: a Pawley overlap group is reported unresolved when *any* member carries a
+#: relative esd above this — that reflection's intensity is not apportioned by
+#: the data even though the group sum is fixed
 PAWLEY_UNRESOLVED_REL = 0.3
 
 
@@ -741,9 +741,10 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
 
     The summed intensity of an overlapped group is determined; its partition is
     not, and the equal-split restraint leaves that ambiguity visible as a large
-    per-reflection esd.  A group is reported when *every* member's relative esd
-    exceeds :data:`PAWLEY_UNRESOLVED_REL` — i.e. no member is pinned by the data
-    — so the caller never presents a confidently-wrong split.
+    per-reflection esd.  A group is reported when *any* member's relative esd
+    exceeds :data:`PAWLEY_UNRESOLVED_REL` — a reflection the data cannot pin is a
+    confident-wrong-singleton risk even when a stronger neighbour in the same
+    group is well determined, so flagging the whole group is the safe report.
     """
     pb = model.pawley
     if pb is None or pb.stderr is None or not pb.groups:
@@ -754,8 +755,8 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
         inten = intens[list(g)]
         sd = np.asarray(pb.stderr)[list(g)]
         rel = sd / np.maximum(np.abs(inten), 1e-10)
-        if float(np.min(rel)) < PAWLEY_UNRESOLVED_REL:
-            continue  # at least one member is well determined — treat as split
+        if float(np.max(rel)) < PAWLEY_UNRESOLVED_REL:
+            continue  # every member is pinned by the data — the split is real
         labels = []
         for gi in g:
             ip, k = _pawley_locate(pb, gi)
@@ -765,9 +766,9 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
         out.append(Diagnostic(
             level="info", code="PAWLEY_OVERLAP_UNRESOLVED", where=labels,
             message=(f"{len(g)} reflections overlap too strongly to split: their "
-                     f"summed intensity ({total:.4g}) is determined but the "
-                     f"individual values are not (relative esd ≥ "
-                     f"{float(np.min(rel)):.0%})"),
+                     f"summed intensity ({total:.4g}) is determined but at least "
+                     f"one individual value is not (relative esd up to "
+                     f"{float(np.max(rel)):.0%})"),
             suggestion="treat the group's summed intensity as the datum; the "
                        "per-reflection split is not resolved by these data",
         ))
