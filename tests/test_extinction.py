@@ -172,6 +172,73 @@ def test_forward_ext_attenuates_strong_reflections_only():
         assert ratio[weak].min() > 0.995, "weak reflections barely change"
 
 
+# -- analytic Jacobian (the hidden-Jacobian guard) ---------------------
+
+
+def test_jacobian_dof_adp_extinction_columns_match_fd_with_extinction_on():
+    """With ext ≠ 0 the analytic coordinate/ADP columns must carry the
+    G = E + x·dE/dx chain factor; the extinction column itself rides the
+    peak-chain FD path.  All are checked against a full-model finite
+    difference.  ext is large here so G departs from 1 by ~10-30% — without
+    the factor the dof/adp columns would miss by far more than the tolerance
+    (that is the hidden-Jacobian bug this test exists to catch)."""
+    from pxrdref import Instrument, PatternData
+    from pxrdref.crystallography.lattice import cell_volume, d_spacings
+    from pxrdref.crystallography.structure_factor import structure_factors_squared
+    from pxrdref.model.forward import compile_model
+    from pxrdref.optimize.least_squares import _make_jacobian, _make_residual
+    from pxrdref.params.vector import ParameterTable
+    from tests.test_aniso_adp import make_aniso_rutile
+
+    structure = make_aniso_rutile()
+    structure.phases[0].scale.value = 1e-3
+    structure.phases[0].extinction.value = 2.0  # large ⇒ |G − 1| ≫ tolerance
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.profile.w.value = 1e-2
+    grid = np.arange(10.0, 90.0, 0.02)
+    pattern = PatternData(two_theta=grid.tolist(), intensity=np.zeros_like(grid).tolist())
+
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    free = ["phases.0.extinction", "phases.0.atoms.1.dof.0",
+            "phases.0.atoms.0.adp.0", "phases.0.atoms.0.adp.1",
+            "phases.0.atoms.1.adp.0", "phases.0.scale", "phases.0.cell.a"]
+    for p in free:
+        assert table.set_vary([p], True), p
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    values = table.decode(table.x0())
+
+    # G must genuinely differ from 1 (so the test discriminates) but no
+    # reflection may cross the x=1 branch discontinuity (FD breaks there)
+    cp = model.phases[0]
+    cell = tuple(values[f"phases.0.cell.{k}"] for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+    d = d_spacings(cp.reflections.hkl, *cell)
+    xyz, occ, biso, uaniso, astar = model._site_values(0, values, cell)
+    f2 = structure_factors_squared(cp.reflections.hkl, d, cp.sites, xyz, occ, biso, uaniso, astar)
+    lam0 = model.line_wavelengths[0]
+    tt0 = cp.reflections.two_theta(cell, lam0)
+    E, _, x = sabine_extinction_and_dx(f2, lam0, cell_volume(*cell), tt0,
+                                       values["phases.0.extinction"])
+    assert x.max() < 0.9, "extinction too strong — a reflection crosses x=1"
+    assert (1.0 - E).max() > 0.02, "extinction too weak — test would not discriminate"
+
+    theta = table.x0()
+    J = _make_jacobian(model, table)(theta)
+    residual = _make_residual(model, table)
+    r0 = residual(theta)
+    for c, path in enumerate(table.free_paths):
+        h = 1e-6 * max(1.0, abs(theta[c]))
+        tp = theta.copy()
+        tp[c] += h
+        col_fd = (residual(tp) - r0) / h
+        col_an = J[:, c]
+        scale = np.linalg.norm(col_fd)
+        assert scale > 0, f"{path}: dead FD column"
+        err = np.linalg.norm(col_an - col_fd) / scale
+        assert err < 5e-3, f"{path}: analytic vs FD mismatch ({err:.2e})"
+
+
 # -- identity when off -------------------------------------------------
 
 

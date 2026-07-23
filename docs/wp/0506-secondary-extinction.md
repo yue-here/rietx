@@ -102,10 +102,11 @@ guard).
       intensity in `phase_peaks` inside the line loop (guard `mode=="rietveld"`,
       Le Bail untouched); `V=cell_volume(*cell)` each call; bit-identical
       regression when `ext=0`.
-- [ ] **Analytic Jacobian chain** — add the `G = E + x·dE/dx` factor to the
+- [x] **Analytic Jacobian chain** — add the `G = E + x·dE/dx` factor to the
       `dof`/`adp` columns in `_structural_intensity_grad`; FD-agreement test
       with extinction **on** for `phases.*.extinction`, `dof`, and `adp`
-      columns.
+      columns (a negative control confirms the columns miss FD by ~6-8%
+      without G).
 - [x] **Param wiring** — `params/vector.py` `_collect` (next to `scale`) and
       `apply_to_models`; confirm `_STRUCTURAL_PATH` does not match
       `phases.N.extinction`; `set_vary(["phases.*.extinction"])` round-trip.
