@@ -91,6 +91,87 @@ def test_phase_extinction_defaults_off_and_round_trips():
     assert back.extinction.transform == "softplus"
 
 
+def test_extinction_param_wiring_and_routing():
+    """It enters θ under the ``phases.*.extinction`` glob, decodes back, and is
+    *not* matched by the structural (dof/adp) analytic-column regex — so it
+    rides the ordinary peak-chain FD column, not the structural one."""
+    from pxrdref import Instrument
+    from pxrdref.optimize.least_squares import _STRUCTURAL_PATH
+    from pxrdref.params.vector import ParameterTable
+    from tests.test_schemas import make_lab6
+
+    structure = make_lab6()
+    structure.phases[0].extinction.value = 0.004
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+    table.set_vary(["*"], False)
+    assert table.set_vary(["phases.*.extinction"], True) == ["phases.0.extinction"]
+    assert table.decode(table.x0())["phases.0.extinction"] == pytest.approx(0.004)
+    # the structural analytic path (dof/adp) must not claim this column
+    assert _STRUCTURAL_PATH.match("phases.0.extinction") is None
+
+
+# -- forward model integration -----------------------------------------
+
+
+def _lab6_model(ext: float):
+    """A compiled LaB6 model (heavy La ⇒ strong |F|², detectable extinction)."""
+    from pxrdref import Instrument, PatternData
+    from pxrdref.model.forward import compile_model
+    from pxrdref.params.vector import ParameterTable
+    from tests.test_schemas import make_lab6
+
+    structure = make_lab6()
+    structure.phases[0].scale.value = 5e-3
+    structure.phases[0].extinction.value = ext
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.profile.w.value = 1e-2
+    tt = np.arange(12.0, 120.0, 0.02)
+    pattern = PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    model = compile_model(structure, ins, pattern, mode="rietveld")
+    table = ParameterTable(structure, ins)
+    return model, table.decode(table.x0())
+
+
+def test_forward_ext_zero_is_the_extinction_free_formula():
+    """ext = 0 skips the multiply: the intensity is exactly scale·m·|F|²·w·Lp,
+    bit-identical to the pre-extinction model."""
+    from pxrdref.crystallography.lattice import d_spacings, two_theta_deg
+    from pxrdref.crystallography.structure_factor import structure_factors_squared
+    from pxrdref.model.corrections import lorentz_polarization
+
+    model, values = _lab6_model(ext=0.0)
+    cp = model.phases[0]
+    cell = tuple(values[f"phases.0.cell.{k}"] for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+    d = d_spacings(cp.reflections.hkl, *cell)
+    xyz, occ, biso, uaniso, astar = model._site_values(0, values, cell)
+    f2 = structure_factors_squared(cp.reflections.hkl, d, cp.sites, xyz, occ, biso, uaniso, astar)
+    base = values["phases.0.scale"] * cp.reflections.multiplicity * f2
+
+    peaks = model.phase_peaks(0, values)
+    for il, lam in enumerate(model.line_wavelengths):
+        w = values[f"instrument.source.lines.{il}.weight"]
+        tt = two_theta_deg(d, lam)
+        expected = base * w * lorentz_polarization(tt, values["instrument.polarization"])
+        assert np.array_equal(peaks[il][3], expected)  # bit-identical, no tolerance
+
+
+def test_forward_ext_attenuates_strong_reflections_only():
+    """Extinction removes intensity from the strong lines and leaves the weak
+    high-angle ones essentially untouched (x ∝ |F|²)."""
+    model0, v0 = _lab6_model(ext=0.0)
+    modelE, vE = _lab6_model(ext=1.0)  # large ⇒ clearly visible on the strong lines
+    i0 = model0.phase_peaks(0, v0)[0][3]
+    iE = modelE.phase_peaks(0, vE)[0][3]
+
+    ratio = iE / np.where(i0 > 0, i0, 1.0)
+    assert np.all(ratio <= 1.0 + 1e-12), "extinction must not amplify"
+    strong = i0 > 0.5 * i0.max()
+    weak = i0 < 1e-3 * i0.max()
+    assert ratio[strong].min() < 0.97, "a strong reflection should be attenuated"
+    if weak.any():
+        assert ratio[weak].min() > 0.995, "weak reflections barely change"
+
+
 # -- identity when off -------------------------------------------------
 
 

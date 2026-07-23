@@ -98,7 +98,7 @@ guard).
       `sabine_extinction_and_dx`) + unit tests: identity at 0, monotonicity
       (E ≤ 1, ∂E/∂ext ≤ 0), angular limits, and a GSAS-II golden covering both
       Laue branches and the Xpol prefactor to ~1e-10.
-- [ ] **Forward hook** — fold `sabine_extinction(...)` into the Rietveld
+- [x] **Forward hook** — fold `sabine_extinction(...)` into the Rietveld
       intensity in `phase_peaks` inside the line loop (guard `mode=="rietveld"`,
       Le Bail untouched); `V=cell_volume(*cell)` each call; bit-identical
       regression when `ext=0`.
@@ -106,7 +106,7 @@ guard).
       `dof`/`adp` columns in `_structural_intensity_grad`; FD-agreement test
       with extinction **on** for `phases.*.extinction`, `dof`, and `adp`
       columns.
-- [ ] **Param wiring** — `params/vector.py` `_collect` (next to `scale`) and
+- [x] **Param wiring** — `params/vector.py` `_collect` (next to `scale`) and
       `apply_to_models`; confirm `_STRUCTURAL_PATH` does not match
       `phases.N.extinction`; `set_vary(["phases.*.extinction"])` round-trip.
 - [ ] **Staged-plan slot** — `Stage("extinction", ["phases.*.extinction"])`

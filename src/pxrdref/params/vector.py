@@ -126,6 +126,7 @@ class ParameterTable:
                 else:
                     self._add(f"{base}.cell.{name}", p)
             self._add(f"{base}.scale", phase.scale)
+            self._add(f"{base}.extinction", phase.extinction)
             self._add(f"{base}.lor_size", phase.lor_size)
             self._add(f"{base}.lor_strain", phase.lor_strain)
             self._add(f"{base}.gauss_size", phase.gauss_size)
@@ -433,6 +434,7 @@ class ParameterTable:
             for name in ("a", "b", "c", "alpha", "beta", "gamma"):
                 put(getattr(phase.cell, name), f"{base}.cell.{name}")
             put(phase.scale, f"{base}.scale")
+            put(phase.extinction, f"{base}.extinction")
             put(phase.lor_size, f"{base}.lor_size")
             put(phase.lor_strain, f"{base}.lor_strain")
             put(phase.gauss_size, f"{base}.gauss_size")
