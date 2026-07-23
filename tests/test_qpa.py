@@ -5,13 +5,25 @@ La 138.905, B 10.811, Ca 40.078, F 18.998 g/mol.
 """
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
 
-from pxrdref import Atom, Cell, Parameter, Phase
+from pxrdref import (
+    Atom,
+    Cell,
+    Instrument,
+    Parameter,
+    PatternData,
+    Phase,
+    Refinement,
+)
+from pxrdref.model.forward import compile_model
 from pxrdref.optimize.qpa import atomic_weight, phase_zmv, weight_fractions
+from pxrdref.params.vector import ParameterTable
 from pxrdref.schemas.common import Provenance
+from pxrdref.schemas.instrument import BackgroundChebyshev
 from pxrdref.schemas.results import (
     PhaseQuantity,
     QuantitativePhaseAnalysis,
@@ -142,3 +154,63 @@ def test_result_with_qpa_round_trip():
         status="converged", mode="rietveld", parameters=[], statistics=stats,
         provenance=Provenance(package_version="test"), qpa=_qpa_fixture())
     assert RefinementResult.model_validate_json(result.model_dump_json()) == result
+
+
+# -- two-phase synthetic acceptance --------------------------------------
+
+_WAVELENGTH = 1.5406
+
+
+def _two_phase_truth(la_scale: float, caf2_scale: float):
+    structure = make_lab6()
+    structure.phases[0].scale.value = la_scale
+    caf2 = _caf2_phase()
+    caf2.scale.value = caf2_scale
+    structure.phases.append(caf2)
+    ins = Instrument.debye_scherrer(wavelength=_WAVELENGTH)
+    ins.profile.w.value = 3e-3
+    ins.background = BackgroundChebyshev(
+        coefficients=[Parameter(value=v) for v in (30.0, -4.0, 1.0)])
+    return structure, ins
+
+
+def _true_weight_fractions(structure) -> np.ndarray:
+    k = np.array([phase_zmv(p.space_group, p.cell.lengths_angles(), _atoms(p)).zmv
+                  for p in structure.phases])
+    s = np.array([p.scale.value for p in structure.phases])
+    a = s * k
+    return a / a.sum()
+
+
+def test_two_phase_synthetic_qpa():
+    truth, ins = _two_phase_truth(la_scale=6e-4, caf2_scale=4e-4)
+    w_true = _true_weight_fractions(truth)
+
+    tt = np.arange(15.0, 90.0, 0.02)
+    blank = PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    model = compile_model(truth, ins, blank, mode="rietveld")
+    y = model.evaluate(ParameterTable(truth, ins).decode(ParameterTable(truth, ins).x0()))
+    y = np.random.default_rng(3).poisson(np.maximum(y, 1.0)).astype(float)
+    data = PatternData(two_theta=tt.tolist(), intensity=y.tolist())
+
+    # refine from perturbed scales (both start equal) and a slightly-off cell
+    start, start_ins = _two_phase_truth(la_scale=1e-3, caf2_scale=1e-3)
+    start.phases[0].cell.a.value += 0.01
+    result = Refinement(start, start_ins).fit(data, plan="mccusker_default")
+
+    assert result.status == "converged"
+    assert result.qpa is not None and len(result.qpa.phases) == 2
+    fractions = {row.name: row for row in result.qpa.phases}
+    assert math.isclose(sum(r.weight_fraction for r in result.qpa.phases), 1.0, abs_tol=1e-9)
+
+    for ip, name in enumerate(("LaB6", "CaF2")):
+        row = fractions[name]
+        assert row.weight_fraction_stderr is not None and row.weight_fraction_stderr > 0
+        # recovered fraction within the propagated σ (with a modest multiplier
+        # for the single noisy realisation) — and never wildly off
+        assert abs(row.weight_fraction - w_true[ip]) < 4 * row.weight_fraction_stderr
+        assert abs(row.weight_fraction - w_true[ip]) < 0.03
+
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    result.plot(path=str(out / "qpa_two_phase.png"))
