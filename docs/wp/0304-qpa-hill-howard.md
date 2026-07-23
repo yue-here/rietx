@@ -1,6 +1,6 @@
 # WP-0304 — QPA: Hill-Howard ZMV mass fractions
 
-Milestone: v0.3 · Status: ⬜ not started
+Milestone: v0.3 · Status: ✅ done 2026-07-23
 Depends on: —
 
 ## Goal
@@ -51,16 +51,16 @@ the Brindley correction as an adjustment to the same object.
 
 ## Tasks
 
-- [ ] Z, M, V derivation from the refined model (occupancy-weighted M;
+- [x] Z, M, V derivation from the refined model (occupancy-weighted M;
       multiplicity-aware Z); unit test against hand-computed values for a
       couple of known structures
-- [ ] `QuantitativePhaseAnalysis` result schema + attachment to
+- [x] `QuantitativePhaseAnalysis` result schema + attachment to
       `RefinementResult`; JSON round-trip test
-- [ ] Weight fractions from refined scales; σ(W) from the scale block of the
+- [x] Weight fractions from refined scales; σ(W) from the scale block of the
       covariance (correlated ratio propagation), Bérar-Lelann carried through
-- [ ] Docstring + field-level statement that fractions are of the modelled
+- [x] Docstring + field-level statement that fractions are of the modelled
       crystalline content only
-- [ ] Two-phase synthetic test with known mixing ratio: recovered fractions
+- [x] Two-phase synthetic test with known mixing ratio: recovered fractions
       within propagated σ
 
 ## Acceptance
@@ -83,3 +83,38 @@ independent-scale propagation (assert the correlated path is being used).
 ## Handover log
 
 - **2026-07-22** — created from the ROADMAP split; not started.
+- **2026-07-23** — **done.** Landed in five commits:
+  1. `optimize/qpa.py` core — `atomic_weight` (gemmi, guards gemmi's
+     placeholder element "X": unknown symbols map to Z=0/weight≈1.0, *not* an
+     error, so we check `atomic_number == 0`), `phase_zmv` (occupancy-weighted
+     cell mass Z·M from orbit multiplicities via `expand_positions`), and
+     `weight_fractions` (Hill-Howard ratio + correlated/independent σ).
+  2. `PhaseQuantity`/`QuantitativePhaseAnalysis` schema (re-exported from
+     `pxrdref.schemas`) + optional `RefinementResult.qpa`.
+  3. `ParameterTable.physical_covariance` + `_cov_free`/`_phys_sigma_free`
+     (factored out of `stderr_physical`); `compute_qpa`; wired into
+     `_build_result` (Rietveld only — Le Bail scales are degenerate).
+  4. Two-phase synthetic acceptance (LaB6 + CaF₂): recovered W within σ.
+  5. This log + ROADMAP/CLAUDE sync.
+- **Z/M split is display-only.** QPA rests on the unambiguous `cell_mass` (Z·M,
+  occupancy-weighted) and `cell_volume`; `z` is a best-effort GCD of the
+  integer per-element cell counts (falls back to `z=1`, `molar_mass=cell_mass`
+  under partial occupancy — see `test_zmv_partial_occupancy…`). Note 0.5×(mult 8)
+  = 4 is still integer, so half-occupancy does *not* trigger the fallback; a
+  non-integer count (e.g. occ 0.3) does.
+- **σ(W) conditioning gotcha (verified empirically, not changed here).**
+  `covariance_estimates` returns per-parameter esds already ×BL, but the
+  correlation matrix it returns carries `1/BL²` on its diagonal, so
+  `correlation ⊙ outer(s,s)` — the `Cov_free` both `stderr_physical`'s
+  correlated path *and* `physical_covariance` use — reconstructs the **raw**
+  χ²·(JᵀJ)⁻¹ covariance (BL cancels). Consequence: the reported per-parameter
+  esds on `RefinementResult` (built via the correlated path) are raw, with BL
+  reported separately in `Statistics.esd_inflation`. QPA σ(W) matches that
+  conditioning **by construction** (proved by
+  `test_physical_covariance_block_diagonal_matches_stderr`). The
+  `Statistics.esd_inflation` docstring still claims reported esds are ×BL —
+  that is a pre-existing correlated-path discrepancy, out of scope for this WP;
+  worth a dedicated fix (touches every esd, would perturb tolerances).
+- **Next**: 0304 unblocks 0305 (Brindley), 0309 (QPA table export) and 0310
+  (round-robin acceptance). `compute_qpa` returns the typed object 0309 will
+  tabulate and 0305 will adjust in place.
