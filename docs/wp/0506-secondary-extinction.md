@@ -1,6 +1,6 @@
 # WP-0506 — Secondary extinction (Sabine model)
 
-Milestone: v0.5 · Status: 🚧 in progress (2026-07-23)
+Milestone: v0.5 · Status: ✅ complete (2026-07-23)
 Depends on: —
 
 ## Goal
@@ -123,7 +123,7 @@ guard).
       assumed: ext is separable from Biso/scale (|ρ| ≈ 0.004) on well-sampled
       data; the real hazard is the minor-phase runaway (documented above).
       obs/calc/diff PNG to `tests/output/extinct_lab6_fit.png`.
-- [ ] **Docs** — this file's ticks + handover; ROADMAP glyph sync.
+- [x] **Docs** — this file's ticks + handover; ROADMAP glyph sync.
 
 ## Risks
 
@@ -185,3 +185,27 @@ extinction ≈ 0 with Rwp not degraded.
 
 - **2026-07-23** — created from the cross-code review plan; implementation in
   progress this session.
+- **2026-07-23** — **complete.** All eight checklist items landed; full suite
+  264 passed (incl. the two `@slow` does-no-harm acceptance tests), `ruff`
+  clean. Physics adopts GSAS-II `GetPwdrExt` verbatim (Xpol 0.079411, the six
+  Laue coefficients, the two-term x>1 asymptote), pinned by a scalar golden to
+  ~1e-10 in both value and derivative. The analytic `dof`/`adp` Jacobian
+  columns carry `G = E + x·dE/dx` (negative-control-verified: they miss FD by
+  ~6-8% without it). Two findings worth carrying forward:
+  1. **Identifiability is better than the a-priori risk assumed.** ext is
+     *measured* separable from Biso/scale (|ρ| ≈ 0.004) on well-sampled data;
+     the ext↔Biso↔scale correlation is a hazard only in the degenerate
+     few-reflection limit.
+  2. **The over-flexible-correction hazard is real on ill-determined phases.**
+     Freeing extinction on NAC's ~1%-weight CaF₂ impurity ran it to a spurious
+     69% attenuation (cosmetic Rwp gain) — the peak-eating-background failure
+     mode in a new place. Hence extinction is off by default and opt-in *per
+     phase*; the NAC acceptance test frees it only on the main phase. A future
+     multi-phase QPA run (WP-0304) should be careful here, and it may be worth
+     a guard that flags an implausibly small min E per phase.
+  Also note the GSAS-II series/asymptote **discontinuity at x=1** (~2% step),
+  kept verbatim and pinned by a test — harmless because real data sit at x≪1.
+  Gotcha for the next reader: the raw `ext` coefficient's scale is
+  wavelength/cell-dependent (x ∝ (λ/V)²), so ~0 for CuKα/LaB6 but ~300 for
+  0.414 Å/NAC — judge extinction by the effect (x or min E), never the
+  coefficient.
