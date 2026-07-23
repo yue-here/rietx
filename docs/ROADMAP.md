@@ -64,7 +64,7 @@ still needs a `.prn`/`.cpi` reader and the two acceptance tests).
 | [0305](wp/0305-brindley-microabsorption.md) | Brindley microabsorption | ✅ 2026-07-23 | 0304 |
 | [0306](wp/0306-pawley-mode.md) | Pawley mode | ✅ 2026-07-23 | — |
 | [0307](wp/0307-march-dollase.md) | March-Dollase preferred orientation | ✅ 2026-07-23 | — |
-| [0308](wp/0308-multi-histogram.md) | Multi-histogram stacked residuals | ⬜ | — |
+| [0308](wp/0308-multi-histogram.md) | Multi-histogram stacked residuals | 🔶 | — |
 | [0309](wp/0309-exporters.md) | Exporters: reflection table, CIF+esds (structure side landed in 0303), QPA table | ⬜ | 0304 |
 | [0310](wp/0310-acceptance-srm676a-qpa.md) | Acceptance: SRM 676a + IUCr QPA round robin | 🔶 | 0304, 0305 |
 
