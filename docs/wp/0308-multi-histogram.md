@@ -1,6 +1,6 @@
 # WP-0308 — Multi-histogram stacked residuals
 
-Milestone: v0.3 · Status: ⬜ not started
+Milestone: v0.3 · Status: ✅ complete (2026-07-24)
 Depends on: —
 
 ## Goal
@@ -137,15 +137,22 @@ documented future seam (noted in DESIGN.md), not a v0.3 deliverable.
 
 - [x] Audit and document what list support exists today; write the sharing-map
       design into this file before coding
-- [ ] Stacked residual + Jacobian across histograms, per-histogram frozen
-      compile state
-- [ ] Per-histogram *and* combined statistics; provenance records the weighting
-- [ ] Parameter-sharing map with histogram-scoped dot-paths, fnmatch-compatible
-- [ ] History serialization for multi-histogram state; FitReport per histogram
-- [ ] Tests: two synthetic patterns of the same phase at different wavelengths
+- [x] Stacked residual + Jacobian across histograms, per-histogram frozen
+      compile state (`optimize/least_squares.run_multi_least_squares` + one
+      `compile_model` per histogram)
+- [x] Per-histogram *and* combined statistics; provenance records the weighting
+      (`HistogramResult.statistics` + pooled `RefinementResult.statistics`;
+      `Provenance.notes["histogram_weights"]`)
+- [x] Parameter-sharing map with histogram-scoped dot-paths, fnmatch-compatible
+      (`params/multi.SharingMap` + `MultiParameterTable`; `hist.{h}.{path}`)
+- [x] History serialization for multi-histogram state; FitReport per histogram
+      (result JSON round-trips with `histograms`; `result.for_histogram(h)` →
+      per-pattern Layer-0 report. Branching DAG deferred — see Design decision)
+- [x] Tests: two synthetic patterns of the same phase at different wavelengths
       recover the shared cell better than either alone; a deliberately
       bad second histogram shows up in its own Rwp rather than being masked
-- [ ] PNGs per histogram to `tests/output/`
+      (`tests/test_multi_histogram.py`)
+- [x] PNGs per histogram to `tests/output/` (`multihist_joint_h*`, `_bad_h*`)
 
 ## Acceptance
 
@@ -165,3 +172,27 @@ mis-scaled histogram is visible in its own Rwp.
 ## Handover log
 
 - **2026-07-22** — created from the ROADMAP split; not started.
+- **2026-07-24** — **complete.** Built on the per-pattern primitives:
+  `params/multi.py` (`SharingMap`, `MultiParameterTable` — one `ParameterTable`
+  per histogram + a combined-θ column map folding shared structural columns to
+  one, scoping per-histogram columns `hist.{h}.{path}`);
+  `optimize/least_squares.run_multi_least_squares` (stacked residual/Jacobian,
+  data rows then penalty rows so `covariance_estimates` is reused verbatim,
+  `√w_h` per-histogram weighting); `multi.py`
+  (`MultiHistogramRefinement`/`refine_multi`, staged cumulative solve, per-hist +
+  pooled statistics, per-hist QPA + guards); `HistogramResult` schema +
+  `RefinementResult.histograms`/`for_histogram`. Rietveld-only.
+  - **Verified:** joint esd(a) = 2.13e-6 is *exactly* the inverse-variance
+    combination of the two single-histogram esds (4.02e-6 ⊕ 2.51e-6) — proof
+    the shared column draws from both patterns. Per-hist Rwp separates a clean
+    hist (0.040) from an impurity-corrupted one (0.212, GoF 3.62); pooled Rwp
+    (0.05) would have masked it. `for_histogram(h)` → Layer-0 report flags the
+    impurity. Full suite + ruff green; 4 PNGs in `tests/output/`.
+  - **Gotchas for the next session:** (1) `run_multi_least_squares` imports the
+    private `_make_residual`/`_make_jacobian` from `least_squares` — internal
+    reuse, fine within the package. (2) Per-histogram `n_free` for χ²/Rexp uses
+    `shared + own` counts (documented conservative choice); per-hist **Rwp** is
+    n_free-independent so the headline number is unaffected. (3) Multi-histogram
+    does **not** enter the `RefinementTree` DAG — a multi-pattern fingerprint is
+    a deeper change (future seam); the `RefinementResult` still fully serializes.
+  - **Next:** WP-0309 (exporters) or WP-0310 (SRM 676a QPA acceptance, 🔶).
