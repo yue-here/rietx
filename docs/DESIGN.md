@@ -40,6 +40,23 @@ differentiable from day one.
 - **Scope discipline** (review finding: this is multi-person-year work):
   one autodiff backend at a time; MCP/FPA/neutron/TOF fenced in v2; every
   milestone has a concrete measured acceptance test.
+  - *FPA fence, clarified (2026-07-23 cross-code review).* The single biggest
+    scientific gap versus an empirical-Caglioti package is the
+    **fundamental-parameters (FPA) peak shape** (Cheary & Coelho 1992): a
+    convolution of physical instrument aberrations rather than fitted U V W X
+    Y. It stays v2-fenced — a differentiable convolution stack is a milestone
+    of its own — but two facts refine the rationale rather than reopen it.
+    (a) The full FPA convolution is not the only route: the **NIST
+    FPA→pseudo-Voigt term mapping (Mendenhall et al. 2022)** emits
+    physically-derived pseudo-Voigt widths that drop straight into the
+    *existing* TCHZ machinery, so if the fence ever opens the cheaper first
+    step is a term-mapping layer, not a new profile. (b) BGMN's headline
+    feature — decoupling a *per-device* instrument function from the
+    sample — is **already paralleled** here at the Caglioti level by the
+    `save_instrument_profile` / `load_instrument_profile` workflow
+    (calibrate on a standard → freeze → refine the sample). So the fence
+    costs us a physically-parameterised profile, not the instrument/sample
+    separation itself. **Note only — do not un-fence.**
 
 ## Architecture invariants
 

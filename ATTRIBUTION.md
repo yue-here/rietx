@@ -33,8 +33,14 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
 - Schwarz, G. (1978). *Ann. Stat.* 6, 461–464 — Bayesian information criterion.
 - Wilson, A. J. C. (1963). *Mathematical Theory of X-ray Powder Diffractometry*;
   Klug & Alexander (1974), ch. 5 — Bragg-Brentano displacement/transparency aberrations.
-- Hölzer et al. (1997). *Phys. Rev. A* 56, 4554–4568 — Cu Kα/Kβ emission wavelengths and intensity ratios.
+- Hölzer et al. (1997). *Phys. Rev. A* 56, 4554–4568 — Cu Kα/Kβ emission wavelengths and intensity ratios (also Co/Cr/Fe Kα, for WP-0507).
 - Bearden, J. A. (1967). *Rev. Mod. Phys.* 39, 78–124 — W Lα1 wavelength (contamination check).
+- Deslattes et al. (2003). *Rev. Mod. Phys.* 75, 35–99 — X-ray transition energies/wavelengths (Mo/Ag Kα, for WP-0507; named at `schemas/instrument.py:334`).
+- Sabine, T. M. (1985). *Aust. J. Phys.* 38, 507–518 — extinction in polycrystalline materials.
+- Sabine, T. M. (1988). *Acta Cryst.* A44, 368–373 — a reconciliation of the Zachariasen and Darwin extinction theories (the Bragg·sin²θ + Laue·cos²θ blend, WP-0506).
+- Sabine, Von Dreele & Jørgensen (1988). *Acta Cryst.* A44, 374–379 — extinction in time-of-flight neutron powder diffraction (the same model applied to a Rietveld refinement).
+- Cheary & Coelho (1992). *J. Appl. Cryst.* 25, 109–121 — the fundamental-parameters convolution approach to line profiles (v2-fenced; DESIGN note only).
+- Mendenhall et al. (2022). *J. Appl. Cryst.* 55, 1362–1367 — NIST fundamental-parameters → pseudo-Voigt term mapping (the lighter-weight FPA route in the DESIGN note; concept only, not implemented).
 - Belsley, Kuh & Welsch (1980). *Regression Diagnostics*, Wiley — scaled-Gram
   condition number as a collinearity diagnostic (FitReport Layer-1 gate).
 
@@ -43,8 +49,11 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
 | Project | License | Relationship |
 |---|---|---|
 | lmfit | BSD-3 | **API inspiration**: the Parameter model (value/vary/min/max/expr). No code ported. |
-| GSAS-II | BSD-style (Argonne) | **Behavioral reference** for conventions and validation goldens. No code ported. |
+| GSAS-II | custom Argonne royalty-free (grant-back clause) | **Behavioral reference** for conventions and validation goldens (e.g. the Sabine extinction parameterization and its Laue-series coefficients, WP-0506). Concepts and goldens are freely usable; the license is *not* a standard BSD — verbatim porting carries attribution and an upstream grant-back obligation, so no code is ported. |
 | CrysPy | MIT | Reference for pure-Python Rietveld mathematics. No code ported. |
+| MAUD | BSD-3 | Reference for texture / residual-stress methods (studied for the v2-fenced spherical-harmonics texture path). No code ported. |
+| CrysFML / CrysFML2008 | LGPL-3.0-or-later + ILL no-military-use clause | Studied (concepts only — the LGPL and the ILL clause both bar a port into an MIT core). **No code ported.** |
+| powerxrd | MIT | Reference for a minimal quick-look powder-XRD API surface. No code ported. |
 | Dans_Diffraction | Apache-2.0 | Reference for scattering computations. No code ported. |
 | pymatgen | MIT | Cross-check for structure factors/multiplicities in tests. |
 | cctbx | BSD-style | Cross-check for symmetry constraints in tests. |

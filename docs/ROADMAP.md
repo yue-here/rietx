@@ -83,6 +83,8 @@ no unmet dependency — [0304](wp/0304-qpa-hill-howard.md) (QPA, which unblocks
 | [0503](wp/0503-stephens-anisotropic-strain.md) | Stephens anisotropic strain | ⬜ | — |
 | [0504](wp/0504-anomalous-scattering-xraydb.md) | Anomalous f′,f″ via xraydb | ⬜ | — |
 | [0505](wp/0505-sequential-refinement.md) | SequentialRefinement warm start | ⬜ | — |
+| [0506](wp/0506-secondary-extinction.md) | Secondary extinction (Sabine) | ⬜ | — |
+| [0507](wp/0507-anode-wavelengths.md) | Additional anode wavelengths (Co/Cr/Fe/Mo/Ag) | ⬜ | — |
 
 ### v0.6 — solver & agents (stubs)
 
