@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import Field
 
-from .common import Base, Diagnostic, Provenance
+from .common import Base, Diagnostic, Mode, Provenance
 
 
 class RefinedParameter(Base):
@@ -65,7 +65,7 @@ class StageResult(Base):
 
 class RefinementResult(Base):
     status: Literal["converged", "max_iter", "diverged"]
-    mode: Literal["rietveld", "lebail"]
+    mode: Mode
     parameters: list[RefinedParameter]
     statistics: Statistics
     correlation_warnings: list[str] = Field(default_factory=list)

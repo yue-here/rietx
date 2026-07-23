@@ -82,6 +82,16 @@ WINDOW_MIN_DEG = 0.3
 #: zero-node profile
 AXIAL_SIZING_FLOOR = 0.02
 
+#: two reflections are treated as "strongly overlapped" for Pawley conditioning
+#: when their primary-line centres sit within this fraction of their mean FWHM
+PAWLEY_OVERLAP_FWHM_FRAC = 0.5
+#: soft equal-split restraint weight for overlapped Pawley groups.  With the
+#: per-group intensity scaling in ``build_pawley_restraint`` this makes the
+#: split-direction esd ≈ (group intensity)/√λ, i.e. an unresolved split is
+#: reported with an esd of order its own value (≈100 % at λ=1) rather than the
+#: spuriously tight one a bare pseudo-inverse of a singular JᵀJ would give.
+PAWLEY_OVERLAP_LAMBDA = 1.0
+
 
 @dataclass
 class CompiledPhase:
@@ -92,7 +102,14 @@ class CompiledPhase:
     win: np.ndarray  # (n_lines, N, 2) int
     # frozen FCJ quadrature node counts, 0 → symmetric peak
     fcj_n: np.ndarray  # (n_lines, N) int
-    lebail_intensity: np.ndarray | None = None  # (N,) per hkl, set in lebail mode
+    # per-hkl integrated intensity buffer, set in lebail *and* pawley mode: in
+    # Le Bail it is refreshed by observed-intensity partitioning, in Pawley it
+    # is the current value of the refined intensity block (a live view of θ).
+    hkl_intensity: np.ndarray | None = None  # (N,)
+    # primary-line 2θ and estimated FWHM at compile, kept for Pawley overlap
+    # grouping (None outside pawley mode)
+    tt_primary: np.ndarray | None = None  # (N,)
+    fwhm_primary: np.ndarray | None = None  # (N,)
 
 
 @dataclass
@@ -119,6 +136,9 @@ class CompiledModel:
     # P-spline smoothness penalty: extra residual rows √λ·D₂·c, already scaled
     # (columns aligned with bkg_paths); None for penalty-free backgrounds
     bkg_penalty: np.ndarray | None
+    # Pawley intensity block (per-hkl intensities as free parameters, appended
+    # to θ outside the ParameterTable); None outside pawley mode.
+    pawley: "PawleyBlock | None" = None
     meta: dict = field(default_factory=dict)
 
     # ------------------------------------------------------------------
@@ -183,8 +203,10 @@ class CompiledModel:
         cell = tuple(values[f"phases.{ip}.cell.{k}"] for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         d = d_spacings(cp.reflections.hkl, *cell)
 
-        if self.mode == "lebail":
-            base = cp.lebail_intensity
+        if self.mode in ("lebail", "pawley"):
+            # per-hkl intensities read straight from the buffer: extracted by
+            # partitioning (Le Bail) or refined as θ (Pawley) — identical here
+            base = cp.hkl_intensity
         else:
             # |F|² samples the form factors at sinθ/λ = 1/2d — line-independent
             f2 = structure_factors_squared(cp.reflections.hkl, d, cp.sites,
@@ -205,7 +227,8 @@ class CompiledModel:
                                     values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
                                     values["instrument.profile.y"] + values[f"phases.{ip}.lor_strain"])
             gamma, eta = tch_gamma_eta(gam_g, gam_l)
-            if self.mode == "lebail":
+            if self.mode in ("lebail", "pawley"):
+                # extracted/refined intensities already absorb Lp
                 intensity = base * w_line
             else:
                 intensity = base * w_line * lorentz_polarization(tt_bragg, values["instrument.polarization"])
@@ -403,7 +426,7 @@ class CompiledModel:
 
     # ------------------------------------------------------------------
     def lebail_update(self, values: dict[str, float], n_cycles: int = 1) -> None:
-        """Refresh Le Bail intensities by observed-intensity partitioning.
+        """Refresh per-hkl intensities by observed-intensity partitioning.
 
         Per-hkl intensities are shared across emission lines: reflection k
         contributes through every line l with profile mass w_l·Ω_lk, so
@@ -411,9 +434,12 @@ class CompiledModel:
             I_k ← Σ_l Σ_i [I_k·w_l·Ω_lk,i / y_bragg,i] · max(y_obs,i − y_bkg,i, 0)
                   / Σ_l w_l·Σ_i Ω_lk,i
 
-        which is a fixed point when y_obs = y_calc (Le Bail et al., 1988).
+        which is a fixed point when y_obs = y_calc (Le Bail et al., 1988).  This
+        *is* the Le Bail step; in Pawley mode it is used only once, to seed the
+        intensity block before the first least-squares run (never between runs,
+        which would overwrite the refined values).
         """
-        if self.mode != "lebail":
+        if self.mode not in ("lebail", "pawley"):
             raise RuntimeError("lebail_update on a Rietveld-mode model")
         sl = values["instrument.geometry.axial_sl"]
         hl = values["instrument.geometry.axial_hl"]
@@ -435,7 +461,7 @@ class CompiledModel:
                             i0, i1 = cp.win[il, k]
                             y_bragg[i0:i1] += intensity[k] * om
                     profs.append(row)
-                new_int = np.asarray(cp.lebail_intensity, dtype=np.float64).copy()
+                new_int = np.asarray(cp.hkl_intensity, dtype=np.float64).copy()
                 for k in range(n):
                     num = 0.0
                     den = 0.0
@@ -456,7 +482,91 @@ class CompiledModel:
                         den += w_line * float(om.sum())
                     if den > 0.0:
                         new_int[k] = num / den
-                cp.lebail_intensity = np.maximum(new_int, 1e-10)
+                cp.hkl_intensity = np.maximum(new_int, 1e-10)
+
+    # ------------------------------------------------------------------
+    # Pawley intensity block (per-hkl intensities as free parameters)
+    # ------------------------------------------------------------------
+    def pawley_x0(self) -> np.ndarray:
+        """Current per-hkl intensities, flat in phase order — the block's θ₀."""
+        return np.concatenate([np.asarray(cp.hkl_intensity, dtype=np.float64)
+                               for cp in self.phases]) if self.phases else np.zeros(0)
+
+    def pawley_bounds(self) -> tuple[np.ndarray, np.ndarray]:
+        """Intensities are bounded ≥ 0 (identity transform, TRF-reflected).
+
+        Positivity is a box, not a restraint: a single reflection's intensity
+        does not couple to the others, so unlike the ADP positive-definite cone
+        it can be enforced component-wise.  Keeping the transform identity is
+        what makes the block's Jacobian columns exactly linear.
+        """
+        n = self.pawley.n if self.pawley is not None else 0
+        return np.zeros(n), np.full(n, np.inf)
+
+    def set_pawley_intensities(self, vec: np.ndarray) -> None:
+        """Write a flat intensity vector back into the per-phase buffers."""
+        for cp, (a, b) in zip(self.phases, self.pawley.phase_slices, strict=True):
+            cp.hkl_intensity = np.array(vec[a:b], dtype=np.float64)
+
+    def pawley_restraint_residual(self) -> np.ndarray | None:
+        """√λ·R·I overlap-restraint rows appended to the residual (or None)."""
+        if self.pawley is None or self.pawley.restraint is None:
+            return None
+        return self.pawley.restraint @ self.pawley_x0()
+
+    def build_pawley_restraint(self, lam: float = PAWLEY_OVERLAP_LAMBDA) -> None:
+        """Build the equal-split restraint rows for the current intensities.
+
+        One row per member of every overlapped group: √λ/s·(δ_kj − 1/n) over the
+        group, where s is the group's current mean intensity.  The rows sum to
+        zero, so they penalise deviations of the *split* from an equal partition
+        while leaving the group *sum* (the data-determined quantity) free.  Run
+        after the intensities are seeded/carried so s reflects a realistic
+        scale; constant during the least-squares run, like the background
+        penalty.
+        """
+        pb = self.pawley
+        if pb is None or not pb.groups:
+            return
+        intens = self.pawley_x0()
+        rows: list[np.ndarray] = []
+        for g in pb.groups:
+            s = max(float(np.mean(intens[g])), 1e-10)
+            n = len(g)
+            for k in g:
+                row = np.zeros(pb.n, dtype=np.float64)
+                for j in g:
+                    row[j] = (np.sqrt(lam) / s) * ((1.0 if j == k else 0.0) - 1.0 / n)
+                rows.append(row)
+        pb.restraint = np.array(rows, dtype=np.float64) if rows else None
+
+
+@dataclass
+class PawleyBlock:
+    """Per-hkl intensities refined as free parameters (Pawley, 1981, J. Appl.
+    Cryst. 14, 357).
+
+    The intensities themselves live in the per-phase ``hkl_intensity`` buffers,
+    not in the ParameterTable (``RefinementState.free_paths`` stays a table of
+    named scalars — see ``schemas/history.ReflectionState``); this block is the
+    seam that lets ``run_least_squares`` append them to θ.  ``phase_slices`` maps
+    each phase to its contiguous slice of the flat intensity vector, concatenated
+    in phase order.
+
+    Overlapped reflections make the intensity block of JᵀJ near-singular — at
+    exact overlap the split between two intensities is unconstrained by the data
+    and the naive pseudo-inverse reports a *spuriously tight* esd for it.
+    ``restraint`` (built by :meth:`CompiledModel.build_pawley_restraint`) holds
+    the √λ-scaled equal-split rows that regularise the split so the covariance
+    reports a large-but-honest esd instead; ``groups`` lists the flat-index
+    members of each overlapped group so those splits can be flagged unresolved.
+    """
+
+    n: int                                   # total intensities across phases
+    phase_slices: list[tuple[int, int]]      # (start, stop) into the flat vector
+    groups: list[list[int]]                  # overlapped groups (flat idx), size ≥ 2
+    restraint: np.ndarray | None = None      # (n_rows, n) √λ-scaled restraint rows
+    stderr: np.ndarray | None = None         # per-intensity esd, filled post-solve
 
 
 @dataclass
@@ -541,6 +651,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         n_lines = len(lams)
         win = np.zeros((n_lines, n, 2), dtype=np.int64)
         fcj_n = np.zeros((n_lines, n), dtype=np.int64)
+        tt_primary = fwhm_primary = None
         for il, lam in enumerate(lams):
             tt_bragg = refl.two_theta(cell, lam)
             theta = 0.5 * tt_bragg
@@ -552,6 +663,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                                     instrument.profile.x.value + phase.lor_size.value,
                                     instrument.profile.y.value + phase.lor_strain.value)
             gamma_est, _ = tch_gamma_eta(g_est, l_est)
+            if il == 0:  # primary line drives Pawley overlap grouping
+                tt_primary, fwhm_primary = pos.copy(), gamma_est.copy()
             half = WINDOW_FWHM_MULT * gamma_est + WINDOW_MIN_DEG
             if fcj_on:
                 half = half + fcj_extent_deg(pos, sl_eff, hl_eff)
@@ -570,8 +683,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                                                       sl_eff, hl_eff)
 
         cp = CompiledPhase(reflections=refl, sites=sites, win=win, fcj_n=fcj_n)
-        if mode == "lebail":
-            cp.lebail_intensity = np.full(n, max(float(np.median(y_obs)), 1.0))
+        if mode in ("lebail", "pawley"):
+            cp.hkl_intensity = np.full(n, max(float(np.median(y_obs)), 1.0))
+        if mode == "pawley":
+            cp.tt_primary, cp.fwhm_primary = tt_primary, fwhm_primary
         phases.append(cp)
 
     # background compilation — always linear: paths + design rows (+ penalty)
@@ -603,6 +718,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     else:  # pragma: no cover - schema exhausts the union
         raise TypeError(f"unsupported background model {type(bkg).__name__}")
 
+    pawley = _build_pawley_block(phases) if mode == "pawley" else None
+
     return CompiledModel(
         tt=tt, y_obs=y_obs, sigma=sigma, tt_min=tt_min, tt_max=tt_max,
         wavelength=instrument.source.primary_wavelength,
@@ -611,4 +728,51 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         mode=mode, phases=phases,
         fixed_background=fixed,
         bkg_paths=bkg_paths, bkg_design=design, bkg_penalty=penalty,
+        pawley=pawley,
     )
+
+
+def _overlap_groups(tt: np.ndarray, fwhm: np.ndarray) -> list[list[int]]:
+    """Contiguous groups of reflections whose primary-line peaks overlap.
+
+    Reflections arrive sorted by descending d (ascending 2θ).  Adjacent peaks k,
+    k+1 join a group when their centre spacing is below
+    ``PAWLEY_OVERLAP_FWHM_FRAC`` of their mean FWHM — the point past which the
+    least squares cannot cleanly apportion intensity between them.  Non-finite
+    positions break the chain.  Returns only groups of size ≥ 2 (singletons need
+    no restraint), as lists of indices into the reflection list.
+    """
+    groups: list[list[int]] = []
+    run = [0] if len(tt) else []
+    for k in range(1, len(tt)):
+        close = (np.isfinite(tt[k]) and np.isfinite(tt[k - 1])
+                 and (tt[k] - tt[k - 1])
+                 < PAWLEY_OVERLAP_FWHM_FRAC * 0.5 * (fwhm[k] + fwhm[k - 1]))
+        if close:
+            run.append(k)
+        else:
+            if len(run) >= 2:
+                groups.append(run)
+            run = [k]
+    if len(run) >= 2:
+        groups.append(run)
+    return groups
+
+
+def _build_pawley_block(phases: list[CompiledPhase]) -> PawleyBlock:
+    """Assemble the flat intensity layout and overlapped-group list.
+
+    The restraint rows themselves are built later (once the intensities are
+    seeded to a realistic scale) by ``CompiledModel.build_pawley_restraint``.
+    """
+    phase_slices: list[tuple[int, int]] = []
+    groups: list[list[int]] = []
+    offset = 0
+    for cp in phases:
+        n = len(cp.reflections)
+        phase_slices.append((offset, offset + n))
+        if cp.tt_primary is not None and n:
+            for g in _overlap_groups(cp.tt_primary, cp.fwhm_primary):
+                groups.append([offset + k for k in g])
+        offset += n
+    return PawleyBlock(n=offset, phase_slices=phase_slices, groups=groups)

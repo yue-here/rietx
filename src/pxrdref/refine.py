@@ -116,7 +116,7 @@ class Refinement:
         values = table.decode(outcome.theta)
         y_calc = model.evaluate(values)
         stats = compute_statistics(model.y_obs, y_calc, model.sigma,
-                                   n_free=len(table.free_paths),
+                                   n_free=len(table.free_paths) + _pawley_n(model),
                                    y_background=model.background(values))
         stderr = (table.stderr_physical(outcome.theta, outcome.stderr_internal,
                                         outcome.correlation)
@@ -313,11 +313,12 @@ class Refinement:
         frozen here and never move until the next stage.
         """
         freed = table.set_vary(stage.turn_on, True)
-        if mode == "lebail":
-            # never refine structural parameters (or the line-intensity
-            # ratio, which the per-hkl intensities can absorb pairwise)
-            # against empirical intensities; drop them from the reported
-            # freed list too — it must describe the set actually left free
+        if mode in ("lebail", "pawley"):
+            # never refine structural parameters, the phase scale (degenerate
+            # with the per-hkl intensities) or the line-intensity ratio (which
+            # those intensities can absorb pairwise) against the intensity
+            # model; drop them from the reported freed list too — it must
+            # describe the set actually left free
             for path in list(freed):
                 if ".atoms." in path or path.endswith(".scale") \
                         or ".source.lines." in path:
@@ -332,17 +333,28 @@ class Refinement:
         new_model = compile_model(self.structure, self.instrument, data, mode=mode,
                                   two_theta_limits=two_theta_limits,
                                   free_paths=set(table.free_paths))
-        if model is not None and mode == "lebail" and model.mode == "lebail":
+        carried = False
+        if model is not None and mode in ("lebail", "pawley") and model.mode == mode:
             _carry_lebail(model, new_model)
-        elif mode == "lebail" and self._pending_reflections:
-            # first stage after a checkout: re-seed the extracted intensities
+            carried = True
+        elif mode in ("lebail", "pawley") and self._pending_reflections:
+            # first stage after a checkout: re-seed the per-hkl intensities
             _restore_lebail(self._pending_reflections, new_model)
+            carried = True
         self._pending_reflections = []
         model = new_model
 
         if mode == "lebail":
             values = table.decode(table.x0())
             model.lebail_update(values, n_cycles=stage.lebail_cycles)
+        elif mode == "pawley":
+            if not carried:
+                # seed the intensity block from one Le Bail partition — a good
+                # warm start for the joint solve; refined values carry onward
+                model.lebail_update(table.decode(table.x0()), n_cycles=stage.lebail_cycles)
+            # equal-split restraint on overlapped groups, scaled to the current
+            # intensities (constant within the coming least-squares run)
+            model.build_pawley_restraint()
 
         if events is not None:
             events.emit("stage_start", stage=stage.name, turn_on=list(stage.turn_on),
@@ -375,8 +387,10 @@ class Refinement:
         record format; ``pxrdref watch`` tails it live.
         """
         if isinstance(plan, str):
-            if mode == "lebail" and plan == "mccusker_default":
+            if plan == "mccusker_default" and mode == "lebail":
                 plan = "profile_only"
+            elif plan == "mccusker_default" and mode == "pawley":
+                plan = "pawley_default"
             try:
                 plan = PLAN_PRESETS[plan]()
             except KeyError:
@@ -430,6 +444,9 @@ class Refinement:
         table.apply_to_models(self.structure, self.instrument)
         self._free_paths = list(table.free_paths)
 
+        if mode == "pawley":
+            diagnostics.extend(_pawley_unresolved_diagnostics(model, self.structure))
+
         self.result_ = _build_result(
             model, table, outcome.theta, mode=mode, status=outcome.status,
             stage_results=stage_results, diagnostics=diagnostics,
@@ -466,6 +483,8 @@ class Refinement:
         model, outcome, guard, freed = self._run_stage(
             stage, data, mode, table, self._model, ttl, correlation_guard)
         diagnostics = _guard_diagnostics(guard)
+        if mode == "pawley":
+            diagnostics.extend(_pawley_unresolved_diagnostics(model, self.structure))
 
         self._model = model
         table.apply_to_models(self.structure, self.instrument)
@@ -512,7 +531,7 @@ class Refinement:
         grid = PatternData(two_theta=tt.tolist(), intensity=[0.0] * len(tt))
         model = compile_model(self.structure, self.instrument, grid,
                               mode=self._mode, free_paths=set(table.free_paths))
-        if self._mode == "lebail":
+        if self._mode in ("lebail", "pawley"):
             _carry_lebail(self._model, model)
         return model.evaluate(table.decode(table.x0()))
 
@@ -607,7 +626,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     y_calc = model.evaluate(values)
     y_bkg = model.background(values)
     stats = compute_statistics(model.y_obs, y_calc, model.sigma,
-                               n_free=len(table.free_paths), y_background=y_bkg)
+                               n_free=len(table.free_paths) + _pawley_n(model),
+                               y_background=y_bkg)
 
     stderr_phys = (table.stderr_physical(theta, stderr_internal, correlation)
                    if stderr_internal is not None else {})
@@ -646,49 +666,120 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
 
 
 def _extract_reflections(model: CompiledModel | None) -> list[ReflectionState]:
-    """Capture the per-hkl state that is not in the parameter vector."""
-    if model is None or model.mode != "lebail":
+    """Capture the per-hkl state that is not in the parameter vector.
+
+    Le Bail intensities are tagged ``lebail_extracted`` (no esds); Pawley
+    intensities are ``pawley_refined`` and carry their per-reflection esds and
+    ``varied=True`` — the distinction is what lets a checkout reseed a Le Bail
+    fixed point but restore a Pawley refinement's actual values.
+    """
+    if model is None or model.mode not in ("lebail", "pawley"):
         return []
+    is_pawley = model.mode == "pawley"
+    stderr_all = model.pawley.stderr if (is_pawley and model.pawley is not None) else None
     out: list[ReflectionState] = []
     for ip, cp in enumerate(model.phases):
-        if cp.lebail_intensity is None:
+        if cp.hkl_intensity is None:
             continue
-        out.append(ReflectionState(
+        state = ReflectionState(
             phase_index=ip,
             hkl=[[int(v) for v in h] for h in cp.reflections.hkl],
-            intensity=[float(v) for v in cp.lebail_intensity],
-            kind="lebail_extracted",
-        ))
+            intensity=[float(v) for v in cp.hkl_intensity],
+            kind="pawley_refined" if is_pawley else "lebail_extracted",
+            varied=is_pawley,
+        )
+        if is_pawley and stderr_all is not None:
+            a, b = model.pawley.phase_slices[ip]
+            state.stderr = [float(v) for v in stderr_all[a:b]]
+        out.append(state)
     return out
 
 
 def _scatter_lebail(lookup: dict[tuple, float], cp_new) -> None:
     """Write intensities into a freshly compiled phase, matching by hkl."""
-    if cp_new.lebail_intensity is None:
+    if cp_new.hkl_intensity is None:
         return
     for i, h in enumerate(map(tuple, cp_new.reflections.hkl)):
         value = lookup.get(h)
         if value is not None:
-            cp_new.lebail_intensity[i] = value
+            cp_new.hkl_intensity[i] = value
 
 
 def _carry_lebail(old: CompiledModel, new: CompiledModel) -> None:
-    """Carry extracted intensities across a stage recompile (match by hkl)."""
+    """Carry per-hkl intensities across a stage recompile (match by hkl)."""
     for cp_old, cp_new in zip(old.phases, new.phases, strict=True):
-        if cp_old.lebail_intensity is None:
+        if cp_old.hkl_intensity is None:
             continue
-        lookup = {tuple(h): float(cp_old.lebail_intensity[i])
+        lookup = {tuple(h): float(cp_old.hkl_intensity[i])
                   for i, h in enumerate(map(tuple, cp_old.reflections.hkl))}
         _scatter_lebail(lookup, cp_new)
 
 
 def _restore_lebail(states: list[ReflectionState], model: CompiledModel) -> None:
-    """Re-seed extracted intensities from a checkpoint (match by hkl)."""
+    """Re-seed per-hkl intensities from a checkpoint (match by hkl)."""
     for state in states:
         if not 0 <= state.phase_index < len(model.phases):
             continue
         lookup = {tuple(h): state.intensity[i] for i, h in enumerate(state.hkl)}
         _scatter_lebail(lookup, model.phases[state.phase_index])
+
+
+#: a Pawley overlap group is reported unresolved when the best-determined
+#: member still carries a relative esd above this — the data cannot apportion
+#: the intensity even though their sum is fixed
+PAWLEY_UNRESOLVED_REL = 0.3
+
+
+def _pawley_n(model: CompiledModel | None) -> int:
+    """Free-parameter count contributed by the Pawley intensity block."""
+    return model.pawley.n if (model is not None and model.pawley is not None) else 0
+
+
+def _pawley_unresolved_diagnostics(model: CompiledModel,
+                                   structure: Structure) -> list[Diagnostic]:
+    """Flag overlapped groups whose intensity *split* the data cannot resolve.
+
+    The summed intensity of an overlapped group is determined; its partition is
+    not, and the equal-split restraint leaves that ambiguity visible as a large
+    per-reflection esd.  A group is reported when *every* member's relative esd
+    exceeds :data:`PAWLEY_UNRESOLVED_REL` — i.e. no member is pinned by the data
+    — so the caller never presents a confidently-wrong split.
+    """
+    pb = model.pawley
+    if pb is None or pb.stderr is None or not pb.groups:
+        return []
+    intens = model.pawley_x0()
+    out: list[Diagnostic] = []
+    for g in pb.groups:
+        inten = intens[list(g)]
+        sd = np.asarray(pb.stderr)[list(g)]
+        rel = sd / np.maximum(np.abs(inten), 1e-10)
+        if float(np.min(rel)) < PAWLEY_UNRESOLVED_REL:
+            continue  # at least one member is well determined — treat as split
+        labels = []
+        for gi in g:
+            ip, k = _pawley_locate(pb, gi)
+            h = tuple(int(v) for v in model.phases[ip].reflections.hkl[k])
+            labels.append(f"{structure.phases[ip].name} {h}")
+        total = float(np.sum(inten))
+        out.append(Diagnostic(
+            level="info", code="PAWLEY_OVERLAP_UNRESOLVED", where=labels,
+            message=(f"{len(g)} reflections overlap too strongly to split: their "
+                     f"summed intensity ({total:.4g}) is determined but the "
+                     f"individual values are not (relative esd ≥ "
+                     f"{float(np.min(rel)):.0%})"),
+            suggestion="treat the group's summed intensity as the datum; the "
+                       "per-reflection split is not resolved by these data",
+        ))
+    return out
+
+
+def _pawley_locate(pb, gi: int) -> tuple[int, int]:
+    """Map a flat intensity index to (phase index, in-phase reflection index)."""
+    for ip, (a, b) in enumerate(pb.phase_slices):
+        if a <= gi < b:
+            return ip, gi - a
+    raise IndexError(gi)
 
 
 def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementResult:
@@ -723,7 +814,7 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
     model = compile_model(structure, instrument, data, mode=state.mode,
                           two_theta_limits=state.two_theta_limits,
                           free_paths=set(table.free_paths))
-    if state.mode == "lebail":
+    if state.mode in ("lebail", "pawley"):
         _restore_lebail(state.reflections, model)
 
     result = _build_result(
