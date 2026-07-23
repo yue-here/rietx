@@ -45,17 +45,20 @@ class StageSpec(Base):
     turn_on: list[str] = Field(default_factory=list)
     max_iter: int = 100
     lebail_cycles: int = 3
+    seed: float = 0.0
 
     @classmethod
     def from_stage(cls, stage: Any) -> "StageSpec":
         return cls(name=stage.name, turn_on=list(stage.turn_on),
-                   max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles)
+                   max_iter=stage.max_iter, lebail_cycles=stage.lebail_cycles,
+                   seed=getattr(stage, "seed", 0.0))
 
     def to_stage(self) -> Any:
         from ..strategy.staged import Stage
 
         return Stage(name=self.name, turn_on=list(self.turn_on),
-                     max_iter=self.max_iter, lebail_cycles=self.lebail_cycles)
+                     max_iter=self.max_iter, lebail_cycles=self.lebail_cycles,
+                     seed=self.seed)
 
 
 class PlanSpec(Base):

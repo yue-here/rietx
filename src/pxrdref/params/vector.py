@@ -355,6 +355,29 @@ class ParameterTable:
         self._rebuild()
         return hits
 
+    def seed_softplus(self, paths: list[str], value: float) -> list[str]:
+        """Lift softplus-bounded free params sitting below ``value`` up to it.
+
+        A softplus coefficient at ~0 has an internal gradient ≈ 0 (dp/du =
+        σ(u) → 0 as p → 0), so TRF cannot move it off the floor.  When a stage
+        frees such a parameter this nudges it to a small positive seed so the
+        first Jacobian has a live column.  Only softplus entries strictly
+        below ``value`` are touched (already-lifted ones and other transforms
+        are left alone); returns the paths actually seeded.
+        """
+        seeded = []
+        for path in paths:
+            i = self._paths.get(path)
+            if i is None:
+                continue
+            e = self.entries[i]
+            if e.transform == "softplus" and e.value < value:
+                e.value = value
+                seeded.append(path)
+        if seeded:
+            self._rebuild()
+        return seeded
+
     # -- optimiser interface -------------------------------------------
     @property
     def free_paths(self) -> list[str]:

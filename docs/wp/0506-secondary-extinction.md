@@ -110,10 +110,12 @@ guard).
 - [x] **Param wiring** — `params/vector.py` `_collect` (next to `scale`) and
       `apply_to_models`; confirm `_STRUCTURAL_PATH` does not match
       `phases.N.extinction`; `set_vary(["phases.*.extinction"])` round-trip.
-- [ ] **Staged-plan slot** — `Stage("extinction", ["phases.*.extinction"])`
-      appended to `mccusker_structural` *after* `biso`, with a seed that lifts
-      `ext` off the softplus zero when the stage activates; document the
-      Biso→extinction ordering.
+- [x] **Staged-plan slot** — `Stage("extinction", ["phases.*.extinction"],
+      seed=1e-3)` appended to `mccusker_structural` *after* `biso`; new
+      `Stage.seed` field + `ParameterTable.seed_softplus` lift `ext` off the
+      softplus zero when the stage activates (carried through `StageSpec`);
+      Biso→extinction ordering documented. Existing `mccusker_structural`
+      tests (coordinates, aniso ADP recovery) still pass with the stage in.
 - [ ] **Recovery + does-no-harm tests** — synthetic extinction injection
       recovered within esds on a detectable case; does-no-harm `@slow` on NAC
       and SRM 660c (extinction refines ≈ 0, Rwp not degraded); correlation

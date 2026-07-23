@@ -32,6 +32,13 @@ class Stage:
     turn_on: list[str]  # path globs, e.g. "phases.*.cell.*"
     max_iter: int = 100
     lebail_cycles: int = 3  # intensity-partitioning refreshes (lebail mode)
+    #: lift any softplus-bounded parameter this stage frees off the exact-zero
+    #: floor to this value before solving, so TRF sees a live gradient (the
+    #: softplus map's slope at p≈0 is ≈0, so a coefficient starting at 0 would
+    #: never move).  0 = no seed.  The extinction stage uses it; unlike the FCJ
+    #: AXIAL_SIZING_FLOOR (an identity-transform bound, movable off zero on its
+    #: own) a softplus coefficient genuinely needs the value nudge.
+    seed: float = 0.0
 
 
 @dataclass
@@ -72,6 +79,13 @@ class RefinementPlan:
                               "instrument.profile.x", "instrument.profile.y"]),
             Stage("coordinates", ["phases.*.atoms.*.dof.*"]),
             Stage("biso", list(_DISPLACEMENT_GLOBS)),
+            # secondary extinction (WP-0506) comes *after* the displacement
+            # stage on purpose: ext, Biso and the ADPs all attenuate high-Q
+            # intensity, so letting the structure/ADPs settle first leaves
+            # extinction with only its (different, low-angle-weighted)
+            # signature to fit.  The coefficient starts at exactly 0 on the
+            # softplus floor, so the stage seeds it to lift TRF off the zero.
+            Stage("extinction", ["phases.*.extinction"], seed=1e-3),
         ])
 
     @classmethod

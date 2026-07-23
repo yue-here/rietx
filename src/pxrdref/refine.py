@@ -313,6 +313,10 @@ class Refinement:
         frozen here and never move until the next stage.
         """
         freed = table.set_vary(stage.turn_on, True)
+        if stage.seed:
+            # lift softplus coefficients (e.g. extinction) off the zero floor
+            # so TRF has a live gradient this stage
+            table.seed_softplus(freed, stage.seed)
         if mode == "lebail":
             # never refine structural parameters (or the line-intensity
             # ratio, which the per-hkl intensities can absorb pairwise)

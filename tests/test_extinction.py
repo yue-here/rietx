@@ -110,6 +110,53 @@ def test_extinction_param_wiring_and_routing():
     assert _STRUCTURAL_PATH.match("phases.0.extinction") is None
 
 
+# -- staged plan + seed ------------------------------------------------
+
+
+def test_mccusker_structural_frees_extinction_after_displacement():
+    from pxrdref.strategy.staged import RefinementPlan
+
+    plan = RefinementPlan.mccusker_structural()
+    names = [s.name for s in plan.stages]
+    assert names[-1] == "extinction"
+    assert names.index("biso") < names.index("extinction")  # displacement first
+    ext = plan.stages[-1]
+    assert ext.turn_on == ["phases.*.extinction"]
+    assert ext.seed == 1e-3
+
+
+def test_seed_softplus_lifts_a_zero_coefficient_into_a_live_gradient():
+    from pxrdref import Instrument
+    from pxrdref.params.transforms import dphys_dinternal, to_internal
+    from pxrdref.params.vector import ParameterTable
+    from tests.test_schemas import make_lab6
+
+    table = ParameterTable(make_lab6(), Instrument.debye_scherrer(wavelength=1.5406))
+    table.set_vary(["*"], False)
+    freed = table.set_vary(["phases.*.extinction"], True)
+    # at exactly 0 the softplus internal gradient is effectively dead
+    assert dphys_dinternal(to_internal(0.0, "softplus"), "softplus") < 1e-6
+
+    seeded = table.seed_softplus(freed, 1e-3)
+    assert seeded == ["phases.0.extinction"]
+    e = next(x for x in table.entries if x.path == "phases.0.extinction")
+    assert e.value == 1e-3
+    # after the nudge the gradient is alive again
+    assert dphys_dinternal(to_internal(1e-3, "softplus"), "softplus") > 1e-4
+    # seeding is idempotent-ish: a value already above the seed is left alone
+    assert table.seed_softplus(freed, 1e-3) == []
+
+
+def test_stagespec_round_trips_the_seed():
+    from pxrdref.schemas.history import StageSpec
+    from pxrdref.strategy.staged import Stage
+
+    spec = StageSpec.from_stage(Stage("extinction", ["phases.*.extinction"], seed=1e-3))
+    assert spec.seed == 1e-3
+    back = StageSpec.model_validate_json(spec.model_dump_json()).to_stage()
+    assert back.seed == 1e-3
+
+
 # -- forward model integration -----------------------------------------
 
 
