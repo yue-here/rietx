@@ -41,8 +41,11 @@ Structure/Instrument/PatternData (schemas/, pydantic, JSON round-trip)
 ```
 
 Entry points: `Refinement.fit()` / `refine()` in `refine.py`; modes
-`"rietveld"` and `"lebail"` (Le Bail intensity partitioning lives in
-`CompiledModel.lebail_update`).
+`"rietveld"`, `"lebail"` (intensity partitioning in
+`CompiledModel.lebail_update`) and `"pawley"` (per-hkl intensities refined as
+an off-table θ block — `model.forward.PawleyBlock`, appended in
+`run_least_squares`; overlapped groups get equal-split restraints and come back
+flagged `PAWLEY_OVERLAP_UNRESOLVED` rather than confidently split).
 
 ## Invariants (do not break)
 
@@ -163,10 +166,10 @@ the ROADMAP.md row.
 
 Shipped: **v0.1** (synchrotron vertical slice), **v0.2** (2026-07-22: lab
 Bragg-Brentano, analytic Jacobian, background automation, FitReport L1-2,
-history DAG, live viz). In progress: **v0.3** — coordinate refinement and
-anisotropic ADPs have landed (WP-0301/0302/0303); QPA, Pawley,
-multi-histogram and exporters remain. v2 fence: FPA, neutron/TOF, texture,
-MCP server.
+history DAG, live viz). In progress: **v0.3** — coordinate refinement,
+anisotropic ADPs and Pawley whole-pattern mode have landed
+(WP-0301/0302/0303/0306); QPA, multi-histogram and exporters remain. v2 fence:
+FPA, neutron/TOF, texture, MCP server.
 
 Key test data (provenance + every reference value in `tests/data/README.md`):
 - `11BM_NAC.fxye` — APS 11-BM synchrotron, λ=0.4139090 from the .prm; NAC +

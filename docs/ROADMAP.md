@@ -27,10 +27,10 @@ a work session loads only what it needs:
 
 ## Current focus
 
-**v0.3** — WP-0301, WP-0302 and WP-0303 are done (the site-constraint
-machinery now covers coordinates *and* anisotropic ADPs). Next: any ⬜ WP with
-no unmet dependency — [0304](wp/0304-qpa-hill-howard.md) (QPA, which unblocks
-0305/0309/0310 and is the widest fan-out), [0306](wp/0306-pawley-mode.md),
+**v0.3** — WP-0301, WP-0302, WP-0303 and WP-0306 are done (site constraints for
+coordinates + aniso ADPs; Pawley whole-pattern mode). Next: any ⬜ WP with no
+unmet dependency — [0304](wp/0304-qpa-hill-howard.md) (QPA, in flight in a
+parallel session, unblocks 0305/0309/0310 and is the widest fan-out),
 [0307](wp/0307-march-dollase.md), [0308](wp/0308-multi-histogram.md).
 
 ## Milestones
@@ -57,7 +57,7 @@ no unmet dependency — [0304](wp/0304-qpa-hill-howard.md) (QPA, which unblocks
 | [0303](wp/0303-anisotropic-adps.md) | Anisotropic ADPs | ✅ 2026-07-23 | 0301 |
 | [0304](wp/0304-qpa-hill-howard.md) | QPA: Hill-Howard ZMV mass fractions | ⬜ | — |
 | [0305](wp/0305-brindley-microabsorption.md) | Brindley microabsorption | ⬜ | 0304 |
-| [0306](wp/0306-pawley-mode.md) | Pawley mode | ⬜ | — |
+| [0306](wp/0306-pawley-mode.md) | Pawley mode | ✅ 2026-07-23 | — |
 | [0307](wp/0307-march-dollase.md) | March-Dollase preferred orientation | ⬜ | — |
 | [0308](wp/0308-multi-histogram.md) | Multi-histogram stacked residuals | ⬜ | — |
 | [0309](wp/0309-exporters.md) | Exporters: reflection table, CIF+esds (structure side landed in 0303), QPA table | ⬜ | 0304 |
