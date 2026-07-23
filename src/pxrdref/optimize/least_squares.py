@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 from scipy.optimize import least_squares
@@ -33,6 +34,9 @@ from ..crystallography.adp import U_NAMES
 from ..model.forward import CompiledModel, DerivativeBases
 from ..params.transforms import dphys_dinternal
 from ..params.vector import ParameterTable
+
+if TYPE_CHECKING:
+    from ..params.multi import MultiParameterTable
 
 #: Wyckoff site DOFs — coordinates (``dof``, tied to x, y, z) and anisotropic
 #: ADPs (``adp``, tied to the six U^ij).  Both get analytic columns that chain
@@ -356,6 +360,90 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     jac_table = np.asarray(res.jac)[:, :n_table] if res.jac is not None else None
     return LSQOutcome(res.x[:n_table], cost0, float(res.cost), int(res.nfev), status,
                       jac_table, stderr, corr, n_aux=n_aux)
+
+
+def run_multi_least_squares(models: list[CompiledModel],
+                            mtable: "MultiParameterTable", *,
+                            weights: list[float] | None = None,
+                            max_iter: int = 100, ftol: float = 1e-9,
+                            compute_uncertainties: bool = True) -> LSQOutcome:
+    """Joint TRF solve of several histograms stacked into one residual (WP-0308).
+
+    Each histogram keeps its own compiled model (⇒ its own frozen hkl list,
+    windows, FCJ node counts) and its own :class:`ParameterTable`; the combined
+    free vector θ threads through them via ``mtable``'s column map, so a *shared*
+    structural column (cell, coordinates, ADPs …) receives Jacobian
+    contributions from *every* histogram — that is what refines the shared
+    quantity better than any single pattern could.
+
+    Row layout is [all histograms' data rows] then [all histograms' background-
+    penalty rows], so :func:`covariance_estimates` (which treats the first
+    ``n_data`` rows as data for χ² and the Bérar-Lelann factor) is reused
+    verbatim.  A per-histogram scalar weight ``w_h`` scales both that
+    histogram's data and its penalty rows by ``√w_h`` — keeping the smoothness
+    prior's strength relative to the data fixed; default unit weights leave the
+    residual identical to N independent solves sharing the structure.
+    """
+    n_hist = len(models)
+    weights = [1.0] * n_hist if weights is None else list(weights)
+    if len(weights) != n_hist:
+        raise ValueError("weights must have one entry per histogram")
+    sqrt_w = [float(np.sqrt(w)) for w in weights]
+
+    residuals = [_make_residual(m, t) for m, t in zip(models, mtable.tables, strict=True)]
+    jacobians = [_make_jacobian(m, t) for m, t in zip(models, mtable.tables, strict=True)]
+    n_data = [len(m.tt) for m in models]
+    n_pen = [0 if m.bkg_penalty is None else m.bkg_penalty.shape[0] for m in models]
+    data_off = np.concatenate([[0], np.cumsum(n_data)])
+    n_data_total = int(data_off[-1])
+    pen_off = n_data_total + np.concatenate([[0], np.cumsum(n_pen)])
+    n_rows = int(pen_off[-1])
+    n_cols = len(mtable.free_paths)
+
+    def residual(theta: np.ndarray) -> np.ndarray:
+        thetas = mtable.split(theta)
+        data_parts: list[np.ndarray] = []
+        pen_parts: list[np.ndarray] = []
+        for h in range(n_hist):
+            r = residuals[h](thetas[h])
+            data_parts.append(sqrt_w[h] * r[:n_data[h]])
+            if n_pen[h]:
+                pen_parts.append(sqrt_w[h] * r[n_data[h]:])
+        return np.concatenate(data_parts + pen_parts) if n_rows else np.zeros(0)
+
+    def jacobian(theta: np.ndarray) -> np.ndarray:
+        thetas = mtable.split(theta)
+        J = np.zeros((n_rows, n_cols), dtype=np.float64)
+        for h in range(n_hist):
+            Jh = jacobians[h](thetas[h])
+            cm = mtable.col_map(h)
+            do = int(data_off[h])
+            J[do:do + n_data[h], cm] = sqrt_w[h] * Jh[:n_data[h]]
+            if n_pen[h]:
+                po = int(pen_off[h])
+                J[po:po + n_pen[h], cm] = sqrt_w[h] * Jh[n_data[h]:]
+        return J
+
+    x0 = mtable.x0()
+    lo, hi = mtable.bounds()
+    x0 = np.clip(x0, lo + 1e-12, hi - 1e-12) if len(x0) else x0
+    r0 = residual(x0)
+    cost0 = 0.5 * float(r0 @ r0)
+    if n_cols == 0:
+        return LSQOutcome(x0, cost0, cost0, 0, "converged", None, None, None)
+
+    res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",
+                        ftol=ftol, xtol=1e-12, gtol=1e-12,
+                        max_nfev=max_iter * max(len(x0), 1))
+    status = "converged" if res.status > 0 else ("max_iter" if res.status == 0 else "diverged")
+
+    stderr = corr = None
+    if compute_uncertainties and res.jac is not None and len(res.fun) > len(res.x):
+        stderr, corr = covariance_estimates(res.jac, res.fun, len(res.x),
+                                            n_data=n_data_total)
+    jac_data = np.asarray(res.jac)[:n_data_total] if res.jac is not None else None
+    return LSQOutcome(res.x, cost0, float(res.cost), int(res.nfev), status,
+                      jac_data, stderr, corr)
 
 
 def covariance_estimates(jac: np.ndarray, fun: np.ndarray, n_free: int,

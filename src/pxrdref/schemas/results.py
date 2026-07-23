@@ -144,6 +144,36 @@ class StageResult(Base):
     freed: list[str] = Field(default_factory=list)
 
 
+class HistogramResult(Base):
+    """One pattern's slice of a multi-histogram joint refinement.
+
+    A joint fit stacks several patterns into one residual (Von Dreele, 1997,
+    J. Appl. Cryst. 30, 517), so a *single* pooled Rwp would hide a
+    badly-fitting histogram — the failure mode this package's reporting exists
+    to prevent.  Each histogram therefore reports its **own** agreement indices
+    and curves here; ``RefinementResult.statistics`` stays the pooled number,
+    never quoted alone.  Empty ``RefinementResult.histograms`` ⇒ an ordinary
+    single-histogram fit (backward compatible).
+
+    ``weight`` is the inter-histogram relative weight applied to this
+    histogram's residual block (1.0 = unit weight, each point's own esd
+    governs); it is also recorded in ``Provenance.notes`` so a non-unit
+    weighting is never silent.
+    """
+
+    label: str = ""
+    weight: float = 1.0
+    statistics: Statistics
+    two_theta: list[float] = Field(default_factory=list)
+    y_obs: list[float] = Field(default_factory=list)
+    y_calc: list[float] = Field(default_factory=list)
+    y_background: list[float] = Field(default_factory=list)
+    sigma: list[float] = Field(default_factory=list)
+    ticks: dict[str, list[float]] = Field(default_factory=dict)
+    qpa: "QuantitativePhaseAnalysis | None" = None
+    diagnostics: list[Diagnostic] = Field(default_factory=list)
+
+
 class RefinementResult(Base):
     status: Literal["converged", "max_iter", "diverged"]
     mode: Mode
@@ -175,6 +205,37 @@ class RefinementResult(Base):
     # Quantitative phase analysis (weight fractions); computed for Rietveld
     # fits, None for Le Bail (its scales are degenerate).
     qpa: QuantitativePhaseAnalysis | None = None
+
+    # Per-histogram slices of a multi-histogram joint refinement (WP-0308);
+    # empty for an ordinary single-histogram fit.  ``statistics`` above is then
+    # the pooled combined number and ``two_theta``/``y_*`` mirror histogram 0.
+    histograms: list[HistogramResult] = Field(default_factory=list)
+
+    def for_histogram(self, h: int) -> "RefinementResult":
+        """A single-histogram-shaped view of histogram ``h`` for reporting/plots.
+
+        Swaps the top-level curves and statistics for histogram ``h``'s own and
+        clears ``histograms``, so ``build_report(result.for_histogram(h))`` and
+        ``result.for_histogram(h).plot()`` operate per pattern (reports are
+        per-histogram — see :class:`HistogramResult`).
+        """
+        if not self.histograms:
+            if h == 0:
+                return self
+            raise IndexError("this result has no per-histogram slices")
+        hr = self.histograms[h]
+        view = self.model_copy(deep=True)
+        view.statistics = hr.statistics.model_copy(deep=True)
+        view.two_theta = list(hr.two_theta)
+        view.y_obs = list(hr.y_obs)
+        view.y_calc = list(hr.y_calc)
+        view.y_background = list(hr.y_background)
+        view.sigma = list(hr.sigma)
+        view.ticks = dict(hr.ticks)
+        view.qpa = hr.qpa.model_copy(deep=True) if hr.qpa is not None else None
+        view.diagnostics = list(hr.diagnostics)
+        view.histograms = []
+        return view
 
     def plot(self, path: str | None = None, **kw):
         from ..viz.plots import plot_result
