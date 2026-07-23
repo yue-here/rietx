@@ -27,10 +27,11 @@ a work session loads only what it needs:
 
 ## Current focus
 
-**v0.3** — WP-0301, WP-0302, WP-0303 and WP-0306 are done (site constraints for
-coordinates + aniso ADPs; Pawley whole-pattern mode). Next: any ⬜ WP with no
-unmet dependency — [0304](wp/0304-qpa-hill-howard.md) (QPA, in flight in a
-parallel session, unblocks 0305/0309/0310 and is the widest fan-out),
+**v0.3** — WP-0301, WP-0302, WP-0303, WP-0304 and WP-0306 are done
+(site-constraint machinery covers coordinates *and* aniso ADPs; QPA weight
+fractions land off `RefinementResult.qpa`; Pawley whole-pattern mode). Next: any
+⬜ WP with no unmet dependency — [0305](wp/0305-brindley-microabsorption.md) and
+[0309](wp/0309-exporters.md) are now unblocked by 0304, alongside
 [0307](wp/0307-march-dollase.md), [0308](wp/0308-multi-histogram.md).
 
 ## Milestones
@@ -55,7 +56,7 @@ parallel session, unblocks 0305/0309/0310 and is the widest fan-out),
 | [0301](wp/0301-wyckoff-constraints.md) | Wyckoff/site-symmetry constraints (affine p = C·θ + d) | ✅ 2026-07-22 | — |
 | [0302](wp/0302-atomic-coordinates.md) | Atomic-coordinate refinement | ✅ 2026-07-23 | 0301 |
 | [0303](wp/0303-anisotropic-adps.md) | Anisotropic ADPs | ✅ 2026-07-23 | 0301 |
-| [0304](wp/0304-qpa-hill-howard.md) | QPA: Hill-Howard ZMV mass fractions | ⬜ | — |
+| [0304](wp/0304-qpa-hill-howard.md) | QPA: Hill-Howard ZMV mass fractions | ✅ 2026-07-23 | — |
 | [0305](wp/0305-brindley-microabsorption.md) | Brindley microabsorption | ⬜ | 0304 |
 | [0306](wp/0306-pawley-mode.md) | Pawley mode | ✅ 2026-07-23 | — |
 | [0307](wp/0307-march-dollase.md) | March-Dollase preferred orientation | ⬜ | — |

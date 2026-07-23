@@ -398,9 +398,7 @@ class ParameterTable:
         thereby report exactly the source esd; general rows get full linear
         propagation including cross terms.  Held parameters are omitted.
         """
-        s = np.array([abs(dphys_dinternal(float(t), self.entries[i].transform)) * float(sd)
-                      for t, sd, i in zip(theta, stderr_internal, self._free_idx, strict=True)],
-                     dtype=np.float64)
+        s = self._phys_sigma_free(theta, stderr_internal)
         if correlation is None:
             var = self._C.multiply(self._C) @ (s * s)
         else:
@@ -410,6 +408,47 @@ class ParameterTable:
         touched = np.diff(self._C.indptr) > 0  # rows with any free source
         return {e.path: float(np.sqrt(var[i]))
                 for i, e in enumerate(self.entries) if touched[i]}
+
+    def _phys_sigma_free(self, theta: np.ndarray, stderr_internal: np.ndarray
+                         ) -> np.ndarray:
+        """Chain-ruled physical esd of each free parameter (θ-column order)."""
+        return np.array(
+            [abs(dphys_dinternal(float(t), self.entries[i].transform)) * float(sd)
+             for t, sd, i in zip(theta, stderr_internal, self._free_idx, strict=True)],
+            dtype=np.float64)
+
+    def _cov_free(self, theta: np.ndarray, stderr_internal: np.ndarray,
+                  correlation: np.ndarray | None) -> np.ndarray:
+        """Covariance of the *physical* free parameters (Cov_free).
+
+        Diagonal from the chain-ruled esds; off-diagonal from ``correlation``
+        when given.  This is the exact construction :meth:`stderr_physical`
+        uses, so any block extracted from it carries the same Bérar-Lelann
+        conditioning as the reported per-parameter esds.
+        """
+        s = self._phys_sigma_free(theta, stderr_internal)
+        if correlation is None:
+            return np.diag(s * s)
+        return np.asarray(correlation, dtype=np.float64) * np.outer(s, s)
+
+    def physical_covariance(self, theta: np.ndarray, stderr_internal: np.ndarray,
+                            correlation: np.ndarray | None,
+                            paths: list[str]) -> np.ndarray:
+        """Physical covariance sub-block for ``paths`` (free or tied entries).
+
+        Generalises :meth:`stderr_physical` (which returns only the diagonal)
+        to the full block ``Cov = C_rows · Cov_free · C_rowsᵀ``, so callers can
+        propagate correlated functions of several parameters — e.g. QPA weight
+        fractions from the phase scales.  A parameter that was never freed has
+        an all-zero ``C`` row, hence a zero covariance row/column (no
+        uncertainty), which the caller handles naturally.
+        """
+        rows = [self._paths[p] for p in paths]
+        if not self._free_idx:
+            return np.zeros((len(paths), len(paths)), dtype=np.float64)
+        cov_free = self._cov_free(theta, stderr_internal, correlation)
+        c_rows = self._C[rows, :].toarray()
+        return c_rows @ cov_free @ c_rows.T
 
     def apply_to_models(self, structure: Structure, instrument: Instrument,
                         stderr: dict[str, float] | None = None) -> None:
