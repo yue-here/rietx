@@ -469,17 +469,21 @@ def test_injected_extinction_is_recovered_within_esds():
     plot_result(result, path=str(OUT / "extinct_lab6_fit.png"))
 
 
-def test_extinction_is_separable_from_scale_and_biso_and_the_guard_stays_quiet():
-    """The WP flags ext↔Biso↔scale as the main refinement risk (all attenuate
-    the strong lines).  Measured on well-sampled LaB6 data it is *not* a
-    generic problem: co-freeing ext, scale and both Biso leaves every
-    ext-involving correlation ≈ 0, because extinction's per-reflection
-    signature (x ∝ |F|², weighted by sin²θ/cos²θ) is not a uniform scale and
-    is not the monotone exp(−B k²) of Biso — the varied |F|² across reflections
-    breaks the degeneracy.  The pairwise guard therefore correctly stays quiet;
-    the risk is real only in the degenerate few-reflection limit, which is why
-    the staged plan still refines Biso before extinction and keeps the guards
-    live (see also the does-no-harm acceptance tests on real data)."""
+def test_extinction_correlates_with_scale_and_biso_and_the_guard_fires():
+    """Co-freeing extinction, scale and the atom Biso on a *single* powder
+    pattern is a genuine degeneracy — all three attenuate the strong low-angle
+    lines.  Measured on this LaB6 synthetic the extinction↔scale correlation is
+    ρ ≈ +0.97 and extinction↔La-Biso ρ ≈ +0.87: extinction's per-reflection
+    x ∝ |F|² sin²θ/cos²θ signature does *not* break the degeneracy against a
+    freely-varying scale here.  That is exactly why the staged plan refines
+    scale (and Biso) before extinction and holds Biso while extinction is freed
+    (test_injected_extinction_is_recovered_within_esds), and it is what the
+    high-correlation guard exists to catch.
+
+    This test also pins the guard *live*: before WP-0407 the returned
+    correlation matrix was deflated by BL² (the placement bug), so this
+    genuinely-collinear pair reported ρ ≈ +0.4 and the guard never fired.  On
+    the true Pearson matrix (unit diagonal) it does."""
     from pxrdref import Instrument
     from pxrdref.model.forward import compile_model
     from pxrdref.optimize.least_squares import run_least_squares
@@ -504,10 +508,15 @@ def test_extinction_is_separable_from_scale_and_biso_and_the_guard_stays_quiet()
 
     free = table.free_paths
     ie = free.index("phases.0.extinction")
+    isc = free.index("phases.0.scale")
     corr = np.asarray(outcome.correlation)
-    worst = max(abs(corr[ie, j]) for j in range(len(free)) if j != ie)
-    assert worst < 0.5, f"extinction should be identifiable here, |ρ|max={worst:.2f}"
+    # true Pearson matrix: unit diagonal (the placement bug left 1/BL² here)
+    assert np.allclose(np.diag(corr), 1.0)
+    assert corr[ie, isc] > 0.9, \
+        f"ext↔scale should be collinear here, ρ={corr[ie, isc]:+.2f}"
 
-    # and the pairwise guard (even at a lenient 0.8) flags nothing spurious
+    # the guard fires on the genuinely degenerate ext↔scale pair (ρ ≈ 0.97 sits
+    # below the default 0.98 bar; at the lenient 0.8 threshold it is flagged)
     guard = check_guards(table, outcome, threshold=0.8)
-    assert not any("extinction" in c for c in guard.high_correlations)
+    assert any("extinction" in c and "scale" in c
+               for c in guard.high_correlations), guard.high_correlations

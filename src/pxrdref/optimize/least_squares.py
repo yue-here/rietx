@@ -445,7 +445,16 @@ def run_multi_least_squares(models: list[CompiledModel],
     Row layout is [all histograms' data rows] then [all histograms' background-
     penalty rows], so :func:`covariance_estimates` (which treats the first
     ``n_data`` rows as data for χ² and the Bérar-Lelann factor) is reused
-    verbatim.  A per-histogram scalar weight ``w_h`` scales both that
+    verbatim.  The BL run-of-signs statistic is therefore evaluated on the
+    *concatenated* data residual: WP-0407 examined this and kept it as-is —
+    each histogram join contaminates the statistic with at most one artificial
+    run boundary (a point where consecutive residuals are not 2θ-neighbours),
+    i.e. ≤ ``n_hist − 1`` boundaries out of ``n_data_total``, negligible for the
+    handful of patterns co-refined here.  A per-histogram decomposition was not
+    adopted because BL applies as a single scalar to the whole covariance
+    diagonal and a *shared* parameter draws from every histogram, so there is
+    no clean single per-parameter factor to combine.  A per-histogram scalar
+    weight ``w_h`` scales both that
     histogram's data and its penalty rows by ``√w_h`` — keeping the smoothness
     prior's strength relative to the data fixed; default unit weights leave the
     residual identical to N independent solves sharing the structure.
@@ -521,9 +530,20 @@ def covariance_estimates(jac: np.ndarray, fun: np.ndarray, n_free: int,
 
     Cov = χ²_red · (JᵀJ)⁻¹ with χ²_red = Σr²/(N−P); esd_i = √Cov_ii, then
     multiplied by the Bérar-Lelann serial-correlation factor (Bérar & Lelann,
-    1991, J. Appl. Cryst. 24, 1 — see ``statistics.berar_lelann_factor``);
-    the factor cancels in the correlation matrix.
-    A pseudo-inverse guards against singular normal matrices.
+    1991, J. Appl. Cryst. 24, 1 — see ``statistics.berar_lelann_factor``).  The
+    returned esds therefore carry the inflation; the correlation matrix does
+    **not** — it is the true Pearson matrix (unit diagonal) normalised by the
+    *raw* sqrt-diagonal, so a genuinely degenerate pair reports |ρ| ≈ 1 and the
+    0.98 high-correlation guard means what it says (WP-0407 fixed a placement
+    bug where normalising by the inflated diagonal left corr with a 1/BL²
+    diagonal, cancelling BL in the reported physical esds and deflating the
+    guard).  A pseudo-inverse guards against singular normal matrices.
+
+    Both esd consumers inherit the inflation: table esds flow through
+    ``ParameterTable.stderr_physical`` as ``diag(C·corr·outer(s,s)·Cᵀ)`` with
+    ``s`` already ×BL and ``corr`` now unit-diagonal (no cancellation), and the
+    Pawley per-hkl tail (``model.pawley.stderr`` in :func:`run_least_squares`)
+    is a slice of this ×BL diagonal used directly.
 
     With P-spline penalty rows appended (rows beyond ``n_data``), JᵀJ keeps
     them — (J_dᵀJ_d + λD₂ᵀD₂)⁻¹ is the regularised covariance — but χ² and
@@ -544,8 +564,16 @@ def covariance_estimates(jac: np.ndarray, fun: np.ndarray, n_free: int,
     JTJ = jac.T @ jac
     chi2_red = float(data @ data) / max(len(data) - n_free, 1)
     cov = np.linalg.pinv(JTJ) * chi2_red
-    diag = np.sqrt(np.maximum(np.diag(cov), 0.0)) * berar_lelann_factor(data)
-    denom = np.outer(diag, diag)
+    # Normalise the correlation by the *raw* (un-inflated) sqrt-diagonal so it is
+    # a true Pearson matrix with unit diagonal; apply Bérar-Lelann only to the
+    # returned esd diagonal.  Normalising by the inflated diagonal instead (the
+    # pre-WP-0407 bug) left corr with a 1/BL² diagonal, which then cancelled the
+    # BL factor exactly inside ``ParameterTable.stderr_physical`` (making the
+    # reported physical esds effectively raw) and deflated every off-diagonal by
+    # BL² (killing the 0.98 high-correlation guard).
+    sqrt = np.sqrt(np.maximum(np.diag(cov), 0.0))
+    denom = np.outer(sqrt, sqrt)
     with np.errstate(invalid="ignore", divide="ignore"):
         corr = np.where(denom > 0, cov / denom, 0.0)
+    diag = sqrt * berar_lelann_factor(data)
     return diag, corr

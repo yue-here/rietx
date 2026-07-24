@@ -368,13 +368,15 @@ def test_round_trip_recovers_an_anisotropic_perturbation():
         assert p.stderr is not None and p.stderr > 0, name
         assert getattr(o.aniso, name).value == pytest.approx(
             truth, abs=max(4 * p.stderr, 3e-4)), name
-    # the anisotropy is *resolved*, not merely fitted: U33 separates from
-    # U11 by several esds — and these esds already carry the Bérar-Lelann
-    # inflation, which sits near 1.5 even for white residuals, so 3σ on this
-    # scale is a conservative statement of the separation (measured ≈ 3.4σ)
+    # the anisotropy is *resolved*, not merely fitted: U33 separates from U11
+    # by ≈2.2σ once the esds carry the Bérar-Lelann inflation the reported
+    # values now genuinely include (BL ≈ 1.52 here for near-white residuals;
+    # WP-0407 fixed the placement bug that used to cancel BL out, which is why
+    # this read ≈3.4σ against the raw esds before).  Still resolved, just stated
+    # against honest (conservative) uncertainties.
     u11 = result.parameter("phases.0.atoms.1.u11")
     u33 = result.parameter("phases.0.atoms.1.u33")
-    assert abs(u11.value - u33.value) > 3 * max(u11.stderr, u33.stderr)
+    assert abs(u11.value - u33.value) > 2 * max(u11.stderr, u33.stderr)
     # and the tensors stayed physical throughout
     assert not [d for d in result.diagnostics
                 if d.code == "ADP_NOT_POSITIVE_DEFINITE"]
