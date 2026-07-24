@@ -1,6 +1,6 @@
 # WP-0407 — esd reconciliation (Bérar-Lelann placement)
 
-Milestone: v0.4 · Status: ⬜ not started
+Milestone: v0.4 · Status: ✅ done 2026-07-24
 Depends on: —
 
 ## Goal
@@ -141,18 +141,19 @@ touching the covariance's penalty-row handling.
 
 ## Tasks
 
-- [ ] Fix `covariance_estimates`: unit-diagonal correlation from the raw
+- [x] Fix `covariance_estimates`: unit-diagonal correlation from the raw
       sqrt-diagonal, BL applied only to the returned esd diagonal; update
       the docstring to describe what it now does
-- [ ] Re-measure SRM 660c; correct the comment in
+- [x] Re-measure SRM 660c; correct the comment in
       `tests/test_acceptance_srm660c.py` and the running text in
-      `docs/milestones/v0.2.md` if any raw digits are quoted
-- [ ] Regression test: a known-collinear pair (e.g. zero-shift ~ sample
+      `docs/milestones/v0.2.md` if any raw digits are quoted (v0.2 record
+      already quoted the inflated `(25)` — no change needed there)
+- [x] Regression test: a known-collinear pair (e.g. zero-shift ~ sample
       displacement freed together) now trips the 0.98 guard, and the returned
       correlation matrix has unit diagonal
-- [ ] Re-measure QPA σ(W); confirm no acceptance tolerance regresses and
+- [x] Re-measure QPA σ(W); confirm no acceptance tolerance regresses and
       update quoted digits in records
-- [ ] Update/delete the `esd-berar-lelann-conditioning` memory note
+- [x] Update/delete the `esd-berar-lelann-conditioning` memory note (deleted)
 
 ## Acceptance
 
@@ -180,3 +181,50 @@ correlation guard trips on a deliberately collinear pair.
   BL = 5.18), which cancels BL exactly in `stderr_physical` (measured: equals
   the raw esd to floating-point equality) and deflates the guard's ρ by BL².
   Decision recorded: inflate/fix-the-placement.
+
+- **2026-07-24 (landed)** — fix shipped; all five checklist items done, both
+  acceptance commands green (fast suite + full slow suite, 21 acceptance tests
+  passed). One-line fix in `covariance_estimates`: correlation now normalised
+  by the raw sqrt-diagonal (true Pearson, unit diagonal), BL applied only to
+  the returned esd diagonal.
+
+  Measured after fix:
+  - SRM 660c `a`-esd = **2.49e-5** (raw 7.4e-6 × BL 3.38) — the reported number
+    is now the milestone's `4.156895(25)`. Added a `1.5e-5 < a_err` lower bound
+    so a regression back to raw would fail.
+  - Collinear zero-shift ~ Bragg-Brentano displacement reads ρ ≈ 1.0 and trips
+    the default 0.98 guard; returned correlation has unit diagonal (new pins in
+    `tests/test_v02_core.py`).
+  - QPA σ(W) 0.1–0.9 wt% (was 0.1–0.4 raw); no acceptance tolerance regresses.
+  - Pawley overlapped-pair rel esd ≈ 116% (BL ×1.567).
+
+  **Corrections to this WP's own Context/Inherited (verify, don't trust):**
+  1. The Inherited note calls the Pawley `model.pawley.stderr` tail "raw". It is
+     **not** — the tail is `diag[n_table:]` and `diag = sqrt·BL`, so it already
+     carried BL *before* this fix and is unchanged *by* it. What flipped is the
+     table path (raw→inflated via the removed 1/BL² cancellation). So both esd
+     paths now report inflated esds; WP-0306 gotcha (4) is now globally true
+     because "everywhere else" (the table path) caught up, not because the tail
+     changed. No code change was needed on the Pawley path.
+  2. Multi-histogram BL: examined and **kept** on the concatenated data residual
+     (documented in `run_multi_least_squares`). Join contamination is
+     ≤ n_hist−1 artificial run boundaries out of n_data_total (negligible), and
+     a shared parameter draws from every histogram so there is no clean single
+     per-parameter factor to combine. Not re-architected.
+
+  **Ripples that surfaced (as the WP predicted — reported, not silenced):**
+  Two unit tests rode the bug and were reconciled to the honest physics, not
+  worked around:
+  - `test_extinction.py`: co-freeing extinction+scale+Biso on one pattern is a
+    **genuine** degeneracy (ρ(ext,scale) ≈ +0.97, ρ(ext,La-Biso) ≈ +0.87). The
+    old "separable, guard stays quiet" claim was the BL²-deflation artifact.
+    Rewritten to assert the guard **fires** (renamed
+    `..._correlates_with_scale_and_biso_and_the_guard_fires`). The PO sibling
+    (`test_po_is_identifiable...`) is genuinely identifiable (worst ρ ≈ 0.28)
+    and passes unchanged — now for real.
+  - `test_aniso_adp.py`: U11/U33 separation is ≈2.2σ against honest esds (was
+    3σ against raw); relaxed 3σ→2σ, comment corrected. Recovery-within-4-esds
+    assertions only *widen* under inflation, so they were safe.
+
+  Next: nothing on 0407. If a future WP touches esds, the two `stderr_physical`
+  paths are now consistent (both ×BL) and the guard is live at 0.98.

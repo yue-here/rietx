@@ -72,13 +72,17 @@ S/L == H/L subgradient kink needs the same loose bar there) →
 starts only once 0402+0404 are green, and supplies the first real-hardware
 measurement of 0403's policy).
 
-Two WPs are independent of the backend chain and can be picked up at any
-time: [0407](wp/0407-esd-reconciliation.md) (small — the reported
-per-parameter esds do not actually carry the Bérar-Lelann inflation the
-docstrings claim, because the correlation matrix is normalised by the
-inflated diagonal; the same bug leaves the high-correlation guard dead) and
-[0406](wp/0406-restraint-penalty-rows.md) (bond/angle restraints).
-[0405](wp/0405-faddeeva-voigt.md) (true Voigt) needs only 0401.
+[0407](wp/0407-esd-reconciliation.md) (esd reconciliation) **landed
+2026-07-24**: the Bérar-Lelann placement bug is fixed — reported physical esds
+now genuinely carry the inflation the docstrings claim (SRM 660c `a`-esd
+2.49e-5 = raw 7.4e-6 × BL 3.38), the returned correlation matrix is a true
+Pearson matrix (unit diagonal), and the 0.98 high-correlation guard is live
+again (it correctly fires on collinear zero-shift ~ sample-displacement).  It
+un-masked two unit tests that had ridden the bug (extinction↔scale is a genuine
+ρ≈0.97 degeneracy, not separable; aniso U11/U33 separate at ≈2.2σ against honest
+esds) — reconciled to the true physics, not silenced.  Still independent of the
+backend chain: [0406](wp/0406-restraint-penalty-rows.md) (bond/angle
+restraints).  [0405](wp/0405-faddeeva-voigt.md) (true Voigt) needs only 0401.
 
 ## Milestones
 
@@ -120,7 +124,7 @@ inflated diagonal; the same bug leaves the high-correlation guard dead) and
 | [0404](wp/0404-cross-backend-jacobian-ci.md) | Cross-backend Jacobian CI | ⬜ | 0402 |
 | [0405](wp/0405-faddeeva-voigt.md) | True Voigt via shared Faddeeva w(z) | ⬜ | 0401 |
 | [0406](wp/0406-restraint-penalty-rows.md) | Restraint penalty rows | ⬜ | — |
-| [0407](wp/0407-esd-reconciliation.md) | esd reconciliation (Bérar-Lelann placement) | ⬜ | — |
+| [0407](wp/0407-esd-reconciliation.md) | esd reconciliation (Bérar-Lelann placement) | ✅ 2026-07-24 | — |
 | [0408](wp/0408-torch-mps-backend.md) | torch backend (MPS fp32 forward) — moved from v0.6 | ⬜ | 0401, 0402, 0404 |
 
 ### v0.5 — corrections & microstructure (stubs)
