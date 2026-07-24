@@ -127,6 +127,41 @@ class QuantitativePhaseAnalysis(Base):
     microabsorption_skipped: str | None = None
 
 
+class RestraintRow(Base):
+    """One soft restraint's computed-vs-target deviation (WP-0406).
+
+    ``deviation_over_sigma`` is the headline: a restraint fighting the data
+    shows up as |deviation/σ| ≫ 1 (and, past a threshold, a ``RESTRAINT_TENSION``
+    diagnostic).  ``atoms`` (bond/angle) or ``path`` (value) names the target;
+    exactly one is set.
+    """
+
+    phase_index: int | None = None
+    kind: Literal["bond", "angle", "value"]
+    atoms: list[int] | None = None                  # bond (2) / angle (3) indices
+    path: str | None = None                         # value-restraint dot-path
+    computed: float                                 # Å (bond), deg (angle), or value
+    target: float
+    sigma: float
+    weight: float = 1.0
+    deviation: float                                # computed − target
+    deviation_over_sigma: float
+
+
+class RestraintReport(Base):
+    """Per-restraint deviations and the pooled restraint χ² (WP-0406).
+
+    ``restraint_chi2`` = Σ weight·(deviation/σ)² is the sum of the squared
+    restraint residual rows — the penalty the restraints add to the cost.  It
+    is *not* part of the data-row Rwp/χ²/GoF (those see data rows only), by
+    design: restraints are soft observations, not measured intensities.
+    """
+
+    rows: list[RestraintRow]
+    restraint_chi2: float
+    n_restraints: int
+
+
 class IterationRecord(Base):
     stage: str
     iteration: int
@@ -171,6 +206,7 @@ class HistogramResult(Base):
     sigma: list[float] = Field(default_factory=list)
     ticks: dict[str, list[float]] = Field(default_factory=dict)
     qpa: "QuantitativePhaseAnalysis | None" = None
+    restraints: "RestraintReport | None" = None
     diagnostics: list[Diagnostic] = Field(default_factory=list)
 
 
@@ -206,6 +242,12 @@ class RefinementResult(Base):
     # fits, None for Le Bail (its scales are degenerate).
     qpa: QuantitativePhaseAnalysis | None = None
 
+    # Soft-restraint summary (bond/angle/value deviations, pooled restraint χ²);
+    # present only when a phase declared restraints (Rietveld-only), None
+    # otherwise.  Deviations in units of σ surface an over-tight restraint
+    # fighting the data even while Rwp looks good.
+    restraints: RestraintReport | None = None
+
     # Per-histogram slices of a multi-histogram joint refinement (WP-0308);
     # empty for an ordinary single-histogram fit.  ``statistics`` above is then
     # the pooled combined number and ``two_theta``/``y_*`` mirror histogram 0.
@@ -233,6 +275,8 @@ class RefinementResult(Base):
         view.sigma = list(hr.sigma)
         view.ticks = dict(hr.ticks)
         view.qpa = hr.qpa.model_copy(deep=True) if hr.qpa is not None else None
+        view.restraints = (hr.restraints.model_copy(deep=True)
+                           if hr.restraints is not None else None)
         view.diagnostics = list(hr.diagnostics)
         view.histograms = []
         return view
