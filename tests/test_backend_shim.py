@@ -17,6 +17,9 @@ States (chosen to cover every refactored code path):
   restraint rows.
 * ``toy_rich`` — aniso ADPs + March-Dollase + extinction + displacement/
   transparency/zero all *on* (nonzero), unequal axial S/L ≠ H/L.
+* ``toy_restraints`` — Rietveld rutile with bond, angle and value soft-restraint
+  rows (WP-0406): the nonlinear penalty stripe below the data rows, its residual
+  and analytic Jacobian columns locked for the cross-backend CI (WP-0404).
 
 Golden bit patterns are environment-pinned (they depend on the numpy/BLAS
 build); they live in ``tests/data/backend_goldens/`` and are documented in
@@ -251,12 +254,48 @@ def _state_toy_rich():
     return model, table, {}
 
 
+def _state_toy_restraints():
+    """Rietveld rutile carrying bond, angle and value soft-restraint rows.
+
+    Locks the WP-0406 restraint stripe under the bit-identity gate: the rows are
+    nonlinear in the coordinates and cell, so their residual and analytic
+    Jacobian columns are the new surface a backend could drift on.  The angle
+    names explicit orbit ops so the two O neighbours of Ti form a non-degenerate
+    angle (auto min-image would pick the same image for both).
+    """
+    from pxrdref.schemas.structure import (
+        AngleRestraint,
+        BondRestraint,
+        ValueRestraint,
+    )
+
+    structure, instrument, pattern = _toy_base()
+    structure.phases[0].atoms[1].x.vary = True  # free the O coordinate DOF
+    structure.phases[0].restraints = [
+        BondRestraint(atom_i=0, atom_j=1, target=1.95, sigma=0.01),
+        AngleRestraint(atom_i=1, atom_j=0, atom_k=1, target_deg=90.0, sigma=1.5,
+                       op_index_i=0, op_index_k=1),
+        ValueRestraint(path="phases.0.atoms.1.occ", target=0.95, sigma=0.03),
+    ]
+    instrument.background = BackgroundChebyshev.with_terms(4)
+    table = ParameterTable(structure, instrument)
+    _free(table, [
+        "phases.0.cell.a", "phases.0.cell.c", "phases.0.scale",
+        "phases.0.atoms.1.dof.0", "phases.0.atoms.1.occ",
+        "instrument.zero_shift", "instrument.background.*",
+    ])
+    model = compile_model(structure, instrument, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    return model, table, {}
+
+
 STATES = {
     "srm660c": _state_srm660c,
     "nac": _state_nac,
     "toy_lebail": _state_toy_lebail,
     "toy_pawley": _state_toy_pawley,
     "toy_rich": _state_toy_rich,
+    "toy_restraints": _state_toy_restraints,
 }
 
 
@@ -345,6 +384,7 @@ def test_set_backend_roundtrip():
     "toy_lebail",
     "toy_pawley",
     "toy_rich",
+    "toy_restraints",
 ])
 def test_numpy_path_bit_identical_to_golden(name):
     path = GOLDEN_DIR / f"{name}.npz"
