@@ -78,7 +78,11 @@ per-parameter esds do not actually carry the Bérar-Lelann inflation the
 docstrings claim, because the correlation matrix is normalised by the
 inflated diagonal; the same bug leaves the high-correlation guard dead) and
 [0406](wp/0406-restraint-penalty-rows.md) (bond/angle restraints).
-[0405](wp/0405-faddeeva-voigt.md) (true Voigt) needs only 0401.
+[0405](wp/0405-faddeeva-voigt.md) (true Voigt) **landed 2026-07-24**:
+`Instrument.profile.shape="voigt"` selects an opt-in Gaussian⊗Lorentzian peak
+built on one backend-agnostic Weideman-N=32 Faddeeva `w(z)` (no per-backend
+`wofz`); TCHZ stays the default, the U,V,W,X,Y widths and FCJ are shared, and
+numpy↔jax agree to 1e-16 on `w(z)`.
 
 ## Milestones
 
@@ -118,7 +122,7 @@ inflated diagonal; the same bug leaves the high-correlation guard dead) and
 | [0402](wp/0402-jax-backend.md) | JAX backend: chunked jacfwd | ✅ 2026-07-24 | 0401 |
 | [0403](wp/0403-cuda-mixed-precision.md) | Mixed-precision policy (CUDA-deferred, CPU-testable) | ✅ 2026-07-24 | 0402 |
 | [0404](wp/0404-cross-backend-jacobian-ci.md) | Cross-backend Jacobian CI | ⬜ | 0402 |
-| [0405](wp/0405-faddeeva-voigt.md) | True Voigt via shared Faddeeva w(z) | ⬜ | 0401 |
+| [0405](wp/0405-faddeeva-voigt.md) | True Voigt via shared Faddeeva w(z) | ✅ 2026-07-24 | 0401 |
 | [0406](wp/0406-restraint-penalty-rows.md) | Restraint penalty rows | ⬜ | — |
 | [0407](wp/0407-esd-reconciliation.md) | esd reconciliation (Bérar-Lelann placement) | ⬜ | — |
 | [0408](wp/0408-torch-mps-backend.md) | torch backend (MPS fp32 forward) — moved from v0.6 | ⬜ | 0401, 0402, 0404 |
