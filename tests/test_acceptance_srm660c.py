@@ -18,7 +18,8 @@ Reference values (see tests/data/README.md):
 * Hölzer et al. (1997): integrated CuKα2/Kα1 intensity ratio ≈ 0.52.
 
 Measured v0.2 result (recorded 2026-07-22, also in docs/milestones/v0.2.md):
-a = 4.156895(7) Å (Δ = +1.15e-4 = +28 ppm), Rwp = 8.7 %, GoF = 1.87,
+a = 4.156895(25) Å (Δ = +1.15e-4 = +28 ppm; the esd is Bérar-Lelann-inflated,
+raw χ²·(JᵀJ)⁻¹ esd 7.4e-6 × BL 3.38 — WP-0407), Rwp = 8.7 %, GoF = 1.87,
 displacement −0.0801 mm (1.3 µm from NIST's), Kα2/Kα1 = 0.513.  The ±2e-4
 cell band below is *interim*: the remaining bias is the unmodelled
 equatorial (flat-specimen) divergence, tube tails and monochromator
@@ -103,9 +104,10 @@ def test_srm660c_lab6_rietveld(srm_inputs):
 
     a = ref.fitted_structure.phases[0].cell.a.value
     a_err = result.parameter("phases.0.cell.a").stderr
-    # esds carry the Bérar-Lelann serial-correlation inflation (~3.5 here —
-    # the raw χ²·(JᵀJ)⁻¹ esd is ~7e-6); the honest number is the larger one
-    assert a_err is not None and a_err < 5e-5
+    # the reported esd carries the Bérar-Lelann serial-correlation inflation
+    # (BL ≈ 3.38 here, so ~25e-6 vs the raw χ²·(JᵀJ)⁻¹ ~7.4e-6) — WP-0407 fixed
+    # the placement bug that used to cancel BL out of the reported physical esd
+    assert a_err is not None and 1.5e-5 < a_err < 5e-5
     assert result.statistics.esd_inflation is not None
     assert 1.5 < result.statistics.esd_inflation < 6.0
     # interim accuracy band — see module docstring for the honest breakdown
