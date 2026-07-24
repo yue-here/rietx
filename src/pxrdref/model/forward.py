@@ -88,6 +88,7 @@ from .preferred_orientation import (
 from .profiles.caglioti import gaussian_fwhm, lorentzian_fwhm
 from .profiles.fcj import fcj_extent_deg, fcj_node_count, fcj_offsets_weights
 from .profiles.pseudovoigt import pseudo_voigt, pseudo_voigt_derivs, tch_gamma_eta
+from .profiles.voigt import fwhm_to_voigt_params, voigt, voigt_derivs
 
 #: windows extend ±(WINDOW_FWHM_MULT · Γ_est + WINDOW_MIN_DEG + FCJ extent)
 WINDOW_FWHM_MULT = 30.0
@@ -164,6 +165,11 @@ class CompiledModel:
     # P-spline smoothness penalty: extra residual rows √λ·D₂·c, already scaled
     # (columns aligned with bkg_paths); None for penalty-free backgrounds
     bkg_penalty: np.ndarray | None
+    # peak shape frozen for the stage: "tchz_pv" (default pseudo-Voigt) or
+    # "voigt" (true Gaussian⊗Lorentzian via the shared Faddeeva w(z)).  A
+    # compile-time structural constant, never a θ entry — the width parameters
+    # (U,V,W,X,Y and phase size/strain) are identical for both shapes.
+    shape: str = "tchz_pv"
     # Pawley intensity block (per-hkl intensities as free parameters, appended
     # to θ outside the ParameterTable); None outside pawley mode.
     pawley: "PawleyBlock | None" = None
@@ -240,14 +246,43 @@ class CompiledModel:
         return march_dollase_factors(cp.po_members, cp.po_seg, cp.po_counts,
                                      cp.po_axis, gstar, r)
 
+    # ------------------------------------------------------------------
+    # peak-shape dispatch — the two width scalars, the unit-area profile and
+    # its partials all switch on the frozen ``shape`` (default TCHZ).  Both
+    # shapes consume the *same* component FWHMs and expose a two-width tuple
+    # ``(pos, w₁, w₂, intensity)``, so everything downstream (the peak-chain
+    # Jacobian, Le Bail partitioning, FitReport Layer-1) is shape-agnostic.
+    # ------------------------------------------------------------------
+    def _peak_widths(self, gam_g: np.ndarray, gam_l: np.ndarray
+                     ) -> tuple[np.ndarray, np.ndarray]:
+        """(w₁, w₂) from component FWHMs: (Γ, η) for TCHZ, (σ, γ_HWHM) for Voigt."""
+        if self.shape == "voigt":
+            return fwhm_to_voigt_params(gam_g, gam_l)
+        return tch_gamma_eta(gam_g, gam_l)
+
+    def _profile(self, x: np.ndarray, w1: np.ndarray, w2: np.ndarray) -> np.ndarray:
+        """Unit-area profile of the active shape at offsets ``x``."""
+        if self.shape == "voigt":
+            return voigt(x, w1, w2)
+        return pseudo_voigt(x, w1, w2)
+
+    def _profile_derivs(self, x: np.ndarray, w1: float, w2: float
+                        ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """(Ω, ∂Ω/∂x, ∂Ω/∂w₁, ∂Ω/∂w₂) of the active shape."""
+        if self.shape == "voigt":
+            return voigt_derivs(x, w1, w2)
+        return pseudo_voigt_derivs(x, w1, w2)
+
     def phase_peaks(self, ip: int, values: dict[str, float],
                     hkl_intensity: np.ndarray | None = None
                     ) -> list[tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
-        """Per-line (positions, widths, mixing, intensities) for phase ip.
+        """Per-line (positions, w₁, w₂, intensities) for phase ip.
 
-        Returns one (pos, gamma, eta, intensity) tuple per emission line;
-        arrays run over the frozen reflection list.  ``intensity`` already
-        carries the line weight (and Lp per line in Rietveld mode).
+        Returns one (pos, w₁, w₂, intensity) tuple per emission line; arrays run
+        over the frozen reflection list.  The two width slots are shape-specific
+        (``_peak_widths``): (Γ, η) for the TCHZ pseudo-Voigt, (σ, γ_HWHM) for the
+        true Voigt.  ``intensity`` already carries the line weight (and Lp per
+        line in Rietveld mode).
 
         In lebail/pawley mode ``hkl_intensity`` supplies the per-hkl
         intensities explicitly — the residual/Jacobian closures always pass it
@@ -299,7 +334,7 @@ class CompiledModel:
             gam_l = lorentzian_fwhm(theta,
                                     values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
                                     values["instrument.profile.y"] + values[f"phases.{ip}.lor_strain"])
-            gamma, eta = tch_gamma_eta(gam_g, gam_l)
+            gamma, eta = self._peak_widths(gam_g, gam_l)
             if self.mode in ("lebail", "pawley"):
                 # extracted/refined intensities already absorb Lp
                 intensity = base * w_line
@@ -334,11 +369,11 @@ class CompiledModel:
         x = self.tt[i0:i1]
         n_fcj = int(cp.fcj_n[il, k])
         if n_fcj == 0:  # frozen node count — structural
-            return xp.where(finite, pseudo_voigt(x - pos_safe, gamma_k, eta_k), 0.0)
+            return xp.where(finite, self._profile(x - pos_safe, gamma_k, eta_k), 0.0)
         # FCJ images computed at the apparent position: the ≤0.1° detector
         # shifts change the aberration geometry negligibly (≪ node spacing)
         phi, omega = fcj_offsets_weights(pos_safe, sl, hl, n_fcj)
-        prof = omega @ pseudo_voigt(x[None, :] - phi[:, None], gamma_k, eta_k)
+        prof = omega @ self._profile(x[None, :] - phi[:, None], gamma_k, eta_k)
         return xp.where(finite, prof, 0.0)
 
     def phase_component(self, ip: int, values: dict[str, float],
@@ -547,7 +582,7 @@ class CompiledModel:
                     x = self.tt[i0:i1]
                     n_fcj = int(cp.fcj_n[il, k])
                     if n_fcj == 0:
-                        pv, d_dx, d_dg, d_de = pseudo_voigt_derivs(
+                        pv, d_dx, d_dg, d_de = self._profile_derivs(
                             x - pos[k], float(gamma[k]), float(eta[k]))
                         rows.append((il, k, int(i0), int(i1),
                                      pv, -d_dx, d_dg, d_de, None, None))
@@ -555,7 +590,7 @@ class CompiledModel:
                     if sl <= 0.0 or hl <= 0.0:
                         axial_ok = False
                     phi, om = fcj_offsets_weights(float(pos[k]), sl, hl, n_fcj)
-                    pv, d_dx, d_dg, d_de = pseudo_voigt_derivs(
+                    pv, d_dx, d_dg, d_de = self._profile_derivs(
                         x[None, :] - phi[:, None], float(gamma[k]), float(eta[k]))
                     omega = om @ pv
                     d_gamma = om @ d_dg
@@ -846,6 +881,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
             l_est = lorentzian_fwhm(theta,
                                     instrument.profile.x.value + phase.lor_size.value,
                                     instrument.profile.y.value + phase.lor_strain.value)
+            # TCHZ combined Γ is a compile-time width proxy for window sizing
+            # and FCJ node counts under *both* shapes: it tracks the true Voigt
+            # FWHM to ~1 % (that is what the TCH quintic is fit to), and the
+            # 30·FWHM window margin dwarfs any residual difference.
             gamma_est, _ = tch_gamma_eta(g_est, l_est)
             if il == 0:  # primary line drives Pawley overlap grouping
                 tt_primary, fwhm_primary = pos.copy(), gamma_est.copy()
@@ -920,6 +959,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         mode=mode, phases=phases,
         fixed_background=fixed,
         bkg_paths=bkg_paths, bkg_design=design, bkg_penalty=penalty,
+        shape=instrument.profile.shape,
         pawley=pawley,
     )
 
