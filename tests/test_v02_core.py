@@ -6,7 +6,12 @@ import pytest
 
 from pxrdref import Instrument, PatternData, Refinement
 from pxrdref.model.forward import compile_model
-from pxrdref.optimize.least_squares import _make_jacobian, _make_residual
+from pxrdref.optimize.least_squares import (
+    _make_jacobian,
+    _make_residual,
+    covariance_estimates,
+    run_least_squares,
+)
 from pxrdref.optimize.statistics import berar_lelann_factor
 from pxrdref.params.vector import ParameterTable
 from tests.test_refine_synthetic import perturbed_models, synthesize
@@ -50,6 +55,75 @@ def test_esd_inflation_in_result(synthetic_pattern):
     assert result.statistics.esd_inflation >= 1.0
     # near-perfect synthetic fit → residuals ≈ white → near the 1.51 floor
     assert result.statistics.esd_inflation < 1.7
+
+
+# ----------------------------------------------------------------------
+# WP-0407: BL lives on the esd diagonal; the correlation is a true Pearson
+# matrix (unit diagonal), which keeps the high-correlation guard alive
+# ----------------------------------------------------------------------
+def test_covariance_correlation_is_unit_diagonal_and_esd_carries_bl():
+    """covariance_estimates returns esds ×BL and a *true* Pearson correlation
+    (unit diagonal).  The pre-WP-0407 placement bug normalised the correlation
+    by the inflated diagonal, leaving it with a 1/BL² diagonal — which cancelled
+    BL in the reported physical esds and deflated the correlation guard by BL²."""
+    rng = np.random.default_rng(0)
+    n = 400
+    c1 = rng.standard_normal(n)
+    c2 = c1 + 0.01 * rng.standard_normal(n)      # ρ(c1, c2) ≈ 0.9999
+    jac = np.column_stack([c1, c2, rng.standard_normal(n)])
+    resid = np.cumsum(rng.standard_normal(n))    # serially correlated ⇒ BL ≫ 1
+    resid -= resid.mean()
+
+    esd, corr = covariance_estimates(jac, resid, 3, n_data=n)
+    bl = berar_lelann_factor(resid)
+    assert bl > 3.0                              # strong inflation, to expose the bug
+
+    # true Pearson matrix: unit diagonal, |ρ| ≤ 1, and the collinear pair reads so
+    assert np.allclose(np.diag(corr), 1.0)
+    assert np.all(np.abs(corr) <= 1.0 + 1e-9)
+    assert abs(corr[0, 1]) > 0.98
+
+    # the returned esd is the raw √diag(cov) scaled by BL exactly
+    cov = np.linalg.pinv(jac.T @ jac) * (resid @ resid) / (n - 3)
+    assert np.allclose(esd, np.sqrt(np.diag(cov)) * bl)
+
+
+def test_collinear_zero_displacement_trips_the_correlation_guard():
+    """Zero-shift and Bragg-Brentano sample displacement both shift the peaks,
+    so freeing them together is a textbook degeneracy (ρ ≈ 1).  On the true
+    Pearson matrix the default 0.98 high-correlation guard fires; before WP-0407
+    every off-diagonal was ÷BL² so the guard was dead."""
+    from pxrdref.strategy.staged import check_guards
+
+    structure = make_lab6()
+    structure.phases[0].scale.value = 5e-3
+    ins = Instrument.bragg_brentano(monochromator_two_theta=26.6)
+    ins.profile.w.value = 4e-3
+    ins.geometry.sample_displacement.value = 0.08
+    tt = np.arange(20.0, 40.0, 0.01)
+    seed = PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    m0 = compile_model(structure, ins, seed, mode="rietveld")
+    t0 = ParameterTable(structure, ins)
+    y = m0.evaluate(t0.decode(t0.x0())) + 40.0
+    rng = np.random.default_rng(5)
+    pattern = PatternData(two_theta=m0.tt.tolist(),
+                          intensity=rng.poisson(np.maximum(y, 1.0)).astype(float).tolist())
+
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    table.set_vary(["instrument.zero_shift",
+                    "instrument.geometry.sample_displacement"], True)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    outcome = run_least_squares(model, table, max_iter=80)
+
+    corr = np.asarray(outcome.correlation)
+    assert np.allclose(np.diag(corr), 1.0)       # regression: not 1/BL²
+    assert abs(corr[0, 1]) > 0.98
+
+    guard = check_guards(table, outcome, threshold=0.98)   # the default threshold
+    assert any("zero_shift" in c and "sample_displacement" in c
+               for c in guard.high_correlations), guard.high_correlations
 
 
 # ----------------------------------------------------------------------
