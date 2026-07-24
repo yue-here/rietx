@@ -72,13 +72,19 @@ S/L == H/L subgradient kink needs the same loose bar there) →
 starts only once 0402+0404 are green, and supplies the first real-hardware
 measurement of 0403's policy).
 
-Two WPs are independent of the backend chain and can be picked up at any
-time: [0407](wp/0407-esd-reconciliation.md) (small — the reported
-per-parameter esds do not actually carry the Bérar-Lelann inflation the
-docstrings claim, because the correlation matrix is normalised by the
-inflated diagonal; the same bug leaves the high-correlation guard dead) and
-[0406](wp/0406-restraint-penalty-rows.md) (bond/angle restraints).
-[0405](wp/0405-faddeeva-voigt.md) (true Voigt) needs only 0401.
+Restraint penalty rows [0406](wp/0406-restraint-penalty-rows.md) **landed
+2026-07-24**: bond/angle/value soft restraints as √w·(computed−target)/σ rows
+below the data (in JᵀJ, out of Rwp/DW/Bérar-Lelann), with the analytic
+nonlinear row-Jacobian chained through the affine constraint block, a
+`RestraintReport` + `RESTRAINT_TENSION` diagnostic, and a 6th backend golden
+(`toy_restraints`).  Rietveld- and single-histogram-only (multi-histogram
+deferred — see WP-0308 `### Inherited`).
+
+One backend-independent WP remains: [0407](wp/0407-esd-reconciliation.md)
+(small — the reported per-parameter esds do not actually carry the
+Bérar-Lelann inflation the docstrings claim, because the correlation matrix is
+normalised by the inflated diagonal; the same bug leaves the high-correlation
+guard dead).  [0405](wp/0405-faddeeva-voigt.md) (true Voigt) needs only 0401.
 
 ## Milestones
 
@@ -119,7 +125,7 @@ inflated diagonal; the same bug leaves the high-correlation guard dead) and
 | [0403](wp/0403-cuda-mixed-precision.md) | Mixed-precision policy (CUDA-deferred, CPU-testable) | ✅ 2026-07-24 | 0402 |
 | [0404](wp/0404-cross-backend-jacobian-ci.md) | Cross-backend Jacobian CI | ⬜ | 0402 |
 | [0405](wp/0405-faddeeva-voigt.md) | True Voigt via shared Faddeeva w(z) | ⬜ | 0401 |
-| [0406](wp/0406-restraint-penalty-rows.md) | Restraint penalty rows | ⬜ | — |
+| [0406](wp/0406-restraint-penalty-rows.md) | Restraint penalty rows | ✅ 2026-07-24 | — |
 | [0407](wp/0407-esd-reconciliation.md) | esd reconciliation (Bérar-Lelann placement) | ⬜ | — |
 | [0408](wp/0408-torch-mps-backend.md) | torch backend (MPS fp32 forward) — moved from v0.6 | ⬜ | 0401, 0402, 0404 |
 

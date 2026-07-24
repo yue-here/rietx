@@ -1,6 +1,6 @@
 # WP-0406 — Restraint penalty rows
 
-Milestone: v0.4 · Status: ⬜ not started
+Milestone: v0.4 · Status: ✅ 2026-07-24
 Depends on: —
 
 ## Goal
@@ -115,22 +115,24 @@ connectivity search.
 
 ## Tasks
 
-- [ ] `schemas/structure.py`: `BondRestraint`/`AngleRestraint`/
+- [x] `schemas/structure.py`: `BondRestraint`/`AngleRestraint`/
       `ValueRestraint` + `Phase.restraints` (opt-in, empty default); the PBC
       sym-op/translation spec
-- [ ] `model/restraints.py`: differentiable distance/angle from (xyz, cell)
+- [x] `model/restraints.py`: differentiable distance/angle from (xyz, cell)
       using frozen `sites.ops`; `√w·(d − target)/σ` rows
-- [ ] Compile-time restraint row block + analytic `∂/∂θ` row-Jacobian below
-      the background-penalty rows in `_make_residual`/`_make_jacobian`; FD
-      fallback
-- [ ] `covariance_estimates` reuse verified (rows in JᵀJ, excluded from
-      `fun[:n_data]`); `RestraintReport` in the FitReport
-- [ ] Tests: `tests/test_restraints.py` — a bond restraint pulls a
+- [x] Compile-time restraint row block + analytic `∂/∂θ` row-Jacobian below
+      the background-penalty rows in `_make_residual`/`_make_jacobian` (both
+      residual builders — numpy + jax); the shipped kinds are all analytic so
+      no per-kind FD fallback was needed
+- [x] `covariance_estimates` reuse verified (rows in JᵀJ, excluded from
+      `fun[:n_data]`); `RestraintReport` on the result + FitReport +
+      `RESTRAINT_TENSION` diagnostic; multi-histogram deferred (guard raises)
+- [x] Tests: `tests/test_restraints.py` — a bond restraint pulls a
       deliberately-displaced atom back to target within σ without changing
       the data-row statistics; the restraint-row analytic Jacobian vs FD
-      <5e-3; Rwp/DW/Bérar-Lelann bit-identical to the no-restraint-row
+      <5e-3 per kind; Rwp/DW/Bérar-Lelann bit-identical to the no-restraint-row
       statistics at the same parameters + obs/calc/diff PNGs to
-      `tests/output/`
+      `tests/output/`; 6th backend golden (`toy_restraints`) locks the rows
 
 ## Acceptance
 
@@ -157,3 +159,49 @@ statistics at the same parameters).
   bond/angle/value), explicit sym-op+translation PBC spec over minimum-image,
   analytic nonlinear row-Jacobian, statistics-exclusion seam reuse and the
   `RestraintReport` decided.
+- **2026-07-24** — **LANDED.** Full acceptance measured, suite green
+  (376 fast + 11 new restraint tests + the 6th backend golden; ruff clean).
+
+  **Done.** Schema (`schemas/structure.py`): `BondRestraint`/`AngleRestraint`/
+  `ValueRestraint` + `Phase.restraints=[]` (plain smart union — the field sets
+  are distinct so no discriminator needed; `sigma>0`/`weight≥0` field
+  constraints, atom-index `@model_validator` on `Phase`).  Geometry
+  (`model/restraints.py`): traceable `restraint_residual` (xp) + host-numpy
+  analytic `restraint_partials`/`summarise_restraints`; min-image freeze over
+  `sites.ops[j] × {−1,0,1}³` at compile.  Wiring: `CompiledModel.restraints`
+  + `restraint_residual` method, resolved rietveld-only in `compile_model`,
+  4th `parts.append` in **both** `_make_residual` and `make_traced_residual`.
+  Jacobian: `J[restr, :n_table] = (R_phys @ C.toarray()) * dpdu` below the
+  data/penalty/Pawley rows; Fix A (bounded the Pawley write to its stripe) and
+  Fix B (`C.toarray()`) both applied.  Report: `RestraintReport` on
+  result + `HistogramResult` + `for_histogram`, attached in `_build_result`,
+  `RESTRAINT_TENSION` diagnostic at |dev/σ|>3, surfaced in `build_report`.
+
+  **Measured.** Bond restraint recovers a displaced rutile O within σ
+  (GoF 1.03); analytic-vs-FD restraint rows <5e-3 per kind (bond ~1e-6, angle
+  0 machine, value machine; triclinic P1 exercised all six ∂G/∂cell + the
+  angle quotient rule); data-row Rwp/DW/χ²/n_points bit-identical with vs
+  without restraint rows; jax jacfwd matches numpy restraint rows to 2.8e-16
+  (data rows untouched — same 2.6e-6 WP-0402 level with or without restraints).
+
+  **Gotchas / notes for a successor.**
+  - The six exact `∂G/∂cell` (angles in degrees ⇒ the π/180 factor), in
+    `_metric_g_derivs`: `∂G/∂a` (0,0)=2a,(0,1)=(1,0)=b·cosγ,(0,2)=(2,0)=c·cosβ;
+    `∂G/∂b` (0,1)=a·cosγ,(1,1)=2b,(1,2)=c·cosα; `∂G/∂c` (0,2)=a·cosβ,
+    (1,2)=b·cosα,(2,2)=2c; `∂G/∂α` (1,2)=(2,1)=−bc·sinα·π/180; `∂G/∂β`
+    (0,2)=−ac·sinβ·π/180; `∂G/∂γ` (0,1)=−ab·sinγ·π/180.
+  - **Angle degeneracy:** cos θ is clamped to `±(1−1e-9)` before `arccos`
+    (`_COS_CLAMP`); the derivative ∝ 1/sinθ, so 0°/180° are unsupported. The
+    auto min-image picks the *same* nearest image for both neighbours when
+    `atom_i == atom_k` → u ∥ v → a degenerate 0° angle; name distinct
+    `op_index_i`/`op_index_k` to get a real angle (the golden/tests do).
+  - **Chain-rule seam:** partials are written against the *entry* dot-paths
+    (atom x/y/z + six cell), never the DOF paths — `C.toarray()` chains them,
+    so a coordinate DOF (e.g. rutile O's [110]) sums its x and y automatically,
+    exactly the WP-0301/0302 `### Inherited` requirement.
+  - Restraints are **Rietveld-only** (Le Bail/Pawley `model.restraints is None`)
+    and **single-histogram-only** (`run_multi_least_squares` raises
+    `NotImplementedError`; the stacked layout needs a third offset row-block —
+    forward-reference left in WP-0308's `### Inherited`).
+  - `n_free` unchanged (restrained coords count fully — Pawley precedent);
+    restraint rows are *soft observations*, out of Rwp/DW/Bérar-Lelann.
