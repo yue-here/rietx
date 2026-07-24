@@ -17,6 +17,7 @@ from .history.events import as_event_stream
 from .history.store import fingerprint
 from .history.tree import RefinementTree
 from .model.forward import CompiledModel, Mode, compile_model
+from .model.restraints import summarise_restraints
 from .optimize.least_squares import run_least_squares
 from .optimize.qpa import compute_qpa, microabsorption_diagnostics
 from .optimize.statistics import compute_statistics
@@ -733,6 +734,15 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                           wavelength=wavelength)
         diagnostics = diagnostics + microabsorption_diagnostics(qpa)
 
+    # Soft-restraint summary (bond/angle/value deviations).  Rietveld-only, so
+    # model.restraints is None outside it and this is naturally skipped.  A
+    # restraint fighting the data (|dev/σ| large) becomes a RESTRAINT_TENSION
+    # diagnostic — never hide a bad sub-fit.
+    restraints_report = summarise_restraints(model.restraints, values)
+    if restraints_report is not None:
+        diagnostics = diagnostics + _restraint_tension_diagnostics(
+            restraints_report, structure)
+
     return RefinementResult(
         status=status, mode=mode,
         parameters=params, statistics=stats,
@@ -741,7 +751,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         two_theta=model.tt.tolist(), y_obs=model.y_obs.tolist(),
         y_calc=y_calc.tolist(), y_background=y_bkg.tolist(),
         sigma=model.sigma.tolist(),
-        ticks=ticks, qpa=qpa,
+        ticks=ticks, qpa=qpa, restraints=restraints_report,
     )
 
 
@@ -853,6 +863,40 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
                        "per-reflection split is not resolved by these data",
         ))
     return out
+
+
+#: a soft restraint is flagged in tension when its computed value sits more
+#: than this many σ from the target — the data and the prior disagree, which
+#: must be visible rather than silently averaged into a slightly-worse Rwp
+RESTRAINT_TENSION_SIGMA = 3.0
+
+
+def _restraint_tension_diagnostics(report, structure: Structure) -> list[Diagnostic]:
+    """Flag restraints the data fights (|deviation/σ| beyond the threshold)."""
+    out: list[Diagnostic] = []
+    for row in report.rows:
+        if abs(row.deviation_over_sigma) <= RESTRAINT_TENSION_SIGMA:
+            continue
+        out.append(Diagnostic(
+            level="warning", code="RESTRAINT_TENSION",
+            where=_restraint_where(row, structure),
+            message=(f"{row.kind} restraint deviates "
+                     f"{row.deviation_over_sigma:+.1f}σ from its target "
+                     f"({row.computed:.4g} vs {row.target:.4g})"),
+            suggestion="the data and this restraint disagree: loosen its sigma, "
+                       "correct the target, or accept that the measured pattern "
+                       "should override the prior (raise sigma so it does)",
+        ))
+    return out
+
+
+def _restraint_where(row, structure: Structure) -> list[str]:
+    if row.path is not None:
+        return [row.path]
+    if row.phase_index is None or row.atoms is None:
+        return []
+    phase = structure.phases[row.phase_index]
+    return [f"{phase.name} {phase.atoms[j].label}" for j in row.atoms]
 
 
 def _pawley_locate(pb, gi: int) -> tuple[int, int]:

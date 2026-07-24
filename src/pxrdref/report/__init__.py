@@ -85,6 +85,10 @@ def build_report(result: RefinementResult, *, model=None, values=None,
     """
     report = build_layer0(result, top_n=top_n, match_tol_deg=match_tol_deg,
                           min_peak_sigma=min_peak_sigma)
+    # Soft-restraint deviations are model-free (carried from the result), so they
+    # surface even at Layer 0 — a restraint fighting the data is worth reporting
+    # regardless of whether the fit is mature enough to linearise.
+    report.restraints = result.restraints
     if model is None or values is None:
         return report
 
