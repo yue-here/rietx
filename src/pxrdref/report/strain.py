@@ -252,7 +252,7 @@ def _fit(templates: np.ndarray, y: np.ndarray, w: np.ndarray) -> tuple[np.ndarra
 
 
 def analyse_strain(model: CompiledModel, values: dict[str, float], *,
-                   min_weight_frac: float = 1e-3) -> list[StrainAnalysis]:
+                   min_weight_frac: float = 1e-6) -> list[StrainAnalysis]:
     """Detect directional (Stephens) width misfit, one result per phase.
 
     Runs whether or not the phase already carries a ``microstrain`` block: with
@@ -267,12 +267,21 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
     for ip, cp in enumerate(model.phases):
         d_lambda, weight = _strain_errors(model, values, ip)
         d, _gam_g, _gam_l, tan_theta, current = _components(model, values, ip)
-        live = (weight > min_weight_frac * max(weight.max(initial=0.0), 1e-300)) \
+        # ``live`` only excludes reflections with no leverage at all — the
+        # solve is already weighted by leverage, so a weak one costs nothing
+        # and a tight cut just throws away information (measured on zircon,
+        # whose leverage spans 10⁶ in amplitude: a 10⁻³ cut left *one*
+        # reflection).  Which directions may be *named* is a separate, much
+        # stricter question — see ``_QUOTABLE_WEIGHT_FRAC`` below.  The cut is
+        # on √weight because weight is a squared column norm.
+        live = (np.sqrt(weight) > min_weight_frac
+                * max(float(np.sqrt(weight.max(initial=0.0))), 1e-300)) \
             & np.isfinite(tan_theta[0]) & (tan_theta[0] > 0.0)
         n_used = int(live.sum())
         basis = stephens_basis(cp.reflections.spacegroup).astype(np.float64)
         if n_used < max(STRAIN_MIN_REFLECTIONS, len(basis) + 1):
-            out.append(StrainAnalysis(phase_index=ip, n_reflections_used=n_used))
+            out.append(StrainAnalysis(phase_index=ip, n_reflections_used=n_used,
+                                      n_patterns=len(basis)))
             continue
 
         # required strain coefficient per reflection.  A negative one is
@@ -292,7 +301,11 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
         # for the low-index ones.  Dividing by (∂y/∂Λ)² makes the solve a
         # weighted least squares in the width itself, which is the quantity the
         # residual actually measured.
-        floor = 1e-3 * max(float(np.median(target[live])), 1e-12)
+        # The propagation factor blows up as Λ → 0, so it is floored at a
+        # quarter of the median: a reflection whose extracted Λ came out at (or
+        # clipped to) zero is the *least* informative one there is, and without
+        # the floor it would carry the largest weight in the solve.
+        floor = 0.25 * max(float(np.median(target[live])), 1e-12)
         w = weight[live] * (scale / (2.0 * np.maximum(target[live], floor))) ** 2
 
         # the isotropic baseline: one column, the M² = 1/d⁴ ray — exactly what
@@ -308,8 +321,15 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
         # extrapolates freely where nothing holds it down.
         fitted = np.sqrt(np.maximum(templates @ coef, 0.0) * scale)
         lev = weight[live]
-        strong = lev > _QUOTABLE_WEIGHT_FRAC * lev.max()
-        idx = np.nonzero(strong)[0] if strong.any() else np.arange(len(fitted))
+        idx = np.nonzero(lev > _QUOTABLE_WEIGHT_FRAC * lev.max())[0]
+        if len(idx) < 2:
+            # one quotable direction is no contrast at all: a pattern whose
+            # leverage sits on a single peak cannot say anything about
+            # anisotropy, and naming that peak as both extremes would dress
+            # "no information" up as a measurement
+            out.append(StrainAnalysis(phase_index=ip, n_reflections_used=n_used,
+                                      r2=max(r2, 0.0), n_patterns=len(basis)))
+            continue
         hi_i = idx[int(np.argmax(fitted[idx]))]
         lo_i = idx[int(np.argmin(fitted[idx]))]
         lo, hi = float(fitted[lo_i]), float(fitted[hi_i])

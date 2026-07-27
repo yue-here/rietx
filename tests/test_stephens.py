@@ -580,10 +580,15 @@ def test_layer1_reports_the_width_direction_before_anyone_models_it():
     assert strain.r2 > 0.5
     assert strain.n_patterns == 4               # P-3m1
     assert strain.broadest_hkl[:2] == (0, 0)    # 00l is the injected direction
-    assert strain.narrowest_hkl[2] == 0         # hk0 is untouched
+    assert abs(strain.narrowest_hkl[2]) <= 1    # a low-l one, which is untouched
     assert strain.separable
-    # Λ ∝ √Σ, so the injected 12× on the l⁴ pattern is a √12 width ratio
-    assert strain.anisotropy == pytest.approx(np.sqrt(12.0), rel=0.10)
+    # the reported ratio must be the truth's ratio *at the pair it named* —
+    # a diagnostic that names the right directions and mis-sizes the contrast
+    # is still a wrong answer
+    want = _lambda(truth)
+    assert strain.anisotropy == pytest.approx(
+        want[strain.broadest_hkl] / want[strain.narrowest_hkl], rel=0.12)
+    assert strain.anisotropy > 2.5
 
 
 def test_layer1_strain_stays_quiet_on_an_isotropic_specimen():

@@ -234,7 +234,10 @@ class StrainAnalysis(Base):
     templates already cover, but of hkl — and a Stephens block on it is worth
     declaring.  ``anisotropy`` is the fitted broadest/narrowest Λ ratio with
     ``broadest_hkl``/``narrowest_hkl`` naming the directions, so the finding
-    reads as "widths along (00l) are 3.4× those along (hk0)".
+    reads as "widths along (00l) are 3.4× those along (hk0)".  Its ceiling
+    value (10⁶) means the fit wants *zero* strain along ``narrowest_hkl``, so
+    the ratio is unbounded rather than measured; the hkl fields are ``None``
+    when no two reflections carry enough leverage to contrast at all.
 
     The measurement is of the **specimen**, not of the residual: refining a
     ``microstrain`` block does not make ``detected`` go False, it makes the two
