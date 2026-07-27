@@ -37,12 +37,16 @@ FORMAT_VERSION = "1"
 def save_instrument_profile(instrument: Instrument, path: str | Path) -> None:
     """Write the instrument's calibrated state to a JSON profile file.
 
-    The background and the specimen displacement/transparency are stripped:
-    they describe one measurement, not the goniometer.
+    The background, the specimen displacement/transparency and any surface
+    roughness are stripped: they describe one measurement, not the goniometer.
+    Roughness is a property of how *this* specimen was packed and pressed, so
+    carrying it into the next sample's refinement would be worse than useless —
+    it would silently pre-bias that sample's ADPs.
     """
     ins = instrument.model_copy(deep=True)
     ins.geometry.sample_displacement.value = 0.0
     ins.geometry.sample_transparency.value = 0.0
+    ins.geometry.surface_roughness = None
     doc = {
         FORMAT_KEY: FORMAT_VERSION,
         "created_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -57,7 +61,8 @@ def load_instrument_profile(path: str | Path) -> Instrument:
     Every stored parameter comes back with ``vary=False`` — the calibration
     is data, not a starting guess.  The background is a fresh default
     (attach the model the new measurement needs); displacement and
-    transparency are 0 and refinable per the sample plan.
+    transparency are 0 and refinable per the sample plan, and surface
+    roughness is absent (attach a block per specimen if the fit needs one).
     """
     doc = json.loads(Path(path).read_text())
     if doc.get(FORMAT_KEY) != FORMAT_VERSION:

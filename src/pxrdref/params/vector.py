@@ -43,6 +43,27 @@ def _background_parameters(bkg) -> list[tuple[str, Parameter]]:
     return [(f"c{n}", p) for n, p in enumerate(cheb)]
 
 
+def roughness_parameters(rough) -> list[tuple[str, Parameter]]:
+    """(sub-path, Parameter) pairs for a surface-roughness block, or [].
+
+    Shared by the collector and by :meth:`ParameterTable.apply_to_models` on
+    purpose: a parameter registered in one and forgotten in the other silently
+    loses its refined value at the next stage's recompile, which has bitten this
+    file before (see the coordinate write-back comment below).  One source of
+    truth for the field names makes that class of bug unrepresentable.
+
+    The sub-path is the model's own field name, so the ``kind`` is legible
+    straight from the dot-path (``…surface_roughness.b`` vs
+    ``…surface_roughness.tau``) and a glob over
+    ``instrument.geometry.surface_roughness.*`` frees whichever model is
+    attached without the stage plan having to know which one it is.
+    """
+    if rough is None:
+        return []
+    return [(name, getattr(rough, name)) for name in type(rough).model_fields
+            if name != "kind"]
+
+
 @dataclass(frozen=True)
 class AffineTie:
     """Declares one physical parameter as an affine function of others.
@@ -238,6 +259,12 @@ class ParameterTable:
             self._add(f"instrument.geometry.{name}", getattr(geom, name),
                       force_fixed=(geom.kind != "bragg_brentano"
                                    and name.startswith("sample_")))
+        # surface roughness is opt-in, so it is *skipped* when absent rather
+        # than added locked: a table built from an instrument without the block
+        # is byte-for-byte the pre-WP-0502 table.  No geometry gate needed —
+        # Geometry's validator already refuses the block on non-flat specimens.
+        for sub, cp in roughness_parameters(geom.surface_roughness):
+            self._add(f"instrument.geometry.surface_roughness.{sub}", cp)
         for name in ("u", "v", "w", "x", "y"):
             self._add(f"instrument.profile.{name}", getattr(instrument.profile, name))
         for sub, cp in _background_parameters(instrument.background):
@@ -521,6 +548,8 @@ class ParameterTable:
         for name in ("sample_displacement", "sample_transparency",
                      "axial_sl", "axial_hl"):
             put(getattr(instrument.geometry, name), f"instrument.geometry.{name}")
+        for sub, cp in roughness_parameters(instrument.geometry.surface_roughness):
+            put(cp, f"instrument.geometry.surface_roughness.{sub}")
         for name in ("u", "v", "w", "x", "y"):
             put(getattr(instrument.profile, name), f"instrument.profile.{name}")
         for sub, cp in _background_parameters(instrument.background):

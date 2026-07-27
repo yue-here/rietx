@@ -546,6 +546,13 @@ class CompiledModel:
             return True
         if path.startswith("instrument.geometry.sample_"):
             return True
+        # surface roughness scales the per-peak intensity and nothing else, so
+        # it rides the same chain.  Spelled out rather than left to the
+        # ``sample_`` prefix above: the path does not start with it, and the
+        # silent consequence of missing it is a *correct* but whole-model-FD
+        # column, i.e. a slow test rather than a failing one.
+        if path.startswith("instrument.geometry.surface_roughness."):
+            return True
         if path.startswith("instrument.profile."):
             return True
         return path.startswith("instrument.source.lines.")

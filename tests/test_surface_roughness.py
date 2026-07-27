@@ -13,11 +13,12 @@ import numpy as np
 import pytest
 from pydantic import ValidationError
 
-from pxrdref import Instrument
+from pxrdref import Instrument, Parameter
 from pxrdref.model.corrections import (
     surface_roughness_pitschke,
     surface_roughness_suortti,
 )
+from pxrdref.params.vector import ParameterTable
 from pxrdref.schemas import Geometry, RoughnessPitschke, RoughnessSuortti
 
 TT = np.arange(5.0, 160.0, 0.5)
@@ -272,3 +273,88 @@ def test_pitschke_stays_positive_inside_its_bounds():
         sth = np.sin(np.radians(TT / 2.0))
         r = surface_roughness_pitschke(TT, 4.0, tau)
         assert np.all(r[sth >= tau] >= 0.0)
+
+
+# -- parameter wiring --------------------------------------------------------
+
+
+def _bb(rough=None) -> Instrument:
+    ins = Instrument.bragg_brentano()
+    ins.geometry.surface_roughness = rough
+    return ins
+
+
+def test_no_block_means_no_table_entries():
+    """Opt-in must be invisible: the table is identical to the pre-WP one."""
+    from tests.test_schemas import make_lab6
+    table = ParameterTable(make_lab6(), _bb())
+    assert not [p for p in table._paths if "surface_roughness" in p]
+
+
+def test_block_registers_its_own_field_names():
+    from tests.test_schemas import make_lab6
+    for block, names in ((RoughnessSuortti(), ("a", "b")),
+                         (RoughnessPitschke(), ("c", "tau"))):
+        table = ParameterTable(make_lab6(), _bb(block))
+        got = [p for p in table._paths if "surface_roughness" in p]
+        assert got == [f"instrument.geometry.surface_roughness.{n}" for n in names]
+
+
+def test_one_glob_frees_whichever_model_is_attached():
+    """Stage plans must not need to know which `kind` the user chose."""
+    from tests.test_schemas import make_lab6
+    for block in (RoughnessSuortti(), RoughnessPitschke()):
+        table = ParameterTable(make_lab6(), _bb(block))
+        table.set_vary(["instrument.geometry.surface_roughness.*"], True)
+        freed = [p for p in table.free_paths if "surface_roughness" in p]
+        assert len(freed) == 2, f"{type(block).__name__}: freed {freed}"
+
+
+def test_refined_values_survive_the_write_back():
+    """Without apply_to_models the value vanishes at the next stage's recompile."""
+    from tests.test_schemas import make_lab6
+    structure, ins = make_lab6(), _bb(RoughnessSuortti())
+    table = ParameterTable(structure, ins)
+    for e in table.entries:
+        if e.path.endswith("surface_roughness.b"):
+            e.value = 0.42
+        if e.path.endswith("surface_roughness.a"):
+            e.value = 0.31
+    table.apply_to_models(structure, ins)
+    assert ins.geometry.surface_roughness.b.value == pytest.approx(0.42)
+    assert ins.geometry.surface_roughness.a.value == pytest.approx(0.31)
+
+
+def test_roughness_rides_the_analytic_peak_chain_not_whole_model_fd():
+    """A missed prefix here is a silent slowdown, not a failure — so pin it."""
+    from pxrdref.model.forward import CompiledModel
+    for name in ("a", "b", "c", "tau"):
+        path = f"instrument.geometry.surface_roughness.{name}"
+        assert CompiledModel.scalar_chain_supported(None, path) is True
+
+
+def test_roughness_is_per_histogram_by_default():
+    """Each histogram is a separate mount, so packing is not a shared property."""
+    from pxrdref.params.multi import SharingMap
+    sharing = SharingMap()
+    for name in ("a", "b", "c", "tau"):
+        path = f"instrument.geometry.surface_roughness.{name}"
+        assert sharing.is_shared(path) is False
+
+
+def test_calibration_profiles_never_carry_roughness(tmp_path):
+    """Roughness describes how *this* specimen was packed, not the goniometer.
+
+    Saving it into an instrument profile would silently pre-bias the ADPs of
+    every later sample measured on that diffractometer.
+    """
+    from pxrdref.io.instrument_profile import (
+        load_instrument_profile,
+        save_instrument_profile,
+    )
+    ins = _bb(RoughnessSuortti(b=Parameter(value=0.4, min=0.0, max=5.0,
+                                           transform="softplus")))
+    path = tmp_path / "profile.json"
+    save_instrument_profile(ins, path)
+    assert ins.geometry.surface_roughness is not None, "must not mutate the caller"
+    assert load_instrument_profile(path).geometry.surface_roughness is None
