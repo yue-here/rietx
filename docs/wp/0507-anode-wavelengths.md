@@ -30,6 +30,28 @@ comment immediately above it (`:334`) already anticipates the others:
   the default tuples. A `Wβ`-style contamination check already exists for W
   Lα1 (Bearden 1967) and is the pattern to follow if Kβ is ever wanted.
 
+### Inherited
+
+From **WP-0504** (anomalous f′/f″, landed 2026-07-27) — **check each new anode
+against the dispersion table, not only against the wavelength references.**
+Anomalous scattering is strongly anode-dependent, and an anode is routinely
+*chosen* to sit on a particular side of a constituent's absorption edge:
+
+* `crystallography/dispersion.py` bundles Cromer-Liberman over **3–70 keV**.
+  Every anode in this WP's list is inside that band (Cr Kα1 = 5.415 keV lowest,
+  Ag Kα1 = 22.16 keV highest), so no re-extraction is needed — but assert it,
+  because the table *refuses* out-of-band rather than extrapolating.
+* `dispersion.resolve` **raises** when the Kα1/Kα2 pair straddles an absorption
+  edge of a constituent, because the two lines then cannot share one |F|².
+  20 eV is a narrow window at Cu, but the gap grows with the anode and real
+  cases exist: **Eu at Cu Kα**, and **Ru at Ag Kα** (ΔE = 173 eV, with Ru's K
+  edge between the lines). A per-anode test that checks only wavelengths will
+  not see this; add a smoke test that `resolve` succeeds at each new anode.
+* The **`DISPERSION_NEGLECTED` diagnostic fires per wavelength**, so its
+  message changes with the anode — Fe at Co Kα (6.93 keV, just below the Fe K
+  edge at 7.11 keV) is a far larger correction than Fe at Mo Kα. Expect it in
+  any new anode's acceptance output.
+
 ## Tasks
 
 - [ ] Expand this stub into a full WP before writing code
@@ -37,6 +59,9 @@ comment immediately above it (`:334`) already anticipates the others:
       (Deslattes 2003), each with a source line in the `_RADIATIONS` comment
 - [ ] Round-trip / lookup test per anode; confirm the doublet weight and
       polarization defaults still make sense off Cu
+- [ ] Per-anode dispersion smoke test (see `### Inherited`): every anode inside
+      the bundled 3–70 keV band, and `dispersion.resolve` not refusing the
+      doublet for the test structures
 
 ## Acceptance
 

@@ -117,6 +117,30 @@ test is useless at 7251 channels — it blesses an inert 0.13 % χ² improvement
 so ΔBIC is the statistic to quote ([1001](wp/1001-validation-matrix.md)
 `### Inherited`).
 
+**Out of order: anomalous scattering
+[0504](wp/0504-anomalous-scattering-xraydb.md) landed 2026-07-27** (v0.5, same
+session as 0503). `Source.dispersion` is an opt-in block applying f′ + i·f″ from
+a bundled Cromer-Liberman table (`data/f1f2_CromerLiberman.dat`, DABAX/MIT,
+Kissel-Pratt-corrected — **not** xraydb, which needs sqlalchemy, and **not**
+Chantler, whose DABAX file carries an ESRF-only restriction over a live NIST SRD
+copyright). The load-bearing piece is not that f goes complex — F was already
+complex — but that a powder measures the **Friedel average**: `generate_reflections`
+merges ±h into one orbit and evaluates one representative, which is exact only
+while f is real. The closed form ⟨|F|²⟩ = |A|² + |B|² (A carrying f₀+f′, B
+carrying f″, over the *same* orbit sums) is exact, needs no second orbit pass and
+no centro/non-centro split, and reduces bit-identically when the block is absent.
+The acceptance **re-derives a v0.3 conclusion**: refitting the eight IUCr
+round-robin sample-1 mixtures under the identical protocol takes the QPA error
+from RMS 2.26 → **0.69 wt %** and worst |ΔW| 5.13 → **1.39**, so the signed bias
+v0.3 attributed to microabsorption is mostly neglected dispersion (the giveaway
+was fluorite coming back *high*, which microabsorption could not explain). Its
+sharpest single result is elsewhere: on pure ZnO, Rwp barely moves but B(O) goes
+from 0.022 to 0.429 Å² — a displacement parameter that had been spent absorbing
+Zn's missing f′. The default stays **off** so every shipped acceptance number
+remains valid; flipping it is a re-measurement of the validation matrix
+([1001](wp/1001-validation-matrix.md) `### Inherited`), and per-anode dispersion
+checks are written into [0507](wp/0507-anode-wavelengths.md).
+
 ## Milestones
 
 | Milestone | Scope | Status | Acceptance |
@@ -167,7 +191,7 @@ so ΔBIC is the statistic to quote ([1001](wp/1001-validation-matrix.md)
 | [0501](wp/0501-absorption-corrections.md) | Capillary + flat-plate absorption | ⬜ | — |
 | [0502](wp/0502-surface-roughness.md) | Surface roughness | ⬜ | — |
 | [0503](wp/0503-stephens-anisotropic-strain.md) | Stephens anisotropic strain | ✅ 2026-07-27 | — |
-| [0504](wp/0504-anomalous-scattering-xraydb.md) | Anomalous f′,f″ (bundled table, not xraydb) | 🔶 | — |
+| [0504](wp/0504-anomalous-scattering-xraydb.md) | Anomalous f′,f″ (bundled Cromer-Liberman, not xraydb) | ✅ 2026-07-27 | — |
 | [0505](wp/0505-sequential-refinement.md) | SequentialRefinement warm start | ⬜ | — |
 | [0506](wp/0506-secondary-extinction.md) | Secondary extinction (Sabine) | ✅ 2026-07-23 | — |
 | [0507](wp/0507-anode-wavelengths.md) | Additional anode wavelengths (Co/Cr/Fe/Mo/Ag) | ⬜ | — |

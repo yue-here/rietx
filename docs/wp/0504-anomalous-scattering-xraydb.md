@@ -1,6 +1,6 @@
 # WP-0504 — Anomalous scattering f′, f″
 
-Milestone: v0.5 · Status: 🔶 in progress
+Milestone: v0.5 · Status: ✅ shipped 2026-07-27
 Depends on: —
 
 ## Goal
@@ -168,7 +168,10 @@ the historical filename. **Bundle**, matching the `f0_WaasKirf.dat` /
   extraction, so the f1-vs-f′ convention cannot silently rot.
 * **Not** periodictable's Henke tables: they cap at 30 keV, *below* the 11-BM
   acceptance energy (29.95 keV is inside but 0.4 Å synchrotron work is not),
-  and they are the wrong tool (locked decision, `../DESIGN.md`).
+  and the Windt/Henke f″ differs from Cromer-Liberman by up to 8 % (La) in the
+  hard-X-ray band where it is extrapolated. (This WP's original scope line
+  called them "the wrong tool"; that judgement is confirmed, but it lives here
+  and not in `../DESIGN.md`, which has no dispersion entry.)
 
 Source: `github.com/oasys-kit/DabaxFiles` (MIT), the current home of DABAX;
 the `esrf.fr/computing/scientific/dabax` URL in every header is dead.
@@ -264,22 +267,30 @@ Each item ≈ one commit, prefixed `WP-0504:`.
 - [ ] `schemas/instrument.py`: opt-in `Dispersion` block on `Source`
       (`overrides: {element: (f′, f″)}` for measured near-edge values),
       validators, JSON round-trip test.
-- [ ] `crystallography/structure_factor.py`: the A/B Friedel-averaged form (1);
+- [x] `crystallography/structure_factor.py`: the A/B Friedel-averaged form (1);
       `PhaseSites.f_anom` (per-atom complex, frozen);
-      `compile_phase_sites(phase, wavelengths=…)`. Bit-identity golden when off;
-      identity vs the explicit orbit average on a non-centrosymmetric group.
-- [ ] Derivatives: `d_f2_d_xyz` and `d_f2_d_uaniso` in the A/B form; FD and jax
-      `jacfwd` agreement; `toy_anomalous` backend golden (non-centrosymmetric,
-      so it actually exercises B ≠ 0).
-- [ ] `model/forward.py`: wire λ into the compile; line-spread guard
-      (`LINE_DISPERSION_TOL`); `io/exporters.py` reports the Friedel-averaged
-      |F|².
-- [ ] `DISPERSION_NEGLECTED` diagnostic: fires when the block is absent and any
-      species' |f′| or f″ exceeds a threshold fraction of Z at any line.
-- [ ] Tests: unit/property + obs/calc/diff PNGs to `tests/output/`.
-- [ ] Acceptance (below); re-derive
-      `test_sample1_bias_has_the_microabsorption_shape` and record the measured
-      numbers in the handover log.
+      `compile_phase_sites(phase, f_anom)`. Bit-identity when off — which
+      constrained the fp *association order*, not just the algebra; identity vs
+      the explicit orbit average on ZnO to 1e-12.
+- [x] Derivatives: `d_f2_d_xyz` and `d_f2_d_uaniso` in the A/B form (B reuses
+      A's bracketed sum, so it costs one multiply-accumulate); FD and jax
+      `jacfwd` agreement; `toy_anomalous` backend golden — the only
+      non-centrosymmetric state in the set, so it is the only one that
+      exercises B ≠ 0.
+- [x] `model/forward.py`: λ wired into the compile; line-spread guard
+      (`LINE_DISPERSION_TOL`, 1 % of Z). `io/exporters.py` already reported the
+      Friedel-averaged |F|² by construction (it reads `cp.sites`); its docstring
+      now says so.
+- [x] `DISPERSION_NEGLECTED` diagnostic: fires when the block is absent and a
+      species' |f|² at k = 0 moves ≥ 2 %, escalating to a warning at 5 %.
+- [x] Tests: `tests/test_dispersion.py` (36 unit/property) + PNGs to
+      `tests/output/` from the acceptance module.
+- [x] Acceptance (below), and the re-derivation WP-0310 asked for:
+      `test_sample1_bias_has_the_microabsorption_shape` is renamed
+      `…_has_the_dispersion_shape` with the corrected reasoning (its assertions
+      are unchanged — that suite deliberately stays dispersion-off and
+      comparable to v0.3). `docs/milestones/v0.3.md` carries a dated
+      superseded-explanation note.
 
 ## Acceptance
 
@@ -307,21 +318,38 @@ takes the RMS error from **2.26 → 0.83 wt %**.
 
 Criterion: with dispersion on, the worst |ΔW| falls well below the v0.3 5.13
 wt % (1f zincite) and the signed shape collapses — mean zincite error toward
-zero rather than −2.7. *If it does not*, that is the finding and it gets
-written up: the prediction above uses fixed Biso and scales, and a real
-refinement will partly re-absorb the change into Biso — quantify how much
-rather than tuning to the table.
+zero rather than −2.7.
+
+**Measured** (2026-07-27, `tests/test_acceptance_dispersion.py`, all eight
+refitted under the identical v0.3 protocol with only the block added):
+
+| phase | mean error off → on | RMS off → on | worst off → on |
+|---|---|---|---|
+| corundum | +1.69 → **+0.75** | 1.96 → 0.88 | 3.17 → 1.20 |
+| zincite | −2.66 → **−0.54** | 3.14 → 0.70 | 5.13 → 1.39 |
+| fluorite | +0.97 → **−0.20** | 1.27 → 0.43 | 2.02 → 0.65 |
+| **overall** | | **2.26 → 0.69** | **5.13 → 1.39** |
+
+The refinement *beat* the parameter-free prediction (0.69 vs 0.83 predicted),
+despite `qpa_plan` freeing Biso so it could have re-absorbed the correction
+instead. Every phase's RMS improves and the signed shape is gone.
 
 **Structural — ZnO `P 63 m c` (`qarr/zincite.prn`), the non-centrosymmetric
-case.** Unit-level: (1) matches the explicit Laue-orbit average to < 1e-12
-relative. Real-data: refining zincite alone with dispersion on must not degrade
-Rwp, and the cell must stay put (dispersion moves intensities, never positions).
+case.** Unit-level: (1) matches the explicit Laue-orbit average to < 1e-12.
+Real-data measured: cell unmoved (a, c to 1e-5 Å), Rwp 10.907 → 10.758 %, and
+the finding Rwp barely shows — **B(O) goes from 0.022 to 0.429 Å²**. Without
+Zn's f′ = −1.55 the model over-scatters Zn by ~10 %, and the only lever the
+refinement has to restore the Zn:O contrast is to drive B(O) to its floor. The
+correction hands back a physical displacement parameter.
 
-**Negative control — SRM 660c LaB₆ (`nist_srm660c_100a.cif`).** `a` must be
-unmoved within its esd (the **absolute** anchor; positions do not see f′), and
-Rwp/Biso(La) recorded as a characterisation. LaB₆ is the *quiet* case by
-construction — f′ = −1.38 and f″ = 9.03 nearly cancel in |f|², netting −1.0 %
-— so a large move here would itself be the finding.
+**Negative control — SRM 660c LaB₆ (`nist_srm660c_100a.cif`).** Measured:
+`a` = 4.156895 Å both ways (esd 25e-6), Rwp 8.661 → 8.640 %. LaB₆ is the quiet
+case by *net* power (f′ = −1.38 and f″ = 9.03 nearly cancel in |f|², −1.0 %) yet
+still redistributes between the sites, since only La carries the correction:
+B(La) +12 %, B(B) −22 %. Recorded as a characterisation.
+
+End-to-end, the `DISPERSION_NEGLECTED` diagnostic fires on the off run and is
+absent from the on run.
 
 ```sh
 .venv/bin/python -m pytest tests/test_dispersion.py -q
@@ -354,6 +382,60 @@ construction — f′ = −1.38 and f″ = 9.03 nearly cancel in |f|², netting 
 Append-only, newest first. An entry is REQUIRED before ending any session that
 touched this WP — done / in flight / next / gotchas.
 
+- **2026-07-27 (end of session)** — **all eight checklist items landed; the
+  suite is green (523 fast + the `slow` acceptance, 36 new unit tests and 14 new
+  acceptance tests).** The design in the entry below survived contact; what it
+  did not anticipate is below.
+
+  **The headline is the acceptance, not the feature.** Refitting the eight IUCr
+  round-robin sample-1 mixtures under the identical v0.3 protocol with only the
+  dispersion block added takes the QPA error from RMS **2.26 → 0.69 wt %** and
+  worst |ΔW| **5.13 → 1.39**. That *re-derives a v0.3 conclusion*: the signed
+  bias v0.3 attributed to untreated microabsorption is mostly this. WP-0310
+  asked for exactly that re-derivation if the physics changed; the shape test is
+  renamed `test_sample1_bias_has_the_dispersion_shape` with corrected reasoning
+  (assertions untouched — that suite stays dispersion-off and comparable), and
+  `milestones/v0.3.md` carries a dated superseded-explanation note. The
+  prediction was written into this file *before* the refits and the refinement
+  beat it (0.69 measured vs 0.83 predicted) even though `qpa_plan` frees Biso
+  and could have re-absorbed the correction instead.
+
+  **The single best illustration is not in the QPA numbers.** Pure ZnO: Rwp
+  moves only 10.91 → 10.76 %, but **B(O) goes from 0.022 to 0.429 Å²**. With
+  Zn's f′ = −1.55 neglected the model over-scatters Zn by ~10 %, and the only
+  lever the refinement has to restore the Zn:O contrast is to drive B(O) to its
+  floor — a displacement parameter spent absorbing a systematic. Rwp is not
+  where this shows up; the ADPs are.
+
+  **Four gotchas that cost real time, none of them the physics.**
+  1. *Bit-identity constrains the fp association order, not just the algebra.*
+     Factoring a shared `occ·dw` prefactor out of A and B is algebraically
+     identical and moved two backend goldens by an ulp. `_orbit_terms` builds
+     `occ·f·dw` in that order deliberately; there is a comment saying so.
+  2. *`amp_b` must be (N,) on the anisotropic path too.* f″ carries no
+     per-reflection Debye-Waller factor to spread it, so it came out a scalar,
+     and the derivative kernels index `amp[:, None]`. Found only by building the
+     `toy_anomalous` golden with an aniso site — a reason to put one there.
+  3. *Do not trust recalled f′/f″ values.* Three of the seven I used to size the
+     WP were wrong (Al's f′ and f″ swapped; Zr and La at Cu Kα badly off), which
+     put wrong magnitudes in the first draft. Four independent tabulations agree
+     with each other; recall does not. `gemmi.cromer_liberman` is already
+     available and is the cheapest oracle.
+  4. *The DABAX Chantler file is a licence trap.* It is the best data and it is
+     in an MIT repo, and its own header restricts use to the ESRF over a live
+     NIST SRD copyright. Read the `#UD` block of any DABAX file before bundling
+     it.
+
+  **Not done, deliberately** (all fenced in Non-goals): refining f′/f″,
+  per-emission-line |F|² (guarded against instead — Ni's K edge between Cu Kα
+  and Kβ is the test case), Kramers-Kronig f′ from the µ table, re-sourcing µ
+  from f″, flipping the default to on. Also untouched: `multi.py` — a
+  multi-histogram run compiles per histogram so each gets its own λ and its own
+  f′/f″, which should just work, but is untested.
+
+  **Next**, if reopened: nothing outstanding for v0.5. The one change that would
+  multiply what shipped is flipping the default to on, which is a re-measurement
+  of the whole validation matrix and is written into WP-1001's `### Inherited`.
 - **2026-07-27** — expanded the stub into this WP (task 1). Design settled and
   the load-bearing claims *prototyped and measured* before writing, not
   asserted:

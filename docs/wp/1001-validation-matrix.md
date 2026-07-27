@@ -62,6 +62,38 @@ physics guard (the strain-variance cone), on real data. That tier is neither
 exact nor statistical — it is "characterisation", the same tier round-robin
 sample 4 occupies for microabsorption, and the matrix needs a name for it.
 
+From **WP-0504** (anomalous f′/f″, landed 2026-07-27) — **every acceptance
+number recorded in `docs/milestones/` was measured with dispersion OFF, and
+turning it on is the right default for v1.0.** `Source.dispersion` shipped
+opt-in precisely so that landing it did not invalidate the record; flipping the
+default is a re-measurement of the whole matrix, and that is this WP's job.
+
+What the flip is worth, measured, not projected: on the eight IUCr round-robin
+sample-1 mixtures under the *identical* v0.3 protocol, the QPA error goes from
+RMS 2.26 → **0.69 wt %** and worst |ΔW| 5.13 → **1.39 wt %**. It also
+**re-derives a v0.3 conclusion**: the signed bias shape v0.3 attributed to
+untreated microabsorption is mostly neglected dispersion (the giveaway was
+fluorite coming back *high*, which microabsorption could not explain).
+`test_sample1_bias_has_the_dispersion_shape` carries the corrected reasoning
+while still asserting the dispersion-off shape, because that suite deliberately
+stays comparable to v0.3.
+
+Three consequences for the policy:
+
+* Numbers to re-measure when the default flips: every QPA figure in
+  `milestones/v0.3.md`, and the lab Rwp/Biso baselines (SRM 660c moves Rwp
+  8.661 → 8.640 % and B(La)/B(B) by 12 %/22 % — the cell does **not** move,
+  4.156895 Å either way, so the absolute anchor is safe).
+* The **`DISPERSION_NEGLECTED` diagnostic** (`refine.py`) already names which
+  species and by how much. A validation matrix entry that runs dispersion-off
+  should assert the diagnostic is present, not merely tolerate it.
+* This is a fourth acceptance shape, alongside 0503's "assert a model is
+  inadmissible": **a pre-registered prediction about numbers already
+  recorded.** The prediction here was parameter-free (each phase's Bragg power
+  ratio), written into the WP before the refits, and beat itself (predicted RMS
+  0.83, measured 0.69). The matrix should have a name for that tier — it is
+  much stronger evidence than a tolerance being met.
+
 ## Tasks
 
 - [ ] Expand this stub into a full WP before starting

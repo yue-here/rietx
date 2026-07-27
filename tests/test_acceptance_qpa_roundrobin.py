@@ -36,9 +36,13 @@ the weighed values, not that the numbers land.
 **Measured results** (2026-07-24, recorded in docs/milestones/v0.3.md):
 sample-1 worst |ΔW| = 5.1 wt % (1f zincite), traces ≤ 1.3 wt %; the signed
 errors have a stable shape — zincite low (mean −2.7), corundum high (+1.7),
-fluorite mildly high (+1.0) — consistent in direction with untreated
-microabsorption for the corundum/zincite pair (µ ≈ 128 vs 282 cm⁻¹), and
-asserted as a shape below rather than absorbed into a wider band.  Sample 2:
+fluorite mildly high (+1.0) — asserted as a shape below rather than absorbed
+into a wider band.  **WP-0504 re-derived that shape**: it is mostly the
+*anomalous scattering these fits omit* (this suite runs dispersion-off on
+purpose, so its numbers stay comparable to v0.3), not microabsorption as v0.3
+supposed — see the shape test's docstring and
+``test_acceptance_dispersion.py``, where enabling it takes the overall RMS
+error from 2.26 to 0.69 wt %.  Sample 2:
 worst 2.9 wt % with brucite March-Dollase r ≈ 0.68 (< 1 = platy in
 Bragg-Brentano reflection geometry, the expected habit).  Sample 4
 uncorrected: corundum +24, magnetite −15, zircon −9 wt %; Brindley with
@@ -301,14 +305,29 @@ def test_sample1_fractions_within_participant_spread(sample1_results, sample):
 
 
 @pytest.mark.slow
-def test_sample1_bias_has_the_microabsorption_shape(sample1_results):
+def test_sample1_bias_has_the_dispersion_shape(sample1_results):
     """The residual inaccuracy is a *characterised systematic*, not noise:
-    zincite comes back low and corundum high across the whole suite — the
-    direction untreated microabsorption imposes on that pair (µ ≈ 282 vs
-    128 cm⁻¹; fluorite's sign shows the effect is also particle-size
-    dependent, and no d50s are published to model it honestly).  Asserting
-    the shape pins the explanation; a future change that breaks the shape
-    (or fixes the physics) should fail here and prompt re-derivation."""
+    zincite comes back low and corundum high across the whole suite, and
+    fluorite high as well.
+
+    **Re-derived by WP-0504** (this docstring is the re-derivation WP-0310
+    asked for; the assertions are unchanged, because this suite still runs
+    dispersion-off).  v0.3 attributed the shape to untreated microabsorption
+    (µ ≈ 282 vs 128 cm⁻¹ for the zincite/corundum pair) while flagging that
+    fluorite's *positive* sign did not fit that story.  It does not: the
+    leading term is the **neglected anomalous scattering** these fits run
+    without.  At Cu Kα, Zn sits just below its K edge (f′ = −1.55) while Al
+    and Ca sit above theirs, so each phase's Bragg power is mis-scaled by a
+    different factor — 1.0542 corundum, 0.8441 zincite, 1.0728 fluorite — and
+    QPA divides one phase's scale by another's.  That predicts all three signs
+    with no free parameters.  Enabling the correction and refitting under this
+    identical protocol takes the overall RMS error from 2.26 to 0.69 wt % and
+    the worst |ΔW| from 5.13 to 1.39 (``test_acceptance_dispersion.py``).
+
+    Microabsorption is real and still present in the ~0.7 wt % that remains;
+    it is no longer the leading term.  Asserting the shape pins the
+    explanation; a change that breaks it should fail here and prompt another
+    re-derivation."""
     err = {name: [_fractions_pct(sample1_results[s])[name] - WEIGHED[s][name]
                   for s in SAMPLE1]
            for name in ("corundum", "zincite", "fluorite")}

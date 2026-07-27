@@ -45,6 +45,25 @@ xp-routed. New correction code calls `xp.*` with `xp = get_backend()` bound
 once per compiled-model call, never bare `np.*` and never per-op — otherwise it
 breaks the jax and torch backends silently.
 
+From **WP-0504** (anomalous f′/f″, landed 2026-07-27) — three things, one of
+which is a trap.
+
+* **µ stays on McMaster; do not switch it to f″.** 0504 bundled a
+  Cromer-Liberman f′/f″ table and the optical theorem (σ_photo = 2·r_e·λ·f″,
+  `dispersion.photoabsorption_barn`) makes it *look* like µ could be re-sourced
+  from it. It cannot: f″ gives **photoabsorption only**, while beam removal
+  needs the total, and the Rayleigh + Compton gap is largest for **light**
+  elements (photoabsorption ~Z⁴, Rayleigh ~Z²) — exactly where 0305 flagged
+  McMaster as weakest. The decision, and the measured numbers, are in 0504.
+* **New helper, use it:** `attenuation.photoelectric_cross_section` now exposes
+  the photoelectric column separately (0504 split it out of the shared
+  interpolator). The edge-refusal behaviour 0305 described is unchanged and now
+  lives in `attenuation._interpolate`.
+* **The two tables cross-check each other** to 0.04–5.4 % over Z = 8→57 at Cu
+  Kα (`test_dispersion.py::test_f_double_prime_reproduces_the_mcmaster_photoabsorption`).
+  If an absorption correction ever disagrees with an independent code by more
+  than that, the tabulation is not the explanation.
+
 ## Tasks
 
 - [ ] Expand this stub into a full WP before writing code

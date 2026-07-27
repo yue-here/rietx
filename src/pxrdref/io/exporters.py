@@ -74,6 +74,12 @@ class ReflectionRow:
     rather than computed from the structure.  ``intensity`` is the modelled
     integrated intensity of this (line, reflection): in Rietveld mode
     scale·multiplicity·|F|²·P·(line weight)·Lp·extinction.
+
+    With anomalous scattering on, ``f_squared`` is the **Friedel-averaged**
+    ⟨|F|²⟩ = ½(|F(h)|² + |F(−h)|²) that the powder peak actually contains, not
+    the representative reflection's own |F(h)|² — the two differ in a
+    non-centrosymmetric group, and only the average is observable in a powder
+    (see ``crystallography.structure_factor``).
     """
 
     phase: str
