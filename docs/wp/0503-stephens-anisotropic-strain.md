@@ -143,7 +143,7 @@ size with a floor if the block is about to be freed from a near-zero start
 |---|---|
 | `crystallography/stephens.py` *(new)* | monomial table, invariant basis (reuses `wyckoff._nullspace_int`), monomial matrix for an hkl list, M² isotropic-limit coefficients |
 | `schemas/structure.py` | `StephensStrain` block + `Phase.microstrain`, validators |
-| `params/vector.py` | `phases.i.strain.k` DOFs, absolute affine ties, out-of-subspace raise, `lor_strain` lock, write-back |
+| `params/vector.py` | `phases.i.microstrain.dof.k` DOFs, absolute affine ties, out-of-subspace raise, `lor_strain` lock, write-back |
 | `model/profiles/caglioti.py` | `lorentzian_fwhm(..., aniso_strain=0.0)` |
 | `model/forward.py` | `CompiledPhase.strain_monomials`, Λ in `phase_peaks`, Λ in the compile-time width estimate |
 | `strategy/staged.py` | `microstrain` stage; `check_stephens_positive` guard → `GuardReport` |
@@ -216,7 +216,7 @@ extents) must be computed at stage compile, never inside the solve.
       `isotropic(microstrain, cell)` / `zero()` constructors),
       `Phase.microstrain`, validator rejecting `lor_strain.vary` alongside a
       block. JSON round-trip test.
-- [ ] `params/vector.py`: `phases.i.strain.k` DOFs (absolute, identity,
+- [ ] `params/vector.py`: `phases.i.microstrain.dof.k` DOFs (absolute, identity,
       unbounded), affine ties for the 15 components, raise on an
       out-of-subspace S, raise on freeing an all-zero block, lock `lor_strain`,
       write-back in `apply_to_models`.
@@ -224,7 +224,7 @@ extents) must be computed at stage compile, never inside the solve.
       the Lorentzian strain term; frozen monomial matrix on `CompiledPhase`;
       compile-time window/FCJ sizing sees Λ. Absent block stays bit-identical
       (golden test).
-- [ ] Jacobian: confirm the `phases.*` scalar chain covers `…strain.k` and that
+- [ ] Jacobian: confirm the `phases.*` scalar chain covers `…microstrain.dof.k` and that
       the analytic column matches FD *and* jax `jacfwd` to the bars
       `backend/linalg64.py` exports. Add a `toy_stephens` backend golden.
 - [ ] Guard + diagnostic: `STEPHENS_STRAIN_NOT_POSITIVE` when σ²(M) ≤ 0 on any
