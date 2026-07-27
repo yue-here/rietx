@@ -11,6 +11,28 @@ Debye-Waller factor (International Tables C).  Intensities use |F|² with the
 reflection multiplicity applied separately (Rietveld, 1969, J. Appl. Cryst.
 2, 65).
 
+**Anomalous scattering and the powder average.**  With dispersion the species
+factor is complex, f = f₀(k) + f′(λ) + i·f″(λ), and Friedel's law dies in a
+non-centrosymmetric group: |F(h)|² ≠ |F(−h)|².  A powder cannot resolve the
+pair — d(h) = d(−h), they land in one peak — and ``symmetry.generate_reflections``
+accordingly merges ±h into a single orbit and keeps one representative.  So
+what this module must return is the **orbit average**, not the representative's
+own value.  Splitting the species factor into its real and imaginary parts,
+
+    A(h) = Σ_j occ_j·(f₀_j + f′_j)·Σ_m T_jm·exp(2πi h·x_jm)
+    B(h) = Σ_j occ_j·      f″_j  ·Σ_m T_jm·exp(2πi h·x_jm)
+
+gives F = A + iB, and since T is real, F(−h) = conj(A − iB), so
+
+    ⟨|F|²⟩ = ½(|F(h)|² + |F(−h)|²) = |A|² + |B|²
+
+*exactly*, over the same orbit sums — no second pass over the orbit, and no
+centro/non-centro case split (in a centrosymmetric group A and B share one
+common phase, so the cross term vanishes identically).  f″ = 0 makes B ≡ 0 and
+recovers |F|², so a structure without a dispersion block is bit-identical to
+the non-anomalous model.  Conventions and the tabulation: ``crystallography.
+dispersion``.
+
 **Isotropic** sites take T = exp(−B_j k²), identical for every image, so it
 factors out of the orbit sum.  **Anisotropic** sites (an ``AnisoU`` block on
 the atom) take
@@ -49,15 +71,28 @@ class PhaseSites:
     multiplicity.  ``aniso[j]`` says which Debye-Waller form atom ``j`` uses;
     like the op subsets it is decided at compile time and frozen for the
     stage (it comes from the schema, never from θ).
+
+    ``f_anom[j]`` is the atom's dispersion correction f′ + i·f″, ``None`` when
+    the source declares none.  It is frozen for the same reason the op subsets
+    are, but more strongly: it depends only on the species and the wavelength,
+    and ``EmissionLine.wavelength`` is a plain float rather than a
+    ``Parameter``, so it can never be a function of θ.
     """
 
     ops: list[tuple[np.ndarray, np.ndarray]]
     species: list[str]
     aniso: list[bool] = field(default_factory=list)
+    f_anom: np.ndarray | None = None  # (n_asym,) complex128
 
     def __post_init__(self) -> None:
         if not self.aniso:
             self.aniso = [False] * len(self.species)
+        if self.f_anom is not None:
+            self.f_anom = np.asarray(self.f_anom, dtype=np.complex128)
+            if self.f_anom.shape != (len(self.species),):
+                raise ValueError(
+                    f"f_anom must have one entry per asymmetric-unit atom "
+                    f"({len(self.species)}), got shape {self.f_anom.shape}")
 
     @property
     def n_asym(self) -> int:
@@ -94,7 +129,16 @@ def select_orbit_ops(sg: gemmi.SpaceGroup, xyz: np.ndarray, *, tol: float = 1e-4
     return np.asarray(rots), np.asarray(trans)
 
 
-def compile_phase_sites(phase: Phase) -> PhaseSites:
+def compile_phase_sites(phase: Phase,
+                        f_anom: dict[str, complex] | None = None) -> PhaseSites:
+    """Freeze the per-atom symmetry and species data for one stage.
+
+    ``f_anom`` maps a **raw** ``Atom.species`` string (``"Zn2+"``, not the
+    normalised form-factor key) to its dispersion correction f′ + i·f″;
+    ``None`` leaves the phase non-anomalous.  The caller resolves it, because
+    it is a property of the *source* wavelength rather than of the structure —
+    see ``model.forward.compile_model``.
+    """
     sg = get_spacegroup(phase.space_group)
     ops: list[tuple[np.ndarray, np.ndarray]] = []
     species: list[str] = []
@@ -104,7 +148,11 @@ def compile_phase_sites(phase: Phase) -> PhaseSites:
         ops.append(select_orbit_ops(sg, xyz))
         species.append(normalize_species(atom.species))
         aniso.append(atom.aniso is not None)
-    return PhaseSites(ops=ops, species=species, aniso=aniso)
+    fa = None
+    if f_anom is not None:
+        fa = np.array([complex(f_anom[a.species]) for a in phase.atoms],
+                      dtype=np.complex128)
+    return PhaseSites(ops=ops, species=species, aniso=aniso, f_anom=fa)
 
 
 def transposed_rotation_indices(hkl: np.ndarray, rot: np.ndarray) -> np.ndarray:
@@ -127,28 +175,64 @@ def _aniso_dw(hkl: np.ndarray, rot: np.ndarray, u6, astar: np.ndarray) -> np.nda
 
 
 def _orbit_terms(hkl, k, sites, xyz, occ, biso, uaniso, astar, j):
-    """Per-atom pieces of F: ``(amp (N,), phase (m,N), dw (m,N) | None)``.
+    """Per-atom pieces of F: ``(amp_a, amp_b, phase (m,N), dw (m,N) | None)``.
 
-    ``amp`` is the real prefactor that multiplies the whole orbit sum;
-    ``dw`` is the per-image Debye-Waller factor, ``None`` for isotropic sites
-    (whose factor is already folded into ``amp``).  Sharing this between the
-    forward model and the two derivative routines is what keeps their
-    expansions of F literally the same expression.
+    ``amp_a`` is the real prefactor occ·(f₀ + f′) that multiplies the orbit sum
+    in A and ``amp_b`` the occ·f″ one that multiplies it in B (both (N,); see
+    the module docstring).  ``amp_b`` is ``None`` — not a zero array — when the
+    phase carries no dispersion, so the off path does no arithmetic at all;
+    that test is compile-time structural (``sites.f_anom``), never a branch on
+    θ, so it does not break residual purity.  ``dw`` is the per-image
+    Debye-Waller factor, ``None`` for isotropic sites (whose factor is already
+    folded into the amplitudes).  Sharing this between the forward model and
+    the two derivative routines is what keeps their expansions of F literally
+    the same expression.
+
+    The amplitude is deliberately built as ``occ·f·dw`` in that association
+    order: fp multiplication is not associative, and regrouping it (say to
+    share an ``occ·dw`` prefactor between A and B) moves the non-anomalous
+    path off its backend goldens by an ulp.
     """
     xp = get_backend()
     rot, tran = sites.ops[j]
     positions = rot @ xyz[j] + tran  # (m, 3)
     phase = xp.exp(2.0j * xp.pi * (positions @ hkl.T))  # (m, N)
+    fa = None if sites.f_anom is None else sites.f_anom[j]
+    f = f0(sites.species[j], k)
+    if fa is not None:
+        f = f + float(fa.real)
     if sites.aniso[j]:
-        return (occ[j] * f0(sites.species[j], k), phase,
-                _aniso_dw(hkl, rot, uaniso[j], astar))
+        dw = _aniso_dw(hkl, rot, uaniso[j], astar)
+        amp_b = None if fa is None else occ[j] * float(fa.imag)
+        return occ[j] * f, amp_b, phase, dw
     dw = xp.exp(-biso[j] * k * k)  # exp(−B (sinθ/λ)²)
-    return occ[j] * f0(sites.species[j], k) * dw, phase, None
+    amp_b = None if fa is None else occ[j] * float(fa.imag) * dw
+    return occ[j] * f * dw, amp_b, phase, None
 
 
 def _orbit_sum(phase: np.ndarray, dw: np.ndarray | None) -> np.ndarray:
     """Σ_m T_m·exp(2πi h·x_m) — the isotropic T factored out already."""
     return phase.sum(axis=0) if dw is None else (phase * dw).sum(axis=0)
+
+
+def _structure_factors_ab(h, k, sites, xyz, occ, biso, uaniso, astar):
+    """(A, B) of the module docstring; ``B`` is ``None`` without dispersion."""
+    xp = get_backend()
+    A = xp.zeros(len(h), dtype=np.complex128)
+    B = None if sites.f_anom is None else xp.zeros(len(h), dtype=np.complex128)
+    for j in range(sites.n_asym):
+        amp_a, amp_b, phase, dw = _orbit_terms(
+            h, k, sites, xyz, occ, biso, uaniso, astar, j)
+        orbit = _orbit_sum(phase, dw)
+        A = A + amp_a * orbit
+        if B is not None:
+            B = B + amp_b * orbit
+    return A, B
+
+
+def _abs2(z) -> np.ndarray:
+    xp = get_backend()
+    return xp.real(z * xp.conj(z))
 
 
 def structure_factors_squared(
@@ -161,12 +245,16 @@ def structure_factors_squared(
     uaniso: np.ndarray | None = None,
     astar: np.ndarray | None = None,
 ) -> np.ndarray:
-    """|F(hkl)|² for each reflection.
+    """Powder |F(hkl)|² for each reflection — Friedel-averaged (see module docs).
+
+    Without dispersion this is |F|² exactly as before; with it, the value
+    returned is ⟨|F|²⟩ = |A|² + |B|², the average over the ±h orbit the powder
+    peak actually contains.
 
     Parameters
     ----------
     hkl, d : (N,3) reflection indices and current d-spacings (Å).
-    sites : frozen per-atom symmetry-operation subsets.
+    sites : frozen per-atom symmetry-operation subsets (and f′ + i·f″).
     xyz : (n_asym, 3) current fractional coordinates.
     occ, biso : (n_asym,) occupancies and isotropic B (Å²).
     uaniso : (n_asym, 6) CIF U^ij (Å²) in (11, 22, 33, 12, 13, 23) order.
@@ -178,12 +266,8 @@ def structure_factors_squared(
     xp = get_backend()
     k = 1.0 / (2.0 * xp.asarray(d, dtype=np.float64))  # sinθ/λ = 1/(2d)
     h = xp.asarray(hkl, dtype=np.float64)
-
-    F = xp.zeros(len(h), dtype=np.complex128)
-    for j in range(sites.n_asym):
-        amp, phase, dw = _orbit_terms(h, k, sites, xyz, occ, biso, uaniso, astar, j)
-        F = F + amp * _orbit_sum(phase, dw)
-    return xp.real(F * xp.conj(F))
+    A, B = _structure_factors_ab(h, k, sites, xyz, occ, biso, uaniso, astar)
+    return _abs2(A) if B is None else _abs2(A) + _abs2(B)
 
 
 def d_f2_d_xyz(
@@ -197,35 +281,51 @@ def d_f2_d_xyz(
     uaniso: np.ndarray | None = None,
     astar: np.ndarray | None = None,
 ) -> np.ndarray:
-    """Analytic ∂|F|²/∂x_j over the frozen op subsets, shape (N, 3).
+    """Analytic ∂⟨|F|²⟩/∂x_j over the frozen op subsets, shape (N, 3).
 
-    With F = Σ_j' A_j'·G_j', A_j the real occ·f₀(·Debye-Waller, isotropic
+    With A = Σ_j' a_j'·G_j', a_j the real occ·(f₀+f′)(·Debye-Waller, isotropic
     sites only) prefactor and G_j = Σ_m T_jm·exp(2πi h·(R_m x_j + t_m)),
 
-        ∂F/∂x_jc = A_j · 2πi Σ_m (R_mᵀ h)_c · T_jm · exp(2πi h·(R_m x_j + t_m))
+        ∂A/∂x_jc = a_j · 2πi Σ_m (R_mᵀ h)_c · T_jm · exp(2πi h·(R_m x_j + t_m))
 
     — the reciprocal-space action is the **transposed** rotation (see
-    ``symmetry.py``) — and ∂|F|²/∂x_jc = 2·Re(F̄ · ∂F/∂x_jc) (structure-
+    ``symmetry.py``) — and ∂|A|²/∂x_jc = 2·Re(Ā · ∂A/∂x_jc) (structure-
     factor derivatives per Rietveld, 1969, J. Appl. Cryst. 2, 65).  T_jm is
     the per-image Debye-Waller factor, which is constant over the orbit for
     an isotropic site and image-dependent for an anisotropic one; either way
     it is independent of x_j, so it rides along unchanged.  The op subsets
     are the same frozen ``sites.ops`` the forward model uses, so the gradient
     is exact for the model as compiled.
+
+    B differs from A only in its per-atom prefactor, so it shares the whole
+    bracketed sum: the anomalous term costs one extra multiply-and-accumulate,
+    not a second expansion.
     """
     xp = get_backend()
     k = 1.0 / (2.0 * xp.asarray(d, dtype=np.float64))
     h = xp.asarray(hkl, dtype=np.float64)
-    F = xp.zeros(len(h), dtype=np.complex128)
-    dF = xp.zeros((len(h), 3), dtype=np.complex128)
+    A = xp.zeros(len(h), dtype=np.complex128)
+    B = None if sites.f_anom is None else xp.zeros(len(h), dtype=np.complex128)
+    dA = xp.zeros((len(h), 3), dtype=np.complex128)
+    dB = None if B is None else xp.zeros((len(h), 3), dtype=np.complex128)
     for jj in range(sites.n_asym):
-        amp, phase, dw = _orbit_terms(h, k, sites, xyz, occ, biso, uaniso, astar, jj)
-        F = F + amp * _orbit_sum(phase, dw)
+        amp_a, amp_b, phase, dw = _orbit_terms(
+            h, k, sites, xyz, occ, biso, uaniso, astar, jj)
+        orbit = _orbit_sum(phase, dw)
+        A = A + amp_a * orbit
+        if B is not None:
+            B = B + amp_b * orbit
         if jj == j:
             rth = transposed_rotation_indices(h, sites.ops[jj][0])  # (m, N, 3)
             weighted = phase if dw is None else phase * dw
-            dF = amp[:, None] * (2.0j * xp.pi) * (weighted[:, :, None] * rth).sum(axis=0)
-    return 2.0 * xp.real(xp.conj(F)[:, None] * dF)
+            bracket = (weighted[:, :, None] * rth).sum(axis=0)
+            dA = amp_a[:, None] * (2.0j * xp.pi) * bracket
+            if dB is not None:
+                dB = amp_b[:, None] * (2.0j * xp.pi) * bracket
+    out = 2.0 * xp.real(xp.conj(A)[:, None] * dA)
+    if B is not None:
+        out = out + 2.0 * xp.real(xp.conj(B)[:, None] * dB)
+    return out
 
 
 def d_f2_d_uaniso(
@@ -239,7 +339,7 @@ def d_f2_d_uaniso(
     uaniso: np.ndarray,
     astar: np.ndarray,
 ) -> np.ndarray:
-    """Analytic ∂|F|²/∂U^ij for anisotropic atom ``j``, shape (N, 6).
+    """Analytic ∂⟨|F|²⟩/∂U^ij for anisotropic atom ``j``, shape (N, 6).
 
     The exponent of the image-m Debye-Waller factor is
 
@@ -251,8 +351,10 @@ def d_f2_d_uaniso(
 
         ∂E_m/∂U^cd = −2π² a*_c a*_d q_c q_d · (1 if c = d else 2)
 
-    and ∂F/∂U^cd = A_j·Σ_m T_jm·exp(2πi h·x_jm)·∂E_m/∂U^cd, closed by
-    ∂|F|²/∂U = 2·Re(F̄·∂F/∂U).  Columns are in the same order as
+    and ∂A/∂U^cd = a_j·Σ_m T_jm·exp(2πi h·x_jm)·∂E_m/∂U^cd, closed by
+    ∂|A|²/∂U = 2·Re(Ā·∂A/∂U) and the matching B term (see
+    :func:`d_f2_d_xyz` — the per-component sum is shared, only the prefactor
+    differs).  Columns are in the same order as
     ``crystallography.adp.U_NAMES``, which is what the Wyckoff ADP constraint
     rows are written in.
 
@@ -264,11 +366,17 @@ def d_f2_d_uaniso(
     k = 1.0 / (2.0 * xp.asarray(d, dtype=np.float64))
     h = xp.asarray(hkl, dtype=np.float64)
     s = xp.asarray(astar, dtype=np.float64)
-    F = xp.zeros(len(h), dtype=np.complex128)
-    dF = np.zeros((len(h), 6), dtype=np.complex128)
+    A = xp.zeros(len(h), dtype=np.complex128)
+    B = None if sites.f_anom is None else xp.zeros(len(h), dtype=np.complex128)
+    dA = np.zeros((len(h), 6), dtype=np.complex128)
+    dB = None if B is None else np.zeros((len(h), 6), dtype=np.complex128)
     for jj in range(sites.n_asym):
-        amp, phase, dw = _orbit_terms(h, k, sites, xyz, occ, biso, uaniso, astar, jj)
-        F = F + amp * _orbit_sum(phase, dw)
+        amp_a, amp_b, phase, dw = _orbit_terms(
+            h, k, sites, xyz, occ, biso, uaniso, astar, jj)
+        orbit = _orbit_sum(phase, dw)
+        A = A + amp_a * orbit
+        if B is not None:
+            B = B + amp_b * orbit
         if jj == j:
             if dw is None:
                 raise ValueError(f"atom {j} is isotropic: no U^ij to differentiate")
@@ -276,5 +384,11 @@ def d_f2_d_uaniso(
             for v, (c, e) in enumerate(VOIGT):
                 fold = 1.0 if c == e else 2.0
                 de = (-2.0 * xp.pi ** 2 * fold * s[c] * s[e]) * q[:, :, c] * q[:, :, e]
-                dF[:, v] = amp * (phase * dw * de).sum(axis=0)
-    return 2.0 * xp.real(xp.conj(F)[:, None] * dF)
+                bracket = (phase * dw * de).sum(axis=0)
+                dA[:, v] = amp_a * bracket
+                if dB is not None:
+                    dB[:, v] = amp_b * bracket
+    out = 2.0 * xp.real(xp.conj(A)[:, None] * dA)
+    if B is not None:
+        out = out + 2.0 * xp.real(xp.conj(B)[:, None] * dB)
+    return out
