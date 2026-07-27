@@ -364,13 +364,18 @@ def test_calibration_profiles_never_carry_roughness(tmp_path):
 # -- forward model -----------------------------------------------------------
 
 
-def _lab6_bb(rough=None, *, mode="rietveld", two_theta_min=8.0):
-    """Compiled LaB6 on a lab Bragg-Brentano instrument, reaching low angle."""
+def _lab6_bb(rough=None, *, mode="rietveld", two_theta_min=8.0, structure=None):
+    """Compiled LaB6 on a lab Bragg-Brentano instrument.
+
+    ``structure`` overrides the phase — needed wherever the *reflection*
+    positions matter rather than the grid, since LaB6's first CuKa line is at
+    21.4 deg.
+    """
     from pxrdref import PatternData
     from pxrdref.model.forward import compile_model
     from tests.test_schemas import make_lab6
 
-    structure = make_lab6()
+    structure = make_lab6() if structure is None else structure
     structure.phases[0].scale.value = 5e-3
     ins = _bb(rough)
     ins.profile.w.value = 1e-2
@@ -712,10 +717,14 @@ def test_pitschke_outside_its_regime_is_flagged_not_clamped():
     """The paper's Eq (18) fence: past sin(theta) = tau the model amplifies."""
     from pxrdref.refine import _roughness_regime_diagnostics
 
-    # data from 8 deg 2theta => sin(theta_min) ~ 0.070, so tau = 0.15 is past it
+    # the fence is measured at the lowest *reflection*, not the lowest grid
+    # point (real data forced that -- see the acceptance notes), so this needs
+    # the large-cell phase, whose first reflection sits at ~8.8 deg 2theta =>
+    # sin(theta) ~ 0.077, comfortably below tau = 0.15
     model, values = _lab6_bb(RoughnessPitschke(
         c=Parameter(value=1.0, min=0.0, max=4.0, transform="softplus"),
-        tau=Parameter(value=0.15, min=0.0, max=0.3)), two_theta_min=8.0)
+        tau=Parameter(value=0.15, min=0.0, max=0.3)), two_theta_min=7.0,
+        structure=_big_cell_structure())
     diags = [d for d in _roughness_regime_diagnostics(model, values)
              if d.code == "ROUGHNESS_OUTSIDE_REGIME"]
     assert diags and diags[0].level == "warning"
@@ -728,7 +737,8 @@ def test_pitschke_outside_its_regime_is_flagged_not_clamped():
     # comfortably inside the regime: no warning
     model, values = _lab6_bb(RoughnessPitschke(
         c=Parameter(value=1.0, min=0.0, max=4.0, transform="softplus"),
-        tau=Parameter(value=0.02, min=0.0, max=0.3)), two_theta_min=8.0)
+        tau=Parameter(value=0.02, min=0.0, max=0.3)), two_theta_min=7.0,
+        structure=_big_cell_structure())
     assert not [d for d in _roughness_regime_diagnostics(model, values)
                 if d.code == "ROUGHNESS_OUTSIDE_REGIME"]
 
@@ -818,3 +828,165 @@ def test_injected_roughness_is_recovered_and_is_resolved_not_merely_fitted():
                 two_theta_range=(7.0, 40.0))  # where the depression lives
     import matplotlib.pyplot as plt
     plt.close("all")
+
+
+# -- real data (slow) --------------------------------------------------------
+#
+# Measured 2026-07-27.  The headline result is a *negative* one, and it is the
+# fences rather than the correction that are being accepted here.
+#
+# Surface roughness is constrained by low-angle **reflections**, not by
+# low-angle grid points, and neither real Bragg-Brentano dataset in this repo
+# has any.  The IUCr round-robin patterns run from 5 deg 2theta, but corundum's
+# first reflection is at 25.6, fluorite's at 28.3 and zincite's at 31.8, with
+# only 2-3 reflections below 40 deg apiece; SRM 660c starts at 20.3 with LaB6's
+# first line at 21.4.  That is squarely inside the range the block-R2
+# measurement above identifies as degenerate (R2(b) = 0.91-0.93 for fits
+# starting at 20-30 deg).
+#
+# What the refinements do:
+#
+#   phase      Rwp off   Rwp on    refined (a, b)     Biso off -> on
+#   corundum   0.1437    0.1437    (1.000, 0.0000)    0.232 -> 0.228
+#   zincite    0.1091    0.1091    (1.000, 0.0000)    0.840 -> 0.840
+#   fluorite   0.1793    0.1792    (0.000, 0.0146)    0.390 -> 0.457
+#
+# Corundum and zincite drive the correction back to the exact identity and
+# raise ROUGHNESS_UNCONSTRAINED.  Fluorite is the more interesting failure: it
+# finds a ~9% low-angle depression *and* pushes both Biso up to compensate,
+# buying 0.0001 in Rwp.  That is the roughness<->Biso degeneracy moving along
+# its flat direction, which is exactly what this WP exists to make visible.
+#
+# Consequence for WP-0502's open question: roughness is **not** a competing
+# explanation for the signed sample-1 QPA bias (zincite low, corundum high)
+# that test_acceptance_qpa_roundrobin attributes to untreated microabsorption.
+# It cannot be, because it is not identifiable from these patterns at all.  The
+# microabsorption-shape test is therefore left alone rather than re-derived.
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("phase_name", ["corundum", "fluorite", "zincite"])
+def test_qarr_pure_phases_cannot_constrain_roughness(phase_name):
+    """Real back-packed Bragg-Brentano specimens: the fences must hold.
+
+    These are the best roughness candidates in the repo -- back-packed, unspun,
+    flat-plate -- and the answer is still "the data cannot see it".  The test
+    accepts that answer rather than a number: no fit may claim a resolved
+    roughness while buying nothing in Rwp.
+    """
+    import pxrdref as pr
+    from tests.test_acceptance_qpa_roundrobin import (
+        DATA,
+        _require_data,
+        corundum_phase,
+        fluorite_phase,
+        qarr_instrument,
+        qpa_plan,
+        seed_scales,
+        zincite_phase,
+    )
+
+    _require_data()
+    phase_fn = {"corundum": corundum_phase, "fluorite": fluorite_phase,
+                "zincite": zincite_phase}[phase_name]
+
+    def fit(with_roughness: bool):
+        data = pr.read_pattern(DATA / f"{phase_name}.prn")
+        structure = pr.Structure(phases=[phase_fn()])
+        ins = qarr_instrument()
+        plan = qpa_plan()
+        if with_roughness:
+            ins.geometry.surface_roughness = RoughnessSuortti(
+                a=Parameter(value=0.5, min=0.0, max=1.0),
+                b=Parameter(value=0.0, min=0.0, max=5.0, transform="softplus"))
+            plan.stages.append(pr.Stage(
+                "roughness", ["instrument.geometry.surface_roughness.*"], seed=0.3))
+        seed_scales(structure, ins, data)
+        return pr.Refinement(structure, ins).fit(data, plan=plan)
+
+    off, on = fit(False), fit(True)
+
+    # 1. Freeing roughness buys essentially nothing.  Judged on Rwp *here*
+    #    precisely because the claim is that nothing happened; the WP's
+    #    positive claims are judged on band-resolved structure and block R².
+    assert on.statistics.rwp <= off.statistics.rwp + 1e-4
+    assert off.statistics.rwp - on.statistics.rwp < 5e-4, (
+        f"{phase_name}: roughness bought {off.statistics.rwp - on.statistics.rwp:.5f} "
+        f"in Rwp — re-derive this test, the data may have grown a lever arm")
+
+    # 2. The specimen has no low-angle reflections to constrain it with.
+    first = min(min(v) for v in on.ticks.values() if v)
+    assert first > 20.0, f"{phase_name}: first reflection at {first:.1f}°"
+
+    # 3. So the result must be fenced, not reported as measured.  Any of the
+    #    guards may be the one that speaks, and which one is itself informative:
+    #    corundum and zincite collapse to the exact identity and raise
+    #    ROUGHNESS_UNCONSTRAINED, while fluorite finds a ~4% depression at its
+    #    first reflection and is caught instead by HIGH_CORRELATION on
+    #    rho(a, b) = +1.000 — the two roughness parameters trading against each
+    #    other.  The Pearson guard and the block-R2 guard are complementary:
+    #    one sees a degenerate *pair*, the other a degenerate *block*.
+    b = on.parameter("instrument.geometry.surface_roughness.b")
+    a = on.parameter("instrument.geometry.surface_roughness.a")
+    spoke = [d for d in on.diagnostics
+             if "surface_roughness" in (" ".join(d.where) + d.message)]
+    assert spoke, (
+        f"{phase_name}: refined a={a.value:.3f} b={b.value:.4f} with no "
+        f"diagnostic naming roughness — a confident wrong singleton is the one "
+        f"outcome this WP must never produce; got "
+        f"{sorted({d.code for d in on.diagnostics})}")
+
+    # 4. And where the fit did *not* disclaim the correction outright, the esds
+    #    must admit the uncertainty.  This is the assertion that would survive a
+    #    rewrite of every guard: either the report says "this is nothing", or
+    #    the reported uncertainty is honest about it.  (A tight esd on a b that
+    #    is inert because a has gone to 1.0 is not a claim — R is identically 1
+    #    there, so b has no gradient and its esd means nothing; that case is the
+    #    UNCONSTRAINED branch.)
+    if "ROUGHNESS_UNCONSTRAINED" not in {d.code for d in on.diagnostics}:
+        assert b.stderr is None or b.stderr > b.value, (
+            f"{phase_name}: b = {b.value:.4g} ± {b.stderr:.4g} claims a "
+            f"resolved roughness from a pattern with no low-angle reflections")
+
+    OUT.mkdir(exist_ok=True)
+    on.plot(path=str(OUT / f"roughness_qarr_{phase_name}.png"))
+    on.plot(path=str(OUT / f"roughness_qarr_{phase_name}_lowangle.png"),
+            two_theta_range=(15.0, 60.0))
+    import matplotlib.pyplot as plt
+    plt.close("all")
+
+
+@pytest.mark.slow
+def test_srm660c_is_unmoved_by_freeing_roughness():
+    """The absolute anchor must not drift when the new freedom is offered.
+
+    SRM 660c is a certified line-profile standard: carefully prepared, strongly
+    absorbing, and measured from 20.3 deg 2theta with LaB6's first line at 21.4.
+    There is no roughness to find and no lever arm to find it with, so the
+    acceptance is that nothing happens -- the cell stays inside the WP-0310
+    tolerance and the fences say why.
+    """
+    import pxrdref as pr
+    from tests.test_acceptance_srm660c import A_REFERENCE, DATA, build_srm_inputs
+
+    if not (DATA / "nist_srm660c_100a.cif").exists():
+        pytest.skip("SRM 660c dataset not present")
+    data, structure, ins = build_srm_inputs()  # (data, structure, instrument)
+    ins.geometry.surface_roughness = RoughnessSuortti(
+        a=Parameter(value=0.5, min=0.0, max=1.0),
+        b=Parameter(value=0.0, min=0.0, max=5.0, transform="softplus"))
+    plan = pr.RefinementPlan.lab_bragg_brentano()
+    assert plan.stages[-1].name == "roughness"   # the plan already carries it
+
+    result = pr.Refinement(structure, ins).fit(data, plan=plan)
+    a = result.parameter("phases.0.cell.a")
+    assert a.value == pytest.approx(A_REFERENCE, abs=2e-3), (
+        f"a = {a.value:.6f} A moved out of band with roughness free")
+
+    b = result.parameter("instrument.geometry.surface_roughness.b")
+    codes = {d.code for d in result.diagnostics}
+    named = [d for d in result.diagnostics
+             if "surface_roughness" in (" ".join(d.where) + d.message)]
+    assert named or b.value < 1e-3, (
+        f"roughness refined to b={b.value:.4g} on a certified standard with "
+        f"no diagnostic; codes {sorted(codes)}")

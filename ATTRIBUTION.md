@@ -71,7 +71,7 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
 | Project | License | Relationship |
 |---|---|---|
 | lmfit | BSD-3 | **API inspiration**: the Parameter model (value/vary/min/max/expr). No code ported. |
-| GSAS-II | custom Argonne royalty-free (grant-back clause) | **Behavioral reference** for conventions and validation goldens (e.g. the Sabine extinction parameterization and its Laue-series coefficients, WP-0506). Concepts and goldens are freely usable; the license is *not* a standard BSD — verbatim porting carries attribution and an upstream grant-back obligation, so no code is ported. |
+| GSAS-II | custom Argonne royalty-free (grant-back clause) | **Behavioral reference** for conventions and validation goldens (e.g. the Sabine extinction parameterization and its Laue-series coefficients, WP-0506; the Suortti surface-roughness parameterization `SurfaceRough`, whose SRA/SRB are our `a`/`b`, WP-0502 — independently confirmed against Pitschke *et al.* (1993) p. 78, which quotes Suortti's form directly, so the physics does not rest on the GSAS-II reading alone). Concepts and goldens are freely usable; the license is *not* a standard BSD — verbatim porting carries attribution and an upstream grant-back obligation, so no code is ported. |
 | CrysPy | MIT | Reference for pure-Python Rietveld mathematics. No code ported. |
 | MAUD | BSD-3 | Reference for texture / residual-stress methods (studied for the v2-fenced spherical-harmonics texture path). No code ported. |
 | CrysFML / CrysFML2008 | LGPL-3.0-or-later + ILL no-military-use clause | Studied (concepts only — the LGPL and the ILL clause both bar a port into an MIT core). **No code ported.** |

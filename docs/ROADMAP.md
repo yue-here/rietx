@@ -97,15 +97,40 @@ No backend-independent WP remains; the path to the v0.4 milestone is the backend
 chain [0404](wp/0404-cross-backend-jacobian-ci.md) →
 [0408](wp/0408-torch-mps-backend.md).
 
-**Out of order, in flight: v0.5 surface roughness
-[0502](wp/0502-surface-roughness.md)** (started 2026-07-27, expanded from stub).
-Backend-independent, so it does not block or depend on the 0404 → 0408 chain.
-Both published models were verified against primary sources before coding —
-Suortti (1972) via GSAS-II `SurfaceRough` *and* Pitschke's independent quotation
-of it, Pitschke (1993) by numerically rederiving its equations from the supplied
-paper. Two design decisions fell out of that check and are recorded in the WP:
-its P₀ term is dropped (angle-independent ⇒ exactly degenerate with the phase
-scale) and τ is refined directly rather than t₀.
+**Out of order, landed 2026-07-27: v0.5 surface roughness
+[0502](wp/0502-surface-roughness.md)** — backend-independent, so it neither
+blocks nor depends on the 0404 → 0408 chain. `Geometry.surface_roughness` is an
+opt-in, Bragg-Brentano-only, Rietveld-only intensity multiplier with two
+published models behind a `kind` seam (Suortti 1972, Pitschke 1993), exactly the
+identity when off, folded into all three intensity assemblies so the analytic
+dof/adp/March columns cannot drift from FD, and a 7th backend golden.
+
+Both models were verified against primary sources *before* coding: Suortti via
+GSAS-II `SurfaceRough` **and** Pitschke's independent quotation of it; Pitschke
+by numerically rederiving its equations from the (OCR'd) paper — Eqs 7/9/10 are
+exact identities and Eq 12 reproduces its Table I to ≤1.6 %. Two design
+decisions fell out: P₀ is dropped (angle-independent ⇒ exactly degenerate with
+the phase scale, and the paper itself never resolved it) and τ is refined
+directly rather than t₀.
+
+The measured outcome is a **negative** one, and it is the fences that are
+accepted rather than the correction. Roughness is constrained by low-angle
+*reflections*, not grid points, and no dataset here has any — qarr corundum /
+fluorite / zincite first reflect at 25.6 / 28.3 / 31.8°, SRM 660c at 21.4°. Two
+of three qarr phases drive the correction back to the identity and raise
+`ROUGHNESS_UNCONSTRAINED`; the third slides along the roughness↔Biso degenerate
+direction for 0.0001 in Rwp, with ρ(a,b) = +1.000 and esds 350× the values. So
+roughness is **not** a competing explanation for the sample-1 QPA bias, and
+`test_sample1_bias_has_the_microabsorption_shape` is left as it was.
+
+Three things this WP exports downstream (all written into WP-0501's
+`### Inherited`): `optimize.statistics.block_projection_r2` with its
+**nuisance** argument — any multiplicative correction is trivially ~0.96
+"scale-like", so only the *partial* R² carries signal; the rule that a
+correction is judged at reflection positions, not on the fitted grid (real data
+forced that fix); and a pre-existing `|ρ| > 1` in the reported correlation
+matrix under poor conditioning, which undermines the correlation guard that both
+0501 and 0502 lean on.
 
 ## Milestones
 
@@ -155,7 +180,7 @@ scale) and τ is refined directly rather than t₀.
 | WP | Title | Status | Depends on |
 |---|---|---|---|
 | [0501](wp/0501-absorption-corrections.md) | Capillary + flat-plate absorption | ⬜ | — |
-| [0502](wp/0502-surface-roughness.md) | Surface roughness (Suortti + Pitschke) | 🔶 | — |
+| [0502](wp/0502-surface-roughness.md) | Surface roughness (Suortti + Pitschke) | ✅ 2026-07-27 | — |
 | [0503](wp/0503-stephens-anisotropic-strain.md) | Stephens anisotropic strain | ⬜ | — |
 | [0504](wp/0504-anomalous-scattering-xraydb.md) | Anomalous f′,f″ via xraydb | ⬜ | — |
 | [0505](wp/0505-sequential-refinement.md) | SequentialRefinement warm start | ⬜ | — |

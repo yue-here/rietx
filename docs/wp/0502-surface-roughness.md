@@ -1,6 +1,6 @@
 # WP-0502 — Surface roughness
 
-Milestone: v0.5 · Status: 🔶 in progress
+Milestone: v0.5 · Status: ✅ shipped 2026-07-27
 Depends on: —
 
 ## Goal
@@ -182,52 +182,52 @@ honestly. Do not silence it — reconcile to the physics.
 ## Tasks
 
 - [x] Expand this stub into a full WP before writing code
-- [ ] Schema: `RoughnessSuortti` + `RoughnessPitschke` + union alias +
+- [x] Schema: `RoughnessSuortti` + `RoughnessPitschke` + union alias +
       `Geometry.surface_roughness` + BB-only validator + `schemas/__init__.py`
       export; JSON round-trip and defaults-off tests
-- [ ] Physics: `surface_roughness_suortti` in `model/corrections.py`, xp-routed,
+- [x] Physics: `surface_roughness_suortti` in `model/corrections.py`, xp-routed,
       docstring citing Suortti (1972) with both limits derived and the GSAS-II
       SRA/SRB mapping; property tests — exact identity at b=0, 0 < R ≤ 1,
       monotone increasing in θ, and an independent scalar transcription of the
       published formula matched to `abs=rel=1e-10`
-- [ ] Param wiring: `_collect_instrument` skip-when-`None`, `apply_to_models`
+- [x] Param wiring: `_collect_instrument` skip-when-`None`, `apply_to_models`
       write-back, `scalar_chain_supported` prefix, `instrument_profile`
       strip-on-save + `_iter_parameters`, `multi.SharingMap` per-histogram
       assertion
-- [ ] Forward hook in `phase_peaks` + the two analytic-column sites + the
+- [x] Forward hook in `phase_peaks` + the two analytic-column sites + the
       `io/exporters.py` intensity-chain docstring. Tests: bit-identical
       (`np.array_equal`) when off; analytic-vs-FD for **every** free column with
       roughness **on** (incl. dof/adp/`preferred_orientation.r`), with an
       explicit discriminating-power precondition
-- [ ] Staged plans: a `roughness` stage after `biso` in `lab_sample_refine`,
+- [x] Staged plans: a `roughness` stage after `biso` in `lab_sample_refine`,
       `lab_bragg_brentano` and `mccusker_structural`, with `seed=`;
       stage-order test
-- [ ] `block_projection_r2` refactor of `background_absorption` (+ an
+- [x] `block_projection_r2` refactor of `background_absorption` (+ an
       unchanged-numbers test), `roughness_absorption` measured in both
       directions, a **measured** `ROUGHNESS_ABSORPTION_GUARD`,
       `GuardReport.roughness_correlations`, and the `ROUGHNESS_ABSORPTION` /
       `ROUGHNESS_UNCONSTRAINED` diagnostics. Tests in both shapes: degenerate
       case → guard fires; identifiable case → guard does **not** false-positive
-- [ ] End-to-end recovery on a synthetic BB pattern carrying known (a, b):
+- [x] End-to-end recovery on a synthetic BB pattern carrying known (a, b):
       within `max(4σ, 5 %)` **and** resolved (> 5σ from the off state);
       obs/calc/diff + low-angle-zoom PNGs to `tests/output/`
-- [ ] Backend parity: a 7th `toy_roughness` golden in
+- [x] Backend parity: a 7th `toy_roughness` golden in
       `tests/data/backend_goldens`, plus jax jacfwd agreement on the new columns
-- [ ] `@pytest.mark.slow` real data — SRM 660c as the control (20.3° start ⇒
+- [x] `@pytest.mark.slow` real data — SRM 660c as the control (20.3° start ⇒
       roughness must do ≈ nothing, `ROUGHNESS_UNCONSTRAINED` fires); FAP as
       protocol fidelity (GSAS's `.EXP` `HST 1ABSCOR … N` proves it held the
       correction off — mirror that); qarr as the measurement, µ-contrast
       `fluorite`/`cpd-1a` (low µ) vs `magnetit` (µ ≈ 1165)
-- [ ] If and only if the qarr measurement supports it: re-derive
+- [x] If and only if the qarr measurement supports it: re-derive
       `test_sample1_bias_has_the_microabsorption_shape`, documenting the
       measured evidence in the test docstring and `tests/data/README.md`
-- [ ] Pitschke `kind`: `R = 1 − c·(τ/sinθ)(1 − τ/sinθ)`, same test battery,
+- [x] Pitschke `kind`: `R = 1 − c·(τ/sinθ)(1 − τ/sinθ)`, same test battery,
       plus `ROUGHNESS_OUTSIDE_REGIME` and a property test that the turnover and
       the R > 1 region are *fenced, not silently fitted*
 - [ ] Cross-model comparison on the qarr data: fit both `kind`s, report both,
       and state which (if either) the data prefers — a nested/ΔBIC-style
       statement, not a Rwp beauty contest
-- [ ] Docs: ROADMAP status glyph, handover log, ATTRIBUTION.md, and an
+- [x] Docs: ROADMAP status glyph, handover log, ATTRIBUTION.md, and an
       `### Inherited` entry in `wp/0501-absorption-corrections.md`
 
 ## Acceptance
@@ -270,8 +270,102 @@ honestly. Do not silence it — reconcile to the physics.
 - IUCr CPD QPA round robin — `tests/data/README.md` (instrument; and the signed
   low-angle bias currently attributed to microabsorption).
 
+## Measured results (2026-07-27)
+
+### The correction is not identifiable from any dataset in this repo
+
+Roughness is constrained by low-angle **reflections**, not by low-angle grid
+points, and neither real Bragg-Brentano dataset has any:
+
+| specimen | data from | first reflection | reflections < 40° |
+|---|---|---|---|
+| qarr corundum | 5.0° | 25.6° | 3 |
+| qarr fluorite | 5.0° | 28.3° | 2 |
+| qarr zincite | 5.0° | 31.8° | 3 |
+| SRM 660c LaB6 | 20.3° | 21.4° | 0 |
+
+That is squarely inside the range the block-R² measurement calls degenerate.
+Refining the qarr pure phases with and without a Suortti block:
+
+| phase | Rwp off | Rwp on | refined (a, b) | Biso off → on |
+|---|---|---|---|---|
+| corundum | 0.1437 | 0.1437 | (1.000, 0.0000) | 0.232 → 0.228 |
+| zincite | 0.1091 | 0.1091 | (1.000, 0.0000) | 0.840 → 0.840 |
+| fluorite | 0.1793 | 0.1792 | (0.000, 0.0146) | 0.390 → 0.457 |
+
+Corundum and zincite drive the correction back to the exact identity and raise
+`ROUGHNESS_UNCONSTRAINED`. Fluorite is the more instructive failure: it finds a
+~4 % depression at its first reflection *and* pushes both Biso up to
+compensate, buying 0.0001 in Rwp, with ρ(a, b) = +1.000 and esds 350× the
+values. That is the roughness↔Biso degeneracy sliding along its flat direction
+— exactly what this WP exists to make visible, caught here by the Pearson guard
+rather than the block-R² one (the two are complementary: one sees a degenerate
+*pair*, the other a degenerate *block*).
+
+**Consequence for the open question:** roughness is **not** a competing
+explanation for the signed sample-1 QPA bias (zincite low, corundum high) that
+`test_acceptance_qpa_roundrobin` attributes to untreated microabsorption. It
+cannot be, because it is not identifiable from those patterns at all. The
+microabsorption-shape test is therefore **left alone**, not re-derived — the
+authorisation to re-derive it was conditional on evidence, and the evidence
+went the other way.
+
+### The guard threshold
+
+Measured on a synthetic large-cell lab pattern, varying only the low-angle
+cutoff (scale, background, both Biso and both Suortti parameters free):
+
+| lowest fitted 2θ | 7° | 15° | 20° | 30° | 45° |
+|---|---|---|---|---|---|
+| reflections < 40° | 20 | 18 | 16 | 10 | 0 |
+| R²(Suortti b) | 0.06 | 0.62 | 0.91 | 0.93 | 0.95 |
+
+`ROUGHNESS_ABSORPTION_GUARD = 0.9` sits in that gap.
+
 ## Handover log
 
+- **2026-07-27** — **implemented; 12 commits, all checklist items landed except
+  the two marked below.** 424 fast tests + the full slow acceptance suite green,
+  ruff clean, seven backend goldens bit-identical.
+  - **Done**: schema (both `kind`s), physics functions, parameter wiring,
+    forward hook + both analytic-column sites, staged plans, the block-R² guard
+    and three diagnostics, synthetic recovery, `toy_roughness` backend golden,
+    real-data acceptance on qarr + SRM 660c, docs.
+  - **Two claims in this file's original draft were wrong and are corrected
+    above**: (1) "larger b deepens the depression" — false; `1 − a` bounds the
+    depression and `b` sets *where in angle* the transition falls, with both
+    b → 0 and b → ∞ returning the identity, so `b` is **bimodal** and has a
+    flat-gradient dead zone past b ≈ 3. (2) The Suortti↔Pitschke-quoted-Suortti
+    agreement is to 1e-14, not bit-for-bit; the two ways of writing it group
+    the float operations differently. My earlier "bit-for-bit" came from a
+    lucky scalar sample.
+  - **The guard design changed after measurement.** The first version projected
+    the roughness column onto {ADP, scale, background} and scored ≈0.96
+    regardless of the data — a guard that always fires. Roughness is a
+    *multiplicative* correction, so it is trivially scale-like. The fix is a
+    **partial** R²: scale and background are nuisance directions, projected out
+    of the whole Jacobian first. `block_projection_r2(..., nuisance=...)` is
+    exported for WP-0501, which will need the same treatment.
+  - **Real data corrected a fence.** `ROUGHNESS_UNCONSTRAINED` originally
+    measured the depression over the fitted 2θ *grid*; on the qarr patterns
+    that reported a 27 % depression at 5° where no reflection exists. It now
+    evaluates at `phase_peaks` positions.
+  - **Gotcha for anyone extending this**: LaB6 is useless as a roughness test
+    case (first CuKα line at 21.4°). `tests/test_surface_roughness.py` carries
+    a `_big_cell_structure()` (10 Å cubic, reflections from ~8.8°) for
+    everything where the reflection positions matter.
+  - **Pre-existing bug noticed, not fixed** (also written into WP-0501's
+    `### Inherited`): the reported correlation matrix can contain `|ρ| > 1`
+    (+2.75 for `scale ~ axial_sl`, −1.10 for `axial_sl ~ background.c5`) on the
+    fluorite fit. `pinv` on a singular JᵀJ is returning a non-PSD covariance.
+    Unrelated to roughness — WP-0407 fixed the Bérar-Lelann *placement*, not
+    this — but it undermines the correlation guard wherever conditioning is
+    poor, and both 0501 and this WP lean on that guard. Worth its own fix.
+  - **Next**: the two unchecked items are (a) jax jacfwd parity on the new
+    columns — jax is not installed in this workspace, so it was never run, and
+    (b) the cross-model qarr comparison, which is moot until a dataset with
+    low-angle reflections exists. See the WP-0501 note: acquiring such a
+    dataset is the highest-value follow-up for both WPs.
 - **2026-07-27** — expanded from stub to full WP; no source code yet.
   - **Both models verified against primary sources before coding.** Suortti's
     form was taken from GSAS-II `SurfaceRough` *and* independently confirmed by

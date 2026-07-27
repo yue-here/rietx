@@ -947,9 +947,23 @@ def _roughness_regime_diagnostics(model: CompiledModel,
     import numpy as np
 
     base = "instrument.geometry.surface_roughness"
-    tt_min = float(np.min(model.tt))
-    factor = model._roughness_factor(model.tt, values)
-    depression = float(1.0 - np.min(np.asarray(factor)))
+    # Evaluated at the **reflection** positions, not over the 2θ grid.  Real
+    # data forced this (WP-0502): the IUCr round-robin patterns start at 5° 2θ
+    # but their first reflection is at 25-32°, and a grid-based fence happily
+    # reported a 27 % depression that no modelled peak ever experienced.
+    # Roughness is constrained by low-angle reflections, so that is where it
+    # has to be judged.
+    positions = np.concatenate(
+        [np.asarray(pos) for ip in range(len(model.phases))
+         for pos, *_ in [model.phase_peaks(ip, values)[0]]]) \
+        if model.phases else np.empty(0)
+    positions = positions[np.isfinite(positions)]
+    positions = positions[(positions >= model.tt_min) & (positions <= model.tt_max)]
+    if not positions.size:
+        return []
+    tt_min = float(np.min(positions))
+    factor = np.asarray(model._roughness_factor(positions, values))
+    depression = float(1.0 - np.min(factor))
 
     out: list[Diagnostic] = []
     if model.roughness == "pitschke":
@@ -987,8 +1001,8 @@ def _roughness_regime_diagnostics(model: CompiledModel,
             where=[f"{base}.{n}" for n in ("a", "b", "c", "tau")
                    if f"{base}.{n}" in values],
             message=(f"the refined surface roughness depresses intensity by at "
-                     f"most {depression:.2%} over the fitted range "
-                     f"(from {tt_min:.2f}° 2θ) — the data cannot see it"),
+                     f"most {depression:.2%} at any modelled reflection "
+                     f"(lowest at {tt_min:.2f}° 2θ) — the data cannot see it"),
             suggestion="drop the roughness block, or extend the measurement to "
                        "lower 2θ where the depression has a lever arm; note "
                        "the Suortti model reaches the identity from both ends, "
