@@ -53,6 +53,7 @@ from ..crystallography.lattice import (
     reciprocal_metric_tensor,
     two_theta_deg,
 )
+from ..crystallography.stephens import S_NAMES, monomial_matrix, strain_width_deg
 from ..crystallography.structure_factor import (
     PhaseSites,
     compile_phase_sites,
@@ -144,6 +145,11 @@ class CompiledPhase:
     po_members: np.ndarray | None = None    # (M_total, 3) int
     po_seg: np.ndarray | None = None        # (M_total,) int → reflection index
     po_counts: np.ndarray | None = None     # (N,) int orbit sizes
+    # Stephens anisotropic strain: the frozen (N, 15) matrix of quartic
+    # monomials h^H k^K l^L.  None unless the phase carries a microstrain
+    # block.  σ²(M) = monomials @ S is the only hkl-dependent piece; the
+    # d-spacings that turn it into a width move with the cell at evaluation.
+    strain_monomials: np.ndarray | None = None
 
 
 @dataclass
@@ -256,6 +262,20 @@ class CompiledModel:
         return march_dollase_factors(cp.po_members, cp.po_seg, cp.po_counts,
                                      cp.po_axis, gstar, r)
 
+    def _strain_width(self, ip: int, values: dict[str, float], d: np.ndarray):
+        """Λ(hkl) (N,) — the Stephens tanθ coefficient — or 0.0 when off.
+
+        The ``None`` test is compile-time structural (does this phase carry a
+        block), not a branch on θ, so it does not break residual purity; the
+        off state contributes an exact ±0 to the Lorentzian strain term.
+        """
+        cp = self.phases[ip]
+        if cp.strain_monomials is None:
+            return 0.0
+        xp = get_backend()
+        s = xp.stack([values[f"phases.{ip}.microstrain.{n}"] for n in S_NAMES])
+        return strain_width_deg(cp.strain_monomials, s, d)
+
     # ------------------------------------------------------------------
     # peak-shape dispatch — the two width scalars, the unit-area profile and
     # its partials all switch on the frozen ``shape`` (default TCHZ).  Both
@@ -331,6 +351,10 @@ class CompiledModel:
             ext = values[f"phases.{ip}.extinction"]
             vol = cell_volume(*cell)
 
+        # anisotropic strain is line-independent (it depends on hkl and the
+        # cell, not on λ), so Λ is computed once and reused across the lines
+        aniso = self._strain_width(ip, values, d)
+
         out = []
         for il, lam in enumerate(self.line_wavelengths):
             w_line = values[f"instrument.source.lines.{il}.weight"]
@@ -343,7 +367,8 @@ class CompiledModel:
                                   values[f"phases.{ip}.gauss_strain"])
             gam_l = lorentzian_fwhm(theta,
                                     values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
-                                    values["instrument.profile.y"] + values[f"phases.{ip}.lor_strain"])
+                                    values["instrument.profile.y"] + values[f"phases.{ip}.lor_strain"],
+                                    aniso)
             gamma, eta = self._peak_widths(gam_g, gam_l)
             if self.mode in ("lebail", "pawley"):
                 # extracted/refined intensities already absorb Lp
@@ -894,6 +919,18 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         win = np.zeros((n_lines, n, 2), dtype=np.int64)
         fcj_n = np.zeros((n_lines, n), dtype=np.int64)
         tt_primary = fwhm_primary = None
+        # Stephens anisotropic strain: freeze the quartic monomials and take
+        # the width estimate *with* Λ, so a direction that is three times
+        # broader than the isotropic average still gets a wide enough window.
+        # No sizing floor (cf. AXIAL_SIZING_FLOOR): Λ cannot start at zero —
+        # freeing an all-zero block is rejected in ``params.vector`` — and the
+        # 30·FWHM margin absorbs the growth a stage can produce from there.
+        strain_monomials = aniso_est = None
+        if phase.microstrain is not None:
+            strain_monomials = monomial_matrix(refl.hkl)
+            aniso_est = strain_width_deg(
+                strain_monomials, np.array(phase.microstrain.values()),
+                d_spacings(refl.hkl, *cell))
         for il, lam in enumerate(lams):
             tt_bragg = refl.two_theta(cell, lam)
             theta = 0.5 * tt_bragg
@@ -903,7 +940,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                                   phase.gauss_size.value, phase.gauss_strain.value)
             l_est = lorentzian_fwhm(theta,
                                     instrument.profile.x.value + phase.lor_size.value,
-                                    instrument.profile.y.value + phase.lor_strain.value)
+                                    instrument.profile.y.value + phase.lor_strain.value,
+                                    0.0 if aniso_est is None else aniso_est)
             # TCHZ combined Γ is a compile-time width proxy for window sizing
             # and FCJ node counts under *both* shapes: it tracks the true Voigt
             # FWHM to ~1 % (that is what the TCH quintic is fit to), and the
@@ -928,7 +966,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                         fcj_n[il, k] = fcj_node_count(float(pos[k]), float(gamma_est[k]),
                                                       sl_eff, hl_eff)
 
-        cp = CompiledPhase(reflections=refl, sites=sites, win=win, fcj_n=fcj_n)
+        cp = CompiledPhase(reflections=refl, sites=sites, win=win, fcj_n=fcj_n,
+                           strain_monomials=strain_monomials)
         if mode in ("lebail", "pawley"):
             cp.hkl_intensity = np.full(n, max(float(np.median(y_obs)), 1.0))
         if mode == "pawley":

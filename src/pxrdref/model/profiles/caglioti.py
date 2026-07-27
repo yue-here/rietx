@@ -44,8 +44,16 @@ def gaussian_fwhm(theta_deg: np.ndarray, u: float, v: float, w: float,
     return xp.sqrt(xp.maximum(g2, _MIN_GAMMA_G2))
 
 
-def lorentzian_fwhm(theta_deg: np.ndarray, x_size: float, y_strain: float) -> np.ndarray:
-    """Γ_L(θ) = x_size/cosθ + y_strain·tanθ; input θ in degrees."""
+def lorentzian_fwhm(theta_deg: np.ndarray, x_size: float, y_strain: float,
+                    aniso_strain=0.0) -> np.ndarray:
+    """Γ_L(θ) = x_size/cosθ + (y_strain + aniso_strain)·tanθ; θ in degrees.
+
+    ``aniso_strain`` is Λ(hkl) from the Stephens anisotropic-strain model
+    (:mod:`pxrdref.crystallography.stephens`) — a **per-reflection** array in
+    the same deg-2θ FWHM units as ``y_strain``, which is why it enters the same
+    tanθ slot rather than getting a law of its own.  It defaults to an exact
+    ±0, so a phase without a microstrain block is bit-identical.
+    """
     xp = get_backend()
     th = xp.radians(theta_deg)
-    return x_size / xp.cos(th) + y_strain * xp.tan(th)
+    return x_size / xp.cos(th) + (y_strain + aniso_strain) * xp.tan(th)

@@ -17,7 +17,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pxrdref import Instrument
+from pxrdref import Instrument, PatternData
 from pxrdref.crystallography.lattice import d_spacings
 from pxrdref.crystallography.stephens import (
     S_EXPONENTS,
@@ -30,6 +30,8 @@ from pxrdref.crystallography.stephens import (
     strain_width_deg,
 )
 from pxrdref.crystallography.symmetry import get_spacegroup, rotation_matrices
+from pxrdref.model.forward import compile_model
+from pxrdref.optimize.least_squares import _make_jacobian, _make_residual
 from pxrdref.params.vector import ParameterTable
 from pxrdref.schemas.common import Parameter
 from pxrdref.schemas.structure import (
@@ -295,3 +297,103 @@ def test_write_back_and_json_round_trip():
 
     revived = Structure.model_validate_json(structure.model_dump_json())
     assert np.allclose(np.array(revived.phases[0].microstrain.values()), written)
+
+
+# ----------------------------------------------------------------------
+# forward model
+# ----------------------------------------------------------------------
+def _pattern(lo=10.0, hi=110.0, step=0.02) -> PatternData:
+    grid = np.arange(lo, hi, step)
+    return PatternData(two_theta=grid.tolist(),
+                       intensity=np.zeros_like(grid).tolist())
+
+
+def _compiled(strain: StephensStrain | None, *, free: list[str] | None = None):
+    structure = Structure(phases=[brucite(strain)])
+    structure.phases[0].scale.value = 1e-2
+    inst = Instrument.debye_scherrer(wavelength=1.5406)
+    inst.profile.w.value = 5e-3
+    table = ParameterTable(structure, inst)
+    table.set_vary(["*"], False)
+    for path in free or []:
+        assert table.set_vary([path], True), path
+    model = compile_model(structure, inst, _pattern(), mode="rietveld",
+                          free_paths=set(table.free_paths))
+    return model, table
+
+
+def test_absent_and_zero_blocks_are_bit_identical():
+    """Λ ≡ 0 must cost exactly nothing: an opt-in correction that perturbs the
+    off state is not opt-in."""
+    m_none, t_none = _compiled(None)
+    m_zero, t_zero = _compiled(StephensStrain.from_values([0.0] * 15))
+    y_none = m_none.evaluate(t_none.decode(t_none.x0()))
+    y_zero = m_zero.evaluate(t_zero.decode(t_zero.x0()))
+    assert np.array_equal(y_none, y_zero)
+
+
+def test_widths_become_direction_dependent():
+    """(00l) broadens on its own when only s004 is raised — the whole point:
+    two reflections at nearly the same 2θ get different widths."""
+    cell = make_cell(CELLS[1])
+    iso = np.array(StephensStrain.isotropic(500.0, cell).values())
+    aniso = iso.copy()
+    aniso[S_NAMES.index("s004")] *= 30.0
+
+    widths = {}
+    for tag, s in (("iso", iso), ("aniso", aniso)):
+        model, table = _compiled(StephensStrain.from_values(s))
+        values = table.decode(table.x0())
+        _pos, gamma, _eta, _i = model.phase_peaks(0, values)[0]
+        hkl = model.phases[0].reflections.hkl
+        widths[tag] = {tuple(h): float(g) for h, g in zip(hkl, gamma)}
+
+    # 00l picks up the extra strain; hk0 does not (l = 0 kills every monomial
+    # carrying l, and s004 is the pure l⁴ pattern).  The strain law is ∝ tanθ,
+    # so the *ratio* grows with angle — assert the sense everywhere and the
+    # magnitude where the law has room to act.
+    ratios = []
+    for h, w in widths["aniso"].items():
+        if h[0] == 0 and h[1] == 0:
+            assert w > widths["iso"][h], h
+            ratios.append(w / widths["iso"][h])
+        elif h[2] == 0:
+            assert w == pytest.approx(widths["iso"][h], rel=1e-12), h
+    assert max(ratios) > 1.5
+
+
+def test_analytic_jacobian_columns_match_finite_differences():
+    dofs = [f"phases.0.microstrain.dof.{k}" for k in range(4)]
+    model, table = _compiled(
+        StephensStrain.isotropic(900.0, make_cell(CELLS[1])), free=dofs)
+    assert table.free_paths == dofs
+    theta = table.x0()
+    jac = _make_jacobian(model, table)(theta)
+    residual = _make_residual(model, table)
+    r0 = residual(theta)
+    for c, path in enumerate(dofs):
+        h = 1e-6 * max(1.0, abs(theta[c]))
+        tp = theta.copy()
+        tp[c] += h
+        col_fd = (residual(tp) - r0) / h
+        scale = np.linalg.norm(col_fd)
+        assert scale > 0, f"{path}: dead FD column"
+        col_an = jac[:, c]
+        assert np.linalg.norm(col_an - col_fd) / scale < 5e-3, path
+        cos = float(col_an @ col_fd) / (np.linalg.norm(col_an) * scale)
+        assert cos > 0.99999, f"{path}: direction off (cos={cos:.6f})"
+
+
+@pytest.mark.parametrize("symbol,cell6", [
+    ("P m -3 m", CELLS[0]), ("P -3 m 1", CELLS[1]), ("P 6_3/m", CELLS[2]),
+    ("P 1 21/c 1", CELLS[3]), ("P -1", CELLS[4]),
+])
+def test_dof_magnitudes_stay_above_the_shared_fd_step_floor(symbol, cell6):
+    """The 10⁻¹² Å⁻⁴ unit convention exists so that ``h = 1e-6·max(1, |θ|)``
+    stays a *relative* step.  Physical Å⁻⁴ values (~10⁻⁸) would be differenced
+    with a step 100× their own size, and the columns above would be garbage.
+    Checked on the DOFs the optimiser actually sees, over cells from 3 to 13 Å."""
+    basis = stephens_basis(symbol).astype(np.float64)
+    s = isotropic_coefficients(cell6, microstrain=1000.0)
+    coef, *_ = np.linalg.lstsq(basis.T, s, rcond=None)
+    assert np.abs(coef).max() > 1.0, symbol

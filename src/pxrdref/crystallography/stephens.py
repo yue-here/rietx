@@ -79,13 +79,6 @@ S_NAMES: tuple[str, ...] = tuple(f"s{h}{k}{ll}" for h, k, ll in S_EXPONENTS)
 
 _S_INDEX = {e: i for i, e in enumerate(S_EXPONENTS)}
 
-#: σ²(M) floor in the scaled units of (1).  Real coefficients put Σ at 10⁰-10⁶,
-#: so this is unreachably small; its job is to keep the √ real and — through
-#: ``maximum``'s zero subgradient below the floor — to make an all-zero block a
-#: *dead* column rather than the infinite one √ has at the origin.  Freeing an
-#: all-zero block is rejected upstream (``params.vector``), not papered over.
-_MIN_SIGMA2 = 1e-20
-
 _DEG_PER_RAD = 180.0 / np.pi
 
 
@@ -179,10 +172,21 @@ def strain_width_deg(monomials: np.ndarray, s: np.ndarray, d: np.ndarray) -> np.
 
     ``d`` moves with the cell, so this is evaluated per residual call rather
     than cached; ``monomials`` is the frozen compile-time matrix.
+
+    σ² ≤ 0 is outside the physical cone (``STEPHENS_STRAIN_NOT_POSITIVE``
+    reports it) and would make the √ complex, so it is masked to zero width —
+    with the *double* ``where`` that keeps an autodiff backend away from the
+    ``sqrt`` at the origin, whose derivative is infinite.  The mask is on a
+    θ-dependent quantity, so it is a ``where``, never a python branch (residual
+    purity (c)).  All-zero coefficients therefore give an exact ±0 width, which
+    is what makes an unrefined block bit-identical to no block at all.
     """
     xp = get_backend()
-    sigma2 = xp.maximum(sigma2_m(monomials, s), _MIN_SIGMA2)
-    return (_DEG_PER_RAD * 1e-6) * d * d * xp.sqrt(sigma2)
+    sigma2 = sigma2_m(monomials, s)
+    positive = sigma2 > 0.0
+    safe = xp.where(positive, sigma2, 1.0)
+    width = (_DEG_PER_RAD * 1e-6) * d * d * xp.sqrt(safe)
+    return xp.where(positive, width, 0.0)
 
 
 # ----------------------------------------------------------------------
