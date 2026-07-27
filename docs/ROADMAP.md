@@ -97,6 +97,16 @@ No backend-independent WP remains; the path to the v0.4 milestone is the backend
 chain [0404](wp/0404-cross-backend-jacobian-ci.md) →
 [0408](wp/0408-torch-mps-backend.md).
 
+**Out of order, in flight: v0.5 surface roughness
+[0502](wp/0502-surface-roughness.md)** (started 2026-07-27, expanded from stub).
+Backend-independent, so it does not block or depend on the 0404 → 0408 chain.
+Both published models were verified against primary sources before coding —
+Suortti (1972) via GSAS-II `SurfaceRough` *and* Pitschke's independent quotation
+of it, Pitschke (1993) by numerically rederiving its equations from the supplied
+paper. Two design decisions fell out of that check and are recorded in the WP:
+its P₀ term is dropped (angle-independent ⇒ exactly degenerate with the phase
+scale) and τ is refined directly rather than t₀.
+
 ## Milestones
 
 | Milestone | Scope | Status | Acceptance |
@@ -145,7 +155,7 @@ chain [0404](wp/0404-cross-backend-jacobian-ci.md) →
 | WP | Title | Status | Depends on |
 |---|---|---|---|
 | [0501](wp/0501-absorption-corrections.md) | Capillary + flat-plate absorption | ⬜ | — |
-| [0502](wp/0502-surface-roughness.md) | Surface roughness | ⬜ | — |
+| [0502](wp/0502-surface-roughness.md) | Surface roughness (Suortti + Pitschke) | 🔶 | — |
 | [0503](wp/0503-stephens-anisotropic-strain.md) | Stephens anisotropic strain | ⬜ | — |
 | [0504](wp/0504-anomalous-scattering-xraydb.md) | Anomalous f′,f″ via xraydb | ⬜ | — |
 | [0505](wp/0505-sequential-refinement.md) | SequentialRefinement warm start | ⬜ | — |
