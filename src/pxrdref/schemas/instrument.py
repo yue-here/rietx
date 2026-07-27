@@ -67,6 +67,102 @@ class Source(Base):
         return self.lines[0].wavelength
 
 
+class RoughnessSuortti(Base):
+    """Surface-roughness intensity correction, Suortti (1972) form.
+
+        R(θ) = [a + (1 − a)·exp(−b/sinθ)] / [a + (1 − a)·exp(−b)]
+
+    normalised so R(90°) = 1.  A rough or loosely-packed flat specimen has a
+    packing-density deficit in its top layer; at low θ the beam crosses that
+    depleted layer at grazing incidence over a long path, so the diffracted
+    intensity is depressed, increasingly so as θ → 0.  Suortti, P. (1972),
+    *J. Appl. Cryst.* **5**, 325–331.
+
+    **Document by physics, not letters.**  ``b`` is the *strength* knob: it sets
+    how deep the low-angle depression goes and over what angular range it
+    decays (the correction enters only through exp(−b/sinθ), so b is the
+    surface layer's dimensionless optical depth).  ``a`` is the *shape* knob:
+    the residual intensity fraction that survives even at grazing incidence,
+    so 1 − a bounds the depression.  This is GSAS-II's ``SurfaceRough``
+    parameterisation with a = SRA and b = SRB, which is what makes numbers
+    portable between the two codes (behavioral reference only — no code ported,
+    see ATTRIBUTION.md).
+
+    Two properties the rest of the code relies on:
+
+    * ``b = 0 ⇒ R ≡ 1``, and *exactly* so in floating point for any ``a``:
+      numerator and denominator reduce to the identical expression
+      ``a + (1 − a)*1.0``.  The off state is therefore bit-identical, with no
+      branch in the hot path.
+    * ``0 < R ≤ 1`` for b ≥ 0, since sinθ ≤ 1 ⇒ exp(−b/sinθ) ≤ exp(−b).  The
+      correction can only *depress* intensity, never amplify it.
+
+    ``a`` defaults to 0.5 — strictly interior — rather than to the seemingly
+    natural 1.0, because at b = 0 the gradient ∂R/∂b = (1 − a)·(1 − 1/sinθ)
+    vanishes identically when a = 1: the parameter could never lift off.
+    """
+
+    kind: Literal["suortti"] = "suortti"
+    a: Parameter = Field(
+        default_factory=lambda: Parameter(value=0.5, min=0.0, max=1.0)
+    )
+    b: Parameter = Field(
+        default_factory=lambda: Parameter(value=0.0, min=0.0, max=10.0,
+                                          transform="softplus")
+    )
+
+
+class RoughnessPitschke(Base):
+    """Surface-roughness intensity correction, Pitschke *et al.* (1993) form.
+
+        R(θ) = 1 − c·u·(1 − u),      u = τ/sinθ
+
+    Pitschke, W., Hermann, H. & Mattern, N. (1993), *Powder Diffr.* **8**,
+    74–83, Eqs (13)–(18).  The paper writes the multiplier as (1 − P) with
+    P = P₀ + C·u(1 − u); **P₀ is deliberately absent here** because it is the
+    angle-*independent* bulk-porosity term, so (1 − P) factorises as
+    (1 − P₀)·[1 − c·u(1 − u)] with c = C/(1 − P₀) and the constant prefactor is
+    exactly degenerate with the phase scale factor.  (The paper could only
+    extract P₀ by fitting I/I₀ curves against a separate free scale, and even
+    then reported 0.5–0.7 ± 0.1 for all four of its specimens — unresolved.)
+
+    ``τ = t₀/β`` is the paper's dimensionless surface-roughness parameter,
+    refined here **directly** rather than via the particle size β = 2b/3, which
+    keeps a length scale the diffraction data cannot constrain out of the
+    parameter table.  ``c`` is the strength knob; c = 0 gives R ≡ 1 exactly.
+
+    **Regime (the paper's Eq 18: sinθ ≥ τ).**  u(1 − u) peaks at u = ½ and
+    returns to 0 at u = 1, so:
+
+    * R is monotone in θ only while **sinθ ≥ 2τ**;
+    * between 2τ and τ the depression turns back over — the model is empirical
+      there, with no geometric interpretation (the paper says so itself);
+    * beyond sinθ = τ the correction would *amplify* (R > 1), which is
+      unphysical.
+
+    ``τ`` is bounded at 0.3, the paper's own estimate of the physical upper
+    limit for real powders (its fitted values span 0.005–0.12), and ``c`` at 4,
+    beyond which R can go negative inside the valid range.  The refinement
+    still raises ``ROUGHNESS_OUTSIDE_REGIME`` when τ exceeds sinθ of the lowest
+    fitted angle: bounds cannot express a fence that depends on the data range.
+
+    ``τ`` defaults to 0.05 — mid-range and strictly interior — for the same
+    lift-off reason as :class:`RoughnessSuortti`'s ``a``.
+    """
+
+    kind: Literal["pitschke"] = "pitschke"
+    c: Parameter = Field(
+        default_factory=lambda: Parameter(value=0.0, min=0.0, max=4.0,
+                                          transform="softplus")
+    )
+    tau: Parameter = Field(
+        default_factory=lambda: Parameter(value=0.05, min=0.0, max=0.3)
+    )
+
+
+SurfaceRoughness = RoughnessSuortti | RoughnessPitschke
+
+
 class Geometry(Base):
     """Diffraction geometry.
 
@@ -103,10 +199,20 @@ class Geometry(Base):
     over the goniometer radius.  Both zero → symmetric profile (FCJ off).
     S/L and H/L enter the aberration nearly symmetrically and are strongly
     correlated; refining only one (or tying them equal) is common practice.
+
+    ``surface_roughness`` is an **opt-in** block (default ``None``) carrying the
+    third Bragg-Brentano sample aberration: unlike displacement and
+    transparency it does not move the peaks, it depresses their *intensity* at
+    low angle.  See :class:`RoughnessSuortti` / :class:`RoughnessPitschke`.  It
+    is opt-in rather than always-present because an uncorrected roughness
+    depression is absorbed by Biso/ADPs, so *adding* the freedom must be a
+    deliberate act — and because attaching it changes nothing until refined
+    (both models are exactly the identity at their default values).
     """
 
     kind: Literal["debye_scherrer", "bragg_brentano"] = "debye_scherrer"
     goniometer_radius_mm: float | None = None
+    surface_roughness: SurfaceRoughness | None = None
     sample_displacement: Parameter = Field(
         default_factory=lambda: Parameter(value=0.0, min=-1.0, max=1.0, unit="mm")
     )
@@ -124,6 +230,14 @@ class Geometry(Base):
     def _bb_needs_radius(self) -> "Geometry":
         if self.kind == "bragg_brentano" and not self.goniometer_radius_mm:
             raise ValueError("bragg_brentano geometry requires goniometer_radius_mm")
+        if self.surface_roughness is not None and self.kind != "bragg_brentano":
+            # Raise rather than silently lock the parameters: the block is
+            # opt-in, so its presence is a claim about the specimen, and the
+            # correction is derived for a flat reflection specimen only.  A
+            # spinning capillary has no illuminated flat surface to roughen.
+            raise ValueError(
+                f"surface_roughness is a flat-specimen (bragg_brentano) "
+                f"correction; this geometry is {self.kind!r}")
         return self
 
 
