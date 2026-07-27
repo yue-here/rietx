@@ -23,6 +23,9 @@ States (chosen to cover every refactored code path):
 * ``toy_stephens`` — Rietveld rutile with a Stephens anisotropic-strain block
   (WP-0503): an hkl-dependent width reached through a √ of a frozen monomial
   matmul, which no other state exercises.
+* ``toy_anomalous`` — Rietveld zincite with f′, f″ on (WP-0504): the only
+  **non-centrosymmetric** state, so it is the only one where the
+  Friedel-averaged |A|² + |B|² differs from |F|² at the orbit representative.
 
 Golden bit patterns are environment-pinned (they depend on the numpy/BLAS
 build); they live in ``tests/data/backend_goldens/`` and are documented in
@@ -325,6 +328,54 @@ def _state_toy_stephens():
     return model, table, {}
 
 
+def _state_toy_anomalous():
+    """Rietveld zincite with anomalous scattering on (WP-0504).
+
+    Deliberately **non-centrosymmetric** (ZnO, ``P 63 m c``), which is the only
+    setting where the Friedel-averaged |A|² + |B|² differs from |F|² at the
+    orbit representative — a centrosymmetric golden would lock the code while
+    leaving the one term that motivates it untested.  Zn sits just below its K
+    edge at Cu Kα, so f′ = −1.55 is large, and an anisotropic Zn site plus a
+    free polar-axis z run the correction through *both* structural derivative
+    kernels.
+    """
+    from pxrdref.schemas.instrument import Dispersion
+    from pxrdref.schemas.structure import AnisoU, Structure
+    from tests.test_dispersion import zincite
+
+    phase = zincite()
+    phase.scale.value = 6.0e-3
+    phase.atoms[0].biso.vary = False
+    phase.atoms[0].aniso = AnisoU.from_values(
+        (0.0072, 0.0072, 0.0081, 0.0036, 0.0, 0.0), vary=True)
+    structure = Structure(phases=[phase])
+    instrument = Instrument.bragg_brentano(radiation="CuKa")
+    instrument.source.dispersion = Dispersion()
+    instrument.profile.w.value = 1.2e-2
+    instrument.background = BackgroundChebyshev.with_terms(4)
+    grid = np.arange(28.0, 95.0, 0.02)
+    empty = PatternData(two_theta=grid.tolist(),
+                        intensity=np.zeros_like(grid).tolist())
+    sim = structure.model_copy(deep=True)
+    sim.phases[0].cell.a.value += 0.004
+    sim.phases[0].atoms[1].z.value += 0.003
+    sim_model = compile_model(sim, instrument, empty, mode="rietveld")
+    sim_table = ParameterTable(sim, instrument)
+    y = sim_model.evaluate(sim_table.decode(sim_table.x0())) + 25.0
+    pattern = PatternData(two_theta=sim_model.tt.tolist(), intensity=y.tolist())
+
+    table = ParameterTable(structure, instrument)
+    _free(table, [
+        "phases.0.cell.a", "phases.0.cell.c", "phases.0.scale",
+        "phases.0.atoms.*.dof.*", "phases.0.atoms.0.adp.*",
+        "phases.0.atoms.1.biso", "instrument.zero_shift",
+        "instrument.background.*",
+    ])
+    model = compile_model(structure, instrument, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    return model, table, {}
+
+
 STATES = {
     "srm660c": _state_srm660c,
     "nac": _state_nac,
@@ -333,6 +384,7 @@ STATES = {
     "toy_rich": _state_toy_rich,
     "toy_restraints": _state_toy_restraints,
     "toy_stephens": _state_toy_stephens,
+    "toy_anomalous": _state_toy_anomalous,
 }
 
 
@@ -423,6 +475,7 @@ def test_set_backend_roundtrip():
     "toy_rich",
     "toy_restraints",
     "toy_stephens",
+    "toy_anomalous",
 ])
 def test_numpy_path_bit_identical_to_golden(name):
     path = GOLDEN_DIR / f"{name}.npz"

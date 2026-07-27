@@ -198,13 +198,17 @@ def test_jacfwd_matches_analytic_and_fd_on_families():
     "toy_pawley",
     "toy_rich",
     "toy_stephens",
+    "toy_anomalous",
     pytest.param("srm660c", marks=pytest.mark.slow),
 ])
 def test_jacfwd_matches_analytic_on_state(name):
     """Whole-matrix agreement on the shim states (Le Bail snapshot + P-spline
     penalty rows; Pawley aux block + restraint rows; aniso ADPs + March-
     Dollase + extinction + FCJ asymmetry; hkl-dependent Stephens widths, whose
-    √ of a monomial matmul jacfwd has to trace; real doublet lab data)."""
+    √ of a monomial matmul jacfwd has to trace; the Friedel-averaged
+    |A|² + |B|² of a non-centrosymmetric anomalous structure, where both
+    structural derivative kernels carry a second term; real doublet lab
+    data)."""
     built = STATES[name]()
     if built is None:
         pytest.skip(f"dataset for state {name!r} not present")

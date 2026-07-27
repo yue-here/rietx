@@ -165,7 +165,9 @@ macOS arm64 Accelerate).  `toy_restraints` was added by WP-0406 (soft-restraint
 penalty rows) from the green post-WP-0406 tree — a *new* baseline, so the
 existing five were not re-captured.  `toy_stephens` was added the same way by
 WP-0503 (hkl-dependent anisotropic-strain widths), again capturing only the new
-state.  `test_backend_shim.py` asserts the current
+state, and `toy_anomalous` by WP-0504 (anomalous f′/f″ on a non-centrosymmetric
+structure, the only state where the Friedel-averaged |A|² + |B|² differs from
+|F|² at the orbit representative).  `test_backend_shim.py` asserts the current
 tree reproduces each **bit-for-bit** (`np.array_equal`) — the acceptance gate
 for "nothing here may change a single computed number on the numpy path".
 

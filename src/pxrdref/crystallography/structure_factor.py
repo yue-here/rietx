@@ -178,8 +178,8 @@ def _orbit_terms(hkl, k, sites, xyz, occ, biso, uaniso, astar, j):
     """Per-atom pieces of F: ``(amp_a, amp_b, phase (m,N), dw (m,N) | None)``.
 
     ``amp_a`` is the real prefactor occ·(f₀ + f′) that multiplies the orbit sum
-    in A and ``amp_b`` the occ·f″ one that multiplies it in B (both (N,); see
-    the module docstring).  ``amp_b`` is ``None`` — not a zero array — when the
+    in A and ``amp_b`` the occ·f″ one that multiplies it in B — both **(N,)**,
+    which the derivative kernels rely on (see the module docstring).  ``amp_b`` is ``None`` — not a zero array — when the
     phase carries no dispersion, so the off path does no arithmetic at all;
     that test is compile-time structural (``sites.f_anom``), never a branch on
     θ, so it does not break residual purity.  ``dw`` is the per-image
@@ -203,7 +203,11 @@ def _orbit_terms(hkl, k, sites, xyz, occ, biso, uaniso, astar, j):
         f = f + float(fa.real)
     if sites.aniso[j]:
         dw = _aniso_dw(hkl, rot, uaniso[j], astar)
-        amp_b = None if fa is None else occ[j] * float(fa.imag)
+        # broadcast to (N,) like every other amplitude: f″ is reflection-
+        # independent, but an anisotropic site's ``f`` carries no per-reflection
+        # Debye-Waller factor to spread it, and the derivative kernels index
+        # both amplitudes as ``amp[:, None]``
+        amp_b = None if fa is None else xp.full_like(f, occ[j] * float(fa.imag))
         return occ[j] * f, amp_b, phase, dw
     dw = xp.exp(-biso[j] * k * k)  # exp(−B (sinθ/λ)²)
     amp_b = None if fa is None else occ[j] * float(fa.imag) * dw
