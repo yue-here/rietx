@@ -264,7 +264,7 @@ Each item ≈ one commit, prefixed `WP-0504:`.
       optical-theorem cross-check. Tests: International Tables at Cu Kα,
       `gemmi.cromer_liberman` as an independent f″ oracle (1e-3 e), and the
       optical theorem vs McMaster at 6 %.
-- [ ] `schemas/instrument.py`: opt-in `Dispersion` block on `Source`
+- [x] `schemas/instrument.py`: opt-in `Dispersion` block on `Source`
       (`overrides: {element: (f′, f″)}` for measured near-edge values),
       validators, JSON round-trip test.
 - [x] `crystallography/structure_factor.py`: the A/B Friedel-averaged form (1);
