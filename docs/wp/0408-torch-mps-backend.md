@@ -94,6 +94,28 @@ From **WP-0403** (mixed-precision policy, landed 2026-07-24):
 - `column_agreement(J_ref, J_test)` in `linalg64.py` gives (worst rel-L2, worst
   cosine) with dead columns already skipped — reuse it.
 
+From **WP-0405** (true Voigt, landed 2026-07-24) — only relevant when a torch
+run uses `Instrument.profile.shape="voigt"` (TCHZ is the default and is
+complex-free):
+
+- **The Voigt path needs working complex tensors, not just `exp`/`conj`.**
+  `model/profiles/faddeeva.py` builds `z` with `1j * z`, divides complex arrays
+  with the bare `/` operator, and takes `.real`/`.imag` — deliberately *not*
+  through named ops in `backend/api.py`, so it dispatches on the tensor type
+  alone. torch supports all of these, but verify `1j * tensor`, complex `/` and
+  `torch.real`/`imag` on your device before claiming the shape works. There is
+  **no new op to implement** for it — if TCHZ passes the op-set contract, add a
+  single agreement point for `faddeeva_w` on a complex sample and one Voigt
+  forward eval, no more.
+- **Complex is fp-policy-coupled on MPS.** w(z) is fp64/complex128 on CPU;
+  under WP-0403's fp32 column policy it is complex64. If MPS lacks a needed
+  complex op, the honest move is to route `shape="voigt"` to the CPU-fp64 torch
+  path (like the analytic column path already is) rather than silently degrade —
+  the Voigt argument always has Im z ≥ 0, so no branch is needed, only dtype.
+- **Sizing is shape-free.** `compile_model` sizes windows/FCJ nodes with the
+  TCHZ Γ proxy under both shapes, so no Voigt-specific compile-time path (and
+  hence no device-tensor-in-frozen-state risk beyond Gotcha (1) above).
+
 ### Design (decided)
 
 - **Autodiff strategy: torch accelerates the *forward*; `torch.func.jacfwd`

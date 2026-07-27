@@ -10,6 +10,12 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
 - Rietveld, H. M. (1969). *J. Appl. Cryst.* 2, 65–71 — the profile refinement method.
 - Caglioti, Paoletti & Ricci (1958). *Nucl. Instrum.* 3, 223–228 — U,V,W width law.
 - Thompson, Cox & Hastings (1987). *J. Appl. Cryst.* 20, 79–83 — TCH pseudo-Voigt.
+- Weideman, J. A. C. (1994). *SIAM J. Numer. Anal.* 31, 1497–1518 — rational
+  (FFT-coefficient) approximation of the complex error function w(z); the
+  N=32 algorithm behind the shared, backend-agnostic Faddeeva in the opt-in
+  true-Voigt profile (implemented from the paper, no code ported).
+- Armstrong, B. H. (1967). *J. Quant. Spectrosc. Radiat. Transfer* 7, 61–88 —
+  the Voigt profile as Re[w(z)] and its Gaussian/Lorentzian limits.
 - Finger, Cox & Jephcoat (1994). *J. Appl. Cryst.* 27, 892–900 — axial-divergence asymmetry.
 - Waasmaier & Kirfel (1995). *Acta Cryst.* A51, 416–431 — 5-Gaussian form factors.
 - McCusker et al. (1999). *J. Appl. Cryst.* 32, 36–50 — Rietveld refinement guidelines.
