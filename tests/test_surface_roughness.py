@@ -489,3 +489,61 @@ def test_every_analytic_column_matches_fd_with_roughness_on(block):
         assert scale > 0, f"{path}: dead FD column"
         err = np.linalg.norm(jac[:, c] - col_fd) / scale
         assert err < 5e-3, f"{path}: analytic vs FD mismatch ({err:.2e})"
+
+
+# -- staged plans ------------------------------------------------------------
+
+
+def test_roughness_refines_last_in_every_plan_that_carries_it():
+    """After biso, extinction and preferred orientation — everything it is
+    degenerate with must be allowed to settle before it is freed."""
+    from pxrdref.strategy.staged import RefinementPlan
+
+    for name in ("mccusker_structural", "lab_bragg_brentano", "lab_sample_refine"):
+        stages = [s.name for s in getattr(RefinementPlan, name)().stages]
+        assert stages[-1] == "roughness", f"{name}: {stages}"
+    structural = [s.name for s in RefinementPlan.mccusker_structural().stages]
+    for earlier in ("biso", "preferred_orientation", "extinction"):
+        assert structural.index(earlier) < structural.index("roughness")
+
+
+def test_calibration_plan_never_frees_roughness():
+    """A certified standard measures the goniometer, not the mount."""
+    from pxrdref.strategy.staged import RefinementPlan
+
+    globs = [g for s in RefinementPlan.lab_calibrate().stages for g in s.turn_on]
+    assert not any("surface_roughness" in g for g in globs)
+
+
+def test_the_roughness_stage_is_inert_without_a_block():
+    """The glob must match nothing when no block is attached, so the stage can
+    live in shared plans without changing existing refinements."""
+    from tests.test_schemas import make_lab6
+
+    table = ParameterTable(make_lab6(), _bb())
+    assert table.set_vary(["instrument.geometry.surface_roughness.*"], True) == []
+
+
+def test_the_seed_lifts_the_strength_parameter_into_its_sensitive_band():
+    """A softplus parameter at exactly 0 has a dead internal gradient, and for
+    Suortti b a token 1e-3 seed would be dead in the *physics* too: both b -> 0
+    and b -> infinity are the identity, so the seed has to land near the
+    measured sensitivity peak (b ~ 0.17 at 5 deg, ~ 0.46 at 20 deg)."""
+    from pxrdref.params.transforms import dphys_dinternal, to_internal
+    from pxrdref.strategy.staged import RefinementPlan
+    from tests.test_schemas import make_lab6
+
+    stage = RefinementPlan.lab_sample_refine().stages[-1]
+    assert stage.name == "roughness"
+    assert 0.1 < stage.seed < 0.6
+
+    assert dphys_dinternal(to_internal(0.0, "softplus"), "softplus") < 1e-6
+    assert dphys_dinternal(to_internal(stage.seed, "softplus"), "softplus") > 0.1
+
+    table = ParameterTable(make_lab6(), _bb(RoughnessSuortti()))
+    freed = table.set_vary(stage.turn_on, True)  # seed_softplus takes paths
+    table.seed_softplus(freed, stage.seed)
+    seeded = {e.path: e.value for e in table.entries}
+    assert seeded["instrument.geometry.surface_roughness.b"] == pytest.approx(stage.seed)
+    # ... and the seed leaves the identity-transform shape parameter alone
+    assert seeded["instrument.geometry.surface_roughness.a"] == pytest.approx(0.5)
