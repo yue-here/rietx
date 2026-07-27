@@ -358,3 +358,134 @@ def test_calibration_profiles_never_carry_roughness(tmp_path):
     save_instrument_profile(ins, path)
     assert ins.geometry.surface_roughness is not None, "must not mutate the caller"
     assert load_instrument_profile(path).geometry.surface_roughness is None
+
+
+# -- forward model -----------------------------------------------------------
+
+
+def _lab6_bb(rough=None, *, mode="rietveld", two_theta_min=8.0):
+    """Compiled LaB6 on a lab Bragg-Brentano instrument, reaching low angle."""
+    from pxrdref import PatternData
+    from pxrdref.model.forward import compile_model
+    from tests.test_schemas import make_lab6
+
+    structure = make_lab6()
+    structure.phases[0].scale.value = 5e-3
+    ins = _bb(rough)
+    ins.profile.w.value = 1e-2
+    tt = np.arange(two_theta_min, 120.0, 0.02)
+    pattern = PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    model = compile_model(structure, ins, pattern, mode=mode)
+    table = ParameterTable(structure, ins)
+    return model, table.decode(table.x0())
+
+
+def test_forward_off_state_is_bit_identical_to_no_block_at_all():
+    """The regression that matters most: attaching a block must cost nothing."""
+    plain, v_plain = _lab6_bb(None)
+    for block in (RoughnessSuortti(), RoughnessPitschke()):
+        withb, v_with = _lab6_bb(block)
+        for il in range(len(plain.line_wavelengths)):
+            assert np.array_equal(plain.phase_peaks(0, v_plain)[il][3],
+                                  withb.phase_peaks(0, v_with)[il][3])
+        assert np.array_equal(plain.evaluate(v_plain), withb.evaluate(v_with))
+
+
+def test_forward_roughness_depresses_low_angle_intensity_only():
+    """The signature that makes it identifiable — and confusable with an ADP."""
+    off, v_off = _lab6_bb(RoughnessSuortti())
+    on, v_on = _lab6_bb(RoughnessSuortti(
+        a=Parameter(value=0.4, min=0.0, max=1.0),
+        b=Parameter(value=0.3, min=0.0, max=5.0, transform="softplus")))
+
+    i_off = off.phase_peaks(0, v_off)[0][3]
+    i_on = on.phase_peaks(0, v_on)[0][3]
+    pos = off.phase_peaks(0, v_off)[0][0]
+    ratio = i_on / np.where(i_off > 0, i_off, 1.0)
+
+    assert np.all(ratio <= 1.0 + 1e-12), "roughness must never amplify"
+    lo, hi = pos < 30.0, pos > 90.0
+    assert lo.any() and hi.any()
+    assert ratio[lo].min() < 0.85, "the low-angle depression should be obvious"
+    assert ratio[hi].min() > ratio[lo].max(), "and must fade with angle"
+
+
+def test_roughness_is_ignored_outside_rietveld_mode():
+    """Le Bail/Pawley intensities are extracted from the data, so they would
+    absorb any smooth theta-dependent factor and leave it unidentifiable."""
+    for mode in ("lebail", "pawley"):
+        model, _ = _lab6_bb(RoughnessSuortti(), mode=mode)
+        assert model.roughness is None
+    assert _lab6_bb(RoughnessSuortti())[0].roughness == "suortti"
+    assert _lab6_bb(RoughnessPitschke())[0].roughness == "pitschke"
+
+
+# -- the hidden-Jacobian guard -----------------------------------------------
+
+
+@pytest.mark.parametrize("block", [
+    RoughnessSuortti(a=Parameter(value=0.4, min=0.0, max=1.0),
+                     b=Parameter(value=0.35, min=0.0, max=5.0,
+                                 transform="softplus")),
+    RoughnessPitschke(c=Parameter(value=1.2, min=0.0, max=4.0,
+                                  transform="softplus"),
+                      tau=Parameter(value=0.06, min=0.0, max=0.3)),
+])
+def test_every_analytic_column_matches_fd_with_roughness_on(block):
+    """The analytic dof/adp/March columns bypass phase_peaks, so they must fold
+    the roughness factor in by hand.  Omitting it there is the hidden-Jacobian
+    bug WP-0506 and WP-0307 both pinned, and it is invisible with the
+    correction off — hence a deliberately strong block here.
+    """
+    from pxrdref import PatternData
+    from pxrdref.model.forward import compile_model
+    from pxrdref.optimize.least_squares import _make_jacobian, _make_residual
+    from pxrdref.schemas import PreferredOrientation
+    from tests.test_aniso_adp import make_aniso_rutile
+
+    structure = make_aniso_rutile()
+    structure.phases[0].scale.value = 1e-3
+    structure.phases[0].preferred_orientation = PreferredOrientation(axis=(0, 0, 1))
+    ins = _bb(block)
+    ins.profile.w.value = 1e-2
+    grid = np.arange(10.0, 90.0, 0.02)
+    pattern = PatternData(two_theta=grid.tolist(),
+                          intensity=np.zeros_like(grid).tolist())
+
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    free = ["phases.0.scale", "phases.0.cell.a",
+            "phases.0.atoms.1.dof.0", "phases.0.atoms.0.adp.0",
+            "phases.0.atoms.0.adp.1", "phases.0.atoms.1.adp.0",
+            "phases.0.preferred_orientation.r",
+            "instrument.geometry.surface_roughness."
+            + ("b" if block.kind == "suortti" else "c"),
+            "instrument.geometry.surface_roughness."
+            + ("a" if block.kind == "suortti" else "tau")]
+    for p in free:
+        assert table.set_vary([p], True), p
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    values = table.decode(table.x0())
+
+    # the correction must genuinely bite, or the test cannot discriminate
+    tt0 = model.phases[0].reflections.two_theta(
+        tuple(values[f"phases.0.cell.{k}"]
+              for k in ("a", "b", "c", "alpha", "beta", "gamma")),
+        model.line_wavelengths[0])
+    rough = model._roughness_factor(tt0, values)
+    assert (1.0 - rough).max() > 0.05, "roughness too weak to discriminate"
+
+    theta = table.x0()
+    jac = _make_jacobian(model, table)(theta)
+    residual = _make_residual(model, table)
+    r0 = residual(theta)
+    for c, path in enumerate(table.free_paths):
+        h = 1e-6 * max(1.0, abs(theta[c]))
+        tp = theta.copy()
+        tp[c] += h
+        col_fd = (residual(tp) - r0) / h
+        scale = np.linalg.norm(col_fd)
+        assert scale > 0, f"{path}: dead FD column"
+        err = np.linalg.norm(jac[:, c] - col_fd) / scale
+        assert err < 5e-3, f"{path}: analytic vs FD mismatch ({err:.2e})"

@@ -77,6 +77,8 @@ from ..schemas.structure import Structure
 from .corrections import (
     displacement_shift_deg,
     lorentz_polarization,
+    surface_roughness_pitschke,
+    surface_roughness_suortti,
     transparency_shift_deg,
 )
 from .extinction import sabine_extinction, sabine_extinction_and_dx
@@ -175,6 +177,11 @@ class CompiledModel:
     # compile-time structural constant, never a θ entry — the width parameters
     # (U,V,W,X,Y and phase size/strain) are identical for both shapes.
     shape: str = "tchz_pv"
+    # Surface-roughness model frozen for the stage: "suortti", "pitschke" or
+    # None when the instrument carries no block.  Compile-time structural, like
+    # ``shape`` and ``geometry_kind`` — never a θ entry, so the branch on it
+    # never sees a decoded value and the residual stays smooth (WP-0502).
+    roughness: str | None = None
     # Pawley intensity block (per-hkl intensities as free parameters, appended
     # to θ outside the ParameterTable); None outside pawley mode.
     pawley: "PawleyBlock | None" = None
@@ -263,6 +270,33 @@ class CompiledModel:
     # ``(pos, w₁, w₂, intensity)``, so everything downstream (the peak-chain
     # Jacobian, Le Bail partitioning, FitReport Layer-1) is shape-agnostic.
     # ------------------------------------------------------------------
+    def _roughness_factor(self, tt_bragg: np.ndarray, values: dict[str, float]):
+        """Surface-roughness intensity multiplier, or ``None`` when off.
+
+        ``None`` rather than an array of ones so the off state costs nothing and
+        stays bit-identical; the model choice is a compile-time constant, so
+        this branch never inspects a θ-decoded value.
+
+        Evaluated at the *ideal* Bragg 2θ, matching Lp and Sabine extinction —
+        the sample aberrations shift where a peak lands on the detector by
+        ≤0.1°, which does not change the depth the beam travelled.
+
+        **Every site that folds intensity by hand must call this.** The analytic
+        column builders bypass :meth:`phase_peaks`, so a factor applied only
+        there would leave the dof/adp/March columns disagreeing with finite
+        differences — the hidden-Jacobian bug that WP-0506 and WP-0307 both
+        pinned.  Unlike extinction, roughness is independent of |F|², so it is a
+        plain multiply everywhere: there is no ``G = E + x·dE/dx`` analogue.
+        """
+        if self.roughness is None:
+            return None
+        base = "instrument.geometry.surface_roughness"
+        if self.roughness == "suortti":
+            return surface_roughness_suortti(tt_bragg, values[f"{base}.a"],
+                                             values[f"{base}.b"])
+        return surface_roughness_pitschke(tt_bragg, values[f"{base}.c"],
+                                          values[f"{base}.tau"])
+
     def _peak_widths(self, gam_g: np.ndarray, gam_l: np.ndarray
                      ) -> tuple[np.ndarray, np.ndarray]:
         """(w₁, w₂) from component FWHMs: (Γ, η) for TCHZ, (σ, γ_HWHM) for Voigt."""
@@ -351,6 +385,13 @@ class CompiledModel:
             else:
                 intensity = base * w_line * lorentz_polarization(tt_bragg, values["instrument.polarization"])
                 intensity = intensity * sabine_extinction(f2, lam, vol, tt_bragg, ext)
+                # surface roughness (model/corrections.py): a per-(line,
+                # reflection) depression of the low-angle intensity.  Rides
+                # after extinction — all these multiplies commute — and, unlike
+                # extinction, does not feed back into the extinction variable x.
+                rough = self._roughness_factor(tt_bragg, values)
+                if rough is not None:
+                    intensity = intensity * rough
             # a reflection pushed off the sphere (λ/2d > 1 → NaN position)
             # carries exactly zero intensity: Lp of a NaN angle is NaN, and the
             # masked profile (purity (c)) would otherwise multiply NaN·0
@@ -489,6 +530,12 @@ class CompiledModel:
                 tt_bragg, values["instrument.polarization"])
             E, dEdx, x = sabine_extinction_and_dx(f2, lam, vol, tt_bragg, ext)
             col = col * (E + x * dEdx)
+            # roughness scales the intensity and does not depend on the
+            # coordinates/ADPs, so a structural move chains through it
+            # unchanged — carry exactly what phase_peaks folded in.
+            rough = self._roughness_factor(tt_bragg, values)
+            if rough is not None:
+                col = col * rough
             out.append(col)
         return out
 
@@ -529,6 +576,9 @@ class CompiledModel:
             col = d_base * w_line * lorentz_polarization(
                 tt_bragg, values["instrument.polarization"])
             col = col * sabine_extinction(f2, lam, vol, tt_bragg, ext)
+            rough = self._roughness_factor(tt_bragg, values)
+            if rough is not None:
+                col = col * rough
             out.append(col)
         return out
 
@@ -997,6 +1047,12 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         fixed_background=fixed,
         bkg_paths=bkg_paths, bkg_design=design, bkg_penalty=penalty,
         shape=instrument.profile.shape,
+        # Rietveld-only, for the reason preferred orientation is: Le Bail and
+        # Pawley intensities are extracted from the data and would absorb any
+        # smooth θ-dependent factor, leaving the parameters unidentifiable.
+        roughness=(geom.surface_roughness.kind
+                   if geom.surface_roughness is not None and mode == "rietveld"
+                   else None),
         pawley=pawley, restraints=restraints,
     )
 
