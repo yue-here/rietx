@@ -8,6 +8,7 @@ degeneracy that physics creates.
 """
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -743,3 +744,77 @@ def test_background_absorption_numbers_are_unchanged_by_the_refactor():
     targets = [(k, p) for k, p in enumerate(free)
                if p.endswith((".biso", ".scale", ".occ")) or ".adp." in p]
     assert background_absorption(jac, free) == block_projection_r2(jac, bg, targets)
+
+
+# -- end-to-end recovery -----------------------------------------------------
+
+OUT = Path(__file__).parent / "output"
+
+
+def _synthesize_rough(block, *, noise_seed: int = 7, two_theta_min: float = 7.0):
+    """A large-cell lab pattern carrying a known roughness + Poisson noise."""
+    from pxrdref import PatternData
+    from pxrdref.model.forward import compile_model
+
+    structure = _big_cell_structure()
+    structure.phases[0].scale.value = 2e-2
+    ins = _bb(block)
+    ins.profile.w.value = 8e-3
+    tt = np.arange(two_theta_min, 120.0, 0.02)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=np.zeros_like(tt).tolist())
+    model = compile_model(structure, ins, pattern, mode="rietveld")
+    table = ParameterTable(structure, ins)
+    y = model.evaluate(table.decode(table.x0())) + 40.0  # flat background floor
+    rng = np.random.default_rng(noise_seed)
+    return PatternData(two_theta=model.tt.tolist(),
+                       intensity=rng.poisson(np.maximum(y, 1.0)).astype(float).tolist())
+
+
+def test_injected_roughness_is_recovered_and_is_resolved_not_merely_fitted():
+    """Inject a known Suortti depression, start from the identity, recover it.
+
+    Biso is held at its (correct) value so the recovery isolates roughness from
+    the displacement parameters it competes with — the co-refined case is what
+    the block-R² guard above is for, and the does-no-harm side is checked
+    against real data in the acceptance tests.
+    """
+    from pxrdref import Refinement
+    from pxrdref.strategy.staged import RefinementPlan, Stage
+    from pxrdref.viz.plots import plot_result
+
+    b_true = 0.35
+    truth = RoughnessSuortti(
+        a=Parameter(value=0.45, min=0.0, max=1.0),
+        b=Parameter(value=b_true, min=0.0, max=5.0, transform="softplus"))
+    pattern = _synthesize_rough(truth)
+
+    structure = _big_cell_structure()
+    structure.phases[0].scale.value = 1.6e-2
+    ins = _bb(RoughnessSuortti(          # starts at the identity: b = 0
+        a=Parameter(value=0.45, vary=False, min=0.0, max=1.0),
+        b=Parameter(value=0.0, min=0.0, max=5.0, transform="softplus")))
+    ins.profile.w.value = 9e-3
+
+    plan = RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("cell", ["phases.*.cell.*"]),
+        Stage("profile_w", ["instrument.profile.w"]),
+        Stage("roughness", ["instrument.geometry.surface_roughness.b"], seed=0.3),
+    ])
+    result = Refinement(structure, ins, history=False).fit(pattern, plan=plan)
+    assert result.status == "converged"
+
+    b = result.parameter("instrument.geometry.surface_roughness.b")
+    assert b.stderr is not None and b.stderr > 0
+    assert b.value == pytest.approx(b_true, abs=max(4 * b.stderr, 0.05 * b_true)), \
+        f"recovered b={b.value:.4f}±{b.stderr:.4f}, truth {b_true}"
+    # resolved, not merely fitted: several esds off the identity it started at
+    assert b.value > 5 * b.stderr
+
+    OUT.mkdir(exist_ok=True)
+    plot_result(result, path=str(OUT / "roughness_recovery.png"))
+    plot_result(result, path=str(OUT / "roughness_recovery_lowangle.png"),
+                two_theta_range=(7.0, 40.0))  # where the depression lives
+    import matplotlib.pyplot as plt
+    plt.close("all")
