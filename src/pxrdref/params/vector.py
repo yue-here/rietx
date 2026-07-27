@@ -25,7 +25,7 @@ import numpy as np
 from scipy import sparse
 
 from ..crystallography.adp import U_NAMES
-from ..crystallography.stephens import S_NAMES, strain_basis
+from ..crystallography.stephens import S_NAMES, isotropic_coefficients, strain_basis
 from ..crystallography.symmetry import get_spacegroup, rotation_matrices
 from ..crystallography.wyckoff import adp_basis, coordinate_basis, stabilizer_rotations
 from ..schemas.common import Parameter
@@ -98,6 +98,10 @@ _FIXED_ANGLES: dict[str, tuple[str, ...]] = {
 class ParameterTable:
     def __init__(self, structure: Structure, instrument: Instrument):
         self.entries: list[Entry] = []
+        #: phase base path → the Stephens DOF vector of the *unit* isotropic
+        #: limit (1 ppm), kept so :meth:`seed_stephens` can put a freed block
+        #: on the isotropic ray without rebuilding the symmetry basis
+        self._strain_unit: dict[str, np.ndarray] = {}
         self._collect(structure, instrument)
         self._rebuild()
 
@@ -212,6 +216,11 @@ class ParameterTable:
         for k, path in enumerate(dof_paths):
             self.entries.append(Entry(path=path, value=float(coef[k]), vary=want_vary,
                                       lo=-np.inf, hi=np.inf, transform="identity"))
+        # S scales as microstrain², so one unit-ppm projection serves any seed
+        unit, *_ = np.linalg.lstsq(
+            basis.T.astype(np.float64),
+            isotropic_coefficients(phase.cell.lengths_angles(), 1.0), rcond=None)
+        self._strain_unit[base] = unit
 
     def _collect_atom_coords(self, base: str, sg, atom) -> None:
         """Coordinates enter θ through site-symmetry displacement DOFs.
@@ -448,6 +457,43 @@ class ParameterTable:
             if e.transform == "softplus" and e.value < value:
                 e.value = value
                 seeded.append(path)
+        if seeded:
+            self._rebuild()
+        return seeded
+
+    def seed_stephens(self, paths: list[str], microstrain: float) -> list[str]:
+        """Put a freed but still all-zero Stephens block on the isotropic ray.
+
+        The counterpart of :meth:`seed_softplus` for the anisotropic-strain
+        DOFs, and needed for the opposite reason: they are identity-transform,
+        so ``seed_softplus`` skips them, and their pathology at zero is an
+        *exploding* rather than a dead gradient (Λ ∝ √Σ).  The seed is the
+        isotropic limit — S = microstrain²·[M²], the one point of the allowed
+        subspace that is guaranteed to give σ²(M) > 0 for every reflection.
+
+        Only phases whose *whole* block is still zero are touched, so a
+        deliberate starting model is never overwritten.  Returns the paths
+        actually seeded.
+        """
+        if microstrain <= 0.0:
+            return []
+        wanted: dict[str, set[int]] = {}
+        for path in paths:
+            base, _, tail = path.rpartition(".microstrain.dof.")
+            if base and tail.isdigit():
+                wanted.setdefault(base, set()).add(int(tail))
+        seeded: list[str] = []
+        for base, _ in wanted.items():
+            unit = self._strain_unit.get(base)
+            if unit is None:
+                continue
+            dofs = [(k, self._paths[f"{base}.microstrain.dof.{k}"])
+                    for k in range(len(unit))]
+            if any(self.entries[i].value != 0.0 for _, i in dofs):
+                continue
+            for k, i in dofs:
+                self.entries[i].value = float(microstrain) ** 2 * float(unit[k])
+                seeded.append(self.entries[i].path)
         if seeded:
             self._rebuild()
         return seeded

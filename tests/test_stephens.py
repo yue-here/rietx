@@ -14,10 +14,12 @@ The isotropic limit gets its own test: M² lies in the allowed subspace for
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
-from pxrdref import Instrument, PatternData
+from pxrdref import Instrument, PatternData, Refinement
 from pxrdref.crystallography.lattice import d_spacings
 from pxrdref.crystallography.stephens import (
     S_EXPONENTS,
@@ -29,7 +31,11 @@ from pxrdref.crystallography.stephens import (
     strain_basis,
     strain_width_deg,
 )
-from pxrdref.crystallography.symmetry import get_spacegroup, rotation_matrices
+from pxrdref.crystallography.symmetry import (
+    generate_reflections,
+    get_spacegroup,
+    rotation_matrices,
+)
 from pxrdref.model.forward import compile_model
 from pxrdref.optimize.least_squares import _make_jacobian, _make_residual
 from pxrdref.params.vector import ParameterTable
@@ -41,6 +47,10 @@ from pxrdref.schemas.structure import (
     StephensStrain,
     Structure,
 )
+from pxrdref.strategy.staged import RefinementPlan, Stage
+from pxrdref.viz.plots import plot_result
+
+OUT = Path(__file__).parent / "output"
 
 # (space group, Laue class, number of independent S_HKL) — Stephens Table 1
 DIMENSIONS = [
@@ -384,6 +394,81 @@ def test_analytic_jacobian_columns_match_finite_differences():
         assert cos > 0.99999, f"{path}: direction off (cos={cos:.6f})"
 
 
+def _brucite_coef(microstrain: float) -> np.ndarray:
+    basis = stephens_basis("P -3 m 1").astype(np.float64)
+    coef, *_ = np.linalg.lstsq(
+        basis.T, isotropic_coefficients(CELLS[1], microstrain), rcond=None)
+    return coef
+
+
+def _strain_from_coef(coef, *, vary: bool = True) -> StephensStrain:
+    basis = stephens_basis("P -3 m 1").astype(np.float64)
+    return StephensStrain.from_values(basis.T @ np.asarray(coef), vary=vary)
+
+
+#: index of the pure l⁴ pattern in the P-3m1 basis — the one that broadens 00l
+#: and nothing else, so scaling it alone makes an unambiguous injection
+_L4_ROW = next(k for k, row in enumerate(stephens_basis("P -3 m 1"))
+               if _named(row) == {"s004": 1})
+
+
+# ----------------------------------------------------------------------
+# seeding and the positivity guard
+# ----------------------------------------------------------------------
+def test_seed_puts_a_freed_zero_block_on_the_isotropic_ray():
+    t = table_for(brucite(StephensStrain.from_values([0.0] * 15)))
+    dofs = t.set_vary(["phases.*.microstrain.dof.*"], True)
+    assert len(dofs) == 4
+    # the softplus seed cannot reach identity-transform DOFs — that is exactly
+    # why seed_stephens exists
+    assert t.seed_softplus(dofs, 1e-3) == []
+    assert sorted(t.seed_stephens(dofs, 1200.0)) == sorted(dofs)
+    values = t.decode(t.x0())
+    got = np.array([values[f"phases.0.microstrain.{n}"] for n in S_NAMES])
+    assert np.allclose(got, isotropic_coefficients(CELLS[1], 1200.0), rtol=1e-9)
+
+
+def test_seed_never_overwrites_a_deliberate_starting_model():
+    t = table_for(brucite(StephensStrain.isotropic(300.0, make_cell(CELLS[1]))))
+    before = t.decode(t.x0())
+    assert t.seed_stephens(t.free_paths, 5000.0) == []
+    assert t.decode(t.x0()) == before
+
+
+def test_guard_flags_coefficients_outside_the_physical_cone():
+    from pxrdref.refine import _guard_diagnostics
+    from pxrdref.strategy.staged import GuardReport, check_stephens_positive
+
+    good = _brucite_coef(600.0)
+    model, table = _compiled(_strain_from_coef(good, vary=False))
+    assert check_stephens_positive(table, model) == []
+    assert check_stephens_positive(table, None) == []
+
+    # drive the l⁴ pattern strongly negative: σ²(M) for 00l goes below zero
+    bad = good.copy()
+    bad[_L4_ROW] = -50.0 * abs(good[_L4_ROW])
+    model, table = _compiled(_strain_from_coef(bad, vary=False))
+    flagged = check_stephens_positive(table, model)
+    assert len(flagged) == 1 and flagged[0].startswith("phases.0.microstrain")
+
+    diags = _guard_diagnostics(GuardReport(nonpositive_strain=flagged))
+    assert [d.code for d in diags] == ["STEPHENS_STRAIN_NOT_POSITIVE"]
+    assert diags[0].where == ["phases.0.microstrain"]
+
+
+def test_out_of_cone_reflections_get_zero_width_not_nan():
+    """The masked √ must not poison the pattern: an unphysical σ² is a
+    diagnostic, and the peaks it touches simply lose their strain broadening."""
+    bad = _brucite_coef(600.0)
+    bad[_L4_ROW] = -50.0 * abs(bad[_L4_ROW])
+    model, table = _compiled(_strain_from_coef(bad, vary=False))
+    y = model.evaluate(table.decode(table.x0()))
+    assert np.all(np.isfinite(y))
+
+
+# ----------------------------------------------------------------------
+# injection → recovery
+# ----------------------------------------------------------------------
 @pytest.mark.parametrize("symbol,cell6", [
     ("P m -3 m", CELLS[0]), ("P -3 m 1", CELLS[1]), ("P 6_3/m", CELLS[2]),
     ("P 1 21/c 1", CELLS[3]), ("P -1", CELLS[4]),
@@ -397,3 +482,82 @@ def test_dof_magnitudes_stay_above_the_shared_fd_step_floor(symbol, cell6):
     s = isotropic_coefficients(cell6, microstrain=1000.0)
     coef, *_ = np.linalg.lstsq(basis.T, s, rcond=None)
     assert np.abs(coef).max() > 1.0, symbol
+
+
+def _lambda(structure) -> dict[tuple[int, int, int], float]:
+    """Λ(hkl) of a structure's phase 0, keyed by hkl — the observable the
+    injection test compares (the S_HKL themselves are basis-dependent)."""
+    phase = structure.phases[0]
+    hkl = generate_reflections(phase.space_group, phase.cell.lengths_angles(),
+                               1.5406, two_theta_max=120.0).hkl
+    lam = strain_width_deg(monomial_matrix(hkl),
+                           np.array(phase.microstrain.values()),
+                           d_spacings(hkl, *phase.cell.lengths_angles()))
+    return {tuple(int(v) for v in h): float(w) for h, w in zip(hkl, lam)}
+
+
+def _synthetic(structure, inst, *, seed=17) -> PatternData:
+    grid = _pattern(15.0, 120.0, 0.02)
+    model = compile_model(structure, inst, grid, mode="rietveld")
+    table = ParameterTable(structure, inst)
+    y = model.evaluate(table.decode(table.x0())) + 40.0
+    rng = np.random.default_rng(seed)
+    noisy = rng.poisson(np.maximum(y, 1.0) * 20.0) / 20.0
+    return PatternData(two_theta=model.tt.tolist(), intensity=noisy.tolist(),
+                       sigma=np.sqrt(np.maximum(y, 1.0) / 20.0).tolist())
+
+
+def _injection_state(coef):
+    structure = Structure(phases=[brucite(_strain_from_coef(coef))])
+    structure.phases[0].scale.value = 3e-2
+    inst = Instrument.debye_scherrer(wavelength=1.5406)
+    inst.profile.w.value = 3e-3
+    return structure, inst
+
+
+def test_injected_anisotropy_is_recovered():
+    """Inject a 12× broadening of 00l alone, start from the right *isotropic*
+    level, and check the refinement finds the direction — the whole model in
+    one assertion, and the one that would fail if the basis, the width law or
+    the Jacobian were wrong."""
+    truth_coef = _brucite_coef(600.0)
+    truth_coef[_L4_ROW] *= 12.0
+    truth, inst = _injection_state(truth_coef)
+    data = _synthetic(truth, inst)
+    want = _lambda(truth)
+
+    start, start_inst = _injection_state(_brucite_coef(600.0))
+    ref = Refinement(start, start_inst, history=False)
+    result = ref.fit(data, plan=RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("microstrain", ["phases.*.microstrain.dof.*"]),
+    ]))
+    assert result.status == "converged"
+    got = _lambda(ref.fitted_structure)
+
+    # the injected direction is found, not just the level
+    assert got[(0, 0, 2)] == pytest.approx(want[(0, 0, 2)], rel=0.10)
+    assert got[(1, 0, 0)] == pytest.approx(want[(1, 0, 0)], rel=0.10)
+    # Λ ∝ √Σ, so scaling the l⁴ pattern 12× separates the two directions by √12
+    assert got[(0, 0, 2)] / got[(1, 0, 0)] == pytest.approx(np.sqrt(12.0), rel=0.15)
+    weighted = max(abs(got[h] - want[h]) / want[h] for h in want)
+    assert weighted < 0.25, weighted
+
+    OUT.mkdir(exist_ok=True)
+    plot_result(result, path=str(OUT / "stephens_injection_fit.png"))
+
+
+def test_isotropic_start_does_not_invent_anisotropy():
+    """Negative control: a genuinely isotropic specimen must come back
+    isotropic.  Λ is one number for every hkl when the S sit on the M² ray, so
+    any spurious spread here is the fit reading noise as direction."""
+    truth, inst = _injection_state(_brucite_coef(700.0))
+    data = _synthetic(truth, inst, seed=23)
+    start, start_inst = _injection_state(_brucite_coef(700.0))
+    ref = Refinement(start, start_inst, history=False)
+    ref.fit(data, plan=RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("microstrain", ["phases.*.microstrain.dof.*"]),
+    ]))
+    got = np.array(list(_lambda(ref.fitted_structure).values()))
+    assert got.std() / got.mean() < 0.15

@@ -332,6 +332,10 @@ class Refinement:
             # lift softplus coefficients (e.g. extinction) off the zero floor
             # so TRF has a live gradient this stage
             table.seed_softplus(freed, stage.seed)
+        if stage.strain_seed:
+            # the Stephens DOFs are identity-transform, so the softplus seed
+            # above never sees them; put an all-zero block on the isotropic ray
+            table.seed_stephens(freed, stage.strain_seed)
         if mode in ("lebail", "pawley"):
             # never refine structural parameters, the phase scale (degenerate
             # with the per-hkl intensities) or the line-intensity ratio (which
@@ -387,7 +391,7 @@ class Refinement:
         if mode == "lebail":
             model.lebail_update(table.decode(outcome.theta), n_cycles=stage.lebail_cycles)
 
-        guard = check_guards(table, outcome, correlation_guard)
+        guard = check_guards(table, outcome, correlation_guard, model=model)
         if events is not None:
             events.emit("stage_end", stage=stage.name, status=outcome.status,
                         n_iterations=outcome.n_iterations,
@@ -651,6 +655,20 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
                        "isotropic biso, check the occupancy and species "
                        "assignment, or extend the fit range; do not report "
                        "the tensor as measured",
+        ))
+    for msg in guard.nonpositive_strain:
+        path = msg.split(" ")[0]
+        out.append(Diagnostic(
+            level="warning", code="STEPHENS_STRAIN_NOT_POSITIVE", where=[path],
+            message=f"the Stephens strain coefficients of {msg} — σ²(M) is a "
+                    "variance, so a negative value is not a large anisotropy "
+                    "but coefficients outside the physical cone, and those "
+                    "reflections silently get no strain broadening at all",
+            suggestion="the data do not support this many strain patterns in "
+                       "this direction: restart from the isotropic limit "
+                       "(StephensStrain.isotropic), refine fewer patterns (a "
+                       "higher-symmetry Laue class has fewer), or extend the "
+                       "fit range; do not report the S_HKL as measured",
         ))
     for msg in guard.background_correlations:
         path = msg.split(" ")[0]
