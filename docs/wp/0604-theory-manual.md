@@ -30,6 +30,27 @@ planned, handover logs record what shipped, and where they disagree the code is
 authoritative. Every physics function cites author/year/journal in its
 docstring by invariant, which is what makes the code the better source.
 
+From **WP-0503** (Stephens anisotropic strain, landed 2026-07-27) — the manual
+must state *conventions*, not just equations, and this is the worst offender so
+far. Three independent labelling choices sit behind the S_HKL of
+`crystallography/stephens.py`, and getting any one wrong rescales every
+published number:
+
+1. `√(Σ S·monomial)·d²·10⁻⁶` is the **FWHM** of the ΔM/M distribution here, not
+   its standard deviation — no √(8 ln 2) appears anywhere;
+2. the coefficients are carried in **10⁻¹² Å⁻⁴**, not physical Å⁻⁴ (and that is
+   load-bearing numerically, not cosmetic — see the module docstring);
+3. they multiply the **literal monomials** h^H k^K l^L, whereas other codes fold
+   symmetry multiplicities into their templates (writing the cubic S220 term as
+   `3·(h²k² + h²l² + k²l²)`, say), so their printed values differ by small
+   integer factors as well.
+
+A manual that reproduces Stephens (1999) equation (1) without all three is
+worse than no manual: a reader would transfer literature S values straight in
+and get a wrong width law that still refines. The same applies to the
+size↔1/cosθ, strain↔tanθ letter conventions already in `profiles/caglioti.py`
+(GSAS and FullProf swap X/Y).
+
 ## Tasks
 
 - [ ] Expand this stub into a full WP before writing code

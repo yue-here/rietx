@@ -103,6 +103,17 @@ context). Sample 2 (platy brucite → preferred orientation) and sample 4
 Scarlett et al. 2002) exacerbate the scatter and exercise the WP-0307 texture
 and WP-0305 µR-fence machinery respectively.
 
+The two *pure-phase* patterns `qarr/brucite.prn` and `qarr/corundum.prn` carry a
+second job from WP-0503, as the anisotropic-strain acceptance pair
+(`test_acceptance_stephens.py`): brucite as the candidate for directional
+broadening and corundum as the isotropic control on the same instrument,
+protocol and channel count. **The reference values there are not a certificate —
+they are a characterisation**, and the headline one is negative: three Stephens
+patterns improve brucite's Rwp from 18.55 % to 17.90 % with ΔBIC = +488 and
+still drive σ²(M) negative on 12 of 43 reflections. Corundum: Rwp 14.37 %,
+ΔBIC = −17, Layer-1 anisotropy 1.60× and `detected=False`. Re-measure both
+before changing any of them.
+
 - Madsen, I. C.; Scarlett, N. V. Y.; Cranswick, L. M. D.; Lwin, T. (2001).
   *Outcomes of the IUCr CPD Round Robin on Quantitative Phase Analysis: Samples
   1a–1h.* J. Appl. Cryst. **34**, 409–426.

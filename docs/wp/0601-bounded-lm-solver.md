@@ -50,6 +50,34 @@ WPs. A genuinely bound-constrained solver could retire the transform for width
 and scale parameters — worth measuring as part of the benchmark, since it would
 remove a recurring class of silent no-op refinements.
 
+From **WP-0503** (Stephens anisotropic strain, landed 2026-07-27) — **the
+first constraint in this package that is an inequality, not a box, and a
+measured reason to want one.** The Stephens strain variance must satisfy
+σ²(M) = T·θ ≥ 0 on every fitted reflection, where T is a constant
+(reflection × pattern) matrix frozen at stage compile and θ the strain DOFs.
+That is a *linear* inequality in the free parameters — precisely the shape a
+bound-constrained CG inner solve (Coelho 2005) generalises to, and unreachable
+for `scipy.optimize.least_squares`, whose only constraint vocabulary is a box.
+
+Why it matters rather than being a nicety: measured on two real round-robin
+patterns (`tests/test_acceptance_stephens.py`), the *unconstrained* refinement
+leaves the cone on **both** — the strongly anisotropic specimen (brucite, 12 of
+43 reflections) and the isotropic control (corundum) alike, because the poorly
+determined anisotropic directions are free to wander. So today
+`STEPHENS_STRAIN_NOT_POSITIVE` is not a rare alarm but the normal outcome, and
+the coefficients are never quotable. Enforcing T·θ ≥ 0 in the solver would turn
+the guard back into an exception and make refined S_HKL reportable. If the
+benchmark needs a second motivating case beyond speed, this is it. (The
+analogous ADP positive-definiteness cone is *not* linear — it is a
+semidefinite constraint — so do not expect one mechanism to serve both.)
+
+Also from WP-0503, a note for whatever the benchmark quotes: on the 7251-channel
+round-robin patterns, Hamilton's F test at α = 0.05 blesses a 0.13 % χ²
+improvement (an inert 3-parameter addition) just as it blesses a real 6.9 % one.
+ΔBIC separated the same pair by +488 vs −17. If this WP reports "the new solver
+finds a better minimum", say by how much in ΔBIC, not by whether Hamilton
+passes.
+
 ## Tasks
 
 - [ ] Expand this stub into a full WP before writing code

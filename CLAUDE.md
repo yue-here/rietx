@@ -122,6 +122,28 @@ flagged `PAWLEY_OVERLAP_UNRESOLVED` rather than confidently split).
   is not enforced by bounds, since the constraint couples all six components.
   `structure_from_cif(..., aniso=True)` is opt-in — several test CIFs carry
   aniso loops, and reading a file must not silently change what a plan frees.
+- **Anisotropic strain is opt-in per phase** (`Phase.microstrain`, Stephens
+  1999) and is the first width that depends on hkl rather than only on θ:
+  σ²(M) = 10⁻¹²·Σ S_HKL h^H k^K l^L adds Λ(hkl)·tanθ to the *Lorentzian* FWHM.
+  Same shape as the ADP story one rank up — the Laue-allowed S_HKL patterns are
+  **derived** from the operators (`crystallography/stephens.py`, exact rational
+  nullspace of the induced rank-4 action, sharing `wyckoff._nullspace_int`),
+  refine as absolute DOFs `phases.i.microstrain.dof.k`, and an out-of-subspace
+  set raises. Three conventions are load-bearing and stated in that module:
+  √Σ·d²·10⁻⁶ is the **FWHM** (not σ) of the ΔM/M distribution; the coefficients
+  are in **10⁻¹² Å⁻⁴** (physical Å⁻⁴ values ~10⁻⁸ would be finite-differenced
+  with a step 100× their own size); and they multiply the **literal** monomials,
+  where other codes fold symmetry multiplicities in. A block **locks
+  `lor_strain`** — its isotropic direction is identically that column, the
+  `biso`/`aniso` bargain again — so the block subsumes it, and it must be freed
+  *in* the sample-broadening stage, not after. The isotropic limit S = ε²·[M²]
+  (exactly in the subspace, whatever the symmetry) is both the seed and the only
+  legal start: at S ≡ 0 the √ has unbounded slope, so `Stage.strain_seed`, not
+  `Stage.seed`, which reaches softplus entries only. σ²(M) ≥ 0 is a *cone*
+  coupling all fifteen, hence a guard (`STEPHENS_STRAIN_NOT_POSITIVE`) rather
+  than bounds — and measured on real data it fires on isotropic and anisotropic
+  specimens alike, so read it as "these coefficients are not quotable", never as
+  evidence *of* anisotropy.
 - History nodes store **state, not curves** (a node is ~10 kB; embedding
   y_calc would make it ~1.24 MB). Their cached metrics are *as-optimised* —
   measured on a model frozen at the values each stage *started* from — so

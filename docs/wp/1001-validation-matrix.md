@@ -44,6 +44,24 @@ CIF block value under an explicitly *interim* ±2e-4 Å band — the residual bi
 there is unmodelled equatorial divergence, tube tails and monochromator
 passband, i.e. the same FPA territory.
 
+From **WP-0503** (Stephens anisotropic strain, landed 2026-07-27) — **do not
+name Hamilton's R-ratio test as the arbiter of "are these parameters
+justified".** Measured on the 7251-channel round-robin patterns: at α = 0.05 it
+blesses a *0.13 %* χ² improvement from three inert parameters on corundum
+exactly as it blesses a real 6.9 % one on brucite. Hamilton's threshold does
+not grow with the channel count, so on modern step-scanned patterns almost any
+added parameter clears it. ΔBIC separated the same pair by +488 vs −17 (its
+ln(N) penalty does grow with N), and is the statistic the policy should quote.
+Both are already implemented in `report/layer2.py`.
+
+Also from WP-0503, a third acceptance *shape* the policy should recognise
+alongside "absolute anchor" and "cross-code consistency": **a test that asserts
+a model is inadmissible.** `tests/test_acceptance_stephens.py` asserts that an
+Rwp improvement both statistical tests bless is nonetheless rejected by a
+physics guard (the strain-variance cone), on real data. That tier is neither
+exact nor statistical — it is "characterisation", the same tier round-robin
+sample 4 occupies for microabsorption, and the matrix needs a name for it.
+
 ## Tasks
 
 - [ ] Expand this stub into a full WP before starting

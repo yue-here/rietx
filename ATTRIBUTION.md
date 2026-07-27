@@ -10,6 +10,14 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
 - Rietveld, H. M. (1969). *J. Appl. Cryst.* 2, 65–71 — the profile refinement method.
 - Caglioti, Paoletti & Ricci (1958). *Nucl. Instrum.* 3, 223–228 — U,V,W width law.
 - Thompson, Cox & Hastings (1987). *J. Appl. Cryst.* 20, 79–83 — TCH pseudo-Voigt.
+- Stephens, P. W. (1999). *J. Appl. Cryst.* 32, 281–289 — phenomenological model of
+  anisotropic peak broadening; the rank-4 S_HKL invariants and the per-Laue-class
+  term counts of its Table 1. The allowed subspace here is *derived* from the
+  space-group operators (`crystallography/stephens.py`), not transcribed from the
+  table — the table is the independent check.
+- Popa, N. C. (1998). *J. Appl. Cryst.* 31, 176–180 — the equivalent
+  strain-tensor formulation of the same anisotropy (concept reference; the
+  phenomenological parameterisation is what is implemented).
 - Weideman, J. A. C. (1994). *SIAM J. Numer. Anal.* 31, 1497–1518 — rational
   (FFT-coefficient) approximation of the complex error function w(z); the
   N=32 algorithm behind the shared, backend-agnostic Faddeeva in the opt-in

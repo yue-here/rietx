@@ -53,6 +53,7 @@ Working today — constant-wavelength X-ray, both **capillary/synchrotron** and
 | Atomic-coordinate refinement (Wyckoff/site-symmetry constraints), anisotropic ADPs | ✅ |
 | QPA weight fractions (Hill-Howard ZMV), Brindley microabsorption + µR fence | ✅ |
 | Pawley whole-pattern mode, March-Dollase preferred orientation | ✅ |
+| Stephens anisotropic strain (hkl-dependent widths; Laue-allowed S_HKL derived, not tabulated) | ✅ |
 | Multi-histogram joint refinement (shared structure, per-histogram Rwp) | ✅ |
 | Exporters: reflection table, refinement CIF (values + esds), QPA table | ✅ |
 | Differentiable backends: JAX autodiff Jacobians, torch/MPS; true Voigt; restraints | v0.4 |
@@ -65,7 +66,7 @@ shipped milestones ([docs/milestones/](docs/milestones/)).
 
 ### Validation
 
-Five real-data acceptance suites, each with its tolerance chosen to match what
+Six real-data acceptance suites, each with its tolerance chosen to match what
 the reference actually is:
 
 | Dataset | Result | Reference |
@@ -75,6 +76,7 @@ the reference actually is:
 | GSAS-II **fluorapatite** tutorial | Rwp 9.73 %, Rp 7.76 % | GSAS's own 10.05 % / 7.66 % on identical channels; cell +116 ppm — a **cross-code consistency** check |
 | SRM 676a **corundum** (lab CuKα) | c/a = 2.729928 (+30 ppm) | the axial ratio where uniform d-scale systematics cancel — a **certificate-grade** anchor; absolute axes carry a ~−300 ppm lab d-scale offset |
 | IUCr **CPD QPA round robin** (samples 1a–h, 2, 4) | worst 5.1 wt % (sample 1); traces ≤ 1.3 wt % | tolerance referenced to the published **participant spread**; sample 4 is the designed Brindley-defeating case (µR fence fires, no accuracy band claimed) |
+| CPD **brucite** / **corundum** (anisotropic strain) | brucite Rwp 18.55 → 17.90 %, ΔBIC +488 — *and rejected* | a **characterisation**: the improvement passes both statistical tests yet drives the strain variance negative on 12 of 43 reflections, so the cone guard fires and no S_HKL are quotable. Corundum is the isotropic control (ΔBIC −17, diagnostic 1.60×, not detected) |
 
 The SRM 660c fit does **not** reach the certificate's ±8×10⁻⁶ Å band, and does
 not claim to: the residual is a characterised cotθ/sin2θ aberration
