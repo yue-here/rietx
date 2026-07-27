@@ -35,6 +35,40 @@ class EmissionLine(Base):
     )
 
 
+class Dispersion(Base):
+    """Anomalous scattering corrections f′, f″ at the source wavelengths.
+
+    Opt-in, and absent by default: switching it on changes every computed
+    intensity (by −16 % for ZnO at Cu Kα, +7 % for CaF₂), so it is a modelling
+    decision the caller makes rather than one a file read makes for them.  It
+    is *not* a refinement — f′ and f″ are fixed constants of (element,
+    wavelength), looked up once at stage compile from
+    ``crystallography.dispersion``.
+
+    ``overrides`` supplies measured pairs for elements where a table cannot be
+    right: within a few tens of eV of an absorption edge the true f″ is the
+    near-edge structure of the *compound*, which depends on coordination and
+    oxidation state.  Keys are element symbols (``{"Zn": (-3.1, 0.5)}``), and
+    an override also disables the edge-interval refusal for that element,
+    since supplying the number is exactly how a user says "I measured this".
+    """
+
+    table: Literal["cromer_liberman"] = "cromer_liberman"
+    overrides: dict[str, tuple[float, float]] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _known_elements(self) -> "Dispersion":
+        from ..crystallography.dispersion import normalize_element
+
+        for key in self.overrides:
+            if normalize_element(key) != key.strip().capitalize():
+                raise ValueError(
+                    f"dispersion override key {key!r} must be a bare element "
+                    "symbol: f' and f'' are core-level effects and are "
+                    "tabulated per element, not per ion")
+        return self
+
+
 class Source(Base):
     """Constant-wavelength X-ray source.
 
@@ -55,6 +89,9 @@ class Source(Base):
     polarization: Parameter = Field(
         default_factory=lambda: Parameter(value=0.5, min=0.0, max=1.0)
     )
+    #: opt-in anomalous scattering; None ⇒ f = f₀, bit-identical to the
+    #: non-anomalous model (see :class:`Dispersion`)
+    dispersion: Dispersion | None = None
 
     @model_validator(mode="after")
     def _nonempty(self) -> "Source":

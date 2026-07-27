@@ -226,3 +226,50 @@ def dispersion_map(species: list[str], wavelength: float) -> dict[str, complex]:
     behind it is per element.
     """
     return {s: complex(*dispersion(s, wavelength)) for s in dict.fromkeys(species)}
+
+
+#: A single |F|² is shared across the source's emission lines, so f′/f″ are
+#: evaluated at the primary line only.  Cu Kα1 and Kα2 are 20 eV apart, which
+#: is nothing unless an edge lands between them — but a modelled Kβ line sits
+#: ~860 eV away, and there the assumption fails.  A line whose f′ or f″ differs
+#: from the primary's by more than this fraction of Z is refused rather than
+#: averaged.  (The fix, if a real dataset ever needs one, is cheap: the orbit
+#: sums in ``structure_factor`` are line-independent, so a per-line |F|² costs
+#: one extra combine per line, not a re-evaluation.)
+LINE_DISPERSION_TOL = 0.01
+
+
+def resolve(species: list[str], wavelengths: tuple[float, ...],
+            overrides: dict[str, tuple[float, float]] | None = None
+            ) -> dict[str, complex]:
+    """{species label: f′ + i·f″} at the primary line, with the line guard.
+
+    ``overrides`` maps an element symbol to a measured (f′, f″) pair; those
+    elements skip both the table lookup and the guard, which is the point —
+    an override is how a user supplies a value the table cannot give.
+    """
+    import gemmi
+
+    overrides = overrides or {}
+    out: dict[str, complex] = {}
+    for label in dict.fromkeys(species):
+        sym = normalize_element(label)
+        if sym in overrides:
+            out[label] = complex(*overrides[sym])
+            continue
+        primary = dispersion(sym, wavelengths[0])
+        z = float(gemmi.Element(sym).atomic_number) or 1.0
+        for lam in wavelengths[1:]:
+            other = dispersion(sym, lam)
+            drift = max(abs(other[0] - primary[0]), abs(other[1] - primary[1]))
+            if drift > LINE_DISPERSION_TOL * z:
+                raise ValueError(
+                    f"{sym} dispersion differs by {drift:.3f} e between the "
+                    f"source's {wavelengths[0]} A and {lam} A lines "
+                    f"({LINE_DISPERSION_TOL:.0%} of Z = {z:.0f} is the limit), "
+                    "so one structure factor cannot serve both: an absorption "
+                    "edge lies between them.  Refine the lines as separate "
+                    "histograms, drop the distant line, or supply a measured "
+                    "pair through the source's dispersion overrides")
+        out[label] = complex(*primary)
+    return out

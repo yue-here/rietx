@@ -47,6 +47,7 @@ from ..background.models import (
     second_difference_matrix,
 )
 from ..crystallography.adp import U_NAMES, reciprocal_axis_lengths
+from ..crystallography.dispersion import resolve as resolve_dispersion
 from ..crystallography.lattice import (
     cell_volume,
     d_spacings,
@@ -906,13 +907,23 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                 shift = shift + transparency_shift_deg(tt_bragg, t)
         return shift
 
+    # Anomalous scattering: f′ + i·f″ per species, frozen for the stage.  The
+    # source owns it (it is a property of the wavelength, not the structure),
+    # and ``resolve`` refuses rather than averages when an emission line is far
+    # enough from the primary for one |F|² not to serve both.
+    disp = instrument.source.dispersion
+
     phases: list[CompiledPhase] = []
     restraint_items: list = []
     for ip, phase in enumerate(structure.phases):
         cell = phase.cell.lengths_angles()
         refl = generate_reflections(phase.space_group, cell, lam_gen,
                                     two_theta_max=hi_eff, two_theta_min=gen_min)
-        sites = compile_phase_sites(phase)
+        f_anom = None
+        if disp is not None:
+            f_anom = resolve_dispersion([a.species for a in phase.atoms], lams,
+                                        disp.overrides)
+        sites = compile_phase_sites(phase, f_anom)
 
         n = len(refl)
         n_lines = len(lams)

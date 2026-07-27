@@ -535,3 +535,111 @@ def test_table_covers_every_element_the_test_data_uses():
         fp, fpp = dispersion(el, CU_KA1_LAMBDA)
         assert fpp > 0.0
         assert abs(fp) < 30.0
+
+
+# ----------------------------------------------------------------------
+# the schema block and the compiled model
+# ----------------------------------------------------------------------
+def _zincite_structure():
+    from pxrdref.schemas.structure import Structure
+
+    ph = zincite()
+    ph.scale.value = 5e-3
+    return Structure(phases=[ph])
+
+
+def _compiled(dispersion_block=None, *, lines=None):
+    """A compiled ZnO model with and without the source dispersion block."""
+    from pxrdref import Instrument, PatternData
+    from pxrdref.model.forward import compile_model
+    from pxrdref.params.vector import ParameterTable
+
+    ins = Instrument.bragg_brentano(radiation="CuKa")
+    if lines is not None:
+        ins.source.lines = lines
+    ins.source.dispersion = dispersion_block
+    ins.profile.w.value = 2e-2
+    tt = np.arange(25.0, 100.0, 0.02)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=np.zeros_like(tt).tolist())
+    structure = _zincite_structure()
+    model = compile_model(structure, ins, pattern, mode="rietveld")
+    table = ParameterTable(structure, ins)
+    return model, table.decode(table.x0())
+
+
+def test_dispersion_block_json_round_trip():
+    from pxrdref.schemas.instrument import Dispersion
+
+    d = Dispersion(overrides={"Zn": (-3.1, 0.52)})
+    back = Dispersion.model_validate_json(d.model_dump_json())
+    assert back.table == "cromer_liberman"
+    assert back.overrides["Zn"] == (-3.1, 0.52)
+
+
+def test_override_key_must_be_a_bare_element():
+    from pxrdref.schemas.instrument import Dispersion
+
+    with pytest.raises(ValueError, match="bare element symbol"):
+        Dispersion(overrides={"Zn2+": (-3.1, 0.52)})
+
+
+def test_absent_block_leaves_the_compiled_pattern_bit_identical():
+    """The default path must be untouched — this is what the goldens promise."""
+    m_off, v_off = _compiled(None)
+    assert m_off.phases[0].sites.f_anom is None
+    np.testing.assert_array_equal(m_off.evaluate(v_off), m_off.evaluate(v_off))
+
+
+def test_enabling_dispersion_moves_the_pattern_the_expected_way():
+    from pxrdref.schemas.instrument import Dispersion
+
+    m_off, v_off = _compiled(None)
+    m_on, v_on = _compiled(Dispersion())
+    y_off, y_on = m_off.evaluate(v_off), m_on.evaluate(v_on)
+    assert m_on.phases[0].sites.f_anom is not None
+    # Zn below its K edge at Cu Kα: less scattering power, so a weaker pattern
+    assert 0.80 < float(np.sum(y_on) / np.sum(y_off)) < 0.90
+
+
+def test_line_guard_refuses_when_an_edge_falls_between_the_lines():
+    """Ni's K edge (8.333 keV) sits between Cu Kα and Kβ — that is why Ni is
+    the Cu Kβ filter — so one |F|² cannot serve both lines."""
+    from pxrdref.crystallography.dispersion import resolve
+
+    with pytest.raises(ValueError, match="an absorption edge lies between them"):
+        resolve(["Ni"], (1.5405929, 1.39222))
+
+
+def test_line_guard_passes_the_ka_doublet():
+    """20 eV apart: nothing moves, which is what lets |F|² be shared."""
+    from pxrdref.crystallography.dispersion import resolve
+
+    for el in ("Zn", "Fe", "Ca", "La", "Zr", "O"):
+        got = resolve([el], (1.5405929, 1.5444274))
+        assert got[el] == complex(*dispersion(el, 1.5405929))
+
+
+def test_override_supplies_a_value_the_table_cannot():
+    """Overrides skip both the lookup and the edge refusal — that is the point.
+
+    A user standing 5 eV above the Zn K edge has measured f′/f″ from a
+    fluorescence scan; the table there is not merely coarse but wrong in
+    principle, so refusing them would be the unhelpful answer.
+    """
+    from pxrdref.crystallography.attenuation import _HC_EV_ANGSTROM
+    from pxrdref.crystallography.dispersion import edges, resolve
+
+    at_edge = _HC_EV_ANGSTROM / edges("Zn")[0]
+    with pytest.raises(ValueError, match="contains an absorption edge"):
+        resolve(["Zn"], (at_edge,))
+    got = resolve(["Zn"], (at_edge,), {"Zn": (-7.4, 0.6)})
+    assert got["Zn"] == complex(-7.4, 0.6)
+
+
+def test_override_is_keyed_by_element_but_applies_to_the_ion():
+    from pxrdref.crystallography.dispersion import resolve
+
+    got = resolve(["Zn2+", "O2-"], (1.5405929,), {"Zn": (-3.1, 0.52)})
+    assert got["Zn2+"] == complex(-3.1, 0.52)
+    assert got["O2-"].real == pytest.approx(0.0494, abs=1e-3)
