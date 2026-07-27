@@ -9,11 +9,18 @@ degeneracy that physics creates.
 
 import math
 
+import numpy as np
 import pytest
 from pydantic import ValidationError
 
 from pxrdref import Instrument
+from pxrdref.model.corrections import (
+    surface_roughness_pitschke,
+    surface_roughness_suortti,
+)
 from pxrdref.schemas import Geometry, RoughnessPitschke, RoughnessSuortti
+
+TT = np.arange(5.0, 160.0, 0.5)
 
 # -- schema ------------------------------------------------------------------
 
@@ -96,3 +103,172 @@ def test_the_two_models_are_exactly_the_identity_when_off():
             s = math.sin(math.radians(two_theta / 2.0))
             u = tau / s
             assert 1.0 - 0.0 * u * (1.0 - u) == 1.0
+
+
+# -- physics: the correction functions ---------------------------------------
+
+
+def test_suortti_is_bit_exactly_one_when_off():
+    """No tolerance: the off state must not perturb a single bit of y_calc."""
+    for a in (0.0, 0.1, 0.5, 0.9, 1.0):
+        r = surface_roughness_suortti(TT, a, 0.0)
+        assert np.array_equal(r, np.ones_like(TT))
+
+
+def test_pitschke_is_bit_exactly_one_when_off():
+    for tau in (0.0, 0.05, 0.3):
+        assert np.array_equal(surface_roughness_pitschke(TT, 0.0, tau),
+                              np.ones_like(TT))
+    for c in (0.0, 1.0, 3.9):
+        assert np.array_equal(surface_roughness_pitschke(TT, c, 0.0),
+                              np.ones_like(TT))
+
+
+def test_suortti_only_ever_depresses_and_rises_with_angle():
+    """0 < R <= 1 and monotone increasing in theta, for every (a, b) in range.
+
+    Both follow from sin(theta) <= 1 => exp(-b/sin) <= exp(-b): the numerator
+    can never exceed the theta=90 denominator, and it grows as sin(theta) does.
+    A correction that could *amplify* would be free to imitate a scale factor.
+    """
+    for a in (0.0, 0.2, 0.5, 0.8, 0.99):
+        for b in (0.05, 0.5, 2.0, 9.0):
+            r = surface_roughness_suortti(TT, a, b)
+            assert np.all(r > 0.0)
+            assert np.all(r <= 1.0 + 1e-15)
+            assert np.all(np.diff(r) >= -1e-15), f"not monotone at a={a}, b={b}"
+
+
+def test_one_minus_a_bounds_the_depression():
+    """`a` is the depth knob: no (b, theta) may push the depression past 1 - a."""
+    for a in (0.1, 0.5, 0.9):
+        worst = min(surface_roughness_suortti(TT, a, b).min()
+                    for b in np.geomspace(1e-4, 5.0, 400))
+        assert 1.0 - worst <= 1.0 - a + 1e-12
+        # and the bound is tight — it is approached, not merely respected
+        # (measured on this grid: 97% of 1-a at a=0.1, 89% at 0.5, 84% at 0.9)
+        assert 1.0 - worst > 0.8 * (1.0 - a)
+
+
+def test_b_is_bimodal_both_limits_are_the_identity():
+    """b -> 0 and b -> infinity both switch the correction off.
+
+    b sets *where in angle* the transition falls, not how deep the depression
+    goes: at b -> 0 the depleted layer is transparent, and at b -> infinity it
+    is opaque at every angle, so the theta=90 normalisation divides the
+    angular dependence back out.  The correction therefore peaks at
+    intermediate b, and any given depression is reproducible by two b values.
+
+    This is a genuine refinement hazard (a flat-gradient dead zone the
+    optimiser can wander into), which is why the staged plan seeds b near the
+    sensitive region and ROUGHNESS_UNCONSTRAINED is defined on the modelled
+    depression rather than on b itself.
+    """
+    a = 0.5
+    depth = np.array([1.0 - surface_roughness_suortti(TT, a, b).min()
+                      for b in np.geomspace(1e-6, 50.0, 3000)])
+    assert depth[0] < 1e-4, "b -> 0 must be the identity"
+    assert depth[-1] < 1e-4, "b -> infinity must be the identity too"
+    peak = depth.argmax()
+    assert 0 < peak < len(depth) - 1
+    assert depth[peak] > 0.4
+    # strictly unimodal: rises to the peak, falls after it
+    assert np.all(np.diff(depth[:peak + 1]) >= -1e-12)
+    assert np.all(np.diff(depth[peak:]) <= 1e-12)
+
+
+def test_the_sensitive_b_moves_out_as_the_lowest_fitted_angle_rises():
+    """Data starting at 20 deg is sensitive to a different b than data from 5.
+
+    The staged-plan seed and the ROUGHNESS_UNCONSTRAINED threshold both depend
+    on this, so pin it.
+    """
+    grid = np.geomspace(1e-3, 5.0, 4000)
+
+    def peak_b(two_theta_min):
+        tt = np.arange(two_theta_min, 160.0, 0.5)
+        depth = [1.0 - surface_roughness_suortti(tt, 0.5, b).min() for b in grid]
+        return grid[int(np.argmax(depth))]
+
+    assert peak_b(5.0) < peak_b(15.0) < peak_b(20.3)
+    assert 0.1 < peak_b(5.0) < 0.3
+    assert 0.3 < peak_b(20.3) < 0.7
+
+
+def test_suortti_matches_an_independent_transcription_of_the_published_form():
+    """Scalar transcription of Suortti (1972) as GSAS-II SurfaceRough writes it.
+
+    Written out here from the reference implementation's own algebra so the
+    vectorised, xp-routed version cannot drift from the published formula.
+    """
+    def reference(two_theta_deg: float, sra: float, srb: float) -> float:
+        sth = math.sin(math.radians(two_theta_deg / 2.0))
+        t1 = math.exp(-srb / sth)
+        t2 = sra + (1.0 - sra) * math.exp(-srb)
+        return (sra + (1.0 - sra) * t1) / t2
+
+    for a, b in ((0.37, 0.85), (0.5, 0.1), (0.05, 4.0), (0.9, 2.5)):
+        got = surface_roughness_suortti(TT, a, b)
+        want = np.array([reference(t, a, b) for t in TT])
+        assert got == pytest.approx(want, abs=1e-10, rel=1e-10)
+    # and the test data actually spans a meaningful depression, or it would
+    # pass just as well against a stub returning ones
+    assert 1.0 - surface_roughness_suortti(TT, 0.37, 0.85)[0] > 0.3
+
+
+def test_pitschke_form_matches_the_paper_and_reduces_to_suorttis_shape():
+    """Eq (17) with P0 factored out, plus the paper's own quotation of Suortti.
+
+    Pitschke p. 78 quotes Suortti as P_s = C1*[1 - exp(-C2/sin th)].  Feeding
+    that into (1 - P) and normalising at theta = 90 reproduces our Suortti
+    routine with C1 = 1 - a and C2 = b — two independent sources for one
+    formula.  Agreement is to rounding, not bit-for-bit: the two ways of
+    writing it group the float operations differently.
+    """
+    for c, tau in ((1.8, 0.11), (3.75, 0.073), (5.0, 0.003)):
+        sth = np.sin(np.radians(TT / 2.0))
+        u = tau / sth
+        want = 1.0 - c * u * (1.0 - u)
+        assert surface_roughness_pitschke(TT, c, tau) == pytest.approx(want)
+
+    for a, b in ((0.37, 0.85), (0.6, 1.4)):
+        sth = np.sin(np.radians(TT / 2.0))
+        c1, c2 = 1.0 - a, b
+        quoted = ((1.0 - c1 * (1.0 - np.exp(-c2 / sth)))
+                  / (1.0 - c1 * (1.0 - np.exp(-c2))))
+        assert surface_roughness_suortti(TT, a, b) == pytest.approx(
+            quoted, rel=1e-14, abs=1e-15)
+
+
+def test_pitschke_turns_over_and_then_amplifies_outside_its_regime():
+    """Pin the known breakdown so the fence that guards it cannot be dropped.
+
+    u(1-u) peaks at u = 1/2 and returns to 0 at u = 1, so R is monotone only
+    while sin(theta) >= 2*tau, and *rises above 1* past sin(theta) = tau (the
+    paper's Eq 18).  This is not smoothed away: clamping would kink the
+    Jacobian, so the model is evaluated unconditionally and the refinement
+    raises ROUGHNESS_OUTSIDE_REGIME instead.
+    """
+    tau, c = 0.2, 1.0
+    tt = np.linspace(2.0, 120.0, 4000)
+    r = surface_roughness_pitschke(tt, c, tau)
+    sth = np.sin(np.radians(tt / 2.0))
+
+    monotone = sth >= 2.0 * tau
+    assert np.all(np.diff(r[monotone]) >= -1e-12)
+    # inside the paper's validity range the correction depresses ...
+    valid = sth >= tau
+    assert np.all(r[valid] <= 1.0 + 1e-12)
+    # ... and outside it, it amplifies — the thing the fence exists to catch
+    assert np.any(r[sth < tau] > 1.0)
+    # the turnover is real: somewhere between tau and 2*tau, R stops rising
+    band = (sth > tau) & (sth < 2.0 * tau)
+    assert band.sum() > 10 and np.any(np.diff(r[band]) < 0.0)
+
+
+def test_pitschke_stays_positive_inside_its_bounds():
+    """c <= 4 is what keeps R > 0 in the valid range, since max u(1-u) = 1/4."""
+    for tau in (0.01, 0.1, 0.3):
+        sth = np.sin(np.radians(TT / 2.0))
+        r = surface_roughness_pitschke(TT, 4.0, tau)
+        assert np.all(r[sth >= tau] >= 0.0)

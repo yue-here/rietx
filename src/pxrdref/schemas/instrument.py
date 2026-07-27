@@ -78,15 +78,38 @@ class RoughnessSuortti(Base):
     intensity is depressed, increasingly so as θ → 0.  Suortti, P. (1972),
     *J. Appl. Cryst.* **5**, 325–331.
 
-    **Document by physics, not letters.**  ``b`` is the *strength* knob: it sets
-    how deep the low-angle depression goes and over what angular range it
-    decays (the correction enters only through exp(−b/sinθ), so b is the
-    surface layer's dimensionless optical depth).  ``a`` is the *shape* knob:
-    the residual intensity fraction that survives even at grazing incidence,
-    so 1 − a bounds the depression.  This is GSAS-II's ``SurfaceRough``
-    parameterisation with a = SRA and b = SRB, which is what makes numbers
-    portable between the two codes (behavioral reference only — no code ported,
-    see ATTRIBUTION.md).
+    **Document by physics, not letters.**  ``a`` is the intensity fraction that
+    survives even at grazing incidence, so **1 − a bounds the depression**
+    (measured: with a = 0.9 the depression never exceeds 0.084 anywhere).
+    ``b`` is the depleted layer's dimensionless optical depth, and it sets
+    **where in angle** the transition falls, *not* how deep it goes.  This is
+    GSAS-II's ``SurfaceRough`` parameterisation with a = SRA and b = SRB, which
+    is what makes numbers portable between the two codes (behavioral reference
+    only — no code ported, see ATTRIBUTION.md).
+
+    **``b`` is bimodal, and that is a refinement hazard worth knowing.**  Both
+    limits return the identity: b → 0 leaves the layer transparent, and b → ∞
+    makes it opaque at *every* angle, so after the θ=90° normalisation no
+    relative angular variation survives.  The correction is therefore strongest
+    at intermediate b, and any given depression is reproducible by **two**
+    values of b, one on each side of that peak.  Measured depression at the
+    lowest fitted angle, a = 0.5:
+
+    ======  ======  ======  ======  ======  ======
+    b       0.01    0.1     0.3     1.0     3.0
+    ======  ======  ======  ======  ======  ======
+    2θ=5°   0.098   0.422   0.425   0.269   0.047
+    2θ=20°  0.023   0.177   0.321   0.266   0.047
+    ======  ======  ======  ======  ======  ======
+
+    — peaking near b ≈ 0.17 (2θ_min = 5°) and b ≈ 0.46 (2θ_min = 20°), i.e. the
+    peak moves out as sinθ_min grows.  Past b ≈ 3 the correction is effectively
+    dead and its gradient is flat, so an optimiser that wanders there stalls.
+    Two things guard this: the staged plan seeds ``b`` near the sensitive
+    region rather than at the softplus floor, and the ``ROUGHNESS_UNCONSTRAINED``
+    diagnostic fires on *either* dead branch by measuring the modelled
+    depression over the fitted window instead of looking at ``b`` itself.
+    ``max = 5`` bounds the excursion without pretending the bound is physics.
 
     Two properties the rest of the code relies on:
 
@@ -107,7 +130,7 @@ class RoughnessSuortti(Base):
         default_factory=lambda: Parameter(value=0.5, min=0.0, max=1.0)
     )
     b: Parameter = Field(
-        default_factory=lambda: Parameter(value=0.0, min=0.0, max=10.0,
+        default_factory=lambda: Parameter(value=0.0, min=0.0, max=5.0,
                                           transform="softplus")
     )
 
