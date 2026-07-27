@@ -20,6 +20,9 @@ States (chosen to cover every refactored code path):
 * ``toy_restraints`` — Rietveld rutile with bond, angle and value soft-restraint
   rows (WP-0406): the nonlinear penalty stripe below the data rows, its residual
   and analytic Jacobian columns locked for the cross-backend CI (WP-0404).
+* ``toy_roughness`` — Bragg-Brentano rutile with Suortti surface roughness on
+  (WP-0502): an exp of a reciprocal sin, folded into all three intensity
+  assemblies (phase_peaks plus both analytic column builders).
 
 Golden bit patterns are environment-pinned (they depend on the numpy/BLAS
 build); they live in ``tests/data/backend_goldens/`` and are documented in
@@ -44,6 +47,7 @@ from pxrdref.schemas.instrument import (
     BackgroundChebyshev,
     BackgroundPSpline,
     Instrument,
+    RoughnessSuortti,
 )
 from pxrdref.schemas.pattern import PatternData
 from pxrdref.schemas.structure import PreferredOrientation
@@ -289,6 +293,47 @@ def _state_toy_restraints():
     return model, table, {}
 
 
+def _state_toy_roughness():
+    """Rietveld rutile on a Bragg-Brentano mount carrying Suortti roughness.
+
+    Locks the WP-0502 stripe: the correction is an ``xp.exp`` of a reciprocal
+    of ``xp.sin``, evaluated per (line, reflection) and folded into three
+    separate intensity assemblies (phase_peaks and the two analytic column
+    builders).  A backend that got any of them subtly wrong would show up here
+    before it showed up in a fit.  Bragg-Brentano because the schema refuses a
+    roughness block on a capillary, so this state cannot reuse ``_toy_base``.
+    """
+    from tests.test_coordinates import make_rutile
+
+    structure = make_rutile()
+    structure.phases[0].scale.value = 8.0e-3
+    structure.phases[0].atoms[1].x.vary = True
+    instrument = Instrument.bragg_brentano()
+    instrument.profile.w.value = 8e-3
+    instrument.background = BackgroundChebyshev.with_terms(4)
+    instrument.geometry.surface_roughness = RoughnessSuortti(
+        a=pr.Parameter(value=0.45, min=0.0, max=1.0),
+        b=pr.Parameter(value=0.32, min=0.0, max=5.0, transform="softplus"))
+    grid = np.arange(12.0, 80.0, 0.02)
+    empty = PatternData(two_theta=grid.tolist(),
+                        intensity=np.zeros_like(grid).tolist())
+    sim = compile_model(structure, instrument, empty, mode="rietveld")
+    sim_table = ParameterTable(structure, instrument)
+    y = sim.evaluate(sim_table.decode(sim_table.x0())) + 30.0
+    pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
+
+    table = ParameterTable(structure, instrument)
+    _free(table, [
+        "phases.0.cell.a", "phases.0.cell.c", "phases.0.scale",
+        "phases.0.atoms.1.dof.0", "phases.0.atoms.0.biso",
+        "instrument.geometry.surface_roughness.*",
+        "instrument.zero_shift", "instrument.background.*",
+    ])
+    model = compile_model(structure, instrument, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    return model, table, {}
+
+
 STATES = {
     "srm660c": _state_srm660c,
     "nac": _state_nac,
@@ -296,6 +341,7 @@ STATES = {
     "toy_pawley": _state_toy_pawley,
     "toy_rich": _state_toy_rich,
     "toy_restraints": _state_toy_restraints,
+    "toy_roughness": _state_toy_roughness,
 }
 
 
@@ -385,6 +431,7 @@ def test_set_backend_roundtrip():
     "toy_pawley",
     "toy_rich",
     "toy_restraints",
+    "toy_roughness",
 ])
 def test_numpy_path_bit_identical_to_golden(name):
     path = GOLDEN_DIR / f"{name}.npz"
