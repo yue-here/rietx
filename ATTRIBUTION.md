@@ -26,6 +26,13 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
   the Voigt profile as Re[w(z)] and its Gaussian/Lorentzian limits.
 - Finger, Cox & Jephcoat (1994). *J. Appl. Cryst.* 27, 892–900 — axial-divergence asymmetry.
 - Waasmaier & Kirfel (1995). *Acta Cryst.* A51, 416–431 — 5-Gaussian form factors.
+- Cromer, D. T. & Liberman, D. (1970). *J. Chem. Phys.* 53, 1891–1898 — relativistic
+  calculation of the anomalous scattering factors f′, f″ (also LANL report LA-4403).
+- Cromer, D. T. & Liberman, D. (1981). *Acta Cryst.* A37, 267–268 — anomalous
+  dispersion near and on the long-wavelength side of an absorption edge.
+- Cromer, D. T. (1983). *J. Appl. Cryst.* 16, 437 — f′, f″ at arbitrary wavelengths.
+- Kissel, L. & Pratt, R. H. (1990). *Acta Cryst.* A46, 170–175 — corrections to the
+  tabulated anomalous-scattering factors (the high-energy limit the bundled table uses).
 - McCusker et al. (1999). *J. Appl. Cryst.* 32, 36–50 — Rietveld refinement guidelines.
 - Toby, B. H. (2006). *Powder Diffraction* 21, 67–70 — agreement indices.
 - Bérar & Lelann (1991). *J. Appl. Cryst.* 24, 1–5 — serial-correlation esd correction.
@@ -106,5 +113,21 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
   with P. Bandyopadhyay's mucal). Modified for bundling: energy-trimmed to
   2–120 keV and reduced to the PhotonEnergy/Photoelectric/Total columns (the
   file header documents the same). Cite McMaster et al. (1969).
+- `src/pxrdref/data/f1f2_CromerLiberman.dat` — anomalous scattering factors
+  f′, f″, extracted from the DABAX file `f1f2_CromerLiberman.dat` obtained from
+  [oasys-kit/DabaxFiles](https://github.com/oasys-kit/DabaxFiles) (MIT,
+  © 2022 Manuel Sanchez del Rio), itself generated with D. T. Cromer's FPRIME
+  program (version 3F, 1993; redistributed in LLNL's RTAB database) including
+  the Kissel & Pratt (1990) high-energy-limit correction. Modified for
+  bundling: energy-trimmed to 3–70 keV (the file header documents the same).
+  Cite Cromer & Liberman (1970, 1981) and Kissel & Pratt (1990).
+  **Deliberately not used:** the DABAX `f1f2_Chantler.dat` file, whose header
+  restricts use to the ESRF and which sits over a live NIST Standard Reference
+  Data (SRD 66) copyright — SRD is the statutory exception to 17 U.S.C. §105,
+  so it is *not* public domain and the DABAX repository's MIT grant cannot
+  convey it. Also deliberately not used: `gemmi.cromer_liberman`, although
+  gemmi is already a dependency — its f″ is sound (and is used as a test
+  oracle) but its f′ disagrees with every published tabulation for several
+  lanthanides and actinides.
 - Test patterns under `tests/data/` — see `tests/data/README.md` for per-file
   provenance (NIST / APS 11-BM public data are works of the U.S. Government).

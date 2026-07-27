@@ -69,14 +69,8 @@ def _load_table() -> dict[str, np.ndarray]:
     return table
 
 
-def total_cross_section(element: str, wavelength: float) -> float:
-    """Total photon-atom cross section (barn/atom) at ``wavelength`` (A).
-
-    Log-log linear interpolation on the McMaster et al. (1969) grid.  Raises
-    ``KeyError`` for elements absent from the compilation and ``ValueError``
-    when the wavelength falls outside the tabulated 2-120 keV band or inside
-    a grid interval containing an absorption edge (see module docstring).
-    """
+def _interpolate(element: str, wavelength: float, column: int) -> float:
+    """Log-log interpolate one column of the McMaster grid (barn/atom)."""
     sym = element.strip().capitalize()
     table = _load_table()
     if sym not in table:
@@ -101,7 +95,32 @@ def total_cross_section(element: str, wavelength: float) -> float:
             f"absorption edge of {sym}; mu cannot be interpolated there (and "
             "the sample would fluoresce strongly at this wavelength)")
     t = (np.log(energy) - np.log(e[i])) / (np.log(e[i + 1]) - np.log(e[i]))
-    return float(np.exp((1.0 - t) * np.log(grid[i, 2]) + t * np.log(grid[i + 1, 2])))
+    return float(np.exp((1.0 - t) * np.log(grid[i, column])
+                        + t * np.log(grid[i + 1, column])))
+
+
+def total_cross_section(element: str, wavelength: float) -> float:
+    """Total photon-atom cross section (barn/atom) at ``wavelength`` (A).
+
+    Log-log linear interpolation on the McMaster et al. (1969) grid.  Raises
+    ``KeyError`` for elements absent from the compilation and ``ValueError``
+    when the wavelength falls outside the tabulated 2-120 keV band or inside
+    a grid interval containing an absorption edge (see module docstring).
+    """
+    return _interpolate(element, wavelength, 2)
+
+
+def photoelectric_cross_section(element: str, wavelength: float) -> float:
+    """Photoelectric cross section alone (barn/atom) at ``wavelength`` (A).
+
+    This is the component the optical theorem ties to the imaginary dispersion
+    correction, sigma_photo = 2*r_e*lambda*f'' (see
+    ``crystallography.dispersion.photoabsorption_barn``), so it is what makes
+    this 1969 compilation and the Cromer-Liberman f'' table check each other.
+    It is *not* what an attenuation correction wants -- beam removal needs the
+    total, coherent and incoherent scattering included.
+    """
+    return _interpolate(element, wavelength, 1)
 
 
 def mass_attenuation(element: str, wavelength: float) -> float:

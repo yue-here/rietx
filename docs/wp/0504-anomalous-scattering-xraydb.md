@@ -16,25 +16,36 @@ A diagnostic fires when the correction is off but large enough to matter, so
 ### Why this is a correctness WP, not a refinement
 
 f′/f″ are not a modelling flourish; at a lab Cu tube they are a
-**double-digit-percent** error on the Bragg power of any 3d/4d-bearing phase,
-and QPA divides one phase's scale by another's. Measured with a prototype
-(`f′,f″` at Cu Kα1, total Σ m·|F|² over 2θ ≤ 110°, round-robin phases as the
-acceptance test declares them):
+**double-digit-percent** error on the Bragg power of a 3d-bearing phase, and
+QPA divides one phase's scale by another's. Measured with the bundled table
+(Cu Kα1, total Σ m·|F|² over 2θ ≤ 110°, round-robin phases exactly as
+`test_acceptance_qpa_roundrobin` declares them):
 
 | phase | Bragg power with f′,f″ ÷ without |
 |---|---|
-| corundum Al₂O₃ `R -3 c` | **+6.2 %** |
-| fluorite CaF₂ `F m -3 m` | **+6.9 %** |
-| LaB₆ `P m -3 m` | −4.8 % |
+| fluorite CaF₂ `F m -3 m` | **+7.3 %** |
+| corundum Al₂O₃ `R -3 c` | **+5.4 %** |
+| brucite Mg(OH)₂ `P -3 m 1` | +4.6 % |
+| zircon ZrSiO₄ `I 41/a m d:2` | +0.2 % |
+| LaB₆ `P m -3 m` | −1.0 % |
 | magnetite Fe₃O₄ `F d -3 m:2` | −9.2 % |
-| zircon ZrSiO₄ `I 41/a m d:2` | −13.2 % |
 | zincite ZnO `P 63 m c` | **−15.6 %** |
 
-Signs differ across phases (Zn/Fe/Zr sit *below* their K edges at 8.048 keV so
-f′ is a large negative; Al/Ca sit above theirs so f′ is positive), so nothing
-cancels into the scale — the *ratio* corundum:zincite moves by 26 %. That is
-the whole QPA answer. See "Acceptance" for the pre-registered prediction this
-makes about the already-measured v0.3 numbers.
+Signs differ across phases and nothing cancels into a common scale: the *ratio*
+corundum:zincite moves by 25 %, and that is the whole QPA answer. See
+"Acceptance" for the pre-registered prediction this makes about the
+already-measured v0.3 numbers.
+
+Two entries in that table are traps worth naming, because getting them wrong
+by recall rather than by lookup is exactly what happened while writing this WP:
+
+* **Zn (−15.6 %) and Zr (+0.2 %) are not the same story.** Zn sits just below
+  its K edge at 8.048 keV (f′ = −1.55, f″ = 0.68); Zr's K edge is at 18 keV, far
+  above, so its f′ is only −0.18 while f″ = 2.24 from the L shell. "Below the
+  K edge ⇒ large negative f′" is true only *just* below.
+* **f′ and f″ partly cancel for heavy elements.** |f|² picks up f″ as
+  +f″², so La (f′ = −1.38, f″ = 9.03) nets to only −1.0 % on LaB₆. A
+  correction can be individually large and collectively small.
 
 ### The powder average is Friedel-averaged, and there is an exact closed form
 
@@ -130,24 +141,44 @@ asymmetry looks like a bug otherwise.
 | `refine.py` (+ `strategy/staged.py`) | `DISPERSION_NEGLECTED` diagnostic |
 | `tests/test_dispersion.py` *(new)*, `tests/test_acceptance_dispersion.py` *(new)* | unit/property + real-data acceptance |
 
-### Data source: bundle a table, do not depend on xraydb
+### Data source: `f1f2_CromerLiberman.dat`, bundled — decided, not open
 
-WP-0305 already made this call once for µ and this WP inherits the reasoning
-(see `### Inherited`): the package bundles DABAX extracts (`f0_WaasKirf.dat`,
-`mu_McMaster.dat`) rather than taking runtime dependencies, and xraydb drags
-sqlalchemy. Bundle an f1f2 tabulation in the same `#S`-block DABAX format the
-two existing loaders already parse.
+The title of this WP says "via xraydb". That is now wrong and stays only as
+the historical filename. **Bundle**, matching the `f0_WaasKirf.dat` /
+`mu_McMaster.dat` precedent, and take the *Cromer-Liberman* tabulation:
 
-Two conventions to pin when the file is chosen, both of which silently corrupt
-values if got wrong:
+* **xraydb** is MIT with a CC0 data dedication, and its Chantler tables are the
+  best data in the survey — but it hard-requires **sqlalchemy** (tightened, not
+  dropped, in recent releases), which is a heavy ABI-churning dependency for a
+  numeric core. It also returns f′ with the 3/5-CL relativistic and
+  nuclear-Thomson corrections folded in and no way to remove them.
+* **`f1f2_Chantler.dat` must not be bundled.** Its DABAX header reads "The
+  present license has been purchased by the ESRF Programming Group. No use of
+  these data is allowed from outside ESRF", over a NIST SRD 66 copyright —
+  and NIST Standard Reference Data is the statutory *exception* to
+  17 U.S.C. §105, not public domain. The MIT grant on the DABAX repo cannot
+  convey rights its author never held. (It is also technically the worst
+  option: ~545 eV grid spacing at 8 keV.)
+* **Cromer-Liberman is the crystallographic reference**: it is what
+  *International Tables* Vol. C §4.2.6 tabulates and what GSAS-II computes, so
+  a disagreement with another Rietveld code is attributable — the repo's
+  "adopt the protocol" principle applied to a data table. Z = 3–98, 1–70 keV,
+  1024 log-spaced points (0.42 % spacing, ~33 eV at 8 keV), column 2 is **f′
+  itself**, and the per-element `#UF1ADD` header equals Z exactly — asserted on
+  extraction, so the f1-vs-f′ convention cannot silently rot.
+* **Not** periodictable's Henke tables: they cap at 30 keV, *below* the 11-BM
+  acceptance energy (29.95 keV is inside but 0.4 Å synchrotron work is not),
+  and they are the wrong tool (locked decision, `../DESIGN.md`).
 
-1. Several DABAX f1f2 files tabulate **f1 = Z\* + f′** (Z\* = Z minus a small
-   relativistic correction), not f′. Converting needs Z\*, not Z. Test it:
-   far above every edge f′ must approach a *small negative constant*, not 0.
-2. Sign of f″ (always ≥ 0 in the f = f₀ + f′ + i f″ convention used here).
+Source: `github.com/oasys-kit/DabaxFiles` (MIT), the current home of DABAX;
+the `esrf.fr/computing/scientific/dabax` URL in every header is dead.
 
-**Do not** pull in periodictable's Henke tables — they cap at 30 keV and are
-the wrong tool (locked decision, `../DESIGN.md`).
+**gemmi already exposes `gemmi.cromer_liberman`** and is already a hard
+dependency — but it is used here only as a **test oracle for f″** (agrees with
+the table to 1e-4 e), never for f′: its f′ disagrees with every published
+tabulation for a handful of lanthanides and actinides (Ce by 11 e at 19 keV,
+Bi by 6.9 e near 8 keV), and it returns (0, 0) silently outside Z = 3–92.
+Say so in ATTRIBUTION.md, so "why not just call gemmi" has a recorded answer.
 
 ### The cross-check that makes the bundled table falsifiable
 
@@ -156,10 +187,11 @@ The optical theorem ties f″ to the photoabsorption cross section:
     σ_photo [barn] = 2 · r_e[Å] · λ[Å] · f″ · 1e8,   r_e = 2.8179403262e-5 Å
 
 and `mu_McMaster.dat` already carries a **photoelectric column** from an
-entirely independent compilation. Prototyped at Cu Kα1: the McMaster-implied
-f″ agrees with published values to **1.0 (O) / 3.5 (Al) / 1.3 (Ca) / 1.1 (Fe) /
-5.6 (Zn) / 4.4 (Zr) / 2.6 % (La)**. That is a real unit test across Z = 8→57,
-and it is the reason µ stays on McMaster (below).
+entirely independent compilation (1969 vs 1983, no shared inputs). Measured at
+Cu Kα1, the two agree to **0.04 % (O) / 3.4 (Al) / 1.2 (Ca) / 1.1 (Fe) / 5.4
+(Zn) / 3.8 (Zr) / 2.5 % (La)** — a real unit test across Z = 8→57, at a 6 %
+tolerance. The residual is genuine tabulation disagreement, and that is
+precisely why µ stays on McMaster (below) rather than being re-derived.
 
 ### Inherited
 
@@ -171,11 +203,11 @@ DABAX `CrossSec_McMaster.dat` (McMaster 1969), with ATTRIBUTION.md updated.
 
 **This WP's call: keep µ on McMaster, add f′/f″ as a separate bundled table.**
 Not a compromise — a physics fence. µ is *beam removal* and needs the total
-cross section; f″ gives **photoabsorption only**. Measured at Cu Kα1 from the
-bundled table, the scattering (Rayleigh + Compton) share of the total is 4.4 %
-(O), 1.2 % (Al), 0.7 % (Ca), 0.6 % (Fe), 3.5 % (Zn), 2.0 % (Zr), 1.1 % (La) —
-small but systematic and largest exactly where 0305 flagged McMaster as
-weakest. Re-sourcing µ from f″ would therefore make µ *worse*, not better; the
+cross section; f″ gives **photoabsorption only**. The gap is Rayleigh +
+Compton, and it is largest for **light** elements — photoabsorption grows about
+as Z⁴ while Rayleigh grows as Z², so at Cu Kα the scattering share is ~4.6 %
+for O and ~1.1 % for La. That is exactly where 0305 flagged McMaster as
+weakest, so re-sourcing µ from f″ would trade one small error for another; the
 two tables instead check each other (previous section). 0305's other measured
 warning stands and is not fixed here: McMaster's low-Z accuracy vs NIST
 Hubbell-Seltzer is B −7 %, O −3.6 %.
@@ -220,12 +252,15 @@ fluorite included.
 Each item ≈ one commit, prefixed `WP-0504:`.
 
 - [x] Expand this stub into a full WP before writing code
-- [ ] `crystallography/dispersion.py` + bundled data file + ATTRIBUTION.md:
-      loader in the existing `#S`-block idiom, `dispersion(element, wavelength)
-      -> (f′, f″)`, f1→f′ conversion with the Z\* convention pinned, edge-
-      interval refusal, near-edge warning. Unit tests against published values
-      at Cu/Mo Kα and the optical-theorem cross-check vs the McMaster
-      photoelectric column.
+- [x] `crystallography/dispersion.py` + bundled `f1f2_CromerLiberman.dat` +
+      ATTRIBUTION.md: loader in the existing `#S`-block idiom,
+      `dispersion(element, wavelength) -> (f′, f″)`, `#UF1ADD == Z` asserted at
+      extraction so the f1-vs-f′ convention cannot rot, edge-interval refusal,
+      `near_edge` for the XANES region, H/He zeroed rather than refused.
+      `attenuation.photoelectric_cross_section` split out for the
+      optical-theorem cross-check. Tests: International Tables at Cu Kα,
+      `gemmi.cromer_liberman` as an independent f″ oracle (1e-3 e), and the
+      optical theorem vs McMaster at 6 %.
 - [ ] `schemas/instrument.py`: opt-in `Dispersion` block on `Source`
       (`overrides: {element: (f′, f″)}` for measured near-edge values),
       validators, JSON round-trip test.
@@ -251,24 +286,24 @@ Each item ≈ one commit, prefixed `WP-0504:`.
 **Primary — IUCr round-robin sample 1a–1h, `tests/data/qarr/cpd-1*.prn`.**
 This WP makes a *pre-registered, parameter-free* prediction about numbers that
 were measured before it started. Neglecting dispersion inflates each phase's
-fitted scale by r_p = (power with f′f″)/(power without) = 1.0616 (corundum),
-0.8438 (zincite), 1.0690 (fluorite), so the recovered fractions are biased to
+fitted scale by r_p = (power with f′f″)/(power without) = 1.0542 (corundum),
+0.8441 (zincite), 1.0728 (fluorite), so the recovered fractions are biased to
 W_p ∝ w_p·r_p renormalised. Against the v0.3 measured errors:
 
 | sample | corundum pred/meas | zincite pred/meas | fluorite pred/meas |
 |---|---|---|---|
-| 1a | +0.00 / +0.61 | −0.82 / −0.57 | +0.82 / −0.04 |
-| 1b | +0.24 / −0.12 | −0.28 / −0.02 | +0.04 / +0.14 |
-| 1c | +1.20 / +1.26 | −1.52 / −1.72 | +0.33 / +0.47 |
-| 1d | +0.92 / +1.85 | −4.97 / −3.87 | +4.05 / +2.02 |
-| 1e | +1.67 / +2.21 | −2.76 / −2.32 | +1.11 / +0.12 |
-| 1f | **+3.41 / +3.17** | **−5.79 / −5.13** | **+2.38 / +1.96** |
-| 1g | +2.28 / +2.39 | −5.04 / −3.91 | +2.76 / +1.52 |
-| 1h | +2.22 / +2.17 | −4.68 / −3.72 | +2.45 / +1.54 |
+| 1a | −0.01 / +0.61 | −0.83 / −0.57 | +0.84 / −0.04 |
+| 1b | +0.18 / −0.12 | −0.27 / −0.02 | +0.09 / +0.14 |
+| 1c | +1.15 / +1.26 | −1.49 / −1.72 | +0.34 / +0.47 |
+| 1d | +0.80 / +1.85 | −4.99 / −3.87 | +4.19 / +2.02 |
+| 1e | +1.43 / +2.21 | −2.72 / −2.32 | +1.30 / +0.12 |
+| 1f | **+3.24 / +3.17** | **−5.71 / −5.13** | **+2.47 / +1.96** |
+| 1g | +2.08 / +2.39 | −5.00 / −3.91 | +2.93 / +1.52 |
+| 1h | +2.01 / +2.17 | −4.64 / −3.72 | +2.63 / +1.54 |
 
 All three signs reproduced in 7 of 8 mixtures, including **fluorite positive**,
 which the microabsorption story could not explain. Subtracting the prediction
-takes the RMS error from **2.26 → 0.77 wt %**.
+takes the RMS error from **2.26 → 0.83 wt %**.
 
 Criterion: with dispersion on, the worst |ΔW| falls well below the v0.3 5.13
 wt % (1f zincite) and the signed shape collapses — mean zincite error toward
@@ -284,8 +319,9 @@ Rwp, and the cell must stay put (dispersion moves intensities, never positions).
 
 **Negative control — SRM 660c LaB₆ (`nist_srm660c_100a.cif`).** `a` must be
 unmoved within its esd (the **absolute** anchor; positions do not see f′), and
-Rwp/Biso(La) recorded as a characterisation — La at Cu Kα carries f″ ≈ 9, so
-Biso(La) is expected to move measurably, and that number is the deliverable.
+Rwp/Biso(La) recorded as a characterisation. LaB₆ is the *quiet* case by
+construction — f′ = −1.38 and f″ = 9.03 nearly cancel in |f|², netting −1.0 %
+— so a large move here would itself be the finding.
 
 ```sh
 .venv/bin/python -m pytest tests/test_dispersion.py -q

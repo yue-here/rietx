@@ -22,6 +22,7 @@ import math
 import numpy as np
 import pytest
 
+from pxrdref.crystallography.dispersion import dispersion
 from pxrdref.crystallography.lattice import d_spacings
 from pxrdref.crystallography.scattering import f0
 from pxrdref.crystallography.structure_factor import (
@@ -44,7 +45,7 @@ from pxrdref.schemas.structure import AnisoU, Atom, Cell, Phase
 CU_KA1 = {
     "Zn": complex(-1.5491, 0.6778),
     "O": complex(0.0492, 0.0322),
-    "Al": complex(0.2455, 0.2547),
+    "Al": complex(0.2130, 0.2455),
 }
 
 ZINCITE_CELL = (3.2499, 3.2499, 5.2066, 90.0, 90.0, 120.0)
@@ -341,3 +342,196 @@ def test_f_anom_length_is_validated():
 
     with pytest.raises(ValueError, match="one entry per asymmetric-unit atom"):
         PhaseSites(ops=[], species=["Zn", "O"], f_anom=np.array([1 + 1j]))
+
+
+# ----------------------------------------------------------------------
+# the tabulation
+# ----------------------------------------------------------------------
+CU_KA1_LAMBDA = 1.5405929
+MO_KA1_LAMBDA = 0.7093
+
+
+def test_table_matches_international_tables_at_cu_ka():
+    """The published check values every crystallographer knows.
+
+    ``CU_KA1`` above is *International Tables* Vol. C §4.2.6, which is itself
+    Cromer-Liberman — so this asserts the loader (grid units, column order,
+    interpolation, the f1-vs-f′ convention) rather than the physics.
+    """
+    for species, want in CU_KA1.items():
+        fp, fpp = dispersion(species, CU_KA1_LAMBDA)
+        assert fp == pytest.approx(want.real, abs=0.005), species
+        assert fpp == pytest.approx(want.imag, abs=0.005), species
+
+
+def test_matches_gemmi_independently():
+    """gemmi *computes* Cromer-Liberman rather than interpolating a table.
+
+    An agreement to 1e-3 e across Z and energy therefore catches a mis-parsed
+    grid, a swapped column or a units slip in a way the hand-entered check
+    values above cannot.  It also pins the **relativistic convention**: gemmi
+    applies the Kissel & Pratt (1990) high-energy-limit correction, worth
+    −1.3 e at uranium, so f′ agreeing here is what says the bundled table is
+    the corrected variant and not the 1970 one.
+
+    The two tolerances differ by two orders of magnitude and that is the
+    point: f″ is a direct cross-section readout and matches to 2e-4 e, while
+    f″-independent additive corrections (the relativistic term, orbital
+    quadrature) live entirely in f′, where the DABAX run and gemmi's port
+    differ by up to 1.7e-2 e — measured at the grid *nodes*, so it is a real
+    difference between two Cromer-Liberman implementations, not interpolation.
+    Both bounds are far below the 1.3 e that would separate the corrected
+    variant from the 1970 one.
+
+    Not asserted for every element: gemmi's f′ is known to disagree with every
+    published tabulation for a few lanthanides and actinides (Ce by ~11 e near
+    19 keV), so the oracle is used over the range where it is sound rather
+    than blindly.
+    """
+    import gemmi
+
+    from pxrdref.crystallography.attenuation import _HC_EV_ANGSTROM
+
+    for lam in (CU_KA1_LAMBDA, MO_KA1_LAMBDA, 0.4139090):
+        for el in ("O", "Mg", "Al", "Si", "Ca", "Ti", "Fe", "Zn", "Sr", "Zr",
+                   "Ag", "Ba", "La", "W", "Pb", "U"):
+            fp, fpp = dispersion(el, lam)
+            g_fp, g_fpp = gemmi.cromer_liberman(
+                gemmi.Element(el).atomic_number, _HC_EV_ANGSTROM / lam)
+            assert fpp == pytest.approx(g_fpp, abs=1e-3), (el, lam, "f''")
+            assert fp == pytest.approx(g_fp, abs=3e-2), (el, lam, "f'")
+
+
+def test_the_table_carries_the_kissel_pratt_correction():
+    """Which relativistic convention the bundled file uses, asserted not assumed.
+
+    Cromer-Liberman's high-energy limit uses (5/3)·E_tot/mc²; Kissel & Pratt
+    (1990) showed the coefficient should be 1.  The gap is Z-dependent and
+    energy-independent — 0.065 e at Fe but **1.3 e at uranium** — so a wrong
+    guess here is a silent few-per-cent intensity error for heavy elements.
+    gemmi applies the correction, and agrees at U to far better than the size
+    of the correction itself.
+    """
+    import gemmi
+
+    from pxrdref.crystallography.attenuation import _HC_EV_ANGSTROM
+
+    fp, _ = dispersion("U", CU_KA1_LAMBDA)
+    g_fp, _ = gemmi.cromer_liberman(92, _HC_EV_ANGSTROM / CU_KA1_LAMBDA)
+    assert abs(fp - g_fp) < 0.05
+    assert abs(fp - (g_fp + 1.306)) > 1.0   # the uncorrected value is excluded
+
+
+def test_f_double_prime_reproduces_the_mcmaster_photoabsorption():
+    """Optical theorem across two independent compilations, Z = 8 → 57.
+
+    σ_photo = 2·r_e·λ·f″ ties the f″ of a 1983 Cromer-Liberman calculation to
+    the photoelectric column of the 1969 McMaster compilation the attenuation
+    path already bundles.  They share no inputs, so agreement is evidence both
+    are being read correctly — and the ~5 % scatter is the genuine
+    disagreement between the two tabulations, not a bug, which is why µ is not
+    re-sourced from f″.
+    """
+    from pxrdref.crystallography.attenuation import photoelectric_cross_section
+    from pxrdref.crystallography.dispersion import photoabsorption_barn
+
+    for el in ("O", "F", "Mg", "Al", "Si", "Ca", "Fe", "Zn", "Zr", "La"):
+        _fp, fpp = dispersion(el, CU_KA1_LAMBDA)
+        implied = photoabsorption_barn(fpp, CU_KA1_LAMBDA)
+        tabulated = photoelectric_cross_section(el, CU_KA1_LAMBDA)
+        assert implied == pytest.approx(tabulated, rel=0.06), el
+
+
+def test_scattering_share_of_the_total_is_small_but_real():
+    """Why µ keeps its own table: f″ is photoabsorption, µ is beam removal.
+
+    The gap is Rayleigh + Compton.  It is a few per cent and it is *largest
+    for light elements* (photoabsorption grows about as Z⁴, Rayleigh as Z²),
+    which is exactly where the McMaster table was already known to be weakest
+    — so re-sourcing µ from f″ would trade one small error for another.
+    """
+    from pxrdref.crystallography.attenuation import (
+        photoelectric_cross_section,
+        total_cross_section,
+    )
+
+    share = {}
+    for el in ("O", "Al", "Ca", "Fe", "La"):
+        pe = photoelectric_cross_section(el, CU_KA1_LAMBDA)
+        tot = total_cross_section(el, CU_KA1_LAMBDA)
+        share[el] = (tot - pe) / tot
+    assert all(0.0 < v < 0.10 for v in share.values()), share
+    assert share["O"] > share["La"]
+
+
+def test_edges_are_detected_and_refused_not_smeared():
+    """f″ jumps ~8× across one grid interval; interpolating it is nonsense."""
+    from pxrdref.crystallography.attenuation import _HC_EV_ANGSTROM
+    from pxrdref.crystallography.dispersion import edges
+
+    zn_k = edges("Zn")
+    assert len(zn_k) == 1
+    assert zn_k[0] == pytest.approx(9659.0, rel=3e-3)
+    with pytest.raises(ValueError, match="contains an absorption edge"):
+        dispersion("Zn", _HC_EV_ANGSTROM / zn_k[0])
+    # La has three L edges and a K edge inside the tabulated band
+    assert len(edges("La")) == 4
+
+
+def test_near_edge_flags_the_xanes_region():
+    from pxrdref.crystallography.attenuation import _HC_EV_ANGSTROM
+    from pxrdref.crystallography.dispersion import edges, near_edge
+
+    zn_k = edges("Zn")[0]
+    assert near_edge("Zn", _HC_EV_ANGSTROM / (zn_k + 30.0)) == pytest.approx(zn_k)
+    assert near_edge("Zn", _HC_EV_ANGSTROM / (zn_k + 500.0)) is None
+    assert near_edge("Zn", CU_KA1_LAMBDA) is None
+
+
+def test_ions_resolve_to_the_element():
+    """f′/f″ are core-level effects, so the charge is dropped — unlike f₀."""
+    from pxrdref.crystallography.dispersion import normalize_element
+
+    assert normalize_element("Zn2+") == "Zn"
+    assert normalize_element("O2-") == "O"
+    assert normalize_element("FE") == "Fe"
+    assert dispersion("Zn2+", CU_KA1_LAMBDA) == dispersion("Zn", CU_KA1_LAMBDA)
+
+
+def test_hydrogen_is_zero_not_a_refusal():
+    """Z = 1, 2 are absent from the tabulation and have no X-ray edge.
+
+    Refusing them would make every hydrous phase (brucite, fluorapatite)
+    un-refinable with dispersion on, to protect a ~1e-3 e correction.
+    """
+    assert dispersion("H", CU_KA1_LAMBDA) == (0.0, 0.0)
+    assert dispersion("He", MO_KA1_LAMBDA) == (0.0, 0.0)
+
+
+def test_out_of_band_wavelength_is_refused():
+    with pytest.raises(ValueError, match="outside the tabulated"):
+        dispersion("Fe", 6.0)      # 2.07 keV, below the 3 keV floor
+    with pytest.raises(ValueError, match="outside the tabulated"):
+        dispersion("Fe", 0.1)      # 124 keV, above the 70 keV ceiling
+
+
+def test_unknown_element_is_refused():
+    with pytest.raises(KeyError, match="Z = 3-98"):
+        dispersion("Cf", CU_KA1_LAMBDA)  # Z = 98 is the last; Es is not there
+        dispersion("Es", CU_KA1_LAMBDA)
+
+
+def test_dispersion_map_is_keyed_by_the_raw_species_label():
+    from pxrdref.crystallography.dispersion import dispersion_map
+
+    m = dispersion_map(["Zn2+", "O2-", "Zn2+"], CU_KA1_LAMBDA)
+    assert set(m) == {"Zn2+", "O2-"}
+    assert m["Zn2+"].real == pytest.approx(-1.546, abs=5e-3)
+
+
+def test_table_covers_every_element_the_test_data_uses():
+    for el in ("Na", "Ca", "Al", "F", "La", "B", "Zn", "O", "Mg", "Fe",
+               "Zr", "Si", "P"):
+        fp, fpp = dispersion(el, CU_KA1_LAMBDA)
+        assert fpp > 0.0
+        assert abs(fp) < 30.0
