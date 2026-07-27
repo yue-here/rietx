@@ -20,6 +20,9 @@ States (chosen to cover every refactored code path):
 * ``toy_restraints`` — Rietveld rutile with bond, angle and value soft-restraint
   rows (WP-0406): the nonlinear penalty stripe below the data rows, its residual
   and analytic Jacobian columns locked for the cross-backend CI (WP-0404).
+* ``toy_stephens`` — Rietveld rutile with a Stephens anisotropic-strain block
+  (WP-0503): an hkl-dependent width reached through a √ of a frozen monomial
+  matmul, which no other state exercises.
 
 Golden bit patterns are environment-pinned (they depend on the numpy/BLAS
 build); they live in ``tests/data/backend_goldens/`` and are documented in
@@ -289,6 +292,39 @@ def _state_toy_restraints():
     return model, table, {}
 
 
+def _state_toy_stephens():
+    """Rietveld rutile with a Stephens anisotropic-strain block (WP-0503).
+
+    Locks the hkl-dependent width path: rutile is Laue 4/mmm, so the block has
+    four DOFs, and the tetragonal cell makes the (h00)/(00l) contrast real.  The
+    strain enters through a √ of a frozen monomial matmul — a shape no other
+    golden exercises, and one an autodiff backend has to trace through.  The
+    start is deliberately *off* the isotropic ray so the anisotropic patterns
+    carry a nonzero derivative.
+    """
+    from pxrdref.crystallography.stephens import stephens_basis
+    from pxrdref.schemas.structure import StephensStrain
+
+    structure, instrument, pattern = _toy_base()
+    phase = structure.phases[0]
+    basis = stephens_basis(phase.space_group).astype(np.float64)
+    coef, *_ = np.linalg.lstsq(
+        basis.T,
+        np.array(StephensStrain.isotropic(900.0, phase.cell).values()), rcond=None)
+    coef[0] *= 1.7  # break the isotropic degeneracy
+    phase.microstrain = StephensStrain.from_values(basis.T @ coef, vary=True)
+    instrument.background = BackgroundChebyshev.with_terms(4)
+    table = ParameterTable(structure, instrument)
+    _free(table, [
+        "phases.0.cell.a", "phases.0.cell.c", "phases.0.scale",
+        "phases.0.microstrain.dof.*", "phases.0.lor_size",
+        "instrument.zero_shift", "instrument.background.*",
+    ])
+    model = compile_model(structure, instrument, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    return model, table, {}
+
+
 STATES = {
     "srm660c": _state_srm660c,
     "nac": _state_nac,
@@ -296,6 +332,7 @@ STATES = {
     "toy_pawley": _state_toy_pawley,
     "toy_rich": _state_toy_rich,
     "toy_restraints": _state_toy_restraints,
+    "toy_stephens": _state_toy_stephens,
 }
 
 
@@ -385,6 +422,7 @@ def test_set_backend_roundtrip():
     "toy_pawley",
     "toy_rich",
     "toy_restraints",
+    "toy_stephens",
 ])
 def test_numpy_path_bit_identical_to_golden(name):
     path = GOLDEN_DIR / f"{name}.npz"

@@ -152,7 +152,9 @@ states defined in `tests/test_backend_shim.py`.  The first five (`srm660c`,
 **before** the WP-0401 backend-shim refactors (at commit `c9fc8c0`, numpy 2.x /
 macOS arm64 Accelerate).  `toy_restraints` was added by WP-0406 (soft-restraint
 penalty rows) from the green post-WP-0406 tree — a *new* baseline, so the
-existing five were not re-captured.  `test_backend_shim.py` asserts the current
+existing five were not re-captured.  `toy_stephens` was added the same way by
+WP-0503 (hkl-dependent anisotropic-strain widths), again capturing only the new
+state.  `test_backend_shim.py` asserts the current
 tree reproduces each **bit-for-bit** (`np.array_equal`) — the acceptance gate
 for "nothing here may change a single computed number on the numpy path".
 
