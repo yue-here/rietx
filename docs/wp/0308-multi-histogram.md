@@ -51,6 +51,21 @@ carries one `two_theta_limits`, and the report's regions are per-pattern.
 Decide and record whether reports are per-histogram (recommended) and how a
 multi-histogram node serializes.
 
+### Inherited
+
+From **WP-0406** (restraint penalty rows, landed 2026-07-24): soft restraints
+are **deferred in the multi-histogram path**. `run_multi_least_squares` sizes
+the below-data slot from the background-penalty rows only (`n_pen[h] =
+bkg_penalty.shape[0]`) and lumps everything below `n_data` into that stripe, so
+a restraint row-block would crash on a shape mismatch. It now raises
+`NotImplementedError` when `any(m.restraints for m in models)`. To support it,
+add a **third offset row-block** to the stacked layout: rows become
+`[all data | all bkg-penalty | all restraint]` with a `restr_off[h]` cumulative
+offset alongside `pen_off[h]`, and the per-histogram Jacobian's restraint stripe
+(`Jh[n_data[h]+n_pen[h]:]`) scattered into it. Restraints are Rietveld-only, so
+only Rietveld histograms contribute rows. The single-histogram seam
+(`optimize/least_squares.py`, `model/restraints.py`) is the reference.
+
 ## Design (audit + decisions — 2026-07-24)
 
 **Audit — how far list support goes today.** None, for histograms. The only

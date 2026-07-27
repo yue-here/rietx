@@ -146,12 +146,15 @@ dropped in favour of a fetch-on-demand script against the Internet Archive.
 
 ## backend_goldens/ — WP-0401 bit-identity baseline
 
-`backend_goldens/*.npz` hold `evaluate`/residual/Jacobian arrays for the five
-states defined in `tests/test_backend_shim.py`, captured from the tree **before**
-the WP-0401 backend-shim refactors (at commit `c9fc8c0`, numpy 2.x / macOS
-arm64 Accelerate).  `test_backend_shim.py` asserts the current tree reproduces
-them **bit-for-bit** (`np.array_equal`) — the acceptance gate for "nothing here
-may change a single computed number on the numpy path".
+`backend_goldens/*.npz` hold `evaluate`/residual/Jacobian arrays for the
+states defined in `tests/test_backend_shim.py`.  The first five (`srm660c`,
+`nac`, `toy_lebail`, `toy_pawley`, `toy_rich`) were captured from the tree
+**before** the WP-0401 backend-shim refactors (at commit `c9fc8c0`, numpy 2.x /
+macOS arm64 Accelerate).  `toy_restraints` was added by WP-0406 (soft-restraint
+penalty rows) from the green post-WP-0406 tree — a *new* baseline, so the
+existing five were not re-captured.  `test_backend_shim.py` asserts the current
+tree reproduces each **bit-for-bit** (`np.array_equal`) — the acceptance gate
+for "nothing here may change a single computed number on the numpy path".
 
 These are *environment-pinned* bit patterns, not physical reference values: a
 different BLAS/numpy build may legitimately differ in final bits.  Re-baseline

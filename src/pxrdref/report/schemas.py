@@ -21,6 +21,7 @@ from typing import Literal
 from pydantic import Field
 
 from ..schemas.common import Base
+from ..schemas.results import RestraintReport
 
 THRESHOLDS_VERSION = "0.2"
 
@@ -289,6 +290,10 @@ class FitReport(Base):
     #: compiled model is supplied, independent of the maturity gate (texture is
     #: a common *cause* of an immature fit, so it must still be reported)
     texture: list[TextureAnalysis] = Field(default_factory=list)
+    #: soft-restraint summary (bond/angle/value deviations, pooled restraint χ²),
+    #: carried through from the result whenever restraints were declared; a
+    #: deviation ≫ σ here is a restraint fighting the data (see RESTRAINT_TENSION)
+    restraints: RestraintReport | None = None
     layer1_available: bool = False
     #: set when the global maturity gate refused Layer 1 (the report abstains)
     abstained_reason: str | None = None

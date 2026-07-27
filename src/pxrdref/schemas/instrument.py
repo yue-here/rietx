@@ -143,8 +143,16 @@ class ProfileTCHZ(Base):
     microstrain broadening (document physics, not letters: GSAS and FullProf
     swap the X/Y letter assignment).  Thompson, Cox & Hastings (1987),
     J. Appl. Cryst. 20, 79.
+
+    ``shape`` selects the peak shape these widths feed: the default
+    ``"tchz_pv"`` pseudo-Voigt (fast, the usual Rietveld choice) or ``"voigt"``,
+    the exact Gaussian⊗Lorentzian convolution via a shared Faddeeva w(z)
+    (``model/profiles/voigt.py``).  It is a per-instrument, compile-time choice —
+    not a refinable parameter and not per-reflection — and consumes the *same*
+    U,V,W,X,Y widths, so switching shapes never touches the parameter table.
     """
 
+    shape: Literal["tchz_pv", "voigt"] = "tchz_pv"
     u: Parameter = Field(default_factory=lambda: Parameter(value=0.0, min=-0.05, max=1.0, unit="deg^2"))
     v: Parameter = Field(default_factory=lambda: Parameter(value=0.0, min=-0.5, max=0.5, unit="deg^2"))
     w: Parameter = Field(

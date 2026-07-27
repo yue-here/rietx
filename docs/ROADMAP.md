@@ -72,17 +72,30 @@ S/L == H/L subgradient kink needs the same loose bar there) →
 starts only once 0402+0404 are green, and supplies the first real-hardware
 measurement of 0403's policy).
 
-[0407](wp/0407-esd-reconciliation.md) (esd reconciliation) **landed
-2026-07-24**: the Bérar-Lelann placement bug is fixed — reported physical esds
-now genuinely carry the inflation the docstrings claim (SRM 660c `a`-esd
-2.49e-5 = raw 7.4e-6 × BL 3.38), the returned correlation matrix is a true
-Pearson matrix (unit diagonal), and the 0.98 high-correlation guard is live
-again (it correctly fires on collinear zero-shift ~ sample-displacement).  It
-un-masked two unit tests that had ridden the bug (extinction↔scale is a genuine
-ρ≈0.97 degeneracy, not separable; aniso U11/U33 separate at ≈2.2σ against honest
-esds) — reconciled to the true physics, not silenced.  Still independent of the
-backend chain: [0406](wp/0406-restraint-penalty-rows.md) (bond/angle
-restraints).  [0405](wp/0405-faddeeva-voigt.md) (true Voigt) needs only 0401.
+Three backend-independent WPs landed 2026-07-24.  Restraint penalty rows
+[0406](wp/0406-restraint-penalty-rows.md): bond/angle/value soft restraints as
+√w·(computed−target)/σ rows below the data (in JᵀJ, out of Rwp/DW/Bérar-Lelann),
+with the analytic nonlinear row-Jacobian chained through the affine constraint
+block, a `RestraintReport` + `RESTRAINT_TENSION` diagnostic, and a 6th backend
+golden (`toy_restraints`); Rietveld- and single-histogram-only (multi-histogram
+deferred — see WP-0308 `### Inherited`).  True Voigt
+[0405](wp/0405-faddeeva-voigt.md): `Instrument.profile.shape="voigt"` selects an
+opt-in Gaussian⊗Lorentzian peak built on one backend-agnostic Weideman-N=32
+Faddeeva `w(z)` (no per-backend `wofz`); TCHZ stays the default, the U,V,W,X,Y
+widths and FCJ are shared, and numpy↔jax agree to 1e-16 on `w(z)`.  esd
+reconciliation [0407](wp/0407-esd-reconciliation.md): the Bérar-Lelann placement
+bug is fixed — reported physical esds now genuinely carry the inflation the
+docstrings claim (SRM 660c `a`-esd 2.49e-5 = raw 7.4e-6 × BL 3.38), the returned
+correlation matrix is a true Pearson matrix (unit diagonal), and the 0.98
+high-correlation guard is live again (it fires on collinear zero-shift ~
+sample-displacement); it un-masked two unit tests that had ridden the bug
+(extinction↔scale is a genuine ρ≈0.97 degeneracy, not separable; aniso U11/U33
+separate at ≈2.2σ against honest esds) — reconciled to the true physics, not
+silenced.
+
+No backend-independent WP remains; the path to the v0.4 milestone is the backend
+chain [0404](wp/0404-cross-backend-jacobian-ci.md) →
+[0408](wp/0408-torch-mps-backend.md).
 
 ## Milestones
 
@@ -122,8 +135,8 @@ restraints).  [0405](wp/0405-faddeeva-voigt.md) (true Voigt) needs only 0401.
 | [0402](wp/0402-jax-backend.md) | JAX backend: chunked jacfwd | ✅ 2026-07-24 | 0401 |
 | [0403](wp/0403-cuda-mixed-precision.md) | Mixed-precision policy (CUDA-deferred, CPU-testable) | ✅ 2026-07-24 | 0402 |
 | [0404](wp/0404-cross-backend-jacobian-ci.md) | Cross-backend Jacobian CI | ⬜ | 0402 |
-| [0405](wp/0405-faddeeva-voigt.md) | True Voigt via shared Faddeeva w(z) | ⬜ | 0401 |
-| [0406](wp/0406-restraint-penalty-rows.md) | Restraint penalty rows | ⬜ | — |
+| [0405](wp/0405-faddeeva-voigt.md) | True Voigt via shared Faddeeva w(z) | ✅ 2026-07-24 | 0401 |
+| [0406](wp/0406-restraint-penalty-rows.md) | Restraint penalty rows | ✅ 2026-07-24 | — |
 | [0407](wp/0407-esd-reconciliation.md) | esd reconciliation (Bérar-Lelann placement) | ✅ 2026-07-24 | — |
 | [0408](wp/0408-torch-mps-backend.md) | torch backend (MPS fp32 forward) — moved from v0.6 | ⬜ | 0401, 0402, 0404 |
 

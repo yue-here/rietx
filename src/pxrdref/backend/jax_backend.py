@@ -96,10 +96,12 @@ def make_traced_residual(model, table):
     """The weighted residual as a pure traceable function of the combined θ.
 
     Mirrors ``optimize.least_squares._make_residual`` row for row — [data |
-    background-penalty | Pawley-restraint] — with the Le Bail intensity
-    snapshot and every weight/design constant closed over.  Any drift between
-    the two is caught by the jax-vs-numpy column tests in
-    ``tests/test_backend_jax.py``.
+    background-penalty | Pawley-restraint | soft-restraint] — with the Le Bail
+    intensity snapshot and every weight/design constant closed over.  The
+    soft-restraint rows (bond/angle/value) are one differentiable function of
+    the decoded coordinates and cell, so jacfwd differentiates them
+    automatically.  Any drift between the two is caught by the jax-vs-numpy
+    column tests in ``tests/test_backend_jax.py``.
     """
     import jax.numpy as jnp
 
@@ -128,6 +130,9 @@ def make_traced_residual(model, table):
             rpen = model.pawley_restraint_residual(theta[n_table:])
             if rpen is not None:
                 parts.append(rpen)
+        rr = model.restraint_residual(values)
+        if rr is not None:
+            parts.append(rr)
         return parts[0] if len(parts) == 1 else jnp.concatenate(parts)
 
     return residual

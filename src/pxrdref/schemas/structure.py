@@ -155,6 +155,79 @@ class Atom(Base):
         return self
 
 
+class BondRestraint(Base):
+    """A soft restraint on the distance between two atoms of one phase.
+
+    Contributes a single residual row √weight·(d − target)/sigma (Waser, 1963,
+    Acta Cryst. 16, 1091 — least squares with observational restraints), so a
+    known chemical distance can stabilise an under-determined coordinate
+    without hard-constraining it.  ``atom_i``/``atom_j`` are **positional
+    indices** into ``Phase.atoms`` (the dot-path convention everywhere).
+
+    Distances obey periodic boundary conditions: the second atom is taken at
+    the symmetry image ``R·x_j + t + n``.  ``op_index`` selects the rotation
+    operation from the atom's frozen orbit subset (``PhaseSites.ops``) and
+    ``translation`` the lattice shift ``n``; leaving ``op_index`` ``None``
+    resolves the *minimum image* at the stage's compile-time coordinates and
+    freezes that choice for the stage (frozen-per-stage discreteness — the
+    positions still move smoothly, only the discrete op/translation is fixed).
+    """
+
+    atom_i: int
+    atom_j: int
+    target: float  # Å
+    sigma: float = Field(gt=0.0)  # Å
+    weight: float = Field(default=1.0, ge=0.0)
+    op_index: int | None = None
+    translation: tuple[int, int, int] = (0, 0, 0)
+
+
+class AngleRestraint(Base):
+    """A soft restraint on the i–j–k bond angle (vertex = the **middle** atom
+    ``atom_j``), contributing √weight·(angle − target_deg)/sigma degrees.
+
+    The angle is formed by u = x_i' − x_j and v = x_k' − x_j, where x_i' and
+    x_k' are the (optionally symmetry-imaged) neighbour positions and x_j the
+    vertex atom, taken at its base position.  Each neighbour carries its own
+    PBC selection (``op_index_i``/``translation_i`` and
+    ``op_index_k``/``translation_k``), resolved to the minimum image at compile
+    time when the op index is ``None``, exactly as :class:`BondRestraint`.
+    Angles near 0°/180° are ill-conditioned (cos θ is clamped just inside
+    [−1, 1] before ``arccos``) and are not a supported target.
+    """
+
+    atom_i: int
+    atom_j: int  # vertex
+    atom_k: int
+    target_deg: float
+    sigma: float = Field(gt=0.0)  # degrees
+    weight: float = Field(default=1.0, ge=0.0)
+    op_index_i: int | None = None
+    translation_i: tuple[int, int, int] = (0, 0, 0)
+    op_index_k: int | None = None
+    translation_k: tuple[int, int, int] = (0, 0, 0)
+
+
+class ValueRestraint(Base):
+    """A soft restraint pulling a single parameter toward ``target``.
+
+    ``path`` is any dot-path in the model tree (e.g. ``phases.0.atoms.1.occ``);
+    the row is √weight·(value − target)/sigma, linear in the physical value.
+    """
+
+    path: str
+    target: float
+    sigma: float = Field(gt=0.0)
+    weight: float = Field(default=1.0, ge=0.0)
+
+
+#: A soft observational restraint on one phase — a bond length, a bond angle,
+#: or a single parameter value.  Each contributes one residual row that is kept
+#: in the covariance (JᵀJ) but excluded from Rwp/Durbin-Watson/Bérar-Lelann
+#: (they are soft observations, not data — the standard Rietveld convention).
+Restraint = BondRestraint | AngleRestraint | ValueRestraint
+
+
 class Phase(Base):
     """A crystalline phase: symmetry, cell, atoms, scale, sample broadening."""
 
@@ -210,11 +283,38 @@ class Phase(Base):
     # a particle-size analysis; leave None (the default) for no correction.
     # Not a Parameter on purpose: it must never enter the least-squares fit.
     particle_radius_um: float | None = Field(default=None, gt=0.0)
+    # Soft observational restraints (bond lengths, bond angles, value targets).
+    # Empty default ⇒ exactly off: a phase declaring none is bit-identical to
+    # one without the field.  Each contributes a √weight·(computed − target)/σ
+    # residual row (model/restraints.py) kept in the covariance but excluded
+    # from Rwp/Durbin-Watson/Bérar-Lelann.  Rietveld-mode only (Le Bail/Pawley
+    # do not compute structural coordinates for a bond/angle to differentiate).
+    restraints: list[Restraint] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _nonempty(self) -> "Phase":
         if not self.atoms:
             raise ValueError(f"phase {self.name!r} has no atoms")
+        return self
+
+    @model_validator(mode="after")
+    def _valid_restraints(self) -> "Phase":
+        n = len(self.atoms)
+
+        def check(idx: int, label: str) -> None:
+            if not 0 <= idx < n:
+                raise ValueError(
+                    f"phase {self.name!r} restraint references {label}={idx}, "
+                    f"but the phase has {n} atom(s) (indices 0..{n - 1})")
+
+        for r in self.restraints:
+            if isinstance(r, BondRestraint):
+                check(r.atom_i, "atom_i")
+                check(r.atom_j, "atom_j")
+            elif isinstance(r, AngleRestraint):
+                check(r.atom_i, "atom_i")
+                check(r.atom_j, "atom_j")
+                check(r.atom_k, "atom_k")
         return self
 
 
