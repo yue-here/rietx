@@ -663,6 +663,26 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
                        "fractions from this fit are biased even though Rwp "
                        "looks good",
         ))
+    for msg in guard.roughness_correlations:
+        path = msg.split(" ")[0]
+        rough = "surface_roughness" in path
+        out.append(Diagnostic(
+            level="warning", code="ROUGHNESS_ABSORPTION", where=[path],
+            message=(f"surface roughness is not separable from the "
+                     f"displacement/scale/background block here — {msg} of the "
+                     f"roughness column is reproducible by it"
+                     if rough else
+                     f"most of {msg} is reproducible by the surface-roughness "
+                     f"block: this displacement parameter is hiding in it"),
+            suggestion=("extend the fit to lower 2θ, where roughness has a "
+                        "lever arm the displacement parameters do not, or hold "
+                        "roughness fixed at an independently measured value; "
+                        "refining both against this range reports two numbers "
+                        "where the data support one, and their esds understate "
+                        "it (Pitschke et al. 1993 Table III: uncorrected "
+                        "roughness drives Biso negative, so neither leaving it "
+                        "out nor freeing it blind is safe)"),
+        ))
     return out
 
 
@@ -742,6 +762,10 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     if restraints_report is not None:
         diagnostics = diagnostics + _restraint_tension_diagnostics(
             restraints_report, structure)
+
+    # Surface-roughness regime fences (WP-0502): whether the fitted range can
+    # see the correction at all, and whether it left its derivation's domain.
+    diagnostics = diagnostics + _roughness_regime_diagnostics(model, values)
 
     return RefinementResult(
         status=status, mode=mode,
@@ -886,6 +910,89 @@ def _restraint_tension_diagnostics(report, structure: Structure) -> list[Diagnos
             suggestion="the data and this restraint disagree: loosen its sigma, "
                        "correct the target, or accept that the measured pattern "
                        "should override the prior (raise sigma so it does)",
+        ))
+    return out
+
+
+#: below this modelled depression at the lowest fitted angle, a refined
+#: roughness correction is doing nothing the fit could have noticed.  Chosen
+#: against the counting statistics it competes with: 1 % of the strongest
+#: low-angle peak is at or under the noise of a typical lab scan, so a
+#: "correction" that small is a number the data did not constrain.
+ROUGHNESS_MIN_DEPRESSION = 0.01
+
+
+def _roughness_regime_diagnostics(model: CompiledModel,
+                                  values: dict[str, float]) -> list[Diagnostic]:
+    """Fences on where the roughness models are meaningful (WP-0502).
+
+    Two distinct failures, both invisible in Rwp:
+
+    ``ROUGHNESS_UNCONSTRAINED`` — the refined correction barely departs from
+    1.0 anywhere in the fitted range, so its value is arbitrary.  This is
+    measured on the *modelled depression*, not on the parameters, because the
+    Suortti model reaches the identity from **both** ends (b → 0 and b → ∞ —
+    see :class:`~pxrdref.schemas.instrument.RoughnessSuortti`); a test on ``b``
+    alone would catch only one of the two dead branches.  It also fires for the
+    legitimate case of data that simply starts too high in 2θ to see roughness.
+
+    ``ROUGHNESS_OUTSIDE_REGIME`` — Pitschke only, and taken from that paper's
+    own Eq (18): the derivation holds for sinθ ≥ τ.  Between τ and 2τ the
+    depression turns back over, and below τ the "correction" *amplifies*
+    intensity.  Reported rather than clamped, because clamping would put a kink
+    in the residual (the frozen-per-stage smoothness invariant).
+    """
+    if model.roughness is None or not len(model.tt):
+        return []
+    import numpy as np
+
+    base = "instrument.geometry.surface_roughness"
+    tt_min = float(np.min(model.tt))
+    factor = model._roughness_factor(model.tt, values)
+    depression = float(1.0 - np.min(np.asarray(factor)))
+
+    out: list[Diagnostic] = []
+    if model.roughness == "pitschke":
+        tau = values[f"{base}.tau"]
+        sin_min = float(np.sin(np.radians(0.5 * tt_min)))
+        if tau > sin_min:
+            out.append(Diagnostic(
+                level="warning", code="ROUGHNESS_OUTSIDE_REGIME",
+                where=[f"{base}.tau"],
+                message=(f"Pitschke roughness tau={tau:.4f} exceeds "
+                         f"sin(theta) = {sin_min:.4f} at the lowest fitted "
+                         f"angle ({tt_min:.2f}° 2θ): past that point the model "
+                         f"amplifies rather than depresses intensity"),
+                suggestion="restrict the fit to 2θ above "
+                           f"{2 * np.degrees(np.arcsin(min(tau, 1.0))):.1f}°, or "
+                           "switch to kind='suortti', which is bounded ≤ 1 "
+                           "everywhere (Pitschke et al. 1993 Eq 18)",
+            ))
+        elif tau > 0.5 * sin_min:
+            out.append(Diagnostic(
+                level="info", code="ROUGHNESS_OUTSIDE_REGIME",
+                where=[f"{base}.tau"],
+                message=(f"Pitschke roughness is past its turnover at the low "
+                         f"end of the fit (tau={tau:.4f} vs sin(theta)="
+                         f"{sin_min:.4f} at {tt_min:.2f}° 2θ): the depression "
+                         f"stops deepening there"),
+                suggestion="the model is empirical rather than geometric in "
+                           "this range (the paper says so); treat tau as a "
+                           "fitting parameter, not a measured roughness",
+            ))
+
+    if depression < ROUGHNESS_MIN_DEPRESSION:
+        out.append(Diagnostic(
+            level="warning", code="ROUGHNESS_UNCONSTRAINED",
+            where=[f"{base}.{n}" for n in ("a", "b", "c", "tau")
+                   if f"{base}.{n}" in values],
+            message=(f"the refined surface roughness depresses intensity by at "
+                     f"most {depression:.2%} over the fitted range "
+                     f"(from {tt_min:.2f}° 2θ) — the data cannot see it"),
+            suggestion="drop the roughness block, or extend the measurement to "
+                       "lower 2θ where the depression has a lever arm; note "
+                       "the Suortti model reaches the identity from both ends, "
+                       "so a large b is as inert as a zero one",
         ))
     return out
 

@@ -238,6 +238,10 @@ class GuardReport:
     background_correlations: list[str] = field(default_factory=list)
     # anisotropic displacement tensors that are no longer ellipsoids
     nonpositive_adps: list[str] = field(default_factory=list)
+    # two-way surface-roughness degeneracy (WP-0502): either roughness is not
+    # identifiable from this data, or a displacement parameter is now hiding
+    # in it.  Same block-R² statistic as background_correlations.
+    roughness_correlations: list[str] = field(default_factory=list)
 
 
 #: R² beyond which the background block is reported as able to imitate a
@@ -246,6 +250,22 @@ class GuardReport:
 #: penalized spline) sit at 0.01-0.03 even against broad peaks, while a
 #: 1°-knot unpenalized spline reaches 0.46.
 BACKGROUND_ABSORPTION_GUARD = 0.25
+
+#: R² beyond which surface roughness and the displacement parameters are
+#: reported as mutually substitutable (see
+#: ``optimize.statistics.roughness_absorption``, which projects out the scale
+#: and background first — without that every number saturates near 0.96).
+#: Measured on a synthetic large-cell lab pattern, varying only the low-angle
+#: cutoff: R²(Suortti b) = 0.06 with the fit reaching 7° 2θ (20 reflections
+#: below 40°), 0.62 from 15°, then 0.91 / 0.93 / 0.95 from 20° / 30° / 45° —
+#: the crossing happens exactly as the low-angle reflections that give the
+#: depression its lever arm drop out of range.  0.9 sits in that gap.
+#:
+#: Deliberately looser than BACKGROUND_ABSORPTION_GUARD: a background imitating
+#: a peak is always pathological, whereas roughness genuinely *is* a Q-dependent
+#: intensity trend, so partial overlap with the ADPs is expected physics and
+#: only near-total overlap is a finding.
+ROUGHNESS_ABSORPTION_GUARD = 0.9
 
 
 def check_adp_positive_definite(table) -> list[str]:
@@ -278,12 +298,13 @@ def check_adp_positive_definite(table) -> list[str]:
 
 
 def check_guards(table, outcome, threshold: float,
-                 background_threshold: float = BACKGROUND_ABSORPTION_GUARD
+                 background_threshold: float = BACKGROUND_ABSORPTION_GUARD,
+                 roughness_threshold: float = ROUGHNESS_ABSORPTION_GUARD
                  ) -> GuardReport:
-    """Correlation, bound, background-absorption and ADP-shape guards."""
+    """Correlation, bound, background/roughness-absorption and ADP-shape guards."""
     import numpy as np
 
-    from ..optimize.statistics import background_absorption
+    from ..optimize.statistics import background_absorption, roughness_absorption
 
     report = GuardReport()
     report.nonpositive_adps = check_adp_positive_definite(table)
@@ -302,6 +323,10 @@ def check_guards(table, outcome, threshold: float,
                                key=lambda kv: -kv[1]):
             if r2 > background_threshold:
                 report.background_correlations.append(f"{path} (R²={r2:.2f})")
+        for path, r2 in sorted(roughness_absorption(outcome.jac, free).items(),
+                               key=lambda kv: -kv[1]):
+            if r2 > roughness_threshold:
+                report.roughness_correlations.append(f"{path} (R²={r2:.2f})")
 
     lo, hi = table.bounds()
     for k, path in enumerate(free):

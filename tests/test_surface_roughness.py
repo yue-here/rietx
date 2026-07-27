@@ -547,3 +547,199 @@ def test_the_seed_lifts_the_strength_parameter_into_its_sensitive_band():
     assert seeded["instrument.geometry.surface_roughness.b"] == pytest.approx(stage.seed)
     # ... and the seed leaves the identity-transform shape parameter alone
     assert seeded["instrument.geometry.surface_roughness.a"] == pytest.approx(0.5)
+
+
+# -- the roughness <-> ADP degeneracy guard ----------------------------------
+
+
+def _big_cell_structure():
+    """A 10 A cubic cell, so reflections reach down to ~9 deg 2theta.
+
+    LaB6 is useless for this: its first Cu-Kalpha reflection is at 21.4 deg, so
+    lowering the fit limit adds empty grid and no information.  Roughness is
+    constrained by low-angle *reflections*, not by low-angle points.
+    """
+    from pxrdref import Structure
+    from pxrdref.schemas import Atom, Cell, Phase
+    return Structure(phases=[Phase(
+        name="big", space_group="P m -3 m", cell=Cell.cubic(10.0),
+        atoms=[Atom(label="Zr", species="Zr", x=Parameter(value=0.0),
+                    y=Parameter(value=0.0), z=Parameter(value=0.0)),
+               Atom(label="O", species="O", x=Parameter(value=0.5),
+                    y=Parameter(value=0.5), z=Parameter(value=0.5))])])
+
+
+def _absorption_at(two_theta_min: float):
+    """roughness_absorption for a fit starting at `two_theta_min`."""
+    from pxrdref import PatternData
+    from pxrdref.model.forward import compile_model
+    from pxrdref.optimize.least_squares import _make_jacobian
+    from pxrdref.optimize.statistics import roughness_absorption
+    from pxrdref.schemas.instrument import BackgroundChebyshev
+
+    structure = _big_cell_structure()
+    structure.phases[0].scale.value = 5e-3
+    ins = _bb(RoughnessSuortti(
+        a=Parameter(value=0.5, min=0.0, max=1.0),
+        b=Parameter(value=0.3, min=0.0, max=5.0, transform="softplus")))
+    ins.profile.w.value = 1e-2
+    ins.background = BackgroundChebyshev.with_terms(4, vary=True)
+    tt = np.arange(two_theta_min, 120.0, 0.02)
+    pattern = PatternData(two_theta=tt.tolist(), intensity=np.ones_like(tt).tolist())
+
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for p in ("phases.0.scale", "instrument.background.*",
+              "phases.0.atoms.*.biso", "instrument.geometry.surface_roughness.*"):
+        table.set_vary([p], True)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    jac = _make_jacobian(model, table)(table.x0())
+    return roughness_absorption(jac, table.free_paths), table, jac
+
+
+def test_roughness_is_identifiable_when_the_fit_reaches_low_angle():
+    """The negative control: the guard must not cry wolf on usable data."""
+    from pxrdref.strategy.staged import ROUGHNESS_ABSORPTION_GUARD
+
+    r2, _, _ = _absorption_at(7.0)
+    b = r2["instrument.geometry.surface_roughness.b"]
+    assert b < 0.5, f"b should keep its own signature here, got R²={b:.3f}"
+    assert max(r2.values()) < 1.0
+    assert b < ROUGHNESS_ABSORPTION_GUARD
+
+
+def test_roughness_becomes_degenerate_once_the_low_angle_reflections_are_gone():
+    """And the positive control: it must fire when the data cannot separate them."""
+    from pxrdref.strategy.staged import ROUGHNESS_ABSORPTION_GUARD
+
+    wide = _absorption_at(7.0)[0]["instrument.geometry.surface_roughness.b"]
+    narrow = _absorption_at(30.0)[0]["instrument.geometry.surface_roughness.b"]
+    assert narrow > wide, "losing the low-angle reflections must cost separability"
+    assert narrow > ROUGHNESS_ABSORPTION_GUARD, f"got R²={narrow:.3f}"
+
+
+def test_the_partial_projection_is_what_makes_the_guard_work():
+    """Without projecting out scale+background the statistic carries no signal.
+
+    Roughness is a multiplicative correction, so against a block containing the
+    phase scale it scores high whatever the data — which says only that both
+    rescale the pattern.  The test is not that the naive number is *large* but
+    that it is nearly *constant*: it barely moves between data that determines
+    roughness and data that cannot, while the partial number moves across most
+    of its range.  Pinned because 'simplifying' the nuisance projection away
+    would silently disable the guard rather than break anything.
+    """
+    from pxrdref.optimize.statistics import block_projection_r2
+
+    def both(two_theta_min, name):
+        _, table, jac = _absorption_at(two_theta_min)
+        free = table.free_paths
+        rough = [k for k, p in enumerate(free)
+                 if p.endswith(f"surface_roughness.{name}")]
+        disp = [(k, p) for k, p in enumerate(free) if p.endswith(".biso")]
+        nuis = [k for k, p in enumerate(free)
+                if p.endswith(".scale") or p.startswith("instrument.background.")]
+        naive = block_projection_r2(jac, [k for k, _ in disp] + nuis,
+                                    [(k, free[k]) for k in rough])
+        partial = block_projection_r2(jac, [k for k, _ in disp],
+                                      [(k, free[k]) for k in rough], nuis)
+        return next(iter(naive.values())), next(iter(partial.values()))
+
+    # `a` is the clearest case: measured 0.961 -> 0.990 naive (blind) against
+    # 0.586 -> 0.907 partial (informative) as the low-angle reflections go.
+    naive_good, partial_good = both(7.0, "a")
+    naive_bad, partial_bad = both(45.0, "a")
+    assert naive_good > 0.9 and naive_bad > 0.9, "naive saturates either way"
+    assert naive_bad - naive_good < 0.1, "and barely moves — no signal in it"
+    assert partial_bad - partial_good > 0.25, "the partial statistic tracks it"
+
+
+def test_the_guard_reports_both_directions():
+    """'roughness is unidentifiable' and 'Biso is hiding in roughness' are
+    different findings and both must reach the user."""
+    r2, _, _ = _absorption_at(30.0)
+    assert any("surface_roughness" in k for k in r2)
+    assert any(k.endswith(".biso") for k in r2)
+
+
+def test_guard_report_carries_roughness_and_the_diagnostic_is_actionable():
+    """The measurement is only useful if it reaches the RefinementResult."""
+    from types import SimpleNamespace
+
+    from pxrdref.refine import _guard_diagnostics
+    from pxrdref.strategy.staged import check_guards
+
+    _, table, jac = _absorption_at(30.0)
+    outcome = SimpleNamespace(correlation=None, jac=jac, theta=table.x0())
+    guard = check_guards(table, outcome, threshold=0.98)
+    assert guard.roughness_correlations, "the degenerate case must be reported"
+
+    diags = _guard_diagnostics(guard)
+    rough = [d for d in diags if d.code == "ROUGHNESS_ABSORPTION"]
+    assert rough
+    for d in rough:
+        assert d.level == "warning" and d.where and d.suggestion
+    # both directions get their own wording, not one generic sentence
+    msgs = " ".join(d.message for d in rough)
+    assert "not separable" in msgs or "hiding in it" in msgs
+
+
+def test_unconstrained_roughness_is_flagged_rather_than_reported_as_measured():
+    """Both dead branches of the Suortti model must trip the same fence: a
+    large b is exactly as inert as a zero one, so a test on the parameter would
+    catch only half the cases."""
+    from pxrdref.refine import ROUGHNESS_MIN_DEPRESSION, _roughness_regime_diagnostics
+
+    for b in (1e-6, 60.0):
+        model, values = _lab6_bb(RoughnessSuortti(
+            a=Parameter(value=0.5, min=0.0, max=1.0),
+            b=Parameter(value=b, min=0.0, max=100.0, transform="softplus")))
+        codes = [d.code for d in _roughness_regime_diagnostics(model, values)]
+        assert "ROUGHNESS_UNCONSTRAINED" in codes, f"b={b} is inert but unflagged"
+
+    # ... and a correction that genuinely bites is not flagged
+    model, values = _lab6_bb(RoughnessSuortti(
+        a=Parameter(value=0.4, min=0.0, max=1.0),
+        b=Parameter(value=0.3, min=0.0, max=5.0, transform="softplus")))
+    diags = _roughness_regime_diagnostics(model, values)
+    assert not [d for d in diags if d.code == "ROUGHNESS_UNCONSTRAINED"]
+    assert ROUGHNESS_MIN_DEPRESSION == pytest.approx(0.01)
+
+
+def test_pitschke_outside_its_regime_is_flagged_not_clamped():
+    """The paper's Eq (18) fence: past sin(theta) = tau the model amplifies."""
+    from pxrdref.refine import _roughness_regime_diagnostics
+
+    # data from 8 deg 2theta => sin(theta_min) ~ 0.070, so tau = 0.15 is past it
+    model, values = _lab6_bb(RoughnessPitschke(
+        c=Parameter(value=1.0, min=0.0, max=4.0, transform="softplus"),
+        tau=Parameter(value=0.15, min=0.0, max=0.3)), two_theta_min=8.0)
+    diags = [d for d in _roughness_regime_diagnostics(model, values)
+             if d.code == "ROUGHNESS_OUTSIDE_REGIME"]
+    assert diags and diags[0].level == "warning"
+    assert "amplifies" in diags[0].message
+
+    # the forward model is *not* clamped — clamping would kink the Jacobian
+    factor = model._roughness_factor(model.tt, values)
+    assert np.max(factor) > 1.0, "the breakdown is reported, not hidden"
+
+    # comfortably inside the regime: no warning
+    model, values = _lab6_bb(RoughnessPitschke(
+        c=Parameter(value=1.0, min=0.0, max=4.0, transform="softplus"),
+        tau=Parameter(value=0.02, min=0.0, max=0.3)), two_theta_min=8.0)
+    assert not [d for d in _roughness_regime_diagnostics(model, values)
+                if d.code == "ROUGHNESS_OUTSIDE_REGIME"]
+
+
+def test_background_absorption_numbers_are_unchanged_by_the_refactor():
+    """block_projection_r2 was extracted from background_absorption; the
+    background guard's measured behaviour must not have moved."""
+    from pxrdref.optimize.statistics import background_absorption, block_projection_r2
+
+    _, table, jac = _absorption_at(7.0)
+    free = table.free_paths
+    bg = [k for k, p in enumerate(free) if p.startswith("instrument.background.")]
+    targets = [(k, p) for k, p in enumerate(free)
+               if p.endswith((".biso", ".scale", ".occ")) or ".adp." in p]
+    assert background_absorption(jac, free) == block_projection_r2(jac, bg, targets)
