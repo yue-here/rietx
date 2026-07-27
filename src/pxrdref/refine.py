@@ -436,7 +436,8 @@ class Refinement:
         # …but the staged plan drives the turn-on sequence explicitly
         table = self._prepare_table(restore=False)
 
-        diagnostics: list[Diagnostic] = []
+        diagnostics: list[Diagnostic] = _dispersion_diagnostics(
+            self.structure, self.instrument)
         stage_results: list[StageResult] = []
         outcome = None
         model = None
@@ -881,6 +882,69 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
                        "per-reflection split is not resolved by these data",
         ))
     return out
+
+
+#: a species whose |f|² at k = 0 moves by more than this fraction when f′, f″
+#: are applied is reported as a neglected correction.  2 % is set by what it
+#: costs: the v0.3 QPA acceptance carries a several-wt-% bias whose sign and
+#: size the neglected corrections reproduce (WP-0504), and the phases driving
+#: it sit at 5-16 %.
+DISPERSION_NEGLECT_FRAC = 0.02
+#: above this the effect is large enough that the numbers should not be
+#: quoted without it, so the diagnostic escalates from info to warning
+DISPERSION_NEGLECT_SEVERE = 0.05
+
+
+def _dispersion_diagnostics(structure: Structure,
+                            instrument: Instrument) -> list[Diagnostic]:
+    """Flag anomalous corrections the model is *not* applying.
+
+    ``Source.dispersion`` is opt-in, which keeps a file read from silently
+    changing everyone's numbers — but "off" must never be a quiet wrong
+    answer.  The size reported is the change in |f|² at k = 0,
+    ((Z + f′)² + f″²)/Z², which is the fraction by which every reflection of
+    that species' contribution is mis-scaled.  A refinement is never blocked
+    by a lookup failure here: an untabulated element or an on-edge wavelength
+    is skipped, because enabling the block is what should raise, not
+    describing it.
+    """
+    import gemmi
+
+    from .crystallography.dispersion import dispersion, normalize_element
+
+    if instrument.source.dispersion is not None:
+        return []
+    lam = instrument.source.primary_wavelength
+    effects: dict[str, float] = {}
+    for phase in structure.phases:
+        for atom in phase.atoms:
+            try:
+                sym = normalize_element(atom.species)
+                if sym in effects:
+                    continue
+                z = float(gemmi.Element(sym).atomic_number)
+                fp, fpp = dispersion(sym, lam)
+            except (KeyError, ValueError):
+                continue
+            if z <= 0.0:
+                continue
+            effects[sym] = abs(((z + fp) ** 2 + fpp ** 2) / z ** 2 - 1.0)
+    flagged = {s: v for s, v in effects.items() if v >= DISPERSION_NEGLECT_FRAC}
+    if not flagged:
+        return []
+    worst = max(flagged.values())
+    named = ", ".join(f"{s} {v:.0%}" for s, v in
+                      sorted(flagged.items(), key=lambda kv: -kv[1]))
+    return [Diagnostic(
+        level="warning" if worst >= DISPERSION_NEGLECT_SEVERE else "info",
+        code="DISPERSION_NEGLECTED",
+        message=(f"anomalous scattering is off, but at lambda = {lam:.5f} A it "
+                 f"changes the scattering power of {named}"),
+        suggestion="set instrument.source.dispersion = Dispersion() — the "
+                   "correction is a fixed constant, not a refined parameter, "
+                   "and unequal effects across phases bias QPA weight "
+                   "fractions directly",
+    )]
 
 
 #: a soft restraint is flagged in tension when its computed value sits more

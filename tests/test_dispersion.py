@@ -643,3 +643,63 @@ def test_override_is_keyed_by_element_but_applies_to_the_ion():
     got = resolve(["Zn2+", "O2-"], (1.5405929,), {"Zn": (-3.1, 0.52)})
     assert got["Zn2+"] == complex(-3.1, 0.52)
     assert got["O2-"].real == pytest.approx(0.0494, abs=1e-3)
+
+
+# ----------------------------------------------------------------------
+# "off" must not be a silent wrong answer
+# ----------------------------------------------------------------------
+def _fit_zincite(dispersion_block=None):
+    import pxrdref as pr
+
+    ins = pr.Instrument.bragg_brentano(radiation="CuKa")
+    ins.source.dispersion = dispersion_block
+    ins.profile.w.value = 2e-2
+    tt = np.arange(30.0, 80.0, 0.05)
+    data = pr.PatternData(two_theta=tt.tolist(),
+                          intensity=(np.zeros_like(tt) + 10.0).tolist())
+    ref = pr.Refinement(_zincite_structure(), ins)
+    return ref, data
+
+
+def test_neglected_dispersion_is_reported():
+    from pxrdref.refine import _dispersion_diagnostics
+
+    ref, _ = _fit_zincite(None)
+    diags = _dispersion_diagnostics(ref.structure, ref.instrument)
+    assert len(diags) == 1
+    assert diags[0].code == "DISPERSION_NEGLECTED"
+    assert diags[0].level == "warning"      # Zn moves |f|² by ~10 %
+    assert "Zn" in diags[0].message
+
+
+def test_no_report_when_the_block_is_present():
+    from pxrdref.refine import _dispersion_diagnostics
+    from pxrdref.schemas.instrument import Dispersion
+
+    ref, _ = _fit_zincite(Dispersion())
+    assert _dispersion_diagnostics(ref.structure, ref.instrument) == []
+
+
+def test_no_report_for_a_light_structure_at_short_wavelength():
+    """11-BM at 0.414 Å: nothing in NAC moves 2 %, so stay quiet."""
+    from pathlib import Path
+
+    import pxrdref as pr
+    from pxrdref.crystallography.cif import structure_from_cif
+    from pxrdref.refine import _dispersion_diagnostics
+    cif = Path(__file__).parent / "data" / "cod_1000236.cif"
+    structure = structure_from_cif(str(cif))
+    ins = pr.Instrument.debye_scherrer(wavelength=0.4139090)
+    assert _dispersion_diagnostics(structure, ins) == []
+
+
+def test_lookup_failure_never_blocks_a_refinement():
+    """An untabulated element is skipped, not raised: describing the omission
+    must not be able to break a fit that would otherwise run."""
+    import pxrdref as pr
+    from pxrdref.refine import _dispersion_diagnostics
+
+    structure = _zincite_structure()
+    structure.phases[0].atoms[1].species = "He"      # absent from the table
+    ins = pr.Instrument.debye_scherrer(wavelength=6.0)   # outside 3-70 keV
+    assert _dispersion_diagnostics(structure, ins) == []
