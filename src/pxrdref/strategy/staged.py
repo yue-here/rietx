@@ -157,17 +157,18 @@ class RefinementPlan:
             Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
             Stage("disp", ["instrument.geometry.sample_displacement"]),
             Stage("cell", ["phases.*.cell.*"]),
+            # Stephens anisotropic strain (WP-0503) is freed *in* the
+            # sample-broadening stage, not after it.  A microstrain block locks
+            # lor_strain — its isotropic direction is that same column — so a
+            # later stage would leave the isotropic width unrefined right up to
+            # the moment four correlated patterns are turned on at once, which
+            # is the worst possible starting point.  The glob matches only
+            # phases that declared a block, and the seed puts an all-zero one
+            # on the isotropic ray (Λ ∝ √Σ has unbounded slope at Σ = 0).
             Stage("sample_profile", ["phases.*.lor_size", "phases.*.lor_strain",
-                                     "phases.*.gauss_size", "phases.*.gauss_strain"]),
-            # Stephens anisotropic strain (WP-0503) comes *after* the isotropic
-            # sample-broadening stage: the block's isotropic direction is the
-            # lor_strain column itself, so letting the average width settle
-            # first leaves the S_HKL patterns with only the hkl-*directional*
-            # residual to fit.  The glob matches only phases that declared a
-            # microstrain block (which also locks their lor_strain), and the
-            # seed puts an all-zero block on the isotropic ray — Λ ∝ √Σ has
-            # unbounded slope at Σ = 0.
-            Stage("microstrain", ["phases.*.microstrain.dof.*"], strain_seed=1000.0),
+                                     "phases.*.gauss_size", "phases.*.gauss_strain",
+                                     "phases.*.microstrain.dof.*"],
+                  strain_seed=1000.0),
             Stage("biso", list(_DISPLACEMENT_GLOBS)),
         ])
 
