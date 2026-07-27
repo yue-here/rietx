@@ -262,7 +262,7 @@ class CompiledModel:
         return march_dollase_factors(cp.po_members, cp.po_seg, cp.po_counts,
                                      cp.po_axis, gstar, r)
 
-    def _strain_width(self, ip: int, values: dict[str, float], d: np.ndarray):
+    def strain_width(self, ip: int, values: dict[str, float], d: np.ndarray):
         """Λ(hkl) (N,) — the Stephens tanθ coefficient — or 0.0 when off.
 
         The ``None`` test is compile-time structural (does this phase carry a
@@ -353,7 +353,7 @@ class CompiledModel:
 
         # anisotropic strain is line-independent (it depends on hkl and the
         # cell, not on λ), so Λ is computed once and reused across the lines
-        aniso = self._strain_width(ip, values, d)
+        aniso = self.strain_width(ip, values, d)
 
         out = []
         for il, lam in enumerate(self.line_wavelengths):

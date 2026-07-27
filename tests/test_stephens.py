@@ -547,6 +547,77 @@ def test_injected_anisotropy_is_recovered():
     plot_result(result, path=str(OUT / "stephens_injection_fit.png"))
 
 
+def _fit_isotropic_only(data, *, seed_ppm: float) -> Refinement:
+    """Refine the *isotropic* strain only — no microstrain block at all.  This
+    is the state the Layer-1 diagnostic has to speak into: a user who has not
+    yet decided whether the specimen needs Stephens."""
+    structure = Structure(phases=[brucite()])
+    structure.phases[0].scale.value = 3e-2
+    structure.phases[0].lor_strain = Parameter(
+        value=np.degrees(seed_ppm * 1e-6), min=0.0, transform="softplus")
+    inst = Instrument.debye_scherrer(wavelength=1.5406)
+    inst.profile.w.value = 3e-3
+    ref = Refinement(structure, inst, history=False)
+    ref.fit(data, plan=RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("strain", ["phases.*.lor_strain"], seed=1e-3),
+    ]))
+    return ref
+
+
+def test_layer1_reports_the_width_direction_before_anyone_models_it():
+    """The diagnostic the WP exists to enable: with only an isotropic strain
+    refined, the report must say the width misfit is *directional*, name the
+    broad direction, and quantify it."""
+    truth_coef = _brucite_coef(600.0)
+    truth_coef[_L4_ROW] *= 12.0
+    truth, inst = _injection_state(truth_coef)
+    data = _synthetic(truth, inst, seed=31)
+
+    report = _fit_isotropic_only(data, seed_ppm=600.0).report()
+    strain = report.strain[0]
+    assert strain.detected, strain
+    assert strain.r2 > 0.5
+    assert strain.n_patterns == 4               # P-3m1
+    assert strain.broadest_hkl[:2] == (0, 0)    # 00l is the injected direction
+    assert strain.narrowest_hkl[2] == 0         # hk0 is untouched
+    assert strain.separable
+    # Λ ∝ √Σ, so the injected 12× on the l⁴ pattern is a √12 width ratio
+    assert strain.anisotropy == pytest.approx(np.sqrt(12.0), rel=0.10)
+
+
+def test_layer1_strain_stays_quiet_on_an_isotropic_specimen():
+    """Negative control — and the one that matters, because the standing
+    invariant is that the report must never produce a confident wrong
+    singleton."""
+    truth, inst = _injection_state(_brucite_coef(700.0))
+    data = _synthetic(truth, inst, seed=37)
+    report = _fit_isotropic_only(data, seed_ppm=700.0).report()
+    assert not report.strain[0].detected, report.strain[0]
+
+
+def test_layer1_strain_agrees_with_the_refined_block():
+    """The diagnostic reports the specimen's *total* strain anisotropy, so a
+    refined block does not silence it — it has to agree with it.  Two
+    independent routes to the same number (a residual extraction and a
+    least-squares refinement), which is what makes either believable."""
+    truth_coef = _brucite_coef(600.0)
+    truth_coef[_L4_ROW] *= 12.0
+    truth, inst = _injection_state(truth_coef)
+    data = _synthetic(truth, inst, seed=31)
+
+    start, start_inst = _injection_state(_brucite_coef(600.0))
+    ref = Refinement(start, start_inst, history=False)
+    ref.fit(data, plan=RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        Stage("microstrain", ["phases.*.microstrain.dof.*"]),
+    ]))
+    strain = ref.report().strain[0]
+    refined = _lambda(ref.fitted_structure)
+    assert strain.anisotropy == pytest.approx(
+        refined[strain.broadest_hkl] / refined[strain.narrowest_hkl], rel=0.10)
+
+
 def test_isotropic_start_does_not_invent_anisotropy():
     """Negative control: a genuinely isotropic specimen must come back
     isotropic.  Λ is one number for every hkl when the S sit on the M² ray, so

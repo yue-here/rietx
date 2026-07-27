@@ -27,6 +27,7 @@ from .schemas import (
     FitReport,
     Region,
     RegionAttribution,
+    StrainAnalysis,
     SuggestedAction,
     TextureAnalysis,
     TrendAnalysis,
@@ -34,6 +35,7 @@ from .schemas import (
     UnmatchedPeak,
     VerificationOutcome,
 )
+from .strain import analyse_strain
 from .texture import analyse_texture
 
 __all__ = [
@@ -42,12 +44,14 @@ __all__ = [
     "FitReport",
     "Region",
     "RegionAttribution",
+    "StrainAnalysis",
     "SuggestedAction",
     "TextureAnalysis",
     "TrendAnalysis",
     "TrendTemplate",
     "UnmatchedPeak",
     "VerificationOutcome",
+    "analyse_strain",
     "analyse_texture",
     "analyse_trends",
     "apply_strategy_veto",
@@ -94,10 +98,12 @@ def build_report(result: RefinementResult, *, model=None, values=None,
 
     attributions = attribute_regions(model, values, report.regions)
     report.attribution = attributions
-    # March-Dollase texture is computed before the maturity gate: uncorrected
-    # texture is a common *cause* of an immature fit, so the diagnostic must
-    # still speak when the rest of Layer 1 abstains.
+    # March-Dollase texture and Stephens anisotropic strain are computed before
+    # the maturity gate: an uncorrected intensity or width *direction* is a
+    # common *cause* of an immature fit, so these must still speak when the rest
+    # of Layer 1 abstains.
     report.texture = analyse_texture(model, values)
+    report.strain = analyse_strain(model, values)
 
     reason = maturity_gate(result.statistics.rwp, attributions)
     if reason is not None:
