@@ -146,7 +146,7 @@ chain [0404](wp/0404-cross-backend-jacobian-ci.md) →
 |---|---|---|---|
 | [0501](wp/0501-absorption-corrections.md) | Capillary + flat-plate absorption | ⬜ | — |
 | [0502](wp/0502-surface-roughness.md) | Surface roughness | ⬜ | — |
-| [0503](wp/0503-stephens-anisotropic-strain.md) | Stephens anisotropic strain | ⬜ | — |
+| [0503](wp/0503-stephens-anisotropic-strain.md) | Stephens anisotropic strain | 🔶 | — |
 | [0504](wp/0504-anomalous-scattering-xraydb.md) | Anomalous f′,f″ via xraydb | ⬜ | — |
 | [0505](wp/0505-sequential-refinement.md) | SequentialRefinement warm start | ⬜ | — |
 | [0506](wp/0506-secondary-extinction.md) | Secondary extinction (Sabine) | ✅ 2026-07-23 | — |
