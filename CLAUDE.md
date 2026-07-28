@@ -8,8 +8,8 @@ core, pydantic v2 schemas, gemmi for CIF/symmetry. Import name: `pxrdref`.
 ```sh
 uv venv --python 3.12 && uv pip install -e ".[dev]"   # setup (once)
 uv pip install -e ".[dev,jax,torch]"                   # + optional jax/torch backends
-.venv/bin/python -m pytest                             # full suite ~14 min (852 tests), incl. real-data acceptance
-.venv/bin/python -m pytest -m "not slow"               # skip acceptance (791 tests, ~2.5 min)
+.venv/bin/python -m pytest                             # full suite ~16 min (889 tests), incl. real-data acceptance
+.venv/bin/python -m pytest -m "not slow"               # skip acceptance (809 tests, ~2.8 min)
 .venv/bin/python -m pytest tests/test_cross_backend.py # Jacobian agreement matrix; rows self-skip without their backend
 .venv/bin/python -m ruff check src tests examples      # lint (must be clean)
 .venv/bin/python examples/nac_11bm.py                  # end-to-end demo + plot
@@ -51,6 +51,18 @@ Structure/Instrument/PatternData (schemas/, pydantic, JSON round-trip)
     append-only JSONL to persist; history/events.py streams per-iteration
     events, viz/live.py + watch.py render them live
 ```
+
+A **series** (in-situ ramp, parametric sweep, tray of related specimens) is N
+separate refinements chained by a warm start — `sequential.py`
+(`SequentialRefinement` / `refine_sequential`), returning a `SeriesResult` of
+per-pattern summaries plus parameter *trajectories*, one history tree per
+pattern (a tree is pinned to its pattern by `TreeHeader.data_fingerprint`),
+linked by annotation notes. Not to be confused with `multi.py`, which stacks
+patterns into **one joint residual**. A chained fit is worth ≈3× in iterations
+and nothing in accuracy, and its trajectory is path-dependent by construction,
+so `direction="both"` runs the chain each way and flags parameters the two
+disagree on (`SEQUENTIAL_PATH_DEPENDENT`) — the only check that separates a
+measured trajectory from an ordering artefact.
 
 Entry points: `Refinement.fit()` / `refine()` in `refine.py`; modes
 `"rietveld"`, `"lebail"` (intensity partitioning in
@@ -264,8 +276,8 @@ measured acceptance in `docs/milestones/v0.4.md`).
 
 **In flight: v0.5 — corrections & microstructure.** Landed and usable but the
 milestone has not closed: capillary absorption (0501), surface roughness (0502),
-Stephens anisotropic strain (0503), anomalous f′/f″ (0504), secondary extinction
-(0506). Remaining: 0505 (sequential warm start), 0507 (anode wavelengths), 0508
+Stephens anisotropic strain (0503), anomalous f′/f″ (0504), sequential series
+(0505), secondary extinction (0506). Remaining: 0507 (anode wavelengths), 0508
 (flat-plate absorption + a real capillary acceptance). `pyproject.version`
 tracks the milestone *in flight*, not the last one shipped, because that string
 is stamped into every `RefinementResult.provenance` and history node.

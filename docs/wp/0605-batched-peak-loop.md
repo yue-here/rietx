@@ -49,6 +49,19 @@ faith.
 
 ### Inherited
 
+From **WP-0505** (sequential series, landed 2026-07-28): **the "batch many
+patterns" case now has an API to live behind.** WP-0408 measured that a device
+only pays at ≈10 synchrotron / ≈60 lab patterns batched together and fenced the
+`vmap`-batched series to v2; `pxrdref.sequential.SequentialRefinement` is now
+where such a series is expressed, and it walks patterns strictly one at a time
+(`_chain`). So if the batched-loop spike here ever grows a multi-pattern form,
+`_chain` is the single call site to change, and its warm-start chain is the
+reason a naive batch is *not* equivalent: pattern k's starting values are
+pattern k−1's answers, so patterns in a chain cannot be evaluated
+simultaneously. A batched series has to batch across independent chains (or
+give up the warm start), which is a design constraint that did not exist before
+this WP and is not visible from the timing numbers alone.
+
 From **WP-0408** (torch backend, landed 2026-07-27) — the measurements above,
 plus three constraints that are already known and need not be rediscovered:
 

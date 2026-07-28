@@ -33,6 +33,19 @@ either excludes multi-histogram or returns a fit with no history where the
 single-pattern call has one. That asymmetry needs a deliberate answer in the
 schema, not an accident. The `RefinementResult` itself still fully serializes.
 
+From **WP-0505** (sequential series, landed 2026-07-28): **there is now a
+second top-level result type.** `SeriesResult` (`schemas/sequential.py`) is
+what `SequentialRefinement` / `refine_sequential` return, and it is *not* a
+`RefinementResult` — it carries per-pattern `SeriesEntry` summaries (statistics,
+refined values + esds, QPA, diagnostics, node/tree ids) and deliberately no
+curves, so a `refine_json` that only knows how to emit `RefinementResult` cannot
+express a series at all. It also brings three diagnostic codes the agent
+vocabulary must carry: `SEQUENTIAL_RESEED`, `SEQUENTIAL_DISCONTINUITY`,
+`SEQUENTIAL_PATH_DEPENDENT` (semantics in `docs/AGENT_PROTOCOL.md` §9b). One
+asymmetry to decide deliberately rather than by accident, the same shape as the
+0308 one above: a series produces **one history tree per pattern**, so its
+`node_id`/`tree_id` are per entry and there is no single tree id for the run.
+
 From **WP-0307** (March-Dollase): `FitReport.texture` reports a diagnosed
 preferred-orientation axis, but **no Layer-2 `ActionKind` was ever added for
 it** — the vocabulary is versioned, so 0307 deferred it and no WP has claimed

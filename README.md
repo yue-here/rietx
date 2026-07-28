@@ -69,6 +69,7 @@ Bragg-Brentano** geometry:
 | Stephens anisotropic strain (hkl-dependent widths; Laue-allowed S_HKL derived, not tabulated) | ✅ |
 | Anomalous scattering f′, f″ (Cromer-Liberman; Friedel-averaged \|F\|², opt-in per source) | ✅ |
 | Multi-histogram joint refinement (shared structure, per-histogram Rwp) | ✅ |
+| **Sequential series** (in-situ/parametric): warm-started chain, parameter trajectories, forward-vs-backward path-dependence check | ✅ |
 | Exporters: reflection table, refinement CIF (values + esds), QPA table | ✅ |
 | Differentiable backends (`backend="jax"` / `"torch"` / `"torch-mps"`), held to per-column Jacobian agreement | ✅ |
 | True Voigt peak shape (shared Faddeeva `w(z)`; TCHZ still the default) | ✅ |
@@ -300,8 +301,8 @@ reproducible script. Pass `history=False` for a zero-overhead plain fit.
 
 ```sh
 uv venv --python 3.12 && uv pip install -e ".[dev]"
-pytest              # 852 tests incl. seven real-data acceptance suites (~14 min)
-pytest -m "not slow"    # 791 unit/property tests only (~2.5 min)
+pytest              # 889 tests incl. eight real-data acceptance suites (~16 min)
+pytest -m "not slow"    # 809 unit/property tests only (~2.8 min)
 ruff check src tests examples
 ```
 

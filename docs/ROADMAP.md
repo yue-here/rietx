@@ -72,11 +72,57 @@ absorption), [0502](wp/0502-surface-roughness.md) (surface roughness),
 taken out of order; each has its own note below. They are orthogonal in the peak
 chain — 0501 and 0502 act on intensity in geometries that exclude each other
 (capillary vs flat-plate), 0504 on |F|², 0503 on widths — which is why the
-merges were clean. **[0505](wp/0505-sequential-refinement.md) (sequential warm
-start) and [0507](wp/0507-anode-wavelengths.md) (anode wavelengths) are what
-remain** before the v0.5 row can flip, plus [0508](wp/0508-flat-plate-absorption.md),
+merges were clean. [0505](wp/0505-sequential-refinement.md) (sequential warm
+start) landed 2026-07-28 — see its note below.
+**[0507](wp/0507-anode-wavelengths.md) (anode wavelengths) is what remains**
+before the v0.5 row can flip, plus [0508](wp/0508-flat-plate-absorption.md),
 which 0501 split out and which needs a capillary dataset the repo does not have.
-All three are stubs — expand one before writing code.
+Both are stubs — expand one before writing code.
+
+**[0505](wp/0505-sequential-refinement.md) (sequential series) landed
+2026-07-28** (889 tests green). `SequentialRefinement` / `refine_sequential`
+chains N refinements over an ordered series, each warm-started from its
+predecessor, and returns a `SeriesResult` of per-pattern summaries plus
+parameter *trajectories* — state, not curves, the same rule the history nodes
+follow. Distinct from `multi.py` throughout: nothing is shared, only the
+starting point crosses a pattern boundary. One history tree per pattern (a tree
+is pinned to its pattern by `TreeHeader.data_fingerprint`, and that check is
+what stops a node being replayed against the wrong data), chained by annotation
+notes rather than parent edges.
+
+The measured results changed two defaults and refuted one design assumption.
+On the eight round-robin sample-1 mixtures, under the v0.3 QPA protocol
+imported wholesale so only the *chaining* differs: **2863 iterations unchained,
+1623 re-walking the staged plan warm, 904 with the plan collapsed into one
+stage** — at identical mean Rwp (0.1278) and QPA accuracy identical to the v0.3
+independent-fit record (RMS |ΔW| 2.26 wt %, worst 5.13). So `refit="single"` is
+the default: the staged turn-on order exists to keep early stages conditioned
+from a *poor* starting model, and a converged neighbour is not one. And the
+`carry`-glob hypothesis — that chaining a phase scale across a 1 → 94 wt % swing
+would be worse than starting cold — **is false**: carrying everything costs 838
+iterations against 904 for a carry that excludes the scales and re-seeds them
+per pattern. `carry` stays as a control for parameters that must provably not
+be chained, not as tuning; the docstring says so rather than the reverse.
+
+Three findings worth carrying forward:
+
+- **A sequential trajectory is path-dependent by construction, and a smooth
+  curve is exactly what a poisoned chain produces.** `direction="both"` runs
+  the series each way and reports `SEQUENTIAL_PATH_DEPENDENT` per parameter —
+  the only check that separates a measured trajectory from an ordering
+  artefact, and the one to run on anything publishable.
+- **Ratio-based fences need a noise floor, and the σ leg cannot supply it.** A
+  softplus coefficient dying on its floor has dp/du → 0, so its esd collapses
+  *alongside* its value and the significance test inverts instead of
+  protecting: an unrefinable `instrument.profile.y` came back with a median
+  step of 4e-16, one step of 1.3e-11 (29 000× the median) and σ ≈ 4e-55, and
+  the two chains "disagreed" at 1e16 σ over 1e-60 vs 1e-74. Both fences now
+  also require the step to be 1e-9 of the parameter's own magnitude. Any future
+  trajectory- or ratio-shaped statistic wants the same guard.
+- **The reseed fence never fired on the hostile series.** The collapsed refit
+  recovers a bad warm start *within* the fit, so the cold restart is insurance
+  rather than a routine mechanism — which is why its mechanics are pinned by
+  unit tests rather than by the acceptance suite.
 
 **0502 (surface roughness)** is the flat-plate counterpart to 0501, and lands
 the same shape: an opt-in `Geometry.surface_roughness` block with two published
@@ -430,7 +476,7 @@ the linear algebra's.
 | [0502](wp/0502-surface-roughness.md) | Surface roughness (Suortti + Pitschke) | ✅ 2026-07-27 | — |
 | [0503](wp/0503-stephens-anisotropic-strain.md) | Stephens anisotropic strain | ✅ 2026-07-27 | — |
 | [0504](wp/0504-anomalous-scattering-xraydb.md) | Anomalous f′,f″ (bundled Cromer-Liberman, not xraydb) | ✅ 2026-07-27 | — |
-| [0505](wp/0505-sequential-refinement.md) | SequentialRefinement warm start | ⬜ | — |
+| [0505](wp/0505-sequential-refinement.md) | SequentialRefinement warm start | ✅ 2026-07-28 | — |
 | [0506](wp/0506-secondary-extinction.md) | Secondary extinction (Sabine) | ✅ 2026-07-23 | — |
 | [0507](wp/0507-anode-wavelengths.md) | Additional anode wavelengths (Co/Cr/Fe/Mo/Ag) | ⬜ | — |
 | [0508](wp/0508-flat-plate-absorption.md) | Flat-plate absorption + real-data capillary acceptance | ⬜ | 0501 |

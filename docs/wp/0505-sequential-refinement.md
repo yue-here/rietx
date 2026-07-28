@@ -1,6 +1,6 @@
 # WP-0505 — SequentialRefinement with warm start
 
-Milestone: v0.5 · Status: 🔶 in progress
+Milestone: v0.5 · Status: ✅ shipped 2026-07-28
 Depends on: —
 
 ## Goal
@@ -113,19 +113,36 @@ the bullet here and says so.
 1. **Warm start is per-parameter, not all-or-nothing.** `carry` is a list of
    path globs (fnmatch on dot paths, the `set_vary` convention), default
    `["*"]`. Paths that match take the previous pattern's fitted value; paths
-   that do not are reset to the *initial* model's value. This exists because a
-   series is not always monotone in every parameter: chaining the instrument
-   profile and cell across a set of related specimens is obviously right, while
-   chaining a phase scale across mixtures whose composition swings from 1 wt %
-   to 94 wt % (qarr 1a → 1b) starts the next fit further from its answer than a
-   cold start would.
+   that do not are reset to the *initial* model's value.
+
+   The motivating hypothesis — that chaining a phase scale across mixtures
+   whose composition swings from 1 to 94 wt % (qarr 1a → 1b) would start the
+   next fit further from its answer than a cold start — **was measured and is
+   false**. Carrying everything costs 838 iterations against 904 for a carry
+   that excludes the scales and re-seeds them per pattern, with identical Rwp
+   and identical weight fractions. The knob stays, because a series where a
+   parameter must provably not be chained is a real thing; what changed is its
+   documentation, which now says "control, not tuning" rather than asserting a
+   benefit the data refuse to show. A hostile real series was the only way to
+   find that out, which is why the acceptance runs both passes and keeps them.
+
+   The *other* half of the same problem turned out to be real, and needed a
+   second mechanism: a phase scale on a series of different mixtures must be
+   re-estimated **from this pattern**, which excluding it from `carry` cannot
+   express (that only falls back to the first pattern's guess). Hence the
+   `prepare` hook — `(index, data, structure, instrument) -> None`, called on
+   the warmed models just before each fit.
 2. **The refit strategy is measured, not assumed.** Two modes:
    `refit="stages"` re-runs the whole plan on every pattern (safe: the same
    staged turn-on order, just from a better starting point), `refit="single"`
    collapses the plan into one stage freeing the union of its `turn_on` globs
    (fast: what an in-situ operator actually does once the model is stable).
-   Implement both, measure both on the acceptance series, default to whichever
-   wins on (Rwp, robustness) and record the number.
+   **Measured on the acceptance series: `single` wins and is the default** —
+   904 iterations against 1623 staged and 2863 unchained, at identical mean Rwp
+   (0.1278) and identical QPA accuracy (RMS |ΔW| 2.26 vs 2.27 wt %). The staged
+   turn-on order exists to keep early stages conditioned from a *poor* starting
+   model, and a converged neighbour is not one; when it turns out not to be a
+   good one either, decision 3 catches it and refits cold with the full plan.
 3. **Reseed on failure, and say so.** After pattern *k*: if `status` is
    `"diverged"`, or Rwp exceeds `reseed_factor ×` the reference Rwp (median of
    the accepted ones so far — a median, not the previous value, so one bad
@@ -171,28 +188,36 @@ the bullet here and says so.
 ## Tasks
 
 - [x] Expand this stub into a full WP before writing code
-- [ ] `schemas/sequential.py`: `SeriesEntry` / `SeriesResult` / `Trajectory`,
+- [x] `schemas/sequential.py`: `SeriesEntry` / `SeriesResult` / `Trajectory`,
       state-not-curves, JSON round-trip test
-- [ ] `sequential.py`: `SequentialRefinement.fit` warm chain, `carry` globs,
+- [x] `sequential.py`: `SequentialRefinement.fit` warm chain, `carry` globs,
       `refit="stages"|"single"`, `refine_sequential` one-shot; exports
-- [ ] Reseed guard + `SEQUENTIAL_RESEED` diagnostic (injected-bad-pattern test)
-- [ ] History: one tree per pattern, cross-linked by annotation notes
-- [ ] Le Bail series: carry extracted intensities pattern-to-pattern
-- [ ] Trajectory API + `write_csv` + `viz.plots.plot_trajectory`
-- [ ] `SEQUENTIAL_DISCONTINUITY` + `direction="both"` /
+- [x] Reseed guard + `SEQUENTIAL_RESEED` diagnostic
+- [x] History: one tree per pattern, cross-linked by annotation notes
+- [x] Le Bail series: carry extracted intensities pattern-to-pattern
+- [x] Trajectory API + `write_csv` + `viz.plots.plot_trajectory`
+- [x] `SEQUENTIAL_DISCONTINUITY` + `direction="both"` /
       `SEQUENTIAL_PATH_DEPENDENT`
-- [ ] Acceptance: synthetic in-situ thermal series (injected α recovered) and
-      the qarr sample-1 series as a real-data chain
-- [ ] Docs: AGENT_PROTOCOL rows for the new codes, README, ROADMAP, handover log
+- [x] `prepare` hook (found necessary by the acceptance — see decision 1)
+- [x] Acceptance: synthetic in-situ thermal series (injected ramp recovered,
+      `tests/test_sequential.py`, fast) and the qarr sample-1 series as a
+      real-data chain (`tests/test_acceptance_sequential.py`, slow)
+- [x] Docs: AGENT_PROTOCOL §9b + three diagnostic rows, README, CLAUDE.md,
+      ROADMAP, forward notes into 0602/0605/1001, handover log
 
 ## Acceptance
 
-**Synthetic in-situ series (controlled truth).** A 9-pattern thermal ramp
-generated from a known structure with a linear cell expansion and a rising
-Biso: the sequential fit recovers the injected expansion coefficient within its
-propagated esd, and every pattern converges. This is the only place in the WP
-where the true trajectory is known, so it is where the trajectory machinery is
-actually validated.
+**Synthetic in-situ series (controlled truth).** A 7-pattern thermal ramp
+generated from a known structure with a linear cell expansion: the sequential
+fit recovers the injected expansion coefficient (as the *slope* of a(T)) to
+within 5 %, and every pattern converges. This is the only place in the WP where
+the true trajectory is known, so it is where the trajectory machinery is
+actually validated — and it is deliberately a **fast** test, not a slow one, so
+every run of the unit suite exercises it. It lives in `tests/test_sequential.py`
+alongside the fence regressions rather than in the acceptance module.
+
+*Measured 2026-07-28*: recovered, with the tied cubic b/c tracking a exactly;
+`refit="single"` 82 iterations against `"stages"` 154 on the same four patterns.
 
 **Real-data series (qarr sample 1a-1h).** The eight round-robin mixtures share
 one instrument and three phases, so they are a legitimate — and deliberately
@@ -200,14 +225,27 @@ hostile — series: the compositions swing from 1 to 94 wt %. Criterion: the
 sequential chain reproduces the *independent* per-pattern QPA fractions of
 `test_acceptance_qpa_roundrobin.py` within its stated participant-spread
 tolerance, and the total iteration count is reported against the independent
-baseline. A speedup is expected but **not** asserted as a pass/fail gate —
-whether warm starting helps on a series whose scales jump by 90 wt % is a
-measurement, and the honest outcome may be "helps for cell/profile, hurts for
-scale", which is exactly what design decision 1 exists to express.
+baseline. A speedup is expected but **not** asserted as a pass/fail gate.
+
+*Measured 2026-07-28*, protocol imported wholesale from the QPA acceptance so
+only the chaining differs:
+
+| pass | iterations | mean Rwp | RMS \|ΔW\| | worst \|ΔW\| | reseeds |
+|---|---|---|---|---|---|
+| independent (v0.3 protocol, per mixture) | 2863 | 0.1278 | 2.26 | 5.13 | — |
+| chained, `refit="stages"`, carry ∌ scales | 1623 | 0.1276 | 2.27 | 5.15 | 0 |
+| chained, `refit="single"`, carry ∌ scales | 904 | 0.1278 | 2.26 | 5.13 | 0 |
+| chained, `refit="single"`, carry = `*` | 838 | 0.1278 | 2.26 | 5.13 | 0 |
+
+Wall clock for the two `single`/`stages` passes: 43.5 s against 74.1 s. Every
+sample-1 fraction stays inside the participant-spread band, the three cells are
+flat across the series to < 2e-3 Å (they are the same materials in every
+mixture, so a drifting cell would be the chain imprinting a trend), and the
+chained fractions sit within 1 wt % of the independent ones everywhere.
 
 ```sh
-.venv/bin/python -m pytest tests/test_sequential.py -q
-.venv/bin/python -m pytest tests/test_acceptance_sequential.py -q   # slow
+.venv/bin/python -m pytest tests/test_sequential.py -q             # 24 tests
+.venv/bin/python -m pytest tests/test_acceptance_sequential.py -q  # 13, slow
 .venv/bin/python -m ruff check src tests examples
 ```
 
@@ -222,6 +260,43 @@ scale", which is exactly what design decision 1 exists to express.
   path-dependence rather than suppressing it.
 
 ## Handover log
+
+- **2026-07-28 (ship)** — **done**, all checklist items landed, 889 tests green
+  (809 fast in 2.8 min), ruff clean. Three commits: WP expansion, the core
+  module + 24 unit tests, the real-data acceptance + the two defaults it moved.
+
+  *Two defaults were set by measurement, not by design.* `refit="single"` is
+  the default because the collapsed refit is 1.8× cheaper than re-walking the
+  staged plan and 3.2× cheaper than not chaining, for the same answer to three
+  decimals. And the `carry` glob's motivating hypothesis is **refuted** — see
+  decision 1; the docstring and the acceptance module both say so, deliberately,
+  because the tempting alternative was to quietly keep the knob and imply it
+  earns its place.
+
+  *Gotcha that will recur.* Both trajectory fences are ratio tests, and a
+  softplus coefficient sitting on its floor breaks them in a way the σ leg
+  cannot catch: dp/du → 0 there, so the esd collapses *with* the value and
+  "significance" inverts. Measured on the synthetic ramp: `instrument.profile.y`
+  with a median step of 4e-16, one step of 1.3e-11 (29 000× the median) and
+  σ ≈ 4e-55 passed both legs, and the forward/backward chains "disagreed" at
+  1e16 σ over 1e-60 vs 1e-74. `NOISE_FLOOR_REL` (1e-9 of the parameter's own
+  magnitude, never below 1e-9 absolute) is the fix; `test_sequential.py` pins
+  both cases. Any future statistic shaped as "is this change large relative to
+  that change" wants the same floor.
+
+  *Not built, deliberately.* Parametric refinement (Stinton & Evans 2007) stays
+  a non-goal — it is one joint residual with a shared trajectory model, i.e.
+  the 0308 machinery, not this one. Automatic phase appearance/disappearance
+  across a series is a v0.6+ agent-surface problem. `vmap`-batched execution
+  stays v2-fenced; a note went into 0605 explaining why a *warm-started* chain
+  cannot simply be batched (pattern k's start is pattern k−1's answer).
+
+  *Forward notes written* (protocol step 3b): 0602 (`SeriesResult` is a second
+  top-level result type its single-call API must express; three new diagnostic
+  codes; per-entry tree ids), 1001 (a new acceptance suite whose anchor is this
+  package's own other result — a third tier beside absolute and cross-code —
+  and which moves in lockstep with the round-robin protocol), 0605 (the
+  batching constraint above).
 
 - **2026-07-28** — stub expanded into a full WP (goal, design decisions 1-6,
   non-goals, task checklist, two-part acceptance). Key findings from the

@@ -37,6 +37,26 @@ that a tolerance policy written from certificates alone would violate.
   Rexp ≈ 8.9 %, so Rwp = 14.4 % is mostly counting statistics, not misfit. A
   policy demanding GoF → 1 would be demanding FPA.
 
+From **WP-0505** (sequential series, landed 2026-07-28) — a new acceptance
+suite, and a *tier* the policy does not yet name.
+`tests/test_acceptance_sequential.py` refits the eight round-robin sample-1
+mixtures as a warm-started chain under the v0.3 QPA protocol imported wholesale
+from `test_acceptance_qpa_roundrobin`, so what it measures is the chaining and
+nothing else. Its assertions are the *same* participant-spread tolerances, plus
+a "chained agrees with independent" band of 1 wt %. Two consequences:
+
+- **The comparison target is this package's own other result**, not a
+  certificate and not another code — a third kind of anchor beside the
+  absolute (SRM) and cross-code (GSAS) ones the scope names, and the tier it
+  belongs in is closer to "exact" than either: two runs of the same protocol
+  differing only in starting values should agree far inside any physical
+  tolerance, and 1 wt % is generous rather than tight.
+- **Its numbers move when the round-robin protocol moves.** The chained pass
+  reproduces the v0.3 independent-fit record exactly (RMS |ΔW| 2.26 wt %, worst
+  5.13, mean Rwp 0.1278) because it *is* that protocol; the WP-0504 note above
+  about re-measuring if dispersion is switched on by default therefore applies
+  to this suite too, in lockstep.
+
 From **WP-0401** (op shim, landed 2026-07-24): current baselines to write the
 matrix against are SRM 660c Rwp 8.66 % and NAC Rwp 9.31 % (unchanged across the
 shim refactor, verified bit-identical). SRM 660c's cell sits +28 ppm from the

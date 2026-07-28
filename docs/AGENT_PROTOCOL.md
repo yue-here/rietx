@@ -206,6 +206,7 @@ propagate it, do not paper over it.
 | `STEPHENS_STRAIN_NOT_POSITIVE` | σ²(M) went negative on some reflection — outside the physical cone | The S_HKL are **not quotable**. This fires on isotropic and anisotropic specimens alike, so it is never evidence *of* anisotropy |
 | `ADP_NOT_POSITIVE_DEFINITE` | The tensor is not an ellipsoid; its Debye-Waller factor diverges at high Q | Revert the site to isotropic `biso` |
 | `ROUGHNESS_UNCONSTRAINED` | The refined correction depresses no modelled reflection by >1 % | Drop the block. The value it refined to is arbitrary |
+| `SEQUENTIAL_PATH_DEPENDENT` | A parameter's trajectory differs between the forward and backward chains by more than their esds allow | That trajectory is an artefact of the refinement order, not a measurement. Hold the parameter, restrain it, or quote the forward/backward spread as its uncertainty |
 
 `Layer 1`'s gates, for reference, are: resolvability on the **scale-normalised**
 Gram matrix, a 0.4·FWHM validity radius (a peak 5 FWHM off must trigger
@@ -239,6 +240,9 @@ Every code below is a structured `Diagnostic` on `result.diagnostics` with a
 | `MICROABSORPTION_SKIPPED` | Assume microabsorption was handled |
 | `PAWLEY_OVERLAP_UNRESOLVED` | Use an individual reflection intensity from the group |
 | `RESTRAINT_TENSION` | Silently accept the averaged compromise — the data and your prior disagree by >3σ |
+| `SEQUENTIAL_RESEED` | Read this point of a series as evidence that the trajectory is continuous — its starting values did not come from its neighbour |
+| `SEQUENTIAL_DISCONTINUITY` | Report the jump as physics without opening that pattern's own fit; it is equally the signature of a chain failure |
+| `SEQUENTIAL_PATH_DEPENDENT` | Quote that parameter's per-pattern esd as its uncertainty — the between-chain spread is larger and is the honest one |
 
 ```python
 codes = {d.code for d in result.diagnostics}
@@ -384,6 +388,47 @@ Two properties worth relying on:
 - **Each node carries the API call that produced it**, so a session doubles as
   a reproducible script, and `cherry_pick` replays another node's stage *action*
   (not its values) on top of the current state.
+
+---
+
+## 9b. Series: refine a ramp as a chain, and check it both ways
+
+An in-situ ramp, a parametric sweep or a tray of related specimens is
+`pr.SequentialRefinement` / `pr.refine_sequential`: N separate refinements,
+each warm-started from its predecessor.  (One *joint* residual over patterns
+that share structural parameters is the different verb `pr.refine_multi`.)
+What comes back is a `SeriesResult` — per-pattern summaries plus
+`trajectory(path)`, `qpa_trajectory(phase)`, `to_table()`, `write_csv()`.
+
+```python
+series = pr.refine_sequential(patterns, structure, instrument,
+                              x=temperatures, x_label="T (K)",
+                              plan="lab_sample_refine")
+a_of_T = series.trajectory("phases.0.cell.a")     # x, value, stderr
+```
+
+Three things an operator must know, all measured:
+
+- **Chaining is worth ~3x in iterations, not in accuracy.**  On the eight
+  round-robin sample-1 mixtures: 2863 iterations unchained, 904 chained, at
+  identical Rwp and identical weight fractions.  Use it to make a long series
+  affordable, never to make an individual fit better.
+- **The default `refit="single"` collapses the plan into one stage** for every
+  pattern after the first.  The staged turn-on order exists to keep early
+  stages conditioned from a *poor* starting model; a converged neighbour is not
+  one.  A pattern where that turns out to be wrong is caught by the reseed
+  fence, which refits it cold with the full staged plan.
+- **A sequential trajectory is path-dependent by construction**, so a smooth
+  curve is exactly what a poisoned chain produces.  `direction="both"` runs the
+  series each way and reports `SEQUENTIAL_PATH_DEPENDENT` per parameter.  For
+  any trajectory you intend to publish, run it — it is the only check that
+  separates a measurement from an ordering artefact.
+
+`carry` (dot-path globs) restricts what crosses a pattern boundary.  Reach for
+it when a parameter must provably not be chained; do **not** reach for it
+because a parameter jumps.  That hypothesis was tested on a series whose
+composition swings 1 → 94 wt % and it is false: carrying everything is cheaper
+there than excluding the scales.
 
 ---
 
