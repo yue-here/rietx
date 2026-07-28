@@ -98,6 +98,8 @@ not bugs; they are the geometry of the problem.
 | zero shift · sample displacement · cell | const · cosθ · tanθ | Over a narrow 2θ range these are collinear. A cell "refined" against a free zero on 20° of data is not measured. |
 | crystallite size · microstrain | 1/cosθ · tanθ | Williamson-Hall separability. Over a short range they are one parameter, not two. |
 | phase scale · Biso/ADPs · background · absorption · surface roughness · extinction | all smooth in Q | This is the big one. Every member depresses or lifts intensity as a smooth function of angle. Any of them can absorb any other. |
+| capillary µR · phase scale · Biso | exp(c·sin²θ) — *exactly* | Not "correlated": singular. µR is computed from the specimen and never refined, and the fit is identical with and without it (§8.1). |
+| flat-plate µt · phase scale · Biso | mostly, but not exactly | 60–99 % absorbable, so it is also computed rather than refined — but the remainder does move Rwp, and a wrong thickness lands partly in the fit and partly in the ADPs (§8.12). |
 | preferred orientation · site occupancy | both rescale specific hkl | An occupancy refined against uncorrected texture is a texture measurement. |
 | overlapped reflection intensities (Pawley/Le Bail) | identical | The *sum* is determined; the split is not. |
 
@@ -234,8 +236,10 @@ Every code below is a structured `Diagnostic` on `result.diagnostics` with a
 | `ADP_NOT_POSITIVE_DEFINITE` | Report the tensor as measured |
 | `STEPHENS_STRAIN_NOT_POSITIVE` | Report any S_HKL |
 | `DISPERSION_NEGLECTED` | Quote QPA weight fractions — unequal f′ across phases biases them directly (measured: RMS 2.26 → 0.69 wt % once applied) |
-| `ABSORPTION_ESTIMATE_UNAVAILABLE` | Assume the capillary correction ran. It did not; the fit has **no** absorption correction |
+| `ABSORPTION_ESTIMATE_UNAVAILABLE` | Assume the absorption correction ran. It did not; the fit has **no** specimen absorption correction |
 | `ABSORPTION_MU_R_OUT_OF_RANGE` | Trust the magnitude of the correction — µR > 1 extrapolates the Rouse fit |
+| `ABSORPTION_THICKNESS_MATTERS` | Quote displacement parameters without checking the flat specimen's thickness — part of the correction is not absorbable by the scale and ADPs, so a wrong µt lands in both |
+| `ABSORPTION_PLATE_THICKNESS` | (info) Read it as a fit problem — a transmission plate far from µt = 1 costs counts, not accuracy |
 | `BRINDLEY_OUTSIDE_REGIME` | Prefer the corrected fractions; past µR ≈ 0.05 the "correction" can be further from truth than none |
 | `MICROABSORPTION_SKIPPED` | Assume microabsorption was handled |
 | `PAWLEY_OVERLAP_UNRESOLVED` | Use an individual reflection intensity from the group |
@@ -253,7 +257,7 @@ if "BACKGROUND_ABSORPTION" in codes:
 
 ---
 
-## 8. Eleven things that will surprise you, all measured
+## 8. Twelve things that will surprise you, all measured
 
 These are the findings from building the package that change how an agent
 should behave. Each one cost a debugging pass.
@@ -266,6 +270,12 @@ that a Biso refined without it comes back **low by 0.49 Å² at µR = 1** (Cu K�
 which is comparable to Biso itself and 19σ against its own esd. `result.absorption`
 reports the bias because no fit statistic can. **Corollary for the agent: never
 judge a correction by Δ Rwp. Ask which physical quantity it unbiases.**
+
+Measured end to end on a real capillary pattern (11-BM, NIST SRM 660a LaB₆ in
+the documented 0.81 mm bore, µR = 0.674): Rwp moved 3 × 10⁻⁸, the lattice
+parameter 8 × 10⁻¹² Å, and **both** displacement parameters moved by
++0.0166542 Å² against a predicted 0.0166542. That is what "exact" means here.
+It is not a general property of absorption corrections — see 8.12.
 
 **8.2 The opposite also happens: an improvement that passes every statistical
 test and is still rejected.** On round-robin brucite, adding anisotropic strain
@@ -357,6 +367,31 @@ Three things then follow from *which* anode, all measured:
   an untabulated anode) yields `contamination == []` — *not checked*, not
   clean. `background.identify_anode(λ)` returns `None` there and is how you
   tell the two apart.
+
+**8.12 "Infinitely thick" is a modelling claim you make by saying nothing.**
+Every flat-plate fit in this package — and by default in every Rietveld code —
+assumes the specimen is thicker than the beam penetrates. That is exactly right
+for a filled well and badly wrong for a thin layer on a zero-background holder,
+which is how small, precious or air-sensitive samples are usually mounted. The
+error is much larger than the capillary case and has the opposite sign:
+`ΔBiso = −1.5 Å² at µt = 0.2` over a Cu Kα range, because a thin specimen runs
+out of material exactly where the beam penetrates deepest, and the missing
+high-angle intensity reads as thermal motion.
+
+Three consequences for an agent:
+
+* Declare `Geometry.mu_t` (or `thickness_mm`, and let it be estimated) whenever
+  the specimen is a thin mount. Silence means thick.
+* The "off" value is **µt = ∞, not 0** — the reverse of every other correction
+  here. `mu_t = 0` is a specimen of no thickness and is refused for reflection
+  geometry rather than being taken as "no correction".
+* Unlike the capillary case this one **does** move Rwp, because it is not an
+  exact reparameterisation (1–40 % of ln A survives a free scale and Biso). So
+  8.1's rule inverts: here a *worse* Rwp after declaring a thickness is
+  evidence the specimen was not that thin. Measured on round-robin fluorite —
+  a thick back-packed mount — declaring µt = 0.5 takes Rwp 0.1793 → 0.1830 and
+  drives one Biso onto its bound. That is the correction correctly refusing to
+  fit a specimen that is not there.
 
 ---
 

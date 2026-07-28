@@ -144,6 +144,22 @@ flagged `PAWLEY_OVERLAP_UNRESOLVED` rather than confidently split).
   is silently float32: this cost the Pawley aux columns four orders of accuracy
   once, and is why constants are lifted inside the traced call, not at closure
   build.
+- **Specimen absorption is one seam, three geometries, and their "off" states
+  disagree** (`model/absorption.py`, `CompiledModel._absorption`). Capillary:
+  `Geometry.mu_r`, Rouse (1970), off at µR = 0, and *exactly* a
+  reparameterisation of {scale, Biso} — Rwp provably cannot move, the whole
+  content is ΔB = c(µR)·λ²/2 (measured on real 11-BM SRM 660a data:
+  ΔRwp 3e-8, every Biso +0.0166542 Å² against a predicted 0.0166542). Flat plate:
+  `Geometry.mu_t`, ITC Table 6.3.3.1 case (2) under `bragg_brentano` and case
+  (3a) under `flat_plate_transmission`, **off at µt = ∞** (thick specimen, ITC
+  (1a), the assumption every flat-plate fit here made before v0.5) — so `mu_t`
+  absent ≠ `mu_t = 0`, which is a specimen of no thickness and raises. It is
+  *not* an exact reparameterisation (1-40 % of ln A survives the projection), so
+  it moves Rwp, its ΔBiso is an order of magnitude larger and negative, and on a
+  genuinely thick specimen declaring a thickness correctly makes the fit worse.
+  Neither µR nor µt is refinable: µR is exactly singular, µt is merely
+  ill-conditioned and knowable from the specimen, and the difference is recorded
+  rather than smoothed over.
 - **Instrument ⊕ sample profile split**: Gaussian *variances* add
   (instrument U,V,W + phase `gauss_size`/`gauss_strain`), Lorentzian *FWHMs*
   add (instrument X,Y + phase `lor_size`/`lor_strain`). Workflow:
@@ -229,7 +245,8 @@ flagged `PAWLEY_OVERLAP_UNRESOLVED` rather than confidently split).
   just the primary — otherwise Layer 0 flags each Kα2 peak as an unindexed
   impurity (this was a real bug, caught by the misfit-injection suite).
 - Tests: fast unit/property tests always; real-data acceptance marked
-  `@pytest.mark.slow` (`test_acceptance_nac.py`, `_srm660c.py`, `_fap.py`).
+  `@pytest.mark.slow` (`test_acceptance_nac.py`, `_srm660c.py`, `_fap.py`,
+  `_capillary.py`).
   Reference values and data provenance in `tests/data/README.md`. Every test
   refinement also writes obs/calc/diff PNGs to `tests/output/` (gitignored)
   for visual inspection — Rwp hides locally-bad fits.
@@ -274,13 +291,13 @@ measured acceptance in `docs/milestones/v0.3.md`: SRM 676a cell anchor via c/a
 tolerances), **v0.4** (2026-07-27: differentiable backends — WP-0401…0408,
 measured acceptance in `docs/milestones/v0.4.md`).
 
-**In flight: v0.5 — corrections & microstructure.** Landed and usable but the
-milestone has not closed: capillary absorption (0501), surface roughness (0502),
-Stephens anisotropic strain (0503), anomalous f′/f″ (0504), sequential series
-(0505), secondary extinction (0506). Remaining: 0507 (anode wavelengths), 0508
-(flat-plate absorption + a real capillary acceptance). `pyproject.version`
-tracks the milestone *in flight*, not the last one shipped, because that string
-is stamped into every `RefinementResult.provenance` and history node.
+**v0.5 — corrections & microstructure** (2026-07-28: capillary absorption 0501,
+surface roughness 0502, Stephens anisotropic strain 0503, anomalous f′/f″ 0504,
+sequential series 0505, secondary extinction 0506, anode wavelengths 0507,
+flat-plate absorption + the real-data capillary acceptance 0508; measured
+acceptance in `docs/milestones/v0.5.md`). `pyproject.version` tracks the
+milestone *in flight*, not the last one shipped, because that string is stamped
+into every `RefinementResult.provenance` and history node.
 
 **v0.4 — differentiable backends.** `backend=` takes `"numpy"` (the default and
 the only one anyone needs), `"jax"`, or the **experimental** `"torch"` (CPU

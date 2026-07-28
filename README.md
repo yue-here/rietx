@@ -47,8 +47,8 @@ v0.4 is recorded with measured acceptance in
 [docs/milestones/v0.4.md](docs/milestones/v0.4.md); the v0.5 rows marked below
 have landed but the milestone has not closed (see
 [docs/ROADMAP.md](docs/ROADMAP.md) for what remains). Working today —
-constant-wavelength X-ray, both **capillary/synchrotron** and **laboratory
-Bragg-Brentano** geometry:
+constant-wavelength X-ray in three geometries — **capillary/synchrotron**,
+**laboratory Bragg-Brentano** and **flat-plate transmission**:
 
 | Capability | State |
 |---|---|
@@ -75,6 +75,7 @@ Bragg-Brentano** geometry:
 | True Voigt peak shape (shared Faddeeva `w(z)`; TCHZ still the default) | ✅ |
 | Soft bond / angle / value restraints (Rietveld, single-histogram) | ✅ |
 | Capillary (cylindrical) absorption, µR computed from composition — unbiases Biso, cannot change Rwp | ✅ |
+| Flat-plate absorption (ITC 6.3.3.1 finite-thickness reflection + symmetric transmission), µt computed from composition | ✅ |
 | Surface roughness (Suortti 1972 / Pitschke 1993), Bragg-Brentano, with identifiability fences | ✅ |
 | Secondary extinction (Sabine polycrystalline blend) | ✅ |
 | Fundamental Parameters Approach, neutron/TOF, texture | v2 |
@@ -93,7 +94,7 @@ cannot improve Rwp can still be the one you need).
 
 ### Validation
 
-Seven real-data acceptance suites, each with its tolerance chosen to match what
+Eight real-data acceptance suites, each with its tolerance chosen to match what
 the reference actually is:
 
 | Dataset | Result | Reference |
@@ -104,6 +105,7 @@ the reference actually is:
 | SRM 676a **corundum** (lab CuKα) | c/a = 2.729928 (+30 ppm) | the axial ratio where uniform d-scale systematics cancel — a **certificate-grade** anchor; absolute axes carry a ~−300 ppm lab d-scale offset |
 | IUCr **CPD QPA round robin** (samples 1a–h, 2, 4) | worst 5.1 wt % (sample 1); traces ≤ 1.3 wt % | tolerance referenced to the published **participant spread**; sample 4 is the designed Brindley-defeating case (µR fence fires, no accuracy band claimed) |
 | IUCr round robin **with f′, f″ applied** | worst 1.4 wt %, RMS 0.69 (was 5.1 / 2.26) | a **pre-registered prediction**: the parameter-free bias from neglecting anomalous scattering was written down before the refits, and re-derives the v0.3 shape v0.3 had attributed to microabsorption. Pure ZnO: Rwp barely moves, B(O) 0.02 → 0.43 Å² |
+| APS 11-BM **SRM 660a** LaB₆ (capillary, 0.81 mm bore) | Rwp and cell invariant to 3e-8 / 8e-12 Å; every Biso +0.0166542 Å² | the capillary absorption correction's claim, on real data: it is an *exact reparameterisation* of {scale, Biso}, so the predicted ΔB is the only observable. λ is beamline-calibrated on this standard, so the cell here is a consistency check and **not** an anchor |
 | CPD **brucite** / **corundum** (anisotropic strain) | brucite Rwp 18.55 → 17.90 %, ΔBIC +488 — *and rejected* | a **characterisation**: the improvement passes both statistical tests yet drives the strain variance negative on 12 of 43 reflections, so the cone guard fires and no S_HKL are quotable. Corundum is the isotropic control (ΔBIC −17, diagnostic 1.60×, not detected) |
 
 Plus one validation suite that has no reference dataset because its subject is

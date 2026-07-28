@@ -243,6 +243,8 @@ in the base install; the FitReport itself is pure numpy.
 
 Cylindrical (capillary) absorption, WP-0501, is worth recording as a design
 case because it inverts the usual test for whether a correction is working.
+Its flat-plate siblings (WP-0508) then invert it back, which is why both are
+recorded here together rather than as one rule.
 
 **Convention first, by physics not letters.** The forward model multiplies by
 the **transmission** coefficient A ≤ 1 (ITC Vol. C eq. 6.3.3.1). Most
@@ -278,11 +280,45 @@ Three consequences, each of which shaped an interface:
   the obvious way — "the corrected fit should be better" — it would assert
   something the physics cannot deliver, and would fail for the right reason.
 
-**Flat plate is fenced** for the mirror-image reason: reflection off a thick
-specimen has A = 1/2µ (ITC Table 6.3.3.1(1a)) with no θ at all, so it is not
-merely degenerate with the phase scale, it *is* the phase scale. Only the
-finite-thickness and transmission cases carry a signature; they need a sample
-thickness the schema does not have, and go to WP-0508.
+**Flat plate, WP-0508: the same family, and every one of the four bullets above
+comes out differently.** Reflection off a *thick* specimen has A = 1/2µ (ITC
+Table 6.3.3.1(1a)) with no θ at all, so it is not merely degenerate with the
+phase scale, it *is* the phase scale — that case stays unimplemented, and it is
+what this package assumes whenever a flat specimen declares no thickness. The
+two cases that do carry a signature are finite-thickness reflection (ITC (2))
+and symmetric transmission (ITC (3a)), and they differ from the cylinder in
+ways worth stating because they are counter-intuitive:
+
+- **Not an exact reparameterisation.** ln A is not affine in sin²θ for either,
+  so 1–40 % of the correction survives a free scale and a free Biso. Applying
+  it *does* move Rwp, and the acceptance therefore asserts the opposite of the
+  capillary one: on a genuinely thick specimen, declaring a thickness makes the
+  fit **worse** (round-robin fluorite, µt = 0.5: Rwp 0.1793 → 0.1830), which is
+  the correction correctly refusing a specimen that is not there.
+- **Much larger, and the other sign.** ΔBiso reaches −1.5 Å² at µt = 0.2 over a
+  Cu Kα range, an order of magnitude past the capillary's, and it is *negative*:
+  a thin specimen runs out of material where the beam penetrates deepest, so the
+  missing high-angle intensity reads as thermal motion.
+- **The identity is µt = ∞, not µt = 0.** The reflection expression is
+  normalised by its own thick limit, so "off" is an infinitely thick specimen
+  and µt = 0 is a specimen of no thickness. That inverts the convention every
+  other correction here follows, so it is enforced rather than documented: the
+  schema refuses `mu_t = 0` under reflection and `CompiledModel.mu_t` is
+  `None`-able rather than defaulting to `0.0`.
+- **µt is still not refinable, but on weaker evidence, and the difference is
+  recorded rather than smoothed over.** `mu_t_identifiable_fraction` measures a
+  few per cent to tens of per cent surviving the {scale, Biso} projection —
+  real, unlike µR's identical zero. It is held fixed on three grounds instead:
+  µt is knowable from the specimen, a free one sits in the ill-conditioned
+  {scale, Biso, background} corner, and what it would silently re-apportion is
+  the ADPs the correction exists to protect. The measurement is pinned by a test
+  so a future session revisiting the choice starts from numbers.
+
+Transmission adds one thing the other geometries have no analogue for: its
+unnormalised intensity peaks at **µt = 1**, so µt *is* the plate thickness in
+units of the optimal one and `intensity_fraction_of_optimal = µt·e^(1−µt)` says
+how many counts the specimen preparation cost. It is reported, never acted on —
+a badly chosen thickness costs statistics, not accuracy.
 
 **Validation lesson.** The coefficient b₂ is printed as "−0·0375" in the
 available scan of Rouse when it is −0·3750. That error is invisible against a
