@@ -137,11 +137,13 @@ def test_x64_and_global_backend_never_leak():
 
 
 def test_unknown_backend_rejected():
+    # "cupy", not "torch": torch became a real backend with WP-0408, so this
+    # needs a name that is genuinely absent from the registry
     with pytest.raises(ValueError, match="unknown backend"):
-        resolve_backend("torch")
+        resolve_backend("cupy")
     structure, ins, _ = _lab_state()
     with pytest.raises(NotImplementedError, match="unknown backend"):
-        pr.Refinement(structure, ins, backend="torch", history=False)
+        pr.Refinement(structure, ins, backend="cupy", history=False)
 
 
 def test_jax_backend_ops_functional_contract():

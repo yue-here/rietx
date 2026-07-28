@@ -101,6 +101,36 @@ class MicroabsorptionCorrection(Base):
     mu_mean_cm: float                               # µ̄ of the solid mixture, 1/cm
 
 
+class AbsorptionCorrection(Base):
+    """Record of the cylindrical (capillary) absorption applied, WP-0501.
+
+    Present only for ``debye_scherrer`` Rietveld fits that actually carried a
+    µR.  ``mu_r`` is the value used (from ``Geometry.mu_r``, or estimated from
+    composition × packing × capillary radius when that was left unset), and
+    ``mu_r_source`` says which.
+
+    ``equivalent_delta_biso`` is the point of the whole correction.  The Rouse
+    transmission factor is exactly a constant times exp(c·sin²θ), so applying
+    it is an exact reparameterisation of the phase scale and the displacement
+    parameters: Rwp does not change.  What changes is that a Biso refined
+    *without* it comes back low by this much (Å²), which is why the correction
+    is worth applying and why an Rwp comparison would show nothing.
+    """
+
+    method: Literal["rouse_cylinder"] = "rouse_cylinder"
+    mu_r: float
+    mu_r_source: Literal["given", "estimated"]
+    wavelength: float                    # Å, primary emission line
+    equivalent_delta_biso: float         # Å², bias incurred by omitting this
+    #: set when µR was requested but could not be estimated (absorption edge in
+    #: the tabulation interval, element outside the compilation, energy outside
+    #: 2-120 keV) — the correction was then not applied
+    skipped: str | None = None
+    #: set when µR exceeds the Rouse fit's stated range; the value was still
+    #: used, since refusing outright would silently drop real absorption
+    out_of_range: bool = False
+
+
 class QuantitativePhaseAnalysis(Base):
     """Per-phase weight fractions from the refined Rietveld scales.
 
@@ -241,6 +271,11 @@ class RefinementResult(Base):
     # Quantitative phase analysis (weight fractions); computed for Rietveld
     # fits, None for Le Bail (its scales are degenerate).
     qpa: QuantitativePhaseAnalysis | None = None
+
+    # Cylindrical absorption (WP-0501); None unless a capillary µR was given or
+    # estimable.  Carries the equivalent Biso bias, because that — not Rwp — is
+    # what the correction buys.
+    absorption: AbsorptionCorrection | None = None
 
     # Soft-restraint summary (bond/angle/value deviations, pooled restraint χ²);
     # present only when a phase declared restraints (Rietveld-only), None

@@ -1,15 +1,16 @@
 # WP-0404 — Cross-backend Jacobian-agreement CI
 
-Milestone: v0.4 · Status: ⬜ not started
+Milestone: v0.4 · Status: ✅ landed 2026-07-24
 Depends on: WP-0402
 
 ## Goal
 
 A test matrix proving that analytic, FD, jax-jacfwd, torch-fp64-CPU and
-fp32-column-policy Jacobians agree — including across stage boundaries and in
-Rietveld/Le Bail/Pawley single- and multi-histogram modes — so backend drift
-is caught the day it happens, not the day it ships a wrong esd. Green with
-and without the optional backends installed.
+fp32-column-policy Jacobians agree — including across stage boundaries, in
+Rietveld (single- and multi-histogram) and in Le Bail/Pawley (single-histogram;
+multi-histogram is Rietveld-only by WP-0308's design) — so backend drift is
+caught the day it happens, not the day it ships a wrong esd. Green with and
+without the optional backends installed.
 
 ## Context
 
@@ -122,13 +123,29 @@ restated here or it is lost.
   stages is where discreteness bugs surface): run a 3-stage SRM 660c plan;
   at each recompile assert Jacobian continuity `‖J_after − J_before‖/‖J‖ <
   1e-6` at the shared parameter values. Cover Rietveld, Le Bail and Pawley.
+  *(Corrected on landing: 1e-6 was written before measurement and sits below
+  the real srm660c gap of 5.9e-6 — a converged stage moves parameters, so the
+  frozen state it regenerates is genuinely staler than that. Shipped bars are
+  1e-4 Frobenius / 1e-3 per column, against measured 5.9e-6 / 6.9e-5; see
+  Acceptance. Two sharper claims carry the weight instead: the boundary whose
+  stage freed only scale/background must be **exactly** zero, and the frozen
+  state must be **bit-identical** across each least-squares run.)*
 - **Runs without extras.** Backend-specific rows use
   `pytest.importorskip("jax")` / `importorskip("torch")` (the established
   pattern — see `tests/test_pawley.py`); the analytic-vs-FD core always
   runs, so a numpy-only checkout stays green. The full matrix runs after
-  `uv pip install -e ".[dev,jax,torch]"`. GitHub Actions wiring is
-  deliberately deferred to WP-1002 (no `.github/` exists yet) — acceptance
-  here is pytest-command-based.
+  `uv pip install -e ".[dev,jax]"` (the `torch` extra does not exist yet —
+  it lands with WP-0408, and the torch row skips itself until then).
+  GitHub Actions wiring is deliberately deferred to WP-1002 (no `.github/`
+  exists yet) — acceptance here is pytest-command-based.
+- **Central differences, not forward** *(decided on landing)*. Forward FD
+  carries O(h) truncation error, which on real data with sharp peaks is not
+  small: measured against the analytic column, forward FD sits 6.2e-3 away on
+  `srm660c` `phases.0.cell.a` and 4.7e-3 on `nac` — at or past the 5e-3 bar,
+  for reasons that have nothing to do with any backend. Central FD (O(h²))
+  puts the same two columns at 4.3e-5 and 2.2e-5. A bar loose enough for forward FD
+  would be too loose to catch drift. The forward-difference variant stays under
+  test where it belongs: `test_v02_core.test_analytic_jacobian_matches_fd`.
 
 ## Non-goals
 
@@ -137,28 +154,56 @@ WP-0402/0408); esd-value assertions (WP-0407 owns the esd path).
 
 ## Tasks
 
-- [ ] `tests/test_cross_backend.py`: parametrized (method × config) matrix;
+- [x] `tests/test_cross_backend.py`: parametrized (method × config) matrix;
       analytic-vs-FD and fp32-column always-on (the fp32 policy needs no
       extra); jax/torch rows `importorskip`-gated; fp64 tolerance constants
       declared here, fp32 bars imported from `backend.linalg64`
-- [ ] Stage-boundary continuity cases (3-stage SRM 660c; Rietveld + Le Bail
+- [x] Stage-boundary continuity cases (3-stage SRM 660c; Rietveld + Le Bail
       + Pawley)
-- [ ] Multi-histogram stacked-Jacobian agreement (via
+- [x] Multi-histogram stacked-Jacobian agreement (via
       `run_multi_least_squares` layout)
-- [ ] Document the extras invocation (`uv pip install -e ".[dev,jax,torch]"`)
-      in this file and CLAUDE.md once the extras exist
+- [x] Document the extras invocation (`uv pip install -e ".[dev,jax]"`) in
+      this file and CLAUDE.md once the extras exist — done for jax; the
+      `torch` extra does not exist yet and lands with WP-0408
 
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/test_cross_backend.py -q   # numpy-only: analytic vs FD
-# after: uv pip install -e ".[dev,jax,torch]"
-.venv/bin/python -m pytest tests/test_cross_backend.py -q   # full matrix
+.venv/bin/python -m pytest tests/test_cross_backend.py -q   # numpy-only rows only
+# after: uv pip install -e ".[dev,jax]"   (torch extra: WP-0408)
+.venv/bin/python -m pytest tests/test_cross_backend.py -q   # + the jax rows
 ```
 
-Measured: all fp64 methods agree <5e-3 / >0.99999 on every config; the
-fp32-column method agrees <2e-2 / >0.999; stage-boundary Jacobian continuity
-<1e-6; the file is green both with and without the extras installed.
+Measured 2026-07-24 (jax 0.11.0, no torch installed — 46 tests / 42 s with the
+two `slow` real-data configs, 34 tests / 22 s without; 10 skips are the torch
+rows and the configs with no axial columns):
+
+| method | worst rel-L2 off the kink | on the kink | bar |
+|---|---|---|---|
+| central FD | 8.8e-4 (`srm660c` `profile.u`) | 3.0e-3 | 5e-3 / kink 2e-2 |
+| jax jacfwd | 8.8e-4 (`srm660c` `profile.u`) | 6.1e-3 | 5e-3 / kink 2e-2 |
+| numpy + fp32 policy | 3.7e-8 (`toy_pawley` intensity column) | 2.6e-8 | 2e-2 |
+| jax + fp32 policy | 8.8e-4 | 6.1e-3 | 2e-2 |
+| multi-histogram, stacked | FD 1.4e-4, jax 1.8e-6, fp32 2.7e-8 | — | as above |
+
+Only the two real-data configs reach 1e-4 at all; the four synthetic ones stay
+below 2.8e-5 for every method. Worst cosine off the kink columns: 1 − 1.3e-7
+(`srm660c` `profile.u`, both FD and jax — i.e. the disagreement is in
+magnitude, not direction). The Pawley intensity block — exact linear columns on
+both sides — agrees to 6.7e-14 (jax) and 1.1e-10 (central FD, i.e. round-off/h).
+
+Stage boundaries (3-stage plans; per-boundary Frobenius / worst column, bars
+1e-4 / 1e-3): `srm660c` Rietveld **0.0** then 5.9e-6 / 6.9e-5; toy Le Bail
+**0.0** then 1.9e-7; toy Pawley **0.0** then 7.6e-7. The exact zeros are the
+boundaries whose stage freed only scale/background, which cannot move the
+frozen state; the frozen state (hkl list, window ranges, FCJ node counts, PO
+orbit members) is bit-identical across every least-squares run. For contrast,
+letting Le Bail *re-extract* intensities at the same boundary moves the same
+columns 8.2e-2 (Le Bail) and 3.2e-1 (Pawley) — which is why the measurement is
+taken with intensities carried.
+
+The file is green with and without jax installed; the torch rows skip with
+`unknown backend 'torch'` until WP-0408.
 
 ## References
 
@@ -181,3 +226,38 @@ tolerance style is the measured v0.2 harness.
   The Design tolerance bullet previously said to declare the fp32 bars
   locally; that would have duplicated `linalg64`'s exports, which is the very
   drift this WP exists to catch. Corrected.
+- **2026-07-24 — landed.** All four tasks done in `tests/test_cross_backend.py`
+  (46 tests: 5 methods × 6 configs = 30, the 5 multi-histogram method rows +
+  its layout guard, 3 stage-boundary plans, the per-config `axial_ok` guard
+  (6), and the Pawley exact-column check). Measured numbers in Acceptance
+  above.
+  - *Done*: the (method × config) matrix; stage-boundary continuity for
+    Rietveld/Le Bail/Pawley; multi-histogram stacked agreement;
+    `uv pip install -e ".[dev,jax]"` documented here and in CLAUDE.md.
+  - *Two design bullets were corrected against measurement, not opinion*: the
+    1e-6 boundary bar (real srm660c gap is 5.9e-6) and forward-vs-central FD
+    (forward sits 6.2e-3 from analytic on srm660c cell `a` — past the fp64
+    bar, from truncation alone). Both are annotated in Design above.
+  - *One production change*: `optimize/least_squares._multi_closures()`, the
+    stacked residual/Jacobian pair split out of `run_multi_least_squares` so
+    the multi-histogram layout is reachable without running a solve. Behaviour
+    unchanged; `run_multi_least_squares` now calls it.
+  - *Gotchas for anyone extending this file*:
+    - **The matrix only covers what the state builders contain.** Configs are
+      `tests/test_backend_shim.py::STATES` plus the `ANALYTIC_FAMILIES` lab
+      state. New physics (a new profile shape, restraint rows, an absorption
+      correction) is invisible here until it appears in one of those states.
+    - **jit compile, not flops, is the cost.** `_JACOBIAN_CACHE` keys one
+      built callable per (config, backend) so the `+fp32` rows reuse the
+      compiled jax one — that halved the file's runtime (29 s → 15 s for the
+      non-`slow` subset). Do not build a second callable per row.
+    - **The kink loose bar is conditional**, applied only when the state's
+      decoded S/L equals H/L. Do not make it unconditional to silence a
+      failure on some other state — that would hide real drift.
+    - Suite runtimes were badly stale and are now measured: `-m "not slow"`
+      ~85 s (CLAUDE.md said ~20 s) and the full suite ~13 min (it said ~2 min).
+      This file is ~22 s / ~42 s of those. CLAUDE.md corrected; WP-1002's
+      `### Inherited` warned, since it sizes CI jobs from those numbers.
+  - *Next*: nothing here. WP-0408 activates the torch rows by adding the
+    `torch` branch to `_jacobian_for` plus a `torch` extra — the row and its
+    skip are already written (noted in 0408's `### Inherited`).

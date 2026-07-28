@@ -10,10 +10,19 @@ state:
 - **Typed, JSON-round-trippable schemas** (pydantic v2) for structures,
   instruments, patterns, plans, and results. Every schema exports JSON Schema
   for LLM tool-calling; unknown fields fail loudly with actionable errors.
-- **numpy + scipy float64 core** (~50 MB install). Optional autodiff/GPU
-  backends (JAX first) are on the roadmap; the forward model is written to
-  stay differentiable (frozen reflection lists and evaluation windows per
-  refinement stage, smooth reparameterisations, no clamps in the graph).
+- **numpy + scipy float64 core** (~50 MB install), with optional autodiff
+  backends behind the `[jax]` and `[torch]` extras: `backend="jax"` /
+  `"torch"` / `"torch-mps"` swap in an exact forward-mode Jacobian, and every
+  one is held to per-column agreement with the analytic assembly in CI. The
+  numpy path is the default and the fast one; `[torch]` is **experimental**,
+  never installed by default, and earns its place as an independent check on
+  the analytic Jacobian rather than as a speedup. The forward model is written
+  to stay differentiable (frozen reflection lists and evaluation windows per
+  refinement stage, smooth reparameterisations, no clamps in the graph). GPU columns run fp32 — the residual and the solve are always
+  fp64 on host, because JᵀJ squares the condition number. Reported honestly:
+  Apple-GPU execution is currently *slower* than numpy (the peak loop is
+  dispatch-bound, not arithmetic-bound), so `torch-mps` today buys precision
+  validation rather than speed.
 - **Documented mathematics**: every implemented equation cites its literature
   reference in the docstring (Rietveld 1969; Caglioti 1958; Thompson-Cox-
   Hastings 1987; Waasmaier-Kirfel 1995; Toby 2006; Le Bail 1988; …).
@@ -32,7 +41,7 @@ state:
   without reading a plot image. Every layer is built to **abstain rather than
   guess**: collinear causes are reported as unresolved, not resolved wrongly.
 
-## Status: v0.3 (pre-alpha)
+## Status: v0.4 (pre-alpha)
 
 Working today — constant-wavelength X-ray, both **capillary/synchrotron** and
 **laboratory Bragg-Brentano** geometry:
@@ -57,7 +66,10 @@ Working today — constant-wavelength X-ray, both **capillary/synchrotron** and
 | Anomalous scattering f′, f″ (Cromer-Liberman; Friedel-averaged \|F\|², opt-in per source) | ✅ |
 | Multi-histogram joint refinement (shared structure, per-histogram Rwp) | ✅ |
 | Exporters: reflection table, refinement CIF (values + esds), QPA table | ✅ |
-| Differentiable backends: JAX autodiff Jacobians, torch/MPS; true Voigt; restraints | v0.4 |
+| Differentiable backends (`backend="jax"` / `"torch"` / `"torch-mps"`), held to per-column Jacobian agreement | ✅ |
+| True Voigt peak shape (shared Faddeeva `w(z)`; TCHZ still the default) | ✅ |
+| Soft bond / angle / value restraints (Rietveld, single-histogram) | ✅ |
+| Capillary (cylindrical) absorption, µR computed from composition — unbiases Biso, cannot change Rwp | ✅ |
 | Fundamental Parameters Approach, neutron/TOF, texture | v2 |
 
 Milestones are tracked in [docs/ROADMAP.md](docs/ROADMAP.md), which indexes
@@ -80,6 +92,19 @@ the reference actually is:
 | IUCr round robin **with f′, f″ applied** | worst 1.4 wt %, RMS 0.69 (was 5.1 / 2.26) | a **pre-registered prediction**: the parameter-free bias from neglecting anomalous scattering was written down before the refits, and re-derives the v0.3 shape v0.3 had attributed to microabsorption. Pure ZnO: Rwp barely moves, B(O) 0.02 → 0.43 Å² |
 | CPD **brucite** / **corundum** (anisotropic strain) | brucite Rwp 18.55 → 17.90 %, ΔBIC +488 — *and rejected* | a **characterisation**: the improvement passes both statistical tests yet drives the strain variance negative on 12 of 43 reflections, so the cone guard fires and no S_HKL are quotable. Corundum is the isotropic control (ΔBIC −17, diagnostic 1.60×, not detected) |
 
+Plus one validation suite that has no reference dataset because its subject is
+the code itself: **cross-backend Jacobian agreement**. Every way the package can
+produce a Jacobian — the analytic peak-chain assembly, central differences, JAX
+`jacfwd`, torch, and each of those under the fp32-column policy — is compared
+column by column on the same compiled state, across eight configurations
+(Rietveld, Le Bail, Pawley, anisotropic ADPs / preferred orientation /
+extinction, true Voigt, restraints, and two real patterns), the stacked
+multi-histogram layout, and across stage-boundary recompiles. An
+**all-fp32 Apple-GPU refinement of SRM 676a lands 3.5×10⁻⁸ Å from the numpy
+fp64 cell**, because the residual and the solve are fp64 on host whatever the
+columns are computed in — see
+[docs/milestones/v0.4.md](docs/milestones/v0.4.md).
+
 The SRM 660c fit does **not** reach the certificate's ±8×10⁻⁶ Å band, and does
 not claim to: the residual is a characterised cotθ/sin2θ aberration
 (flat-specimen divergence, tube tails, monochromator passband) that belongs to
@@ -89,8 +114,8 @@ than tuned away — see [docs/milestones/v0.2.md](docs/milestones/v0.2.md).
 The FitReport's confidence numbers are calibrated by **synthetic misfit
 injection**: perturb exactly one known cause, assert the report recovers it,
 ranks it first, and reports *low* confidence when causes are deliberately
-made collinear. Run `pytest` (~2 min, includes all of the above; `pytest -m
-"not slow"` is ~20 s), `python examples/nac_11bm.py` (synchrotron walkthrough) or
+made collinear. Run `pytest` (~8 min, includes all of the above; `pytest -m
+"not slow"` is ~2 min), `python examples/nac_11bm.py` (synchrotron walkthrough) or
 `python examples/srm660c_lab.py` (lab walkthrough: diagnostics → refinement →
 all three FitReport layers → plots + interactive HTML).
 
@@ -235,12 +260,17 @@ reproducible script. Pass `history=False` for a zero-overhead plain fit.
 
 ```sh
 uv venv --python 3.12 && uv pip install -e ".[dev]"
-pytest              # 354 tests incl. five real-data acceptance suites (~2 min)
-pytest -m "not slow"    # 336 unit/property tests only (~20 s)
+pytest              # 801 tests incl. seven real-data acceptance suites (~12 min)
+pytest -m "not slow"    # 744 unit/property tests only (~2 min)
 ruff check src tests examples
 ```
 
-Extras: `[viz]` (matplotlib, plotly), `[baselines]` (pybaselines algorithm zoo).
+Extras: `[viz]` (matplotlib, plotly), `[baselines]` (pybaselines algorithm zoo),
+`[jax]` (autodiff Jacobians) and `[torch]` (**experimental** — an independent
+check on the analytic Jacobian and a route to differentiable-layer use, not a
+faster path; never installed by default). Every backend row in the agreement
+and conformance suites self-skips when its package is absent, so a numpy-only
+checkout is fully green.
 
 ## Architecture (one paragraph)
 

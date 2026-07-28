@@ -73,7 +73,7 @@ class ReflectionRow:
     Bail/Pawley mode, where the per-reflection intensity is extracted or refined
     rather than computed from the structure.  ``intensity`` is the modelled
     integrated intensity of this (line, reflection): in Rietveld mode
-    scale·multiplicity·|F|²·P·(line weight)·Lp·extinction.
+    scale·multiplicity·|F|²·P·(line weight)·Lp·extinction·absorption·roughness.
 
     With anomalous scattering on, ``f_squared`` is the **Friedel-averaged**
     ⟨|F|²⟩ = ½(|F(h)|² + |F(−h)|²) that the powder peak actually contains, not

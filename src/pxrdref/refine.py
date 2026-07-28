@@ -13,20 +13,31 @@ import numpy as np
 if TYPE_CHECKING:
     from .io.exporters import ReflectionRow
 
+from .backend.api import backend_dtype_note
 from .history.events import as_event_stream
 from .history.store import fingerprint
 from .history.tree import RefinementTree
+from .model.absorption import CYLINDER_MU_R_MAX, equivalent_delta_biso
 from .model.forward import CompiledModel, Mode, compile_model
 from .model.restraints import summarise_restraints
 from .optimize.least_squares import run_least_squares
-from .optimize.qpa import compute_qpa, microabsorption_diagnostics
+from .optimize.qpa import (
+    compute_qpa,
+    estimate_capillary_mu_r,
+    microabsorption_diagnostics,
+)
 from .optimize.statistics import compute_statistics
 from .params.vector import ParameterTable
 from .schemas.common import Diagnostic, Provenance
 from .schemas.history import NodeAction, NodeMetrics, RefinementState, ReflectionState
 from .schemas.instrument import Instrument
 from .schemas.pattern import PatternData
-from .schemas.results import RefinedParameter, RefinementResult, StageResult
+from .schemas.results import (
+    AbsorptionCorrection,
+    RefinedParameter,
+    RefinementResult,
+    StageResult,
+)
 from .schemas.structure import Structure
 from .strategy.staged import PLAN_PRESETS, RefinementPlan, Stage, check_guards
 
@@ -58,18 +69,25 @@ class Refinement:
     def __init__(self, structure: Structure, instrument: Instrument, *,
                  backend: str = "numpy",
                  history: bool | str | Path | RefinementTree = True):
-        if backend == "jax":
+        if backend != "numpy":
             # fail fast (with the install hint) instead of at the first stage;
             # resolve_backend caches the instance, so this costs one import
             from .backend import resolve_backend
 
-            resolve_backend("jax")
-        elif backend != "numpy":
-            raise NotImplementedError(
-                f"unknown backend {backend!r}; v0.4 ships numpy and jax")
+            try:
+                resolve_backend(backend)
+            except ValueError as exc:
+                raise NotImplementedError(str(exc)) from exc
         self._backend = backend
         self.structure = structure.model_copy(deep=True)
         self.instrument = instrument.model_copy(deep=True)
+        # Resolve a capillary µR from composition once, here, rather than per
+        # stage: µR is a property of the specimen as mounted, so it must not
+        # chase the refinement.  Writing it onto the (already copied)
+        # instrument makes the value visible in ``fitted_instrument`` and in
+        # every history snapshot instead of hiding inside the compiled model.
+        self._mu_r_source, self._mu_r_skipped = _resolve_capillary_mu_r(
+            self.structure, self.instrument)
         self.result_: RefinementResult | None = None
         self._model: CompiledModel | None = None
 
@@ -476,7 +494,8 @@ class Refinement:
             model, table, outcome.theta, mode=mode, status=outcome.status,
             stage_results=stage_results, diagnostics=diagnostics,
             structure=self.structure, stderr_internal=outcome.stderr_internal,
-            correlation=outcome.correlation)
+            correlation=outcome.correlation, backend=self._backend,
+            mu_r_source=self._mu_r_source, mu_r_skipped=self._mu_r_skipped)
         _apply_esds(table, self.result_, self.structure, self.instrument)
         self._stamp(self.result_, tree)
         if stream is not None:
@@ -529,7 +548,8 @@ class Refinement:
             model, table, outcome.theta, mode=mode, status=outcome.status,
             stage_results=[stage_result], diagnostics=diagnostics,
             structure=self.structure, stderr_internal=outcome.stderr_internal,
-            correlation=outcome.correlation)
+            correlation=outcome.correlation, backend=self._backend,
+            mu_r_source=self._mu_r_source, mu_r_skipped=self._mu_r_skipped)
         _apply_esds(table, self.result_, self.structure, self.instrument)
         self._stamp(self.result_, tree)
         return self.result_
@@ -682,6 +702,26 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
                        "fractions from this fit are biased even though Rwp "
                        "looks good",
         ))
+    for msg in guard.roughness_correlations:
+        path = msg.split(" ")[0]
+        rough = "surface_roughness" in path
+        out.append(Diagnostic(
+            level="warning", code="ROUGHNESS_ABSORPTION", where=[path],
+            message=(f"surface roughness is not separable from the "
+                     f"displacement/scale/background block here — {msg} of the "
+                     f"roughness column is reproducible by it"
+                     if rough else
+                     f"most of {msg} is reproducible by the surface-roughness "
+                     f"block: this displacement parameter is hiding in it"),
+            suggestion=("extend the fit to lower 2θ, where roughness has a "
+                        "lever arm the displacement parameters do not, or hold "
+                        "roughness fixed at an independently measured value; "
+                        "refining both against this range reports two numbers "
+                        "where the data support one, and their esds understate "
+                        "it (Pitschke et al. 1993 Table III: uncorrected "
+                        "roughness drives Biso negative, so neither leaving it "
+                        "out nor freeing it blind is safe)"),
+        ))
     return out
 
 
@@ -697,10 +737,81 @@ def _apply_esds(table: ParameterTable, result: RefinementResult,
         p.path: p.stderr for p in result.parameters if p.stderr is not None})
 
 
+def _resolve_capillary_mu_r(structure: Structure,
+                            instrument: Instrument) -> tuple[str, str | None]:
+    """Fill in ``Geometry.mu_r`` from composition, in place.  Returns
+    ``(source, skipped_reason)``.
+
+    Only acts when the geometry is a capillary with a radius and no explicit
+    µR — an explicit value always wins, because the user measured their
+    specimen and we did not.  Failure to estimate leaves ``mu_r`` at ``None``
+    (correction off) and returns the reason, which the result then reports:
+    silently running with no absorption after the user asked for it would be
+    the worst of the three outcomes.
+    """
+    geom = instrument.geometry
+    if geom.kind != "debye_scherrer" or geom.capillary_radius_mm is None:
+        return "given", None
+    if geom.mu_r is not None:
+        return "given", None
+    table = ParameterTable(structure, instrument)
+    mu_r, reason = estimate_capillary_mu_r(
+        structure, table.decode(table.x0()),
+        instrument.source.primary_wavelength,
+        geom.capillary_radius_mm, geom.packing_fraction)
+    if mu_r is None:
+        return "estimated", reason
+    geom.mu_r = mu_r
+    return "estimated", None
+
+
+def _absorption_record(model: CompiledModel, source: str,
+                       skipped: str | None):
+    """The :class:`AbsorptionCorrection` record, or None when nothing applies."""
+    if model.geometry_kind != "debye_scherrer" or model.mode != "rietveld":
+        return None
+    if not model.mu_r and skipped is None:
+        return None
+    lam = model.line_wavelengths[0] if model.line_wavelengths else model.wavelength
+    return AbsorptionCorrection(
+        mu_r=float(model.mu_r), mu_r_source=source, wavelength=float(lam),
+        equivalent_delta_biso=equivalent_delta_biso(model.mu_r, lam),
+        skipped=skipped, out_of_range=model.mu_r > CYLINDER_MU_R_MAX)
+
+
+def _absorption_diagnostics(record) -> list[Diagnostic]:
+    """Surface the two ways a capillary absorption correction can mislead."""
+    out: list[Diagnostic] = []
+    if record.skipped is not None:
+        out.append(Diagnostic(
+            level="warning", code="ABSORPTION_ESTIMATE_UNAVAILABLE",
+            where=["instrument.geometry.mu_r"],
+            message=("a capillary radius was given but µR could not be "
+                     f"estimated ({record.skipped}); the pattern was fitted "
+                     "with NO absorption correction"),
+            suggestion=("set instrument.geometry.mu_r explicitly, or use a "
+                        "wavelength away from an absorption edge of the "
+                        "specimen")))
+    if record.out_of_range:
+        out.append(Diagnostic(
+            level="warning", code="ABSORPTION_MU_R_OUT_OF_RANGE",
+            where=["instrument.geometry.mu_r"],
+            message=(f"µR = {record.mu_r:.2f} is outside the Rouse et al. "
+                     f"(1970) fit's range (µR ≤ {CYLINDER_MU_R_MAX:g}); the "
+                     "transmission factor is an extrapolation there"),
+            suggestion=("dilute the specimen, use a narrower capillary, or a "
+                        "shorter wavelength — pxrdref.estimate_mu_r() shows "
+                        "what each choice buys")))
+    return out
+
+
 def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray, *,
                   mode: Mode, status: str, stage_results: list[StageResult],
                   diagnostics: list[Diagnostic], structure: Structure,
-                  stderr_internal=None, correlation=None) -> RefinementResult:
+                  stderr_internal=None, correlation=None,
+                  backend: str = "numpy",
+                  mu_r_source: str = "given",
+                  mu_r_skipped: str | None = None) -> RefinementResult:
     values = table.decode(theta)
     y_calc = model.evaluate(values)
     y_bkg = model.background(values)
@@ -762,15 +873,28 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         diagnostics = diagnostics + _restraint_tension_diagnostics(
             restraints_report, structure)
 
+    # Cylindrical absorption: report what was applied and, crucially, the Biso
+    # bias it removed — Rwp is provably unchanged by it, so nothing else in the
+    # result would show that the correction did anything.
+    absorption = _absorption_record(model, mu_r_source, mu_r_skipped)
+    if absorption is not None:
+        diagnostics = diagnostics + _absorption_diagnostics(absorption)
+
+    # Surface-roughness regime fences (WP-0502): whether the fitted range can
+    # see the correction at all, and whether it left its derivation's domain.
+    diagnostics = diagnostics + _roughness_regime_diagnostics(model, values)
+
     return RefinementResult(
         status=status, mode=mode,
         parameters=params, statistics=stats,
         stages=stage_results, diagnostics=diagnostics,
-        provenance=Provenance(package_version=_VERSION, created_utc=_utcnow()),
+        provenance=Provenance(package_version=_VERSION, created_utc=_utcnow(),
+                              backend=backend, dtype=backend_dtype_note(backend)),
         two_theta=model.tt.tolist(), y_obs=model.y_obs.tolist(),
         y_calc=y_calc.tolist(), y_background=y_bkg.tolist(),
         sigma=model.sigma.tolist(),
         ticks=ticks, qpa=qpa, restraints=restraints_report,
+        absorption=absorption,
     )
 
 
@@ -972,6 +1096,103 @@ def _restraint_tension_diagnostics(report, structure: Structure) -> list[Diagnos
     return out
 
 
+#: below this modelled depression at the lowest fitted angle, a refined
+#: roughness correction is doing nothing the fit could have noticed.  Chosen
+#: against the counting statistics it competes with: 1 % of the strongest
+#: low-angle peak is at or under the noise of a typical lab scan, so a
+#: "correction" that small is a number the data did not constrain.
+ROUGHNESS_MIN_DEPRESSION = 0.01
+
+
+def _roughness_regime_diagnostics(model: CompiledModel,
+                                  values: dict[str, float]) -> list[Diagnostic]:
+    """Fences on where the roughness models are meaningful (WP-0502).
+
+    Two distinct failures, both invisible in Rwp:
+
+    ``ROUGHNESS_UNCONSTRAINED`` — the refined correction barely departs from
+    1.0 anywhere in the fitted range, so its value is arbitrary.  This is
+    measured on the *modelled depression*, not on the parameters, because the
+    Suortti model reaches the identity from **both** ends (b → 0 and b → ∞ —
+    see :class:`~pxrdref.schemas.instrument.RoughnessSuortti`); a test on ``b``
+    alone would catch only one of the two dead branches.  It also fires for the
+    legitimate case of data that simply starts too high in 2θ to see roughness.
+
+    ``ROUGHNESS_OUTSIDE_REGIME`` — Pitschke only, and taken from that paper's
+    own Eq (18): the derivation holds for sinθ ≥ τ.  Between τ and 2τ the
+    depression turns back over, and below τ the "correction" *amplifies*
+    intensity.  Reported rather than clamped, because clamping would put a kink
+    in the residual (the frozen-per-stage smoothness invariant).
+    """
+    if model.roughness is None or not len(model.tt):
+        return []
+    import numpy as np
+
+    base = "instrument.geometry.surface_roughness"
+    # Evaluated at the **reflection** positions, not over the 2θ grid.  Real
+    # data forced this (WP-0502): the IUCr round-robin patterns start at 5° 2θ
+    # but their first reflection is at 25-32°, and a grid-based fence happily
+    # reported a 27 % depression that no modelled peak ever experienced.
+    # Roughness is constrained by low-angle reflections, so that is where it
+    # has to be judged.
+    positions = np.concatenate(
+        [np.asarray(pos) for ip in range(len(model.phases))
+         for pos, *_ in [model.phase_peaks(ip, values)[0]]]) \
+        if model.phases else np.empty(0)
+    positions = positions[np.isfinite(positions)]
+    positions = positions[(positions >= model.tt_min) & (positions <= model.tt_max)]
+    if not positions.size:
+        return []
+    tt_min = float(np.min(positions))
+    factor = np.asarray(model._roughness_factor(positions, values))
+    depression = float(1.0 - np.min(factor))
+
+    out: list[Diagnostic] = []
+    if model.roughness == "pitschke":
+        tau = values[f"{base}.tau"]
+        sin_min = float(np.sin(np.radians(0.5 * tt_min)))
+        if tau > sin_min:
+            out.append(Diagnostic(
+                level="warning", code="ROUGHNESS_OUTSIDE_REGIME",
+                where=[f"{base}.tau"],
+                message=(f"Pitschke roughness tau={tau:.4f} exceeds "
+                         f"sin(theta) = {sin_min:.4f} at the lowest fitted "
+                         f"angle ({tt_min:.2f}° 2θ): past that point the model "
+                         f"amplifies rather than depresses intensity"),
+                suggestion="restrict the fit to 2θ above "
+                           f"{2 * np.degrees(np.arcsin(min(tau, 1.0))):.1f}°, or "
+                           "switch to kind='suortti', which is bounded ≤ 1 "
+                           "everywhere (Pitschke et al. 1993 Eq 18)",
+            ))
+        elif tau > 0.5 * sin_min:
+            out.append(Diagnostic(
+                level="info", code="ROUGHNESS_OUTSIDE_REGIME",
+                where=[f"{base}.tau"],
+                message=(f"Pitschke roughness is past its turnover at the low "
+                         f"end of the fit (tau={tau:.4f} vs sin(theta)="
+                         f"{sin_min:.4f} at {tt_min:.2f}° 2θ): the depression "
+                         f"stops deepening there"),
+                suggestion="the model is empirical rather than geometric in "
+                           "this range (the paper says so); treat tau as a "
+                           "fitting parameter, not a measured roughness",
+            ))
+
+    if depression < ROUGHNESS_MIN_DEPRESSION:
+        out.append(Diagnostic(
+            level="warning", code="ROUGHNESS_UNCONSTRAINED",
+            where=[f"{base}.{n}" for n in ("a", "b", "c", "tau")
+                   if f"{base}.{n}" in values],
+            message=(f"the refined surface roughness depresses intensity by at "
+                     f"most {depression:.2%} at any modelled reflection "
+                     f"(lowest at {tt_min:.2f}° 2θ) — the data cannot see it"),
+            suggestion="drop the roughness block, or extend the measurement to "
+                       "lower 2θ where the depression has a lever arm; note "
+                       "the Suortti model reaches the identity from both ends, "
+                       "so a large b is as inert as a zero one",
+        ))
+    return out
+
+
 def _restraint_where(row, structure: Structure) -> list[str]:
     if row.path is not None:
         return [row.path]
@@ -1031,6 +1252,33 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
     result.node_id = node.id
     result.tree_id = tree.header.tree_id
     return result
+
+
+def estimate_mu_r(structure: Structure, instrument: Instrument) -> float | None:
+    """Starting µR for a packed capillary, from composition and geometry.
+
+    Combines each phase's linear attenuation coefficient (McMaster tables, via
+    :mod:`pxrdref.crystallography.attenuation`) into a volume-fraction-weighted
+    bulk µ, scales it by ``Geometry.packing_fraction`` — voids do not absorb —
+    and multiplies by ``Geometry.capillary_radius_mm``.
+
+    Returns ``None`` rather than raising when µ is unavailable (a wavelength
+    whose tabulation interval straddles an absorption edge, an element outside
+    the compilation, an energy outside 2-120 keV) or when the geometry carries
+    no capillary radius.  Use it to *populate* ``Geometry.mu_r``; a refinement
+    will do the same thing itself at compile time if ``mu_r`` is left ``None``.
+
+    µR is not refinable, deliberately — see :mod:`pxrdref.model.absorption`.
+    """
+    geom = instrument.geometry
+    if geom.kind != "debye_scherrer" or geom.capillary_radius_mm is None:
+        return None
+    table = ParameterTable(structure, instrument)
+    mu_r, _ = estimate_capillary_mu_r(
+        structure, table.decode(table.x0()),
+        instrument.source.primary_wavelength,
+        geom.capillary_radius_mm, geom.packing_fraction)
+    return mu_r
 
 
 def refine(data: PatternData, structure: Structure, instrument: Instrument,

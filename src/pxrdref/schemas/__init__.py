@@ -8,7 +8,10 @@ from .instrument import (
     Geometry,
     Instrument,
     ProfileTCHZ,
+    RoughnessPitschke,
+    RoughnessSuortti,
     Source,
+    SurfaceRoughness,
 )
 from .pattern import PatternData
 from .results import (
@@ -43,8 +46,11 @@ __all__ = [
     "QuantitativePhaseAnalysis",
     "RefinedParameter",
     "RefinementResult",
+    "RoughnessPitschke",
+    "RoughnessSuortti",
     "Source",
     "StageResult",
     "Statistics",
     "Structure",
+    "SurfaceRoughness",
 ]

@@ -26,7 +26,7 @@ differentiable from day one.
 ## Locked decisions
 
 - **Backend**: numpy/scipy fp64 core (~50 MB default install); forward model
-  kept differentiable; optional `[jax]` (v0.4) then `[torch]` (v0.6) extras.
+  kept differentiable; optional `[jax]` and `[torch]` (both v0.4) extras.
   Hard constraint discovered in research: **no Apple GPU supports fp64 in any
   framework** (MPS/MLX fp32-only; jax-metal abandoned), and JᵀJ squares the
   condition number ⇒ GPUs compute fp32 Jacobian columns only, fp64 host solve.
@@ -39,6 +39,61 @@ differentiable from day one.
     starts only once the jax path (WP-0402) and the cross-backend agreement
     CI (WP-0404) are green, so the second backend lands against an existing
     agreement harness. v0.6 keeps the solver and agent-surface work.
+  - *Measured (2026-07-27, WP-0408 landed).* Both halves of that amendment
+    came in, and only one of them came in the way it was expected to. The
+    **fp32-column policy is confirmed on real hardware**: an MPS refinement of
+    SRM 676a corundum, with the whole peak chain and every Jacobian column
+    computed in fp32 on the GPU, lands 3.5×10⁻⁸ Å from the numpy fp64 cell and
+    5×10⁻¹¹ in Rwp — the trust region re-measures each step against an fp64
+    cost, so reduced columns perturb the path and not the answer, exactly as
+    `backend/linalg64.py` argues. **Apple-GPU acceleration did not
+    materialise**: MPS runs 60-125× *slower* than numpy
+    (`examples/bench_torch_mps.py`). The cause is the loop shape, not the
+    device — the residual evaluates ~130 frozen windows of 200-900 points one
+    at a time in python, and MPS per-op cost is *flat* at 110-165 µs from 64 to
+    65 536 elements, i.e. pure launch latency. It behaves like a GPU only at
+    ~10⁶ elements per kernel (255 µs vs numpy's 1588 µs).
+  - *Measured again (2026-07-27, after the above).* The obvious remedy was
+    over-claimed on first writing and is corrected here. Batching the peak loop
+    into one padded reflection × window tensor **does** collapse the dispatch
+    cost — at fixed total work, 128×900 → 1×115 200 takes MPS from 10.6 ms to
+    ~0.4 ms — **but it takes numpy from 1.36 ms to ~0.55 ms.** Sweeping one
+    kernel across sizes locates the two numbers that settle every "should this
+    run on the GPU" question here:
+    - **break-even ≈ 50-65 k elements per kernel** (65 k → 0.99×, 131 k → 1.47×);
+    - **the ceiling is ≈2.5-3×**, not an order of magnitude. The peak chain is
+      ~17 flops per element, i.e. memory-bound, so a GPU's arithmetic throughput
+      never participates (~10 G-element/s device vs ~3 G-element/s host, and
+      about half of even that gap is fp32 moving half the bytes of fp64).
+    Two consequences, both load-bearing:
+    - **The batched peak loop is a numpy-path optimisation** (≈2.4×, no optional
+      dependency, every user) that happens to also be a GPU precondition. It is
+      scoped as a measure-then-decide spike in WP-0605, justified on that basis
+      and not on device acceleration.
+    - **The GPU case is a bigger problem, not a better backend** — and is worth
+      ≈2.5-3× when it arrives. One batched kernel per pattern is 121 k elements
+      (11-BM NAC), 38 k (lab corundum), 17 k (SRM 660c), so the plateau needs
+      **≈10 synchrotron or ≈60 lab patterns processed together**: a `vmap`-batched
+      in-situ/parametric series, which sits in the v2 fence below and is the
+      honest place to revisit device acceleration. A single lab pattern is below
+      break-even even after batching.
+    `torch.compile` is not a way around this either: on CPU it is 2.5× *slower*
+    than eager (13.5 vs 5.4 ms) after a 38 s compile, and on MPS it fails —
+    dynamo specialises on each window's literal `(i0, i1)` bounds and hits its
+    recompile limit trying to build one graph per reflection. The loop shape
+    defeats compilation for the same reason it defeats the device. Until a
+    batched loop exists, torch's value here is being an independent third
+    opinion in the agreement matrix.
+  - *Decided (2026-07-27, v0.4 sign-off).* Given the above, **`[torch]` is an
+    experimental extra** (`backend.api.EXPERIMENTAL_BACKENDS`), never installed
+    by default and never the recommendation for running a refinement. It is
+    kept for two reasons that have nothing to do with speed: it is an
+    independent opinion on the analytic Jacobian, and it is the only backend
+    for which using the forward model as a differentiable *layer* is idiomatic
+    — see "What the differentiable core unlocks" below. jax stays the vehicle
+    for gradient-heavy CPU work: on the FCJ-heavy corundum state its Jacobian
+    runs at 0.48× numpy against torch's 0.08×, a 6× gap on identical
+    mathematics.
 - **Scope**: constant-wavelength X-ray powder first; `Source`/`Geometry`/
   profile/`IntensityModel` are the frozen extension seams for neutron/TOF/FPA.
 - **License**: MIT. Port only from permissive sources (CrysPy MIT, cctbx
@@ -184,6 +239,60 @@ tailing the structured event stream — every line paired with its equivalent
 API call, so the log doubles as a reproducible session script. Zero viz deps
 in the base install; the FitReport itself is pure numpy.
 
+## Absorption: a correction that cannot improve the fit
+
+Cylindrical (capillary) absorption, WP-0501, is worth recording as a design
+case because it inverts the usual test for whether a correction is working.
+
+**Convention first, by physics not letters.** The forward model multiplies by
+the **transmission** coefficient A ≤ 1 (ITC Vol. C eq. 6.3.3.1). Most
+tabulations print the **absorption correction** A\* = 1/A ≥ 1 (eq. 6.3.3.2)
+instead. Both equal 1 at µR = 0, so an identity test cannot tell them apart —
+only the *direction* of the θ-dependence can (A increases with 2θ, because the
+mean path through a cylinder shortens toward backscatter).
+
+**The correction is an exact reparameterisation.** Rouse et al. (1970) fit the
+cylinder integral over 0 ≤ µR ≤ 1 with
+
+    A(µR, θ) = exp{−(a₁ + b₁sin²θ)µR − (a₂ + b₂sin²θ)µR²} = K(µR)·exp(c(µR)·sin²θ)
+
+which factors *exactly* into a constant times a Debye-Waller shape. So applying
+it to a model with a free phase scale and free displacement parameters cannot
+change the residual at all — Rwp is provably identical. Its entire physical
+content is that a Biso refined without it comes back low by ΔB = c·λ²/2, which
+is 0.13 Å² at µR = 0.5 and **0.49 Å² at µR = 1.0** for Cu Kα: comparable to Biso
+itself, and 19σ against the esd the value is quoted with.
+
+Three consequences, each of which shaped an interface:
+
+- **µR is computed and held fixed, never refined.** It is not a
+  strongly-correlated parameter; it is an *exactly singular direction* in the
+  normal equations alongside the scale and Biso. `Geometry.mu_r` is therefore a
+  plain float, not a `Parameter` — the type is the guard, and a test asserts it.
+  The same argument fixes `packing_fraction`, which is exactly degenerate with
+  µR in turn.
+- **The result carries the bias, because no fit statistic can.**
+  `RefinementResult.absorption` reports the applied µR and the equivalent ΔB. A
+  user who only looked at Rwp would conclude the correction did nothing.
+- **The acceptance test asserts equality of Rwp, not an improvement.** Written
+  the obvious way — "the corrected fit should be better" — it would assert
+  something the physics cannot deliver, and would fail for the right reason.
+
+**Flat plate is fenced** for the mirror-image reason: reflection off a thick
+specimen has A = 1/2µ (ITC Table 6.3.3.1(1a)) with no θ at all, so it is not
+merely degenerate with the phase scale, it *is* the phase scale. Only the
+finite-thickness and transmission cases carry a signature; they need a sample
+thickness the schema does not have, and go to WP-0508.
+
+**Validation lesson.** The coefficient b₂ is printed as "−0·0375" in the
+available scan of Rouse when it is −0·3750. That error is invisible against a
+constant-θ slice of the paper's own table — which constrains only a₁ and a₂ —
+and is 0.08 wrong at µR = 1. It was caught by a quadrature of the exact ITC
+integral, which shares no constant with any published fit. The general rule:
+**a fit of two arguments must be validated across both**, and the strongest
+anchor is the integral a fit approximates, not another code's transcription of
+the same fit.
+
 ## Testing & validation policy
 
 - Unit tests against published values (form factors, multiplicities,
@@ -220,10 +329,78 @@ systematic rather than a shrug.
 Ill-conditioning → staged strategy, guards, reparameterization, cond
 reporting. Background eating peaks → penalized spline + correlation
 guardrails. fp32 contamination → fp64 host residual/solve + agreement gate.
-Backend drift → small op vocabulary + mandatory cross-backend tests.
+Backend drift → small op vocabulary + mandatory cross-backend tests, and
+(2026-07-27) **one implementation instead of agreeing copies**: the row layout
+in `model/rows.py`, the traced residual in `backend/traced.py`, and a
+conformance suite driven by the backend registry rather than a hand-written
+list, so a new backend inherits every rule and cannot ship without its
+agreement rows.
 **Scope (the biggest risk)** → strict per-milestone acceptance tests, one
 backend at a time, a real v2 fence, and the validation suite doubling as the
 recruiting hook for co-maintainers. Licensing → GPL never ported; provenance
 documented in ATTRIBUTION.md. Performance → analytic columns (v0.2), jax jit
 (v0.4); honest documentation that the numpy-FD path is the slow-but-correct
 reference.
+
+## What the differentiable core unlocks (deferred, not planned)
+
+Recorded 2026-07-27, when v0.4 shipped, because the question "what is a
+differentiable backend actually *for*, given it is slower?" deserves a written
+answer rather than being re-derived each time. Nothing here is scheduled; each
+item would need its own work package, and several sit behind the v2 fence.
+
+**Start from the measurement that reframes it.** On a fully-freed lab state —
+28 free parameters across every family — **0 fall back to finite differences**:
+the analytic chain covers everything shipped. So for someone *running a
+refinement today* the backends offer no accuracy or capability the numpy path
+lacks, and cost 10-30× in Jacobian time (v0.4 record). Their present value is
+to the maintainer: they are how the analytic Jacobian is validated, which is
+why torch keeps a place after the GPU story collapsed. Everything below is
+about what the *property* of being differentiable makes possible, not about
+what the backends do now.
+
+- **Gradients for physics nobody has hand-differentiated yet.** That "0 of 28"
+  is a maintenance obligation, not a permanent state: every new parameter
+  family (v0.5's absorption, surface roughness, Stephens strain, anomalous
+  f′f″) either gets a hand-derived analytic column or drops to *forward*
+  finite differences — measured at 6.2e-3 relative error on SRM 660c's cell `a`
+  against 4.3e-5 for central differences, an error that lands in that
+  parameter's esd. With autodiff, new physics is exact on day one and the
+  analytic column becomes a later optimisation, validated against the autodiff
+  one by the agreement matrix that already exists. That inverts the workflow
+  from derive-then-ship to ship-then-optimise.
+- **Honest uncertainties — the strongest candidate.** Today's esds are
+  χ²·(JᵀJ)⁻¹ with a Bérar-Lelann inflation: Gaussian, symmetric, and purely
+  local curvature at the minimum. A differentiable forward model supports
+  gradient-based MCMC (NUTS via numpyro on jax, Pyro on torch) and therefore an
+  actual posterior — asymmetric, correlation-aware, able to say a parameter is
+  multimodal. For a package whose stated rule is *never return a confident
+  wrong singleton*, that is the closest philosophical fit on this list, and it
+  needs no GPU: jax on CPU is the vehicle.
+- **Objectives other than weighted least squares.** The analytic chain is
+  hardwired to r = √w·(y_obs − y_calc). Autodiff differentiates whatever is
+  written: a true Poisson log-likelihood instead of the √max(y,1) Gaussian
+  approximation the readers fall back on (which biases at low counts), Huber
+  losses for detector spikes, explicit priors.
+- **Exact second derivatives.** Gauss-Newton discards the second-order term; an
+  exact Hessian gives true Newton steps and profile-likelihood intervals rather
+  than quadratic ones — directly relevant to WP-0601's bounded LM.
+- **torch specifically: the model as a layer.** Dropping the forward model into
+  a torch training loop — learning a background or texture prior across many
+  datasets, fitting instrument constants jointly with a neural component — is a
+  real workflow, and torch is the only backend for which it is idiomatic. This
+  is the argument that keeps `[torch]` alive as an **experimental** extra; it is
+  not a performance argument.
+
+**The costs, so the trade stays visible:** an optional ~500 MB dependency,
+Jacobians ~10× slower than the analytic assembly, one more traced residual to
+keep honest (now structural — `model/rows.py` owns the row layout and
+`backend/traced.py` the traced twin, so a new backend inherits both), and the
+torch-MPS trap collection in WP-0408's handover.
+
+**And the two autodiff backends are not interchangeable.** jax's jit collapses
+the dispatch overhead that dominates this problem: on the FCJ-heavy corundum
+state its Jacobian runs at 0.48× numpy against torch's 0.08× — a **6× gap
+between the two on identical mathematics** (measured, v0.4 record). For
+gradient-heavy CPU work jax is the vehicle; torch's distinct argument is
+ecosystem interop, not speed.

@@ -118,9 +118,13 @@ def test_mccusker_structural_frees_extinction_after_displacement():
 
     plan = RefinementPlan.mccusker_structural()
     names = [s.name for s in plan.stages]
-    assert names[-1] == "extinction"
+    # extinction used to be the last stage; since WP-0502 surface roughness
+    # follows it, being *more* degenerate with Biso/ADPs still (a low-angle
+    # intensity depression with no |F|² handle to distinguish it).  The
+    # load-bearing assertion was always the ordering, not the last position.
     assert names.index("biso") < names.index("extinction")  # displacement first
-    ext = plan.stages[-1]
+    assert names.index("extinction") < names.index("roughness")
+    ext = plan.stages[names.index("extinction")]
     assert ext.turn_on == ["phases.*.extinction"]
     assert ext.seed == 1e-3
 

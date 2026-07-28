@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 import gemmi
 import numpy as np
 
-from ..crystallography.attenuation import linear_attenuation
+from ..crystallography.attenuation import linear_attenuation, packed_mu_r
 from ..crystallography.lattice import cell_volume
 from ..crystallography.symmetry import expand_positions, get_spacegroup
 from ..schemas.common import Diagnostic
@@ -369,6 +369,58 @@ def compute_qpa(structure: Structure, values: dict[str, float],
     qpa = QuantitativePhaseAnalysis(phases=rows)
     _apply_microabsorption(qpa, structure, zmvs, w, wavelength)
     return qpa
+
+
+def estimate_capillary_mu_r(structure: Structure, values: dict[str, float],
+                            wavelength: float, radius_mm: float,
+                            packing_fraction: float,
+                            multiplicities=None) -> tuple[float | None, str | None]:
+    """(µR estimate, reason it was skipped) for a packed capillary.
+
+    Composition → per-phase linear attenuation → volume-fraction-weighted bulk
+    µ → µR, reusing exactly the machinery WP-0305 built for Brindley.  Volume
+    fractions come from the refined phase scales via the Hill-Howard weight
+    fractions and the X-ray densities; when the scales are not yet meaningful
+    every phase contributes equally, which is stated in the reason string
+    rather than hidden.
+
+    **Never raises.**  The attenuation tables refuse a wavelength whose grid
+    interval straddles an absorption edge, refuse outside 2-120 keV, and have
+    gaps at seven elements — all of which are ordinary situations for a real
+    specimen, not programming errors, so they come back as a reason string the
+    caller can surface as a diagnostic.  Same contract as
+    :func:`_apply_microabsorption`.
+    """
+    try:
+        zmvs, scales = [], []
+        for ip, phase in enumerate(structure.phases):
+            base = f"phases.{ip}"
+            cell = tuple(values[f"{base}.cell.{n}"]
+                         for n in ("a", "b", "c", "alpha", "beta", "gamma"))
+            atoms = [(atom.species,
+                      values[f"{base}.atoms.{j}.x"], values[f"{base}.atoms.{j}.y"],
+                      values[f"{base}.atoms.{j}.z"], values[f"{base}.atoms.{j}.occ"])
+                     for j, atom in enumerate(phase.atoms)]
+            mult = multiplicities[ip] if multiplicities is not None else None
+            zmvs.append(phase_zmv(phase.space_group, cell, atoms, multiplicities=mult))
+            scales.append(values[f"{base}.scale"])
+        mus = [linear_attenuation(z.element_counts, z.cell_volume, wavelength)
+               for z in zmvs]
+    except (KeyError, ValueError) as exc:
+        return None, f"attenuation unavailable — {exc}"
+
+    note = None
+    if any(s > 0.0 for s in scales):
+        w, _, _ = weight_fractions([z.zmv for z in zmvs], scales, None)
+        vols = [wi / z.density for wi, z in zip(w, zmvs)]
+    else:
+        vols = [1.0] * len(zmvs)
+        note = "phase scales are all zero; assumed equal volume fractions"
+    try:
+        mu_r = packed_mu_r(mus, vols, radius_mm, packing_fraction)
+    except ValueError as exc:
+        return None, str(exc)
+    return float(mu_r), note
 
 
 def _apply_microabsorption(qpa: QuantitativePhaseAnalysis, structure: Structure,

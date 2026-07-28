@@ -76,9 +76,12 @@ from ..schemas.instrument import (
 )
 from ..schemas.pattern import PatternData
 from ..schemas.structure import Structure
+from .absorption import cylinder_absorption
 from .corrections import (
     displacement_shift_deg,
     lorentz_polarization,
+    surface_roughness_pitschke,
+    surface_roughness_suortti,
     transparency_shift_deg,
 )
 from .extinction import sabine_extinction, sabine_extinction_and_dx
@@ -166,6 +169,14 @@ class CompiledModel:
     line_wavelengths: tuple[float, ...]
     geometry_kind: str
     radius_mm: float | None
+    # dimensionless µ·R of a packed capillary, resolved once at compile from
+    # Geometry.mu_r or the composition estimate.  A *frozen scalar*, never a θ
+    # entry: the Rouse transmission factor is exactly a constant times
+    # exp(c·sin²θ), so a refinable µR would be an exactly singular direction
+    # alongside the phase scale and Biso (model/absorption.py).  0.0 means the
+    # correction is the exact identity.  A itself is not frozen — it follows
+    # 2θ_Bragg, which moves with the cell.
+    mu_r: float
     mode: Mode
     phases: list[CompiledPhase]
     fixed_background: np.ndarray | None  # sampled on tt, or None
@@ -182,6 +193,11 @@ class CompiledModel:
     # compile-time structural constant, never a θ entry — the width parameters
     # (U,V,W,X,Y and phase size/strain) are identical for both shapes.
     shape: str = "tchz_pv"
+    # Surface-roughness model frozen for the stage: "suortti", "pitschke" or
+    # None when the instrument carries no block.  Compile-time structural, like
+    # ``shape`` and ``geometry_kind`` — never a θ entry, so the branch on it
+    # never sees a decoded value and the residual stays smooth (WP-0502).
+    roughness: str | None = None
     # Pawley intensity block (per-hkl intensities as free parameters, appended
     # to θ outside the ParameterTable); None outside pawley mode.
     pawley: "PawleyBlock | None" = None
@@ -195,18 +211,21 @@ class CompiledModel:
     # ------------------------------------------------------------------
     def background(self, values: dict[str, float]) -> np.ndarray:
         # stacked, not np.array-ed: the coefficients come from θ (traced)
-        coeffs = get_backend().stack([values[p] for p in self.bkg_paths])
-        y = coeffs @ self.bkg_design
+        xp = get_backend()
+        coeffs = xp.stack([values[p] for p in self.bkg_paths])
+        y = xp.matmul(coeffs, self.bkg_design)
         if self.fixed_background is not None:
-            y = y + self.fixed_background
+            y = y + xp.asarray(self.fixed_background, dtype=np.float64)
         return y
 
     def penalty_residual(self, values: dict[str, float]) -> np.ndarray | None:
         """√λ·D₂·c rows appended to the residual (P-spline smoothness)."""
         if self.bkg_penalty is None:
             return None
-        coeffs = get_backend().stack([values[p] for p in self.bkg_paths])
-        return self.bkg_penalty @ coeffs
+        xp = get_backend()
+        coeffs = xp.stack([values[p] for p in self.bkg_paths])
+        # xp.matmul: the frozen penalty rows are the *left* operand (backend/api.py)
+        return xp.matmul(self.bkg_penalty, coeffs)
 
     def _position_shift_deg(self, theta: np.ndarray, tt_bragg: np.ndarray,
                             values: dict[str, float]) -> np.ndarray | float:
@@ -223,6 +242,25 @@ class CompiledModel:
             t = values["instrument.geometry.sample_transparency"]
             shift = shift + transparency_shift_deg(tt_bragg, t)
         return shift
+
+    def _absorption(self, tt_bragg: np.ndarray) -> np.ndarray | float:
+        """Cylindrical absorption transmission A(µR, θ), or exactly 1.0.
+
+        **Every hand-written analytic intensity column must apply this too.**
+        A is a plain multiplier on the same product ``phase_peaks`` builds, and
+        unlike extinction it does not depend on |F|², r or any refined
+        parameter — so a coordinate/ADP/PO move chains through it unchanged and
+        the column is simply scaled.  Omit it in one of those builders and that
+        column is silently wrong by A (a factor of ~5 at µR = 1) while the
+        finite-difference columns stay right, which converges happily to the
+        wrong structure.  ``test_absorption.py`` guards this.
+
+        Returns the scalar ``1.0`` when off so the multiply is a no-op the
+        backends do not even trace.
+        """
+        if self.geometry_kind != "debye_scherrer" or not self.mu_r:
+            return 1.0
+        return cylinder_absorption(tt_bragg, self.mu_r)
 
     def _site_values(self, ip: int, values: dict[str, float], cell: tuple
                      ) -> tuple[np.ndarray, np.ndarray, np.ndarray,
@@ -284,6 +322,33 @@ class CompiledModel:
     # ``(pos, w₁, w₂, intensity)``, so everything downstream (the peak-chain
     # Jacobian, Le Bail partitioning, FitReport Layer-1) is shape-agnostic.
     # ------------------------------------------------------------------
+    def _roughness_factor(self, tt_bragg: np.ndarray, values: dict[str, float]):
+        """Surface-roughness intensity multiplier, or ``None`` when off.
+
+        ``None`` rather than an array of ones so the off state costs nothing and
+        stays bit-identical; the model choice is a compile-time constant, so
+        this branch never inspects a θ-decoded value.
+
+        Evaluated at the *ideal* Bragg 2θ, matching Lp and Sabine extinction —
+        the sample aberrations shift where a peak lands on the detector by
+        ≤0.1°, which does not change the depth the beam travelled.
+
+        **Every site that folds intensity by hand must call this.** The analytic
+        column builders bypass :meth:`phase_peaks`, so a factor applied only
+        there would leave the dof/adp/March columns disagreeing with finite
+        differences — the hidden-Jacobian bug that WP-0506 and WP-0307 both
+        pinned.  Unlike extinction, roughness is independent of |F|², so it is a
+        plain multiply everywhere: there is no ``G = E + x·dE/dx`` analogue.
+        """
+        if self.roughness is None:
+            return None
+        base = "instrument.geometry.surface_roughness"
+        if self.roughness == "suortti":
+            return surface_roughness_suortti(tt_bragg, values[f"{base}.a"],
+                                             values[f"{base}.b"])
+        return surface_roughness_pitschke(tt_bragg, values[f"{base}.c"],
+                                          values[f"{base}.tau"])
+
     def _peak_widths(self, gam_g: np.ndarray, gam_l: np.ndarray
                      ) -> tuple[np.ndarray, np.ndarray]:
         """(w₁, w₂) from component FWHMs: (Γ, η) for TCHZ, (σ, γ_HWHM) for Voigt."""
@@ -334,7 +399,10 @@ class CompiledModel:
             # |F|² samples the form factors at sinθ/λ = 1/2d — line-independent
             f2 = structure_factors_squared(cp.reflections.hkl, d, cp.sites,
                                            *self._site_values(ip, values, cell))
-            base = values[f"phases.{ip}.scale"] * cp.reflections.multiplicity * f2
+            # multiplicity lifted onto the backend: a frozen numpy factor in a
+            # product with traced values (backend/api.py)
+            mult = xp.asarray(cp.reflections.multiplicity, dtype=np.float64)
+            base = values[f"phases.{ip}.scale"] * mult * f2
             # March-Dollase preferred orientation: a line-independent per-hkl
             # intensity multiplier folded into ``base`` (P ≡ 1 when off, so this
             # leaves the intensity bit-identical then).  It rides ahead of the
@@ -377,6 +445,23 @@ class CompiledModel:
             else:
                 intensity = base * w_line * lorentz_polarization(tt_bragg, values["instrument.polarization"])
                 intensity = intensity * sabine_extinction(f2, lam, vol, tt_bragg, ext)
+                # cylindrical (capillary) absorption, model/absorption.py.  The
+                # geometry test is a compile-time structural branch, permitted
+                # by the same rule as _position_shift_deg; µR is frozen, so no
+                # θ-derived value is branched on.  µR=0 gives A ≡ 1.0
+                # bit-for-bit, so leaving it out of the branch would be
+                # harmless — it is kept for the same reason PO is skipped when
+                # absent, to keep non-capillary work off the code path.
+                intensity = intensity * self._absorption(tt_bragg)
+                # surface roughness (model/corrections.py): a per-(line,
+                # reflection) depression of the low-angle intensity.  Rides
+                # after extinction — all these multiplies commute — and, unlike
+                # extinction, does not feed back into the extinction variable x.
+                # Mutually exclusive with the absorption factor above in
+                # practice: that one is capillary-only, this one flat-plate-only.
+                rough = self._roughness_factor(tt_bragg, values)
+                if rough is not None:
+                    intensity = intensity * rough
             # a reflection pushed off the sphere (λ/2d > 1 → NaN position)
             # carries exactly zero intensity: Lp of a NaN angle is NaN, and the
             # masked profile (purity (c)) would otherwise multiply NaN·0
@@ -386,7 +471,8 @@ class CompiledModel:
 
     def _reflection_profile(self, cp: CompiledPhase, il: int, k: int,
                             pos_k: float, gamma_k: float, eta_k: float,
-                            sl: float, hl: float) -> np.ndarray | None:
+                            sl: float, hl: float,
+                            grid: np.ndarray | None = None) -> np.ndarray | None:
         """Unit-area profile of one (line, reflection) on its frozen window.
 
         Returns ``None`` only for the frozen empty window (``i1 <= i0``, a
@@ -395,6 +481,13 @@ class CompiledModel:
         is evaluated at a safe position and zeroed element-wise —
         ``phase_peaks`` zeroes the matching intensity, so a dead reflection
         contributes exactly 0 without a python branch.
+
+        ``grid`` is the fit grid already lifted onto the active backend, hoisted
+        by the caller: it is subtracted *from the left* of the θ-derived peak
+        position, which torch requires be a tensor (backend/api.py), and lifting
+        it once per forward call rather than once per reflection is the
+        difference between one host→device copy and thousands.  ``None`` keeps
+        the numpy buffer, which is what ``asarray`` would hand back anyway.
         """
         i0, i1 = cp.win[il, k]
         if i1 <= i0:
@@ -402,7 +495,7 @@ class CompiledModel:
         xp = get_backend()
         finite = xp.isfinite(pos_k)
         pos_safe = xp.where(finite, pos_k, 0.0)
-        x = self.tt[i0:i1]
+        x = (self.tt if grid is None else grid)[i0:i1]
         n_fcj = int(cp.fcj_n[il, k])
         if n_fcj == 0:  # frozen node count — structural
             return xp.where(finite, self._profile(x - pos_safe, gamma_k, eta_k), 0.0)
@@ -417,13 +510,15 @@ class CompiledModel:
         """Bragg contribution of one phase (used by the analytic scale Jacobian)."""
         xp = get_backend()
         y = xp.zeros_like(self.tt)
+        grid = xp.asarray(self.tt, dtype=np.float64)  # lifted once, see below
         cp = self.phases[ip]
         sl = values["instrument.geometry.axial_sl"]
         hl = values["instrument.geometry.axial_hl"]
         peaks = self.phase_peaks(ip, values, hkl_intensity)
         for il, (pos, gamma, eta, intensity) in enumerate(peaks):
             for k in range(len(pos)):
-                prof = self._reflection_profile(cp, il, k, pos[k], gamma[k], eta[k], sl, hl)
+                prof = self._reflection_profile(cp, il, k, pos[k], gamma[k],
+                                                eta[k], sl, hl, grid)
                 if prof is None:
                     continue
                 i0, i1 = int(cp.win[il, k, 0]), int(cp.win[il, k, 1])
@@ -515,6 +610,13 @@ class CompiledModel:
                 tt_bragg, values["instrument.polarization"])
             E, dEdx, x = sabine_extinction_and_dx(f2, lam, vol, tt_bragg, ext)
             col = col * (E + x * dEdx)
+            col = col * self._absorption(tt_bragg)
+            # roughness scales the intensity and does not depend on the
+            # coordinates/ADPs, so a structural move chains through it
+            # unchanged — carry exactly what phase_peaks folded in.
+            rough = self._roughness_factor(tt_bragg, values)
+            if rough is not None:
+                col = col * rough
             out.append(col)
         return out
 
@@ -555,6 +657,10 @@ class CompiledModel:
             col = d_base * w_line * lorentz_polarization(
                 tt_bragg, values["instrument.polarization"])
             col = col * sabine_extinction(f2, lam, vol, tt_bragg, ext)
+            col = col * self._absorption(tt_bragg)
+            rough = self._roughness_factor(tt_bragg, values)
+            if rough is not None:
+                col = col * rough
             out.append(col)
         return out
 
@@ -571,6 +677,13 @@ class CompiledModel:
         if path in ("instrument.zero_shift", "instrument.polarization"):
             return True
         if path.startswith("instrument.geometry.sample_"):
+            return True
+        # surface roughness scales the per-peak intensity and nothing else, so
+        # it rides the same chain.  Spelled out rather than left to the
+        # ``sample_`` prefix above: the path does not start with it, and the
+        # silent consequence of missing it is a *correct* but whole-model-FD
+        # column, i.e. a slow test rather than a failing one.
+        if path.startswith("instrument.geometry.surface_roughness."):
             return True
         if path.startswith("instrument.profile."):
             return True
@@ -767,7 +880,8 @@ class CompiledModel:
         """√λ·R·I overlap-restraint rows appended to the residual (or None)."""
         if self.pawley is None or self.pawley.restraint is None:
             return None
-        return self.pawley.restraint @ vec
+        # xp.matmul: R is a frozen numpy constant on the left (backend/api.py)
+        return get_backend().matmul(self.pawley.restraint, vec)
 
     def restraint_residual(self, values: dict) -> np.ndarray | None:
         """√w·(computed − target)/σ soft-restraint rows appended below the data
@@ -1036,10 +1150,19 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         wavelength=instrument.source.primary_wavelength,
         line_wavelengths=lams,
         geometry_kind=geom.kind, radius_mm=geom.goniometer_radius_mm,
+        # frozen for the stage; None (nothing asked for) and 0.0 (asked for
+        # and negligible) both mean the correction is the exact identity
+        mu_r=float(geom.mu_r or 0.0),
         mode=mode, phases=phases,
         fixed_background=fixed,
         bkg_paths=bkg_paths, bkg_design=design, bkg_penalty=penalty,
         shape=instrument.profile.shape,
+        # Rietveld-only, for the reason preferred orientation is: Le Bail and
+        # Pawley intensities are extracted from the data and would absorb any
+        # smooth θ-dependent factor, leaving the parameters unidentifiable.
+        roughness=(geom.surface_roughness.kind
+                   if geom.surface_roughness is not None and mode == "rietveld"
+                   else None),
         pawley=pawley, restraints=restraints,
     )
 

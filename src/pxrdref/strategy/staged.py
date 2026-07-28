@@ -26,6 +26,7 @@ _U_ORDER = {"11": 0, "22": 1, "33": 2, "12": 3, "13": 4, "23": 5}
 _DISPLACEMENT_GLOBS = ["phases.*.atoms.*.biso", "phases.*.atoms.*.adp.*"]
 
 
+
 @dataclass
 class Stage:
     name: str
@@ -44,6 +45,27 @@ class Stage:
     #: identity-transform, and their pathology at zero is the *exploding*
     #: gradient of √Σ rather than the softplus's dead one.  0 = no seed.
     strain_seed: float = 0.0
+
+
+#: Surface roughness (WP-0502) goes **last** in every plan that carries it.
+#: It is the most degenerate correction in the package: a low-angle intensity
+#: depression is exactly what an inflated Biso/ADP, a shrunken scale or a
+#: flexible background will each happily absorb, and unlike extinction it has no
+#: |F|²-dependence to distinguish it.  Letting the structure settle first leaves
+#: roughness only its own (θ-only, low-angle-weighted) signature to fit — and
+#: whatever is left over is what the ROUGHNESS_ABSORPTION guard measures.
+#:
+#: The glob matches only instruments that declared a block, so it is safe in
+#: any plan (same property as the preferred-orientation stage).  The seed lifts
+#: the softplus strength parameter (Suortti ``b``, Pitschke ``c``) off the zero
+#: floor where dp/du → 0; 0.3 is chosen from the measured sensitivity peak of
+#: the Suortti model, which sits near b ≈ 0.17 for data from 5° 2θ and b ≈ 0.46
+#: from 20° — not at a token 1e-3, which for ``b`` is not merely a dead
+#: *internal* gradient but a genuinely dead *correction* (see
+#: RoughnessSuortti: both b → 0 and b → ∞ are the identity).
+_ROUGHNESS_STAGE = (
+    Stage("roughness", ["instrument.geometry.surface_roughness.*"], seed=0.3),
+)
 
 
 @dataclass
@@ -98,6 +120,7 @@ class RefinementPlan:
             # signature to fit.  The coefficient starts at exactly 0 on the
             # softplus floor, so the stage seeds it to lift TRF off the zero.
             Stage("extinction", ["phases.*.extinction"], seed=1e-3),
+            *_ROUGHNESS_STAGE,
         ])
 
     @classmethod
@@ -118,6 +141,7 @@ class RefinementPlan:
             Stage("lines_axial", ["instrument.source.lines.*.weight",
                                   "instrument.geometry.axial_sl",
                                   "instrument.geometry.axial_hl"]),
+            *_ROUGHNESS_STAGE,
         ])
 
     @classmethod
@@ -128,7 +152,14 @@ class RefinementPlan:
         {zero (const), displacement (cosθ), cell (tanθ)} triple — while zero,
         displacement, the resolution function, the Kα2 ratio and the axial
         ratios refine.  Export the result with ``save_instrument_profile``;
-        refine unknowns against it with the ``lab_sample_refine`` plan."""
+        refine unknowns against it with the ``lab_sample_refine`` plan.
+
+        **No roughness stage here, deliberately.**  A certified line-profile
+        standard is a carefully prepared specimen, and this plan's job is to
+        measure the *goniometer*; freeing a mount property against a fixed
+        certified cell would let specimen preparation contaminate the
+        calibration that every later sample inherits.  ``save_instrument_profile``
+        strips any roughness block for the same reason."""
         return cls(stages=[
             Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
             Stage("zero_disp", ["instrument.zero_shift",
@@ -170,6 +201,7 @@ class RefinementPlan:
                                      "phases.*.microstrain.dof.*"],
                   strain_seed=1000.0),
             Stage("biso", list(_DISPLACEMENT_GLOBS)),
+            *_ROUGHNESS_STAGE,
         ])
 
     @classmethod
@@ -223,6 +255,10 @@ class GuardReport:
     nonpositive_adps: list[str] = field(default_factory=list)
     # phases whose Stephens strain coefficients have left the physical cone
     nonpositive_strain: list[str] = field(default_factory=list)
+    # two-way surface-roughness degeneracy (WP-0502): either roughness is not
+    # identifiable from this data, or a displacement parameter is now hiding
+    # in it.  Same block-R² statistic as background_correlations.
+    roughness_correlations: list[str] = field(default_factory=list)
 
 
 #: R² beyond which the background block is reported as able to imitate a
@@ -231,6 +267,22 @@ class GuardReport:
 #: penalized spline) sit at 0.01-0.03 even against broad peaks, while a
 #: 1°-knot unpenalized spline reaches 0.46.
 BACKGROUND_ABSORPTION_GUARD = 0.25
+
+#: R² beyond which surface roughness and the displacement parameters are
+#: reported as mutually substitutable (see
+#: ``optimize.statistics.roughness_absorption``, which projects out the scale
+#: and background first — without that every number saturates near 0.96).
+#: Measured on a synthetic large-cell lab pattern, varying only the low-angle
+#: cutoff: R²(Suortti b) = 0.06 with the fit reaching 7° 2θ (20 reflections
+#: below 40°), 0.62 from 15°, then 0.91 / 0.93 / 0.95 from 20° / 30° / 45° —
+#: the crossing happens exactly as the low-angle reflections that give the
+#: depression its lever arm drop out of range.  0.9 sits in that gap.
+#:
+#: Deliberately looser than BACKGROUND_ABSORPTION_GUARD: a background imitating
+#: a peak is always pathological, whereas roughness genuinely *is* a Q-dependent
+#: intensity trend, so partial overlap with the ADPs is expected physics and
+#: only near-total overlap is a finding.
+ROUGHNESS_ABSORPTION_GUARD = 0.9
 
 
 def check_adp_positive_definite(table) -> list[str]:
@@ -301,11 +353,13 @@ def check_stephens_positive(table, model) -> list[str]:
 
 def check_guards(table, outcome, threshold: float,
                  background_threshold: float = BACKGROUND_ABSORPTION_GUARD,
+                 roughness_threshold: float = ROUGHNESS_ABSORPTION_GUARD,
                  model=None) -> GuardReport:
-    """Correlation, bound, background-absorption, ADP- and strain-shape guards."""
+    """Correlation, bound, background/roughness-absorption, ADP- and
+    strain-shape guards."""
     import numpy as np
 
-    from ..optimize.statistics import background_absorption
+    from ..optimize.statistics import background_absorption, roughness_absorption
 
     report = GuardReport()
     report.nonpositive_adps = check_adp_positive_definite(table)
@@ -325,6 +379,10 @@ def check_guards(table, outcome, threshold: float,
                                key=lambda kv: -kv[1]):
             if r2 > background_threshold:
                 report.background_correlations.append(f"{path} (R²={r2:.2f})")
+        for path, r2 in sorted(roughness_absorption(outcome.jac, free).items(),
+                               key=lambda kv: -kv[1]):
+            if r2 > roughness_threshold:
+                report.roughness_correlations.append(f"{path} (R²={r2:.2f})")
 
     lo, hi = table.bounds()
     for k, path in enumerate(free):

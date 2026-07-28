@@ -19,12 +19,20 @@ from __future__ import annotations
 
 import numpy as np
 
+from .backend.api import backend_dtype_note
 from .model.forward import compile_model
 from .optimize.least_squares import run_multi_least_squares
 from .optimize.qpa import compute_qpa, microabsorption_diagnostics
 from .optimize.statistics import background_absorption, compute_statistics
 from .params.multi import MultiParameterTable, SharingMap
-from .refine import _VERSION, _guard_diagnostics, _utcnow
+from .refine import (
+    _VERSION,
+    _absorption_diagnostics,
+    _absorption_record,
+    _guard_diagnostics,
+    _resolve_capillary_mu_r,
+    _utcnow,
+)
 from .schemas.common import Diagnostic, Provenance
 from .schemas.instrument import Instrument
 from .schemas.pattern import PatternData
@@ -71,18 +79,29 @@ class MultiHistogramRefinement:
 
     def __init__(self, structure: Structure, instruments: list[Instrument], *,
                  sharing: SharingMap | None = None, backend: str = "numpy"):
-        if backend == "jax":
+        if backend != "numpy":
             from .backend import resolve_backend
 
-            resolve_backend("jax")  # fail fast with the install hint
-        elif backend != "numpy":
-            raise NotImplementedError(
-                f"unknown backend {backend!r}; v0.4 ships numpy and jax")
+            try:
+                resolve_backend(backend)  # fail fast with the install hint
+            except ValueError as exc:
+                raise NotImplementedError(str(exc)) from exc
         self._backend = backend
         instruments = list(instruments)
         if len(instruments) < 1:
             raise ValueError("multi-histogram needs at least one instrument")
         self.mtable = MultiParameterTable(structure, instruments, sharing=sharing)
+        # Resolve each histogram's capillary µR from composition, exactly as the
+        # single-histogram path does.  Without this a user who set
+        # ``capillary_radius_mm`` here would silently get no absorption
+        # correction and no diagnostic saying so — the failure mode WP-0501's
+        # reporting exists to prevent.  µR is per *instrument* (each histogram
+        # may be a different wavelength, hence a different µ) but the structure
+        # is shared, which is what makes one loop correct.
+        resolved = [_resolve_capillary_mu_r(structure, ins)
+                    for ins in self.mtable.instruments]
+        self._mu_r_source: list[str] = [src for src, _ in resolved]
+        self._mu_r_skipped: list[str | None] = [why for _, why in resolved]
         self.result_: RefinementResult | None = None
         self._models = None
 
@@ -217,6 +236,13 @@ class MultiHistogramRefinement:
                             background_correlations=[f"hist.{h}.{path} (R²={r2:.2f})"])))
             if qpa is not None:
                 diags.extend(microabsorption_diagnostics(qpa))
+            # cylindrical absorption, per histogram — each may sit at its own
+            # wavelength, hence its own µR.  Only the failure modes are surfaced
+            # here; the applied value lives on ``fitted_instruments[h]``.
+            absorption = _absorption_record(model, self._mu_r_source[h],
+                                            self._mu_r_skipped[h])
+            if absorption is not None:
+                diags.extend(_absorption_diagnostics(absorption))
 
             histograms.append(HistogramResult(
                 label=model.meta.get("label", "") or f"hist{h}",
@@ -242,6 +268,7 @@ class MultiHistogramRefinement:
                        else ", ".join(f"hist{h}={w:g}" for h, w in enumerate(weights)))
         provenance = Provenance(
             package_version=_VERSION, created_utc=_utcnow(),
+            backend=self._backend, dtype=backend_dtype_note(self._backend),
             notes={"n_histograms": str(n), "histogram_weights": weight_note})
 
         return RefinementResult(

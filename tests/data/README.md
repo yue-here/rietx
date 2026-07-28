@@ -14,6 +14,15 @@
 | `qarr/cpd-2.prn` | **Sample 2** = sample-1 phases + brucite Mg(OH)₂ (strongly platy → preferred-orientation test) | same | same |
 | `qarr/cpd-4.prn` | **Sample 4** = corundum / coarse magnetite (Fe₃O₄) / zircon (ZrSiO₄) — microabsorption test | same | same |
 | `qarr/corundum.prn`, `qarr/fluorite.prn`, `qarr/zincite.prn`, `qarr/brucite.prn`, `qarr/magnetit.prn`, `qarr/zircon.prn` | Pure single-phase patterns of the round-robin component phases, same instrument/conditions — component references for the mixtures and the SRM 676a corundum comparison | same | same |
+| `absorption_cylinder_rouse.dat` | Cylinder **transmission** factor A (not A\* = 1/A) vs µR and sin²θ, 4 dp — 80 values: the full sin²θ = 0 column (µR 0.00–0.50 step 0.01) plus four complete µR = 0.50 / 1.00 rows. Ground truth for the WP-0501 capillary absorption correction (`test_absorption.py`) | Rouse, Cooper, York & Chakera (1970), *Acta Cryst.* **A26**, 682-691, Table 1(a)/(b) | Published table, transcribed with attribution; no code involved |
+
+Note — the Rouse fixture carries only the blocks that could be read
+unambiguously from the available scan (each cell holds five *consecutive* µR
+rows and the printed labels are offset by three; see the file header). Every
+value in it was checked against a quadrature of ITC Vol. C eq. (6.3.3.4) before
+being committed — max difference 1.7e-4, within the table's own four-decimal
+resolution. The damaged remainder of the grid is deliberately absent rather than
+guessed.
 
 Note — the amorphous-bearing **Sample 3** (corundum/fluorite/zincite/glass) is
 deliberately **not** in the repo: amorphous / internal-standard quantification
@@ -163,15 +172,28 @@ states defined in `tests/test_backend_shim.py`.  The first five (`srm660c`,
 **before** the WP-0401 backend-shim refactors (at commit `c9fc8c0`, numpy 2.x /
 macOS arm64 Accelerate).  `toy_restraints` was added by WP-0406 (soft-restraint
 penalty rows) from the green post-WP-0406 tree — a *new* baseline, so the
-existing five were not re-captured.  `toy_stephens` was added the same way by
-WP-0503 (hkl-dependent anisotropic-strain widths), again capturing only the new
-state, and `toy_anomalous` by WP-0504 (anomalous f′/f″ on a non-centrosymmetric
-structure, the only state where the Friedel-averaged |A|² + |B|² differs from
-|F|² at the orbit representative).  `test_backend_shim.py` asserts the current
+existing five were not re-captured.  `toy_stephens` (WP-0503, hkl-dependent
+anisotropic-strain widths), `toy_capillary` (WP-0501, cylindrical absorption),
+`toy_roughness` (WP-0502, Bragg-Brentano Suortti surface roughness: an `exp`
+of a reciprocal `sin`, folded into `phase_peaks` and both analytic column
+builders) and `toy_anomalous` (WP-0504, anomalous f′/f″ on a
+non-centrosymmetric structure — the only state where the Friedel-averaged
+|A|² + |B|² differs from |F|² at the orbit representative) were added the same
+way, each from its own green tree and each capturing only the new state — the
+earlier goldens were left untouched every time.  `toy_capillary` and
+`toy_roughness` are deliberately a pair: one locks the capillary intensity
+factor, the other the flat-plate one.
+`test_backend_shim.py` asserts the current
 tree reproduces each **bit-for-bit** (`np.array_equal`) — the acceptance gate
 for "nothing here may change a single computed number on the numpy path".
 
 These are *environment-pinned* bit patterns, not physical reference values: a
 different BLAS/numpy build may legitimately differ in final bits.  Re-baseline
 only from a tree that passes the full suite, via
-`.venv/bin/python -m tests.test_backend_shim`, and say so in the commit message.
+
+    .venv/bin/python -m tests.test_backend_shim STATE [STATE ...]
+
+naming **only** the states that genuinely changed, and say so in the commit
+message.  The state names are required rather than optional on purpose: capturing
+every state at once quietly rebases baselines that were meant to be fixed points,
+which is the one failure mode these files cannot detect themselves.

@@ -78,7 +78,9 @@ def cos2_alpha(members: np.ndarray, axis: np.ndarray, gstar: np.ndarray
     ga = gstar @ a
     haa = h @ ga                                   # h · G* · a          (N,)
     hh = xp.einsum("mi,ij,mj->m", h, gstar, h)     # h · G* · h          (N,)
-    aa = a @ ga                                    # a · G* · a          0-d scalar
+    # xp.matmul, not `a @ ga`: a 1-D·1-D matmul lowers to aten::dot, which MPS
+    # cannot batch — the backend expands that one shape (backend/api.py)
+    aa = xp.matmul(a, ga)                          # a · G* · a          0-d scalar
     denom = hh * aa
     return xp.where(denom > 0.0, haa * haa / xp.where(denom > 0.0, denom, 1.0), 1.0)
 
@@ -119,8 +121,9 @@ def _segment_mean(values: np.ndarray, seg: np.ndarray, counts: np.ndarray
     ``seg`` maps each stacked equivalent to its reflection index; ``counts`` is
     the per-reflection orbit size (the multiplicity).
     """
-    total = get_backend().segment_sum(values, seg, len(counts))
-    return total / counts
+    xp = get_backend()
+    total = xp.segment_sum(values, seg, len(counts))
+    return total / xp.asarray(counts, dtype=np.float64)
 
 
 def march_dollase_factors(members: np.ndarray, seg: np.ndarray, counts: np.ndarray,

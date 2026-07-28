@@ -7,9 +7,10 @@ core, pydantic v2 schemas, gemmi for CIF/symmetry. Import name: `pxrdref`.
 
 ```sh
 uv venv --python 3.12 && uv pip install -e ".[dev]"   # setup (once)
-uv pip install -e ".[dev,jax]"                         # + optional jax backend
-.venv/bin/python -m pytest                             # full suite ~2 min, incl. real-data acceptance
-.venv/bin/python -m pytest -m "not slow"               # skip acceptance (~20 s)
+uv pip install -e ".[dev,jax,torch]"                   # + optional jax/torch backends
+.venv/bin/python -m pytest                             # full suite ~8 min (551 tests), incl. real-data acceptance
+.venv/bin/python -m pytest -m "not slow"               # skip acceptance (512 tests, ~2 min)
+.venv/bin/python -m pytest tests/test_cross_backend.py # Jacobian agreement matrix; rows self-skip without their backend
 .venv/bin/python -m ruff check src tests examples      # lint (must be clean)
 .venv/bin/python examples/nac_11bm.py                  # end-to-end demo + plot
 .venv/bin/pxrdref watch <live-dir>                     # live viewer for a LiveSession run
@@ -56,9 +57,12 @@ flagged `PAWLEY_OVERLAP_UNRESOLVED` rather than confidently split).
   between stages. This keeps the residual smooth for FD/autodiff Jacobians.
   (FCJ node *positions* follow the parameters smoothly, with the quadrature
   split at the overlap-trapezoid kink — see profiles/fcj.py.)
-- **fp64 everywhere** in the core; future GPU backends may compute Jacobian
+- **fp64 everywhere** in the core; a GPU backend may compute Jacobian
   *columns* in fp32 but the residual used for cost/statistics and the solve
-  stay fp64 on host.
+  stay fp64 on host — `backend/linalg64.py` is that boundary, and it holds on
+  real hardware: an Apple-MPS refinement whose every column was computed in
+  fp32 lands 3.5e-8 Å from the numpy fp64 cell, because the trust region
+  re-measures each step against an fp64 cost.
 - **No pydantic in the hot loop**: `ParameterTable.decode()` returns a plain
   dict; the forward model consumes floats/arrays only.
 - **Weights**: use the file's esd column when present (readers), Poisson
@@ -94,6 +98,30 @@ flagged `PAWLEY_OVERLAP_UNRESOLVED` rather than confidently split).
   survive JSON round-trip — tested).
 - Angles in degrees throughout; Caglioti U,V,W in deg²(2θ); Biso in Å²
   (= 8π²·Uiso); wavelengths in Å; k = sinθ/λ.
+- **Hot-path code must not put a frozen numpy constant on the left of a python
+  operator against a θ-derived value** — `ndarray * tensor` raises on the torch
+  backend (and `tensor * ndarray` routes through numpy's deprecated
+  `__array_wrap__`, then fails under a functorch transform). Route it through
+  `xp.matmul` or lift it with `xp.asarray(c, dtype=np.float64)`; both are no-ops
+  on numpy. Same rule for a *new op*: add it to `_OP_NAMES` and implement it on
+  every backend — `tests/test_backend_conformance.py` fails, for every
+  registered backend at once, if you don't.
+- **Two things are written once and consumed everywhere; never restate either.**
+  The residual **row layout** `[data | background-penalty | Pawley-restraint |
+  soft-restraint]` lives in `model/rows.py` (`BLOCK_ORDER`, `layout()`,
+  `assemble()`) — the numpy residual, the numpy Jacobian's row offsets and every
+  traced residual build from it, so a new block is one edit. The **traced twin**
+  of `decode`/residual lives in `backend/traced.py`, parameterised by `xp` — jax
+  and torch share it, and a new backend inherits it. Adding a backend means
+  adding a name to `backend.api.BACKEND_NAMES` and a row to
+  `test_cross_backend.METHODS`; the conformance suite's meta-test fails if you
+  do the first without the second.
+- **Traced code runs inside `backend.traced.active(xp)`** — it makes `xp` the
+  globally-bound backend *and* opens the backend's `full_precision()` scope.
+  jax's fp64 is scoped, so a constant (or a θ vector) materialised outside it
+  is silently float32: this cost the Pawley aux columns four orders of accuracy
+  once, and is why constants are lifted inside the traced call, not at closure
+  build.
 - **Instrument ⊕ sample profile split**: Gaussian *variances* add
   (instrument U,V,W + phase `gauss_size`/`gauss_strain`), Lorentzian *FWHMs*
   add (instrument X,Y + phase `lor_size`/`lor_strain`). Workflow:
@@ -144,6 +172,26 @@ flagged `PAWLEY_OVERLAP_UNRESOLVED` rather than confidently split).
   than bounds — and measured on real data it fires on isotropic and anisotropic
   specimens alike, so read it as "these coefficients are not quotable", never as
   evidence *of* anisotropy.
+- **Anomalous scattering is opt-in per source** (`Source.dispersion`, f = f₀ +
+  f′ + i·f″ from bundled Cromer-Liberman `data/f1f2_CromerLiberman.dat`), and
+  the load-bearing part is *not* that f goes complex — F always was. It is that
+  `generate_reflections` merges ±h into one Laue orbit and evaluates a single
+  representative, which is exact only while f is real: with f″ ≠ 0 in a
+  non-centrosymmetric group |F(h)|² ≠ |F(−h)|², and both land in the *same*
+  powder peak. So `structure_factors_squared` returns the **Friedel average**,
+  in the exact closed form ⟨|F|²⟩ = |A|² + |B|² with A carrying f₀+f′ and B
+  carrying f″ over the *same* orbit sums — no second orbit pass, no
+  centro/non-centro case split, and B ≡ 0 recovers |F|² bit-identically (which
+  constrains the fp *association order* in `_orbit_terms`, not just the
+  algebra). f′/f″ are frozen at stage compile onto `PhaseSites.f_anom`: they
+  depend only on species and λ, and `EmissionLine.wavelength` is a plain float,
+  so they can never be a function of θ. One |F|² is shared across emission
+  lines, *guarded* rather than smeared — `dispersion.resolve` raises when a line
+  differs from the primary by more than 1 % of Z (an edge between them). Near an
+  edge the table is wrong in principle, not merely coarse, so that is refused
+  too and `Dispersion.overrides` takes measured pairs. Default **off** so every
+  shipped acceptance number stays valid; `DISPERSION_NEGLECTED` makes "off"
+  loud. Ions resolve to the element (core-level effect), unlike ionic f₀.
 - History nodes store **state, not curves** (a node is ~10 kB; embedding
   y_calc would make it ~1.24 MB). Their cached metrics are *as-optimised* —
   measured on a model frozen at the values each stage *started* from — so
@@ -196,20 +244,32 @@ in *that* WP's `### Inherited` section, naming yours as the source
 
 Shipped: **v0.1** (synchrotron vertical slice), **v0.2** (2026-07-22: lab
 Bragg-Brentano, analytic Jacobian, background automation, FitReport L1-2,
-history DAG, live viz). In progress: **v0.3** — coordinate refinement,
-anisotropic ADPs, QPA weight fractions, Brindley microabsorption, Pawley
-whole-pattern mode and March-Dollase preferred orientation have landed
-(WP-0301…0307; `RefinementResult.qpa` = Hill-Howard ZMV with correlated σ, plus
-corrected fractions + µR fence when every phase carries `particle_radius_um`;
-`Phase.preferred_orientation` is an optional single-axis March-Dollase block —
-integer hkl axis + softplus `r`, identity at r=1, analytic ∂P/∂r column, and a
-Layer-1 axis diagnostic on `FitReport.texture` that fits the full nonlinear
-P(r) — the linear template is degenerate in high-symmetry crystals);
-the v0.3 acceptance (WP-0310) is measured and recorded in
-`docs/milestones/v0.3.md` — SRM 676a cell anchor via c/a (+30 ppm) plus the
-IUCr QPA round robin with participant-spread-referenced tolerances; only
-multi-histogram (0308) and exporters (0309) remain before the milestone row
-flips. v2 fence: FPA, neutron/TOF, spherical-harmonics texture, MCP server.
+history DAG, live viz), **v0.3** (2026-07-24: coordinate refinement, anisotropic
+ADPs, QPA weight fractions, Brindley microabsorption, Pawley whole-pattern mode,
+March-Dollase preferred orientation, multi-histogram, exporters — WP-0301…0310,
+measured acceptance in `docs/milestones/v0.3.md`: SRM 676a cell anchor via c/a
+(+30 ppm) plus the IUCr QPA round robin with participant-spread-referenced
+tolerances), **v0.4** (2026-07-27: differentiable backends — WP-0401…0408,
+measured acceptance in `docs/milestones/v0.4.md`).
+
+**v0.4 — differentiable backends.** `backend=` takes `"numpy"` (the default and
+the only one anyone needs), `"jax"`, or the **experimental** `"torch"` (CPU
+fp64) / `"torch-mps"` (Apple GPU, necessarily fp32) — never installed by
+default, kept as an independent opinion in the agreement matrix and as the
+route to using the forward model as a differentiable layer (DESIGN.md, "What
+the differentiable core unlocks"). Every backend is held to per-column
+agreement with the analytic Jacobian in `tests/test_cross_backend.py` — whose
+configs must grow whenever a *new derivative path* does, or no backend row
+covers it. Also landed: true Voigt
+(`Instrument.profile.shape="voigt"`, one shared Weideman Faddeeva `w(z)`, TCHZ
+still the default), soft bond/angle/value restraints (extra residual rows below
+the data, Rietveld and single-histogram only), and the Bérar-Lelann esd fix
+(reported esds now carry the inflation; the correlation matrix is a true Pearson
+matrix and the 0.98 guard is live). Apple-GPU execution is *slower* than numpy
+(46-182×, launch-latency-bound) — `torch-mps` buys precision validation, not
+speed; the measured break-even (≈65 k elements per kernel) and ceiling (≈2.5×)
+are in the v0.4 record. v2 fence:
+FPA, neutron/TOF, spherical-harmonics texture, MCP server.
 
 Key test data (provenance + every reference value in `tests/data/README.md`):
 - `11BM_NAC.fxye` — APS 11-BM synchrotron, λ=0.4139090 from the .prm; NAC +

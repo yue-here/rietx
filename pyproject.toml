@@ -30,6 +30,13 @@ dependencies = [
 viz = ["matplotlib>=3.8", "plotly>=5.20"]
 baselines = ["pybaselines>=1.1"]
 jax = ["jax>=0.4.30"]
+# EXPERIMENTAL, and deliberately not part of [dev]: torch is a ~500 MB
+# dependency whose CPU Jacobian is ~10x slower than the analytic numpy one and
+# whose Apple-GPU path is slower still (measured — docs/milestones/v0.4.md).
+# It is kept as an independent opinion in the Jacobian-agreement matrix and as
+# the route to using the forward model as a differentiable layer; nobody
+# running refinements needs it installed.
+torch = ["torch>=2.2"]
 dev = [
     "pytest>=8",
     "pytest-cov",

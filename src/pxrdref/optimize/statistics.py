@@ -89,17 +89,121 @@ def background_absorption(jac: np.ndarray, free_paths: list[str]) -> dict[str, f
     bg = [k for k, p in enumerate(free_paths) if p.startswith("instrument.background.")]
     targets = [(k, p) for k, p in enumerate(free_paths)
                if p.endswith((".biso", ".scale", ".occ")) or ".adp." in p]
-    if not bg or not targets:
+    return block_projection_r2(jac, bg, targets)
+
+
+def block_projection_r2(jac: np.ndarray, block: list[int],
+                        targets: list[tuple[int, str]],
+                        nuisance: list[int] | None = None) -> dict[str, float]:
+    """R²ᵢ of each target column on the span of ``block``, keyed by path.
+
+    The shared core of :func:`background_absorption` and
+    :func:`roughness_absorption`: a thin QR of the block gives an orthonormal
+    basis, and each target column is projected onto it.  Extracted rather than
+    copied because the *statistic* is the reusable idea — "can this group of
+    parameters, acting together, imitate that one?" — and a second hand-rolled
+    copy would be free to drift from this one's clipping and degenerate-column
+    handling.
+
+    ``nuisance`` columns, when given, are projected out of the **whole**
+    Jacobian first, making the result a *partial* R²: how much of the target
+    the block can still explain once those parameters have taken whatever they
+    can.  That matters whenever the nuisance directions are free anyway, and it
+    is what makes the roughness number mean something (see
+    :func:`roughness_absorption`).
+
+    ``block``, ``nuisance`` and the indices in ``targets`` index columns of
+    ``jac``.  A zero-norm target column is skipped rather than reported as 0 or
+    1: it carries no information either way.
+    """
+    if not block or not targets:
         return {}
-    q, _ = np.linalg.qr(np.asarray(jac)[:, bg])
+    jac = np.asarray(jac)
+    if nuisance:
+        qn, _ = np.linalg.qr(jac[:, nuisance])
+        jac = jac - qn @ (qn.T @ jac)
+    q, _ = np.linalg.qr(jac[:, block])
     out: dict[str, float] = {}
     for k, path in targets:
-        j = np.asarray(jac)[:, k]
+        j = jac[:, k]
         denom = float(j @ j)
         if denom <= 0.0:
             continue
         resid = j - q @ (q.T @ j)
         out[path] = float(np.clip(1.0 - float(resid @ resid) / denom, 0.0, 1.0))
+    return out
+
+
+def _displacement_like(path: str) -> bool:
+    """Displacement freedom a low-angle intensity depression can hide in."""
+    return path.endswith(".biso") or ".adp." in path
+
+
+def _roughness_nuisance(path: str) -> bool:
+    """Directions that are free anyway and would swamp the comparison.
+
+    Roughness is a *multiplicative* correction, so it is trivially "scale-like":
+    projected onto a block containing the phase scale it scores R² ≈ 0.95
+    whatever the data (measured), which says nothing except that both rescale
+    the pattern.  The scale and the background refine in every plan regardless,
+    so the question worth asking is what is left of roughness *after* they have
+    taken whatever they can — a partial R².
+    """
+    return path.endswith(".scale") or path.startswith("instrument.background.")
+
+
+def roughness_absorption(jac: np.ndarray, free_paths: list[str]
+                         ) -> dict[str, float]:
+    """Two-way degeneracy between surface roughness and the ADPs (WP-0502).
+
+    Surface roughness depresses low-angle intensity, which is exactly the
+    signature an inflated Biso/ADP can reproduce.  Pitschke, Hermann & Mattern
+    (1993) Table III is the canonical demonstration of the consequence:
+    uncorrected, YBa₂Cu₃O₇ refines to Biso = −1.9 … −2.5 Å², and only the
+    correction brings it back to 0.28–0.45 Å².  The degeneracy is real physics,
+    so the answer is to *measure* it, not to hide it behind a good-looking Rwp.
+
+    The phase scale and the background are treated as **nuisance** directions
+    and projected out of everything first (see :func:`_roughness_nuisance`);
+    without that step every number here saturates near 0.96 and the guard is
+    blind.  Both remaining directions are reported, because they answer
+    different questions:
+
+    * ``instrument.geometry.surface_roughness.*`` keys — how much of the
+      roughness column the displacement block can still reproduce.  High ⇒
+      *roughness is not identifiable from this data* and whatever it refined to
+      is arbitrary.
+    * ``…biso`` / ``…adp.k`` keys — how much of that parameter the roughness
+      block can reproduce.  High ⇒ *the displacement parameter is hiding in
+      roughness*, so its esd understates its true uncertainty.
+
+    Measured on a synthetic large-cell lab pattern with scale, background, both
+    Biso and both Suortti parameters free, varying only the low-angle cutoff:
+
+    ======================  =====  =====  =====  =====  =====
+    lowest fitted 2θ          7°    15°    20°    30°    45°
+    reflections below 40°     20     18     16     10      0
+    R²(roughness b)         0.06   0.62   0.91   0.93   0.95
+    ======================  =====  =====  =====  =====  =====
+
+    i.e. the statistic tracks the thing that actually determines
+    identifiability — how many *reflections* fall in the range where the
+    depression has a lever arm — rather than the nominal 2θ limit.
+
+    As for :func:`background_absorption`, pairwise ρ is the wrong statistic (a
+    block of many coefficients absorbs collectively while every individual |ρ|
+    stays small) and ``jac`` must be the **full** Jacobian including any
+    P-spline penalty rows.
+    """
+    rough = [k for k, p in enumerate(free_paths)
+             if p.startswith("instrument.geometry.surface_roughness.")]
+    disp = [(k, p) for k, p in enumerate(free_paths) if _displacement_like(p)]
+    if not rough or not disp:
+        return {}
+    nuisance = [k for k, p in enumerate(free_paths) if _roughness_nuisance(p)]
+    out = block_projection_r2(jac, [k for k, _ in disp],
+                              [(k, free_paths[k]) for k in rough], nuisance)
+    out.update(block_projection_r2(jac, rough, disp, nuisance))
     return out
 
 

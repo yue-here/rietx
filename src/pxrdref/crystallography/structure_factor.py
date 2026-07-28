@@ -195,7 +195,10 @@ def _orbit_terms(hkl, k, sites, xyz, occ, biso, uaniso, astar, j):
     """
     xp = get_backend()
     rot, tran = sites.ops[j]
-    positions = rot @ xyz[j] + tran  # (m, 3)
+    # xp.matmul / xp.asarray, not bare `rot @ … + tran`: the frozen numpy
+    # constants must not meet a traced value through a python operator at all
+    # (see backend/api.py's module docstring)
+    positions = xp.matmul(rot, xyz[j]) + xp.asarray(tran, dtype=np.float64)  # (m, 3)
     phase = xp.exp(2.0j * xp.pi * (positions @ hkl.T))  # (m, N)
     fa = None if sites.f_anom is None else sites.f_anom[j]
     f = f0(sites.species[j], k)

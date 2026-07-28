@@ -27,6 +27,7 @@ fluorescence, so a refusal is more honest than any interpolated value.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import lru_cache
 from importlib import resources
 
@@ -152,3 +153,37 @@ def linear_attenuation(element_counts: dict[str, float], volume: float,
     sigma = sum(count * total_cross_section(sym, wavelength)
                 for sym, count in element_counts.items())
     return sigma / volume
+
+
+def packed_mu_r(mus_cm: Sequence[float], volume_fractions: Sequence[float],
+                radius_mm: float, packing_fraction: float) -> float:
+    """Dimensionless mu*R of a packed polyphase cylindrical specimen.
+
+    ``mus_cm`` are the *crystalline* linear attenuation coefficients (1/cm,
+    one per phase, from :func:`linear_attenuation`), ``volume_fractions`` the
+    corresponding crystalline volume fractions, ``radius_mm`` the capillary
+    bore radius and ``packing_fraction`` the fraction of the bore occupied by
+    solid.  Voids do not absorb, which is the entire content of the packing
+    factor:
+
+        mu_bulk = f_pack * sum_i v_i * mu_i          [1/cm]
+        mu*R    = mu_bulk * radius_mm / 10
+
+    The packing fraction is not refinable and is not meant to be fitted: it is
+    exactly degenerate with mu*R itself, so a wrong value here is
+    indistinguishable from a wrong radius or a wrong composition.  Typical
+    tapped powders sit at 0.3-0.6; 0.64 is random close packing of spheres.
+    """
+    if len(mus_cm) != len(volume_fractions):
+        raise ValueError("mus_cm and volume_fractions must have the same length")
+    if radius_mm <= 0.0:
+        raise ValueError(f"capillary radius must be positive, got {radius_mm}")
+    if not 0.0 < packing_fraction <= 1.0:
+        raise ValueError(
+            f"packing fraction must be in (0, 1], got {packing_fraction}")
+    total = float(sum(volume_fractions))
+    if total <= 0.0:
+        raise ValueError("volume fractions must sum to a positive value")
+    mu_bulk = packing_fraction * sum(
+        mu * (v / total) for mu, v in zip(mus_cm, volume_fractions))
+    return mu_bulk * radius_mm / 10.0
