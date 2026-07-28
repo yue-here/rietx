@@ -48,6 +48,50 @@ From **WP-0403** (mixed-precision policy, landed 2026-07-24): if `w(z)` is
 ever evaluated below fp64, that is a *Jacobian-column* concern only — the
 policy lives in `backend/linalg64.py` and the residual stays fp64 regardless.
 
+From **WP-0408** (torch backend, landed 2026-07-27) — **"per-backend
+maintenance liability" now means three backends, and torch is the awkward one.**
+
+- The op-set claim above is unchanged, but the cost of a new op went up:
+  `TorchBackend` in `backend/api.py` builds its vocabulary from `_TORCH_UNARY` /
+  `_TORCH_BINARY` plus explicit methods, and
+  `tests/test_backend_torch.py::test_every_shim_op_is_implemented` fails if an
+  op lands in `_OP_NAMES` without a torch implementation. Good — but write the
+  torch side in the same commit.
+- **A rational or polynomial `w(z)` approximation will hit the numpy-constant
+  rule.** Its coefficient tables are exactly the frozen numpy arrays that must
+  not sit on the left of a product against a traced value — `ndarray * tensor`
+  raises on torch, and `tensor * ndarray` silently detours through numpy's
+  deprecated `__array_wrap__` and then *fails* under a functorch transform. Lift
+  the tables with `xp.asarray(c, dtype=np.float64)` once, at the top of the
+  function, exactly as `crystallography/scattering.py::f0` now does with the
+  Waasmaier-Kirfel coefficients. The rule is stated in `backend/api.py`'s module
+  docstring and in CLAUDE.md's Conventions.
+- **Horner evaluation is the safe shape** for the same reason a region-split is
+  not: `where`-masked full-array arithmetic is what all three backends batch.
+- **If the `w(z)` region test is a scalar comparison, watch the 0-d case on
+  MPS.** A 0-d dual tensor cannot be combined with a python float under
+  `torch.func.jvp` on Apple hardware; `TorchBackend.scalarize` covers every 0-d
+  value the backend *produces*, but a 0-d value you build by indexing a plain
+  array (`tab[k]`) is not covered — route it through an `xp.*` op or
+  `xp.scalarize`.
+
+From **WP-0404** (cross-backend Jacobian CI, landed 2026-07-24) — the drift
+guard this file's Context invokes now exists, and **it only sees what the
+state builders contain**:
+
+- `tests/test_cross_backend.py` runs (analytic | central FD | jax | torch |
+  fp32-policy) × configs, where the configs are `tests/test_backend_shim.py`'s
+  `STATES` plus the 18 `ANALYTIC_FAMILIES` lab state. A true-Voigt instrument
+  is a *new derivative path*: add one state with `profile.shape="voigt"` to
+  `STATES` (regenerating its golden per `tests/data/README.md`) and it joins
+  every method row at once. Ship the profile without doing that and the matrix
+  is silently blind to it — the same trap WP-0506 hit, where the extinction
+  factor `G = E + x·dE/dx` was only exercised because `toy_rich` has
+  extinction nonzero.
+- The bars there are per-column rel-L2 < 5e-3 and cosine > 0.99999 for fp64
+  methods. The analytic ∂V/∂(σ,γ) columns this WP writes are what gets
+  measured against central FD and jacfwd.
+
 ### Design (decided)
 
 - **Algorithm: Weideman (1994) rational approximation, N = 32 terms**
@@ -116,6 +160,31 @@ SRM-660c-style lab LaB6 end-to-end (slow) Rwp 0.031, a within 5e-4 Å.
 
 ## Handover log
 
+- **2026-07-27** — **torch verification, done by WP-0408 during integration**
+  (this WP and the torch backend were built in parallel on separate branches).
+  The open question left in the `### Inherited` note below — "verify `1j *
+  tensor`, complex `/` and `real`/`imag` on your device before claiming the
+  shape works" — is now answered:
+
+  - **CPU fp64 torch: works unchanged.** `faddeeva_w` needed no edit. The
+    coefficient-table hazard WP-0408 predicted does not bite, because
+    `_WEIDEMAN_A[0]` indexes out a numpy *scalar* (which torch accepts on the
+    left of an operator) rather than slicing an array — the Horner form is what
+    saved it.
+  - **MPS fp32: one bug, in WP-0408's code, not here.** `voigt.py`'s
+    `1j * gamma` on a 0-d width tripped that backend's scalar guard, which lifted
+    the complex literal at the operand's real dtype. Fixed there; `voigt.py` and
+    `faddeeva.py` are untouched. Routing `shape="voigt"` to CPU — the fallback
+    this WP's note suggested — was **not** needed: complex64 `exp`/`mul`/`sum`/
+    `real`/`imag` all work on Metal.
+  - **The matrix now covers the shape.** This WP's own `### Inherited` warned
+    that shipping without a `shape="voigt"` state leaves
+    `tests/test_cross_backend.py` blind to the new derivative path; that is what
+    happened. A `families_voigt` config now runs the 18 analytic families under
+    the Voigt shape across analytic / central FD / jax / torch and both fp32
+    policies — all inside the fp64 bars, worst column 3.1e-5 rel-L2 (torch vs
+    analytic). It is built locally in that file rather than added to
+    `test_backend_shim.STATES`, so it needs no bit-identity golden.
 - **2026-07-22** — created as a stub from the ROADMAP split.
 - **2026-07-24** — expanded from stub (v0.4 planning session): Weideman N=32
   chosen for branchlessness; per-instrument `profile.shape` enum; files,

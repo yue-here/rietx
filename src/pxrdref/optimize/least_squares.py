@@ -31,8 +31,10 @@ import numpy as np
 from scipy.optimize import least_squares
 
 from ..backend import get_backend
+from ..backend.api import TORCH_DEVICES
 from ..backend.linalg64 import get_precision_policy, require_fp64, to_host_fp64
 from ..crystallography.adp import U_NAMES
+from ..model import rows as row_layout
 from ..model.forward import CompiledModel, DerivativeBases
 from ..model.restraints import restraint_partials
 from ..params.transforms import dphys_dinternal
@@ -84,32 +86,29 @@ def _make_residual(model: CompiledModel, table: ParameterTable):
     split into per-phase slices and passed *through* the evaluation (never
     written to the buffers — those are committed once, post-solve), and the
     overlap-restraint rows are appended after the background penalty rows.
+
+    The row *layout* is not written here: ``model.rows`` owns it, and the
+    traced residuals every autodiff backend uses call the same assembler, so
+    the numpy reference and the traced twins cannot disagree about block order.
     """
     sqrt_w = 1.0 / model.sigma
     n_table = len(table.free_paths)
     xp = get_backend()
     fixed_intens = _lebail_snapshot(model)
+    empty_aux = np.zeros(0, dtype=np.float64)
 
     def residual(theta: np.ndarray) -> np.ndarray:
         if model.pawley is not None:
-            intens = model.split_pawley_intensities(theta[n_table:])
+            aux = theta[n_table:]
+            intens = model.split_pawley_intensities(aux)
             values = table.decode(theta[:n_table])
         else:
+            aux = empty_aux
             intens = fixed_intens
             values = table.decode(theta)
-        r = sqrt_w * (model.y_obs - model.evaluate(values, intens))
-        parts = [r]
-        pen = model.penalty_residual(values)
-        if pen is not None:
-            parts.append(pen)
-        if model.pawley is not None:
-            rpen = model.pawley_restraint_residual(theta[n_table:])
-            if rpen is not None:
-                parts.append(rpen)
-        rr = model.restraint_residual(values)
-        if rr is not None:
-            parts.append(rr)
-        return parts[0] if len(parts) == 1 else xp.concatenate(parts)
+        return row_layout.assemble(model, row_layout.ResidualInputs(
+            values=values, intens=intens, theta_aux=aux,
+            sqrt_w=sqrt_w, y_obs=model.y_obs, xp=xp))
 
     return residual
 
@@ -258,12 +257,11 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
     sqrt_w = 1.0 / model.sigma
     free = table.free_paths
     n_table = len(free)
-    n_data = len(model.tt)
-    n_bkg_pen = 0 if model.bkg_penalty is None else model.bkg_penalty.shape[0]
-    n_res = (0 if model.pawley is None or model.pawley.restraint is None
-             else model.pawley.restraint.shape[0])
-    n_restraint = 0 if model.restraints is None else model.restraints.n_rows
-    n_rows = n_data + n_bkg_pen + n_res + n_restraint
+    # row extents from the one layout authority — the Jacobian writes into the
+    # same blocks the residual stacks, so it must not re-derive them
+    data_blk, pen_blk, pawley_blk, restr_blk = row_layout.layout(model)
+    n_data, n_bkg_pen, n_restraint = data_blk.n, pen_blk.n, restr_blk.n
+    n_rows = row_layout.n_rows(model)
 
     bkg_cols = {path: n for n, path in enumerate(model.bkg_paths)}
     axial_paths = {"instrument.geometry.axial_sl": 8, "instrument.geometry.axial_hl": 9}
@@ -335,14 +333,15 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
 
         if model.pawley is not None:
             _pawley_intensity_columns(model, get_bases(), values, sqrt_w, J,
-                                      n_table, n_data + n_bkg_pen)
+                                      n_table, pawley_blk.start)
 
         if model.restraints is not None and n_table:
             # One unconditional matrix block below the data/penalty/Pawley rows:
             # ∂row/∂θ_c = (R_phys @ C)[i,c]·dφ/du[c], since decode gives
-            # p = C·to_physical(θ) + d.  Rietveld-only (n_res is then 0), and the
+            # p = C·to_physical(θ) + d.  Rietveld-only (the Pawley block is then
+            # empty, so restr_blk starts right after the penalty rows), and the
             # rows touch table θ only — no Pawley-intensity columns.
-            restr0 = n_data + n_bkg_pen + n_res
+            restr0 = restr_blk.start
             r_phys = restraint_partials(model.restraints, values, table)
             cmat = table.constraint_block()[0].toarray()  # C small: dense is fine
             dpdu = np.array([dpdu_of(c, theta_t) for c in range(n_table)],
@@ -356,9 +355,11 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
 def _jacobian_for(model, table, backend: str):
     """The Jacobian callable for ``backend`` (lazy import keeps numpy pure).
 
-    The jax callable produces the same fp64 host array in the same row/column
-    layout as :func:`_make_jacobian`; the residual used for cost/statistics
-    and the TRF solve stay numpy either way (WP-0402).
+    Every autodiff callable produces the same fp64 host array in the same
+    row/column layout as :func:`_make_jacobian`; the residual used for
+    cost/statistics and the TRF solve stay numpy whichever backend built the
+    columns (WP-0402 for jax, WP-0408 for torch — ``"torch"`` is fp64 on CPU,
+    ``"torch-mps"`` fp32 on the Apple GPU, since no Apple GPU has fp64).
 
     This is also the assembly's exit point, so it is where the WP-0403
     mixed-precision policy is applied: whichever backend built the columns,
@@ -371,10 +372,15 @@ def _jacobian_for(model, table, backend: str):
         from ..backend.jax_backend import make_jax_jacobian
 
         inner = make_jax_jacobian(model, table)
+    elif backend in TORCH_DEVICES:
+        from ..backend.torch_backend import make_torch_jacobian
+
+        inner = make_torch_jacobian(model, table, device=TORCH_DEVICES[backend])
     elif backend == "numpy":
         inner = _make_jacobian(model, table)
     else:
-        raise ValueError(f"unknown backend {backend!r}; available: numpy, jax")
+        raise ValueError(f"unknown backend {backend!r}; "
+                         f"available: numpy, jax, {', '.join(TORCH_DEVICES)}")
 
     def jacobian(theta: np.ndarray) -> np.ndarray:
         # policy read per call, not per closure build: a `with precision_policy`
@@ -448,37 +454,14 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                       jac_table, stderr, corr, n_aux=n_aux)
 
 
-def run_multi_least_squares(models: list[CompiledModel],
-                            mtable: "MultiParameterTable", *,
-                            weights: list[float] | None = None,
-                            max_iter: int = 100, ftol: float = 1e-9,
-                            compute_uncertainties: bool = True,
-                            backend: str = "numpy") -> LSQOutcome:
-    """Joint TRF solve of several histograms stacked into one residual (WP-0308).
+def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
+                    *, weights: list[float] | None = None,
+                    backend: str = "numpy"):
+    """(residual, jacobian, n_data_total) for the stacked multi-histogram solve.
 
-    Each histogram keeps its own compiled model (⇒ its own frozen hkl list,
-    windows, FCJ node counts) and its own :class:`ParameterTable`; the combined
-    free vector θ threads through them via ``mtable``'s column map, so a *shared*
-    structural column (cell, coordinates, ADPs …) receives Jacobian
-    contributions from *every* histogram — that is what refines the shared
-    quantity better than any single pattern could.
-
-    Row layout is [all histograms' data rows] then [all histograms' background-
-    penalty rows], so :func:`covariance_estimates` (which treats the first
-    ``n_data`` rows as data for χ² and the Bérar-Lelann factor) is reused
-    verbatim.  The BL run-of-signs statistic is therefore evaluated on the
-    *concatenated* data residual: WP-0407 examined this and kept it as-is —
-    each histogram join contaminates the statistic with at most one artificial
-    run boundary (a point where consecutive residuals are not 2θ-neighbours),
-    i.e. ≤ ``n_hist − 1`` boundaries out of ``n_data_total``, negligible for the
-    handful of patterns co-refined here.  A per-histogram decomposition was not
-    adopted because BL applies as a single scalar to the whole covariance
-    diagonal and a *shared* parameter draws from every histogram, so there is
-    no clean single per-parameter factor to combine.  A per-histogram scalar
-    weight ``w_h`` scales both that
-    histogram's data and its penalty rows by ``√w_h`` — keeping the smoothness
-    prior's strength relative to the data fixed; default unit weights leave the
-    residual identical to N independent solves sharing the structure.
+    Split out of :func:`run_multi_least_squares` so the stacked layout is
+    reachable without running a solve — WP-0404's cross-backend matrix compares
+    this Jacobian across backends exactly as the solver would build it.
     """
     n_hist = len(models)
     if any(m.restraints is not None for m in models):
@@ -527,6 +510,45 @@ def run_multi_least_squares(models: list[CompiledModel],
                 po = int(pen_off[h])
                 J[po:po + n_pen[h], cm] = sqrt_w[h] * Jh[n_data[h]:]
         return J
+
+    return residual, jacobian, n_data_total
+
+
+def run_multi_least_squares(models: list[CompiledModel],
+                            mtable: "MultiParameterTable", *,
+                            weights: list[float] | None = None,
+                            max_iter: int = 100, ftol: float = 1e-9,
+                            compute_uncertainties: bool = True,
+                            backend: str = "numpy") -> LSQOutcome:
+    """Joint TRF solve of several histograms stacked into one residual (WP-0308).
+
+    Each histogram keeps its own compiled model (⇒ its own frozen hkl list,
+    windows, FCJ node counts) and its own :class:`ParameterTable`; the combined
+    free vector θ threads through them via ``mtable``'s column map, so a *shared*
+    structural column (cell, coordinates, ADPs …) receives Jacobian
+    contributions from *every* histogram — that is what refines the shared
+    quantity better than any single pattern could.
+
+    Row layout is [all histograms' data rows] then [all histograms' background-
+    penalty rows], so :func:`covariance_estimates` (which treats the first
+    ``n_data`` rows as data for χ² and the Bérar-Lelann factor) is reused
+    verbatim.  The BL run-of-signs statistic is therefore evaluated on the
+    *concatenated* data residual: WP-0407 examined this and kept it as-is —
+    each histogram join contaminates the statistic with at most one artificial
+    run boundary (a point where consecutive residuals are not 2θ-neighbours),
+    i.e. ≤ ``n_hist − 1`` boundaries out of ``n_data_total``, negligible for the
+    handful of patterns co-refined here.  A per-histogram decomposition was not
+    adopted because BL applies as a single scalar to the whole covariance
+    diagonal and a *shared* parameter draws from every histogram, so there is
+    no clean single per-parameter factor to combine.  A per-histogram scalar
+    weight ``w_h`` scales both that
+    histogram's data and its penalty rows by ``√w_h`` — keeping the smoothness
+    prior's strength relative to the data fixed; default unit weights leave the
+    residual identical to N independent solves sharing the structure.
+    """
+    residual, jacobian, n_data_total = _multi_closures(
+        models, mtable, weights=weights, backend=backend)
+    n_cols = len(mtable.free_paths)
 
     x0 = mtable.x0()
     lo, hi = mtable.bounds()

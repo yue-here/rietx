@@ -1,0 +1,106 @@
+#F absorption_cylinder_rouse.dat
+#UT Transmission factor A for equatorial reflections from a cylinder
+#C  Transcribed from Table 1(a)/(b) of:
+#C    K. D. Rouse, M. J. Cooper, E. J. York & A. Chakera (1970),
+#C    "Absorption corrections for neutron diffraction",
+#C    Acta Cryst. A26, 682-691.
+#C  The published table gives A_hkl (the TRANSMISSION factor, <= 1, which the
+#C  forward model multiplies into calc) -- NOT the absorption correction
+#C  A* = 1/A that most other tabulations print.  Its muR = 0 row is 1.0000.
+#C  Stated accuracy: four decimal places.
+#C
+#C  TRANSCRIPTION NOTE.  In the scan this was read from, each table cell holds
+#C  five *consecutive* muR rows and the printed muR labels are offset by three
+#C  from the values beside them (the label "0.20" sits at index 17).  Read as
+#C  one continuous run the sin^2(theta) = 0 column recovers exactly 51 entries
+#C  = muR 0.00..0.50, and that count is the check that the reading is aligned.
+#C  Only blocks that could be read unambiguously are carried here, and every
+#C  value was validated against a quadrature of ITC Vol. C eq. (6.3.3.4)
+#C  before being committed: max |diff| = 1.7e-4, i.e. within the table's own
+#C  four-decimal resolution.  The remainder of the grid was too damaged to
+#C  transcribe safely and is deliberately absent -- see WP-0501.
+#C
+#C  Used only by tests/test_absorption.py.  Nothing at runtime reads this file.
+#UD Column description:
+#UD   1: muR (dimensionless)  2: sin^2(theta)  3: A (transmission)
+#L muR  sin2theta  A
+  0.00    0.00  1.0000
+  0.01    0.00  0.9832
+  0.02    0.00  0.9667
+  0.03    0.00  0.9504
+  0.04    0.00  0.9345
+  0.05    0.00  0.9188
+  0.06    0.00  0.9034
+  0.07    0.00  0.8883
+  0.08    0.00  0.8734
+  0.09    0.00  0.8588
+  0.10    0.00  0.8444
+  0.11    0.00  0.8303
+  0.12    0.00  0.8164
+  0.13    0.00  0.8028
+  0.14    0.00  0.7894
+  0.15    0.00  0.7763
+  0.16    0.00  0.7634
+  0.17    0.00  0.7507
+  0.18    0.00  0.7383
+  0.19    0.00  0.7260
+  0.20    0.00  0.7140
+  0.21    0.00  0.7021
+  0.22    0.00  0.6905
+  0.23    0.00  0.6790
+  0.24    0.00  0.6678
+  0.25    0.00  0.6567
+  0.26    0.00  0.6458
+  0.27    0.00  0.6352
+  0.28    0.00  0.6247
+  0.29    0.00  0.6144
+  0.30    0.00  0.6043
+  0.31    0.00  0.5944
+  0.32    0.00  0.5846
+  0.33    0.00  0.5750
+  0.34    0.00  0.5656
+  0.35    0.00  0.5563
+  0.36    0.00  0.5472
+  0.37    0.00  0.5382
+  0.38    0.00  0.5294
+  0.39    0.00  0.5208
+  0.40    0.00  0.5123
+  0.41    0.00  0.5040
+  0.42    0.00  0.4958
+  0.43    0.00  0.4877
+  0.44    0.00  0.4798
+  0.45    0.00  0.4720
+  0.46    0.00  0.4643
+  0.47    0.00  0.4568
+  0.48    0.00  0.4494
+  0.49    0.00  0.4421
+  0.50    0.00  0.4349
+  0.50    0.10  0.4394
+  0.50    0.20  0.4441
+  0.50    0.30  0.4490
+  0.50    0.40  0.4540
+  0.50    0.50  0.4592
+  0.50    0.60  0.4645
+  0.50    0.70  0.4700
+  1.00    0.00  0.1965
+  1.00    0.10  0.2060
+  1.00    0.20  0.2154
+  1.00    0.30  0.2249
+  1.00    0.40  0.2344
+  1.00    0.50  0.2439
+  1.00    0.60  0.2535
+  1.00    0.70  0.2633
+  0.50    0.65  0.4672
+  0.50    0.75  0.4728
+  0.50    0.80  0.4757
+  0.50    0.85  0.4786
+  0.50    0.90  0.4817
+  0.50    0.95  0.4848
+  0.50    1.00  0.4880
+  1.00    0.65  0.2584
+  1.00    0.75  0.2683
+  1.00    0.80  0.2734
+  1.00    0.85  0.2786
+  1.00    0.90  0.2839
+  1.00    0.95  0.2895
+  1.00    1.00  0.2951

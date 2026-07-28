@@ -70,7 +70,54 @@ From **WP-0401** (op shim, landed):
   `window_add` on frozen contiguous windows plus `concatenate` is the whole
   vocabulary, deliberately.
 
-### Design (decided)
+From **WP-0404** (cross-backend Jacobian CI, landed 2026-07-24) — two things
+that check the "one new wrinkle" above (a *nonlinear* penalty row-Jacobian,
+which the P-spline and Pawley precedents did not have):
+
+- `tests/test_cross_backend.py` compares the **full augmented** Jacobian —
+  data rows *and* every penalty/restraint row below them — against central
+  differences of the same augmented residual, per column at rel-L2 < 5e-3 and
+  cosine > 0.99999. So a hand-written analytic restraint row-Jacobian is
+  checked for free, but only on a state that actually carries restraints: add
+  one to `tests/test_backend_shim.py::STATES` (the configs come from there) or
+  the matrix never sees the new rows.
+- Its stage-boundary test asserts the residual **row count is unchanged across
+  a recompile** and that the Jacobian's shared columns move < 1e-4 (Frobenius)
+  when the frozen state regenerates. Build the restraint row block
+  deterministically from the frozen state, the way `build_pawley_restraint`
+  does, or a boundary will change the row count mid-plan and that test will
+  say so.
+
+From **WP-0408** (torch backend, landed 2026-07-27) — **the residual's row
+layout is now written out in three places, not two.** Adding a penalty-row block
+means editing all of:
+
+1. `optimize/least_squares.py::_make_residual` (+ `_make_jacobian`'s row
+   accounting: `n_rows = n_data + n_bkg_pen + n_res`),
+2. `backend/jax_backend.py::make_traced_residual`,
+3. `backend/torch_backend.py::make_traced_residual`.
+
+The two traced twins mirror `_make_residual` row for row and each ends with
+`concatenate(parts)` over the same `[data | background-penalty |
+Pawley-restraint]` list — miss one and the matrix reports a shape mismatch
+rather than a wrong number, which is the good failure, but only if a config
+carrying the new rows is in `STATES` (see the WP-0404 note above). Consider
+whether the three copies should become one shared assembly while you are in
+there; 0408 kept them separate because the backend-specific pieces (traced
+decode, `concatenate`) differ, and the matrix catches drift.
+
+Two hot-path rules that now bind any row-assembly code (both stated in
+`backend/api.py`'s module docstring and CLAUDE.md's Conventions):
+
+- **A frozen numpy constant must not meet a traced value through a bare python
+  operator.** `R @ vec` was exactly this and is now
+  `get_backend().matmul(self.pawley.restraint, vec)`; the P-spline rows likewise.
+  Write new restraint rows the same way — `xp.matmul` for a design-matrix
+  product, `xp.asarray` to lift a coefficient array — both no-ops on numpy.
+- **A restraint target that is a python float** (a nominal bond length, say)
+  multiplied against a 0-d decoded value breaks on Apple MPS under forward-AD.
+  `TorchBackend.scalarize` handles values the backend produced; a float you
+  introduce yourself is safest lifted with `xp.asarray`.
 
 - **Schema** (pydantic v2, `extra="forbid"`; opt-in, empty default so a
   phase that declares none is untouched — the extinction/PO pattern):
@@ -154,6 +201,31 @@ statistics at the same parameters).
 
 ## Handover log
 
+- **2026-07-27** — **torch integration, done by WP-0408** (this WP and the torch
+  backend were built in parallel on separate branches, so neither could see the
+  other's `### Inherited` note in time).
+
+  - **The soft-restraint rows now exist in a third traced residual.**
+    `backend/torch_backend.py::make_traced_residual` gained the same
+    `model.restraint_residual(values)` append this WP added to
+    `_make_residual` and the jax twin. The row layout
+    `[data | background-penalty | Pawley-restraint | soft-restraint]` is written
+    out in three places — that is the hazard this file's `### Inherited` names,
+    and it has now been hit once for real.
+  - **`toy_restraints` was in `STATES` but not in the agreement matrix.**
+    `tests/test_cross_backend.py` takes its configs from an explicit
+    `CONFIG_PARAMS` list, not from `STATES` wholesale, so the new state was
+    carrying a bit-identity golden while no backend row differentiated it. It is
+    a matrix config now: analytic / central FD / jax / torch and both fp32
+    policies all agree on the restraint rows, worst column 2.4e-6 rel-L2 (torch
+    vs analytic), and MPS agrees with torch fp64 to 1.6e-4.
+  - **Untested on a device: the bond/angle geometry.** `_bond_distance` and
+    `_angle_deg` contain four 1-D·1-D products (`dx @ (g @ dx)` and friends),
+    which lower to `aten::dot` — an op Apple MPS cannot batch under a functorch
+    transform. `toy_restraints` declares *value* restraints only, so that path
+    never reaches the device and the gap is untested rather than broken.
+    `xp.matmul` expands the 1-D case on that backend if it is ever needed; a
+    bond/angle state on the matrix would settle it.
 - **2026-07-22** — created as a stub from the ROADMAP split.
 - **2026-07-24** — expanded from stub (v0.4 planning session): schema (opt-in
   bond/angle/value), explicit sym-op+translation PBC spec over minimum-image,

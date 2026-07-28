@@ -137,11 +137,13 @@ def test_x64_and_global_backend_never_leak():
 
 
 def test_unknown_backend_rejected():
+    # "cupy", not "torch": torch became a real backend with WP-0408, so this
+    # needs a name that is genuinely absent from the registry
     with pytest.raises(ValueError, match="unknown backend"):
-        resolve_backend("torch")
+        resolve_backend("cupy")
     structure, ins, _ = _lab_state()
     with pytest.raises(NotImplementedError, match="unknown backend"):
-        pr.Refinement(structure, ins, backend="torch", history=False)
+        pr.Refinement(structure, ins, backend="cupy", history=False)
 
 
 def test_jax_backend_ops_functional_contract():
@@ -197,12 +199,14 @@ def test_jacfwd_matches_analytic_and_fd_on_families():
     "toy_lebail",
     "toy_pawley",
     "toy_rich",
+    "toy_stephens",
     pytest.param("srm660c", marks=pytest.mark.slow),
 ])
 def test_jacfwd_matches_analytic_on_state(name):
     """Whole-matrix agreement on the shim states (Le Bail snapshot + P-spline
     penalty rows; Pawley aux block + restraint rows; aniso ADPs + March-
-    Dollase + extinction + FCJ asymmetry; real doublet lab data)."""
+    Dollase + extinction + FCJ asymmetry; hkl-dependent Stephens widths, whose
+    √ of a monomial matmul jacfwd has to trace; real doublet lab data)."""
     built = STATES[name]()
     if built is None:
         pytest.skip(f"dataset for state {name!r} not present")

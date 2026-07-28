@@ -128,9 +128,13 @@ def fcj_offsets_weights(two_theta_deg: float, sl: float, hl: float,
     C¹ everywhere except the inherent FCJ kink at s = h itself.
     """
     xp = get_backend()
-    tau, glw = _gauss_legendre_01(max(n_nodes // 2, 4))  # frozen host nodes
-    fallback_w = np.zeros(2 * len(tau))
+    tau_np, glw_np = _gauss_legendre_01(max(n_nodes // 2, 4))  # frozen host nodes
+    fallback_w = np.zeros(2 * len(tau_np))
     fallback_w[0] = 1.0
+    # lifted onto the backend: both sit on the *left* of products against the
+    # θ-derived ξ below, which torch will not accept (backend/api.py)
+    tau = xp.asarray(tau_np, dtype=np.float64)
+    glw = xp.asarray(glw_np, dtype=np.float64)
     tt = xp.radians(two_theta_deg)
     xi_max = _xi_max(tt, sl, hl)
     ok = (xi_max > 0.0) & (sl > 0.0) & (hl > 0.0)

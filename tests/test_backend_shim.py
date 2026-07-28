@@ -17,9 +17,15 @@ States (chosen to cover every refactored code path):
   restraint rows.
 * ``toy_rich`` — aniso ADPs + March-Dollase + extinction + displacement/
   transparency/zero all *on* (nonzero), unequal axial S/L ≠ H/L.
+* ``toy_capillary`` — Debye-Scherrer with cylindrical absorption on (WP-0501):
+  the only state whose cell/coordinate/ADP/scale columns chain through a
+  θ-dependent intensity factor that is neither Lp nor extinction.
 * ``toy_restraints`` — Rietveld rutile with bond, angle and value soft-restraint
   rows (WP-0406): the nonlinear penalty stripe below the data rows, its residual
   and analytic Jacobian columns locked for the cross-backend CI (WP-0404).
+* ``toy_stephens`` — Rietveld rutile with a Stephens anisotropic-strain block
+  (WP-0503): an hkl-dependent width reached through a √ of a frozen monomial
+  matmul, which no other state exercises.
 * ``toy_roughness`` — Bragg-Brentano rutile with Suortti surface roughness on
   (WP-0502): an exp of a reciprocal sin, folded into all three intensity
   assemblies (phase_peaks plus both analytic column builders).
@@ -29,7 +35,10 @@ build); they live in ``tests/data/backend_goldens/`` and are documented in
 ``tests/data/README.md``.  If the environment shifts, re-baseline **from a
 tree that passes the full suite**, never from a mid-refactor tree:
 
-    .venv/bin/python -m tests.test_backend_shim
+    .venv/bin/python -m tests.test_backend_shim STATE [STATE ...]
+
+naming only the states that genuinely changed — re-capturing an untouched state
+rebases a baseline that was meant to be a fixed point.
 """
 
 from __future__ import annotations
@@ -293,6 +302,85 @@ def _state_toy_restraints():
     return model, table, {}
 
 
+def _state_toy_capillary():
+    """Debye-Scherrer rutile with cylindrical absorption ON (WP-0501).
+
+    µR = 0.8 sits inside the Rouse et al. (1970) fit's stated µR ≤ 1 range and
+    is strong enough that A runs ~0.24-0.31 across the pattern.
+
+    There is no new *column* here — µR is not refinable, deliberately (it is
+    exactly a linear combination of the scale and Biso directions).  What is
+    new is that A depends on 2θ_Bragg, so the cell, coordinate, ADP and scale
+    columns now chain through a θ-dependent factor that no other state
+    exercises: every existing Rietveld state is either bragg_brentano (where
+    the correction is off by geometry) or sits at µR = 0.
+    """
+    from tests.test_aniso_adp import make_aniso_rutile
+
+    structure = make_aniso_rutile()
+    phase = structure.phases[0]
+    phase.scale.value = 8.0e-3
+    instrument = Instrument.debye_scherrer(wavelength=1.5406, mu_r=0.8)
+    instrument.profile.w.value = 8e-3
+    instrument.profile.x.value = 5e-3
+    instrument.zero_shift.value = 0.01
+
+    grid = np.arange(15.0, 90.0, 0.02)
+    empty = PatternData(two_theta=grid.tolist(),
+                        intensity=np.zeros_like(grid).tolist())
+    sim_structure = structure.model_copy(deep=True)
+    sim_structure.phases[0].cell.a.value = 4.5987
+    sim = compile_model(sim_structure, instrument, empty, mode="rietveld")
+    sim_table = ParameterTable(sim_structure, instrument)
+    y = sim.evaluate(sim_table.decode(sim_table.x0())) + 20.0
+    pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
+
+    table = ParameterTable(structure, instrument)
+    _free(table, [
+        "phases.0.scale", "phases.0.cell.a", "phases.0.cell.c",
+        "phases.0.atoms.*.dof.*", "phases.0.atoms.*.adp.*",
+        "instrument.zero_shift", "instrument.profile.w", "instrument.profile.x",
+        "instrument.background.*",
+    ])
+    model = compile_model(structure, instrument, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    assert model.mu_r == 0.8, "absorption must actually be live in this state"
+    return model, table, {}
+
+
+def _state_toy_stephens():
+    """Rietveld rutile with a Stephens anisotropic-strain block (WP-0503).
+
+    Locks the hkl-dependent width path: rutile is Laue 4/mmm, so the block has
+    four DOFs, and the tetragonal cell makes the (h00)/(00l) contrast real.  The
+    strain enters through a √ of a frozen monomial matmul — a shape no other
+    golden exercises, and one an autodiff backend has to trace through.  The
+    start is deliberately *off* the isotropic ray so the anisotropic patterns
+    carry a nonzero derivative.
+    """
+    from pxrdref.crystallography.stephens import stephens_basis
+    from pxrdref.schemas.structure import StephensStrain
+
+    structure, instrument, pattern = _toy_base()
+    phase = structure.phases[0]
+    basis = stephens_basis(phase.space_group).astype(np.float64)
+    coef, *_ = np.linalg.lstsq(
+        basis.T,
+        np.array(StephensStrain.isotropic(900.0, phase.cell).values()), rcond=None)
+    coef[0] *= 1.7  # break the isotropic degeneracy
+    phase.microstrain = StephensStrain.from_values(basis.T @ coef, vary=True)
+    instrument.background = BackgroundChebyshev.with_terms(4)
+    table = ParameterTable(structure, instrument)
+    _free(table, [
+        "phases.0.cell.a", "phases.0.cell.c", "phases.0.scale",
+        "phases.0.microstrain.dof.*", "phases.0.lor_size",
+        "instrument.zero_shift", "instrument.background.*",
+    ])
+    model = compile_model(structure, instrument, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    return model, table, {}
+
+
 def _state_toy_roughness():
     """Rietveld rutile on a Bragg-Brentano mount carrying Suortti roughness.
 
@@ -301,7 +389,9 @@ def _state_toy_roughness():
     separate intensity assemblies (phase_peaks and the two analytic column
     builders).  A backend that got any of them subtly wrong would show up here
     before it showed up in a fit.  Bragg-Brentano because the schema refuses a
-    roughness block on a capillary, so this state cannot reuse ``_toy_base``.
+    roughness block on a capillary, so this state cannot reuse ``_toy_base`` —
+    and it is the flat-plate counterpart to ``toy_capillary``, which locks the
+    other geometry's intensity factor.
     """
     from tests.test_coordinates import make_rutile
 
@@ -341,6 +431,8 @@ STATES = {
     "toy_pawley": _state_toy_pawley,
     "toy_rich": _state_toy_rich,
     "toy_restraints": _state_toy_restraints,
+    "toy_stephens": _state_toy_stephens,
+    "toy_capillary": _state_toy_capillary,
     "toy_roughness": _state_toy_roughness,
 }
 
@@ -431,6 +523,8 @@ def test_set_backend_roundtrip():
     "toy_pawley",
     "toy_rich",
     "toy_restraints",
+    "toy_stephens",
+    "toy_capillary",
     "toy_roughness",
 ])
 def test_numpy_path_bit_identical_to_golden(name):
@@ -452,8 +546,23 @@ def test_numpy_path_bit_identical_to_golden(name):
 
 
 if __name__ == "__main__":
+    # Capture goldens.  Named states only by default is deliberate: these files
+    # are environment-pinned bit patterns, and re-capturing a state that did not
+    # change silently rebases a baseline that was meant to be a fixed point.
+    # Pass state names to add or refresh exactly those; pass nothing to see the
+    # list rather than to overwrite all of them.
+    import sys
+
+    wanted = sys.argv[1:]
+    if not wanted:
+        print("usage: python -m tests.test_backend_shim STATE [STATE ...]")
+        print(f"states: {', '.join(STATES)}")
+        raise SystemExit(2)
+    unknown = [n for n in wanted if n not in STATES]
+    if unknown:
+        raise SystemExit(f"unknown state(s): {', '.join(unknown)}")
     GOLDEN_DIR.mkdir(parents=True, exist_ok=True)
-    for name in STATES:
+    for name in wanted:
         got = _capture(name)
         if got is None:
             print(f"{name}: dataset missing, skipped")

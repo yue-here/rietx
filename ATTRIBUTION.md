@@ -10,6 +10,14 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
 - Rietveld, H. M. (1969). *J. Appl. Cryst.* 2, 65–71 — the profile refinement method.
 - Caglioti, Paoletti & Ricci (1958). *Nucl. Instrum.* 3, 223–228 — U,V,W width law.
 - Thompson, Cox & Hastings (1987). *J. Appl. Cryst.* 20, 79–83 — TCH pseudo-Voigt.
+- Stephens, P. W. (1999). *J. Appl. Cryst.* 32, 281–289 — phenomenological model of
+  anisotropic peak broadening; the rank-4 S_HKL invariants and the per-Laue-class
+  term counts of its Table 1. The allowed subspace here is *derived* from the
+  space-group operators (`crystallography/stephens.py`), not transcribed from the
+  table — the table is the independent check.
+- Popa, N. C. (1998). *J. Appl. Cryst.* 31, 176–180 — the equivalent
+  strain-tensor formulation of the same anisotropy (concept reference; the
+  phenomenological parameterisation is what is implemented).
 - Weideman, J. A. C. (1994). *SIAM J. Numer. Anal.* 31, 1497–1518 — rational
   (FFT-coefficient) approximation of the complex error function w(z); the
   N=32 algorithm behind the shared, backend-agnostic Faddeeva in the opt-in
@@ -65,13 +73,31 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
   (validation anchor only; no code).
 - Lutterotti, L. — *QPA methods developments* course notes (MAUD) — the
   exponential fit to Brindley's τ table (validation anchor only; no code).
+- Rouse, K. D., Cooper, M. J., York, E. J. & Chakera, A. (1970). *Acta Cryst.*
+  A26, 682–691 — cylinder transmission factor A(µR, θ): eq. (2), the
+  exp-of-quadratic fit implemented in `model/absorption.py`, and Table 1, the
+  four-decimal tabulation carried as a test fixture
+  (`tests/data/absorption_cylinder_rouse.dat`).  Published table and formula,
+  transcribed with attribution.
+- *International Tables for Crystallography*, Vol. C, §6.3.3 — transmission
+  coefficient A (6.3.3.1) vs absorption correction A\* = 1/A (6.3.3.2), the
+  exact cylinder integral (6.3.3.4) used as the independent physics check, and
+  Table 6.3.3.1's analytic special cases (the flat-plate fence).  © IUCr —
+  cited and re-derived, never redistributed.
+- Hewat, A. W. (1979). *Acta Cryst.* A35, 248 — the scale × Debye-Waller
+  factorisation of cylindrical absorption for µr < 1, which is why µR is
+  computed rather than refined (WP-0501).
+- Lobanov, N. N. & Alte da Veiga, L. (1998), 6th EPDIC abstract P12-16 — the
+  alternative cylinder fit used by GSAS-II and TOPAS, valid to µR ≤ 3.
+  **Not implemented**: its coefficients trace only to a conference abstract
+  that could not be obtained, so they cannot be verified against a source.
 
 ## Open-source software studied or used
 
 | Project | License | Relationship |
 |---|---|---|
 | lmfit | BSD-3 | **API inspiration**: the Parameter model (value/vary/min/max/expr). No code ported. |
-| GSAS-II | custom Argonne royalty-free (grant-back clause) | **Behavioral reference** for conventions and validation goldens (e.g. the Sabine extinction parameterization and its Laue-series coefficients, WP-0506; the Suortti surface-roughness parameterization `SurfaceRough`, whose SRA/SRB are our `a`/`b`, WP-0502 — independently confirmed against Pitschke *et al.* (1993) p. 78, which quotes Suortti's form directly, so the physics does not rest on the GSAS-II reading alone). Concepts and goldens are freely usable; the license is *not* a standard BSD — verbatim porting carries attribution and an upstream grant-back obligation, so no code is ported. |
+| GSAS-II | custom Argonne royalty-free (grant-back clause) | **Behavioral reference** for conventions and validation goldens (e.g. the Sabine extinction parameterization and its Laue-series coefficients, WP-0506; the Suortti surface-roughness parameterization `SurfaceRough`, whose SRA/SRB are our `a`/`b`, WP-0502 — independently confirmed against Pitschke *et al.* (1993) p. 78, which quotes Suortti's form directly, so the physics does not rest on the GSAS-II reading alone; and its `Absorb` cylinder routine, consulted for WP-0501 and then *not* followed — see the Lobanov note above). Concepts and goldens are freely usable; the license is *not* a standard BSD — verbatim porting carries attribution and an upstream grant-back obligation, so no code is ported. |
 | CrysPy | MIT | Reference for pure-Python Rietveld mathematics. No code ported. |
 | MAUD | BSD-3 | Reference for texture / residual-stress methods (studied for the v2-fenced spherical-harmonics texture path). No code ported. |
 | CrysFML / CrysFML2008 | LGPL-3.0-or-later + ILL no-military-use clause | Studied (concepts only — the LGPL and the ILL clause both bar a port into an MIT core). **No code ported.** |

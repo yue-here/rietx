@@ -162,6 +162,76 @@ correlation matrix is now a true Pearson matrix (unit diagonal) and the 0.98
 guard is live, so a genuinely degenerate roughness pairing will report |ρ| ≈ 1
 honestly. Do not silence it — reconcile to the physics.
 
+From **WP-0501** (capillary absorption, landed 2026-07-27) — this WP lands in
+the same degenerate pocket, and 0501 built the tools to measure it:
+
+- **Measure the degeneracy before designing the parameter.** Roughness is a
+  low-angle intensity depression, and the {phase scale, Biso} pair spans
+  {1, sin²θ} in log-intensity. 0501 found that cylindrical absorption is
+  *exactly* in that span — its µR column is singular, not merely correlated —
+  and consequently made µR a computed plain float rather than a refinable
+  `Parameter`. Use `model.absorption.mu_r_identifiable_fraction` (it projects
+  ∂lnA/∂p onto span{1, sin²θ} and returns the normalised residual) on the
+  roughness model *before* deciding it is refinable. The Suortti and Pitschke
+  forms are not obviously separable, and a roughness coefficient that turns out
+  to be a reparameterised Biso would silently eat ADPs while improving nothing.
+- **`CompiledModel._absorption` is the seam**, and its docstring states the
+  hazard a new intensity multiplier inherits: it must be applied in
+  `phase_peaks` *and* in both hand-written analytic-column builders
+  (`_structural_intensity_grad`, `po_intensity_grad`), or those columns are
+  silently wrong while the finite-difference columns stay right. The two guard
+  tests in `tests/test_absorption.py`, each with a
+  `(1 − A).max() > 0.5` pre-assert so they cannot pass vacuously, are the
+  pattern to copy.
+- **Judge it by the physical quantity it unbiases, not by Rwp.** 0501's
+  correction provably cannot change Rwp (it is an exact reparameterisation), so
+  its acceptance test asserts the *Biso bias removed* — 0.489 Å² at µR = 1,
+  recovered to four decimals at 18.8σ — and explicitly asserts Rwp is
+  *unchanged*. If roughness turns out to be similar, the obvious "the fit should
+  improve" test would assert something the physics cannot deliver.
+- `RefinementResult.absorption` (`schemas/results.AbsorptionCorrection`) is the
+  precedent for reporting a correction whose effect no fit statistic shows.
+- **A parameter's *name* silently selects its derivative path.**
+  `params/vector.py` decides whether a geometry parameter is force-fixed by
+  testing whether the name starts with `sample_`, and
+  `CompiledModel.scalar_chain_supported` uses the same prefix to decide between
+  an analytic peak-chain column and whole-model finite differences. 0501 left
+  both alone (its µR is not refinable, so neither applied) — but roughness *is*
+  a Bragg-Brentano geometry term, so it is the next WP likely to trip over
+  them. Choose the name deliberately.
+
+**What happened against 0501's advice (added when 0502 shipped, 2026-07-27).**
+Every point above landed, and two of them changed the design:
+
+- The identifiability check was done, and the answer differs from 0501's. Both
+  roughness models are **1/sinθ**-shaped, not sin²θ-shaped, so unlike µR they
+  are *not* exactly in span{1, sin²θ} — they are refinable, but only when the
+  fit reaches low enough 2θ to see the difference. That "only when" is the whole
+  finding: measured partial R²(Suortti b) runs 0.06 → 0.95 as the low-angle
+  reflections leave the range, so both parameters stay refinable and a guard
+  reports when they stop being identifiable.
+- 0501's `mu_r_identifiable_fraction` was not reusable here (it projects onto a
+  fixed two-vector basis). The generalisation went the other way instead:
+  `optimize.statistics.block_projection_r2` now takes an explicit **nuisance**
+  block, and the scale/background are projected out of the whole Jacobian.
+  Without that step every roughness number saturates near 0.96 — a multiplicative
+  correction is trivially "scale-like" — and the guard is blind.
+- The `_absorption` seam and its hidden-Jacobian hazard were followed exactly:
+  `_roughness_factor` is applied in `phase_peaks` and both analytic column
+  builders, and the guard test carries the same kind of pre-assert
+  (`(1 − R).max() > 0.05`). It was checked by deletion — removing the fold from
+  `_structural_intensity_grad` takes the analytic-vs-FD error from < 5e-3 to
+  0.199.
+- The naming warning was right and was acted on:
+  `instrument.geometry.surface_roughness.*` does **not** match the `sample_`
+  prefix, so `scalar_chain_supported` gained the prefix explicitly. The failure
+  mode of missing it is a *correct* but whole-model-FD column — a slow test, not
+  a failing one — so nothing would have caught it.
+- "Judge it by the physical quantity, not Rwp" applied, with a twist: on real
+  data the correction is **not identifiable at all**, so the acceptance asserts
+  the fences fire and the esds stay honest rather than asserting any recovered
+  number. See "Measured results" below.
+
 ## Non-goals
 
 - **No specimen-characterisation machinery from Pitschke §III–IV.** Eqs (1)–(12)

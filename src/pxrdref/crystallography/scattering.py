@@ -74,9 +74,11 @@ def f0(species: str, k: np.ndarray) -> np.ndarray:
     """
     xp = get_backend()
     coeffs = _load_table()[normalize_species(species)]
-    a = coeffs[0:5]
+    a = xp.asarray(coeffs[0:5], dtype=np.float64)
     c = coeffs[5]
-    b = coeffs[6:11]
+    # lifted, not left as a numpy view: b sits on the *left* of the broadcast
+    # product below, which torch will not accept against a traced operand
+    b = xp.asarray(coeffs[6:11], dtype=np.float64)
     k2 = xp.asarray(k, dtype=np.float64) ** 2
     # b ⊗ k² as a broadcast product (np.outer cannot take a traced operand)
     return xp.einsum("i,in->n", a, xp.exp(-(b[:, None] * k2[None, :]))) + c

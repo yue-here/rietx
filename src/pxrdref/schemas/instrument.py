@@ -190,7 +190,21 @@ class Geometry(Base):
     """Diffraction geometry.
 
     ``debye_scherrer``: spinning capillary (synchrotron or lab); only
-    ``zero_shift`` moves the peaks.
+    ``zero_shift`` moves the peaks.  Cylindrical **absorption** is applied as an
+    intensity factor when µR > 0 (Rouse, Cooper, York & Chakera, 1970, *Acta
+    Cryst.* A26, 682; see :mod:`pxrdref.model.absorption`), µR coming either
+    from ``mu_r`` directly or from ``capillary_radius_mm`` × ``packing_fraction``
+    × the composition's linear attenuation coefficient.
+
+    **µR is deliberately a plain float and not a refinable** :class:`Parameter`.
+    The Rouse expression factors exactly into a constant times exp(c·sin²θ) — a
+    Debye-Waller shape — so within this model a free µR is *exactly* a linear
+    combination of the phase-scale and Biso columns rather than merely a
+    correlated one.  Refining it would improve nothing and silently
+    re-apportion ADPs.  ``packing_fraction`` is likewise not refinable: it is
+    exactly degenerate with µR itself.  What the correction buys is an
+    **unbiased Biso** — neglecting it biases Biso low by c(µR)·λ²/2, which is
+    0.13 Å² at µR = 0.5 and 0.49 Å² at µR = 1.0 for Cu Kα.
 
     ``bragg_brentano``: flat-plate para-focusing goniometer (v0.2).  Two
     sample aberrations shift the peaks (Wilson, 1963, *Mathematical Theory of
@@ -248,6 +262,15 @@ class Geometry(Base):
     axial_hl: Parameter = Field(
         default_factory=lambda: Parameter(value=0.0, min=0.0, max=0.2)
     )
+    #: dimensionless µ·R of the packed specimen; ``None`` → estimate it from the
+    #: composition and ``capillary_radius_mm``.  Never a ``Parameter`` — see the
+    #: class docstring.  0.0 disables the correction exactly (A ≡ 1.0).
+    mu_r: float | None = None
+    #: internal radius of the capillary bore, mm (estimator input only).
+    capillary_radius_mm: float | None = None
+    #: fraction of the bore occupied by solid.  0.3-0.6 is typical for a tapped
+    #: powder; 0.64 is random close packing of spheres.  Estimator input only.
+    packing_fraction: float = Field(default=0.6, gt=0.0, le=1.0)
 
     @model_validator(mode="after")
     def _bb_needs_radius(self) -> "Geometry":
@@ -261,6 +284,18 @@ class Geometry(Base):
             raise ValueError(
                 f"surface_roughness is a flat-specimen (bragg_brentano) "
                 f"correction; this geometry is {self.kind!r}")
+        return self
+
+    @model_validator(mode="after")
+    def _capillary_fields_need_debye_scherrer(self) -> "Geometry":
+        if self.kind != "debye_scherrer":
+            for name in ("mu_r", "capillary_radius_mm"):
+                if getattr(self, name) is not None:
+                    raise ValueError(f"{name} applies only to debye_scherrer geometry")
+        if self.mu_r is not None and self.mu_r < 0.0:
+            raise ValueError("mu_r must be non-negative")
+        if self.capillary_radius_mm is not None and self.capillary_radius_mm <= 0.0:
+            raise ValueError("capillary_radius_mm must be positive")
         return self
 
 
@@ -413,18 +448,27 @@ class Instrument(Base):
     )
 
     @classmethod
-    def debye_scherrer(cls, wavelength: float, *, polarization: float = 0.99) -> "Instrument":
+    def debye_scherrer(cls, wavelength: float, *, polarization: float = 0.99,
+                       capillary_radius_mm: float | None = None,
+                       packing_fraction: float = 0.6,
+                       mu_r: float | None = None) -> "Instrument":
         """Synchrotron/capillary preset with a single wavelength.
 
         ``polarization`` follows the GSAS POLA convention (see :class:`Source`);
         0.99 matches APS 11-BM instrument-parameter files.
+
+        Cylindrical absorption stays **off** unless a capillary radius or an
+        explicit ``mu_r`` is given, so the preset's historical meaning ("no
+        position aberrations") is unchanged for callers that pass neither.
         """
         return cls(
             source=Source(
                 lines=[EmissionLine(wavelength=wavelength)],
                 polarization=Parameter(value=polarization, min=0.0, max=1.0),
             ),
-            geometry=Geometry(kind="debye_scherrer"),
+            geometry=Geometry(kind="debye_scherrer", mu_r=mu_r,
+                              capillary_radius_mm=capillary_radius_mm,
+                              packing_fraction=packing_fraction),
         )
 
     @classmethod

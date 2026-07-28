@@ -36,6 +36,8 @@ from __future__ import annotations
 import numpy as np
 
 from .api import get_backend, resolve_backend, set_backend
+from .traced import make_traced_decode as _make_traced_decode
+from .traced import make_traced_residual as _make_traced_residual
 
 #: parameter-axis chunk for the vmapped one-hot tangent seeds; peak memory is
 #: ≈ chunk × n_rows × 8 B per block (≈ 1.3 MB at 5·10³ points), overridable
@@ -44,98 +46,26 @@ DEFAULT_CHUNK = 32
 
 
 def _enable_x64():
-    """The scoped-x64 context manager across jax versions (≥ 0.11: top-level;
-    older: ``jax.experimental``)."""
-    import jax
-
-    try:
-        return jax.enable_x64()
-    except AttributeError:  # pragma: no cover - depends on installed jax
-        from jax.experimental import enable_x64
-
-        return enable_x64()
+    """The scoped-x64 context manager — now :meth:`JaxBackend.full_precision`,
+    kept as a module-level name because call sites and tests import it."""
+    return resolve_backend("jax").full_precision()
 
 
 def make_traced_decode(table):
-    """Traceable twin of :meth:`ParameterTable.decode` (θ → value dict).
-
-    The numpy ``decode`` runs ``to_physical(float(t))`` per element — the
-    ``float()`` coercions make it untraceable.  This builds the same map from
-    frozen constants: elementwise transform application (grouped by kind into
-    static masks) followed by the dense constant matmul p = C·θ_phys + d.
-    Values come back as 0-d traced scalars keyed by dot-path, exactly the
-    dict shape the forward model consumes.
-    """
-    import jax
-    import jax.numpy as jnp
-
-    C, d = table.constraint_block()
-    C_dense = np.asarray(C.toarray(), dtype=np.float64)
-    d = np.asarray(d, dtype=np.float64)
-    paths = [e.path for e in table.entries]
-    transforms = [table.entries[i].transform for i in table._free_idx]
-    masks = {kind: np.array([t == kind for t in transforms])
-             for kind in set(transforms) if kind != "identity"}
-    apply = {"softplus": lambda u: jnp.logaddexp(0.0, u),
-             "exp": jnp.exp,
-             "logit": jax.nn.sigmoid}
-
-    def decode(theta):
-        p = theta
-        for kind, mask in masks.items():
-            # static mask; both branches are smooth everywhere, so the
-            # discarded branch cannot poison the selected tangent
-            p = jnp.where(mask, apply[kind](theta), p)
-        full = C_dense @ p + d
-        return {path: full[i] for i, path in enumerate(paths)}
-
-    return decode
+    """jax's traced decode — :func:`backend.traced.make_traced_decode` bound to
+    this backend.  Kept as a name here because callers and tests import it."""
+    return _make_traced_decode(table, resolve_backend("jax"))
 
 
 def make_traced_residual(model, table):
-    """The weighted residual as a pure traceable function of the combined θ.
+    """jax's traced residual — :func:`backend.traced.make_traced_residual`
+    bound to this backend.
 
-    Mirrors ``optimize.least_squares._make_residual`` row for row — [data |
-    background-penalty | Pawley-restraint | soft-restraint] — with the Le Bail
-    intensity snapshot and every weight/design constant closed over.  The
-    soft-restraint rows (bond/angle/value) are one differentiable function of
-    the decoded coordinates and cell, so jacfwd differentiates them
-    automatically.  Any drift between the two is caught by the jax-vs-numpy
-    column tests in ``tests/test_backend_jax.py``.
+    The body lives in ``backend/traced.py`` so jax and torch cannot drift from
+    each other, and the row layout lives in ``model/rows.py`` so neither can
+    drift from the numpy reference.
     """
-    import jax.numpy as jnp
-
-    decode = make_traced_decode(table)
-    n_table = len(table.free_paths)
-    sqrt_w = np.asarray(1.0 / model.sigma, dtype=np.float64)
-    y_obs = np.asarray(model.y_obs, dtype=np.float64)
-    # Le Bail extraction runs *between* solves; the snapshot is a constant of
-    # the trace exactly as it is a constant of the numpy closure
-    fixed_intens = ([np.asarray(cp.hkl_intensity, dtype=np.float64)
-                     for cp in model.phases] if model.mode == "lebail" else None)
-
-    def residual(theta):
-        if model.pawley is not None:
-            intens = model.split_pawley_intensities(theta[n_table:])
-            values = decode(theta[:n_table])
-        else:
-            intens = fixed_intens
-            values = decode(theta)
-        r = sqrt_w * (y_obs - model.evaluate(values, intens))
-        parts = [r]
-        pen = model.penalty_residual(values)
-        if pen is not None:
-            parts.append(pen)
-        if model.pawley is not None:
-            rpen = model.pawley_restraint_residual(theta[n_table:])
-            if rpen is not None:
-                parts.append(rpen)
-        rr = model.restraint_residual(values)
-        if rr is not None:
-            parts.append(rr)
-        return parts[0] if len(parts) == 1 else jnp.concatenate(parts)
-
-    return residual
+    return _make_traced_residual(model, table, resolve_backend("jax"))
 
 
 def make_jax_jacobian(model, table, *, chunk_size: int = DEFAULT_CHUNK):

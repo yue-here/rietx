@@ -25,7 +25,8 @@ import numpy as np
 from scipy import sparse
 
 from ..crystallography.adp import U_NAMES
-from ..crystallography.symmetry import get_spacegroup
+from ..crystallography.stephens import S_NAMES, isotropic_coefficients, strain_basis
+from ..crystallography.symmetry import get_spacegroup, rotation_matrices
 from ..crystallography.wyckoff import adp_basis, coordinate_basis, stabilizer_rotations
 from ..schemas.common import Parameter
 from ..schemas.instrument import BackgroundChebyshev, BackgroundPSpline, Instrument
@@ -118,6 +119,10 @@ _FIXED_ANGLES: dict[str, tuple[str, ...]] = {
 class ParameterTable:
     def __init__(self, structure: Structure, instrument: Instrument):
         self.entries: list[Entry] = []
+        #: phase base path → the Stephens DOF vector of the *unit* isotropic
+        #: limit (1 ppm), kept so :meth:`seed_stephens` can put a freed block
+        #: on the isotropic ray without rebuilding the symmetry basis
+        self._strain_unit: dict[str, np.ndarray] = {}
         self._collect(structure, instrument)
         self._rebuild()
 
@@ -152,9 +157,14 @@ class ParameterTable:
                 self._add(f"{base}.preferred_orientation.r",
                           phase.preferred_orientation.r)
             self._add(f"{base}.lor_size", phase.lor_size)
-            self._add(f"{base}.lor_strain", phase.lor_strain)
+            # a Stephens block owns the tanθ Lorentzian channel outright: its
+            # isotropic direction is the same column, so lor_strain is locked
+            # (the Atom.aniso ⇒ biso bargain, one level up)
+            self._add(f"{base}.lor_strain", phase.lor_strain,
+                      force_fixed=phase.microstrain is not None)
             self._add(f"{base}.gauss_size", phase.gauss_size)
             self._add(f"{base}.gauss_strain", phase.gauss_strain)
+            self._collect_microstrain(base, sg, phase)
             for j, atom in enumerate(phase.atoms):
                 self._collect_atom_coords(f"{base}.atoms.{j}", sg, atom)
                 self._add(f"{base}.atoms.{j}.occ", atom.occ)
@@ -162,6 +172,76 @@ class ParameterTable:
 
         self._add("instrument.zero_shift", instrument.zero_shift)
         self._collect_instrument(instrument)
+
+    def _collect_microstrain(self, base: str, sg, phase) -> None:
+        """Stephens S_HKL enter θ through Laue-symmetry-allowed patterns.
+
+        The rank-4 twin of :meth:`_collect_atom_adps`: the phase contributes
+        ``phases.i.microstrain.dof.k`` parameters, one per allowed pattern
+        (``crystallography.stephens``), and the fifteen components become
+        affine rows S = Σₖ Bₖ·θₖ.  **Absolute**, like the ADP patterns — the
+        basis spans the whole allowed subspace, so writing S this way enforces
+        the lattice symmetry exactly and coefficients outside it are an error
+        rather than something to symmetrise.  Components the symmetry forces to
+        zero are locked; the DOFs are unbounded, because σ²(M) ≥ 0 couples all
+        fifteen and cannot be a box (positivity is a guard — the same argument
+        that keeps the ADP cone out of ``bounds``).
+
+        An all-zero block is the exact no-broadening identity, so it is allowed
+        to *exist*; refining from there is not.  Λ ∝ √Σ has unbounded slope at
+        the origin, so the first Jacobian column would be enormous and TRF's
+        first step garbage — the failure inverts the softplus-at-zero trap
+        (dead gradient) into an exploding one, and neither is something to
+        discover from a bad fit.  ``Stage(seed=…)`` cannot help: it lifts
+        softplus entries only, and these are identity-transform.
+        """
+        block = phase.microstrain
+        if block is None:
+            return
+        basis = strain_basis(rotation_matrices(sg))  # (n_free, 15)
+        s0 = np.array(block.values(), dtype=np.float64)
+        coef, *_ = np.linalg.lstsq(basis.T.astype(np.float64), s0, rcond=None)
+        residual = basis.T @ coef - s0
+        scale = max(float(np.abs(s0).max()), 1.0)
+        if float(np.abs(residual).max()) > 1e-6 * scale:
+            raise ValueError(
+                f"{base}.microstrain: the coefficients {s0.tolist()} are not "
+                f"compatible with the lattice symmetry, which allows only "
+                f"{basis.tolist()} in {list(S_NAMES)}; the nearest allowed set "
+                f"is {(basis.T @ coef).tolist()}")
+        want_vary = any(getattr(block, n).vary for n in S_NAMES)
+        if want_vary and not np.any(s0):
+            raise ValueError(
+                f"{base}.microstrain: every S_HKL is zero, which is the point "
+                "where the √ of the width law has unbounded slope — refining "
+                "from there gives a meaningless first step.  Start from the "
+                "isotropic limit instead: "
+                "StephensStrain.isotropic(microstrain_ppm, phase.cell)")
+        dof_paths = [f"{base}.microstrain.dof.{k}" for k in range(len(basis))]
+        for v, name in enumerate(S_NAMES):
+            p: Parameter = getattr(block, name)
+            terms = tuple((dof_paths[k], float(basis[k][v]))
+                          for k in range(len(basis)) if basis[k][v] != 0)
+            if terms:
+                self._add(f"{base}.microstrain.{name}", p, tie=AffineTie(terms=terms))
+            else:
+                # symmetry forces this monomial to vanish, so it is locked *at
+                # zero* rather than at whatever the caller passed: the residual
+                # check above has already bounded that to roundoff (the
+                # isotropic seed goes through a matrix inverse), and carrying
+                # the noise forward would break the symmetry the basis exists
+                # to enforce exactly
+                self.entries.append(Entry(
+                    path=f"{base}.microstrain.{name}", value=0.0, vary=False,
+                    lo=p.min, hi=p.max, transform=p.transform, locked=True))
+        for k, path in enumerate(dof_paths):
+            self.entries.append(Entry(path=path, value=float(coef[k]), vary=want_vary,
+                                      lo=-np.inf, hi=np.inf, transform="identity"))
+        # S scales as microstrain², so one unit-ppm projection serves any seed
+        unit, *_ = np.linalg.lstsq(
+            basis.T.astype(np.float64),
+            isotropic_coefficients(phase.cell.lengths_angles(), 1.0), rcond=None)
+        self._strain_unit[base] = unit
 
     def _collect_atom_coords(self, base: str, sg, atom) -> None:
         """Coordinates enter θ through site-symmetry displacement DOFs.
@@ -408,6 +488,43 @@ class ParameterTable:
             self._rebuild()
         return seeded
 
+    def seed_stephens(self, paths: list[str], microstrain: float) -> list[str]:
+        """Put a freed but still all-zero Stephens block on the isotropic ray.
+
+        The counterpart of :meth:`seed_softplus` for the anisotropic-strain
+        DOFs, and needed for the opposite reason: they are identity-transform,
+        so ``seed_softplus`` skips them, and their pathology at zero is an
+        *exploding* rather than a dead gradient (Λ ∝ √Σ).  The seed is the
+        isotropic limit — S = microstrain²·[M²], the one point of the allowed
+        subspace that is guaranteed to give σ²(M) > 0 for every reflection.
+
+        Only phases whose *whole* block is still zero are touched, so a
+        deliberate starting model is never overwritten.  Returns the paths
+        actually seeded.
+        """
+        if microstrain <= 0.0:
+            return []
+        wanted: dict[str, set[int]] = {}
+        for path in paths:
+            base, _, tail = path.rpartition(".microstrain.dof.")
+            if base and tail.isdigit():
+                wanted.setdefault(base, set()).add(int(tail))
+        seeded: list[str] = []
+        for base, _ in wanted.items():
+            unit = self._strain_unit.get(base)
+            if unit is None:
+                continue
+            dofs = [(k, self._paths[f"{base}.microstrain.dof.{k}"])
+                    for k in range(len(unit))]
+            if any(self.entries[i].value != 0.0 for _, i in dofs):
+                continue
+            for k, i in dofs:
+                self.entries[i].value = float(microstrain) ** 2 * float(unit[k])
+                seeded.append(self.entries[i].path)
+        if seeded:
+            self._rebuild()
+        return seeded
+
     # -- optimiser interface -------------------------------------------
     @property
     def free_paths(self) -> list[str]:
@@ -533,6 +650,9 @@ class ParameterTable:
             put(phase.lor_strain, f"{base}.lor_strain")
             put(phase.gauss_size, f"{base}.gauss_size")
             put(phase.gauss_strain, f"{base}.gauss_strain")
+            if phase.microstrain is not None:
+                for name in S_NAMES:
+                    put(getattr(phase.microstrain, name), f"{base}.microstrain.{name}")
             for j, atom in enumerate(phase.atoms):
                 # coordinates too — without this, refined positions vanish at
                 # the next stage's recompile (models feed compile_phase_sites)

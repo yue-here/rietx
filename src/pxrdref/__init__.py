@@ -13,7 +13,7 @@ from .io.instrument_profile import load_instrument_profile, save_instrument_prof
 from .io.readers import read_pattern, read_pdcif
 from .multi import MultiHistogramRefinement, refine_multi
 from .params.multi import SharingMap
-from .refine import Refinement, refine, replay
+from .refine import Refinement, estimate_mu_r, refine, replay
 from .report import FitReport, RegionAttribution, SuggestedAction, build_report
 from .schemas import (
     AnisoU,
@@ -63,6 +63,7 @@ __all__ = [
     "replay",
     "save_instrument_profile",
     "write_qpa_table",
+    "estimate_mu_r",
     "write_reflection_table",
     "write_refinement_cif",
 ]

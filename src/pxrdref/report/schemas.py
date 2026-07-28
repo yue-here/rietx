@@ -60,6 +60,22 @@ TEXTURE_MIN_R2 = 0.5
 TEXTURE_MIN_STRENGTH = 0.03
 TEXTURE_MIN_REFLECTIONS = 4
 
+#: Stephens anisotropic-strain diagnostic (:mod:`.strain`).  ``STRAIN_MIN_R2``
+#: is the fraction of the width misfit a Laue-allowed Stephens model must
+#: explain *beyond an isotropic strain* before anisotropy is called;
+#: ``STRAIN_MIN_ANISOTROPY`` the broadest/narrowest Λ ratio below which the
+#: answer is "isotropic" however good the fit (the texture diagnostic's r ≈ 1
+#: escape, one model down); ``STRAIN_MIN_REFLECTIONS`` the floor on
+#: intensity-bearing reflections — the effective floor is one more than the
+#: Laue class's pattern count, so a triclinic phase needs sixteen.
+#: ``STRAIN_MAX_GRAM_CONDITION`` is the scale-normalised Gram condition beyond
+#: which the individual patterns are reported unresolved: the headline
+#: "directional by N×" survives that, the per-pattern breakdown does not.
+STRAIN_MIN_R2 = 0.5
+STRAIN_MIN_ANISOTROPY = 1.3
+STRAIN_MIN_REFLECTIONS = 6
+STRAIN_MAX_GRAM_CONDITION = 1e3
+
 #: a fit worse than this is "immature": Layer 1 abstains from parameter-level
 #: statements entirely
 MATURITY_MAX_RWP = 0.35
@@ -210,6 +226,47 @@ class TextureAnalysis(Base):
     runner_up_r2: float = 0.0
 
 
+class StrainAnalysis(Base):
+    """Stephens anisotropic-strain (directional width) diagnostic, per phase.
+
+    ``detected`` is the field to branch on: when True the phase's widths are
+    *directional* — not a function of 2θ, which is what the size/strain trend
+    templates already cover, but of hkl — and a Stephens block on it is worth
+    declaring.  ``anisotropy`` is the fitted broadest/narrowest Λ ratio with
+    ``broadest_hkl``/``narrowest_hkl`` naming the directions, so the finding
+    reads as "widths along (00l) are 3.4× those along (hk0)".  Its ceiling
+    value (10⁶) means the fit wants *zero* strain along ``narrowest_hkl``, so
+    the ratio is unbounded rather than measured; the hkl fields are ``None``
+    when no two reflections carry enough leverage to contrast at all.
+
+    The measurement is of the **specimen**, not of the residual: refining a
+    ``microstrain`` block does not make ``detected`` go False, it makes the two
+    agree (the anisotropy is still there — it is now modelled).  Suppressing a
+    suggestion once the parameters are free is the Layer-2 strategy veto's job,
+    not this field's.
+
+    ``r2`` is measured against an **isotropic-strain** baseline, so it answers
+    "how much of the width variation is directional", not "how much of it is
+    strain" — a specimen that is uniformly too broad scores ~0 here and belongs
+    to ``lor_strain`` instead.  ``n_patterns`` is the Laue class's number of
+    independent S_HKL, and ``separable`` says whether those patterns are
+    individually resolved over the sampled reflections: when it is False the
+    ratio and the directions still stand but the per-pattern breakdown does
+    not, so refine the block and read the fit, do not quote coefficients.
+    """
+
+    phase_index: int
+    n_reflections_used: int = 0
+    r2: float = 0.0
+    anisotropy: float = 1.0
+    broadest_hkl: tuple[int, int, int] | None = None
+    narrowest_hkl: tuple[int, int, int] | None = None
+    n_patterns: int = 0
+    gram_condition: float = 0.0
+    separable: bool = False
+    detected: bool = False
+
+
 # ----------------------------------------------------------------------
 # Layer 2
 # ----------------------------------------------------------------------
@@ -290,6 +347,11 @@ class FitReport(Base):
     #: compiled model is supplied, independent of the maturity gate (texture is
     #: a common *cause* of an immature fit, so it must still be reported)
     texture: list[TextureAnalysis] = Field(default_factory=list)
+    #: per-phase Stephens anisotropic-strain diagnostic; populated on the same
+    #: terms as ``texture`` and for the same reason — a directional width error
+    #: no model accounts for is a common cause of an immature fit, so it must
+    #: still be reported when Layer 1 abstains
+    strain: list[StrainAnalysis] = Field(default_factory=list)
     #: soft-restraint summary (bond/angle/value deviations, pooled restraint χ²),
     #: carried through from the result whenever restraints were declared; a
     #: deviation ≫ σ here is a restraint fighting the data (see RESTRAINT_TENSION)

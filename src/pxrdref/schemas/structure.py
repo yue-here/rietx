@@ -126,6 +126,81 @@ class PreferredOrientation(Base):
         return self
 
 
+def _s() -> Parameter:
+    return Parameter(value=0.0, unit="1e-12 A^-4")
+
+
+class StephensStrain(Base):
+    """Anisotropic strain broadening coefficients S_HKL (Stephens, 1999).
+
+    The variance of M = 1/d² across the crystallites is a homogeneous quartic
+    in the Miller indices, σ²(M) = 10⁻¹²·Σ S_HKL h^H k^K l^L, which turns into
+    an **hkl-dependent** Lorentzian width Λ(hkl)·tanθ — the physics, the units
+    (S_HKL in 10⁻¹² Å⁻⁴) and the FWHM-not-σ convention are all documented in
+    :mod:`pxrdref.crystallography.stephens`, which also derives the
+    Laue-allowed subspace.
+
+    Like :class:`AnisoU`, the components refine through symmetry-allowed
+    *patterns* rather than one by one: ``ParameterTable`` ties them to
+    ``phases.i.strain.k`` DOFs and the values are **absolute**
+    (S = Σₖ θₖ·Bₖ), so the lattice symmetry is enforced exactly and a set of
+    coefficients outside the allowed subspace is an error, not something to
+    silently symmetrise.  ``min``/``max`` on a component are inert: σ²(M) ≥ 0
+    couples all fifteen, so positivity is a diagnostic
+    (``STEPHENS_STRAIN_NOT_POSITIVE``), not a box.
+
+    Build one with :meth:`isotropic` — all-zero coefficients are the exact
+    no-broadening identity, but they sit at the √ cusp of the width law where
+    the derivative is unbounded, so refining from there is rejected.
+    """
+
+    s400: Parameter = Field(default_factory=_s)
+    s310: Parameter = Field(default_factory=_s)
+    s301: Parameter = Field(default_factory=_s)
+    s220: Parameter = Field(default_factory=_s)
+    s211: Parameter = Field(default_factory=_s)
+    s202: Parameter = Field(default_factory=_s)
+    s130: Parameter = Field(default_factory=_s)
+    s121: Parameter = Field(default_factory=_s)
+    s112: Parameter = Field(default_factory=_s)
+    s103: Parameter = Field(default_factory=_s)
+    s040: Parameter = Field(default_factory=_s)
+    s031: Parameter = Field(default_factory=_s)
+    s022: Parameter = Field(default_factory=_s)
+    s013: Parameter = Field(default_factory=_s)
+    s004: Parameter = Field(default_factory=_s)
+
+    def values(self) -> tuple[float, ...]:
+        """The fifteen coefficients in ``crystallography.stephens.S_NAMES`` order."""
+        from ..crystallography.stephens import S_NAMES
+
+        return tuple(getattr(self, n).value for n in S_NAMES)
+
+    @classmethod
+    def from_values(cls, s15, *, vary: bool = False) -> "StephensStrain":
+        from ..crystallography.stephens import S_NAMES
+
+        return cls(**{n: Parameter(value=float(v), vary=vary, unit="1e-12 A^-4")
+                      for n, v in zip(S_NAMES, s15, strict=True)})
+
+    @classmethod
+    def isotropic(cls, microstrain: float, cell: "Cell", *, vary: bool = True
+                  ) -> "StephensStrain":
+        """The coefficients giving σ(M)/M ≡ ``microstrain``·10⁻⁶ for every hkl.
+
+        M² is a Laue invariant in any group, so this point lies *exactly* in
+        the allowed subspace whatever the symmetry — the rank-4 analogue of
+        :meth:`AnisoU.isotropic`.  ``microstrain`` is ΔM/M = 2·Δd/d in ppm;
+        1000 (0.1 % in ΔM/M) is a reasonable start for a broadened lab pattern.
+        Defaults to ``vary=True``: an isotropic block that never refines is
+        just a clumsy spelling of ``lor_strain``.
+        """
+        from ..crystallography.stephens import isotropic_coefficients
+
+        return cls.from_values(
+            isotropic_coefficients(cell.lengths_angles(), microstrain), vary=vary)
+
+
 class Atom(Base):
     """One site in the asymmetric unit.
 
@@ -274,6 +349,14 @@ class Phase(Base):
     gauss_strain: Parameter = Field(
         default_factory=lambda: Parameter(value=0.0, min=0.0, unit="deg^2", transform="softplus")
     )
+    # Optional Stephens (1999) anisotropic strain broadening: an hkl-dependent
+    # Lorentzian width Λ(hkl)·tanθ replacing the isotropic lor_strain·tanθ.
+    # None ⇒ no correction, and all-zero coefficients are exactly the identity
+    # too, so it is opt-in and never perturbs a phase that does not use it.
+    # The isotropic direction of the S subspace *is* the lor_strain column
+    # (identically, not merely correlated), so declaring a block locks
+    # lor_strain — the same bargain Atom.aniso strikes with biso.
+    microstrain: StephensStrain | None = None
     # Physical particle radius in micrometres, used only by the Brindley
     # microabsorption correction of QPA weight fractions (Brindley 1945).
     # There is no way to obtain it from the pattern: profile broadening
@@ -295,6 +378,16 @@ class Phase(Base):
     def _nonempty(self) -> "Phase":
         if not self.atoms:
             raise ValueError(f"phase {self.name!r} has no atoms")
+        return self
+
+    @model_validator(mode="after")
+    def _one_strain_model(self) -> "Phase":
+        if self.microstrain is not None and self.lor_strain.vary:
+            raise ValueError(
+                f"phase {self.name!r} has a Stephens microstrain block, whose "
+                "isotropic direction is the same residual column as "
+                "lor_strain; refining both is exactly degenerate.  Set "
+                "lor_strain.vary=False and refine the S_HKL patterns instead")
         return self
 
     @model_validator(mode="after")

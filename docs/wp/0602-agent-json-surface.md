@@ -39,6 +39,25 @@ it** — the vocabulary is versioned, so 0307 deferred it and no WP has claimed
 it since. An agent surface consuming Layer-2 actions is the closest natural
 owner; either claim it here or it stays orphaned.
 
+From **WP-0408** (torch backend, landed 2026-07-27) — two surface facts a
+single-call JSON API has to get right:
+
+- **`backend` is a name from a registry, not a boolean.** There are four:
+  `numpy`, `jax`, `torch`, `torch-mps`. `backend.api._BACKEND_NAMES` is the live
+  list and `resolve_backend` is the validator both `Refinement` and
+  `MultiHistogramRefinement` now call, raising with the available set. A JSON
+  surface should validate through the same call rather than restate a literal
+  union that will go stale — the fourth name arrived after the third by two
+  days.
+- **`Provenance.backend` / `.dtype` are now populated** (they had said
+  `"numpy"` / `"float64"` since v0.1 no matter what ran). `dtype` is
+  `"float64"` except on Apple GPU, where it is
+  `"float64/jacobian:float32"` — the residual and solve are fp64 there too, so
+  it is one honest string rather than a dtype per stage. An agent reporting
+  reproducibility metadata should surface both; do not parse the string for the
+  fp32 substring to decide anything, ask
+  `backend.api.backend_dtype_note(name)`.
+
 From **WP-0506** (secondary extinction): **never expose the raw `ext`
 coefficient with a fixed bound or plausibility check.** Its scale is
 wavelength/cell-dependent (x ∝ (λ/V)²): ~0 for CuKα/LaB6 but ~300 for

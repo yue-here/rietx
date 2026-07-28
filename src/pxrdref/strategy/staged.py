@@ -40,6 +40,11 @@ class Stage:
     #: AXIAL_SIZING_FLOOR (an identity-transform bound, movable off zero on its
     #: own) a softplus coefficient genuinely needs the value nudge.
     seed: float = 0.0
+    #: microstrain (ppm of ΔM/M) to put a freed but still all-zero Stephens
+    #: block on before solving.  ``seed`` cannot serve: the S_HKL DOFs are
+    #: identity-transform, and their pathology at zero is the *exploding*
+    #: gradient of √Σ rather than the softplus's dead one.  0 = no seed.
+    strain_seed: float = 0.0
 
 
 #: Surface roughness (WP-0502) goes **last** in every plan that carries it.
@@ -183,8 +188,18 @@ class RefinementPlan:
             Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
             Stage("disp", ["instrument.geometry.sample_displacement"]),
             Stage("cell", ["phases.*.cell.*"]),
+            # Stephens anisotropic strain (WP-0503) is freed *in* the
+            # sample-broadening stage, not after it.  A microstrain block locks
+            # lor_strain — its isotropic direction is that same column — so a
+            # later stage would leave the isotropic width unrefined right up to
+            # the moment four correlated patterns are turned on at once, which
+            # is the worst possible starting point.  The glob matches only
+            # phases that declared a block, and the seed puts an all-zero one
+            # on the isotropic ray (Λ ∝ √Σ has unbounded slope at Σ = 0).
             Stage("sample_profile", ["phases.*.lor_size", "phases.*.lor_strain",
-                                     "phases.*.gauss_size", "phases.*.gauss_strain"]),
+                                     "phases.*.gauss_size", "phases.*.gauss_strain",
+                                     "phases.*.microstrain.dof.*"],
+                  strain_seed=1000.0),
             Stage("biso", list(_DISPLACEMENT_GLOBS)),
             *_ROUGHNESS_STAGE,
         ])
@@ -238,6 +253,8 @@ class GuardReport:
     background_correlations: list[str] = field(default_factory=list)
     # anisotropic displacement tensors that are no longer ellipsoids
     nonpositive_adps: list[str] = field(default_factory=list)
+    # phases whose Stephens strain coefficients have left the physical cone
+    nonpositive_strain: list[str] = field(default_factory=list)
     # two-way surface-roughness degeneracy (WP-0502): either roughness is not
     # identifiable from this data, or a displacement parameter is now hiding
     # in it.  Same block-R² statistic as background_correlations.
@@ -297,17 +314,56 @@ def check_adp_positive_definite(table) -> list[str]:
     return out
 
 
+def check_stephens_positive(table, model) -> list[str]:
+    """Phases whose Stephens σ²(M) is non-positive on some fitted reflection.
+
+    σ² is a variance, so a negative value is not a large anisotropy but an
+    unphysical set of coefficients — the width law's √ has nothing to take and
+    the model quietly reports zero broadening for that direction.  The
+    constraint is a *cone* coupling all fifteen coefficients (like ADP positive
+    definiteness), which is why it cannot be a box bound and has to be a guard.
+
+    Tested on the frozen reflection list rather than over all integer hkl: the
+    cone condition off the measured directions is unobservable, and flagging it
+    would be a claim the data cannot support.  Needs the compiled model for
+    that list, so it returns ``[]`` when none is supplied.
+    """
+    import numpy as np
+
+    from ..crystallography.stephens import S_NAMES, sigma2_m
+
+    if model is None:
+        return []
+    values = {e.path: e.value for e in table.entries}
+    out: list[str] = []
+    for ip, cp in enumerate(model.phases):
+        if cp.strain_monomials is None:
+            continue
+        base = f"phases.{ip}.microstrain"
+        s = np.array([values.get(f"{base}.{n}", 0.0) for n in S_NAMES])
+        sigma2 = np.asarray(sigma2_m(cp.strain_monomials, s))
+        bad = sigma2 <= 0.0
+        if bad.any():
+            k = int(np.argmin(sigma2))
+            hkl = tuple(int(v) for v in cp.reflections.hkl[k])
+            out.append(f"{base} ({int(bad.sum())} of {len(sigma2)} reflections, "
+                       f"worst σ²(M) {sigma2[k]:+.2e} at {hkl})")
+    return out
+
+
 def check_guards(table, outcome, threshold: float,
                  background_threshold: float = BACKGROUND_ABSORPTION_GUARD,
-                 roughness_threshold: float = ROUGHNESS_ABSORPTION_GUARD
-                 ) -> GuardReport:
-    """Correlation, bound, background/roughness-absorption and ADP-shape guards."""
+                 roughness_threshold: float = ROUGHNESS_ABSORPTION_GUARD,
+                 model=None) -> GuardReport:
+    """Correlation, bound, background/roughness-absorption, ADP- and
+    strain-shape guards."""
     import numpy as np
 
     from ..optimize.statistics import background_absorption, roughness_absorption
 
     report = GuardReport()
     report.nonpositive_adps = check_adp_positive_definite(table)
+    report.nonpositive_strain = check_stephens_positive(table, model)
     free = table.free_paths
 
     if outcome.correlation is not None and len(free) > 1:

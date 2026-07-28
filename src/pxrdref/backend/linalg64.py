@@ -170,7 +170,14 @@ def to_host_fp64(a: Any) -> np.ndarray:
     Every backend's Jacobian goes through here before it reaches JᵀJ, so a
     device array that arrived as fp32 (or as a jax/torch handle) becomes a
     plain fp64 numpy array in exactly one place.
+
+    An array living on an accelerator is brought back first: ``np.asarray`` on
+    an MPS/CUDA tensor raises rather than transferring, so a backend whose
+    results never touch host memory would otherwise have to open-code the
+    transfer (and could open-code it *differently*).
     """
+    if hasattr(a, "detach"):          # torch tensor, possibly on a device
+        a = a.detach().cpu()
     return np.asarray(a, dtype=np.float64)
 
 
