@@ -385,6 +385,11 @@ Three consequences for an agent:
 * The "off" value is **µt = ∞, not 0** — the reverse of every other correction
   here. `mu_t = 0` is a specimen of no thickness and is refused for reflection
   geometry rather than being taken as "no correction".
+* **The reported ΔBiso is a lower bound here, not the answer.** For the
+  capillary it is exact (seven decimals on real data); for a flat plate the
+  bias a fit actually absorbs runs 1.06–1.5× larger, tracking
+  `absorption.unabsorbed_fraction` — which is on the record for exactly this
+  reason. Quote it as "at least this much", with the residue beside it.
 * Unlike the capillary case this one **does** move Rwp, because it is not an
   exact reparameterisation (1–40 % of ln A survives a free scale and Biso). So
   8.1's rule inverts: here a *worse* Rwp after declaring a thickness is

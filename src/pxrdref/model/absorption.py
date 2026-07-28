@@ -303,8 +303,24 @@ def equivalent_delta_biso_from_transmission(
     The second return value is ‖residual‖/‖ln A − mean‖ — how much of the
     correction's angular shape is *not* reproducible by {scale, Biso}.  Zero to
     rounding means the correction is an exact reparameterisation and cannot
-    change the fit; the cylinder is the exact case, and both flat-plate
-    expressions sit at a few per cent.
+    change the fit; the cylinder is that exact case.
+
+    **Read the two returns together: the second bounds how far to trust the
+    first.**  This projection is *unweighted*, while a refinement finds a
+    weighted least-squares compromise, and the two coincide only insofar as the
+    correction really is a {scale, Biso} direction.  Measured against synthetic
+    refits (``tests/test_flat_plate.py``), ΔB is a **lower bound** on the bias a
+    fit actually absorbs, by a factor that tracks the residue:
+
+    ====================  =====  =====  =====
+    µt (ITC case 2)       0.15   0.3    0.6
+    unabsorbed fraction   0.263  0.201  0.080
+    actual / predicted    ~1.5   ~1.3   ~1.06
+    ====================  =====  =====  =====
+
+    For the cylinder the residue is zero and the prediction is exact — measured
+    to seven decimals on real 11-BM data.  For a flat plate, quote ΔB as "at
+    least this much", with the residue beside it.
     """
     s = np.asarray(_sin2_theta(get_backend(), two_theta_deg), dtype=np.float64)
     ln_a = np.log(np.asarray(transmission, dtype=np.float64))

@@ -447,6 +447,108 @@ def test_transmission_record_carries_the_thickness_advice():
         d.code for d in at_optimum.diagnostics}
 
 
+def test_a_neglected_thickness_lands_in_biso_and_the_prediction_is_a_lower_bound():
+    """The end-to-end version of the claim, and the honest limit of it.
+
+    Everything else here tests the projection *arithmetic*.  This one generates
+    patterns from a known structure **through** the correction, refits them
+    without declaring the thickness, and asks where the difference went — which
+    is the failure this correction exists to prevent, and the only test that
+    would catch a sign error in the ΔBiso the result reports.
+
+    Two results, and the second is why ``unabsorbed_fraction`` is on the record
+    next to ``equivalent_delta_biso`` rather than buried:
+
+    1. Declaring the true thickness recovers the true Biso **exactly** (5e-4),
+       and omitting it inflates Biso by Å²-scale amounts — 1.8 Å² at µt = 0.15
+       on a B = 0.8 structure.
+    2. The reported ΔBiso is a **lower bound**, not the answer. The projection
+       is an unweighted fit of ln A onto {1, sin²θ}; the refinement finds a
+       *weighted* least-squares compromise, and the two agree only insofar as
+       the correction is genuinely a {scale, Biso} direction. Measured, the
+       ratio of actual to predicted bias tracks ``unabsorbed_fraction``:
+
+       ====================  =====  =====  =====
+       µt                    0.15   0.3    0.6
+       unabsorbed_fraction   0.263  0.201  0.080
+       actual / predicted    ~1.5   ~1.3   ~1.06
+       ====================  =====  =====  =====
+
+       For the cylinder ``unabsorbed_fraction`` is zero to rounding and the
+       predicted shift is exact to seven decimals on real data
+       (``test_acceptance_capillary``). That contrast is the whole point.
+    """
+    import pxrdref as pr
+    from pxrdref.model.forward import compile_model
+    from pxrdref.params.vector import ParameterTable
+    from tests.test_aniso_adp import make_aniso_rutile
+
+    b_true = 0.8
+    grid = np.arange(15.0, 130.0, 0.02)
+    plan = pr.RefinementPlan(stages=[
+        pr.Stage("scale", ["phases.*.scale"]),
+        pr.Stage("biso", ["phases.*.atoms.*.biso"]),
+    ])
+
+    def build(mu_t):
+        structure = make_aniso_rutile()
+        phase = structure.phases[0]
+        phase.scale.value = 1e-3
+        for atom in phase.atoms:      # isotropic, so Biso is the only sink
+            atom.aniso = None
+            atom.biso = pr.Parameter(value=b_true, min=0.0, max=5.0)
+        ins = pr.Instrument.bragg_brentano(radiation="CuKa1", mu_t=mu_t)
+        ins.profile.w.value = 1e-2
+        return structure, ins
+
+    measured = []
+    for mu_t in (0.15, 0.6):
+        truth, ins_true = build(mu_t)
+        table = ParameterTable(truth, ins_true)
+        model = compile_model(truth, ins_true,
+                              pr.PatternData(two_theta=grid.tolist(),
+                                             intensity=np.ones_like(grid).tolist()),
+                              mode="rietveld", free_paths=set())
+        y = np.asarray(model.evaluate(table.decode(table.x0())))
+        # no background offset: the plan frees only the scale and Biso, so an
+        # unmodelled constant would be absorbed by the parameters under test
+        data = pr.PatternData(two_theta=grid.tolist(), intensity=y.tolist(),
+                              sigma=np.sqrt(np.maximum(y, 1.0)).tolist())
+
+        fits = {}
+        for declared in (mu_t, None):
+            structure, ins = build(declared)
+            for atom in structure.phases[0].atoms:
+                atom.biso.value = 0.5      # start away from the truth either way
+            ref = pr.Refinement(structure, ins, history=False)
+            result = ref.fit(data, plan=plan)
+            assert result.status == "converged"
+            fits[declared] = (ref, result)
+
+        ref_on, result_on = fits[mu_t]
+        ref_off, _ = fits[None]
+        # 1. declaring the true thickness recovers the true Biso
+        for atom in ref_on.fitted_structure.phases[0].atoms:
+            assert atom.biso.value == pytest.approx(b_true, abs=5e-4), atom.label
+
+        record = result_on.absorption
+        assert record.equivalent_delta_biso < 0.0
+        for on, off in zip(ref_on.fitted_structure.phases[0].atoms,
+                           ref_off.fitted_structure.phases[0].atoms):
+            shift = off.biso.value - on.biso.value
+            assert shift > 0.4, f"B({on.label}) barely moved ({shift:.4f} Å²)"
+            ratio = shift / -record.equivalent_delta_biso
+            # 2. a lower bound: never an overestimate, and never wild
+            assert 1.0 <= ratio < 2.0, f"B({on.label}) ratio {ratio:.3f}"
+            measured.append((record.unabsorbed_fraction, ratio))
+
+    # …and the error tracks how much of ln A a free {scale, Biso} cannot absorb,
+    # which is exactly what makes that field worth reporting alongside the bias
+    (unabs_hi, ratio_hi), (unabs_lo, ratio_lo) = measured[0], measured[-1]
+    assert unabs_hi > unabs_lo
+    assert ratio_hi > ratio_lo + 0.2
+
+
 def test_thick_specimen_produces_no_record_at_all():
     """No thickness ⇒ nothing was corrected ⇒ nothing to report, rather than a
     record full of zeros that reads as "we applied something"."""

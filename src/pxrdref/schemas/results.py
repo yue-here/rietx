@@ -119,14 +119,19 @@ class AbsorptionCorrection(Base):
     What changes is that a Biso refined *without* it comes back low by this
     much (Å²) — positive means "add this to recover the unbiased value".
 
-    The flat-plate cases are **not** exactly reparameterisable, so two more
-    fields carry what the cylinder does not need:
+    The flat-plate cases are **not** exactly reparameterisable, and that makes
+    their ``equivalent_delta_biso`` a **lower bound** rather than the answer: the
+    projection behind it is unweighted while a refinement finds a weighted
+    compromise, and measured against synthetic refits the bias a fit really
+    absorbs runs 1.06-1.5x the predicted one, tracking ``unabsorbed_fraction``.
+    Two more fields carry what the cylinder does not need:
     ``unabsorbed_fraction`` is the share of ln A that a free scale and a free
     Biso cannot reproduce (0 for the cylinder to rounding, a few per cent to
-    tens of per cent for a flat plate), and ``identifiable_fraction`` the same
-    measure applied to ∂lnA/∂µt — the number behind the decision not to make
-    the thickness refinable.  Both are measured at the *reflection* positions
-    rather than on the fitted grid (WP-0502's lesson).
+    tens of per cent for a flat plate) — and hence how far to trust the ΔBiso
+    above.  ``identifiable_fraction`` is the same measure applied to ∂lnA/∂µt,
+    the number behind the decision not to make the thickness refinable.  Both
+    are measured at the *reflection* positions rather than on the fitted grid
+    (WP-0502's lesson).
 
     ``intensity_fraction_of_optimal`` is filled for transmission only.  The
     intensity-maximising plate has µt = 1 exactly, so µt *is* the thickness in

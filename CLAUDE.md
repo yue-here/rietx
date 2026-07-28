@@ -295,9 +295,16 @@ measured acceptance in `docs/milestones/v0.4.md`).
 surface roughness 0502, Stephens anisotropic strain 0503, anomalous f′/f″ 0504,
 sequential series 0505, secondary extinction 0506, anode wavelengths 0507,
 flat-plate absorption + the real-data capillary acceptance 0508; measured
-acceptance in `docs/milestones/v0.5.md`). `pyproject.version` tracks the
-milestone *in flight*, not the last one shipped, because that string is stamped
-into every `RefinementResult.provenance` and history node.
+acceptance in `docs/milestones/v0.5.md`). Its method result is worth carrying
+into any future correction: **not one of the eight is well judged by Δ Rwp** —
+two provably cannot move it, one moves it the *wrong way* when it is right, and
+the two largest accuracy wins are invisible in it. So a new correction ships
+with a record field or a diagnostic that states what it changed, never with an
+Rwp comparison as its evidence.
+
+**In flight: v0.6 — solver, performance & agents.** `pyproject.version` tracks
+the milestone *in flight* (0.6.0.dev0), not the last one shipped, because that
+string is stamped into every `RefinementResult.provenance` and history node.
 
 **v0.4 — differentiable backends.** `backend=` takes `"numpy"` (the default and
 the only one anyone needs), `"jax"`, or the **experimental** `"torch"` (CPU
