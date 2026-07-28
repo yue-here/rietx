@@ -30,7 +30,7 @@ from .refine import (
     _absorption_diagnostics,
     _absorption_record,
     _guard_diagnostics,
-    _resolve_capillary_mu_r,
+    _resolve_specimen_absorption,
     _utcnow,
 )
 from .schemas.common import Diagnostic, Provenance
@@ -91,14 +91,16 @@ class MultiHistogramRefinement:
         if len(instruments) < 1:
             raise ValueError("multi-histogram needs at least one instrument")
         self.mtable = MultiParameterTable(structure, instruments, sharing=sharing)
-        # Resolve each histogram's capillary µR from composition, exactly as the
-        # single-histogram path does.  Without this a user who set
-        # ``capillary_radius_mm`` here would silently get no absorption
-        # correction and no diagnostic saying so — the failure mode WP-0501's
-        # reporting exists to prevent.  µR is per *instrument* (each histogram
-        # may be a different wavelength, hence a different µ) but the structure
-        # is shared, which is what makes one loop correct.
-        resolved = [_resolve_capillary_mu_r(structure, ins)
+        # Resolve each histogram's specimen absorption (capillary µR or
+        # flat-plate µt) from composition, exactly as the single-histogram path
+        # does.  Without this a user who set ``capillary_radius_mm`` or
+        # ``thickness_mm`` here would silently get no absorption correction and
+        # no diagnostic saying so — the failure mode WP-0501's reporting exists
+        # to prevent.  The dimensionless product is per *instrument* (each
+        # histogram may be a different wavelength and geometry, hence a
+        # different µ) but the structure is shared, which is what makes one loop
+        # correct.
+        resolved = [_resolve_specimen_absorption(structure, ins)
                     for ins in self.mtable.instruments]
         self._mu_r_source: list[str] = [src for src, _ in resolved]
         self._mu_r_skipped: list[str | None] = [why for _, why in resolved]

@@ -242,6 +242,28 @@ def test_geometry_round_trips_through_json():
     assert Geometry.model_validate_json(geom.model_dump_json()) == geom
 
 
+def test_specimen_absorption_is_stripped_from_an_instrument_profile(tmp_path):
+    """µt describes the mount, not the diffractometer.
+
+    Saving it into an instrument profile would silently pre-bias the ADPs of
+    every later sample measured on that instrument — the exact bias the
+    correction exists to remove.  Same rule as surface roughness (WP-0502).
+    """
+    from pxrdref import Instrument
+    from pxrdref.io.instrument_profile import (
+        load_instrument_profile,
+        save_instrument_profile,
+    )
+
+    ins = Instrument.bragg_brentano(mu_t=0.4, thickness_mm=0.02)
+    path = tmp_path / "profile.json"
+    save_instrument_profile(ins, path)
+    assert ins.geometry.mu_t == 0.4, "must not mutate the caller"
+    loaded = load_instrument_profile(path)
+    assert loaded.geometry.mu_t is None
+    assert loaded.geometry.thickness_mm is None
+
+
 def test_transmission_preset_defaults_to_a_monochromated_beam():
     from pxrdref import Instrument
 

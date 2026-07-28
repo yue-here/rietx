@@ -93,7 +93,7 @@ class Refinement:
         # chase the refinement.  Writing it onto the (already copied)
         # instrument makes the value visible in ``fitted_instrument`` and in
         # every history snapshot instead of hiding inside the compiled model.
-        self._mu_r_source, self._mu_r_skipped = _resolve_capillary_mu_r(
+        self._mu_r_source, self._mu_r_skipped = _resolve_specimen_absorption(
             self.structure, self.instrument)
         self.result_: RefinementResult | None = None
         self._model: CompiledModel | None = None
@@ -744,7 +744,7 @@ def _apply_esds(table: ParameterTable, result: RefinementResult,
         p.path: p.stderr for p in result.parameters if p.stderr is not None})
 
 
-def _resolve_capillary_mu_r(structure: Structure,
+def _resolve_specimen_absorption(structure: Structure,
                             instrument: Instrument) -> tuple[str, str | None]:
     """Fill in ``Geometry.mu_r`` **or** ``Geometry.mu_t`` from composition, in
     place.  Returns ``(source, skipped_reason)``.
