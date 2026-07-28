@@ -4,9 +4,11 @@
 neutron/TOF and fundamental-parameters work.  What is implemented today is a
 constant-wavelength X-ray source (one or more emission lines, optional
 anomalous dispersion) in two geometries: ``debye_scherrer`` (capillary /
-synchrotron, e.g. APS 11-BM, with the cylindrical absorption correction) and
+synchrotron, e.g. APS 11-BM, with the cylindrical absorption correction),
 ``bragg_brentano`` (laboratory flat plate, with displacement, transparency,
-axial divergence and surface roughness).
+axial divergence, surface roughness and finite-thickness absorption) and
+``flat_plate_transmission`` (a plate the beam passes through, with the
+symmetric-transmission absorption factor).
 """
 
 from __future__ import annotations
@@ -312,7 +314,9 @@ class Geometry(Base):
     a plate of zero thickness diffracts nothing, so ``mu_t = 0`` is rejected for
     ``bragg_brentano`` rather than being silently treated as "off".  Under
     transmission ``mu_t = 0`` is legal and means a non-absorbing plate, which
-    still carries the sec θ growth of the illuminated volume.
+    still carries the sec θ growth of the illuminated volume — and so is leaving
+    it ``None``: that geometry applies its factor unconditionally, because the
+    footprint belongs to the tilt and not to the absorption.
 
     **µt is a plain float for the same reason µR is, but on weaker evidence,
     and the difference is worth knowing.**  A free µR is *exactly* a linear
@@ -678,9 +682,10 @@ class Instrument(Base):
         name explicitly for an unmonochromated transmission setup.
 
         Give ``mu_t`` directly, or ``thickness_mm`` and let the refinement
-        estimate µt from the composition (``pxrdref.estimate_mu_t``); with
-        neither, the geometry still applies the sec θ footprint factor and says
-        so through the ``ABSORPTION_THICKNESS_UNKNOWN`` diagnostic.
+        estimate µt from the composition.  With neither, the geometry still
+        applies the sec θ footprint factor at µt = 0 — a transparent plate is
+        still a tilted one — and the result's ``absorption`` record reports
+        ``mu_r = 0`` so that choice is visible rather than implied.
         """
         try:
             lines = _RADIATIONS[radiation]

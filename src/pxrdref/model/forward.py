@@ -283,10 +283,15 @@ class CompiledModel:
         """
         if self.geometry_kind == "debye_scherrer":
             return cylinder_absorption(tt_bragg, self.mu_r) if self.mu_r else 1.0
+        if self.geometry_kind == "flat_plate_transmission":
+            # µt is optional here and *not* an on/off switch: the sec θ growth
+            # of the illuminated volume is a property of a tilted plate, not of
+            # its absorption, so an undeclared thickness means µt = 0 (a
+            # transparent plate) rather than no correction.  Choosing this
+            # geometry is the opt-in.
+            return flat_plate_transmission_absorption(tt_bragg, self.mu_t or 0.0)
         if self.mu_t is None:
             return 1.0
-        if self.geometry_kind == "flat_plate_transmission":
-            return flat_plate_transmission_absorption(tt_bragg, self.mu_t)
         return flat_plate_reflection_absorption(tt_bragg, self.mu_t)
 
     def _site_values(self, ip: int, values: dict[str, float], cell: tuple

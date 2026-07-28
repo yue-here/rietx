@@ -342,6 +342,17 @@ catches a factor applied in one assembly and not the other three).
     table above records both). Any future ratio-of-norms diagnostic wants the
     same check: the numerator is invariant to adding a scale direction, the
     denominator is not.
+  - **The flat-plate ΔBiso the record reports is a *lower bound*, and this was
+    only found by testing it end to end.** Every other test here checks the
+    projection arithmetic; the one that generates a pattern through the
+    correction and refits without declaring the thickness shows the fit absorbs
+    **1.06–1.5×** the predicted bias, tracking `unabsorbed_fraction` (0.080 →
+    0.263). The projection is unweighted, the refinement is weighted, and they
+    agree only insofar as the correction really is a {scale, Biso} direction —
+    which for the cylinder it exactly is, hence seven decimals there and a
+    factor of 1.5 here. Anything that reports a "bias" by projecting onto a
+    parameter subspace inherits this, and the honest fix was to say so and pin
+    the relationship rather than to widen a tolerance.
   - **A missing thickness must not be spelled `0.0`.** The reflection case's
     identity is µt = ∞, so the usual "0 means off" convention would multiply
     every intensity by zero. This is enforced in three places (schema refusal,

@@ -371,6 +371,30 @@ def test_the_thick_specimen_default_leaves_the_forward_model_untouched():
         < y_thin[bottom].max() / y_thick[bottom].max()
 
 
+def test_transmission_applies_its_factor_even_with_no_declared_thickness():
+    """µt is optional under transmission and is *not* an on/off switch.
+
+    The sec θ growth of the illuminated volume belongs to a tilted plate, not to
+    its absorption, so an undeclared thickness means a transparent plate rather
+    than no correction — the opposite of the reflection case, where an
+    undeclared thickness means an infinitely thick one. Choosing the geometry is
+    the opt-in, and the record says so by reporting µt = 0 rather than staying
+    silent.
+    """
+    import pxrdref as pr
+
+    model, _ = _flat_plate_model(0.0, "flat_plate_transmission")
+    object.__setattr__(model, "mu_t", None)
+    theta = np.radians(0.5 * model.tt)
+    assert np.allclose(np.asarray(model._absorption(model.tt)), 1.0 / np.cos(theta))
+
+    result = _fit_flat_plate("flat_plate_transmission")
+    assert result.absorption is not None, "an applied factor must be reported"
+    assert result.absorption.mu_r == 0.0
+    assert result.absorption.method == "flat_plate_transmission"
+    assert pr.Instrument.flat_plate_transmission().geometry.mu_t is None
+
+
 def test_debye_scherrer_ignores_mu_t_and_flat_plate_ignores_mu_r():
     """The geometry gate, from the forward model's side rather than the schema's."""
     model, _ = _flat_plate_model(0.3, "bragg_brentano")

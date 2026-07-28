@@ -807,13 +807,16 @@ def _absorption_record(model: CompiledModel, source: str, skipped: str | None,
             equivalent_delta_biso=equivalent_delta_biso(model.mu_r, lam),
             skipped=skipped, out_of_range=model.mu_r > CYLINDER_MU_R_MAX)
 
-    if model.mu_t is None and skipped is None:
-        return None
     transmission = model.geometry_kind == "flat_plate_transmission"
+    # transmission always applies its factor (sec θ survives at µt = 0), so it
+    # always gets a record; reflection with no declared thickness applied
+    # nothing and says nothing
+    if not transmission and model.mu_t is None and skipped is None:
+        return None
     mu_t = 0.0 if model.mu_t is None else float(model.mu_t)
     delta_biso = unabsorbed = identifiable = None
     positions = _reflection_positions(model, values)
-    if model.mu_t is not None and positions.size:
+    if (model.mu_t is not None or transmission) and positions.size:
         a = np.asarray(model._absorption(positions), dtype=np.float64)
         delta_biso, unabsorbed = equivalent_delta_biso_from_transmission(
             positions, a, lam)
@@ -826,8 +829,7 @@ def _absorption_record(model: CompiledModel, source: str, skipped: str | None,
         equivalent_delta_biso=delta_biso or 0.0, skipped=skipped,
         unabsorbed_fraction=unabsorbed, identifiable_fraction=identifiable,
         intensity_fraction_of_optimal=(
-            transmission_intensity_fraction(mu_t)
-            if transmission and model.mu_t is not None else None))
+            transmission_intensity_fraction(mu_t) if transmission else None))
 
 
 def _reflection_positions(model: CompiledModel,
