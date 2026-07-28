@@ -74,10 +74,52 @@ chain — 0501 and 0502 act on intensity in geometries that exclude each other
 (capillary vs flat-plate), 0504 on |F|², 0503 on widths — which is why the
 merges were clean. [0505](wp/0505-sequential-refinement.md) (sequential warm
 start) landed 2026-07-28 — see its note below.
-**[0507](wp/0507-anode-wavelengths.md) (anode wavelengths) is what remains**
-before the v0.5 row can flip, plus [0508](wp/0508-flat-plate-absorption.md),
-which 0501 split out and which needs a capillary dataset the repo does not have.
-Both are stubs — expand one before writing code.
+[0507](wp/0507-anode-wavelengths.md) (anode wavelengths) landed 2026-07-28 —
+see its note below. **[0508](wp/0508-flat-plate-absorption.md) is what remains**
+before the v0.5 row can flip; 0501 split it out, and it needs a capillary
+dataset the repo does not have. It is still a stub — expand it before writing
+code.
+
+**[0507](wp/0507-anode-wavelengths.md) (anode wavelengths) landed 2026-07-28.**
+Five anodes joined `CuKa` — Cr, Fe, Co, Mo, Ag, each also as a Kα1-only variant
+for an incident-side-monochromated beam. Nominally a data-table extension, and
+the table itself is four lines; the work was in the two questions around it.
+
+*Which scale.* All six come from one column of one evaluation — the NIST X-ray
+Transition Energies Database (SRD 128), direct-experimental KL3/KL2 — and the
+argument for trusting it is internal rather than bibliographic: **that column's
+Cu pair is bit-identical to the `CuKa` values shipped since v0.2**, so the
+existing entry is unchanged and doubles as the proof the new rows share its
+scale. A test asserts it, including the negative half (≠ Bearden's 1.540562).
+The textbook alternative, Bearden 1967, differs by 24–26 ppm at Mo/Ag; taking
+one anode from it while Cu stays Hölzer is exactly the ~100 ppm cell error the
+WP existed to avoid, so "correcting" a row toward the familiar numbers is a
+regression, not a fix.
+
+*What silently assumed Cu.* Two things, both found by scoping rather than by a
+test failing:
+
+- `background.diagnostics._contamination_flags` returned `[]` for any wavelength
+  more than 0.01 Å from Cu Kα1 — so every anode this WP enables would have
+  reported `contamination == []`, which reads as *clean* rather than *not
+  checked*. It is now per anode (`identify_anode`, exported), with Kβ from the
+  same database column. The two ghosts are looked up differently because they
+  are different physics: Kβ comes off the target, W Lα1 off the **filament**,
+  so W is checked for every anode and Kβ only for a recognised one.
+- The `26.6°` graphite monochromator angle in the `bragg_brentano` docstring is
+  a *Cu* number, not a property of the crystal — the same graphite sits at 12.1°
+  at Mo Kα, where the polarization constant K is 0.511 rather than 0.500.
+
+One finding worth carrying forward: **the one-|F|²-per-source assumption is
+weaker off Cu, and measurably so.** The Kα1/Kα2 gap grows from 20 eV at Cu to
+173 eV at Ag, and a census over Z = 3–98 × six anodes finds `dispersion.resolve`
+refusing 7 of 576 combinations — nothing at all at Cr and Fe Kα (9 and 13 eV
+apart, no edge fits between the lines), and at Ag one specimen someone will
+actually mount: **Ru, K edge 22.14 keV, right between the lines**. The census is
+pinned as a test so a table or tolerance change has to restate it. Relatedly,
+`DISPERSION_NEGLECTED`'s severity is anode-dependent — hematite is a `warning`
+at Co Kα (180 eV below the Fe K edge, f′ = −3.3 e) and an `info` at Mo Kα
+(f′ = +0.3 e). Both are now in AGENT_PROTOCOL §8.11.
 
 **[0505](wp/0505-sequential-refinement.md) (sequential series) landed
 2026-07-28** (890 tests green). `SequentialRefinement` / `refine_sequential`
@@ -478,7 +520,7 @@ the linear algebra's.
 | [0504](wp/0504-anomalous-scattering-xraydb.md) | Anomalous f′,f″ (bundled Cromer-Liberman, not xraydb) | ✅ 2026-07-27 | — |
 | [0505](wp/0505-sequential-refinement.md) | SequentialRefinement warm start | ✅ 2026-07-28 | — |
 | [0506](wp/0506-secondary-extinction.md) | Secondary extinction (Sabine) | ✅ 2026-07-23 | — |
-| [0507](wp/0507-anode-wavelengths.md) | Additional anode wavelengths (Co/Cr/Fe/Mo/Ag) | ⬜ | — |
+| [0507](wp/0507-anode-wavelengths.md) | Additional anode wavelengths (Co/Cr/Fe/Mo/Ag) | ✅ 2026-07-28 | — |
 | [0508](wp/0508-flat-plate-absorption.md) | Flat-plate absorption + real-data capillary acceptance | ⬜ | 0501 |
 
 ### v0.6 — solver, performance & agents (stubs)

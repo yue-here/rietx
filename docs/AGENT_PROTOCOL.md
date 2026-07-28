@@ -31,7 +31,7 @@ Preconditions, all of which must hold before `fit()` is meaningful:
 |---|---|---|
 | Every crystalline phase present is in the model | `Structure.from_cif` per phase | An unmodelled phase's peaks land in the residual; Layer 0's `unmatched_obs` list is how you find them |
 | The starting cell is within ~1 % | from the CIF | The peaks are outside their frozen evaluation windows and the refinement cannot walk there; Layer 2 says so with `reindex_or_recheck_cell` rather than reporting a small shift (§6) |
-| The wavelength is right | from the beamline `.prm`, the file header, or `Instrument.bragg_brentano(radiation=...)` | Every cell you report is wrong by the same scale factor and *nothing in the fit will tell you* |
+| The wavelength is right | from the beamline `.prm`, the file header, or `Instrument.bragg_brentano(radiation=...)` — `"CrKa"`, `"FeKa"`, `"CoKa"`, `"CuKa"`, `"MoKa"`, `"AgKa"`, or any of them suffixed `1` for a Kα1-only monochromated beam | Every cell you report is wrong by the same scale factor and *nothing in the fit will tell you*. Do not hand-enter a wavelength from a textbook to "match" one of these: the table is one scale end to end (§8.11) and mixing scales is a ~100 ppm cell error |
 | The geometry is right | `Instrument.debye_scherrer` vs `.bragg_brentano` | The aberration model is wrong; displacement/transparency/roughness/absorption are geometry-gated and silently absent |
 | The intensities are un-manipulated counts, with esds if available | `read_pattern` reads the file's esd column when present | Weights are wrong ⇒ every esd and every χ² is wrong |
 
@@ -253,7 +253,7 @@ if "BACKGROUND_ABSORPTION" in codes:
 
 ---
 
-## 8. Ten things that will surprise you, all measured
+## 8. Eleven things that will surprise you, all measured
 
 These are the findings from building the package that change how an agent
 should behave. Each one cost a debugging pass.
@@ -337,6 +337,26 @@ A ≤ 1 — and both equal 1 at µR = 0, so an identity test cannot tell them ap
 only the direction of the θ-dependence can. The March coefficient r means
 opposite habits in reflection and transmission geometry. **Read the docstring,
 not the symbol.**
+
+**8.11 The anode is a physics choice, not a number to look up.** All six
+`radiation=` presets come from one column of one evaluation (NIST XRTE
+SRD 128), and the shipped `CuKa` pair is bit-identical to it — that is what
+makes the others trustworthy, so **never substitute a value from elsewhere**;
+Bearden's widely-quoted numbers are a different scale, 24–26 ppm away at Mo/Ag.
+Three things then follow from *which* anode, all measured:
+
+* The Kα1/Kα2 gap grows from 20 eV at Cu to 173 eV at Ag, so the one-|F|²-per-
+  source assumption gets weaker. A census over Z = 3–98 × six anodes refuses 7
+  of 576 combinations, and one is a real specimen: **Ru at Ag Kα**, K edge
+  22.14 keV, between the lines. The refusal is correct — split the lines into
+  separate histograms or supply a measured override.
+* What `DISPERSION_NEGLECTED` is warning about is anode-dependent: hematite is
+  a `warning` at Co Kα (180 eV under the Fe K edge, f′ = −3.3 e) and an `info`
+  at Mo Ka (f′ = +0.3 e). Same specimen, same code, different severity.
+* Contamination checks are per anode. An unrecognised wavelength (synchrotron,
+  an untabulated anode) yields `contamination == []` — *not checked*, not
+  clean. `background.identify_anode(λ)` returns `None` there and is how you
+  tell the two apart.
 
 ---
 

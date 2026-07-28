@@ -162,6 +162,8 @@ result.plot(path="fit.png")                               # obs/calc/diff/ticks
 data = pr.read_pattern("sample.xrdml.xy")
 instrument = pr.Instrument.bragg_brentano(radiation="CuKa",      # Kα1/Kα2 doublet
                                           monochromator_two_theta=26.6)
+# also "CrKa" / "FeKa" / "CoKa" / "MoKa" / "AgKa", or any of them suffixed "1"
+# for a Kα1-only monochromated beam (2θ_m above is a Cu number — recompute it)
 instrument.background = pr.background.auto_background(data)       # diagnose → select → build
 
 ref = pr.Refinement(structure, instrument)

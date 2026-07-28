@@ -1,6 +1,6 @@
 # WP-0507 — Additional anode wavelengths (Co/Cr/Fe/Mo/Ag)
 
-Milestone: v0.5 · Status: 🔶 in progress
+Milestone: v0.5 · Status: ✅ shipped 2026-07-28
 Depends on: —
 
 ## Goal
@@ -117,16 +117,16 @@ Anomalous scattering is strongly anode-dependent, and an anode is routinely
 ## Tasks
 
 - [x] Expand this stub into a full WP before writing code
-- [ ] Transcribe Cr/Fe/Co/Mo/Ag Kα1,Kα2 into `_RADIATIONS`, each with its
+- [x] Transcribe Cr/Fe/Co/Mo/Ag Kα1,Kα2 into `_RADIATIONS`, each with its
       source in the comment; Cu unchanged
-- [ ] Lookup/round-trip test per anode; the Cu-unchanged scale assertion; the
+- [x] Lookup/round-trip test per anode; the Cu-unchanged scale assertion; the
       doublet weight and polarization defaults checked off Cu
-- [ ] Kα1-only variants (`"CuKa1"`, `"MoKa1"`, …) derived from the same tuples,
+- [x] Kα1-only variants (`"CuKa1"`, `"MoKa1"`, …) derived from the same tuples,
       for Ge(111)/Johansson-monochromated lab data
-- [ ] Per-anode dispersion smoke test (see `### Inherited`): every anode inside
+- [x] Per-anode dispersion smoke test (see `### Inherited`): every anode inside
       the bundled 3–70 keV band, and `dispersion.resolve` not refusing the
       doublet for the test structures
-- [ ] Generalize the Kβ / W Lα contamination check off Cu
+- [x] Generalize the Kβ / W Lα contamination check off Cu
 
 ## Acceptance
 
@@ -155,12 +155,39 @@ value to its cited source, and the Cu pair is asserted byte-for-byte unchanged.
 
 ## Handover log
 
-- **2026-07-28** — stub expanded into this file. **Done**: the scale decision
-  (one database column for all six anodes, with the shipped Cu pair
-  bit-identical to it — that is the whole safety argument, read it before
-  touching a digit) and the two anode-shaped gaps found while scoping it: the
-  contamination check bails off Cu, and the graphite-monochromator angle in the
-  docstring is a Cu number. **In flight**: the table itself. **Next**: tasks
-  2–6 below, in order.
+- **2026-07-28** — **shipped**; all six tasks landed, fast suite green.
+
+  **Done.** The scale decision above (one database column for all six anodes,
+  with the shipped Cu pair bit-identical to it — that is the whole safety
+  argument, read it before touching a digit); `_KA_DOUBLETS` + the derived
+  Kα1-only variants; per-anode lookup tests including the Cu-unchanged
+  assertion and its negative half (≠ Bearden's 1.540562); the dispersion band
+  and doublet census; the Kβ / W Lα check generalized off Cu behind an exported
+  `background.identify_anode`. Docs: AGENT_PROTOCOL §8.11 and the wavelength
+  precondition row, ATTRIBUTION rewritten around the database rather than the
+  two papers, README anode list, ROADMAP note. Forward-references pushed to
+  **0508** (µ is a function of the anode; a Co-tube dataset is the real
+  flat-plate case) and **1001** (every acceptance number in the repo is a Cu
+  measurement — now a stated gap).
+
+  **Gotchas.** (1) The values are *not* Bearden's; a "correction" toward the
+  textbook numbers is a regression, and the Cu assertion is what would catch
+  it. (2) `bragg_brentano(radiation="CuKa1")` silently ignores `ka2_ratio` —
+  there is no second line for it to act on, and the default cannot be
+  distinguished from an explicit pass. (3) The contamination check's empty list
+  still means *either* "nothing found" *or* "wavelength not recognised"; the
+  asymmetry is documented and `identify_anode` is how a caller separates them,
+  but the `PatternDiagnostics` field itself cannot. (4) Fe at Co Kα is the
+  sharp case for anyone extending dispersion work: 6.93 keV is ~180 eV under
+  the Fe K edge, so f′ = −3.3 e is large *and* the tabulation is at its least
+  trustworthy there — but 180 eV is outside the 50 eV XANES window, so nothing
+  flags it as near-edge.
+
+  **Not done, deliberately.** No row was added to `pxrdref compare`: its
+  registry is one of *corrections* to toggle against a standard, and an
+  emission-line table is not one — there is no variant whose Δχ² would mean
+  anything. No acceptance dataset: see the note pushed to 1001.
+
+  **Next.** Nothing blocking. v0.5 needs only 0508 to close.
 - **2026-07-23** — created as a stub during the cross-code review that landed
   WP-0506; the wavelengths are documentation-checked but not yet transcribed.

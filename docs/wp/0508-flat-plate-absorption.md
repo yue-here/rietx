@@ -106,6 +106,28 @@ once per call and use no op outside `backend/api.py`'s vocabulary; and the
 `sample_`-prefix heuristic at `params/vector.py:239` decides parameter gating by
 name, which is a latent trap for any new geometry-gated parameter.
 
+From **WP-0507** (anode wavelengths, landed 2026-07-28) — µ is a function of the
+anode, and this WP is the one that computes µ:
+
+- **`schemas.instrument._KA_DOUBLETS` now holds six anodes** (Cr/Fe/Co/Cu/Mo/Ag,
+  each also as a `…Ka1` single-line variant). Import wavelengths from it; do not
+  re-enter a number, and specifically do not reach for the familiar Bearden
+  values — the table is one scale end to end and mixing scales is a ~100 ppm
+  cell error. `background.diagnostics` shows the import pattern.
+- **A flat-plate acceptance is no longer implicitly a Cu experiment**, and the
+  anode changes µt by more than the geometry does. The routine reason to buy a
+  **Co** tube is an Fe-bearing specimen — Cu Kα sits above the Fe K edge, where
+  µ/ρ is ~5× larger and the specimen fluoresces; Co Kα sits 180 eV below it.
+  Measured from the bundled McMaster table: Fe µ/ρ = 297.7 at Cu Kα1, 56.2 at
+  Co Kα1, 36.2 at Mo Kα1. `estimate_capillary_mu_r` and `packed_mu_r` already
+  take `wavelength` and will do the right thing — the point is that a µt quoted
+  without naming the anode is meaningless, and if a dataset is acquired for
+  this WP the anode is part of its specification, not a detail of it.
+- **`µ` and `f′/f″` come from different tables that both jump at the same
+  edges** (`data/mu_McMaster.dat`, `data/f1f2_CromerLiberman.dat`). A wavelength
+  near an edge makes both untrustworthy at once, and WP-0507's census over
+  Z = 3–98 × six anodes is the map of where that bites.
+
 From **WP-0502** (surface roughness, landed 2026-07-27) — it shipped a
 correction in **this WP's geometry** (flat-plate, Bragg-Brentano) and in the
 same low-angle-intensity family, so most of its machinery and all of its traps

@@ -54,9 +54,15 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
 - Schwarz, G. (1978). *Ann. Stat.* 6, 461–464 — Bayesian information criterion.
 - Wilson, A. J. C. (1963). *Mathematical Theory of X-ray Powder Diffractometry*;
   Klug & Alexander (1974), ch. 5 — Bragg-Brentano displacement/transparency aberrations.
-- Hölzer et al. (1997). *Phys. Rev. A* 56, 4554–4568 — Cu Kα/Kβ emission wavelengths and intensity ratios (also Co/Cr/Fe Kα, for WP-0507).
-- Bearden, J. A. (1967). *Rev. Mod. Phys.* 39, 78–124 — W Lα1 wavelength (contamination check).
-- Deslattes et al. (2003). *Rev. Mod. Phys.* 75, 35–99 — X-ray transition energies/wavelengths (Mo/Ag Kα, for WP-0507; named at `schemas/instrument.py:334`).
+- NIST **X-ray Transition Energies Database** (SRD 128), <https://physics.nist.gov/PhysRefData/XrayTrans/> —
+  the direct-experimental KL3/KL2 (Kα1/Kα2) and KM3 (Kβ1,3) wavelengths of every
+  anode in `schemas/instrument._KA_DOUBLETS` and `background.diagnostics._KBETA`.
+  One column of one evaluation for all six anodes, which is what keeps them on a
+  common scale. Its two upstream measurements:
+  - Hölzer, Fritsch, Deutsch, Härtwig & Förster (1997). *Phys. Rev. A* 56, 4554–4568 — Cr/Fe/Co/Cu Kα and Kβ (database ref `7d`); the Cu pair this package has shipped since v0.2.
+  - Deslattes & Kessler (1985), in *Atomic Inner-Shell Physics*, ed. Crasemann (Plenum), 181–235 — Mo/Ag Kα and Kβ (database ref `5d`).
+- Deslattes, Kessler, Indelicato, de Billy, Lindroth & Anton (2003). *Rev. Mod. Phys.* 75, 35–99 — the evaluation behind that database.
+- Bearden, J. A. (1967). *Rev. Mod. Phys.* 39, 78–124 — W Lα1 wavelength (contamination check). Note his Kα scale is *not* the one used above and the two must not be mixed.
 - Sabine, T. M. (1985). *Aust. J. Phys.* 38, 507–518 — extinction in polycrystalline materials.
 - Sabine, T. M. (1988). *Acta Cryst.* A44, 368–373 — a reconciliation of the Zachariasen and Darwin extinction theories (the Bragg·sin²θ + Laue·cos²θ blend, WP-0506).
 - Sabine, Von Dreele & Jørgensen (1988). *Acta Cryst.* A44, 374–379 — extinction in time-of-flight neutron powder diffraction (the same model applied to a Rietveld refinement).

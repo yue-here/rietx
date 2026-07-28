@@ -27,8 +27,9 @@ from .models import chebyshev_design_matrix
 #: Transition Energies Database (SRD 128) direct-experimental KM3.  For the 3d
 #: metals that column reports the KM2,3 *blend*, which is what a check wants;
 #: for Mo and Ag it resolves Kβ1 (KM3) from Kβ3 (KM2, half the weight), and we
-#: take Kβ1 — the 3e-4 relative gap between them is ~0.01° 2θ, an order inside
-#: the matching window below.
+#: take Kβ1 rather than blending them 2:1 — the two choices differ by 3.1e-4
+#: relative, i.e. Δ2θ = 2·tanθ·Δλ/λ ≤ 0.02° out to 60° 2θ, which is an order
+#: inside the 0.15° matching window in :func:`_contamination_flags`.
 _KBETA: dict[str, float] = {
     "CrKa": 2.0848810,
     "FeKa": 1.7566040,
@@ -44,8 +45,9 @@ _KBETA: dict[str, float] = {
 _W_LA1 = 1.4763800
 
 #: How close the pattern's wavelength must be to an anode's Kα1 to be treated
-#: as that anode.  The closest pair in the table is Fe/Co, 0.147 Å apart, so
-#: this is unambiguous by two orders.
+#: as that anode.  The closest pair in the table is Fe/Co at 0.147 Å (Mo/Ag is
+#: next at 0.150), so the assignment cannot be ambiguous — but it can be
+#: *absent*, and that is the case the caller has to handle.
 _ANODE_MATCH_TOL = 0.01
 
 

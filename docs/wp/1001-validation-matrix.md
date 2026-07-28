@@ -37,6 +37,26 @@ that a tolerance policy written from certificates alone would violate.
   Rexp ≈ 8.9 %, so Rwp = 14.4 % is mostly counting statistics, not misfit. A
   policy demanding GoF → 1 would be demanding FPA.
 
+From **WP-0507** (anode wavelengths, landed 2026-07-28) — **every acceptance
+number in the repo is a Cu measurement, and that is now a stated gap rather
+than an unstated assumption.** Six anodes ship (Cr/Fe/Co/Cu/Mo/Ag, plus Kα1-only
+variants); none but Cu has a dataset behind it, so what is validated is the
+*table and its checks*, not a refinement at those wavelengths. Two things for
+the matrix:
+
+- **A non-Cu dataset is the single cheapest new tier** — Co Kα on an Fe-bearing
+  specimen is the routine real case (Cu Kα fluoresces Fe: µ/ρ = 297.7 vs 56.2)
+  and would exercise the parts of the chain that are wavelength-dependent all
+  at once: dispersion (f′ = −3.3 e for Fe at Co Kα, 180 eV under its K edge),
+  absorption, and the per-anode Kβ contamination check.
+- **Wavelength scale is a validation axis of its own.** All six anodes come from
+  one column of one evaluation (NIST XRTE SRD 128) and the shipped Cu pair is
+  bit-identical to it; a test asserts that, because if the table were ever
+  re-sourced, every cell in `tests/data` would move with it and *no other
+  assertion in the suite would notice*. Any tolerance policy on cell parameters
+  is downstream of that assertion — the SRM 676a ±30 ppm result above is
+  measured on this scale.
+
 From **WP-0505** (sequential series, landed 2026-07-28) — a new acceptance
 suite, and a *tier* the policy does not yet name.
 `tests/test_acceptance_sequential.py` refits the eight round-robin sample-1
