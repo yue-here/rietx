@@ -352,7 +352,7 @@ class SequentialRefinement:
             back_entries, *_ = self._chain(
                 list(reversed(order)), patterns, names, xs, mode, base_plan,
                 warm_plan, two_theta_limits, reseed, reseed_factor, prepare,
-                None)
+                None, history_suffix=".backward")
             back = SeriesResult(mode=mode, entries=back_entries, x_label=x_label,
                                 direction="backward")
             diagnostics += _path_dependence_diagnostics(series, back)
@@ -368,7 +368,8 @@ class SequentialRefinement:
 
     # ------------------------------------------------------------------
     def _chain(self, order, patterns, names, xs, mode, base_plan, warm_plan,
-               two_theta_limits, reseed, reseed_factor, prepare, on_result):
+               two_theta_limits, reseed, reseed_factor, prepare, on_result,
+               history_suffix: str = ""):
         """Walk ``order``, warm-starting each fit from the previous accepted one.
 
         Returns entries in **series** order regardless of the walk direction, so
@@ -390,14 +391,15 @@ class SequentialRefinement:
             ref, result = self._fit_one(
                 data, names[k], previous, previous_hkl,
                 warm_plan if warm else base_plan,
-                mode, two_theta_limits, position, previous_tag, prepare, k)
+                mode, two_theta_limits, position, previous_tag, prepare, k,
+                history_suffix)
             entry = _entry_from_result(k, names[k], xs[k], result)
 
             if warm and reseed and _reseed_needed(result, accepted_rwp,
                                                   reseed_factor):
                 cold_ref, cold = self._fit_one(
                     data, names[k], None, [], base_plan, mode, two_theta_limits,
-                    position, previous_tag, prepare, k)
+                    position, previous_tag, prepare, k, history_suffix)
                 if _better(cold, result):
                     entry = _entry_from_result(k, names[k], xs[k], cold)
                     entry.reseeded = True
@@ -431,7 +433,7 @@ class SequentialRefinement:
                  previous_hkl: list[ReflectionState],
                  plan: RefinementPlan, mode: Mode, two_theta_limits,
                  position: int, previous_tag: tuple[str | None, str | None],
-                 prepare, index: int):
+                 prepare, index: int, history_suffix: str = ""):
         """One pattern: warm the models from ``previous``, then run ``plan``."""
         structure = self.structure.model_copy(deep=True)
         instrument = self.instrument.model_copy(deep=True)
@@ -440,7 +442,7 @@ class SequentialRefinement:
         if prepare is not None:
             prepare(index, data, structure, instrument)
         ref = Refinement(structure, instrument, backend=self._backend,
-                         history=self._history_spec(label))
+                         history=self._history_spec(label + history_suffix))
         if previous_hkl and mode in ("lebail", "pawley"):
             # Le Bail/Pawley per-hkl intensities are path-dependent state that
             # lives *outside* θ, so `_carry_into` cannot reach them — and a flat
@@ -456,7 +458,13 @@ class SequentialRefinement:
         return ref, result
 
     def _history_spec(self, label: str):
-        """Per-pattern history target: a file under the given directory."""
+        """Per-pattern history target: a file under the given directory.
+
+        The backward pass of ``direction="both"`` writes to ``<label>.backward``
+        so a verification chain never appends its nodes to the reported chain's
+        log — the JSONL format is append-only by design, and two headers in one
+        file would make the reload ambiguous.
+        """
         spec = self._history
         if isinstance(spec, bool):
             return spec

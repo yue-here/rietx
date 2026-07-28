@@ -52,7 +52,12 @@ class SeriesEntry(Base):
     #: continuous there, because its starting point did not come from its
     #: neighbour.
     reseeded: bool = False
-    #: Rwp the rejected warm-started fit reached, when ``reseeded``.
+    #: Rwp the warm-started fit reached, set whenever a cold restart was tried
+    #: at all.  With ``reseeded`` it says which of the two was kept: both set
+    #: means the restart rescued the pattern, ``rwp_warm`` alone means the
+    #: guard fired but the warm fit was still the better one — worth seeing,
+    #: since it marks a pattern the series found hard for a reason the restart
+    #: could not fix.
     rwp_warm: float | None = None
 
     #: Where this pattern's own history lives (one tree per pattern — a tree is

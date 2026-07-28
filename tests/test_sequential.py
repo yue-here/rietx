@@ -431,6 +431,27 @@ def test_one_tree_per_pattern_cross_linked(thermal_patterns, tmp_path):
     assert reloaded.root.notes["series_label"] == "t1"
 
 
+def test_the_backward_pass_writes_its_own_logs(thermal_patterns, tmp_path):
+    """A verification chain must not append to the reported chain's log.
+
+    The JSONL format is append-only by design, so two headers in one file would
+    make the reload ambiguous — ``direction="both"`` writes the backward pass
+    to ``<label>.backward.jsonl``."""
+    structure, ins = _start_models()
+    series = SequentialRefinement(structure, ins, history=tmp_path / "h")
+    series.fit(thermal_patterns[:2], labels=["a", "b"], direction="both")
+
+    for name in ("a", "b"):
+        forward = tmp_path / "h" / f"{name}.jsonl"
+        assert forward.exists()
+        assert (tmp_path / "h" / f"{name}.backward.jsonl").exists()
+        # exactly one header record, so the log is unambiguously reloadable
+        headers = [line for line in forward.read_text().splitlines()
+                   if '"record":"header"' in line.replace(" ", "")]
+        assert len(headers) == 1
+        assert pr.RefinementTree.load(forward).header.tree_id
+
+
 # -- Le Bail --------------------------------------------------------------
 
 @pytest.mark.slow
