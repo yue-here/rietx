@@ -4,6 +4,8 @@
 |---|---|---|---|
 | `11BM_NAC.fxye` | Na2Ca3Al2F14 (NAC) powder pattern, APS beamline 11-BM, λ = 0.4139090 Å (from the accompanying `.prm`), 54000 points, GSAS ESD (fxye) format | GSAS-II tutorials repo, `TOF-CW Joint Refinement/data/` (github.com/AdvancedPhotonSource/GSAS-II-tutorials) | Argonne/APS tutorial data (U.S. Government work; publicly distributed) |
 | `11bm_gsas.prm` | GSAS instrument parameter file for the above (profile from SRM 660a LaB6 fit) | same | same |
+| `11BM_LaB6_660a.fxye` | NIST SRM 660a LaB6 powder pattern, APS beamline 11-BM, λ = 0.4131280 Å (from the accompanying `.prm`), 132992 points, 0.4995-66.995° 2θ at 0.0005°, 295.0 K, GSAS ESD (fxye) format — the **capillary** specimen of the v0.5 absorption acceptance (`test_acceptance_capillary.py`). Its own header identifies it: `sample_name, "SRM 660a"` / `chemical_formula, "Lanthanum Hexaboride (LaB6)"` / `comment1, "robotic collection"` | GSAS-II tutorials repo, `FitPeaks/data/11bmb_3844.fxye` (github.com/AdvancedPhotonSource/GSAS-II-tutorials) | Argonne/APS tutorial data (U.S. Government work; publicly distributed) |
+| `11bm_lab6_gsas.prm` | GSAS instrument parameter file for the above (λ = 0.4131280 Å, POLA 0.99, profile from the same Feb-2009 SRM 660a fit as `11bm_gsas.prm`) | same, `11bmb_3844.prm` | same |
 | `cod_1000236.cif` | NAC structure, Courbion & Ferey (1988) J. Solid State Chem. 76, 426, space group I2₁3, a = 10.257 Å | Crystallography Open Database entry 1000236 | COD (public domain dedication) |
 | `cod_1000055.cif` | LaB6 structure, Pm-3m, a = 4.157597 Å | COD entry 1000055 | COD (public domain dedication) |
 | `nist_srm660c_100a.cif` | NIST SRM 660c LaB6 certification dataset incl. measured profile (5332 pts in 24 stitched scan regions, Cu Kα + graphite post-monochromator, NIST DBD, R = 217.5 mm) — v0.2 lab-instrument acceptance (`test_acceptance_srm660c.py`) | NIST Public Data Repository mds2-2315 (data.nist.gov) | NIST open data license (U.S. Government work) |
@@ -47,6 +49,10 @@ Reference values used in acceptance tests:
 - SRM 660c auxiliary references: CIF-recorded specimen displacement
   −0.07877 mm (the v0.2 fit recovers −0.0801 mm with zero fixed);
   Hölzer integrated Kα2/Kα1 intensity ratio ≈ 0.52 (fit: 0.513).
+- LaB6 **SRM 660a** (the 11-BM capillary pattern) certified lattice parameter:
+  a = 4.1569162(97) Å at 22.5 °C (k = 2; NIST certificate,
+  tsapps.nist.gov/srmext/certificates/archives/660a.pdf).  **Not an anchor for
+  this dataset** — see the capillary section below.
 - Fluorapatite (`FAP.EXP`, GSAS's own converged values — a **cross-code
   consistency** reference, not a certificate): cell a = 9.371724(36) Å,
   c = 6.885867(37) Å (`CRS1 ABC`/`ABCSIG`); Rwp = 0.1005, Rp = 0.0766 over
@@ -163,6 +169,67 @@ as a standard QPA benchmark for the exact purpose for which they were released.
 The **papers** above are © IUCr (all rights reserved) — cited, never
 redistributed. If the IUCr/CSIRO prefer these files not be vendored, they can be
 dropped in favour of a fetch-on-demand script against the Internet Archive.
+
+## v0.5 capillary absorption acceptance data (WP-0508)
+
+`11BM_LaB6_660a.fxye` is the repo's only pattern from a specimen whose
+**container is specified**, which is what makes a capillary-absorption
+acceptance possible at all: µR needs a bore radius and a composition, and most
+published patterns state neither.
+
+**The container.** 11-BM is a transmission (Debye-Scherrer) instrument, and its
+rapid-access mail-in program supplies exactly one standard capillary:
+"Standard Size = 0.8 mm diameter Kapton tube and mounting base", identified on
+the beamline's *Supplies and Tools* page as Cole-Parmer #95820-06,
+**ID 0.0320″ = 0.81 mm**, OD 0.0340″ = 0.86 mm (a 1.5 mm size was added later).
+This scan's header records `comment1, "robotic collection"` — the mail-in robot,
+which takes only those bases. So R = 0.405 mm is the documented standard
+container, not a measurement of this particular tube.
+
+**µR.** With the LaB6 composition and λ = 0.4131280 Å, `pxrdref.estimate_mu_r`
+gives µ = 33.7 cm⁻¹ for the crystalline solid, hence
+
+| packing fraction | 0.35 | 0.50 | 0.60 |
+|---|---|---|---|
+| µR | 0.47 | 0.67 | 0.81 |
+
+all inside the Rouse et al. (1970) fit's stated range (µR ≤ 1). Packing is the
+one input nobody measures; the acceptance is built so that **its conclusion does
+not depend on the value** (below).
+
+**The cell is not an anchor for this dataset, and the reason is in the file
+header.** `# Calibration from: /data/oct09/11bmb_3843.calib` — λ was calibrated
+at the beamline against LaB6 itself, so refining a LaB6 cell against it is
+circular: a is pinned by construction to reproduce the standard. It does
+(a = 4.156850 Å vs the certificate's 4.1569162 Å at 22.5 °C, 16 ppm, with the
+scan at 295.0 K worth ≈ −4 ppm of that), and that is quotable as a consistency
+check only. The absolute cell anchors remain SRM 660c (`nist_srm660c_100a.cif`,
+lab flat plate) and SRM 676a (`qarr/corundum.prn`).
+
+**What the acceptance asserts instead.** The Rouse transmission factor is
+*exactly* a constant times exp(c·sin²θ), so applying it is an exact
+reparameterisation of {phase scale, Biso}: the fit cannot improve, and the
+displacement parameters carry the entire content. Measured over 2–60° 2θ
+(116 001 points), the same staged plan run with and without µR = 0.674:
+
+| | no correction | µR = 0.674 | Δ |
+|---|---|---|---|
+| Rwp | 0.0884883 | 0.0884884 | +3.2e-8 |
+| a (Å) | 4.1568496 | 4.1568496 | −7.9e-12 |
+| B(La) (Å²) | 0.453890 | 0.470545 | **+0.0166542** |
+| B(B) (Å²) | 0.205395 | 0.222049 | **+0.0166542** |
+
+against `equivalent_delta_biso(0.674, 0.413128) = 0.0166542`. Any µR would give
+the same *form* of result with its own predicted shift, which is why the
+packing-fraction uncertainty does not weaken it.
+
+**The absolute Biso here is not a reference value.** Turning on anomalous
+dispersion (WP-0504; La at 30 keV has f′ = −1.22, f″ = +0.94, its K edge being
+at 38.9 keV) moves B(La) 0.4539 → 0.4098 and B(B) 0.2054 → 0.2690 — 2.6× the
+absorption effect and, for La, in the opposite direction. Two independent biases
+land on the same parameters; only the difference this test measures is
+attributable to absorption, and the identity above reproduces to 0.0166540 with
+dispersion switched on, which is the check that they are independent.
 
 ## backend_goldens/ — WP-0401 bit-identity baseline
 
