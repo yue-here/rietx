@@ -12,4 +12,10 @@ htmlcov/
 *.png
 *.html
 !docs/**/*.html
+# every test refinement writes obs/calc/diff plots and exported tables here,
+# for visual inspection (Rwp hides locally-bad fits).  The *.png rule above
+# used to cover this by accident; WP-0505 added a CSV export and it was
+# committed, so ignore the directory rather than the extensions that happen
+# to land in it.
+tests/output/
 .DS_Store
