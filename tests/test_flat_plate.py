@@ -592,6 +592,17 @@ def test_a_neglected_thickness_lands_in_biso_and_the_prediction_is_a_lower_bound
     assert unabs_hi > unabs_lo
     assert ratio_hi > ratio_lo + 0.2
 
+    # obs/calc/diff for visual inspection (tests/output/, gitignored): the last
+    # µt's undeclared refit, where the misfit the ADPs could not absorb is what
+    # is left in the difference curve
+    from pathlib import Path
+
+    from pxrdref.viz.plots import plot_result
+    out = Path(__file__).parent / "output"
+    out.mkdir(exist_ok=True)
+    plot_result(fits[None][1], path=str(out / "flat_plate_thickness_omitted.png"))
+    plot_result(fits[mu_t][1], path=str(out / "flat_plate_thickness_declared.png"))
+
 
 def test_thick_specimen_produces_no_record_at_all():
     """No thickness ⇒ nothing was corrected ⇒ nothing to report, rather than a
