@@ -620,6 +620,120 @@ def test_line_guard_passes_the_ka_doublet():
         assert got[el] == complex(*dispersion(el, 1.5405929))
 
 
+# ----------------------------------------------------------------------
+# the anode table meets the dispersion table (WP-0507)
+# ----------------------------------------------------------------------
+def _anodes():
+    from pxrdref.schemas.instrument import _KA_DOUBLETS
+
+    return _KA_DOUBLETS
+
+
+def test_every_anode_is_inside_the_tabulated_band():
+    """The bundled Cromer-Liberman extract spans 3-70 keV and *refuses*
+    out-of-band rather than extrapolating, so every shipped anode has to be
+    asserted inside it, not assumed."""
+    from pxrdref.crystallography.attenuation import _HC_EV_ANGSTROM
+
+    energies = {}
+    for name, lines in _anodes().items():
+        for i, lam in enumerate(lines):
+            e = _HC_EV_ANGSTROM / lam
+            assert 3.0e3 < e < 70.0e3, f"{name} at {lam} A is {e / 1e3:.2f} keV"
+            # the arithmetic above is the claim; this is the table agreeing
+            dispersion("Fe", lam)
+            energies[f"{name}{i + 1}"] = e
+    # the two extremes, which are what would fail first if the band shrank
+    assert min(energies, key=energies.get) == "CrKa2"
+    assert energies["CrKa2"] == pytest.approx(5.406e3, rel=1e-3)
+    assert max(energies, key=energies.get) == "AgKa1"
+    assert energies["AgKa1"] == pytest.approx(22.163e3, rel=1e-3)
+
+
+def test_resolve_serves_the_doublet_at_every_anode():
+    """One |F|² per source requires f′/f″ to be common to both lines.  The
+    doublet gap grows with the anode — 20 eV at Cu, 173 eV at Ag — so this is a
+    weaker assumption off Cu and has to be measured, not inherited."""
+    from pxrdref.crystallography.dispersion import resolve
+
+    common = ("O", "Na", "Mg", "Al", "Si", "P", "Ca", "Fe", "Zn", "Zr", "La", "B")
+    for name, lines in _anodes().items():
+        got = resolve(list(common), lines)
+        for el in common:
+            assert got[el] == complex(*dispersion(el, lines[0])), f"{el} at {name}"
+
+
+def test_the_doublet_assumption_has_real_exceptions_off_cu():
+    """A census over Z = 3-98 × the six anodes: 7 of 576 combinations refuse.
+
+    Cr and Fe Kα refuse nothing — their lines are 9 and 13 eV apart, so no edge
+    can fit between them.  The exceptions concentrate at Mo and Ag, whose
+    doublets span 105 and 173 eV, and one of them is a specimen someone will
+    actually mount: **Ru at Ag Kα** (K edge 22.14 keV, between the lines).
+    The refusal is the correct answer, not a limitation to route around — the
+    fix is separate histograms or a measured override.
+    """
+    import gemmi
+
+    from pxrdref.crystallography.dispersion import resolve
+
+    refused = {}
+    for name, lines in _anodes().items():
+        bad = []
+        for z in range(3, 99):
+            el = gemmi.Element(z).name
+            try:
+                resolve([el], lines)
+            except ValueError:
+                bad.append(el)
+        refused[name] = bad
+    assert refused["CrKa"] == []
+    assert refused["FeKa"] == []
+    assert refused["CoKa"] == ["Eu"]
+    assert refused["CuKa"] == ["Eu", "Ho"]
+    assert refused["MoKa"] == ["At", "Rn", "Np"]
+    assert refused["AgKa"] == ["Ru", "Pu"]
+
+
+def test_the_neglected_dispersion_message_is_anode_dependent():
+    """Choosing the anode *is* choosing the size of the correction being
+    skipped: Co Kα sits 180 eV below the Fe K edge, where f′ = −3.3 e, and the
+    same specimen on Mo Kα is 10 keV above it, where f′ = +0.3 e."""
+    import pxrdref as pr
+    from pxrdref.refine import _dispersion_diagnostics
+    from pxrdref.schemas.instrument import _KA_DOUBLETS
+
+    fp_co, _ = dispersion("Fe", _KA_DOUBLETS["CoKa"][0])
+    fp_mo, _ = dispersion("Fe", _KA_DOUBLETS["MoKa"][0])
+    assert fp_co < -3.0 < 0.0 < fp_mo < 1.0
+    # 180 eV out is well beyond the 50 eV XANES window, so the table is fine
+    # here — the correction is merely large, which is a different thing
+    from pxrdref.crystallography.dispersion import near_edge
+    assert near_edge("Fe", _KA_DOUBLETS["CoKa"][0]) is None
+
+    hematite = pr.Structure(phases=[pr.Phase(
+        name="Fe2O3", space_group="R -3 c", cell=pr.Cell(
+            a=pr.Parameter(value=5.0356), b=pr.Parameter(value=5.0356),
+            c=pr.Parameter(value=13.7489), alpha=pr.Parameter(value=90.0),
+            beta=pr.Parameter(value=90.0), gamma=pr.Parameter(value=120.0)),
+        atoms=[
+            pr.Atom(label="Fe", species="Fe", x=pr.Parameter(value=0.0),
+                    y=pr.Parameter(value=0.0), z=pr.Parameter(value=0.3553),
+                    biso=pr.Parameter(value=0.3)),
+            pr.Atom(label="O", species="O", x=pr.Parameter(value=0.3059),
+                    y=pr.Parameter(value=0.0), z=pr.Parameter(value=0.25),
+                    biso=pr.Parameter(value=0.5)),
+        ])])
+    levels = {}
+    for name in ("CoKa", "MoKa"):
+        ins = pr.Instrument.bragg_brentano(radiation=name)
+        diags = _dispersion_diagnostics(hematite, ins)
+        assert len(diags) == 1 and diags[0].code == "DISPERSION_NEGLECTED"
+        assert f"{_KA_DOUBLETS[name][0]:.5f}" in diags[0].message
+        levels[name] = diags[0].level
+    assert levels == {"CoKa": "warning", "MoKa": "info"}
+
+
 def test_override_supplies_a_value_the_table_cannot():
     """Overrides skip both the lookup and the edge refusal — that is the point.
 
