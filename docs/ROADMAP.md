@@ -3,6 +3,11 @@
 Canonical milestone **index**. The content that used to live here is split so
 a work session loads only what it needs:
 
+- **[AGENT_PROTOCOL.md](AGENT_PROTOCOL.md)** — how to *use* the package as an
+  automated operator: turn-on order, degeneracies, abstention handling,
+  diagnostic-code semantics, and the measured findings that change agent
+  behaviour. Written for consumers, not maintainers; a WP that adds a
+  diagnostic code or a correction should add its row there.
 - **[DESIGN.md](DESIGN.md)** — the design record (rationale, locked decisions,
   invariants). Stable; read the specific section a work package links.
 - **[milestones/](milestones/)** — shipped-milestone records with the measured
@@ -140,7 +145,44 @@ Two findings worth carrying forward:
   the strongest anchor is the integral a fit approximates, not another code's
   transcription of the same fit.
 
-**0501 left three things open for review**, listed with what would settle each in
+### Repo-wide audit, 2026-07-28
+
+Not a WP — a sweep for doc/code drift and physics errors across the whole tree,
+run at the user's request alongside two new deliverables. What it changed:
+
+- **A real bug, root-caused and fixed.** `np.linalg.pinv` was taking its general
+  SVD path on JᵀJ, losing symmetry on the cond ≈ 10²⁰ normal matrices this
+  package routinely forms and emitting |ρ| up to 1.6 × 10³ (WP-0502 had logged
+  the symptom on the fluorite fit as "worth its own fix"). `hermitian=True` on a
+  symmetrised matrix caps it at 1 + 4 ulp. Correlation reporting — and therefore
+  the 0.98 guard both 0501 and 0502 lean on — is trustworthy again.
+- **WP-0501's b₂ question is settled**, without needing a clean copy of the
+  paper: an independently written quadrature of ITC (6.3.3.4) reproduces
+  Rouse's own 0.0035 bound with −0.3750 (0.0820 with −0.0375), and the sphere
+  coefficients from the same table make the transposition visible without any
+  computation (see that WP's "Open for review"). One of the three open items is
+  therefore closed; the other two remain judgement calls.
+- **Two new deliverables.** [AGENT_PROTOCOL.md](AGENT_PROTOCOL.md) — the
+  consumer-facing protocol for driving this package from an agent — and
+  `pxrdref compare`, a browser UI comparing refinement settings on the bundled
+  standards (`viz/compare.py` + `compare_app.py`, tested in
+  `tests/test_compare_ui.py`, whose anti-drift test pins its protocols to the
+  acceptance suites').
+- **Stale docs corrected**: test counts (835 / 775, ~17 min / ~2.5 min),
+  `pyproject.version` 0.2.0.dev0 → 0.5.0.dev0 (it is stamped into every result's
+  provenance), README's status header and its missing roughness/extinction rows,
+  `symmetry.py`'s now-wrong claim that Friedel merging depends on there being no
+  anomalous scattering, and WP-0501's "µR > 1 … not extrapolated" bullet, which
+  contradicted both the code and its own "Open for review" item.
+
+The physics itself was checked module by module against its cited sources and
+**no errors were found**: FCJ's cos 2φ relation and ξ_max cap, the TCH and Voigt
+closed-form partials, the Friedel-average ⟨|F|²⟩ = |A|² + |B|² identity, the
+Stephens Λ = (180/π)·10⁻⁶·d²√(ΣS·mono) chain, Sabine's branches, Brindley's τ
+series, and the Rouse ΔB = c·λ²/2 bias all reproduce independently.
+
+**0501 left three things open for review** (one now closed above), listed with
+what would settle each in
 [its "Open for review" section](wp/0501-absorption-corrections.md#open-for-review):
 the b₂ coefficient contradicts the printed source (a clean copy of the paper
 settles it); µR > 1 is used-but-warned rather than refused, which is a judgement
@@ -329,7 +371,13 @@ Three things this WP exports downstream (all written into WP-0501's
 correction is judged at reflection positions, not on the fitted grid (real data
 forced that fix); and a pre-existing `|ρ| > 1` in the reported correlation
 matrix under poor conditioning, which undermines the correlation guard that both
-0501 and 0502 lean on.
+0501 and 0502 lean on. **That third one was fixed 2026-07-28** in a repo-wide
+audit rather than a WP: `np.linalg.pinv`'s default general-SVD path loses
+symmetry on the cond ≈ 10²⁰ normal matrices this package routinely forms
+(reproduced at |ρ| ≈ 1.6 × 10³), and `covariance_estimates` now symmetrises JᵀJ
+and passes `hermitian=True`. Every reported correlation is a valid Pearson
+correlation again, so the 0.98 guard measures the data's degeneracies and not
+the linear algebra's.
 
 ## Milestones
 
@@ -365,7 +413,7 @@ matrix under poor conditioning, which undermines the correlation guard that both
 
 | WP | Title | Status | Depends on |
 |---|---|---|---|
-| [0401](wp/0401-backend-op-shim.md) | Backend op shim (~41 ops, `window_add`) + residual purity refactors | ✅ 2026-07-24 | — |
+| [0401](wp/0401-backend-op-shim.md) | Backend op shim (34 named ops + `window_add`/`segment_sum`; the WP was scoped at "~41" before the survey) + residual purity refactors | ✅ 2026-07-24 | — |
 | [0402](wp/0402-jax-backend.md) | JAX backend: chunked jacfwd | ✅ 2026-07-24 | 0401 |
 | [0403](wp/0403-cuda-mixed-precision.md) | Mixed-precision policy (CUDA-deferred, CPU-testable) | ✅ 2026-07-24 | 0402 |
 | [0404](wp/0404-cross-backend-jacobian-ci.md) | Cross-backend Jacobian CI | ✅ 2026-07-24 | 0402 |

@@ -8,13 +8,23 @@ core, pydantic v2 schemas, gemmi for CIF/symmetry. Import name: `pxrdref`.
 ```sh
 uv venv --python 3.12 && uv pip install -e ".[dev]"   # setup (once)
 uv pip install -e ".[dev,jax,torch]"                   # + optional jax/torch backends
-.venv/bin/python -m pytest                             # full suite ~8 min (551 tests), incl. real-data acceptance
-.venv/bin/python -m pytest -m "not slow"               # skip acceptance (512 tests, ~2 min)
+.venv/bin/python -m pytest                             # full suite ~14 min (852 tests), incl. real-data acceptance
+.venv/bin/python -m pytest -m "not slow"               # skip acceptance (791 tests, ~2.5 min)
 .venv/bin/python -m pytest tests/test_cross_backend.py # Jacobian agreement matrix; rows self-skip without their backend
 .venv/bin/python -m ruff check src tests examples      # lint (must be clean)
 .venv/bin/python examples/nac_11bm.py                  # end-to-end demo + plot
 .venv/bin/pxrdref watch <live-dir>                     # live viewer for a LiveSession run
+.venv/bin/pxrdref compare --open                       # settings-comparison UI on the standards
 ```
+
+`pxrdref compare` is the fastest way to answer "does this new correction
+actually help?": pick a standard, tick variants, and read the **cumulative
+Δχ² vs reference** panel, which localises *where* a change acted rather than
+only whether Rwp moved. Registry + runner in `viz/compare.py` (also usable
+headlessly as `compare.run(standard, variant)`); server/page in
+`compare_app.py`. Its standards are the acceptance suites' protocols, and
+`tests/test_compare_ui.py` asserts that field-by-field so the two cannot
+drift — **add a row there whenever a new correction lands.**
 
 ## Data flow
 
@@ -251,6 +261,14 @@ measured acceptance in `docs/milestones/v0.3.md`: SRM 676a cell anchor via c/a
 (+30 ppm) plus the IUCr QPA round robin with participant-spread-referenced
 tolerances), **v0.4** (2026-07-27: differentiable backends — WP-0401…0408,
 measured acceptance in `docs/milestones/v0.4.md`).
+
+**In flight: v0.5 — corrections & microstructure.** Landed and usable but the
+milestone has not closed: capillary absorption (0501), surface roughness (0502),
+Stephens anisotropic strain (0503), anomalous f′/f″ (0504), secondary extinction
+(0506). Remaining: 0505 (sequential warm start), 0507 (anode wavelengths), 0508
+(flat-plate absorption + a real capillary acceptance). `pyproject.version`
+tracks the milestone *in flight*, not the last one shipped, because that string
+is stamped into every `RefinementResult.provenance` and history node.
 
 **v0.4 — differentiable backends.** `backend=` takes `"numpy"` (the default and
 the only one anyone needs), `"jax"`, or the **experimental** `"torch"` (CPU

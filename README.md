@@ -41,10 +41,14 @@ state:
   without reading a plot image. Every layer is built to **abstain rather than
   guess**: collinear causes are reported as unresolved, not resolved wrongly.
 
-## Status: v0.4 (pre-alpha)
+## Status: v0.4 shipped, v0.5 in progress (pre-alpha)
 
-Working today — constant-wavelength X-ray, both **capillary/synchrotron** and
-**laboratory Bragg-Brentano** geometry:
+v0.4 is recorded with measured acceptance in
+[docs/milestones/v0.4.md](docs/milestones/v0.4.md); the v0.5 rows marked below
+have landed but the milestone has not closed (see
+[docs/ROADMAP.md](docs/ROADMAP.md) for what remains). Working today —
+constant-wavelength X-ray, both **capillary/synchrotron** and **laboratory
+Bragg-Brentano** geometry:
 
 | Capability | State |
 |---|---|
@@ -70,12 +74,21 @@ Working today — constant-wavelength X-ray, both **capillary/synchrotron** and
 | True Voigt peak shape (shared Faddeeva `w(z)`; TCHZ still the default) | ✅ |
 | Soft bond / angle / value restraints (Rietveld, single-histogram) | ✅ |
 | Capillary (cylindrical) absorption, µR computed from composition — unbiases Biso, cannot change Rwp | ✅ |
+| Surface roughness (Suortti 1972 / Pitschke 1993), Bragg-Brentano, with identifiability fences | ✅ |
+| Secondary extinction (Sabine polycrystalline blend) | ✅ |
 | Fundamental Parameters Approach, neutron/TOF, texture | v2 |
 
 Milestones are tracked in [docs/ROADMAP.md](docs/ROADMAP.md), which indexes
 per-task work packages ([docs/wp/](docs/wp/)), the design rationale
 ([docs/DESIGN.md](docs/DESIGN.md)), and the measured acceptance records of
 shipped milestones ([docs/milestones/](docs/milestones/)).
+
+**Driving this from an agent?** Read
+[docs/AGENT_PROTOCOL.md](docs/AGENT_PROTOCOL.md) first — the turn-on order, the
+degeneracies to memorise, how to read the abstentions, what every diagnostic
+code forbids you from reporting, and ten measured findings that change how an
+automated operator should behave (starting with: a correction that provably
+cannot improve Rwp can still be the one you need).
 
 ### Validation
 
@@ -114,8 +127,8 @@ than tuned away — see [docs/milestones/v0.2.md](docs/milestones/v0.2.md).
 The FitReport's confidence numbers are calibrated by **synthetic misfit
 injection**: perturb exactly one known cause, assert the report recovers it,
 ranks it first, and reports *low* confidence when causes are deliberately
-made collinear. Run `pytest` (~8 min, includes all of the above; `pytest -m
-"not slow"` is ~2 min), `python examples/nac_11bm.py` (synchrotron walkthrough) or
+made collinear. Run `pytest` (~14 min, includes all of the above; `pytest -m
+"not slow"` is ~2.5 min), `python examples/nac_11bm.py` (synchrotron walkthrough) or
 `python examples/srm660c_lab.py` (lab walkthrough: diagnostics → refinement →
 all three FitReport layers → plots + interactive HTML).
 
@@ -221,6 +234,33 @@ ref.fit(data, events=LiveSession("live/"))   # rewrites live/fit.html per stage
 pxrdref watch live/     # stdlib http.server: auto-refreshing plot + event console
 ```
 
+### Comparing settings — "does this correction actually help?"
+
+```sh
+pxrdref compare --open    # pick a standard, tick variants, read the Δχ² panel
+```
+
+A browser UI (same stdlib-http, offline-plotly architecture as `watch`) that
+refines a bundled standard under several settings and draws the comparison the
+eye cannot do from two Rietveld panels: **cumulative Δχ² against a reference
+variant**, where a falling curve is a variant winning and the *slope* says at
+which angles it won. That distinction matters, because some corrections here
+provably cannot move Rwp at all and others improve it by absorbing physics that
+belongs elsewhere — so the statistics table and the structured diagnostics sit
+beside the plots rather than under them.
+
+The registry is a plain API too:
+
+```python
+from pxrdref.viz import compare
+base = compare.run("zincite", "baseline")
+disp = compare.run("zincite", "dispersion")   # Rwp barely moves; B(O) 0.02 → 0.43 Å²
+```
+
+Its standards *are* the acceptance suites' protocols — asserted field by field
+in `tests/test_compare_ui.py`, so a comparison run here is comparable with the
+recorded acceptance numbers.
+
 Everything is JSON-serialisable end to end:
 `structure.model_dump_json()` / `Structure.model_validate_json(...)`, and the
 same for instruments, results, reports, and history nodes. (Staged plans are
@@ -260,8 +300,8 @@ reproducible script. Pass `history=False` for a zero-overhead plain fit.
 
 ```sh
 uv venv --python 3.12 && uv pip install -e ".[dev]"
-pytest              # 801 tests incl. seven real-data acceptance suites (~12 min)
-pytest -m "not slow"    # 744 unit/property tests only (~2 min)
+pytest              # 852 tests incl. seven real-data acceptance suites (~14 min)
+pytest -m "not slow"    # 791 unit/property tests only (~2.5 min)
 ruff check src tests examples
 ```
 
