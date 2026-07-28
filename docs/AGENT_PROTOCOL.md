@@ -378,13 +378,16 @@ error is much larger than the capillary case and has the opposite sign:
 out of material exactly where the beam penetrates deepest, and the missing
 high-angle intensity reads as thermal motion.
 
-Three consequences for an agent:
+Four consequences for an agent:
 
 * Declare `Geometry.mu_t` (or `thickness_mm`, and let it be estimated) whenever
   the specimen is a thin mount. Silence means thick.
 * The "off" value is **µt = ∞, not 0** — the reverse of every other correction
   here. `mu_t = 0` is a specimen of no thickness and is refused for reflection
-  geometry rather than being taken as "no correction".
+  geometry rather than being taken as "no correction". Under
+  `flat_plate_transmission` it is the other way round: silence means a
+  transparent plate, and the sec θ footprint factor applies regardless, because
+  it belongs to the tilt rather than to the absorption.
 * **The reported ΔBiso is a lower bound here, not the answer.** For the
   capillary it is exact (seven decimals on real data); for a flat plate the
   bias a fit actually absorbs runs 1.06–1.5× larger, tracking

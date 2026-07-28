@@ -353,6 +353,21 @@ catches a factor applied in one assembly and not the other three).
     factor of 1.5 here. Anything that reports a "bias" by projecting onto a
     parameter subspace inherits this, and the honest fix was to say so and pin
     the relationship rather than to widen a tolerance.
+  - **The two flat geometries disagree about what silence means**, which is why
+    neither can use a sentinel. Under *reflection* an undeclared thickness means
+    infinitely thick (the correction is the identity); under *transmission* it
+    means a transparent plate, because the sec θ footprint belongs to the tilt
+    and not to the absorption — so that geometry applies its factor
+    unconditionally and always emits a record. This was caught by re-reading a
+    docstring against the code: the preset promised the behaviour and named a
+    diagnostic that did not exist, and the docstring turned out to have the
+    physics right.
+  - **A fence gated on the wrong quantity fires always.** The
+    `ABSORPTION_THICKNESS_MATTERS` threshold was first put on the identifiable
+    fraction, which is 3–47 % for *every* flat-plate µt including the inert
+    µt ≥ 2 — WP-0502's "guard that always fires" all over again. It is gated on
+    |ΔBiso| > 0.05 Å² instead, and a test pins that gating on the residue would
+    have inverted the message.
   - **A missing thickness must not be spelled `0.0`.** The reflection case's
     identity is µt = ∞, so the usual "0 means off" convention would multiply
     every intensity by zero. This is enforced in three places (schema refusal,
