@@ -244,7 +244,7 @@ mixture, so a drifting cell would be the chain imprinting a trend), and the
 chained fractions sit within 1 wt % of the independent ones everywhere.
 
 ```sh
-.venv/bin/python -m pytest tests/test_sequential.py -q             # 24 tests
+.venv/bin/python -m pytest tests/test_sequential.py -q             # 25 tests
 .venv/bin/python -m pytest tests/test_acceptance_sequential.py -q  # 13, slow
 .venv/bin/python -m ruff check src tests examples
 ```
@@ -261,9 +261,10 @@ chained fractions sit within 1 wt % of the independent ones everywhere.
 
 ## Handover log
 
-- **2026-07-28 (ship)** — **done**, all checklist items landed, 889 tests green
-  (809 fast in 2.8 min), ruff clean. Three commits: WP expansion, the core
-  module + 24 unit tests, the real-data acceptance + the two defaults it moved.
+- **2026-07-28 (ship)** — **done**, all checklist items landed, 890 tests green
+  (810 fast in 2.8 min), ruff clean. Five commits: WP expansion, the core module
+  + unit tests, the real-data acceptance + the two defaults it moved, the docs
+  and forward notes, and a self-review fix (below).
 
   *Two defaults were set by measurement, not by design.* `refit="single"` is
   the default because the collapsed refit is 1.8× cheaper than re-walking the
@@ -283,6 +284,16 @@ chained fractions sit within 1 wt % of the independent ones everywhere.
   magnitude, never below 1e-9 absolute) is the fix; `test_sequential.py` pins
   both cases. Any future statistic shaped as "is this change large relative to
   that change" wants the same floor.
+
+  *Found in self-review, after the acceptance.* `direction="both"` ran its
+  verification chain through the same per-pattern history targets as the
+  reported one, so with a history directory both passes appended to
+  `<label>.jsonl` — and since `RefinementTree.load` takes the last header it
+  sees, a reloaded tree would silently mix two chains' nodes under one header.
+  The backward pass now writes `<label>.backward.jsonl`. The general shape:
+  anything that runs the chain a *second* time for verification has to be
+  checked for side effects on the first run's artefacts, and history is
+  append-only precisely so that a collision is silent rather than an error.
 
   *Not built, deliberately.* Parametric refinement (Stinton & Evans 2007) stays
   a non-goal — it is one joint residual with a shared trajectory model, i.e.

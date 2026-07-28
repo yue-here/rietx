@@ -80,7 +80,7 @@ which 0501 split out and which needs a capillary dataset the repo does not have.
 Both are stubs — expand one before writing code.
 
 **[0505](wp/0505-sequential-refinement.md) (sequential series) landed
-2026-07-28** (889 tests green). `SequentialRefinement` / `refine_sequential`
+2026-07-28** (890 tests green). `SequentialRefinement` / `refine_sequential`
 chains N refinements over an ordered series, each warm-started from its
 predecessor, and returns a `SeriesResult` of per-pattern summaries plus
 parameter *trajectories* — state, not curves, the same rule the history nodes
