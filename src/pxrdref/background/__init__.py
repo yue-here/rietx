@@ -1,5 +1,10 @@
 from .auto import auto_background
-from .diagnostics import ContaminationFlag, PatternDiagnostics, diagnose
+from .diagnostics import (
+    ContaminationFlag,
+    PatternDiagnostics,
+    diagnose,
+    identify_anode,
+)
 from .estimators import arpls, auto_lambda, snip, whittaker_solve
 from .models import (
     bspline_design_matrix,
@@ -26,6 +31,7 @@ __all__ = [
     "chebyshev_background",
     "chebyshev_design_matrix",
     "diagnose",
+    "identify_anode",
     "interpolate_fixed",
     "peak_mask",
     "second_difference_matrix",

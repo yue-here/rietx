@@ -82,23 +82,79 @@ def test_diagnostics_detect_air_scatter_and_hump():
     assert hump.amorphous_hump_score > 10 * air.amorphous_hump_score
 
 
+def _dope_ghost(data, lam_parent, lam_ghost, *, height=0.12):
+    """Add a ghost of the strongest peak at a second wavelength's position."""
+    from scipy.signal import find_peaks
+
+    tt = np.asarray(data.two_theta)
+    y = np.asarray(data.intensity, dtype=float)
+    idx, _ = find_peaks(y, height=np.percentile(y, 99.5), distance=20)
+    parent = tt[idx[np.argmax(y[idx])]]
+    s = np.sin(np.radians(parent / 2.0)) * lam_ghost / lam_parent
+    ghost = 2.0 * np.degrees(np.arcsin(s))
+    y = y + height * y.max() * np.exp(-0.5 * ((tt - ghost) / 0.05) ** 2)
+    return pr.PatternData(two_theta=tt.tolist(), intensity=y.tolist()), ghost
+
+
 def test_diagnostics_flag_kbeta_ghost():
     """Inject a Kβ ghost of the strongest LaB6 line and check it is flagged."""
     data = _peaky_pattern(background=_flat_bkg)
-    tt = np.asarray(data.two_theta)
-    y = np.asarray(data.intensity, dtype=float)
-    # strongest observed peak → its Kβ position (same d, shorter λ)
-    from scipy.signal import find_peaks
-    idx, _ = find_peaks(y, height=np.percentile(y, 99.5), distance=20)
-    parent = tt[idx[np.argmax(y[idx])]]
-    s = np.sin(np.radians(parent / 2.0)) * 1.3922340 / WAVELENGTH
-    ghost = 2.0 * np.degrees(np.arcsin(s))
-    y = y + 0.12 * y.max() * np.exp(-0.5 * ((tt - ghost) / 0.05) ** 2)
-    doped = pr.PatternData(two_theta=tt.tolist(), intensity=y.tolist())
+    doped, ghost = _dope_ghost(data, WAVELENGTH, 1.3922340)
 
     flags = diagnose(doped, wavelength=WAVELENGTH).contamination
     kb = [f for f in flags if f.kind == "kbeta" and abs(f.two_theta - ghost) < 0.2]
     assert kb, f"Kβ ghost at {ghost:.2f}° not flagged; got {flags}"
+
+
+@pytest.mark.parametrize("anode", ["CrKa", "FeKa", "CoKa", "CuKa", "MoKa", "AgKa"])
+def test_kbeta_check_follows_the_anode(anode):
+    """The ghost sits at the *anode's* Kβ, so the check has to be per anode.
+
+    Before WP-0507 this returned [] for anything but Cu — an empty list that
+    reads as "clean".
+    """
+    from pxrdref.background.diagnostics import _KBETA
+
+    ins = pr.Instrument.bragg_brentano(radiation=anode)
+    lam = ins.source.lines[0].wavelength
+    data = _peaky_pattern(background=_flat_bkg, instrument=ins, lo=5.0, hi=125.0)
+    doped, ghost = _dope_ghost(data, lam, _KBETA[anode])
+
+    flags = diagnose(doped, wavelength=lam).contamination
+    kb = [f for f in flags if f.kind == "kbeta" and abs(f.two_theta - ghost) < 0.2]
+    assert kb, f"{anode} Kβ ghost at {ghost:.2f}° not flagged; got {flags}"
+    # and the *wrong* anode's Kβ is not what was matched
+    other = _KBETA["CuKa" if anode != "CuKa" else "CoKa"]
+    assert abs(ghost - 2.0 * np.degrees(np.arcsin(
+        np.sin(np.radians(kb[0].parent_two_theta / 2.0)) * other / lam))) > 0.5
+
+
+def test_tungsten_contamination_is_checked_off_cu():
+    """W Lα1 comes off the filament, not the target, so it is anode-independent
+    — unlike Kβ, which is why the two are looked up differently."""
+    from pxrdref.background.diagnostics import _W_LA1
+
+    ins = pr.Instrument.bragg_brentano(radiation="CoKa")
+    lam = ins.source.lines[0].wavelength
+    data = _peaky_pattern(background=_flat_bkg, instrument=ins, lo=25.0, hi=125.0)
+    doped, ghost = _dope_ghost(data, lam, _W_LA1, height=0.05)
+
+    flags = diagnose(doped, wavelength=lam).contamination
+    w = [f for f in flags if f.kind == "tungsten_la" and abs(f.two_theta - ghost) < 0.2]
+    assert w, f"W Lα1 ghost at {ghost:.2f}° not flagged; got {flags}"
+
+
+def test_unknown_wavelength_is_not_checked_rather_than_clean():
+    from pxrdref.background import identify_anode
+
+    assert identify_anode(1.5405929) == "CuKa"
+    assert identify_anode(1.788996) == "CoKa"
+    assert identify_anode(0.4139090) is None      # 11-BM: no characteristic Kβ
+    assert identify_anode(1.6) is None            # between Co and Fe, unclaimed
+
+    data = _peaky_pattern(background=_flat_bkg)
+    doped, _ = _dope_ghost(data, WAVELENGTH, 1.3922340)
+    assert diagnose(doped, wavelength=0.4139090).contamination == []
 
 
 # ----------------------------------------------------------------------

@@ -21,12 +21,32 @@ from ..schemas.common import Base
 from ..schemas.pattern import PatternData
 from .models import chebyshev_design_matrix
 
-#: Kβ1,3 / W Lα1 wavelengths (Å) for contamination checks, per anode Kα1.
-#: Cu Kβ: Hölzer et al. (1997), Phys. Rev. A 56, 4554; W Lα1: Bearden (1967),
-#: Rev. Mod. Phys. 39, 78 — tungsten sublimes onto an aging Cu anode.
-_CU_KA1 = 1.5405929
-_CU_KB = 1.3922340
+#: Kβ1,3 wavelengths (Å) per anode, for contamination checks only — Kβ is never
+#: a modelled emission line (see ``schemas.instrument._RADIATIONS``).  Same
+#: source and column as the Kα table it is keyed against: the NIST X-ray
+#: Transition Energies Database (SRD 128) direct-experimental KM3.  For the 3d
+#: metals that column reports the KM2,3 *blend*, which is what a check wants;
+#: for Mo and Ag it resolves Kβ1 (KM3) from Kβ3 (KM2, half the weight), and we
+#: take Kβ1 — the 3e-4 relative gap between them is ~0.01° 2θ, an order inside
+#: the matching window below.
+_KBETA: dict[str, float] = {
+    "CrKa": 2.0848810,
+    "FeKa": 1.7566040,
+    "CoKa": 1.6208260,
+    "CuKa": 1.3922340,
+    "MoKa": 0.632303,
+    "AgKa": 0.4970817,
+}
+
+#: W Lα1 (Bearden 1967, Rev. Mod. Phys. 39, 78).  Tungsten reaches the target
+#: by subliming off the *filament*, so unlike Kβ this line is a property of the
+#: tube's age rather than of the anode material, and is checked for every anode.
 _W_LA1 = 1.4763800
+
+#: How close the pattern's wavelength must be to an anode's Kα1 to be treated
+#: as that anode.  The closest pair in the table is Fe/Co, 0.147 Å apart, so
+#: this is unambiguous by two orders.
+_ANODE_MATCH_TOL = 0.01
 
 
 class ContaminationFlag(Base):
@@ -55,7 +75,10 @@ class PatternDiagnostics(Base):
       cubic **and** the 1/x term, relative to the median level: what is left
       is genuinely broad non-polynomial structure (amorphous content,
       capillary glass).  ≳0.05 calls for a more flexible background.
-    * ``contamination`` — Kβ / W Lα ghost candidates (needs ``wavelength``).
+    * ``contamination`` — Kβ / W Lα ghost candidates.  Needs ``wavelength``,
+      and an *empty list means nothing was flagged or nothing was checked*:
+      the Kβ position is anode-specific, so a wavelength that matches no
+      tabulated Kα1 (:func:`identify_anode`) is silently skipped.
     * ``baseline_lambda`` — the arPLS stiffness the whiteness rule selects
       for this pattern (:func:`pxrdref.background.select_arpls_lambda`).
     """
@@ -152,6 +175,21 @@ def diagnose(data: PatternData, *, wavelength: float | None = None,
     )
 
 
+def identify_anode(wavelength: float) -> str | None:
+    """The anode whose Kα1 this wavelength is, or ``None``.
+
+    ``None`` means "not a tabulated characteristic wavelength" — synchrotron,
+    an anode we do not carry, or a Kα2-referenced pattern.  Callers must treat
+    it as *not checked*, never as *clean*.
+    """
+    from ..schemas.instrument import _KA_DOUBLETS
+
+    for name, (ka1, _) in _KA_DOUBLETS.items():
+        if abs(wavelength - ka1) <= _ANODE_MATCH_TOL:
+            return name
+    return None
+
+
 def _contamination_flags(tt: np.ndarray, net: np.ndarray, sigma: np.ndarray,
                          peak_idx: np.ndarray, wavelength: float,
                          *, tol_deg: float = 0.15) -> list[ContaminationFlag]:
@@ -160,16 +198,22 @@ def _contamination_flags(tt: np.ndarray, net: np.ndarray, sigma: np.ndarray,
     Same d-spacing, different λ:  sinθ_ghost = sinθ_parent · λ_ghost/λ_parent.
     A candidate must be a *weaker* detected peak near the predicted position
     (height ratio < 0.6 — Kβ is ≤ ~0.2 of Kα even unfiltered; W Lα weaker
-    still); only checked for Cu-anode wavelengths where the line positions
-    are tabulated.
+    still).
+
+    Which ghosts are looked for follows the anode: Kβ is anode-specific, W Lα1
+    is filament-derived and so applies to any of them.  An unrecognised
+    wavelength yields no flags, which is a *silence*, not a clean bill — the
+    caller sees the same empty list either way, and that asymmetry is why
+    every anode this package can build a source for has a Kβ entry.
     """
-    if abs(wavelength - _CU_KA1) > 0.01:
+    anode = identify_anode(wavelength)
+    if anode is None:
         return []
     heights = net[peak_idx]
     order = np.argsort(heights)[::-1]
     strongest = peak_idx[order[:8]]
     flags: list[ContaminationFlag] = []
-    for kind, lam_ghost in (("kbeta", _CU_KB), ("tungsten_la", _W_LA1)):
+    for kind, lam_ghost in (("kbeta", _KBETA[anode]), ("tungsten_la", _W_LA1)):
         ratio = lam_ghost / wavelength
         for ip in strongest:
             s = np.sin(np.radians(tt[ip] / 2.0)) * ratio
