@@ -518,11 +518,18 @@ class Instrument(Base):
                        ka2_ratio: float = 0.5) -> "Instrument":
         """Lab flat-plate diffractometer preset with a Kα1/Kα2 doublet.
 
+        ``radiation`` names an anode in :data:`_RADIATIONS` — ``"CrKa"``,
+        ``"FeKa"``, ``"CoKa"``, ``"CuKa"``, ``"MoKa"``, ``"AgKa"``, or the
+        ``…Ka1`` variant of any of them for an incident-side-monochromated beam
+        with Kα2 removed (``ka2_ratio`` then has no line to act on).
+
         Each emission line diffracts at its own Bragg angle, so the doublet
         splitting *grows with tanθ* (differentiate Bragg's law:
         Δ2θ = 2·tanθ·Δλ/λ) — never a fixed 2θ offset.  ``ka2_ratio`` seeds the
-        refinable Kα2/Kα1 intensity ratio (0.5 for the bare Cu spectrum; a
-        diffracted-beam monochromator passband typically clips it a little).
+        refinable Kα2/Kα1 intensity ratio.  0.5 is the 2j+1 degeneracy ratio
+        (4:2) and is the right seed for every anode; measured integrated ratios
+        run a few percent above it and rise slowly with Z, and a
+        diffracted-beam monochromator passband typically clips it a little.
 
         ``monochromator_two_theta``: 2θ_m of a diffracted-beam (post-sample)
         crystal monochromator, e.g. ≈26.6° for pyrolytic graphite (002) with
@@ -530,6 +537,11 @@ class Instrument(Base):
         (1 + cos²2θ_m·cos²2θ)/(1 + cos²2θ_m), i.e. our K-convention with
         K = 1/(1 + cos²2θ_m)  (International Tables C, §6.2; Azároff, 1955).
         ``None`` → unpolarized beam, K = 0.5.
+
+        That 26.6° is a *Cu* number, not a property of the crystal: 2θ_m =
+        2·asin(λ/2d) with d₍₀₀₂₎ ≈ 3.354 Å, so the same graphite sits at ≈12.1°
+        at Mo Kα, where K = 0.511 rather than 0.500.  Off Cu, compute it for
+        the anode in use rather than copying the example.
         """
         try:
             lines = _RADIATIONS[radiation]
@@ -557,11 +569,53 @@ class Instrument(Base):
         )
 
 
-#: Kα1/Kα2 peak wavelengths (Å).  Cu: Hölzer, Fritsch, Deutsch, Härtwig &
-#: Förster (1997), Phys. Rev. A 56, 4554, on the scale used by the NIST
-#: SRM 660c certificate (Kα1 = 1.5405929 Å); Kα2 is the Hölzer peak value.
-#: Other anodes (Co, Mo, …) will be added once their values are transcribed
-#: and checked against Deslattes et al. (2003), Rev. Mod. Phys. 75, 35.
+#: Kα1/Kα2 **peak** wavelengths (Å) — not the centroid Kᾱ, which is what the
+#: doublet model would double-count.
+#:
+#: Every value is the *direct experimental* wavelength of the KL3 (Kα1) and
+#: KL2 (Kα2) transition in the NIST X-ray Transition Energies Database
+#: (SRD 128, https://physics.nist.gov/PhysRefData/XrayTrans/), whose evaluation
+#: is Deslattes, Kessler, Indelicato, de Billy, Lindroth & Anton (2003),
+#: Rev. Mod. Phys. 75, 35.  Reproduce any row with
+#:
+#:     curl "https://physics.nist.gov/cgi-bin/XrayTrans/search.pl?\
+#: download=tab&element=Mo&trans=KL2&trans=KL3&lower=&upper=&units=A"
+#:
+#: **One column of one evaluation for all anodes** is the load-bearing part,
+#: not the individual digits: mixing wavelength scales is the classic ~100 ppm
+#: cell error.  Within that column the anodes trace to two measurements —
+#: ref 7d = Hölzer, Fritsch, Deutsch, Härtwig & Förster (1997), Phys. Rev. A
+#: 56, 4554 for the 3d metals, ref 5d = Deslattes & Kessler, in *Atomic
+#: Inner-Shell Physics* (Plenum, 1985), 181 for Mo/Ag — so "same column" is
+#: the claim, not "same paper".  What makes it checkable: the Cu pair below is
+#: byte-for-byte the Hölzer peak values this package has shipped since v0.2,
+#: on the scale of the NIST SRM 660c certificate.  It is unchanged here, and
+#: `test_lab_instrument` asserts that, because it is what pins the rest.
+#:
+#: Bearden (1967), Rev. Mod. Phys. 39, 78 — the values most textbooks quote —
+#: is a *different* scale (Mo Kα2 0.713590 vs 0.713607 here, 24 ppm; Ag Kα1
+#: 0.5594075 vs 0.55942178, 26 ppm).  Do not "correct" a row toward it.
+#:
+#: Kβ is deliberately absent: it is filtered or monochromated away in
+#: essentially every lab setup, and one |F|² cannot serve it and Kα together
+#: (``dispersion.LINE_DISPERSION_TOL``).  The Kβ wavelengths used for the
+#: contamination check live in ``pxrdref.background.diagnostics``.
+_KA_DOUBLETS: dict[str, tuple[float, float]] = {
+    "CrKa": (2.2897260, 2.2936510),    # ref 7d
+    "FeKa": (1.9360410, 1.9399730),    # ref 7d
+    "CoKa": (1.7889960, 1.7928350),    # ref 7d
+    "CuKa": (1.5405929, 1.5444274),    # ref 7d — 1.54059290 / 1.54442740
+    "MoKa": (0.70931715, 0.713607),    # ref 5d
+    "AgKa": (0.55942178, 0.5638131),   # ref 5d
+}
+
+#: The doublets, plus a Kα1-only entry per anode (``"CuKa1"``, ``"MoKa1"``, …)
+#: for beams monochromated on the incident side — a Ge(111) or Johansson
+#: crystal removes Kα2, and that is a flat-plate geometry the single-wavelength
+#: :meth:`Instrument.debye_scherrer` preset cannot express.  Derived from the
+#: same tuples so there is one source of truth per wavelength.  ``ka2_ratio``
+#: has no line to act on for those entries and is ignored.
 _RADIATIONS: dict[str, tuple[float, ...]] = {
-    "CuKa": (1.5405929, 1.5444274),
+    **_KA_DOUBLETS,
+    **{f"{name}1": (lines[0],) for name, lines in _KA_DOUBLETS.items()},
 }

@@ -5,6 +5,7 @@ Fast unit/property tests; the SRM 660c real-data acceptance lives in
 """
 
 import numpy as np
+import pytest
 
 import pxrdref as pr
 from pxrdref.model.corrections import displacement_shift_deg, transparency_shift_deg
@@ -102,6 +103,123 @@ def test_line0_weight_always_fixed():
     hits = table.set_vary(["instrument.source.lines.*.weight"], True)
     assert "instrument.source.lines.0.weight" not in hits
     assert "instrument.source.lines.1.weight" in hits
+
+
+# ---------------------------------------------------------------------------
+# the anode table (WP-0507)
+# ---------------------------------------------------------------------------
+
+#: Transcribed a second time, by hand, from the NIST X-ray Transition Energies
+#: Database (SRD 128) "direct experimental" column — KL3 = Kα1, KL2 = Kα2 —
+#: which is the Deslattes et al. (2003) evaluation.  Duplicating the table is
+#: the point: a test that imported ``_RADIATIONS`` would assert nothing about
+#: the transcription, only that a dict is a dict.
+NIST_XRTE_DIRECT = {
+    "CrKa": (2.2897260, 2.2936510),
+    "FeKa": (1.9360410, 1.9399730),
+    "CoKa": (1.7889960, 1.7928350),
+    "CuKa": (1.5405929, 1.5444274),
+    "MoKa": (0.70931715, 0.713607),
+    "AgKa": (0.55942178, 0.5638131),
+}
+
+
+def test_every_anode_matches_its_cited_source():
+    for name, (ka1, ka2) in NIST_XRTE_DIRECT.items():
+        ins = pr.Instrument.bragg_brentano(radiation=name)
+        got = [line.wavelength for line in ins.source.lines]
+        assert got == [ka1, ka2], name
+
+
+def test_cu_pair_is_unchanged_by_the_anode_extension():
+    """The scale anchor.
+
+    Every other anode is trusted because it comes from the *same column* of the
+    same evaluation as Cu, and the Cu pair in that column is byte-for-byte the
+    Hölzer (1997) peak values this package has shipped since v0.2 (the scale of
+    the NIST SRM 660c certificate, which the acceptance suite refines against).
+    If this fails, the table was re-sourced and every cell in ``tests/data``
+    moved with it.
+    """
+    ins = pr.Instrument.bragg_brentano()
+    assert [line.wavelength for line in ins.source.lines] == [CU_KA1, CU_KA2]
+    # ...and specifically *not* Bearden (1967), the other scale in circulation
+    assert ins.source.lines[0].wavelength != 1.540562
+
+
+def test_doublet_splitting_grows_with_atomic_number():
+    """Δλ/λ is the 2p spin-orbit splitting, which grows steeply with Z.
+
+    A property no single value can check: it catches a row transcribed into the
+    wrong anode, or a Kα1/Kα2 pair swapped, in a way per-value equality cannot
+    (both would still be "some number near the right wavelength").
+    """
+    order = ["CrKa", "FeKa", "CoKa", "CuKa", "MoKa", "AgKa"]  # ascending Z
+    rel = []
+    for name in order:
+        ka1, ka2 = NIST_XRTE_DIRECT[name]
+        assert ka1 < ka2, f"{name}: Kα1 (KL3) is the higher-energy line"
+        rel.append((ka2 - ka1) / ka1)
+    assert rel == sorted(rel)
+    assert rel[0] == pytest.approx(1.71e-3, rel=0.01)   # Cr
+    assert rel[-1] == pytest.approx(7.85e-3, rel=0.01)  # Ag
+
+
+def test_ka1_only_variants_are_derived_from_the_doublets():
+    for name, (ka1, _) in NIST_XRTE_DIRECT.items():
+        ins = pr.Instrument.bragg_brentano(radiation=f"{name}1")
+        assert [line.wavelength for line in ins.source.lines] == [ka1]
+        # the single line is line 0, hence structurally locked at weight 1
+        assert ins.source.lines[0].weight.value == 1.0
+
+
+def test_unknown_anode_lists_what_is_available():
+    with pytest.raises(ValueError, match="unknown radiation 'NiKa'"):
+        pr.Instrument.bragg_brentano(radiation="NiKa")
+    with pytest.raises(ValueError, match="MoKa"):
+        pr.Instrument.bragg_brentano(radiation="NiKa")
+
+
+def test_doublet_defaults_hold_off_cu():
+    """``ka2_ratio`` and the polarization default are anode-independent; the
+    monochromator angle is not."""
+    ins = pr.Instrument.bragg_brentano(radiation="MoKa", ka2_ratio=0.5)
+    assert ins.source.lines[1].weight.value == 0.5   # 2j+1 degeneracy, any Z
+    assert ins.source.polarization.value == 0.5      # unpolarized, no mono
+
+    # graphite (002), d = 3.354 A: 2θ_m is a function of the anode, so the
+    # 26.6° in the docstring is a *Cu* number and K moves with it
+    for radiation, d in (("CuKa", 3.354), ("MoKa", 3.354)):
+        lam = NIST_XRTE_DIRECT[radiation][0]
+        tt_m = 2.0 * np.degrees(np.arcsin(lam / (2.0 * d)))
+        ins = pr.Instrument.bragg_brentano(radiation=radiation,
+                                           monochromator_two_theta=tt_m)
+        k = 1.0 / (1.0 + np.cos(np.radians(tt_m)) ** 2)
+        assert ins.source.polarization.value == pytest.approx(k)
+    assert tt_m == pytest.approx(12.14, abs=0.02)     # Mo, vs 26.55 for Cu
+    assert k == pytest.approx(0.511, abs=5e-4)
+
+
+def test_off_cu_instrument_round_trips_through_json():
+    ins = pr.Instrument.bragg_brentano(radiation="AgKa", goniometer_radius_mm=240.0)
+    back = pr.Instrument.model_validate_json(ins.model_dump_json())
+    assert [line.wavelength for line in back.source.lines] == \
+        list(NIST_XRTE_DIRECT["AgKa"])
+    assert back.geometry.goniometer_radius_mm == 240.0
+
+
+def test_peaks_move_to_the_anode_wavelength():
+    """The forward model uses the table, not a cached Cu number: the same phase
+    on Mo Kα puts its first peak where Bragg's law says."""
+    structure = pr.Structure(phases=[_lab6_phase()])
+    ins = pr.Instrument.bragg_brentano(radiation="MoKa")
+    ins.profile.w.value = 2e-3
+    model, values = _compiled(instrument=ins, pattern=_flat_pattern(5.0, 60.0),
+                              structure=structure)
+    pos = model.phase_peaks(0, values)[0][0]
+    lam = NIST_XRTE_DIRECT["MoKa"][0]
+    expected = 2.0 * np.degrees(np.arcsin(lam / (2.0 * 4.1568)))  # LaB6 (100)
+    assert pos[0] == pytest.approx(expected, abs=1e-6)
 
 
 # ---------------------------------------------------------------------------
