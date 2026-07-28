@@ -88,6 +88,41 @@ def test_covariance_correlation_is_unit_diagonal_and_esd_carries_bl():
     assert np.allclose(esd, np.sqrt(np.diag(cov)) * bl)
 
 
+def test_correlation_stays_a_valid_pearson_matrix_under_extreme_conditioning():
+    """A badly conditioned JᵀJ must not produce |ρ| > 1.
+
+    JᵀJ is PSD, so its Moore-Penrose inverse is PSD and every |ρ| ≤ 1 —
+    mathematically.  ``np.linalg.pinv`` *without* ``hermitian=True`` takes the
+    general SVD path, which on cond ≈ 10²⁰ normal matrices returns a
+    non-symmetric, non-PSD result; WP-0502 saw ρ = +2.75 for
+    ``scale ~ axial_sl`` on the fluorite fit and logged it as an unfixed bug
+    undermining the 0.98 correlation guard.  The columns below reproduce that
+    regime deterministically: six columns spanning twelve decades of scale with
+    three exact linear dependencies among them.
+    """
+    rng = np.random.default_rng(11)
+    n = 400
+    base = rng.standard_normal((n, 3))
+    scales = 10.0 ** np.linspace(-6.0, 6.0, 6)
+    jac = np.column_stack([
+        base[:, 0],
+        base[:, 0] * (1.0 + 1e-11 * rng.standard_normal(n)),  # near-duplicate
+        base[:, 1],
+        base[:, 1] + base[:, 2],                              # exact dependency
+        base[:, 2],
+        base[:, 0] + base[:, 1],                              # exact dependency
+    ]) * scales
+    resid = 1e-2 * rng.standard_normal(n)
+
+    esd, corr = covariance_estimates(jac, resid, 6, n_data=n)
+    assert np.all(np.abs(corr) <= 1.0)
+    assert np.allclose(np.diag(corr), 1.0)
+    assert np.allclose(corr, corr.T)
+    assert np.all(np.isfinite(esd)) and np.all(esd >= 0.0)
+    # the near-duplicate pair is the degeneracy the guard exists to catch
+    assert abs(corr[0, 1]) > 0.98
+
+
 def test_collinear_zero_displacement_trips_the_correlation_guard():
     """Zero-shift and Bragg-Brentano sample displacement both shift the peaks,
     so freeing them together is a textbook degeneracy (ρ ≈ 1).  On the true

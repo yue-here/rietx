@@ -605,6 +605,22 @@ def covariance_estimates(jac: np.ndarray, fun: np.ndarray, n_free: int,
     precision can never take.  ``to_host_fp64`` is that boundary — a Jacobian
     whose columns were computed at fp32 is upcast here before JᵀJ, while the
     residual is *required* to have been fp64 all along.
+
+    **The pseudo-inverse is taken on the symmetrised matrix with
+    ``hermitian=True``, and this is a correctness requirement, not a
+    micro-optimisation.**  JᵀJ is positive semi-definite, so its Moore-Penrose
+    inverse is too and every |ρ| ≤ 1 exactly.  But the *general* SVD path
+    ``pinv`` takes by default treats the matrix as unstructured, and on a
+    cond ≈ 10²⁰ normal matrix (routine here — the scale/axial/background block
+    of a real fit) it returns a visibly non-symmetric, non-PSD result: measured
+    |ρ| up to 1.6 × 10³ on synthetic ill-conditioning, and +2.75 for
+    ``scale ~ axial_sl`` on the WP-0502 fluorite fit, which is what made that WP
+    log "the correlation guard is undermined wherever conditioning is poor".
+    ``hermitian=True`` routes through ``eigh``, which cannot break the symmetry,
+    and caps the same cases at 1 + 4 ulp; the final clip removes that ulp so a
+    reported correlation is always a valid one.  Note the clip is *not* the fix —
+    clipping a 2.75 to 1.0 would report a degeneracy that the arithmetic, not
+    the data, invented.
     """
     from .statistics import berar_lelann_factor
 
@@ -612,8 +628,9 @@ def covariance_estimates(jac: np.ndarray, fun: np.ndarray, n_free: int,
     require_fp64(data, "residual entering the covariance solve")
     jac = to_host_fp64(jac)
     JTJ = jac.T @ jac
+    JTJ = 0.5 * (JTJ + JTJ.T)  # kill the fp asymmetry before the eigensolve
     chi2_red = float(data @ data) / max(len(data) - n_free, 1)
-    cov = np.linalg.pinv(JTJ) * chi2_red
+    cov = np.linalg.pinv(JTJ, hermitian=True) * chi2_red
     # Normalise the correlation by the *raw* (un-inflated) sqrt-diagonal so it is
     # a true Pearson matrix with unit diagonal; apply Bérar-Lelann only to the
     # returned esd diagonal.  Normalising by the inflated diagonal instead (the
@@ -625,5 +642,7 @@ def covariance_estimates(jac: np.ndarray, fun: np.ndarray, n_free: int,
     denom = np.outer(sqrt, sqrt)
     with np.errstate(invalid="ignore", divide="ignore"):
         corr = np.where(denom > 0, cov / denom, 0.0)
+    corr = np.clip(corr, -1.0, 1.0)
+    np.fill_diagonal(corr, np.where(sqrt > 0.0, 1.0, 0.0))
     diag = sqrt * berar_lelann_factor(data)
     return diag, corr
