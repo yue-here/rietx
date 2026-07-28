@@ -1,8 +1,8 @@
 """The ``pxrdref`` command-line entry point.
 
-Deliberately tiny: the package is API-first, and the CLI exists for the two
-things that are genuinely terminal-shaped — watching a running refinement
-and rendering a result file.
+Deliberately tiny: the package is API-first, and the CLI exists for the few
+things that are genuinely terminal-shaped — watching a running refinement,
+rendering a result file, and launching the settings-comparison UI.
 """
 
 from __future__ import annotations
@@ -16,7 +16,10 @@ def main(argv: list[str] | None = None) -> int:
         print("usage: pxrdref <command> [...]\n\n"
               "commands:\n"
               "  watch <dir> [--port N] [--open]   live viewer for a LiveSession directory\n"
-              "  html <result.json> <out.html>     render a saved RefinementResult to HTML")
+              "  html <result.json> <out.html>     render a saved RefinementResult to HTML\n"
+              "  compare [--data DIR] [--port N] [--open]\n"
+              "                                    browser UI comparing refinement\n"
+              "                                    settings on the bundled standards")
         return 0
 
     command, rest = argv[0], argv[1:]
@@ -25,6 +28,10 @@ def main(argv: list[str] | None = None) -> int:
 
         watch_main(rest)
         return 0
+    if command == "compare":
+        from .compare_app import main as compare_main
+
+        return compare_main(rest)
     if command == "html":
         if len(rest) != 2:
             print("usage: pxrdref html <result.json> <out.html>", file=sys.stderr)
