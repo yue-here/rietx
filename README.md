@@ -301,7 +301,7 @@ reproducible script. Pass `history=False` for a zero-overhead plain fit.
 
 ```sh
 uv venv --python 3.12 && uv pip install -e ".[dev]"
-pytest              # 890 tests incl. eight real-data acceptance suites (~16 min)
+pytest              # 890 tests incl. eight real-data acceptance suites (~17 min)
 pytest -m "not slow"    # 810 unit/property tests only (~2.8 min)
 ruff check src tests examples
 ```
