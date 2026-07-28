@@ -121,13 +121,17 @@ def _labels_for(patterns: Sequence[PatternData],
 def _collapse(plan: RefinementPlan) -> RefinementPlan:
     """One stage freeing everything the plan would free, in one solve.
 
-    The ``refit="single"`` strategy: with a converged neighbour as the starting
-    point the staged turn-on order has already done its job of keeping early
-    stages well conditioned, so re-walking it per pattern is mostly overhead.
-    The seeds carry over as the maximum across the plan's stages, so the
-    protocol is the compressed plan rather than a different one —
-    ``seed_softplus`` only lifts values *below* the seed, and a carried value
-    that far down the softplus floor is indistinguishable from a cold zero.
+    The default ``refit="single"`` strategy: with a converged neighbour as the
+    starting point the staged turn-on order has already done its job of keeping
+    early stages well conditioned, so re-walking it per pattern is mostly
+    overhead.  Measured on the round-robin sample-1 series: 904 iterations
+    against 1623 for the staged refit and 2863 unchained, for the same weight
+    fractions to three decimals.
+
+    The seeds carry over as the maximum across the plan's stages, so this is
+    the compressed plan rather than a different protocol — ``seed_softplus``
+    only lifts values *below* the seed, and a carried value that far down the
+    softplus floor is indistinguishable from a cold zero.
     """
     turn_on: list[str] = []
     for stage in plan.stages:
@@ -167,11 +171,18 @@ def _carry_into(structure: Structure, instrument: Instrument,
 
     Only paths matching one of the ``carry`` globs move; everything else keeps
     the value it came in with (the *initial* model, when this is called from the
-    chain).  Warm starting is per-parameter for a measured reason: chaining the
-    instrument profile and the cell across related specimens is obviously right,
-    while chaining a phase scale across mixtures whose composition swings from
-    1 to 94 wt % starts the next fit further from its answer than a cold start
-    would.
+    chain).
+
+    The knob is a control, not a tuning parameter — and the measurement says
+    so.  It was built expecting that chaining a phase scale across mixtures
+    whose composition swings from 1 to 94 wt % would start the next fit further
+    from its answer than a cold start; on the round-robin sample-1 series that
+    is **not** what happens.  Carrying everything costs 838 iterations against
+    904 for a carry that excludes the scales and re-seeds them per pattern,
+    with identical Rwp (0.1278) and identical weight fractions.  What matters
+    is chaining at all (2863 unchained).  So: default to carrying everything,
+    and reach for a narrower glob when a parameter must provably not be chained
+    — not on the assumption that a big jump needs one.
     """
     previous = {e.path: e.value
                 for e in ParameterTable(source[0], source[1]).entries}
@@ -257,11 +268,13 @@ class SequentialRefinement:
             labels: Sequence[str] | None = None,
             mode: Mode = "rietveld",
             plan: RefinementPlan | str = "mccusker_default",
-            refit: str = "stages",
+            refit: str = "single",
             two_theta_limits: tuple[float, float] | None = None,
             direction: str = "forward",
             reseed: bool = True,
             reseed_factor: float = RESEED_FACTOR,
+            prepare: Callable[[int, PatternData, Structure, Instrument],
+                              None] | None = None,
             on_result: Callable[[int, RefinementResult], None] | None = None,
             ) -> SeriesResult:
         """Run the series.
@@ -276,9 +289,16 @@ class SequentialRefinement:
             Without one the pattern index is the axis, and ``x_label`` says so.
         plan, refit:
             ``plan`` runs on the first pattern (cold) and on any reseeded one.
-            ``refit="stages"`` (default) re-runs it on every subsequent pattern
-            from the warm state; ``refit="single"`` collapses it into one stage
-            freeing the same set — see :func:`_collapse`.
+            ``refit="single"`` (default) collapses it into one stage freeing
+            the same set for every subsequent pattern; ``refit="stages"``
+            re-walks the whole staged plan from the warm state.  Measured on
+            the eight round-robin sample-1 mixtures (WP-0505 acceptance): 904
+            iterations against 1623 staged and 2863 unchained, with the QPA
+            error identical to three decimals (RMS |ΔW| 2.26 vs 2.27 wt %).
+            The staged order exists to keep early stages well conditioned from
+            a *poor* starting model, and a converged neighbour is not one —
+            when it turns out not to be a good one either, the reseed fence
+            catches it and refits cold with the full staged plan.
         direction:
             ``"forward"``, ``"backward"`` (chain from the last pattern), or
             ``"both"``, which runs it each way and reports where the two
@@ -287,6 +307,14 @@ class SequentialRefinement:
         reseed:
             Refit a pattern cold when its warm-started fit diverged or landed
             far above the series median Rwp, and keep the better of the two.
+        prepare:
+            ``(index, data, structure, instrument) -> None``, called on the
+            warmed models just before each pattern's fit.  The hook exists for
+            what a `carry` glob cannot express: a parameter that must be
+            re-estimated *from this pattern* rather than either carried or left
+            at its initial value — a phase scale on a series of different
+            mixtures being the case that forced it.  Excluding scales from
+            `carry` alone would only fall back to the first pattern's guess.
         """
         patterns = list(patterns)
         if not patterns:
@@ -309,7 +337,7 @@ class SequentialRefinement:
             order.reverse()
         entries, results, trees, models = self._chain(
             order, patterns, names, xs, mode, base_plan, warm_plan,
-            two_theta_limits, reseed, reseed_factor, on_result)
+            two_theta_limits, reseed, reseed_factor, prepare, on_result)
 
         diagnostics = [d for e in entries for d in _reseed_diagnostics(e)]
         series = SeriesResult(
@@ -323,7 +351,8 @@ class SequentialRefinement:
         if direction == "both":
             back_entries, *_ = self._chain(
                 list(reversed(order)), patterns, names, xs, mode, base_plan,
-                warm_plan, two_theta_limits, reseed, reseed_factor, None)
+                warm_plan, two_theta_limits, reseed, reseed_factor, prepare,
+                None)
             back = SeriesResult(mode=mode, entries=back_entries, x_label=x_label,
                                 direction="backward")
             diagnostics += _path_dependence_diagnostics(series, back)
@@ -339,7 +368,7 @@ class SequentialRefinement:
 
     # ------------------------------------------------------------------
     def _chain(self, order, patterns, names, xs, mode, base_plan, warm_plan,
-               two_theta_limits, reseed, reseed_factor, on_result):
+               two_theta_limits, reseed, reseed_factor, prepare, on_result):
         """Walk ``order``, warm-starting each fit from the previous accepted one.
 
         Returns entries in **series** order regardless of the walk direction, so
@@ -361,14 +390,14 @@ class SequentialRefinement:
             ref, result = self._fit_one(
                 data, names[k], previous, previous_hkl,
                 warm_plan if warm else base_plan,
-                mode, two_theta_limits, position, previous_tag)
+                mode, two_theta_limits, position, previous_tag, prepare, k)
             entry = _entry_from_result(k, names[k], xs[k], result)
 
             if warm and reseed and _reseed_needed(result, accepted_rwp,
                                                   reseed_factor):
                 cold_ref, cold = self._fit_one(
                     data, names[k], None, [], base_plan, mode, two_theta_limits,
-                    position, previous_tag)
+                    position, previous_tag, prepare, k)
                 if _better(cold, result):
                     entry = _entry_from_result(k, names[k], xs[k], cold)
                     entry.reseeded = True
@@ -401,12 +430,15 @@ class SequentialRefinement:
                  previous: tuple[Structure, Instrument] | None,
                  previous_hkl: list[ReflectionState],
                  plan: RefinementPlan, mode: Mode, two_theta_limits,
-                 position: int, previous_tag: tuple[str | None, str | None]):
+                 position: int, previous_tag: tuple[str | None, str | None],
+                 prepare, index: int):
         """One pattern: warm the models from ``previous``, then run ``plan``."""
         structure = self.structure.model_copy(deep=True)
         instrument = self.instrument.model_copy(deep=True)
         if previous is not None:
             _carry_into(structure, instrument, previous, self.carry)
+        if prepare is not None:
+            prepare(index, data, structure, instrument)
         ref = Refinement(structure, instrument, backend=self._backend,
                          history=self._history_spec(label))
         if previous_hkl and mode in ("lebail", "pawley"):
