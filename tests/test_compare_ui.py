@@ -94,10 +94,37 @@ def test_capillary_only_variants_are_gated_by_geometry():
         if standard.geometry == "debye_scherrer":
             assert "roughness_suortti" not in offered
             assert "roughness_pitschke" not in offered
+            assert "flat_plate" not in offered
             assert "absorption" in offered
         else:
             assert "absorption" not in offered
             assert "roughness_suortti" in offered
+            assert "flat_plate" in offered
+
+
+def test_lab6_capillary_standard_matches_the_acceptance_builder():
+    """The WP-0508 capillary protocol, pinned to the suite that measures it."""
+    if not (DATA_DIR / "11BM_LaB6_660a.fxye").exists():
+        pytest.skip("11-BM SRM 660a dataset not present")
+    from tests.test_acceptance_capillary import (
+        LIMITS,
+        _instrument,
+        _plan,
+        _structure,
+    )
+
+    inputs = cmp.STANDARD_BY_KEY["lab6_capillary"].build(DATA_DIR)
+    assert _dump(inputs.structure) == _dump(_structure())
+    # the acceptance declares the capillary and lets the estimator fill µR in;
+    # the UI leaves it off in the baseline and the *variant* sets it, so compare
+    # everything except the two capillary fields
+    got, want = _dump(inputs.instrument), _dump(_instrument(capillary=True))
+    for field in ("mu_r", "capillary_radius_mm", "packing_fraction"):
+        got["geometry"][field] = want["geometry"][field] = None
+    assert got == want
+    assert inputs.two_theta_limits == LIMITS
+    assert [(s.name, list(s.turn_on)) for s in inputs.plan.stages] == \
+           [(s.name, list(s.turn_on)) for s in _plan().stages]
 
 
 def test_every_variant_is_reachable_from_some_standard():

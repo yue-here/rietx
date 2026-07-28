@@ -318,6 +318,36 @@ def _build_nac(data_dir: Path) -> StandardInputs:
                           plan=plan, two_theta_limits=(2.0, 24.0))
 
 
+def _build_lab6_capillary(data_dir: Path) -> StandardInputs:
+    """APS 11-BM SRM 660a LaB₆ — the documented-bore capillary standard.
+
+    Mirrors ``tests/test_acceptance_capillary`` field for field (the anti-drift
+    test in ``tests/test_compare_ui`` asserts it), which is what makes the
+    numbers in the UI the same numbers the acceptance asserts.
+
+    This is the standard the capillary-absorption variant exists for.  Measured
+    at µR = 0.674 over 2-60° 2θ: Rwp 0.0884883 → 0.0884884 and a moves 8e-12 Å,
+    while **both** displacement parameters move by +0.0166542 Å² — exactly
+    ΔB = c(µR)·λ²/2.  Compare that against ``nac``, where one impurity Biso sits
+    on its bound and cannot take its share, leaving a spurious 2.5e-5 in Rwp.
+    """
+    from ..io.readers import read_pattern
+
+    data = read_pattern(data_dir / "11BM_LaB6_660a.fxye")
+    structure = Structure.from_cif(str(data_dir / "cod_1000055.cif"))
+    structure.phases[0].scale = _p(1e-4, min=0.0, transform="softplus")
+    for atom in structure.phases[0].atoms:
+        atom.biso = _p(0.3, min=0.0, max=5.0)
+    ins = Instrument.debye_scherrer(wavelength=0.4131280)
+    ins.profile.w.value = 2e-5
+    ins.profile.x.value = 2e-3
+    ins.background = BackgroundChebyshev.with_terms(8)
+    plan = RefinementPlan.mccusker_default()
+    plan.stages.append(Stage("biso", ["phases.*.atoms.*.biso"]))
+    return StandardInputs(data=data, structure=structure, instrument=ins,
+                          plan=plan, two_theta_limits=(2.0, 60.0))
+
+
 STANDARDS: tuple[Standard, ...] = (
     Standard(
         key="srm660c", title="NIST SRM 660c — LaB₆ (lab CuKα)",
@@ -364,6 +394,16 @@ STANDARDS: tuple[Standard, ...] = (
                      "one where the capillary absorption variant applies."),
         files=("11BM_NAC.fxye", "cod_1000236.cif"), build=_build_nac,
         geometry="debye_scherrer"),
+    Standard(
+        key="lab6_capillary", title="APS 11-BM — NIST SRM 660a LaB₆ (capillary)",
+        description=("The only standard here whose specimen container is "
+                     "documented: 11-BM's mail-in 0.81 mm Kapton tube, giving "
+                     "µR ≈ 0.5-0.7 from the composition. λ = 0.4131280 Å was "
+                     "calibrated at the beamline against LaB₆ itself, so the "
+                     "cell is circular here and is not an anchor — the "
+                     "absorption variant's Biso shift is what this one shows."),
+        files=("11BM_LaB6_660a.fxye", "cod_1000055.cif"),
+        build=_build_lab6_capillary, geometry="debye_scherrer"),
 )
 
 STANDARD_BY_KEY = {s.key: s for s in STANDARDS}
@@ -484,14 +524,31 @@ def _extend_broadening_stage(plan: RefinementPlan, globs: list[str],
 def _with_capillary_absorption(inputs: StandardInputs) -> None:
     """µR = 0.5 for an 0.8 mm-bore capillary at typical packing.
 
-    Fixed rather than estimated so the comparison is reproducible: the 11-BM
-    deposited metadata does not carry a bore diameter, and µR is *not*
-    refinable by construction (it is an exactly singular direction alongside
-    the scale and Biso).  Expect Rwp to be **identical** to the baseline and
-    Biso to move by ΔB = c(µR)·λ²/2 — that is the whole content of the
-    correction, and the reason the results table shows Biso next to Rwp.
+    Fixed rather than estimated so the comparison is reproducible across
+    standards, and because µR is *not* refinable by construction (it is an
+    exactly singular direction alongside the scale and Biso).  Expect Rwp to be
+    **identical** to the baseline and Biso to move by ΔB = c(µR)·λ²/2 — that is
+    the whole content of the correction, and the reason the results table shows
+    Biso next to Rwp.  (The ``lab6_capillary`` standard is the one whose real
+    bore is documented — 0.81 mm — so 0.5 there is a round number near the
+    composition estimate of 0.67 rather than a stand-in for a missing one.)
     """
     inputs.instrument.geometry.mu_r = 0.5
+
+
+def _with_flat_plate_absorption(inputs: StandardInputs) -> None:
+    """µt = 0.5: a *finite-thickness* reflection specimen, ITC (2).
+
+    The one flat-plate variant whose baseline is not "off but harmless": every
+    Bragg-Brentano standard here is a thick back-packed mount, for which ITC
+    (1a) gives an exactly angle-independent A, so the baseline is the physically
+    right model and this variant deliberately mis-declares the specimen.  What
+    it demonstrates is the *size* of the mistake in the other direction — a
+    genuinely thin mount fitted as though it were thick — and that is large:
+    ΔBiso runs to −1.5 Å² at µt = 0.2 over a Cu Kα range, an order of magnitude
+    past the capillary case, and unlike the capillary it moves Rwp too.
+    """
+    inputs.instrument.geometry.mu_t = 0.5
 
 
 VARIANTS: tuple[Variant, ...] = (
@@ -547,6 +604,13 @@ VARIANTS: tuple[Variant, ...] = (
             "{scale, Biso}, so **Rwp cannot change** — if it does, something is "
             "wrong. The whole effect is the Biso column of the results table.",
             _with_capillary_absorption, geometries=("debye_scherrer",)),
+    Variant("flat_plate", "+ finite specimen thickness (µt = 0.5)",
+            "ITC (2) flat-plate absorption — declares a thin layer where the "
+            "baseline assumes an infinitely thick mount. Unlike the capillary "
+            "case it is *not* an exact reparameterisation, so Rwp moves too; the "
+            "point is the scale of the Biso shift a mis-declared thickness "
+            "causes, which reaches Å².",
+            _with_flat_plate_absorption, geometries=("bragg_brentano",)),
 )
 
 VARIANT_BY_KEY = {v.key: v for v in VARIANTS}
