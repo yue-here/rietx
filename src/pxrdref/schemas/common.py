@@ -51,7 +51,11 @@ class Parameter(Base):
     min, max:
         Inclusive bounds passed to the bounded minimiser.
     expr:
-        Reserved for constraint expressions (v0.2); must be ``None`` in v0.1.
+        Reserved for nonlinear constraint expressions; **not implemented** —
+        must be ``None``. The design (a tiny AST-whitelisted DSL emitted as
+        backend ops, because asteval cannot run on autodiff tracers) is in
+        DESIGN.md's "Parameter system"; linear/symmetry ties do not need it and
+        go through the affine constraint block instead.
     transform:
         Reparameterisation used internally.  ``softplus`` maps an unbounded
         internal variable to a strictly positive physical value, which keeps
@@ -80,8 +84,11 @@ class Parameter(Base):
             )
         if self.expr is not None:
             raise ValueError(
-                "Parameter.expr (constraint expressions) is planned for v0.2; "
-                "set expr=None"
+                "Parameter.expr (nonlinear constraint expressions) is not "
+                "implemented; set expr=None.  Symmetry and linear ties do not "
+                "need it — they are applied as the affine constraint block in "
+                "params/vector.py (crystal-system cell ties, Wyckoff coordinate "
+                "DOFs, site-symmetry ADP patterns)."
             )
         return self
 

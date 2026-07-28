@@ -1,9 +1,12 @@
 """Instrument schemas: source, geometry, profile, background.
 
 ``Source``/``Geometry``/profile blocks are the pluggable seams for later
-neutron/TOF and fundamental-parameters work; v0.1 implements a single
-constant-wavelength X-ray source and the Debye-Scherrer (capillary) geometry
-used at synchrotron powder beamlines such as APS 11-BM.
+neutron/TOF and fundamental-parameters work.  What is implemented today is a
+constant-wavelength X-ray source (one or more emission lines, optional
+anomalous dispersion) in two geometries: ``debye_scherrer`` (capillary /
+synchrotron, e.g. APS 11-BM, with the cylindrical absorption correction) and
+``bragg_brentano`` (laboratory flat plate, with displacement, transparency,
+axial divergence and surface roughness).
 """
 
 from __future__ import annotations

@@ -101,10 +101,16 @@ def auto_lambda(y: np.ndarray, *, candidates: tuple[float, ...] = tuple(10.0 ** 
                 ) -> float:
     """Pick the arPLS λ whose baseline is smooth but still follows the data.
 
-    Heuristic v0.1 criterion: largest λ for which the fraction of points where
-    the baseline exceeds the data by more than 3σ_noise stays below 1%.
-    (σ_noise from the median absolute successive difference.)  A synthetic-
-    peak extended-range criterion is planned for v0.2.
+    Heuristic criterion: largest λ for which the fraction of points where the
+    baseline exceeds the data by more than 3σ_noise stays below 1%.  (σ_noise
+    from the median absolute successive difference.)
+
+    Deliberately a heuristic and still one: a synthetic-peak criterion (inject
+    a known peak, pick the λ that recovers its area) would be better-founded but
+    has never been the limiting factor, because the *order-selection* path
+    (`background.select`, BIC + Durbin-Watson) and the
+    ``BACKGROUND_ABSORPTION`` guard both sit downstream of it and catch an
+    over-flexible baseline on their own terms.
     """
     y = np.asarray(y, dtype=np.float64)
     noise = np.median(np.abs(np.diff(y))) / 0.7979 + 1e-12  # E|N(0,σ)| = σ·0.798

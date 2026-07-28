@@ -4,7 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pxrd-refine"
-version = "0.2.0.dev0"
+# Tracks the ROADMAP milestone in flight, not the last one shipped: v0.4 is
+# recorded in docs/milestones/v0.4.md and v0.5 is open.  This string is stamped
+# into every RefinementResult's Provenance and every history node, so a stale
+# value silently mislabels the provenance of real results.
+version = "0.5.0.dev0"
 description = "API-first, differentiable Rietveld refinement of powder X-ray diffraction data"
 readme = "README.md"
 license = "MIT"

@@ -2,9 +2,19 @@
 
 gemmi (MPL-2.0, used as a dependency) owns the symbol → operators mapping, the
 systematic-absence test, and centring information.  Reflection multiplicities
-are computed here by explicit orbit counting under the Laue group (the point
-group of the diffraction pattern, i.e. the crystal point group plus inversion
-— Friedel's law holds for the kinematic, non-anomalous v0.1 model).
+are computed here by explicit orbit counting under the **Laue** group (the
+point group of the diffraction pattern, i.e. the crystal point group plus
+inversion), so ±h are always merged into one orbit.
+
+**Merging ±h is exact with or without anomalous scattering, but for two
+different reasons — do not "fix" it when dispersion is on.**  Without f″,
+|F(h)|² = |F(−h)|² (Friedel's law) and the two are literally the same number.
+With f″ they differ in a non-centrosymmetric group, but a powder cannot
+separate them either way: d(h) = d(−h), so the pair lands in one peak and what
+the peak measures is the *orbit average*.  ``structure_factor`` returns exactly
+that average in closed form (⟨|F|²⟩ = |A|² + |B|², see its module docstring),
+which is why one representative per Laue orbit remains the correct — not the
+approximate — thing to enumerate here.
 """
 
 from __future__ import annotations
@@ -163,8 +173,9 @@ def generate_reflections(sg_symbol: str,
     # indices (column form) as h' = Rᵀ h; the orbit therefore uses the
     # transposed rotations.  ({Rᵀ} ≠ {R} as a set outside cubic/orthogonal
     # settings — e.g. trigonal threefold axes — so the transpose matters.)
-    # Friedel mates ±h are merged: the v0.1 model is kinematic without
-    # anomalous scattering, so Friedel's law holds.
+    # Friedel mates ±h are merged.  Exact with or without anomalous
+    # scattering — the powder measures the ±h average and structure_factor
+    # returns it in closed form; see the module docstring.
     rots = rotation_matrices(sg)
     rot_int = np.rint(np.transpose(rots, (0, 2, 1))).astype(np.int64)
     canon: dict[tuple[int, int, int], int] = {}

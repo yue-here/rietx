@@ -1,8 +1,9 @@
 """Static obs/calc/difference plotting (matplotlib/Agg).
 
-The interactive plotly HTML viewer follows in v0.2; this renderer produces
-the standard Rietveld panel: observed points, calculated line, difference
-curve offset below, and per-phase reflection tick rows.
+This renderer produces the standard Rietveld panel: observed points,
+calculated line, difference curve offset below, and per-phase reflection tick
+rows.  The interactive plotly viewer is :mod:`pxrdref.viz.html`; the
+VLM-readable montage is :func:`plot_for_vlm` here.
 """
 
 from __future__ import annotations

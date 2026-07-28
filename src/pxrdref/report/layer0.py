@@ -1,8 +1,9 @@
 """FitReport Layer 0: model-free, agent-native fit diagnostics.
 
 Everything here is computed without linearising the model, so it stays
-trustworthy even when the refinement is far from converged (the gated linear
-misfit attribution — Layer 1 — arrives in v0.2):
+trustworthy even when the refinement is far from converged — which is exactly
+what the gated linear misfit attribution of :mod:`pxrdref.report.layer1`
+cannot claim, and why that layer abstains rather than guessing:
 
 * global agreement indices;
 * the cumulative-χ² curve vs 2θ, whose steps localise the regions where the

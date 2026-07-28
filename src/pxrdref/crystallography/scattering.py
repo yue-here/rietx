@@ -7,7 +7,14 @@ Acta Cryst. A51, 416-431:
 
 valid for k ≤ 6 Å⁻¹ — a wider range than the older 4-Gaussian Cromer-Mann
 form.  Coefficients are read from the DABAX file ``f0_WaasKirf.dat`` (ESRF
-DABAX collection; see ATTRIBUTION.md).  Anomalous terms f′, f″ are v0.5.
+DABAX collection; see ATTRIBUTION.md).
+
+This module is the **angle-dependent, wavelength-independent** half of the
+scattering factor.  The anomalous corrections f′ + i·f″ are angle-independent
+and wavelength-dependent, live in :mod:`pxrdref.crystallography.dispersion`,
+and are applied by the structure factor rather than here — which is why the
+form-factor lookup is keyed by ion (``La3+``) and the dispersion lookup by
+element (``La``).
 """
 
 from __future__ import annotations
