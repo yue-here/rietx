@@ -153,3 +153,60 @@ def plot_for_vlm(result: RefinementResult, report=None, *,
 
     fig.savefig(path, format="png")
     return fig
+
+
+def plot_trajectory(series, paths, *, path: str | None = None,
+                    dpi: int = 150, mark_diagnostics: bool = True):
+    """Parameter trajectories across a sequential series (WP-0505).
+
+    One stacked panel per requested dot-path (or ``"qpa.<phase>"`` for a weight
+    fraction), value with esd error bars against the series coordinate.
+    Patterns the reseed guard refitted cold are ringed rather than dropped, and
+    a discontinuity the series flagged is marked between its two points — the
+    plot shows the same fences the diagnostics carry, so a trajectory is never
+    read as smoother than it was measured to be.
+    """
+    try:
+        import matplotlib
+        matplotlib.use("Agg", force=False)
+        import matplotlib.pyplot as plt
+    except ImportError as exc:  # pragma: no cover
+        raise ImportError("plotting needs matplotlib: pip install 'pxrd-refine[viz]'") from exc
+
+    if isinstance(paths, str):
+        paths = [paths]
+    paths = list(paths)
+    if not paths:
+        raise ValueError("plot_trajectory needs at least one parameter path")
+
+    jumps = {d.where[0] for d in series.diagnostics
+             if d.code == "SEQUENTIAL_DISCONTINUITY" and d.where}
+    unstable = {d.where[0] for d in series.diagnostics
+                if d.code == "SEQUENTIAL_PATH_DEPENDENT" and d.where}
+    reseeded = {e.label for e in series.entries if e.reseeded}
+
+    fig, axes = plt.subplots(len(paths), 1, figsize=(8, 2.4 * len(paths)),
+                             dpi=dpi, sharex=True, squeeze=False)
+    for ax, name in zip(axes[:, 0], paths, strict=True):
+        traj = (series.qpa_trajectory(name[4:]) if name.startswith("qpa.")
+                else series.trajectory(name))
+        x, value, sd = traj.arrays()
+        ax.errorbar(x, value, yerr=np.where(np.isfinite(sd), sd, 0.0),
+                    fmt="o-", ms=4, lw=1.0, capsize=2, color="#1f5fa8")
+        if mark_diagnostics:
+            for i, label in enumerate(traj.labels):
+                if label in reseeded:
+                    ax.plot(x[i], value[i], "o", ms=10, mfc="none",
+                            mec="#c23b22", mew=1.2)
+            if name in jumps and len(x) > 1:
+                k = int(np.argmax(np.abs(np.diff(value))))
+                ax.axvspan(x[k], x[k + 1], color="#c23b22", alpha=0.10, lw=0)
+        flag = "  [path-dependent]" if name in unstable else ""
+        ax.set_ylabel(name.split(".")[-1] if len(name) > 24 else name, fontsize=8)
+        ax.set_title(f"{name}{flag}", fontsize=9, loc="left")
+        ax.tick_params(labelsize=8)
+    axes[-1, 0].set_xlabel(series.x_label)
+    fig.tight_layout()
+    if path is not None:
+        fig.savefig(path)
+    return fig

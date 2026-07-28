@@ -27,6 +27,8 @@ from .schemas import (
     Structure,
 )
 from .schemas.history import HistoryNode, NodeAction, RefinementState
+from .schemas.sequential import SeriesEntry, SeriesResult, Trajectory
+from .sequential import SequentialRefinement, refine_sequential
 from .strategy.staged import RefinementPlan, Stage
 
 __all__ = [
@@ -48,9 +50,13 @@ __all__ = [
     "RefinementTree",
     "ReflectionRow",
     "RegionAttribution",
+    "SequentialRefinement",
+    "SeriesEntry",
+    "SeriesResult",
     "SharingMap",
     "Stage",
     "Structure",
+    "Trajectory",
     "SuggestedAction",
     "build_report",
     "format_su",
@@ -59,6 +65,7 @@ __all__ = [
     "read_pdcif",
     "reflection_table",
     "refine",
+    "refine_sequential",
     "refine_multi",
     "replay",
     "save_instrument_profile",
