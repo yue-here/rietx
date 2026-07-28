@@ -169,7 +169,14 @@ WP needs only `exp`, `sin`, `radians`, `asarray`, so it adds none.
   6.3.3.1(3), A = t·sec θ·exp(−µt·sec θ) at φ = 0, do have θ-signatures but need a
   sample thickness and tilt that no schema carries.
 - **A refinable µR.** See above; this is a design decision, not a deferral.
-- **µR > 1.** Outside Rouse's validity; diagnosed, not extrapolated.
+- **A *better* expression above µR = 1.** Outside Rouse's validity the fit is
+  applied anyway and flagged with `ABSORPTION_MU_R_OUT_OF_RANGE` — i.e. it *is*
+  extrapolated, deliberately, because silently dropping real absorption from a
+  strongly absorbing specimen is the worse failure. (An earlier draft of this
+  line read "diagnosed, not extrapolated", which contradicted both the code and
+  "Open for review" item 2 below; the code has always extrapolated.) What is out
+  of scope is sourcing a fit that is *valid* up to µR ≈ 3 — the Lobanov one
+  GSAS-II and TOPAS use, whose coefficients trace only to a conference abstract.
 - **A real-data capillary acceptance.** There is no capillary dataset in
   `tests/data/` — every real pattern is flat-plate Bragg-Brentano, and 11-BM is
   fitted with the geometry-agnostic `debye_scherrer` preset, which carries no
@@ -192,7 +199,9 @@ shipped WP reaches nobody. The short version, for anyone auditing 0501 itself:
 multiplicative correction is trivially ~0.96 "scale-like", so only the partial
 R² carries signal); a correction must be judged at reflection positions, not on
 the fitted grid; and a pre-existing `|ρ| > 1` in the reported correlation matrix
-shows up wherever conditioning is poor.
+showed up wherever conditioning is poor (**fixed 2026-07-28**: `np.linalg.pinv`
+needed `hermitian=True` — its general SVD path loses symmetry on a cond ≈ 10²⁰
+JᵀJ; see WP-0502's handover log).
 
 From **WP-0504** (anomalous f′/f″, landed 2026-07-27) — three things, one of
 which is a trap. Its forward-reference went to
@@ -273,17 +282,35 @@ Criteria:
 Three things this WP decided that a second opinion should confirm. None blocks
 anything; all three are cheap to check and expensive to get wrong silently.
 
-1. **The b₂ coefficient contradicts the printed source.** The scan says
-   "−0·0375"; this WP implements **−0·3750**. The evidence is circumstantial but
-   strong and mutually consistent: −0.3750 hits Rouse's own claimed 0.0035 bound
-   against a quadrature of ITC eq. (6.3.3.4) while −0.0375 is off by 0.0821, and
-   the paper's own Table 1 entry at µR = 1, sin²θ = 1 (0.2951) matches the
-   quadrature (0.29509) rather than the printed formula (0.21303). **What would
-   settle it:** one look at a clean copy of Acta Cryst. A26, 682 eq. (2). If the
-   paper really prints −0.0375, then the paper has an erratum and the table is
-   right — but that is worth knowing rather than assuming.
-   *Detectors already in place:* `test_a_wrong_b2_would_fail_the_exact_check`
-   and `test_cylinder_absorption_matches_exact_physics_across_mu_r_and_theta`.
+1. ~~**The b₂ coefficient contradicts the printed source.**~~ **Settled
+   2026-07-28 — b₂ = −0.3750 is correct; no clean copy of the paper needed.**
+   The original argument (below) was circumstantial because every strand of it
+   ran through this repo's own code. It was re-checked against a *from-scratch*
+   Gauss-Legendre quadrature of the ITC (6.3.3.4) cylinder integral written
+   independently of `model/absorption.py` — incident chord `t_in = P·x̂ +
+   √((P·x̂)² + 1 − |P|²)`, diffracted chord the same expression along
+   (cos2θ, sin2θ), area-averaged over the unit disc — which reproduces the
+   numbers exactly:
+
+   | | max \|A_exact − A_fit\| over 0 ≤ µR ≤ 1 × 0 ≤ sin²θ ≤ 1 |
+   |---|---|
+   | b₂ = −0.3750 | **0.00357** — Rouse's own claimed bound is 0.0035 |
+   | b₂ = −0.0375 | 0.0820 |
+
+   and gives A(µR = 1, sin²θ = 1) = 0.29498 against the paper's tabulated
+   0.2951 (the transposed formula gives 0.21303). A fit cannot land on its
+   author's stated error bound by coincidence.
+
+   One *independent* argument was also available all along and is worth
+   recording because it needs no computation at all: the **sphere** coefficients
+   from the same table of the same paper are (1.5108, −0.0315, −0.0951,
+   **−0.2898**). Cylinder and sphere agree to ~13 % on a₁, ~17 % on b₁ and ~3 %
+   on a₂ — but "−0.0375" would make them differ by a factor of **7.7** on b₂
+   alone. The transposed digit is visible in the shape of the table, not only in
+   the physics.
+
+   *Detectors in place:* `test_a_wrong_b2_would_fail_the_exact_check` and
+   `test_cylinder_absorption_matches_exact_physics_across_mu_r_and_theta`.
 
 2. **µR > 1 is used-but-warned rather than refused.** Outside Rouse's stated
    range the expression is an extrapolation, not a fit. This WP chose to apply

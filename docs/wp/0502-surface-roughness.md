@@ -435,6 +435,18 @@ cutoff (scale, background, both Biso and both Suortti parameters free):
     Unrelated to roughness — WP-0407 fixed the Bérar-Lelann *placement*, not
     this — but it undermines the correlation guard wherever conditioning is
     poor, and both 0501 and this WP lean on that guard. Worth its own fix.
+    **→ Fixed 2026-07-28** (repo-wide audit, not a WP). Root cause: JᵀJ is PSD,
+    so its Moore-Penrose inverse is PSD and |ρ| ≤ 1 *mathematically* — but
+    `np.linalg.pinv` defaults to the **general** SVD path, which treats the
+    matrix as unstructured and, on the cond ≈ 10²⁰ normal matrices this package
+    routinely forms, returns a visibly non-symmetric result. Reproduced
+    deterministically at |ρ| up to 1.6 × 10³ on synthetic ill-conditioning.
+    `optimize/least_squares.covariance_estimates` now symmetrises JᵀJ and passes
+    `hermitian=True` (an `eigh` path, which cannot break symmetry), capping the
+    same cases at 1 + 4 ulp, with a final clip to remove the ulp. Regression:
+    `test_v02_core.test_correlation_stays_a_valid_pearson_matrix_under_extreme_conditioning`.
+    Note the clip is *not* the fix — clipping 2.75 to 1.0 would report a
+    degeneracy the arithmetic invented rather than the one the data has.
   - **Next**: the two unchecked items are (a) jax jacfwd parity on the new
     columns — jax is not installed in this workspace, so it was never run, and
     (b) the cross-model qarr comparison, which is moot until a dataset with

@@ -144,13 +144,18 @@ apply here directly:
   and nothing is measurable. **This WP's acceptance needs a dataset acquired for
   it**; plan that in rather than discovering it at the end. It is the highest-
   value single unblock for both WPs.
-- **Watch for `|ρ| > 1` in the reported correlation matrix.** Fitting fluorite
-  with roughness free produced +2.75 and −1.10 on *unrelated* pairs
+- ~~**Watch for `|ρ| > 1` in the reported correlation matrix.**~~ **Fixed
+  2026-07-28 — no longer a hazard, but the lesson is.** Fitting fluorite with
+  roughness free produced +2.75 and −1.10 on *unrelated* pairs
   (`scale ~ axial_sl`, `axial_sl ~ background.c5`) alongside a legitimate
-  ρ(a,b) = +1.000. `pinv` on a singular JᵀJ is returning a non-PSD covariance.
-  Pre-existing and not caused by roughness (WP-0407 fixed the Bérar-Lelann
-  *placement*, not this), but it undermines the correlation guard exactly where
-  this WP will be working. Worth its own fix first.
+  ρ(a,b) = +1.000. The cause was not the fit but `np.linalg.pinv`: its default
+  **general** SVD path treats JᵀJ as unstructured and loses symmetry on the
+  cond ≈ 10²⁰ normal matrices this package forms routinely.
+  `covariance_estimates` now symmetrises and passes `hermitian=True`.
+  **What to carry into this WP:** absorption parameters land in exactly that
+  ill-conditioned {scale, displacement, background} corner, so when a
+  correlation looks absurd here, suspect the linear algebra before the physics —
+  and check `np.allclose(corr, corr.T)` as the cheapest tell.
 
 From **WP-0504** (anomalous f′/f″, landed 2026-07-27) — it touched
 `crystallography/attenuation.py`, which this WP reuses for µt:
