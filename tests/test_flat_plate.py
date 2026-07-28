@@ -185,3 +185,255 @@ def test_mu_t_identifiability_is_small_but_not_zero():
     # and the µR comparison that motivates the whole distinction
     from pxrdref.model.absorption import mu_r_identifiable_fraction
     assert mu_r_identifiable_fraction(tt, 0.5) < 1e-12
+
+
+def test_intensity_fraction_peaks_at_one_absorption_length():
+    from pxrdref.model.absorption import transmission_intensity_fraction
+
+    assert transmission_intensity_fraction(1.0) == pytest.approx(1.0)
+    for mu_t in (0.05, 0.4, 2.0, 5.0):
+        assert transmission_intensity_fraction(mu_t) < 1.0
+    # both a too-thin and a too-thick plate lose, but not symmetrically in µt:
+    # 0.4 and 2.0 straddle the optimum yet give 0.7288 and 0.7358
+    assert transmission_intensity_fraction(0.4) == pytest.approx(0.7288, abs=1e-4)
+    assert transmission_intensity_fraction(2.0) == pytest.approx(0.7358, abs=1e-4)
+    assert transmission_intensity_fraction(0.1) == pytest.approx(0.2460, abs=1e-4)
+
+
+# -- the schema seam ----------------------------------------------------
+
+
+@pytest.mark.parametrize("kwargs,match", [
+    (dict(kind="debye_scherrer", mu_t=0.3), "flat-specimen quantity"),
+    (dict(kind="debye_scherrer", thickness_mm=0.2), "flat-specimen quantity"),
+    (dict(kind="bragg_brentano", goniometer_radius_mm=217.5, mu_t=0.0),
+     "zero thickness"),
+    (dict(kind="bragg_brentano", goniometer_radius_mm=217.5, mu_t=-0.1),
+     "non-negative"),
+    (dict(kind="flat_plate_transmission", thickness_mm=0.0), "must be positive"),
+    (dict(kind="flat_plate_transmission", mu_r=0.5), "only to debye_scherrer"),
+])
+def test_geometry_validators(kwargs, match):
+    from pydantic import ValidationError
+
+    from pxrdref.schemas.instrument import Geometry
+    with pytest.raises(ValidationError, match=match):
+        Geometry(**kwargs)
+
+
+def test_zero_mu_t_is_legal_in_transmission_and_is_pure_footprint():
+    """The asymmetry between the two flat cases, pinned.
+
+    µt = 0 is a *specimen* under transmission (a non-absorbing plate still has
+    a sec θ footprint) and a contradiction under reflection (no specimen at
+    all), so the two cannot share the "0 means off" convention.
+    """
+    from pxrdref.schemas.instrument import Geometry
+
+    geom = Geometry(kind="flat_plate_transmission", mu_t=0.0)
+    assert geom.mu_t == 0.0
+
+
+def test_geometry_round_trips_through_json():
+    from pxrdref.schemas.instrument import Geometry
+
+    geom = Geometry(kind="flat_plate_transmission", mu_t=0.42, thickness_mm=0.15,
+                    packing_fraction=0.45)
+    assert Geometry.model_validate_json(geom.model_dump_json()) == geom
+
+
+def test_transmission_preset_defaults_to_a_monochromated_beam():
+    from pxrdref import Instrument
+
+    ins = Instrument.flat_plate_transmission(mu_t=0.3)
+    assert ins.geometry.kind == "flat_plate_transmission"
+    assert len(ins.source.lines) == 1, "Kα1-only by default (focusing mono)"
+    assert ins.geometry.mu_t == 0.3
+    doublet = Instrument.flat_plate_transmission(radiation="CuKa", mu_t=0.3)
+    assert len(doublet.source.lines) == 2
+
+
+# -- the forward-model seam, and the hidden-Jacobian hazard -------------
+
+
+def _flat_plate_model(mu_t: float, kind: str):
+    """A compiled aniso-rutile model with every analytic-column path live.
+
+    Mirrors ``test_absorption._capillary_model`` deliberately: the guard below
+    is the same guard, and the two must not drift apart.
+    """
+    from pxrdref import Instrument, PatternData
+    from pxrdref.model.forward import compile_model
+    from pxrdref.params.vector import ParameterTable
+    from tests.test_aniso_adp import make_aniso_rutile
+
+    structure = make_aniso_rutile()
+    structure.phases[0].scale.value = 1e-3
+    structure.phases[0].extinction.value = 2.0
+    if kind == "flat_plate_transmission":
+        ins = Instrument.flat_plate_transmission(radiation="CuKa1", mu_t=mu_t)
+    else:
+        ins = Instrument.bragg_brentano(radiation="CuKa1", mu_t=mu_t)
+    ins.profile.w.value = 1e-2
+    grid = np.arange(10.0, 90.0, 0.02)
+    pattern = PatternData(two_theta=grid.tolist(),
+                          intensity=np.zeros_like(grid).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for p in ("phases.0.atoms.1.dof.0", "phases.0.atoms.0.adp.0",
+              "phases.0.atoms.0.adp.1", "phases.0.atoms.1.adp.0",
+              "phases.0.scale", "phases.0.cell.a", "phases.0.cell.c",
+              "phases.0.extinction"):
+        assert table.set_vary([p], True), p
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          free_paths=set(table.free_paths))
+    return model, table
+
+
+@pytest.mark.parametrize("kind,mu_t", [
+    ("bragg_brentano", 0.15),
+    ("flat_plate_transmission", 3.0),
+])
+def test_every_analytic_column_carries_the_flat_plate_factor(kind, mu_t):
+    """The hidden-Jacobian guard, for the two new geometries.
+
+    A multiplies the same product ``_structural_intensity_grad`` and
+    ``po_intensity_grad`` rebuild by hand.  Omit it in either and those columns
+    are wrong by A while the finite-difference columns stay right: the fit still
+    converges, to the wrong structure.  The µt values are chosen so A swings by
+    more than half across the pattern — the pre-assert below is what stops this
+    passing vacuously, exactly as in ``test_absorption.py``.
+    """
+    from pxrdref.optimize.least_squares import _make_jacobian, _make_residual
+
+    model, table = _flat_plate_model(mu_t, kind)
+    a = np.asarray(model._absorption(model.tt))
+    assert a.max() / a.min() > 1.5, "correction too weak — test would not discriminate"
+
+    theta = table.x0()
+    jac = _make_jacobian(model, table)(theta)
+    residual = _make_residual(model, table)
+    r0 = residual(theta)
+    for c, path in enumerate(table.free_paths):
+        h = 1e-6 * max(1.0, abs(theta[c]))
+        tp = theta.copy()
+        tp[c] += h
+        col_fd = (residual(tp) - r0) / h
+        scale = np.linalg.norm(col_fd)
+        assert scale > 0, f"{path}: dead FD column"
+        err = np.linalg.norm(jac[:, c] - col_fd) / scale
+        assert err < 5e-3, f"{path}: analytic vs FD mismatch ({err:.2e})"
+
+
+def test_the_thick_specimen_default_leaves_the_forward_model_untouched():
+    """Every flat-plate result this package shipped before WP-0508 is unchanged.
+
+    Not a formality: the *reflection* correction's identity is µt → ∞, so an
+    implementation that treated a missing thickness as µt = 0 would multiply
+    every intensity by zero.  ``mu_t is None`` has to mean "thick", and this is
+    what pins it.
+    """
+    model_off, table = _flat_plate_model(0.4, "bragg_brentano")
+    object.__setattr__(model_off, "mu_t", None)
+    assert model_off._absorption(model_off.tt) == 1.0
+    values = table.decode(table.x0())
+    y_thick = model_off.evaluate(values)
+    assert np.all(np.isfinite(y_thick)) and y_thick.max() > 0.0
+
+    model_on, _ = _flat_plate_model(0.4, "bragg_brentano")
+    y_thin = model_on.evaluate(values)
+    # the thin specimen has lost high-angle intensity relative to low
+    top = model_on.tt > 70.0
+    bottom = model_on.tt < 25.0
+    assert y_thin[top].max() / y_thick[top].max() \
+        < y_thin[bottom].max() / y_thick[bottom].max()
+
+
+def test_debye_scherrer_ignores_mu_t_and_flat_plate_ignores_mu_r():
+    """The geometry gate, from the forward model's side rather than the schema's."""
+    model, _ = _flat_plate_model(0.3, "bragg_brentano")
+    assert model.mu_r == 0.0
+    assert not np.isscalar(model._absorption(model.tt))
+
+    from pxrdref import Instrument
+    ins = Instrument.debye_scherrer(wavelength=1.5406, mu_r=0.5)
+    assert ins.geometry.mu_t is None
+
+
+# -- the result record and its diagnostics ------------------------------
+
+
+def _fit_flat_plate(kind: str, **geometry):
+    """A tiny end-to-end Rietveld fit against a self-generated pattern."""
+    import pxrdref as pr
+    from tests.test_aniso_adp import make_aniso_rutile
+
+    structure = make_aniso_rutile()
+    structure.phases[0].scale.value = 1e-3
+    if kind == "flat_plate_transmission":
+        ins = pr.Instrument.flat_plate_transmission(radiation="CuKa1", **geometry)
+    else:
+        ins = pr.Instrument.bragg_brentano(radiation="CuKa1", **geometry)
+    ins.profile.w.value = 1e-2
+    grid = np.arange(15.0, 90.0, 0.05)
+    from pxrdref.model.forward import compile_model
+    from pxrdref.params.vector import ParameterTable
+    table = ParameterTable(structure, ins)
+    model = compile_model(structure, ins,
+                          pr.PatternData(two_theta=grid.tolist(),
+                                         intensity=np.ones_like(grid).tolist()),
+                          mode="rietveld", free_paths=set())
+    y = np.asarray(model.evaluate(table.decode(table.x0())))
+    data = pr.PatternData(two_theta=grid.tolist(),
+                          intensity=(y + 1.0).tolist())
+    ref = pr.Refinement(structure, ins, history=False)
+    return ref.fit(data, plan=pr.RefinementPlan(
+        stages=[pr.Stage("scale", ["phases.*.scale"])]))
+
+
+def test_record_reports_the_bias_and_the_part_that_is_not_a_reparameterisation():
+    result = _fit_flat_plate("bragg_brentano", mu_t=0.2)
+    record = result.absorption
+    assert record is not None
+    assert record.method == "flat_plate_reflection"
+    assert record.mu_r == pytest.approx(0.2)
+    assert record.mu_r_source == "given"
+    # a thin reflection specimen biases Biso *high*, so the recovery is negative
+    assert record.equivalent_delta_biso < 0.0
+    # …and, unlike the cylinder, the correction is not purely a scale × Biso
+    assert record.unabsorbed_fraction > 0.01
+    assert record.identifiable_fraction > 0.0
+    assert record.intensity_fraction_of_optimal is None
+    assert not record.out_of_range, "out_of_range belongs to the Rouse fit only"
+
+    codes = {d.code for d in result.diagnostics}
+    assert "ABSORPTION_THICKNESS_MATTERS" in codes
+
+
+def test_transmission_record_carries_the_thickness_advice():
+    result = _fit_flat_plate("flat_plate_transmission", mu_t=0.1)
+    record = result.absorption
+    assert record.method == "flat_plate_transmission"
+    assert record.intensity_fraction_of_optimal == pytest.approx(
+        0.1 * np.exp(0.9), rel=1e-9)
+    codes = {d.code for d in result.diagnostics}
+    assert "ABSORPTION_PLATE_THICKNESS" in codes, "a 0.1 µt plate wastes counts"
+
+    # at the optimum the advice is silent
+    at_optimum = _fit_flat_plate("flat_plate_transmission", mu_t=1.0)
+    assert "ABSORPTION_PLATE_THICKNESS" not in {
+        d.code for d in at_optimum.diagnostics}
+
+
+def test_thick_specimen_produces_no_record_at_all():
+    """No thickness ⇒ nothing was corrected ⇒ nothing to report, rather than a
+    record full of zeros that reads as "we applied something"."""
+    assert _fit_flat_plate("bragg_brentano").absorption is None
+
+
+def test_mu_t_is_estimated_from_thickness_and_composition():
+    result = _fit_flat_plate("bragg_brentano", thickness_mm=0.02)
+    record = result.absorption
+    assert record is not None and record.mu_r_source == "estimated"
+    # TiO2 at Cu Kα1: µ ≈ 500 /cm, so 20 µm at 0.6 packing lands near µt ≈ 0.6
+    assert 0.2 < record.mu_r < 1.5, record.mu_r

@@ -260,6 +260,22 @@ def optimal_transmission_thickness_mm(mu_cm: float) -> float:
     return 10.0 / mu_cm
 
 
+def transmission_intensity_fraction(mu_t: float) -> float:
+    """Counts from a plate at ``mu_t``, as a fraction of the best possible.
+
+    The optimum above is at µt = 1, so **µt is itself the plate's thickness in
+    units of the optimal one** and the whole comparison needs no length: from
+    the unnormalised ITC (3a) at θ = 0, I ∝ µt·exp(−µt), maximal at µt = 1, so
+
+        I/I_max = µt·exp(1 − µt)
+
+    1.0 at the optimum, 0.7 at µt = 0.4 or 2, 0.15 at µt = 0.05 or 5.  Reported
+    rather than acted on: a badly chosen thickness costs counting statistics,
+    not accuracy, and the fit is equally good either way.
+    """
+    return float(mu_t * np.exp(1.0 - mu_t))
+
+
 def equivalent_delta_biso_from_transmission(
         two_theta_deg: np.ndarray, transmission: np.ndarray, wavelength: float
         ) -> tuple[float, float]:

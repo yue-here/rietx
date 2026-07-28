@@ -31,7 +31,11 @@ from dataclasses import dataclass, field
 import gemmi
 import numpy as np
 
-from ..crystallography.attenuation import linear_attenuation, packed_mu_r
+from ..crystallography.attenuation import (
+    linear_attenuation,
+    packed_mu_r,
+    packed_mu_t,
+)
 from ..crystallography.lattice import cell_volume
 from ..crystallography.symmetry import expand_positions, get_spacegroup
 from ..schemas.common import Diagnostic
@@ -391,6 +395,55 @@ def estimate_capillary_mu_r(structure: Structure, values: dict[str, float],
     caller can surface as a diagnostic.  Same contract as
     :func:`_apply_microabsorption`.
     """
+    mus_vols, note = _specimen_mu_and_volumes(structure, values, wavelength,
+                                              multiplicities)
+    if mus_vols is None:
+        return None, note
+    mus, vols = mus_vols
+    try:
+        mu_r = packed_mu_r(mus, vols, radius_mm, packing_fraction)
+    except ValueError as exc:
+        return None, str(exc)
+    return float(mu_r), note
+
+
+def estimate_flat_plate_mu_t(structure: Structure, values: dict[str, float],
+                             wavelength: float, thickness_mm: float,
+                             packing_fraction: float,
+                             multiplicities=None) -> tuple[float | None, str | None]:
+    """(µt estimate, reason it was skipped) for a packed flat specimen.
+
+    The flat-plate twin of :func:`estimate_capillary_mu_r`, sharing everything
+    but the length the bulk µ multiplies (WP-0508).  Same never-raises
+    contract: an absorption edge inside a tabulation interval, an element
+    outside the McMaster compilation or an energy outside 2-120 keV are all
+    ordinary properties of a real specimen, so they come back as a reason
+    string the caller surfaces as a diagnostic.
+    """
+    mus_vols, note = _specimen_mu_and_volumes(structure, values, wavelength,
+                                              multiplicities)
+    if mus_vols is None:
+        return None, note
+    mus, vols = mus_vols
+    try:
+        mu_t = packed_mu_t(mus, vols, thickness_mm, packing_fraction)
+    except ValueError as exc:
+        return None, str(exc)
+    return float(mu_t), note
+
+
+def _specimen_mu_and_volumes(structure: Structure, values: dict[str, float],
+                             wavelength: float, multiplicities
+                             ) -> tuple[tuple[list[float], list[float]] | None,
+                                        str | None]:
+    """((per-phase µ, volume fractions), note) or (None, reason it failed).
+
+    Composition → per-phase linear attenuation → volume fractions from the
+    refined scales via the Hill-Howard weight fractions and the X-ray densities.
+    When the scales are not yet meaningful every phase contributes equally,
+    which is stated in the note rather than hidden.  Shape-independent: what the
+    two estimators above add is only which length µ_bulk multiplies.
+    """
     try:
         zmvs, scales = [], []
         for ip, phase in enumerate(structure.phases):
@@ -409,18 +462,11 @@ def estimate_capillary_mu_r(structure: Structure, values: dict[str, float],
     except (KeyError, ValueError) as exc:
         return None, f"attenuation unavailable — {exc}"
 
-    note = None
     if any(s > 0.0 for s in scales):
         w, _, _ = weight_fractions([z.zmv for z in zmvs], scales, None)
-        vols = [wi / z.density for wi, z in zip(w, zmvs)]
-    else:
-        vols = [1.0] * len(zmvs)
-        note = "phase scales are all zero; assumed equal volume fractions"
-    try:
-        mu_r = packed_mu_r(mus, vols, radius_mm, packing_fraction)
-    except ValueError as exc:
-        return None, str(exc)
-    return float(mu_r), note
+        return (mus, [wi / z.density for wi, z in zip(w, zmvs)]), None
+    return (mus, [1.0] * len(zmvs)), \
+        "phase scales are all zero; assumed equal volume fractions"
 
 
 def _apply_microabsorption(qpa: QuantitativePhaseAnalysis, structure: Structure,

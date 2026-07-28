@@ -174,16 +174,42 @@ def packed_mu_r(mus_cm: Sequence[float], volume_fractions: Sequence[float],
     indistinguishable from a wrong radius or a wrong composition.  Typical
     tapped powders sit at 0.3-0.6; 0.64 is random close packing of spheres.
     """
-    if len(mus_cm) != len(volume_fractions):
-        raise ValueError("mus_cm and volume_fractions must have the same length")
     if radius_mm <= 0.0:
         raise ValueError(f"capillary radius must be positive, got {radius_mm}")
+    return packed_bulk_mu(mus_cm, volume_fractions, packing_fraction) * radius_mm / 10.0
+
+
+def packed_mu_t(mus_cm: Sequence[float], volume_fractions: Sequence[float],
+                thickness_mm: float, packing_fraction: float) -> float:
+    """Dimensionless mu*t of a packed polyphase **flat** specimen (WP-0508).
+
+    Identical bulk-mu arithmetic to :func:`packed_mu_r` — the specimen shape
+    enters only through which length the bulk coefficient multiplies, the bore
+    radius for a cylinder and the layer thickness for a plate.  Shared rather
+    than re-derived so a fix to the packing/void treatment cannot reach one
+    geometry and miss the other.
+    """
+    if thickness_mm <= 0.0:
+        raise ValueError(f"specimen thickness must be positive, got {thickness_mm}")
+    return packed_bulk_mu(mus_cm, volume_fractions,
+                          packing_fraction) * thickness_mm / 10.0
+
+
+def packed_bulk_mu(mus_cm: Sequence[float], volume_fractions: Sequence[float],
+                   packing_fraction: float) -> float:
+    """Volume-fraction-weighted bulk mu (1/cm) of a packed powder.
+
+    ``mu_bulk = f_pack * sum_i v_i * mu_i``: voids do not absorb, which is the
+    entire content of the packing factor.  Shape-independent, hence separate
+    from :func:`packed_mu_r` / :func:`packed_mu_t`.
+    """
+    if len(mus_cm) != len(volume_fractions):
+        raise ValueError("mus_cm and volume_fractions must have the same length")
     if not 0.0 < packing_fraction <= 1.0:
         raise ValueError(
             f"packing fraction must be in (0, 1], got {packing_fraction}")
     total = float(sum(volume_fractions))
     if total <= 0.0:
         raise ValueError("volume fractions must sum to a positive value")
-    mu_bulk = packing_fraction * sum(
+    return packing_fraction * sum(
         mu * (v / total) for mu, v in zip(mus_cm, volume_fractions))
-    return mu_bulk * radius_mm / 10.0

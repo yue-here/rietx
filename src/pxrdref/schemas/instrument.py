@@ -285,9 +285,52 @@ class Geometry(Base):
     depression is absorbed by Biso/ADPs, so *adding* the freedom must be a
     deliberate act — and because attaching it changes nothing until refined
     (both models are exactly the identity at their default values).
+
+    ``flat_plate_transmission``: a flat specimen the beam passes *through* —
+    a Stoe Stadi P, or a laboratory diffractometer run in transmission with the
+    powder between two foils (v0.5, WP-0508).  It models **absorption and
+    nothing else**: like ``debye_scherrer``, only ``zero_shift`` moves its
+    peaks.  A transmission goniometer has its own displacement aberration, and
+    this package does not model it rather than inventing one; if a specimen is
+    badly enough off-axis for that to matter, the peak positions are not
+    trustworthy anyway.
+
+    ``mu_t`` — dimensionless µ times **specimen thickness** — turns on the
+    flat-plate absorption factors for both flat geometries
+    (:mod:`pxrdref.model.absorption`, *International Tables* Vol. C
+    Table 6.3.3.1):
+
+    * ``bragg_brentano`` → case (2), finite-thickness reflection,
+      A = 1 − exp(−2µt/sin θ), normalised by the thick-specimen limit;
+    * ``flat_plate_transmission`` → case (3a), symmetric transmission,
+      A = sec θ·exp(−µt·(sec θ − 1)), normalised at θ = 0.
+
+    **The off state for reflection is µt = ∞, not µt = 0** — the reverse of
+    every other correction in this package.  ITC case (1a) says a specimen
+    thicker than the penetration depth has A = 1/2µ with *no θ at all*, which is
+    what "leave ``mu_t`` unset" means and what this package has always assumed;
+    a plate of zero thickness diffracts nothing, so ``mu_t = 0`` is rejected for
+    ``bragg_brentano`` rather than being silently treated as "off".  Under
+    transmission ``mu_t = 0`` is legal and means a non-absorbing plate, which
+    still carries the sec θ growth of the illuminated volume.
+
+    **µt is a plain float for the same reason µR is, but on weaker evidence,
+    and the difference is worth knowing.**  A free µR is *exactly* a linear
+    combination of the scale and Biso columns.  A free µt is not: measured
+    against the normalised expressions above it keeps a few per cent to tens of
+    per cent of its angular signature
+    (``absorption.mu_t_identifiable_fraction``).  It is held fixed anyway, on
+    three grounds — µt is knowable from the specimen (a thickness and a
+    composition), a free one lands in the ill-conditioned {scale, Biso,
+    background} corner, and what it would silently re-apportion is the ADPs,
+    which is what the correction exists to protect.  What the fit *reports*
+    instead is the Biso bias it removed, which for a flat plate is large:
+    −1.5 Å² at µt = 0.2 over a Cu Kα range, an order of magnitude past the
+    capillary case.
     """
 
-    kind: Literal["debye_scherrer", "bragg_brentano"] = "debye_scherrer"
+    kind: Literal["debye_scherrer", "bragg_brentano",
+                  "flat_plate_transmission"] = "debye_scherrer"
     goniometer_radius_mm: float | None = None
     surface_roughness: SurfaceRoughness | None = None
     sample_displacement: Parameter = Field(
@@ -308,8 +351,17 @@ class Geometry(Base):
     mu_r: float | None = None
     #: internal radius of the capillary bore, mm (estimator input only).
     capillary_radius_mm: float | None = None
-    #: fraction of the bore occupied by solid.  0.3-0.6 is typical for a tapped
-    #: powder; 0.64 is random close packing of spheres.  Estimator input only.
+    #: dimensionless µ·t of the packed flat specimen; ``None`` → estimate it from
+    #: the composition and ``thickness_mm``, and failing that leave the specimen
+    #: thick (reflection) — the pre-WP-0508 assumption.  Never a ``Parameter``;
+    #: see the class docstring.
+    mu_t: float | None = None
+    #: flat-specimen thickness, mm (estimator input only).  For a reflection
+    #: mount this is the depth of the powder layer, not the holder.
+    thickness_mm: float | None = None
+    #: fraction of the bore (or the specimen slab) occupied by solid.  0.3-0.6 is
+    #: typical for a tapped powder; 0.64 is random close packing of spheres.
+    #: Estimator input only.
     packing_fraction: float = Field(default=0.6, gt=0.0, le=1.0)
 
     @model_validator(mode="after")
@@ -336,6 +388,33 @@ class Geometry(Base):
             raise ValueError("mu_r must be non-negative")
         if self.capillary_radius_mm is not None and self.capillary_radius_mm <= 0.0:
             raise ValueError("capillary_radius_mm must be positive")
+        return self
+
+    @model_validator(mode="after")
+    def _flat_plate_fields_need_a_flat_specimen(self) -> "Geometry":
+        if self.kind == "debye_scherrer":
+            for name in ("mu_t", "thickness_mm"):
+                if getattr(self, name) is not None:
+                    raise ValueError(
+                        f"{name} is a flat-specimen quantity; this geometry is "
+                        f"{self.kind!r} (a capillary uses mu_r / "
+                        "capillary_radius_mm)")
+        if self.thickness_mm is not None and self.thickness_mm <= 0.0:
+            raise ValueError("thickness_mm must be positive")
+        if self.mu_t is not None:
+            if self.mu_t < 0.0:
+                raise ValueError("mu_t must be non-negative")
+            # 0 is the identity for every other correction here and emphatically
+            # not for this one: ITC case (2) reads A = 1 − exp(0) = 0, a
+            # specimen of no thickness, which is a modelling mistake worth
+            # refusing rather than a way of switching the correction off.
+            if self.mu_t == 0.0 and self.kind == "bragg_brentano":
+                raise ValueError(
+                    "mu_t = 0 is a specimen of zero thickness, not 'no "
+                    "correction': leave mu_t unset for the thick-specimen case "
+                    "(International Tables C, Table 6.3.3.1 case 1a), which is "
+                    "exactly degenerate with the phase scale and needs no "
+                    "correction at all")
         return self
 
 
@@ -515,7 +594,9 @@ class Instrument(Base):
     def bragg_brentano(cls, *, radiation: str = "CuKa",
                        goniometer_radius_mm: float = 217.5,
                        monochromator_two_theta: float | None = None,
-                       ka2_ratio: float = 0.5) -> "Instrument":
+                       ka2_ratio: float = 0.5,
+                       mu_t: float | None = None,
+                       thickness_mm: float | None = None) -> "Instrument":
         """Lab flat-plate diffractometer preset with a Kα1/Kα2 doublet.
 
         ``radiation`` names an anode in :data:`_RADIATIONS` — ``"CrKa"``,
@@ -542,6 +623,11 @@ class Instrument(Base):
         2·asin(λ/2d) with d₍₀₀₂₎ ≈ 3.354 Å, so the same graphite sits at ≈12.1°
         at Mo Kα, where K = 0.511 rather than 0.500.  Off Cu, compute it for
         the anode in use rather than copying the example.
+
+        ``mu_t`` / ``thickness_mm`` declare a **finite-thickness** specimen
+        (ITC case 2, WP-0508) — a thin layer on a zero-background holder rather
+        than a filled well.  Both absent is the thick-specimen default, which
+        needs no correction because it is exactly degenerate with the scale.
         """
         try:
             lines = _RADIATIONS[radiation]
@@ -565,7 +651,54 @@ class Instrument(Base):
                 polarization=Parameter(value=k, min=0.0, max=1.0),
             ),
             geometry=Geometry(kind="bragg_brentano",
-                              goniometer_radius_mm=goniometer_radius_mm),
+                              goniometer_radius_mm=goniometer_radius_mm,
+                              mu_t=mu_t, thickness_mm=thickness_mm),
+        )
+
+
+    @classmethod
+    def flat_plate_transmission(cls, *, radiation: str = "CuKa1",
+                                mu_t: float | None = None,
+                                thickness_mm: float | None = None,
+                                packing_fraction: float = 0.6,
+                                ka2_ratio: float = 0.5) -> "Instrument":
+        """Flat-specimen **transmission** preset (WP-0508).
+
+        The powder sits between two foils and the beam passes through it —
+        a Stoe Stadi P, or a Bragg-Brentano instrument reconfigured for
+        transmission.  Only ``zero_shift`` moves the peaks (see
+        :class:`Geometry`); what this geometry adds over a bare source is ITC
+        case (3a) absorption, which is on as soon as the geometry is chosen
+        because its sec θ volume factor survives at µt = 0.
+
+        ``radiation`` defaults to the **Kα1-only** ``"CuKa1"``, unlike
+        :meth:`bragg_brentano`: a transmission instrument of this kind is
+        normally built around an incident-beam focusing monochromator, which is
+        what makes the geometry practical in the first place.  Pass a doublet
+        name explicitly for an unmonochromated transmission setup.
+
+        Give ``mu_t`` directly, or ``thickness_mm`` and let the refinement
+        estimate µt from the composition (``pxrdref.estimate_mu_t``); with
+        neither, the geometry still applies the sec θ footprint factor and says
+        so through the ``ABSORPTION_THICKNESS_UNKNOWN`` diagnostic.
+        """
+        try:
+            lines = _RADIATIONS[radiation]
+        except KeyError:
+            raise ValueError(
+                f"unknown radiation {radiation!r}; available: {sorted(_RADIATIONS)}"
+            ) from None
+        emission = [EmissionLine(wavelength=lines[0],
+                                 weight=Parameter(value=1.0, min=0.0, max=2.0))]
+        for wl in lines[1:]:
+            emission.append(EmissionLine(
+                wavelength=wl, weight=Parameter(value=ka2_ratio, min=0.0, max=1.0)))
+        return cls(
+            source=Source(lines=emission,
+                          polarization=Parameter(value=0.5, min=0.0, max=1.0)),
+            geometry=Geometry(kind="flat_plate_transmission", mu_t=mu_t,
+                              thickness_mm=thickness_mm,
+                              packing_fraction=packing_fraction),
         )
 
 

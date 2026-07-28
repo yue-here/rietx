@@ -102,33 +102,62 @@ class MicroabsorptionCorrection(Base):
 
 
 class AbsorptionCorrection(Base):
-    """Record of the cylindrical (capillary) absorption applied, WP-0501.
+    """Record of the specimen absorption applied — WP-0501 (cylinder), WP-0508
+    (flat plate).
 
-    Present only for ``debye_scherrer`` Rietveld fits that actually carried a
-    µR.  ``mu_r`` is the value used (from ``Geometry.mu_r``, or estimated from
-    composition × packing × capillary radius when that was left unset), and
-    ``mu_r_source`` says which.
+    Present only for Rietveld fits that actually carried a specimen dimension.
+    ``method`` says which geometry's expression ran; ``mu_r`` carries the
+    dimensionless µ·(length) in every case — the capillary radius for
+    ``rouse_cylinder``, the specimen thickness for the two flat-plate cases —
+    and ``mu_r_source`` says whether it was given or estimated from
+    composition × packing × that length.
 
-    ``equivalent_delta_biso`` is the point of the whole correction.  The Rouse
-    transmission factor is exactly a constant times exp(c·sin²θ), so applying
-    it is an exact reparameterisation of the phase scale and the displacement
-    parameters: Rwp does not change.  What changes is that a Biso refined
-    *without* it comes back low by this much (Å²), which is why the correction
-    is worth applying and why an Rwp comparison would show nothing.
+    ``equivalent_delta_biso`` is the point of the whole correction, and for the
+    cylinder it is the *only* point: the Rouse transmission factor is exactly a
+    constant times exp(c·sin²θ), so applying it is an exact reparameterisation
+    of the phase scale and the displacement parameters and Rwp does not change.
+    What changes is that a Biso refined *without* it comes back low by this
+    much (Å²) — positive means "add this to recover the unbiased value".
+
+    The flat-plate cases are **not** exactly reparameterisable, so two more
+    fields carry what the cylinder does not need:
+    ``unabsorbed_fraction`` is the share of ln A that a free scale and a free
+    Biso cannot reproduce (0 for the cylinder to rounding, a few per cent to
+    tens of per cent for a flat plate), and ``identifiable_fraction`` the same
+    measure applied to ∂lnA/∂µt — the number behind the decision not to make
+    the thickness refinable.  Both are measured at the *reflection* positions
+    rather than on the fitted grid (WP-0502's lesson).
+
+    ``intensity_fraction_of_optimal`` is filled for transmission only.  The
+    intensity-maximising plate has µt = 1 exactly, so µt *is* the thickness in
+    units of the optimum and this is µt·exp(1 − µt) — the counts this specimen
+    delivered as a fraction of the best it could have.  A specimen-preparation
+    number no fit statistic can express, since a badly chosen thickness costs
+    counting statistics and not accuracy.
     """
 
-    method: Literal["rouse_cylinder"] = "rouse_cylinder"
+    method: Literal["rouse_cylinder", "flat_plate_reflection",
+                    "flat_plate_transmission"] = "rouse_cylinder"
     mu_r: float
     mu_r_source: Literal["given", "estimated"]
     wavelength: float                    # Å, primary emission line
     equivalent_delta_biso: float         # Å², bias incurred by omitting this
-    #: set when µR was requested but could not be estimated (absorption edge in
-    #: the tabulation interval, element outside the compilation, energy outside
-    #: 2-120 keV) — the correction was then not applied
+    #: set when the dimensionless product was requested but could not be
+    #: estimated (absorption edge in the tabulation interval, element outside
+    #: the compilation, energy outside 2-120 keV) — the correction was then not
+    #: applied
     skipped: str | None = None
     #: set when µR exceeds the Rouse fit's stated range; the value was still
-    #: used, since refusing outright would silently drop real absorption
+    #: used, since refusing outright would silently drop real absorption.
+    #: Never set for the flat-plate cases, which are exact integrals with no
+    #: fitted range to leave
     out_of_range: bool = False
+    #: flat plate only — the share of ln A not reproducible by {scale, Biso}
+    unabsorbed_fraction: float | None = None
+    #: flat plate only — the share of ∂lnA/∂(µt) not reproducible by them
+    identifiable_fraction: float | None = None
+    #: transmission only — counts delivered as a fraction of the µt = 1 optimum
+    intensity_fraction_of_optimal: float | None = None
 
 
 class QuantitativePhaseAnalysis(Base):

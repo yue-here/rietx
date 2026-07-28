@@ -236,11 +236,12 @@ class MultiHistogramRefinement:
                             background_correlations=[f"hist.{h}.{path} (R²={r2:.2f})"])))
             if qpa is not None:
                 diags.extend(microabsorption_diagnostics(qpa))
-            # cylindrical absorption, per histogram — each may sit at its own
-            # wavelength, hence its own µR.  Only the failure modes are surfaced
-            # here; the applied value lives on ``fitted_instruments[h]``.
+            # specimen absorption, per histogram — each may sit at its own
+            # wavelength and geometry, hence its own µR/µt.  Only the failure
+            # modes are surfaced here; the applied value lives on
+            # ``fitted_instruments[h]``.
             absorption = _absorption_record(model, self._mu_r_source[h],
-                                            self._mu_r_skipped[h])
+                                            self._mu_r_skipped[h], values)
             if absorption is not None:
                 diags.extend(_absorption_diagnostics(absorption))
 

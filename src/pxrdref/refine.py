@@ -17,13 +17,20 @@ from .backend.api import backend_dtype_note
 from .history.events import as_event_stream
 from .history.store import fingerprint
 from .history.tree import RefinementTree
-from .model.absorption import CYLINDER_MU_R_MAX, equivalent_delta_biso
+from .model.absorption import (
+    CYLINDER_MU_R_MAX,
+    equivalent_delta_biso,
+    equivalent_delta_biso_from_transmission,
+    mu_t_identifiable_fraction,
+    transmission_intensity_fraction,
+)
 from .model.forward import CompiledModel, Mode, compile_model
 from .model.restraints import summarise_restraints
 from .optimize.least_squares import run_least_squares
 from .optimize.qpa import (
     compute_qpa,
     estimate_capillary_mu_r,
+    estimate_flat_plate_mu_t,
     microabsorption_diagnostics,
 )
 from .optimize.statistics import compute_statistics
@@ -739,69 +746,163 @@ def _apply_esds(table: ParameterTable, result: RefinementResult,
 
 def _resolve_capillary_mu_r(structure: Structure,
                             instrument: Instrument) -> tuple[str, str | None]:
-    """Fill in ``Geometry.mu_r`` from composition, in place.  Returns
-    ``(source, skipped_reason)``.
+    """Fill in ``Geometry.mu_r`` **or** ``Geometry.mu_t`` from composition, in
+    place.  Returns ``(source, skipped_reason)``.
 
-    Only acts when the geometry is a capillary with a radius and no explicit
-    µR — an explicit value always wins, because the user measured their
-    specimen and we did not.  Failure to estimate leaves ``mu_r`` at ``None``
-    (correction off) and returns the reason, which the result then reports:
-    silently running with no absorption after the user asked for it would be
-    the worst of the three outcomes.
+    Only acts when the geometry declares a specimen dimension (capillary radius
+    or flat-specimen thickness) and no explicit dimensionless product — an
+    explicit value always wins, because the user measured their specimen and we
+    did not.  Failure to estimate leaves the field at ``None`` (correction off)
+    and returns the reason, which the result then reports: silently running with
+    no absorption after the user asked for it would be the worst of the three
+    outcomes.
     """
     geom = instrument.geometry
-    if geom.kind != "debye_scherrer" or geom.capillary_radius_mm is None:
-        return "given", None
-    if geom.mu_r is not None:
+    if geom.kind == "debye_scherrer":
+        if geom.capillary_radius_mm is None or geom.mu_r is not None:
+            return "given", None
+        table = ParameterTable(structure, instrument)
+        mu_r, reason = estimate_capillary_mu_r(
+            structure, table.decode(table.x0()),
+            instrument.source.primary_wavelength,
+            geom.capillary_radius_mm, geom.packing_fraction)
+        if mu_r is None:
+            return "estimated", reason
+        geom.mu_r = mu_r
+        return "estimated", None
+
+    if geom.thickness_mm is None or geom.mu_t is not None:
         return "given", None
     table = ParameterTable(structure, instrument)
-    mu_r, reason = estimate_capillary_mu_r(
+    mu_t, reason = estimate_flat_plate_mu_t(
         structure, table.decode(table.x0()),
         instrument.source.primary_wavelength,
-        geom.capillary_radius_mm, geom.packing_fraction)
-    if mu_r is None:
+        geom.thickness_mm, geom.packing_fraction)
+    if mu_t is None:
         return "estimated", reason
-    geom.mu_r = mu_r
+    geom.mu_t = mu_t
     return "estimated", None
 
 
-def _absorption_record(model: CompiledModel, source: str,
-                       skipped: str | None):
+#: ``unabsorbed_fraction`` above which a flat-plate absorption correction is
+#: genuinely changing the fit rather than re-labelling the scale and the ADPs —
+#: i.e. above which a *wrong* µt shows up as misfit instead of as a quiet Biso
+#: shift.  Chosen at the elbow of the measured curve (µt 0.2-0.5 over a Cu Kα
+#: range sits at 0.09-0.28, µt ≥ 2 climbs again but on an A that is within 1 %
+#: of 1 everywhere), not from theory.
+FLAT_PLATE_IDENTIFIABLE = 0.05
+
+
+def _absorption_record(model: CompiledModel, source: str, skipped: str | None,
+                       values: dict[str, float] | None = None):
     """The :class:`AbsorptionCorrection` record, or None when nothing applies."""
-    if model.geometry_kind != "debye_scherrer" or model.mode != "rietveld":
-        return None
-    if not model.mu_r and skipped is None:
+    if model.mode != "rietveld":
         return None
     lam = model.line_wavelengths[0] if model.line_wavelengths else model.wavelength
+    if model.geometry_kind == "debye_scherrer":
+        if not model.mu_r and skipped is None:
+            return None
+        return AbsorptionCorrection(
+            mu_r=float(model.mu_r), mu_r_source=source, wavelength=float(lam),
+            equivalent_delta_biso=equivalent_delta_biso(model.mu_r, lam),
+            skipped=skipped, out_of_range=model.mu_r > CYLINDER_MU_R_MAX)
+
+    if model.mu_t is None and skipped is None:
+        return None
+    transmission = model.geometry_kind == "flat_plate_transmission"
+    mu_t = 0.0 if model.mu_t is None else float(model.mu_t)
+    delta_biso = unabsorbed = identifiable = None
+    positions = _reflection_positions(model, values)
+    if model.mu_t is not None and positions.size:
+        a = np.asarray(model._absorption(positions), dtype=np.float64)
+        delta_biso, unabsorbed = equivalent_delta_biso_from_transmission(
+            positions, a, lam)
+        identifiable = mu_t_identifiable_fraction(positions, mu_t,
+                                                  model.geometry_kind)
     return AbsorptionCorrection(
-        mu_r=float(model.mu_r), mu_r_source=source, wavelength=float(lam),
-        equivalent_delta_biso=equivalent_delta_biso(model.mu_r, lam),
-        skipped=skipped, out_of_range=model.mu_r > CYLINDER_MU_R_MAX)
+        method=("flat_plate_transmission" if transmission
+                else "flat_plate_reflection"),
+        mu_r=mu_t, mu_r_source=source, wavelength=float(lam),
+        equivalent_delta_biso=delta_biso or 0.0, skipped=skipped,
+        unabsorbed_fraction=unabsorbed, identifiable_fraction=identifiable,
+        intensity_fraction_of_optimal=(
+            transmission_intensity_fraction(mu_t)
+            if transmission and model.mu_t is not None else None))
+
+
+def _reflection_positions(model: CompiledModel,
+                          values: dict[str, float] | None) -> np.ndarray:
+    """In-range Bragg 2θ of every modelled reflection, primary line.
+
+    Where an intensity correction is *judged* — never on the fitted grid, which
+    can start far below the first peak and make a correction look enormous that
+    no modelled reflection ever experienced (WP-0502 measured exactly that on
+    the round-robin patterns).
+    """
+    if not model.phases or values is None:
+        return np.empty(0)
+    positions = np.concatenate(
+        [np.asarray(model.phase_peaks(ip, values)[0][0], dtype=np.float64)
+         for ip in range(len(model.phases))])
+    positions = positions[np.isfinite(positions)]
+    return positions[(positions >= model.tt_min) & (positions <= model.tt_max)]
 
 
 def _absorption_diagnostics(record) -> list[Diagnostic]:
-    """Surface the two ways a capillary absorption correction can mislead."""
+    """Surface the ways a specimen absorption correction can mislead."""
     out: list[Diagnostic] = []
+    flat = record.method != "rouse_cylinder"
+    where = ["instrument.geometry." + ("mu_t" if flat else "mu_r")]
     if record.skipped is not None:
         out.append(Diagnostic(
             level="warning", code="ABSORPTION_ESTIMATE_UNAVAILABLE",
-            where=["instrument.geometry.mu_r"],
-            message=("a capillary radius was given but µR could not be "
-                     f"estimated ({record.skipped}); the pattern was fitted "
-                     "with NO absorption correction"),
-            suggestion=("set instrument.geometry.mu_r explicitly, or use a "
-                        "wavelength away from an absorption edge of the "
-                        "specimen")))
+            where=where,
+            message=(("a specimen thickness" if flat else "a capillary radius")
+                     + " was given but "
+                     + ("µt" if flat else "µR")
+                     + f" could not be estimated ({record.skipped}); the "
+                     "pattern was fitted with NO absorption correction"),
+            suggestion=(f"set {where[0]} explicitly, or use a wavelength away "
+                        "from an absorption edge of the specimen")))
     if record.out_of_range:
         out.append(Diagnostic(
-            level="warning", code="ABSORPTION_MU_R_OUT_OF_RANGE",
-            where=["instrument.geometry.mu_r"],
+            level="warning", code="ABSORPTION_MU_R_OUT_OF_RANGE", where=where,
             message=(f"µR = {record.mu_r:.2f} is outside the Rouse et al. "
                      f"(1970) fit's range (µR ≤ {CYLINDER_MU_R_MAX:g}); the "
                      "transmission factor is an extrapolation there"),
             suggestion=("dilute the specimen, use a narrower capillary, or a "
                         "shorter wavelength — pxrdref.estimate_mu_r() shows "
                         "what each choice buys")))
+    if flat and record.identifiable_fraction is not None \
+            and record.identifiable_fraction > FLAT_PLATE_IDENTIFIABLE:
+        # Not a fence — the opposite.  It says the correction is doing something
+        # a fit could in principle see, so µt is worth measuring properly rather
+        # than estimated from a nominal thickness and a guessed packing.
+        out.append(Diagnostic(
+            level="info", code="ABSORPTION_THICKNESS_MATTERS", where=where,
+            message=(f"µt = {record.mu_r:.3f} shifts every Biso by "
+                     f"{record.equivalent_delta_biso:+.3f} Å², and "
+                     f"{100 * record.identifiable_fraction:.0f} % of its angular "
+                     "signature is not reproducible by the scale and the ADPs — "
+                     "so an error in the specimen thickness or packing lands "
+                     "partly in the fit and partly in the displacement "
+                     "parameters"),
+            suggestion=("measure the specimen thickness rather than assuming a "
+                        "nominal one; µt is held fixed by design (it is not "
+                        "refinable) precisely because it would otherwise "
+                        "re-apportion the ADPs")))
+    if record.method == "flat_plate_transmission" \
+            and record.intensity_fraction_of_optimal is not None \
+            and record.intensity_fraction_of_optimal < 0.7:
+        out.append(Diagnostic(
+            level="info", code="ABSORPTION_PLATE_THICKNESS", where=where,
+            message=(f"a transmission plate is brightest at µt = 1, so this one "
+                     f"(µt = {record.mu_r:.3f}) delivered "
+                     f"{100 * record.intensity_fraction_of_optimal:.0f} % of the "
+                     "counts it could have"),
+            suggestion=("a plate far from t = 1/µ fits just as well and simply "
+                        "measures fewer counts — a specimen-preparation note, "
+                        "not a fit problem")))
     return out
 
 
@@ -873,10 +974,10 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         diagnostics = diagnostics + _restraint_tension_diagnostics(
             restraints_report, structure)
 
-    # Cylindrical absorption: report what was applied and, crucially, the Biso
-    # bias it removed — Rwp is provably unchanged by it, so nothing else in the
-    # result would show that the correction did anything.
-    absorption = _absorption_record(model, mu_r_source, mu_r_skipped)
+    # Specimen absorption: report what was applied and, crucially, the Biso
+    # bias it removed — for a capillary Rwp is provably unchanged by it, so
+    # nothing else in the result would show that the correction did anything.
+    absorption = _absorption_record(model, mu_r_source, mu_r_skipped, values)
     if absorption is not None:
         diagnostics = diagnostics + _absorption_diagnostics(absorption)
 

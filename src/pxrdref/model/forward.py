@@ -76,7 +76,11 @@ from ..schemas.instrument import (
 )
 from ..schemas.pattern import PatternData
 from ..schemas.structure import Structure
-from .absorption import cylinder_absorption
+from .absorption import (
+    cylinder_absorption,
+    flat_plate_reflection_absorption,
+    flat_plate_transmission_absorption,
+)
 from .corrections import (
     displacement_shift_deg,
     lorentz_polarization,
@@ -177,6 +181,15 @@ class CompiledModel:
     # correction is the exact identity.  A itself is not frozen — it follows
     # 2θ_Bragg, which moves with the cell.
     mu_r: float
+    # dimensionless µ·t of a flat specimen, resolved once at compile the same
+    # way and for the same reasons (model/absorption.py).  ``None`` means the
+    # thick-specimen assumption — ITC case (1a), A = 1/2µ with no θ, exactly
+    # degenerate with the phase scale — which is what this package modelled
+    # before WP-0508 and what a reflection geometry without a thickness still
+    # models.  0.0 is a *legal transmission* specimen (non-absorbing plate,
+    # sec θ footprint only) and an illegal reflection one, so the two cases
+    # cannot share the "0 means off" convention the rest of the model uses.
+    mu_t: float | None
     mode: Mode
     phases: list[CompiledPhase]
     fixed_background: np.ndarray | None  # sampled on tt, or None
@@ -244,23 +257,37 @@ class CompiledModel:
         return shift
 
     def _absorption(self, tt_bragg: np.ndarray) -> np.ndarray | float:
-        """Cylindrical absorption transmission A(µR, θ), or exactly 1.0.
+        """Specimen absorption transmission A(θ) for this geometry, or exactly 1.0.
+
+        One seam, three geometries (:mod:`pxrdref.model.absorption`): the Rouse
+        cylinder for a capillary, ITC case (2) for a finite-thickness flat
+        reflection specimen, ITC case (3a) for symmetric transmission.  The
+        branch is on *compile-time structural* state only — the geometry kind
+        and a frozen scalar — so no θ-derived value is ever branched on and the
+        residual stays smooth for FD/autodiff Jacobians.
 
         **Every hand-written analytic intensity column must apply this too.**
         A is a plain multiplier on the same product ``phase_peaks`` builds, and
         unlike extinction it does not depend on |F|², r or any refined
         parameter — so a coordinate/ADP/PO move chains through it unchanged and
         the column is simply scaled.  Omit it in one of those builders and that
-        column is silently wrong by A (a factor of ~5 at µR = 1) while the
-        finite-difference columns stay right, which converges happily to the
-        wrong structure.  ``test_absorption.py`` guards this.
+        column is silently wrong by A (a factor of ~5 at µR = 1, and a factor of
+        3 across the pattern at µt = 0.2) while the finite-difference columns
+        stay right, which converges happily to the wrong structure.
+        ``test_absorption.py`` guards this for every geometry.
 
         Returns the scalar ``1.0`` when off so the multiply is a no-op the
-        backends do not even trace.
+        backends do not even trace.  "Off" differs by geometry and that is
+        deliberate: no capillary µR, or a flat specimen with no declared
+        thickness (the thick limit, which has no θ-dependence to correct).
         """
-        if self.geometry_kind != "debye_scherrer" or not self.mu_r:
+        if self.geometry_kind == "debye_scherrer":
+            return cylinder_absorption(tt_bragg, self.mu_r) if self.mu_r else 1.0
+        if self.mu_t is None:
             return 1.0
-        return cylinder_absorption(tt_bragg, self.mu_r)
+        if self.geometry_kind == "flat_plate_transmission":
+            return flat_plate_transmission_absorption(tt_bragg, self.mu_t)
+        return flat_plate_reflection_absorption(tt_bragg, self.mu_t)
 
     def _site_values(self, ip: int, values: dict[str, float], cell: tuple
                      ) -> tuple[np.ndarray, np.ndarray, np.ndarray,
@@ -445,20 +472,22 @@ class CompiledModel:
             else:
                 intensity = base * w_line * lorentz_polarization(tt_bragg, values["instrument.polarization"])
                 intensity = intensity * sabine_extinction(f2, lam, vol, tt_bragg, ext)
-                # cylindrical (capillary) absorption, model/absorption.py.  The
+                # specimen absorption, model/absorption.py: cylinder, finite
+                # flat reflection or flat transmission by geometry.  The
                 # geometry test is a compile-time structural branch, permitted
-                # by the same rule as _position_shift_deg; µR is frozen, so no
-                # θ-derived value is branched on.  µR=0 gives A ≡ 1.0
-                # bit-for-bit, so leaving it out of the branch would be
-                # harmless — it is kept for the same reason PO is skipped when
-                # absent, to keep non-capillary work off the code path.
+                # by the same rule as _position_shift_deg; µR/µt are frozen, so
+                # no θ-derived value is branched on.  Off returns the scalar
+                # 1.0, which keeps a specimen-shape-free model off the code path
+                # entirely rather than merely multiplying by ones.
                 intensity = intensity * self._absorption(tt_bragg)
                 # surface roughness (model/corrections.py): a per-(line,
                 # reflection) depression of the low-angle intensity.  Rides
                 # after extinction — all these multiplies commute — and, unlike
                 # extinction, does not feed back into the extinction variable x.
-                # Mutually exclusive with the absorption factor above in
-                # practice: that one is capillary-only, this one flat-plate-only.
+                # It can now coexist with the absorption factor above (both are
+                # flat-specimen quantities, and a thin rough layer is a real
+                # specimen), which is why neither is written as an else-branch
+                # of the other.
                 rough = self._roughness_factor(tt_bragg, values)
                 if rough is not None:
                     intensity = intensity * rough
@@ -1153,6 +1182,8 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         # frozen for the stage; None (nothing asked for) and 0.0 (asked for
         # and negligible) both mean the correction is the exact identity
         mu_r=float(geom.mu_r or 0.0),
+        # None and 0.0 are *different* here — see the field comment
+        mu_t=None if geom.mu_t is None else float(geom.mu_t),
         mode=mode, phases=phases,
         fixed_background=fixed,
         bkg_paths=bkg_paths, bkg_design=design, bkg_penalty=penalty,
