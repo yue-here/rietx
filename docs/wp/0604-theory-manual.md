@@ -17,6 +17,24 @@ Depends on: —
 
 ## Inherited
 
+From **WP-0508** (flat-plate absorption, landed 2026-07-28) — a section that
+is already written, and a worked example of the house rule.
+
+- **The three specimen-absorption geometries are derived in full in
+  `model/absorption.py`'s module docstring**, each in three lines from the ITC
+  eq. (6.3.3.1) volume average, including the sin θ cancellation that makes a
+  *thick* Bragg-Brentano specimen angle-independent. That is manual prose
+  already; lift it rather than re-deriving, and keep the convention paragraph
+  (A ≤ 1 transmission vs the A\* = 1/A most tables print — an identity test
+  cannot tell them apart, only the direction of the θ-dependence can).
+- **It is also the cleanest illustration of "validate against the integral, not
+  a transcription".** WP-0501's b₂ was printed with two digits transposed in
+  the available scan of Rouse (1970); the error is invisible against a
+  constant-θ slice of the paper's own table and 0.08 wrong at µR = 1. The
+  flat-plate cases are closed-form integrals rather than fits, so
+  `tests/test_flat_plate.py` checks them against an adaptive quadrature of the
+  defining path-length integral, sharing no constant with the implementation.
+
 From **WP-0305** (Brindley, landed 2026-07-23) — a concrete instance of the
 "second, divergent source" risk this stub already names, and a warning about
 *which* source to trust. 0305's own WP body wrote the microabsorption fence as

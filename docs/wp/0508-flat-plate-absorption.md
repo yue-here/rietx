@@ -1,6 +1,6 @@
 # WP-0508 — Flat-plate absorption + a real-data capillary acceptance
 
-Milestone: v0.5 · Status: 🔶 in progress
+Milestone: v0.5 · Status: ✅ shipped 2026-07-28
 Depends on: 0501
 
 ## Goal
@@ -122,25 +122,36 @@ direction alongside {scale, Biso}. The `### Inherited` note below (correctly)
 refused to extend that to flat plate without measuring, since neither (2) nor
 (3a) is of that form. Measured — ∂lnA/∂µt projected onto span{1, sin²θ}, the
 subspace a free phase scale and a free Biso span, reporting the norm fraction
-left over (the `mu_r_identifiable_fraction` construction):
+left over (the `mu_r_identifiable_fraction` construction, shipped as
+`mu_t_identifiable_fraction`):
 
-| 2θ range | case (2), µt = 0.05 → 2.0 | case (3a), any µt |
+| 2θ range | case (2) at µt = 0.05 / 0.3 / 1.0 / 2.0 | case (3a), any µt |
 |---|---|---|
-| 5–60° | 0.119 → 0.469 | **0.0023** |
-| 10–90° | 0.064 → 0.322 | **0.013** |
-| 20–140° | 0.029 → 0.174 | 0.117 |
+| 5–60° | 0.119 / 0.148 / 0.211 / 0.469 | 0.035 |
+| 10–90° | 0.064 / 0.164 / 0.082 / 0.322 | 0.084 |
+| 20–140° | 0.028 / 0.119 / 0.048 / 0.174 | 0.265 |
 
-Case (3a)'s residue does not depend on µt at all (∂lnA/∂µt = −sec θ, an
-amplitude), and over any range a transmission plate is actually measured on
-(sec θ diverges, so ≲ 90° 2θ) it is **0.2–1.3 % — degenerate for practical
-purposes**, the cylinder story again for a different reason. Case (2) genuinely
-carries a few per cent to tens of per cent, but its residue is largest exactly
-where the correction is weakest (µt ≥ 2 depresses nothing: A is within 1 % of 1
-over the whole range).
+**The measurement moved once it was made against the code rather than the
+paper, and that is worth recording.** Case (3a)'s ∂lnA/∂µt is −(sec θ − 1) for
+the *normalised* expression this WP implements and −sec θ for ITC's — a
+difference of a constant, i.e. of a multiple of the phase-scale direction. The
+numerator of the ratio is identical either way; the denominator is not, and the
+unnormalised form reports 0.2–1.3 % where the normalised one reports 3–26 %.
+**The fraction is basis-dependent and is not an esd**; read it as "how much of
+this correction's angular signature survives a free scale and a free Biso" and
+quote the normalised numbers, which are what the shipped function returns.
 
-So: **µt is a plain float, computed from thickness × composition × packing, and
-never refined**, matching `Geometry.mu_r`. The identifiable fraction is
-*reported* rather than acted on, so a caller who disagrees can see the number.
+Either way the conclusion holds, but its *grounds* change: flat-plate µt is not
+degenerate the way µR is exactly degenerate — it is merely ill-conditioned. So
+**µt is a plain float, computed from thickness × composition × packing, and
+never refined**, on three stated grounds rather than on an identity: µt is
+knowable from the specimen, a free one lands in the {scale, Biso, background}
+corner WP-0502 needed guards for, and what it would silently re-apportion is the
+ADPs the correction exists to protect. The fraction is *reported* on the result
+record, so a caller who disagrees can see the number and decide for themselves.
+Case (2)'s residue is also largest exactly where the correction is weakest
+(µt ≥ 2 depresses nothing: A is within 1 % of 1 across the whole range), which
+is the opposite of a case for refining it.
 
 ### Files and seams to extend (do not duplicate)
 
@@ -253,23 +264,23 @@ From **WP-0504** (anomalous f′/f″, landed 2026-07-27):
 
 - [x] Expand this stub into a full WP before writing code
 - [x] Source a capillary dataset with a stated bore diameter and specimen
-- [ ] Land `tests/data/11BM_LaB6_660a.fxye` + `.prm` with provenance rows in
+- [x] Land `tests/data/11BM_LaB6_660a.fxye` + `.prm` with provenance rows in
       `tests/data/README.md` (source, licence, capillary spec, the circular-λ
       warning)
-- [ ] `tests/test_acceptance_capillary.py` (slow): the exact-reparameterisation
+- [x] `tests/test_acceptance_capillary.py` (slow): the exact-reparameterisation
       identity on real data — Rwp and cell invariant, both Biso shifted by
       `equivalent_delta_biso`; obs/calc/diff PNGs to `tests/output/`
-- [ ] `model/absorption.py`: `flat_plate_absorption` for ITC (2)/(3a), the
+- [x] `model/absorption.py`: `flat_plate_absorption` for ITC (2)/(3a), the
       generalised (projected) ΔBiso, `mu_t_identifiable_fraction`, optimal
       thickness; validated against a quadrature of the defining integral
-- [ ] Schema seam: `Geometry.kind += "flat_plate_transmission"`, `mu_t`,
+- [x] Schema seam: `Geometry.kind += "flat_plate_transmission"`, `mu_t`,
       `thickness_mm`, validators; `estimate_flat_plate_mu_t` beside the
       capillary estimator
-- [ ] `CompiledModel.mu_t` + `_absorption` dispatch, applied in all three
+- [x] `CompiledModel.mu_t` + `_absorption` dispatch, applied in all three
       intensity assemblies, guarded analytic-vs-FD as `test_absorption.py` does
-- [ ] `AbsorptionCorrection` record + diagnostics; `pxrdref compare` row;
-      AGENT_PROTOCOL row
-- [ ] Handover log + ROADMAP sync
+- [x] `AbsorptionCorrection` record + diagnostics; `pxrdref compare` row +
+      the `lab6_capillary` standard; AGENT_PROTOCOL §8.12 and two diagnostic rows
+- [x] Handover log + ROADMAP sync
 
 ## Acceptance
 
@@ -305,6 +316,48 @@ catches a factor applied in one assembly and not the other three).
   (github.com/AdvancedPhotonSource/GSAS-II-tutorials).
 
 ## Handover log
+
+- **2026-07-28 (later)** — **shipped.** *Done:* everything on the checklist.
+  Seven commits: WP expansion, dataset + provenance, capillary acceptance,
+  flat-plate physics + quadrature tests, the model/record/diagnostic wiring, the
+  compare-UI row and `lab6_capillary` standard, and the doc sweep
+  (AGENT_PROTOCOL §8.12 + two diagnostic rows, DESIGN's absorption section,
+  README, CLAUDE.md). 907 tests green (`-m "not slow"` 868, ~2.8 min).
+
+  *Findings worth carrying, beyond what is written above:*
+
+  - **The capillary acceptance came out cleaner than the design expected.** The
+    prediction was "Rwp roughly unchanged"; the measurement is Rwp to 3e-8, the
+    cell to 8e-12 Å, and *both* Biso to seven decimals of the predicted shift,
+    including on top of an anomalous-dispersion model. That is tight enough to
+    use as a regression on the whole intensity chain, not just on absorption.
+  - **The flat-plate correction is much bigger than the capillary one** — ΔBiso
+    −1.5 Å² at µt = 0.2 versus 0.49 at µR = 1 — and it moves Rwp, so it is a
+    genuinely different animal despite sharing a module. The compare-UI row is
+    the honest way to show it: on a thick specimen (fluorite) declaring µt = 0.5
+    makes Rwp *worse* and drives a Biso onto its bound, which is the correction
+    refusing a specimen that is not there.
+  - **The identifiable-fraction number is basis-dependent**, and this was found
+    only by re-measuring against the shipped code rather than the ITC form (the
+    table above records both). Any future ratio-of-norms diagnostic wants the
+    same check: the numerator is invariant to adding a scale direction, the
+    denominator is not.
+  - **A missing thickness must not be spelled `0.0`.** The reflection case's
+    identity is µt = ∞, so the usual "0 means off" convention would multiply
+    every intensity by zero. This is enforced in three places (schema refusal,
+    `CompiledModel.mu_t: float | None`, a test that a thick specimen leaves the
+    forward model bit-untouched) rather than commented once.
+
+  *Next:* nothing on this WP. The v0.5 milestone closes with it — record in
+  `docs/milestones/v0.5.md`.
+
+  *Deferred, with the numbers that would justify revisiting:* making µt
+  refinable. It is not the exactly-singular direction µR is (3–47 % of its
+  signature survives the {scale, Biso} projection), so a bounded-LM solver plus
+  the `block_projection_r2` nuisance machinery could in principle fit it on data
+  with a strong low-angle range. What stops it today is that µt is measurable
+  and the failure mode is silent ADP re-apportionment. Anyone reopening this
+  should start from `test_mu_t_identifiability_is_small_but_not_zero`.
 
 - **2026-07-28** — stub expanded to a full WP, with the two questions it was
   blocked on both answered by measurement rather than assumption. *Done:* the

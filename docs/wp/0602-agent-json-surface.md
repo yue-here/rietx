@@ -17,6 +17,27 @@ Depends on: —
 
 ## Inherited
 
+From **WP-0508** (flat-plate absorption, landed 2026-07-28) — new surface to
+cover, and one enum that is no longer binary.
+
+- **`Geometry.kind` has three values**, not two: `debye_scherrer`,
+  `bragg_brentano` and `flat_plate_transmission`. Anything that branches on
+  "capillary or flat plate" (JSON schema enums, request validation, the
+  worked examples) needs the third, and the two flat kinds behave differently —
+  only `bragg_brentano` accepts `surface_roughness`, and the absorption
+  expression differs between them.
+- **`AbsorptionCorrection` grew four fields** (`method`, `unabsorbed_fraction`,
+  `identifiable_fraction`, `intensity_fraction_of_optimal`), and `method` is
+  the discriminator a consumer must read before interpreting `mu_r` — it is
+  µ·R for a cylinder and µ·t for a plate, deliberately one field because it is
+  one dimensionless product, but they are not the same quantity.
+- **Two new diagnostic codes**, both flat-plate: `ABSORPTION_THICKNESS_MATTERS`
+  (`info`, but it is the one that says a wrong thickness lands partly in the
+  ADPs) and `ABSORPTION_PLATE_THICKNESS` (`info`, specimen-preparation advice
+  with no bearing on the fit). Their agent-facing semantics are in
+  AGENT_PROTOCOL §7's table and §8.12; the JSON surface should not restate
+  them, only stay consistent with them.
+
 Four result-surface shapes landed in v0.3 that a single-call JSON API will trip
 over. All are real, none are bugs.
 

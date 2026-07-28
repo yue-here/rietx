@@ -22,6 +22,34 @@ Depends on: —
 
 ## Inherited
 
+From **WP-0508** (flat-plate absorption, landed 2026-07-28) — a new suite, a
+new *kind* of tolerance, and a dataset with a documented circularity.
+
+- **An eighth acceptance suite exists**: `tests/test_acceptance_capillary.py`
+  (slow, ~17 s), on `11BM_LaB6_660a.fxye` — NIST SRM 660a LaB₆ at APS 11-BM in
+  the beamline's documented 0.81 mm Kapton bore.
+- **Its tolerances are a tier the matrix does not yet have: *identity*
+  tolerances.** The capillary correction is an exact reparameterisation of
+  {scale, Biso}, so the assertions are |ΔRwp| < 1e-6, |Δa| < 1e-9 Å and
+  |ΔB − predicted| < 1e-5 Å² *between two fits*, not agreement with an external
+  value. Measured margins are 3e-8, 8e-12 and ~1e-7, i.e. two to four orders
+  inside the bars. This tier is not referenced to a certificate, to a
+  participant spread, or to σ — it is referenced to floating-point arithmetic,
+  and the policy should name it rather than force it into an accuracy band.
+- **The cell from that dataset must never enter the matrix as an anchor.** λ was
+  calibrated at the beamline against LaB₆ itself (`# Calibration from:
+  .../11bmb_3843.calib`), so a refined LaB₆ cell reproduces the standard by
+  construction. It lands 16 ppm from the SRM 660a certificate, which is worth
+  recording as consistency and nothing more. The absolute anchors stay SRM 660c
+  and SRM 676a.
+- **The v0.5 milestone record ends with a table this WP should adopt**
+  ([../milestones/v0.5.md](../milestones/v0.5.md)): for each of the eight
+  corrections, Δ Rwp versus what it actually changes. Not one of the eight is
+  well judged by Δ Rwp — two cannot move it, one moves it the wrong way when it
+  is right, and the two largest accuracy wins are invisible in it. A validation
+  matrix whose columns are agreement indices would score this milestone as
+  having delivered nothing.
+
 From **WP-0310** (v0.3 acceptance, landed 2026-07-24) — two measured ceilings
 that a tolerance policy written from certificates alone would violate.
 

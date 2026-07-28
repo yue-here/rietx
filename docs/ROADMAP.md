@@ -46,6 +46,39 @@ backlog is cleared — new sessions only need to keep up with their own.*
 
 ## Current focus
 
+**v0.5 shipped 2026-07-28** — all eight WPs (0501–0508) landed; measured
+acceptance in [milestones/v0.5.md](milestones/v0.5.md). The headline is the
+milestone's own method result rather than any single correction: **not one of
+the eight is well judged by Δ Rwp.** Two provably cannot move it (capillary
+absorption moves Rwp by 3e-8 on real data while shifting every Biso by exactly
+the predicted 0.0166542 Å²), one moves it the *wrong way* when it is right (a
+flat-plate thickness declared on a thick specimen — which is how you learn the
+specimen was not thin), three move it while changing nothing quotable, and the
+two largest accuracy wins — dispersion taking round-robin QPA from RMS 2.26 to
+0.69 wt %, and absorption unbiasing ADPs by up to 1.5 Å² — are invisible in it.
+That is why each correction ships with a record field or a diagnostic that says
+what it did, and why AGENT_PROTOCOL leads with it.
+
+WP-0508 closed the milestone by answering the two questions it was blocked on
+with measurements rather than assumptions: the capillary dataset exists (11-BM's
+SRM 660a LaB₆, in the beamline's documented 0.81 mm Kapton bore, µR ≈ 0.5–0.7),
+and flat-plate µt is *not* the exactly-singular direction µR is — it keeps
+3–47 % of its signature — so it is held fixed on stated grounds rather than on
+an identity, with the number reported so a caller can disagree.
+
+**Next: v0.6 — solver, performance & agents.** Nothing blocks it. The obvious
+first row is **[0605](wp/0605-batched-peak-loop.md)**, which behaves like a v0.5
+row: its ≈2.4× lands on the **default numpy path** and needs no optional
+dependency; it was found in 0408 rather than belonging where it sits. Then
+[0601](wp/0601-bounded-lm-solver.md) (a bounded LM, which 0503 wants for the
+Stephens positivity cone and 0508 would let revisit whether µt is refinable),
+[0602](wp/0602-agent-json-surface.md) (the agent JSON surface, now with a
+consumer-facing protocol document to be faithful to) and
+[0604](wp/0604-theory-manual.md).
+
+<details>
+<summary>How v0.5 got here — the per-WP narrative (superseded by the record)</summary>
+
 **v0.4 shipped 2026-07-27** — all eight WPs (0401–0408) landed; measured
 acceptance in [milestones/v0.4.md](milestones/v0.4.md). The headline is
 deliberately two-sided: every backend computes the same Jacobian (and an
@@ -75,10 +108,10 @@ chain — 0501 and 0502 act on intensity in geometries that exclude each other
 merges were clean. [0505](wp/0505-sequential-refinement.md) (sequential warm
 start) landed 2026-07-28 — see its note below.
 [0507](wp/0507-anode-wavelengths.md) (anode wavelengths) landed 2026-07-28 —
-see its note below. **[0508](wp/0508-flat-plate-absorption.md) is what remains**
-before the v0.5 row can flip; 0501 split it out, and it needs a capillary
-dataset the repo does not have. It is still a stub — expand it before writing
-code.
+see its note below. [0508](wp/0508-flat-plate-absorption.md) closed the
+milestone the same day: it was a stub needing a capillary dataset the repo did
+not have, and the dataset turned out to exist (11-BM's SRM 660a LaB₆, in the
+beamline's documented 0.81 mm bore).
 
 **[0507](wp/0507-anode-wavelengths.md) (anode wavelengths) landed 2026-07-28.**
 Five anodes joined `CuKa` — Cr, Fe, Co, Mo, Ag, each also as a Kα1-only variant
@@ -467,6 +500,8 @@ and passes `hermitian=True`. Every reported correlation is a valid Pearson
 correlation again, so the 0.98 guard measures the data's degeneracies and not
 the linear algebra's.
 
+</details>
+
 ## Milestones
 
 | Milestone | Scope | Status | Acceptance |
@@ -475,7 +510,7 @@ the linear algebra's.
 | v0.2 | Lab diffractometer + FitReport attribution + viz | ✅ **shipped 2026-07-22** ([record](milestones/v0.2.md)) | SRM 660c LaB6: a = 4.156895(25) Å (+28 ppm vs NIST value for this dataset, Bérar-Lelann-inflated esd), Rwp 8.7%; GSAS-II FAP tutorial: Rwp 9.73% vs GSAS's 10.05% on identical channels, cell +116 ppm (uniform d-scale convention offset) |
 | v0.3 | Multi-phase QPA, Pawley, aniso ADPs, multi-histogram | ✅ **shipped 2026-07-24** ([record](milestones/v0.3.md)) | SRM 676a corundum: c/a +30 ppm vs certificate (absolute axes −313/−283 ppm, uniform d-scale); IUCr round robin: sample-1 worst 5.1 wt% (traces ≤1.3), sample 2 worst 2.9 wt% with brucite March-Dollase r=0.67, sample 4 characterised as the designed Brindley failure (µR fence fires) |
 | v0.4 | Differentiable backends: JAX jacfwd, mixed precision, torch-MPS; true Voigt; restraints | ✅ **shipped 2026-07-27** ([record](milestones/v0.4.md)) | Cross-backend Jacobian agreement (analytic/FD/jax/torch × 8 configs + multi-histogram + stage boundaries) inside the 5e-3 rel-L2 fp64 bar; an all-fp32 Apple-GPU refinement of SRM 676a lands Δa = −3.5e-8 Å from numpy fp64 (bar 3e-5); wall-clock reported, not gated — and it is a *finding*: MPS is 46-182× slower (launch-latency-bound) and jit'd jacfwd is within 2.1× of the analytic assembly at best, so the batched peak loop is a numpy-path win (WP-0605), not GPU enablement |
-| v0.5 | Corrections & microstructure (absorption, Stephens, f′f″) | ⬜ | capillary absorption validated at **algorithm level**: the Rouse (1970) cylinder factor against a quadrature of the exact ITC eq. (6.3.3.4) integral across 0 ≤ µR ≤ 1 *and* 0 ≤ sin²θ ≤ 1 (0.0035, the paper's own bound), plus the Biso bias it removes measured on synthetic data (0.489 Å² at µR = 1, recovered to 4 dp at 18.8σ). A *dataset*-level capillary acceptance is WP-0508 — `tests/data` has no capillary pattern, and the reworded criterion says so rather than implying evidence that does not exist |
+| v0.5 | Corrections & microstructure (absorption, Stephens, f′f″) | ✅ **shipped 2026-07-28** ([record](milestones/v0.5.md)) | capillary absorption validated at **both** levels: the Rouse (1970) cylinder factor against a quadrature of the exact ITC eq. (6.3.3.4) integral across 0 ≤ µR ≤ 1 *and* 0 ≤ sin²θ ≤ 1 (0.0035, the paper's own bound), and on real 11-BM SRM 660a LaB₆ data in a documented 0.81 mm bore — Rwp moves 3e-8, the cell 8e-12 Å, and *both* Biso move by the predicted 0.0166542 Å². Plus the two accuracy wins no fit statistic shows: dispersion takes the round-robin QPA error from RMS 2.26 → 0.69 wt %, and a mis-declared flat-plate thickness biases Biso by up to −1.5 Å² |
 | v0.6 | TOPAS-style bounded LM, agent surface, batched peak loop | ⬜ | solver benchmark vs scipy TRF (a **CPU** comparison — device acceleration was measured not to exist at this problem size, see 0408) |
 | v1.0 | Hardening, API freeze, PyPI | ⬜ | full validation matrix green |
 | v2+ | FPA, neutron/TOF, texture, MCP server | ⬜ fenced | — |
@@ -521,7 +556,7 @@ the linear algebra's.
 | [0505](wp/0505-sequential-refinement.md) | SequentialRefinement warm start | ✅ 2026-07-28 | — |
 | [0506](wp/0506-secondary-extinction.md) | Secondary extinction (Sabine) | ✅ 2026-07-23 | — |
 | [0507](wp/0507-anode-wavelengths.md) | Additional anode wavelengths (Co/Cr/Fe/Mo/Ag) | ✅ 2026-07-28 | — |
-| [0508](wp/0508-flat-plate-absorption.md) | Flat-plate absorption + real-data capillary acceptance | ⬜ | 0501 |
+| [0508](wp/0508-flat-plate-absorption.md) | Flat-plate absorption + real-data capillary acceptance | ✅ 2026-07-28 | 0501 |
 
 ### v0.6 — solver, performance & agents (stubs)
 

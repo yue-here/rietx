@@ -20,6 +20,30 @@ Depends on: —
 
 ## Inherited
 
+From **WP-0508** (flat-plate absorption, landed 2026-07-28) — a second
+candidate for a constrained solver, and a warning about it.
+
+- **A better-conditioned solver would re-open whether `Geometry.mu_t` can be
+  refined.** WP-0501 fixed capillary µR because its derivative lies
+  *identically* in span{1, sin²θ} — no solver can help with an exactly singular
+  direction. Flat-plate µt is different: measured, it keeps **3-47 %** of its
+  signature after that projection (`absorption.mu_t_identifiable_fraction`, and
+  `tests/test_flat_plate.py::test_mu_t_identifiability_is_small_but_not_zero`
+  pins the numbers). It is held fixed today because it is knowable from the
+  specimen and because a free one lands in exactly the ill-conditioned
+  {scale, Biso, background} corner. If this WP lands a solver that handles that
+  corner honestly, the measurement to redo is `block_projection_r2` with the
+  scale and background as `nuisance` (WP-0502's machinery) on a real thin-mount
+  pattern — not the norm ratio above, which is basis-dependent (see below).
+- **A ratio-of-norms diagnostic is basis-dependent, and this cost a WP an
+  incorrect table.** WP-0508 first measured µt's identifiable fraction against
+  the *ITC* form of the transmission factor and got 0.2-1.3 %; against the
+  **normalised** form the code actually implements it is 3-26 %. The two differ
+  by a constant in ln A — i.e. by a multiple of the phase-scale direction — so
+  the numerator is identical and only the denominator moves. Any new
+  conditioning statistic here wants the same check before its numbers are
+  quoted.
+
 From **WP-0308** (multi-histogram, landed 2026-07-24) — **there are now two
 drivers, not one.** `run_multi_least_squares` imports the private
 `_make_residual` / `_make_jacobian` from `least_squares.py` and runs its own
