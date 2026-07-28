@@ -155,7 +155,8 @@ value to its cited source, and the Cu pair is asserted byte-for-byte unchanged.
 
 ## Handover log
 
-- **2026-07-28** — **shipped**; all six tasks landed, fast suite green.
+- **2026-07-28** — **shipped**; all six tasks landed, fast suite green
+  (834 of 910; +20 tests, all fast — this WP adds no slow path).
 
   **Done.** The scale decision above (one database column for all six anodes,
   with the shipped Cu pair bit-identical to it — that is the whole safety
