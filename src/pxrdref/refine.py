@@ -784,13 +784,15 @@ def _resolve_specimen_absorption(structure: Structure,
     return "estimated", None
 
 
-#: ``unabsorbed_fraction`` above which a flat-plate absorption correction is
-#: genuinely changing the fit rather than re-labelling the scale and the ADPs —
-#: i.e. above which a *wrong* µt shows up as misfit instead of as a quiet Biso
-#: shift.  Chosen at the elbow of the measured curve (µt 0.2-0.5 over a Cu Kα
-#: range sits at 0.09-0.28, µt ≥ 2 climbs again but on an A that is within 1 %
-#: of 1 everywhere), not from theory.
-FLAT_PLATE_IDENTIFIABLE = 0.05
+#: |ΔBiso| (Å²) above which a declared flat-specimen thickness is worth telling
+#: the user about.  Gated on the **bias**, not on the identifiable fraction:
+#: that fraction is 3-47 % for every flat-plate µt worth declaring — including
+#: µt ≥ 2, where A is within 1 % of 1 everywhere and there is nothing to say —
+#: so a fence on it would fire always, which WP-0502 established is a fence
+#: that measures nothing.  0.05 Å² is roughly a typical Biso esd and ~10 % of a
+#: typical Biso: below it the correction cannot move a quoted displacement
+#: parameter outside its own uncertainty.
+FLAT_PLATE_BIAS_MIN = 0.05
 
 
 def _absorption_record(model: CompiledModel, source: str, skipped: str | None,
@@ -875,20 +877,22 @@ def _absorption_diagnostics(record) -> list[Diagnostic]:
             suggestion=("dilute the specimen, use a narrower capillary, or a "
                         "shorter wavelength — pxrdref.estimate_mu_r() shows "
                         "what each choice buys")))
-    if flat and record.identifiable_fraction is not None \
-            and record.identifiable_fraction > FLAT_PLATE_IDENTIFIABLE:
+    if flat and abs(record.equivalent_delta_biso) > FLAT_PLATE_BIAS_MIN:
         # Not a fence — the opposite.  It says the correction is doing something
-        # a fit could in principle see, so µt is worth measuring properly rather
-        # than estimated from a nominal thickness and a guessed packing.
+        # to the displacement parameters that is worth the user knowing the size
+        # of, so µt is worth measuring rather than taken from a nominal
+        # thickness and a guessed packing.  "At least" because the projected
+        # bias understates what a weighted fit absorbs, by a factor that grows
+        # with the unabsorbed fraction quoted beside it (model/absorption.py).
+        residue = record.identifiable_fraction or 0.0
         out.append(Diagnostic(
             level="info", code="ABSORPTION_THICKNESS_MATTERS", where=where,
-            message=(f"µt = {record.mu_r:.3f} shifts every Biso by "
+            message=(f"µt = {record.mu_r:.3f} shifts every Biso by at least "
                      f"{record.equivalent_delta_biso:+.3f} Å², and "
-                     f"{100 * record.identifiable_fraction:.0f} % of its angular "
-                     "signature is not reproducible by the scale and the ADPs — "
-                     "so an error in the specimen thickness or packing lands "
-                     "partly in the fit and partly in the displacement "
-                     "parameters"),
+                     f"{100 * residue:.0f} % of its angular signature is not "
+                     "reproducible by the scale and the ADPs — so an error in "
+                     "the specimen thickness or packing lands partly in the fit "
+                     "and partly in the displacement parameters"),
             suggestion=("measure the specimen thickness rather than assuming a "
                         "nominal one; µt is held fixed by design (it is not "
                         "refinable) precisely because it would otherwise "

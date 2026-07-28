@@ -456,6 +456,26 @@ def test_record_reports_the_bias_and_the_part_that_is_not_a_reparameterisation()
     assert "ABSORPTION_THICKNESS_MATTERS" in codes
 
 
+def test_the_thickness_diagnostic_is_gated_on_the_bias_not_the_residue():
+    """It must be silent on a nearly-thick specimen, or it measures nothing.
+
+    The obvious gate — the identifiable fraction — is 3-47 % for *every*
+    flat-plate µt, including µt ≥ 2 where A is within 1 % of 1 everywhere and
+    there is nothing to report.  A fence that always fires is exactly what
+    WP-0502 established is worthless, so this one is gated on the size of the
+    Biso shift instead.
+    """
+    from pxrdref.refine import FLAT_PLATE_BIAS_MIN
+
+    inert = _fit_flat_plate("bragg_brentano", mu_t=4.0)
+    assert abs(inert.absorption.equivalent_delta_biso) < FLAT_PLATE_BIAS_MIN
+    assert "ABSORPTION_THICKNESS_MATTERS" not in {
+        d.code for d in inert.diagnostics}
+    # …while the residue at that µt is *larger* than at µt = 0.2, which is why
+    # gating on it would have inverted the message
+    assert inert.absorption.identifiable_fraction > 0.05
+
+
 def test_transmission_record_carries_the_thickness_advice():
     result = _fit_flat_plate("flat_plate_transmission", mu_t=0.1)
     record = result.absorption
