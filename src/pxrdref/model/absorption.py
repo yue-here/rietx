@@ -1,4 +1,4 @@
-"""Cylindrical (capillary) absorption for Debye-Scherrer geometry.
+"""Specimen absorption: cylindrical (capillary) and flat-plate geometries.
 
 A powder in a capillary attenuates the beam along a path that is longest in
 forward scattering and shortest toward backscatter, so measured intensities are
@@ -66,6 +66,83 @@ what this module delivers.
 Sphere coefficients (1.5108, −0.0315, −0.0951, −0.2898; max error 0.0024) are
 given in the same paper and are deliberately **not** implemented: the specimen
 shape here is a capillary.
+
+Flat plate (WP-0508)
+--------------------
+
+*International Tables* Vol. C Table 6.3.3.1 gives three flat-specimen cases.
+All three follow from the same eq. (6.3.3.1) volume average, and — unlike the
+cylinder — each integrates in closed form, so nothing here is a *fit* and there
+are no tabulated coefficients to transcribe wrongly:
+
+    (1a) reflection, specimen thicker than the penetration depth
+         A = 1/2µ                                  — no θ at all
+    (2)  reflection, finite thickness t, planes parallel to the surface
+         A = {1 − exp(−2µt·cosec θ)} / 2µ
+    (3a) transmission, plate of thickness t, symmetric (φ = 0)
+         A = t·sec θ·exp(−µt·sec θ)
+
+Case (1a) is *identical* to the phase scale, not merely correlated: a column of
+zeros.  It is not implemented, and neither is it needed — it is what this
+package has always assumed.  GSAS-II returns 1.0 for its ``'Bragg'`` case for
+the same reason.
+
+Both implemented cases are normalised, and they take **opposite** answers about
+what "off" means:
+
+* :func:`flat_plate_reflection_absorption` divides by the thick limit 1/2µ,
+  giving ``A = 1 − exp(−2µt/sin θ)`` → 1 as µt → ∞.  The identity is therefore
+  an **infinitely thick** specimen, not µt = 0 — a plate of zero thickness
+  diffracts nothing.  This is the reverse of every other correction in this
+  package, where 0 is the identity, and it is why the field is optional
+  (absent ⇒ thick ⇒ nothing applied) rather than defaulted to zero.
+* :func:`flat_plate_transmission_absorption` has no thick limit (A → 0), so it
+  is normalised at θ = 0: ``A = sec θ·exp(−µt·(sec θ − 1))``.  µt = 0 leaves
+  ``sec θ``, which is **physics, not a leftover**: the beam's footprint on the
+  tilted plate, hence the diffracting volume, grows as sec θ.  Selecting the
+  geometry is what switches it on.
+
+Derivations, since they are three lines each and pin the sin/cos that a reader
+will otherwise have to trust.  Take an incident beam of cross-section S.
+
+*(2)* the beam meets the surface at grazing angle θ, so the illuminated area is
+S/sin θ and an element at depth z has total path 2z/sin θ:
+
+    ∫₀ᵗ exp(−2µz/sin θ)·(S/sin θ) dz = (S/2µ)·{1 − exp(−2µt/sin θ)}
+
+— the sin θ of the footprint cancelling against the sin θ of the penetration
+depth is exactly why the *thick* case has no θ-dependence at all.
+
+*(3a)* the plate normal bisects the incident and diffracted beams, so an element
+at depth z has incident path z/cos θ and diffracted path (t − z)/cos θ: the
+total is t/cos θ **independent of z**, and the footprint is S/cos θ:
+
+    ∫₀ᵗ exp(−µt/cos θ)·(S/cos θ) dz = S·(t/cos θ)·exp(−µt/cos θ)
+
+Direction of the bias, which is the whole point of applying either:
+
+* case (2) depresses the **high**-angle intensity (deeper penetration at high θ
+  runs out of specimen), so a Biso refined without it comes back too **large** —
+  the opposite sign to the capillary;
+* case (3a) raises the high angle while µt is small (the sec θ footprint) and
+  depresses it once µt is large, so the sign of its bias flips with thickness.
+
+:func:`equivalent_delta_biso_from_transmission` reports either, by projecting
+ln A onto span{1, sin²θ} over the *reflection* positions — WP-0502's lesson that
+a correction is judged where peaks are, not on the fitted grid.  Neither
+flat-plate expression is exactly of that form (the cylinder's is), so it also
+returns the fraction of ln A that is **not** absorbed, which is the part a fit
+could in principle distinguish from a scale and a Biso.  Measured over ranges a
+plate is really scanned on, that fraction is 0.2-1.3 % for transmission and a
+few per cent for finite-thickness reflection — so µt, like µR, is a plain float
+computed from the specimen and never refined.
+
+The optimal transmission thickness falls out of the *unnormalised* (3a):
+d/dt [t·exp(−µt·sec θ)] = 0 at µt = cos θ, i.e. **t = 1/µ** at θ = 0, one
+absorption length.  That is a specimen-preparation number, reported by
+:func:`optimal_transmission_thickness_mm`, and deliberately not part of the
+fitted model — the normalisation above has already absorbed the overall t into
+the phase scale.
 """
 
 from __future__ import annotations
@@ -135,6 +212,98 @@ def equivalent_delta_biso(mu_r: float, wavelength: float) -> float:
     return c * wavelength ** 2 / 2.0
 
 
+def flat_plate_reflection_absorption(two_theta_deg: np.ndarray, mu_t: float
+                                     ) -> np.ndarray:
+    """ITC (2): finite-thickness reflection, normalised by the thick limit.
+
+        A = 1 − exp(−2·µt/sin θ)
+
+    ``mu_t`` is µ times the *specimen thickness* (dimensionless).  A → 1 as
+    µt → ∞, which is the thick-specimen case this package assumes when no
+    thickness is declared; the off state is therefore µt = ∞ (field absent),
+    **not** µt = 0, which would be a specimen of no thickness at all.
+    """
+    xp = get_backend()
+    theta = xp.radians(0.5 * xp.asarray(two_theta_deg, dtype=np.float64))
+    return 1.0 - xp.exp(-2.0 * mu_t / xp.sin(theta))
+
+
+def flat_plate_transmission_absorption(two_theta_deg: np.ndarray, mu_t: float
+                                       ) -> np.ndarray:
+    """ITC (3a): symmetric transmission, normalised at θ = 0.
+
+        A = sec θ · exp(−µt·(sec θ − 1))
+
+    ``mu_t`` is µ times the *plate thickness*.  The sec θ prefactor survives at
+    µt = 0 on purpose — it is the growth of the illuminated volume as the plate
+    tilts, not a normalisation residue — so this correction has no "off" state
+    short of leaving the geometry.
+    """
+    xp = get_backend()
+    theta = xp.radians(0.5 * xp.asarray(two_theta_deg, dtype=np.float64))
+    sec = 1.0 / xp.cos(theta)
+    return sec * xp.exp(-mu_t * (sec - 1.0))
+
+
+def optimal_transmission_thickness_mm(mu_cm: float) -> float:
+    """Plate thickness (mm) maximising diffracted intensity: t = 1/µ.
+
+    From the *unnormalised* ITC (3a): d/dt[t·exp(−µt·sec θ)] = 0 at µt = cos θ,
+    so t = 1/µ at θ = 0 and slightly less at higher angles — the classic "one
+    absorption length" rule.  A specimen-preparation number, not a model
+    parameter: the fitted expression divides the overall t out into the phase
+    scale, so a plate at 3× the optimum fits exactly as well and just measures
+    a third of the counts.
+    """
+    if mu_cm <= 0.0:
+        raise ValueError(f"linear attenuation must be positive, got {mu_cm}")
+    return 10.0 / mu_cm
+
+
+def equivalent_delta_biso_from_transmission(
+        two_theta_deg: np.ndarray, transmission: np.ndarray, wavelength: float
+        ) -> tuple[float, float]:
+    """(ΔBiso, unabsorbed fraction) for an arbitrary transmission factor.
+
+    The general form of :func:`equivalent_delta_biso`.  A free phase scale and a
+    free isotropic displacement parameter span exactly ``{1, sin²θ}`` in the
+    log-intensity, so least-squares projecting ``ln A`` onto that basis splits
+    any intensity correction into the part a fit silently re-absorbs and the
+    part it cannot.  With ``ln A ≈ const + β·sin²θ``,
+
+        B_fitted = B_true − β·λ²/2        ⇒  ΔB = +β·λ²/2
+
+    Returned **signed**: add it to a Biso refined without the correction to
+    recover the unbiased value.  Positive for the cylinder (absorption
+    neglected reads as too little thermal motion), negative for
+    finite-thickness reflection, either sign for transmission depending on
+    whether the sec θ footprint or the exponential dominates.
+
+    ``two_theta_deg`` should be the **reflection positions**, not the fitted
+    grid: a correction is only ever applied where there are peaks, and a grid
+    that starts far below the first reflection reports a depression no modelled
+    peak ever saw (WP-0502 measured that on real data).
+
+    The second return value is ‖residual‖/‖ln A − mean‖ — how much of the
+    correction's angular shape is *not* reproducible by {scale, Biso}.  Zero to
+    rounding means the correction is an exact reparameterisation and cannot
+    change the fit; the cylinder is the exact case, and both flat-plate
+    expressions sit at a few per cent.
+    """
+    s = np.asarray(_sin2_theta(get_backend(), two_theta_deg), dtype=np.float64)
+    ln_a = np.log(np.asarray(transmission, dtype=np.float64))
+    finite = np.isfinite(s) & np.isfinite(ln_a)
+    s, ln_a = s[finite], ln_a[finite]
+    if s.size < 2:
+        return 0.0, 0.0
+    design = np.column_stack([np.ones_like(s), s])
+    coeffs, *_ = np.linalg.lstsq(design, ln_a, rcond=None)
+    resid = ln_a - design @ coeffs
+    spread = float(np.linalg.norm(ln_a - ln_a.mean()))
+    unabsorbed = float(np.linalg.norm(resid) / spread) if spread > 0.0 else 0.0
+    return float(coeffs[1]) * wavelength ** 2 / 2.0, unabsorbed
+
+
 def mu_r_identifiable_fraction(two_theta_deg: np.ndarray, mu_r: float) -> float:
     """Fraction of ∂lnA/∂µR that a free {scale, Biso} pair cannot absorb.
 
@@ -160,6 +329,48 @@ def mu_r_identifiable_fraction(two_theta_deg: np.ndarray, mu_r: float) -> float:
     s = np.asarray(_sin2_theta(xp, two_theta_deg), dtype=np.float64)
     a, da = cylinder_absorption_and_dmur(two_theta_deg, mu_r)
     g = np.asarray(da, dtype=np.float64) / np.asarray(a, dtype=np.float64)
+    return _identifiable_fraction(s, g)
+
+
+def mu_t_identifiable_fraction(two_theta_deg: np.ndarray, mu_t: float,
+                               geometry_kind: str) -> float:
+    """The same measurement for a flat plate, where the answer is *not* zero.
+
+    ∂lnA/∂µt for the two implemented cases:
+
+        (2)  reflection    2/sin θ · exp(−k)/(1 − exp(−k)),  k = 2µt/sin θ
+        (3a) transmission  −(sec θ − 1)                      — no µt at all
+
+    so transmission's shape is an amplitude, and its identifiable fraction does
+    not depend on µt.  Both are measured against the **normalised** A this
+    module implements, which matters: the two expressions differ from their ITC
+    forms by a θ-independent factor, i.e. by a multiple of the phase-scale
+    direction, and that changes the denominator of this ratio without changing
+    the numerator.  Read the number as "how much of this correction's angular
+    signature survives a free scale and a free Biso", not as an esd.
+
+    Measured over ranges a flat plate is really scanned on, it runs from a few
+    per cent (transmission, and reflection at the µt where the correction
+    actually bites) to tens of per cent (reflection at µt ≥ 2, where A is within
+    1 % of 1 everywhere and there is nothing to identify).  That is why
+    ``Geometry.mu_t`` is a plain float computed from the specimen rather than a
+    refinable :class:`~pxrdref.schemas.common.Parameter` — the same conclusion
+    as µR but for a weaker reason, so it is stated as a design choice backed by
+    a measurement rather than as an identity.
+    """
+    xp = get_backend()
+    s = np.asarray(_sin2_theta(xp, two_theta_deg), dtype=np.float64)
+    theta = np.radians(0.5 * np.asarray(two_theta_deg, dtype=np.float64))
+    if geometry_kind == "flat_plate_transmission":
+        g = -(1.0 / np.cos(theta) - 1.0)
+    else:
+        k = 2.0 * mu_t / np.sin(theta)
+        g = (2.0 / np.sin(theta)) * np.exp(-k) / (1.0 - np.exp(-k))
+    return _identifiable_fraction(s, g)
+
+
+def _identifiable_fraction(s: np.ndarray, g: np.ndarray) -> float:
+    """‖g − proj_{span{1, s}} g‖ / ‖g‖, the shared core of the two above."""
     design = np.column_stack([np.ones_like(s), s])
     resid = g - design @ np.linalg.lstsq(design, g, rcond=None)[0]
     scale = np.linalg.norm(g)
