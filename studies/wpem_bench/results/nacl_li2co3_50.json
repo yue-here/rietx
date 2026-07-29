@@ -1,0 +1,253 @@
+{
+  "case": "nacl_li2co3_50",
+  "dataset": "CASES/StandardSample/50percent/intensity.csv",
+  "n_points": 4189,
+  "two_theta_range": [
+    10.00763028,
+    119.986878
+  ],
+  "wavelengths": [
+    1.5405929,
+    1.5444274
+  ],
+  "mode": "rietveld",
+  "rwp": 0.1386051982071394,
+  "rp": 0.09637804256646262,
+  "rexp": 0.08489800363554635,
+  "gof": 1.6326084509848962,
+  "chi2": 2.6654103542273018,
+  "n_free": 45,
+  "status": "max_iter",
+  "seconds": 857.6,
+  "cells": {
+    "NaCl": {
+      "a": 5.644075769097765,
+      "b": 5.644075769097765,
+      "c": 5.644075769097765,
+      "alpha": 90.0,
+      "beta": 90.0,
+      "gamma": 90.0
+    },
+    "Li2CO3": {
+      "a": 8.362816016552692,
+      "b": 4.97854649890208,
+      "c": 6.198302744600901,
+      "alpha": 90.0,
+      "beta": 114.69361651515942,
+      "gamma": 90.0
+    }
+  },
+  "cell_esds": {
+    "NaCl": {
+      "a": 0.00018579873448396715,
+      "b": 0.00018579873448396715,
+      "c": 0.00018579873448396715
+    },
+    "Li2CO3": {
+      "a": 0.0006733495615920554,
+      "b": 0.0003776731350701587,
+      "c": 0.0005068387146521034,
+      "beta": 0.007758346547755933
+    }
+  },
+  "weight_fractions": {
+    "NaCl": 0.37097984616729807,
+    "Li2CO3": 0.6290201538327018
+  },
+  "weight_fraction_esds": {
+    "NaCl": 0.010100082273300972,
+    "Li2CO3": 0.010100082273300972
+  },
+  "parameters": {
+    "phases.0.cell.a": {
+      "value": 5.644075769097765,
+      "stderr": 0.00018579873448396715
+    },
+    "phases.0.scale": {
+      "value": 0.0024934755296489217,
+      "stderr": 7.253788391292917e-05
+    },
+    "phases.0.preferred_orientation.r": {
+      "value": 0.5922889156257751,
+      "stderr": 0.005351560684063084
+    },
+    "phases.0.atoms.0.biso": {
+      "value": 1.3962805953975345e-31,
+      "stderr": 0.16136833400567563
+    },
+    "phases.0.atoms.1.biso": {
+      "value": 3.9518057593198486,
+      "stderr": 0.2542260458952274
+    },
+    "phases.1.cell.a": {
+      "value": 8.362816016552692,
+      "stderr": 0.0006733495615920554
+    },
+    "phases.1.cell.b": {
+      "value": 4.97854649890208,
+      "stderr": 0.0003776731350701587
+    },
+    "phases.1.cell.c": {
+      "value": 6.198302744600901,
+      "stderr": 0.0005068387146521034
+    },
+    "phases.1.cell.beta": {
+      "value": 114.69361651515942,
+      "stderr": 0.007758346547755933
+    },
+    "phases.1.scale": {
+      "value": 0.002564240223466597,
+      "stderr": 9.316558737552479e-05
+    },
+    "phases.1.preferred_orientation.r": {
+      "value": 1.1702149126777066,
+      "stderr": 0.018318512189165966
+    },
+    "phases.1.atoms.0.dof.0": {
+      "value": 0.004622361121293871,
+      "stderr": 0.0037357779784134237
+    },
+    "phases.1.atoms.0.dof.1": {
+      "value": 0.019535704996106747,
+      "stderr": 0.00512705582243927
+    },
+    "phases.1.atoms.0.dof.2": {
+      "value": -0.0061294682594021455,
+      "stderr": 0.006281519874075976
+    },
+    "phases.1.atoms.0.biso": {
+      "value": 1.6112470289808243,
+      "stderr": 0.6704444667404086
+    },
+    "phases.1.atoms.1.dof.0": {
+      "value": -0.016114636841786392,
+      "stderr": 0.004534213716198306
+    },
+    "phases.1.atoms.1.biso": {
+      "value": 1.4522077183955584,
+      "stderr": 0.5816948171404522
+    },
+    "phases.1.atoms.2.dof.0": {
+      "value": -0.002606687323607744,
+      "stderr": 0.002711009990558061
+    },
+    "phases.1.atoms.2.biso": {
+      "value": 2.6538393722519777,
+      "stderr": 0.4843348118239271
+    },
+    "phases.1.atoms.3.dof.0": {
+      "value": 0.0022775949760715786,
+      "stderr": 0.0011735976808143018
+    },
+    "phases.1.atoms.3.dof.1": {
+      "value": 0.0026642748047982162,
+      "stderr": 0.0016101325329770458
+    },
+    "phases.1.atoms.3.dof.2": {
+      "value": -0.0038561421975503787,
+      "stderr": 0.0023014666465373495
+    },
+    "phases.1.atoms.3.biso": {
+      "value": 0.9839530480019422,
+      "stderr": 0.2653320925350366
+    },
+    "instrument.zero_shift": {
+      "value": 0.0967968901799421,
+      "stderr": 0.0018628872714727903
+    },
+    "instrument.source.lines.1.weight": {
+      "value": 0.47050576389218624,
+      "stderr": 0.018410417054129602
+    },
+    "instrument.geometry.axial_sl": {
+      "value": 0.0311390646934775,
+      "stderr": 0.04488080124241231
+    },
+    "instrument.geometry.axial_hl": {
+      "value": 0.0312650874245164,
+      "stderr": 0.04497769034338245
+    },
+    "instrument.profile.u": {
+      "value": -0.005834692646910428,
+      "stderr": 0.002472462722630442
+    },
+    "instrument.profile.v": {
+      "value": 0.014261191867481133,
+      "stderr": 0.0015467419025092678
+    },
+    "instrument.profile.w": {
+      "value": 7.850597750297423e-15,
+      "stderr": 7.443066679927209e-25
+    },
+    "instrument.profile.x": {
+      "value": 7.55403518486278e-24,
+      "stderr": 6.695422313855465e-37
+    },
+    "instrument.profile.y": {
+      "value": 0.0854922665795832,
+      "stderr": 0.005132243455664423
+    }
+  },
+  "diagnostics": [
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_hl ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.w ~ instrument.profile.y (\u03c1=-0.989)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.w ~ instrument.profile.x (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.0.atoms.0.biso refined to its bound"
+    }
+  ],
+  "reference": {
+    "source": "arXiv 2602.16372 Fig. 2e + CASES MassFraction_estimate files",
+    "nacl_percent": {
+      "10": 91.829,
+      "40": 40.656,
+      "50": 47.54
+    },
+    "paper_nacl_percent": {
+      "10": 91.8,
+      "40": 40.7,
+      "50": 47.5
+    },
+    "method": "mass fraction from integrated component intensities of the decomposed profiles",
+    "nominal_nacl_percent": 50.0,
+    "wpem_nacl_percent": 47.54
+  },
+  "notes": [
+    "Both cells refined and the Cu Ka doublet kept; WPEM held cells fixed and used an averaged wavelength on the 10% and 50% runs.",
+    "Rietveld reached its fixed point in 2 passes."
+  ]
+}

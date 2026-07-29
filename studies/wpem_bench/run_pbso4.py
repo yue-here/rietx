@@ -29,6 +29,7 @@ from bench import (
     lab_plan,
     load,
     plot,
+    preferred_orientation,
     record,
     seed_background,
     seed_profile,
@@ -74,7 +75,7 @@ def main() -> None:
     structure = cif("pbso4_anglesite")
     phase = structure.phases[0]
     phase.name = "PbSO4"
-    phase.preferred_orientation = pr.schemas.PreferredOrientation(axis=(0, 0, 1))
+    phase.preferred_orientation = preferred_orientation((0, 0, 1))
     print(f"  model: {phase.space_group}, {len(phase.atoms)} sites, "
           f"a={phase.cell.a.value:.4f} b={phase.cell.b.value:.4f} "
           f"c={phase.cell.c.value:.4f} (Pbnm setting)")

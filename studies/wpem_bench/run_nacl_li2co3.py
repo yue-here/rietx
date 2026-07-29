@@ -30,6 +30,7 @@ from bench import (
     lab_plan,
     load,
     plot,
+    preferred_orientation,
     record,
     seed_background,
     seed_profile,
@@ -54,10 +55,10 @@ NOMINAL_NACL = {"10": 90.0, "40": 40.0, "50": 50.0}
 def build(tag: str) -> tuple[pr.Structure, pr.Instrument]:
     nacl = cif("nacl")
     nacl.phases[0].name = "NaCl"
-    nacl.phases[0].preferred_orientation = pr.schemas.PreferredOrientation(axis=(1, 0, 0))
+    nacl.phases[0].preferred_orientation = preferred_orientation((1, 0, 0))
     li2co3 = cif("li2co3")
     li2co3.phases[0].name = "Li2CO3"
-    li2co3.phases[0].preferred_orientation = pr.schemas.PreferredOrientation(axis=(0, 0, 2))
+    li2co3.phases[0].preferred_orientation = preferred_orientation((0, 0, 2))
     structure = pr.Structure(phases=[nacl.phases[0], li2co3.phases[0]])
     for phase in structure.phases:
         phase.scale = pr.Parameter(value=1e-3, min=0.0, transform="softplus")

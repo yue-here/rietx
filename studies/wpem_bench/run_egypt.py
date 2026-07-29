@@ -27,6 +27,7 @@ from bench import (
     fit_to_fixed_point,
     load,
     plot,
+    preferred_orientation,
     record,
     seed_background,
     seed_profile,
@@ -74,7 +75,7 @@ def main() -> None:
         # Hydrogen contributes ~nothing to X-ray scattering and its CIF
         # positions here are placeholders; drop it rather than refine it.
         phase.atoms = [a for a in phase.atoms if a.species.rstrip("+-0123456789") != "H"]
-        phase.preferred_orientation = pr.schemas.PreferredOrientation(axis=PO_AXES[name])
+        phase.preferred_orientation = preferred_orientation(PO_AXES[name])
         phase.scale = pr.Parameter(value=1e-4, min=0.0, transform="softplus")
         phases.append(phase)
         print(f"  {name:12s} {phase.space_group:12s} "

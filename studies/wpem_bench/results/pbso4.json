@@ -11,34 +11,34 @@
     1.5444274
   ],
   "mode": "rietveld",
-  "rwp": 0.07131201147782128,
-  "rp": 0.05492696758605012,
-  "rexp": 0.049236405815741235,
-  "gof": 1.448359405938244,
-  "chi2": 2.0977449687697836,
-  "n_free": 51,
+  "rwp": 0.07578722375879543,
+  "rp": 0.058477944804553345,
+  "rexp": 0.04925708903690798,
+  "gof": 1.5386054117410108,
+  "chi2": 2.367306613038725,
+  "n_free": 46,
   "status": "converged",
-  "seconds": 543.3,
+  "seconds": 206.2,
   "cells": {
     "PbSO4": {
-      "a": 6.956506606848303,
-      "b": 8.476090057286005,
-      "c": 5.395926504357134,
+      "a": 6.961766691815316,
+      "b": 8.482369436928556,
+      "c": 5.399932971062223,
       "alpha": 90.0,
       "beta": 90.0,
       "gamma": 90.0
     },
     "PbSO4_pnma": {
-      "a": 8.476090057286005,
-      "b": 5.395926504357134,
-      "c": 6.956506606848303
+      "a": 8.482369436928556,
+      "b": 5.399932971062223,
+      "c": 6.961766691815316
     }
   },
   "cell_esds": {
     "PbSO4": {
-      "a": 0.00044918782560220296,
-      "b": 0.0005353923236053033,
-      "c": 0.00034187982619360123
+      "a": 0.00014436430511625484,
+      "b": 0.0001712291227199882,
+      "c": 0.000107239415916732
     }
   },
   "weight_fractions": {
@@ -47,131 +47,138 @@
   "weight_fraction_esds": {
     "PbSO4": 0.0
   },
+  "parameters": {
+    "phases.0.cell.a": {
+      "value": 6.961766691815316,
+      "stderr": 0.00014436430511625484
+    },
+    "phases.0.cell.b": {
+      "value": 8.482369436928556,
+      "stderr": 0.0001712291227199882
+    },
+    "phases.0.cell.c": {
+      "value": 5.399932971062223,
+      "stderr": 0.000107239415916732
+    },
+    "phases.0.scale": {
+      "value": 0.0004192542444290716,
+      "stderr": 3.5433871032166568e-06
+    },
+    "phases.0.preferred_orientation.r": {
+      "value": 0.9807047933555407,
+      "stderr": 0.0032253009296942317
+    },
+    "phases.0.atoms.0.dof.0": {
+      "value": 2.3701485913573744e-05,
+      "stderr": 0.000239720980250562
+    },
+    "phases.0.atoms.0.dof.1": {
+      "value": -0.00010464285054259454,
+      "stderr": 0.00016612407628764433
+    },
+    "phases.0.atoms.0.biso": {
+      "value": 1.3326701068090523,
+      "stderr": 0.03916498814386045
+    },
+    "phases.0.atoms.1.dof.0": {
+      "value": 0.0013647045274295527,
+      "stderr": 0.0012890878310658212
+    },
+    "phases.0.atoms.1.dof.1": {
+      "value": -0.000255514691389407,
+      "stderr": 0.000977880656836893
+    },
+    "phases.0.atoms.1.biso": {
+      "value": 0.7454262252764482,
+      "stderr": 0.1724909223174374
+    },
+    "phases.0.atoms.2.dof.0": {
+      "value": 0.0004921285911227316,
+      "stderr": 0.0025062348625355933
+    },
+    "phases.0.atoms.2.dof.1": {
+      "value": 0.00027645507994199594,
+      "stderr": 0.0021394327917612786
+    },
+    "phases.0.atoms.2.biso": {
+      "value": 0.5919731337689156,
+      "stderr": 0.4378221884922551
+    },
+    "phases.0.atoms.3.dof.0": {
+      "value": -0.004912329900397782,
+      "stderr": 0.0031671678481209877
+    },
+    "phases.0.atoms.3.dof.1": {
+      "value": 0.003766151132046755,
+      "stderr": 0.0025796159799534664
+    },
+    "phases.0.atoms.3.biso": {
+      "value": 1.407465508650795,
+      "stderr": 0.4682950749716301
+    },
+    "phases.0.atoms.4.dof.0": {
+      "value": 0.002817147937633805,
+      "stderr": 0.0021851939665610233
+    },
+    "phases.0.atoms.4.dof.1": {
+      "value": 0.0028408181514520325,
+      "stderr": 0.0014699071688751024
+    },
+    "phases.0.atoms.4.dof.2": {
+      "value": -0.001427337940496974,
+      "stderr": 0.0020047325550942917
+    },
+    "phases.0.atoms.4.biso": {
+      "value": 0.8778855441751383,
+      "stderr": 0.31258831418930594
+    },
+    "instrument.zero_shift": {
+      "value": -0.014873814888472389,
+      "stderr": 0.0009165579763253358
+    },
+    "instrument.source.lines.1.weight": {
+      "value": 0.5360311583645954,
+      "stderr": 0.009345956222142595
+    },
+    "instrument.geometry.axial_sl": {
+      "value": 0.027439131324546985,
+      "stderr": 0.01623800920750651
+    },
+    "instrument.geometry.axial_hl": {
+      "value": 0.027305258773429566,
+      "stderr": 0.016249988081726202
+    },
+    "instrument.profile.u": {
+      "value": 0.0014093544294219633,
+      "stderr": 0.0016322656976414738
+    },
+    "instrument.profile.v": {
+      "value": -0.0010769912471957444,
+      "stderr": 0.0018599303457494042
+    },
+    "instrument.profile.w": {
+      "value": 0.0019402660616192522,
+      "stderr": 0.0005942304684676769
+    },
+    "instrument.profile.x": {
+      "value": 0.03330223831850629,
+      "stderr": 0.0032582965869093357
+    },
+    "instrument.profile.y": {
+      "value": 0.08272393154876559,
+      "stderr": 0.009607654973881611
+    }
+  },
   "diagnostics": [
     {
       "level": "warning",
       "code": "HIGH_CORRELATION",
-      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.997)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
       "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.999)"
     },
     {
       "level": "warning",
       "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.lor_strain (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_size (\u03c1=+0.998)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_strain ~ phases.0.gauss_size (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_strain ~ phases.0.gauss_strain (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ phases.0.gauss_strain (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
       "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.lor_strain (\u03c1=-0.997)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_size (\u03c1=-0.998)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=-0.998)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_strain ~ phases.0.gauss_size (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_strain ~ phases.0.gauss_strain (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ phases.0.gauss_strain (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=-0.997)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ instrument.profile.w (\u03c1=+0.998)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.999)"
     },
     {
       "level": "warning",
@@ -182,26 +189,6 @@
       "level": "warning",
       "code": "BACKGROUND_ABSORPTION",
       "message": "the background can reproduce most of phases.0.atoms.0.biso (R\u00b2=0.58)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.lor_strain (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=+0.997)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_strain ~ phases.0.gauss_strain (\u03c1=+0.998)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.999)"
     },
     {
       "level": "warning",
@@ -227,20 +214,22 @@
       "c": 6.96378
     },
     "method": "whole-pattern decomposition, per-reflection free (gamma, sigma, Delta, w); no atomic structure",
+    "wpem_free_parameters": 3064,
+    "wpem_free_parameters_note": "766 peaks x (w, Delta, gamma, sigma^2), counted from WPEMPeakParas; excludes the 3 cell parameters and the 1000-anchor background",
     "literature_pnma": {
       "a": 8.48024,
       "b": 5.39754,
       "c": 6.95802
     },
     "lebail": {
-      "rwp_percent": 8.582830292734457,
-      "rp_percent": 6.297963642935914,
-      "n_free": 28
+      "rwp_percent": 7.479968974848377,
+      "rp_percent": 5.704691628665401,
+      "n_free": 27
     }
   },
   "notes": [
     "COD 9015524 is the Pbnm setting; PbSO4_pnma below is the standard-setting map (b,c,a) used for comparison.",
-    "Le Bail to a fixed point in 3 passes: Rwp=8.583% Rp=6.298% nfree=28",
+    "Le Bail to a fixed point in 3 passes: Rwp=7.480% Rp=5.705% nfree=27",
     "Rietveld reached its fixed point in 2 passes."
   ]
 }

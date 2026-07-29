@@ -11,27 +11,27 @@
     1.5444274
   ],
   "mode": "rietveld",
-  "rwp": 0.12353454120917284,
-  "rp": 0.09131646669970117,
-  "rexp": 0.05223602075986355,
-  "gof": 2.364930165279602,
-  "chi2": 5.592894686649407,
-  "n_free": 61,
+  "rwp": 0.12149406464633294,
+  "rp": 0.08973231451458293,
+  "rexp": 0.05227624873714654,
+  "gof": 2.324077713709429,
+  "chi2": 5.401337219360845,
+  "n_free": 53,
   "status": "converged",
-  "seconds": 356.8,
+  "seconds": 1752.6,
   "cells": {
     "Tb2BaCoO5": {
-      "a": 3.757258658166009,
-      "b": 5.825831223446899,
-      "c": 11.555482714865438,
+      "a": 3.7572646216450334,
+      "b": 5.825820279901056,
+      "c": 11.555521176875036,
       "alpha": 90.0,
       "beta": 90.0,
       "gamma": 90.0
     },
     "BaCO3": {
-      "a": 5.28769292790353,
-      "b": 8.940506574162812,
-      "c": 6.425083719619093,
+      "a": 5.28183400642265,
+      "b": 8.993879365621204,
+      "c": 6.4202842778994595,
       "alpha": 90.0,
       "beta": 90.0,
       "gamma": 90.0
@@ -39,215 +39,203 @@
   },
   "cell_esds": {
     "Tb2BaCoO5": {
-      "a": 0.00018813210198351965,
-      "b": 0.00030915882170017873,
-      "c": 0.0005947909997746409
+      "a": 0.0001739310736155717,
+      "b": 0.0002871741103453774,
+      "c": 0.000554823341481444
     },
     "BaCO3": {
-      "a": 0.0025210597530741733,
-      "b": 0.00437319711007968,
-      "c": 0.003013557884047627
+      "a": 0.004685101567675451,
+      "b": 0.007792964136133564,
+      "c": 0.006771699878290592
     }
   },
   "weight_fractions": {
-    "Tb2BaCoO5": 0.9807851413970124,
-    "BaCO3": 0.0192148586029876
+    "Tb2BaCoO5": 0.9690231912780021,
+    "BaCO3": 0.03097680872199794
   },
   "weight_fraction_esds": {
-    "Tb2BaCoO5": 0.005213340368732081,
-    "BaCO3": 0.00521334036873208
+    "Tb2BaCoO5": 0.008450918392502121,
+    "BaCO3": 0.008450918392502121
   },
   "parameters": {
     "phases.0.cell.a": {
-      "value": 3.757258658166009,
-      "stderr": 0.00018813210198351965
+      "value": 3.7572646216450334,
+      "stderr": 0.0001739310736155717
     },
     "phases.0.cell.b": {
-      "value": 5.825831223446899,
-      "stderr": 0.00030915882170017873
+      "value": 5.825820279901056,
+      "stderr": 0.0002871741103453774
     },
     "phases.0.cell.c": {
-      "value": 11.555482714865438,
-      "stderr": 0.0005947909997746409
+      "value": 11.555521176875036,
+      "stderr": 0.000554823341481444
     },
     "phases.0.scale": {
-      "value": 0.0004280431379933889,
-      "stderr": 9.774707004210976e-06
-    },
-    "phases.0.lor_size": {
-      "value": 1.000000002782466e-12,
-      "stderr": 6.191505448265547e-18
-    },
-    "phases.0.lor_strain": {
-      "value": 0.07602590506488496,
-      "stderr": 0.018971816746875973
-    },
-    "phases.0.gauss_size": {
-      "value": 1.0000000000249774e-12,
-      "stderr": 5.852533910698674e-18
-    },
-    "phases.0.gauss_strain": {
-      "value": 1.000000000005434e-12,
-      "stderr": 2.0833789387255025e-18
+      "value": 0.0004234545391336188,
+      "stderr": 9.267426721876318e-06
     },
     "phases.0.atoms.0.dof.0": {
-      "value": 2.8172896749741554e-06,
-      "stderr": 0.0003749439867101776
+      "value": 2.3757999350981954e-07,
+      "stderr": 0.0003691867671993562
     },
     "phases.0.atoms.0.biso": {
-      "value": 0.06646412878344544,
-      "stderr": 0.12591360493986206
+      "value": 5.003058552320184e-13,
+      "stderr": 0.12135716150323275
     },
     "phases.0.atoms.1.biso": {
-      "value": 0.27103245247824465,
-      "stderr": 0.15292498300546833
+      "value": 0.19448200615651157,
+      "stderr": 0.146778880218111
     },
     "phases.0.atoms.2.biso": {
-      "value": 0.016133416140563794,
-      "stderr": 0.30837225808860125
+      "value": 5.711375773222301e-13,
+      "stderr": 0.29873300064332453
     },
     "phases.0.atoms.3.dof.0": {
-      "value": -1.75857675820039e-05,
-      "stderr": 0.0049969761500200174
+      "value": -1.0723933871861197e-05,
+      "stderr": 0.005024544849106929
     },
     "phases.0.atoms.3.dof.1": {
-      "value": 1.4672385525425561e-05,
-      "stderr": 0.00266743661222134
+      "value": 8.801237733393231e-08,
+      "stderr": 0.0027271052914425893
     },
     "phases.0.atoms.3.biso": {
-      "value": 0.5854287253664744,
-      "stderr": 0.6558152193331916
+      "value": 0.5365919764443604,
+      "stderr": 0.6350275826852111
     },
     "phases.0.atoms.4.biso": {
-      "value": 1.9789077082665543,
-      "stderr": 1.683922453630278
+      "value": 1.8342323980723991,
+      "stderr": 1.6295255895558922
     },
     "phases.1.cell.a": {
-      "value": 5.28769292790353,
-      "stderr": 0.0025210597530741733
+      "value": 5.28183400642265,
+      "stderr": 0.004685101567675451
     },
     "phases.1.cell.b": {
-      "value": 8.940506574162812,
-      "stderr": 0.00437319711007968
+      "value": 8.993879365621204,
+      "stderr": 0.007792964136133564
     },
     "phases.1.cell.c": {
-      "value": 6.425083719619093,
-      "stderr": 0.003013557884047627
+      "value": 6.4202842778994595,
+      "stderr": 0.006771699878290592
     },
     "phases.1.scale": {
-      "value": 1.0512100743853181e-05,
-      "stderr": 2.9022956919989575e-06
-    },
-    "phases.1.lor_size": {
-      "value": 1.0000000000021796e-12,
-      "stderr": 1.1730112989280087e-18
-    },
-    "phases.1.lor_strain": {
-      "value": 1.000000000000684e-12,
-      "stderr": 3.884829018034497e-19
-    },
-    "phases.1.gauss_size": {
-      "value": 1.000000000015815e-12,
-      "stderr": 4.8430294640432506e-18
-    },
-    "phases.1.gauss_strain": {
-      "value": 1.0000000000024745e-12,
-      "stderr": 6.723979548072938e-19
+      "value": 1.6899363754694296e-05,
+      "stderr": 4.734037477265962e-06
     },
     "phases.1.atoms.0.dof.0": {
-      "value": -0.0010815857188326168,
-      "stderr": 0.012088472230538591
+      "value": -3.5234189567797236e-06,
+      "stderr": 0.010023460679218681
     },
     "phases.1.atoms.0.dof.1": {
-      "value": -0.0007478606478477282,
-      "stderr": 0.06374549547860034
+      "value": 3.9100864876411674e-05,
+      "stderr": 0.0719704791885574
     },
     "phases.1.atoms.0.biso": {
-      "value": 0.7518364699482538,
-      "stderr": 2.1576726857539903
+      "value": 2.6278916571355526,
+      "stderr": 3.455770028680479
     },
     "phases.1.atoms.1.dof.0": {
-      "value": 0.0012773671831553678,
-      "stderr": 0.2423545472775881
+      "value": -3.752809817203308e-05,
+      "stderr": 0.30661493281944086
     },
     "phases.1.atoms.1.dof.1": {
-      "value": 0.0027357975269263536,
-      "stderr": 0.2300594650446662
+      "value": -0.0005373148679260379,
+      "stderr": 0.5627234788959269
     },
     "phases.1.atoms.1.biso": {
-      "value": 0.8290283063076567,
-      "stderr": 46.91998954551509
+      "value": 0.00023337936860911052,
+      "stderr": 87.27230394927597
     },
     "phases.1.atoms.2.dof.0": {
-      "value": -0.002467937598998826,
-      "stderr": 0.12279104974365138
+      "value": 3.818315036993703e-05,
+      "stderr": 0.22301691417115077
     },
     "phases.1.atoms.2.dof.1": {
-      "value": -0.0009193559822331197,
-      "stderr": 0.14144414472484376
+      "value": -9.991905200102093e-06,
+      "stderr": 0.237705845905076
     },
     "phases.1.atoms.2.biso": {
-      "value": 1.2474476391866172,
-      "stderr": 34.65514252989176
+      "value": 0.0002194201020641691,
+      "stderr": 50.46779171246845
     },
     "phases.1.atoms.3.dof.0": {
-      "value": -0.0007369886624254131,
-      "stderr": 0.141828531873689
+      "value": 4.543227056388656e-05,
+      "stderr": 0.09731400403120857
     },
     "phases.1.atoms.3.dof.1": {
-      "value": -0.0007597901906272347,
-      "stderr": 0.09030909249543546
+      "value": -9.140255628122153e-05,
+      "stderr": 0.05649365200161286
     },
     "phases.1.atoms.3.dof.2": {
-      "value": -0.003508003390732331,
-      "stderr": 0.11791564426991863
+      "value": -9.913579271604404e-05,
+      "stderr": 0.0750198309193065
     },
     "phases.1.atoms.3.biso": {
-      "value": 1.2314860113131605,
-      "stderr": 20.912934156422445
+      "value": 8.129457916062056e-06,
+      "stderr": 16.2092586578487
     },
     "instrument.zero_shift": {
-      "value": 0.013165701349555551,
-      "stderr": 0.003165176811348155
+      "value": 0.013451682379560516,
+      "stderr": 0.002706831407945921
     },
     "instrument.source.lines.1.weight": {
-      "value": 0.48093567375009627,
-      "stderr": 0.02034011176888996
+      "value": 0.4793180118116812,
+      "stderr": 0.01950496829573282
     },
     "instrument.geometry.axial_sl": {
-      "value": 0.03419819512347314,
-      "stderr": 0.0227484538188794
+      "value": 0.03198922638581212,
+      "stderr": 0.022869547580162568
     },
     "instrument.geometry.axial_hl": {
-      "value": 0.031562711732662174,
-      "stderr": 0.023115267028388203
+      "value": 0.034129770284732956,
+      "stderr": 0.022542852449948757
     },
     "instrument.profile.u": {
-      "value": 0.003969920490963289,
-      "stderr": 0.004637108208714705
+      "value": -0.04999999999935886,
+      "stderr": 22.03663403253633
     },
     "instrument.profile.v": {
-      "value": -0.0045274572082691185,
-      "stderr": 0.004263827287910459
+      "value": -0.4999999999993417,
+      "stderr": 8.293244674815975
     },
     "instrument.profile.w": {
-      "value": 0.0012796352725567659,
-      "stderr": 0.001046639822595106
+      "value": 0.11419506080906328,
+      "stderr": 0.7637025910823414
     },
     "instrument.profile.x": {
-      "value": 0.036886820113156776,
-      "stderr": 0.008581656280620971
+      "value": 0.0344581388306335,
+      "stderr": 0.005130605910701962
     },
     "instrument.profile.y": {
-      "value": 4.3160356526677323e-07,
-      "stderr": 3.059601339785869e-10
+      "value": 0.08432980171013146,
+      "stderr": 0.011167947763764728
     }
   },
   "diagnostics": [
     {
       "level": "warning",
       "code": "HIGH_CORRELATION",
-      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.998)"
+      "message": "instrument.profile.u ~ instrument.profile.v (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.u ~ instrument.profile.w (\u03c1=+0.985)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.v ~ instrument.profile.w (\u03c1=-0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "instrument.profile.u refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "instrument.profile.v refined to its bound"
     },
     {
       "level": "warning",
@@ -257,77 +245,27 @@
     {
       "level": "warning",
       "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_size (\u03c1=-0.998)"
+      "message": "instrument.profile.u ~ instrument.profile.v (\u03c1=-0.997)"
     },
     {
       "level": "warning",
       "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=+0.997)"
+      "message": "instrument.profile.u ~ instrument.profile.w (\u03c1=+0.985)"
     },
     {
       "level": "warning",
       "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.lor_size (\u03c1=+0.992)"
+      "message": "instrument.profile.v ~ instrument.profile.w (\u03c1=-0.995)"
     },
     {
       "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.lor_strain (\u03c1=+0.995)"
+      "code": "BOUND_HIT",
+      "message": "instrument.profile.u refined to its bound"
     },
     {
       "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.gauss_size (\u03c1=+0.991)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ phases.0.gauss_strain (\u03c1=-0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ phases.1.lor_size (\u03c1=-0.997)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ phases.1.lor_strain (\u03c1=-0.998)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ phases.1.gauss_size (\u03c1=-0.996)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ phases.1.lor_size (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ phases.1.lor_strain (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ phases.1.gauss_size (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_size ~ phases.1.lor_strain (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_size ~ phases.1.gauss_size (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ phases.1.gauss_size (\u03c1=+0.999)"
+      "code": "BOUND_HIT",
+      "message": "instrument.profile.v refined to its bound"
     },
     {
       "level": "warning",
@@ -337,12 +275,67 @@
     {
       "level": "warning",
       "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ instrument.profile.y (\u03c1=+0.985)"
+      "message": "instrument.profile.u ~ instrument.profile.v (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.u ~ instrument.profile.w (\u03c1=+0.985)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.v ~ instrument.profile.w (\u03c1=-0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "instrument.profile.u refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "instrument.profile.v refined to its bound"
     },
     {
       "level": "warning",
       "code": "HIGH_CORRELATION",
       "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.u ~ instrument.profile.v (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.u ~ instrument.profile.w (\u03c1=+0.985)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.v ~ instrument.profile.w (\u03c1=-0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.0.atoms.0.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.0.atoms.2.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "instrument.profile.u refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "instrument.profile.v refined to its bound"
     },
     {
       "level": "warning",
@@ -364,19 +357,19 @@
     },
     "method": "whole-pattern decomposition, per-reflection free shapes; no atomic structure",
     "single_phase": {
-      "rwp_percent": 13.039409349035965,
-      "rp_percent": 9.606847678712601,
-      "n_free": 40
+      "rwp_percent": 13.02515591799908,
+      "rp_percent": 9.61892640550165,
+      "n_free": 36
     },
     "lebail": {
-      "rwp_percent": 17.33046265079188,
-      "rp_percent": 11.52407699155478,
+      "rwp_percent": 24.81711542904657,
+      "rp_percent": 14.995290965690971,
       "n_free": 26
     }
   },
   "notes": [
     "Structure built by Y->Tb, Ni->Co substitution into COD 1001501 (Y2BaNiO5, Immm); Tb2BaCoO5 has no COD entry.",
     "BaCO3 (witherite, COD 9006838) added as a second phase after the single-phase FitReport's Layer-0 unmatched list landed on witherite 111/021/002.",
-    "Le Bail fixed point in 2 passes (Rwp=17.330%, Rp=11.524%, nfree=26); single-phase Rietveld in 3 (Rwp=13.039%); two-phase Rietveld in 2."
+    "Le Bail fixed point in 3 passes (Rwp=24.817%, Rp=14.995%, nfree=26); single-phase Rietveld in 2 (Rwp=13.025%); two-phase Rietveld in 2."
   ]
 }

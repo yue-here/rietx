@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 
 import numpy as np
-from bench import DATA, OUT, RESULTS, Timer
+from bench import DATA, OUT, RESULTS, Timer, normalize_cif_species
 from insitu_io import series
 
 import pxrdref as pr
@@ -44,8 +44,30 @@ def main() -> None:
           f"{tt[0]:.2f}-{tt[-1]:.2f} deg")
 
     structure = pr.Structure.from_cif(str(DATA / "insitu/LiNiO2.cif"))
+    # This CIF writes its charges sign-first (O-2, Ni+3), which
+    # dispersion.normalize_element rejects — see normalize_cif_species.
+    fixed = normalize_cif_species(structure)
+    if fixed:
+        print(f"  [cif] species relabelled: {', '.join(fixed)}")
     phase = structure.phases[0]
     phase.name = "LixNiyO2"
+    # Bound the scale away from zero.  On the backward leg of direction="both"
+    # one pattern drove it to 0, and compute_qpa then *raised*
+    # ``phase scales give a non-positive scaled total (sum S.ZMV = 0.0)`` from
+    # inside _build_result — killing all 157 refinements over one bad pattern,
+    # for a quantity that is definitionally 100 % in a single-phase model.
+    # See REPORT.md 4.1(h).
+    phase.scale = pr.Parameter(value=1e-3, min=1e-8, max=1e3)
+    # Bound the cell to +/-4 % of the starting LiNiO2 metric.  329 points at
+    # 0.16 deg over 10-62 deg give only ~6 usable reflections, and an unbounded
+    # cell against six peaks wanders: the first attempt ran c from 14.18 to
+    # 379 A and a to 0.12 A.  The package's direction="both" check caught it —
+    # eight parameters flagged SEQUENTIAL_PATH_DEPENDENT, one at 3e4 sigma — but
+    # a trajectory has to be *bounded by the chemistry* to be worth plotting.
+    # An operando cathode does not change its lattice by 4 %.
+    for axis, span in (("a", 0.04), ("c", 0.04)):
+        par = getattr(phase.cell, axis)
+        par.min, par.max = par.value * (1 - span), par.value * (1 + span)
     print(f"  model: {phase.space_group}, a={phase.cell.a.value:.5f} "
           f"c={phase.cell.c.value:.5f}, {len(phase.atoms)} sites")
 

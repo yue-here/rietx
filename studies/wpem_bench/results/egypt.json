@@ -1,0 +1,548 @@
+{
+  "case": "egypt",
+  "dataset": "CASES/EgyptianMakeup/WPEMfitting/intensity.csv",
+  "n_points": 7000,
+  "two_theta_range": [
+    5.0,
+    74.9899999999985
+  ],
+  "wavelengths": [
+    0.9627
+  ],
+  "mode": "rietveld",
+  "rwp": 0.057034886056092374,
+  "rp": 0.040224428749598924,
+  "rexp": 0.03105619690593285,
+  "gof": 1.8365058100593334,
+  "chi2": 3.3727535903816888,
+  "n_free": 75,
+  "status": "converged",
+  "seconds": 41.7,
+  "cells": {
+    "gypsum": {
+      "a": 5.678236266866194,
+      "b": 15.211473369735874,
+      "c": 6.527415375779659,
+      "alpha": 90.0,
+      "beta": 118.48755766848606,
+      "gamma": 90.0
+    },
+    "phosgenite": {
+      "a": 8.158981053000977,
+      "b": 8.158981053000977,
+      "c": 8.875321002080796,
+      "alpha": 90.0,
+      "beta": 90.0,
+      "gamma": 90.0
+    },
+    "cerussite": {
+      "a": 5.179181892630309,
+      "b": 8.490882639442557,
+      "c": 6.143548884614131,
+      "alpha": 90.0,
+      "beta": 90.0,
+      "gamma": 90.0
+    },
+    "galena": {
+      "a": 5.9381145414150165,
+      "b": 5.9381145414150165,
+      "c": 5.9381145414150165,
+      "alpha": 90.0,
+      "beta": 90.0,
+      "gamma": 90.0
+    },
+    "laurionite": {
+      "a": 9.717815963860929,
+      "b": 4.0208617401523865,
+      "c": 7.11319983965871,
+      "alpha": 90.0,
+      "beta": 90.0,
+      "gamma": 90.0
+    }
+  },
+  "cell_esds": {
+    "gypsum": {
+      "a": 0.0014709682752075833,
+      "b": 0.004127304769251461,
+      "c": 0.001782663909394665,
+      "beta": 0.018548300892675833
+    },
+    "phosgenite": {
+      "a": 0.00032767300580791855,
+      "b": 0.00032767300580791855,
+      "c": 0.0005436650597259685
+    },
+    "cerussite": {
+      "a": 0.00034692011948084516,
+      "b": 0.0006113776843762777,
+      "c": 0.0004414911490496047
+    },
+    "galena": {
+      "a": 0.00021616171529877904,
+      "b": 0.00021616171529877904,
+      "c": 0.00021616171529877904
+    },
+    "laurionite": {
+      "a": 0.0004889806649651811,
+      "b": 0.00018346837950740963,
+      "c": 0.00033772673258028934
+    }
+  },
+  "weight_fractions": {
+    "gypsum": 0.14641497469274226,
+    "phosgenite": 0.17893167486209194,
+    "cerussite": 0.22891381315234313,
+    "galena": 0.04909681561440572,
+    "laurionite": 0.396642721678417
+  },
+  "weight_fraction_esds": {
+    "gypsum": 0.012621867811284873,
+    "phosgenite": 0.00474481230297211,
+    "cerussite": 0.0056290307074060575,
+    "galena": 0.0019198453336579707,
+    "laurionite": 0.00750373119332042
+  },
+  "parameters": {
+    "phases.0.cell.a": {
+      "value": 5.678236266866194,
+      "stderr": 0.0014709682752075833
+    },
+    "phases.0.cell.b": {
+      "value": 15.211473369735874,
+      "stderr": 0.004127304769251461
+    },
+    "phases.0.cell.c": {
+      "value": 6.527415375779659,
+      "stderr": 0.001782663909394665
+    },
+    "phases.0.cell.beta": {
+      "value": 118.48755766848606,
+      "stderr": 0.018548300892675833
+    },
+    "phases.0.scale": {
+      "value": 3.0185813270847662e-05,
+      "stderr": 3.051450672429984e-06
+    },
+    "phases.0.preferred_orientation.r": {
+      "value": 1.066193889592776,
+      "stderr": 0.04360032867425687
+    },
+    "phases.0.lor_size": {
+      "value": 0.018158202085932846,
+      "stderr": 0.010888173851242008
+    },
+    "phases.0.lor_strain": {
+      "value": 2.1550011463274093e-16,
+      "stderr": 1.191938424786622e-22
+    },
+    "phases.0.atoms.0.biso": {
+      "value": 0.024580306923451724,
+      "stderr": 1.5765663341988265
+    },
+    "phases.0.atoms.1.biso": {
+      "value": 2.3750076628290553,
+      "stderr": 2.8188532612359105
+    },
+    "phases.0.atoms.2.biso": {
+      "value": 2.0353743010659597,
+      "stderr": 4.037992238724212
+    },
+    "phases.0.atoms.3.biso": {
+      "value": 5.058493029197069,
+      "stderr": 4.8018780063203454
+    },
+    "phases.0.atoms.4.biso": {
+      "value": 1.7119763292524506,
+      "stderr": 3.3170297534365365
+    },
+    "phases.1.cell.a": {
+      "value": 8.158981053000977,
+      "stderr": 0.00032767300580791855
+    },
+    "phases.1.cell.c": {
+      "value": 8.875321002080796,
+      "stderr": 0.0005436650597259685
+    },
+    "phases.1.scale": {
+      "value": 9.539959064882346e-06,
+      "stderr": 2.474438065460809e-07
+    },
+    "phases.1.preferred_orientation.r": {
+      "value": 1.0123754557108537,
+      "stderr": 0.010363698775120462
+    },
+    "phases.1.lor_size": {
+      "value": 0.006812486602955861,
+      "stderr": 0.004549095554119156
+    },
+    "phases.1.lor_strain": {
+      "value": 0.09331177121517623,
+      "stderr": 0.0706916803250481
+    },
+    "phases.1.atoms.0.biso": {
+      "value": 1.233203731355975,
+      "stderr": 0.19815667063250092
+    },
+    "phases.1.atoms.1.biso": {
+      "value": 1.4912225690886072,
+      "stderr": 1.1113736038102275
+    },
+    "phases.1.atoms.2.biso": {
+      "value": 3.034072751464878,
+      "stderr": 2.092082859389994
+    },
+    "phases.1.atoms.3.biso": {
+      "value": 1.3743022436228763e-32,
+      "stderr": 4.592871205099565
+    },
+    "phases.1.atoms.4.biso": {
+      "value": 4.549572108565851e-34,
+      "stderr": 3.2141627226860545
+    },
+    "phases.1.atoms.5.biso": {
+      "value": 1.0994902323940643,
+      "stderr": 2.6239654215802233
+    },
+    "phases.2.cell.a": {
+      "value": 5.179181892630309,
+      "stderr": 0.00034692011948084516
+    },
+    "phases.2.cell.b": {
+      "value": 8.490882639442557,
+      "stderr": 0.0006113776843762777
+    },
+    "phases.2.cell.c": {
+      "value": 6.143548884614131,
+      "stderr": 0.0004414911490496047
+    },
+    "phases.2.scale": {
+      "value": 5.446911607263655e-05,
+      "stderr": 1.2325259932158812e-06
+    },
+    "phases.2.preferred_orientation.r": {
+      "value": 1.0215349041214412,
+      "stderr": 0.011341966071085655
+    },
+    "phases.2.lor_size": {
+      "value": 0.006050285157653042,
+      "stderr": 0.004554226373186278
+    },
+    "phases.2.lor_strain": {
+      "value": 0.1654740963502402,
+      "stderr": 0.07148972359252831
+    },
+    "phases.2.atoms.0.biso": {
+      "value": 0.9304751028429357,
+      "stderr": 0.17339969288205143
+    },
+    "phases.2.atoms.1.biso": {
+      "value": 7.916362847118079e-26,
+      "stderr": 2.6876166922922793
+    },
+    "phases.2.atoms.2.biso": {
+      "value": 0.1111753410564083,
+      "stderr": 1.5124023573357275
+    },
+    "phases.2.atoms.3.biso": {
+      "value": 0.05491183077237725,
+      "stderr": 1.2730418580632696
+    },
+    "phases.3.cell.a": {
+      "value": 5.9381145414150165,
+      "stderr": 0.00021616171529877904
+    },
+    "phases.3.scale": {
+      "value": 1.683414278654375e-05,
+      "stderr": 6.302307356700127e-07
+    },
+    "phases.3.preferred_orientation.r": {
+      "value": 0.9183451916429717,
+      "stderr": 0.08417333003384946
+    },
+    "phases.3.lor_size": {
+      "value": 9.19981372758794e-45,
+      "stderr": 1.944057633195458e-56
+    },
+    "phases.3.lor_strain": {
+      "value": 0.08213443669471981,
+      "stderr": 0.07065521696856711
+    },
+    "phases.3.atoms.0.biso": {
+      "value": 0.984809171170917,
+      "stderr": 0.194390382002997
+    },
+    "phases.3.atoms.1.biso": {
+      "value": 1.9220887156056243,
+      "stderr": 0.8149840454969391
+    },
+    "phases.4.cell.a": {
+      "value": 9.717815963860929,
+      "stderr": 0.0004889806649651811
+    },
+    "phases.4.cell.b": {
+      "value": 4.0208617401523865,
+      "stderr": 0.00018346837950740963
+    },
+    "phases.4.cell.c": {
+      "value": 7.11319983965871,
+      "stderr": 0.00033772673258028934
+    },
+    "phases.4.scale": {
+      "value": 9.47747667213339e-05,
+      "stderr": 1.588505508509231e-06
+    },
+    "phases.4.preferred_orientation.r": {
+      "value": 1.0288164254978784,
+      "stderr": 0.007869960746716458
+    },
+    "phases.4.lor_size": {
+      "value": 0.014654511278679255,
+      "stderr": 0.0035863090059226597
+    },
+    "phases.4.lor_strain": {
+      "value": 0.09529115583690158,
+      "stderr": 0.06958132767530151
+    },
+    "phases.4.atoms.0.biso": {
+      "value": 1.615547255034181,
+      "stderr": 0.1336421415285694
+    },
+    "phases.4.atoms.1.biso": {
+      "value": 0.49955029692626796,
+      "stderr": 1.2014454127214023
+    },
+    "phases.4.atoms.2.biso": {
+      "value": 2.185808598577958,
+      "stderr": 0.5456671604818053
+    },
+    "instrument.zero_shift": {
+      "value": 0.0018188649817156577,
+      "stderr": 0.000622478006668333
+    },
+    "instrument.profile.u": {
+      "value": 0.0038123655312065742,
+      "stderr": 0.006878312893485313
+    },
+    "instrument.profile.v": {
+      "value": 0.00017244502098207084,
+      "stderr": 0.0035896845801630236
+    },
+    "instrument.profile.w": {
+      "value": 0.0015140964887945967,
+      "stderr": 0.00043713406384355565
+    },
+    "instrument.profile.x": {
+      "value": 1.7460600075107015e-84,
+      "stderr": 2.3419691723617194e-97
+    },
+    "instrument.profile.y": {
+      "value": 0.020426891066073767,
+      "stderr": 0.07079374541212854
+    }
+  },
+  "diagnostics": [
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.3.lor_size (\u03c1=+0.990)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.3.lor_strain (\u03c1=+0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.3.lor_size ~ phases.3.lor_strain (\u03c1=+0.985)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.3.lor_size ~ phases.3.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.3.lor_size ~ phases.4.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.3.lor_size ~ instrument.profile.x (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.3.lor_strain ~ phases.4.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.3.lor_strain ~ instrument.profile.x (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.4.lor_strain ~ instrument.profile.x (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.0.atoms.0.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.0.atoms.1.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.0.atoms.2.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.0.atoms.4.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.1.atoms.3.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.1.atoms.4.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.2.atoms.2.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.2.atoms.3.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.2.atoms.0.biso (R\u00b2=0.44)"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.0.atoms.0.biso (R\u00b2=0.43)"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.4.atoms.0.biso (R\u00b2=0.37)"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.0.atoms.1.biso (R\u00b2=0.35)"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.1.atoms.0.biso (R\u00b2=0.30)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.3.lor_size ~ instrument.profile.x (\u03c1=+0.988)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.3.lor_strain ~ instrument.profile.y (\u03c1=-0.986)"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.1.atoms.3.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.1.atoms.4.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.2.atoms.1.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.2.atoms.0.biso (R\u00b2=0.44)"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.0.atoms.0.biso (R\u00b2=0.41)"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.4.atoms.0.biso (R\u00b2=0.38)"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.1.atoms.0.biso (R\u00b2=0.30)"
+    }
+  ],
+  "reference": {
+    "source": "arXiv 2602.16372 Fig. 4 text; CASES MassFraction/LatticeConstances files",
+    "paper_mass_percent": {
+      "gypsum": 12.53,
+      "phosgenite": 18.53,
+      "cerussite": 32.02,
+      "galena": 9.69,
+      "laurionite": 27.23
+    },
+    "cases_mass_percent": {
+      "gypsum": 12.658,
+      "phosgenite": 22.279,
+      "cerussite": 34.186,
+      "galena": 1.677,
+      "laurionite": 29.199
+    },
+    "paper_cells": {
+      "gypsum": {
+        "a": 5.68,
+        "b": 15.2144,
+        "c": 6.5303,
+        "beta": 118.4841
+      },
+      "phosgenite": {
+        "a": 8.16,
+        "c": 8.8834
+      },
+      "cerussite": {
+        "a": 5.1794,
+        "b": 8.4922,
+        "c": 6.1418
+      },
+      "galena": {
+        "a": 5.9388
+      },
+      "laurionite": {
+        "a": 9.7002,
+        "b": 4.02,
+        "c": 7.1108
+      }
+    },
+    "method": "whole-pattern decomposition; mass fractions from component integrated intensities"
+  },
+  "notes": [
+    "Paper and shipped CASES mass fractions disagree (galena 9.69% vs 1.68%); both are recorded.",
+    "H sites dropped from gypsum and laurionite \u2014 negligible X-ray scattering, placeholder CIF positions.",
+    "Rietveld reached its fixed point in 2 passes."
+  ]
+}

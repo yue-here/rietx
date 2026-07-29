@@ -11,670 +11,193 @@
     1.5444274
   ],
   "mode": "rietveld",
-  "rwp": 0.15269900376168494,
-  "rp": 0.10403322527409048,
-  "rexp": 0.07686073943211996,
-  "gof": 1.9866970431183792,
-  "chi2": 3.94696514113531,
-  "n_free": 54,
+  "rwp": 0.1353850530974697,
+  "rp": 0.08361582573022809,
+  "rexp": 0.07693505488523773,
+  "gof": 1.7597316762744954,
+  "chi2": 3.0966555724838454,
+  "n_free": 46,
   "status": "converged",
-  "seconds": 1696.8,
+  "seconds": 2838.4,
   "cells": {
     "NaCl": {
-      "a": 5.64411176210927,
-      "b": 5.64411176210927,
-      "c": 5.64411176210927,
+      "a": 5.644083760512835,
+      "b": 5.644083760512835,
+      "c": 5.644083760512835,
       "alpha": 90.0,
       "beta": 90.0,
       "gamma": 90.0
     },
     "Li2CO3": {
-      "a": 8.356254160067172,
-      "b": 4.972689237686269,
-      "c": 6.203353344409655,
+      "a": 8.355179473011377,
+      "b": 4.9753837257873545,
+      "c": 6.202340677434015,
       "alpha": 90.0,
-      "beta": 114.53262181381615,
+      "beta": 114.51090854385416,
       "gamma": 90.0
     }
   },
   "cell_esds": {
     "NaCl": {
-      "a": 0.0001595167296778902,
-      "b": 0.0001595167296778902,
-      "c": 0.0001595167296778902
+      "a": 0.00023176530634540506,
+      "b": 0.00023176530634540506,
+      "c": 0.00023176530634540506
     },
     "Li2CO3": {
-      "a": 0.002845972747845368,
-      "b": 0.0014173120547132203,
-      "c": 0.0009203964954947006,
-      "beta": 0.018091140686410198
+      "a": 0.0027356161963438316,
+      "b": 0.00141000323074492,
+      "c": 0.0009922367377802996,
+      "beta": 0.01912318997791028
     }
   },
   "weight_fractions": {
-    "NaCl": 0.6392325128202888,
-    "Li2CO3": 0.36076748717971124
+    "NaCl": 0.6138091325502897,
+    "Li2CO3": 0.3861908674497105
   },
   "weight_fraction_esds": {
-    "NaCl": 0.028454281951527938,
-    "Li2CO3": 0.02845428195152794
+    "NaCl": 0.031221418739465386,
+    "Li2CO3": 0.031221418739465375
   },
   "parameters": {
     "phases.0.cell.a": {
-      "value": 5.64411176210927,
-      "stderr": 0.0001595167296778902
+      "value": 5.644083760512835,
+      "stderr": 0.00023176530634540506
     },
     "phases.0.scale": {
-      "value": 0.0022096470603349297,
-      "stderr": 7.674841988034527e-05
+      "value": 0.002182469073054317,
+      "stderr": 6.671483661362896e-05
     },
     "phases.0.preferred_orientation.r": {
-      "value": 1.7039193098786596,
-      "stderr": 0.03873934271254173
-    },
-    "phases.0.lor_size": {
-      "value": 2.4583792614786386e-27,
-      "stderr": 4.9620017566322925e-33
-    },
-    "phases.0.lor_strain": {
-      "value": 0.04075627365067001,
-      "stderr": 0.017772391768425606
-    },
-    "phases.0.gauss_size": {
-      "value": 4.002386606180909e-12,
-      "stderr": 6.542933221098618e-19
-    },
-    "phases.0.gauss_strain": {
-      "value": 7.526078844458312e-13,
-      "stderr": 7.322819121665688e-19
+      "value": 1.7141407987030615,
+      "stderr": 0.03405433360563108
     },
     "phases.0.atoms.0.biso": {
-      "value": 1.28989152816249,
-      "stderr": 0.18586216062362038
+      "value": 1.3602177626371517,
+      "stderr": 0.16344483419480005
     },
     "phases.0.atoms.1.biso": {
-      "value": 0.8813532204601674,
-      "stderr": 0.14032873081671168
+      "value": 0.9899946928670367,
+      "stderr": 0.12268394261762647
     },
     "phases.1.cell.a": {
-      "value": 8.356254160067172,
-      "stderr": 0.002845972747845368
+      "value": 8.355179473011377,
+      "stderr": 0.0027356161963438316
     },
     "phases.1.cell.b": {
-      "value": 4.972689237686269,
-      "stderr": 0.0014173120547132203
+      "value": 4.9753837257873545,
+      "stderr": 0.00141000323074492
     },
     "phases.1.cell.c": {
-      "value": 6.203353344409655,
-      "stderr": 0.0009203964954947006
+      "value": 6.202340677434015,
+      "stderr": 0.0009922367377802996
     },
     "phases.1.cell.beta": {
-      "value": 114.53262181381615,
-      "stderr": 0.018091140686410198
+      "value": 114.51090854385416,
+      "stderr": 0.01912318997791028
     },
     "phases.1.scale": {
-      "value": 0.0007562727988587131,
-      "stderr": 8.883568013986474e-05
+      "value": 0.0008323648639773442,
+      "stderr": 0.00010454926102979456
     },
     "phases.1.preferred_orientation.r": {
-      "value": 0.34404346904668476,
-      "stderr": 0.012936913769297264
-    },
-    "phases.1.lor_size": {
-      "value": 0.005850048101080335,
-      "stderr": 0.004779353871995939
-    },
-    "phases.1.lor_strain": {
-      "value": 3.749149217567853e-09,
-      "stderr": 1.8386195169870215e-15
-    },
-    "phases.1.gauss_size": {
-      "value": 1.006480654559211e-12,
-      "stderr": 3.1576552698798753e-19
-    },
-    "phases.1.gauss_strain": {
-      "value": 2.3668632748586888e-12,
-      "stderr": 2.6846095143851077e-18
+      "value": 0.33761982789004047,
+      "stderr": 0.00866283335454898
     },
     "phases.1.atoms.0.dof.0": {
-      "value": -0.0006529806472696479,
-      "stderr": 0.015888582682658657
+      "value": 0.002757281646895733,
+      "stderr": 0.012662202244271337
     },
     "phases.1.atoms.0.dof.1": {
-      "value": 0.0012288473199406934,
-      "stderr": 0.027023325648497697
+      "value": 0.0019739764580402157,
+      "stderr": 0.019935508157437942
     },
     "phases.1.atoms.0.dof.2": {
-      "value": 0.00016170271166463426,
-      "stderr": 0.008395635361194042
+      "value": -4.561738544940778e-05,
+      "stderr": 0.00704544628804911
     },
     "phases.1.atoms.0.biso": {
-      "value": 1.8058335503102104e-26,
-      "stderr": 1.4353943522775865
+      "value": 6.455776742575988e-13,
+      "stderr": 1.254996297435691
     },
     "phases.1.atoms.1.dof.0": {
-      "value": 0.0007005187469797683,
-      "stderr": 0.02739663175100405
+      "value": -0.00405801069578607,
+      "stderr": 0.06103102335428046
     },
     "phases.1.atoms.1.biso": {
-      "value": 1.3650289777886293,
-      "stderr": 2.3079172019487193
+      "value": 24.961876045515083,
+      "stderr": 16.044279824750166
     },
     "phases.1.atoms.2.dof.0": {
-      "value": -0.0007508680305541704,
-      "stderr": 0.015430803674789922
+      "value": -0.003972334728224576,
+      "stderr": 0.012301976643650262
     },
     "phases.1.atoms.2.biso": {
-      "value": 2.0773445166120617,
-      "stderr": 1.3575288813061857
+      "value": 7.573362859453825e-10,
+      "stderr": 0.9075885750681957
     },
     "phases.1.atoms.3.dof.0": {
-      "value": -7.572901782902537e-05,
-      "stderr": 0.007739049073560003
+      "value": -0.002637781229797562,
+      "stderr": 0.006260047211137421
     },
     "phases.1.atoms.3.dof.1": {
-      "value": 0.000299819841945582,
-      "stderr": 0.010656510992436053
+      "value": 6.63362596500032e-08,
+      "stderr": 0.008902554967097706
     },
     "phases.1.atoms.3.dof.2": {
-      "value": 7.321727344663986e-05,
-      "stderr": 0.003060956182327052
+      "value": -6.504660023533596e-05,
+      "stderr": 0.003297714507370567
     },
     "phases.1.atoms.3.biso": {
-      "value": 0.8441843689674344,
-      "stderr": 0.8022648469725657
+      "value": 1.226250960764422,
+      "stderr": 0.6392909051486207
     },
     "instrument.zero_shift": {
-      "value": 0.14638607745304716,
-      "stderr": 0.0017378187595686366
+      "value": 0.1460934858500171,
+      "stderr": 0.003913986783871029
     },
     "instrument.source.lines.1.weight": {
-      "value": 0.4847056852583117,
-      "stderr": 0.012455760398487994
+      "value": 0.501363827200062,
+      "stderr": 0.010972016162387084
     },
     "instrument.geometry.axial_sl": {
-      "value": 0.03602674432212485,
-      "stderr": 0.0014946569425584222
+      "value": 0.028339599248164326,
+      "stderr": 0.07403605678976127
     },
     "instrument.geometry.axial_hl": {
-      "value": 0.014565258334216602,
-      "stderr": 0.0017834122727140981
+      "value": 0.02686535071199505,
+      "stderr": 0.07427362007269185
     },
     "instrument.profile.u": {
-      "value": 0.00289986814345708,
-      "stderr": 3.999530012931718e-15
+      "value": 0.007206598555270031,
+      "stderr": 0.001755854737961711
     },
     "instrument.profile.v": {
-      "value": -0.36494345168608516,
-      "stderr": 5.854172316272014e-14
+      "value": 0.002166004451786326,
+      "stderr": 0.0007006927321448788
     },
     "instrument.profile.w": {
-      "value": 1.356204277340934e-12,
-      "stderr": 1.4092257820789245e-26
+      "value": 1.096999381606168e-85,
+      "stderr": 7.3024213108194475e-96
     },
     "instrument.profile.x": {
-      "value": 6.489002453093448e-26,
-      "stderr": 6.477787137512917e-39
+      "value": 3.1268963813136264e-25,
+      "stderr": 3.813095888492501e-35
     },
     "instrument.profile.y": {
-      "value": 0.08992371956400319,
-      "stderr": 0.016592886716678114
+      "value": 0.08353354245783688,
+      "stderr": 0.002858029192373283
     }
   },
   "diagnostics": [
     {
       "level": "warning",
       "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.u ~ instrument.profile.w (\u03c1=+0.993)"
+      "message": "instrument.profile.w ~ instrument.profile.x (\u03c1=+0.980)"
     },
     {
       "level": "warning",
       "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.lor_strain (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.gauss_size (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.gauss_strain (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ instrument.profile.u (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ instrument.profile.v (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ instrument.profile.w (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ phases.1.lor_strain (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ phases.1.gauss_size (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ phases.1.gauss_strain (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ instrument.profile.u (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ instrument.profile.v (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ instrument.profile.w (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ phases.1.gauss_size (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ phases.1.gauss_strain (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ instrument.profile.u (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ instrument.profile.v (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ instrument.profile.w (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ phases.1.gauss_strain (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ instrument.profile.u (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ instrument.profile.v (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ instrument.profile.w (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_strain ~ instrument.profile.u (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_strain ~ instrument.profile.v (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_strain ~ instrument.profile.w (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.u ~ instrument.profile.v (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.u ~ instrument.profile.w (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.v ~ instrument.profile.w (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_size (\u03c1=+0.991)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ phases.1.gauss_strain (\u03c1=+0.995)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.u ~ instrument.profile.v (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.u ~ instrument.profile.w (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.v ~ instrument.profile.w (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_size (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.lor_strain (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.gauss_size (\u03c1=+0.993)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.gauss_strain (\u03c1=+0.993)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ instrument.profile.u (\u03c1=+0.990)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ instrument.profile.v (\u03c1=-0.989)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ instrument.profile.w (\u03c1=+0.982)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ phases.1.lor_strain (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ phases.1.gauss_size (\u03c1=+0.995)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ phases.1.gauss_strain (\u03c1=+0.995)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ instrument.profile.u (\u03c1=+0.992)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ instrument.profile.v (\u03c1=-0.991)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ instrument.profile.w (\u03c1=+0.985)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ phases.1.gauss_size (\u03c1=+0.997)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ phases.1.gauss_strain (\u03c1=+0.997)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ instrument.profile.u (\u03c1=+0.995)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ instrument.profile.v (\u03c1=-0.992)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ instrument.profile.w (\u03c1=+0.989)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ phases.1.gauss_strain (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ instrument.profile.u (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ instrument.profile.v (\u03c1=-0.991)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ instrument.profile.w (\u03c1=+0.997)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_strain ~ instrument.profile.u (\u03c1=+1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_strain ~ instrument.profile.v (\u03c1=-0.991)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_strain ~ instrument.profile.w (\u03c1=+0.997)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.u ~ instrument.profile.v (\u03c1=-0.989)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.u ~ instrument.profile.w (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.v ~ instrument.profile.w (\u03c1=-0.981)"
-    },
-    {
-      "level": "warning",
-      "code": "BOUND_HIT",
-      "message": "phases.1.atoms.0.biso refined to its bound"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=-0.998)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.lor_strain (\u03c1=+0.993)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.gauss_size (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ phases.1.gauss_strain (\u03c1=-1.000)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ instrument.profile.v (\u03c1=-0.991)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ instrument.profile.w (\u03c1=-0.987)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.lor_size ~ instrument.profile.x (\u03c1=-0.986)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ instrument.profile.v (\u03c1=-0.993)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ instrument.profile.w (\u03c1=-0.996)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_size ~ instrument.profile.x (\u03c1=-0.996)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ phases.1.lor_strain (\u03c1=-0.987)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ phases.1.gauss_size (\u03c1=-0.995)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ phases.1.gauss_strain (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.0.gauss_strain ~ instrument.profile.v (\u03c1=+0.982)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ phases.1.gauss_size (\u03c1=+0.995)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ phases.1.gauss_strain (\u03c1=-0.992)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ instrument.profile.v (\u03c1=-0.993)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ instrument.profile.w (\u03c1=-0.991)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.lor_strain ~ instrument.profile.x (\u03c1=-0.990)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ phases.1.gauss_strain (\u03c1=-0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ instrument.profile.v (\u03c1=-0.996)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ instrument.profile.w (\u03c1=-0.993)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_size ~ instrument.profile.x (\u03c1=-0.992)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_strain ~ instrument.profile.v (\u03c1=+0.990)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_strain ~ instrument.profile.w (\u03c1=+0.986)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "phases.1.gauss_strain ~ instrument.profile.x (\u03c1=+0.986)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.v ~ instrument.profile.w (\u03c1=+0.999)"
-    },
-    {
-      "level": "warning",
-      "code": "HIGH_CORRELATION",
-      "message": "instrument.profile.v ~ instrument.profile.x (\u03c1=+0.999)"
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-1.000)"
     },
     {
       "level": "warning",
@@ -683,8 +206,73 @@
     },
     {
       "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.w ~ instrument.profile.x (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ instrument.profile.w (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ instrument.profile.x (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.w ~ instrument.profile.x (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
       "code": "BOUND_HIT",
       "message": "phases.1.atoms.0.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.1.atoms.2.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ instrument.profile.w (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ instrument.profile.x (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.profile.w ~ instrument.profile.x (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.1.atoms.0.biso refined to its bound"
+    },
+    {
+      "level": "warning",
+      "code": "BOUND_HIT",
+      "message": "phases.1.atoms.2.biso refined to its bound"
     }
   ],
   "reference": {
@@ -705,6 +293,6 @@
   },
   "notes": [
     "Both cells refined and the Cu Ka doublet kept; WPEM held cells fixed and used an averaged wavelength on the 10% and 50% runs.",
-    "Le Bail fixed point in 2 passes (Rwp=742.000%); Rietveld in 3."
+    "Rietveld reached its fixed point in 3 passes."
   ]
 }

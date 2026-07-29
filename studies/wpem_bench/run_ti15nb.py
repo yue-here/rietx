@@ -32,6 +32,7 @@ from bench import (
     lab_plan,
     load,
     plot,
+    preferred_orientation,
     record,
     seed_background,
     seed_profile,
@@ -88,7 +89,7 @@ def hcp(name: str, a: float, c: float, nb_fraction: float) -> pr.Phase:
         z=pr.Parameter(value=0.25),
         occ=pr.Parameter(value=nb_fraction, vary=False),
         biso=pr.Parameter(value=0.5, min=0.0, max=25.0)))
-    phase.preferred_orientation = pr.schemas.PreferredOrientation(axis=(0, 0, 2))
+    phase.preferred_orientation = preferred_orientation((0, 0, 2))
     phase.scale = pr.Parameter(value=1e-3, min=0.0, transform="softplus")
     return phase
 
@@ -105,7 +106,7 @@ def bcc(name: str, a: float, nb_fraction: float) -> pr.Phase:
         z=pr.Parameter(value=0.0),
         occ=pr.Parameter(value=nb_fraction, vary=False),
         biso=pr.Parameter(value=0.5, min=0.0, max=25.0)))
-    phase.preferred_orientation = pr.schemas.PreferredOrientation(axis=(1, 1, 0))
+    phase.preferred_orientation = preferred_orientation((1, 1, 0))
     phase.scale = pr.Parameter(value=1e-4, min=0.0, transform="softplus")
     return phase
 
