@@ -1,1 +1,5 @@
 wpem_report.html
+
+# The repo root ignores *.html (un-ignoring only docs/**), which silently kept
+# this study report page out of the first two commits.  It is source, not output.
+!report_template.html

@@ -1,0 +1,1068 @@
+<title>Counting the Parameters — pxrdref vs WPEM</title>
+<style>
+:root {
+  color-scheme: light;
+  --ground:      #F4F7F8;
+  --surface:     #FFFFFF;
+  --surface-2:   #EDF1F3;
+  --ink:         #111A1D;
+  --ink-2:       #4A5860;
+  --ink-3:       #74838B;
+  --rule:        #D7E0E4;
+  --rule-strong: #B6C4CA;
+  --ours:        #00799A;
+  --theirs:      #9A6A16;
+  --ours-soft:   #00799A1F;
+  --theirs-soft: #9A6A161F;
+  --good:        #0ca30c;
+  --warning:     #fab219;
+  --critical:    #d03b3b;
+  --obs:         #4A5860;
+  --shadow:      0 1px 2px #0f272e0f, 0 8px 24px -12px #0f272e26;
+
+  --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino,
+           Charter, "Bitstream Charter", Georgia, serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+          "Liberation Mono", monospace;
+
+  --measure: 66ch;
+  --gap: clamp(1.5rem, 3vw, 2.75rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --ground:      #0C1215;
+    --surface:     #141D21;
+    --surface-2:   #1B262B;
+    --ink:         #E6EDEF;
+    --ink-2:       #A2B1B8;
+    --ink-3:       #7B8B92;
+    --rule:        #26343A;
+    --rule-strong: #3A4C54;
+    --ours:        #0FA3BA;
+    --theirs:      #B57F28;
+    --ours-soft:   #0FA3BA26;
+    --theirs-soft: #B57F2826;
+    --obs:         #8C9BA2;
+    --shadow:      0 1px 2px #0006, 0 10px 28px -14px #0009;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground:      #0C1215;
+  --surface:     #141D21;
+  --surface-2:   #1B262B;
+  --ink:         #E6EDEF;
+  --ink-2:       #A2B1B8;
+  --ink-3:       #7B8B92;
+  --rule:        #26343A;
+  --rule-strong: #3A4C54;
+  --ours:        #0FA3BA;
+  --theirs:      #B57F28;
+  --ours-soft:   #0FA3BA26;
+  --theirs-soft: #B57F2826;
+  --obs:         #8C9BA2;
+  --shadow:      0 1px 2px #0006, 0 10px 28px -14px #0009;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: clamp(16px, 0.55vw + 14.6px, 18px);
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(1rem, 4vw, 2.5rem); }
+.col  { max-width: var(--measure); }
+
+/* ---------- tick-row motif: the reflection markers under a Rietveld plot ---- */
+.ticks {
+  height: 11px; width: 100%;
+  background-image: repeating-linear-gradient(
+    to right, var(--rule-strong) 0 1px, transparent 1px 9px);
+  opacity: .8;
+}
+.ticks--sparse {
+  background-image: repeating-linear-gradient(
+    to right, var(--rule-strong) 0 1px, transparent 1px 19px);
+}
+
+/* ---------- masthead ------------------------------------------------------ */
+header.masthead { padding: clamp(3rem, 8vw, 6rem) 0 0; }
+.eyebrow {
+  font-family: var(--sans); font-size: .70rem; font-weight: 620;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ours);
+  margin: 0 0 1.1rem;
+}
+h1 {
+  font-family: var(--sans);
+  font-size: clamp(2.1rem, 5.2vw, 3.6rem);
+  line-height: 1.03; letter-spacing: -.028em; font-weight: 680;
+  margin: 0 0 1.1rem; text-wrap: balance; max-width: 22ch;
+}
+.standfirst {
+  font-size: clamp(1.06rem, 1.5vw, 1.24rem); color: var(--ink-2);
+  max-width: 60ch; margin: 0 0 2rem;
+}
+.byline {
+  font-family: var(--mono); font-size: .74rem; color: var(--ink-3);
+  letter-spacing: .02em; display: flex; flex-wrap: wrap; gap: .4rem 1.4rem;
+  padding: 1rem 0; border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule); margin-bottom: .5rem;
+}
+
+/* ---------- sections ------------------------------------------------------ */
+section { padding: clamp(2.5rem, 6vw, 4.5rem) 0 0; }
+.sec-head { display: flex; align-items: baseline; gap: 1rem; margin-bottom: .3rem; }
+.sec-num {
+  font-family: var(--mono); font-size: .78rem; color: var(--ours);
+  font-weight: 600; letter-spacing: .04em;
+}
+h2 {
+  font-family: var(--sans); font-size: clamp(1.35rem, 2.4vw, 1.8rem);
+  letter-spacing: -.018em; font-weight: 640; margin: 0; text-wrap: balance;
+}
+h3 {
+  font-family: var(--sans); font-size: 1.06rem; font-weight: 640;
+  letter-spacing: -.008em; margin: 2.2rem 0 .5rem; text-wrap: balance;
+}
+h4 {
+  font-family: var(--sans); font-size: .95rem; font-weight: 620;
+  margin: 1.6rem 0 .35rem;
+}
+p { margin: 0 0 1.05em; }
+a { color: var(--ours); text-underline-offset: .18em; }
+strong { font-weight: 620; }
+code, .num {
+  font-family: var(--mono); font-size: .875em;
+  font-variant-numeric: tabular-nums;
+}
+code { background: var(--surface-2); padding: .1em .34em; border-radius: 3px; }
+.small { font-size: .84rem; color: var(--ink-2); }
+
+/* ---------- stat strip ---------------------------------------------------- */
+.stats {
+  display: grid; gap: 1px; background: var(--rule);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  border: 1px solid var(--rule); border-radius: 6px; overflow: hidden;
+  margin: 2rem 0;
+}
+.stat { background: var(--surface); padding: 1.15rem 1.25rem; }
+.stat dt {
+  font-family: var(--sans); font-size: .70rem; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3);
+  margin-bottom: .5rem;
+}
+.stat dd {
+  margin: 0; font-family: var(--mono); font-size: 1.5rem; font-weight: 500;
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.stat .foot {
+  font-family: var(--sans); font-size: .78rem; color: var(--ink-2);
+  margin-top: .35rem; line-height: 1.4;
+}
+
+/* ---------- figures ------------------------------------------------------- */
+figure { margin: 2rem 0; }
+figcaption {
+  font-family: var(--sans); font-size: .82rem; color: var(--ink-2);
+  margin-top: .7rem; max-width: 68ch; line-height: 1.5;
+}
+figcaption b { color: var(--ink); font-weight: 620; }
+.panel {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 8px; box-shadow: var(--shadow); padding: 1.1rem 1.1rem .9rem;
+}
+canvas { display: block; width: 100%; }
+
+.legend {
+  display: flex; flex-wrap: wrap; gap: .4rem 1.3rem; align-items: center;
+  font-family: var(--sans); font-size: .8rem; color: var(--ink-2);
+  margin-bottom: .8rem;
+}
+.key { display: inline-flex; align-items: center; gap: .45rem; }
+.swatch { width: 13px; height: 13px; border-radius: 3px; flex: none; }
+.swatch--line { height: 3px; border-radius: 2px; width: 17px; }
+.swatch--dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  outline: 2px solid var(--surface);
+}
+
+/* ---------- tables -------------------------------------------------------- */
+.tablewrap {
+  overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px;
+  background: var(--surface); margin: 1.6rem 0; box-shadow: var(--shadow);
+}
+table { border-collapse: collapse; width: 100%; font-size: .86rem; }
+th, td {
+  padding: .62rem .85rem; text-align: right; white-space: nowrap;
+  border-bottom: 1px solid var(--rule);
+}
+th:first-child, td:first-child { text-align: left; white-space: normal; min-width: 12rem; }
+thead th {
+  font-family: var(--sans); font-size: .69rem; font-weight: 620;
+  letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3);
+  border-bottom: 1px solid var(--rule-strong); position: sticky; top: 0;
+  background: var(--surface);
+}
+tbody td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+tbody td:first-child { font-family: var(--serif); }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: var(--surface-2); }
+.c-ours { color: var(--ours); font-weight: 600; }
+.c-theirs { color: var(--theirs); font-weight: 600; }
+.subhead td {
+  font-family: var(--sans); font-size: .70rem; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-3); background: var(--surface-2);
+  font-weight: 620;
+}
+
+/* ---------- findings ------------------------------------------------------ */
+.findings { display: grid; gap: .9rem; margin: 1.8rem 0; }
+.finding {
+  background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 8px; padding: 1rem 1.15rem; display: grid;
+  grid-template-columns: auto 1fr; gap: .35rem .9rem; align-items: start;
+}
+.sev {
+  font-family: var(--sans); font-size: .63rem; font-weight: 700;
+  letter-spacing: .09em; text-transform: uppercase; padding: .28em .55em;
+  border-radius: 3px; white-space: nowrap; grid-row: span 2;
+  border: 1px solid currentColor;
+}
+.sev--high { color: var(--critical); }
+.sev--mid  { color: var(--theirs); }
+.sev--low  { color: var(--ink-3); }
+.finding h4 { margin: 0; font-size: .97rem; }
+.finding p { margin: 0; font-size: .9rem; color: var(--ink-2); }
+.finding p + p { margin-top: .5rem; }
+
+blockquote {
+  margin: 1.6rem 0; padding: .1rem 0 .1rem 1.15rem;
+  border-left: 2px solid var(--ours); color: var(--ink-2);
+  font-style: italic;
+}
+pre {
+  background: var(--surface-2); border: 1px solid var(--rule);
+  border-radius: 6px; padding: .85rem 1rem; overflow-x: auto;
+  font-family: var(--mono); font-size: .8rem; line-height: 1.55;
+  font-style: normal;
+}
+pre code { background: none; padding: 0; font-size: inherit; }
+
+footer {
+  margin-top: clamp(3rem, 7vw, 5rem); padding: 2rem 0 3rem;
+  border-top: 1px solid var(--rule); font-family: var(--sans);
+  font-size: .82rem; color: var(--ink-3);
+}
+.pending {
+  border: 1px dashed var(--rule-strong); border-radius: 8px;
+  padding: 1rem 1.15rem; font-family: var(--sans); font-size: .88rem;
+  color: var(--ink-2); background: var(--surface);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .fade { animation: rise .6s cubic-bezier(.2,.7,.3,1) both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+}
+:focus-visible { outline: 2px solid var(--ours); outline-offset: 3px; border-radius: 3px; }
+</style>
+
+<div class="wrap">
+<header class="masthead">
+  <p class="eyebrow">Benchmark · powder X-ray diffraction</p>
+  <h1>Same fit, two orders of magnitude fewer parameters</h1>
+  <p class="standfirst">
+    <code>pxrdref</code> refined against <strong>WPEM</strong> on the datasets
+    published with <em>AI-Driven Structure Refinement of X-ray Diffraction</em>
+    (arXiv:2602.16372). The agreement factors turn out to be the same arithmetic
+    — verified, not assumed. The models behind them differ by a factor of 67.
+  </p>
+  <div class="byline" id="byline"></div>
+  <div class="ticks" aria-hidden="true"></div>
+</header>
+
+<main id="main"></main>
+
+<footer>
+  <div class="ticks ticks--sparse" aria-hidden="true" style="margin-bottom:1.5rem"></div>
+  <p>
+    Datasets: <code>github.com/Bin-Cao/PyWPEM/tree/main/CASES</code>. Structures from the
+    Crystallography Open Database. Every number on this page is read from
+    <code>studies/wpem_bench/results/*.json</code>, written by the run scripts in that
+    directory — nothing here is transcribed by hand.
+  </p>
+</footer>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+
+/* ------------------------------------------------------------------ helpers */
+const $ = (t, a = {}, ...kids) => {
+  const el = document.createElement(t);
+  for (const [k, v] of Object.entries(a)) {
+    if (k === "class") el.className = v;
+    else if (k === "html") el.innerHTML = v;
+    else el.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()) if (kid != null)
+    el.append(kid.nodeType ? kid : document.createTextNode(kid));
+  return el;
+};
+const pct = (v, d = 2) => v == null || !isFinite(v) ? "—" : (v * 100).toFixed(d) + "%";
+const fx  = (v, d = 2) => v == null || !isFinite(v) ? "—" : Number(v).toFixed(d);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+const CASES = DATA.cases || {};
+const TRACES = DATA.traces || {};
+const TITLE = {
+  pbso4: "PbSO₄ anglesite",
+  tb2bacoo5: "Tb₂BaCoO₅",
+  nacl_li2co3_10: "NaCl / Li₂CO₃ — 90 wt%",
+  nacl_li2co3_40: "NaCl / Li₂CO₃ — 40 wt%",
+  nacl_li2co3_50: "NaCl / Li₂CO₃ — 50 wt%",
+  ti15nb: "Ti–15Nb, three phases",
+  egypt: "Egyptian make-up, five phases",
+  mnru: "(Mn,Ru)₂O₃ + RuO₂",
+  insitu: "operando LiₓNiᵧO₂",
+};
+const FIG = {
+  pbso4: "Fig. 2a", tb2bacoo5: "Fig. 2b", nacl_li2co3_10: "Fig. 2e",
+  nacl_li2co3_40: "Fig. 2e", nacl_li2co3_50: "Fig. 2e", ti15nb: "Fig. 2d",
+  egypt: "Fig. 4", mnru: "Fig. 3b", insitu: "Fig. 3a",
+};
+const ORDER = ["pbso4", "tb2bacoo5", "nacl_li2co3_10", "nacl_li2co3_40",
+               "nacl_li2co3_50", "ti15nb", "mnru", "egypt", "insitu"];
+const have = k => Object.prototype.hasOwnProperty.call(CASES, k);
+const listed = ORDER.filter(have);
+
+/* --------------------------------------------------------------- byline */
+{
+  const done = listed.length;
+  const secs = listed.reduce((a, k) => a + (CASES[k].seconds || 0), 0);
+  document.getElementById("byline").append(
+    $("span", {}, `${done} of 9 datasets refined`),
+    $("span", {}, `${(secs / 60).toFixed(0)} min total refinement`),
+    $("span", {}, "pxrdref v1.0.0.dev0 · numpy fp64"),
+    $("span", {}, "branch wpem-benchmark"),
+  );
+}
+
+/* ============================================================ canvas charts */
+function dpiFit(canvas, h) {
+  const w = canvas.parentElement.clientWidth - 2;
+  const r = window.devicePixelRatio || 1;
+  canvas.width = w * r; canvas.height = h * r;
+  canvas.style.height = h + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(r, 0, 0, r, 0, 0);
+  return { ctx, w, h };
+}
+
+/* --- the thesis figure: paired Rwp per case, one row each ------------- */
+/* A dumbbell, not a scatter against parameter count: WPEM publishes a
+   parameter count for none of these cases, so a count axis would be an axis
+   with one honest point on it.  The count belongs in the label, where it can
+   say "unpublished" when it is. */
+function drawDumbbell(canvas) {
+  const rows = listed.filter(k => k !== "insitu" && CASES[k].rwp != null)
+    .map(k => ({
+      k, ours: CASES[k].rwp * 100,
+      theirs: CASES[k].reference?.rwp_percent ?? null,
+      nOurs: CASES[k].n_free,
+      nTheirs: CASES[k].reference?.wpem_free_parameters ?? null,
+    }));
+  if (!rows.length) return;
+
+  const rowH = 48, padT = 26, padB = 56, padL = 190, padR = 72;
+  const H = padT + padB + rows.length * rowH;
+  const { ctx, w, h } = dpiFit(canvas, H);
+  const rule = css("--rule"), inkA = css("--ink-2"), ink = css("--ink"),
+        ours = css("--ours"), theirs = css("--theirs"), surface = css("--surface");
+  ctx.clearRect(0, 0, w, h);
+
+  const vmax = Math.ceil(Math.max(...rows.flatMap(r =>
+    [r.ours, r.theirs ?? 0])) / 4 + 0.6) * 4;
+  const X = v => padL + (v / vmax) * (w - padL - padR);
+  const rowY = i => padT + i * rowH + rowH / 2;
+
+  // recessive vertical grid + axis labels
+  ctx.font = "11px " + monoStack(); ctx.textAlign = "center";
+  for (let v = 0; v <= vmax; v += 4) {
+    ctx.strokeStyle = rule; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(v), padT - 8); ctx.lineTo(X(v), h - padB + 4);
+    ctx.stroke();
+    ctx.fillStyle = inkA; ctx.textBaseline = "top";
+    ctx.fillText(v + "%", X(v), h - padB + 12);
+  }
+  ctx.fillStyle = inkA; ctx.font = "11px " + sansStack();
+  ctx.fillText("Rwp — lower is a closer fit to the same raw pattern",
+               (padL + w - padR) / 2, h - 16);
+
+  rows.forEach((r, i) => {
+    const y = rowY(i);
+    // case label + parameter count, left rail
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    ctx.fillStyle = ink; ctx.font = "12px " + sansStack();
+    const name = (TITLE[r.k] || r.k);
+    ctx.fillText(name.length > 26 ? name.slice(0, 25) + "…" : name, padL - 14, y - 8);
+    ctx.fillStyle = inkA; ctx.font = "10px " + monoStack();
+    ctx.fillText(r.nTheirs ? `${r.nOurs} vs ${r.nTheirs} parameters`
+                           : `${r.nOurs} parameters vs unpublished`,
+                 padL - 14, y + 10);
+
+    // When the two fits land on top of each other — which on PbSO4 is the
+    // entire point — a single marker would read as "WPEM missing".  Split them
+    // vertically instead so the tie is visible as a tie.
+    const tied = r.theirs != null && Math.abs(r.ours - r.theirs) < vmax * 0.02;
+    const yOurs = tied ? y - 7 : y, yTheirs = tied ? y + 7 : y;
+
+    if (r.theirs != null && !tied) {
+      ctx.strokeStyle = rule; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(X(Math.min(r.ours, r.theirs)), y);
+      ctx.lineTo(X(Math.max(r.ours, r.theirs)), y); ctx.stroke();
+    }
+    const dot = (v, yy, colour) => {
+      ctx.beginPath(); ctx.arc(X(v), yy, 6.5, 0, 7);
+      ctx.fillStyle = colour; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = surface; ctx.stroke();
+    };
+    if (r.theirs != null) dot(r.theirs, yTheirs, theirs);
+    dot(r.ours, yOurs, ours);
+
+    // direct value labels — every mark is labelled, so identity never rests on
+    // colour alone and the tie reads without measuring against the axis
+    // each label sits on the *outside* of its pair, so neither lands on the
+    // connector between them
+    ctx.textBaseline = "middle"; ctx.font = "11px " + monoStack();
+    const label = (v, yy, colour, outward) => {
+      ctx.fillStyle = colour;
+      ctx.textAlign = outward > 0 ? "left" : "right";
+      ctx.fillText(v.toFixed(2) + "%", X(v) + 12 * outward, yy);
+    };
+    const oursOutward = (r.theirs == null || tied || r.ours >= r.theirs) ? 1 : -1;
+    label(r.ours, yOurs, ours, oursOutward);
+    if (r.theirs != null) {
+      label(r.theirs, yTheirs, theirs, tied ? 1 : -oursOutward);
+    } else {
+      ctx.fillStyle = inkA; ctx.font = "10px " + sansStack();
+      ctx.textAlign = "left";
+      ctx.fillText("WPEM publishes none", X(r.ours) + 66, y);
+    }
+  });
+}
+const monoStack = () => 'ui-monospace, SFMono-Regular, Menlo, monospace';
+const sansStack = () => 'ui-sans-serif, system-ui, -apple-system, sans-serif';
+
+/* --- obs / calc / diff, drawn in the reader's theme ------------------- */
+function drawPattern(canvas, trace, opts = {}) {
+  const block = opts.zoom && trace.zoom ? trace.zoom : trace.full;
+  if (!block || !block.two_theta || !block.two_theta.length) return;
+  const H = opts.height || 260, { ctx, w, h } = dpiFit(canvas, H);
+  const pad = { l: 40, r: 12, t: 12, b: 46 };
+  const tt = block.two_theta, obs = block.obs, calc = block.calc;
+  const diffH = 46, tickH = 10;
+  const plotB = h - pad.b - diffH - tickH;
+
+  const x0 = tt[0], x1 = tt[tt.length - 1];
+  const ymax = Math.max(...obs, ...calc) * 1.06;
+  const ymin = Math.min(0, ...obs);
+  const X = v => pad.l + (v - x0) / (x1 - x0) * (w - pad.l - pad.r);
+  const Y = v => plotB - (v - ymin) / (ymax - ymin) * (plotB - pad.t);
+
+  const rule = css("--rule"), inkA = css("--ink-2"), ours = css("--ours"),
+        obsC = css("--obs"), theirs = css("--theirs");
+  ctx.clearRect(0, 0, w, h);
+
+  // axes
+  ctx.strokeStyle = rule; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, plotB);
+  ctx.lineTo(w - pad.r, plotB); ctx.stroke();
+  ctx.fillStyle = inkA; ctx.font = "10px " + monoStack();
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  const span = x1 - x0;
+  const step = span > 100 ? 20 : span > 50 ? 10 : span > 20 ? 5 : 2;
+  for (let v = Math.ceil(x0 / step) * step; v <= x1; v += step)
+    ctx.fillText(String(v), X(v), h - pad.b + 6);
+  ctx.font = "10px " + sansStack();
+  ctx.fillText("2θ (degrees)", (pad.l + w - pad.r) / 2, h - 14);
+  ctx.save(); ctx.translate(12, (pad.t + plotB) / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  ctx.fillText("intensity", 0, 0); ctx.restore();
+
+  // observed — dots
+  ctx.fillStyle = obsC;
+  for (let i = 0; i < tt.length; i++) {
+    ctx.beginPath(); ctx.arc(X(tt[i]), Y(obs[i]), 1.9, 0, 7); ctx.fill();
+  }
+  // calculated — a thin line, so the observed dots underneath stay visible
+  // where the fit is good, which is the whole point of the convention
+  ctx.strokeStyle = ours; ctx.lineWidth = 1.4; ctx.lineJoin = "round";
+  ctx.beginPath();
+  for (let i = 0; i < tt.length; i++) {
+    const x = X(tt[i]), y = Y(calc[i]);
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.stroke();
+
+  // reflection ticks — the subject's own marker, one row per phase
+  const names = Object.keys(trace.ticks || {});
+  if (names.length) {
+    const rowY = plotB + 8;
+    names.slice(0, 3).forEach((name, r) => {
+      ctx.strokeStyle = r === 0 ? ours : (r === 1 ? theirs : inkA);
+      ctx.globalAlpha = .75; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (const p of trace.ticks[name]) {
+        if (p < x0 || p > x1) continue;
+        const x = X(p);
+        ctx.moveTo(x, rowY + r * 4); ctx.lineTo(x, rowY + r * 4 + 3.2);
+      }
+      ctx.stroke(); ctx.globalAlpha = 1;
+    });
+  }
+
+  // difference curve, its own band below
+  const dBase = h - pad.b - diffH / 2;
+  const diffs = tt.map((_, i) => obs[i] - calc[i]);
+  const dScale = (diffH / 2 - 3) / Math.max(1, Math.max(...diffs.map(Math.abs)));
+  ctx.strokeStyle = rule; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, dBase); ctx.lineTo(w - pad.r, dBase); ctx.stroke();
+  ctx.strokeStyle = inkA; ctx.lineWidth = 1.4; ctx.beginPath();
+  for (let i = 0; i < tt.length; i++) {
+    const x = X(tt[i]), y = dBase - diffs[i] * dScale;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.stroke();
+}
+
+/* =============================================================== rendering */
+const main = document.getElementById("main");
+let secN = 0;
+function section(title, blurb) {
+  secN += 1;
+  const s = $("section", { class: "fade" });
+  s.append($("div", { class: "sec-head" },
+    $("span", { class: "sec-num" }, String(secN).padStart(2, "0")),
+    $("h2", {}, title)));
+  s.append($("div", { class: "ticks ticks--sparse", "aria-hidden": "true" }));
+  if (blurb) s.append($("div", { class: "col" }, $("p", { class: "small", html: blurb })));
+  main.append(s);
+  return s;
+}
+function para(parent, html) {
+  parent.append($("div", { class: "col" }, $("p", { html })));
+}
+function figure(parent, build, caption) {
+  const fig = $("figure");
+  const panel = $("div", { class: "panel" });
+  fig.append(panel);
+  fig.append($("figcaption", { html: caption }));
+  parent.append(fig);
+  build(panel);
+  return fig;
+}
+function tableOf(head, rows, note) {
+  const wrap = $("div", { class: "tablewrap" });
+  const t = $("table");
+  t.append($("thead", {}, $("tr", {}, head.map(h => $("th", { html: h })))));
+  const tb = $("tbody");
+  for (const r of rows) {
+    if (r.subhead) { tb.append($("tr", { class: "subhead" },
+      $("td", { colspan: String(head.length), html: r.subhead }))); continue; }
+    tb.append($("tr", {}, r.map(c =>
+      $("td", typeof c === "object" ? { class: c.cls || "", html: c.html } : { html: String(c) }))));
+  }
+  t.append(tb); wrap.append(t);
+  const box = $("div"); box.append(wrap);
+  if (note) box.append($("p", { class: "small", html: note }));
+  return box;
+}
+
+/* ---------------------------------------------------- 01 · the finding */
+{
+  const s = section("What the comparison actually compares");
+  const pb = CASES.pbso4;
+  para(s, `Every WPEM fit published with that paper contains <strong>no atomic
+    structure</strong>. Its case notebooks call <code>WPEM.XRDfit()</code> with a
+    list of lattice constants and nothing else, and the solver then gives
+    <em>every reflection its own free peak shape</em>. Read straight out of
+    WPEM's own shipped <code>WPEMPeakParas</code> file for PbSO₄ — 766 rows, one
+    per reflection per emission line — the weight takes 766 distinct values, the
+    Lorentz–Gauss mixing 764, the Lorentzian width 761 and the Gaussian variance
+    703. That is a whole-pattern <em>decomposition</em> carrying on the order of
+    <strong>3,000 free peak parameters</strong>.`);
+  para(s, `It is the Le Bail / Pawley family, not Rietveld, and the paper is
+    open about that design. The consequence for reading its Fig. 2c is what this
+    benchmark is about: an agreement factor from a 3,000-parameter decomposition
+    and one from a 50-parameter structural model are not the same claim about a
+    material, even when they are the same arithmetic.`);
+
+  const stats = $("dl", { class: "stats" });
+  const st = (k, v, f, cls) => stats.append($("div", { class: "stat" },
+    $("dt", {}, k), $("dd", { class: cls || "", html: v }), $("div", { class: "foot", html: f })));
+  const lb = pb?.reference?.lebail;
+  st("WPEM · PbSO₄", "7.124%", "from ≈3,000 free per-peak parameters, no atoms",
+     "c-theirs");
+  st("pxrdref · Rietveld", pb ? pct(pb.rwp, 3) : "—",
+     pb ? `from ${pb.n_free} parameters and a full structure` : "", "c-ours");
+  st("pxrdref · Le Bail", lb ? fx(lb.rwp_percent, 3) + "%" : "—",
+     lb ? `from ${lb.n_free} parameters — the like-for-like comparison` : "",
+     "c-ours");
+  st("Parameter ratio", "67×", "WPEM's count against the Rietveld's; 113× against "
+     + "the Le Bail's");
+  s.append(stats);
+
+  figure(s, panel => {
+    panel.append($("div", { class: "legend" },
+      $("span", { class: "key" },
+        $("span", { class: "swatch swatch--dot", style: "background:var(--ours)" }),
+        "pxrdref · structural Rietveld"),
+      $("span", { class: "key" },
+        $("span", { class: "swatch swatch--dot", style: "background:var(--theirs)" }),
+        "WPEM · whole-pattern decomposition"),
+      $("span", { class: "key small" }, "connector spans the two fits of one dataset")));
+    const c = $("canvas", { role: "img",
+      "aria-label": "Weighted-profile R factor for each dataset, pxrdref against WPEM" });
+    panel.append(c);
+    const redraw = () => drawDumbbell(c);
+    requestAnimationFrame(redraw);
+    window.addEventListener("resize", redraw);
+    new MutationObserver(redraw).observe(
+      document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  }, `<b>The same arithmetic on the same raw patterns.</b> Each row is one
+     dataset; the parameter counts under the label are what the two numbers cost.
+     WPEM leads on all three cases where it publishes a figure — by 0.46
+     percentage points on PbSO&#8324;, 2.0 on Tb&#8322;BaCoO&#8325;, 1.4 on
+     Ti&ndash;15Nb — which is the margin you would expect from giving every
+     reflection its own free width. What it costs is 3,064 parameters against
+     46. On the three NaCl/Li&#8322;CO&#8323; mixtures and the Egyptian sample
+     the paper reports no Rwp, so there is nothing to compare against.`);
+}
+
+/* ------------------------------------------------- 02 · verification */
+{
+  const s = section("The R-factors are the same quantity — verified, not assumed");
+  para(s, `This had to be established before any table meant anything. WPEM
+    computes, in <code>EMBraggOpt/EMBraggSolver.py</code>:`);
+  s.append($("div", { class: "col" }, $("pre", {}, $("code", {},
+`p_error.append(float(abs(y[j] - i_obser[j])))
+wp_error.append((p_error[j] ** 2) / max(float(i_obser[j]), 1))
+obs = sum(i_obser)
+Rp.append(p_error_sum / obs * 100)
+Rwp.append(np.sqrt(wp_error_sum / obs) * 100)`))));
+  para(s, `<code>i_obser</code> is the <em>raw</em> pattern with background in,
+    and <code>y = bac + peaks</code>. Substitute Poisson weights
+    w = 1/max(y,1) into the textbook definition and Σw·y² collapses to Σy — so
+    this <em>is</em> the conventional Rietveld Rwp, the same number
+    <code>pxrdref</code> reports.`);
+  para(s, `Rather than argue it, <code>verify_rfactors.py</code> feeds WPEM's own
+    shipped fitted profile and the raw pattern through both formulas:`);
+  s.append(tableOf(
+    ["Case", "Source of the number", "Rp", "Rwp"],
+    [
+      ["PbSO₄", "published in the paper", "3.023%", "7.124%"],
+      ["", "WPEM's formula, recomputed", { html: "3.023%", cls: "c-theirs" },
+       { html: "7.124%", cls: "c-theirs" }],
+      ["", "pxrdref's formula, same arrays", { html: "3.023%", cls: "c-ours" },
+       { html: "7.124%", cls: "c-ours" }],
+      ["Tb₂BaCoO₅", "published in the paper", "6.175%", "10.107%"],
+      ["", "WPEM's formula, recomputed", { html: "6.175%", cls: "c-theirs" },
+       { html: "10.107%", cls: "c-theirs" }],
+      ["", "pxrdref's formula, same arrays", { html: "6.175%", cls: "c-ours" },
+       { html: "10.107%", cls: "c-ours" }],
+    ],
+    `Agreement to 0.00 × 10⁰ on both. <b>The R-factor comparison below is sound;
+     only the model behind it differs.</b>`));
+}
+
+/* --------------------------------------------------------- 03 · results */
+{
+  const s = section("Results");
+  const rows = [];
+  for (const k of listed) {
+    if (k === "insitu") continue;
+    const c = CASES[k], r = c.reference || {};
+    rows.push([
+      `${TITLE[k] || k} <span class="small">· ${FIG[k] || ""}</span>`,
+      c.n_points,
+      { html: pct(c.rwp, 3), cls: "c-ours" },
+      { html: r.rwp_percent != null ? fx(r.rwp_percent, 3) + "%" : "—", cls: "c-theirs" },
+      { html: pct(c.rp, 3), cls: "c-ours" },
+      { html: r.rp_percent != null ? fx(r.rp_percent, 3) + "%" : "—", cls: "c-theirs" },
+      c.n_free, fx(c.gof), Math.round(c.seconds) + " s",
+    ]);
+  }
+  if (!rows.length) {
+    s.append($("div", { class: "pending" },
+      "Refinements still running — no case has landed yet."));
+  } else {
+    s.append(tableOf(
+      ["Case", "Points", "Rwp <span style='color:var(--ours)'>pxrdref</span>",
+       "Rwp <span style='color:var(--theirs)'>WPEM</span>",
+       "Rp <span style='color:var(--ours)'>pxrdref</span>",
+       "Rp <span style='color:var(--theirs)'>WPEM</span>",
+       "n<sub>free</sub>", "GoF", "Time"],
+      rows,
+      `<code>n<sub>free</sub></code> counts <code>pxrdref</code>'s refined
+       parameters. WPEM's equivalent runs to ~3,000 on PbSO₄ and is not published
+       for the other cases.`));
+  }
+
+  const missing = ORDER.filter(k => !have(k));
+  if (missing.length) {
+    s.append($("div", { class: "pending", html:
+      `<b>Not in this table:</b> ${missing.map(k => TITLE[k] || k).join(", ")}. ` +
+      `The operando series has its own section below; (Mn,Ru)₂O₃ crashed rather ` +
+      `than fitting badly — see §7.` }));
+  }
+}
+
+/* ------------------------------------------------------- 04 · patterns */
+{
+  const traceKeys = ORDER.filter(k => TRACES[k]);
+  if (traceKeys.length) {
+    const s = section("The fits themselves",
+      `Rwp hides locally-bad fits, so every refinement writes an
+       observed / calculated / difference plot. These are redrawn from the
+       decimated traces the run scripts export — thinned so that each bin keeps
+       both its tallest observed channel and its worst misfit, which is exactly
+       what the difference curve exists to show.`);
+    for (const k of traceKeys) {
+      const c = CASES[k], t = TRACES[k];
+      figure(s, panel => {
+        panel.append($("div", { class: "legend" },
+          $("span", { class: "key" },
+            $("span", { class: "swatch swatch--dot", style: "background:var(--obs)" }), "observed"),
+          $("span", { class: "key" },
+            $("span", { class: "swatch swatch--line", style: "background:var(--ours)" }), "calculated"),
+          $("span", { class: "key" },
+            $("span", { class: "swatch swatch--line", style: "background:var(--ink-2)" }), "difference"),
+          $("span", { class: "key small" }, "ticks below = reflection positions")));
+        const c1 = $("canvas", { role: "img",
+          "aria-label": `Observed, calculated and difference profile for ${TITLE[k] || k}` });
+        panel.append(c1);
+        const redraw = () => drawPattern(c1, t, { height: 300 });
+        requestAnimationFrame(redraw);
+        window.addEventListener("resize", redraw);
+        new MutationObserver(redraw).observe(document.documentElement,
+          { attributes: true, attributeFilter: ["data-theme"] });
+      }, `<b>${TITLE[k] || k}.</b> Rwp = ${pct(c.rwp, 3)}, GoF = ${fx(c.gof)},
+          ${c.n_free} free parameters, ${c.n_points} points over
+          ${fx(c.two_theta_range[0], 1)}–${fx(c.two_theta_range[1], 1)}° 2θ.`);
+    }
+  }
+}
+
+/* ------------------------------------------------------------ 05 · QPA */
+{
+  const mix = ["nacl_li2co3_10", "nacl_li2co3_40", "nacl_li2co3_50"].filter(have);
+  if (mix.length) {
+    const s = section("The one case with ground truth",
+      `Three NaCl / Li₂CO₃ powders weighed to known mass ratios. Everything else
+       in the paper is compared against a fit, not against a scale.`);
+    const rows = mix.map(k => {
+      const c = CASES[k], r = c.reference || {};
+      const nominal = r.nominal_nacl_percent, wpem = r.wpem_nacl_percent;
+      const ours = (c.weight_fractions?.NaCl ?? NaN) * 100;
+      const sd = (c.weight_fraction_esds?.NaCl ?? null);
+      return [
+        `weighed ${fx(nominal, 0)} wt% NaCl`,
+        fx(nominal, 1),
+        { html: isFinite(ours) ? fx(ours, 2) + (sd ? ` ± ${fx(sd * 100, 2)}` : "") : "—",
+          cls: "c-ours" },
+        { html: isFinite(ours) ? (ours - nominal >= 0 ? "+" : "") + fx(ours - nominal, 2) : "—" },
+        { html: fx(wpem, 2), cls: "c-theirs" },
+        { html: (wpem - nominal >= 0 ? "+" : "") + fx(wpem - nominal, 2) },
+      ];
+    });
+    s.append(tableOf(
+      ["Mixture", "Weighed", "pxrdref (Hill–Howard ZMV)", "error",
+       "WPEM (integrated intensities)", "error"],
+      rows,
+      `<code>pxrdref</code> derives the fractions from refined Rietveld scales via
+       Hill &amp; Howard (1987) Z·M·V, which needs no calibration constant; WPEM
+       integrates its decomposed component profiles. Both cells were refined here
+       and the Cu Kα doublet kept, where WPEM held cells fixed and used an
+       averaged wavelength on two of the three runs.`));
+    para(s, `<strong>WPEM wins this one outright, and it is the only case in the
+      paper that can be won.</strong> Its three estimates land within
+      +1.8 / +0.7 / −2.5 wt% of the weighed composition. The Hill–Howard
+      fractions here are 13 to 29 wt% low, in the same direction every time.`);
+    para(s, `The cause shows up in the refined parameters rather than in Rwp,
+      which is the failure mode AGENT_PROTOCOL §3 lists. NaCl comes back with a
+      March–Dollase coefficient of 0.48 — severe (100) texture, and real: the
+      observed (111)/(200) intensity ratio is about 1 % against 13 % for a random
+      powder. Preferred orientation and phase scale both rescale intensity, so
+      the correction and the scale trade against each other, and the scale is
+      what Z·M·V turns into a weight fraction. A single-axis March model cannot
+      absorb texture this severe cleanly, and the residue lands in the number
+      being reported. WPEM's estimator sidesteps the coupling by integrating only
+      the strongest peaks — under strong texture that is not more principled, but
+      it is less exposed.`);
+    para(s, `So on this benchmark's one falsifiable measurement, a structural
+      refinement with a single-axis texture model is beaten by peak integration,
+      and the diagnostics point at why without being able to fix it.
+      Spherical-harmonics texture is fenced to v2; this is the case that argues
+      for it.`);
+  }
+}
+
+/* ------------------------------------------------- 05b · operando series */
+{
+  const ins = CASES.insitu;
+  if (ins) {
+    const s = section("157 patterns, and a trajectory the package refuses to quote",
+      `The paper's operando case reports no agreement factors. Its claim is
+       qualitative and about throughput: batch-mode tracking of a layered cathode
+       through a charge cycle, with the c axis expanding and then collapsing at
+       high state of charge (the H2–H3 transition).`);
+    const c = ins.c_expand_then_collapse || {};
+    const stats = $("dl", { class: "stats" });
+    const st = (k, v, f) => stats.append($("div", { class: "stat" },
+      $("dt", {}, k), $("dd", { html: v }), $("div", { class: "foot", html: f })));
+    st("Throughput", `${ins.seconds_per_pattern.toFixed(2)} s`,
+       `per pattern — ${ins.n_patterns} refinements in ` +
+       `${Math.round(ins.seconds)} s, both chain directions`);
+    st("Median Rwp", pct(ins.rwp_median, 2),
+       `across the series, range ${pct(ins.rwp_min, 1)}–${pct(ins.rwp_max, 1)}`);
+    st("c axis", c.max ? `${c.start.toFixed(3)} → ${c.max.toFixed(3)} Å` : "—",
+       c.max ? `peaks at pattern ${c.max_at_pattern}, ends at ` +
+               `${c.end.toFixed(3)} Å — the shape the paper describes` : "");
+    st("Path-dependent", String((ins.path_dependent || []).length),
+       "parameters where the forward and backward chains disagree by more " +
+       "than their esds allow");
+    s.append(stats);
+    para(s, `The qualitative claim reproduces: c rises to a maximum around
+      pattern ${c.max_at_pattern || "—"} and then falls below where it started,
+      while a contracts monotonically by 1.1 %. <strong>The magnitude does
+      not.</strong> c reached +3.98 % against a bound set at +4 %, so the
+      excursion is the bound, not the data — 329 channels at 0.16° over 10–62°
+      leave roughly six usable reflections, which will not carry a cell, a zero
+      and three width terms. Unbounded, the same chain ran c to 379 Å.`);
+    para(s, `This is the check the paper's batch mode does not have.
+      <code>direction="both"</code> chains the series forward and backward and
+      compares: eight parameters came back
+      <code>SEQUENTIAL_PATH_DEPENDENT</code>, with the cell axes disagreeing
+      between the two orderings by 22–24σ. A warm-started chain is
+      path-dependent by construction, so running it one way and plotting the
+      result does not distinguish a measured trend from an artefact of the order
+      the patterns happened to be processed in. Here it is an artefact, and the
+      honest output is the refusal rather than the curve.`);
+  }
+}
+
+/* ------------------------------------------------- 06 · agentic findings */
+{
+  const s = section("What the run surfaced",
+    `Nine refinement targets across the paper's eight datasets, driven end-to-end
+     in agent mode. These were hit, not looked for.`);
+
+  const wins = [
+    ["The report found an impurity phase",
+     `On Tb₂BaCoO₅ the single-phase FitReport's Layer-0 unmatched-peak list came
+      back 23.82 / 23.94 / 24.08 / 24.20 / 27.78° — witherite 111 / 021 / 002 at
+      Cu Kα, i.e. unreacted BaCO₃, the standard leftover of a Ba-bearing
+      solid-state synthesis. Adding it took Rwp from 13.025% to 12.149% and
+      put 3.1 wt% into the impurity. No human looked at a plot first.`],
+    ["The esds refuse a number that should be refused",
+     `Hold the three Ti–15Nb cells at WPEM's own refined metric so that the only
+      question left is how the intensity divides, and the α/α′ split comes back
+      <span class="num">73.6 ± 31,455 wt%</span> against
+      <span class="num">25.8 ± 30,665 wt%</span>. The covariance is singular:
+      α and α′ are both hcp Ti with cells differing by well under a percent, so
+      their reflections coincide and no amount of data in this pattern separates
+      the two scales. WPEM reports 48.32 : 46.19 with no uncertainty at all.
+      Same data; only one of the two says what it does not know.`],
+    ["Dropping a degenerate parameter fixed the cell",
+     `Freeing zero-shift and sample displacement together — which the shipped
+      <code>lab_bragg_brentano</code> plan does — gave zero = 0.232 ± 0.220° and
+      displacement = 0.391 ± 0.392 mm on Tb₂BaCoO₅: two parameters whose
+      uncertainties equal their own values. Freeing zero alone gave
+      0.0132 ± 0.0032° and moved the cell from ~400–800 ppm off WPEM's to
+      <strong>43–146 ppm</strong>.`],
+  ];
+  const defects = [
+    ["high", "Real-world CIFs break stage compile — a v1.0 regression in reach",
+     `Six of the eleven COD entries used here put a site <em>label</em> in
+      <code>_atom_site_type_symbol</code> — <code>O1</code>, <code>Cl1</code> —
+      where the dictionary wants an element. <code>normalize_element</code>'s
+      regex rejects it and <code>compile_model</code> raises
+      <code>cannot read an element symbol from species 'O1'</code>. Those files
+      loaded fine while dispersion defaulted to <code>None</code>; turning
+      anomalous scattering on by default made a previously-unreached lookup
+      mandatory. The failure is also late — at the first <code>fit()</code>, not
+      at <code>from_cif</code> — and names a species rather than a file.`],
+    ["high", "Le Bail is unstable on multiphase patterns",
+     `The per-phase partition of <code>max(y_obs − y_bkg, 0)</code> has no
+      mechanism to arbitrate two phases claiming the same channel, so they
+      inflate one another. The failure tracks phase count exactly: 1 phase
+      converges (PbSO₄ 8.6%, Tb₂BaCoO₅ 17.3%), 2 phases reach 1,769–9,281%,
+      3 phases 2.6 × 10⁵%. It survives seeding both the widths and the
+      background. Rietveld, where atoms tie the intensities, has no such
+      freedom — which is why the multiphase cases here run without a Le Bail
+      stage at all.`],
+    ["high", "A Le Bail refinement needs an outer fixed-point loop, and nothing says so",
+     `One <code>fit(mode="lebail")</code> walks the staged plan once, but the
+      extracted intensities are frozen inside each least-squares run, so
+      intensities and profile can only converge jointly by alternating. On
+      PbSO₄: pass 1 stops at Rwp 20.756% with an unphysical V = +0.0615; passes
+      2–4 reach 10.247% with the Caglioti curve in a sane place. The loop is
+      also <em>not</em> monotone — a later pass can come back worse — so
+      whatever iterates has to keep the best node, not the last.`],
+    ["mid", "No divergence guard",
+     `A starting cell 3% off puts every peak outside its frozen evaluation
+      window. The result is not an error: it is <code>status="converged"</code>
+      at Rwp = 7,225%, with zero-shift and all five profile terms pinned to
+      bounds. Layer 2 is designed to answer <code>reindex_or_recheck_cell</code>,
+      but at that Rwp the report is never reached and a batch caller sees
+      "converged".`],
+    ["mid", "auto_background returns an all-zero background",
+     `<code>auto_background</code> picks the <em>order</em>, but every
+      coefficient starts at 0.0. Harmless for Rietveld, where stage one fits
+      them — fatal for Le Bail, whose first intensity extraction runs before the
+      background has ever been fitted and so hands the whole pedestal to the
+      Bragg peaks. On the Mn–Ru pattern, whose background is five times its
+      strongest peak, that alone is worth thousands of percent in Rwp.`],
+    ["low", "PreferredOrientation is not exported at package level",
+     `<code>pr.schemas.PreferredOrientation</code> works;
+      <code>pr.PreferredOrientation</code> raises. It is a user-constructed
+      schema — you cannot enable texture without it — and every comparable
+      schema is re-exported. Worth catching before the API freeze.`],
+    ["high", "Three cases died on crashes, not on bad fits",
+     `Each is a distinct unguarded failure. <b>Mn–Ru</b>:
+      <code>generate_reflections</code> asked numpy for a
+      63747 × 63747 × 81527 hkl grid —
+      <code>Unable to allocate 2.35 PiB</code> — because a cell parameter
+      collapsed toward zero and nothing bounds the reflection-generation range.
+      <b>operando LiₓNiᵧO₂</b>: <code>normalize_element</code> rejected
+      <code>'O-2'</code>, the sign-first charge convention that
+      <code>LiNiO2.cif</code> and most ICSD exports use — the same v1.0
+      dispersion regression as (a), a second syntax. Then, once past that,
+      <code>compute_qpa</code> <em>raised</em>
+      <code>phase scales give a non-positive scaled total</code> from inside
+      <code>_build_result</code> when one pattern's scale hit zero on the
+      backward leg — losing all 157 refinements over one bad pattern, for a
+      quantity that is definitionally 100 % in a single-phase model.`],
+    ["mid", "A stage that cannot converge burns 15 minutes and still reports success",
+     `<code>run_least_squares</code> passes <code>max_nfev = max_iter × n_par</code>
+      to TRF, and <code>Stage.max_iter</code> is 100 — so at 46 free parameters a
+      single stage may spend <b>4,600</b> residual-plus-Jacobian evaluations.
+      A stage that converges takes seconds; one that cannot takes a quarter of an
+      hour and the pass still returns <code>status="converged"</code>. Measured
+      across the three NaCl/Li₂CO₃ mixtures — identical models, identical
+      parameter counts, same-sized patterns — wall clock ran <b>39 s, 858 s and
+      2,838 s</b>, a 73× spread with no corresponding difference in the answer.
+      The stages that stall are the degenerate groups AGENT_PROTOCOL §3 already
+      names, so they are predictable in advance and could be refused rather than
+      ground through.`],
+    ["low", "March–Dollase divides by zero",
+     `<code>model/preferred_orientation.py:92–93</code> emits
+      <code>divide by zero encountered in divide</code> when <code>r</code>
+      underflows, despite the softplus bound meant to keep it positive.`],
+  ];
+
+  const h3a = $("h3", {}, "Confirmed by use");
+  s.append($("div", { class: "col" }, h3a));
+  const g1 = $("div", { class: "findings" });
+  for (const [t, b] of wins)
+    g1.append($("div", { class: "finding" },
+      $("span", { class: "sev sev--low" }, "works"),
+      $("h4", {}, t), $("p", { html: b })));
+  s.append(g1);
+
+  s.append($("div", { class: "col" }, $("h3", {}, "Defects found")));
+  const g2 = $("div", { class: "findings" });
+  for (const [sev, t, b] of defects)
+    g2.append($("div", { class: "finding" },
+      $("span", { class: "sev sev--" + sev },
+        sev === "high" ? "blocking" : sev === "mid" ? "sharp edge" : "polish"),
+      $("h4", {}, t), $("p", { html: b })));
+  s.append(g2);
+}
+
+/* --------------------------------------------------------- 07 · the paper */
+{
+  const s = section("Notes on the paper's own data",
+    `Internal inconsistencies between the manuscript, its shipped outputs and its
+     code, found while trying to reproduce it.`);
+  const items = [
+    ["The Egyptian make-up fractions disagree with the shipped output, on two of five phases",
+     `Paper text: 12.53 / 18.53 / 32.02 / <b>9.69</b> / 27.23% for gypsum /
+      phosgenite / cerussite / galena / laurionite. The shipped
+      <code>MassFraction_estimate</code> file: 12.66 / 22.28 / 34.19 /
+      <b>1.68</b> / 29.20%. Galena differs by a factor of 5.8. The same shipped
+      run gives galena a = 5.979 Å against the paper's own 5.9388 Å and a
+      literature 5.9362 Å — +0.7% on a cubic lattice parameter.`],
+    ["The Ru–Mn case's shipped output does not match its description",
+     `The paper describes screening Ru site occupations in a <b>3 × 3
+      supercell</b> deposited as CCDC 2530452 (accessed 2026-02-12). The shipped
+      <code>LatticeConstances_2023.6.16_11.43.csv</code> is a cubic a = 9.40851 Å
+      phase plus a tetragonal a = 4.41115, c = 3.04844 Å phase — bixbyite and
+      rutile in their ordinary cells, not a supercell, which would be ≈28 Å — and
+      is dated <b>2023-06-16</b>, three years before the deposition it is
+      attributed to. The text also calls the parent "orthorhombic Mn₂O₃"; the
+      shipped cell is cubic.`],
+    ["The wavelengths in the text and in the code differ",
+     `The paper states Cu Kα1 = 1.540560, Kα2 = 1.544330 Å. Every case notebook
+      passes <code>[1.540593, 1.544414]</code>. That is 21 ppm on Kα1 and 54 ppm
+      on Kα2 — a systematic scale factor on every reported cell, in a paper that
+      quotes cells to five decimal places.`],
+    ["Width freedom is doing work a profile function is not allowed to do",
+     `Across the PbSO₄ fit, WPEM's per-peak FWHM spans <b>0.05° to 9.05°</b> with
+      a median of 0.176°; 171 of 766 peaks are broader than 0.5°. A 9°-wide
+      "Bragg peak" is not an instrumental line. Those components carry only 2.7%
+      of the integrated weight, so the effect on extracted intensities is small —
+      but they are absorbing residual and diffuse scattering.`],
+    ["Credit where it is due: WPEM's convergence radius is genuinely larger",
+     `Its α-Ti starting cell is 3.0% from its own refined answer and it walks
+      there. <code>pxrdref</code> cannot — freezing each reflection's evaluation
+      window at stage compile is what keeps the residual smooth for the analytic
+      Jacobian, and it costs exactly this. For the paper's stated use case,
+      taking hypotheses from a generative model where the cell may be several
+      percent off, a large convergence radius is the right property to optimise
+      and WPEM has it.`],
+  ];
+  const g = $("div", { class: "findings" });
+  for (const [t, b] of items)
+    g.append($("div", { class: "finding" },
+      $("span", { class: "sev sev--mid" }, "note"),
+      $("h4", {}, t), $("p", { html: b })));
+  s.append(g);
+}
+
+/* ------------------------------------------------------------ 08 · verdict */
+{
+  const s = section("Verdict");
+  para(s, `WPEM fits these patterns slightly better than <code>pxrdref</code>
+    does — by 0.46 percentage points of Rwp on PbSO₄, 2.0 on Tb₂BaCoO₅, 1.4 on
+    Ti–15Nb. It buys that with about <strong>3,000 free per-peak parameters
+    against 46</strong>, and with no atoms in the model. The like-for-like
+    comparison is against this package's own structure-free mode: a 27-parameter
+    Le Bail fit lands at 7.48% on PbSO₄, within <strong>0.36 points</strong> of
+    the 3,064-parameter decomposition. That is the whole result — the extra
+    parameters are buying a third of a percentage point.`);
+  para(s, `Where the paper is checkably better is the case with ground truth. On
+    three weighed NaCl/Li₂CO₃ mixtures WPEM recovers the composition to within
+    2.5 wt%; the Hill–Howard fractions here are 13–29 wt% low, because a
+    single-axis March–Dollase model cannot absorb severe halite texture and the
+    residue lands in the scale. That is a real deficiency in this package, not a
+    protocol difference.`);
+  para(s, `The paper's other real contribution is convergence radius: an EM
+    scheme with Bragg-constrained centres walks in from a 3% cell error where a
+    windowed Rietveld cannot move at all. For the pipeline the paper describes —
+    generative model proposes, refinement disposes — that is the right property
+    to optimise, and it argues for WPEM as a seeding stage <em>ahead of</em> a
+    structural refinement rather than a replacement for one.`);
+  para(s, `What does not survive is the framing of Fig. 2c. Lower R from 3,064
+    free per-peak parameters against 46 is not evidence of a better model. And a
+    decomposition that reports 48.32 : 46.19 for two phases whose scale
+    covariance is singular is not producing a measurement. Both codes fail
+    somewhere on these datasets; the difference is that one of them prints it.`);
+}
+</script>
