@@ -183,6 +183,150 @@ def plot(result, case: str, *, zooms: list[tuple[float, float]] | None = None) -
     for lo, hi in zooms or []:
         result.plot(path=str(OUT / f"{case}_zoom_{lo:g}-{hi:g}.png"),
                     two_theta_range=(lo, hi))
+    export_trace(result, case, zoom=zooms[0] if zooms else None)
+
+
+def _decimate(tt: np.ndarray, y_obs: np.ndarray, y_calc: np.ndarray,
+              y_bkg: np.ndarray, target: int) -> np.ndarray:
+    """Indices thinning a pattern to ~``target`` points without clipping peaks.
+
+    Plain striding drops peak tops, which is the one feature a reader checks.
+    Bin the pattern instead and keep, per bin, both the channel where y_obs is
+    largest and the channel where |y_obs − y_calc| is largest — the peaks and the
+    worst misfit, which is what the difference curve exists to show.
+    """
+    n = len(tt)
+    if n <= target:
+        return np.arange(n)
+    edges = np.linspace(0, n, target // 2 + 1).astype(int)
+    keep: list[int] = []
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        if hi <= lo:
+            continue
+        keep.append(lo + int(np.argmax(y_obs[lo:hi])))
+        keep.append(lo + int(np.argmax(np.abs(y_obs[lo:hi] - y_calc[lo:hi]))))
+    return np.unique(np.array(keep))
+
+
+def export_trace(result, case: str, *, zoom: tuple[float, float] | None = None,
+                 target: int = 700) -> None:
+    """Dump the decimated obs/calc/diff trace so a report page can redraw it.
+
+    A matplotlib PNG is 100 kB of light-mode raster; the same information as
+    ~700 (2θ, y_obs, y_calc, y_bkg) quadruples is a few kB and can be drawn in
+    whichever theme the reader is using.  Reflection ticks come from
+    ``RefinementResult.ticks``, which carries **every** emission line.
+    """
+    tt = np.asarray(result.two_theta, dtype=float)
+    if tt.size == 0:
+        return
+    y_obs = np.asarray(result.y_obs, dtype=float)
+    y_calc = np.asarray(result.y_calc, dtype=float)
+    y_bkg = (np.asarray(result.y_background, dtype=float)
+             if len(result.y_background) == len(tt) else np.zeros_like(tt))
+
+    def block(lo: float, hi: float, n: int) -> dict:
+        sel = (tt >= lo) & (tt <= hi)
+        if not sel.any():
+            return {}
+        idx = _decimate(tt[sel], y_obs[sel], y_calc[sel], y_bkg[sel], n)
+        take = lambda a: [round(float(v), 3) for v in a[sel][idx]]  # noqa: E731
+        return {"two_theta": take(tt), "obs": take(y_obs), "calc": take(y_calc),
+                "bkg": take(y_bkg)}
+
+    payload = {
+        "case": case,
+        "rwp": float(result.statistics.rwp),
+        "gof": float(result.statistics.gof),
+        "full": block(float(tt[0]), float(tt[-1]), target),
+        "ticks": {name: [round(float(v), 3) for v in vals]
+                  for name, vals in (result.ticks or {}).items()},
+    }
+    if zoom:
+        payload["zoom"] = {"range": list(zoom), **block(zoom[0], zoom[1], 500)}
+    RESULTS.mkdir(parents=True, exist_ok=True)
+    (RESULTS / f"{case}_trace.json").write_text(json.dumps(payload))
+
+
+def seed_profile(data: pr.PatternData, instrument: pr.Instrument, *,
+                 lorentzian_fraction: float = 0.5, quiet: bool = False) -> float:
+    """Set W (and X) from the pattern's own median peak width.
+
+    ``ProfileTCHZ`` defaults to W = 1e-3 deg², i.e. a Gaussian FWHM of ~0.03°.
+    That is a synchrotron line.  On lab data with 0.15-0.40° lines, the
+    reflection evaluation windows built at stage compile are an order of
+    magnitude narrower than the peaks they are supposed to cover, and the
+    consequences measured here were not subtle: the Le Bail extraction diverged
+    to Rwp = 742 % (NaCl/Li2CO3), 1769 % (Mn-Ru) and 2.6e5 % (Ti-15Nb), and the
+    Rietveld that inherited the wreckage came back with V pinned to its bound
+    and W = 0 — a Caglioti curve whose Gaussian variance is negative at low
+    angle.
+
+    So measure it: smooth, find the prominent peaks, take the median FWHM, and
+    split it between the Gaussian (W = (FWHM·f_G/2)²) and Lorentzian
+    (X = FWHM·f_L, since X multiplies 1/cosθ ≈ 1) terms.  This is what any
+    analyst does by eye before the first fit; doing it in code just makes it
+    reproducible.  Returns the measured FWHM in degrees.
+    """
+    from scipy.ndimage import uniform_filter1d
+    from scipy.signal import find_peaks, peak_widths
+
+    tt = np.asarray(data.two_theta)
+    y = np.asarray(data.intensity)
+    step = float(np.median(np.diff(tt)))
+    # Smooth over ~0.06 deg: enough to kill counting noise on a 0.01 deg grid,
+    # narrow enough not to broaden a 0.1 deg line appreciably.
+    window = max(5, (int(round(0.06 / step)) | 1))
+    smooth = uniform_filter1d(y.astype(float), window)
+    baseline = float(np.median(smooth))
+    peaks, props = find_peaks(smooth, prominence=(smooth.max() - baseline) * 0.02,
+                              distance=max(5, int(round(0.2 / step))))
+    if len(peaks) < 3:
+        return float("nan")
+    # Rank by prominence and measure only the strongest: a noise ripple that
+    # survives smoothing is still a *weak* maximum, and its width would drag the
+    # median down by an order of magnitude (measured on the Mn-Ru pattern:
+    # 0.071 deg from all 86 detections against 0.38 deg from the real lines).
+    order = np.argsort(props["prominences"])[::-1][:12]
+    widths = peak_widths(smooth, peaks[order], rel_height=0.5)[0] * step
+    fwhm = float(np.median(widths))
+    gauss = fwhm * (1.0 - lorentzian_fraction)
+    instrument.profile.w.value = max((gauss / 2.0) ** 2, 1e-4)
+    instrument.profile.x.value = max(fwhm * lorentzian_fraction, 1e-3)
+    if not quiet:
+        print(f"    [seed] {len(peaks)} peaks, median FWHM {fwhm:.3f} deg "
+              f"-> W={instrument.profile.w.value:.5f} deg^2, "
+              f"X={instrument.profile.x.value:.4f}")
+    return fwhm
+
+
+def seed_background(data: pr.PatternData, instrument: pr.Instrument, *,
+                    quiet: bool = False) -> float:
+    """Put the pattern's floor into the background's constant term.
+
+    ``auto_background`` chooses the *order*, but every coefficient it returns
+    starts at 0.0 (``BackgroundChebyshev.with_terms``).  For a Rietveld run that
+    is harmless — the first stage fits them.  For a **Le Bail** run it is not:
+    ``lebail_update`` partitions ``max(y_obs − y_bkg, 0)``, and it runs before
+    the background has ever been fitted, so with y_bkg ≡ 0 the entire pedestal
+    is handed to the Bragg reflections on cycle one.  On the Mn-Ru pattern,
+    whose background (median 8152 counts) is five times its strongest peak,
+    that diverges to Rwp = 9281 %.
+
+    Seeding c₀ at a low percentile of the observed intensity costs nothing and
+    removes the failure.  Returns the seeded level.
+    """
+    y = np.asarray(data.intensity)
+    level = float(np.percentile(y, 5))
+    coefficients = getattr(instrument.background, "coefficients", None)
+    if not coefficients:
+        return float("nan")
+    # Shifted Chebyshev T_0 = 1, so c_0 is the mean level directly.
+    coefficients[0].value = level
+    if not quiet:
+        print(f"    [seed] background c0 = {level:.1f} counts "
+              f"(5th percentile of y_obs)")
+    return level
 
 
 def lab_plan(*, structural: bool = True, sample_profile: bool = True,

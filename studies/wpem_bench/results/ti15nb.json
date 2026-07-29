@@ -1,0 +1,2198 @@
+{
+  "case": "ti15nb",
+  "dataset": "CASES/Ti-15Nb_three phase/intensity.csv",
+  "n_points": 3289,
+  "two_theta_range": [
+    30.00173,
+    90.01128
+  ],
+  "wavelengths": [
+    1.5405929,
+    1.5444274
+  ],
+  "mode": "rietveld",
+  "rwp": 0.10753255353914587,
+  "rp": 0.07601965007956872,
+  "rexp": 0.04181181805314776,
+  "gof": 2.571822000240681,
+  "chi2": 6.614268400921976,
+  "n_free": 54,
+  "status": "converged",
+  "seconds": 299.3,
+  "cells": {
+    "beta": {
+      "a": 3.311694704902279,
+      "b": 3.311694704902279,
+      "c": 3.311694704902279,
+      "alpha": 90.0,
+      "beta": 90.0,
+      "gamma": 90.0
+    },
+    "alpha": {
+      "a": 3.1235719922474687,
+      "b": 3.1235719922474687,
+      "c": 4.786687302707275,
+      "alpha": 90.0,
+      "beta": 90.0,
+      "gamma": 120.0
+    },
+    "alpha_prime": {
+      "a": 2.9810934288465565,
+      "b": 2.9810934288465565,
+      "c": 4.7870929016882755,
+      "alpha": 90.0,
+      "beta": 90.0,
+      "gamma": 120.0
+    }
+  },
+  "cell_esds": {
+    "beta": {
+      "a": 0.004447270070191666,
+      "b": 0.004447270070191666,
+      "c": 0.004447270070191666
+    },
+    "alpha": {
+      "a": 0.007808468716143266,
+      "b": 0.007808468716143266,
+      "c": 0.016865110888524496
+    },
+    "alpha_prime": {
+      "a": 0.0042717189410151285,
+      "b": 0.0042717189410151285,
+      "c": 0.006472316018135127
+    }
+  },
+  "weight_fractions": {
+    "beta": 0.641260380696334,
+    "alpha": 0.08103145825330857,
+    "alpha_prime": 0.2777081610503575
+  },
+  "weight_fraction_esds": {
+    "beta": 0.15833653076522547,
+    "alpha": 0.14349986015046878,
+    "alpha_prime": 0.17025758260260748
+  },
+  "parameters": {
+    "phases.0.cell.a": {
+      "value": 3.311694704902279,
+      "stderr": 0.004447270070191666
+    },
+    "phases.0.scale": {
+      "value": 0.03962272066642342,
+      "stderr": 0.03129941045705482
+    },
+    "phases.0.preferred_orientation.r": {
+      "value": 1.0000000000014138,
+      "stderr": 0.004119401706739896
+    },
+    "phases.0.lor_size": {
+      "value": 1.0886349904058113e-10,
+      "stderr": 6.308117695997774e-13
+    },
+    "phases.0.lor_strain": {
+      "value": 5.639533914239255e-12,
+      "stderr": 1.65087106782125e-14
+    },
+    "phases.0.gauss_size": {
+      "value": 2.578976950814883e-12,
+      "stderr": 1.1675870463491498e-15
+    },
+    "phases.0.gauss_strain": {
+      "value": 1.0016334463426104e-12,
+      "stderr": 3.4877094327989843e-16
+    },
+    "phases.0.atoms.0.biso": {
+      "value": 10.204837431423591,
+      "stderr": 104.58671012220243
+    },
+    "phases.0.atoms.1.biso": {
+      "value": 10.046387776911565,
+      "stderr": 110.71070991076124
+    },
+    "phases.1.cell.a": {
+      "value": 3.1235719922474687,
+      "stderr": 0.007808468716143266
+    },
+    "phases.1.cell.c": {
+      "value": 4.786687302707275,
+      "stderr": 0.016865110888524496
+    },
+    "phases.1.scale": {
+      "value": 0.005506328133110662,
+      "stderr": 0.01105100428545946
+    },
+    "phases.1.preferred_orientation.r": {
+      "value": 0.6390972801623386,
+      "stderr": 0.19682365171060412
+    },
+    "phases.1.lor_size": {
+      "value": 7.85646412268317e-12,
+      "stderr": 8.322413988121375e-15
+    },
+    "phases.1.lor_strain": {
+      "value": 1.0962734592886348e-12,
+      "stderr": 1.3085334947484093e-15
+    },
+    "phases.1.gauss_size": {
+      "value": 2.7424465027476116e-12,
+      "stderr": 8.143073580508808e-16
+    },
+    "phases.1.gauss_strain": {
+      "value": 1.0001666363928586e-12,
+      "stderr": 1.867297875559715e-15
+    },
+    "phases.1.atoms.0.biso": {
+      "value": 8.80208593784154,
+      "stderr": 71.28019360272317
+    },
+    "phases.1.atoms.1.biso": {
+      "value": 5.813207628881593,
+      "stderr": 413.5413939128695
+    },
+    "phases.2.cell.a": {
+      "value": 2.9810934288465565,
+      "stderr": 0.0042717189410151285
+    },
+    "phases.2.cell.c": {
+      "value": 4.7870929016882755,
+      "stderr": 0.006472316018135127
+    },
+    "phases.2.scale": {
+      "value": 0.019008132368158386,
+      "stderr": 0.015751356346551046
+    },
+    "phases.2.preferred_orientation.r": {
+      "value": 0.8459690045504409,
+      "stderr": 0.09841910791773456
+    },
+    "phases.2.lor_size": {
+      "value": 9.999999999999984e-13,
+      "stderr": 9.39005537611258e-16
+    },
+    "phases.2.lor_strain": {
+      "value": 9.999999999999984e-13,
+      "stderr": 5.696039365115845e-16
+    },
+    "phases.2.gauss_size": {
+      "value": 9.999999999999984e-13,
+      "stderr": 4.262168290362486e-16
+    },
+    "phases.2.gauss_strain": {
+      "value": 9.999999999999984e-13,
+      "stderr": 1.5969379344800595e-16
+    },
+    "phases.2.atoms.0.biso": {
+      "value": 4.479651908950747,
+      "stderr": 29.074090281995044
+    },
+    "phases.2.atoms.1.biso": {
+      "value": 3.3228356682830062,
+      "stderr": 61.06776206817701
+    },
+    "instrument.zero_shift": {
+      "value": 0.10255356916180068,
+      "stderr": 0.04400394081928126
+    },
+    "instrument.source.lines.1.weight": {
+      "value": 0.9804443125434281,
+      "stderr": 1.2228350522980083
+    },
+    "instrument.geometry.axial_sl": {
+      "value": 0.06027484631714098,
+      "stderr": 0.09991156999690103
+    },
+    "instrument.geometry.axial_hl": {
+      "value": 0.058859759831085344,
+      "stderr": 0.1000343854907086
+    },
+    "instrument.profile.u": {
+      "value": 0.922681305980903,
+      "stderr": 0.3941014535007937
+    },
+    "instrument.profile.v": {
+      "value": -0.32592184011982356,
+      "stderr": 0.12711001347979206
+    },
+    "instrument.profile.w": {
+      "value": 0.004170381373714645,
+      "stderr": 0.023008559440855694
+    },
+    "instrument.profile.x": {
+      "value": 0.19703175256735075,
+      "stderr": 0.021982349316296626
+    },
+    "instrument.profile.y": {
+      "value": 1.0000000000003429e-12,
+      "stderr": 1.277061390059418e-16
+    }
+  },
+  "diagnostics": [
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.cell.a ~ instrument.zero_shift (\u03c1=+0.992)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.cell.a ~ instrument.zero_shift (\u03c1=+0.992)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.cell.a ~ instrument.zero_shift (\u03c1=+0.991)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.scale ~ phases.2.scale (\u03c1=+0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.scale ~ instrument.source.lines.1.weight (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.scale ~ instrument.source.lines.1.weight (\u03c1=-0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.scale ~ phases.2.scale (\u03c1=+0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.scale ~ instrument.source.lines.1.weight (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_size (\u03c1=-0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_strain (\u03c1=+0.993)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.lor_strain (\u03c1=+0.993)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.gauss_size (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.gauss_strain (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.lor_size (\u03c1=+0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.lor_strain (\u03c1=+0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.gauss_size (\u03c1=-0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.gauss_strain (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ instrument.profile.y (\u03c1=+0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.0.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.lor_size (\u03c1=+0.990)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.gauss_strain (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.lor_size (\u03c1=-0.993)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.gauss_size (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.gauss_strain (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.lor_strain (\u03c1=-0.993)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.gauss_size (\u03c1=+0.988)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.gauss_strain (\u03c1=+0.986)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.lor_size (\u03c1=-0.991)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.lor_strain (\u03c1=-0.991)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.gauss_size (\u03c1=+0.990)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.gauss_strain (\u03c1=-0.991)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ instrument.profile.y (\u03c1=-0.991)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.gauss_size (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.gauss_strain (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.lor_size (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.lor_strain (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.gauss_size (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.gauss_strain (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ instrument.profile.y (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.scale ~ instrument.source.lines.1.weight (\u03c1=-0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_size ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.scale ~ phases.2.scale (\u03c1=+0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.scale ~ instrument.source.lines.1.weight (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_size (\u03c1=-0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_strain (\u03c1=+0.993)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.lor_strain (\u03c1=+0.993)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.gauss_size (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.gauss_strain (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.lor_size (\u03c1=+0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.lor_strain (\u03c1=+0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.gauss_size (\u03c1=-0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.gauss_strain (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ instrument.profile.y (\u03c1=+0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.0.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.lor_size (\u03c1=+0.990)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.gauss_strain (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.lor_size (\u03c1=-0.993)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.gauss_size (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.gauss_strain (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.lor_strain (\u03c1=-0.993)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.gauss_size (\u03c1=+0.988)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.gauss_strain (\u03c1=+0.986)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.lor_size (\u03c1=-0.991)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.lor_strain (\u03c1=-0.991)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.gauss_size (\u03c1=+0.990)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.gauss_strain (\u03c1=-0.991)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ instrument.profile.y (\u03c1=-0.991)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.gauss_size (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.gauss_strain (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.lor_size (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.lor_strain (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.gauss_size (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.gauss_strain (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ instrument.profile.y (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.scale ~ instrument.source.lines.1.weight (\u03c1=-0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_size ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.atoms.0.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.atoms.1.biso (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.atoms.0.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.atoms.1.biso (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.0.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.atoms.0.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.atoms.1.biso (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.atoms.0.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.atoms.1.biso (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.atoms.0.biso ~ phases.0.atoms.1.biso (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.atoms.0.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.atoms.1.biso (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.atoms.0.biso (\u03c1=-0.993)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.atoms.1.biso (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.1.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.1.atoms.0.biso (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.1.atoms.1.biso (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.1.atoms.0.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.1.atoms.1.biso (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ phases.1.atoms.1.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ phases.2.lor_size (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ phases.2.lor_strain (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ phases.2.gauss_size (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ phases.2.gauss_strain (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ instrument.profile.y (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_size ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.atoms.0.biso ~ phases.2.atoms.1.biso (\u03c1=-0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.0.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.0.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.0.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.0.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.1.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.1.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.1.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.1.atoms.0.biso (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.1.atoms.1.biso (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.2.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.preferred_orientation.r ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.gauss_size (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.atoms.0.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.atoms.1.biso (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.atoms.0.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.1.atoms.1.biso (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.0.gauss_strain (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.atoms.0.biso (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.atoms.1.biso (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ instrument.profile.y (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.lor_size (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.gauss_size (\u03c1=-0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.atoms.0.biso (\u03c1=+0.993)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.atoms.1.biso (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.atoms.0.biso ~ phases.0.atoms.1.biso (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.atoms.0.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.atoms.1.biso (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.atoms.0.biso (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.atoms.1.biso (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.lor_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.1.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.1.atoms.0.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.1.atoms.1.biso (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_size ~ instrument.profile.y (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.1.atoms.0.biso (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.1.atoms.1.biso (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.gauss_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ phases.1.atoms.1.biso (\u03c1=-0.993)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ phases.2.lor_size (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ phases.2.lor_strain (\u03c1=+0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ phases.2.gauss_size (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ phases.2.gauss_strain (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.0.biso ~ instrument.profile.y (\u03c1=-0.994)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ phases.2.lor_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ phases.2.lor_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ phases.2.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.atoms.1.biso ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_size ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ phases.2.gauss_size (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ phases.2.gauss_strain (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.lor_strain ~ instrument.profile.y (\u03c1=-1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_size ~ phases.2.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_size ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.gauss_strain ~ instrument.profile.y (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.2.atoms.0.biso ~ phases.2.atoms.1.biso (\u03c1=-0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.997)"
+    }
+  ],
+  "reference": {
+    "source": "arXiv 2602.16372 Fig. 2d + CASES LatticeConstances/MassFraction files",
+    "rp_percent": 5.033,
+    "rwp_percent": 9.005,
+    "cells": {
+      "beta": {
+        "a": 3.2345
+      },
+      "alpha": {
+        "a": 2.9977,
+        "c": 4.6817
+      },
+      "alpha_prime": {
+        "a": 2.9785,
+        "c": 4.7768
+      }
+    },
+    "fractions_percent": {
+      "beta": 5.496,
+      "alpha": 48.317,
+      "alpha_prime": 46.187
+    },
+    "method": "phase fractions from integrated intensities of the decomposed component profiles; no atomic structure, no ground truth",
+    "wpem_start_cells": {
+      "beta": [
+        3.282,
+        3.282
+      ],
+      "alpha": [
+        2.9064,
+        4.6667
+      ],
+      "alpha_prime": [
+        2.93,
+        4.675
+      ]
+    },
+    "cold_start_from_wpem_cells": {
+      "lebail_rwp_percent": 7224.8,
+      "outcome": "diverged; zero_shift and every profile term on a bound"
+    },
+    "free_cell_run": {
+      "rwp_percent": 10.753255353914588,
+      "rp_percent": 7.601965007956872,
+      "cells": {
+        "beta": {
+          "a": 3.311694704902279,
+          "c": 3.311694704902279
+        },
+        "alpha": {
+          "a": 3.1235719922474687,
+          "c": 4.786687302707275
+        },
+        "alpha_prime": {
+          "a": 2.9810934288465565,
+          "c": 4.7870929016882755
+        }
+      },
+      "weight_percent": {
+        "beta": 64.1260380696334,
+        "alpha": 8.103145825330857,
+        "alpha_prime": 27.77081610503575
+      }
+    },
+    "held_cell_run": {
+      "rwp_percent": 12.147085056197268,
+      "rp_percent": 8.421475768405378,
+      "n_free": 39,
+      "weight_percent": {
+        "beta": 8.80817896541407e-07,
+        "alpha": 84.45253682614737,
+        "alpha_prime": 15.547462293034753
+      },
+      "weight_percent_esd": {
+        "beta": 1.6722316267514377e-06,
+        "alpha": 30.753075820473004,
+        "alpha_prime": 30.753074278717634
+      }
+    }
+  },
+  "notes": [
+    "Cells seeded from WPEM's REFINED values, not its starting values: a cold start from the latter (alpha a 3.0% off) diverges to Rwp=7225% because the frozen evaluation windows cannot reach the peaks.",
+    "No Le Bail stage: with three phases whose lines coincide the intensity partition is indeterminate and the extraction runs away (Rwp 2.6e5%).",
+    "Nb site occupancies HELD (beta 0.30, alpha 0.05, alpha' 0.15); occupancy and preferred orientation both rescale specific hkl and cannot be refined together here.",
+    "No ground truth exists for this case \u2014 WPEM's fractions are an estimate, not a reference value.",
+    "Free-cell Rietveld reached its fixed point in 3 passes; held-cell in 3."
+  ]
+}

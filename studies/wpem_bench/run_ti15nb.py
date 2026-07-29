@@ -25,7 +25,19 @@ textures.
 from __future__ import annotations
 
 import numpy as np
-from bench import Timer, cif, fit_to_fixed_point, lab_plan, load, plot, record, show, show_report
+from bench import (
+    Timer,
+    cif,
+    fit_to_fixed_point,
+    lab_plan,
+    load,
+    plot,
+    record,
+    seed_background,
+    seed_profile,
+    show,
+    show_report,
+)
 
 import pxrdref as pr
 
@@ -113,12 +125,12 @@ def main() -> None:
     ])
 
     instrument = pr.Instrument.bragg_brentano(radiation="CuKa")
-    # A cold-rolled alloy film has broad peaks; the default w = 1e-3 deg^2
+    # A cold-rolled alloy film has broad peaks; the default W = 1e-3 deg^2
     # (FWHM ~ 0.03 deg) builds evaluation windows far narrower than the real
     # lines, which is the second half of the cold-start failure described above.
-    instrument.profile.w.value = 2e-2
-    instrument.profile.x.value = 1e-1
+    seed_profile(data, instrument)
     instrument.background = pr.background.auto_background(data, kind="chebyshev")
+    seed_background(data, instrument)
 
     # No Le Bail stage here, and that is itself a result.  Le Bail partitions
     # observed intensity between reflections; with three phases whose lines
@@ -167,7 +179,9 @@ def main() -> None:
     instrument2 = pr.Instrument.bragg_brentano(radiation="CuKa")
     instrument2.profile.w.value = 2e-2
     instrument2.profile.x.value = 1e-1
+    seed_profile(data, instrument2)
     instrument2.background = pr.background.auto_background(data, kind="chebyshev")
+    seed_background(data, instrument2)
     ref2 = pr.Refinement(held, instrument2)
     with Timer() as t_held:
         rv_held, held_passes = fit_to_fixed_point(

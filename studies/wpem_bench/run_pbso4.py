@@ -22,7 +22,19 @@ mapped back to Pnma before comparison.
 from __future__ import annotations
 
 import numpy as np
-from bench import Timer, cif, fit_to_fixed_point, lab_plan, load, plot, record, show, show_report
+from bench import (
+    Timer,
+    cif,
+    fit_to_fixed_point,
+    lab_plan,
+    load,
+    plot,
+    record,
+    seed_background,
+    seed_profile,
+    show,
+    show_report,
+)
 
 import pxrdref as pr
 
@@ -34,6 +46,15 @@ WPEM_REF = {
     "cases_lattice_file": {"a": 8.486, "b": 5.4032, "c": 6.96378},
     "method": "whole-pattern decomposition, per-reflection free (gamma, sigma, "
               "Delta, w); no atomic structure",
+    # Counted from WPEM's own shipped WPEMPeakParas file: 766 rows (383
+    # reflections x 2 emission lines), with 766 distinct weights, 764 distinct
+    # Lorentz-Gauss mixings, 761 distinct Lorentzian widths and 703 distinct
+    # Gaussian variances.  The peak centres follow the cell through Bragg's law
+    # and are not counted; 766 x 4 is the free peak block.
+    "wpem_free_parameters": 766 * 4,
+    "wpem_free_parameters_note":
+        "766 peaks x (w, Delta, gamma, sigma^2), counted from WPEMPeakParas; "
+        "excludes the 3 cell parameters and the 1000-anchor background",
 }
 # Literature anglesite for an outside anchor (COD 9015524, Antao 2012, Pnma
 # setting): a = 8.48024, b = 5.39754, c = 6.95802 Å.
@@ -64,7 +85,9 @@ def main() -> None:
     # takes 53 coefficients whose neighbours correlate at rho > 0.99 and whose
     # block absorbs R^2 = 0.56 of a Biso column — the exact failure mode
     # CLAUDE.md's background invariant is about.
+    seed_profile(data, instrument)
     instrument.background = pr.background.auto_background(data, kind="chebyshev")
+    seed_background(data, instrument)
 
     ref = pr.Refinement(structure, instrument)
 

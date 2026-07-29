@@ -23,7 +23,19 @@ Protocol notes that matter for a fair comparison:
 from __future__ import annotations
 
 import numpy as np
-from bench import Timer, cif, fit_to_fixed_point, lab_plan, load, plot, record, show, show_report
+from bench import (
+    Timer,
+    cif,
+    fit_to_fixed_point,
+    lab_plan,
+    load,
+    plot,
+    record,
+    seed_background,
+    seed_profile,
+    show,
+    show_report,
+)
 
 import pxrdref as pr
 
@@ -49,9 +61,11 @@ def build(tag: str) -> tuple[pr.Structure, pr.Instrument]:
     structure = pr.Structure(phases=[nacl.phases[0], li2co3.phases[0]])
     for phase in structure.phases:
         phase.scale = pr.Parameter(value=1e-3, min=0.0, transform="softplus")
+    data = load(f"{CASE}/{tag}/intensity.csv")
     instrument = pr.Instrument.bragg_brentano(radiation="CuKa")
-    instrument.background = pr.background.auto_background(
-        load(f"{CASE}/{tag}/intensity.csv"), kind="chebyshev")
+    seed_profile(data, instrument)
+    instrument.background = pr.background.auto_background(data, kind="chebyshev")
+    seed_background(data, instrument)
     return structure, instrument
 
 
@@ -64,12 +78,19 @@ def run(tag: str) -> None:
     structure, instrument = build(tag)
     ref = pr.Refinement(structure, instrument)
 
-    with Timer() as t_lb:
-        lb, lb_passes = fit_to_fixed_point(
-            ref, data, mode="lebail",
-            plan=lab_plan(structural=False, sample_profile=False,
-                          preferred_orientation=False), label="LeBail")
-    show(lb, "Le Bail (fixed pt)")
+    # --- no Le Bail stage, and that absence is a measured result.
+    # pxrdref's Le Bail extraction partitions max(y_obs - y_bkg, 0) *per phase*
+    # with no mechanism to arbitrate two phases claiming the same channel, so on
+    # a multiphase pattern the phases inflate each other without bound.  Measured
+    # across this benchmark, the failure tracks the phase count exactly:
+    #   1 phase  (PbSO4)      Le Bail converges, Rwp 8.6 %
+    #   1 phase  (Tb2BaCoO5)  converges, Rwp 17.3 %
+    #   2 phases (NaCl/Li2CO3) Rwp 1924 %
+    #   2 phases (Mn-Ru)       Rwp 1769-9281 %
+    #   3 phases (Ti-15Nb)     Rwp 2.6e5 %
+    # and it survives seeding both the profile widths and the background.  A
+    # structural model ties intensities to atoms and has no such freedom, so
+    # Rietveld is the only route here.  See REPORT.md 4.1(g).
 
     with Timer() as t_rv:
         rv, rv_passes = fit_to_fixed_point(
@@ -88,7 +109,7 @@ def run(tag: str) -> None:
 
     rec = record(f"{CASE}_{tag}", f"CASES/StandardSample/{tag}percent/intensity.csv",
                  data, rv, fitted, mode="rietveld",
-                 seconds=t_lb.seconds + t_rv.seconds,
+                 seconds=t_rv.seconds,
                  reference={**WPEM_REF,
                             "nominal_nacl_percent": NOMINAL_NACL[tag],
                             "wpem_nacl_percent": WPEM_REF["nacl_percent"][tag]},
@@ -96,9 +117,7 @@ def run(tag: str) -> None:
                      "Both cells refined and the Cu Ka doublet kept; WPEM held "
                      "cells fixed and used an averaged wavelength on the 10% "
                      "and 50% runs.",
-                     f"Le Bail fixed point in {lb_passes} passes "
-                     f"(Rwp={lb.statistics.rwp * 100:.3f}%); Rietveld in "
-                     f"{rv_passes}.",
+                     f"Rietveld reached its fixed point in {rv_passes} passes.",
                  ])
     rec.wavelengths = [float(line.wavelength) for line in instrument.source.lines]
     rec.save()

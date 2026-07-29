@@ -17,7 +17,19 @@ when the exact compound has no deposited model.
 from __future__ import annotations
 
 import numpy as np
-from bench import Timer, cif, fit_to_fixed_point, lab_plan, load, plot, record, show, show_report
+from bench import (
+    Timer,
+    cif,
+    fit_to_fixed_point,
+    lab_plan,
+    load,
+    plot,
+    record,
+    seed_background,
+    seed_profile,
+    show,
+    show_report,
+)
 
 import pxrdref as pr
 
@@ -64,7 +76,9 @@ def main() -> None:
           f"from the Y2BaNiO5 structure type")
 
     instrument = pr.Instrument.bragg_brentano(radiation="CuKa")
+    seed_profile(data, instrument)
     instrument.background = pr.background.auto_background(data, kind="chebyshev")
+    seed_background(data, instrument)
 
     ref = pr.Refinement(structure, instrument)
 

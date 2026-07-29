@@ -21,7 +21,18 @@ digit — plus COD 9008694 for galena.
 from __future__ import annotations
 
 import numpy as np
-from bench import Timer, cif, fit_to_fixed_point, load, plot, record, show, show_report
+from bench import (
+    Timer,
+    cif,
+    fit_to_fixed_point,
+    load,
+    plot,
+    record,
+    seed_background,
+    seed_profile,
+    show,
+    show_report,
+)
 
 import pxrdref as pr
 
@@ -75,7 +86,9 @@ def main() -> None:
     instrument = pr.Instrument.debye_scherrer(wavelength=WAVELENGTH)
     instrument.profile.w.value = 2e-3
     instrument.profile.x.value = 2e-3
+    seed_profile(data, instrument)
     instrument.background = pr.background.auto_background(data, kind="chebyshev")
+    seed_background(data, instrument)
 
     plan = pr.RefinementPlan(stages=[
         pr.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
@@ -88,13 +101,21 @@ def main() -> None:
         pr.Stage("biso", ["phases.*.atoms.*.biso", "phases.*.atoms.*.adp.*"]),
         pr.Stage("preferred_orientation", ["phases.*.preferred_orientation.r"]),
     ])
-    profile_plan = pr.RefinementPlan(stages=plan.stages[:5])
 
     ref = pr.Refinement(structure, instrument)
-    with Timer() as t_lb:
-        lb, lb_passes = fit_to_fixed_point(ref, data, mode="lebail",
-                                           plan=profile_plan, label="LeBail")
-    show(lb, "Le Bail (fixed pt)")
+    # --- no Le Bail stage, and that absence is a measured result.
+    # pxrdref's Le Bail extraction partitions max(y_obs - y_bkg, 0) *per phase*
+    # with no mechanism to arbitrate two phases claiming the same channel, so on
+    # a multiphase pattern the phases inflate each other without bound.  Measured
+    # across this benchmark, the failure tracks the phase count exactly:
+    #   1 phase  (PbSO4)      Le Bail converges, Rwp 8.6 %
+    #   1 phase  (Tb2BaCoO5)  converges, Rwp 17.3 %
+    #   2 phases (NaCl/Li2CO3) Rwp 1924 %
+    #   2 phases (Mn-Ru)       Rwp 1769-9281 %
+    #   3 phases (Ti-15Nb)     Rwp 2.6e5 %
+    # and it survives seeding both the profile widths and the background.  A
+    # structural model ties intensities to atoms and has no such freedom, so
+    # Rietveld is the only route here.  See REPORT.md 4.1(g).
 
     with Timer() as t_rv:
         rv, rv_passes = fit_to_fixed_point(ref, data, mode="rietveld",
@@ -113,15 +134,13 @@ def main() -> None:
 
     rec = record(CASE, "CASES/EgyptianMakeup/WPEMfitting/intensity.csv", data,
                  rv, fitted, mode="rietveld",
-                 seconds=t_lb.seconds + t_rv.seconds, reference=WPEM_REF,
+                 seconds=t_rv.seconds, reference=WPEM_REF,
                  notes=[
                      "Paper and shipped CASES mass fractions disagree "
                      "(galena 9.69% vs 1.68%); both are recorded.",
                      "H sites dropped from gypsum and laurionite — negligible "
                      "X-ray scattering, placeholder CIF positions.",
-                     f"Le Bail fixed point in {lb_passes} passes "
-                     f"(Rwp={lb.statistics.rwp * 100:.3f}%); Rietveld in "
-                     f"{rv_passes}.",
+                     f"Rietveld reached its fixed point in {rv_passes} passes.",
                  ])
     rec.wavelengths = [WAVELENGTH]
     rec.save()
