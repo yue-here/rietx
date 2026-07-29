@@ -1,0 +1,45 @@
+MnSb_33_BM: 16552 points 2.084-68.312 deg, file esds present: True
+  Stephens DOFs derived for P6_3/mmc: 9 non-zero of 15 S_HKL on the isotropic ray
+  muR: .inp computes 1.27331; pxrdref's own estimate from composition+geometry = 1.2770739879370638
+===== MnSb_33_BM =====
+status=converged  Rwp=12.466%  Rp=6.830%  Rexp=0.608%  GoF=20.506  DW=0.112
+points fitted=16552  free params=31  esd inflation (Berar-Lelann)=5.91
+  phase 'Mn1+xSb': a=4.129933 b=4.129933 c=5.764019 A, gamma=120.00 deg, scale=0.0677598
+      Mn1   Mn    (0.00000,0.00000,0.00000) occ=1.0000 Biso=+0.3000
+      Mn2   Mn    (0.33333,0.66667,0.75000) occ=0.0713 Biso=+0.3000
+      Sb1   Sb    (0.33333,0.66667,0.25000) occ=1.0000 Biso=-0.5825
+      lor_size=0.00000 lor_strain=0.00000 gauss_size=0.00000 gauss_strain=0.00000
+  instrument: zero=-0.01506 deg  displ=+0.00000 mm
+      U=0.07838 V=-0.02679 W=0.00276 X=0.01164 Y=0.00000
+      FCJ S/L=0.0000 H/L=0.0000
+  absorption: rouse_cylinder muR/mut=1.2733 (given), equivalent dBiso=+0.22249 A^2
+  [warning] HIGH_CORRELATION (x24): instrument.zero_shift ~ instrument.geometry.axial_sl (ρ=+0.984)
+  [warning] BOUND_HIT (x8): instrument.geometry.axial_sl refined to its bound
+  [warning] STEPHENS_STRAIN_NOT_POSITIVE (x3): the Stephens strain coefficients of phases.0.microstrain (19 of 58 reflections, worst σ²(M) -1.36e+07 at (3, 0, 6)) — σ²(M) is a variance, so a negative value is not a large anisotropy but coefficients outside the physical cone, and those reflections silently get no strain broadening at all
+  [warning] ABSORPTION_MU_R_OUT_OF_RANGE: µR = 1.27 is outside the Rouse et al. (1970) fit's range (µR ≤ 1); the transmission factor is an extrapolation there
+  vs TOPAS MnSb_33_BM_synchrotron.inp:
+      a             4.129933   TOPAS    4.130757
+      c             5.764019   TOPAS    5.765880
+      occ(Mn2)      0.071336   TOPAS    0.071640
+      Biso(Sb)     -0.582510   TOPAS   -0.484650
+      Rwp           0.124660   TOPAS    0.084523
+  esd phases.0.cell.a = 4.129933 +/- 0.000438
+  esd phases.0.cell.c = 5.764019 +/- 0.000709
+  esd phases.0.atoms.1.occ = 0.071336 +/- 0.020059
+  esd phases.0.atoms.2.biso = -0.582510 +/- 0.064802
+  Stephens S_HKL (1e-12 A^-4, literal-monomial convention):
+     s400=115318.0  s310=230636.0  s220=345954.0  s202=-105111.8  s130=230636.0  s112=-105111.8  s040=115318.0  s022=-105111.8  s004=6817.3
+     Lorentzian strain FWHM, the tan(theta) coefficient in deg:
+       (1, 0, 0)  d=3.57663 A   Lambda=0.24890 deg
+       (0, 0, 2)  d=2.88201 A   Lambda=0.15717 deg
+       (1, 0, 1)  d=3.03909 A   Lambda=0.06905 deg
+       (1, 1, 0)  d=2.06497 A   Lambda=0.24890 deg
+       (1, 0, 3)  d=1.69258 A   Lambda=0.00000 deg
+       (2, 0, 0)  d=1.78831 A   Lambda=0.24890 deg
+       (0, 0, 4)  d=1.44100 A   Lambda=0.15717 deg
+
+--- controls (Rwp is NOT the right judge of either of these) ---
+  no Stephens strain                 Rwp=17.0805%  GoF= 28.10  a=4.130280  Biso(Sb)=-0.5608
+  no capillary absorption (muR=0)    Rwp=12.0942%  GoF= 19.89  a=4.130712  Biso(Sb)=-0.8022
+  solver=lm (strain cone as inequality) Rwp=16.6108%  GoF= 27.32  a=4.130374  Biso(Sb)=-0.5180
+  true Voigt peak shape              Rwp=12.4492%  GoF= 20.48  a=4.129956  Biso(Sb)=-0.5820

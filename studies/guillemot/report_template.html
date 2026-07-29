@@ -1,0 +1,548 @@
+<title>guiLLeMot examples — refined with pxrd-refine</title>
+<style>
+:root{
+  --bg:#F4F6F9; --surface:#FFFFFF; --ink:#121821; --muted:#5A6473;
+  --rule:#D9E0E8; --rule-soft:#E9EEF3;
+  --accent:#1F5FA8; --warm:#C23B22;
+  --ok:#26714F; --warn:#9A6318; --stop:#A33322;
+  --chip-ok:#E3F1EA; --chip-warn:#F6EEDF; --chip-stop:#F7E7E4;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0E1319; --surface:#151B23; --ink:#E4E9F0; --muted:#93A0B1;
+    --rule:#242D38; --rule-soft:#1D242D;
+    --accent:#77ABE8; --warm:#E8836A;
+    --ok:#5FC49A; --warn:#D6A45C; --stop:#E8877A;
+    --chip-ok:#132A21; --chip-warn:#2A2317; --chip-stop:#2B1A18;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1319; --surface:#151B23; --ink:#E4E9F0; --muted:#93A0B1;
+  --rule:#242D38; --rule-soft:#1D242D;
+  --accent:#77ABE8; --warm:#E8836A;
+  --ok:#5FC49A; --warn:#D6A45C; --stop:#E8877A;
+  --chip-ok:#132A21; --chip-warn:#2A2317; --chip-stop:#2B1A18;
+}
+:root[data-theme="light"]{
+  --bg:#F4F6F9; --surface:#FFFFFF; --ink:#121821; --muted:#5A6473;
+  --rule:#D9E0E8; --rule-soft:#E9EEF3;
+  --accent:#1F5FA8; --warm:#C23B22;
+  --ok:#26714F; --warn:#9A6318; --stop:#A33322;
+  --chip-ok:#E3F1EA; --chip-warn:#F6EEDF; --chip-stop:#F7E7E4;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Charter","Bitstream Charter","Sitka Text",Cambria,Georgia,serif;
+  font-size:17px; line-height:1.62;
+  -webkit-font-smoothing:antialiased;
+}
+.mono,code,th,.chip,.eyebrow,.stat b,figcaption b{
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:0 28px 96px}
+.prose{max-width:68ch}
+p{margin:0 0 1em}
+a{color:var(--accent)}
+
+/* ---- masthead ---------------------------------------------------------- */
+header.top{
+  border-bottom:2px solid var(--ink); margin-bottom:38px;
+  padding:52px 0 20px;
+}
+.eyebrow{
+  font-size:11.5px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--muted); margin:0 0 14px;
+}
+h1{
+  font-size:clamp(30px,4.4vw,46px); line-height:1.1; margin:0 0 14px;
+  font-weight:600; letter-spacing:-.015em; text-wrap:balance;
+}
+.standfirst{font-size:19px; color:var(--muted); max-width:64ch; margin:0}
+
+/* ---- section scaffolding ----------------------------------------------- */
+section{margin:0 0 56px}
+h2{
+  font-size:13px; letter-spacing:.15em; text-transform:uppercase;
+  color:var(--muted); font-weight:600; margin:0 0 18px;
+  padding-bottom:9px; border-bottom:1px solid var(--rule);
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+h3{font-size:23px; margin:0; font-weight:600; letter-spacing:-.01em}
+
+/* ---- dataset card ------------------------------------------------------ */
+.card{
+  background:var(--surface); border:1px solid var(--rule);
+  border-radius:3px; padding:26px 28px 28px; margin:0 0 26px;
+}
+.cardhead{
+  display:flex; flex-wrap:wrap; align-items:baseline; gap:10px 16px;
+  padding-bottom:16px; margin-bottom:20px; border-bottom:1px solid var(--rule-soft);
+}
+.cardhead .path{font-size:13px; color:var(--muted); flex:1 1 auto}
+.chip{
+  font-size:10.5px; letter-spacing:.11em; text-transform:uppercase;
+  padding:4px 9px; border-radius:2px; white-space:nowrap;
+}
+.chip.ok{background:var(--chip-ok); color:var(--ok)}
+.chip.warn{background:var(--chip-warn); color:var(--warn)}
+.chip.stop{background:var(--chip-stop); color:var(--stop)}
+
+/* ---- provenance strip: given vs inferred ------------------------------- */
+.prov{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:0;
+  border:1px solid var(--rule-soft); border-radius:3px; margin:0 0 22px}
+.prov > div{padding:14px 16px}
+.prov > div + div{border-left:1px solid var(--rule-soft)}
+@media (max-width:640px){ .prov > div + div{border-left:0; border-top:1px solid var(--rule-soft)} }
+.prov h4{
+  margin:0 0 7px; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--muted); font-weight:600;
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+.prov p{margin:0; font-size:15px; line-height:1.5}
+
+/* ---- key numbers ------------------------------------------------------- */
+.stats{display:flex; flex-wrap:wrap; gap:0; border-top:1px solid var(--rule-soft);
+  border-bottom:1px solid var(--rule-soft); margin:22px 0}
+.stat{padding:13px 22px 13px 0; margin-right:22px; border-right:1px solid var(--rule-soft)}
+.stat:last-child{border-right:0; margin-right:0}
+.stat span{display:block; font-size:10.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted);
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;}
+.stat b{display:block; font-size:22px; font-weight:600; font-variant-numeric:tabular-nums;
+  margin-top:3px; letter-spacing:-.02em}
+.stat b.acc{color:var(--accent)}
+.stat b.wm{color:var(--warm)}
+
+/* ---- tables ------------------------------------------------------------ */
+.scroll{overflow-x:auto; margin:0 0 20px; -webkit-overflow-scrolling:touch}
+table{border-collapse:collapse; width:100%; min-width:560px; font-size:14.5px}
+th{
+  text-align:left; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase;
+  color:var(--muted); font-weight:600; padding:0 16px 9px 0;
+  border-bottom:1px solid var(--rule); white-space:nowrap;
+}
+td{padding:9px 16px 9px 0; border-bottom:1px solid var(--rule-soft); vertical-align:top}
+td.num,th.num{text-align:right; font-variant-numeric:tabular-nums;
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace; font-size:13.5px}
+tr:last-child td{border-bottom:0}
+code{font-size:.88em; background:var(--rule-soft); padding:1px 5px; border-radius:2px}
+
+/* ---- figures ----------------------------------------------------------- */
+figure{margin:24px 0 0}
+figure img{width:100%; height:auto; display:block; border:1px solid var(--rule);
+  border-radius:3px; background:#fff}
+figcaption{font-size:14px; color:var(--muted); margin-top:10px; max-width:78ch}
+figcaption b{font-size:12.5px; color:var(--ink); letter-spacing:.02em}
+
+/* ---- callout ----------------------------------------------------------- */
+.note{
+  border-left:3px solid var(--warm); padding:2px 0 2px 18px; margin:22px 0;
+  font-size:15.5px; color:var(--ink);
+}
+.note strong{font-weight:600}
+ul{margin:0 0 1em; padding-left:1.15em}
+li{margin-bottom:.45em}
+footer{border-top:1px solid var(--rule); padding-top:20px; font-size:14px; color:var(--muted)}
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">datalab-org/guillemot · examples/ · refined with pxrd-refine 1.0.0.dev0</p>
+  <h1>Five patterns, four structures, one unknown</h1>
+  <p class="standfirst">Every diffraction file in the hackathon <span class="mono">examples/</span> folder,
+  taken as far as the accompanying information allows — and no further. Two folders ship a converged
+  TOPAS input; three ship nothing but a pattern; one ships nothing but an input.</p>
+</header>
+
+<section>
+  <h2>What the folder contains</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr>
+      <th>Folder</th><th>Files</th><th>Sample</th><th class="num">R<sub>wp</sub></th>
+      <th class="num">GoF</th><th>Outcome</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td class="mono">FeSb_19RBM</td>
+        <td>.xy + converged .inp + TOPAS run</td>
+        <td>NiAs-type Fe<sub>1+x</sub>Sb</td>
+        <td class="num">4.07 %</td><td class="num">1.95</td>
+        <td><span class="chip ok">reproduces TOPAS</span></td>
+      </tr>
+      <tr>
+        <td class="mono">MnSb_34_impure</td>
+        <td>.xy only</td>
+        <td>MnSb + 1.7 wt % Sb</td>
+        <td class="num">5.39 %</td><td class="num">2.14</td>
+        <td><span class="chip ok">phase ID + QPA</span></td>
+      </tr>
+      <tr>
+        <td class="mono">KD1-2_5_NaCoO2</td>
+        <td>.xy only (its .inp is the sibling folder)</td>
+        <td>P2-type Na<sub>x</sub>CoO<sub>2</sub>, strongly textured</td>
+        <td class="num">3.07 %</td><td class="num">1.78</td>
+        <td><span class="chip warn">2 parameters not determinable</span></td>
+      </tr>
+      <tr>
+        <td class="mono">MnSb_33_BM</td>
+        <td>.xye + converged .inp</td>
+        <td>Mn<sub>1+x</sub>Sb, I11 capillary, λ = 0.8243 Å</td>
+        <td class="num">12.47 %</td><td class="num">20.5</td>
+        <td><span class="chip warn">cell + occupancy agree, profile does not</span></td>
+      </tr>
+      <tr>
+        <td class="mono">NaCoO2</td>
+        <td>.inp only — <em>no pattern</em></td>
+        <td>—</td>
+        <td class="num">—</td><td class="num">—</td>
+        <td><span class="chip stop">no data to refine</span></td>
+      </tr>
+      <tr>
+        <td class="mono">HL2-1</td>
+        <td>.xy only, no metadata of any kind</td>
+        <td>unidentified; not cubic, tetragonal or hexagonal</td>
+        <td class="num">—</td><td class="num">—</td>
+        <td><span class="chip stop">not identifiable</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="prose">
+    <p>Six folders, five patterns. <span class="mono">NaCoO2/</span> holds a TOPAS input whose
+    <code>xdd</code> line names a file that is not in the repository — but it writes
+    <code>Out_CIF_STR("KD1-2_riet_01.cif")</code>, so it is the refinement script for the
+    <span class="mono">KD1-2_5</span> pattern, and that is how it was used.</p>
+  </div>
+</section>
+
+<section>
+  <h2>How the missing information was filled in</h2>
+  <div class="prose">
+    <p>Three of the five patterns arrive with no instrument description. All three sit on a
+    <em>bit-identical</em> 2θ grid — 5.01436° to 89.99116° in 5086 points — as
+    <span class="mono">FeSb_19RBM.xy</span>, whose <span class="mono">.inp</span> does describe the
+    diffractometer. That fixes Cu Kα with the doublet weights the file pins
+    (Kα2/Kα1 = 0.5295, held), <code>LP_Factor(90)</code> → a constant polarisation factor, and
+    <code>Simple_Axial_Model(!axial, 10)</code> → axial divergence held, not refined.</p>
+    <p>Two protocol choices had to depart from the TOPAS inputs, both because the inputs rely on a
+    calibration file that is not in the repository:</p>
+    <ul>
+      <li><b>Instrument ⊕ sample width split.</b> TOPAS refines only sample terms
+      (<code>CS_L</code>, <code>Strain_G</code>) against a frozen instrument function. With no
+      line-profile standard the split is unidentifiable — freeing both gives ρ = 1.000 between
+      <code>instrument.profile.w</code> and <code>phases.0.gauss_size</code>. So the instrument
+      Caglioti set carries the total width and the phase terms stay at zero. Same physics, opposite
+      bookkeeping.</li>
+      <li><b>Tied displacement parameters.</b> The FeSb input ties one <code>total_beq</code> across
+      all three sites. pxrd-refine has no user-level equality tie, so it was emulated by a
+      fixed-point loop (refine one B, copy it onto the others, refit) — converged in 7 cycles.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>FeSb_19RBM — the one with an answer to check against</h2>
+  <div class="card">
+    <div class="cardhead">
+      <h3>Fe<sub>1+x</sub>Sb, NiAs type</h3>
+      <span class="path mono">examples/FeSb_19RBM/ · P6₃/mmc · 3650 pts, 29–90°</span>
+      <span class="chip ok">independent agreement</span>
+    </div>
+    <div class="prov">
+      <div><h4>Given</h4><p>A converged TOPAS <span class="mono">.inp</span>, its
+      <span class="mono">.out</span>, an <span class="mono">hkl.txt</span> and the reference plot —
+      everything needed to check an independent implementation.</p></div>
+      <div><h4>Inferred</h4><p>Nothing. The protocol is transcribed: same 29° low-angle cut, same
+      held axial model and emission weights, same refined list.</p></div>
+    </div>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>Parameter</th><th class="num">pxrd-refine</th><th class="num">TOPAS</th><th class="num">difference</th><th>read</th></tr></thead>
+      <tbody>
+        <tr><td>a (Å)</td><td class="num">4.113424(264)</td><td class="num">4.113838(67)</td><td class="num">−101 ppm</td><td>1.6 σ on our esd</td></tr>
+        <tr><td>c (Å)</td><td class="num">5.156834(405)</td><td class="num">5.157225(102)</td><td class="num">−76 ppm</td><td>1.0 σ</td></tr>
+        <tr><td>occ(Fe2), 2d interstitial</td><td class="num">0.2650(154)</td><td class="num">0.2779(36)</td><td class="num">−4.6 %</td><td>0.8 σ</td></tr>
+        <tr><td>B<sub>iso</sub> (Å², shared)</td><td class="num">0.508(261)</td><td class="num">1.1231(342)</td><td class="num">−0.61</td><td>2.4 σ — see below</td></tr>
+        <tr><td>R<sub>wp</sub></td><td class="num">4.073 %</td><td class="num">4.095 %</td><td class="num">−0.5 %</td><td>—</td></tr>
+        <tr><td>R<sub>exp</sub></td><td class="num">2.089 %</td><td class="num">2.092 %</td><td class="num">−0.1 %</td><td>same channels, same weights</td></tr>
+        <tr><td>Durbin–Watson</td><td class="num">0.602</td><td class="num">0.599</td><td class="num">+0.5 %</td><td>same serial correlation</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="note prose">
+      <strong>The one real disagreement is B<sub>iso</sub>,</strong> and it is the parameter you would
+      expect: neither model carries a flat-plate absorption or surface-roughness term, so whatever
+      low-angle intensity deficit exists is shared out between scale, background and B. Our automatic
+      background chose 16 Chebyshev terms against the input's 10. The projection guard did not fire
+      (the background cannot imitate the B column here), so this is a modelling difference, not a
+      degeneracy — but it means the two B values are not comparable at their quoted precision.
+    </div>
+    <figure>
+      <img src="__FeSb_19RBM_fit.png__" alt="Observed, calculated and difference curves for FeSb_19RBM, 29 to 90 degrees">
+      <figcaption><b>Fig 1.</b> Observed (blue), calculated (red), background (dashed), difference
+      (below), Fe<sub>1+x</sub>Sb tick marks. The one structural residual is the 43.3° (102)
+      reflection, under-predicted by ~20 %. TOPAS shows the same defect — its R<sub>Bragg</sub> is
+      5.49 % against an R<sub>wp</sub> of 4.10 %.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <h2>MnSb_34_impure — naming the impurity</h2>
+  <div class="card">
+    <div class="cardhead">
+      <h3>MnSb + Sb</h3>
+      <span class="path mono">examples/MnSb_34_impure/ · 4488 pts, 15–90°</span>
+      <span class="chip ok">two phases, quantified</span>
+    </div>
+    <div class="prov">
+      <div><h4>Given</h4><p>A bare two-column <span class="mono">.xy</span> and the word
+      "impure" in the folder name.</p></div>
+      <div><h4>Inferred</h4><p>Host indexed from the pattern: d(110) = 2.0704 → a = 4.1408,
+      d(002) = 2.8931 → c = 5.7862, which then predicts (101) at 3.048 and (102) at 2.2517 against
+      observed 3.0495 and 2.2518. Impurity from its two leftover lines, d = 3.114 and 2.154 —
+      rhombohedral Sb (A7, R‑3m) puts (012) at 3.111 and (110) at 2.154. The sibling synchrotron
+      <span class="mono">.inp</span> carries a commented-out <code>phase_name Sb</code> block in
+      space group 166: the same identification, made by whoever collected the data.</p></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>MnSb a, c</span><b class="acc">4.13912(31), 5.78247(42) Å</b></div>
+      <div class="stat"><span>Sb a, c</span><b class="acc">4.3056(18), 11.326(12) Å</b></div>
+      <div class="stat"><span>Sb weight fraction</span><b class="wm">1.66(28) %</b></div>
+      <div class="stat"><span>occ(Mn2) → Mn<sub>1+x</sub>Sb</span><b>x = 0.102(13)</b></div>
+    </div>
+    <div class="prose">
+      <p>Refined Sb cell against the literature A7 values (4.3084, 11.2740 Å): +0.06 % in a,
+      +0.5 % in c, from a phase carrying 1.7 % of the sample. Dropping the Sb phase costs
+      0.52 points of R<sub>wp</sub> (5.39 → 5.91 %), which is what a genuine minor phase looks like.</p>
+      <p>The host's lines are anisotropically broadened — hk0 much broader than 00l — so a Stephens
+      block was added. Under the default trust-region driver the coefficients leave the physical
+      σ²(M) ≥ 0 cone and the guard fires. Run under <code>solver="lm"</code>, which carries the cone
+      as a linear inequality, the fit is <em>better</em> (5.39 % vs 5.51 %) and the guard falls
+      silent: the anisotropy here is real Stephens-type strain.</p>
+    </div>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>Model</th><th class="num">R<sub>wp</sub></th><th class="num">GoF</th><th>note</th></tr></thead>
+      <tbody>
+        <tr><td>MnSb alone, isotropic widths</td><td class="num">5.91 %</td><td class="num">2.34</td><td>Sb lines unmodelled</td></tr>
+        <tr><td>MnSb + Sb, isotropic widths</td><td class="num">5.98 %</td><td class="num">2.37</td><td>instrument Y absorbs the tanθ term</td></tr>
+        <tr><td>+ Stephens strain, TRF</td><td class="num">5.51 %</td><td class="num">2.18</td><td>coefficients outside the cone — not quotable</td></tr>
+        <tr><td>+ Stephens strain, bounded LM</td><td class="num">5.39 %</td><td class="num">2.14</td><td>cone enforced, guard silent — adopted</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <figure>
+      <img src="__MnSb_34_impure_fit.png__" alt="Two-phase Rietveld fit of MnSb_34 with MnSb and Sb tick rows">
+      <figcaption><b>Fig 2.</b> Two tick rows: MnSb (green) and Sb (red). The Sb contribution is
+      visible as the shoulder at 28.6° and the weak line at 41.9°.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <h2>KD1-2_5 — a textured platelet, and two parameters it cannot support</h2>
+  <div class="card">
+    <div class="cardhead">
+      <h3>P2-type Na<sub>x</sub>CoO<sub>2</sub></h3>
+      <span class="path mono">examples/KD1-2_5_NaCoO2/ · P6₃/mmc · 6474 pts, 5–90°</span>
+      <span class="chip warn">fit good, two parameters undetermined</span>
+    </div>
+    <div class="prov">
+      <div><h4>Given</h4><p>A pattern, plus — one folder away — a TOPAS input naming the same
+      sample stem, with the full four-site structure, ionic form factors and a March–Dollase block
+      about (001).</p></div>
+      <div><h4>Inferred</h4><p>Only the pairing of that input to this pattern.</p></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><span>a</span><b class="acc">2.83254(153) Å</b></div>
+      <div class="stat"><span>c</span><b class="acc">10.91220(285) Å</b></div>
+      <div class="stat"><span>March–Dollase r ‖ (001)</span><b class="wm">0.4961(146)</b></div>
+      <div class="stat"><span>O1 z</span><b>0.09032(298)</b></div>
+    </div>
+    <div class="prose">
+      <p>The pattern is one enormous (002) at 16.15° and about a dozen weak reflections — a strongly
+      aligned layered platelet, which the refined r = 0.50 states quantitatively. R<sub>wp</sub> is
+      3.07 %; the input's own header records <span class="mono">r_wp 2.909</span> for whatever run
+      produced it.</p>
+      <p>The input declares the two Na site occupancies and all four B<sub>iso</sub> as refinable.
+      Neither survives this data:</p>
+      <ul>
+        <li><b>B<sub>iso</sub></b> — freeing all four from four different starting values gives four
+        different answers (0.0 → stays 0.0; 0.27 → 0.28–0.33; 1.0 → 3.2–9.9; 3.0 → stays 3.0) while
+        R<sub>wp</sub> moves by 0.16 points. That is a flat direction, not a measurement. Held at the
+        input's values.</li>
+        <li><b>Na occupancies</b> — they do refine, to 0.129(77) and 0.465(85), total Na 0.59 against
+        the input's held 0.74, for 0.09 points of R<sub>wp</sub>. A 20 % change in composition bought
+        by a change smaller than the background-order sensitivity below is not a composition
+        measurement.</li>
+      </ul>
+      <p>Background order is worth naming because it moves the answer: 6 terms (as the input uses)
+      gives a = 2.83223, 10 gives 2.83224, 15 (the automatic choice) gives 2.83254. The 6-term value
+      lands within 1 ppm of the input's 2.832224.</p>
+    </div>
+    <figure>
+      <img src="__KD1-2_5_NaCoO2_fit.png__" alt="Rietveld fit of the KD1-2_5 NaCoO2 pattern dominated by the 002 reflection">
+      <figcaption><b>Fig 3.</b> Every observed reflection is accounted for — no unindexed lines. The
+      only significant residual is the (002) peak shape itself, a derivative-shaped mismatch of a
+      reflection carrying an order of magnitude more intensity than any other in the pattern.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <h2>MnSb_33_BM — synchrotron, and where the model runs out</h2>
+  <div class="card">
+    <div class="cardhead">
+      <h3>Mn<sub>1+x</sub>Sb, Diamond I11 capillary</h3>
+      <span class="path mono">examples/MnSb_33_BM/ · λ = 0.824323 Å · 16552 pts, 2.08–68.3°</span>
+      <span class="chip warn">structure agrees, profile does not</span>
+    </div>
+    <div class="prov">
+      <div><h4>Given</h4><p>A three-column <span class="mono">.xye</span> with measured esds, and a
+      converged input carrying the wavelength, the capillary diameter, the packing density, its own
+      computed µR = 1.27331, and a Stephens hexagonal strain block.</p></div>
+      <div><h4>Inferred</h4><p>Only the substitution of a refined Caglioti set for the I11
+      instrument macro, whose calibration file is not in the repository.</p></div>
+    </div>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>Parameter</th><th class="num">pxrd-refine</th><th class="num">TOPAS</th><th>note</th></tr></thead>
+      <tbody>
+        <tr><td>a (Å)</td><td class="num">4.129933(438)</td><td class="num">4.130757(23)</td><td>−200 ppm</td></tr>
+        <tr><td>c (Å)</td><td class="num">5.764019(709)</td><td class="num">5.765880(25)</td><td>−323 ppm</td></tr>
+        <tr><td>occ(Mn2)</td><td class="num">0.0713(201)</td><td class="num">0.07164(222)</td><td>0.02 σ</td></tr>
+        <tr><td>B<sub>iso</sub>(Sb) (Å²)</td><td class="num">−0.583(65)</td><td class="num">−0.4847(73)</td><td>negative in both codes</td></tr>
+        <tr><td>µR</td><td class="num">1.2771 (estimated)</td><td class="num">1.27331 (computed)</td><td>0.3 % apart, independently</td></tr>
+        <tr><td>R<sub>wp</sub></td><td class="num">12.47 %</td><td class="num">8.45 %</td><td>see below</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="prose">
+      <p>The structural answers agree — the interstitial occupancy to 0.02 σ, and pxrd-refine's own
+      µR estimate from composition and geometry lands within 0.3 % of the number the input computes
+      from its mass-attenuation call. The <em>profile</em> does not agree, and the reason is visible
+      rather than statistical.</p>
+    </div>
+    <figure>
+      <img src="__MnSb_33_BM_panels.png__" alt="Diagnostic panels for MnSb_33_BM showing full pattern, residual in noise units and four zoomed misfit regions">
+      <figcaption><b>Fig 4.</b> The four worst regions, auto-selected. In every one the observed peak
+      has a sharper core and a broader base than any single pseudo-Voigt can take — a bimodal domain-size
+      population, not a width to be refined. Both codes are fighting it: the input's own
+      <span class="mono">gof 13.9</span> against synchrotron counting statistics says the same thing.</figcaption>
+    </figure>
+    <div class="prose">
+      <p>Three things this pattern exercised that the lab patterns did not, each reported as what it
+      changed rather than as an R<sub>wp</sub> movement:</p>
+      <ul>
+        <li><b>Rouse cylindrical absorption</b> at µR = 1.273 removes a B<sub>iso</sub> bias of
+        +0.2225 Å². Switching it off moves B<sub>iso</sub>(Sb) from −0.58 to −0.80 — which is the
+        whole content of the correction, since it is exactly a reparameterisation of {scale, B}.
+        pxrd-refine also flags that µR = 1.27 is outside the range Rouse <em>et al.</em> fitted
+        (µR ≤ 1), so the transmission factor is an extrapolation. The input's
+        <code>Cylindrical_I_Correction</code> is subject to the same limit and does not say so.</li>
+        <li><b>Stephens anisotropic strain</b> improves R<sub>wp</sub> from 17.1 % to 12.5 % — but
+        the coefficients leave the physical cone on 19 of 58 reflections. Re-run under bounded LM,
+        with the cone carried as a linear inequality, almost the whole improvement disappears
+        (16.6 %). <strong>The width anisotropy in this pattern is not Stephens-type strain.</strong>
+        The identical test on MnSb_34 gives the opposite verdict, which is what makes it a test.</li>
+        <li><b>A true Voigt peak shape</b> instead of TCHZ pseudo-Voigt: 12.45 % vs 12.47 %. Not the
+        problem.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>HL2-1 — not identifiable from what is supplied</h2>
+  <div class="card">
+    <div class="cardhead">
+      <h3>Unknown; not cubic, tetragonal or hexagonal</h3>
+      <span class="path mono">examples/HL2-1/HL2-1_2.xy · 5086 pts, 5–90°, Cu Kα</span>
+      <span class="chip stop">no structure to refine</span>
+    </div>
+    <div class="prov">
+      <div><h4>Given</h4><p>A two-column pattern. No input, no formula, no sibling folder, nothing in
+      the repository's history or source that names it.</p></div>
+      <div><h4>Inferred</h4><p>The diffractometer, from the bit-identical 2θ grid. Nothing else —
+      three attempts are recorded below, all negative.</p></div>
+    </div>
+    <div class="prose">
+      <p>74 resolvable reflections between d = 7.92 and 1.095 Å. Three independent attempts at an
+      identification:</p>
+      <ul>
+        <li><b>Pair-seeded autoindexing</b> over cubic, tetragonal and hexagonal metrics. The best
+        solution indexes 68 % of the observed peak intensity. The identical code recovers MnSb_34's
+        true cell (a = 4.1417, c = 5.7803 Å) at 82 %, so 68 % is a failure and not a threshold effect.</li>
+        <li><b>A 36-phase screen</b> over the chemistry the rest of the collection is made of —
+        Fe, Mn, Co, Na, Sb and their oxides and antimonides — plus everyday laboratory phases. Nothing
+        scores convincingly; the leaders are simply the candidates predicting the most lines.</li>
+        <li><b>The same screen over pairs and triples.</b> The best three-phase combination indexes
+        67 % of the intensity using 104 predicted lines against 74 observed peaks. Chance level.</li>
+      </ul>
+      <p>A Pawley fit on the best-scoring hexagonal metric settles that cell quantitatively: 296
+      free reflection intensities, and R<sub>wp</sub> is still 10.1 % with entire observed peaks
+      missed (16.6°, 33.3°, 34.0°, 55.9°). A correct cell in Pawley mode fits to the noise. This one
+      does not.</p>
+      <p><b>Corrected after publication:</b> this card originally read “at least two phases”. That
+      does not follow. Feeding the indexer complete synthetic peak lists from single-phase
+      orthorhombic and monoclinic compounds scores them at 50–60 % — the same signature — against
+      82–100 % for genuinely tetragonal or hexagonal ones. HL2-1's 69 % rules out cubic, tetragonal
+      and hexagonal, and does not distinguish a mixture from one low-symmetry phase. Measured in the
+      companion provenance audit.</p>
+      <p>So the deliverable for HL2-1 is the extracted peak table — 2θ, d and relative intensity for
+      all 74 lines — which is what a database search actually consumes.</p>
+    </div>
+    <figure>
+      <img src="__HL2-1_pawley_fit.png__" alt="Pawley fit of HL2-1 on a trial hexagonal cell, showing several completely unfitted peaks">
+      <figcaption><b>Fig 5.</b> Pawley, P6/mmm, a = 5.583 Å, c = 21.871 Å. Every tick is a free
+      intensity and the fit still misses whole reflections — the strongest evidence available that the
+      metric is wrong.</figcaption>
+    </figure>
+    <figure>
+      <img src="__HL2-1_peaks.png__" alt="HL2-1 raw pattern in four panels with all 74 extracted peaks labelled by d-spacing">
+      <figcaption><b>Fig 6.</b> The deliverable: all 74 peaks marked and labelled with d (Å), Cu Kα1.
+      Dashed grey is the rolling-minimum background used for peak extraction only.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section>
+  <h2>What carried across</h2>
+  <div class="prose">
+    <ul>
+      <li><b>The independent check held.</b> On the one dataset with a converged reference,
+      an independently written Rietveld code lands within 100 ppm on the cell, inside 1 σ on the
+      refined occupancy, and within 0.02 points on R<sub>wp</sub>, R<sub>exp</sub> and
+      Durbin–Watson. The single disagreement — B<sub>iso</sub> — is traceable to a background and
+      absorption modelling difference, not to the fit.</li>
+      <li><b>R<sub>wp</sub> was the wrong judge three times out of five.</b> The capillary absorption
+      correction provably cannot move it (it is a reparameterisation of scale and B) and its whole
+      content is a 0.22 Å² B bias. The Stephens block improves it in both MnSb samples, and in one of
+      them the improvement is entirely unphysical. Every claim here is anchored to a record field or a
+      guard, not to a fit index.</li>
+      <li><b>The two guards that changed conclusions</b> were the Stephens positivity cone —
+      which distinguished a real anisotropy (MnSb_34) from a fitted one (MnSb_33) with the same
+      block and the same seed — and the start-dependence check on KD1-2_5's B<sub>iso</sub>, which
+      turned four refined numbers into four held ones.</li>
+      <li><b>Nothing was invented for HL2-1.</b> The alternative to a phase assignment is a peak
+      table, not a plausible-looking fit. One inference about it <em>was</em> overstated — see the
+      correction above, and the companion audit of the non-refinement tooling, which also measures
+      what the assumed goniometer radius costs the cell parameters quoted here (roughly ±85 ppm,
+      larger than their esds).</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <p class="mono">Scripts, logs, obs/calc/diff columns and full-resolution plots:
+  <span style="word-break:break-all">__WORKDIR__</span></p>
+  <p>Refined with pxrd-refine 1.0.0.dev0, numpy backend, TRF except where bounded LM is named.
+  Uncertainties are 1 σ and carry the Bérar–Lelann inflation.</p>
+</footer>
+
+</div>

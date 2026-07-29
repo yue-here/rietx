@@ -1,0 +1,30 @@
+FeSb_19RBM: 3650 points 29.0-90.0 deg, Chebyshev order 16
+  cycle 0: Rwp=3.9382%  Biso=0.71004  occ(Fe2)=0.26616
+  cycle 1: Rwp=4.0093%  Biso=0.57656  occ(Fe2)=0.26529
+  cycle 2: Rwp=4.0494%  Biso=0.53119  occ(Fe2)=0.26506
+  cycle 3: Rwp=4.0650%  Biso=0.51579  occ(Fe2)=0.26499
+  cycle 4: Rwp=4.0705%  Biso=0.51056  occ(Fe2)=0.26497
+  cycle 5: Rwp=4.0724%  Biso=0.50878  occ(Fe2)=0.26496
+  cycle 6: Rwp=4.0730%  Biso=0.50817  occ(Fe2)=0.26496
+===== FeSb_19RBM =====
+status=converged  Rwp=4.073%  Rp=2.750%  Rexp=2.089%  GoF=1.949  DW=0.602
+points fitted=3650  free params=27  esd inflation (Berar-Lelann)=3.95
+  phase 'FeSb': a=4.113424 b=4.113424 c=5.156834 A, gamma=120.00 deg, scale=0.00309932
+      Fe1   Fe    (0.00000,0.00000,0.00000) occ=1.0000 Biso=+0.5082
+      Fe2   Fe    (0.33333,0.66667,0.75000) occ=0.2650 Biso=+0.5082
+      Sb1   Sb    (0.33333,0.66667,0.25000) occ=1.0000 Biso=+0.5082
+      lor_size=0.00000 lor_strain=0.00000 gauss_size=0.00000 gauss_strain=0.00000
+  instrument: zero=+0.00000 deg  displ=+0.04006 mm
+      U=0.03186 V=-0.02208 W=0.00699 X=0.03820 Y=0.10090
+      Ka2/Ka1 = 0.5295
+      FCJ S/L=0.0230 H/L=0.0230
+  vs TOPAS FeSb_19RBM.out: 
+      a            4.113424   TOPAS    4.113838     -0.01%
+      c            5.156834   TOPAS    5.157225     -0.01%
+      occ(Fe2)     0.264958   TOPAS    0.277860     -4.64%
+      Biso         0.508171   TOPAS    1.123070    -54.75%
+      Rwp          0.040730   TOPAS    0.040953     -0.54%
+  esd phases.0.cell.a = 4.113424 +/- 0.000264
+  esd phases.0.cell.c = 5.156834 +/- 0.000405
+  esd phases.0.atoms.1.occ = 0.264958 +/- 0.015357
+  esd phases.0.atoms.0.biso = 0.508171 +/- 0.261293

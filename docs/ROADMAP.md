@@ -727,6 +727,44 @@ the linear algebra's.
 
 </details>
 
+### External-data exercise: guiLLeMot examples, 2026-07-29
+
+Not a WP. Every pattern in the `examples/` folder of
+[datalab-org/guillemot](https://github.com/datalab-org/guillemot) (MIT) refined
+with this package, at the user's request. Kept in
+[studies/guillemot/](../studies/guillemot/) — scripts, plots, logs and two
+self-contained HTML reports; the upstream data is *not* vendored (clone it and
+set `GUILLEMOT_EXAMPLES`). Read that directory's README for the numbers; only
+what bears on this package is here.
+
+- **An independent implementation check on real data**, which the acceptance
+  suites do not otherwise give us — two of those folders ship a converged TOPAS
+  input *and* its output. On Fe₁₊ₓSb (CuKα lab, 3650 channels): cell −101/−76
+  ppm, a refined site occupancy inside 1 σ, and Rwp / Rexp / Durbin-Watson all
+  within 0.02 points of TOPAS. The one disagreement is Biso (0.51 vs 1.12 Å²),
+  and it is the parameter to expect: neither model carries flat-plate absorption
+  or roughness, so the low-angle deficit is shared out differently.
+- **`solver="lm"` (WP-0601) proved itself outside the test suite.** The Stephens
+  cone as a linear inequality separated a *real* anisotropy from a *fitted* one
+  on two samples of the same material — same block, same seed, opposite
+  verdicts. On MnSb_34 the constrained fit beats TRF (5.39 % vs 5.51 %) and the
+  guard goes silent; on synchrotron MnSb_33 enforcing the cone discards nearly
+  all the improvement (17.1 → 16.6 %, against TRF's 12.5 %), i.e. that width
+  anisotropy is not Stephens strain. The guard-vs-constraint pair is a better
+  anisotropy *test* than either alone, which is not how 0601 sold itself.
+- **Three gaps, all candidates if a v1.0 WP wants them.** (i) No user-level
+  equality tie between two parameters — TOPAS's `total_beq` had to be emulated
+  with a fixed-point loop; `AffineTie` exists inside `ParameterTable` and
+  nothing exposes it. (ii) The instrument ⊕ sample width split has no up-front
+  refusal — freeing both gives ρ = 1.000 between `instrument.profile.w` and
+  `phases.0.gauss_size`, reported only after the fit. (iii)
+  `Geometry.goniometer_radius_mm` defaults to 217.5 mm and carries a systematic
+  no esd reports: over 180-320 mm, Rwp moves 0.029 points (the data cannot
+  identify R), the specimen displacement absorbs it 4.6×, and ≈ ±85 ppm lands on
+  the cell — larger than the fit's own 1 σ and the same size as the TOPAS
+  agreement above. A lab cell quoted tighter than that with no radius supplied
+  deserves a diagnostic.
+
 ## Milestones
 
 | Milestone | Scope | Status | Acceptance |

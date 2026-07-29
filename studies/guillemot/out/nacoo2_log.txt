@@ -1,0 +1,37 @@
+KD1-2_5_NaCoO2: 6474 points 5.00-89.99 deg, auto Chebyshev order 15
+===== KD1-2_5_NaCoO2 =====
+status=converged  Rwp=3.067%  Rp=1.897%  Rexp=1.721%  GoF=1.782  DW=0.677
+points fitted=6474  free params=26  esd inflation (Berar-Lelann)=4.58
+  phase 'Na0.74CoO2': a=2.832542 b=2.832542 c=10.912204 A, gamma=120.00 deg, scale=0.00277294
+      Co1   Co3+  (0.00000,0.00000,0.50000) occ=1.0000 Biso=+0.2700
+      Na1   Na1+  (0.00000,0.00000,0.25000) occ=0.2300 Biso=+1.3000
+      Na2   Na1+  (0.66667,0.33333,0.25000) occ=0.5100 Biso=+1.3000
+      O1    O2-   (0.33333,0.66667,0.09032) occ=1.0000 Biso=+0.5400
+      lor_size=0.00000 lor_strain=0.00000 gauss_size=0.00000 gauss_strain=0.00000
+      March-Dollase r=0.4961 about (0, 0, 1)
+  instrument: zero=+0.00000 deg  displ=+0.16713 mm
+      U=0.66124 V=-0.24472 W=0.02147 X=0.08356 Y=0.00000
+      Ka2/Ka1 = 0.5295
+      FCJ S/L=0.0230 H/L=0.0230
+  esd phases.0.cell.a = 2.832542 +/- 0.001527
+  esd phases.0.cell.c = 10.912204 +/- 0.002852
+  esd phases.0.preferred_orientation.r = 0.496074 +/- 0.014608
+  esd phases.0.atoms.3.dof.0 = -0.000980 +/- 0.002978
+  O1 z = 0.09032 (.inp start 0.09130)
+
+--- check 1: free the two Na site occupancies (the .inp declares them) ---
+  Rwp 3.067% -> 2.976%
+  occ(Na1) = 0.1286 +/- 0.0769
+  occ(Na2) = 0.4647 +/- 0.0848
+  total Na = 0.5933 (.inp holds 0.7400)
+
+--- check 2: free all four Biso from four different starts ---
+  start 0.00 -> Rwp 3.0809%  Biso [0.0, 0.0, 0.0, 0.0]  r=0.5000
+  start 0.27 -> Rwp 3.1006%  Biso [0.332, 0.278, 0.284, 0.268]  r=0.5008
+  start 1.00 -> Rwp 2.9216%  Biso [3.23, 9.895, 5.221, 4.621]  r=0.5665
+  start 3.00 -> Rwp 2.9715%  Biso [3.0, 3.0, 3.0, 3.0]  r=0.5090
+
+--- check 3: background order ---
+   6 Chebyshev terms -> Rwp 3.2632%  a=2.83223 c=10.91164 r=0.5199
+  10 Chebyshev terms -> Rwp 3.0363%  a=2.83224 c=10.91204 r=0.5097
+  15 Chebyshev terms -> Rwp 3.0667%  a=2.83254 c=10.91220 r=0.4961

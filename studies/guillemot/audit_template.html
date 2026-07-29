@@ -1,0 +1,452 @@
+<title>Where the inputs came from — a provenance audit</title>
+<style>
+:root{
+  --bg:#F4F6F9; --surface:#FFFFFF; --ink:#121821; --muted:#5A6473;
+  --rule:#D9E0E8; --rule-soft:#E9EEF3;
+  --accent:#1F5FA8; --warm:#C23B22;
+  --ok:#26714F; --warn:#9A6318; --stop:#A33322;
+  --chip-ok:#E3F1EA; --chip-warn:#F6EEDF; --chip-stop:#F7E7E4;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0E1319; --surface:#151B23; --ink:#E4E9F0; --muted:#93A0B1;
+    --rule:#242D38; --rule-soft:#1D242D;
+    --accent:#77ABE8; --warm:#E8836A;
+    --ok:#5FC49A; --warn:#D6A45C; --stop:#E8877A;
+    --chip-ok:#132A21; --chip-warn:#2A2317; --chip-stop:#2B1A18;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1319; --surface:#151B23; --ink:#E4E9F0; --muted:#93A0B1;
+  --rule:#242D38; --rule-soft:#1D242D;
+  --accent:#77ABE8; --warm:#E8836A;
+  --ok:#5FC49A; --warn:#D6A45C; --stop:#E8877A;
+  --chip-ok:#132A21; --chip-warn:#2A2317; --chip-stop:#2B1A18;
+}
+:root[data-theme="light"]{
+  --bg:#F4F6F9; --surface:#FFFFFF; --ink:#121821; --muted:#5A6473;
+  --rule:#D9E0E8; --rule-soft:#E9EEF3;
+  --accent:#1F5FA8; --warm:#C23B22;
+  --ok:#26714F; --warn:#9A6318; --stop:#A33322;
+  --chip-ok:#E3F1EA; --chip-warn:#F6EEDF; --chip-stop:#F7E7E4;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:"Charter","Bitstream Charter","Sitka Text",Cambria,Georgia,serif;
+  font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased;
+}
+.mono,code,th,.chip,.eyebrow,.grade,figcaption b,.stat b,.stat span{
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:0 28px 96px}
+.prose{max-width:68ch}
+p{margin:0 0 1em}
+a{color:var(--accent)}
+a:focus-visible,summary:focus-visible{outline:2px solid var(--accent); outline-offset:3px}
+
+header.top{border-bottom:2px solid var(--ink); margin-bottom:38px; padding:52px 0 20px}
+.eyebrow{font-size:11.5px; letter-spacing:.16em; text-transform:uppercase;
+  color:var(--muted); margin:0 0 14px}
+h1{font-size:clamp(30px,4.4vw,46px); line-height:1.1; margin:0 0 14px;
+  font-weight:600; letter-spacing:-.015em; text-wrap:balance}
+.standfirst{font-size:19px; color:var(--muted); max-width:64ch; margin:0}
+
+section{margin:0 0 56px}
+h2{font-size:13px; letter-spacing:.15em; text-transform:uppercase; color:var(--muted);
+  font-weight:600; margin:0 0 18px; padding-bottom:9px; border-bottom:1px solid var(--rule);
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+h3{font-size:23px; margin:0; font-weight:600; letter-spacing:-.01em; text-wrap:balance}
+
+.card{background:var(--surface); border:1px solid var(--rule); border-radius:3px;
+  padding:26px 28px 28px; margin:0 0 26px}
+.cardhead{display:flex; flex-wrap:wrap; align-items:baseline; gap:10px 16px;
+  padding-bottom:16px; margin-bottom:20px; border-bottom:1px solid var(--rule-soft)}
+.cardhead .path{font-size:13px; color:var(--muted); flex:1 1 auto}
+
+.chip,.grade{font-size:10.5px; letter-spacing:.11em; text-transform:uppercase;
+  padding:4px 9px; border-radius:2px; white-space:nowrap; display:inline-block}
+.chip.ok,.grade.ok{background:var(--chip-ok); color:var(--ok)}
+.chip.warn,.grade.warn{background:var(--chip-warn); color:var(--warn)}
+.chip.stop,.grade.stop{background:var(--chip-stop); color:var(--stop)}
+
+.stats{display:flex; flex-wrap:wrap; gap:0; border-top:1px solid var(--rule-soft);
+  border-bottom:1px solid var(--rule-soft); margin:22px 0}
+.stat{padding:13px 22px 13px 0; margin-right:22px; border-right:1px solid var(--rule-soft)}
+.stat:last-child{border-right:0; margin-right:0}
+.stat span{display:block; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--muted)}
+.stat b{display:block; font-size:22px; font-weight:600; font-variant-numeric:tabular-nums;
+  margin-top:3px; letter-spacing:-.02em}
+.stat b.acc{color:var(--accent)} .stat b.wm{color:var(--warm)}
+
+.scroll{overflow-x:auto; margin:0 0 20px; -webkit-overflow-scrolling:touch}
+table{border-collapse:collapse; width:100%; min-width:600px; font-size:14.5px}
+th{text-align:left; font-size:10.5px; letter-spacing:.11em; text-transform:uppercase;
+  color:var(--muted); font-weight:600; padding:0 16px 9px 0;
+  border-bottom:1px solid var(--rule); white-space:nowrap}
+td{padding:9px 16px 9px 0; border-bottom:1px solid var(--rule-soft); vertical-align:top}
+td.num,th.num{text-align:right; font-variant-numeric:tabular-nums;
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace; font-size:13.5px}
+tr:last-child td{border-bottom:0}
+tr.truth td{background:var(--chip-ok)}
+code{font-size:.88em; background:var(--rule-soft); padding:1px 5px; border-radius:2px}
+
+figure{margin:24px 0 0}
+figure img{width:100%; height:auto; display:block; border-radius:3px}
+figure.plate img{border:1px solid var(--rule); background:#fff}
+figcaption{font-size:14px; color:var(--muted); margin-top:10px; max-width:78ch}
+figcaption b{font-size:12.5px; color:var(--ink); letter-spacing:.02em}
+.fig-dark{display:none}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .fig-light{display:none}
+  :root:not([data-theme="light"]) .fig-dark{display:block}
+}
+:root[data-theme="dark"] .fig-light{display:none}
+:root[data-theme="dark"] .fig-dark{display:block}
+:root[data-theme="light"] .fig-light{display:block}
+:root[data-theme="light"] .fig-dark{display:none}
+
+.note{border-left:3px solid var(--warm); padding:2px 0 2px 18px; margin:22px 0; font-size:15.5px}
+.correction{border-left:3px solid var(--stop); background:var(--chip-stop);
+  padding:16px 20px; margin:22px 0; border-radius:0 3px 3px 0}
+.correction h4{margin:0 0 8px; font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--stop); font-weight:600;
+  font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace}
+.correction p{margin:0 0 .7em; font-size:15.5px} .correction p:last-child{margin:0}
+ul{margin:0 0 1em; padding-left:1.15em} li{margin-bottom:.45em}
+footer{border-top:1px solid var(--rule); padding-top:20px; font-size:14px; color:var(--muted)}
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">companion to “Five patterns, four structures, one unknown” · provenance audit</p>
+  <h1>Where every input came from, and what it costs when one is wrong</h1>
+  <p class="standfirst">The Rietveld refinement was perhaps a third of the work on those five
+  patterns. The rest was scaffolding — peak finding, autoindexing, phase screening, repository
+  archaeology and TOPAS macro reading — and none of it reports an uncertainty. Four of its
+  assumptions are measured here. One of them withdraws a claim from the first report.</p>
+</header>
+
+<section>
+  <h2>The ledger — every structural input, and its source</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Input</th><th>Used for</th><th>Source</th><th>Grade</th></tr></thead>
+    <tbody>
+      <tr><td>space group, cell, 3 sites, occ, beq</td><td class="mono">FeSb_19RBM</td>
+        <td>transcribed from <span class="mono">FeSb_19RBM.inp</span></td>
+        <td><span class="grade ok">from file</span></td></tr>
+      <tr><td>Na<sub>0.74</sub>CoO<sub>2</sub>, 4 sites, ionic species</td><td class="mono">KD1-2_5</td>
+        <td>transcribed from the orphaned <span class="mono">NaCoO2/…inp</span>;
+        the <em>pairing</em> is inferred, the structure is not</td>
+        <td><span class="grade ok">from file</span></td></tr>
+      <tr><td>Mn<sub>1+x</sub>Sb, 3 sites, µR, λ, capillary geometry</td><td class="mono">MnSb_33_BM</td>
+        <td>transcribed from <span class="mono">MnSb_33_BM_synchrotron.inp</span></td>
+        <td><span class="grade ok">from file</span></td></tr>
+      <tr><td>MnSb atomic motif</td><td class="mono">MnSb_34</td>
+        <td>borrowed from the sibling synchrotron <span class="mono">.inp</span></td>
+        <td><span class="grade ok">from file</span></td></tr>
+      <tr><td>MnSb cell a, c</td><td class="mono">MnSb_34</td>
+        <td>measured off this pattern — d(110) and d(002), then checked against (101) and (102)</td>
+        <td><span class="grade ok">from the data</span></td></tr>
+      <tr><td>Cu Kα doublet, Kα2 ratio, polarisation, axial model</td><td>3 lab patterns</td>
+        <td>the FeSb <span class="mono">.inp</span>, carried across on bit-identical 2θ grids</td>
+        <td><span class="grade ok">from file</span></td></tr>
+      <tr><td><b>Sb cell a, c and z</b></td><td class="mono">MnSb_34</td>
+        <td>recalled from memory; only the space group (166) came from the
+        <span class="mono">.inp</span>'s commented-out block</td>
+        <td><span class="grade warn">from memory — tested below</span></td></tr>
+      <tr><td><b>36 screening cells</b></td><td class="mono">HL2-1</td>
+        <td>recalled from memory</td>
+        <td><span class="grade warn">from memory — bounded below</span></td></tr>
+      <tr><td><b>goniometer radius 217.5 mm</b></td><td>3 lab patterns</td>
+        <td>pxrd-refine's default. Stated nowhere in any file.</td>
+        <td><span class="grade stop">assumed — cost measured below</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="prose">
+    <p><b>No structure database was consulted at any point.</b> Not OPTIMADE — which is what
+    guiLLeMot itself was built around and what the empty <span class="mono">cifs/</span> directory
+    is waiting for — not the COD, not Materials Project, not the ICSD. Every structure is either
+    transcribed from a TOPAS file in the repository, measured off the pattern, or recalled. The
+    last category is the one worth auditing.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Reading the repository — the highest-yield tool, and the dullest</h2>
+  <div class="card">
+    <div class="cardhead">
+      <h3><span class="mono">gh api</span>, a shallow clone, and grep</h3>
+      <span class="path mono">no refinement involved</span>
+      <span class="chip ok">decisive</span>
+    </div>
+    <div class="prose">
+      <p>The single most valuable finding in the whole job came from grep. The
+      <span class="mono">NaCoO2/</span> folder holds a TOPAS input whose <code>xdd</code> line names
+      <span class="mono">NaCoO2_CuKa_XRD.xy</span> — a file that does not exist in the repository.
+      Four lines from the bottom it writes <code>Out_CIF_STR("KD1-2_riet_01.cif")</code>. That single
+      string is what pairs the orphaned input to the <span class="mono">KD1-2_5</span> pattern and
+      turns an un-analysable file into a full four-site structure with ionic form factors and a
+      texture model.</p>
+      <p>Second-most valuable, equally dull: byte-comparing the 2θ columns. Three of the five
+      patterns share an identical grid — 5.01436° to 89.99116° in 5086 points — which is what
+      licenses carrying one <span class="mono">.inp</span>'s instrument description onto two patterns
+      that have none. Without that, the Kα2 ratio, the polarisation convention and the axial model
+      would all have been guesses on <span class="mono">MnSb_34</span> and
+      <span class="mono">HL2-1</span>.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>The autoindexer — and the claim it withdraws</h2>
+  <div class="card">
+    <div class="cardhead">
+      <h3>Pair-seeded two-parameter indexing</h3>
+      <span class="path mono">~60 lines; no DICVOL, TREOR or McMaille involved</span>
+      <span class="chip warn">works, but narrower than the conclusion drawn from it</span>
+    </div>
+    <div class="prose">
+      <p>For a two-parameter metric Q = A·M + C·l², any two observed Q values plus two trial (M, l)
+      labels determine (A, C) by a 2×2 solve. Enumerate that over the nine strongest peaks and a
+      label set, keep positive solutions, score by the share of observed peak prominence indexed.
+      Cubic is the one-parameter case. It recovers MnSb_34's true cell — a = 4.1417, c = 5.7803 Å —
+      at 82 %, which is what made 68 % on HL2-1 look like a failure.</p>
+      <p>But it only <em>has</em> cubic, tetragonal and hexagonal. To find out what that costs, I fed
+      it the exact, complete peak lists of single-phase compounds of lower symmetry, generated from
+      their space groups so the systematic absences are right:</p>
+    </div>
+    <figure>
+      <img class="fig-light" src="__audit_indexer_light.png__" alt="Bar chart: share of peak intensity indexed by the best two-parameter metric. MnSb 100 percent, Mn3O4 82 percent, HL2-1 69 percent, FeSb2 60 percent, Sb2O3 53 percent, Na2CO3 50 percent.">
+      <img class="fig-dark" src="__audit_indexer_dark.png__" alt="Bar chart: share of peak intensity indexed by the best two-parameter metric. MnSb 100 percent, Mn3O4 82 percent, HL2-1 69 percent, FeSb2 60 percent, Sb2O3 53 percent, Na2CO3 50 percent.">
+      <figcaption><b>Fig 1.</b> Synthetic patterns except HL2-1, which is measured. A genuinely
+      cubic, tetragonal or hexagonal phase scores 82–100 %. A single-phase orthorhombic or monoclinic
+      compound scores 50–60 % — because the indexer has no metric that can describe it. HL2-1's 69 %
+      sits between the two bands.</figcaption>
+    </figure>
+    <div class="correction prose">
+      <h4>Correction to the first report</h4>
+      <p>The first report described HL2-1 as “unidentified, ≥ 2 phases” and “Unknown, at least two
+      phases.” <b>That claim is withdrawn.</b> A single-phase orthorhombic compound produces exactly
+      the signature I read as multiphase, and this tooling cannot separate the two.</p>
+      <p>What survives: HL2-1 is <em>not</em> cubic, tetragonal or hexagonal. Whether it is a mixture
+      or one low-symmetry phase is open. The Pawley evidence in the first report — 296 free
+      intensities and whole peaks still unfitted — is untouched, but it only ever showed that
+      <em>that particular hexagonal cell</em> is wrong, not how many phases are present. The first
+      report has been updated.</p>
+    </div>
+    <div class="prose">
+      <p>Two caveats on the figure itself. The synthetic peak lists are complete, while the measured
+      HL2-1 list is threshold-limited to 74 peaks, so the comparison is indicative rather than exact.
+      And the indexer refines no zero-shift and uses a hit-fraction rather than a proper M₂₀ / F₂₀,
+      both of which a real indexing program would do.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>The phase screen — does it find an answer it is known to contain?</h2>
+  <div class="card">
+    <div class="cardhead">
+      <h3>36 cells, position matching, no structure factors</h3>
+      <span class="path mono">reflections via pxrdref.crystallography.symmetry</span>
+      <span class="chip ok">validated on a known answer</span>
+    </div>
+    <div class="prose">
+      <p>The cells are recalled, but the reflection lists are not: they come from the package's own
+      generator, so systematic absences are handled by gemmi rather than by me. The screen's real
+      weakness is that it matches <em>positions</em> and ignores intensity — so a candidate with a
+      big cell indexes everything and means nothing. The defence is a second column: what fraction of
+      the candidate's <em>own</em> predicted lines are actually seen.</p>
+      <p>A screen that cannot find a known answer cannot be read as evidence of absence, so I pointed
+      it at MnSb_34, where the answer is MnSb + Sb:</p>
+    </div>
+    <div class="scroll">
+    <table>
+      <thead><tr><th class="num">rank</th><th>candidate</th>
+        <th class="num">observed intensity indexed</th>
+        <th class="num">its own lines seen</th><th class="num">lines predicted</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>NaSb</td><td class="num">83.7 %</td><td class="num">9.0 %</td><td class="num">390</td></tr>
+        <tr class="truth"><td class="num">2</td><td><b>MnSb (NiAs)</b> — truth</td><td class="num">79.2 %</td><td class="num">56.5 %</td><td class="num">23</td></tr>
+        <tr><td class="num">3</td><td>Sb₂O₄ cervantite</td><td class="num">37.8 %</td><td class="num">6.7 %</td><td class="num">134</td></tr>
+        <tr><td class="num">4</td><td>Na₂CO₃</td><td class="num">32.9 %</td><td class="num">14.1 %</td><td class="num">135</td></tr>
+        <tr class="truth"><td class="num">5</td><td><b>Sb (A7)</b> — truth</td><td class="num">21.3 %</td><td class="num">36.0 %</td><td class="num">25</td></tr>
+        <tr><td class="num">6</td><td>Na₃Sb</td><td class="num">19.9 %</td><td class="num">7.8 %</td><td class="num">51</td></tr>
+        <tr><td class="num">7</td><td>Mn₃O₄ hausmannite</td><td class="num">17.5 %</td><td class="num">14.3 %</td><td class="num">42</td></tr>
+        <tr><td class="num">8</td><td>Sb₂O₃ valentinite</td><td class="num">16.5 %</td><td class="num">10.1 %</td><td class="num">138</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="prose">
+      <p>Read the first column alone and the screen fails — NaSb tops it with 390 predicted lines and
+      only 9 % of them present. Read <em>both</em> columns and the truth separates cleanly: the two
+      real phases are the only entries with a high lines-seen fraction and a small predicted-line
+      count. So the screen works, on the joint criterion, and nothing in HL2-1 passes it.</p>
+      <p>What that licenses is narrow: <b>none of these 36 phases is a major component of HL2-1.</b>
+      It is not a statement about anything outside the library, and the library is 36 cells I wrote
+      from memory covering the chemistry of the neighbouring folders. Adding calculated |F|² would
+      make the first column mean something on its own and is the obvious upgrade.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>The recalled Sb structure — did it need to be right?</h2>
+  <div class="card">
+    <div class="cardhead">
+      <h3>Radius of convergence of a 1.7 wt % phase</h3>
+      <span class="path mono">MnSb_34 refit from deliberately wrong starting values</span>
+      <span class="chip warn">the memory mattered</span>
+    </div>
+    <div class="scroll">
+    <table>
+      <thead><tr><th>start</th><th class="num">a₀ (Å)</th><th class="num">c₀ (Å)</th><th class="num">z₀</th>
+        <th class="num">R<sub>wp</sub></th><th class="num">final a</th><th class="num">final c</th>
+        <th class="num">final z</th><th class="num">Sb wt %</th></tr></thead>
+      <tbody>
+        <tr class="truth"><td>recalled literature</td><td class="num">4.3084</td><td class="num">11.2740</td><td class="num">0.23349</td>
+          <td class="num">5.391 %</td><td class="num">4.30563</td><td class="num">11.32562</td><td class="num">0.23578</td><td class="num">1.66 %</td></tr>
+        <tr><td>a low by 2.5 %</td><td class="num">4.2000</td><td class="num">11.2740</td><td class="num">0.23349</td>
+          <td class="num">5.893 %</td><td class="num">3.60000</td><td class="num">9.50000</td><td class="num">−1467.9</td><td class="num">0.00 %</td></tr>
+        <tr><td>a high by 2.1 %</td><td class="num">4.4000</td><td class="num">11.2740</td><td class="num">0.23349</td>
+          <td class="num">5.975 %</td><td class="num">4.99122</td><td class="num">13.50000</td><td class="num">0.23349</td><td class="num">0.18 %</td></tr>
+        <tr><td>c low by 3.3 %</td><td class="num">4.3084</td><td class="num">10.9000</td><td class="num">0.23349</td>
+          <td class="num">5.391 %</td><td class="num">4.30563</td><td class="num">11.32562</td><td class="num">0.23578</td><td class="num">1.66 %</td></tr>
+        <tr><td>c high by 3.3 %</td><td class="num">4.3084</td><td class="num">11.6500</td><td class="num">0.23349</td>
+          <td class="num">6.021 %</td><td class="num">3.63384</td><td class="num">13.50000</td><td class="num">0.29282</td><td class="num">0.12 %</td></tr>
+        <tr><td>z low by 0.033</td><td class="num">4.3084</td><td class="num">11.2740</td><td class="num">0.20000</td>
+          <td class="num">5.391 %</td><td class="num">4.30563</td><td class="num">11.32561</td><td class="num">0.23578</td><td class="num">1.66 %</td></tr>
+        <tr><td>z from the .inp's dead block</td><td class="num">4.3084</td><td class="num">11.2740</td><td class="num">0.26629</td>
+          <td class="num">5.391 %</td><td class="num">4.30563</td><td class="num">11.32562</td><td class="num">0.26422</td><td class="num">1.66 %</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <div class="prose">
+      <p>Three readings, in order of how much they matter.</p>
+      <ul>
+        <li><b>The cell had to be recalled to better than about 2 %.</b> Outside that the refinement
+        does not rescue it — it drives the minor phase to its bounds and reports 0.0–0.2 wt %, i.e.
+        it silently concludes there is no Sb. The only warning is R<sub>wp</sub> going 0.5–0.6 points
+        worse, which on a 1.7 wt % impurity is easy to attribute to something else.</li>
+        <li><b>z is not measured at all.</b> Starting from 0.2335 it lands at 0.2358; starting from
+        0.2663 it stays at 0.2642. Same R<sub>wp</sub> to four figures, same cell to five, same
+        weight fraction. Whatever the first report implies by quoting a refined structure, this
+        coordinate carries no information in this pattern.</li>
+        <li><b>The refined c deserves a flag the first report did not give it.</b> 11.3256(115) Å
+        against the A7 literature 11.2740 is +0.46 %, or 4.5 σ. It is reproducible — the fit returns
+        to it from a −3.3 % start — so it is not a starting artefact. Either the Sb is strained or
+        alloyed, or a two-line identification does not pin c as well as the esd suggests. On the
+        evidence here I cannot tell which, and the weight fraction should be read as ~2 %, not
+        1.66(28) %.</li>
+      </ul>
+      <p>Worth being clear about what <em>does</em> hold: the identification itself does not rest on
+      memory. The two impurity lines were matched at d = 3.114 and 2.154 against A7 Sb's (012) at
+      3.111 and (110) at 2.154 before any refinement, and the space group came from the neighbouring
+      <span class="mono">.inp</span>. It is the quantification that needed the cell to be right.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>The goniometer radius — an assumption with no error bar</h2>
+  <div class="card">
+    <div class="cardhead">
+      <h3>217.5 mm, stated nowhere</h3>
+      <span class="path mono">FeSb_19RBM refit at six radii</span>
+      <span class="chip stop">systematic, unreported by any esd</span>
+    </div>
+    <div class="prose">
+      <p>Converting <code>Simple_Axial_Model(!axial, 10)</code> into FCJ ratios needs a radius:
+      S/L = H/L = (10 mm / 2) / R. I used 217.5 mm because it is pxrd-refine's default. No file in the
+      repository states it, and lab diffractometers ship anywhere from ~180 to ~320 mm. R enters
+      twice — through those axial ratios and through the displacement aberration
+      Δ2θ = −(2s/R)·cos θ — so I varied it consistently in both and refit.</p>
+    </div>
+    <figure>
+      <img class="fig-light" src="__audit_radius_light.png__" alt="Line chart of refined cell parameter a minus the TOPAS value in ppm against assumed goniometer radius, falling from -34 ppm at 180 mm to -205 ppm at 320 mm, crossing our 1 sigma band.">
+      <img class="fig-dark" src="__audit_radius_dark.png__" alt="Line chart of refined cell parameter a minus the TOPAS value in ppm against assumed goniometer radius, falling from -34 ppm at 180 mm to -205 ppm at 320 mm, crossing our 1 sigma band.">
+      <figcaption><b>Fig 2.</b> Six refits differing only in the assumed radius. The shaded band is
+      the refinement's own 1 σ on a (±64 ppm). Single pass with B<sub>iso</sub> untied, so the rows
+      differ by nothing else.</figcaption>
+    </figure>
+    <div class="stats">
+      <div class="stat"><span>a across 180–320 mm</span><b class="wm">171 ppm</b></div>
+      <div class="stat"><span>our reported 1σ on a</span><b>64 ppm</b></div>
+      <div class="stat"><span>difference from TOPAS</span><b>101 ppm</b></div>
+      <div class="stat"><span>R<sub>wp</sub> across the whole range</span><b class="acc">0.029 pts</b></div>
+      <div class="stat"><span>displacement absorbs</span><b>0.020 → 0.091 mm</b></div>
+    </div>
+    <div class="note prose">
+      <strong>The data cannot tell you the radius.</strong> R<sub>wp</sub> moves by 0.029 points
+      across the entire plausible range — nothing. What moves instead is the specimen displacement,
+      by a factor of 4.6, soaking up almost the whole difference. The residue lands on the cell as a
+      systematic worth roughly ±85 ppm, which is larger than the refinement's own esd and the same
+      size as the agreement with TOPAS that the first report treated as its headline result.
+    </div>
+    <div class="prose">
+      <p>None of which makes that agreement wrong — both codes are near 4.1134 Å and the difference
+      really is ~100 ppm. It means the cross-check is demonstrating that two implementations of the
+      same physics agree, not that the cell is known to 100 ppm. Quoting a lab cell to better than
+      about ±100 ppm needs the goniometer radius as a datum, or an internal standard, neither of
+      which this dataset has.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Two tools that needed no audit</h2>
+  <div class="card">
+    <div class="cardhead">
+      <h3>Peak extraction, and looking at the plots</h3>
+      <span class="path mono">scipy.signal.find_peaks · pxrdref.viz.plot_for_vlm</span>
+    </div>
+    <div class="prose">
+      <p><b>Peak extraction</b> is <code>find_peaks</code> on (data − rolling-minimum background),
+      with a three-point parabolic interpolation of each maximum so positions are not quantised to
+      the 0.0167° step. That crude background is used only for finding peaks; every refinement uses
+      the package's own automatic Chebyshev selection instead. It is checkable by eye against the
+      annotated plot, and it was.</p>
+      <p><b>Looking at the plots</b> is not a metaphor — the diagnostic montage auto-zooms the four
+      worst-misfit regions and titles each with its own numbers, and I read those images back. The
+      MnSb_33 diagnosis in the first report — sharp cores on broad bases, a bimodal domain-size
+      population rather than a width to be refined — came from seeing that shape. No agreement index
+      would have said it: R<sub>wp</sub>, GoF and Durbin–Watson all just report “bad”, and the
+      Stephens block was happy to fit it with unphysical coefficients.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>What I would change</h2>
+  <div class="prose">
+    <ul>
+      <li><b>Query OPTIMADE for the structures.</b> guiLLeMot already has the tool and the repository
+      has an empty <span class="mono">cifs/</span> directory waiting for the output. That removes the
+      whole “from memory” row of the ledger, including the 2 %-wide convergence trap the Sb phase
+      turned out to sit in.</li>
+      <li><b>Put |F|² into the phase screen.</b> One column doing the work of two, and NaSb stops
+      topping a list it has no business being on.</li>
+      <li><b>Ask for the goniometer radius</b> — it is one number from whoever collected the data,
+      and it is worth more than any amount of further refinement on these patterns.</li>
+      <li><b>Extend the indexer to three parameters</b>, or use a real one. The two-parameter version
+      cost a wrong sentence in the first report, which is exactly the kind of error a tool with no
+      error bar produces.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <p class="mono">Checks A–D: <span style="word-break:break-all">audit_tools.py</span>,
+  log in <span style="word-break:break-all">out/audit_full.txt</span>. Figures:
+  <span style="word-break:break-all">audit_figs.py</span>.</p>
+  <p>Categorical palette: validated slots 1–3, all-pairs, both modes, against this page's own card
+  surfaces. Every bar carries a visible value and the same numbers appear as tables above.</p>
+</footer>
+
+</div>

@@ -1,0 +1,17 @@
+HL2-1: 74 resolvable peaks, d = 1.0951 - 7.9206 A -> wrote /private/tmp/claude-501/-Users-yue-Code-pxrd-refine/da1f7714-96cf-4b26-9ff0-6180f431fefd/scratchpad/work/out/HL2-1_peaks.txt
+  wrote /private/tmp/claude-501/-Users-yue-Code-pxrd-refine/da1f7714-96cf-4b26-9ff0-6180f431fefd/scratchpad/work/out/HL2-1_peaks.png
+===== HL2-1 [Pawley, P6/mmm hex a=5.56 c=21.82] =====
+status=converged  Rwp=10.118%  Rp=5.727%  Rexp=1.357%  GoF=7.458  DW=0.066
+points fitted=4907  free params=171  esd inflation (Berar-Lelann)=5.16
+  phase 'HL2-1 (unidentified)': a=5.582904 b=5.582904 c=21.870853 A, gamma=120.00 deg, scale=1
+      X1    Fe    (0.00000,0.00000,0.00000) occ=1.0000 Biso=+0.5000
+      lor_size=0.00000 lor_strain=0.00000 gauss_size=0.00000 gauss_strain=0.00000
+  instrument: zero=+0.15299 deg  displ=+0.00000 mm
+      U=0.44180 V=-0.41515 W=0.11493 X=0.04067 Y=0.00000
+      Ka2/Ka1 = 0.5295
+      FCJ S/L=0.0230 H/L=0.0230
+  [warning] HIGH_CORRELATION (x442): instrument.zero_shift ~ instrument.background.c0 (ρ=+1.000)
+  [info] PAWLEY_OVERLAP_UNRESOLVED (x5): 2 reflections overlap too strongly to split: their summed intensity (2.525) is determined but at least one individual value is not (relative esd up to 5514%)
+  reflections in range: 296
+  observed peaks: 74
+  caveat: one free intensity per reflection — this Rwp is a peak-shape description, not evidence for the cell

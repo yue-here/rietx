@@ -12,6 +12,11 @@ htmlcov/
 *.png
 *.html
 !docs/**/*.html
+# studies/ holds finished one-off exercises rather than anything CI regenerates
+# (studies/guillemot/README.md), so its plots and its two self-contained HTML
+# reports are the deliverable and are committed — the same exception docs/ has.
+!studies/**/*.png
+!studies/**/*.html
 # every test refinement writes obs/calc/diff plots and exported tables here,
 # for visual inspection (Rwp hides locally-bad fits).  The *.png rule above
 # used to cover this by accident; WP-0505 added a CSV export and it was

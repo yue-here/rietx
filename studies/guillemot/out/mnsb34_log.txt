@@ -1,0 +1,41 @@
+MnSb_34_impure: 4488 points 15.0-90.0 deg
+===== MnSb_34_impure =====
+status=converged  Rwp=5.391%  Rp=3.558%  Rexp=2.520%  GoF=2.139  DW=0.547
+points fitted=4488  free params=34  esd inflation (Berar-Lelann)=3.40
+  phase 'MnSb': a=4.139123 b=4.139123 c=5.782474 A, gamma=120.00 deg, scale=0.00305435
+      Mn1   Mn    (0.00000,0.00000,0.00000) occ=1.0000 Biso=+1.0790
+      Mn2   Mn    (0.33333,0.66667,0.75000) occ=0.1022 Biso=+0.5000
+      Sb1   Sb    (0.33333,0.66667,0.25000) occ=1.0000 Biso=+0.8802
+      lor_size=0.00000 lor_strain=0.00000 gauss_size=0.00000 gauss_strain=0.00000
+  phase 'Sb': a=4.305631 b=4.305631 c=11.325615 A, gamma=120.00 deg, scale=1.21536e-05
+      Sb2   Sb    (0.00000,0.00000,0.23578) occ=1.0000 Biso=+0.5000
+      lor_size=0.00000 lor_strain=0.00000 gauss_size=0.00000 gauss_strain=0.00000
+  instrument: zero=+0.00000 deg  displ=+0.04813 mm
+      U=0.03511 V=-0.01791 W=0.00480 X=0.04408 Y=0.00000
+      Ka2/Ka1 = 0.5295
+      FCJ S/L=0.0230 H/L=0.0230
+  QPA weight fractions: MnSb=98.34(0.28)%, Sb=1.66(0.28)%
+  [warning] HIGH_CORRELATION (x12): phases.0.microstrain.dof.0 ~ phases.0.microstrain.dof.1 (ρ=-1.000)
+  [warning] BACKGROUND_ABSORPTION (x3): the background can reproduce most of phases.0.atoms.2.biso (R²=0.31)
+  esd phases.0.cell.a = 4.139123 +/- 0.000312
+  esd phases.0.cell.c = 5.782474 +/- 0.000424
+  esd phases.1.cell.a = 4.305631 +/- 0.001797
+  esd phases.1.cell.c = 11.325615 +/- 0.011549
+  esd phases.0.atoms.1.occ = 0.102220 +/- 0.012884
+  QPA MnSb: W = 98.34 +/- 0.28 wt%   (Z*M = 364.63 g/mol, V = 85.795 A^3)
+  QPA Sb: W = 1.66 +/- 0.28 wt%   (Z*M = 730.56 g/mol, V = 181.830 A^3)
+  Stephens Lorentzian strain FWHM (tan-theta coefficient, deg):
+     (1, 0, 0)  d=3.58459 A   Lambda=0.26864 deg
+     (0, 0, 2)  d=2.89124 A   Lambda=0.17163 deg
+     (1, 0, 1)  d=3.04668 A   Lambda=0.16809 deg
+     (1, 0, 2)  d=2.25044 A   Lambda=0.09011 deg
+     (1, 1, 0)  d=2.06956 A   Lambda=0.26864 deg
+     (1, 0, 3)  d=1.69763 A   Lambda=0.10595 deg
+     (2, 0, 0)  d=1.79229 A   Lambda=0.26864 deg
+     (0, 0, 4)  d=1.44562 A   Lambda=0.17163 deg
+
+--- controls ---
+  MnSb alone (no Sb phase)     Rwp= 5.9109%  GoF=  2.34
+  MnSb + Sb                    Rwp= 5.3909%  GoF=  2.14
+  isotropic widths only        Rwp= 5.9845%  GoF=  2.37
+  Stephens under TRF (guard only) Rwp= 5.5060%  GoF=  2.18
