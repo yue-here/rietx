@@ -26,3 +26,12 @@ tests/.jax_cache/
 # un-ignore above would otherwise commit every built page.
 docs/manual/_build/
 .DS_Store
+
+# WPEM benchmark study (studies/wpem_bench): downloaded third-party datasets and
+# retrieved COD structures are fetched by fetch_data.py / fetch_cifs.py rather
+# than vendored — they are someone else's data and the scripts record exactly
+# which files and which COD ids.  Run logs are machine-specific.
+studies/wpem_bench/data/
+studies/wpem_bench/cifs/
+studies/wpem_bench/output/
+studies/wpem_bench/logs/

@@ -1,0 +1,382 @@
+{
+  "case": "tb2bacoo5",
+  "dataset": "CASES/Tb2BaCoO5/intensity.csv",
+  "n_points": 5253,
+  "two_theta_range": [
+    15.0,
+    120.03999999999776
+  ],
+  "wavelengths": [
+    1.5405929,
+    1.5444274
+  ],
+  "mode": "rietveld",
+  "rwp": 0.12353454120917284,
+  "rp": 0.09131646669970117,
+  "rexp": 0.05223602075986355,
+  "gof": 2.364930165279602,
+  "chi2": 5.592894686649407,
+  "n_free": 61,
+  "status": "converged",
+  "seconds": 356.8,
+  "cells": {
+    "Tb2BaCoO5": {
+      "a": 3.757258658166009,
+      "b": 5.825831223446899,
+      "c": 11.555482714865438,
+      "alpha": 90.0,
+      "beta": 90.0,
+      "gamma": 90.0
+    },
+    "BaCO3": {
+      "a": 5.28769292790353,
+      "b": 8.940506574162812,
+      "c": 6.425083719619093,
+      "alpha": 90.0,
+      "beta": 90.0,
+      "gamma": 90.0
+    }
+  },
+  "cell_esds": {
+    "Tb2BaCoO5": {
+      "a": 0.00018813210198351965,
+      "b": 0.00030915882170017873,
+      "c": 0.0005947909997746409
+    },
+    "BaCO3": {
+      "a": 0.0025210597530741733,
+      "b": 0.00437319711007968,
+      "c": 0.003013557884047627
+    }
+  },
+  "weight_fractions": {
+    "Tb2BaCoO5": 0.9807851413970124,
+    "BaCO3": 0.0192148586029876
+  },
+  "weight_fraction_esds": {
+    "Tb2BaCoO5": 0.005213340368732081,
+    "BaCO3": 0.00521334036873208
+  },
+  "parameters": {
+    "phases.0.cell.a": {
+      "value": 3.757258658166009,
+      "stderr": 0.00018813210198351965
+    },
+    "phases.0.cell.b": {
+      "value": 5.825831223446899,
+      "stderr": 0.00030915882170017873
+    },
+    "phases.0.cell.c": {
+      "value": 11.555482714865438,
+      "stderr": 0.0005947909997746409
+    },
+    "phases.0.scale": {
+      "value": 0.0004280431379933889,
+      "stderr": 9.774707004210976e-06
+    },
+    "phases.0.lor_size": {
+      "value": 1.000000002782466e-12,
+      "stderr": 6.191505448265547e-18
+    },
+    "phases.0.lor_strain": {
+      "value": 0.07602590506488496,
+      "stderr": 0.018971816746875973
+    },
+    "phases.0.gauss_size": {
+      "value": 1.0000000000249774e-12,
+      "stderr": 5.852533910698674e-18
+    },
+    "phases.0.gauss_strain": {
+      "value": 1.000000000005434e-12,
+      "stderr": 2.0833789387255025e-18
+    },
+    "phases.0.atoms.0.dof.0": {
+      "value": 2.8172896749741554e-06,
+      "stderr": 0.0003749439867101776
+    },
+    "phases.0.atoms.0.biso": {
+      "value": 0.06646412878344544,
+      "stderr": 0.12591360493986206
+    },
+    "phases.0.atoms.1.biso": {
+      "value": 0.27103245247824465,
+      "stderr": 0.15292498300546833
+    },
+    "phases.0.atoms.2.biso": {
+      "value": 0.016133416140563794,
+      "stderr": 0.30837225808860125
+    },
+    "phases.0.atoms.3.dof.0": {
+      "value": -1.75857675820039e-05,
+      "stderr": 0.0049969761500200174
+    },
+    "phases.0.atoms.3.dof.1": {
+      "value": 1.4672385525425561e-05,
+      "stderr": 0.00266743661222134
+    },
+    "phases.0.atoms.3.biso": {
+      "value": 0.5854287253664744,
+      "stderr": 0.6558152193331916
+    },
+    "phases.0.atoms.4.biso": {
+      "value": 1.9789077082665543,
+      "stderr": 1.683922453630278
+    },
+    "phases.1.cell.a": {
+      "value": 5.28769292790353,
+      "stderr": 0.0025210597530741733
+    },
+    "phases.1.cell.b": {
+      "value": 8.940506574162812,
+      "stderr": 0.00437319711007968
+    },
+    "phases.1.cell.c": {
+      "value": 6.425083719619093,
+      "stderr": 0.003013557884047627
+    },
+    "phases.1.scale": {
+      "value": 1.0512100743853181e-05,
+      "stderr": 2.9022956919989575e-06
+    },
+    "phases.1.lor_size": {
+      "value": 1.0000000000021796e-12,
+      "stderr": 1.1730112989280087e-18
+    },
+    "phases.1.lor_strain": {
+      "value": 1.000000000000684e-12,
+      "stderr": 3.884829018034497e-19
+    },
+    "phases.1.gauss_size": {
+      "value": 1.000000000015815e-12,
+      "stderr": 4.8430294640432506e-18
+    },
+    "phases.1.gauss_strain": {
+      "value": 1.0000000000024745e-12,
+      "stderr": 6.723979548072938e-19
+    },
+    "phases.1.atoms.0.dof.0": {
+      "value": -0.0010815857188326168,
+      "stderr": 0.012088472230538591
+    },
+    "phases.1.atoms.0.dof.1": {
+      "value": -0.0007478606478477282,
+      "stderr": 0.06374549547860034
+    },
+    "phases.1.atoms.0.biso": {
+      "value": 0.7518364699482538,
+      "stderr": 2.1576726857539903
+    },
+    "phases.1.atoms.1.dof.0": {
+      "value": 0.0012773671831553678,
+      "stderr": 0.2423545472775881
+    },
+    "phases.1.atoms.1.dof.1": {
+      "value": 0.0027357975269263536,
+      "stderr": 0.2300594650446662
+    },
+    "phases.1.atoms.1.biso": {
+      "value": 0.8290283063076567,
+      "stderr": 46.91998954551509
+    },
+    "phases.1.atoms.2.dof.0": {
+      "value": -0.002467937598998826,
+      "stderr": 0.12279104974365138
+    },
+    "phases.1.atoms.2.dof.1": {
+      "value": -0.0009193559822331197,
+      "stderr": 0.14144414472484376
+    },
+    "phases.1.atoms.2.biso": {
+      "value": 1.2474476391866172,
+      "stderr": 34.65514252989176
+    },
+    "phases.1.atoms.3.dof.0": {
+      "value": -0.0007369886624254131,
+      "stderr": 0.141828531873689
+    },
+    "phases.1.atoms.3.dof.1": {
+      "value": -0.0007597901906272347,
+      "stderr": 0.09030909249543546
+    },
+    "phases.1.atoms.3.dof.2": {
+      "value": -0.003508003390732331,
+      "stderr": 0.11791564426991863
+    },
+    "phases.1.atoms.3.biso": {
+      "value": 1.2314860113131605,
+      "stderr": 20.912934156422445
+    },
+    "instrument.zero_shift": {
+      "value": 0.013165701349555551,
+      "stderr": 0.003165176811348155
+    },
+    "instrument.source.lines.1.weight": {
+      "value": 0.48093567375009627,
+      "stderr": 0.02034011176888996
+    },
+    "instrument.geometry.axial_sl": {
+      "value": 0.03419819512347314,
+      "stderr": 0.0227484538188794
+    },
+    "instrument.geometry.axial_hl": {
+      "value": 0.031562711732662174,
+      "stderr": 0.023115267028388203
+    },
+    "instrument.profile.u": {
+      "value": 0.003969920490963289,
+      "stderr": 0.004637108208714705
+    },
+    "instrument.profile.v": {
+      "value": -0.0045274572082691185,
+      "stderr": 0.004263827287910459
+    },
+    "instrument.profile.w": {
+      "value": 0.0012796352725567659,
+      "stderr": 0.001046639822595106
+    },
+    "instrument.profile.x": {
+      "value": 0.036886820113156776,
+      "stderr": 0.008581656280620971
+    },
+    "instrument.profile.y": {
+      "value": 4.3160356526677323e-07,
+      "stderr": 3.059601339785869e-10
+    }
+  },
+  "diagnostics": [
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_size (\u03c1=-0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=+0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.lor_size (\u03c1=+0.992)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.lor_strain (\u03c1=+0.995)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.1.gauss_size (\u03c1=+0.991)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.0.gauss_strain (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.lor_size (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.lor_strain (\u03c1=-0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.1.gauss_size (\u03c1=-0.996)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.lor_size (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_strain ~ phases.1.gauss_size (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_size ~ phases.1.gauss_size (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.1.lor_strain ~ phases.1.gauss_size (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ instrument.profile.y (\u03c1=+0.985)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.0.atoms.0.biso (R\u00b2=0.36)"
+    }
+  ],
+  "reference": {
+    "source": "arXiv 2602.16372 Fig. 2b",
+    "rp_percent": 6.175,
+    "rwp_percent": 10.107,
+    "a": 3.7571,
+    "b": 5.8255,
+    "c": 11.5538,
+    "cases_lattice_file": {
+      "a": 3.7571,
+      "b": 5.82668,
+      "c": 11.55387
+    },
+    "method": "whole-pattern decomposition, per-reflection free shapes; no atomic structure",
+    "single_phase": {
+      "rwp_percent": 13.039409349035965,
+      "rp_percent": 9.606847678712601,
+      "n_free": 40
+    },
+    "lebail": {
+      "rwp_percent": 17.33046265079188,
+      "rp_percent": 11.52407699155478,
+      "n_free": 26
+    }
+  },
+  "notes": [
+    "Structure built by Y->Tb, Ni->Co substitution into COD 1001501 (Y2BaNiO5, Immm); Tb2BaCoO5 has no COD entry.",
+    "BaCO3 (witherite, COD 9006838) added as a second phase after the single-phase FitReport's Layer-0 unmatched list landed on witherite 111/021/002.",
+    "Le Bail fixed point in 2 passes (Rwp=17.330%, Rp=11.524%, nfree=26); single-phase Rietveld in 3 (Rwp=13.039%); two-phase Rietveld in 2."
+  ]
+}

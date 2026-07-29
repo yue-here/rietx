@@ -1,0 +1,246 @@
+{
+  "case": "pbso4",
+  "dataset": "CASES/PbSO4/intensity.csv",
+  "n_points": 6001,
+  "two_theta_range": [
+    10.0,
+    160.00000000000213
+  ],
+  "wavelengths": [
+    1.5405929,
+    1.5444274
+  ],
+  "mode": "rietveld",
+  "rwp": 0.07131201147782128,
+  "rp": 0.05492696758605012,
+  "rexp": 0.049236405815741235,
+  "gof": 1.448359405938244,
+  "chi2": 2.0977449687697836,
+  "n_free": 51,
+  "status": "converged",
+  "seconds": 543.3,
+  "cells": {
+    "PbSO4": {
+      "a": 6.956506606848303,
+      "b": 8.476090057286005,
+      "c": 5.395926504357134,
+      "alpha": 90.0,
+      "beta": 90.0,
+      "gamma": 90.0
+    },
+    "PbSO4_pnma": {
+      "a": 8.476090057286005,
+      "b": 5.395926504357134,
+      "c": 6.956506606848303
+    }
+  },
+  "cell_esds": {
+    "PbSO4": {
+      "a": 0.00044918782560220296,
+      "b": 0.0005353923236053033,
+      "c": 0.00034187982619360123
+    }
+  },
+  "weight_fractions": {
+    "PbSO4": 1.0
+  },
+  "weight_fraction_esds": {
+    "PbSO4": 0.0
+  },
+  "diagnostics": [
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.lor_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_size (\u03c1=+0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_size (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.0.gauss_strain (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.lor_strain (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_size (\u03c1=-0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=-0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_size (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_strain (\u03c1=+1.000)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ phases.0.gauss_strain (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=-0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.gauss_size ~ instrument.profile.w (\u03c1=+0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.0.atoms.0.biso (R\u00b2=0.58)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.lor_strain (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_size ~ phases.0.gauss_strain (\u03c1=+0.997)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "phases.0.lor_strain ~ phases.0.gauss_strain (\u03c1=+0.998)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.zero_shift ~ instrument.geometry.sample_displacement (\u03c1=+0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "HIGH_CORRELATION",
+      "message": "instrument.geometry.axial_sl ~ instrument.geometry.axial_hl (\u03c1=-0.999)"
+    },
+    {
+      "level": "warning",
+      "code": "BACKGROUND_ABSORPTION",
+      "message": "the background can reproduce most of phases.0.atoms.0.biso (R\u00b2=0.58)"
+    }
+  ],
+  "reference": {
+    "source": "arXiv 2602.16372 Fig. 2a; cell in the standard Pnma setting",
+    "rp_percent": 3.023,
+    "rwp_percent": 7.124,
+    "a": 8.4852,
+    "b": 5.4015,
+    "c": 6.9642,
+    "cases_lattice_file": {
+      "a": 8.486,
+      "b": 5.4032,
+      "c": 6.96378
+    },
+    "method": "whole-pattern decomposition, per-reflection free (gamma, sigma, Delta, w); no atomic structure",
+    "literature_pnma": {
+      "a": 8.48024,
+      "b": 5.39754,
+      "c": 6.95802
+    },
+    "lebail": {
+      "rwp_percent": 8.582830292734457,
+      "rp_percent": 6.297963642935914,
+      "n_free": 28
+    }
+  },
+  "notes": [
+    "COD 9015524 is the Pbnm setting; PbSO4_pnma below is the standard-setting map (b,c,a) used for comparison.",
+    "Le Bail to a fixed point in 3 passes: Rwp=8.583% Rp=6.298% nfree=28",
+    "Rietveld reached its fixed point in 2 passes."
+  ]
+}
