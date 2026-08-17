@@ -47,7 +47,7 @@ steps below run unchanged.
    repo now — a memory note is not a channel to the next session's repo
    state.
 9. **Verify and report**: run
-   `.venv/bin/python -m pytest tests/test_docs_consistency.py -q` and
+   `.venv/bin/python -m pytest tests/test_docs_consistency.py` and
    `.venv/bin/python -m ruff check src tests examples`; confirm the working
    tree is clean and pushed (or say what deliberately is not). Only when all
    of that is green, end with exactly: **ready for /clear**.
