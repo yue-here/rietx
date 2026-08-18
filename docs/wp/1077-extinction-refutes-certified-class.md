@@ -219,8 +219,15 @@ run the full suite once on the final tree.
   re-ran green afterwards (13 passed, 3:11), so the tree stands at **2521 passed
   / 126 skipped** by arithmetic rather than by a second full run, which is a
   bookkeeping question and CI's job.
-  vitest 407 (one new assertion, no new test). `ruff` clean, sphinx `-W` clean.
-  All on `[dev]`, Python 3.12.12, macOS/arm64.
+  Fast selection (`-m "not slow"`, the handover gate): **2413 passed / 117
+  skipped**, ~4 min. vitest 407 (one new assertion, no new test). `ruff` clean,
+  sphinx `-W` clean. All on `[dev]`, Python 3.12.12, macOS/arm64.
+
+  On the ±N check: this tree has no local baseline to difference against (CI's
+  job), so the evidence for "+2 passed, 0 new skips" is the file-level
+  measurement — `test_extinction_symbol.py` went 30 → 32, and the only other
+  test file touched, `test_acceptance_sequential.py`, is `slow` and gained no
+  test, so it is outside the fast selection and adds nothing to the full one.
 
   **The full suite found one failure and it was not this WP's.**
   `test_acceptance_sequential.py::test_series_exports` asserted
