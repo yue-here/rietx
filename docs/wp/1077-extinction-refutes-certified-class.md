@@ -213,8 +213,12 @@ run the full suite once on the final tree.
   only other test file touched is a one-line repair (below) that adds nothing.
   `tests/test_acceptance_indexing.py` 44 passed, 25:29 — the engine-adjacent
   check the WP's acceptance block asks for, no ranking regression. Full suite on
-  the final tree: **2521 passed / 126 skipped**, ~24 min (quote it as a range —
-  the same tree's indexing acceptance alone took 25:29 on this machine today).
+  the final tree, **measured**: 1 failed / 2520 passed / 126 skipped, ~24 min
+  (a range, not a figure — the same tree's indexing acceptance alone took 25:29
+  on this machine today). The one failure is the WP-1076 leftover below; its file
+  re-ran green afterwards (13 passed, 3:11), so the tree stands at **2521 passed
+  / 126 skipped** by arithmetic rather than by a second full run, which is a
+  bookkeeping question and CI's job.
   vitest 407 (one new assertion, no new test). `ruff` clean, sphinx `-W` clean.
   All on `[dev]`, Python 3.12.12, macOS/arm64.
 
