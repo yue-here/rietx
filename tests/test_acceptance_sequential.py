@@ -273,9 +273,18 @@ def test_the_hostile_series_exercises_the_reseed_fence(chained_all):
 
 @pytest.mark.slow
 def test_series_exports(chained):
-    """A series has to leave the artefacts a user actually plots."""
+    """A series has to leave the artefacts a user actually plots.
+
+    The third column is ``x``, not a second ``index``: this run declares no
+    coordinate, so ``x_label`` is its ``"index"`` default and WP-1076's rule —
+    the axis column takes ``x_label`` unless that name is already a column —
+    falls back. Asserted here rather than only in the fast suite because this is
+    the row that reads a *real* series' table (WP-1077 found it stale: 1076
+    changed the header and this row is `slow`, so the gate that closed 1076
+    never ran it).
+    """
     header, rows = chained.to_table(paths=["phases.0.cell.a"])
-    assert header[:3] == ["index", "label", "index"]
+    assert header[:3] == ["index", "label", "x"]
     assert len(rows) == len(SAMPLE1)
     assert (OUT / "seq_qarr.csv").exists()
     assert (OUT / "seq_qarr_cells.png").stat().st_size > 5_000

@@ -208,10 +208,37 @@ run the full suite once on the final tree.
   field that separates the two, and both the chapter and §7e now say so with
   this pair as the measurement.
 
-  **Counts.** `tests/test_extinction_symbol.py` 30 → **32 passed**, both new,
-  no new skips. The fast selection over `-k "index or extinct or schema or docs
-  or manual or agent or gui or capab"`: 697 passed / 2 skipped, ~2:16. vitest
-  407 (one new assertion, no new test). `ruff` clean, sphinx `-W` clean.
+  **Counts.** `tests/test_extinction_symbol.py` 30 → **32 passed**, both new and
+  both passes, **no new skips** — the whole of this session's delta, since the
+  only other test file touched is a one-line repair (below) that adds nothing.
+  `tests/test_acceptance_indexing.py` 44 passed, 25:29 — the engine-adjacent
+  check the WP's acceptance block asks for, no ranking regression. Full suite on
+  the final tree: **2521 passed / 126 skipped**, ~24 min (quote it as a range —
+  the same tree's indexing acceptance alone took 25:29 on this machine today).
+  vitest 407 (one new assertion, no new test). `ruff` clean, sphinx `-W` clean.
+  All on `[dev]`, Python 3.12.12, macOS/arm64.
+
+  **The full suite found one failure and it was not this WP's.**
+  `test_acceptance_sequential.py::test_series_exports` asserted
+  `header[:3] == ["index", "label", "index"]` — the *pre*-WP-1076 header. 1076
+  (commit `086fb387`, already on main) made the axis column fall back to `x`
+  when `x_label` is already a column name and did not update this row, which is
+  `@pytest.mark.slow` and therefore invisible to the fast suite that gated 1076's
+  close. Repaired here rather than filed forward: it is one stale expectation
+  with an unambiguous right answer, and left alone it would have reddened the
+  nightly `full` job. This branch touches nothing under `sequential`/`series` —
+  `git diff origin/main...HEAD --name-only` is the check.
+
+  **CLAUDE.md audit.** One file edited, `src/rietx/indexing/CLAUDE.md`, and the
+  rule went into § The governing rule rather than the rule list — it is doctrine
+  (an answer must not rest on a null model that is not silent), not a war story,
+  and the numbers live in `extinction.py`'s docstring. The file was at exactly
+  its 280-line cap, so the two WP-1046 paragraphs were compressed to pay for it;
+  every clause dropped was checked for a second copy first — the 5 s/30 s set-F
+  timings and the "same defect in a cheaper disguise" reasoning are in v1.0.md
+  § "1046 closed", the "cheap orthorhombic / expensive monoclinic" sentence is
+  v1.0.md:893, and "single-digit harvests" is v1.0.md:4256 and 1046's own file.
+  Nothing was deleted to fit.
 
   **Two things deliberately not done**, each a candidate for a successor.
   `determine_extinction_symbol` still only seeds widths when the caller passes
