@@ -36,7 +36,9 @@ a work session loads only what it needs:
    synced, forward references pushed into the `### Inherited` of any affected
    WP that is not closed and not yours (a handover log reaches only your own
    successor on the same WP), rule 4 applied to anything this session wrote
-   into a CLAUDE.md, working tree clean and pushed. A missed handover is
+   into a CLAUDE.md, working tree clean and pushed, and the branch's pull
+   request opened or updated — a session is not handed over until its work is
+   reviewable, and merging stays the maintainer's. A missed handover is
    detected at the next session start (`.claude/hooks/session_start.py`) and
    repaired before new work.
 4. **A CLAUDE.md takes rules, not findings.** A line enters a CLAUDE.md
