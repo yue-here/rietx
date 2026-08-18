@@ -65,6 +65,24 @@ point of deferring was to stop paying for that.
 
 ### Inherited
 
+**From [1078](1078-indexing-provisional.md), 2026-08-18 — a chapter that
+documents a name now freezes it, and there is a mechanism for saying it does
+not.** Two things to carry when the GUI chapters land. First, the rule the
+compatibility chapter states is live and enforced: any *Python* name a Part 1
+chapter spells is promoted from provisional to frozen by the release that
+documents it, so a GUI chapter that names library API is making a promise on
+its behalf. Second, the way out is no longer prose — `PROVISIONAL_MODULES` in
+`tests/api_surface.py` declares a subsystem by **module prefix**, the tier
+derives from each name's defining module, and `provisional_names()` is the set.
+Whether the GUI's Python surface wants an entry there is a question for
+whoever writes those chapters; the GUI's *beta* declaration in
+`using/compatibility.md` § Provisional by declaration already covers the routes
+and the `.rxt` document, and it now carries a `(provisional-by-declaration)=`
+target. A chapter documenting a declared-provisional name **must** `{ref}` that
+target — `test_the_provisional_promise_reaches_the_chapters_that_document_it`
+fails otherwise, derived over the pages rather than a list of page names, so a
+new GUI chapter is covered by it the moment it exists.
+
 **From [1067](1067-user-api-manual.md), 2026-08-14 — the beta declaration is
 landed, and this WP is now named in public.** README declares the GUI a beta
 feature, names `rietx gui` for the first time (it had never appeared there at
