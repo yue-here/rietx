@@ -16,9 +16,17 @@ from __future__ import annotations
 import math
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from .common import Base, Parameter
+
+#: Å.  Strictly positive floor for a wavelength :class:`Parameter`.  λ reaches
+#: the model only through sin θ = λ/2d, so λ ≤ 0 puts every reflection at
+#: 2θ = 0 (or off the sphere) and the profile derivatives go with it — the
+#: "softplus min=0 where the physics divides" trap of the root ``CLAUDE.md``,
+#: one rank over.  1e-3 Å is three orders below any diffraction wavelength, so
+#: the bound is a fence and not a claim about the instrument.
+_WAVELENGTH_MIN_A = 1e-3
 
 #: The two halves of McCusker eq (4), in order (sin 2θ, cos 2θ).  One
 #: authority for the pair of names: the schema validator, ``ParameterTable``,
@@ -29,23 +37,66 @@ CAPILLARY_OFFSETS: tuple[str, str] = ("capillary_offset_along_beam",
                                       "capillary_offset_across_beam")
 
 
+def _as_wavelength(v):
+    """Coerce a bare number into a wavelength :class:`Parameter`.
+
+    ``wavelength`` was a plain ``float`` through v1.1, so every construction
+    site — and every persisted instrument — spells it as a number.  Accepting
+    one here keeps all of them working and makes the field's own history the
+    migration: a document written before this change validates unchanged, at
+    ``vary=False``, which is what it meant.
+    """
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return Parameter(value=float(v), vary=False,
+                         min=_WAVELENGTH_MIN_A, unit="A")
+    return v
+
+
 class EmissionLine(Base):
     """One wavelength component of the incident spectrum.
 
-    ``wavelength`` is in Å and fixed (emission wavelengths are known far more
-    accurately than a powder pattern can refine them).  ``weight`` is the
-    intensity of this line *relative to the first line of the source*, which is
-    pinned at 1 by convention — refining the first line's weight would be
-    degenerate with the phase scale factors, so the parameter table always
-    holds line 0 fixed.  A Kα1/Kα2 doublet therefore carries one refinable
-    number: the Kα2/Kα1 intensity ratio (≈0.5 for a sealed Cu tube; lower
-    after a crystal monochromator's passband clips Kα2).
+    ``wavelength`` is in Å and **defaults to fixed**, because for a *single*
+    histogram it is exactly degenerate with the cell: d = λ/(2 sin θ) fixes
+    only the product, so a free λ beside a free cell is a flat direction and
+    the parameter table refuses it (:func:`rietx.params.multi.check_wavelength_freedom`).
+    Across several histograms of **one specimen sharing one cell** the
+    degeneracy breaks — holding one λ pins the cell's scale and the remaining
+    N − 1 are over-determined by that shared cell — so a joint fit may free all
+    but one of them.  A bare number is still accepted and becomes a fixed
+    parameter, so nothing that spelled ``wavelength=1.5406`` has to change.
+
+    ``weight`` is the intensity of this line *relative to the first line of the
+    source*, which is pinned at 1 by convention — refining the first line's
+    weight would be degenerate with the phase scale factors, so the parameter
+    table always holds line 0 fixed.  A Kα1/Kα2 doublet therefore carries one
+    refinable number: the Kα2/Kα1 intensity ratio (≈0.5 for a sealed Cu tube;
+    lower after a crystal monochromator's passband clips Kα2).
+
+    **The wavelength rule is that same convention one rank up**, and
+    deliberately so: one member of a set is pinned to fix a scale the data
+    cannot set and the rest are free.  What differs is only *where the set
+    lives* — the line weights are a set inside one source, so line 0 can be
+    locked here; the wavelengths are a set across *instruments*, which no
+    single instrument can count, so the pinning is enforced where the joint
+    problem is assembled.
     """
 
-    wavelength: float = Field(gt=0.0)
+    wavelength: Parameter
     weight: Parameter = Field(
         default_factory=lambda: Parameter(value=1.0, min=0.0, max=2.0)
     )
+
+    @field_validator("wavelength", mode="before")
+    @classmethod
+    def _coerce_wavelength(cls, v):
+        return _as_wavelength(v)
+
+    @model_validator(mode="after")
+    def _positive_wavelength(self) -> "EmissionLine":
+        if self.wavelength.value <= 0.0:
+            raise ValueError(
+                f"wavelength must be positive, got {self.wavelength.value}")
+        return self
 
 
 class NeutronSource(Base):
@@ -77,11 +128,27 @@ class NeutronSource(Base):
     """
 
     kind: Literal["neutron_cw"] = "neutron_cw"
-    #: Å.  Fixed, like every other source wavelength here — a powder pattern
-    #: cannot separate λ from the cell (they enter d = λ/(2 sin θ) as a
-    #: product), which is why a certified standard is refined with its cell
-    #: held to calibrate λ rather than the other way round.
-    wavelength: float = Field(gt=0.0)
+    #: Å.  **Fixed by default** — for one histogram a powder pattern cannot
+    #: separate λ from the cell (they enter d = λ/(2 sin θ) as a product),
+    #: which is why a certified standard is refined with its cell held to
+    #: calibrate λ rather than the other way round.  In a *joint* fit of
+    #: several histograms of one specimen the product splits: see
+    #: :class:`EmissionLine` and
+    #: :func:`rietx.params.multi.check_wavelength_freedom`.  A bare number is
+    #: accepted and becomes a fixed parameter.
+    wavelength: Parameter
+
+    @field_validator("wavelength", mode="before")
+    @classmethod
+    def _coerce_wavelength(cls, v):
+        return _as_wavelength(v)
+
+    @model_validator(mode="after")
+    def _positive_wavelength(self) -> "NeutronSource":
+        if self.wavelength.value <= 0.0:
+            raise ValueError(
+                f"wavelength must be positive, got {self.wavelength.value}")
+        return self
 
     @property
     def lines(self) -> list[EmissionLine]:
@@ -90,13 +157,32 @@ class NeutronSource(Base):
         Weight is structurally 1: with one line there is nothing for a relative
         weight to be relative to, and it would be degenerate with the phase
         scales in any case.
+
+        **A fresh object every access**, so this is a read-only view: the
+        wavelength a table writes back to lives at ``self.wavelength``, and the
+        one authority for reaching it either way is
+        :attr:`wavelength_parameters`.
         """
-        return [EmissionLine(wavelength=self.wavelength,
+        return [EmissionLine(wavelength=self.wavelength.model_copy(),
                              weight=Parameter(value=1.0, vary=False))]
 
     @property
+    def wavelength_parameters(self) -> list[Parameter]:
+        """The live wavelength :class:`Parameter` of each line, in line order.
+
+        The one authority for *writing* a refined wavelength back, and the
+        reason it exists: :attr:`lines` is a property here and a stored field
+        on :class:`Source`, so a write through ``source.lines[i].wavelength``
+        lands on a throwaway object for a neutron source and on the model for
+        an X-ray one.  ``params/vector.py`` reads and writes through this
+        instead, which is what keeps a refined λ from silently vanishing at the
+        next recompile.
+        """
+        return [self.wavelength]
+
+    @property
     def primary_wavelength(self) -> float:
-        return self.wavelength
+        return self.wavelength.value
 
     @property
     def polarization(self) -> Parameter:
@@ -191,8 +277,17 @@ class Source(Base):
         return self
 
     @property
+    def wavelength_parameters(self) -> list[Parameter]:
+        """The live wavelength :class:`Parameter` of each line, in line order.
+
+        The peer of :attr:`NeutronSource.wavelength_parameters` — that
+        docstring says why both exist.
+        """
+        return [line.wavelength for line in self.lines]
+
+    @property
     def primary_wavelength(self) -> float:
-        return self.lines[0].wavelength
+        return self.lines[0].wavelength.value
 
 
 class RoughnessSuortti(Base):

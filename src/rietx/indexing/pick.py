@@ -79,7 +79,7 @@ def pick_peaks_with_state(data: PatternData, instrument: Instrument, *,
     """
     det = detect_peaks(data, instrument, two_theta_range=two_theta_range,
                        shoulders=shoulders)
-    lam0 = instrument.source.lines[0].wavelength
+    lam0 = instrument.source.lines[0].wavelength.value
 
     fits = [fit_group(det, g, instrument) for g in det.groups]
     peaks = _peaks_from_fits(fits, lam0)
@@ -322,7 +322,7 @@ def flag_kalpha2_residuals(peaks: list[ObservedPeak], lines, *,
     """
     if len(lines) < 2:
         return
-    ratio = lines[1].wavelength / lines[0].wavelength
+    ratio = lines[1].wavelength.value / lines[0].wavelength.value
     by_group: dict[int, list[int]] = {}
     for k, p in enumerate(peaks):
         by_group.setdefault(p.group, []).append(k)

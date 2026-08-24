@@ -40,7 +40,18 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 #: added, which is a new field on a response arm.  Nothing existing changes
 #: shape and every pre-0.7 document validates unchanged — the bump is for the
 #: union arm, not for a migration.
-SCHEMA_VERSION = "0.7"
+#: 0.7 → 0.8 (PR #114): ``EmissionLine.wavelength`` and
+#: ``NeutronSource.wavelength`` are a :class:`Parameter` rather than a
+#: ``float``, so a serialized source carries a nested object where it carried a
+#: number and the parameter table gains an
+#: ``instrument.source.lines.N.wavelength`` row.  Both fields still *accept* a
+#: bare number and default to ``vary=False``, so every pre-0.8 document
+#: validates unchanged and every fit that frees no wavelength is bit-identical;
+#: what a consumer can observe is the serialized shape and the new dot-path.
+#: PR #112 is this entry's sibling on PR #108 and also claims 0.8 — deliberately,
+#: so that whichever lands second conflicts here and is forced to renumber to 0.9
+#: rather than merging cleanly into a ladder with a hole in it.
+SCHEMA_VERSION = "0.8"
 
 TransformKind = Literal["identity", "softplus", "exp", "logit"]
 

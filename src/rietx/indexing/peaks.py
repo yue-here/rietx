@@ -242,7 +242,7 @@ def _secondary_line_two_theta(tt_primary: np.ndarray, instrument: Instrument
     tt0 = np.asarray(tt_primary, dtype=np.float64).ravel()
     if len(lines) < 2 or not len(tt0):
         return np.zeros((max(len(lines) - 1, 0), len(tt0)))
-    ratios = np.array([ln.wavelength / lines[0].wavelength
+    ratios = np.array([ln.wavelength.value / lines[0].wavelength.value
                        for ln in lines[1:]], dtype=np.float64)
     s = ratios[:, None] * np.sin(np.radians(0.5 * tt0))[None, :]
     return 2.0 * np.degrees(np.arcsin(np.where(np.abs(s) <= 1.0, s, np.nan)))

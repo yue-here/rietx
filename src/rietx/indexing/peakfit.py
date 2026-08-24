@@ -161,7 +161,7 @@ class _GroupModel:
         self.seed_fwhm = seed_fwhm
         self.shape = instrument.profile.shape
         lines = instrument.source.lines
-        self.lam = np.array([ln.wavelength for ln in lines], dtype=np.float64)
+        self.lam = np.array([ln.wavelength.value for ln in lines], dtype=np.float64)
         self.line_weight = np.array([ln.weight.value for ln in lines],
                                     dtype=np.float64)
         self.line_weight[0] = 1.0   # structurally locked (schemas.instrument)

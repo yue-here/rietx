@@ -137,7 +137,7 @@ def main() -> None:
     try:
         from rietx.viz.plots import plot_for_vlm
         result.plot(path=str(OUT / "srm660c_fit.png"),
-                    wavelength=ref.fitted_instrument.source.lines[0].wavelength)
+                    wavelength=ref.fitted_instrument.source.primary_wavelength)
         plot_for_vlm(result, report, path=str(OUT / "srm660c_vlm.png"))
         print("\nwrote examples/srm660c_fit.png and srm660c_vlm.png")
         from rietx.viz import write_html

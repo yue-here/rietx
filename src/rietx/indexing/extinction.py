@@ -701,7 +701,7 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
 
     symbol = candidate.lattice_group or lattice_group(candidate.system,
                                                       candidate.centring)
-    wavelength = float(instrument.source.lines[0].wavelength)
+    wavelength = float(instrument.source.lines[0].wavelength.value)
     screen = ExtinctionScreen(
         lattice_group=symbol, cell=candidate.cell, system=candidate.system,
         centring=candidate.centring, wavelength=wavelength)

@@ -237,7 +237,7 @@ class PeakEditor:
 
     @property
     def wavelength(self) -> float:
-        return self.instrument.source.lines[0].wavelength
+        return self.instrument.source.lines[0].wavelength.value
 
     # -- picking -------------------------------------------------------
     def pick(self, *, shoulders: bool = True) -> PeakDoc:

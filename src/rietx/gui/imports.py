@@ -386,7 +386,8 @@ def phase_summary(phase) -> dict:
 
 def instrument_summary(instrument) -> dict:
     return {"geometry": instrument.geometry.kind,
-            "wavelengths": [line.wavelength for line in instrument.source.lines],
+            "wavelengths": [line.wavelength.value
+                            for line in instrument.source.lines],
             "n_lines": len(instrument.source.lines),
             "polarization": instrument.source.polarization.value,
             "dispersion": instrument.source.dispersion is not None,
