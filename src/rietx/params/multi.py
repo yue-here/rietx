@@ -34,7 +34,18 @@ import numpy as np
 
 from ..schemas.instrument import Instrument
 from ..schemas.structure import Structure
-from .vector import ParameterTable
+from .vector import ParameterTable, _is_wavelength, check_wavelength_freedom
+
+
+def _unscoped(path: str) -> str:
+    """A combined path with any ``hist.{h}.`` scope removed.
+
+    Shared paths arrive bare and come back unchanged, so this is the inverse of
+    :meth:`MultiParameterTable._canonical` for exactly the cases that have one.
+    """
+    if path.startswith("hist."):
+        return path.split(".", 2)[2]
+    return path
 
 
 @dataclass
@@ -77,8 +88,12 @@ class MultiParameterTable:
                                              for _ in instruments]
         self.instruments: list[Instrument] = [ins.model_copy(deep=True)
                                               for ins in instruments]
+        # ``joint=True``: a sub-table sees one instrument, so it would always
+        # read the single-histogram case and refuse a wavelength this fit is
+        # entitled to free.  The count is made once, over all of them, in
+        # :meth:`_rebuild_columns`.
         self.tables: list[ParameterTable] = [
-            ParameterTable(s, ins)
+            ParameterTable(s, ins, joint=True)
             for s, ins in zip(self.structures, self.instruments, strict=True)]
         self._rebuild_columns()
 
@@ -185,6 +200,27 @@ class MultiParameterTable:
             x0[idx] = xh
             lo[idx] = loh
             hi[idx] = hih
+
+        # The wavelength count, made where the whole set is visible.  A
+        # wavelength is per-histogram under the default sharing rule (it starts
+        # with ``instrument.``), so the scoped ``hist.h.…`` name is what a user
+        # reads and what the refusal must name — the check tests the *unscoped*
+        # tail and reports the scoped path.  Asked after every column rebuild
+        # rather than only at construction, because a staged plan frees its
+        # globs one stage at a time and every :meth:`set_vary` ends here.
+        n_wavelengths = sum(1 for t in self.tables for e in t.entries
+                            if _is_wavelength(e.path))
+        # ``SharingMap`` decides sharing per *path*, not per (path, histogram),
+        # so "the cell is shared with a held-λ histogram" collapses to "the cell
+        # is shared at all" — which is the strongest form this map can express,
+        # and it is the right one: with a per-histogram cell *every* histogram
+        # has its own, so no free λ has anything to be measured against.
+        cell_shared = all(
+            self.sharing.is_shared(e.path) for t in self.tables
+            for e in t.entries if ".cell." in e.path)
+        check_wavelength_freedom(
+            [p for p in combined_paths if _is_wavelength(_unscoped(p))],
+            n_wavelengths, len(self.tables), cell_shared=cell_shared)
 
         self.shared_paths = shared_order
         self.per_hist_paths = per_hist_paths
