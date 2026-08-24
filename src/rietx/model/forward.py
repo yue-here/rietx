@@ -491,6 +491,16 @@ class CompiledModel:
     tt_min: float
     tt_max: float
     wavelength: float                 # primary line, used for tick positions
+    #: λ of each emission line **at stage compile**, in Å.  This is the value
+    #: the frozen discreteness was sized from — the reflection list, the point
+    #: windows and the FCJ node counts all come from it — and it is what a
+    #: caller outside the hot loop (plot, exporter, tick list) reads.  It is
+    #: *not* what the residual uses when a wavelength is free: λ is a row of θ
+    #: since WP-1128, so :meth:`line_lambdas` reads the decoded values and
+    #: falls back to this tuple.  A free λ therefore moves peaks inside a stage
+    #: while the windows stay put, which is the same bargain the cell already
+    #: strikes — legitimate while the motion is small against the window slack,
+    #: and it is (215 ppm of λ is 0.09° at 2θ = 150° with a 0.30° FWHM).
     line_wavelengths: tuple[float, ...]
     geometry_kind: str
     radius_mm: float | None
@@ -684,15 +694,30 @@ class CompiledModel:
             out.append(self._peak_widths(gam_g, gam_l))
         return out
 
-    def _cell_block(self, cp: "CompiledPhase", cell: tuple):
-        """(d, [2θ_Bragg per emission line]) — everything the cell alone fixes.
+    def line_lambdas(self, values: dict[str, float]) -> list:
+        """λ per emission line, from θ where it is a row and frozen otherwise.
+
+        The wavelength became a table entry in WP-1128 (a joint fit may free all
+        but one of them), so the residual must not read the compile-time tuple.
+        ``.get`` rather than ``[]`` because ``phase_peaks`` is public and is
+        called with hand-built value dicts by plots, exporters and replay; a
+        dict that does not mention λ means "the instrument's λ", which is the
+        frozen value.
+        """
+        return [values.get(f"instrument.source.lines.{il}.wavelength", lam)
+                for il, lam in enumerate(self.line_wavelengths)]
+
+    def _cell_block(self, cp: "CompiledPhase", cell: tuple, lams: list):
+        """(d, [2θ_Bragg per emission line]) — the cell and λ together.
 
         One block rather than two memo slots because they share their input and
         every caller wants both: the line positions are ``two_theta_deg(d, λ)``
-        and nothing else enters them.
+        and nothing else enters them.  ``d`` depends on the cell alone; the
+        per-line angles are where λ enters the model at all, which is why a free
+        λ moves every peak of its histogram and nothing else does.
         """
         d = d_spacings(cp.reflections.hkl, *cell)
-        return d, [two_theta_deg(d, lam) for lam in self.line_wavelengths]
+        return d, [two_theta_deg(d, lam) for lam in lams]
 
     def _memo(self, cp: "CompiledPhase", slot: str, key_fn, build):
         """``build()`` memoised on exact equality of a small scalar key.
@@ -980,11 +1005,25 @@ class CompiledModel:
         # every key below is built inside a thunk, never at the call site: on a
         # traced backend these values are tracers and ``float()`` on one raises
         # (see ``_memo``)
+        lams = self.line_lambdas(values)
+
+        # The λs join the cell in *every* key below, not only the "cell" slot.
+        # Two reasons, and the second is the load-bearing one.  (a) 2θ_Bragg
+        # feeds the widths, Lp, the absorption factor and Sabine extinction, so
+        # a stale block under a moved λ would be wrong in five slots rather than
+        # one.  (b) ``_peak_chain_column`` builds the analytic λ column by
+        # perturbing θ and re-deriving these scalars — a key that ignored λ
+        # would hand the perturbed call the *unperturbed* block and the column
+        # would come back identically zero, which is the silent-short-column
+        # failure the FD fallback exists to prevent.  With λ held the key is a
+        # constant-extended tuple, so the hit/miss pattern and every value are
+        # bit-identical to before.
         def cell_key():
-            return tuple(float(c) for c in cell)
+            return (tuple(float(c) for c in cell)
+                    + tuple(float(x) for x in lams))
 
         d, tt_bragg_lines = self._memo(
-            cp, "cell", cell_key, lambda: self._cell_block(cp, cell))
+            cp, "cell", cell_key, lambda: self._cell_block(cp, cell, lams))
 
         if self.mode in ("lebail", "pawley"):
             # extracted by partitioning (Le Bail) or refined as θ (Pawley) —
@@ -1073,7 +1112,7 @@ class CompiledModel:
                 lambda: [self._absorption(tt) for tt in tt_bragg_lines])
 
         out = []
-        for il, lam in enumerate(self.line_wavelengths):
+        for il, lam in enumerate(lams):
             w_line = values[f"instrument.source.lines.{il}.weight"]
             tt_bragg = tt_bragg_lines[il]
             pos = positions[il]
@@ -1368,7 +1407,11 @@ class CompiledModel:
                                        xyz, occ, biso, uaniso, astar)
         vol = cell_volume(*cell)
         out = []
-        for il, lam in enumerate(self.line_wavelengths):
+        # λ read through ``line_lambdas``, never off the frozen tuple: a joint
+        # fit may have moved a wavelength since compile, and a column built at
+        # the compile-time λ would place this phase's peaks somewhere the
+        # residual does not.
+        for il, lam in enumerate(self.line_lambdas(values)):
             w_line = values[f"instrument.source.lines.{il}.weight"]
             tt_bragg = two_theta_deg(d, lam)
             col = d_base * w_line * lorentz_polarization(
@@ -1418,7 +1461,11 @@ class CompiledModel:
         ext = values[f"phases.{ip}.extinction"]
         vol = cell_volume(*cell)
         out = []
-        for il, lam in enumerate(self.line_wavelengths):
+        # λ read through ``line_lambdas``, never off the frozen tuple: a joint
+        # fit may have moved a wavelength since compile, and a column built at
+        # the compile-time λ would place this phase's peaks somewhere the
+        # residual does not.
+        for il, lam in enumerate(self.line_lambdas(values)):
             w_line = values[f"instrument.source.lines.{il}.weight"]
             tt_bragg = two_theta_deg(d, lam)
             col = d_base * w_line * lorentz_polarization(
@@ -1460,6 +1507,28 @@ class CompiledModel:
             return True
         if path.startswith("instrument.profile."):
             return True
+        # Both source-line rows: the ``weight`` scales an already-placed peak,
+        # and the ``wavelength`` moves one.  **The reach claim for λ is that
+        # everything it touches is a per-peak scalar of this method's four**,
+        # and it is checkable by enumeration — λ enters the model in exactly one
+        # expression, ``two_theta_deg(d, λ)`` in :meth:`_cell_block`, and every
+        # further use is a function of that angle: the widths (Caglioti in θ),
+        # Lp, the specimen absorption factor, Sabine extinction, the roughness
+        # depression.  All four scalars move, so no ``profile_derivs=False``
+        # claim covers a free λ (``_INTENSITY_ONLY`` is an allow-list and does
+        # not name it) and ``_require_basis`` would raise rather than shorten a
+        # column if one ever did.
+        #
+        # Two things λ does *not* reach, both by declaration rather than by
+        # accident.  f′/f″ are frozen onto ``PhaseSites.f_anom`` at compile, so
+        # |F|² does not follow a refining λ — legitimate, because a calibration
+        # error is ppm-scale and the dispersion tables are flat over that
+        # (a 215 ppm move at 1.2 Å is 0.26 mÅ, far inside
+        # ``LINE_DISPERSION_TOL``), and *required*, because a θ-dependent
+        # dispersion would break the frozen-per-stage contract.  And the
+        # reflection list, point windows and FCJ node counts are compile-time
+        # discreteness, sized from ``line_wavelengths``: a free λ moves peaks
+        # inside their frozen windows exactly as a free cell does.
         return path.startswith("instrument.source.lines.")
 
     def derivative_bases(self, values: dict[str, float],
@@ -2111,7 +2180,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         raise ValueError("fewer than 10 points remain in the fit range")
     tt_min, tt_max = float(tt[0]), float(tt[-1])
 
-    lams = tuple(line.wavelength for line in instrument.source.lines)
+    lams = tuple(line.wavelength.value for line in instrument.source.lines)
     lam_gen = min(lams)  # smallest λ → smallest 2θ → largest d-sphere needed
     zero = instrument.zero_shift.value
     geom = instrument.geometry
