@@ -473,6 +473,145 @@ their bare path. A turn-on glob matches either form, so an existing
 single-histogram plan frees every histogram's copy unchanged, and a scoped glob
 targets one.
 
+The cell is the one entry in that table that is a **judgement call**. The
+structure — space group, coordinates, ADPs, occupancies — is shared because it
+is one structure; the scale, background and profile widths are per-histogram
+because they belong to the instrument rather than the specimen. Whether the cell
+is one number or several is a claim about the specimens: one number if the
+histograms are one material state, separate numbers if they genuinely differ.
+That choice has a consequence for wavelengths, in the next section.
+
+(a-refinable-wavelength-jointly)=
+### A refinable wavelength
+
+A joint fit is the only place a wavelength can be refined, and it is worth being
+precise about why, because the reason also tells you *which* one to hold.
+
+For a single histogram λ and the cell are exactly degenerate: Bragg's law
+{eq}`pos-bragg` gives the pattern access to λ/(2 sin θ), so only the product of
+λ with a reciprocal cell is measurable and a free λ beside a free cell is a flat
+direction. That is why `EmissionLine.wavelength` and `NeutronSource.wavelength`
+default to `vary=False` and why freeing one in a single-histogram fit is refused
+({ref}`a-refinable-wavelength`).
+
+Several histograms of one specimen **share one cell**, and that is what breaks
+the degeneracy. Holding one wavelength pins the cell's scale; the remaining
+N − 1 are then over-determined by that shared cell and genuinely measurable —
+each of them against the same lattice. Holding *all* of them instead forces every
+monochromator's calibration error into the shared cell, and freeing all of them
+puts the flat direction back. So:
+
+```{admonition} The rule
+:class: important
+
+A free wavelength requires its histogram's cell to be **shared** with at least
+one histogram whose wavelength is **held**.
+```
+
+"Exactly one held, at most N − 1 free" is that statement's special case when
+every histogram shares one cell, which is the `SharingMap` default. Un-share the
+cell and the single-histogram degeneracy is back, per histogram, inside a joint
+fit where it looks solved — so that combination is refused too. All the ways of
+getting it wrong are refused naming their own cause, and the count is stated:
+*"2 of 2 wavelengths are free; hold one"*.
+
+**Which one to hold is not arbitrary: hold the wavelength of the histogram that
+determines the cell.** On a synchrotron-plus-neutron pair that is the
+synchrotron. Its wavelength calibration is the better known and its angular
+resolution makes its cell the better determined, so the cell belongs to the
+X-ray data; what the neutron data uniquely supplies is the *structural* content
+— oxygen positions, site occupancies, displacement parameters — through
+scattering-length contrast X-rays do not have. The neutron wavelengths then
+refine against a cell the X-ray histogram has pinned, which is the only way
+their monochromator calibrations can be measured at all. The accuracy hierarchy
+and the degeneracy argument are one argument: the histogram that owns the cell
+is the histogram whose λ you hold.
+
+A wavelength is per-histogram under the default sharing rule, so it is freed by
+a **scoped** glob — which is what makes "all but one" expressible at all, since
+the bare path would free every histogram's copy and be refused:
+
+<!-- api-doc: no-exec — a joint two-histogram refinement, tens of seconds of solver time -->
+```python
+import rietx as rx
+from rietx.strategy.staged import PLAN_PRESETS, Stage
+
+plan = PLAN_PRESETS["mccusker_structural"]()
+# histogram 0 is the synchrotron and keeps its declared λ; histogram 1's
+# neutron λ refines against the cell histogram 0 has pinned.  The cell and the
+# coordinates ride along, because λ trades against both.
+plan.stages.append(Stage("wavelength",
+                         ["hist.1.instrument.source.lines.0.wavelength",
+                          "phases.*.cell.*", "phases.*.atoms.*.dof.*"]))
+result = rx.refine_multi([xray, neutron], structure, [ins_x, ins_n], plan=plan)
+```
+
+The number to read is the `WAVELENGTH_CALIBRATION` diagnostic on that
+histogram, which reports how far λ moved from its declared value **in ppm** and
+how that compares with its own esd. ppm is the unit a calibration error is
+quoted in, and it is deliberately the only evidence this feature is defended
+with — never an Rwp comparison. A refined λ that comes back inside its own esd
+measured nothing, which is a different outcome from one that measured a
+calibration error, and the diagnostic says which.
+
+Two fences worth knowing. Within one source the emission lines' wavelength
+*ratio* is atomic physics rather than something a pattern can measure, so only
+line 0's wavelength is refinable and a known ratio — a λ/2 harmonic — is a
+`Refinement.tie` with `scale=0.5`. And the reflection list, evaluation windows
+and quadrature node counts are frozen from the *declared* λ at each stage
+compile, so a free λ moves peaks inside their frozen windows exactly as a free
+cell does: legitimate while the motion is small against the window, and a few
+hundred ppm is (250 ppm of λ is 0.11° at 2θ = 150°, against a 0.30° FWHM).
+
+**Constant wavelength only.** The same fence generalises verbatim to a
+time-of-flight multi-bank fit, where each bank carries its own DIFC calibration
+and exactly one of them has to be held to pin the cell. Nothing here implements
+TOF.
+
+(scanning-a-parameter)=
+### Scanning a parameter the data barely constrains
+
+A joint fit often has one parameter that is weakly determined for a physical
+reason — an antisite fraction between two elements whose scattering lengths
+barely differ, a site occupancy, a small strain. Freeing it alongside everything
+else has two failure modes: the solver lands in a local minimum, and the esd it
+reports comes from a linearised curvature the data does not really have.
+
+The remedy is a **profile scan**: hold the parameter on a grid, refine
+everything else at each point, and read the value off the minimum of the curve
+and the interval off its width. It is the empirical version of a concern this
+package already carries in its linear algebra —
+`optimize.statistics.normal_covariance` equilibrates the normal matrix before
+inverting it precisely because *a direction the data does not move has no esd
+rather than a small one*, and `ParameterTable.unmeasured_rows` names what such a
+direction reached. A scan measures that curvature instead of trusting it.
+
+There is no `scan` verb, because the recipe is a thin composition of verbs that
+already exist and a new one would only hide which of them did what:
+
+| Step | Verb |
+|---|---|
+| fork a fresh line of work per grid point | `Refinement.branch`, `Refinement.checkout` |
+| pin the scanned parameter at the grid value | `Refinement.set_values`, then `Refinement.set_vary` with `vary=False` |
+| refine the rest | `Refinement.fit` or `Refinement.run_stage` |
+| read the curve | `RefinementResult.statistics` for χ² and Rwp; `HistogramResult.phase_agreement` for that phase's R_B |
+
+Both `set_values` and `set_vary` auto-commit history nodes, so the whole scan is
+recoverable and replayable; branching per grid point rather than walking the
+grid in sequence is what keeps one point from seeding the next.
+
+Reading it: the minimum gives the value, and the interval where χ² rises by 1
+above the minimum is the 1σ range for one parameter. **A scan measures the
+surface you searched.** A coarse grid can step over a narrow minimum entirely,
+and the interval it gives is only ever as good as the grid spacing — so refine
+the grid near the minimum before quoting a number from it.
+
+In a joint fit, pin the parameter on the **shared** model. `SharingMap` decides
+whether the path you are scanning is shared or per-histogram (occupancies and
+coordinates are shared by default, scales and everything under `instrument.` are
+not), and scanning a per-histogram path pins it in one histogram only, which is
+a different experiment from the one you meant.
+
 ### Reading a joint result
 
 `RefinementResult.histograms` is a list of `HistogramResult`, one per pattern.

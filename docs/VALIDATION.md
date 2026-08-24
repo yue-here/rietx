@@ -90,6 +90,7 @@ either fine or broken depending on which seed the suite happened to pin.
 | `hl2` | `tests/data/hl2_peaks.txt` | characterisation | 74 peaks from a genuinely UNIDENTIFIED laboratory pattern -- our own derived product from datalab-org/guillemot's MIT examples, carried with attribution; the compound is unknown and stays unknown |
 | `qarr` | `tests/data/qarr` | **absolute anchor** | IUCr CPD QPA round-robin patterns (samples 1a-1h, 2, 4 and six pure phases), Cu Ka doublet, graphite diffracted-beam monochromator |
 | `srm660a_capillary` | `tests/data/11BM_LaB6_660a.fxye` | consistency only — *never* an anchor | APS 11-BM SRM 660a LaB6 in the beamline's documented 0.81 mm Kapton bore; lambda was calibrated against this very standard |
+| `ndruo_joint` | `tests/data/mg090.fxye` | cross-code | Nd2Ru2O7 pyrochlore, one specimen, two histograms: APS 11-BM synchrotron X-ray (lambda 0.4132950 A, 49 493 points) and NCNR BT-1 neutron through a Cu(311) monochromator (lambda 1.54040 A, 3 296 points).  The two histograms of a published combined refinement whose stated method is to hold the X-ray wavelength and refine the neutron one -- the only one-specimen two-wavelength pair in the suite, hence the only dataset that can exercise a refinable wavelength at all |
 | `bethanechol` | `tests/data/bethanechol_indexing.json` | cross-code | Bergmann et al. (2004) Tables 5 and 6: ten sets of twenty 2theta positions for bethanechol chloride, the known P21/n cell, and every program's published score -- the only externally graded benchmark any feature in this package has |
 
 `consistency` is a fence, not a label: 11-BM calibrated its wavelength against
@@ -870,6 +871,82 @@ The only externally *graded* feature in the package. Bergmann et al. (2004) publ
 **Measured:** 12 candidates, all low, M20 ~4.6, none validated, best_or_none() None; systems_searched reported and search_complete False on two of the four, so the null is not dressed up as an exhausted domain
 
 **Diagnostics:** `INDEX_ABSTAINED`, `INDEX_SEARCH_INCOMPLETE`
+
+### `tests/test_acceptance_wavelength.py`
+
+A parameter that is exactly degenerate in one histogram and measurable in several, on the two histograms of a published combined refinement whose stated method is precisely that. The bar worth reading is the third row: the refined wavelength reproduces, to 2 %, the cell disagreement the two histograms already showed when refined separately — a prediction made without freeing anything. The fourth adds the check that keeps it honest, which is that holding the other end measures the same ratio with the opposite sign.
+
+#### `test_holding_both_wavelengths_costs_the_neutron_histogram`
+
+`characterisation` · dataset `ndruo_joint`
+
+**Claims:** the problem statement, asserted: one cell for two uncalibrated wavelengths lands the whole calibration mismatch on the histogram with less leverage on the cell
+
+**Referenced to:** each histogram against **its own solo fit** on the same protocol -- our own results either side of one change, so the bar is the 10 % degradation being an order larger on one histogram than the other, not any external value
+
+**Measured:** neutron Rwp 0.05259 alone -> 0.06226 jointly (+18 %); X-ray 0.09364 -> 0.09373 (+0.1 %), a ratio of ~200
+
+#### `test_freeing_the_neutron_wavelength_recovers_its_fit`
+
+`characterisation` · dataset `ndruo_joint`
+
+**Claims:** the degradation above goes away when the neutron wavelength is freed, and the X-ray histogram does not pay for it -- the SYMPTOM, recorded because a correction does not ship on an Rwp comparison
+
+**Referenced to:** the same three fits as the row above.  Deliberately a loose band: two independently converged fits differ by more than their own ftol, so the bars are 'more than half the way back' and 'not past the solo floor', never a figure
+
+**Measured:** 0.06226 held -> 0.05502 freed, against a 0.05259 solo floor: 75 % of the gap recovered; X-ray unchanged to 0.005 %
+
+#### `test_the_refined_wavelength_is_the_solo_cell_disagreement`
+
+`prediction` · dataset `ndruo_joint`
+
+**Claims:** the headline: the refined wavelength reproduces the cell disagreement the two histograms already showed when refined separately -- one number arrived at two independent ways
+
+**Referenced to:** the ratio of the two SOLO cells, computed without freeing anything, is a prediction for how far the neutron lambda must move.  The 20 % band is the scatter two separately converged single-histogram fits carry, not a tolerance
+
+**Measured:** solo cells 10.342905 vs 10.340285 A = +253 ppm; refined lambda 1.540400 -> 1.5407968(989) A = +257.6 ppm, agreeing to 2 %; the move is 4.0x its own esd
+
+#### `test_the_diagnostic_reports_the_ppm_and_nothing_claims_rwp`
+
+`identity` · dataset `ndruo_joint`
+
+**Claims:** the record field this correction ships with: WAVELENGTH_CALIBRATION fires exactly where a wavelength was refined, carries the ppm as Diagnostic.value, and is silent on the held histogram and on a fit that held both
+
+**Referenced to:** floating point (rel=1e-9) between the diagnostic's value and the ppm recomputed from the row -- one measurement, two surfaces, pinned rather than re-derived
+
+**Measured:** one diagnostic, level info, value +257.6 ppm, where hist.1.instrument.source.lines.0.wavelength; zero on histogram 0 and zero on the both-held fit
+
+**Diagnostics:** `WAVELENGTH_CALIBRATION`
+
+#### `test_the_cell_belongs_to_the_synchrotron`
+
+`cross_code` `characterisation` · dataset `ndruo_joint`
+
+**Claims:** holding the X-ray wavelength hands the cell to the X-ray histogram -- the accuracy hierarchy in action -- and the result agrees with the published combined refinement
+
+**Referenced to:** the X-ray SOLO cell to 5e-6 relative (our own result, the claim being that the joint cell lands ON it rather than between the two), and the published a = 10.342312(8) A under a 2e-4 relative band.  The published band is NOT claimed: this is a single-phase fit against a refinement carrying 0.5(1) mol % RuO2 and a modelled lambda/2 second-order contribution, neither of which rietx does
+
+**Measured:** joint a = 10.342904(60) A, on the solo 10.342905 and +57 ppm above the published value; x(O 48f) 0.32994(51) against a published 0.33012(7), inside its own esd
+
+#### `test_swapping_which_wavelength_is_held_measures_the_same_ratio`
+
+`prediction` `identity` · dataset `ndruo_joint`
+
+**Claims:** the sharpest statement of the physics: a joint fit determines the RATIO of the two wavelengths, so which one is called 'the calibration error' is a choice of what to hold and not a result
+
+**Referenced to:** eq. pos-lambda-cell, which says the two runs are one fit in two parameterisations.  Bars: the two ppm figures agree to 2 % of the effect, every per-histogram Rwp to 2e-3 relative and the shared x(O) to 1e-5 absolute
+
+**Measured:** +257.6 ppm holding the X-ray against -256.7 ppm holding the neutron -- 0.9 ppm apart on an effect of 257 (0.35 %); both Rwp identical to 5 decimals, x(O) to 1e-6
+
+#### `test_the_fits_render`
+
+`ceiling` · dataset `ndruo_joint`
+
+**Claims:** the per-histogram obs/calc/diff renderings exist, so the fit can be looked at rather than only summarised
+
+**Referenced to:** existence, not a number -- a ceiling row
+
+**Measured:** two PNGs written to tests/output/, mg090_joint_hist0.png and mg090_joint_hist1.png
 
 ## The one default this matrix decided
 

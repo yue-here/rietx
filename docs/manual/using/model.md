@@ -74,7 +74,7 @@ ref = rx.Refinement(lab6, rx.Instrument.debye_scherrer(wavelength=0.4139),
                     history=False)
 
 rows = ref.parameters()
-assert len(rows) == 41                                  # every scalar, held ones included
+assert len(rows) == 42                                  # every scalar, held ones included
 assert sum(row.refinable for row in rows) == 25         # what set_vary could free
 
 held = {row.path: row.held_because for row in rows if not row.refinable}
@@ -82,7 +82,7 @@ assert held["phases.0.cell.b"] == "tied: = 1·phases.0.cell.a"
 assert held["phases.0.cell.alpha"] == "structurally fixed by symmetry or by the model"
 ```
 
-Forty-one rows for two atoms and a default instrument, of which twenty-five
+Forty-two rows for two atoms and a default instrument, of which twenty-five
 could be freed: most of a table is parameters you will never touch, and the
 listing is the cheapest way to see what is there.
 
@@ -115,14 +115,14 @@ They are distinguishable on purpose, because the fix differs.
 
 | Reason | What it means | Can you release it |
 |---|---|---|
-| `locked` | structurally fixed: a symmetry-fixed cell angle, a fully fixed special position, the first emission line's weight, `biso` on a site that declares an anisotropic tensor | no |
+| `locked` | structurally fixed: a symmetry-fixed cell angle, a fully fixed special position, the first emission line's weight, a wavelength in a single-histogram fit ({ref}`a-refinable-wavelength`), `biso` on a site that declares an anisotropic tensor | no |
 | `tie` | an affine function of other rows, so the freedom lives in its sources | only if it is your own tie |
 | `mode_fixed` | refinable in principle, but the current intensity mode force-fixes it | switch back to `rietveld` |
 
 `ParameterRow.refinable` is false if any of the three holds. The three counts
 do not add up to the number of held rows, and should not: on the LaB6 table
-above, asking for the Le Bail listing marks thirteen rows `mode_fixed` while
-the refinable count only falls from 25 to 19, because seven of those thirteen
+above, asking for the Le Bail listing marks fourteen rows `mode_fixed` while
+the refinable count only falls from 25 to 19, because eight of those fourteen
 were already locked or tied. Read `refinable` for the decision and the three
 flags only to explain it.
 

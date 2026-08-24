@@ -282,7 +282,8 @@ from rietx import Instrument
 
 synchrotron = Instrument.debye_scherrer(wavelength=0.4139090)
 lab = Instrument.bragg_brentano(radiation="CuKa", monochromator_two_theta=26.6)
-assert [line.wavelength for line in lab.source.lines] == [1.5405929, 1.5444274]
+assert [line.wavelength.value for line in lab.source.lines] == [1.5405929,
+                                                                1.5444274]
 assert round(lab.source.polarization.value, 4) == 0.5557
 ```
 
@@ -301,14 +302,72 @@ Ask `capabilities()` for the anode names rather than trusting a list in prose.
 | `Source.dispersion` | `Dispersion` or None | on | anomalous scattering, {eq}`int-friedel` |
 | `Source.kind` | `"xray_cw"` | `"xray_cw"` | constant-wavelength X-rays |
 
-`Source.primary_wavelength` is the first line's wavelength, which is the one
-every d-spacing is quoted against.
+`Source.primary_wavelength` is the first line's wavelength **as a float**,
+which is the one every d-spacing is quoted against.
+`Source.wavelength_parameters` is the list of live wavelength `Parameter`
+objects, one per line, and is what code that needs to *write* a wavelength
+uses — `NeutronSource.lines` builds a fresh object per access, so a write
+through `lines[i].wavelength` lands on a throwaway there.
 
-`EmissionLine.wavelength` is a plain float in Å and `EmissionLine.weight` is a
-refinable intensity relative to line 0. Line 0's weight is structurally locked
-at 1, since it is degenerate with the phase scales. Each line diffracts at its
-own Bragg angle, so a doublet's splitting grows with tan θ ({eq}`pos-doublet`)
-and is never a fixed 2θ offset.
+`EmissionLine.wavelength` is a `Parameter` in Å, defaulting to `vary=False`,
+and `EmissionLine.weight` is a refinable intensity relative to line 0. Line 0's
+weight is structurally locked at 1, since it is degenerate with the phase
+scales. Each line diffracts at its own Bragg angle, so a doublet's splitting
+grows with tan θ ({eq}`pos-doublet`) and is never a fixed 2θ offset.
+
+A bare number is still accepted where a wavelength `Parameter` is wanted, so
+`EmissionLine(wavelength=1.5406)` builds a fixed one and every instrument
+document written before this became a `Parameter` validates unchanged.
+
+(a-refinable-wavelength)=
+#### A refinable wavelength
+
+`EmissionLine.wavelength` and `NeutronSource.wavelength` default to
+`vary=False`, and for a **single** histogram that default is a fence rather
+than a convention. Bragg's law is {eq}`pos-bragg`, so the pattern measures
+λ/(2 sin θ) and fixes only the *product* of λ with a reciprocal cell — a free λ
+beside a free cell is an exactly flat direction, and freeing one is refused
+naming the degeneracy:
+
+```python
+from rietx import Instrument
+from rietx.params.vector import check_wavelength_freedom
+
+instrument = Instrument.debye_scherrer(wavelength=0.4139090)
+instrument.source.lines[0].wavelength.vary = True
+try:
+    check_wavelength_freedom(["instrument.source.lines.0.wavelength"],
+                             n_wavelengths=1, n_histograms=1)
+except ValueError as exc:
+    assert "single-histogram" in str(exc)
+```
+
+Across several histograms of one specimen the degeneracy breaks, because they
+share one cell. The rule is stated in full — and enforced — in
+{ref}`a-refinable-wavelength-jointly`; the short version is **hold one
+wavelength, free at most N − 1**, and hold the one belonging to the histogram
+that determines the cell.
+
+This is `EmissionLine.weight`'s convention one rank up. In both cases one
+member of a set is pinned to fix a scale the data cannot set and the rest are
+free; what differs is where the set lives. A line weight's scale lives inside
+one source, so line 0 is locked in the parameter table. A wavelength's scale
+lives in the *cell*, which is shared across instruments, so no single
+instrument can count the set and the check sits where the joint problem is
+assembled.
+
+Only **line 0**'s wavelength is ever refinable. Within one source the lines'
+wavelength *ratio* is atomic physics — the tabulated Kα1/Kα2 pair traces to one
+NIST column for exactly this reason, and is known to about 20 ppm — so a
+secondary line's wavelength is structurally locked, the way line 0's *weight*
+is. The two locks are the same argument pointed in opposite directions: a weight
+is relative to something inside the source, a wavelength is relative to
+something outside it.
+
+A consequence worth stating: a monochromator's second-order λ/2 harmonic cannot
+be modelled *alongside* a refining wavelength. Adding a second `EmissionLine` at
+λ/2 with its own weight models the harmonic at a fixed λ, but its wavelength
+would not follow line 0's as that refines. Nothing here does that.
 
 `Dispersion` is on by default. `Dispersion.table` names the tabulation and
 `Dispersion.overrides` takes measured f′, f″ pairs per element, which is what
@@ -328,13 +387,19 @@ fields are inert is worse than two classes.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
-| `NeutronSource.wavelength` | float | required | Å, fixed — a powder pattern cannot separate λ from the cell |
+| `NeutronSource.wavelength` | `Parameter` | required | Å, `vary=False` — see {ref}`a-refinable-wavelength` |
 | `NeutronSource.kind` | `"neutron_cw"` | `"neutron_cw"` | constant wavelength, the discriminator you write |
 
 Three read-only properties let code written for an X-ray source keep working.
 `NeutronSource.lines` is the single line, weight structurally 1 — with one line
 there is nothing for a relative weight to be relative to.
-`NeutronSource.primary_wavelength` is that wavelength.
+`NeutronSource.primary_wavelength` is that wavelength as a float, and
+`NeutronSource.wavelength_parameters` is the live `Parameter` behind it, in a
+one-element list so a caller need not know which arm of the union it holds.
+That property is the one authority for writing a refined wavelength back:
+`lines` is a *property* here and a stored field on `Source`, so writing through
+`lines[0].wavelength` would land on a fresh object and the refined value would
+vanish at the next recompile.
 `NeutronSource.polarization` is 1.0 and refuses to be anything else, and
 `NeutronSource.dispersion` is always `None`.
 
