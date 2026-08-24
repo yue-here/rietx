@@ -25,6 +25,7 @@ from .optimize.least_squares import SOLVERS, run_multi_least_squares
 from .optimize.qpa import compute_qpa, microabsorption_diagnostics
 from .optimize.statistics import background_absorption, compute_statistics
 from .params.multi import MultiParameterTable, SharingMap
+from .params.vector import _is_wavelength
 from .refine import (
     _VERSION,
     _absorption_diagnostics,
@@ -58,6 +59,57 @@ from .strategy.staged import (
 )
 
 _CELL_KEYS = ("a", "b", "c", "alpha", "beta", "gamma")
+
+
+def _wavelength_calibration_diagnostics(
+        h: int, declared: list[float], table, values: dict[str, float],
+        esd: dict[str, float]) -> list[Diagnostic]:
+    """``WAVELENGTH_CALIBRATION`` — how far a refined λ moved, in ppm.
+
+    A refined wavelength is a **measurement of the monochromator's calibration
+    error**, and ppm is the unit it is quoted in: 100-200 ppm is a real
+    take-off-angle or lattice-constant error on a CW instrument, and it is the
+    same size as the cell discrepancies that motivate freeing it at all.  The
+    package's rule is that a new correction ships with a record field or a
+    diagnostic saying what it changed and never with an Rwp comparison as its
+    evidence (root ``CLAUDE.md``); this is that statement for this one, and it
+    is deliberately the *only* number the feature is defended with.
+
+    Reported at ``info`` with no threshold, because there is no published band
+    to quote and a tuned one would pretend to a judgement the diagnostic cannot
+    make — whether a 300 ppm move is a calibration error or a wrong wavelength
+    depends on the beamline, not on the fit.  What it does carry is Δλ/σ, so a
+    reader can see whether the move is resolved at all: a freed λ that comes
+    back inside its own esd measured nothing, which is a different (and
+    commoner) outcome from one that measured a calibration error.
+    """
+    out: list[Diagnostic] = []
+    for e in table.entries:
+        if not (_is_wavelength(e.path) and e.vary):
+            continue
+        il = int(e.path.split(".")[3])
+        lam0 = declared[il]
+        lam = values[e.path]
+        ppm = 1e6 * (lam - lam0) / lam0
+        sigma = esd.get(e.path)
+        resolved = ("" if sigma in (None, 0.0)
+                    else f", {abs(lam - lam0) / sigma:.1f}× its own esd "
+                         f"({sigma:.2e} A)")
+        out.append(Diagnostic(
+            level="info", code="WAVELENGTH_CALIBRATION",
+            message=(f"histogram {h} line {il}: wavelength refined from the "
+                     f"declared {lam0:.6f} A to {lam:.6f} A, {ppm:+.1f} ppm"
+                     f"{resolved}.  This is a measurement of that "
+                     f"monochromator's calibration error, taken against the "
+                     f"cell pinned by the histogram whose wavelength is held"),
+            where=[f"hist.{h}.{e.path}"], value=float(ppm),
+            suggestion=("compare it with the instrument's own calibration "
+                        "history before quoting the cell: a wavelength that "
+                        "moved further than the beamline's known drift is more "
+                        "likely a modelling error in this histogram (an "
+                        "unmodelled harmonic, a zero-shift traded against λ) "
+                        "than a real calibration shift")))
+    return out
 
 
 def _normalize_limits(ttl, n: int) -> list[tuple[float, float] | None]:
@@ -115,6 +167,14 @@ class MultiHistogramRefinement:
                     for ins in self.mtable.instruments]
         self._mu_r_source: list[str] = [src for src, _ in resolved]
         self._mu_r_skipped: list[str | None] = [why for _, why in resolved]
+        #: λ per line as *declared*, per histogram, taken before any stage runs.
+        #: The ``WAVELENGTH_CALIBRATION`` diagnostic reports the refined value
+        #: against this, and it has to be snapshotted here: ``mtable`` writes
+        #: refined values back into its own instrument copies at every stage, so
+        #: by the time the result is built there is nothing left to compare to.
+        self._declared_wavelengths: list[list[float]] = [
+            [p.value for p in ins.source.wavelength_parameters]
+            for ins in self.mtable.instruments]
         self.result_: RefinementResult | None = None
         self._models = None
 
@@ -235,6 +295,8 @@ class MultiHistogramRefinement:
             cm = mt.col_map(h)
             s_h = stderr[cm] if stderr is not None else None
             corr_h = corr[np.ix_(cm, cm)] if corr is not None else None
+            esd_h = (table.stderr_physical(thetas[h], s_h, corr_h)
+                     if s_h is not None else {})
 
             n_free_h = mt.n_shared + len(mt.per_hist_paths[h])
             stats = compute_statistics(model.y_obs, y_calc, model.sigma,
@@ -269,6 +331,8 @@ class MultiHistogramRefinement:
                                             self._mu_r_skipped[h], values)
             if absorption is not None:
                 diags.extend(_absorption_diagnostics(absorption))
+            diags.extend(_wavelength_calibration_diagnostics(
+                h, self._declared_wavelengths[h], table, values, esd_h))
 
             histograms.append(HistogramResult(
                 label=model.meta.get("label", "") or f"hist{h}",
