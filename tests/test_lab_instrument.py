@@ -127,7 +127,7 @@ NIST_XRTE_DIRECT = {
 def test_every_anode_matches_its_cited_source():
     for name, (ka1, ka2) in NIST_XRTE_DIRECT.items():
         ins = rx.Instrument.bragg_brentano(radiation=name)
-        got = [line.wavelength for line in ins.source.lines]
+        got = [line.wavelength.value for line in ins.source.lines]
         assert got == [ka1, ka2], name
 
 
@@ -142,9 +142,9 @@ def test_cu_pair_is_unchanged_by_the_anode_extension():
     moved with it.
     """
     ins = rx.Instrument.bragg_brentano()
-    assert [line.wavelength for line in ins.source.lines] == [CU_KA1, CU_KA2]
+    assert [line.wavelength.value for line in ins.source.lines] == [CU_KA1, CU_KA2]
     # ...and specifically *not* Bearden (1967), the other scale in circulation
-    assert ins.source.lines[0].wavelength != 1.540562
+    assert ins.source.lines[0].wavelength.value != 1.540562
 
 
 def test_doublet_splitting_grows_with_atomic_number():
@@ -168,7 +168,7 @@ def test_doublet_splitting_grows_with_atomic_number():
 def test_ka1_only_variants_are_derived_from_the_doublets():
     for name, (ka1, _) in NIST_XRTE_DIRECT.items():
         ins = rx.Instrument.bragg_brentano(radiation=f"{name}1")
-        assert [line.wavelength for line in ins.source.lines] == [ka1]
+        assert [line.wavelength.value for line in ins.source.lines] == [ka1]
         # the single line is line 0, hence structurally locked at weight 1
         assert ins.source.lines[0].weight.value == 1.0
 
@@ -203,7 +203,7 @@ def test_doublet_defaults_hold_off_cu():
 def test_off_cu_instrument_round_trips_through_json():
     ins = rx.Instrument.bragg_brentano(radiation="AgKa", goniometer_radius_mm=240.0)
     back = rx.Instrument.model_validate_json(ins.model_dump_json())
-    assert [line.wavelength for line in back.source.lines] == \
+    assert [line.wavelength.value for line in back.source.lines] == \
         list(NIST_XRTE_DIRECT["AgKa"])
     assert back.geometry.goniometer_radius_mm == 240.0
 

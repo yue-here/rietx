@@ -444,9 +444,18 @@ def test_axial_columns_are_not_silently_fd_routed(config):
 # multi-histogram: the stacked layout
 # ----------------------------------------------------------------------
 #: the free set for the joint state — one shared structural column (the cubic
-#: cell) plus per-histogram scale, background, zero and width
+#: cell) plus per-histogram scale, background, zero, width and **wavelength**.
+#:
+#: The wavelength can only live here.  A single-histogram table refuses a free λ
+#: by construction (exactly degenerate with the cell —
+#: ``params.vector.check_wavelength_freedom``), so the joint state is the only
+#: config in this file able to free one, and it has to: λ is a derivative path
+#: like any other and this file's rule is that its configs grow whenever one
+#: does.  Scoped to histogram 1, because freeing both copies is the degeneracy
+#: back again.
 MULTI_GLOBS = ["phases.*.scale", "instrument.background.*", "phases.*.cell.*",
-               "instrument.zero_shift", "instrument.profile.w"]
+               "instrument.zero_shift", "instrument.profile.w",
+               "hist.1.instrument.source.lines.0.wavelength"]
 
 _MULTI_CACHE: dict[str, tuple] = {}
 

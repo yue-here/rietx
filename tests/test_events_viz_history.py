@@ -313,7 +313,7 @@ def test_q_and_d_axes_are_the_same_pattern_in_another_coordinate(
     structure, ins = perturbed_models()
     ref = rx.Refinement(structure, ins, history=False)
     result = ref.fit(synthetic_pattern)
-    lam = ins.source.lines[0].wavelength
+    lam = ins.source.lines[0].wavelength.value
     OUT.mkdir(exist_ok=True)
 
     tt = np.asarray(result.two_theta)

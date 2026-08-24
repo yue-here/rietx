@@ -233,6 +233,71 @@ land on the same parameters; only the difference this test measures is
 attributable to absorption, and the identity above reproduces to 0.0166540 with
 dispersion switched on, which is the check that they are independent.
 
+## Refinable-wavelength acceptance data — the published Nd₂Ru₂O₇ pair
+
+Four files, **1 711 066 bytes** (1.63 MiB) total: the two histograms of a
+published joint refinement, plus the instrument-parameter file of each.
+
+| file | bytes | instrument | λ (Å) | points | range (°2θ) | σ |
+|---|---|---|---|---|---|---|
+| `mg090.fxye` | 1 654 008 | APS 11-BM synchrotron X-ray, 295 K | 0.4132950 | 49 493 | 0.500–49.992 | from file |
+| `mg090.prm` | 1 134 | its GSAS instrument-parameter file (`ICONS 0.4132950`, POLA 0.990) | — | — | — | — |
+| `mg090.Cu311.gsas` | 54 366 | NCNR BT-1 neutron, Cu(311) monochromator, 300 K | 1.54040 | 3 296 | 3.000–167.750, 0.05° step | from file |
+| `mg090.Cu311.inst` | 1 558 | its GSAS instrument-parameter file (`ICONS 1.54040`) | — | — | — | — |
+
+Nd₂Ru₂O₇ pyrochlore, one specimen. The `.prm` and `.inst` are committed for the
+same reason as the patterns: `ICONS` is where each wavelength comes from, so
+committing them keeps the wavelength's provenance in the repository instead of
+as a literal in a test.
+
+**What they are for.** These are the only two histograms in the suite that are
+*one specimen at two wavelengths*, which makes them the only dataset that can
+exercise a refinable wavelength at all — for one histogram λ and the cell are
+exactly degenerate, and the degeneracy breaks only across histograms sharing one
+cell. They come from a published refinement whose stated method *is* the
+feature, so `tests/test_acceptance_wavelength.py` asks "does rietx reproduce a
+published refinement that required this", not "does the new parameter move".
+
+**Reference values, published.** Gaultois *et al.*, *J. Phys.: Condens. Matter*
+(2013), ms. CM/461205 — the combined refinement of these two histograms:
+
+| quantity | published |
+|---|---|
+| a (Å) | 10.342312(8) |
+| x(O 48f) | 0.33012(7) |
+| data points | 51 295 |
+| refined neutron λ (Å) | 1.5406704, from a declared 1.54040 (+176 ppm) |
+
+and the paper's own account of the protocol, which is what this feature
+implements: *"the synchrotron X-ray wavelength was fixed while the neutron
+wavelength was allowed to vary, though the refined wavelength was within two
+standard deviations of the starting value"*. The paper gives the Cu(311)
+monochromator as λ = 1.5402(2) Å with a **second-order contribution at λ/2**.
+
+**Cross-code consistency, not an absolute anchor** — the distinction this file
+draws elsewhere. `nist_srm660c_100a.cif` and `qarr/corundum.prn` are absolute
+cell anchors because a certificate says what the answer is; here the reference is
+another refinement of the same data, so agreement bounds a modelling difference
+rather than an error. The single-phase fit in the acceptance suite lands
+a = 10.342904(60) Å, **+57 ppm** above the published value: the published
+refinement carries 0.5(1) mol % RuO₂ alongside and models the λ/2 second-order
+contribution, and rietx does neither. x(O 48f) 0.32994(51) is inside its own esd
+of the published 0.33012(7).
+
+**Kennedy & Vogt (1996)**, *J. Solid State Chem.* **126**, 261–270 (ICSD 82304)
+is the citable *structure* reference for Nd₂Ru₂O₇ — Fd-3m:2, a = 10.3442(1),
+x(O 48f) = 0.3301(2), Biso 0.86 / 0.20 / 0.50 / 0.69, R = 0.022 — and is where
+the acceptance suite's site assignment comes from: Nd on 16d (½,½,½), Ru on 16c
+(0,0,0), O1 on 48f (x,⅛,⅛), O2 on 8b (⅜,⅜,⅜).
+
+**Known confound this package does not model.** The Cu(311) monochromator passes
+a second-order λ/2 component, which the paper states and models and rietx does
+not. It is the obvious candidate for the difference between the +176 ppm
+published wavelength shift and the +258 ppm the acceptance suite measures — the
+same sign and order from a different code and a different model. Read the two as
+agreeing about the *existence and size* of a calibration error, not as two
+measurements of one number.
+
 ## backend_goldens/ — WP-0401 bit-identity baseline
 
 `backend_goldens/*.npz` hold `evaluate`/residual/Jacobian arrays for the

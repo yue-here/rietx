@@ -585,7 +585,7 @@ def test_an_uploaded_pattern_and_cif_commit_into_a_project(blank, tmp_path):
     # copied byte-for-byte, which is what makes the reader's esd column the
     # contract rather than a re-serialisation (WP-1005)
     assert (root / "nac.fxye").read_bytes() == pattern
-    assert session.project.refinement.instrument.source.lines[0].wavelength == 0.413909
+    assert session.project.refinement.instrument.source.lines[0].wavelength.value == 0.413909
     assert session.project.refinement.structure.phases[0].space_group == "P m -3 m"
 
 
@@ -673,7 +673,8 @@ def test_an_instrument_preset_supplies_the_wavelengths_it_is_not_given(blank):
 
     doublet = instrument_from_preset({"preset": "bragg_brentano",
                                       "radiation": "CuKa"})
-    assert [line.wavelength for line in doublet.source.lines] == [1.5405929, 1.5444274]
+    assert [line.wavelength.value for line in doublet.source.lines] == [1.5405929,
+                                                                    1.5444274]
     assert doublet.geometry.kind == "bragg_brentano"
 
     with pytest.raises(ValueError, match="unknown radiation"):

@@ -119,7 +119,7 @@ def test_kbeta_check_follows_the_anode(anode):
     from rietx.background.diagnostics import _KBETA
 
     ins = rx.Instrument.bragg_brentano(radiation=anode)
-    lam = ins.source.lines[0].wavelength
+    lam = ins.source.lines[0].wavelength.value
     data = _peaky_pattern(background=_flat_bkg, instrument=ins, lo=5.0, hi=125.0)
     doped, ghost = _dope_ghost(data, lam, _KBETA[anode])
 
@@ -138,7 +138,7 @@ def test_tungsten_contamination_is_checked_off_cu():
     from rietx.background.diagnostics import _W_LA1
 
     ins = rx.Instrument.bragg_brentano(radiation="CoKa")
-    lam = ins.source.lines[0].wavelength
+    lam = ins.source.lines[0].wavelength.value
     data = _peaky_pattern(background=_flat_bkg, instrument=ins, lo=25.0, hi=125.0)
     doped, ghost = _dope_ghost(data, lam, _W_LA1, height=0.05)
 

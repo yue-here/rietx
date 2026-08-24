@@ -103,7 +103,7 @@ def _forward(instrument: Instrument, *, scale: float = 3e-3,
     cell = (ph.cell.a.value, ph.cell.b.value, ph.cell.c.value,
             ph.cell.alpha.value, ph.cell.beta.value, ph.cell.gamma.value)
     d = d_spacings(model.phases[0].reflections.hkl, *cell)
-    s = instrument.source.lines[0].wavelength / (2.0 * d)
+    s = instrument.source.lines[0].wavelength.value / (2.0 * d)
     truth = 2.0 * np.degrees(np.arcsin(s[s < 1.0]))
     truth = np.sort(truth[(truth > tt_lo + 0.5) & (truth < tt_hi - 0.5)])
     # distinct reflections may share a d (cubic 300/221) — one peak, one truth
@@ -336,7 +336,7 @@ def test_fitted_position_is_the_kalpha1_position():
     instrument = _instrument()
     y_true, grid, truth = _forward(instrument)
     peaks = pick_peaks(_noisy(y_true, grid, 4242), instrument)
-    lam = [ln.wavelength for ln in instrument.source.lines]
+    lam = [ln.wavelength.value for ln in instrument.source.lines]
     w = instrument.source.lines[1].weight.value
 
     n_checked = 0
@@ -615,7 +615,7 @@ def test_contamination_line_is_flagged_not_subtracted():
     lam_kb = 1.392234
     parent = float(truth[np.argmax([y_true[np.argmin(np.abs(grid - t))]
                                     for t in truth])])
-    tt_ghost = 2 * np.degrees(np.arcsin(lam_kb / instrument.source.lines[0].wavelength
+    tt_ghost = 2 * np.degrees(np.arcsin(lam_kb / instrument.source.lines[0].wavelength.value
                                         * np.sin(np.radians(0.5 * parent))))
     fwhm = float(predicted_fwhm(np.array([tt_ghost]), instrument)[0])
     peak_h = float(y_true[np.argmin(np.abs(grid - parent))])
