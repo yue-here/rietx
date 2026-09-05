@@ -291,6 +291,128 @@ class Atom(Base):
     biso: Parameter = Field(default_factory=lambda: Parameter(value=0.5, min=0.0, max=25.0, unit="A^2"))
     aniso: AnisoU | None = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _inherit_declared_bounds(cls, data: object) -> object:
+        """Fill a caller-supplied Parameter's min/max/unit from the field's
+        own declared default, wherever the caller left that attribute unset —
+        **before** a ``Parameter`` is ever constructed for that field, so
+        nothing about the caller's own object is read *or written*.
+
+        ``occ``/``biso`` declare their physical range in a ``default_factory``
+        (min=0, max=1.5 for occ; min=0, max=25, unit="A^2" for biso) rather
+        than as a field constraint, so the range only ever applied when the
+        field was omitted entirely — a caller supplying their own
+        ``Parameter(value=..., vary=...)``, the natural way to set a starting
+        value or hold one, silently got ``(-inf, +inf)`` and no unit instead
+        (issue #204). Measured cost: a refined Biso of -165 A^2 and an
+        81-point QPA error at unchanged Rwp, invisible at the call site.
+
+        Detected with ``model_fields_set`` (or, for a raw dict, its keys —
+        the same "was this key present" question one representation down)
+        rather than by comparing against ``Parameter``'s own bare defaults:
+        an *explicit* ``min=-inf`` is indistinguishable from an omission by
+        value alone, and must still win — an explicit bound always beats a
+        declared one, in either direction.
+
+        **A ``mode="after"`` validator was tried first and rejected.**
+        Pydantic stores a passed-in ``Parameter`` *by reference*
+        (``revalidate_instances="never"``), so ``getattr(self, name)`` in an
+        after-validator hands back the caller's own object, not a copy; and
+        ``Base``'s ``validate_assignment=True`` means the ``setattr`` that
+        filled the missing attributes both wrote to that object and added the
+        names to *its own* ``model_fields_set`` — the very signal the next
+        ``Atom`` built from the same object would consult. Reusing one
+        ``Parameter`` for two fields (a plausible pattern — "start both at
+        the field default") leaked the first field's bounds and unit into
+        the second, the same defect class as the one this validator exists to
+        close, reopened through a different door. Filling the *raw* input
+        before a ``Parameter`` object exists at all has no object to mutate:
+        the replacement is a brand-new ``Parameter``, built from a dict of
+        the caller's own values, never their instance. ``data`` itself is
+        copied once up front for the same reason — ``model_validate`` may be
+        handed the caller's own dict directly, unlike keyword construction
+        where Python already built a fresh one.
+
+        **Why the replacement is a ``Parameter``, not the merged dict
+        itself**: ``validate_assignment=True`` (``Base``) re-runs *this*
+        validator on every attribute assignment to an already-built
+        ``Atom`` — ``atom.aniso = ...`` included — not only on the field
+        being assigned, with ``data`` built from the model's current,
+        already-valid field values. So this branch can fire for ``occ`` on
+        an assignment that never touched it, wherever ``occ``'s own
+        ``model_fields_set`` legitimately never grew a ``unit`` key (it was
+        never given one because it never needed one — a bare ``Parameter``
+        has no unit already). Pydantic does not re-run core validation on a
+        field that is not itself the assignment target, so a bare ``dict``
+        placed in ``data`` there reaches ``self.occ`` as a ``dict``, not a
+        ``Parameter``, breaking every later ``.occ.value`` — measured via
+        ``ParameterTable`` construction after ``atom.aniso = AnisoU(...)``.
+        A real ``Parameter`` is a legal value however pydantic treats it.
+
+        Generalised over every ``Parameter`` field on this class carrying a
+        ``default_factory`` (today: ``occ`` and ``biso`` — not ``x``/``y``/
+        ``z``, which are required with no factory and default to (-inf, inf)
+        regardless, so they lose nothing), rather than naming the two fields,
+        so a field added later the same way is covered without touching this
+        validator. See ``test_every_bounds_carrying_atom_field_is_inherited``
+        in ``tests/test_schemas.py``, which fails if a new such field is
+        added and *not* covered by this loop.
+
+        Inherits rather than refuses a bound-less ``Parameter``: requiring
+        every caller to restate the physical range on every construction
+        would break existing ones (the recipe and CIF readers already pass
+        their own explicit bounds and are unaffected either way — checked
+        against this repo's own call sites before landing this). If the
+        caller's value falls outside the inherited bound,
+        ``Parameter._check_bounds`` still raises once the merged dict is
+        validated below — that is this fix doing its job, not a new refusal.
+
+        A field's raw value may be a ``Parameter`` instance, a plain
+        ``dict`` (the JSON-round-trip / ``model_validate`` shape), or absent
+        entirely (the field omitted, where the ``default_factory`` already
+        carries the declared bounds and there is nothing to fill). Anything
+        else — ``None``, a bare number, a wrong type — is left untouched and
+        falls through to whatever error normal field validation already
+        raises for it; this validator only ever *adds* missing keys, never
+        changes which construction is legal.
+        """
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        for name, info in cls.model_fields.items():
+            if info.annotation is not Parameter or info.default_factory is None:
+                continue
+            if name not in data:
+                continue  # omitted: default_factory already carries the bounds
+            raw = data[name]
+            if isinstance(raw, Parameter):
+                present = raw.model_fields_set
+                base = raw.model_dump()
+            elif isinstance(raw, dict):
+                present = raw.keys()
+                base = raw
+            else:
+                continue  # not a shape that carries min/max/unit presence
+            missing = {"min", "max", "unit"} - set(present)
+            if not missing:
+                continue
+            default = info.default_factory()
+            fills = {attr: getattr(default, attr) for attr in missing}
+            # A real Parameter, not the merged dict itself: validate_assignment
+            # re-runs this validator on every attribute assignment to the
+            # Atom (not only the field being assigned), with `data` built
+            # from the model's *current*, already-validated field values —
+            # so this branch also fires reassigning e.g. `atom.aniso = ...`
+            # on an Atom whose `occ` has always been fine (model_fields_set
+            # legitimately missing "unit", never given because it never
+            # needed giving). Pydantic does not re-run core validation on a
+            # field that is not itself being assigned, so a bare dict placed
+            # here would reach `self.occ` as a dict, not a Parameter — it
+            # must already be the right type.
+            data[name] = Parameter(**{**base, **fills})
+        return data
+
     @model_validator(mode="after")
     def _one_displacement_model(self) -> "Atom":
         if self.aniso is not None and self.biso.vary:

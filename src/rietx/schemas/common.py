@@ -128,7 +128,26 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 #: The field it reuses is ``Parameter`` itself rather than a new type, which is
 #: what makes a variable and the model parameter it replaces produce the
 #: identical table ``Entry``.
-SCHEMA_VERSION = "0.16"
+#: 0.16 → 0.17 (issue #204): ``Atom.occ``/``biso`` now inherit their field's
+#: declared bounds and unit onto a caller-supplied ``Parameter`` that omitted
+#: them, rather than silently falling back to ``Parameter``'s own bare
+#: (-inf, inf, no unit). No field gained or changed shape — this is the
+#: 0.4 → 0.5 shape, a behaviour change rather than a field-list one — but
+#: **the set of legal ``Atom`` constructions shrank**, the opposite direction
+#: from every earlier entry here: a bare ``Parameter(value=-165.0)`` for
+#: ``biso``, storable before this change, now raises ``ValidationError``.
+#: WP-1117 made the only question whether a consumer could notice, and a
+#: construction that used to succeed and now doesn't is exactly that.
+#: **Already-written documents are unaffected.** A persisted ``Atom`` always
+#: serializes ``min``/``max``/``unit`` explicitly, so on load
+#: ``model_fields_set`` (or, for the raw dict, its keys) is already complete,
+#: nothing is inherited, and every stored value — including one this
+#: validator would now refuse at construction, e.g. that same -165 A^2 Biso
+#: — deserializes and validates exactly as before. The break is to
+#: *construction*, not to *documents* (issue #209 is the read-time follow-up
+#: that leaves open whether such an already-persisted value should also be
+#: repaired).
+SCHEMA_VERSION = "0.17"
 
 TransformKind = Literal["identity", "softplus", "exp", "logit"]
 
