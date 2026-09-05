@@ -1874,6 +1874,8 @@ class Refinement:
         diagnostics: list[Diagnostic] = (
             _symmetry_silence_diagnostics(self.structure, mode)
             + _dispersion_diagnostics(self.structure, self.instrument)
+            + _resonant_absorber_diagnostics(self.structure,
+                                             self.instrument)
             + _species_fallback_diagnostics(self.structure, self.instrument))
         stage_results: list[StageResult] = []
         self.stage_reports_ = []
@@ -3464,6 +3466,90 @@ def _dispersion_diagnostics(structure: Structure,
                    "weight fractions directly. If it was declined because the "
                    "wavelength sits in an absorption-edge interval, supply the "
                    "measured pair through Dispersion.overrides instead",
+    )]
+
+
+#: A resonant absorber whose *element* absorbs at least this much is reported
+#: as a warning rather than as info.  1000 barn separates the four classic
+#: black absorbers on this table -- Cd 2520, Eu 4530, Sm 5923, Gd 49700 -- from
+#: Yb, whose element absorbs 34.80 and whose resonance lives in one minority
+#: isotope (``168Yb``, 2230.40).  The split is about how much of the beam the
+#: specimen eats, which is a different question from whether b is complex, and
+#: both are worth saying.
+RESONANT_ABSORBER_SEVERE_BARN = 1000.0
+
+
+def _resonant_absorber_diagnostics(structure: Structure,
+                                   instrument: Instrument) -> list[Diagnostic]:
+    """Name a resonant absorber instead of silently using its thermal ``b``.
+
+    The neutron analogue of ``DISPERSION_NEGLECTED`` (issue #113 (a),
+    WP-1312).  For a handful of nuclides the tabulated bound coherent
+    scattering length is complex and varies with wavelength near a nuclear
+    resonance; ``b_Sears.dat`` stores the **real part of the thermal value**
+    and nothing else, so a refinement of such a species is using a number that
+    is incomplete rather than wrong.  At one constant wavelength away from the
+    resonance the thermal value is the right one, which is why this is a
+    statement and not a refusal -- but nothing said so, and
+    ``is_resonant_absorber`` had no caller in the package at all.
+
+    Neutron sources only: ``f'/f''`` is the X-ray effect and it has its own
+    diagnostic, so this is the same gate ``_dispersion_diagnostics`` uses,
+    the other way round.
+
+    Everything reported comes from the shipped table, so a reader can check it
+    against ``src/rietx/data/b_Sears.dat`` without leaving the repository.
+    Deliberately **not** reported: the resonance energy per nuclide, which
+    WP-1312 also asks for.  That needs a citation this package does not
+    currently carry (Mughabghab's *Atlas of Neutron Resonances* is the usual
+    source) and transcribing it from memory is the failure this campaign has
+    already met once -- so the flag lands without it, and the energies can be
+    added with their citation.
+    """
+    from .crystallography.neutron import (  # noqa: PLC0415
+        is_resonant_absorber,
+        normalize_species,
+        properties,
+    )
+
+    if instrument.source.kind == "xray_cw":
+        return []
+    flagged: dict[str, float] = {}
+    where: list[str] = []
+    for i, phase in enumerate(structure.phases):
+        for j, atom in enumerate(phase.atoms):
+            if not is_resonant_absorber(atom.species):
+                continue
+            sym = normalize_species(atom.species)
+            where.append(f"phases.{i}.atoms.{j}")
+            if sym in flagged:
+                continue
+            try:
+                flagged[sym] = float(properties(sym)["xs_abs_barn"])
+            except KeyError:
+                flagged[sym] = float("nan")
+    if not flagged:
+        return []
+    worst = max((v for v in flagged.values() if v == v), default=0.0)
+    named = ", ".join(f"{s} {v:.0f} barn" for s, v in
+                      sorted(flagged.items(), key=lambda kv: -kv[1]))
+    return [Diagnostic(
+        level=("warning" if worst >= RESONANT_ABSORBER_SEVERE_BARN else "info"),
+        code="NEUTRON_RESONANT_ABSORBER",
+        where=sorted(where),
+        message=(f"this structure contains a resonant absorber ({named}); the "
+                 f"tabulated b is the real part of the thermal value and is "
+                 f"incomplete near the resonance"),
+        suggestion="at one constant wavelength away from the resonance the "
+                   "thermal value is the right number and nothing is owed. "
+                   "Check that this wavelength is away from it before quoting "
+                   "an occupancy or a displacement parameter on that site: b "
+                   "is complex there, and this table carries only its real "
+                   "part, so both the amplitude and the phase of that species' "
+                   "contribution are wrong near a resonance in a way no "
+                   "agreement index will show. A wavelength-resolved fit "
+                   "(a range of wavelengths, or TOF) may not use one thermal "
+                   "value at all",
     )]
 
 
