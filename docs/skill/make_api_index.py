@@ -60,15 +60,21 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "PowderLine `GSASII_Rietveld` recipe — read it with `rx.read_recipe` "
         "rather than parsing it yourself: it returns the model, the instrument "
         "and a plan together, and every unit it could not carry across says so "
-        "as a `RECIPE_*` diagnostic instead of arriving silently wrong. It is "
-        "the only foreign-input reader this build has: a TOPAS `.inp`, a GSAS "
-        "`.EXP`/`.PRM` or a FullProf `.pcr` has none, so those are still "
-        "transcribed by hand — `rx.read_recipe` will not open one.",
+        "as a `RECIPE_*` diagnostic instead of arriving silently wrong. "
+        "`rx.read_gsas_prm` reads a GSAS-I `.prm` instrument-parameter file "
+        "(the dominant one-bank, constant-wavelength case; a neutron "
+        "time-of-flight file and every other GSAS profile function are "
+        "refused by name). A GSAS `.EXP`/`.LST` refinement output has no "
+        "reader and is transcribed by hand. A TOPAS `.inp` and a FullProf "
+        "`.pcr` do have readers — `rietx.io.projects.read_topas_inp` and "
+        "`read_fullprof_pcr` — with no top-level `rx.` entry point yet; "
+        "`rx.read_recipe` will not open either.",
         ("rx.read_pattern", "rx.read_pdcif", "rx.read_recipe",
-         "rx.Structure.from_cif", "rx.Instrument.bragg_brentano",
-         "rx.Instrument.debye_scherrer", "rx.estimate_mu_r",
-         "rx.auto_background", "rx.diagnose", "rx.load_instrument_profile",
-         "rx.save_instrument_profile", "rx.capabilities", "rx.help_for"),
+         "rx.read_gsas_prm", "rx.Structure.from_cif",
+         "rx.Instrument.bragg_brentano", "rx.Instrument.debye_scherrer",
+         "rx.estimate_mu_r", "rx.auto_background", "rx.diagnose",
+         "rx.load_instrument_profile", "rx.save_instrument_profile",
+         "rx.capabilities", "rx.help_for"),
     ),
     (
         "The model objects",

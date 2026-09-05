@@ -26,7 +26,11 @@ from .io.exporters import (
     write_refinement_cif,
     write_reflection_table,
 )
-from .io.instrument_profile import load_instrument_profile, save_instrument_profile
+from .io.instrument_profile import (
+    load_instrument_profile,
+    read_gsas_prm,
+    save_instrument_profile,
+)
 from .io.readers import read_pattern, read_pdcif
 from .io.recipe import Recipe, RecipeError, read_recipe, write_recipe_tables
 from .multi import MultiHistogramRefinement, refine_multi
@@ -148,6 +152,7 @@ __all__ = [
     "index_pattern",
     "load_instrument_profile",
     "pick_peaks",
+    "read_gsas_prm",
     "read_pattern",
     "read_pdcif",
     "read_recipe",

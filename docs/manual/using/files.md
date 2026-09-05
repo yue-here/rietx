@@ -8,9 +8,11 @@ graph LR
   P["pattern file<br/><i>.xye .fxye .raw .cif …</i>"] --> RP["read_pattern"]
   C["structure<br/><i>.cif</i>"] --> SC["Structure.from_cif"]
   I["instrument profile<br/><i>.json</i>"] --> LP["load_instrument_profile"]
+  G["GSAS-I instrument file<br/><i>.prm</i>"] --> GP["read_gsas_prm"]
   RP --> REF(["refinement"])
   SC --> REF
   LP --> REF
+  GP --> REF
   subgraph rex ["my_sample.rex/"]
     PJ["project.json<br/><i>settings</i>"]
     PC["the pattern file<br/><i>copied byte for byte</i>"]
@@ -173,6 +175,57 @@ profile…` and `Load profile…`. Saving lands it in the project's `exports/`
 directory. It needs a model and not a fit, unlike everything else written
 there: the other exports describe a refinement result, while a profile
 describes the instrument as it stands.
+
+### Reading a GSAS-I `.prm` instrument file
+
+`read_gsas_prm` reads a GSAS-I instrument-parameter file (Larson & Von Dreele,
+*GSAS*, LAUR 86-748) — the text file an APS 11-BM mail-in ships beside its
+pattern — straight into an `Instrument`, with the same `vary=False` contract
+as `load_instrument_profile`:
+
+<!-- api-doc: no-exec — needs a real .prm file on disk -->
+```python
+instrument = rx.read_gsas_prm("beamline.prm")
+```
+
+It reads the dominant case the format ships — one bank, `HTYPE PXCR`
+(constant-wavelength X-ray), GSAS profile function 3 — converting `GU`/`GV`/
+`GW` from centidegrees² and `LX`/`LY` from centidegrees into the degrees²/
+degrees `ProfileTCHZ` uses. A neutron time-of-flight file (`HTYPE PNTR`) and
+every other GSAS profile function are refused by name rather than
+approximated, and the refusal says which reason applies to which: a
+time-of-flight file puts something onto the axis that `ProfileTCHZ`'s
+constant-wavelength Caglioti/TCH law cannot express, while a
+constant-wavelength neutron file (`HTYPE PNCR`) states a law it *could* hold
+and is refused only for want of a real fixture to pin its coefficient layout
+down. A GSAS `.EXP`/`.LST` refinement output has no reader and is transcribed
+by hand. A TOPAS `.inp` and a FullProf `.pcr` do have readers —
+`rietx.io.projects.read_topas_inp` and `read_fullprof_pcr` — though neither
+has a top-level `rx.` entry point yet, and `rx.read_recipe` will not open
+either.
+
+Two things this reader **chooses** rather than reads, both on the
+`diagnostics=` channel the sections above use. A `.prm` states no geometry at
+all, and `HTYPE PXCR` spans Bragg-Brentano and Debye-Scherrer, so the
+`Instrument` comes back `debye_scherrer` — the 11-BM capillary the corpus this
+reader was built against is — and a flat-plate calibration must have its
+geometry set by the caller. That matters beyond bookkeeping: `Geometry.kind`
+selects the position correction and its suggested action, and the two
+geometries' absorption corrections have different *off* states. The file's
+fields that the `Instrument` cannot carry are dropped at their identity value
+and reported the same way, one per record that carried them:
+
+<!-- api-doc: no-exec — needs a real .prm file on disk -->
+```python
+notes = []
+instrument = rx.read_gsas_prm("beamline.prm", diagnostics=notes)
+[(d.code, d.message) for d in notes]
+# GSAS_PRM_GEOMETRY_ASSUMED — the geometry was not read from the file
+# GSAS_PRM_FIELD_DROPPED    — ICONS field 5, the Kα2/Kα1 ratio, PRCF's GP …
+```
+
+Pass no list and the read is silent and identical, which is what makes the
+channel opt-in rather than a behaviour change.
 
 ## The `.rex` project directory
 

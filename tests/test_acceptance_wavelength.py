@@ -128,7 +128,12 @@ def _xray_instrument() -> rx.Instrument:
     """11-BM, with the profile seeded from ``mg090.prm``'s own PRCF record.
 
     GSAS quotes GU/GV/GW in centidegrees² and LX in centidegrees, so the .prm's
-    1.163 / −0.126 / 0.063 / 0.173 arrive here divided by 10⁴ and 10³.
+    1.163 / −0.126 / 0.063 / 0.173 arrive here divided by 10⁴ and 10²
+    (a centidegree is 1e-2 degree, so LX/LY cross ÷1e2 and GU/GV/GW ÷1e4).
+    ``rx.read_gsas_prm`` reads the same record and ``test_gsas_prm.py``'s
+    ``test_the_unit_conversion_agrees_with_the_hand_transcription`` asserts the
+    two agree; the prose here said 10³ until that test was written, against
+    arithmetic that was right.
     """
     ins = rx.Instrument.debye_scherrer(wavelength=LAM_XRAY, polarization=0.990)
     ins.profile.u.value = 1.163e-4
