@@ -194,10 +194,12 @@ DATASETS: dict[str, Dataset] = {
         "Nd2Ru2O7 pyrochlore, one specimen, two histograms: APS 11-BM "
         "synchrotron X-ray (lambda 0.4132950 A, 49 493 points) and NCNR BT-1 "
         "neutron through a Cu(311) monochromator (lambda 1.54040 A, 3 296 "
-        "points).  The two histograms of a published combined refinement whose "
-        "stated method is to hold the X-ray wavelength and refine the neutron "
-        "one -- the only one-specimen two-wavelength pair in the suite, hence "
-        "the only dataset that can exercise a refinable wavelength at all",
+        "points).  The two histograms of the combined refinement in Gaultois "
+        "et al., J. Phys.: Condens. Matter 25 (2013) 186004 "
+        "(doi:10.1088/0953-8984/25/18/186004), whose stated method is to hold "
+        "the X-ray wavelength and refine the neutron one -- the only "
+        "one-specimen two-wavelength pair in the suite, hence the only "
+        "dataset that can exercise a refinable wavelength at all",
         "cross_code"),
     "bethanechol": Dataset(
         "bethanechol_indexing.json",

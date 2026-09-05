@@ -261,14 +261,18 @@ cell. They come from a published refinement whose stated method *is* the
 feature, so `tests/test_acceptance_wavelength.py` asks "does rietx reproduce a
 published refinement that required this", not "does the new parameter move".
 
-**Reference values, published.** Gaultois *et al.*, *J. Phys.: Condens. Matter*
-(2013), ms. CM/461205 — the combined refinement of these two histograms:
+**Reference values, published.** Gaultois *et al.*, "Structural disorder,
+magnetism, and electrical and thermoelectric properties of pyrochlore
+Nd₂Ru₂O₇", *J. Phys.: Condens. Matter* **25** (2013) 186004,
+[doi:10.1088/0953-8984/25/18/186004](https://doi.org/10.1088/0953-8984/25/18/186004)
+(preprint [arXiv:1301.6661](https://arxiv.org/abs/1301.6661)) — the combined
+refinement of these two histograms:
 
 | quantity | published |
 |---|---|
 | a (Å) | 10.342312(8) |
 | x(O 48f) | 0.33012(7) |
-| data points | 51 295 |
+| data points | 51 295, a subset of these files' 49 493 + 3 296 |
 | refined neutron λ (Å) | 1.5406704, from a declared 1.54040 (+176 ppm) |
 
 and the paper's own account of the protocol, which is what this feature
@@ -282,10 +286,36 @@ draws elsewhere. `nist_srm660c_100a.cif` and `qarr/corundum.prn` are absolute
 cell anchors because a certificate says what the answer is; here the reference is
 another refinement of the same data, so agreement bounds a modelling difference
 rather than an error. The single-phase fit in the acceptance suite lands
-a = 10.342904(60) Å, **+57 ppm** above the published value: the published
-refinement carries 0.5(1) mol % RuO₂ alongside and models the λ/2 second-order
-contribution, and rietx does neither. x(O 48f) 0.32994(51) is inside its own esd
-of the published 0.33012(7).
+a = 10.342904(60) Å, **+57 ppm** above the published value. Three modelling
+differences sit behind that: the published refinement carries 0.5(1) mol % RuO₂
+alongside, models the λ/2 second-order contribution, and frees **one A-site
+occupancy** — Ru substituting on the Nd site, converging at 7.0(3) mol % — where
+rietx's fit does none of the three. x(O 48f) 0.32994(51) is inside its own esd of
+the published 0.33012(7).
+
+**The occupancy is the one not to copy**, and the paper is the reason. It
+concludes that A-site disorder is *suggested*, not established, and says why in
+its own terms: allowing it improves the fit only marginally; the neutron
+histogram cannot see it at all, because Nd and Ru have nearly the same coherent
+scattering length — 7.69 fm against 7.03 fm, the values Sears (1992) tabulates
+and gemmi ships — so the Z contrast lives entirely in the synchrotron
+histogram; and an X-ray PDF of the same specimen would not
+settle it either — the substitution refined to unphysical occupancies there
+(correlated with the scale factor), and ideal ordering against 7.0 % Ru gave
+R = 10.05 % against 10.02 %, a difference the paper describes as smaller than
+the noise in the fit. There is **no occupancy constraint** in the published
+work, and none in this repository: `test_acceptance_wavelength.py::_structure`
+builds four atoms at full default occupancy, which is a deliberate agreement
+with the paper's own conclusion rather than a simplification of it.
+
+Worth quoting for the reason it is a caveat and not a footnote, since this
+package keeps meeting the same problem: on the Hamilton test that made the
+improvement formally significant, the paper notes that *"with only one
+additional parameter between the two models, the large number of independent
+measurements makes virtually any improvement in Rwp statistically
+significant"*. A significance test against 51 295 points is not a model
+comparison, which is the argument for judging a marginal extra parameter on
+what it changes rather than on whether Rwp fell.
 
 **Kennedy & Vogt (1996)**, *J. Solid State Chem.* **126**, 261–270 (ICSD 82304)
 is the citable *structure* reference for Nd₂Ru₂O₇ — Fd-3m:2, a = 10.3442(1),
