@@ -80,10 +80,19 @@ def test_instrument_union_discriminates_on_kind():
         assert again.source.kind == inst.source.kind
 
 
-def test_profile_seed_helper_sets_both_width_terms():
+def test_profile_seed_sets_the_gaussian_constant_term_only():
+    """Renamed from ``..._sets_both_width_terms``, which pinned the defect.
+
+    It asserted ``w = (fwhm/2)**2`` and ``x = fwhm`` — the seed issue #124 is
+    about — so it would have gone red on the fix and green on the bug. The
+    behaviour it should have pinned is the promise the argument makes, and
+    that is asserted as a *width* two tests below rather than as coefficients
+    here.
+    """
     inst = rx.Instrument.constant_wavelength_neutron(2.0780, fwhm_deg=0.4)
-    assert inst.profile.w.value == pytest.approx((0.4 / 2) ** 2)
-    assert inst.profile.x.value == pytest.approx(0.4)
+    default = rx.Instrument.constant_wavelength_neutron(2.0780)
+    assert inst.profile.w.value == pytest.approx(0.4 ** 2)
+    assert inst.profile.x.value == default.profile.x.value
 
 
 # ------------------------------------------------------------ the amplitude ---
@@ -227,11 +236,89 @@ def test_xray_only_diagnostic_stays_quiet_for_neutrons():
     assert "DISPERSION_NEGLECTED" in codes
 
 
+def _tchz_fwhm(profile, two_theta_deg: float) -> float:
+    """Total TCHZ FWHM in deg 2theta, from the stored coefficients.
+
+    Caglioti for the Gaussian half, Gamma_L = X/cos(theta) + Y*tan(theta) for
+    the Lorentzian, combined by Thompson-Cox-Hastings' fifth-order rule.
+    Computed here rather than read off the model so the assertion is about
+    the seeded *coefficients*, which is what issue #124 is about.
+    """
+    th = math.radians(two_theta_deg / 2.0)
+    g_g = math.sqrt(max(profile.u.value * math.tan(th) ** 2
+                        + profile.v.value * math.tan(th)
+                        + profile.w.value, 0.0))
+    g_l = profile.x.value / math.cos(th) + profile.y.value * math.tan(th)
+    return (g_g ** 5 + 2.69269 * g_g ** 4 * g_l + 2.42843 * g_g ** 3 * g_l ** 2
+            + 4.47163 * g_g ** 2 * g_l ** 3 + 0.07842 * g_g * g_l ** 4
+            + g_l ** 5) ** 0.2
+
+
+@pytest.mark.parametrize("fwhm_deg", [0.15, 0.30, 0.50])
+def test_the_seeded_width_is_the_width_you_asked_for_at_every_angle(fwhm_deg):
+    """Issue #124: the seed promised an observed peak width and delivered
+    3.93x it at 150 deg.
+
+    ``fwhm_deg`` used to seed ``w = (fwhm/2)**2`` *and* ``x = fwhm``. ``x`` is
+    the Lorentzian Scherrer term, Gamma_L = X/cos(theta), so the seed both
+    double-counted the width and climbed with angle -- worst over exactly the
+    high-angle peaks a CW neutron cell refinement leans on hardest, and the
+    frozen per-stage windows are sized from it.
+
+    Measured on the old seed at ``fwhm_deg=0.3``: 0.369 deg at 2theta 20
+    (1.23x), 0.405 at 60, 0.474 at 90, 0.637 at 120, **1.179 at 150 (3.93x)**.
+
+    The assertion is deliberately across 20-150 deg rather than at one angle,
+    because the defect was invisible at low angle: a test that checked only
+    2theta 20 would have passed at 1.23x.
+    """
+    inst = rx.Instrument.constant_wavelength_neutron(1.5406, fwhm_deg=fwhm_deg)
+    for two_theta in (20.0, 60.0, 90.0, 120.0, 150.0):
+        got = _tchz_fwhm(inst.profile, two_theta)
+        # 2 % covers the default Lorentzian X = 0.001 deg, which the seed
+        # deliberately leaves alone: it contributes at most 1.4 % here, at the
+        # narrowest seed and the highest angle. It is far tighter than the
+        # defect, which reached 1.23x even at 2theta 20 and 3.93x at 150.
+        assert got == pytest.approx(fwhm_deg, rel=0.02), (
+            f"seeded FWHM {got:.4f} deg at 2theta {two_theta} against the "
+            f"{fwhm_deg} deg asked for ({got / fwhm_deg:.2f}x)")
+
+
+def test_the_seed_leaves_the_lorentzian_terms_alone():
+    """The other half of #124, asserted on the coefficients rather than the
+    width, so it cannot be satisfied by two wrong terms cancelling.
+
+    ``x`` and ``y`` are sample-broadening terms -- Scherrer size and strain --
+    and an instrument constructor has no business claiming either. Seeding
+    ``w`` alone is also the right *shape*: a real CW resolution function is
+    narrowest near the focusing angle and widens either side (Caglioti,
+    Paoletti & Ricci 1958), so a flat seed is an honest zeroth order while a
+    monotonically climbing one is not a coarse version of that curve.
+    """
+    default = rx.Instrument.constant_wavelength_neutron(1.5406)
+    seeded = rx.Instrument.constant_wavelength_neutron(1.5406, fwhm_deg=0.30)
+
+    assert seeded.profile.w.value == pytest.approx(0.30 ** 2)
+    assert seeded.profile.x.value == default.profile.x.value
+    assert seeded.profile.y.value == default.profile.y.value
+    assert seeded.profile.u.value == default.profile.u.value
+    assert seeded.profile.v.value == default.profile.v.value
+
+    # …and the seed really moved w, so the four assertions above are not all
+    # passing because `fwhm_deg` was ignored altogether.
+    assert seeded.profile.w.value != default.profile.w.value
+
+
 def _seeded_width(inst: rx.Instrument, fwhm_deg: float) -> rx.Instrument:
-    """Same profile on both instruments, so only the amplitude differs."""
+    """Same profile on both instruments, so only the amplitude differs.
+
+    Mirrors ``constant_wavelength_neutron``'s own seed and must keep mirroring
+    it: the comparison below is only about scattering amplitude if the two
+    instruments carry an identical profile, so a divergence here would be
+    invisible and would quietly change what that test measures.
+    """
     profile = inst.profile.model_copy(update={
-        "w": inst.profile.w.model_copy(update={"value": (fwhm_deg / 2) ** 2}),
-        "x": inst.profile.x.model_copy(update={"value": fwhm_deg}),
+        "w": inst.profile.w.model_copy(update={"value": fwhm_deg ** 2}),
     })
     return inst.model_copy(update={"profile": profile})
 
