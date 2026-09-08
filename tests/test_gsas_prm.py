@@ -506,3 +506,104 @@ def test_the_unit_conversion_agrees_with_the_hand_transcription():
     assert read.geometry.axial_hl.value == pytest.approx(0.0011)
     assert hand.geometry.axial_sl.value == 0.0
     assert hand.geometry.axial_hl.value == 0.0
+
+
+def test_a_short_type_3_prcf_is_refused_by_name_not_by_its_unpack(tmp_path):
+    """Round three's item 1: the same defect as round one's item 3, one
+    function up from where that was fixed.
+
+    ``_read_prcf`` returns exactly ``ncoef`` coefficients and guarantees
+    nothing about how many that is, so a type-3 header declaring six passes
+    the type gate and reaches ``gu, gv, gw, gp, lx, ly, sl, hl, *rest =
+    coeffs``.  On the parent commit that escapes as ``ValueError: not enough
+    values to unpack (expected at least 8, got 6)`` — no file name, no
+    format, nothing a caller can act on, against ``io/CLAUDE.md``'s rule that
+    a reader raises naming the file and never its parser's exception.
+    Reported by @yue-here, who measured it on the merged tree.
+
+    ``_read_icons`` twelve lines down is the model answer: check the length
+    **before** the unpack and refuse naming the file and the layout.
+    """
+    short = tmp_path / "short.prm"
+    short.write_text(_prm(ncoef=6, coeffs=(1.0, -0.5, 0.2, 0.0, 0.15, 0.0)),
+                     encoding="utf-8")
+    with pytest.raises(ValueError) as excinfo:
+        read_gsas_prm(short)
+    message = str(excinfo.value)
+
+    assert "not enough values to unpack" not in message
+    assert "short.prm" in message
+    assert "6 coefficient(s)" in message
+    assert "GU GV GW GP LX LY S/L H/L" in message
+
+    # The positive arm: a header declaring exactly the eight the mapping
+    # needs is not caught by the guard, so this refuses a short *header*
+    # rather than refusing type 3.
+    eight = tmp_path / "eight.prm"
+    eight.write_text(_prm(ncoef=8, coeffs=(1.0, -0.5, 0.2, 0.0, 0.15, 0.0,
+                                           0.0011, 0.0022)), encoding="utf-8")
+    ins = read_gsas_prm(eight)
+    assert ins.geometry.axial_sl.value == pytest.approx(0.0011)
+
+    # …and the guard is above the short-*file* refusal it resembles, which is
+    # a different question: a header declaring 19 with only 6 present is
+    # still refused for the count it declared, not for the mapping.
+    truncated = tmp_path / "truncated.prm"
+    truncated.write_text(_prm(ncoef=19, coeffs=(1.0, -0.5, 0.2, 0.0, 0.15,
+                                                0.0)), encoding="utf-8")
+    with pytest.raises(ValueError, match="declares 19 coefficients but only"):
+        read_gsas_prm(truncated)
+
+
+def test_the_geometry_warning_says_to_carry_the_axial_terms_over():
+    """Round three's item 2.  Two of the eight coefficients land on the
+    object the reader admits it invented, and the diagnostic's own remedy
+    silently discarded them.
+
+    ``S/L``/``H/L`` (PRCF positions 7-8) are written to
+    ``geometry.axial_sl``/``axial_hl``, not to the profile.  So
+    ``GSAS_PRM_GEOMETRY_ASSUMED`` warns that the geometry was not read from
+    the file while that same geometry carries two values that were, and its
+    suggestion said "set the geometry yourself" — which costs a caller the
+    file's axial divergence, giving the instrument with **none at all** that
+    ``test_the_unit_conversion_agrees_with_the_hand_transcription`` ends by
+    asserting against.  Measured and reported by @yue-here.
+    """
+    diagnostics: list = []
+    ins = read_gsas_prm(DATA / "mg090.prm", diagnostics=diagnostics)
+    assumed = next(d for d in diagnostics
+                   if d.code == "GSAS_PRM_GEOMETRY_ASSUMED")
+
+    # what is actually at stake, from the file
+    assert ins.geometry.axial_sl.value == pytest.approx(0.0011)
+    assert ins.geometry.axial_hl.value == pytest.approx(0.0011)
+
+    # a fresh geometry of the kind the suggestion sends you to has neither
+    flat = rx.Instrument.bragg_brentano()
+    assert flat.geometry.axial_sl.value == 0.0
+    assert flat.geometry.axial_hl.value == 0.0
+
+    # …so the suggestion has to name them, and say they came from the file
+    assert "axial_sl" in assumed.suggestion
+    assert "axial_hl" in assumed.suggestion
+    assert "no axial divergence" in assumed.suggestion
+
+    # `where` still names only what was assumed.  The axial terms were read,
+    # not assumed, so listing them there would be the opposite error.
+    assert assumed.where == ["instrument.geometry.kind"]
+
+
+def test_the_prcf_drop_row_names_both_objects_the_eight_land_on():
+    """The docstring said "the eight coefficients this package's *profile*
+    has room for", and the emitted ``PRCF`` row said "this reader maps
+    positions 1-8 onto ProfileTCHZ".  Neither is true of positions 7-8, which
+    are the two that reach ``Geometry`` — and that was the only clue in the
+    tree about where they land, which is what made round three's item 2
+    invisible.  The agent skill's own row (``diagnostics-projects.md``) had it
+    right all along: "what ``ProfileTCHZ`` and ``Geometry`` have room for"."""
+    diagnostics: list = []
+    read_gsas_prm(DATA / "mg090.prm", diagnostics=diagnostics)
+    prcf = next(d for d in diagnostics
+                if d.code == "GSAS_PRM_FIELD_DROPPED" and d.where == ["PRCF"])
+    assert "onto ProfileTCHZ and 7-8 (S/L, H/L) onto Geometry" in prcf.message
+    assert "positions 1-8 onto ProfileTCHZ" not in prcf.message

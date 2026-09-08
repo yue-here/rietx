@@ -209,7 +209,12 @@ Two things this reader **chooses** rather than reads, both on the
 all, and `HTYPE PXCR` spans Bragg-Brentano and Debye-Scherrer, so the
 `Instrument` comes back `debye_scherrer` — the 11-BM capillary the corpus this
 reader was built against is — and a flat-plate calibration must have its
-geometry set by the caller. That matters beyond bookkeeping: `Geometry.kind`
+geometry set by the caller. Doing that takes one care, because the geometry is
+not only assumed: `S/L` and `H/L` (`PRCF` positions 7-8) *are* read from the
+file, and they land on `geometry.axial_sl`/`geometry.axial_hl` rather than on
+the profile. A replacement `Geometry` built from scratch starts at 0 for both,
+which is an instrument with no axial divergence at all, so copy those two
+across. That matters beyond bookkeeping: `Geometry.kind`
 selects the position correction and its suggested action, and the two
 geometries' absorption corrections have different *off* states. The file's
 fields that the `Instrument` cannot carry are dropped at their identity value

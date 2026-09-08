@@ -269,9 +269,12 @@ def read_gsas_prm(path: str | Path, *,
     looked up from ``IRAD``'s table, and an angular range belongs to the
     pattern, not the instrument.
 
-    Similarly for ``PRCF``: only the eight coefficients this package's
-    profile has room for (``GU GV GW`` → u/v/w, ``LX LY`` → x/y, ``S/L H/L``
-    → axial_sl/axial_hl) are read.  ``GP`` (position 4) and every coefficient
+    Similarly for ``PRCF``: only the eight coefficients this package has room
+    for are read, and they land on **two** objects — ``GU GV GW`` →
+    ``profile.u/v/w`` and ``LX LY`` → ``profile.x/y``, but ``S/L H/L`` →
+    ``geometry.axial_sl``/``geometry.axial_hl``.  That split is why
+    ``GSAS_PRM_GEOMETRY_ASSUMED`` says to carry those two over: replacing the
+    geometry wholesale discards two coefficients the file *did* state.  ``GP`` (position 4) and every coefficient
     past position 8 (``trns``, ``shft``, ``sfec`` and further reserved slots)
     are refused if non-zero and dropped only at their identity value (0) —
     every real file in the corpus is 0 there, so this is the same "refuse a
@@ -285,10 +288,13 @@ def read_gsas_prm(path: str | Path, *,
     list to collect them; the codes are
 
     * ``GSAS_PRM_FIELD_DROPPED`` — once per record that carried a field this
-      reader does not map: ``ICONS`` (a zero second wavelength or zero-point,
-      the unidentified field 5, and field 6's Kα2/Kα1 ratio, which is read and
-      **not applied**), ``PRCF`` (``GP`` and every coefficient past position 8,
-      all at 0), and ``IRAD``/``ITYP``, which are ignored by design.  Each
+      reader does not map: ``ICONS``, ``PRCF`` (``GP`` and every coefficient
+      past position 8, all at 0), and ``IRAD``/``ITYP``, which are ignored by
+      design.  The ``ICONS`` row names the unidentified field 5 and field 6's
+      Kα2/Kα1 ratio, which is read and **not applied**; a zero second
+      wavelength (field 2) and a zero zero-point (field 3) are dropped at
+      their identity without being named, because "ALAM2 = 0" *is* "no second
+      line" and naming it would add nothing.  Each
       row describes a record **this file carried**: the ``IRAD``/``ITYP`` row
       is absent for a file holding neither, and the "past position 8" clause
       is absent for a ``PRCF`` declaring exactly eight.
@@ -354,6 +360,17 @@ def read_gsas_prm(path: str | Path, *,
             f"carrying placeholder zero-broadening values.  Reading it by "
             f"position off type 3 would be a guess, not a parser")
 
+    if len(coeffs) < 8:
+        raise ValueError(
+            f"{p.name}: this bank's PRCF1 header declares a type-3 profile "
+            f"with {len(coeffs)} coefficient(s), but positions 1-8 "
+            f"(GU GV GW GP LX LY S/L H/L) are what this reader maps onto "
+            f"ProfileTCHZ and Geometry — a type-3 record shorter than that is "
+            f"refused rather than read as a subset, because nothing in the "
+            f"file says which of the eight is the missing one.  The count in "
+            f"the header is what this reader trusts (see _read_prcf), so this "
+            f"is a header declaring fewer than the mapping needs, not a "
+            f"truncated file")
     gu, gv, gw, gp, lx, ly, sl, hl, *rest = coeffs
     if gp != 0.0:
         raise ValueError(
@@ -368,7 +385,8 @@ def read_gsas_prm(path: str | Path, *,
                 f"{p.name}: PRCF coefficient {i} of {len(coeffs)} "
                 f"(GSAS 'trns'/'shft'/'sfec' or a further reserved slot) is "
                 f"{v!r}, not 0 — this reader maps only GU/GV/GW/GP/LX/LY/"
-                f"S/L/H/L (positions 1-8) onto ProfileTCHZ, and every real "
+                f"S/L/H/L (positions 1-8) onto ProfileTCHZ and Geometry, and "
+                f"every real "
                 f"file this reader was built against carries 0 past "
                 f"position 8, so a non-zero one here is unidentified rather "
                 f"than dropped")
@@ -393,7 +411,8 @@ def read_gsas_prm(path: str | Path, *,
                   if rest else "")
         dropped.append(
             ("PRCF", f"GP (position 4) = 0{past_8} — this reader maps "
-                     f"positions 1-8 onto ProfileTCHZ"))
+                     f"positions 1-3 and 5-6 onto ProfileTCHZ and 7-8 "
+                     f"(S/L, H/L) onto Geometry"))
         if _IRAD_ITYP_RE.search(text):
             dropped.append(
                 ("IRAD/ITYP", "ignored by design: the wavelength is read from "
@@ -422,7 +441,13 @@ def read_gsas_prm(path: str | Path, *,
                         "diffractometer, set the geometry yourself: "
                         "Geometry.kind selects the position correction and "
                         "the two geometries' absorption corrections have "
-                        "different off states (mu_r = 0 against mu_t = inf)")))
+                        "different off states (mu_r = 0 against mu_t = inf).  "
+                        "Carry geometry.axial_sl and geometry.axial_hl over "
+                        "to the replacement first: PRCF positions 7-8 "
+                        "(S/L, H/L) were read from THIS file and land on the "
+                        "geometry, so a fresh Geometry starts at 0 for both "
+                        "and models an instrument with no axial divergence "
+                        "at all")))
     prof = instrument.profile
     prof.u.value = gu / 1e4
     prof.v.value = gv / 1e4
