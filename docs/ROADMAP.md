@@ -98,7 +98,7 @@ PR #111; the exporter registry next. Two contributor PRs wait on review
 
 **Queued, unscheduled** ([§ Unscheduled](#unscheduled)): the 2026-09-01 issue
 triage's 1309–1322 plus 1323 and 1325; the magnetic scattering track
-(1326–1329); the older one, 1133. The **2026-09-03 triage** adds
+(1326–1329 and 1343); the older one, 1133. The **2026-09-03 triage** adds
 1332–1341 — three more on what fires and what stays silent, three costs a
 multi-hundred-pattern campaign paid that a single fit never sees, three views
 over what a fit already knows, and the skill's own gates — and folded three
@@ -581,15 +581,16 @@ that travels with it (1340); and the report a joint fit has never had (1341).
 
 #### The magnetic scattering track — out of the v2 fence 2026-09-02
 
-Four rungs in dependency order, opened 2026-09-02 from the assessment of PR
-#221 (an outside proposal for one magnetic WP; declined as a PR, its evidence
-kept). Three readers refuse a magnetic structure with one sentence, and the
+Five rungs; 1326–1329 opened 2026-09-02 from the assessment of PR #221 (an
+outside proposal for one magnetic WP; declined as a PR, its evidence kept).
+Three readers refuse a magnetic structure with one sentence, and the
 unexplained-intensity report names a magnetic contribution as a cause it
 cannot test; CW neutron shipped in 1134, so the fence's premise is gone. 1326
 needs no moment (a satellite is a position); 1327 takes the two decisions the
-proposal left open and holds an unsupported moment at zero (1301's rule); the
-datasets are GSAS-II tutorial pairs, the provenance the package already
-vendors from.
+proposal left open and holds an unsupported moment at zero (1301's rule), on
+GSAS-II tutorial data the package already vendors from. 1343 is 1327's price:
+no magnetic size term, so a broad magnetic peak is fitted by a low moment
+(#277).
 
 | WP | Title | Status | Depends on |
 |---|---|---|---|
@@ -597,6 +598,7 @@ vendors from.
 | [1327](wp/1327-magnetic-structure.md) | A magnetic structure: state it, refine it, report what the powder cannot see | ⬜ | 1326 |
 | [1328](wp/1328-magnetic-interchange.md) | Magnetic interchange: magCIF in and out, and the readers stop refusing | ⬜ | 1327 (1118 soft) |
 | [1329](wp/1329-moment-in-a-series.md) | The moment in a series: the onset, the hold, the trajectory | ⬜ | 1327 (1326 soft) |
+| [1343](wp/1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | ⬜ | 1327 (1326 soft) |
 
 ### v2+ — fenced
 
