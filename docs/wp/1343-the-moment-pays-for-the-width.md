@@ -128,7 +128,12 @@ task below, not an assumption.
   1327 leaves it. Bit-identity then holds because the code path is the same
   one, not because two floats happened to agree.
   `CompiledPhase.skip_extinction` is the precedent to copy, including its
-  `moving_paths` gate.
+  `moving_paths` gate — and including that gate's own limit:
+  `gate_off_states` is `moving_paths is not None`, so a caller that makes
+  no claim (public `compile_model`, plots, replay) builds the second family
+  anyway. On that path bit-identity is *only* two floats agreeing, which is
+  the weaker statement, so the bit-identity task has to assert both paths
+  and say which is which.
 - **The Jacobian.** Two new derivative paths. `_make_jacobian` dispatches on
   the free path's *name*, so they take the whole-model FD column until a
   branch claims them; when a branch lands it declares its `_column_extras`
@@ -147,9 +152,10 @@ task below, not an assumption.
 both defaulting to zero. Zero **is** the off state here — no extra magnetic
 broadening — and the forward model does not divide by either, so root
 CLAUDE.md's softplus rule says `min = 0.0` is safe and no floor like
-`MARCH_R_MIN` is wanted. The *conversion* to a coherence length does divide,
-and at zero it returns an infinite length, which is `lor_size`'s existing
-case in `model/microstructure.py` and not a new one.
+`MARCH_R_MIN` is wanted. The *conversion* to a coherence length does divide, and
+`model/microstructure.py` already answers a zero coefficient by returning
+no value at all — `_reading`'s first branch, `unavailable="at_zero"` — not
+an infinite length. That is `lor_size`'s existing case and not a new one.
 
 *Rejected: the Gaussian partners as well.* The issue offers
 `magnetic_gauss_size`/`_strain` "if the existing pattern is kept". A field
@@ -328,13 +334,18 @@ the cheaper of the two at the time; the skill row is required either way.
 4. **A k ≠ 0 CW dataset**, which is the case the term is for. Ba₂FeSbSe₅ at
    1.5 K on G4.1 is the candidate the issue names: the strongest magnetic
    peak's height ratio and the fitted moment against the paper's
-   4.13(4) μ_B, before and after. **Ask for the data and check its licence
+   4.13(4) μ_B, before and after — a number quoted here **through the
+   issue**, so check it against the paper itself when the paper arrives,
+   before it is used as a target. **Ask for the data and check its licence
    before vendoring** (memory: the maintainer supplies literature and data
    on request; `tests/data/README.md`'s per-file fence applies). If it
    cannot be obtained, a synthetic k ≠ 0 supercell built from a published
    structure stands in and the acceptance says which was used.
-5. **Staging.** A plan that frees the widths beside the moment from a cold
-   start is reported by name before it runs.
+5. **Staging.** Whichever of the task's two routes was taken is what this
+   asserts: with the `STAGE_FREES_*` check, a plan that frees the widths
+   beside the moment from a cold start is reported by name before it runs;
+   with the skill row, `tests/test_skill.py` sees the ordering row and the
+   preset's three-step order is asserted directly.
 6. **Cross-backend.** The new derivative paths appear as rows in
    `test_cross_backend.py`, agreeing per column.
 
@@ -366,17 +377,50 @@ the cheaper of the two at the time; the skill row is required either way.
 
 ## Handover log
 
-- **2026-09-08** — created, from the assessment of issue #277. The proposal
-  is accepted in shape and its evidence is not: the measured table it leads
-  with cannot have come from rietx (no moment on main, and POWGEN is TOF,
-  still fenced), and its own follow-up comment attributes most of that
-  signature to a phase coexistence rietx can already model. What carries the
-  WP instead is an argument from our own design — 1327 rejected the separate
-  magnetic phase, and this term is what that phase was buying. Four things
-  changed from the issue's proposal: the Gaussian partners are dropped
-  (WP-1076's absent-writer trap), the acceptance is CW-only, the FWHM-ratio
-  diagnostic becomes a differential residual-shape test that needs no peak
-  fitting, and the identifiability question the issue does not raise (k = 0
-  makes the term nearly flat) is answered with the package's existing
-  unmeasured-row rule. No code touched. First task is the schema, and it
-  cannot start before 1327.
+- **2026-09-08** — created, from the assessment of issue #277. The package
+  now has a written answer to a gap that WP-1327 opens and does not close:
+  a magnetic peak broader than the nuclear profile is fitted by shrinking
+  the moment, and there is no term to stop it because the separate magnetic
+  phase that carried one was rejected. Anyone reading this WP also knows not
+  to trust the issue's numbers — no rietx that exists could have produced
+  them — and knows which of its four design choices were changed and why. No
+  code touched, and nothing here can start before 1327 lands.
+
+  *Done*: the WP file, the ROADMAP row and its section paragraph (rewritten
+  from nine lines to ten while carrying the new fact), the size cap
+  645 → 648 with its dated diary line, and the one forward reference this WP
+  needs — 1327's `### Inherited` now carries the ask to let the magnetic
+  |F_⊥|² arrive as its own array beside `f2` and stay separable through to
+  the per-line `base`. That ask is free for 1327 and it is the difference
+  between 1343 being an extension of its structure-factor path and a rewrite
+  of it.
+
+  *Measured*: nothing about the physics — this session ran no fit and could
+  not, since there is no moment to refine. What it did check is the tree, and
+  the checks are the reason the issue's evidence is refused: `MomentEvidence`,
+  `T-3c` and `model/forward_tof.py`, all cited in the issue as existing,
+  appear nowhere in the repository; `Atom.moment` and `Phase.magnetic_symmetry`
+  are 1327's unstarted tasks; POWGEN is TOF and neutron TOF is still fenced;
+  and no `STAGE_FREES_*` check exists to extend for the staging rule. Test
+  counts did not move — no test was added, and the only file touched under
+  `tests/` is the size-cap diary. `tests/test_docs_consistency.py`,
+  `test_skill.py`, `test_no_stale_name.py` and `test_workflow_hooks.py`:
+  91 passed, on the pr-bench `[dev]` venv, macOS (darwin 25.5.0).
+
+  *Gotchas for the successor*: (1) the two width terms are only identifiable
+  where the magnetic/nuclear intensity ratio differs across reflections, so
+  1327's own k = 0 datasets are expected to return them **unmeasurable** —
+  that is the acceptance's answer, not its failure. (2) The diagnostic
+  deliberately does not measure an observed width; the machinery for that is
+  v1.4's `fit_peaks` (WP-1101) and waiting on it would put this WP behind a
+  milestone it has no other reason to wait for. (3) The Ba₂FeSbSe₅ data the
+  one k ≠ 0 acceptance row wants is not vendored and its licence is not
+  checked — ask for it early, because the fallback (a synthetic supercell)
+  changes what that row proves.
+
+  *Next*: 1327, which this WP cannot start before; 1326 is soft, and
+  without it the k ≠ 0 acceptance row has no satellites to read. When it does,
+  the first task is the schema, and the first thing to re-check is whether
+  1327 honoured the `### Inherited` ask — if the magnetic term was folded
+  into `f2`, the forward-model task is a rewrite and should be re-estimated
+  before the schema is touched.

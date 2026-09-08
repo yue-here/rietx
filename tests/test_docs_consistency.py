@@ -140,8 +140,8 @@ _INHERITED_PRUNE_EPOCH = "2026-07-31"
 #   2026-09-03  docs/ROADMAP.md               621 -> 645  for the 2026-09-03 issue triage (1332-1341): ten rows
 #                                                          across three existing sections and one new one, landed 641
 #   2026-09-08  docs/ROADMAP.md               645 -> 648  for WP-1343 (issue #277, the magnetic
-#                                                          scattering track's fifth rung): one row, its
-#                                                          section's paragraph rewritten to the same length
+#                                                          scattering track's fifth rung): one row, and its
+#                                                          section's paragraph one line longer; landed 647
 SIZE_CAPS: dict[str, int | None] = {
     "CLAUDE.md": 739,
     "docs/ROADMAP.md": 648,
