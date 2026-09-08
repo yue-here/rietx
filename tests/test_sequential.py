@@ -1118,6 +1118,72 @@ def test_path_dependence_judges_the_overlap_of_unequal_chains():
     assert "at p4:" in fired[0].message
 
 
+def test_the_abstention_row_recipe_counts_the_patterns_actually_judged():
+    """The skill row's own remedy, run on the two shapes it exists to catch.
+
+    ``abstention.md``'s ``SEQUENTIAL_PATH_DEPENDENT`` row told an agent to
+    compare ``len(series.trajectory(path))`` against the backward chain's
+    before reading silence as clearance.  @yue-here measured both states in
+    which that returns "fine": two chains whose held stretches sit at opposite
+    ends have equal lengths and no shared pattern at all, and two chains with
+    identical labels can still have no pattern measured by both.  The quantity
+    is neither length — it is the number of patterns where the labels
+    intersect **and** both esds are finite — so the row now carries that
+    computation, and this test is the computation.
+    """
+    path = "phases.1.cell.a"
+    ramp = [4.1500 + 1e-3 * k for k in range(8)]
+    esd = 1e-5
+
+    def patterns_judged(series: SeriesResult, path: str) -> int:
+        """``abstention.md``'s recipe, as an agent would run it."""
+        f = series.trajectory(path)
+        b = series.backward.trajectory(path)
+        _, _, sf = f.arrays()
+        _, _, sb = b.arrays()
+        sb_by = dict(zip(b.labels, sb, strict=True))
+        return sum(1 for lab, e in zip(f.labels, sf, strict=True)
+                   if np.isfinite(e) and np.isfinite(sb_by.get(lab, np.nan)))
+
+    def both(fwd: SeriesResult, bwd: SeriesResult) -> SeriesResult:
+        fwd.direction, fwd.backward = "both", bwd
+        return fwd
+
+    # A — the label half.  The two chains held opposite ends of the series, so
+    # nothing is ever compared and the lengths match anyway.
+    a = both(_series_missing(path, ramp, [esd] * 8, absent={4, 5, 6, 7}),
+             _series_missing(path, ramp, [esd] * 8, absent={0, 1, 2, 3}))
+    fa, ba = a.trajectory(path), a.backward.trajectory(path)
+    assert len(fa) == len(ba) == 4          # the old check: EQUAL -> clearance
+    assert set(fa.labels) & set(ba.labels) == set()
+    assert _path_dependence_diagnostics(a, a.backward) == []
+    assert patterns_judged(a, path) == 0
+
+    # B — the esd half.  Identical labels, identical lengths, and the
+    # both-measured mask rules out every pattern, so nothing is judged.
+    b = both(_series_missing(path, ramp, [None] * 8, absent=set()),
+             _series_missing(path, ramp, [esd] * 8, absent=set()))
+    fb, bb = b.trajectory(path), b.backward.trajectory(path)
+    assert len(fb) == len(bb) == 8          # the old check: EQUAL -> clearance
+    assert fb.labels == bb.labels
+    assert _path_dependence_diagnostics(b, b.backward) == []
+    assert patterns_judged(b, path) == 0
+
+    # The positive arm, because a count that only ever answers 0 is not
+    # separable from a broken one: a series both chains measured throughout is
+    # judged on every pattern, and a partial overlap is reported as the
+    # overlap rather than as either length.
+    whole = both(_series_missing(path, ramp, [esd] * 8, absent=set()),
+                 _series_missing(path, ramp, [esd] * 8, absent=set()))
+    assert patterns_judged(whole, path) == 8
+
+    partial = both(_series_missing(path, ramp, [esd] * 8, absent={0, 1}),
+                   _series_missing(path, ramp, [esd] * 8, absent={7}))
+    assert len(partial.trajectory(path)) == 6
+    assert len(partial.backward.trajectory(path)) == 7
+    assert patterns_judged(partial, path) == 5      # p2..p6, neither length
+
+
 def test_a_uniform_ramp_is_not_a_discontinuity(thermal_series):
     """A steady trend has every step at the median step, so the robust test
     passes it — which is the point of measuring against the series' own scatter
