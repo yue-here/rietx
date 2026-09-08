@@ -161,6 +161,20 @@ rule above applies to the form factors.
   looks for them. The same holds for 1326, 1328 and 1329, which share the
   file rather than opening one each.
 
+- **2026-09-08, from [1343](1343-the-moment-pays-for-the-width.md): keep the
+  magnetic contribution separable inside `phase_peaks`.** 1343 draws the
+  magnetic component with its *own* profile width — a phase whose magnetic
+  order is coherent over a shorter length than its crystallites has broader
+  magnetic peaks, and with one profile the fit reduces the residual under
+  them by shrinking the moment instead (issue #277). That WP is an extension
+  of this one if the magnetic |F_⊥|² arrives as its own array beside `f2`
+  and stays separable through to the per-line `base`, and a rewrite of this
+  WP's structure-factor path if it is folded into `f2` irreversibly. Every
+  factor after that point — March-Dollase, extinction, Lp, specimen
+  absorption, roughness — multiplies both contributions alike, so nothing
+  else in the chain has to know. No field, no schema bump and no cost here:
+  the ask is only that the sum happens as late as it can.
+
 ## Non-goals
 
 - Determining a magnetic structure: representation analysis, k-SUBGROUPSMAG,
