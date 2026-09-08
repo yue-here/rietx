@@ -383,9 +383,9 @@ def test_the_correlation_diagnostic_separates_the_two(shared, degenerate):
     ``biso`` at 0.44 under (0, 25) goes from a step scale of 1 to one of 0.44
     where the gradient pushes it down and 24.56 where it pushes it up, the
     trust region is shaped differently in those directions, and the walk stops
-    elsewhere in the same valley — with nothing at a bound at any point.  Not an algorithm switch either: ``u`` and ``v``
-    carry finite declared bounds already, so this fit was in ``trf_bounds``
-    both before and after.
+    elsewhere in the same valley — with nothing at a bound at any point.  Not
+    an algorithm switch either: ``u`` and ``v`` carry finite declared bounds
+    already, so this fit was in ``trf_bounds`` both before and after.
 
     Asserting on the phase terms keeps what this suite is *for* — the
     Lorentzian split of ``lor_size``/``lor_strain`` against instrument
