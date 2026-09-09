@@ -439,6 +439,25 @@ anode. On the round-robin corundum pattern at Cu Kα the same call returns three
 flags, two Kβ ghosts and one tungsten Lα.
 :::
 
+### The region below the first reflection
+
+`air_scatter_gain` above tests the envelope's *shape* over the whole fitted
+range, so a beam/air-scatter tail a few tens of channels wide out of several
+hundred barely moves it — measured on a real pattern, 0.019 against the 0.3
+trigger, because the tail carried 0.3 % of the whole-range residual the nested
+cubic-vs-cubic+1/x fit compares. A fitted result carries a second, narrower
+check for exactly that case: `LOW_ANGLE_UNMODELLED` reads the fit's own
+residual over `[two_theta_min, first_tick − 2·FWHM)` — every phase, every
+emission line, so a peak's own low-angle flank is never counted — and fires
+when that region's mean weighted-squared residual exceeds three times the
+whole-pattern reduced χ² (`Diagnostic.value`). Silent when the region holds
+fewer than ten channels: no reflections at all, or the first one sits at or
+near the low edge. The message reports the ratio and does not choose between
+its two remedies — raising the pattern's lower limit to where the residual
+falls under 2σ, or adding the background's air-scatter term — because only
+whoever is looking at the pattern can tell whether the region is genuinely
+outside the beam or the background model is locally wrong there.
+
 ### How many observations stand behind each channel
 
 `PatternDiagnostics.coverage_regions` is the one measurement here that reads the

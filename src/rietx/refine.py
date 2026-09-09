@@ -38,6 +38,8 @@ from .model.microstructure import microstructure_table
 from .model.profiles.caglioti import (
     SCHERRER_K,
     apparent_size_from_size_coefficient,
+    gaussian_fwhm,
+    lorentzian_fwhm,
 )
 from .model.restraints import summarise_restraints
 from .optimize.cancel import RefinementCancelled
@@ -3148,6 +3150,13 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     support = data_support(model, values, list(table.free_paths))
     diagnostics = diagnostics + _data_support_diagnostics(support, model)
 
+    # The region below the first reflection (Q3): read off the fit's own
+    # residual, never the background-envelope proxy above — same ``ticks``
+    # this function already built, so the two cannot disagree about where
+    # the first reflection sits.
+    diagnostics = diagnostics + _low_angle_diagnostics(
+        model, values, y_calc, stats, ticks)
+
     # Degeneracy evidence off the answer-producing stage's Jacobian, which is
     # not serialized and so cannot be recovered later (WP-1055/-1056).  The
     # same numbers the guards screened, carried whole rather than as the
@@ -3910,6 +3919,148 @@ def _data_support_diagnostics(support, model: CompiledModel) -> list[Diagnostic]
                         "intensities have to be quotable"),
         ))
     return out
+
+
+#: mean weighted-squared-residual ratio (the region below the first
+#: reflection, over the whole-pattern reduced χ², ``Statistics.chi2``) above
+#: which that region is unmodelled rather than merely quiet.  A Layer-0
+#: constant beside ``STEPS_PER_FWHM_MIN``/``OBS_PER_PARAMETER_MIN`` above —
+#: not part of ``report.schemas.THRESHOLDS_VERSION``, which is the FitReport
+#: Layer-2 gates/vocabulary contract and has never moved for a raw
+#: ``Diagnostic`` (``PATTERN_UNDERSAMPLED`` did not bump it either).
+#:
+#: Measured on Ba₂FeSbSe₅ 1.5 K (Maier, Gaultois et al. 2021, PRB 103,
+#: 054115; G4.1, λ = 2.426 Å, 0.1° steps): with the first reflection pinned
+#: at its cited position (9.4°, magnetic — this worktree has no magnetic
+#: phase, so the compiled model's own first tick is its first *nuclear* one
+#: and this constant is exercised through that path instead, see the WP), a
+#: 4° start's beam/air-scatter tail reads at ≈2.5-3× (χ²/pt ≈30 against a
+#: whole-pattern χ²_red ≈12, both cited); a 6° start, which excludes the
+#: tail, is silent.  3.0 sits just above the 4° reading with headroom below
+#: the 6° one.
+LOW_ANGLE_UNMODELLED_RATIO = 3.0
+
+#: fewest channels the region below the first reflection must hold before
+#: the ratio above is trusted.  Below it there is nothing to measure a level
+#: from — a handful of noisy points can cross any ratio by chance, and a
+#: pattern whose first reflection sits at or near the low edge should read
+#: as "no region" rather than as a level computed on three points.
+LOW_ANGLE_MIN_CHANNELS = 10
+
+
+def _first_reflection_fwhm(model: CompiledModel, values: dict[str, float],
+                           ticks: dict[str, list[float]]
+                           ) -> tuple[float, float] | None:
+    """``(2θ, FWHM)`` of the lowest-angle reflection over every phase and
+    emission line, or ``None`` when the model has no reflection at all
+    (an empty structure list).
+
+    The FWHM is the **instrumental** resolution function alone (Caglioti
+    U/V/W + the Lorentzian X/Y, no per-phase size/strain broadening): this
+    is a boundary heuristic for where the *background* stops being trusted,
+    not a per-reflection width report, and the two sample terms both vanish
+    or are smallest at the lowest angle in the pattern anyway (strain ∝ tanθ,
+    size ∝ 1/cosθ). ``ticks`` is the positions dict :func:`_build_result`
+    already built (zero-shift included), reused rather than re-derived so the
+    two cannot disagree about where the first reflection sits.
+    """
+    all_ticks = [t for row in ticks.values() for t in row]
+    if not all_ticks:
+        return None
+    first_tick = min(all_ticks)
+    theta = np.array([first_tick / 2.0])
+    gam_g = gaussian_fwhm(theta, values["instrument.profile.u"],
+                          values["instrument.profile.v"],
+                          values["instrument.profile.w"])
+    gam_l = lorentzian_fwhm(theta, values["instrument.profile.x"],
+                            values["instrument.profile.y"])
+    w1, w2 = model._peak_widths(gam_g, gam_l)
+    fwhm = float(np.asarray(model.peak_fwhm(w1, w2))[0])
+    return first_tick, fwhm
+
+
+def _low_angle_diagnostics(model: CompiledModel, values: dict[str, float],
+                           y_calc, stats, ticks: dict[str, list[float]]
+                           ) -> list[Diagnostic]:
+    """``LOW_ANGLE_UNMODELLED``: the channels below the first reflection carry
+    more residual than the fit's own whole-pattern χ²_red would predict.
+
+    Nothing else in the package tests this specifically. The nearest
+    relative, ``PatternDiagnostics.air_scatter_gain``
+    (``background/diagnostics.py``), is a nested cubic-vs-cubic+1/x test on
+    the background *envelope* over the **whole** fitted range — so a tail a
+    few tens of channels wide out of several hundred barely moves it (measured
+    on Ba₂FeSbSe₅ 1.5 K: 0.019, against the ``AIR_SCATTER_TRIGGER`` of 0.3;
+    19 tail channels out of 779 carry 0.3 % of the whole-range RSS the nested
+    fit compares). This diagnostic instead reads the fit's own residual, and
+    only over the region no reflection — of any phase, any emission line —
+    can reach: ``[two_theta_min, first_tick − 2·FWHM)``, so a peak's own
+    low-angle flank is never counted as unmodelled.
+
+    Silent (``[]``) rather than firing, under either of two conditions:
+
+    * fewer than :data:`LOW_ANGLE_MIN_CHANNELS` channels in the region — no
+      reflections in the model at all, or the first one sits at or near the
+      low edge, so there is nothing to measure a level from;
+    * the region's mean weighted-squared residual is not more than
+      :data:`LOW_ANGLE_UNMODELLED_RATIO` times the whole-pattern reduced χ².
+
+    The message reports the ratio and **does not choose** between its two
+    remedies — raising the pattern's lower limit, or adding the background's
+    air-scatter term — because they answer different causes (the region is
+    genuinely outside the beam, versus the background model is locally
+    wrong) and only whoever is looking at the pattern can tell which.
+    """
+    first = _first_reflection_fwhm(model, values, ticks)
+    if first is None:
+        return []
+    first_tick, fwhm = first
+    boundary = first_tick - 2.0 * fwhm
+
+    mask = model.tt < boundary
+    n = int(mask.sum())
+    if n < LOW_ANGLE_MIN_CHANNELS:
+        return []
+
+    diff = model.y_obs[mask] - np.asarray(y_calc)[mask]
+    sigma = model.sigma[mask]
+    weighted = diff / sigma
+    local_stat = float(np.mean(weighted ** 2))
+    chi2_red = stats.chi2
+    if not chi2_red > 0.0:
+        return []
+    ratio = local_stat / chi2_red
+    if ratio <= LOW_ANGLE_UNMODELLED_RATIO:
+        return []
+
+    # Where raising the lower limit would stop: the channel just past the
+    # highest-angle point still ≥ 2σ, scanning from the low edge up — the
+    # region above it is the part already reading as agreement.  If no
+    # channel reaches 2σ (the mean is high without any single outlier), the
+    # boundary itself is reported, since no sharper angle is evidenced.
+    tt_region = model.tt[mask]
+    bad = np.flatnonzero(np.abs(weighted) >= 2.0)
+    if len(bad):
+        past = int(bad[-1]) + 1
+        suggested = float(tt_region[past]) if past < len(tt_region) else boundary
+    else:
+        suggested = boundary
+
+    return [Diagnostic(
+        level="warning", code="LOW_ANGLE_UNMODELLED",
+        message=(
+            f"{n} channels below the first reflection ({first_tick:.2f}° "
+            f"− 2×FWHM = {boundary:.2f}°) carry a mean "
+            f"weighted-squared residual {local_stat:.2f}, {ratio:.2f}× "
+            f"the whole-pattern reduced χ² ({chi2_red:.2f}) — "
+            "there are no reflections in this region to explain it"),
+        suggestion=(
+            f"either raise the pattern's lower limit to {suggested:.2f}° "
+            "(the channel where the residual falls under 2σ) or add "
+            "the background's air-scatter term; this diagnostic does not "
+            "choose between them"),
+        value=ratio,
+    )]
 
 
 def _qpa_unavailable_diagnostics(structure: Structure,
