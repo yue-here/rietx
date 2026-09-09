@@ -6,12 +6,13 @@ Three kinds of check, and they fail for different reasons:
   is built, closed, printed, re-parsed and identified.  Those are properties of
   the code, not of any structure, so they are asserted on all of them rather
   than on a sample.
-* **A positive arm on published structures.**  For each named structure the
+* **A positive arm on twenty published structures.**  For each, the
   *published* moment direction is asserted to lie in the **span** of the
   derived allowed subspace — never its dimension, which is right in every
   crystal system under the wrong symmetry action (root ``CLAUDE.md``, the Rᵀ
   trap; ``test_wyckoff.py`` and ``indexing.qspace`` carry the same warning one
-  tensor rank up and one subsystem over).
+  tensor rank up and one subsystem over).  Ten of the twenty are stated in a
+  setting the BNS standard reaches only through a transform.
 * **Negative controls that must fail.**  Each of the three ways to get the
   axial action wrong — transposing R, dropping det R, dropping the
   time-reversal sign — is built on purpose and asserted to *exclude* a moment
@@ -121,21 +122,98 @@ TYPED_OPERATORS = [
      "MAGNDATA #1.1"),
 ]
 
-#: Published structures whose operators are taken from the database by number.
-#: (label, spec, hall_number, site, moment, citation, record)
+#: The rest of the twenty published magnetic structures, their operators taken
+#: from the database by BNS number and carried into the setting each structure
+#: is stated in.  One row per structure:
+#: (label, BNS number, Hall number, transform_BNS_Pp_abc or None, MSG type,
+#: site, published moment in crystal-axis μ_B, derived span, citation, record).
+#:
+#: Every moment is transcribed as a number and cited to the **original paper**
+#: that measured it; the MAGNDATA entry is named only as the record the
+#: transcription was checked against.  No type II (grey) row exists and none
+#: can: a grey group forbids every ordered moment, so no *published magnetic
+#: structure* has one — that type is covered by :data:`GREY_GROUPS` instead.
 PUBLISHED_MOMENTS = [
-    ("LaMnO3", "62.448", 0, (0.0, 0.0, 0.0), (3.7, 0.0, 0.0),
+    ("LaMnO3", "62.448", 0, None, 3, (0.0, 0.0, 0.0), (3.7, 0.0, 0.0),
+     [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
      "Elemans, van Laar, van der Veen & Loopstra (1971), "
      "J. Solid State Chem. 3, 238-242", "MAGNDATA #0.642"),
-    ("GdB4", "127.395", 0, (0.31746, 0.81746, 0.0), (5.05, 5.05, 0.0),
+    ("GdB4", "127.395", 0, None, 3, (0.31746, 0.81746, 0.0), (5.05, 5.05, 0.0),
+     [[1, 1, 0]],
      "Blanco, Brown, Stunault, Katsumata, Iga & Michimura (2006), "
      "Phys. Rev. B 73, 212411", "MAGNDATA #0.9"),
     # origin choice 2: see test_setting_decides_whether_a_published_moment_fits
-    ("Cd2Os2O7", "227.131", 526, (0.0, 0.0, 0.0), (0.6, 0.6, 0.6),
+    ("Cd2Os2O7", "227.131", 526, None, 3, (0.0, 0.0, 0.0), (0.6, 0.6, 0.6),
+     [[1, 1, 1]],
      "Yamaura, Ohgushi, Ohsumi, Hasegawa, Yamauchi, Sugimoto, Takeshita, "
      "Tokuda, Takata, Udagawa, Takigawa, Harima, Arima & Hiroi (2012), "
      "Phys. Rev. Lett. 108, 247205", "MAGNDATA #0.2"),
+    # a hexagonal setting, an in-plane moment: one of the three published rows
+    # where the transposed action fails the span test
+    ("YMnO3", "185.197", 0, None, 1, (0.32080, 0.0, 0.0), (1.68, 3.36, 0.0),
+     [[1, 2, 0]],
+     "Munoz, Alonso, Martinez-Lope, Casais, Martinez & Fernandez-Diaz (2000), "
+     "Phys. Rev. B 62, 9498-9510", "MAGNDATA #0.6"),
+    ("ScMnO3-P63cm", "185.201", 0, None, 3, (0.33160, 0.0, 0.0),
+     (-3.03, 0.0, 0.0), [[1, 0, 0], [0, 0, 1]],
+     "Munoz, Alonso, Martinez-Lope, Casais, Martinez & Fernandez-Diaz (2000), "
+     "Phys. Rev. B 62, 9498-9510", "MAGNDATA #0.7"),
+    ("ScMnO3-P63", "173.129", 0, None, 1, (0.33160, 0.0, 0.0),
+     (3.74, 3.31, 0.0), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+     "Munoz, Alonso, Martinez-Lope, Casais, Martinez & Fernandez-Diaz (2000), "
+     "Phys. Rev. B 62, 9498-9510", "MAGNDATA #0.8"),
+    ("DyFeO3-Pnpapb21", "33.148", 0, "a,c,-b;0,0,0", 3, (0.0, 0.0, 0.5),
+     (1.0, 0.3, 0.0), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+     "Tokunaga, Iguchi, Arima & Tokura (2008), "
+     "Phys. Rev. Lett. 101, 097205", "MAGNDATA #0.11"),
+    ("DyFeO3-P212121", "19.25", 0, "a,b,c;0,0,1/4", 1, (0.0, 0.0, 0.5),
+     (1.0, 0.3, 0.0), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+     "Tokunaga, Iguchi, Arima & Tokura (2008), "
+     "Phys. Rev. Lett. 101, 097205", "MAGNDATA #0.10"),
+    ("U3Ru4Al12", "63.461", 0, "b,-2a-b,c;0,0,0", 3, (0.60980, 0.80490, 0.25),
+     (0.0, -2.5, 0.0), [[0, 1, 0]],
+     "Troc, Pasturel, Tougait, Sazonov, Gukasov, Sulkowski & Noel (2012), "
+     "Phys. Rev. B 85, 064412", "MAGNDATA #0.12"),
+    ("Ca3Co2-xMnxO6", "161.69", 0, None, 1, (0.0, 0.0, 0.0), (0.0, 0.0, 1.93),
+     [[0, 0, 1]],
+     "Choi, Yi, Lee, Huang, Kiryukhin & Cheong (2008), "
+     "Phys. Rev. Lett. 100, 047601", "MAGNDATA #0.13"),
+    ("YBa2Cu3O6+a", "69.526", 0, "a,b,c;0,3/4,3/4", 4, (0.0, 0.0, 0.180515),
+     (0.47, 0.0, 0.0), [[1, 0, 0]],
+     "Shamoto, Sato, Tranquada, Sternlieb & Shirane (1993), "
+     "Phys. Rev. B 48, 13817-13825", "MAGNDATA #1.5"),
+    ("Gd5Ge4", "62.444", 0, None, 3, (0.2927, 0.25, 0.0022), (0.0, 0.0, 1.0),
+     [[1, 0, 0], [0, 0, 1]],
+     "Tan, Kreyssig, Kim, Goldman, McQueeney, Wermeille, Sieve, Lograsso, "
+     "Schlagel, Budko, Pecharsky & Gschneidner (2005), "
+     "Phys. Rev. B 71, 214408", "MAGNDATA #0.14"),
+    ("FePO4", "19.25", 0, "a,b,c;0,1/2,3/4", 1, (0.27550, 0.25, 0.94820),
+     (4.06, 0.9, 0.0), [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+     "Rousse, Rodriguez-Carvajal, Patoux & Masquelier (2003), "
+     "Chem. Mater. 15, 4082-4090", "MAGNDATA #0.17"),
+    ("Sr2IrO4", "54.352", 0, "c,b,-a;0,0,0", 4, (0.0, 0.25, 0.375),
+     (-0.24, 0.0, 0.0), [[1, 0, 0], [0, 1, 0]],
+     "Lovesey, Khalyavin, Manuel, Chapon, Cao & Qi (2012), "
+     "J. Phys.: Condens. Matter 24, 496003", "MAGNDATA #1.3"),
+    # |det P| = 1/8: the magnetic C-cell in the cubic parent's F-cell, so the
+    # lattice completion adds 7 centrings and the order goes 16 -> 128
+    ("NiO", "15.90", 0, "a/4+b/4-c/2,a/4-b/4,-a/2-b/2;0,0,0", 4, (0.0, 0.0, 0.0),
+     (1.0, 1.0, -2.0), [[1, 1, 0], [0, 0, 1]],
+     "Ressouche, Kernavanois, Regnault & Henry (2006), "
+     "Physica B 385-386, 394-397", "MAGNDATA #1.6"),
+    ("EuTiO3", "69.523", 0, "a-b,a+b,c;0,1/2,1/2", 3, (0.5, 0.0, 0.25),
+     (-4.9, -4.9, 0.0), [[1, 1, 0]],
+     "Scagnoli, Allieta, Walker, Scavini, Katsufuji, Sagarna, Zaharko & "
+     "Mazzoli (2012), Phys. Rev. B 86, 094432", "MAGNDATA #0.16"),
 ]
+
+
+def published_group(row) -> MagneticGroup:
+    """The group of one :data:`PUBLISHED_MOMENTS` row, in its own setting."""
+    _, bns, hall, transform, *_ = row
+    group = magnetic_group(bns, hall_number=hall)
+    return group if transform is None else group.transformed(transform)
+
 
 #: Coverage of the four magnetic space-group types across every crystal system
 #: that constrains a moment at all: (UNI, BNS, type, site, expected span).
@@ -190,10 +268,16 @@ TRANSPOSE_TRAP = [
     (1258, "150.28", (Fraction(1, 2), 0, 0), [[1, 0, 0]], [[2, -1, 0]]),
 ]
 
-#: Which of the three wrong actions each published fixture's site can catch,
-#: **measured**.  A control that cannot fail is worth nothing, so this says per
-#: fixture what it is evidence for; see
+#: Which of the three wrong actions each of the twenty published fixtures can
+#: catch, **measured**.  A control that cannot fail confirms whatever you
+#: hoped, so this says per fixture what it is evidence for rather than leaving
+#: the reader to assume every fixture is a control; see
 #: ``test_each_fixture_declares_which_wrong_actions_it_can_catch``.
+#:
+#: Three rows catch the transposed rotation and all three are in a hexagonal
+#: setting with an in-plane moment (YMnO3, ScMnO3-P63cm, U3Ru4Al12); five
+#: catch nothing at all, which is worth knowing before any of them is quoted
+#: as evidence about the symmetry action.
 WRONG_ACTION_BITES = {
     "MnF2": {"transpose": False, "det": True, "epsilon": True},
     "Cr2O3": {"transpose": False, "det": False, "epsilon": False},
@@ -202,6 +286,19 @@ WRONG_ACTION_BITES = {
     "LaMnO3": {"transpose": False, "det": True, "epsilon": False},
     "GdB4": {"transpose": False, "det": True, "epsilon": True},
     "Cd2Os2O7": {"transpose": False, "det": True, "epsilon": True},
+    "YMnO3": {"transpose": True, "det": True, "epsilon": False},
+    "ScMnO3-P63cm": {"transpose": True, "det": True, "epsilon": True},
+    "ScMnO3-P63": {"transpose": False, "det": False, "epsilon": False},
+    "DyFeO3-Pnpapb21": {"transpose": False, "det": False, "epsilon": False},
+    "DyFeO3-P212121": {"transpose": False, "det": False, "epsilon": False},
+    "U3Ru4Al12": {"transpose": True, "det": True, "epsilon": True},
+    "Ca3Co2-xMnxO6": {"transpose": False, "det": False, "epsilon": False},
+    "YBa2Cu3O6+a": {"transpose": False, "det": True, "epsilon": True},
+    "Gd5Ge4": {"transpose": False, "det": True, "epsilon": True},
+    "FePO4": {"transpose": False, "det": False, "epsilon": False},
+    "Sr2IrO4": {"transpose": False, "det": False, "epsilon": True},
+    "NiO": {"transpose": False, "det": True, "epsilon": True},
+    "EuTiO3": {"transpose": False, "det": True, "epsilon": True},
 }
 
 GENERIC_SITE = (0.1234, 0.5678, 0.9137)
@@ -555,16 +652,56 @@ def test_published_moment_lies_in_the_derived_span_typed(
         f"published operator list")
 
 
-@pytest.mark.parametrize("label, spec, hall, site, moment, citation, record",
-                         PUBLISHED_MOMENTS,
+@pytest.mark.parametrize("row", PUBLISHED_MOMENTS,
                          ids=[row[0] for row in PUBLISHED_MOMENTS])
-def test_published_moment_lies_in_the_derived_span_from_the_database(
-        label, spec, hall, site, moment, citation, record):
-    group = magnetic_group(spec, hall_number=hall)
+def test_published_moment_lies_in_the_derived_span_from_the_database(row):
+    """Sixteen more published structures, in the settings they are stated in.
+
+    Ten of the sixteen carry a non-identity ``transform_BNS_Pp_abc``, so the
+    span is derived in the *file's* setting and not in the database's — which
+    is the case a round trip against spglib alone cannot reach.
+    """
+    label, bns, hall, transform, msg_type, site, moment, span, citation, record \
+        = row
+    group = published_group(row)
+    assert group.identify().bns_number == bns
+    assert group.identify().msg_type == msg_type
     basis = group.allowed_moment_basis(site)
+    assert basis.tolist() == span
     assert in_span(basis, moment), (
         f"{label}: {citation} (record {record}) puts the moment at {moment} "
         f"μ_B, outside the derived span {basis.tolist()}")
+
+
+PUBLISHED_TRANSPOSE_CONTROLS = [row for row in PUBLISHED_MOMENTS
+                                if WRONG_ACTION_BITES[row[0]]["transpose"]]
+
+
+@pytest.mark.parametrize("row", PUBLISHED_TRANSPOSE_CONTROLS,
+                         ids=[row[0] for row in PUBLISHED_TRANSPOSE_CONTROLS])
+def test_a_published_moment_is_excluded_by_the_transposed_action(row):
+    """The Rᵀ negative control on published structures, with the numbers.
+
+    All three are hexagonal with an in-plane moment, which is the only shape
+    where the trap is visible at all: YMnO₃'s Mn is allowed along [1 2 0] and
+    the transposed action offers [0 1 0] instead, so the measured
+    (1.68, 3.36, 0) μ_B is outside it.  Same for ScMnO₃ ([1 0 0] against
+    [2 -1 0]) and U₃Ru₄Al₁₂ ([0 1 0] against [1 -2 0]).
+
+    The dimension is identical in every case, so a degrees-of-freedom check
+    passes with the wrong action; only the span fails.
+    """
+    label, bns, hall, transform, msg_type, site, moment, span, citation, record \
+        = row
+    group = published_group(row)
+    stabilizer = group.site_stabilizer(site)
+    correct = allowed_moment_basis(stabilizer)
+    transposed = allowed_moment_basis(stabilizer, transpose=True)
+    assert len(correct) == len(transposed), "the trap keeps the dimension"
+    assert in_span(correct, moment)
+    assert not in_span(transposed, moment), (
+        f"{label}: the transposed action still admits the moment "
+        f"{moment} μ_B of {citation}, so this row is not a control")
 
 
 def test_a_published_moment_propagates_consistently_over_its_orbit():
@@ -637,10 +774,16 @@ def test_derived_span_reproduces_the_group(uni, bns, msg_type, site, span):
 
 
 def test_the_coverage_table_spans_the_four_msg_types():
-    types = {row[2] for row in COVERAGE} | {2}
-    assert types == {1, 2, 3, 4}
-    assert len(COVERAGE) + len(GREY_GROUPS) + len(TYPED_OPERATORS) \
-        + len(PUBLISHED_MOMENTS) >= 20
+    assert {row[2] for row in COVERAGE} | {2} == {1, 2, 3, 4}
+    # twenty published magnetic structures, each cited to its original paper
+    assert len(TYPED_OPERATORS) + len(PUBLISHED_MOMENTS) == 20
+    published_types = ({row[4] for row in TYPED_OPERATORS}
+                       | {row[4] for row in PUBLISHED_MOMENTS})
+    # no published row is type II and none can be: a grey group forbids every
+    # ordered moment, so GREY_GROUPS carries that type instead
+    assert published_types == {1, 3, 4}
+    assert {row[1] for row in GREY_GROUPS} and all(
+        magnetic_group(uni).is_grey for uni, _ in GREY_GROUPS)
 
 
 @pytest.mark.parametrize("uni, bns", GREY_GROUPS, ids=[r[1] for r in GREY_GROUPS])
@@ -675,7 +818,7 @@ def test_each_fixture_declares_which_wrong_actions_it_can_catch(label, bites):
     lookup = dict(
         [(row[0], (MagneticGroup.from_xyz(row[1], row[2]), row[5]))
          for row in TYPED_OPERATORS]
-        + [(row[0], (magnetic_group(row[1], hall_number=row[2]), row[3]))
+        + [(row[0], (published_group(row), row[5]))
            for row in PUBLISHED_MOMENTS])
     group, site = lookup[label]
     stabilizer = group.site_stabilizer(site)
@@ -740,14 +883,16 @@ def test_the_transposed_rotation_fails_the_span_test(uni, bns, site, right,
 
 
 def test_the_transpose_trap_is_invisible_outside_trigonal_and_hexagonal():
-    """Why the control above cannot be MnF₂ or any of the published fixtures.
+    """Why the control above has to be one of the three hexagonal rows.
 
-    Measured over spglib's database: R and Rᵀ give the same allowed subspace at
-    every site of every group outside the trigonal and hexagonal families.  So
-    a suite whose only magnetic fixtures were rutile-, perovskite- or
-    spinel-shaped would pass with the rotation transposed — which is exactly
+    Measured over all 1651 groups against a 14-site grid: R and Rᵀ give the
+    same allowed subspace everywhere outside the trigonal and hexagonal
+    families.  A suite whose magnetic fixtures were only rutile-, perovskite-
+    or spinel-shaped would pass with the rotation transposed — which is exactly
     how WP-1020 built the whole indexing metric subspace from Rᵀ and satisfied
-    its own criterion.
+    its own criterion.  Seventeen of the twenty published fixtures here are in
+    that blind region; this test pins two of them as blind, so a future fixture
+    set that quietly dropped the hexagonal rows would not look like a control.
     """
     for ops, centerings in [(MNF2_OPS, None), (MN3O4_OPS, None)]:
         group = MagneticGroup.from_xyz(ops, centerings)
