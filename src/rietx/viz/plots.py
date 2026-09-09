@@ -98,9 +98,9 @@ PALETTES = {
               "diff": "#737373", "zero": "#c9c9c9", "band": "#2a9d2a",
               "tick": "#1a1a1a",
               "phase": ["#1f77b4", "#d62728", "#2ca02c", "#9467bd"]},
-    "dark": {"obs": "#e8e8e8", "calc": "#ff9d4d", "bkg": "#c99a6a",
+    "dark": {"obs": "#f1ece5", "calc": "#ff9d4d", "bkg": "#c99a6a",
              "diff": "#8f8f8f", "zero": "#4a4a4a", "band": "#4fd44f",
-             "tick": "#e8e8e8", "fg": "#f1ece5",
+             "tick": "#f1ece5", "fg": "#f1ece5",
              "phase": ["#6fb1ff", "#ff7b7b", "#6ede8a", "#c9a6ff"]},
 }
 
