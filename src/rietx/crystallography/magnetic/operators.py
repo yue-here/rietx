@@ -757,24 +757,23 @@ def _resolve_uni(spec) -> int:
                 f"there are {N_MAGNETIC_SPACE_GROUPS} magnetic space groups")
         return uni
     text = str(spec).strip()
-    bns, og = _number_index()
-    dots = text.count(".")
-    if dots == 1 and text in bns:
-        return bns[text]
-    if dots == 2 and text in og:
-        return og[text]
-    if dots == 0 and text.isdigit():
-        return _resolve_uni(int(text))
-    kind = {0: "UNI", 1: "BNS", 2: "OG"}.get(dots)
-    if kind is None or (dots and not re.fullmatch(r"[\d.]+", text)):
+    if not re.fullmatch(r"\d+(\.\d+)*", text):
         raise ValueError(
             f"{text!r} is not a magnetic space-group number. This package takes "
             f"a UNI number (1-{N_MAGNETIC_SPACE_GROUPS}), a BNS number "
             f"('136.499') or an OG number ('136.7.1159'), never a Shubnikov "
             f"symbol: spglib publishes no symbol table, so a symbol cannot be "
             f"resolved here. Give the number, or give the operator list")
-    raise ValueError(f"{text!r} is not a {kind} magnetic space-group number "
-                     f"in spglib's table")
+    bns, og = _number_index()
+    dots = text.count(".")
+    if dots == 1 and text in bns:
+        return bns[text]
+    if dots == 2 and text in og:
+        return og[text]
+    if dots == 0:
+        return _resolve_uni(int(text))
+    kind = {1: "BNS", 2: "OG"}.get(dots, "magnetic space-group")
+    raise ValueError(f"{text!r} is not a {kind} number in spglib's table")
 
 
 def identify(group, lattice=None, *, symprec: float = 1e-5
