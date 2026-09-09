@@ -100,9 +100,23 @@ PALETTES = {
               "phase": ["#1f77b4", "#d62728", "#2ca02c", "#9467bd"]},
     "dark": {"obs": "#e8e8e8", "calc": "#ff9d4d", "bkg": "#c99a6a",
              "diff": "#8f8f8f", "zero": "#4a4a4a", "band": "#4fd44f",
-             "tick": "#e8e8e8",
+             "tick": "#e8e8e8", "fg": "#f1ece5",
              "phase": ["#6fb1ff", "#ff7b7b", "#6ede8a", "#c9a6ff"]},
 }
+
+
+def _fg_rc(hue: dict) -> dict:
+    """Type, spines and ticks on a dark ground.
+
+    ``dark_background`` leaves all three at pure white, brighter than the pages
+    these figures go onto: the landing page and the manual's dark theme set
+    their body text to a warm off-white, and the labels read as part of the
+    page at that colour rather than as a lighter layer on top of it.  Light
+    keeps matplotlib's own black — nothing about a white page needs correcting.
+    """
+    fg = hue["fg"]
+    return {"text.color": fg, "axes.labelcolor": fg, "axes.edgecolor": fg,
+            "xtick.color": fg, "ytick.color": fg}
 
 
 def _rc(font_size: float) -> dict:
@@ -367,7 +381,7 @@ def plot_result(result: RefinementResult, *, path: str | None = None,
     inline = not weighted and y_scale == "linear"
 
     with plt.style.context([_rc(font_size)] if style == "light"
-                           else ["dark_background", _rc(font_size)]):
+                           else ["dark_background", _rc(font_size), _fg_rc(hue)]):
         line_in = 1.35 * font_size / 72.0
         if figsize is None:
             figsize = (7.6, 4.4) if inline else (7.6, 5.6)
