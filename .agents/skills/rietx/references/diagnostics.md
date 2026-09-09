@@ -77,32 +77,14 @@ the question they answer comes before a fit exists: *is the model I just
 imported the model that file describes?* Load that one if a TOPAS `.inp` or a
 FullProf `.pcr` import handed you a diagnostic.
 
-The `RECIPE_*` family is the reader of the **PowderLine interchange format**
-(`read_recipe`, `Recipe.diagnostics`) rather than `result.diagnostics`, and it
-answers a question the others do not: *how does the fit I am about to run
-differ from the one the recipe describes?* A recipe is written for whichever
-engine gets it, so some of what it declares has no counterpart here, and every
-such difference is a row below rather than a silence. Anything the format
-states that this package cannot represent at all raises `RecipeError` naming
-the field — see the manual's recipe chapter for the list and the reason behind
-each.
-
-| Code | What it means you must not do |
-|---|---|
-| `RECIPE_FLAG_DROPPED` | (warning) Compare this fit's free-parameter count, esds or χ² against the reference engine's as if the two refined the same problem. A parameter the recipe flagged for refinement has **no counterpart here** and its flag was not honoured — GSAS-II's constant Lorentzian `Z`, a background peak's Lorentzian γ, or a size/strain half that `LG_eta` put at exactly its off state, where a softplus parameter's gradient *is* its value and nothing can move it. The starting model is unchanged (each of these is at its identity), so the answer is a fit to the same data with one fewer degree of freedom, not a fit to a different model. `where` names what carries the difference instead |
-| `RECIPE_FIELD_DROPPED` | (info) Assume every field of the recipe reached the model. A **fixed** value sitting at its identity was dropped rather than translated: `Z = 0` is no constant Lorentzian, a background peak's γ under one 2θ step is a width these data cannot hold, and `refinement_cycles` is GSAS-II's cycle count where the stopping rule here is the solver's ftol. Nothing about the model moved; the *record* of what the recipe said is now this diagnostic and not the model |
-| `RECIPE_FLAG_TRANSLATED` | (info) Look for a mixing parameter in the result. GSAS-II carries one magnitude per broadening effect plus a Lorentzian share `LG_eta`; this package carries a Lorentzian and a Gaussian coefficient and no share, so a freed `LG_eta` became two free coefficients. Same two degrees of freedom, different names — `where` gives them |
-| `RECIPE_ENGINE_DEFAULT_DECLINED` | (info) Read a difference from the reference engine's broadening as a disagreement about the data. The recipe left a size or strain magnitude **null**, which GSAS-II fills with its own project default (1 µm, 1000 × 10⁻⁶ Δd/d — measured off its committed output, not read from a manual) and this package reads as silence. On a synchrotron pattern the strain default alone is 0.057°·tanθ, a quarter of the peak width at the top of the range, so the instrument terms will differ by however much that was. Another engine's project default is not physics; if you want it, state it in the recipe |
-| `RECIPE_BACKGROUND_RESEEDED` / `RECIPE_SCALE_RESEEDED` | (info) Compare a background coefficient or a phase scale against the recipe's own number, or against another engine's. Neither is transferable: the two codes scale the Chebyshev domain differently, and a scale factor's normalisation is each code's own (on one committed specimen GSAS-II converges to 3.77e-2 and TOPAS to 2.61e-6). The term count and the refine flag are carried; the values are re-seeded, the scale by matching the summed calculated intensity to the data. **Phase scale *ratios* are comparable and the absolute values are not** — which is what a recipe quantifying phase fractions actually needs |
-| `RECIPE_BACKGROUND_PEAK_DEGENERATE` | (warning) Quote the background-peak parameters, or expect the fit to converge. The recipe declares a peak whose FWHM reaches the fitted range, so it never falls to half height inside the window and carries no curvature the Chebyshev terms have not got — it will correlate with the low-order background at \|ρ\| = 1 and the stage will spend its budget walking that valley. Both reference engines confirm it from opposite ends on the one committed instance: one let the peak run to 8.77e10 °2θ at esd 0, the other kept it at 1.63° with an esd 188× its own value. A background peak substitutes for polynomial terms; it never adds to them (§`BACKGROUND_PEAK_TOO_NARROW` is the same lesson from the narrow end) |
-| `RECIPE_CONVENTION_ASSUMED` | (info) Treat the split as measured. GSAS-II's `SH/L` is a **combined** (S+H)/L and this package's axial divergence is two parameters, so it was halved evenly — the symmetric Finger-Cox-Jephcoat reading, and the only one a single number admits. No committed recipe can distinguish it from an uneven split; if your specimen's slit and detector heights differ, set `axial_sl` and `axial_hl` yourself |
-| `RECIPE_PLAN_STAGED` | (info) Read the stage list as a change to what the recipe asked to refine. PowderLine runs one pass over everything flagged; `Recipe.plan` frees the same set over several stages in McCusker order, because a single cold step walked a monoclinic cell to a = 4231 Å on a real fixture. Staging here is **cumulative**, so the last stage *is* the recipe's single pass — the free set at the end is the recipe's and only the route differs |
-| `RECIPE_DISPERSION_DECLINED` | (info) Read it as an approximation you are choosing. The recipe's wavelength is outside the bundled Cromer-Liberman table's 3-70 keV band — a PDF-beamline λ = 0.1665 Å is 74.5 keV — so f = f₀ is used. Every edge of every element in such a recipe is more than an order of magnitude below that energy, so it is the correct limit rather than a concession; what would be wrong is extrapolating the table. The result still carries `DISPERSION_NEGLECTED`, as any `dispersion=None` fit does |
-| `RECIPE_FIT_RANGE_CHANNELS` | (info) Compare an Rwp against another engine's before checking this count against theirs. A recipe states a `fit_range` in **angles** and an engine fits **channels**, and the two need not agree to the channel: on the committed fixtures this package's inclusive mask selects 3767 where GSAS-II's own `fit_profile.txt` shows it fitted 3768, keeping the first channel past the stated upper limit. `value` is the count and the message gives the first and last 2θ |
-| `RECIPE_ZERO_WEIGHT_EXCLUDED` | (info) Assume the pattern's channel count is the fitted count. A recipe excludes a point by giving it weight 0, which has no finite σ, so those channels became `excluded_regions` instead. Same points excluded, different mechanism |
-| `RECIPE_BOUND_HONOURED` | (info) Read a `BOUND_HIT` on this path as a bug. The recipe's 4-tuple carried a `min`/`max`, which PowderLine documents as *not implemented in GSAS-II* — honouring it is the conservative reading and a **recorded difference** from the reference engine, not an accident |
-| `RECIPE_SCHEMA_UNTESTED` | (warning) Trust a field whose meaning may have moved. The recipe declares a `schema_version` this reader has not been checked against; it is read anyway, because PowderLine's models allow extra fields on purpose, but a field that changed meaning is being read with its old one |
-| `RECIPE_NOTHING_REFINED` | (warning) Read the answer as a refinement. No parameter in the recipe is flagged, so the plan has one stage that frees nothing — the model evaluated at its declared values, which is a simulation |
+The `RECIPE_*` family is **not here** either: it belongs to the PowderLine
+recipe reader (`read_recipe`, `Recipe.diagnostics`) rather than
+`result.diagnostics`, and it answers a question the others do not: *how does
+the fit I am about to run differ from the one the recipe describes?* It has
+its own file too — §7g, [`references/diagnostics-projects.md`](diagnostics-projects.md)
+— since a PowderLine recipe is another program's file just as a TOPAS `.inp`
+or a FullProf `.pcr` is. Load that one if a PowderLine recipe handed you a
+diagnostic.
 
 ```python
 codes = {d.code for d in result.diagnostics}
