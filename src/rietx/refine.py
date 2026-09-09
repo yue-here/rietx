@@ -1902,6 +1902,8 @@ class Refinement:
         if mode == "pawley":
             diagnostics.extend(_pawley_unresolved_diagnostics(model, self.structure))
         diagnostics.extend(_constraint_diagnostics(plan.stages[-1].name, outcome))
+        diagnostics.extend(_degenerate_cell_diagnostics(
+            [(sr.name, sr.n_degenerate_cell_probes) for sr in stage_results]))
 
         self.result_ = _build_result(
             model, table, outcome.theta, mode=mode, status=outcome.status,
@@ -1972,6 +1974,7 @@ class Refinement:
                 cost_initial=outcome.cost_initial, cost_final=outcome.cost_final,
                 freed=freed,
                 n_constraint_truncations=outcome.n_constraint_truncations,
+                n_degenerate_cell_probes=outcome.n_degenerate_cell_probes,
                 ftol=ftol, held=hold.held, released=hold.released,
             ))
             if stage_reports:
@@ -2081,6 +2084,8 @@ class Refinement:
         if mode == "pawley":
             diagnostics.extend(_pawley_unresolved_diagnostics(model, self.structure))
         diagnostics.extend(_constraint_diagnostics(stage.name, outcome))
+        diagnostics.extend(_degenerate_cell_diagnostics(
+            [(stage.name, outcome.n_degenerate_cell_probes)]))
 
         self._model = model
         self._write_back(table)
@@ -2091,6 +2096,7 @@ class Refinement:
             cost_initial=outcome.cost_initial, cost_final=outcome.cost_final,
             freed=freed,
             n_constraint_truncations=outcome.n_constraint_truncations,
+            n_degenerate_cell_probes=outcome.n_degenerate_cell_probes,
             ftol=stage.ftol, held=hold.held, released=hold.released)
         if tree is not None:
             self._record(tree, NodeAction(
@@ -2653,6 +2659,37 @@ def _constraint_diagnostics(stage_name: str, outcome) -> list[Diagnostic]:
                    "vary the starting seed and quote them only if they survive "
                    "(the STEPHENS_STRAIN_NOT_POSITIVE protocol row applies even "
                    "though that guard is silent under solver='lm')",
+    )]
+
+
+def _degenerate_cell_diagnostics(rows: list[tuple[str, int]]) -> list[Diagnostic]:
+    """``CELL_DEGENERATE_PROBE`` when any stage's search reached a degenerate
+    cell (issue #283).
+
+    Unlike :func:`_constraint_diagnostics`, every completed stage is summed
+    here rather than only the answer-producing one: a degenerate probe is a
+    fact about the *search's* robustness (it was reached and pushed back out,
+    never a value that entered the reported parameters — see
+    ``_DegenerateCellGuard``), not about whether the final point is
+    admissible, so it is worth surfacing wherever it happened, including a
+    ``cell`` stage that ran and converged before a later stage produced the
+    answer.  ``info``, not ``warning``: ``Cell``'s own bounds mean this is
+    rare and the guard already contained it — nothing about the reported
+    values is in question.
+    """
+    hits = [(name, n) for name, n in rows if n]
+    if not hits:
+        return []
+    total = sum(n for _, n in hits)
+    where = [name for name, _ in hits]
+    return [Diagnostic(
+        level="info", code="CELL_DEGENERATE_PROBE",
+        message=(f"the search reached {total} degenerate cell trial(s) "
+                 f"(zero or negative volume) in stage(s) "
+                 f"{', '.join(repr(n) for n in where)} and was pushed back "
+                 "out rather than crashing (issue #283) — the reported "
+                 "values were never a degenerate point"),
+        where=where, value=float(total),
     )]
 
 

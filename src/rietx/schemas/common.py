@@ -128,6 +128,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 #: The field it reuses is ``Parameter`` itself rather than a new type, which is
 #: what makes a variable and the model parameter it replaces produce the
 #: identical table ``Entry``.
+#: pending renumbering (Q6a, issue #283): ``StageResult.n_degenerate_cell_probes``
+#: is a new additive field (defaulted 0), not yet folded into a bump — batched
+#: with the rest of this rung's small fixes rather than bumped on its own.
 SCHEMA_VERSION = "0.16"
 
 TransformKind = Literal["identity", "softplus", "exp", "logit"]

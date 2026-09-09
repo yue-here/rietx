@@ -35,6 +35,7 @@ from ..backend import get_backend
 from ..backend.api import TORCH_DEVICES
 from ..backend.linalg64 import get_precision_policy, require_fp64
 from ..crystallography.adp import U_NAMES
+from ..crystallography.lattice import DegenerateCellError
 from ..crystallography.stephens import S_NAMES
 from ..model import rows as row_layout
 from ..model.forward import PHASE_SUPPORT_SIGMA, CompiledModel, DerivativeBases
@@ -203,6 +204,19 @@ class LSQOutcome:
     #: LM: :attr:`~.lm.LMOutcome.termination`.  ``""`` only on the
     #: zero-parameter early return, where no criterion was ever consulted.
     termination: str = ""
+    #: trial cells the residual refused as degenerate (see
+    #: ``crystallography.lattice.DegenerateCellError``, issue #283) rather
+    #: than warning about and returning NaN.  ``Cell``'s own bounds keep an
+    #: ordinary bounded search almost entirely away from this, so 0 is the
+    #: common case; a nonzero count means the search still reached a
+    #: degenerate combination *within* those bounds (e.g. three angles all
+    #: past ~120 deg together, well inside the 170 deg per-angle ceiling)
+    #: and was pushed back out rather than crashing -- see
+    #: ``_DegenerateCellGuard`` below.  ``LSQOutcome`` itself
+    #: is an internal dataclass, never serialised; ``refine.py`` copies this
+    #: onto the (pydantic) ``StageResult.n_degenerate_cell_probes``, which is
+    #: the field pending ``SCHEMA_VERSION`` renumbering.
+    n_degenerate_cell_probes: int = 0
 
 
 def _lebail_snapshot(model: CompiledModel) -> list[np.ndarray] | None:
@@ -215,6 +229,45 @@ def _lebail_snapshot(model: CompiledModel) -> list[np.ndarray] | None:
     if model.mode != "lebail":
         return None
     return [np.asarray(cp.hkl_intensity, dtype=np.float64) for cp in model.phases]
+
+
+class _DegenerateCellGuard:
+    """Counts and neutralises :class:`DegenerateCellError` from a residual
+    closure (issue #283).
+
+    ``Cell``'s own bounds keep an ordinary bounded search almost entirely
+    away from a degenerate metric, but they do not forbid every combination
+    inside the box (for a=b=c, three equal angles all past ~120 deg together
+    is already degenerate, well inside the 170 deg per-angle ceiling), so the
+    residual can still raise.  scipy's ``trf`` and
+    the in-package ``lm`` driver both call the residual as an opaque
+    function and have no vocabulary for "this point is inadmissible, try a
+    smaller step" — raising through them would crash the whole stage over
+    one trial the search itself would have rejected on the next step anyway.
+    Returning ``10x`` the last accepted residual is always worse than any
+    point the driver has actually accepted, which is enough to push the
+    trust region back towards the interior without inventing a value that
+    could look like a fit.
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
+        self._last: np.ndarray | None = None
+        self.n_degenerate = 0
+
+    def __call__(self, theta: np.ndarray) -> np.ndarray:
+        try:
+            r = self._inner(theta)
+        except DegenerateCellError:
+            self.n_degenerate += 1
+            if self._last is None:
+                # No accepted point to penalise against yet (x0 itself was
+                # degenerate) -- nothing to fall back to, so this is a
+                # caller error, not a search artefact.
+                raise
+            return self._last * 10.0
+        self._last = r
+        return r
 
 
 def _make_residual(model: CompiledModel, table: ParameterTable):
@@ -1107,6 +1160,8 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     _freeze_strain_cap(model, table)
     _freeze_size_cap(model, table)
     residual = _make_residual(model, table)
+    cell_guard = _DegenerateCellGuard(residual)
+    residual = cell_guard
     jacobian = _jacobian_for(model, table, backend)
 
     if cancel is not None:
@@ -1175,7 +1230,8 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     tracker.accept(x0, cost0)  # the LM path's seed; a no-op after the TRF wrapper
     if len(x0) == 0:
         return LSQOutcome(x0, cost0, cost0, 0, "converged", None, None, None,
-                          solver=solver)
+                          solver=solver,
+                          n_degenerate_cell_probes=cell_guard.n_degenerate)
 
     n_truncated = 0
     if solver == "lm":
@@ -1214,7 +1270,8 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                       n_constraint_truncations=n_truncated,
                       max_shift_over_esd=_final_shift_over_esd(
                           table, tracker.step(), stderr_full, corr, n_table),
-                      termination=termination)
+                      termination=termination,
+                      n_degenerate_cell_probes=cell_guard.n_degenerate)
 
 
 def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",
