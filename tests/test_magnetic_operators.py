@@ -275,7 +275,7 @@ TRANSPOSE_TRAP = [
 #: ``test_each_fixture_declares_which_wrong_actions_it_can_catch``.
 #:
 #: Three rows catch the transposed rotation and all three are in a hexagonal
-#: setting with an in-plane moment (YMnO3, ScMnO3-P63cm, U3Ru4Al12); five
+#: setting with an in-plane moment (YMnO3, ScMnO3-P63cm, U3Ru4Al12); seven
 #: catch nothing at all, which is worth knowing before any of them is quoted
 #: as evidence about the symmetry action.
 WRONG_ACTION_BITES = {
