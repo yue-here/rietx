@@ -206,12 +206,12 @@ class LSQOutcome:
     termination: str = ""
     #: trial cells the residual refused as degenerate (see
     #: ``crystallography.lattice.DegenerateCellError``, issue #283) rather
-    #: than warning about and returning NaN.  ``Cell``'s own bounds keep an
-    #: ordinary bounded search almost entirely away from this, so 0 is the
-    #: common case; a nonzero count means the search still reached a
-    #: degenerate combination *within* those bounds (e.g. three angles all
-    #: past ~120 deg together, well inside the 170 deg per-angle ceiling)
-    #: and was pushed back out rather than crashing -- see
+    #: than warning about and returning NaN.  ``Cell``'s six parameters
+    #: declare no bounds of their own (deliberately -- a physical bound there
+    #: is a design decision for the cell-window machinery, not shipped by
+    #: this change), so an underdetermined cell stage can reach a degenerate
+    #: metric often, not rarely; a nonzero count is the ordinary outcome on
+    #: such data, pushed back out rather than crashing -- see
     #: ``_DegenerateCellGuard`` below.  ``LSQOutcome`` itself
     #: is an internal dataclass, never serialised; ``refine.py`` copies this
     #: onto the (pydantic) ``StageResult.n_degenerate_cell_probes``, which is
@@ -235,19 +235,20 @@ class _DegenerateCellGuard:
     """Counts and neutralises :class:`DegenerateCellError` from a residual
     closure (issue #283).
 
-    ``Cell``'s own bounds keep an ordinary bounded search almost entirely
-    away from a degenerate metric, but they do not forbid every combination
-    inside the box (for a=b=c, three equal angles all past ~120 deg together
-    is already degenerate, well inside the 170 deg per-angle ceiling), so the
-    residual can still raise.  scipy's ``trf`` and
-    the in-package ``lm`` driver both call the residual as an opaque
-    function and have no vocabulary for "this point is inadmissible, try a
-    smaller step" — raising through them would crash the whole stage over
-    one trial the search itself would have rejected on the next step anyway.
-    Returning ``10x`` the last accepted residual is always worse than any
-    point the driver has actually accepted, which is enough to push the
-    trust region back towards the interior without inventing a value that
-    could look like a fit.
+    ``Cell``'s six parameters declare no bounds of their own — that half of
+    #283's suggested fix is deliberately not shipped here, since the
+    cell-window / tie-window machinery in :mod:`rietx.params.vector` reads an
+    infinite stored bound as *no claim made* — so an underdetermined cell
+    stage is free to reach a degenerate metric directly, and often does, not
+    only through some narrow corner case.  scipy's ``trf`` and the
+    in-package ``lm`` driver both call the residual as an opaque function and
+    have no vocabulary for "this point is inadmissible, try a smaller step"
+    — raising through them would crash the whole stage over one trial the
+    search itself would have rejected on the next step anyway.  Returning
+    ``10x`` the last accepted residual is always worse than any point the
+    driver has actually accepted, which is enough to push the trust region
+    back towards the interior without inventing a value that could look like
+    a fit.
     """
 
     def __init__(self, inner):

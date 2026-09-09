@@ -49,43 +49,22 @@ MARCH_R_MAX = 6.0
 #: indexing (WP-1206).  That module re-exports the name.
 DUMMY_SPECIES = "C"
 
-#: Physical bounds backfilled onto a ``Cell``'s six parameters wherever a
-#: caller leaves one at :class:`Parameter`'s own unbounded default
-#: (``min=-inf, max=inf``) -- never onto one a caller has already narrowed
-#: (issue #283: bare ``Parameter``, no ``Field(...)``, meant a bounded search
-#: was free to probe alpha=beta=gamma=180 deg, a zero-volume cell, and
-#: ``d_spacings`` answered with NaN and a bare ``RuntimeWarning`` instead of a
-#: refusal).  Lengths: a positive floor keeps a zero/negative-length trial out
-#: of the metric tensor, set well below any bond length (0.5 A) so no real
-#: cell ever binds it; the ceiling (1000 A) is generous past any powder unit
-#: cell in the literature (large MOF/protein cells run to a few hundred A)
-#: with headroom to spare.  Angles: (10, 170) deg keeps every *individual*
-#: angle away from the 0/180 deg limit where the direct metric tensor's
-#: determinant vanishes (``d_spacings`` has nothing to take a square root of
-#: there), while still covering every triclinic mineral on record (all
-#: comfortably inside 60-120 deg).  This box does **not** by itself guarantee
-#: a positive-definite metric everywhere inside it: for a=b=c with
-#: alpha=beta=gamma, the direct metric's determinant is already zero at
-#: 120 deg and negative beyond -- comfortably inside the 170 deg per-angle
-#: ceiling -- so it is a search-space restriction, not a substitute for the
-#: metric check
-#: :func:`~rietx.crystallography.lattice.d_spacings` makes on every call.
-CELL_LENGTH_MIN = 0.5
-CELL_LENGTH_MAX = 1000.0
-CELL_ANGLE_MIN = 10.0
-CELL_ANGLE_MAX = 170.0
-
-
 class Cell(Base):
     """Unit-cell lengths (Å) and angles (degrees).
 
     Crystal-system constraints (e.g. cubic ``a=b=c``, α=β=γ=90°) are enforced
     by the parameter-vector compiler from the space group, not stored here.
 
-    The six parameters get physical bounds (:data:`CELL_LENGTH_MIN` etc.)
-    backfilled after construction wherever a caller left them at
-    ``Parameter``'s own unbounded default -- see the constants' docstring
-    (issue #283).
+    The six parameters carry no physical bounds of their own (``min=-inf,
+    max=inf`` by default, like every other bare ``Parameter`` field) — the
+    cell-window / tie-window machinery in :mod:`rietx.params.vector`
+    (``cell_window``, ``freeze_cell_windows``, ``_tie_windows``) reads an
+    infinite stored bound as *no claim made* and this is deliberately left
+    that way (issue #283's own discussion; a schema default here is a design
+    decision for that machinery, not a local fix).  A degenerate cell reached
+    by an unbounded search is refused by
+    :func:`~rietx.crystallography.lattice.d_spacings` and neutralised by the
+    solver's own guard instead (``CELL_DEGENERATE_PROBE``).
     """
 
     a: Parameter
@@ -94,32 +73,6 @@ class Cell(Base):
     alpha: Parameter
     beta: Parameter
     gamma: Parameter
-
-    @model_validator(mode="after")
-    def _backfill_physical_bounds(self) -> "Cell":
-        for name, lo, hi in (
-            ("a", CELL_LENGTH_MIN, CELL_LENGTH_MAX),
-            ("b", CELL_LENGTH_MIN, CELL_LENGTH_MAX),
-            ("c", CELL_LENGTH_MIN, CELL_LENGTH_MAX),
-            ("alpha", CELL_ANGLE_MIN, CELL_ANGLE_MAX),
-            ("beta", CELL_ANGLE_MIN, CELL_ANGLE_MAX),
-            ("gamma", CELL_ANGLE_MIN, CELL_ANGLE_MAX),
-        ):
-            p = getattr(self, name)
-            # min and max are backfilled independently -- a caller narrowing
-            # only one side (``compare.py``'s ``_p(9.3717, min=1.0)``) still
-            # gets the other side's physical ceiling/floor rather than
-            # keeping it at Parameter's own -inf/inf forever.
-            new_min = lo if p.min == -math.inf else p.min
-            new_max = hi if p.max == math.inf else p.max
-            if new_min != p.min or new_max != p.max:
-                # Re-run through the constructor (not model_copy) so
-                # Parameter._check_bounds gets a chance to refuse a starting
-                # value that would now sit outside the physical box, rather
-                # than silently carrying an invalid pair forward.
-                setattr(self, name, Parameter(
-                    **{**p.model_dump(), "min": new_min, "max": new_max}))
-        return self
 
     @classmethod
     def cubic(cls, a: float, *, vary: bool = False) -> "Cell":

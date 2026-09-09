@@ -1,6 +1,12 @@
-"""Issue #283: Cell's six parameters declare bounds; d_spacings refuses a
-degenerate metric by name instead of warning; a bounded search that still
-reaches one is counted and pushed back out rather than crashing.
+"""Issue #283: d_spacings refuses a degenerate metric by name instead of
+warning; a search that still reaches one is counted and pushed back out
+rather than crashing.
+
+The other half of #283's suggested shape -- backfilling physical bounds onto
+``Cell``'s six parameters -- is deliberately not shipped here (it contradicts
+how the cell-window / tie-window machinery in ``rietx.params.vector`` reads
+an infinite stored bound as *no claim made*; see the PR discussion on #283),
+so this file has no test asserting ``Cell`` carries bounds.
 """
 
 import warnings
@@ -11,42 +17,7 @@ import pytest
 from rietx import Instrument, PatternData, Refinement
 from rietx.crystallography.lattice import DegenerateCellError, d_spacings
 from rietx.optimize.least_squares import _DegenerateCellGuard
-from rietx.schemas.common import Parameter
-from rietx.schemas.structure import (
-    CELL_ANGLE_MAX,
-    CELL_ANGLE_MIN,
-    CELL_LENGTH_MAX,
-    CELL_LENGTH_MIN,
-    Cell,
-    lebail_scaffold,
-)
-
-
-def test_default_cell_has_physical_bounds():
-    """A Cell built the way lebail_scaffold and Cell.cubic do -- bare
-    Parameter(value=...), no min/max -- gets physical bounds backfilled."""
-    c = Cell.cubic(5.0)
-    for name in ("a", "b", "c"):
-        p = getattr(c, name)
-        assert p.min == CELL_LENGTH_MIN
-        assert p.max == CELL_LENGTH_MAX
-    for name in ("alpha", "beta", "gamma"):
-        p = getattr(c, name)
-        assert p.min == CELL_ANGLE_MIN
-        assert p.max == CELL_ANGLE_MAX
-
-
-def test_backfill_does_not_override_a_narrowed_bound():
-    """A caller who already narrowed one side (viz/compare.py's
-    ``_p(9.3717, min=1.0)`` idiom) keeps it; only the *unset* side (still at
-    Parameter's own -inf/inf) is backfilled."""
-    c = Cell(a=Parameter(value=9.3717, min=1.0),
-             b=Parameter(value=9.3717, min=1.0),
-             c=Parameter(value=6.8859, min=1.0),
-             alpha=Parameter(value=90.0), beta=Parameter(value=90.0),
-             gamma=Parameter(value=90.0))
-    assert c.a.min == 1.0          # untouched
-    assert c.a.max == CELL_LENGTH_MAX  # backfilled
+from rietx.schemas.structure import lebail_scaffold
 
 
 def test_d_spacings_refuses_degenerate_cell_by_name():
@@ -120,14 +91,26 @@ def test_degenerate_cell_guard_reraises_if_never_seen_a_good_point():
 
 def test_issue_283_fixture_no_runtime_warning_and_counted():
     """The issue's own reproduction: P1, a=5 A, lambda=1.5406 A, 20-60 deg
-    2theta, intensity all ones (a featureless pattern -- the cell stage is
-    underdetermined and the trust region used to probe alpha=beta=gamma near
-    180 deg 3430 times in one fit, each a bare RuntimeWarning).  Run under
-    ``-W error::RuntimeWarning`` equivalent (a local filter, so this test does
-    not depend on the invocation's own -W flag): the fit must not warn, and
-    every stage's degenerate-probe count is reported (unconditionally
-    non-negative; 0 is the expected value now that Cell's own bounds keep the
-    search away from the pathological region for this fixture).
+    2theta, intensity all ones (a featureless pattern the issue reports
+    reaching a degenerate cell 3430 times in one fit against an unbounded
+    ``Cell``, each a bare RuntimeWarning).  ``Cell`` still declares no bounds
+    of its own here (that half of #283 is not shipped) -- measured on this
+    tree, the exact a=5.0 starting point in the issue's own reproduction no
+    longer reaches the degenerate region at all (0 raw RuntimeWarnings on
+    unpatched ``origin/main`` too, deterministic across repeats -- something
+    about the trust-region path or a dependency version has changed since
+    the issue was filed, not chased down further here), so this exact
+    fixture is a weak vehicle for exercising the guard end to end.  Kept
+    anyway as the literal acceptance check the issue and brief name: under
+    ``-W error::RuntimeWarning`` equivalent (a local filter, so this test
+    does not depend on the invocation's own -W flag) the fit must not warn,
+    must still converge to the correct cell, and must report a
+    non-negative probe count through the same channel a genuine reach would
+    use.  The mechanism itself -- ``d_spacings`` raising by name, and
+    ``_DegenerateCellGuard`` counting and neutralising it -- is exercised
+    directly by the tests above, and by :func:`test_a_2pc_off_start_still_warning_free`
+    below, which *does* reach warning territory on unpatched ``origin/main``
+    for this same fixture family.
     """
     structure = lebail_scaffold("P1", (5.0, 5.0, 5.0, 90.0, 90.0, 90.0))
     ins = Instrument.debye_scherrer(wavelength=1.5406)
@@ -142,9 +125,43 @@ def test_issue_283_fixture_no_runtime_warning_and_counted():
     assert result.status == "converged"
     cell_stage = next(s for s in result.stages if s.name == "cell")
     assert cell_stage.n_degenerate_cell_probes >= 0
-    # the cell never left the physical box the search was given
+    # the returned cell is still correct -- the issue's own point: "the
+    # returned cell is correct, this is not a wrong answer"
     a, b, c, al, be, ga = ref.fitted_structure.phases[0].cell.lengths_angles()
-    for length in (a, b, c):
-        assert CELL_LENGTH_MIN <= length <= CELL_LENGTH_MAX
-    for angle in (al, be, ga):
-        assert CELL_ANGLE_MIN <= angle <= CELL_ANGLE_MAX
+    assert a == pytest.approx(5.0, abs=0.01)
+    assert b == pytest.approx(5.0, abs=0.01)
+    assert c == pytest.approx(5.0, abs=0.01)
+    assert al == pytest.approx(90.0, abs=0.5)
+    assert be == pytest.approx(90.0, abs=0.5)
+    assert ga == pytest.approx(90.0, abs=0.5)
+
+
+def test_a_2pc_off_start_still_warning_free():
+    """A 2 % wrong starting length on the same featureless fixture -- the
+    issue's own sensitivity table lists this shape (a 2 %-off start on a
+    peaked pattern, 445 warnings) but flags it as possibly a different
+    issue's (#243) rather than this one's; the analogue measured here, on
+    this featureless pattern, is unambiguously #283's: unpatched
+    ``origin/main`` raises 60 raw ``RuntimeWarning``s for this exact start
+    (measured directly, not asserted), all suppressed once ``d_spacings``
+    checks the determinant and wraps its own sqrt in
+    ``np.errstate(invalid=\"ignore\")`` -- whether or not any of those 60
+    were an actual determinant <= 0 event routed through
+    ``DegenerateCellError``/``_DegenerateCellGuard``, or floating-point noise
+    right at the edge of positive-definiteness that the errstate alone
+    catches.  Either way, the fit must run to completion under
+    ``-W error::RuntimeWarning`` with no bounds on ``Cell`` at all.
+    """
+    structure = lebail_scaffold("P1", (4.9, 4.9, 4.9, 90.0, 90.0, 90.0))
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    tt = np.arange(20.0, 60.0, 0.02)
+    pattern = PatternData(two_theta=tt.tolist(), intensity=np.ones_like(tt).tolist())
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", RuntimeWarning)
+        ref = Refinement(structure, ins)
+        result = ref.fit(pattern, mode="lebail", plan="profile_only")
+
+    assert result.status == "converged"
+    cell_stage = next(s for s in result.stages if s.name == "cell")
+    assert cell_stage.n_degenerate_cell_probes >= 0

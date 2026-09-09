@@ -85,14 +85,14 @@ def d_spacings(hkl: np.ndarray, a: float, b: float, c: float,
         negative-volume cell is not a cell, and no d-spacing is defined for
         it, so this refuses by name (naming the six parameters and the
         determinant) instead of the previous bare ``RuntimeWarning`` and a
-        silent NaN (issue #283).  ``Cell``'s own parameter bounds
-        (``schemas.structure.CELL_LENGTH_MIN`` etc.) keep an ordinary bounded
-        search away from here in the first place; this check is what a
-        caller with an unbounded cell, or a combination three bounded angles
-        can still reach together (e.g. a=b=c with alpha=beta=gamma past
-        ~120 deg -- where the direct metric's determinant already changes
-        sign, well inside the 170 deg per-angle ceiling), meets
-        instead of silent arithmetic.
+        silent NaN (issue #283).  ``Cell``'s six parameters declare no bounds
+        of their own (deliberately -- see ``schemas.structure.Cell``'s
+        docstring), so an underdetermined search is free to reach this
+        directly, not only through some corner case; this check, and the
+        solver-side guard that counts and neutralises it
+        (``optimize.least_squares._DegenerateCellGuard``), are what stand
+        between that and silent arithmetic until a physical bound on the
+        cell itself is designed (issue #283, deferred).
 
         The check only fires when the determinant is concrete -- i.e. not an
         abstract value under a jax ``jit``/``vmap`` trace, where a

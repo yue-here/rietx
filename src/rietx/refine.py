@@ -2673,9 +2673,11 @@ def _degenerate_cell_diagnostics(rows: list[tuple[str, int]]) -> list[Diagnostic
     ``_DegenerateCellGuard``), not about whether the final point is
     admissible, so it is worth surfacing wherever it happened, including a
     ``cell`` stage that ran and converged before a later stage produced the
-    answer.  ``info``, not ``warning``: ``Cell``'s own bounds mean this is
-    rare and the guard already contained it — nothing about the reported
-    values is in question.
+    answer.  ``info``, not ``warning``: the guard already contained it before
+    it reached the caller, so however common it is on a given fit — ``Cell``
+    declares no bounds of its own, so an underdetermined cell stage may reach
+    this often, not rarely — nothing about the reported values is in
+    question.
     """
     hits = [(name, n) for name, n in rows if n]
     if not hits:
