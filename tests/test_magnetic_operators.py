@@ -150,6 +150,8 @@ COVERAGE = [
     (1339, "168.109", 1, (0, 0, 0), [[0, 0, 1]]),
     (1503, "195.1", 1, (0, 0, Fraction(1, 4)), [[0, 0, 1]]),
     (1255, "150.25", 1, (Fraction(1, 2), 0, 0), [[1, 0, 0]]),
+    (1259, "151.29", 1, (0, 0, 0), [[2, 1, 0]]),
+    (1295, "160.65", 1, (Fraction(1, 2), 0, 0), [[1, 0, 0]]),
     (10, "3.3", 3, (0, 0, 0), [[1, 0, 0], [0, 0, 1]]),
     (101, "16.3", 3, (0, 0, 0), [[0, 1, 0]]),
     (663, "75.3", 3, (Fraction(1, 2), 0, 0), [[0, 0, 1]]),
@@ -172,10 +174,13 @@ GREY_GROUPS = [(2, "1.2"), (9, "3.2"), (100, "16.2"), (662, "75.2"),
                (1232, "143.2"), (1340, "168.110"), (1504, "195.2")]
 
 #: (UNI, BNS, site, correct span, transposed span) — the only places the Rᵀ
-#: trap is visible.  Measured over the whole database: R and Rᵀ give different
-#: spans for 543 of the (group, site) pairs scanned and **every one is in a
-#: trigonal or hexagonal family** (space groups 149-194), which is why no
-#: orthorhombic, tetragonal or cubic fixture can be the control.
+#: trap is visible.  Measured over all 1651 groups against a 14-site grid: R
+#: and Rᵀ give different spans for 543 of those (group, site) pairs, and
+#: **every one is in a trigonal or hexagonal family** (space groups 149-194),
+#: which is why no orthorhombic, tetragonal or cubic fixture can be the
+#: control.  Every row here is also a row of :data:`COVERAGE`, so the direction
+#: the correct action picks is confirmed by spglib's independent search and not
+#: only by this module's own algebra.
 TRANSPOSE_TRAP = [
     (1255, "150.25", (Fraction(1, 2), 0, 0), [[1, 0, 0]], [[2, -1, 0]]),
     (1259, "151.29", (0, 0, 0), [[2, 1, 0]], [[1, 0, 0]]),
@@ -602,7 +607,7 @@ def test_derived_span_reproduces_the_group(uni, bns, msg_type, site, span):
     not survive this, because the moment it offers cannot even be assigned
     consistently to the orbit.
 
-    Twenty-one rows: all four magnetic space-group types except grey (which
+    Twenty-three rows: all four magnetic space-group types except grey (which
     allows no moment at all — ``test_a_grey_group_forbids_every_moment``),
     over every crystal system whose site symmetry constrains a moment.
     """

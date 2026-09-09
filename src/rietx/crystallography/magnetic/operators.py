@@ -29,11 +29,11 @@ Conventions, stated by physics rather than by letter
   is a group too, so the allowed-moment subspace has the **same dimension**
   under the wrong action in every crystal system: only asserting that a known
   moment lies in the *span* can catch it (see ``adp_basis`` for the rank-2 twin
-  of the same trap).  Measured on spglib's database: R and Rᵀ give a different
-  span for 543 of the (group, site) pairs tested, and **every one of them is in
-  a trigonal or hexagonal family** (space groups 149-194) — in an orthorhombic,
-  tetragonal or cubic setting every stabiliser rotation is its own transpose on
-  the moment subspace, and the wrong action is invisible.
+  of the same trap).  Measured over all 1651 groups against a 14-site grid: R
+  and Rᵀ give a different span for 543 of those (group, site) pairs, and
+  **every one is in a trigonal or hexagonal family** (space groups 149-194).
+  Outside those families the wrong action is invisible on this grid, so a
+  rutile-, perovskite- or spinel-shaped fixture set cannot be the control.
 * **Moment components are on the crystal axes, in μ_B**, the magCIF
   ``_atom_site_moment.crystalaxis_*`` convention: "a right-handed basis of unit
   vectors parallel to the unit-cell basis vectors", so |m| = √(mᵀ·G·m) with G
