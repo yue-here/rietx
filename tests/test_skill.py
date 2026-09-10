@@ -350,8 +350,11 @@ def _tag_parts(text: str) -> tuple[str, str] | None:
     Built on ``_EVIDENCE_TAG`` rather than a second copy of the tag grammar:
     ``docs/wp/1338-the-skills-own-gates.md`` quotes that constant verbatim, and
     two spellings of one grammar is how the quote goes stale.  The flattening
-    matters -- a tag wraps across lines, and ``.`` does not cross a newline, so
-    a naive match reads `(Measured: archive` and stops.
+    matters -- not because the match would otherwise stop short
+    (``_EVIDENCE_TAG`` is compiled with ``re.S``, so ``.`` already crosses the
+    wrap) but because the extracted body would otherwise carry the newline a tag
+    wraps across, and ``body.startswith(corpus)`` compares it against a corpus
+    spelled on one line in the provenance paragraph.
     """
     m = _EVIDENCE_TAG.search(text)
     if m is None:
