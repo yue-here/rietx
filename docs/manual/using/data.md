@@ -440,14 +440,15 @@ assert bt1.source.polarization.value == 1.0
 assert bt1.source.dispersion is None
 ```
 
-Pass `fwhm_deg` unless you have a reason not to. It seeds the Caglioti terms
-from an observed peak width, and it matters more here than on a lab X-ray: a
-neutron instrument's lines are typically 0.2–0.5° where the `ProfileTCHZ`
-default is a synchrotron line of about 0.03°, and the per-stage evaluation
-windows are sized from the seed, so a 0.3° line started from the default is not
-found at all. The width *function* needs no neutron-specific code — the
-Caglioti law U·tan²θ + V·tanθ + W is the neutron resolution function, and the
-X-ray path is the borrower.
+Pass `fwhm_deg` unless you have a reason not to. It seeds `w` alone, so the
+seeded profile is a flat Gaussian of exactly `fwhm_deg` at every angle — the
+width you observed is the width you get — and it matters more here than on a
+lab X-ray: a neutron instrument's lines are typically 0.2–0.5° where the
+`ProfileTCHZ` default is a synchrotron line of about 0.03°, and the per-stage
+evaluation windows are sized from the seed, so a 0.3° line started from the
+default is not found at all. The width *function* needs no neutron-specific
+code — the Caglioti law U·tan²θ + V·tanθ + W is the neutron resolution
+function, and the X-ray path is the borrower.
 
 Two corrections are refused rather than ignored. `surface_roughness` is an
 X-ray effect: both models depress the low-angle intensity of a beam that
