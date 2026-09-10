@@ -424,7 +424,9 @@ def test_the_correlation_diagnostic_separates_the_two(shared, degenerate):
 
     flagged = corr(degenerate)
     assert flagged, "the degenerate fit raised no HIGH_CORRELATION at all"
-    assert any("lor_strain" in d.message for d in flagged)
+    assert any(set(d.where or []) & set(finding) for d in flagged), (
+        "the degenerate fit's broadening split is not flagged: "
+        f"{[(d.where, d.message) for d in flagged]}")
 
 
 def test_rwp_is_worse_than_topas_and_the_reason_is_the_peak_shape(shared):
