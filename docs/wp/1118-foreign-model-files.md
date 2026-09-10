@@ -1,8 +1,9 @@
 # WP-1118 — foreign model files: read a refinement in, write one back
 
-Milestone: unscheduled · Status: 🔄 2026-09-03 — the TOPAS `.inp` reader
-landed (PR #98) and the FullProf `.pcr` reader (PR #111); the model-format
-registry, the GSAS `.EXP`/`.PRM` reader and every writer remain
+Milestone: unscheduled · Status: 🔄 2026-09-10 — the TOPAS `.inp` reader
+landed (PR #98), the FullProf `.pcr` reader (PR #111) and the GSAS-I `.PRM`
+instrument-parameter reader (PR #248); the model-format registry, the GSAS
+`.EXP` half and every writer remain
 Depends on: — (WP-1110 found it; WP-1102 owns the one seam that overlaps)
 
 ## Goal
@@ -341,6 +342,9 @@ missing from its arm applies unchanged. A new format token is spelled in
 - [x] TOPAS `.inp` reader — the format with the evidence behind it.
 - [ ] GSAS `.EXP` + `.PRM` reader, and make `tests/test_acceptance_fap.py` take
       its protocol from the reader instead of from transcribed constants.
+      — the `.PRM` half landed (`rx.read_gsas_prm`, PR #248, merged 2026-09-10,
+      `ff69ec34`); `.EXP`, and the acceptance suite taking its protocol from
+      either, remain.
 - [x] FullProf `.pcr` reader. — PR #111, merged 2026-09-03 (`b717cc98`)
 - [ ] GSAS-II `.gpx` reader behind a **restricted unpickler** (decided
       2026-09-03, issue #234): subclass `pickle.Unpickler`, override
@@ -401,6 +405,55 @@ work this WP does.
   § "Learned in v0.2".
 
 ## Handover log
+
+### 2026-09-10 — the `.PRM` half of the GSAS task landed from outside (PR #248)
+
+Merged in a `/pr-review all` pass, not a WP session; this entry exists because
+an outside contributor has no reason to prefix a commit `WP-1118:` or to edit
+this file, so nothing would otherwise have recorded it. PR #248
+(`ff69ec34`) adds `read_gsas_prm` in `src/rietx/io/instrument_profile.py`,
+a new top-level export, `docs/manual/using/files.md` prose, two diagnostic codes
+with their skill rows, and 609 lines of tests.
+
+**What it makes possible.** An `INST_XRY.PRM`-shaped GSAS-I instrument-parameter
+file now becomes an `Instrument` without transcription. That is the first half of
+the `.EXP`/`.PRM` task above and the half that unblocks the *protocol* argument:
+`tests/data/INST_XRY.PRM` is in the repo already, so the FAP acceptance suite's
+wavelength and profile constants can start coming from the reader rather than
+from constants typed out of the file.
+
+**What it deliberately does not do.** No `.EXP` reader — the converged fit,
+the vary set and the excluded regions are still transcribed, so the task line
+stays unticked. It is not wired into the model-format registry (which does not
+exist yet, and is this WP's first unticked item), and it is neither a
+`PATTERN_FORMATS` entry nor an `io/projects/` project reader: it is a third
+reader kind with no registry of its own.
+
+**What the review established, and the gotchas.**
+
+- The io rulebook's hardest clauses are met and I verified each: every refusal
+  names the file rather than leaking a `float()` exception; the unit is measured
+  three independent ways against the format's own reference output rather than
+  taken from LAUR 86-748's prose; and the `ZERO` field, which the format states
+  two ways, is **refused rather than chosen** — the same disposition a CIF whose
+  angle contradicts its symbol gets. Drift is refused (`GP`, the reserved
+  coefficients, `ALAM2`, `ZERO`, the reserved `ICONS` field), identity-valued
+  drops are reported (`GSAS_PRM_FIELD_DROPPED`), and everything frozen carries
+  `vary=False`.
+- **An organising question this raises and does not answer**: `io/CLAUDE.md`'s
+  "one module per format" is scoped by its own first line to the *pattern*
+  readers, so it does not govern this reader — but the reason behind it does,
+  and `instrument_profile.py` now carries two formats' fences (the native JSON
+  `FORMAT_KEY`/`FORMAT_VERSION` and GSAS-I's spec citation and refusal tables).
+  Whether the third reader kind gets its own module rule, or its own registry
+  alongside `PATTERN_FORMATS` and `io/projects/`, is open and is the thing the
+  registry item above should settle. Raised with the maintainer at merge; no
+  decision taken.
+- Measured on the merged tree, bench venv `[dev,jax]`, macOS arm64, four cores,
+  alone: `tests/test_gsas_prm.py` + `test_acceptance_wavelength.py` +
+  `test_skill.py` + `test_manual_api.py` — 91 passed, ~24 s; the fast selection
+  4353 passed / 78 skipped, ~2.5 min; ruff clean. The full `-m slow` suite ran
+  once on a combined tree carrying this and seven other PRs.
 
 ### 2026-09-03 — the `.gpx` fence lifted, behind a restricted unpickler
 
