@@ -43,9 +43,9 @@ def corundum() -> rx.Phase:
     a, _, c = CORUNDUM_CELL
     return rx.Phase(
         name="Al2O3", space_group="R -3 c :H",
-        cell=P and rx.Cell(a=P(value=a), b=P(value=a), c=P(value=c),
-                           alpha=P(value=90.0), beta=P(value=90.0),
-                           gamma=P(value=120.0)),
+        cell=rx.Cell(a=P(value=a), b=P(value=a), c=P(value=c),
+                     alpha=P(value=90.0), beta=P(value=90.0),
+                     gamma=P(value=120.0)),
         scale=P(value=1.0, min=0.0, transform="softplus"),
         atoms=[
             rx.Atom(label="Al", species="Al", x=P(value=0.0), y=P(value=0.0),
@@ -97,10 +97,10 @@ def test_a_mixed_joint_fit_runs_at_all():
 
     # `HistogramResult` carries no instrument, so the radiation each histogram
     # was fitted under is not readable from the result at all -- only from the
-    # refinement object. Noted here because it is the audit's one structural
-    # gap and it is issue #252's subject.
-    from rietx.schemas.results import HistogramResult
-    assert "instrument" not in HistogramResult.model_fields
+    # refinement object. Noted here as a comment rather than an assertion:
+    # this is the audit's one structural gap and it is issue #252's subject,
+    # so an assertion pinning the field's absence would go red the moment
+    # #252 lands, inside a test named for whether a mixed fit runs at all.
 
 
 def test_each_histogram_scatters_off_its_own_amplitude():
@@ -146,14 +146,32 @@ def test_anomalous_dispersion_is_on_for_xray_and_structurally_absent_for_neutron
     assert by_kind["neutron_cw"].source.dispersion is None
 
 
-def test_the_xray_only_diagnostic_does_not_fire_on_the_neutron_histogram():
-    """A mixed fit must not advise restoring a correction the neutron
-    histogram cannot have.
+def test_the_dispersion_diagnostic_is_not_wired_into_a_joint_fit_yet():
+    """`DISPERSION_NEGLECTED` fires zero times here, and not because either
+    histogram behaves correctly.
 
-    `DISPERSION_NEGLECTED` fires for a caller who set `dispersion=None`. Doing
-    that to the X-ray histogram of a mixed fit must raise it once — for that
-    histogram — and the neutron histogram, whose dispersion is `None` because
-    it is a neutron, must not contribute a second one.
+    The review on #281 asked for the exact count rather than `<= 1`, since
+    that bound cannot tell "fired once, correctly" from "never fired at
+    all". Measured: with the X-ray histogram's `dispersion` set to `None`
+    and corundum's Al at this wavelength well past
+    `DISPERSION_NEGLECT_FRAC` (fractional effect on scattering power ~3.3%,
+    `refine.py::_dispersion_diagnostics`), a single-histogram
+    `Refinement` on the same structure and instrument *does* raise it. A
+    joint fit through `refine_multi`/`MultiHistogramRefinement` does not,
+    on either histogram, at any count.
+
+    That is because `multi.py`'s per-histogram diagnostics loop —
+    `_absorption_diagnostics`, `_capillary_offset_diagnostics`,
+    `_wavelength_calibration_diagnostics`, `_strain_flag_diagnostics`,
+    `_size_flag_diagnostics` and the rest — never calls
+    `_dispersion_diagnostics` at all, for either histogram's diagnostics or
+    the fit's own. So `0` here is the honest count, and it is *not* the
+    "neutron correctly abstains, X-ray correctly fires" result this test
+    used to claim (`assert len(fired) <= 1`, which `0` also satisfies).
+    Wiring `_dispersion_diagnostics` per histogram into the joint path is
+    real follow-up work and a package-behaviour change, not done here —
+    flagged to @yue-here as this file's one open question rather than
+    fixed by this PR.
     """
     xray = _xray()
     xray = xray.model_copy(update={
@@ -162,10 +180,11 @@ def test_the_xray_only_diagnostic_does_not_fire_on_the_neutron_histogram():
     result = rx.refine_multi([xd, nd], rx.Structure(phases=[corundum()]),
                              [xray, _neutron()], plan="profile_only")
     fired = [d for d in result.diagnostics if d.code == "DISPERSION_NEGLECTED"]
-    assert len(fired) <= 1, (
-        "the neutron histogram raised DISPERSION_NEGLECTED as well — the "
-        "diagnostic is keying on the fit rather than on each histogram's "
-        "own radiation")
+    assert len(fired) == 0, (
+        "DISPERSION_NEGLECTED now fires in a joint fit -- if `multi.py` was "
+        "changed to wire `_dispersion_diagnostics` in, this test's docstring "
+        "is the one that needs rewriting to state the intended per-histogram "
+        "count (1, on the X-ray histogram only) rather than the gap")
 
 
 def test_polarization_belongs_to_the_xray_histogram_alone():
