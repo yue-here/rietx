@@ -964,6 +964,18 @@ def _synthetic_series(path: str, values, stderr) -> SeriesResult:
         for k, (v, s) in enumerate(zip(values, stderr, strict=True))])
 
 
+def _series_missing(path: str, values, stderr, absent) -> SeriesResult:
+    """``_synthetic_series`` with the path *absent* from the ``absent``
+    patterns — not held with a ``None`` esd, but carrying no
+    ``RefinedParameter`` row at all, which is what ``trajectory()`` skips and
+    what WP-1301 does to a held structural path."""
+    return SeriesResult(entries=[
+        SeriesEntry(index=k, label=f"p{k}",
+                    parameters=([] if k in absent else
+                                [RefinedParameter(path=path, value=v, stderr=e)]))
+        for k, (v, e) in enumerate(zip(values, stderr, strict=True))])
+
+
 def test_an_inert_parameter_cannot_carry_a_discontinuity():
     """Regression for a measured false positive, and for why the σ test alone
     cannot catch it: a softplus coefficient dying on its floor has dp/du → 0,
@@ -1001,6 +1013,175 @@ def test_path_dependence_ignores_numerically_identical_chains():
                                 [1e-5] * 3)
     assert [d.code for d in _path_dependence_diagnostics(moved, shifted)] == [
         "SEQUENTIAL_PATH_DEPENDENT"]
+
+
+def test_path_dependence_needs_an_esd_from_both_chains():
+    """A pattern one chain refined and the other held has an esd on one side
+    only, and ``Trajectory.arrays`` reports the missing one as NaN.  Combining
+    them through ``np.nan_to_num`` divides the two values' difference by the
+    refining chain's esd alone, which is a significance the held side never
+    earned — 100σ below, on a series where not one pattern was measured twice.
+
+    A tied dependent path reaches this state routinely: ``_build_result`` emits
+    tie rows whether or not their source was refined, so a cubic phase's
+    ``cell.b`` is present in every pattern while its ``cell.a`` is absent in
+    the held ones (and so is dropped by the length gate).
+    """
+    esd = 1e-4
+    held_late = _synthetic_series(
+        "phases.1.cell.b",
+        [5.4000, 5.4010, 5.4020, 5.4030, 5.4030, 5.4030, 5.4030, 5.4030],
+        [esd, esd, esd, esd, None, None, None, None])
+    held_early = _synthetic_series(
+        "phases.1.cell.b",
+        [5.4100, 5.4100, 5.4100, 5.4100, 5.4100, 5.4110, 5.4120, 5.4130],
+        [None, None, None, None, esd, esd, esd, esd])
+    assert _path_dependence_diagnostics(held_late, held_early) == []
+
+
+def test_path_dependence_keeps_the_patterns_both_chains_measured():
+    """The mask is per pattern, not per path.  Six of these eight patterns
+    were measured by both chains and agree well inside their esds; two are
+    one-sided.  Dropping the whole path would discard the six, and judging the
+    two reports the series as path-dependent at 80σ on the strength of the
+    patterns that carry no comparable esd."""
+    esd = 1e-4
+    forward = _synthetic_series(
+        "phases.1.cell.b",
+        [5.4000, 5.4010, 5.4020, 5.4030, 5.4040, 5.4050, 5.4060, 5.4060],
+        [esd] * 8)
+    backward = _synthetic_series(
+        "phases.1.cell.b",
+        [5.4001, 5.4011, 5.4019, 5.4031, 5.4039, 5.4051, 5.4130, 5.4140],
+        [esd] * 6 + [None, None])
+    assert _path_dependence_diagnostics(forward, backward) == []
+
+    # …and a real disagreement inside the comparable patterns still fires,
+    # with the one-sided pair present and ignored: the two channels are
+    # separable, and only one of them is an artefact.
+    backward.entries[5].parameters[0].value = 5.4060
+    assert [d.code for d in _path_dependence_diagnostics(forward, backward)] == [
+        "SEQUENTIAL_PATH_DEPENDENT"]
+
+
+def test_path_dependence_pairs_the_two_chains_by_pattern():
+    """Equal length is not alignment, and the length gate never made it so.
+
+    ``trajectory()`` *skips* patterns where the path is absent, so a path held
+    in the forward chain's first pattern and in the backward chain's last
+    gives two seven-long trajectories over different patterns.  Compared
+    position by position, p1 is subtracted from p0 the whole way down and one
+    clean monotonic ramp — the same ramp, in both chains — is reported
+    path-dependent at tens of sigma, with every esd two-sided so the
+    both-measured mask never sees it.  Reported by @yue-here in review of
+    PR #264, reproduced here before the fix at 70.7σ.
+    """
+    esd = 1e-5
+    ramp = [4.1500 + 1e-3 * k for k in range(8)]
+    forward = _series_missing("phases.1.cell.a", ramp, [esd] * 8, absent={0})
+    backward = _series_missing("phases.1.cell.a", ramp, [esd] * 8, absent={7})
+
+    f = forward.trajectory("phases.1.cell.a")
+    b = backward.trajectory("phases.1.cell.a")
+    assert len(f) == len(b) == 7          # the length gate lets this through
+    assert f.labels != b.labels           # and they are not the same patterns
+
+    assert _path_dependence_diagnostics(forward, backward) == []
+
+    # The positive arm: a real disagreement on a pattern both chains *did*
+    # measure still fires, and the label in the message is the pattern the
+    # two values actually come from.
+    backward.entries[3].parameters[0].value = 4.1600
+    fired = _path_dependence_diagnostics(forward, backward)
+    assert [d.code for d in fired] == ["SEQUENTIAL_PATH_DEPENDENT"]
+    assert "at p3:" in fired[0].message
+    assert "4.153 vs 4.16" in fired[0].message
+
+
+def test_path_dependence_judges_the_overlap_of_unequal_chains():
+    """Unequal lengths no longer mean the path goes unexamined.  Before the
+    label pairing, ``len(f) != len(b)`` dropped the whole path, so a phase
+    absent from one pattern of one chain was never compared on any of the
+    others — the follow-up @yue-here raised on PR #264."""
+    esd = 1e-5
+    ramp = [4.1500 + 1e-3 * k for k in range(8)]
+    forward = _series_missing("phases.1.cell.a", ramp, [esd] * 8, absent={0})
+    disagreeing = list(ramp)
+    disagreeing[4] = 4.1600
+    backward = _series_missing("phases.1.cell.a", disagreeing, [esd] * 8,
+                               absent=set())
+
+    assert len(forward.trajectory("phases.1.cell.a")) == 7
+    assert len(backward.trajectory("phases.1.cell.a")) == 8
+    fired = _path_dependence_diagnostics(forward, backward)
+    assert [d.code for d in fired] == ["SEQUENTIAL_PATH_DEPENDENT"]
+    assert "at p4:" in fired[0].message
+
+
+def test_the_abstention_row_recipe_counts_the_patterns_actually_judged():
+    """The skill row's own remedy, run on the two shapes it exists to catch.
+
+    ``abstention.md``'s ``SEQUENTIAL_PATH_DEPENDENT`` row told an agent to
+    compare ``len(series.trajectory(path))`` against the backward chain's
+    before reading silence as clearance.  @yue-here measured both states in
+    which that returns "fine": two chains whose held stretches sit at opposite
+    ends have equal lengths and no shared pattern at all, and two chains with
+    identical labels can still have no pattern measured by both.  The quantity
+    is neither length — it is the number of patterns where the labels
+    intersect **and** both esds are finite — so the row now carries that
+    computation, and this test is the computation.
+    """
+    path = "phases.1.cell.a"
+    ramp = [4.1500 + 1e-3 * k for k in range(8)]
+    esd = 1e-5
+
+    def patterns_judged(series: SeriesResult, path: str) -> int:
+        """``abstention.md``'s recipe, as an agent would run it."""
+        f = series.trajectory(path)
+        b = series.backward.trajectory(path)
+        _, _, sf = f.arrays()
+        _, _, sb = b.arrays()
+        sb_by = dict(zip(b.labels, sb, strict=True))
+        return sum(1 for lab, e in zip(f.labels, sf, strict=True)
+                   if np.isfinite(e) and np.isfinite(sb_by.get(lab, np.nan)))
+
+    def both(fwd: SeriesResult, bwd: SeriesResult) -> SeriesResult:
+        fwd.direction, fwd.backward = "both", bwd
+        return fwd
+
+    # A — the label half.  The two chains held opposite ends of the series, so
+    # nothing is ever compared and the lengths match anyway.
+    a = both(_series_missing(path, ramp, [esd] * 8, absent={4, 5, 6, 7}),
+             _series_missing(path, ramp, [esd] * 8, absent={0, 1, 2, 3}))
+    fa, ba = a.trajectory(path), a.backward.trajectory(path)
+    assert len(fa) == len(ba) == 4          # the old check: EQUAL -> clearance
+    assert set(fa.labels) & set(ba.labels) == set()
+    assert _path_dependence_diagnostics(a, a.backward) == []
+    assert patterns_judged(a, path) == 0
+
+    # B — the esd half.  Identical labels, identical lengths, and the
+    # both-measured mask rules out every pattern, so nothing is judged.
+    b = both(_series_missing(path, ramp, [None] * 8, absent=set()),
+             _series_missing(path, ramp, [esd] * 8, absent=set()))
+    fb, bb = b.trajectory(path), b.backward.trajectory(path)
+    assert len(fb) == len(bb) == 8          # the old check: EQUAL -> clearance
+    assert fb.labels == bb.labels
+    assert _path_dependence_diagnostics(b, b.backward) == []
+    assert patterns_judged(b, path) == 0
+
+    # The positive arm, because a count that only ever answers 0 is not
+    # separable from a broken one: a series both chains measured throughout is
+    # judged on every pattern, and a partial overlap is reported as the
+    # overlap rather than as either length.
+    whole = both(_series_missing(path, ramp, [esd] * 8, absent=set()),
+                 _series_missing(path, ramp, [esd] * 8, absent=set()))
+    assert patterns_judged(whole, path) == 8
+
+    partial = both(_series_missing(path, ramp, [esd] * 8, absent={0, 1}),
+                   _series_missing(path, ramp, [esd] * 8, absent={7}))
+    assert len(partial.trajectory(path)) == 6
+    assert len(partial.backward.trajectory(path)) == 7
+    assert patterns_judged(partial, path) == 5      # p2..p6, neither length
 
 
 def test_a_uniform_ramp_is_not_a_discontinuity(thermal_series):
