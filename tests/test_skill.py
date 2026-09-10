@@ -300,6 +300,125 @@ def test_every_row_of_an_evidence_tagged_reference_carries_its_tag(path: Path):
         f"{path.name}: row numbers must be unique and increasing, got {numbers}")
 
 
+# A tag on a row measured outside this repository reads exactly like a citation,
+# so #239 put two obligations on it in prose: the file declares the corpus once
+# in its provenance line, and every such tag spells it the same way.  Both were
+# unchecked -- `.+` in `_EVIDENCE_TAG` is the whole contract, so a row closing
+# `*(Measured: some runs I did)*` passed while naming nothing (#241).
+#
+# **Why the gate requires the complement rather than recognising a repo tag.**
+# A repo-shaped tag has no fixed spelling: `WP-\d+` is reliable, but "an eval
+# round" and "a dataset in `tests/data/README.md`" are prose, so a pattern for
+# them either grows with every new phrasing or starts refusing honest tags.
+# Requiring instead that every `Measured` tag opens with `WP-` **or** with the
+# declared corpus gives up on validating repo tags -- which the WP files and
+# `test_every_dotted_name_in_the_api_index_resolves` already cover from the
+# other side -- and spends the whole budget on the private case, which has no
+# other guard.  A per-row marker would make the classification trivial and #239
+# ruled it out, on the ground that declaring once costs no row an edit; that is
+# why the problem cannot simply be designed away.
+#
+# `Hypothesis` tags name what *would* decide a question rather than a run, so
+# they are outside this gate.  A file may hold both kinds, as `batch.md` does
+# with two `WP-` tags among 28 private ones, so the gate is per tag, never per
+# file.
+
+#: The corpus a file declares for rows measured on data it cannot ship: the one
+#: bold span in its provenance paragraph.  Bold is the declaration site because
+#: the prose already uses it (`batch.md` § Writing a row says "name the
+#: **corpus** the file declares"), and requiring *exactly* one turns that from a
+#: convention a reader infers into one a test can find.
+_CORPUS_DECLARATION = re.compile(r"\*\*(.+?)\*\*")
+
+
+def _declared_corpus(paras: list[str]) -> str | None:
+    """The corpus this file declares, or ``None`` if it declares none.
+
+    Raises nothing on a malformed declaration: it returns the ambiguity as a
+    list so the caller can name the file, since this runs under a parametrised
+    test rather than at collection.
+    """
+    spans = _CORPUS_DECLARATION.findall(" ".join(paras[2].split()))
+    if len(spans) != 1:
+        return None if not spans else "\x00".join(spans)
+    return spans[0]
+
+
+def _tag_parts(text: str) -> tuple[str, str] | None:
+    """``(kind, body)`` of the tag closing a row, whitespace-normalised.
+
+    Built on ``_EVIDENCE_TAG`` rather than a second copy of the tag grammar:
+    ``docs/wp/1338-the-skills-own-gates.md`` quotes that constant verbatim, and
+    two spellings of one grammar is how the quote goes stale.  The flattening
+    matters -- not because the match would otherwise stop short
+    (``_EVIDENCE_TAG`` is compiled with ``re.S``, so ``.`` already crosses the
+    wrap) but because the extracted body would otherwise carry the newline a tag
+    wraps across, and ``body.startswith(corpus)`` compares it against a corpus
+    spelled on one line in the provenance paragraph.
+    """
+    m = _EVIDENCE_TAG.search(text)
+    if m is None:
+        return None
+    kind = m.group(1)
+    flat = " ".join(m.group(0).split())
+    return kind, flat[len(f"*({kind}: "):-len(")*")]
+
+
+def test_the_corpus_gate_has_a_private_tag_to_gate():
+    """Collector liveness, in `test_the_evidence_gate_has_a_file_to_gate`'s
+    idiom: if no file declares a corpus, or none of its rows uses it, the
+    "or the declared corpus" arm below is dead and the gate silently reduces to
+    "every tag starts with WP-", which no current file would satisfy."""
+    declaring = []
+    for path in _evidence_tagged():
+        paras = _paragraphs(path.read_text(encoding="utf-8"))
+        corpus = _declared_corpus(paras)
+        if corpus and "\x00" not in corpus:
+            used = [r for r in _rows(paras)
+                    if (t := _tag_parts(r[-1])) and t[0] == "Measured"
+                    and t[1].startswith(corpus)]
+            if used:
+                declaring.append((path.name, corpus, len(used)))
+    assert declaring, (
+        "no evidence-tagged reference declares a corpus and measures a row "
+        "against it — batch.md was the first (#233); if that stopped, the "
+        "private half of the gate below covers nothing and only the WP- arm "
+        "is still doing work")
+
+
+@pytest.mark.parametrize("path", _evidence_tagged(), ids=lambda p: p.name)
+def test_every_measured_tag_names_this_repository_or_the_declared_corpus(
+        path: Path):
+    paras = _paragraphs(path.read_text(encoding="utf-8"))
+    corpus = _declared_corpus(paras)
+    assert corpus is None or "\x00" not in corpus, (
+        f"{path.name}: the provenance paragraph holds "
+        f"{len(corpus.split(chr(0)))} bold spans "
+        f"({', '.join(repr(s) for s in corpus.split(chr(0)))}) — exactly one "
+        "is the corpus declaration, so a second is ambiguous. Bold the corpus "
+        "and nothing else there")
+
+    for row in _rows(paras):
+        sec, n = _ROW_HEAD.match(row[0]).groups()
+        parts = _tag_parts(row[-1])
+        if parts is None or parts[0] != "Measured":
+            continue          # no tag is the row gate's business; Hypothesis is outside
+        body = parts[1]
+        if body.startswith("WP-"):
+            continue
+        assert corpus, (
+            f"{path.name}: row {sec}.{n} closes *(Measured: {body[:50]}…)*, "
+            "which names neither a WP nor a declared corpus — and this file "
+            "declares no corpus. Either name the run so a reader can open it, "
+            "or declare the corpus once in the provenance paragraph, in bold")
+        assert body.startswith(corpus), (
+            f"{path.name}: row {sec}.{n} closes *(Measured: {body[:60]}…)*. A "
+            f"row measured outside this repository names the declared corpus "
+            f"{corpus!r} first, spelled the same way every time — otherwise "
+            "the tag reads as a citation to something a reader could go and "
+            "find. Start it with that string, or with WP- if the run is here")
+
+
 def test_every_dotted_name_in_the_api_index_resolves():
     """The API index cannot name something the package does not have."""
     text = API_INDEX.read_text(encoding="utf-8")
