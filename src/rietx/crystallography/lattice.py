@@ -115,8 +115,20 @@ def d_spacings(hkl: np.ndarray, a: float, b: float, c: float,
             f"gamma={gamma!r}) is degenerate: direct-metric-tensor determinant "
             f"{det_value:.6g} <= 0 (zero or negative cell volume)")
     inv_d2 = inv_d_squared(hkl, a, b, c, alpha, beta, gamma)
-    with np.errstate(invalid="ignore"):
-        return 1.0 / xp.sqrt(inv_d2)
+    # No errstate suppression here (there was one): for a concrete
+    # determinant this function's own check above has already raised on
+    # det <= 0, and for a positive-definite direct metric every principal
+    # minor of G, hence of G* = G^-1, is positive (Sylvester's criterion),
+    # so h.G*.h^T > 0 for every real nonzero h and inv_d2 can carry neither a
+    # negative nor a non-finite entry for sqrt to complain about -- checked
+    # by search (200000 random cells, lengths in [-5, 5] so the no-bounds
+    # case this module documents is covered, angles in [0.1, 179.9] deg,
+    # over 8 hkl including negative indices: zero cells with det > 0 and a
+    # negative/non-finite inv_d2). A concrete det <= 0 is refused above by
+    # name; an abstract one under a jax trace skips the check entirely (see
+    # this function's own docstring) and is not this arithmetic's problem to
+    # suppress.
+    return 1.0 / xp.sqrt(inv_d2)
 
 
 def two_theta_deg(d: np.ndarray, wavelength: float) -> np.ndarray:

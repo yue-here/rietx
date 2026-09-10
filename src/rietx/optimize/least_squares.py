@@ -204,7 +204,7 @@ class LSQOutcome:
     #: LM: :attr:`~.lm.LMOutcome.termination`.  ``""`` only on the
     #: zero-parameter early return, where no criterion was ever consulted.
     termination: str = ""
-    #: trial cells the residual refused as degenerate (see
+    #: trial cells refused as degenerate on *either* evaluation path (see
     #: ``crystallography.lattice.DegenerateCellError``, issue #283) rather
     #: than warning about and returning NaN.  ``Cell``'s six parameters
     #: declare no bounds of their own (deliberately -- a physical bound there
@@ -212,7 +212,10 @@ class LSQOutcome:
     #: this change), so an underdetermined cell stage can reach a degenerate
     #: metric often, not rarely; a nonzero count is the ordinary outcome on
     #: such data, pushed back out rather than crashing -- see
-    #: ``_DegenerateCellGuard`` below.  ``LSQOutcome`` itself
+    #: ``_DegenerateCellGuard`` and ``_DegenerateCellJacobianGuard`` below,
+    #: which share this one counter so the field means "every degenerate
+    #: probe this stage made", not "every degenerate residual call".
+    #: ``LSQOutcome`` itself
     #: is an internal dataclass, never serialised; ``refine.py`` copies this
     #: onto the (pydantic) ``StageResult.n_degenerate_cell_probes``, which is
     #: the field pending ``SCHEMA_VERSION`` renumbering.
@@ -245,7 +248,9 @@ class _DegenerateCellGuard:
     have no vocabulary for "this point is inadmissible, try a smaller step"
     — raising through them would crash the whole stage over one trial the
     search itself would have rejected on the next step anyway.  Returning
-    ``10x`` the last accepted residual is always worse than any point the
+    ``10x`` the last *evaluated* residual (``self._last`` is overwritten on
+    every successful call, including a trial the trust region goes on to
+    reject, not only a point it keeps) is always worse than any point the
     driver has actually accepted, which is enough to push the trust region
     back towards the interior without inventing a value that could look like
     a fit.
@@ -262,13 +267,66 @@ class _DegenerateCellGuard:
         except DegenerateCellError:
             self.n_degenerate += 1
             if self._last is None:
-                # No accepted point to penalise against yet (x0 itself was
+                # No evaluated point to penalise against yet (x0 itself was
                 # degenerate) -- nothing to fall back to, so this is a
                 # caller error, not a search artefact.
                 raise
             return self._last * 10.0
         self._last = r
         return r
+
+
+class _DegenerateCellJacobianGuard:
+    """Counts and neutralises :class:`DegenerateCellError` out of a Jacobian
+    closure the way :class:`_DegenerateCellGuard` does for the residual
+    (issue #283, second review round).
+
+    The residual guard above covers only its own path.  ``_make_jacobian``'s
+    peak-chain columns re-derive ``phase_peaks`` at ``theta + h`` for a
+    per-reflection scalar FD (:func:`_peak_chain_column`), and its declared
+    fallback perturbs the whole model the same way (the ``fd_cols`` loop);
+    both decode through the same ``C`` and reach ``d_spacings`` exactly as
+    the residual does.  A cell parameter sits on the peak-chain branch (the
+    module docstring lists it there), so an FD step off an accepted point
+    close to the degeneracy boundary can cross it during differencing even
+    though the point being differentiated around was itself admissible --
+    the trust region has no notion of "close to the boundary" and nothing
+    keeps an accepted iterate a step size away from it.  Raising
+    :class:`DegenerateCellError` out of a Jacobian call crashes the stage on
+    exactly the path the residual guard does not cover.
+
+    Neutralisation returns the last successfully evaluated Jacobian rather
+    than a residual-style ``10x`` penalty: neither TRF nor the in-package
+    ``lm`` driver compares Jacobians to decide acceptance (both read cost
+    from the residual for that), so there is no "worse" matrix to invent --
+    reusing the last real one is a value the driver has actually seen, and
+    the residual guard's own penalty (which trips first: scipy always
+    evaluates the residual at a point before asking for its Jacobian there)
+    is what does the steering.  The counter is **shared** with the residual
+    guard passed in, so ``n_degenerate_cell_probes`` counts every degenerate
+    probe the stage made, off either path, as one number.
+    """
+
+    def __init__(self, inner, residual_guard: _DegenerateCellGuard):
+        self._inner = inner
+        self._residual_guard = residual_guard
+        self._last: np.ndarray | None = None
+
+    def __call__(self, theta: np.ndarray) -> np.ndarray:
+        try:
+            j = self._inner(theta)
+        except DegenerateCellError:
+            self._residual_guard.n_degenerate += 1
+            if self._last is None:
+                # Mirrors the residual guard: no evaluated Jacobian to fall
+                # back to yet means the very first Jacobian call already hit
+                # the boundary on an FD step, which is a caller error (an x0
+                # so close to degenerate that even a 1e-6-relative step
+                # crosses it), not a search artefact to neutralise.
+                raise
+            return self._last
+        self._last = j
+        return j
 
 
 def _make_residual(model: CompiledModel, table: ParameterTable):
@@ -1164,6 +1222,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     cell_guard = _DegenerateCellGuard(residual)
     residual = cell_guard
     jacobian = _jacobian_for(model, table, backend)
+    jacobian = _DegenerateCellJacobianGuard(jacobian, cell_guard)
 
     if cancel is not None:
         # Both drivers, and *before* the event wrapper, so the check costs one
