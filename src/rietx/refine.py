@@ -3931,10 +3931,12 @@ def _data_support_diagnostics(support, model: CompiledModel) -> list[Diagnostic]
 #:
 #: Measured on Ba₂FeSbSe₅ 1.5 K (Maier, Gaultois et al. 2021, PRB 103,
 #: 054115; G4.1, λ = 2.426 Å, 0.1° steps): with the first reflection pinned
-#: at its cited position (9.4°, magnetic — this worktree has no magnetic
-#: phase, so the compiled model's own first tick is its first *nuclear* one
-#: and this constant is exercised through that path instead, see the WP), a
-#: 4° start's beam/air-scatter tail reads at ≈2.5-3× (χ²/pt ≈30 against a
+#: at its cited position (9.4°, magnetic). A compiled model cannot place a
+#: magnetic phase yet — that lands with WP-1327
+#: (docs/wp/1327-magnetic-structure.md), still unscheduled — so today the
+#: compiled model's own first tick is always its first *nuclear* one, and
+#: this constant is exercised through that path instead: a 4° start's
+#: beam/air-scatter tail reads at ≈2.5-3× (χ²/pt ≈30 against a
 #: whole-pattern χ²_red ≈12, both cited); a 6° start, which excludes the
 #: tail, is silent.  3.0 sits just above the 4° reading with headroom below
 #: the 6° one.
@@ -4004,6 +4006,15 @@ def _low_angle_diagnostics(model: CompiledModel, values: dict[str, float],
       low edge, so there is nothing to measure a level from;
     * the region's mean weighted-squared residual is not more than
       :data:`LOW_ANGLE_UNMODELLED_RATIO` times the whole-pattern reduced χ².
+
+    The region's own mean is not d.o.f.-corrected — it has no free
+    parameters of its own to subtract — while ``stats.chi2`` is divided by
+    ``n − n_free`` over the whole pattern. The comparison is deliberately
+    against that d.o.f.-corrected whole-pattern figure rather than a
+    like-for-like plain mean, which makes the ratio slightly conservative:
+    ``n_free`` only enlarges the denominator, so the region has to clear a
+    slightly higher bar than a straight ratio of means would set, and the
+    diagnostic fires marginally less often as a result.
 
     The message reports the ratio and **does not choose** between its two
     remedies — raising the pattern's lower limit, or adding the background's
