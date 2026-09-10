@@ -164,7 +164,27 @@ treat a trace phase's value as a question rather than a measurement.
 estimator √diag(χ²_red·(JᵀJ)⁻¹), then the Bérar-Lelann factor it was multiplied
 by, which §10 of the guidelines requires any publication to state.
 
+## §4b — Phase ID: the unmatched list and the Le Bail-gap read
+
+`report.unmatched`'s `kind="unmatched_obs"` entries are the strong lines your
+phase set does not produce — an unmodelled phase's signature, distinct from
+resolution-limited noise. `report.lebail_gap` is the structural-against-profile
+triage: it re-partitions the per-hkl intensities at the frozen converged state
+and reports both Rwp. A `ratio` ≫ 1 means positions and profile alone account
+for the pattern, so every line is indexed and phase identification is safe
+**at any absolute Rwp** — the structural model does not have to fit well for
+the phase list to be right.
+
 ## §4b — the QPA background measurement in full
+
+Fractions ride on scales, so the rows that decide a QPA are the ones that bias
+scales silently. `report.background.absorption`, keyed by parameter path, is
+the detector: the block projection R² of each structural parameter's Jacobian
+column onto the background column span sees §3's scale↔Biso↔background
+degeneracy that a pairwise ρ cannot. A negative Biso is that same error
+laundered through a scale. The Le Bail gap reads the *other* way here than for
+phase ID: a large ratio means the intensity model is wrong, and wrong
+intensities **are** wrong fractions.
 
 LaB₆, broad peaks, same data both times. Fitted with a 1°-knot unpenalized
 spline the refinement reports Rwp **0.08852** and GoF 1.022, against **0.08969**
@@ -217,6 +237,17 @@ under 0.6° of broadening. Pushing finer corrections into a fit whose attributio
 is resolution-limited changes numbers it cannot justify.
 
 ## §4b — the trajectory deliverable, and where its rows come from
+
+Four codes on `SeriesResult.summary(deliverable="series")` carry the chain's
+own rows. `SEQUENTIAL_PATH_DEPENDENT` is an ordering artefact — only a
+`direction="both"` chain can produce one, so a one-way chain has not looked.
+`SEQUENTIAL_PERSISTENT_FINDING` states a persistent count no per-pattern code
+can, measured at **42 of 68** patterns on this ramp. `SEQUENTIAL_DISCONTINUITY`
+flags either the science or a chain failure, and `verify_discontinuities=True`
+tells them apart (below). `PHASE_UNCONSTRAINED` says the value is held, not
+measured, so its trajectory is the one you handed in — then the QPA
+deliverable's own background check, applied **at every point** along the
+chain: an absent phase took **40–96 wt %** at equal Rwp.
 
 The row exists because an agent needed it and wrote it itself. Given 68 patterns
 of a variable-temperature ramp, `rietx`, and "tell me what the cell does, and
@@ -291,3 +322,20 @@ proportional to λ, so `MultiHistogramRefinement` normalises the shared column
 and reports it at histogram 0's wavelength, saying so through
 `SIZE_NORMALISED_ACROSS_WAVELENGTHS`. Each histogram's own structure copy
 carries the coefficient it needs; the crystallite behind them is one number.
+
+**`SIZE_UNUSUALLY_SMALL` and `STRAIN_UNUSUALLY_LARGE` flag a coefficient
+outside its usual range, and `BOUND_HIT` on the same path says why it stopped
+there:** a width term pinned to a bound is a held value, not a measurement,
+and reads no differently in the table until you check for it.
+
+## §4b — Structure: why the intensity-model rows are not optional
+
+Structure determination needs everything Phase ID, QPA, Trajectory and
+Microstructure check, plus the rows that speak to the intensity model
+directly: per-region intensity coefficients and their angular trends,
+`report.texture` and `report.strain` with their caveats, restraint tension,
+ADP positive-definiteness, and `report.identifiability.exchanges` with
+`.soft_modes` (step 14, above). Here a notable Le Bail gap is a **blocker**,
+not a comfort the way it can be for phase ID: the intensity model *is* the
+structural claim, and a large gap says that model does not carry the pattern,
+whatever the profile-only fit's Rwp says.
