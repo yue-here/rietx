@@ -143,8 +143,14 @@ line if the checkpoint ended it. Close with
    - **Read before you execute**: the bench runs the branch's code
      (`uv pip install -e .` runs its build config, pytest imports its
      `conftest.py`). Read every hunk to `pyproject.toml`, `setup.py`, any
-     `conftest.py`, `.github/**`, `.claude/**` first; a workflow change is a
-     question for the user, not a finding.
+     `conftest.py`, `.github/**`, `.claude/hooks/**` and `.claude/settings*.json`
+     first; a workflow change is a question for the user, not a finding.
+     **The rest of `.claude/` is text, not execution** — skills, commands and
+     agent definitions are markdown the bench never runs, and treating the whole
+     directory as execution-shaped batched three PRs that only sync markdown.
+     They are read as part of the diff like anything else; what they can carry is
+     an instruction aimed at whoever reads them, which is a conformance question
+     rather than a reason to hold the PR out of review.
    - **Target in the command, `cd` in a subshell** — `git -C`, `npm --prefix`,
      `(cd "$BENCH" && …)`; `no_top_level_cd.py` refuses a bare `cd`.
    - **One `/pr-review` at a time**: the session-start hook names a live
@@ -230,8 +236,14 @@ line if the checkpoint ended it. Close with
    when the contributor asked or the work was folded into another PR.
    Anything else stops and asks (`all`: defers).
 
-   **A merge carrying `WP-NNNN:` commits owes that WP a handover entry, and
-   nothing will ask for it.** `session_start.py`'s order rule is satisfied by
+   **A merge that lands part of an in-flight WP owes that WP a handover entry,
+   and nothing will ask for it.** Two ways in, and only the first is mechanical:
+   the PR carries `WP-NNNN:` commits, **or** its content is a task an open WP
+   declares and has not checked off. An outside contributor has no reason to
+   prefix a commit or to edit a WP file, so the second way is invisible to every
+   check there is — #248 is the GSAS `.PRM` half of WP-1118's unticked
+   `.EXP`/`.PRM` task and names neither. Read the open WPs' task lists at step 1,
+   not at merge. `session_start.py`'s order rule is satisfied by
    *any* later touch of the WP file and its date rule is day-dated, so a
    same-day session editing that file for its own reasons clears both: PR #98's
    45 `WP-1118:` commits merged (`0576726f`, 2026-09-01) with the WP file
@@ -246,9 +258,13 @@ line if the checkpoint ended it. Close with
    line, and open it as a PR. Docs only, so no ladder; not yours to merge,
    being the maintainer's own. Then put the bench back where step 4 expects it
    (`git -C "$BENCH" checkout --detach origin/main`), or the next PR's
-   `reset --hard` rewrites the branch you just pushed. An in-flight WP never
-   reaches this step — rank 1 batches it — so the entry can never collide with
-   a live session's log.
+   `reset --hard` rewrites the branch you just pushed. A WP a *live session* owns
+   never reaches this step — rank 1 batches it on the two signals that mean
+   someone is mid-edit — so the entry can never collide with a live session's
+   log. A WP that is merely open reaches it often, and that is the case above:
+   `Status:` 🔄 means the WP has unfinished tasks, not that anyone is holding it.
+   Check before assuming either — for #248 the last touch of the WP file was six
+   days back and its only worktree branch was already merged and gone.
 10. **Report to the person**: the plain-language paragraph, then what ran, the
     open questions, the URL, and exactly `PR N: <decision>` — `merged`
     (`merged, handover PR M` where step 9's entry was owed),
