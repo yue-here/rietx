@@ -274,13 +274,13 @@ def read_gsas_prm(path: str | Path, *,
     ``profile.u/v/w`` and ``LX LY`` → ``profile.x/y``, but ``S/L H/L`` →
     ``geometry.axial_sl``/``geometry.axial_hl``.  That split is why
     ``GSAS_PRM_GEOMETRY_ASSUMED`` says to carry those two over: replacing the
-    geometry wholesale discards two coefficients the file *did* state.  ``GP`` (position 4) and every coefficient
-    past position 8 (``trns``, ``shft``, ``sfec`` and further reserved slots)
-    are refused if non-zero and dropped only at their identity value (0) —
-    every real file in the corpus is 0 there, so this is the same "refuse a
-    value at drift, never a value at the model's identity" rule
-    ``io/CLAUDE.md``'s ``recipe.py`` section already states, applied to a
-    second format's version of it.
+    geometry wholesale discards two coefficients the file *did* state.
+    ``GP`` (position 4) and every coefficient past position 8 (``trns``,
+    ``shft``, ``sfec`` and further reserved slots) are refused if non-zero
+    and dropped only at their identity value (0) — every real file in the
+    corpus is 0 there, so this is the same "refuse a value at drift, never a
+    value at the model's identity" rule ``io/CLAUDE.md``'s ``recipe.py``
+    section already states, applied to a second format's version of it.
 
     **``diagnostics``** completes that rule's other half: a value dropped at
     the model's identity is dropped *with a diagnostic*, so a caller can learn
