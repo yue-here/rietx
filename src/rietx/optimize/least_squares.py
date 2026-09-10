@@ -35,6 +35,7 @@ from ..backend import get_backend
 from ..backend.api import TORCH_DEVICES
 from ..backend.linalg64 import get_precision_policy, require_fp64
 from ..crystallography.adp import U_NAMES
+from ..crystallography.lattice import DegenerateCellError
 from ..crystallography.stephens import S_NAMES
 from ..model import rows as row_layout
 from ..model.forward import PHASE_SUPPORT_SIGMA, CompiledModel, DerivativeBases
@@ -203,6 +204,22 @@ class LSQOutcome:
     #: LM: :attr:`~.lm.LMOutcome.termination`.  ``""`` only on the
     #: zero-parameter early return, where no criterion was ever consulted.
     termination: str = ""
+    #: trial cells refused as degenerate on *either* evaluation path (see
+    #: ``crystallography.lattice.DegenerateCellError``, issue #283) rather
+    #: than warning about and returning NaN.  ``Cell``'s six parameters
+    #: declare no bounds of their own (deliberately -- a physical bound there
+    #: is a design decision for the cell-window machinery, not shipped by
+    #: this change), so an underdetermined cell stage can reach a degenerate
+    #: metric often, not rarely; a nonzero count is the ordinary outcome on
+    #: such data, pushed back out rather than crashing -- see
+    #: ``_DegenerateCellGuard`` and ``_DegenerateCellJacobianGuard`` below,
+    #: which share this one counter so the field means "every degenerate
+    #: probe this stage made", not "every degenerate residual call".
+    #: ``LSQOutcome`` itself
+    #: is an internal dataclass, never serialised; ``refine.py`` copies this
+    #: onto the (pydantic) ``StageResult.n_degenerate_cell_probes``, which is
+    #: the field pending ``SCHEMA_VERSION`` renumbering.
+    n_degenerate_cell_probes: int = 0
 
 
 def _lebail_snapshot(model: CompiledModel) -> list[np.ndarray] | None:
@@ -215,6 +232,101 @@ def _lebail_snapshot(model: CompiledModel) -> list[np.ndarray] | None:
     if model.mode != "lebail":
         return None
     return [np.asarray(cp.hkl_intensity, dtype=np.float64) for cp in model.phases]
+
+
+class _DegenerateCellGuard:
+    """Counts and neutralises :class:`DegenerateCellError` from a residual
+    closure (issue #283).
+
+    ``Cell``'s six parameters declare no bounds of their own — that half of
+    #283's suggested fix is deliberately not shipped here, since the
+    cell-window / tie-window machinery in :mod:`rietx.params.vector` reads an
+    infinite stored bound as *no claim made* — so an underdetermined cell
+    stage is free to reach a degenerate metric directly, and often does, not
+    only through some narrow corner case.  scipy's ``trf`` and the
+    in-package ``lm`` driver both call the residual as an opaque function and
+    have no vocabulary for "this point is inadmissible, try a smaller step"
+    — raising through them would crash the whole stage over one trial the
+    search itself would have rejected on the next step anyway.  Returning
+    ``10x`` the last *evaluated* residual (``self._last`` is overwritten on
+    every successful call, including a trial the trust region goes on to
+    reject, not only a point it keeps) is always worse than any point the
+    driver has actually accepted, which is enough to push the trust region
+    back towards the interior without inventing a value that could look like
+    a fit.
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
+        self._last: np.ndarray | None = None
+        self.n_degenerate = 0
+
+    def __call__(self, theta: np.ndarray) -> np.ndarray:
+        try:
+            r = self._inner(theta)
+        except DegenerateCellError:
+            self.n_degenerate += 1
+            if self._last is None:
+                # No evaluated point to penalise against yet (x0 itself was
+                # degenerate) -- nothing to fall back to, so this is a
+                # caller error, not a search artefact.
+                raise
+            return self._last * 10.0
+        self._last = r
+        return r
+
+
+class _DegenerateCellJacobianGuard:
+    """Counts and neutralises :class:`DegenerateCellError` out of a Jacobian
+    closure the way :class:`_DegenerateCellGuard` does for the residual
+    (issue #283, second review round).
+
+    The residual guard above covers only its own path.  ``_make_jacobian``'s
+    peak-chain columns re-derive ``phase_peaks`` at ``theta + h`` for a
+    per-reflection scalar FD (:func:`_peak_chain_column`), and its declared
+    fallback perturbs the whole model the same way (the ``fd_cols`` loop);
+    both decode through the same ``C`` and reach ``d_spacings`` exactly as
+    the residual does.  A cell parameter sits on the peak-chain branch (the
+    module docstring lists it there), so an FD step off an accepted point
+    close to the degeneracy boundary can cross it during differencing even
+    though the point being differentiated around was itself admissible --
+    the trust region has no notion of "close to the boundary" and nothing
+    keeps an accepted iterate a step size away from it.  Raising
+    :class:`DegenerateCellError` out of a Jacobian call crashes the stage on
+    exactly the path the residual guard does not cover.
+
+    Neutralisation returns the last successfully evaluated Jacobian rather
+    than a residual-style ``10x`` penalty: neither TRF nor the in-package
+    ``lm`` driver compares Jacobians to decide acceptance (both read cost
+    from the residual for that), so there is no "worse" matrix to invent --
+    reusing the last real one is a value the driver has actually seen, and
+    the residual guard's own penalty (which trips first: scipy always
+    evaluates the residual at a point before asking for its Jacobian there)
+    is what does the steering.  The counter is **shared** with the residual
+    guard passed in, so ``n_degenerate_cell_probes`` counts every degenerate
+    probe the stage made, off either path, as one number.
+    """
+
+    def __init__(self, inner, residual_guard: _DegenerateCellGuard):
+        self._inner = inner
+        self._residual_guard = residual_guard
+        self._last: np.ndarray | None = None
+
+    def __call__(self, theta: np.ndarray) -> np.ndarray:
+        try:
+            j = self._inner(theta)
+        except DegenerateCellError:
+            self._residual_guard.n_degenerate += 1
+            if self._last is None:
+                # Mirrors the residual guard: no evaluated Jacobian to fall
+                # back to yet means the very first Jacobian call already hit
+                # the boundary on an FD step, which is a caller error (an x0
+                # so close to degenerate that even a 1e-6-relative step
+                # crosses it), not a search artefact to neutralise.
+                raise
+            return self._last
+        self._last = j
+        return j
 
 
 def _make_residual(model: CompiledModel, table: ParameterTable):
@@ -1107,7 +1219,10 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     _freeze_strain_cap(model, table)
     _freeze_size_cap(model, table)
     residual = _make_residual(model, table)
+    cell_guard = _DegenerateCellGuard(residual)
+    residual = cell_guard
     jacobian = _jacobian_for(model, table, backend)
+    jacobian = _DegenerateCellJacobianGuard(jacobian, cell_guard)
 
     if cancel is not None:
         # Both drivers, and *before* the event wrapper, so the check costs one
@@ -1175,7 +1290,8 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     tracker.accept(x0, cost0)  # the LM path's seed; a no-op after the TRF wrapper
     if len(x0) == 0:
         return LSQOutcome(x0, cost0, cost0, 0, "converged", None, None, None,
-                          solver=solver)
+                          solver=solver,
+                          n_degenerate_cell_probes=cell_guard.n_degenerate)
 
     n_truncated = 0
     if solver == "lm":
@@ -1214,7 +1330,8 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                       n_constraint_truncations=n_truncated,
                       max_shift_over_esd=_final_shift_over_esd(
                           table, tracker.step(), stderr_full, corr, n_table),
-                      termination=termination)
+                      termination=termination,
+                      n_degenerate_cell_probes=cell_guard.n_degenerate)
 
 
 def _multi_closures(models: list[CompiledModel], mtable: "MultiParameterTable",

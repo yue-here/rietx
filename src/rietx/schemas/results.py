@@ -765,6 +765,18 @@ class StageResult(Base):
     #: ``CONSTRAINT_ACTIVE`` diagnostic — the only signal that a declared
     #: constraint was active rather than merely present (WP-0601).
     n_constraint_truncations: int = 0
+    #: trial cells this stage's residual refused as degenerate (zero or
+    #: negative volume, ``crystallography.lattice.DegenerateCellError``)
+    #: rather than warning about and returning NaN — issue #283.  ``Cell``'s
+    #: six parameters declare no bounds of their own (deliberately; see
+    #: ``schemas.structure.Cell``'s docstring), so an underdetermined cell
+    #: stage can reach a degenerate metric often, not rarely — this is the
+    #: count of every trial pushed back out rather than crashing the stage,
+    #: and 0 only means this particular stage never reached one.
+    #: Additive field, defaulted to 0 (the honest "never happened" state);
+    #: pending SCHEMA_VERSION renumbering rather than bumped with this change
+    #: (see ``schemas/common.py``).
+    n_degenerate_cell_probes: int = 0
     #: paths this stage **held** although the plan had freed them: the
     #: structural parameters of a phase the data could not see at stage start
     #: (``CompiledModel.phase_support`` below ``PHASE_SUPPORT_SIGMA``), which

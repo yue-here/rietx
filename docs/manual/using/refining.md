@@ -471,6 +471,7 @@ for stage in result.stages:
 | `StageResult.freed` | the paths this stage actually freed, after globbing |
 | `StageResult.ftol` | the tolerance it was solved at; `None` = the solver default |
 | `StageResult.n_constraint_truncations` | steps the bounded-LM driver shortened to stay inside a linear-inequality constraint |
+| `StageResult.n_degenerate_cell_probes` | trial cells this stage's residual refused as degenerate (zero or negative volume) rather than warning about and returning NaN |
 | `StageResult.held` | paths the plan freed that this stage held anyway, because the data could not see their phase |
 | `StageResult.released` | the ones it held at the start and let go again, having seen the phase appear while it solved |
 
@@ -505,6 +506,14 @@ is a diverged stage, and `StageResult.status` says so.
 `StageResult.n_constraint_truncations` is `0` under the default `trf` solver,
 which has no linear-inequality vocabulary at all. It counts only under
 `solver="lm"`, and today the only such constraint is the Stephens strain cone.
+
+`StageResult.n_degenerate_cell_probes` counts trials, never the answer: `Cell`
+declares no bounds of its own, so an underdetermined cell stage can reach a
+zero- or negative-volume metric while searching, and each such reach is pushed
+back out and counted rather than crashing the stage or returning a silent
+NaN. Nonzero is the ordinary outcome on a poorly-constrained cell, not a sign
+that anything reported is wrong; the fit-level `CELL_DEGENERATE_PROBE`
+diagnostic sums this across every stage that ran.
 
 ## Guards
 
