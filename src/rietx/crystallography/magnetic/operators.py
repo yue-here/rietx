@@ -48,6 +48,12 @@ Conventions, stated by physics rather than by letter
   the setting does not force to be equal in length
   (``symmetry.cell_constraints``), so the diagonal conjugation is the identity.
 
+``docs/manual/parameterisation.md``'s "Magnetic moment constraints" section
+carries these three equations — the axial-vector action, the crystal-axis
+magnitude and the Cartesian conversion — each with its *Source:* line back to
+this module, beside the Wyckoff coordinate/ADP derivation and the Stephens
+subspace they are built the same way as.
+
 What this module does not do
 ----------------------------
 * It does not resolve a Shubnikov **symbol** (``P4_2'/mnm'``).  spglib exposes
