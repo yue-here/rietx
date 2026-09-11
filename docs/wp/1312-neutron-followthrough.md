@@ -97,9 +97,12 @@ exercising this combination.
 ## Tasks
 
 - [ ] Seed fix: `w` alone; the 20–150° FWHM assertion; the WP-1134 record
-      line.
-- [ ] Yb into `RESONANT_ABSORBERS`; the resonant-absorber diagnostic with a
-      cited resonance-energy entry per member; skill row.
+      line. In flight as PR #280, held on the `ProfileTCHZ.w` bound —
+      decided 2026-09-11, see the entry.
+- [ ] ~~Yb into `RESONANT_ABSORBERS`; the resonant-absorber diagnostic;
+      skill row~~ — landed from outside, PR #282 (`8c39a02c`). **Left: a
+      cited resonance energy per member**, which that PR deliberately
+      declined for want of a citation (2026-09-11 entry).
 - [ ] The mixed-fit acceptance/example (public dual dataset, provenance row)
       + the radiation-kind audit, any fix it forces landing as its own
       commit; obs/calc/diff PNGs for both histograms to `tests/output/`.
@@ -134,6 +137,106 @@ issue #113 saying its (a) slice landed — #113 stays open for the fenced
 - Sears, V. F. (1992), *Neutron News* **3**(3), 26 — the shipped table.
 
 ## Handover log
+
+### 2026-09-11 — two of the three tasks landed from outside, and this WP never opened
+
+A CW neutron refinement now tells you when the structure contains an element
+whose tabulated scattering length cannot describe it. That is task 2, live in
+the package since PR #282 merged (`8c39a02c`), and it arrived from an outside
+contributor rather than from a session on this WP — which is why this entry
+exists at all: nothing in the tooling would have asked for one, because the
+merged commits carry no `WP-NNNN:` prefix and the merge touched no file under
+`docs/wp/`. Task 1, the seed fix, is PR #280, reviewed and held on one
+decision that is recorded below. The WP itself stays `⬜`: no session owns it,
+and the two remaining halves are real work rather than paperwork.
+
+**Done — task 2, in part.** `RESONANT_ABSORBERS` gains natural `Yb` and
+`168Yb`, and `refine._resonant_absorber_diagnostics` emits
+`NEUTRON_RESONANT_ABSORBER` when such a species sits in a structure being
+refined against a non-X-ray source. It reports and never refuses, because one
+constant wavelength away from the resonance the thermal value is the right
+number. Severity splits on `RESONANT_ABSORBER_SEVERE_BARN = 1000.0`: `warning`
+for the four classic black absorbers (Cd 2520, Eu 4530, Sm 5923, Gd 49700),
+`info` for Yb, whose element absorbs 34.80 and whose resonance lives in the
+0.13 % minority `168Yb` at 2230.40. The skill row landed in all three
+committed copies.
+
+**Deliberately not done, and this is what keeps the task open.** The checklist
+asks for "a cited resonance-energy entry per member" and the PR ships none.
+The reason given is the right one: the energies need a citation this package
+does not carry (Mughabghab, *Atlas of Neutron Resonances*, is the usual
+source) and transcribing them from memory is a failure this campaign has
+already met once. So the flag says *that* a species is resonant and cannot yet
+say *where*. Whoever picks this up needs the Atlas or an equivalent, and the
+maintainer-local paper corpus is the first place to look.
+
+**Measured** (bench worktree, `[dev,jax]`, macOS arm64, `-n auto --dist
+loadgroup`, nothing else in the suite), on PR #282 merged onto `origin/main`
+`ff69ec34`:
+
+| | measured |
+|---|---|
+| fast selection | 4534 passed, 78 skipped, ~2m14s |
+| fast selection, main alone | 4529 passed, 78 skipped, ~2m31s |
+| full suite including `-m slow` | 4703 passed, 83 skipped, ~23 min |
+
++5 passed, no new skip — exactly the five new test functions. The full run is
+the one that carries: `ci.yml` runs `-m "not slow"` and `nightly.yml` has no
+`pull_request` trigger, so no acceptance suite ever sees a PR.
+
+**Decided — task 1's held item (2026-09-11).** PR #280 seeds `w = fwhm_deg²`,
+which is right, and in doing so narrows the widths the constructor accepts:
+`ProfileTCHZ.w` declares `max = 1.0` deg², so the old `(0.5·fwhm)²` accepted
+`fwhm_deg` up to 2.0° and the correct seed accepts 1.0°. **The bound stays at
+1.0 and the constructor refuses by name.** Three reasons, in the order they
+decided it:
+
+1. *The narrowing is nominal.* The old upper range never produced a correct
+   profile — at `fwhm_deg = 2.0` the old seed gave Γ_G = 1.0°, half the width
+   asked for, plus a Lorentzian `X = 2.0` climbing as 1/cosθ. Nothing correct
+   is being taken away.
+2. *Widening is not local.* `min`/`max` are serialised fields and refinement
+   bounds both, so raising the schema default changes the search box of every
+   newly built instrument, laboratory X-ray included, where `help.py` puts the
+   typical `w` at 0.001-0.02 — 1.0 is already 50× the top of that range. It is
+   also an observable change to a serialised default, which under the
+   bump-per-observable-change rule owes a `SCHEMA_VERSION` bump. That is a
+   broad cost for a rare case.
+3. *The rare case is already expressible.* The bound is per-`Parameter`, not
+   global: `inst.profile.w = Parameter(value=1.44, min=0.0, max=4.0,
+   unit="deg^2", transform="softplus")` works today and round-trips through
+   `model_dump`/`Instrument(**d)` with `max = 4.0` intact (verified on
+   `8c39a02c`). A genuinely coarse instrument states itself explicitly, which
+   is the right place for that claim to live.
+
+What is actually defective is the message. `fwhm_deg = 1.2` currently dies in
+pydantic naming `w` and the number 1.44, neither of which the caller typed.
+The fix asked for on #280 is a refusal in the constructor naming `fwhm_deg`,
+its seeded `w`, the declared bound read off the field rather than restated,
+and the one-line escape above.
+
+**Gotcha for task 3, found while reviewing #282 and worth more than the PR
+that found it.** `_dispersion_diagnostics` is called only from `Refinement`
+and never from `multi.py`, so a joint fit loses `DISPERSION_NEGLECTED`
+entirely — and the new `_resonant_absorber_diagnostics` is wired in beside it
+and inherits exactly that gap. This is task 3's "audit that per-histogram
+physics keys on the histogram's own radiation" arriving as a concrete defect
+rather than a hypothesis. It is **not** being fixed here: WP-1344, open in
+PR #297, owns how `multi.py` decides which diagnostics a histogram is
+entitled to. No `### Inherited` note has been pushed there because that WP's
+file does not exist on `main` yet and a live session holds it.
+
+**Gotcha — the closing protocol no longer fits.** This WP's Acceptance
+section assumes one shipping PR carrying `Closes #124`, `Closes #194` and a
+comment on #113. The work is arriving piecemeal from outside instead: PR #282
+covers #113(a)'s species half, #280 covers #124, and #194 is untouched.
+Issue #113 still needs its comment saying the (a) slice landed, and it has
+not been posted.
+
+**Next**, in order: settle #280 with the named refusal and merge it, which
+closes task 1 and issue #124; comment on #113(a); then task 3, whose first
+open item is still sourcing the public X-ray + neutron dual dataset, now with
+the `multi.py` diagnostics gap above as a known finding waiting for WP-1344.
 
 - **2026-09-01** — created, from issues #124/#113(a)/#194 (2026-09-01
   triage). Settled: three verbs — fix the seed, name the absorber, exercise
