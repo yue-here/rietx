@@ -1297,6 +1297,10 @@ class Instrument(Base):
         from the seed.  Left ``None``, the default stands and a 0.3° line will
         not be found.
 
+        It seeds ``w`` **only**, so the seeded profile is a flat Gaussian of
+        exactly ``fwhm_deg`` at every angle -- the width you observed is the
+        width you get, which is what makes the argument checkable.
+
         Note the profile itself needs no neutron-specific code: the Caglioti
         law U·tan²θ + V·tanθ + W *is* the neutron resolution function (Caglioti,
         Paoletti & Ricci, 1958, *Nucl. Instrum.* **3**, 223), and the X-ray path
@@ -1325,8 +1329,20 @@ class Instrument(Base):
                                      capillary_radius_mm=capillary_radius_mm,
                                      mu_r=mu_r))
         if fwhm_deg is not None:
-            inst.profile.w.value = (0.5 * fwhm_deg) ** 2
-            inst.profile.x.value = fwhm_deg
+            # Seed the Gaussian constant term alone, at the *full* observed
+            # width: with U = V = 0 the Caglioti law gives Gamma_G = sqrt(W),
+            # so W = fwhm^2 reproduces `fwhm_deg` exactly and at every angle
+            # (issue #124).  `x` is deliberately left at its default.  It is
+            # the Lorentzian Scherrer term, Gamma_L = X/cos(theta), so seeding
+            # it from an observed width both double-counts the width and makes
+            # the seed climb with angle -- 3.93x the stated FWHM at 150 deg,
+            # over exactly the high-angle peaks a CW neutron cell refinement
+            # leans on hardest.  A real CW resolution function is narrowest
+            # near the focusing angle and widens either side (Caglioti,
+            # Paoletti & Ricci 1958), so a monotonically climbing seed is not
+            # a coarse version of that curve; a flat one is the honest
+            # zeroth-order stand-in, and U/V/X/Y refine away from it.
+            inst.profile.w.value = fwhm_deg ** 2
         return inst
 
     @classmethod
