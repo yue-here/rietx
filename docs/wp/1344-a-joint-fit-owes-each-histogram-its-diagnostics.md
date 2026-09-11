@@ -14,11 +14,11 @@ a joint fit's histograms too, or is recorded as deliberately not reaching them.
 
 **Found by PR #281** (2026-09-10), an audit of the per-histogram physics of a
 mixed X-ray + neutron fit, and verified in review rather than taken from the
-PR: `_dispersion_diagnostics` appears exactly twice in the package — its
-definition at `src/rietx/refine.py:3405` and a single call at
-`src/rietx/refine.py:1876`, inside `Refinement`. `multi.py` never names it. So
-a mixed joint fit raises `DISPERSION_NEGLECTED` **zero** times, on either
-histogram.
+PR: `_dispersion_diagnostics` has one definition (`src/rietx/refine.py:3416`) and
+exactly one call site (`src/rietx/refine.py:1878`), both inside `Refinement`;
+its other appearances are docstring cross-references, not uses. `multi.py`
+names it nowhere. So a mixed joint fit raises `DISPERSION_NEGLECTED` **zero**
+times, on either histogram.
 
 The zero is not the neutron histogram correctly abstaining. Measured control in
 that PR: a single-histogram `Refinement` on the same structure and instrument,
@@ -29,11 +29,12 @@ test_joint_xray_neutron.py::test_the_dispersion_diagnostic_is_not_wired_into_a_j
 now asserts that 0 with a docstring saying it is a gap, so the defect is at
 least no longer invisible — but the test is a record, not a fix.
 
-**The same shape arrives again immediately.** PR #282 (open at the time of
-writing) adds `NEUTRON_RESONANT_ABSORBER` through
-`_resonant_absorber_diagnostics(self.structure, self.instrument)` — one
-instrument, which is right for `Refinement` and inherits exactly this gap for a
-joint fit. Two codes asking one question from opposite sides is the reason this
+**The same shape has already arrived again.** PR #282 (merged 2026-09-11,
+`8c39a02c`) adds `NEUTRON_RESONANT_ABSORBER` through
+`_resonant_absorber_diagnostics` — defined at `src/rietx/refine.py:3491` and
+called once, beside the dispersion call, on `self.instrument`. One instrument
+is right for `Refinement` and inherits exactly this gap for a joint fit:
+`multi.py` names this helper no more than it names the other. Two codes asking one question from opposite sides is the reason this
 is a WP rather than two wiring commits: whatever the rule turns out to be, it
 has to give both the same answer, and any future radiation-keyed diagnostic the
 same answer again.
@@ -102,13 +103,27 @@ added (root `CLAUDE.md` § Numbers).
 
 - PR #281 (merged 2026-09-10) — the audit that found it, and the control
   measurement establishing that the 0 is a gap rather than a result.
-- PR #282 — the second diagnostic of the same shape.
+- PR #282 (merged 2026-09-11) — the second diagnostic of the same shape,
+  in the tree now and carrying the gap as predicted.
 - Root `CLAUDE.md` § Invariants, WP-1076 (a declared name is a claim) and
   WP-1131 (what is shared across histograms and what is not).
 - [1341](1341-a-joint-fit-has-no-report.md) — the neighbouring gap, deliberately
   out of scope here.
 
 ## Handover log
+
+- **2026-09-11** — a freshness pass before this WP's filing PR (#297) merges;
+  no work on the WP itself started. PR #282 had merged (`8c39a02c`) between the
+  filing and now, so the Context section's "open at the time of writing" was
+  about to land already false, and the two `refine.py` line numbers matched
+  neither the merged tree nor this branch's own base. Re-verified both claims
+  against the merged tree and corrected them: `_dispersion_diagnostics` is one
+  definition (3416) and one call (1878), the extra grep hits being docstring
+  cross-references rather than uses, and `_resonant_absorber_diagnostics`
+  (3491) is called once beside it. `multi.py` names neither, so the gap this WP
+  exists for is confirmed present with both diagnostics now in the tree, not
+  predicted. The WP's substance is unchanged; only its citations moved. Next is
+  still the classification table, unchanged.
 
 - **2026-09-10** — created from a `/pr-review all` pass, on the maintainer's
   decision to make this a WP rather than wire the two diagnostics in ad hoc.
