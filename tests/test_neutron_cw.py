@@ -209,6 +209,99 @@ def test_surface_roughness_is_refused_on_a_neutron_source():
 
 
 # ------------------------------------------------------------------ the fit ---
+def _one_species(species: str) -> rx.Structure:
+    """A minimal P1 cell carrying one atom of `species`, for the flag below."""
+    P = rx.Parameter
+    return rx.Structure(phases=[rx.Phase(
+        name="probe", space_group="P 1",
+        cell=rx.Cell(a=P(value=5.0), b=P(value=5.0), c=P(value=5.0),
+                     alpha=P(value=90.0), beta=P(value=90.0),
+                     gamma=P(value=90.0)),
+        scale=P(value=1.0),
+        atoms=[rx.Atom(label=species, species=species, x=P(value=0.0),
+                       y=P(value=0.0), z=P(value=0.0), biso=P(value=0.5))])])
+
+
+def test_a_resonant_absorber_is_named_rather_than_silently_tabulated():
+    """Issue #113 (a) / WP-1312: ``is_resonant_absorber`` had no caller.
+
+    ``b_Sears.dat`` stores the real part of the thermal ``b``, and for these
+    nuclides that is incomplete rather than wrong -- near the resonance ``b``
+    is complex and wavelength-dependent. At one CW wavelength away from it the
+    thermal value is the right number, so this reports and never refuses.
+    """
+    from rietx.refine import _resonant_absorber_diagnostics  # noqa: PLC0415
+
+    neutron = rx.Instrument.constant_wavelength_neutron(1.5406)
+    fired = _resonant_absorber_diagnostics(_one_species("Gd"), neutron)
+    assert [d.code for d in fired] == ["NEUTRON_RESONANT_ABSORBER"]
+    assert fired[0].level == "warning"          # Gd absorbs 49700 barn
+    assert "Gd" in fired[0].message
+    assert fired[0].where == ["phases.0.atoms.0"]
+
+    # Yb is the species this issue adds, and it lands as info rather than
+    # warning: its *element* absorbs 34.80 barn, and the resonance is in a
+    # minority isotope. Before this change it produced nothing at all.
+    yb = _resonant_absorber_diagnostics(_one_species("Yb"), neutron)
+    assert [d.code for d in yb] == ["NEUTRON_RESONANT_ABSORBER"]
+    assert yb[0].level == "info"
+
+
+def test_the_resonant_flag_is_silent_where_it_should_be():
+    """Three negatives, because a flag that fires on everything says nothing.
+
+    An ordinary species; a moderate absorber that is *not* classified resonant
+    (Nd, which this campaign's own planning notes wrongly called one); and an
+    X-ray source, where the analogue is ``DISPERSION_NEGLECTED`` and this
+    would be answering a question about the wrong radiation.
+    """
+    from rietx.refine import _resonant_absorber_diagnostics  # noqa: PLC0415
+
+    neutron = rx.Instrument.constant_wavelength_neutron(1.5406)
+    xray = rx.Instrument.debye_scherrer(1.5406)
+
+    assert _resonant_absorber_diagnostics(_one_species("O"), neutron) == []
+    assert _resonant_absorber_diagnostics(_one_species("Nd"), neutron) == []
+    assert _resonant_absorber_diagnostics(_one_species("Gd"), xray) == []
+
+
+def test_the_resonant_flag_reaches_a_real_refinement_result():
+    """The diagnostic is wired into the result, not merely importable.
+
+    A private helper that no code path calls is what this issue was about in
+    the first place, so the flag is asserted where a caller meets it.
+
+    The plan frees the background alone.  This diagnostic is a statement about
+    the *species*, so it needs a fit to have happened and nothing more, while
+    the ``profile_only`` preset drags in something unrelated: its ``cell``
+    stage frees ``phases.*.cell.*``, and those parameters carry declared
+    bounds of (-inf, inf).  Against this deliberately featureless pattern the
+    trust region therefore *probes* cells with angles up to 180.1 deg, whose
+    reciprocal metric is not positive definite, and ``d_spacings`` answers
+    each one with NaN and a bare ``RuntimeWarning`` -- 3430 of them in one
+    fit.  The search rejects those points and the returned cell is correct,
+    so this is noise and a missing bound rather than a wrong answer; it is
+    also pre-existing and not this test's subject, so the test stays out of
+    it.
+    """
+    tt = np.arange(20.0, 60.0, 0.2)
+    data = rx.PatternData(two_theta=tt.tolist(),
+                          intensity=np.ones_like(tt).tolist())
+    inst = rx.Instrument.constant_wavelength_neutron(1.5406, fwhm_deg=0.3)
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage(name="bkg", turn_on=["instrument.background.*"])])
+
+    ref = rx.Refinement(_one_species("Gd"), inst)
+    result = ref.fit(data, plan=plan, mode="lebail")
+    assert "NEUTRON_RESONANT_ABSORBER" in {d.code for d in result.diagnostics}
+
+    # and it is absent from the same fit on an ordinary species, so the
+    # assertion above is about Gd and not about every result
+    ref_o = rx.Refinement(_one_species("O"), inst)
+    plain = ref_o.fit(data, plan=plan, mode="lebail")
+    assert "NEUTRON_RESONANT_ABSORBER" not in {d.code for d in plain.diagnostics}
+
+
 def test_xray_only_diagnostic_stays_quiet_for_neutrons():
     """DISPERSION_NEGLECTED would advise restoring a correction that does not
     exist for this radiation."""

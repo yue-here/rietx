@@ -67,6 +67,12 @@ docs/manual/_build/
 .claude/worktrees/
 .claude/settings.local.json
 
+# A PR description composed on disk for `gh pr create/edit --body-file`.  Not
+# ignored until one of them reached a commit and would have merged to sit at the
+# repository root beside README.md (PR #206) — nothing partitions the root, so
+# no test saw it and CI was green with it.
+/pr_body.md
+
 # Generated at Sphinx build time from rietx.help (docs/manual/conf.py).
 docs/manual/_generated/
 

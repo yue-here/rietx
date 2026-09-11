@@ -129,6 +129,62 @@ directions {eq}`par-coord` forbids — before the images are generated.
 Multiplicities feed $ZMV$ and hence every quantitative phase fraction of
 {ref}`ch-estimation`, and none of that reaches $R_{wp}$.
 
+## Magnetic moment constraints
+
+A site's ordered magnetic moment is symmetry-constrained the same way a
+coordinate is — by the operators that fix the site — but a moment is an
+**axial** vector rather than a polar one, and a magnetic operation carries a
+time-reversal sign $\varepsilon = \pm 1$ that an ordinary space-group
+operation does not. An operation $(R, \mathbf{t}, \varepsilon)$ acts on a
+moment as
+
+```{math}
+:label: par-moment-action
+
+\mathbf{m} \;\to\; \varepsilon \,\det(R)\, R\, \mathbf{m},
+```
+
+*Source:* `rietx.crystallography.magnetic.operators.MagneticOperator.moment_matrix`
+
+with $R$ **untransposed** {cite}`halpern1939` — the reciprocal-space
+$R^\top$ convention this manual uses elsewhere for an *hkl* does not apply to
+a real-space axial vector — and $\varepsilon$ the magnetic group's own sign
+{cite}`perezmato2015`. The allowed-moment subspace for a site's stabiliser is
+then $\bigcap \ker(\varepsilon\det(R)R - I)$, the same construction as
+{eq}`par-coord` with this action in place of $R$.
+
+Moment components are stored on the crystal axes, in a right-handed basis of
+**unit** vectors parallel to the cell edges rather than the edges themselves,
+so the magnitude is not $\sqrt{\sum_i m_i^2}$ except in a cubic cell:
+
+```{math}
+:label: par-moment-magnitude
+
+|\mathbf{m}| \;=\; \sqrt{\mathbf{m}^\top G\, \mathbf{m}},
+```
+
+*Source:* `rietx.crystallography.magnetic.operators.moment_magnitude`
+
+with $G$ the unit-vector metric — ones on the diagonal, the cell's cosines
+off it — so a hexagonal $(1, 1, 0)$ moment has magnitude 1 $\mu_B$, not
+$\sqrt{2}$. A moment in this crystal-axis form also converts to the
+orthonormal Cartesian frame `rietx.crystallography.adp.cartesian_basis`
+already builds for the ADP tensor above, reached by normalising each
+direct-lattice basis vector to unit length before applying it:
+
+```{math}
+:label: par-moment-cartesian
+
+\mathbf{m}_{\mathrm{cart}} \;=\; \left(\frac{\mathbf{a}}{a}, \frac{\mathbf{b}}{b},
+\frac{\mathbf{c}}{c}\right) \mathbf{m},
+```
+
+*Source:* `rietx.crystallography.magnetic.operators.moment_to_cartesian`
+
+the same Cholesky-derived Cartesian frame the ADP construction above uses, so
+the crystal-axis and fractional actions of $R$ agree and the constraint
+algebra above never has to see a cell.
+
 ## Soft restraints
 
 A bond-length, angle or value restraint contributes one row to the residual

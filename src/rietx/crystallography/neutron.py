@@ -55,8 +55,16 @@ _ISOTOPE_ALIAS: dict[str, str] = {"D": "2H", "T": "3H"}
 #: *incomplete* for these, and silently using it near a resonance is the
 #: neutron version of interpolating an X-ray table across an edge. Callers that
 #: care are expected to ask; see :func:`is_resonant_absorber`.
+#:
+#: Natural **Yb** and ``168Yb`` are here on the strength of this table's own
+#: numbers rather than an outside claim (issue #113 (a)): ``168Yb`` absorbs
+#: 2230.40 barn against ``176Yb``'s 2.85, a spread of nearly three orders
+#: within one element, and absorption that large and that isotope-dependent
+#: *is* a nuclear resonance.  ``168Yb`` sits with ``113Cd`` (20600) and the
+#: two Gd nuclides rather than with its own element's thermal 34.80.
 RESONANT_ABSORBERS: frozenset[str] = frozenset(
-    {"Cd", "Sm", "Eu", "Gd", "113Cd", "149Sm", "151Eu", "155Gd", "157Gd"})
+    {"Cd", "Sm", "Eu", "Gd", "Yb",
+     "113Cd", "149Sm", "151Eu", "155Gd", "157Gd", "168Yb"})
 
 
 @lru_cache(maxsize=None)

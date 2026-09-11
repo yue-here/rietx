@@ -135,7 +135,8 @@ What an operator must know, all measured:
 - **One batch row applies to a chain and lives in §9c**, which a series
   operator never loads: the shared `EventStream` opens its file in append mode,
   so a re-run of a ramp writes into the previous run's log unless the path is
-  rotated ([`references/batch.md`](batch.md) § 9c.13) — measured on chains.
+  rotated ([`references/batch-operating.md`](batch-operating.md) § 9c.13) —
+  measured on chains.
   The companion rule — a phase that switches fully in and fully out along the
   ramp is a degenerate split rather than a coexistence, and whether its
   fraction is an observable at all depends on the transition's order — is this

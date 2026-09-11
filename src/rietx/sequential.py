@@ -1365,29 +1365,68 @@ def _path_dependence_diagnostics(forward: SeriesResult,
     different starting-point sequences reaching the same answer; two that do
     not have found a parameter whose value the data do not determine on their
     own.
+
+    Both restrictions below narrow that claim, and neither is cosmetic: the
+    comparison is made **per pattern, between the same pattern in each chain**,
+    and only where *both* chains measured an esd for it.  A pattern one chain
+    never refined this path in is not compared at all, so a path can be
+    reported on for part of a series and be silent for the rest of it — and a
+    path the two chains share no measured pattern for is not judged here at
+    all.
     """
     out: list[Diagnostic] = []
     for path in forward.paths(varied_only=False):
         f, b = forward.trajectory(path), backward.trajectory(path)
-        if len(f) != len(b) or not len(f):
+        # Pair the two chains by *pattern label*, not by position.  Equal
+        # lengths do not make two trajectories comparable: ``trajectory()``
+        # skips patterns where the path is absent, and WP-1301 drops a held
+        # structural path from ``RefinedParameter`` rows entirely, so a path
+        # held in the forward chain's first pattern and in the backward
+        # chain's last yields two seven-long trajectories over *different*
+        # patterns.  Subtracting those position by position compares p1
+        # against p0 the whole way down and reports a clean, monotonic ramp as
+        # tens of sigma of path dependence — with every esd two-sided, so the
+        # mask below never sees it.  Intersecting on labels is also what lets
+        # the old ``len(f) != len(b)`` gate go: unequal lengths no longer mean
+        # the path goes unexamined, only that fewer patterns are comparable.
+        first_in_b: dict[str, int] = {}
+        for j, label in enumerate(b.labels):
+            first_in_b.setdefault(label, j)
+        pairs = [(i, first_in_b[label]) for i, label in enumerate(f.labels)
+                 if label in first_in_b]
+        if not pairs:
             continue
-        _, vf, sf = f.arrays()
-        _, vb, sb = b.arrays()
+        fi = np.asarray([i for i, _ in pairs], dtype=int)
+        bj = np.asarray([j for _, j in pairs], dtype=int)
+        labels = [f.labels[i] for i in fi]
+        _, vf_all, sf_all = f.arrays()
+        _, vb_all, sb_all = b.arrays()
+        vf, sf = vf_all[fi], sf_all[fi]
+        vb, sb = vb_all[bj], sb_all[bj]
+        # Judge a pattern only where *both* chains measured an esd.  A
+        # parameter with no esd anywhere cannot be judged this way at all, and
+        # neither can a pattern one chain refined and the other held: its esd
+        # exists on one side only, and dividing the two values' difference by
+        # it reports a significance the held side never earned.  A tied
+        # dependent path reaches exactly that state routinely, since
+        # ``_build_result`` emits tie rows whether or not their source was
+        # refined.  The mask is per pattern rather than per path, so the
+        # patterns both chains did measure are still judged.
+        comparable = np.isfinite(sf) & np.isfinite(sb)
         combined = np.sqrt(np.nan_to_num(sf) ** 2 + np.nan_to_num(sb) ** 2)
-        # A parameter with no esd anywhere cannot be judged this way; skip it
-        # rather than declare agreement it has not earned.
-        if not np.any(combined > 0.0):
+        if not np.any(comparable & (combined > 0.0)):
             continue
         with np.errstate(divide="ignore", invalid="ignore"):
             n_sigma = np.abs(vf - vb) / np.where(combined > 0.0, combined, np.nan)
         n_sigma = np.where(np.abs(vf - vb) > _noise_floor(vf, vb), n_sigma, 0.0)
+        n_sigma = np.where(comparable, n_sigma, 0.0)
         if not np.any(n_sigma > PATH_DEPENDENCE_SIGMA):
             continue
         k = int(np.nanargmax(n_sigma))
         out.append(Diagnostic(
             level="warning", code="SEQUENTIAL_PATH_DEPENDENT", where=[path],
             message=(f"{path} differs between the forward and backward chains "
-                     f"by up to {n_sigma[k]:.1f}σ (at {f.labels[k]}: "
+                     f"by up to {n_sigma[k]:.1f}σ (at {labels[k]}: "
                      f"{vf[k]:.6g} vs {vb[k]:.6g})"),
             suggestion=("this parameter's trajectory depends on the order the "
                         "series was refined in, so it is not determined by the "

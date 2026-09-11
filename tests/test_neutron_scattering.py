@@ -110,6 +110,46 @@ def test_resonant_absorbers_are_flagged():
         assert is_resonant_absorber(species)
 
 
+def test_ytterbium_is_a_resonant_absorber_on_this_table_s_own_numbers():
+    """Issue #113 (a): Yb was missing, and the table itself is the argument.
+
+    The claim is not that natural Yb absorbs a lot -- at 34.80 barn it absorbs
+    less than a fiftieth of Cd.  It is that the absorption is wildly
+    *isotope-dependent*, which is the signature of a nuclear resonance and the
+    thing a single thermal number cannot express.  Asserted against the
+    shipped table rather than an outside source, so this test fails if the
+    data file ever stops supporting the classification.
+    """
+    assert is_resonant_absorber("Yb")
+    assert is_resonant_absorber("168Yb")
+
+    spread = properties("168Yb")["xs_abs_barn"] / properties("176Yb")["xs_abs_barn"]
+    assert spread > 100.0, (
+        f"168Yb/176Yb absorption ratio is {spread:.0f}; Yb is in "
+        f"RESONANT_ABSORBERS because that spread is nearly three orders")
+
+    # …and the ordinary isotope is not swept in with its element: the set is
+    # about nuclides, and 176Yb at 2.85 barn is an unremarkable absorber.
+    assert not is_resonant_absorber("176Yb")
+    assert properties("176Yb")["xs_abs_barn"] < 10.0
+
+
+def test_neodymium_is_not_in_the_set_and_the_table_says_why():
+    """A negative control with a real candidate behind it.
+
+    Nd is a moderate absorber that turns up in this campaign's own data, and
+    it was informally called a resonant absorber while planning WP-1312. The
+    table does not support that: its strongest nuclide is an order of
+    magnitude below 168Yb and nearly two below 113Cd, so it sits with the
+    ordinary elements. Recorded as a test rather than a comment because the
+    next person to look will have the same idea.
+    """
+    assert not is_resonant_absorber("Nd")
+    assert not is_resonant_absorber("143Nd")
+    assert (properties("143Nd")["xs_abs_barn"]
+            < properties("168Yb")["xs_abs_barn"] / 5.0)
+
+
 def test_unknown_species_raises_naming_it():
     """A missing species is a modelling error the caller must see.
 
