@@ -147,9 +147,9 @@ lab use become first-class, served by machinery that already exists.
       "the v1.4 fit_peaks work" now describe a call that exists — reword the
       refusals (a `GSASII_SPF` recipe and a top-level `single_peaks` block are
       still refused; what changes is that they can name the call to use).
-- [ ] Tests wrap-up (fast-suite delta stated in the handover) + ruff +
+- [x] Tests wrap-up (fast-suite delta stated in the handover) + ruff +
       sphinx `-W` + obs/calc/diff-style PNGs of fitted groups to
-      `tests/output/`.
+      `tests/output/` (`fit_peaks_groups.png`, the four cases).
 
 ## Acceptance
 
