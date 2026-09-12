@@ -58,6 +58,12 @@ from ..schemas.pattern import PatternData
 
 _LN2_8 = 8.0 * np.log(2.0)
 
+#: A window a caller *asked* for must land on enough channels to fit two
+#: widths and one component; below this the position is on a gap or an
+#: excluded region, not on a peak.  Detection never meets the case — its seeds
+#: are channels that exist — so only :func:`group_at` tests it.
+MIN_GROUP_POINTS = 8
+
 
 @dataclass
 class PeakGroup:
@@ -122,6 +128,67 @@ def predicted_fwhm(two_theta_deg: np.ndarray, instrument: Instrument) -> np.ndar
     lor = lorentzian_fwhm(theta, prof.x.value, prof.y.value)
     gamma, _eta = tch_gamma_eta(g, lor)
     return np.asarray(gamma, dtype=np.float64)
+
+
+def window_indices(two_theta: np.ndarray, lo_seed: float, hi_seed: float,
+                   fwhm: float, instrument: Instrument) -> tuple[int, int]:
+    """The channel range ``[i0, i1)`` of a fitting window spanning these seeds.
+
+    One arithmetic, three callers: :func:`detect_peaks` sizes every group it
+    finds, and :func:`group_at` sizes a window around positions somebody named
+    (WP-1027's peak editor, WP-1101's ``fit_peaks``).  They had drifted as two
+    copies of the same four lines, which is one edit away from a GUI window
+    that disagrees with the one the fitter would have chosen.
+
+    The FCJ allowance is added on the **low** side only: the axial smear is
+    one-sided and toward low angle below 90°, which is exactly where the lines
+    indexing depends on most sit.  Width costs almost nothing here — the
+    profile kernel is dispatch-bound, 11.8 µs at 25 points against 13.6 µs at
+    194 (WP-1109) — so the window is sized for safety, and
+    :data:`~rietx.schemas.indexing.PEAK_WINDOW_FWHM_MULT` explains why it is
+    nevertheless not wider.
+    """
+    half = PEAK_WINDOW_FWHM_MULT * float(fwhm)
+    sl = instrument.geometry.axial_sl.value
+    hl = instrument.geometry.axial_hl.value
+    extra = (float(fcj_extent_deg(np.array(float(lo_seed)), sl, hl))
+             if sl > 0.0 and hl > 0.0 else 0.0)
+    i0 = int(np.searchsorted(two_theta, lo_seed - half - extra, side="left"))
+    i1 = int(np.searchsorted(two_theta, hi_seed + half, side="right"))
+    return i0, i1
+
+
+def group_at(det: Detection, positions: np.ndarray,
+             instrument: Instrument) -> PeakGroup:
+    """A fresh window around positions a caller named, sized as detection is.
+
+    Detection's seeds are channels that exist, so it needs no refusals; a
+    *given* position may sit off the end of the pattern or in a gap, and both
+    are refused by name rather than fitted into nonsense.  The seed width is
+    the instrument's own FWHM at the position, scaled by the width census
+    (``Detection.width_scale``) exactly as detection scales its own — the
+    census is what makes a declared synchrotron profile usable on lab data.
+    """
+    pos = np.sort(np.asarray(positions, dtype=np.float64))
+    if pos.ndim != 1 or len(pos) == 0:
+        raise ValueError("group_at needs at least one position")
+    tt = det.two_theta
+    outside = pos[(pos < tt[0]) | (pos > tt[-1])]
+    if len(outside):
+        raise ValueError(
+            f"2θ = {outside[0]:.4f}° is outside the picked range "
+            f"{tt[0]:.4f}–{tt[-1]:.4f}°")
+    # the census scales each width *before* the mean, as ``fwhm_seed_curve``
+    # does, so a caller naming exactly detection's seeds gets bit-identical
+    # widths rather than last-ulp ones
+    fw = float(np.mean(det.width_scale * predicted_fwhm(pos, instrument)))
+    i0, i1 = window_indices(tt, float(pos[0]), float(pos[-1]), fw, instrument)
+    if i1 - i0 < MIN_GROUP_POINTS:
+        raise ValueError(
+            f"only {i1 - i0} channel(s) around 2θ = {pos[0]:.4f}°; that is a "
+            "gap or an excluded region, not a place a peak can be fitted")
+    return PeakGroup(i0=i0, i1=i1, seed_two_theta=pos, seed_fwhm=fw,
+                     from_shoulder=np.zeros(len(pos), dtype=bool))
 
 
 def _debiased_envelope(tt: np.ndarray, y: np.ndarray) -> np.ndarray:
@@ -369,19 +436,11 @@ def detect_peaks(data: PatternData, instrument: Instrument, *,
     is_shoulder = np.isin(all_idx, shoulder_idx)
 
     groups = _group_indices(tt[all_idx], fwhm_seed_curve[all_idx])
-    sl = instrument.geometry.axial_sl.value
-    hl = instrument.geometry.axial_hl.value
     out: list[PeakGroup] = []
     for members in groups:
         seeds = tt[all_idx[members]]
         fw = float(np.mean(fwhm_seed_curve[all_idx[members]]))
-        half = PEAK_WINDOW_FWHM_MULT * fw
-        # the FCJ smear is one-sided and toward *low* angle below 90°, which is
-        # exactly where the lines indexing depends on most sit
-        extra = (float(fcj_extent_deg(np.array(seeds.min()), sl, hl))
-                 if sl > 0.0 and hl > 0.0 else 0.0)
-        i0 = int(np.searchsorted(tt, seeds.min() - half - extra, side="left"))
-        i1 = int(np.searchsorted(tt, seeds.max() + half, side="right"))
+        i0, i1 = window_indices(tt, seeds.min(), seeds.max(), fw, instrument)
         out.append(PeakGroup(i0=i0, i1=i1, seed_two_theta=seeds, seed_fwhm=fw,
                              from_shoulder=is_shoulder[members]))
     return Detection(tt, y, sigma, env, out, fwhm_meas,

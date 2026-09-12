@@ -37,6 +37,7 @@ from rietx.indexing.peaks import (
     _debiased_envelope,
     _secondary_line_two_theta,
     detect_peaks,
+    group_at,
     predicted_fwhm,
 )
 from rietx.indexing.pick import _not_separable
@@ -877,3 +878,79 @@ def test_the_phantom_components_of_a_real_pattern_are_flagged_and_excluded():
     # and the point of removing them: every line offered to an engine now has a
     # position esd a lattice search can use.  The worst was 3.9e+49 degrees.
     assert max(p.two_theta_esd for p in peaks.usable()) < 1.0
+
+
+# ----------------------------------------------------------------------
+# One window-sizing arithmetic (WP-1101)
+# ----------------------------------------------------------------------
+def test_a_named_position_gets_detections_own_window():
+    """``group_at`` and ``detect_peaks`` size a window the same way.
+
+    They were two copies of the same four lines — ``gui/peaks.py`` sizing a
+    clicked position and the detection loop sizing a found one — and nothing
+    held them together.  A caller naming exactly the seeds detection found must
+    therefore get exactly detection's window back, indices *and* seed width.
+    LaB6 resolves, so every group here is a singleton; the multi-seed half of
+    the claim is the width association, pinned in
+    ``test_two_named_positions_share_one_window``.
+    """
+    ins = _instrument(axial=(0.03, 0.03))        # FCJ on: the low-side allowance
+    y, grid, _truth = _forward(ins)
+    det = detect_peaks(_noisy(y, grid, seed=7), ins)
+    assert len(det.groups) > 5
+
+    for g in det.groups:
+        fresh = group_at(det, g.seed_two_theta, ins)
+        assert (fresh.i0, fresh.i1) == (g.i0, g.i1)
+        assert fresh.seed_fwhm == g.seed_fwhm
+
+
+def test_a_position_off_the_end_of_the_pattern_is_refused_by_name():
+    ins = _instrument()
+    y, grid, _truth = _forward(ins)
+    det = detect_peaks(_noisy(y, grid, seed=7), ins)
+    with pytest.raises(ValueError, match="outside the picked range"):
+        group_at(det, np.array([grid[-1] + 5.0]), ins)
+
+
+def test_a_position_in_a_gap_is_refused_rather_than_fitted():
+    """A gap is a place a peak cannot be fitted, and saying so is the answer.
+
+    The refusal names the channel count, because "8 channels" and "0 channels"
+    are different conversations with the caller: one is an excluded region's
+    edge, the other is a position between two scan ranges.
+    """
+    ins = _instrument()
+    lo = np.arange(20.0, 30.0, STEP)
+    hi = np.arange(50.0, 60.0, STEP)
+    grid = np.concatenate([lo, hi])
+    data = PatternData(two_theta=grid.tolist(),
+                       intensity=(np.zeros_like(grid) + 100.0).tolist())
+    det = detect_peaks(data, ins)
+    with pytest.raises(ValueError, match="channel.*that is a gap"):
+        group_at(det, np.array([40.0]), ins)
+
+
+def test_two_named_positions_share_one_window():
+    """Positions close enough to share a window are one group, not two.
+
+    ``group_at`` takes the whole set, so the window spans them and the fit that
+    follows is simultaneous — which is the only way overlapping components can
+    be fitted without each biasing the other.
+    """
+    ins = _instrument()
+    y, grid, _truth = _forward(ins)
+    det = detect_peaks(_noisy(y, grid, seed=7), ins)
+    fw = float(predicted_fwhm(np.array([40.0]), ins)[0] * det.width_scale)
+    pair = np.array([40.0, 40.0 + 0.5 * fw])
+
+    both = group_at(det, pair, ins)
+    assert both.n == 2
+    one = group_at(det, pair[:1], ins)
+    assert both.i0 == one.i0 and both.i1 > one.i1
+
+    # and the seed width of a group is the mean of its members', scaled by the
+    # census *before* the mean — the association ``fwhm_seed_curve`` uses, which
+    # is what keeps a multi-seed window bit-identical to detection's own
+    other = group_at(det, pair[1:], ins)
+    assert both.seed_fwhm == 0.5 * (one.seed_fwhm + other.seed_fwhm)

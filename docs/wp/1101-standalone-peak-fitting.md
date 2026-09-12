@@ -120,9 +120,14 @@ lab use become first-class, served by machinery that already exists.
 
 ## Tasks
 
-- [ ] Lift fresh-window sizing from `gui/peaks.py` (`_new_group`) into
+- [x] Lift fresh-window sizing from `gui/peaks.py` (`_new_group`) into
       `indexing/` (shared helper; gui imports it back); behavior pinned —
       `tests/test_gui_peaks.py` unchanged-green plus a window-equality test.
+      Landed as `indexing.peaks.window_indices` (the arithmetic, called by
+      `detect_peaks`) + `group_at` (positions a caller named, with both
+      refusals) + `MIN_GROUP_POINTS`; the census scales each width *before*
+      the mean, matching `fwhm_seed_curve`'s association, so a named seed set
+      reproduces detection's window bit for bit.
 - [ ] `fit_peaks()` in `rietx.indexing` + the `"unnamed_neighbour"` flag;
       unit tests: a position where detection found nothing, two positions in
       one window, a position in a data gap (refusal names the gap), a named
