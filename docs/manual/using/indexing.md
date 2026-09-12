@@ -383,8 +383,10 @@ the instrument's first: measure the width law on a standard with
 `lab_calibrate`, save it with `save_instrument_profile`, and subtract it — in
 the widths for a Williamson-Hall plot, or, better, by refining the sample
 broadening terms against it, which is what [](model.md) covers and what
-`rietx.model.microstructure` reports with esds. The split itself is Part 2's
-{ref}`ch-profiles`.
+`rietx.model.microstructure` reports with esds. Part 2 carries both halves:
+the instrument ⊕ sample convolution in {ref}`ch-profiles`, and the two
+relations this plot combines — Scherrer's 1/cosθ and strain's tanθ — in
+{ref}`ch-microstructure`, each with the symbol it was transcribed from.
 
 Two smaller conventions in the four lines above. The plot is in FWHM, not
 integral breadth, so K = 0.9 rather than 1: quote which you used, because the
