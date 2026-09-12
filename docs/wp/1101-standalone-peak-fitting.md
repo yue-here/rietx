@@ -208,10 +208,14 @@ W-H numbers come from an executed block.
   refinement and `fit_peaks` refines nothing. (8) `tests/output/fit_peaks_groups.png`,
   obs/calc/diff for the four cases.
 
-  **Measured** (`[dev]`, darwin/arm64, no other suite running). Fast selection
-  4486 passed / 127 skipped, 2:07 and 2:19 on two runs; full selection 4649
-  passed / 136 skipped in 22:12. `test_peak_picking.py` collects 46 against 34
-  at the branch base — the twelve tests this WP added, no new skips.
+  **Measured** (`[dev]`, darwin/arm64, no other suite running), on **current
+  main merged into this branch** — the tree that lands, which nothing else
+  tests. Fast selection 4487 passed / 127 skipped in 2:16; full selection 4650
+  passed / 136 skipped in 22:52. On the branch before the merge and before the
+  review's one added test: 4486 / 127 (2:07 and 2:19 on two runs) and 4649 /
+  136 (22:12), so the whole delta is that test. `test_peak_picking.py` collects
+  47 against 34 at the branch base — the thirteen tests this WP added, no new
+  skips.
   `fit_peaks` costs 0.03 s for seven lines on a 5753-point lab pattern, and
   `build_example("fap")` 0.01 s, which is why the manual's blocks execute
   rather than carrying a no-exec reason. The chapter's Williamson-Hall numbers:
