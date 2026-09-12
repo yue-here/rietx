@@ -240,6 +240,19 @@ W-H numbers come from an executed block.
   would push a named empty position to a small positive intensity instead of to
   its bound. That belongs to `background_envelope`, not here.
 
+  **The review pass** (`/code-review medium --fix`) found one real gap and
+  three smaller things, and nothing was declined. The real one: `fit_peaks`
+  accepted the *same* position twice and answered — two components at one 2θ
+  are exactly singular in their intensities, so one peak came back split
+  543/1.1 counts with an esd on each half, while a gap and an off-the-end
+  position were both refused by name. It is refused now, on the same rule. The
+  others: `__all__` in `pick.py` and `peaks.py` named none of the four new
+  public names; a refused *cluster* named only its lowest position rather than
+  the span; and the fresh-window clustering computed each window twice. The
+  pass also re-executed every number in the new manual chapter and reproduced
+  each exactly, and checked the `fit_group` refactor is behaviour-identical to
+  the loop it replaces.
+
   **Next**, in order. [1102](1102-component-seam-humps.md) is unblocked and
   independent; its first act is to sharpen its own row in
   [`milestones/v1.4.md`](../milestones/v1.4.md) § Acceptance, which this session
