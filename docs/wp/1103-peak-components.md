@@ -177,6 +177,39 @@ use is the design case.
 
 ### Inherited
 
+**From WP-1101 (2026-09-13) — v1.4 is open, and three things it built are
+yours to reuse rather than rebuild.**
+
+The milestone opened on 2026-09-13 (`pyproject.version` → `1.4.0.dev0`,
+[`milestones/v1.4.md`](../milestones/v1.4.md)). **Your acceptance row in that
+record is deliberately unfinished**: it says only what `../ROADMAP.md` already
+commits to, and is marked for sharpening at your open, because a bar written by
+a session that has not read this WP is a bar set too low. Sharpening it is the
+first act of the session that starts here — before the work, not after it.
+
+Three seams 1101 left behind:
+
+* `indexing.peaks.window_indices` and `group_at` are now the **one** window
+  sizing — detection, the GUI peak editor and `fit_peaks` all go through them,
+  and `group_at` carries the refusals a *given* position needs (off the end of
+  the pattern, in a gap).
+* `peakfit.reseed_candidate` is the one authority for "does this window hold a
+  component that is not declared?" — the residual proposes a position and ΔBIC
+  decides. `fit_group` walks it; `fit_peaks` asks it once. It is what a
+  component seam should ask rather than measuring seed distances, which 1101
+  tried first and which stayed silent on a 26-esd bias.
+* `rx.fit_peaks(data, instrument, positions)` fits named peaks with no model at
+  all. It is the *measurement* half of the same question this WP models, so a
+  component's declared position can be checked against a free fit of the same
+  window without building a refinement.
+
+One mechanical cost, if this WP adds a `PeakFlag` member: it is a four-surface
+edit — the schema `Literal`, `help.py`, `gui/src/lib/rxt.ts`'s `PEAK_FLAGS`,
+and the committed `tests/data/gui/help_keys.json` — and touching `gui/src`
+means `npm --prefix gui ci && npm --prefix gui run build`, because the dist
+digest covers it.
+
+
 **From WP-1110 item 14 (2026-08-21) — a declared component that is not in the
 specimen has an unidentifiable position, and this is now measurable.**
 

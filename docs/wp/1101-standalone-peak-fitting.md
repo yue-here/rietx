@@ -1,6 +1,6 @@
 # WP-1101 — fit_peaks: standalone peak fitting at named positions
 
-Milestone: v1.4 · Status: ⬜
+Milestone: v1.4 · Status: ✅ 2026-09-13 — `fit_peaks` exported, flagged, documented in the manual and the skill; v1.4 opened alongside
 Depends on: — (first of the free-standing peaks set; opens the 11xx block)
 
 ## Goal
@@ -173,6 +173,81 @@ W-H numbers come from an executed block.
   lifts), [1078](1078-indexing-provisional.md) (the provisional tier).
 
 ## Handover log
+
+- **2026-09-13** — **`fit_peaks` ships, and v1.4 is open.** Anyone with a
+  pattern can now profile-fit the peaks they name — no structure, no space
+  group, no refinement — and get positions with esds, d-spacings and widths
+  back. That makes a Williamson-Hall analysis, a d-spacing lookup and an
+  ordinary lab check on one reflection first-class uses of this package rather
+  than things you had to build a refinement to reach. Two answers the call
+  refuses to fudge are what took the work: a position where there is no peak
+  comes back flagged and unusable rather than dropped or dressed as a
+  measurement, and a window holding a component you did not name says so, which
+  on the bundled fluorapatite is worth 2.7 esds on the line you actually wanted
+  and 26 esds on a synthetic built to be hard. The milestone opened with its
+  acceptance rows written in advance, which is the part a row written at ship
+  cannot do.
+
+  **Done.** (1) One window-sizing arithmetic: `indexing.peaks.window_indices`
+  (called by `detect_peaks`) and `group_at` (positions a caller named, with the
+  out-of-range and gap refusals), with `gui/peaks.py` importing them back —
+  the two copies of those four lines are gone. The census scales each width
+  *before* the mean, matching `fwhm_seed_curve`, so a named seed set reproduces
+  detection's window bit for bit. (2) `rx.fit_peaks(data, instrument,
+  positions)` in `indexing/pick.py`, re-exported at top level, provisional tier
+  by defining module (1078). (3) The `unnamed_neighbour` `PeakFlag`, its
+  `help.py` entry, its word in the GUI highlighter's `PEAK_FLAGS`, and the
+  regenerated help-key fixture. (4) `capabilities().features["peak_fitting"]`,
+  derived. (5) `using/indexing.md` § Fitting peaks you name, three executed
+  blocks over the bundled fluorapatite. (6) The skill's judgement half in
+  `references/diagnostics-indexing.md` under §7b, reached by widening the
+  existing routing row rather than adding one — so no body cut was owed —
+  plus `fit_peaks` in the api index's generator and both committed copies
+  re-synced. (7) `io/recipe.py`'s three "not this package's yet" refusals now
+  name the call; the refusals themselves stand, because a recipe describes a
+  refinement and `fit_peaks` refines nothing. (8) `tests/output/fit_peaks_groups.png`,
+  obs/calc/diff for the four cases.
+
+  **Measured** (`[dev]`, darwin/arm64, no other suite running). Fast selection
+  4486 passed / 127 skipped, 2:07 and 2:19 on two runs; full selection 4649
+  passed / 136 skipped in 22:12. `test_peak_picking.py` collects 46 against 34
+  at the branch base — the twelve tests this WP added, no new skips.
+  `fit_peaks` costs 0.03 s for seven lines on a 5753-point lab pattern, and
+  `build_example("fap")` 0.01 s, which is why the manual's blocks execute
+  rather than carrying a no-exec reason. The chapter's Williamson-Hall numbers:
+  1355 Å and 0.011 % from seven isolated fluorapatite lines — instrument-
+  dominated, and the chapter says so.
+
+  **Gotchas.** (1) **The `unnamed_neighbour` criterion was wrong first, and
+  silently.** Written against `PAWLEY_OVERLAP_FWHM_FRAC` (0.5 FWHM) it asks an
+  *apportionment* question where an *identity* question was needed, and it
+  stayed quiet on a 51 m° / 26-esd bias. It now routes through
+  `peakfit.reseed_candidate`, extracted from `fit_group`: the residual proposes
+  a position and ΔBIC decides, one authority for both callers. The lesson
+  generalises — "is this the same component?" is not "can least squares split
+  these?". (2) **A new `PeakFlag` member is a four-surface edit**: the schema
+  Literal, `help.py`, `gui/src/lib/rxt.ts`'s `PEAK_FLAGS`, and the committed
+  `tests/data/gui/help_keys.json` — and touching `gui/src` means
+  `npm --prefix gui ci && run build`, because the dist digest covers it. Two
+  suites catch three of the four; the fixture rewrites itself and must then be
+  committed. (3) `INDEXING_THRESHOLDS_VERSION` deliberately did **not** move: no
+  `pick_peaks` answer changes, and a list that can carry the new flag comes from
+  a call that did not exist at 1.3. (4) An observation left alone: in the quiet
+  37.4° region of the bundled fluorapatite the frozen background envelope sits
+  2-3σ *above* the data (visible in the diff panel of the committed PNG). It
+  makes the empty-position answer conservative rather than wrong — a peak can
+  only add intensity — but a region where the envelope sat *below* the data
+  would push a named empty position to a small positive intensity instead of to
+  its bound. That belongs to `background_envelope`, not here.
+
+  **Next**, in order. [1102](1102-component-seam-humps.md) is unblocked and
+  independent; its first act is to sharpen its own row in
+  [`milestones/v1.4.md`](../milestones/v1.4.md) § Acceptance, which this session
+  deliberately left at the level ROADMAP already commits to — a bar set by
+  someone who has not read the WP is a bar set too low. Still owed to the
+  milestone and nobody's WP: deleting the `AGENT_PROTOCOL.md` pointer, which
+  moves `pyproject`'s wheel mapping and the links reaching it from four shipped
+  milestone records (they want redirecting to the skill, not dropping).
 
 - **2026-09-12** — pruned on arrival (`/wp-start`). The mailbox is folded into
   Context and deleted: WP-1110's named-position case and WP-1109's window cost
