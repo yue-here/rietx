@@ -24,7 +24,6 @@ from ..model.forward import PAWLEY_OVERLAP_FWHM_FRAC
 from ..schemas.indexing import (
     PEAK_ASYMMETRY_MIN_SIGMA,
     PEAK_AXIAL_TAIL_MAX_FWHM,
-    PEAK_DETECT_SEPARATION_FWHM_FRAC,
     PEAK_REFUTED_SIGMA,
     PEAK_SATELLITE_MAX_RATIO,
     PEAK_SATELLITE_NEAR_FWHM,
@@ -38,7 +37,7 @@ from ..schemas.instrument import Instrument
 from ..schemas.pattern import PatternData
 from ..strategy.staged import BOUND_HIT_RTOL
 from .diagnostics import peak_diagnostics
-from .peakfit import GroupFit, fit_group, fit_group_at
+from .peakfit import GroupFit, fit_group, fit_group_at, reseed_candidate
 from .peaks import Detection, PeakGroup, detect_peaks, group_at
 
 
@@ -132,9 +131,13 @@ def fit_peaks(data: PatternData, instrument: Instrument,
     position, so what comes back is wherever the solve left it (measured: 40 m°
     from the seed, with an esd of 1e+16 degrees saying exactly that) — the flag
     is the answer, the number is not.
-    (3) Where detection saw a component the list did not name, the named lines
-    in that window are flagged ``unnamed_neighbour``: the unnamed intensity had
-    nowhere to go but into them.
+    (3) Where the window holds a component the list did not name, its named
+    lines are flagged ``unnamed_neighbour``: the unnamed intensity had nowhere
+    to go but into them.  The question is asked of the caller's own fit, and
+    answered the way :func:`fit_group` answers it for detection's seeds — the
+    residual proposes a position and ΔBIC decides whether it pays
+    (:func:`~rietx.indexing.peakfit.reseed_candidate`) — so it catches a
+    component detection never seeded as well as one it did.
 
     Returns a :class:`PeakList` like :func:`pick_peaks`, so
     :meth:`PeakList.usable` is still the screened view and ``peaks`` still
@@ -147,13 +150,11 @@ def fit_peaks(data: PatternData, instrument: Instrument,
     lam0 = instrument.source.lines[0].wavelength.value
 
     groups = _windows_for(det, pos, instrument)
-    seen = (np.concatenate([g.seed_two_theta for g in det.groups])
-            if det.groups else np.zeros(0))
 
     peaks: list[ObservedPeak] = []
     for gi, group in enumerate(groups):
         fit = fit_group_at(det, group, instrument, group.seed_two_theta)
-        crowded = _unnamed_inside(det, group, seen)
+        crowded = reseed_candidate(det, group, instrument, fit) is not None
         for peak in peaks_of_group(fit, gi, lam0):
             peak.origin = "manual"
             if crowded:
@@ -219,30 +220,6 @@ def _windows_for(det: Detection, pos: np.ndarray,
         out.append(group_at(det, np.asarray(cluster), instrument))
         i += 1
     return sorted(out, key=lambda g: g.i0)
-
-
-def _unnamed_inside(det: Detection, group: PeakGroup,
-                    seen: np.ndarray) -> bool:
-    """Did detection see a component in this window that nobody named?
-
-    "The same line" is detection's own resolving power,
-    ``PEAK_DETECT_SEPARATION_FWHM_FRAC``: a seed closer than that to a named
-    position is a component detection could not have told apart from it, so
-    nothing was missed.  The apportionment constant ``PAWLEY_OVERLAP_FWHM_FRAC``
-    (0.5 FWHM) was the first choice here and is twice too generous for an
-    *identity* test — on the doubled-LaB6 fixture it called a seed 0.08° away
-    the same line and stayed silent while naming one of the two moved the
-    fitted position **51 m°, twenty-six of its own esds**.
-    """
-    if not len(seen):
-        return False
-    lo, hi = det.two_theta[group.i0], det.two_theta[group.i1 - 1]
-    inside = seen[(seen >= lo) & (seen <= hi)]
-    if not len(inside):
-        return False
-    near = PEAK_DETECT_SEPARATION_FWHM_FRAC * group.seed_fwhm
-    gap = np.abs(inside[:, None] - group.seed_two_theta[None, :])
-    return bool(np.any(np.min(gap, axis=1) > near))
 
 
 def _flag_extrapolated_background(peaks: list[ObservedPeak],

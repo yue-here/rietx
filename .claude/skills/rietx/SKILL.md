@@ -44,7 +44,7 @@ restated here; a page named `x` below is `https://rietx.org/using/x.html`.
 | §5 — you are about to quote a number: which field carries which fact, and read numbers rather than pixels | [`references/numbers.md`](references/numbers.md) | `report`, `results` |
 | §4/§4b — a judging or deliverable rule needs its measurement, before you override one | [`references/judging.md`](references/judging.md) | `report`, `qpa`, `constraints` |
 | §8 — the fit did something that makes no sense: twenty-one measured results that contradict an intuition | [`references/surprises.md`](references/surprises.md) | `refining` |
-| §7b-7f — the phase is unknown: peak picking, indexing, the closed loop, the extinction screen | [`references/diagnostics-indexing.md`](references/diagnostics-indexing.md) | `indexing` |
+| §7b-7f — the phase is unknown, or you want the peaks themselves and no cell: peak picking, fitting peaks you name, indexing, the closed loop, the extinction screen | [`references/diagnostics-indexing.md`](references/diagnostics-indexing.md) | `indexing` |
 | §9 — one fit is not the answer: the trajectory, and the history DAG as a search structure | [`references/history.md`](references/history.md) | `history` |
 | §9b — an in-situ ramp, a sweep or a tray: chaining N patterns, and checking the chain both ways | [`references/series.md`](references/series.md) | `series` |
 | §9c, deciding: ranking, differencing, auditing, identifiability | [`references/batch.md`](references/batch.md) | `history`, `series` |

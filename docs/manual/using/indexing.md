@@ -9,7 +9,7 @@ observed lines are.
 :::{admonition} Provisional
 :class: warning
 Indexing is under active development, so this chapter's names are documented
-but **not frozen**. `pick_peaks`, `index_pattern`,
+but **not frozen**. `pick_peaks`, `fit_peaks`, `index_pattern`,
 `determine_extinction_symbol`, the answer types in `rietx.schemas.indexing` and
 the helpers under `rietx.indexing` may change in a 1.x release, because the
 engines, the gates and the figures of merit are still being measured against
@@ -27,6 +27,10 @@ wants answered.
 | `pick_peaks` | a pattern and an instrument | `PeakList`: every resolvable line, with a fitted position and its own esd |
 | `index_pattern` | that list, and the pattern | `IndexingResult`: candidate lattices, ranked and graded |
 | `determine_extinction_symbol` | a candidate, and the pattern | `ExtinctionScreen`: the extinction classes that lattice admits |
+
+A fourth call in this chapter indexes nothing. `fit_peaks` fits the peaks
+*you* name, which is the same machinery serving a question that is not about a
+cell at all: [](#fitting-peaks-you-name).
 
 None of the three returns a single answer, by design.
 `IndexingResult` has no `.cell` and no `.best`; `ExtinctionScreen` has no
@@ -76,6 +80,7 @@ held.
 Abstention is a result here too: a pattern with too few lines comes back as a
 list carrying `PEAK_LIST_TOO_SHORT`, never as an exception.
 
+(what-a-list-holds)=
 ### What a list holds
 
 | Field | Holds |
@@ -190,6 +195,203 @@ information. Intensities default to equal weight, which is what a
 position-only list actually says. Pass `two_theta_esd=` if you know better,
 and `intensity=` when the source quotes relative intensities, because the search
 is driven by the strongest lines and intensities change which lines it uses.
+
+
+(fitting-peaks-you-name)=
+## Fitting peaks you name
+
+`pick_peaks` decides what the lines are. `fit_peaks` does not: you give it
+positions, and it fits exactly those. No structure, no space group, no
+refinement. It is the call for a width analysis over a chosen set of lines, a
+d-spacing lookup, or a check on one reflection.
+
+```python
+import tempfile
+
+import rietx as rx
+from rietx.examples import build_example
+
+with tempfile.TemporaryDirectory() as parent:
+    project = build_example("fap", parent)
+    data, ins = project.data, project.refinement.instrument
+
+# seven isolated fluorapatite lines, as you would read them off a plot
+peaks = rx.fit_peaks(data, ins, [28.094, 34.087, 39.985, 48.226,
+                                 49.521, 50.711, 51.522])
+
+for p in peaks.peaks[:3]:
+    print(f"{p.two_theta:7.3f} ± {p.two_theta_esd:.4f}°   "
+          f"d = {p.d:.4f} Å   FWHM = {p.fwhm:.4f}°   {p.origin}")
+```
+
+```text
+ 28.094 ± 0.0010°   d = 3.1735 Å   FWHM = 0.0665°   manual
+ 34.087 ± 0.0007°   d = 2.6279 Å   FWHM = 0.0693°   manual
+ 39.985 ± 0.0007°   d = 2.2529 Å   FWHM = 0.0707°   manual
+```
+
+The answer is a `PeakList`, the same object [](#what-a-list-holds) describes, so
+everything in it reads the same way. Two things differ, and both are about
+provenance: every line carries `origin="manual"`, because these positions are
+yours rather than detection's proposals, and the components fitted in each
+window are exactly the ones you named.
+
+| | `pick_peaks` | `fit_peaks` |
+|---|---|---|
+| what is fitted | every line detection resolves | the positions you pass |
+| a weak shoulder | proposed, then kept or refused on ΔBIC | fitted only if you name it |
+| `ObservedPeak.origin` | `fitted` | `manual` |
+| a position with no peak | never arises | returned, flagged `no_intensity` |
+
+Detection still runs. The background envelope, the seed widths and the window
+each group is fitted over all come from it, and a position inside a detected
+window reuses that window rather than re-sizing one around a subset of its
+components. Positions that share a window are fitted **together**, in one
+simultaneous solve, because overlapping components fitted separately each bias
+the other. A position where detection found nothing gets a fresh window sized
+exactly as detection sizes its own, and a position off the end of the pattern
+or in a gap is refused by name:
+
+```text
+ValueError: only 0 channel(s) around 2θ = 40.0000°; that is a gap or an
+excluded region, not a place a peak can be fitted
+```
+
+### Naming a position where there is no peak
+
+This is a correct request, not a mistake. A width analysis over a published
+line list, or a d-spacing lookup, will name positions that turn out to be
+empty, and the answer has to say so.
+
+```python
+import tempfile
+
+import rietx as rx
+from rietx.examples import build_example
+
+with tempfile.TemporaryDirectory() as parent:
+    project = build_example("fap", parent)
+    data, ins = project.data, project.refinement.instrument
+
+empty = rx.fit_peaks(data, ins, [37.43])       # flat background, no line
+line = empty.peaks[0]
+print(f"intensity {line.intensity:.0e}   esd(2θ) {line.two_theta_esd:.0e}°")
+print(f"flags {line.flags}")
+print(f"usable {len(empty.usable())} of {len(empty.peaks)}")
+```
+
+```text
+intensity 8e-16   esd(2θ) 3e+15°
+flags ['position_at_bound', 'no_intensity']
+usable 0 of 1
+```
+
+The line comes back **flagged and unusable**, never dropped: a component you
+placed is yours to see and remove, and a call that silently returns fewer peaks
+than you asked for is a call you cannot check. It is also not a measurement.
+A peak reaches the data only through intensity × profile, so a component at
+zero intensity has no gradient on its own position: what comes back is wherever
+the solve left it, and the esd of 3e+15° is the honest statement of that.
+`PeakList.usable` drops it for you; `PeakList.peaks` keeps the reason.
+
+### The neighbour you did not name
+
+If the window holds a component your list left out, its intensity has nowhere
+to go but into the components that were fitted. The named positions are then
+biased towards it, and χ²_red is the only other sign. Those lines are flagged
+`unnamed_neighbour`.
+
+```python
+import tempfile
+
+import rietx as rx
+from rietx.examples import build_example
+
+with tempfile.TemporaryDirectory() as parent:
+    project = build_example("fap", parent)
+    data, ins = project.data, project.refinement.instrument
+
+for named in ([52.253], [52.170, 52.253]):
+    for p in rx.fit_peaks(data, ins, named).peaks:
+        print(f"named {len(named)}: {p.two_theta:8.4f} ± {p.two_theta_esd:.4f}°"
+              f"   χ²_red {p.chi2_red:5.2f}   {p.flags}")
+```
+
+```text
+named 1:  52.2502 ± 0.0010°   χ²_red  4.94   ['unnamed_neighbour']
+named 2:  52.1701 ± 0.0067°   χ²_red  1.50   ['axial_tail']
+named 2:  52.2529 ± 0.0008°   χ²_red  1.50   []
+```
+
+Naming the weak neighbour moves the line you actually wanted by 2.7 m°, which
+is 2.7 times its own esd, and takes χ²_red from 4.94 to 1.50. The flag is
+**reported, not refused**: naming a subset is legitimate, and the esd inflation
+by √max(χ²_red, 1) already carries part of the cost. Whether 2.7 esds matters
+is yours to judge.
+
+The question is asked of your own fit rather than of detection's seed list: the
+residual proposes a position and ΔBIC decides whether it earns its two
+parameters, which is how `pick_peaks` decides the same thing. So the flag also
+catches a component detection never seeded.
+
+### Widths: a Williamson-Hall analysis
+
+The package fits the peaks; the analysis is four lines of numpy, and writing it
+out is better than hiding it behind a helper whose conventions you would have
+to look up anyway. Williamson and Hall (1953) separate size from strain by
+their different angular dependence: size broadening goes as 1/cosθ, strain as
+tanθ, so
+
+$$\beta \cos\theta = \frac{K\lambda}{L} + 4\varepsilon \sin\theta$$
+
+is a straight line in sinθ whose intercept gives the size L and whose slope
+gives the strain ε.
+
+```python
+import tempfile
+
+import numpy as np
+import rietx as rx
+from rietx.examples import build_example
+
+with tempfile.TemporaryDirectory() as parent:
+    project = build_example("fap", parent)
+    data, ins = project.data, project.refinement.instrument
+
+peaks = rx.fit_peaks(data, ins, [28.094, 34.087, 39.985, 48.226,
+                                 49.521, 50.711, 51.522])
+
+theta = np.radians(np.array([p.two_theta for p in peaks.peaks]) / 2.0)
+beta = np.radians(np.array([p.fwhm for p in peaks.peaks]))
+slope, intercept = np.polyfit(np.sin(theta), beta * np.cos(theta), 1)
+
+print(f"intercept Kλ/L = {intercept:.3e}  →  L = {0.9 * peaks.wavelength / intercept:.0f} Å")
+print(f"slope       4ε = {slope:.3e}  →  ε = {100 * slope / 4:.3f} %")
+```
+
+```text
+intercept Kλ/L = 1.023e-03  →  L = 1355 Å
+slope       4ε = 4.269e-04  →  ε = 0.011 %
+```
+
+**Those two numbers are the broadening of the pattern, not of the specimen.**
+`ObservedPeak.fwhm` is the width that was measured, and a measured width is the
+instrument's own width convolved with whatever the sample adds. On this
+fluorapatite the instrument dominates, so 1355 Å is a floor set by the
+diffractometer rather than a crystallite size. To get the sample's half, remove
+the instrument's first: measure the width law on a standard with
+`lab_calibrate`, save it with `save_instrument_profile`, and subtract it — in
+the widths for a Williamson-Hall plot, or, better, by refining the sample
+broadening terms against it, which is what [](model.md) covers and what
+`rietx.model.microstructure` reports with esds. The split itself is Part 2's
+{ref}`ch-profiles`.
+
+Two smaller conventions in the four lines above. The plot is in FWHM, not
+integral breadth, so K = 0.9 rather than 1: quote which you used, because the
+two differ by about 10 % on the same data. And the fit is unweighted, while
+`two_theta_esd` and the fitted widths give you everything a weighted fit
+needs — a weighted `np.polyfit` is one more argument, and on a list mixing
+strong and weak lines it is the right one.
 
 ## Whether the list can be indexed
 

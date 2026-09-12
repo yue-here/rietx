@@ -134,16 +134,16 @@ lab use become first-class, served by machinery that already exists.
       position beside an unnamed detected neighbour (flag fires).
 - [x] Top-level re-export + `"peak_fitting"` in `_SURFACE_FLAGS` + the
       capabilities expected-key set.
-- [ ] Manual: `using/indexing.md` — `fit_peaks` section + `pick_peaks`
+- [x] Manual: `using/indexing.md` — `fit_peaks` section + `pick_peaks`
       general-use subsection with executed d-spacing/W-H example; api-surface
       partition satisfied (documents `fit_peaks` at provisional tier).
-- [ ] Skill: the free-standing-peaks routing row + its `references/` file
+- [x] Skill: the free-standing-peaks routing row + its `references/` file
       (WP-1330's rule — a task *shape*, not a body rule), naming the
       named-position-that-fits-nothing answer and the `usable`/`peaks` split;
       `rietx skill --install . --copy` re-syncs the two committed copies;
       `tests/test_skill.py` green. (Replaces this WP's agent-envelope task,
       dead since WP-1303.)
-- [ ] `io/recipe.py`: the three messages saying free-standing peaks are
+- [x] `io/recipe.py`: the three messages saying free-standing peaks are
       "the v1.4 fit_peaks work" now describe a call that exists — reword the
       refusals (a `GSASII_SPF` recipe and a top-level `single_peaks` block are
       still refused; what changes is that they can name the call to use).

@@ -65,7 +65,7 @@ never silently ignore a refine flag.
 
 | Refused | Because |
 |---|---|
-| `schema_name` other than `GSASII_Rietveld` | `GSASII_SPF` is single-peak fitting, which this package does not do yet |
+| `schema_name` other than `GSASII_Rietveld` | `GSASII_SPF` is single-peak fitting, which is {ref}`fit_peaks <fitting-peaks-you-name>` here and not a recipe: it refines nothing |
 | `Type` other than `PXC` | every other type puts something that is not 2θ on the x axis |
 | a `size_broadening` or `strain_broadening` `model` other than `isotropic` | PowderLine itself raises `NotImplementedError` for these |
 | a non-zero `Zero` | see below |
@@ -73,7 +73,7 @@ never silently ignore a refine flag.
 | a negative `W`, `X` or `Y` | those are softplus-bounded at zero here; reading one would silently give ≈0 rather than the declared value |
 | a background peak whose Lorentzian γ exceeds one 2θ step | `BackgroundPeak` is a Gaussian, deliberately |
 | an `Uaniso` atom | anisotropic displacement through a recipe is not read yet |
-| a top-level `single_peaks` block with any live entry | free-standing peaks are not this package's yet |
+| a top-level `single_peaks` block with any live entry | free-standing peaks are not part of a refinement here; {ref}`fit_peaks <fitting-peaks-you-name>` fits them on their own |
 
 **`Zero` is the interesting one.** PowderLine states its unit twice and the two
 statements disagree: its easydiffraction engine converts `Zero` as

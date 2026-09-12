@@ -170,9 +170,10 @@ A refinement, a series, an indexing run and a suggestion each return their own t
 
 ## An unknown phase
 
-Peaks, then a cell, then the extinction symbol — the closed loop of §7b-7f, each step returning a ranked list and never a singleton.
+Peaks, then a cell, then the extinction symbol — the closed loop of §7b-7f, each step returning a ranked list and never a singleton. `rx.fit_peaks` leaves that loop: it fits the positions *you* name, for a width analysis or a d-spacing, with no cell in the question.
 
 - `rx.pick_peaks(data: PatternData, instrument: Instrument, *, two_theta_range: tuple[float, float] | None = None, shoulders: bool = True, flag_contamination: bool = True) -> PeakList` — Every resolvable line in `data`, with a fitted position and its esd.
+- `rx.fit_peaks(data: PatternData, instrument: Instrument, positions: np.ndarray | list[float], *, two_theta_range: tuple[float, float] | None = None) -> PeakList` — Profile-fit **exactly** the peaks at `positions` — no structure, no space group, no refinement.
 - `rx.index_pattern(peaks: PeakList | None = None, *, data: PatternData | None = None, instrument: Instrument | None = None, spec=None, preset: str | None = None, engines: Sequence[str] | None = None, quality=None, shift_from_pairs: bool = True, validate: bool = True, check_top: int | None = None, two_theta_limits: tuple[float, float] | None = None, events=None, cancel=None)` — Find the unit cell — or say, in the shape of the answer, that it cannot.
 - `rx.determine_extinction_symbol(data: PatternData, candidate: CellCandidate, instrument: Instrument, *, peaks: PeakList | None = None, two_theta_limits: tuple[float, float] | None = None, k_sigma: float = 3.0, max_classes: int | None = None, cancel=None) -> ExtinctionScreen` — Rank the extinction classes compatible with an indexed lattice.
 

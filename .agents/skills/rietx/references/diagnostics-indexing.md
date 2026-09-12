@@ -33,6 +33,52 @@ are read on the peak list, not on a `RefinementResult`.
 | `INDEX_SHIFT_ALLOWANCE` | (info) Quote the winning cell without fitting a shift template. The search *assumed* a systematic allowance (no shift had been measured), and a cell found inside a widened window absorbs the shift — measured, +1400 ppm on a certified pattern. Re-fit with `shift_template` and quote that cell |
 | `INDEX_SHIFT_FROM_PAIRS` | (info) Read the reported amplitude as naming a *cause*. It does not: the pair method measures the shift's size from harmonic reflection pairs with no reference, and `constant` and `cos_theta` are collinear over an ordinary range, so `best` is not an attribution. Read `pairs.refuted_templates` for what the data *do* reject, and widen the 2θ range if the cause matters |
 
+### Peaks you name (`rx.fit_peaks`)
+
+`pick_peaks` decides what the lines are; `fit_peaks(data, instrument, positions)`
+fits exactly the positions you pass and nothing else. Reach for it when the
+question is about the peaks rather than about a cell: a width analysis
+(Williamson-Hall) over lines you chose, d-spacings for a lookup, one reflection
+checked. It needs no structure and no space group, and it runs in tens of
+milliseconds on a lab pattern.
+
+The answer is an ordinary `PeakList`, so §7b's flags and the `usable()`/`peaks`
+split read exactly as they do above. Four rules are specific to naming your own
+positions.
+
+* **A position with no peak comes back flagged, not dropped.** It carries
+  `no_intensity` (and usually `position_at_bound`), and it is out of `usable()`.
+  Do not read its `two_theta`: a component at zero intensity has no gradient on
+  its own position, so the fitter leaves it wherever the solve ended, and the
+  esd says so in the only way it can — 3e+15° on the bundled fluorapatite
+  pattern. Count the flag, quote nothing (WP-1101).
+* **`unnamed_neighbour` means your list is incomplete, and the bias is real.**
+  It fires when the window holds a component you did not name, decided by the
+  same ΔBIC test `pick_peaks` uses to accept one. Measured on the bundled
+  fluorapatite: naming 52.253° alone gives 52.2502(10)° with χ²_red 4.94;
+  naming its weak neighbour at 52.170° too gives 52.2529(8)° with χ²_red 1.50 —
+  the line you wanted moved **2.7 m°, 2.7 of its own esds**. On a deliberately
+  doubled synthetic the same omission moved a position **51 m°, 26 esds**, with
+  χ²_red 0.93 → 82.5. Re-fit with the neighbour named, or say the position is
+  biased; do not quote it silently.
+* **Widths are the pattern's, not the specimen's.** `ObservedPeak.fwhm` is what
+  was measured: instrument convolved with sample. A Williamson-Hall intercept
+  from raw widths is a floor set by the diffractometer (1355 Å on that
+  fluorapatite, where the instrument dominates), not a crystallite size.
+  Calibrate the instrument on a standard first (`lab_calibrate`,
+  `save_instrument_profile`), or refine the sample-broadening terms and read
+  `rietx.model.microstructure`, which reports each mechanism with an esd and
+  says whether the two are separable. State K and whether β is FWHM or integral
+  breadth whenever you quote a size: they differ by ~10 % on the same data.
+* **Refusals are by name, not by silence.** A position off the end of the
+  pattern, or in a gap or an excluded region, raises `ValueError` naming the
+  position and the channel count. That is a fact about the range you asked for;
+  re-read the pattern's limits rather than retrying.
+
+Positions sharing a window are fitted together in one solve, so pass the whole
+cluster at once rather than calling once per line — separate calls over
+overlapping lines each bias the other.
+
 ## 7c. The answer's own diagnostics (`IndexingResult.diagnostics`, and each candidate's)
 
 These arrive from `rietx.index_pattern`. **Statements about one candidate live
