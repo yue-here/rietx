@@ -8,9 +8,8 @@ Depends on: — (first of the free-standing peaks set; opens the 11xx block)
 A caller can profile-fit peaks in a pattern — including exactly the positions
 they name, with no structure, no space group and no refinement — through one
 documented top-level call, `fit_peaks(data, instrument, positions) →
-PeakList`, and through `agent.refine_json` (`task="fit_peaks"`). Peak-width
-analysis (Williamson-Hall), quick d-spacings and general lab use become
-first-class, served by machinery that already exists.
+PeakList`. Peak-width analysis (Williamson-Hall), quick d-spacings and general
+lab use become first-class, served by machinery that already exists.
 
 ## Context
 
@@ -46,24 +45,31 @@ first-class, served by machinery that already exists.
   new `PeakFlag` member (`"unnamed_neighbour"`; the Literal lives in
   provisional `schemas/indexing.py`, so the addition is cheap) and the esd
   inflation carries the numeric honesty. Evidence, not refusal.
-- **The load-bearing lift.** Fresh-window sizing for a position where
-  detection found nothing lives in `gui/peaks.py` (`PeakEditor._new_group`):
-  predicted FWHM × width_scale × `PEAK_WINDOW_FWHM_MULT` + FCJ extent, with
-  refusals naming an out-of-range position and a gap (`_MIN_GROUP_POINTS`).
-  Move it down into `indexing/` and have gui import it back — gui is never
-  imported by indexing. Pin: `tests/test_gui_peaks.py` stays green, plus a
-  direct window-equality test.
-- **Agent surface — the set's one contract-version event.** `task="fit_peaks"`
-  with `positions: list[float] | None`: positions given → `fit_peaks`; absent
-  → `pick_peaks` (one tag, one answer shape). Request modeled on
-  `IndexRequest` (`agent.py` — extends `Base` directly: no backend, solver or
-  plan). New `AgentSuccess.peaks: PeakList | None` arm — a different *shape*,
-  so its own arm ([1043](1043-agent-and-human-indexing.md)'s rule). A new
-  task tag and answer arm are closed-vocabulary additions to the agent
-  envelope, so `SCHEMA_VERSION` moves as a minor event. Release ordering is
-  the maintainer's: if 1.0.2 ships first (recommended — nothing gates it),
-  this takes its own 0.2 → 0.3 inside 1.1.0.dev; if 1.0.2 is held, it rides
-  that bump. `tool_definition()`'s registry meta-tests must stay green.
+- **The load-bearing lift** (re-read 2026-09-12; smaller than written).
+  `PEAK_WINDOW_FWHM_MULT = 4.0` already lives in `schemas/indexing.py` and
+  both sites import it from there. What is duplicated is the *arithmetic*:
+  `gui/peaks.py` (`PeakEditor._new_group`) sizes a fresh window around one
+  position — predicted FWHM × `Detection.width_scale` × mult, FCJ extent added
+  on the low side only, `searchsorted` both ends, refusals naming an
+  out-of-range position and a gap (`_MIN_GROUP_POINTS = 8`) — and
+  `indexing/peaks.py` (`detect_peaks`'s per-group loop) does the same over a
+  seed *span* with no refusals. Lift one helper into `indexing/` covering
+  both, have gui import it back (gui is never imported by indexing). Pin:
+  `tests/test_gui_peaks.py` stays green, plus a direct window-equality test
+  against the detection loop.
+- **Agent surface — superseded 2026-09-12, and the replacement is smaller.**
+  This WP was written against `agent.refine_json`; [1303](1303-retire-refine-json.md)
+  deleted that module in v1.3 after measuring zero use, so there is no task
+  tag, no `AgentSuccess.peaks` arm, no `SCHEMA_VERSION` event and no
+  `tests/test_agent_surface.py` (the file does not exist; the acceptance
+  command below was corrected). `fit_peaks` is reached the way every other
+  call is. Two things survive from that bullet. The *contract* fact is now
+  `capabilities()`, whose `features` flag is the only thing a client branches
+  on. And the agent-facing judgement — when free-standing peak fitting is the
+  right answer at all, and what to do with a named position that fits nothing
+  — belongs in the skill (`docs/skill/rietx/`), which is where a rule for a
+  task *shape* goes (root CLAUDE.md § skill, WP-1330); the manual's
+  `using/agents.md` describes the surface's shape and needs no catalogue row.
 - `pick_peaks` gets re-documented as a general-purpose tool: a short
   subsection in `../manual/using/indexing.md` with an executed example —
   d-spacings from `q`, widths from `fwhm`, a Williamson-Hall computation done
@@ -72,66 +78,34 @@ first-class, served by machinery that already exists.
   (`capabilities.py`) beside `"peak_picking"`; the hand-written expected-key
   set in `tests/test_capabilities.py` grows by one.
 
-### Inherited
-
-**From WP-1110 item 14 (2026-08-21) — `PeakList` gained a flag, and the case it
-names is exactly the one `fit_peaks(positions=…)` invites.**
-
-`normal_covariance` is now Jacobi-equilibrated before the pseudo-inverse, and
-`indexing/peakfit.py` is its second consumer. The consequence for this WP: a
-component that refines onto its **zero intensity bound** has no gradient on its
-own position, so its fitted 2θ is whatever the seed was. It now comes back
-flagged `no_intensity`, which is in `PEAK_UNUSABLE_FLAGS`
-(`INDEXING_THRESHOLDS_VERSION` 1.3). Before this the pseudo-inverse truncated
-such a component's position esd to an ordinary-looking 0.06°; two of the
-certified corundum pattern's 62 components had been published that way.
-
-**This is the failure mode `positions=` makes routine.** A caller naming
-positions explicitly — Williamson-Hall over a list, a d-spacing lookup — will
-name some where there is no peak, and that is a *correct* request rather than a
-mistake. So `fit_peaks` needs to say what its answer is for one: the flag is
-there and is the right vocabulary, but decide deliberately whether a
-user-named position that fits nothing is returned flagged (the peak editor's
-precedent: a component a human placed is theirs to see and remove) or refused,
-and say so in the chapter. Do **not** drop it silently — that is the version
-this WP tried first and it made the GUI's add verb do nothing.
-
-Related: `PeakList.usable()` is what indexing consumes, so a public `fit_peaks`
-returning `PeakList` inherits a `usable`/`peaks` split its callers must be told
-about.
-
-**From WP-1109 (2026-08-20), measured on this worktree's `[dev]` venv,
-darwin/arm64 — the cost model for window sizing is not the intuitive one.**
-
-The profile kernel is **dispatch-bound, not point-bound**:
-`model/profiles/pseudovoigt.py:64` `pseudo_voigt_derivs` costs **11.8 µs at a
-25-point window and 13.6 µs at 194 points** — about 11 µs of fixed python/ufunc
-dispatch and ~0.01 µs per point. So a fitter's cost tracks the *number* of
-windows it evaluates, essentially not their width. Two consequences for the
-fresh-window sizing task here: widening a window to be safe is close to free,
-and shaving points off one to be fast buys almost nothing (measured ~13 % on the
-refinement path). Optimise the count, not the width.
-
-For calibration on what the refinement path currently does — this is context,
-not a rule to copy: `model/forward.py:110-111` sets `WINDOW_FWHM_MULT = 30.0`
-and `WINDOW_MIN_DEG = 0.3`, which on the `qarr/cpd-2` protocol gives a median
-window of 185 points against a median FWHM of 3 points (**~69× FWHM**), and
-summed window points of **8.1 × n_points** per residual. That margin is sized
-for a pure Lorentzian and applied unconditionally: truncation at 8 FWHM is
-2.0e-3 of peak height at η = 0.6, and at 4 FWHM 7.8e-3 — though the 1109
-review re-judged truncation by *area* (a ±8 FWHM cut at η = 0.6 loses ≈2.4 %
-of intensity), and the η-aware sizing task moved to WP-1112 with that
-corrected criterion. If `PEAK_WINDOW_FWHM_MULT` here ends up deriving from
-`WINDOW_FWHM_MULT`, expect that constant to move under 1112.
-
-**Forward note (WP-1112, 2026-08-21)**: it moved. `WINDOW_FWHM_MULT` is
-gone; windows are sized per peak by `window_fwhm_mult(η)` against
-`WINDOW_AREA_TOL = 2e-2` (a discarded-*area* bound; the Lorentzian tail
-makes k ≈ η/(π·tol), so a 1e-3 tolerance would have *grown* every lab
-window — the sweep is in 1112's task-4 record). On `qarr/cpd-1a` the summed
-window points fell 8.5 → 2.8 × n_points. `PEAK_WINDOW_FWHM_MULT` here is
-untouched and still independent; the paragraph above stays as the
-pre-1112 calibration snapshot.
+- **A named position that fits nothing is the routine case, not the mistake**
+  (folded 2026-09-12 from WP-1110 item 14's mailbox entry; re-verified in the
+  tree — `no_intensity` is in `PeakFlag` and in `PEAK_UNUSABLE_FLAGS`,
+  `INDEXING_THRESHOLDS_VERSION` 1.3). A component that refines onto its zero
+  intensity bound has no gradient on its own position, so its fitted 2θ is
+  whatever the seed was; since the equilibrated `normal_covariance` it comes
+  back flagged rather than wearing an ordinary-looking 0.06° esd, which two of
+  the certified corundum pattern's 62 components had been published with. A
+  caller naming positions — a W-H list, a d-spacing lookup — *will* name some
+  where there is no peak, and that is a correct request. So `fit_peaks` must
+  say what its answer is for one: return it flagged (the peak editor's
+  precedent — a component a human placed is theirs to see and remove) or
+  refuse, decided deliberately and written into the chapter. Not dropped
+  silently: that is the version this WP tried first, and it made the GUI's add
+  verb do nothing. `PeakList.usable()` is what indexing consumes, so a public
+  `fit_peaks` returning a `PeakList` inherits a `usable`/`peaks` split its
+  callers must be told about.
+- **Window width is nearly free; window *count* is the cost** (folded from
+  WP-1109's mailbox, measured on `[dev]`, darwin/arm64).
+  `pseudo_voigt_derivs` costs 11.8 µs at a 25-point window and 13.6 µs at 194
+  points — ~11 µs of fixed dispatch, ~0.01 µs per point — so a fitter's cost
+  tracks how many windows it evaluates, essentially not how wide they are.
+  Widening to be safe is close to free; shaving points to be fast bought ~13 %
+  on the refinement path. The rest of that entry was the pre-1112 calibration
+  of `forward.WINDOW_FWHM_MULT`, which WP-1112 deleted (windows are now sized
+  per peak by `window_fwhm_mult(η)` against `WINDOW_AREA_TOL`); verified
+  landed 2026-09-12, and `PEAK_WINDOW_FWHM_MULT` here is untouched and still
+  independent of it.
 
 ## Non-goals
 
@@ -158,9 +132,16 @@ pre-1112 calibration snapshot.
 - [ ] Manual: `using/indexing.md` — `fit_peaks` section + `pick_peaks`
       general-use subsection with executed d-spacing/W-H example; api-surface
       partition satisfied (documents `fit_peaks` at provisional tier).
-- [ ] Agent: `task="fit_peaks"` request + `peaks` answer arm;
-      `SCHEMA_VERSION` event per its rule; `tool_definition` + envelope
-      tests + `using/agents.md` row.
+- [ ] Skill: the free-standing-peaks routing row + its `references/` file
+      (WP-1330's rule — a task *shape*, not a body rule), naming the
+      named-position-that-fits-nothing answer and the `usable`/`peaks` split;
+      `rietx skill --install . --copy` re-syncs the two committed copies;
+      `tests/test_skill.py` green. (Replaces this WP's agent-envelope task,
+      dead since WP-1303.)
+- [ ] `io/recipe.py`: the three messages saying free-standing peaks are
+      "the v1.4 fit_peaks work" now describe a call that exists — reword the
+      refusals (a `GSASII_SPF` recipe and a top-level `single_peaks` block are
+      still refused; what changes is that they can name the call to use).
 - [ ] Tests wrap-up (fast-suite delta stated in the handover) + ruff +
       sphinx `-W` + obs/calc/diff-style PNGs of fitted groups to
       `tests/output/`.
@@ -171,7 +152,7 @@ pre-1112 calibration snapshot.
 W-H numbers come from an executed block.
 
 ```sh
-.venv/bin/python -m pytest tests/test_peak_picking.py tests/test_gui_peaks.py tests/test_agent_surface.py tests/test_capabilities.py tests/test_manual_api.py -q
+.venv/bin/python -m pytest tests/test_peak_picking.py tests/test_gui_peaks.py tests/test_capabilities.py tests/test_manual_api.py tests/test_skill.py tests/test_recipe.py
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
 .venv/bin/python -m ruff check src tests examples
 .venv/bin/python -m sphinx -W -q -b html docs/manual docs/manual/_build/html
@@ -187,6 +168,19 @@ W-H numbers come from an executed block.
   lifts), [1078](1078-indexing-provisional.md) (the provisional tier).
 
 ## Handover log
+
+- **2026-09-12** — pruned on arrival (`/wp-start`). The mailbox is folded into
+  Context and deleted: WP-1110's named-position case and WP-1109's window cost
+  model are both still true and are now Context bullets, and WP-1112's forward
+  note is confirmed landed. One task died and one was corrected: the agent
+  envelope (`refine_json`, `AgentSuccess`, `SCHEMA_VERSION`,
+  `tests/test_agent_surface.py`) was deleted entire by WP-1303 in v1.3, so the
+  contract half of that task is now `capabilities()` and the judgement half is
+  a skill reference; and `PEAK_WINDOW_FWHM_MULT` already sits in
+  `schemas/indexing.py` with both sites importing it, so the lift is of the
+  sizing *arithmetic* only. Added: `io/recipe.py` carries three refusal
+  messages (landed with WP-1306, after this WP was written) whose prose says
+  the call does not exist yet.
 
 - **2026-08-18** — created from the single-peak planning session; numbering
   opens the 11xx block (v1.1). Designed alongside
