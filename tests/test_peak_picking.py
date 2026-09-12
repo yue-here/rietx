@@ -1088,3 +1088,62 @@ def test_a_short_named_list_is_not_told_it_is_too_short_to_index():
     # but pick_peaks on a three-line range still says it
     short = pick_peaks(_noisy(y, grid, seed=7), ins, two_theta_range=(20.0, 45.0))
     assert "PEAK_LIST_TOO_SHORT" in [d.code for d in short.diagnostics]
+
+
+def test_fit_peaks_writes_obs_calc_diff_panels(tmp_path):
+    """Obs/calc/difference for the four cases ``fit_peaks`` has to get right.
+
+    Written to ``tests/output/`` and meant to be looked at: a χ²_red and a flag
+    say a window went wrong, and only the picture says *how*. The pattern is
+    the bundled fluorapatite, so these are the manual chapter's own numbers.
+    """
+    import matplotlib.pyplot as plt
+
+    from rietx.examples import build_example
+    from rietx.indexing.peakfit import fit_group_at, group_profile
+    from rietx.indexing.pick import _windows_for
+
+    project = build_example("fap", tmp_path)
+    data, ins = project.data, project.refinement.instrument
+    det = detect_peaks(data, ins)
+
+    cases = [
+        ("one isolated line", [49.521]),
+        ("a pair, one named", [52.253]),
+        ("the same pair, both named", [52.170, 52.253]),
+        ("nothing there (37.43°)", [37.43]),
+    ]
+
+    OUT.mkdir(exist_ok=True)
+    fig, axes = plt.subplots(2, 4, figsize=(15, 6),
+                             gridspec_kw={"height_ratios": [3, 1]})
+    for col, (label, named) in enumerate(cases):
+        group = _windows_for(det, np.asarray(named, dtype=float), ins)[0]
+        fit = fit_group_at(det, group, ins, group.seed_two_theta)
+        s = slice(group.i0, group.i1)
+        x, obs, sig = det.two_theta[s], det.intensity[s], det.sigma[s]
+        calc = det.envelope[s] + group_profile(det, group, ins, fit)
+
+        top, bot = axes[0, col], axes[1, col]
+        top.plot(x, obs, "k.", ms=3, label="obs")
+        top.plot(x, calc, "r-", lw=1.0, label="calc")
+        top.plot(x, det.envelope[s], "g-", lw=0.8, label="background")
+        for tt in named:
+            top.axvline(tt, color="b", ls="--", lw=0.8)
+        for tt in fit.two_theta:
+            top.axvline(tt, color="r", ls=":", lw=0.8)
+        top.set_title(f"{label}\nχ²_red {fit.chi2_red:.2f}", fontsize=9)
+        if col == 0:
+            top.legend(fontsize=7)
+            top.set_ylabel("counts")
+            bot.set_ylabel("Δ/σ")
+        bot.axhline(0.0, color="0.6", lw=0.8)
+        bot.plot(x, (obs - calc) / sig, "k-", lw=0.8)
+        bot.set_xlabel("2θ (°)")
+
+    fig.suptitle("WP-1101 fit_peaks on the bundled fluorapatite — "
+                 "blue dashed = the position named, red dotted = fitted")
+    fig.tight_layout()
+    fig.savefig(OUT / "fit_peaks_groups.png", dpi=110)
+    plt.close(fig)
+    assert (OUT / "fit_peaks_groups.png").exists()
