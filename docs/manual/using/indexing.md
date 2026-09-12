@@ -249,8 +249,8 @@ window reuses that window rather than re-sizing one around a subset of its
 components. Positions that share a window are fitted **together**, in one
 simultaneous solve, because overlapping components fitted separately each bias
 the other. A position where detection found nothing gets a fresh window sized
-exactly as detection sizes its own, and a position off the end of the pattern
-or in a gap is refused by name:
+exactly as detection sizes its own, and a position off the end of the pattern,
+in a gap, or named twice is refused by name:
 
 ```text
 ValueError: only 0 channel(s) around 2θ = 40.0000°; that is a gap or an

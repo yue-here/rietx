@@ -73,7 +73,9 @@ positions.
 * **Refusals are by name, not by silence.** A position off the end of the
   pattern, or in a gap or an excluded region, raises `ValueError` naming the
   position and the channel count. That is a fact about the range you asked for;
-  re-read the pattern's limits rather than retrying.
+  re-read the pattern's limits rather than retrying. The same position named
+  twice is refused too: two components at one 2θ are exactly singular in their
+  intensities, so there is no answer to give.
 
 Positions sharing a window are fitted together in one solve, so pass the whole
 cluster at once rather than calling once per line — separate calls over

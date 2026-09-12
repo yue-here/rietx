@@ -119,7 +119,8 @@ def fit_peaks(data: PatternData, instrument: Instrument,
     A position where detection found nothing gets a fresh window sized exactly
     as detection sizes its own (:func:`~rietx.indexing.peaks.group_at`), and a
     position off the end of the pattern or in a gap is refused by name rather
-    than fitted into nonsense.
+    than fitted into nonsense, as is the same position named twice — two
+    components at one 2θ are exactly singular in their intensities.
 
     **Three things a caller must know about the answer.**  (1) Every line
     carries ``origin="manual"``: these positions are the caller's, not
@@ -146,6 +147,16 @@ def fit_peaks(data: PatternData, instrument: Instrument,
     pos = np.sort(np.asarray(positions, dtype=np.float64).ravel())
     if not len(pos):
         raise ValueError("fit_peaks needs at least one position to fit")
+    # two components at one position are the same component twice: the solve is
+    # exactly singular in their intensities, and what comes back is an
+    # arbitrary split of one peak wearing two esds.  Refused by name, as a gap
+    # is, rather than answered
+    if len(pos) > 1:
+        same = pos[:-1][np.diff(pos) == 0.0]
+        if len(same):
+            raise ValueError(
+                f"2θ = {same[0]:.4f}° is named more than once; two components "
+                "at one position cannot be told apart, so name it once")
     det = detect_peaks(data, instrument, two_theta_range=two_theta_range)
     lam0 = instrument.source.lines[0].wavelength.value
 
@@ -211,13 +222,13 @@ def _windows_for(det: Detection, pos: np.ndarray,
     i = 0
     while i < len(fresh):
         cluster = [fresh[i]]
-        while i + 1 < len(fresh):
-            window = group_at(det, np.asarray(cluster), instrument)
-            if fresh[i + 1] > det.two_theta[window.i1 - 1]:
-                break
+        window = group_at(det, np.asarray(cluster), instrument)
+        while (i + 1 < len(fresh)
+               and fresh[i + 1] <= det.two_theta[window.i1 - 1]):
             cluster.append(fresh[i + 1])
             i += 1
-        out.append(group_at(det, np.asarray(cluster), instrument))
+            window = group_at(det, np.asarray(cluster), instrument)
+        out.append(window)
         i += 1
     return sorted(out, key=lambda g: g.i0)
 
@@ -500,5 +511,5 @@ def flag_ghosts(peaks: list[ObservedPeak], wavelength: float,
             peaks[k].flags = [*peaks[k].flags, name]
 
 
-__all__ = ["flag_ghosts", "flag_kalpha2_residuals", "peaks_of_group",
-           "pick_peaks", "pick_peaks_with_state"]
+__all__ = ["fit_peaks", "flag_ghosts", "flag_kalpha2_residuals",
+           "peaks_of_group", "pick_peaks", "pick_peaks_with_state"]

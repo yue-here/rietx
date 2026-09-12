@@ -1078,6 +1078,19 @@ def test_fit_peaks_needs_a_position():
         fit_peaks(_noisy(y, grid, seed=7), ins, [])
 
 
+def test_the_same_position_named_twice_is_refused():
+    """Two components at one 2θ are exactly singular in their intensities.
+
+    Whatever comes back is an arbitrary split of one peak wearing two esds, so
+    the answer is the refusal — the rule a gap and an off-the-end position
+    already follow.
+    """
+    ins = _instrument()
+    y, grid, truth = _forward(ins)
+    with pytest.raises(ValueError, match="named more than once"):
+        fit_peaks(_noisy(y, grid, seed=7), ins, [truth[0], truth[0]])
+
+
 def test_a_short_named_list_is_not_told_it_is_too_short_to_index():
     """``PEAK_LIST_TOO_SHORT`` is about indexing a pattern; here the count is
     the caller's own argument, and repeating it back is noise."""

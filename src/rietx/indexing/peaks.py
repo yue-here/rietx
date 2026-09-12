@@ -184,8 +184,12 @@ def group_at(det: Detection, positions: np.ndarray,
     fw = float(np.mean(det.width_scale * predicted_fwhm(pos, instrument)))
     i0, i1 = window_indices(tt, float(pos[0]), float(pos[-1]), fw, instrument)
     if i1 - i0 < MIN_GROUP_POINTS:
+        # a cluster is refused as a span: naming only its first position hides
+        # which of the caller's positions the window was supposed to cover
+        where = (f"2θ = {pos[0]:.4f}°" if len(pos) == 1 else
+                 f"2θ = {pos[0]:.4f}–{pos[-1]:.4f}°")
         raise ValueError(
-            f"only {i1 - i0} channel(s) around 2θ = {pos[0]:.4f}°; that is a "
+            f"only {i1 - i0} channel(s) around {where}; that is a "
             "gap or an excluded region, not a place a peak can be fitted")
     return PeakGroup(i0=i0, i1=i1, seed_two_theta=pos, seed_fwhm=fw,
                      from_shoulder=np.zeros(len(pos), dtype=bool))
@@ -466,5 +470,6 @@ def _group_indices(tt: np.ndarray, fwhm: np.ndarray) -> list[np.ndarray]:
 
 
 #: re-exported so a caller can see which constant set the grouping
-__all__ = ["Detection", "PeakGroup", "PAWLEY_OVERLAP_FWHM_FRAC",
-           "detect_peaks", "predicted_fwhm"]
+__all__ = ["Detection", "MIN_GROUP_POINTS", "PeakGroup",
+           "PAWLEY_OVERLAP_FWHM_FRAC", "detect_peaks", "group_at",
+           "predicted_fwhm", "window_indices"]
