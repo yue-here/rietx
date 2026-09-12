@@ -425,6 +425,16 @@ PEAK_ASSUMED_ESD_DEG = 0.02
 #: judgement left for a consumer to make.  It stays in ``peaks`` for the same
 #: reason ``not_separable`` does — a report must be able to say why a line went,
 #: and a component a *human* placed is theirs to see and remove.
+#: ``unnamed_neighbour`` — only :func:`~rietx.indexing.fit_peaks` can raise it
+#: (WP-1101): detection saw a component inside this window that the caller's
+#: position list did not name, so the fit apportioned that intensity among the
+#: named components and biased their positions.  The only other numeric trace
+#: is χ²_red.  **Reported, not refused**: naming a subset is a legitimate
+#: request — one line of a cluster is all a d-spacing lookup wants — and the
+#: esd inflation by √max(χ²_red, 1) already carries the cost.  It is absent
+#: from :data:`PEAK_UNUSABLE_FLAGS` for that reason, and it does not move
+#: :data:`INDEXING_THRESHOLDS_VERSION`: no ``pick_peaks`` answer changes, and a
+#: list that can carry the flag comes from a call that did not exist at 1.3.
 PeakFlag = Literal[
     "ghost_kbeta",
     "ghost_tungsten",
@@ -439,6 +449,7 @@ PeakFlag = Literal[
     "axial_tail",
     "kalpha2_residual",
     "no_intensity",
+    "unnamed_neighbour",
 ]
 
 #: FWHM multiple within which a weak component may be read as a stronger

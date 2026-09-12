@@ -868,6 +868,20 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
         ),
         anchor="peak-positions.html#wavelength-scales",
     ),
+    "unnamed_neighbour": HelpEntry(
+        title="An unnamed component shares this window",
+        label="unnamed neighbour",
+        description=(
+            "You named the components in this window, and detection found "
+            "another one you did not name. Its intensity had nowhere to go but "
+            "into the components that were fitted, so their positions are "
+            "biased towards it and χ²_red is the only other sign. Reported and "
+            "not refused: naming a subset is a legitimate request, and the esd "
+            "inflation by the square root of χ²_red already carries the cost. "
+            "Name the neighbour too, or narrow the range, if the position "
+            "matters."
+        ),
+    ),
     "no_intensity": HelpEntry(
         title="Refined to zero intensity",
         label="no intensity",

@@ -312,6 +312,7 @@ def test_features_are_derived_not_asserted(caps):
     """
     assert caps.features["indexing"] is True
     assert caps.features["peak_picking"] is True
+    assert caps.features["peak_fitting"] is True
     assert caps.features["cancellation"] is True
 
     # schema-shaped flags follow the schemas
@@ -358,7 +359,7 @@ def test_the_documented_feature_keys_are_present(caps):
         "capillary_absorption", "flat_plate_absorption", "anomalous_dispersion",
         "anomalous_dispersion_default_on", "multi_histogram",
         "sequential_series", "project_container", "background_estimation",
-        "pattern_diagnostics", "peak_picking", "indexing",
+        "pattern_diagnostics", "peak_picking", "peak_fitting", "indexing",
         "cancellation", "report_trajectory", "powderline_recipe",
         "compiled_kernels", "compiled_kernels_active",
     }

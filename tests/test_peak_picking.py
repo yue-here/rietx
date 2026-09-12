@@ -27,7 +27,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from rietx import Instrument, PatternData, pick_peaks
+from rietx import Instrument, PatternData, fit_peaks, pick_peaks
 from rietx.crystallography.lattice import d_spacings
 from rietx.indexing.diagnostics import peak_diagnostics
 from rietx.indexing.peakfit import GroupFit, _fit_at, _GroupModel, fit_group
@@ -954,3 +954,137 @@ def test_two_named_positions_share_one_window():
     # is what keeps a multi-seed window bit-identical to detection's own
     other = group_at(det, pair[1:], ins)
     assert both.seed_fwhm == 0.5 * (one.seed_fwhm + other.seed_fwhm)
+
+
+# ----------------------------------------------------------------------
+# fit_peaks: exactly the components a caller names (WP-1101)
+# ----------------------------------------------------------------------
+def _doubled(ins: Instrument, shift: int = 5, seed: int = 11):
+    """A LaB6 pattern with every line doubled 0.05° away.
+
+    LaB6 resolves, so nothing in the plain pattern makes a group of two, and
+    the case ``fit_peaks`` has to get right is precisely a window holding more
+    components than the caller named.  0.05° is the narrow band where detection
+    sees two maxima (past ``PEAK_DETECT_SEPARATION_FWHM_FRAC``) and grouping
+    still puts them in one window (inside ``PAWLEY_OVERLAP_FWHM_FRAC``).
+    """
+    y, grid, _truth = _forward(ins)
+    return _noisy(y + np.roll(y, shift), grid, seed)
+
+
+def test_fit_peaks_measures_the_positions_it_was_given():
+    """The whole point: positions in, fitted positions with esds out.
+
+    Against the forward model's own Bragg positions, so the residuals are
+    errors rather than a comparison of two fits.
+    """
+    ins = _instrument()
+    y, grid, truth = _forward(ins)
+    data = _noisy(y, grid, seed=7)
+
+    peaks = fit_peaks(data, ins, truth[:6])
+    assert len(peaks.peaks) == 6
+    assert all(p.origin == "manual" for p in peaks.peaks)
+    assert peaks.source == "fitted"
+
+    got = np.array([p.two_theta for p in peaks.peaks])
+    esd = np.array([p.two_theta_esd for p in peaks.peaks])
+    assert np.max(np.abs(got - truth[:6])) < 1e-3
+    assert np.max(np.abs(got - truth[:6]) / esd) < 3.0
+
+
+def test_a_named_position_with_no_peak_comes_back_flagged_not_dropped():
+    """A position where there is nothing is a *correct* request to fit.
+
+    Williamson-Hall over a published line list, a d-spacing lookup — a caller
+    naming positions will name some that are empty.  The answer is the flag,
+    never a silent drop (which made the GUI's add verb do nothing) and never a
+    position wearing an ordinary esd: the component has no gradient on its own
+    position, so the number it comes back with means nothing and its esd says
+    so in the only way it can.
+    """
+    ins = _instrument()
+    y, grid, _truth = _forward(ins)
+    data = _noisy(y, grid, seed=7)
+
+    peaks = fit_peaks(data, ins, [35.0])          # flat background, no line
+    assert len(peaks.peaks) == 1
+    assert "no_intensity" in peaks.peaks[0].flags
+    assert peaks.peaks[0].intensity < 1e-12
+    assert not peaks.usable()
+    assert peaks.peaks[0].two_theta_esd > 1.0
+
+
+def test_an_unnamed_component_in_the_window_is_flagged():
+    """Detection saw a line the caller did not name, and fitting without it
+    biases the ones that were named.
+
+    Measured on this fixture: naming one of the two moves the fitted position
+    **51 m°, 26 of its own esds**, and χ²_red goes 0.93 → 82.5.  Nothing else
+    in the answer says so, which is why the flag exists — and why it is
+    reported rather than refused: naming a subset is legitimate.
+    """
+    ins = _instrument()
+    data = _doubled(ins)
+    det = detect_peaks(data, ins)
+    pair = next(g for g in det.groups if g.n > 1)
+
+    both = fit_peaks(data, ins, pair.seed_two_theta)
+    assert [p.flags for p in both.peaks] == [[], []]
+    assert both.peaks[0].n_in_group == 2
+
+    one = fit_peaks(data, ins, [float(pair.seed_two_theta[0])])
+    assert "unnamed_neighbour" in one.peaks[0].flags
+    assert one.peaks[0].chi2_red > 10.0 * both.peaks[0].chi2_red
+    # reported, not refused: the line is still usable, with its esd inflated
+    assert len(one.usable()) == 1
+    assert one.peaks[0].two_theta_esd > both.peaks[0].two_theta_esd
+
+    bias = abs(one.peaks[0].two_theta - both.peaks[0].two_theta)
+    assert bias > 10.0 * one.peaks[0].two_theta_esd
+
+
+def test_two_named_positions_in_one_window_are_fitted_together():
+    """Overlapping components fitted separately each bias the other, so a
+    shared window is one simultaneous solve — the same rule the group fitter
+    already follows for detection's own seeds."""
+    ins = _instrument()
+    data = _doubled(ins)
+    det = detect_peaks(data, ins)
+    pair = next(g for g in det.groups if g.n > 1)
+
+    peaks = fit_peaks(data, ins, pair.seed_two_theta)
+    assert len(peaks.peaks) == 2
+    assert {p.group for p in peaks.peaks} == {peaks.peaks[0].group}
+    assert all(p.n_in_group == 2 for p in peaks.peaks)
+    # and they came apart: two distinct lines, not one fitted twice
+    assert peaks.peaks[1].two_theta - peaks.peaks[0].two_theta > 0.04
+
+
+def test_fit_peaks_refuses_a_position_in_a_gap_by_name():
+    ins = _instrument()
+    grid = np.concatenate([np.arange(20.0, 30.0, STEP),
+                           np.arange(50.0, 60.0, STEP)])
+    data = PatternData(two_theta=grid.tolist(),
+                       intensity=(np.zeros_like(grid) + 100.0).tolist())
+    with pytest.raises(ValueError, match="that is a gap"):
+        fit_peaks(data, ins, [40.0])
+
+
+def test_fit_peaks_needs_a_position():
+    ins = _instrument()
+    y, grid, _truth = _forward(ins)
+    with pytest.raises(ValueError, match="at least one position"):
+        fit_peaks(_noisy(y, grid, seed=7), ins, [])
+
+
+def test_a_short_named_list_is_not_told_it_is_too_short_to_index():
+    """``PEAK_LIST_TOO_SHORT`` is about indexing a pattern; here the count is
+    the caller's own argument, and repeating it back is noise."""
+    ins = _instrument()
+    y, grid, truth = _forward(ins)
+    peaks = fit_peaks(_noisy(y, grid, seed=7), ins, truth[:3])
+    assert "PEAK_LIST_TOO_SHORT" not in [d.code for d in peaks.diagnostics]
+    # but pick_peaks on a three-line range still says it
+    short = pick_peaks(_noisy(y, grid, seed=7), ins, two_theta_range=(20.0, 45.0))
+    assert "PEAK_LIST_TOO_SHORT" in [d.code for d in short.diagnostics]

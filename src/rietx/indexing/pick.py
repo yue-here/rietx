@@ -24,6 +24,7 @@ from ..model.forward import PAWLEY_OVERLAP_FWHM_FRAC
 from ..schemas.indexing import (
     PEAK_ASYMMETRY_MIN_SIGMA,
     PEAK_AXIAL_TAIL_MAX_FWHM,
+    PEAK_DETECT_SEPARATION_FWHM_FRAC,
     PEAK_REFUTED_SIGMA,
     PEAK_SATELLITE_MAX_RATIO,
     PEAK_SATELLITE_NEAR_FWHM,
@@ -37,8 +38,8 @@ from ..schemas.instrument import Instrument
 from ..schemas.pattern import PatternData
 from ..strategy.staged import BOUND_HIT_RTOL
 from .diagnostics import peak_diagnostics
-from .peakfit import GroupFit, fit_group
-from .peaks import Detection, detect_peaks
+from .peakfit import GroupFit, fit_group, fit_group_at
+from .peaks import Detection, PeakGroup, detect_peaks, group_at
 
 
 def pick_peaks(data: PatternData, instrument: Instrument, *,
@@ -96,6 +97,152 @@ def pick_peaks_with_state(data: PatternData, instrument: Instrument, *,
         source="fitted")
     return pl.model_copy(update={
         "diagnostics": peak_diagnostics(pl, det)}), det, fits
+
+
+def fit_peaks(data: PatternData, instrument: Instrument,
+              positions: np.ndarray | list[float], *,
+              two_theta_range: tuple[float, float] | None = None,
+              ) -> PeakList:
+    """Profile-fit **exactly** the peaks at ``positions`` — no structure, no
+    space group, no refinement.
+
+    The peer of :func:`pick_peaks` for the case where the caller already knows
+    where the peaks are: a Williamson-Hall analysis over a chosen set of lines,
+    a d-spacing lookup, a lab check on one reflection.  Detection still runs,
+    for the background envelope and the window sizing, but it no longer decides
+    *what* is fitted: in every window the components are the caller's positions
+    and nothing else, which is
+    :func:`~rietx.indexing.peakfit.fit_group_at`'s contract one level up.
+
+    Positions inside a detected group's window reuse that frozen window;
+    positions sharing a window are fitted **together**, as one simultaneous
+    solve, since overlapping components fitted separately each bias the other.
+    A position where detection found nothing gets a fresh window sized exactly
+    as detection sizes its own (:func:`~rietx.indexing.peaks.group_at`), and a
+    position off the end of the pattern or in a gap is refused by name rather
+    than fitted into nonsense.
+
+    **Three things a caller must know about the answer.**  (1) Every line
+    carries ``origin="manual"``: these positions are the caller's, not
+    detection's proposals.  (2) A named position where there is no peak comes
+    back *flagged* ``no_intensity`` and unusable — not dropped, and never
+    quietly turned into a measurement.  Naming a position that turns out to be
+    empty is a correct request, and dropping it is the version that made the
+    GUI's add verb do nothing.  Such a component has no gradient on its own
+    position, so what comes back is wherever the solve left it (measured: 40 m°
+    from the seed, with an esd of 1e+16 degrees saying exactly that) — the flag
+    is the answer, the number is not.
+    (3) Where detection saw a component the list did not name, the named lines
+    in that window are flagged ``unnamed_neighbour``: the unnamed intensity had
+    nowhere to go but into them.
+
+    Returns a :class:`PeakList` like :func:`pick_peaks`, so
+    :meth:`PeakList.usable` is still the screened view and ``peaks`` still
+    holds everything with its reasons attached.
+    """
+    pos = np.sort(np.asarray(positions, dtype=np.float64).ravel())
+    if not len(pos):
+        raise ValueError("fit_peaks needs at least one position to fit")
+    det = detect_peaks(data, instrument, two_theta_range=two_theta_range)
+    lam0 = instrument.source.lines[0].wavelength.value
+
+    groups = _windows_for(det, pos, instrument)
+    seen = (np.concatenate([g.seed_two_theta for g in det.groups])
+            if det.groups else np.zeros(0))
+
+    peaks: list[ObservedPeak] = []
+    for gi, group in enumerate(groups):
+        fit = fit_group_at(det, group, instrument, group.seed_two_theta)
+        crowded = _unnamed_inside(det, group, seen)
+        for peak in peaks_of_group(fit, gi, lam0):
+            peak.origin = "manual"
+            if crowded:
+                peak.flags = [*peak.flags, "unnamed_neighbour"]
+            peaks.append(peak)
+    peaks.sort(key=lambda p: p.two_theta)
+
+    flag_ghosts(peaks, lam0, det)
+    flag_kalpha2_residuals(peaks, instrument.source.lines)
+    _flag_extrapolated_background(peaks, det.two_theta)
+
+    pl = PeakList(
+        peaks=peaks, wavelength=lam0,
+        two_theta_min=float(det.two_theta[0]),
+        two_theta_max=float(det.two_theta[-1]),
+        source="fitted")
+    # PEAK_LIST_TOO_SHORT is a statement about indexing a pattern; here the
+    # count is the caller's own argument rather than anything the pattern said
+    diags = [d for d in peak_diagnostics(pl, det)
+             if d.code != "PEAK_LIST_TOO_SHORT"]
+    return pl.model_copy(update={"diagnostics": diags})
+
+
+def _windows_for(det: Detection, pos: np.ndarray,
+                 instrument: Instrument) -> list[PeakGroup]:
+    """The caller's positions, grouped into the windows they will be fitted in.
+
+    A detected window is *reused* rather than re-sized: it is the window the
+    background envelope and the seed width were measured over, and re-sizing it
+    around a subset of its components would fit the same intensity against a
+    different baseline.  Everything else gets a fresh window, and a position
+    that falls inside one already being built joins it.
+    """
+    reuse: dict[int, list[float]] = {}
+    fresh: list[float] = []
+    for x in pos.tolist():
+        hits = [k for k, g in enumerate(det.groups)
+                if det.two_theta[g.i0] <= x <= det.two_theta[g.i1 - 1]]
+        if hits:
+            # windows overlap by their margins; the group whose components sit
+            # closest is the one the caller meant (the peak editor's rule)
+            k = min(hits, key=lambda k: float(
+                np.min(np.abs(x - det.groups[k].seed_two_theta))))
+            reuse.setdefault(k, []).append(x)
+        else:
+            fresh.append(x)
+
+    out = [PeakGroup(i0=det.groups[k].i0, i1=det.groups[k].i1,
+                     seed_two_theta=np.asarray(xs, dtype=np.float64),
+                     seed_fwhm=det.groups[k].seed_fwhm,
+                     from_shoulder=np.zeros(len(xs), dtype=bool))
+           for k, xs in reuse.items()]
+
+    i = 0
+    while i < len(fresh):
+        cluster = [fresh[i]]
+        while i + 1 < len(fresh):
+            window = group_at(det, np.asarray(cluster), instrument)
+            if fresh[i + 1] > det.two_theta[window.i1 - 1]:
+                break
+            cluster.append(fresh[i + 1])
+            i += 1
+        out.append(group_at(det, np.asarray(cluster), instrument))
+        i += 1
+    return sorted(out, key=lambda g: g.i0)
+
+
+def _unnamed_inside(det: Detection, group: PeakGroup,
+                    seen: np.ndarray) -> bool:
+    """Did detection see a component in this window that nobody named?
+
+    "The same line" is detection's own resolving power,
+    ``PEAK_DETECT_SEPARATION_FWHM_FRAC``: a seed closer than that to a named
+    position is a component detection could not have told apart from it, so
+    nothing was missed.  The apportionment constant ``PAWLEY_OVERLAP_FWHM_FRAC``
+    (0.5 FWHM) was the first choice here and is twice too generous for an
+    *identity* test — on the doubled-LaB6 fixture it called a seed 0.08° away
+    the same line and stayed silent while naming one of the two moved the
+    fitted position **51 m°, twenty-six of its own esds**.
+    """
+    if not len(seen):
+        return False
+    lo, hi = det.two_theta[group.i0], det.two_theta[group.i1 - 1]
+    inside = seen[(seen >= lo) & (seen <= hi)]
+    if not len(inside):
+        return False
+    near = PEAK_DETECT_SEPARATION_FWHM_FRAC * group.seed_fwhm
+    gap = np.abs(inside[:, None] - group.seed_two_theta[None, :])
+    return bool(np.any(np.min(gap, axis=1) > near))
 
 
 def _flag_extrapolated_background(peaks: list[ObservedPeak],

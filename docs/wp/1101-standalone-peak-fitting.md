@@ -128,11 +128,11 @@ lab use become first-class, served by machinery that already exists.
       refusals) + `MIN_GROUP_POINTS`; the census scales each width *before*
       the mean, matching `fwhm_seed_curve`'s association, so a named seed set
       reproduces detection's window bit for bit.
-- [ ] `fit_peaks()` in `rietx.indexing` + the `"unnamed_neighbour"` flag;
+- [x] `fit_peaks()` in `rietx.indexing` + the `"unnamed_neighbour"` flag;
       unit tests: a position where detection found nothing, two positions in
       one window, a position in a data gap (refusal names the gap), a named
       position beside an unnamed detected neighbour (flag fires).
-- [ ] Top-level re-export + `"peak_fitting"` in `_SURFACE_FLAGS` + the
+- [x] Top-level re-export + `"peak_fitting"` in `_SURFACE_FLAGS` + the
       capabilities expected-key set.
 - [ ] Manual: `using/indexing.md` — `fit_peaks` section + `pick_peaks`
       general-use subsection with executed d-spacing/W-H example; api-surface
