@@ -36,7 +36,8 @@ export const PEAK_FLAGS = ["ghost_kbeta", "ghost_tungsten", "excluded",
                            "fit_failed", "sigma_assumed", "unresolved_shoulder",
                            "position_at_bound", "asymmetry_unmodelled",
                            "not_separable", "background_extrapolated",
-                           "axial_tail", "kalpha2_residual", "no_intensity"];
+                           "axial_tail", "kalpha2_residual", "no_intensity",
+                           "unnamed_neighbour"];
 
 /** `name value` annotations on a parameter row. `textdoc._PAIR_WORDS`. */
 export const PAIRS = ["min", "max", "esd"];
