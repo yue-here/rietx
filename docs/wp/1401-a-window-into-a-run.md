@@ -33,8 +33,10 @@ chose, in a process the human is not in. One directory holds one run, and
 the gap this WP closes.
 
 **Watching is expensive.** `LiveSession.write_snapshot` builds a self-contained
-page with the whole of plotly inlined, about 3.5 MB, on the fit's own thread,
-after every stage. That is WP-1402's problem.
+page with the whole of plotly inlined — 4.3 MB empty and 6.3 MB on a NAC-sized
+pattern, measured 2026-09-13 under plotly 7.0.0 — on the fit's own thread, after
+every stage. That is WP-1402's problem, and WP-1402 re-measures it rather than
+carrying this figure.
 
 ### The decision this track rests on
 
@@ -237,8 +239,8 @@ test: a wall-clock budget in a test is a runaway guard, never a timer.
   implemented; six WP files and the ROADMAP rows are the whole deliverable.
 
   *Done.* Six self-contained WP files, one new Unscheduled section, and the
-  track named in Current focus. The ROADMAP cap moved 648 → 670 with its ledger
-  line, landing at 669; the section's paragraph was cut to the rungs' order and
+  track named in Current focus. The ROADMAP cap moved 648 → 672 with its ledger
+  line, landing at 670; the section's paragraph was cut to the rungs' order and
   the one surface decision, because each file carries its reasoning in full.
 
   *Measured.* Nothing physical — this round measured nothing and must not be
@@ -247,9 +249,16 @@ test: a wall-clock budget in a test is a runaway guard, never a timer.
   count is unchanged by construction rather than by comparison. The full suite
   was not run and is not owed: nothing here can move a measured number.
 
-  *Gotchas for the successor.* Four cited `file:line` references in the drafts
-  were wrong and are fixed; nothing tests them, so check any one you are about
-  to rely on. Two facts were verified by hand and are load-bearing:
+  *Gotchas for the successor.* Six cited `file:line` references in the drafts
+  were wrong and are fixed (a review pass after the first sweep found two more:
+  the `write_snapshot` call site is `refine.py:1985-1987`, and `cli.md`'s
+  sentence about what watch serves is at 121, not the heading at 115); nothing
+  tests them, so check any one you are about to rely on. The track's headline
+  number was wrong the same way: "3.5 MB a stage" came from WP-1029's
+  measurement of a whole `.rex` directory, not of `fit.html`. Measured here
+  instead — plotly 7.0.0's bundle is 4.29 MB, an empty self-contained page
+  4.30 MB, a NAC-sized one 6.3 MB — and WP-1402 re-measures rather than
+  carrying it. Two facts were verified by hand and are load-bearing:
   `_free_values` is a second full `table.decode` on **every** residual
   evaluation and it runs *before* the sink is consulted, so no sink-side thrift
   avoids it; and `_abandon_on_cancel` short-circuits on `cancel is None` and

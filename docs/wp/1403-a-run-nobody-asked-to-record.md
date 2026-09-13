@@ -39,7 +39,7 @@ The costs, verified in the tree 2026-09-13:
 |---|---|---|
 | `_free_values` (`least_squares.py:1153`, `:866`) | **per residual evaluation** | a second full `table.decode` (`:822`), then a list build over `free_paths`. It runs **before** the sink is consulted, so no sink-side thrift avoids it. |
 | `json.dumps` + write + `flush` (`events.py:146-147`) | per evaluation | a syscall pair per residual evaluation, on the fit thread |
-| `stage_end.rwp` (`refine.py:1758-1771`) | per **stage** | one `background` pass plus one `bragg_component` pass. Negligible against a stage's hundreds of evaluations, and it is what makes a live Rwp a real number rather than a raw cost. Keep it unconditional. |
+| `stage_end.rwp` (`refine.py:1758-1771`) | per **stage** | one `background` pass plus one `bragg_component` pass. Negligible against a stage's hundreds of evaluations, and it is what makes a live Rwp a real number rather than a raw cost. Keep it exempt from any thinning below — it stays conditioned on a stream existing, so a fit with telemetry off still pays nothing. |
 | `_abandon_on_cancel` (`refine.py:1543-1546`) | per stage, **new** | it short-circuits on `cancel is None` and says so: "the copies are taken only when a token is present, so an ordinary fit pays nothing." Attaching a token so WP-1405's cross-process cancel works ends that guarantee — two `model_copy(deep=True)` a stage, scaling with atom count. |
 
 Three mitigations, in the order they cost something to give up:
@@ -91,7 +91,12 @@ forwarder. So, first hit wins:
 3. a **derived** fallback for a bare `ref.fit()` on a project-built
    `Refinement`: `self.history.path.parent` holding a `project.json`. One
    `exists()` a run, nothing stored on the `Refinement`, and (2) never depends
-   on it;
+   on it. **Both attributes are `Optional`** — `self.history` is `None` until
+   `_ensure_history` runs (`refine.py:378`) and `RefinementTree.path` is `None`
+   for an in-memory tree (`history/tree.py:46`), which is what `history=False`
+   and every synthetic fixture produce — so this step is two `is not None`
+   tests before the `exists()`, and it falls through to (4) rather than
+   raising;
 4. the working directory.
 
 One new public keyword on `Refinement.fit`, `Refinement.run_stage`, `refine()`
@@ -113,7 +118,8 @@ this WP exists to control. The fix: the GUI passes a callback-only stream and th
 recorder owns the file. It only ever needed `_push`; the file existed for
 `rietx watch`, which the recorder now serves better. That changes the contents of
 `<project>/live/`, which `docs/manual/using/files.md` documents twice — the
-mermaid tree at line 20 and the annotated listing at line 245.
+mermaid tree at line 16 (its `live/` node at 20) and the annotated listing at
+line 241 (its `live/` row at 245).
 `project.json`'s schema does not move and `live/`'s *contents* were never part of
 the format's promise, so the reading here is **no `PROJECT_FORMAT_VERSION`
 bump** — but make that call deliberately when it lands, and record it.

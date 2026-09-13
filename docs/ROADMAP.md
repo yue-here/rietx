@@ -617,7 +617,7 @@ behind v1.4's peaks and ahead of the magnetic track.
 | WP | Title | Status | Depends on |
 |---|---|---|---|
 | [1401](wp/1401-a-window-into-a-run.md) | A window into a run: find the runs that already exist | ⬜ | — |
-| [1402](wp/1402-the-picture-costs-three-megabytes.md) | The live picture costs 3.5 MB a stage, and the fit pays it | ⬜ | 1401 |
+| [1402](wp/1402-the-picture-costs-megabytes.md) | The live picture costs megabytes a stage, and the fit pays it | ⬜ | 1401 |
 | [1403](wp/1403-a-run-nobody-asked-to-record.md) | A run nobody asked to record | ⬜ | 1401, 1402 |
 | [1404](wp/1404-what-recording-every-fit-costs.md) | What recording every fit costs | ⬜ | 1403 (1401 baseline) |
 | [1405](wp/1405-the-human-stops-the-run.md) | The human stops the run | ⬜ | 1403 (1401 soft) |

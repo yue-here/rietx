@@ -49,6 +49,18 @@ one probe per cadence. Latency is then the cadence plus the residual evaluation
 in flight, which on a large pattern is the dominant term anyway. The page says so
 rather than appearing to hang.
 
+The coupling that clock hides: the recorder only gets control when something
+calls it, so a probe "per cadence" is really *per cadence, at an event*. With
+the shipping eval stream that is every residual evaluation and the distinction
+is invisible — but WP-1403's mitigation 3 (thinning) and WP-1404's configuration
+1 (stage boundaries only) both take the eval events away, and the probe would
+then fire once a **stage**. On the long runs this button exists for that is
+minutes, not the cadence. So the probe is hung on the *unthinned* evaluation
+boundary, not on the emitted event: it is a wall-clock test in the residual
+wrapper that already reads the token, and it survives whatever WP-1404 decides
+about what gets written. Assert it: a test with eval events off must still
+cancel within a cadence.
+
 ### What the agent's process sees, and why that is the point
 
 Nothing new. Routing through the shipped token means a human's cancel and an
@@ -133,7 +145,8 @@ with the dialog in front of you, and record which way and why.
 - [ ] The confirm dialog, with the three sentences above. Looked at, not only
       asserted.
 - [ ] Tests: the cancel file sets a caller's own token rather than a second one;
-      a recorded fit with no caller token still cancels; `RefinementCancelled`'s
+      a recorded fit with no caller token still cancels; a fit with eval events
+      off cancels within a cadence, not a stage; `RefinementCancelled`'s
       three fields are unchanged; a GET does not cancel; the read-only flag
       refuses; traversal is refused. Plus a `slow`-marked two-process test — a
       subprocess runs a long fit, the parent writes the file, and the child's

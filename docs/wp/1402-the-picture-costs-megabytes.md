@@ -1,14 +1,15 @@
-# WP-1402 — the live picture costs 3.5 MB a stage, and the fit pays it
+# WP-1402 — the live picture costs megabytes a stage, and the fit pays it
 
 Milestone: unscheduled · Status: ⬜
 Depends on: 1401 (the reader that displays what this writes)
 
 ## Goal
 
-A stage's live picture becomes about 100 kB of numbers instead of a 3.5 MB
-self-contained web page, the viewer loads plotly once and redraws in place, and
-recording a live view stops needing plotly at all. That is what makes WP-1403's
-automatic recording affordable, and it is worth doing even if 1403 never ships.
+A stage's live picture becomes about 100 kB of numbers instead of a
+multi-megabyte self-contained web page, the viewer loads plotly once and redraws
+in place, and recording a live view stops needing plotly at all. That is what
+makes WP-1403's automatic recording affordable, and it is worth doing even if
+1403 never ships.
 
 ## Context
 
@@ -17,8 +18,13 @@ automatic recording affordable, and it is worth doing even if 1403 never ships.
 stage**. Three costs, and only the first is obvious:
 
 1. **The fit waits on it.** The page is written on the fit's own thread, so each
-   stage stops to serialise about 3.5 MB, the whole of plotly inlined afresh each
-   time. A five-stage fit writes it five times.
+   stage stops to serialise several megabytes, the whole of plotly inlined
+   afresh each time. Measured 2026-09-13, `[dev]` venv (plotly 7.0.0), macOS
+   arm64: `plotly.min.js` alone is 4.29 MB, an empty self-contained page
+   4.30 MB, and a NAC-sized page (22 003 points, obs/calc/bkg/σ) **6.3 MB**.
+   Re-measure on the real cases in this WP's own task rather than carrying that
+   figure forward — plotly's bundle size moves with its version. A five-stage
+   fit writes it five times.
 2. **The browser rebuilds the plot from scratch.** `watch.py`'s page reloads the
    iframe when `fit.html`'s `Last-Modified` moves, so the reader's zoom is lost
    every stage — precisely when they were looking at something.
@@ -46,9 +52,9 @@ that breaks are cheap **and every one is recorded**:
   (478) and then fetches it over HTTP from the served directory (491). Both
   change here. The `fit.html` at line 129 is `write_html`'s own output and is
   **not** affected.
-- `docs/manual/using/cli.md:115` says watch "serves the directory a
-  `LiveSession` writes, with a self-refreshing plot". The sentence stays true;
-  the manual's fuller account is WP-1406's.
+- `docs/manual/using/cli.md:121` (the § `rietx watch` heading is at 115) says
+  watch "serves the directory a `LiveSession` writes, with a self-refreshing
+  plot". The sentence stays true; the manual's fuller account is WP-1406's.
 
 `LiveSession` is public, so this is the largest public change in the whole track
 — larger than any name WP-1403 adds. Say so when it lands.
@@ -82,7 +88,7 @@ rather than assumed free.
 
 ### The call site, and two defects in it
 
-`refine.py:1980-1982`:
+`refine.py:1985-1987`:
 
 ```python
 if stream is not None and hasattr(stream, "write_snapshot"):
