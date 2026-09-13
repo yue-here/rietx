@@ -71,6 +71,26 @@ from `SeriesResult`, so neither surface invents a second set of names.
 
 ### Inherited
 
+- **2026-09-13, from WP-1401 (the live-watcher track): Task 2 is on its way to
+  being answered by removing its own premise — do not decide it standing
+  alone.** WP-1403 makes every `fit()` record itself, with an env switch and
+  nothing for a caller to remember, on this WP's own evidence: an agent cannot
+  switch off by accident what it never had to switch on. If 1403 ships, the
+  `history` defaults asymmetry stops being the thing that decided coverage and
+  Task 2 becomes a note in the skill rather than a defaults flip. If 1403 is
+  reprioritised or fails WP-1404's cost gate, Task 2 is live again exactly as
+  written. Either way WP-1406 is scheduled to record the outcome here, dated.
+  **Task 1 is untouched by all of it**: the post-hoc aggregator over an event
+  log is a terminal-shaped surface for a moment the watcher does not serve, and
+  it is a contributor's offered PR. Also relevant to it: WP-1401 lands
+  incremental tailing of an `events.jsonl` by byte offset, tolerant of a torn
+  last line — import that rather than writing a second reader.
+
+  Related, and the reason this entry is not stronger: WP-1403 gives each run its
+  own directory, which answers the segmentation problem below for *recorded*
+  runs without touching `EventStream`'s append mode. A log a caller opened by
+  hand still has no run marker.
+
 - **2026-09-03, from the issue triage (issues #223 and #237, the same defect
   reported twice): an aggregator cannot segment the log it is given, because
   `EventStream` appends with no run marker.** `EventStream.__init__` opens
