@@ -16,7 +16,21 @@ tensor $G^*$ {cite}`itc-b`:
 *Source:* `rietx.crystallography.lattice`
 
 where $\mathbf{h} = (h, k, l)$ is the row vector of Miller indices and $G$ is
-the direct metric tensor built from $(a, b, c, \alpha, \beta, \gamma)$.
+the direct metric tensor of the cell $(a, b, c, \alpha, \beta, \gamma)$,
+
+```{math}
+:label: pos-metric
+
+G \;=\;
+\begin{pmatrix}
+a^2 & ab\cos\gamma & ac\cos\beta \\
+ab\cos\gamma & b^2 & bc\cos\alpha \\
+ac\cos\beta & bc\cos\alpha & c^2
+\end{pmatrix}.
+```
+
+*Source:* `rietx.crystallography.lattice.direct_metric_tensor`
+
 Written out, with $(A, B, C, D, E, F) = (G^*_{11}, G^*_{22}, G^*_{33},
 2G^*_{23}, 2G^*_{13}, 2G^*_{12})$, {eq}`pos-dspacing` is the familiar
 quadratic form
