@@ -17,7 +17,7 @@ name = "rietx"
 # shipped.  The value itself is stamped into every RefinementResult's Provenance
 # and every history node, so a stale one mislabels the provenance of real
 # results, and the release workflow refuses a tag that disagrees with it.
-version = "1.3.0"
+version = "1.4.0.dev0"
 description = "Python-API-first analysis and Rietveld refinement of powder diffraction data"
 readme = "README.md"
 license = "MIT"

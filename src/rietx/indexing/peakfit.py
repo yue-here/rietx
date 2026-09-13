@@ -470,13 +470,8 @@ def fit_group(det: Detection, group: PeakGroup, instrument: Instrument, *,
         return _empty_fit(det, group, instrument)
     added = np.zeros(best.n, dtype=bool)
     for _ in range(max_reseed):
-        if best.reseed_at is None or not best.converged:
-            break
-        trial_pos = np.sort(np.concatenate([best.two_theta, [best.reseed_at]]))
-        trial = _fit_at(det, group, instrument, trial_pos)
-        gain = delta_bic(_chi2(best), _chi2(trial),
-                         n_points=best.n_points, n_added=2)
-        if gain < PEAK_KEEP_COMPONENT_MIN_DELTA_BIC:
+        trial = reseed_candidate(det, group, instrument, best)
+        if trial is None:
             break
         # provenance travels with the *sorted* position vector, so the new
         # component is identified by where it was inserted rather than by index
@@ -485,6 +480,31 @@ def fit_group(det: Detection, group: PeakGroup, instrument: Instrument, *,
         best = trial
     best.from_reseed = added
     return best
+
+
+def reseed_candidate(det: Detection, group: PeakGroup, instrument: Instrument,
+                     fit: GroupFit) -> GroupFit | None:
+    """The one-component-richer fit of this window, when it pays for itself.
+
+    The residual proposes a position (``GroupFit.reseed_at``) and
+    :data:`~rietx.schemas.indexing.PEAK_KEEP_COMPONENT_MIN_DELTA_BIC` on
+    ``delta_bic`` decides whether two more parameters are earned — the same
+    statistic the Stephens acceptance quotes, and not Hamilton's R-ratio, which
+    at these channel counts blesses an inert improvement.  ``None`` means the
+    window is fully described by the components it already has.
+
+    Two callers, one answer: :func:`fit_group` walks this until it returns
+    ``None``, and :func:`~rietx.indexing.pick.fit_peaks` asks it **once** to
+    find out whether the window holds a component the caller did not name.
+    The cost is one extra solve, and only where a proposal exists at all.
+    """
+    if fit.reseed_at is None or not fit.converged:
+        return None
+    trial_pos = np.sort(np.concatenate([fit.two_theta, [fit.reseed_at]]))
+    trial = _fit_at(det, group, instrument, trial_pos)
+    gain = delta_bic(_chi2(fit), _chi2(trial),
+                     n_points=fit.n_points, n_added=2)
+    return trial if gain >= PEAK_KEEP_COMPONENT_MIN_DELTA_BIC else None
 
 
 def _prune_shoulders(det: Detection, group: PeakGroup, instrument: Instrument,

@@ -147,8 +147,11 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     (
         "An unknown phase",
         "Peaks, then a cell, then the extinction symbol — the closed loop of "
-        "§7b-7f, each step returning a ranked list and never a singleton.",
-        ("rx.pick_peaks", "rx.index_pattern", "rx.determine_extinction_symbol"),
+        "§7b-7f, each step returning a ranked list and never a singleton. "
+        "`rx.fit_peaks` leaves that loop: it fits the positions *you* name, for "
+        "a width analysis or a d-spacing, with no cell in the question.",
+        ("rx.pick_peaks", "rx.fit_peaks", "rx.index_pattern",
+         "rx.determine_extinction_symbol"),
     ),
     (
         "Out",

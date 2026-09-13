@@ -46,17 +46,15 @@ import numpy as np
 
 from ..indexing.diagnostics import peak_diagnostics
 from ..indexing.peakfit import GroupFit, fit_group, fit_group_at, group_profile
-from ..indexing.peaks import Detection, PeakGroup, detect_peaks, predicted_fwhm
+from ..indexing.peaks import Detection, PeakGroup, detect_peaks, group_at
 from ..indexing.pick import (
     flag_ghosts,
     flag_kalpha2_residuals,
     peaks_of_group,
     pick_peaks_with_state,
 )
-from ..model.profiles.fcj import fcj_extent_deg
 from ..schemas.indexing import (
     PEAK_UNUSABLE_FLAGS,
-    PEAK_WINDOW_FWHM_MULT,
     ObservedPeak,
     PeakFlag,
     PeakList,
@@ -66,10 +64,6 @@ from ..schemas.pattern import PatternData
 
 PEAKS_FILE = "peaks.json"
 PEAKS_FORMAT_VERSION = "1"
-
-#: A manually created group must land on enough channels to fit two widths and
-#: one component; below this the click was on a gap or an excluded region.
-_MIN_GROUP_POINTS = 8
 
 
 def _utcnow() -> str:
@@ -437,29 +431,17 @@ class PeakEditor:
         return min(hits, key=distance)[0]
 
     def _new_group(self, doc: PeakDoc, tt: float) -> tuple[int, GroupMeta]:
-        """A fresh window around ``tt``, sized as detection sizes its own."""
+        """A fresh window around ``tt``, sized as detection sizes its own.
+
+        The sizing and both refusals live in :func:`~rietx.indexing.peaks.group_at`
+        — one arithmetic shared with detection and with ``fit_peaks`` (WP-1101).
+        """
         det = self.det
-        if not det.two_theta[0] <= tt <= det.two_theta[-1]:
-            raise ValueError(
-                f"2θ = {tt:.4f}° is outside the picked range "
-                f"{det.two_theta[0]:.4f}–{det.two_theta[-1]:.4f}°")
-        fw = float(predicted_fwhm(np.array([tt]), self.instrument)[0]
-                   * det.width_scale)
-        half = PEAK_WINDOW_FWHM_MULT * fw
-        sl_ap = self.instrument.geometry.axial_sl.value
-        hl_ap = self.instrument.geometry.axial_hl.value
-        extra = (float(fcj_extent_deg(np.array(tt), sl_ap, hl_ap))
-                 if sl_ap > 0.0 and hl_ap > 0.0 else 0.0)
-        i0 = int(np.searchsorted(det.two_theta, tt - half - extra, "left"))
-        i1 = int(np.searchsorted(det.two_theta, tt + half, "right"))
-        if i1 - i0 < _MIN_GROUP_POINTS:
-            raise ValueError(
-                f"only {i1 - i0} channel(s) around 2θ = {tt:.4f}°; that is a "
-                "gap or an excluded region, not a place a peak can be fitted")
+        pg = group_at(det, np.array([tt], dtype=np.float64), self.instrument)
         g = max(doc.groups, default=-1) + 1
         return g, GroupMeta(
-            lo=float(det.two_theta[i0]), hi=float(det.two_theta[i1 - 1]),
-            seed_fwhm=fw, gamma_g=0.0, gamma_l=0.0, from_reseed=[])
+            lo=float(det.two_theta[pg.i0]), hi=float(det.two_theta[pg.i1 - 1]),
+            seed_fwhm=pg.seed_fwhm, gamma_g=0.0, gamma_l=0.0, from_reseed=[])
 
     def _peak_group(self, meta: GroupMeta, seeds: list[float]) -> PeakGroup:
         det = self.det

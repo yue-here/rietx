@@ -415,6 +415,7 @@ _SURFACE_FLAGS: dict[str, str] = {
     "background_estimation": "auto_background",
     "pattern_diagnostics": "diagnose",
     "peak_picking": "pick_peaks",
+    "peak_fitting": "fit_peaks",
     "indexing": "index_pattern",
     # run control (WP-1006): a client that cannot cancel must not offer to
     "cancellation": "CancelToken",

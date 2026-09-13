@@ -122,7 +122,7 @@ from .fom import (
 )
 from .peakfit import fit_group
 from .peaks import Detection, PeakGroup, detect_peaks
-from .pick import pick_peaks
+from .pick import fit_peaks, pick_peaks
 from .qspace import (
     CandidateFit,
     af_from_cell,
@@ -221,6 +221,7 @@ __all__ = [
     "m20",
     "metric_basis",
     "peak_diagnostics",
+    "fit_peaks",
     "pick_peaks",
     "predicted_reflection_count",
     "predicted_seen_fraction",

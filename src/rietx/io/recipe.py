@@ -71,7 +71,9 @@ Upstream's rule 4 is that an engine rejects loudly what it cannot represent,
 and never silently ignores a refine flag.  This reader refuses by name:
 
 * ``schema_name`` other than ``GSASII_Rietveld`` — ``GSASII_SPF`` is single-peak
-  fitting, which is this package's v1.4 ``fit_peaks``;
+  fitting, which this package does as :func:`~rietx.indexing.fit_peaks` and not
+  as a recipe: a recipe describes a refinement, and ``fit_peaks`` refines
+  nothing;
 * ``Type`` other than ``PXC`` (constant-wavelength X-ray);
 * a ``size_broadening``/``strain_broadening`` ``model`` other than
   ``isotropic`` — upstream raises ``NotImplementedError`` on these itself;
@@ -290,8 +292,9 @@ def read_recipe(source: str | Path | dict,
     if name != RIETVELD_SCHEMA:
         raise RecipeError(
             f"schema_name: this reader speaks {RIETVELD_SCHEMA!r}; got {name!r}. "
-            + ("GSASII_SPF is single-peak fitting, which this package does not "
-               "do yet — free-standing peaks are the v1.4 fit_peaks work."
+            + ("GSASII_SPF is single-peak fitting. Call rietx.fit_peaks(data, "
+               "instrument, positions) for that — it fits the peaks you name "
+               "and refines nothing, so there is no recipe to run."
                if name == "GSASII_SPF" else
                "The recipe must declare a schema_name; PowderLine accepts "
                "'GSASII_Rietveld' and 'GSASII_SPF'."))
@@ -1417,9 +1420,10 @@ def _refuse_single_peak_fitting(payload: dict,
         return
     raise RecipeError(
         f"payload.single_peaks: free-standing peak fitting ({', '.join(live)}) "
-        f"is not this package's yet — it is the v1.4 fit_peaks work. Note this "
-        f"is the *top-level* single_peaks block; background.single_peaks, "
-        f"which describes a broad background feature, is read")
+        f"is not part of a refinement here — rietx.fit_peaks(data, instrument, "
+        f"positions) fits peaks you name, on its own. Note this is the "
+        f"*top-level* single_peaks block; background.single_peaks, which "
+        f"describes a broad background feature, is read")
 
 
 # ============================================================================
