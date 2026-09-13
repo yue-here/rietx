@@ -38,7 +38,7 @@ The costs, verified in the tree 2026-09-13:
 | item | scope | what it is |
 |---|---|---|
 | `_free_values` (`least_squares.py:1153`, `:866`) | **per residual evaluation** | a second full `table.decode` (`:822`), then a list build over `free_paths`. It runs **before** the sink is consulted, so no sink-side thrift avoids it. |
-| `json.dumps` + write + `flush` (`events.py:150-153`) | per evaluation | a syscall pair per residual evaluation, on the fit thread |
+| `json.dumps` + write + `flush` (`events.py:146-147`) | per evaluation | a syscall pair per residual evaluation, on the fit thread |
 | `stage_end.rwp` (`refine.py:1758-1771`) | per **stage** | one `background` pass plus one `bragg_component` pass. Negligible against a stage's hundreds of evaluations, and it is what makes a live Rwp a real number rather than a raw cost. Keep it unconditional. |
 | `_abandon_on_cancel` (`refine.py:1543-1546`) | per stage, **new** | it short-circuits on `cancel is None` and says so: "the copies are taken only when a token is present, so an ordinary fit pays nothing." Attaching a token so WP-1405's cross-process cancel works ends that guarantee — two `model_copy(deep=True)` a stage, scaling with atom count. |
 
@@ -64,7 +64,7 @@ Three mitigations, in the order they cost something to give up:
 
 ### Composition: three cases, and an identity that must survive
 
-`refine.py:1851` — `stream = _attach_progress(as_event_stream(events), progress)`
+`refine.py:1853` — `stream = _attach_progress(as_event_stream(events), progress)`
 — and `fit` closes it only `if stream is not events`. That identity test is why
 `sequential._SeriesStream` is a *subclass*. Nothing here may disturb it.
 
@@ -112,7 +112,8 @@ chained recorder writes the whole eval stream **twice** — precisely the weight
 this WP exists to control. The fix: the GUI passes a callback-only stream and the
 recorder owns the file. It only ever needed `_push`; the file existed for
 `rietx watch`, which the recorder now serves better. That changes the contents of
-`<project>/live/`, which `docs/manual/using/files.md:187` documents.
+`<project>/live/`, which `docs/manual/using/files.md` documents twice — the
+mermaid tree at line 20 and the annotated listing at line 245.
 `project.json`'s schema does not move and `live/`'s *contents* were never part of
 the format's promise, so the reading here is **no `PROJECT_FORMAT_VERSION`
 bump** — but make that call deliberately when it lands, and record it.

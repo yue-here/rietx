@@ -41,8 +41,11 @@ that breaks are cheap **and every one is recorded**:
 - `rietx html <result.json> <out.html>` and `viz.html.write_html` are untouched,
   so the self-contained, emailable page remains a **capability**. What stops is
   producing it unasked.
-- `tests/test_events_viz_history.py:469-489` is the one test asserting
-  `fit.html` and the watch index string. It changes here.
+- `tests/test_events_viz_history.py`'s `test_live_session_and_watch_server`
+  (line 469) is the one test asserting `fit.html`: it checks the file exists
+  (478) and then fetches it over HTTP from the served directory (491). Both
+  change here. The `fit.html` at line 129 is `write_html`'s own output and is
+  **not** affected.
 - `docs/manual/using/cli.md:115` says watch "serves the directory a
   `LiveSession` writes, with a self-refreshing plot". The sentence stays true;
   the manual's fuller account is WP-1406's.
@@ -142,7 +145,7 @@ start of a framework.
       missing `run_stage` call site added before `_record`. A test per defect,
       because neither is covered today.
 - [ ] `fit.html` stops being written. Rewrite
-      `tests/test_events_viz_history.py:469-489` to assert `snapshot.json`, and
+      `test_live_session_and_watch_server` to assert `snapshot.json`, and
       add the second test — a pre-existing `fit.html` is still served — without
       which the back-compat claim is prose.
 - [ ] Report the measured size of one stage's snapshot on each of `nac`,

@@ -40,7 +40,8 @@ does not exist. Keep the reason, which is the part that matters.
   line 16 is a hand-kept copy of `cli.py`'s string: update it too. Nothing
   crosses those two today; a one-line guard would be cheap, but it is not this
   WP's job — note it and move on.
-- **`using/files.md`** (around line 187) — the `.rex` tree gains the run
+- **`using/files.md`** — the `.rex` tree is drawn twice, as a mermaid diagram
+  (line 16) and an annotated listing (line 241); **both** gain the run
   directories, and a new subsection covers the working directory's `.rietx/`
   with the sentence no test can enforce: it is unrelated to `$HOME/.rietx` and
   **no env var moves it**. Then, plainly, **what a run directory contains** —
