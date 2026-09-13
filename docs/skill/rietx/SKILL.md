@@ -10,7 +10,7 @@ description: >-
 license: MIT
 compatibility: Requires the rietx Python package (pip install rietx) and Python 3.11+. Works offline — this file and its references ship in the wheel; the user manual it names is hosted at https://rietx.org.
 metadata:
-  version: "1.3.0"
+  version: "1.4.0.dev0"
   homepage: "https://rietx.org"
 ---
 
