@@ -226,10 +226,45 @@ test: a wall-clock budget in a test is a runaway guard, never a timer.
 
 ## Handover log
 
-- **2026-09-13** — created, from a design session on giving a human a window into
-  agent-driven refinements. The surface question (grow `watch` against a mode in
-  `gui`) and the read-only-by-construction argument are settled in Context and
-  should not be reopened without new evidence. This WP was deliberately cut to
-  read only what already exists, so that the reader is proven against a format a
-  writer produces — the alternative ordering, a reader first against an invented
-  format, is the thing WP-1006's own precedent warns about.
+- **2026-09-13** — created, and with it the whole live-watcher track
+  (1401–1406). What this round settles is that a human will be able to see, and
+  stop, a refinement an agent is running, without that costing the agent
+  anything it has to remember to do. The design question that took the longest
+  was where it lives, and the answer is that it grows `rietx watch` rather than
+  becoming a mode in the GUI: the GUI's live view is an in-process ring that
+  physically cannot see a run in another process, and read-only is a stronger
+  promise when an app has no verbs than when a mode hides them. Nothing is
+  implemented; six WP files and the ROADMAP rows are the whole deliverable.
+
+  *Done.* Six self-contained WP files, one new Unscheduled section, and the
+  track named in Current focus. The ROADMAP cap moved 648 → 670 with its ledger
+  line, landing at 669; the section's paragraph was cut to the rungs' order and
+  the one surface decision, because each file carries its reasoning in full.
+
+  *Measured.* Nothing physical — this round measured nothing and must not be
+  quoted as if it had. Fast selection 4487 passed, 127 skipped, `[dev]` venv (no
+  jax, no torch), macOS arm64. Docs-only with no test added or removed, so that
+  count is unchanged by construction rather than by comparison. The full suite
+  was not run and is not owed: nothing here can move a measured number.
+
+  *Gotchas for the successor.* Four cited `file:line` references in the drafts
+  were wrong and are fixed; nothing tests them, so check any one you are about
+  to rely on. Two facts were verified by hand and are load-bearing:
+  `_free_values` is a second full `table.decode` on **every** residual
+  evaluation and it runs *before* the sink is consulted, so no sink-side thrift
+  avoids it; and `_abandon_on_cancel` short-circuits on `cancel is None` and
+  says so in its docstring, which means WP-1405 attaching a token universally
+  ends a guarantee the code currently makes. `origin/main` was ahead of the main
+  checkout when this opened — WP-1344 already existed — so 14xx was taken as the
+  next free block on the user's instruction; per
+  `test_index_section_mirrors_the_wp_milestone_line` the number never carries
+  the milestone, the `Milestone:` line does.
+
+  *Next.* Start 1401 itself: `runs.py` plus the no-argument `rietx watch` over
+  the directories today's code already writes. Its last task — the baseline
+  measurement of what `events=` costs now — is the one that matters most,
+  because it decides whether 1403's automatic recording ships on by default at
+  all, and the three failure paths for that are already written down in 1404 so
+  they cannot be quietly avoided. The track is slated for v1.5, behind v1.4's
+  free-standing peaks; 1401 is the only rung that delivers a usable window on
+  its own, so it is also the safe place to stop if the track is reprioritised.
