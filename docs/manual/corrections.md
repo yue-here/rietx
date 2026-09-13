@@ -47,7 +47,11 @@ and the McMaster total cross sections {cite}`mcmaster1969`:
 
 *Source:* `rietx.crystallography.attenuation`
 
-(1 barn = 10⁻²⁴ cm² and 1 Å³ = 10⁻²⁴ cm³, so the exponents cancel).
+summed over the asymmetric-unit sites, with $\mathrm{occ}$ the site
+occupancy, $m$ its multiplicity ({eq}`par-multiplicity`) — so
+$\mathrm{occ}\cdot m$ is the atom count per cell — $\sigma_{\mathrm{tot}}$
+the species' total cross section at the working wavelength and $V$ the cell
+volume. (1 barn = 10⁻²⁴ cm² and 1 Å³ = 10⁻²⁴ cm³, so the exponents cancel.)
 Attenuation means beam *removal*, so the total cross section including
 coherent and incoherent scattering is used — the NIST convention
 {cite}`hubbell1995`. The tabulation is a ~2 %-spaced logarithmic grid that
@@ -322,7 +326,8 @@ W_p \;=\; \frac{S_p\, (Z M V)_p}{\sum_q S_q\, (Z M V)_q},
 with $Z$ formula units per cell, $M$ the formula mass and $V$ the cell
 volume — all derived from the refined model. Occupancies enter the mass, so
 the load-bearing quantity is the **cell mass** $ZM = \sum \mathrm{occ}\cdot
-m\cdot A$; the $Z/M$ split is display-only. These are fractions of the
+m\cdot A$, summed over sites as in {eq}`corr-mu` with $A$ the species' atomic
+weight; the $Z/M$ split is display-only. These are fractions of the
 *modelled crystalline* content: an amorphous fraction still makes them sum
 to 1.
 

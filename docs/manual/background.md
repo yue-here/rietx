@@ -85,7 +85,10 @@ pipeline. The Whittaker smoother {cite}`eilers2003` solves the banded
 
 *Source:* `rietx.background.estimators`
 
-and arPLS {cite}`baek2015` iterates it with asymmetric reweighting so
+for the baseline $z$ against the observed $y$, with $W$ the diagonal matrix
+of channel weights and $\lambda$ the smoothing strength — the larger it is,
+the more the second-difference term dominates and the stiffer $z$ becomes.
+arPLS {cite}`baek2015` iterates it with asymmetric reweighting so
 peaks are progressively excluded from the baseline. SNIP {cite}`ryan1988`
 is available as an independent alternative.
 

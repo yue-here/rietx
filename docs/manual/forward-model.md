@@ -54,7 +54,11 @@ I_k \;\leftarrow\;
 
 *Source:* `rietx.model.forward.CompiledModel.lebail_update`
 
-which is a fixed point when $y_{\mathrm{obs}} = y_{\mathrm{calc}}$. The
+where $y_{\mathrm{bragg},i}$ is the Bragg part of {eq}`fm-ycalc` at point $i$
+— the triple sum over **every** phase, without the background — so the
+bracket is reflection $k$'s share of the calculated intensity there and the
+shares sum to exactly 1 at each channel. The step is a fixed point when
+$y_{\mathrm{obs}} = y_{\mathrm{calc}}$. The
 extracted intensities live outside the parameter vector and are
 path-dependent, so history nodes serialize them per node rather than
 treating them as parameters.

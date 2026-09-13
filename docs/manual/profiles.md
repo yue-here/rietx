@@ -156,7 +156,8 @@ unbounded build for any fit that stays off the floor.
 
 The default profile approximates the Voigt (Gaussian ⊗ Lorentzian) as a
 linear blend with a single FWHM $\Gamma$ and mixing $\eta$
-{cite}`thompson1987`:
+{cite}`thompson1987`, in the offset $x = 2\theta - 2\theta_k$ from the
+reflection's Bragg position:
 
 ```{math}
 :label: prof-pv

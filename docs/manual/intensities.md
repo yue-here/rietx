@@ -112,8 +112,13 @@ e^{2\pi i\, \mathbf{h}\cdot(R_m \mathbf{x}_j + \mathbf{t}_m)},
 
 *Source:* `rietx.crystallography.structure_factor`
 
-where the inner sum runs over a per-atom *subset* of symmetry operations,
-chosen once per stage so special-position images are not double counted
+where $j$ runs over the asymmetric-unit sites with occupancy
+$\mathrm{occ}_j$, fractional coordinate $\mathbf{x}_j$ and species factor
+$f_j$ of {eq}`int-species`; $(R_m, \mathbf{t}_m)$ is the rotation and
+translation of symmetry operation $m$, $T_{jm}$ the Debye-Waller factor of
+that image, and $\mathbf{h} = (h, k, l)$ as in {eq}`pos-dspacing`. The inner
+sum runs over a per-atom *subset* of symmetry operations, chosen once per
+stage so special-position images are not double counted
 (the subset is frozen — discrete — while the positions it produces remain
 smooth functions of the refined coordinates). Intensities use $|F|^2$ with
 the reflection multiplicity applied separately {cite}`rietveld1969`;
@@ -181,7 +186,8 @@ B(\mathbf{h}) = \sum_j \mathrm{occ}_j\, f''_j
 \sum_m T_{jm}\, e^{2\pi i \mathbf{h}\cdot\mathbf{x}_{jm}},
 ```
 
-gives $F = A + iB$, and since $T$ is real, $F(-\mathbf{h}) =
+with $\mathbf{x}_{jm} = R_m\mathbf{x}_j + \mathbf{t}_m$ the image position of
+{eq}`int-F`, gives $F = A + iB$, and since $T$ is real, $F(-\mathbf{h}) =
 \overline{A - iB}$, so
 
 ```{math}
