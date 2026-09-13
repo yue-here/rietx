@@ -98,7 +98,7 @@ PR #111; the exporter registry next. Two contributor PRs wait on review
 
 **Queued, unscheduled** ([§ Unscheduled](#unscheduled)): the 2026-09-01 issue
 triage's 1309–1322 plus 1323 and 1325; the magnetic scattering track
-(1326–1329 and 1343); the older one, 1133. The **2026-09-03 triage** adds
+(1326–1329 and 1343); the live-watcher track (1401–1406); the older one, 1133. The **2026-09-03 triage** adds
 1332–1341 — three more on what fires and what stays silent, three costs a
 multi-hundred-pattern campaign paid that a single fit never sees, three views
 over what a fit already knows, and the skill's own gates — and folded three
@@ -600,6 +600,27 @@ no magnetic size term, so a broad magnetic peak is fitted by a low moment
 | [1328](wp/1328-magnetic-interchange.md) | Magnetic interchange: magCIF in and out, and the readers stop refusing | ⬜ | 1327 (1118 soft) |
 | [1329](wp/1329-moment-in-a-series.md) | The moment in a series: the onset, the hold, the trajectory | ⬜ | 1327 (1326 soft) |
 | [1343](wp/1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | ⬜ | 1327 (1326 soft) |
+
+#### A window into a run — the live-watcher track
+
+Six rungs, opened 2026-09-13. An agent driving rietx leaves a human no view of
+the work, and 1322 measured what documenting the knob achieves: three subagents
+each read the skill in full and each wrote `history=False`. So 1403 records every
+fit, and 1404 is licensed to send it back if the cost says it cannot. The surface
+grows `watch` rather than adding a mode to `gui`, whose live ring is in-process
+and cannot see a foreign run: read-only is stronger when the app has no verbs
+than when a mode hides them. 1401 lands first over directories today's code
+already writes, so a window arrives before the risky half. Slated for v1.5,
+behind v1.4's peaks and ahead of the magnetic track.
+
+| WP | Title | Status | Depends on |
+|---|---|---|---|
+| [1401](wp/1401-a-window-into-a-run.md) | A window into a run: find the runs that already exist | ⬜ | — |
+| [1402](wp/1402-the-picture-costs-three-megabytes.md) | The live picture costs 3.5 MB a stage, and the fit pays it | ⬜ | 1401 |
+| [1403](wp/1403-a-run-nobody-asked-to-record.md) | A run nobody asked to record | ⬜ | 1401, 1402 |
+| [1404](wp/1404-what-recording-every-fit-costs.md) | What recording every fit costs | ⬜ | 1403 (1401 baseline) |
+| [1405](wp/1405-the-human-stops-the-run.md) | The human stops the run | ⬜ | 1403 (1401 soft) |
+| [1406](wp/1406-say-that-the-fit-writes-to-disk.md) | Say that the fit writes to disk | ⬜ | 1403, 1405 (1402 soft) |
 
 ### v2+ — fenced
 

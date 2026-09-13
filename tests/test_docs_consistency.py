@@ -142,9 +142,13 @@ _INHERITED_PRUNE_EPOCH = "2026-07-31"
 #   2026-09-08  docs/ROADMAP.md               645 -> 648  for WP-1343 (issue #277, the magnetic
 #                                                          scattering track's fifth rung): one row, and its
 #                                                          section's paragraph one line longer; landed 647
+#   2026-09-13  docs/ROADMAP.md               648 -> 670  for the live-watcher track (1401-1406): six
+#                                                          rows in one new section, its paragraph cut to the
+#                                                          rungs' order and the one surface decision, the rest
+#                                                          left in the WP files; landed 669
 SIZE_CAPS: dict[str, int | None] = {
     "CLAUDE.md": 739,
-    "docs/ROADMAP.md": 648,
+    "docs/ROADMAP.md": 670,
     "gui/CLAUDE.md": 1028,
     "tests/CLAUDE.md": 275,
     "src/rietx/indexing/CLAUDE.md": 300,
