@@ -129,7 +129,10 @@ measured finding.
 intensities from the data instead of computing them, so it converges the cell,
 zero and profile with no structural assumption. Do that first, then switch to
 Rietveld with the converged cell and profile: it is the single most reliable way
-to avoid a structural minimum that is really a profile error. Two rules about it
+to avoid a structural minimum that is really a profile error. Its **cell** is
+the weaker half of that: where reflections are dense, arbitrary intensities can
+index one pattern more than one way, so check a Le Bail cell against even a
+rough structural model before quoting it (Peterson 2005). Two rules about it
 the API does not tell you, both measured on third-party lab data.
 
 4. **Iterate the whole plan to a fixed point; one `fit()` is not enough**, and
