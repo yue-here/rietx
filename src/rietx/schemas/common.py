@@ -161,7 +161,22 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 #: The path half is the reason the migration exists at all: a stored plan glob
 #: under the old spelling loads clean and then matches nothing, which stops
 #: refining a declared hump in silence.
-SCHEMA_VERSION = "0.19"
+#: 0.19 → 0.20 (issue #283): ``StageResult.n_degenerate_cell_probes`` — the
+#: count of degenerate-cell trial points a stage's search reached (zero or
+#: negative direct-metric-tensor determinant, refused by name from
+#: ``crystallography.lattice.d_spacings`` as ``DegenerateCellError``) and the
+#: solver-side guard (``optimize.least_squares._DegenerateCellGuard``) pushed
+#: back out before the reported values were ever computed from one.
+#: Additive and defaulted to 0, the honest empty state for a fit whose search
+#: never left the physical cell, but it is a new field on every stage result
+#: a consumer enumerates — bump per observable change (the precedent is
+#: 0.8 → 0.9, where ``Structure.phases`` being allowed empty grew the set of
+#: legal documents with no field added at all; a new field is squarely that,
+#: and more so).  Surfaced beside it, not instead of it, as the ``info``-level
+#: ``CELL_DEGENERATE_PROBE`` diagnostic: the guard already contained the
+#: excursion before it reached the caller, so however often an underdetermined
+#: cell stage reaches this, nothing about the reported values is in question.
+SCHEMA_VERSION = "0.20"
 
 TransformKind = Literal["identity", "softplus", "exp", "logit"]
 

@@ -49,12 +49,22 @@ MARCH_R_MAX = 6.0
 #: indexing (WP-1206).  That module re-exports the name.
 DUMMY_SPECIES = "C"
 
-
 class Cell(Base):
     """Unit-cell lengths (Å) and angles (degrees).
 
     Crystal-system constraints (e.g. cubic ``a=b=c``, α=β=γ=90°) are enforced
     by the parameter-vector compiler from the space group, not stored here.
+
+    The six parameters carry no physical bounds of their own (``min=-inf,
+    max=inf`` by default, like every other bare ``Parameter`` field) — the
+    cell-window / tie-window machinery in :mod:`rietx.params.vector`
+    (``cell_window``, ``freeze_cell_windows``, ``_tie_windows``) reads an
+    infinite stored bound as *no claim made* and this is deliberately left
+    that way (issue #283's own discussion; a schema default here is a design
+    decision for that machinery, not a local fix).  A degenerate cell reached
+    by an unbounded search is refused by
+    :func:`~rietx.crystallography.lattice.d_spacings` and neutralised by the
+    solver's own guard instead (``CELL_DEGENERATE_PROBE``).
     """
 
     a: Parameter
