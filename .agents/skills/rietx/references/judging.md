@@ -187,6 +187,15 @@ integrates net intensity above the fitted background over each predicted
 position. The blind direction is the one de Wolff's M₂₀ has, and it is why
 Oishi-Tomiyasu (2013, *J. Appl. Cryst.* **46**, 1277) reversed the figure.
 
+The clip at zero is rietx's, and it changes what a bad background looks like.
+Unrectified, the method returns **negative** intensities wherever the background
+is overestimated (David & Sivia 2002, through Le Bail's retrospection, *Powder
+Diffr.* **20**, 316). rietx partitions `max(y_obs − y_bkg, 0)`, so a background
+set too high hides in intensities pinned at nothing. A background driven too
+*low* is the documented pathology on the other side: `absent_reflections` found
+0 of 163 absences on a wrong candidate whose co-refined background had gone
+negative.
+
 ## §4b — the QPA background measurement in full
 
 Fractions ride on scales, so the rows that decide a QPA are the ones that bias
