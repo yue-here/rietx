@@ -824,3 +824,17 @@ def test_the_prcf_drop_row_names_both_objects_the_eight_land_on():
                 if d.code == "GSAS_PRM_FIELD_DROPPED" and d.where == ["PRCF"])
     assert "onto ProfileTCHZ and 7-8 (S/L, H/L) onto Geometry" in prcf.message
     assert "positions 1-8 onto ProfileTCHZ" not in prcf.message
+def test_the_bank_count_is_read_at_its_column(tmp_path):
+    """``BANK`` is ``I5``, so anything after the count is not part of it.
+
+    Read by stripping the whole payload, a record carrying a comment after its
+    number is not a digit string, and the refusal then says "no BANK/HTYPE
+    record found" about a file that has one. Found by the review pass on
+    WP-1118's `.gpx` branch: it is the one record in this module that was not
+    read by column, in a module whose whole thesis is that they are.
+    """
+    text = _prm().replace("INS   BANK  1", "INS   BANK  1    ID 11-BM-B")
+    path = tmp_path / "commented.prm"
+    path.write_text(text, encoding="latin-1")
+    instrument = read_gsas_prm(path)
+    assert instrument.source.lines[0].wavelength.value > 0

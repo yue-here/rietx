@@ -91,12 +91,24 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "Ka2/Ka1 ratio, and the 0.5 such a file *does* state is the "
         "polarization one field earlier — both are conventionally 0.5, so "
         "taking the wrong one agrees with the right one until it does not "
-        "(Measured: WP-1118). A GSAS `.LST` "
+        "(Measured: WP-1118). A GSAS-II `.gpx` reads through the same door and "
+        "carries two things the older formats cannot: the constraints, and the "
+        "`vary_list` naming every variable the run refined. It is a **pickle**, so "
+        "the reader resolves an allow-list and refuses any other global by name "
+        "without reading the file (Measured: WP-1118 — 11 distinct globals across "
+        "34 public tutorial projects, 7 of them outside the list first proposed). "
+        "`to_structure` refuses a negative `Uiso` and a phase with no sites, both of "
+        "which real projects contain. **Two codes, two goodness-of-fit "
+        "conventions**: a `.gpx`’s `gof` is the square root of reduced χ² and a "
+        "`.EXP`’s `reduced_chi2` is not a root at all, so comparing your fit with "
+        "either file’s figure means knowing which one it quoted (Measured: WP-1118, "
+        "on six projects stating chisq, Nobs and Nvars together). A GSAS `.LST` "
         "refinement output still has no reader and is transcribed by hand.",
         ("rx.read_pattern", "rx.read_pdcif", "rx.read_recipe",
          "rx.read_gsas_prm", "rx.read_project_model",
          "rx.identify_project_format", "rx.read_topas_inp",
-         "rx.read_fullprof_pcr", "rx.read_gsas_exp", "rx.Structure.from_cif",
+         "rx.read_fullprof_pcr", "rx.read_gsas_exp", "rx.read_gsas2_gpx",
+         "rx.Structure.from_cif",
          "rx.Instrument.bragg_brentano", "rx.Instrument.debye_scherrer",
          "rx.estimate_mu_r", "rx.auto_background", "rx.diagnose",
          "rx.load_instrument_profile", "rx.save_instrument_profile",

@@ -6,8 +6,9 @@ instrument-parameter reader (PR #248), the model-format registry over them and
 the GSAS `.EXP` reader (#103), whose acceptance rewire showed the FAP suite
 refines 20 parameters where GSAS refined 28; `read_gsas_prm` now reads its
 fixed-format records by column and a Kα doublet with them (PR #332), and
-refuses an out-of-range value naming the file; the `.gpx` reader and every
-writer remain
+refuses an out-of-range value naming the file; the GSAS-II `.gpx` reader landed
+2026-09-16 behind a restricted unpickler (#234), whose corpus pass corrected the
+`.EXP` reader's GOF claim; every writer remains
 Depends on: — (WP-1110 found it; WP-1102 owns the one seam that overlaps)
 
 ## Goal
@@ -262,18 +263,29 @@ format token is spelled in `_about.py`, never inline (root CLAUDE.md § Conventi
       368 → 383.
 
 - [x] FullProf `.pcr` reader. — PR #111, merged 2026-09-03 (`b717cc98`)
-- [ ] GSAS-II `.gpx` reader behind a **restricted unpickler** (decided
-      2026-09-03, issue #234): subclass `pickle.Unpickler`, override
-      `find_class` to an allow-list — builtins plus `numpy.ndarray`,
-      `numpy.dtype`, `numpy.core.multiarray._reconstruct`, the set measured on
-      146 files — and refuse every other global **by name**, the same "report
-      or refuse, never drop" rule as the format keywords. Loop
-      `pickle.load(f, encoding="latin-1")` to `EOFError`; the tree is a list of
-      `[label, data]` pairs per top-level item. Widen the corpus before
-      shipping (image, HKLF, sequential, magnetic; `G2VarObj` in
-      `Constraints`). GSAS-II's own source is read as specification only, and
-      its documented python interface is **GSASIIscriptable** — "pysas" is an
-      unrelated XMM-Newton toolkit, not GSAS-II's.
+- [x] GSAS-II `.gpx` reader behind a **restricted unpickler** (decided
+      2026-09-03, issue #234). — landed 2026-09-16. `rx.read_gsas2_gpx`,
+      `PROJECT_FORMATS` member `gsas2_gpx` (first, being the one binary
+      member), `projects/gsas2.to_structure`, seven `GSAS2_GPX_*` diagnostics.
+      **The corpus was widened first, and it moved three decisions.** The
+      public GSAS-II tutorial corpus (34 projects, redistributable, unlike this
+      WP's other two formats) covers every kind #234 listed as untested, and
+      `Closes #234`.
+      (1) The allow-list in #234 is **incomplete**: eleven globals appear and
+      seven are outside it, so a list measured on one 146-file archive would
+      refuse 10 of 34 real projects. `G2VarObj` and `ExpressionObj` are
+      admitted as **inert stand-ins** rather than refused, which is PyTorch's
+      `weights_only` shape and the reason a refusal aborts the whole file
+      rather than a record.
+      (2) The sniff cannot be the magic bytes — 11 of the 34 carry no pickle
+      protocol header at all.
+      (3) `Rvals['GOF']` is the **square root** of reduced χ², which is the
+      opposite of what `projects/gsas.py` claimed about it; corrected there in
+      the same branch, with the GDNFT claim itself left standing.
+      Two shapes the specification never mentions are refused by name because a
+      real corpus contains them: a negative `Uiso` (7 of 34) and a phase with no
+      sites (GSAS-II's Le Bail extraction). 19 of the 34 build a structure and
+      15 refuse, each naming its phase.
 - [ ] Origin-choice honesty: `SPACE_GROUP_ORIGIN_ASSUMED` when a multi-origin
       symbol resolves unpinned, and the TOPAS suffixes accepted on input
       (issue #101; lift `normalize_space_group` from the #98 draft).
@@ -301,7 +313,13 @@ format token is spelled in `_about.py`, never inline (root CLAUDE.md § Conventi
       row landed, and the GSAS `.EXP` half on 2026-09-15 (arm, six
       `GSAS_EXP_*` rows in `references/diagnostics-projects.md` §7g, a Part 1
       section over the whole `GsasModel` tree, and an `ATTRIBUTION.md` row).
-      **Still open for the `.gpx` reader and the writers.**
+      **The `.gpx` half landed 2026-09-16**: the arm is derived from
+      `PROJECT_FORMATS` so it needed no edit, seven `GSAS2_GPX_*` rows joined
+      `references/diagnostics-projects.md` §7g (whose family prefix list in
+      `tests/test_skill.py` grew with them), `rx.read_gsas2_gpx` joined
+      `make_api_index.py`'s In section, a Part 1 section documents the whole
+      `Gsas2Model` tree, and `ATTRIBUTION.md` has its row. **Still open for the
+      writers.**
       **Superseded in part, 2026-09-13**: `references/api.md` § In
       was repaired somewhere between 2026-09-03 and 2026-09-13 and now names
       both `rietx.io.projects.read_topas_inp` and `read_fullprof_pcr`, says
@@ -332,8 +350,13 @@ format token is spelled in `_about.py`, never inline (root CLAUDE.md § Conventi
       `.EXP` half landed 2026-09-15: `FAP.EXP`'s row says it is now the
       reader's corroborating fixture, and the file also **ships in the wheel**
       (`src/rietx/data/examples/`, `LICENCES` in `test_example_projects.py`)
-      because the `fap` example reads its protocol from it. Open for the
-      formats with no fixture yet.
+      because the `fap` example reads its protocol from it. The `.gpx` half
+      landed 2026-09-16 — `gsas2_pbso4.gpx` and `gsas2_lacamno3_magnetic.gpx`,
+      the first project-reader fixtures this WP could **vendor at all**, since
+      the GSAS-II tutorials carry a redistribution grant where TOPAS's and
+      FullProf's corpora are private. Nothing enters the wheel. The 34-project
+      survey behind them has its own section in `tests/data/README.md`. Open
+      for the formats with no fixture yet.
 
 ## Acceptance
 
@@ -369,6 +392,157 @@ work this WP does.
   § "Learned in v0.2".
 
 ## Handover log
+
+### 2026-09-16 — the GSAS-II `.gpx` reader, and the corpus that changed three answers
+
+Someone can now hand this package a GSAS-II project file and get back the model
+it describes: the phases, the sites, the instrument, and the part nobody can
+rebuild from a CIF plus a pattern, which is which parameters that refinement was
+free to move. A `.gpx` also carries two things the older formats have no room
+for, and both come across: the constraints the run held its variables under, and
+the list naming every variable it refined. None of it needs GSAS-II installed.
+
+The obstacle was never the format. A `.gpx` is a sequence of python pickles, and
+loading a pickle runs whatever it names, so opening a downloaded one would be
+handing a stranger's file the keyboard. The reader resolves an allow-list and
+refuses every other name, naming it, without reading the file at all.
+
+The part worth knowing is that **the allow-list could not have been written from
+one archive**. Issue #234 proposed one measured on 146 private projects; read
+against the 34 public tutorial projects, seven of the eleven names that actually
+occur are outside it, and two of those are GSAS-II's own classes, which appear in
+10 of the 34. Refusing them by name would have refused those ten files entire.
+They are admitted as inert stand-ins instead — a class with no `__reduce__` and
+no `__setstate__`, which the pickle machinery can only fill with data — which is
+the same shape PyTorch's `weights_only` unpickler uses, and it is why the
+constraints are readable at all. Widening the corpus before writing the reader
+was the whole of this session's method, and it moved two more answers: the sniff
+cannot be the magic bytes, because 11 of the 34 files carry no pickle protocol
+header; and GSAS-II's `GOF` is the **square root** of reduced χ², which is the
+opposite of what this repo's `.EXP` reader said about it.
+
+*Done* — six commits on `wp1118-gsas2-gpx`, cut from `origin/main` at `6d42926e`.
+
+- `src/rietx/io/projects/gsas2.py` (1 100 lines) — the reader.
+  `rx.read_gsas2_gpx` returns a `Gsas2Model`; `projects.gsas2.to_structure`
+  builds a `Structure` carrying the file's own refine flags.
+  `ALLOWED_GLOBALS` is the trust boundary as **data**, with a reason per entry
+  and a meta-test partitioning it against the resolver both ways.
+  `TREE_ITEM_STANCE` declares one stance per tree-item kind, sharing
+  `coverage.Stance`'s vocabulary, so an unclassified item is reported rather
+  than dropped.
+- `PROJECT_FORMATS` gains `gsas2_gpx` **first**, being the registry's one binary
+  member: every other sniff decodes with `errors="ignore"` and would meet a
+  pickle as text with its bytes dropped. `capabilities().project_formats` needed
+  no edit, being derived from the registry.
+- Seven `GSAS2_GPX_*` diagnostics, rows in the skill's §7g, a Part 1 section over
+  the whole `Gsas2Model` tree, and an `ATTRIBUTION.md` row naming which document
+  was read as specification.
+- `tests/test_projects_gsas2.py` (37 tests) and two vendored fixtures. These are
+  the **first project-reader fixtures this WP could vendor at all**: the GSAS-II
+  tutorials carry a redistribution grant where TOPAS's and FullProf's corpora are
+  private research inputs.
+- `projects/gsas.py`'s GOF corroboration corrected, in `GsasModel.reduced_chi2`,
+  in `_reduced_chi2` and in the test docstring that repeated it. The GDNFT claim
+  itself stands: that record states the words.
+- `io/CLAUDE.md` takes three rules and the cap goes 383 → 410.
+
+*Measured* — this worktree's `.venv`, `[dev]` only (no jax, no torch), python
+3.12.12, darwin/arm64, alone on the machine (checked with `ps aux | grep`).
+
+- Fast selection `-n auto --dist loadgroup -m "not slow"`, on **current main
+  merged into this branch**, which is the only tree anything ever tests that
+  resembles what lands: **4997 passed, 133 skipped**, 2:10. On the bare branch
+  before the merge it was 4990/132.
+  The delta is derived per file rather than by re-measuring `main`. This
+  session added **45**: 39 in `test_projects_gsas2.py`, 3 in
+  `test_projects_gsas.py` and 1 in `test_gsas_prm.py` (the last four from the
+  review pass), plus **2** parametrised cases the new registry member adds to
+  `test_projects_registry.py` (`[gsas2_gpx]` on the `reports_at` and
+  declared-field rows). Against the 4951 the previous session measured on the
+  branch that is now `origin/main`, that is 4996, and the merge with WP-1423's
+  main accounts for the remaining +1 pass and the one new skip — **which is
+  WP-1423's, not this session's**: nothing here added a skip. Two parents'
+  additions do not sum, so the 4997 is quoted as the merged tree's figure and
+  not as either parent's.
+- `tests/test_acceptance_fap.py`: 3 passed, 3.19 s. It reads its protocol from
+  the `.EXP` reader, which this session touched (comments only), so it is the
+  row that would notice.
+- **No full selection.** Nothing this session added is reachable from a fit: the
+  new reader has no caller inside the package, and the `.EXP` edits are
+  docstrings. No measured number can move.
+- The corpus, read with the finished reader: 34 projects read, **0 refused**; 19
+  build a structure and 15 refuse by name (7 for a negative `Uiso`, 5 for
+  anisotropic sites, 2 for stating no phases, 1 for a Le Bail phase with no
+  sites). The survey behind those numbers is in `tests/data/README.md`
+  § GSAS-II `.gpx`.
+- The centidegree convention is corroborated **across formats** by a file this
+  repo already held: the tutorial `.gpx` of the 11-BM instrument states `U`, `V`,
+  `W` of 1.163, −0.126, 0.063, and `read_gsas_prm` converts
+  `tests/data/11bm_gsas.prm` to 1.163e-4, −1.26e-5, 6.3e-6 deg². `Zero` is the
+  exception and is degrees in GSAS-II, by its own specification and by the
+  magnitude of the nine non-zero values in the corpus (0.0004° to 0.0219°).
+
+*Reviewed* — `/code-review high --fix` over the branch diff, and it found the
+class this session thought it had closed. Six fixes accepted, each with the test
+it was missing; the review reproduced every one before changing anything.
+
+- **The `.EXP` reader had the same hole the `.gpx` reader was written to
+  avoid.** A file stating a negative `Uiso` reached `rx.Parameter` and came back
+  as a pydantic `ValidationError` naming a `Parameter` and never the file. The
+  refusal and the one-guard build are now in both readers, which is what
+  "generalise the fix" should have meant while writing the second one rather
+  than after.
+- Two in the new reader, both on malformed input: the id-resolving passes
+  assumed a tree-item shape the main loop had already reported as unreadable
+  (a bare `[42]` raised `TypeError` out of the reader), and an empty atom row
+  reached `row[-1]`.
+- `GsasHistogram.two_theta_range` could come back `(None, 129.98)` under a
+  `tuple[float, float] | None` annotation, which is WP-1076's shape in a field
+  nobody had looked at.
+- `BANK` was the one record in `instrument_profile.py` not read by column, in a
+  module whose whole argument is that they are: a record carrying a comment
+  after its `I5` count was reported as an absent record.
+- Two dead names removed (`seen` here, `_EIGHT_PI2` in `viz/compare.py`).
+
+Two findings were looked at and left, both recorded here rather than silently:
+the `.EXP` row's `extensions=(".exp", ".EXP")` renders a second suffix that buys
+nothing when matching is content-based, and `_matches_gsas_exp`'s `lines[:-1] or
+lines` drops the last complete record when the head covers the whole file, which
+can only bite a `.EXP` whose one vocabulary key sits on its final card.
+
+*Gotchas* — three, each a place the next session should not assume.
+
+- **The excluded-region path is specification-only.** Not one of the 195
+  histograms in the corpus has one, so `Limits[2:]` rests on GSAS-II's own
+  statement in `GSASIIstrIO` and is exercised by a `.gpx` the test module writes
+  rather than by a real file.
+- **The anisotropic refusal is liftable by a measurement, not by an opinion.**
+  126 of the corpus's 439 sites are anisotropic and all of them are refused,
+  which follows the `.EXP` and `.pcr` readers. Whether GSAS-II's `Uij` are CIF
+  `U^ij` is testable rather than arguable: feed them through
+  `crystallography.wyckoff.adp_basis` and see whether they lie in the
+  site-symmetry subspace, which a wrong off-diagonal convention would break.
+- **A `magPhases` key makes a nuclear phase half a model.** Ten corpus phases are
+  typed `nuclear` and carry one, and they build correctly; what does not come
+  across is the magnetic scattering in the file's own Rwp, so the figures are not
+  comparable. That is a warning rather than a refusal, and it is a different
+  shape from the magnetic phase the same code refuses.
+
+*Next*, in order, with what decides between them.
+
+1. **Origin-choice honesty** (#101), still the cheap one:
+   `normalize_space_group` is drafted in the #98 branch and the task closes an
+   issue.
+2. **The writers** (#148). One of its two banked obligations is now evidenced
+   rather than open: `Z` is zero in **all 95** constant-wavelength histograms
+   the corpus states it on, so nothing anybody writes needs the field, and
+   refusing a non-zero `Z` by name costs nothing a round-trip can see. Growing
+   `ProfileTCHZ` a sixth coefficient is measurable work — the five-name tuple is
+   hard-coded in four places and 121 files name a profile path — and it would be
+   a declared name with no writer until the forward model computed it.
+3. The `#prm` integer evaluator for `.inp` `#if` guards.
+
 
 ### 2026-09-16 — the handover the column read never wrote, and the refusal the repair found
 

@@ -66,6 +66,23 @@ is still named in the result.
 
 ### Inherited
 
+- **2026-09-16, from [1118](1118-foreign-model-files.md): a fourth magnetic
+  refusal, a second *shape* of one, and a real magnetic project now in
+  `tests/data`.** The GSAS-II `.gpx` reader refuses a phase GSAS-II types
+  `magnetic` with the same sentence the other three use, so the table this WP
+  changes has one more row than it did yesterday. The new shape is the one to
+  design for: GSAS-II also writes the nuclear and magnetic halves as **separate
+  phases**, and a nuclear phase carrying `General['magPhases']` imports
+  correctly while the file's own Rwp includes scattering this build cannot
+  compute. That is reported (`GSAS2_GPX_PHASE_MAGNETIC`, the second of its two
+  shapes) rather than refused, because the structure really is right. Also
+  practical: `tests/data/gsas2_lacamno3_magnetic.gpx` is a real magnetic
+  refinement, vendored under a redistribution grant, whose magnetic phase
+  carries moments in its atom records and whose `AtomPtrs` are `[3, 1, 10, 12]`
+  rather than `[3, 1, 7, 9]` — the columns move because the moments sit between
+  the occupancy and the site symmetry. It is the fixture to test a magnetic
+  model against without asking anyone for data.
+
 - **2026-09-15, from [1118](1118-foreign-model-files.md): there is now a third
   magnetic refusal to lift, in the same shape as the other two.** The GSAS
   `.EXP` reader reads a magnetic phase (GSAS phase types 2 and 3, from the

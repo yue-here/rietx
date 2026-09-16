@@ -53,6 +53,21 @@ flipping).
 
 ### Inherited
 
+- **2026-09-16, from [1118](1118-foreign-model-files.md): the registry has a
+  binary member now, and two of its rules are yours to inherit.** The GSAS-II
+  `.gpx` reader went in first in `PROJECT_FORMATS`, because every other sniff
+  decodes the head with `errors="ignore"` and meets a binary file as text with
+  its bytes dropped. Two rules landed in `io/CLAUDE.md` with it and neither is
+  about pickles. **A binary format's sniff is not its magic bytes**: 11 of 34
+  real `.gpx` files carry no protocol header, so the test is "opens as one *and*
+  names one of its own labels", and a Jana `.m50` claimed on a first line should
+  expect the same kind of exception from its own writer. And **every schema
+  object a conversion builds is built in one place, inside one guard**, so a
+  pydantic `ValidationError` cannot reach a caller naming a `Parameter` instead
+  of the file — `gsas2.to_structure` closes the class `read_gsas_prm` opened,
+  and a `.m40` full of real refined values will find the same edges (a negative
+  displacement parameter, an occupancy outside the schema's range).
+
 - **2026-09-15 (2nd session), from [1118](1118-foreign-model-files.md): one
   vendor's several file kinds read a record through one function, and
   `io/CLAUDE.md` now says so.** A `.prm` and a `.EXP` are both GSAS, and their

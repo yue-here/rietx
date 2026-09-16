@@ -428,7 +428,11 @@ def read_gsas_prm(path: str | Path, *,
     # than the four columns the layout allows, which is what a refusal by name
     # owes a reader whose file says something longer.
     htype = htypes[0].strip().upper() if htypes else ""
-    bank_field = banks[0].strip() if banks else ""
+    # BANK's count is ``I5``, so it is read at its column like every other
+    # field here.  Testing the *whole* payload for digits reads a record that
+    # carries anything after the number as an absent record, and the refusal
+    # then says "no BANK/HTYPE record found" about a file that has one.
+    bank_field = banks[0][:5].strip() if banks else ""
     if not htype or not bank_field.isdigit():
         raise ValueError(
             f"{p.name}: not a GSAS-I instrument-parameter file — no "

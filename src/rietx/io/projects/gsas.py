@@ -434,7 +434,9 @@ class GsasModel:
     rwp: float | None = None
     rp: float | None = None
     #: GSAS's ``GDNFT`` figure, which is **reduced χ²** and not its root — the
-    #: record states this in words and GSAS-II's ``Rvals['GOF']`` agrees
+    #: record states so in words.  GSAS-II is *not* the same convention, which
+    #: this field claimed until WP-1118 measured it: its ``Rvals['GOF']`` is the
+    #: **square root** of reduced χ²
     reduced_chi2: float | None = None
     n_variables: int | None = None
     n_observations: int | None = None
@@ -831,7 +833,13 @@ def _read_histogram(number: int, block: dict[str, str], kind: str,
         excluded.append((lo, hi))
 
     chans = block.get("CHANS", "")
-    trnge = block.get("TRNGE")
+    # Both halves or neither: the field is declared ``tuple[float, float] |
+    # None``, and a ``TRNGE`` with one blank field handed back
+    # ``(None, 129.98)`` under that annotation — a caller unpacking it into two
+    # floats gets a ``None`` far from the record it came off (WP-1076).
+    trnge = block.get("TRNGE", "")
+    span = (_num(trnge, 0, 10), _num(trnge, 10, 10))
+    two_theta_range = None if None in span else span
     rpowd = block.get("RPOWD", "")
     scale = block.get("HSCALE", "")
 
@@ -874,8 +882,7 @@ def _read_histogram(number: int, block: dict[str, str], kind: str,
         ka2_ratio=icons.ka2_ratio,
         anode=anode,
         excluded_regions=tuple(excluded),
-        two_theta_range=(
-            (_num(trnge, 0, 10), _num(trnge, 10, 10)) if trnge else None),
+        two_theta_range=two_theta_range,
         n_channels_total=_int(chans, 40, 10),
         n_channels_used=_int(chans, 20, 10),
         scale=_num(scale, 0, 15),
@@ -1051,9 +1058,16 @@ def _reduced_chi2(record: str) -> float | None:
 
     The record is free text ("Reduced CHI**2 =  3.224     for   28 variables")
     rather than a fixed-format numeric, so it is read by its own words.  Worth
-    stating plainly because the quantity is **reduced χ² and not its root**:
-    GSAS-II's ``Rvals['GOF']`` is the same convention, so reading either as a
-    goodness-of-fit reports the square of the number meant (issue #103).
+    stating plainly because the quantity is **reduced χ² and not its root**, so
+    reading it as a goodness-of-fit reports the square of the number meant
+    (issue #103).
+
+    **The two GSAS generations disagree here**, which this docstring got wrong
+    until WP-1118 measured it while writing the ``.gpx`` reader: GSAS-II's
+    ``Rvals['GOF']`` is ``sqrt(chisq / (Nobs - Nvars))`` — its own documentation
+    says the root, and it matches to six figures on all six tutorial projects
+    stating the four numbers.  So a caller moving between the two formats
+    converts rather than copies, and `Gsas2Model.gof` is named for what it is.
     """
     if "=" not in record:
         return None
@@ -1168,6 +1182,11 @@ def to_structure(model: GsasModel, *, phase: int | None = None,
       factor at high Q.  This is the refusal ``fullprof.to_structure`` makes
       about a ``β`` block, for the same reason and with the same remedy: a
       corroborating file.
+
+    And one the corpus taught rather than the specification: a **negative
+    Uiso**, which a real refinement reaches and which no structure can hold.
+    It names the phase; a schema refusal that got past it would name a
+    ``Parameter`` and never the file, so the final build converts one.
     """
     import gemmi
     import numpy as np
@@ -1231,16 +1250,20 @@ def to_structure(model: GsasModel, *, phase: int | None = None,
             f"off-diagonal convention GSAS wrote them in is not settled by any "
             f"file in this repo, and a wrong factor of two is a silently wrong "
             f"Debye-Waller factor at high Q")
+    negative = [(a.label, a.uiso) for a in chosen.atoms
+                if a.uiso is not None and a.uiso < 0.0]
+    if negative:
+        worst = min(negative, key=lambda row: row[1])
+        raise GsasExpError(
+            f"{model.path or '<model>'}: phase {chosen.number} states a "
+            f"negative Uiso on {len(negative)} site(s), the largest on "
+            f"{worst[0]!r} at {worst[1]:.5g} Å².  A refinement really can end "
+            f"there and GSAS really does store it, but exp(-B·s²) with B < 0 "
+            f"grows without bound at high Q, so the value is carried on "
+            f"`model.phases[…].atoms[…].uiso` and not built into a structure.  "
+            f"Deciding what it should have been is yours")
 
     cell = chosen.cell
-    varies = cell.refined
-    rx_cell = rx.Cell(
-        a=rx.Parameter(value=cell.a, min=1.0, vary=varies),
-        b=rx.Parameter(value=cell.b, min=1.0, vary=varies),
-        c=rx.Parameter(value=cell.c, min=1.0, vary=varies),
-        alpha=rx.Parameter(value=cell.alpha, vary=varies),
-        beta=rx.Parameter(value=cell.beta, vary=varies),
-        gamma=rx.Parameter(value=cell.gamma, vary=varies))
 
     # GSAS's own words for the X flag are "XYZ's are to be refined **as
     # permitted by symmetry**", and rietx models exactly that: coordinates
@@ -1263,7 +1286,7 @@ def to_structure(model: GsasModel, *, phase: int | None = None,
     frozen: list[str] = []
 
     rewrites: dict[str, tuple[str, list[str]]] = {}
-    atoms = []
+    sites: list[dict] = []
     for i, atom in enumerate(chosen.atoms):
         species = normalize_species(atom.species)
         if species != atom.species:
@@ -1271,24 +1294,49 @@ def to_structure(model: GsasModel, *, phase: int | None = None,
                 f"phases.0.atoms.{i}.species")
         xyz = np.array([atom.x, atom.y, atom.z])
         movable = len(coordinate_basis(stabilizer_rotations(sg, xyz))) > 0
-        vary_xyz = atom.refine_xyz and movable
         if atom.refine_xyz and not movable:
             frozen.append(atom.label)
-        atoms.append(rx.Atom(
-            label=atom.label, species=species,
-            x=rx.Parameter(value=atom.x, vary=vary_xyz),
-            y=rx.Parameter(value=atom.y, vary=vary_xyz),
-            z=rx.Parameter(value=atom.z, vary=vary_xyz),
-            occ=rx.Parameter(value=atom.occupancy, min=0.0, max=1.5,
-                             vary=atom.refine_occupancy),
-            biso=rx.Parameter(value=(atom.uiso or 0.0) * EIGHT_PI_SQUARED,
-                              min=0.0, max=25.0, vary=atom.refine_u)))
+        sites.append(dict(
+            label=atom.label, species=species, xyz=(atom.x, atom.y, atom.z),
+            vary_xyz=atom.refine_xyz and movable,
+            occupancy=atom.occupancy, vary_occupancy=atom.refine_occupancy,
+            biso=(atom.uiso or 0.0) * EIGHT_PI_SQUARED, vary_biso=atom.refine_u))
 
-    structure = rx.Structure(phases=[rx.Phase(
-        name=chosen.name or f"phase {chosen.number}",
-        space_group=chosen.space_group,
-        cell=rx_cell, atoms=atoms,
-        scale=rx.Parameter(value=1e-3, min=0.0, transform="softplus"))])
+    # Every schema object the conversion builds is built **here**, inside one
+    # try, rather than as it goes — the shape ``gsas2.to_structure`` uses and
+    # for the same reason: a schema refusal that reached a caller would name a
+    # ``Parameter`` and never the file, which is the one thing
+    # ``io/CLAUDE.md`` forbids a reader.  The two shapes the corpus contains
+    # (a negative Uiso, an anisotropic site) are refused by name above; this
+    # is the class rather than a third instance.
+    varies = cell.refined
+    try:
+        structure = rx.Structure(phases=[rx.Phase(
+            name=chosen.name or f"phase {chosen.number}",
+            space_group=chosen.space_group,
+            cell=rx.Cell(
+                a=rx.Parameter(value=cell.a, min=1.0, vary=varies),
+                b=rx.Parameter(value=cell.b, min=1.0, vary=varies),
+                c=rx.Parameter(value=cell.c, min=1.0, vary=varies),
+                alpha=rx.Parameter(value=cell.alpha, vary=varies),
+                beta=rx.Parameter(value=cell.beta, vary=varies),
+                gamma=rx.Parameter(value=cell.gamma, vary=varies)),
+            atoms=[rx.Atom(
+                label=site["label"], species=site["species"],
+                x=rx.Parameter(value=site["xyz"][0], vary=site["vary_xyz"]),
+                y=rx.Parameter(value=site["xyz"][1], vary=site["vary_xyz"]),
+                z=rx.Parameter(value=site["xyz"][2], vary=site["vary_xyz"]),
+                occ=rx.Parameter(value=site["occupancy"], min=0.0, max=1.5,
+                                 vary=site["vary_occupancy"]),
+                biso=rx.Parameter(value=site["biso"], min=0.0, max=25.0,
+                                  vary=site["vary_biso"]))
+                for site in sites],
+            scale=rx.Parameter(value=1e-3, min=0.0, transform="softplus"))])
+    except ValueError as exc:
+        raise GsasExpError(
+            f"{model.path or '<model>'}: phase {chosen.number} "
+            f"({chosen.name!r}) states values this build's schema refuses "
+            f"({exc}).  The file's own numbers are on `model.phases`") from exc
 
     if diagnostics is not None:
         named = model.path or "<model>"

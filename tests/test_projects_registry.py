@@ -496,14 +496,20 @@ def test_every_declared_field_is_populated(fmt: ProjectFormat):
 
 
 def test_the_order_is_strongest_evidence_first():
-    """``PATTERN_FORMATS``' rule, and here it is two members rather than sixteen.
+    """``PATTERN_FORMATS``' rule, and here it is four members rather than sixteen.
 
-    FullProf's evidence is a line the format *requires* first; TOPAS's is a
-    keyword anywhere in a 64 kB head.  A file satisfying both would be claimed
-    by the stronger test, and the order is what says so.
+    The binary member goes first, because every other sniff decodes the head
+    with ``errors="ignore"`` and would meet a pickle as text with its bytes
+    dropped.  Then FullProf, whose evidence is a line the format *requires*
+    first, and TOPAS last, whose evidence is a keyword anywhere in a 64 kB head.
+    A file satisfying two would be claimed by the stronger test, and the order
+    is what says so.
     """
-    assert PROJECT_FORMATS[0].name == "fullprof_pcr"
-    assert "COMM" in PROJECT_FORMATS[0].sniff
+    assert PROJECT_FORMATS[0].name == "gsas2_gpx"
+    assert PROJECT_FORMATS[-1].name == "topas_inp"
+    text = [f.name for f in PROJECT_FORMATS]
+    assert text.index("fullprof_pcr") < text.index("topas_inp")
+    assert "COMM" in PROJECT_FORMATS[text.index("fullprof_pcr")].sniff
 
 
 def test_the_sniff_budgets_differ_by_kind_not_by_taste():

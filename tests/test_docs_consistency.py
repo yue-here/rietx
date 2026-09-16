@@ -293,7 +293,18 @@ SIZE_CAPS: dict[str, int | None] = {
     # establishing it had been committed. Both are protocol rule 4's test.
     # Raised rather than shaved, per the failure message's own instruction.
     # Landed at 381; the headroom is +2.
-    "src/rietx/io/CLAUDE.md": 383,
+    #
+    # 2026-09-16, 383 -> 410 for WP-1118's GSAS-II `.gpx` reader, the first
+    # member of either registry that is **binary and executable**. Three rules,
+    # each governing the next reader rather than describing this one: that a
+    # reader which runs what it reads resolves an allow-list and refuses a name
+    # rather than a record (with the two measurements that shape such a list —
+    # a stand-in for the vendor's own classes, and that one archive cannot
+    # produce it); that a binary format's sniff cannot be its magic bytes, since
+    # a third of a real corpus does not write them; and that a conversion builds
+    # every schema object inside one guard, which is the class `read_gsas_prm`'s
+    # repair opened and this closes. The section's existing rules were not cut.
+    "src/rietx/io/CLAUDE.md": 410,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs

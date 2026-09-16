@@ -55,7 +55,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from ..formats.base import HEAD_BYTES, head, looks_binary
-from . import fullprof, gsas, topas
+from . import fullprof, gsas, gsas2, topas
 from .gsas import RECORD_BYTES
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -283,6 +283,33 @@ def _matches_gsas_exp(path: Path) -> bool:
     return any(ln.startswith(_EXP_KEYS) for ln in lines)
 
 
+#: The tree-item labels a ``.gpx`` head carries, as bytes.  Every corpus file's
+#: first 4 kB holds at least one: 33 of 34 open on ``Notebook`` and the
+#: thirty-fourth on ``Phases``.  They are matched as bytes because the file is
+#: one, and pickled strings carry a length prefix rather than a quote, so a
+#: decoded head would only add a way to lose a byte.
+_GPX_LABELS = (b"Notebook", b"Controls", b"Covariance", b"Constraints",
+               b"Restraints", b"Rigid bodies", b"Phases", b"PWDR ")
+
+
+def _matches_gsas2_gpx(path: Path) -> bool:
+    """A ``.gpx`` is a pickle whose first item is a labelled tree item.
+
+    Two tests, because neither alone is safe.  The stream has to **open as a
+    pickle**: either the protocol-2 header byte, or the list opcode that a tree
+    item starts with directly.  And one of GSAS-II's own top-level labels has to
+    appear in the head.  A file passing both is not plausibly anything else; a
+    file passing only the first is any pickle at all, which is exactly what this
+    reader must not open on the strength of a suffix.
+
+    **The header byte is not enough on its own, and that is measured**: 11 of
+    the 34 tutorial projects carry no protocol header at all, so a sniff written
+    to the protocol-2 magic alone would have declined a third of them.
+    """
+    raw = head(path, HEAD_BYTES).raw
+    return raw[:1] in (b"\x80", b"]") and any(k in raw for k in _GPX_LABELS)
+
+
 def _matches_topas_inp(path: Path) -> bool:
     """A ``.inp`` is claimed on a line-start TOPAS keyword, never on its suffix.
 
@@ -304,13 +331,33 @@ def _matches_topas_inp(path: Path) -> bool:
 
 #: The registry, **ordered**, and the order is behaviour: the first format whose
 #: ``matches`` returns True claims the file.  ``PATTERN_FORMATS``' "strongest
-#: evidence first", applied to three members rather than sixteen.  FullProf and
-#: GSAS both test something the format *requires* — a ``COMM`` title line, and
-#: an 80-character card carrying a key from a closed vocabulary — and they
-#: cannot collide, so their relative order is immaterial and is left as it was.
+#: evidence first", applied to four members rather than sixteen.  GSAS-II is
+#: first because it is the one **binary** member, and ``PATTERN_FORMATS``' rule
+#: that binary-claiming formats go first holds for the same reason here: every
+#: other sniff decodes the head with ``errors="ignore"``, so a pickle handed to
+#: them arrives as text with its bytes quietly dropped.  FullProf and GSAS then
+#: test something their formats *require* — a ``COMM`` title line, and an
+#: 80-character card carrying a key from a closed vocabulary — and they cannot
+#: collide, so their relative order is immaterial and is left as it was.
 #: TOPAS is last because its evidence is a keyword anywhere in a 64 kB head,
 #: which is the one weak test here and the one a file could satisfy by accident.
 PROJECT_FORMATS: tuple[ProjectFormat, ...] = (
+        ProjectFormat(
+            name="gsas2_gpx",
+            title="GSAS-II .gpx",
+            extensions=(".gpx",),
+            sniff="a pickle stream whose head carries one of GSAS-II's own "
+                  "top-level tree labels",
+            carries=("phases", "sites", "refine flags", "the constraints and "
+                     "which variables the run refined", "the instrument "
+                     "coefficients and their flags", "the range fitted and any "
+                     "excluded regions", "the sample broadening per phase and "
+                     "histogram", "the run's own Rwp and goodness of fit"),
+            reports_at="both",
+            matches=_matches_gsas2_gpx,
+            read=gsas2.read_gsas2_gpx,
+            to_structure=gsas2.to_structure,
+        ),
         ProjectFormat(
             name="fullprof_pcr",
             title="FullProf .pcr",

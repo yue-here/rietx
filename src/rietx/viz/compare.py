@@ -282,8 +282,6 @@ def _build_srm660c(data_dir: Path) -> StandardInputs:
     return StandardInputs(data=data, structure=structure, instrument=ins, plan=plan)
 
 
-_EIGHT_PI2 = 8.0 * np.pi**2
-
 def _build_fap(data_dir: Path) -> StandardInputs:
     """GSAS-II's "LabData" fluorapatite — the **cross-code** row.
 

@@ -371,6 +371,33 @@ same reason. Six rules the pattern readers do not need:
   keyword without a stance fails rather than being dropped in silence. Support
   for a construct arrives by moving its row; until then every import that meets
   it says so.
+- **A reader that *runs* what it reads resolves an allow-list, and refuses a
+  name rather than a record** (WP-1118). A `.gpx` is a sequence of pickles, so
+  loading one calls whatever it names: `projects/gsas2.ALLOWED_GLOBALS` is the
+  whole trust boundary and is **data a caller can read**, every other name is
+  refused *by name*, and the **file is refused entire** — half a project is not
+  a model. Two halves of that are measured rather than chosen. The vendor's own
+  classes are admitted as **inert stand-ins** — no `__reduce__`, no
+  `__setstate__`, so the machinery can only fill a dict — because refusing
+  `G2VarObj` refuses 10 of 34 real projects, and PyTorch's `weights_only`
+  unpickler is the same shape for the same reason. And **an allow-list taken
+  from one archive is wrong**: 7 of the 11 globals the public corpus names were
+  outside the list a 146-file private one produced.
+- **A binary format's sniff is not its magic bytes** (WP-1118). 11 of those 34
+  files carry no pickle protocol header at all, so the test is "opens as one
+  **and** names one of its own tree labels" — a writer need not follow its own
+  format's convention, and a suffix is not evidence either (§ Dispatch). The
+  registry's order inherits the pattern readers' rule with its first binary
+  member: binary first, because every other sniff decodes with
+  `errors="ignore"` and meets a pickle as text with its bytes dropped.
+- **Every schema object a conversion builds is built in one place, inside one
+  guard.** A pydantic `ValidationError` reaching a caller names a `Parameter`
+  and never the file, which is § Refusals losing to the thing it forbids;
+  `read_gsas_prm` paid for that once (WP-1118) and `gsas2.to_structure` closes
+  the class rather than adding a third instance. The two shapes a real corpus
+  contains are still refused by **name** first — a negative `Uiso`, and a phase
+  with no sites, which is how GSAS-II stores a Le Bail extraction — because a
+  message naming the phase is worth more than one naming the field.
 - **A project reader refuses where a pattern reader would repair.** A pattern
   reader repairs only where it can say it did; a project reader mostly cannot,
   because its output is a whole model and a caller cannot see which part is the

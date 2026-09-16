@@ -55,9 +55,11 @@ def test_overall_records(fap):
 def test_gdnft_is_reduced_chi_squared_not_its_root(fap):
     """The record says "Reduced CHI**2" in words, and it is not a GoF.
 
-    Issue #103 brought this from a GSAS-II ``.gpx`` campaign, where
-    ``Rvals['GOF']`` is the same convention; reading either as a
-    goodness-of-fit reports the square of the number meant.
+    Issue #103 brought this from a GSAS-II ``.gpx`` campaign, and this docstring
+    used to add that ``Rvals['GOF']`` is the same convention.  It is not:
+    WP-1118 measured GSAS-II's figure at ``sqrt(chisq / (Nobs - Nvars))``, which
+    ``test_projects_gsas2.py`` now asserts on a real project.  The claim here is
+    about this record alone, where the file states the words itself.
     """
     assert fap.reduced_chi2 == pytest.approx(3.224)
 
@@ -293,6 +295,56 @@ def test_a_record_after_the_terminator_is_still_read(tmp_path):
                 _card("    HSTRY 17", " GENLES appended after the end marker"))
     model = read_gsas_exp(path)
     assert model.phases[0].name == "one"
+
+
+def test_a_negative_uiso_is_refused_rather_than_built(tmp_path):
+    """A real GSAS refinement reaches one, and no structure can hold it.
+
+    Found by the review pass on WP-1118's own branch, which had just written
+    this refusal into the ``.gpx`` reader and not looked for its sibling here.
+    Without it the file reaches ``rx.Parameter`` and pydantic refuses, naming a
+    ``Parameter`` and never the file.
+    """
+    cards = list(_MINIMAL)
+    cards[-1] = _card("CRS1  AT  1B",
+                      " -0.010000                                                    I  U")
+    path = _exp(tmp_path, "negative.EXP", *cards)
+    model = read_gsas_exp(path)
+    assert model.phases[0].atoms[0].uiso == pytest.approx(-0.01)
+    with pytest.raises(GsasExpError) as caught:
+        to_structure(model)
+    assert "negative Uiso" in str(caught.value)
+    assert "NA1" in str(caught.value)
+
+
+def test_a_schema_refusal_is_converted_rather_than_leaked(tmp_path):
+    """The class, not a third instance: no pydantic error reaches a caller.
+
+    An occupancy of 40 is in no real file and is checked for by name nowhere.
+    It must still come back naming the file (``io/CLAUDE.md`` § Refusals).
+    """
+    cards = list(_MINIMAL)
+    cards[-2] = _card(
+        "CRS1  AT  1A",
+        "  NA        0.000000  0.000000  0.000000 40.000000NA1        1 000")
+    path = _exp(tmp_path, "occupancy.EXP", *cards)
+    with pytest.raises(GsasExpError, match="occupancy.EXP"):
+        to_structure(read_gsas_exp(path))
+
+
+def test_a_half_stated_two_theta_range_is_none_rather_than_half(tmp_path):
+    """Both halves or neither, under a ``tuple[float, float] | None``.
+
+    A ``TRNGE`` with one blank field used to hand back ``(None, 129.98)``, and
+    a caller unpacking two floats got a ``None`` far from the record it came
+    off (WP-1076's shape, found by the same review pass).
+    """
+    path = _exp(tmp_path, "trnge.EXP", *_MINIMAL,
+                _card(" EXPR  HTYP1", "  PXC"),
+                _card("HST  1 ICONS", "  1.540500  1.544300       0.0         0       0.5    0"),
+                _card("HST  1TRNGE ", "              129.9800"))
+    histogram = read_gsas_exp(path).histogram(1)
+    assert histogram.two_theta_range is None
 
 
 def test_an_unnamed_profile_function_is_refused_rather_than_read_positionally(tmp_path):

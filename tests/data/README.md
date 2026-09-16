@@ -15,6 +15,8 @@
 | `INST_XRY.PRM` | GSAS instrument parameter file for the above (λ = 1.5405/1.5443 Å, POLA **0.7**, Kα2/Kα1 0.5, starting GU/GV/GW = 2/−2/5 centideg²). Its value is that it states POLA and KRATIO *separately* where `FAP.EXP` states only POLA: both are conventionally 0.5, so this is the file that tells the two ICONS fields apart (this row read 0.5 for POLA until WP-1118 measured it). `read_gsas_prm` **refuses** it — its GU/GV/GW/GP are GSAS's stock placeholders, and the refusal names the GP of 0.1 | same | same |
 | `FAP.EXP` | GSAS's **converged** refinement of `FAP.XRA` — the source of every reference value and of the refinement protocol the acceptance test mirrors. Since WP-1118 it is also the corroborating fixture for `rx.read_gsas_exp`, and the acceptance test reads the protocol from it rather than restating it | same | same |
 | `fluorapatite.cif` | The `FAP.EXP` starting model (7 sites, P 6₃/m, a = 9.3717, c = 6.8859 Å) transcribed to CIF, for `examples/fap_lab.py` and the landing page's worked example. **Not** used by `test_acceptance_fap.py`, which builds the same model from the `CRS1 AT` records instead — one authority per number, and it is not this file | transcribed from `FAP.EXP` (same tutorial repo); the published structure it descends from is Hughes, Cameron & Crowley (1989), *Am. Mineral.* **74**, 870-876 | same |
+| `gsas2_pbso4.gpx` | GSAS-II's CIF-tutorial PbSO₄ refinement: one `P n m a` phase against a constant-wavelength neutron histogram (λ = 1.909 Å) **and** a laboratory Cu Kα doublet, converged at Rwp 6.171 % over 8 739 channels with 49 variables, every site refining `XU`. The corroborating fixture for `rx.read_gsas2_gpx`, and the file that states its own variable count twice — `Rvals['Nvars']` and the length of `varyList` — which is the one assertion no single-field bug passes | GSAS-II tutorials repo, `CIFtutorial/data/NXPbSO4.gpx` (github.com/AdvancedPhotonSource/GSAS-II-tutorials), renamed | GSAS-II Open Source License (UChicago Argonne): royalty-free use and redistribution with the notice; vendored verbatim, test data only — nothing enters the wheel |
+| `gsas2_lacamno3_magnetic.gpx` | The SimpleMagnetic tutorial's La₀.₈Ca₀.₂MnO₃ at 50 K: a nuclear phase **and** a magnetic one, fourteen constraints naming their variables with GSAS-II's own `G2VarObj`, and a pickle stream with no protocol header. It carries the three things the PbSO₄ file cannot — the magnetic refusal, the constraint decoding, and the third of the corpus a magic-byte sniff would have declined | GSAS-II tutorials repo, `SimpleMagnetic/data/LaCaMnO3 bbb.gpx`, renamed | same |
 | `qarr/cpd-1a.prn` … `qarr/cpd-1h.prn` | IUCr CPD QPA round-robin **Sample 1** suite: eight three-phase corundum (Al₂O₃) / zincite (ZnO) / fluorite (CaF₂) mixtures spanning trace→major for each phase; weighed compositions known (below). 2-column ASCII (2θ°, counts), 5–150° 2θ, 0.02° step, 7251 pts — v0.3 QPA acceptance (`test_acceptance_qpa_roundrobin.py`) | IUCr CPD Quantitative Phase Analysis Round Robin, "col" (2θ,counts) format, `www.iucr.org/__data/iucr/powder/QARR/col/`; retrieved via the Internet Archive (the live IUCr site is behind a Cloudflare JS challenge). **The live site is the better route now** — the challenge clears for a real browser session, which is how the `.rd` files below were fetched in 2026-09; see the WP-1407 section | IUCr CPD / CSIRO Minerals round-robin data, freely released on the web (Nov 1999) "for re-analysis with a standard Rietveld code"; no explicit open licence — redistributed here as an academic QPA benchmark, with attribution (see licence note below) |
 | `qarr/cpd-2.prn` | **Sample 2** = sample-1 phases + brucite Mg(OH)₂ (strongly platy → preferred-orientation test) | same | same |
 | `qarr/cpd-4.prn` | **Sample 4** = corundum / coarse magnetite (Fe₃O₄) / zircon (ZrSiO₄) — microabsorption test | same | same |
@@ -1112,6 +1114,70 @@ shaped the code:
   `crystallography.symmetry.cell_constraints` rather than trusting the corpus.
   Exactly the limit `TOPAS_CELL_COUPLING_DROPPED` hit one reader over, whose four
   coupled files were tetragonal and cubic for the same reason.
+
+### GSAS-II `.gpx` — 34 tutorial projects, and the two that ship
+
+`io/projects/gsas2.py` reads a GSAS-II project: the phases, the histograms, the
+refine flags and the constraints. Unlike the two formats above, this one has a
+**public corpus with a redistribution grant** — the GSAS-II tutorials repository
+under the GSAS-II Open Source License (UChicago Argonne, royalty-free use and
+redistribution with the notice) — so for once the evidence is checkable by
+anyone, and two files are vendored rather than none.
+
+All 34 tutorial projects were read before the reader was finished, and the
+numbers below are that pass (2026-09-16, `[dev]` venv, darwin/arm64). They are
+here rather than in the module because they are facts about a corpus, not about
+the code: a later corpus moves them.
+
+| measured across the 34 | number |
+|---|---|
+| top-level tree items | 195 `PWDR`, 4 `IMG`, 4 `HKLF`, 3 `Sequential results`, 1 `Sequential peak fit results`, and the six singletons every project carries |
+| histogram types | 99 `PNT` (time of flight), 80 `PXC`, 16 `PNC` |
+| phases | 46: 40 nuclear, 6 magnetic — and **10 of the nuclear ones carry `magPhases`**, so they are the nuclear half of a magnetic model rather than a whole one |
+| atom refine flags | `''` 270, `XU` 155, `U` 7, `UM` 4, `M` 1, and 2 written as a single space |
+| displacement | 313 isotropic sites, 126 anisotropic |
+| background functions | 114 `chebyschev-1`, 80 `chebyschev`, 1 `log interpolate` |
+| constraints | 93 rows: 86 equivalences, 4 holds, 3 constraint equations |
+| distinct pickle globals | 11, of which **7 are outside the allow-list proposed on issue #234** |
+
+Four of those settled a decision, and each would otherwise have been a guess:
+
+- **The allow-list cannot come from one archive.** Issue #234's was measured on
+  146 private projects that are all plain CW powder Rietvelds, and it holds
+  `numpy.ndarray`, `numpy.dtype` and `_reconstruct`. The public corpus adds
+  `numpy.core.multiarray.scalar` (268 uses), `_codecs.encode` (12 files), the
+  masked-array pair (19 files), `copy_reg._reconstructor` with
+  `__builtin__.object` (6 files), and GSAS-II's own `G2VarObj` (10 files) and
+  `ExpressionObj` (1). Refusing the last two by name would refuse **10 of 34
+  real projects entire**, which is what the inert stand-in exists to avoid.
+- **A python-2 rebuild name is not a python-2 file.** One of the six carrying
+  `copy_reg._reconstructor` was written by python 3.6.6, so the correlation a
+  reader might have reached for does not hold and the names are admitted
+  unconditionally.
+- **The sniff cannot be the magic bytes.** 11 of the 34 carry no pickle protocol
+  header at all, so the test is "opens as a pickle **and** names a GSAS-II tree
+  item", and one of those 11 is vendored so the path stays exercised.
+- **`Rvals['GOF']` is the square root of reduced χ².** On all six projects that
+  state `chisq`, `Nobs` and `Nvars` together it matches `sqrt(chisq/(Nobs-Nvars))`
+  to six figures. This repo's `.EXP` reader claimed the opposite convention for
+  GSAS-II in a corroborating clause, which is now corrected.
+
+And three limits of the corpus are recorded rather than smoothed over:
+
+- **Not one of the 195 histograms has an excluded region.** Every `Limits` is
+  two pairs. The `Limits[2:]` layout is GSAS-II's own statement in
+  `GSASIIstrIO.py` rather than a guess, but no real file here exercises it, so
+  `test_projects_gsas2.py` writes one that does. The same is true of a Pawley
+  phase (`doPawley` is False in all 46) and of a negative occupancy.
+- **`Z` is zero in every constant-wavelength histogram that states it** (95 of
+  them). So the corpus says nothing about GSAS-II's constant Lorentzian term
+  beyond that nobody in it used one — which is the evidence behind refusing a
+  non-zero `Z` on the writer rather than growing a schema field for it.
+- **19 of the 34 build a structure; 15 refuse by name** — 7 for a negative
+  `Uiso`, 5 for anisotropic sites, 2 for stating no phases at all (a cluster
+  analysis and a sequential peak fit), 1 for a Le Bail phase with no sites.
+  A corpus of teaching files is *meant* to contain mid-refinement states, so
+  that ratio is a property of the corpus and not a defect rate.
 
 ## v1.3 PowderLine recipe fixtures (WP-1306)
 

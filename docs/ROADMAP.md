@@ -94,9 +94,9 @@ placement, link resolution, and the size caps on this file and CLAUDE.md.
 survives from 1407: Stoe `.raw` files paired with the WinXPOW ASCII export of
 the same scans would make Stoe writable.
 
-**In flight:** [1118](wp/1118-foreign-model-files.md) landed the GSAS `.EXP`
-reader 2026-09-15 (#103), which showed the FAP acceptance frees 20 parameters
-where GSAS freed 28. `STR(...)` (#107) still stands. The **live-watcher track
+**In flight:** [1118](wp/1118-foreign-model-files.md) landed the GSAS-II `.gpx`
+reader 2026-09-16 (#234); its corpus pass corrected the `.EXP` reader's own GOF
+claim. The writers (#148) and `STR(...)` (#107) stand. The **live-watcher track
 is closed on the code and owes one decision**: 1413 took recording to
 1.03-1.23x (`nac` still over WP-1404's 1.05x gate, its six snapshots costing
 50 ms of a 17.7 ms budget), and
