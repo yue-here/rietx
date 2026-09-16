@@ -653,7 +653,7 @@ more, in order: 1430, 1426, 1424, 1431, 1425, 1429, 1427, 1428 (a decision).
 | [1406](wp/1406-say-that-the-fit-writes-to-disk.md) | Say that the fit writes to disk | ✅ 2026-09-15 | 1403, 1405 (1402 soft) |
 | [1413](wp/1413-the-snapshot-is-what-recording-costs.md) | The snapshot is what recording costs | ✅ 2026-09-15 | 1404, 1402 |
 | [1423](wp/1423-a-page-that-holds-still.md) | A page that holds still | ✅ 2026-09-16 | 1405, 1402 |
-| [1430](wp/1430-the-page-is-a-file.md) | The page is a file | ⬜ | 1423 |
+| [1430](wp/1430-the-page-is-a-file.md) | The page is a file | 🔄 2026-09-16 | 1423 |
 | [1426](wp/1426-still-under-resize-and-across-a-stage.md) | Still under resize, and across a stage | ⬜ | 1430, 1423 |
 | [1424](wp/1424-a-row-that-names-its-run.md) | A row that tells its run apart, and a number that fits its slot | ⬜ | 1430 (1423 soft) |
 | [1431](wp/1431-a-caller-names-its-run.md) | A caller names its run | ⬜ | 1424 |

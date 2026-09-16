@@ -1,6 +1,6 @@
 # WP-1430 — the page is a file
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-09-16 — claimed by @yue-here
 Depends on: 1423 (the page as it stands)
 
 ## Goal
