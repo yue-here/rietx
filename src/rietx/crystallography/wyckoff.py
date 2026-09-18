@@ -39,7 +39,13 @@ import gemmi
 import numpy as np
 import spglib
 
-from .symmetry import SITE_TOL, expand_positions, get_spacegroup, site_orbit
+from .symmetry import (
+    SITE_TOL,
+    OperatorGroup,
+    as_group,
+    expand_positions,
+    site_orbit,
+)
 
 #: Index pairs of the symmetric-tensor components in storage order.
 _VOIGT: tuple[tuple[int, int], ...] = ((0, 0), (1, 1), (2, 2), (0, 1), (0, 2), (1, 2))
@@ -172,16 +178,22 @@ def _compatible_lattice(sg: gemmi.SpaceGroup) -> np.ndarray:
     return np.linalg.cholesky(g)
 
 
-def site_constraints(space_group: str, xyz, *, tol: float = SITE_TOL) -> SiteConstraints:
+def site_constraints(space_group, xyz, *, tol: float = SITE_TOL) -> SiteConstraints:
     """Wyckoff letter, oriented site symmetry, and constraint bases for a site.
 
-    ``space_group`` is any symbol gemmi resolves; ``xyz`` is the fractional
-    position of the site (values within ``tol`` of a special position count
-    as on it).  Raises ``RuntimeError`` if spglib does not recover the
-    requested group from the probe cell — that indicates coordinates given
-    in a setting inconsistent with the operators, not a tolerance issue.
+    ``space_group`` is any symbol gemmi resolves, or a group object from
+    :func:`~rietx.crystallography.symmetry.resolve_group`; ``xyz`` is the
+    fractional position of the site (values within ``tol`` of a special
+    position count as on it).  Raises ``RuntimeError`` if spglib does not
+    recover the requested group from the probe cell — that indicates
+    coordinates given in a setting inconsistent with the operators, not a
+    tolerance issue.  **The Wyckoff letter is spglib's**, so it is available
+    only for a group spglib names; an
+    :class:`~rietx.crystallography.symmetry.OperatorGroup` gets the constraint
+    bases, the site symmetry and the multiplicity — which are all read off its
+    own operations — and an empty letter.
     """
-    sg = get_spacegroup(space_group)
+    sg = as_group(space_group)
     x = np.asarray(xyz, dtype=np.float64)
 
     # one expansion, so the constraint bases and the multiplicity below are
@@ -192,6 +204,18 @@ def site_constraints(space_group: str, xyz, *, tol: float = SITE_TOL) -> SiteCon
     adp = adp_basis(rots)
 
     site_positions = [p for p in orbit.images]
+    if isinstance(sg, OperatorGroup):
+        # A group with no symbol has no Wyckoff *letter*: the letters are a
+        # property of the tabulated type in its own setting, and spglib would
+        # answer for the type it identifies from the probe cell — which for a
+        # child cell whose glide translation is a quarter is the type, not the
+        # setting, so the letter it returned would name a position of a
+        # different cell.  Everything else here is read off this group's own
+        # operations and is unaffected, so the letter and the oriented symbol
+        # are left empty rather than filled with a plausible wrong one.
+        return SiteConstraints(
+            wyckoff="", site_symmetry="", multiplicity=orbit.multiplicity,
+            coord_basis=coord, adp_basis=adp)
     # the dummy general-position orbit pins the probe cell's symmetry to
     # exactly this group; if the site itself sits near the first probe point,
     # fall back to the second so no two probe atoms coincide

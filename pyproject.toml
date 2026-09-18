@@ -118,6 +118,14 @@ dev = [
     "pytest-xdist>=3.6",
     "hypothesis>=6",
     "ruff",
+    # TEST ORACLE ONLY, for crystallography/magnetic/irreps.py: an independent
+    # implementation of the small irreps of a little group (Neto's subgroup
+    # chain, where ours splits the twisted regular representation).  It is
+    # deliberately not a runtime dependency and is never imported outside
+    # tests/test_magnetic_irreps.py, where every test using it carries
+    # `_oracle` in its name and `pytest.importorskip("spgrep")`, so the suite
+    # is green without it.  BSD-3 (Kohei Shinohara); pulls in hsnf (MIT).
+    "spgrep>=0.7",
 ]
 
 [project.urls]

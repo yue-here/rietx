@@ -55,6 +55,211 @@ def get_spacegroup(symbol: str) -> gemmi.SpaceGroup:
     return sg
 
 
+@functools.lru_cache(maxsize=256)
+def _op_list_from_xyz(xyz: tuple[str, ...]) -> tuple[gemmi.Op, ...]:
+    """The operations of an explicit ``x,y,z`` list, **in the given order**.
+
+    Order is load-bearing and gemmi's ``GroupOps`` does not preserve it: built
+    from a flat 192-operation list it re-splits the group into 48 coset
+    representatives times 4 centrings and picks *different* representatives
+    (measured on ``F d -3 m:2``: the 18th operation comes back as ``y,z,x``
+    where the table has ``y,z+1/2,x+1/2``, the same operation times a
+    centring), so the product it iterates is a permutation of what went in.
+    Orbit images are listed in operation order and
+    ``structure_factor.select_orbit_ops`` freezes that order onto the compiled
+    model, so a permutation reorders the structure-factor sum and changes the
+    last bits of every intensity.  Keeping the caller's order is what makes a
+    phase carrying the operation list of a *named* group predict bit-identically
+    to the same phase carrying only the symbol.
+    """
+    if not xyz:
+        raise ValueError("symmetry_operations: the list is empty; a group has "
+                         "at least the identity in it")
+    try:
+        return tuple(gemmi.Op(str(s)) for s in xyz)
+    except (RuntimeError, ValueError) as exc:
+        raise ValueError(
+            f"symmetry_operations: {exc} — an operation is an 'x,y,z'-style "
+            f"triplet such as 'x,y,z' or '-x+1/2,y,z+1/4'") from exc
+
+
+@functools.lru_cache(maxsize=256)
+def _ops_from_xyz(xyz: tuple[str, ...]) -> gemmi.GroupOps:
+    """gemmi's group object for an explicit list — for absences and epsilon.
+
+    The *set* is what a systematic-absence or epsilon-factor test reads, so the
+    reordering :func:`_op_list_from_xyz` warns about is harmless here; anything
+    that reads the operations one by one must use that function instead.
+    """
+    return gemmi.GroupOps(list(_op_list_from_xyz(xyz)))
+
+
+@functools.lru_cache(maxsize=256)
+def _closest_type(xyz: tuple[str, ...]) -> gemmi.SpaceGroup | None:
+    """The tabulated group with this operation list's rotations and centring.
+
+    gemmi's ``derive_symmorphic`` drops every operation's translation part but
+    keeps the centring, so what comes back has the **same point group and the
+    same lattice** as the given list and differs from it only in the screw and
+    glide translations — the very things a doubled cell turns into quarters.
+    Every symmorphic group is tabulated, so this resolves for any operation
+    list that is a space group at all, and it is what makes the metric
+    constraints of an unnamed group knowable: ``cell_constraints`` reads only
+    the crystal system, the ``R``-axes extension and the monoclinic unique
+    axis, and all three are properties of the point group and the lattice.
+
+    **Two tries, and the second is the one the real cases need.**  A child
+    group carries the *parent's* lattice translation — the nuclear structure is
+    still periodic on it; only the magnetic or displacive order is not — and a
+    half translation along one axis is no tabulated Bravais centring, so gemmi
+    reads it as a centring it cannot name and the symmorphic lookup returns
+    nothing.  Measured on Ba₂FeSbSe₅'s S3(a,b) child in 2a,b,a+c: the
+    operations are {x,y,z; x+½,y,z; x,−y+½,z; x+½,−y+½,z}, the symmorphic
+    derivation keeps the (½,0,0) "centring", and ``find_spacegroup_by_ops``
+    gives ``None``.  Dropping to the bare **point group on a P lattice** then
+    resolves it as ``P 1 m 1`` — monoclinic, unique axis b, which is what the
+    child cell is.  That second try is safe for the three keys
+    :func:`cell_constraints` reads: a centring changes neither the crystal
+    system nor the monoclinic unique axis, and the one setting where the
+    lattice *is* load-bearing — trigonal on rhombohedral axes, ``ext == "R"`` —
+    is named by the **first** try, because an R centring is tabulated.
+
+    ``None`` only when even the point group does not resolve, which means the
+    list is not a crystallographic group in this setting — a caller error
+    rather than a naming problem.
+    """
+    ops = _ops_from_xyz(xyz)
+    found = gemmi.find_spacegroup_by_ops(ops.derive_symmorphic())
+    if found is not None:
+        return found
+    seen: dict[tuple[int, ...], gemmi.Op] = {}
+    for op in ops:
+        bare = gemmi.Op("x,y,z")
+        bare.rot = [list(row) for row in op.rot]
+        bare.tran = [0, 0, 0]
+        seen.setdefault(tuple(v for row in op.rot for v in row), bare)
+    return gemmi.find_spacegroup_by_ops(gemmi.GroupOps(list(seen.values())))
+
+
+@dataclass(frozen=True)
+class OperatorGroup:
+    """A space group stated as its operation list, under a label.
+
+    **Why this exists.**  A parent operation whose translation along a doubled
+    axis is a half becomes a *quarter* in the child cell, and no Hermann-Mauguin
+    symbol in any tabulated setting has a quarter in its operation list.  Such a
+    group is a perfectly good space group of that cell — it has orbits, site
+    multiplicities and systematic absences like any other — and the only thing
+    it lacks is a name.  Before this class the package could only store a
+    symbol, so the honest answer was a refusal
+    (``magnetic.supercell.resolve_child_group``, which now states it); with it the
+    answer is the operation list plus a label that says the symbol does not
+    generate it.
+
+    ``label`` is what :attr:`~rietx.schemas.structure.Phase.space_group` holds —
+    the bracketed form :func:`unnamed_label` builds.  ``xyz`` is the operation
+    list, in the caller's order, because a CIF symmetry code is an index into a
+    listed order and the order therefore has to survive a round trip.
+
+    The gemmi-shaped surface (:meth:`operations`, :meth:`xhm`, :attr:`hm`,
+    :attr:`ext`, :meth:`crystal_system_str`, :meth:`monoclinic_unique_axis`) is
+    what every consumer in this package already asks a ``gemmi.SpaceGroup``
+    for, so :func:`resolve_group` can hand either object to any of them.  The
+    four *naming* members delegate to :attr:`closest_type` and the reason they
+    may is the one :func:`_closest_type` states: the symmorphic derivation has
+    this list's point group and lattice exactly.
+    """
+
+    label: str
+    xyz: tuple[str, ...]
+
+    def operations(self) -> gemmi.GroupOps:
+        return _ops_from_xyz(self.xyz)
+
+    def xhm(self) -> str:
+        return self.label
+
+    @property
+    def closest_type(self) -> gemmi.SpaceGroup:
+        """The symmorphic group with the same point group and lattice."""
+        found = _closest_type(self.xyz)
+        if found is None:
+            raise ValueError(
+                f"the operation list of {self.label!r} ({len(self.xyz)} "
+                f"operations) has no symmorphic space group in gemmi's table, "
+                f"so it is not a crystallographic group in this setting and "
+                f"neither its crystal system nor its cell constraints are "
+                f"defined. Check the list: {', '.join(self.xyz[:4])}...")
+        return found
+
+    @property
+    def hm(self) -> str:
+        return self.closest_type.hm
+
+    @property
+    def ext(self) -> str:
+        return self.closest_type.ext
+
+    @property
+    def number(self) -> int:
+        """The *closest type's* IT number — a type, never this group's name."""
+        return int(self.closest_type.number)
+
+    def crystal_system_str(self) -> str:
+        return self.closest_type.crystal_system_str()
+
+    def monoclinic_unique_axis(self) -> str:
+        return self.closest_type.monoclinic_unique_axis()
+
+    def is_centrosymmetric(self) -> bool:
+        return bool(self.operations().is_centrosymmetric())
+
+    def centring_type(self) -> str:
+        return str(self.operations().find_centering())
+
+
+def resolve_group(space_group: str,
+                  operations=None) -> gemmi.SpaceGroup | OperatorGroup:
+    """The group a phase means: its operation list when it carries one.
+
+    **The one place the choice is made.**  Every consumer of a phase's symmetry
+    — orbit expansion, site multiplicity, systematic absences, reflection
+    generation and multiplicity, the structure factor's frozen operation
+    subsets, the Wyckoff constraint bases, the cell ties, the bond/angle symop
+    table, ZMV, the CIF writer — calls this rather than
+    :func:`get_spacegroup`, so a phase whose group has no symbol reaches all of
+    them with the same operations and none of them can silently fall back on
+    the label.
+
+    ``operations`` ``None`` (every phase written before this field existed) is
+    exactly the old path: ``get_spacegroup(space_group)``, same object, same
+    cache, same numbers.
+    """
+    if operations is None:
+        return get_spacegroup(space_group)
+    return OperatorGroup(label=str(space_group),
+                         xyz=tuple(str(s) for s in operations))
+
+
+def as_group(spec) -> gemmi.SpaceGroup | OperatorGroup:
+    """A symbol string, or a group object, as a group object.
+
+    The adapter that lets the symbol-taking functions in this module
+    (:func:`generate_reflections`, :func:`reflection_orbits`) also take what
+    :func:`resolve_group` returns, without every call site branching.
+    """
+    if isinstance(spec, str):
+        return get_spacegroup(spec)
+    return spec
+
+
+def group_key(sg) -> tuple[str, tuple[str, ...]]:
+    """A hashable identity for a group, for the operation-array cache."""
+    if isinstance(sg, OperatorGroup):
+        return ("ops", sg.xyz)
+    return ("hm", (sg.xhm(),))
+
+
 @functools.lru_cache(maxsize=1)
 def _settings_by_hm() -> dict[str, tuple[str, ...]]:
     """H-M symbols the tables hold more than one setting for, in table order.
@@ -347,17 +552,16 @@ def complete_cell(sg: gemmi.SpaceGroup,
     return {name: cell[name] for name in CELL_NAMES}
 
 
-def rotation_matrices(sg: gemmi.SpaceGroup) -> np.ndarray:
+def rotation_matrices(sg) -> np.ndarray:
     """Integer rotation parts of all symmetry operations, shape (M, 3, 3).
 
-    gemmi stores rotations scaled by Op.DEN (=24).
+    gemmi stores rotations scaled by Op.DEN (=24).  ``sg`` is a
+    ``gemmi.SpaceGroup`` or an :class:`OperatorGroup`; the rows come from
+    :func:`_group_arrays`, so they are in the same order as the orbit images
+    and, for a tabulated symbol, element for element what this function
+    returned before it took either.
     """
-    ops = sg.operations()
-    mats = []
-    for op in ops:
-        r = np.array(op.rot, dtype=np.float64) / gemmi.Op.DEN
-        mats.append(r)
-    return np.array(mats)
+    return np.array(_group_arrays(group_key(sg))[1])
 
 
 #: Default tolerance, in fractional coordinates, for "this operation fixes this
@@ -397,7 +601,8 @@ def _op_arrays(op: gemmi.Op) -> tuple[np.ndarray, np.ndarray]:
 
 
 @functools.lru_cache(maxsize=64)
-def _group_arrays(xhm: str) -> tuple[tuple[gemmi.Op, ...], np.ndarray, np.ndarray]:
+def _group_arrays(key: tuple[str, tuple[str, ...]]
+                  ) -> tuple[tuple[gemmi.Op, ...], np.ndarray, np.ndarray]:
     """Operations of one group with their (R, t) already in float64.
 
     Rebuilding them per call is what :func:`site_orbit` spent most of its time
@@ -405,8 +610,14 @@ def _group_arrays(xhm: str) -> tuple[tuple[gemmi.Op, ...], np.ndarray, np.ndarra
     costs 0.78 ms a walk, so a 48-site cubic phase paid 0.76 s every time
     ``snap_diagnostics`` ran.  The arrays are exactly what :func:`_op_arrays`
     returns and are never written to, so the cache changes no number.
+
+    ``key`` is :func:`group_key`'s: the xhm symbol for a tabulated group and
+    the explicit operation list for an :class:`OperatorGroup`, so the two
+    cannot collide and a phase carrying its own list is cached like any other.
     """
-    ops = tuple(get_spacegroup(xhm).operations())
+    kind, payload = key
+    ops = (_op_list_from_xyz(payload) if kind == "ops"
+           else tuple(get_spacegroup(payload[0]).operations()))
     pairs = [_op_arrays(op) for op in ops]
     rot = np.array([r for r, _ in pairs], dtype=np.float64)
     tran = np.array([t for _, t in pairs], dtype=np.float64)
@@ -505,7 +716,7 @@ def site_orbit(sg: gemmi.SpaceGroup, xyz: np.ndarray, *,
     exactly why the guard is kept: it is the invariant, and an invariant nobody
     can currently break is the one worth asserting.
     """
-    ops, all_rot, all_tran = _group_arrays(sg.xhm())
+    ops, all_rot, all_tran = _group_arrays(group_key(sg))
     order = len(ops)
     x = np.asarray(xyz, dtype=np.float64).reshape(3)
 

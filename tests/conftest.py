@@ -64,6 +64,31 @@ if os.environ.get("PYTEST_XDIST_WORKER"):
     os.environ.setdefault(COMPILED_THREADS_ENV, "1")
 
 
+@pytest.fixture(autouse=True)
+def _spglib_error_mode_is_not_a_shared_global():
+    """Put back the error mode an imported oracle changes under everyone's feet.
+
+    ``spgrep/__init__.py`` (0.7.0) sets ``spglib.error.OLD_ERROR_HANDLING =
+    False`` when it is imported, and it is imported *inside* the oracle tests of
+    ``tests/test_magnetic_irreps.py``.  From that point on, in that xdist
+    worker, spglib **raises** where it used to return ``None``, so
+    ``crystallography.magnetic.operators.identify()`` — which reads the
+    ``None`` — leaks a ``SpglibError`` instead of the ``ValueError`` it
+    documents.  Tests in two other files then fail or pass according to how
+    ``-n auto`` happened to deal them: measured 2026-09-06, three failures on
+    worker gw4 and none anywhere else, and green in every serial run.
+
+    Restoring the flag per test is the suite-wide half of the fix; the other
+    half is that a caller should catch both (see
+    ``magnetic.isotropy.IDENTIFY_REFUSALS``).
+    """
+    import spglib.error
+
+    before = spglib.error.OLD_ERROR_HANDLING
+    yield
+    spglib.error.OLD_ERROR_HANDLING = before
+
+
 #: The one ``--dist`` that honours ``@pytest.mark.xdist_group``.  ``load``
 #: distributes by test and ``loadscope``/``loadfile`` by scope and file, so all
 #: three deal a group's members to whichever worker is free.
