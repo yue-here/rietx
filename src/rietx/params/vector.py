@@ -286,14 +286,57 @@ CELL_WINDOW_ANGLE_DEG = 2.0
 #: refinement bound.
 CELL_MIN_LENGTH_A = 1.5
 
+#: Unconditional post-solve safety window (fraction, degrees) — see
+#: ``refine.clamp_cell_runaway``, which applies this to *every* free cell
+#: parameter regardless of ``phase_support``, after a stage has solved and
+#: committed.  ``phase_support`` (the authority behind ``cell_window``'s own
+#: window above, and ``refine._hold_unsupported_phases``, WP-1301) is a
+#: per-phase amplitude test and cannot see a *joint* degeneracy: two free
+#: phases sharing a near-identical cell trade scale against each other along
+#: an axis that is exactly as flat as an absent phase's, and the phase that
+#: ends up walking it can be the one with the real, undiminished scale — its
+#: own modelled contribution never drops below
+#: :data:`~rietx.model.forward.PHASE_SUPPORT_SIGMA`, so neither the window
+#: nor the hold ever applies to it.  Measured (a multi-phase in-situ
+#: series, 2026-09-17): a synthetic two-phase LaB6 pattern, one copy at full scale
+#: and a second at a 2 % trace with the *same* starting cell, freeing scale
+#: and cell together in one stage — the fully-supported phase's own cell
+#: (not the trace phase's) ran 4.1566 -> 3803 Å in twenty TRF iterations of
+#: that one stage, unwindowed the whole time, and crashed the next stage's
+#: ``generate_reflections`` with the WP-1110 refusal before
+#: ``freeze_cell_windows`` for that next stage ever ran.
+#:
+#: Applied to the *outcome*, never as a live solver bound: a bound scipy's
+#: TRF actually sees changes its trust-region step scaling even when never
+#: hit (measured, WP-1110: windowing an honest phase's cell alone took the
+#: IUCr ``cpd-1c`` collapsed refit from 82 to its 400-iteration budget and
+#: left it at a worse Rwp) — which is exactly why the support-based window
+#: is restricted to phases judged invisible rather than applied to every free
+#: cell, and why this fallback cannot be a second live bound without costing
+#: every other test's iteration count and pinned digits.  A stage that never
+#: leaves this window (every one WP-1110's own 51-transition survey measured:
+#: worst honest single-stage move 2.8e-4 relative, five orders inside it) is
+#: therefore bit-identical whether or not this check exists at all.
+#: ±15 % is three times :data:`CELL_WINDOW_FRACTION` — wide enough that no
+#: real measurement needs it (thermal expansion and a composition swing are
+#: each a few percent at most) and narrow enough that an escaping cell is
+#: pulled back in Å rather than left to reach the thousands.
+CELL_SAFETY_FRACTION = 0.15
+CELL_SAFETY_ANGLE_DEG = 3.0 * CELL_WINDOW_ANGLE_DEG
+
 #: A cell angle is degenerate at 0° and 180° — the metric tensor is singular
 #: there — so the window is clipped inside them.
 _ANGLE_MIN_DEG = 1.0
 _ANGLE_MAX_DEG = 179.0
 
 
-def _cell_parameter_name(path: str, *, phases: set[int]) -> str | None:
+def _cell_parameter_name(path: str, *, phases: set[int] | None) -> str | None:
     """``"phases.0.cell.a"`` → ``"a"`` when phase 0 is in ``phases``, else None.
+
+    ``phases=None`` means *any* phase — the unconditional safety fallback in
+    :meth:`ParameterTable.bounds` asks this of every free cell path regardless
+    of which phase it belongs to, where the support-based window asks it only
+    of the phases ``freeze_cell_windows`` declared.
 
     Read off the path rather than recorded on the :class:`Entry`, because the
     window is applied at the optimiser interface and the entries there arrive
@@ -307,13 +350,22 @@ def _cell_parameter_name(path: str, *, phases: set[int]) -> str | None:
             ip = int(parts[1])
         except ValueError:
             return None
-        return parts[3] if ip in phases else None
+        return parts[3] if phases is None or ip in phases else None
     return None
 
 
 def cell_window(name: str, value: float, lo: float, hi: float,
-                *, path: str | None = None) -> tuple[float, float]:
+                *, path: str | None = None,
+                fraction: float = CELL_WINDOW_FRACTION,
+                angle_deg: float = CELL_WINDOW_ANGLE_DEG) -> tuple[float, float]:
     """The default bounds on one cell parameter, anchored at ``value``.
+
+    ``fraction``/``angle_deg`` default to the per-phase-support window's own
+    constants; ``refine.clamp_cell_runaway`` passes
+    :data:`CELL_SAFETY_FRACTION`/:data:`CELL_SAFETY_ANGLE_DEG` instead, three
+    times as wide, to pull an escaped cell back after a stage regardless of
+    which phase it belonged to — see that constant's docstring.  Every
+    existing caller of this function keeps the old numbers.
 
     **Why a cell needs a default bound at all.**  Every structural parameter of
     a phase reaches the pattern only through ``scale × |F|² × profile``, so a
@@ -406,8 +458,8 @@ def cell_window(name: str, value: float, lo: float, hi: float,
                 "them.  Refuse the model rather than bounding it — a cell "
                 "this far out is a transcription or a diverged stage, not a "
                 "parameter to window.")
-        window_lo = max(_ANGLE_MIN_DEG, value - CELL_WINDOW_ANGLE_DEG)
-        window_hi = min(_ANGLE_MAX_DEG, value + CELL_WINDOW_ANGLE_DEG)
+        window_lo = max(_ANGLE_MIN_DEG, value - angle_deg)
+        window_hi = min(_ANGLE_MAX_DEG, value + angle_deg)
     else:
         if not value > 0.0:
             raise ValueError(
@@ -418,8 +470,8 @@ def cell_window(name: str, value: float, lo: float, hi: float,
                 "floor is left alone here and reported where there is a "
                 "diagnostics channel.)")
         window_lo = max(CELL_MIN_LENGTH_A,
-                        value * (1.0 - CELL_WINDOW_FRACTION) - CELL_WINDOW_PAD_A)
-        window_hi = value * (1.0 + CELL_WINDOW_FRACTION) + CELL_WINDOW_PAD_A
+                        value * (1.0 - fraction) - CELL_WINDOW_PAD_A)
+        window_hi = value * (1.0 + fraction) + CELL_WINDOW_PAD_A
     # never propose a window that excludes where the parameter already is: a
     # cell below the floor is a model to refuse elsewhere, not a bound to raise
     # on here (ParameterTable has no diagnostics channel — the rule in

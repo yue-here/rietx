@@ -69,10 +69,14 @@ from .optimize.statistics import (
     structure_r_factors,
 )
 from .params.vector import (
+    CELL_SAFETY_ANGLE_DEG,
+    CELL_SAFETY_FRACTION,
     VAR_PREFIX,
     AffineTie,
     ParameterTable,
+    _cell_parameter_name,
     _is_wavelength,
+    cell_window,
     is_variable_path,
 )
 from .report.schemas import THRESHOLDS_VERSION, FitReport, StageReport
@@ -166,6 +170,12 @@ class _StageHold:
 
     held: list[str]
     released: list[str]
+    #: ``(path, escaped_value, clamped_value)`` for every free cell parameter
+    #: ``clamp_cell_runaway`` pulled back this stage — empty on every stage
+    #: that never leaves the safety window, which is every stage measured so
+    #: far (WP-1110's own 51-transition survey).
+    cell_runaway: list[tuple[str, float, float]] = dataclasses.field(
+        default_factory=list)
 
 
 def _tie_terms(source: "str | dict[str, float] | Sequence[tuple[str, float]]",
@@ -255,6 +265,82 @@ def _hold_unsupported_phases(model: CompiledModel,
     if held:
         table.set_vary(held, False)
     return held
+
+
+def clamp_cell_runaway(table: ParameterTable, start_values: dict[str, float]
+                       ) -> list[tuple[str, float, float]]:
+    """Pull every free cell parameter back inside ``CELL_SAFETY_FRACTION`` /
+    ``CELL_SAFETY_ANGLE_DEG`` of ``start_values`` — the stage's own — and
+    report what it pulled back, as ``(path, escaped_value, clamped_value)``.
+
+    Call this **after** ``table.commit(outcome.theta)``, on the committed
+    ``Entry.value``\\ s, never as a bound the solver sees — that is the whole
+    design (:data:`~rietx.params.vector.CELL_SAFETY_FRACTION`'s docstring):
+    ``cell_window``'s own support-based window is deliberately restricted to
+    phases ``phase_support`` judges invisible, because a live bound changes
+    scipy TRF's trust-region step scaling even where it is never hit,
+    measurably costing iterations and pinned digits on a phase that was never
+    going to run away.  A phase judged **visible** the whole time (the trigger
+    case: two free phases sharing a near-identical cell, one at full scale)
+    is exactly what that window cannot reach, so this checks the *outcome*
+    unconditionally instead — bit-identical for every fit whose cell never
+    leaves the window (every one measured in WP-1110's own 51-transition
+    survey), and a correction rather than a crash for one that does.
+
+    Symmetry-derived cell parameters (``b``/``c`` tied to ``a`` on a cubic
+    cell, etc.) are not in ``table.free_paths`` and are not visited here —
+    :meth:`~rietx.params.vector.ParameterTable.refresh_ties` (called by the
+    caller, exactly as the WP-1301 collapse-restore beside this call already
+    does) re-derives them off the clamped source.
+    """
+    clamped: list[tuple[str, float, float]] = []
+    free = set(table.free_paths)
+    for e in table.entries:
+        if e.path not in free:
+            continue
+        cell_name = _cell_parameter_name(e.path, phases=None)
+        if cell_name is None:
+            continue
+        start = start_values.get(e.path)
+        if start is None or not math.isfinite(start):
+            continue
+        lo, hi = cell_window(cell_name, start, -math.inf, math.inf,
+                             path=e.path, fraction=CELL_SAFETY_FRACTION,
+                             angle_deg=CELL_SAFETY_ANGLE_DEG)
+        if not (lo <= e.value <= hi):
+            target = min(max(e.value, lo), hi)
+            clamped.append((e.path, float(e.value), float(target)))
+            e.value = target
+    return clamped
+
+
+def _cell_runaway_diagnostic(
+        cell_runaway: list[tuple[str, float, float]]) -> Diagnostic | None:
+    """``CELL_RUNAWAY`` for one stage's :func:`clamp_cell_runaway` findings,
+    or ``None`` when it clamped nothing (the overwhelming majority of stages,
+    including every one this package's own suite runs)."""
+    if not cell_runaway:
+        return None
+    paths = [p for p, _, _ in cell_runaway]
+    worst = max(cell_runaway, key=lambda t: abs(t[1] - t[2]))
+    detail = "; ".join(f"{p} {old:.6g} -> {new:.6g} Å"
+                       for p, old, new in cell_runaway)
+    return Diagnostic(
+        level="warning", code="CELL_RUNAWAY", where=paths,
+        value=abs(worst[1] - worst[2]),
+        message=(f"{len(cell_runaway)} free cell parameter"
+                 f"{'' if len(cell_runaway) == 1 else 's'} left "
+                 f"±{CELL_SAFETY_FRACTION:.0%} of this stage's starting cell "
+                 f"during solving and {'was' if len(cell_runaway) == 1 else 'were'} "
+                 f"pulled back to the window edge rather than left to reach "
+                 f"an unphysical value: {detail}"),
+        suggestion=(
+            "the pulled-back value is not a measurement: this phase's own "
+            "cell is degenerate with another free phase's (or with another "
+            "free parameter) along this direction; fix one phase's cell, "
+            "hold the other free phase, or free the cell in its own stage "
+            "away from the degenerate pairing"),
+    )
 
 
 def _released_phases(model: CompiledModel, table: ParameterTable,
@@ -1751,6 +1837,14 @@ class Refinement:
                                     backend=self._backend, solver=self._solver,
                                     cancel=cancel, **stage_ftol)
         table.commit(outcome.theta)
+        # A phase's own support can stay comfortably above PHASE_SUPPORT_SIGMA
+        # the whole time and its cell still walk to nonsense — a joint
+        # degeneracy with another free phase's cell, invisible to the
+        # per-phase test above (CELL_SAFETY_FRACTION's docstring).  Checked
+        # and corrected once, on the outcome, never as a bound the solver saw.
+        cell_runaway = clamp_cell_runaway(table, start_values)
+        if cell_runaway:
+            table.refresh_ties()
 
         # Support is a fact about the values, and a stage moves them.  So the
         # measurement is taken again at the answer, and it can have moved
@@ -1812,6 +1906,10 @@ class Refinement:
                 stage=stage.name, backend=self._backend,
                 solver=self._solver, cancel=cancel, **stage_ftol)
             table.commit(second.theta)
+            second_runaway = clamp_cell_runaway(table, start_values)
+            if second_runaway:
+                table.refresh_ties()
+                cell_runaway = cell_runaway + second_runaway
             # the record is one stage: the second solve's answer, the first
             # solve's starting cost, and the iterations of both — the whole
             # point being that the hold cost something and it must be visible
@@ -1847,8 +1945,9 @@ class Refinement:
                         cost_initial=outcome.cost_initial,
                         cost_final=outcome.cost_final, rwp=stage_rwp,
                         held=list(held), released=list(released))
-        return model, outcome, guard, freed, _StageHold(held=list(held),
-                                                        released=list(released))
+        return model, outcome, guard, freed, _StageHold(
+            held=list(held), released=list(released),
+            cell_runaway=list(cell_runaway))
 
     def fit(self, data: PatternData, *, mode: Mode = "rietveld",
             plan: RefinementPlan | str = "mccusker_default",
@@ -2129,6 +2228,10 @@ class Refinement:
                     continue          # re-taken on the converged vector below
                 else:
                     diagnostics.append(d)
+            runaway_diag = _cell_runaway_diagnostic(hold.cell_runaway)
+            if runaway_diag is not None:
+                diagnostics.append(runaway_diag)
+                stage_diagnostics = stage_diagnostics + [runaway_diag]
             stage_results.append(StageResult(
                 name=stage.name, status=outcome.status, n_iterations=outcome.n_iterations,
                 cost_initial=outcome.cost_initial, cost_final=outcome.cost_final,
@@ -2270,6 +2373,9 @@ class Refinement:
             diagnostics.extend(_constraint_diagnostics(stage.name, outcome))
             diagnostics.extend(_degenerate_cell_diagnostics(
                 [(stage.name, outcome.n_degenerate_cell_probes)]))
+            runaway_diag = _cell_runaway_diagnostic(hold.cell_runaway)
+            if runaway_diag is not None:
+                diagnostics.append(runaway_diag)
 
             self._model = model
             self._write_back(table)
