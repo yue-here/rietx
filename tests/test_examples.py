@@ -137,10 +137,9 @@ def test_nac_example_writes_its_plot(nac_run):
 @pytest.mark.xdist_group("example-srm660c")
 def test_srm660c_example_writes_its_renderings(srm660c_run):
     """The lab script renders through both paths — matplotlib for the PNGs and
-    plotly for the self-contained HTML — so a broken one is a silent loss of
-    exactly what the chapter points a reader at."""
+    the chart module for the self-contained HTML — so a broken one is a silent
+    loss of exactly what the chapter points a reader at."""
     pytest.importorskip("matplotlib")
-    pytest.importorskip("plotly")
     _, before = srm660c_run
     for name, stamp in before.items():
         path = EXAMPLES / name

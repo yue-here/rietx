@@ -2,7 +2,7 @@
 
 This renderer produces the standard Rietveld panel: observed points, calculated
 line, the difference below them, and per-phase reflection tick rows below
-*that*.  The interactive plotly viewer is :mod:`rietx.viz.html`; the
+*that*.  The interactive viewer is :mod:`rietx.viz.html`; the
 VLM-readable montage is :func:`plot_for_vlm` here, and it is deliberately *not*
 held to any of what follows — it is drawn for a vision model, not for a person.
 

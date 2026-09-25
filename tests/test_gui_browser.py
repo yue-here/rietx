@@ -16,6 +16,8 @@ includes CI.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from rietx.gui import GuiSession
@@ -173,3 +175,26 @@ def test_the_peak_layer_is_painted_on_the_peaks_tab_in_its_own_two_inks(page, gu
     main, _, _ = page.evaluate(PANES)
     assert _has(main, "fill", ink["peak"])
     assert _has(main, "stroke", ink["peakfit"], dash=True)
+
+
+def test_the_pattern_exports_as_drawn_and_fetches_svgcanvas_only_then(page):
+    """D6 in the pattern panel. svgcanvas is a chunk of its own, fetched on the
+    first SVG and not at boot, and the table copied is the fit's channels in
+    view with the residual the panel is drawing."""
+    asked: list[str] = []
+    page.on("request", lambda r: asked.append(r.url))
+    page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+    row = page.get_by_role("group", name="export").first
+    assert not [u for u in asked if "svgcanvas" in u]
+    with page.expect_download() as download:
+        row.get_by_role("button", name="SVG", exact=True).click()
+    assert download.value.suggested_filename == "pattern.svg"
+    assert [u for u in asked if u.endswith("/assets/vendor-svgcanvas.js")]
+    svg = Path(download.value.path()).read_text(encoding="utf-8")
+    assert svg.count("<svg") == 4
+    row.get_by_role("button", name="copy data").click()
+    page.wait_for_function("[...document.querySelectorAll('.exports .said')]"
+                           ".some((e) => e.textContent.startsWith('copied'))")
+    head = page.evaluate("navigator.clipboard.readText()").split("\n")[0]
+    assert head.split("\t")[:3] == ["two_theta", "y_obs", "excluded"]
+

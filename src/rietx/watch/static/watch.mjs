@@ -8,7 +8,7 @@ import {LAYOUT_DEFAULT, ago, axisOf, clampSize, clock, curvesOf, deltaRange,
         deltaTitle, dragged, esc, guiReason, hasBackground, intensityRange,
         legendOf, nextLayout, num, parseLayout, pct, rowName, sizeField,
         paletteFrom, runLabel, runTitle, tickText} from './watch-core.mjs';
-import {nearest, pattern} from './rxplot.mjs';
+import {exportButtons, nearest, pattern} from './rxplot.mjs';
 
 const $ = id => document.getElementById(id);
 let SINGLE = null;          // set when the served directory is itself a run
@@ -321,6 +321,21 @@ function retheme() {
 // the canvas, so the canvas is repainted when the system's answer moves.
 window.matchMedia?.('(prefers-color-scheme: dark)')
   .addEventListener?.('change', () => retheme());
+
+// The picture's four exports (D6), behind one word in the bar, which keeps
+// its one row at the narrowest window. Each acts on the stage on screen, at
+// the reader's zoom.
+function armExports() {
+  const said = document.createElement('output');
+  $('export-menu').append(...exportButtons(() => {
+    if (!chart) throw new Error('no picture on screen');
+    return chart.fig;
+  }, {
+    name: () => `rietx-${chart ? chart.id : 'run'}`,
+    svgcanvas: () => import('./svgcanvas.esm.js'),
+    say: text => { said.textContent = text; },
+  }), said);
+}
 
 function destroyChart() {
   if (chart) chart.fig.destroy();
@@ -1298,6 +1313,7 @@ $('stop').onclick = () => {
   armGrip('console');
   // the run pane's collapse is a button, not a grip: nothing sizes that pane
   $('toggle-run').addEventListener('click', () => toggleSeam('run'));
+  armExports();
   applyLayout();
   await refresh();
   // `data-single` arrives with the walk now, and it is a layout the page has

@@ -165,3 +165,21 @@ def test_a_failed_variant_is_a_row_not_a_broken_page(page):
         for (let i = 0; i < img.length; i += 4 * 97) out.push(Array.from(img.slice(i, i + 4)));
         return out; })()""")
     assert _has(pixels, [0x1f, 0x5f, 0xa8], alpha=100)
+
+
+def test_the_figure_exports_what_is_drawn(page):
+    """D6. Before a run there is nothing to export and the page says so. After
+    one, the SVG loads svgcanvas from the page's own server, and the file is
+    named after the standard."""
+    page.click("#exports button:text-is('SVG')")
+    page.wait_for_function("document.getElementById('export-said').textContent !== ''")
+    assert page.text_content("#export-said") == "SVG failed: nothing is drawn yet"
+    _run(page, ["baseline", "extinction"])
+    with page.expect_download() as download:
+        page.click("#exports button:text-is('SVG')")
+    assert download.value.suggested_filename == f"compare-{page.input_value('#standard')}.svg"
+    assert "/svgcanvas.esm.js" in page.asked
+    svg = download.value.path().read_text(encoding="utf-8")
+    # the three panes and the tick band, inside the one document
+    assert svg.count("<svg") == 5
+

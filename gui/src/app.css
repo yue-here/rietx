@@ -533,13 +533,3 @@ kbd {
 .cm-editor.cm-focused {
   outline: none;
 }
-
-/* The chart's pointer line carries no quantity, so it is chrome: solid, in
-   `--fg`, the one ink no plot colour is near (WP-1213). uPlot's own is dashed
-   grey-blue, which reads as the dotted edge an excluded region leaves. Cursor
-   sync draws it in every pane of a figure, as plotly's `spikemode: "across"`
-   did. Every chart in the GUI takes it from here (WP-1461): three classes,
-   because uPlot's own rule is two and its stylesheet loads after this one. */
-.uplot.u-hz .u-cursor-x {
-  border-right: 1px solid var(--fg);
-}

@@ -38,11 +38,13 @@ export default defineConfig({
         // first paint.
         //
         // uPlot is split for the same reason (WP-1461): 51 kB of third-party
-        // bytes that change only when its pin does.
+        // bytes that change only when its pin does. svgcanvas too, and it is
+        // imported on the first SVG export rather than at boot.
         manualChunks: (id: string) =>
           /node_modules[\\/](@codemirror|@lezer|crelt|style-mod|w3c-keyname)[\\/]/
             .test(id) ? "vendor-cm"
-            : /node_modules[\\/]uplot[\\/]/.test(id) ? "vendor-uplot" : undefined,
+            : /node_modules[\\/]uplot[\\/]/.test(id) ? "vendor-uplot"
+            : /node_modules[\\/]svgcanvas[\\/]/.test(id) ? "vendor-svgcanvas" : undefined,
         assetFileNames: (info) =>
           info.names?.[0]?.endsWith(".css") ? "assets/app.css" : "assets/[name][extname]",
       },

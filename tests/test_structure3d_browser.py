@@ -164,7 +164,8 @@ def test_an_anisotropic_site_shows_its_principal_ellipses(page):
 
 def test_the_png_is_rendered_again_at_3000_pixels(page, tmp_path):
     with page.expect_download() as download:
-        page.get_by_role("button", name="PNG", exact=True).click()
+        # the viewer's own: the pattern panel beside it has a PNG export too (WP-1461)
+        page.locator("section.viewer").get_by_role("button", name="PNG", exact=True).click()
     path = tmp_path / "structure.png"
     download.value.save_as(path)
     image = np.asarray(imread(path), dtype=float)[..., :3]

@@ -21,6 +21,26 @@ export function lower(xs, v) {
   return lo;
 }
 
+/** The first index whose value is past `v`, in an ascending array. */
+export function upper(xs, v) {
+  let lo = 0, hi = xs.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (xs[mid] <= v) lo = mid + 1; else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * `rows` under a header of `names`, tab-separated, a row a line. A number is
+ * written in full, so a pasted value is the one drawn. A gap, and a value that
+ * is not a finite number, is an empty cell.
+ */
+export function tsv(names, rows) {
+  const cell = (v) => (v == null || (typeof v === "number" && !Number.isFinite(v)) ? "" : String(v));
+  return [names.join("\t"), ...rows.map((row) => row.map(cell).join("\t"))].join("\n");
+}
+
 /**
  * The index of the entry nearest `v`, or -1 when none is within `radius`.
  * Distance is measured in pixels through `toPx`, since a pointer's reach is a
@@ -375,16 +395,27 @@ export function panes(uPlot, host, spec) {
     u.over.addEventListener("mouseleave", () => { pointer = null; group.onCursor?.(null); });
   }
 
-  function build(p) {
+  /**
+   * The options pane `p` is built with. `copy`, when given, is the live pane
+   * an export redraws (`svg`): the same pane at its size, its view and its
+   * shown series, in no sync group and answering no gesture. Synced, its first
+   * `setScale` redrew the live panes while `Path2D` was swapped (finding 6).
+   */
+  function options(p, copy) {
     const key = p.key;
     const hooks = { ...(p.hooks ?? {}) };
     const extend = (name, fn) => { hooks[name] = [...(hooks[name] ?? []), fn]; };
-    extend("setScale", (u, k) => { if (k === "x") group.setX(u.scales.x.min, u.scales.x.max); });
-    extend("setSelect", onSelect);
-    extend("setCursor", onCursor);
-    const u = new uPlot({
-      width: host.clientWidth, height: heights()[key], legend: { show: false },
-      scales: { x: { time: false }, y: yScale(uPlot, p.y ?? "lin", () => pins[key] ?? null, p.range, p.auto) },
+    if (!copy) {
+      extend("setScale", (u, k) => { if (k === "x") group.setX(u.scales.x.min, u.scales.x.max); });
+      extend("setSelect", onSelect);
+      extend("setCursor", onCursor);
+    }
+    const view = copy && [copy.scales.y.min, copy.scales.y.max];
+    const series = p.series.map((s, i) => ({ points: { show: false }, ...s, ...(copy ? { show: copy.series[i + 1].show } : {}) }));
+    const common = {
+      width: copy ? copy.width : host.clientWidth, height: copy ? copy.height : heights()[key], legend: { show: false },
+      scales: { x: copy ? { time: false, range: () => [copy.scales.x.min, copy.scales.x.max] } : { time: false },
+                y: yScale(uPlot, p.y ?? "lin", copy ? () => view : () => pins[key] ?? null, p.range, p.auto) },
       axes: axes(p, gutter),
       // A band has no y labels for uPlot's automatic top padding to make room
       // for, and that padding took 17 px of a one-phase band's 22.
@@ -392,7 +423,11 @@ export function panes(uPlot, host, spec) {
       // A line is a line. uPlot rings every point of a series whose points sit
       // far enough apart, which a zoom always reaches, and a ringed calculated
       // curve reads as observed points. A series that wants marks says so.
-      series: [{}, ...p.series.map((s) => ({ points: { show: false }, ...s }))],
+      series: [{}, ...series],
+      hooks,
+    };
+    if (copy) return { ...common, cursor: { show: false, drag: { x: false, y: false } } };
+    return { ...common,
       cursor: {
         sync: { key: sync, setSeries: false, scales: ["x", null],
                 filters: { pub: (type) => type !== "mousedown" && type !== "mouseup" && type !== "dblclick" } },
@@ -406,8 +441,19 @@ export function panes(uPlot, host, spec) {
         bind: { dblclick: () => null },
         points: { show: false }, y: false, focus: { prox: -1 },
       },
-      hooks,
-    }, [spec.x, ...p.data], divs[key]);
+    };
+  }
+
+  function build(p) {
+    const key = p.key;
+    const u = new uPlot(options(p), [spec.x, ...p.data], divs[key]);
+    // The pointer's line carries no quantity, so it is chrome: solid, in
+    // `--fg`, the one ink no plot colour is near (WP-1213). uPlot's own is
+    // dashed grey-blue, which reads as the dotted edge an excluded region
+    // leaves. Inline and through the token, so every page takes it and a theme
+    // switch restyles it. A rule in each page's stylesheet had to outrank
+    // uPlot's own, and one page of four had none.
+    u.root.querySelector(".u-cursor-x")?.style.setProperty("border-right", "1px solid var(--fg)");
     u.__rxKey = key;
     group.panes[key] = u;
     gestures(u, key);
@@ -518,12 +564,206 @@ export function panes(uPlot, host, spec) {
   const observer = new ResizeObserver(fit);
   observer.observe(host);
 
+  // ------------------------------------------------------------ exports (D6)
+
+  /** The indices of `spec.x` in view, as [i0, i1). Both ends are in the view. */
+  group.inView = () => {
+    const { min, max } = Object.values(group.panes)[0].scales.x;
+    return [lower(spec.x, min), upper(spec.x, max)];
+  };
+
+  /**
+   * The panes as one canvas, top to bottom, at the device's resolution. uPlot
+   * leaves its canvas transparent (finding 8), so the ground is filled first.
+   */
+  group.image = () => {
+    const canvases = Object.values(group.panes).map((u) => u.ctx.canvas);
+    const out = document.createElement("canvas");
+    out.width = Math.max(...canvases.map((c) => c.width));
+    out.height = canvases.reduce((sum, c) => sum + c.height, 0);
+    const g = out.getContext("2d");
+    g.fillStyle = groundOf(host);
+    g.fillRect(0, 0, out.width, out.height);
+    let y = 0;
+    for (const c of canvases) { g.drawImage(c, 0, y); y += c.height; }
+    return out;
+  };
+
+  /** The panes as a PNG blob. */
+  group.png = () => new Promise((resolve, reject) => group.image().toBlob(
+    (blob) => (blob ? resolve(blob) : reject(new Error("the browser made no PNG"))), "image/png"));
+
+  /**
+   * The panes as a PNG on the clipboard. The item takes the blob's promise,
+   * so the write starts inside the press: Safari refuses a write made after
+   * an await has spent the user's activation.
+   */
+  group.copyImage = async () => {
+    const blob = group.png();
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    return blob;
+  };
+
+  /**
+   * The panes as one SVG document, each pane redrawn once into svgcanvas
+   * (finding 6). `load` resolves to the svgcanvas module, so a page that never
+   * exports never loads it. Each pane is a nested `<svg>` in device pixels,
+   * scaled to its CSS size by its `viewBox`, as uPlot draws at the device's
+   * resolution and the module's hooks do too.
+   */
+  group.svg = async (load) => {
+    const { Context } = await load();
+    const r = devicePixelRatio, parts = [];
+    let top = 0, width = 0;
+    for (const [key, live] of Object.entries(group.panes)) {
+      const w = live.width, h = live.height;
+      const el = await record(Context, w * r, h * r,
+                              (div) => new uPlot(options(specs[key], live), live.data, div));
+      for (const [name, value] of [["x", 0], ["y", top], ["width", w], ["height", h],
+                                   ["viewBox", `0 0 ${w * r} ${h * r}`]]) el.setAttribute(name, value);
+      parts.push(new XMLSerializer().serializeToString(el));
+      top += h;
+      width = Math.max(width, w);
+    }
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${top}" `
+      + `viewBox="0 0 ${width} ${top}"><rect width="100%" height="100%" fill="${groundOf(host)}"/>`
+      + `${parts.join("")}</svg>`;
+  };
+
+  /**
+   * What the figure holds in view, as tab-separated text a spreadsheet
+   * pastes. A figure says what its columns are by setting `group.table` to a
+   * function returning `{ names, rows }`.
+   */
+  group.tsv = () => {
+    if (!group.table) throw new Error("rxplot: this figure has no table");
+    const { names, rows } = group.table();
+    return tsv(names, rows);
+  };
+
   group.destroy = () => {
     observer.disconnect();
     for (const u of Object.values(group.panes)) u.destroy();
     for (const d of Object.values(divs)) d.remove();
   };
   return group;
+}
+
+/** The colour behind `el`: its nearest ancestor's background that is not transparent. */
+function groundOf(el) {
+  for (let e = el; e; e = e.parentElement) {
+    const c = getComputedStyle(e).backgroundColor;
+    if (c && c !== "transparent" && !/^rgba\(.*,\s*0\)$/.test(c)) return c;
+  }
+  return "#ffffff";
+}
+
+/**
+ * A `Path2D` that records what is drawn into it, for svgcanvas to replay.
+ * svgcanvas cannot read a native one, and uPlot strokes every series through
+ * one (finding 6).
+ */
+class Recorded {
+  constructor(from) { this.ops = from instanceof Recorded ? from.ops.slice() : []; }
+  addPath(p) { if (p instanceof Recorded) this.ops.push(...p.ops); }
+}
+for (const op of ["moveTo", "lineTo", "rect", "arc", "arcTo", "ellipse", "bezierCurveTo",
+                  "quadraticCurveTo", "closePath"]) {
+  Recorded.prototype[op] = function (...args) { this.ops.push([op, args]); };
+}
+
+/**
+ * One chart built by `make` into svgcanvas's context, as that context's SVG
+ * element. For the draw uPlot commits a microtask after construction,
+ * `Path2D` is the recording class and the first 2D context asked for is
+ * svgcanvas's. Both are put back before this returns, whatever happens.
+ */
+async function record(Context, width, height, make) {
+  const native = window.Path2D, get = HTMLCanvasElement.prototype.getContext;
+  let svg = null, u = null, taken = false;
+  HTMLCanvasElement.prototype.getContext = function (type, ...rest) {
+    // taken before the context is made: svgcanvas's constructor asks for a
+    // native 2D context of its own, which re-entered here without end
+    if (taken || type !== "2d") return get.call(this, type, ...rest);
+    taken = true;
+    svg = new Context({ width, height });
+    for (const m of ["stroke", "fill", "clip"]) {
+      const own = svg[m].bind(svg);
+      svg[m] = (path, ...more) => {
+        if (!(path instanceof Recorded)) return own(path, ...more);
+        svg.beginPath();
+        for (const [op, args] of path.ops) svg[op](...args);
+        return own(...more);
+      };
+    }
+    return svg;
+  };
+  const div = document.body.appendChild(document.createElement("div"));
+  div.style.cssText = "position:fixed;left:-100000px;top:0";
+  window.Path2D = Recorded;
+  try {
+    u = make(div);
+    await Promise.resolve();
+    await Promise.resolve();
+  } finally {
+    HTMLCanvasElement.prototype.getContext = get;
+    window.Path2D = native;
+    u?.destroy();
+    div.remove();
+  }
+  return svg.getSvg();
+}
+
+/** `blob` saved as a file named `name`, as a download link does. */
+export function download(blob, name) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // late, not at once: Firefox and Safari read the URL after the click
+  // returns, and a revoked one saves nothing
+  setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+}
+
+/**
+ * The four exports (D6) as buttons, for a page with no framework of its own to
+ * place in its controls. `name()` is the file name without its extension,
+ * `svgcanvas` loads that module (`group.svg`), and `say(text)` reports what
+ * happened, a failure included, since a clipboard can refuse.
+ */
+export function exportButtons(figure, { name, svgcanvas, say }) {
+  const act = (label, title, run) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    b.title = title;
+    b.onclick = async () => {
+      try { say(await run()); } catch (e) { say(`${label} failed: ${e.message}`); }
+    };
+    return b;
+  };
+  return [
+    act("PNG", "save the figure as a PNG, as drawn", async () => {
+      download(await figure().png(), `${name()}.png`);
+      return "saved a PNG";
+    }),
+    act("SVG", "save the figure as an SVG, redrawn as vectors", async () => {
+      const text = await figure().svg(svgcanvas);
+      download(new Blob([text], { type: "image/svg+xml" }), `${name()}.svg`);
+      return "saved an SVG";
+    }),
+    act("copy image", "copy the figure to the clipboard as a PNG", async () => {
+      await figure().copyImage();
+      return "copied the figure";
+    }),
+    act("copy data", "copy what is in view as tab-separated columns", async () => {
+      const text = figure().tsv();
+      await navigator.clipboard.writeText(text);
+      return `copied ${text.split("\n").length - 1} rows`;
+    }),
+  ];
 }
 
 // ---------------------------------------------------------------- the pattern
@@ -631,6 +871,10 @@ const MAIN = ["obs", "masked", "calc", "bkg"];
 
 /** Which of a curves payload's arrays each residual is. */
 const RESIDUALS = { weighted: "delta", delta: "delta_raw", cumulative: "cumulative_chi2" };
+
+/** Each residual's column name in a table. The cumulative χ² is re-based as drawn. */
+const RESIDUAL_COLUMNS = { weighted: "delta_over_sigma", delta: "obs_minus_calc",
+                           cumulative: "cumulative_chi2_in_view" };
 
 /**
  * The diffraction pattern (D3): observed points over the model, a band of
@@ -764,6 +1008,18 @@ export function pattern(uPlot, host, curves, spec) {
   /** The Σχ² the drawn cumulative curve has subtracted, 0 under any other residual. */
   group.chi2Base = () => (cumulative() ? state.base : 0);
 
+  /** Every channel in view: the observed point, whether it is excluded, and the model and residual as drawn. */
+  group.table = () => {
+    const [i0, i1] = group.inView(), c = state.c, resid = residData()[0], rows = [];
+    for (let i = i0; i < i1; i++) {
+      rows.push([c.arrays.two_theta[i], c.arrays.y_obs[i], c.masked[i] == null ? 0 : 1,
+                 c.calc[i], c.bkg[i], resid[i]]);
+    }
+    // before a fit the pane is the page's `rawResidual`, whatever residual is chosen
+    const residName = c.header.fit ? RESIDUAL_COLUMNS[state.residual] : "residual";
+    return { names: ["two_theta", "y_obs", "excluded", "y_calc", "y_background", residName], rows };
+  };
+
   /** A new payload. `keep` holds the reader's view, as a run landing should. */
   group.setCurves = (payload, keep = false) => {
     state.c = prepare(payload);
@@ -885,6 +1141,20 @@ export function overlay(uPlot, host, data, spec) {
     if (key === state.reference) return;
     state.reference = key;
     group.setData("cum", cumData());
+  };
+
+  /** Every channel in view: the observed point, then each fit drawn, as its three panes draw it. */
+  group.table = () => {
+    const [i0, i1] = group.inView(), { cum, diff, fit } = group.panes, rows = [];
+    const shown = data.fits.map((f, i) => [f, i]).filter(([f]) => !state.hidden.has(f.key));
+    for (let i = i0; i < i1; i++) {
+      const row = [data.x[i], data.obs[i]];
+      for (const [, j] of shown) row.push(fit.data[2 + j][i], diff.data[1 + j][i], cum.data[1 + j][i]);
+      rows.push(row);
+    }
+    const names = ["two_theta", "y_obs"];
+    for (const [f] of shown) names.push(`${f.key}:y_calc`, `${f.key}:delta_over_sigma`, `${f.key}:delta_chi2`);
+    return { names, rows };
   };
 
   /** Draw every fit but `keys`, in every pane. */
@@ -1089,6 +1359,16 @@ export function trajectory(uPlot, host, traj, spec) {
       hidden.add(id);
     }
     group.redraw();
+  };
+
+  /** Each pattern in view, in chain order: its place in the chain, its x, and the value with its esd. */
+  group.table = () => {
+    const { min, max } = group.panes.traj.scales.x, rows = [];
+    for (let i = 0; i < n; i++) {
+      if (!(t.x[i] >= min && t.x[i] <= max)) continue;
+      rows.push(t.backward ? [i, t.x[i], value(i), esd(i), back(i)] : [i, t.x[i], value(i), esd(i)]);
+    }
+    return { names: ["pattern", "x", "value", "esd", ...(t.backward ? ["backward"] : [])], rows };
   };
 
   return group;

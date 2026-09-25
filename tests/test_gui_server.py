@@ -2527,7 +2527,7 @@ def test_the_ticks_carry_their_miller_indices_only_where_they_pair(fitted):
     A result reopened from before WP-1438 carries positions and no indices,
     and its rows then have no indices at all, rather than a list of blanks.
     """
-    from rietx.gui.session import _tick_rows
+    from rietx.viz.packed import _tick_rows
 
     _, _, project = fitted
     result = project.refinement.result_
@@ -2627,11 +2627,11 @@ def test_a_pattern_past_the_ceiling_is_decimated_and_every_index_follows(
     """D4 and D5: past ``CURVES_CEILING`` the route decimates the pattern as the
     window route does, and ``kept``, ``fitted`` and the model follow the channels
     that stay. The ceiling is lowered here, since no pattern on disk passes it."""
-    from rietx.gui import session as session_mod
+    from rietx.viz import packed as packed_mod
 
     _, client, _ = fitted
     whole = _packed(client, "/api/result/curves").arrays
-    monkeypatch.setattr(session_mod, "CURVES_CEILING", 1000)
+    monkeypatch.setattr(packed_mod, "CURVES_CEILING", 1000)
     got = _packed(client, "/api/result/curves")
     head, arrays = got.header, got.arrays
     assert head["decimated"] is True
@@ -2642,10 +2642,11 @@ def test_a_pattern_past_the_ceiling_is_decimated_and_every_index_follows(
     at = np.searchsorted(whole["two_theta"], arrays["two_theta"])
     np.testing.assert_array_equal(whole["two_theta"][at], arrays["two_theta"])
     np.testing.assert_array_equal(whole["y_obs"][at], arrays["y_obs"])
-    # min and max per bucket of the window route's three curves, so the
-    # tallest peak survives, and so does the worst misfit
+    # min and max per bucket of the observed, calculated and both residuals,
+    # so the tallest peak survives, and so does the worst misfit in either
     assert arrays["y_obs"].max() == whole["y_obs"].max()
-    assert np.abs(arrays["delta"]).max() == np.abs(whole["delta"]).max()
+    for key in ("delta", "delta_raw"):
+        assert np.abs(arrays[key]).max() == np.abs(whole[key]).max(), key
     # the indices name the same channels they named before, and the model and
     # its Σχ² come with them unchanged
     assert set(at[arrays["kept"]]) <= set(whole["kept"])
@@ -2787,14 +2788,11 @@ def test_the_weighted_residual_has_exactly_one_authority(fitted):
     # elementwise ops on the same arrays: equal to the bit, not to a tolerance
     np.testing.assert_array_equal(sent, drawn)
 
-    # and the third drawer, the plotly export, divides by the same σ
-    from rietx.viz.html import figure_from_arrays
-    figure = figure_from_arrays(
-        np.asarray(result.two_theta), np.asarray(result.y_obs),
-        np.asarray(result.y_calc), None, result.ticks, sigma=result.sig(),
-        max_points=10 * len(result.two_theta))
-    trace = next(t for t in figure.data if t.name == "Δ/σ")
-    np.testing.assert_array_equal(np.asarray(trace.y), drawn)
+    # and the third drawer, the file write_html writes, divides by the same σ
+    from rietx.viz.html import page
+    from tests.test_events_viz_history import page_parts
+    _, written = page_parts(page(result, weighted=True))
+    np.testing.assert_array_equal(written.arrays["delta"], drawn)
 
 
 def test_a_poisson_project_still_gets_a_weighted_residual(
@@ -2982,21 +2980,19 @@ def test_exports_land_in_the_project_and_cannot_escape_it(fitted, tmp_path):
     assert client.post("/api/export/nonsense")[0] == 404
 
 
-def test_the_html_export_without_plotly_names_the_extra(fitted, monkeypatch):
-    """The GUI runs on a base install since WP-1462, and the html figure does not.
-
-    It is plotly's, which only the ``viz`` extra installs, so a base install
-    meets it here. Uncaught, the ``ImportError`` was a 500.
-    """
+def test_the_html_export_needs_nothing_a_base_install_lacks(fitted, monkeypatch):
+    """The GUI runs on a base install since WP-1462, and since WP-1461's task 10
+    so does its html export. It was plotly's, which only the ``viz`` extra
+    installed, so a base install met a 409 naming the extra here."""
     import sys
 
     _, client, _ = fitted
     monkeypatch.setitem(sys.modules, "plotly", None)
     monkeypatch.setitem(sys.modules, "plotly.graph_objects", None)
     status, payload = client.post("/api/export/html")
-    assert status == 409, payload
-    assert payload["error"]["code"] == "EXPORT_UNAVAILABLE"
-    assert "[viz]" in payload["error"]["message"]
+    assert status == 200, payload
+    written = Path(payload["path"]).read_text(encoding="utf-8")
+    assert 'id="curves"' in written and "Plotly" not in written
 
 
 def test_patching_vary_on_a_held_path_is_a_refusal_rather_than_a_crash(

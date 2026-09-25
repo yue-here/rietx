@@ -17,6 +17,8 @@ declare module "rxplot" {
   export function hklLabel(hkl: unknown): string;
   export function vlines(u: any, xs: ArrayLike<number>, top: number, height: number,
                          color: string): void;
+  export function tsv(names: readonly string[], rows: readonly (readonly unknown[])[]): string;
+  export function download(blob: Blob, name: string): void;
 
   export interface Hit { key: string; idx: number; x: number; left: number; top: number }
 
@@ -31,6 +33,14 @@ declare module "rxplot" {
     unpin(key?: string): void;
     redraw(): void;
     destroy(): void;
+    /** The exports (D6), each on the figure as drawn now, at the reader's zoom. */
+    inView(): [number, number];
+    image(): HTMLCanvasElement;
+    png(): Promise<Blob>;
+    copyImage(): Promise<Blob>;
+    svg(load: () => Promise<{ Context: any }>): Promise<string>;
+    tsv(): string;
+    table: (() => { names: string[]; rows: unknown[][] }) | null | undefined;
   }
 
   export interface PatternColors {

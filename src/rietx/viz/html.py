@@ -1,190 +1,204 @@
-"""Self-contained interactive HTML viewer (plotly Scattergl).
+"""The self-contained interactive page: one fit, drawn by the chart module.
 
-``write_html(result, path)`` renders the standard Rietveld panel — observed
-points, calculated line, background, offset difference curve, per-phase tick
-rows — as one HTML file with plotly.js embedded (~3.6 MB, no network needed;
-pass ``include_plotlyjs="cdn"`` to trade offline use for a ~10 kB file).
+``write_html(result, path)`` writes the Rietveld figure every browser page of
+rietx draws (WP-1461): the observed points over the model, a band of reflection
+ticks, and the residual under both, with the same gestures. A drag zooms, the
+wheel zooms about the pointer, shift-wheel and alt-drag pan, a double-click
+resets, and the legend hides a curve.
 
-Scattergl draws with WebGL, so full-resolution patterns (10⁴-10⁵ points)
-zoom smoothly without decimation; beyond ``max_points`` a min-max decimation
-per pixel-bucket keeps the *envelope* of the data (never plain striding,
-which would drop peak tops), and the size budget holds.
+Everything is inlined: uPlot and svgcanvas with their licences, the chart
+module (``static/rxplot.mjs``), this page's own script and stylesheet
+(``figure/``) and the fit's curves. So the file opens from a disk or an email with no
+network, no server and no optional dependency. It used to embed plotly.js,
+4.8 MB of every file (§ Staying on plotly in the WP).
 
-Zero heavy imports at module load: plotly is imported inside the call, and
-the base install works without it (``pip install 'rietx[viz]'``).
+The curves are :func:`rietx.viz.packed.curve_arrays`' payload, the one the GUI
+draws, sent as base64 so every value is the fit's own double. Past
+``max_points`` channels they are decimated as the GUI's are, on the observed,
+calculated and Δ/σ curves together, so a misfit spike survives as a peak top
+does.
 """
 
 from __future__ import annotations
 
+import base64
+import json
+from html import escape
+from pathlib import Path
+
 import numpy as np
 
-from .._about import DIST_NAME
 from ..schemas.results import RefinementResult
+from . import packed, theme
+from .chart import CHART_DIR
+from .plots import PALETTES
+
+#: This page's script and stylesheet.
+FIGURE_DIR = Path(__file__).parent / "figure"
+
+#: The one import ``figure.mjs`` makes. The file answers it by inlining the
+#: module before the script, so the statement itself is taken out.
+_IMPORT = "import {exportButtons, hklLabel, nearest, pattern, unpack} from '../static/rxplot.mjs';\n"
+
+#: The residual each mode draws, as ``rxplot.pattern`` names it, and the
+#: payload array it reads.
+_RESIDUAL = {True: ("weighted", "delta"), False: ("delta", "delta_raw")}
 
 
-def _minmax_decimate(tt: np.ndarray, ys: list[np.ndarray], max_points: int
-                     ) -> tuple[np.ndarray, list[np.ndarray]]:
-    """Keep per-bucket min AND max of every curve (preserves peak envelopes).
+def _script_safe(text: str, name: str) -> str:
+    """``text`` unchanged, refused if it could end the element it is inlined in."""
+    lowered = text.lower()
+    if "</script" in lowered or "<!--" in lowered:
+        raise ValueError(f"{name} holds '</script' or '<!--', so it cannot be "
+                         "inlined in a <script> element")
+    return text
 
-    The buckets are :func:`~rietx.viz.compare.decimation_index`'s, not a
-    second set: which points survive is one question, and this module used to
-    answer it a second time, differing from that one only in not forcing the
-    end points. Four consumers now, and a plot that disagreed with the
-    comparison UI about which points it drew would be a picture of a
-    different fit.
+
+def _notice(name: str) -> str:
+    """A vendored licence, to be written as a comment beside its code."""
+    text = (CHART_DIR / name).read_text(encoding="utf-8").strip()
+    if "*/" in text:
+        raise ValueError(f"{name} holds '*/', so it cannot be its code's comment")
+    return text
+
+
+def _json(value) -> str:
+    """JSON that cannot close the ``<script>`` element it is inlined in."""
+    return (json.dumps(value, ensure_ascii=False)
+            .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
+
+
+def _legend(ticks: dict, has_background: bool, weighted: bool, hue: dict) -> list[dict]:
+    """The legend's entries in the order the curves are drawn.
+
+    An all-zero background is no background and gets no entry. A tick row
+    takes the observed points' ink when it is the only one, as the chart's
+    ``phaseInk`` draws it: colour tells rows apart, and one row has nothing to
+    be told from.
     """
-    from .compare import decimation_index
+    out = [{"id": "obs", "label": "observed", "ink": hue["obs"], "mark": "dot"},
+           {"id": "calc", "label": "calculated", "ink": hue["calc"], "mark": "line"}]
+    if has_background:
+        out.append({"id": "bkg", "label": "background", "ink": hue["bkg"], "mark": "dash"})
+    out.append({"id": "diff", "label": "Δ/σ" if weighted else "difference",
+                "ink": hue["diff"], "mark": "line"})
+    for row, name in enumerate(ticks):
+        ink = hue["obs"] if len(ticks) <= 1 else hue["phase"][row % len(hue["phase"])]
+        out.append({"id": f"ticks:{name}", "label": f"hkl: {name}", "ink": ink,
+                    "mark": "tick"})
+    return out
 
-    if len(tt) <= max_points:
-        return tt, ys
-    idx = decimation_index(tt, ys, max_points)
-    return tt[idx], [y[idx] for y in ys]
 
+def page(result: RefinementResult, *, weighted: bool = False,
+         max_points: int | None = None) -> str:
+    """The page :func:`write_html` writes, as a string.
 
-def figure_from_arrays(tt: np.ndarray, y_obs: np.ndarray, y_calc: np.ndarray,
-                       y_bkg: np.ndarray | None, ticks: dict[str, list[float]],
-                       *, sigma: np.ndarray | None = None, title: str = "",
-                       max_points: int = 200_000):
-    """Build the plotly Figure (shared by the file writer and the live view).
+    ``weighted`` draws Δ/σ with its ±3σ band, and otherwise the raw
+    difference, as :func:`rietx.viz.plots.plot_result` does by default.
+    ``max_points`` is the channel budget past which the curves are decimated,
+    :data:`rietx.viz.packed.CURVES_CEILING` unless given. The chart paints each
+    pixel column's lowest and highest point, and that ceiling is the pattern
+    size it was measured to draw with no long frame.
 
-    With ``sigma`` the difference is drawn weighted (Δ/σ) in its own lower
-    panel with a ±3σ band — expectation 1 under a correct model, so the curve
-    reads on an absolute statistical scale (Toby, 2024, J. Appl. Cryst. 57,
-    175); it cannot share the intensity axis. Without ``sigma`` the classic
-    offset raw difference is drawn in the single panel.
-
-    Either way the reflection rows go **below the difference**, which in the
-    weighted case means inside the lower panel: the residual is read against
-    the peaks that caused it, so nothing comes between them, and the rows are
-    an index of what the model contains.
-
-    Series colours are quoted from :data:`rietx.viz.plots.PALETTES`, not chosen
-    here: this and the matplotlib panel are two pictures of one fit, and a
-    person who flips between them must not have to relearn which curve is which.
-    The layout is the viewer's own — the legend stays, because in an interactive
-    figure it is a control (click a name to hide its trace) rather than a colour
-    key the eye has to look up.
+    The colours are :data:`rietx.viz.plots.PALETTES`' light set, the matplotlib
+    figure's rather than the GUI's theme tokens, since this and
+    ``plot_result`` are two files of one fit and a reader flipping between them
+    must not relearn which curve is which. The axes and grid take the light
+    theme's chrome from :mod:`rietx.viz.theme`, as every other page's do.
     """
-    try:
-        import plotly.graph_objects as go
-    except ImportError as exc:  # pragma: no cover
-        raise ImportError(
-            f"the HTML viewer needs plotly: pip install '{DIST_NAME}[viz]'") from exc
-
-    from .plots import PALETTES
-    from .theme import with_alpha
+    s = result.statistics
+    n = len(result.two_theta)
+    curves = packed.curve_arrays(result.two_theta, result.y_obs, np.ones(n, dtype=bool),
+                                 result, weighted=None, ceiling=max_points)
+    residual, array = _RESIDUAL[bool(weighted)]
+    # A result is fitted at every channel it carries, so the page builds
+    # `kept` and `fitted` itself, and it draws one residual of the three. An
+    # all-zero background is no background: sent, it would draw a line at zero
+    # that no legend entry can hide, and pull the intensity axis down to it.
+    has_background = bool(np.any(curves.arrays.get("y_background", [])))
+    keep = ("two_theta", "y_obs", "y_calc", array) + (("y_background",) if has_background else ())
+    body = packed.pack(curves.header, {k: v for k, v in curves.arrays.items() if k in keep})
 
     hue = PALETTES["light"]
-    weighted = sigma is not None
-    diff = (y_obs - y_calc) / sigma if weighted else y_obs - y_calc
-    curves = [y_obs, y_calc, diff] + ([y_bkg] if y_bkg is not None else [])
-    tt_d, dec = _minmax_decimate(np.asarray(tt), [np.asarray(c) for c in curves],
-                                 max_points)
-    y_obs_d, y_calc_d, diff_d = dec[0], dec[1], dec[2]
-    y_bkg_d = dec[3] if y_bkg is not None else None
+    title = f"{result.mode}  Rwp={s.rwp:.4f}  GoF={s.gof:.2f}"
+    spec = {
+        "residual": residual, "band": bool(weighted),
+        "labels": {"y": "intensity", "resid": "Δ/σ" if weighted else "Δ"},
+        "colors": {"obs": hue["obs"], "masked": hue["obs"], "calc": hue["calc"],
+                   "bkg": hue["bkg"], "diff": hue["diff"], "zero": hue["zero"],
+                   "band": hue["band"], "phase": list(hue["phase"])},
+        "legend": _legend(curves.header.get("ticks", {}), has_background,
+                          bool(weighted), hue),
+    }
 
-    span = float(np.max(y_obs_d) - min(float(np.min(y_obs_d)), 0.0)) or 1.0
+    chrome = theme.TOKENS["light"]
+    uplot = _script_safe((CHART_DIR / "uPlot.iife.min.js").read_text(encoding="utf-8"),
+                         "uPlot")
+    notice = _notice("uPlot.LICENSE")
+    svgcanvas = _script_safe((CHART_DIR / "svgcanvas.esm.js").read_text(encoding="utf-8"),
+                             "svgcanvas")
+    svg_notice = _notice("svgcanvas.LICENSE")
+    module = _script_safe((CHART_DIR / "rxplot.mjs").read_text(encoding="utf-8"), "rxplot.mjs")
+    script = (FIGURE_DIR / "figure.mjs").read_text(encoding="utf-8")
+    if script.count(_IMPORT) != 1:
+        raise ValueError(f"figure.mjs must import the chart module as {_IMPORT.strip()!r}")
+    script = _script_safe(script.replace(_IMPORT, ""), "figure.mjs")
+    css = (CHART_DIR / "uPlot.min.css").read_text(encoding="utf-8") + "\n" + \
+        (FIGURE_DIR / "figure.css").read_text(encoding="utf-8")
+    if "</style" in css.lower():
+        raise ValueError("a stylesheet holds '</style', so it cannot be inlined")
+    tokens = (f":root {{ --fg: {chrome['--fg']}; --line: {chrome['--line']}; "
+              f"--muted: {chrome['--muted']}; --ground: {hue['ground']}; }}")
 
-    if weighted:
-        from plotly.subplots import make_subplots
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                            row_heights=[0.72, 0.28], vertical_spacing=0.05)
-        # the rows live in the lower panel, under the Δ/σ trace, and are spaced
-        # in its units rather than the intensity's
-        d_lo = min(float(np.min(diff_d)), -3.0)
-        d_hi = max(float(np.max(diff_d)), 3.0)
-        d_span = (d_hi - d_lo) or 1.0
-        tick_base, tick_step = d_lo - 0.14 * d_span, 0.09 * d_span
-    else:
-        fig = go.Figure()
-        offset = -0.15 * span
-        # under the *drawn* difference, not under a fixed fraction of the
-        # intensity span: a noisy residual on a weak pattern reaches further
-        # down than the fraction allows and the rows land inside it
-        tick_base = offset + float(np.min(diff_d)) - 0.06 * span
-        tick_step = 0.05 * span
-
-    fig.add_trace(go.Scattergl(x=tt_d, y=y_obs_d, mode="markers",
-                               marker={"size": 3, "color": hue["obs"]},
-                               name="observed"))
-    fig.add_trace(go.Scattergl(x=tt_d, y=y_calc_d, mode="lines",
-                               line={"width": 1.2, "color": hue["calc"]},
-                               name="calculated"))
-    if y_bkg_d is not None and np.any(y_bkg_d):
-        fig.add_trace(go.Scattergl(x=tt_d, y=y_bkg_d, mode="lines",
-                                   line={"width": 1, "dash": "dash",
-                                         "color": hue["bkg"]},
-                                   name="background"))
-    if weighted:
-        fig.add_trace(go.Scattergl(x=tt_d, y=diff_d, mode="lines",
-                                   line={"width": 1, "color": hue["diff"]},
-                                   name="Δ/σ"), row=2, col=1)
-        fig.add_hrect(y0=-3, y1=3, row=2, col=1, line_width=0,
-                      fillcolor=hue["band"], opacity=0.15)
-    else:
-        fig.add_trace(go.Scattergl(x=tt_d, y=diff_d + offset, mode="lines",
-                                   line={"width": 1, "color": hue["diff"]},
-                                   name="difference"))
-
-    # one row per phase, and the single-phase row stays neutral: colour is for
-    # telling rows apart, so one row has nothing to be told apart from
-    for row, (name, positions) in enumerate(ticks.items()):
-        y_row = tick_base - row * tick_step
-        pos = np.asarray(positions, dtype=np.float64)
-        colour = (hue["tick"] if len(ticks) == 1
-                  else hue["phase"][row % len(hue["phase"])])
-        trace = go.Scattergl(
-            x=pos, y=np.full_like(pos, y_row), mode="markers",
-            marker={"symbol": "line-ns-open", "size": 7, "color": colour},
-            name=f"hkl: {name}")
-        if weighted:
-            fig.add_trace(trace, row=2, col=1)
-        else:
-            fig.add_trace(trace)
-
-    fig.update_layout(
-        title=title, template="simple_white",
-        # Inside the paper, for the reason the watch page's legend is
-        # (WP-1426): anchored above the plot area it lives in the top margin,
-        # and plotly grows that margin when the row wraps. Measured here, the
-        # area's top went 60 px to 75 px between a 1000 px and a 700 px window
-        # while the title stayed put, so the picture moved and the page around
-        # it did not. The title keeps the margin; the legend no longer shares
-        # it. A ground behind the rows keeps them readable over a peak, and it
-        # is the palette's like every other colour on this page (WP-1429).
-        legend={"orientation": "h", "y": 1, "yanchor": "top", "x": 0,
-                "xanchor": "left", "bgcolor": with_alpha(hue["ground"], 0.85)},
-        margin={"l": 60, "r": 20, "t": 60, "b": 50},
-    )
-    if weighted:
-        fig.update_xaxes(title_text="2θ (deg)", row=2, col=1)
-        fig.update_yaxes(title_text="intensity", row=1, col=1)
-        fig.update_yaxes(title_text="Δ/σ", row=2, col=1)
-    else:
-        fig.update_layout(xaxis_title="2θ (deg)", yaxis_title="intensity")
-    return fig
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{escape(title)}</title>
+<style>
+{tokens}
+{css}
+</style>
+</head>
+<body>
+<header><h1>{escape(title)}</h1><span id="exports"></span><div id="readout"></div></header>
+<div id="plot"></div>
+<script type="application/json" id="spec">{_json(spec)}</script>
+<script type="application/octet-stream" id="curves">
+{base64.b64encode(body).decode("ascii")}
+</script>
+<script>
+/*
+{notice}
+*/
+{uplot}
+</script>
+<script type="module">
+/*
+{svg_notice}
+*/
+{svgcanvas}
+window.rxSvgcanvas = {{ Context }};
+</script>
+<script type="module">
+{module}
+{{
+{script}
+}}
+</script>
+</body>
+</html>
+"""
 
 
-def write_html(result: RefinementResult, path: str, *,
-               weighted: bool = False, include_plotlyjs: bool | str = True,
-               max_points: int = 200_000) -> None:
+def write_html(result: RefinementResult, path: str, *, weighted: bool = False,
+               max_points: int | None = None) -> None:
     """Render a :class:`RefinementResult` to a self-contained HTML file.
 
     ``weighted`` defaults off, matching :func:`rietx.viz.plots.plot_result`:
     both are a file someone takes away and reads as a figure, so they show the
-    same difference.  The *live* view (:mod:`rietx.viz.live`) passes ``sigma``
-    explicitly and keeps Δ/σ, because a stage-by-stage diagnostic is asking a
-    different question — is the model right yet — of the same numbers.
+    same difference. :func:`page` builds the file and says what is in it.
     """
-    s = result.statistics
-    y_obs = np.asarray(result.y_obs)
-    sigma = result.sig() if weighted else None
-    fig = figure_from_arrays(
-        np.asarray(result.two_theta), y_obs,
-        np.asarray(result.y_calc),
-        np.asarray(result.y_background) if result.y_background else None,
-        result.ticks, sigma=sigma,
-        title=f"{result.mode}  Rwp={s.rwp:.4f}  GoF={s.gof:.2f}",
-        max_points=max_points)
-    fig.write_html(path, include_plotlyjs=include_plotlyjs,
-                   full_html=True, config={"displaylogo": False})
+    Path(path).write_text(page(result, weighted=weighted, max_points=max_points),
+                          encoding="utf-8")

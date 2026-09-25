@@ -1251,7 +1251,7 @@ class RefinementResult(Base):
         """Per-point σ for this result — **the one authority** (WP-1029 (s)).
 
         Every weighted residual in the package divides by this: the matplotlib
-        panel, the plotly export, the VLM montage, Layer 0 and the GUI's
+        panel, the ``write_html`` page, the VLM montage, Layer 0 and the GUI's
         curves routes.  They each open-coded it once, with three
         different policies, and agreed only because the disagreement lived in
         branches a modern result never takes.

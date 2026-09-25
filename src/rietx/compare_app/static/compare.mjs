@@ -8,7 +8,7 @@
 // The poll carries each variant's statistics and never its curves. Those are
 // fetched once per variant, packed, when the variant lands (`fetchCurves`).
 
-import {hklLabel, nearest, overlay, token, unpack} from './rxplot.mjs';
+import {exportButtons, hklLabel, nearest, overlay, token, unpack} from './rxplot.mjs';
 import {diagnosticsHtml, esc, paramsHtml, sameGrid, statsHtml, usable,
         valueText} from './compare-core.mjs';
 
@@ -78,6 +78,17 @@ async function boot() {
   $('run').onclick = run;
   $('clear').onclick = () => { forget(); draw(); };
   $('reference').onchange = draw;
+  // the figure's four exports (D6), each on what is drawn and in view now
+  const exports = exportButtons(() => {
+    if (!FIG) throw new Error('nothing is drawn yet');
+    return FIG;
+  }, {
+    name: () => `compare-${$('standard').value}`,
+    svgcanvas: () => import('./svgcanvas.esm.js'),
+    say: text => { $('export-said').textContent = text; },
+  });
+  for (const b of exports) b.className = 'ghost';
+  $('exports').append(...exports);
   renderVariants();
   draw();
 }

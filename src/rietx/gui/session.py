@@ -72,9 +72,10 @@ from ..schemas.instrument import Instrument
 from ..schemas.plan import PlanSpec, StageSpec
 from ..schemas.structure import Structure
 from ..strategy.staged import PLAN_PRESETS, resolve_plan
+from ..viz import packed as _packed
 from ..viz import theme
 from ..viz.compare import decimation_index
-from ..viz.packed import CURVES_CEILING, Packed
+from ..viz.packed import Packed
 from . import series as series_mod
 from . import symmetry
 from .imports import (
@@ -2839,10 +2840,6 @@ class GuiSession:
             # one: a Le Bail fit has no weight fractions, and saying so beats
             # writing an empty table
             raise GuiError(str(exc), code="EXPORT_UNAVAILABLE", status=409) from None
-        except ImportError as exc:
-            # the html figure is plotly's, which the `viz` extra installs and a
-            # base install (all the GUI itself needs since WP-1462) lacks
-            raise GuiError(str(exc), code="EXPORT_UNAVAILABLE", status=409) from None
         return {"kind": kind, "path": str(target), "name": target.name,
                 "bytes": target.stat().st_size}
 
@@ -2927,129 +2924,17 @@ class GuiSession:
 # ----------------------------------------------------------------------
 def curve_arrays(tt_all, y_all, keep, res, *, weighted: bool,
                  header: dict | None = None) -> Packed:
-    """A pattern's every channel, and a fit's curves on the channels it kept.
+    """:func:`rietx.viz.packed.curve_arrays`, whose refusal is a 409 here.
 
-    WP-1461, D4. Module-level and taking the result explicitly, because it has
-    two callers whose results are different: ``GuiSession.result_curves`` draws
-    the project's, and ``GuiSession.series_curves`` one member of a series.
-    One function means no two panels draw residuals under two policies: the σ
-    is ``RefinementResult.sig()``, never a re-derivation.
-
-    ``weighted`` is the caller's fact, not this function's: it is whether the σ
-    was **measured** (``DataRef.has_sigma``) rather than whether ``delta`` is
-    divided by something, which it always is. ``GuiSession.result_curves``'s
-    docstring says what happens when that distinction is lost.
-
-    The arrays:
-
-    - ``two_theta`` and ``y_obs``: the pattern over every channel, ascending in
-      2θ, as ``PatternData`` refuses any other order and uPlot draws no other.
-    - ``kept``: the channels the protocol fits now, as indices into those two.
-      The client draws the rest as masked.
-    - With a fit, ``fitted``: the channels the fit kept, the same way. Then
-      ``y_calc``, ``y_background`` when there is one, ``delta``, ``delta_raw``
-      and ``cumulative_chi2``, one value per fitted channel.
-
-    ``fitted`` and ``kept`` differ only when ``stale``: an exclusion persists
-    on the verb and the curves move only on a run. Two facts carry the index,
-    both checked on the NAC example and a series member bit for bit: a result's
-    2θ is the pattern's own under the mask it was fitted with, and so is its
-    ``y_obs``. A result not on this pattern's channels is refused.
-
-    Past :data:`CURVES_CEILING` channels the pattern is decimated, and every
-    index follows: ``n_channels`` is then the pattern's count and ``decimated``
-    says so. **Three residuals, and one of them cannot be derived from the
-    others** (WP-1029): the Σχ² is accumulated over every fitted channel before
-    any decimation, so each value sent is still exact, where summing the
-    channels that survive would understate it by whatever the dropped ones
-    contributed.
+    The builder moved to ``viz`` so the file ``write_html`` writes draws the
+    payload these routes send (WP-1461, task 10). A result off the pattern's
+    channels is a run to repeat, which is what a 409 says.
     """
-    import numpy as np
-
-    grid = np.asarray(tt_all, dtype=float)
-    head = {"weighted": weighted, "n_channels": len(grid), **(header or {})}
-    arrays = {"two_theta": grid, "y_obs": np.asarray(y_all, dtype=float),
-              "kept": np.flatnonzero(keep)}
-    if res is None or not res.two_theta:
-        return _under_ceiling(Packed({**head, "fit": False}, arrays))
-
-    tt_fit = np.asarray(res.two_theta, dtype=float)
-    at = np.minimum(np.searchsorted(grid, tt_fit), len(grid) - 1)
-    if not np.array_equal(grid[at], tt_fit):
-        raise GuiError("the fit's channels are not this pattern's, so its curves "
-                       "cannot be drawn over it — run again",
-                       code="RESULT_NOT_ON_PATTERN", status=409)
-    y_obs, y_calc = np.asarray(res.y_obs), np.asarray(res.y_calc)
-    raw = y_obs - y_calc
-    delta = raw / res.sig()
-    arrays.update({"fitted": at, "y_calc": y_calc})
-    if res.y_background:
-        arrays["y_background"] = np.asarray(res.y_background)
-    arrays.update({"delta": delta, "delta_raw": raw,
-                   # accumulated over every fitted channel; a client re-bases it
-                   # at a zoom as cum[j] − cum[i−1]
-                   "cumulative_chi2": np.cumsum(delta**2)})
-    head.update({
-        "fit": True, "n_fitted": len(tt_fit),
-        "stale": not np.array_equal(grid[keep], tt_fit),
-        **_tick_rows(res),
-    })
-    return _under_ceiling(Packed(head, arrays))
-
-
-def _under_ceiling(packed: Packed) -> Packed:
-    """``packed`` with its pattern decimated to :data:`CURVES_CEILING` channels.
-
-    The channels kept are ``decimation_index``'s over observed, calculated and
-    Δ/σ, the curves every window this package drew was decimated by, so a
-    misfit spike survives as a peak top does. The budget is split between the
-    curves, since each adds its own bucket extrema. ``kept`` and ``fitted`` are re-indexed onto the
-    channels that stay, and a fitted channel that went takes its model values
-    with it.
-    """
-    import numpy as np
-
-    arrays = packed.arrays
-    n = len(arrays["two_theta"])
-    if n <= CURVES_CEILING:
-        return packed
-    curves = [arrays["y_obs"]]
-    if "fitted" in arrays:
-        # off the fit's channels the model is the data and the residual zero,
-        # so neither adds an extremum there
-        for key, off in (("y_calc", arrays["y_obs"]), ("delta", np.zeros(n))):
-            on_grid = np.array(off, dtype=float)
-            on_grid[arrays["fitted"]] = arrays[key]
-            curves.append(on_grid)
-    sel = decimation_index(arrays["two_theta"], curves, CURVES_CEILING // len(curves))
-    where = np.full(n, -1)
-    where[sel] = np.arange(len(sel))
-    out = {"two_theta": arrays["two_theta"][sel], "y_obs": arrays["y_obs"][sel]}
-    kept = where[arrays["kept"]]
-    out["kept"] = kept[kept >= 0]
-    if "fitted" in arrays:
-        fitted = where[arrays["fitted"]]
-        on = fitted >= 0
-        out["fitted"] = fitted[on]
-        for key, values in arrays.items():
-            if key not in out and key != "fitted":
-                out[key] = values[on]
-    return Packed({**packed.header, "decimated": True}, out)
-
-
-def _tick_rows(res) -> dict:
-    """``ticks`` and ``tick_hkl``, the Miller indices only where they pair.
-
-    ``tick_hkl`` is a companion pinned by index (``RefinementResult``), so a
-    row's indices are sent only when they are as many as its positions. A
-    result built before WP-1438 — one reopened from a project's history —
-    carries positions and no indices, and then the row is simply absent rather
-    than a list of blanks: the page falls back to the 2θ it always showed.
-    """
-    ticks = {phase: list(row) for phase, row in res.ticks.items()}
-    hkl = {phase: list(res.tick_hkl[phase]) for phase, row in res.ticks.items()
-           if phase in res.tick_hkl and len(res.tick_hkl[phase]) == len(row)}
-    return {"ticks": ticks, "tick_hkl": hkl}
+    try:
+        return _packed.curve_arrays(tt_all, y_all, keep, res, weighted=weighted,
+                                    header=header)
+    except _packed.OffPattern as exc:
+        raise GuiError(str(exc), code="RESULT_NOT_ON_PATTERN", status=409) from None
 
 
 def tree_payload(tree) -> dict:

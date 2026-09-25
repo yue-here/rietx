@@ -33,6 +33,7 @@ FILES = {
     "/rxplot.mjs": (STATIC / "rxplot.mjs", "text/javascript; charset=utf-8"),
     "/uPlot.iife.min.js": (STATIC / "uPlot.iife.min.js", "text/javascript; charset=utf-8"),
     "/uPlot.min.css": (STATIC / "uPlot.min.css", "text/css; charset=utf-8"),
+    "/svgcanvas.esm.js": (STATIC / "svgcanvas.esm.js", "text/javascript; charset=utf-8"),
 }
 
 
@@ -195,6 +196,23 @@ def test_the_readout_comes_from_the_pane_under_the_pointer(page):
     page.mouse.move(b["x"] + 0.5 * b["w"], b["y"] - 40)
     _frames(page)
     assert page.evaluate("G.cursors.at(-1)") is None
+
+
+def test_the_pointers_line_is_solid_in_the_pages_ink_and_follows_it(page):
+    """WP-1213's rule, owned by the module since WP-1461's task 10. Each page
+    restated it in its own stylesheet until then, and ``rietx compare`` had
+    none, so its line was uPlot's dashed grey-blue. A theme switch restyles
+    it, since the line reads the token rather than its value."""
+    b = _box(page, "main")
+    page.mouse.move(b["x"] + 0.5 * b["w"], b["y"] + 0.5 * b["h"])
+    _frames(page)
+    read = """() => [...document.querySelectorAll('.u-cursor-x')].map((el) => {
+        const s = getComputedStyle(el);
+        return [s.borderRightStyle, s.borderRightWidth, s.borderRightColor]; })"""
+    lines = page.evaluate(read)
+    assert lines and all(line == ["solid", "1px", "rgb(27, 27, 27)"] for line in lines), lines
+    page.evaluate("document.documentElement.style.setProperty('--fg', '#e6e6e2')")
+    assert {line[2] for line in page.evaluate(read)} == {"rgb(230, 230, 226)"}
 
 
 def test_a_live_update_keeps_the_readers_zoom(page):
@@ -669,3 +687,94 @@ def test_the_overlay_zooms_every_pane_and_its_band_carries_the_ticks(page):
         return Array.from({length: 5}, (_, i) => Array.from(u.ctx.getImageData(px - 2 + i, y, 1, 1).data)); }""",
                            [20, rows[0]])
     assert _has(pixels, [0, 0xa0, 0xa0], alpha=100)
+
+
+# ------------------------------------------------------------------ exports (D6)
+#: The SVG export of `G`, read back: each nested pane's place and paths, the
+#: text drawn in each, the inks, and whether the two globals it swaps are back.
+SVG = """async () => {
+  const text = await G.svg(() => import('/svgcanvas.esm.js'));
+  const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+  const root = doc.documentElement, panes = [...root.children].filter((e) => e.tagName === 'svg');
+  return { errors: doc.querySelectorAll('parsererror').length,
+           height: +root.getAttribute('height'), ground: root.querySelector('rect').getAttribute('fill'),
+           panes: panes.map((e) => [+e.getAttribute('y'), +e.getAttribute('height'),
+                                    e.querySelectorAll('path').length]),
+           texts: panes.map((e) => [...e.querySelectorAll('text')].map((s) => s.textContent)),
+           strokes: [...new Set([...root.querySelectorAll('path')].map((e) => e.getAttribute('stroke')))],
+           native: String(Path2D).includes('native code')
+             && String(HTMLCanvasElement.prototype.getContext).includes('native code') };
+}"""
+
+
+def test_the_panes_export_as_one_png_and_one_svg_of_the_view(page):
+    """D6. The PNG stacks the panes' canvases over the ground, at the device's
+    resolution. The SVG redraws each pane once through svgcanvas, as vectors,
+    at the reader's zoom, and puts ``Path2D`` and ``getContext`` back
+    (finding 6). The live figure is untouched by either."""
+    page.evaluate("mountPattern()")
+    page.evaluate("G.setX(20, 30)")
+    _frames(page)
+    png = page.evaluate("""async () => { const b = await createImageBitmap(await G.png());
+        const us = Object.values(G.panes);
+        return [b.width, b.height, us[0].ctx.canvas.width,
+                us.reduce((s, u) => s + u.ctx.canvas.height, 0)]; }""")
+    assert png[0] == png[2] and png[1] == png[3]
+    got = page.evaluate(SVG)
+    assert got["errors"] == 0 and got["native"]
+    heights = page.evaluate("Object.values(G.panes).map((u) => u.height)")
+    assert [h for _, h, _ in got["panes"]] == heights
+    assert [y for y, _, _ in got["panes"]] == [sum(heights[:i]) for i in range(len(heights))]
+    assert got["height"] == sum(heights) and all(n > 0 for _, _, n in got["panes"])
+    # the view the reader chose, not the whole pattern: 20-30 labelled, 5 not
+    resid = got["texts"][-1]
+    assert "2θ (°)" in resid and "25" in resid and "5" not in resid
+    # the calculated curve in its own ink, over the page's ground
+    assert "#ff0000" in got["strokes"]
+    assert got["ground"] == page.evaluate("getComputedStyle(document.body).backgroundColor")
+    # the live figure kept its view and still moves
+    assert _x(page, "main") == [20, 30]
+    page.evaluate("G.setX(10, 40)")
+    _frames(page)
+    assert _x(page, "main") == [10, 40]
+
+
+def test_a_y_range_the_reader_chose_is_the_one_the_svg_draws(page):
+    """An export chart takes the live pane's y range, so a box zoom exports as seen."""
+    page.evaluate("mountPattern()")
+    _drag(page, "main", 0.3, 0.2, 0.6, 0.7)
+    live = page.evaluate("G.panes.main.axes[1]._values.filter(Boolean)")
+    got = page.evaluate(SVG)
+    assert live and set(live) <= set(got["texts"][0])
+
+
+def test_each_figure_tabulates_what_is_in_view(page):
+    """``tsv``: every channel in view with each curve as drawn, a gap empty."""
+    page.evaluate("mountPattern()")
+    page.evaluate("G.setX(8, 12)")
+    lines = page.evaluate("G.tsv()").split("\n")
+    assert lines[0].split("\t") == ["two_theta", "y_obs", "excluded", "y_calc", "y_background",
+                                     "delta_over_sigma"]
+    rows = [line.split("\t") for line in lines[1:]]
+    xs = page.evaluate("Array.from(curves().arrays.two_theta).filter((x) => x >= 8 && x <= 12)")
+    assert [float(r[0]) for r in rows] == xs
+    # the fit kept 10-40°: under 10 a channel is excluded and has no model
+    below = [r for r in rows if float(r[0]) < 10]
+    assert below and all(r[2] == "1" and r[3] == "" and r[5] == "" for r in below)
+    above = [r for r in rows if float(r[0]) >= 10]
+    assert above and all(r[2] == "0" and r[3] != "" for r in above)
+
+    page.evaluate("mountOverlay({hidden: ['b']})")
+    page.evaluate("G.setX(20, 21)")
+    lines = page.evaluate("G.tsv()").split("\n")
+    assert lines[0].split("\t") == ["two_theta", "y_obs", "a:y_calc", "a:delta_over_sigma",
+                                     "a:delta_chi2", "c:y_calc", "c:delta_over_sigma", "c:delta_chi2"]
+    # the reference's Δχ² is zero against itself
+    assert {line.split("\t")[4] for line in lines[1:]} == {"0"}
+
+    page.evaluate("mountTrajectory()")
+    lines = page.evaluate("G.tsv()").split("\n")
+    # the chain in its own order, and the esd a fit did not give left empty
+    assert lines == ["pattern\tx\tvalue\tesd", "0\t300\t1\t0.01", "1\t350\t1.1\t",
+                     "2\t400\t1.2\t0.01", "3\t350\t1.15\t0.01", "4\t300\t1.05\t0.01"]
+

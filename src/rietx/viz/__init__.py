@@ -12,8 +12,8 @@ __all__ = ["LiveSession", "plot_candidates", "plot_for_vlm", "plot_indexing",
 
 
 def __getattr__(name: str):
-    # write_html imports plotly lazily and LiveSession imports none at all
-    # (WP-1402) — keep the base import light either way
+    # neither imports a plotting library (WP-1402, WP-1461); both stay out of
+    # the base import, which a plot does not need
     if name == "write_html":
         from .html import write_html
 

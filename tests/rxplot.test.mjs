@@ -11,7 +11,7 @@ import {test} from 'node:test';
 import {
   chi2Base, difference, hklLabel, lower, nearest, nearestXY, partition, phaseInk, positive, scatter, sqrtSplits,
   tickDecimals, tickHeight,
-  tickLabels, unpack,
+  tickLabels, tsv, unpack, upper,
 } from '../src/rietx/viz/static/rxplot.mjs';
 
 // ------------------------------------------------------------------ lookups
@@ -172,4 +172,19 @@ test('a Miller index reads as a reader writes one', () => {
 test('a difference is a subtraction on one grid, and two grids throw', () => {
   assert.deepEqual(Array.from(difference([3, 5, 9], [1, 1, 4])), [2, 4, 5]);
   assert.throws(() => difference([1, 2, 3], [1, 2]), /3 channels against 2/);
+});
+
+// ------------------------------------------------------------------ exports
+test('upper is the first index past the value, so a view keeps both its ends', () => {
+  const xs = [1, 2, 2, 3];
+  assert.equal(upper(xs, 2), 3);
+  assert.equal(upper(xs, 0), 0);
+  assert.equal(upper(xs, 3), 4);
+  assert.deepEqual(xs.slice(lower(xs, 2), upper(xs, 3)), [2, 2, 3]);
+});
+
+test('a table is tab-separated, every number in full and every gap empty', () => {
+  const text = tsv(['x', 'y'], [[0.1 + 0.2, null], [2, NaN], [3, -Infinity], [4, 0]]);
+  assert.equal(text, 'x\ty\n0.30000000000000004\t\n2\t\n3\t\n4\t0');
+  assert.equal(tsv(['x'], []), 'x');
 });

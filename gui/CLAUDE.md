@@ -138,8 +138,12 @@ build and the test; `build-info.json` deliberately carries no timestamp, because
 **Which points a payload carries is the server's** (`viz.compare.decimation_index`, past
 `CURVES_CEILING` in the curves routes); the chart module paints
 each pixel column's extremes of them (WP-1461 D5), what is drawn and never what the
-readout reads. No GUI page loads plotly (WP-1462); uPlot is vendored, into
+readout reads. No GUI page loads plotly (WP-1462); uPlot and svgcanvas are vendored, into
 `src/rietx/viz/static` by `scripts/vendor.py`, the build's first step: bump the pin, build.
+**The chart module, uPlot and svgcanvas are chunks off the boot path**, fetched on the first
+draw and the first SVG export, so a panel imports them dynamically or by type alone:
+`test_gui_dist.py` fails on one inlined into `app.js`, which one static `import {download}`
+did without anything else going red (WP-1461).
 `npm run build` needs `python3`, `vitest` needs
 `resolve.conditions: ["browser"]` or `mount()` comes from svelte's server build,
 `@sveltejs/vite-plugin-svelte` must be v7 for Vite 8, and the toolchain needs
@@ -635,9 +639,9 @@ the fence stops**: on a clean ramp nothing is flagged and every distance is unde
 and put `phases.0.cell.a` eighth. And **a per-pattern tree is read-only here** —
 one tree per pattern, pinned by `data_fingerprint`, so a node cannot be checked
 out into this project; what makes the chain navigable is the root node's
-`series_warm_start_node` note. Two shared authorities came out of it rather than
-second copies: `session.curve_arrays` (so the two panels cannot draw residuals
-under two σ policies) and `session.tree_payload`.
+`series_warm_start_node` note. Two shared authorities came out of it rather than second copies: `curve_arrays`, in
+`viz.packed` since the file `write_html` writes became a third drawer (so no two pictures draw
+residuals under two σ policies), and `session.tree_payload`.
 
 Its **five keys on every event** are the thing to know outside the panel:
 `SequentialRefinement.fit` takes `events=`/`cancel=` (since this WP — WP-1008's
@@ -891,7 +895,8 @@ the tolerance — so the pointer sat on three picked lines in a row while the ro
 read `—`. **The pointer's line is chrome, so it is solid and takes `--fg`**: dotted in
 `--muted` is `maskShapes`' excluded-region edge exactly, and the pointer drew a
 line indistinguishable from a protocol boundary (uPlot's own is dashed
-`#607d8b`, and `app.css` restyles `.u-cursor-x` for every GUI chart) — a mark carrying no quantity
+`#607d8b`, and `rxplot.panes` sets `.u-cursor-x` inline for every chart on every page, since a
+page stylesheet that forgot the rule left `rietx compare` dashed) — a mark carrying no quantity
 needs no `--plot-*` token (WP-1210), it needs the one ink no plot colour is
 near. **Prose takes `−`, numbers take `-`**, which this app followed unwritten
 until a typographic minus in the tick offsets sat beside `formatValue`'s

@@ -284,10 +284,22 @@ tr.run.selected { background:color-mix(in srgb, var(--accent) 16%, transparent);
 #picture { flex:1 1 68%; min-height:180px; position:relative; }
 #plot { position:absolute; inset:0; border:0; width:100%; height:100%;
         overflow:hidden; }
-/* The pointer's line carries no quantity, so it is chrome: solid, in `--fg`,
-   as the GUI's is (WP-1213). uPlot's own is dashed. */
-#plot .u-cursor-x { border-right:1px solid var(--fg); }
 #plot .u-select { background:color-mix(in srgb, var(--fg) 10%, transparent); }
+/* The picture's exports (WP-1461, D6): one word in the bar, and the four
+   verbs in a menu under it, so the bar keeps its one row at 420 px. */
+#export { position:relative; flex:0 0 auto; }
+/* dressed as the bar's other button, `#toggle-run`, which it sits beside */
+#export > summary { cursor:pointer; list-style:none; color:var(--muted); font-size:11px;
+                    padding:1px 8px; border:1px solid var(--line); border-radius:4px;
+                    background:var(--panel); }
+#export > summary::-webkit-details-marker { display:none; }
+#export[open] > summary, #export > summary:hover { color:var(--fg);
+  background:color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+#export-menu { position:absolute; right:0; top:calc(100% + 6px); z-index:5;
+               display:flex; flex-direction:column; gap:4px; padding:6px;
+               background:var(--panel); border:1px solid var(--line); }
+#export-menu output { color:var(--muted); font-size:11px; white-space:normal;
+                      max-width:24ch; }
 /* What is laid over the figure. Each is placed in the plot's coordinates and
    takes no room from the picture, so none of them can move it. */
 #plot .legend, #plot .caption, #plot .tip { position:absolute; z-index:1; }

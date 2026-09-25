@@ -1,4 +1,4 @@
-"""v0.2 events stream, HTML viewer, live watch, and history merge/cherry-pick."""
+"""v0.2 events stream, the HTML page, live watch, and history merge/cherry-pick."""
 
 import json
 import urllib.request
@@ -119,65 +119,127 @@ def test_event_stream_hot_loop_is_plain_json(tmp_path):
 
 
 # ----------------------------------------------------------------------
-# plotly HTML viewer
+# the self-contained page (WP-1461)
 # ----------------------------------------------------------------------
-def test_write_html_self_contained(tmp_path, synthetic_pattern):
+@pytest.fixture(scope="module")
+def page_result():
     structure, ins = perturbed_models()
-    ref = rx.Refinement(structure, ins, history=False)
-    result = ref.fit(synthetic_pattern)
+    return rx.Refinement(structure, ins, history=False).fit(synthesize())
 
-    out = tmp_path / "fit.html"
+
+def page_parts(html: str):
+    """The spec and the curves a written page carries, read as the page reads them."""
+    import base64
+    import re
+
+    from rietx.viz.packed import unpack
+
+    spec = re.search(r'<script type="application/json" id="spec">(.*?)</script>', html, re.S)
+    body = re.search(r'<script type="application/octet-stream" id="curves">(.*?)</script>',
+                     html, re.S)
+    return json.loads(spec.group(1)), unpack(base64.b64decode(body.group(1)))
+
+
+def test_write_html_is_self_contained_and_draws_with_the_chart_module(tmp_path, page_result):
+    import re
+
     from rietx.viz import write_html
+
+    result = page_result
+    out = tmp_path / "fit.html"
     write_html(result, str(out))
     html = out.read_text(encoding="utf-8")
-    assert "plotly" in html.lower()
-    assert "scattergl" in html.lower()
-    # self-contained: no external <script src=…> tag (the embedded plotly
-    # bundle *mentions* URLs inside its own JS string constants — harmless)
-    import re
-    assert not re.search(r"<script[^>]+src=", html)
-    assert out.stat().st_size > 1_000_000       # plotly.js embedded
-    # the raw difference is the default here as it is in the matplotlib panel:
-    # both are a file someone takes away and reads as a figure
-    assert "difference" in html
-    # Δ/σ stays available (the trace name survives either ensure_ascii choice
-    # in plotly's JSON serialization)
-    write_html(result, str(tmp_path / "fit_weighted.html"), weighted=True,
-               include_plotlyjs="cdn")
-    weighted_html = (tmp_path / "fit_weighted.html").read_text(encoding="utf-8")
-    assert ("Δ/σ" in weighted_html) or ("\\u0394" in weighted_html)
+    # nothing fetched: no script or stylesheet by reference, and no plotly
+    assert not re.search(r"<script[^>]+src=|<link", html)
+    # plotly's global; the module's comments name the library they replaced
+    assert "Plotly" not in html
+    # uPlot inlined with its notice, which MIT asks of every copy, and the module
+    assert "Copyright (c) 2022 Leon Sorokin" in html
+    assert "var uPlot=" in html and "export function pattern(" in html
+
+    # the numbers are the fit's own doubles, and one residual of the three
+    spec, curves = page_parts(html)
+    assert set(curves.arrays) == {"two_theta", "y_obs", "y_calc", "y_background", "delta_raw"}
+    for key in ("two_theta", "y_obs", "y_calc", "y_background"):
+        np.testing.assert_array_equal(curves.arrays[key], getattr(result, key))
+    np.testing.assert_array_equal(curves.arrays["delta_raw"],
+                                  np.asarray(result.y_obs) - np.asarray(result.y_calc))
+    assert curves.header["ticks"] == {k: list(v) for k, v in result.ticks.items()}
+    # the raw difference is the default, as in the matplotlib panel: both are a
+    # file someone takes away and reads as a figure
+    assert spec["residual"] == "delta" and spec["band"] is False
+    assert spec["labels"] == {"y": "intensity", "resid": "Δ"}
+    assert [e["label"] for e in spec["legend"]] == [
+        "observed", "calculated", "background", "difference",
+        *[f"hkl: {name}" for name in result.ticks]]
 
 
-def test_figure_from_arrays_weighted_and_raw():
-    from rietx.viz.html import figure_from_arrays
+def test_the_weighted_page_divides_by_the_results_own_sigma(tmp_path, page_result):
+    """Δ/σ with its ±3σ band, and σ is ``RefinementResult.sig()``, the lookup
+    every weighted residual in the package divides by."""
+    from rietx.viz.html import page
 
-    tt = np.linspace(10, 60, 500)
-    y_calc = 100 + 50 * np.exp(-((tt - 30) ** 2) / 0.05)
-    rng = np.random.default_rng(0)
-    y_obs = y_calc + rng.normal(0, 5, tt.size)
-    sigma = np.full_like(tt, 5.0)
-    ticks = {"phase 0": [30.0, 45.0]}
+    spec, curves = page_parts(page(page_result, weighted=True))
+    assert "delta_raw" not in curves.arrays
+    raw = np.asarray(page_result.y_obs) - np.asarray(page_result.y_calc)
+    np.testing.assert_array_equal(curves.arrays["delta"], raw / page_result.sig())
+    assert spec["residual"] == "weighted" and spec["band"] is True
+    assert spec["labels"]["resid"] == "Δ/σ"
+    assert "Δ/σ" in [e["label"] for e in spec["legend"]]
 
-    weighted = figure_from_arrays(tt, y_obs, y_calc, None, ticks, sigma=sigma)
-    names = [t.name for t in weighted.data]
-    assert "Δ/σ" in names and "difference" not in names
-    dsig = weighted.data[names.index("Δ/σ")]
-    assert dsig.yaxis == "y2", "Δ/σ must live on its own axis, not intensity"
-    assert max(abs(v) for v in dsig.y) < 10     # statistical scale, not counts
-    assert len(weighted.layout.shapes) == 1     # the ±3σ band
-    # the rows follow the residual into the lower panel: the reading order is
-    # data, residual, index — the residual is read against the peaks that
-    # caused it, so nothing comes between them
-    row = weighted.data[names.index("hkl: phase 0")]
-    assert row.yaxis == "y2"
-    assert max(row.y) < min(dsig.y), "tick rows must sit below the Δ/σ trace"
 
-    raw = figure_from_arrays(tt, y_obs, y_calc, None, ticks)
-    names = [t.name for t in raw.data]
-    assert "difference" in names and "Δ/σ" not in names
-    assert all(t.yaxis in (None, "y") for t in raw.data)
-    assert (max(raw.data[names.index("hkl: phase 0")].y)
-            < min(raw.data[names.index("difference")].y))
+def test_the_page_decimates_past_its_budget_and_keeps_the_peak_tops(page_result):
+    """``max_points`` is the GUI's ceiling unless given, and the decimation is
+    the GUI's too, which keeps each bucket's extremes."""
+    from rietx.viz.html import page
+
+    _, whole = page_parts(page(page_result))
+    assert "decimated" not in whole.header
+    _, few = page_parts(page(page_result, max_points=600))
+    assert few.header["decimated"] is True
+    assert len(few.arrays["two_theta"]) <= 610 < len(page_result.two_theta)
+    assert few.arrays["y_obs"].max() == max(page_result.y_obs)
+    # the residual drawn keeps its worst misfit too, which Δ/σ's extremes alone
+    # did not: −363 where the whole pattern's is −391
+    assert few.arrays["delta_raw"].min() == whole.arrays["delta_raw"].min()
+
+
+def test_each_tick_row_takes_its_own_ink_unless_it_is_alone():
+    """The legend's inks are the ones the chart draws the rows in (``phaseInk``)."""
+    from rietx.viz.html import _legend
+    from rietx.viz.plots import PALETTES
+
+    hue = PALETTES["light"]
+    one = _legend({"a": [1.0]}, False, False, hue)
+    assert [e["ink"] for e in one if e["mark"] == "tick"] == [hue["obs"]]
+    assert "bkg" not in [e["id"] for e in one]
+    two = _legend({"a": [1.0], "b": [2.0]}, True, True, hue)
+    assert [e["ink"] for e in two if e["mark"] == "tick"] == hue["phase"][:2]
+
+
+def test_the_page_script_parses_as_javascript():
+    """Root CLAUDE.md: a page that is javascript is a file, ``node --check``ed.
+    Its decisions are made in Python (``html.page``'s spec), so it has no
+    DOM-free half for ``node --test``, and ``test_html_browser.py`` drives it."""
+    import subprocess
+
+    from rietx.viz.html import FIGURE_DIR
+    from tests.test_rxplot import _node
+
+    done = subprocess.run([_node(), "--check", str(FIGURE_DIR / "figure.mjs")],
+                          capture_output=True, text=True, check=False)
+    assert done.returncode == 0, done.stderr
+
+
+def test_nothing_a_phase_is_called_can_close_the_script_it_is_written_in():
+    from rietx.viz.html import _json, _script_safe
+
+    value = {"label": "hkl: </script><script>alert(1)</script> & <!--"}
+    text = _json(value)
+    assert "<" not in text and ">" not in text and "&" not in text
+    assert json.loads(text) == value
+    with pytest.raises(ValueError, match="cannot be inlined"):
+        _script_safe("const a = '</SCRIPT>';", "a module")
 
 
 def test_plot_result_default_is_one_panel_with_the_raw_difference(
@@ -453,16 +515,6 @@ def test_plot_style_dark_flips_the_ground_and_leaves_light_alone(synthetic_patte
         result.plot(style="solarized")
 
 
-def test_minmax_decimation_keeps_peaks():
-    from rietx.viz.html import _minmax_decimate
-    tt = np.linspace(0, 100, 50_001)
-    y = np.zeros_like(tt)
-    y[25_000] = 1e6                             # a single sharp spike
-    tt_d, (y_d,) = _minmax_decimate(tt, [y], max_points=2_000)
-    assert len(tt_d) <= 2_100
-    assert y_d.max() == 1e6, "decimation dropped the peak top"
-
-
 # ----------------------------------------------------------------------
 # live session + watch server
 # ----------------------------------------------------------------------
@@ -547,7 +599,7 @@ def test_cli_help_and_html(tmp_path, synthetic_pattern):
     src.write_text(result.model_dump_json(), encoding="utf-8")
     out = tmp_path / "out.html"
     assert main(["html", str(src), str(out)]) == 0
-    assert out.exists() and out.stat().st_size > 1_000_000
+    assert 'id="curves"' in out.read_text(encoding="utf-8")
 
 
 # ----------------------------------------------------------------------

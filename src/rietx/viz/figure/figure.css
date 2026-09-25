@@ -1,0 +1,33 @@
+/* The page `write_html` writes (WP-1461). `html.py` sets the four colours this
+   reads on :root: `--fg` and `--line` from `viz/theme.py`'s light chrome,
+   which the chart module draws its axes and grid in, and `--ground` and
+   `--muted` beside them. */
+html, body { height:100%; margin:0; }
+body { display:flex; flex-direction:column; background:var(--ground); color:var(--fg);
+       font:13px system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+/* one line, so the readout filling and emptying never moves the picture */
+header { flex:0 0 auto; display:flex; gap:16px; align-items:baseline;
+         padding:8px 12px 4px; white-space:nowrap; overflow:hidden; }
+h1 { font-size:13px; font-weight:600; margin:0; flex:0 0 auto; }
+#exports { flex:0 0 auto; display:flex; gap:4px; }
+#exports button { font:inherit; font-size:12px; padding:1px 7px; cursor:pointer; color:var(--fg);
+                  background:var(--ground); border:1px solid var(--line); border-radius:3px; }
+#exports button:hover { background:color-mix(in srgb, var(--fg) 6%, var(--ground)); }
+#readout { flex:1 1 auto; text-align:right; overflow:hidden; text-overflow:ellipsis;
+           white-space:pre; color:var(--muted); font-variant-numeric:tabular-nums; }
+#plot { position:relative; flex:1 1 auto; min-height:360px; margin:0 8px 4px; }
+/* a drag's box, in the page's ink as the watcher's is */
+#plot .u-select { background:color-mix(in srgb, var(--fg) 10%, transparent); }
+#plot .legend { position:absolute; z-index:1; display:flex; flex-wrap:wrap; gap:0 10px;
+                padding:2px 6px; box-sizing:border-box;
+                /* part-transparent: it sits over the data */
+                background:color-mix(in srgb, var(--ground) 85%, transparent); }
+#plot .legend button { all:unset; cursor:pointer; font-size:11px; display:inline-flex;
+                       align-items:center; gap:5px; white-space:nowrap; line-height:18px; }
+#plot .legend button:focus-visible { outline:1px solid var(--fg); }
+/* a hidden curve keeps its entry, dimmed, so the reader can bring it back */
+#plot .legend button[aria-pressed="false"] { opacity:0.4; }
+#plot .legend i { display:inline-block; width:14px; height:0; border-top:1.5px solid var(--ink); }
+#plot .legend .dash i { border-top-style:dashed; }
+#plot .legend .dot i { width:4px; height:4px; border:0; background:var(--ink); }
+#plot .legend .tick i { width:0; height:9px; border:0; border-left:1.5px solid var(--ink); }

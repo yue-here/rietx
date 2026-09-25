@@ -78,7 +78,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-viz = ["matplotlib>=3.8", "plotly>=5.20"]
+# matplotlib alone since WP-1461: the interactive page `write_html` writes
+# inlines the uPlot committed under src/rietx/viz/static, so it needs nothing.
+viz = ["matplotlib>=3.8"]
 # Empty since WP-1462, and kept so `pip install 'rietx[gui]'` still works: the
 # built frontend is committed under src/rietx/gui/static with every library it
 # draws with (uPlot, and the structure viewer's own renderer), so the GUI needs

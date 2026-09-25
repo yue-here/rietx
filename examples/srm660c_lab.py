@@ -140,11 +140,12 @@ def main() -> None:
                     wavelength=ref.fitted_instrument.source.primary_wavelength)
         plot_for_vlm(result, report, path=str(OUT / "srm660c_vlm.png"))
         print("\nwrote examples/srm660c_fit.png and srm660c_vlm.png")
-        from rietx.viz import write_html
-        write_html(result, str(OUT / "srm660c_fit.html"))
-        print("wrote examples/srm660c_fit.html (interactive, self-contained)")
     except ImportError:
-        print("\n(install '[viz]' for plots and the HTML viewer)")
+        print("\n(install '[viz]' for the plots)")
+    # the interactive page needs nothing beyond a base install
+    from rietx.viz import write_html
+    write_html(result, str(OUT / "srm660c_fit.html"))
+    print("wrote examples/srm660c_fit.html (interactive, self-contained)")
 
 
 if __name__ == "__main__":

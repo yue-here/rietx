@@ -142,6 +142,29 @@ def test_codemirror_is_split_out_and_off_the_boot_path():
     assert "vendor-cm.js" in app or "editor.js" in app
 
 
+#: Each chunk the chart draws with, and a string found in its code and nowhere else.
+LAZY_CHART_CHUNKS = {
+    "rxplot.js": "rxplot: no y scale",
+    "vendor-uplot.js": "u-cursor-pt",
+    "vendor-svgcanvas.js": "getSerializedSvg",
+}
+
+
+def test_the_chart_and_its_libraries_are_off_the_boot_path():
+    """The chart module and uPlot are fetched on the first draw, and svgcanvas
+    on the first SVG export (WP-1461). A static import of any of the three from
+    a panel inlines it into ``app.js`` and nothing else fails: the export row's
+    one ``import {download}`` did it once, and 18.7 kB of chart code went onto
+    every boot."""
+    html = (DIST / "index.html").read_text(encoding="utf-8")
+    app = (DIST / "assets" / "app.js").read_text(encoding="utf-8")
+    for chunk, marker in LAZY_CHART_CHUNKS.items():
+        assert (DIST / "assets" / chunk).is_file(), f"no {chunk} — {REBUILD}"
+        assert marker in (DIST / "assets" / chunk).read_text(encoding="utf-8"), chunk
+        assert marker not in app, f"{chunk}'s code was inlined into app.js"
+        assert chunk not in html
+
+
 def test_the_sources_the_digest_covers_are_the_ones_that_matter(build_info):
     """Config files count, and vitest files count.
 
@@ -164,18 +187,23 @@ def test_the_sources_the_digest_covers_are_the_ones_that_matter(build_info):
 
 
 def test_the_vendored_chart_library_is_the_pinned_release(vendor):
-    """uPlot is vendored at the exact pin in ``gui/package.json`` (WP-1461, D2).
+    """uPlot and svgcanvas are vendored at the exact pins in ``gui/package.json`` (WP-1461, D2).
 
-    ``npm run build`` is the one writer of the copy. The lockfile is in the
+    ``npm run build`` is the one writer of the copies. The lockfile is in the
     dist's digest, so a pin bump stays red until someone runs the build, and
-    this says the rebuilt copy is the release the pin names. A minified file
-    carries its version in its banner and nowhere else. On a fresh clone it
-    also catches a copy that never got committed.
+    this says the rebuilt copies are the releases the pins name. uPlot's
+    minified file carries its version in its banner, and svgcanvas's carries
+    none, so the build records both beside the copies. On a fresh clone it also
+    catches a copy that never got committed.
     """
     vendored = ROOT / "src" / "rietx" / "viz" / "static"
     assert vendor.banner_version(vendored) == vendor.pin(GUI_DIR), (
         f"the vendored uPlot is not the pinned release — {REBUILD}")
-    missing = set(vendor.FILES.values()) - {p.name for p in vendored.iterdir()}
+    assert vendor.recorded(vendored) == {
+        package: vendor.pin(GUI_DIR, package) for package in vendor.PACKAGES}, (
+        f"the vendored copies are not the pinned releases — {REBUILD}")
+    names = {name for files in vendor.PACKAGES.values() for name in files.values()}
+    missing = names - {p.name for p in vendored.iterdir()}
     assert not missing, f"not vendored: {sorted(missing)} — {REBUILD}"
 
 
@@ -313,11 +341,12 @@ def test_the_dist_is_in_the_wheel(wheel_names):
     # while the server code vanished, so a wheel install broke at the first
     # capabilities() call (WP-1003, 2026-08-16)
     wanted += ["rietx/gui/__init__.py", "rietx/gui/textdoc.py"]
-    # the vendored chart library, which pages read out of the installed
-    # package, with its licence beside it, and the module that draws with it
-    # (WP-1461)
-    wanted += [f"rietx/viz/static/{name}"
-               for name in [*_script("vendor.py").FILES.values(), "rxplot.mjs"]]
+    # the vendored chart libraries, which pages read out of the installed
+    # package, with their licences beside them, the module that draws with
+    # them, and the page write_html builds from them (WP-1461)
+    vendored = [name for files in _script("vendor.py").PACKAGES.values() for name in files.values()]
+    wanted += [f"rietx/viz/static/{name}" for name in [*vendored, "rxplot.mjs"]]
+    wanted += ["rietx/viz/figure/figure.mjs", "rietx/viz/figure/figure.css"]
     for name in wanted:
         assert name in inside, f"{name} is missing from the wheel"
 

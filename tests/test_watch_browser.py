@@ -694,6 +694,35 @@ def test_the_legend_hides_a_curve_and_a_stage_keeps_it_hidden(browser, tmp_path,
     assert calc in _inks(shown)
 
 
+def test_the_picture_exports_from_a_menu_in_the_bar(browser, tmp_path, monkeypatch):
+    """D6: the four exports sit behind one word in the bar, which keeps its one
+    row at the narrowest window. The SVG loads svgcanvas from the watcher's own
+    server, and the file is named after the run."""
+    _light(monkeypatch, tmp_path)
+    watched = _make_tree(tmp_path, n_done=2)
+    with _served(tmp_path) as base:
+        run_id = next(r.run_id for r in runs.discover(tmp_path) if r.path == watched)
+        page, errors = _open(browser, base, run_id)
+        asked: list[str] = []
+        page.on("request", lambda r: asked.append(r.url.removeprefix(base)))
+        page.click("#export > summary")
+        with page.expect_download() as download:
+            page.click("#export-menu button:text-is('SVG')")
+        name = download.value.suggested_filename
+        said = page.text_content("#export-menu output")
+        page.set_viewport_size({"width": 420, "height": 700})
+        page.wait_for_timeout(100)
+        bar = page.evaluate("(() => { const b = document.getElementById('bar');"
+                            " return [b.scrollWidth, b.clientWidth]; })()")
+        page.close()
+
+    assert not errors, errors
+    assert name == f"rietx-{run_id}.svg" and said == "saved an SVG"
+    assert "/svgcanvas.esm.js" in asked
+    # nothing in the bar runs past its edge at 420 px
+    assert bar[0] <= bar[1], bar
+
+
 def test_the_residual_carries_the_three_sigma_band(browser, tmp_path,
                                                    monkeypatch):
     """Δ/σ has expectation 1 under a correct model, so the band puts the

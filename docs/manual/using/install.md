@@ -110,8 +110,8 @@ uv pip install -e ".[dev]"         # from a source checkout
 
 | Extra | Installs | Purpose |
 |---|---|---|
-| `viz` | matplotlib, plotly | Plots. `RefinementResult.plot` and the report figures need matplotlib; `viz.html.write_html` writes the interactive plotly page. |
-| `gui` | nothing | Empty, and kept so an existing `rietx[gui]` install line still works. The refinement GUI, `rietx gui`, runs on a base install: its built front end is committed inside the package with every library it draws with. Its `html` export writes a plotly page, so that one export needs `viz`. |
+| `viz` | matplotlib | Plots. `RefinementResult.plot` and the report figures need it. The interactive page `viz.html.write_html` writes does not. |
+| `gui` | nothing | Empty, and kept so an existing `rietx[gui]` install line still works. The refinement GUI, `rietx gui`, runs on a base install. Its built front end is committed inside the package with every library it draws with. |
 | `jax` | jax | The `backend="jax"` Jacobian (`jacfwd`, chunked). |
 | `torch` | torch | Experimental. `backend="torch"` (CPU fp64) and `backend="torch-mps"` (Apple GPU, necessarily fp32). About 500 MB, and slower than numpy on this hardware. It buys an independent opinion in the Jacobian-agreement matrix, and the forward model as a differentiable layer. It does not buy speed. |
 | `docs` | sphinx, myst-parser, sphinxcontrib-bibtex, sphinx-design, furo | Builds this manual. |

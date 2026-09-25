@@ -1,8 +1,9 @@
-# Dependabot watches the one dependency the package vendors: uPlot (WP-1461).
+# Dependabot watches the two dependencies the package vendors: uPlot and
+# svgcanvas, which the charts' SVG export draws through (WP-1461).
 #
-# uPlot is pinned exactly in gui/package.json, and `npm --prefix gui run build`
+# Each is pinned exactly in gui/package.json, and `npm --prefix gui run build`
 # copies it into src/rietx/viz/static (gui/scripts/vendor.py). Nothing else
-# would notice a new release: plotly.js moves with the Python `plotly` package,
+# would notice a new release: a Python dependency moves when pip resolves it,
 # while a vendored copy stays frozen until someone moves the pin.
 #
 # A bump's pull request stays red until someone runs the build, because the
@@ -16,3 +17,4 @@ updates:
       interval: weekly
     allow:
       - dependency-name: uplot
+      - dependency-name: svgcanvas

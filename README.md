@@ -9,7 +9,7 @@
 
 ```sh
 pip install rietx            # Python >= 3.11; numpy/scipy core, compiled kernels on
-pip install "rietx[viz]"     # + matplotlib and plotly rendering
+pip install "rietx[viz]"     # + matplotlib figures
 ```
 
 ## Example refinement

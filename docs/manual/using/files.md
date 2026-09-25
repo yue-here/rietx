@@ -1194,8 +1194,9 @@ once, unlike `GeometryTable`, whose audience is a chemist counting neighbours
 rather than a parser. Take `structure` from `Refinement.fitted_structure`, which
 is where the refined values and their esds are.
 
-`viz.html.write_html` writes the interactive plotly page, and
-`RefinementResult.plot` writes the static figure. Both need the `viz` extra.
+`viz.html.write_html` writes the interactive page, and `RefinementResult.plot`
+writes the static figure. The page needs nothing beyond a base install. The
+figure needs the `viz` extra.
 
 :::{admonition} For agents
 :class: agent

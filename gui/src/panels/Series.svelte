@@ -28,6 +28,7 @@
   import { onDestroy } from "svelte";
 
   import { api } from "../api";
+  import Exports from "./Exports.svelte";
   import { seriesCompact } from "../lib/resize";
   import { curveColors, toggleCurve } from "../lib/plot";
   import {
@@ -307,6 +308,13 @@
   // -- the plot ------------------------------------------------------
   /** The figure on screen, the trajectory or one member's pattern. */
   let fig: any = null;
+
+  /** An export's file name: the parameter the trajectory is of, or the pattern shown. */
+  function exportName(): string {
+    // numbered as the heading and the table number it, from 0
+    if (selectedPattern !== null) return `series-pattern-${selectedPattern}`;
+    return `trajectory-${(current?.path ?? "series").replace(/[^\w.-]+/g, "_")}`;
+  }
   /** What its legend offers, and which of those the reader hid, for this view. */
   let legend = $state<LegendEntry[]>([]);
   let hidden = $state<string[]>([]);
@@ -630,6 +638,7 @@ plot's x-axis title, and the column above">
           style:--ink={`var(${entry.ink})`}></i>{entry.label}</button>
       {/each}
     </div>
+    <Exports figure={() => fig} name={exportName} />
     <div class="plotbox">
       <div class="plot" bind:this={plotNode}></div>
       {#if tip}

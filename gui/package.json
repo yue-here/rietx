@@ -27,6 +27,7 @@
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.7",
     "@lezer/highlight": "^1.2.3",
+    "svgcanvas": "2.6.0",
     "uplot": "1.6.32"
   }
 }

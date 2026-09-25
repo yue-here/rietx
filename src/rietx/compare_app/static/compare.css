@@ -60,6 +60,9 @@ th { color:var(--muted); font-weight:600; font-size:11px; text-transform:upperca
 /* The figure's host. The chart module appends a pane per quantity, and the
    page moves each heading in front of its own. */
 #figure { position:relative; }
+/* a drag's box, in the page's ink as the watcher's is: uPlot's own is 7 %
+   black, which the dark theme hides */
+#figure .u-select { background:color-mix(in srgb, var(--fg) 10%, transparent); }
 #figure.empty #head-diff, #figure.empty #head-fit { display:none; }
 #figure:not(.empty) #nothing { display:none; }
 /* which reflection is under the pointer, over the tick band */

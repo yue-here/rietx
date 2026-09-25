@@ -19,6 +19,7 @@
   import { untrack } from "svelte";
 
   import { ApiError } from "../api";
+  import Exports from "./Exports.svelte";
   import { grabToleranceDeg, nearestPeak, type PeaksPayload } from "../lib/peaks";
   import {
     RESIDUAL_KINDS,
@@ -746,6 +747,7 @@
                  ? "put the other curves back"
                  : "hide every curve but the measured points"}>data only</button>
       {/if}
+      <Exports figure={() => chart?.fig ?? null} name={() => "pattern"} />
       <!-- Past `CURVES_CEILING` the server decimates, and the line says so: a
            sample drawn without saying so would read as every channel. -->
       <p class="hint muted tabular">

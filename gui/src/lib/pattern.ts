@@ -307,6 +307,10 @@ export class PatternChart {
   }
 
   private placeRing(u: any): void {
+    // An SVG export redraws the pane as a copy with these layers on it, and
+    // the ring is DOM on the live pane: moved into the copy, it went when the
+    // copy did. The fig is unset only while the constructor builds the pane.
+    if (this.fig && u !== this.fig.panes.main) return;
     const el = this.ringEl;
     if (el.parentNode !== u.over) u.over.appendChild(el);
     const at = this.ringAt, h = at == null ? null : this.height(at);
