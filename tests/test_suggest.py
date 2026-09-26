@@ -543,26 +543,17 @@ def test_delta_bic_refuses_a_tie_that_clears_the_noise_floor():
 _FREE = ("phases.*.scale", "instrument.background.*")
 
 
-def _refit_ssr(result) -> float:
-    """A result's own weighted SSR, through the one σ every renderer uses."""
-    d = (np.asarray(result.y_obs) - np.asarray(result.y_calc)) / result.sig()
-    return float(d @ d)
-
-
-def _measured_delta_bic(restricted, full, n_added: int) -> float:
+def _measured_delta_bic(restricted, full) -> float:
     """What the agent measured by hand: two nested refits, one ΔBIC.
 
-    Charged at N_eff from the **restricted** fit's ``esd_inflation``, as
-    ``suggest`` charges its prediction: it measures f on the restricted
-    state's residual, so that is the fit whose f makes the two comparable.
+    ``report.compare_freed`` since WP-1417, which charges N_eff from the
+    **restricted** fit's ``esd_inflation`` as ``suggest`` charges its
+    prediction: it measures f on the restricted state's residual, so that is
+    the fit whose f makes the two comparable.
     """
-    from rietx.optimize.statistics import effective_sample_size
-    from rietx.report.layer2 import delta_bic
+    from rietx.report import compare_freed
 
-    n = len(restricted.two_theta)
-    return delta_bic(_refit_ssr(restricted), _refit_ssr(full), n, n_added,
-                     n_effective=effective_sample_size(
-                         n, restricted.statistics.esd_inflation))
+    return compare_freed(restricted, full).delta_bic
 
 
 def _fitted(truth, free, **edits):
@@ -581,14 +572,14 @@ def test_predicted_delta_bic_agrees_with_a_full_refit_when_it_admits(truth):
     numbers are computed the same way from the same nested pair, both charged
     at N_eff from the restricted fit's ``esd_inflation``, so their signs are
     directly comparable."""
-    r, restricted, data = _fitted(truth, _FREE, w=6e-3)
+    r, _, data = _fitted(truth, _FREE, w=6e-3)
     res = r.suggest(data)
     top = res.groups[0]
     assert top.resolved and top.members[0].path == "instrument.profile.w"
     assert top.delta_bic > 0.0
 
-    _, full, _ = _fitted(truth, (*_FREE, "instrument.profile.w"), w=6e-3)
-    assert _measured_delta_bic(restricted, full, 1) > 0.0
+    full, _, _ = _fitted(truth, (*_FREE, "instrument.profile.w"), w=6e-3)
+    assert _measured_delta_bic(r, full) > 0.0
 
 
 def test_predicted_and_refit_agree_that_an_inert_parameter_is_refused(truth):
@@ -600,12 +591,12 @@ def test_predicted_and_refit_agree_that_an_inert_parameter_is_refused(truth):
     this at 25 °C, at raw N, and quoted it in the other sign convention, +6.7
     to refuse.)"""
     path = "instrument.geometry.sample_displacement"
-    r, restricted, data = _fitted(truth, _FREE)
+    r, _, data = _fitted(truth, _FREE)
     res = r.suggest(data)
     assert path not in _member_paths(res)
 
-    _, full, _ = _fitted(truth, (*_FREE, path))
-    assert _measured_delta_bic(restricted, full, 1) < 0.0
+    full, _, _ = _fitted(truth, (*_FREE, path))
+    assert _measured_delta_bic(r, full) < 0.0
 
 
 def test_include_glob_limits_enumeration(truth):

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pytest
 
 import rietx as rx
@@ -63,6 +64,11 @@ def test_a_parameter_within_two_sigma_is_decisive_at_raw_n_and_not_at_n_eff(
     assert c.delta_bic < 0.0
     assert c.n_effective == pytest.approx(
         effective_sample_size(c.n_points, c.esd_inflation))
+    # the sums, not the reduced Statistics.chi2: the reduced pair's ratio
+    # would carry (N − P_f)/(N − P_r), −1 of raw-N ΔBIC here
+    r = ref.result_
+    d = (np.asarray(r.y_obs) - np.asarray(r.y_calc)) / r.sig()
+    assert c.chi2_restricted == pytest.approx(float(d @ d), rel=1e-9)
     # one parameter: the pair agree, ΔBIC ≈ t² − ln N_eff
     assert c.delta_bic == pytest.approx(p.t_ratio ** 2 - math.log(c.n_effective),
                                         abs=1.0)

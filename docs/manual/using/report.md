@@ -574,7 +574,7 @@ Considering freeing a parameter is not a refinement move.
 | `CandidateGroup.members` | one or more `ParameterCandidate` | |
 | `CandidateGroup.gain` | the joint gain of freeing the whole group | what the data measures; the members' own gains are near-equal by construction |
 | `CandidateGroup.resolved` | false exactly when there is more than one member | a tie the data cannot split, merged by pairwise collinearity rather than reported as a winner |
-| `CandidateGroup.delta_bic` | the same gain read as a model-selection answer | Schwarz's ΔBIC (`report.layer2.delta_bic`, the form the whole package uses) at the Gauss-Newton prediction of what freeing the group reaches, charged at `SuggestionResult.n_effective`. Positive favours freeing, so a full refit's ΔBIC computed the same way, with `n_effective=` from the restricted fit's `Statistics.esd_inflation` (the residual `suggest` measures f on), is directly comparable |
+| `CandidateGroup.delta_bic` | the same gain read as a model-selection answer | Schwarz's ΔBIC (`report.layer2.delta_bic`, the form the whole package uses) at the Gauss-Newton prediction of what freeing the group reaches, charged at `SuggestionResult.n_effective`. Positive favours freeing. A full refit's ΔBIC charged at the restricted fit's `Statistics.esd_inflation` (the residual `suggest` measures f on) is directly comparable, and `report.compare_freed` computes it that way |
 | `CandidateGroup.delta_bic_raw_n` | the same ΔBIC at the raw residual row count | the pre-1.6 figure, an upper bound on the evidence. Where it is positive and `delta_bic` is not, the leverage is real and the serial correlation says it is not independent evidence |
 
 The two numbers answer different questions and can disagree, and both are there

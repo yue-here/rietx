@@ -91,8 +91,8 @@ class CandidateGroup(Base):
     ``delta_bic`` is the same gain read as a **model-selection** answer
     (WP-1305).  ``gain`` ranks; it does not say whether the improvement pays
     for the parameter it costs, and at powder-pattern channel counts that is
-    the question — the protocol's §4 rule is ΔBIC, never Hamilton's R-ratio,
-    and the ramp run that motivated this field held zero shift and sample
+    the question — the protocol's §4 rule reads the t-ratio first and ΔBIC
+    at N/f² beside it (WP-1417), and the ramp run that motivated this field held zero shift and sample
     displacement on a ΔBIC its agent had to measure by hand with two extra
     refits per candidate.  It is :func:`~rietx.report.layer2.delta_bic`
     (Schwarz 1978) — the package's one BIC form — evaluated at the
@@ -109,7 +109,9 @@ class CandidateGroup(Base):
     layer2 defines, so a full refit's ΔBIC computed the same way — charged at
     ``effective_sample_size`` of the **restricted** fit's ``esd_inflation``,
     since the probe measures f on the restricted state's residual — is
-    directly comparable; that is what the test pins.
+    directly comparable.  :func:`~rietx.report.compare_freed` computes it that
+    way from two fitted refinements, and ``test_suggest.py`` pins the two
+    against each other.
 
     Predicted, not measured: the linearisation is the same one ``gain`` is,
     and a group whose predicted ``chi2_full`` reaches zero leaves the linear
