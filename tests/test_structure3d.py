@@ -80,10 +80,13 @@ def test_a_cubic_phase_expands_to_its_multiplicities(lab6):
     assert len(real) == 7
     assert sum(1 for a in real if a["site"] == 0) == by_label["La"]["multiplicity"]
     # …and with no bonds to complete, the only images are the seven copies that
-    # put the corner atom at all eight corners
+    # put the corner atom at all eight corners, beside the B that only La's
+    # hidden LaB₂₄ polyhedra need, which the client draws with them
     plain = s3.build(lab6, bond_tolerance=0.5)
     assert not plain["bonds"]
-    assert sum(a["boundary"] for a in plain["atoms"]) == 7
+    assert sum(a["boundary"] and not a["vertex_only"] for a in plain["atoms"]) == 7
+    vertices = {v for p in plain["polyhedra"] for v in p["vertices"]}
+    assert all(k in vertices for k, a in enumerate(plain["atoms"]) if a["vertex_only"])
 
 
 def test_a_monoclinic_phase_expands_and_frames_the_same_way():
@@ -571,15 +574,15 @@ TETRAHEDRON = [1.6 * np.array(v) / math.sqrt(3.0)
                for v in ((1, 1, 1), (1, -1, -1), (-1, 1, -1), (-1, -1, 1))]
 
 
-def cluster(centre, ligands) -> Structure:
+def cluster(centre, ligands, side: float = 12.0) -> Structure:
     """``(species, occ)`` pairs at the centre and ``(species, offset Å, occ)``
-    around it, alone in a 12 Å P1 cell.
+    around it, alone in a P1 cell of ``side`` Å.
 
     Built rather than read, because each test needs one shell with one defect
-    in it: the nearest translated ligand is 8.8 Å from the centre, beyond
-    :data:`~rietx.gui.structure3d.SHELL_RADIUS`.
+    in it: at 12 Å the nearest translated ligand is 8.8 Å from the centre,
+    beyond the window of a centre whose ligands sit at 2.1 Å or less
+    (:data:`~rietx.gui.structure3d.SHELL_REACH`).
     """
-    side = 12.0
     cell = Cell(a=_p(side), b=_p(side), c=_p(side),
                 alpha=_p(90.0), beta=_p(90.0), gamma=_p(90.0))
     atoms = [Atom(label=f"{species}0{k}", species=species, x=_p(0.5), y=_p(0.5),
@@ -614,23 +617,43 @@ def test_a_ligand_is_a_non_metal_of_another_element_other_than_hydrogen(center, 
     assert s3.is_ligand(center, element) is ligand
 
 
-def test_the_shell_ends_at_the_largest_gap_among_the_first_thirteen():
+def test_the_shell_ends_at_the_largest_gap_of_the_whole_sequence():
+    """P3, as Brunner & Schwarzenbach (1971) judge a gap: the quotient of the
+    two distances bounding it, the largest anywhere in the sequence."""
     # fluorapatite's P: four O, then Ca at 3.12 Å
     n, gap = s3.shell_gap([1.52, 1.52, 1.55, 1.58, 3.12, 3.59])
     assert (n, gap) == (4, pytest.approx(3.12 / 1.58))
-    # LaB6's La: 24 B at one distance, so no gap at all
-    assert s3.shell_gap([3.06] * 24)[1] == 1.0
-    # a gap after the thirteenth distance is not looked for
-    assert s3.shell_gap([2.0] * 14 + [4.0])[1] == 1.0
+    # LaB6's La: 24 B at one distance, then the next B 1.45 times further
+    n, gap = s3.shell_gap([3.058] * 24 + [4.43, 4.43])
+    assert (n, gap) == (24, pytest.approx(4.43 / 3.058))
+    # one ligand or none is a shell with no gap
+    assert s3.shell_gap([2.0]) == (1, 1.0)
+    assert s3.shell_gap([]) == (0, 1.0)
+
+
+def test_the_window_reaches_three_times_the_shortest_distance(lab6):
+    """P3: CsCl's Cs has 8 Cl at 3.56 Å and the next at 6.8 Å, past the 6 Å
+    the images first reach, so the orbit grows to the 10.7 Å window."""
+    a = 4.115
+    cell = Cell(a=_p(a), b=_p(a), c=_p(a), alpha=_p(90.0), beta=_p(90.0), gamma=_p(90.0))
+    cscl = Structure(phases=[Phase(name="CsCl", space_group="P m -3 m", cell=cell, atoms=[
+        Atom(label="Cs", species="Cs", x=_p(0.0), y=_p(0.0), z=_p(0.0)),
+        Atom(label="Cl", species="Cl", x=_p(0.5), y=_p(0.5), z=_p(0.5))])])
+    (p, *_) = s3.build(cscl)["polyhedra"]
+    assert p["coordination"] == 8
+    # the next Cl is at a·√11/2, so the gap is √11/√3
+    assert p["gap"] == pytest.approx(math.sqrt(11 / 3))
+    # LaB6's La: 24 B at one distance, a hidden shell of 24
+    assert {q["coordination"] for q in s3.build(lab6)["polyhedra"]} == {24}
 
 
 def test_the_default_picture_draws_tetrahedra_and_octahedra(lab6, nac, fap):
     """P5 on WP-1462's three phases: PO₄ and AlF₆ drawn, the larger shells hidden.
 
     Fluorapatite's Ca sites are CaO₉ and CaO₆F, and LaB6's La has 24 B at one
-    distance, so it is no polyhedron at all.
+    distance, a shell too large to draw by default.
     """
-    assert _drawn(s3.build(lab6)) == {}
+    assert _drawn(s3.build(lab6)) == {("La", 24, False): 8}
     assert _drawn(s3.build(nac)) == {("Al1", 6, True): 8, ("Ca1", 8, False): 18,
                                      ("Na1", 7, False): 8}
     assert _drawn(s3.build(fap)) == {("P3", 4, True): 6, ("Ca1", 9, False): 4,
@@ -695,11 +718,11 @@ def test_a_metal_and_a_cation_share_no_stick():
 
 
 def test_a_shell_with_no_clear_gap_is_not_a_polyhedron():
-    """P4: six O at 2.0 Å then eight at 2.2 Å, a gap of 1.10 against 1.15."""
-    octahedron = [v * 2.0 for v in (*np.eye(3), *-np.eye(3))]
-    cube = [2.2 * np.array(v) / math.sqrt(3.0)
-            for v in np.array(np.meshgrid(*[(-1, 1)] * 3)).reshape(3, -1).T]
-    payload = s3.build(cluster([("Al", 1.0)], [("O", v, 1.0) for v in octahedron + cube]))
+    """P4: shells of six O every 1.10 times the last, from 2.0 Å to past the
+    6.0 Å window, so no gap reaches 1.15."""
+    octahedron = [*np.eye(3), *-np.eye(3)]
+    ligands = [("O", v * 2.0 * 1.1 ** k, 1.0) for k in range(13) for v in octahedron]
+    payload = s3.build(cluster([("Al", 1.0)], ligands, side=30.0))
     assert payload["polyhedra"] == []
 
 

@@ -1,11 +1,11 @@
 
 LaB6 (tests/cod_1000055.cif)
-  La     La occ 1.00  gap after 12 ×1.00, next after 11 ×1.00  not a polyhedron —
+  La     La occ 1.00  gap after 24 ×1.45, next after 48 ×1.31  polyhedron       hidden
 
 NAC (tests/cod_1000236.cif)
-  Ca1    Ca occ 1.00  gap after  8 ×1.54, next after  6 ×1.06  polyhedron       hidden
-  Al1    Al occ 1.00  gap after  6 ×2.08, next after  7 ×1.06  polyhedron       drawn
-  Na1    Na occ 1.00  gap after  7 ×1.41, next after 10 ×1.11  polyhedron       hidden
+  Ca1    Ca occ 1.00  gap after  8 ×1.54, next after 16 ×1.16  polyhedron       hidden
+  Al1    Al occ 1.00  gap after  6 ×2.08, next after 22 ×1.10  polyhedron       drawn
+  Na1    Na occ 1.00  gap after  7 ×1.41, next after 19 ×1.13  polyhedron       hidden
 
 fluorapatite (tests/fluorapatite.cif)
   Ca1    Ca occ 1.00  gap after  9 ×1.38, next after  6 ×1.15  polyhedron       hidden
@@ -13,73 +13,73 @@ fluorapatite (tests/fluorapatite.cif)
   P3     P  occ 1.00  gap after  4 ×1.98, next after  5 ×1.15  polyhedron       drawn
 
 spinel MgAl2O4 (COD 5000120)
-  Mg1    Mg occ 1.00  gap after  4 ×1.78, next after 12 ×1.00  polyhedron       drawn
-  Al1    Al occ 1.00  gap after  6 ×1.73, next after  8 ×1.06  polyhedron       drawn
+  Mg1    Mg occ 1.00  gap after  4 ×1.78, next after 16 ×1.27  polyhedron       drawn
+  Al1    Al occ 1.00  gap after  6 ×1.73, next after 14 ×1.26  polyhedron       drawn
 
 perovskite SrTiO3 (COD 1512124)
-  sr     Sr occ 1.00  gap after 12 ×1.73, next after  2 ×1.00  polyhedron       hidden
-  ti     Ti occ 1.00  gap after  6 ×2.24, next after 12 ×1.00  polyhedron       drawn
+  sr     Sr occ 1.00  gap after 12 ×1.73, next after 36 ×1.29  polyhedron       hidden
+  ti     Ti occ 1.00  gap after  6 ×2.24, next after 30 ×1.34  polyhedron       drawn
 
 garnet grossular (COD 9002677, at 103 K)
-  Ca     Ca occ 1.00  gap after  8 ×1.48, next after 12 ×1.08  polyhedron       hidden
+  Ca     Ca occ 1.00  gap after  8 ×1.48, next after 40 ×1.13  polyhedron       hidden
   Al     Al occ 1.00  gap after  6 ×1.91, next after 12 ×1.14  polyhedron       drawn
-  Si     Si occ 1.00  gap after  4 ×1.96, next after  8 ×1.10  polyhedron       drawn
+  Si     Si occ 1.00  gap after  4 ×1.96, next after 24 ×1.14  polyhedron       drawn
 
 rutile TiO2 (COD 9015662)
-  Ti     Ti occ 1.00  gap after  6 ×1.76, next after 10 ×1.02  polyhedron       drawn
+  Ti     Ti occ 1.00  gap after  6 ×1.76, next after 36 ×1.17  polyhedron       drawn
 
 olivine forsterite (COD 9007377)
-  Mg1    Mg occ 1.00  gap after  6 ×1.65, next after 10 ×1.05  polyhedron       drawn
-  Mg2    Mg occ 1.00  gap after  6 ×1.55, next after  3 ×1.05  polyhedron       drawn
-  Si     Si occ 1.00  gap after  4 ×1.90, next after 11 ×1.06  polyhedron       drawn
+  Mg1    Mg occ 1.00  gap after  6 ×1.65, next after 18 ×1.13  polyhedron       drawn
+  Mg2    Mg occ 1.00  gap after  6 ×1.55, next after 36 ×1.08  polyhedron       drawn
+  Si     Si occ 1.00  gap after  4 ×1.90, next after 14 ×1.15  polyhedron       drawn
 
 zircon ZrSiO4 (COD 9002554)
-  Si     Si occ 1.00  gap after  4 ×2.04, next after  8 ×1.07  polyhedron       drawn
-  Zr     Zr occ 1.00  gap after  8 ×1.78, next after  4 ×1.07  polyhedron       hidden
+  Si     Si occ 1.00  gap after  4 ×2.04, next after 16 ×1.13  polyhedron       drawn
+  Zr     Zr occ 1.00  gap after  8 ×1.78, next after 40 ×1.16  polyhedron       hidden
 
 corundum Al2O3 (COD 1000032)
-  Al1    Al occ 1.00  gap after  6 ×1.63, next after  3 ×1.06  polyhedron       drawn
+  Al1    Al occ 1.00  gap after  6 ×1.63, next after 15 ×1.09  polyhedron       drawn
 
 fluorite CaF2 (COD 1000043)
-  Ca1    Ca occ 1.00  gap after  8 ×1.91, next after 12 ×1.00  polyhedron       hidden
+  Ca1    Ca occ 1.00  gap after  8 ×1.91, next after 32 ×1.31  polyhedron       hidden
 
 wurtzite ZnO (COD 2300450)
-  Zn     Zn occ 1.00  gap after  4 ×1.63, next after  5 ×1.18  polyhedron       drawn
+  Zn     Zn occ 1.00  gap after  4 ×1.63, next after 14 ×1.20  polyhedron       drawn
 
 quartz SiO2 (COD 5000035)
   Si1    Si occ 1.00  gap after  4 ×2.18, next after 10 ×1.08  polyhedron       drawn
 
 calcite CaCO3 (COD 2100992)
   Ca     Ca occ 1.00  gap after  6 ×1.47, next after 12 ×1.24  polyhedron       drawn
-  C      C  occ 1.00  gap after  3 ×2.66, next after 12 ×1.15  not a polyhedron —
+  C      C  occ 1.00  gap after  3 ×2.66, next after  9 ×1.09  not a polyhedron —
 
 gypsum CaSO4.2H2O (COD 2300258, with H)
-  CA1    Ca occ 1.00  gap after  8 ×1.61, next after  4 ×1.07  polyhedron       hidden
+  CA1    Ca occ 1.00  gap after  8 ×1.61, next after 32 ×1.09  polyhedron       hidden
   S2     S  occ 1.00  gap after  4 ×2.37, next after  6 ×1.06  polyhedron       drawn
   H6     H  occ 1.00  gap after  1 ×1.81, next after  2 ×1.64  not a polyhedron —
-  H7     H  occ 1.00  gap after  1 ×2.09, next after  2 ×1.46  not a polyhedron —
+  H7     H  occ 1.00  gap after  1 ×2.09, next after  2 ×1.44  not a polyhedron —
 
 pyrite FeS2 (COD 7700358)
-  Fe1    Fe occ 1.00  gap after  6 ×1.52, next after 12 ×1.05  polyhedron       drawn
+  Fe1    Fe occ 1.00  gap after  6 ×1.52, next after 14 ×1.23  polyhedron       drawn
 
 baryte BaSO4 (COD 8107510)
-  Ba1    Ba occ 1.00  gap after 12 ×1.21, next after 10 ×1.08  polyhedron       hidden
+  Ba1    Ba occ 1.00  gap after 12 ×1.21, next after 13 ×1.08  polyhedron       hidden
   S1     S  occ 1.00  gap after  4 ×2.31, next after  7 ×1.11  polyhedron       drawn
 
 andalusite Al2SiO5 (COD 9003990)
-  Al1    Al occ 1.00  gap after  6 ×1.63, next after  4 ×1.10  polyhedron       drawn
-  Al2    Al occ 1.00  gap after  5 ×1.68, next after 11 ×1.13  polyhedron       drawn
+  Al1    Al occ 1.00  gap after  6 ×1.63, next after 16 ×1.20  polyhedron       drawn
+  Al2    Al occ 1.00  gap after  5 ×1.68, next after 28 ×1.14  polyhedron       drawn
   Si     Si occ 1.00  gap after  4 ×1.64, next after  5 ×1.20  polyhedron       drawn
 
 CsCl (COD 9009743)
-  Cs     Cs occ 1.00  gap after  8 ×1.68, next after  7 ×1.00  polyhedron       hidden
+  Cs     Cs occ 1.00  gap after  8 ×1.91, next after 32 ×1.31  polyhedron       hidden
 
 high cristobalite SiO2 (COD 9008230, at 221 °C, O split six ways at 1/6)
-  Si     Si occ 1.00  gap after  1 ×1.00, next after 12 ×1.00  not a polyhedron —
+  Si     Si occ 1.00  gap after 24 ×2.25, next after 96 ×1.15  not a polyhedron —
 
 olivine (Mg0.9Fe0.1)2SiO4 (COD 9007377, forsterite with Fe beside Mg on M1 and M2)
-  Mg1    Mg occ 0.90  gap after  6 ×1.65, next after 10 ×1.05  polyhedron       drawn
-  Mg2    Mg occ 0.90  gap after  6 ×1.55, next after  3 ×1.05  polyhedron       drawn
-  Si     Si occ 1.00  gap after  4 ×1.90, next after 11 ×1.06  polyhedron       drawn
-  FeMg1  Fe occ 0.10  gap after  6 ×1.65, next after 10 ×1.05  not a polyhedron —
-  FeMg2  Fe occ 0.10  gap after  6 ×1.55, next after  3 ×1.05  not a polyhedron —
+  Mg1    Mg occ 0.90  gap after  6 ×1.65, next after 18 ×1.13  polyhedron       drawn
+  Mg2    Mg occ 0.90  gap after  6 ×1.55, next after 36 ×1.08  polyhedron       drawn
+  Si     Si occ 1.00  gap after  4 ×1.90, next after 14 ×1.15  polyhedron       drawn
+  FeMg1  Fe occ 0.10  gap after  6 ×1.65, next after 18 ×1.13  not a polyhedron —
+  FeMg2  Fe occ 0.10  gap after  6 ×1.55, next after 36 ×1.08  not a polyhedron —

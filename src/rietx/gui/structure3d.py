@@ -112,19 +112,26 @@ BOUNDARY_TOL = 1e-3
 
 #: A coordination shell ends at the largest gap in its ligand distances, and
 #: it is drawn only when that gap is at least this ratio (WP-1466, P3 and P4).
-#: Measured on 21 phases (``docs/wp/1466-measure``): every real shell's gap is
-#: 1.21 or more (baryte's BaO₁₂) and every site with no shell scores 1.00
-#: (LaB6's La, high cristobalite's Si).  The default picture is the same for
-#: any value from 1.01 to 1.47, the smallest gap of a shell drawn by default.
+#: Brunner & Schwarzenbach (1971) found no structure whose largest gap was
+#: smaller: 1.15 was their least, β-Pu averaged over its sites, and each
+#: single site's was larger.  On 21 phases (``docs/wp/1466-measure``) every
+#: shell's gap is 1.21 or more (baryte's BaO₁₂), and the default picture is
+#: the same for any value up to 1.47, the smallest gap of a shell drawn by
+#: default.
 POLYHEDRON_GAP = 1.15
 
-#: The gap is looked for among the first ``MAX_SHELL + 1`` ligands, so no
-#: shell is larger than a cuboctahedron.
-MAX_SHELL = 12
+#: A centre's ligands are searched out to this multiple of its shortest ligand
+#: distance, and the shell ends at the largest gap among all of them (P3).
+#: Brunner & Schwarzenbach (1971) computed every distance out to at least three
+#: times the shortest and took the largest gap of the whole sequence.  No cap
+#: on the shell's size: LaB6's La has 24 B at one distance and then a gap of
+#: 1.45.  A shell whose next ligand lies beyond the window takes the window's
+#: edge as that next distance, which can only understate the gap.
+SHELL_REACH = 3.0
 
-#: How far a centre's ligands are searched for, in Å.  A shell whose next
-#: ligand lies beyond it takes this radius as that next distance, which can
-#: only understate the gap.
+#: The images the ligands are searched among reach at least this far, in Å.
+#: It covers the bond search that decides which non-metals are cations, and it
+#: grows when a large cation's window reaches further (Cs in CsCl, 10.7 Å).
 SHELL_RADIUS = 6.0
 
 #: Shells of these sizes are drawn by default: the tetrahedra and octahedra a
@@ -463,13 +470,13 @@ def _cation_sites(sites: list[dict], orbit: dict[str, Any], basis: np.ndarray) -
 def shell_gap(distances: np.ndarray) -> tuple[int, float]:
     """``(n, ratio)``: the shell ends after ``n`` ligands, at a gap of ``ratio``.
 
-    The largest gap among the first ``MAX_SHELL + 1`` sorted distances, as
-    Daams & Villars (1993) apply Brunner & Schwarzenbach (1971, Z. Kristallogr.
-    133, 127).  The gap is the ratio of each distance to the one before it,
-    WP-1462's stand-in until that paper is read.  One ligand or none gives
+    The largest gap in the sorted distances, as Daams & Villars (1993) apply
+    Brunner & Schwarzenbach (1971, Z. Kristallogr. 133, 127).  A gap is judged
+    by the quotient of the two distances bounding it, as they judge it.  The
+    caller sets the window (:data:`SHELL_REACH`).  One ligand or none gives
     ``(len, 1.0)``, a shell with no gap.
     """
-    d = np.asarray(distances, dtype=np.float64)[:MAX_SHELL + 1]
+    d = np.asarray(distances, dtype=np.float64)
     if len(d) < 2:
         return len(d), 1.0
     ratios = d[1:] / d[:-1]
@@ -661,6 +668,7 @@ def _expand(ph, phase: int, sg, basis: np.ndarray, astar: np.ndarray,
                     "frac": image.tolist(),
                     "pos": (basis @ image).tolist(),
                     "boundary": bool(shift.any()),
+                    "vertex_only": False,
                     "ellipsoid": transform.tolist(),
                     "rms": rms.tolist(),
                     "npd": npd,
@@ -864,8 +872,9 @@ def _bonds(positions: np.ndarray, radii: np.ndarray, basis: np.ndarray,
 # ----------------------------------------------------------------------
 # coordination polyhedra (WP-1466)
 # ----------------------------------------------------------------------
-def _orbit(sites: list[dict], every: list[dict], basis: np.ndarray) -> dict[str, Any]:
-    """Each position of the orbit once, and its images out to :data:`SHELL_RADIUS`.
+def _orbit(sites: list[dict], every: list[dict], basis: np.ndarray,
+           radius: float = SHELL_RADIUS) -> dict[str, Any]:
+    """Each position of the orbit once, and its images out to ``radius`` Å.
 
     ``every`` is the untrimmed image list, and its ``boundary`` duplicates are
     the same atoms again, so they are left out.  ``cart`` holds every image
@@ -876,12 +885,13 @@ def _orbit(sites: list[dict], every: list[dict], basis: np.ndarray) -> dict[str,
     """
     orbit = [a for a in every if not a["boundary"]]
     frac = np.array([a["frac"] for a in orbit], dtype=np.float64).reshape(-1, 3)
-    reach = np.floor(SHELL_RADIUS * np.linalg.norm(np.linalg.inv(basis), axis=1)
+    reach = np.floor(radius * np.linalg.norm(np.linalg.inv(basis), axis=1)
                      + BOUNDARY_TOL)
     grid = np.stack(np.meshgrid(*[np.arange(-r - 1, r + 2) for r in reach],
                                 indexing="ij"), axis=-1).reshape(-1, 3)
     return {
         "atoms": orbit,
+        "radius": radius,
         "elements": [sites[a["site"]]["element"] for a in orbit],
         "owner": [a["site"] for a in orbit],
         "occupancy": np.array([sites[a["site"]]["occ"] for a in orbit], dtype=np.float64),
@@ -898,29 +908,51 @@ def _polyhedra(sites: list[dict], orbit: dict[str, Any], cations: set[int],
 
     A centre is a cation and its ligands are anions (:func:`_cation_sites`,
     :func:`is_ligand`).  The ligands are searched over the whole orbit
-    (:func:`_orbit`), untrimmed, out to :data:`SHELL_RADIUS`, and matched by
-    **position**: the server can find a contact from a translated copy of the
-    centre, and a shell collected by atom index came out short on 6 of 18 Ca
-    in NAC (WP-1462's spike).  The shell ends at :func:`shell_gap`, and it is
-    drawn only when it is a polyhedron (P4): at least four ligands, a gap of
-    :data:`POLYHEDRON_GAP` or more, every ligand at a vertex of the convex
-    hull and the centre strictly inside it.  That is Daams & Villars' (1993)
-    convex-volume condition, and it turns away a planar CO₃.  A shell holding
-    two partly occupied ligands closer to each other than to the centre is a
-    split site and is not drawn (P9).
+    (:func:`_orbit`), untrimmed, out to :data:`SHELL_REACH` times the centre's
+    shortest ligand distance, and matched by **position**: the server can find
+    a contact from a translated copy of the centre, and a shell collected by
+    atom index came out short on 6 of 18 Ca in NAC (WP-1462's spike).  The
+    orbit is rebuilt once when a window passes its radius.  The shell ends at
+    :func:`shell_gap`, and it is drawn only when it is a polyhedron (P4): at
+    least four ligands, a gap of :data:`POLYHEDRON_GAP` or more, every ligand
+    at a vertex of the convex hull and the centre strictly inside it.  That is
+    Daams & Villars' (1993) convex-volume condition, and it turns away a planar
+    CO₃.  A shell holding two partly occupied ligands closer to each other than
+    to the centre is a split site and is not drawn (P9).
 
     A vertex outside the drawn atoms becomes a partner, flagged ``boundary``
-    as :func:`_partners`' are, so no polyhedron is cut off (P7).  One whose
-    partners would pass ``room`` is not drawn and is counted in ``dropped``.
+    as :func:`_partners`' are, so no polyhedron is cut off (P7).  It is also
+    flagged ``vertex_only``, and the client draws it only while one of its
+    polyhedra is drawn: at the default bond tolerance NAC's hidden NaF₇ and
+    CaF₈ put 12 F in the picture with no stick and no face.  One whose partners
+    would pass ``room`` is not drawn and is counted in ``dropped``, and the
+    shells drawn by default claim the room first.
     """
-    from scipy.spatial import ConvexHull, QhullError
+    from scipy.spatial import ConvexHull, QhullError, cKDTree
 
     if not orbit["atoms"] or n_cell == 0:
         return [], [], 0
-    elements, occupancy = orbit["elements"], orbit["occupancy"]
-    cart, source = orbit["cart"], orbit["source"]
     # a centre is a cation and a ligand is an anion (P2)
     anion = np.array([j not in cations for j in orbit["owner"]])
+    elements = orbit["elements"]
+
+    def ligand_rows(element: str, orbit: dict[str, Any]) -> np.ndarray:
+        eligible = anion & np.array([is_ligand(element, e) for e in elements], dtype=bool)
+        return np.nonzero(eligible[orbit["source"]])[0]
+
+    # every centre's window must lie inside the orbit, and the images of one
+    # site all see the same shortest distance
+    reach = 0.0
+    for j in sorted(cations & set(orbit["owner"])):
+        here = orbit["frac"][orbit["owner"].index(j)] @ basis.T
+        dist = np.linalg.norm(orbit["cart"][ligand_rows(sites[j]["element"], orbit)] - here,
+                              axis=1)
+        dist = dist[dist >= BOND_MIN]
+        if len(dist):
+            reach = max(reach, SHELL_REACH * float(dist.min()))
+    if reach > orbit["radius"]:
+        orbit = _orbit(sites, orbit["atoms"], basis, reach)
+    occupancy, cart, source = orbit["occupancy"], orbit["cart"], orbit["source"]
 
     known = {tuple(np.round(a["pos"], 6)): k for k, a in enumerate(atoms)}
     segments: dict[tuple, list[int]] = {}
@@ -931,6 +963,7 @@ def _polyhedra(sites: list[dict], orbit: dict[str, Any], cations: set[int],
     # rows of ``cart`` an element's centre may take as ligands, found once
     ligand_of: dict[str, np.ndarray] = {}
     centres: list[np.ndarray] = []
+    found: list[tuple] = []
     out: list[dict] = []
     partners: list[dict] = []
     dropped = 0
@@ -940,8 +973,7 @@ def _polyhedra(sites: list[dict], orbit: dict[str, Any], cations: set[int],
             continue
         element = sites[atom["site"]]["element"]
         if element not in ligand_of:
-            eligible = anion & np.array([is_ligand(element, e) for e in elements], dtype=bool)
-            ligand_of[element] = np.nonzero(eligible[source])[0]
+            ligand_of[element] = ligand_rows(element, orbit)
         index = ligand_of[element]
         if not len(index):
             continue
@@ -951,27 +983,23 @@ def _polyhedra(sites: list[dict], orbit: dict[str, Any], cations: set[int],
             continue
         centres.append(centre)
         dist = np.linalg.norm(cart[index] - centre, axis=1)
-        near = (dist >= BOND_MIN) & (dist <= SHELL_RADIUS)
-        index, dist = index[near], dist[near]
+        index, dist = index[dist >= BOND_MIN], dist[dist >= BOND_MIN]
+        if not len(dist):
+            continue
+        # Brunner & Schwarzenbach's window (P3)
+        window = min(SHELL_REACH * float(dist.min()), orbit["radius"])
+        index, dist = index[dist <= window], dist[dist <= window]
         order = np.argsort(dist, kind="stable")
         index, dist = index[order], dist[order]
         # atoms of two sites at one position are one ligand, their
-        # occupancies summed, so a mixed O/F site is full and a split one is not
-        kept: list[list] = []                      # [candidate, distance, occupancy]
-        for k in range(len(index)):
-            here = cart[index[k]]
-            twin = next((row for row in kept if dist[k] - row[1] < SAME_POSITION
-                         and np.linalg.norm(cart[row[0]] - here) < SAME_POSITION), None)
-            if twin is not None:
-                twin[2] += occupancy[source[index[k]]]
-                continue
-            if len(kept) > MAX_SHELL:
-                break
-            kept.append([index[k], dist[k], occupancy[source[index[k]]]])
-        distances = [row[1] for row in kept]
-        if len(distances) <= MAX_SHELL:
-            distances.append(SHELL_RADIUS)
-        n, gap = shell_gap(np.array(distances))
+        # occupancies summed, so a mixed O/F site is full and a split one is not;
+        # each joins the nearest of its twins, pairs coming sorted
+        root = np.arange(len(index))
+        for i, j in sorted(cKDTree(cart[index]).query_pairs(SAME_POSITION)):
+            root[j] = min(root[j], root[i])
+        total = np.bincount(root, weights=occupancy[source[index]], minlength=len(index))
+        kept = [[index[k], dist[k], total[k]] for k in np.nonzero(root == np.arange(len(root)))[0]]
+        n, gap = shell_gap(np.array([row[1] for row in kept] + [window]))
         if n < 4 or gap < POLYHEDRON_GAP:
             continue
         shell = kept[:n]
@@ -987,6 +1015,11 @@ def _polyhedra(sites: list[dict], orbit: dict[str, Any], cations: set[int],
             continue
         if len(hull.vertices) < n or (hull.equations[:, 3] > -INSIDE_TOL).any():
             continue
+        found.append((c, atom["site"], centre, n, gap, shell, vertices, hull))
+    # a shell drawn by default claims room under the atom cap first, so a
+    # hidden one never costs the default picture a polyhedron
+    for c, site, centre, n, gap, shell, vertices, hull in sorted(
+            found, key=lambda f: f[3] not in DEFAULT_SHELLS):
         needed = [k for k in range(n) if tuple(np.round(vertices[k], 6)) not in known]
         if len(partners) + len(needed) > room:
             dropped += 1
@@ -995,7 +1028,7 @@ def _polyhedra(sites: list[dict], orbit: dict[str, Any], cations: set[int],
             origin = orbit["atoms"][source[shell[k][0]]]
             known[tuple(np.round(vertices[k], 6))] = len(atoms) + len(partners)
             partners.append({**origin, "pos": vertices[k].tolist(), "boundary": True,
-                             "frac": (inverse @ vertices[k]).tolist()})
+                             "frac": (inverse @ vertices[k]).tolist(), "vertex_only": True})
         members = [known[tuple(np.round(v, 6))] for v in vertices]
         simplices = hull.simplices.copy()
         corner = vertices[simplices]
@@ -1015,7 +1048,7 @@ def _polyhedra(sites: list[dict], orbit: dict[str, Any], cations: set[int],
             tuple(sorted((centre_key, tuple(np.round(v, 6))))), []))
         out.append({
             "center": c,
-            "site": atom["site"],
+            "site": site,
             "vertices": members,
             "faces": simplices.tolist(),
             "edges": [list(e) for e in sorted(edges)],
@@ -1027,4 +1060,5 @@ def _polyhedra(sites: list[dict], orbit: dict[str, Any], cations: set[int],
             "gap": gap,
             "drawn_by_default": n in DEFAULT_SHELLS,
         })
+    out.sort(key=lambda p: p["center"])
     return out, partners, dropped

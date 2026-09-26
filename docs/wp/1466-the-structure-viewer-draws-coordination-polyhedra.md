@@ -99,7 +99,9 @@ survey could not confirm a default from a primary source, it is left out.
 ### The phase-set measurement
 
 Measured 2026-09-26 on the stand-in gap measure, with P2 as amended that
-day. `1466-measure/measure.py` fetches each phase from the Crystallography
+day, and re-run the same day under Brunner & Schwarzenbach's window (P3).
+The re-run moved three sites' largest gaps and no default picture.
+`1466-measure/measure.py` fetches each phase from the Crystallography
 Open Database, and `results.txt` beside it holds the run. Its `--fixture`
 writes `tests/data/polyhedra_phases.json`, which
 `test_the_default_picture_on_the_measured_phases` holds the default to. The
@@ -108,7 +110,7 @@ gap ratio.
 
 | Phase (COD) | Drawn by default | Qualifies, hidden |
 |---|---|---|
-| LaB6 (test CIF) | none: La has 24 B at one distance | none |
+| LaB6 (test CIF) | none | LaB₂₄ 1.45 |
 | NAC (test CIF) | AlF₆ 2.08 | CaF₈ 1.54, NaF₇ 1.41 |
 | fluorapatite (test CIF) | PO₄ 1.98 | CaO₉ 1.38, CaO₆F 1.24 |
 | spinel MgAl₂O₄ (5000120) | MgO₄ 1.78, AlO₆ 1.73 | none |
@@ -126,8 +128,8 @@ gap ratio.
 | pyrite (7700358) | FeS₆ 1.52 | none |
 | baryte (8107510) | SO₄ 2.31 | BaO₁₂ 1.21 |
 | andalusite (9003990) | SiO₄ 1.64, AlO₆ 1.63, AlO₅ 1.68 | none |
-| CsCl (9009743) | none | CsCl₈ 1.68 |
-| high cristobalite (9008230, at 221 °C) | none: Si has 24 split O at one distance | none |
+| CsCl (9009743) | none | CsCl₈ 1.91 |
+| high cristobalite (9008230, at 221 °C) | none: Si's 24 O positions are split sites (P9) | none |
 | olivine, Fe 0.1 beside Mg (built on 9007377) | as forsterite, one octahedron per mixed site | none |
 
 ## Decisions this WP takes
@@ -169,15 +171,27 @@ confirmed that too on the same day.
   more electronegative N or O, so Prussian blue's C-bonded Fe would get N.
 - **P3. The shell ends at the largest gap in the ligand distances,** as
   Daams & Villars apply Brunner & Schwarzenbach. The gap is measured the way
-  Brunner & Schwarzenbach measure it once that paper is read. The spike's
-  successive-distance ratio stands in until then.
+  Brunner & Schwarzenbach measure it.
+  *Read 2026-09-26.* They judge a gap by the quotient of the two distances
+  bounding it, which is the spike's ratio. They take the largest gap of the
+  whole sequence, computed out to at least three times the shortest
+  distance. So the window is theirs too: every ligand out to three times
+  the centre's shortest distance (`SHELL_REACH`), with no cap on the
+  shell's size. The spike had searched the first 13 ligands, and that hid
+  two shells. LaB6's La has 24 B and then a gap of 1.45, and high
+  cristobalite's Si has 24 O positions and then 2.25. They also found a
+  clear largest gap in about 90 % of their structures. The six without one
+  had two gaps of about equal size.
 - **P4. A shell is drawn only when it is a polyhedron.** It needs 4 or more
   ligands, the centre strictly inside the hull, every ligand at a hull
   vertex (Daams & Villars' convex-volume condition), and a clear gap. The
-  gap threshold is 1.15, measured on 21 phases (§ The phase-set
-  measurement): every real shell's gap is 1.21 or more, and every site with
-  no shell scores 1.00. The default picture is the same for any threshold
-  from 1.01 to 1.47.
+  gap threshold is 1.15, the smallest largest gap in Brunner &
+  Schwarzenbach's survey (β-Pu averaged over its sites; each single site's
+  was larger). On 21 phases (§ The phase-set measurement) every shell's gap
+  is 1.21 or more, and the default picture is the same for any threshold up
+  to 1.47. *Amended 2026-09-26:* it was first measured as "every site with
+  no shell scores 1.00", but the two such sites scored 1.00 only under the
+  spike's window (P3).
 - **P5. By default, shells of 4 to 6 ligands are drawn.** Tetrahedra and
   octahedra are the framework a chemist reads first. Shells of 7 or more
   qualify and start hidden, because with them NAC's cell fills with
@@ -205,21 +219,21 @@ confirmed that too on the same day.
   the centre is a split site, and it is not drawn. A site with vacancies
   and no split still draws. Daams & Villars excluded every partly occupied
   point set, which would lose each BO₆ of an oxygen-deficient perovskite.
-  Measured on two phases: high cristobalite's O is split six ways at 1/6,
-  and the gap turned Si away first, with 24 O positions at one distance.
-  An olivine with Fe beside Mg on both M sites drew one octahedron per site.
+  Measured on two phases. High cristobalite's O is split six ways at 1/6,
+  and the split rule turns Si's shell of 24 O positions away. (The spike's
+  window had turned it away by the gap first.) An olivine with Fe beside Mg
+  on both M sites drew one octahedron per site.
 
 ## Where it will bite
 
-- **The threshold has few negatives.** On the measured set only two sites
-  have no shell, both at 1.00, so nothing places a real no-gap case between
-  1.00 and 1.21. The default picture does not depend on it.
-- **Two nearly equal gaps.** Daams & Villars resolve a tie by the fewest
+- **The threshold has no measured negative.** Under Brunner &
+  Schwarzenbach's window every site on the measured set has a gap of 1.21
+  or more, so 1.15 rests on their survey. The default picture does not
+  depend on it.
+- **Two nearly equal gaps.** Brunner & Schwarzenbach found this in six of
+  their structures, and Daams & Villars resolve such a tie by the fewest
   environment types. None arose on the measured set: the closest is
   fluorapatite's Ca2, whose largest gap is 1.24 against 1.14 for the next.
-- **P9's split rule has no measured case.** The one split phase measured
-  was turned away by the gap before the split rule was reached. The rule
-  is tested on a built cluster only.
 - **A cyanide or a carbonyl** draws the wrong shell (P2).
 - **A split anion site can make a cation** (found by the 2026-09-26 review).
   Fluorapatite with F at 0.5 and an OH oxygen 0.48 Å from it reads the O as
@@ -248,7 +262,7 @@ confirmed that too on the same day.
 ## Tasks
 
 - [x] The maintainer confirms P1-P8, and this file records which (2026-09-26: all, with amendments to P2, P5 and P7, and P9 added)
-- [ ] Read Brunner & Schwarzenbach (1971) (the maintainer supplies it) and set P3's gap measure to theirs, then re-run `1466-measure/measure.py`
+- [x] Read Brunner & Schwarzenbach (1971) (the maintainer supplies it) and set P3's gap measure to theirs, then re-run `1466-measure/measure.py` (2026-09-26: the measure was theirs, the window was not; P3)
 - [ ] Read Allred (1961) (the maintainer supplies it) and check `structure3d.ELECTRONEGATIVITY`'s 18 values against it
 - [x] Measure P4, P5 and P9 on the wider phase set, a disordered phase among it, and record the threshold and the table (2026-09-26, on the stand-in gap measure: § The phase-set measurement)
 - [x] Server: the `polyhedra` arm, the ligand rule, the gap shell, the polyhedron conditions and the vertex partners, with tests in `tests/test_structure3d.py` (2026-09-26; the gap measure is the stand-in until task 2, and `POLYHEDRON_GAP` is measured at 1.15)
@@ -276,7 +290,9 @@ npm --prefix gui test && npm --prefix gui run check
   the rhombohedral "intermetallic" structure types. The maintainer's copy
   (`rietx-refs-misc`) does not carry the journal details.
 - Brunner, G. O. & Schwarzenbach, D. (1971). *Z. Kristallogr.* 133, 127.
-  The maximum-gap rule, not yet read here.
+  Zur Abgrenzung der Koordinationssphäre und Ermittlung der Koordinationszahl
+  in Kristallstrukturen. The maximum-gap rule, read in full (the maintainer's
+  copy in `rietx-refs-misc`).
 - Momma, K. & Izumi, F. (2011). VESTA 3. *J. Appl. Cryst.* 44, 1272-1276,
   and the VESTA manual, chapters 8 and 12.
 - Pan, H. et al. (2021). *Inorg. Chem.*, doi:10.1021/acs.inorgchem.0c02996,

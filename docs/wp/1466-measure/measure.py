@@ -106,12 +106,19 @@ def load(name: str, cache: Path):
 
 
 def shells(payload: dict) -> dict[str, tuple[int, float, int, float]]:
-    """Per site label, ``(n, gap, n2, gap2)``: the two largest gaps."""
+    """Per site label, ``(n, gap, n2, gap2)``: the two largest gaps.
+
+    Brunner & Schwarzenbach's window, read independently of the server: every
+    ligand out to ``SHELL_REACH`` times the shortest, the window's edge
+    standing in for the next distance.
+    """
     lattice = np.array(payload["lattice"])
     cell = [a for a in payload["atoms"] if not a["boundary"]]
     frac = np.array([a["frac"] for a in cell])
-    grid = np.array([[i, j, k] for i in range(-2, 3) for j in range(-2, 3)
-                     for k in range(-2, 3)])
+    # translations enough for a 12 Å window from anywhere in the cell
+    span = np.ceil(12.0 * np.linalg.norm(np.linalg.inv(lattice), axis=0)).astype(int) + 1
+    grid = np.stack(np.meshgrid(*[np.arange(-r, r + 1) for r in span], indexing="ij"),
+                    axis=-1).reshape(-1, 3)
     # the server's own reading of which sites are cations
     owner = [a["site"] for a in cell]
     elements = [payload["sites"][j]["element"] for j in owner]
@@ -133,11 +140,14 @@ def shells(payload: dict) -> dict[str, tuple[int, float, int, float]]:
                 points = (f + grid) @ lattice
                 r = np.linalg.norm(points - centre, axis=1)
                 for p, x in zip(points, r):
-                    if s3.BOND_MIN <= x <= s3.SHELL_RADIUS:
+                    if x >= s3.BOND_MIN:
                         found[tuple(np.round(p, 2))] = x
-        d = np.sort(list(found.values()))[:s3.MAX_SHELL + 1]
-        if len(d) <= s3.MAX_SHELL:
-            d = np.append(d, s3.SHELL_RADIUS)
+        if not found:
+            continue
+        d = np.sort(list(found.values()))
+        window = s3.SHELL_REACH * d[0]
+        assert window <= 12.0, (site["label"], window)
+        d = np.append(d[d <= window], window)
         if len(d) < 2:
             continue
         ratios = d[1:] / d[:-1]
