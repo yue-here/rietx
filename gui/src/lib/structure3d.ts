@@ -803,8 +803,12 @@ export function pickFace(scene: Scene, view: View, width: number, height: number
 /** The sentence under the plot: what is drawn, at what thresholds. */
 export function caption(geometry: Geometry, mode: Mode, exaggeration = 1,
                         shown: readonly number[] = []): string {
-  const real = geometry.atoms.filter((a) => !a.boundary).length;
-  const ghosts = geometry.atoms.length - real;
+  // an atom only a polyhedron needs is counted while one of its polyhedra is
+  // drawn, as `buildScene` draws it
+  const corners = new Set(shown.flatMap((i) => geometry.polyhedra[i].vertices));
+  const counted = geometry.atoms.filter((a, k) => !a.vertex_only || corners.has(k));
+  const real = counted.filter((a) => !a.boundary).length;
+  const ghosts = counted.length - real;
   const parts = [
     `${real} atom${real === 1 ? "" : "s"} in the cell`
       + (ghosts ? ` + ${ghosts} image${ghosts === 1 ? "" : "s"} outside it` : ""),

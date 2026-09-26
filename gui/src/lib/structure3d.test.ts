@@ -500,6 +500,10 @@ describe("the polyhedra", () => {
       buildScene(geo, { mode: "ball", polyhedra }).atoms.map((a) => a.index);
     expect(atoms([])).toEqual([0, 1, 2, 3]);
     expect(atoms([0])).toEqual([0, 1, 2, 3, 4]);
+    // and the caption counts what is drawn, the server's vertex being an image
+    geo.atoms[4].boundary = true;
+    expect(caption(geo, "ball", 1, [])).toContain("4 atoms in the cell · ");
+    expect(caption(geo, "ball", 1, [0])).toContain("4 atoms in the cell + 1 image outside it");
   });
 
   it("bring their faces and edges, and take their centre's sticks away", () => {

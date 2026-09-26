@@ -124,8 +124,8 @@
    *  ball mode and off in ellipsoid mode, where faces would cover the ADPs
    *  that mode exists to show.  One switch changes the mode it is pressed in. */
   let polyhedraIn = $state<Record<Mode, boolean>>({ ball: true, ellipsoid: false });
-  /** The legend's switch per centre species (P5).  A species this does not
-   *  name takes the server's default, which draws shells of four to six. */
+  /** The legend's switch per formula (P5).  A formula this does not name
+   *  takes the server's default, which draws shells of four to six. */
   let polyFormulas = $state(new Map<string, boolean>());
   /** Export the PNG on a transparent background rather than the panel's. */
   let transparent = $state(false);
