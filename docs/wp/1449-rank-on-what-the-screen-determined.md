@@ -1,8 +1,8 @@
 # WP-1449 — rank on what the screen determined, not on what the peak list shows
 
 Milestone: unscheduled · Status: 🔄 2026-09-27 — the rank rows wait for a finished search and
-INDEX_SEARCH_INCOMPLETE names its cause; the ranking design waits on six
-paywalled papers
+INDEX_SEARCH_INCOMPLETE names its cause; the ranking seam is measured and
+proposed, awaiting the maintainer's decision
 Depends on: — (1446 measured the refutation; 1025 built the screen)
 Priority: P2 2026-09-23 — a wrong cell ranked first on a surface every page calls provisional; 1446 already measured the refutation
 
@@ -283,39 +283,42 @@ search: a local run, or the nightly dispatched with `full_macos`.
 
 ## Handover log
 
-### 2026-09-27 — the rank rows wait for a finished search; the design waits on papers
+### 2026-09-27 — the rank rows wait for a finished search; the design is measured and proposed
 
 The Linux nightly failed five nights running on one row, and the cause was the
 test, not the ranking. The runner is slow enough that the search behind that
 row is stopped by its time budget, and a stopped search does not produce a
 repeatable order: the same search, stopped the same way, put a different cell
 first on two runs here. Every indexing row that asserts an order now waits for
-a search that finished, and says which parts were stopped when it cannot. A
-second fix came out of the same question: the warning that a search did not
-finish blamed the clock even when a size limit had stopped it, and told users
-to wait longer where waiting changes nothing. The ranking design itself has not
-started. The three open papers read so far leave the question open, so it
-needs the papers you have to supply.
+a search that finished, and says which parts were stopped when it cannot. The
+warning that a search did not finish also blamed the clock when a size limit
+had stopped it, and told users to wait longer where waiting changes nothing;
+it now names the cause. The ranking design moved from a question to a measured
+proposal. Eight papers show the problem is known and that EXPO scores cells
+under their most probable extinction symbol. Over the eleven acceptance
+datasets, that idea keeps every true cell and demotes only wrong supercells,
+once each supercell's missing lines are judged against chance. Nothing in the
+ranking is built yet, because the seam is the maintainer's decision.
 
 **Done.**
 
 - `_skip_unless_finished` runs before every order a real-data row reads (14
   sites). It reads each unit's clock from `engine_stats` against the budget the
   result recorded in `provenance.notes`, never `search_complete`, which a cap
-  also sets. The svd retry's clock (`svd.<system>.trim.seconds`) counts. Rows
-  that assert only what was found stay live, and so does hl2's row, whose 15 s
+  also sets. svd's retry clock (`svd.<system>.trim.seconds`) counts. Rows that
+  assert only what was found stay live, and so does hl2's row, whose 15 s
   budget is cut by design and whose claim is an abstention.
-- The gallery sidecar records `unit_seconds`, so the nightly artifact now says
-  which units the clock stopped. Three stale captions (brucite, fluorite, fap)
-  and four double-escaped dashes fixed in `tests/indexing_gallery.py`.
-- `incomplete_diagnostic` takes the capped systems apart from the clock-stopped
-  ones. Each engine files an incomplete unit by whether its budget had expired
+- The gallery sidecar records `unit_seconds`. Three stale captions (brucite,
+  fluorite, fap) and four double-escaped dashes fixed.
+- `incomplete_diagnostic` words a capped system apart from a clock-stopped
+  one; each engine files an incomplete unit by whether its budget had expired
   when it returned. Staged in `releases/1.5.1.md`; two skill rows updated, one
-  of them with the order finding below.
-- Context gained the three preprints' findings and the Borda mechanism the
-  folded Inherited entries carried. `tests/CLAUDE.md` § Budgets rule updated
-  and kept at its 296-line cap by pointing the old 15:33 → 8:09 story at the
-  v1.0 record, where it already lived.
+  with the finding that a cut search's order does not repeat.
+- Context gained the Borda mechanism, the three arXiv preprints, the five
+  papers in the synced Zotero library (`~/Zotero yue-here/`), and the measured
+  proposal with its table. The corpus task is ticked; Markvardsen *et al.*
+  (2001) and Santoro & Mighell (1972) are not in the library and stay unread.
+- `tests/CLAUDE.md` § Budgets rule updated and kept at its 296-line cap.
 
 **Measured** (`[dev]`, macOS arm64, py3.12, unless named).
 
@@ -329,41 +332,53 @@ needs the papers you have to supply.
 - Brucite at 300 s, two runs: dichotomy units 232/209 s and 175/139 s, a × 2
   supercell first both times. At 60 s, two runs: both units stopped at 60.01 s,
   truth first once and supercell first once.
-- NAC's dichotomy: 0 boxes in 0.26 s, reported before this fix as "did not
+- NAC's dichotomy: 0 boxes in 0.26 s, reported before the fix as "did not
   finish cubic within 300 s per system".
 - `tests/test_acceptance_indexing.py` under `-n auto`: 44 passed, 1 xfailed,
-  nothing skipped, 21:28, with another session loading the machine at the
-  start. So every search finished here. The slowest units were close anyway:
-  brucite 278 s, corundum 246 s, corundum with shift 215 s, fluorite 151 s,
-  all against 300 s.
+  nothing skipped, 21:28, another session loading the machine at the start.
+  The slowest units still came close to 300 s: brucite 278 s, corundum 246 s,
+  corundum with shift 215 s, fluorite 151 s.
 - Fast suite: 6305 passed, 151 skipped (6456), 3:32, no other pytest running.
-  No test function was added, only assertions inside two engine tests. The
-  cap assertion failed against the old engine code before passing on the new.
-  `tests/test_indexing_engines.py` alone: 76 passed. The full selection did not
-  run: nothing here can move a measured number.
+  No test function was added, only assertions inside two engine tests; the cap
+  assertion failed against the old engine code before passing on the new.
+  `tests/test_indexing_engines.py`: 76 passed. The full selection did not run,
+  since nothing here can move a measured number.
+- The screen probes, all on searches that finished (scripts in the session
+  scratchpad only). Under the manual's protocol (widths seeded from the peak
+  list, 20-90°) the screen returns `R - c -` on corundum at ΔBIC −3361.
+  Without it, it refutes corundum's own glide. It costs 0.1-1.3 s per
+  candidate. Brucite's truth and a × 2 supercell both get `P - - -`, so a
+  class-level `predicted_seen_fraction` leaves them at 0.86 and 0.32. The
+  chance test's corpus table is in Context: truths tested as a child at
+  p ≤ 5.0e-4, refuted children at p ≥ 0.042. WP-1446's lattice-level share did
+  not reproduce here: corundum's truth read 0.735, not 0.943, because this
+  probe used the search's wider matching window.
 
 **In flight.** Nothing uncommitted. The next nightly after merge should show
 the six rank rows skipped with named units, or passing if the runner finished.
 
 **Gotchas.**
 
-- A skip in a strict-xfail row reports as skipped, which is what keeps the
-  nightly green on a cut search. The fold-back task can only be judged on a
-  local run or the nightly dispatched with `full_macos`.
-- The worktree guard refuses `$VAR` paths, loops and pipes with computed
-  operands. Scratchpad scripts run in one plain command get past it.
-- poppler (`pdftotext`) was installed with brew by the reading agent on
-  2026-09-27; the three preprints' text is in the session scratchpad only.
+- A skip in a strict-xfail row reports as skipped, which keeps the nightly
+  green on a cut search. The fold-back can only be judged on a local run or
+  the nightly dispatched with `full_macos`.
+- The screen's answer depends on a caller's protocol (seeded widths, trimmed
+  range). Wiring it into `index_pattern` has to supply that protocol itself.
+- The corpus is high-symmetry: ten of the eleven datasets have at most two
+  free metric parameters, so the table says nothing yet about monoclinic or
+  triclinic cells.
+- The probe's truth check matched axes and ignored centring, and flagged
+  corundum's P descriptions of the R metric as truths. They are not.
+- The worktree guard refuses `$VAR` paths, loops and computed pipes. Scratchpad
+  scripts run in one plain command get past it.
 
-**Next.** First, the paywalled papers: Oishi-Tomiyasu (2013) *J. Appl. Cryst.*
-**46**, 1277-1282; Markvardsen, David, Johnston & Shankland (2001) *Acta
-Cryst.* **A57**, 47-54; Altomare *et al.* (2019) ITC Vol. H ch. 3.4; Boultif
-& Louër (2004) *J. Appl. Cryst.* **37**, 724-731; Santoro & Mighell (1972)
-*Acta Cryst.* **A28**, 284-287; Oishi-Tomiyasu (2014) *J. Appl. Cryst.*
-**47**, 593-598. The first two decide the most: whether M^Rev was meant to
-answer the extinction confound, and what the extinction-symbol method can say
-about a candidate before it is ranked. Then answer the remaining corpus
-questions in Context and take the seam decision, where cost decides.
+**Next.** First the maintainer's decision on the proposed seam in Context:
+re-rank a refuted child below its parent with a caveat, or report the verdict
+without reordering. Then, if re-ranking: rework `ambiguity._refuted_supercell`
+to take the child's class and return counts and p; choose the screen's range
+inside `index_pattern` by measurement; decide the bare-peak-list case; re-run
+the acceptance file, where the brucite xfail should go red and fold back into
+the row above it.
 
 ### 2026-09-22 — filed as a stub
 
