@@ -70,6 +70,38 @@ that distinct lattices can produce identical positions.
 general knowledge, never from a paper read for this WP. **Expand this section on
 a machine with the corpus before designing anything.**
 
+**Three open preprints were read on 2026-09-27.** All three are Oishi-Tomiyasu's:
+arXiv:1211.3926 (published as *Acta Cryst.* **A69**, 603-610, 2013),
+arXiv:2003.13403 (de Wolff's figure generalised to EBSD) and arXiv:2312.07909
+(lattice-basis reduction for indexing). Each quote below was checked against the
+extracted text.
+
+- Conograph leaves the choice between a lattice and its derivative to a figure
+  of merit. "Powder auto-indexing is divided into two main stages: enumeration
+  and sort of solutions. We contributed mainly to the stage of enumeration"
+  (1211.3926, Conclusion). Its duplicate check looks for "nearly identical
+  solutions", and "normally [...] only in the same Bravais class"
+  (2312.07909 §2, applying Eq. 13 of §6.1).
+- The one ordering rule stated is qualitative and about symmetry. For nearly
+  identical cells in different Bravais classes, "the more symmetric one is
+  usually correct, but it is not appropriate to reject the less symmetric one
+  at this point" (2312.07909 §2).
+- The EBSD figure punishes a derivative lattice through N, as M₂₀ does. N is
+  set by the smallest d threshold that indexes every observed band, with
+  m·hkl counted once. The paper calls this "a heuristic for ranking the true
+  solution above the derivative lattices" (2003.13403 §4). It needs no
+  extinction class, so it has M₂₀'s blind spot. With half the bands, a
+  low-symmetry derivative of hexagonal Zn was output and still scored above 20
+  (§5).
+- None of the three orders candidates on systematic absences. 1211.3926
+  classifies space-group absences, glides and screws included (its Table 2),
+  and uses them only to show that the enumeration survives them. No pipeline
+  in the three has an extinction-symbol step.
+
+So the practice found so far sorts on a lattice-only figure and leaves the
+confound open. The remaining questions need the paywalled papers, listed in
+the handover entry.
+
 **The rank row read the machine, and now waits for a finished search.**
 `test_brucites_truth_is_not_ranked_first` turned the Linux nightly red five
 nights running, 22 to 26 September, each time as `XPASS(strict)`. The search
@@ -105,10 +137,13 @@ search: a local run, or the nightly dispatched with `full_macos`.
   anything for it? The blind spot is the same one that sank WP-1446.
 - Conograph (Oishi-Tomiyasu 2014) — how does it order candidates that stand in a
   derivative relation, and does it defer the question to a later stage?
+  *Partly answered 2026-09-27 from the preprints (Context): it sorts on a
+  figure of merit and names no later stage. The 2014 paper is unread.*
 - What do DICVOL and its dichotomy papers (Louër & Boultif) say about returning
   a supercell, and do they rank on volume parsimony explicitly?
 - Is there published practice for ordering on the **extinction symbol's** verdict
   rather than on the lattice figures, or is the sequential workflow universal?
+  *None in the three preprints (Context).*
 - Mighell's derivative-lattice work (NIST): does it offer a criterion for
   choosing between a lattice and its derivative from powder data alone?
 
