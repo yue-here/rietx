@@ -19,10 +19,14 @@ out, and a predicted Δχ².  Three rules keep it honest:
    actually runs the stage and rolls back when the measured improvement does
    not materialise, so a wrong suggestion costs time, not correctness.
 
-New *parameters* additionally need statistical justification before they are
-suggested: :func:`hamilton_justified` implements the Hamilton (1965) R-factor
-ratio test and ΔBIC, so "add a parameter" is never proposed on the strength of
-a cosmetic χ² drop alone.
+The actions carry no statistical test of their own.  Whether a freed
+parameter paid for itself is :func:`compare_freed`, which prices two fits'
+χ² with :func:`delta_bic` at N/f² and puts each freed parameter's t-ratio
+beside it (WP-1417).  :func:`hamilton_justified` and :func:`delta_bic` are
+the free functions under it; their default N is the raw count, right only
+where N counts independent points (the indexing callers).  Until WP-1417
+this paragraph said the actions were gated by both tests, and no call in
+this module made either.
 """
 
 from __future__ import annotations
@@ -46,6 +50,8 @@ from .schemas import (
     VALIDITY_RADIUS_FWHM,
     ActionKind,
     ExchangeFinding,
+    FreedComparison,
+    FreedParameter,
     RegionAttribution,
     RivalComparison,
     RivalFit,
@@ -136,6 +142,10 @@ def hamilton_justified(chi2_restricted: float, chi2_full: float,
     compared against F(n_added, N − P_f) at ``alpha``.  Returns True when the
     improvement justifies the parameters.
 
+    Both χ² are the unreduced sums Σw·Δ².  ``Statistics.chi2`` is reduced,
+    over N − P, so a caller holding two results multiplies each by its own
+    N − P first; the reduced pair biases F by about −1.
+
     ``n_effective`` is the independent-observation count to test at in place
     of ``n_points`` — :func:`~rietx.optimize.statistics.effective_sample_size`
     of the fit's ``esd_inflation`` (#270).  The statistic is then evaluated
@@ -166,6 +176,11 @@ def delta_bic(chi2_restricted: float, chi2_full: float,
 
     ΔBIC = N·ln(χ²_r/χ²_f) − n_added·ln(N)  (Schwarz 1978, Gaussian errors).
 
+    Both χ² are the unreduced sums Σw·Δ².  ``Statistics.chi2`` is reduced,
+    over N − P, and the reduced pair's ratio carries (N − P_f)/(N − P_r),
+    about −n_added of ΔBIC at raw N.  :func:`compare_freed` does the
+    conversion for two fits.
+
     Schwarz's N is a count of **independent** observations.  ``n_effective``
     replaces it in both terms — pass
     :func:`~rietx.optimize.statistics.effective_sample_size` of the fit's
@@ -181,6 +196,135 @@ def delta_bic(chi2_restricted: float, chi2_full: float,
         return 0.0
     n = float(n_points) if n_effective is None else float(n_effective)
     return n * math.log(chi2_restricted / chi2_full) - n_added * math.log(max(n, 2.0))
+
+
+def compare_freed(restricted, full) -> FreedComparison:
+    """ΔBIC of the parameters ``full`` frees beyond ``restricted``, each one's t beside it.
+
+    Both arguments are :class:`~rietx.Refinement` objects the caller has
+    already fitted, on the same pattern and in the same mode, with ``full``
+    freeing everything ``restricted`` frees and more.  A branch that ran one
+    more stage is the usual shape.  No fit runs here.
+
+    ΔBIC is :func:`delta_bic` at N/f², with f the restricted fit's
+    ``esd_inflation`` (:func:`~rietx.optimize.statistics.effective_sample_size`),
+    and the raw-N figure rides beside it.  Each freed parameter's t-ratio is
+    measured from the value ``restricted`` held it at, which is why the
+    arguments are refinements and not results: a result lists only what
+    varied, so the held value is in the working table and nowhere else.  The
+    table stands where the fit left it, because every verb that moves a value
+    drops ``result_``.
+
+    A coordinate DOF is a step from where its own fit began
+    (:attr:`~rietx.params.vector.ParameterTable.anchored_dof_paths`), so its
+    held value is read through a coordinate row it alone drives, which is
+    absolute in both fits.  The t-ratio is then right whichever model each
+    fit started from.
+
+    Issue #270 is why the pair travels together.  On four ~49 500-channel
+    fits of one occupancy, raw-N ΔBIC read +36 to +211 while each fit's own
+    esd put the occupancy within 0.76-1.89σ of zero.
+
+    Raises :class:`ValueError` when the two fits are not nested: different
+    channel counts, intensities or modes, a path ``restricted`` frees that
+    ``full`` does not, nothing added, or a free count that moved by other than
+    the added paths (a Pawley intensity block whose reflection list changed).
+    """
+    for name, ref in (("restricted", restricted), ("full", full)):
+        if ref.result_ is None:
+            raise RuntimeError(f"run a fit on the {name} refinement before comparing")
+    held = {row.path: row.value for row in restricted.parameters()}
+    return _freed_comparison(restricted.result_, held, full)
+
+
+def _freed_comparison(restricted: RefinementResult, held: dict[str, float],
+                      full) -> FreedComparison:
+    """:func:`compare_freed` on the restricted result, its table's values, and
+    the fuller :class:`~rietx.Refinement`."""
+    from ..optimize.statistics import _chi2_absolute, effective_sample_size
+    from ..params.vector import ParameterTable
+
+    fr = full.result_
+    rs, fs = restricted.statistics, fr.statistics
+    if rs.n_points != fs.n_points:
+        raise ValueError(
+            f"the fits saw {rs.n_points} and {fs.n_points} channels; ΔBIC "
+            "compares two models of one pattern")
+    if not np.array_equal(restricted.y_obs, fr.y_obs):
+        # two patterns of one series share a channel count
+        raise ValueError(
+            "the fits saw different intensities; ΔBIC compares two models "
+            "of one pattern")
+    if restricted.mode != fr.mode:
+        raise ValueError(
+            f"the fits ran in {restricted.mode!r} and {fr.mode!r} mode, so "
+            "neither model is the other with parameters added")
+    free_r = {p.path for p in restricted.parameters if p.vary}
+    added = [p for p in fr.parameters if p.vary and p.path not in free_r]
+    dropped = sorted(free_r - {p.path for p in fr.parameters if p.vary})
+    if dropped:
+        raise ValueError(
+            f"not nested: the restricted fit frees {dropped[0]!r}"
+            + (f" and {len(dropped) - 1} more" if len(dropped) > 1 else "")
+            + " and the fuller one does not")
+    # the solver's own count, as compare_rivals takes it: ``parameters`` also
+    # carries tied rows, which are not free columns
+    n_added = fs.n_free_parameters - rs.n_free_parameters
+    if n_added <= 0 or not added:
+        raise ValueError(
+            f"the fuller fit frees {fs.n_free_parameters} parameters against "
+            f"{rs.n_free_parameters}, so there is nothing added to compare")
+    if n_added != len(added):
+        # only an off-table block moves the count without a path: a Pawley
+        # intensity set whose reflection list the freed parameter changed
+        raise ValueError(
+            f"the free count moved by {n_added} while {len(added)} paths were "
+            "added, so an off-table block changed size between the fits and "
+            "neither count is the parameters the fuller model added")
+
+    table = ParameterTable(full.structure, full.instrument)
+    relative = table.anchored_dof_paths
+    # a coordinate row x = anchor + b·dof, keyed by the one DOF it follows.
+    # Candidates are the DOF's own coordinate rows, never any single-term
+    # tie naming it: a user tie of another DOF onto this one is relative too
+    through = {}
+    if any(p.path in relative for p in added):
+        ties = {row.path: row.tie for row in full.parameters()}
+        for dof in relative:
+            for path, _ in table._anchored_dofs[dof]:
+                tie = ties.get(path)
+                if (tie is not None and len(tie.terms) == 1
+                        and tie.terms[0][0] == dof):
+                    through.setdefault(dof, (path, tie.terms[0][1]))
+    values = {p.path: p.value for p in fr.parameters}
+
+    def held_at(p) -> float | None:
+        if p.path not in relative:
+            return held.get(p.path)
+        row, b = through.get(p.path, (None, 0.0))
+        if row is None or b == 0.0 or row not in held or row not in values:
+            return None
+        return p.value - (values[row] - held[row]) / b
+
+    freed = []
+    for p in added:
+        start = held_at(p)
+        t = (None if start is None or not p.stderr
+             else (p.value - start) / p.stderr)
+        freed.append(FreedParameter(path=p.path, held_at=start, value=p.value,
+                                    esd=p.stderr, t_ratio=t))
+    # ``Statistics.chi2`` is reduced, over N − P, and the two P differ by
+    # n_added: its ratio would carry (N − P_f)/(N − P_r), about −n_added of
+    # ΔBIC at raw N.  delta_bic wants the sums.
+    chi2_r, chi2_f = _chi2_absolute(rs), _chi2_absolute(fs)
+    n_eff = effective_sample_size(rs.n_points, rs.esd_inflation)
+    return FreedComparison(
+        freed=freed, n_added=n_added, n_points=rs.n_points,
+        chi2_restricted=chi2_r, chi2_full=chi2_f,
+        esd_inflation=rs.esd_inflation, n_effective=n_eff,
+        delta_bic=delta_bic(chi2_r, chi2_f, rs.n_points, n_added,
+                            n_effective=n_eff),
+        delta_bic_raw_n=delta_bic(chi2_r, chi2_f, rs.n_points, n_added))
 
 
 def _significant(templates, name: str) -> tuple[float, float] | None:
@@ -918,6 +1062,10 @@ def predict_then_verify(refinement, data, action: SuggestedAction, *,
             observed_delta_chi2=0.0, accepted=False,
             reason="action carries no refinable parameter paths")
 
+    # read before the trial: without a history it runs in place, and the
+    # values the restricted fit held are then gone
+    restricted = refinement.result_
+    held = {row.path: row.value for row in refinement.parameters()}
     trial = refinement.branch() if refinement.history is not None else refinement
     stage = Stage(f"verify:{action.kind}", list(action.parameter_paths))
     try:
@@ -925,21 +1073,27 @@ def predict_then_verify(refinement, data, action: SuggestedAction, *,
         # candidate action, and a recorder here writes a run directory for each
         # — the same "sixty directories for one job" a series declines
         # (WP-1403).  The run the caller asked about is the fit they started.
-        after = trial.run_stage(data, stage, telemetry=False).statistics.chi2
+        result = trial.run_stage(data, stage, telemetry=False)
     except Exception as exc:  # a failed trial is a rejection, not a crash
         return VerificationOutcome(
             kind=action.kind, predicted_delta_chi2=action.expected_delta_chi2,
             observed_delta_chi2=0.0, accepted=False,
             reason=f"trial refinement failed: {exc}")
 
+    after = result.statistics.chi2
     observed = before - after
     accepted = observed > min_improvement * abs(before)
+    try:
+        comparison = _freed_comparison(restricted, held, trial)
+    except ValueError:      # nothing newly freed, or a stage hold moved
+        comparison = None
     return VerificationOutcome(
         kind=action.kind, predicted_delta_chi2=action.expected_delta_chi2,
         observed_delta_chi2=float(observed), accepted=bool(accepted),
         reason=(f"χ² {before:.4g} → {after:.4g} "
                 f"({observed / abs(before):+.2%}); "
-                f"{'accepted' if accepted else 'rolled back'}"))
+                f"{'accepted' if accepted else 'rolled back'}"),
+        comparison=comparison)
 
 
 def _rival_trial(refinement):

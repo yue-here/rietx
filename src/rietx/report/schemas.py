@@ -213,7 +213,14 @@ from ..strategy.staged import BACKGROUND_ABSORPTION_GUARD
 #   deliberately, so the arm cannot be tuned independently of the layer whose
 #   peaks it is reading.  It bumps because it is a new field on the report a
 #   consumer enumerates, exactly as 1.3-1.6 did.
-THRESHOLDS_VERSION = "1.7"
+# 1.7 → 1.8 (WP-1417, issue #270): ``compare_freed`` / ``FreedComparison``
+#   ship the nested comparison, ΔBIC of the parameters one fit frees beyond
+#   another with each one's t-ratio beside it, and
+#   ``VerificationOutcome.comparison`` carries the same for a trial.  ΔBIC is
+#   charged at N/f² (``optimize.statistics.effective_sample_size``), the count
+#   ``suggest`` has predicted at since #431.  Additive, defaulted to ``None``,
+#   and no verdict field, on 0.8's precedent.  No threshold moved.
+THRESHOLDS_VERSION = "1.8"
 
 #: linearisation is only meaningful for peak shifts well inside the peak; past
 #: this fraction of FWHM the answer is "re-detect the peak", not "shift it"
@@ -1059,14 +1066,72 @@ class SuggestedAction(Base):
         return self.vetoed_by is None
 
 
+class FreedParameter(Base):
+    """One parameter the fuller fit frees and the restricted fit held.
+
+    ``t_ratio`` is (``value`` − ``held_at``)/``esd``: how far the parameter
+    moved from where the restricted fit held it, in its own esd.  The esd is
+    the fuller fit's, already Bérar-Lelann inflated.  ``held_at`` is ``None``
+    where the restricted model has no such entry (a phase the fuller model
+    adds), and for a coordinate DOF no coordinate row follows alone.
+    ``t_ratio`` is ``None`` then and wherever the esd is.
+    """
+
+    path: str
+    held_at: float | None = None
+    value: float
+    esd: float | None = None
+    t_ratio: float | None = None
+
+
+class FreedComparison(Base):
+    """What freeing parameters bought, as ΔBIC with each one's t-ratio beside it.
+
+    Built by :func:`~rietx.report.compare_freed` from two fits the caller ran
+    (WP-1417, issue #270).  ``delta_bic`` is charged at ``n_effective`` =
+    N/f², with f the **restricted** fit's ``esd_inflation``, which is the
+    count :meth:`~rietx.Refinement.suggest` predicts at, so a prediction and
+    its refit compare.  ``delta_bic_raw_n`` is the same at the channel count.
+    Positive favours the fuller model.
+
+    The pair is the point.  For one added parameter ΔBIC at N_eff is close to
+    t² − ln N_eff, so the two agree when the residual's correlation has not
+    moved between the fits.  At raw N a serially correlated residual lets
+    ΔBIC bless a parameter its own esd puts within 1σ of zero: the issue's
+    four fits gave +36 to +211 at t = 0.76-1.89.  **There is deliberately no
+    verdict field**, on :class:`RivalComparison`'s precedent.
+    """
+
+    freed: list[FreedParameter]
+    n_added: int
+    n_points: int
+    #: the unreduced Σw·Δ² :func:`~rietx.report.delta_bic` takes, which is
+    #: each fit's ``Statistics.chi2`` times its own N − P
+    chi2_restricted: float
+    chi2_full: float
+    esd_inflation: float | None = None
+    n_effective: float
+    delta_bic: float
+    delta_bic_raw_n: float
+
+
 class VerificationOutcome(Base):
-    """Result of actually trying an action (predict-then-verify with rollback)."""
+    """Result of actually trying an action (predict-then-verify with rollback).
+
+    ``accepted`` is the fractional χ² rule and nothing else.  ``comparison``
+    rides beside it (WP-1417): the trial's ΔBIC at N_eff and each newly freed
+    parameter's t-ratio, written by :func:`~rietx.report.predict_then_verify`
+    alone.  ``None`` when there was no trial fit, when the action freed
+    nothing that was not already free, or when a stage hold made the two fits
+    stop being nested.
+    """
 
     kind: ActionKind
     predicted_delta_chi2: float | None
     observed_delta_chi2: float
     accepted: bool
     reason: str
+    comparison: FreedComparison | None = None
 
 
 class RivalFit(Base):

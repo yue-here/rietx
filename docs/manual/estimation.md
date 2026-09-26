@@ -299,9 +299,11 @@ unindexed peaks are flagged against the tick positions of every emission line
 misfit to profile shape derivatives, under four gates (resolvability on the
 scale-normalised Gram, a validity radius, local-χ² significance, global
 maturity), so a collinear pair is declared non-separable rather than resolved
-into a confident wrong singleton. Layer 2 turns attributions into actions,
-testing candidate model extensions with Hamilton's ℛ-ratio test
-{cite}`hamilton1965` and ΔBIC {cite}`schwarz1978`. Its thresholds are versioned
+into a confident wrong singleton. Layer 2 turns attributions into actions. The
+actions are advisory and carry no statistical test of their own. Whether a
+freed parameter pays for itself is ΔBIC {cite}`schwarz1978`, predicted before
+the fit by `Refinement.suggest` and measured after it by
+`report.compare_freed` (next section). The report's thresholds are versioned
 (currently {{ THRESHOLDS_VERSION }}).
 
 ## Which parameter to free next
@@ -375,3 +377,10 @@ so the two verdicts are read off one count. Measured on four ~49 500-channel
 synchrotron fits of one occupancy, raw $N$ gave ΔBIC +36 to +211 to a
 parameter each fit's own esd put within 0.76-1.89σ of zero, and
 $N_{\mathrm{eff}}$ turned all four negative.
+
+After the fit the same count prices the measured gain. `report.compare_freed`
+takes the fit without a parameter and the fit with it, and returns
+{eq}`est-effective-n` beside each freed parameter's $t$. The two agree for one
+parameter, so their disagreement is information: a multi-parameter block whose
+joint ΔBIC is positive while no member's $t$ clears 2, or an $f$ that moved
+between the fits.

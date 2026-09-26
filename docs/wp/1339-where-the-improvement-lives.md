@@ -123,6 +123,12 @@ and (2) is accepted.
 
 ### Inherited
 
+- **From WP-1417, 2026-09-27: `references/judging.md` now has a § 4
+  section on adding a parameter** (the t-ratio before ΔBIC at N/f²,
+  `report.compare_freed`). This WP's routing row, that ΔBIC and a
+  nested F-test do not settle two candidate space groups, belongs
+  beside it and should cite it rather than restate N/f².
+
 - **From WP-1461, 2026-09-26: the page this WP's Context describes has
   moved.** The compare page is files in `compare_app/static/`, and the
   JavaScript embedded in `compare_app.py` is gone. The Δχ² against the

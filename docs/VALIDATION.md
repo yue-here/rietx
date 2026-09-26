@@ -729,9 +729,9 @@ Anisotropic strain, and the matrix's canonical inadmissibility result — an imp
 
 **Claims:** an Rwp improvement that both statistical tests bless is rejected by a physics guard, on real data — the matrix's canonical inadmissibility row
 
-**Referenced to:** **no accuracy claim.** Hamilton at alpha = 0.05 and Delta BIC > 100 both pass; the strain-variance cone sigma^2(M) >= 0 fails on 12 of 43 reflections, so STEPHENS_STRAIN_NOT_POSITIVE fires and no S_HKL is quotable.  The r ~ 0.65 March coefficient is checked against WP-0310's own measurement on the same material
+**Referenced to:** **no accuracy claim.** Hamilton at alpha = 0.05 and Delta BIC both pass at N/f^2 (WP-1417), while at most one of the four S_HKL coefficients lies 2 sigma from zero; the strain-variance cone sigma^2(M) >= 0 fails on 12 of 43 reflections, so STEPHENS_STRAIN_NOT_POSITIVE fires and no S_HKL is quotable.  The r ~ 0.65 March coefficient is checked against WP-0310's own measurement on the same material
 
-**Measured:** Rwp 18.55 -> 17.90 %, Delta BIC +488, 3 parameters added, anisotropy 3.45x on an injected 3.46x
+**Measured:** Rwp 18.55 -> 17.90 %, Delta BIC +15.5 at N/f^2 (+592 at raw N), 3 parameters added, anisotropy 3.45x on an injected 3.46x
 
 **Diagnostics:** `STEPHENS_STRAIN_NOT_POSITIVE`
 
@@ -745,15 +745,15 @@ Anisotropic strain, and the matrix's canonical inadmissibility result — an imp
 
 **Measured:** anisotropy 1.60x, 4 patterns, > 40 reflections; never leaves the cone at any seed
 
-#### `test_corundum_block_is_inert_and_bic_says_so_where_hamilton_does_not`
+#### `test_corundum_block_is_inert_and_hamilton_blesses_it_only_at_raw_n`
 
 `characterisation` `identity` · dataset `qarr`
 
-**Claims:** freeing the block on an isotropic specimen is inert, and the two statistics disagree about whether that is fine — which is why the policy quotes Delta BIC and not Hamilton
+**Claims:** freeing the block on an isotropic specimen is inert, and both statistics say so at N/f^2 while Hamilton at the raw channel count blesses it
 
-**Referenced to:** Hamilton's R-ratio test at alpha = 0.05 **passes** a 0.13 % chi^2 improvement from three inert parameters, exactly as it passes brucite's real 6.9 % one: its threshold does not grow with the channel count, and these patterns have 7251 channels.  Delta BIC separates them (+488 vs -17).  The certificate-grade c/a is asserted not to move (rel=1e-4)
+**Referenced to:** Hamilton's R-ratio test at alpha = 0.05 and raw N **passes** a 0.16 % chi^2 improvement from three inert parameters, exactly as it passes brucite's 8.2 % one, on 7251 channels.  At N/f^2 (issue #270, WP-1417) both tests refuse it: Delta BIC -17.8 against brucite's +15.5.  The certificate-grade c/a is asserted not to move (rel=1e-4)
 
-**Measured:** Delta BIC -17 while Hamilton says justified; c/a unmoved
+**Measured:** Delta BIC -17.8 at N/f^2 and Hamilton refuses; Hamilton at raw N says justified; c/a unmoved
 
 #### `test_constrained_solver_keeps_brucite_inside_the_cone`
 

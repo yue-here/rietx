@@ -183,6 +183,51 @@ treat a trace phase's value as a question rather than a measurement.
 estimator √diag(χ²_red·(JᵀJ)⁻¹), then the Bérar-Lelann factor it was multiplied
 by, which §10 of the guidelines requires any publication to state.
 
+## §4 — adding a parameter: the t-ratio before ΔBIC
+
+Schwarz's BIC counts N independent observations. A powder residual is serially
+correlated, so at tens of thousands of channels the reward N·ln(χ²_r/χ²_f)
+outvotes one ln N for almost any gain. Issue #270 measured it on four ~49 500-channel
+synchrotron fits, each freeing one occupancy:
+
+| fit | t = value/esd | ΔBIC at raw N | Hamilton | `esd_inflation` | Durbin-Watson |
+|---|---|---|---|---|---|
+| 1 | 0.76 | +36.2 | justified | 10.16 | 0.43 |
+| 2 | 1.89 | +211.0 | justified | 7.13 | 0.58 |
+| 3 | 1.05 | +71.1 | justified | 7.89 | 0.57 |
+| 4 | 1.01 | +80.9 | justified | 8.59 | 0.61 |
+
+None reaches 2σ, and both statistics call all four decisive. Charged at
+N/f², with f the fit's own `esd_inflation`, all four turn negative. For one
+parameter that count makes ΔBIC close to t² − ln N_eff, so the verdict and the
+esd agree. Over 27 last-freed parameters across the acceptance fixtures, N/f²
+refused every |t| < 2.3 and admitted every |t| ≥ 2.6. The rule this replaced
+was measured on a 7251-channel corundum pattern, where Hamilton's test at raw N
+blessed an inert Stephens block's 0.16 % χ² gain. At N/f² both tests refuse
+it.
+
+`suggest()` predicts ΔBIC at N/f² before you free anything. After the fit,
+compare the two fits:
+
+```python
+trial = ref.branch()
+trial.run_stage(data, rx.Stage("occupancy", ["phases.0.atoms.2.occ"]))
+c = rx.report.compare_freed(ref, trial)
+[(p.path, p.t_ratio) for p in c.freed], c.delta_bic, c.delta_bic_raw_n
+```
+
+Read the t-ratios first. A disagreement between the pair is information. A
+block of several parameters can carry a positive joint ΔBIC while no member's
+|t| reaches 2, which says the block moves the fit and no single member is
+measured. A ΔBIC far from t² − ln N_eff for one parameter means f moved between
+the two fits. `predict_then_verify` carries the same record on
+`VerificationOutcome.comparison`, beside its 1 % χ² rule.
+
+By hand, for a pair `compare_freed` refuses as not nested, remember that
+`result.statistics.chi2` is reduced. Multiply each by its own N − P before
+`rx.report.delta_bic`, and pass `n_effective=`. The reduced pair costs about
+one unit of raw-N ΔBIC per added parameter.
+
 ## §4b — Phase ID: the unmatched list and the Le Bail-gap read
 
 `report.unmatched`'s `kind="unmatched_obs"` entries are the strong lines your

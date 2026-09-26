@@ -574,7 +574,7 @@ Considering freeing a parameter is not a refinement move.
 | `CandidateGroup.members` | one or more `ParameterCandidate` | |
 | `CandidateGroup.gain` | the joint gain of freeing the whole group | what the data measures; the members' own gains are near-equal by construction |
 | `CandidateGroup.resolved` | false exactly when there is more than one member | a tie the data cannot split, merged by pairwise collinearity rather than reported as a winner |
-| `CandidateGroup.delta_bic` | the same gain read as a model-selection answer | Schwarz's ΔBIC (`report.layer2.delta_bic`, the form the whole package uses) at the Gauss-Newton prediction of what freeing the group reaches, charged at `SuggestionResult.n_effective`. Positive favours freeing, so a full refit's ΔBIC computed the same way, with `n_effective=` from the restricted fit's `Statistics.esd_inflation` (the residual `suggest` measures f on), is directly comparable |
+| `CandidateGroup.delta_bic` | the same gain read as a model-selection answer | Schwarz's ΔBIC (`report.layer2.delta_bic`, the form the whole package uses) at the Gauss-Newton prediction of what freeing the group reaches, charged at `SuggestionResult.n_effective`. Positive favours freeing. A full refit's ΔBIC charged at the restricted fit's `Statistics.esd_inflation` (the residual `suggest` measures f on) is directly comparable, and `report.compare_freed` computes it that way |
 | `CandidateGroup.delta_bic_raw_n` | the same ΔBIC at the raw residual row count | the pre-1.6 figure, an upper bound on the evidence. Where it is positive and `delta_bic` is not, the leverage is real and the serial correlation says it is not independent evidence |
 
 The two numbers answer different questions and can disagree, and both are there
@@ -609,6 +609,54 @@ occupancy pair summing to one, and `instrument.polarization` is refused at an
 absorption of exactly 1.000. Two more are skipped for zero column norm,
 `instrument.geometry.axial_sl` and `instrument.geometry.axial_hl`, which is a
 synchrotron capillary having no axial divergence to refine.
+
+### After freeing it
+
+`report.compare_freed(restricted, full)` measures what `suggest` predicted.
+It takes two refinements you have already fitted on one pattern, the second
+freeing everything the first frees and more. A branch that ran one more stage is
+the usual pair. It runs no fit.
+
+<!-- api-doc: no-exec — it needs a refinement that has run -->
+```python
+from rietx.report import compare_freed
+
+trial = ref.branch()
+trial.run_stage(data, rx.Stage("occupancy", ["phases.0.atoms.2.occ"]))
+c = compare_freed(ref, trial)
+for p in c.freed:
+    print(p.path, p.t_ratio)
+print(c.delta_bic, c.delta_bic_raw_n)
+```
+
+Each freed parameter comes back with its t-ratio beside the ΔBIC of adding the
+set. For one parameter the two agree, ΔBIC being close to t² − ln N_eff, so a
+parameter within 1σ of where the restricted fit held it cannot be decisive. At
+raw N it can. On a LaB6 fit whose model lacks the data's Lorentzian width
+(21 400 channels, Durbin-Watson 0.10, f = 6.07), freeing the boron Biso gave
+t = +1.58, raw-N ΔBIC +87 and ΔBIC −3.7 at N_eff 580.
+
+| Field | Is | Reads as |
+|---|---|---|
+| `FreedComparison.freed` | one `FreedParameter` per path the fuller fit frees | in table order |
+| `FreedParameter.held_at` | where the restricted fit held the parameter | read off its working table. For a coordinate DOF it is read through the coordinate row the DOF drives, because a DOF is a step from where its own fit began. Null where the restricted model has no such entry, a phase the fuller model adds |
+| `FreedParameter.value` | the fuller fit's value | |
+| `FreedParameter.esd` | the fuller fit's esd | already inflated by that fit's Bérar-Lelann factor |
+| `FreedParameter.t_ratio` | (value − held_at)/esd | how far the parameter moved, in its own esd. Null where either is |
+| `FreedComparison.n_added` | the free-parameter count difference | the solver's count, so a tied row adds nothing |
+| `FreedComparison.n_points` | the channel count both fits saw | a comparison across two different counts is refused |
+| `FreedComparison.chi2_restricted` | the restricted fit's χ² | |
+| `FreedComparison.chi2_full` | the fuller fit's χ² | |
+| `FreedComparison.esd_inflation` | the restricted fit's Bérar-Lelann factor f | the residual `suggest` measures f on, so a prediction and its refit are charged alike |
+| `FreedComparison.n_effective` | N/f² | `optimize.statistics.effective_sample_size` |
+| `FreedComparison.delta_bic` | ΔBIC charged at `n_effective` | positive favours the fuller model |
+| `FreedComparison.delta_bic_raw_n` | the same at the channel count | an upper bound on the evidence, kept so the gap is visible |
+
+There is no verdict field. A pair that is not nested raises `ValueError`: a
+different channel count or mode, a path the restricted fit frees and the fuller
+one does not, or nothing added. `report.predict_then_verify` fills
+`VerificationOutcome.comparison` with the same record for its trial, beside the
+χ² rule its `VerificationOutcome.accepted` applies.
 
 ## Reports at every stage
 

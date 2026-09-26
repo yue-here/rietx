@@ -156,13 +156,18 @@ A refinement, a series, an indexing run and a suggestion each return their own t
 
 ## The report
 
-`ref.report()` or `rx.build_report` gives the three-layer `rx.FitReport` §5 reads. `compare_rivals` and `predict_then_verify` are the two experiments §4 step 14 and §4b call for.
+`ref.report()` or `rx.build_report` gives the three-layer `rx.FitReport` §5 reads. `compare_rivals` and `predict_then_verify` are the two experiments §4 step 14 and §4b call for, and `compare_freed` prices a parameter you freed (§4).
 
 - `rx.build_report(result: RefinementResult, *, model=None, values=None, plan=None, free_paths: list[str] | None = None, structure=None, held: list[str] | None = None, top_n: int = 15, match_tol_deg: float = 0.08, min_peak_sigma: float = 5.0) -> FitReport` — Build the report, going as deep as the inputs allow.
 - `rx.FitReport` — All three layers.
-  Fields: `thresholds_version: str = '1.7'`, `rwp: float`, `gof: float`, `cumulative_chi2_breakpoints: list[float] = []`, `regions: list[Region] = []`, `n_regions_total: int = 0`, `unmatched: list[UnmatchedPeak] = []`, `satellites: list[SatelliteEvidence] = []`, `magnetic: list[MomentEvidence] = []`, `lebail_gap: LeBailGap | None = None`, `background: BackgroundEvidence | None = None`, `identifiability: IdentifiabilityEvidence | None = None`, `summary: str = ''`, `attribution: list[RegionAttribution] = []`, `trends: list[TrendAnalysis] = []`, `texture: list[TextureAnalysis] = []`, `strain: list[StrainAnalysis] = []`, `restraints: RestraintReport | None = None`, `geometry: GeometryTable | None = None`, `microstructure: list[PhaseMicrostructure] = []`, `layer1_available: bool = False`, `abstained_reason: str | None = None`, `abstained_kind: Literal['immature', 'resolution_limited', 'unreadable'] | None = None`, `suggested_actions: list[SuggestedAction] = []`
+  Fields: `thresholds_version: str = '1.8'`, `rwp: float`, `gof: float`, `cumulative_chi2_breakpoints: list[float] = []`, `regions: list[Region] = []`, `n_regions_total: int = 0`, `unmatched: list[UnmatchedPeak] = []`, `satellites: list[SatelliteEvidence] = []`, `magnetic: list[MomentEvidence] = []`, `lebail_gap: LeBailGap | None = None`, `background: BackgroundEvidence | None = None`, `identifiability: IdentifiabilityEvidence | None = None`, `summary: str = ''`, `attribution: list[RegionAttribution] = []`, `trends: list[TrendAnalysis] = []`, `texture: list[TextureAnalysis] = []`, `strain: list[StrainAnalysis] = []`, `restraints: RestraintReport | None = None`, `geometry: GeometryTable | None = None`, `microstructure: list[PhaseMicrostructure] = []`, `layer1_available: bool = False`, `abstained_reason: str | None = None`, `abstained_kind: Literal['immature', 'resolution_limited', 'unreadable'] | None = None`, `suggested_actions: list[SuggestedAction] = []`
 - `rx.report.compare_rivals(refinement, data, finding: ExchangeFinding | tuple[str, str]) -> RivalComparison` — Fit each member of an exchangeable pair alone, the other at its null.
 - `rx.report.predict_then_verify(refinement, data, action: SuggestedAction, *, min_improvement: float = 0.01) -> VerificationOutcome` — Try an action on a branch, keep it only if χ² actually improves.
+- `rx.report.compare_freed(restricted, full) -> FreedComparison` — ΔBIC of the parameters `full` frees beyond `restricted`, each one's t beside it.
+- `rx.report.FreedComparison` — What freeing parameters bought, as ΔBIC with each one's t-ratio beside it.
+  Fields: `freed: list[FreedParameter]`, `n_added: int`, `n_points: int`, `chi2_restricted: float`, `chi2_full: float`, `esd_inflation: float | None = None`, `n_effective: float`, `delta_bic: float`, `delta_bic_raw_n: float`
+- `rx.report.FreedParameter` — One parameter the fuller fit frees and the restricted fit held.
+  Fields: `path: str`, `held_at: float | None = None`, `value: float`, `esd: float | None = None`, `t_ratio: float | None = None`
 
 ## Series, history, projects
 

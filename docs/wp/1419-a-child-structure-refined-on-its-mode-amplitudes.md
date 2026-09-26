@@ -161,6 +161,15 @@ the transposed rotation set is a group too and passes any dimension count.
 
 ### Inherited
 
+**From WP-1417, 2026-09-27: read § The problem's ΔBIC figures at N/f²
+before building on them.** They come from #286 and do not say which N
+they were charged at. At raw N a serially correlated powder residual
+lets ΔBIC bless almost any gain, and a block of 22-90 modes pays
+22-90 × ln N. `report.compare_freed(parent_fit, child_fit)` returns
+ΔBIC at N/f², the raw-N figure and each freed amplitude's t-ratio, so
+the acceptance can say how many amplitudes are measured one at a
+time.
+
 **2026-09-23, from the issue triage (issue #418).** The reporter proposes
 moving the representation analysis that PR #389 landed today (`irreps.py`,
 `modes.py`, and the `kind`-neutral half of `isotropy.py`) out of

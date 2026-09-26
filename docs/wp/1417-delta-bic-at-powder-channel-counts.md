@@ -1,8 +1,7 @@
 # WP-1417 — ΔBIC at powder channel counts
 
-Milestone: unscheduled · Status: ⬜ — tasks 3-5 and the `suggest()` half of task 2 landed from outside (PR #431); task 1 and the layer-2 half of task 2 open
+Milestone: unscheduled · Status: ✅ 2026-09-27 — all five tasks landed: 3-5 and the `suggest()` half of 2 in PR #431, 1 and the layer-2 half of 2 in PR #488
 Depends on: — (1339 soft: the same family, where the improvement lives)
-Priority: P2 2026-09-23 — a verdict the skill sends agents to blesses a parameter within 1σ of zero
 
 ## Goal
 
@@ -23,7 +22,9 @@ Issue #270 (2026-09-05).
 ΔBIC = N·ln(χ²_r/χ²_f) − n_added·ln(N)
 ```
 
-with N the raw channel count. Schwarz 1978 for N independent Gaussian
+with N the raw channel count. *Superseded in part 2026-09-26: since PR #431
+both callers in the fit path charge it at N_eff = N/f² (§ Handover log,
+2026-09-24); the free functions still default to raw N.* Schwarz 1978 for N independent Gaussian
 observations, correctly implemented, and its docstring says so. It feeds
 `strategy/suggest.py::_predicted_delta_bic` (with the residual row count as
 N) and so `SuggestedAction.delta_bic`, which reaches the agent as "next:
@@ -95,15 +96,6 @@ shipped acceptance fixtures, since the issue's data are withheld.
 Not #219 (1339). That one is about *where* Δχ² lives; this is about N in the
 penalty. Same family, different mechanism, different fix.
 
-### Inherited
-
-- **2026-09-23, from the issue triage (issue #270).** The reporter claimed
-  this on the thread and opened PR #431 the same day ("ΔBIC is charged at
-  the independent-observation count N/f², measured against the
-  alternative"). Its penalty takes a stand on this WP's open estimator
-  question, so the review reads it against § Context's recommendation.
-  Reviewing it is `/pr-review`'s.
-
 ## Non-goals
 
 - Hamilton's test itself, and `hamilton_justified`'s threshold.
@@ -112,13 +104,14 @@ penalty. Same family, different mechanism, different fix.
 
 ## Tasks
 
-- [ ] Skill: rewrite `SKILL.md` § 4's ΔBIC rule and add the
+- [x] Skill: rewrite `SKILL.md` § 4's ΔBIC rule and add the
       `references/judging.md` row: at powder channel counts ΔBIC on raw N
       blesses any improvement; the parameter's esd and `esd_inflation`
       outrank both statistics. Paid for by a cut, per root CLAUDE.md § skill.
-- [ ] Layer 2 carries the t-ratio of a freed parameter beside the ΔBIC of
-      adding it, and `suggest()`'s predicted ΔBIC says it is raw-N; the
-      declared field's writer named at review (1076).
+- [x] Layer 2 carries the t-ratio of a freed parameter beside the ΔBIC of
+      adding it; the declared field's writer named at review (1076). (The
+      `suggest()` half, the predicted ΔBIC saying which N it is charged at,
+      landed in PR #431.)
 - [x] Measure both effective-N estimators on every acceptance fixture and on
       the issue's shape (one occupancy DOF, synthetic if need be); the table
       in the handover decides whether `delta_bic` takes an `n_effective`.
@@ -144,6 +137,105 @@ penalty. Same family, different mechanism, different fix.
 - WP-1071, WP-1305 (`delta_bic`'s absent state), WP-1339.
 
 ## Handover log
+
+### 2026-09-27 — closed: a freed parameter's t-ratio rides beside the ΔBIC of adding it
+
+After a fit, rietx can now say whether a parameter you freed paid for itself.
+It answers in two numbers kept together: ΔBIC charged at the pattern's effective
+observation count, and how far each freed parameter moved in its own esd. For
+one parameter the two agree, so issue #270's trap, a raw-count ΔBIC blessing an
+occupancy within 1σ of zero, no longer has a route through the package's verbs
+or through the skill, whose rule now reads the esd first. The session also found
+that the χ² every result reports is the reduced one, which a hand-computed ΔBIC
+had been using as the sum. That cost about one unit of raw-count ΔBIC per added
+parameter. Re-judged at the effective count, the two Stephens acceptance claims
+both hold.
+
+**Done.**
+
+- `report.compare_freed(restricted, full)` → `FreedComparison` (ΔBIC at N/f²
+  with f the restricted fit's `esd_inflation`, the raw-N figure, and one
+  `FreedParameter` per newly freed path with `held_at`, value, esd and
+  `t_ratio`). No fit runs. It refuses a pair that is not nested: channel count,
+  intensities, mode, a path the restricted fit frees and the fuller does not,
+  nothing added, or a free count that moved by other than the added paths (a
+  Pawley block whose reflection list changed). `predict_then_verify` is its
+  second writer, on `VerificationOutcome.comparison`, `None` when nothing new
+  was freed. `THRESHOLDS_VERSION` 1.7 → 1.8.
+- A coordinate DOF's `held_at` is read through its own coordinate row, because
+  its value is a step from where its own fit began (WP-1333). Right whichever
+  model each fit started from.
+- Both χ² go through `optimize.statistics._chi2_absolute`, moved there from
+  `indexing/extinction.py` so layer2, extinction and the Stephens helper share
+  one inverse of `compute_statistics`' division.
+- Task 1: `SKILL.md` § 4's rule reads the t-ratio first, then ΔBIC at N/f²
+  (body 1 B smaller). `references/judging.md` § 4 carries #270's table, the
+  27-row separation, how to read a disagreement, and the by-hand rule.
+- The Layer 2 module docstring and Part 2 said the actions were gated by
+  Hamilton's test and ΔBIC. No call made either; both now say what is true.
+  Part 1 `using/report.md` § After freeing it documents the new type.
+- Siblings: `test_acceptance_stephens.py` passed the reduced χ² and judged at
+  raw N. It now judges at N/f², and the corundum test is renamed
+  `…_hamilton_blesses_it_only_at_raw_n`. `test_suggest.py`'s hand-built refit
+  ΔBIC now goes through `compare_freed`. The validation matrix, VALIDATION.md,
+  the skill's surprises row, the `CandidateGroup` docstring and its manual row
+  carry the new figures.
+- #431 and this session staged in `releases/1.5.1.md` (whose intro had said no
+  statistic changed), narrated in the v1.6 record.
+- Inherited pruned on arrival: its one entry pointed at PR #431's review, and
+  #431 merged on 2026-09-24.
+
+**Measured** (2026-09-26/27, macOS arm64, python 3.12, `[dev]`):
+
+- LaB6 fixture with the data's Lorentzian width left out (21 400 channels,
+  Durbin-Watson 0.099, f 6.074, N_eff 580): boron Biso t = +1.585, ΔBIC +86.98
+  raw and −3.74 at N_eff; `profile.u` t = 7.08, +1980.56 and +47.58. On white
+  residuals (f 1.47) the two ΔBIC agree to about 1.
+- A coordinate DOF freed from a different starting coordinate: t = −15.037,
+  equal to the coordinate row's own (x − x_held)/esd.
+- Stephens, qarr, dispersion declined, 7251 channels, 3 added: brucite χ²
+  ratio 1.0891, f 4.302, ΔBIC +592.34 raw and +15.53 at N_eff 392, Hamilton
+  justified at both counts; its S_HKL value/esd 0.33, −1.14, 0.33, 2.31 (from
+  zero, since the isotropic fit has no block). Corundum ratio 1.0016, f 3.826,
+  −15.09 raw and −17.83 at N_eff 495, Hamilton justified at raw N only. With
+  the reduced χ² the raw figures read +589.33 and −18.10, the −k bias.
+- Fast suite on origin/main `612453fa` merged into the branch: 6438 passed,
+  151 skipped (6589) in 4:43, no other suite running. Count check: the test
+  files that differ from main collect 745 fast cases against main's copies'
+  740, `test_compare_freed.py`'s five. Main's CI at `612453fa` totals 6582
+  (Linux py3.14 `[dev]`), so the whole-suite gap is +7. The other two are
+  platform: the 2026-09-26 nightly at `63e2a8c4` totals 6334 on macOS and 6331
+  on Windows.
+- Full suite not run: no forward model, solver or fitted value changed. The
+  slow tests over changed code ran targeted and pass: `test_report_loop.py`
+  and the two Stephens tests.
+
+**Review** (`/code-review high --fix`): seven findings. It fixed five: the DOF
+row lookup could follow a user tie of another DOF, two patterns on one grid
+passed as one, the χ² un-reduction was a second copy, the module lacked its
+xdist group, and a docstring missed a `None` case. Two were left to me. The
+Pawley count now refuses rather than choosing a number. The brucite value/esd
+figures are measured from zero, so they say no coefficient is quotable and not
+that the pair disagrees; commit `74d39c59`'s message claims the latter, and
+`611ab192` corrects the prose.
+
+**Gotchas.**
+
+- `compare_freed` refuses a reparameterised block such as Stephens, which
+  locks `lor_strain` (its isotropic direction): the models are nested and the
+  path sets are not. `test_acceptance_stephens._information` does that pair
+  by hand.
+- `layer2` reads `ParameterTable._anchored_dofs`, a private field, for the
+  DOF's own rows.
+
+**Deliberately not generalised.** `delta_bic` and `hamilton_justified` keep
+raw N as their default, since the indexing callers count independent peaks.
+`predict_then_verify`'s 1 % χ² rule is unchanged. `build_report` gains no ΔBIC,
+because it runs no fits and one fit has no restricted χ².
+
+**Next.** Nothing is owed here. Forward references went to 1418 (M-9's
+ranking), 1419 (its ΔBIC figures do not say which N), 1453 and 1339. None was
+blocked, so none is re-rated.
 
 ### 2026-09-24 — task 3 and half of task 2 landed from outside; ΔBIC is charged at N/f²
 

@@ -168,6 +168,17 @@ def berar_lelann_factor(delta: np.ndarray) -> float:
     return max(float(np.sqrt((run_sums @ run_sums) / chi2)), 1.0)
 
 
+def _chi2_absolute(stats) -> float:
+    """The weighted residual sum of squares ``report.layer2.delta_bic`` wants.
+
+    ``Statistics.chi2`` is the *reduced* χ² (Σwd²/(N−P)), and the two models being
+    compared have different P, so dividing by their own dof first would fold a
+    second, unwanted ratio into the comparison.  The inverse of
+    :func:`compute_statistics`' own division, clamp included.
+    """
+    return float(stats.chi2) * max(stats.n_points - stats.n_free_parameters, 1)
+
+
 def effective_sample_size(n_points: int, esd_inflation: float | None) -> float:
     """The channel count a model-selection penalty may charge, N/f² (#270).
 

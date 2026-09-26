@@ -28,7 +28,7 @@ settings side by side on the bundled standards, whose cumulative-Δχ² panel sh
 
 **8.2 The opposite also happens: an improvement that passes every statistical
 test and is still rejected.** On round-robin brucite, adding anisotropic strain
-improves Rwp 18.55 → 17.90 % with ΔBIC +488 — and drives σ²(M) negative on 12
+improves Rwp 18.55 → 17.90 % with ΔBIC +15.5 at N/f² — and drives σ²(M) negative on 12
 of 43 reflections, so the coefficients are unphysical and unquotable. A
 statistical test cannot see a violated positivity cone.
 

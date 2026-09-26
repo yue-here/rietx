@@ -39,7 +39,8 @@ WAVELENGTH = 1.5405929
 _COUNT_SCALE = 60.0
 
 
-def _truth(lo=18.0, hi=125.0, step=0.02, seed=17, disp=0.0):
+def _truth(lo=18.0, hi=125.0, step=0.02, seed=17, disp=0.0,
+           count_scale=_COUNT_SCALE):
     """A model and the noisy pattern it generates — i.e. a *converged* state.
 
     The background lives in the instrument (a flat Chebyshev term), not added
@@ -54,6 +55,10 @@ def _truth(lo=18.0, hi=125.0, step=0.02, seed=17, disp=0.0):
     well and tie exactly (WP-1063; ``tests/eval_report_agent/PROTOCOL.md``
     § Episode validity says the same thing of E2 and E8).  The default is
     ``0.0``, so every other caller's data is unchanged.
+
+    ``count_scale`` multiplies the counts.  Raised, it makes a model misfit
+    dominate the counting noise, which is how ``test_compare_freed.py`` gets a
+    serially correlated residual.
     """
     from rietx.schemas.instrument import BackgroundChebyshev
 
@@ -76,9 +81,9 @@ def _truth(lo=18.0, hi=125.0, step=0.02, seed=17, disp=0.0):
     table = ParameterTable(structure, ins)
     y = model.evaluate(table.decode(table.x0()))
     rng = np.random.default_rng(seed)
-    y_noisy = rng.poisson(np.maximum(y, 1.0) * _COUNT_SCALE) / _COUNT_SCALE
+    y_noisy = rng.poisson(np.maximum(y, 1.0) * count_scale) / count_scale
     data = rx.PatternData(two_theta=model.tt.tolist(), intensity=y_noisy.tolist(),
-                          sigma=np.sqrt(np.maximum(y, 1.0) / _COUNT_SCALE).tolist())
+                          sigma=np.sqrt(np.maximum(y, 1.0) / count_scale).tolist())
     return structure, ins, data
 
 
@@ -492,6 +497,11 @@ def test_predict_then_verify_accepts_a_real_improvement(truth):
     assert outcome.observed_delta_chi2 > 0
     # the parent refinement is untouched: verification ran on a branch
     assert ref.result_.statistics.chi2 == chi2_before
+    # the pair rides beside the verdict (WP-1417): measured from where the
+    # restricted fit held the zero
+    [freed] = outcome.comparison.freed
+    assert freed.path == "instrument.zero_shift" and freed.held_at == 0.02
+    assert abs(freed.t_ratio) > 10 and outcome.comparison.delta_bic > 10
 
 
 def test_predict_then_verify_rejects_a_useless_action(truth):
@@ -505,6 +515,9 @@ def test_predict_then_verify_rejects_a_useless_action(truth):
     outcome = predict_then_verify(ref, data, useless)
     assert not outcome.accepted
     assert "rolled back" in outcome.reason
+    [freed] = outcome.comparison.freed
+    assert freed.path == "instrument.geometry.sample_transparency"
+    assert abs(freed.t_ratio) < 3 and outcome.comparison.delta_bic < 0
 
 
 def test_veto_helper_is_pure_annotation():
