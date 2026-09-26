@@ -292,6 +292,7 @@ def search_trial_error(peaks: PeakList, *, spec: SearchSpec | None = None,
 
     raw: list[EngineCandidate] = []
     incomplete: list[str] = []
+    capped: list[str] = []
     for system in systems:
         # not started ⇒ not claimed — the same rule as ``search_dichotomy``,
         # and what keeps "not reached" distinct from "truncated" (WP-1037)
@@ -312,7 +313,9 @@ def search_trial_error(peaks: PeakList, *, spec: SearchSpec | None = None,
         for key, value in stats.items():
             result.stats[f"{system}.{key}"] = value
         if not complete:
-            incomplete.append(system)
+            # a unit its budget did not stop hit a size cap, where more
+            # time changes nothing (``incomplete_diagnostic``)
+            (incomplete if budget.expired() else capped).append(system)
         if progress is not None:
             progress.end(f"trial_error:{system}", engine="trial_error",
                          system=system, n_candidates=len(found),
@@ -331,9 +334,10 @@ def search_trial_error(peaks: PeakList, *, spec: SearchSpec | None = None,
     result.stats["shift_allowance_deg"] = round(allowance, 5)
     if assumed:
         result.diagnostics.append(shift_allowance_diagnostic(allowance))
-    if incomplete:
+    if incomplete or capped:
         result.diagnostics.append(
-            incomplete_diagnostic("trial_error", incomplete, spec.budget_seconds))
+            incomplete_diagnostic("trial_error", incomplete, spec.budget_seconds,
+                                  capped))
     if probe and not result.candidates \
             and not (cancel is not None and bool(cancel)):
         # the probe explains a silence, so a cancelled run — whose silence the

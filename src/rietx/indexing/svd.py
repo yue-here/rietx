@@ -675,6 +675,7 @@ def search_svd(peaks: PeakList, *, spec: SearchSpec | None = None,
     systems = [s for s in SYSTEM_ORDER if s in spec.systems]
     raw: list[EngineCandidate] = []
     incomplete: list[str] = []
+    capped: list[str] = []
 
     for system in systems:
         # not started ⇒ not claimed — the rule both other engines follow, and what
@@ -709,7 +710,9 @@ def search_svd(peaks: PeakList, *, spec: SearchSpec | None = None,
         for key, value in stats.items():
             result.stats[f"{system}.{key}"] = value
         if not complete:
-            incomplete.append(system)
+            # a unit its budget did not stop hit a size cap, where more
+            # time changes nothing (``incomplete_diagnostic``)
+            (incomplete if budget.expired() else capped).append(system)
         if progress is not None:
             progress.end(f"svd:{system}", engine="svd", system=system,
                          n_candidates=len(found), complete=complete,
@@ -728,9 +731,10 @@ def search_svd(peaks: PeakList, *, spec: SearchSpec | None = None,
     result.stats["seed"] = float(spec.seed)
     if assumed:
         result.diagnostics.append(shift_allowance_diagnostic(allowance))
-    if incomplete:
+    if incomplete or capped:
         result.diagnostics.append(
-            incomplete_diagnostic("svd", incomplete, spec.budget_seconds))
+            incomplete_diagnostic("svd", incomplete, spec.budget_seconds,
+                                  capped))
     return result
 
 

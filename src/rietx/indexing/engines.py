@@ -1339,25 +1339,44 @@ def _panel_for(cand: EngineCandidate, peaks: PeakList, k_sigma: float,
 
 
 def incomplete_diagnostic(engine: str, systems: Sequence[str],
-                          seconds: float) -> Diagnostic:
-    """``INDEX_SEARCH_INCOMPLETE`` — the budget ran out before the domain did.
+                          seconds: float,
+                          capped: Sequence[str] = ()) -> Diagnostic:
+    """``INDEX_SEARCH_INCOMPLETE`` — a searched domain was not exhausted.
 
     Its whole content is that a *negative* result from these systems is not
     evidence: an exhaustive engine's silence means "no such cell" only when it
     finished.
+
+    **Two causes, and only one of them is time** (WP-1449).  ``systems`` were
+    stopped by the clock; ``capped`` outgrew a size cap on the grid or the
+    trial set, where a larger ``budget_seconds`` changes nothing.  Measured on
+    11-BM NAC, the dichotomy explored 0 boxes in 0.26 s and this message said it
+    had not finished within 300 s.  So the engines classify each unit by
+    whether its budget had expired when it returned.
     """
+    parts = []
+    if systems:
+        parts.append(f"did not finish {', '.join(systems)} within {seconds:g} s "
+                     "per system")
+    if capped:
+        parts.append(f"outgrew a size cap on {', '.join(capped)}")
+    everything = [*systems, *capped]
+    dof = ", ".join(f"{s} {METRIC_DOF[s]}" for s in everything if s in METRIC_DOF)
+    if systems:
+        advice = ("raise budget_seconds, or narrow the search — a smaller "
+                  "max_volume or a shorter d-axis range costs exponentially "
+                  "less than more time buys.")
+    else:
+        advice = ("narrow the search — a smaller max_volume, a shorter d-axis "
+                  "range or a peak list ending at a lower angle shrinks what "
+                  "the cap counts; more time changes nothing.")
     return Diagnostic(
         level="warning", code="INDEX_SEARCH_INCOMPLETE",
-        message=(f"the {engine} search did not finish "
-                 f"{', '.join(systems)} within {seconds:g} s per system, so "
-                 "finding no cell there is not evidence that none exists"),
-        where=list(systems),
-        suggestion=("raise budget_seconds, or narrow the search — a smaller "
-                    "max_volume or a shorter d-axis range costs exponentially "
-                    "less than more time buys.  Cost grows with the metric "
-                    "degrees of freedom (" +
-                    ", ".join(f"{s} {METRIC_DOF[s]}" for s in systems
-                              if s in METRIC_DOF) + ")"))
+        message=(f"the {engine} search {' and '.join(parts)}, so finding no "
+                 "cell there is not evidence that none exists"),
+        where=everything,
+        suggestion=(f"{advice}  Cost grows with the metric degrees of freedom "
+                    f"({dof})"))
 
 
 def candidates_truncated_diagnostic(n_merged: int, n_reported: int,

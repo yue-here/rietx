@@ -348,6 +348,14 @@ def test_a_centring_that_fits_the_trial_cap_keeps_its_search():
     found = {c.centring for c in kept.candidates}
     assert found and "P" not in found, found
     assert not none_fit.candidates
+    # and it names the cap, since a larger budget would change nothing (WP-1449:
+    # 11-BM NAC explored 0 boxes in 0.26 s and was reported as a 300 s timeout)
+    for res in (kept, none_fit):
+        diag = next(d for d in res.diagnostics
+                    if d.code == "INDEX_SEARCH_INCOMPLETE")
+        assert "size cap on cubic" in diag.message, diag.message
+        assert "within" not in diag.message, diag.message
+        assert "budget_seconds" not in diag.suggestion, diag.suggestion
     # and with no cap in the way the primitive cell is the one ranked first
     full = D.search_dichotomy(peaks, spec=spec)
     assert full.search_complete["cubic"] is True
@@ -668,6 +676,9 @@ def test_an_unfinished_search_says_so_rather_than_reporting_nothing_found():
     message = next(d for d in result.diagnostics
                    if d.code == "INDEX_SEARCH_INCOMPLETE")
     assert "not evidence" in message.message
+    # the clock stopped it, so the clock is what it names and what it offers
+    assert "within 0.5 s per system" in message.message
+    assert message.suggestion.startswith("raise budget_seconds")
 
 
 def test_a_restricted_search_reports_only_the_systems_it_searched():

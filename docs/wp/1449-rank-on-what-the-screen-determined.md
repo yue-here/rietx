@@ -125,13 +125,13 @@ search: a local run, or the nightly dispatched with `full_macos`.
       runs before every order a real-data row reads. The budget comment and
       `tests/CLAUDE.md` § Budgets are corrected, three stale gallery captions
       rewritten, and the gallery sidecar records each unit's clock.
-- [ ] `INDEX_SEARCH_INCOMPLETE` names the clock where a cap stopped the search.
+- [x] `INDEX_SEARCH_INCOMPLETE` names what stopped the search (2026-09-27).
       Measured 2026-09-26 on NAC: dichotomy ran 0.26 s over 0 boxes, and the
-      message says it "did not finish cubic within 300 s per system" and
-      suggests raising `budget_seconds`, which would change nothing. All three
-      engines return one `complete` flag for three causes (the clock, the grid
-      cap, the trial-set cap). Carrying the cause on the result would let
-      `_clock_cut` read it instead of comparing clocks.
+      message said it "did not finish cubic within 300 s per system" and
+      suggested raising `budget_seconds`, which would change nothing. Each
+      engine now files an incomplete unit by whether its budget had expired,
+      and `incomplete_diagnostic` words each cause with its own remedy. The
+      cause lives in the message only, so `_clock_cut` still compares clocks.
 - [ ] Expand Context from the corpus, answering the questions above.
 - [ ] Decide where the screen's verdict enters: a re-rank of the reported list
       after validation, or a caveat that reorders, or a reported field that
