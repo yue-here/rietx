@@ -308,7 +308,8 @@ it. Four rules. **gemmi has no colour table** — it supplies radii and
 (ATTRIBUTION.md), never transcribed. **A radius-sum bond rule needs a chemical
 predicate**: bond a metal to a cation only when the phase has no non-metal in
 it, or LaB6's cell edges become La–La sticks and forsterite grows Mg–Si ones
-(a cation is `_cation_sites`', WP-1466). **A non-positive-definite tensor draws its non-positive axes at
+(a cation is `_cation_sites`', WP-1466), and **a floor, between non-metals only**
+(`SPLIT_FLOOR`: a split pair sits under it, and uranyl's U=O would too). **A non-positive-definite tensor draws its non-positive axes at
 zero** on the server (a √ of a negative is a NaN), and the client keeps such a
 column at `FLAT_AXIS` = 1 mÅ because the ray-caster solves through M⁻¹. And
 **bond segments complete their partners exactly one level** — a bond to a

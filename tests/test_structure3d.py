@@ -26,7 +26,7 @@ from rietx.crystallography.adp import principal_values, u_cartesian
 from rietx.crystallography.cif import structure_from_cif
 from rietx.crystallography.symmetry import expand_orbit, expand_positions, get_spacegroup
 from rietx.gui import structure3d as s3
-from rietx.schemas.structure import AnisoU, Atom, Cell, Phase, Structure
+from rietx.schemas.structure import AnisoU, Atom, Cell, Parameter, Phase, Structure
 
 DATA = Path(__file__).parent / "data"
 
@@ -658,6 +658,52 @@ def test_the_default_picture_draws_tetrahedra_and_octahedra(lab6, nac, fap):
                                      ("Na1", 7, False): 8}
     assert _drawn(s3.build(fap)) == {("P3", 4, True): 6, ("Ca1", 9, False): 4,
                                      ("Ca2", 7, False): 6}
+
+
+def test_a_split_partner_makes_no_cation(fap):
+    """P10: hydroxyfluorapatite's OH oxygen, 0.43 Å from a half-occupied F, is
+    one channel position split two ways, so the F does not make it a cation.
+
+    Above :data:`~rietx.gui.structure3d.BOND_MIN`, it had: the O left every Ca
+    shell and lost its Ca sticks.
+    """
+    c = 6.8859
+    phase = fap.phases[0]
+    (fluorine,) = [a for a in phase.atoms if a.species == "F"]
+    fluorine.occ = Parameter(value=0.5)
+    phase.atoms.append(Atom(label="O8", species="O", x=_p(0.0), y=_p(0.0),
+                            z=_p(0.25 - 0.43 / c), occ=_p(0.25)))
+    payload = s3.build(fap)
+    elements = [payload["sites"][a["site"]]["element"] for a in payload["atoms"]]
+    oxygen = {k for k, a in enumerate(payload["atoms"])
+              if payload["sites"][a["site"]]["label"] == "O8"}
+    pairs = {tuple(sorted((elements[b["i"]], elements[b["j"]])))
+             for b in payload["bonds"] if b["i"] in oxygen or b["j"] in oxygen}
+    # the O keeps its Ca, and no stick joins the split positions
+    assert pairs == {("Ca", "O")}
+
+
+def test_no_stick_joins_two_non_metals_closer_than_the_split_floor():
+    """P10 on the measured phases: high cristobalite's split O positions,
+    0.45-0.90 Å apart, drew O–O sticks until the floor."""
+    for row in MEASURED:
+        payload = s3.build(measured(row))
+        pairs = []
+        for b in payload["bonds"]:
+            i, j = (payload["sites"][payload["atoms"][k]["site"]] for k in (b["i"], b["j"]))
+            pairs.append((i["element"], j["element"]))
+            if not (i["metal"] or j["metal"]):
+                assert b["d"] >= s3.SPLIT_FLOOR * (i["radius"] + j["radius"]), row["name"]
+        # read without the constant, which a broken floor would carry with it
+        if row["name"].startswith("high cristobalite"):
+            assert ("O", "O") not in pairs
+
+
+def test_the_split_floor_spares_a_metal_oxo_bond():
+    """P10 holds only between non-metals: uranyl's U=O is 0.67 of the radius sum."""
+    payload = s3.build(cluster([("U", 1.0)], [("O", (1.76, 0, 0), 1.0),
+                                              ("O", (-1.76, 0, 0), 1.0)]))
+    assert sorted(round(b["d"], 2) for b in payload["bonds"]) == [1.76, 1.76]
 
 
 def test_a_non_metal_bonded_to_a_stronger_one_is_a_cation_and_no_ligand():

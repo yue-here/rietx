@@ -77,6 +77,15 @@ MAX_BONDS = 4000
 #: disordered pair sharing a site) and no stick is drawn between them.
 BOND_MIN = 0.4
 
+#: Two non-metals closer than this fraction of their radius sum are one atom
+#: split over two positions, and never bonded (WP-1466, P10).  The shortest real
+#: bonds between non-metals, N≡N and NO⁺, are 0.77 of it; hydroxyfluorapatite's
+#: split O/F pair is 0.39 and high cristobalite's split O pairs 0.34-0.68.  A
+#: pair with a metal keeps :data:`BOND_MIN` alone, since uranyl's U=O is 0.67.
+#: It is VESTA's positive minimum bond length for a split-atom model, set from
+#: the radii rather than by hand.
+SPLIT_FLOOR = 0.7
+
 #: Ball-and-stick spheres are drawn at this fraction of the covalent radius.
 #: 0.4 is VESTA's ball-and-stick fraction, and the number is only comparable
 #: because both ends of the comparison are stated: VESTA scales its *atomic*
@@ -446,7 +455,10 @@ def _cation_sites(sites: list[dict], orbit: dict[str, Any], basis: np.ndarray) -
 
     Bonded is the viewer's radius-sum rule at :data:`BOND_TOLERANCE`, the
     default rather than the query's, so the polyhedra do not move with the
-    bond slider.  ``orbit`` is :func:`_orbit`'s.
+    bond slider.  A partner closer than :data:`SPLIT_FLOOR` of the radius sum
+    is a split site and no bond: hydroxyfluorapatite's OH oxygen, 0.48 Å from
+    a half-occupied F, had made itself a cation and left every Ca shell.
+    ``orbit`` is :func:`_orbit`'s.
     """
     cations = {j for j, site in enumerate(sites) if site["metal"]}
     elements, owner, source = orbit["elements"], orbit["owner"], orbit["source"]
@@ -461,10 +473,11 @@ def _cation_sites(sites: list[dict], orbit: dict[str, Any], basis: np.ndarray) -
         rows = (strength > mine)[source]
         if not rows.any():
             continue
-        cutoff = BOND_TOLERANCE * (site["radius"] + radius[source[rows]])
+        pair = site["radius"] + radius[source[rows]]
         reach = np.linalg.norm(orbit["cart"][rows] - orbit["frac"][owner.index(j)] @ basis.T,
                                axis=1)
-        if ((reach >= BOND_MIN) & (reach <= cutoff)).any():
+        # a split partner is no bond, however electronegative (P10)
+        if ((reach >= SPLIT_FLOOR * pair) & (reach <= BOND_TOLERANCE * pair)).any():
             cations.add(j)
     return cations
 
@@ -840,15 +853,21 @@ def _bonds(positions: np.ndarray, radii: np.ndarray, basis: np.ndarray,
     every stick between a metal and a cation (:func:`_cation_sites`), as
     forsterite's 36 Mg–Si sticks at 2.69-2.79 Å and grossular's 90 Ca–Si
     were (WP-1466).  Two cationic non-metals keep their stick, or an organic
-    would lose every C–C and C–H bond.
+    would lose every C–C and C–H bond.  Two non-metals closer than
+    :data:`SPLIT_FLOOR` of their radius sum get none: they are a split site.
     """
     n = len(positions)
     if n == 0:
         return []
-    cutoff = float(tolerance) * (radii[:, None] + radii[None, :])
+    reach = radii[:, None] + radii[None, :]
+    cutoff = float(tolerance) * reach
+    floor = np.full_like(cutoff, BOND_MIN)
+    # ``metal`` is None only for a phase with no non-metal in it
     if metal is not None:
         pair = metal[:, None] & (metal if cation is None else cation)[None, :]
         cutoff = np.where(pair | pair.T, -1.0, cutoff)
+        floor = np.where(~metal[:, None] & ~metal[None, :],
+                         np.maximum(SPLIT_FLOOR * reach, BOND_MIN), floor)
     shifts = np.array([[i - 1, j - 1, k - 1] for i in range(3) for j in range(3)
                        for k in range(3)], dtype=np.float64) @ basis.T
     out: list[dict] = []
@@ -857,7 +876,7 @@ def _bonds(positions: np.ndarray, radii: np.ndarray, basis: np.ndarray,
         home = not shift.any()
         delta = (positions[None, :, :] + shift) - positions[:, None, :]
         dist = np.sqrt((delta ** 2).sum(axis=2))
-        hit = (dist <= cutoff) & (dist >= BOND_MIN)
+        hit = (dist <= cutoff) & (dist >= floor)
         if home:
             hit &= np.triu(np.ones_like(hit, dtype=bool), 1)  # each pair once
         for i, j in zip(*np.nonzero(hit)):
