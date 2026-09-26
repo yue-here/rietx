@@ -70,67 +70,33 @@ that distinct lattices can produce identical positions.
 general knowledge, never from a paper read for this WP. **Expand this section on
 a machine with the corpus before designing anything.**
 
-### Inherited
+**The rank row read the machine, and now waits for a finished search.**
+`test_brucites_truth_is_not_ranked_first` turned the Linux nightly red five
+nights running, 22 to 26 September, each time as `XPASS(strict)`. The search
+behind it was cut. Its 300 s per-unit budget binds on that runner, and a cut
+search put the truth first each night. Measured 2026-09-26 on a Mac (`[dev]`,
+arm64), over two runs at each budget. Finished, the two dichotomy units take
+139-232 s and the a × 2 supercell leads. At 60 s both stop on the clock, and the
+truth led one run and the supercell the other. So a rank read off a cut search
+can pass where the finished search fails.
 
-- **From WP-1333 (2026-09-23): on Linux x86-64 the brucite strict xfail
-  passes, so `main`'s full suite is red there.**
-  `tests/test_acceptance_indexing.py::test_brucites_truth_is_not_ranked_first`
-  reported `[XPASS(strict)]` on the 2026-09-22 nightly at `a1261ca`
-  (`[dev,jax]`, 1 failed, 5709 passed, 103 skipped). It did so again in
-  WP-1333's full run at `16b72c3`, which carries #414 (`[dev]`, Linux x86-64,
-  py3.12). WP-1446's handover recorded it as "1 xfailed", so on at least one
-  platform the truth is now ranked first and on another it is not. Either the
-  ranking the xfail pins is platform-dependent, which is a finding in itself,
-  or the mark needs `strict=False` with a reason. Folding the row back is this
-  WP's last task in any case. Until then, every Linux nightly `full` job fails
-  on this one row, and a real regression in that job would read as the same
-  red.
-- **From WP-1454 (2026-09-24): on one Linux machine the row flips with load,
-  not with platform.** `[dev]`, Linux x86-64, py3.12, 4 cores, at `016d06c`
-  (main at `8fbafe5` plus WP-1454, which touches no indexing code). The full
-  suite at `-n auto` reported `[XPASS(strict)]`. The same row run alone on the
-  same tree reported `1 xfailed`. So the ranking it pins moves with the quick
-  preset's wall-clock budget. A fix that flips it has to be judged on a run
-  alone, and a mark kept strict will stay a load sensor until then
-  (tests/CLAUDE.md § Budgets in tests).
-- **From the nightly investigation (2026-09-24): the XPASS comes from a
-  truncated search.** The platform was a proxy for speed. On the Linux `full`
-  job the brucite search reports `INDEX_SEARCH_INCOMPLETE`. The evidence is
-  the gallery sidecar `indexing_brucite.gallery.json` in run 35988617175's
-  `test-output-linux` artifact. The fixture's setup took 802 s, 860 s and
-  848 s on the 22, 23 and 24 Sep nightlies, against a budget of 300 s per
-  engine and system.
+The mechanism matters to the design below. Corroboration does not move: in
+every run dichotomy and trial_error both find the a × 2 cell, which indexes 34
+lines against the truth's 33. Inside the corroborated tier `rank_candidates`
+orders by a Borda count, and a Borda count depends on the rest of the pool. A
+cut dichotomy returns a different pool (145 merged lattices against 146, measured
+2026-09-24), and that flips a one-line margin.
 
-  Reproduced on macOS arm64 (`.venv` `[dev]` + numba, at `14239188`). Only
-  `budget_seconds` changed between the two runs, and the machine carried a
-  load of about 7 from another session:
-
-  | `budget_seconds` | search | wall | ranked first |
-  |---|---|---|---|
-  | 300 | complete | 520 s | a × 2 supercell, a = 6.2950 (the xfail holds) |
-  | 60 | dichotomy incomplete in both systems | 153 s | truth, a = 3.1477 (as on Linux) |
-
-  Corroboration does not move. In both runs dichotomy and trial_error find
-  the a × 2 cell, and it indexes 34 lines against the truth's 33. Within the
-  corroborated tier `rank_candidates` orders by a Borda count. A Borda count
-  depends on the rest of the pool, and a truncated dichotomy returns a
-  different pool (145 merged lattices against 146). That is enough to flip a
-  one-line margin.
-
-  For the fold-back task, this row can assert a rank only on a search that
-  finished. The one CI job that runs slow rows is the Linux `full` job. It did
-  not finish this search on any of the three nights. The macOS job runs slow
-  rows only when dispatched with `full_macos`. There are two options, and
-  neither has been costed. One skips the row when the result carries
-  `INDEX_SEARCH_INCOMPLETE`. The other raises brucite's budget until the Linux
-  runner completes the search.
-
-  The class is wider than this row. Seven of the 13 indexing searches in the
-  same artifact carry `INDEX_SEARCH_INCOMPLETE`: brucite, corundum,
-  corundum_shift, cpd1a, fluorite, hl2 and nac. The comment on
-  `REAL_DATA_BUDGET_SECONDS` says the budget is several times the search's
-  cost. On that runner it is not. Only brucite's assertion flips. Nobody has
-  checked which of the other six rows assert a rank.
+On 2026-09-26, 8 of the nightly's 13 searches came back incomplete. Two are
+incomplete by design: NAC stops at a cap, and hl2 runs at 15 s. The other six
+ran at 300 s and finish locally, so the runner's clock is the likely cause. The
+gallery sidecar now records each unit's clock, so the next nightly says.
+Raising the budget was set aside. The corundum group already takes 61 of that
+job's 100 minutes against a 150-minute limit, and how long the cut searches
+need to finish there is unmeasured. Every row that reads an order now calls
+`_skip_unless_finished` first. It compares each unit's clock with the budget
+the result recorded. The fold-back task below therefore needs a finished
+search: a local run, or the nightly dispatched with `full_macos`.
 
 ## Questions for the corpus
 
@@ -155,6 +121,17 @@ a machine with the corpus before designing anything.**
 
 ## Tasks
 
+- [x] A rank waits for a finished search (2026-09-26). `_skip_unless_finished`
+      runs before every order a real-data row reads. The budget comment and
+      `tests/CLAUDE.md` § Budgets are corrected, three stale gallery captions
+      rewritten, and the gallery sidecar records each unit's clock.
+- [ ] `INDEX_SEARCH_INCOMPLETE` names the clock where a cap stopped the search.
+      Measured 2026-09-26 on NAC: dichotomy ran 0.26 s over 0 boxes, and the
+      message says it "did not finish cubic within 300 s per system" and
+      suggests raising `budget_seconds`, which would change nothing. All three
+      engines return one `complete` flag for three causes (the clock, the grid
+      cap, the trial-set cap). Carrying the cause on the result would let
+      `_clock_cut` read it instead of comparing clocks.
 - [ ] Expand Context from the corpus, answering the questions above.
 - [ ] Decide where the screen's verdict enters: a re-rank of the reported list
       after validation, or a caveat that reorders, or a reported field that

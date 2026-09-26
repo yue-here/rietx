@@ -193,13 +193,13 @@ SPECIMENS: dict[str, dict[str, str]] = {
                       "Kristallogr. 219, 783 \u2014 ten peak sets at six levels of "
                       "difficulty, with eleven programs' scores printed.",
         "why": "The only externally graded benchmark any feature in this package "
-               "has \\u2014 and the one place we <b>decline to report a score</b>. "
+               "has \u2014 and the one place we <b>decline to report a score</b>. "
                "Eleven indexing programs were run on one compound at six levels "
                "of difficulty, and both the data and every program's score were "
                "printed, so the bar is what ITO13, DICVOL91, TREOR90 and McMaille "
                "actually achieved rather than a tolerance somebody chose. What we "
                "check against it is below; <b>what we cannot</b> is that score, "
-               "and the reason is a measurement, not an omission \\u2014 see the "
+               "and the reason is a measurement, not an omission \u2014 see the "
                "note under the figure.",
     },
 }
@@ -250,8 +250,8 @@ DATASETS: dict[str, dict[str, str]] = {
     },
     "fap": {
         "specimen": "fap", "step": "Indexed over hexagonal and trigonal",
-        "asserts": "the cross-code cell is found but <b>not ranked first</b>, "
-                   "inside 500 ppm \u2014 and the gate declines the leader.",
+        "asserts": "the cross-code cell leads, inside 500 ppm, because every "
+                   "engine found it \u2014 and the gate still declines it.",
     },
     "zincite": {
         "specimen": "zincite", "step": "Indexed over hexagonal and trigonal",
@@ -264,8 +264,9 @@ DATASETS: dict[str, dict[str, str]] = {
     },
     "brucite": {
         "specimen": "brucite", "step": "Indexed over trigonal and hexagonal",
-        "asserts": "the truth ranked first with its c\u00d72 and c\u00d73 supercells "
-                   "below it \u2014 reversing what was recorded in 2026-07.",
+        "asserts": "the truth found with its c\u00d72 and c\u00d73 supercells, "
+                   "which the reversed member separates; an a\u00d72 supercell "
+                   "still ranks <b>first</b> (WP-1449).",
     },
     "magnetite": {
         "specimen": "magnetite", "step": "Indexed over cubic",
@@ -273,9 +274,11 @@ DATASETS: dict[str, dict[str, str]] = {
                    "<i>below</i> its own primitive rival.",
     },
     "fluorite": {
-        "specimen": "fluorite", "step": "Refused before any engine started",
-        "asserts": "18 usable lines against PEAK_MIN_USABLE_LINES = 20, so "
-                   "systems_searched is empty and the run costs 0.1 s.",
+        "specimen": "fluorite",
+        "step": "Searched on fewer lines than M₂₀ needs",
+        "asserts": "fewer usable lines than PEAK_MIN_USABLE_LINES = 20, searched "
+                   "anyway; the certified cell ranks first, unscored and capped "
+                   "at medium.",
     },
     "cpd1a": {
         "specimen": "cpd1a", "step": "Indexed as a single phase (it is not one)",
@@ -291,8 +294,8 @@ DATASETS: dict[str, dict[str, str]] = {
         "step": "The ten published peak sets, checked against the published cell",
         "asserts": "three things the paper states and never tabulates, so a "
                    "transcription error in the 200 typed numbers would break at "
-                   "least one: the zeroshift arithmetic (C = A \\u2212 0.100\\u00b0), "
-                   "the I \\u2265 5 % intensity subsetting, and the paper's own "
+                   "least one: the zeroshift arithmetic (C = A \u2212 0.100\u00b0), "
+                   "the I \u2265 5 % intensity subsetting, and the paper's own "
                    "count of unexplained lines per set. Then its published "
                    "figures of merit, M(20) = 197 and F(20) = 1080, reproduce.",
     },
@@ -491,6 +494,12 @@ def draw(stem: str, *, peaks, data=None, result=None, instrument=None,
     best_or_none = result.best_or_none() if hasattr(result, "best_or_none") else None
     card["promoted"] = best_or_none is not None
     card["diagnostics"] = sorted({d.code for d in getattr(result, "diagnostics", ())})
+    # each unit's own clock, which is what says whether a budget stopped it:
+    # ``INDEX_SEARCH_INCOMPLETE`` also fires where a cap did (WP-1449)
+    card["unit_seconds"] = {
+        key.removesuffix(".seconds"): value
+        for key, value in sorted(getattr(result, "engine_stats", {}).items())
+        if key.endswith(".seconds")}
 
     # the whole ranking, compactly — seven numbers and two strings per candidate,
     # which is what lets the scoreboard be re-scored without re-running a search

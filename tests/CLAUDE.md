@@ -166,10 +166,10 @@ test depends on may be one rank down, in the library**
 (`DOMINANT_ZONE_PROBE_SECONDS`, a hard-coded 10 s against a 4.3 s serial
 cost); a real-data row that reported a *different centring* under load
 (73 s serial, 258 s loaded, 60 s declared — `REAL_DATA_BUDGET_SECONDS`, now
-300 s, costs nothing because these searches finish early when they finish at
-all); and completion assertions generally — "some system did not finish" is
-a statement about machine load, not the data, and belongs as "every system
-searched reports whether its domain was exhausted".
+300 s and still binding on the Linux nightly); and completion assertions
+generally — "some system did not finish" is a statement about machine load,
+not the data, and belongs as "every system searched reports whether its
+domain was exhausted".
 
 **The check to run before landing any row with a budget: compare its serial
 time with its declared budget; if the budget is not several times larger,
@@ -184,13 +184,13 @@ neighbour**: sized on `a` at 2.5e-6, the same bar fired 12 days later on `c`,
 number: `test_acceptance_srm676a.py` §3. A pass margin under ~10x still smells.
 
 **The honest-budget rule and the CI budget pull against each other, so expect
-to pay in scope.** Raising a real-data `budget_seconds` from 60 to 300 let
-one search run to completion at 850 s and took the full suite to 15:33; the
-budget could not go back, so the scope moved — each pure phase searched over
-the systems its answer lives in, a declared restriction `systems_searched`
-carries — and the same tree re-measured at 8:09. When a budget fix makes
-something slow, narrowing what is searched is the lever — never the budget,
-and never a silent cap.
+to pay in scope.** When a budget fix makes something slow, narrow what is
+searched — never the budget, never a silent cap (the pure phases' declared
+`systems_searched`, 15:33 → 8:09; v1.0 record § Appendix). **Where the budget
+still binds, an *order* waits for a finished search** (WP-1449): finished,
+brucite ranks a supercell first, and cut, the truth in one run of two.
+`_skip_unless_finished` reads each unit's clock against the recorded budget,
+never `search_complete` (a cap sets it too); a *found* claim stays live.
 
 ## Quoting numbers
 
