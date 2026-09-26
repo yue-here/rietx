@@ -292,6 +292,8 @@ def search_trial_error(peaks: PeakList, *, spec: SearchSpec | None = None,
 
     raw: list[EngineCandidate] = []
     incomplete: list[str] = []
+    capped: list[str] = []
+    stopped: list[str] = []
     for system in systems:
         # not started ⇒ not claimed — the same rule as ``search_dichotomy``,
         # and what keeps "not reached" distinct from "truncated" (WP-1037)
@@ -312,7 +314,15 @@ def search_trial_error(peaks: PeakList, *, spec: SearchSpec | None = None,
         for key, value in stats.items():
             result.stats[f"{system}.{key}"] = value
         if not complete:
-            incomplete.append(system)
+            # the token (the run's ceiling or the caller) outranks the
+            # unit's own clock, and a unit neither stopped hit a size cap,
+            # where more time changes nothing (``incomplete_diagnostic``)
+            if cancel is not None and bool(cancel):
+                stopped.append(system)
+            elif budget.expired():
+                incomplete.append(system)
+            else:
+                capped.append(system)
         if progress is not None:
             progress.end(f"trial_error:{system}", engine="trial_error",
                          system=system, n_candidates=len(found),
@@ -331,9 +341,10 @@ def search_trial_error(peaks: PeakList, *, spec: SearchSpec | None = None,
     result.stats["shift_allowance_deg"] = round(allowance, 5)
     if assumed:
         result.diagnostics.append(shift_allowance_diagnostic(allowance))
-    if incomplete:
+    if incomplete or capped or stopped:
         result.diagnostics.append(
-            incomplete_diagnostic("trial_error", incomplete, spec.budget_seconds))
+            incomplete_diagnostic("trial_error", incomplete, spec.budget_seconds,
+                                  capped, stopped))
     if probe and not result.candidates \
             and not (cancel is not None and bool(cancel)):
         # the probe explains a silence, so a cancelled run — whose silence the
@@ -392,7 +403,10 @@ def _search_system(peaks: PeakList, system: str, basis: np.ndarray,
         dm_full = design_matrix(hkl_full)
         for base in combinations(range(len(pool)), n_dof):
             if budget.expired():
-                return found, {"solves": float(n_solved)}, False
+                # the clock rides the cut return too: a reader telling a clock
+                # cut from a cap reads it (WP-1449)
+                return found, {"solves": float(n_solved),
+                               "seconds": round(budget.elapsed, 3)}, False
             lines = pool[list(base)]
             combos = _combos([per_line[int(i)] for i in lines])
             if not len(combos):

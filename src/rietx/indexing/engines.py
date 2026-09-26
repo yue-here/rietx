@@ -1339,25 +1339,59 @@ def _panel_for(cand: EngineCandidate, peaks: PeakList, k_sigma: float,
 
 
 def incomplete_diagnostic(engine: str, systems: Sequence[str],
-                          seconds: float) -> Diagnostic:
-    """``INDEX_SEARCH_INCOMPLETE`` — the budget ran out before the domain did.
+                          seconds: float,
+                          capped: Sequence[str] = (),
+                          stopped: Sequence[str] = ()) -> Diagnostic:
+    """``INDEX_SEARCH_INCOMPLETE`` — a searched domain was not exhausted.
 
     Its whole content is that a *negative* result from these systems is not
     evidence: an exhaustive engine's silence means "no such cell" only when it
     finished.
+
+    **Three causes, each with its own remedy** (WP-1449).  ``systems`` ran out
+    of their own per-system ``budget_seconds``.  ``capped`` outgrew a size cap
+    on the grid or the trial set, where more time changes nothing: measured on
+    11-BM NAC, the dichotomy explored 0 boxes in 0.26 s and this message said it
+    had not finished within 300 s.  ``stopped`` were cut by the cancel token,
+    which is the run's ``total_budget_seconds`` ceiling or the caller's own
+    stop, so a larger ``budget_seconds`` changes nothing there either.  The
+    engines file each unit by what was true when it returned.
     """
+    parts = []
+    if systems:
+        parts.append(f"did not finish {', '.join(systems)} within {seconds:g} s "
+                     "per system")
+    if capped:
+        parts.append(f"outgrew a size cap on {', '.join(capped)}")
+    if stopped:
+        parts.append(f"was stopped on {', '.join(stopped)} by the run's ceiling "
+                     "or a cancel")
+    # ``where`` keeps the search order it had before the causes were split
+    everything = sorted([*systems, *capped, *stopped],
+                        key=lambda s: (SYSTEM_ORDER.index(s)
+                                       if s in SYSTEM_ORDER else len(SYSTEM_ORDER)))
+    dof = ", ".join(f"{s} {METRIC_DOF[s]}" for s in everything if s in METRIC_DOF)
+    advice = []
+    if systems:
+        advice.append("raise budget_seconds, or narrow the search — a smaller "
+                      "max_volume or a shorter d-axis range costs exponentially "
+                      "less than more time buys.")
+    if capped:
+        advice.append(f"On {', '.join(capped)}, narrow the search — a smaller "
+                      "max_volume, a shorter d-axis range or a peak list ending "
+                      "at a lower angle shrinks what the cap counts; more time "
+                      "changes nothing.")
+    if stopped:
+        advice.append(f"On {', '.join(stopped)}, raise total_budget_seconds or "
+                      "narrow the search; INDEX_BUDGET_EXHAUSTED names what the "
+                      "ceiling left.")
     return Diagnostic(
         level="warning", code="INDEX_SEARCH_INCOMPLETE",
-        message=(f"the {engine} search did not finish "
-                 f"{', '.join(systems)} within {seconds:g} s per system, so "
-                 "finding no cell there is not evidence that none exists"),
-        where=list(systems),
-        suggestion=("raise budget_seconds, or narrow the search — a smaller "
-                    "max_volume or a shorter d-axis range costs exponentially "
-                    "less than more time buys.  Cost grows with the metric "
-                    "degrees of freedom (" +
-                    ", ".join(f"{s} {METRIC_DOF[s]}" for s in systems
-                              if s in METRIC_DOF) + ")"))
+        message=(f"the {engine} search {' and '.join(parts)}, so finding no "
+                 "cell there is not evidence that none exists"),
+        where=everything,
+        suggestion=("  ".join(advice) + "  Cost grows with the metric degrees "
+                    f"of freedom ({dof})"))
 
 
 def candidates_truncated_diagnostic(n_merged: int, n_reported: int,

@@ -112,8 +112,8 @@ def bench() -> dict:
 
 
 # ----------------------------------------------------------------------
-# Real-data fixtures.  Each search is ~60-90 s, so they are module-scoped and
-# every consumer carries the matching xdist_group (CLAUDE.md).
+# Real-data fixtures.  Each search costs seconds to minutes, so they are
+# module-scoped and every consumer carries the matching xdist_group (CLAUDE.md).
 # ----------------------------------------------------------------------
 #: Lines a search may leave unindexed on these real patterns.  **Three, not the
 #: default two, and it is a measurement rather than a knob.**  After the
@@ -131,18 +131,56 @@ REAL_DATA_N_UNINDEXED = 3
 #: the result so the report says what was covered rather than concluding about
 #: the specimen.
 REAL_DATA_SYSTEMS = ("cubic", "tetragonal", "hexagonal", "trigonal")
-#: Per-system wall-clock budget for the real-data searches.  **Generous on
-#: purpose, and this is CLAUDE.md's rule paid for a fourth time.**  A budget
+#: Per-(engine × system) wall-clock budget for the real-data searches.  A budget
 #: inside a test is a runaway guard, never a timer: at 60 s the zircon row passed
 #: serially (73 s for all four systems) and **failed under ``-n auto``**, where
 #: the same work takes 258 s — the search truncated, and the row reported
-#: tetragonal *P* ranked first instead of *I*.  Nothing about the index table had
-#: changed; the machine was busy.  At 300 s the budget never binds on any dataset
-#: here, so it costs nothing when the search finishes early and only stops a
-#: runaway.  The rule to apply when adding a row: compare its **serial** time
-#: with its declared budget, and if the budget is not several times larger the
-#: assertion is a load sensor.
+#: tetragonal *P* ranked first instead of *I*.
+#:
+#: **At 300 s it still binds.**  Six of the searches run at it came back
+#: incomplete on the nightly's Linux runner on 2026-09-26, beside NAC's cap, and
+#: brucite's two dichotomy units take 139-232 s on a Mac (WP-1449).  Raising it
+#: again would lengthen that job's longest xdist group, whose three corundum
+#: searches already cost 61 of its 100 minutes against a 150-minute limit.  So
+#: the budget stays a cost cap, and a row that reads the *order* calls
+#: :func:`_skip_unless_finished` first.
 REAL_DATA_BUDGET_SECONDS = 300.0
+
+
+def _clock_cut(res) -> list[str]:
+    """The ``engine.system`` units whose own clock reached the search's budget.
+
+    Both numbers come from the result: the budget the run recorded, and each
+    unit's clock.  ``search_complete`` would not do, since it also reads
+    ``False`` where the domain outgrew a cap, which no budget would change
+    (NAC's dichotomy explores zero boxes).  svd's retry shares its unit's
+    budget and records it as ``svd.<system>.trim.seconds``, so that clock
+    counts too.
+    """
+    budget = float(res.provenance.notes["budget_seconds"])
+    if budget <= 0.0:
+        return []           # ``Budget``'s "no limit": no clock can cut a unit
+    systems = set(res.systems_searched)
+    return sorted(key.removesuffix(".seconds")
+                  for key, seconds in res.engine_stats.items()
+                  if key.endswith(".seconds") and key.split(".")[1] in systems
+                  and seconds >= budget)
+
+
+def _skip_unless_finished(*results) -> None:
+    """Skip the rest of a row whose claims read the order of a cut search.
+
+    **A rank read off a cut search is a reading of machine load, in both
+    directions** (WP-1449).  Brucite's finished search ranks an a × 2 supercell
+    first.  Cut at 60 s, it put the truth first in one run and the supercell in
+    the next, so a "truth first" row can pass on a cut search that the finished
+    one fails.  A row that asserts only what was *found* is left live: a cut
+    that loses a candidate fails it in plain view.
+    """
+    cut = sorted({unit for res in results for unit in _clock_cut(res)})
+    if cut:
+        pytest.skip(f"the per-unit budget stopped {', '.join(cut)}, so the "
+                    "order is a reading of machine load (WP-1449)")
 
 A_SRM676A, C_SRM676A = 4.759355, 12.99231     # k = 2, 22.5 °C (certificate)
 
@@ -333,7 +371,7 @@ A_MAGNETITE = 8.3941                          # F d -3 m
 
 @pytest.fixture(scope="module")
 def brucite_index():
-    """Trigonal/hexagonal P from a lab pattern. ~100-210 s."""
+    """Trigonal/hexagonal P from a lab pattern. 6-8 min, nearly all dichotomy."""
     return _index_qarr_phase("brucite", ("trigonal", "hexagonal"))
 
 
@@ -1056,6 +1094,7 @@ def test_a_certified_lab_pattern_indexes_and_is_graded_honestly(corundum_index):
 
     assert res.validated
     assert res.candidates, "no candidate at all on a pattern with a certificate"
+    _skip_unless_finished(res)
     best = res.candidates[0]
     assert best.system == "trigonal" and best.centring == "R", (
         f"ranked first: {best.system} {best.centring}")
@@ -1126,6 +1165,7 @@ def test_declaring_the_shift_template_is_what_recovers_the_certificate(
     plain, _a, _c = corundum_index
     res, a_cert, c_cert = corundum_index_with_shift
 
+    _skip_unless_finished(plain, res)
     best = res.candidates[0]
     assert best.system == "trigonal" and best.centring == "R"
     assert best.shift_template == "cos_theta"
@@ -1247,6 +1287,7 @@ def test_a_short_clean_list_is_searched_ranked_and_reported_unscored(
 
     # the certified cell, ranked first by the reduced panel
     assert res.candidates
+    _skip_unless_finished(res)
     top = res.candidates[0]
     assert top.system == "cubic" and top.centring == "F"
     assert top.cell[0] == pytest.approx(5.4631, rel=1e-4)
@@ -1284,6 +1325,7 @@ def test_a_hexagonal_lab_pattern_recovers_its_lattice(zincite_index):
     res = zincite_index
     a_ref, c_ref = QARR_PHASES["zincite"][1][0], QARR_PHASES["zincite"][1][2]
     assert res.candidates
+    _skip_unless_finished(res)
     best = res.candidates[0]
 
     assert best.system in ("hexagonal", "trigonal") and best.centring == "P"
@@ -1327,6 +1369,7 @@ def test_a_centred_tetragonal_lattice_is_recovered_with_its_centring(zircon_inde
     res = zircon_index
     a_ref, c_ref = QARR_PHASES["zircon"][1][0], QARR_PHASES["zircon"][1][2]
     assert res.candidates
+    _skip_unless_finished(res)
     best = res.candidates[0]
 
     assert best.system == "tetragonal" and best.centring == "I", (
@@ -1381,7 +1424,10 @@ def test_the_supercells_that_used_to_outrank_brucite_now_sit_below_it(
     does *not* assert the ranking: since WP-1442 an a × 2 supercell ranks above
     the truth here, and
     ``test_brucites_truth_is_not_ranked_first`` below carries that as a strict
-    xfail so it cannot pass unnoticed.  **WP-1446 owns restoring it.**
+    xfail so it cannot pass unnoticed.  **WP-1449 owns restoring it**, WP-1446
+    having measured that the peak list cannot.  This row does not wait for a
+    finished search: a cut that loses a candidate it looks for fails it in
+    plain view.
 
     The member that answers a supercell is visible in the numbers: the truth
     shows **0.86** of its own predicted lines against the c × 2 cell's 0.43 and
@@ -1469,14 +1515,21 @@ def test_brucites_truth_is_not_ranked_first(brucite_index):
     discards were holding the supercell down.  Removing either one alone still
     leaves the supercell first, so the margin is one line and always was.
 
-    ``strict=True`` deliberately: when WP-1446 makes the ranking read the
-    reversed panel member, this row goes **red**, and whoever is there restores
-    the assertion to the row above and deletes this one.
+    ``strict=True`` deliberately: when WP-1449 makes the ranking read what the
+    extinction screen determined, this row goes **red**, and whoever is there
+    restores the assertion to the row above and deletes this one.
+
+    **Only on a finished search.**  The Linux nightly's 300 s budget cut this
+    search five nights running, and each put the truth first, reported as
+    ``XPASS(strict)``.  Measured 2026-09-26 on this Mac: finished, the two
+    dichotomy units take 139-232 s and the supercell leads.  Cut at 60 s, the
+    truth led one run and the supercell the next (WP-1449).
     """
     res = brucite_index
     assert res.candidates
     truth = _brucite_truth(res)
     assert truth is not None
+    _skip_unless_finished(res)
     assert res.candidates[0] is truth, (
         "ranked first: "
         + repr(tuple(round(x, 4) for x in res.candidates[0].cell[:3])))
@@ -1532,6 +1585,7 @@ def test_magnetites_correct_cell_is_ranked_first_and_graded_below_its_rival(
     """
     res = magnetite_index
     assert res.candidates
+    _skip_unless_finished(res)
     best = res.candidates[0]
 
     assert best.system == "cubic" and best.centring == "F", (
@@ -1707,6 +1761,7 @@ def test_short_wavelength_data_is_indexed_by_the_engines_that_enumerate_nothing(
     # within a member, not across members, and no aggregate of these seven
     # numbers has yet been shown to read both patterns right.  `_log_sum_scores`
     # is in `fom.py`, tested and unwired, with the measurement in its docstring.
+    _skip_unless_finished(res)
     assert res.candidates[0].centring == "P", (
         "the panel still leads with the centring Le Bail refutes; invert this "
         "only with a measured aggregate, not a predicted one")
@@ -1780,6 +1835,7 @@ def test_the_cross_code_cell_leads_because_the_engines_agree_on_it(fap_index):
     assert best_in_band.n_indexed >= 0.95 * best_in_band.n_lines
 
     # …and it leads, because every engine found it (WP-1046)
+    _skip_unless_finished(res)
     leader = res.candidates[0]
     assert leader is best_in_band, (
         "the in-band cell no longer leads: "
@@ -1895,6 +1951,7 @@ def test_a_certified_cubic_cell_is_recovered_with_no_extinction_caveat(lab6_inde
 
     assert res.validated
     assert res.candidates, "no candidate on the absolute lab anchor"
+    _skip_unless_finished(res)
     best = res.candidates[0]
     assert best.system == "cubic" and best.centring == "P", (
         f"ranked first: {best.system} {best.centring}")
@@ -2325,6 +2382,7 @@ def test_the_isospectral_rival_is_ranked_beside_the_truth(lab6_index):
     exactly isospectral rather than isospectral within a tolerance.
     """
     res = lab6_index
+    _skip_unless_finished(res)
     truth = res.candidates[0]
     assert truth.system == "cubic"
 
@@ -2470,6 +2528,7 @@ def test_impurity_lines_cost_the_certificate_its_grade_long_before_its_rank(
     data, instrument = _lab6_inputs()
 
     seen: dict[int, list[dict]] = {}
+    searches = []
     for k in CONTAMINATION_KS:
         for seed in CONTAMINATION_SEEDS:
             peaks, injected = _contaminate(clean, k, seed, allowed)
@@ -2478,6 +2537,7 @@ def test_impurity_lines_cost_the_certificate_its_grade_long_before_its_rank(
                               n_unindexed=max(REAL_DATA_N_UNINDEXED, k))
             res = index_pattern(peaks, data=data, instrument=instrument,
                                 spec=spec, preset="full")
+            searches.append(res)
             rank, truth = None, None
             for i, c in enumerate(res.candidates):
                 if c.centring == "P" and same_lattice(np.asarray(c.af),
@@ -2496,11 +2556,16 @@ def test_impurity_lines_cost_the_certificate_its_grade_long_before_its_rank(
 
     for k, runs in seen.items():
         for r in runs:
-            # the sharp one: an injected line is never absorbed into the cell
+            # the sharp one: an injected line is never absorbed into the cell —
+            # a claim about what was found, so it does not wait for the clock
             assert r["n_indexed"] == n_clean, (
                 f"k={k}: the truth indexed {r['n_indexed']} of {r['n_lines']} — "
                 f"it should index its own {n_clean} lines and no impurity")
             assert r["n_lines"] == n_clean + k
+
+    _skip_unless_finished(*searches)
+    for k, runs in seen.items():
+        for r in runs:
             assert r["rank"] == 1, f"k={k}: truth ranked {r['rank']}"
 
     # …so the grade is decided by 25/(25+k) against the 0.9 bar, and nothing else
@@ -2571,6 +2636,7 @@ def test_what_the_unflagged_tail_components_cost_the_certified_cell(
     res, screen = lab6_calibrated
 
     assert res.candidates, "the calibrated protocol found nothing"
+    _skip_unless_finished(res)
     best = res.candidates[0]
     assert best.system == "cubic" and best.centring == "P"
 
@@ -2663,6 +2729,7 @@ def test_what_the_unflagged_tail_components_cost_the_certified_cell(
     assert tight.candidates, (
         "a window 4.3× too tight now finds nothing again — if the zero-error "
         "column changed, this is where it shows first")
+    _skip_unless_finished(tight)
     recovered = tight.candidates[0]
     assert recovered.found_by == ["svd"], (
         f"{recovered.found_by} — only the engine that fits a zero error should "
