@@ -554,9 +554,9 @@ export function buildScene(geometry: Geometry, options: SceneOptions): Scene {
     return { index, triangles, normals, color: rgb(color), centroid };
   });
   // the fit reads positions and ball sizes only, so neither a mode nor a
-  // legend click moves the zoom; the depth range holds whatever is drawn.  It
-  // takes the atoms the default picture can draw: a hidden polyhedron's own
-  // atoms would halve LaB6's picture at a bond tolerance of 1.00
+  // legend click moves the zoom.  The fit takes the atoms the default picture
+  // can draw: a hidden polyhedron's own atoms would halve LaB6's picture at a
+  // bond tolerance of 1.00
   const byDefault = new Set(geometry.polyhedra.filter((p) => p.drawn_by_default)
     .flatMap((p) => p.vertices));
   const points = [...geometry.corners, ...geometry.atoms
@@ -570,8 +570,13 @@ export function buildScene(geometry: Geometry, options: SceneOptions): Scene {
   const ball = geometry.ball_fraction * Math.max(0, ...geometry.sites.map((s) => s.radius));
   const reach = Math.max(ball, ...atoms.map((a) => [0, 1, 2].reduce((m, c) =>
     Math.max(m, Math.hypot(a.shape[c], a.shape[3 + c], a.shape[6 + c])), 0)));
+  // the depth range holds every atom the payload can draw, the zoom's
+  // excluded ones too: a hidden polyhedron switched on would otherwise put
+  // its outer faces and edges past the clip planes
+  const far = Math.max(half, ...geometry.atoms.map((a) =>
+    Math.hypot(a.pos[0] - center[0], a.pos[1] - center[1], a.pos[2] - center[2])));
   return { atoms, halves, lines, faces, labels: axisLabels(geometry), center,
-           radius: Math.max(half + ball, 1), depth: half + reach + 1 };
+           radius: Math.max(half + ball, 1), depth: far + reach + 1 };
 }
 
 /**

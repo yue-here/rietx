@@ -957,9 +957,15 @@ def _polyhedra(sites: list[dict], orbit: dict[str, Any], cations: set[int],
     anion = np.array([j not in cations for j in orbit["owner"]])
     elements = orbit["elements"]
 
+    # per orbit atom and per centre element, found once: the orbit's atoms
+    # outlive its rebuild, so only ``source`` differs between the two readers
+    eligible: dict[str, np.ndarray] = {}
+
     def ligand_rows(element: str, orbit: dict[str, Any]) -> np.ndarray:
-        eligible = anion & np.array([is_ligand(element, e) for e in elements], dtype=bool)
-        return np.nonzero(eligible[orbit["source"]])[0]
+        if element not in eligible:
+            eligible[element] = anion & np.array([is_ligand(element, e) for e in elements],
+                                                 dtype=bool)
+        return np.nonzero(eligible[element][orbit["source"]])[0]
 
     # every centre's window must lie inside the orbit, and the images of one
     # site all see the same shortest distance
@@ -1014,7 +1020,7 @@ def _polyhedra(sites: list[dict], orbit: dict[str, Any], cations: set[int],
         index, dist = index[order], dist[order]
         # atoms of two sites at one position are one ligand, their
         # occupancies summed, so a mixed O/F site is full and a split one is not;
-        # each joins the nearest of its twins, pairs coming sorted
+        # each joins its twin nearest the centre, the rows being sorted by distance
         root = np.arange(len(index))
         for i, j in sorted(cKDTree(cart[index]).query_pairs(SAME_POSITION)):
             root[j] = min(root[j], root[i])

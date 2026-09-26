@@ -514,6 +514,9 @@ describe("the polyhedra", () => {
     expect(radius([])).toBeLessThan(10);
     // switching it on does not move the zoom
     expect(radius([0])).toBe(radius([]));
+    // but the depth range still holds it, or its faces fall past the clip planes
+    const scene = buildScene(geo, { mode: "ball", polyhedra: [0] });
+    expect(scene.depth).toBeGreaterThan(Math.hypot(...[40, 40, 40].map((x, k) => x - scene.center[k])));
     // and a vertex of a shell drawn by default is in the fit
     geo.polyhedra[0].drawn_by_default = true;
     expect(radius([0])).toBeGreaterThan(30);
