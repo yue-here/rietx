@@ -44,6 +44,9 @@ export interface DrawnAtom {
   frac: number[];
   pos: number[];
   boundary: boolean;
+  /** in the payload only as a polyhedron's vertex, so drawn only while one of
+   *  its polyhedra is (WP-1466); absent reads as false */
+  vertex_only?: boolean;
   /** columns are the principal axes at one RMS displacement (Å) */
   ellipsoid: number[][];
   rms: number[];
@@ -207,40 +210,43 @@ export function polyhedronLabel(geometry: Geometry, polyhedron: Polyhedron): str
  *
  * `on` is the one switch, and its default is the mode's (WP-1466, P8): on in
  * ball mode, off in ellipsoid mode, where faces would cover the ADPs that mode
- * exists to show.  `species` holds the legend's switches per centre species;
- * a species it does not name takes the server's default (P5), which draws
+ * exists to show.  `formulas` holds the legend's switches, one per formula; a
+ * formula it does not name takes the server's default (P5), which draws
  * shells of four to six.  A polyhedron goes with its centre's species when
  * the atom legend hides that, and with its centre when the images outside the
  * cell are hidden.
  */
 export function shownPolyhedra(geometry: Geometry, on: boolean,
-                               species: ReadonlyMap<string, boolean>,
+                               formulas: ReadonlyMap<string, boolean>,
                                hidden: ReadonlySet<string> = new Set(),
                                showBoundary = true): number[] {
   if (!on) return [];
   return geometry.polyhedra.flatMap((p, i) => {
-    const centre = geometry.sites[p.site].species;
-    if (hidden.has(centre)) return [];
+    if (hidden.has(geometry.sites[p.site].species)) return [];
     if (!showBoundary && geometry.atoms[p.center].boundary) return [];
-    return (species.get(centre) ?? p.drawn_by_default) ? [i] : [];
+    return (formulas.get(polyhedronFormula(geometry, p)) ?? p.drawn_by_default) ? [i] : [];
   });
 }
 
-/** Centre species → its polyhedra legend entry, in the order the sites are
- *  declared, with the formulas it draws and whether the default draws any. */
+/**
+ * One legend switch per formula, in the order the server lists the
+ * polyhedra, coloured by the centre.
+ *
+ * Per formula rather than per species, because the default is per shell
+ * size (P5) and a formula fixes the size, so every polyhedron under one
+ * switch shares its default.  One switch for a species with a CaO₆ drawn and
+ * a CaO₈ hidden would read as on, and off then on would draw both, with no
+ * way back to the default.  A two-state switch per formula also reaches the
+ * one a three-state species switch cannot: the CaO₈ alone.
+ */
 export function polyhedraLegend(geometry: Geometry): Array<{
-  species: string; color: string; formulas: string[]; byDefault: boolean }> {
-  const out: Array<{ species: string; color: string; formulas: string[]; byDefault: boolean }> = [];
+  formula: string; color: string; byDefault: boolean }> {
+  const out: Array<{ formula: string; color: string; byDefault: boolean }> = [];
   for (const p of geometry.polyhedra) {
-    const site = geometry.sites[p.site];
-    let entry = out.find((e) => e.species === site.species);
-    if (!entry) {
-      entry = { species: site.species, color: site.color, formulas: [], byDefault: false };
-      out.push(entry);
-    }
     const formula = polyhedronFormula(geometry, p);
-    if (!entry.formulas.includes(formula)) entry.formulas.push(formula);
-    entry.byDefault ||= p.drawn_by_default;
+    if (!out.some((e) => e.formula === formula)) {
+      out.push({ formula, color: geometry.sites[p.site].color, byDefault: p.drawn_by_default });
+    }
   }
   return out;
 }
@@ -478,7 +484,10 @@ function drawable(m: number[][]): Mat3 {
  *
  * A drawn polyhedron (WP-1466) brings its faces and its edges, the edges as
  * lines in a darker ink of the centre's colour, and takes away its centre's
- * sticks to its own vertices.  The gap shell and the bond rule can disagree
+ * sticks to its own vertices.  An atom in the payload only as a polyhedron's
+ * vertex is drawn only while one of its polyhedra is: at the default bond
+ * tolerance, NAC's hidden NaF₇ and CaF₈ would leave 12 F with no stick and no
+ * face.  The gap shell and the bond rule can disagree
  * (NAC's Na: 4 sticks, 7 vertices), and drawing both would show the
  * contradiction rather than the shell.
  */
@@ -487,11 +496,14 @@ export function buildScene(geometry: Geometry, options: SceneOptions): Scene {
           exaggeration = 1, cell = "#1f5fa8", polyhedra = [] } = options;
   // a drawn polyhedron replaces its centre's sticks to its own vertices (P6)
   const replaced = new Set(polyhedra.flatMap((i) => geometry.polyhedra[i].bonds));
+  // and brings the atoms only a polyhedron needs, which come with no other
+  const corners = new Set(polyhedra.flatMap((i) => geometry.polyhedra[i].vertices));
   const atoms: SceneAtom[] = [];
   geometry.atoms.forEach((atom, index) => {
     const site = geometry.sites[atom.site];
     if (hidden.has(site.species)) return;
     if (atom.boundary && !showBoundary) return;
+    if (atom.vertex_only && !corners.has(index)) return;
     const shape = drawable(atomTransform(geometry, atom, mode, exaggeration));
     atoms.push({
       index,

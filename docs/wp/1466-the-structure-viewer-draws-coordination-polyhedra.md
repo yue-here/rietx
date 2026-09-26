@@ -196,9 +196,16 @@ confirmed that too on the same day.
   octahedra are the framework a chemist reads first. Shells of 7 or more
   qualify and start hidden, because with them NAC's cell fills with
   overlapping polyhedra. On the measured set the default draws the table in
-  § The phase-set measurement. The legend switches polyhedra per centre species.
+  § The phase-set measurement. The legend switches polyhedra per formula.
   *Amended 2026-09-26 from "7 and 8"*, so a perovskite's 12-coordinate A
-  site is covered.
+  site is covered. *Amended again 2026-09-26, from "per centre species".*
+  The default is per shell size and a formula fixes the size, so every
+  polyhedron under one switch shares its default. A per-species switch over
+  a CaO₆ drawn and a CaO₈ hidden read as on, and off then on drew both,
+  with no way back. A three-state species switch (the WAI-ARIA mixed
+  checkbox) restores the default but never shows the CaO₈ alone. Per
+  formula costs one extra button where a species has two shapes:
+  fluorapatite's Ca and andalusite's Al on the measured set.
 - **P6. The look follows VESTA, except inside a polyhedron.** Faces take the
   centre's colour at alpha 0.55, and edges a darker ink as WP-1462's D9
   quads. The centre atom stays. The sticks from the centre to its ligands
@@ -241,10 +248,6 @@ confirmed that too on the same day.
   Ca shell and loses its Ca sticks. Skipping pairs that are both partly
   occupied would break a disordered sulfate or perchlorate, whose partial S
   and O really are bonded, so the rule is the maintainer's call.
-- **A species whose shells are only partly drawn by default** (a CaO₆ site
-  beside a CaO₈ one) has one legend button, and off then on draws every
-  shell with no way back to the default. One button per formula would fix
-  it; P5 says per species.
 - **Every fetch recomputes the polyhedra**, so each release of the bond
   slider pays the search again: the review measured 75-85 ms on grossular.
   The probability control does not refetch.
@@ -268,6 +271,7 @@ confirmed that too on the same day.
 - [x] Server: the `polyhedra` arm, the ligand rule, the gap shell, the polyhedron conditions and the vertex partners, with tests in `tests/test_structure3d.py` (2026-09-26; the gap measure is the stand-in until task 2, and `POLYHEDRON_GAP` is measured at 1.15)
 - [x] Renderer: the translucent pass, the edges, and hover on a polyhedron (centre, ligand count, mean distance); a polyhedra case in `1462-spike/gate.py`'s script (2026-09-26; acceptance 3 in `1466-measure/results_*.txt`)
 - [x] GUI: the per-species toggles, P5's and P8's defaults, and the caption saying what is drawn (2026-09-26)
+- [x] The legend switches per formula, and a hidden polyhedron's own partner atoms hide with it (2026-09-26; P5)
 - [x] Docs: the structure viewer paragraphs in `gui/CLAUDE.md` and the GUI guide (2026-09-26)
 
 ## Acceptance

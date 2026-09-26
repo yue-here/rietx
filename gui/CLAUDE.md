@@ -316,10 +316,10 @@ translated image is correct and *reads* as broken — which is the line between 
 coordination and the packing diagram this WP declined. `probability` and
 `bond_tolerance` are drawing thresholds on the query string, never in
 `ProjectDoc`. **Polyhedra are chemistry, so the server builds them** (WP-1466):
-a centre is a cation, a ligand an anion, and a non-metal bonded to a more
-electronegative one is a cation (`_cation_sites`). A rule change re-runs
-`docs/wp/1466-measure/measure.py`, which writes the 21-phase default picture
-the tests hold (`tests/data/polyhedra_phases.json`).
+cation centres, anion ligands (`_cation_sites`). A rule change re-runs
+`docs/wp/1466-measure/measure.py`, writing the default picture the tests hold.
+**A legend switch is as fine as the default it restores** (per formula, since
+P5 is per shell size), and a hidden polyhedron's `vertex_only` atoms hide too.
 
 Its **look** (the second pass, 2026-07-30, read against VESTA, Jmol and
 3Dmol.js) is crystallography's rather than a plotting library's. **Parallel

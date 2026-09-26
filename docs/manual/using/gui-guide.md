@@ -321,16 +321,19 @@ Ball mode also draws coordination polyhedra: the shape the nearest anions make
 around a cation, such as SiO₄ or AlF₆. Shells of four to six ligands are drawn
 by default, which are the tetrahedra and octahedra of a framework. Larger
 shells, such as NAC's CaF₈, start switched off. The row under the species
-legend holds a `polyhedra` switch and one button per centre species, labelled
-with the formulas it draws. The switch is held per mode, so polyhedra start on
-in ball mode and off in ellipsoid mode, where the faces would cover the
-ellipsoids. A drawn polyhedron takes the place of its centre's sticks. Pointing
-at a face names the polyhedron, its ligand count, its mean distance and its
-gap, and the caption lists what is drawn and what is off.
+legend holds a `polyhedra` switch and one button per formula. A species with
+two shapes, such as a CaO₆ site beside a CaO₈ one, has two buttons. The switch
+is held per mode, so polyhedra start on in ball mode and off in ellipsoid mode,
+where the faces would cover the ellipsoids. A drawn polyhedron takes the place
+of its centre's sticks. It also brings the ligands it needs outside the cell,
+and they go when it is switched off. Pointing at a face names the polyhedron,
+its ligand count, its mean distance and its gap. The caption lists what is
+drawn and what is off.
 
 A centre is a metal, or a non-metal bonded to a more electronegative one, as P
-is in PO₄. A ligand is any other non-metal except hydrogen. The shell ends at
-the largest jump in the sorted ligand distances. It is drawn only when that
+is in PO₄. A ligand is any other non-metal except hydrogen. The ligands are
+searched out to three times the nearest one's distance, and the shell ends at
+the largest jump in their sorted distances. It is drawn only when that
 jump is at least 1.15 times, every ligand is a corner, and the centre is
 inside. On 21 test phases, from spinel to gypsum, this draws the picture a
 chemist would. It does not cover three cases:

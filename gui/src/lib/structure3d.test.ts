@@ -456,7 +456,7 @@ describe("the polyhedra", () => {
     expect(polyhedronLabel(geo, geo.polyhedra[0]))
       .toBe("SiO₄ around Si1  ·  4 ligands  ·  mean 1.600 Å  ·  gap ×2.00");
     expect(polyhedraLegend(geo)).toEqual([
-      { species: "Si", color: "#f0c8a0", formulas: ["SiO₄"], byDefault: true }]);
+      { formula: "SiO₄", color: "#f0c8a0", byDefault: true }]);
   });
 
   it("show by the server's default, until a switch or a legend says otherwise", () => {
@@ -464,14 +464,42 @@ describe("the polyhedra", () => {
     const hidden = tetrahedron({ drawn_by_default: false });
     expect(shownPolyhedra(shown, true, new Map())).toEqual([0]);
     expect(shownPolyhedra(hidden, true, new Map())).toEqual([]);
-    expect(shownPolyhedra(hidden, true, new Map([["Si", true]]))).toEqual([0]);
-    expect(shownPolyhedra(shown, true, new Map([["Si", false]]))).toEqual([]);
+    expect(shownPolyhedra(hidden, true, new Map([["SiO₄", true]]))).toEqual([0]);
+    expect(shownPolyhedra(shown, true, new Map([["SiO₄", false]]))).toEqual([]);
     // the one switch, and the atom legend hiding the centre's species
-    expect(shownPolyhedra(shown, false, new Map([["Si", true]]))).toEqual([]);
+    expect(shownPolyhedra(shown, false, new Map([["SiO₄", true]]))).toEqual([]);
     expect(shownPolyhedra(shown, true, new Map(), new Set(["Si"]))).toEqual([]);
     // an image's polyhedron goes with the images
     shown.atoms[0].boundary = true;
     expect(shownPolyhedra(shown, true, new Map(), new Set(), false)).toEqual([]);
+  });
+
+  it("switch per formula, so a species drawn in part can go back to its default", () => {
+    // one Si centre drawn as SiO₄ by default, and a second shell of it hidden
+    const geo = tetrahedron();
+    geo.polyhedra.push({ ...geo.polyhedra[0], vertices: [1, 2, 3], coordination: 3,
+                         drawn_by_default: false });
+    expect(polyhedraLegend(geo)).toEqual([
+      { formula: "SiO₄", color: "#f0c8a0", byDefault: true },
+      { formula: "SiO₃", color: "#f0c8a0", byDefault: false }]);
+    expect(shownPolyhedra(geo, true, new Map())).toEqual([0]);
+    // off and on again is the default, not every shell of the species
+    expect(shownPolyhedra(geo, true, new Map([["SiO₄", true]]))).toEqual([0]);
+    // and the hidden shell alone is reachable
+    expect(shownPolyhedra(geo, true, new Map([["SiO₄", false], ["SiO₃", true]])))
+      .toEqual([1]);
+  });
+
+  it("bring the atoms only they need, and no hidden one does", () => {
+    const geo = tetrahedron();
+    // a vertex only a polyhedron needs has no stick of its own
+    geo.atoms[4].vertex_only = true;
+    geo.bonds = geo.bonds.slice(0, 3);
+    geo.polyhedra[0].bonds = [0, 1, 2];
+    const atoms = (polyhedra: number[]) =>
+      buildScene(geo, { mode: "ball", polyhedra }).atoms.map((a) => a.index);
+    expect(atoms([])).toEqual([0, 1, 2, 3]);
+    expect(atoms([0])).toEqual([0, 1, 2, 3, 4]);
   });
 
   it("bring their faces and edges, and take their centre's sticks away", () => {

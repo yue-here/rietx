@@ -126,7 +126,7 @@
   let polyhedraIn = $state<Record<Mode, boolean>>({ ball: true, ellipsoid: false });
   /** The legend's switch per centre species (P5).  A species this does not
    *  name takes the server's default, which draws shells of four to six. */
-  let polySpecies = $state(new Map<string, boolean>());
+  let polyFormulas = $state(new Map<string, boolean>());
   /** Export the PNG on a transparent background rather than the panel's. */
   let transparent = $state(false);
   /** What is under the pointer: the readout strip's one line (WP-1213's rule —
@@ -138,7 +138,7 @@
 
   const entries = $derived(geo ? legend(geo) : []);
   const levels = $derived(geo ? Object.keys(geo.probability_levels) : []);
-  const shown = $derived(geo ? shownPolyhedra(geo, polyhedraIn[mode], polySpecies,
+  const shown = $derived(geo ? shownPolyhedra(geo, polyhedraIn[mode], polyFormulas,
                                                hidden, showBoundary) : []);
   const polyEntries = $derived(geo ? polyhedraLegend(geo) : []);
 
@@ -386,13 +386,13 @@
     }
   }
 
-  /** Whether the legend shows a centre species' polyhedra as on. */
-  function polyOn(species: string, byDefault: boolean): boolean {
-    return polyhedraIn[mode] && (polySpecies.get(species) ?? byDefault);
+  /** Whether the legend shows a formula's polyhedra as on. */
+  function polyOn(formula: string, byDefault: boolean): boolean {
+    return polyhedraIn[mode] && (polyFormulas.get(formula) ?? byDefault);
   }
 
-  function togglePolyhedra(species: string, byDefault: boolean) {
-    polySpecies = new Map(polySpecies).set(species, !(polySpecies.get(species) ?? byDefault));
+  function togglePolyhedra(formula: string, byDefault: boolean) {
+    polyFormulas = new Map(polyFormulas).set(formula, !(polyFormulas.get(formula) ?? byDefault));
   }
 
   function toggleSpecies(species: string) {
@@ -514,20 +514,20 @@
       {/each}
     </div>
     {#if polyEntries.length}
-      <!-- one switch for the mode it is pressed in, then one per centre
-           species: shells of four to six start on, larger ones off (P5) -->
+      <!-- one switch for the mode it is pressed in, then one per formula:
+           shells of four to six start on, larger ones off (P5) -->
       <div class="legend">
         <button class="ghost" class:on={polyhedraIn[mode]}
           onclick={() => (polyhedraIn[mode] = !polyhedraIn[mode])}
           title="coordination polyhedra: on in ball mode and off in ellipsoid mode
                  until switched, since faces would cover the ellipsoids">polyhedra</button>
-        {#each polyEntries as entry (entry.species)}
-          <button class="ghost" class:off={!polyOn(entry.species, entry.byDefault)}
+        {#each polyEntries as entry (entry.formula)}
+          <button class="ghost" class:off={!polyOn(entry.formula, entry.byDefault)}
             disabled={!polyhedraIn[mode]}
-            onclick={() => togglePolyhedra(entry.species, entry.byDefault)}
-            title="the {entry.species} polyhedra: the shell ends at the largest gap
+            onclick={() => togglePolyhedra(entry.formula, entry.byDefault)}
+            title="the {entry.formula} polyhedra: the shell ends at the largest gap
                    in its ligand distances">
-            <span class="dot" style="background:{entry.color}"></span>{entry.formulas.join(" ")}
+            <span class="dot" style="background:{entry.color}"></span>{entry.formula}
           </button>
         {/each}
       </div>
