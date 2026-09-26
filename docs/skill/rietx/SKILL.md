@@ -301,9 +301,9 @@ measured evidence behind each rule is
     phase's R_B with the major phase's**: neither is weighted, and a minor phase's
     windows sit under the major phase's peaks.
 
-**Adding parameters: use ΔBIC, not Hamilton's R-ratio.** Measured at 7251
-channels, Hamilton's test blesses a 0.13 % χ² improvement that is physically
-inert; ΔBIC carries the sample-size penalty powder channel counts need.
+**Adding a parameter: its t-ratio first, then ΔBIC at N/f².** A powder
+residual is serially correlated, so at raw N both ΔBIC and Hamilton's test
+bless any χ² gain. `rx.report.compare_freed(ref, trial)` returns the pair.
 
 **Comparing against another code means adopting its protocol, not just reading
 its numbers.** Mirror its refined-parameter set, its held parameters and its

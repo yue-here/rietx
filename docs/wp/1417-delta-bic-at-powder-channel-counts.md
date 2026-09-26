@@ -105,7 +105,7 @@ penalty. Same family, different mechanism, different fix.
 
 ## Tasks
 
-- [ ] Skill: rewrite `SKILL.md` § 4's ΔBIC rule and add the
+- [x] Skill: rewrite `SKILL.md` § 4's ΔBIC rule and add the
       `references/judging.md` row: at powder channel counts ΔBIC on raw N
       blesses any improvement; the parameter's esd and `esd_inflation`
       outrank both statistics. Paid for by a cut, per root CLAUDE.md § skill.
