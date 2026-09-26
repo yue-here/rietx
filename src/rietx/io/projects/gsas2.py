@@ -1354,8 +1354,10 @@ def _report(model: Gsas2Model, diagnostics: list[Diagnostic]) -> None:
                 level="warning", code="GSAS2_GPX_PHASE_MAGNETIC",
                 message=(
                     f"{named}: phase {phase.name!r} is a magnetic phase "
-                    f"(GSAS-II phase type {phase.kind!r}) and rietx has no "
-                    f"magnetic scattering model"),
+                    f"(GSAS-II phase type {phase.kind!r}), and this reader "
+                    f"does not read a `.gpx` magnetic block yet — a magCIF of "
+                    f"the structure is the route that does "
+                    f"(`Structure.from_cif`)"),
                 where=[f"phases.{phase.number}"]))
         elif phase.magnetic_partner:
             diagnostics.append(Diagnostic(
@@ -1408,10 +1410,11 @@ def to_structure(model: Gsas2Model, *, phase: str | int | None = None,
 
     Four refusals, each naming what it would otherwise have dropped:
 
-    * **A magnetic phase.**  rietx has no magnetic scattering model, so the
-      nuclear half is all that could be imported and it would look complete —
-      the stance :mod:`~rietx.io.projects.coverage` declares for the sibling
-      readers, reached here through the same sentence.
+    * **A magnetic phase.**  This reader does not read a ``.gpx`` magnetic
+      block yet (the operators with their time-reversal signs and the site
+      moments), so the nuclear half is all that could be imported and it would
+      look complete.  A magCIF of the same structure is the route that reads
+      (``Structure.from_cif``).
     * **A macromolecular phase**, whose atom records carry three more columns
       before the label than this reader reads.
     * **An anisotropic site.**  The six ``Uij`` are on the model, but which
@@ -1448,10 +1451,15 @@ def to_structure(model: Gsas2Model, *, phase: str | int | None = None,
     if chosen.magnetic:
         raise Gsas2GpxError(
             f"{named}: phase {chosen.name!r} is magnetic (GSAS-II phase type "
-            f"{chosen.kind!r}) and rietx has no magnetic scattering model.  "
-            f"Importing its nuclear half would hand back a structure that "
-            f"looks complete while the magnetic contribution went unmentioned. "
-            f" The numbers are on `model.phases`")
+            f"{chosen.kind!r}), and this reader does not read a `.gpx` "
+            f"magnetic block yet: it would need the magnetic operators "
+            f"with their time-reversal signs and each site's moment "
+            f"components mapped onto "
+            f"`Phase.magnetic_symmetry` and `Atom.moment`, and nothing in the "
+            f"project tree is.  Importing its nuclear half would hand back a "
+            f"structure that looks complete while the magnetic contribution "
+            f"went unmentioned.  The numbers are on `model.phases`; a magCIF "
+            f"of the same structure reads, through `Structure.from_cif`")
     if chosen.kind.lower().startswith("macro"):
         raise Gsas2GpxError(
             f"{named}: phase {chosen.name!r} is macromolecular (GSAS-II phase "

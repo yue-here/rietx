@@ -29,7 +29,13 @@ asserted against the lines actually parsed, and :func:`to_structure` builds a
 :class:`~rietx.schemas.Structure`.
 
 **Read but not modelled: magnetic phases** (``Jbt = 1``, both ``Isy = -1`` and
-``Isy = -2`` sub-grammars). rietx has no magnetic scattering model, so a
+``Isy = -2`` sub-grammars). rietx *does* have a magnetic model since WP-1327 —
+a moment on a site of a nuclear phase, under a magnetic space group given as an
+operator list — and a ``Jbt = 1`` phase still does not fit it, for the two
+reasons :data:`MAGNETIC_PHASE_REFUSAL` states: it is a **pure magnetic** phase
+with its own scale and no nuclear half (FullProf's spelling of a TOPAS
+``mag_only``), and its symmetry is a magnetic *representation* whose matrices
+need not be the Shubnikov axial action. So a
 magnetic phase cannot become a :class:`~rietx.schemas.Phase`. It is neither
 dropped nor allowed to make the file unreadable: :func:`read_fullprof_pcr`
 returns it in full on :attr:`FullProfModel.phases`, and
@@ -163,6 +169,53 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from ...schemas import Structure
 
 # --------------------------------------------------------------------- errors
+
+
+#: Why a ``Jbt = 1`` phase is refused, once, so the read-time report and the
+#: build-time refusal cannot drift apart (WP-1328).
+#:
+#: **The reason changed and the old one had gone stale**, which is the failure
+#: worth naming here: until WP-1327 the sentence was "rietx has no magnetic
+#: scattering model", and that is now false — rietx has one. What it does not
+#: have is a shape for *this* construct, and the two are different refusals with
+#: different remedies. A ``Jbt = 1`` phase is a **pure magnetic** phase, which
+#: is FullProf's spelling of what a TOPAS ``.inp`` writes as ``mag_only``
+#: (:mod:`.coverage` refuses that keyword for the same argument): only the
+#: magnetic atoms are listed (``Nat 1`` in the corpus's ``Isy = -1`` file), the
+#: species is a magnetic form-factor table name rather than an element
+#: (``MCR3``), the symbol line is the placeholder ``P -1`` rather than a space
+#: group, and the phase carries its **own** ``Scale``. WP-1327's model is a
+#: moment on a site of a *nuclear* phase sharing one scale, so there is nothing
+#: here for the file's own decomposition to land in.
+#:
+#: The symmetry is the second half, and it is the harder one. FullProf states a
+#: magnetic phase's symmetry as a **magnetic representation** — ``SYMM`` with
+#: one or more magnetic matrices ``MSYM`` *and a phase*, or basis vectors of an
+#: irrep (``BASR``/``BASI``) — and those matrices are not required to be the
+#: Shubnikov axial action ε·det(R)·R that WP-1327's operator list stores. The
+#: corpus's own ``Isy = -1`` pair is the evidence for the caution rather than
+#: against it: ``SYMM Y, X, -Z+1`` with ``MSYM -u,-v,w`` gives a moment matrix
+#: of diag(−1,−1,1) where ε·det(R)·R for that rotation is the off-diagonal
+#: (v, u, −w), so the two cannot both be read as a Shubnikov operator, and
+#: **which reading is right is not something any file on this tree settles**.
+#: So the conversion is refused rather than guessed, per ``io/CLAUDE.md``'s rule
+#: for a construct with no evidence: a wrong ε is a fit under the wrong magnetic
+#: group, reported with a confident esd.
+MAGNETIC_PHASE_REFUSAL = (
+    "A Jbt = 1 phase is a *pure magnetic* phase — no nuclear structure factor, "
+    "its own Scale, only the magnetic atoms listed, and a magnetic "
+    "form-factor label in the species column — and rietx's magnetic model is a "
+    "moment on a site of a nuclear phase sharing one scale (WP-1327), so the "
+    "file's own decomposition has nowhere to land. Its symmetry is a magnetic "
+    "*representation* besides (SYMM with magnetic matrices and a phase under "
+    "Isy = -1, basis vectors of an irrep under Isy = -2), and those matrices "
+    "need not be the Shubnikov axial action eps*det(R)*R that a magnetic space "
+    "group's operator list is, so converting them would be a guess about the "
+    "physics rather than a reading of the file. What would make this readable: "
+    "the phase restated as a nuclear phase carrying moments — which is what a "
+    "magCIF states, and `rietx.Structure.from_cif` reads one (WP-1328) — or a "
+    "file that settles FullProf's MSYM convention against a known magnetic "
+    "space group.")
 
 
 class FullProfPcrError(ValueError):
@@ -539,8 +592,9 @@ class FullProfPhase:
 
     @property
     def is_magnetic(self) -> bool:
-        """``Jbt = 1``. rietx has no magnetic scattering model, so this phase
-        can be reported but not built — see the module docstring's decision 1."""
+        """``Jbt = 1``. A pure magnetic phase has no shape in rietx's magnetic
+        model (:data:`MAGNETIC_PHASE_REFUSAL`), so this phase can be reported
+        but not built — see the module docstring's decision 1."""
         return self.jbt == 1
 
     @property
@@ -671,8 +725,8 @@ def normalize_species(token: str) -> str:
 
     A token that does not look like an element with an optional charge —
     ``MCR3``, a magnetic form-factor table name — is returned **verbatim**.
-    rietx has no magnetic form factors, so inventing ``Mc`` + charge from it
-    would be a species that means nothing, and the phase carrying it is refused
+    It is not an element, so inventing ``Mc`` + charge from it would be a
+    species that means nothing, and the phase carrying it is refused
     at :func:`to_structure` anyway.
     """
     stripped = re.sub(r"[^A-Za-z0-9+-]", "", token)
@@ -1232,7 +1286,18 @@ def _read_phase(cur: _Cursor, path: Path, index: int) -> FullProfPhase:
             f"{where}: Jbt = {jbt}. Only Jbt 0 (nuclear) and Jbt 1 (magnetic) "
             f"are evidenced here; the others select Le Bail intensity "
             f"extraction, a combined nuclear+magnetic phase or a form-factor "
-            f"phase, each of which changes the atom block's own layout.")
+            f"phase, each of which changes the atom block's own layout. In "
+            f"particular the **Fourier-component** magnetic forms — a phase "
+            f"whose moments are stated as amplitudes per propagation vector "
+            f"rather than as one moment per site — are outside rietx's "
+            f"magnetic model whatever their Jbt: WP-1327 carries a single "
+            f"commensurate moment per site, and a (3+d)-dimensional "
+            f"modulation has no shape here (the same fence "
+            f"`rietx.Structure.from_cif` states by name for a magCIF's "
+            f"_atom_site_moment_Fourier loop). Which Jbt selects which of "
+            f"those layouts is **not** something this reader claims to know: "
+            f"no file it was written against states one, and guessing would "
+            f"desynchronise every line after this — a .pcr is positional.")
     # `Ang` when Jbt = 0, `Mom` when Jbt = 1 — one column, two header words
     # (trap 2). A nuclear phase's non-zero `Ang` opens an angle-restraint block
     # whose position nothing here establishes; a magnetic phase's `Mom` is the
@@ -2003,8 +2068,9 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
 
     Six refusals, each naming what it would otherwise have dropped:
 
-    * **A magnetic phase.** rietx has no magnetic scattering model, so returning
-      the nuclear phases alone would hand back a structure that looks complete
+    * **A magnetic phase.** A ``Jbt = 1`` phase has no shape in rietx's
+      magnetic model (:data:`MAGNETIC_PHASE_REFUSAL`), so returning the nuclear
+      phases alone would hand back a structure that looks complete
       while the file's magnetic contribution — and its R_Bragg — went
       unmentioned. ``nuclear_only=True`` is how a caller *declares* it wants the
       nuclear subset; the omission is then the caller's, and named in the
@@ -2059,12 +2125,12 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
                           f"{len(ph.atoms)} sites)" for ph in magnetic)
         raise FullProfPcrError(
             f"{model.path or '<model>'}: {len(magnetic)} of {len(model.phases)} "
-            f"phases are magnetic and rietx has no magnetic scattering model: "
-            f"{named}. Returning only the nuclear phases would hand back a "
-            f"structure that looks complete while those phases' contribution "
-            f"went unmentioned. Read `model.magnetic_phases` for what the file "
-            f"states about them, or pass nuclear_only=True to declare that the "
-            f"nuclear subset is what you want.")
+            f"phases are magnetic: {named}. {MAGNETIC_PHASE_REFUSAL} Returning "
+            f"only the nuclear phases would hand back a structure that looks "
+            f"complete while those phases' contribution went unmentioned. Read "
+            f"`model.magnetic_phases` for what the file states about them, or "
+            f"pass nuclear_only=True to declare that the nuclear subset is "
+            f"what you want.")
 
     phases = []
     # Keyed by the raw file token, so ``CR`` on two sites is one diagnostic
@@ -2259,6 +2325,30 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
             f"`model.magnetic_phases` for what it does say about them.")
     if diagnostics is not None:
         named = model.path or "<model>"
+        # `nuclear_only=True` makes the omission the *caller's* declared choice,
+        # which is not the same as the omission being invisible (WP-1328): the
+        # channel still says which phases went, what each stated, and its
+        # R_Bragg, so a caller who asked for the nuclear subset can still see
+        # the size of what they asked to drop.
+        for ph in model.magnetic_phases:
+            moment_columns = sorted(
+                {k for atom in ph.atoms for k in ("m1", "m2", "m3")
+                 if atom.values.get(k)})
+            diagnostics.append(Diagnostic(
+                level="warning", code="FULLPROF_MAGNETIC_PHASE_OMITTED",
+                where=[f"phases.{ph.index}"],
+                value=ph.r_bragg,
+                message=(f"{named}: phase {ph.index} ({ph.name!r}) is magnetic "
+                         f"(Jbt {ph.jbt}, Isy {ph.isy}, {len(ph.atoms)} site"
+                         f"{'' if len(ph.atoms) == 1 else 's'}, "
+                         f"{len(ph.propagation_vectors)} propagation vector"
+                         f"{'' if len(ph.propagation_vectors) == 1 else 's'}, "
+                         f"non-zero moment columns "
+                         f"{', '.join(moment_columns) or 'none'}"
+                         + (f", R_Bragg {ph.r_bragg}" if ph.r_bragg is not None
+                            else "")
+                         + ") and nuclear_only=True omitted it"),
+                suggestion=MAGNETIC_PHASE_REFUSAL))
         for raw, (canonical, wheres) in rewrites.items():
             diagnostics.append(Diagnostic(
                 level="info", code="FULLPROF_SPECIES_NORMALISED",

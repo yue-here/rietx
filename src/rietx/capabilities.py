@@ -534,7 +534,7 @@ def _features() -> dict[str, bool]:
     from .model import compiled
     from .refine import Refinement
     from .schemas.instrument import Geometry, Instrument, Source
-    from .schemas.structure import Atom, Phase
+    from .schemas.structure import Atom, Phase, Structure
 
     return {
         # corrections and model extensions, asked of the schemas
@@ -556,6 +556,13 @@ def _features() -> dict[str, bool]:
         # flag here.
         "magnetic_moments": ("magnetic_symmetry" in Phase.model_fields
                              and "moment" in Atom.model_fields),
+        # whether a magCIF reads and writes — the interchange half (WP-1328),
+        # which `magnetic_moments` does not answer: a build could carry the
+        # model and not the format.  Derived from the reader's own signature
+        # rather than from a module's existence, so it flips if the arm is
+        # removed and not merely if a file is renamed.
+        "magnetic_interchange": "moment_ions" in inspect.signature(
+            Structure.from_cif).parameters,
         "surface_roughness": "surface_roughness" in Geometry.model_fields,
         "capillary_absorption": "mu_r" in Geometry.model_fields,
         "flat_plate_absorption": "mu_t" in Geometry.model_fields,

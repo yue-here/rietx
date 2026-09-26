@@ -486,19 +486,69 @@ def test_the_certified_standards_protocol_survives_the_round_trip(tmp_path):
 
 # ------------------------------------------- report or refuse, never drop
 
-def test_a_magnetic_phase_is_refused_by_name(tmp_path):
-    """rietx has no magnetic structure model, so returning the nuclear half
-    silently would hand back a model that looks complete.
+def test_mag_space_group_is_not_read_as_the_nuclear_one(tmp_path):
+    """`mag_space_group` must not reach `space_group`, and the pin outlives the
+    refusal that used to hide the question.
 
     Found by compiling every structure the reader returns: `mag_space_group
     62.448` matched an unanchored `space_group` and arrived as the *symbol*
-    "62.448", which gemmi then refused a long way from the cause.
+    "62.448", which gemmi then refused a long way from the cause. Until
+    WP-1328 a read-time raise on `mag_space_group` masked that — the keyword
+    could not reach a built phase at all. Now the magnetic construct is read
+    (WP-1327 gave the package a magnetic model, and `coverage`'s
+    `magnetic space group` row is the declared stance), so the collision is a
+    live question again and this is the only thing asserting the answer: `\\b`
+    is what keeps the two apart, since `mag_space_group` offers no word
+    boundary before `space`.
     """
     inp = _inp(tmp_path, "mag.inp",
-               'str\nphase_name "LaMnO3_mag"\nmag_space_group 62.448\na 5.7\n'
-               'site Mn1 x 0 y 0 z 0 occ Mn+3 1 beq b 0.5\n')
-    with pytest.raises(TopasInpError, match="magnetic space group"):
-        read_topas_inp(inp)
+               'str\nphase_name "LaMnO3_mag"\nspace_group "P n m a"\n'
+               'mag_space_group 62.448\na 5.7 b 7.6 c 5.5\n'
+               'site Mn1 x 0 y 0 z 0 occ Mn+3 1 beq b 0.5 mlx 3.4\n')
+    model = read_topas_inp(inp)
+    (phase,) = model.phases
+    assert phase.space_group == "P n m a"
+    assert phase.mag_space_group == "62.448"
+    assert phase.sites[0].moment == {"mlx": 3.4}
+    # ... and the keyword is *read* (a number is the group), so nothing about
+    # it is left to report.
+    assert not model.coverage.reported
+    assert coverage.stance("mag_space_group") is coverage.Stance.READ
+
+
+def test_a_magnetic_phase_takes_its_bns_number_and_refuses_a_bare_symbol(
+        tmp_path):
+    """A `mag_space_group` number is the group; a symbol still is not.
+
+    Reading a magnetic `.inp` does not raise — the moments are on the model —
+    and a BNS number resolves on its own (spglib, the standard setting), so
+    `to_structure` builds with no caller spec and says where the group came
+    from. A Shubnikov *symbol* gives no operator list, so the refusal stays at
+    `to_structure`, naming the phase, the sites and the symbol.
+    """
+    text = ('str\nphase_name "LaMnO3_mag"\nspace_group "P n m a"\n'
+            'mag_space_group 62.448\na 5.7 b 7.6 c 5.5\n'
+            'site Mn1 x 0 y 0 z 0 occ Mn+3 1 beq b 0.5 mlx 0.6\n')
+    built_diags: list = []
+    built = to_structure(read_topas_inp(_inp(tmp_path, "mag.inp", text)),
+                         diagnostics=built_diags)
+    assert built.phases[0].magnetic_symmetry.bns_number == "62.448"
+    assert built.phases[0].space_group == "P n m a"
+    # mlx is fractional: 0.6 of a 5.7 Å edge is 3.42 mu_B along a
+    assert built.phases[0].atoms[0].moment.values() == pytest.approx(
+        (0.6 * 5.7, 0.0, 0.0))
+    (read,) = [d for d in built_diags if d.code == "TOPAS_MAGNETIC_GROUP_READ"]
+    assert "'62.448'" in read.message
+    assert read.where == ["phases.0.magnetic_symmetry"]
+
+    symbol = read_topas_inp(_inp(tmp_path, "sym.inp", text.replace(
+        "mag_space_group 62.448", "mag_space_group \"P n' m a'\"")))
+    with pytest.raises(TopasInpError, match="Shubnikov") as excinfo:
+        to_structure(symbol)
+    assert "P n' m a'" in str(excinfo.value)
+    assert "'Mn1'" in str(excinfo.value)
+    built = to_structure(symbol, magnetic_symmetry="62.448")
+    assert built.phases[0].magnetic_symmetry.bns_number == "62.448"
 
 
 def test_an_inp_with_no_structural_phase_refuses_naming_the_file(tmp_path):

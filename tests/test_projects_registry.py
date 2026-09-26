@@ -274,11 +274,14 @@ def test_read_project_model_tags_the_answer_with_its_format(tmp_path):
 
 
 def test_the_inp_reader_reports_its_repairs_at_read(tmp_path):
-    """``reports_at="read"``, exercised rather than asserted from the table."""
+    """``reports_at="both"`` (the magnetic chain's TOPAS_MOMENT_* diagnostics
+    added the build half; this call exercises the read half, still the one
+    a plain import with no ``magnetic_symmetry=`` reaches), exercised rather
+    than asserted from the table."""
     diagnostics: list = []
     model = read_project_model(_write(tmp_path, "run.inp", INP_MINIMAL),
                                diagnostics=diagnostics)
-    assert model.format.reports_at == "read"
+    assert model.format.reports_at == "both"
     assert model.stated.r_wp == pytest.approx(9.73)
     structure = model.to_structure()
     assert [p.name for p in structure.phases] == ["corundum"]
@@ -420,7 +423,7 @@ def test_every_project_format_appears_in_the_capabilities_arm():
     # the arm states what each file carries *beyond* a structure, which is what
     # a client asks before it reads a model it has no common shape for
     assert "refine flags" in " ".join(by_name["topas_inp"].carries)
-    assert by_name["topas_inp"].reports_at == "read"
+    assert by_name["topas_inp"].reports_at == "both"
     assert by_name["fullprof_pcr"].reports_at == "build"
 
 

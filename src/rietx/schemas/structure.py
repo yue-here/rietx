@@ -17,6 +17,7 @@ from __future__ import annotations
 import functools
 import math
 from collections.abc import Sequence
+from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -1249,11 +1250,30 @@ class Structure(Base):
 
     @classmethod
     def from_cif(cls, path: str, *, phase_name: str | None = None,
-                 aniso: bool = False, diagnostics: list | None = None,
+                 aniso: bool = False,
+                 moment_ions: dict[str, str] | None = None,
+                 moment_g: dict[str, float] | None = None,
+                 nuclear_group: Literal["auto", "parent", "file"] = "auto",
+                 diagnostics: list | None = None,
                  ) -> "Structure":
+        """Read a CIF, or a **magCIF**, into a :class:`Structure`.
+
+        ``moment_ions`` and ``moment_g`` state, per site label, the two
+        quantities the magnetic dictionary has no item for: the ion whose form
+        factor a moment scatters with (``{"Mn1": "Mn3+"}``) and the Landé g a
+        4f moment needs.  Forwarded, not interpreted — see
+        ``crystallography.cif.structure_from_cif`` for the whole of the read
+        and for the two magnetic constructs it refuses by name (WP-1328).
+        ``nuclear_group`` chooses which group a magCIF's atom positions refine
+        under: ``"auto"`` (the highest tabulated group the file's atoms
+        satisfy, reported either way), ``"parent"`` or ``"file"`` (issue
+        #457).
+        """
         from ..crystallography.cif import structure_from_cif
 
         return structure_from_cif(path, phase_name=phase_name, aniso=aniso,
+                                  moment_ions=moment_ions, moment_g=moment_g,
+                                  nuclear_group=nuclear_group,
                                   diagnostics=diagnostics)
 
     def to_cif(self, path: str) -> None:
