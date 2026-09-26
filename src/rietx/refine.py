@@ -2661,12 +2661,21 @@ class Refinement:
             # caller asked for events at all — one forward evaluation, not a
             # fit, the same pattern _record uses for a history node's metrics.
             # background(values) computed once and reused, never twice —
-            # evaluate() is background + bragg_component internally, so
-            # calling both would price this at two background passes
+            # evaluate() is background [+ extra_peak_curve] + bragg_component
+            # internally, so calling both would price this at two background
+            # passes.  The sum is therefore evaluate()'s, restated in its own
+            # association order: a declared peak is in the model the stage
+            # fitted but not in background(), and leaving it out made every
+            # stage Rwp that of a model with the peaks deleted (#441); a model
+            # declaring none keeps the two-term sum, bit for bit.
             values = table.decode(outcome.theta)
             y_bkg = model.background(values)
+            y_stage = (y_bkg + model.bragg_component(values)
+                       if not model.peak_components else
+                       y_bkg + model.extra_peak_curve(values)
+                       + model.bragg_component(values))
             stage_rwp = compute_statistics(
-                model.y_obs, y_bkg + model.bragg_component(values), model.sigma,
+                model.y_obs, y_stage, model.sigma,
                 n_free=len(table.free_paths) + _pawley_n(model),
                 y_background=y_bkg).rwp
             events.emit("stage_end", stage=stage.name, status=outcome.status,
@@ -2797,9 +2806,15 @@ class Refinement:
         sinks = _snapshot_sinks(stream, events, recorder)
         try:
             if stream is not None:
+                from .project import fitted_mask
+
+                # the fitted count, as every ``stage_start``'s is, and the
+                # file's beside it (#441): ``fitted_mask`` is the authority
+                # ``compile_model`` is pinned to (WP-1033)
                 stream.emit("fit_start", mode=mode,
                             stages=[s.name for s in plan.stages],
-                            n_points=len(data.two_theta))
+                            n_points=int(fitted_mask(data, two_theta_limits).sum()),
+                            n_points_file=len(data.two_theta))
 
             # Stages are cumulative *within the plan*, and the plan drives the whole
             # turn-on sequence: `restore=False` holds everything first, so a fit

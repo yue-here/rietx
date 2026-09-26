@@ -686,3 +686,122 @@ def test_cherry_pick_replays_a_stage_action(synthetic_pattern):
 
     with pytest.raises(ValueError, match="stage"):
         other.cherry_pick(ref.history.root.id, synthetic_pattern)
+
+
+# ----------------------------------------------------------------------
+# stage_end.rwp is the Rwp of the model the stage fitted (WP-1457, #441)
+# ----------------------------------------------------------------------
+def _one_stage_fit(*, peak: bool, two_theta_limits=None):
+    """A one-stage LaB6 fit freeing only linear parameters, events captured.
+
+    Scale, background and a declared peak's area are all the model is linear
+    in, so the final compile (#272) rebuilds the stage's own reflection list
+    and windows and ``fit_end.rwp`` is evaluated on the same model at the same
+    values: the two Rwps may then be compared to the bit.
+    """
+    from rietx.model.forward import compile_model
+    from rietx.params.vector import ParameterTable
+    from rietx.schemas.common import Parameter
+    from rietx.schemas.instrument import BackgroundChebyshev, PeakComponent
+    from tests.test_refine_synthetic import (
+        TRUE_A,
+        TRUE_BKG,
+        TRUE_SCALE,
+        TRUE_W,
+        TRUE_ZERO,
+        WAVELENGTH,
+    )
+    from tests.test_schemas import make_lab6
+
+    def models(area):
+        structure = make_lab6()
+        for name in ("a", "b", "c"):
+            getattr(structure.phases[0].cell, name).value = TRUE_A
+        structure.phases[0].scale.value = TRUE_SCALE
+        ins = rx.Instrument.debye_scherrer(wavelength=WAVELENGTH)
+        ins.source.dispersion = None      # declared, never inherited
+        ins.zero_shift.value = TRUE_ZERO
+        ins.profile.w.value = TRUE_W
+        ins.background = BackgroundChebyshev(
+            coefficients=[Parameter(value=v) for v in TRUE_BKG])
+        if peak:
+            ins.extra_components = [PeakComponent(
+                label="stray",
+                center=Parameter(value=11.3, min=11.2, max=11.4),
+                area=Parameter(value=area, min=0.0),
+                fwhm=Parameter(value=0.08, min=0.02, max=0.3))]
+        return structure, ins
+
+    structure, ins = models(area=40.0)
+    tt = np.arange(3.0, 24.0, 0.005)
+    grid = rx.PatternData(two_theta=tt.tolist(),
+                          intensity=np.zeros_like(tt).tolist())
+    table = ParameterTable(structure, ins)
+    y = compile_model(structure, ins, grid, mode="rietveld").evaluate(
+        table.decode(table.x0()))
+    y = np.random.default_rng(7).poisson(np.maximum(y, 1.0)).astype(float)
+    data = rx.PatternData(two_theta=tt.tolist(), intensity=y.tolist())
+
+    structure, ins = models(area=15.0)
+    structure.phases[0].scale.value = TRUE_SCALE * 1.8
+    ins.background = BackgroundChebyshev.with_terms(3)
+    free = ["phases.0.scale", "instrument.background.*"]
+    if peak:
+        free.append("instrument.extra_components.0.area")
+    seen: list[dict] = []
+    result = rx.Refinement(structure, ins, history=False).fit(
+        data, plan=rx.RefinementPlan(stages=[Stage("all", free)]),
+        two_theta_limits=two_theta_limits, events=seen.append, telemetry=False)
+
+    def of(kind):
+        return [e["data"] for e in seen if e["kind"] == kind]
+    return data, result, of
+
+
+def test_stage_end_rwp_counts_the_declared_peaks():
+    """A declared ``PeakComponent`` is in the model a stage fitted (#441).
+
+    The stage block summed ``background + bragg_component`` and never
+    ``extra_peak_curve``, so every ``stage_end.rwp`` — the progress line and
+    ``status.json``'s — was the Rwp of the model with the declared peaks
+    deleted.  Before the fix this fit read ``stage_end.rwp`` 0.06075 against a
+    ``fit_end.rwp`` of 0.04039 (macOS arm64); after it, the two agree to the bit.
+    """
+    _, result, of = _one_stage_fit(peak=True)
+    [stage_end] = of("stage_end")
+    [fit_end] = of("fit_end")
+    assert stage_end["rwp"] == fit_end["rwp"] == result.statistics.rwp
+
+
+# this fit's ``stage_end.rwp`` on ``54a049d2``, before the fix (macOS arm64)
+PRE_FIX_NO_PEAK_RWP = float.fromhex("0x1.49dc04b678889p-5")
+
+
+def test_a_fit_without_peaks_keeps_its_stage_rwp_to_the_bit():
+    """The fix adds a term only when a peak is declared (WP-1457).
+
+    ``CompiledModel.evaluate`` keeps its no-peak arm's association on purpose,
+    and so does the stage block, so a fit without peaks reads the stage Rwp it
+    read before.  The bit-level bar is the one that holds on every platform:
+    the stage Rwp equals ``fit_end``'s, which is ``evaluate``'s no-peak arm,
+    ``background + bragg_component`` — the pre-fix sum.  The value measured
+    before the fix is pinned beside it at 1e-12, which a change of association
+    would still clear, so it guards the number rather than its last digit.
+    """
+    _, result, of = _one_stage_fit(peak=False)
+    [stage_end] = of("stage_end")
+    [fit_end] = of("fit_end")
+    assert stage_end["rwp"] == fit_end["rwp"] == result.statistics.rwp
+    assert stage_end["rwp"] == pytest.approx(PRE_FIX_NO_PEAK_RWP, rel=1e-12)
+
+
+def test_fit_start_counts_the_fitted_channels_and_names_the_file_count():
+    """``fit_start.n_points`` is the fitted count, as every ``stage_start``'s
+    is; the file's own count rides beside it as ``n_points_file`` (#441)."""
+    data, result, of = _one_stage_fit(peak=False, two_theta_limits=(5.0, 20.0))
+    [fit_start] = of("fit_start")
+    [stage_start] = of("stage_start")
+    assert fit_start["n_points"] == stage_start["n_points"] \
+        == result.statistics.n_points == len(result.two_theta)
+    assert fit_start["n_points_file"] == len(data.two_theta)
+    assert fit_start["n_points"] < fit_start["n_points_file"]
