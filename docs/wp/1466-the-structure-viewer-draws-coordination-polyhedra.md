@@ -1,8 +1,9 @@
 # WP-1466 — the structure viewer draws coordination polyhedra
 
-Milestone: unscheduled · Status: 🔄 2026-09-26 — claimed by @yue-here
+Milestone: unscheduled · Status: 🔄 2026-09-26 — every task done; it closes on the
+maintainer's call on the split anion site
 Depends on: 1462
-Priority: P3 2026-09-26 — WP-1462 closed, so its one blocker is gone; P1-P9 are confirmed, P3's gap measure waits on Brunner & Schwarzenbach (1971) and the electronegativities on Allred (1961)
+Priority: P3 2026-09-26 — every task is done, and the close waits on one maintainer call (§ Where it will bite, the split anion site)
 
 ## Goal
 
@@ -253,6 +254,11 @@ confirmed that too on the same day.
   Ca shell and loses its Ca sticks. Skipping pairs that are both partly
   occupied would break a disordered sulfate or perchlorate, whose partial S
   and O really are bonded, so the rule is the maintainer's call.
+- **A large hidden shell can lose its room at the atom cap.** A shell of 24
+  needs up to 24 partner atoms. The shells drawn by default claim room first,
+  so the default picture keeps its polyhedra. A hidden one dropped at the cap
+  leaves the legend, and the payload's note counts it (P7). None dropped on
+  the measured set, where grossular's payload is 383 of 400 atoms.
 - **Every fetch recomputes the polyhedra**, so each release of the bond
   slider pays the search again: the review measured 75-85 ms on grossular.
   The probability control does not refetch.
@@ -312,6 +318,102 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-1462 and its spike, `docs/wp/1462-spike/`.
 
 ## Handover log
+
+### 2026-09-26 (2nd session) — the gap rule is Brunner & Schwarzenbach's, the legend switches per formula, and the electronegativities are checked
+
+Both papers are read, and the viewer now follows them. Brunner &
+Schwarzenbach measure a gap exactly as the spike did, by the ratio of the two
+distances around it. They look further, though: the whole sequence out to three
+times the nearest distance. That uncovered two shells the old 13-ligand search
+had hidden, and no default picture changed on the 21 phases. Allred's table
+confirms 14 of the 18 electronegativities to the last digit and has none for
+the other four. The legend now has one button per formula, so a species drawn
+in part can go back to its default. A hidden polyhedron no longer leaves its
+ligands behind as stray atoms. Every task is ticked. The WP closes when the
+maintainer rules on the split anion site.
+
+*Decided.* The legend's granularity (the maintainer said "use best practice").
+One button per formula, because P5's default is per shell size and a formula
+fixes the size. The alternative from accessibility practice is a three-state
+species button (the WAI-ARIA mixed checkbox). It restores a partial default
+but can never show a CaO₈ alone. P5 records the amendment.
+
+*Done.*
+
+- `structure3d.SHELL_REACH` = 3: every ligand out to three times the
+  centre's shortest distance, and no cap on the shell. The orbit grows once
+  when a large cation's window passes 6 Å. The twin merge is a KD-tree pair
+  query, since the uncapped window made the old loop quadratic.
+- `vertex_only` on an atom the payload carries only for a polyhedron. The
+  client draws it, counts it in the caption and fits the zoom to it only
+  where a polyhedron that uses it is drawn, or drawn by default. Shells
+  drawn by default claim room under the 400-atom cap first.
+- The legend: `polyhedraLegend` gives one entry per formula, and
+  `shownPolyhedra` takes a map keyed by formula.
+- `ELECTRONEGATIVITY`'s comment says which values are Allred's.
+- `measure.py`'s own shell reader uses the new window, and `results.txt`
+  is the re-run.
+
+*Measured* (Apple M4, macOS; `[dev]` venv plus playwright, node 22.15.0):
+
+- The window moved three sites' largest gaps and no default picture.
+  LaB6's La: 24 B, then ×1.45, now a hidden LaB₂₄. CsCl's Cs: ×1.91,
+  where the 6 Å pad read ×1.68. High cristobalite's Si: 24 O positions,
+  then ×2.25, turned away by P9. That is P9's first measured case.
+  Refetching the 17 COD entries rewrote the fixture byte for byte.
+- Stray atoms, with no stick and no face, from hidden polyhedra: at the
+  default bond tolerance NAC 12 F and baryte 4 O, on main too. At 1.00,
+  LaB6 102 B, fluorite 56 F, NAC 36, CsCl 26, grossular 24, baryte 16,
+  fluorapatite 14 and gypsum 6.
+- The zoom fit, before its fix, at a bond tolerance of 1.00: LaB6 and CsCl
+  drawn at half size, fluorite ×1.50, NAC and grossular ×1.08, gypsum
+  ×1.06. No phase moved at the default 1.15.
+- Build time, best of 7 against main: the same within noise on 20 phases,
+  and LaB6 4.7 to 7.3 ms (it now builds eight polyhedra). With the old
+  twin loop LaB6 took 38 ms.
+- Allred (1961), Table 3: H, B, C, N, O, F, Si, P, S, Cl, As, Se, Br and I
+  match. Te, At, Kr and Xe are absent from it.
+- A NAC probe in Chromium: the legend reads CaF₈, AlF₆, NaF₇. CaF₈ on and
+  off again gives back the default picture to 0.0 levels.
+- Counts: the fast selection is 6363 passed and 140 skipped. Main is the
+  tree the last session counted at 6362 and 140, so +1, the window test.
+  `tests/test_structure3d.py` 84 passed and 1 skipped (+1). GUI vitest 571
+  passed in 24 files (+3). `tests/test_structure3d_browser.py` 5 passed. The
+  full selection did not run: the change is GUI and viewer code and moves no
+  refinement number.
+
+*Review.* `/code-review high --fix` found eight. It fixed the caption's image
+count and a stale comment. Of its six declines I took two: the zoom fit (it
+halved LaB6 at 1.00, a regression this branch made) and a stale test comment.
+Four stay declined:
+
+- A twin of a twin joins one cluster. That needs three ligands each within
+  0.01 Å of the next, which no refined structure has.
+- A large hidden shell can lose its room at the atom cap (§ Where it will
+  bite).
+- A large cation grows the orbit for every centre. The measured cost is in
+  the build times above.
+- `measure.py` asserts rather than widens its 12 Å grid, so a phase with a
+  nearest ligand past 4 Å stops the script loudly.
+
+*Gotchas.*
+
+- `gui/CLAUDE.md` sits at its line cap. The new rule took one line, and the
+  paragraph above it lost two facts that live in `_cation_sites` and
+  `measure.py`.
+- Any edit under `gui/src`, a test file included, changes the dist's
+  fingerprint. Rebuild after the last edit, or `test_gui_dist.py` fails.
+- `measure.py` has no cache left from the last session. It fetches from COD
+  into whatever directory it is given.
+
+*Next.*
+
+1. The maintainer rules on the split anion site (§ Where it will bite): keep
+   it as a recorded limit, or skip bonds between two partly occupied
+   anions, which breaks a disordered sulfate. The cyanide and the arsenic
+   telluride are recorded limits unless the maintainer wants either fixed.
+2. Then the WP closes ✅: the Priority line goes, and its narrative moves to
+   the v1.6 record per the protocol's step 5.
 
 ### 2026-09-26 — the viewer draws coordination polyhedra, and the ligand rule became cations and anions
 
