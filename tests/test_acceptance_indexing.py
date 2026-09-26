@@ -153,14 +153,16 @@ def _clock_cut(res) -> list[str]:
     Both numbers come from the result: the budget the run recorded, and each
     unit's clock.  ``search_complete`` would not do, since it also reads
     ``False`` where the domain outgrew a cap, which no budget would change
-    (NAC's dichotomy explores zero boxes).
+    (NAC's dichotomy explores zero boxes).  svd's retry shares its unit's
+    budget and records it as ``svd.<system>.trim.seconds``, so that clock
+    counts too.
     """
     budget = float(res.provenance.notes["budget_seconds"])
     systems = set(res.systems_searched)
     return sorted(key.removesuffix(".seconds")
                   for key, seconds in res.engine_stats.items()
-                  if key.endswith(".seconds") and key.count(".") == 2
-                  and key.split(".")[1] in systems and seconds >= budget)
+                  if key.endswith(".seconds") and key.split(".")[1] in systems
+                  and seconds >= budget)
 
 
 def _skip_unless_finished(*results) -> None:
