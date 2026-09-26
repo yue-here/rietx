@@ -259,3 +259,105 @@ def test_every_truncation_of_a_synthesized_fixture_fails_the_same_way(kind, tmp_
             raise AssertionError(
                 f"synthesized {kind} cut at {cut} raised "
                 f"{type(exc).__module__}.{type(exc).__name__}: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# the *structure* readers, and the magnetic constructs they carry (WP-1328)
+#
+# Until this rung the harness above covered the **pattern** readers only, so a
+# `.cif` or a `.inp` had never been handed to `structure_from_cif` /
+# `read_topas_inp` cut mid-token.  It found one defect immediately and it was
+# pre-existing on the nuclear path: an empty or truncated CIF raised a bare
+# `IndexError('vector')` out of gemmi's C++ side — neither ValueError nor
+# OSError, naming no file, which is a traceback on an API caller and a 500 on
+# the GUI's upload route.  `crystallography.cif._gemmi_or_value_error` is the
+# conversion; this arm is what keeps it.
+# ---------------------------------------------------------------------------
+
+#: The magnetic structure fixtures to truncate, taken from ``test_magcif``'s
+#: own typed set rather than re-typed here: one writer per fixture, and a
+#: fixture that changes there changes here.  Four published structures spanning
+#: orthorhombic, tetragonal and (twice) hexagonal — the last because M-5
+#: measured that a wrong symmetry action is invisible outside space groups
+#: 149-194, so a magnetic arm without a hexagonal file is not a control.
+MAGNETIC_STRUCTURE_FIXTURES = ("LaMnO3", "Cr2WO6", "YMnO3", "ScMnO3")
+
+
+@pytest.mark.parametrize("key", MAGNETIC_STRUCTURE_FIXTURES)
+def test_every_truncation_of_a_magcif_fails_as_a_named_value_error(key, tmp_path):
+    """Twenty depths through a magCIF: each may read, none may crash.
+
+    The depths that matter are the ones that cut inside a construct rather than
+    between two: mid-operator (``-x+1/2,y+1/2,-z``), mid-su (``3.7(1`` — an
+    unclosed parenthesis), mid-bracket (``[0 0`` in the propagation vector,
+    which gemmi cannot tokenise even whole), and between a loop header and its
+    rows.  A truncation that still reads is a legitimate outcome — a magCIF
+    with the moment loop cut off is a nuclear CIF — so the assertion is on the
+    *kind* of failure and never on there being one.
+    """
+    from rietx.crystallography.cif import structure_from_cif
+    from tests.test_magcif import _fixture
+
+    raw = _fixture(tmp_path, key).read_bytes()
+    for cut in CUTS:
+        stub = tmp_path / f"{int(cut * 1e6):07d}_{key}.mcif"
+        stub.write_bytes(raw[:int(len(raw) * cut)])
+        try:
+            structure_from_cif(str(stub))
+        except (ValueError, OSError) as exc:
+            assert stub.name in str(exc), (
+                f"{key} cut at {cut}: refusal does not name the file: {exc}")
+        except Exception as exc:                       # noqa: BLE001 - the point
+            raise AssertionError(
+                f"magCIF {key} cut at {cut} raised "
+                f"{type(exc).__module__}.{type(exc).__name__}, which is "
+                f"neither ValueError nor OSError: {exc}") from exc
+
+
+@pytest.mark.parametrize("key", MAGNETIC_STRUCTURE_FIXTURES)
+def test_a_magcif_with_a_nul_spliced_in_is_refused_rather_than_decoded(
+        key, tmp_path):
+    """Bytes that are not text at all, on the structure reader's own path."""
+    from rietx.crystallography.cif import structure_from_cif
+    from tests.test_magcif import _fixture
+
+    raw = bytearray(_fixture(tmp_path, key).read_bytes())
+    raw[100:110] = b"\x00" * 10
+    stub = tmp_path / f"nul_{key}.mcif"
+    stub.write_bytes(bytes(raw))
+    try:
+        structure_from_cif(str(stub))
+    except (ValueError, OSError) as exc:
+        assert stub.name in str(exc)
+    except Exception as exc:                           # noqa: BLE001 - the point
+        raise AssertionError(
+            f"magCIF {key} with a NUL spliced in raised "
+            f"{type(exc).__module__}.{type(exc).__name__}: {exc}") from exc
+
+
+def test_every_truncation_of_a_magnetic_inp_fails_as_a_named_value_error(tmp_path):
+    """The same invariant for the TOPAS reader's new magnetic keywords.
+
+    A cut inside ``mlx 0 mly @ 2.35`` leaves a site stating a moment component
+    with no value, which the reader must refuse naming the line rather than
+    default to 0 — a moment pointing somewhere else, with |F_m|² quadratic in
+    it, is not an error that announces itself.
+    """
+    from rietx.io.projects.topas import read_topas_inp, to_structure
+    from tests.test_magcif import _TOPAS_MAG
+
+    raw = _TOPAS_MAG.encode()
+    for cut in CUTS:
+        stub = tmp_path / f"{int(cut * 1e6):07d}_mag.inp"
+        stub.write_bytes(raw[:int(len(raw) * cut)])
+        try:
+            model = read_topas_inp(stub)
+            to_structure(model, magnetic_symmetry="58.395")
+        except (ValueError, OSError) as exc:
+            assert stub.name in str(exc), (
+                f"mag.inp cut at {cut}: refusal does not name the file: {exc}")
+        except Exception as exc:                       # noqa: BLE001 - the point
+            raise AssertionError(
+                f"magnetic .inp cut at {cut} raised "
+                f"{type(exc).__module__}.{type(exc).__name__}, which is "
+                f"neither ValueError nor OSError: {exc}") from exc

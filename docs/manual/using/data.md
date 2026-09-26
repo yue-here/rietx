@@ -198,7 +198,8 @@ space group with moments on the sites states the structure that produces it.
 Both default to `None`, which is exactly off, and the two are refused on one
 phase together with `propagation_vector`, because they are the same physics
 stated twice and nothing reconciles them. [](refining.md) has the blocks, what
-refines and what the report says.
+refines and what the report says; [](files.md) has how a magCIF gets one in
+and out.
 
 `symmetry_operations` is how a phase states a group that has no name in its
 cell, and the case is not exotic: a parent operation whose translation along a

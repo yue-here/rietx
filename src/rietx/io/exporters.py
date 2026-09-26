@@ -479,6 +479,36 @@ def _write_pattern_loop(block, result: RefinementResult) -> None:
         ])
 
 
+def _moment_esds(result: RefinementResult, ip: int,
+                 phase) -> dict[str, float]:
+    """A refined moment's esd, per site label, for the magCIF ``magnitude_su``.
+
+    A moment's uncertainty lives on the **modulus** DOF and nowhere else
+    (WP-1327): the three crystal-axis components are written back from the DOFs
+    at the end of a stage and their ``stderr`` stays ``None``, because the
+    quantity the powder measures is |m| and a direction the powder cannot
+    determine is *held* rather than given a small esd.  So the number that
+    belongs in ``_atom_site_moment.magnitude_su`` is the esd of
+    ``phases.i.atoms.j.moment.dof0``, read from
+    :attr:`~rietx.schemas.results.RefinementResult.parameters` — the one writer
+    (WP-1076), never recomputed here.
+
+    A site whose moment did not refine is simply absent, and the writer puts a
+    CIF ``.`` there rather than a zero.
+    """
+    esds: dict[str, float] = {}
+    if not getattr(phase, "magnetic_symmetry", None):
+        return esds
+    by_path = {p.path: p for p in result.parameters}
+    for j, atom in enumerate(phase.atoms):
+        if atom.moment is None:
+            continue
+        row = by_path.get(f"phases.{ip}.atoms.{j}.moment.dof0")
+        if row is not None and row.stderr is not None:
+            esds[atom.label] = float(row.stderr)
+    return esds
+
+
 def refinement_cif_doc(result: RefinementResult, structure: Structure,
                        instrument: Instrument) -> gemmi.cif.Document:
     """Build the refinement CIF as a gemmi document (see :func:`write_refinement_cif`)."""
@@ -488,7 +518,8 @@ def refinement_cif_doc(result: RefinementResult, structure: Structure,
     agreement = {row.name: row for row in result.phase_agreement}
     for ip, phase in enumerate(structure.phases):
         block = doc.add_new_block(re.sub(r"\W+", "_", phase.name) or f"phase_{ip}")
-        write_structure_block(block, phase)
+        write_structure_block(block, phase,
+                              moment_magnitude_esds=_moment_esds(result, ip, phase))
         # Structure-sensitive R factors, on the phase's *own* block: both tags
         # are core-dictionary `_refine_ls` items, whose scope is the structure
         # in the block, not the pattern.  So a multi-phase export gives each

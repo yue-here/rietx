@@ -28,6 +28,14 @@ of its own, below. GSAS and GSAS-II have a file of their own, §7h,
 kinds between them and the writers that put three of them back, under the same
 criterion.
 
+The TOPAS `.inp` reader's magnetic rows (`TOPAS_MAGNETIC_GROUP_READ`, `TOPAS_MOMENT_CONVENTION`,
+`TOPAS_MOMENT_ION_UNCHARGED`) and the FullProf `.pcr` reader's
+`FULLPROF_MAGNETIC_PHASE_OMITTED` moved out to §7j,
+[`references/magnetic.md`](magnetic.md) (issue #286), beside the rest of the
+magnetic family rather than split across three files by which channel each
+happened to fire on; the channel itself is unchanged (still at import, still
+not on `result.diagnostics`).
+
 Each row states, as the others do, what you must *not* assume once it fires.
 Two conventions run across the family. A reader **repairs and reports** where
 the repair is a stated, recoverable loss and **refuses** where carrying on
