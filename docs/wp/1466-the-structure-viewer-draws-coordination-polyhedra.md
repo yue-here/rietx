@@ -411,6 +411,11 @@ the further work filed at the maintainer's request.
   GUI vitest 571 passed in 24 files (+3). `tests/test_structure3d_browser.py`
   5 passed. The full selection did not run: the change is GUI and viewer
   code and moves no refinement number.
+- After #468 (WP-1326's satellites) merged, main was merged in at
+  `a15959be`. The two share no file; #468's schema change is one optional
+  field, `Phase.propagation_vector`, that the viewer does not read. The
+  merged tree's fast selection is 6426 passed and 145 skipped, the same in
+  two runs.
 
 *Review.* Two `/code-review high --fix` passes.
 
