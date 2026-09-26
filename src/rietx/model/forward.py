@@ -77,6 +77,7 @@ from ..crystallography.neutron import b_coh as neutron_b_coh
 from ..crystallography.neutron import (
     normalize_species as neutron_normalize_species,
 )
+from ..crystallography.satellites import merge_satellites, satellite_reflections
 from ..crystallography.scattering import normalize_species
 from ..crystallography.stephens import S_NAMES, monomial_matrix, strain_width_deg
 from ..crystallography.structure_factor import (
@@ -579,6 +580,18 @@ class CompiledPhase:
     # the hot loop exactly as it was; numpy path only, for the reason the FCJ
     # memo is numpy-only.
     scalar_cache: dict[str, tuple] | None = None
+    # WP-1326.  ``satellites`` is the second ReflectionSet, frozen at stage
+    # compile beside the nuclear one, kept whole so a caller can ask what was
+    # generated and from which k; ``reflections`` above is the **merge** of the
+    # two, because every consumer downstream — the frozen windows, the FCJ node
+    # counts, the Le Bail partition, the Pawley block, the tick list, the
+    # observation count — is written over "the phase's reflections" and a
+    # satellite is one of those.  ``nuclear_mask`` is (N,) 1.0/0.0 over the
+    # merged list and is what makes a Rietveld stage contribute exactly zero at
+    # a satellite (``_nuclear_f2``).  Both ``None`` for a phase with no
+    # propagation vector, which is what keeps that phase bit-identical.
+    satellites: ReflectionSet | None = None
+    nuclear_mask: np.ndarray | None = None
     # WP-1327.  ``magnetic`` is the frozen per-atom magnetic data — the axial
     # matrices ε·det(R)·R on the *nuclear* operation subset, the form-factor
     # ion and g, the moment frame — and ``None`` for every phase without a
@@ -590,15 +603,13 @@ class CompiledPhase:
     # the magnetic intensity is its **average** and not one representative's
     # value times a multiplicity.
     #
-    # ``nuclear_mask`` is (N,) 1.0/0.0 over the reflection list and ``None``
-    # for every phase without a moment.  A k = 0 magnetic space group puts
+    # ``nuclear_mask`` above is also set for a magnetic phase, and for a
+    # different reason than a satellite: a k = 0 magnetic space group puts
     # intensity on the reciprocal-lattice points the parent's glide and screw
     # operations forbid, those rows are added to the reflection list
     # (``magnetic_reflections``), and the nuclear structure factor there is
     # identically zero by the absence condition — so the mask is exact
-    # arithmetic rather than a tolerance.  It is built as shared plumbing: a
-    # satellite row (WP-1326) is the other row whose nuclear term is zero.
-    nuclear_mask: np.ndarray | None = None
+    # arithmetic rather than a tolerance.
     magnetic: MagneticSites | None = None
     mag_members: np.ndarray | None = None   # (M_total, 3) int
     mag_seg: np.ndarray | None = None       # (M_total,) int → reflection index
@@ -1050,7 +1061,7 @@ class CompiledModel:
         per-line angles are where λ enters the model at all, which is why a free
         λ moves every peak of its histogram and nothing else does.
         """
-        d = d_spacings(cp.reflections.hkl, *cell)
+        d = d_spacings(cp.reflections.index, *cell)
         return d, [two_theta_deg(d, lam) for lam in lams]
 
     def _memo(self, cp: "CompiledPhase", slot: str, key_fn, build):
@@ -1187,13 +1198,14 @@ class CompiledModel:
         return xyz, occ, biso, uaniso, reciprocal_axis_lengths(*cell)
 
     def _nuclear_mask(self, ip: int):
-        """(N,) 1.0 on a nuclear row, 0.0 on a parent-forbidden one — or ``None``.
+        """(N,) 1.0 on a nuclear row, 0.0 on a satellite or a parent-forbidden
+        row — or ``None``.
 
-        ``None`` is the phase with no moment, and it is not the same as an
-        array of ones: the multiply never happens, so a phase that declares no
-        moment reaches the same arithmetic in the same order and every number
-        it produces is bit-identical to what it produced before WP-1327
-        existed.
+        ``None`` is the phase with neither a propagation vector nor a moment,
+        and it is not the same as an array of ones: the multiply never happens,
+        so such a phase reaches the same arithmetic in the same order and every
+        number it produces is bit-identical to what it produced before WP-1326
+        and WP-1327 existed.
 
         Lifted onto the backend, never left as a frozen numpy constant beside
         a θ-derived value (root ``CLAUDE.md``: ``ndarray * tensor`` raises on
@@ -1207,15 +1219,28 @@ class CompiledModel:
         return get_backend().asarray(cp.nuclear_mask, dtype=np.float64)
 
     def _nuclear_f2(self, ip: int, d, values: dict[str, float], cell: tuple):
-        """⟨|F|²⟩ with a parent-forbidden row set to exactly zero (WP-1327).
+        """⟨|F|²⟩ with a satellite's or a parent-forbidden row set to exactly zero.
 
-        A k = 0 magnetic space group drops the parent's glide and screw
-        operations, so its reflection list carries rows the nuclear structure
-        factor forbids; the nuclear term there is zero by the absence
-        condition, and the mask makes it exactly zero rather than whatever
-        roundoff the orbit sum leaves.  The result is masked, rather than the
-        reflection list being split in two: one array per quantity is what
-        every consumer downstream was written over.
+        **A satellite is a position, not a structure factor** (WP-1326).  That
+        rung carries no moment, no magnetic form factor and no magnetic
+        symmetry, so the nuclear model has nothing to say about the intensity
+        at Q = H ± k — and the honest value is zero, not the parent
+        reflection's |F|² evaluated at a d it does not have.  A Rietveld stage
+        therefore contributes nothing there and the peak is drawn by whatever
+        a Le Bail or Pawley stage extracted, which is the whole shape of the
+        hypothesis test.  The structure-factor call is made with the
+        **parent** integer hkl — the op subsets frozen on ``cp.sites`` are
+        indexed by nothing else.
+
+        A k = 0 magnetic space group (WP-1327) drops the parent's glide and
+        screw operations, so its reflection list carries rows the nuclear
+        structure factor forbids; the nuclear term there is zero by the
+        absence condition, and the mask makes it exactly zero rather than
+        whatever roundoff the orbit sum leaves.
+
+        The result is masked, rather than the reflection list being split in
+        two: one array per quantity is what every consumer downstream was
+        written over.
         """
         cp = self.phases[ip]
         f2 = structure_factors_squared(
@@ -1954,17 +1979,15 @@ class CompiledModel:
         cp = self.phases[ip]
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
-        d = d_spacings(cp.reflections.hkl, *cell)
+        d = d_spacings(cp.reflections.index, *cell)
         xyz, occ, biso, uaniso, astar = self._site_values(ip, values, cell)
         df2 = kernel(cp.reflections.hkl, d, cp.sites, xyz, occ, biso, j, uaniso, astar
                      ) @ np.asarray(coeffs, dtype=np.float64)
-        # a parent-forbidden row has no nuclear structure factor, so it has no
-        # derivative of one either — the same mask ``_nuclear_f2`` applies to
-        # the forward model, applied here so the analytic column and the
-        # residual cannot disagree about a row the forward model puts at
-        # exactly zero.  (Unreached today — a phase with a mask carries a
-        # moment and ``structural_grad_supported`` declines it — and kept so
-        # the two readers of the mask cannot drift.)
+        # a satellite or a parent-forbidden row has no nuclear structure
+        # factor, so it has no derivative of one either — the same mask
+        # ``_nuclear_f2`` applies to the forward model, applied here so the
+        # analytic column and the residual cannot disagree about a row the
+        # forward model puts at exactly zero
         nuc = self._nuclear_mask(ip)
         if nuc is not None:
             df2 = df2 * nuc
@@ -2030,7 +2053,7 @@ class CompiledModel:
             return None
         cell = tuple(values[f"phases.{ip}.cell.{k}"]
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
-        d = d_spacings(cp.reflections.hkl, *cell)
+        d = d_spacings(cp.reflections.index, *cell)
         # preferred orientation multiplies the whole reflection's intensity, so
         # the derivative carries the magnetic term with it
         f2 = self._total_f2(ip, d, values, cell)
@@ -2539,7 +2562,7 @@ class CompiledModel:
             # from phase_peaks' product, which folds preferred orientation in.
             cell = tuple(values[f"phases.{ip}.cell.{key}"]
                          for key in ("a", "b", "c", "alpha", "beta", "gamma"))
-            d = d_spacings(cp.reflections.hkl, *cell)
+            d = d_spacings(cp.reflections.index, *cell)
             f2 = np.asarray(self._total_f2(ip, d, values, cell),
                             dtype=np.float64)
             i_calc = np.asarray(cp.reflections.multiplicity,
@@ -3174,6 +3197,19 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         group = resolve_group(phase.space_group, phase.symmetry_operations)
         refl = generate_reflections(group, cell, lam_gen,
                                     two_theta_max=hi_eff, two_theta_min=gen_min)
+        # WP-1326: a declared propagation vector adds the satellites at
+        # Q = H ± k as a second ReflectionSet, frozen here with the nuclear one
+        # and merged into a single list (see ``CompiledPhase.satellites``).
+        # The generation runs over the reciprocal *lattice* and applies no
+        # glide/screw absence — those are conditions on the nuclear structure
+        # factor, which a satellite does not have.  The schema refuses a k
+        # beside a moment model, so at most one of the two branches runs.
+        satellites = None
+        if phase.propagation_vector is not None:
+            satellites = satellite_reflections(
+                phase.space_group, cell, lam_gen, hi_eff,
+                phase.propagation_vector, two_theta_min=gen_min)
+            refl = merge_satellites(refl, satellites)
         # WP-1327: a magnetic space group generally drops the parent's glide
         # and screw operations, so a k = 0 magnetic structure puts intensity
         # on reciprocal-lattice points the nuclear structure factor forbids —
@@ -3216,10 +3252,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         # 30·FWHM margin absorbs the growth a stage can produce from there.
         strain_monomials = aniso_est = None
         if phase.microstrain is not None:
-            strain_monomials = monomial_matrix(refl.hkl)
+            strain_monomials = monomial_matrix(refl.index)
             aniso_est = strain_width_deg(
                 strain_monomials, np.array(phase.microstrain.values()),
-                d_spacings(refl.hkl, *cell))
+                d_spacings(refl.index, *cell))
         for il, lam in enumerate(lams):
             tt_bragg = refl.two_theta(cell, lam)
             theta = 0.5 * tt_bragg
@@ -3259,7 +3295,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                                                       sl_eff, hl_eff)
 
         cp = CompiledPhase(reflections=refl, sites=sites, win=win, fcj_n=fcj_n,
-                           strain_monomials=strain_monomials)
+                           strain_monomials=strain_monomials,
+                           satellites=satellites)
+        if satellites is not None:
+            cp.nuclear_mask = (~refl.is_satellite).astype(np.float64)
         if magnetic_mask is not None:
             cp.nuclear_mask = magnetic_mask
             cp.magnetic = compile_magnetic_sites(phase, sites.ops)

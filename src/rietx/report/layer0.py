@@ -55,6 +55,23 @@ def _segment_regions(tt: np.ndarray, positions: np.ndarray, gap_deg: float) -> l
     return regions
 
 
+def residual_peak_indices(resid_norm: np.ndarray, *,
+                          min_peak_sigma: float) -> np.ndarray:
+    """Indices of the positive residual peaks — one definition, two readers.
+
+    :func:`build_layer0` keeps the ones with no calculated tick within
+    ``match_tol_deg`` as ``unmatched_obs`` and drops the rest; the satellite
+    arm (:mod:`rietx.report.satellites`) needs the **whole** list, because a
+    residual peak sitting on a nuclear line, or on a reciprocal-lattice point
+    the nuclear structure factor forbids, is the k = 0 evidence — and it sorts
+    them by its own radius rather than by ``match_tol_deg`` (that module's
+    docstring says why).  Factored out rather than repeated so the two cannot
+    disagree about what a peak is.
+    """
+    peaks, _ = find_peaks(resid_norm, height=min_peak_sigma, distance=5)
+    return peaks
+
+
 def lebail_gap(model, values: dict[str, float], *, rwp_rietveld: float,
                n_cycles: int = LEBAIL_GAP_CYCLES) -> LeBailGap | None:
     """Evaluate-only Le Bail partition at the converged state → the gap.
@@ -179,7 +196,7 @@ def build_layer0(result: RefinementResult, *, top_n: int = 15,
     # --- region segmentation from calc ticks ∪ residual peaks
     ticks = np.concatenate([np.asarray(v) for v in result.ticks.values()]) if result.ticks else np.array([])
     resid_norm = delta / sigma
-    peaks_obs, _ = find_peaks(resid_norm, height=min_peak_sigma, distance=5)
+    peaks_obs = residual_peak_indices(resid_norm, min_peak_sigma=min_peak_sigma)
     all_pos = np.concatenate([ticks, tt[peaks_obs]]) if len(peaks_obs) else ticks
     median_step = float(np.median(np.diff(tt)))
     regions_bounds = _segment_regions(tt, all_pos, gap_deg=max(20 * median_step, 0.15))

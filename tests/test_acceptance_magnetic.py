@@ -123,12 +123,13 @@ def _fit(structure, instrument, data, stages):
 
 
 @pytest.fixture(scope="module")
-def cr2wo6():
-    d4 = rx.read_pattern(DATA / "gsas2_hb2a_cr2wo6_4K.dat")
-    d150 = rx.read_pattern(DATA / "gsas2_hb2a_cr2wo6_150K.dat")
-    ref150, nuc150 = _fit(_trirutile(), _instrument(), d150, NUCLEAR_STAGES)
-    ref4, nuc4 = _fit(ref150.structure.model_copy(deep=True),
-                      ref150.instrument.model_copy(deep=True), d4, NUCLEAR_STAGES)
+def cr2wo6(cr2wo6_nuclear):
+    # the nuclear fits are the session's (``conftest.cr2wo6_nuclear``), shared
+    # with the satellite arm's acceptance, which refines the same two files
+    # from the same start
+    d4, d150 = cr2wo6_nuclear["d4"], cr2wo6_nuclear["d150"]
+    ref150, nuc150 = cr2wo6_nuclear["ref150"], cr2wo6_nuclear["nuc150"]
+    ref4, nuc4 = cr2wo6_nuclear["ref4"], cr2wo6_nuclear["nuc4"]
     ordered = {}
     for name, seed in (("a", (2.0, 0.0, 0.0)), ("b", (0.0, 2.0, 0.0))):
         ref, res = _fit(_with_moment(ref4.structure, seed),

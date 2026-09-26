@@ -921,6 +921,9 @@ class HistogramResult(Base):
     #: Every emission line's tick is here, so one representative appears once
     #: per line — the same reflection, imaged twice, which is what the reader
     #: hovering a Kα2 tick wants to be told.
+    #:
+    #: A satellite (WP-1326) is ``[h, k, l, m]`` — its parent H and its order —
+    #: because H alone does not identify it; a nuclear row keeps three.
     tick_hkl: dict[str, list[list[int]]] = Field(default_factory=dict)
     qpa: "QuantitativePhaseAnalysis | None" = None
     restraints: "RestraintReport | None" = None
@@ -1118,6 +1121,9 @@ class RefinementResult(Base):
     #: Every emission line's tick is here, so one representative appears once
     #: per line — the same reflection, imaged twice, which is what the reader
     #: hovering a Kα2 tick wants to be told.
+    #:
+    #: A satellite (WP-1326) is ``[h, k, l, m]`` — its parent H and its order —
+    #: because H alone does not identify it; a nuclear row keeps three.
     tick_hkl: dict[str, list[list[int]]] = Field(default_factory=dict)
 
     # Quantitative phase analysis (weight fractions); computed for Rietveld

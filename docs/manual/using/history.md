@@ -165,6 +165,7 @@ intensities are not computed from the structure.
 | `ReflectionState.phase_index` | which phase these belong to |
 | `ReflectionState.hkl` | the reflection indices, one triple per row |
 | `ReflectionState.intensity` | the intensity for each |
+| `ReflectionState.satellite_order` | the m of Q = H + m·k per row, or null for a phase with no propagation vector |
 | `ReflectionState.kind` | `lebail_extracted` or `pawley_refined` |
 | `ReflectionState.stderr` | esds, which Pawley has and Le Bail does not |
 | `ReflectionState.varied` | whether these were free parameters |

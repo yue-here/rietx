@@ -146,7 +146,8 @@ and the rest describe what this specimen did to the peaks.
 | `Phase.preferred_orientation` | `PreferredOrientation` or None | `None` | single-axis March-Dollase, {eq}`corr-md` |
 | `Phase.microstrain` | `StephensStrain` or None | `None` | anisotropic strain, width per hkl, {eq}`ms-sigma` |
 | `Phase.particle_radius_um` | float or None | `None` | Brindley microabsorption input, {eq}`corr-brindley`; a plain float, never refined |
-| `Phase.magnetic_symmetry` | `MagneticSymmetry` or None | `None` | the magnetic space group as its magCIF operator and centring loops, {eq}`int-Fmag` |
+| `Phase.propagation_vector` | tuple of three rational strings, or None | `None` | commensurate k on the conventional reciprocal cell; adds satellites at Q = H ± k, {eq}`sat-position` |
+| `Phase.magnetic_symmetry` | `MagneticSymmetry` or None | `None` | the magnetic space group as its magCIF operator and centring loops, {eq}`int-Fmag`; refused beside `propagation_vector` |
 | `Phase.restraints` | list | `[]` | soft observational restraints, {eq}`par-restraint` |
 
 The four broadening terms are the sample half of the instrument ⊕ sample split.
@@ -164,12 +165,40 @@ absorption path Brindley's correction integrates over, and conflating the two is
 a standing error. Supply it from a micrograph or a particle-size measurement, or
 leave it `None`.
 
-`magnetic_symmetry` and `Atom.moment` state a magnetic structure: a magnetic
-space group given as its operator list, and moments on the sites it allows.
-Both default to `None`, which is exactly off. A commensurate k ≠ 0 structure
-is stated in its magnetic supercell, never as a propagation vector beside a
-moment model. [](refining.md) has the blocks, what refines and what the report
-says.
+`propagation_vector` is the one field on a phase that adds reflections
+rather than changing what an existing one does. Declaring `("0", "0", "1/2")`
+puts a second reflection at Q = H ± k beside every H of the phase's reciprocal
+lattice; a Le Bail or Pawley stage then extracts intensity on those satellites
+and a Rietveld stage contributes exactly zero there, because this rung carries
+no moment and the nuclear model has nothing to say about the intensity of a
+magnetic satellite. That is the whole point: it lets you test whether unindexed
+intensity in a neutron pattern indexes as satellites of a k, without stating a
+single moment. [](refining.md) covers the report arm that ranks candidates for
+you.
+
+Three rules the field enforces rather than documents. Components are exact
+rationals, and any spelling (`"1/2"`, `Fraction(1, 2)`, `0.5`, `0`) is
+stored as the same canonical string, so a float that is not a rational of small
+denominator is refused by name: an incommensurate k is a superspace problem and
+is outside this rung. A k that is a reciprocal-lattice vector of this phase's
+symmetry (the test is centring-aware) is k = 0 and is refused, because every
+satellite would land on a nuclear line and the reflection list would be exactly
+duplicated. And `None` is exactly off: a phase that declares no k compiles to
+the reflection list it always had, and every number the fit produces is
+unchanged.
+
+On an X-ray histogram the same declaration means a superstructure
+reflection, not magnetism. The positions are identical; the inference is not,
+and nothing in the package can tell them apart for you.
+
+`magnetic_symmetry` and `Atom.moment` are the other half of the same question,
+and they are the *answer* rather than the test: k on the nuclear cell with no
+moment asks whether the extra intensity indexes as satellites, and a magnetic
+space group with moments on the sites states the structure that produces it.
+Both default to `None`, which is exactly off, and the two are refused on one
+phase together with `propagation_vector`, because they are the same physics
+stated twice and nothing reconciles them. [](refining.md) has the blocks, what
+refines and what the report says.
 
 `symmetry_operations` is how a phase states a group that has no name in its
 cell, and the case is not exotic: a parent operation whose translation along a

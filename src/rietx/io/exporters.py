@@ -35,7 +35,6 @@ import numpy as np
 
 from ..crystallography.cif import format_su, write_structure_block
 from ..crystallography.lattice import d_spacings
-from ..crystallography.structure_factor import structure_factors_squared
 from ..crystallography.symmetry import resolve_group
 from ..model.components import COMPONENT_AGGREGATE
 from ..model.forward import CompiledModel
@@ -101,11 +100,17 @@ class ReflectionRow:
     multiplicity: int
     f_squared: float | None
     intensity: float
+    #: m of Q = H + m·k for a satellite of a phase carrying a propagation
+    #: vector (WP-1326); 0 on every nuclear reflection, which is every row of
+    #: a phase that declares no k.  ``h``/``k``/``l`` stay the **parent**
+    #: reciprocal-lattice vector, so a satellite row is read as H and m
+    #: together — the (3+1)-index spelling — and ``d`` is the satellite's own.
+    satellite_order: int = 0
 
 
 REFLECTION_COLUMNS = (
     "phase", "line", "wavelength", "h", "k", "l", "d",
-    "two_theta", "multiplicity", "f_squared", "intensity",
+    "two_theta", "multiplicity", "f_squared", "intensity", "satellite_order",
 )
 
 
@@ -125,10 +130,15 @@ def reflection_table(model: CompiledModel, values: dict[str, float],
         cell = _cell(values, ip)
         hkl = cp.reflections.hkl
         mult = cp.reflections.multiplicity
-        d = d_spacings(hkl, *cell)
+        # the parent H labels the row; the *position* is the satellite index
+        # H + m·k (WP-1326), which is what the d-spacing and every angle below
+        # must be computed from
+        order = cp.reflections.satellite_order
+        d = d_spacings(cp.reflections.index, *cell)
         if model.mode == "rietveld":
-            f2 = structure_factors_squared(hkl, d, cp.sites,
-                                           *model._site_values(ip, values, cell))
+            # a satellite carries no nuclear structure factor, and this is the
+            # same masked quantity the forward model folded into the intensity
+            f2 = model._nuclear_f2(ip, d, values, cell)
         else:  # Le Bail / Pawley: intensity is extracted/refined, not from |F|²
             f2 = None
         peaks = model.phase_peaks(ip, values)
@@ -144,6 +154,7 @@ def reflection_table(model: CompiledModel, values: dict[str, float],
                     multiplicity=int(mult[j]),
                     f_squared=None if f2 is None else float(f2[j]),
                     intensity=float(intensity[j]),
+                    satellite_order=0 if order is None else int(order[j]),
                 ))
     return rows
 
@@ -162,6 +173,7 @@ def write_reflection_table(rows: list[ReflectionRow], path: str | Path, *,
                 r.phase, r.line, _g(r.wavelength), r.h, r.k, r.l, _g(r.d),
                 _g(r.two_theta), r.multiplicity,
                 "" if r.f_squared is None else _g(r.f_squared), _g(r.intensity),
+                r.satellite_order,
             ])
 
 

@@ -63,7 +63,6 @@ from rietx.schemas.structure import (
     MagneticSymmetry,
     Moment,
     Phase,
-    refuse_moment_model_with_k,
 )
 
 # --------------------------------------------------------------------- helpers
@@ -565,19 +564,20 @@ def test_an_unknown_ion_or_a_missing_g_is_refused_at_the_schema():
 
 
 def test_a_moment_model_beside_a_propagation_vector_is_refused():
-    """WP-1326's declared hook: the field name is in the tuple, the refusal live.
+    """WP-1326's declared hook, live: the field name is in the tuple.
 
     A commensurate magnetic structure is stated *either* by k on the nuclear
     cell with no moments — 1326's hypothesis test — *or* by a magnetic space
     group with moments in the magnetic supercell.  Both on one phase is the
-    same physics twice with nothing to reconcile them.  ``Phase`` carries no
-    ``propagation_vector`` on this tree, so the refusal is asserted on the
-    hook the field's validator will call.
+    same physics twice with nothing to reconcile them.
     """
     assert MOMENT_MODEL_FIELDS == ("magnetic_symmetry",)
-    refuse_moment_model_with_k("x", [])
-    with pytest.raises(ValueError, match="same thing"):
-        refuse_moment_model_with_k("x", list(MOMENT_MODEL_FIELDS))
+    with pytest.raises(ValidationError, match="same thing"):
+        Phase(name="x", space_group="P 63 c m", cell=cell(*YMNO3_CELL),
+              propagation_vector=("0", "0", "1/2"),
+              atoms=[atom("Mn", "Mn", YMNO3_SITE,
+                          moment=Moment.from_values(YMNO3_MOMENT, "Mn3+"))],
+              magnetic_symmetry=YMNO3_BNS)
 
 
 def test_an_operator_list_that_is_not_a_group_is_refused_at_the_schema():
@@ -1768,8 +1768,9 @@ def test_the_capability_flag_is_derived_from_the_fields():
     # ``Atom.moment`` and ``Phase.magnetic_symmetry`` landed together with
     # WP-1327, on the rung after #431's 0.27.  WP-1454 took the next, 0.29;
     # ``Phase.symmetry_operations`` (the operation-list phase, #448) took 0.30;
-    # the supercell's ``MagneticSymmetry.propagation_vector_parent`` took 0.31.
-    assert caps.schema_version == "0.31"
+    # the supercell's ``MagneticSymmetry.propagation_vector_parent`` took 0.31,
+    # and WP-1326's ``Phase.propagation_vector`` the one after, 0.32.
+    assert caps.schema_version == "0.32"
 
 
 def test_every_moment_dof_has_a_help_entry():

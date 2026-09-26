@@ -543,6 +543,10 @@ def _features() -> dict[str, bool]:
         "stephens_strain": "microstrain" in Phase.model_fields,
         "secondary_extinction": "extinction" in Phase.model_fields,
         "restraints": "restraints" in Phase.model_fields,
+        # a commensurate propagation vector, hence satellites at G ± k
+        # (WP-1326).  Derived from the field, so it flips on its own
+        # exactly as the rest of this arm does.
+        "satellites": "propagation_vector" in Phase.model_fields,
         # a magnetic moment on a site under a magnetic space group, refined
         # against a neutron histogram (WP-1327).  Derived from the fields, like
         # every flag here: the two together are what makes a moment model

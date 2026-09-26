@@ -51,6 +51,7 @@ from pathlib import Path
 
 import numpy as np
 
+from ..crystallography.symmetry import reflection_label_row
 from .compare import decimation_index
 
 #: The file a run's viewer reads. Flat in a ``LiveSession`` directory, beside
@@ -147,8 +148,9 @@ def stage_ticks(model, values: dict, *,
         pos = np.concatenate(rows) if rows else np.zeros(0)
         # one reflection list per emission line, in the same order each time,
         # so the index list is that list tiled: a Kα2 image is the same hkl
-        hkl = (np.tile(cp.reflections.hkl, (len(rows), 1)) if rows
-               else np.zeros((0, 3), dtype=np.int64))
+        # (H, m), not H: a satellite is labelled by its order (WP-1326)
+        hkl = (np.tile(cp.reflections.hklm, (len(rows), 1)) if rows
+               else np.zeros((0, 4), dtype=np.int64))
         # filtered and sorted in numpy, not in a generator: the cap below
         # exists because a large cell over a wide range reaches a hundred
         # thousand positions, and walking those in python is the cost this
@@ -167,7 +169,7 @@ def stage_ticks(model, values: dict, *,
         ticks[f"phase {ip}"] = {
             # at most ``max_per_phase`` of them reach python
             "two_theta": [round(float(p), TWO_THETA_DECIMALS) for p in pos],
-            "hkl": [[int(h), int(k), int(el)] for h, k, el in hkl],
+            "hkl": [reflection_label_row(r) for r in hkl],
             "n_total": n_total,
         }
     return ticks

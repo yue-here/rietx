@@ -64,6 +64,7 @@ or absent for a stated reason:
 | `FitReport.attribution` | one `RegionAttribution` per region | Layer 1 |
 | `FitReport.trends` | one `TrendAnalysis` per observable | Layer 1 |
 | `FitReport.texture`, `FitReport.strain` | one entry per phase, always | Layer 1 |
+| `FitReport.satellites` | one `SatelliteEvidence` per phase whenever the model is available | evidence |
 | `FitReport.magnetic` | one `MomentEvidence` per magnetic site whenever the model is available | evidence |
 | `FitReport.layer1_available` | whether Layer 1 ran at all | Layer 1 |
 | `FitReport.abstained_reason`, `FitReport.abstained_kind` | why it declined, and which kind | Layer 1 |
@@ -290,6 +291,20 @@ Refining a `Phase.microstrain` block does not turn it False. It makes the two
 agree, because the anisotropy is still there and is now modelled. Suppressing
 the matching suggestion once the parameters are free is the Layer 2 veto's job
 and not this field's.
+
+### Is the unexplained intensity magnetic?
+
+`FitReport.satellites` carries one `SatelliteEvidence` per phase and is
+populated on the same terms as texture and strain, for the same reason:
+intensity the model puts nowhere is a *cause* of an immature fit, so the arm has
+to speak when the rest of Layer 1 abstains. It sorts the positive residual peaks
+into three (on a calculated line, on a reciprocal-lattice point the nuclear
+structure factor forbids, or neither) and ranks an enumerated set of candidate
+propagation vectors against the third by how many fall inside the report's own
+validity radius of a satellite at Q = H ± k, using no moment and no magnetic
+symmetry at all. [](refining.md) documents the fields, the k = 0 signature the
+second bucket carries, and the two cases where the ranking means nothing and
+the arm says so.
 
 ### When Layer 1 abstains
 

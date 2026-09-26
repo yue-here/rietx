@@ -723,7 +723,7 @@ class GuardFinding:
 
     @classmethod
     def nonpositive_strain(cls, path: str, n_bad: int, n_total: int,
-                           worst: float, hkl: tuple[int, int, int]) -> "GuardFinding":
+                           worst: float, hkl: str) -> "GuardFinding":
         return cls("STEPHENS_STRAIN_NOT_POSITIVE", (path,), float(worst),
                    f"{path} ({n_bad} of {n_total} reflections, "
                    f"worst σ²(M) {worst:+.2e} at {hkl})")
@@ -1069,6 +1069,7 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
     import numpy as np
 
     from ..crystallography.stephens import S_NAMES, sigma2_m
+    from ..crystallography.symmetry import reflection_label
 
     if model is None:
         return []
@@ -1084,7 +1085,7 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
         bad = sigma2 < -STEPHENS_CONE_TOL * scale
         if bad.any():
             k = int(np.argmin(sigma2))
-            hkl = tuple(int(v) for v in cp.reflections.hkl[k])
+            hkl = reflection_label(cp.reflections.hklm[k])
             out.append(GuardFinding.nonpositive_strain(
                 base, int(bad.sum()), len(sigma2), float(sigma2[k]), hkl))
     return out

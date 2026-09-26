@@ -139,6 +139,57 @@ the doubled indices are all even, and the diamond structure factor $1 +
 \exp[2\pi i (h+k+l)/4]$ vanishes unless $h+k+l \equiv 0 \pmod 4$, while doubling
 an all-odd triple always gives $h+k+l \equiv 2$.
 
+(sec-satellites)=
+### Satellites of a propagation vector
+
+A phase that orders with a commensurate propagation vector $\mathbf{k}$
+scatters at $\mathbf{Q} = \mathbf{H} \pm \mathbf{k}$ for every vector
+$\mathbf{H}$ of its nuclear reciprocal lattice {cite}`rodriguezcarvajal1993`.
+Positions follow from {eq}`pos-dspacing` with $\mathbf{h}$ replaced by
+
+```{math}
+:label: sat-position
+
+\mathbf{Q}_{\mathbf{H},m} \;=\; \mathbf{H} + m\,\mathbf{k},
+\qquad m \in \{-1,\,0,\,+1\},
+```
+
+{source}`rietx.crystallography.satellites`
+
+so $m = 0$ is the nuclear reflection and $m = \pm 1$ its two satellites. The
+d-spacing, and hence {eq}`pos-bragg`, is otherwise unchanged: a satellite is a
+position, and needs no moment, no magnetic form factor and no magnetic
+symmetry to be placed.
+
+Two rules decide which $\mathbf{Q}$ exist, and both are easy to get wrong.
+First, $\mathbf{k}$ and $-\mathbf{k}$ are one vector exactly when
+
+```{math}
+:label: sat-plus-minus
+
+2\mathbf{k} \in \Lambda^*,
+```
+
+{source}`rietx.crystallography.satellites`
+
+with $\Lambda^*$ the reciprocal lattice, which is a *sublattice* of the
+integer $hkl$ grid whenever the direct lattice is centred. On a C lattice
+$(\tfrac12, 0, 0)$ and $(-\tfrac12, 0, 0)$ are therefore distinct, because
+$(1,0,0)$ violates $h + k = 2n$, while $(0, 0, \tfrac12)$ is a single vector
+because $(0,0,1)$ is a lattice point. Second, $\mathbf{H}$ runs over
+$\Lambda^*$ itself: the centring conditions decide which $\mathbf{H}$ exist,
+but a glide or a screw absence is a condition on the *nuclear structure
+factor*, and a satellite has no nuclear structure factor to be absent from:
+applying those conditions to a satellite drops reflections that are there.
+
+The multiplicity of a satellite is the number of distinct $\mathbf{Q}$ in its
+orbit under the Laue group, Friedel mates merged, with the reciprocal-space
+action $R^\top$. It is obtained by enumeration: the plausible closed form
+$|{\rm orbit}(\mathbf{H})| \times |{\rm star}(\mathbf{k})|$ is not even a
+bound, because $R^\top\mathbf{H}$ and $R^\top\mathbf{k}$ are images under the
+*same* $R$ and because reducing an arm of the star back into the first cell
+shifts the parent by a lattice vector.
+
 ## The wavelength–cell degeneracy
 
 {eq}`pos-bragg` reaches the wavelength only through the ratio $\lambda/2d$, so

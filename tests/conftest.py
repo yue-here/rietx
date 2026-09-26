@@ -28,7 +28,8 @@ Four things live here, in the order they have to happen:
    wall-clock budget, both without failing, so ``pytest_configure`` refuses it
    rather than leaving it to be noticed in a ``--durations`` list.
 
-Shared expensive results (``sample1_results``, ``srm660c_baseline``) are
+Shared expensive results (``sample1_results``, ``srm660c_baseline``,
+``cr2wo6_nuclear``) are
 session-scoped: they exist because several acceptance modules were re-deriving
 the *identical* fit.  A consumer must carry the matching
 ``@pytest.mark.xdist_group`` or a second xdist worker silently recomputes the
@@ -182,6 +183,39 @@ def sample1_results():
                                   fluorite_phase()], plan=qpa_plan())
         out[sample] = result
     return out
+
+
+@pytest.fixture(scope="session")
+def cr2wo6_nuclear():
+    """The Cr₂WO₆ nuclear-only fits at 150 K and 4 K, fitted once.
+
+    Two suites refined these two files from the same trirutile start under
+    the same six stages: WP-1327's moment acceptance
+    (``test_acceptance_magnetic``), which seeds its moment fits from them, and
+    WP-1326's satellite arm (``test_satellites_acceptance``), which reads
+    ``report().satellites`` off them.  The 4 K fit starts from the 150 K one.
+
+    Both ``ref`` objects are live (``report()`` works); do not ``fit()`` them
+    again, and copy a model before editing it.
+
+    **Consumers must carry** ``@pytest.mark.xdist_group("magnetic-cr2wo6")``.
+    """
+    import rietx as rx
+    from tests.test_acceptance_magnetic import (
+        DATA,
+        NUCLEAR_STAGES,
+        _fit,
+        _instrument,
+        _trirutile,
+    )
+
+    d4 = rx.read_pattern(DATA / "gsas2_hb2a_cr2wo6_4K.dat")
+    d150 = rx.read_pattern(DATA / "gsas2_hb2a_cr2wo6_150K.dat")
+    ref150, nuc150 = _fit(_trirutile(), _instrument(), d150, NUCLEAR_STAGES)
+    ref4, nuc4 = _fit(ref150.structure.model_copy(deep=True),
+                      ref150.instrument.model_copy(deep=True), d4, NUCLEAR_STAGES)
+    return {"d4": d4, "d150": d150, "ref150": ref150, "nuc150": nuc150,
+            "ref4": ref4, "nuc4": nuc4}
 
 
 @pytest.fixture(scope="session")

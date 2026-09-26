@@ -342,6 +342,8 @@ def test_features_are_derived_not_asserted(caps):
 
     # schema-shaped flags follow the schemas
     assert caps.features["stephens_strain"] == ("microstrain" in rx.Phase.model_fields)
+    assert caps.features["satellites"] == (
+        "propagation_vector" in rx.Phase.model_fields)
     assert caps.features["anisotropic_adp"] == ("aniso" in rx.Atom.model_fields)
 
     # the one default whose position changes published numbers (WP-1001)
@@ -380,7 +382,7 @@ def test_the_documented_feature_keys_are_present(caps):
     """Removing a flag is a client-visible change, so make it a loud one."""
     expected = {
         "anisotropic_adp", "preferred_orientation", "stephens_strain",
-        "secondary_extinction", "restraints", "magnetic_moments",
+        "secondary_extinction", "restraints", "satellites", "magnetic_moments",
         "surface_roughness",
         "capillary_absorption", "flat_plate_absorption", "anomalous_dispersion",
         "anomalous_dispersion_default_on", "extra_components",

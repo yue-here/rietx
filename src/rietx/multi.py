@@ -22,6 +22,7 @@ import dataclasses
 import numpy as np
 
 from .backend.api import backend_dtype_note
+from .crystallography.symmetry import reflection_label_row
 from .model.components import EXTRA_TICK_KEY
 from .model.forward import PHASE_SUPPORT_SIGMA, compile_model
 from .model.microstructure import microstructure_table
@@ -432,14 +433,14 @@ class MultiHistogramRefinement:
             pos = np.concatenate(rows) if rows else np.array([])
             # one reflection list per emission line, in the same order each
             # time, so the index list is that list tiled
-            hkl = (np.tile(cp.reflections.hkl, (len(rows), 1)) if rows
-                   else np.zeros((0, 3), dtype=np.int64))
+            # (H, m), not H: a satellite is labelled by its order (WP-1326)
+            hkl = (np.tile(cp.reflections.hklm, (len(rows), 1)) if rows
+                   else np.zeros((0, 4), dtype=np.int64))
             keep = np.isfinite(pos)
             pos, hkl = pos[keep], hkl[keep]
             order = np.argsort(pos, kind="stable")
             ticks[name] = [float(v) for v in pos[order]]
-            tick_hkl[name] = [[int(h), int(k), int(el)]
-                              for h, k, el in hkl[order]]
+            tick_hkl[name] = [reflection_label_row(r) for r in hkl[order]]
         # Declared sharp peaks are ticks here too (WP-1103, the member
         # contract's clause 2).  A joint fit's Layer 0 reads *this* list, so
         # without the row every declared peak comes back as an unindexed

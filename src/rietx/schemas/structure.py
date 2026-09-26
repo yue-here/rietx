@@ -783,13 +783,12 @@ class MagneticSymmetry(Base):
 #: commensurate magnetic structure — a propagation vector on the nuclear cell
 #: (WP-1326) and a magnetic space group with moments — must not both sit on
 #: one phase, and :func:`refuse_moment_model_with_k` is the refusal that
-#: enforces it.  WP-1326's ``Phase.propagation_vector`` is not on this tree,
-#: so nothing calls the refusal yet: it is a declared hook for that field's
-#: validator, written and tested here so that adding the field is one call
-#: rather than a rule someone has to remember.  ``Atom.moment`` is not listed
-#: and does not need to be: a moment without a magnetic symmetry is refused on
-#: its own (:meth:`Phase._moments_are_stateable`), so a phase carrying any
-#: moment carries this field too.
+#: enforces it, called from :meth:`Phase._k_is_usable`.  It was written and
+#: tested by WP-1327 before ``Phase.propagation_vector`` existed, so that
+#: adding the field was one call rather than a rule someone had to remember.
+#: ``Atom.moment`` is not listed and does not need to be: a moment without a
+#: magnetic symmetry is refused on its own (:meth:`Phase._moments_are_stateable`),
+#: so a phase carrying any moment carries this field too.
 MOMENT_MODEL_FIELDS: tuple[str, ...] = ("magnetic_symmetry",)
 
 
@@ -914,14 +913,34 @@ class Phase(Base):
     # a particle-size analysis; leave None (the default) for no correction.
     # Not a Parameter on purpose: it must never enter the least-squares fit.
     particle_radius_um: float | None = Field(default=None, gt=0.0)
+    # Commensurate propagation vector k, in fractional coordinates of the
+    # *conventional* reciprocal cell — the basis a CIF, a Bilbao page and
+    # ``_parent_propagation_vector`` all speak.  Declaring one adds satellite
+    # reflections at Q = H ± k to the phase's frozen reflection list
+    # (``crystallography/satellites.py``): Le Bail and Pawley extract intensity
+    # on them and a Rietveld stage contributes exactly zero there, so a user
+    # with unindexed low-angle intensity in a neutron pattern can test the
+    # magnetic hypothesis **without stating a single moment** (WP-1326).
+    #
+    # Stored as three rational *strings* (``"0"``, ``"1/2"``, ``"1/3"``), not
+    # floats, and that is the point: k is exact, the ± k equivalence test and
+    # the satellite enumeration are integer arithmetic, and a float would put a
+    # tolerance where none belongs.  Any spelling a caller finds natural — an
+    # int, a ``Fraction``, ``"1/2"``, or a float that *is* a small rational —
+    # arrives through the validator below and is stored canonically, so a JSON
+    # round-trip is bit-identical.  ``None`` (the default) is exactly off: a
+    # phase declaring none compiles to the reflection list it always did.
+    propagation_vector: tuple[str, str, str] | None = None
     # The phase's magnetic space group, as the magCIF operator and centring
     # loops (WP-1327).  ``None`` — the default — is exactly off, and it is the
     # only state in which an atom of this phase may carry no ``moment``:
     # declaring one is what gives a moment an allowed subspace to refine in
-    # and an orbit to be propagated over.  A commensurate k ≠ 0 structure is
-    # stated in its magnetic supercell
-    # (``crystallography.magnetic.supercell.magnetic_supercell``), never as a
-    # propagation vector beside a moment model (:data:`MOMENT_MODEL_FIELDS`).
+    # and an orbit to be propagated over.  Refused beside
+    # ``propagation_vector`` (:data:`MOMENT_MODEL_FIELDS`): a commensurate
+    # magnetic structure is described *either* by k on the nuclear cell with
+    # no moments, *or* by a magnetic space group with moments in the magnetic
+    # supercell (``crystallography.magnetic.supercell.magnetic_supercell``),
+    # and both at once is the same physics stated twice.
     #
     # A UNI/BNS/OG number is accepted here in place of the block and resolved
     # through spglib (issue #257 A4); what is stored is always the operator
@@ -1024,6 +1043,54 @@ class Phase(Base):
             None if bracket is not None else self.space_group)
         if refusal is not None:
             raise ValueError(f"phase {self.name!r}{refusal}")
+        return self
+
+    @field_validator("propagation_vector", mode="before")
+    @classmethod
+    def _canonical_k(cls, value):
+        """Normalise any accepted spelling of k to three rational strings.
+
+        Validation of what the *vector* means — commensurate, and not a
+        reciprocal-lattice vector of this phase's symmetry — needs the space
+        group and therefore happens in :meth:`_k_is_usable` below.  This step
+        only fixes the storage: ``Fraction``s, ints, ``"1/2"`` strings and
+        floats that are exactly a small rational all become the same three
+        strings, so two callers who spelled the same vector differently store
+        the same document.
+        """
+        if value is None:
+            return None
+        from ..crystallography.satellites import as_propagation_vector
+
+        return tuple(str(c) for c in as_propagation_vector(value))
+
+    @model_validator(mode="after")
+    def _k_is_usable(self) -> "Phase":
+        """Refuse a k this phase's symmetry cannot carry, and a moment model.
+
+        Two refusals, and neither can be made by the field validator above.
+        **k = 0** — a k that is a reciprocal-lattice vector of *this* group,
+        which is a centring-aware test — would put every satellite on a
+        nuclear line and duplicate the reflection list exactly; the message
+        (``crystallography.satellites.check_propagation_vector``) says what to
+        do instead.  And a **moment model declared beside k**: the two
+        descriptions of a commensurate magnetic structure — a propagation
+        vector on the nuclear cell, and a magnetic space group with moments —
+        must not both be declared on one phase, because they say the same
+        thing twice and nothing reconciles them
+        (:func:`refuse_moment_model_with_k`).
+        """
+        if self.propagation_vector is None:
+            return self
+        from ..crystallography.satellites import check_propagation_vector
+
+        try:
+            check_propagation_vector(self.space_group, self.propagation_vector)
+        except ValueError as exc:
+            raise ValueError(f"phase {self.name!r}: {exc}") from exc
+        refuse_moment_model_with_k(
+            self.name, [f for f in MOMENT_MODEL_FIELDS
+                        if getattr(self, f, None) is not None])
         return self
 
     @model_validator(mode="after")

@@ -106,7 +106,9 @@ def _components(model: CompiledModel, values: dict[str, float], ip: int
     cp = model.phases[ip]
     cell = tuple(values[f"phases.{ip}.cell.{k}"]
                  for k in ("a", "b", "c", "alpha", "beta", "gamma"))
-    d = np.asarray(d_spacings(cp.reflections.hkl, *cell), dtype=np.float64)
+    # the position a row's peak sits at — H + m·k on a satellite (WP-1326),
+    # never the parent, whose (0, 0, 0) would be d = ∞
+    d = np.asarray(d_spacings(cp.reflections.index, *cell), dtype=np.float64)
     aniso = np.asarray(model.strain_width(ip, values, d)) \
         if cp.strain_monomials is not None else np.zeros(len(d))
     # the whole tanθ coefficient, isotropic part included: a Stephens block
@@ -293,7 +295,9 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
         # width, not about anisotropy.
         target = np.maximum(current + d_lambda, 0.0)
 
-        mono = monomial_matrix(cp.reflections.hkl)
+        # the direction the width is measured along, which for a satellite is
+        # H + m·k — the same array compile_model built strain_monomials from
+        mono = monomial_matrix(cp.reflections.index)
         templates = (mono @ basis.T)[live]
         scale = (_C * d[live] ** 2) ** 2          # y = Λ²/scale
         y = target[live] ** 2 / scale
@@ -324,7 +328,12 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
         # extrapolates freely where nothing holds it down.
         fitted = np.sqrt(np.maximum(templates @ coef, 0.0) * scale)
         lev = weight[live]
-        idx = np.nonzero(lev > _QUOTABLE_WEIGHT_FRAC * lev.max())[0]
+        # a satellite informs the fit (its direction is H + m·k) but is never
+        # *named*: ``broadest_hkl`` is three integers and a satellite's
+        # direction is rational, so only nuclear rows may be quoted (WP-1326)
+        nuclear = ~np.asarray(cp.reflections.is_satellite)[live]
+        idx = np.nonzero((lev > _QUOTABLE_WEIGHT_FRAC * lev.max())
+                         & nuclear)[0]
         if len(idx) < 2:
             # one quotable direction is no contrast at all: a pattern whose
             # leverage sits on a single peak cannot say anything about

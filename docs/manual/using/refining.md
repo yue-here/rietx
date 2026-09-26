@@ -199,9 +199,71 @@ attribute to the harmonic once everything else had its chance?". It is the only
 way to see a contamination whose peaks overlap the fundamental's too closely for
 a peak search to separate.
 
+## Is the unexplained intensity magnetic?
+
+The sentence above ("an unindexed impurity, a magnetic contribution, a
+background too stiff to follow") names magnetism as a cause of intensity the
+model puts nowhere. `FitReport.satellites` is how you test it, and it needs
+nothing you do not already have: a cell, a symmetry and a wavelength. A
+satellite is a position. No moment, no magnetic form factor and no magnetic
+symmetry enters, which is what makes this worth running *before* deciding
+whether a magnetic model is worth building.
+
+For each phase the arm sorts the positive residual peaks into the three places
+one can be, and only the third is scored:
+
+1. on a calculated line: a nuclear misfit, or a k = 0 structure whose
+   intensity coincides with the nuclear reflections. This route cannot tell
+   those apart;
+2. on a reciprocal-lattice point a glide or screw absence of the *assumed*
+   space group forbids. The fitted model cannot put intensity there, but a
+   nuclear group lower than the one assumed can, and so can λ/2
+   contamination, an impurity line and, on neutrons, a k = 0 magnetic
+   structure. The arm names all of them and separates none; what it does
+   settle is that these peaks need no k;
+3. neither: the only peaks a satellite is needed to explain.
+
+For those it generates the satellite positions Q = H ± k for a small,
+enumerated set of candidate propagation vectors and counts how many land
+inside the report's own validity radius of one. It publishes the whole ranked
+list (never a singleton, the same rule indexing follows), because a k at the
+top of it is a hypothesis worth testing and not an answer.
+
+<!-- api-doc: no-exec — it needs a refinement that has run -->
+```python
+report = ref.report()
+arm = report.satellites[0]
+print(arm.note)
+for c in arm.candidates[:3]:
+    print(c.vector, c.matched, "of", arm.n_unexplained)
+```
+
+| Field | Is | Reads as |
+|---|---|---|
+| `SatelliteEvidence.phase_index` | which phase | position in `Structure.phases` |
+| `SatelliteEvidence.radiation` | `"neutron"` or `"xray"` | read off the phase's own scattering amplitude, never assumed |
+| `SatelliteEvidence.n_residual_peaks` | positive residual peaks before the sort | |
+| `SatelliteEvidence.n_unexplained` | peaks at neither of the next two, i.e. the ones the ranking was scored against | zero means nothing needed a satellite, which is not a result about the specimen |
+| `SatelliteEvidence.excess_on_nuclear_lines` | residual peaks that sit on a calculated reflection | a nuclear misfit or a k = 0 structure, and this route cannot separate them |
+| `SatelliteEvidence.excess_on_absent_lattice_lines` | residual peaks on a reciprocal-lattice point the assumed group's glide or screw forbids | a group set too high, λ/2, an impurity line or (neutrons only) a k = 0 structure; the arm cannot separate them (see below) |
+| `SatelliteEvidence.declared_k` | the k this phase already declares, or null | the arm still scores: "does another k explain the rest" is a question a declared one does not answer |
+| `SatelliteEvidence.generator` | which candidate set was used | the default is the zone-boundary set; a caller may supply another |
+| `SatelliteEvidence.candidates` | the ranked list, one `SatelliteCandidate` each | |
+| `SatelliteEvidence.note` | the sentences above, rendered | always non-empty |
+| `SatelliteCandidate.vector` | the plain spelling, `(0, 0, 1/2)` | what to type into `Phase.propagation_vector` |
+| `SatelliteCandidate.name` | a positional label, `k1`, `k2`, … | stable within one generator, and nothing else |
+| `SatelliteCandidate.cdml` | the CDML k-label | `None` today: those tables are a data source this package has not sourced, and a made-up label would look like CDML and disagree with it |
+| `SatelliteCandidate.k` | the three exact rationals | |
+| `SatelliteCandidate.matched`, `SatelliteCandidate.matched_fraction` | how many unexplained peaks this k accounts for | the ranking key |
+| `SatelliteCandidate.worst_offset_deg` | the largest Δ2θ among those | null when none matched |
+| `SatelliteCandidate.n_satellites` | satellite positions this k puts in range | a k that floods the pattern explains peaks by having a line everywhere |
+| `SatelliteCandidate.star_size` | arms of the star of k | |
+| `SatelliteCandidate.minus_k_distinct` | whether −k is a second vector | false when 2k is a reciprocal-lattice vector; the test respects centring, so on a C lattice (½ 0 0) is distinct from its negative and (0 0 ½) is not |
+
 ## A moment, stated and refined
 
-When you know the magnetic structure, state it. A moment is a site attribute (`Atom.moment`, a `Moment` block)
+When the answer to the previous section is "yes, and I know the structure",
+state it. A moment is a site attribute (`Atom.moment`, a `Moment` block)
 under a `MagneticSymmetry` declared on the phase as `Phase.magnetic_symmetry`. That shape is
 deliberate: `qpa.weight_fractions` reads species, occupancy and multiplicity
 and never sees a moment, so the classic trap of a separate magnetic phase
@@ -315,6 +377,53 @@ below three of its own esds, and the note quotes which. A modulus with no
 esd has no ratio to take, and `supported` is then `None`, not an answer. At 4 K the same model
 gives 2.12 ± 0.06, a ratio of 35, and the answer flips. That is the
 deliverable; a small moment with a small esd would not be.
+
+A peak on a forbidden lattice point is forbidden under the group the fit
+*assumed*, and four causes put one there. A true nuclear group lacking that
+glide or screw puts intensity there, since the assumed group is then too high;
+so do λ/2 contamination from the monochromator and an impurity line that lands
+on the point. On neutrons the fourth is a k = 0 magnetic structure: its
+structure factor is an axial vector, and its absence rule for a glide or screw
+can be the complement of the nuclear one
+({cite}`gallego2012`, § 4.1.1, and § 4.3.2 in P4₂/mnm). The arm names all four
+in the note, and on an X-ray histogram only the first three. It cannot separate
+them, so `excess_on_absent_lattice_lines` says these peaks need no k and
+nothing more. Measured on the Cr₂WO₆ 4 K neutron pattern against a nuclear
+model refined on it from the 150 K one: four residual peaks sit on forbidden
+lattice points, the (0 0 1) and (1 0 2) regions among them, none of them
+carrying a tick, and the same arm on the 150 K pattern counts zero.
+
+A match count is not yet evidence for a k. The count has no chance baseline:
+on that 4 K pattern the two best zone-boundary candidates each index 2 of the
+6 peaks left at neither place, and on the 150 K pattern, which has no magnetic
+order, the best one indexes 2 of 5. Read `SatelliteCandidate.n_satellites`
+beside `SatelliteCandidate.matched`: a k with a line every few tenths of a
+degree matches peaks by being everywhere. The note quotes both where it names
+the best candidate, with the runner-up's `matched` and `n_satellites` beside
+them, and says so when the two tie, since the ranking then breaks only on the
+offset and the name.
+
+Two cases where the ranking means nothing, and the arm says so.
+
+*The excess sits on nuclear lines.* With k = 0 the satellites coincide with the
+nuclear reflections, so a Le Bail extraction absorbs the magnetic intensity into
+the nuclear intensities: a k = 0 structure and a nuclear misfit look alike by
+this route, and no ranking can separate them. What does is a pattern of the
+same specimen above its ordering temperature. `excess_on_nuclear_lines` counts
+the residual peaks in that state; they are deliberately not scored.
+
+*The histogram is X-ray.* Intensity at G ± k is then a superstructure
+reflection. The positions are the same and the inference is not.
+
+A good pattern can also score nothing, and that is a property of the candidate
+set rather than of the data. The set is enumerated, not searched: the
+zone-boundary vectors {0, ½}³ minus the origin, plus (⅓ ⅓ 0) and (⅓ ⅓ ½) on a
+hexagonal or trigonal lattice, one representative per star. An incommensurate k
+is outside it by construction, and so is any commensurate k it does not list.
+
+Once a candidate looks worth testing, declare it (`Phase.propagation_vector`,
+[](data.md)) and refine in Le Bail or Pawley mode: the satellites become rows
+the extraction can put intensity on, and whether it does is the measurement.
 
 ## How hard each stage is converged
 

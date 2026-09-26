@@ -30,6 +30,7 @@ from .background.diagnostics import (
     dead_channels,
     sampling_steps_per_fwhm,
 )
+from .crystallography.symmetry import reflection_label, reflection_label_row
 from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
 from .history.store import fingerprint
@@ -4521,8 +4522,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         # one reflection list per emission line, in the same order each time,
         # so the index list is that list tiled — the Kα2 image of a peak is
         # the same hkl and says so.
-        hkl = (np.tile(cp.reflections.hkl, (len(rows), 1)) if rows
-               else np.zeros((0, 3), dtype=np.int64))
+        # (H, m), not H: a satellite is labelled by its order (WP-1326)
+        hkl = (np.tile(cp.reflections.hklm, (len(rows), 1)) if rows
+               else np.zeros((0, 4), dtype=np.int64))
         line_support = model.reflection_support(ip, values)
         sup = (np.tile(np.max(np.stack(line_support), axis=0), len(rows))
                if rows else np.array([]))
@@ -4558,8 +4560,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
             pos_k, hkl_k, sup_k = pos[sel], hkl[sel], sup[sel]
             order = np.argsort(pos_k, kind="stable")
             ticks[key] = [float(v) for v in pos_k[order]]
-            tick_hkl[key] = [[int(h), int(k), int(el)]
-                             for h, k, el in hkl_k[order]]
+            tick_hkl[key] = [reflection_label_row(r) for r in hkl_k[order]]
             tick_support[key] = [float(v) for v in sup_k[order]]
 
     # Declared sharp peaks are ticks too, under one reserved key.  This is the
@@ -4805,9 +4806,17 @@ def _extract_reflections(model: CompiledModel | None) -> list[ReflectionState]:
     for ip, cp in enumerate(model.phases):
         if cp.hkl_intensity is None:
             continue
+        order = cp.reflections.satellite_order
         state = ReflectionState(
             phase_index=ip,
             hkl=[[int(v) for v in h] for h in cp.reflections.hkl],
+            # WP-1326: the parent H alone does not identify a row — a phase
+            # with a propagation vector has up to two satellites sharing one
+            # H — so the key a checkout matches on is (H, m).  ``None`` for a
+            # phase with no k: the document gains that one null and nothing
+            # else, which is what makes the version bump additive.
+            satellite_order=(None if order is None
+                             else [int(v) for v in order]),
             intensity=[float(v) for v in cp.hkl_intensity],
             kind="pawley_refined" if is_pawley else "lebail_extracted",
             varied=is_pawley,
@@ -4819,32 +4828,52 @@ def _extract_reflections(model: CompiledModel | None) -> list[ReflectionState]:
     return out
 
 
+def _reflection_keys(hkl, order) -> list[tuple]:
+    """(h, k, l, m) per row — the key a Le Bail intensity is matched on.
+
+    ``m`` is the satellite order (WP-1326) and is 0 on every nuclear row, so a
+    phase with no propagation vector produces exactly the keys the three-index
+    form did with one constant appended, and matching is unchanged.  With a
+    propagation vector the parent H alone is ambiguous: H + k and H − k are
+    two reflections at two positions carrying two intensities.
+    """
+    if order is None:
+        return [(int(h[0]), int(h[1]), int(h[2]), 0) for h in hkl]
+    return [(int(h[0]), int(h[1]), int(h[2]), int(m))
+            for h, m in zip(hkl, order, strict=True)]
+
+
 def _scatter_lebail(lookup: dict[tuple, float], cp_new) -> None:
-    """Write intensities into a freshly compiled phase, matching by hkl."""
+    """Write intensities into a freshly compiled phase, matching by (hkl, m)."""
     if cp_new.hkl_intensity is None:
         return
-    for i, h in enumerate(map(tuple, cp_new.reflections.hkl)):
-        value = lookup.get(h)
+    keys = _reflection_keys(cp_new.reflections.hkl,
+                            cp_new.reflections.satellite_order)
+    for i, key in enumerate(keys):
+        value = lookup.get(key)
         if value is not None:
             cp_new.hkl_intensity[i] = value
 
 
 def _carry_lebail(old: CompiledModel, new: CompiledModel) -> None:
-    """Carry per-hkl intensities across a stage recompile (match by hkl)."""
+    """Carry per-hkl intensities across a stage recompile (match by (hkl, m))."""
     for cp_old, cp_new in zip(old.phases, new.phases, strict=True):
         if cp_old.hkl_intensity is None:
             continue
-        lookup = {tuple(h): float(cp_old.hkl_intensity[i])
-                  for i, h in enumerate(map(tuple, cp_old.reflections.hkl))}
+        keys = _reflection_keys(cp_old.reflections.hkl,
+                                cp_old.reflections.satellite_order)
+        lookup = {key: float(cp_old.hkl_intensity[i])
+                  for i, key in enumerate(keys)}
         _scatter_lebail(lookup, cp_new)
 
 
 def _restore_lebail(states: list[ReflectionState], model: CompiledModel) -> None:
-    """Re-seed per-hkl intensities from a checkpoint (match by hkl)."""
+    """Re-seed per-hkl intensities from a checkpoint (match by (hkl, m))."""
     for state in states:
         if not 0 <= state.phase_index < len(model.phases):
             continue
-        lookup = {tuple(h): state.intensity[i] for i, h in enumerate(state.hkl)}
+        keys = _reflection_keys(state.hkl, state.satellite_order)
+        lookup = {key: state.intensity[i] for i, key in enumerate(keys)}
         _scatter_lebail(lookup, model.phases[state.phase_index])
 
 
@@ -4897,7 +4926,7 @@ def _pawley_unresolved_diagnostics(model: CompiledModel,
         labels = []
         for gi in g:
             ip, k = _pawley_locate(pb, gi)
-            h = tuple(int(v) for v in model.phases[ip].reflections.hkl[k])
+            h = reflection_label(model.phases[ip].reflections.hklm[k])
             labels.append(f"{structure.phases[ip].name} {h}")
         total = float(np.sum(inten))
         out.append(Diagnostic(
@@ -4929,7 +4958,7 @@ def _pawley_off_data_diagnostics(model: CompiledModel,
     by_phase: dict[int, list[str]] = {}
     for gi in pb.off_data:
         ip, k = _pawley_locate(pb, gi)
-        h = tuple(int(v) for v in model.phases[ip].reflections.hkl[k])
+        h = reflection_label(model.phases[ip].reflections.hklm[k])
         by_phase.setdefault(ip, []).append(f"{structure.phases[ip].name} {h}")
     return [Diagnostic(
         level="info", code="PAWLEY_OFF_DATA_RIDGED", where=labels,

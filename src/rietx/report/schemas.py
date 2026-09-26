@@ -199,7 +199,21 @@ from ..strategy.staged import BACKGROUND_ABSORPTION_GUARD
 #   rule uses) and :data:`MOMENT_PAIR_RHO_MIN` (the correlation above which two
 #   moduli are reported as one powder-degenerate pair).  No existing threshold,
 #   gate or emission condition moved.
-THRESHOLDS_VERSION = "1.6"
+# 1.6 → 1.7 (WP-1326): ``FitReport.satellites`` — the satellite arm of the
+#   unexplained-intensity report: for each phase, the enumerated candidate
+#   propagation vectors ranked by how many unexplained peaks fall inside the
+#   report's own validity radius of a satellite at G ± k, plus the two
+#   sentences the arm must always be able to say (the k = 0 ambiguity, and
+#   that a satellite on an X-ray histogram is a superstructure reflection and
+#   not magnetism) — plus the k = 0 signature stated *positively*, a residual
+#   peak on a reciprocal-lattice point the nuclear structure factor forbids.
+#   Additive and defaulted to an empty list, which is the honest empty state —
+#   a report built with no compiled model measured nothing.  **No new
+#   threshold**: the match radius is the existing ``VALIDITY_RADIUS_FWHM``,
+#   deliberately, so the arm cannot be tuned independently of the layer whose
+#   peaks it is reading.  It bumps because it is a new field on the report a
+#   consumer enumerates, exactly as 1.3-1.6 did.
+THRESHOLDS_VERSION = "1.7"
 
 #: linearisation is only meaningful for peak shifts well inside the peak; past
 #: this fraction of FWHM the answer is "re-detect the peak", not "shift it"
@@ -473,6 +487,112 @@ class UnmatchedPeak(Base):
     two_theta: float
     height_over_sigma: float
     kind: str  # "unmatched_obs" (no calc tick nearby) | "unmatched_calc"
+
+
+class SatelliteCandidate(Base):
+    """One candidate propagation vector, scored against the unexplained peaks.
+
+    ``matched`` is how many of the report's unexplained observed peaks fall
+    within :data:`VALIDITY_RADIUS_FWHM` of a satellite position generated from
+    this k — the *report's own* radius, not a second one, so the arm cannot be
+    tuned independently of the layer whose peaks it reads.
+
+    **This is a ranking and never a singleton** (the indexing rule, root
+    ``CLAUDE.md``): the whole list is published in order, and a k at the top of
+    it is a hypothesis worth testing rather than an answer.  ``matched`` is a
+    count of *positions*, which is the only thing this rung measures — no
+    intensity is computed anywhere, because computing one would need a moment.
+
+    ``cdml`` is the CDML k-label a user would cross-check against MAGNDATA or
+    ISODISTORT, and is ``None`` until those tables are sourced
+    (``crystallography.satellites.cdml_label``); ``vector`` — the plain
+    spelling — is always there.
+    """
+
+    k: list[str]                 # three exact rationals, e.g. ["0", "0", "1/2"]
+    name: str                    # positional, deterministic within a generator
+    vector: str                  # "(0, 0, 1/2)"
+    cdml: str | None = None
+    #: how many satellite positions this k puts inside the fitted range
+    n_satellites: int = 0
+    #: arms of the star of k — how many distinct directions the powder averages
+    star_size: int = 1
+    #: False when 2k is a reciprocal-lattice vector, i.e. −k ≡ k (the FullProf
+    #: manual's ±k rule, which is centring-aware)
+    minus_k_distinct: bool = True
+    matched: int = 0
+    #: ``matched`` over the number of unexplained peaks; 0.0 when there are none
+    matched_fraction: float = 0.0
+    #: the largest |Δ2θ| among the matched peaks, in degrees; None when none
+    #: matched
+    worst_offset_deg: float | None = None
+
+
+class SatelliteEvidence(Base):
+    """Does the unexplained intensity index as satellites of a small set of k?
+
+    The arm WP-1326 adds to the unexplained-intensity report, and the whole of
+    what this rung can say: **a satellite is a position**.  No moment, no
+    magnetic form factor and no magnetic symmetry enters, which is exactly why
+    a user can run it before deciding whether the hypothesis is worth the model.
+
+    Two statements it must always be able to make, because both are cases where
+    the ranking below means nothing:
+
+    * ``excess_on_nuclear_lines`` — the residual peaks sit *on* calculated
+      reflections.  With k = 0 the satellites coincide with the nuclear lines,
+      so a Le Bail extraction absorbs the magnetic intensity into the nuclear
+      intensities: a k = 0 structure and a nuclear misfit look alike here and
+      this route cannot separate them.  What does is a pattern of the same
+      specimen above its ordering temperature (WP-1329 makes that a series).
+    * ``excess_on_absent_lattice_lines`` — they sit on reciprocal-lattice
+      points a glide or screw absence of the *assumed* space group forbids.
+      The fitted model cannot put intensity there, but four causes can and
+      this arm separates none of them: a true nuclear group lacking the
+      operation (the assumed group is too high), λ/2 contamination, an
+      impurity line on the point, and — on neutrons only — a k = 0 magnetic
+      structure, whose axial structure factor can obey the complementary
+      absence rule (Gallego et al. 2012, *J. Appl. Cryst.* **45**, 1236).
+      What the count does settle is that these peaks need no k, so they are
+      not scored.  Measured on the Cr₂WO₆ 4 K pattern, whose two strongest
+      residual peaks are the absent (0 0 1) and (1 0 2).
+    * ``radiation`` — on an X-ray histogram a satellite is a **superstructure**
+      reflection, not magnetism.  The positions are the same and the inference
+      is not.
+
+    ``candidates`` is empty when there was nothing to score, and that is not a
+    result about the specimen.  A good pattern can also score nothing because
+    the candidate set is *enumerated*: an incommensurate k is outside it by
+    construction, and so is every commensurate k the generator does not list.
+    """
+
+    phase_index: int
+    #: ``"neutron"`` or ``"xray"`` — read off the compiled phase's amplitude
+    #: (a bound coherent scattering length means neutrons), never assumed
+    radiation: str
+    #: positive residual peaks the arm sorted, before any of them was scored
+    n_residual_peaks: int = 0
+    #: peaks at neither of the two below — the ones the ranking was scored
+    #: against, because they are the only ones that need a satellite
+    n_unexplained: int = 0
+    #: positive residual peaks that sit on a **calculated reflection** — a
+    #: nuclear misfit, or a k = 0 structure, and this route cannot tell them
+    #: apart
+    excess_on_nuclear_lines: int = 0
+    #: positive residual peaks that sit on a **reciprocal-lattice point the
+    #: assumed space group forbids** — a group set too high, λ/2, an impurity
+    #: line, or (neutrons) a k = 0 magnetic structure; the note names the
+    #: causes this arm cannot separate, and none of them needs a k
+    excess_on_absent_lattice_lines: int = 0
+    #: the k this phase already declares, if any; the arm still scores, because
+    #: "does another k explain the rest" is a question a declared one does not
+    #: answer
+    declared_k: list[str] | None = None
+    #: which generator produced the candidate set (issue #257 A1)
+    generator: str = ""
+    candidates: list[SatelliteCandidate] = Field(default_factory=list)
+    #: the sentences above, rendered — always non-empty
+    note: str = ""
 
 
 class BackgroundEvidence(Base):
@@ -1206,6 +1326,12 @@ class FitReport(Base):
     regions: list[Region] = Field(default_factory=list)
     n_regions_total: int = 0
     unmatched: list[UnmatchedPeak] = Field(default_factory=list)
+    #: the satellite arm (WP-1326): per phase, whether the unexplained
+    #: intensity indexes as satellites of an enumerated candidate set of
+    #: propagation vectors.  Empty when no compiled model was supplied — the
+    #: arm needs the cell, the symmetry and the radiation — which is absence
+    #: for cause and never "no candidate scored".
+    satellites: list[SatelliteEvidence] = Field(default_factory=list)
     #: the moment arm (WP-1327): one row per magnetic site, with the magnitude
     #: the fit measured, the dipole approximation in force, the direction the
     #: powder average could not determine, and whether the modulus is above

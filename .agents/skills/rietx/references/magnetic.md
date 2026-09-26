@@ -1,6 +1,6 @@
-# 7j. The magnetic family: a stated moment and the child group it implies
+# 7j. The magnetic family: a satellite, a stated moment and the child group it implies
 
-Load it when a magnetic `Diagnostic` fired — from `analyse_moments` on a fit's `FitReport.magnetic` rows, or from `magnetic_supercell`'s returned statement.
+Load it when a magnetic `Diagnostic` fired — from `analyse_moments` on a fit's `FitReport.magnetic` rows, or from `magnetic_supercell`'s returned statement — or before you read `FitReport.satellites`.
 
 *A reference file of the `rietx` skill. The body it belongs to is [`SKILL.md`](../SKILL.md); section numbers are the ones the body cites.*
 
@@ -8,6 +8,16 @@ The magnetic diagnostic family lives in this one file rather than in §7's table
 
 * **Moment codes** are about a refined moment (WP-1327) and ride on the report's `MomentEvidence` rows (`analyse_moments`, `FitReport.magnetic`).
 * **Candidate codes** are not on `result.diagnostics` at all: they are on the `SupercellStatement` `magnetic_supercell` returns, because the question — does a Hermann-Mauguin symbol name the child group this cell carries — is settled before a fit exists, the same way a project reader's own codes are.
+* The **satellite arm** (WP-1326, `FitReport.satellites`) emits no code at all; its readings are in the next section.
+
+## The satellite arm
+
+| reading | what you must not assume, and what to do |
+|---|---|
+| `SatelliteCandidate.matched` at the top of `SatelliteEvidence.candidates` | Read the top row as the propagation vector. The count has no chance baseline: on the Cr₂WO₆ tutorial set the best zone-boundary k indexes 2 of 6 leftover peaks at 4 K and 2 of 5 at 150 K, where there is no order. Compare `matched` with `n_satellites` (a k with a line everywhere matches by being everywhere) and with the runner-up (the note quotes all three, and calls a tie), then declare the k (`Phase.propagation_vector`) and run a Le Bail or Pawley stage: whether the extraction puts intensity on the satellites is the measurement |
+| `SatelliteEvidence.excess_on_absent_lattice_lines` > 0 | Read it as a k = 0 magnetic structure. The points are forbidden only under the group you assumed: a lower nuclear group, λ/2 contamination and an impurity line also put intensity there, and on X-rays magnetism is not a cause at all. Rule those out first; on neutrons, then test a moment model under a k = 0 magnetic space group (§7j above), not a propagation vector, which refuses k = 0 |
+| `SatelliteEvidence.excess_on_nuclear_lines` > 0 | Call it magnetic or nuclear from this pattern. A k = 0 structure and a nuclear misfit look alike here; a pattern of the same specimen above its ordering temperature separates them |
+| `SatelliteEvidence.radiation == "xray"` | Call intensity at G ± k magnetic. On X-rays it is a superstructure reflection |
 
 ## Moment codes
 

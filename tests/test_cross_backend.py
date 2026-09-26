@@ -462,6 +462,67 @@ def _state_magnetic():
     return model, table, {}
 
 
+def _state_satellites():
+    """WP-1326: coordinate and ADP columns of a phase carrying a propagation vector.
+
+    The new derivative path is the **masked** ``df2`` branch in
+    ``CompiledModel``'s analytic structural columns: a satellite row has no
+    nuclear structure factor, so its derivative is multiplied by the same
+    ``_nuclear_mask`` the forward model applies.  No other config has a mask
+    and no moment, and a moment would route the coordinate columns away from
+    that branch (``structural_grad_supported``), so this is the only row that
+    reaches it — a column that forgot the mask would carry intensity
+    derivatives on rows the residual draws at exactly zero.
+
+    One general-position atom (three coordinate DOFs, a free Biso) and one
+    anisotropic atom on a special position (its Uᵢⱼ DOFs), under k = (0, 0, ½)
+    on ``P m m m``, which puts a satellite between every pair of nuclear
+    lines along c*.
+    """
+    import rietx as rx
+    from rietx.schemas.instrument import BackgroundChebyshev
+    from rietx.schemas.pattern import PatternData
+    from rietx.schemas.structure import AnisoU
+    from tests.test_backend_shim import _free
+
+    P = rx.Parameter
+    cell = rx.Cell(a=P(value=4.0), b=P(value=5.0), c=P(value=6.0),
+                   alpha=P(value=90.0), beta=P(value=90.0), gamma=P(value=90.0))
+    structure = rx.Structure(phases=[rx.Phase(
+        name="sat", space_group="P m m m", cell=cell,
+        atoms=[rx.Atom(label="Fe", species="Fe", x=P(value=0.13),
+                       y=P(value=0.27), z=P(value=0.31), biso=P(value=0.5)),
+               rx.Atom(label="O", species="O", x=P(value=0.5),
+                       y=P(value=0.5), z=P(value=0.5), biso=P(value=0.6),
+                       aniso=AnisoU.isotropic(0.008, cell))],
+        scale=P(value=0.05), propagation_vector=(0, 0, "1/2"))])
+    ins = rx.Instrument.constant_wavelength_neutron(2.4)
+    ins.profile.u.value, ins.profile.w.value = 0.05, 0.03
+    ins.profile.x.value = 0.04
+    ins.background = BackgroundChebyshev.with_terms(2)
+    ins.background.coefficients[0].value = 20.0
+
+    grid = np.arange(8.0, 140.0, 0.05)
+    empty = PatternData(two_theta=grid.tolist(),
+                        intensity=np.zeros_like(grid).tolist())
+    sim = compile_model(structure, ins, empty, mode="rietveld")
+    assert sim.phases[0].reflections.is_satellite.any()
+    sim_table = ParameterTable(structure, ins)
+    y = sim.evaluate(sim_table.decode(sim_table.x0()))
+    # off the expansion point, so no column is dead by construction
+    pattern = PatternData(two_theta=sim.tt.tolist(),
+                          intensity=(np.asarray(y) * 1.03 + 2.0).tolist())
+
+    table = ParameterTable(structure, ins)
+    _free(table, ["phases.0.scale", "phases.0.atoms.0.dof.*",
+                  "phases.0.atoms.0.biso", "phases.0.atoms.1.adp.*",
+                  "instrument.background.c0", "instrument.zero_shift"])
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    assert model.structural_grad_supported(0)
+    return model, table, {}
+
+
 CONFIGS = {"families": _state_families,
            "families_voigt": _state_families_voigt,
            "families_tied": _state_families_tied,
@@ -469,7 +530,8 @@ CONFIGS = {"families": _state_families,
            "capillary_offsets": _state_capillary_offsets,
            "extra_components": _state_extra_components,
            "extra_peak": _state_extra_peak,
-           "magnetic": _state_magnetic, **STATES}
+           "magnetic": _state_magnetic,
+           "satellites": _state_satellites, **STATES}
 
 #: the fast configs run everywhere; the two real-data ones are `slow`.
 #: ``families_voigt`` (WP-0405's shape) and ``toy_restraints`` (WP-0406's extra
@@ -497,6 +559,7 @@ CONFIG_PARAMS = [
     _config("extra_components"),
     _config("extra_peak"),
     _config("magnetic"),
+    _config("satellites"),
     _config("toy_lebail"),
     _config("toy_pawley"),
     _config("toy_rich"),

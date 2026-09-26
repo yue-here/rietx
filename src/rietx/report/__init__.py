@@ -9,6 +9,8 @@ and the pinned thresholds, and docs/DESIGN.md for the design rationale.
 
 from __future__ import annotations
 
+import numpy as np
+
 from ..schemas.results import RefinementResult
 from .apply import RECIPES, Recipe, describe_action, recipe, stage_for
 from .background import assess_background
@@ -21,6 +23,7 @@ from .layer0 import (
     background_clause,
     build_layer0,
     lebail_gap,
+    residual_peak_indices,
     too_flexible,
     too_stiff,
 )
@@ -48,6 +51,7 @@ from .layer2 import (
     texture_actions,
 )
 from .magnetic import analyse_moments
+from .satellites import analyse_satellites
 from .schemas import (
     LEBAIL_GAP_NOTABLE,
     RIVAL_DECISIVE_MIN_CHI2_RATIO,
@@ -64,6 +68,8 @@ from .schemas import (
     RegionAttribution,
     RivalComparison,
     RivalFit,
+    SatelliteCandidate,
+    SatelliteEvidence,
     StageReport,
     StrainAnalysis,
     SuggestedAction,
@@ -93,6 +99,8 @@ __all__ = [
     "RegionAttribution",
     "RivalComparison",
     "RivalFit",
+    "SatelliteCandidate",
+    "SatelliteEvidence",
     "StageReport",
     "StrainAnalysis",
     "SuggestedAction",
@@ -103,6 +111,7 @@ __all__ = [
     "VerificationOutcome",
     "abstention_flavour",
     "analyse_moments",
+    "analyse_satellites",
     "analyse_strain",
     "analyse_texture",
     "analyse_trends",
@@ -130,6 +139,7 @@ __all__ = [
     "predict_then_verify",
     "recipe",
     "reindex_action",
+    "residual_peak_indices",
     "resolution_limited_action",
     "stage_for",
     "suggest_actions",
@@ -174,6 +184,12 @@ def _attach_separability(report: FitReport) -> None:
         block.size_strain_collinearity = width.max_template_collinearity
 
 
+def _resid_norm(result: RefinementResult) -> np.ndarray:
+    """(y_obs − y_calc)/σ on the fitted grid — Layer 0's own residual."""
+    return ((np.asarray(result.y_obs) - np.asarray(result.y_calc))
+            / result.sig())
+
+
 def build_report(result: RefinementResult, *, model=None, values=None,
                  plan=None, free_paths: list[str] | None = None,
                  structure=None, held: list[str] | None = None,
@@ -195,9 +211,10 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         or parameters already free, are marked inactive.
     structure:
         The :class:`~rietx.schemas.structure.Structure` the model was compiled
-        from.  Optional, and it buys exactly one thing: the moment arm
-        (WP-1327) labels each row with the atom's own label rather than its
-        index, which the compiled model does not carry.
+        from.  Optional, and it buys two things the compiled model does not
+        carry: the moment arm (WP-1327) labels each row with the atom's own
+        label rather than its index, and the satellite arm (WP-1326) reports
+        which propagation vector each phase already *declares*.
     held:
         The last stage's hold list (``StageResult.held``), so the moment arm's
         "unmeasured" directions are the refinement's answer rather than a
@@ -277,6 +294,23 @@ def build_report(result: RefinementResult, *, model=None, values=None,
     # of Layer 1 abstains.
     report.texture = analyse_texture(model, values)
     report.strain = analyse_strain(model, values)
+    # The satellite arm (WP-1326) is computed here, on the same terms and for
+    # the same reason as texture and strain: intensity the model puts nowhere
+    # is a *cause* of an immature fit, so the arm must still speak when the
+    # rest of Layer 1 abstains — and "might this be magnetic?" is precisely
+    # the question a reader asks of a neutron pattern with unindexed low-angle
+    # peaks.  It is model-free in the same sense they are: positions only.
+    sat_ticks = np.asarray([t for positions in result.ticks.values()
+                            for t in positions], dtype=np.float64)
+    # every positive residual peak, not Layer 0's ``unmatched_obs`` subset: the
+    # arm sorts them itself so one radius decides both the tick test and the
+    # satellite test (``report/satellites.py``'s docstring has the measurement)
+    tt_res = np.asarray(result.two_theta)
+    residual_peaks = tt_res[residual_peak_indices(
+        _resid_norm(result), min_peak_sigma=min_peak_sigma)]
+    report.satellites = analyse_satellites(
+        model, values, residual_two_theta=residual_peaks, ticks=sat_ticks,
+        structure=structure)
     # The Le Bail gap is measured, never linearised, so it too speaks on both
     # branches (None outside Rietveld mode — absent for cause).  The summary
     # quotes it only when notable: a converged fit reads ratio ≲ 1 and saying
