@@ -138,7 +138,8 @@ gap ratio.
 The maintainer confirmed P1-P8 on 2026-09-26, with three amendments from
 a critical pass that day (in P2, P5 and P7), and chose the recommended P9.
 The phase-set measurement then changed P2 a second time, and the maintainer
-confirmed that too on the same day.
+confirmed that too on the same day. The same day the maintainer chose P10
+over recording the split anion site as a limit.
 
 - **P1. The server builds the polyhedra.** `/api/structure3d` gains a
   `polyhedra` arm: the centre's atom index, the vertex positions, outward
@@ -233,8 +234,23 @@ confirmed that too on the same day.
   and the split rule turns Si's shell of 24 O positions away. (The spike's
   window had turned it away by the gap first.) An olivine with Fe beside Mg
   on both M sites drew one octahedron per site.
+- **P10. Two non-metals closer than 0.7 of their radius sum are one atom
+  over two positions.** *Added 2026-09-26.* No stick joins them, and
+  neither makes the other a cation (`SPLIT_FLOOR`). VESTA's manual has the
+  user raise a pair's minimum bond length for a split-atom model; this sets
+  it from the radii. Mercury and CrystalMaker separate alternatives by the
+  file's disorder groups, which rietx's schema does not carry. Every stick on
+  the measured set is 0.856 of its radius sum or more (baryte's S–O), and
+  the shortest real bonds between non-metals are 0.77 (N≡N, NO⁺). The split
+  pairs sit below: hydroxyfluorapatite's O/F at 0.39, and high cristobalite's
+  O pairs at 0.34-0.68, which drew O–O sticks until now. A pair with a metal
+  keeps the 0.4 Å minimum alone, because uranyl's U=O is 0.67 and vanadyl's
+  and titanyl's 0.72. The default picture did not move.
 
 ## Where it will bite
+
+The further work these limits suggest is filed as
+[WP-1468](1468-what-the-polyhedra-still-miss.md).
 
 - **The threshold has no measured negative.** Under Brunner &
   Schwarzenbach's window every site on the measured set has a gap of 1.21
@@ -248,12 +264,10 @@ confirmed that too on the same day.
 - **An arsenic telluride would invert.** On the Pauling scale Te (2.10) is
   less electronegative than As (2.18), so As₂Te₃'s Te would be the cation
   and As its ligand. No such phase was measured.
-- **A split anion site can make a cation** (found by the 2026-09-26 review).
-  Fluorapatite with F at 0.5 and an OH oxygen 0.48 Å from it reads the O as
-  bonded to the more electronegative F, so the O is a cation: it leaves every
-  Ca shell and loses its Ca sticks. Skipping pairs that are both partly
-  occupied would break a disordered sulfate or perchlorate, whose partial S
-  and O really are bonded, so the rule is the maintainer's call.
+- **A split pair wider than the floor still bonds** (P10). Two O more than
+  0.92 Å apart get a stick. Hydroxyfluorapatite with its OH oxygen 0.48 Å
+  from F has its two mirror O positions 0.96 Å apart, so they do. The F no
+  longer makes that O a cation.
 - **A large hidden shell can lose its room at the atom cap.** A shell of 24
   needs up to 24 partner atoms. The shells drawn by default claim room first,
   so the default picture keeps its polyhedra. A hidden one dropped at the cap
@@ -283,6 +297,8 @@ confirmed that too on the same day.
 - [x] Renderer: the translucent pass, the edges, and hover on a polyhedron (centre, ligand count, mean distance); a polyhedra case in `1462-spike/gate.py`'s script (2026-09-26; acceptance 3 in `1466-measure/results_*.txt`)
 - [x] GUI: the per-species toggles, P5's and P8's defaults, and the caption saying what is drawn (2026-09-26)
 - [x] The legend switches per formula, and a hidden polyhedron's own partner atoms hide with it (2026-09-26; P5)
+- [x] The split floor between non-metals, for the sticks and the cation test (2026-09-26; P10)
+- [x] File the further work as WP-1468 (2026-09-26)
 - [x] Docs: the structure viewer paragraphs in `gui/CLAUDE.md` and the GUI guide (2026-09-26)
 
 ## Acceptance

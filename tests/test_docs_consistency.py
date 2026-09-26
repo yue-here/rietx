@@ -522,7 +522,11 @@ SIZE_CAPS: dict[str, int | None] = {
     # 851 -> 852 (2026-09-25): one row, 1467, under § What fires, and what
     # stays silent, from a review of the same private series' Stephens runs.
     # No prose: the evidence stays in the WP file.  Landed 851, +1 headroom.
-    "docs/ROADMAP.md": 852,
+    # 852 -> 854 (WP-1466, 2026-09-26): one row, 1468, under § Render what the
+    # fit already knows, the further work 1466's automatic polyhedra leave, at
+    # the maintainer's request.  No prose: the evidence stays in the WP file.
+    # Landed 853, +1 headroom.
+    "docs/ROADMAP.md": 854,
     # 1036 -> 1053 (WP-1429): where the GUI's colour values live, now that
     # they are Python and this workspace's `tokens.css` is generated from
     # them. It governs work outside the WP that measured it — an edit to a
