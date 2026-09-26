@@ -1,7 +1,6 @@
 # WP-1466 — the structure viewer draws coordination polyhedra
 
-Milestone: unscheduled · Status: 🔄 2026-09-26 — built and measured; the gap measure and the
-electronegativities wait on two papers the maintainer supplies
+Milestone: unscheduled · Status: 🔄 2026-09-26 — claimed by @yue-here
 Depends on: 1462
 Priority: P3 2026-09-26 — WP-1462 closed, so its one blocker is gone; P1-P9 are confirmed, P3's gap measure waits on Brunner & Schwarzenbach (1971) and the electronegativities on Allred (1961)
 
