@@ -313,10 +313,21 @@ ranking is built yet, because the seam is the maintainer's decision.
   budget is cut by design and whose claim is an abstention.
 - The gallery sidecar records `unit_seconds`. Three stale captions (brucite,
   fluorite, fap) and four double-escaped dashes fixed.
-- `incomplete_diagnostic` words a capped system apart from a clock-stopped
-  one; each engine files an incomplete unit by whether its budget had expired
-  when it returned. Staged in `releases/1.5.1.md`; two skill rows updated, one
-  with the finding that a cut search's order does not repeat.
+- `incomplete_diagnostic` names one of three causes per system: the unit's
+  own budget, a size cap, or the cancel token (the run's ceiling or the
+  caller). Each engine files an incomplete unit by what was true when it
+  returned. Staged in `releases/1.5.1.md`; two skill rows updated, one with
+  the finding that a cut search's order does not repeat.
+- `/code-review high --fix` found ten issues. The pass fixed five: the missing
+  clock on trial_error's cut return (which `_clock_cut` needs), `where` kept
+  in `SYSTEM_ORDER`, advice per cause on a mixed result, a zero budget read
+  as no limit, and the contamination row's found-claims made to run before
+  its skip. The ceiling cause was fixed here, since the new skill row would
+  otherwise have sent agents to raise the wrong budget. Declined, all older
+  than this WP: a unit that hit a cap and then ran out of time reads as the
+  clock; svd's retry discards its own completeness flag; svd's `capped` list
+  is unreachable, kept for symmetry; `unit_seconds` has no reader but the
+  person opening the artifact.
 - Context gained the Borda mechanism, the three arXiv preprints, the five
   papers in the synced Zotero library (`~/Zotero yue-here/`), and the measured
   proposal with its table. The corpus task is ticked; Markvardsen *et al.*
@@ -341,11 +352,14 @@ ranking is built yet, because the seam is the maintainer's decision.
   nothing skipped, 21:28, another session loading the machine at the start.
   The slowest units still came close to 300 s: brucite 278 s, corundum 246 s,
   corundum with shift 215 s, fluorite 151 s.
-- Fast suite: 6305 passed, 151 skipped (6456), 3:32, no other pytest running.
-  No test function was added, only assertions inside two engine tests; the cap
-  assertion failed against the old engine code before passing on the new.
-  `tests/test_indexing_engines.py`: 76 passed. The full selection did not run,
-  since nothing here can move a measured number.
+- Final tree, `origin/main` at `612453fa` merged in, no other pytest running:
+  fast suite 6432 passed, 151 skipped (6583), 2:42; the acceptance file again
+  44 passed, 1 xfailed, 22:09. Before the merge the branch read 6305 + 151 =
+  6456. This session added one test function (the ceiling stop), so the rest
+  of the move is main's WP-1328 merge. Both new cause assertions failed
+  against the old engine code before passing on the new. Engine and
+  scheduler files: 90 passed. The full selection did not run, since nothing
+  here can move a measured number.
 - The screen probes, all on searches that finished (scripts in the session
   scratchpad only). Under the manual's protocol (widths seeded from the peak
   list, 20-90°) the screen returns `R - c -` on corundum at ΔBIC −3361.
