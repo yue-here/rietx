@@ -109,7 +109,7 @@ penalty. Same family, different mechanism, different fix.
       `references/judging.md` row: at powder channel counts ΔBIC on raw N
       blesses any improvement; the parameter's esd and `esd_inflation`
       outrank both statistics. Paid for by a cut, per root CLAUDE.md § skill.
-- [ ] Layer 2 carries the t-ratio of a freed parameter beside the ΔBIC of
+- [x] Layer 2 carries the t-ratio of a freed parameter beside the ΔBIC of
       adding it; the declared field's writer named at review (1076). (The
       `suggest()` half, the predicted ΔBIC saying which N it is charged at,
       landed in PR #431.)

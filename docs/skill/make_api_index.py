@@ -207,9 +207,11 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
         "The report",
         "`ref.report()` or `rx.build_report` gives the three-layer "
         "`rx.FitReport` §5 reads. `compare_rivals` and `predict_then_verify` "
-        "are the two experiments §4 step 14 and §4b call for.",
+        "are the two experiments §4 step 14 and §4b call for, and "
+        "`compare_freed` prices a parameter you freed (§4).",
         ("rx.build_report", "rx.FitReport", "rx.report.compare_rivals",
-         "rx.report.predict_then_verify"),
+         "rx.report.predict_then_verify", "rx.report.compare_freed",
+         "rx.report.FreedComparison", "rx.report.FreedParameter"),
     ),
     (
         "Series, history, projects",
