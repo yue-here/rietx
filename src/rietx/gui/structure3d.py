@@ -417,9 +417,11 @@ def is_ligand(center: str, element: str) -> bool:
 #: Pauling electronegativities of gemmi's non-metals, for the one question the
 #: polyhedra ask of them: which of two bonded non-metals is the cation.  An
 #: element with no value (He, Ne, Ar, Rn, Ts, Og) is never the more
-#: electronegative of a pair.  The values are the Pauling scale as usually
-#: tabulated after Allred (1961, J. Inorg. Nucl. Chem. 17, 215), not yet
-#: checked against that paper (WP-1466's task).  Deuterium is hydrogen's value,
+#: electronegative of a pair.  Fourteen are Allred's (1961, J. Inorg. Nucl.
+#: Chem. 17, 215, Table 3), checked against it.  His table has none for Te,
+#: At, Kr or Xe, and theirs are the values usually tabulated on the Pauling
+#: scale, not checked.  Te needs one: without it a tellurate's Te would be an
+#: anion, and a ligand of the metals beside it.  Deuterium is hydrogen's value,
 #: since :func:`element_symbol` passes ``D`` through and a neutron structure
 #: must draw as its protonated twin does.
 ELECTRONEGATIVITY: dict[str, float] = {

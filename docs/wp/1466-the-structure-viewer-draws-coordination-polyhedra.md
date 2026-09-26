@@ -148,8 +148,10 @@ confirmed that too on the same day.
   cation too, as Si is in SiO₄, and bonded means the viewer's radius-sum
   rule at its default tolerance. Every other non-metal except hydrogen is
   an anion, and a ligand is an anion of another element. The
-  electronegativities are 18 Pauling values, checked against Allred (1961)
-  once the maintainer supplies it. This is Mercury's two lists derived
+  electronegativities are 18 Pauling values. *Checked 2026-09-26:* 14 are
+  Allred's (1961, Table 3) to the last digit (H, B, C, N, O, F, Si, P, S,
+  Cl, As, Se, Br, I). His table has none for Te, At, Kr or Xe, so theirs
+  stay the values usually tabulated, unchecked. This is Mercury's two lists derived
   rather than declared, and CrystalNN's "no cation-cation bonds" carried
   from the metals to the non-metals. An intermetallic therefore gets no polyhedra by
   default, where Daams & Villars would draw every atom's environment.
@@ -242,6 +244,9 @@ confirmed that too on the same day.
   environment types. None arose on the measured set: the closest is
   fluorapatite's Ca2, whose largest gap is 1.24 against 1.14 for the next.
 - **A cyanide or a carbonyl** draws the wrong shell (P2).
+- **An arsenic telluride would invert.** On the Pauling scale Te (2.10) is
+  less electronegative than As (2.18), so As₂Te₃'s Te would be the cation
+  and As its ligand. No such phase was measured.
 - **A split anion site can make a cation** (found by the 2026-09-26 review).
   Fluorapatite with F at 0.5 and an OH oxygen 0.48 Å from it reads the O as
   bonded to the more electronegative F, so the O is a cation: it leaves every
@@ -266,7 +271,7 @@ confirmed that too on the same day.
 
 - [x] The maintainer confirms P1-P8, and this file records which (2026-09-26: all, with amendments to P2, P5 and P7, and P9 added)
 - [x] Read Brunner & Schwarzenbach (1971) (the maintainer supplies it) and set P3's gap measure to theirs, then re-run `1466-measure/measure.py` (2026-09-26: the measure was theirs, the window was not; P3)
-- [ ] Read Allred (1961) (the maintainer supplies it) and check `structure3d.ELECTRONEGATIVITY`'s 18 values against it
+- [x] Read Allred (1961) (the maintainer supplies it) and check `structure3d.ELECTRONEGATIVITY`'s 18 values against it (2026-09-26: 14 match, and his table has none for the other four; P2)
 - [x] Measure P4, P5 and P9 on the wider phase set, a disordered phase among it, and record the threshold and the table (2026-09-26, on the stand-in gap measure: § The phase-set measurement)
 - [x] Server: the `polyhedra` arm, the ligand rule, the gap shell, the polyhedron conditions and the vertex partners, with tests in `tests/test_structure3d.py` (2026-09-26; the gap measure is the stand-in until task 2, and `POLYHEDRON_GAP` is measured at 1.15)
 - [x] Renderer: the translucent pass, the edges, and hover on a polyhedron (centre, ligand count, mean distance); a polyhedra case in `1462-spike/gate.py`'s script (2026-09-26; acceptance 3 in `1466-measure/results_*.txt`)
@@ -293,6 +298,9 @@ npm --prefix gui test && npm --prefix gui run check
 - Daams, J. L. C. & Villars, P. (1993). Atomic environment classification of
   the rhombohedral "intermetallic" structure types. The maintainer's copy
   (`rietx-refs-misc`) does not carry the journal details.
+- Allred, A. L. (1961). Electronegativity values from thermochemical data.
+  *J. Inorg. Nucl. Chem.* 17, 215. Read in full (the maintainer's copy in
+  `rietx-refs-misc`).
 - Brunner, G. O. & Schwarzenbach, D. (1971). *Z. Kristallogr.* 133, 127.
   Zur Abgrenzung der Koordinationssphäre und Ermittlung der Koordinationszahl
   in Kristallstrukturen. The maximum-gap rule, read in full (the maintainer's
