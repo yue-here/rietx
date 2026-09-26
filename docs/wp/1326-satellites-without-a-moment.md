@@ -1,6 +1,6 @@
 # WP-1326 — satellites at G ± k, with no moment model: is it magnetic?
 
-Milestone: v1.6 · Status: ⬜
+Milestone: v1.6 · Status: 🔄 2026-09-26 — the satellites and their report arm landed from outside (PR #468); the public k ≠ 0 pattern and the Cr₂WO₆ PNG remain
 Depends on: — (first rung of the magnetic scattering track; 1327 builds on
 its reflection list)
 Priority: P2 2026-09-23 — the open milestone's first rung, nothing blocks it
@@ -133,25 +133,26 @@ not both be declared on one phase.
 
 ## Tasks
 
-- [ ] `Phase.propagation_vector`: rational components over the conventional
+- [x] `Phase.propagation_vector`: rational components over the conventional
       reciprocal basis, validated commensurate, with the ±k equivalence test
       and the centring rule above; refused together with a magnetic operator
       list once 1327 adds one.
-- [ ] Satellite generation as a second `ReflectionSet` per phase: enumeration
+- [x] Satellite generation as a second `ReflectionSet` per phase: enumeration
       over the lattice, multiplicity by orbit counting, an equivalence test on
       a C-centred cell against the manual's two examples.
-- [ ] The compiled model carries satellites through every mode: Le Bail and
+- [x] The compiled model carries satellites through every mode: Le Bail and
       Pawley rows, zero nuclear contribution under Rietveld, ticks for every
       emission line, the observation count.
-- [ ] The report arm: the enumerated candidate set, the ranked list, the k = 0
+- [x] The report arm: the enumerated candidate set, the ranked list, the k = 0
       sentence, the X-ray sentence.
-- [ ] `help.py` entry, skill row, manual Part 1 (`using/refining.md`, the
+- [x] `help.py` entry, skill row, manual Part 1 (`using/refining.md`, the
       unexplained-intensity section) and Part 2 (the satellite condition as
-      an equation with its *Source* line).
-- [ ] Vendor the Cr₂WO₆ 4 K and 150 K HB-2A patterns from the GSAS-II
+      an equation with its *Source* line). (`help.py`: no arm covers a
+      `Phase` schema field, so there is no entry — handover 2026-09-26.)
+- [x] Vendor the Cr₂WO₆ 4 K and 150 K HB-2A patterns from the GSAS-II
       tutorial repository (`Magnetic-II/data`, ORNL data distributed by
       Argonne; licence checked per file, a `tests/data/README.md` row each);
-      they serve 1327's acceptance as well.
+      they serve 1327's acceptance as well. (Vendored by WP-1327's PR #433.)
 - [ ] Source a public constant-wavelength neutron pattern with a published
       k ≠ 0 structure (search the maintainer's corpus first, then ask; the
       GSAS-II `Magnetic-III` … `-V` folders are the first place to look).
@@ -188,6 +189,126 @@ not both be declared on one phase.
   the fence this track opens.
 
 ## Handover log
+
+### 2026-09-26 — the satellites landed from outside
+
+A phase can now declare a commensurate propagation vector, and its satellites
+at Q = H ± k join the frozen reflection list. The unexplained-intensity report
+now asks whether leftover peaks index as satellites of some k. Neither needs a
+moment, a form factor or a magnetic group. It arrived as the contributor's
+PR #468, first in the order on #286. It was reviewed over three rounds (one
+finding list, one stray-file and rebase round, one rebase onto #477) and
+merged after #477, so its rung is `SCHEMA_VERSION` 0.32. Six of the eight
+task lines tick. Four tick outright. The manual-and-skill line ticks with
+`help.py` recorded as moot. The vendoring line ticks because WP-1327's PR #433
+had already done it (`0e3119d`). The public k ≠ 0 pattern and the tests line,
+which asks for the Cr₂WO₆ PNG, remain.
+
+- *Done*: PR #468, merged as `a15959be`.
+  - **`Phase.propagation_vector`** stores three exact rational strings, whatever
+    the spelling it was given. An incommensurate component is refused by name,
+    and so is a k ≡ 0 modulo the reciprocal lattice, a test that respects
+    centring. It is refused beside a moment model through WP-1327's
+    `refuse_moment_model_with_k`, which now runs for real.
+  - **`crystallography/satellites.py`** enumerates H over the reciprocal
+    *lattice*, so centring conditions apply and glides and screws do not. The
+    multiplicity comes from orbit counting under Rᵀ with Friedel mates, and a
+    product-formula test checks it against an independent orbit count on
+    P/I/F/R cells. The file also holds the ±k rule and the zone-boundary
+    candidate generator. The arm takes any `CandidateGenerator` (#257 A1), and
+    `cdml_label` returns `None` until the CDML tables are sourced (#257 A2).
+  - **The compiled model** merges the satellites into the phase's list at stage
+    compile. Le Bail and Pawley put intensity on those rows. Under Rietveld
+    they contribute exactly zero through WP-1327's `nuclear_mask`. Le Bail
+    carries intensities on (H, m), because H + k and H − k can share one H.
+    `ReflectionState.satellite_order` stores the m. The no-k path is
+    arithmetic-identical: it has no mask multiply and no merge.
+  - **Every reader that identifies a reflection takes (H, m) or H + m·k.**
+    That is `tick_hkl` (a satellite row is `[h, k, l, m]`) in `refine.py`,
+    `multi.py` and `viz/snapshot.py`; `report/strain.py`'s d and Stephens
+    monomials; and the `PAWLEY_OVERLAP_UNRESOLVED`, `PAWLEY_OFF_DATA_RIDGED`
+    and `STEPHENS_STRAIN_NOT_POSITIVE` names. `ReflectionSet.hklm` and
+    `reflection_label` hold the one spelling. The structure factor and the Le
+    Bail key's H half read the parent on purpose.
+  - **`FitReport.satellites`** (`THRESHOLDS_VERSION` 1.7, no new threshold)
+    sorts positive residual peaks three ways: on a calculated line, on a
+    forbidden reciprocal-lattice point, or neither.
+    - It ranks the candidates against the third group within
+      `VALIDITY_RADIUS_FWHM`. It names the best with its `n_satellites`, the
+      runner-up's `matched` and `n_satellites`, and a tie flag.
+    - A peak on a forbidden point gets a sentence naming what the arm cannot
+      separate: a true group lacking that glide or screw, λ/2, an impurity
+      line, and a k = 0 magnetic structure on neutrons only. It cites
+      Gallego et al. (2012) for the complementary absence rule.
+    - The parent grid is built once per phase and offset per candidate.
+  - Part 2 § Satellites of a propagation vector (`peak-positions.md`, two
+    equations); Part 1 across `refining.md`, `report.md`, `data.md`,
+    `history.md` and `exports.md`; the skill's satellite-arm section in
+    `references/magnetic.md` and the widened §7j routing row.
+  - A `satellites` config in `test_cross_backend.py` covers the masked `df2`
+    branch a satellite phase now reaches. The contributor made it fail on
+    purpose by removing the mask multiply.
+- *Not done*:
+  - **The public k ≠ 0 pattern** (task line 7). The tree has Ba₂FeSbSe₅'s
+    nuclear model and not its pattern. `Magnetic-III`/`-IV` (#257 A7) are
+    still the first place to look.
+  - **The Cr₂WO₆ acceptance writes no PNG.** Only the synthetic positive arm
+    writes `tests/output/satellites_k_00half.png`.
+  - **`help.py`** has no arm for a `Phase` schema field, so
+    `propagation_vector` has no entry. Adding one is an arm, not a row.
+  - **An operation-list phase with a k** is still refused by
+    `check_propagation_vector`. Three places need the list when it lands:
+    `_k_is_usable`, `compile_model`'s `satellite_reflections(...)` call and
+    `merge_satellites`. `_resolve`'s docstring names them.
+  - **Canonical k.** `as_kvector(("3/2", "0", "0"))` keeps 3/2. Positions and
+    counts agree with ½ (probed in P m m m, P 1 and P -1), but every parent H
+    shifts, so a Le Bail node written under one spelling cannot restore under
+    the other. This needs its own rung with a migration.
+  - **The three browser pages** show a four-index `tick_hkl` row unlabelled
+    rather than as its parent. They need a dist rebuild.
+  - **The GSAS-style peak list** (`io/recipe.py`) writes a satellite as its
+    parent H. That is a format decision.
+- *Deviation from the acceptance text*: "no candidate scores" on Cr₂WO₆ does
+  not hold. At 4 K the two best zone-boundary candidates each index 2 of the
+  6 leftover peaks. At 150 K, with no magnetic order, the best indexes 2 of 5.
+  The arm has no chance baseline, so the test asserts the k = 0 signature (4
+  peaks on forbidden points at 4 K, 0 at 150 K) and not that clause. The note
+  now prints the comparison a reader needs to see that for themselves.
+- *Gotchas found in review* (round one; each fixed with a test):
+  - The k = 0 sentence first called any peak on a forbidden point "a result
+    rather than an ambiguity", on X-rays too.
+  - The best candidate was named without the runner-up, which read as a
+    confident singleton on a pattern with no magnetic order.
+  - Of 15 readers of `reflections.hkl`, 9 took the parent H where they meant
+    the satellite. A satellite of (0 0 0) got d = ∞ in the strain report.
+  - The arm re-enumerated the whole grid per candidate: 27.7 s on a
+    moderate P2₁/c cell to 150°. The contributor measured 7.1-8.6 s → 1.43-1.46
+    s on their machine after the fix.
+  - A no-k Le Bail node gained `"satellite_order": null`. The comment is now
+    true, and a test pins the dump.
+- *Measured on the merged tree* (Linux x86_64, python 3.12.3, `[dev,jax]`, 4
+  cores, run as root, nothing else running):
+  - ruff clean.
+  - Fast suite on `dfd09df` + #468: 6307 passed, 109 skipped, 1 failed,
+    20:39. The failure is `test_telemetry`'s unwritable-directory case, which
+    fails identically on `main` as root. `ee2a027` adds docs only, and
+    `test_docs_consistency.py` passes on it.
+  - Full `-m slow` on `ee2a027` + #468: 227 passed, 14 skipped, 2 failed,
+    1:22:04. Neither failure is the PR's, and both are the pair #477's merge
+    met.
+    - The ramp runaway guard in `test_held_phase` took 152 s against 60 s
+      under `-n auto`. It passes alone in 14 s on the same tree.
+    - Brucite's strict xfail passed. It is in indexing, which the PR does not
+      touch.
+  - `main` moved to `2443090` (#483, the polyhedra) during the slow run. #483
+    shares no file with #468, and `gui/structure3d.py` reads nothing #468
+    changes. The maintainer merged on the evidence above rather than wait for
+    a re-run, so **no suite ran on the final merged tree**.
+  - CI's fast jobs and lint were green on `14d4705a`.
+- *Next*: #478 (WP-1328, magnetic interchange) conflicts with this merge in
+  eight files. Its §7j routing row cannot simply be unioned with this one
+  under `SKILL_MAX_BYTES`. After that come the public k ≠ 0 pattern and the
+  Cr₂WO₆ PNG.
 
 - **2026-09-02** — created, from the assessment of PR #221 (an outside
   proposal for a single magnetic WP, which conflicted with main and left the
