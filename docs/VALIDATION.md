@@ -729,7 +729,7 @@ Anisotropic strain, and the matrix's canonical inadmissibility result — an imp
 
 **Claims:** an Rwp improvement that both statistical tests bless is rejected by a physics guard, on real data — the matrix's canonical inadmissibility row
 
-**Referenced to:** **no accuracy claim.** Hamilton at alpha = 0.05 and Delta BIC both pass at N/f^2 (WP-1417), while at most one of the four S_HKL coefficients reaches |t| = 2; the strain-variance cone sigma^2(M) >= 0 fails on 12 of 43 reflections, so STEPHENS_STRAIN_NOT_POSITIVE fires and no S_HKL is quotable.  The r ~ 0.65 March coefficient is checked against WP-0310's own measurement on the same material
+**Referenced to:** **no accuracy claim.** Hamilton at alpha = 0.05 and Delta BIC both pass at N/f^2 (WP-1417), while at most one of the four S_HKL coefficients lies 2 sigma from zero; the strain-variance cone sigma^2(M) >= 0 fails on 12 of 43 reflections, so STEPHENS_STRAIN_NOT_POSITIVE fires and no S_HKL is quotable.  The r ~ 0.65 March coefficient is checked against WP-0310's own measurement on the same material
 
 **Measured:** Rwp 18.55 -> 17.90 %, Delta BIC +15.5 at N/f^2 (+592 at raw N), 3 parameters added, anisotropy 3.45x on an injected 3.46x
 

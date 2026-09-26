@@ -20,6 +20,10 @@ from rietx.optimize.statistics import effective_sample_size
 from rietx.report import compare_freed
 from tests.test_fitreport_layers import _truth
 
+# both module fixtures are shared by several tests (tests/CLAUDE.md § Shared
+# fixtures and xdist groups)
+pytestmark = pytest.mark.xdist_group("compare-freed")
+
 BASE = ["phases.*.scale", "instrument.background.*", "instrument.zero_shift",
         "phases.*.cell.*"]
 
@@ -117,6 +121,11 @@ def test_what_is_not_nested_is_refused(truth):
         compare_freed(ref, ref)
     with pytest.raises(ValueError, match="not nested"):
         compare_freed(trial, ref)
+    # another pattern on the same grid, as two members of a series are
+    s2, i2, other = _truth(seed=18)
+    elsewhere = _fit(s2, i2, other, extra=["phases.0.atoms.1.biso"])
+    with pytest.raises(ValueError, match="different intensities"):
+        compare_freed(ref, elsewhere)
     # a moved value drops the result, so held values are never read off a
     # table that has left its fit
     ref.set_values({"instrument.zero_shift": 0.05})

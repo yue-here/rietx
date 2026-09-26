@@ -168,8 +168,7 @@ lets ΔBIC bless almost any gain, and a block of 22-90 modes pays
 22-90 × ln N. `report.compare_freed(parent_fit, child_fit)` returns
 ΔBIC at N/f², the raw-N figure and each freed amplitude's t-ratio, so
 the acceptance can say how many amplitudes are measured one at a
-time. On brucite's Stephens block the joint ΔBIC is +15.5 at N/f² while
-only one of four coefficients reaches |t| = 2.
+time.
 
 **2026-09-23, from the issue triage (issue #418).** The reporter proposes
 moving the representation analysis that PR #389 landed today (`irreps.py`,

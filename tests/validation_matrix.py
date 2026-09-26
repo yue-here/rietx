@@ -1029,7 +1029,7 @@ CLAIMS: tuple[Claim, ...] = (
         "inadmissibility row",
         reference="**no accuracy claim.** Hamilton at alpha = 0.05 and "
                   "Delta BIC both pass at N/f^2 (WP-1417), while at most one "
-                  "of the four S_HKL coefficients reaches |t| = 2; the "
+                  "of the four S_HKL coefficients lies 2 sigma from zero; the "
                   "strain-variance cone "
                   "sigma^2(M) >= 0 fails on 12 of 43 reflections, so "
                   "STEPHENS_STRAIN_NOT_POSITIVE fires and no S_HKL is "

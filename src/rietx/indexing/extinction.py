@@ -112,6 +112,7 @@ from dataclasses import dataclass, field
 import gemmi
 import numpy as np
 
+from ..optimize.statistics import _chi2_absolute
 from ..schemas.common import Diagnostic
 from ..schemas.indexing import (
     CellCandidate,
@@ -648,16 +649,6 @@ def _fit_class(candidate: CellCandidate, data: PatternData, instrument: Instrume
     result = ref.fit(data, mode="lebail", plan=_screen_plan(),
                      two_theta_limits=two_theta_limits, telemetry=False)
     return ref, result
-
-
-def _chi2_absolute(stats) -> float:
-    """The weighted residual sum of squares ``delta_bic`` wants.
-
-    ``Statistics.chi2`` is the *reduced* χ² (Σwd²/(N−P)), and the two models being
-    compared have different P, so dividing by their own dof first would fold a
-    second, unwanted ratio into the comparison.
-    """
-    return float(stats.chi2) * max(stats.n_points - stats.n_free_parameters, 1)
 
 
 def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,

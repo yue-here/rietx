@@ -1073,7 +1073,8 @@ class FreedParameter(Base):
     moved from where the restricted fit held it, in its own esd.  The esd is
     the fuller fit's, already Bérar-Lelann inflated.  ``held_at`` is ``None``
     where the restricted model has no such entry (a phase the fuller model
-    adds), and ``t_ratio`` is ``None`` then and wherever the esd is.
+    adds), and for a coordinate DOF no coordinate row follows alone.
+    ``t_ratio`` is ``None`` then and wherever the esd is.
     """
 
     path: str

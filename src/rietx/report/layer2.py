@@ -226,8 +226,9 @@ def compare_freed(restricted, full) -> FreedComparison:
     esd put the occupancy within 0.76-1.89σ of zero.
 
     Raises :class:`ValueError` when the two fits are not nested: different
-    channel counts or modes, a path ``restricted`` frees that ``full`` does
-    not, or nothing added.
+    channel counts, intensities or modes, a path ``restricted`` frees that
+    ``full`` does not, nothing added, or a free count that moved by other than
+    the added paths (a Pawley intensity block whose reflection list changed).
     """
     for name, ref in (("restricted", restricted), ("full", full)):
         if ref.result_ is None:
@@ -240,7 +241,7 @@ def _freed_comparison(restricted: RefinementResult, held: dict[str, float],
                       full) -> FreedComparison:
     """:func:`compare_freed` on the restricted result, its table's values, and
     the fuller :class:`~rietx.Refinement`."""
-    from ..optimize.statistics import effective_sample_size
+    from ..optimize.statistics import _chi2_absolute, effective_sample_size
     from ..params.vector import ParameterTable
 
     fr = full.result_
@@ -249,6 +250,11 @@ def _freed_comparison(restricted: RefinementResult, held: dict[str, float],
         raise ValueError(
             f"the fits saw {rs.n_points} and {fs.n_points} channels; ΔBIC "
             "compares two models of one pattern")
+    if not np.array_equal(restricted.y_obs, fr.y_obs):
+        # two patterns of one series share a channel count
+        raise ValueError(
+            "the fits saw different intensities; ΔBIC compares two models "
+            "of one pattern")
     if restricted.mode != fr.mode:
         raise ValueError(
             f"the fits ran in {restricted.mode!r} and {fr.mode!r} mode, so "
@@ -268,14 +274,28 @@ def _freed_comparison(restricted: RefinementResult, held: dict[str, float],
         raise ValueError(
             f"the fuller fit frees {fs.n_free_parameters} parameters against "
             f"{rs.n_free_parameters}, so there is nothing added to compare")
+    if n_added != len(added):
+        # only an off-table block moves the count without a path: a Pawley
+        # intensity set whose reflection list the freed parameter changed
+        raise ValueError(
+            f"the free count moved by {n_added} while {len(added)} paths were "
+            "added, so an off-table block changed size between the fits and "
+            "neither count is the parameters the fuller model added")
 
-    relative = ParameterTable(full.structure, full.instrument).anchored_dof_paths
-    # a coordinate row x = anchor + b·dof, keyed by the one DOF it follows
+    table = ParameterTable(full.structure, full.instrument)
+    relative = table.anchored_dof_paths
+    # a coordinate row x = anchor + b·dof, keyed by the one DOF it follows.
+    # Candidates are the DOF's own coordinate rows, never any single-term
+    # tie naming it: a user tie of another DOF onto this one is relative too
     through = {}
     if any(p.path in relative for p in added):
-        for row in full.parameters():
-            if row.tie is not None and len(row.tie.terms) == 1:
-                through.setdefault(row.tie.terms[0][0], (row.path, row.tie.terms[0][1]))
+        ties = {row.path: row.tie for row in full.parameters()}
+        for dof in relative:
+            for path, _ in table._anchored_dofs[dof]:
+                tie = ties.get(path)
+                if (tie is not None and len(tie.terms) == 1
+                        and tie.terms[0][0] == dof):
+                    through.setdefault(dof, (path, tie.terms[0][1]))
     values = {p.path: p.value for p in fr.parameters}
 
     def held_at(p) -> float | None:
@@ -296,8 +316,7 @@ def _freed_comparison(restricted: RefinementResult, held: dict[str, float],
     # ``Statistics.chi2`` is reduced, over N − P, and the two P differ by
     # n_added: its ratio would carry (N − P_f)/(N − P_r), about −n_added of
     # ΔBIC at raw N.  delta_bic wants the sums.
-    chi2_r = rs.chi2 * max(rs.n_points - rs.n_free_parameters, 1)
-    chi2_f = fs.chi2 * max(fs.n_points - fs.n_free_parameters, 1)
+    chi2_r, chi2_f = _chi2_absolute(rs), _chi2_absolute(fs)
     n_eff = effective_sample_size(rs.n_points, rs.esd_inflation)
     return FreedComparison(
         freed=freed, n_added=n_added, n_points=rs.n_points,

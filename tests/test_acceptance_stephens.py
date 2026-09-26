@@ -86,9 +86,9 @@ separates them (+592 against −15).  That read as ΔBIC being the statistic to
 trust until #270 showed raw-N ΔBIC blessing a 1σ occupancy the same way.  Both
 are now read at N/f², f the restricted fit's ``esd_inflation``.  There Hamilton
 refuses corundum too, and ΔBIC reads +15.5 for brucite against −17.8.  Brucite's
-block still pays for its three parameters jointly, while its four coefficients
-sit at t = 0.33, −1.14, 0.33 and 2.31: the ~100 % spread across starts above,
-seen from one fit.
+block still pays for its three parameters jointly, while three of its four S_HKL
+coefficients lie within 1.2σ of zero (value/esd 0.33, −1.14, 0.33, 2.31): the
+~100 % spread across starts above, seen in one fit's esds.
 
 
 Dispersion is **declined**, inherited from ``qarr_instrument`` in
@@ -104,7 +104,7 @@ import numpy as np
 import pytest
 
 import rietx as rx
-from rietx.optimize.statistics import effective_sample_size
+from rietx.optimize.statistics import _chi2_absolute, effective_sample_size
 from rietx.report.layer2 import delta_bic, hamilton_justified
 from rietx.schemas.structure import StephensStrain
 from tests.test_acceptance_qpa_roundrobin import (
@@ -212,13 +212,12 @@ def _information(restricted, full):
     Not ``report.compare_freed``: the block locks ``lor_strain`` (its
     isotropic direction), so the path sets are not nested although the models
     are.  ``Statistics.chi2`` is reduced, so each is taken back to Σw·Δ² at its
-    own N − P first, and "eff" charges N/f² with the restricted fit's f
-    (WP-1417).
+    own N − P first (``_chi2_absolute``), and "eff" charges N/f² with the
+    restricted fit's f (WP-1417).
     """
     rs, fs = restricted.statistics, full.statistics
     n, k = rs.n_points, fs.n_free_parameters - rs.n_free_parameters
-    chi2_r = rs.chi2 * (n - rs.n_free_parameters)
-    chi2_f = fs.chi2 * (n - fs.n_free_parameters)
+    chi2_r, chi2_f = _chi2_absolute(rs), _chi2_absolute(fs)
     counts = {"raw": None, "eff": effective_sample_size(n, rs.esd_inflation)}
     return k, {label: (delta_bic(chi2_r, chi2_f, n, k, n_effective=n_eff),
                        hamilton_justified(chi2_r, chi2_f, n, rs.n_free_parameters,
@@ -277,8 +276,9 @@ def test_brucite_improvement_is_justified_but_leaves_the_physical_cone(
     assert n_added == 3          # P-3m1 has 4 patterns, one of them isotropic
     bic, hamilton = info["eff"]
     assert bic > 0.0 and hamilton
-    # …jointly: at most one of the four coefficients is measured on its own
-    # (t = 0.33, −1.14, 0.33, 2.31), the pair disagreeing as judging.md says
+    # …jointly: at most one of the four S_HKL coefficients lies 2σ from zero
+    # (value/esd 0.33, −1.14, 0.33, 2.31), so the data measure the block and
+    # not its coefficients.  From zero, because the isotropic fit has no block
     t = [p.value / p.stderr for p in ani.parameters
          if ".microstrain.dof." in p.path and p.stderr]
     assert len(t) == 4 and sum(abs(x) >= 2.0 for x in t) <= 1
