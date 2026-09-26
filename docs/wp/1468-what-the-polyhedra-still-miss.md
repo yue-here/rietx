@@ -92,6 +92,12 @@ Read 2026-09-26 from each program's manual.
   The default shells claim room first, and a hidden one that does not fit
   leaves the legend, counted in the payload's note. None did on the measured
   set, where grossular's payload is 383 of 400 atoms.
+- **Two rules are written more than once** (WP-1466's second review).
+  "Bonded" is tested in `_bonds` for the sticks and again in
+  `_cation_sites`, and P10's floor went into both by hand. The client's
+  "which atoms are drawn" rule has three copies: `buildScene`, `caption` and
+  the zoom fit. The copies agree today; a change to one that misses another
+  is how the caption came to count undrawn atoms.
 - **Every bond-slider release recomputes the polyhedra.** They read the
   default bond tolerance, never the slider's, so only the sticks need the
   new value. Grossular's whole payload takes 62 ms best of 7 (Apple M4); the
@@ -118,6 +124,7 @@ Independent; take any.
 - [ ] The two-gap tie: find a real case, then decide whether to apply Daams & Villars' rule
 - [ ] A hidden shell dropped at the atom cap stays in the legend as unavailable, or the cap stops counting it
 - [ ] The polyhedra stop recomputing on a bond-slider release
+- [ ] One authority for "bonded" on the server and one for "drawn" on the client
 - [ ] A source for the Te, At, Kr and Xe electronegativities
 
 ## Acceptance
