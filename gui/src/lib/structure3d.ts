@@ -44,6 +44,9 @@ export interface DrawnAtom {
   frac: number[];
   pos: number[];
   boundary: boolean;
+  /** in the payload only as a polyhedron's vertex, so drawn only while one of
+   *  its polyhedra is (WP-1466); absent reads as false */
+  vertex_only?: boolean;
   /** columns are the principal axes at one RMS displacement (Å) */
   ellipsoid: number[][];
   rms: number[];
@@ -207,40 +210,43 @@ export function polyhedronLabel(geometry: Geometry, polyhedron: Polyhedron): str
  *
  * `on` is the one switch, and its default is the mode's (WP-1466, P8): on in
  * ball mode, off in ellipsoid mode, where faces would cover the ADPs that mode
- * exists to show.  `species` holds the legend's switches per centre species;
- * a species it does not name takes the server's default (P5), which draws
+ * exists to show.  `formulas` holds the legend's switches, one per formula; a
+ * formula it does not name takes the server's default (P5), which draws
  * shells of four to six.  A polyhedron goes with its centre's species when
  * the atom legend hides that, and with its centre when the images outside the
  * cell are hidden.
  */
 export function shownPolyhedra(geometry: Geometry, on: boolean,
-                               species: ReadonlyMap<string, boolean>,
+                               formulas: ReadonlyMap<string, boolean>,
                                hidden: ReadonlySet<string> = new Set(),
                                showBoundary = true): number[] {
   if (!on) return [];
   return geometry.polyhedra.flatMap((p, i) => {
-    const centre = geometry.sites[p.site].species;
-    if (hidden.has(centre)) return [];
+    if (hidden.has(geometry.sites[p.site].species)) return [];
     if (!showBoundary && geometry.atoms[p.center].boundary) return [];
-    return (species.get(centre) ?? p.drawn_by_default) ? [i] : [];
+    return (formulas.get(polyhedronFormula(geometry, p)) ?? p.drawn_by_default) ? [i] : [];
   });
 }
 
-/** Centre species → its polyhedra legend entry, in the order the sites are
- *  declared, with the formulas it draws and whether the default draws any. */
+/**
+ * One legend switch per formula, in the order the server lists the
+ * polyhedra, coloured by the centre.
+ *
+ * Per formula rather than per species, because the default is per shell
+ * size (P5) and a formula fixes the size, so every polyhedron under one
+ * switch shares its default.  One switch for a species with a CaO₆ drawn and
+ * a CaO₈ hidden would read as on, and off then on would draw both, with no
+ * way back to the default.  A two-state switch per formula also reaches the
+ * one a three-state species switch cannot: the CaO₈ alone.
+ */
 export function polyhedraLegend(geometry: Geometry): Array<{
-  species: string; color: string; formulas: string[]; byDefault: boolean }> {
-  const out: Array<{ species: string; color: string; formulas: string[]; byDefault: boolean }> = [];
+  formula: string; color: string; byDefault: boolean }> {
+  const out: Array<{ formula: string; color: string; byDefault: boolean }> = [];
   for (const p of geometry.polyhedra) {
-    const site = geometry.sites[p.site];
-    let entry = out.find((e) => e.species === site.species);
-    if (!entry) {
-      entry = { species: site.species, color: site.color, formulas: [], byDefault: false };
-      out.push(entry);
-    }
     const formula = polyhedronFormula(geometry, p);
-    if (!entry.formulas.includes(formula)) entry.formulas.push(formula);
-    entry.byDefault ||= p.drawn_by_default;
+    if (!out.some((e) => e.formula === formula)) {
+      out.push({ formula, color: geometry.sites[p.site].color, byDefault: p.drawn_by_default });
+    }
   }
   return out;
 }
@@ -478,7 +484,10 @@ function drawable(m: number[][]): Mat3 {
  *
  * A drawn polyhedron (WP-1466) brings its faces and its edges, the edges as
  * lines in a darker ink of the centre's colour, and takes away its centre's
- * sticks to its own vertices.  The gap shell and the bond rule can disagree
+ * sticks to its own vertices.  An atom in the payload only as a polyhedron's
+ * vertex is drawn only while one of its polyhedra is: at the default bond
+ * tolerance, NAC's hidden NaF₇ and CaF₈ would leave 12 F with no stick and no
+ * face.  The gap shell and the bond rule can disagree
  * (NAC's Na: 4 sticks, 7 vertices), and drawing both would show the
  * contradiction rather than the shell.
  */
@@ -487,11 +496,14 @@ export function buildScene(geometry: Geometry, options: SceneOptions): Scene {
           exaggeration = 1, cell = "#1f5fa8", polyhedra = [] } = options;
   // a drawn polyhedron replaces its centre's sticks to its own vertices (P6)
   const replaced = new Set(polyhedra.flatMap((i) => geometry.polyhedra[i].bonds));
+  // and brings the atoms only a polyhedron needs, which come with no other
+  const corners = new Set(polyhedra.flatMap((i) => geometry.polyhedra[i].vertices));
   const atoms: SceneAtom[] = [];
   geometry.atoms.forEach((atom, index) => {
     const site = geometry.sites[atom.site];
     if (hidden.has(site.species)) return;
     if (atom.boundary && !showBoundary) return;
+    if (atom.vertex_only && !corners.has(index)) return;
     const shape = drawable(atomTransform(geometry, atom, mode, exaggeration));
     atoms.push({
       index,
@@ -542,8 +554,13 @@ export function buildScene(geometry: Geometry, options: SceneOptions): Scene {
     return { index, triangles, normals, color: rgb(color), centroid };
   });
   // the fit reads positions and ball sizes only, so neither a mode nor a
-  // legend click moves the zoom; the depth range holds whatever is drawn
-  const points = [...geometry.corners, ...geometry.atoms.map((a) => a.pos)];
+  // legend click moves the zoom.  The fit takes the atoms the default picture
+  // can draw: a hidden polyhedron's own atoms would halve LaB6's picture at a
+  // bond tolerance of 1.00
+  const byDefault = new Set(geometry.polyhedra.filter((p) => p.drawn_by_default)
+    .flatMap((p) => p.vertices));
+  const points = [...geometry.corners, ...geometry.atoms
+    .filter((a, k) => !a.vertex_only || byDefault.has(k)).map((a) => a.pos)];
   const lo = [0, 1, 2].map((k) => Math.min(...points.map((p) => p[k])));
   const hi = [0, 1, 2].map((k) => Math.max(...points.map((p) => p[k])));
   const center = [0, 1, 2].map((k) => (lo[k] + hi[k]) / 2);
@@ -553,8 +570,13 @@ export function buildScene(geometry: Geometry, options: SceneOptions): Scene {
   const ball = geometry.ball_fraction * Math.max(0, ...geometry.sites.map((s) => s.radius));
   const reach = Math.max(ball, ...atoms.map((a) => [0, 1, 2].reduce((m, c) =>
     Math.max(m, Math.hypot(a.shape[c], a.shape[3 + c], a.shape[6 + c])), 0)));
+  // the depth range holds every atom the payload can draw, the zoom's
+  // excluded ones too: a hidden polyhedron switched on would otherwise put
+  // its outer faces and edges past the clip planes
+  const far = Math.max(half, ...geometry.atoms.map((a) =>
+    Math.hypot(a.pos[0] - center[0], a.pos[1] - center[1], a.pos[2] - center[2])));
   return { atoms, halves, lines, faces, labels: axisLabels(geometry), center,
-           radius: Math.max(half + ball, 1), depth: half + reach + 1 };
+           radius: Math.max(half + ball, 1), depth: far + reach + 1 };
 }
 
 /**
@@ -791,8 +813,12 @@ export function pickFace(scene: Scene, view: View, width: number, height: number
 /** The sentence under the plot: what is drawn, at what thresholds. */
 export function caption(geometry: Geometry, mode: Mode, exaggeration = 1,
                         shown: readonly number[] = []): string {
-  const real = geometry.atoms.filter((a) => !a.boundary).length;
-  const ghosts = geometry.atoms.length - real;
+  // an atom only a polyhedron needs is counted while one of its polyhedra is
+  // drawn, as `buildScene` draws it
+  const corners = new Set(shown.flatMap((i) => geometry.polyhedra[i].vertices));
+  const counted = geometry.atoms.filter((a, k) => !a.vertex_only || corners.has(k));
+  const real = counted.filter((a) => !a.boundary).length;
+  const ghosts = counted.length - real;
   const parts = [
     `${real} atom${real === 1 ? "" : "s"} in the cell`
       + (ghosts ? ` + ${ghosts} image${ghosts === 1 ? "" : "s"} outside it` : ""),

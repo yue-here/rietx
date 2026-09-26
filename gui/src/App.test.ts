@@ -3242,7 +3242,7 @@ describe("the structure viewer", () => {
     button("balls")!.click();
     await flush();
     expect(last().scene.faces).toHaveLength(1);
-    // the legend switches one centre species
+    // the legend switches one formula
     button("LaB₄")!.click();
     await flush();
     expect(last().scene.faces).toHaveLength(0);

@@ -1,9 +1,9 @@
 # WP-1466 — the structure viewer draws coordination polyhedra
 
-Milestone: unscheduled · Status: 🔄 2026-09-26 — built and measured; the gap measure and the
-electronegativities wait on two papers the maintainer supplies
+Milestone: unscheduled · Status: ✅ 2026-09-26 — polyhedra drawn by Brunner &
+Schwarzenbach's gap on 21 measured phases, the legend per formula, a split pair
+no bond; the further work is WP-1468
 Depends on: 1462
-Priority: P3 2026-09-26 — WP-1462 closed, so its one blocker is gone; P1-P9 are confirmed, P3's gap measure waits on Brunner & Schwarzenbach (1971) and the electronegativities on Allred (1961)
 
 ## Goal
 
@@ -100,7 +100,9 @@ survey could not confirm a default from a primary source, it is left out.
 ### The phase-set measurement
 
 Measured 2026-09-26 on the stand-in gap measure, with P2 as amended that
-day. `1466-measure/measure.py` fetches each phase from the Crystallography
+day, and re-run the same day under Brunner & Schwarzenbach's window (P3).
+The re-run moved three sites' largest gaps and no default picture.
+`1466-measure/measure.py` fetches each phase from the Crystallography
 Open Database, and `results.txt` beside it holds the run. Its `--fixture`
 writes `tests/data/polyhedra_phases.json`, which
 `test_the_default_picture_on_the_measured_phases` holds the default to. The
@@ -109,7 +111,7 @@ gap ratio.
 
 | Phase (COD) | Drawn by default | Qualifies, hidden |
 |---|---|---|
-| LaB6 (test CIF) | none: La has 24 B at one distance | none |
+| LaB6 (test CIF) | none | LaB₂₄ 1.45 |
 | NAC (test CIF) | AlF₆ 2.08 | CaF₈ 1.54, NaF₇ 1.41 |
 | fluorapatite (test CIF) | PO₄ 1.98 | CaO₉ 1.38, CaO₆F 1.24 |
 | spinel MgAl₂O₄ (5000120) | MgO₄ 1.78, AlO₆ 1.73 | none |
@@ -127,8 +129,8 @@ gap ratio.
 | pyrite (7700358) | FeS₆ 1.52 | none |
 | baryte (8107510) | SO₄ 2.31 | BaO₁₂ 1.21 |
 | andalusite (9003990) | SiO₄ 1.64, AlO₆ 1.63, AlO₅ 1.68 | none |
-| CsCl (9009743) | none | CsCl₈ 1.68 |
-| high cristobalite (9008230, at 221 °C) | none: Si has 24 split O at one distance | none |
+| CsCl (9009743) | none | CsCl₈ 1.91 |
+| high cristobalite (9008230, at 221 °C) | none: Si's 24 O positions are split sites (P9) | none |
 | olivine, Fe 0.1 beside Mg (built on 9007377) | as forsterite, one octahedron per mixed site | none |
 
 ## Decisions this WP takes
@@ -136,7 +138,8 @@ gap ratio.
 The maintainer confirmed P1-P8 on 2026-09-26, with three amendments from
 a critical pass that day (in P2, P5 and P7), and chose the recommended P9.
 The phase-set measurement then changed P2 a second time, and the maintainer
-confirmed that too on the same day.
+confirmed that too on the same day. The same day the maintainer chose P10
+over recording the split anion site as a limit.
 
 - **P1. The server builds the polyhedra.** `/api/structure3d` gains a
   `polyhedra` arm: the centre's atom index, the vertex positions, outward
@@ -147,8 +150,10 @@ confirmed that too on the same day.
   cation too, as Si is in SiO₄, and bonded means the viewer's radius-sum
   rule at its default tolerance. Every other non-metal except hydrogen is
   an anion, and a ligand is an anion of another element. The
-  electronegativities are 18 Pauling values, checked against Allred (1961)
-  once the maintainer supplies it. This is Mercury's two lists derived
+  electronegativities are 18 Pauling values. *Checked 2026-09-26:* 14 are
+  Allred's (1961, Table 3) to the last digit (H, B, C, N, O, F, Si, P, S,
+  Cl, As, Se, Br, I). His table has none for Te, At, Kr or Xe, so theirs
+  stay the values usually tabulated, unchecked. This is Mercury's two lists derived
   rather than declared, and CrystalNN's "no cation-cation bonds" carried
   from the metals to the non-metals. An intermetallic therefore gets no polyhedra by
   default, where Daams & Villars would draw every atom's environment.
@@ -170,22 +175,41 @@ confirmed that too on the same day.
   more electronegative N or O, so Prussian blue's C-bonded Fe would get N.
 - **P3. The shell ends at the largest gap in the ligand distances,** as
   Daams & Villars apply Brunner & Schwarzenbach. The gap is measured the way
-  Brunner & Schwarzenbach measure it once that paper is read. The spike's
-  successive-distance ratio stands in until then.
+  Brunner & Schwarzenbach measure it.
+  *Read 2026-09-26.* They judge a gap by the quotient of the two distances
+  bounding it, which is the spike's ratio. They take the largest gap of the
+  whole sequence, computed out to at least three times the shortest
+  distance. So the window is theirs too: every ligand out to three times
+  the centre's shortest distance (`SHELL_REACH`), with no cap on the
+  shell's size. The spike had searched the first 13 ligands, and that hid
+  two shells. LaB6's La has 24 B and then a gap of 1.45, and high
+  cristobalite's Si has 24 O positions and then 2.25. They also found a
+  clear largest gap in about 90 % of their structures. The six without one
+  had two gaps of about equal size.
 - **P4. A shell is drawn only when it is a polyhedron.** It needs 4 or more
   ligands, the centre strictly inside the hull, every ligand at a hull
   vertex (Daams & Villars' convex-volume condition), and a clear gap. The
-  gap threshold is 1.15, measured on 21 phases (§ The phase-set
-  measurement): every real shell's gap is 1.21 or more, and every site with
-  no shell scores 1.00. The default picture is the same for any threshold
-  from 1.01 to 1.47.
+  gap threshold is 1.15, the smallest largest gap in Brunner &
+  Schwarzenbach's survey (β-Pu averaged over its sites; each single site's
+  was larger). On 21 phases (§ The phase-set measurement) every shell's gap
+  is 1.21 or more, and the default picture is the same for any threshold up
+  to 1.47. *Amended 2026-09-26:* it was first measured as "every site with
+  no shell scores 1.00", but the two such sites scored 1.00 only under the
+  spike's window (P3).
 - **P5. By default, shells of 4 to 6 ligands are drawn.** Tetrahedra and
   octahedra are the framework a chemist reads first. Shells of 7 or more
   qualify and start hidden, because with them NAC's cell fills with
   overlapping polyhedra. On the measured set the default draws the table in
-  § The phase-set measurement. The legend switches polyhedra per centre species.
+  § The phase-set measurement. The legend switches polyhedra per formula.
   *Amended 2026-09-26 from "7 and 8"*, so a perovskite's 12-coordinate A
-  site is covered.
+  site is covered. *Amended again 2026-09-26, from "per centre species".*
+  The default is per shell size and a formula fixes the size, so every
+  polyhedron under one switch shares its default. A per-species switch over
+  a CaO₆ drawn and a CaO₈ hidden read as on, and off then on drew both,
+  with no way back. A three-state species switch (the WAI-ARIA mixed
+  checkbox) restores the default but never shows the CaO₈ alone. Per
+  formula costs one extra button where a species has two shapes:
+  fluorapatite's Ca and andalusite's Al on the measured set.
 - **P6. The look follows VESTA, except inside a polyhedron.** Faces take the
   centre's colour at alpha 0.55, and edges a darker ink as WP-1462's D9
   quads. The centre atom stays. The sticks from the centre to its ligands
@@ -206,32 +230,49 @@ confirmed that too on the same day.
   the centre is a split site, and it is not drawn. A site with vacancies
   and no split still draws. Daams & Villars excluded every partly occupied
   point set, which would lose each BO₆ of an oxygen-deficient perovskite.
-  Measured on two phases: high cristobalite's O is split six ways at 1/6,
-  and the gap turned Si away first, with 24 O positions at one distance.
-  An olivine with Fe beside Mg on both M sites drew one octahedron per site.
+  Measured on two phases. High cristobalite's O is split six ways at 1/6,
+  and the split rule turns Si's shell of 24 O positions away. (The spike's
+  window had turned it away by the gap first.) An olivine with Fe beside Mg
+  on both M sites drew one octahedron per site.
+- **P10. Two non-metals closer than 0.7 of their radius sum are one atom
+  over two positions.** *Added 2026-09-26.* No stick joins them, and
+  neither makes the other a cation (`SPLIT_FLOOR`). VESTA's manual has the
+  user raise a pair's minimum bond length for a split-atom model; this sets
+  it from the radii. Mercury and CrystalMaker separate alternatives by the
+  file's disorder groups, which rietx's schema does not carry. Every stick on
+  the measured set is 0.856 of its radius sum or more (baryte's S–O), and
+  the shortest real bonds between non-metals are 0.77 (N≡N, NO⁺). The split
+  pairs sit below: hydroxyfluorapatite's O/F at 0.39, and high cristobalite's
+  O pairs at 0.34-0.68, which drew O–O sticks until now. A pair with a metal
+  keeps the 0.4 Å minimum alone, because uranyl's U=O is 0.67 and vanadyl's
+  and titanyl's 0.72. The default picture did not move.
 
 ## Where it will bite
 
-- **The threshold has few negatives.** On the measured set only two sites
-  have no shell, both at 1.00, so nothing places a real no-gap case between
-  1.00 and 1.21. The default picture does not depend on it.
-- **Two nearly equal gaps.** Daams & Villars resolve a tie by the fewest
+The further work these limits suggest is filed as
+[WP-1468](1468-what-the-polyhedra-still-miss.md).
+
+- **The threshold has no measured negative.** Under Brunner &
+  Schwarzenbach's window every site on the measured set has a gap of 1.21
+  or more, so 1.15 rests on their survey. The default picture does not
+  depend on it.
+- **Two nearly equal gaps.** Brunner & Schwarzenbach found this in six of
+  their structures, and Daams & Villars resolve such a tie by the fewest
   environment types. None arose on the measured set: the closest is
   fluorapatite's Ca2, whose largest gap is 1.24 against 1.14 for the next.
-- **P9's split rule has no measured case.** The one split phase measured
-  was turned away by the gap before the split rule was reached. The rule
-  is tested on a built cluster only.
 - **A cyanide or a carbonyl** draws the wrong shell (P2).
-- **A split anion site can make a cation** (found by the 2026-09-26 review).
-  Fluorapatite with F at 0.5 and an OH oxygen 0.48 Å from it reads the O as
-  bonded to the more electronegative F, so the O is a cation: it leaves every
-  Ca shell and loses its Ca sticks. Skipping pairs that are both partly
-  occupied would break a disordered sulfate or perchlorate, whose partial S
-  and O really are bonded, so the rule is the maintainer's call.
-- **A species whose shells are only partly drawn by default** (a CaO₆ site
-  beside a CaO₈ one) has one legend button, and off then on draws every
-  shell with no way back to the default. One button per formula would fix
-  it; P5 says per species.
+- **An arsenic telluride would invert.** On the Pauling scale Te (2.10) is
+  less electronegative than As (2.18), so As₂Te₃'s Te would be the cation
+  and As its ligand. No such phase was measured.
+- **A split pair wider than the floor still bonds** (P10). Two O more than
+  0.92 Å apart get a stick. Hydroxyfluorapatite with its OH oxygen 0.48 Å
+  from F has its two mirror O positions 0.96 Å apart, so they do. The F no
+  longer makes that O a cation.
+- **A large hidden shell can lose its room at the atom cap.** A shell of 24
+  needs up to 24 partner atoms. The shells drawn by default claim room first,
+  so the default picture keeps its polyhedra. A hidden one dropped at the cap
+  leaves the legend, and the payload's note counts it (P7). None dropped on
+  the measured set, where grossular's payload is 383 of 400 atoms.
 - **Every fetch recomputes the polyhedra**, so each release of the bond
   slider pays the search again: the review measured 75-85 ms on grossular.
   The probability control does not refetch.
@@ -249,12 +290,15 @@ confirmed that too on the same day.
 ## Tasks
 
 - [x] The maintainer confirms P1-P8, and this file records which (2026-09-26: all, with amendments to P2, P5 and P7, and P9 added)
-- [ ] Read Brunner & Schwarzenbach (1971) (the maintainer supplies it) and set P3's gap measure to theirs, then re-run `1466-measure/measure.py`
-- [ ] Read Allred (1961) (the maintainer supplies it) and check `structure3d.ELECTRONEGATIVITY`'s 18 values against it
+- [x] Read Brunner & Schwarzenbach (1971) (the maintainer supplies it) and set P3's gap measure to theirs, then re-run `1466-measure/measure.py` (2026-09-26: the measure was theirs, the window was not; P3)
+- [x] Read Allred (1961) (the maintainer supplies it) and check `structure3d.ELECTRONEGATIVITY`'s 18 values against it (2026-09-26: 14 match, and his table has none for the other four; P2)
 - [x] Measure P4, P5 and P9 on the wider phase set, a disordered phase among it, and record the threshold and the table (2026-09-26, on the stand-in gap measure: § The phase-set measurement)
 - [x] Server: the `polyhedra` arm, the ligand rule, the gap shell, the polyhedron conditions and the vertex partners, with tests in `tests/test_structure3d.py` (2026-09-26; the gap measure is the stand-in until task 2, and `POLYHEDRON_GAP` is measured at 1.15)
 - [x] Renderer: the translucent pass, the edges, and hover on a polyhedron (centre, ligand count, mean distance); a polyhedra case in `1462-spike/gate.py`'s script (2026-09-26; acceptance 3 in `1466-measure/results_*.txt`)
 - [x] GUI: the per-species toggles, P5's and P8's defaults, and the caption saying what is drawn (2026-09-26)
+- [x] The legend switches per formula, and a hidden polyhedron's own partner atoms hide with it (2026-09-26; P5)
+- [x] The split floor between non-metals, for the sticks and the cation test (2026-09-26; P10)
+- [x] File the further work as WP-1468 (2026-09-26)
 - [x] Docs: the structure viewer paragraphs in `gui/CLAUDE.md` and the GUI guide (2026-09-26)
 
 ## Acceptance
@@ -276,8 +320,13 @@ npm --prefix gui test && npm --prefix gui run check
 - Daams, J. L. C. & Villars, P. (1993). Atomic environment classification of
   the rhombohedral "intermetallic" structure types. The maintainer's copy
   (`rietx-refs-misc`) does not carry the journal details.
+- Allred, A. L. (1961). Electronegativity values from thermochemical data.
+  *J. Inorg. Nucl. Chem.* 17, 215. Read in full (the maintainer's copy in
+  `rietx-refs-misc`).
 - Brunner, G. O. & Schwarzenbach, D. (1971). *Z. Kristallogr.* 133, 127.
-  The maximum-gap rule, not yet read here.
+  Zur Abgrenzung der Koordinationssphäre und Ermittlung der Koordinationszahl
+  in Kristallstrukturen. The maximum-gap rule, read in full (the maintainer's
+  copy in `rietx-refs-misc`).
 - Momma, K. & Izumi, F. (2011). VESTA 3. *J. Appl. Cryst.* 44, 1272-1276,
   and the VESTA manual, chapters 8 and 12.
 - Pan, H. et al. (2021). *Inorg. Chem.*, doi:10.1021/acs.inorgchem.0c02996,
@@ -285,6 +334,119 @@ npm --prefix gui test && npm --prefix gui run check
 - WP-1462 and its spike, `docs/wp/1462-spike/`.
 
 ## Handover log
+
+### 2026-09-26 (2nd session) — the gap rule is Brunner & Schwarzenbach's, the legend switches per formula, a split pair is no bond, and the WP closes
+
+Both papers are read, and the viewer follows them. Brunner & Schwarzenbach
+measure a gap exactly as the spike did, by the ratio of the two distances
+around it. They look further, though: the whole sequence out to three times
+the nearest distance. That uncovered two shells the old 13-ligand search had
+hidden, and no default picture changed on the 21 phases. Allred's table
+confirms 14 of the 18 electronegativities and has none for the other four. The
+legend has one button per formula, so a species drawn in part can go back to
+its default. A hidden polyhedron no longer leaves its ligands behind as stray
+atoms. The maintainer ruled on the split anion site: two non-metals closer
+than 0.7 of their radius sum are one atom over two positions, never a bond
+(P10). The WP closes, and what the automatic polyhedra still miss is filed as
+WP-1468.
+
+*Decided.* The legend's granularity (the maintainer said "use best practice").
+One button per formula, because P5's default is per shell size and a formula
+fixes the size. A three-state species button (the WAI-ARIA mixed checkbox)
+restores a partial default but can never show a CaO₈ alone. Then P10, after a
+survey of what VESTA, Mercury and CrystalMaker do (recorded in WP-1468), and
+the further work filed at the maintainer's request.
+
+*Done.*
+
+- `structure3d.SHELL_REACH` = 3: every ligand out to three times the
+  centre's shortest distance, and no cap on the shell. The orbit grows once
+  when a large cation's window passes 6 Å. The twin merge is a KD-tree pair
+  query, since the uncapped window made the old loop quadratic.
+- `vertex_only` on an atom the payload carries only for a polyhedron. The
+  client draws it and counts it in the caption only while a polyhedron that
+  uses it is drawn. The zoom fits the atoms the default picture can draw, and
+  the depth range holds every atom. Shells drawn by default claim room under
+  the 400-atom cap first.
+- The legend: `polyhedraLegend` gives one entry per formula, and
+  `shownPolyhedra` takes a map keyed by formula.
+- `structure3d.SPLIT_FLOOR` = 0.7, in `_bonds` and in `_cation_sites`,
+  between two non-metals only (P10).
+- `ELECTRONEGATIVITY`'s comment says which values are Allred's.
+- `measure.py`'s own shell reader uses the new window, and `results.txt` is
+  the re-run.
+- The polyhedra are staged in `docs/releases/1.5.1.md`, which the first
+  session had missed.
+- WP-1468 filed, with its row and ROADMAP's cap 852 -> 854.
+
+*Measured* (Apple M4, macOS; `[dev]` venv plus playwright, node 22.15.0):
+
+- The window moved three sites' largest gaps and no default picture.
+  LaB6's La: 24 B, then ×1.45, now a hidden LaB₂₄. CsCl's Cs: ×1.91,
+  where the 6 Å pad read ×1.68. High cristobalite's Si: 24 O positions,
+  then ×2.25, turned away by P9, its first measured case. Refetching the 17
+  COD entries rewrote the fixture byte for byte, and P10 left `results.txt`
+  byte for byte too.
+- Stray atoms, with no stick and no face, from hidden polyhedra: at the
+  default bond tolerance NAC 12 F and baryte 4 O, on main too. At 1.00,
+  LaB6 102 B, fluorite 56 F, NAC 36, CsCl 26, grossular 24, baryte 16,
+  fluorapatite 14 and gypsum 6.
+- The zoom fit at a bond tolerance of 1.00, before its fix: LaB6 and CsCl
+  drawn at half size, fluorite ×1.50. No phase moved at the default 1.15.
+- Build time, best of 7 against main: the same within noise on 20 phases,
+  and LaB6 4.7 to 7.3 ms (it now builds eight polyhedra). With the old
+  twin loop LaB6 took 38 ms.
+- P10's evidence, as length over covalent radius sum: every stick on the 21
+  phases is 0.856 or more (baryte's S–O); N≡N and NO⁺ are 0.77 and cyanide
+  0.81. The split pairs are 0.39 (hydroxyfluorapatite's O/F) and 0.34-0.68
+  (cristobalite's O). Uranyl's U=O is 0.67 and vanadyl's and titanyl's 0.72,
+  from literature bond lengths, which is why metal pairs are exempt.
+- Allred (1961), Table 3: H, B, C, N, O, F, Si, P, S, Cl, As, Se, Br and I
+  match. Te, At, Kr and Xe are absent from it.
+- A NAC probe in Chromium: the legend reads CaF₈, AlF₆, NaF₇. CaF₈ on and
+  off again gives back the default picture to 0.0 levels.
+- Counts: the fast selection is 6366 passed and 140 skipped. Main is the
+  tree the first session counted at 6362 and 140, so +4: the window test
+  and three for P10. `tests/test_structure3d.py` 87 passed and 1 skipped.
+  GUI vitest 571 passed in 24 files (+3). `tests/test_structure3d_browser.py`
+  5 passed. The full selection did not run: the change is GUI and viewer
+  code and moves no refinement number.
+- After #468 (WP-1326's satellites) merged, main was merged in at
+  `a15959be`. The two share no file; #468's schema change is one optional
+  field, `Phase.propagation_vector`, that the viewer does not read. The
+  merged tree's fast selection is 6426 passed and 145 skipped, the same in
+  two runs.
+
+*Review.* Two `/code-review high --fix` passes.
+
+- The first found eight and fixed the caption's image count and a stale
+  comment. I took two of its declines as well: the zoom fit, and a stale test
+  comment.
+- The second found seven and fixed a clipping bug my zoom fix had made (the
+  depth range came from the trimmed set), a per-site ligand mask and a
+  comment. I took its docstring finding.
+- Declined, with reasons: a twin of a twin joins one cluster (needs three
+  ligands each within 0.01 Å of the next); a large cation grows the orbit for
+  every centre (the build times above); `measure.py` asserts rather than
+  widens its 12 Å grid; the per-site shortest distance is computed twice.
+- Declined into WP-1468: "bonded" is tested twice on the server and "drawn"
+  three times on the client. The two floors agree, since the smallest
+  non-metal radius sum (H–H, 0.62 Å) puts the split floor at 0.43 Å, above
+  the 0.4 Å minimum.
+
+*Gotchas.*
+
+- `gui/CLAUDE.md` sits at its line cap. The legend rule took one line, and
+  the paragraph above it lost two facts that live in `_cation_sites` and
+  `measure.py`.
+- Any edit under `gui/src`, a test file included, changes the dist's
+  fingerprint. Rebuild after the last edit, or `test_gui_dist.py` fails.
+- A test that compares against `s3.SPLIT_FLOOR` stays green when the floor
+  breaks. The cristobalite assertion reads the pairs without it.
+
+*Next.* None here: the WP closes. WP-1468 carries the further work, each task
+independent. Its disorder-group task carries the most and needs a schema
+decision first.
 
 ### 2026-09-26 — the viewer draws coordination polyhedra, and the ligand rule became cations and anions
 

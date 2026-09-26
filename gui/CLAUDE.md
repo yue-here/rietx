@@ -308,7 +308,8 @@ it. Four rules. **gemmi has no colour table** — it supplies radii and
 (ATTRIBUTION.md), never transcribed. **A radius-sum bond rule needs a chemical
 predicate**: bond a metal to a cation only when the phase has no non-metal in
 it, or LaB6's cell edges become La–La sticks and forsterite grows Mg–Si ones
-(a cation is `_cation_sites`', WP-1466). **A non-positive-definite tensor draws its non-positive axes at
+(a cation is `_cation_sites`', WP-1466), and **a floor, between non-metals only**
+(`SPLIT_FLOOR`: a split pair sits under it, and uranyl's U=O would too). **A non-positive-definite tensor draws its non-positive axes at
 zero** on the server (a √ of a negative is a NaN), and the client keeps such a
 column at `FLAT_AXIS` = 1 mÅ because the ray-caster solves through M⁻¹. And
 **bond segments complete their partners exactly one level** — a bond to a
@@ -316,10 +317,10 @@ translated image is correct and *reads* as broken — which is the line between 
 coordination and the packing diagram this WP declined. `probability` and
 `bond_tolerance` are drawing thresholds on the query string, never in
 `ProjectDoc`. **Polyhedra are chemistry, so the server builds them** (WP-1466):
-a centre is a cation, a ligand an anion, and a non-metal bonded to a more
-electronegative one is a cation (`_cation_sites`). A rule change re-runs
-`docs/wp/1466-measure/measure.py`, which writes the 21-phase default picture
-the tests hold (`tests/data/polyhedra_phases.json`).
+cation centres, anion ligands (`_cation_sites`). A rule change re-runs
+`docs/wp/1466-measure/measure.py`, writing the default picture the tests hold.
+**A legend switch is as fine as the default it restores** (per formula, since
+P5 is per shell size), and a hidden polyhedron's `vertex_only` atoms hide too.
 
 Its **look** (the second pass, 2026-07-30, read against VESTA, Jmol and
 3Dmol.js) is crystallography's rather than a plotting library's. **Parallel
