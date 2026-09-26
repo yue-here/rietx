@@ -66,6 +66,13 @@ its writer named at review (root CLAUDE.md, a declared name is a claim).
 
 ### Inherited
 
+- **From WP-1417, 2026-09-27: the ΔBIC this WP's Non-goals defers to
+  is settled.** 1417 closed with ΔBIC at N/f² and
+  `report.compare_freed` for nested pairs. Two models with different
+  phase sets are not nested, so `compare_freed` refuses them. A hand
+  comparison takes each `Statistics.chi2` (reduced) back to Σw·Δ² at
+  its own N − P before `report.delta_bic`.
+
 - **2026-09-24, from a review of the open WPs: task 1's fixture can be fixed
   out from under it.** Task 1 closes this WP if the two passes never
   disagree in cost, and it names WP-1420's #267 fixture as a candidate.

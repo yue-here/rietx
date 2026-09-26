@@ -125,6 +125,15 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
 
+- **From WP-1417, 2026-09-27: M-9's "1417's caveat on N" is settled.**
+  ΔBIC is charged at N/f², `optimize.statistics.effective_sample_size`
+  of the restricted fit's `esd_inflation`, and both statistics want the
+  unreduced Σw·Δ². `Statistics.chi2` is reduced, over N − P. At equal
+  parameter count that cancels in the ratio, so M-9's ranking is safe
+  as long as every trial frees the same count; a trial that frees more
+  takes each χ² back to the sum first. `report.compare_freed` covers a
+  nested pair only, with each freed parameter's t beside the ΔBIC.
+
 - **2026-09-25, from the issue triage (issue #455): M-7's class count is a
   random variable of the platform and the seed.** `isotropy.equivalence_classes`
   calls a pair *distinguishable* when any one of its draws has every restart

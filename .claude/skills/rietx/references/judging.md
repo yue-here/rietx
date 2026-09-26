@@ -223,6 +223,11 @@ measured. A ΔBIC far from t² − ln N_eff for one parameter means f moved betw
 the two fits. `predict_then_verify` carries the same record on
 `VerificationOutcome.comparison`, beside its 1 % χ² rule.
 
+By hand, for a pair `compare_freed` refuses as not nested, remember that
+`result.statistics.chi2` is reduced. Multiply each by its own N − P before
+`rx.report.delta_bic`, and pass `n_effective=`. The reduced pair costs about
+one unit of raw-N ΔBIC per added parameter.
+
 ## §4b — Phase ID: the unmatched list and the Le Bail-gap read
 
 `report.unmatched`'s `kind="unmatched_obs"` entries are the strong lines your
