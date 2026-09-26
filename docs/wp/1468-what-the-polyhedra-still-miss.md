@@ -2,7 +2,7 @@
 
 Milestone: unscheduled · Status: ⬜
 Depends on: 1466
-Priority: P3 2026-09-26 — a view over what the fit already knows; each miss is a drawing, never a number, and switching the polyhedron off works around it
+Priority: P3 2026-09-26 — a view over what the fit already knows; each miss is a drawing, never a number, and switching the polyhedron off works around it; 1466 closed, so nothing blocks it
 
 ## Goal
 
