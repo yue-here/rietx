@@ -1,6 +1,8 @@
 # WP-1449 — rank on what the screen determined, not on what the peak list shows
 
-Milestone: unscheduled · Status: 🔄 2026-09-26 — claimed by @yue-here
+Milestone: unscheduled · Status: 🔄 2026-09-27 — the rank rows wait for a finished search and
+INDEX_SEARCH_INCOMPLETE names its cause; the ranking design waits on six
+paywalled papers
 Depends on: — (1446 measured the refutation; 1025 built the screen)
 Priority: P2 2026-09-23 — a wrong cell ranked first on a surface every page calls provisional; 1446 already measured the refutation
 
@@ -195,6 +197,88 @@ search: a local run, or the nightly dispatched with `full_macos`.
   candidates.
 
 ## Handover log
+
+### 2026-09-27 — the rank rows wait for a finished search; the design waits on papers
+
+The Linux nightly failed five nights running on one row, and the cause was the
+test, not the ranking. The runner is slow enough that the search behind that
+row is stopped by its time budget, and a stopped search does not produce a
+repeatable order: the same search, stopped the same way, put a different cell
+first on two runs here. Every indexing row that asserts an order now waits for
+a search that finished, and says which parts were stopped when it cannot. A
+second fix came out of the same question: the warning that a search did not
+finish blamed the clock even when a size limit had stopped it, and told users
+to wait longer where waiting changes nothing. The ranking design itself has not
+started. The three open papers read so far leave the question open, so it
+needs the papers you have to supply.
+
+**Done.**
+
+- `_skip_unless_finished` runs before every order a real-data row reads (14
+  sites). It reads each unit's clock from `engine_stats` against the budget the
+  result recorded in `provenance.notes`, never `search_complete`, which a cap
+  also sets. The svd retry's clock (`svd.<system>.trim.seconds`) counts. Rows
+  that assert only what was found stay live, and so does hl2's row, whose 15 s
+  budget is cut by design and whose claim is an abstention.
+- The gallery sidecar records `unit_seconds`, so the nightly artifact now says
+  which units the clock stopped. Three stale captions (brucite, fluorite, fap)
+  and four double-escaped dashes fixed in `tests/indexing_gallery.py`.
+- `incomplete_diagnostic` takes the capped systems apart from the clock-stopped
+  ones. Each engine files an incomplete unit by whether its budget had expired
+  when it returned. Staged in `releases/1.5.1.md`; two skill rows updated, one
+  of them with the order finding below.
+- Context gained the three preprints' findings and the Borda mechanism the
+  folded Inherited entries carried. `tests/CLAUDE.md` § Budgets rule updated
+  and kept at its 296-line cap by pointing the old 15:33 → 8:09 story at the
+  v1.0 record, where it already lived.
+
+**Measured** (`[dev]`, macOS arm64, py3.12, unless named).
+
+- Nightly `full` job, 22-26 September: every run failed on
+  `test_brucites_truth_is_not_ranked_first` as `XPASS(strict)` (23 Sep also on
+  a magnetic-irreps row). On 26 September 8 of 13 sidecars carried
+  `INDEX_SEARCH_INCOMPLETE`: NAC by its cap, hl2 by its 15 s design, and six
+  searches run at 300 s. Setup there: corundum 1473 s, corundum with shift
+  1283 s, fluorite 1199 s, the mixture 921 s, brucite 833 s. Job 1:39:52
+  against a 150-minute limit.
+- Brucite at 300 s, two runs: dichotomy units 232/209 s and 175/139 s, a × 2
+  supercell first both times. At 60 s, two runs: both units stopped at 60.01 s,
+  truth first once and supercell first once.
+- NAC's dichotomy: 0 boxes in 0.26 s, reported before this fix as "did not
+  finish cubic within 300 s per system".
+- `tests/test_acceptance_indexing.py` under `-n auto`: 44 passed, 1 xfailed,
+  nothing skipped, 21:28, with another session loading the machine at the
+  start. So every search finished here. The slowest units were close anyway:
+  brucite 278 s, corundum 246 s, corundum with shift 215 s, fluorite 151 s,
+  all against 300 s.
+- Fast suite: 6305 passed, 151 skipped (6456), 3:32, no other pytest running.
+  No test function was added, only assertions inside two engine tests. The
+  cap assertion failed against the old engine code before passing on the new.
+  `tests/test_indexing_engines.py` alone: 76 passed. The full selection did not
+  run: nothing here can move a measured number.
+
+**In flight.** Nothing uncommitted. The next nightly after merge should show
+the six rank rows skipped with named units, or passing if the runner finished.
+
+**Gotchas.**
+
+- A skip in a strict-xfail row reports as skipped, which is what keeps the
+  nightly green on a cut search. The fold-back task can only be judged on a
+  local run or the nightly dispatched with `full_macos`.
+- The worktree guard refuses `$VAR` paths, loops and pipes with computed
+  operands. Scratchpad scripts run in one plain command get past it.
+- poppler (`pdftotext`) was installed with brew by the reading agent on
+  2026-09-27; the three preprints' text is in the session scratchpad only.
+
+**Next.** First, the paywalled papers: Oishi-Tomiyasu (2013) *J. Appl. Cryst.*
+**46**, 1277-1282; Markvardsen, David, Johnston & Shankland (2001) *Acta
+Cryst.* **A57**, 47-54; Altomare *et al.* (2019) ITC Vol. H ch. 3.4; Boultif
+& Louër (2004) *J. Appl. Cryst.* **37**, 724-731; Santoro & Mighell (1972)
+*Acta Cryst.* **A28**, 284-287; Oishi-Tomiyasu (2014) *J. Appl. Cryst.*
+**47**, 593-598. The first two decide the most: whether M^Rev was meant to
+answer the extinction confound, and what the extinction-symbol method can say
+about a candidate before it is ranked. Then answer the remaining corpus
+questions in Context and take the seam decision, where cost decides.
 
 ### 2026-09-22 — filed as a stub
 
