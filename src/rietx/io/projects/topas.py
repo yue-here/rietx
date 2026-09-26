@@ -160,6 +160,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ...crystallography.symmetry import (
+    OperatorGroup,
     get_spacegroup,
     refuse_operation_list,
     setting_diagnostics,
@@ -233,6 +234,47 @@ class TopasSite:
     #: tensor-free site needs and the :class:`~rietx.AnisoU` a tensor-bearing one
     #: needs are both :func:`to_structure`'s, behind its ``aniso=`` opt-in.
     adps: dict | None = None
+    #: The site's magnetic moment exactly as the file states it, keyed
+    #: ``"mlx"``/``"mly"``/``"mlz"`` and ``"mg"`` for the Landé factor
+    #: (WP-1328). ``None`` where the site states no moment; a *key* is absent
+    #: where that component is not stated, which is not the same as zero — the
+    #: same tri-state ``beq`` and ``adps`` keep, and for the same reason.
+    #:
+    #: **The basis is fractional**: m = mlx·**a** + mly·**b** + mlz·**c**, the
+    #: edges in Å, so the crystal-axis μ_B that
+    #: :class:`~rietx.schemas.structure.Moment` stores (magCIF's
+    #: ``_atom_site_moment.crystalaxis_*``, unit vectors along a, b, c) is
+    #: ``(mlx·|a|, mly·|b|, mlz·|c|)`` — a per-axis scale on every cell, never a
+    #: rotation. Stored here as the file writes it; :func:`to_structure`
+    #: converts. The evidence is the TOPAS Technical Reference § 13 "Magnetic
+    #: Structure Refinement": Fmagc = L·Fmag with m = {mlx, mly, mlz} and L the
+    #: Cartesian lattice matrix, which is m_Cartesian = L·m, and its two macros
+    #: ``MM_CrystalAxis_Display`` (mxc = mlx·a, myc = mly·b, mzc = mlz·c) and
+    #: ``MM_CrystalAxis_Refine`` (mlx = mxc/a). The Durham LaMnO₃ magnetic
+    #: tutorial prints both sides, ``mlx mly mlz`` beside
+    #: ``MM_CrystalAxis_Display``, and its display values are those three
+    #: products to the printed digits. One sentence in the same reference
+    #: points elsewhere —
+    #: the ``mlx`` keyword entry calls them "Cartesian components" — and its
+    #: own formula and both macros contradict it, so it is not followed. It is
+    #: also **measured** (2026-09-25, TOPAS-64 v6): one Mn²⁺ site in BNS 1.1 on
+    #: a 5.2 / 6.9 / 8.4 Å, β = 115° cell with ``mlx 0.4 mly -0.3 mlz 0.3``.
+    #: TOPAS's magnetic intensity ratios over 54 strong equal-d pairs
+    #: (h k l)/(h −k l), which cancel form factor, Lorentz factor and scale,
+    #: match this reading to four digits on every pair, and its absolute
+    #: magnetic intensity gives |m| = 3.2452 μ_B, this reading's value. The
+    #: crystal-axis and Cartesian readings miss the median pair by factors of
+    #: 1.58 and 1.80. A moment along b alone, where all three readings
+    #: coincide, matches under all three, which is the control that the
+    #: comparison can separate them. The same holds on the orthogonal cell.
+    #: TOPAS's table for the three-axis moment is vendored
+    #: (``tests/data/topas_moment_basis_A_mono3_mag_hkl.txt``) and the pair
+    #: check re-runs against it in ``tests/test_magcif.py``.
+    #: Until WP-1328's review this reader took the crystal-axis reading
+    #: (``mlx`` as μ_B along a unit vector), which made an imported moment too
+    #: small by roughly the edge length and, wherever the edges differ and the
+    #: moment has two or more components, point elsewhere.
+    moment: dict | None = None
     #: Which of this site's parameters the file records as having been free.
     #: Keyed by field name (``"x"``, ``"beq"``, ``"u11"``…, …); a key is absent
     #: where the file said nothing, which is not the same as "held" — see
@@ -243,6 +285,10 @@ class TopasSite:
 @dataclass
 class TopasPhase:
     name: str
+    #: The nuclear ``space_group`` as written (origin suffix normalised), or
+    #: ``""`` where the ``str`` states only ``mag_space_group`` — TOPAS's own
+    #: magnetic examples do — and :func:`to_structure` derives the nuclear
+    #: group from the magnetic one (``TOPAS_MAGNETIC_GROUP_READ``).
     space_group: str
     cell: dict = field(default_factory=dict)
     cell_limits: dict = field(default_factory=dict)
@@ -257,6 +303,14 @@ class TopasPhase:
     #: The grammar makes ``str`` a **child** of ``xdd`` and ``xdd`` an array, so
     #: a phase is a fact about one pattern and not about the file.
     dataset: int | None = None
+    #: ``mag_space_group`` exactly as written (WP-1328): a BNS number
+    #: (``62.448``, ``1.1`` — how the Durham LaMnO₃ tutorial and ISODISTORT's
+    #: TOPAS export write it), an OG number (three integers), or a Shubnikov
+    #: **symbol**. :func:`to_structure` takes a number as the phase's magnetic
+    #: group (:func:`magnetic_group_number`); a symbol is metadata only,
+    #: because no dependency here parses one, and the group then has to come
+    #: from ``to_structure(magnetic_symmetry=...)``.
+    mag_space_group: str | None = None
 
 
 @dataclass
@@ -1008,6 +1062,17 @@ _SITE_KEYWORDS = r"\b(?:" + "|".join(
 #: ``tests/data/README.md`` says so and says what would settle it — the claim
 #: names the state of its own evidence rather than reading as established.
 _ADP_KEYS = ("u11", "u22", "u33", "u12", "u13", "u23")
+
+#: The site's magnetic keywords, in the order :class:`~rietx.Moment` stores
+#: them plus the Landé factor last (WP-1328).  ``mlx``/``mly``/``mlz`` are
+#: fractional-basis components, converted to crystal-axis μ_B by
+#: :func:`to_structure` — see :attr:`TopasSite.moment` for what that rests
+#: on — and ``mg`` is the g the ⟨j₂⟩ term of a 4f form factor
+#: needs (``crystallography.magnetic.form_factor.resolve_g``).
+_MOMENT_KEYS = ("mlx", "mly", "mlz", "mg")
+
+#: The three components of :data:`_MOMENT_KEYS`, without the g.
+_MOMENT_COMPONENT_KEYS = _MOMENT_KEYS[:3]
 
 #: Any anisotropic component marks a site anisotropic — with or without the
 #: ``adps`` keyword, which introduces the tensor but carries no value itself.
@@ -1924,17 +1989,35 @@ def read_topas_inp(path: str | Path, *,
         gchunk = gmasked[opener.end():end]     # and of its `keep_get` view
         name = re.search(r'phase_name\s+"?([^"\n]+)', chunk)
         sg = re.search(r'\bspace_group\s+"?([^"\n]+)', chunk)
-        # A *magnetic* space group is a construct this package has no model for,
-        # and dropping it silently would return a nuclear-only structure that
-        # looks complete. WP-1118's rule: report or refuse, never drop. Caught
-        # here rather than by the regex because `mag_space_group 62.448` used to
-        # match the unanchored `space_group` and arrive as the symbol "62.448".
-        if mag := re.search(r"\bmag_space_group\s+(\S+)", chunk):
-            raise TopasInpError(
-                f"{path}: {name.group(1).strip() if name else '?'}: magnetic space "
-                f"group {mag.group(1)!r} has no counterpart in rietx; reading this "
-                f"phase would return a nuclear-only model that looks complete")
-        if not (name and sg):
+        # A *magnetic* space group used to raise here, because rietx had no
+        # magnetic model at all and a nuclear-only import would have looked
+        # complete. WP-1327 gave it one, so the construct is now **read** and
+        # the refusal moved to where the impossible thing is actually asked
+        # for: the value is carried as written (:mod:`.coverage`'s `magnetic
+        # space group` row), the site moments are read below, and
+        # :func:`to_structure` takes a BNS/OG number as the group and refuses
+        # a phase whose moments have no operator list to be propagated over —
+        # a Shubnikov symbol, which no dependency here parses, with no
+        # caller-supplied group. `\b` is what keeps the unanchored
+        # `space_group` search above off this keyword — `mag_space_group`
+        # offers no word boundary before `space` — and
+        # `test_mag_space_group_is_not_read_as_the_nuclear_one` pins it, since
+        # arriving as the *symbol* "62.448" is how this went wrong once.
+        # A quoted value is the symbol inside the quotes; an unquoted one is one
+        # token (`mag_space_group 62.448`), so a keyword later on the same line
+        # is not read into it — the BNS number is matched on this value.
+        if mag := re.search(r'\bmag_space_group\s+(?:"([^"\n]*)"|(\S+))', chunk):
+            mag_space_group = (mag.group(1) if mag.group(1) is not None
+                               else mag.group(2)).strip()
+        else:
+            mag_space_group = None
+        # A `str` stating `mag_space_group` and **no** `space_group` is a phase:
+        # it is how TOPAS's own magnetic examples and the Durham LaMnO3
+        # tutorial write one, TOPAS generating the atoms with the magnetic
+        # group's operators. Its nuclear group is `to_structure`'s to derive
+        # (from the file's BNS/OG number, `_nuclear_groups`), so it is stored
+        # here as "" — what the file states — and never as the number.
+        if not (name and (sg or mag_space_group)):
             # Recorded rather than passed over in silence: `archive file 6`
             # has a `str` block stating a cell and two sites and no
             # `phase_name`, and it used to arrive named "CaO" with scale 1.0 —
@@ -1946,7 +2029,8 @@ def read_topas_inp(path: str | Path, *,
             # block — and `to_structure` refuses where such a block is dropped.
             n_sites = len(re.findall(r"\bsite\b", mchunk))
             lacks = " or ".join(w for w, got in
-                                (("phase_name", name), ("space_group", sg))
+                                (("phase_name", name),
+                                 ("space_group", sg or mag_space_group))
                                 if not got)
             scale_read = _read("scale", chunk, symbols)
             model.skipped_blocks.append(SkippedBlock(
@@ -1955,10 +2039,10 @@ def read_topas_inp(path: str | Path, *,
                 scale=scale_read.value if scale_read else None,
                 weight_percent=_field("weight_percent", chunk, symbols)))
             continue
-        raw_sg = sg.group(1).strip()
-        norm_sg = normalize_space_group(sg.group(1))
+        raw_sg = sg.group(1).strip() if sg else ""
+        norm_sg = normalize_space_group(sg.group(1)) if sg else ""
         phase = TopasPhase(name=name.group(1).strip(), space_group=norm_sg,
-                           dataset=dataset)
+                           dataset=dataset, mag_space_group=mag_space_group)
         if norm_sg != raw_sg:
             origin_translations.append((phase.name, raw_sg, norm_sg))
         # What this phase states that the import does not carry. Scanned on THE
@@ -2214,6 +2298,28 @@ def read_topas_inp(path: str | Path, *,
                     f"tensor components this reader can read: {text.strip()!r} "
                     f"— building it isotropic would discard a stated "
                     f"anisotropy.")
+            # The site's magnetic moment, carried as what the file states
+            # (WP-1328). A stated component this reader cannot resolve refuses
+            # naming the line, the same rule `beq`, `x` and the ADP tensor
+            # follow: substituting 0 for a stated `mlx` is a moment pointing
+            # somewhere else, and |F_m|² is quadratic in it so the error does
+            # not announce itself as an obviously broken pattern.
+            moment: dict | None = None
+            for key in _MOMENT_KEYS:
+                if not re.search(rf"\b{key}\b", text):
+                    continue
+                mread = _read(key, text, symbols)
+                if mread is None or mread.value is None:
+                    raise TopasInpError(
+                        f"{path}: {phase.name}: cannot read {key} from site "
+                        f"line: {text.strip()!r} — the site states a magnetic "
+                        f"moment and this reader could not resolve {key}, so "
+                        f"building it would substitute 0 for a number the file "
+                        f"states.")
+                moment = {} if moment is None else moment
+                moment[key] = mread.value
+                if mread.vary is not None:
+                    reads[key] = mread
             # A site carrying several `occ` tokens is a **mixed** site: one atom
             # per species, sharing this site's label, coordinates and B, exactly
             # as the two-`site`-line spelling already builds (WP-1118, finding 2).
@@ -2249,6 +2355,7 @@ def read_topas_inp(path: str | Path, *,
                     label=label.group(1), species=norm_species,
                     occupancy=occupancy if occupancy is not None else 1.0,
                     beq=beq, adps=dict(adps) if adps is not None else None,
+                    moment=dict(moment) if moment is not None else None,
                     vary=vary,
                     **{axis: reads[axis].value for axis in "xyz"}))
         # A site token that read no atom is a silently wrong structure factor, so
@@ -2396,8 +2503,331 @@ def read_topas_inp(path: str | Path, *,
     return model
 
 
+def _magnetic_group_number(mag_space_group: str | None) -> str | None:
+    """The BNS or OG number a ``mag_space_group`` value *is*, or ``None``.
+
+    TOPAS's grammar writes ``mag_space_group $symbol``, and the files write a
+    number there: the Durham LaMnO₃ magnetic tutorial's ``mag_space_group
+    62.448`` and ``mag_space_group 1.1`` (the latter under a ``'BNS:1.1 P1``
+    comment ISODISTORT's TOPAS export writes). Two dotted integers are a BNS
+    number and three an OG one, which is exactly the syntax
+    :class:`~rietx.schemas.structure.MagneticSymmetry` resolves (spglib, the
+    standard setting); anything else is a Shubnikov symbol, and no dependency
+    here parses one (M-5 D-c), so it returns ``None`` and the group has to come
+    from the caller.
+    """
+    if mag_space_group is None:
+        return None
+    text = mag_space_group.strip()
+    return text if re.fullmatch(r"\d+\.\d+(?:\.\d+)?", text) else None
+
+
+def _magnetic_specs(model: TopasModel, phases_in, magnetic_symmetry
+                    ) -> tuple[dict[str, object], set[str]]:
+    """``{phase name: magnetic-symmetry spec}``, or a refusal naming the phase.
+
+    The rule, and the whole of WP-1328's TOPAS stance in one place:
+
+    * a phase whose sites state **no** moment is nuclear and gets nothing —
+      passing a group for it would put a magnetic space group on a phase with
+      no moment, which the schema allows and which means nothing;
+    * a phase whose sites **do** state a moment needs a group. A
+      ``mag_space_group`` stating a BNS or OG number is one
+      (:func:`_magnetic_group_number`) and is used where the caller supplied
+      none for that phase; a symbol is not (M-5 D-c: no dependency here parses
+      a Shubnikov symbol). With a spec supplied it is used; without one the
+      build **refuses by name**;
+    * a spec naming a phase that is not being built, or one that states no
+      moment, refuses too — a caller who passes ``{"Cr2WO6": 58.395}`` and gets
+      silence because the phase is spelled differently in the file has been
+      handed a nuclear structure that looks complete, which is the exact
+      failure this whole registry exists to prevent.
+
+    A bare spec (an ``int``, a number string, a
+    :class:`~rietx.schemas.structure.MagneticSymmetry`) is accepted where
+    exactly **one** phase being built states a moment; with two, the mapping
+    form is required, because guessing which phase a single group belongs to is
+    a choice a reader does not get to make.
+
+    Returns the resolved specs and the names of the phases whose group came
+    from the file's own number rather than from the caller.
+    """
+    magnetic_phases = [ph.name for ph in phases_in
+                       if any(s.moment is not None for s in ph.sites)]
+    from_file = {ph.name: number for ph in phases_in
+                 if ph.name in magnetic_phases
+                 and (number := _magnetic_group_number(ph.mag_space_group))}
+    if magnetic_symmetry is None:
+        if not magnetic_phases:
+            return {}, set()
+        unresolved = [n for n in magnetic_phases if n not in from_file]
+        if unresolved:
+            named = "; ".join(
+                f"{ph.name!r} (mag_space_group "
+                f"{ph.mag_space_group!r}, moments on "
+                f"{', '.join(repr(s.label) for s in ph.sites if s.moment)})"
+                for ph in phases_in if ph.name in unresolved)
+            raise TopasInpError(
+                f"{model.path or '<model>'}: {len(unresolved)} phase"
+                f"{'' if len(unresolved) == 1 else 's'} "
+                f"state{'s' if len(unresolved) == 1 else ''} site magnetic "
+                f"moments and this build was not given a magnetic space "
+                f"group: {named}. A BNS or OG number in mag_space_group is "
+                f"read as the group; this states a Shubnikov *symbol* (or "
+                f"none), and rietx's model is the operator list — no "
+                f"dependency here parses a symbol, and guessing one is how a "
+                f"fit lands under the wrong group — so the group has to come "
+                f"from the caller: pass to_structure(magnetic_symmetry=<BNS/"
+                f"OG/UNI number or operator list>), or {{phase name: spec}} "
+                f"for more than one. Building the phase without its moments "
+                f"would return the nuclear half of a magnetic refinement, and "
+                f"`model.phases[i].sites[j].moment` is what the file states.")
+        specs = dict(from_file)
+    elif isinstance(magnetic_symmetry, dict) and not (
+            set(magnetic_symmetry) <= {"operations", "centerings", "bns_number",
+                                       "og_number", "uni_number", "symbol",
+                                       "setting"}):
+        specs = dict(magnetic_symmetry)
+    elif not magnetic_phases:
+        # No phase being built states a moment, so a group has nowhere to
+        # attach. Refused with the same sentence the named-phase arm below
+        # uses, because it is the same mistake: a magnetic space group on a
+        # phase with no moment constrains nothing and contributes nothing.
+        raise TopasInpError(
+            f"{model.path or '<model>'}: magnetic_symmetry was given and no "
+            f"phase being built states a site moment: none of "
+            f"{', '.join(repr(ph.name) for ph in phases_in)} writes "
+            f"mlx/mly/mlz. A magnetic space group on a phase with no moment "
+            f"constrains nothing and contributes nothing, so it is refused "
+            f"rather than stored as a claim the file does not make.")
+    else:
+        if len(magnetic_phases) != 1:
+            raise TopasInpError(
+                f"{model.path or '<model>'}: magnetic_symmetry was given as one "
+                f"spec and {len(magnetic_phases)} phases being built state "
+                f"moments ({', '.join(map(repr, magnetic_phases))}). Which "
+                f"phase it belongs to is not something this reader may guess: "
+                f"pass {{phase name: spec}}.")
+        specs = {magnetic_phases[0]: magnetic_symmetry}
+    building = {ph.name for ph in phases_in}
+    unknown = sorted(set(specs) - building)
+    if unknown:
+        raise TopasInpError(
+            f"{model.path or '<model>'}: magnetic_symmetry names phase"
+            f"{'' if len(unknown) == 1 else 's'} "
+            f"{', '.join(map(repr, unknown))}, which "
+            f"{'is' if len(unknown) == 1 else 'are'} not being built here. "
+            f"This file states {', '.join(repr(n) for n in sorted(building))}. "
+            f"A misspelled phase name would otherwise hand back a nuclear "
+            f"structure with no magnetic model and nothing said.")
+    momentless = sorted(set(specs) - set(magnetic_phases))
+    if momentless:
+        raise TopasInpError(
+            f"{model.path or '<model>'}: magnetic_symmetry was given for phase"
+            f"{'' if len(momentless) == 1 else 's'} "
+            f"{', '.join(map(repr, momentless))}, whose sites state no "
+            f"mlx/mly/mlz. A magnetic space group on a phase with no moment "
+            f"constrains nothing and contributes nothing, so it is refused "
+            f"rather than stored as a claim the file does not make.")
+    # a phase the caller's mapping leaves out takes the file's own number
+    taken_from_file = {n for n in set(magnetic_phases) - set(specs)
+                       if n in from_file} | (
+        set(specs) if magnetic_symmetry is None else set())
+    for n in taken_from_file:
+        specs.setdefault(n, from_file[n])
+    missing = sorted(set(magnetic_phases) - set(specs))
+    if missing:
+        raise TopasInpError(
+            f"{model.path or '<model>'}: phase"
+            f"{'' if len(missing) == 1 else 's'} "
+            f"{', '.join(map(repr, missing))} "
+            f"state{'s' if len(missing) == 1 else ''} site moments and "
+            f"magnetic_symmetry names no group for "
+            f"{'it' if len(missing) == 1 else 'them'}. Every phase with a "
+            f"moment needs one, or its moments would be dropped in silence.")
+    # Resolved here rather than at `rx.Phase(...)`, so a spec this schema
+    # cannot read is refused naming the *argument* and the phase instead of
+    # arriving as a pydantic report about a field. The commonest such spec is a
+    # BNS number written as a float: `58.395` is a dotted pair of integers, not
+    # a number — as a float it is the same value as 58.3950, which is a
+    # different entry — so the schema takes an int (UNI) or a string, and this
+    # says which.
+    from ...schemas.structure import MagneticSymmetry
+
+    resolved: dict[str, object] = {}
+    for name, spec in specs.items():
+        try:
+            resolved[name] = (spec if isinstance(spec, MagneticSymmetry)
+                              else MagneticSymmetry.model_validate(spec))
+        except Exception as exc:
+            hint = (" A BNS or OG number is a dotted pair of integers and has "
+                    "to be a *string* — '58.395', not 58.395 — because as a "
+                    "float it is the same value as 58.3950, a different entry; "
+                    "a UNI number is a plain int."
+                    if isinstance(spec, float) else "")
+            raise TopasInpError(
+                f"{model.path or '<model>'}: magnetic_symmetry for phase "
+                f"{name!r} is not a magnetic space group this schema can read "
+                f"({spec!r}): {exc}.{hint}") from exc
+    return resolved, taken_from_file
+
+
+def _nuclear_groups(model: TopasModel, phases_in, specs) -> dict:
+    """``{phase name: nuclear group}`` for every phase stating none.
+
+    A ``str`` with ``mag_space_group`` and no ``space_group`` — TOPAS's own
+    magnetic examples, the Durham LaMnO₃ tutorial — has its atoms generated by
+    the magnetic group's operators, so its nuclear group is the magnetic
+    group's operators with time reversal dropped: tier 2 of
+    :func:`~rietx.crystallography.magcif.resolve_nuclear_symmetry` (issue
+    #457's rule), there being no parent for tier 1 to try, or tier 3 — the
+    operation list under a bracketed label — where no tabulated setting has
+    exactly those operations. The value is the group object
+    (``gemmi.SpaceGroup`` or ``symmetry.OperatorGroup``). The magnetic group
+    is the phase's spec where it has one, else the file's own number (a phase
+    stating no moment still needs its nuclear group); a phase with neither is
+    refused, naming the symbol it wrote.
+    """
+    from ...crystallography.magcif import MagCifError, resolve_nuclear_symmetry
+    from ...schemas.structure import MagneticSymmetry
+
+    path = model.path or "<model>"
+    out: dict[str, str] = {}
+    for ph in phases_in:
+        if ph.space_group:
+            continue
+        spec = specs.get(ph.name)
+        if spec is None and (number := _magnetic_group_number(
+                ph.mag_space_group)) is not None:
+            # built inside the guard, as every schema object a conversion
+            # builds is (io/CLAUDE.md): a number the schema cannot resolve
+            # (``999.1``) raises naming the file and the phase, never as a
+            # bare pydantic report about a field (review of #478, item 2)
+            try:
+                spec = MagneticSymmetry.model_validate(number)
+            except Exception as exc:
+                raise TopasInpError(
+                    f"{path}: phase {ph.name!r} states no space_group, and its "
+                    f"mag_space_group {ph.mag_space_group!r} is not a magnetic "
+                    f"space group this schema can resolve, so there is no "
+                    f"operator list to derive the nuclear group from: "
+                    f"{exc}") from exc
+        if spec is None:
+            raise TopasInpError(
+                f"{path}: phase {ph.name!r} states no space_group, and its "
+                f"mag_space_group {ph.mag_space_group!r} is a Shubnikov "
+                f"symbol rather than a BNS or OG number, so there is no "
+                f"operator list to derive the nuclear group from — no "
+                f"dependency here parses a symbol. State the nuclear "
+                f"space_group beside it, write the BNS number, or pass "
+                f"to_structure(magnetic_symmetry={{{ph.name!r}: <number>}}) "
+                f"where the phase states moments.")
+        try:
+            group = resolve_nuclear_symmetry(
+                None, spec, f"{path}: phase {ph.name!r}",
+                nuclear_group="file")
+        except MagCifError as exc:
+            raise TopasInpError(str(exc)) from exc
+        out[ph.name] = group
+    return out
+
+
+def _magnetic_build_diagnostics(model: TopasModel, phases_in, specs,
+                                group_from_file=frozenset(),
+                                nuclear_groups=None) -> list[Diagnostic]:
+    """What the magnetic build assumed, said once per phase it applies to.
+
+    Three things, each an assumption or a derivation rather than a reading,
+    which is exactly why they are on a channel instead of in a comment:
+
+    * ``TOPAS_MAGNETIC_GROUP_READ`` — the magnetic group is the file's own
+      ``mag_space_group`` number, resolved to operators in the standard BNS
+      setting (the caller supplied none for that phase), and, where the ``str``
+      stated no ``space_group``, the nuclear group was derived from it
+      (:func:`_nuclear_groups`). The file's coordinates are taken to be in that
+      standard setting, as TOPAS takes them to be in the setting of its own
+      table; nothing here checks that the two tables agree.
+    * ``TOPAS_MOMENT_CONVENTION`` — ``mlx mly mlz`` are read as
+      **fractional-basis** components and stored as crystal-axis μ_B
+      (component × edge; :attr:`TopasSite.moment` carries the evidence). The
+      reading is the TOPAS Technical Reference's own formula, and it is
+      **measured** against TOPAS's own calculated intensities, so the
+      diagnostic says both.
+    * ``TOPAS_MOMENT_ION_UNCHARGED`` — the magnetic form factor is keyed by
+      oxidation state and the site's own species is what supplies it. TOPAS
+      files usually write ``occ Cr+3``, which normalises to ``Cr3+`` and
+      resolves; a site written ``occ Cr`` gets the *neutral* atom's ⟨j₀⟩, which
+      is a different curve, so the substitution is reported.
+    """
+    out: list[Diagnostic] = []
+    path = model.path or "<model>"
+    nuclear_groups = nuclear_groups or {}
+    for ip, ph in enumerate(phases_in):
+        derived = nuclear_groups.get(ph.name)
+        if ph.name in group_from_file or derived is not None:
+            parts = []
+            if ph.name in group_from_file:
+                parts.append(
+                    f"magnetic group from the file's mag_space_group "
+                    f"{ph.mag_space_group!r} as a BNS/OG number, operators in "
+                    f"its standard setting")
+            if derived is not None:
+                parts.append(
+                    f"no space_group stated, so the positions refine under "
+                    f"{derived.xhm()!r}, the magnetic group's operators with time "
+                    f"reversal dropped")
+            out.append(Diagnostic(
+                level="info", code="TOPAS_MAGNETIC_GROUP_READ",
+                where=[f"phases.{ip}.magnetic_symmetry"] * (
+                    ph.name in group_from_file)
+                + [f"phases.{ip}.space_group"] * (derived is not None),
+                message=f"{path}: phase {ph.name!r}: " + "; ".join(parts),
+                suggestion=("the file's coordinates and moments are taken to "
+                            "be in the standard setting of that number, which "
+                            "is how TOPAS reads it too; pass "
+                            "to_structure(magnetic_symmetry=...) with an "
+                            "operator list if the file uses another setting")))
+        if ph.name not in specs:
+            continue
+        moment_sites = [s for s in ph.sites if s.moment is not None]
+        out.append(Diagnostic(
+            level="info", code="TOPAS_MOMENT_CONVENTION",
+            where=[f"phases.{ip}.atoms.{j}.moment"
+                   for j, s in enumerate(ph.sites) if s.moment is not None],
+            message=(f"{path}: phase {ph.name!r}: mlx/mly/mlz on "
+                     f"{', '.join(repr(s.label) for s in moment_sites)} read as "
+                     f"fractional-basis components (m = mlx*a + mly*b + "
+                     f"mlz*c) and stored as crystal-axis mu_B, (mlx*|a|, "
+                     f"mly*|b|, mlz*|c|)"),
+            suggestion=("the reading is the TOPAS Technical Reference § 13 "
+                        "(Fmagc = L*Fmag; MM_CrystalAxis_Display gives mxc = "
+                        "mlx*a), and it is measured: TOPAS 6's own calculated "
+                        "magnetic intensities on a monoclinic cell match it "
+                        "pair by pair and in |m|, and match neither a "
+                        "crystal-axis nor a Cartesian reading; a file's "
+                        "MM_CrystalAxis_Display values are the stored "
+                        "components, to check against")))
+        bare = [s for s in moment_sites if re.fullmatch(r"[A-Za-z]{1,2}",
+                                                        s.species)]
+        if bare:
+            out.append(Diagnostic(
+                level="info", code="TOPAS_MOMENT_ION_UNCHARGED",
+                where=[f"phases.{ip}.atoms.{j}.moment.ion"
+                       for j, s in enumerate(ph.sites) if s in bare],
+                message=(f"{path}: phase {ph.name!r}: "
+                         f"{', '.join(repr(s.label) for s in bare)} state a "
+                         f"moment and an uncharged species, so the magnetic "
+                         f"form factor is the neutral atom's"),
+                suggestion="the magnetic form factor is keyed by oxidation "
+                           "state; write the site's `occ` with its charge "
+                           "(`occ Cr+3`) so the ion resolves"))
+    return out
+
+
 def to_structure(model: TopasModel, *, cell_limits: bool = True,
-                 aniso: bool = False, dataset: int | None = None):
+                 aniso: bool = False, dataset: int | None = None,
+                 magnetic_symmetry=None,
+                 diagnostics: list[Diagnostic] | None = None):
     """Build a :class:`~rietx.schemas.Structure` from a parsed model.
 
     A **module-level** name, not a package export. WP-1118 is "read a refinement
@@ -2454,6 +2884,40 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
     as the rule a future reader keeps rather than as a claim about a file, since
     no such sibling exists on this tree yet (WP-1076: a declared name is a
     claim).
+
+    ``magnetic_symmetry`` names a **magnetic** phase's group where the file
+    does not. A ``mag_space_group`` stating a BNS or OG number (``62.448``,
+    ``1.1`` — how the Durham LaMnO₃ tutorial and ISODISTORT's TOPAS export
+    write it) *is* the group, resolved to its standard-setting operators and
+    reported as ``TOPAS_MAGNETIC_GROUP_READ``; a Shubnikov *symbol*
+    (``mag_space_group "P n' n m"``) is not, because rietx's model is the
+    operator list and no dependency here parses a symbol — spglib exposes UNI,
+    BNS and OG *numbers* and no symbol table, and guessing one is how a fit
+    lands under the wrong group (M-5, decision D-c). For a symbol the group has
+    to come from here: pass a BNS/OG/UNI number, a
+    :class:`~rietx.schemas.structure.MagneticSymmetry`, or a ``{phase name:
+    spec}`` mapping when the file has more than one magnetic phase; a spec
+    passed here outranks the file's number for its phase.
+
+    A ``str`` stating ``mag_space_group`` and **no** ``space_group`` is built
+    under its magnetic group's operators with time reversal dropped — the
+    nuclear group TOPAS generates its atoms with — through tier 2 of
+    :func:`~rietx.crystallography.magcif.resolve_nuclear_symmetry`, the magCIF
+    reader's rule (:func:`_nuclear_groups`). The moments ``mlx mly mlz`` are
+    fractional-basis components and are stored as crystal-axis μ_B,
+    component × edge (:attr:`TopasSite.moment`, ``TOPAS_MOMENT_CONVENTION``).
+
+    A phase whose sites state a moment and for which no group was supplied or
+    read is **refused, naming the phase, the sites and the symbol the file
+    wrote** — building it without the moments would return the nuclear half of
+    a magnetic refinement, which is the failure every one of this reader's
+    magnetic refusals existed to prevent; and building it *with* them is not
+    possible, since a moment with no ``magnetic_symmetry`` has no allowed
+    subspace and no orbit and the schema refuses it. Pass
+    ``magnetic_symmetry={...}`` to build the magnetic model, or drop the
+    moments from the phase to declare that the nuclear subset is what you want.
+    ``mag_only``/``mag_only_for_mag_sites`` stay refused (:mod:`.coverage`'s
+    ``magnetic-only phase`` row says why dropping them is not an option).
     """
     import rietx as rx
 
@@ -2509,6 +2973,19 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
             f"{'; '.join(h.feature.why for h in blocked if h.feature.why)}. "
             f"Read `model.phases` for what the file states, and "
             f"`model.coverage` for every construct this import does not carry.")
+
+    # **The magnetic arm** (WP-1328). A phase whose sites state a moment needs
+    # an operator list, and the file states a *symbol*: so either the caller
+    # supplied the group or this refuses, naming the phase, the sites and the
+    # symbol. Resolved before anything is built, so a two-phase file with one
+    # magnetic phase refuses before the nuclear one is half-constructed.
+    magnetic_specs, group_from_file = _magnetic_specs(model, phases_in,
+                                                      magnetic_symmetry)
+    nuclear_groups = _nuclear_groups(model, phases_in, magnetic_specs)
+    if diagnostics is not None:
+        diagnostics.extend(_magnetic_build_diagnostics(
+            model, phases_in, magnetic_specs, group_from_file,
+            nuclear_groups))
 
     # The window is `Atom.biso`'s own declaration, read off the schema rather
     # than restated here: the bound this refusal quotes must not be the reader's
@@ -2620,10 +3097,32 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
                 displacement = {"biso": _sp(s, "beq",
                                             0.5 if s.beq is None else s.beq,
                                             **biso_window)}
+            magnetic = {}
+            if s.moment is not None and ph.name in magnetic_specs:
+                # `mlx/mly/mlz` are fractional-basis components (see
+                # `TopasSite.moment`), so the crystal-axis mu_B rietx stores is
+                # each one times its own edge in Å — `MM_CrystalAxis_Display`'s
+                # mxc = mlx*a — never a rotation, on any cell. The edges are
+                # the ones the `Cell` below is built from. A component the file
+                # did not state is 0, which is what a moment along one axis
+                # writes. The ion is the
+                # site's own species where TOPAS wrote a charge (`occ Cr+3`
+                # normalises to `Cr3+`, which is a magnetic form-factor key);
+                # where it did not, the neutral atom is used and the diagnostic
+                # says so, because <j0> for Mn and for Mn3+ are different
+                # curves.
+                edges = (c["a"], c.get("b", c["a"]), c.get("c", c["a"]))
+                magnetic["moment"] = rx.Moment.from_values(
+                    [s.moment.get(k, 0.0) * edge
+                     for k, edge in zip(_MOMENT_COMPONENT_KEYS, edges)],
+                    ion=s.species,
+                    g=s.moment.get("mg"),
+                    vary=any(s.vary.get(k) for k in _MOMENT_COMPONENT_KEYS))
             return rx.Atom(label=s.label, species=s.species,
                            x=_sp(s, "x", s.x), y=_sp(s, "y", s.y),
                            z=_sp(s, "z", s.z),
-                           occ=_sp(s, "occ", s.occupancy), **displacement)
+                           occ=_sp(s, "occ", s.occupancy), **displacement,
+                           **magnetic)
 
         # Every schema refusal from here is converted at this boundary: a
         # reader raises naming the file, and pydantic's report names a field.
@@ -2642,7 +3141,15 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
                            gamma=_p("ga", 90.0))
             atoms = [_atom(s) for s in ph.sites]
             phases.append(rx.Phase(
-                name=ph.name, space_group=ph.space_group, cell=cell, atoms=atoms,
+                name=ph.name,
+                space_group=(nuclear_groups[ph.name].xhm()
+                             if ph.name in nuclear_groups else ph.space_group),
+                symmetry_operations=(
+                    list(nuclear_groups[ph.name].xyz)
+                    if isinstance(nuclear_groups.get(ph.name), OperatorGroup)
+                    else None),
+                cell=cell, atoms=atoms,
+                magnetic_symmetry=magnetic_specs.get(ph.name),
                 # `or 1e-4` substituted the seed for a *stated* zero: 20 real
                 # phases across 9 files record `scale 0`, a phase refined to
                 # absent, and this repo already treats that as a real state

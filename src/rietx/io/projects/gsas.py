@@ -1319,8 +1319,10 @@ def _report(model: GsasModel, diagnostics: list[Diagnostic]) -> None:
                 level="warning", code="GSAS_EXP_PHASE_MAGNETIC",
                 message=(
                     f"{named}: phase {phase.number} ({phase.name!r}) is a "
-                    f"magnetic phase (GSAS phase type {phase.kind}) and rietx "
-                    f"has no magnetic scattering model"),
+                    f"magnetic phase (GSAS phase type {phase.kind}), and this "
+                    f"reader does not read a `.EXP` magnetic block yet — a "
+                    f"magCIF of the structure is the route that does "
+                    f"(`Structure.from_cif`)"),
                 where=[f"phases.{phase.number}"]))
         # A `.EXP` states `SG SYM` and no operators, so where the symbol names
         # two settings the file has not chosen between them and neither can this
@@ -1369,11 +1371,11 @@ def to_structure(model: GsasModel, *, phase: int | None = None,
 
     Three refusals, each naming what it would otherwise have dropped:
 
-    * **A magnetic phase** (GSAS phase type 2 or 3).  rietx has no magnetic
-      scattering model, so the nuclear half is all that could be imported and
-      it would look complete — the stance
-      :mod:`~rietx.io.projects.coverage` already declares for the sibling
-      readers, reached here through the same sentence.
+    * **A magnetic phase** (GSAS phase type 2 or 3).  This reader does not
+      read a ``.EXP`` magnetic block yet (the operators with their
+      time-reversal signs and the site moments), so the nuclear half is all
+      that could be imported and it would look complete.  A magCIF of the
+      same structure is the route that reads (``Structure.from_cif``).
     * **A macromolecular phase** (type 4).  Its sites are on ``ATmmmm`` records
       with a different layout, which this reader does not read at all, so the
       phase would arrive with no atoms rather than with wrong ones.
@@ -1430,11 +1432,16 @@ def to_structure(model: GsasModel, *, phase: int | None = None,
     if chosen.magnetic:
         raise GsasExpError(
             f"{model.path or '<model>'}: phase {chosen.number} "
-            f"({chosen.name!r}) is magnetic (GSAS phase type {chosen.kind}) "
-            f"and rietx has no magnetic scattering model.  Importing its "
-            f"nuclear half would hand back a structure that looks complete "
-            f"while the magnetic contribution went unmentioned.  The numbers "
-            f"are on `model.phases`")
+            f"({chosen.name!r}) is magnetic (GSAS phase type {chosen.kind}), "
+            f"and this reader does not read a `.EXP` magnetic block yet: it "
+            f"would need the magnetic operators with their time-reversal "
+            f"signs and each site's moment components mapped onto "
+            f"`Phase.magnetic_symmetry` and "
+            f"`Atom.moment`, and no `.EXP` record is.  Importing its nuclear "
+            f"half would hand back a structure that looks complete while the "
+            f"magnetic contribution went unmentioned.  The numbers are on "
+            f"`model.phases`; a magCIF of the same structure reads, through "
+            f"`Structure.from_cif`")
     if chosen.kind == 4:
         raise GsasExpError(
             f"{model.path or '<model>'}: phase {chosen.number} "

@@ -40,7 +40,7 @@ restated here; a page named `x` below is `https://rietx.org/using/x.html`.
 | you are about to call rietx: entry points, constructors, the four answer types and their fields, the report | [`references/api.md`](references/api.md) | `quickstart`, `model`, `refining`, `results`, `agents` |
 | you were handed another program's input file, not a pattern | [`references/api.md`](references/api.md) § In | `recipe`, `files` |
 | a `Diagnostic` fired and you need its row — §7 the engine's own, §7g another program's project file, §7h a file you wrote back, §7i your own file as read | [`references/diagnostics.md`](references/diagnostics.md), [`references/diagnostics-projects.md`](references/diagnostics-projects.md), [`references/diagnostics-gsas.md`](references/diagnostics-gsas.md), [`references/diagnostics-reading.md`](references/diagnostics-reading.md) | `results` |
-| §7j — a magnetic `Diagnostic` fired, or `FitReport.satellites` ranked a k | [`references/magnetic.md`](references/magnetic.md) | `results` |
+| §7j — a magnetic `Diagnostic` fired, or `FitReport.satellites` ranked a k, or you were handed a magnetic structure (magCIF, TOPAS moments) | [`references/magnetic.md`](references/magnetic.md) | `results`, `files` |
 | §6 — something declined to answer: abstentions, caveats, gate failures, `best_or_none()` returning `None` | [`references/abstention.md`](references/abstention.md) | `report` |
 | §5 — you are about to quote a number: which field carries which fact, and read numbers rather than pixels | [`references/numbers.md`](references/numbers.md) | `report`, `results` |
 | §4/§4b — a judging or deliverable rule needs its measurement, before you override one | [`references/judging.md`](references/judging.md) | `report`, `qpa`, `constraints` |
@@ -454,9 +454,8 @@ protocol is not a measurement.
 
 ## The API
 
-**There is one integration surface and it is the Python API.** A caller runs a
-verb, reads the typed answer, and dumps it with `model_dump(mode="json")` when a
-file is wanted. A failure **raises**: there is no envelope and no error code.
+**There is one integration surface: the Python API.** Dump a typed answer with
+`model_dump(mode="json")`; a failure **raises**, with no envelope or error code.
 
 **A `RefinementCancelled` you did not request is not a bug in your call.** Every
 fit records itself, and a human watching one can stop it from `rietx watch`. The

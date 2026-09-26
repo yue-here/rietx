@@ -470,7 +470,14 @@ def test_every_bundled_phase_is_drawn_in_colours_that_can_be_told_apart(cif):
     """
     try:
         structure = structure_from_cif(str(DATA / cif))
-    except RuntimeError as exc:                 # a pdCIF, not a structure CIF
+    except (RuntimeError, ValueError) as exc:   # a pdCIF, not a structure CIF
+        # WP-1328 gave the reader `io/CLAUDE.md`'s refusal shape — a
+        # ValueError naming the file — where gemmi's bare `RuntimeError`
+        # used to escape, so this skip matches on the *sentence* rather than
+        # on the class: any other ValueError here is a structure CIF this
+        # test must not pass over in silence.
+        if "single data block expected" not in str(exc):
+            raise
         pytest.skip(f"{cif} is not a single-block structure file: {exc}")
     payload = s3.build(structure, phase=0)
     colours = {site["element"]: site["color"] for site in payload["sites"]}

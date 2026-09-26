@@ -158,6 +158,192 @@ spinel = rx.Phase(
 Naming the setting silences it. Files carry theirs, so a CIF or a TOPAS `.inp`
 never raises it.
 
+### A magnetic structure: reading and writing a magCIF
+
+A magnetic structure reaches you as a magCIF, and `Structure.from_cif` reads
+one. MAGNDATA, ISODISTORT, k-SUBGROUPSMAG and Bilbao's own tools all emit that
+form, and what it carries is exactly what the model stores: the operator list
+with its time-reversal signs, the moments in crystal-axis components and the
+BNS symbol.
+
+<!-- api-doc: no-exec — it reads a magCIF the reader supplies -->
+```python
+notes = []
+structure = rx.Structure.from_cif("0.642.mcif", moment_ions={"Mn1": "Mn3+"},
+                                  diagnostics=notes)
+phase = structure.phases[0]
+print(phase.space_group, phase.magnetic_symmetry.bns_number)
+print(phase.atoms[1].moment.values(), phase.atoms[1].moment.ion)
+```
+
+Four things about that read are worth knowing before you trust the answer.
+
+The nuclear space group's label comes from `_parent_space_group.name_H-M_alt`
+(a magCIF states no ordinary `_space_group_name_H-M_alt` at all, since the
+magnetic block replaces it). The IUCr underscore screw-axis spelling
+(`P 2_1/c`) is normalised to the plain one gemmi's lookup table accepts (`P
+21/c`) before the symbol is resolved, and the file's own spelling stays
+unchanged in every diagnostic. The symbol names the type, and the setting is
+checked against the file's own magnetic operators with time reversal dropped,
+because gemmi's tabulated operator table for a Hermann-Mauguin symbol can sit
+at a different origin or axis choice than a non-standard setting's own
+(measured on Ima2, space group 46), and a symbol lookup on its own would attach
+the wrong coordinate frame to a right-looking name. The atom positions refine under
+the highest tabulated group the file's atoms satisfy, and the moments always
+under the file's magnetic group. The parent is kept when it contains those
+operators and gives every listed site the same number of images as they do:
+that is a nuclear phase under the parent carrying moments under a magnetic
+group that may be a subgroup of it, Cr₂WO₆'s `Pn'nm` in `P4₂/mnm`, and
+`CIF_MAGNETIC_NUCLEAR_GROUP` says so ("positions refine under 'P 42/m n m',
+index 2 over the file's own 'P n n m'; moments under the file's magnetic
+group"). Otherwise the phase is built under the tabulated setting whose
+operations are exactly the file's own, and `CIF_MAGNETIC_NUCLEAR_SETTING` says
+which and why. `Structure.from_cif(..., nuclear_group="file")` always takes the
+file's own group, and `nuclear_group="parent"` always takes the parent and is
+refused by name where the parent cannot carry the file's atoms; the default,
+`"auto"`, is the rule above.
+That covers a symbol tabulated at another origin, and a symmetry-lowering
+magnetic group whose asymmetric unit lists one parent orbit as two sites,
+which under the parent would be one orbit counted twice. A file whose own
+group is in a setting no tabulated symbol names, an origin or axis choice
+gemmi's table does not hold, is read with that group as its operation list:
+`Phase.symmetry_operations` holds the file's operations with time reversal
+dropped, in the file's order, `Phase.space_group` holds a bracketed label
+naming the closest type (`'P -1 [unnamed in this cell]'`), and
+`CIF_MAGNETIC_NUCLEAR_SETTING` says so. Every symmetry consumer reads the list,
+never the label, and `Structure.to_cif` writes the list back. A writer whose
+format states a group only as a symbol refuses such a phase by name. A group
+whose rotations are in no tabulated orientation at all, a two-fold along a face
+diagonal for instance, is refused by name: an operation list takes its crystal
+system and cell ties from the tabulated group with the same rotations, and
+there is none.
+A `_parent_space_group.transform_Pp_abc`
+that is not the identity is a record of which setting the symbol was
+tabulated in, one every non-standard-setting MAGNDATA entry carries, and is
+not by itself a reason to refuse the file. What is refused is a genuine
+supercell, judged by the child transform's determinant and by k, never by the
+parent transform. A file with no space group this reader can resolve at all,
+neither an ordinary tag nor a magCIF parent symbol, is refused by name.
+
+The operators are stored verbatim, and `transform_BNS_Pp_abc` is not applied.
+A published structure is usually written in its own setting rather than the BNS
+standard one (Cr₂WO₆'s record carries `'b,-a,c;0,0,0'`), and that setting is
+the one its cell and coordinates are in. So the list is kept as written, the
+transform goes into `MagneticSymmetry.setting` as the record it is, and applying
+it would move the group away from the atoms beside it.
+`MagneticSymmetry.uni_number` is *derived* from the operators through spglib, so
+it is the same on both sides of a round trip.
+
+The magnetic ion is not in the file. The magnetic dictionary has no item for
+it, and MAGNDATA writes a bare `Mn` for a site that is chemically Mn³⁺, so
+without `moment_ions=` the *neutral atom's* ⟨j₀⟩ is used and
+`CIF_MAGNETIC_ION_UNCHARGED` says so. The two curves differ, and a moment
+refined under the wrong one absorbs the difference into its magnitude. A bare
+lanthanide or actinide symbol has no neutral-atom row at all, so there the
+fallback goes one step further, to the element's majority oxidation state
+that is *magnetic* (Ln³⁺, except Eu²⁺; U⁴⁺, Np⁴⁺, Pu³⁺), reporting
+`MAGNETIC_ION_ASSUMED` instead. `moment_g=` is the same shape for the Landé g
+a 4f moment needs. Where the ion itself was assumed this way, its free-ion
+Hund's-rule g_J is assumed too (magCIF has no item for g any more than it has
+one for the ion, so refusing on a quantity the file could never have carried
+either way would be the wrong-shaped fix), reporting `LANDE_G_ASSUMED`. An ion
+*stated* explicitly (`moment_ions=`) still needs `moment_g=` stated alongside
+it, unchanged: that gap is the caller's, unrelated to this default. Both
+arguments are keyed by `_atom_site_moment.label`, and a key that names no row
+of that loop is refused with the labels the file does carry, since a
+misspelled label would leave its site on the default with nothing said.
+
+All three moment forms are read. The dictionary defines the moment in
+crystal axes, in spherical coordinates and in Cartesian ones; a reader taking
+only the first would silently drop the other two. The spherical and Cartesian
+frames are the one where x ∥ a and z ∥ c*, which is the frame the ADP
+code already uses, so no second convention enters. Where a file states more than
+one form they must agree, and a file stating `_atom_site_moment.magnitude` has
+it cross-checked against the components under the cosine metric the
+dictionary defines: |m| = √(mᵀ·G·m) and not √(Σmᵢ²), which on hexagonal axes is
+29 % out and is the commonest way that line goes wrong. The check compares
+`|magnitude|` against the (always non-negative) derived norm, since a
+negative stated magnitude is a sign convention rather than a mismatch, at a
+tolerance drawn from the file's own stated precision (`magnitude_su`, an
+inline `value(su)`, or half the last printed digit when neither is given)
+rather than a fixed band, widened by each component's own imprecision
+propagated through the metric, since the derived norm is itself only as
+precise as the components it came from. A magnitude rounded to fewer
+figures than the components is read, not refused.
+
+Standard uncertainties follow the form the moment is taken from. A
+crystal-axis row keeps its own. A Cartesian row's go through the conversion,
+which is linear, so each crystal-axis esd is the Cartesian ones propagated
+through it, assuming no correlation between components, since a CIF row
+states none. A spherical row's are not propagated, because that conversion
+is nonlinear and singular on the pole, and `CIF_MAGNETIC_SPHERICAL_ESD_NOT_STORED`
+names each su that was dropped, so a component's `stderr=None` there is not
+read as "not refined".
+
+Two constructs are refused by name rather than half-read. A modulated
+structure (any `_atom_site_moment_Fourier` loop, special function, cell wave
+vector or superspace group), because reading its k = 0 amplitude alone would
+return a collinear structure for a modulated one. And a structure stated in a
+supercell of its parent, which is the generic commensurate k ≠ 0 record: the
+asymmetric unit of the magnetic group in that cell splits one *nuclear* orbit
+into several sites carrying different moments, and the model stores one moment
+per nuclear site. Both refusals name what would be needed. The k ≠ 0 test
+reduces every component modulo 1 first, because a propagation vector is only
+ever meaningful modulo the reciprocal lattice: an all-integer k such as
+(1, 1, 1) is Γ identically and reads exactly like k = 0, never as a
+supercell. The parent k is read for that test and nothing else, so it is not
+stored and not written back.
+
+`Structure.to_cif` and `Refinement.write_cif` write the same form back. The
+operator and centring loops go out verbatim, the BNS/OG metadata with them,
+and the moments in crystal-axis components with the dictionary's own
+`_su` items beside them, *not* in the `value(su)` notation every other number
+in the file uses, and for a measured reason: a refined moment's esd is routinely
+0.05-0.9 μ_B, so two significant figures of su would quote the value to one
+decimal and the number you refined would not come back. Two items have no
+magnetic-dictionary tag at all, the form-factor ion and the Landé g, so they go
+out under a namespaced `_rietx_atom_site_moment.` category; without them a round
+trip would lose which form factor the refinement used. A refinement CIF also
+carries `_atom_site_moment.magnitude_su`, the esd of the modulus, which is
+where a moment's uncertainty lives.
+
+### A magnetic phase from a TOPAS `.inp`
+
+A TOPAS `.inp` states a magnetic phase as `mag_space_group` on a `str`, with
+`mlx mly mlz` (and optionally `mg`) on each magnetic `site`. Its magnetic
+examples, and ISODISTORT's TOPAS export, often state no nuclear `space_group`
+at all. `rx.read_topas_inp` reads such a `str` as a phase. The build then takes
+the nuclear group from the magnetic one: its operators with time reversal
+dropped, under the magCIF reader's tier-2 rule above. TOPAS itself generates
+the atoms from those operators.
+
+A `mag_space_group` written as a BNS number (`62.448`, `1.1`) or an OG number
+is used as the group directly. It resolves to the operators of that number's
+standard setting, and `TOPAS_MAGNETIC_GROUP_READ` says so. A Shubnikov
+*symbol* is only kept as metadata, because nothing here parses one. The build
+refuses a phase that states moments under a symbol until you pass
+`to_structure(magnetic_symmetry=...)`.
+
+`mlx mly mlz` are components in the fractional basis,
+m = mlx·a + mly·b + mlz·c with the edges in Å. The stored
+crystal-axis moment is therefore (mlx·|a|, mly·|b|, mlz·|c|). This is a
+per-axis scale, never a rotation. It is the TOPAS Technical Reference's own
+reading, § 13: Fmagc = L·Fmag, and its `MM_CrystalAxis_Display` macro gives
+mxc = mlx·a. A file's `MM_CrystalAxis_Display` line is the number to compare
+with. On the Durham LaMnO₃ tutorial it agrees to the printed digits. It is
+also measured against TOPAS's own calculated intensities. On a monoclinic
+cell with β = 115° and a moment on all three axes, TOPAS 6's magnetic
+intensity ratios between reflections of equal d match this reading on every
+pair to four digits, and its absolute magnetic intensity gives the same |m|.
+A crystal-axis reading misses the median pair by about 58 %, and a Cartesian
+one by about 80 %. With the moment along b alone, where the three readings
+coincide, all three match, which shows the comparison can tell them apart.
+
+`mag_only` and `mag_only_for_mag_sites` switch a site's nuclear scattering off.
+The file that uses them typically restates the magnetic sites in a second
+`str`. Building that without the switch would count those sites' nuclear
+scattering twice, so it is refused by name rather than dropped.
+
 ## Instrument profiles
 
 A calibrated instrument is a file. `save_instrument_profile` writes one and
@@ -528,7 +714,7 @@ do.
 | `TopasModel.emission_lines`, `TopasModel.emission_macro`, `TopasModel.anode`, `TopasModel.wavelength` | the emission profile, as stated or as a macro named it |
 | `TopasModel.geometry`, `TopasModel.goniometer_radius_mm` | the diffractometer, where the file says |
 | `TopasModel.background_terms` | how many background coefficients were refined |
-| `TopasModel.skipped_blocks` | phase blocks that stated no name or space group, recorded whether or not a diagnostics list was passed |
+| `TopasModel.skipped_blocks` | phase blocks that stated no name, or neither a `space_group` nor a `mag_space_group`, recorded whether or not a diagnostics list was passed |
 | `TopasModel.coverage` | what the reader met and did not carry; see below |
 
 `read_fullprof_pcr` returns a `FullProfModel`:
