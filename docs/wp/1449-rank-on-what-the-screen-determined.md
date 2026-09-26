@@ -364,8 +364,8 @@ the six rank rows skipped with named units, or passing if the runner finished.
   the nightly dispatched with `full_macos`.
 - The screen's answer depends on a caller's protocol (seeded widths, trimmed
   range). Wiring it into `index_pattern` has to supply that protocol itself.
-- The corpus is high-symmetry: ten of the eleven datasets have at most two
-  free metric parameters, so the table says nothing yet about monoclinic or
+- The corpus is high-symmetry: all eleven datasets have at most two free
+  metric parameters, so the table says nothing yet about monoclinic or
   triclinic cells.
 - The probe's truth check matched axes and ignored centring, and flagged
   corundum's P descriptions of the R metric as truths. They are not.
