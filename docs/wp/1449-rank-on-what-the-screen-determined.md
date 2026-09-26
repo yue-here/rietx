@@ -101,8 +101,45 @@ extracted text.
   in the three has an extinction-symbol step.
 
 So the practice found so far sorts on a lattice-only figure and leaves the
-confound open. The remaining questions need the paywalled papers, listed in
-the handover entry.
+confound open.
+
+**Five published papers were read on 2026-09-27**, from the synced Zotero
+library (`~/Zotero yue-here/`). Each quote below was checked against the
+extracted text.
+
+- **The figure `m_rev` implements names this gap itself.** Oishi-Tomiyasu
+  (2013, *J. Appl. Cryst.* **46**, 1277-1282) computes N^cal from the Bravais
+  lattice alone: "only information about Bravais lattices was used to provide
+  a set of computed lines, and systematic absences were not considered. This
+  might have adversely affected in particular the results of M_n^Rev because
+  M_n^Rev is more sensitive to extinct reflections" (§3). WP-1446's corundum
+  row is that sentence measured.
+- **Conograph** (Oishi-Tomiyasu 2014, *J. Appl. Cryst.* **47**, 593-598) lists
+  cells with identical computed lines (Mighell & Santoro 1975) and leaves
+  their order to the 2013 figures. Its computed lines are Bravais-only.
+- **DICVOL** (Boultif & Louër 1991, 2004) builds parsimony into the search
+  order: high to low symmetry, smallest volume first, "the volume is inversely
+  proportional to the figure of merit" (1991, p. 992). A later, lower-symmetry
+  search is bounded by the volume of a solution already found (2004, §4.1).
+  Predicted lines apply no extinction, and space-group derivation is a
+  separate later stage (2004, §3.3).
+- **EXPO's WRIP20 orders on the extinction verdict**, and is the precedent
+  this WP asked for (Altomare *et al.* 2019, ITC Vol. H ch. 3.4, eq. 3.4.5;
+  the figure is Altomare *et al.* 2009). WRIP20 = RAT_Rp² · RAT_Ind · RAT_Pres
+  · w_u · RAT_M20^½. For the extinction symbol with the highest probability,
+  PERC_Pres = Σ_Pres mult / Σ_all mult is the share of reflections it leaves
+  present, and RAT_Pres = (PERC_Pres)_min / PERC_Pres. The probability comes
+  from a statistical analysis of normalised intensities (Altomare *et al.*
+  2004, 2005), and Rp from a Le Bail fit in the highest Laue group with no
+  extinctions. In the chapter's Example 3, "the classical M20 figure of merit
+  was not able to pick up the solution" and WRIP20 did. In Example 4 a
+  hexagonal/orthorhombic ambiguity was settled by selecting "the
+  higher-symmetry one", with no extinction test.
+
+So the literature has both halves. The reversed figure's author names the
+extinction blind spot, and EXPO answers it by scoring each cell under its most
+probable extinction symbol. Still unread: Markvardsen *et al.* (2001) and
+Santoro & Mighell (1972), neither in the library.
 
 **The rank row read the machine, and now waits for a finished search.**
 `test_brucites_truth_is_not_ranked_first` turned the Linux nightly red five
@@ -137,17 +174,21 @@ search: a local run, or the nightly dispatched with `full_macos`.
 - Does Oishi-Tomiyasu (2013, *J. Appl. Cryst.* **46**, 1277-1282) address the
   space-group-extinction confound in `M^Rev` directly, and does she prescribe
   anything for it? The blind spot is the same one that sank WP-1446.
+  *Answered 2026-09-27: she names it and prescribes nothing (Context).*
 - Conograph (Oishi-Tomiyasu 2014) — how does it order candidates that stand in a
   derivative relation, and does it defer the question to a later stage?
-  *Partly answered 2026-09-27 from the preprints (Context): it sorts on a
-  figure of merit and names no later stage. The 2014 paper is unread.*
+  *Answered 2026-09-27: it leaves the order to the 2013 figures and names
+  no later stage (Context).*
 - What do DICVOL and its dichotomy papers (Louër & Boultif) say about returning
   a supercell, and do they rank on volume parsimony explicitly?
+  *Answered 2026-09-27: parsimony is the search order itself (Context).*
 - Is there published practice for ordering on the **extinction symbol's** verdict
   rather than on the lattice figures, or is the sequential workflow universal?
-  *None in the three preprints (Context).*
+  *Answered 2026-09-27: EXPO's WRIP20 does it (Context).*
 - Mighell's derivative-lattice work (NIST): does it offer a criterion for
   choosing between a lattice and its derivative from powder data alone?
+  *Unread: Santoro & Mighell (1972, Acta Cryst. A28, 284-287) is not in
+  the library.*
 
 ## Non-goals
 
@@ -169,7 +210,9 @@ search: a local run, or the nightly dispatched with `full_macos`.
       engine now files an incomplete unit by whether its budget had expired,
       and `incomplete_diagnostic` words each cause with its own remedy. The
       cause lives in the message only, so `_clock_cut` still compares clocks.
-- [ ] Expand Context from the corpus, answering the questions above.
+- [x] Expand Context from the corpus, answering the questions above
+      (2026-09-27). Eight papers read; Markvardsen *et al.* (2001) and
+      Santoro & Mighell (1972) are not in the library.
 - [ ] Decide where the screen's verdict enters: a re-rank of the reported list
       after validation, or a caveat that reorders, or a reported field that
       leaves the order alone. **Cost is the deciding input** — the screen is
