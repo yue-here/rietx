@@ -1104,6 +1104,8 @@ class FreedComparison(Base):
     freed: list[FreedParameter]
     n_added: int
     n_points: int
+    #: the unreduced Σw·Δ² :func:`~rietx.report.delta_bic` takes, which is
+    #: each fit's ``Statistics.chi2`` times its own N − P
     chi2_restricted: float
     chi2_full: float
     esd_inflation: float | None = None

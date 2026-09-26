@@ -1028,12 +1028,15 @@ CLAIMS: tuple[Claim, ...] = (
         "a physics guard, on real data — the matrix's canonical "
         "inadmissibility row",
         reference="**no accuracy claim.** Hamilton at alpha = 0.05 and "
-                  "Delta BIC > 100 both pass; the strain-variance cone "
+                  "Delta BIC both pass at N/f^2 (WP-1417), while at most one "
+                  "of the four S_HKL coefficients reaches |t| = 2; the "
+                  "strain-variance cone "
                   "sigma^2(M) >= 0 fails on 12 of 43 reflections, so "
                   "STEPHENS_STRAIN_NOT_POSITIVE fires and no S_HKL is "
                   "quotable.  The r ~ 0.65 March coefficient is checked "
                   "against WP-0310's own measurement on the same material",
-        measured="Rwp 18.55 -> 17.90 %, Delta BIC +488, 3 parameters added, "
+        measured="Rwp 18.55 -> 17.90 %, Delta BIC +15.5 at N/f^2 (+592 at "
+                 "raw N), 3 parameters added, "
                  "anisotropy 3.45x on an injected 3.46x",
         starts=4,
         diagnostics=("STEPHENS_STRAIN_NOT_POSITIVE",),
@@ -1051,19 +1054,19 @@ CLAIMS: tuple[Claim, ...] = (
     ),
     Claim(
         "test_acceptance_stephens",
-        "test_corundum_block_is_inert_and_bic_says_so_where_hamilton_does_not",
+        "test_corundum_block_is_inert_and_hamilton_blesses_it_only_at_raw_n",
         "qarr", ("characterisation", "identity"),
-        "freeing the block on an isotropic specimen is inert, and the two "
-        "statistics disagree about whether that is fine — which is why the "
-        "policy quotes Delta BIC and not Hamilton",
-        reference="Hamilton's R-ratio test at alpha = 0.05 **passes** a "
-                  "0.13 % chi^2 improvement from three inert parameters, "
-                  "exactly as it passes brucite's real 6.9 % one: its "
-                  "threshold does not grow with the channel count, and these "
-                  "patterns have 7251 channels.  Delta BIC separates them "
-                  "(+488 vs -17).  The certificate-grade c/a is asserted not "
-                  "to move (rel=1e-4)",
-        measured="Delta BIC -17 while Hamilton says justified; c/a unmoved",
+        "freeing the block on an isotropic specimen is inert, and both "
+        "statistics say so at N/f^2 while Hamilton at the raw channel count "
+        "blesses it",
+        reference="Hamilton's R-ratio test at alpha = 0.05 and raw N "
+                  "**passes** a 0.16 % chi^2 improvement from three inert "
+                  "parameters, exactly as it passes brucite's 8.2 % one, on "
+                  "7251 channels.  At N/f^2 (issue #270, WP-1417) both tests "
+                  "refuse it: Delta BIC -17.8 against brucite's +15.5.  The "
+                  "certificate-grade c/a is asserted not to move (rel=1e-4)",
+        measured="Delta BIC -17.8 at N/f^2 and Hamilton refuses; Hamilton "
+                 "at raw N says justified; c/a unmoved",
     ),
     Claim(
         "test_acceptance_stephens",

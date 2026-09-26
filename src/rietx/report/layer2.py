@@ -142,6 +142,10 @@ def hamilton_justified(chi2_restricted: float, chi2_full: float,
     compared against F(n_added, N − P_f) at ``alpha``.  Returns True when the
     improvement justifies the parameters.
 
+    Both χ² are the unreduced sums Σw·Δ².  ``Statistics.chi2`` is reduced,
+    over N − P, so a caller holding two results multiplies each by its own
+    N − P first; the reduced pair biases F by about −1.
+
     ``n_effective`` is the independent-observation count to test at in place
     of ``n_points`` — :func:`~rietx.optimize.statistics.effective_sample_size`
     of the fit's ``esd_inflation`` (#270).  The statistic is then evaluated
@@ -171,6 +175,11 @@ def delta_bic(chi2_restricted: float, chi2_full: float,
     """BIC difference (restricted − full); positive favours the fuller model.
 
     ΔBIC = N·ln(χ²_r/χ²_f) − n_added·ln(N)  (Schwarz 1978, Gaussian errors).
+
+    Both χ² are the unreduced sums Σw·Δ².  ``Statistics.chi2`` is reduced,
+    over N − P, and the reduced pair's ratio carries (N − P_f)/(N − P_r),
+    about −n_added of ΔBIC at raw N.  :func:`compare_freed` does the
+    conversion for two fits.
 
     Schwarz's N is a count of **independent** observations.  ``n_effective``
     replaces it in both terms — pass
@@ -284,14 +293,19 @@ def _freed_comparison(restricted: RefinementResult, held: dict[str, float],
              else (p.value - start) / p.stderr)
         freed.append(FreedParameter(path=p.path, held_at=start, value=p.value,
                                     esd=p.stderr, t_ratio=t))
+    # ``Statistics.chi2`` is reduced, over N − P, and the two P differ by
+    # n_added: its ratio would carry (N − P_f)/(N − P_r), about −n_added of
+    # ΔBIC at raw N.  delta_bic wants the sums.
+    chi2_r = rs.chi2 * max(rs.n_points - rs.n_free_parameters, 1)
+    chi2_f = fs.chi2 * max(fs.n_points - fs.n_free_parameters, 1)
     n_eff = effective_sample_size(rs.n_points, rs.esd_inflation)
     return FreedComparison(
         freed=freed, n_added=n_added, n_points=rs.n_points,
-        chi2_restricted=rs.chi2, chi2_full=fs.chi2,
+        chi2_restricted=chi2_r, chi2_full=chi2_f,
         esd_inflation=rs.esd_inflation, n_effective=n_eff,
-        delta_bic=delta_bic(rs.chi2, fs.chi2, rs.n_points, n_added,
+        delta_bic=delta_bic(chi2_r, chi2_f, rs.n_points, n_added,
                             n_effective=n_eff),
-        delta_bic_raw_n=delta_bic(rs.chi2, fs.chi2, rs.n_points, n_added))
+        delta_bic_raw_n=delta_bic(chi2_r, chi2_f, rs.n_points, n_added))
 
 
 def _significant(templates, name: str) -> tuple[float, float] | None:

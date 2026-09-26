@@ -202,8 +202,9 @@ N/f², with f the fit's own `esd_inflation`, all four turn negative. For one
 parameter that count makes ΔBIC close to t² − ln N_eff, so the verdict and the
 esd agree. Over 27 last-freed parameters across the acceptance fixtures, N/f²
 refused every |t| < 2.3 and admitted every |t| ≥ 2.6. The rule this replaced
-was measured at 7251 channels, where Hamilton's test blessed a 0.13 % χ² gain
-that was physically inert.
+was measured on a 7251-channel corundum pattern, where Hamilton's test at raw N
+blessed an inert Stephens block's 0.16 % χ² gain. At N/f² both tests refuse
+it.
 
 `suggest()` predicts ΔBIC at N/f² before you free anything. After the fit,
 compare the two fits:

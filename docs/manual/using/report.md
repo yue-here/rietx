@@ -634,7 +634,7 @@ set. For one parameter the two agree, ΔBIC being close to t² − ln N_eff, so 
 parameter within 1σ of where the restricted fit held it cannot be decisive. At
 raw N it can. On a LaB6 fit whose model lacks the data's Lorentzian width
 (21 400 channels, Durbin-Watson 0.10, f = 6.07), freeing the boron Biso gave
-t = +1.58, raw-N ΔBIC +86 and ΔBIC −3.8 at N_eff 580.
+t = +1.58, raw-N ΔBIC +87 and ΔBIC −3.7 at N_eff 580.
 
 | Field | Is | Reads as |
 |---|---|---|
