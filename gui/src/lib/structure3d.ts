@@ -554,8 +554,13 @@ export function buildScene(geometry: Geometry, options: SceneOptions): Scene {
     return { index, triangles, normals, color: rgb(color), centroid };
   });
   // the fit reads positions and ball sizes only, so neither a mode nor a
-  // legend click moves the zoom; the depth range holds whatever is drawn
-  const points = [...geometry.corners, ...geometry.atoms.map((a) => a.pos)];
+  // legend click moves the zoom; the depth range holds whatever is drawn.  It
+  // takes the atoms the default picture can draw: a hidden polyhedron's own
+  // atoms would halve LaB6's picture at a bond tolerance of 1.00
+  const byDefault = new Set(geometry.polyhedra.filter((p) => p.drawn_by_default)
+    .flatMap((p) => p.vertices));
+  const points = [...geometry.corners, ...geometry.atoms
+    .filter((a, k) => !a.vertex_only || byDefault.has(k)).map((a) => a.pos)];
   const lo = [0, 1, 2].map((k) => Math.min(...points.map((p) => p[k])));
   const hi = [0, 1, 2].map((k) => Math.max(...points.map((p) => p[k])));
   const center = [0, 1, 2].map((k) => (lo[k] + hi[k]) / 2);

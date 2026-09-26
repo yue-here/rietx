@@ -506,6 +506,19 @@ describe("the polyhedra", () => {
     expect(caption(geo, "ball", 1, [0])).toContain("4 atoms in the cell + 1 image outside it");
   });
 
+  it("fit the zoom to what the default picture can draw", () => {
+    // the hidden polyhedron's own vertex, far out
+    const geo = tetrahedron({ drawn_by_default: false });
+    geo.atoms[4] = { ...geo.atoms[4], vertex_only: true, pos: [40, 40, 40] };
+    const radius = (polyhedra: number[]) => buildScene(geo, { mode: "ball", polyhedra }).radius;
+    expect(radius([])).toBeLessThan(10);
+    // switching it on does not move the zoom
+    expect(radius([0])).toBe(radius([]));
+    // and a vertex of a shell drawn by default is in the fit
+    geo.polyhedra[0].drawn_by_default = true;
+    expect(radius([0])).toBeGreaterThan(30);
+  });
+
   it("bring their faces and edges, and take their centre's sticks away", () => {
     const geo = tetrahedron();
     const bare = buildScene(geo, { mode: "ball" });
