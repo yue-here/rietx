@@ -141,6 +141,48 @@ extinction blind spot, and EXPO answers it by scoring each cell under its most
 probable extinction symbol. Still unread: Markvardsen *et al.* (2001) and
 Santoro & Mighell (1972), neither in the library.
 
+**What the screen decides, measured 2026-09-27** (`[dev]`, macOS arm64; probes
+in the handover entry). Swapping a panel member for its class-level version
+fixes nothing on brucite. The screen gives the truth and the a × 2 supercell
+the same verdict, `P - - -`, so their `predicted_seen_fraction` stays 0.86
+against 0.32. What separates the populations is WP-1446's pairwise question
+asked under the child's best extinction class and judged against chance.
+For each pair where the child is a derivative supercell of the parent, the
+child's extras are the lines its best class allows and the parent does not
+predict. The chance rate p0 is the share of the observed Q range that lies
+inside some observed line's matching window. A child whose extras are seen no
+more often than p0 predicts (one-sided binomial p ≥ α) is refuted.
+
+| dataset | p0 | a truth as the child | wrong children refuted |
+|---|---|---|---|
+| brucite | 0.105 | none | a × 2 (3 of 59 seen), c × 2 under `P 63 - -` (2 of 22), √3 a, and their products; p ≥ 0.60 |
+| corundum | 0.117 | R truth under `R - c -`: 8 of 18 seen, p = 5.0e-4, **kept** | the 8.24 Å cells, and the P descriptions of the R metric; p ≥ 0.10 |
+| corundum, shift declared | 0.117 | the same, p = 5.0e-4, **kept** | the 8.24 Å cells; p ≥ 0.79 |
+| zincite | 0.071 | none | ten supercells; p ≥ 0.042 |
+| zircon | 0.164 | none | ten P supercells of the I truth; p ≥ 0.46 |
+| fluorite | 0.042 | none | one I cell (0 of 8 seen) |
+| LaB6 | 0.061 | truth in a tetragonal setting: 9 of 12 seen, p = 2.1e-9, **kept** | none |
+| magnetite, LaB6 calibrated, NAC, FAP | 0.054-0.918 | none | none |
+
+Every truth tested as a child sits at p ≤ 5.0e-4 and every refuted child at
+p ≥ 0.042, so a conventional α = 0.01 falls in the gap without being fitted to
+it. At lattice level, without the class, corundum's truth is marginal. On a
+line-rich pattern p0 is high (NAC 0.918, FAP 0.352), so the test has little
+power there and leaves the order alone. Three limits of the measurement: the
+candidates are the local acceptance run's finished searches; the screen ran
+under the manual's protocol, since without seeded widths it refutes corundum's
+own glide; and the window outside brucite and corundum is `match_window` under
+a default spec.
+
+**The proposed seam, awaiting the maintainer's decision.** After validation,
+screen each reported child that stands in such a pair, and order a refuted
+child directly below its parent with a caveat naming the parent and the counts.
+Every other candidate keeps today's order, and `best_or_none()` is unchanged.
+The screen cost 0.1-1.3 s per candidate on these patterns, against searches of
+220-480 s. Open: α; how `index_pattern` chooses the screen's 2θ range, since
+the manual's 20-90° is a caller's choice and no rule for it is measured; and
+what a bare peak list does, having no pattern to screen.
+
 **The rank row read the machine, and now waits for a finished search.**
 `test_brucites_truth_is_not_ranked_first` turned the Linux nightly red five
 nights running, 22 to 26 September, each time as `XPASS(strict)`. The search
