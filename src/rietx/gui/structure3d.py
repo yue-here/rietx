@@ -636,7 +636,9 @@ def _expand(ph, phase: int, sg, basis: np.ndarray, astar: np.ndarray,
     a **boundary** duplicate is the same atom seen at the opposite face and is
     there so a corner atom appears at all eight corners.  :func:`_partners` adds
     a third kind under the same flag — a bonded neighbour just outside the cell —
-    for the same reason: it is an image, not a cell member.
+    for the same reason: it is an image, not a cell member.  :func:`_polyhedra`
+    adds a fourth, a ligand no stick reached, flagged ``vertex_only`` as well,
+    and the client draws it only while one of its polyhedra is drawn.
 
     The last item returned is every image before the ``max_atoms`` trim, since
     a polyhedron's ligands are searched over the whole orbit.
