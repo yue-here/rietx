@@ -23,7 +23,9 @@ Issue #270 (2026-09-05).
 ΔBIC = N·ln(χ²_r/χ²_f) − n_added·ln(N)
 ```
 
-with N the raw channel count. Schwarz 1978 for N independent Gaussian
+with N the raw channel count. *Superseded in part 2026-09-26: since PR #431
+both callers in the fit path charge it at N_eff = N/f² (§ Handover log,
+2026-09-24); the free functions still default to raw N.* Schwarz 1978 for N independent Gaussian
 observations, correctly implemented, and its docstring says so. It feeds
 `strategy/suggest.py::_predicted_delta_bic` (with the residual row count as
 N) and so `SuggestedAction.delta_bic`, which reaches the agent as "next:
@@ -95,15 +97,6 @@ shipped acceptance fixtures, since the issue's data are withheld.
 Not #219 (1339). That one is about *where* Δχ² lives; this is about N in the
 penalty. Same family, different mechanism, different fix.
 
-### Inherited
-
-- **2026-09-23, from the issue triage (issue #270).** The reporter claimed
-  this on the thread and opened PR #431 the same day ("ΔBIC is charged at
-  the independent-observation count N/f², measured against the
-  alternative"). Its penalty takes a stand on this WP's open estimator
-  question, so the review reads it against § Context's recommendation.
-  Reviewing it is `/pr-review`'s.
-
 ## Non-goals
 
 - Hamilton's test itself, and `hamilton_justified`'s threshold.
@@ -117,8 +110,9 @@ penalty. Same family, different mechanism, different fix.
       blesses any improvement; the parameter's esd and `esd_inflation`
       outrank both statistics. Paid for by a cut, per root CLAUDE.md § skill.
 - [ ] Layer 2 carries the t-ratio of a freed parameter beside the ΔBIC of
-      adding it, and `suggest()`'s predicted ΔBIC says it is raw-N; the
-      declared field's writer named at review (1076).
+      adding it; the declared field's writer named at review (1076). (The
+      `suggest()` half, the predicted ΔBIC saying which N it is charged at,
+      landed in PR #431.)
 - [x] Measure both effective-N estimators on every acceptance fixture and on
       the issue's shape (one occupancy DOF, synthetic if need be); the table
       in the handover decides whether `delta_bic` takes an `n_effective`.
