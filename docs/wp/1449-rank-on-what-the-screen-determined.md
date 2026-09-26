@@ -249,9 +249,12 @@ search: a local run, or the nightly dispatched with `full_macos`.
       Measured 2026-09-26 on NAC: dichotomy ran 0.26 s over 0 boxes, and the
       message said it "did not finish cubic within 300 s per system" and
       suggested raising `budget_seconds`, which would change nothing. Each
-      engine now files an incomplete unit by whether its budget had expired,
-      and `incomplete_diagnostic` words each cause with its own remedy. The
-      cause lives in the message only, so `_clock_cut` still compares clocks.
+      engine now files an incomplete unit under one of three causes (the
+      cancel token, its own budget, a size cap), and `incomplete_diagnostic`
+      words each with its own remedy. The cause lives in the message only, so
+      `_clock_cut` still compares clocks. Declined from the review: a unit
+      that hit a cap and then ran out of time reads as the clock, and svd's
+      retry discards its own completeness flag; both predate this WP.
 - [x] Expand Context from the corpus, answering the questions above
       (2026-09-27). Eight papers read; Markvardsen *et al.* (2001) and
       Santoro & Mighell (1972) are not in the library.

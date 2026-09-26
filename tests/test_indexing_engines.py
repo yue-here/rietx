@@ -681,6 +681,24 @@ def test_an_unfinished_search_says_so_rather_than_reporting_nothing_found():
     assert message.suggestion.startswith("raise budget_seconds")
 
 
+def test_a_search_the_ceiling_stopped_does_not_blame_its_own_budget():
+    """The whole-run ceiling is a cancel token, so a larger ``budget_seconds``
+    changes nothing on a unit it cut, and the message says so (WP-1449)."""
+    from rietx.indexing.engines import Deadline
+
+    peaks, _cell = synthetic_peaks("orthorhombic")
+    result = search_dichotomy(peaks, spec=spec_for(
+        "orthorhombic", min_d_axis=2.0, max_d_axis=20.0, max_volume=8000.0,
+        budget_seconds=30.0), cancel=Deadline(0.5))
+    assert result.search_complete.get("orthorhombic") is False
+    message = next(d for d in result.diagnostics
+                   if d.code == "INDEX_SEARCH_INCOMPLETE")
+    assert "by the run's ceiling or a cancel" in message.message, message.message
+    assert "within" not in message.message, message.message
+    assert "total_budget_seconds" in message.suggestion
+    assert "raise budget_seconds" not in message.suggestion
+
+
 def test_a_restricted_search_reports_only_the_systems_it_searched():
     """The engine never concludes anything about systems it did not look at —
     WP-1022's withdrawn-claim lesson, one level down: a low score under a

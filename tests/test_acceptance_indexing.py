@@ -158,6 +158,8 @@ def _clock_cut(res) -> list[str]:
     counts too.
     """
     budget = float(res.provenance.notes["budget_seconds"])
+    if budget <= 0.0:
+        return []           # ``Budget``'s "no limit": no clock can cut a unit
     systems = set(res.systems_searched)
     return sorted(key.removesuffix(".seconds")
                   for key, seconds in res.engine_stats.items()
@@ -2552,14 +2554,18 @@ def test_impurity_lines_cost_the_certificate_its_grade_long_before_its_rank(
                  "caveats": set(truth.confidence_caveats),
                  "injected": len(injected)})
 
-    _skip_unless_finished(*searches)
     for k, runs in seen.items():
         for r in runs:
-            # the sharp one: an injected line is never absorbed into the cell
+            # the sharp one: an injected line is never absorbed into the cell —
+            # a claim about what was found, so it does not wait for the clock
             assert r["n_indexed"] == n_clean, (
                 f"k={k}: the truth indexed {r['n_indexed']} of {r['n_lines']} — "
                 f"it should index its own {n_clean} lines and no impurity")
             assert r["n_lines"] == n_clean + k
+
+    _skip_unless_finished(*searches)
+    for k, runs in seen.items():
+        for r in runs:
             assert r["rank"] == 1, f"k={k}: truth ranked {r['rank']}"
 
     # …so the grade is decided by 25/(25+k) against the 0.9 bar, and nothing else

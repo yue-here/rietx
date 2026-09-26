@@ -596,6 +596,7 @@ def search_dichotomy(peaks: PeakList, *, spec: SearchSpec | None = None,
 
     incomplete: list[str] = []
     capped: list[str] = []
+    stopped: list[str] = []
     raw: list[EngineCandidate] = []
     for system in systems:
         # a system this engine never *started* is not claimed: it stays out of
@@ -624,9 +625,15 @@ def search_dichotomy(peaks: PeakList, *, spec: SearchSpec | None = None,
         result.stats[f"{system}.boxes"] = float(n_boxes)
         result.stats[f"{system}.rows_per_box"] = round(n_rows / max(n_boxes, 1), 1)
         if not complete:
-            # a unit its budget did not stop hit a size cap, where more
-            # time changes nothing (``incomplete_diagnostic``)
-            (incomplete if budget.expired() else capped).append(system)
+            # the token (the run's ceiling or the caller) outranks the
+            # unit's own clock, and a unit neither stopped hit a size cap,
+            # where more time changes nothing (``incomplete_diagnostic``)
+            if cancel is not None and bool(cancel):
+                stopped.append(system)
+            elif budget.expired():
+                incomplete.append(system)
+            else:
+                capped.append(system)
         if progress is not None:
             progress.end(f"dichotomy:{system}", engine="dichotomy",
                          system=system, n_candidates=len(found),
@@ -647,10 +654,10 @@ def search_dichotomy(peaks: PeakList, *, spec: SearchSpec | None = None,
     result.stats["shift_allowance_deg"] = round(allowance, 5)
     if assumed:
         result.diagnostics.append(shift_allowance_diagnostic(allowance))
-    if incomplete or capped:
+    if incomplete or capped or stopped:
         result.diagnostics.append(
             incomplete_diagnostic("dichotomy", incomplete, spec.budget_seconds,
-                                  capped))
+                                  capped, stopped))
     return result
 
 
