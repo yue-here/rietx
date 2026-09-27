@@ -196,7 +196,7 @@ gh run list --workflow ci.yml --limit 10 --json headBranch,conclusion,createdAt,
 
 ## Handover log
 
-- **2026-09-27** — Created by a session the maintainer asked to find where
+- **2026-09-27** — Created by the session the maintainer asked to find where
   the repo's CI and merge drag comes from. The docs-only skip was a
   regression: WP-1003 removed it for a reason that a summary check answers.
   The measurements above are that session's, taken from `gh run list`, the
