@@ -1167,3 +1167,5 @@ work holds up. `/wp-lanes` runs the selective policy in a real WP session, and
 
 Whether `/wp-start` step 6b takes the rule waits for a few rows. Until then
 the policy lives only in `/wp-lanes`.
+[WP-1903](../wp/1903-the-lane-trial-decides.md) makes the decision once three
+rows are in.
