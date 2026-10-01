@@ -31,6 +31,91 @@ monochromator sets $K = 1/(1 + \cos^2 2\theta_m)$ {cite}`itc-c,azaroff1955`. The
 familiar 26.6° there is a Cu number and not a property of the graphite
 crystal.
 
+### The time-of-flight Lorentz factor
+
+A bank that separates reflections by arrival time rather than by angle has a
+different Lorentz factor, and it is not {eq}`corr-lp` with a substitution
+{cite}`larson2004`:
+
+```{math}
+:label: corr-lorentz-tof
+
+L_{\text{TOF}} \;=\; d^{4} \sin\theta_{\text{bank}} .
+```
+
+{source}`rietx.model.forward_tof.CompiledTOFModel.lorentz`
+
+Two things about it are commonly got wrong. The angle is the bank's, fixed,
+the same for every reflection in the histogram, not a per-reflection $\theta$,
+so on a single bank $\sin\theta_{\text{bank}}$ is exactly degenerate with
+the phase scale, and it earns its place only across the banks of one
+instrument, where the ratio is what lets one set of scales fit all of them.
+And the $d^4$ is steep: over the decade in $d$ a bank typically covers it
+spans four orders of magnitude, which is why an error of one in the exponent
+shows up as a wrong $B_{\text{iso}}$ long before it shows up as a wrong cell.
+$K = 1$ on this arm as on every neutron source, so no polarisation factor
+multiplies it.
+
+(sec-tof-spectrum)=
+## The incident spectrum of a time-of-flight bank
+
+A white beam delivers a different number of neutrons at every flight time, so
+a histogram that has not been divided by a vanadium measurement carries the
+moderator's own output as a smooth envelope over its Bragg peaks. GSAS records
+that envelope in an instrument-parameter file: the `ITYP` record says which of
+five functions was fitted to it, the `ICOFF` block carries the coefficients
+{cite}`larson2004`. Type 1 (the one two of the three real files reached here
+declare) is a sum of exponentials of the flight time $T$ in
+milliseconds:
+
+```{math}
+:label: corr-ityp1
+
+I_i(T) \;=\; P_1 \;+\; \sum_{k=1}^{5} P_{2k}\,
+              \exp\!\left(-P_{2k+1}\,T^{k}\right)
+```
+
+{source}`rietx.model.tof_spectrum.incident_spectrum`
+
+with type 2 replacing the $k=1$ term by a Maxwellian
+$P_2\exp(-P_3/T^2)/T^5$, and types 3–5 twelve-term Chebyshev polynomials of
+the first kind in $X = 2/T - 1$ (or $X = T/10$ for type 5). The millisecond is
+the trap: everything else on this arm is microseconds, and in µs the
+Chebyshev argument leaves its orthogonal range by three orders.
+
+The first four powers are Von Dreele, Jorgensen and Windsor's original series
+{cite}`vondreele1982`. The manual states eleven coefficients, but its printed
+ladder of exponents stops before the fifth pair. That exponent, 5, was
+established by conformance, not read: GSAS-II 5.8.2 was run as a black box on
+synthetic coefficient sets, and the exponent fitted to its computed spectrum
+is 5.000000, with the root-mean-square residual doubling at a shift of
+about $10^{-15}$. The strict file reader still refuses a non-zero
+$P_{10}$ or $P_{11}$, because it holds to the documented layout. The legacy
+LANSCE reader in [](../reference/instrument-files.md#legacy-lansce-layout) passes
+the pair through.
+
+Whether a file carries one is a fact about the file and not about the
+technique. ISIS GEM writes `ITYP 0` on all six banks (no spectrum, because
+its reduction already divided by vanadium), and so do the Mantid reductions
+POWGEN and NOMAD use; a LANSCE-style file writes `ITYP 1` with a full `ICOFF`
+block, and its data still carries the envelope. `ITYP 0` is the default, and a
+bank that declares it multiplies by nothing at all.
+
+Where the factor goes differs from GSAS deliberately. GSAS divides the
+observed counts by $I_i$ and the channel width; `rietx` leaves the data as
+the file gave it and multiplies the calculated Bragg intensity instead, per
+channel, so every weight stays the data's own $\sigma$ and $R_{wp}$ is
+computed against counts a person can go and look at. The background takes no
+factor: it is fitted in the observed space, so whatever the spectrum does to it
+is already in the coefficients the background refines.
+
+Leave the coefficients held. A smooth envelope in $\lambda$ and an isotropic
+displacement parameter are the same shape (that degeneracy is exactly why the
+correction has to be *right* rather than merely flexible), so freeing them
+against an unknown structure moves $B_{\text{iso}}$ rather than measuring the
+spectrum. Freeing them on a standard, where $B_{\text{iso}}$ is known, is how
+the file's own calibration gets checked.
+
 ## Attenuation coefficients
 
 Specimen absorption needs $\mu$, computed from the refined cell contents
@@ -155,6 +240,49 @@ Biso shift
 capillary absorption biases Biso low by that much. It is also why $\mu R$ is a
 plain float and never refinable: a free $\mu R$ is an exactly singular direction
 in the normal equations, rather than a merely correlated one.
+
+### Absorption across a time-of-flight bank
+
+$\mu$ is a function of $\lambda$ for a neutron, because absorption follows the
+$1/v$ law while scattering does not {cite}`sears1992`:
+
+```{math}
+:label: corr-mu-neutron-tof
+
+\mu(\lambda)\ [\mathrm{cm}^{-1}] \;=\; \sum_i n_i
+   \left[\sigma_{\mathrm{abs},i}\frac{\lambda}{1.798\,\text{Å}}
+   + \sigma_{\mathrm{coh},i} + \sigma_{\mathrm{inc},i}\right] \Big/ V
+```
+
+{source}`rietx.model.tof_spectrum.neutron_attenuation_terms`
+
+so $\mu$ is exactly affine in $\lambda$, and on a fixed-angle bank
+$\lambda = 2d\sin\theta_{\text{bank}}$, one wavelength per reflection. The
+cylinder transmission factor {eq}`corr-rouse` is then evaluated per reflection at
+its own $\mu R$, which is where GSAS evaluates it too: the manual's absorption
+parameter for a flight-time histogram is written $A_B = \mu R/\lambda$
+precisely because it is $\mu R$ *per ångström* that is constant across a bank
+{cite}`larson2004`.
+
+Three consequences worth stating, because none of them has a
+constant-wavelength counterpart:
+
+* It is computed, never refined. The manual's own warning (that the
+  correction is indistinguishable from thermal motion and should not be
+  refined) applies with more force here, not less. A scalar
+  `Geometry.mu_r` is refused on a bank for the same reason: it is a claim at
+  one wavelength. Declare `capillary_radius_mm` and let the composition
+  supply $\mu$.
+* The correction does not disappear into the scale. On a
+  constant-wavelength capillary {eq}`corr-rouse` factors exactly into a constant
+  times $\exp(c\sin^2\theta)$, so omitting it moves $B_{\text{iso}}$ and
+  leaves $R_{wp}$ untouched. Here $\theta$ is fixed and $\mu R$ varies, so the
+  correction has a shape in $d$ that neither the scale nor $B_{\text{iso}}$
+  reproduces: measured on a synthetic Co capillary, $\mu R$ 0.13 to 0.63,
+  refining with it off cost $R_{wp}$ 0.0123 → 0.0452 and moved
+  $B_{\text{iso}}$ from 0.498(1) to 0.058(11) Å² against a generating 0.5.
+* The Rouse domain has two ends. $\mu R \le 1$ can hold at the short-$\lambda$
+  end of a bank and fail at the long one; the result reports the pair.
 
 ## Flat-plate absorption
 
@@ -324,6 +452,38 @@ CaF₂'s reflections run to $x = 6.5$ at the answer. Until 1.10, rietx used
 GSAS-II's stepped pair, and that fit stopped with one reflection on the step.
 CaF₂'s esd then depended on whether the solver's last Jacobian straddled it:
 0.21 wt % on one platform and 2.24 on another.
+
+### Extinction across a time-of-flight bank
+
+{eq}`corr-sabine` and {eq}`corr-sabine-x` are used unchanged on a
+flight-time bank: this is the one λ-dependent correction that needed no new
+physics at all. λ enters only through $(\lambda/V)^2$, so the same function
+takes an array of per-reflection wavelengths where the constant-wavelength
+model passes one scalar per emission line, and $2\theta$ is the bank's, fixed.
+
+What changes is that the correction now has a *trend across the histogram*
+where a scan sees one wavelength. $x \propto |F|^2\lambda^2$, so at fixed
+$|F|^2$ the deficit $1 - E$ goes as $\lambda^2$ (measured as a log-log slope
+of 1.99 over a whole reflection list), and worth stating because the $\lambda^4$
+one might expect belongs to the *Lorentz* factor {eq}`corr-lorentz-tof`, which
+multiplies beside it. On a fixed-angle bank long λ means long $d$, so
+extinction takes intensity out of the same end absorption does and the opposite
+end the Debye-Waller factor does.
+
+Measured on a synthetic Si bank generated with $\mathrm{ext} = 100$ ($E$ from
+0.60 to 1.00 across the window) and refined both ways: with the coefficient
+free, $R_{wp} = 0.0021$, $\mathrm{ext} = 99.8(1)$ and $B_{\text{iso}} =
+0.4989(5)$ against a generating 0.5; with it held at zero, $R_{wp} = 0.0951$
+and $B_{\text{iso}} = -0.164(28)$, negative, which is the classic signature
+this section opens with.
+
+```{note}
+$\mathrm{ext}$ is four orders larger on a neutron phase than the 0.004-2 a
+constant-wavelength X-ray fit uses, and that is a **unit** statement: $x$
+carries $|F|^2$, which is in fm² for a neutron and electrons² for an X-ray.
+Compare an extinction coefficient only against another fit of the same
+radiation.
+```
 
 ## Preferred orientation (March-Dollase)
 

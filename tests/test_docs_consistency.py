@@ -299,6 +299,11 @@ PRIORITIES = wp_index.PRIORITIES
 #                                                          reader's pre-drop decisions; landed 571
 #   2026-11-12  src/rietx/io/CLAUDE.md        571 -> 572  for the σ ≤ 0 rule (WP-1952, WP-2002 B5): one
 #                                                          reader-repair row; landed 572
+#   2026-11-17  src/rietx/io/CLAUDE.md        572 -> 588  for the time-of-flight forward model (issue
+#                                                          #193): § The intensity basis is never
+#                                                          inferred, the ordinate's twin of the axis
+#                                                          rule; landed 587 (rebased onto WP-1952's 572;
+#                                                          first landed 586 on WP-2079's 571, 2026-11-06)
 SIZE_CAPS: dict[str, int | None] = {
     # 739 -> 755 (WP-1102): two standing rules for the component seam — that an
     # additive non-Bragg term is a union *member* and not a new field, and that
@@ -802,7 +807,14 @@ SIZE_CAPS: dict[str, int | None] = {
     # on a banner rather than by escalating, and that a Windows-written header
     # ends in `\r`, which `$` under `re.M` does not match.  Landed at 562; the
     # +1 is headroom.
-    "src/rietx/io/CLAUDE.md": 572,
+    # 572 -> 588 (issue #193, the time-of-flight forward model): the ordinate
+    # becomes a declared quantity beside the axis — whether a channel holds
+    # counts or counts per µs — so § The intensity basis is never inferred
+    # states the rule the next reader must follow (set it only from a
+    # declaration, measure W from the abscissa).  The evidence is in
+    # `io/formats/gsas.py`'s docstring.  Landed at 587 on WP-1952's 572 (586 on WP-2079's
+    # 571 first); the +1 is headroom.
+    "src/rietx/io/CLAUDE.md": 588,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs

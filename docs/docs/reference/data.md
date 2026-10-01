@@ -60,6 +60,7 @@ It is `None` on a parameter that was never free, and on a free one whose esd cou
 | `PatternData.two_theta` | `list[float]` or `None` | `None` | 2θ in degrees, strictly increasing |
 | `PatternData.tof` | `list[float]` or `None` | `None` | neutron flight time in µs, strictly increasing |
 | `PatternData.intensity` | `list[float]` | required | measured intensity, one value per point |
+| `PatternData.intensity_basis` | `"counts"`, `"density"` or `None` | `None` | whether a channel holds counts or counts per µs; `None` means the file did not say. Read on a flight-time axis only |
 | `PatternData.sigma` | `list[float]` or `None` | `None` | per-point esd from the file; `None` selects the Poisson fallback |
 | `PatternData.excluded_regions` | `list[tuple[float, float]]` | `[]` | intervals left out of the fit, on whichever axis is set |
 | `PatternData.metadata` | `dict[str, str]` | `{}` | what the reader found in the file header |
@@ -189,10 +190,25 @@ fig = data.plot(model=ref, two_theta_range=(25, 40))
 
 A time-of-flight pattern comes from a spallation neutron source such as ISIS, SNS or LANSCE.
 The whole moderator spectrum reaches the specimen, and the reflections arrive in order of d-spacing.
-This version reads such a pattern and refines none, because no flight-time forward model exists yet.
-`Refinement`, `refine`, `MultiHistogramRefinement`, `refine_sequential`, `index_pattern`, `pick_peaks`, `diagnose`, `auto_background`, `PatternData.plot` and every other entry point that computes from a pattern raise on a flight-time axis or a `neutron_tof` instrument.
+`Refinement.fit` refines one bank in Rietveld mode, against a `neutron_tof` instrument carrying the bank's calibration ([Time-of-flight bank](instrument.md#time-of-flight-bank)).
+Positions come from TOF = DIFC·d + DIFA·d² + TZERO + DIFB/d, the profile is a back-to-back exponential pair whose widths are polynomials in d, and the Lorentz factor is d⁴·sin θ ([Time-of-flight: the back-to-back exponentials](../theory/profiles.md#time-of-flight-the-back-to-back-exponentials)).
+The result carries `RefinementResult.tof` in place of `RefinementResult.two_theta`, and `RefinementResult.axis` says which ([The result](result.md)).
+
+The rest of the package is still angle-shaped, and says so.
+`MultiHistogramRefinement`, `refine_sequential`, `index_pattern`, `pick_peaks`, `determine_extinction_symbol`, `auto_background`, `diagnose`, `PatternData.plot` and the project container raise on a flight-time axis or a `neutron_tof` instrument.
 The message names the axis, its unit and the entry point.
-With the bank's calibration ([Time-of-flight bank](instrument.md#time-of-flight-bank)), the flight times convert to d-spacings.
+Le Bail and Pawley extraction, soft restraints and a magnetic moment are refused on a bank by name.
+So are March-Dollase preferred orientation and Stephens anisotropic strain, rather than dropped: both are written in degrees 2θ, and on a bank every reflection shares one angle, so each has a different form there and not a different value.
+A spherical-harmonics texture is refused because only the constant-wavelength model computes it.
+Specimen absorption and Sabine extinction are not refused.
+They are applied per reflection at its own wavelength, λ = 2·d·sin θ of the bank.
+
+What one channel holds is a declaration too.
+`PatternData.intensity_basis` says whether the stored intensity is the number of neutrons the channel counted, or that number already divided by the channel's own width in µs.
+On a bank the width rises with the flight time, so the two answers differ by a slope that a displacement parameter pays for, not the phase scale.
+The readers set the field where the file says so and leave it `None` where nothing does ([What a channel holds](pattern-files.md#what-a-channel-holds)).
+`None` is refined as a density, with a warning that names the two values in question.
+The constant-wavelength arm ignores the field: a 2θ step is constant, or nearly so, and folds into the scale.
 
 ### Checking a pattern before a fit
 

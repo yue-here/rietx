@@ -244,8 +244,8 @@ The whole moderator spectrum reaches the specimen, and a bank at a fixed angle s
 The source has no wavelength.
 A reflection's position comes from its d-spacing through the bank's calibration, {eq}`pos-tof`: TOF = DIFC·d + DIFA·d² + TZERO + DIFB/d.
 
-This version reads a bank and refines none.
-`Refinement.fit` and every other entry point that computes a pattern refuse a `neutron_tof` source by name.
+`Refinement.fit` refines one bank in Rietveld mode.
+[Time-of-flight patterns](data.md#time-of-flight-patterns) lists what is still refused on one, each by name.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
@@ -300,7 +300,10 @@ $$
 All ten default to 0 and fixed, because an instrument-parameter file's profile is a calibration refined against a standard.
 The three `sig` terms are variances and are bounded below at 0.
 A bare number becomes a fixed `Parameter` with the field's unit and bounds.
-In this version the coefficients are carried and listed in a bank's parameter table, and nothing evaluates them.
+Freeing them is a stage's decision, like any other parameter in a bank's table.
+The forward model evaluates them ([Time-of-flight: the back-to-back exponentials](../theory/profiles.md#time-of-flight-the-back-to-back-exponentials)).
+While every Lorentzian width is zero and held (the three `gam` terms and each phase's `lor_size` and `lor_strain`), a stage compiles the back-to-back pair convoluted with a Gaussian (GSAS type 1), and otherwise with a pseudo-Voigt (type 3).
+An all-zero profile, and a σ²(d) or γ(d) that goes negative over the fitted range, are refused by name.
 
 ### Incident spectrum
 
@@ -321,7 +324,7 @@ ISIS GEM, SNS NOMAD and POWGEN write it.
 A LANSCE-style file writes `ITYP 1` with a full `ICOFF` block.
 `read_gsas_tof_iparm` holds to the documented layout, and refuses a block whose fifth pair (P<sub>10</sub>, P<sub>11</sub>) is non-zero.
 `rietx.io.legacy.read_lansce_iparm` carries such a block as written.
-Nothing in this version evaluates a spectrum.
+The forward model evaluates the spectrum per channel, the fifth pair as P<sub>10</sub>·exp(−P<sub>11</sub>·T⁵), and multiplies the calculated Bragg sum by it, never the background ([The incident spectrum of a time-of-flight bank](../theory/corrections.md#the-incident-spectrum-of-a-time-of-flight-bank)).
 
 ### Building a bank
 
