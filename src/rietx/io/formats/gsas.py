@@ -136,7 +136,7 @@ from pathlib import Path
 import numpy as np
 
 from ...schemas.common import Diagnostic
-from ...schemas.pattern import AxisKind, PatternData
+from ...schemas.pattern import AxisKind, IntensityBasis, PatternData
 from .base import PatternFormat, ascending, head, pattern_data
 
 #: The bintypes read: a start angle and a step, both in centidegrees.  The
@@ -220,6 +220,25 @@ _UNIMPLEMENTED_FLAGS = {
     "FXY": "an x and intensity pair with no esd",
 }
 
+
+#: Mantid's ``SaveGSS`` writes this sentence into its header **when, and only
+#: when, it multiplied Y by the bin widths** — its ``MultiplyByBinWidth``
+#: option, whose default is TRUE.  So on a file carrying it the ordinate is a
+#: count per channel and the flight-time forward model owes it a factor of W
+#: (``schemas.pattern.PatternData.intensity_basis``).  It is a **declaration**
+#: in ``io/CLAUDE.md``'s first sense — a statement in the writer's own header
+#: that cannot disagree with itself — and it was checked anyway, against a
+#: public ISIS GEM ``.gss`` carrying the line and its ``_tof.xye`` export of
+#: the same bank: they differ by exactly that bank's channel width
+#: (Δt/t = 0.004; the first channel's 1.01737949 against 0.23038662 at
+#: T = 1106.1995 µs is a ratio of 4.416 against a width of 4.425 µs).
+#:
+#: **Its absence says nothing**, and is not read as one.  A GSAS file written
+#: by anything but Mantid has no such header at all, and no obtainable file
+#: was written by ``SaveGSS`` with the option off, so "Mantid header, no such
+#: line" has never been seen and is left undetermined rather than guessed.
+_MANTID_BIN_WIDTH_RE = re.compile(
+    r"^#.*\bY\s+multiplied\s+by\s+the\s+bin\s+widths?", re.M | re.I)
 
 #: A ``BANK`` record may sit behind a ``#`` (issue #230: two copies of one 2013
 #: measurement differed by two bytes, the ``#`` some tool prepended to the title
@@ -614,8 +633,74 @@ def _read_bank(p: Path, lines: list[str],
         sigma = np.asarray(sigma)[good].tolist()
     x, y, sig = ascending(x, y, sigma, path=p, fmt=GSAS, axis=axis,
                           diagnostics=diagnostics)
-    return pattern_data(p, x, y, sig, axis=axis,
+    basis = _intensity_basis(lines[:data_start], bintype, type_flag)
+    if basis is None and axis == "tof":
+        _no_basis_diagnostic(p, bintype, type_flag, diagnostics)
+    return pattern_data(p, x, y, sig, axis=axis, intensity_basis=basis,
                    source_file=p.name, format=f"gsas-{type_flag.lower()}")
+
+
+def _intensity_basis(header: list[str], bintype: str,
+                     type_flag: str) -> IntensityBasis | None:
+    """What one channel of this bank **holds**, from what the file declares.
+
+    Three declarations, and nothing else — no test on the values, for the
+    reason ``io/CLAUDE.md`` § The intensity basis is never inferred gives: a
+    count per channel and a count per microsecond are both plausible positive
+    reals and differ by a factor this reader would then be inventing.
+
+    * a ``SaveGSS`` header stating the bin-width multiplication
+      (:data:`_MANTID_BIN_WIDTH_RE`) — Mantid's own words for what it did;
+    * an ``STD`` or ``ESD`` record layout.  Both are raw-histogram layouts: an
+      ``STD`` record is a repeat count and an integer count in six characters
+      (``(10(I2,F6.0))``), which cannot express a density, and every
+      obtainable ``ESD`` file is a data-acquisition histogram whose esd column
+      is √y channel by channel.  Neither layout has a writer that divides by a
+      width;
+    * a ``TIME_MAP`` bintype, which is a *tabulated channel map* — the form a
+      data-acquisition clock writes and the one Mantid does not write at all.
+
+    Everything else is ``None``: a bare ``RALF``/``SLOG`` FXYE bank with no
+    Mantid header states neither, and the two answers differ by a factor of
+    W(T), which on a logarithmic bank grows in proportion to T across the
+    whole range, so guessing is the one thing this cannot do.
+    """
+    if any(_MANTID_BIN_WIDTH_RE.match(line) for line in header):
+        return "counts"
+    if type_flag in ("STD", "ESD") or bintype in _TABULATED_TOF_BINTYPES:
+        return "counts"
+    return None
+
+
+def _no_basis_diagnostic(p: Path, bintype: str, type_flag: str,
+                         diagnostics: list[Diagnostic] | None) -> None:
+    """Say that the ordinate's basis is undetermined, and name both answers.
+
+    Only on a flight-time bank, because only there does the answer change a
+    number: a constant-wavelength step is constant (or nearly so) and folds
+    into the phase scale, so a diagnostic on that arm would be one nobody can
+    act on and nobody needs to.
+    """
+    if diagnostics is None:
+        return
+    diagnostics.append(Diagnostic(
+        level="warning", code="PATTERN_INTENSITY_BASIS_UNKNOWN",
+        where=["intensity_basis"],
+        message=(f"{p.name}: this is a GSAS {bintype} bank of {type_flag} "
+                 f"records and nothing in it says whether one channel holds "
+                 f"the counts it recorded ('counts') or those counts already "
+                 f"divided by the channel width ('density'). Mantid's SaveGSS "
+                 f"multiplies Y by the bin widths by default and writes a "
+                 f"header line saying so; this file has no such line and no "
+                 f"raw-histogram layout either. The two differ by W(T), which "
+                 f"on a logarithmic bank grows in proportion to T, so it is "
+                 f"not a scale a refinement absorbs — it is a slope in flight "
+                 f"time, and a displacement parameter is what pays for it"),
+        suggestion=("set pattern.intensity_basis to 'counts' or to 'density' "
+                    "from how the bank was reduced — 'counts' if the export "
+                    "multiplied by the bin width, 'density' if it did not; "
+                    "left unset, the flight-time model proceeds as 'density', "
+                    "which is what every fit before this option did")))
 
 
 def _synth_axis(axis: AxisKind, bintype: str, lines: list[str], bank_line: str,

@@ -30,6 +30,16 @@ carries a TOF-looking token without stating a unit is therefore read as 2θ —
 and **says so** (``PATTERN_X_AXIS_ASSUMED``), which is the third row of the axis
 policy (``io/CLAUDE.md`` § The axis is never trusted) rather than a silence.
 
+**The same header states the *y* unit, and that one settles the intensity
+basis** — whether a channel holds the counts it recorded or those counts
+already divided by the channel's own width (``PatternData.intensity_basis``,
+GSAS's I_o = I'_o/(W·I_i)).  Read by :func:`_stated_basis`, and read the same
+way: only a declaration counts, and only a unit stating a division by a unit
+of *flight time* is a density.  The POWGEN export above states ``Counts per
+microAmp.hour``, which is a count normalised by an integrated proton charge —
+a scalar, degenerate with the phase scale — so a Mantid header is by itself no
+evidence of a density.  A file stating nothing leaves the field ``None``.
+
 **FullProf's** ``XYDATA`` **header is read where the file opens with it.**  The
 FullProf manual (J. Rodríguez-Carvajal, *An Introduction to the Program
 FullProf 2000*, Laboratoire Léon Brillouin, version July 2001, PDF p. 74,
@@ -71,7 +81,7 @@ from pathlib import Path
 import numpy as np
 
 from ...schemas.common import Diagnostic
-from ...schemas.pattern import AxisKind, PatternData
+from ...schemas.pattern import AxisKind, IntensityBasis, PatternData
 from .base import (
     PatternFormat,
     ascending,
@@ -125,6 +135,62 @@ _OTHER_UNITS: tuple[tuple[re.Pattern[str], str], ...] = (
 #: A TOF-looking token anywhere in a comment, used **only** to decide whether
 #: an assumed 2θ axis is worth a diagnostic.  Never to set the axis.
 _TOF_HINT_RE = re.compile(r"time[-\s]?of[-\s]?flight|\btof\b", re.I)
+
+#: The **y**-axis twin of :data:`_UNIT_RE`.  Mantid writes it in the same block
+#: and the same shape (``' The Y-axis unit is: Counts per microAmp.hour``), so
+#: it is read the same way — and, like the x one, only as a *declaration*.
+_Y_UNIT_RE = re.compile(
+    r"\by[-\s]?(?:axis\s*(?:units?)?|units?)\s*(?:is)?\s*[:=]\s*(\S.*?)\s*$",
+    re.I)
+
+#: A stated y unit that is a count **per unit flight time**: the file has
+#: already divided by the channel width and the flight-time forward model owes
+#: it no factor of W (``schemas.pattern.PatternData.intensity_basis``).  The
+#: time unit is required — this is the whole discrimination, and it is why
+#: "Counts per microAmp.hour" and "Counts per second" are *not* here.  Both of
+#: those divide by a **scalar** (an integrated proton charge, a counting time),
+#: which is exactly degenerate with the phase scale; only a division by the
+#: channel's own width has a shape in flight time.
+_DENSITY_UNIT_RE = re.compile(
+    r"per\s*(?:micro\s*second|microsec|µs|us\b|usec)"
+    r"|/\s*(?:µs|us\b|microsecond)"
+    r"|counts?\s*[/·]\s*(?:µs|us\b)", re.I)
+
+#: …and one that is a count per channel, however else it is normalised.  Read
+#: after :data:`_DENSITY_UNIT_RE`, so "Counts per microsecond" is a density and
+#: "Counts per microAmp.hour" is a count.
+_COUNTS_UNIT_RE = re.compile(r"\bcounts?\b", re.I)
+
+
+def _stated_basis(comments: list[str]) -> IntensityBasis | None:
+    """The intensity basis from a **stated** y-axis unit, or ``None``.
+
+    ``io/CLAUDE.md`` § The intensity basis is never inferred, one rank down
+    from § The axis is never trusted and for the identical reason: a count per
+    channel and a count per microsecond are both plausible positive reals, and
+    on the one real pair obtainable they differ by a factor of 4.4 that a
+    refinement would charge to a displacement parameter.  So the y column's
+    meaning is settled by what the file *says* about it and by nothing else,
+    and an unstated one stays ``None`` rather than defaulting to either.
+
+    The one obtainable Mantid ``.xye`` — an SNS POWGEN bank — states ``Counts
+    per microAmp.hour``, i.e. a **count**, normalised by an integrated proton
+    charge.  That is the case worth naming: the presence of a Mantid header is
+    *not* evidence of a density, and reading it as one would have applied the
+    wrong branch to that file.
+    """
+    for line in comments:
+        m = _Y_UNIT_RE.search(line)
+        if not m:
+            continue
+        stated = m.group(1)
+        if _DENSITY_UNIT_RE.search(stated):
+            return "density"
+        if _COUNTS_UNIT_RE.search(stated):
+            return "counts"
+        return None
+    return None
+
 
 #: What opens a comment line.  ``;`` is Bruker's comment marker (``uxd``), and
 #: since ``;`` also separates columns here, a ``;`` line would otherwise read as
@@ -508,6 +574,7 @@ def read_xy(path: str | Path, *, axis: str | None = None,
     x, y, sig = ascending(arr[:, 0], arr[:, 1], sigma, path=p, fmt=XY,
                           axis=axis, diagnostics=diagnostics)
     return pattern_data(p, x, y, sig, axis=axis, source_file=p.name, format="xy",
+                        intensity_basis=_stated_basis(comments),
                         x_label=stated, temperature_k=temperature,
                         declared_axis=declared)
 
