@@ -422,9 +422,10 @@ _DIFC_MIN = 1.0
 
 #: :class:`TOFSource`'s four calibration constants, in the order the four-term
 #: relation writes them.  One authority for the names, the ``CAPILLARY_OFFSETS``
-#: idiom: the field validator below coerces them and ``params.vector``
-#: registers them as ``instrument.source.<name>`` and writes them back — so a
-#: fifth term (or a rename) is one edit rather than several that can drift.
+#: idiom: the field validator below coerces them, ``params.vector`` registers
+#: them as ``instrument.source.<name>`` and writes them back, and
+#: ``model.forward_tof.CompiledTOFModel.calibration`` reads that path — so a
+#: fifth term (or a rename) is one edit rather than four that can drift.
 TOF_CONSTANTS: tuple[str, ...] = ("difc", "difa", "tzero", "difb")
 
 
@@ -467,15 +468,14 @@ class ProfileTOF(_InheritsDeclaredDefaults):
     does not carry; the readers in :mod:`rietx.io.instrument_tof` record what
     they dropped rather than dropping it silently.
 
-    **A container, and in this build nothing evaluates it.**  Reading a
-    calibration losslessly is what it is for: ``params.vector`` registers all
-    ten as ``instrument.source.profile_tof.*`` — fixed by default, like the
-    calibration constants beside them — so a bank's table lists them, and no
-    forward model reads them until the time-of-flight profile lands
-    (yue-here/rietx issue #193).  They are the rows a stage freeing a bank's
-    widths will address, which is why the constant-wavelength
-    ``instrument.profile.*`` rows are not registered on a bank at all
-    (:meth:`rietx.params.vector.ParameterTable._collect_instrument`).
+    **These are refinable parameters**: ``params.vector`` registers all ten
+    as ``instrument.source.profile_tof.*`` — fixed by default, like the
+    calibration constants beside them — and
+    :meth:`rietx.model.forward_tof.CompiledTOFModel.shape_parameters` reads
+    them off the decoded values on every residual evaluation.  They are the
+    rows a stage freeing a bank's widths addresses, which is why the
+    constant-wavelength ``instrument.profile.*`` rows are not registered on a
+    bank at all (:meth:`rietx.params.vector.ParameterTable._collect_instrument`).
     """
 
     #: µs⁻¹.  The d-independent part of the rise constant α.  A *rate*, like
@@ -575,8 +575,10 @@ class IncidentSpectrum(_InheritsDeclaredDefaults):
     flexible.  Freeing them anyway is legitimate on a standard, and is how the
     transcription gets checked.
 
-    The functions and their millisecond argument are tabulated in
-    :mod:`rietx.model.tof_spectrum`; nothing in this build evaluates them.
+    The functions themselves are :func:`rietx.model.tof_spectrum.incident_spectrum`,
+    applied per channel by the flight-time forward model; the millisecond
+    argument and the fifth pair's measured exponent are in that module's
+    docstring.
     Larson & Von Dreele (2004), *GSAS — General Structure Analysis System*,
     LAUR 86-748, GSAS Technical Manual p. 127-129.
     """
@@ -664,15 +666,24 @@ class TOFSource(_InheritsDeclaredDefaults):
     * **The Lorentz factor is d⁴·sin θ**, not 1/(sin²θ·cos θ) (manual p. 140),
       and the absorption varies *within* one histogram because λ does.
 
-    **This build reads such a bank and refines none.**  The readers
-    (:mod:`rietx.io.instrument_tof`, :mod:`rietx.io.legacy`) return one
-    ``Instrument`` per bank carrying this source, and
-    :class:`rietx.params.vector.ParameterTable` lists its calibration and
-    profile rows; no time-of-flight forward model exists here yet, so
-    :meth:`rietx.Refinement.fit` and every other entry that would compute a
-    pattern refuse a ``neutron_tof`` source by name
-    (:func:`rietx.schemas.pattern.require_two_theta`).  Widening them is
-    tracked on yue-here/rietx issue #193.
+    **This build refines such a bank through** :meth:`rietx.Refinement.fit`,
+    which routes a (time-of-flight pattern, ``neutron_tof`` instrument) pair to
+    :func:`rietx.model.forward_tof.compile_tof_model`.  What is *not* on that
+    route is the rest of the package — peak picking, indexing, the joint
+    multi-histogram fit, the project container and the GUI are angle-shaped
+    from end to end and refuse a flight time by name
+    (:func:`rietx.schemas.pattern.require_two_theta`); widening them is tracked
+    on yue-here/rietx issue #193.
+
+    **The corrections that vary with λ are evaluated along the bank**, not
+    frozen to a scalar: the incident spectrum this source declares
+    (:class:`IncidentSpectrum`) per channel, specimen absorption per reflection
+    at a µR that follows the 1/v law, and Sabine extinction per reflection at
+    λ_hkl = 2·d·sin θ_bank.  What is still refused, by name, is a *scalar*
+    ``Geometry.mu_r`` — a claim at one wavelength, on a source that has many —
+    together with preferred orientation and Stephens strain, both of which are
+    written in deg 2θ and need their flight-time forms derived rather than
+    reinterpreted.  ``compile_tof_model`` states each refusal.
     """
 
     kind: Literal["neutron_tof"] = "neutron_tof"
@@ -2332,9 +2343,14 @@ class Instrument(_InheritsDeclaredDefaults):
     #: ``"neutron_cw"`` is :class:`NeutronSource`, ``"neutron_tof"`` is
     #: :class:`TOFSource`.  A union rather than one class with inert fields —
     #: see :class:`NeutronSource`.  A ``neutron_tof`` source puts a flight time
-    #: on the pattern's abscissa and is **read, never refined**, in this build:
-    #: every entry that would compute a pattern refuses it by name through
-    #: :func:`rietx.schemas.pattern.require_two_theta`.
+    #: on the pattern's abscissa and **is refined against one**
+    #: (:mod:`rietx.model.forward_tof`).  What still refuses a flight time **by
+    #: name** through :func:`rietx.schemas.pattern.require_two_theta` is a
+    #: narrower list than "every public entry": ``Project``,
+    #: ``refine_sequential``, the background tools and the joint
+    #: multi-histogram fit.  A bank also refuses ``lebail``/``pawley`` mode,
+    #: and a pattern and an instrument whose axes disagree are refused through
+    #: :func:`rietx.schemas.pattern.require_matched_axis`.
     source: Source | NeutronSource | TOFSource = Field(discriminator="kind")
     geometry: Geometry = Field(default_factory=Geometry)
     #: unbounded with the other position corrections since 2026-10-20: see
@@ -2520,13 +2536,13 @@ class Instrument(_InheritsDeclaredDefaults):
 
         **A multi-bank experiment is several instruments, not one.**  DIFC,
         DIFA, TZERO and the whole profile differ per bank — that is what a bank
-        *is* — so each bank gets its own ``Instrument`` and they meet in a
-        multi-histogram fit once a time-of-flight forward model exists, the
-        way several wavelengths meet today
-        (:class:`rietx.multi.MultiHistogramRefinement`).
+        *is* — so each bank gets its own ``Instrument``.  A joint fit over
+        several banks, the way several wavelengths meet today
+        (:class:`rietx.multi.MultiHistogramRefinement`), is not written yet.
 
-        This build builds and reads such a bank and refines none; see
-        :class:`TOFSource`.
+        :meth:`rietx.Refinement.fit` refines one such bank against a
+        time-of-flight pattern; see :class:`TOFSource` for what the rest of the
+        package still refuses.
         """
         source = TOFSource(difc=difc, difa=difa, tzero=tzero, difb=difb,
                            two_theta_bank_deg=two_theta_bank_deg,

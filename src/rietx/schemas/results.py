@@ -20,7 +20,72 @@ from .parametric import (
     ParametricValue,
     RefinedParametricEquation,
 )
-from .pattern import POISSON_FLOOR_COUNTS, _floor_sigma
+from .pattern import AXIS_UNITS, POISSON_FLOOR_COUNTS, AxisKind, _floor_sigma
+
+
+# ----------------------------------------------------------------------
+# The abscissa, written once for the two carriers.
+#
+# :class:`RefinementResult` and :class:`HistogramResult` hold the same pair of
+# fields for the reason :class:`~rietx.schemas.pattern.PatternData` holds it:
+# a constant-wavelength fit reports degrees and a time-of-flight fit reports
+# microseconds, and the two are related by a per-bank DIFC/DIFA/TZERO/DIFB
+# calibration a *result* does not carry.  So the discriminator is read off
+# which field is set, exactly as ``PatternData`` reads it, and every consumer
+# asks rather than assuming.
+#
+# Three module functions rather than a shared base class, because the derived
+# public surface (``tests/api_surface.py``) attributes a member to the class
+# that **defines** it: a mixin would put ``axis`` and ``x`` on a private name
+# no caller can write, and the manual would document a class nobody has.  The
+# reasoning lives here, once; each class declares four short members that call
+# these.
+# ----------------------------------------------------------------------
+def _refuse_two_abscissae(result):
+    """Refuse a result carrying both abscissae, and return it otherwise.
+
+    **The one thing refused is "both".**  A pattern must have an abscissa; a
+    result need not — a hand-built one, a summary read back without its
+    curves, and every construction reporting only parameters and statistics
+    carry neither, which is what makes ``None`` the third answer of
+    :func:`_axis_of` rather than an impossible state.  Both set is the other
+    end, and it is a claim that somebody converted between them.
+    """
+    if result.two_theta is not None and result.tof is not None:
+        raise ValueError(
+            "a result carries at most one abscissa, and this one carries both "
+            "two_theta (an angle in degrees) and tof (a flight time in "
+            "microseconds). The two are related by a per-bank "
+            "DIFC/DIFA/TZERO/DIFB calibration this container does not hold, so "
+            "a result claiming both would be claiming a conversion nobody "
+            "checked. Set the one the fit ran on and leave the other None.")
+    return result
+
+
+def _axis_of(result) -> AxisKind | None:
+    """Which abscissa a result carries, or ``None`` for one with no curve.
+
+    Read off which field is set, so it cannot drift from the data — and
+    ``None`` is the WP-1076 honest empty state, not a defaulted
+    ``"two_theta"`` that would have every curve-less result assert an abscissa
+    nobody measured.
+    """
+    if result.two_theta is not None:
+        return "two_theta"
+    return "tof" if result.tof is not None else None
+
+
+def _x_of(result) -> np.ndarray:
+    """Whichever abscissa is set, as float64 — empty where neither is.
+
+    For code that windows, masks, plots or counts channels, where the quantity
+    does not matter.  Anything doing *arithmetic* on the axis branches on
+    :func:`_axis_of` first, so the wrong one is refused rather than returning
+    plausible nonsense — the reason
+    :meth:`~rietx.schemas.pattern.PatternData.tt` raises.
+    """
+    arr = result.two_theta if result.two_theta is not None else result.tof
+    return np.asarray([] if arr is None else arr, dtype=np.float64)
 
 
 class RefinedParameter(Base):
@@ -1513,9 +1578,11 @@ class Radiation(Base):
     table entry to the last digit do.
     """
 
-    #: ``Source.kind`` of the histogram: ``"xray_cw"`` or ``"neutron_cw"``.
+    #: ``Source.kind`` of the histogram: ``"xray_cw"``, ``"neutron_cw"`` or
+    #: ``"neutron_tof"``.
     kind: str
-    #: Each emission line's wavelength in Å, in line order, primary first.
+    #: Each emission line's wavelength in Å, in line order, primary first;
+    #: empty on a time-of-flight bank, whose white beam has no line.
     wavelengths: list[float]
 
 
@@ -1539,11 +1606,16 @@ class HistogramResult(Base):
     label: str = ""
     weight: float = 1.0
     statistics: Statistics
-    two_theta: list[float] = Field(default_factory=list)
+    #: This histogram's abscissa — see :class:`_HasAbscissa`.  Exactly one of
+    #: the two is set on a histogram that carries a curve at all.
+    two_theta: list[float] | None = None
+    tof: list[float] | None = None
     y_obs: list[float] = Field(default_factory=list)
     y_calc: list[float] = Field(default_factory=list)
     y_background: list[float] = Field(default_factory=list)
     sigma: list[float] = Field(default_factory=list)
+    #: Reflection tick positions per phase, **on this histogram's own axis** —
+    #: deg 2θ where :attr:`two_theta` is set, µs where :attr:`tof` is.
     ticks: dict[str, list[float]] = Field(default_factory=dict)
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
@@ -1572,6 +1644,25 @@ class HistogramResult(Base):
     #: this histogram's own R_Bragg/R_F — the partition is of *these* counts
     phase_agreement: list[PhaseAgreement] = Field(default_factory=list)
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _at_most_one_abscissa(self) -> "HistogramResult":
+        return _refuse_two_abscissae(self)
+
+    @property
+    def axis(self) -> AxisKind | None:
+        """``"two_theta"``, ``"tof"``, or ``None`` — see :func:`_axis_of`."""
+        return _axis_of(self)
+
+    @property
+    def axis_unit(self) -> str | None:
+        """The unit :attr:`axis` is measured in, for a label or a message."""
+        a = _axis_of(self)
+        return None if a is None else AXIS_UNITS[a]
+
+    def x(self) -> np.ndarray:
+        """This histogram's abscissa, whichever it is — see :func:`_x_of`."""
+        return _x_of(self)
 
 
 # ----------------------------------------------------------------------
@@ -2169,15 +2260,24 @@ class RefinementResult(Base):
 
     # Arrays for plotting/export (kept as lists for JSON round-trip; use
     # the exporters for column files).
-    two_theta: list[float] = Field(default_factory=list)
+    # The abscissa the fit ran on — see :class:`_HasAbscissa`.  ``two_theta``
+    # in degrees for a constant-wavelength fit, ``tof`` in microseconds for a
+    # time-of-flight bank, never both, and neither on a result that carries no
+    # curve.  ``result.axis`` is the discriminator and ``result.x()`` the
+    # axis-blind view; both are ``PatternData``'s, one rank up.
+    two_theta: list[float] | None = None
+    tof: list[float] | None = None
     y_obs: list[float] = Field(default_factory=list)
     y_calc: list[float] = Field(default_factory=list)
     y_background: list[float] = Field(default_factory=list)
     # per-point σ actually used in the fit (file esds when present, Poisson
     # fallback otherwise) — the FitReport weights with these, never re-derives
     sigma: list[float] = Field(default_factory=list)
-    # per-phase reflection tick positions (deg 2θ), where the model draws each
-    # peak: Bragg angle plus zero and the geometry's shift (WP-1908)
+    # Per-phase reflection tick positions, **on the fit's own abscissa**, where
+    # the model draws each peak: deg 2θ where ``two_theta`` is set (Bragg angle
+    # plus zero and the geometry's shift, WP-1908), µs where ``tof`` is.  A
+    # tick list is a set of positions on the curve beside it, so it follows
+    # that curve's axis and is never a second quantity a reader has to convert.
     ticks: dict[str, list[float]] = Field(default_factory=dict)
     #: Which reflection each of those ticks is, index for index, as the orbit
     #: representative ``h k l`` (WP-1438).  A **companion**, not a change of
@@ -2236,6 +2336,7 @@ class RefinementResult(Base):
     # otherwise.  Deviations in units of σ surface an over-tight restraint
     # fighting the data even while Rwp looks good.
     restraints: RestraintReport | None = None
+
 
     # Bonding geometry with esds propagated through the full covariance
     # (WP-1072) — see :class:`GeometryTable`.  Rietveld-only, and None when the
@@ -2416,6 +2517,40 @@ class RefinementResult(Base):
                 and not any(row.level == "error"
                             for row in diagnostic_view(self.diagnostics, None, levels)))
 
+    # -- the abscissa ------------------------------------------------------
+    @model_validator(mode="after")
+    def _at_most_one_abscissa(self) -> "RefinementResult":
+        return _refuse_two_abscissae(self)
+
+    @property
+    def axis(self) -> AxisKind | None:
+        """Which abscissa this result carries — the discriminator.
+
+        ``"two_theta"`` for a constant-wavelength fit, ``"tof"`` for a
+        time-of-flight bank, ``None`` for a result that carries no curve at
+        all.  Read off which field is set, never off the values: a range of
+        1000-10000 is a plausible 2θ scan and a plausible flight-time window,
+        and which one it is was settled by the fit.  See :func:`_axis_of`.
+        """
+        return _axis_of(self)
+
+    @property
+    def axis_unit(self) -> str | None:
+        """The unit :attr:`axis` is measured in, for a label or a message."""
+        a = _axis_of(self)
+        return None if a is None else AXIS_UNITS[a]
+
+    def x(self) -> np.ndarray:
+        """The fitted abscissa as float64, whichever quantity it is.
+
+        The peer of :meth:`~rietx.schemas.pattern.PatternData.x` one rank up,
+        and the view every axis-blind consumer wants: it is the same array as
+        ``two_theta`` on a constant-wavelength fit and as ``tof`` on a
+        time-of-flight one.  Empty where the result carries no curve.  See
+        :func:`_x_of`.
+        """
+        return _x_of(self)
+
     # -- numpy views -------------------------------------------------------
     def sig(self) -> np.ndarray:
         """Per-point σ for this result — **the one authority** (WP-1029 (s)).
@@ -2498,7 +2633,17 @@ class RefinementResult(Base):
         # the joint solve's convergence figure belongs to the stages the view
         # keeps, so it travels with them (WP-1341)
         view.statistics.max_shift_over_esd = self.statistics.max_shift_over_esd
-        view.two_theta = list(hr.two_theta)
+        # The slice's own abscissa — both fields, so a joint fit over banks of
+        # different kinds cannot hand histogram h the previous one's axis.
+        # Cleared before either is written, because this model validates on
+        # assignment and refuses both at once: writing the new axis over a view
+        # still holding the old one would raise on exactly the mixed case.
+        view.two_theta = None
+        view.tof = None
+        if hr.two_theta is not None:
+            view.two_theta = list(hr.two_theta)
+        if hr.tof is not None:
+            view.tof = list(hr.tof)
         view.y_obs = list(hr.y_obs)
         view.y_calc = list(hr.y_calc)
         view.y_background = list(hr.y_background)

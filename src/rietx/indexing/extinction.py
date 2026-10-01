@@ -1240,6 +1240,11 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     """
     from ..crystallography.symmetry import reflection_orbits
     from ..report.layer2 import delta_bic, hamilton_justified
+    # Before the try below, deliberately: that block turns a raise into an
+    # EXTINCTION_SCREEN_FAILED diagnostic, which is right for a fit that would
+    # not converge and wrong for a pattern this whole function cannot read.
+    require_two_theta(data, "determine_extinction_symbol()",
+                      instrument=instrument)
     from .diagnostics import extinction_class_diagnostics, extinction_diagnostics
     from .peaks import predicted_fwhm
     from .workflow import seed_widths, validation_plan

@@ -1494,6 +1494,19 @@ def check_hump_width(table, model) -> list[GuardFinding]:
     Needs the compiled model for the frozen peak paths, so it returns ``[]``
     without one — the ``check_stephens_positive`` convention one function up.
 
+    **Abstains on a time-of-flight bank, and the caller says so.**  Γ_instrument
+    is the Caglioti total FWHM in deg 2θ, which a bank has no term for: its
+    resolution is ``ProfileTOF``'s σ(d) and γ(d) polynomials and a declared
+    background peak's ``position``/``fwhm`` are microseconds, so the comparison
+    has no common unit.  Until this gate the whole function was reached on that
+    arm and died on ``instrument_fwhm_deg``, which
+    :class:`~rietx.model.forward_tof.CompiledTOFModel` does not define — an
+    ``AttributeError`` from inside a guard scan, on any bank that declared a
+    background peak.  ``[]`` here is not the guard passing: the two
+    ``_build_result`` paths pair it with a ``BACKGROUND_PEAK_WIDTH_UNAVAILABLE``
+    line (``refine._tof_background_peak_diagnostics``) so an unrun check cannot
+    read as a clean one.
+
     **Abstains where the resolution is not evaluable.**  Γ_instrument is only a
     real width while the Caglioti quadratic Γ_G² = U·tan²θ + V·tanθ + W stays
     positive; a schema-legal but ill-conditioned refinement can drive it
@@ -1524,6 +1537,8 @@ def check_hump_width(table, model) -> list[GuardFinding]:
 
     if model is None or not model.component_paths:
         return []
+    if getattr(model, "axis", "two_theta") != "two_theta":
+        return []  # see the docstring: no common unit, and the caller says so
     values = {e.path: e.value for e in table.entries}
     out: list[GuardFinding] = []
     for pos_path, _height_path, fwhm_path in model.component_paths:
@@ -1767,6 +1782,8 @@ def check_resolution_supported(table, model) -> list[GuardFinding]:
 
     if model is None:
         return []
+    if getattr(model, "axis", "two_theta") != "two_theta":
+        return []  # a bank's resolution is ProfileTOF's, not Caglioti's
     moving = set(table.moving_paths)
     freed = tuple(p for p in GAUSSIAN_RESOLUTION_PATHS if p in moving)
     if not freed:
@@ -2025,6 +2042,8 @@ def check_resolution_positive(table, model) -> list[GuardFinding]:
 
     if model is None:
         return []
+    if getattr(model, "axis", "two_theta") != "two_theta":
+        return []  # a bank's resolution is ProfileTOF's, not Caglioti's
     tt = np.asarray(model.tt, dtype=np.float64)
     if tt.size == 0:
         return []

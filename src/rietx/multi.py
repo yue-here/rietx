@@ -126,6 +126,7 @@ from .refine import (
     _phase_support_diagnostics,
     _quantify_phases,
     _radiation,
+    _range_text,
     _refuse_without_phases,
     _reported_support_sigma,
     _resolve_specimen_absorption,
@@ -397,6 +398,15 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (ABSENT,), "not called from multi.py: the moment's shift between the "
                    "width preset's rungs (WP-1343) is read by "
                    "Refinement._run_plan, which a joint fit does not run"),
+    "_tof_absorption_diagnostics": (
+        (ABSENT,), "a time-of-flight bank's µ(λ) record; a joint fit refuses "
+                   "a bank by name, so there is no bank to report"),
+    "_tof_intensity_basis_diagnostics": (
+        (ABSENT,), "a time-of-flight bank's channel-width basis; a joint fit "
+                   "refuses a bank by name, so there is no bank to report"),
+    "_tof_background_peak_diagnostics": (
+        (ABSENT,), "says the hump-width guard abstained on a bank; a joint fit "
+                   "refuses a bank by name, so it never abstains there"),
 }
 
 #: The same rule one rank down, over :class:`~rietx.strategy.staged.GuardReport`'s
@@ -2685,7 +2695,7 @@ class MultiHistogramRefinement:
         per_lines = np.array([m.phase_line_counts() for m in models])
         diagnostics = diagnostics + _phase_support_diagnostics(
             per_support.max(axis=0), per_lines.sum(axis=0),
-            (min(m.tt_min for m in models), max(m.tt_max for m in models)),
+            _range_text(*models),
             [_unscoped(p) for p in mt.free_paths],
             self.mtable.structures[0], stage_results,
             basis=("against the counting noise, in the histogram that shows it "

@@ -897,6 +897,10 @@ def magnetic_width_findings(model, values, *, esds=None, free=(),
     one's height is by taking the moment down.
     """
     out: list[Diagnostic] = []
+    # a bank draws no magnetic component (``forward.magnetic_wanted`` refuses
+    # a moment there), and its ``tt`` raises rather than answering None
+    if getattr(model, "axis", "two_theta") != "two_theta":
+        return out
     if getattr(model, "phases", None) is None or getattr(model, "tt", None) is None:
         return out
     # every result build calls this, so a fit with no magnetic component must
