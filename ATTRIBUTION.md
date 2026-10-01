@@ -276,6 +276,16 @@ TOPAS and FullProf are closed-source too. What rietx took from their papers and
 documentation is recorded where it was used, in the literature list above and
 in § Format specifications below.
 
+TOPAS-64 v6 has been **run as a black box** to measure what its documentation
+does not state (among them the `.inp` grammar's `for` loops and the
+time-of-flight macros' laws; `tests/data/README.md` § TOPAS `.inp`). The test
+fixtures that vendor its output are listed in `tests/data/README.md`; the
+time-of-flight one is `tests/data/tof/topas_synthetic/`, the `Y_calc` TOPAS
+computed from a synthetic bank this package wrote (synthetic input, no measured
+data), with the peak-stack kit beside it in `tests/data/tof/topas_stack/`.
+Nothing of TOPAS's own — no macro, no file of its installation — is in the
+repository.
+
 ## Format specifications (WP-1047)
 
 A file format is an **interface**, not an expression: there is exactly one
