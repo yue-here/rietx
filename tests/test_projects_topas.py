@@ -3315,19 +3315,22 @@ _BANK_PHASE = ('  str phase_name "P" scale @ 0.001\n'
 def test_a_time_of_flight_dataset_is_refused_by_name(tmp_path, bank, construct):
     """Before this, every one of these read as a constant-wavelength file: the
     phase built, nothing was reported, and the model said `bragg_brentano` — a
-    geometry the file never states. Now the read names the construct and the
-    issue, the model records which dataset is time of flight, and the build
-    refuses rather than hand a bank's phase to a constant-wavelength fit."""
+    geometry the file never states. On this branch the dataset is recognised
+    and read toward a rietx bank (`model.tof_banks`); each of these one-line
+    banks states too little to be one (no calibration, width or exponentials),
+    so the read names what is missing, and `to_structure` points at
+    `topas_tof.to_tof_refinement` rather than building a constant-wavelength
+    phase out of a time-of-flight bank's scale."""
     found: list = []
     model = read_topas_inp(_inp(tmp_path, "tof.inp", bank + _BANK_PHASE),
                            diagnostics=found)
     assert model.time_of_flight == {0: (construct,)}
     assert model.geometry is None
+    assert model.tof_banks[0].refused
     (refusal,) = [d for d in found if d.code == "TOPAS_FEATURE_REFUSED"]
-    assert "time of flight" in refusal.message and "#193" in refusal.message
-    assert construct in refusal.message
-    assert refusal.where == ["time_of_flight.0"]
-    with pytest.raises(TopasInpError, match="#193"):
+    assert "time of flight" in refusal.message
+    assert refusal.where == ["tof_banks.0"]
+    with pytest.raises(TopasInpError, match="to_tof_refinement"):
         to_structure(model)
 
 
@@ -3362,7 +3365,7 @@ def test_a_mixed_file_builds_its_constant_wavelength_dataset(tmp_path):
     assert model.geometry == "bragg_brentano"       # the X-ray dataset's
     assert not any("scale_pks" in h.keywords for h in model.coverage.reported)
     assert len(to_structure(model, dataset=0).phases) == 1
-    with pytest.raises(TopasInpError, match="time-of-flight"):
+    with pytest.raises(TopasInpError, match="to_tof_refinement"):
         to_structure(model, dataset=1)
 
 

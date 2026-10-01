@@ -455,6 +455,12 @@ same reason. Six rules the pattern readers do not need:
   whose body lives in a library, and a file whose phases belong to different
   patterns — a *selection*, following `read_pattern`'s `scan=`:
   `to_structure(model, dataset=N)`, never concatenated; a TOF one refuses, #193.
+- **A TOPAS time-of-flight bank is read by evaluating its laws, never its
+  spelling** (`projects/topas_tof.py`). Each macro's law is measured against
+  TOPAS output, not read from a body; the file's width, rate and position laws
+  are sampled over d and taken only where rietx's reproduces them exactly, else
+  refused by name. The bank angle is not in a `.inp` (TOPAS's intensity has no
+  sin θ), so the caller gives it; the writer runs only in TOPAS's working form.
 - **Where a file states its symmetry twice, the operators outrank the symbol —
   and where it states it once, the reader says so** (WP-1118, issue #101). A
   Hermann-Mauguin symbol is ambiguous for 40 of gemmi's settings, the `:1`/`:2`
