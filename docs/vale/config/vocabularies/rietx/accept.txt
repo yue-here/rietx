@@ -165,6 +165,7 @@ IUCr
 Jacobian
 Jacobians
 Jmol
+Jorgensen
 Jupyter
 JupyterLab
 Kapton

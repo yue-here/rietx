@@ -224,6 +224,36 @@ Enforcement is per stage rather than per iteration. A stage that starts below
 the bound may cross it, and the next stage pulls it back and reports `BOUND_HIT`
 on the path (`RefinedParameter.at_bound` carries the same finding on the row).
 
+(sec-tof-strain-cap)=
+### The same rule on a flight-time bank
+
+A bank's strain broadening is a flight time and not an angle: it is
+$\Delta T = \mathrm{DIFC}\,\varepsilon\,d$ with $\varepsilon = \Delta d/d$ as a
+FWHM ({ref}`sec-tof-profiles`), so the arithmetic changes while the rule does
+not, and the term is largest at the longest fitted $d$ exactly as
+$\tan\theta$ is largest at the highest $\theta$:
+
+```{math}
+:label: prof-tof-strain-cap
+
+\varepsilon \;\le\; \frac{f\,(T_{\max} - T_{\min})}{\mathrm{DIFC}\cdot d_{\max}}
+```
+
+{source}`rietx.params.vector.tof_strain_cap`
+
+$f$ is the same range-fraction constant as {eq}`prof-strain-cap` above
+({{ STRAIN_CAP_RANGE_FRACTION }}), not a second one: one cap, spent as a
+fraction of whichever axis the bank measures in.
+
+With $\mathrm{DIFA} = \mathrm{DIFB} = \mathrm{TZERO} = 0$ {eq}`prof-tof-strain-cap`
+reads as the fitted $d$ range's own fractional width,
+$\varepsilon \le f\,(d_{\max}-d_{\min})/d_{\max}$, since $T = \mathrm{DIFC}\,d$;
+taking it off the flight-time window instead is what keeps it right on a bank
+whose DIFA is not zero. The stored coefficient is $\varepsilon$ divided by
+$\pi/360$. Generous by the same construction: a bank spanning
+$d = 1.24$–$7.79$ Å caps $\varepsilon$ at 84 %, against the $10^{-3}$ a real
+specimen shows.
+
 (sec-size-cap)=
 ## The size coefficient bound
 
@@ -265,6 +295,29 @@ The bound behaves as the {ref}`strain cap <sec-strain-cap>` does. It is armed on
 has already reached it, a finite stored `max` outranks it, and it reports
 `BOUND_HIT` when the next stage pulls a crossing back. Any fit that stays below
 the bound is bit-identical to an unbounded build.
+
+(sec-tof-size-cap)=
+### The same bound on a flight-time bank
+
+On a bank the size coefficient *is* $K/L$ in Å$^{-1}$ rather than a width in
+degrees ({ref}`sec-tof-profiles`), so the bound needs no wavelength at all (the
+one thing a white beam cannot supply). It is {eq}`prof-tof-strain-cap` with
+$d^2$ for $d$, because a size broadening is
+$\Delta T = \mathrm{DIFC}\,(K/L)\,d^2$ and is largest at the longest fitted $d$:
+
+```{math}
+:label: prof-tof-size-cap
+
+\frac{K}{L} \;\le\; \frac{f\,(T_{\max}-T_{\min})}{\mathrm{DIFC}\cdot d_{\max}^{2}}
+```
+
+{source}`rietx.params.vector.tof_size_cap`
+
+There is no floor on a bank either, for the reason the warning above gives on a
+scan. The bound limits a runaway and not a size: a line at the bound is as
+wide as the whole fitted window, far wider than any real crystallite gives. The
+Gaussian term takes the square of the same width, as it does on the angular
+arm.
 
 ## Thompson-Cox-Hastings pseudo-Voigt
 
@@ -554,7 +607,153 @@ $s = h = 0$ gives the symmetric peak. A refinement can therefore land an
 aperture exactly on its lower bound of zero.
 
 The quadrature is split at the kink of the trapezoid {eq}`prof-fcj-weight`,
-which keeps the response $C^1$ everywhere but the inherent FCJ corner at
-$s = h$. That corner is a genuine non-differentiability, and it has measured
-consequences for refinement when both apertures are equal. {ref}`ch-method`
-works them through.
+which keeps the response $C^1$ everywhere *except* the inherent FCJ corner
+at $s = h$, a genuine non-differentiability with measured consequences for
+refinement when both apertures are equal, worked through in
+{ref}`ch-method`.
+
+(sec-tof-profiles)=
+## Time-of-flight: the back-to-back exponentials
+
+```{note}
+The shapes below are **evaluated**, and this note says by what and against
+what.
+
+A flight time is a `PatternData` abscissa of its own (`PatternData.tof`, µs);
+`read_pattern` opens a GSAS `TIME_MAP`/`RALF`/`SLOG` bank and a Mantid-exported
+`.xye` that states its unit, taking `bank=` where a file holds several; and
+`read_gsas_tof_iparm` / `read_gsas2_instprm` supply the calibration a data file
+never carries. `Instrument.tof_neutron_bank` is the preset,
+`model/forward_tof.py` the forward model — eqs. {eq}`tof-type1` to
+{eq}`tof-widths` here on the calibration {eq}`pos-tof`, plus the bank's own $d^4\sin\theta$ Lorentz factor, the
+incident spectrum, the channel width and cylindrical absorption per channel —
+and `Refinement.fit` refines a bank against it in Rietveld mode.
+The ten `ProfileTOF` coefficients are refinable parameters (`instrument.source.profile_tof.*`), and
+a phase's size and microstrain broaden a bank's peaks through
+$\gamma$ and $\sigma^2$ ({ref}`ch-microstructure`).
+
+What is **not** written: several banks (or a bank beside a scan) as one joint
+residual, which `MultiHistogramRefinement` refuses by name; Le Bail and Pawley
+intensity extraction on a bank (both refused by name); and the Ikeda-Carpenter pulse itself (last paragraph
+of this section).
+```
+
+On a spallation source the pattern is collected in flight time and the peak
+shape is set by the moderator, not by the goniometer: neutrons of one
+wavelength start to leak out quickly and stop slowly. Von Dreele, Jorgensen &
+Windsor {cite}`vondreele1982` model that pulse as two back-to-back
+exponentials with rise α and decay β (physically the moderator's fast and
+slow emission constants {cite}`ikeda1985`), whose convolution with the
+resolution function is the peak. Flight time and d-spacing are related by the bank's
+calibration, {eq}`pos-tof` in {ref}`sec-tof-positions`, with the inverse taken
+on the branch that tends to $(T - \mathrm{TZERO})/\mathrm{DIFC}$ as
+$\mathrm{DIFA} \to 0$, and refused where $\mathrm{DIFA}$ turns {eq}`pos-tof`
+inside the requested range: a non-monotonic map has no inverse to choose.
+
+Writing $N = \alpha\beta/2(\alpha+\beta)$ and $\Delta T$ for channel minus
+peak, the pulse convoluted with a Gaussian of variance $\sigma^2$ is
+
+```{math}
+:label: tof-type1
+
+\Omega(\Delta T) = N\bigl[e^{u}\operatorname{erfc}(y)
++ e^{v}\operatorname{erfc}(z)\bigr],
+\quad
+\begin{aligned}
+u &= \tfrac{\alpha}{2}(\alpha\sigma^2 + 2\Delta T), &
+y &= \frac{\alpha\sigma^2 + \Delta T}{\sqrt{2\sigma^2}},\\
+v &= \tfrac{\beta}{2}(\beta\sigma^2 - 2\Delta T), &
+z &= \frac{\beta\sigma^2 - \Delta T}{\sqrt{2\sigma^2}}.
+\end{aligned}
+```
+
+{source}`rietx.model.profiles.tof.back_to_back_gaussian`
+
+```{warning}
+The sign of $\Delta T$ is the whole asymmetry. With channel minus peak, α is
+the rise on the **short**-TOF side and β the decay on the **long**-TOF side,
+so the usual β < α puts the tail at long flight time — where a moderator puts
+it. The GSAS manual's prose reads the other way round ("the difference in TOF
+between the reflection position and the profile point") while its own
+formulae, and GSAS-II's call site, use channel minus peak.
+```
+
+Because $u - y^2 = v - z^2 = -\Delta T^2/2\sigma^2$ identically, the enormous
+$e^{u}$ and the vanishing $\operatorname{erfc}(y)$ are never formed
+separately: {eq}`tof-type1` evaluates as one Gaussian factor times two
+*scaled* complementary error functions, and those come from the same Faddeeva
+$w(z)$ as {eq}`prof-voigt`, since $\operatorname{erfcx}(t) = w(it)$ for
+$t \ge 0$.
+
+The same pulse convolved with the pseudo-Voigt of {eq}`prof-pv` instead
+gives the shape that carries sample Lorentzian broadening. Its Gaussian half
+is {eq}`tof-type1` evaluated at the combined Thompson-Cox-Hastings width
+{eq}`prof-tch-gamma`, and its Lorentzian half is an exponential integral:
+
+```{math}
+:label: tof-type3-lorentzian
+
+\Omega_L(\Delta T) = -\frac{2N}{\pi}
+\Bigl(\operatorname{Im}\bigl[e^{p}E_1(p)\bigr]
++ \operatorname{Im}\bigl[e^{q}E_1(q)\bigr]\Bigr),
+\qquad
+\begin{aligned}
+p &= \alpha(\Delta T + i\Gamma/2),\\
+q &= \beta(-\Delta T + i\Gamma/2).
+\end{aligned}
+```
+
+{source}`rietx.model.profiles.tof.back_to_back_pseudovoigt`
+
+```{warning}
+The GSAS manual {cite}`larson2004` defines $p$ for this function by reference
+to its Ikeda-Carpenter function, giving $p = -\alpha\Delta T + i\alpha\Gamma/2$,
+and the GSAS Fortran implements that. Both exponentials of the
+Ikeda-Carpenter pulse decay *forward* in time and take that sign; the
+back-to-back rise wing runs backwards and does not. As published the term is
+invariant under exchanging α and β, which the convolution of an asymmetric
+pulse cannot be, and it departs from the integral it is the closed form of by
+0.81 % of the peak at a mixed shape. rietx uses the sign the convolution
+requires, so a γ coefficient refined by GSAS against this function is not
+directly transferable.
+```
+
+At $\gamma = 0$ the mixing $\eta$ of {eq}`prof-tch-eta` is exactly zero and
+{eq}`tof-type3-lorentzian` drops out, recovering {eq}`tof-type1` bit for bit.
+Both shapes are unit-area in $\Delta T$, and the first moment of
+{eq}`tof-type1` is $1/\beta - 1/\alpha$, the pulse asymmetry, unmoved by a
+symmetric resolution function. The pseudo-Voigt shape has no finite first
+moment at all, its Lorentzian half being a Cauchy distribution.
+
+The three shape parameters and the Lorentzian width follow the reflection
+d-spacing as {cite}`larson2004`
+
+```{math}
+:label: tof-widths
+
+\alpha = \alpha_0 + \frac{\alpha_1}{d},
+\qquad
+\beta = \beta_0 + \frac{\beta_1}{d^4},
+\qquad
+\sigma^2 = \sigma_0^2 + \sigma_1^2 d^2 + \sigma_2^2 d^4,
+\qquad
+\gamma = \gamma_0 + \gamma_1 d + \gamma_2 d^2 .
+```
+
+{source}`rietx.model.profiles.tof.tof_sigma_sq`
+
+```{warning}
+The three σ symbols carry their squares as part of the name: each *is* a
+variance, and the coefficients an instrument file supplies enter
+{eq}`tof-widths` unsquared. Squaring them inflates every width by the value
+of the coefficient. As always the conventions are physics, not letters: here
+the d-linear $\gamma$ term is microstrain (constant $\Delta d/d$ gives
+$\Delta T \propto d$) and the $d^2$ term is crystallite size (constant
+$\Delta Q$ gives $\Delta d \propto d^2$). GSAS-II renames these three to X,
+Y, Z, and its X is the *size* coefficient in {eq}`prof-caglioti-l` and the
+*strain* one here — one code, one pair of letters, two opposite meanings.
+Transfer a number by matching the power of d.
+```
+
+The Ikeda-Carpenter pulse-shape function itself {cite}`ikeda1985`, which
+replaces the exponential pair for cryogenic moderators, is not implemented.

@@ -252,6 +252,20 @@ classifying above cannot see a *unit*: a GSAS file whose sniff missed fell to
 and adds no range check of its own. It abstains on a flight-time axis, which
 violates the bound by construction and was declared rather than assumed.
 
+## The intensity basis is never inferred
+
+The ordinate's twin of § The axis is never trusted: GSAS's
+**I_o = I'_o/(W·I_i)** (LAUR 86-748 p. 127) makes a calculated Bragg sum a
+*density*, so raw counts owe a factor of the channel width W — constant on a
+2θ scan (folds into the phase scale) but a **slope in flight time** on a
+TOF bank (the GEM measurement is in `formats/gsas.py`).
+`PatternData.intensity_basis` (`"counts"`/`"density"`/`None`) is set
+**only from a declaration** — a Mantid bin-width header, a GSAS raw-histogram
+form, or a stated y-axis unit — never inferred from the values;
+`PATTERN_INTENSITY_BASIS_UNKNOWN` fires on an undeclared flight-time pattern.
+W itself is measured from the pattern's own abscissa (`numpy.gradient`), never
+read from the file or instrument.
+
 ## Metadata
 
 `METADATA_KEYS` is **data**, and `base.metadata()` refuses an undeclared key,
@@ -484,7 +498,8 @@ axis over.
   2/4/5 refused, a non-default set declined; a non-zero anisotropic term or
   ITYP 1/2 fifth `ICOFF` pair refused. A LANSCE-shaped file (8-slot type-1
   `PRCF`) is **refused** here and read only by `legacy/` below. A bank with no
-  `PRCF` reads with an all-zero `ProfileTOF`, which says so. `ICONS`' POLA,
+  `PRCF` reads with an all-zero `ProfileTOF`, which says so and which
+  `compile_tof_model` refuses by name. `ICONS`' POLA,
   IPOLA, KRATIO pass blank **or zero**, FORTRAN's one reading (F77 §13.5.9).
 - **`.instprm` is one public reader on `Type`**: `read_gsas2_instprm` hands
   a file stating `Type: PNT` *by path* to `read_tof_instprm`, before

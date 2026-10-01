@@ -148,6 +148,62 @@ $10^{-6}$, and FullProf's apparent strain is $\tfrac{1}{2}\beta^{*}d$, read off
 the integral breadth rather than the FWHM. A microstrain is comparable between
 codes only with its convention attached.
 
+(sec-sample-broadening-tof)=
+## The same two quantities on a time-of-flight bank
+
+A bank has no angle to vary and no wavelength to state, so neither
+{eq}`ms-size-coefficient` nor {eq}`ms-strain-coefficient` can be written down
+there. Both quantities survive the move unchanged, because both are statements
+about $d$ rather than about $2\theta$. Flight time is proportional to
+d-spacing, $T = \mathrm{DIFC}\cdot d$ to the order a width is taken at, so a
+fractional spread in $d$ is the same fractional spread in $T$:
+
+```{math}
+:label: ms-tof-widths
+
+\Delta T_{\text{size}} = \mathrm{DIFC}\,\frac{K}{L}\,d^{2},
+\qquad
+\Delta T_{\text{strain}} = \mathrm{DIFC}\,\varepsilon\,d
+\qquad [\mu\mathrm{s}]
+```
+
+{source}`rietx.model.profiles.tof.tof_sample_gamma`
+
+Microstrain is a constant $\Delta d/d = \varepsilon$, hence linear in $d$;
+Scherrer broadening is a constant $\Delta Q = 2\pi K/L$, i.e.
+$\Delta d/d = (K/L)\,d$, hence quadratic. The Lorentzian pair add to the
+bank's $\gamma(d)$ and the Gaussian pair enter its $\sigma^{2}(d)$ in
+quadrature, before the Thompson–Cox–Hastings mixing: a width added to the
+mixed $\Gamma$ would be a width of neither shape.
+
+The refinable quantities are the same four `Phase` parameters the angular arm
+uses. Their unit differs on a bank, and only
+for the size pair, which is the asymmetry of
+{eq}`ms-size-coefficient`–{eq}`ms-strain-coefficient` again. A strain
+coefficient carries no $\lambda$, so `lor_strain` and `gauss_strain` are the
+same numbers of degrees on both arms. A size coefficient is
+$(180/\pi)K\lambda/L$, so on a `neutron_tof` histogram `lor_size` holds $K/L$
+in Å⁻¹ and `gauss_size` its square. A joint fit sharing one size between a
+bank and a scan would convert between the two units, as the multi-histogram
+fit already does across two wavelengths; that fit is not written for a bank
+yet. The apparent size is then
+
+```{math}
+:label: ms-tof-size
+
+L \;=\; K \big/ x_{\text{size}}^{(d)} \qquad [\text{Å}]
+```
+
+{source}`rietx.model.profiles.caglioti.apparent_size_from_d_size_coefficient`
+
+with no reference angle and no wavelength at all: the flight-time twin of
+{eq}`ms-size-coefficient`, and the reason the microstructure block reports a
+crystallite on a bank rather than abstaining.
+
+rietx's defaults are zero on all four, which is the physical statement "an
+infinite, strain-free crystal", and no other program's non-zero defaults are
+adopted; seed them explicitly to reproduce another program's project.
+
 ## Stephens anisotropic strain
 
 Stephens' phenomenological model {cite}`stephens1999` lets every

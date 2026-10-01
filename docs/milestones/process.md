@@ -1018,6 +1018,14 @@ only when called by name.  The operating detail went down a rank: the PRCF
 layout, the bintype table and every refusal's wording are the module
 docstrings'.  560 landed against the 561.
 
+565 -> 581 for the neutron time-of-flight forward model (yue-here/rietx issue
+#193): the *ordinate* becomes the second declared quantity.  Whether a channel
+holds the counts it recorded or those counts divided by its own width is a
+statement no value can settle, and on a bank the wrong answer is a slope in
+flight time that a displacement parameter pays for, so the declare-never-infer
+rule gains its intensity-basis section.  The measurement behind it is
+`io/formats/gsas.py`'s docstring.  580 landed against the 581.
+
 ## What a session's reading costs
 
 Measured 2026-09-30 for `/pr-review`

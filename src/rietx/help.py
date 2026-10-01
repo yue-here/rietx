@@ -596,8 +596,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "α₁/d. It describes the rise of the back-to-back pair, which is the "
             "short-flight-time side of the peak. A larger α gives a sharper leading "
             "edge. The shape has amplitude αβ/(α+β), and its width becomes infinite as "
-            "either rate goes to zero. An all-zero block is therefore a profile that "
-            "nobody calibrated."
+            "either rate goes to zero. A fit therefore refuses an all-zero block."
         ),
         unit="µs⁻¹", default="0.0",
         typical="0-1 µs⁻¹; often left at 0 with all of α in α₁",
@@ -3546,6 +3545,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "file. A repeat with a different intensity stops the read instead."
         ),
     ),
+    "PATTERN_INTENSITY_BASIS_UNKNOWN": HelpEntry(
+        title="A flight-time file did not say what a channel holds",
+        description=(
+            "This is a time-of-flight bank, and nothing in the file says whether a "
+            "channel holds the counts it recorded or those counts already divided by "
+            "the channel width. The two differ by the width W(T), which grows with the "
+            "flight time on most banks. That is a slope across the bank, not a scale, "
+            "and a displacement parameter pays for it if it is wrong. Set "
+            "`pattern.intensity_basis` by hand from how the bank was reduced. Left "
+            "unset, the fit runs as a density and says so again."
+        ),
+    ),
     "PATTERN_INTENSITY_NET": HelpEntry(
         title="The intensities are the file's net column",
         description=(
@@ -4484,6 +4495,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "tabulated ion of the same element with a nearby charge."
         ),
     ),
+    "SPECIMEN_ABSORPTION_TOF": HelpEntry(
+        title="Absorption was applied along the bank",
+        description=(
+            "Specimen absorption was applied to each reflection at its own wavelength, "
+            "and the message quotes the range of µR across the fitted window. µ follows "
+            "the wavelength on a neutron bank, so one number cannot describe it. It was "
+            "computed from the refined composition and the declared capillary radius, "
+            "and it is never refined, because it is indistinguishable from thermal "
+            "motion. Without a capillary radius no correction runs, and this line does "
+            "not appear."
+        ),
+    ),
     "STAGE_FREED_NOTHING": HelpEntry(
         title="A stage freed nothing in one histogram",
         description=(
@@ -4614,6 +4637,29 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "evidence that the specimen is textured. Lower the order, or hold the "
             "highest terms. The default solver keeps the density positive at the "
             "reflections."
+        ),
+    ),
+    "TOF_CHANNEL_WIDTH_APPLIED": HelpEntry(
+        title="The channel width was in the model",
+        description=(
+            "The pattern declares that its channels hold counts, so the calculated "
+            "Bragg sum was multiplied by each channel's width, measured from the "
+            "pattern's own flight times. The message quotes the width at both ends of "
+            "the window. If the export had already divided by the bin width, declare "
+            "`'density'` instead, because applying the width twice biases the "
+            "displacement parameters the other way."
+        ),
+    ),
+    "TOF_INTENSITY_BASIS_ASSUMED": HelpEntry(
+        title="The fit assumed what a channel holds",
+        description=(
+            "Nothing said whether a channel of this bank holds counts or counts per "
+            "channel width, so the fit ran as a density, with no width factor. If the "
+            "data are counts, the missing factor is a smooth rise across the bank, and "
+            "a refined Biso absorbs it beside a worse Rwp. Mantid's `SaveGSS` "
+            "multiplies by the bin widths by default. Declare "
+            "`pattern.intensity_basis` and refit before you quote a displacement "
+            "parameter."
         ),
     ),
     "TOPAS_BLOCK_SKIPPED": HelpEntry(
@@ -5540,14 +5586,25 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The 2θ of every channel the fit used, in order. A channel outside the fit "
             "range or inside an excluded region is absent, so this can be shorter than "
-            "the pattern file."
+            "the pattern file. `None` on a time-of-flight fit, whose channels are in "
+            "`tof`."
         ),
         unit="deg 2θ",
+    ),
+    "RefinementResult.tof": HelpEntry(
+        title="Fitted channels, in flight time",
+        description=(
+            "The flight time of every channel a time-of-flight fit used, in order. It "
+            "takes the place of `two_theta`, which is `None` on such a fit, and "
+            "`axis` says which of the two is set. A channel outside the fit range or "
+            "inside an excluded region is absent."
+        ),
+        unit="µs",
     ),
     "RefinementResult.y_obs": HelpEntry(
         title="Observed intensity",
         description=(
-            "The observed intensity at each channel of `two_theta`, in the pattern's "
+            "The observed intensity at each fitted channel, in the pattern's "
             "own intensity units. It is what the residual was computed against."
         ),
     ),

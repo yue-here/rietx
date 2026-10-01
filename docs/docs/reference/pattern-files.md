@@ -200,7 +200,31 @@ A GSAS file holding banks on both a 2θ and a flight-time axis is refused, namin
 
 The calibration that converts a flight time to a d-spacing is not in the data file.
 [Instrument files](instrument-files.md#time-of-flight-instrument-files) gives the readers for it, and [Time-of-flight bank](instrument.md#time-of-flight-bank) gives the fields they fill.
-This version reads a time-of-flight pattern and refines none ([Time-of-flight patterns](data.md#time-of-flight-patterns)).
+`Refinement.fit` refines one bank ([Time-of-flight patterns](data.md#time-of-flight-patterns)).
+
+### What a channel holds
+
+The ordinate follows the same rule as the axis.
+GSAS writes the intensity relation as $I_o = I'_o/(W\cdot I_i)$, where $I'_o$ is the number of counts observed in a channel of width $W$.
+A calculated Bragg sum is therefore an intensity *density*: a histogram whose channels hold counts owes it a factor of $W$, and one already divided by $W$ does not.
+On a flight-time bank $W$ is not a constant.
+An ISIS GEM `RALF` bank is Δt/t = 0.004 throughout, so $W$ rises in proportion to the flight time across the whole window.
+The difference is a slope in flight time, not a scale, and a fit that gets it wrong pays for it in the displacement parameters rather than in the phase scale.
+`PatternData.intensity_basis` is `"counts"`, `"density"` or `None`, and a reader sets it only where the file declares it.
+
+| File | What it declares |
+|---|---|
+| GSAS bank whose header says `with Y multiplied by the bin widths` | `"counts"`. Mantid's `SaveGSS` writes that line when, and only when, its `MultiplyByBinWidth` option was on, and that option defaults to on. |
+| GSAS bank of `STD` or `ESD` records | `"counts"`. Neither layout can express a density: an `STD` record is a repeat count and a six-character integer. |
+| GSAS bank of `TIME_MAP` bintype | `"counts"`. A tabulated acquisition-clock map, which is not a form Mantid writes. |
+| `.xy` or `.xye` stating a y-axis unit per unit of flight time | `"density"` |
+| `.xy` or `.xye` stating any other count-like y-axis unit | `"counts"` |
+| anything else | `None`, and on a flight-time pattern a `PATTERN_INTENSITY_BASIS_UNKNOWN` naming both answers |
+
+A Mantid header is not by itself evidence of a density.
+A POWGEN `.xye` states `Counts per microAmp.hour`: a count normalised by an integrated proton charge, which is a scalar and exactly degenerate with the phase scale.
+Only a per-µs unit is a division by the channel's own width.
+A reader leaves `None` as `None`, and the fit then proceeds as a density and says so with `TOF_INTENSITY_BASIS_ASSUMED`.
 
 ## Metadata
 
