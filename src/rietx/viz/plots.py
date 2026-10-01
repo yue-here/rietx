@@ -71,12 +71,20 @@ from .theme import PHASE_COLOURS
 #: figures come from.  ``font_size=`` moves it for another exposure surface.
 BASE = 11.0
 
-#: The x axis a pattern may be drawn against.  2θ is the measurement's own
-#: coordinate and is meaningless without the wavelength beside it; *Q* and *d*
-#: are derived from it *through* the wavelength and are therefore comparable
-#: across wavelengths, which is the whole reason to use them — so they need
-#: ``wavelength=`` and their axis label carries no λ.
-X_AXES = ("two_theta", "q", "d")
+#: The x axis a pattern may be drawn against.  2θ is a constant-wavelength
+#: measurement's own coordinate and is meaningless without the wavelength
+#: beside it; *Q* and *d* are derived from it *through* the wavelength and are
+#: therefore comparable across wavelengths, which is the whole reason to use
+#: them — so they need ``wavelength=`` and their axis label carries no λ.
+#:
+#: ``"tof"`` is a **time-of-flight** fit's own coordinate, the flight-time twin
+#: of ``"two_theta"``: it needs no wavelength (a white beam states none) and it
+#: is the only member drawable from such a result, because Q and d are reached
+#: from it through the *bank calibration* rather than through a λ and this
+#: module holds no calibration.  The two measurement coordinates are mutually
+#: exclusive per result, which ``_x_values`` enforces by name rather than by
+#: drawing whatever is in the array.
+X_AXES = ("two_theta", "q", "d", "tof")
 
 #: Intensity scales.  ``sqrt`` is the counting-statistics one — equal display
 #: distance for equal Poisson σ, so a weak peak's shape is readable beside a
@@ -249,8 +257,16 @@ def _x_values(two_theta, x_axis: str, wavelength: float | None,
     it and why the 2θ label must.  ``radiation`` (``"Cu Kα"``) goes on the 2θ
     label before λ, in one form whichever of the two is known:
     ``2θ (degrees), Cu Kα, λ = 1.54059 Å``.
+
+    ``"tof"`` is handled **before** the trigonometry below and not after: the
+    array is a flight time in microseconds, and ``np.radians`` of a number in
+    the tens of thousands does not fail — it returns a plausible angle and
+    every panel drawn from it is a confident lie.  That is the one line this
+    branch exists to sit in front of.
     """
     tt = np.asarray(two_theta, dtype=float)
+    if x_axis == "tof":
+        return tt, r"time of flight ($\mu$s)"
     if x_axis == "two_theta":
         label = r"$2\theta$ (degrees)"
         if radiation is not None:
@@ -341,7 +357,7 @@ def _check_panel_args(style: str, x_axis: str, y_scale: str,
         raise ValueError(f"x_axis must be one of {list(X_AXES)}, not {x_axis!r}")
     if y_scale not in Y_SCALES:
         raise ValueError(f"y_scale must be one of {list(Y_SCALES)}, not {y_scale!r}")
-    if x_axis != "two_theta" and wavelength is None:
+    if x_axis not in ("two_theta", "tof") and wavelength is None:
         raise ValueError(f"x_axis={x_axis!r} is derived from 2θ through the "
                          "wavelength; pass wavelength=")
 
@@ -846,10 +862,32 @@ def plot_result(result: RefinementResult, *, path: str | None = None,
     if label_align not in ("bottom", "curve"):
         raise ValueError("label_align must be 'bottom' or 'curve', not "
                          f"{label_align!r}")
+    if x_axis not in ("two_theta", "tof") and wavelength is None:
+        raise ValueError(f"x_axis={x_axis!r} is derived from 2θ through the "
+                         "wavelength; pass wavelength=")
+    # The result's own abscissa decides which measurement coordinate is legal.
+    # Both directions are refused, and each names the other: drawing a bank
+    # against ``"two_theta"`` would put microseconds on a degree axis, and
+    # drawing a constant-wavelength scan against ``"tof"`` would put degrees on
+    # a microsecond one.  Q and d are reached from a flight time through the
+    # bank calibration, which this module does not hold, so they are refused on
+    # that arm too.
+    axis = result.axis
+    if axis == "tof" and x_axis != "tof":
+        raise ValueError(
+            f"x_axis={x_axis!r}: this result's abscissa is a flight time in "
+            f"microseconds, so the only measurement coordinate it can be drawn "
+            f"against is x_axis='tof'. Q and d are reached from a flight time "
+            f"through the bank's DIFC/DIFA/TZERO/DIFB rather than through a "
+            f"wavelength, and this module holds no calibration.")
+    if axis != "tof" and x_axis == "tof":
+        raise ValueError(
+            "x_axis='tof': this result's abscissa is 2θ in degrees, not a "
+            "flight time. Use 'two_theta', 'q' or 'd'.")
     plt = _pyplot()
     from matplotlib.ticker import MaxNLocator
 
-    tt = np.asarray(result.two_theta, dtype=float)
+    tt = result.x()
     y_obs = np.asarray(result.y_obs, dtype=float)
     y_calc = np.asarray(result.y_calc, dtype=float)
     y_bkg = np.asarray(result.y_background, dtype=float)
@@ -1397,7 +1435,13 @@ def plot_for_vlm(result: RefinementResult, report=None, *,
         from ..report import build_layer0
         report = build_layer0(result)
 
-    tt = np.asarray(result.two_theta)
+    # The result's own abscissa: ``x()`` is ``two_theta`` on a
+    # constant-wavelength fit and the flight times on a bank, and the axis
+    # label follows it rather than being spelled once in degrees — which it was
+    # until T-1c, and which would have printed a flat lie on this arm.
+    tt = result.x()
+    x_label = ("time of flight (" + chr(956) + "s)" if result.axis == "tof"
+               else "2" + chr(952) + " (deg)")
     y_obs = np.asarray(result.y_obs)
     y_calc = np.asarray(result.y_calc)
     sigma = result.sig()
@@ -1433,7 +1477,7 @@ def plot_for_vlm(result: RefinementResult, report=None, *,
     ax.plot(tt, delta / sigma, "-", lw=0.5, color="#333333")
     ax.axhspan(-3, 3, color="#2a9d2a", alpha=0.15, lw=0)
     ax.set_ylabel(r"$\Delta/\sigma$")
-    ax.set_xlabel(r"2$\theta$ (deg)")
+    ax.set_xlabel(x_label)
     ax.set_title(r"model error in noise units (green band = ±3$\sigma$; "
                  "a correct model stays inside)", fontsize=9)
 

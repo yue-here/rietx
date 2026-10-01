@@ -175,10 +175,42 @@ def test_write_html_is_self_contained_and_draws_with_the_chart_module(tmp_path, 
     # the raw difference is the default, as in the matplotlib panel: both are a
     # file someone takes away and reads as a figure
     assert spec["residual"] == "delta" and spec["band"] is False
-    assert spec["labels"] == {"y": "intensity", "resid": "Δ"}
+    assert spec["labels"] == {"y": "intensity", "resid": "Δ",
+                              "x": "2θ", "xunit": "°", "xdigits": 4}
     assert [e["label"] for e in spec["legend"]] == [
         "observed", "calculated", "background", "difference",
         *[f"hkl: {name}" for name in result.ticks]]
+
+
+def _bare_tof_bank_result(tof, y_obs, y_calc, **kw):
+    """A minimal single-bank TOF ``RefinementResult`` — no fit, just curves."""
+    from rietx.schemas.common import Provenance
+    from rietx.schemas.results import RefinementResult, Statistics
+
+    return RefinementResult(
+        status="converged", mode="rietveld", parameters=[],
+        statistics=Statistics(rwp=0.05, rp=0.04, rexp=0.045, gof=1.1, chi2=1.2,
+                              n_points=len(tof), n_free_parameters=3),
+        provenance=Provenance(package_version="test", created_utc="now"),
+        tof=list(tof), y_obs=list(y_obs), y_calc=list(y_calc), **kw)
+
+
+def test_the_page_draws_a_tof_bank_on_its_own_abscissa():
+    """A bank's page carries its flight times, and the readout names them.
+
+    ``page`` read ``result.two_theta``, which is ``None`` on every TOF result;
+    it reads ``result.x()`` and the spec tells the readout what x is."""
+    from rietx.viz.html import page
+
+    tof = np.linspace(12000.0, 12600.0, 61)
+    y_calc = 100.0 + 60.0 * np.exp(-((tof - tof.mean()) ** 2) / 4000.0)
+    y_obs = y_calc + np.random.default_rng(0).normal(0, 4, tof.size)
+    result = _bare_tof_bank_result(tof, y_obs, y_calc,
+                                   ticks={"phase 0": [12100.0, 12300.0]})
+    spec, curves = page_parts(page(result))
+    np.testing.assert_array_equal(curves.arrays["two_theta"], tof)
+    assert curves.header["ticks"] == {"phase 0": [12100.0, 12300.0]}
+    assert spec["labels"]["x"] == "TOF" and spec["labels"]["xunit"] == " µs"
 
 
 def test_the_weighted_page_divides_by_the_results_own_sigma(tmp_path, page_result):
@@ -403,8 +435,19 @@ def test_q_and_d_axes_are_the_same_pattern_in_another_coordinate(
 
     with pytest.raises(ValueError, match="wavelength"):
         result.plot(x_axis="q")
-    with pytest.raises(ValueError, match="x_axis must be one of"):
+    # **A deliberate contract change (T-1c).**  ``"tof"`` used to be refused as
+    # a name the vocabulary did not have; it is now a real member of
+    # ``X_AXES``, and what refuses it here is the *result* — this one's
+    # abscissa is 2θ, so the flight-time coordinate is not one it can be drawn
+    # against.  The refusal is stronger than the old one: it names the axis
+    # this result has, not just the set of legal spellings.
+    from rietx.viz.plots import X_AXES
+
+    assert "tof" in X_AXES
+    with pytest.raises(ValueError, match="abscissa is 2θ in degrees"):
         result.plot(x_axis="tof", wavelength=lam)
+    with pytest.raises(ValueError, match="x_axis must be one of"):
+        result.plot(x_axis="d-spacing", wavelength=lam)
 
 
 def test_curve_names_are_a_block_bottom_aligned_with_their_data(

@@ -192,7 +192,18 @@ def pattern_items(result, wavelength: float, pattern=None
 
 
 def write_pattern_block(block, result, wavelength: float, pattern=None) -> None:
-    """Set :func:`pattern_items`' pairs and loop on ``block``."""
+    """Set :func:`pattern_items`' pairs and loop on ``block``.
+
+    **Omitted on a time-of-flight fit**, whose ``two_theta`` is ``None``: every
+    tag written here is an angular one (``_pd_meas_2theta_scan``), and
+    pdCIF's flight-time column is a different tag
+    (``_pd_meas_time_of_flight``) with its own calibration items beside it.
+    Writing microseconds under the angular tag would produce a file that reads
+    back as a scan nobody measured, so the loop is left out and the rest of the
+    document — cell, coordinates, agreement indices, geometry — is written as
+    usual.  A flight-time pattern loop is a later rung of the time-of-flight
+    track (yue-here/rietx issue #193).
+    """
     if not result.two_theta:
         return
     pairs, tags, rows = pattern_items(result, wavelength, pattern)
