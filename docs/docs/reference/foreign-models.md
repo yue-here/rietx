@@ -27,6 +27,7 @@ The models differ from each other because the formats do, and each one changes a
 | `TopasModel.skipped_blocks` | `str` blocks that stated no name, or neither a `space_group` nor a `mag_space_group`, with the cell, scale and `weight_percent` each did carry. Recorded whether or not a diagnostics list was passed |
 | `TopasModel.coverage` | what the reader met and did not carry ([TOPAS constructs and their stances](foreign-files.md#topas-constructs-and-their-stances)) |
 | `TopasModel.time_of_flight` | the datasets that are neutron time of flight, each with the constructs that said so. `to_structure` refuses their phases by name |
+| `TopasModel.tof_banks` | each time-of-flight dataset read toward a rietx bank: its calibration and profile on `TOFSource` and `ProfileTOF`, and by name every construct rietx cannot carry. `rietx.io.projects.topas_tof.to_tof_refinement` builds the structure and instrument from one, and `rietx.io.projects.topas_tof.from_tof` writes one back |
 | `TopasModel.symbols` | every parameter the file declares, by name, with its value and refine flag: what a name in an equation refers to |
 | `TopasModel.neutron` | whether the file states `neutron_data` |
 | `TopasModel.lp_factor` | the angle of the file's `LP_Factor(c)`, or `None`. With `neutron`, what `to_structure(scale="rietx")` converts TOPAS's scale by |

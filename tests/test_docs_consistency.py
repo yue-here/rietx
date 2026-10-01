@@ -304,6 +304,9 @@ PRIORITIES = wp_index.PRIORITIES
 #                                                          inferred, the ordinate's twin of the axis
 #                                                          rule; landed 587 (rebased onto WP-1952's 572;
 #                                                          first landed 586 on WP-2079's 571, 2026-11-06)
+#   2026-11-17  src/rietx/io/CLAUDE.md        588 -> 594  for the TOPAS time-of-flight bank (issue #193):
+#                                                          one rule, read by evaluating a law and not its
+#                                                          spelling; landed 593 (592 on 587 first, 2026-11-06)
 SIZE_CAPS: dict[str, int | None] = {
     # 739 -> 755 (WP-1102): two standing rules for the component seam — that an
     # additive non-Bragg term is a union *member* and not a new field, and that
@@ -814,7 +817,12 @@ SIZE_CAPS: dict[str, int | None] = {
     # declaration, measure W from the abscissa).  The evidence is in
     # `io/formats/gsas.py`'s docstring.  Landed at 587 on WP-1952's 572 (586 on WP-2079's
     # 571 first); the +1 is headroom.
-    "src/rietx/io/CLAUDE.md": 588,
+    # 588 -> 594 (issue #193, the TOPAS time-of-flight bank): a `.inp` bank is
+    # read by evaluating the laws it states, so the rule a session needs is that
+    # one and the bank angle the file cannot carry; the measured laws are in
+    # `projects/topas_tof.py` and `tests/data/README.md`.  Landed at 593 (592
+    # before the rebase onto WP-1952's 572); the +1 is headroom.
+    "src/rietx/io/CLAUDE.md": 594,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs
