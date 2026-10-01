@@ -107,8 +107,12 @@ def page(result: RefinementResult, *, weighted: bool = False,
     theme's chrome from :mod:`rietx.viz.theme`, as every other page's do.
     """
     s = result.statistics
-    n = len(result.two_theta)
-    curves = packed.curve_arrays(result.two_theta, result.y_obs, np.ones(n, dtype=bool),
+    # The result's own abscissa, which on a bank is a flight time in µs: the
+    # packed column keeps its ``two_theta`` key (it is the chart's x, whatever
+    # quantity that is) and the readout takes its name and unit from the spec.
+    x = result.x()
+    n = len(x)
+    curves = packed.curve_arrays(x, result.y_obs, np.ones(n, dtype=bool),
                                  result, weighted=None, ceiling=max_points)
     residual, array = _RESIDUAL[bool(weighted)]
     # A result is fitted at every channel it carries, so the page builds
@@ -123,7 +127,11 @@ def page(result: RefinementResult, *, weighted: bool = False,
     title = f"{result.mode}  Rwp={s.rwp:.4f}  GoF={s.gof:.2f}"
     spec = {
         "residual": residual, "band": bool(weighted),
-        "labels": {"y": "intensity", "resid": "Δ/σ" if weighted else "Δ"},
+        "labels": {"y": "intensity", "resid": "Δ/σ" if weighted else "Δ",
+                   # the readout's x: "2θ 12.3456°", or "TOF 12345.6 µs"
+                   **({"x": "TOF", "xunit": " µs", "xdigits": 1}
+                      if result.axis == "tof" else
+                      {"x": "2θ", "xunit": "°", "xdigits": 4})},
         "colors": {"obs": hue["obs"], "masked": hue["obs"], "calc": hue["calc"],
                    "bkg": hue["bkg"], "diff": hue["diff"], "zero": hue["zero"],
                    "band": hue["band"], "phase": list(hue["phase"])},

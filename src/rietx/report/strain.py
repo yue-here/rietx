@@ -334,7 +334,15 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
     Pawley widths are shared with empirical intensities, so a width error there
     is not separable from an intensity one.
     """
-    if model.mode != "rietveld":
+    # Empty on a model whose grid is not an angle, and the reason runs through
+    # the whole module rather than sitting on one line: it iterates
+    # ``line_wavelengths`` (a white beam declares none), takes an ``arcsin`` to
+    # get θ, and reads the Caglioti and FCJ parameter paths, which a bank's
+    # table does not carry.  ``compile_tof_model`` refuses a declared Stephens
+    # block outright, so there is nothing to look for here either — but this is
+    # the boundary, and a check at the boundary is what stops the module being
+    # reached with the wrong quantity.
+    if model.mode != "rietveld" or getattr(model, "axis", "two_theta") != "two_theta":
         return []
     out: list[StrainAnalysis] = []
     for ip, cp in enumerate(model.phases):

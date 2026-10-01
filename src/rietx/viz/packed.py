@@ -150,10 +150,12 @@ def curve_arrays(tt_all, y_all, keep, res, *, weighted: bool | None,
     head = {"weighted": weighted, "n_channels": len(grid), **(header or {})}
     arrays = {"two_theta": grid, "y_obs": np.asarray(y_all, dtype=float),
               "kept": np.flatnonzero(keep)}
-    if res is None or not res.two_theta:
+    # the fit's own abscissa, which is a flight time on a bank: ``x()`` and
+    # never ``two_theta`` (``None`` there), so a bank's page draws its curves
+    tt_fit = np.asarray(res.x(), dtype=float) if res is not None else np.array([])
+    if not len(tt_fit):
         return _under_ceiling(Packed({**head, "fit": False}, arrays), ceiling)
 
-    tt_fit = np.asarray(res.two_theta, dtype=float)
     at = np.minimum(np.searchsorted(grid, tt_fit), len(grid) - 1)
     if not np.array_equal(grid[at], tt_fit):
         raise OffPattern("the fit's channels are not this pattern's, so its curves "

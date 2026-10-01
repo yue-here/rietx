@@ -138,6 +138,8 @@ def stage_ticks(model, values: dict, *,
     separately could come apart, and the reader would never know which of the
     two was lying.
     """
+    # On the model's own axis: ``reflection_positions`` is each model's own
+    # walk, and a bank's twin places its one row by the four-term calibration.
     ticks: dict[str, dict] = {}
     for ip in range(len(model.phases)):
         # the forward model's own position (Bragg angle, zero and the
@@ -199,7 +201,11 @@ def build_snapshot(model, table, outcome, stage_name: str, *,
     from ..optimize.statistics import compute_statistics
 
     values = table.decode(outcome.theta)
-    tt = np.asarray(model.tt, dtype=np.float64)
+    # ``.grid`` rather than ``.tt``: the axis-blind accessor both
+    # ``CompiledModel`` and ``CompiledTOFModel`` carry, so a flight-time
+    # snapshot's payload holds microseconds under this same key rather than
+    # raising on a constant-wavelength-only attribute.
+    tt = np.asarray(model.grid, dtype=np.float64)
     y_obs = np.asarray(model.y_obs, dtype=np.float64)
     y_calc = np.asarray(model.evaluate(values), dtype=np.float64)
     y_bkg = np.asarray(model.background(values), dtype=np.float64)
@@ -223,7 +229,9 @@ def build_snapshot(model, table, outcome, stage_name: str, *,
         "schema": SCHEMA_VERSION,
         "written": time.time(),
         "stage": stage_name,
-        "weighted": model.sigma_measured,
+        # ``CompiledTOFModel`` carries no ``sigma_measured`` (T-1/T-1c never
+        # extended this field there); ``None`` is honest rather than a guess.
+        "weighted": getattr(model, "sigma_measured", None),
         "statistics": {
             "rwp": float(stats.rwp), "gof": float(stats.gof),
             "chi2": float(stats.chi2), "rp": float(stats.rp),
