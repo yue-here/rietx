@@ -430,17 +430,19 @@ _RADIATION_NOTES: dict[str, tuple[str, str]] = {
     "neutron_cw": ("Constant-wavelength neutron",
                    "the nucleus, a point scatterer, so b is independent of Q"),
     # What a client reads to decide whether to hand the build a bank, so it
-    # may not overstate the answer: this build reads one and refines none.
+    # may not overstate the answer: one bank refines, several do not yet.
     "neutron_tof": ("Neutron time-of-flight",
                     "the nucleus, as for CW neutron — but the bank sees the "
                     "whole moderator spectrum and separates reflections by "
                     "arrival time, so the abscissa is a flight time in µs and "
-                    "the positions come from the bank's DIFC/DIFA/TZERO/DIFB. "
-                    "This build reads a bank (GSAS TIME_MAP/RALF/SLOG and "
-                    "Mantid pattern files, GSAS-I .iparm and GSAS-II .instprm "
-                    "calibrations) and refines none: there is no flight-time "
-                    "forward model yet, and every entry that would compute a "
-                    "pattern refuses a bank by name"),
+                    "the forward model is the flight-time one: positions from "
+                    "the bank's DIFC/DIFA/TZERO/DIFB, a back-to-back "
+                    "exponential profile, the bank's own d⁴·sinθ Lorentz "
+                    "factor, the incident spectrum and the channel width per "
+                    "channel. Rietveld refinement of one bank against a "
+                    "structure, with the phase's own size and microstrain; "
+                    "several banks as one joint residual, and Le Bail and "
+                    "Pawley extraction on a bank, are not written"),
 }
 
 

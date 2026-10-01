@@ -283,8 +283,8 @@ def test_the_capabilities_arm_grows_a_third_radiation_and_does_not_call_it_one_l
     would be the one wrong statement a derived table could make about it.
 
     The note is what a client reads to decide whether to hand the build a
-    bank, so it may not overstate the answer: it says the arm is read and that
-    no flight-time forward model exists here.
+    bank, so it may not overstate the answer: it names the flight-time model a
+    bank refines with, and what is still **not** written on one.
     """
     arms = {r.kind: r for r in rx.capabilities().radiations}
     assert set(arms) == {"xray_cw", "neutron_cw", "neutron_tof"}
@@ -294,7 +294,9 @@ def test_the_capabilities_arm_grows_a_third_radiation_and_does_not_call_it_one_l
     assert tof.anomalous_dispersion is False
     note = tof.scatterer.lower()
     assert "flight time" in note
-    assert "read" in note and "refines none" in note
+    assert "rietveld refinement of one bank" in note
+    assert "several banks" in note and "not written" in note
+    assert "le bail" in note
 
 
 # ---------------------------------------------------------------------------
@@ -1165,16 +1167,25 @@ def _assert_authored(exc: pytest.ExceptionInfo, where: str) -> None:
     assert "issue #193" in message
 
 
-def test_fit_refuses_a_tof_pattern_against_a_cw_instrument(tof_pattern,
-                                                           cw_models):
-    """No flight-time forward model exists in this build, so the matched pair
-    is refused at construction (a bank) and the crossed pair at ``fit``."""
+def test_fit_refuses_a_crossed_pair_either_way(tof_pattern, cw_models):
+    """``fit`` serves both arms, so what it refuses is a *crossed* pair: a
+    flight time against a constant-wavelength instrument, and a 2θ scan
+    against a bank — each by name, before a run begins."""
     structure, instrument = cw_models
     for call in (lambda: rx.Refinement(structure, instrument).fit(tof_pattern),
                  lambda: rx.refine(tof_pattern, structure, instrument)):
         with pytest.raises(ValueError) as exc:
             call()
-        _assert_authored(exc, "Refinement.fit()")
+        message = str(exc.value)
+        assert message.startswith("Refinement.fit()"), message
+        assert "time of flight in microseconds" in message
+        assert "no bank calibration" in message
+    bank = rx.Instrument.tof_neutron_bank(difc=5123.45, two_theta_bank_deg=61.2)
+    scan = PatternData(two_theta=[10.0 + 0.02 * i for i in range(200)],
+                       intensity=[10.0] * 200)
+    with pytest.raises(ValueError, match=r"^Refinement\.fit\(\): this "
+                       r"instrument's source is a neutron_tof bank"):
+        rx.Refinement(structure, bank, history=False).fit(scan)
 
 
 def test_the_multi_histogram_entry_names_which_histogram(tof_pattern, cw_models):
@@ -1250,7 +1261,8 @@ def test_compile_model_is_the_backstop(tof_pattern, cw_models):
 
 
 def _remaining_entries(tof_pattern, structure, instrument):
-    """Every other public entry that takes a pattern and computes from it.
+    """Every other public entry that takes a pattern, computes from it, and
+    serves only a 2θ scan.
 
     Each refuses at its own door, before anything it would check first (a fit
     that has not run, a history that is off): the axis is the earlier fact,
@@ -1259,7 +1271,6 @@ def _remaining_entries(tof_pattern, structure, instrument):
     """
     from rietx.background import select_arpls_lambda, select_chebyshev_order
     from rietx.indexing import detect_peaks, validate_by_lebail
-    from rietx.io.exporters import refinement_cif_doc
     from rietx.report.body_misfit import rigid_body_misfit
     from rietx.schemas.indexing import CellCandidate
 
@@ -1268,14 +1279,8 @@ def _remaining_entries(tof_pattern, structure, instrument):
                               cell_esd=(1e-4,) * 3 + (0.0,) * 3,
                               system="cubic", centring="F")
     return [
-        ("Refinement.run_stage()",
-         lambda: ref.run_stage(tof_pattern, rx.Stage(name="s", turn_on=["*.scale"]))),
-        ("Refinement.predict()", lambda: ref.predict(tof_pattern)),
-        ("Refinement.suggest()", lambda: ref.suggest(tof_pattern)),
         ("Refinement.profile_fraction()",
          lambda: ref.profile_fraction(tof_pattern, 0)),
-        ("Refinement.cherry_pick()", lambda: ref.cherry_pick("n0001", tof_pattern)),
-        ("replay()", lambda: rx.replay(None, "n0001", tof_pattern)),
         ("solve_magnetic()", lambda: rx.solve_magnetic(ref, tof_pattern)),
         ("fit_peaks()", lambda: rx.fit_peaks(tof_pattern, instrument, [1500.0])),
         ("detect_peaks()", lambda: detect_peaks(tof_pattern, instrument)),
@@ -1286,12 +1291,6 @@ def _remaining_entries(tof_pattern, structure, instrument):
         ("Refinement.check_rigid_bodies()",
          lambda: ref.check_rigid_bodies(tof_pattern)),
         ("rigid_body_misfit()", lambda: rigid_body_misfit(ref, tof_pattern)),
-        ("write_refinement_cif()",
-         lambda: rx.write_refinement_cif(None, structure, instrument, "never.cif",
-                                         pattern=tof_pattern)),
-        ("refinement_cif_doc()",
-         lambda: refinement_cif_doc(None, structure, instrument,
-                                    pattern=tof_pattern)),
     ]
 
 
@@ -1302,6 +1301,43 @@ def test_every_remaining_pattern_entry_refuses_by_its_own_name(tof_pattern,
         with pytest.raises(ValueError) as exc:
             call()
         _assert_authored(exc, where)
+
+
+def _two_arm_entries(tof_pattern, structure, instrument):
+    """The entries a bank's own fit reaches, which serve both arms.
+
+    What each refuses is a *crossed* pair, by its own name, as ``fit`` does.
+    ``replay`` is not here: the instrument it checks is the one its history
+    recorded, so its check follows the node lookup.
+    """
+    from rietx.io.exporters import refinement_cif_doc
+
+    ref = rx.Refinement(structure, instrument, history=False)
+    return [
+        ("Refinement.run_stage()",
+         lambda: ref.run_stage(tof_pattern, rx.Stage(name="s", turn_on=["*.scale"]))),
+        ("Refinement.predict()", lambda: ref.predict(tof_pattern)),
+        ("Refinement.suggest()", lambda: ref.suggest(tof_pattern)),
+        ("Refinement.cherry_pick()", lambda: ref.cherry_pick("n0001", tof_pattern)),
+        ("write_refinement_cif()",
+         lambda: rx.write_refinement_cif(None, structure, instrument, "never.cif",
+                                         pattern=tof_pattern)),
+        ("refinement_cif_doc()",
+         lambda: refinement_cif_doc(None, structure, instrument,
+                                    pattern=tof_pattern)),
+    ]
+
+
+def test_every_two_arm_entry_refuses_a_crossed_pair_by_its_own_name(
+        tof_pattern, cw_models):
+    structure, instrument = cw_models
+    for where, call in _two_arm_entries(tof_pattern, structure, instrument):
+        with pytest.raises(ValueError) as exc:
+            call()
+        message = str(exc.value)
+        assert message.startswith(where), message
+        assert "time of flight in microseconds" in message
+        assert "no bank calibration" in message
 
 
 def test_a_project_reopened_on_a_flight_time_is_refused(tmp_path, cw_models):
@@ -1370,29 +1406,26 @@ def test_the_instrument_writers_refuse_a_bank_by_name(tmp_path, cw_models):
     assert not list(tmp_path.iterdir())
 
 
-def test_a_tof_instrument_is_refused_at_construction(cw_models):
-    """The mistake seen from the other side, refused before anything reads a
-    wavelength the source does not have.
-
-    Without this it surfaces as an ``AttributeError`` for a wavelength the
-    source does not have, which tells a caller nothing about what they did.
-    The single and the joint constructor both read one, so both refuse; an
-    edit that swaps a bank in is the same door.
-    """
+def test_a_bank_constructs_a_refinement_and_the_joint_entry_still_refuses(
+        cw_models):
+    """A single ``Refinement`` over a bank is a legitimate object now — its
+    table registers the bank's calibration, and the pattern is checked at
+    ``fit`` — and an edit that swaps a bank in is the same.  The joint
+    constructor still reads a wavelength per histogram and has no flight-time
+    arm, so it refuses a bank by name, saying which instrument."""
     structure, instrument = cw_models
     bank = rx.Instrument.tof_neutron_bank(difc=5123.45, two_theta_bank_deg=61.2)
-    for call, where in (
-            (lambda: rx.Refinement(structure, bank), "Refinement()"),
-            (lambda: rx.MultiHistogramRefinement(structure, [instrument, bank]),
-             "MultiHistogramRefinement(), instrument 1 of 2"),
-            (lambda: rx.Refinement(structure, instrument, history=False).edit(
-                instrument=bank), "Refinement.edit()")):
-        with pytest.raises(ValueError) as exc:
-            call()
-        message = str(exc.value)
-        assert message.startswith(where), message
-        assert "neutron_tof bank" in message
-        assert "issue #193" in message
+    ref = rx.Refinement(structure, bank, history=False)
+    assert "instrument.source.difc" in {r.path for r in ref.parameters()}
+    edited = rx.Refinement(structure, instrument, history=False)
+    edited.edit(instrument=bank)
+    assert edited.instrument.source.kind == "neutron_tof"
+    with pytest.raises(ValueError) as exc:
+        rx.MultiHistogramRefinement(structure, [instrument, bank])
+    message = str(exc.value)
+    assert message.startswith("MultiHistogramRefinement(), instrument 1 of 2"), message
+    assert "neutron_tof bank" in message
+    assert "issue #193" in message
 
 
 def test_require_two_theta_passes_a_constant_wavelength_pattern(cw_models):
@@ -1422,9 +1455,11 @@ def test_the_project_and_gui_doors_refuse_one_too(tmp_path, tof_pattern, cw_mode
                           structure=structure, instrument=instrument)
     _assert_authored(exc, "Project.create()")
 
-    with pytest.raises(ValueError) as exc:
-        rx.project.fitted_mask(tof_pattern, None)
-    _assert_authored(exc, "project.fitted_mask()")
+    # ``fitted_mask`` is the fit's own authority on which channels it uses,
+    # and the fit now runs on a bank, so it answers on the pattern's own
+    # abscissa: limits in µs there
+    mask = rx.project.fitted_mask(tof_pattern, (1100.0, 1500.0))
+    assert int(mask.sum()) == 41
 
     # the GUI's own door: an upload is refused with the same words, wrapped in
     # the type the wizard shows rather than as a bare ValueError
@@ -1539,24 +1574,23 @@ def test_a_project_made_before_bank_existed_still_opens_on_a_multi_bank_file(
     assert reopened.data.two_theta[0] == pytest.approx(10.0)
 
 
-def test_a_refused_bank_edit_leaves_the_working_state_where_it_was(cw_models):
-    """``edit`` refuses a bank, and the refusal comes before any state moves:
-    the structure, the user ties and the head are all as they were."""
+def test_a_bank_edit_drops_a_tie_on_a_row_the_bank_does_not_carry(cw_models):
+    """``edit`` takes a bank since the time-of-flight forward model (it refused
+    one before).  A user tie naming a constant-wavelength row, which a bank
+    does not carry (#442), is dropped by name with a warning: the general rule
+    for a tie that no longer applies, rather than a half-applied edit."""
     structure, instrument = cw_models
     ref = rx.Refinement(structure, instrument)
     ref.tie_equal(["instrument.profile.u", "instrument.profile.v"])
     assert ref._ties
-    ties_before = dict(ref._ties)
-    head_before = ref._head_id
     s2 = structure.model_copy(deep=True)
     s2.phases[0].cell.a.value += 0.5
     bank = rx.Instrument.tof_neutron_bank(difc=5123.45, two_theta_bank_deg=90.0)
-    with pytest.raises(ValueError) as exc:
+    with pytest.warns(UserWarning, match=r"instrument\.profile\.v"):
         ref.edit(structure=s2, instrument=bank)
-    assert str(exc.value).startswith("Refinement.edit()")
-    assert ref.structure.phases[0].cell.a.value == structure.phases[0].cell.a.value
-    assert ref._ties == ties_before
-    assert ref._head_id == head_before
+    assert ref.instrument.source.kind == "neutron_tof"
+    assert ref.structure.phases[0].cell.a.value == s2.phases[0].cell.a.value
+    assert not ref._ties
 
 
 def test_a_flight_time_pattern_prints_and_says_which_axis_it_is(tof_pattern):
