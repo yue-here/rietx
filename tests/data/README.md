@@ -1292,6 +1292,7 @@ was read.
 | `TOF_PV(fw, F, lor, η, t1)` | pseudo-Voigt, FWHM = 10⁻⁵·F·t1·d, fraction η | FWHM ∝ F, ∝ d, ∝ t1; h·Γ/area 0.9394 at η 0, 0.635 at η 1 |
 | `TOF_Exponential(a0, ·, a1, ·, w, t1, ±)` | rate ln(1000)·(a0 + a1/d^w)/t1; `+` late, `−` early | r·t1 = 20 ln 1000 at a0 20; ∝ 1/d⁴ at w 4, 1/d at w 1; ∝ 1/t1 |
 | `exp_conv_const c` | rate −ln(0.001)/c, late for c > 0 | c = −Ln(0.001)/0.05 → 0.0500000 µs⁻¹ at every d |
+| `push_peak` / rise / `bring_2nd_peak_to_top` / decay / `add_pop_1st_2nd_peak` | the back-to-back pulse, the same as the two in series (VD82 eq. 10: the members are not unit-area) | 9.8e-4 of max against rietx's pulse, 0.71 off the equal-weight sum; with `scale_top_peak 3` 0.137 off, a weighted pair (`tof/topas_stack/`) |
 | intensity | TOPAS = rietx × 0.01/sin θ_bank at one scale | Si and NiO per d-group, \|ln dev\| ≤ 1.3e-7 (b² in barn vs fm²; rietx's sin θ_bank) |
 | `bkg c0 c1 …` | rietx's shifted Chebyshev, on TOPAS's output grid ends | `bkg 0 1`, `0 0 1`, `1 0 0 1`: 5e-7 (print precision) |
 | `Lam` on a `TOF_LAM` bank | 0 — no wavelength of its own | `phase_out` |
@@ -1310,6 +1311,14 @@ matters on a coarse grid: where a rise exponential spans a channel or two, the
 default step leaves several 1e-3 of the maximum, and `convolution_step 4`–`8`
 removes it (measured on a variant of an archive standard, whose values are not
 quoted here), so `from_tof` takes `convolution_step=` for such a bank.
+
+**In CI:** `tof/topas_synthetic/` vendors one synthetic case of that identity
+at reduced size — the same NiO + Si bank over 8000–12000 µs, profile types 1
+and 3, the `.inp` this package wrote and the `Y_calc` TOPAS computed from it
+(synthetic input, no measured data; its README has the generator, the program
+version, the date and the hashes). `test_tof_topas_synthetic.py` holds rietx
+to 1.5e-3 of the maximum against it (measured 1.26e-3 and 1.05e-3), with DIFA's
+sign and an α/β swap planted on the rietx side as the arms that must fail.
 
 ### FullProf `.pcr` — six real files, none of them vendorable
 
