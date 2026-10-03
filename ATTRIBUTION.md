@@ -362,6 +362,45 @@ they were built from. Their licence texts ship in the wheel and sdist as
   *Atlas of Neutron Resonances* (2006) for 113Cd (0.178 eV), 149Sm (0.0973 eV)
   and 168Yb (0.597 eV); the copy to hand lacks the 155Gd and 157Gd pages and
   151Eu was not located, so those three rest on ENDF alone.
+- `src/rietx/data/r_ion_Shannon.dat` — effective ionic and crystal radii,
+  all 497 rows of Table 1 (pp. 752–753) of Shannon, R. D. (1976). *Acta
+  Cryst.* A**32**, 751–767, doi:10.1107/S0567739476001551, with every printed
+  column and Shannon's derivation/reliability flags. **Shannon is the sole
+  source of every ionic radius here.** Transcribed for this package from
+  the page images (2026-10-02). No file was copied. Two independent digital
+  copies were read as checks only: the Imperial College Shannon database
+  agrees on all 994 radii and differs on one flag, and Wikipedia's "Ionic
+  radius" tables differ on two cells. In all three cases the page agrees
+  with this transcription. The file header lists those cells, the page
+  checks, and the one printed exception to Shannon's CR = IR ± 0.14 Å
+  (N⁵⁺ III). Read by `crystallography.radii.ionic_radius`.
+- `src/rietx/data/r_cov_Pyykko.dat` — molecular covalent radii from
+  Pyykkö, P. & Atsumi, M. (2009). *Chem. Eur. J.* **15**, 186–197,
+  doi:10.1002/chem.200800987 (single bonds, r₁, Fig. 2, 118 elements), and
+  Pyykkö, P. & Atsumi, M. (2009). *Chem. Eur. J.* **15**, 12770–12779,
+  doi:10.1002/chem.200901472 (double bonds, r₂, Fig. 3, 108 elements).
+  Transcribed from the figures (2026-10-02). Fig. 3 is marked "This table
+  copyright © 2009 by Pekka Pyykkö", so only the numbers are reproduced,
+  never the figure. Wikipedia's "Covalent radius" table was a check only,
+  and agrees on all 226 values. These radii are for covalent bonds in
+  molecules and rigid bodies (`crystallography.radii.covalent_radius`).
+  The bond table in `model/geometry.py` does not read them; it uses gemmi's
+  Cordero et al. (2008) radii.
+- `src/rietx/data/r_metal_Pauling.dat` — metallic valences and radii (v,
+  R(L12), R₁) for 72 elements, Table 11-1, "Metallic valences and radii of
+  the elements" (p. 403) of Pauling, L. (1960). *The Nature of the Chemical
+  Bond and the Structure of Molecules and Crystals*, 3rd ed., Cornell
+  University Press, Ithaca NY. Transcribed for this package from the page
+  images of two copies of the 3rd edition (2026-10-02). No file was copied.
+  Checked against Pauling, L. (1947). *J. Am. Chem. Soc.* **69**, 542–553,
+  doi:10.1021/ja01195a024 (Table I), and Pauling's own relation
+  R(L12) = R₁ + 0.300 log(12/v) (p. 412). Table 11-1 is used rather than the
+  book's Table 7-18 (p. 256), which is essentially the 1947 R(1) set. Three
+  printed cells are corrected misprints, each with the printed value kept in
+  the file: Gd R(L12) 2.804 → 1.804, Eu v 3 → 2, and the Sr cell labelled
+  "Sn"; Pm R(L12) is kept as printed and flagged. Read by
+  `crystallography.radii.metallic_radius`, for metal–metal contacts in
+  intermetallic and anion-free phases; the bond table does not read it.
 - `src/rietx/data/f0_WaasKirf.dat` — Waasmaier & Kirfel (1995) 5-Gaussian f0
   coefficients, obtained from the ESRF DABAX collection (public scientific data,
   redistributed by silx (MIT) among others). Cite Waasmaier & Kirfel (1995).

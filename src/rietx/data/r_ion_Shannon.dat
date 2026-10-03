@@ -1,0 +1,567 @@
+# r_ion_Shannon.dat -- effective ionic radii and crystal radii, Shannon (1976) Table 1.
+#
+# CITE:  Shannon, R. D. (1976). Revised effective ionic radii and systematic
+#        studies of interatomic distances in halides and chalcogenides.
+#        Acta Cryst. A32, 751-767. doi:10.1107/S0567739476001551
+#        Table 1, pp. 752-753.
+#
+# STATUS: every number below is Shannon's, transcribed for this package from
+# the printed page; no file of anyone else's was copied. The two digital
+# copies named under CHECKS were read as checks only and supplied no value.
+# Cite the article, never this file or a copy, as the source of a radius.
+#
+# TRANSCRIPTION (2026-10-02). Read row by row from 400 dpi images of the two
+# printed pages: 497 rows, 83 + 83 + 83 on p. 752 and 83 + 83 + 82 on p. 753
+# (`block` is page.column, `row` the row within that column block).
+#
+# CHECKS, with counts. No check changed a transcribed value.
+#   1. The PDF's own publisher OCR layer: agrees exactly on 340 rows; the other
+#      157 (60 of them a 4 -> 6 digit swap) were re-read at 500 dpi, and the
+#      page confirmed this transcription in all 157.
+#   2. The Imperial College Shannon database (abulafia.mt.ic.ac.uk/shannon,
+#      read 2026-10-02): 497 rows; CR, IR and CN identical on all 497. One
+#      flag differs: Cr2+ VI HS is R* there and R on the page.
+#   3. Wikipedia, "Ionic radius" (read 2026-10-02): 419 of 430 cells agree.
+#      Two are wrong there: Pa3+ VI CR is 1.16 there and 1.18 on the page;
+#      Gd3+ VI IR is 0.935 there and 0.938 on the page. The other 9 cells are
+#      not Table 1 values (other sources, or ions with no Table 1 row).
+#   4. Shannon's own relation, "crystal radii differ from traditional radii
+#      only by a constant factor of 0.14 A" (pp. 759-760): CR = IR + 0.14 for
+#      every cation and IR - 0.14 for every anion, on 496 of 497 rows. The
+#      exception is N5+ III, printed .044 / -.104 (0.148), as the page has it.
+#
+# COLUMNS (Shannon's definitions, p. 752 caption and pp. 759-760):
+#   ion     element symbol; OH is the hydroxide ion, D deuterium
+#   charge  formal oxidation state as printed (CO+2 -> 2, O-2 -> -2)
+#   ec      electronic configuration, exactly as printed; - for OH-, which prints none
+#   cn      coordination number as a Roman numeral; suffix SQ = square
+#           planar, PY = pyramidal
+#   spin    HS or LS as printed, - where the table prints none
+#   cr_A    crystal radius (A), on r(VI O2-) = 1.26 A and r(VI F-) = 1.19 A,
+#           the Fumi & Tosi (1964) definition; Shannon: they "correspond more
+#           closely to the physical size of ions in a solid" (p. 760)
+#   ir_A    effective ionic radius (A), the traditional scale on
+#           r(VI O2-) = 1.40 A; Shannon keeps it "for comparison of unit-cell
+#           volumes and interatomic distances" (p. 760)
+#   flags   as printed, - where none (p. 760):
+#             R  from r^3 vs V plots
+#             C  calculated from bond-length--bond-strength equations
+#             E  estimated ("implies poor or nonexistent structural data")
+#             *  most reliable: >= 5 structures agree within +/-0.01 A
+#             M  from a compound with metallic conductivity ("may be too small
+#                for use in compounds having localized electrons")
+#             A  Ahrens (1952) ionic radius;  P  Pauling (1960) crystal radius
+#             ?  doubtful -- defined, but printed on no row
+#   page block row   where the row is printed
+#
+# AS PRINTED, deliberately: radii carry the printed number of decimals with a
+# leading zero added (.675 -> 0.675); No2+ VI IR is printed 1.1 and kept so.
+# Five radii are printed negative (H+ I and II, D+ II, C4+ III, N5+ III).
+# Sb3+ IR(V) 0.80 > IR(VI) 0.76 is printed so. Four EC entries are not the
+# physical configuration (Ce3+ 6S1, La3+ 4D10, Cf3+ 6D1, Pa4+ 6D1); no radius
+# is affected. The table has no N3- CN VI row and no row for H-.
+#
+# SCOPE (Shannon, pp. 751-753): fitted mostly to oxides and fluorides, and
+# "more applicable to oxides than fluorides"; additivity fails with covalence,
+# metallic character, distortion and partial occupancy. Ionic radii cannot
+# describe a covalent contact (B-B, C-C): see r_cov_Pyykko.dat.
+#
+# columns: ion  charge  ec  cn  spin  cr_A  ir_A  flags  page  block  row
+
+Ac    3  6P6   VI    -      1.26    1.12  R   752 2.1  1
+Ag    1  4D10  II    -      0.81    0.67  -   752 2.1  2
+Ag    1  4D10  IV    -      1.14    1.00  C   752 2.1  3
+Ag    1  4D10  IVSQ  -      1.16    1.02  -   752 2.1  4
+Ag    1  4D10  V     -      1.23    1.09  C   752 2.1  5
+Ag    1  4D10  VI    -      1.29    1.15  C   752 2.1  6
+Ag    1  4D10  VII   -      1.36    1.22  -   752 2.1  7
+Ag    1  4D10  VIII  -      1.42    1.28  -   752 2.1  8
+Ag    2  4D9   IVSQ  -      0.93    0.79  -   752 2.1  9
+Ag    2  4D9   VI    -      1.08    0.94  -   752 2.1 10
+Ag    3  4D8   IVSQ  -      0.81    0.67  -   752 2.1 11
+Ag    3  4D8   VI    -      0.89    0.75  R   752 2.1 12
+Al    3  2P6   IV    -      0.53    0.39  *   752 2.1 13
+Al    3  2P6   V     -      0.62    0.48  -   752 2.1 14
+Al    3  2P6   VI    -     0.675   0.535  R*  752 2.1 15
+Am    2  5F7   VII   -      1.35    1.21  -   752 2.1 16
+Am    2  5F7   VIII  -      1.40    1.26  -   752 2.1 17
+Am    2  5F7   IX    -      1.45    1.31  -   752 2.1 18
+Am    3  5F6   VI    -     1.115   0.975  R   752 2.1 19
+Am    3  5F6   VIII  -      1.23    1.09  -   752 2.1 20
+Am    4  5F5   VI    -      0.99    0.85  R   752 2.1 21
+Am    4  5F5   VIII  -      1.09    0.95  -   752 2.1 22
+As    3  4S2   VI    -      0.72    0.58  A   752 2.1 23
+As    5  3D10  IV    -     0.475   0.335  R*  752 2.1 24
+As    5  3D10  VI    -      0.60    0.46  C*  752 2.1 25
+At    7  5D10  VI    -      0.76    0.62  A   752 2.1 26
+Au    1  5D10  VI    -      1.51    1.37  A   752 2.1 27
+Au    3  5D8   IVSQ  -      0.82    0.68  -   752 2.1 28
+Au    3  5D8   VI    -      0.99    0.85  A   752 2.1 29
+Au    5  5D6   VI    -      0.71    0.57  -   752 2.1 30
+B     3  1S2   III   -      0.15    0.01  *   752 2.1 31
+B     3  1S2   IV    -      0.25    0.11  *   752 2.1 32
+B     3  1S2   VI    -      0.41    0.27  C   752 2.1 33
+Ba    2  5P6   VI    -      1.49    1.35  -   752 2.1 34
+Ba    2  5P6   VII   -      1.52    1.38  C   752 2.1 35
+Ba    2  5P6   VIII  -      1.56    1.42  -   752 2.1 36
+Ba    2  5P6   IX    -      1.61    1.47  -   752 2.1 37
+Ba    2  5P6   X     -      1.66    1.52  -   752 2.1 38
+Ba    2  5P6   XI    -      1.71    1.57  -   752 2.1 39
+Ba    2  5P6   XII   -      1.75    1.61  C   752 2.1 40
+Be    2  1S2   III   -      0.30    0.16  -   752 2.1 41
+Be    2  1S2   IV    -      0.41    0.27  *   752 2.1 42
+Be    2  1S2   VI    -      0.59    0.45  C   752 2.1 43
+Bi    3  6S2   V     -      1.10    0.96  C   752 2.1 44
+Bi    3  6S2   VI    -      1.17    1.03  R*  752 2.1 45
+Bi    3  6S2   VIII  -      1.31    1.17  R   752 2.1 46
+Bi    5  5D10  VI    -      0.90    0.76  E   752 2.1 47
+Bk    3  5F8   VI    -      1.10    0.96  R   752 2.1 48
+Bk    4  5F7   VI    -      0.97    0.83  R   752 2.1 49
+Bk    4  5F7   VIII  -      1.07    0.93  R   752 2.1 50
+Br   -1  4P6   VI    -      1.82    1.96  P   752 2.1 51
+Br    3  4P2   IVSQ  -      0.73    0.59  -   752 2.1 52
+Br    5  4S2   IIIPY -      0.45    0.31  -   752 2.1 53
+Br    7  3D10  IV    -      0.39    0.25  -   752 2.1 54
+Br    7  3D10  VI    -      0.53    0.39  A   752 2.1 55
+C     4  1S2   III   -      0.06   -0.08  -   752 2.1 56
+C     4  1S2   IV    -      0.29    0.15  P   752 2.1 57
+C     4  1S2   VI    -      0.30    0.16  A   752 2.1 58
+Ca    2  3P6   VI    -      1.14    1.00  -   752 2.1 59
+Ca    2  3P6   VII   -      1.20    1.06  *   752 2.1 60
+Ca    2  3P6   VIII  -      1.26    1.12  *   752 2.1 61
+Ca    2  3P6   IX    -      1.32    1.18  -   752 2.1 62
+Ca    2  3P6   X     -      1.37    1.23  C   752 2.1 63
+Ca    2  3P6   XII   -      1.48    1.34  C   752 2.1 64
+Cd    2  4D10  IV    -      0.92    0.78  -   752 2.1 65
+Cd    2  4D10  V     -      1.01    0.87  -   752 2.1 66
+Cd    2  4D10  VI    -      1.09    0.95  -   752 2.1 67
+Cd    2  4D10  VII   -      1.17    1.03  C   752 2.1 68
+Cd    2  4D10  VIII  -      1.24    1.10  C   752 2.1 69
+Cd    2  4D10  XII   -      1.45    1.31  -   752 2.1 70
+Ce    3  6S1   VI    -      1.15    1.01  R   752 2.1 71
+Ce    3  6S1   VII   -      1.21    1.07  E   752 2.1 72
+Ce    3  6S1   VIII  -     1.283   1.143  R   752 2.1 73
+Ce    3  6S1   IX    -     1.336   1.196  R   752 2.1 74
+Ce    3  6S1   X     -      1.39    1.25  -   752 2.1 75
+Ce    3  6S1   XII   -      1.48    1.34  C   752 2.1 76
+Ce    4  5P6   VI    -      1.01    0.87  R   752 2.1 77
+Ce    4  5P6   VIII  -      1.11    0.97  R   752 2.1 78
+Ce    4  5P6   X     -      1.21    1.07  -   752 2.1 79
+Ce    4  5P6   XII   -      1.28    1.14  -   752 2.1 80
+Cf    3  6D1   VI    -      1.09    0.95  R   752 2.1 81
+Cf    4  5F8   VI    -     0.961   0.821  R   752 2.1 82
+Cf    4  5F8   VIII  -      1.06    0.92  -   752 2.1 83
+Cl   -1  3P6   VI    -      1.67    1.81  P   752 2.2  1
+Cl    5  3S2   IIIPY -      0.26    0.12  -   752 2.2  2
+Cl    7  2P6   IV    -      0.22    0.08  *   752 2.2  3
+Cl    7  2P6   VI    -      0.41    0.27  A   752 2.2  4
+Cm    3  5F7   VI    -      1.11    0.97  R   752 2.2  5
+Cm    4  5F6   VI    -      0.99    0.85  R   752 2.2  6
+Cm    4  5F6   VIII  -      1.09    0.95  R   752 2.2  7
+Co    2  3D7   IV    HS     0.72    0.58  -   752 2.2  8
+Co    2  3D7   V     -      0.81    0.67  C   752 2.2  9
+Co    2  3D7   VI    LS     0.79    0.65  R   752 2.2 10
+Co    2  3D7   VI    HS    0.885   0.745  R*  752 2.2 11
+Co    2  3D7   VIII  -      1.04    0.90  -   752 2.2 12
+Co    3  3D6   VI    LS    0.685   0.545  R*  752 2.2 13
+Co    3  3D6   VI    HS     0.75    0.61  -   752 2.2 14
+Co    4  3D5   IV    -      0.54    0.40  -   752 2.2 15
+Co    4  3D5   VI    HS     0.67    0.53  R   752 2.2 16
+Cr    2  3D4   VI    LS     0.87    0.73  E   752 2.2 17
+Cr    2  3D4   VI    HS     0.94    0.80  R   752 2.2 18
+Cr    3  3D3   VI    -     0.755   0.615  R*  752 2.2 19
+Cr    4  3D2   IV    -      0.55    0.41  -   752 2.2 20
+Cr    4  3D2   VI    -      0.69    0.55  R   752 2.2 21
+Cr    5  3D1   IV    -     0.485   0.345  R   752 2.2 22
+Cr    5  3D1   VI    -      0.63    0.49  ER  752 2.2 23
+Cr    5  3D1   VIII  -      0.71    0.57  -   752 2.2 24
+Cr    6  3P6   IV    -      0.40    0.26  -   752 2.2 25
+Cr    6  3P6   VI    -      0.58    0.44  C   752 2.2 26
+Cs    1  5P6   VI    -      1.81    1.67  -   752 2.2 27
+Cs    1  5P6   VIII  -      1.88    1.74  -   752 2.2 28
+Cs    1  5P6   IX    -      1.92    1.78  -   752 2.2 29
+Cs    1  5P6   X     -      1.95    1.81  -   752 2.2 30
+Cs    1  5P6   XI    -      1.99    1.85  -   752 2.2 31
+Cs    1  5P6   XII   -      2.02    1.88  -   752 2.2 32
+Cu    1  3D10  II    -      0.60    0.46  -   752 2.2 33
+Cu    1  3D10  IV    -      0.74    0.60  E   752 2.2 34
+Cu    1  3D10  VI    -      0.91    0.77  E   752 2.2 35
+Cu    2  3D9   IV    -      0.71    0.57  -   752 2.2 36
+Cu    2  3D9   IVSQ  -      0.71    0.57  *   752 2.2 37
+Cu    2  3D9   V     -      0.79    0.65  *   752 2.2 38
+Cu    2  3D9   VI    -      0.87    0.73  -   752 2.2 39
+Cu    3  3D8   VI    LS     0.68    0.54  -   752 2.2 40
+D     1  1S0   II    -      0.04   -0.10  -   752 2.2 41
+Dy    2  4F10  VI    -      1.21    1.07  -   752 2.2 42
+Dy    2  4F10  VII   -      1.27    1.13  -   752 2.2 43
+Dy    2  4F10  VIII  -      1.33    1.19  -   752 2.2 44
+Dy    3  4F9   VI    -     1.052   0.912  R   752 2.2 45
+Dy    3  4F9   VII   -      1.11    0.97  -   752 2.2 46
+Dy    3  4F9   VIII  -     1.167   1.027  R   752 2.2 47
+Dy    3  4F9   IX    -     1.223   1.083  R   752 2.2 48
+Er    3  4F11  VI    -     1.030   0.890  R   752 2.2 49
+Er    3  4F11  VII   -     1.085   0.945  -   752 2.2 50
+Er    3  4F11  VIII  -     1.144   1.004  R   752 2.2 51
+Er    3  4F11  IX    -     1.202   1.062  R   752 2.2 52
+Eu    2  4F7   VI    -      1.31    1.17  -   752 2.2 53
+Eu    2  4F7   VII   -      1.34    1.20  -   752 2.2 54
+Eu    2  4F7   VIII  -      1.39    1.25  -   752 2.2 55
+Eu    2  4F7   IX    -      1.44    1.30  -   752 2.2 56
+Eu    2  4F7   X     -      1.49    1.35  -   752 2.2 57
+Eu    3  4F6   VI    -     1.087   0.947  R   752 2.2 58
+Eu    3  4F6   VII   -      1.15    1.01  -   752 2.2 59
+Eu    3  4F6   VIII  -     1.206   1.066  R   752 2.2 60
+Eu    3  4F6   IX    -     1.260   1.120  R   752 2.2 61
+F    -1  2P6   II    -     1.145   1.285  -   752 2.2 62
+F    -1  2P6   III   -      1.16    1.30  -   752 2.2 63
+F    -1  2P6   IV    -      1.17    1.31  -   752 2.2 64
+F    -1  2P6   VI    -      1.19    1.33  -   752 2.2 65
+F     7  1S2   VI    -      0.22    0.08  A   752 2.2 66
+Fe    2  3D6   IV    HS     0.77    0.63  -   752 2.2 67
+Fe    2  3D6   IVSQ  HS     0.78    0.64  -   752 2.2 68
+Fe    2  3D6   VI    LS     0.75    0.61  E   752 2.2 69
+Fe    2  3D6   VI    HS    0.920   0.780  R*  752 2.2 70
+Fe    2  3D6   VIII  HS     1.06    0.92  C   752 2.2 71
+Fe    3  3D5   IV    HS     0.63    0.49  *   752 2.2 72
+Fe    3  3D5   V     -      0.72    0.58  -   752 2.2 73
+Fe    3  3D5   VI    LS     0.69    0.55  R   752 2.2 74
+Fe    3  3D5   VI    HS    0.785   0.645  R*  752 2.2 75
+Fe    3  3D5   VIII  HS     0.92    0.78  -   752 2.2 76
+Fe    4  3D4   VI    -     0.725   0.585  R   752 2.2 77
+Fe    6  3D2   IV    -      0.39    0.25  R   752 2.2 78
+Fr    1  6P6   VI    -      1.94    1.80  A   752 2.2 79
+Ga    3  3D10  IV    -      0.61    0.47  *   752 2.2 80
+Ga    3  3D10  V     -      0.69    0.55  -   752 2.2 81
+Ga    3  3D10  VI    -     0.760   0.620  R*  752 2.2 82
+Gd    3  4F7   VI    -     1.078   0.938  R   752 2.2 83
+Gd    3  4F7   VII   -      1.14    1.00  -   752 2.3  1
+Gd    3  4F7   VIII  -     1.193   1.053  R   752 2.3  2
+Gd    3  4F7   IX    -     1.247   1.107  RC  752 2.3  3
+Ge    2  4S2   VI    -      0.87    0.73  A   752 2.3  4
+Ge    4  3D10  IV    -     0.530   0.390  *   752 2.3  5
+Ge    4  3D10  VI    -     0.670   0.530  R*  752 2.3  6
+H     1  1S0   I     -     -0.24   -0.38  -   752 2.3  7
+H     1  1S0   II    -     -0.04   -0.18  -   752 2.3  8
+Hf    4  4F14  IV    -      0.72    0.58  R   752 2.3  9
+Hf    4  4F14  VI    -      0.85    0.71  R   752 2.3 10
+Hf    4  4F14  VII   -      0.90    0.76  -   752 2.3 11
+Hf    4  4F14  VIII  -      0.97    0.83  -   752 2.3 12
+Hg    1  6S1   III   -      1.11    0.97  -   752 2.3 13
+Hg    1  6S1   VI    -      1.33    1.19  -   752 2.3 14
+Hg    2  5D10  II    -      0.83    0.69  -   752 2.3 15
+Hg    2  5D10  IV    -      1.10    0.96  -   752 2.3 16
+Hg    2  5D10  VI    -      1.16    1.02  -   752 2.3 17
+Hg    2  5D10  VIII  -      1.28    1.14  R   752 2.3 18
+Ho    3  4F10  VI    -     1.041   0.901  R   752 2.3 19
+Ho    3  4F10  VIII  -     1.155   1.015  R   752 2.3 20
+Ho    3  4F10  IX    -     1.212   1.072  R   752 2.3 21
+Ho    3  4F10  X     -      1.26    1.12  -   752 2.3 22
+I    -1  5P6   VI    -      2.06    2.20  A   752 2.3 23
+I     5  5S2   IIIPY -      0.58    0.44  *   752 2.3 24
+I     5  5S2   VI    -      1.09    0.95  -   752 2.3 25
+I     7  4D10  IV    -      0.56    0.42  -   752 2.3 26
+I     7  4D10  VI    -      0.67    0.53  -   752 2.3 27
+In    3  4D10  IV    -      0.76    0.62  -   752 2.3 28
+In    3  4D10  VI    -     0.940   0.800  R*  752 2.3 29
+In    3  4D10  VIII  -      1.06    0.92  RC  752 2.3 30
+Ir    3  5D6   VI    -      0.82    0.68  E   752 2.3 31
+Ir    4  5D5   VI    -     0.765   0.625  R   752 2.3 32
+Ir    5  5D4   VI    -      0.71    0.57  EM  752 2.3 33
+K     1  3P6   IV    -      1.51    1.37  -   752 2.3 34
+K     1  3P6   VI    -      1.52    1.38  -   752 2.3 35
+K     1  3P6   VII   -      1.60    1.46  -   752 2.3 36
+K     1  3P6   VIII  -      1.65    1.51  -   752 2.3 37
+K     1  3P6   IX    -      1.69    1.55  -   752 2.3 38
+K     1  3P6   X     -      1.73    1.59  -   752 2.3 39
+K     1  3P6   XII   -      1.78    1.64  -   752 2.3 40
+La    3  4D10  VI    -     1.172   1.032  R   752 2.3 41
+La    3  4D10  VII   -      1.24    1.10  -   752 2.3 42
+La    3  4D10  VIII  -     1.300   1.160  R   752 2.3 43
+La    3  4D10  IX    -     1.356   1.216  R   752 2.3 44
+La    3  4D10  X     -      1.41    1.27  -   752 2.3 45
+La    3  4D10  XII   -      1.50    1.36  C   752 2.3 46
+Li    1  1S2   IV    -     0.730   0.590  *   752 2.3 47
+Li    1  1S2   VI    -      0.90    0.76  *   752 2.3 48
+Li    1  1S2   VIII  -      1.06    0.92  C   752 2.3 49
+Lu    3  4F14  VI    -     1.001   0.861  R   752 2.3 50
+Lu    3  4F14  VIII  -     1.117   0.977  R   752 2.3 51
+Lu    3  4F14  IX    -     1.172   1.032  R   752 2.3 52
+Mg    2  2P6   IV    -      0.71    0.57  -   752 2.3 53
+Mg    2  2P6   V     -      0.80    0.66  -   752 2.3 54
+Mg    2  2P6   VI    -     0.860   0.720  *   752 2.3 55
+Mg    2  2P6   VIII  -      1.03    0.89  C   752 2.3 56
+Mn    2  3D5   IV    HS     0.80    0.66  -   752 2.3 57
+Mn    2  3D5   V     HS     0.89    0.75  C   752 2.3 58
+Mn    2  3D5   VI    LS     0.81    0.67  E   752 2.3 59
+Mn    2  3D5   VI    HS    0.970   0.830  R*  752 2.3 60
+Mn    2  3D5   VII   HS     1.04    0.90  C   752 2.3 61
+Mn    2  3D5   VIII  -      1.10    0.96  R   752 2.3 62
+Mn    3  3D4   V     -      0.72    0.58  -   752 2.3 63
+Mn    3  3D4   VI    LS     0.72    0.58  R   752 2.3 64
+Mn    3  3D4   VI    HS    0.785   0.645  R*  752 2.3 65
+Mn    4  3D3   IV    -      0.53    0.39  R   752 2.3 66
+Mn    4  3D3   VI    -     0.670   0.530  R*  752 2.3 67
+Mn    5  3D2   IV    -      0.47    0.33  R   752 2.3 68
+Mn    6  3D1   IV    -     0.395   0.255  -   752 2.3 69
+Mn    7  3P6   IV    -      0.39    0.25  -   752 2.3 70
+Mn    7  3P6   VI    -      0.60    0.46  A   752 2.3 71
+Mo    3  4D3   VI    -      0.83    0.69  E   752 2.3 72
+Mo    4  4D2   VI    -     0.790   0.650  RM  752 2.3 73
+Mo    5  4D1   IV    -      0.60    0.46  R   752 2.3 74
+Mo    5  4D1   VI    -      0.75    0.61  R   752 2.3 75
+Mo    6  4P6   IV    -      0.55    0.41  R*  752 2.3 76
+Mo    6  4P6   V     -      0.64    0.50  -   752 2.3 77
+Mo    6  4P6   VI    -      0.73    0.59  R*  752 2.3 78
+Mo    6  4P6   VII   -      0.87    0.73  -   752 2.3 79
+N    -3  2P6   IV    -      1.32    1.46  -   752 2.3 80
+N     3  2S2   VI    -      0.30    0.16  A   752 2.3 81
+N     5  1S2   III   -     0.044  -0.104  -   752 2.3 82
+N     5  1S2   VI    -      0.27    0.13  A   752 2.3 83
+Na    1  2P6   IV    -      1.13    0.99  -   753 3.1  1
+Na    1  2P6   V     -      1.14    1.00  -   753 3.1  2
+Na    1  2P6   VI    -      1.16    1.02  -   753 3.1  3
+Na    1  2P6   VII   -      1.26    1.12  -   753 3.1  4
+Na    1  2P6   VIII  -      1.32    1.18  -   753 3.1  5
+Na    1  2P6   IX    -      1.38    1.24  C   753 3.1  6
+Na    1  2P6   XII   -      1.53    1.39  -   753 3.1  7
+Nb    3  4D2   VI    -      0.86    0.72  -   753 3.1  8
+Nb    4  4D1   VI    -      0.82    0.68  RE  753 3.1  9
+Nb    4  4D1   VIII  -      0.93    0.79  -   753 3.1 10
+Nb    5  4P6   IV    -      0.62    0.48  C   753 3.1 11
+Nb    5  4P6   VI    -      0.78    0.64  -   753 3.1 12
+Nb    5  4P6   VII   -      0.83    0.69  C   753 3.1 13
+Nb    5  4P6   VIII  -      0.88    0.74  -   753 3.1 14
+Nd    2  4F4   VIII  -      1.43    1.29  -   753 3.1 15
+Nd    2  4F4   IX    -      1.49    1.35  -   753 3.1 16
+Nd    3  4F3   VI    -     1.123   0.983  R   753 3.1 17
+Nd    3  4F3   VIII  -     1.249   1.109  R*  753 3.1 18
+Nd    3  4F3   IX    -     1.303   1.163  R   753 3.1 19
+Nd    3  4F3   XII   -      1.41    1.27  E   753 3.1 20
+Ni    2  3D8   IV    -      0.69    0.55  -   753 3.1 21
+Ni    2  3D8   IVSQ  -      0.63    0.49  -   753 3.1 22
+Ni    2  3D8   V     -      0.77    0.63  E   753 3.1 23
+Ni    2  3D8   VI    -     0.830   0.690  R*  753 3.1 24
+Ni    3  3D7   VI    LS     0.70    0.56  R*  753 3.1 25
+Ni    3  3D7   VI    HS     0.74    0.60  E   753 3.1 26
+Ni    4  3D6   VI    LS     0.62    0.48  R   753 3.1 27
+No    2  5F14  VI    -      1.24     1.1  E   753 3.1 28
+Np    2  5F5   VI    -      1.24    1.10  -   753 3.1 29
+Np    3  5F4   VI    -      1.15    1.01  R   753 3.1 30
+Np    4  5F3   VI    -      1.01    0.87  R   753 3.1 31
+Np    4  5F3   VIII  -      1.12    0.98  R   753 3.1 32
+Np    5  5F2   VI    -      0.89    0.75  -   753 3.1 33
+Np    6  5F1   VI    -      0.86    0.72  R   753 3.1 34
+Np    7  6P6   VI    -      0.85    0.71  A   753 3.1 35
+O    -2  2P6   II    -      1.21    1.35  -   753 3.1 36
+O    -2  2P6   III   -      1.22    1.36  -   753 3.1 37
+O    -2  2P6   IV    -      1.24    1.38  -   753 3.1 38
+O    -2  2P6   VI    -      1.26    1.40  -   753 3.1 39
+O    -2  2P6   VIII  -      1.28    1.42  -   753 3.1 40
+OH   -1  -     II    -      1.18    1.32  -   753 3.1 41
+OH   -1  -     III   -      1.20    1.34  -   753 3.1 42
+OH   -1  -     IV    -      1.21    1.35  E   753 3.1 43
+OH   -1  -     VI    -      1.23    1.37  E   753 3.1 44
+Os    4  5D4   VI    -     0.770   0.630  RM  753 3.1 45
+Os    5  5D3   VI    -     0.715   0.575  E   753 3.1 46
+Os    6  5D2   V     -      0.63    0.49  -   753 3.1 47
+Os    6  5D2   VI    -     0.685   0.545  E   753 3.1 48
+Os    7  5D1   VI    -     0.665   0.525  E   753 3.1 49
+Os    8  5P6   IV    -      0.53    0.39  -   753 3.1 50
+P     3  3S2   VI    -      0.58    0.44  A   753 3.1 51
+P     5  2P6   IV    -      0.31    0.17  *   753 3.1 52
+P     5  2P6   V     -      0.43    0.29  -   753 3.1 53
+P     5  2P6   VI    -      0.52    0.38  C   753 3.1 54
+Pa    3  5F2   VI    -      1.18    1.04  E   753 3.1 55
+Pa    4  6D1   VI    -      1.04    0.90  R   753 3.1 56
+Pa    4  6D1   VIII  -      1.15    1.01  -   753 3.1 57
+Pa    5  6P6   VI    -      0.92    0.78  -   753 3.1 58
+Pa    5  6P6   VIII  -      1.05    0.91  -   753 3.1 59
+Pa    5  6P6   IX    -      1.09    0.95  -   753 3.1 60
+Pb    2  6S2   IVPY  -      1.12    0.98  C   753 3.1 61
+Pb    2  6S2   VI    -      1.33    1.19  -   753 3.1 62
+Pb    2  6S2   VII   -      1.37    1.23  C   753 3.1 63
+Pb    2  6S2   VIII  -      1.43    1.29  C   753 3.1 64
+Pb    2  6S2   IX    -      1.49    1.35  C   753 3.1 65
+Pb    2  6S2   X     -      1.54    1.40  C   753 3.1 66
+Pb    2  6S2   XI    -      1.59    1.45  C   753 3.1 67
+Pb    2  6S2   XII   -      1.63    1.49  -   753 3.1 68
+Pb    4  5D10  IV    -      0.79    0.65  E   753 3.1 69
+Pb    4  5D10  V     -      0.87    0.73  E   753 3.1 70
+Pb    4  5D10  VI    -     0.915   0.775  R   753 3.1 71
+Pb    4  5D10  VIII  -      1.08    0.94  R   753 3.1 72
+Pd    1  4D9   II    -      0.73    0.59  -   753 3.1 73
+Pd    2  4D8   IVSQ  -      0.78    0.64  -   753 3.1 74
+Pd    2  4D8   VI    -      1.00    0.86  -   753 3.1 75
+Pd    3  4D7   VI    -      0.90    0.76  -   753 3.1 76
+Pd    4  4D6   VI    -     0.755   0.615  R   753 3.1 77
+Pm    3  4F4   VI    -      1.11    0.97  R   753 3.1 78
+Pm    3  4F4   VIII  -     1.233   1.093  R   753 3.1 79
+Pm    3  4F4   IX    -     1.284   1.144  R   753 3.1 80
+Po    4  6S2   VI    -      1.08    0.94  R   753 3.1 81
+Po    4  6S2   VIII  -      1.22    1.08  R   753 3.1 82
+Po    6  5D10  VI    -      0.81    0.67  A   753 3.1 83
+Pr    3  4F2   VI    -      1.13    0.99  R   753 3.2  1
+Pr    3  4F2   VIII  -     1.266   1.126  R   753 3.2  2
+Pr    3  4F2   IX    -     1.319   1.179  R   753 3.2  3
+Pr    4  4F1   VI    -      0.99    0.85  R   753 3.2  4
+Pr    4  4F1   VIII  -      1.10    0.96  R   753 3.2  5
+Pt    2  5D8   IVSQ  -      0.74    0.60  -   753 3.2  6
+Pt    2  5D8   VI    -      0.94    0.80  A   753 3.2  7
+Pt    4  5D6   VI    -     0.765   0.625  R   753 3.2  8
+Pt    5  5D5   VI    -      0.71    0.57  ER  753 3.2  9
+Pu    3  5F5   VI    -      1.14    1.00  R   753 3.2 10
+Pu    4  5F4   VI    -      1.00    0.86  R   753 3.2 11
+Pu    4  5F4   VIII  -      1.10    0.96  -   753 3.2 12
+Pu    5  5F3   VI    -      0.88    0.74  E   753 3.2 13
+Pu    6  5F2   VI    -      0.85    0.71  R   753 3.2 14
+Ra    2  6P6   VIII  -      1.62    1.48  R   753 3.2 15
+Ra    2  6P6   XII   -      1.84    1.70  R   753 3.2 16
+Rb    1  4P6   VI    -      1.66    1.52  -   753 3.2 17
+Rb    1  4P6   VII   -      1.70    1.56  -   753 3.2 18
+Rb    1  4P6   VIII  -      1.75    1.61  -   753 3.2 19
+Rb    1  4P6   IX    -      1.77    1.63  E   753 3.2 20
+Rb    1  4P6   X     -      1.80    1.66  -   753 3.2 21
+Rb    1  4P6   XI    -      1.83    1.69  -   753 3.2 22
+Rb    1  4P6   XII   -      1.86    1.72  -   753 3.2 23
+Rb    1  4P6   XIV   -      1.97    1.83  -   753 3.2 24
+Re    4  5D3   VI    -      0.77    0.63  RM  753 3.2 25
+Re    5  5D2   VI    -      0.72    0.58  E   753 3.2 26
+Re    6  5D1   VI    -      0.69    0.55  E   753 3.2 27
+Re    7  5P6   IV    -      0.52    0.38  -   753 3.2 28
+Re    7  5P6   VI    -      0.67    0.53  -   753 3.2 29
+Rh    3  4D6   VI    -     0.805   0.665  R   753 3.2 30
+Rh    4  4D5   VI    -      0.74    0.60  RM  753 3.2 31
+Rh    5  4D4   VI    -      0.69    0.55  -   753 3.2 32
+Ru    3  4D5   VI    -      0.82    0.68  -   753 3.2 33
+Ru    4  4D4   VI    -     0.760   0.620  RM  753 3.2 34
+Ru    5  4D3   VI    -     0.705   0.565  ER  753 3.2 35
+Ru    7  4D1   IV    -      0.52    0.38  -   753 3.2 36
+Ru    8  4P6   IV    -      0.50    0.36  -   753 3.2 37
+S    -2  3P6   VI    -      1.70    1.84  P   753 3.2 38
+S     4  3S2   VI    -      0.51    0.37  A   753 3.2 39
+S     6  2P6   IV    -      0.26    0.12  *   753 3.2 40
+S     6  2P6   VI    -      0.43    0.29  C   753 3.2 41
+Sb    3  5S2   IVPY  -      0.90    0.76  -   753 3.2 42
+Sb    3  5S2   V     -      0.94    0.80  -   753 3.2 43
+Sb    3  5S2   VI    -      0.90    0.76  A   753 3.2 44
+Sb    5  4D10  VI    -      0.74    0.60  *   753 3.2 45
+Sc    3  3P6   VI    -     0.885   0.745  R*  753 3.2 46
+Sc    3  3P6   VIII  -     1.010   0.870  R*  753 3.2 47
+Se   -2  4P6   VI    -      1.84    1.98  P   753 3.2 48
+Se    4  4S2   VI    -      0.64    0.50  A   753 3.2 49
+Se    6  3D10  IV    -      0.42    0.28  *   753 3.2 50
+Se    6  3D10  VI    -      0.56    0.42  C   753 3.2 51
+Si    4  2P6   IV    -      0.40    0.26  *   753 3.2 52
+Si    4  2P6   VI    -     0.540   0.400  R*  753 3.2 53
+Sm    2  4F6   VII   -      1.36    1.22  -   753 3.2 54
+Sm    2  4F6   VIII  -      1.41    1.27  -   753 3.2 55
+Sm    2  4F6   IX    -      1.46    1.32  -   753 3.2 56
+Sm    3  4F5   VI    -     1.098   0.958  R   753 3.2 57
+Sm    3  4F5   VII   -      1.16    1.02  E   753 3.2 58
+Sm    3  4F5   VIII  -     1.219   1.079  R   753 3.2 59
+Sm    3  4F5   IX    -     1.272   1.132  R   753 3.2 60
+Sm    3  4F5   XII   -      1.38    1.24  C   753 3.2 61
+Sn    4  4D10  IV    -      0.69    0.55  R   753 3.2 62
+Sn    4  4D10  V     -      0.76    0.62  C   753 3.2 63
+Sn    4  4D10  VI    -     0.830   0.690  R*  753 3.2 64
+Sn    4  4D10  VII   -      0.89    0.75  -   753 3.2 65
+Sn    4  4D10  VIII  -      0.95    0.81  C   753 3.2 66
+Sr    2  4P6   VI    -      1.32    1.18  -   753 3.2 67
+Sr    2  4P6   VII   -      1.35    1.21  -   753 3.2 68
+Sr    2  4P6   VIII  -      1.40    1.26  -   753 3.2 69
+Sr    2  4P6   IX    -      1.45    1.31  -   753 3.2 70
+Sr    2  4P6   X     -      1.50    1.36  C   753 3.2 71
+Sr    2  4P6   XII   -      1.58    1.44  C   753 3.2 72
+Ta    3  5D2   VI    -      0.86    0.72  E   753 3.2 73
+Ta    4  5D1   VI    -      0.82    0.68  E   753 3.2 74
+Ta    5  5P6   VI    -      0.78    0.64  -   753 3.2 75
+Ta    5  5P6   VII   -      0.83    0.69  -   753 3.2 76
+Ta    5  5P6   VIII  -      0.88    0.74  -   753 3.2 77
+Tb    3  4F8   VI    -     1.063   0.923  R   753 3.2 78
+Tb    3  4F8   VII   -      1.12    0.98  E   753 3.2 79
+Tb    3  4F8   VIII  -     1.180   1.040  R   753 3.2 80
+Tb    3  4F8   IX    -     1.235   1.095  R   753 3.2 81
+Tb    4  4F7   VI    -      0.90    0.76  R   753 3.2 82
+Tb    4  4F7   VIII  -      1.02    0.88  -   753 3.2 83
+Tc    4  4D3   VI    -     0.785   0.645  RM  753 3.3  1
+Tc    5  4D2   VI    -      0.74    0.60  ER  753 3.3  2
+Tc    7  4P6   IV    -      0.51    0.37  -   753 3.3  3
+Tc    7  4P6   VI    -      0.70    0.56  A   753 3.3  4
+Te   -2  5P6   VI    -      2.07    2.21  P   753 3.3  5
+Te    4  5S2   III   -      0.66    0.52  -   753 3.3  6
+Te    4  5S2   IV    -      0.80    0.66  -   753 3.3  7
+Te    4  5S2   VI    -      1.11    0.97  -   753 3.3  8
+Te    6  4D10  IV    -      0.57    0.43  C   753 3.3  9
+Te    6  4D10  VI    -      0.70    0.56  *   753 3.3 10
+Th    4  6P6   VI    -      1.08    0.94  C   753 3.3 11
+Th    4  6P6   VIII  -      1.19    1.05  RC  753 3.3 12
+Th    4  6P6   IX    -      1.23    1.09  *   753 3.3 13
+Th    4  6P6   X     -      1.27    1.13  E   753 3.3 14
+Th    4  6P6   XI    -      1.32    1.18  C   753 3.3 15
+Th    4  6P6   XII   -      1.35    1.21  C   753 3.3 16
+Ti    2  3D2   VI    -      1.00    0.86  E   753 3.3 17
+Ti    3  3D1   VI    -     0.810   0.670  R*  753 3.3 18
+Ti    4  3P6   IV    -      0.56    0.42  C   753 3.3 19
+Ti    4  3P6   V     -      0.65    0.51  C   753 3.3 20
+Ti    4  3P6   VI    -     0.745   0.605  R*  753 3.3 21
+Ti    4  3P6   VIII  -      0.88    0.74  C   753 3.3 22
+Tl    1  6S2   VI    -      1.64    1.50  R   753 3.3 23
+Tl    1  6S2   VIII  -      1.73    1.59  R   753 3.3 24
+Tl    1  6S2   XII   -      1.84    1.70  RE  753 3.3 25
+Tl    3  5D10  IV    -      0.89    0.75  -   753 3.3 26
+Tl    3  5D10  VI    -     1.025   0.885  R   753 3.3 27
+Tl    3  5D10  VIII  -      1.12    0.98  C   753 3.3 28
+Tm    2  4F13  VI    -      1.17    1.03  -   753 3.3 29
+Tm    2  4F13  VII   -      1.23    1.09  -   753 3.3 30
+Tm    3  4F12  VI    -     1.020   0.880  R   753 3.3 31
+Tm    3  4F12  VIII  -     1.134   0.994  R   753 3.3 32
+Tm    3  4F12  IX    -     1.192   1.052  R   753 3.3 33
+U     3  5F3   VI    -     1.165   1.025  R   753 3.3 34
+U     4  5F2   VI    -      1.03    0.89  -   753 3.3 35
+U     4  5F2   VII   -      1.09    0.95  E   753 3.3 36
+U     4  5F2   VIII  -      1.14    1.00  R*  753 3.3 37
+U     4  5F2   IX    -      1.19    1.05  -   753 3.3 38
+U     4  5F2   XII   -      1.31    1.17  E   753 3.3 39
+U     5  5F1   VI    -      0.90    0.76  -   753 3.3 40
+U     5  5F1   VII   -      0.98    0.84  E   753 3.3 41
+U     6  6P6   II    -      0.59    0.45  -   753 3.3 42
+U     6  6P6   IV    -      0.66    0.52  -   753 3.3 43
+U     6  6P6   VI    -      0.87    0.73  *   753 3.3 44
+U     6  6P6   VII   -      0.95    0.81  E   753 3.3 45
+U     6  6P6   VIII  -      1.00    0.86  -   753 3.3 46
+V     2  3D3   VI    -      0.93    0.79  -   753 3.3 47
+V     3  3D2   VI    -     0.780   0.640  R*  753 3.3 48
+V     4  3D1   V     -      0.67    0.53  -   753 3.3 49
+V     4  3D1   VI    -      0.72    0.58  R*  753 3.3 50
+V     4  3D1   VIII  -      0.86    0.72  E   753 3.3 51
+V     5  3P6   IV    -     0.495   0.355  R*  753 3.3 52
+V     5  3P6   V     -      0.60    0.46  *   753 3.3 53
+V     5  3P6   VI    -      0.68    0.54  -   753 3.3 54
+W     4  5D2   VI    -      0.80    0.66  RM  753 3.3 55
+W     5  5D1   VI    -      0.76    0.62  R   753 3.3 56
+W     6  5P6   IV    -      0.56    0.42  *   753 3.3 57
+W     6  5P6   V     -      0.65    0.51  -   753 3.3 58
+W     6  5P6   VI    -      0.74    0.60  *   753 3.3 59
+Xe    8  4D10  IV    -      0.54    0.40  -   753 3.3 60
+Xe    8  4D10  VI    -      0.62    0.48  -   753 3.3 61
+Y     3  4P6   VI    -     1.040   0.900  R*  753 3.3 62
+Y     3  4P6   VII   -      1.10    0.96  -   753 3.3 63
+Y     3  4P6   VIII  -     1.159   1.019  R*  753 3.3 64
+Y     3  4P6   IX    -     1.215   1.075  R   753 3.3 65
+Yb    2  4F14  VI    -      1.16    1.02  -   753 3.3 66
+Yb    2  4F14  VII   -      1.22    1.08  E   753 3.3 67
+Yb    2  4F14  VIII  -      1.28    1.14  -   753 3.3 68
+Yb    3  4F13  VI    -     1.008   0.868  R*  753 3.3 69
+Yb    3  4F13  VII   -     1.065   0.925  E   753 3.3 70
+Yb    3  4F13  VIII  -     1.125   0.985  R   753 3.3 71
+Yb    3  4F13  IX    -     1.182   1.042  R   753 3.3 72
+Zn    2  3D10  IV    -      0.74    0.60  *   753 3.3 73
+Zn    2  3D10  V     -      0.82    0.68  *   753 3.3 74
+Zn    2  3D10  VI    -     0.880   0.740  R*  753 3.3 75
+Zn    2  3D10  VIII  -      1.04    0.90  C   753 3.3 76
+Zr    4  4P6   IV    -      0.73    0.59  R   753 3.3 77
+Zr    4  4P6   V     -      0.80    0.66  C   753 3.3 78
+Zr    4  4P6   VI    -      0.86    0.72  R*  753 3.3 79
+Zr    4  4P6   VII   -      0.92    0.78  *   753 3.3 80
+Zr    4  4P6   VIII  -      0.98    0.84  *   753 3.3 81
+Zr    4  4P6   IX    -      1.03    0.89  -   753 3.3 82
