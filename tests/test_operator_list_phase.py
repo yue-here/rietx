@@ -473,15 +473,21 @@ def test_the_ba2fesbse5_s3ab_child_is_built_instead_of_refused():
     assert statement.child_group_named is False
     assert sym.split_group_label(statement.phase.space_group) is not None
     assert statement.phase.symmetry_operations is not None
-    # Two of S3_CHILD_OPS's four operations — the pure translation
-    # 'x+1/2,y,z' (the child's anti-translation) and its product with the
-    # mirror, 'x+1/2,-y+1/2,z' — carry little-group character −1 on this
-    # displacive candidate's mode field, which an ε = +1 nuclear operation
-    # cannot state; supercell._sign_consistent_operations drops them, so the
-    # declared group is the order-2 subgroup and each sibling they would have
-    # reached is its own representative: 24 atoms.
-    assert set(statement.phase.symmetry_operations) == {"x,y,z", "x,-y+1/2,z"}
-    assert len(statement.phase.atoms) == 24
+    # The candidate's own group is now the stabiliser of its displacement
+    # field, built with the coset character ε(Δ) (#679): the pure
+    # anti-translation 'x+1/2,y,z' (ε = −1) is no longer in it, and the
+    # group is the order-4 {x,y,z; x,-y+1/2,z; -x+1/2,y+1/2,-z;
+    # -x+1/2,-y,-z} (a mirror, a screw axis and an inversion).  Each of the
+    # four carries ε = +1 on the field, so
+    # supercell._sign_consistent_operations keeps all four (checked by
+    # propagating the field by the bare rotation); the previous order-2 set
+    # was what the old grey rule left after that filter dropped its
+    # ε = −1 operations.  12 atoms: the child holds 32 (16 per parent cell,
+    # two parent cells), and the order-4 group's orbits leave 4 Ba, and 4 each
+    # of Fe and Se, whose mirror fixes y = 1/4 (the order-2 group left 24).
+    assert set(statement.phase.symmetry_operations) == {
+        "x,y,z", "x,-y+1/2,z", "-x+1/2,y+1/2,-z", "-x+1/2,-y,-z"}
+    assert len(statement.phase.atoms) == 12
     codes = [d.code for d in statement.diagnostics]
     assert "CHILD_GROUP_UNNAMED" in codes
     note = next(d for d in statement.diagnostics

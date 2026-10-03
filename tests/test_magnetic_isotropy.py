@@ -735,7 +735,16 @@ def test_dropping_the_anti_translation_changes_the_group_and_its_absences():
 
 
 def test_the_displacive_time_reversal_rule_greys_a_magnetic_order_parameter():
-    """Control (ii): +1 on a moment gives grey stabilisers, which forbid every moment."""
+    """Control (ii): +1 on a moment gives grey stabilisers, which forbid every moment.
+
+    Re-pinned for the displacive isotropy-group fix: the displacive groups are
+    built by ``_candidate_group(..., kind="displacive")``, which emits both
+    time-reversal signs of every operation that fixes the displacement.  The
+    expected value (grey, forbidding every moment, a different BNS set from the
+    magnetic one) is unchanged at k = 0; what changed is that the call now has
+    to say ``kind``, since the displacive rule is no longer the magnetic one
+    with a different sign.
+    """
     representation = modes.magnetic_representation("P n m a", (0, 0, 0.5), GAMMA)
     little = irreps.little_group("P n m a", GAMMA)
     cell = isotropy.magnetic_cell("P n m a", GAMMA)
@@ -747,7 +756,8 @@ def test_the_displacive_time_reversal_rule_greys_a_magnetic_order_parameter():
         for kind, sink in (("magnetic", magnetic), ("displacive", displacive)):
             space = isotropy.order_parameter_space(basis, kind=kind)
             for direction in isotropy.isotropy_directions(space):
-                sink.append(isotropy._candidate_group(little, cell, direction.stabilizer))
+                sink.append(isotropy._candidate_group(little, cell, direction.stabilizer,
+                                                      kind=kind))
     assert len(magnetic) == len(displacive) == 4
     assert not any(group.is_grey for group in magnetic)
     assert all(group.is_grey for group in displacive)
@@ -768,11 +778,22 @@ def test_the_displacive_time_reversal_rule_greys_a_magnetic_order_parameter():
 #: displacement is a polar vector, not an axial one.
 PNMA_SB_SITE = (0.02806, 0.25, 0.01240)
 PNMA_SB_K = (Fraction(1, 2), Fraction(0), Fraction(1, 2))
-PNMA_SB_DISPLACIVE_BNS = {"4.8", "11.51", "6.19", "2.5"}
+#: Re-pinned: the pre-fix set {4.8, 11.51, 6.19, 2.5} was the groups of the
+#: *parent* lattice, which carried the anti-translation as a pure translation
+#: (a symmetry of no distorted structure at k != 0).  The child types spglib
+#: names on the distorted structure (independent oracle, black box) are P2_1/m
+#: (11.51) for S2/S3 and P2_1/c (14.76) for S1/S4.
+PNMA_SB_DISPLACIVE_BNS = {"11.51", "14.76"}
 
 
 def test_pnma_sb_displacive_candidates_verify_true():
     """Regression: the four Type-II displacive candidates, checked by their own rule.
+
+    Re-pinned for the displacive isotropy-group fix (see the constant above):
+    the four candidates are unchanged, their groups are not.  P2_1 / Pm / P-1
+    were the parent-lattice groups; the stabiliser of each field is P2_1/m
+    (S2, S3) or P2_1/c (S1, S4).  The prose below describes the pre-fix
+    verification bug and its numbers are the pre-fix ones.
 
     Before the fix, ``candidates(..., kind="displacive")`` raised under the
     default ``verify=True`` for this site and k — and for every other site and
@@ -785,6 +806,7 @@ def test_pnma_sb_displacive_candidates_verify_true():
     contains 1' when it fixes the site polarly).
     """
     found = isotropy.candidates("P n m a", PNMA_SB_SITE, PNMA_SB_K, kind="displacive")
+    assert len(found) == 4
     assert {c.bns_number for c in found} == PNMA_SB_DISPLACIVE_BNS
     assert all(c.msg_type == 2 for c in found)
     for candidate in found:
@@ -844,10 +866,16 @@ Q22_K = ("1/2", "1/2", "0")
 Q22_ROTATION = ((1, 0, 0), (0, -1, 0), (0, 0, 1))
 Q22_TRANSLATION = (Fraction(0), Fraction(1, 2), Fraction(0))
 Q22_LITTLE_INDEX = 7
+#: Re-pinned for the displacive isotropy-group fix.  The candidate Q21 diagnosed
+#: was selected as BNS 6.19, a group of the parent lattice that is no symmetry of
+#: its own field; at the correct group the same case (little-group index 7 with a
+#: -1 return phase on parent atom 1, where the pre-Q22 rule rejects the
+#: candidate's own pattern) is the rank-2 direction whose child group is BNS 8.33,
+#: with a stabiliser of order 2 (the identity and element 7).
 #: The gauge-free selector for Q21's candidate: the BNS number of its isotropy
 #: subgroup.  The ``S1(rank 2)#3`` label is not one — ``isotropy.py``'s direction
 #: sort numbers the ties *after* sorting, and the tie-break is the gauge.
-Q22_BNS = "6.19"
+Q22_BNS = "8.33"
 
 
 def test_the_return_vector_phase_flips_which_eigenspace_a_displacement_needs():
@@ -874,12 +902,12 @@ def test_the_return_vector_phase_flips_which_eigenspace_a_displacement_needs():
     is not, and ``in_span`` is a question about the line.
     """
     found = isotropy.candidates("P n m a", Q22_SITE, Q22_K, kind="displacive", verify=False)
-    # BNS 6.19 is unique in this set, where every rank-2 direction has the same
-    # stabiliser order (4) and the ``#n`` numbering is the gauge
+    # BNS 8.33 is unique in this set, and the ``#n`` numbering of the rank-2
+    # directions is the gauge
     matching = [c for c in found if c.bns_number == Q22_BNS]
     assert len(matching) == 1, [c.bns_number for c in found]
     candidate = matching[0]
-    assert candidate.direction.rank == 2 and len(candidate.direction.stabilizer) == 4
+    assert candidate.direction.rank == 2 and len(candidate.direction.stabilizer) == 2
     little = candidate.permutation.little
     assert little.rotations[Q22_LITTLE_INDEX].tolist() == [list(r) for r in Q22_ROTATION]
     assert little.translations[Q22_LITTLE_INDEX] == Q22_TRANSLATION
@@ -1179,6 +1207,97 @@ def test_every_configuration_is_invariant_under_its_own_group(case):
                                            candidate.configurations)
             assert np.allclose(moved, candidate.configurations, atol=1e-8), \
                 f"{candidate.label} is not fixed by {operation.xyz()!r}"
+
+
+def _field_stabiliser(operations, positions, field, kind, tol=1e-6):
+    """The operations of ``operations`` that map the (position, vector) set onto itself.
+
+    The independent oracle for a candidate's declared group: it never reads the
+    isotropy machinery, only the field the candidate produces.  A displacement
+    transforms as R, a moment as ε·det(R)·R (Halpern & Johnson 1939); positions
+    are matched modulo the lattice.
+    """
+    kept = []
+    for op in operations:
+        rotation = op.matrix.astype(float)
+        shift = np.array([float(v) for v in op.translation])
+        action = (op.time_reversal * op.determinant * rotation
+                  if kind == "magnetic" else rotation)
+        moved = (positions @ rotation.T + shift) % 1.0
+        carried = field @ action.T
+        for j in range(len(positions)):
+            d = np.abs(positions - moved[j])
+            hit = np.flatnonzero(np.all(np.minimum(d, 1 - d) < tol, axis=1))
+            if hit.size != 1 or not np.allclose(field[hit[0]], carried[j], atol=1e-6):
+                break
+        else:
+            kept.append(op)
+    return kept
+
+
+def _assert_declared_group_is_the_field_stabiliser(group, site, k, kind):
+    found = isotropy.candidates(group, site, k, kind=kind, verify=False)
+    assert len(found) > 0
+    grey = isotropy.grey_little_group(group, k, found.cell).all_operations()
+    rng = np.random.default_rng(7)
+    for candidate in found:
+        field = candidate.moments(rng.normal(size=candidate.free_amplitudes))
+        stabiliser = {(o.rotation, tuple(o.translation), o.time_reversal)
+                      for o in _field_stabiliser(grey, candidate.positions, field, kind)}
+        declared = {(o.rotation, tuple(o.translation), o.time_reversal)
+                    for o in candidate.group.all_operations()}
+        assert declared == stabiliser, (group, k, kind, candidate.label)
+
+
+#: (group, site, k): a k = 0 case that was always right (the control), and k != 0
+#: cases that were wrong before the fix — the perovskite R point, the Pnma
+#: (1/2, 0, 1/2) Sb site and a doubling in I4_1/amd (all public settings).
+STABILISER_FAST_CASES = [
+    ("P 4", (0.1, 0.2, 0.3), GAMMA),
+    ("P m -3 m", (Fraction(1, 2), 0, 0), (Fraction(1, 2),) * 3),
+    ("P n m a", PNMA_SB_SITE, PNMA_SB_K),
+]
+
+
+@pytest.mark.parametrize("kind", ["displacive", "magnetic"])
+@pytest.mark.parametrize("case", STABILISER_FAST_CASES,
+                         ids=[f"{c[0]}@{c[2][0]}" for c in STABILISER_FAST_CASES])
+def test_every_candidates_declared_group_is_the_stabiliser_of_its_own_field(case, kind):
+    """The declared group is the set of operations that fix the candidate's own field.
+
+    Added with the displacive isotropy-group fix.  Before it, ``kind="displacive"``
+    carried the parent translation as a pure translation and lacked the operations
+    needing the anti-translation at every k != 0 (206 of 209 candidates on a
+    34-case sweep, failing at P m -3 m / R and Pnma / (1/2, 0, 1/2) below), and
+    ``verified`` could not see it because it never reads the translation lattice.
+    The oracle is independent of the isotropy machinery: it applies the grey
+    little group to a random field and keeps what leaves it unchanged.
+    """
+    group, site, k = case
+    _assert_declared_group_is_the_field_stabiliser(group, site, k, kind)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("kind", ["displacive", "magnetic"])
+@pytest.mark.parametrize("case", ENGINE_CASES, ids=[f"{c[0]}@{c[2][0]}" for c in ENGINE_CASES])
+def test_the_declared_group_is_the_field_stabiliser_across_the_engine_cases(case, kind):
+    """The sweep form of the test above over every engine case, both kinds."""
+    group, site, k = case
+    _assert_declared_group_is_the_field_stabiliser(group, site, k, kind)
+
+
+def test_the_perovskite_tilt_irrep_gives_howard_and_stokes_six_subgroups():
+    """Known answer (Howard & Stokes 1998, Acta Cryst. B54, 782): the R-point tilt irrep.
+
+    (a,0,0) I4/mcm, (a,a,a) R-3c, (a,a,0) Imma, (a,b,0) C2/m, (a,a,b) C2/c and
+    (a,b,c) P-1, as grey-group BNS numbers 140.542, 167.104, 74.555, 12.59,
+    15.86 and 2.5.  Before the fix the enumeration used +D only and listed four
+    directions (rank 1 x3 and (a,b,c)), none of them with the right lattice.
+    """
+    found = isotropy.candidates("P m -3 m", (Fraction(1, 2), 0, 0),
+                                (Fraction(1, 2),) * 3, kind="displacive")
+    tilt = sorted(c.bns_number for c in found if c.label.startswith("S10("))
+    assert tilt == sorted(["140.542", "167.104", "74.555", "12.59", "15.86", "2.5"])
 
 
 def test_random_amplitude_draws_find_the_same_absences_as_the_exact_test():

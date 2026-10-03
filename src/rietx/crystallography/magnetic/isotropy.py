@@ -78,10 +78,16 @@ Conventions a caller can get wrong silently
    above rests on.
 
 2. **Time reversal acts as −1 on a magnetic order parameter and +1 on a
-   displacive one** (``kind``).  With +1 every stabiliser contains 1' and every
-   candidate is a grey group, which forbids every ordered moment; that is the
-   displacive rule, and using it on a moment is a physics error a dimension
-   count cannot see.
+   displacive one** (``kind``).  A displacement does not care about 1', so every
+   displacive stabiliser contains both time-reversal signs of each operation
+   and every displacive candidate is a grey group, which forbids every ordered
+   moment; using that rule on a moment is a physics error a dimension count
+   cannot see.  The sign that *does* matter for a displacement is ε(Δ), the
+   character the lattice translation Δ of a coset carries (−1 on the
+   anti-translation coset of a k ≠ 0 star): the element {R | v + Δ} fixes the
+   field only when ε(Δ)·D(R) fixes it, so the child lattice of a displacive
+   candidate is the *sub*lattice of the parent's that ε(Δ) = +1 selects, exactly
+   as for a moment.
 
 3. **A stabiliser is a set of group elements, not of matrices.**  Two grey
    elements can share a matrix (when −1 is already in the image), and it is the
@@ -209,7 +215,8 @@ except ImportError:  # pragma: no cover - a spglib without the error module
     pass
 
 #: Order-parameter kinds.  ``"magnetic"`` gives time reversal the −1 a moment
-#: carries; ``"displacive"`` gives it the +1 a displacement carries.
+#: carries; ``"displacive"`` gives it the +1 a displacement carries (the
+#: coset character ε(Δ) acts on both kinds alike)
 ORDER_PARAMETER_KINDS = ("magnetic", "displacive")
 
 #: Tolerance on the numerical linear algebra of the order-parameter space —
@@ -547,9 +554,15 @@ def order_parameter_space(basis: IrrepBasis, *, kind: str = "magnetic"
     """The real order-parameter space of one irrep, with time reversal in the group.
 
     The grey little group is G_k1' = G_k ∪ G_k·1'.  A **magnetic** order
-    parameter changes sign under 1' and a **displacive** one does not, so the
-    element (g, ε) acts by η·D_ν(g) with η = ε for ``kind="magnetic"`` and
-    η = +1 for ``kind="displacive"``.  D_ν is taken in the gauge
+    parameter changes sign under 1' and a **displacive** one does not.  The
+    element (g, ε) acts by ε·D_ν(g) for **both** kinds: ε is the character of
+    the coset (the anti-translation of a k ≠ 0 star carries −1 on the order
+    parameter, whatever the order parameter is) and for a moment it also
+    absorbs the time-reversal sign.  What ``kind`` changes is which group
+    :func:`candidates` builds from the stabiliser: a displacive element
+    {R | v + Δ} stabilises the field when ε(Δ) = η, with either time-reversal
+    sign, since a displacement ignores 1' (Howard & Stokes 1998, *Acta Cryst.*
+    B54, 782).  D_ν is taken in the gauge
     :func:`~.modes.basis_vectors` used for the vectors, so the order-parameter
     coordinates and the moment patterns are in step; where that gauge is not
     real the space is the realification (module docstring, convention 1).
@@ -593,7 +606,7 @@ def order_parameter_space(basis: IrrepBasis, *, kind: str = "magnetic"
     for i in range(n_ops):
         for eps in (1, -1):
             elements.append((i, eps))
-            stack.append((eps if kind == "magnetic" else 1) * small[i])
+            stack.append(eps * small[i])
     space = OrderParameterSpace(
         irrep=basis.irrep, basis=basis, kind=kind, elements=tuple(elements),
         matrices=np.array(stack, dtype=np.float64), configurations=configs,
@@ -756,7 +769,11 @@ def isotropy_directions(space: OrderParameterSpace, *, limit: int = 512,
     ∀ v ∈ V} — so the representatives and the isotropy subgroups are in
     bijection.  The whole space (the kernel of the representation, ISOTROPY's
     "general direction") is always among them.  This is the enumeration Stokes &
-    Hatch (1988) tabulate and Campbell et al. (2006) drive ISODISPLACE from.
+    Hatch (1988) tabulate and Campbell et al. (2006) drive ISODISPLACE from,
+    for moments and — since the coset character ε(Δ) enters both kinds alike —
+    for displacements (Howard & Stokes 1998), which a ``+D``-only
+    enumeration lacked: it missed every direction whose stabiliser needs an
+    element acting as −D.
 
     With ``conjugacy`` (the default) directions related by an element of the
     grey little group are collapsed to one, and :attr:`OrderParameterDirection.
@@ -1037,7 +1054,10 @@ class MagneticCandidate:
                                              label=little.triplets[index])
                 ops.append(MagneticOperator.build(
                     integral, (Fraction(0), Fraction(0), Fraction(0)), eta))
-                phases.append(1 if phase_c.real > 0 else -1)
+                phase_sign = 1 if phase_c.real > 0 else -1
+                # a displacive stabiliser element (i, η) reads R·d = η·phase·d
+                # (the coset character ε(Δ) = η), a moment's η rides on the operator
+                phases.append(phase_sign * eta if self.kind == "displacive" else phase_sign)
             basis = basis_fn(tuple(ops), phases=tuple(phases))
             for pattern in self.configurations:
                 if not in_span(basis, pattern[atom], atol=atol):
@@ -1130,7 +1150,8 @@ def _close_operations(seed) -> tuple[MagneticOperator, ...]:
 
 
 def _candidate_group(little: LittleGroup, cell: MagneticCell,
-                     stabilizer: tuple[GreyElement, ...]) -> MagneticGroup:
+                     stabilizer: tuple[GreyElement, ...],
+                     kind: str = "magnetic") -> MagneticGroup:
     """Operator list of one isotropy subgroup, in the magnetic cell.
 
     An operation of the parent is {R_i | v_i + Δ} with Δ a lattice vector; it
@@ -1147,6 +1168,20 @@ def _candidate_group(little: LittleGroup, cell: MagneticCell,
     *specific* atom needs: see :meth:`MagneticCandidate.in_allowed_span` for
     the atom-level return-vector phase this construction cannot carry.
 
+    **The displacive group** (the isotropy-group fix).  A displacement is
+    invariant under {R | v + Δ} when ε(Δ)·D(R) fixes it, and time reversal does
+    nothing to it.  So for ``kind="displacive"`` the element (i, ε) is emitted
+    for every lattice vector Δ of the parent with ε(Δ) = η, **with both
+    time-reversal signs**; the coset with ε(Δ) ≠ η is dropped, which is what
+    makes the child lattice a sublattice of the parent's (a pure parent
+    translation {E | Δ} with ε = −1 is *not* a symmetry of the distorted
+    structure).  The earlier text of this paragraph argued that a displacive
+    stabiliser is "always grey" and therefore right with the parent lattice;
+    grey is right, the parent lattice is not.  The groups are checked against
+    the stabiliser of the candidate's own field (``tests/
+    test_magnetic_isotropy.py::test_every_candidates_declared_group_is_the_
+    stabiliser_of_its_own_field``).
+
     **The Q23 correction, kind-independent.** The seed set built from
     ``stabilizer`` times ``cell.translations`` is not always already closed
     under multiplication: composing two coset representatives of a
@@ -1161,13 +1196,11 @@ def _candidate_group(little: LittleGroup, cell: MagneticCell,
     need a lattice-translation correction regardless of kind, and only the
     magnetic path's own η bookkeeping happened to already absorb it every
     time — see :func:`_close_operations` for the measured P4₂ example).  A
-    ``kind="displacive"`` stabiliser legitimately keeps *both* grey signs of
-    an index that stabilises it (:func:`order_parameter_space` gives η = +1
-    regardless of ε there, so a displacement's own stabiliser is always
+    ``kind="displacive"`` stabiliser keeps *both* time-reversal signs of each
+    element it emits (a displacement is indifferent to 1', so its group is
     grey/Type-II — ``tests/test_magnetic_isotropy.py::
-    test_pnma_sb_displacive_candidates_verify_true`` asserts exactly this and
-    is unchanged by Q23); both signs are genuine, independent generators and
-    neither is dropped.
+    test_pnma_sb_displacive_candidates_verify_true``); both signs are genuine,
+    independent generators and neither is dropped.
     """
     inverse = _exact_inverse(cell.basis)
     forward = [[_frac(v) for v in row] for row in cell.basis]
@@ -1180,6 +1213,15 @@ def _candidate_group(little: LittleGroup, cell: MagneticCell,
             translation = [base[i] + shift[i] for i in range(3)]
             in_cell = [sum(inverse[i][j] * translation[j] for j in range(3))
                        for i in range(3)]
+            if kind == "displacive":
+                # ε(Δ)·D(g_i)·v = v is the symmetry condition of the distorted
+                # structure; time reversal does nothing to it, so both signs
+                if eps != eta:
+                    continue
+                for time_reversal in (1, -1):
+                    operations.setdefault(
+                        MagneticOperator.build(integral, in_cell, time_reversal), None)
+                continue
             operations.setdefault(
                 MagneticOperator.build(integral, in_cell, eta * eps), None)
     return MagneticGroup.from_operations(_close_operations(operations))
@@ -1569,9 +1611,16 @@ def candidates(space_group, site_xyz, k, *, kind: str = "magnetic", cell=None,
     with time reversal in the group (Perez-Mato et al., 2015) and the
     stabiliser construction of Stokes & Hatch (1988).
 
-    ``kind="displacive"`` gives time reversal the +1 a displacement carries and
-    is here for the control it makes possible: on a magnetic order parameter it
-    produces grey stabilisers, which forbid every moment.
+    ``kind="displacive"`` builds the isotropy group of a *displacement* field:
+    time reversal acts as +1, so the group is grey, and its lattice is the
+    sublattice of the parent's on which the coset character ε(Δ) is +1 (the
+    same sublattice as a moment's, but with both time-reversal signs).  Its
+    consumers are :func:`magnetic_supercell` and the structural-distortion
+    work; on a magnetic order parameter it is also the control that produces
+    grey stabilisers, which forbid every moment.  Before the isotropy-group fix
+    the displacive group carried the parent translation as a pure translation
+    at every k ≠ 0, lacked the operations needing the anti-translation, and the
+    enumeration missed rank-2 directions.
 
     ``verify`` runs :meth:`MagneticCandidate.in_allowed_span` on every
     candidate — the two halves of the engine checking each other — and marks
@@ -1626,7 +1675,7 @@ def candidates(space_group, site_xyz, k, *, kind: str = "magnetic", cell=None,
         kept.append(irrep)
         space = order_parameter_space(basis, kind=kind)
         for direction in isotropy_directions(space):
-            group = _candidate_group(little, mcell, direction.stabilizer)
+            group = _candidate_group(little, mcell, direction.stabilizer, kind=kind)
             configurations = _expand_configurations(
                 space, direction, inverse, sign_array, parent_index)
             # ``identification`` is the *non-raising* authority (Q-17): an

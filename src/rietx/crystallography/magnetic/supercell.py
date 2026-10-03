@@ -676,8 +676,10 @@ def _sign_consistent_operations(cand, m_matrix, ops, *, tol: float = 1e-6
     (rather than keeping it with a wrong assumed sign) is the only choice
     available to a group whose operators carry one ε each.  On the generic
     Pnma fixture of ``tests/test_operator_list_phase.py`` at k = (½, 0, ½)
-    that leaves S3(a,b) the order-2 ``{x,y,z; x,-y+1/2,z}`` which
-    ``test_the_ba2fesbse5_s3ab_child_is_built_instead_of_refused`` pins.
+    S3(a,b)'s group (built with the coset character ε(Δ), so it holds no
+    ε = −1 pure translation) is the order-4 ``{x,y,z; x,-y+1/2,z;
+    -x+1/2,y+1/2,-z; -x+1/2,-y,-z}``, all four of which this keeps;
+    ``test_the_ba2fesbse5_s3ab_child_is_built_instead_of_refused`` pins it.
 
     ``cand`` is one of :mod:`.isotropy`'s ``MagneticCandidate`` objects
     (``kind="displacive"`` or ``"magnetic"`` — the test is the same shape for

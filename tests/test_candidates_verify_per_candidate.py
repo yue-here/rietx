@@ -29,11 +29,6 @@ import pytest
 
 from rietx.crystallography.magnetic import isotropy
 from rietx.crystallography.magnetic.isotropy import MagneticCandidate, candidates
-from rietx.crystallography.magnetic.operators import (
-    allowed_displacement_basis,
-    allowed_moment_basis,
-    in_span,
-)
 
 PNMA_MIRROR_SITE = (0.1, 0.25, 0.15)   # generic y = 1/4 mirror site, nominal cell
 K_HALF_HALF_0 = ("1/2", "1/2", "0")
@@ -49,54 +44,36 @@ NIO_SITE = (0.0, 0.0, 0.0)
 NIO_K = (Fraction(1, 2), Fraction(1, 2), Fraction(1, 2))
 
 
-def _old_rule_in_allowed_span(candidate) -> bool:
-    """The pre-Q22 ``in_allowed_span``: geometric stabiliser, no return phase.
-
-    Reproduced here (not imported — the whole point is that it no longer
-    exists in ``isotropy.py``) so Section A can show the *old* rule really
-    did reject these two candidates, not merely that they are unrelated to
-    whatever ``candidates()`` happens to return today.
-    """
-    basis_fn = (allowed_moment_basis if candidate.kind == "magnetic"
-                else allowed_displacement_basis)
-    for atom in range(candidate.positions.shape[0]):
-        basis = basis_fn(candidate.group.site_stabilizer(candidate.positions[atom]))
-        for pattern in candidate.configurations:
-            if not in_span(basis, pattern[atom]):
-                return False
-    return True
-
-
 # --------------------------------------------------------------------------
 # A. the two measured Pnma cases: Q21 flagged them, Q22 fixed them
 # --------------------------------------------------------------------------
 
-@pytest.mark.parametrize("k,stabilizer,bns", [
-    (K_HALF_HALF_0, 4, "6.19"),
-    (K_0_HALF_HALF, 8, "26.67"),
-])
-def test_the_two_q21_candidates_now_verify_true_under_q22(k, stabilizer, bns):
-    """Selected by BNS number and stabiliser order, which are the gauge-free keys.
+#: Re-pinned for the displacive isotropy-group fix (#679).  The BNS numbers this
+#: section used to pin (6.19 at k = (1/2, 1/2, 0), 26.67 at (0, 1/2, 1/2)) were
+#: groups of the *parent* lattice, which are no symmetry of their own field; the
+#: stabilisers of the same fields are these.  The older "old rule really did
+#: reject it" assertion is gone with them: the pre-Q22 geometric check used the
+#: candidate's declared group, and at the corrected group (whose lattice is the
+#: child's) it no longer rejects anything.  What Q22's return-vector phase does
+#: for a displacement is pinned by test_magnetic_isotropy.py::
+#: test_the_return_vector_phase_flips_which_eigenspace_a_displacement_needs.
+PNMA_MIRROR_SITE_BNS = {
+    K_HALF_HALF_0: ["1.2", "2.5", "4.8", "8.33"],
+    K_0_HALF_HALF: ["14.76", "14.76", "36.173", "36.173", "4.8", "4.8"],
+}
 
-    The ``#n`` in a direction label is not one: ``isotropy.py``'s direction sort
-    numbers the ties *after* sorting on ``(rank, -len(stabilizer), label)``, and
-    its own comment says the numbering exists because a gauge that is not
-    axis-aligned gives several directions the same fallback label — so which of
-    them is ``#3`` follows the gauge, and the gauge differs between platforms
-    (Yue's review of #389 §6).
+
+@pytest.mark.parametrize("k", [K_HALF_HALF_0, K_0_HALF_HALF])
+def test_the_pnma_mirror_site_candidates_all_verify_true(k):
+    """Every candidate verifies, with the corrected child groups.
+
+    Compared as a sorted list of BNS numbers, the gauge-free key: the ``#n`` in a
+    direction label is not one (``isotropy.py``'s direction sort numbers ties
+    *after* sorting, and the gauge differs between platforms — Yue's review of
+    #389 §6).
     """
     cs = candidates("P n m a", PNMA_MIRROR_SITE, k, kind="displacive", verify=True)
-    matching = [c for c in cs if c.bns_number == bns]
-    assert len(matching) == 1, [c.bns_number for c in cs]
-    candidate = matching[0]
-    assert len(candidate.direction.stabilizer) == stabilizer
-    # the old rule really did reject this candidate — the fix is not a no-op
-    assert _old_rule_in_allowed_span(candidate) is False, (
-        f"BNS {bns} must fail the pre-Q22 rule, or this is not testing the fix")
-    # ... and the new rule (what candidates() actually flags) accepts it
-    assert candidate.verified is True, (
-        f"BNS {bns} still fails its own span check under the Q22 rule")
-    assert candidate.verification_reason is None
+    assert sorted(c.bns_number for c in cs) == PNMA_MIRROR_SITE_BNS[k]
     for c in cs:
         assert c.verified is True, f"{c.label} unexpectedly failed its own span check"
         assert c.verification_reason is None
@@ -196,21 +173,20 @@ def test_named_group_candidates_are_bit_identical_to_before():
 # E. CandidateSet.verified_only() — the filter the callers use
 # --------------------------------------------------------------------------
 
-@pytest.mark.parametrize("k,bns", [
-    (K_HALF_HALF_0, "6.19"),
-    (K_0_HALF_HALF, "26.67"),
-])
-def test_verified_only_is_a_no_op_on_this_site_under_q22(k, bns):
+@pytest.mark.parametrize("k", [K_HALF_HALF_0, K_0_HALF_HALF])
+def test_verified_only_is_a_no_op_on_this_site_under_q22(k):
     """Under Q21's rule this site had one candidate ``verified_only()`` dropped
     (the one with this BNS number); under Q22's fix it verifies too, so the
     filter now keeps everything — pinned here so a regression back to the Q21
     behaviour would be caught by a *count* changing, not just by a candidate
     disappearing.  Named by BNS number rather than by direction label, which
-    carries the gauge (#389 §6)."""
+    carries the gauge (#389 §6).  Re-pinned for #679: the candidates' groups are
+    the corrected child groups (``PNMA_MIRROR_SITE_BNS``), not the 6.19 / 26.67
+    the parent-lattice groups gave."""
     cs = candidates("P n m a", PNMA_MIRROR_SITE, k, kind="displacive", verify=True)
     n_before = len(cs)
     filtered = cs.verified_only()
-    assert [c.bns_number for c in filtered].count(bns) == 1
+    assert sorted(c.bns_number for c in filtered) == PNMA_MIRROR_SITE_BNS[k]
     assert len(filtered) == n_before
     assert all(c.verified is not False for c in filtered)
 

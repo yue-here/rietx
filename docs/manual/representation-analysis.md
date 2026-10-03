@@ -232,6 +232,16 @@ every pseudo-cubic neighbour antiparallel, identifies as the unprimed
 twelve basis vectors above; the isotropy subgroup, not a separate
 calculation, is what picks the moment direction each BNS number belongs to.
 
+For a displacive order parameter the stabiliser is not the candidate's group
+in the parent's lattice: time reversal does nothing to a displacement, so the
+group is grey, but the coset character $\varepsilon(\Delta)$ of the
+anti-translations enters exactly as for a moment, so the child lattice is the
+sublattice on which it is $+1$ and an element $\{R \mid \mathbf{v}+\Delta\}$
+belongs to the group when $\varepsilon(\Delta)\,D(R)$ fixes the displacement
+{cite}`stokeshatch1988`. The perovskite R-point tilt irrep then gives the six
+subgroups $I4/mcm$, $R\bar{3}c$, $Imma$, $C2/m$, $C2/c$, $P\bar{1}$ of Howard and
+Stokes (1998).
+
 A candidate's own group also predicts which reflections it can never show
 intensity at, independent of the free amplitudes. For an operation
 $(R, \mathbf{t}, \varepsilon)$ the magnetic structure factor obeys
