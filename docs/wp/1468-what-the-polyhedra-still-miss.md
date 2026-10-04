@@ -1,9 +1,9 @@
 # WP-1468 — what the polyhedra still miss, and the controls a chemist would reach for
 
-Milestone: unscheduled · Status: 🔄 2026-09-28 — ten of twelve tasks landed; the electronegativity sources wait on two papers
+Milestone: unscheduled · Status: 🔄 2026-10-03 — eleven of twelve original tasks landed; WP-1533's dark-theme C colour and two figure controls remain
 Track: Render what the fit already knows
 Depends on: 1466
-Priority: P4 2026-09-28 — was P3: WP-1468's first session landed ten of twelve tasks; left is a source for four constants, which waits on Pauling (1960) and Allen & Huheey (1980), and cluster polyhedra nobody has asked for
+Priority: P4 2026-10-03 — the electronegativity sources are checked; left are WP-1533's C colour and two figure controls, and cluster polyhedra nobody has asked for
 
 ## Goal
 
@@ -86,14 +86,17 @@ Read 2026-09-26 from each program's manual.
 - **An arsenic telluride inverts.** On the Pauling scale Te (2.10) is less
   electronegative than As (2.18), so As₂Te₃'s Te would be the cation. No such
   phase was measured.
-- **Four electronegativities are unchecked.** Allred (1961, Table 3) has
-  none for Te, At, Kr or Xe. The values in `ELECTRONEGATIVITY` are the ones
-  usually tabulated, from sources not read here. Checked 2026-09-28: the
-  synced Zotero library and `~/Code/rietx-refs-misc/` hold neither Pauling
-  (1960, *The Nature of the Chemical Bond*, 3rd ed.), where Te 2.1 and At
-  2.2 are usually cited from, nor Allen & Huheey (1980, *J. Inorg. Nucl.
-  Chem.* 42, 1523) for Kr 3.0 and Xe 2.6. The citations are from memory
-  and unread.
+- **Four electronegativities are checked second-hand.** Allred (1961,
+  Table 3) has none for Te, At, Kr or Xe. *Superseded in part 2026-10-03:*
+  the four values in `ELECTRONEGATIVITY` (Te 2.10, At 2.20, Kr 3.00,
+  Xe 2.60) agree with the Pauling-scale columns of the CRC Handbook (84th
+  ed., 2003, § 9, citing Pauling 1960 and Allen 1989), WebElements and
+  Lange's Handbook, as Wikipedia's "Electronegativities of the elements
+  (data page)" quotes them. No source disagrees, and Lange has no Kr. The
+  2026-09-28 note named Allen & Huheey (1980) for Kr and Xe from memory;
+  none of the three handbooks cites it, so it is not needed. Neither
+  Pauling (1960) nor Allen & Huheey (1980) is in the maintainer's corpus
+  (searched 2026-10-03), and no handbook was opened.
 
 ### Controls
 
@@ -164,23 +167,6 @@ replays the rules over the committed payloads and never rebuilds them, since
 file by itself. A change to `build()` that adds no field does not, so delete
 the file and run the test to refresh the payloads.
 
-### Inherited
-
-From **WP-1533** (2026-10-02), which declined to change the default colours
-and measured two facts that land here. First, C's default `#383838` reads at
-1.56:1 against the dark theme's `#151515`. That is the GUI's dark background
-and `render_structure(background="#151515")`'s, and C shows there only
-through its highlights. It mirrors H's `#d8d8d8` at 1.38:1 on the light
-`#fbfbfa`, which the convention accepts. A plain 3:1 rule would repaint 11
-of the 20 CPK colours on light, and Br (2.37) and I (2.51) also fall under it
-on dark. A theme-dependent C is the candidate. It changes the GUI's dark
-picture, so this WP's non-goal rule applies: re-run WP-1466's `measure.py`
-and name the rows that moved. Until then the skill tells an agent to
-recolour C on a dark background. Second, all six take-2 promo scripts
-cropped `fig.image` to its ink by hand, and the figure carries no polyhedron
-colour, so the scripts read `g["sites"]` for one. Both are controls a
-chemist reaches for.
-
 ## Non-goals
 
 - The octant cut-out, Voronoi solid angles, effective coordination numbers
@@ -203,7 +189,9 @@ Independent; take any.
 - [x] A hidden shell dropped at the atom cap stays in the legend as unavailable, or the cap stops counting it (2026-09-28: the payload's `polyhedra_dropped` lists each by site and ligands, and the legend greys a formula that has nothing else to draw. The cap still counts every shell: it bounds what the viewer draws)
 - [x] The polyhedra stop recomputing on a bond-slider release — declined on the record 2026-09-28. The recompute is kept and made cheaper (Context). A memo would be keyed on the phase and on every rule constant, and one left out of the key serves a stale picture
 - [x] One authority for "bonded" on the server and one for "drawn" on the client (2026-09-28: `structure3d.bonded`, `drawnWith` and its twin `drawn_with`)
-- [ ] A source for the Te, At, Kr and Xe electronegativities
+- [x] A source for the Te, At, Kr and Xe electronegativities (2026-10-03: three handbooks agree, read second-hand, Context; the `ELECTRONEGATIVITY` comment says so)
+- [ ] A theme-dependent C colour (from WP-1533): C's `#383838` reads at 1.56:1 on the dark `#151515`, as H's `#d8d8d8` does at 1.38:1 on the light `#fbfbfa`; a plain 3:1 rule would repaint 11 of 20 CPK colours on light. It changes the dark default picture, so re-run `measure.py` and name the rows that moved. Until then the skill tells an agent to recolour C on a dark background
+- [ ] Two figure controls the promo scripts did by hand (from WP-1533): `fig.image` cropped to its ink, and a polyhedron colour on the figure, where all six take-2 scripts read `g["sites"]` instead
 
 ## Acceptance
 
@@ -230,6 +218,24 @@ npm --prefix gui test && npm --prefix gui run check
 - Allred, A. L. (1961). *J. Inorg. Nucl. Chem.* 17, 215.
 
 ## Handover log
+
+- **2026-10-03** — **The four electronegativities nobody had checked now
+  have a source.** Te, At, Kr and Xe agree with three handbooks, the CRC
+  Handbook among them. The check is second-hand, through the handbooks' values
+  as Wikipedia's data page quotes them, and the code comment says so. The
+  WP did not close, because WP-1533 had sent it two live asks on 10-02. Both
+  are tasks now.
+
+  *Done* (a cleanup session over unowned in-flight WPs). The context note
+  rewritten in place, the task ticked, the `ELECTRONEGATIVITY` comment in
+  `gui/structure3d.py` naming the three handbooks and the page it read them
+  from. No value changed. Inherited pruned: WP-1533's entry is two tasks, the
+  dark-theme C colour and the two figure controls. *Searched:* the
+  maintainer's zotero-linker, `~/Zotero` and `~/MinerU`, by title, filename
+  and full text, hold neither Pauling (1960) nor Allen & Huheey (1980).
+
+  *Next:* either new task. The C colour moves the dark default picture, so it
+  re-runs `measure.py` first.
 
 - **2026-09-28** — the structure viewer now reads chemistry it used to get
   wrong. A cyanide's or a carbonyl's C is its metal's ligand, so Prussian blue

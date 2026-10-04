@@ -477,8 +477,13 @@ def element_list(values: Sequence[str], what: str = "elements") -> list[str]:
 #: element with no value (He, Ne, Ar, Rn, Ts, Og) is never the more
 #: electronegative of a pair.  Fourteen are Allred's (1961, J. Inorg. Nucl.
 #: Chem. 17, 215, Table 3), checked against it.  His table has none for Te,
-#: At, Kr or Xe, and theirs are the values usually tabulated on the Pauling
-#: scale, not checked.  Te needs one: without it a tellurate's Te would be an
+#: At, Kr or Xe.  Theirs agree with the Pauling-scale table of the CRC
+#: Handbook (84th ed., 2003, § 9), which cites Pauling (1960, The Nature of
+#: the Chemical Bond, 3rd ed.) and Allen (1989, J. Am. Chem. Soc. 111, 9003),
+#: and with WebElements and Lange's Handbook (15th ed., 1999, Table 4.5).
+#: That check is second-hand: all three as quoted on Wikipedia's
+#: "Electronegativities of the elements (data page)", read 2026-10-03; no
+#: handbook was opened.  Te needs one: without it a tellurate's Te would be an
 #: anion, and a ligand of the metals beside it.  Deuterium needs no row:
 #: :func:`element_symbol` reads ``D`` as hydrogen, so a neutron structure draws
 #: as its protonated twin does.

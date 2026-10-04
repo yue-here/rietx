@@ -82,6 +82,14 @@ the whole surface with real agents.
 
 ### Inherited
 
+- **2026-10-03, from [1902](1902-the-solve-cost-as-a-quadratic-form.md),
+  closed: WP-1904 is reserved.** Decided 2026-10-02 on issue #562: the
+  Wyckoff-class enumeration claims WP-1904, a separate module
+  (`crystallography/site_classes.py`, beside `wyckoff.py`, outside `solve/`)
+  with its own acceptance across all 564 gemmi settings. Its file is written
+  when its PR lands, or sooner if the reporter wants the number on record. Do
+  not take 1904 for anything else.
+
 - **2026-09-30, from the issue triage (issue #562, and its prototype
   comment): the reporter's scoping proposal for this WP.** Thirteen chunks
   S0-S9, six of them touching no v1.6 file. The design rests on one cost

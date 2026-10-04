@@ -1,8 +1,8 @@
 # WP-1504 — the figure surface measured with real agents
 
-Milestone: rietview · Status: 🔄 2026-10-01 — fixed round run (14 runs, 13 done); N = 3 waits on a menu pick
+Milestone: rietview · Status: 🔄 2026-10-04 — option E run at N = 3: fixed 40/42 done against before 25/42; the maintainer's spot-check remains, then close
 Depends on: 1501, 1502, 1503; 1529 soft (the next round)
-Priority: P3 2026-10-01 — the fixed round ran on WP-1529's merge; option E (N = 3) waits on the maintainer
+Priority: P3 2026-10-04 — option E ran and found no new defect; the maintainer's spot-check of the fixed figures is all that remains
 
 ## Goal
 
@@ -128,6 +128,65 @@ agent could then answer with an SVG.
 - The agent skill's `references/api-figure.md`.
 
 ## Handover log
+
+### 2026-10-04 (round E) — before against fixed at N = 3
+
+The direction round C showed holds at three runs a cell. With the fixed
+surface, agents finished 40 of 42 figure tasks. On the surface before
+WP-1501-1503 they finished 25 of 42. Fluorapatite went from 0 of 6 to 6 of 6.
+The one fixed miss is the agent's, not the package's: it turned off boundary
+images, left bonds pointing into empty space, and did not re-read the report
+that counts them. So this round found no new defect in the figure surface,
+which is what WP-1505's trigger waited on. The maintainer picked option E on
+2026-10-03, and it cost $21.28 against the menu's $13-33.
+
+*Measured* (darwin, `claude-sonnet-5-5` and `claude-opus-5-5`, protocol 1.3,
+repeats 2 and 3 of every `before` and `fixed` cell, so 56 runs; done-rates
+recomputed from the committed `score.json` files):
+
+| | before | fixed |
+|---|---|---|
+| Sonnet, N = 3 | 9/21 | 19/21 |
+| Opus, N = 3 | 16/21 | 21/21 |
+| both | 25/42 | 40/42 |
+
+- By task, both models (k/6), before → fixed: rutile 3 → 6, chains 5 → 6,
+  gypsum 2 → 4, calcite 6 → 6, nac 3 → 6, lab6 6 → 6, fap 0 → 6.
+- Round B's single `before` run undercounted that condition (Sonnet 2/7 in
+  repeat 1, 7/14 in repeats 2-3). The gap to `fixed` holds at N = 3.
+- Routes: the rietx skill was invoked in 42/42 fixed runs and 4/42 before.
+  Sonnet on `before` drew by hand in 11 of 21 runs. `keep` was called in
+  30/42 fixed runs.
+- `fig.report` reads, of 42 fixed runs: the whole report 42, `empty` 9,
+  `hidden` 6, `dangling_bonds` 6, `hidden_atoms` 3; `label_overlaps`, `cut`,
+  `note` and `warnings` never.
+- Spend: agents $16.60, judge $4.69. Agent time 50.0 min; 68 min wall,
+  serial. The 56 run records are 9.0 MB, and `runs/` is now 16 MB.
+- The ten misses: nine are `before` runs, in classes round B named
+  (fluorapatite's bare P ×4, `hidden=` stubs, the 1.2 block wording) or drawn
+  by hand (×3). The tenth is gypsum-fixed-sonnet-3: `boundary=False` on an
+  `extent` block, `report.dangling_bonds` 48 against 0 at the default,
+  reproduced by script. `references/api-figure.md` states the behaviour and
+  the agent read it. No verdict is disputed; two are marginal
+  (gypsum-before-sonnet-3, nac-before-sonnet-2).
+
+*Done.* The 56 runs, committed under `runs/`. The `render_structure`
+docstring now says what `api-figure.md` says, that `boundary=False` keeps
+the bonds to the images it leaves out. WP-1505's trigger re-rated (its
+Inherited and Priority line). The round ran as a lane from a cleanup session.
+
+*Deviations, recorded rather than amended.* The Claude Code version moved
+during the round. Repeat 1 of every cell ran on 2.1.286, the version
+PROTOCOL.md names. Runs 1-36 of this round ran on 2.1.288 and runs 37-56 on
+2.1.289, after an auto-update at 23:13 UTC; each transcript's `version`
+field says so. And `run.py:492`'s regex for skill files read needs the whole
+path in one token, so it misses `cd …/references; cat api-figure.md`. The
+scores' `skills.files` is a lower bound: a transcript search finds
+`api-figure.md` in 42 of 42 fixed runs, where the score counts 36.
+
+*Next:* (1) the maintainer spot-checks the fixed figures,
+`open docs/wp/1504-eval/runs/*-fixed-*/figure.png`. (2) Then close: the result
+for 1501-1503 is in their Inherited from round B, and E changes none of it.
 
 ### 2026-10-01 (round C) — the fixed condition, one run a cell
 

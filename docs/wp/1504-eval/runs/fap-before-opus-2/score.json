@@ -1,0 +1,186 @@
+{
+ "run": "fap-before-opus-2",
+ "task": "fap",
+ "condition": "before",
+ "model": "opus",
+ "repeat": 2,
+ "commit": "5304b85ab092f629a0392b43966df8fda76563dd",
+ "protocol": "1.3",
+ "session_id": "6d9549a6-1e34-43b5-9df2-5ac5651bd40a",
+ "models_seen": {
+  "claude-opus-5-5": 15
+ },
+ "cost_usd": 0.4818914,
+ "turns": 17,
+ "minutes": 1.48,
+ "api_calls": 15,
+ "tokens": {
+  "input": 30,
+  "cache_read": 386397,
+  "cache_write": 32119,
+  "output": 7377
+ },
+ "renders": [
+  {
+   "pixels": [
+    687,
+    1000
+   ],
+   "values": {
+    "view": "c",
+    "size": 1000
+   },
+   "first": "Structure",
+   "ok": true
+  },
+  {
+   "pixels": [
+    1727,
+    2400
+   ],
+   "values": {
+    "view": "c",
+    "up": [
+     1,
+     -1,
+     0
+    ],
+    "size": 2400,
+    "supersample": 3
+   },
+   "first": "dict",
+   "ok": true
+  },
+  {
+   "pixels": [
+    2400,
+    1709
+   ],
+   "values": {
+    "view": "c",
+    "up": [
+     1,
+     1,
+     0
+    ],
+    "size": 2400,
+    "supersample": 3
+   },
+   "first": "dict",
+   "ok": true
+  }
+ ],
+ "builds": [
+  {},
+  {},
+  {},
+  {}
+ ],
+ "cuts": {},
+ "looks": [
+  {
+   "path": "/tmp/fap_default.png",
+   "pixels": [
+    687,
+    1000
+   ]
+  },
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-before-opus-2/figure.png",
+   "pixels": [
+    1798,
+    2000
+   ]
+  },
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-before-opus-2/figure.png",
+   "pixels": [
+    2000,
+    1082
+   ]
+  }
+ ],
+ "report_reads": {},
+ "figure_reads": {
+  "image": 2,
+  "letters": 1,
+  "rotation": 1
+ },
+ "skills": {
+  "invoked": [],
+  "files": []
+ },
+ "errors": [
+  "cd /private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/venvs/before/lib/python3.12/site-packages/rietx/viz/f"
+ ],
+ "outside": [],
+ "figure": {
+  "exists": true,
+  "pixels": [
+   2007,
+   1086
+  ],
+  "dpi": [
+   300.0,
+   300.0
+  ]
+ },
+ "mechanical": {
+  "pass": true,
+  "checks": [
+   [
+    "figure.png exists",
+    true
+   ],
+   [
+    "width 2007 px within (2005, 2011)",
+    true
+   ],
+   [
+    "dpi 300.0 within (299.0, 301.0)",
+    true
+   ]
+  ]
+ },
+ "stall": null,
+ "judge": {
+  "model": "opus",
+  "session_id": "1d7a15b5-94b3-49e8-a337-d6e7116e3af5",
+  "returncode": 0,
+  "cost_usd": 0.099599,
+  "criteria": [
+   {
+    "n": 1,
+    "verdict": "yes",
+    "saw": "The cell outline is a rhombus with a 120° angle at its top and bottom corners, and the F channels at the corners are seen end-on, each ringed by triangles of Ca."
+   },
+   {
+    "n": 2,
+    "verdict": "yes",
+    "saw": "The legend on the right names Ca, P, O and F, each beside a coloured circle, plus an entry for PO4 tetrahedra."
+   },
+   {
+    "n": 3,
+    "verdict": "yes",
+    "saw": "Ca is teal, P orange, O red and F green, both in the legend and in the picture."
+   },
+   {
+    "n": 4,
+    "verdict": "yes",
+    "saw": "Every atom and polyhedron sits well inside the frame, with white margin all round."
+   },
+   {
+    "n": 5,
+    "verdict": "yes",
+    "saw": "Every bond I could see, red O bonds and green F–Ca bonds alike, ends at an atom that is drawn."
+   },
+   {
+    "n": 6,
+    "verdict": "no",
+    "saw": "Several orange P atoms, at about (557,345), (1080,415), (440,665) and (960,735), are drawn with no tetrahedron around them."
+   }
+  ],
+  "yes": false
+ },
+ "done": false
+}

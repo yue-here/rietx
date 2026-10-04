@@ -323,20 +323,20 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   Every symmetry refusal is raised in `ParameterTable.__init__`, and the snapshot
   `Refinement.edit` commits performs none of it, so `edit` builds the **proposed** pair's table
   and refuses rather than recording (WP-1035).
-- **A specimen has one crystallite size, and exactly two of the six sample-broadening
-  quantities are not one number across wavelengths** (WP-1131). A size coefficient is
-  (180/π)·K·λ/L and the Gaussian one its square; both strains and Stephens' Λ(hkl) are
-  λ-free and stay shared. `params.multi.SIZE_LAMBDA_POWER` is that list **as data**, and
-  `MultiParameterTable` hands histogram h the factor λ_h/λ_0, so **a joint fit shares the
-  size, never the degrees** (unfixed: 363.3 Å against 623.9 Å for one specimen,
-  `converged`, Rwp ×1.8 on the long-λ histogram and ×4.7 for `gauss_size`). The seam is
-  `ParameterTable.apply_value_scale`, a factor folded into **C** — because
-  `_peak_chain_column` finite-differences θ *through* `decode`, no derivative branch is
-  touched and the analytic and FD columns cannot disagree. Sharing happens in **internal**
-  coordinates, so a writer that touches one entry per histogram inherits nothing: shared
-  bounds are **intersected**, not last-write-wins, and a **seed is in column units** — a
-  physical one puts two histograms at different coordinates for one column and the last
-  write silently wins.
+- **A specimen has one crystallite size, and exactly three of the seven sample-broadening
+  quantities are not one number across wavelengths** (WP-1131, WP-1343). A size coefficient is
+  (180/π)·K·λ/L and the Gaussian one its square, and the magnetic coherence length's Lorentzian one
+  (`magnetic_lor_size`) goes as λ like `lor_size`; both strains, the magnetic strain and Stephens'
+  Λ(hkl) are λ-free and stay shared. `params.multi.SIZE_LAMBDA_POWER` is that list **as data**, and
+  `MultiParameterTable` hands histogram h the factor λ_h/λ_0, so **a joint fit shares the size,
+  never the degrees** (unfixed: 363.3 Å against 623.9 Å for one specimen, `converged`, Rwp ×1.8 on
+  the long-λ histogram and ×4.7 for `gauss_size`). The seam is `ParameterTable.apply_value_scale`,
+  a factor folded into **C** — because `_peak_chain_column` finite-differences θ *through*
+  `decode`, no derivative branch is touched and the analytic and FD columns cannot disagree.
+  Sharing happens in **internal** coordinates, so a writer that touches one entry per histogram
+  inherits nothing: shared bounds are **intersected**, not last-write-wins, and a **seed is in
+  column units** — a physical one puts two histograms at different coordinates for one column and
+  the last write silently wins.
 - **A derived quantity of one parameter needs no covariance; one of two correlated
   columns does** — WP-1072 one rank down. `model/microstructure.py` reports each
   mechanism's Gaussian and Lorentzian readings separately with exact single-parameter

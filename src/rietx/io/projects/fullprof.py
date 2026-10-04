@@ -800,13 +800,21 @@ def fullprof_species(species: str, *, neutron: bool) -> tuple[str, float | None]
       ``LI7`` with no LINE 12 runs **at natural abundance** with no message, so
       the isotope is never written without its b.
 
-    An ion with a sign and no magnitude (``Cu+``) is refused on an X-ray file,
-    as the TOPAS writer refuses it: rietx computes the neutral atom for it and
-    FullProf's X-ray table has no ``CU+``. On a neutron file it is written as
-    the element, whose b both programs give it. So is an isotope whose name would not fit
-    ``NAM``'s four characters (``157Gd`` → ``GD157``; FullProf stops on it).
+    An isotope whose name would not fit ``NAM``'s four characters is refused
+    (``157Gd`` → ``GD157``; FullProf stops on it).
+
+    The species spelled is the one rietx computes
+    (:func:`~rietx.crystallography.scattering.written_species`, WP-1527). A
+    one-charge ion without its digit is the tabulated ion, so ``Cu+`` →
+    ``CU+1`` on an X-ray file, which FullProf reads as that ion. An ion
+    rietx's X-ray table lacks is computed as the neutral atom, so ``Fe+`` →
+    ``FE``, and :func:`from_structure` reports it on an X-ray file as
+    ``FULLPROF_SPECIES_WRITTEN_NEUTRAL``. A neutron file writes the element
+    for every ion, whose b both programs give it.
     """
-    s = species.strip()
+    from ...crystallography.scattering import written_species
+
+    s = written_species(species)[0].strip()
     mass = ""
     if s in ("D", "T"):
         mass, s = ("2" if s == "D" else "3"), "H"
@@ -817,14 +825,6 @@ def fullprof_species(species: str, *, neutron: bool) -> tuple[str, float | None]
             f"a FullProf Typ names one of those")
     lead, element, magnitude, sign = m.groups()
     mass = mass or lead
-    if sign and not magnitude and not neutron:
-        raise ValueError(
-            f"species {species!r} has a sign but no charge magnitude: rietx's "
-            f"scattering table reads it as the neutral atom, and FullProf's "
-            f"X-ray table has no {element.upper() + sign!r} (it stops), so no "
-            f"FullProf spelling states the model rietx computed. Write "
-            f"{mass + element + '1' + sign!r} for the ion or "
-            f"{mass + element!r} for the neutral atom")
     element = element.upper()
     if not neutron:
         if mass:
@@ -3308,7 +3308,8 @@ def _widths(phase, instrument: Instrument | None) -> list[float]:
 
 
 def from_structure(structure: Structure, *,
-                   instrument: Instrument | None = None) -> str:
+                   instrument: Instrument | None = None,
+                   diagnostics: list[Diagnostic] | None = None) -> str:
     """Serialise ``structure`` as a FullProf ``.pcr`` — the inverse of
     :func:`to_structure`.
 
@@ -3333,7 +3334,10 @@ def from_structure(structure: Structure, *,
       neutron file (refused on an X-ray one, which has no slot for it). A
       call with no ``instrument`` always writes an X-ray file, so a deuterated
       structure (``D``, ``7Li``) needs a neutron ``instrument``, or its sites
-      respelled as the element, before it can be exported.
+      respelled as the element, before it can be exported. No species is
+      refused for its charge: an ion rietx's X-ray table lacks (``Fe+``) is
+      written as the neutral element rietx computed, and named
+      ``FULLPROF_SPECIES_WRITTEN_NEUTRAL`` when ``diagnostics=`` is a list.
     * **the anomalous dispersion** on an X-ray file, as one LINE-12
       ``nam f′ f″ 2`` per ``Typ`` (:func:`_anomalous`): rietx's own
       Cromer-Liberman values at the primary line. Without them FullProf
@@ -3669,12 +3673,21 @@ def from_structure(structure: Structure, *,
     # codewords this writer actually handed out.
     lines.append(str(counter[0]))
     lines.extend(body)
+    # A neutron file writes the element for every ion, and rietx's b is the
+    # element's too, so nothing was substituted there.
+    if diagnostics is not None and not neutron:
+        from ...crystallography.scattering import written_neutral_diagnostics
+        diagnostics.extend(written_neutral_diagnostics(
+            structure, code="FULLPROF_SPECIES_WRITTEN_NEUTRAL",
+            program="FullProf"))
     return "\n".join(lines) + "\n"
 
 
 def write_fullprof_pcr(structure: Structure, path: str | Path, *,
-                       instrument: Instrument | None = None) -> None:
+                       instrument: Instrument | None = None,
+                       diagnostics: list[Diagnostic] | None = None) -> None:
     """Write ``structure`` to ``path`` as a FullProf ``.pcr``. See
     :func:`from_structure` for exactly what carries and what does not."""
-    Path(path).write_text(from_structure(structure, instrument=instrument),
+    Path(path).write_text(from_structure(structure, instrument=instrument,
+                                         diagnostics=diagnostics),
                           encoding="utf-8")

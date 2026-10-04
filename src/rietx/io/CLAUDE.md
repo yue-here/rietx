@@ -450,14 +450,17 @@ Four rules the readers do not need (WP-1118, four formats: `.inp`, `.pcr`,
 
 - **Refuse on the way out whatever the reader refuses on the way in**, and
   refuse it where the value is still in hand rather than leaving the file on
-  disk to fail in someone else's program. An anisotropic
-  site under a convention `to_structure` declines to assume, a setting the
-  format cannot spell — and a **non-finite** value, which `repr` writes as
-  `inf` and no real program parses. The reader's own refusals are the list to
-  work from; where the reader refuses *for want of evidence*, § What a reader
-  may repair's rule decides the direction — magnitude, not the refine flag, so
-  a value at the model's identity is dropped and a non-zero one raises (a
-  `.prm`'s `ICONS ZERO`, whose unit no file here settles).
+  disk to fail in someone else's program. An anisotropic site under a
+  convention `to_structure` declines to assume, a setting the format cannot
+  spell — and a **non-finite** value, which `repr` writes as `inf` and no real
+  program parses. The reader's own refusals are the list to work from; where
+  the reader refuses *for want of evidence*, § What a reader may repair's rule
+  decides the direction — magnitude, not the refine flag, so a value at the
+  model's identity is dropped and a non-zero one raises (a `.prm`'s `ICONS
+  ZERO`, whose unit no file here settles). **A species is the exception**
+  (WP-1527): written as the atom rietx computed (`scattering.written_species`),
+  a neutral substitute reported, a moment's ion kept, and refused only where
+  the file has no label (an isotope, `Cval`), never for a charge.
 - **A fixed-column writer owes two things a token writer does not.** The field
   is the *budget*: spend it (`gsas.write_field`, `%g` descending from seventeen
   digits, which is the value's own `repr` wherever that fits) and name what

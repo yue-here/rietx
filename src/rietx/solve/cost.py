@@ -112,8 +112,8 @@ class ExtractionRefused(ValueError):
     fit, whose profile was refined with its intensities tied to a structure, so
     it is not a free-intensity extraction of the pattern.  ``"unconverged"``:
     the solver did not report ``converged``, so the frozen profile is not the
-    extraction's.  ``"poor"``: the fit is not a fit of this pattern
-    (:data:`rietx.refine.MODEL_FAR_FROM_DATA_RWP`).  ``"magnetic"``: the
+    extraction's.  ``"poor"``: the fit is not a fit of this pattern, by the
+    package's own reading (``RefinementResult.usable``).  ``"magnetic"``: the
     compile draws a magnetic term for some phase; that term is a second function
     of the atoms (its own form factor, and under WP-1343 its own frozen
     windows) that one |F|² per reflection and the dummy-atom compile cannot
@@ -438,9 +438,12 @@ class SolveCost:
         (``ValueError``).
         Refuses, with :class:`ExtractionRefused`, a magnetic structure, a
         refinement that holds no fit or a Rietveld fit, one whose solver did not
-        converge, and one whose Rwp
-        exceeds :data:`rietx.refine.MODEL_FAR_FROM_DATA_RWP` (0.8) or that
-        carries ``MODEL_FAR_FROM_DATA``.  That bar is the package's measured
+        converge, and one the package calls unusable
+        (:attr:`~rietx.schemas.results.RefinementResult.usable`, WP-1902): an
+        error-level diagnostic, which today is only ``MODEL_FAR_FROM_DATA``
+        at Rwp above :data:`rietx.refine.MODEL_FAR_FROM_DATA_RWP` (0.8).  An
+        error-level code added later refuses here with no edit.  That bar is
+        the package's measured
         line between a bad fit and no fit of this model (WP-1028 §(c): Rwp = 1
         is y_calc ≡ 0, the zero-scale attractor converges at 0.99999, and the
         failures above it exceed it by orders of magnitude; a Le Bail fit of
@@ -450,7 +453,6 @@ class SolveCost:
         """
         from ..model.forward import compile_model
         from ..params.vector import ParameterTable
-        from ..refine import MODEL_FAR_FROM_DATA_RWP
 
         instrument = refinement.fitted_instrument
         # the dummy-atom compile drops every moment, so ask the fitted one
@@ -472,12 +474,13 @@ class SolveCost:
                 "unconverged", f"the extraction's solver stopped with status "
                 f"{result.status!r}, not 'converged'; refit before solving")
         rwp = float(result.statistics.rwp)
-        far = any(dg.code == "MODEL_FAR_FROM_DATA" for dg in result.diagnostics)
-        if far or not rwp <= MODEL_FAR_FROM_DATA_RWP:
+        if not result.usable:
+            errors = ", ".join(sorted({dg.code for dg in result.diagnostics
+                                       if dg.level == "error"}))
             raise ExtractionRefused(
-                "poor", f"the extraction's Rwp is {rwp:.3g} (bar "
-                f"{MODEL_FAR_FROM_DATA_RWP}, rietx.refine.MODEL_FAR_FROM_DATA_RWP): "
-                "it is not a fit of this pattern")
+                "poor", f"the extraction carries {errors} at Rwp {rwp:.3g}, so "
+                "the package calls it unusable (RefinementResult.usable): it is "
+                "not a fit of this pattern")
         structure = blind_structure(refinement.fitted_structure, phase, nuisance)
         model = compile_model(structure, instrument, data, mode="rietveld",
                               two_theta_limits=refinement._two_theta_limits)

@@ -1,6 +1,6 @@
 # WP-1527 — foreign files spell a species as the other program does
 
-Milestone: unscheduled · Status: 🔄 2026-10-02 — all four fix PRs landed (#569, #570, #572, and #568 for `.pcr`); the fallback-ion decision is open
+Milestone: unscheduled · Status: 🔄 2026-10-04 — the rule is in all four writers and the lookup reads one-charge ions; the `.pcr` other-program test and Y³⁺ past 2 Å⁻¹ remain
 Track: Coming from another code
 Depends on: — (WP-1118 closed 2026-09-16; its writers and readers are what this corrects)
 Priority: P2 2026-09-30 — a silent wrong structure in another program's refinement (GSAS-II turns `7Li` into H), on a path few fits run; the fix PRs are open
@@ -50,7 +50,28 @@ an ion to its isotope.
    the element with a warning (the file would refine natural abundance until
    someone acts).
 2. A digitless ion (`Cu+`) is refused, because rietx computes the neutral atom
-   for it (#202's fallback) and GSAS-II reads carbon.
+   for it (#202's fallback) and GSAS-II reads carbon. *Superseded 2026-10-03
+   by the maintainer's rule below: no writer refuses a species.*
+
+**The maintainer's rule, 2026-10-03.** A writer neither refuses a species
+nor writes an atom rietx did not compute. It writes the species rietx
+computed, in the other program's spelling. Where rietx substituted the
+neutral atom, the writer writes the neutral element and reports the
+substitution. The rule holds for every writer. Decision 1 is untouched: an
+isotope with no place in the file has no spelling that states what rietx
+computed.
+
+**Measured 2026-10-03: most substitutions are rietx's own lookup miss.**
+`scattering.normalize_species` (`:117-123`) tries `Cu+` and then `Cu`, never
+`Cu1+`. So `Na+`, `K+`, `Li+`, `Ag+`, `Cu+`, `Cl-` and `F-` all compute as
+the neutral atom, though the Waasmaier-Kirfel table carries each ion as
+`Na1+`, `Cl1-` and so on. A CIF with those labels reads with no diagnostic,
+and at fit time `SPECIES_FALLBACK_NEUTRAL` says the ion is not tabulated,
+which is false. pymatgen writes this spelling. Of the 111 ions in
+*International Tables* Vol. C Table 6.1.1.3, the table lacks exactly one,
+Y³⁺, and Table 6.1.1.4 gives its coefficients (4 Gaussians + c, fitted to
+sinθ/λ ≤ 2 Å⁻¹). Ions in no table remain (`Fe+`, `S2-`, `Se2-` on this
+table), and the writer rule is for those.
 
 ## Non-goals
 
@@ -62,13 +83,39 @@ an ion to its isotope.
 
 ## Tasks
 
-- [ ] Review and land PRs #568 (.pcr), #569 (GSAS-II CIF), #570 (.gpx reader),
+- [x] Review and land PRs #568 (.pcr), #569 (GSAS-II CIF), #570 (.gpx reader),
   #572 (.EXP) through `/pr-review`, each against its issue's reproduction
+  (all four merged by 2026-10-02; handover log)
 - [ ] A test per writer that reads the written species through the *other*
   program's rule (the reporter's table), not through rietx's own reader
-- [ ] Decide the reader's X-ray arm for an isotope from a foreign file
-  (#554's note: land with #552 or refuse on the X-ray histogram)
-- [ ] Skill: a reference row for the refusal codes the PRs add, or "none" and why
+  (met for #569 and #572; the `.pcr` writer's is unconfirmed)
+- [x] Decide the reader's X-ray arm for an isotope from a foreign file
+  (#554's note: land with #552 or refuse on the X-ray histogram) (settled by
+  #556: an isotope takes its element's f₀ on an X-ray histogram)
+- [x] Skill: a reference row for the refusal codes the PRs add, or "none" and why
+  (none: no new code; #570 and #572 extend two messages, three copies agree)
+- [x] A digitless one-charge ion reads as the tabulated ion: `normalize_species`
+  tries `Na1+` between `Na+` and `Na`. It moves every fit that used the
+  spelling, so it states what it changed (a diagnostic or a record field), and
+  `SPECIES_FALLBACK_NEUTRAL` stops firing on those labels
+- [x] Y³⁺ in the X-ray table, from *International Tables* Vol. C Table 6.1.1.4,
+  with its source and its sinθ/λ ≤ 2 Å⁻¹ range beside the row
+  (`scattering._ITC_IONS`; the DABAX file stays byte-identical) and in the
+  manual Part 2's f₀ section (2026-10-04: checked against Table 6.1.1.3,
+  0.0049 e at worst over s ≤ 2 Å⁻¹, and against cctbx `it1992` and GSAS-II
+  `atmdata.py`, digit for digit)
+- [ ] Decide what Y³⁺ does past s = 2 Å⁻¹, where the fit leaves the free atom
+  (−0.11 e at 2.5, −0.57 e at 3.0, negative beyond 3.86) and ITC sends the
+  reader to the free-atom curve. Today rietx evaluates the fit everywhere, as
+  cctbx and GSAS-II do. A switch at s = 2 would put a step in f₀ that a
+  reflection crossing it during a stage would feel.
+- [x] The maintainer's rule in every writer (GSAS-II CIF, GSAS `.EXP`, FullProf
+  `.pcr`, TOPAS `.inp`): write the species rietx computed; where it
+  substituted, write the neutral element and report it. The three
+  digitless-ion refusals go (`topas.py:1568`, `fullprof.py:803`,
+  `gsas2.py:1827`) (2026-10-04: `scattering.written_species` and
+  `written_neutral_diagnostics`; one `*_SPECIES_WRITTEN_NEUTRAL` code per
+  format)
 
 ## Acceptance
 
@@ -87,6 +134,107 @@ the spelling the issue's "fix direction" names.
 - Issues #553, #554, #555, #557, #558; PRs #568-#570, #572; PR #556 (#552).
 
 ## Handover log
+
+- **2026-10-04** — **The rule is in the code.** A structure labelled with
+  `Na+` or `Cl-` now scatters as the ions it names, and Y³⁺ is tabulated. A
+  file written for GSAS-II, GSAS, FullProf or TOPAS now states the atom rietx
+  computed in that program's spelling. No writer refuses an ion label any
+  more. Where rietx computes an ion as its neutral atom, the file says neutral
+  and the writer reports it. An isotope a file has no place for still refuses.
+
+  *Done*, as two lanes from a cleanup session, each checked and re-run here.
+  `e24980d9`: `normalize_species` tries `Na1+` between `Na+` and `Na`, and
+  `_ITC_IONS` carries Y³⁺ (a = 17.9268, 9.15310, 1.76795, −33.108; b =
+  1.35417, 11.2145, 22.6599, −0.01319; c = 40.2602), checked against Table
+  6.1.1.3's own Y³⁺ column (0.0049 e at worst over s ≤ 2 Å⁻¹, f(0) =
+  36.00005) and against cctbx `it1992` and GSAS-II `atmdata.py`. The OCR'd
+  copy dropped the minus signs on a4 and b4; only the negative values give 36
+  electrons at s = 0. The DABAX file is byte-identical. The writers:
+  `scattering.written_species` gives each label the species rietx computes,
+  the four spelling functions call it, the three digitless-ion refusals are
+  gone, and `write_topas_inp`/`write_fullprof_pcr` take `diagnostics=`.
+  `Cu+` writes `Cu+1` (TOPAS), `CU+1` (FullProf X-ray, GSAS), `Cu1+` (GSAS-II
+  CIF), and reads back as `Cu1+` through all four. Staged in the 1.7.0 notes.
+
+  *Caps raised*, each with its reason beside it: `API_INDEX_MAX_BYTES`
+  39 600 → 39 700 (`api.md` is 39 642 B with the two new keywords), and
+  `src/rietx/io/CLAUDE.md`'s line cap 498 → 501 for the species exception to
+  § Project writers' first rule. PR #690 (WP-1510) also sets
+  `API_INDEX_MAX_BYTES` to 39 700, so whichever merges second resolves a
+  one-line conflict in `tests/skill_caps.py`.
+
+  *Measured* (`[dev]`, macOS arm64): `test_species_fallback.py` 72 passed
+  (48 before); the four writer files 890 (872 before); with the registry,
+  manual API, skill, docs and portability files, 1189 passed. Pinned numbers
+  that moved: the fallback fixture is now As³⁺ (its value 0.0828 → 0.0996),
+  and the skill row reads 11 of 111.
+
+  *Final tree* (after the review's fixes; `[dev]`, macOS arm64, nothing
+  else running): the fast selection 8165 passed, 159 skipped, in 2:36; with
+  current `main` merged in (WP-1510's PR among it), 8200 passed, 159 skipped,
+  in 3:23, the figure this branch merges at. The
+  session's 20 added tests cost 0.22 s together (`tests.added_test_times`), so
+  none joins the slow tail. The full selection was not run: no acceptance
+  fixture carries a digitless ion label or Y³⁺ (a grep of `tests/data/*.cif`),
+  and the writers touch no measured number, so none can move.
+
+  *Lane trial* (`session_usage.py lanes 0433c291`; the session's three lanes,
+  both of this WP's and WP-1504's round E, are measured here):
+
+  | lane | est | requests | main at dispatch | lane base | re-read | main requests | left in main | main edits after | redo | lane $ | in-session $ | saved $ |
+  |---|---|---|---|---|---|---|---|---|---|---|---|---|
+  | 1504-option-E | 40 | 51 | 214K | 69K | 0K of 1061K | 15 | 20K | 4 | 0 | 2.42 | 8.65 | +4.55 |
+  | 1527-lookup-and-Y3 | 35 | 84 | 411K | 70K | 0K of 3K | 6 | 15K | 0 | 0 | 3.83 | 10.49 | +5.86 |
+  | 1527-writers-rule | 35 | 108 | 429K | 69K | 0K of 8K | 10 | 16K | 1 | 0 | 5.36 | 14.12 | +7.56 |
+
+  One item kept: 1902-poor-reads-usable, est 10, 16 requests, at 322K. The
+  session: main 243 requests, peak 461K, $21.32; lanes $11.61. Estimates ran
+  2.00× short. The 1504 lane's window is not clean: it ran 68 minutes while
+  this session worked other WPs, so its 15 main requests and 4 main edits
+  include unrelated work (the edits were WP-1504's own file, the 1505 note
+  and a docstring the lane suggested, none of them fixes to the lane's runs).
+  The selective policy at these figures (`baseline --u 0 --mo 10 --d 16489`):
+  −21 % over the 194 replayed sessions, −13 % with the lane assumptions
+  doubled, and −29 % in the band above 450K that this session reached. Row
+  added to `docs/milestones/process.md` § Lanes within a WP.
+
+  *Review* (`/code-review high --fix`, `8aa52925`). Fixed: the TOPAS writer
+  had neutralised a magnetic site's species (`Fe4+` → `Fe`), though TOPAS
+  reads the magnetic form factor from it and rietx computes the moment from
+  that ion, so a site with a moment keeps its ion (Fe⁴⁺ and Mn⁺ tested); the
+  written-neutral warning names the label written (`D`, `57Fe`); the rule in
+  `io/CLAUDE.md` names the valence labels GSAS still refuses. Declined: a
+  warning for Y³⁺ past s = 2 (a task above, since it needs plumbing in the
+  fit); writing the element in the case it was typed (`fe+` → `fe`, the
+  writers' existing pattern); resolving each species twice per export
+  (negligible).
+
+  *Not done.* The GSAS writer still refuses valence labels (`Cval`, `Siva`,
+  `gsas.py:1405`): no GSAS spelling states what rietx computes. No real
+  program has read `NA+1` or `Na1+`; only `Cu1+`/`CU+1` were measured. `S2-`
+  written as `S` was never run in a target program.
+
+  *Next:* the `.pcr` writer's test through FullProf's own rule (task 2), then
+  the Y³⁺ range decision.
+
+- **2026-10-03** — **The open question is decided, and most of it turned out
+  to be a lookup bug.** The maintainer's rule: a writer never refuses a
+  species and never writes an atom rietx did not compute. While checking it,
+  `Na+`, `Cl-`, `Cu+` and the other one-charge spellings turned out to compute
+  as neutral atoms, though rietx's table holds each ion. Fixing the lookup
+  removes most substitutions before any writer meets them. Y³⁺ is the only
+  ion *International Tables* Vol. C carries and rietx's table does not.
+
+  *Done* (a cleanup session over unowned in-flight WPs; docs only). Tasks 1,
+  3 and 4 ticked from the earlier entries. The rule and the measurement are
+  in Context. Three tasks added. *Measured* by calling
+  `normalize_species`/`detect_fallback` on 15 labels, and by reading a
+  two-site NaCl CIF labelled `Na+`/`Cl-`: no read diagnostic, both neutral.
+  The ITC count compares Table 6.1.1.3's 111 ion headers, from `pdftotext` of
+  the maintainer's copy, with the table's `#S` lines.
+
+  *Next:* the lookup fix first, since it shrinks what the writer rule has to
+  cover. Then Y³⁺, then the writers.
 
 - **2026-10-02** — The FullProf half is on `main`. A `.pcr` now states what
   FullProf needs to run it: non-zero widths, the radiation, FullProf's own

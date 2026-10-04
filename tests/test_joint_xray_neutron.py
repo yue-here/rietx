@@ -639,16 +639,16 @@ def _yb_oxide() -> rx.Phase:
                        y=P(value=0.5), z=P(value=0.5), biso=P(value=0.3))])
 
 
-def _y3plus_corundum() -> rx.Phase:
-    """Corundum with its Al site labelled ``Y3+``, an ion the X-ray table lacks."""
+def _as3plus_corundum() -> rx.Phase:
+    """Corundum with its Al site labelled ``As3+``, an ion the X-ray table lacks."""
     phase = corundum()
-    phase.atoms[0].species = "Y3+"
+    phase.atoms[0].species = "As3+"
     return phase
 
 
 @pytest.mark.parametrize("code, phase, owner", [
     ("NEUTRON_RESONANT_ABSORBER", _yb_oxide, "neutron_cw"),
-    ("SPECIES_FALLBACK_NEUTRAL", _y3plus_corundum, "xray_cw"),
+    ("SPECIES_FALLBACK_NEUTRAL", _as3plus_corundum, "xray_cw"),
 ])
 def test_the_other_radiation_keyed_diagnostics_fire_on_their_own_histogram(
         code, phase, owner):

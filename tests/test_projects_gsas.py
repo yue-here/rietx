@@ -1248,6 +1248,8 @@ def test_a_gsas_isotope_type_reads_as_that_isotope(tmp_path, gsas_type, species,
     ("Zr4+", "ZR+4"), ("O2-", "O-2"), ("Cu1+", "CU+1"), ("Mn", "MN"),
     ("7Li", "LI_7"), ("7Li1+", "LI+1_7"), ("D", "H_2"), ("60Ni", "NI_60"),
     ("157Gd", "GD_157"),
+    # WP-1527: the atom rietx computes, the tabulated Cu1+ and the neutral Fe
+    ("Cu+", "CU+1"), ("Na+", "NA+1"), ("Fe+", "FE"),
 ])
 def test_the_writer_spells_the_manuals_type(tmp_path, species, written):
     """'aasv_nnn', symbol upper case and the valence sign-first with its
@@ -1263,10 +1265,22 @@ def test_the_writer_spells_the_manuals_type(tmp_path, species, written):
             == normalize_species(species))
 
 
-def test_the_writer_refuses_a_digitless_ion():
-    with pytest.raises(ValueError, match="sign but no charge magnitude") as exc:
-        from_structure(_one_site("Cu+"))
-    assert "'A1'" in str(exc.value)
+@pytest.mark.parametrize("species, back, named", [
+    ("Cu+", "Cu1+", False),   # the tabulated ion rietx computes (WP-1527)
+    ("Fe+", "Fe", True),      # no Fe1+ in rietx's table: neutral Fe, named
+])
+def test_a_digitless_ion_is_written_as_the_atom_rietx_computes(
+        tmp_path, species, back, named):
+    """The maintainer's rule (WP-1527, 2026-10-03): no species is refused for
+    its charge, and none is written as an atom rietx did not compute."""
+    diagnostics: list = []
+    out = tmp_path / "syn.EXP"
+    write_gsas_exp(_one_site(species), out, diagnostics=diagnostics)
+    assert to_structure(read_gsas_exp(out)).phases[0].atoms[0].species == back
+    said = [d for d in diagnostics
+            if d.code == "GSAS_EXP_SPECIES_WRITTEN_NEUTRAL"]
+    assert [d.where for d in said] == (
+        [["phases.0.atoms.0.species"]] if named else [])
 
 
 @pytest.mark.parametrize("species, element", [("Cval", "C"), ("Siva", "Si")])

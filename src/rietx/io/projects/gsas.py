@@ -1389,13 +1389,18 @@ def gsas_species(species: str) -> str:
     ``Zr4+`` → ``ZR+4``, ``Mn`` → ``MN``, ``7Li`` → ``LI_7``, ``D`` → ``H_2``.
     **From the manual only**: no GSAS run has checked it (issue #555).
 
-    An ion with a sign and no magnitude (``Cu+``) is refused, as the TOPAS and
-    FullProf writers refuse it: rietx computes the neutral atom for it, and
-    the grammar has no digitless valence to write.  A valence-labelled species
-    (``Cval``, ``Siva``) is refused with its own message: rietx scatters it
-    from the Waasmaier-Kirfel table, and the grammar has no label for it.
+    The species spelled is the one rietx computes
+    (:func:`~rietx.crystallography.scattering.written_species`, WP-1527).  A
+    one-charge ion without its digit is the tabulated ion, so ``Cu+`` →
+    ``CU+1``.  An ion rietx's table lacks is computed as the neutral atom, so
+    ``Fe+`` → ``FE``, and :func:`from_structure` reports it as
+    ``GSAS_EXP_SPECIES_WRITTEN_NEUTRAL``.  A valence-labelled species
+    (``Cval``, ``Siva``) is refused: rietx scatters it from the
+    Waasmaier-Kirfel table, and the grammar has no label for it.
     """
-    s = species.strip()
+    from ...crystallography.scattering import written_species
+
+    s = written_species(species)[0].strip()
     mass = ""
     if s in ("D", "T"):
         mass, s = ("2" if s == "D" else "3"), "H"
@@ -1414,14 +1419,6 @@ def gsas_species(species: str) -> str:
             f"a GSAS atom type ('aasv_nnn') names one of those")
     lead, element, magnitude, sign = m.groups()
     mass = mass or lead
-    if sign and not magnitude:
-        raise ValueError(
-            f"species {species!r} has a sign but no charge magnitude: rietx's "
-            f"scattering table reads it as the neutral atom, and GSAS's type "
-            f"grammar writes a valence as a sign and a number ('TI+4'), so no "
-            f"GSAS type states the model rietx computed. Write "
-            f"{mass + element + '1' + sign!r} for the ion or "
-            f"{mass + element!r} for the neutral atom")
     return (f"{element.upper()}{sign or ''}{magnitude or ''}"
             + (f"_{mass}" if mass else ""))
 
@@ -1871,6 +1868,11 @@ def from_structure(structure: Structure, *, title: str = "",
     it in the other direction for the reason ``GSAS_EXP_SCALE_NOT_COMPARABLE``
     gives.
 
+    A species is written as the atom rietx computes, in the manual's type
+    grammar (:func:`gsas_species`).  Where rietx computes the neutral atom for
+    an ion its table lacks (``Fe+``), the file states the neutral element, and
+    the label is named, ``GSAS_EXP_SPECIES_WRITTEN_NEUTRAL``.
+
     Four refusals besides the two in :func:`_write_label`.  More than
     :data:`_WRITE_MAX_PHASES` phases or :data:`_WRITE_MAX_ATOMS` sites in one,
     both limits of the format's own key and record layout rather than of this
@@ -2030,6 +2032,9 @@ def from_structure(structure: Structure, *, title: str = "",
                     f"holds.  Reading it back gives every member of the group "
                     f"the one flag"),
                 where=list(merged)))
+        from ...crystallography.scattering import written_neutral_diagnostics
+        diagnostics.extend(written_neutral_diagnostics(
+            structure, code="GSAS_EXP_SPECIES_WRITTEN_NEUTRAL", program="GSAS"))
     return "\r\n".join(cards) + "\r\n"
 
 

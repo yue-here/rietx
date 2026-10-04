@@ -243,10 +243,10 @@ def _rock_salt(species: str) -> rx.Phase:
                        y=P(value=0.5), z=P(value=0.5), biso=P(value=0.3))])
 
 
-def _y3plus_corundum() -> rx.Phase:
-    """Corundum with its Al site labelled ``Y3+``, an ion the X-ray table lacks."""
+def _as3plus_corundum() -> rx.Phase:
+    """Corundum with its Al site labelled ``As3+``, an ion the X-ray table lacks."""
     phase = corundum()
-    phase.atoms[0].species = "Y3+"
+    phase.atoms[0].species = "As3+"
     return phase
 
 
@@ -260,8 +260,8 @@ ARMS = [
                  [0, 1], id="resonant-Gd"),
     pytest.param("NEUTRON_RESONANT_ABSORBER", corundum, _xray, [0, 0],
                  id="resonant-none"),
-    pytest.param("SPECIES_FALLBACK_NEUTRAL", _y3plus_corundum, _xray, [1, 0],
-                 id="fallback-Y3+"),
+    pytest.param("SPECIES_FALLBACK_NEUTRAL", _as3plus_corundum, _xray, [1, 0],
+                 id="fallback-As3+"),
     pytest.param("SPECIES_FALLBACK_NEUTRAL", corundum, _xray, [0, 0],
                  id="fallback-none"),
 ]

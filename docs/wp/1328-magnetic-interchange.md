@@ -1,9 +1,8 @@
 # WP-1328 — magnetic interchange: magCIF in and out, and the readers stop refusing
 
-Milestone: magnetic · Status: 🔄 2026-10-01 — every task landed (PR #544 the last), and #567's writer refusal (PR #571); the `### Inherited` items remain to prune before it closes
+Milestone: magnetic · Status: ✅ 2026-10-03 — every task landed (PRs #544, #571), shipped in 1.6.0
 Depends on: 1327 (the model the files describe); 1118 soft (the coverage
 registry the foreign readers report through)
-Priority: P3 2026-09-23 — waits on 1327's model; P2 when it lands
 
 ## Goal
 
@@ -65,161 +64,6 @@ nuclear-only structure that looks complete is the failure every one of these
 refusals exists to prevent, so a magnetic construct the reader cannot carry
 is still named in the result.
 
-### Inherited
-
-- **2026-09-30, from the review of #544: `Phase.propagation_vector` is refused
-  by the TOPAS writer only.** Checked on #544's head: `gsas`, `fullprof` and
-  `gsas2`'s `from_structure` write a phase carrying k = (0, 0, ½) with no k in
-  the file, no exception and no warning, so it reads back as k = 0. A follow-up.
-  **Issue #567 is this entry (2026-09-30 triage); fix PR #571 is open.**
-  *Checked at `e3e6486a`* with the reporter's snippet: `gsas` and `gsas2`
-  read back `None`, and the TOPAS refusal fires. Two more findings there are
-  design choices left open: `fullprof.to_structure` drops a nuclear phase's
-  `Nvk` k (FullProf's nuclear k and rietx's k are not the same model), and
-  `Structure.to_cif` writes no k either, so the TOPAS message's "A CIF
-  (Structure.to_cif) is the export for a k hypothesis" points at the wrong
-  export. The PR points every refusal at the JSON.
-- **2026-09-27, from the issue triage (issue #470): three of the four
-  foreign writers still drop a magnetic phase in silence.** The handover
-  below lists #470 as not done; PR #478 says it "does not fix the writer".
-  *Checked at `91deebbb`* with the reporter's own snippet (MnF₂ from
-  `tests/test_magnetic.py`'s `_mnf2()`, BNS 136.499): `topas`, `gsas` and
-  `fullprof`'s `from_structure` write the phase as a nuclear one, with no
-  moment record, no magnetic group, no exception and no warning. `gsas2`
-  now carries both, because its writer goes through
-  `crystallography.cif.write_structure_block`, which #478 taught the magCIF
-  loops (`_space_group_magn.number_BNS 136.499` and the
-  `_atom_site_moment` loop appear). Whether GSAS-II's own CIF import reads
-  those loops is not measured. The reporter's smallest fix is a refusal by
-  name in each of the three, one shared helper beside
-  `symmetry.refuse_operation_list` (#448's follow-up 2, which already
-  guards the same writers), and they offered it as a small PR off `main`.
-  The TOPAS writer could instead *write* `mlx mly mlz`, now that #478
-  measured their basis on the reader's side; that is a larger change than
-  the refusal. **Decided 2026-09-27** (issue triage, on #470): yes to the
-  reporter's refusal PR off `main`, separate from this WP, with its shared
-  helper beside `refuse_operation_list` and a call in `topas`, `gsas` and
-  `fullprof`. The PR states whether `gsas2` keeps writing the loops, on
-  what GSAS-II's import does with them. Writing TOPAS `mlx mly mlz` records
-  stays with this WP, after the refusal.
-- **2026-09-25, from the issue triage (issue #457, with #286's comments of
-  2026-09-24): which group a magCIF's nuclear positions refine under.** A
-  magCIF states the magnetic group only. The nuclear symmetry (positions,
-  occupancies, ADPs) is a choice between the parent named by
-  `_parent_space_group.name_H-M_alt` and the file's own family group (its
-  operators with time reversal dropped), which is a subgroup of the parent.
-  The fork's `magnetic-v16` took the family group always, handing 463 of
-  1171 MAGNDATA entries an operation list: never wrong, and
-  under-constrained wherever the parent also fits. The fork's
-  `pr/wp1328-magnetic-interchange` (ready, not opened) takes the **highest
-  tabulated group the file's atoms satisfy**, in three tiers: (1) the parent,
-  when every file operator is one of its operations *and* every listed site
-  has the same multiplicity under both (without the orbit test, 241 of 1012
-  entries listed one parent orbit as two sites and would have been counted
-  twice in |F_N|²); (2) the file's own group when one tabulated setting has
-  exactly its operations (reported by `CIF_MAGNETIC_NUCLEAR_SETTING`, info);
-  (3) the operation list, a refusal by name until PR #448 lands. Counts on
-  the 1012 entries the branch reads: 811 / 201 / 171. Tier 1 is
-  bit-identical to reading the parent symbol alone, which is how
-  `tests/test_acceptance_magnetic.py` states Cr₂WO₆ (the nuclear phase in
-  `P 42/m n m`, line 94). **Checked at `07952d4e`:** no magCIF reader exists on `main`
-  (no `_parent_space_group`, no `CIF_MAGNETIC_NUCLEAR_*` code), so none of
-  this can be reproduced here; it is a claim about the branch. **The asks:**
-  tier 1 must not be silent, so an `info` diagnostic on every magCIF read
-  names the tier, the group taken, the file's family group and the index
-  between them; an override,
-  `structure_from_cif(..., nuclear_group="auto" | "parent" | "file")`; the
-  skill row in `references/magnetic.md`. The moments always refine under
-  the file's magnetic group, and k ≠ 0 supercells go through
-  `magnetic_supercell`, not this rule. **The reporter asked for a decision
-  before the PR opens:** the tiered rule, or the file's own group always
-  winning over the parent. **Decided 2026-09-25: the tiered rule, parent
-  first, with the `info` diagnostic and the `nuclear_group` override.** The
-  maintainer asked for established practice, and it agrees. FullProf's
-  standard route keeps the nuclear phase in its own space group ("The symbol
-  of the space group that we need to provide in the magnetic phase is not
-  used for generating atoms", Rodríguez-Carvajal's magnetic-structure
-  tutorial, checked verbatim), with a single MSG phase through
-  `mCIF_to_PCR` as the alternative. The TOPAS LaMnO₃ tutorial keeps Pnma for
-  the nuclear part. Cui, Huang & Toby (2006, *Powder Diffr.* 21, 71) is
-  reported to constrain "the nuclear structure to higher symmetry than the
-  magnetic structure" (not checked: the publisher blocked the PDF).
-  `nuclear_group="file"` is that alternative route. Condition (b) stays a
-  hard test.
-- **2026-09-16, from [1118](1118-foreign-model-files.md): "out" now has a
-  rulebook, and this WP's magCIF writer inherits it.** `io/CLAUDE.md` gained a
-  § Project writers when the GSAS-I pair landed, four rules covering every
-  later writer in this family. Two bear on a magCIF: refuse on the way out
-  whatever the reader refuses on the way in, and where the reader refuses *for
-  want of evidence* let magnitude decide drop against refuse — which is the
-  shape a magnetic writer meets immediately, since this build refuses a
-  magnetic phase for want of a model rather than for want of a spelling. The
-  acceptance is the round trip through the matching reader, with no committed
-  fixture.
-- **2026-09-16, from [1118](1118-foreign-model-files.md): a fourth magnetic
-  refusal, a second *shape* of one, and a real magnetic project now in
-  `tests/data`.** The GSAS-II `.gpx` reader refuses a phase GSAS-II types
-  `magnetic` with the same sentence the other three use, so the table this WP
-  changes has one more row than it did yesterday. The new shape is the one to
-  design for: GSAS-II also writes the nuclear and magnetic halves as **separate
-  phases**, and a nuclear phase carrying `General['magPhases']` imports
-  correctly while the file's own Rwp includes scattering this build cannot
-  compute. That is reported (`GSAS2_GPX_PHASE_MAGNETIC`, the second of its two
-  shapes) rather than refused, because the structure really is right. Also
-  practical: `tests/data/gsas2_lacamno3_magnetic.gpx` is a real magnetic
-  refinement, vendored under a redistribution grant, whose magnetic phase
-  carries moments in its atom records and whose `AtomPtrs` are `[3, 1, 10, 12]`
-  rather than `[3, 1, 7, 9]` — the columns move because the moments sit between
-  the occupancy and the site symmetry. It is the fixture to test a magnetic
-  model against without asking anyone for data.
-
-- **2026-09-15, from [1118](1118-foreign-model-files.md): there is now a third
-  magnetic refusal to lift, in the same shape as the other two.** The GSAS
-  `.EXP` reader reads a magnetic phase (GSAS phase types 2 and 3, from the
-  `EXPR NPHAS` record) onto `GsasPhase.magnetic` and refuses it in
-  `to_structure` with the same sentence the `.inp` and `.pcr` readers use — the
-  nuclear half would look complete. Its diagnostic row is
-  `GSAS_EXP_PHASE_MAGNETIC` in `references/diagnostics-projects.md` §7g. So this
-  WP's "one table" now has three entries rather than two, and none of them needs
-  new machinery.
-
-- **2026-09-13, from [1118](1118-foreign-model-files.md): the readers are now
-  behind a registry, so lifting the magnetic refusals touches one more
-  declared place.** `PROJECT_FORMATS` (`io/projects/registry.py`) carries a
-  `carries` field per format — what the file holds beyond a structure, in
-  words, published through `capabilities().project_formats` and read by a
-  client deciding what to ask for. The FullProf row does not mention magnetic
-  phases today, correctly, because `to_structure` refuses them. When 1327's
-  model lands and that refusal lifts, that row is part of the change and
-  `tests/test_projects_registry.py` asserts the arm member for member.
-  Nothing else moved: `coverage.py`'s `magnetic structure` stance is still
-  `Stance.REFUSED` and there is still no moment on `main` (verified
-  2026-09-13), so this WP's premise holds unchanged.
-
-- **2026-09-15, from the issue triage (issue #257, PR #290): two of this
-  WP's premises moved.** `MagneticGroup.transformed` (PR #290,
-  `crystallography/magnetic/operators.py`) already carries a group between
-  settings via magCIF's `transform_BNS_Pp_abc`, lattice completion
-  included, so the reader *applies* that transform, and the refusal by name
-  is reserved for a string it cannot parse. And the writer can emit
-  `_space_group_magn.name_BNS` from `identify()` on the refined operator
-  list instead of echoing input metadata, which is #257's ask for this WP.
-  MAGNDATA entries carrying the transform are the round-trip fixtures; ten
-  of PR #290's twenty published structures are evaluated in a setting the
-  BNS standard reaches only through it.
-
-- **2026-09-17, from [1436](1436-k-is-the-wavevector-everywhere-else.md):
-  `k` is free for the propagation vector.** The earlier note here warned that
-  `scattering.py`, `structure_factor.py` and `dispersion.py` all spent `k` on
-  sinθ/λ, in the same subpackage `crystallography/magnetic/` lives in, and
-  asked this WP to spell the propagation vector out rather than add a second
-  bare `k`. 1436 has landed: that quantity is `stol` in python and `s` in
-  equations throughout, following Waasmaier & Kirfel and the IUCr core
-  dictionary, and a tree-wide sweep found no line left pairing a bare `k` with
-  sinθ/λ in `src/`, `tests/`, `examples/` or the manual. **So name the
-  propagation vector `k` and add no qualifier.** Root CLAUDE.md § Conventions
-  carries the rule that keeps it free. The same note is in 1326, 1327, 1329 and 1418.
-
 ## Non-goals
 
 - The model itself, its physics, its DOFs: 1327.
@@ -278,6 +122,23 @@ is still named in the result.
   [1319](1319-structure-interchange.md) the CIF writer's guard.
 
 ## Handover log
+
+- **2026-10-03** — **Closed** by a cleanup session over unowned in-flight
+  WPs. A magnetic phase now reads from and writes to magCIF, and the foreign
+  readers that refused one read it.
+
+  *Inherited, consumed*, each checked against the tree. #567 and #470 are
+  closed (PRs #571 and the refusal PR). The nuclear-group tiers are in
+  (`CIF_MAGNETIC_NUCLEAR_SETTING`, `nuclear_group`). The project coverage
+  table reads moments and magnetic groups (`coverage.py:142-146`), the
+  registry's rows say so, the writer emits `name_BNS`, and the TOPAS writer
+  writes `mlx mly mlz`. The `k` naming note is a convention now. The 1118
+  rulebook notes were guidance for writers that have landed. *Forwarded* to
+  WP-1326's Inherited: two design choices #567's entry left open, a
+  `.pcr` nuclear phase's `Nvk` k that `fullprof.to_structure` drops, and
+  `Structure.to_cif` writing no k. *Not measured, not carried:* whether
+  GSAS-II's own CIF import reads the magCIF loops the `gsas2` writer emits.
+  Narrative moved to the v1.7 record.
 
 ### 2026-10-01 — #567's writer refusal landed from outside
 

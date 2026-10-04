@@ -71,6 +71,14 @@ builds on it.
 
 ### Inherited
 
+- **2026-10-03, from [1433](1433-the-inp-grammar-still-refused.md), closed:
+  four TOPAS files wait on rigid bodies.** PR #587 taught `read_topas_inp`
+  `STR(sg)`, `STR(sg, name)` and `#if` over `#prm`, so four archive files
+  that used to refuse at parse now read their phases and stop at
+  `to_structure` on a rigid body. They are the corpus's first test of a
+  rigid-body reader (the contributor's count over 462 of 606 archive files is
+  in 1433's 2026-10-01 entry).
+
 - **2026-09-30, from the issue triage (issue #561): the reporter's scoping
   proposal for this WP.** Thirteen independent chunks R0-R12 off `main`, each
   with a test that can fail; R0 (rotation mathematics) and R1 (`Fragment`)

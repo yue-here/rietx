@@ -27,23 +27,32 @@ percentages match the issue's table to the decimal place).  The 99 "correct"
 side of that partition is the issue author's own private working list, which
 is not recoverable from this repository, so it is *not* what
 ``test_every_tabulated_ion_is_silent`` below tests — that test instead uses
-the 111 ion entries the Waasmaier-Kirfel table itself carries (verified by
-``test_the_table_carries_111_ion_entries``), a different but independently
-checkable set that happens to share the same size. Every one of those really
+the ion entries the X-ray table itself carries (111 Waasmaier-Kirfel rows and
+one *International Tables* row, verified by
+``test_the_table_carries_112_ion_entries``), a different but independently
+checkable set. Every one of those really
 is "correct" by construction (the table has it verbatim), which is the
 property this test needs; whether it is the *same* 99-of-111 the issue
 counted is not verified and is flagged here rather than assumed.
+
+WP-1527 took two labels off the fallback list.  ``Y3+``, one of the twelve,
+has a row from ITC Vol. C Table 6.1.1.4.  A one-charge ion written without its
+digit (``Na+``, ``Cl-``) reads as the tabulated ion (``Na1+``, ``Cl1-``),
+where through 1.6 it read as the neutral atom.
 """
 
 from __future__ import annotations
 
 import re
+from importlib import resources
 
 import gemmi
 import numpy as np
 import pytest
 
+from rietx._about import DATA_PACKAGE
 from rietx.crystallography.scattering import (
+    _ITC_IONS,
     SpeciesFallback,
     _load_table,
     detect_fallback,
@@ -101,6 +110,10 @@ KNOWN_AFFECTED = {
     "Se2-": (36, "-5.6"), "Re4+": (71, "+5.6"), "Te2-": (54, "-3.7"),
 }
 
+#: issue #202's twelve less ``Y3+``, which WP-1527 tabulated from ITC Vol. C
+#: Table 6.1.1.4 (``test_y3plus_is_no_longer_a_fallback`` below)
+STILL_AFFECTED = sorted(set(KNOWN_AFFECTED) - {"Y3+"})
+
 _LABEL_RE = re.compile(r"^([A-Za-z]{1,2})(\d*)([+-])$")
 
 
@@ -114,8 +127,8 @@ def _z_and_charge(species: str) -> tuple[int, int]:
     return gemmi.Element(elem.capitalize()).atomic_number, charge
 
 
-@pytest.mark.parametrize("species", sorted(KNOWN_AFFECTED))
-def test_the_twelve_known_affected_ions_are_detected(species):
+@pytest.mark.parametrize("species", STILL_AFFECTED)
+def test_the_known_affected_ions_are_detected(species):
     """Every species issue #202 lists as silently wrong is now caught, with
     an electron count derived from Z and the charge -- not transcribed from
     the issue's own printed percentages, which are only used to cross-check
@@ -167,16 +180,24 @@ def test_charge_equal_to_z_does_not_raise(species):
     assert fb.delta_frac is None  # must not raise ZeroDivisionError
 
 
-def test_the_table_carries_111_ion_entries():
+def test_the_table_carries_112_ion_entries():
     """Sizes the corpus the next test checks against, so a change to the
     bundled WK table (a version bump, a re-export) is visible here rather
-    than silently changing what 'every tabulated ion' means."""
+    than silently changing what 'every tabulated ion' means.
+
+    111 come from the DABAX file, read here from its own ``#S`` lines, and
+    one from ``_ITC_IONS``.  An ITC row never shadows a DABAX one."""
+    text = (resources.files(DATA_PACKAGE) / "f0_WaasKirf.dat").read_text(
+        encoding="utf-8")
+    dabax = {line.split()[2] for line in text.splitlines()
+             if line.startswith("#S") and len(line.split()) >= 3}
+    assert len([k for k in dabax if k[-1] in "+-"]) == 111, (
+        "f0_WaasKirf.dat changed; re-check whether the known-affected "
+        "species are still absent from it")
+    assert set(_ITC_IONS) == {"Y3+"}
+    assert not set(_ITC_IONS) & dabax
     ions = [k for k in _load_table() if k[-1] in "+-"]
-    assert len(ions) == 111, (
-        f"expected 111 ion entries in f0_WaasKirf.dat, found {len(ions)} -- "
-        "the table changed; re-check whether the 12 known-affected species "
-        "are still absent from it"
-    )
+    assert len(ions) == 112
 
 
 def test_every_tabulated_ion_is_silent():
@@ -248,15 +269,17 @@ def test_a_detector_blind_to_the_resolved_form_over_fires():
 # ----------------------------------------------------------------------
 
 def test_diagnostics_fires_for_an_untabulated_ion():
-    structure = _structure("Y3+")
+    # As3+ (issue #202's +10.0 %); this was Y3+ (+8.3 %) until WP-1527
+    # tabulated it
+    structure = _structure("As3+")
     diags = _species_fallback_diagnostics(structure, _xray_instrument())
     assert len(diags) == 1
     d = diags[0]
     assert d.code == "SPECIES_FALLBACK_NEUTRAL"
     assert d.level == "warning"
     assert d.where == ["phases.0.atoms.0.species"]
-    assert d.value == pytest.approx(0.0828, abs=1e-3)
-    assert "Y3+" in d.message and "Y" in d.message
+    assert d.value == pytest.approx(0.0996, abs=1e-3)
+    assert "As3+" in d.message and "As" in d.message
 
 
 def test_diagnostics_silent_for_a_tabulated_ion():
@@ -284,12 +307,12 @@ def test_diagnostics_silent_for_a_neutron_source():
     """Neutron phases resolve species through crystallography.neutron, a
     different table with a different fallback story -- widening this
     diagnostic to cover it would be a second defect, not this one."""
-    structure = _structure("Y3+")
+    structure = _structure("As3+")
     assert _species_fallback_diagnostics(structure, _neutron_instrument()) == []
 
 
 def test_diagnostics_groups_repeats_of_the_same_species_into_one_row():
-    structure = _structure("Y3+", "Y3+")
+    structure = _structure("As3+", "As3+")
     diags = _species_fallback_diagnostics(structure, _xray_instrument())
     assert len(diags) == 1
     assert sorted(diags[0].where) == [
@@ -308,9 +331,9 @@ def test_lookup_failure_never_blocks_this_diagnostic():
     """A species compile will refuse outright (unknown symbol) must not be
     able to break the diagnostic pass that runs before it -- same contract
     ``_dispersion_diagnostics`` gives its own lookup failures."""
-    structure = _structure("Y3+", "Zz9+")   # "Zz" is not an element at all
+    structure = _structure("As3+", "Zz9+")   # "Zz" is not an element at all
     diags = _species_fallback_diagnostics(structure, _xray_instrument())
-    assert len(diags) == 1 and diags[0].message.count("Y3+") >= 1
+    assert len(diags) == 1 and diags[0].message.count("As3+") >= 1
 
 
 def test_the_threshold_is_a_named_constant_yues_call_by_default_any():
@@ -383,3 +406,93 @@ def test_an_isotope_ion_reports_the_fallback_its_element_would():
     assert isotope.species == "13C4+"
     assert (isotope.element, isotope.charge, isotope.true_electrons) == \
         (plain.element, plain.charge, plain.true_electrons)
+
+
+# ------------------------------- a one-charge ion written without its 1 ---
+#: every one-charge ion the table carries, as (digitless label, table key)
+_ONE_CHARGE = sorted(
+    (m.group(1) + m.group(2), key) for key in _load_table()
+    if (m := re.fullmatch(r"([A-Z][a-z]?)1([+-])", key)))
+
+
+def test_the_one_charge_corpus_holds_the_labels_measured():
+    """The labels WP-1527 measured falling back are all in it."""
+    labels = {label for label, _ in _ONE_CHARGE}
+    assert {"Na+", "K+", "Li+", "Ag+", "Cu+", "Cl-", "F-"} <= labels
+
+
+@pytest.mark.parametrize("label, key", _ONE_CHARGE)
+def test_a_digitless_one_charge_ion_reads_as_the_tabulated_ion(label, key):
+    """``Na+`` is ``Na1+``: the table writes the 1 and pymatgen does not.
+
+    Through 1.6 ``normalize_species`` tried ``Na+`` and then ``Na``, so the
+    label computed the neutral atom and ``SPECIES_FALLBACK_NEUTRAL`` called
+    the ion untabulated (WP-1527)."""
+    assert normalize_species(label) == key
+    assert detect_fallback(label) is None
+    stol = np.linspace(0.0, 2.0, 9)
+    assert np.array_equal(f0(label, stol), f0(key, stol))
+    element = key[:-2]
+    assert not np.array_equal(f0(label, stol), f0(element, stol))
+
+
+def test_the_acceptance_labels():
+    assert normalize_species("Na+") == "Na1+"
+    assert normalize_species("Cl-") == "Cl1-"
+    assert normalize_species("Cu+") == "Cu1+"
+    assert normalize_species("7Li+") == "Li1+"     # an isotope's ion too
+
+
+@pytest.mark.parametrize("label", ["Fe+", "Al+"])
+def test_a_digitless_ion_no_table_carries_still_falls_back(label):
+    """No table has ``Fe1+``, so ``Fe+`` is still neutral Fe, and both
+    functions say so."""
+    element = label[:-1]
+    assert normalize_species(label) == element
+    fb = detect_fallback(label)
+    assert fb is not None
+    assert (fb.element, fb.charge) == (element, 1)
+
+
+def test_the_diagnostic_stops_firing_on_a_digitless_tabulated_ion():
+    structure = _structure("Na+", "Cl-", "Fe+")
+    diags = _species_fallback_diagnostics(structure, _xray_instrument())
+    assert [d.where for d in diags] == [["phases.0.atoms.2.species"]]
+    assert "Fe+" in diags[0].message
+
+
+# ------------------------------------------------- Y3+ from ITC Vol. C ---
+#: Y3+ from ITC Vol. C (2004) Table 6.1.1.3, p. 570: (s, f) at seven of its
+#: 56 grid points.  Independent of Table 6.1.1.4, which ``_ITC_IONS`` carries.
+Y3_TABULATED = [(0.00, 36.000), (0.10, 34.425), (0.25, 28.567),
+                (0.50, 20.382), (1.00, 11.340), (1.50, 7.008), (2.00, 5.443)]
+
+
+def test_y3plus_is_no_longer_a_fallback():
+    assert normalize_species("Y3+") == "Y3+"
+    assert detect_fallback("Y3+") is None
+    assert _species_fallback_diagnostics(_structure("Y3+"),
+                                         _xray_instrument()) == []
+
+
+def test_y3plus_carries_36_electrons():
+    """Z = 39 less the charge.  The coarsest printed digit is a4's third
+    decimal (−33.108), so the sum rule holds to 1e-3; neutral Y is 39."""
+    assert f0("Y3+", np.array([0.0]))[0] == pytest.approx(36.0, abs=1e-3)
+    assert f0("Y", np.array([0.0]))[0] == pytest.approx(39.0, abs=0.05)
+
+
+def test_y3plus_reproduces_the_tabulated_scattering_factor():
+    """Table 6.1.1.4 states a maximum fit error of 0.005 e over s ≤ 2 Å⁻¹.
+    A dropped minus sign on a4 or b4 (the OCR'd copy drops both) misses by
+    66 e at s = 0 or 3.5 e at s = 2."""
+    s, tabulated = (np.array(v) for v in zip(*Y3_TABULATED))
+    assert np.abs(f0("Y3+", s) - tabulated).max() <= 0.005
+
+
+def test_an_itc_row_reads_through_the_same_eleven_slots():
+    """Four Gaussians, stored with a5 = b5 = 0."""
+    row = _load_table()["Y3+"]
+    a, b, c = _ITC_IONS["Y3+"]
+    assert row.shape == (11,)
+    assert list(row) == [*a, 0.0, c, *b, 0.0]

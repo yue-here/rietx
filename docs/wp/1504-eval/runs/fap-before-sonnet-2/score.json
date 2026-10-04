@@ -1,0 +1,136 @@
+{
+ "run": "fap-before-sonnet-2",
+ "task": "fap",
+ "condition": "before",
+ "model": "sonnet",
+ "repeat": 2,
+ "commit": "5304b85ab092f629a0392b43966df8fda76563dd",
+ "protocol": "1.3",
+ "session_id": "9a2d492a-b0d8-4e04-9653-9f25c9618f40",
+ "models_seen": {
+  "claude-sonnet-5-5": 11
+ },
+ "cost_usd": 0.19550659999999997,
+ "turns": 14,
+ "minutes": 0.65,
+ "api_calls": 11,
+ "tokens": {
+  "input": 22,
+  "cache_read": 261953,
+  "cache_write": 27313,
+  "output": 3382
+ },
+ "renders": [
+  {
+   "pixels": [
+    2008,
+    1700
+   ],
+   "values": {
+    "view": "c",
+    "size": [
+     2008,
+     1700
+    ],
+    "supersample": 3
+   },
+   "first": "dict",
+   "ok": true
+  }
+ ],
+ "builds": [
+  {},
+  {}
+ ],
+ "cuts": {},
+ "looks": [
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-before-sonnet-2/figure.png",
+   "pixels": [
+    2000,
+    1900
+   ]
+  }
+ ],
+ "report_reads": {},
+ "figure_reads": {
+  "image": 2
+ },
+ "skills": {
+  "invoked": [
+   "dataviz"
+  ],
+  "files": []
+ },
+ "errors": [],
+ "outside": [],
+ "figure": {
+  "exists": true,
+  "pixels": [
+   2007,
+   1907
+  ],
+  "dpi": [
+   300.0,
+   300.0
+  ]
+ },
+ "mechanical": {
+  "pass": true,
+  "checks": [
+   [
+    "figure.png exists",
+    true
+   ],
+   [
+    "width 2007 px within (2005, 2011)",
+    true
+   ],
+   [
+    "dpi 300.0 within (299.0, 301.0)",
+    true
+   ]
+  ]
+ },
+ "stall": null,
+ "judge": {
+  "model": "opus",
+  "session_id": "b6d1524e-c28b-4191-ab00-26aed6fa0b7e",
+  "returncode": 0,
+  "cost_usd": 0.1176198,
+  "criteria": [
+   {
+    "n": 1,
+    "verdict": "yes",
+    "saw": "The cell outline is a 120° rhombus with F at the corners, and the Ca-ringed channels along c are seen end-on."
+   },
+   {
+    "n": 2,
+    "verdict": "yes",
+    "saw": "A legend at the bottom shows Ca, P, O and F, each beside a coloured disc."
+   },
+   {
+    "n": 3,
+    "verdict": "yes",
+    "saw": "Ca is teal, P orange, O red and F green, and the atoms in the picture match these, with darker shades for the copies outside the cell."
+   },
+   {
+    "n": 4,
+    "verdict": "yes",
+    "saw": "All atoms and polyhedra sit well inside the frame with white margins all round."
+   },
+   {
+    "n": 5,
+    "verdict": "yes",
+    "saw": "Every bond I traced ends at a drawn atom, including the short stubs into small or partly hidden spheres."
+   },
+   {
+    "n": 6,
+    "verdict": "no",
+    "saw": "Several dark-orange P atoms outside the cell are drawn with no tetrahedron, each bonded to only one O."
+   }
+  ],
+  "yes": false
+ },
+ "done": false
+}

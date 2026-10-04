@@ -379,6 +379,16 @@ they were built from. Their licence texts ship in the wheel and sdist as
 - `src/rietx/data/f0_WaasKirf.dat` — Waasmaier & Kirfel (1995) 5-Gaussian f0
   coefficients, obtained from the ESRF DABAX collection (public scientific data,
   redistributed by silx (MIT) among others). Cite Waasmaier & Kirfel (1995).
+- `_ITC_IONS` in `src/rietx/crystallography/scattering.py` — the 4-Gaussian
+  f0 coefficients of Y³⁺, the one ion of *International Tables* Vol. C Table
+  6.1.1.3 the Waasmaier-Kirfel file lacks. Nine numbers, no code, transcribed
+  from Maslen, Fox & O'Keefe, *International Tables for Crystallography*
+  Vol. C, 3rd ed. (2004), Table 6.1.1.4. Checked against the same volume's
+  tabulated Table 6.1.1.3 (largest difference 0.0049 e over s ≤ 2 Å⁻¹) and
+  against two open-source transcriptions carrying the same digits, cctbx's
+  `cctbx/eltbx/xray_scattering/it1992.cpp` (BSD-style) and GSAS-II's
+  `atmdata.py` (the GSAS-II open-source licence); nothing was copied from
+  either. Cite *International Tables* Vol. C, Table 6.1.1.4.
 - `src/rietx/data/mu_McMaster.dat` — photon-atom cross sections from the
   McMaster et al. (1969) compilation (UCRL-50174, a U.S. Government report),
   extracted from the ESRF DABAX file `CrossSec_McMaster.dat` (itself generated

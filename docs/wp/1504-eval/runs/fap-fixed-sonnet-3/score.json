@@ -1,0 +1,209 @@
+{
+ "run": "fap-fixed-sonnet-3",
+ "task": "fap",
+ "condition": "fixed",
+ "model": "sonnet",
+ "repeat": 3,
+ "commit": "1b837e038042236e13face9824ecf5905e5740e8",
+ "protocol": "1.3",
+ "session_id": "5da54d8b-5e0f-4a43-9e2b-fede883ad5e1",
+ "models_seen": {
+  "claude-sonnet-5-5": 7
+ },
+ "cost_usd": 0.2157182,
+ "turns": 15,
+ "minutes": 0.69,
+ "api_calls": 7,
+ "tokens": {
+  "input": 14,
+  "cache_read": 193111,
+  "cache_write": 34267,
+  "output": 4000
+ },
+ "renders": [
+  {
+   "pixels": [
+    275,
+    400
+   ],
+   "values": {
+    "view": "c",
+    "size": 400,
+    "outline": true
+   },
+   "first": "Structure",
+   "ok": true
+  },
+  {
+   "pixels": [
+    275,
+    400
+   ],
+   "values": {
+    "view": "c",
+    "size": 400,
+    "outline": true
+   },
+   "first": "Structure",
+   "ok": true
+  },
+  {
+   "pixels": [
+    1237,
+    1800
+   ],
+   "values": {
+    "view": "c",
+    "size": 1800,
+    "outline": true
+   },
+   "first": "Structure",
+   "ok": true
+  },
+  {
+   "pixels": [
+    1237,
+    1800
+   ],
+   "values": {
+    "view": "c",
+    "size": 1800,
+    "outline": true
+   },
+   "first": "Structure",
+   "ok": true
+  },
+  {
+   "pixels": [
+    1237,
+    1800
+   ],
+   "values": {
+    "view": "c",
+    "size": 1800,
+    "outline": true
+   },
+   "first": "Structure",
+   "ok": true
+  }
+ ],
+ "builds": [],
+ "cuts": {},
+ "looks": [
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-fixed-sonnet-3/t.png",
+   "pixels": [
+    275,
+    400
+   ]
+  },
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-fixed-sonnet-3/figure.png",
+   "pixels": [
+    2000,
+    1240
+   ]
+  },
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-fixed-sonnet-3/figure.png",
+   "pixels": [
+    2000,
+    1240
+   ]
+  },
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-fixed-sonnet-3/figure.png",
+   "pixels": [
+    1999,
+    1145
+   ]
+  }
+ ],
+ "report_reads": {
+  "whole": 1
+ },
+ "figure_reads": {
+  "image": 6,
+  "palette": 1,
+  "report": 1
+ },
+ "skills": {
+  "invoked": [
+   "rietx"
+  ],
+  "files": [
+   "references/api-figure.md"
+  ]
+ },
+ "errors": [],
+ "outside": [],
+ "figure": {
+  "exists": true,
+  "pixels": [
+   2008,
+   1150
+  ],
+  "dpi": [
+   300.0,
+   300.0
+  ]
+ },
+ "mechanical": {
+  "pass": true,
+  "checks": [
+   [
+    "figure.png exists",
+    true
+   ],
+   [
+    "width 2008 px within (2005, 2011)",
+    true
+   ],
+   [
+    "dpi 300.0 within (299.0, 301.0)",
+    true
+   ]
+  ]
+ },
+ "stall": null,
+ "judge": {
+  "model": "opus",
+  "session_id": "144df994-4af9-4e3c-97b9-fadb023c624d",
+  "returncode": 0,
+  "cost_usd": 0.1030086,
+  "criteria": [
+   {
+    "n": 1,
+    "verdict": "yes",
+    "saw": "The blue cell outline is a 120° rhombus, and the F channels at the corners are seen end-on, each ringed by a hexagon of Ca."
+   },
+   {
+    "n": 2,
+    "verdict": "yes",
+    "saw": "A legend on the right puts Ca, P, F and O beside coloured circles."
+   },
+   {
+    "n": 3,
+    "verdict": "yes",
+    "saw": "Ca is cyan (with darker teal copies), P orange, O red and the small corner F atoms green, matching the legend."
+   },
+   {
+    "n": 4,
+    "verdict": "yes",
+    "saw": "The top and bottom Ca spheres come close to the frame edge but are not clipped, and nothing else touches the edge."
+   },
+   {
+    "n": 5,
+    "verdict": "yes",
+    "saw": "Every bond I can see ends on a drawn Ca, O, P or F atom; none ends in empty space."
+   },
+   {
+    "n": 6,
+    "verdict": "yes",
+    "saw": "Each of the six P atoms sits inside an orange tetrahedron whose O corners are all drawn."
+   }
+  ],
+  "yes": true
+ },
+ "done": true
+}

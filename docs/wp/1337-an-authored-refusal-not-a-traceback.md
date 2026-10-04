@@ -1,9 +1,8 @@
 # WP-1337 — an authored refusal, not a raw traceback
 
-Milestone: unscheduled · Status: 🔄 2026-09-30 — all six tasks landed (PR #537); `### Inherited` to prune, then close
+Milestone: unscheduled · Status: ✅ 2026-10-03 — both refusals landed (PR #537) and shipped in 1.6.0
 Track: What fires, and what stays silent
 Depends on: — (1311, 1321 soft: they own the bounds this refusal inherits)
-Priority: P3 2026-09-23 — two loud failures made legible; the traceback names the wrong thing, never a wrong number
 
 ## Goal
 
@@ -122,66 +121,6 @@ lands first.
 - Loosening any bound, or the coordinate bound check itself.
 - The `suggest()` ranking or its candidate vocabulary.
 
-### Inherited
-
-- **2026-09-29, from [1321](1321-persisted-bounds-repair.md): every class
-  that declares a range now passes it on, so a tie meets far more declared
-  bounds.** Until 1321 only `Atom.occ`/`biso` inherited their declared range
-  onto a caller's own `Parameter`; now 57 fields on 17 classes do
-  (`schemas.common._InheritsDeclaredDefaults`: a phase's scale and widths, the
-  instrument's zero shift, displacement and Caglioti widths, …), with the
-  transform travelling alongside the bounds it enforces. A tie whose implied value leaves
-  a declared bound is therefore reachable on those fields too, where before
-  their bounds were ±inf. The voice to match is the mixin's own refusal: it
-  names the class and field, the range the field declares, and the escape
-  (`ProfileTCHZ.coarse` for the Caglioti box).
-
-- **2026-09-04, from [1119](1119-named-variables.md): #246 no longer reproduces
-  as written, task 4's computation now exists, and 1119 stopped one step short
-  of using it for the refusal.** Check all three against the tree before
-  building on this WP's text.
-
-  1119 closed a different hole in the same place — a tie carried its dependent
-  past *its own* bounds, because the solver's box covers the free column and a
-  tied entry is not one. Two things landed that touch you.
-
-  **Your reproduction now refuses at `tie()`, with most of the message you
-  asked for.** `apply_to_models` catches the raw pydantic error and re-raises
-  naming the path, the value, the bound and the tie. Run verbatim on this tree,
-  your snippet gives:
-
-  > `ValueError: writing phases.0.atoms.1.x=3.2482 back to the model breaks its
-  > own bounds [0, 1]; it follows 1·phases.0.atoms.1.dof.0 + 0.2482`
-
-  So the traceback you quote is gone and the reporter's confusion — a number
-  belonging to no parameter they named — is answered. **What is still missing
-  is narrower than the WP says**: the atom *label* (`Al1`), and that the tie
-  quoted is the *symmetry* one underneath rather than the user's
-  `dof.1 = 1.0·dof.0 + 3.0`, which is still the thing they wrote. It also
-  refuses from `apply_to_models` rather than in `tie()`'s voice beside the other
-  six, which is your actual complaint. Rewrite § #246's evidence from the
-  current output before quoting it.
-
-  **Task 4's computation is already written.** `params.vector.tie_window` and
-  `ParameterTable._derive_tie_windows` invert each tie (`lo ≤ Σ c·θ + d ≤ hi`)
-  onto its sources and hand the result to `bounds()` — over the **flattened**
-  ties, so a coordinate's `[0, 1]` reaches the DOF underneath it with nothing
-  new. That is exactly "the coordinates a DOF target reaches"; the value, the
-  bound and the tie are all in hand there, and only the refusal is missing.
-
-  **Where to put it.** `_derive_tie_windows` ends by *widening* each window to
-  admit the source's current value, with a comment naming this WP. Two reasons,
-  and only one of them is yours: a stage that stops on a window writes its
-  answer back through `decode` and can come back an ulp the wrong side, which
-  must not make the next stage meet "x0 is infeasible" about a parameter nobody
-  tied — keep that. The other is the inconsistent-state case, and that widening
-  is the seam your refusal replaces. 1119 deliberately did not raise there: it
-  would have annexed this task and put the message in the wrong voice.
-
-  Also: skill `references/surprises.md` § 8.22 is rewritten around the window,
-  so your task 6 row — that declaring bounds everywhere (#204's workaround) is
-  what exposes this — lands beside it rather than replacing it.
-
 ## Tasks
 
 - [x] A synthetic Pawley fixture that genuinely floors a width candidate —
@@ -219,6 +158,13 @@ Pawley fixture's `summary()` returns.
 - WP-1302 — the error is the documentation; the closest-match surface.
 
 ## Handover log
+
+- **2026-10-03** — **Closed** by a cleanup session over unowned in-flight
+  WPs. Nothing landed after PR #537. *Inherited, consumed:* both entries are
+  answered by #537, as its entry below says. The 1119 entry asked that the
+  message name the atom and the user's own tie, and it does. The 1321 entry
+  noted that declared ranges reach 57 fields, and the refusal checks every
+  entry the new ties move. Narrative moved to the v1.7 record.
 
 - **2026-09-30** — Both refusals landed from outside: PR #537
   (`mustachefeeling`), merged as `e8d15d01` in a `/pr-review` run, closing

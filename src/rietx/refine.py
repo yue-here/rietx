@@ -6691,9 +6691,10 @@ def _species_fallback_diagnostics(structure: Structure,
     (issue #202).
 
     ``crystallography.scattering.normalize_species`` falls back to the neutral
-    atom when an ion is absent from the Waasmaier-Kirfel table — deliberate
-    (refusing would break files that currently refine, and 99 of 111
-    chemically-real oxidation states resolve correctly) but previously silent:
+    atom when an ion is absent from its table — deliberate
+    (refusing would break files that currently refine, and 100 of issue
+    #202's 111 chemically-real oxidation states resolve correctly, Y3+ since
+    WP-1527) but previously silent:
     nothing recorded that the model's scattering power was not what the
     species label claimed. A wrong electron count biases site occupancies,
     ADPs and QPA fractions without moving Rwp much, because the model simply

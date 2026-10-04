@@ -124,6 +124,13 @@ down.
 
 ### Inherited
 
+- **2026-10-03, from a cleanup session: the guard is 300 s.** This WP's own
+  commit `b333ca09` (2026-09-30) had widened `RAMP_RUNAWAY_GUARD_S` to 300 s
+  and fixed the root CLAUDE.md's count of λ-scaled size terms, but was never
+  pushed from its tree. It is cherry-picked as `6336c65c` (CLAUDE.md rewrapped
+  to hold its line cap) and closes issue #539. The ramp-guard halves of the
+  three entries below are discharged; the iteration bar's name (#538,
+  WP-1334) is not.
 - **2026-10-02, from WP-1534: a fifth trip of the ramp guard.**
   `test_the_ramp_reproduction_no_longer_runs_away` measured 81.6 s on
   WP-1534's branch and 81.9 s on its untouched base, against the 60 s guard.
@@ -347,6 +354,14 @@ series golden is bit-identical.
   a bet), WP-1043 (never a confident singleton), WP-1333, WP-1342, WP-1419.
 
 ## Handover log
+
+- **2026-10-03** — **The ramp test's timeout is 300 s.** This WP's own
+  commit from 2026-09-30 had widened it and was never pushed; a cleanup
+  session cherry-picked it (`6336c65c`), so issue #539 closes with its PR.
+  Nothing else of this WP started, and the status stays ⬜. *Done:*
+  `RAMP_RUNAWAY_GUARD_S` 60 → 300 s, and the root CLAUDE.md's count of
+  λ-scaled size terms (three of seven, rewrapped to hold its line cap); a note
+  in Inherited says which entries that discharges. *Next:* the WP's own tasks.
 
 - **2026-09-15** — created, from the 2026-09-15 issue triage (issue #267).
   Added in the round's second pass: the first pass read the issue and

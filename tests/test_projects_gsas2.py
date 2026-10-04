@@ -953,6 +953,9 @@ def _type_symbol(path: Path) -> str:
 @pytest.mark.parametrize("species, written", [
     ("Zr4+", "Zr4+"), ("O2-", "O2-"), ("Cu1+", "Cu1+"), ("Mn", "Mn"),
     ("D", "D"), ("2H", "D"),
+    # WP-1527: the atom rietx computes, in the measured `Cu1+` form. A
+    # digitless ion is the tabulated one; an untabulated ion is neutral.
+    ("Cu+", "Cu1+"), ("Na+", "Na1+"), ("Fe+", "Fe"),
 ])
 def test_the_type_symbol_is_one_gsas2_imports_as_that_species(tmp_path, species,
                                                               written):
@@ -961,6 +964,22 @@ def test_the_type_symbol_is_one_gsas2_imports_as_that_species(tmp_path, species,
     out = tmp_path / "one.cif"
     rx.write_gsas2_phase_cif(_one_site(species), out)
     assert _type_symbol(out) == written
+
+
+@pytest.mark.parametrize("species, back, named", [
+    ("Cu+", "Cu1+", False), ("Fe+", "Fe", True)])
+def test_a_substituted_ion_is_written_neutral_and_named(tmp_path, species,
+                                                        back, named):
+    """The maintainer's rule (WP-1527, 2026-10-03): no species is refused for
+    its charge. `Cu+` reads back as the ion; `Fe+`, which rietx computes as
+    neutral Fe, is written so and named."""
+    found: list = []
+    out = tmp_path / "one.cif"
+    rx.write_gsas2_phase_cif(_one_site(species), out, diagnostics=found)
+    assert rx.Structure.from_cif(out).phases[0].atoms[0].species == back
+    rows = [d for d in found if d.code == "GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL"]
+    assert [d.where for d in rows] == (
+        [["phases.0.atoms.0.species"]] if named else [])
 
 
 @pytest.mark.parametrize("species, respelled", [
@@ -985,7 +1004,6 @@ def test_a_deuterium_site_is_named_with_gsas2s_own_b(species, respelled):
 @pytest.mark.parametrize("species, match", [
     ("7Li", "is an isotope"), ("60Ni", "is an isotope"),
     ("7Li1+", "is an isotope"), ("157Gd", "is an isotope"),
-    ("Cu+", "sign but no charge magnitude"),
 ])
 def test_a_species_gsas2_would_import_as_another_element_is_refused(tmp_path,
                                                                     species, match):

@@ -1,10 +1,9 @@
 # WP-1433 — the `.inp` grammar the reader still refuses: `STR(...)` and `#if`
 
-Milestone: unscheduled · Status: 🔄 2026-10-01 — every task landed from outside (PR #587); four `STR(...)` files stop at `to_structure` as rigid bodies (WP-1514)
+Milestone: unscheduled · Status: ✅ 2026-10-03 — both constructs read (PR #587), shipped in 1.6.0; four `STR(...)` files stop at rigid bodies, which is WP-1514's
 Track: Coming from another code
 Depends on: — (WP-1118 closed 2026-09-16 and handed these two over; WP-1119
 settled that neither needs an expression language)
-Priority: P3 2026-09-23 — two constructs refused by name; the file is edited around them
 
 ## Goal
 
@@ -183,6 +182,12 @@ ships, at the model WP-1130 got from its stripped scratchpad copy.
   [1119](1119-named-variables.md) § Decisions 4.
 
 ## Handover log
+
+- **2026-10-03** — **Closed, by the maintainer's call.** The entry below left
+  it open: every task is done, but four archive files the reader can now open
+  stop at `to_structure` because they hold rigid bodies. That remainder is
+  rigid bodies, not the `.inp` grammar, so it is forwarded to WP-1514's
+  Inherited and this WP closes. Narrative moved to the v1.7 record.
 
 - **2026-10-01** — Both halves landed from outside. `STR(sg)` and
   `STR(sg, name)` expand to the `str` block they open, and `#prm`, `#if`,

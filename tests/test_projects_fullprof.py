@@ -2351,14 +2351,13 @@ def test_an_isotope_goes_to_fullprof_as_a_line12_user_b(species, nam, b_fm):
 @pytest.mark.parametrize("species, neutron, match", [
     ("7Li", False, "X-ray .pcr cannot state one"),
     ("D", False, "X-ray .pcr cannot state one"),
-    ("Cu+", False, "sign but no charge magnitude"),
     ("157Gd", True, "A4"),
 ])
 def test_a_species_fullprof_cannot_state_is_refused_by_name(species, neutron, match):
     """An isotope on an X-ray file (no isotope label; LINE 12 there is
-    anomalous dispersion), a digitless ion (rietx's neutral atom, FullProf's
-    stop), and an isotope whose NAM exceeds four characters (`GD157` stops
-    FullProf's parse, measured). The refusal names the phase and the atom."""
+    anomalous dispersion), and an isotope whose NAM exceeds four characters
+    (`GD157` stops FullProf's parse, measured). The refusal names the phase
+    and the atom."""
     inst = rx.Instrument.constant_wavelength_neutron(1.5406) if neutron else None
     with pytest.raises(ValueError, match=match) as exc:
         from_structure(_cubic(species), instrument=inst)
@@ -2633,8 +2632,47 @@ def test_the_reader_reads_a_files_own_dispersion_and_refuses_a_different_one(tmp
 
 
 def test_a_neutron_file_writes_a_digitless_ion_as_its_element():
-    """Follow-up 7: Cu+ is refused for an X-ray reason (no CU+ form factor);
-    rietx and FullProf both give it Cu's b."""
+    """Follow-up 7: a neutron file keys b on the element, and rietx and
+    FullProf both give Cu+ Cu's b."""
     text = from_structure(_cubic("Cu+"),
                           instrument=rx.Instrument.constant_wavelength_neutron(1.5406))
     assert any(line.startswith("A0 CU ") for line in _lines(text))
+
+
+@pytest.mark.parametrize("species, xray, neutron", [
+    # WP-1527: the atom rietx computes, in the measured keys above. A
+    # digitless ion is the tabulated one; an untabulated ion is neutral.
+    ("Cu+", "CU+1", "CU"),
+    ("Na+", "NA+1", "NA"),
+    ("Fe+", "FE", "FE"),
+])
+def test_a_digitless_ion_is_written_as_the_atom_rietx_computes(species, xray,
+                                                               neutron):
+    from rietx.crystallography.scattering import written_species
+    from rietx.io.projects.fullprof import fullprof_species
+    assert fullprof_species(species, neutron=False) == (xray, None)
+    assert fullprof_species(species, neutron=True) == (neutron, None)
+    assert normalize_species(xray) == written_species(species)[0]
+
+
+@pytest.mark.parametrize("instrument, named", [
+    (None, True),
+    (rx.Instrument.constant_wavelength_neutron(1.5406), False),
+])
+def test_a_written_ion_reads_back_and_a_substitution_is_named(tmp_path,
+                                                              instrument, named):
+    """The maintainer's rule (WP-1527, 2026-10-03): `Cu+` round-trips as the
+    ion on an X-ray file, and `Fe+`, which rietx computes as neutral Fe, is
+    written so and named. A neutron file writes the element for every ion
+    and substitutes nothing, so it names nothing."""
+    diagnostics: list = []
+    out = tmp_path / "ions.pcr"
+    write_fullprof_pcr(_cubic("Cu+", "Fe+"), out, instrument=instrument,
+                       diagnostics=diagnostics)
+    back = to_structure(read_fullprof_pcr(out))
+    assert [a.species for a in back.phases[0].atoms] == (
+        ["Cu1+", "Fe"] if instrument is None else ["Cu", "Fe"])
+    rows = [d for d in diagnostics
+            if d.code == "FULLPROF_SPECIES_WRITTEN_NEUTRAL"]
+    assert [d.where for d in rows] == (
+        [["phases.0.atoms.1.species"]] if named else [])

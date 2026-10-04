@@ -713,17 +713,14 @@ phase's own stored spelling, so a setting this build already resolved is not
 laundered back into an ambiguous symbol. The TOPAS writer spells an ion
 sign-first (`Zr4+` → `occ Zr+4`, `O2-` → `occ O-2`), because TOPAS stops on
 the IUCr order rietx stores. An isotope keeps its leading mass number, which is
-TOPAS's order too (`7Li`, and `7Li1+` → `occ 7Li+1`). It refuses an ion with a sign and no magnitude
-(`Cu+`): rietx reads that as the neutral atom, and TOPAS reads `Cu+1` as the
-ion. The FullProf writer spells a species by the radiation, because FullProf
+TOPAS's order too (`7Li`, and `7Li1+` → `occ 7Li+1`). The FullProf writer spells a species by the radiation, because FullProf
 looks the two tables up differently: X-rays key the form factor on element,
 sign and magnitude (`Zr4+` → `ZR+4`, `O2-` → `O-2`), and neutrons key b on
 the element alone, so the charge is not written (`O2-` → `O`; FullProf stops on
 `O-2` there). An isotope is written only on a neutron file, as a LINE-12 user
 scattering length (`7Li` → `Typ LI7` with `LI7 -0.222 0.0 0`), because a bare
-`LI7` runs at natural abundance with no message. An isotope on an X-ray file,
-`Cu+` on an X-ray file (a neutron file writes it as `CU`, Cu's b in both
-programs), and an isotope whose name would not fit LINE 12's four characters
+`LI7` runs at natural abundance with no message. An isotope on an X-ray file
+and an isotope whose name would not fit LINE 12's four characters
 (`157Gd`) are refused by name. FullProf's grammar has no origin or
 axis suffix at all, though, so it can only *state* a setting its own
 bare-symbol convention already prefers (root CLAUDE.md's "an R lattice on
@@ -762,7 +759,7 @@ or three disagree is written free and the group is named,
 you learn which held parameter it frees. Pass `diagnostics=[]` to collect
 both. A species is written as the manual's atom type, `aasv_nnn`: the symbol
 in upper case, the valence sign-first with its number, then `_` and the isotope
-number (`Zr4+` → `ZR+4`, `7Li1+` → `LI+1_7`, `D` → `H_2`); `Cu+` is refused.
+number (`Zr4+` → `ZR+4`, `7Li1+` → `LI+1_7`, `D` → `H_2`).
 That spelling is from the manual only, since no GSAS run has checked it. The
 reader takes GSAS's `NI+2_58` back as `58Ni2+`, the ⁵⁸Ni isotope of the ion.
 
@@ -822,13 +819,26 @@ operations and offers to transform a structure that disagrees. A phase whose
 symbol is ambiguous is named `GSAS2_CIF_SETTING_IN_OPERATORS`. What a CIF
 cannot state (the refine flags, the phase scale, the sample broadening) is
 named `GSAS2_CIF_FIELD_NOT_WRITTEN`. An isotope other than deuterium is
-refused by name, and so is `Cu+`. GSAS-II keeps an isotope as a per-type
+refused by name. GSAS-II keeps an isotope as a per-type
 choice in the phase's General data, which no CIF tag reaches. Its importer
-reads `7Li` as hydrogen and `Cu+` as carbon, and says so only on stdout. Write
+reads `7Li` as hydrogen and says so only on stdout. Write
 the element, then choose the isotope in GSAS-II. `2H` is written `D`, the one
 isotope label GSAS-II takes, and every site written `D` is named
 `GSAS2_CIF_DEUTERIUM_AS_D`: GSAS-II's D has b = 6.681 fm, against the
 6.671 fm (Sears) rietx uses.
+
+No writer refuses a species for its charge. Each writes the atom rietx
+computes, in its own program's spelling. A one-charge ion written without its
+digit is the tabulated ion, so `Cu+` goes out as `occ Cu+1` (TOPAS), `CU+1`
+(FullProf X-ray and GSAS) and `Cu1+` (GSAS-II), and each reads back as `Cu1+`.
+The digit matters to GSAS-II, whose importer reads a bare `Cu+` as carbon. An
+ion rietx's table does not carry, such as `Fe+` or `S2-`, is computed as the
+neutral atom, so the file states the neutral element. Pass `diagnostics=[]` to
+any of the four writers to have each such label named:
+`TOPAS_SPECIES_WRITTEN_NEUTRAL`, `FULLPROF_SPECIES_WRITTEN_NEUTRAL`,
+`GSAS_EXP_SPECIES_WRITTEN_NEUTRAL` or `GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL`. A
+FullProf neutron file writes the element for every ion and substitutes
+nothing, so it names none.
 
 ### What comes back
 

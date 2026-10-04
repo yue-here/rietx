@@ -93,6 +93,14 @@ not both be declared on one phase.
 
 ### Inherited
 
+- **2026-10-03, from [1328](1328-magnetic-interchange.md), closed: two
+  places a propagation vector still drops on the way out or in.** Both were
+  left as design choices by #567's review. `fullprof.to_structure` drops a
+  nuclear phase's `Nvk` k, since FullProf's nuclear k and rietx's k are not
+  the same model. `Structure.to_cif` writes no k, though magCIF has
+  `_parent_propagation_vector.kxkykz`; the writers' refusals point at the JSON
+  instead.
+
 - **2026-09-15, from the issue triage (issue #257 A1–A3, and PR #290):
   three amendments to this WP, and a layer that landed under it.**
   PR #290 (2026-09-10) added `crystallography.magnetic.operators`: operators
@@ -168,6 +176,14 @@ not both be declared on one phase.
 - [ ] Source a public constant-wavelength neutron pattern with a published
       k ≠ 0 structure (search the maintainer's corpus first, then ask; the
       GSAS-II `Magnetic-III` … `-V` folders are the first place to look).
+      *Two candidates confirmed 2026-10-03*, each a CW neutron pattern under
+      the GSAS-II-tutorials `LICENSE` that the `gsas2_*.gpx` fixtures already
+      ship under: `Magnetic-III/data/Ba6Co6.xye` (+ `D1B.PRM`), Ba₆Co₆ClO₁₆ on
+      ILL D1B, k = (0, 0, ½) by the tutorial's own text; and
+      `Magnetic-IV/data/PrSrMnO.gda` (+ `Saclay 3T2.instprm`),
+      Pr₀.₅Sr₀.₅MnO₃ on LLB 3T2, k = (1, 0, 0) on the Fmmm cell (the
+      A-centring made magnetic). The published structure each answers to is
+      still to cite. WP-1343's acceptance 4 wants the same data.
 - [ ] Tests, including the acceptance below, with obs/calc/diff PNGs to
       `tests/output/`.
 
@@ -201,6 +217,19 @@ not both be declared on one phase.
   the fence this track opens.
 
 ## Handover log
+
+### 2026-10-03 — two public k ≠ 0 patterns found, by a cleanup session
+
+The data this WP was waiting to ask for exists in public already. GSAS-II's
+own tutorials ship two constant-wavelength neutron patterns with k ≠ 0, under
+the licence four `tests/data` files already carry. Nothing was vendored.
+
+*Done* (WP-file edits only): the sourcing task names both candidates,
+`Magnetic-III` (Ba₆Co₆ClO₁₆, D1B, k = (0, 0, ½)) and `Magnetic-IV`
+(Pr₀.₅Sr₀.₅MnO₃, 3T2, k = (1, 0, 0) on Fmmm), with k read from each tutorial's
+own text. WP-1328's two open k choices arrived in Inherited when it closed.
+*Next:* cite the published structure each answers to, then vendor one and
+write the acceptance; WP-1343's acceptance 4 wants the same data.
 
 ### 2026-09-26 — the satellites landed from outside
 

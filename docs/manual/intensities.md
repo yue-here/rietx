@@ -31,6 +31,18 @@ f_0(s) \;=\; \sum_{i=1}^{5} a_i\, e^{-b_i s^2} + c,
 
 {source}`rietx.crystallography.scattering.f0`
 
+An ion's label names its charge. A one-charge ion may leave out the digit, so
+`Na+` reads as `Na1+`.
+
+The Waasmaier-Kirfel table lacks one ion of the 111 in {cite}`itc-c` Table
+6.1.1.3, Y³⁺. Its $f_0$ comes from Table 6.1.1.4 instead, a fit of four
+Gaussians. That is {eq}`int-f0` with $a_5 = b_5 = 0$. The fit holds for
+$s \le 2$ Å⁻¹, where the table gives its largest error as 0.005 e. Past that
+range *International Tables* recommends the free-atom curve, because the core
+electrons dominate high-angle scattering. rietx evaluates the fit at every
+$s$. It falls 0.57 e below the free atom at $s = 3$ Å⁻¹ and turns negative
+past 3.86 Å⁻¹.
+
 $f'/f''$ come from the Cromer-Liberman tabulation
 {cite}`cromer1970,cromer1981`, the crystallographic reference calculation and
 what {cite}`itc-c` §4.2.6 tabulates. That choice makes a disagreement with

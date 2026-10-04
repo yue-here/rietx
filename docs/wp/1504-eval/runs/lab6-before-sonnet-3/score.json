@@ -1,0 +1,91 @@
+{
+ "run": "lab6-before-sonnet-3",
+ "task": "lab6",
+ "condition": "before",
+ "model": "sonnet",
+ "repeat": 3,
+ "commit": "5304b85ab092f629a0392b43966df8fda76563dd",
+ "protocol": "1.3",
+ "session_id": "707b7087-ec98-477f-a35d-f94eb8c1f08c",
+ "models_seen": {
+  "claude-sonnet-5-5": 5
+ },
+ "cost_usd": 0.07694120000000002,
+ "turns": 5,
+ "minutes": 0.39,
+ "api_calls": 5,
+ "tokens": {
+  "input": 10,
+  "cache_read": 79696,
+  "cache_write": 9853,
+  "output": 2157
+ },
+ "renders": [],
+ "builds": [],
+ "cuts": {},
+ "looks": [],
+ "report_reads": {},
+ "figure_reads": {},
+ "skills": {
+  "invoked": [],
+  "files": []
+ },
+ "errors": [],
+ "outside": [],
+ "figure": {
+  "exists": true,
+  "pixels": [
+   1200,
+   1200
+  ],
+  "dpi": [
+   200.0,
+   200.0
+  ]
+ },
+ "mechanical": {
+  "pass": true,
+  "checks": [
+   [
+    "figure.png exists",
+    true
+   ]
+  ]
+ },
+ "stall": null,
+ "judge": {
+  "model": "opus",
+  "session_id": "928fe916-b757-443a-8265-3bceafa82b05",
+  "returncode": 0,
+  "cost_usd": 0.0798826,
+  "criteria": [
+   {
+    "n": 1,
+    "verdict": "yes",
+    "saw": "One B6 octahedron is drawn as a shaded polyhedron, with six B atoms at its corners joined by edges."
+   },
+   {
+    "n": 2,
+    "verdict": "yes",
+    "saw": "No La atoms are drawn and no La–B bonds appear; only B atoms are present."
+   },
+   {
+    "n": 3,
+    "verdict": "yes",
+    "saw": "The octahedron sits in the middle of the cell box, well inside the frame, and nothing is clipped."
+   },
+   {
+    "n": 4,
+    "verdict": "yes",
+    "saw": "Every edge line ends on one of the six drawn B atoms."
+   },
+   {
+    "n": 5,
+    "verdict": "yes",
+    "saw": "The single octahedron has all six corners and nothing else is drawn that needs a polyhedron."
+   }
+  ],
+  "yes": true
+ },
+ "done": true
+}

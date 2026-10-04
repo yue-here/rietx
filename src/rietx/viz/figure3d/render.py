@@ -633,7 +633,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     with their bond halves; the other half of each bond stays, as a stub the
     report counts in ``dangling_bonds``, and ``keep`` with a mask removes a
     species with its bonds whole.  ``boundary=False`` leaves out the images
-    outside the cell.
+    outside the cell, or outside an ``extent`` block; the bonds that reach
+    them stay, as stubs the report counts in ``dangling_bonds``.
     ``cell=False`` leaves out the cell's frame, and the a, b and c that label
     its edges go with it, so the view is fitted to the atoms alone.
     ``polyhedra`` is ``None`` for the mode's default (on for balls, off for

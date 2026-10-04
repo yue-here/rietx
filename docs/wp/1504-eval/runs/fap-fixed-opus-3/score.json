@@ -1,0 +1,363 @@
+{
+ "run": "fap-fixed-opus-3",
+ "task": "fap",
+ "condition": "fixed",
+ "model": "opus",
+ "repeat": 3,
+ "commit": "1b837e038042236e13face9824ecf5905e5740e8",
+ "protocol": "1.3",
+ "session_id": "c70d135f-d51f-44f1-85ae-4216294758d9",
+ "models_seen": {
+  "claude-opus-5-5": 15
+ },
+ "cost_usd": 0.49240119999999993,
+ "turns": 19,
+ "minutes": 1.49,
+ "api_calls": 15,
+ "tokens": {
+  "input": 30,
+  "cache_read": 494406,
+  "cache_write": 32870,
+  "output": 6522
+ },
+ "renders": [
+  {
+   "pixels": [
+    275,
+    400
+   ],
+   "values": {
+    "view": "c",
+    "size": 400,
+    "outline": true
+   },
+   "first": "Structure",
+   "ok": true
+  },
+  {
+   "pixels": [
+    2008,
+    1300
+   ],
+   "values": {
+    "view": "c",
+    "up": [
+     1,
+     0,
+     0
+    ],
+    "size": [
+     2008,
+     1300
+    ],
+    "outline": true,
+    "supersample": 3
+   },
+   "first": "Structure",
+   "ok": true
+  },
+  {
+   "pixels": [
+    275,
+    400
+   ],
+   "values": {
+    "view": "c",
+    "size": 400
+   },
+   "first": "Structure",
+   "ok": true
+  },
+  {
+   "pixels": [
+    275,
+    400
+   ],
+   "values": {
+    "view": "c",
+    "size": 400
+   },
+   "first": "Structure",
+   "ok": true
+  },
+  {
+   "pixels": [
+    687,
+    1000
+   ],
+   "values": {
+    "view": "c",
+    "size": 1000,
+    "outline": true
+   },
+   "first": "Structure",
+   "ok": true
+  },
+  {
+   "pixels": [
+    2008,
+    1300
+   ],
+   "values": {
+    "view": "c",
+    "turn": null,
+    "size": [
+     2008,
+     1300
+    ]
+   },
+   "first": "dict",
+   "ok": true
+  },
+  {
+   "pixels": [
+    2008,
+    1300
+   ],
+   "values": {
+    "view": "c",
+    "turn": "30z",
+    "size": [
+     2008,
+     1300
+    ]
+   },
+   "first": "dict",
+   "ok": true
+  },
+  {
+   "pixels": [
+    2008,
+    1300
+   ],
+   "values": {
+    "view": "c",
+    "turn": "60z",
+    "size": [
+     2008,
+     1300
+    ]
+   },
+   "first": "dict",
+   "ok": true
+  },
+  {
+   "pixels": [
+    2008,
+    1300
+   ],
+   "values": {
+    "view": "c",
+    "turn": "90z",
+    "size": [
+     2008,
+     1300
+    ]
+   },
+   "first": "dict",
+   "ok": true
+  },
+  {
+   "pixels": [
+    2008,
+    1300
+   ],
+   "values": {
+    "view": "c",
+    "turn": "-30z",
+    "size": [
+     2008,
+     1300
+    ]
+   },
+   "first": "dict",
+   "ok": true
+  },
+  {
+   "pixels": [
+    2008,
+    1300
+   ],
+   "values": {
+    "view": "c",
+    "turn": "-60z",
+    "size": [
+     2008,
+     1300
+    ]
+   },
+   "first": "dict",
+   "ok": true
+  },
+  {
+   "pixels": [
+    600,
+    390
+   ],
+   "values": {
+    "view": "c",
+    "turn": "90z",
+    "size": [
+     600,
+     390
+    ],
+    "outline": true
+   },
+   "first": "dict",
+   "ok": true
+  },
+  {
+   "pixels": [
+    2008,
+    1300
+   ],
+   "values": {
+    "view": "c",
+    "turn": "90z",
+    "size": [
+     2008,
+     1300
+    ],
+    "outline": true,
+    "supersample": 3
+   },
+   "first": "dict",
+   "ok": true
+  }
+ ],
+ "builds": [
+  {},
+  {},
+  {},
+  {},
+  {}
+ ],
+ "cuts": {},
+ "looks": [
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-fixed-opus-3/preview.png",
+   "pixels": [
+    275,
+    400
+   ]
+  },
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-fixed-opus-3/preview.png",
+   "pixels": [
+    502,
+    382
+   ]
+  },
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-fixed-opus-3/crop.png",
+   "pixels": [
+    240,
+    240
+   ]
+  },
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-fixed-opus-3/preview.png",
+   "pixels": [
+    600,
+    390
+   ]
+  },
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-fixed-opus-3/preview.png",
+   "pixels": [
+    669,
+    510
+   ]
+  }
+ ],
+ "report_reads": {
+  "empty": 6,
+  "hidden_atoms": 1,
+  "whole": 4
+ },
+ "figure_reads": {
+  "atoms": 3,
+  "image": 3,
+  "palette": 3,
+  "report": 11
+ },
+ "skills": {
+  "invoked": [
+   "rietx"
+  ],
+  "files": [
+   "references/api-figure.md"
+  ]
+ },
+ "errors": [],
+ "outside": [],
+ "figure": {
+  "exists": true,
+  "pixels": [
+   2008,
+   1530
+  ],
+  "dpi": [
+   300.0,
+   300.0
+  ]
+ },
+ "mechanical": {
+  "pass": true,
+  "checks": [
+   [
+    "figure.png exists",
+    true
+   ],
+   [
+    "width 2008 px within (2005, 2011)",
+    true
+   ],
+   [
+    "dpi 300.0 within (299.0, 301.0)",
+    true
+   ]
+  ]
+ },
+ "stall": null,
+ "judge": {
+  "model": "opus",
+  "session_id": "87692267-6179-42cc-bb17-f2326cb9e8b0",
+  "returncode": 0,
+  "cost_usd": 0.1112038,
+  "criteria": [
+   {
+    "n": 1,
+    "verdict": "yes",
+    "saw": "The cell outline is a 60°/120° rhombus, and the F channels at the corners are seen end-on, each ringed by a triangle of Ca."
+   },
+   {
+    "n": 2,
+    "verdict": "yes",
+    "saw": "A legend below the structure shows colour swatches labelled Ca, P, O, F and PO4 tetrahedra."
+   },
+   {
+    "n": 3,
+    "verdict": "yes",
+    "saw": "Ca is cyan, P orange, O red and F light green, matching the legend; the copies outside the cell are darker shades of the same colours."
+   },
+   {
+    "n": 4,
+    "verdict": "yes",
+    "saw": "All atoms and polyhedra sit well inside the frame, with white margins on every side."
+   },
+   {
+    "n": 5,
+    "verdict": "yes",
+    "saw": "Every bond, including the short stubs, ends on a drawn atom; none ends in empty space."
+   },
+   {
+    "n": 6,
+    "verdict": "yes",
+    "saw": "All six P atoms sit inside orange tetrahedra whose visible corners each have an O atom, and no P is drawn without one."
+   }
+  ],
+  "yes": true
+ },
+ "done": true
+}

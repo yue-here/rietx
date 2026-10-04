@@ -328,7 +328,22 @@ def test_refuses_a_converged_fit_far_from_the_data(nac):
     result = ref.fit(data, mode="lebail", two_theta_limits=(2.0, 12.0), telemetry=False,
                      plan=rx.RefinementPlan(stages=[rx.Stage("b", ["instrument.background.*"])]))
     assert result.status == "converged"
-    with pytest.raises(ExtractionRefused, match="MODEL_FAR_FROM_DATA_RWP") as err:
+    with pytest.raises(ExtractionRefused, match="carries MODEL_FAR_FROM_DATA") as err:
+        SolveCost.from_pawley(ref, data)
+    assert err.value.reason == "poor"
+
+
+def test_refuses_a_converged_extraction_carrying_any_error_level_code(nac_lebail,
+                                                                       monkeypatch):
+    """The "poor" bar is ``RefinementResult.usable``, not a copy of one code's
+    threshold: an error-level code it has never heard of refuses too (WP-1902)."""
+    ref, data = nac_lebail
+    error = rx.Diagnostic(level="error", code="SOME_FUTURE_ERROR", message="x")
+    unusable = ref.result_.model_copy(
+        update={"diagnostics": [*ref.result_.diagnostics, error]})
+    assert unusable.status == "converged" and not unusable.usable
+    monkeypatch.setattr(ref, "result_", unusable)
+    with pytest.raises(ExtractionRefused, match="carries SOME_FUTURE_ERROR") as err:
         SolveCost.from_pawley(ref, data)
     assert err.value.reason == "poor"
 

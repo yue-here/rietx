@@ -126,11 +126,13 @@ REFERENCE_BUDGET_BYTES = REFERENCE_MAX_BYTES - REFERENCE_GAP_BYTES
 #: stood at 38 993 B, 7 B under, so any PR adding a public field failed here;
 #: #524 adds 137 B (two `Phase` fields, a preset key, `'1.10'`).  39 500 → 39 600
 #: (WP-1539): `auto_background(source=)` adds 49 B, and no signature in the index
-#: can be cut for it.  39 600 → 39 700 (WP-1510): `index_pattern(formula=,
-#: temperature=)` adds 56 B, and the merged file stood at 39 605 B.  The ceiling
-#: is now 300 B under the 40 kB truncation, so the next raise is the split.  A
-#: technique split (`api-magnetic.md`) is the alternative, and the maintainer's
-#: call.
+#: can be cut for it.  39 600 → 39 700 for two additions that landed apart:
+#: WP-1510's `index_pattern(formula=, temperature=)`, 56 B, and WP-1527's
+#: `diagnostics=` on `write_topas_inp` and `write_fullprof_pcr`, 37 B, so a
+#: writer can name the ion it wrote as its neutral atom.  Merged, the file is
+#: 39 698 B, and the ceiling is 300 B under the 40 kB truncation, so the next
+#: raise is the split.  A technique split (`api-magnetic.md`) is the
+#: alternative, and the maintainer's call.
 API_INDEX_MAX_BYTES = 39_700
 
 

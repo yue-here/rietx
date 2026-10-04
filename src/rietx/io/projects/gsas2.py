@@ -1726,9 +1726,12 @@ def from_structure(structure, *,
     What does not cross is named in the diagnostics rather than dropped in
     silence: a CIF states no refine flags, no phase scale and no sample
     broadening, so a GSAS-II project built from this file starts with its own.
-    An isotope other than deuterium and a digitless ion are refused by name
-    (:func:`gsas2_cif_species`), because GSAS-II's import reads them as a
-    different element and says so only on stdout (issue #553).
+    An isotope other than deuterium is refused by name
+    (:func:`gsas2_cif_species`), because GSAS-II's import reads it as a
+    different element and says so only on stdout (issue #553). Every other
+    species is written as the atom rietx computes: ``Cu+`` as ``Cu1+``, and
+    an ion rietx's table lacks (``Fe+``) as the neutral element, named
+    ``GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL``.
     A magnetic phase is refused instead (issue #470): the file would carry
     the magCIF loops, but GSAS-II's import drops them without a word, so a
     diagnostic here would be too quiet.
@@ -1767,7 +1770,9 @@ def from_structure(structure, *,
             why="GSAS-II's CIF import drops the file's magnetic loops without "
                 "a warning (measured on GSAS-II 5.6.3)")
         # The species GSAS-II's importer reads as this site's (#553): a
-        # refusal names the site, and D is the one respelling.
+        # refusal names the site. D is the one isotope respelling; a
+        # digitless ion gains its 1 and an untabulated one loses its charge
+        # (WP-1527).
         typed = []
         for j, atom in enumerate(phase.atoms):
             try:
@@ -1806,6 +1811,10 @@ def from_structure(structure, *,
 
     if diagnostics is not None:
         _report_cif(structure, ambiguous, diagnostics, deuterium)
+        from ...crystallography.scattering import written_neutral_diagnostics
+        diagnostics.extend(written_neutral_diagnostics(
+            structure, code="GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL",
+            program="GSAS-II"))
     return doc.as_string()
 
 
@@ -1825,14 +1834,23 @@ def gsas2_cif_species(species: str) -> str:
       it takes is ``D`` (b = 6.681 fm, Sears's 6.671), so ``2H`` is written as
       ``D``; every other isotope is refused by name.
     * **a digitless ion**: ``Cu+`` came back as **C** ("Atom type C+u not
-      found, using C"), where rietx computes neutral Cu for it.
+      found, using C"). rietx computes the tabulated ion for it
+      (:func:`~rietx.crystallography.scattering.written_species`, WP-1527), so
+      it is written ``Cu1+``, which GSAS-II stores as ``Cu+1``.
+
+    An ion rietx's table lacks is computed as the neutral atom, so ``Fe+`` is
+    written ``Fe``, and :func:`from_structure` reports it as
+    ``GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL``.
     """
-    s = species.strip()
+    from ...crystallography.scattering import written_species
+
+    written = written_species(species)[0]
+    s = written.strip()
     if s in ("D", "2H"):
         return "D"
     m = re.fullmatch(r"(\d*)([A-Za-z]{1,2})(?:(\d*)([+-]))?", s)
     if m is None:
-        return species
+        return written
     mass, element, magnitude, sign = m.groups()
     if mass:
         raise ValueError(
@@ -1844,14 +1862,7 @@ def gsas2_cif_species(species: str) -> str:
             f"{element + (magnitude or '') + (sign or '')!r} and choose "
             f"isotope {mass} for that type in GSAS-II (Phase > General > "
             f"Isotope), or use D for deuterium, the one isotope label it takes")
-    if sign and not magnitude:
-        raise ValueError(
-            f"species {species!r} has a sign but no charge magnitude: rietx "
-            f"reads it as the neutral atom, and GSAS-II's CIF import reads "
-            f"{species!r} as a different element altogether (Cu+ became C, "
-            f"measured). Write {element + '1' + sign!r} for the ion or "
-            f"{element!r} for the neutral atom")
-    return species
+    return written
 
 
 def _block_name(name: str, index: int, taken: set[str]) -> str:

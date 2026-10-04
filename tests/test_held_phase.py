@@ -681,8 +681,10 @@ RAMP_RUN_GRID = np.arange(15.0, 60.0 + 1e-9, 0.02)
 #: unbounded chain it reproduces was killed after 13 minutes on ``main``
 #: without finishing, so anything of this order means the flat direction is
 #: back, and a machine slow enough to fail it honestly would fail the whole
-#: suite's budgets too (tests/CLAUDE.md § Running).
-RAMP_RUNAWAY_GUARD_S = 60.0
+#: suite's budgets too (tests/CLAUDE.md § Running).  The chain takes 9-17 s
+#: alone and tripped a 60 s guard on five of five full runs under load
+#: (WP-1420), so 300 s keeps the margin over the runaway's 13+ minutes.
+RAMP_RUNAWAY_GUARD_S = 300.0
 
 #: iterations the same 13 patterns took on ``main`` **with** the ±2.5 % cell
 #: bounds the agent added after the fact — the bounded baseline this replaces.

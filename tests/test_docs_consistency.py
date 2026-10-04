@@ -694,7 +694,12 @@ SIZE_CAPS: dict[str, int | None] = {
     # no per-format axis classifier can see a unit; a constant σ is reported on
     # the same hook.  The two row additions (gsas, xy) cost no line.  Landed at
     # 497; the +1 is headroom.  Raised rather than shaved, per the message.
-    "src/rietx/io/CLAUDE.md": 498,
+    # 498 -> 501 (WP-1527): the maintainer's rule of 2026-10-03 carves species
+    # out of § Project writers' first rule, since a writer now writes the atom
+    # rietx computed rather than refusing a label the reader would take.  It
+    # governs every later writer, and the file had no line of headroom.
+    # Landed at 501, no headroom.
+    "src/rietx/io/CLAUDE.md": 501,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs

@@ -1,9 +1,8 @@
 # WP-1323 — the Le Bail alternation has a stop rule, and a scope
 
-Milestone: unscheduled · Status: 🔄 2026-10-03 — alternation shipped; background protocol open
+Milestone: unscheduled · Status: ✅ 2026-10-03 — the alternation shipped in 1.6.0; the background protocol is WP-1542
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-09-23 — the skill sends every Le Bail job to a hand loop with no cap; the call is the workaround
 
 ## Goal
 
@@ -74,46 +73,6 @@ per-hkl intensities inside the least squares (Pawley-like), so they have no
 alternation to diverge. The package's Pawley mode already has the second
 shape (a θ block with equal-split restraints on overlapped groups); this WP
 does not change it.
-
-### Inherited
-
-*Pruned 2026-10-02. The 2026-09-23 entry is folded into Context above. The two
-below describe failures this WP deliberately does not address (the stop rule
-cannot see a wrong cell or a low background), and both are still true.*
-
-- **2026-09-28, from the review of `solution case 1` (private corpus map
-  § 5; WP-1510 has the source).** A third way a Le Bail answer goes wrong,
-  this time on the background. The agent followed SKILL.md §2 rule 5 and
-  seeded every coefficient of an `auto_background` P-spline at a low
-  percentile. The pattern carried a broad diffuse hump over several degrees.
-  The free per-reflection intensities absorbed it, the background stayed at
-  its seed, and the Lorentzian width term grew to carry the hump's tails (it
-  fell 4× once the background was corrected). The cell was unaffected, so
-  nothing looked wrong. Every structure fit after it inherited a background
-  that was too low, with light-atom Biso at bounds and strong peaks
-  under-predicted, for about two hours, until the person saw the flat line
-  in a plot. What worked was a SNIP estimate held fixed under a 4-term
-  Chebyshev: Le Bail Rwp fell to 0.74× its first value. A fully free
-  background went the other way (`BACKGROUND_ABSORPTION`, R² 0.70 against
-  the scale). The agent wrote its own SNIP although `rietx.background.snip`
-  ships, and the skill names neither it nor this failure. For this WP's
-  scope clause: the Le Bail call owns a background protocol, and a width
-  term that grows while the background sits at its seed is the tell to
-  report. The too-stiff side has no guard (root CLAUDE.md § Background
-  flexibility).
-- **2026-09-15, from the issue #313 manual fix (no WP).** A second way the
-  alternation wanders, on a *wrong cell* rather than a flat profile subspace.
-  LaB₆ (`tests/data/11BM_LaB6_660a.fxye`, 2-20°, `plan="profile_only"`,
-  Chebyshev-6 background seeded at the 5th percentile and co-refined) fitted
-  Le Bail against a deliberately doubled cell got worse at every pass: Rwp
-  0.2801, 0.3589, 0.3901, 0.4045. The true cell sat at 0.0894 and did not move
-  across four passes. So "keep the best pass" is load-bearing here in a way the
-  #210 fixture does not show, and a pass cap alone would not have helped, since
-  pass 1 was already the best. The 50 reflections the doubled cell adds came
-  back at a median 0.131 against 39.8 for the 12 real ones, and the alternation
-  still grew them pass over pass. What a window like that holds is background-
-  sensitive (`indexing/workflow.py`'s `absent_reflections` records how far that
-  goes), so reproduce the growth before designing around it.
 
 ## Non-goals
 
@@ -213,6 +172,43 @@ baseline table, never gated.
   schedule), WP-1302 (the termination view).
 
 ## Handover log
+
+- **2026-10-04** — after the close, a forward note to WP-1511, whose
+  `Depends on:` names this WP for the background protocol: that protocol is
+  WP-1542.
+
+- **2026-10-03** — **Closed.** `fit` runs the Le Bail alternation itself,
+  with a cap, keep-best and a named stop, and it shipped in 1.6.0. The one
+  thing the WP had left was a background failure its stop rule cannot see,
+  and it is now WP-1542, at the maintainer's request.
+
+  *Inherited, consumed.* The 2026-09-28 background entry is WP-1542's
+  Context, whole. The 2026-09-15 wrong-cell entry is discharged by the rule
+  this WP shipped, by its definition and not re-measured: its Rwp rose from
+  pass 1 (0.2801, 0.3589, …), so the non-monotone stop ends at pass 2 and
+  keeps pass 1, which was the best. Not carried: the old numbers in
+  `tests/test_background_auto.py:1246`'s docstring, and whether any code
+  prints "42 of 68" today (Tasks, the judging.md item). Neither changes a
+  number a fit returns. Narrative moved to the v1.7 record.
+
+- **2026-10-03** (reconstructed post hoc, from `git log --stat`) — **The
+  alternation's tests now pass on Linux as well as macOS.** CI on the PR failed
+  after the entry below was written, because the converged Rwp differs between
+  the two platforms in the fifth decimal. Two commits widened the bar to cover
+  that spread, and PR #683 then merged. No package code changed.
+
+  **Done.** `6d3ca805`: `RWP_PLATFORM_SPREAD = 3e-4` in
+  `tests/test_lebail_alternation.py` replaces the 2e-5 bar in four tests. Its
+  comment carries the measurement: the exact-cell pass 1 reads 0.168210 on
+  macOS arm64 and 0.168236-0.168238 on Linux x86-64 (CI, py3.11/3.12 and jax),
+  and pass 2 (0.16907) stays 8.6e-4 away, so the bar still tells the passes
+  apart. `3ddf76ae`: the per-pass table in the stop message is parsed as
+  numbers, since as text it read "16.821, 16.907" on macOS and
+  "16.824, 16.905" on Linux. CI (`gh run list`): `d9e04240` failed,
+  `6d3ca805` was cancelled by the next push, `3ddf76ae` passed. The commits do
+  not say which session wrote them.
+
+  **Next:** unchanged from the entry below.
 
 - **2026-10-03** — **The Le Bail alternation now behaves as one job.** A run
   of several passes is one row in `rietx watch` with the right status, a cancel

@@ -1,8 +1,7 @@
 # WP-1902 — the solve cost as a quadratic form, and the doublet question first
 
-Milestone: structure-solution · Status: 🔄 2026-10-01 — the spike, `solve/cost.py` (PR #580) and its two named refusals (PR #648) landed; one task left: the "poor" refusal reads `RefinementResult.usable`
+Milestone: structure-solution · Status: ✅ 2026-10-03 — the spike, `solve/cost.py` (PR #580), its two named refusals (PR #648), and the "poor" refusal reading `RefinementResult.usable`
 Depends on: —
-Priority: P2 2026-09-30 — the design gate for the direct-space route; every engine chunk reads this cost
 
 ## Goal
 
@@ -47,27 +46,6 @@ Refusals by name: a magnetic phase; a Rietveld-mode model; a poor or
 unconverged extraction. "Poor" means `not result.usable` (WP-1336), set
 2026-10-01; a tighter bar waits for a measurement on public data.
 
-### Inherited
-
-- **2026-10-02, from the issue triage (issue #562): the Wyckoff-class
-  enumeration is not a task here.** *Decided 2026-10-02:* it claims its own
-  number, **WP-1904**, answering the reporter's question of 2026-09-30. It is
-  a separate module (`crystallography/site_classes.py`, beside `wyckoff.py`,
-  outside `solve/`) with its own acceptance across all 564 gemmi settings, so
-  it shares no handover with this WP. The WP file is written when its PR
-  lands, or before if the reporter wants the number on the record first. Do
-  not take 1904 for anything else.
-- **From WP-1541 (2026-10-03):
-  `test_the_harmonic_is_not_refused_under_scale_or_on_the_solved_phase` now
-  fits a pattern that carries the phase.** It asserted a positive scale on the
-  flat `_flat(10, 150)` pattern, where the background explains everything, so
-  the projected data were rounding noise (|b| = 7.6e-15) and the scale's sign
-  with them. It came out 0.0 on the Windows nightly of 2026-10-02. The data
-  are now CaF₂'s own calculated pattern and the assertion is scale = 1 to
-  1e-9 (measured 1.0000000000000002); built without the λ/2 line the same
-  cost answers 1.0101. Any other solve-cost test on a flat pattern that reads
-  the sign or size of `b` has the same exposure.
-
 ## Non-goals
 
 - Engines, moves, tempering, grading (later WPs).
@@ -80,9 +58,9 @@ unconverged extraction. "Poor" means `not result.usable` (WP-1336), set
 - [x] `solve/cost.py`: c, r, M, the floor from S0's own solve, χ² from I
 - [x] Tests: Ω·I equals `evaluate` to 1e-14 at ten random moves on NAC and on FAP; a wrong Ω fails; the three refusals
 - [x] Skill: none until a public entry exists
-- [ ] `from_pawley`'s "poor" refusal reads `result.usable` instead of its own
+- [x] `from_pawley`'s "poor" refusal reads `result.usable` instead of its own
       Rwp test; a test refuses a converged extraction that carries an
-      error-level diagnostic (set 2026-10-01)
+      error-level diagnostic (set 2026-10-01; done 2026-10-03)
 
 ## Acceptance
 
@@ -98,6 +76,33 @@ unconverged extraction. "Poor" means `not result.usable` (WP-1336), set
 - Issue #562; WP-1515.
 
 ## Handover log
+
+### 2026-10-03 — the last task, and closed
+
+A structure trial can now be scored against an extraction without a pattern
+evaluation, and the extraction it is built from must be one the package itself
+calls usable. That last rule is what this session added: `from_pawley`
+refuses any converged extraction carrying an error-level diagnostic, rather
+than re-testing one code's Rwp threshold. Today the two agree; a future
+error-level code now refuses with no edit here.
+
+*Done* (a cleanup session over unowned in-flight WPs). `from_pawley` reads
+`result.usable` and names the error-level codes it found; the
+`MODEL_FAR_FROM_DATA_RWP` import is gone. One test added,
+`test_refuses_a_converged_extraction_carrying_any_error_level_code`, which
+injects an invented error-level code. *Measured* (`[dev]`, macOS arm64):
+`tests/test_solve_cost.py` 31 passed, 30 before. *Inherited, consumed.* The
+WP-1904 reservation (#562's Wyckoff-class enumeration) is forwarded to
+WP-1515, which scopes this milestone. The WP-1541 note asked whether any other
+solve-cost test on a flat pattern reads the sign or size of `b`: none does.
+The three others on `_flat(...)` assert refusal reasons and counts. Nothing
+depends on 1902 in a `Depends on:` line. Narrative moved to the v1.7 record.
+
+*Review* (2026-10-04, `/code-review high`): one finding, declined. With the
+Rwp bar gone, a result over Rwp 0.8 that carries no error-level diagnostic is
+accepted. A result's diagnostics are part of its record, so a reopened one
+keeps `MODEL_FAR_FROM_DATA`; only a hand-edited result loses it, and the
+2026-10-01 decision made `usable` the one bar.
 
 ### 2026-10-01 (3rd session) — the two silent absences refuse by name
 

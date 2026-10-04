@@ -2,7 +2,7 @@
 
 Milestone: rietview · Status: ⬜
 Depends on: 1504
-Priority: P4 2026-09-27 — waits on a trigger nobody has pulled; P3 the day one fires
+Priority: P3 2026-10-04 — was P4: the trigger's second clause fired (WP-1504's rounds C and E, no new defect on one surface)
 
 ## Goal
 
@@ -84,6 +84,14 @@ the list is rietx's by nature.
   rietx's `api-figure.md` becomes a pointer to it.
 
 ### Inherited
+
+- **2026-10-04, from WP-1504 round E: the trigger's second clause fired.**
+  Rounds C and E ran the same pinned `fixed` surface (amendment 1.3), and E's
+  56 runs found no new defect in it: 40 of 42 fixed runs done, the one miss
+  the agent's. That is the pair the 2026-10-01 note below waited for, so the
+  Priority line is P3 as its own rule says. WP-1536 to 1538 are still ⬜
+  (PR #686 filed them), so nothing has changed the surface since; the note
+  below on what each would change when it lands still holds.
 
 - **From WP-1501 (2026-09-30).** The split's measured cost is pinned by
   `tests/test_figure_boundary.py`: `_about`, `viz.theme`, `model.compiled`,

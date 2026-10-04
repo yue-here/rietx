@@ -1,0 +1,163 @@
+{
+ "run": "fap-before-sonnet-3",
+ "task": "fap",
+ "condition": "before",
+ "model": "sonnet",
+ "repeat": 3,
+ "commit": "5304b85ab092f629a0392b43966df8fda76563dd",
+ "protocol": "1.3",
+ "session_id": "8cdbdff4-ec4e-4eb4-9d2a-b95dab6ac632",
+ "models_seen": {
+  "claude-sonnet-5-5": 10
+ },
+ "cost_usd": 0.2687578,
+ "turns": 15,
+ "minutes": 0.73,
+ "api_calls": 10,
+ "tokens": {
+  "input": 20,
+  "cache_read": 347979,
+  "cache_write": 41528,
+  "output": 3301
+ },
+ "renders": [
+  {
+   "pixels": [
+    1600,
+    1600
+   ],
+   "values": {
+    "view": "c",
+    "size": [
+     1600,
+     1600
+    ]
+   },
+   "first": "dict",
+   "ok": true
+  },
+  {
+   "pixels": [
+    1600,
+    1600
+   ],
+   "values": {
+    "view": "c",
+    "size": [
+     1600,
+     1600
+    ]
+   },
+   "first": "dict",
+   "ok": true
+  }
+ ],
+ "builds": [
+  {},
+  {},
+  {}
+ ],
+ "cuts": {},
+ "looks": [
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-before-sonnet-3/figure.png",
+   "pixels": [
+    2000,
+    1900
+   ]
+  },
+  {
+   "path": "/private/tmp/claude-501/-Users-yue-Code-rietx/0433c291-1037-42b9-8cb7-5377547150b7/scratchpad/1504-root/work/fap-before-sonnet-3/figure.png",
+   "pixels": [
+    2000,
+    1800
+   ]
+  }
+ ],
+ "report_reads": {},
+ "figure_reads": {
+  "image": 2
+ },
+ "skills": {
+  "invoked": [
+   "rietx",
+   "dataviz"
+  ],
+  "files": [
+   "references/api-figure.md"
+  ]
+ },
+ "errors": [
+  "PY=../../venvs/before/bin/python && sed -i 's|^W=17/2.54|W=2008/300|; s|W\\*0.95|W*0.9|; s|^ax=fig.add_axes.*|ax=fig.add_axes([0,0.1,1,0.9]); ax.imshow(img[60:15"
+ ],
+ "outside": [],
+ "figure": {
+  "exists": true,
+  "pixels": [
+   2008,
+   1807
+  ],
+  "dpi": [
+   300.0,
+   300.0
+  ]
+ },
+ "mechanical": {
+  "pass": true,
+  "checks": [
+   [
+    "figure.png exists",
+    true
+   ],
+   [
+    "width 2008 px within (2005, 2011)",
+    true
+   ],
+   [
+    "dpi 300.0 within (299.0, 301.0)",
+    true
+   ]
+  ]
+ },
+ "stall": null,
+ "judge": {
+  "model": "opus",
+  "session_id": "afde94d1-e832-4b0c-a6ab-0d181b268e55",
+  "returncode": 0,
+  "cost_usd": 0.1161838,
+  "criteria": [
+   {
+    "n": 1,
+    "verdict": "yes",
+    "saw": "The cell outline is a 120° rhombus, and F atoms sit at its corners as end-on channel columns, each ringed by Ca."
+   },
+   {
+    "n": 2,
+    "verdict": "yes",
+    "saw": "A legend at the bottom shows Ca, P, O and F, each beside a coloured circle."
+   },
+   {
+    "n": 3,
+    "verdict": "yes",
+    "saw": "Ca is teal, P orange, O red and F purple in the picture, matching the legend; copies outside the cell are darker shades of the same colours."
+   },
+   {
+    "n": 4,
+    "verdict": "yes",
+    "saw": "All atoms and polyhedra sit well inside the frame with white margins."
+   },
+   {
+    "n": 5,
+    "verdict": "yes",
+    "saw": "Each visible bond appears to end on a drawn atom; I saw no stubs ending in empty space."
+   },
+   {
+    "n": 6,
+    "verdict": "no",
+    "saw": "Several dark-orange P atoms outside the cell, for example at upper left and lower right, are drawn with a single bond and no tetrahedron."
+   }
+  ],
+  "yes": false
+ },
+ "done": false
+}

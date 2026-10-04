@@ -62,6 +62,14 @@ accepted cell is tested as the explanation of the leftovers.
 
 ### Inherited
 
+- **2026-10-04, from [1323](1323-lebail-stop-rule.md), closed: the Le Bail
+  background protocol is [1542](1542-a-le-bail-background-left-at-its-seed.md).**
+  This WP's `Depends on:` names 1323 for "the Le Bail call and its background
+  protocol". The call shipped in 1.6.0 (`fit` runs the alternation with a cap
+  and keep-best). The background protocol did not: a seed left too low lowers
+  Rwp, so 1323's stop rule cannot see it, and it is filed as 1542, not
+  started. Read 1542 before relying on a Le Bail background.
+
 - **From WP-1449 (closed 2026-09-29): the supercell check's power below high
   symmetry.** Asked directly of the published bethanechol cell's 55
   superlattices of index 2-4 on all ten sets (`ambiguity.supercell_chance`),
