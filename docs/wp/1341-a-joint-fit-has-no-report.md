@@ -88,6 +88,15 @@ Some constraints that shape (1) and (3):
 
 ### Inherited
 
+- **From WP-1523, 2026-10-04: the joint fit judges support on the screen
+  alone.** A single fit calls a phase seen when its scale is 3σ from zero by a
+  marginal esd against counting noise (`refine._answer_significance`). A joint
+  fit (`multi.py`) still reads only `phase_support`, which is now ‖y_p/σ‖₂ per
+  histogram at 3σ. On issue #481's blank frame that norm reached 3.1-4.4σ once
+  a released cell had chased the noise. So a joint fit can still call a
+  noise-fitted phase seen. Its report should decide whether to take the
+  marginal test, and whether histograms combine in quadrature. Today a phase
+  any one histogram sees is seen.
 - **From WP-1534, 2026-10-02: the joint runner does not run the scale–B
   probe.** A single-histogram stage holds a phase's displacement parameters
   where the fitted range cannot separate them from its scale

@@ -163,6 +163,16 @@ here, never set by eye (root CLAUDE.md, WP-1448). An Rwp comparison is not
 evidence for a correction. A fix ships with a record field or diagnostic
 stating what it changed.
 
+### Inherited
+
+- **2026-10-04, from WP-1523: the support test leaves displacements out
+  because of this ridge.** A phase is now seen when its scale is 3σ from zero
+  by a marginal esd (`refine._answer_significance`), and that marginal skips
+  every column that moves only displacements or occupancies. With them in it,
+  `tests/test_scale_b_ridge.py`'s fluorite read 153.7σ on the screen and
+  0.02σ marginal, and was held as absent. Any change to what the scale-B hold
+  frees should re-run that file and `tests/test_phase_significance.py`.
+
 ## Non-goals
 
 - Reporting each correlated pair once. That is WP-1460.

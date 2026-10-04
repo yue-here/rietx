@@ -325,6 +325,11 @@ def _joint_unsupported_phases(models, mtable) -> set[int]:
     invisible in one histogram may be plain in another, and if its cell is
     shared then the data — jointly, which is what a joint refinement fits —
     can see it.
+
+    The screen ``CompiledModel.phase_support`` alone, at the stage start and
+    at the answer alike.  The single fit's answer reads the scale's
+    significance (``refine._answer_significance``, WP-1523); the joint path
+    deliberately does not, because its report is WP-1341's to define.
     """
     per_model = [m.phase_support(t.decode(t.x0()))
                  for m, t in zip(models, mtable.tables, strict=True)]
@@ -1150,6 +1155,9 @@ class MultiHistogramRefinement:
         # showing would fire this on a phase invisible in one pattern and plain
         # in another, which is a phase the joint fit measures and never holds:
         # a warning on a healthy phase teaches a consumer to ignore the code.
+        #
+        # The screen alone, never the single fit's significance (WP-1523): the
+        # joint report is WP-1341's, so the message names the screen's basis.
         per_support = np.array([m.phase_support(v)
                                 for m, v in zip(models, per_values, strict=True)])
         per_lines = np.array([m.phase_line_counts() for m in models])
@@ -1157,7 +1165,9 @@ class MultiHistogramRefinement:
             per_support.max(axis=0), per_lines.sum(axis=0),
             (min(m.tt_min for m in models), max(m.tt_max for m in models)),
             [_unscoped(p) for p in mt.free_paths],
-            self.mtable.structures[0], stage_results)
+            self.mtable.structures[0], stage_results,
+            basis="with everything else held, in the histogram that shows it best",
+            decided=False)
 
         weight_note = ("unit (each point's esd governs)"
                        if all(w == 1.0 for w in weights)

@@ -1195,8 +1195,10 @@ def _freeze_cell_windows(model: CompiledModel, table: ParameterTable) -> None:
     derives its per-coordinate trust-region scale from the distance to the
     bounds, so bounding a cell changes the step taken in it even where the bound
     is never reached — so it is spent only where the alternative is a flat
-    direction the fit will wander down.  ``phase_support`` is the one authority
-    for that, shared with the ``PHASE_UNCONSTRAINED`` diagnostic.
+    direction the fit will wander down.  ``phase_support`` decides it: the
+    screen ``refine._answer_significance`` starts from, which bounds the
+    scale's significance from above (WP-1523).  So a windowed phase is one the
+    ``PHASE_UNCONSTRAINED`` diagnostic would also call unseen.
 
     Read at the values the stage *starts* from, which is the whole point of
     doing it here: the same place every other per-stage freeze happens.

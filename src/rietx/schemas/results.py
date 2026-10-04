@@ -804,7 +804,9 @@ class StageResult(Base):
     n_degenerate_cell_probes: int = 0
     #: paths this stage **held** although the plan had freed them: the
     #: structural parameters of a phase the data could not see at stage start
-    #: (``CompiledModel.phase_support`` below ``PHASE_SUPPORT_SIGMA``), which
+    #: (the screen ``CompiledModel.phase_support`` below
+    #: ``PHASE_SUPPORT_SIGMA``), or whose scale was not that significant
+    #: against the counting noise at the stage's answer (WP-1523), which
     #: reach the pattern only through ``scale × |F|² × profile`` and are
     #: therefore a flat direction the solver would spend its budget walking
     #: (WP-1301).  Disjoint from :attr:`freed` by construction — a held path is

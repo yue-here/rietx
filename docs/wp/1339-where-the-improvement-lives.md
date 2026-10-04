@@ -124,6 +124,15 @@ and (2) is accepted.
 
 ### Inherited
 
+- **From WP-1523, 2026-10-04: the support statistic changed, and the ridge
+  case is unmeasured under it.** "Seen" is now the phase scale over its esd at
+  3σ (`refine._answer_significance`). The esd comes from (JᵀWJ)⁻¹ against
+  counting noise and is marginal over every free column except displacements
+  and occupancies, so another phase's scale and cell are in it.
+  `phase_support` is now only the screen, ‖y_p/σ‖₂. The #219 entry below read
+  0.65σ, 197σ and 54-56σ on the old single-point max. Re-measure it before
+  building on it. A phase collinear with another should read low on the
+  marginal, but nobody has measured that.
 - **From WP-1469, 2026-09-29: the support statistic now has an owner.** The
   #219 entry below found `phase_support` reading 0.65-197σ on one phantom
   phase depending only on its seed. WP-1469 found its noise twin: a frame

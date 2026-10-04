@@ -233,7 +233,7 @@ free to wander without changing Rwp at all. Unbounded it leaves the physical
 range entirely, and the run fails much later, when the reflection list for a
 cell that size is refused.
 
-So when a stage begins, any phase whose strongest modelled point sits below 1σ
+So when a stage begins, any phase whose summed contribution ‖y/σ‖ sits below 3σ
 of the counting noise has its cell bounded to ±5 % of the value that stage
 starts from, on whichever side you left at ±inf. Set a bound yourself and that
 side is yours. Such a cell can therefore report `BOUND_HIT` while its
@@ -247,8 +247,10 @@ and a fit of one gives the identical answer it gave before this existed.
 
 The window bounds the symptom. The cause is reported separately, as
 `PHASE_UNCONSTRAINED`: which phase the data cannot distinguish from absent, and
-what the run did with its parameters. Both read the same measurement, so they
-can never disagree about which phase is which.
+what the run did with its parameters. It reads the phase scale's significance:
+the scale over its esd against the counting noise, at least 3σ to count as seen.
+The window's measurement is an upper bound on that significance, so a phase with
+a windowed cell is one the diagnostic also calls unseen.
 
 In a staged refinement the window is rarely reached now, because the stage
 holds those parameters instead of bounding them; see `StageResult.held` in

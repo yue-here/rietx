@@ -124,6 +124,14 @@ down.
 
 ### Inherited
 
+- **2026-10-04, from WP-1523: the hold's threshold moved, so re-measure
+  before quoting.** A phase is now seen when its scale is 3σ from zero by its
+  marginal esd against counting noise (`refine._answer_significance`). The old
+  test was one point at 1σ. The stage-start hold reads the screen
+  ‖y_p/σ‖₂ ≥ 3, and the release reads the marginal with the held columns freed
+  for the measurement. A weak phase now re-enters later than it did: at scale
+  3e-8 on issue #481's frame, 1 of 8 fits saw it, against 6 of 8 before. Any
+  re-entry count in this file was taken under the old rule.
 - **2026-10-02, from WP-1534: a fifth trip of the ramp guard.**
   `test_the_ramp_reproduction_no_longer_runs_away` measured 81.6 s on
   WP-1534's branch and 81.9 s on its untouched base, against the 60 s guard.

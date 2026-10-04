@@ -69,7 +69,9 @@ from .model.rows import layout as row_layout
 from .optimize.cancel import RefinementCancelled
 from .optimize.least_squares import (
     SOLVERS,
+    _jacobian_for,
     _longest_line_wavelength,
+    covariance_estimates,
     rechart_outcome,
     run_least_squares,
 )
@@ -379,6 +381,14 @@ class _StageHold:
     #: ``StageResult.scale_b_held`` (WP-1534): per phase whose displacement
     #: columns :func:`_hold_scale_b_ridges` held, the separation it measured
     scale_b_held: dict[int, float] = dataclasses.field(default_factory=dict)
+    #: each phase's :func:`_answer_significance` at the stage's answer
+    #: (WP-1523), written by ``_run_stage`` alone.  Carried so the result's
+    #: ``PHASE_UNCONSTRAINED`` reads the number the hold was decided on: a
+    #: phase the support hold still holds keeps that reading, taken with its
+    #: held columns free, which the result's own covariance cannot do.  A
+    #: phase that refined is read off the last solve.  ``None`` outside
+    #: Rietveld mode, where the result reads the screen itself.
+    significance: np.ndarray | None = None
 
 
 def _tie_terms(source: "str | dict[str, float] | Sequence[tuple[str, float]]",
@@ -440,11 +450,13 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     about.  ``ParameterTable.column_reach`` is the question restated as what a
     column *moves*; :func:`_only_moves` is the decision over it.
 
-    "Cannot see" is ``CompiledModel.phase_support`` below
-    :data:`~rietx.model.forward.PHASE_SUPPORT_SIGMA` — the one authority, shared
-    with the ``PHASE_UNCONSTRAINED`` diagnostic and the default cell window, and
-    read here at the values the stage *starts* from like every other per-stage
-    freeze.
+    "Cannot see" is a phase's significance below
+    :data:`~rietx.model.forward.PHASE_SUPPORT_SIGMA` (WP-1523).  At the values
+    the stage *starts* from, like every other per-stage freeze, there is no
+    Jacobian, so it is ``CompiledModel.phase_support``, the screen the default
+    cell window also reads.  The screen bounds the full test from above, so a
+    phase it holds is one :func:`_answer_significance` would call unseen too.
+    At the answer the caller passes :func:`_answer_significance` instead.
 
     **The phase's own scale is never held.**  Every structural parameter of a
     phase reaches the pattern only through ``scale × |F|² × profile``, so with
@@ -458,9 +470,9 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     against nothing, and the ``refit="single"`` collapse — one stage carrying
     the whole plan — is exactly the shape the ramp that motivated this ran.
 
-    ``support`` is the ``phase_support`` vector when a caller has already
-    measured it at these values (the post-solve pass asks two questions of one
-    measurement); ``None`` measures it here.
+    ``support`` is the significance vector when a caller has already measured
+    it at these values (the post-solve pass asks two questions of one
+    measurement); ``None`` measures the screen here.
     """
     if support is None:
         support = model.phase_support(table.decode(table.x0()))
@@ -1335,7 +1347,9 @@ def _released_phases(model: CompiledModel, table: ParameterTable,
     Measured at the values the solve *landed* on, against the same threshold
     the hold was taken at — a phase whose scale climbed while the stage ran is
     now one the data can see, and its parameters are measurable in this stage
-    rather than the next one.
+    rather than the next one.  ``support`` is :func:`_answer_significance`,
+    which measures a held phase with its held columns free (WP-1523), so a held
+    cell cannot make the phase look better determined than it would be free.
 
     **Columns, never names**, the other half of :func:`_unsupported_phase_paths`
     and the same repair: a held column may be a caller's ``vars.X``, whose own
@@ -1363,6 +1377,153 @@ def _released_phases(model: CompiledModel, table: ParameterTable,
     return [p for p in held
             if any(name.startswith(prefixes)
                    for name in (p, *reach.get(p, ())))]
+
+
+#: ``phases.<i>.`` — the phase a path or a column's reach belongs to.
+_PHASE_PREFIX = re.compile(r"^phases\.(\d+)\.")
+
+
+def _phases_reached(columns: list[str], reach: dict[str, list[str]]) -> set[int]:
+    """Every phase a column names or moves — the name, and the hold's reach
+    for a ``vars.X`` whose own name carries no phase (WP-1342)."""
+    return {int(m.group(1)) for c in columns for name in (c, *reach.get(c, ()))
+            if (m := _PHASE_PREFIX.match(name))}
+
+
+#: An occupancy path.  With :data:`_DISPLACEMENT_PATH` (an anisotropic ADP
+#: column reaches the U^ij components it drives, so ``biso|adp`` alone would
+#: keep it), the paths a column may move and still be left out of the
+#: significance (:func:`_significance_columns`): they rescale a phase's
+#: intensities and move no peak.
+_OCCUPANCY_PATH = re.compile(r"^phases\.\d+\.atoms\.\d+\.occ$")
+
+
+def _intensity_only_path(path: str) -> bool:
+    return bool(_DISPLACEMENT_PATH.match(path) or _OCCUPANCY_PATH.match(path))
+
+
+def _significance_columns(free: list[str], held: list[str],
+                          reach: dict[str, list[str]]) -> list[str]:
+    """The columns a phase's scale significance is marginal over (WP-1523).
+
+    Every free column, and the phase's own held columns, except a column that
+    moves only displacements or occupancies.  The freedom that inflates a fit
+    to noise is where the peaks sit: a cell, a width, a zero shift (Davies,
+    R. B., 1977, *Biometrika* 64, 247-254, a nuisance parameter present only
+    under the alternative).  A column that only rescales intensities, B or an
+    occupancy, says how the intensity splits between it and the scale, not
+    whether the phase is there.  Marginal over B, a phase whose scale and B
+    nearly share a direction reads as absent: measured on
+    ``tests/test_scale_b_ridge.py``'s fluorite, 153.7σ on the screen and
+    0.02σ marginal.  "Moves only" is read off the column's reach, a variable
+    dropped first, so a ``vars.B`` driving two displacements is left out too
+    (WP-1342).
+    """
+    def moved(column: str) -> list[str]:
+        return [p for p in reach.get(column, [column]) if not is_variable_path(p)]
+
+    return [c for c in [*free, *(h for h in held if h not in free)]
+            if not (moved(c) and all(_intensity_only_path(p) for p in moved(c)))]
+
+
+def _scale_significance(table: ParameterTable, theta: np.ndarray,
+                        jac: np.ndarray, columns: list[str], ip: int) -> float:
+    """Phase ``ip``'s scale over its esd from (JᵀWJ)⁻¹ on ``columns`` alone.
+
+    **Against counting noise**, as the screen and
+    :data:`~rietx.indexing.workflow.ABSENT_SIGMA` are: the covariance carries
+    neither √χ²_red nor the Bérar-Lelann factor the reported esds do.  Both
+    grow with a misfit anywhere in the pattern, so with them a present phase
+    read as absent: measured on two dead channels under LaB₆, 2865σ on the
+    screen and 0.23σ by the reported esd (``tests/test_data_support.py``), and
+    on CaF₂ held 1.2 % off its cell, 6.74σ against 0.65σ
+    (``tests/test_held_phase.py``).  The esd goes through
+    ``ParameterTable.stderr_physical`` like a reported one, so a tied or
+    transformed scale is propagated the same way.  A scale column with no
+    gradient reads 0.
+    """
+    path = f"phases.{ip}.scale"
+    index = {p: k for k, p in enumerate(table.free_paths)}
+    idx = np.array([index[c] for c in columns if c in index], dtype=np.intp)
+    if not len(idx):
+        return 0.0
+    # a residual with Σr² = 1 and one degree of freedom is a unit χ²_red, and
+    # one nonzero entry has no same-sign run, so a unit Bérar-Lelann factor:
+    # ``covariance_estimates`` returns pinv(JᵀWJ) unscaled, through the same
+    # equilibration, cut and tiny-column esd (WP-1463) every reported esd takes
+    unit = np.zeros(len(idx) + 1)
+    unit[0] = 1.0
+    sd, corr_sub = covariance_estimates(np.asarray(jac)[:, idx], unit, len(idx))
+    n = len(table.free_paths)
+    stderr = np.zeros(n)
+    stderr[idx] = sd
+    corr = np.zeros((n, n))
+    corr[np.ix_(idx, idx)] = corr_sub
+    esd = table.stderr_physical(theta, stderr, corr).get(path)
+    if esd is None or not np.isfinite(esd) or esd <= 0.0:
+        return 0.0
+    return float(table.decode(theta)[path]) / esd
+
+
+def _answer_significance(model: CompiledModel, table: ParameterTable,
+                         outcome, held: list[str],
+                         reach: dict[str, list[str]], backend: str
+                         ) -> np.ndarray:
+    """Each phase's significance in σ at a stage's answer (WP-1523).
+
+    The one test of "can the data see this phase", read by the release, the
+    collapse and the result's ``PHASE_UNCONSTRAINED``.  A phase is seen when
+    its scale is :data:`~rietx.model.forward.PHASE_SUPPORT_SIGMA` of its esds
+    from zero (:func:`_scale_significance`), marginal over the columns
+    :func:`_significance_columns` names.  A phase with columns in ``held``
+    (the support hold's, never the moment or ridge holds) is measured with
+    them freed for the measurement and held again, so a held cell cannot make
+    the phase look better determined than it would be free.
+
+    The screen ``CompiledModel.phase_support`` comes first.  It is the scale's
+    conditional z, which bounds the marginal one, so a phase under it keeps
+    the screen value with no Jacobian built.  So does a phase outside
+    Rietveld mode (Le Bail and Pawley fix the scale), one whose scale nothing
+    refines, and one whose covariance cannot be formed.  The solve's own
+    Jacobian is reused unless a held column must be freed; ``set_vary`` can
+    decline a row, so only what it freed is held again.
+    """
+    theta = outcome.theta
+    out = np.array(model.phase_support(table.decode(theta)), dtype=np.float64)
+    if model.mode != "rietveld":
+        return out
+    moving = set(table.moving_paths)
+    seen = [ip for ip in range(len(out)) if out[ip] >= PHASE_SUPPORT_SIGMA
+            and f"phases.{ip}.scale" in moving]
+    if not seen:
+        return out
+    held_of = {ip: [c for c in held if ip in _phases_reached([c], reach)]
+               for ip in seen}
+    free = list(table.free_paths)
+    extra = list(dict.fromkeys(c for cs in held_of.values() for c in cs))
+    freed = table.set_vary(extra, True) if extra else []
+    try:
+        th = table.x0()
+        if freed or outcome.jac is None:
+            jac = np.asarray(_jacobian_for(model, table, backend)(th),
+                             dtype=np.float64)
+        else:
+            jac = np.asarray(outcome.jac, dtype=np.float64)
+        column_reach = table.column_reach()
+        for ip in seen:
+            columns = _significance_columns(
+                free, [c for c in held_of[ip] if c in freed], column_reach)
+            try:
+                # never above the screen it is bounded by: a direction the
+                # pinv cut discards reads zero variance, which would inflate z
+                out[ip] = min(out[ip],
+                              _scale_significance(table, th, jac, columns, ip))
+            except np.linalg.LinAlgError:
+                pass  # no covariance: the screen stands
+    finally:
+        if freed:
+            table.set_vary(freed, False)
+    return out
 
 
 class NoPhasesError(ValueError):
@@ -3300,8 +3461,8 @@ class Refinement:
         # theta, Jacobian and correlations describes the values committed
         signs = table.commit(outcome.theta)
         outcome = rechart_outcome(outcome, table.x0(), signs)
-        # A phase's own support can stay comfortably above PHASE_SUPPORT_SIGMA
-        # the whole time and its cell still walk to nonsense — a joint
+        # A phase can stay comfortably significant (PHASE_SUPPORT_SIGMA) the
+        # whole time and its cell still walk to nonsense — a joint
         # degeneracy with another free phase's cell, invisible to the
         # per-phase test above (CELL_SAFETY_FRACTION's docstring).  Checked
         # and corrected once, on the outcome, never as a bound the solver saw.
@@ -3335,9 +3496,6 @@ class Refinement:
         # CaF₂ was seeded at scale 1e-4, so it began every pattern well above
         # the noise, and the flat direction opened up only as the solver drove
         # that scale to nothing.
-        # one measurement, two questions — the release and the collapse are
-        # complementary readings of the same ``phase_support`` vector
-        support = model.phase_support(table.decode(table.x0()))
         # the moment holds are asked of the answer separately: they are about a
         # direction rather than a phase, so ``_released_phases``'s prefix test
         # would release them for the wrong reason — a phase rising above the
@@ -3351,6 +3509,12 @@ class Refinement:
         moment_held = [p for p in held if p in moment_set]
         phase_held = [p for p in held
                       if p not in moment_set and p not in ridge_set]
+        # one measurement, two questions — the release and the collapse are
+        # complementary readings of the same significance vector (WP-1523):
+        # a held phase measured with its held columns free, every other phase
+        # off this solve's own covariance
+        support = _answer_significance(model, table, outcome, phase_held,
+                                       held_reach, self._backend)
         # the hold's reach travels with it: a held ``vars.X`` names no phase,
         # and asking the table now would get nothing back (WP-1342)
         released = (_released_phases(model, table, phase_held, support, held_reach)
@@ -3389,19 +3553,30 @@ class Refinement:
                            if f"{b}.dof2" in still_flat})
         moment_turned.update(late_turned)
         flat_now, collapse_axes = _flat_moment_scan(model, table)
-        collapsed = _unsupported_phase_paths(model, table, support) + flat_now
+        collapsed_phase = _unsupported_phase_paths(model, table, support)
+        collapsed = collapsed_phase + flat_now
+        # the support hold's columns once the release and the collapse have
+        # acted: taken now, because a late scale-B hold below re-holds some of
+        # the released columns for a different reason
+        released_now = set(released)
+        support_held = ([p for p in phase_held if p not in released_now]
+                        + collapsed_phase)
         for b, a in collapse_axes.items():
             flat_axes.setdefault(_site(b),
                                  _axis_in_crystal_axes(a, frames[_site(b)]))
         if released or collapsed or late_turned:
             if collapsed:
-                # Restore before holding: those values moved in a direction the
-                # data cannot see, and the restore is invisible to the data by
-                # the very measurement that licences the hold — a phase under
-                # 1σ contributes under 1σ wherever its peaks sit, since the
-                # height is scale·|F|²·profile and the cell only moves them.
-                # Without it the stage would freeze the walk it was trying to
-                # prevent (measured on the ramp: cells at 20.3 Å and −6.5 Å).
+                # Restore before holding.  A phase whose scale is not 3σ from
+                # zero (``_answer_significance``) is one the data cannot tell
+                # from absent, so where its cell and widths went is not a
+                # measurement: under that null they are free to chase the noise
+                # (WP-1523), and the values they reached are the chase.  The
+                # restore can move χ², since a curve fitted to noise does lower
+                # it, which is why the second solve below re-fits everything
+                # else against the restored phase rather than assuming the
+                # restore changed nothing.  Without it the stage would freeze
+                # the walk it was trying to prevent (measured on the ramp:
+                # cells at 20.3 Å and −6.5 Å).
                 by_path = {e.path: e for e in table.entries}
                 for path in collapsed:
                     by_path[path].value = start_values[path]
@@ -3492,6 +3667,15 @@ class Refinement:
                 n_iterations=outcome.n_iterations + second.n_iterations,
                 n_constraint_truncations=(outcome.n_constraint_truncations
                                           + second.n_constraint_truncations))
+            # the significance the result will quote.  A phase the support
+            # hold still holds keeps the reading its hold was decided on, so
+            # the hold and PHASE_UNCONSTRAINED cannot disagree; every other
+            # phase is read again off the second solve's own covariance
+            decided = support
+            support = _answer_significance(model, table, outcome, [],
+                                           held_reach, self._backend)
+            for ip in _phases_reached(support_held, held_reach):
+                support[ip] = decided[ip]
 
         if mode == "lebail":
             model.lebail_update(table.decode(outcome.theta), n_cycles=stage.lebail_cycles)
@@ -3538,7 +3722,10 @@ class Refinement:
             scale_b_held=dict(scale_b_held),
             blocked_by_hold=blocked_by_hold, unknown_paths=unknown_paths,
             cell_runaway=list(cell_runaway),
-            cell_runaway_unresolved=[(d, list(e)) for d, e in cell_runaway_unresolved])
+            cell_runaway_unresolved=[(d, list(e)) for d, e in cell_runaway_unresolved],
+            # Le Bail and Pawley read the screen alone, which the result
+            # measures on its own compile as it always has
+            significance=support if mode == "rietveld" else None)
 
     def fit(self, data: PatternData, *, mode: Mode = "rietveld",
             plan: RefinementPlan | str = "mccusker_default",
@@ -3863,7 +4050,7 @@ class Refinement:
 
             try:
                 (model, outcome, guard, stage_results, diagnostics,
-                 answer_runaway) = self._run_plan(
+                 answer_runaway, answer_significance) = self._run_plan(
                     plan, data, mode, table, two_theta_limits, tree, stream, cancel,
                     stage_results, diagnostics, sinks=sinks,
                     stage_reports=stage_reports)
@@ -3906,7 +4093,8 @@ class Refinement:
                 mu_r_source=self._mu_r_source, mu_r_skipped=self._mu_r_skipped,
                 guard=guard, max_shift_over_esd=outcome.max_shift_over_esd,
                 declared_wavelengths=declared_wavelengths,
-                cell_runaway=answer_runaway)
+                cell_runaway=answer_runaway,
+                significance=answer_significance)
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,
@@ -3945,15 +4133,17 @@ class Refinement:
         """The stage loop of :meth:`fit`, split out so cancellation has one exit.
 
         Returns ``(model, outcome, guard, stage_results, diagnostics,
-        answer_runaway)``; raises :class:`RefinementCancelled` with the
-        completed stages attached.  The guard returned is the **last** stage's,
+        answer_runaway, answer_significance)``; raises
+        :class:`RefinementCancelled` with the completed stages attached.  The guard returned is the **last** stage's,
         for the same reason :func:`_constraint_diagnostics` reads only that
         stage: earlier stages measured an intermediate state, and it is the
         answer-producing one whose Jacobian the result's identifiability
         evidence describes.  ``answer_runaway`` is that stage's
         ``CELL_RUNAWAY`` finding (``[]`` or one), for the same reason: it is
         what :func:`_build_result` withholds esds on, while ``diagnostics``
-        carries every stage's.
+        carries every stage's.  ``answer_significance`` is that stage's
+        :func:`_answer_significance` too (WP-1523), the vector its hold was
+        decided on, which ``PHASE_UNCONSTRAINED`` quotes.
 
         ``stage_reports`` appends one :class:`~rietx.report.StageReport` per
         completed stage to :attr:`stage_reports_`.  A cancelled run keeps the
@@ -4009,6 +4199,9 @@ class Refinement:
         correlation_hits: dict[tuple[str, frozenset],
                               list[tuple[str, Diagnostic]]] = {}
         answer_runaway: list[Diagnostic] = []
+        #: the last stage's ``_StageHold.significance`` (WP-1523), which the
+        #: result's ``PHASE_UNCONSTRAINED`` quotes
+        answer_significance = None
         #: the moment's rung at the first stage that moved it with every
         #: magnetic width still at its off state (WP-1343)
         moment_off_state: dict[str, tuple[float, float | None]] = {}
@@ -4064,6 +4257,7 @@ class Refinement:
             # the last stage's alone survives the loop: an earlier stage's
             # clamp is re-measured by every later one (staging is cumulative)
             answer_runaway = [] if runaway_diag is None else [runaway_diag]
+            answer_significance = hold.significance
             if runaway_diag is not None:
                 diagnostics.append(runaway_diag)
                 stage_diagnostics = stage_diagnostics + [runaway_diag]
@@ -4086,7 +4280,7 @@ class Refinement:
             if stage_reports:
                 self.stage_reports_.append(self._stage_report(
                     stage.name, plan, data, mode, table, model, outcome, guard,
-                    stage_diagnostics))
+                    stage_diagnostics, significance=hold.significance))
             for sink in sinks:
                 # live monitoring (viz.live.LiveSession): rewrite the snapshot
                 sink.write_snapshot(model, table, outcome, stage.name)
@@ -4113,7 +4307,8 @@ class Refinement:
             name, rung, widths = moment_released
             diagnostics.extend(_moved_moment_diagnostics(
                 name, moment_off_state, rung, widths))
-        return model, outcome, guard, stage_results, diagnostics, answer_runaway
+        return (model, outcome, guard, stage_results, diagnostics,
+                answer_runaway, answer_significance)
 
     def _final_compile(self, model: CompiledModel, table: ParameterTable,
                        outcome, data: PatternData, mode: Mode,
@@ -4192,7 +4387,8 @@ class Refinement:
             value=rel)]
 
     def _stage_report(self, name, plan, data, mode, table, model, outcome,
-                      guard, stage_diagnostics) -> StageReport:
+                      guard, stage_diagnostics, *, significance=None
+                      ) -> StageReport:
         """One trajectory rung: the report at this stage's end (WP-1058).
 
         The result it reads is transient — built here from the state the stage
@@ -4219,7 +4415,8 @@ class Refinement:
             correlation=outcome.correlation, backend=self._backend,
             solver=self._solver, mu_r_source=self._mu_r_source,
             mu_r_skipped=self._mu_r_skipped, guard=guard,
-            max_shift_over_esd=outcome.max_shift_over_esd)
+            max_shift_over_esd=outcome.max_shift_over_esd,
+            significance=significance)
         report = build_report(result, model=model,
                               values=table.decode(outcome.theta), plan=plan,
                               structure=self.structure,
@@ -4369,7 +4566,8 @@ class Refinement:
                 solver=self._solver,
                 mu_r_source=self._mu_r_source, mu_r_skipped=self._mu_r_skipped,
                 guard=guard, max_shift_over_esd=outcome.max_shift_over_esd,
-                declared_wavelengths=declared_wavelengths)
+                declared_wavelengths=declared_wavelengths,
+                significance=hold.significance)
             _apply_esds(table, self.result_, self.structure, self.instrument)
             self._answer_covariance = (self.result_, table, outcome.theta,
                                        outcome.stderr_internal,
@@ -5820,9 +6018,9 @@ def _reflection_tick_support(model: CompiledModel, ip: int,
     """Each tick's support in σ, for phase ``ip``'s ``n_rows`` emission-line
     rows tiled in reflection order — the pairing ``tick_support`` carries.
 
-    A tick carries its *reflection's* support, the strongest modelled point
-    over every emission-line image of that hkl (WP-1458).  One authority for
-    both tick builders, this module's :func:`_build_result` and
+    A tick carries its *reflection's* support, the largest window norm
+    ‖y/σ‖₂ over every emission-line image of that hkl (WP-1458, WP-1523).
+    One authority for both tick builders, this module's :func:`_build_result` and
     ``multi.MultiHistogramRefinement._ticks`` (WP-1344), so the joint fit's
     low-angle boundary asks the question the single fit's does.
     """
@@ -5856,6 +6054,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                   max_shift_over_esd: float | None = None,
                   declared_wavelengths: list[float] | None = None,
                   cell_runaway: Sequence[Diagnostic] | None = None,
+                  significance: np.ndarray | None = None,
                   ) -> RefinementResult:
     values = table.decode(theta)
     y_calc = model.evaluate(values)
@@ -5914,8 +6113,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # `tick_support` rides beside the positions on the same terms, carried
     # through the same filter and sort, so the low-angle boundary can ask
     # which ticks have anything behind them without pairing by position
-    # (WP-1458).  Each tick carries its *reflection's* support: the strongest
-    # modelled point in σ (`CompiledModel.reflection_support`) over every
+    # (WP-1458).  Each tick carries its *reflection's* support: the largest
+    # window norm in σ (`CompiledModel.reflection_support`, WP-1523) over every
     # emission-line image of that hkl, so a Kα2 or λ/2 image is judged with the
     # reflection it is an image of, as its index already says.  It is not a
     # result field; `_low_angle_diagnostics` is its one reader.
@@ -6090,11 +6289,17 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # (WP-1301).  Named here rather than left to HIGH_CORRELATION, which reports
     # the ρ≈1 between the phase's cell and its scale — the symptom — while this
     # reports the cause.  The stage records carry the hold, so the message and
-    # the record quote one measurement.
+    # the record quote one measurement.  The significance is the answer
+    # stage's own (WP-1523): a Rietveld fit hands in the vector its hold was
+    # decided on, and any other caller (Le Bail, Pawley, a replay) gets the
+    # screen at these values, an upper bound on the scale's significance.
+    decided = significance is not None
+    if significance is None:
+        significance = model.phase_support(values)
     diagnostics = diagnostics + _phase_support_diagnostics(
-        model.phase_support(values), model.phase_line_counts(),
+        significance, model.phase_line_counts(),
         (model.tt_min, model.tt_max), list(table.free_paths), structure,
-        stage_results)
+        stage_results, decided=decided)
 
     # A phase whose scale and B the range cannot separate (WP-1534), and what
     # its fraction is conditional on.  Read off the stage records, which carry
@@ -6115,7 +6320,8 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # coefficient, so it speaks where the two flags above have nothing to read
     # — a model with no size or strain freed.  Why here and not as a
     # precondition call: ``indexing.diagnostics.refinement_width_diagnostics``.
-    diagnostics = diagnostics + _width_census_diagnostics(model, values, structure)
+    diagnostics = diagnostics + _width_census_diagnostics(model, values, structure,
+                                                          significance)
 
     # The two robustness statements that are about the *run* rather than a
     # parameter, so they are Diagnostics here rather than GuardFindings (which
@@ -7320,28 +7526,30 @@ def _first_reflection_fwhm(model: CompiledModel, values: dict[str, float],
     every phase, emission line and declared peak, or ``None`` when there is
     none (an empty structure list, or no tick carrying intensity).
 
-    **Which ticks count** (WP-1458): the images of a reflection whose
-    strongest modelled point, on any emission line, reaches
-    :data:`~rietx.model.forward.PHASE_SUPPORT_SIGMA` σ of the noise — read
-    off ``support``, which :func:`_build_result` builds from
+    **Which ticks count** (WP-1458): the images of a reflection whose window
+    norm ‖y/σ‖₂, on any emission line, reaches
+    :data:`~rietx.model.forward.PHASE_SUPPORT_SIGMA` — read off ``support``,
+    which :func:`_build_result` builds from
     :meth:`CompiledModel.reflection_support` and
     :meth:`CompiledModel.extra_peak_support` and pairs with ``ticks`` by
-    index.  That is :meth:`CompiledModel.phase_support`'s test one rank down,
-    per reflection rather than per phase, because a *supported* row can still
+    index.  That is :data:`~rietx.indexing.workflow.ABSENT_SIGMA`'s test on a
+    line, and :meth:`CompiledModel.phase_support`'s one rank down (WP-1523).
+    Per reflection rather than per phase, because a *supported* row can still
     carry empty ticks below its first real line (a declared peak at zero
     area, a superstructure reflection whose |F| is zero), and because a
     phase's summed curve can clear the threshold where none of its
-    reflections does (issue #436's large-cell dummy: 1.23σ summed, no
-    reflection above 0.62σ).  A tick with nothing behind it reaches nothing;
-    before this rule one below the data moved the boundary there and silenced
-    the diagnostic.
+    reflections does (issue #436's large-cell dummy, measured under the
+    pre-WP-1523 strongest-point test: 1.23σ summed, no reflection above
+    0.62σ).  A tick with nothing behind it reaches nothing; before this rule
+    one below the data moved the boundary there and silenced the diagnostic.
 
     **Per reflection, not per image**: the unit is the hkl, as ``tick_hkl``
     has it, so a Kα2 or λ/2 image of a reflection the data sees keeps its
-    place however weak the image is on its own.  Judged image by image, the
-    λ/2 (111) of the published BT-1 Cu(311) Nd₂Ru₂O₇ fit (0.095σ, beside its
-    primary's 2.86σ) was dropped, the region grew from 36 to 185 channels,
-    and a warning firing at 5.92× today fell to 2.66×.
+    place however weak the image is on its own.  Judged image by image under
+    the strongest-point test, the λ/2 (111) of the published BT-1 Cu(311)
+    Nd₂Ru₂O₇ fit (0.095σ, beside its primary's 2.86σ) was dropped, the region
+    grew from 36 to 185 channels, and a warning firing at 5.92× fell to
+    2.66×.
 
     ``support=None`` makes no claim and counts every tick by position alone.
 
@@ -7781,6 +7989,8 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
                                free_paths: list[str],
                                structure: Structure,
                                stage_results: list[StageResult] | None = None,
+                               *, basis: str = "against the counting noise",
+                               decided: bool = True,
                                ) -> list[Diagnostic]:
     """``PHASE_UNCONSTRAINED`` — a phase the data cannot see, and what was done.
 
@@ -7793,11 +8003,19 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
     such a phase's cell to a ≈ 39 293 Å and a ≈ 40 000 Å, and the run died
     hundreds of stages later inside ``generate_reflections`` (WP-1110).
 
-    Measured on the **modelled contribution**, not on ``scale``, for the reason
-    :data:`ROUGHNESS_MIN_DEPRESSION` is measured on the depression: scale is
-    degenerate with |F|², the profile widths and the line weights, so a small
-    scale is not the same statement as a small contribution and only one of
-    them is about what the data can see.
+    ``support_by_phase`` is each phase's significance in σ (WP-1523).  A
+    single fit hands in :func:`_answer_significance`: the scale over its esd
+    against counting noise, or the screen ``‖y_p/σ‖₂`` where that is already
+    under the threshold.  The screen bounds the other from above, so the
+    scale is *at most* that many σ from zero either way, and the message says
+    so.  A ratio is unmoved by the scale's degeneracy with |F|², the widths
+    and the line weights, since rescaling one rescales the scale and its esd
+    alike.  ``basis`` names how the σ was taken, for the message: a joint fit
+    reads the screen in the histogram that shows the phase best.
+    ``decided`` says whether a held phase's reading is the one its hold was
+    decided on (a single Rietveld fit's stage vector) or one taken at the
+    answer (a joint fit, Le Bail, Pawley, a replay), so the message claims
+    only what is true of the number.
 
     ``params.vector.cell_window`` bounds the *symptom* — it stops the cell
     running away — but a windowed cell re-anchors on every stage, so it walks
@@ -7844,10 +8062,18 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
             cause = (f"no reflection of phase {ip} ({name}) lies in the fitted "
                      f"range {tt_range[0]:.4g}-{tt_range[1]:.4g}°, so nothing "
                      f"about it is measurable here")
+        elif held and decided:
+            # a held phase quotes the reading its hold was decided on, which
+            # a second solve at the restored values can since have moved
+            cause = (f"phase {ip} ({name})'s scale was at most {support:.2g}σ "
+                     f"from zero {basis} when its hold was decided, under the "
+                     f"{PHASE_SUPPORT_SIGMA:g}σ a phase needs to count as "
+                     f"seen, so the stage could not distinguish it from absent")
         else:
-            cause = (f"phase {ip} ({name}) contributes at most {support:.2g}σ of "
-                     f"the observation noise anywhere in the fitted range, so "
-                     f"the data cannot distinguish it from absent")
+            cause = (f"phase {ip} ({name})'s scale is at most {support:.2g}σ "
+                     f"from zero {basis}, under the {PHASE_SUPPORT_SIGMA:g}σ "
+                     f"a phase needs to count as seen, so the data cannot "
+                     f"distinguish it from absent")
         clauses = []
         if held:
             stages = held_stages[ip]
@@ -8140,7 +8366,9 @@ SIZE_FLAG_SIZE_A = 50.0
 
 
 def _width_census_diagnostics(model: CompiledModel, values: dict[str, float],
-                              structure: Structure) -> list[Diagnostic]:
+                              structure: Structure,
+                              significance: np.ndarray | None = None
+                              ) -> list[Diagnostic]:
     """``PEAK_WIDTH_LAW_MISMATCH`` from the fit: the indexing census taken on
     the fitted channels, against each phase's width at the returned values.
 
@@ -8150,9 +8378,12 @@ def _width_census_diagnostics(model: CompiledModel, values: dict[str, float],
     width is not one number per angle: a phase with a Stephens ``microstrain``
     block (its width is per reflection, and the isotropic law alone would
     under-read it), or a width law that is not finite and positive on the grid.
-    Only phases the data can see (``phase_support`` at or above
+    Only phases the data can see (``significance`` at or above
     :data:`~rietx.model.forward.PHASE_SUPPORT_SIGMA`, with a line in range)
     take part: an invisible phase's width explains no line of the census.
+    ``significance`` is the vector ``PHASE_UNCONSTRAINED`` reads
+    (:func:`_answer_significance`, WP-1523); ``None`` reads the screen, which
+    is all a joint fit asks.
     """
     from .indexing.diagnostics import refinement_width_diagnostics
     from .indexing.peaks import width_census
@@ -8174,7 +8405,7 @@ def _width_census_diagnostics(model: CompiledModel, values: dict[str, float],
     # its width — a seeded or runaway lor_size — would otherwise be free to
     # land near the census and silence the warning the visible phases owe
     # (#585 follow-up).  Same authority and threshold as PHASE_UNCONSTRAINED.
-    support = model.phase_support(values)
+    support = model.phase_support(values) if significance is None else significance
     line_counts = model.phase_line_counts()
     modelled: dict[int, tuple[str, float]] = {}
     for ip in range(len(model.phases)):

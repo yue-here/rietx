@@ -13,10 +13,11 @@ and no converged-point quantity can see past the one the fit reached (issue
 **The axis is the phase's width, never its scale** (WP-1320's decision).
 Profiling the scale directly is the textbook object, and #203's own design
 proposed it, but a refit at a pinned scale reaches the hump basin only by
-broadening the phase until its strongest point falls under
+broadening the phase until it is no longer significant by
 ``PHASE_SUPPORT_SIGMA``, which is exactly when WP-1301's collapse rule restores
-and holds the phase's structure: measured on the fixture, the width was held
-at 4× and 8× the fitted scale and χ² ran away.  At a pinned width the rest of
+and holds the phase's structure: measured on the fixture under the
+pre-WP-1523 strongest-point test, the width was held at 4× and 8× the fitted
+scale and χ² ran away.  At a pinned width the rest of
 the problem is close to linear in the scale, the refit has one answer, and
 the ridge is traversed rather than jumped.  So every free isotropic width term
 of the phase is an axis, each pinned in turn on its own branch.

@@ -373,7 +373,7 @@ so on a single quadratic basin it reproduces W ± 1.96 esd. `excess` is the
 farthest admissible fraction from the fit's in units of that half-width, and
 `QPA_FRACTION_UNDETERMINED` fires past 2. The axis is the width, never the
 scale: at a pinned scale the refit reaches the hump basin only by broadening
-the phase under 1σ, where WP-1301 holds its structure, so the scan stops short.
+the phase below `PHASE_SUPPORT_SIGMA`, where WP-1301 holds its structure, so the scan stops short.
 The grid stops at half the range because on the full range the frozen peak
 windows no longer cover the profile and `FROZEN_COMPILE_STALE` fires.
 `fit_admissible=False` means a pinned refit beat the fit by more than the cut,

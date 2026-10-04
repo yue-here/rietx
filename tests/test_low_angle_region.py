@@ -328,8 +328,10 @@ def test_empty_ticks_of_a_supported_phase_do_not_silence_it(hump_pattern):
 
 
 def test_reflection_support_is_phase_support_one_rank_down():
-    """Per-reflection support is max(y/sigma) over one window: never above the
-    phase's, and equal to it on LaB6, whose strongest reflection stands alone.
+    """Per-reflection support is ‖y/σ‖₂ over one window (WP-1523): never above
+    the phase's norm over the whole range, since every contribution is
+    non-negative.  (Under the strongest-point test it equalled the phase's on
+    LaB6, whose strongest reflection stands alone; a norm sums every line.)
     A reflection with an empty frozen window reads 0."""
     from rietx.model.forward import PHASE_SUPPORT_SIGMA
 
@@ -342,7 +344,7 @@ def test_reflection_support_is_phase_support_one_rank_down():
     values = table.decode(table.x0())
     rows = model.reflection_support(0, values)
     best = max(float(np.max(r)) for r in rows)
-    assert best == pytest.approx(float(model.phase_support(values)[0]), rel=1e-9)
+    assert 0.0 < best <= float(model.phase_support(values)[0])
     empty = model.phases[0].win[0, :, 1] <= model.phases[0].win[0, :, 0]
     assert np.all(rows[0][empty] == 0.0)
     assert (rows[0][~empty] >= PHASE_SUPPORT_SIGMA).any()

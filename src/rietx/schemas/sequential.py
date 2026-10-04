@@ -77,9 +77,10 @@ class SeriesEntry(Base):
     #: definitions and the warning.
     #:
     #: The measurement that does answer that question is ``PHASE_UNCONSTRAINED``
-    #: — the phase's strongest modelled point in σ of the observation noise,
-    #: reaching an entry through :attr:`diagnostics` and aggregating over the
-    #: chain as ``SEQUENTIAL_PERSISTENT_FINDING``.  R_B belongs beside it and
+    #: — the phase scale's significance, its value over its esd against
+    #: counting noise (WP-1523), reaching an entry through :attr:`diagnostics`
+    #: and aggregating over the chain as ``SEQUENTIAL_PERSISTENT_FINDING``.
+    #: R_B belongs beside it and
     #: beside the weight with its esd, never in front of either.
     #:
     #: Empty outside Rietveld mode, for the reason it is empty on

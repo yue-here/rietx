@@ -315,10 +315,10 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   moves them** → re-measured at the answer: a phase that appeared is *released*; one that
   **collapsed** while solving is restored to where the stage found it and held (one extra solve,
   never a third). **A value that is not a measurement is the caller's**: held paths leave
-  `RefinementResult.parameters`, a trajectory starts at the onset. Which phases:
-  `CompiledModel.phase_support`, its zero limit `phase_line_counts` ("no line in range"). Both
-  feed `PHASE_UNCONSTRAINED`, which now says what was done; `SEQUENTIAL_PERSISTENT_FINDING` says
-  what no per-pattern finding can: "42 of 68".
+  `RefinementResult.parameters`, a trajectory starts at the onset. Which phases: a scale under 3σ
+  of its counting-noise esd (`refine._answer_significance`, WP-1523), never the fitted curve an
+  absent phase's cell fits to noise; zero limit `phase_line_counts`. Both feed `PHASE_UNCONSTRAINED`,
+  which says what was done; `SEQUENTIAL_PERSISTENT_FINDING` what no one pattern can: "42 of 68".
 - **Pydantic knows no crystallography, so a whole-model swap is checked by building its table.**
   Every symmetry refusal is raised in `ParameterTable.__init__`, and the snapshot
   `Refinement.edit` commits performs none of it, so `edit` builds the **proposed** pair's table

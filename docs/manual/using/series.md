@@ -277,8 +277,9 @@ watching a phase's R_B walk across a ramp is a use a single fit cannot make of
 it.
 
 The question it looks like it answers has its own channel.
-`PHASE_UNCONSTRAINED` measures each phase's strongest modelled point in σ of the
-observation noise, which is whether the data can see this phase at all. It
+`PHASE_UNCONSTRAINED` measures each phase scale's significance, its value over
+its esd against the counting noise, which is whether the data can see this phase
+at all. It
 reaches an entry through `SeriesEntry.diagnostics`, and aggregates over the
 chain as `SEQUENTIAL_PERSISTENT_FINDING`, which says the thing no per-pattern
 diagnostic can: 42 of 68. Read R_B beside that and beside the weight with its

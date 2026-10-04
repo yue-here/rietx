@@ -397,10 +397,10 @@ CELL_MIN_LENGTH_A = 1.5
 #: driver would move every other value it also reaches, which is not this
 #: function's decision to make.  Such an escape is named instead, never
 #: silently passed through: see ``refine._vars_driven_cell_escapes`` and the
-#: review of #385 finding 1.  ``phase_support`` (the authority behind
+#: review of #385 finding 1.  ``phase_support`` (the screen behind
 #: ``cell_window``'s own
 #: window above, and ``refine._hold_unsupported_phases``, WP-1301) is a
-#: per-phase amplitude test and cannot see a *joint* degeneracy: two free
+#: per-phase test and cannot see a *joint* degeneracy: two free
 #: phases sharing a near-identical cell trade scale against each other along
 #: an axis that is exactly as flat as an absent phase's, and the phase that
 #: ends up walking it can be the one with the real, undiminished scale — its
@@ -524,8 +524,9 @@ def cell_window(name: str, value: float, lo: float, hi: float,
 
     **It is applied only to phases the data cannot see** — the set
     ``run_least_squares`` freezes through
-    :meth:`ParameterTable.freeze_cell_windows`, off
-    :meth:`~rietx.model.forward.CompiledModel.phase_support` — and that
+    :meth:`ParameterTable.freeze_cell_windows`, off the screen
+    :meth:`~rietx.model.forward.CompiledModel.phase_support` at the stage
+    start, where there is no Jacobian for the scale's significance — and that
     restriction is measured, not conservatism.  A window is not free: scipy's
     TRF derives its per-coordinate trust-region scale from the distance to the
     bounds, so bounding a cell changes the *step* the solver takes in it even

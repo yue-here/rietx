@@ -304,16 +304,19 @@ def _cached_fcj_nodes(cp: "CompiledPhase", il: int, k: int, variant: int,
     return phi, omega
 
 
-#: A phase whose strongest modelled point sits below this many σ of the
-#: observation noise is one the data cannot distinguish from absent.  One σ,
-#: not a tuned fraction: the comparison is against the counting statistics the
-#: phase competes with, the same footing ``indexing.workflow.ABSENT_SIGMA``
-#: puts a missing line on.  Below it every parameter of the phase has a
-#: Jacobian column under the noise floor, which is the definition of
-#: unconstrained rather than an opinion about it.  Lives here, beside
-#: :meth:`CompiledModel.phase_support`, because the bound and the diagnostic
-#: must read one number.
-PHASE_SUPPORT_SIGMA = 1.0
+#: The significance a phase must reach to count as one the data can see, in σ.
+#: It is a significance, not a height: the phase's scale must sit this many of
+#: its own esds from zero, the esd taken against the counting noise
+#: (WP-1523).  Three is :data:`~rietx.indexing.workflow.ABSENT_SIGMA`'s value
+#: and meaning, the multiple of its propagated σ a line's net intensity must
+#: reach to count as present, so a phase and a line are judged present on one
+#: footing.  :meth:`CompiledModel.phase_support` is the cheap screen against
+#: it, and ``refine._answer_significance`` the full test where the screen
+#: passes.  Until
+#: WP-1523 this was 1.0 against one point's height, and a scale fitted to pure
+#: noise lifted that point past it.  Lives here, beside the screen, because the
+#: bound and the diagnostic must read one number.
+PHASE_SUPPORT_SIGMA = 3.0
 
 @dataclass
 class BatchLayout:
@@ -1963,40 +1966,54 @@ class CompiledModel:
                 + self.bragg_component(values, intensities))
 
     def phase_support(self, values: dict[str, float]) -> np.ndarray:
-        """Each phase's strongest modelled point, in σ of the observation noise.
+        """Each phase's integrated contribution ‖y_p/σ‖₂ over the fitted range.
 
-        The one authority for "can the data see this phase at all", with two
-        consumers that must not disagree: the default cell window
-        (``params.vector.cell_window``, applied by ``run_least_squares`` only to
-        phases below :data:`PHASE_SUPPORT_SIGMA`) and the
-        ``PHASE_UNCONSTRAINED`` diagnostic.  A second opinion here would pass a
-        test and still let the solver bound a phase the report calls visible —
-        the ``staged.bound_findings`` precedent (WP-1076), one measurement
-        projected twice.
+        This is the phase scale's **conditional** z against the counting
+        noise: its significance with every other parameter held, since y_p is
+        linear in the scale and the scale's Jacobian column is y_p/(scale·σ).
+        Holding the others can only shrink the scale's variance, so this
+        bounds the full test, ``refine._answer_significance``, from above.
+        That makes it the cheap screen against :data:`PHASE_SUPPORT_SIGMA`
+        (WP-1523): a phase under it is unseen, with no Jacobian needed.  The
+        stage-start hold and the default cell window
+        (``params.vector.cell_window``) read it.
+
+        **It cannot decide alone, because a pass can be noise.**  When the phase
+        is absent, where its peaks sit and how wide they are is unidentified,
+        so the fit picks both to match the noise.  That is the nuisance
+        parameter present only under the alternative (Davies, R. B., 1977,
+        *Biometrika* 64, 247-254), and every function of the fitted curve
+        inherits the choice.  Measured on issue #481's frame redrawn over 20
+        blank fits, this norm reached 3.1 to 4.4 once a released cell had
+        chased the noise.  The full test is marginal over every column but
+        those that only rescale intensities, which counts that freedom to
+        first order, and called 1 of the 20 seen.
 
         Measured on the **modelled contribution** rather than on ``scale``,
         because scale is degenerate with |F|², the profile widths and the line
-        weights: a small scale is not the same statement as a small
-        contribution, and only one of them is about what the data can see.
-        Against σ rather than a fraction of the pattern, for the reason
-        ``refine.ROUGHNESS_MIN_DEPRESSION`` is: the competitor is counting
-        statistics.
+        weights.  Against σ rather than a fraction of the pattern, for the
+        reason ``refine.ROUGHNESS_MIN_DEPRESSION`` is: the competitor is
+        counting statistics.
         """
         sigma = np.asarray(self.sigma, dtype=np.float64)
         out = np.zeros(len(self.phases), dtype=np.float64)
         for ip in range(len(self.phases)):
             y = np.asarray(self.phase_component(ip, values), dtype=np.float64)
-            out[ip] = float(np.max(y / sigma)) if len(y) else 0.0
+            out[ip] = float(np.linalg.norm(y / sigma)) if len(y) else 0.0
         return out
 
     def reflection_support(self, ip: int, values: dict[str, float]
                            ) -> list[np.ndarray]:
-        """Each reflection's strongest modelled point, in σ of the noise.
+        """Each reflection's integrated contribution ‖y/σ‖₂ over its window.
 
-        :meth:`phase_support` one rank down — the same quantity, max(y/σ), over
-        one (emission line, reflection) window instead of over the whole phase
-        — so the two can be read against one threshold,
-        :data:`PHASE_SUPPORT_SIGMA` (WP-1458).  One array per emission line
+        :meth:`phase_support` one rank down — the same quantity over one
+        (emission line, reflection) window instead of over the whole phase —
+        so the two can be read against one threshold,
+        :data:`PHASE_SUPPORT_SIGMA` (WP-1458, WP-1523).  That is
+        :data:`~rietx.indexing.workflow.ABSENT_SIGMA`'s own test on a line:
+        the line's net intensity against its propagated σ.  The contributions
+        are non-negative, so a phase's norm is never below its strongest
+        reflection's.  One array per emission line
         over the frozen reflection list, the layout :meth:`phase_peaks`
         returns.  A reflection whose frozen window is empty (generated in the
         compiler's margin, outside the fitted range) reads 0: nothing of it is
@@ -2022,8 +2039,10 @@ class CompiledModel:
                 lay, pos, lay.gather(peaks, 1), lay.gather(peaks, 2),
                 np.isfinite(pos), values["instrument.geometry.axial_sl"],
                 values["instrument.geometry.axial_hl"], compiled.SPELL_FORWARD)
+            # the planes are pad-zeroed (``_omega_batch``), so a pad slot adds
+            # nothing to the sum of squares
             height = lay.gather(peaks, 3)[:, None] * omega / sigma[lay.idx]
-            row = np.max(height, axis=1)
+            row = np.linalg.norm(height, axis=1)
             for il in range(len(lay.line_ptr) - 1):
                 a, b = int(lay.line_ptr[il]), int(lay.line_ptr[il + 1])
                 out[il][lay.k[a:b]] = row[a:b]
@@ -2038,7 +2057,7 @@ class CompiledModel:
                     continue
                 i0, i1 = int(cp.win[il, k, 0]), int(cp.win[il, k, 1])
                 y = np.asarray(intensity[k] * prof, dtype=np.float64)
-                out[il][k] = float(np.max(y / sigma[i0:i1]))
+                out[il][k] = float(np.linalg.norm(y / sigma[i0:i1]))
         return out
 
     def _reflection_support_split(self, ip: int, values: dict[str, float],
@@ -2050,9 +2069,9 @@ class CompiledModel:
         windows, and reading the nuclear pass alone would give every
         magnetic-only reflection a support of zero — the reflection table's
         failure, one reader over.  So both components are drawn per (line,
-        reflection) on the union of their windows and added before the
-        maximum is taken, which is the quantity the one-component path
-        measures.  Evaluate-only, and only ever reached by a split phase.
+        reflection) on the union of their windows and added before the norm
+        is taken, which is the quantity the one-component path measures.
+        Evaluate-only, and only ever reached by a split phase.
         """
         cp = self.phases[ip]
         sl = values["instrument.geometry.axial_sl"]
@@ -2078,7 +2097,7 @@ class CompiledModel:
                         continue
                     y[i0 - lo:i1 - lo] += np.asarray(intensity[k] * prof,
                                                      dtype=np.float64)
-                out[il][k] = float(np.max(y / sigma[lo:hi]))
+                out[il][k] = float(np.linalg.norm(y / sigma[lo:hi]))
         return out
 
     def extra_peak_support(self, values: dict[str, float]
@@ -2087,11 +2106,11 @@ class CompiledModel:
 
         The images :meth:`extra_peak_tick_positions` lists — same filter, same
         sort, so the two pair by index — each with the index of the peak it is
-        an image of (into :attr:`peak_components`) and its strongest modelled
-        point in σ of the noise, :meth:`reflection_support`'s quantity for a
-        declared peak.  The curve is :meth:`extra_peak_curve`'s term for that
-        (peak, line), rebuilt here on numpy because that method returns the
-        sum and this needs the terms.  An image whose frozen window is empty
+        an image of (into :attr:`peak_components`) and its integrated
+        contribution ‖y/σ‖₂ over its window, :meth:`reflection_support`'s
+        quantity for a declared peak.  The curve is :meth:`extra_peak_curve`'s
+        term for that (peak, line), rebuilt here on numpy because that method
+        returns the sum and this needs the terms.  An image whose frozen window is empty
         reads 0.  Evaluate-only.
         """
         sigma = np.asarray(self.sigma, dtype=np.float64)
@@ -2116,7 +2135,8 @@ class CompiledModel:
                 if il:
                     gain = gain * float(lorentz_polarization(pos, pol) / lp0)
                 y = area * gain * pseudo_voigt(self.tt[i0:i1] - pos, gamma, eta)
-                out.append((pos, j, float(np.max(np.asarray(y) / sigma[i0:i1]))))
+                out.append((pos, j,
+                            float(np.linalg.norm(np.asarray(y) / sigma[i0:i1]))))
         return sorted(out, key=lambda t: t[0])
 
     def phase_line_counts(self) -> np.ndarray:
