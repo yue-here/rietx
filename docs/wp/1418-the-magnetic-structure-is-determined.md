@@ -143,7 +143,14 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
   parent site (`tie_equal`, a `SOLVE_B_TIED_PER_PARENT_SITE` info row), and a
   synthetic Pnma test. Open, the maintainer's: hold the cell or use 1419's
   metric subspace, and whether the reference fit takes the same ties (ΔBIC
-  needs equal free sets).
+  needs equal free sets). *Decided 2026-10-06, through draft PR #746:*
+  `solve_magnetic(..., tie_to_parent=True)` is wanted as an option, default
+  off. It holds the child cell, ties child Biso per parent atom, and gives
+  the nuclear reference the same ties. That is the screening form. The end
+  state follows mode-amplitude practice (ISODISTORT with TOPAS; Campbell,
+  Evans, Perselli and Stokes 2007): the parent's own cell parameters refine,
+  the child cell is derived from them, and a strain mode is freed only where
+  the data show one. It is built once, in WP-1419, never here.
 
 - **2026-10-05, from the issue triage (issue #679): a displacive
   candidate's group is a parent-lattice group at every k ≠ 0.** The rule is

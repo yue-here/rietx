@@ -97,9 +97,18 @@ Licensing: SHELXL is closed. Use the paper only.
 
 ## Tasks
 
-- [ ] Decide with the maintainer: hold (and which atom) or centroid
+- [x] Decide with the maintainer: hold (and which atom) or centroid
       constraint; whether a caller lifts it with `unhold` or a new verb;
       the diagnostic's name (`ORIGIN_FIXED_ON_POLAR_AXIS` proposed) and level.
+      *Decided 2026-10-06, through draft PR #749: a hold, on the first atom
+      whose free DOF runs along the direction, lifted with `unhold`, and
+      reported as `ORIGIN_FIXED_ON_POLAR_AXIS` (info), with
+      `ORIGIN_NOT_FIXED` (warning) where no atom's DOF runs along it. For
+      now it is an option the caller invokes
+      (`Refinement.hold_floating_origin()`). Applying it by default in the
+      table is not decided. The centroid restraint (Flack & Schwarzenbach
+      1988, SHELXL's default) may come later as a second mode, because it
+      keeps an esd on every atom and does not depend on which atom is held.*
 - [ ] `crystallography.wyckoff`: the group-level free-origin basis, tested on
       the ten groups above and on every gemmi setting, asserting **which**
       directions, not how many (root CLAUDE.md, the cell-ties rule).
@@ -144,6 +153,14 @@ with each moved number named.
   WP-0302, WP-1432, WP-1435; `schemas/params.py` (`needs_held_cell`).
 
 ## Handover log
+
+- **2026-10-06** — Maintainer decision on #727, through draft PR #749,
+  recorded on the decision task above. Holding one coordinate is the common
+  powder practice, and the abstract of Flack & Schwarzenbach (1988)
+  describes it as the common definition. SHELXL instead restrains the centroid automatically. GSAS-II
+  computes each group's polar axes (`GSASIIspc.SGpolar`). GitHub's code
+  search finds them used nowhere in refinement, and its solver drops a parameter when the
+  normal matrix goes singular. What TOPAS and FullProf do was not confirmed.
 
 - **2026-10-05** — created, from the 2026-10-05 issue triage (issue #727).
   Checked against the tree at 32ef5a6: the issue's snippet lists both ZnO z

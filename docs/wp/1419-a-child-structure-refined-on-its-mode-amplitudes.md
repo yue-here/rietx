@@ -477,6 +477,15 @@ every shipped fixture are bit-identical.
 
 ## Handover log
 
+### 2026-10-06 — the maintainer reports an ISODISTORT equivalent in progress
+
+The maintainer reports that a collaborator is building an ISODISTORT
+equivalent, which is this WP's ground. Ask the maintainer before starting
+here, so the work is not done twice. The WP-1418 decision on #724 points
+here too. Its end state for a supercell child's cell refines the parent's
+cell parameters and derives the child's, with strain modes freed only where
+the data show one, and this WP's mode vectors are where it gets built.
+
 ### 2026-09-18 — the four rulings, and the fence that was built through (reconstructed post hoc)
 
 Reconstructed from `dd86b9d6` and `34776095`. The session that made them left
