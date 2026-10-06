@@ -116,9 +116,12 @@ and is not proposed here. No code is ported.
       Add the margin both ways at finer steps, and the same scan on FAP
       (`P 63 - -`) and the synthetic monoclinic, so the contract quotes a
       margin per pattern, not one number.
-- [ ] Maintainer decision on point 1, recorded here: document only; refine
+- [x] Maintainer decision on point 1, recorded here: document only; refine
       the cell in the shared fit; a caution (code name settled at review);
-      or a combination.
+      or a combination. *Decided 2026-10-06: document the contract, and
+      refine the cell in the shared fit as an option,
+      `determine_extinction_symbol(..., refine_cell=False)` by default
+      (draft PR #747). The caution was not decided.*
 - [ ] Land it. If the shared fit changes, the FAP, NAC and corundum rows of
       `tests/test_extinction_symbol.py` must keep their classes.
 - [ ] Maintainer decision on point 2: a new caveat or screen diagnostic for a
@@ -156,6 +159,12 @@ are out of its reach.
   WP-1449 (ranking on the screen).
 
 ## Handover log
+
+- **2026-10-06** — Maintainer decision on point 1 of #726, through draft
+  PR #747: the contract is documented, and `refine_cell=True` is wanted as
+  an option with the default unchanged. Point 2 (the centring twin) and the
+  `CELL_OFFSET_REFUTES_CLASS` caution are not decided, and #747 leaves both
+  out.
 
 - **2026-10-05** — created, from the 2026-10-05 issue triage (issue #726).
   Checked against the tree at 32ef5a6: on the suite's corundum fixture the

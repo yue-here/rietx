@@ -387,6 +387,12 @@ land alone before the transform exists.
     the TOPAS reader's ties and the magnetic-part merge) is reviewed at
     round 2 with four items and needs a rebase over #710. #755 (C1's zero
     shift) is a draft.
+  - Maintainer decision on draft PR #755 (C1's `Zero`):
+    `write_fullprof_pcr(..., write_zero_shift=True)` is wanted as an option,
+    and the default still refuses a non-zero zero shift. The contributor
+    measured the sign and unit against FullProf 8.20 as a black box: `Zero`
+    is degrees 2θ with rietx's sign. Whether #723 is taken as one package in
+    the reporter's order is not decided, so that task stays open.
   - Next: the maintainer decision on #721's items 2-4.
 
 - **2026-10-06** — Two of this WP's inherited TOPAS-writer fixes merged

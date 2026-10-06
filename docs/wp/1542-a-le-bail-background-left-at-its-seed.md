@@ -99,6 +99,15 @@ within their no-hump values.
 
 ## Handover log
 
+- **2026-10-06** — Maintainer decision on #725, through draft PR #744:
+  `auto_background(..., seed=True)` is wanted as an option, and the default
+  stays `seed=False` (all-zero coefficients). Whether the default ever
+  changes still waits on task 4's measurement of the seed beside the
+  SNIP-held protocol, on the hump fixture and a high-pedestal one. #744's
+  synthetic (a pedestal under peaks 22 times higher, Le Bail
+  `profile_only`) is that high-pedestal fixture: Rwp 0.0605 unseeded against
+  0.0437 seeded, and the Lorentzian X 0.0565 against 0.0 (true 0.001).
+
 - **2026-10-03** — filed from WP-1323's Inherited entry when 1323 closed. No
   open WP owns a too-stiff background: the open rows of the index carry no
   Le Bail or background protocol, and 1530's held background is a TOPAS

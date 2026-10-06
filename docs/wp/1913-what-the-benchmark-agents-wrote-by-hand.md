@@ -84,6 +84,8 @@ schema change across every result reader.
 
 - [ ] Decide with the maintainer which of the three are wanted, and for
       part 4 whether `fix_special_positions()` ships beside the earlier refusal.
+      *Part 4 decided 2026-10-06: `fix_special_positions()` ships, beside the
+      refusal (draft PR #754). Parts 3 and 5 are not decided.*
 - [ ] Part 4: `Refinement.__init__` builds the table as `edit` does and
       refuses there, naming every fully fixed atom with a free coordinate;
       the GUI, `.rxt` and project open paths checked for a second builder.
@@ -122,6 +124,12 @@ set it replaces, to the same numbers. `.esd` on a `RefinedParameter` names
   tiny column is live).
 
 ## Handover log
+
+- **2026-10-06** — Maintainer decision on part 4 of #728, through draft
+  PR #754: `Refinement.fix_special_positions()` is wanted, and construction
+  and `fit()` still refuse a free coordinate on a fully fixed special
+  position. #754 also documents the one-call extinction screen, which is
+  #728's part 2 and WP-1532's. Parts 3 and 5 are not decided.
 
 - **2026-10-05** — created, from the 2026-10-05 issue triage (issue #728,
   parts 3-5). Checked against the tree at 32ef5a6: part 4 reproduced
