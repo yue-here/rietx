@@ -709,6 +709,29 @@ A `StageReport` is the report at a stage boundary. The stage's own arithmetic
 (what it freed, how many iterations it took, whether it converged) is a
 `StageResult`, in [](refining.md).
 
+## Checking a rigid body against the data
+
+A rigid body can converge to a good pose with the wrong shape, and nothing in the
+report above names the body. `Refinement.check_rigid_bodies` refits each body
+twice from the fitted state, as the body and as free atoms held near the template
+by soft restraints, under the refinement's own 2θ limits, ties, holds, backend
+and solver. It warns (`RIGID_BODY_MISFIT`) only when Hamilton's test and ΔBIC both
+prefer the released atoms, and the message names the template bonds and angles
+that moved most. It costs two refinements per body and is not part of `fit`.
+
+<!-- api-doc: no-exec — it needs a refinement of a rigid-body phase that has run -->
+```python
+out = ref.check_rigid_bodies(pattern)
+for row in out.rows:
+    print(row.body, row.fires, row.delta_bic, row.deviations[:3], row.dropped)
+```
+
+A template bond wrong by more than the bonding criterion's slack is not found as
+a bond, so the check is blind to it. A tie or hold on the released body (or on a
+later body of its phase, whose index the release shifts) is dropped from the
+released arm and listed in `row.dropped`. What to do with a firing is
+{doc}`the agent skill <skill>`'s `RIGID_BODY_MISFIT` row.
+
 ## Comparing settings with `rietx compare`
 
 "Did that correction help?" is not a question ΔRwp answers. Some corrections

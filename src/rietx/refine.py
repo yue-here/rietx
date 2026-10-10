@@ -2087,7 +2087,7 @@ class Refinement:
             ref.checkout(node_id)
         return ref
 
-    def _trial(self) -> "Refinement":
+    def _trial(self, *, record: bool = True) -> "Refinement":
         """A private working tree for a fit the *package* runs, never the caller's.
 
         :meth:`branch` where there is a history to branch, and otherwise a
@@ -2095,9 +2095,11 @@ class Refinement:
         same declarations — the one builder both paths share, so a trial run
         on a caller who disabled history answers the caller's question and not
         a looser one (before WP-1320 that path copied only the free set, and a
-        user tie or a named variable fell off it).
+        user tie or a named variable fell off it).  ``record=False`` takes the
+        history-free path even where there is a history, for a trial whose
+        stages the caller's tree should not gain nodes from.
         """
-        if self.history is not None:
+        if self.history is not None and record:
             return self.branch()
         with _refined_state():
             ref = Refinement(self.structure, self.instrument,
@@ -5027,6 +5029,19 @@ class Refinement:
                             values=table.decode(table.x0()), plan=plan,
                             structure=self.structure, held=list(self._held),
                             free_paths=list(self._free_paths), **kw)
+
+    def check_rigid_bodies(self, data: PatternData, **kw):
+        """Test each rigid body against the data (``RIGID_BODY_MISFIT``).
+
+        Refits every body as the body and as restrained free atoms, from this
+        fitted state and under this refinement's declarations, and warns where
+        the data reject the template's shape.  Needs a prior :meth:`fit`; not
+        run inside it.  Keywords and the test:
+        :func:`rietx.report.body_misfit.rigid_body_misfit`.
+        """
+        from .report.body_misfit import rigid_body_misfit
+
+        return rigid_body_misfit(self, data, **kw)
 
     def summary(self, *, deliverable: str | None = None, plot: str | None = None,
                plan: RefinementPlan | str | None = None,
