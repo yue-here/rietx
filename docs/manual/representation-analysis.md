@@ -325,7 +325,27 @@ in which a false answer silently drops a distinguishable model. Two families
 proved isometric then share every proved verdict: a separation proved
 against one of them, or from one of them, is carried to the other exactly
 (`propagated`, naming its source), and is not drawn again. Only proofs are
-carried; a sampled verdict stays where it was drawn. Every other
+carried; a sampled verdict stays where it was drawn. One family is proved
+*inside* another when a matrix $\mathbf{E}$ with
+$\mathbf{G}^A_s = c\,\mathbf{E}^{\mathsf T}\mathbf{G}^B_s\mathbf{E}$ on every
+shell is found, so that every pattern of the first is a pattern of the
+second with the amplitudes mapped and one scale absorbed (`span`; a rank-1
+direction inside its irrep's (a,b) plane is the measured case); it is found
+from the moment patterns and proved by the congruence residual, printed
+with the verdict. A proved separation then travels along the proved
+containments, exactly: a draw of $A$ that $B$ cannot reach is a draw of
+every family containing $A$, and is out of reach of every family inside
+$B$ (`containment`, naming its source). It also travels to a third family
+$C$ that reproduces the draw, by a bound that reads no sign: the
+certificate's direction $\hat{\mathbf{y}}$ puts the whole of $B$'s image
+(where $B$'s stack has a near-kernel, its amplitudes with a kernel component
+no larger than the live one) inside the cone $\cos(\hat{\mathbf{y}}, \mathbf{I}) \ge \mu$, and $C$'s
+exact image point at the draw, formed from its fitted amplitudes with
+their component along $C$'s own kernel projected out, lies below
+$\mu - \rho$, $\rho$ a stated rounding allowance (`transfer`, stored with
+every number, the cosine and $\mu - \rho$ printed; a margin $\mu$ below $10^{-8}$ is labelled "proved on the
+float Gram stack"). A transfer that does not fire is undecided, never
+"equal", and nothing sampled is ever read as a containment. Every other
 "equivalent", and every
 "distinguishable" no certificate gives, is tested on random amplitude draws
 (by default 12 per direction between two irreps and 3 inside one), each

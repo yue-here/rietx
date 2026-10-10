@@ -2034,8 +2034,8 @@ def test_every_cross_class_pair_of_the_pnma_candidates_is_proved():
                 assert dark[v.b] - dark[v.a], (v, "b is dark nowhere a is lit")
     assert sum(v.draws for v in found.relations) == 0
     assert _table_marks(found) == ["P"] * 4
-    assert ("proved 6 (absence 6, subspace 0, isometry 0, farkas 0, propagated 0); sampled 0"
-            in str(found))
+    assert ("proved 6 (absence 6, subspace 0, isometry 0, farkas 0, propagated 0, span 0, "
+            "containment 0, transfer 0); sampled 0" in str(found))
 
 
 def test_a_subspace_certificate_is_a_separation_a_fit_confirms():
@@ -2311,6 +2311,13 @@ def test_the_cubic_known_answer_has_four_classes_at_the_default_draws():
     assert by["absence"] == 36 and by["farkas"] + by["propagated"] == 18 and None not in by
     assert by["farkas"] >= 4             # one found draw per (S1 family, S2 family-or-copy class) at least
     assert not [v for v in found.relations if v.status == "sampled-not"]
+    # part 4: each rank-1 copy is proved inside its (a,b) plane (8 directions), and no
+    # transfer has anything left to carry, every cross-irrep direction being proved already
+    spans = [v for v in found.relations if v.certificate == "span"]
+    assert len(spans) == 8 and all(v.containment.residual <= 1e-12 for v in spans)
+    assert {(label[v.a].split("(")[0], "(rank 1)" in label[v.a], label[v.b].endswith("(a,b)"))
+            for v in spans} == {(s, True, True) for s in ("S1", "S2", "S3", "S4")}
+    assert not [v for v in found.relations if v.certificate in ("containment", "transfer")]
     copies = [v for v in found.relations if v.certificate == "isometry"]
     assert {(label[v.a], label[v.b]) for v in copies} == {
         (f"{s}(rank 1)#{p}", f"{s}(rank 1)#{q}") for s in ("S1", "S2", "S3", "S4")
@@ -2612,13 +2619,20 @@ def test_a_stored_synthetic_witness_reverifies_and_its_negation_does_not():
         draw=1, t=tuple(SYNTHETIC_OUT), live=(0, 1, 2), y=tuple(y), weights=None,
         kernel_dim=0, kernel_residual=0.0, kernel_amplitude_ratio=float("inf"),
         ratio=parts["ratio"], rounding_bound=parts["rounding_bound"], exact=True,
-        d=(1.0 / float(np.linalg.norm(y)), 1.0))
+        d=(1.0 / float(np.linalg.norm(y)), 1.0),
+        interior=tuple(parts["interior"]), margin=parts["margin"])
     assert parts["kernel_amplitude_ratio"] == float("inf")
     holds, ratio, off = isotropy._verify_witness(SYNTHETIC_STACK, witness)
     assert holds and ratio >= isotropy.FARKAS_FLOOR and off <= 1e-12
     from dataclasses import replace
 
     assert not isotropy._verify_witness(SYNTHETIC_STACK, replace(witness, y=tuple(-y)))[0]
+    # the interior direction is checked too: its negation bounds nothing, and it must be unit
+    assert not isotropy._verify_witness(
+        SYNTHETIC_STACK, replace(witness, interior=tuple(-v for v in witness.interior)))[0]
+    assert not isotropy._verify_witness(
+        SYNTHETIC_STACK, replace(witness, interior=tuple(2.0 * v for v in witness.interior)))[0]
+    assert 0.0 < witness.margin <= 1.0
     # a stack that reaches t = (1, 1, 2.5) at x = (1, 1): no certificate exists for it
     other = np.array([np.diag([1.0, 0.0]), np.diag([0.0, 1.0]), 1.25 * np.eye(2)])
     assert not isotropy._verify_witness(other, witness)[0]
@@ -2746,7 +2760,7 @@ def test_the_gate_reads_rtol_with_the_root_s_factor(monkeypatch, pm3mx_stack):
 
     def failing(*args, **kwargs):
         calls.append(kwargs["restarts"])
-        return 1.0, 1.0
+        return 1.0, 1.0, np.zeros(grams[b].shape[1])
 
     monkeypatch.setattr(isotropy, "_restarts", failing)
 
@@ -2781,7 +2795,12 @@ def test_a_proved_separation_inside_a_joined_class_is_reported(monkeypatch, know
     S4 ∪ S5).  The joining family is S1(a,b) rather than part 2's
     S1(rank 1)#2, because a rank-1 copy is isometric to S1(rank 1)#1 since
     part 3 and inherits its proof, which closes the join this test is
-    about; S1(a,b) has no isometric copy.
+    about; S1(a,b) has no isometric copy.  Since part 4 the join is
+    narrower still: S1(rank 1)#1 ⊆ S1(a,b) is proved (``span``), so the
+    witness is carried to S1(a,b) ⊄ S2(rank 1)#1 (``containment``, issue
+    #565 item 5, the first rule) over the stubbed draws that had joined
+    that direction, which keep their count; the class is held by the two
+    remaining sampled directions and is still marked S.
     """
     from dataclasses import replace
 
@@ -2812,7 +2831,16 @@ def test_a_proved_separation_inside_a_joined_class_is_reported(monkeypatch, know
     text = str(result)
     assert f"S1(rank 1)#1 ⊄ S2(rank 1)#1  d ∈ [{lo:.2g}, {hi:.2g}]  draw 4" in text
     assert "classes holding a proved separation (part 5 of issue #565 splits them): 0" in text
-    assert "proved 1 (absence 0, subspace 0, isometry 0, farkas 1, propagated 0)" in text
+    assert ("proved 2 (absence 0, subspace 0, isometry 0, farkas 1, propagated 0, span 0, "
+            "containment 1, transfer 0)") in text
+    verdicts = {(v.a, v.b): v for v in result.relations}
+    assert (verdicts[(0, 1)].status, verdicts[(0, 1)].certificate) == ("proved-contained", "span")
+    carried = verdicts[(1, 2)]
+    assert (carried.status, carried.certificate, carried.via, carried.draws) == \
+        ("proved-not", "containment", (0, 2), isotropy.CROSS_IRREP_DRAWS)
+    assert carried.witness is there.witness and carried.d == there.d
+    assert f"  S1(a,b) ⊄ S2(rank 1)#1  via S1(rank 1)#1 ⊄ S2(rank 1)#1  d ∈ [{lo:.2g}, {hi:.2g}]" in text
+    assert {v.status for v in (verdicts[(1, 0)], verdicts[(2, 1)])} == {"sampled-contained"}
 
 
 @pytest.mark.xdist_group("magnetic-known-answer")
@@ -3000,7 +3028,10 @@ def test_a_stored_known_answer_witness_reverifies_from_its_literals(known_answer
     witness = isotropy.Witness(
         draw=2, t=KNOWN_WITNESS_T, live=KNOWN_WITNESS_LIVE, y=KNOWN_WITNESS_Y, weights=None,
         kernel_dim=0, kernel_residual=0.0, kernel_amplitude_ratio=float("inf"), ratio=1e-10,
-        rounding_bound=7.9e-15, exact=True, d=(1.0 / float(np.linalg.norm(y)), 0.00495))
+        rounding_bound=7.9e-15, exact=True, d=(1.0 / float(np.linalg.norm(y)), 0.00495),
+        # the quoted y's own direction: strictly inside the PSD cone (ratio 1e-10), so
+        # a valid interior, with the small margin that goes with the quoted point
+        interior=tuple(y / float(np.linalg.norm(y))), margin=2.3e-11)
     holds, ratio, off = isotropy._verify_witness(grams[b], witness)
     assert holds and ratio >= isotropy.FARKAS_FLOOR and off <= 1e-9
     assert witness.d[0] == pytest.approx(0.00494, rel=2e-3)
@@ -3257,7 +3288,8 @@ def test_the_full_stack_guard_refuses_a_kernel_the_quoted_margin_cannot_cover():
         draw=1, t=tuple(SYNTHETIC_OUT), live=(0, 1, 2), y=tuple(parts["y"]), weights=None,
         kernel_dim=1, kernel_residual=parts["kernel_residual"], kernel_amplitude_ratio=rho,
         ratio=parts["ratio"], rounding_bound=parts["rounding_bound"], exact=True,
-        d=(1.0 / float(np.linalg.norm(parts["y"])), 1.0))
+        d=(1.0 / float(np.linalg.norm(parts["y"])), 1.0),
+        interior=tuple(parts["interior"]), margin=parts["margin"])
     assert isotropy._verify_witness(tight, witness)[0]
     holds, ratio, off = isotropy._verify_witness(loose, witness)
     assert not holds and ratio >= isotropy.FARKAS_FLOOR and off <= 1e-9
@@ -3300,3 +3332,612 @@ def test_propagation_carries_only_proofs_and_refuses_two_that_disagree():
     isotropy._propagate(isotropy.PairVerdict(0, 3, "proved-not", "propagated", via=(1, 4)),
                         fresh, list(copies), 5)
     assert fresh == {}
+
+
+# --------------------------------------------------------------------------
+# III. The span-containment certificate, the containment transfers and the
+#      sign-free fit transfer (issue #565, part 4)
+# --------------------------------------------------------------------------
+
+@pytest.mark.xdist_group("magnetic-known-answer")
+def test_a_rank_one_direction_is_proved_inside_its_plane(known_answer_stack):
+    """S1(rank 1)#1 ⊆ S1(a,b) by an injection congruence G^A_s = c·EᵀG^B_sE, c = ½; the plane is not inside the line, and S1 is not inside S2.
+
+    The record is proved by its congruence residual on the Gram stacks
+    (≤ 1e-13 here against :data:`isotropy.ISOMETRY_RESIDUAL` = 1e-12), re-
+    verified from E alone, and checked on random amplitudes:
+    I_A(x) = c·I_B(Ex) on every shell.  Here the patterns are in span
+    (pattern residual at rounding, domain 0).  Negative arms: the reverse
+    direction, a cross-irrep pair (S1 against both S2 families) and an E
+    scaled by 1 %.
+    """
+    found, reflections, canonical, grams, dark, labels = known_answer_stack
+    little = irreps.little_group(found.space_group, found.k)
+    a, b = labels.index("S1(rank 1)#1"), labels.index("S1(a,b)")
+    patterns = {i: isotropy._domain_patterns(canonical[i], little) for i in (a, b)}
+    record = isotropy._containment(canonical[a], grams[a], grams[b], patterns[b])
+    assert record is not None
+    assert record.residual <= 1e-13 and record.pattern_residual <= 1e-12 and record.domain == 0
+    assert record.scale == pytest.approx(0.5, rel=1e-9)
+    e = np.array(record.e)
+    assert e.shape == (canonical[b].free_amplitudes, canonical[a].free_amplitudes)
+    rng = np.random.default_rng(11)
+    for _ in range(5):
+        x = rng.normal(size=canonical[a].free_amplitudes)
+        left = (grams[a] @ x) @ x
+        right = record.scale * ((grams[b] @ (e @ x)) @ (e @ x))
+        assert np.allclose(left, right, rtol=0.0, atol=1e-12 * np.max(np.abs(left)))
+    holds, residual = isotropy._verify_containment(grams[a], grams[b], record)
+    assert holds and residual == pytest.approx(record.residual)
+    from dataclasses import replace
+
+    wrong = replace(record, e=tuple(tuple(1.01 * v for v in row) for row in record.e))
+    assert not isotropy._verify_containment(grams[a], grams[b], wrong)[0]
+    assert isotropy._containment(canonical[b], grams[b], grams[a], patterns[a]) is None
+    for other in ("S2(rank 1)#1", "S2(a,b)"):
+        c = labels.index(other)
+        assert isotropy._containment(canonical[a], grams[a], grams[c],
+                                     isotropy._domain_patterns(canonical[c], little)) is None
+    assert hash(isotropy.PairVerdict(a, b, "proved-contained", "span", containment=record))
+
+
+@pytest.mark.xdist_group("magnetic-known-answer")
+def test_the_span_certificate_decides_one_direction_and_the_draws_the_other(known_answer_stack):
+    """S1(rank 1)#1 → S1(a,b) is proved contained and not drawn; S1(a,b) → S1(rank 1)#1 is drawn as before and sampled.
+
+    The pair is equivalent at this seed (the plane's three draws are
+    reproduced by the line), joined by one proved and one sampled
+    direction, and printed as ``n = 0 (span), 3``.  The same with the
+    candidates the other way round, so the certificate reads the pair and
+    not the order.
+    """
+    from dataclasses import replace
+
+    found, reflections = known_answer_stack[0], known_answer_stack[1]
+    pick = {c.label: c for c in found}
+    for names in (("S1(rank 1)#1", "S1(a,b)"), ("S1(a,b)", "S1(rank 1)#1")):
+        subset = replace(found, candidates=tuple(pick[name] for name in names))
+        line, plane = names.index("S1(rank 1)#1"), names.index("S1(a,b)")
+        classes, relations = isotropy._classify(subset, reflections, draws=None, seed=20260906,
+                                                rtol=1e-4, restarts=4)
+        verdicts = {(v.a, v.b): v for v in relations}
+        there, back = verdicts[(line, plane)], verdicts[(plane, line)]
+        assert (there.status, there.certificate, there.draws) == ("proved-contained", "span", 0)
+        assert there.containment is not None and there.containment.residual <= 1e-13
+        assert (back.status, back.certificate, back.draws) == \
+            ("sampled-contained", None, isotropy.WITHIN_IRREP_DRAWS)
+        assert classes == ((0, 1),)
+        text = str(replace(subset, classes=classes, relations=relations))
+        assert "proved contained (span)" in text
+        assert f"  S1(rank 1)#1 ⊆ S1(a,b)  residual {there.containment.residual:.1e}" in text
+        assert f"n = {'0 (span), 3' if line == 0 else '3, 0 (span)'}" in text
+    assert isotropy.powder_equivalent(pick["S1(rank 1)#1"], pick["S1(a,b)"], reflections,
+                                      restarts=4)
+
+
+#: ``F -4 3 m`` at the general site (0.11, 0.13, 0.17), k = 0: 17 families,
+#: the set of issue #565's control, where at seed 2 one draw of S4 refutes
+#: the sampled S4 ∪ S5 join.
+F43M_GAMMA = ("F -4 3 m", (0.11, 0.13, 0.17), GAMMA)
+
+
+@pytest.fixture(scope="module")
+def f43m_stack():
+    """``F43M_GAMMA``'s candidates, canonical bases, Gram stacks and dark shells, built once (about 8 s)."""
+    return _stack(F43M_GAMMA)
+
+
+#: The stored ``F -4 3 m`` Γ seed-2 witness (issue #565, part 4's acceptance):
+#: draw 106 of S4(rank 1)#2 against S5(rank 2)#1, as the 2026-09-30 run
+#: certified it on two machines (projected ratio +2.3e-6, d = 0.0052,
+#: exact-PSD).  ``t`` is the draw's intensity on the 10 shells; S5(rank 2)#1
+#: is dark on six of them, where the draw is round-off (≤ 1.2e-28), and
+#: live on the four of ``F43M_WITNESS_LIVE``.  ``y`` is the minimum-norm
+#: certificate on those four, and ``interior`` the unit direction of the
+#: dual's maximiser.  10 + 4 + 4 floats are the whole certificate.
+F43M_WITNESS_T = (
+    1.638282726408967e-30, 2.8349583371292487e-30, 20.410358836281144, 29.833248177617417,
+    4.50951298428427e-29, 7.401540777828149e-29, 15.147160346230379, 1.1759478936183933e-28,
+    3.693491135362942e-29, 33.79497696858829)
+F43M_WITNESS_LIVE = (2, 3, 6, 9)
+F43M_WITNESS_Y = (17.569507673668543, -153.36716017587415, 50.04865784868707,
+                  100.81364403558946)
+F43M_WITNESS_INTERIOR = (0.08935432309765487, -0.7990132994368212, 0.2582331904393587,
+                         0.5356390310856317)
+
+
+def _f43m_witness():
+    y = np.array(F43M_WITNESS_Y)
+    return isotropy.Witness(
+        draw=106, t=F43M_WITNESS_T, live=F43M_WITNESS_LIVE, y=F43M_WITNESS_Y, weights=None,
+        kernel_dim=0, kernel_residual=0.0, kernel_amplitude_ratio=float("inf"), ratio=6.1e-10,
+        rounding_bound=6.0e-15, exact=True, d=(1.0 / float(np.linalg.norm(y)), 0.00524),
+        interior=F43M_WITNESS_INTERIOR, margin=8.42e-7)
+
+
+@pytest.mark.xdist_group("magnetic-f43m")
+def test_the_stored_f43m_witness_transfers_to_the_family_that_reproduces_it(f43m_stack):
+    """Issue #565's part-4 acceptance, the fit transfer: S4(rank 1)#1 reproduces the stored draw and the sign-free bound fires; nothing of S5's fires.
+
+    Rebuilt from the literals against the stack this module builds, the
+    witness re-verifies on S5(rank 2)#1 (and not on S4(rank 1)#2's own
+    stack, nor with the interior negated), and its margin is μ = 8.4e-7
+    on this stack.  **Positive arm:** S4(rank 1)#1 is fitted to the draw,
+    reaches it (δ ≤ 1e-10), and :func:`isotropy._fit_transfer` fires with
+    ρ/μ ≤ 1e-4, so S4(rank 1)#1 ⊄ S5(rank 2)#1; the record re-verifies
+    from its stored amplitudes.  **The sign is not what decides:** |cos|
+    is at rounding (≤ 1e-9, and +9e-16 on one machine), so the bound fires
+    with cos replaced by +|cos| just the same.  **The kernel projection:**
+    S4(rank 1)#1 has a one-dimensional common kernel; a kernel component
+    of 1e3·‖x‖ added to the fitted amplitudes leaves I_c unchanged and the
+    stored x the projected one, while the unprojected κ_c (3e9) would take
+    ρ past μ (ρ/μ 18) and nothing could fire.  **Negative arms:** five
+    draws of S5(rank 2)#1 itself, of each of its proved sub-families
+    S5(rank 1)#1 (in the span of a conjugate of S5(rank 2)#1: domain > 0)
+    and S5(rank 1)#3 (in span as written, domain 0), of its isometric copy
+    S5(rank 2)#2 and of S5(a,b,c), and three points of the PSD relaxation,
+    all sit at cos ≥ 1e4 μ and none fires.  The third kind of containment,
+    a least-squares E that reproduces the Gram stack and not the patterns
+    (pattern residual 0.5), is S4(rank 1)#3 ⊆ S4(rank 2)#2.
+    """
+    found, reflections, canonical, grams, dark, labels = f43m_stack
+    little = irreps.little_group(found.space_group, found.k)
+    a, b, c = (labels.index(name) for name in ("S4(rank 1)#2", "S5(rank 2)#1", "S4(rank 1)#1"))
+    witness = _f43m_witness()
+    t = np.asarray(witness.t)
+    assert tuple(np.flatnonzero(isotropy._fit_rows(t, grams[b]) & ~dark[b])) == witness.live
+    holds, ratio, off = isotropy._verify_witness(grams[b], witness)
+    assert holds and ratio >= isotropy.FARKAS_FLOOR and off <= 1e-9
+    assert not isotropy._verify_witness(grams[a], witness)[0]
+    from dataclasses import replace
+
+    negated = replace(witness, interior=tuple(-v for v in witness.interior))
+    assert not isotropy._verify_witness(grams[b], negated)[0]
+    live = np.array(witness.live)
+    g, t_hat = isotropy._certificate_stack(grams[b][live], t[live], None)
+    projected = isotropy._live_projection(g)[0]
+    lam, gamma, mu = isotropy._cone_margin(projected, np.array(witness.interior))
+    assert mu == pytest.approx(8.42e-7, rel=1e-2) and lam > 0.0
+
+    x = isotropy._transfer_fit(t, grams[c], np.random.default_rng([20260906, a, b, c]),
+                               restarts=8, rtol=1e-4)
+    assert x is not None
+    fires, record = isotropy._fit_transfer(witness, grams[b], dark[b], grams[c], x)
+    assert fires and record is not None
+    assert record.fit <= 1e-10 and record.mu == pytest.approx(mu)
+    assert record.rho / record.mu <= 1e-4 and not record.float_stack
+    assert (record.n_b, record.n_c, record.shells) == (18, 9, 4)
+    assert abs(record.cos) <= 1e-9                       # rounding, either sign
+    assert abs(record.cos) < record.mu - record.rho      # fires with the sign flipped
+    assert isotropy._verify_transfer(witness, grams[b], dark[b], grams[c], record)
+    assert hash(isotropy.PairVerdict(c, b, "proved-not", "transfer", transfer=record,
+                                     witness=witness, via=(a, b)))
+
+    gc = grams[c] / np.max(np.abs(grams[c]))
+    kernel, _, _ = isotropy._common_kernel(gc)
+    assert kernel.shape[1] == 1
+    shifted = x + kernel @ (np.ones(1) * 1e3 * np.linalg.norm(x))
+    fires_s, record_s = isotropy._fit_transfer(witness, grams[b], dark[b], grams[c], shifted)
+    assert fires_s and np.allclose(record_s.x, record.x, atol=1e-9)
+    assert record_s.kappa == pytest.approx(record.kappa, rel=1e-6)
+    eps = np.finfo(float).eps
+    i_live = ((grams[c] @ shifted) @ shifted)[live]
+    gamma_c = np.sqrt(np.sum(np.linalg.norm(grams[c][live], 2, axis=(1, 2)) ** 2))
+    kappa_raw = gamma_c * float(shifted @ shifted) / np.linalg.norm(i_live)
+    rho_raw = (4 * record.shells * eps + record.shells * np.sqrt(record.n_b) * eps
+               + 2 * (record.n_c + 1) * eps * kappa_raw)
+    assert kappa_raw > 1e8 and rho_raw > record.mu
+
+    rng = np.random.default_rng(3)
+    for name in ("S5(rank 2)#1", "S5(rank 1)#1", "S5(rank 1)#3", "S5(rank 2)#2", "S5(a,b,c)"):
+        f = labels.index(name)
+        for _ in range(5):
+            draw = isotropy._normalised_draw(canonical[f], reflections.lattice, rng)
+            fired, probe = isotropy._fit_transfer(witness, grams[b], dark[b], grams[f], draw)
+            assert not fired and probe is not None and probe.cos >= 1e4 * probe.mu, name
+    patterns_b = isotropy._domain_patterns(canonical[b], little)
+    inside = {name: isotropy._containment(canonical[labels.index(name)],
+                                          grams[labels.index(name)], grams[b], patterns_b)
+              for name in ("S5(rank 1)#1", "S5(rank 1)#3")}
+    assert all(r is not None and r.residual <= 1e-13 for r in inside.values())
+    assert inside["S5(rank 1)#3"].domain == 0 and inside["S5(rank 1)#3"].pattern_residual <= 1e-12
+    assert inside["S5(rank 1)#1"].domain > 0 and inside["S5(rank 1)#1"].pattern_residual <= 1e-12
+    s4_3, s4_r2 = labels.index("S4(rank 1)#3"), labels.index("S4(rank 2)#2")
+    stack_only = isotropy._containment(canonical[s4_3], grams[s4_3], grams[s4_r2],
+                                       isotropy._domain_patterns(canonical[s4_r2], little))
+    assert stack_only is not None and stack_only.residual <= 1e-13
+    assert stack_only.pattern_residual > 0.1 and stack_only.domain > 0
+    assert isotropy._verify_containment(grams[s4_3], grams[s4_r2], stack_only)[0]
+    n = grams[b].shape[1]
+    for _ in range(3):
+        z = rng.normal(size=(n, n))
+        relaxed = np.einsum("sij,ij->s", grams[b], z @ z.T)[live]
+        assert float(np.array(witness.interior) @ relaxed) / np.linalg.norm(relaxed) >= 1e4 * mu
+
+
+#: The eight ``F -4 3 m`` Γ families the pipeline arms below run on: the
+#: three isometric S4 rank-1 copies, the rank-2 and (a,b,c) directions that
+#: contain them, and S5(rank 1)#3 ⊆ S5(rank 2)#1 ≅ S5(rank 2)#2.
+F43M_ARM = ["S4(rank 1)#1", "S4(rank 1)#2", "S4(rank 1)#3", "S4(rank 2)#2", "S4(a,b,c)",
+            "S5(rank 1)#3", "S5(rank 2)#1", "S5(rank 2)#2"]
+
+
+def _f43m_arm(f43m_stack, monkeypatch):
+    """The eight-family subset with every draw stubbed reproduced except the first S4(rank 1)#1 draw against S5(rank 2)#1, which is the stored witness."""
+    from dataclasses import replace
+
+    found, reflections, canonical, grams, dark, labels = f43m_stack
+    subset = replace(found, candidates=tuple(found[labels.index(name)] for name in F43M_ARM))
+    target = grams[labels.index("S5(rank 2)#1")]
+    witness = _f43m_witness()
+    state = {"armed": False, "injected": 0}
+    real_draw = isotropy._normalised_draw
+
+    def arming(candidate, lattice, rng):
+        state["armed"] = candidate.label == "S4(rank 1)#1"
+        return real_draw(candidate, lattice, rng)
+
+    def inject(t, grams_b, *args, **kwargs):
+        if state["armed"] and np.array_equal(grams_b, target):
+            state["armed"] = False
+            state["injected"] += 1
+            return False, True, witness, 2.3e-6
+        return True, False, None, None
+
+    monkeypatch.setattr(isotropy, "_normalised_draw", arming)
+    monkeypatch.setattr(isotropy, "_certify_draw", inject)
+    return subset, reflections, witness, state
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("magnetic-f43m")
+def test_the_containment_transfers_carry_the_f43m_witness_to_every_s4_family(f43m_stack,
+                                                                             monkeypatch):
+    """Issue #565's part-4 acceptance, the containment rules: one stored witness separates every S4 family from S5(rank 2)#1, its copy and its sub-family.
+
+    Every draw is stubbed reproduced except the one that is the stored
+    witness (S4(rank 1)#1 → S5(rank 2)#1, ``farkas``, draw 1), so the
+    eight families are one sampled class; the proofs then run through it.
+    Isometry carries the witness to the two other rank-1 copies and to
+    S5(rank 2)#2 (``propagated``).  The first rule, A ⊆ A′: S4(rank 2)#2
+    and S4(a,b,c) contain S4(rank 1)#1 (``span``), so S4(rank 2)#2 ⊄
+    S5(rank 2)#1 and S4(a,b,c) ⊄ S5(rank 2)#1 (``containment``, the same
+    witness and bracket, re-verified on S5(rank 2)#1's stack; the drawn
+    direction keeps its 12 draws).  The second rule, C ⊆ B:
+    S5(rank 1)#3 ⊆ S5(rank 2)#1, so S4(rank 1)#1 ⊄ S5(rank 1)#3 with
+    d ∈ [d_lo, 1], and from there the copies and the containing families
+    again.  Nineteen of the 28 pairs are proved from one draw; the
+    reverse directions that were drawn (the containing S4 families and
+    S5(rank 1)#3 back to S4(rank 1)#1, the two S5(rank 2) copies back to
+    S4(rank 2)#2) stay sampled, the class is one and marked S, and no fit
+    transfer is made.
+    """
+    from dataclasses import replace
+
+    subset, reflections, witness, state = _f43m_arm(f43m_stack, monkeypatch)
+    names = F43M_ARM
+    classes, relations = isotropy._classify(subset, reflections, draws=None, seed=20260906,
+                                            rtol=1e-4, restarts=4)
+    assert state["injected"] == 1 and classes == ((0, 1, 2, 3, 4, 5, 6, 7),)
+    v = {(names[r.a], names[r.b]): r for r in relations}
+    found = v[("S4(rank 1)#1", "S5(rank 2)#1")]
+    assert (found.status, found.certificate, found.draws) == ("proved-not", "farkas", 1)
+    assert found.witness is witness
+    by = {}
+    for r in relations:
+        by.setdefault(r.certificate, []).append((names[r.a], names[r.b]))
+    assert sorted(by["containment"]) == [
+        ("S4(a,b,c)", "S5(rank 1)#3"), ("S4(a,b,c)", "S5(rank 2)#1"),
+        ("S4(rank 1)#1", "S5(rank 1)#3"),
+        ("S4(rank 2)#2", "S5(rank 1)#3"), ("S4(rank 2)#2", "S5(rank 2)#1")]
+    assert "transfer" not in by and len(by["propagated"]) == 9 and len(by["span"]) == 9
+    carried = v[("S4(rank 2)#2", "S5(rank 2)#1")]
+    assert (carried.via, carried.draws, carried.d) == ((0, 6), isotropy.CROSS_IRREP_DRAWS, found.d)
+    assert carried.witness is witness
+    grams = f43m_stack[3]
+    labels = f43m_stack[5]
+    for key in (("S4(rank 2)#2", "S5(rank 2)#1"), ("S4(a,b,c)", "S5(rank 2)#1")):
+        assert isotropy._verify_witness(grams[labels.index(key[1])], v[key].witness)[0]
+    # a containment verdict's witness verifies against the b of its ``via`` pair, the stack it
+    # was issued on, rule 2's carried witness included (its own b is the smaller family)
+    for r in relations:
+        if r.certificate == "containment":
+            assert isotropy._verify_witness(grams[labels.index(names[r.via[1]])], r.witness)[0], r
+    reverse = v[("S4(rank 1)#1", "S5(rank 1)#3")]
+    assert (reverse.via, reverse.d) == ((0, 6), (found.d[0], 1.0))
+    assert all(r.status == "proved-not" for r in relations
+               if names[r.a].startswith("S4") and names[r.b].startswith("S5"))
+    sampled = sorted((names[r.a], names[r.b]) for r in relations if r.status.startswith("sampled"))
+    assert sampled == [("S4(a,b,c)", "S4(rank 1)#1"), ("S4(rank 2)#2", "S4(rank 1)#1"),
+                       ("S5(rank 1)#3", "S4(rank 1)#1"), ("S5(rank 2)#1", "S4(rank 2)#2"),
+                       ("S5(rank 2)#2", "S4(rank 2)#2")]
+    result = replace(subset, classes=classes, relations=relations)
+    text = str(result)
+    assert _table_marks(result) == ["S"] * 8
+    assert ("proved 19 (absence 0, subspace 0, isometry 4, farkas 1, propagated 9, span 0, "
+            "containment 5, transfer 0)") in text
+    assert "proved separations carried by containment (containment):" in text
+    assert (f"  S4(rank 2)#2 ⊄ S5(rank 2)#1  via S4(rank 1)#1 ⊄ S5(rank 2)#1"
+            f"  d ∈ [{found.d[0]:.2g}, {found.d[1]:.2g}]") in text
+    assert f"  S4(rank 1)#1 ⊄ S5(rank 1)#3  via S4(rank 1)#1 ⊄ S5(rank 2)#1  d ∈ [{found.d[0]:.2g}, 1]" in text
+    assert "classes holding a proved separation (part 5 of issue #565 splits them): 0" in text
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("magnetic-f43m")
+def test_the_fit_transfer_reaches_the_families_the_containments_would_have(f43m_stack,
+                                                                            monkeypatch):
+    """With the span certificate switched off, the fit transfer alone carries the witness to S4(rank 2)#2 and S4(a,b,c).
+
+    Same arm, :func:`isotropy._containment` returning None: the draws
+    said both families reproduce S4(rank 1)#1, so each is fitted to the
+    witness draw, reaches it (δ ≤ 1e-9) and fires the bound (|cos| ≤ 1e-9
+    against μ − ρ = 8.4e-7), giving ``transfer`` verdicts ``via`` the
+    witness pair with the bracket moved by δ, carried on to S5(rank 2)#2
+    by isometry.  S5(rank 1)#3 also reproduced S4(rank 1)#1's draws, is
+    fitted to the witness, does not reach it, and its direction to
+    S5(rank 2)#1 stays what the loop left it (joined, not drawn): a fit
+    that fails decides nothing.  No ``containment`` verdict exists.
+    """
+    from dataclasses import replace
+
+    monkeypatch.setattr(isotropy, "_containment", lambda *args, **kwargs: None)
+    subset, reflections, witness, state = _f43m_arm(f43m_stack, monkeypatch)
+    names = F43M_ARM
+    classes, relations = isotropy._classify(subset, reflections, draws=None, seed=20260906,
+                                            rtol=1e-4, restarts=4)
+    assert state["injected"] == 1
+    v = {(names[r.a], names[r.b]): r for r in relations}
+    found = v[("S4(rank 1)#1", "S5(rank 2)#1")]
+    assert found.certificate == "farkas"
+    transfers = {key: r for key, r in v.items() if r.certificate == "transfer"}
+    assert sorted(transfers) == [("S4(a,b,c)", "S5(rank 2)#1"), ("S4(rank 2)#2", "S5(rank 2)#1")]
+    grams, dark, labels = f43m_stack[3], f43m_stack[4], f43m_stack[5]
+    b = labels.index("S5(rank 2)#1")
+    for (c_name, _), r in transfers.items():
+        record = r.transfer
+        assert r.via == (0, 6) and r.witness is witness and r.status == "proved-not"
+        assert abs(record.cos) <= 1e-9 and record.fit <= 1e-9
+        assert record.mu == pytest.approx(8.42e-7, rel=1e-2) and record.rho / record.mu <= 1e-3
+        assert abs(record.cos) < record.mu - record.rho
+        assert isotropy._verify_transfer(witness, grams[b], dark[b], grams[labels.index(c_name)],
+                                         record)
+        assert found.d[0] - record.fit <= r.d[0] <= found.d[1] + record.fit >= r.d[1]
+    assert v[("S4(rank 2)#2", "S5(rank 2)#1")].draws == isotropy.CROSS_IRREP_DRAWS
+    for c_name in ("S4(a,b,c)", "S4(rank 2)#2"):
+        copy = v[(c_name, "S5(rank 2)#2")]
+        assert (copy.certificate, copy.via) == ("propagated", (names.index(c_name), 6))
+    assert v[("S5(rank 1)#3", "S5(rank 2)#1")].status == "unresolved"
+    assert v[("S4(rank 1)#1", "S5(rank 1)#3")].status == "sampled-contained"
+    assert not [r for r in relations if r.certificate in ("span", "containment")]
+    text = str(replace(subset, classes=classes, relations=relations))
+    assert "proved separations by fit transfer (transfer), cos(ŷ, I_c) < μ − ρ:" in text
+    assert "  S4(rank 2)#2 ⊄ S5(rank 2)#1  via S4(rank 1)#1 ⊄ S5(rank 2)#1  cos " in text
+
+
+def test_transfers_read_only_proved_containments_and_refuse_a_contradiction():
+    """:func:`isotropy._transfers` on hand-built verdicts: the two rules, what each carries, what is left alone, and the raise.
+
+    Five candidates on copies of the synthetic stack, no isometry.  A
+    ``farkas`` 0 → 3 with the synthetic witness; 0 ⊆ 1 and 4 ⊆ 3 proved
+    (``span``); 0 ⊆ 2 *sampled*.  Rule 1 gives 1 ⊄ 3 (``containment``,
+    ``via`` (0, 3), the witness, the bracket and the 12 draws it had);
+    rule 2 gives 0 ⊄ 4 with the bracket (d_lo, 1), and the carried proofs
+    seed the rules again (1 ⊄ 4, from 0 ⊄ 4 and 0 ⊆ 1); the sampled
+    containment carries nothing, so 2 → 3 is untouched.  A ``transfer``
+    source carries its record along rule 1.  Then with 1 ⊆ 3 also
+    "proved", the rules would prove 1 ⊄ 3 against it, and raise.
+    """
+    _, parts = isotropy._farkas_certificate(SYNTHETIC_STACK, SYNTHETIC_OUT)
+    witness = isotropy.Witness(
+        draw=1, t=tuple(SYNTHETIC_OUT), live=(0, 1, 2), y=tuple(parts["y"]), weights=None,
+        kernel_dim=0, kernel_residual=0.0, kernel_amplitude_ratio=float("inf"),
+        ratio=parts["ratio"], rounding_bound=parts["rounding_bound"], exact=True,
+        d=(0.01, 0.1), interior=tuple(parts["interior"]), margin=parts["margin"])
+    n = 5
+    grams = [SYNTHETIC_STACK] * n
+    dark = [np.zeros(3, dtype=bool)] * n
+    silent = [False, False, True, False, False]
+
+    def fresh():
+        verdicts = {(i, j): isotropy.PairVerdict(i, j, "unresolved", None, reason="joined")
+                    for i in range(n) for j in range(n) if i != j}
+        verdicts[(0, 3)] = isotropy.PairVerdict(0, 3, "proved-not", "farkas", 4, 0, d=(0.01, 0.1),
+                                                witness=witness, dual=1e-6)
+        verdicts[(0, 1)] = isotropy.PairVerdict(0, 1, "proved-contained", "span")
+        verdicts[(4, 3)] = isotropy.PairVerdict(4, 3, "proved-contained", "span")
+        verdicts[(0, 2)] = isotropy.PairVerdict(0, 2, "sampled-contained", None, 12, 0)
+        verdicts[(1, 3)] = isotropy.PairVerdict(1, 3, "sampled-contained", None, 12, 0)
+        return verdicts
+
+    verdicts = fresh()
+    isotropy._transfers(verdicts, list(range(n)), grams, dark, silent, n=n, seed=1, rtol=1e-4,
+                        restarts=2)
+    carried = verdicts[(1, 3)]
+    assert (carried.status, carried.certificate, carried.via, carried.draws, carried.d) == \
+        ("proved-not", "containment", (0, 3), 12, (0.01, 0.1))
+    assert carried.witness is witness and carried.dual == 1e-6
+    reverse = verdicts[(0, 4)]
+    assert (reverse.status, reverse.certificate, reverse.via, reverse.draws, reverse.d) == \
+        ("proved-not", "containment", (0, 3), 0, (0.01, 1.0))
+    assert verdicts[(2, 3)].status == "unresolved" and verdicts[(0, 2)].status == "sampled-contained"
+    chained = verdicts[(1, 4)]      # 0 ⊄ 4 and 0 ⊆ 1 (rule 1 on the carried proof, which is
+    assert (chained.status, chained.certificate, chained.via, chained.d) == \
+        ("proved-not", "containment", (0, 4), (0.01, 1.0))      # reached before 1 ⊄ 3 and 4 ⊆ 3)
+    assert verdicts[(0, 3)].certificate == "farkas"
+    proved = sorted(key for key, v in verdicts.items() if v.proved)
+    assert proved == [(0, 1), (0, 3), (0, 4), (1, 3), (1, 4), (4, 3)]
+
+    record = isotropy.Transfer(x=(1.0, 0.0), cos=-1e-12, mu=1e-6, rho=1e-11, lambda_prime=1e-6,
+                               gamma=1.0, kappa=1.0, n_b=2, n_c=2, shells=3, fit=1e-12,
+                               float_stack=False, kernel_dim=0, kernel_residual=0.0)
+    verdicts = fresh()
+    verdicts[(0, 3)] = isotropy.PairVerdict(0, 3, "proved-not", "transfer", 4, 0, d=(0.01, 0.1),
+                                            witness=witness, transfer=record, via=(2, 3))
+    isotropy._transfers(verdicts, list(range(n)), grams, dark, silent, n=n, seed=1, rtol=1e-4,
+                        restarts=2)
+    assert verdicts[(1, 3)].certificate == "containment" and verdicts[(1, 3)].transfer is record
+
+    verdicts = fresh()
+    verdicts[(1, 3)] = isotropy.PairVerdict(1, 3, "proved-contained", "span")
+    with pytest.raises(RuntimeError, match="two certificates disagree"):
+        isotropy._transfers(verdicts, list(range(n)), grams, dark, silent, n=n, seed=1,
+                            rtol=1e-4, restarts=2)
+
+
+def _kernel_stack(d: float, r: float) -> np.ndarray:
+    """Three shells of a 3-amplitude ``b`` whose third amplitude is a near-kernel: shell s is a_s·I on (0, 1), a coupling r to the kernel direction and r²·2/a_s on it, a = (1 + d, 1, 2)."""
+    shells = []
+    for a in (1.0 + d, 1.0, 2.0):
+        shells.append(np.array([[a, 0.0, r], [0.0, a, 0.0], [r, 0.0, 2.0 * r * r / a]]))
+    return np.array(shells)
+
+
+def _kernel_witness():
+    """A witness whose interior ŷ = (1, −1, 0)/√2 puts M(ŷ) = (d/√2)·I on the live directions: the margin is d/√2 over Γ, as small as the stack's d."""
+    return isotropy.Witness(
+        draw=1, t=(1.0, 1.0, 1.0), live=(0, 1, 2), y=(1.0, -1.0, 0.0), weights=None,
+        kernel_dim=1, kernel_residual=0.0, kernel_amplitude_ratio=float("inf"), ratio=1e-9,
+        rounding_bound=1e-15, exact=True, d=(0.01, 0.1),
+        interior=(1.0 / np.sqrt(2.0), -1.0 / np.sqrt(2.0), 0.0), margin=1e-9)
+
+
+def test_the_fit_transfer_reads_the_kernel_leak_of_the_stack_it_bounds():
+    """A cone margin on b's projected stack is not a margin on b's full stack: r_K·Y·(2ρ + ρ²) is subtracted, and a margin it exceeds fires nothing.
+
+    ``b`` has a near-kernel (coupling r = 2e-9, r_K ≈ 5e-10, accepted: r_K ≤
+    :data:`isotropy.INTENSITY_RTOL`); ``c`` is a one-amplitude family
+    whose image point is (1, 3, 1), at cos(ŷ, I_c) = −0.43, far below any
+    positive margin.  Reviewer's item 1 on #853: with d = 2e-9 the
+    projected margin is positive (1.4e-9 over Γ), so a bound read on the
+    projected stack alone fires, while a model of ``b`` with a kernel
+    component as large as its live one can leave the cone by 3·r_K·Y =
+    2.1e-9; the transfer then declines.  Positive arms: the same family
+    at d = 1 (the margin dwarfs the leak) fires, with the cone narrowed by
+    the 1 + ρ² of the norm bound, and at r = 0 (an exact kernel) it
+    fires at any d, the record carrying both kernel numbers.
+    """
+    dark = np.zeros(3, dtype=bool)
+    grams_c = np.array([1.0, 3.0, 1.0]).reshape(3, 1, 1)
+    witness = _kernel_witness()
+    y_hat = np.array(witness.interior)
+
+    thin = _kernel_stack(2e-9, 2e-9)
+    projected, kernel, residual = isotropy._live_projection(thin)
+    assert kernel == 1 and 4e-10 < residual <= isotropy.INTENSITY_RTOL
+    assert isotropy._cone_margin(projected, y_hat)[2] > 0.0      # what the old code read, and fired on
+    assert isotropy._fit_transfer(witness, thin, dark, grams_c, [1.0]) == (False, None)
+    assert isotropy._transfer_margin(thin, y_hat)[2] < 0.0
+
+    wide = _kernel_stack(1.0, 2e-9)
+    fires, record = isotropy._fit_transfer(witness, wide, dark, grams_c, [1.0])
+    assert fires and record.cos < -0.4 and record.kernel_dim == 1
+    assert 4e-10 < record.kernel_residual <= isotropy.INTENSITY_RTOL
+    lam, gamma, mu = isotropy._cone_margin(isotropy._live_projection(wide)[0], y_hat)
+    assert 0.0 < record.mu < mu and record.mu == pytest.approx(record.lambda_prime / record.gamma)
+
+    exact = _kernel_stack(2e-9, 0.0)
+    fires, record = isotropy._fit_transfer(witness, exact, dark, grams_c, [1.0])
+    assert fires and record.kernel_dim == 1 and record.kernel_residual < 1e-15 and record.mu > 0.0
+    assert isotropy._verify_transfer(witness, exact, dark, grams_c, record)
+
+
+def test_a_propagated_transfer_verdict_keeps_its_record_and_is_not_fitted_again():
+    """:func:`isotropy._propagate` carries ``transfer`` to the isometric copies, so :func:`isotropy._transfers`' loop, which skips a verdict with a record, skips the copy too.
+
+    Reviewer's item 2 on #853: the copy (2, 1) of a ``transfer`` verdict
+    (0, 1) came out ``propagated`` with ``transfer=None``, and the loop
+    read its witness (0's draw, not a point of 2's image) as 2's own and
+    fitted every third family to it.  Here 0 ≅ 2, nothing else is an
+    isometric copy, and the fit is stubbed to count its calls: none may be
+    made, for the source or its copy.
+    """
+    _, parts = isotropy._farkas_certificate(SYNTHETIC_STACK, SYNTHETIC_OUT)
+    witness = isotropy.Witness(
+        draw=1, t=tuple(SYNTHETIC_OUT), live=(0, 1, 2), y=tuple(parts["y"]), weights=None,
+        kernel_dim=0, kernel_residual=0.0, kernel_amplitude_ratio=float("inf"),
+        ratio=parts["ratio"], rounding_bound=parts["rounding_bound"], exact=True,
+        d=(0.01, 0.1), interior=tuple(parts["interior"]), margin=parts["margin"])
+    record = isotropy.Transfer(x=(1.0, 0.0), cos=-1e-12, mu=1e-6, rho=1e-11, lambda_prime=1e-6,
+                               gamma=1.0, kappa=1.0, n_b=2, n_c=2, shells=3, fit=1e-12,
+                               float_stack=False, kernel_dim=0, kernel_residual=0.0)
+    n = 4
+    verdicts = {(i, j): isotropy.PairVerdict(i, j, "unresolved", None, reason="joined")
+                for i in range(n) for j in range(n) if i != j}
+    verdicts[(0, 1)] = isotropy.PairVerdict(0, 1, "proved-not", "transfer", d=(0.01, 0.1),
+                                            witness=witness, transfer=record, via=(3, 1))
+    copies = [0, 1, 0, 3]
+    isotropy._propagate(verdicts[(0, 1)], verdicts, copies, n)
+    copy = verdicts[(2, 1)]
+    assert (copy.status, copy.certificate, copy.via) == ("proved-not", "propagated", (0, 1))
+    assert copy.transfer is record and copy.witness is witness
+
+    calls = []
+    original = isotropy._transfer_fit
+    isotropy._transfer_fit = lambda *args, **kwargs: calls.append(args) or None
+    try:
+        isotropy._transfers(verdicts, copies, [SYNTHETIC_STACK] * n,
+                            [np.zeros(3, dtype=bool)] * n, [False] * n, n=n, seed=1, rtol=1e-4,
+                            restarts=2)
+    finally:
+        isotropy._transfer_fit = original
+    assert calls == []
+
+
+def test_the_fit_transfer_reads_the_margin_and_not_the_sign():
+    """A point of ``c``'s image at cos = +μ/2, the wrong side of zero for the sign test, fires; one at cos = 2μ, inside the cone, does not; one lighting a dark shell of ``b`` is refused.
+
+    ``b`` is the synthetic stack with its certificate for t = (1, 1, 2.5)
+    and a fourth, dark shell; ``c`` is a one-amplitude family whose single
+    pattern is t̂ + ε·ŷ on the live shells, so its image is that ray and
+    the cosine is ε to first order (ŷ its interior, μ its margin).  Issue
+    #565, item 6: "the sign test y·I_c < 0 is noise"; the decision is
+    cos < μ − ρ, whatever the sign, a point inside the cone round ŷ is
+    undecided, never a separation, and a point that lights a shell ``b``
+    is dark at is another certificate's business (absence), so the
+    transfer declines it.
+    """
+    stack = np.concatenate([SYNTHETIC_STACK, np.zeros((1, 2, 2))])      # shell 3 dark for b
+    dark = np.array([False, False, False, True])
+    _, parts = isotropy._farkas_certificate(SYNTHETIC_STACK, SYNTHETIC_OUT)
+    witness = isotropy.Witness(
+        draw=1, t=tuple(SYNTHETIC_OUT) + (0.0,), live=(0, 1, 2), y=tuple(parts["y"]),
+        weights=None, kernel_dim=0, kernel_residual=0.0, kernel_amplitude_ratio=float("inf"),
+        ratio=parts["ratio"], rounding_bound=parts["rounding_bound"], exact=True,
+        d=(0.01, 0.1), interior=tuple(parts["interior"]), margin=parts["margin"])
+    y_hat, mu = np.array(witness.interior), witness.margin
+    t_hat = SYNTHETIC_OUT / np.linalg.norm(SYNTHETIC_OUT)
+    for epsilon, should_fire in ((0.5 * mu, True), (2.0 * mu, False)):
+        ray = t_hat + epsilon * y_hat                   # all positive: a valid 1 × 1 PSD stack
+        assert np.all(ray > 0.0)
+        grams_c = np.r_[ray, 0.0].reshape(4, 1, 1)
+        fires, record = isotropy._fit_transfer(witness, stack, dark, grams_c, [1.0])
+        assert record is not None and record.mu == pytest.approx(mu)
+        exact = float(y_hat @ ray) / float(np.linalg.norm(ray))    # ε to first order
+        assert record.cos == pytest.approx(exact, rel=1e-9) and record.cos > 0.0
+        assert abs(record.cos - epsilon) <= 0.05 * epsilon
+        assert fires is should_fire, (epsilon, record)
+        assert record.rho < 1e-3 * mu
+        lit = np.r_[ray, 0.5].reshape(4, 1, 1)         # the same ray, lighting b's dark shell
+        assert isotropy._fit_transfer(witness, stack, dark, lit, [1.0]) == (False, None)
+
+
+def test_the_witness_interior_is_the_duals_maximiser():
+    """``Witness.interior`` is the unit direction at the dual's optimum, whose margin is decades above the quoted point's.
+
+    On the synthetic stack: λ_min/|λ|_max of M(ŷ) equals the dual's
+    optimum, the stored margin is λ′/Γ for it (:func:`isotropy._cone_margin`),
+    and the quoted y, a step inside the PSD boundary by construction
+    (ratio :data:`isotropy.FARKAS_QUOTE`), has a margin at least a hundred
+    times smaller; a transfer read on the quoted point would leave the
+    rounding allowance a real share of the bound.
+    """
+    dual, parts = isotropy._farkas_certificate(SYNTHETIC_STACK, SYNTHETIC_OUT)
+    interior = np.array(parts["interior"])
+    assert np.linalg.norm(interior) == pytest.approx(1.0)
+    stack = SYNTHETIC_STACK / np.max(np.abs(SYNTHETIC_STACK))
+    assert isotropy._spectrum_ratio(stack, interior) == pytest.approx(dual, rel=1e-9)
+    lam, gamma, mu = isotropy._cone_margin(stack, interior)
+    assert parts["margin"] == pytest.approx(mu) and 0.0 < mu < 1.0
+    quoted = np.array(parts["y"]) / np.linalg.norm(parts["y"])
+    assert mu >= 100.0 * isotropy._cone_margin(stack, quoted)[2]
