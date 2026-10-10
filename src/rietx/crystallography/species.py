@@ -2,8 +2,9 @@
 
 One parser for every caller that reads a species: the composition and the
 mass in :mod:`rietx.optimize.qpa`, the covalent radius in
-:mod:`rietx.model.geometry` and the colour and radius in
-:mod:`rietx.gui.structure3d`.  It needs only gemmi's element table, so it
+:mod:`rietx.model.geometry`, the colour and radius in
+:mod:`rietx.gui.structure3d`, and the tabulated ionic, covalent and metallic
+radii in :mod:`rietx.crystallography.radii`.  It needs only gemmi's element table, so it
 sits here rather than in ``optimize.qpa``, which the structure viewer would
 otherwise import whole (#590 review, before-merge 1).
 """

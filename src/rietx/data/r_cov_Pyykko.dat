@@ -1,0 +1,155 @@
+# r_cov_Pyykko.dat -- molecular single- and double-bond covalent radii, Pyykko & Atsumi (2009).
+#
+# CITE:  Pyykko, P. & Atsumi, M. (2009a). Molecular single-bond covalent radii
+#        for elements 1-118. Chem. Eur. J. 15, 186-197.
+#        doi:10.1002/chem.200800987 -- r1, Fig. 2, p. 192.
+#        Pyykko, P. & Atsumi, M. (2009b). Molecular double-bond covalent radii
+#        for elements Li-E112. Chem. Eur. J. 15, 12770-12779.
+#        doi:10.1002/chem.200901472 -- r2, Fig. 3, p. 12775.
+#
+# STATUS: every number below is Pyykko & Atsumi's, transcribed for this
+# package from the two printed figures; no file of anyone else's was copied.
+# Fig. 3 carries the line "This table copyright (c) 2009 by Pekka Pyykko";
+# only the numbers are reproduced here, never the figure. Cite the articles.
+#
+# WHAT THEY ARE: additive radii, R(AB) = r(A) + r(B), fitted self-consistently
+# to experimental and theoretical E-E, E-H and E-CH3 bond lengths at the
+# group valencies the papers choose (sigma = 2.8 pm over 410 points for r1,
+# 3 pm over 316 for r2). They are radii for COVALENT bonds in molecules and
+# molecular fragments (rigid bodies), not for extended inorganic solids, and
+# not this package's bond table, which uses Cordero et al. (2008) through
+# gemmi (model/geometry.py).
+#
+# TRANSCRIPTION (2026-10-02), read from the figure images at native
+# resolution (both figures are rasters, so the PDFs hold no text for them).
+#   r1: 118 values. The 2009b Fig. 3 reprint of r1 agrees on all 118, and so
+#       do Wikipedia's "Covalent radius" Pyykko table and a machine OCR of
+#       Fig. 2.
+#   r2: 108 values; nan where the figure prints "-" or nothing (H, He, Fm,
+#       No, E113-E118). Wikipedia agrees on all 108.
+# The papers print E112-E118; they are written here with their IUPAC symbols
+# (Cn, Nh, Fl, Mc, Lv, Ts, Og). r2 > r1 for Ne, Na, Ar, Cu, Zn, Kr, Ag, Cd,
+# Xe, Hg, Rn and Cn, as printed (2009b, "Apparent anomalies", p. 12776).
+#
+# columns: symbol  Z  r1_pm  r2_pm  cn  (cn: the "typical coordination numbers
+# assumed" row of Fig. 2, as printed; the f-block row is printed once beneath
+# both the lanthanide and actinide rows and is applied to both here)
+
+H     1   32  nan  1
+He    2   46  nan  1,2
+Li    3  133  124  1
+Be    4  102   90  2
+B     5   85   78  3
+C     6   75   67  4
+N     7   71   60  3
+O     8   63   57  2
+F     9   64   59  1
+Ne   10   67   96  1,2
+Na   11  155  160  1
+Mg   12  139  132  2
+Al   13  126  113  3
+Si   14  116  107  4
+P    15  111  102  3
+S    16  103   94  2
+Cl   17   99   95  1
+Ar   18   96  107  1,2
+K    19  196  193  1
+Ca   20  171  147  2
+Sc   21  148  116  3
+Ti   22  136  117  4
+V    23  134  112  5
+Cr   24  122  111  6
+Mn   25  119  105  5
+Fe   26  116  109  4
+Co   27  111  103  3
+Ni   28  110  101  2
+Cu   29  112  115  1
+Zn   30  118  120  2
+Ga   31  124  117  3
+Ge   32  121  111  4
+As   33  121  114  3
+Se   34  116  107  2
+Br   35  114  109  1
+Kr   36  117  121  1,2
+Rb   37  210  202  1
+Sr   38  185  157  2
+Y    39  163  130  3
+Zr   40  154  127  4
+Nb   41  147  125  5
+Mo   42  138  121  6
+Tc   43  128  120  5
+Ru   44  125  114  4
+Rh   45  125  110  3
+Pd   46  120  117  2
+Ag   47  128  139  1
+Cd   48  136  144  2
+In   49  142  136  3
+Sn   50  140  130  4
+Sb   51  140  133  3
+Te   52  136  128  2
+I    53  133  129  1
+Xe   54  131  135  1,2
+Cs   55  232  209  1
+Ba   56  196  161  2
+La   57  180  139  3
+Ce   58  163  137  4
+Pr   59  176  138  5
+Nd   60  174  137  3,6
+Pm   61  173  135  3
+Sm   62  172  134  3
+Eu   63  168  134  3
+Gd   64  169  135  3
+Tb   65  168  135  3
+Dy   66  167  133  3
+Ho   67  166  133  3
+Er   68  165  133  3
+Tm   69  164  131  3
+Yb   70  170  129  3
+Lu   71  162  131  3
+Hf   72  152  128  4
+Ta   73  146  126  5
+W    74  137  120  6
+Re   75  131  119  5
+Os   76  129  116  4
+Ir   77  122  115  3
+Pt   78  123  112  2
+Au   79  124  121  1
+Hg   80  133  142  2
+Tl   81  144  142  3
+Pb   82  144  135  4
+Bi   83  151  141  3
+Po   84  145  135  2
+At   85  147  138  1
+Rn   86  142  145  1,2
+Fr   87  223  218  1
+Ra   88  201  173  2
+Ac   89  186  153  3
+Th   90  175  143  4
+Pa   91  169  138  5
+U    92  170  134  3,6
+Np   93  171  136  3
+Pu   94  172  135  3
+Am   95  166  135  3
+Cm   96  166  136  3
+Bk   97  168  139  3
+Cf   98  168  140  3
+Es   99  165  140  3
+Fm  100  167  nan  3
+Md  101  173  139  3
+No  102  176  nan  3
+Lr  103  161  141  3
+Rf  104  157  140  4
+Db  105  149  136  5
+Sg  106  143  128  6
+Bh  107  141  128  5
+Hs  108  134  125  4
+Mt  109  129  125  3
+Ds  110  128  116  2
+Rg  111  121  116  1
+Cn  112  122  137  2
+Nh  113  136  nan  3
+Fl  114  143  nan  4
+Mc  115  162  nan  3
+Lv  116  175  nan  2
+Ts  117  165  nan  1
+Og  118  157  nan  1,2
