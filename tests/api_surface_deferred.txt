@@ -14,6 +14,12 @@ BodyOrigin.values
 BodyOrigin.x
 BodyOrigin.y
 BodyOrigin.z
+BodyTorsion
+BodyTorsion.angle
+BodyTorsion.axis
+BodyTorsion.moves
+BodyTorsion.name
+BodyTorsion.vary
 MomentEvidence.paired_magnitude
 MomentEvidence.paired_magnitude_esd
 MomentEvidence.paired_with
@@ -25,3 +31,4 @@ RigidBody.orientation
 RigidBody.origin
 RigidBody.rotation_vary
 RigidBody.template
+RigidBody.torsions

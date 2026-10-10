@@ -229,8 +229,15 @@ def _body_phase() -> Phase:
                     y=Parameter(value=0.2), z=Parameter(value=0.3)),
                Atom(label="O1", species="O", x=Parameter(value=0.3),
                     y=Parameter(value=0.2), z=Parameter(value=0.3))])
-    return phase.model_copy(update={"rigid_bodies": [
-        body_from_atoms(phase, ["C1", "O1"], "co")]})
+    from rietx.schemas.structure import BodyTorsion
+
+    phase = phase.model_copy(update={"atoms": [*phase.atoms, Atom(
+        label="H1", species="H", x=Parameter(value=0.35), y=Parameter(value=0.3),
+        z=Parameter(value=0.3))]})
+    body = body_from_atoms(phase, ["C1", "O1", "H1"], "coh")
+    body = body.model_copy(update={"torsions": [
+        BodyTorsion(name="t", axis=("C1", "O1"), moves=["H1"])]})
+    return phase.model_copy(update={"rigid_bodies": [body]})
 
 
 def _all_models() -> list[tuple[Structure, Instrument]]:

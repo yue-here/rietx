@@ -756,6 +756,9 @@ def test_a_hold_on_a_body_atom_row_raises_and_on_a_body_dof_holds():
         ref.hold("phases.0.atoms.2.x")
     with pytest.raises(ValueError, match="hold the body's own"):
         ref.hold("phases.0.atoms.*.y")
+    # a twist is a body DOF too (WP-1808): the refusal names its glob
+    with pytest.raises(ValueError, match=r"rigid_bodies\.\*\.torsions\.\*\.twist"):
+        ref.hold("phases.0.atoms.*.y")
     assert ref.hold("phases.0.rigid_bodies.0.origin.dof.*")
 
 

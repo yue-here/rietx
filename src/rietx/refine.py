@@ -2971,8 +2971,10 @@ class Refinement:
                 f"cannot hold {blocked[0]!r}"
                 + (f" and {len(blocked) - 1} more" if len(blocked) > 1 else "")
                 + f": placed by rigid body {names[0]!r}; hold the body's own "
-                "origin and rotation instead (phases.*.rigid_bodies.*.origin.dof.*, "
-                "phases.*.rigid_bodies.*.rotation.*)")
+                "origin, rotation and torsions instead "
+                "(phases.*.rigid_bodies.*.origin.dof.*, "
+                "phases.*.rigid_bodies.*.rotation.*, "
+                "phases.*.rigid_bodies.*.torsions.*.twist)")
         new = [p for p in hits if p not in self._user_holds]
         if not new:
             return []

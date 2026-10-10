@@ -390,7 +390,10 @@ from .._nearmiss import did_you_mean
 #: before this may have freed a row on its floor (issue #832's did), so an
 #: empty default would say "looked, nothing seeded" of a fit nobody looked at.
 #: All three runners write both on every stage.
-SCHEMA_VERSION = "0.44"
+#: 0.44 → 0.45 (WP-1808): ``RigidBody.torsions``, named-bond torsions inside
+#: a body (axis, declared moved set, the angle record).  Additive and defaulted to
+#: empty, a body without one building exactly the 0.44 table.
+SCHEMA_VERSION = "0.45"
 
 TransformKind = Literal["identity", "softplus", "exp", "logit"]
 

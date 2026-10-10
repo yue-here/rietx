@@ -88,6 +88,7 @@
   "parameters:phases.*.rigid_bodies.*.origin.y",
   "parameters:phases.*.rigid_bodies.*.origin.z",
   "parameters:phases.*.rigid_bodies.*.rotation.*",
+  "parameters:phases.*.rigid_bodies.*.torsions.*.twist",
   "parameters:phases.*.scale",
   "peak_diagnostics:PEAK_ASYMMETRY_UNMODELLED",
   "peak_diagnostics:PEAK_AXIAL_TAIL",

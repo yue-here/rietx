@@ -447,6 +447,8 @@ export const PLACES: Readonly<Record<string, Format>> = {
   "phases.*.rigid_bodies.*.origin.y": 5,
   "phases.*.rigid_bodies.*.origin.z": 5,
   "phases.*.rigid_bodies.*.rotation.*": 4,
+  // WP-1808: a torsion's increment is degrees, like a cell angle
+  "phases.*.rigid_bodies.*.torsions.*.twist": 3,
   "phases.*.scale": "exp",
 };
 

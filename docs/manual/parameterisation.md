@@ -308,6 +308,31 @@ refined parameters, chained through the covariance of the origin, rotation and
 cell. A distance between two atoms of one body has no esd, because the template
 fixes it.
 
+A named-bond torsion turns a declared set of the body's atoms by an angle
+$\varphi$ about the line through two other body atoms, before the pose, in
+the right-handed sense from the first axis atom to the second (TOPAS's
+`Rotate_about_points` {cite}`coelho2018topas`):
+
+```{math}
+:label: par-torsion
+
+\mathbf{T}_i \;\leftarrow\; \mathbf{T}_a + R_{\hat{\mathbf{u}}}(\varphi)\,
+(\mathbf{T}_i - \mathbf{T}_a),
+\qquad \hat{\mathbf{u}} = \frac{\mathbf{T}_b - \mathbf{T}_a}{|\mathbf{T}_b - \mathbf{T}_a|},
+```
+
+{source}`rietx.params.bodies.apply_torsions`
+
+with $R_{\hat{\mathbf u}}(\varphi)$ Rodrigues' rotation. The moved set is
+declared, not derived from bonds, so the derivative with respect to
+$\varphi$ is exact by construction. A dihedral angle that ends on a moved
+atom changes by $\varphi$. Like the body's own rotation, a torsion refines
+as an anchored increment, $\varphi = \varphi_0 + \delta\varphi$, and every
+commit sets $\varphi_0 \leftarrow \varphi_0 + \delta\varphi$ and
+$\delta\varphi \leftarrow 0$. About one axis that composition is addition,
+so the chart moves by a translation and the esd of $\delta\varphi$ is the
+esd of $\varphi$.
+
 ## Soft restraints
 
 A bond-length, angle or value restraint contributes one row to the residual

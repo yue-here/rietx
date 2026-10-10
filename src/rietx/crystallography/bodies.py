@@ -23,7 +23,7 @@ from collections.abc import Sequence
 import numpy as np
 
 from ..schemas.common import Parameter
-from ..schemas.structure import Atom, BodyOrigin, Phase, RigidBody
+from ..schemas.structure import Atom, BodyOrigin, BodyTorsion, Phase, RigidBody
 from . import rotation
 
 
@@ -34,8 +34,16 @@ def _frames(cell):
 
 
 def _points(body: RigidBody) -> np.ndarray:
-    """The body-frame points the map places (WP-1808 adds torsions here)."""
-    return np.asarray(body.template, dtype=np.float64)
+    """The body-frame points the map places: the template after its torsions."""
+    from ..params.bodies import apply_torsions
+
+    pts = np.asarray(body.template, dtype=np.float64)
+    if not body.torsions:
+        return pts
+    member = {label: i for i, label in enumerate(body.atoms)}
+    return apply_torsions(
+        pts, [(member[t.axis[0]], member[t.axis[1]], [member[m] for m in t.moves])
+              for t in body.torsions], [t.angle for t in body.torsions])
 
 
 def body_fractional(body: RigidBody, cell) -> np.ndarray:
@@ -79,14 +87,15 @@ def add_body(phase: Phase, name: str, labels: Sequence[str],
              species: Sequence[str], template, origin, *,
              orientation=(1.0, 0.0, 0.0, 0.0), biso: float = 1.0,
              occ: float = 1.0, centre: bool = True, rotation_vary: bool = False,
-             origin_vary: bool = False) -> Phase:
+             origin_vary: bool = False, torsions: Sequence[BodyTorsion] = ()) -> Phase:
     """A copy of ``phase`` with a body's atoms appended and the body declared.
 
     ``template`` is (n, 3) Cartesian Å, or a ``fragments.Fragment`` (its
     ``xyz``); with ``centre`` it is shifted to its centroid first, so ``origin``
     (fractional) is where the body's centroid goes.  ``orientation`` is a unit
-    quaternion (w, x, y, z), stored canonical.  The new atoms take ``biso`` and
-    ``occ`` and are written at the positions the body gives them.
+    quaternion (w, x, y, z), stored canonical.  ``torsions`` (WP-1808) are
+    declared on the body and applied before the pose.  The new atoms take
+    ``biso`` and ``occ`` and are written at the positions the body gives them.
     """
     pts = np.asarray(getattr(template, "xyz", template), dtype=np.float64)
     if pts.shape != (len(labels), 3) or len(species) != len(labels):
@@ -103,7 +112,7 @@ def add_body(phase: Phase, name: str, labels: Sequence[str],
         origin=BodyOrigin(**{c: Parameter(value=float(v), vary=origin_vary)
                              for c, v in zip("xyz", origin, strict=True)}),
         orientation=tuple(float(v) for v in np.asarray(q)),
-        rotation_vary=rotation_vary)
+        rotation_vary=rotation_vary, torsions=list(torsions))
     frac = body_fractional(body, phase.cell.lengths_angles())
     atoms = list(phase.atoms) + [
         Atom(label=lab, species=sp, x=Parameter(value=float(f[0])),

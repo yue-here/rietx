@@ -662,7 +662,11 @@ def _carry_into(structure: Structure, instrument: Instrument,
     orientations = {f"phases.{ip}.rigid_bodies.{b}": body.orientation
                     for ip, phase in enumerate(source[0].phases)
                     for b, body in enumerate(phase.rigid_bodies)}
-    displaced = table.displace_anchored_dofs(previous, named, orientations)
+    # …and its torsions' angles, the same kind about one axis each (WP-1808)
+    torsions = {f"phases.{ip}.rigid_bodies.{b}": [t.angle for t in body.torsions]
+                for ip, phase in enumerate(source[0].phases)
+                for b, body in enumerate(phase.rigid_bodies)}
+    displaced = table.displace_anchored_dofs(previous, named, orientations, torsions)
     # Hold everything, then read the affine map back: tied entries (crystal-
     # system cell ties, Wyckoff coordinate DOFs, site-symmetry ADP patterns)
     # are re-derived from whatever their sources now hold, so a narrow carry

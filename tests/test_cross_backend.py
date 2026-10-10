@@ -659,11 +659,21 @@ def _state_bodies():
     cell partials and the rotation's left Jacobian are both away from their
     trivial points; a bond restraint from a body atom to a free Li puts a
     restraint row across the block (the analytic block's local Jacobian).
+    Two torsions (WP-1808), the second's axis riding on the first's moved
+    atom, so the chained tangent is checked; unphysical in a ring, which no
+    derivative minds.  Anchors and twists both off zero, like the rotation.
     """
     from rietx.crystallography.bodies import add_body
     from rietx.schemas.common import Parameter
     from rietx.schemas.pattern import PatternData
-    from rietx.schemas.structure import Atom, BondRestraint, Cell, Phase, Structure
+    from rietx.schemas.structure import (
+        Atom,
+        BodyTorsion,
+        BondRestraint,
+        Cell,
+        Phase,
+        Structure,
+    )
     from tests.test_rigid_body import c6br
 
     P = Parameter
@@ -674,7 +684,11 @@ def _state_bodies():
              z=P(value=0.63))], scale=P(value=1e-2, min=0.0, transform="softplus"))
     phase = add_body(phase, "c6br", [f"C{i}" for i in range(6)] + ["Br"],
                      ["C"] * 6 + ["Br"], c6br(), (0.31, 0.42, 0.27),
-                     orientation=(0.9, 0.1, 0.2, 0.3), biso=2.0)
+                     orientation=(0.9, 0.1, 0.2, 0.3), biso=2.0,
+                     torsions=[BodyTorsion(name="t0", axis=("C0", "C1"),
+                                           moves=["C5", "Br"], angle=12.0),
+                               BodyTorsion(name="t1", axis=("C0", "C5"),
+                                           moves=["Br"], angle=-7.0)])
     phase = phase.model_copy(update={"restraints": [
         BondRestraint(atom_i=7, atom_j=0, target=3.0, sigma=0.05, op_index=0)]})
     structure = Structure(phases=[Phase.model_validate(phase.model_dump())])
@@ -690,17 +704,22 @@ def _state_bodies():
     table.set_vary(["*"], False)
     for glob in ("phases.0.rigid_bodies.0.origin.dof.*",
                  "phases.0.rigid_bodies.0.rotation.*", "phases.0.cell.*",
-                 "phases.0.atoms.0.dof.*", "phases.0.scale"):
+                 "phases.0.atoms.0.dof.*", "phases.0.scale",
+                 "phases.0.rigid_bodies.0.torsions.*.twist"):
         assert table.set_vary([glob], True), glob
     theta = table.x0()
     for k, v in enumerate((0.07, -0.04, 0.05)):
         theta[table.free_paths.index(f"phases.0.rigid_bodies.0.rotation.{k}")] = v
+    for t, v in enumerate((9.0, -6.0)):
+        theta[table.free_paths.index(f"phases.0.rigid_bodies.0.torsions.{t}.twist")] = v
     # the commit composes the rotation into R₀ and zeroes it (WP-1805), so the
     # anchor is off the identity and the increment is set off zero again by
     # value, where the left Jacobian is away from its trivial point too
     table.commit(theta)
     for k, v in enumerate((0.03, 0.02, -0.06)):
         table.entries[table._paths[f"phases.0.rigid_bodies.0.rotation.{k}"]].value = v
+    for t, v in enumerate((4.0, -3.0)):
+        table.entries[table._paths[f"phases.0.rigid_bodies.0.torsions.{t}.twist"]].value = v
     table.refresh_ties()
     model = compile_model(structure, ins, pattern, mode="rietveld",
                           moving_paths=set(table.moving_paths))
