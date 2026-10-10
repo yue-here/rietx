@@ -230,8 +230,8 @@ CI leg by 3-4×**, so it reads CI's `junit-*` file when the branch has one (WP-1
   WP-1115 added a second default that changes arithmetic. The compiled kernel
   tier is on unless switched off, so a golden or a bit-identity assertion says
   `compiled.set_enabled(False)` (or `True`) rather than inheriting. The
-  signature of getting this wrong is a test that **fails under `-n auto` and
-  passes alone**: the background compile finishes at a different point in each.
+  signature of getting this wrong is a test that **passes on darwin/arm64 and
+  fails on Linux**, whose C library `exp` the kernels call and numpy does not.
   `conftest.py` also asks for one kernel thread per xdist worker, so a
   wall-clock budget is not a function of the worker count.
 - **A worktree needs its own venv, and quote which one you used.** The main

@@ -524,14 +524,17 @@ def test_features_are_derived_not_asserted(caps):
     # the one default whose position changes published numbers (WP-1001)
     assert caps.features["anomalous_dispersion_default_on"] is True
 
-    # the compiled tier (WP-1115), derived from the tier itself rather than
-    # from a literal: two flags, because "numba imports here" and "the next
-    # residual will use it" are different questions and `RIETX_COMPILED=0`
-    # separates them
+    # the compiled tier (WP-1115, WP-1940), derived from the tier itself rather
+    # than from a literal: two flags, because "the wheel loaded here" and "the
+    # next residual will use it" are different questions and `RIETX_COMPILED=0`
+    # separates them.  The reason beside them is the tier's own answer too.
     from rietx.model import compiled
 
     assert caps.features["compiled_kernels"] == compiled.available()
-    assert caps.features["compiled_kernels_active"] == compiled.enabled()
+    assert caps.features["compiled_kernels_active"] == (
+        compiled.enabled() and compiled.available())
+    assert caps.compiled_kernels_unavailable == compiled.unavailable()
+    assert (caps.compiled_kernels_unavailable is None) == compiled.available()
     assert all(isinstance(v, bool) for v in caps.features.values())
 
 

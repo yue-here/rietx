@@ -23,14 +23,14 @@ ROOT = Path(rietx.__file__).parent
 #: species with instead of a parser of its own that disagreed on ``D`` (#576
 #: review, follow-up 2).  It is that parser alone, moved out of
 #: ``optimize.qpa`` so the split is not committed to qpa's imports (#590
-#: review).
+#: review).  2026-10-10: ``model.compiled`` left with the numba rasteriser
+#: (WP-1940), whose switch, cache and thread pool were the figure's from there.
 BOUNDARY = {
     "rietx._about",
     "rietx.crystallography.adp",
     "rietx.crystallography.species",
     "rietx.crystallography.symmetry",
     "rietx.gui.structure3d",
-    "rietx.model.compiled",
     "rietx.viz.theme",
 }
 

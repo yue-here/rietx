@@ -118,6 +118,12 @@ bound on what sticks add. The multishadow number is the WP's to measure.
 
 ### Inherited
 
+- **2026-10-10, from WP-1940 (4th session, PR #864).** The rasteriser's numba twin is
+  deleted in that PR, and its port into `kernels/src/lib.rs` is the next
+  kernel release, 1.1.0 (1940 § Decisions item 9). An occlusion kernel joins
+  that port or a later minor release, held to `raster.py`'s numpy functions
+  on the bit.
+
 - **2026-10-10, from WP-1940 (3rd session).** numba leaves rietx at the
   kernel migration (1940 § Decisions item 8), and the rasteriser's numba
   twin is deleted then. The task "the numba kernel, held bit-identical to

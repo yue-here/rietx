@@ -33,7 +33,14 @@ Not yet established: what dichotomy holds at 2 GB; whether the 9 GB is that allo
 
 ### Inherited
 
-(empty)
+- **2026-10-10, from WP-1940 (4th session, PR #864).** The dichotomy traversal now
+  runs on numpy alone: its numba twin is deleted. § Context's measurements
+  were taken with numba on. On WP-1508's synthetic monoclinic list the numpy
+  loop takes ~200 s where the compiled one took 10 s, so a box-bound monoclinic
+  search spends far more of its ceiling in the traversal. Re-measure before
+  building on those numbers. A compiled port would go into the
+  `rietx-kernels` crate, held to the numpy loop leaf by leaf
+  (`indexing/CLAUDE.md`).
 
 ## Non-goals
 

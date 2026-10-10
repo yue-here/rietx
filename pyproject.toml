@@ -54,44 +54,39 @@ dependencies = [
     # 2.8 corrects the time-reversal flags of UNI 282-284, the three magnetic
     # groups 2.7.0 could not identify from their own operators (WP-1452).
     "spglib>=2.8",
-    # The compiled kernel tier (WP-1115): ~2x on a four-phase Cu Kα refinement
-    # and ~1.35x on a synchrotron one, measured on the WP-1111 harness.  It is
-    # *required* rather than an extra because the default install is what a
-    # user is judged by, and the two costs — +157 MB (llvmlite is 137 MB of it,
-    # on a ~124 MB runtime baseline) and the `numpy<2.6` ceiling numba carries
-    # — were both accepted deliberately, on the reading that this runs in
-    # per-project virtual environments.
+    # The compiled kernel tier (WP-1115, in Rust since WP-1940): ~2x on a
+    # four-phase Cu Kα refinement and ~1.35x on a synchrotron one.  It is one
+    # abi3 wheel per platform, built from kernels/ in this repository.  It is
+    # required with no platform markers, and the crate publishes no sdist, so
+    # pip fails loudly where no wheel exists rather than installing a rietx
+    # that is silently slower.
     #
-    # **An extra could not have expressed the opposite choice.**  Extras only
-    # ever add dependencies; there is no `rietx[slow]` that installs fewer, so
-    # "fast by default, numba-free still possible" cannot be a packaging shape
-    # at all.  It is a *code* shape instead, and `model/compiled.py` is where
-    # it lives: the import is soft and every entry point declines rather than
-    # raising, so `--no-deps`, a constraint file or a distro package that omits
-    # numba still yields a working install running the numpy expressions, and
-    # `RIETX_COMPILED=0` (`_about.COMPILED_ENV`) switches the tier off at
-    # runtime with no reinstall.
+    # The import stays soft: `--no-deps` or a distro package without it still
+    # yields a working install running the numpy expressions, and that install
+    # warns once and says why in `capabilities()`.  `RIETX_COMPILED=0`
+    # (`_about.COMPILED_ENV`) switches the tier off at runtime.
     #
-    # The floor is where numba's wheels first cover *every* interpreter the
-    # `requires-python` above admits: cp314 wheels start at 0.63, cp313 at
-    # 0.61.  A lower floor would resolve fine in practice — pip takes the
-    # newest anyway — and strand a 3.14 user who pinned.  Measured on 0.67.0.
-    "numba>=0.63",
+    # The range is `model.compiled.KERNEL_ABI`, the kernel interface number.
+    # A major release of the wheel is a breaking interface change.  A new
+    # kernel is a minor release, and raises this floor.  docs/RELEASING.md
+    # § The kernel wheel has the procedure.
+    "rietx-kernels>=1,<2",
     # Required since WP-1545, an extra (`viz`) before it.  A figure is how most
     # people read a fit, and every tutorial and the landing page draw one, so a
     # base install that could not was the install people were judged by.  The
     # cost is ~58 MB with its dependencies (pillow, fonttools, contourpy,
-    # kiwisolver, pyparsing, cycler) against ~265 MB for the rest.
+    # kiwisolver, pyparsing, cycler) against ~124 MB for the rest.
     # `viz.plots._pyplot` still imports it lazily, so `import rietx` pays
     # nothing for it.
     #
     # The floor is two floors.  On cp314 it is where matplotlib's wheels first
-    # cover the interpreter (3.10.5), the numba rule above.  Below 3.14 it is
-    # 3.10.0, because that is what Google Colab preinstalls (googlecolab/
-    # backend-info, 2026-10-09) and Colab imports matplotlib at startup: a
-    # floor above it makes `%pip install rietx` upgrade an imported module and
-    # ask for a runtime restart before the tutorial's next cell.  Every
-    # plotting, tutorial and example test passed on 3.10.0.
+    # cover the interpreter (3.10.5), so a 3.14 user who pins the floor still
+    # gets a wheel.  Below 3.14 it is 3.10.0, because that is what Google
+    # Colab preinstalls (googlecolab/backend-info, 2026-10-09) and Colab
+    # imports matplotlib at startup: a floor above it makes `%pip install
+    # rietx` upgrade an imported module and ask for a runtime restart before
+    # the tutorial's next cell.  Every plotting, tutorial and example test
+    # passed on 3.10.0.
     "matplotlib>=3.10; python_version<'3.14'",
     "matplotlib>=3.10.5; python_version>='3.14'",
 ]

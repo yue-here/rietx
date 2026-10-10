@@ -706,7 +706,8 @@ def test_the_compiled_path_holds_the_goldens_to_its_own_bar(name):
     if not path.exists():
         pytest.skip(f"golden {path.name} not present")
     if not compiled.available():
-        pytest.skip("no numba in this venv — the compiled tier cannot run")
+        pytest.skip("the rietx-kernels wheel did not load here: "
+                    f"{compiled.unavailable()}")
     got = _capture(name, compiled_path=True)
     if got is None:
         pytest.skip(f"dataset for state {name!r} not present")

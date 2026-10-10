@@ -1,8 +1,7 @@
 # Installation
 
 `rietx` needs Python 3.11 or newer and installs from PyPI. Install it into a
-virtual environment: `numba` carries an upper bound on `numpy`, which is easier
-to satisfy per project than across one shared environment.
+virtual environment, one per project.
 
 ::::{tab-set}
 
@@ -90,7 +89,7 @@ was built from. Then start with [](quickstart.md).
 | `pydantic` ≥ 2.6 | the schemas: validation, defaults, JSON round-trip |
 | `gemmi` ≥ 0.6.5 | CIF reading, space groups, symmetry operations |
 | `spglib` ≥ 2.4 | site symmetry, Wyckoff positions, cell reduction |
-| `numba` ≥ 0.63 | compiles the peak kernels ({ref}`the-compiled-kernels`) |
+| `rietx-kernels` ≥ 1, < 2 | the compiled peak kernels, one wheel per platform ({ref}`the-compiled-kernels`) |
 | `matplotlib` ≥ 3.10 (≥ 3.10.5 on Python 3.14) | figures: `RefinementResult.plot`, `PatternData.plot` and the report figures |
 
 Those seven are the whole install, and nothing in that list is optional.
@@ -139,46 +138,46 @@ four-phase Cu Kα refinement they take the fit from 17.6 s to 8.9 s; on a
 three-phase one, from 4.2 s to 2.2 s; on a two-phase synchrotron pattern with no
 axial divergence, from 0.54 s to 0.40 s.
 
-The first process on a machine pays a 0.6 s compile, and every later one pays
-0.12 s to load the result from `~/.rietx/numba-cache` (or from
-`$RIETX_STATE_DIR` if that is set). Most of even that overlaps with other work:
-the compile starts on a background thread when the model is compiled, and runs
-while the file is read and the parameter table is built.
+The kernels are written in Rust and ship as a separate package, `rietx-kernels`,
+which `pip` installs with rietx. It is one compiled wheel per platform, between
+140 and 250 kB: Linux (glibc) on x86_64 and aarch64, macOS on arm64 and x86_64,
+and Windows on x64. There is no compile step and no cache. Importing the wheel
+is the whole start-up cost. Releases before the kernels became a wheel compiled
+them with `numba` on first use and cached the result in `~/.rietx/numba-cache`.
+That directory is no longer read, and you can delete it.
 
-The dichotomy indexing engine's box search runs on a compiled kernel too. It
-searches the same boxes in the same order as the numpy loop, so it finds the
-same candidates, bit for bit, and only the time changes. How much depends on
-how many free metric parameters the crystal system has. On a synthetic
-monoclinic list (four) the engine takes 9.99-10.02 s where it took 195-206 s. On the
-round-robin brucite and corundum patterns (hexagonal, trigonal and tetragonal,
-two each) it saves 3-8 %, because most of their time goes to refining the cells
-the search finds rather than to the search. Real monoclinic data is the same
-once the search is fast: a bethanechol search cut at its 30 s budget tests 13 %
-more boxes and reaches the same answer. That kernel is compiled the first
-time an indexing search needs it, 4.4-4.6 s on the first run on a machine and
-0.23-0.27 s after that, before any crystal system's time budget starts.
+The dichotomy indexing engine and the structure figure run on numpy alone, so
+these kernels and the switch below do not reach them.
 
 Turn the kernels off with `RIETX_COMPILED=0`, which needs no reinstall. Every
 kernel has the numpy expression it replaces standing behind it, so refinements
-and indexing searches run correctly, only slower. Use it on a machine where the
-compiler misbehaves, or for a run that has to reproduce another one exactly.
+run correctly, only slower. Use it for a run that has to reproduce another one
+exactly.
 
 ```sh
 RIETX_COMPILED=0 python my_refinement.py
 ```
 
-For a smaller install, leave `numba` out altogether and take the numpy path
-permanently. It is 157 MB of the install, 137 MB of that `llvmlite`, against a
-124 MB baseline:
+An install without the wheel also runs the numpy path (see Troubleshooting).
+It warns once per process, at the first refinement or the first
+`capabilities()` call:
 
-```sh
-pip install --no-deps rietx
-pip install numpy scipy pydantic gemmi spglib
+```text
+RuntimeWarning: rietx's compiled kernels did not load, because importing
+rietx_kernels raised ModuleNotFoundError (No module named 'rietx_kernels').
+Fits run the numpy path, which is slower. Install the kernels with pip install
+"rietx-kernels>=1,<2", or set RIETX_COMPILED=0 to choose the numpy path and
+silence this warning.
 ```
 
-`capabilities().features` answers the two questions separately, because they can
-disagree: `compiled_kernels` is whether `numba` imports here, and
-`compiled_kernels_active` is whether the next refinement will use it.
+The same warning names a wheel of another major version, whose kernel
+interface this rietx does not call.
+
+`capabilities()` answers the three questions separately, because they can
+disagree. `features["compiled_kernels"]` is whether the wheel loaded here.
+`features["compiled_kernels_active"]` is whether the next refinement will use
+it. `Capabilities.compiled_kernels_unavailable` is the reason the wheel did not
+load, or `None` when it did.
 
 ```python
 from rietx import capabilities
@@ -186,6 +185,7 @@ from rietx import capabilities
 caps = capabilities()
 caps.features["compiled_kernels"]
 caps.features["compiled_kernels_active"]
+caps.compiled_kernels_unavailable
 ```
 
 The compiled and numpy paths agree to within one or two units in the last place,
@@ -270,10 +270,17 @@ Results are stamped with the source version and the commit
 so they still name the code that ran. Reinstall (`uv pip install -e ".[dev]"`)
 to make the two agree.
 
-`pip` cannot find a version of `numba` for your `numpy`. `numba` carries an
-upper bound on `numpy` (`numpy<2.6` as of `numba` 0.63), so a very new numpy has
-to wait for a `numba` that admits it. Either pin numpy below the ceiling in this
-environment, or install without `numba` as above and run the numpy path.
+`No matching distribution found for rietx-kernels`. Your platform has no
+`rietx-kernels` wheel, and the package publishes no source to build one from.
+Two common cases are a musllinux system such as Alpine, and a free-threaded
+Python build (3.13t or 3.14t), which cannot load the wheels that exist. Install
+rietx without its dependencies and run the numpy path. The first refinement
+warns once that the kernels did not load, and `RIETX_COMPILED=0` silences it.
+
+```sh
+pip install --no-deps rietx
+pip install numpy scipy pydantic gemmi spglib matplotlib
+```
 
 ## Validation and accuracy claims
 

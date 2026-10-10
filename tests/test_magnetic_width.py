@@ -76,7 +76,7 @@ def numpy_path():
 
     A bit-identity claim is the numpy path's (root ``CLAUDE.md``, compiled
     tier rule 3); under the kernels an ``exp`` bounds it at 1e-13 relative,
-    and which side a process runs is set by the machine's numba, so a test
+    and which side a process runs is set by the machine's C library, so a test
     that inherits it passes on one CI row and fails on the next
     (``tests/CLAUDE.md`` § Quoting numbers).
     """
@@ -416,10 +416,11 @@ def test_the_scalar_and_batched_draws_agree_on_the_split_path(kernels):
     builder to the bit, the compiled one to 1e-13 relative, the bar an ``exp``
     in the kernel sets (root ``CLAUDE.md``, compiled tier rule 3).  Inherited,
     this was bit-identity under the kernels and failed on the CI rows whose
-    numba rounds one ``exp`` differently (1.24e-16 relative, Linux x86_64).
+    C library rounds one ``exp`` differently (1.24e-16 relative, Linux x86_64).
     """
     if kernels and not compiled.available():
-        pytest.skip("this build has no numba; the compiled tier cannot run")
+        pytest.skip("the rietx-kernels wheel did not load here: "
+                    f"{compiled.unavailable()}")
     was = compiled.set_enabled(kernels)
     try:
         model, _t, v = _state(_mnf2(size=SIZE), moving=None)

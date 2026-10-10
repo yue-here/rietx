@@ -24,8 +24,9 @@ against the scalar arithmetic, and the bit-equality bar above is a statement
 about two numpy expressions.  WP-1115's compiled tier is the default and is a
 third implementation with its own stated bar — held to it in
 ``tests/test_compiled_kernels.py``, which is also where the measurement that
-forced this declaration lives: numba's ``exp`` matches numpy's bit for bit on
-darwin/arm64 and does not on Linux, by ~3e-17.
+forced this declaration lives: the C library's ``exp``, which the kernels
+call, matches numpy's bit for bit on darwin/arm64 and does not on Linux, by
+~3e-17.
 """
 
 from __future__ import annotations

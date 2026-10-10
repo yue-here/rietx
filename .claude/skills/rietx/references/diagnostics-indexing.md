@@ -307,14 +307,14 @@ indexer instead of leaving you to try one.
 
 Two of those flags are about **speed rather than capability**, and they are the
 ones to read before reporting that a refinement is slow.
-`features["compiled_kernels"]` says whether the compiled peak kernels can be
-built here (`numba` is a required dependency, but an install may legitimately
-omit it), and `features["compiled_kernels_active"]` says whether the next
-refinement or dichotomy search will use them — `RIETX_COMPILED=0` switches them
-off without a reinstall. Both false on a slow fit is an explanation; both true
-is not, and the answer is somewhere in the stage plan. Nothing else changes:
-numbers agree to the last place or two, and the accumulation and the dichotomy
-search are bit-for-bit identical.
+`features["compiled_kernels"]` says whether the compiled peak kernels loaded
+here (the `rietx-kernels` wheel is required, but a `--no-deps` install may
+lack it), and `compiled_kernels_unavailable` says why not.
+`features["compiled_kernels_active"]` says whether the next refinement will use
+them — `RIETX_COMPILED=0` switches them off without a reinstall. Both false on
+a slow fit is an explanation; both true is not, and the answer is somewhere in
+the stage plan. Nothing else changes: numbers agree to
+the last place or two, and the accumulation is bit-for-bit identical.
 
 ---
 

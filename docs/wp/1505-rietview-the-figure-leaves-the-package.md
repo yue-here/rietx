@@ -85,6 +85,14 @@ the list is rietx's by nature.
 
 ### Inherited
 
+- **2026-10-10, from WP-1940 (4th session, PR #864).** The figure's numba path is
+  deleted in that PR, so the rasteriser runs its numpy twin. `view="auto"`
+  takes 1.30-1.36 s on the NAC cell at 400 px (92 ms on numba) and 22.6 s at
+  3143 atoms (565 ms). The maintainer made the rasteriser port the next
+  kernel release, `rietx-kernels` 1.1.0 (1940 § Decisions item 9). If this
+  WP moves the figure first, the port goes with it. `model.compiled` is no
+  longer imported by the figure (`tests/test_figure_boundary.py`).
+
 - **2026-10-04, from WP-1504 round E: the trigger's second clause fired.**
   Rounds C and E ran the same pinned `fixed` surface (amendment 1.3), and E's
   56 runs found no new defect in it: 40 of 42 fixed runs done, the one miss

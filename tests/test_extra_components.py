@@ -213,14 +213,18 @@ def test_the_restated_four_ln2_still_equals_the_profiles_own():
     ``background`` package pulls no private out of ``model.profiles``.  Its own
     docstring argues it has a single owner and no second spelling to reproduce —
     which is exactly the state the softplus floor was in before it drifted.  Pin
-    it to the pseudo-Voigt and compiled-kernel copies so retuning one cannot
-    leave this one behind in silence.
+    it to the pseudo-Voigt copy so retuning one cannot leave this one behind in
+    silence.
+
+    The compiled kernels' copy (``K4LN2`` in ``kernels/src/lib.rs``) is Rust
+    since WP-1940 and cannot be imported here.  ``test_compiled_kernels.py``
+    holds it instead: it compares the kernels' Ω against the numpy profile
+    built on ``_PV_4LN2``, to the bit where that was measured.
     """
     from rietx.background.models import FOUR_LN2_NEG
-    from rietx.model._kernels_numba import _4LN2 as _KERNEL_4LN2
     from rietx.model.profiles.pseudovoigt import _4LN2 as _PV_4LN2
 
-    assert FOUR_LN2_NEG == -_PV_4LN2 == -_KERNEL_4LN2
+    assert FOUR_LN2_NEG == -_PV_4LN2
 
 
 def test_the_curve_is_a_gaussian_of_the_declared_fwhm():

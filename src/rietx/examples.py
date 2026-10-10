@@ -89,8 +89,8 @@ def examples_dir() -> Path:
 
     A real filesystem path rather than a ``Traversable``: the readers and
     :func:`~rietx.crystallography.cif.structure_from_cif` open files by path,
-    and every wheel that carries this package also carries compiled extensions
-    (numba, gemmi), so it is never imported from a zip.
+    and every install that carries this package also carries compiled
+    extensions (rietx-kernels, gemmi), so it is never imported from a zip.
     """
     from importlib import resources
 

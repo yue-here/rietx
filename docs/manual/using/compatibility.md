@@ -195,6 +195,21 @@ instrument-profile tag) name versioned contracts, and do not move because a
 brand did. A future rename is therefore no format break. A project written
 today opens under whatever the package is called when you open it.
 
+## The kernel wheel has its own version
+
+The compiled kernels ship as a second package, `rietx-kernels`, with its own
+version ({ref}`the-compiled-kernels`). Its major version is the kernel
+interface rietx calls, and rietx pins that major: `rietx-kernels>=1,<2`. A new
+major is an interface break, and it arrives with a rietx release that moves the
+pin. A new kernel is a minor release, and the rietx release that first calls it
+raises the floor.
+
+The move from `numba` to the wheel changed no number a fit returns. The Rust
+kernels match the `numba` ones bit for bit on all five platforms the wheel
+ships for. Two things you could observe did change. `numba` is no longer
+installed with rietx. An install without the kernels now warns once per
+process, where an install without `numba` ran the numpy path in silence.
+
 ## What a default promises
 
 One principle decides defaults, and it explains why the same content can

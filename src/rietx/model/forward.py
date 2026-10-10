@@ -3422,12 +3422,6 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     if restraint_weight_scale < 0.0:
         raise ValueError(
             f"restraint_weight_scale must be >= 0 (got {restraint_weight_scale})")
-    # Start the kernel compile here, on a background thread: numba releases the
-    # GIL while it compiles, so the cost hides behind the reflection generation,
-    # symmetry orbits and window sizing below rather than landing on the first
-    # residual.  A no-op on every call after the first, and on a build with no
-    # numba (``model/compiled.py`` § Startup).
-    compiled.warm()
     mask = pattern.in_range_mask()
     tt_all, y_all, s_all = pattern.tt(), pattern.y(), pattern.sig()
     if two_theta_limits is not None:

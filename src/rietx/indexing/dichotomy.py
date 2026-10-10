@@ -53,11 +53,8 @@ metric is allowed to have.
 
 from __future__ import annotations
 
-import threading
-
 import numpy as np
 
-from ..model import compiled
 from ..schemas.common import Diagnostic
 from ..schemas.indexing import PeakList
 from .engines import (
@@ -136,53 +133,6 @@ MAX_GRID_CELLS = 400_000
 #: degenerate search (a wildly over-tolerant peak list can accept thousands of
 #: near-identical boxes) without changing the answer.
 DEDUP_EVERY = 2_000
-#: Row-tests the compiled traversal runs before handing back to python, so
-#: ``Budget.expired`` is still asked about every 0.09 s (measured: ~23 million
-#: row-tests a second on the synthetic monoclinic unit, WP-1508).  The chunk
-#: is counted in rows rather than boxes because a box costs its row count: ~100
-#: rows on a 4-D search, ~2000 on a 2-D one.
-TRAVERSAL_ROW_CHUNK = 2_000_000
-#: Leaves the compiled traversal buffers before python runs ``_accept`` on them.
-#: Small, because the budget is checked between leaves and a 2-D leaf costs a
-#: fifth of a second (WP-1508 § Gate reading).
-TRAVERSAL_LEAF_BUFFER = 32
-
-#: Survivor lists of the widest grid cell the traversal's pool starts with room
-#: for above its base; the kernel asks for more (``GROW``) and the pool doubles.
-_POOL_HEADROOM = 8
-
-_KERNEL_LOCK = threading.Lock()
-_KERNELS: dict | None = None
-_KERNELS_FAILED = False
-
-
-def _traversal_kernels() -> dict | None:
-    """The compiled box traversal, or ``None`` for the numpy loop (WP-1508).
-
-    The model tier's switch (:func:`rietx.model.compiled.enabled`,
-    ``RIETX_COMPILED``) governs this one too, so one knob turns every compiled
-    path off.  Built on first use rather than in the model tier's ``build``,
-    which every refinement process pays and none of them needs this for; built
-    under a lock and waited for, so which path a search takes never depends on
-    how fast the machine compiled.  Declines — never raises — when numba will
-    not import or the build fails, and the caller keeps its numpy loop.
-    """
-    global _KERNELS, _KERNELS_FAILED
-    if not compiled.enabled():
-        return None
-    if _KERNELS is not None or _KERNELS_FAILED:
-        return _KERNELS
-    with _KERNEL_LOCK:
-        if _KERNELS is None and not _KERNELS_FAILED:
-            try:
-                if not compiled.available():     # also redirects the cache
-                    raise ImportError("numba is not importable")
-                from . import _kernels_numba
-
-                _KERNELS = _kernels_numba.build()
-            except Exception:  # pragma: no cover - depends on the install
-                _KERNELS_FAILED = True
-    return _KERNELS
 
 
 def _pivots(basis: np.ndarray) -> list[tuple[int, float]]:
@@ -704,12 +654,9 @@ def search_dichotomy(peaks: PeakList, *, spec: SearchSpec | None = None,
         # otherwise record 0 s of work as if it had been searched
         if cancel is not None and bool(cancel):
             break
-        # built (or loaded from the disk cache) before this unit's clock
-        # starts, and only once a system is entered — a first compile on a
-        # machine is seconds, it is not search time, and a stopped run should
-        # not pay it; every later call is a flag test
-        _traversal_kernels()
-        # the trial index's once-a-process BLAS probe, for the same reason
+        # the trial index's once-a-process BLAS probe, run before this unit's
+        # clock starts and only once a system is entered: it is not search
+        # time, and a stopped run should not pay it
         row_local_product()
         result.systems_searched += (system,)
         if progress is not None:
@@ -785,8 +732,8 @@ def _centre_volume(basis: np.ndarray, lo: np.ndarray, hi: np.ndarray) -> float:
 def _centre_volumes(basis: np.ndarray, boxes) -> list[float]:
     """:func:`_centre_volume` for every ``(lo, hi, ...)`` box, on the same bits.
 
-    Ordering the grid's survivors called the scalar one per cell, and once the
-    traversal was compiled that loop was a quarter of a 4-D unit (WP-1508).
+    Ordering the grid's survivors called the scalar one per cell, and while the
+    traversal ran compiled that loop was a quarter of a 4-D unit (WP-1508).
     Each box's A..F is still its own ``basis.T @ θ`` — a batched product may
     round differently, and the key only has to break a near-tie differently to
     reorder the search — while the eigenvalue test and the inverse run as one
@@ -820,13 +767,12 @@ def _centre_volumes(basis: np.ndarray, boxes) -> list[float]:
 
 def _grid_pass(basis: np.ndarray, lo0: np.ndarray, hi0: np.ndarray, rows0,
                test, budget: Budget) -> tuple[list | None, int, int, bool]:
-    """Phase 1 of :func:`_search_one`, shared by the numpy and compiled paths.
+    """Phase 1 of :func:`_search_one`: the grid, breadth-first.
 
-    ``rows0`` is the box's trial set as indices into the search set — on both
-    paths since WP-1509, because a leaf needs to know which rows survived — and
-    ``test(rows, lo, hi)`` returns the survivors a box's children inherit, or
-    ``None`` for an impossible box.  One loop, so the two paths cannot come to
-    different grids.  Returns ``(frontier, n_boxes, n_rows, complete)``;
+    ``rows0`` is the box's trial set as indices into the search set, because a
+    leaf needs to know which rows survived (WP-1509), and ``test(rows, lo, hi)``
+    returns the survivors a box's children inherit, or ``None`` for an
+    impossible box.  Returns ``(frontier, n_boxes, n_rows, complete)``;
     ``frontier`` is ``None`` when the budget expired, and ``complete`` is
     ``False`` for that or for an overflowed grid (:data:`MAX_GRID_CELLS`).
     """
@@ -1015,13 +961,6 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
             if cand is not None:
                 found.append(cand)
 
-    kernels = _traversal_kernels()
-    if kernels is not None:
-        n_boxes, n_rows, complete = _traverse_compiled(
-            kernels, basis, lo0, hi0, m_full, q_hi, det_band, swaps, lo_search,
-            hi_search, spec.n_unindexed, tol_accept, budget, leaf)
-        return found, (n_boxes, n_rows), complete and complete_union
-
     # ---- phase 1: the grid, breadth-first, one dimension at a time ----
     # a parent's survivors are handed to every child, and ``_grid_pass`` tests
     # siblings back to back, so their rows are gathered once per parent rather
@@ -1090,132 +1029,6 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
         _push_children(stack, [(lo, left_hi), (right_lo, hi)], m, ids,
                        lo_search, hi_search, spec.n_unindexed, depth + 1)
     return found, (n_boxes, n_rows), complete and complete_union
-
-
-def _traverse_compiled(kernels: dict, basis: np.ndarray, lo0: np.ndarray,
-                       hi0: np.ndarray, m_full: np.ndarray, q_hi: float,
-                       det_band: tuple[float, float],
-                       swaps: list[tuple[int, int]], lo_search: np.ndarray,
-                       hi_search: np.ndarray, n_unindexed: int,
-                       tol_accept: float, budget: Budget, leaf,
-                       ) -> tuple[int, int, bool]:
-    """Phases 1 and 2 of :func:`_search_one` on the compiled kernels.
-
-    **The same search, box for box** — the grid pass is the numpy one with its box
-    test swapped for the kernel's, and phase 2 is ``_kernels_numba.traverse``,
-    which pops, tests, splits and pushes in the numpy loop's order.  Rows travel
-    as indices into ``m_full`` alone, where the numpy loop stacks their values
-    beside the indices, which is the only representational difference, and
-    ``leaf`` is the numpy path's own closure, handed each leaf and its
-    surviving rows in the order the traversal met it.  So a finished search
-    reports the same boxes, rows and candidates; a cut one stops at most one
-    :data:`TRAVERSAL_ROW_CHUNK` or one leaf later than the numpy loop would.
-
-    Returns ``(n_boxes, n_rows, complete)``; ``complete`` is ``False`` for an
-    overflowed grid or an expired budget, as in the numpy path.
-    """
-    from . import _kernels_numba as kn
-
-    m = np.ascontiguousarray(m_full, dtype=np.float64)
-    basis_t = np.ascontiguousarray(basis.T, dtype=np.float64)
-    swaps_a = np.asarray(swaps, dtype=np.int64).reshape(-1, 2)
-    lo_s = np.ascontiguousarray(lo_search, dtype=np.float64)
-    hi_s = np.ascontiguousarray(hi_search, dtype=np.float64)
-    band_lo, band_hi = float(det_band[0]), float(det_band[1])
-    cos_max = float(MAX_ANGLE_COSINE)
-    n_lines = len(lo_s)
-    n_all = len(m)
-    q_min_buf = np.empty(n_all)
-    q_max_buf = np.empty(n_all)
-    out = np.empty(n_all, dtype=np.int64)
-    counts = np.empty(n_lines, dtype=np.int64)
-    first = np.empty(n_lines, dtype=np.int64)
-    af_lo = np.empty(6)
-    af_hi = np.empty(6)
-    test_rows = kernels["test_rows"]
-
-    # ---- phase 1: the shared grid pass, box test compiled ----
-    def grid_test(rows: np.ndarray, lo: np.ndarray, hi: np.ndarray):
-        ok, k, _width, _unique = test_rows(
-            m, rows, lo, hi, basis_t, q_hi, band_lo, band_hi, swaps_a, lo_s,
-            hi_s, n_unindexed, cos_max, out, q_min_buf, q_max_buf, counts,
-            first, af_lo, af_hi)
-        return out[:k].copy() if ok else None
-
-    frontier, n_boxes, n_rows, complete = _grid_pass(
-        basis, np.asarray(lo0, dtype=np.float64),
-        np.asarray(hi0, dtype=np.float64), np.arange(n_all, dtype=np.int64),
-        grid_test, budget)
-    if frontier is None:
-        return n_boxes, n_rows, False
-
-    # ---- phase 2: the traversal, smallest cell first as in the numpy path ----
-    volumes = _centre_volumes(basis, frontier)
-    order = sorted(((volumes[i], i, lo, hi, rows)
-                    for i, (lo, hi, rows) in enumerate(frontier)), reverse=True)
-    n_dim = len(lo0)
-    n_entries = len(order)
-    cap = n_entries + 2 * (MAX_DEPTH + 2)
-    st_lo = np.empty((cap, n_dim))
-    st_hi = np.empty((cap, n_dim))
-    st_depth = np.zeros(cap, dtype=np.int64)
-    st_start = np.zeros(cap, dtype=np.int64)
-    st_len = np.zeros(cap, dtype=np.int64)
-    # siblings share their parent's surviving rows, so each distinct list enters
-    # the pool once — the base region every stack entry below it points into
-    placed: dict[int, tuple[int, int]] = {}
-    chunks: list[np.ndarray] = []
-    base_top = 0
-    for e, (_v, _i, lo, hi, rows) in enumerate(order):
-        if id(rows) not in placed:
-            placed[id(rows)] = (base_top, len(rows))
-            chunks.append(rows)
-            base_top += len(rows)
-        st_lo[e] = lo
-        st_hi[e] = hi
-        st_start[e], st_len[e] = placed[id(rows)]
-    widest = max((len(r) for r in chunks), default=1)
-    pool = np.zeros(base_top + _POOL_HEADROOM * max(widest, 1), dtype=np.int64)
-    if chunks:
-        pool[:base_top] = np.concatenate(chunks)
-    state = np.array([n_entries, base_top, 0, 0, 0, 0], dtype=np.int64)
-    leaf_lo = np.empty((TRAVERSAL_LEAF_BUFFER, n_dim))
-    leaf_hi = np.empty((TRAVERSAL_LEAF_BUFFER, n_dim))
-    leaf_width = np.empty(TRAVERSAL_LEAF_BUFFER)
-    # each buffered leaf's surviving rows; the kernel hands back before this
-    # could fail to hold one more leaf's, so twice the search set always fits
-    # one and, at a 2-D leaf's few dozen rows, holds the whole leaf buffer
-    leaf_rows = np.empty(max(2 * n_all, 1), dtype=np.int64)
-    leaf_start = np.empty(TRAVERSAL_LEAF_BUFFER, dtype=np.int64)
-    leaf_len = np.empty(TRAVERSAL_LEAF_BUFFER, dtype=np.int64)
-    line_hit = np.empty(n_lines, dtype=np.int64)
-
-    def counted() -> tuple[int, int]:
-        return n_boxes + int(state[3]), n_rows + int(state[4])
-
-    while True:
-        if budget.expired():
-            return (*counted(), False)
-        status = kernels["traverse"](
-            m, basis_t, q_hi, band_lo, band_hi, swaps_a, lo_s, hi_s,
-            n_unindexed, cos_max, tol_accept, MAX_DEPTH,
-            st_lo, st_hi, st_depth, st_start, st_len,
-            pool, base_top, state,
-            leaf_lo, leaf_hi, leaf_width, leaf_rows, leaf_start, leaf_len,
-            TRAVERSAL_ROW_CHUNK,
-            q_min_buf, q_max_buf, counts, first, af_lo, af_hi, line_hit)
-        for i in range(int(state[2])):
-            if budget.expired():
-                return (*counted(), False)
-            s = int(leaf_start[i])
-            leaf(leaf_lo[i].copy(), leaf_hi[i].copy(), float(leaf_width[i]),
-                 leaf_rows[s:s + int(leaf_len[i])].copy())
-        state[2] = 0
-        state[5] = 0
-        if status == kn.DONE:
-            return (*counted(), complete)
-        if status == kn.GROW:
-            pool = np.concatenate([pool, np.zeros(len(pool), dtype=np.int64)])
 
 
 #: Relative grid on which a converged box's A..F is hashed to see whether that

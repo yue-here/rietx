@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
 Depends on: — (1508 declined it at review, for a signal both tiers report)
-Priority: P4 2026-09-28 — a capability flag that reads "active" after a failed build, only on an install where numba imports and compiling fails; no fit number changes
+Priority: P4 2026-10-10 — moot once PR #864 merges: WP-1940 does its whole Goal, and it closes as 🛑 then
 
 ## Goal
 
@@ -55,6 +55,13 @@ bit-identical to their numpy paths or to a stated bar. What is wrong is a
 report about speed.
 
 ### Inherited
+
+- **2026-10-10, from WP-1940 (4th session, PR #864).** This WP's whole Goal
+  lands with that PR. The indexing traversal lost its compiled path, so one
+  compiled tier is left. Its import is the build, so `compiled_kernels` and a
+  build cannot disagree. A decline warns once a process, and
+  `Capabilities.compiled_kernels_unavailable` says why. Close this WP as 🛑,
+  superseded by 1940, once #864 merges.
 
 - **2026-10-10, from WP-1939 (amended the same day by its review, now
   WP-1940).** The numba model tier is being replaced by a Rust wheel

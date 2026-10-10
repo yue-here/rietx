@@ -701,19 +701,19 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   addition is not associative, so one bincount across all phases regroups each shared point into a
   different double; a guard for that builds the regrouped variant, never reverses the phase order,
   which passes whatever the code does.
-- **The numpy path has a compiled tier and it is what a default install runs** (WP-1115;
-  `model/compiled.py` owns the tier, `model/_kernels_numba.py` the arithmetic). *Not* a fourth
-  backend: jax and torch keep the traced twin, and nothing above `compile_model` may branch on
-  whether the kernels ran. Four rules. (1) The **fallback is mandatory and must stay exercised** —
-  numba is a *required* dependency (an extra can only add one, never subtract), so "installable
-  without the compiler" is a code property: soft import, every entry point declining rather than
-  raising, and `RIETX_COMPILED=0` / `compiled.set_enabled` the switch the goldens and
-  `test_compiled_kernels.py` run the numpy side through. (2) A **new kernel is serial
-  `njit(cache=True, nogil=True)` over a row range on the shared pool, never `prange`**, which
-  refuses to cache *and* measured slower. (3) Its **equivalence bar is per kernel, stated and
-  asserted**: no library call in it means the bit, an `exp` in it means 1e-13 relative, and the
-  numpy builder stays the bit-identity oracle against `_phase_component_scalar`. (4) **One path
-  per process** — deciding per call made the last digits a function of machine speed.
+- **The numpy path has a compiled tier and it is what a default install runs** (WP-1115, WP-1940;
+  `model/compiled.py` owns the tier, the `rietx-kernels` crate in `kernels/` the arithmetic). *Not*
+  a fourth backend: jax and torch keep the traced twin, and nothing above `compile_model` may branch
+  on whether the kernels ran. Four rules. (1) The **fallback is mandatory and must stay exercised**.
+  The wheel is a hard dependency with no markers and no sdist, so pip fails where none exists; the
+  import is still soft, every entry point declines rather than raising, a decline warns once and
+  reaches `capabilities()`, and `RIETX_COMPILED=0` / `compiled.set_enabled` is the switch the
+  goldens and `test_compiled_kernels.py` run the numpy side through. (2) A **new kernel is a serial
+  loop over a row range that releases the GIL**, on the shared pool and split on estimated work; it
+  ships as a minor wheel release that raises rietx's floor (`compiled.KERNEL_ABI` is the major).
+  (3) Its **equivalence bar is per kernel, stated and asserted**: no library call in it means the
+  bit, an `exp` in it means 1e-13 relative, and the numpy builder stays the bit-identity oracle
+  against `_phase_component_scalar`. (4) **One path per process**, never decided per call.
 - **Traced code runs inside `backend.traced.active(xp)`** — it makes `xp` the globally-bound
   backend *and* opens the backend's `full_precision()` scope. jax's fp64 is scoped, so a constant
   (or a θ vector) materialised outside it is silently float32 (it once cost the Pawley aux columns

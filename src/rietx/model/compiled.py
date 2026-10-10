@@ -1,10 +1,12 @@
-"""Fused, threaded twins of the batched numpy planes (WP-1115).
+"""Fused, threaded twins of the batched numpy planes (WP-1115, WP-1940).
 
 This is an **accelerator of the numpy path, not a fourth backend**.  jax and
-torch keep the traced twin (``backend/traced.py``); what lives here is a set of
-``numba`` kernels that compute exactly what ``model/forward.py`` computes with
+torch keep the traced twin (``backend/traced.py``); what lives here loads five
+compiled kernels that compute exactly what ``model/forward.py`` computes with
 numpy, in one pass over the grid instead of a dozen, and on more than one core.
-Nothing above it may branch on whether they ran.
+The kernels are Rust, shipped as the ``rietx-kernels`` wheel and built from
+``kernels/`` in this repository; numba compiled them until WP-1940.  Nothing
+above this module may branch on whether they ran.
 
 Why a compiled tier at all
 --------------------------
@@ -22,16 +24,18 @@ and ~12× threaded on the derivative bases, 6.9-7.1× on the column scatter.
 The three rules this module is held to
 --------------------------------------
 1. **The fallback is not optional.**  Every entry point declines rather than
-   raising — numba missing, the tier switched off, a ``shape="voigt"`` model, an
-   arity it was not written for — and the caller runs the numpy expression it
-   already had.  A build without numba is a supported build: the dependency is
-   required (``pyproject``) so the fast path is what a user gets by default, but
-   the import is *soft* so ``--no-deps``, a distro package or a constraint file
-   still produces a working install.  An extra cannot express this — extras only
-   ever *add* dependencies, never subtract one — so the knob is a runtime one
-   (:data:`~rietx._about.COMPILED_ENV`), which is the better knob anyway: it
-   needs no reinstall, and it is what keeps the numpy path exercised on the
-   default install.
+   raising — the wheel missing or of another interface, the tier switched off,
+   a ``shape="voigt"`` model, an arity it was not written for — and the caller
+   runs the numpy expression it already had.  ``rietx-kernels`` is a hard
+   dependency with no platform markers, and the crate publishes no sdist, so
+   pip fails loudly on a platform with no wheel.  The import stays soft all
+   the same, for ``--no-deps``, a distro package or an interface mismatch.
+   Such an install runs the numpy path, warns once a process and says why in
+   ``capabilities()`` (:func:`unavailable`).  Before WP-1940 it ran numpy in
+   silence, which was WP-1521's failure in a new place.
+   :data:`~rietx._about.COMPILED_ENV` remains the runtime switch: it needs no
+   reinstall, and it is what keeps the numpy path exercised on the default
+   install.
 2. **Each kernel declares which spelling of Ω it reproduces.**  ``pseudo_voigt``
    (the forward) and ``_components`` (the derivative bases) are 1-2 ulp apart on
    purpose, and the difference is a single association: the forward computes
@@ -43,26 +47,40 @@ The three rules this module is held to
    is **bit-identical** — multiplies and adds in the order ``np.bincount``
    performs them, with no library function in it, so the bar is the bit and
    ``tests/test_compiled_kernels.py`` asserts it.  The profile kernels call
-   ``exp``, and **whose ``exp`` decides the last bit**: numba calls the C
-   library's, numpy its own vectorised routine.  Measured, they agree bit for
-   bit on darwin/arm64 against numpy 2.5.2 and miss by ~3e-17 relative on
-   Linux — so the contract is the rounding bar (≤ 1e-15, WP-1112's bar for FCJ
-   rows) and the bit is asserted only where it was measured.  The numpy builder
-   stays the oracle for bit-identity against the per-reflection loop
-   (``tests/test_batched_forward.py``), which is why it has to remain a live,
-   exercised path and not merely dead fallback code — and why every test in
-   that file declares the numpy path rather than inheriting the default.
+   ``exp``, and **whose ``exp`` decides the last bit**: Rust's ``f64::exp``
+   calls the platform C library's, as numba did, and numpy uses its own
+   vectorised routine.  Measured, they agree bit for bit on darwin/arm64
+   against numpy 2.5.2 and miss by ~3e-17 relative on Linux — so the contract
+   is the rounding bar (≤ 1e-15, WP-1112's bar for FCJ rows) and the bit is
+   asserted only where it was measured.  The wheel matched numba bit for bit
+   on all five platforms it ships for (WP-1940), so these bars are the ones
+   numba was held to.  The numpy builder stays the oracle for bit-identity
+   against the per-reflection loop (``tests/test_batched_forward.py``), which
+   is why it has to remain a live, exercised path and not merely dead fallback
+   code — and why every test in that file declares the numpy path rather than
+   inheriting the default.
+
+Loading
+-------
+Importing the wheel *is* the build, so :func:`available` says whether the
+import succeeded.  numba needed two answers there, whether the compiler
+imports and whether the kernels then built (WP-1521), and a background compile
+to hide its warm-up.  Both are gone.  The wheel reports its interface number,
+and a load checks it against :data:`KERNEL_ABI`.  The ``pyproject`` pin
+``rietx-kernels>=N,<N+1`` with N = :data:`KERNEL_ABI` makes pip refuse a
+mismatch first, so the check here catches an install that bypassed the
+resolver.  A wheel lacking one of :data:`KERNEL_NAMES` declines the same way.
+A decline warns once a process, from the first :func:`enabled`, unless
+:data:`~rietx._about.COMPILED_ENV` chose the numpy path.
 
 Threading
 ---------
-``prange`` was measured the wrong shape twice over: it refuses to cache, so its
-~1.0 s recompiles in **every process**, and it is *slower* than the alternative
-(1.36 ms against 1.23 ms at 8 threads on the bases kernel).  So every kernel
-here is serial and ``nogil=True``, and the parallelism is a shared
-``ThreadPoolExecutor`` over disjoint row ranges — which caches like any other
-serial kernel (0.28 s in the first process, 0.06 s thereafter).  The pool is
-shared because building one per call costs more than half the win (6.0 ms
-against 2.8 ms, measured).
+Every kernel is serial over a row range and releases the GIL itself (PyO3's
+``Python::detach``), and the parallelism is a shared ``ThreadPoolExecutor``
+over disjoint row ranges.  numba's ``prange`` was measured slower than this
+pool, and refused to cache besides (WP-1115).  The pool is shared because
+building one per call costs more than half the win (6.0 ms against 2.8 ms,
+measured).
 
 **A call engages the pool on its estimated work, never on its row count**
 (:func:`_splits`, WP-1940).  An FCJ row carries 8-40 quadrature nodes across
@@ -78,35 +96,29 @@ setting and never a numerical one.
 The scatter is the exception and stays single-threaded: its rows write into
 overlapping windows, so splitting it by rows is a data race, and the order the
 additions arrive in is the whole of its bit-identity claim.
-
-Startup
--------
-Compilation releases the GIL and overlaps essentially completely with numpy
-work (measured across separate processes: 0.96 s serial against 0.65 s
-threaded), so :func:`warm` is fired from ``compile_model`` on a background
-thread and hides behind the file read, CIF parse and table build a fit does
-anyway.  The disk cache is redirected to the package state directory because
-numba's default is beside the source, i.e. inside ``site-packages``, which is
-read-only in plenty of real installs (system python, containers, Nix) — and an
-unwritable cache silently means recompiling in every process.
 """
 
 from __future__ import annotations
 
 import os
-import sys
 import threading
+import warnings
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import numpy as np
 
-from .._about import (
-    COMPILED_ENV,
-    COMPILED_THREADS_ENV,
-    STATE_DIR_ENV,
-    STATE_DIR_NAME,
-)
+from .._about import COMPILED_ENV, COMPILED_THREADS_ENV
+
+#: The kernel interface this rietx calls.  It is the ``rietx-kernels`` wheel's
+#: major version and the N of ``pyproject``'s ``rietx-kernels>=N,<N+1`` pin, so
+#: a new kernel is a minor release of the wheel and a changed signature a major
+#: one (``docs/RELEASING.md`` § The kernel wheel).  A wheel reporting another
+#: number is declined.
+KERNEL_ABI = 1
+
+#: The kernels the wheel must export, under the names ``_KERNELS`` keys them
+#: by.  A wheel lacking one is declined like a wrong :data:`KERNEL_ABI`.
+KERNEL_NAMES = ("accum", "omega_sym", "omega_fcj", "bases_sym", "bases_fcj")
 
 #: Ω spelled as :func:`~rietx.model.profiles.pseudovoigt.pseudo_voigt` — the
 #: forward model's own arithmetic.
@@ -139,64 +151,21 @@ _EMPTY_2D = np.zeros((0, 0))
 _LOCK = threading.Lock()
 _POOL_LOCK = threading.Lock()
 _KERNELS: dict | None = None
-_UNAVAILABLE = False
+#: why the load was declined, once one has been tried; ``None`` before that
+#: and after a load that succeeded
+_UNAVAILABLE: str | None = None
 _ENABLED: bool | None = None
+_WARNED = False
 _POOL: ThreadPoolExecutor | None = None
 #: worker count the pool was actually built with — read once, from the
 #: environment, and the number ``_spread`` splits by thereafter
 _POOL_WORKERS = 0
-_WARMING: threading.Thread | None = None
 
 
 def _off_by_env() -> bool:
     """Is the tier switched off in the environment?"""
     return os.environ.get(COMPILED_ENV, "").strip().lower() in {
         "0", "off", "no", "false"}
-
-
-def _cache_dir() -> str:
-    """Where numba writes ``.nbi``/``.nbc``, defaulting into the state dir.
-
-    A ``NUMBA_CACHE_DIR`` already in the environment always wins — a container
-    image that pre-warms the cache at build time sets one, and this must not
-    override it.
-    """
-    root = os.environ.get(STATE_DIR_ENV) or Path.home() / STATE_DIR_NAME
-    return str(Path(root) / "numba-cache")
-
-
-def _redirect_cache() -> None:
-    """Point numba's disk cache at :func:`_cache_dir`, whichever order wins.
-
-    **numba reads ``NUMBA_CACHE_DIR`` once, when it is imported**, so setting
-    the variable later does nothing and the cache silently falls back to
-    ``__pycache__`` beside the source — inside ``site-packages`` for an
-    ordinary install, which is read-only often enough to matter (system python,
-    containers, Nix) and, when it is not writable, means recompiling in every
-    process with nothing said.  This was live here for one commit and the
-    symptom was mild: it worked on a dev checkout, which is exactly where
-    nobody notices.
-
-    So both halves are covered.  The variable is set before *this* module
-    imports numba, which is the ordinary case; and if something else imported
-    numba first and left the setting empty, the already-parsed config value is
-    corrected in place.  A caller who set either one keeps it.
-
-    **The already-imported branch reads a module another thread may still be
-    building**, which is why ``config`` is fetched defensively rather than as
-    an attribute: :func:`warm` puts the numba import on a background thread on
-    purpose, so a first :func:`enabled` on the calling thread lands inside that
-    import often enough to matter, sees ``numba`` in ``sys.modules`` with no
-    ``config`` on it yet, and raised ``AttributeError`` out of a fit.  Skipping
-    the correction there is also the *right* answer, not merely the safe one:
-    the thread doing the importing came through this function first, so the
-    environment variable was already set and the import in flight is reading
-    it.
-    """
-    os.environ.setdefault("NUMBA_CACHE_DIR", _cache_dir())
-    cfg = getattr(sys.modules.get("numba"), "config", None)
-    if cfg is not None and not getattr(cfg, "CACHE_DIR", None):
-        cfg.CACHE_DIR = os.environ["NUMBA_CACHE_DIR"]
 
 
 def n_threads() -> int:
@@ -215,24 +184,81 @@ def n_threads() -> int:
     return max(1, min(8, os.cpu_count() or 1))
 
 
-def available() -> bool:
-    """Can the compiled kernels be built here — does numba import?
+def _load() -> tuple[dict | None, str | None]:
+    """Import the wheel and check it: the kernels, or why they were declined.
 
-    Does **not** say whether they are switched on (:func:`enabled`).  Both are
-    cheap after the first call and neither compiles anything.
+    Each reason is one clause naming what was found, so it reads both alone
+    (:func:`unavailable`) and inside the warning.
     """
-    if _UNAVAILABLE:
-        return False
-    if _KERNELS is not None:
-        return True
-    # before the import, never after: see _redirect_cache
-    _redirect_cache()
     try:
-        import numba  # noqa: F401
-    except Exception:  # pragma: no cover - depends on the install
-        return False
-    _redirect_cache()
-    return True
+        import rietx_kernels as wheel
+    except Exception as exc:
+        return None, (f"importing rietx_kernels raised {type(exc).__name__}"
+                      f" ({exc})")
+    version = getattr(wheel, "__version__", "of unknown version")
+    abi = getattr(wheel, "KERNEL_ABI", None)
+    if abi != KERNEL_ABI:
+        return None, (f"rietx_kernels {version} has kernel interface {abi},"
+                      f" and this rietx calls interface {KERNEL_ABI}")
+    missing = [n for n in KERNEL_NAMES if not callable(getattr(wheel, n, None))]
+    if missing:
+        return None, (f"rietx_kernels {version} lacks the kernel"
+                      f"{'s' if len(missing) > 1 else ''} {', '.join(missing)}")
+    return {n: getattr(wheel, n) for n in KERNEL_NAMES}, None
+
+
+def _kernels() -> dict | None:
+    """The kernels, loaded on first use; ``None`` if the load was declined.
+
+    Behind :data:`_LOCK` because several threads may ask at once, and one path
+    per process is the rule: which path an evaluation took must never depend on
+    which thread asked first.  A declined load is never retried.
+    """
+    global _KERNELS, _UNAVAILABLE
+    if _KERNELS is not None:
+        return _KERNELS
+    if _UNAVAILABLE is not None:
+        return None
+    with _LOCK:
+        if _KERNELS is None and _UNAVAILABLE is None:
+            _KERNELS, _UNAVAILABLE = _load()
+    return _KERNELS
+
+
+def available() -> bool:
+    """Did the compiled kernels load here?
+
+    Does **not** say whether they are switched on (:func:`enabled`).  Importing
+    the wheel is the whole build, so the first call costs an import and every
+    later one a flag test.
+    """
+    return _kernels() is not None
+
+
+def unavailable() -> str | None:
+    """Why the compiled kernels did not load here; ``None`` when they did.
+
+    ``capabilities()`` carries it as ``compiled_kernels_unavailable``, so a
+    client asking why a build is slow gets the reason and not only the flag.
+    """
+    _kernels()
+    return _UNAVAILABLE
+
+
+def _warn_unavailable() -> None:
+    """Warn, once a process, that the tier was wanted and did not load."""
+    global _WARNED
+    with _LOCK:
+        if _WARNED:
+            return
+        _WARNED = True
+    pin = f"rietx-kernels>={KERNEL_ABI},<{KERNEL_ABI + 1}"
+    warnings.warn(
+        f"rietx's compiled kernels did not load, because {_UNAVAILABLE}. Fits"
+        f" run the numpy path, which is slower. Install the kernels with"
+        f' pip install "{pin}", or set {COMPILED_ENV}=0 to choose the numpy'
+        f" path and silence this warning.",
+        RuntimeWarning, stacklevel=3)
 
 
 def enabled() -> bool:
@@ -242,10 +268,20 @@ def enabled() -> bool:
     Jacobian calls into the scatter thousands of times per iteration — and an
     ``os.environ`` lookup per call is not free at that rate.  Use
     :func:`set_enabled` to change it inside a process.
+
+    The first evaluation is where a declined load warns, because the switch was
+    on and the caller expected the tier.  Under
+    :data:`~rietx._about.COMPILED_ENV` ``=0`` the numpy path was chosen, and
+    nothing warns.
     """
     global _ENABLED
     if _ENABLED is None:
-        _ENABLED = not _off_by_env() and available()
+        if _off_by_env():
+            _ENABLED = False
+        else:
+            _ENABLED = available()
+            if not _ENABLED:
+                _warn_unavailable()
     return _ENABLED
 
 
@@ -255,74 +291,13 @@ def set_enabled(flag: bool | None) -> bool | None:
 
     This is the seam the suite runs the numpy path through — the fallback is
     only real if something exercises it — and the escape hatch for a caller who
-    has hit a difference and wants to say which side it is on.
+    has hit a difference and wants to say which side it is on.  It never warns.
+    Forcing the tier on where the wheel did not load leaves every entry point
+    declining, as before the call.
     """
     global _ENABLED
     was, _ENABLED = _ENABLED, flag
     return was
-
-
-def _kernels() -> dict | None:
-    """Build (or fetch) the kernels; ``None`` if this build has no numba.
-
-    **A caller that finds the build in progress waits for it.**  Declining
-    instead — running numpy for the calls that arrive early and the kernels for
-    the ones that arrive late — was the first shape here and it is the wrong
-    one: it makes which path a given evaluation took a function of how fast the
-    machine compiled, so the same script gives different last digits on two
-    runs and, through a trust-region decision, occasionally a different
-    iteration count.  One path per process is worth more than the few hundred
-    milliseconds it costs, and :func:`warm` has already overlapped most of that
-    with the model compile by the time a residual asks.
-    """
-    global _KERNELS, _UNAVAILABLE
-    if _KERNELS is not None:
-        return _KERNELS
-    if _UNAVAILABLE:
-        return None
-    with _LOCK:
-        if _KERNELS is not None:
-            return _KERNELS
-        if _UNAVAILABLE:
-            return None
-        _redirect_cache()
-        try:
-            from . import _kernels_numba
-
-            built = _kernels_numba.build()
-        except Exception:  # pragma: no cover - depends on the install
-            _UNAVAILABLE = True
-            return None
-        _KERNELS = built
-        return built
-
-
-def warm(block: bool = False) -> None:
-    """Compile the kernels, by default on a background thread.
-
-    numba's compilation releases the GIL, so this overlaps with the setup a fit
-    does before its first residual rather than adding to it.  Idempotent and
-    safe to call from anywhere; on a build without numba it is a no-op the first
-    time and a flag test thereafter.
-    """
-    global _WARMING
-    if _KERNELS is not None or _UNAVAILABLE:
-        return
-    # deliberately *not* ``enabled()``: that would answer through
-    # ``available()``, which imports numba — a tenth of a second or two, on the
-    # calling thread, immediately before handing the rest of the work to
-    # another one.  The switch can be read without it, and whether numba
-    # actually imports is then the background thread's question too.
-    if _ENABLED is False or (_ENABLED is None and _off_by_env()):
-        return
-    if block:
-        _kernels()
-        return
-    if _WARMING is not None and _WARMING.is_alive():
-        return
-    _WARMING = threading.Thread(
-        target=_kernels, name="rietx-kernel-warm", daemon=True)
-    _WARMING.start()
 
 
 def _pool() -> ThreadPoolExecutor:
@@ -333,8 +308,6 @@ def _pool() -> ThreadPoolExecutor:
     """
     global _POOL, _POOL_WORKERS
     if _POOL is None:
-        # its own lock: ``_LOCK`` is held for the whole of a cold compile, and
-        # a pool build must never queue behind one
         with _POOL_LOCK:
             if _POOL is None:
                 _POOL_WORKERS = n_threads()
@@ -398,8 +371,11 @@ def _spread(fn, n_rows: int, split: bool) -> None:
 
 
 def _c(a: np.ndarray, dtype=np.float64) -> np.ndarray:
-    """C-contiguous view of the declared dtype — free when it already is one,
-    and what keeps numba to a single compiled specialisation per kernel."""
+    """C-contiguous array of the declared dtype, free when it already is one.
+
+    The wheel refuses any other dtype and any plane that is not C-contiguous,
+    so every input passes through here on its way in.
+    """
     return np.ascontiguousarray(a, dtype=dtype)
 
 

@@ -6,11 +6,10 @@ name: Kernels
 #
 # Three triggers, one pipeline:
 #
-#   * A pull request touching the crate, its harness, the numba kernels it
-#     must agree with, their caller or this file builds every platform's
-#     wheel and checks each on its own platform, so a kernel change is tested
-#     where it ships before it merges.  A draft waits, as ci.yml's matrix
-#     does.
+#   * A pull request touching the crate, its tests, its harness, its caller or
+#     this file builds every platform's wheel and checks each on its own
+#     platform, so a kernel change is tested where it ships before it merges.
+#     A draft waits, as ci.yml's matrix does.
 #   * A `kernels-v*` tag does the same and then publishes.  A tag push, never a
 #     GitHub release: release.yml publishes rietx on every published release.
 #   * workflow_dispatch does the same as a pull request, plus `verify-trust`.
@@ -31,11 +30,16 @@ name: Kernels
 # No sdist is built (WP-1940 § Decisions item 4): pip fails loudly on a
 # platform with no wheel, where an sdist would need a Rust toolchain.
 #
-# The `test` job's agreement pass compares the wheel with numba inside two real
-# fits and fails on any differing call (`--gate`).  It needs numba, which rietx
-# still depends on until the migration; the macOS x86_64 job pins numba below
-# 0.63, the last line with wheels there.  When numba leaves rietx, this check
-# becomes tests/test_compiled_kernels.py against the numpy path.
+# The `test` job installs this run's wheel, never the index's, and checks that
+# it did.  Its reference is the numpy path, the arithmetic RIETX_COMPILED=0
+# runs.  numba was the reference until WP-1940 removed it from rietx.  Three
+# checks: the refusals, tests/test_compiled_kernels.py, and the agreement
+# pass.  That test file runs once: each of its comparisons sets both paths
+# itself, so a second run under RIETX_COMPILED=0 would repeat it.  That pass compares every kernel
+# call inside two real fits and fails on a call past its bar (`--gate`; the
+# bars are in the bench's docstring).  The numpy path itself lives in
+# src/rietx/model/forward.py.  ci.yml's fast suite tests a change there
+# against the published wheel, so it is not a trigger here.
 
 on:
   push:
@@ -44,13 +48,14 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'kernels/**'
-      # the agreement pass's reference and the calls it shadows: a change to
-      # either can break agreement without touching the crate
-      - 'src/rietx/model/_kernels_numba.py'
+      # the calls the agreement pass shadows, its harness and the `test` job's
+      # test files: a change to any can break agreement without touching the
+      # crate
       - 'src/rietx/model/compiled.py'
       - 'examples/aot_spike/bench_aot_kernels.py'
       - 'examples/bench_refinement.py'
       - 'tests/test_rietx_kernels.py'
+      - 'tests/test_compiled_kernels.py'
       - '.github/workflows/kernels.yml'
   workflow_dispatch:
 
@@ -97,11 +102,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {os: ubuntu-latest, platform: linux-x86_64, numba: ""}
-          - {os: ubuntu-24.04-arm, platform: linux-aarch64, numba: ""}
-          - {os: macos-latest, platform: macos-arm64, numba: ""}
-          - {os: macos-15-intel, platform: macos-x86_64, numba: "numba<0.63"}
-          - {os: windows-latest, platform: windows-x64, numba: ""}
+          - {os: ubuntu-latest, platform: linux-x86_64}
+          - {os: ubuntu-24.04-arm, platform: linux-aarch64}
+          - {os: macos-latest, platform: macos-arm64}
+          - {os: macos-15-intel, platform: macos-x86_64}
+          - {os: windows-latest, platform: windows-x64}
     defaults:
       run:
         shell: bash
@@ -118,20 +123,31 @@ jobs:
         with:
           name: wheel-${{ matrix.platform }}
           path: dist/
-      - name: Install rietx and this platform's wheel
+      - name: Install rietx and this run's wheel
+        # A path on the command line is a direct requirement, so uv takes the
+        # file even where the index holds the same version for rietx's pin.
+        run: uv pip install --python "$PY" -e ".[dev]" dist/*.whl
+      - name: The wheel imports, and is this run's
+        # before the tests, which skip at module level without it; a wheel
+        # from the index has no file URL in its direct_url.json
         run: |
-          OV=""
-          if [ -n "${{ matrix.numba }}" ]; then
-            echo "${{ matrix.numba }}" > overrides.txt
-            OV="--overrides overrides.txt"
-          fi
-          uv pip install --python "$PY" $OV -e ".[dev]" dist/*.whl
-      - name: The wheel imports
-        # before the tests, which skip at module level without it
-        run: '"$PY" -c "import rietx_kernels as k, numba; print(k.__version__, k.KERNEL_ABI, numba.__version__)"'
+          "$PY" - <<'PY'
+          import importlib.metadata as md
+          import json
+
+          import rietx_kernels as k
+
+          url = json.loads(md.distribution("rietx-kernels").read_text(
+              "direct_url.json") or "{}").get("url", "the package index")
+          print(k.__version__, k.KERNEL_ABI, url)
+          assert url.startswith("file:") and url.endswith(".whl"), \
+              f"rietx-kernels was installed from {url}, not from dist/"
+          PY
       - name: The refusals
         run: '"$PY" -m pytest tests/test_rietx_kernels.py'
-      - name: Agreement with numba inside two real fits
+      - name: The kernel tests, the wheel against the numpy path
+        run: '"$PY" -m pytest tests/test_compiled_kernels.py'
+      - name: Agreement with the numpy path inside two real fits
         run: '"$PY" examples/aot_spike/bench_aot_kernels.py --cases cpd-1a,trigger --skip 2,3 --gate'
 
   verify-trust:

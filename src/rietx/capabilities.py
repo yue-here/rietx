@@ -322,6 +322,11 @@ class Capabilities(Base):
     #: keeping a second copy of the vocabulary
     reader_options: list[ReaderOptionCapability] = Field(default_factory=list)
     features: dict[str, bool] = Field(default_factory=dict)
+    #: Why the compiled kernels did not load here (WP-1940), or ``None`` when
+    #: they did.  ``features["compiled_kernels"]`` is the flag; this is the
+    #: reason, read from ``model.compiled.unavailable()``, so a client asking
+    #: why a build is slow can say what to install.
+    compiled_kernels_unavailable: str | None = None
     #: Absolute path of the agent skill this build carries (WP-1304), or
     #: ``None`` where neither the wheel's copy nor a repository tree is present.
     #: A *path* rather than the text: the skill is ~156 kB across nine files and
@@ -337,6 +342,7 @@ def capabilities() -> Capabilities:
     # package is initialised and the constant is reachable — still quoted from
     # where it is defined, never copied.
     from .gui.textdoc import FORMAT_VERSION as TEXTDOC_FORMAT_VERSION
+    from .model import compiled
     from .skill import skill_path
 
     _skill = skill_path()
@@ -394,6 +400,7 @@ def capabilities() -> Capabilities:
             ReaderOptionCapability(name=o.name, kind=o.kind, help=o.help)
             for _, o in sorted(READER_OPTIONS.items())],
         features=_features(),
+        compiled_kernels_unavailable=compiled.unavailable(),
     )
 
 
@@ -586,15 +593,17 @@ def _features() -> dict[str, bool]:
         # arguments and could run validators — a capability query must not.
         "anomalous_dispersion_default_on": Source.model_fields["dispersion"]
         .get_default(call_default_factory=True) is not None,
-        # execution, asked of the tier itself (WP-1115).  Two flags because
-        # they answer different questions and can disagree: *can* the compiled
-        # kernels be built here — numba is a required dependency, but a
-        # ``--no-deps`` or distro install legitimately has none — and *will*
-        # the next residual (and, since WP-1508, the next dichotomy search) use
-        # them, which ``RIETX_COMPILED=0`` decides.  A client reporting "why is
-        # this build slow" needs the second.
+        # execution, asked of the tier itself (WP-1115, WP-1940).  Two flags
+        # because they answer different questions and can disagree.  The first
+        # is whether the ``rietx-kernels`` wheel loaded here: it is a required
+        # dependency, but a ``--no-deps`` or distro install can lack it, and a
+        # wheel of another interface is declined.  The second is whether the
+        # next residual will use the kernels, which ``RIETX_COMPILED=0``
+        # decides.  ``Capabilities.compiled_kernels_unavailable`` says why the
+        # first is false.  A switch forced on over a wheel that did not load
+        # still runs numpy, so the second needs the first (WP-1521).
         "compiled_kernels": compiled.available(),
-        "compiled_kernels_active": compiled.enabled(),
+        "compiled_kernels_active": compiled.enabled() and compiled.available(),
         # delivery (WP-1058): whether a fit can hand back the report at every
         # stage boundary as well as at the end.  Asked of the keyword that
         # turns it on, because the envelope whose field this used to read was

@@ -86,6 +86,15 @@ reads that page's article body, and needs widening if the column becomes
 required. The manual copies notebooks from `examples/tutorials/` on every build,
 so dropping the "until 1.7" lines needs no manual edit.
 
+### Inherited
+
+- **2026-10-10, from WP-1940 (4th session, PR #864).** rietx no longer depends on
+  numba. It depends on `rietx-kernels`, one abi3 wheel per platform with no
+  sdist. So the next release's `%pip install rietx` on Colab touches numba
+  not at all, and adds a ~200 KB manylinux wheel. JupyterLite stays out of
+  reach for a new reason: Pyodide has no `rietx-kernels` wheel, so pip refuses
+  rietx there.
+
 ## Non-goals
 
 - The manual's tutorial chapter and the quickstart rename (WP-1916).

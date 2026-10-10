@@ -84,6 +84,12 @@ this closes 🛑 with the numbers, as WP-1508's gate did for the 2-D traversal.
 
 ### Inherited
 
+- **2026-10-10, from WP-1940 (4th session, PR #864).** The dichotomy traversal now
+  runs on numpy alone. § Context's 40-46 % leaf share was measured with the
+  compiled traversal (numba 0.67.0), so the traversal's own share is now
+  larger and the leaves' smaller. WP-1508 measured the numpy loop at
+  1.03-1.09× on real patterns. Re-measure the share before ranking this lever.
+
 - **From WP-1518 (closed 2026-09-28): a digest belongs to a platform, and 1518
   moved five of the six.** The digest hashes the cells' bits. On macOS arm64
   (system BLAS) not one of 1509's six Linux x86-64 digests reproduced on the

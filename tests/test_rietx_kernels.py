@@ -1,8 +1,8 @@
 """The ``rietx_kernels`` wheel refuses every call its raw writes cannot survive.
 
 The crate writes its output planes through raw pointers (``kernels/src/lib.rs``
-says why), so a call numba would have run wrongly is, in Rust, undefined
-behaviour or a wrapped index.  Each binding therefore checks its arguments
+says why), so a call numba would have run wrongly (before WP-1940) is, in
+Rust, undefined behaviour or a wrapped index.  Each binding therefore checks its arguments
 before releasing the GIL.  Every case below is one well-formed call with one
 defect, and the well-formed call itself is the control, so a blanket refusal
 cannot pass.

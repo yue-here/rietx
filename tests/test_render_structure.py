@@ -23,7 +23,6 @@ import pytest
 
 from rietx.crystallography.cif import structure_from_cif
 from rietx.gui import structure3d as s3
-from rietx.model import compiled
 from rietx.schemas.structure import AnisoU, Atom, Cell, Phase, Structure
 from rietx.viz import component, keep, recolour, render_structure, select
 from rietx.viz.figure3d import glyphs, raster, render, views
@@ -312,36 +311,19 @@ def _general_ellipsoid() -> dict:
         aniso=AnisoU.from_values([0.03, 0.012, 0.02, 0.004, -0.003, 0.006])))
 
 
-@pytest.mark.skipif(not compiled.available(), reason="numba does not import here")
 @pytest.mark.parametrize("kw", [
     {"mode": "ball", "polyhedra": True, "atom_labels": True},
     {"mode": "ellipsoid", "background": None, "outline": True},
 ])
-def test_the_two_paths_draw_the_same_bits_in_any_banding(nac, kw, monkeypatch):
-    """The kernel and its numpy oracle call no library function, so the bar
-    between them is the bit (D1), and a band boundary moves nothing: the
-    outline reads across one through its halo."""
-    was = compiled.set_enabled(True)
-    try:
-        whole = render_structure(nac, size=240, **kw).image
-        monkeypatch.setattr(raster, "BAND_SAMPLES", 2000)      # dozens of bands
-        banded = render_structure(nac, size=240, **kw).image
-        compiled.set_enabled(False)
-        oracle = render_structure(nac, size=240, **kw).image
-    finally:
-        compiled.set_enabled(was)
+def test_a_band_boundary_moves_no_bit(nac, kw, monkeypatch):
+    """The picture is drawn a band of rows at a time, and where the bands
+    break moves nothing: the outline reads across a boundary through its
+    halo."""
+    whole = render_structure(nac, size=240, **kw).image
+    monkeypatch.setattr(raster, "BAND_SAMPLES", 2000)      # dozens of bands
+    banded = render_structure(nac, size=240, **kw).image
     assert np.array_equal(whole, banded)
-    assert np.array_equal(whole, oracle)
     assert (whole[..., 3] > 0).sum() > 5000
-
-
-def test_the_numpy_path_is_what_runs_with_the_tier_switched_off(nac):
-    was = compiled.set_enabled(False)
-    try:
-        fig = render_structure(nac, size=160)
-    finally:
-        compiled.set_enabled(was)
-    assert (fig.image[..., 3] > 0).sum() > 1000
 
 
 def test_two_renders_are_identical(nac):
@@ -414,12 +396,8 @@ def test_a_polyhedron_leaves_a_translucent_pixel():
 
 def test_a_non_positive_tensor_draws_no_nan():
     geo = s3.build(_monoclinic(aniso=AnisoU.from_values([0.02, -0.01, -0.01, 0.0, 0.0, 0.0])))
-    was = compiled.set_enabled(False)
-    try:
-        with np.errstate(invalid="raise", divide="raise"):
-            fig = render_structure(geo, mode="ellipsoid", size=200, background=None)
-    finally:
-        compiled.set_enabled(was)
+    with np.errstate(invalid="raise", divide="raise"):
+        fig = render_structure(geo, mode="ellipsoid", size=200, background=None)
     assert (fig.image[..., 3] > 0).sum() > 200
 
 
@@ -636,24 +614,6 @@ def _stack(z_near: float = 0.75, z_far: float = 0.25, **atom_kw) -> dict:
              Atom(label="C2", species="C", x=_p(0.5), y=_p(0.5), z=_p(z_far), **atom_kw)]
     return s3.build(Structure(phases=[Phase(name="stack", space_group="P 1",
                                             cell=cell, atoms=atoms)]))
-
-
-def test_the_id_pass_is_the_same_on_both_paths(nac):
-    """One integer plane, so the bar between the compiled kernel and numpy is
-    equality."""
-    if raster._id_kernel() is None:
-        pytest.skip("no compiled tier in this build")
-    for geometry in (s3.build(nac), _general_ellipsoid()):
-        scene = sc.build_scene(geometry, "ball")
-        arrays = raster.scene_arrays(scene)
-        for view in ("opening", "c", [1, 1, 0]):
-            pk = raster.pack_ids(arrays, views.resolve(geometry, view))
-            frame = raster.Frame(width=200, height=160, x0=-9.0, y0=8.0, ppa=11.0, px_scale=1.0)
-            a = raster.id_plane(pk, frame, compiled_path=True)
-            b = raster.id_plane(pk, frame, compiled_path=False)
-            assert (a.ids >= 0).any()
-            assert np.array_equal(a.ids, b.ids)
-            assert np.array_equal(a.seen, b.seen) and np.array_equal(a.front, b.front)
 
 
 def test_an_atom_behind_another_is_hidden_and_one_beside_it_is_not():

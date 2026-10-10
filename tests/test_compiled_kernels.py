@@ -1,4 +1,5 @@
-"""The WP-1115 compiled tier against the numpy path it accelerates.
+"""The compiled tier (WP-1115, a Rust wheel since WP-1940) against the numpy
+path it accelerates.
 
 Two things are checked here and they are different in kind.
 
@@ -10,10 +11,10 @@ Two things are checked here and they are different in kind.
   bit pattern;
 * the **profile kernels** agree to rounding — 1e-13 relative, WP-1112's bar —
   and on symmetric rows they are bit-identical *where that was measured*.
-  Which is a property of the platform rather than of the code: numba calls the
-  C library's ``exp``, numpy its own vectorised routine, and the two agree bit
-  for bit on darwin/arm64 against numpy 2.5.2 and miss by ~3e-17 on Linux.  The
-  bit is therefore asserted only there, for the same reason
+  Which is a property of the platform rather than of the code: the kernels
+  call the C library's ``exp``, numpy its own vectorised routine, and the two
+  agree bit for bit on darwin/arm64 against numpy 2.5.2 and miss by ~3e-17 on
+  Linux.  The bit is therefore asserted only there, for the same reason
   ``test_backend_shim`` pins its goldens to one platform.  The pad tail is
   excluded from the bit assertion either way: numpy reaches it by multiplying
   the computed value by ``mask``, so a negative value lands on ``-0.0`` there
@@ -21,10 +22,11 @@ Two things are checked here and they are different in kind.
   difference because the scatter drops the pad.
 
 **The contract**, which is the half a green arithmetic test would not notice: a
-build with no numba, or one with the tier switched off, must produce a working
-fit rather than an ``ImportError``.  The fallback is only real if something
-runs it, so the switch is exercised here and, one rank up, by every golden in
-``tests/test_backend_shim.py``.
+build without the wheel, with a wheel of another interface, or with the tier
+switched off must produce a working fit rather than an ``ImportError``.  A
+decline must also say so, once, and reach ``capabilities()``.  The fallback is
+only real if something runs it, so the switch is exercised here and, one rank
+up, by every golden in ``tests/test_backend_shim.py``.
 
 What is deliberately *not* asserted: that the compiled path is faster.  Wall
 clock belongs in ``examples/bench_refinement.py``, where it is quoted as a
@@ -34,19 +36,20 @@ a suite that runs under ``-n auto`` measures the machine, not the change.
 
 from __future__ import annotations
 
-import os
 import platform
-import subprocess
 import sys
+import tomllib
 import types
+import warnings
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+import rietx as rx
 from rietx import Instrument, PatternData
-from rietx._about import COMPILED_ENV, STATE_DIR_ENV
+from rietx._about import COMPILED_ENV
 from rietx.model import compiled
 from rietx.model.forward import BatchLayout, accumulate_planes, compile_model
 from rietx.params.vector import ParameterTable
@@ -54,7 +57,8 @@ from rietx.schemas.common import Parameter
 from rietx.schemas.structure import Atom, Cell, Phase, Structure
 
 pytestmark = pytest.mark.skipif(
-    not compiled.available(), reason="no numba in this venv")
+    not compiled.available(),
+    reason=f"the rietx-kernels wheel did not load: {compiled.unavailable()}")
 
 
 @pytest.fixture(autouse=True)
@@ -82,7 +86,6 @@ def _both(fn):
     compiled.set_enabled(False)
     want = fn()
     compiled.set_enabled(True)
-    compiled.warm(block=True)
     return fn(), want
 
 
@@ -132,7 +135,6 @@ def test_the_scatter_declines_an_arity_it_was_not_written_for():
               rng.standard_normal((len(lay.i0), lay.w_max)) * lay.mask)
              for _ in range(compiled.MAX_TERMS + 1)]
     compiled.set_enabled(True)
-    compiled.warm(block=True)
     assert compiled.accumulate(500, [(lay, terms)]) is None
     got, want = _both(lambda: accumulate_planes(500, [(lay, terms)]))
     assert _bits_equal(got, want)
@@ -174,7 +176,7 @@ def test_symmetric_rows_land_on_the_numpy_doubles():
     move it is ``exp``, and whether that moves it is a **property of the
     platform, not of the code**.
 
-    numba calls the C library's ``exp``; numpy calls its own vectorised
+    The kernels call the C library's ``exp``; numpy calls its own vectorised
     routine.  Measured: they agree bit for bit on darwin/arm64 against numpy
     2.5.2, and miss by ~3e-17 relative on Linux — which cost a CI round, and is
     why the bar this test enforces everywhere is the rounding one.  The bit is
@@ -213,7 +215,7 @@ def test_the_forward_and_the_bases_keep_their_separate_spellings():
     one spelling.  **Which of them is which** cannot be established by
     magnitude off the measured platform, and pretending otherwise would be the
     weakest kind of green: the gap between the spellings is 1-2 ulp, and so is
-    the gap between numba's ``exp`` and numpy's, so on Linux "used the other
+    the gap between the C library's ``exp`` and numpy's, so on Linux "used the other
     spelling" and "used the right one" are literally the same size — measured
     at 2.87e-17 against a 5.74e-17 spelling gap, a factor of two.  On
     darwin/arm64, where ``exp`` agrees, each compiled Ω is bit-equal to its own
@@ -263,7 +265,6 @@ def test_the_forward_agrees_with_the_scalar_loop_on_fcj_data():
     per-reflection loop that neither batching nor compiling may drift from."""
     model, values = _model(axial=True)
     compiled.set_enabled(True)
-    compiled.warm(block=True)
     for ip in range(len(model.phases)):
         got = model._phase_component_batched(ip, values)
         want = model._phase_component_scalar(ip, values)
@@ -304,7 +305,6 @@ def test_a_split_call_lands_on_the_inline_bits(monkeypatch, axial):
     """
     model, values = _model(axial=axial)
     compiled.set_enabled(True)
-    compiled.warm(block=True)
 
     def planes():
         out = [model._phase_component_batched(ip, values)
@@ -357,52 +357,135 @@ def test_the_switch_turns_the_tier_off_without_a_reinstall():
     assert compiled.enabled()
 
 
-def test_a_build_with_no_numba_still_fits(monkeypatch):
-    """The soft import is the whole reason numba can be a *required* dependency
-    without making it a hard one, so it is worth a test that actually removes
-    the kernels rather than one that reads the code and believes it."""
+def _fresh_load(monkeypatch, wheel=None, *, absent=False):
+    """Forget this process's load and warning, with ``wheel`` (or no wheel at
+    all) where ``import rietx_kernels`` will look.  ``monkeypatch`` puts the
+    real module and every latch back after the test."""
+    monkeypatch.setattr(compiled, "_KERNELS", None)
+    monkeypatch.setattr(compiled, "_UNAVAILABLE", None)
+    monkeypatch.setattr(compiled, "_WARNED", False)
+    if absent:
+        # ``None`` in sys.modules makes the import raise, as a missing wheel does
+        monkeypatch.setitem(sys.modules, "rietx_kernels", None)
+    elif wheel is not None:
+        monkeypatch.setitem(sys.modules, "rietx_kernels", wheel)
+
+
+def _wheel(**changes):
+    """A stand-in for the wheel: the real one's names, with ``changes`` applied
+    and a ``None`` change deleting the name."""
+    import rietx_kernels
+
+    fake = types.ModuleType("rietx_kernels")
+    for name in ("__version__", "KERNEL_ABI", *compiled.KERNEL_NAMES):
+        setattr(fake, name, getattr(rietx_kernels, name))
+    for name, value in changes.items():
+        if value is None:
+            delattr(fake, name)
+        else:
+            setattr(fake, name, value)
+    return fake
+
+
+def test_a_build_without_the_wheel_still_fits(monkeypatch):
+    """The soft import is why the wheel can be a hard dependency and a
+    ``--no-deps`` install still work, so the test removes the wheel rather than
+    reading the code and believing it."""
     model, values = _model(axial=True)
     compiled.set_enabled(True)
-    compiled.warm(block=True)
     want = model.evaluate(values)
-    monkeypatch.setattr(compiled, "_KERNELS", None)
-    monkeypatch.setattr(compiled, "_UNAVAILABLE", True)
+    _fresh_load(monkeypatch, absent=True)
+    assert not compiled.available()
+    assert compiled.unavailable().startswith(
+        "importing rietx_kernels raised ModuleNotFoundError")
     assert compiled.accumulate(len(model.tt), []) is None
     got = model.evaluate(values)
     assert _rel(got, want) < 1e-13
 
 
-def test_the_disk_cache_lands_in_the_state_dir_and_not_beside_the_source(
-        tmp_path):
-    """numba reads ``NUMBA_CACHE_DIR`` **when it is imported**, once.
+def test_a_wheel_of_another_interface_is_declined_by_both_numbers(monkeypatch):
+    """pip's ``<N+1`` refuses this first; the integer check is for an install
+    that went round the resolver, and its reason must name both sides."""
+    other = compiled.KERNEL_ABI + 1
+    _fresh_load(monkeypatch, _wheel(KERNEL_ABI=other, __version__=f"{other}.0.0"))
+    assert not compiled.available()
+    why = compiled.unavailable()
+    assert f"rietx_kernels {other}.0.0 has kernel interface {other}" in why
+    assert f"this rietx calls interface {compiled.KERNEL_ABI}" in why
 
-    Setting it later does nothing, and the cache then falls back to
-    ``__pycache__`` beside the source — inside ``site-packages`` for an ordinary
-    install, which is read-only often enough to matter, and where an unwritable
-    cache means recompiling in every process with nothing said.  This was live
-    here for one commit and worked perfectly on a dev checkout, which is exactly
-    where nobody notices; only counting the files caught it.
 
-    A subprocess, because the ordering being asserted is an import ordering and
-    this one has numba loaded already.
-    """
-    env = dict(os.environ)
-    env[STATE_DIR_ENV] = str(tmp_path)
-    env.pop("NUMBA_CACHE_DIR", None)
-    env.pop(COMPILED_ENV, None)
-    script = (
-        "from rietx.model import compiled\n"
-        "compiled.warm(block=True)\n"
-        "assert compiled._kernels() is not None, 'kernels did not build'\n"
-    )
-    out = subprocess.run([sys.executable, "-c", script], env=env,
-                         capture_output=True, text=True)
-    assert out.returncode == 0, out.stderr
-    written = sorted(p.name for p in (tmp_path / "numba-cache").rglob("*.nb[ic]"))
-    assert written, f"nothing cached under {tmp_path}: {out.stderr}"
-    beside = Path(compiled.__file__).parent / "__pycache__"
-    assert not list(beside.glob("*.nb[ic]")), \
-        f"cache leaked beside the source: {sorted(p.name for p in beside.glob('*.nb[ic]'))}"
+def test_a_wheel_lacking_a_kernel_is_declined_by_name(monkeypatch):
+    """A kernel the wheel lacks declines the whole tier, as a wrong interface
+    number does.  Serving the other four would make which path ran a function
+    of which kernel a call reached."""
+    _fresh_load(monkeypatch, _wheel(bases_fcj=None, omega_sym="not a kernel"))
+    assert not compiled.available()
+    assert compiled.unavailable().endswith("lacks the kernels omega_sym, bases_fcj")
+    assert compiled.bases_fcj(*[None] * 16) is False
+
+
+def test_a_decline_warns_once_and_never_when_the_numpy_path_was_chosen(
+        monkeypatch):
+    """A tier that did not run must say so (WP-1521), once a process, and only
+    when it was wanted.  ``RIETX_COMPILED=0`` and :func:`set_enabled` are both
+    a choice of the numpy path, so neither warns."""
+    monkeypatch.delenv(COMPILED_ENV, raising=False)
+    _fresh_load(monkeypatch, absent=True)
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
+        compiled.set_enabled(None)
+        assert not compiled.enabled()
+        compiled.set_enabled(None)
+        assert not compiled.enabled()
+        compiled.set_enabled(True)
+        compiled.enabled()
+    runtime = [w for w in seen if issubclass(w.category, RuntimeWarning)]
+    assert len(runtime) == 1, [str(w.message) for w in runtime]
+    text = str(runtime[0].message)
+    assert compiled.unavailable() in text
+    pin = f"rietx-kernels>={compiled.KERNEL_ABI},<{compiled.KERNEL_ABI + 1}"
+    assert f'pip install "{pin}"' in text
+    assert f"{COMPILED_ENV}=0" in text
+
+    monkeypatch.setenv(COMPILED_ENV, "0")
+    _fresh_load(monkeypatch, absent=True)
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
+        compiled.set_enabled(None)
+        assert not compiled.enabled()
+        assert not compiled.available()
+    assert not [w for w in seen if issubclass(w.category, RuntimeWarning)]
+
+
+def test_capabilities_says_why_the_kernels_did_not_load(monkeypatch):
+    """The flag says the build is slow; the reason says what to do about it."""
+    assert rx.capabilities().compiled_kernels_unavailable is None
+    _fresh_load(monkeypatch, _wheel(KERNEL_ABI=compiled.KERNEL_ABI + 1))
+    compiled.set_enabled(None)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        caps = rx.capabilities()
+    assert caps.features["compiled_kernels_active"] is False
+    assert caps.features["compiled_kernels"] is False
+    assert caps.compiled_kernels_unavailable == compiled.unavailable()
+    assert "kernel interface" in caps.compiled_kernels_unavailable
+    # forcing the switch on cannot make a declined tier run (WP-1521)
+    compiled.set_enabled(True)
+    assert rx.capabilities().features["compiled_kernels_active"] is False
+
+
+def test_the_pin_is_the_kernel_interface_and_numba_is_gone():
+    """``pyproject``'s range and :data:`compiled.KERNEL_ABI` are one number
+    written twice, so a bump of either alone fails here."""
+    path = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    project = tomllib.loads(path.read_text(encoding="utf-8"))["project"]
+    deps = project["dependencies"]
+    abi = compiled.KERNEL_ABI
+    assert [d for d in deps if d.startswith("rietx-kernels")] == [
+        f"rietx-kernels>={abi},<{abi + 1}"]
+    every = deps + [d for extra in project["optional-dependencies"].values()
+                    for d in extra]
+    assert not [d for d in every if d.lower().startswith(("numba", "llvmlite"))]
 
 
 def test_the_thread_count_is_settable_and_never_zero(monkeypatch):
@@ -416,35 +499,3 @@ def test_the_thread_count_is_settable_and_never_zero(monkeypatch):
         assert got >= 1
         if want is not None:
             assert got == want, f"{raw!r} gave {got}"
-
-
-def test_the_cache_redirect_survives_a_numba_another_thread_is_importing(
-        monkeypatch):
-    """``warm`` imports numba on a *thread*, so the module can be half-built.
-
-    :func:`compiled.warm` deliberately keeps the numba import off the calling
-    thread, which means a first :func:`compiled.enabled` on that thread can run
-    while the background one is inside ``import numba`` — ``sys.modules`` has
-    the module, with no ``config`` attribute on it yet.  Reading ``mod.config``
-    there raised ``AttributeError`` out of an ordinary fit; it surfaced as a
-    crashed benchmark that ran clean on the next attempt, which is how a race
-    announces itself.
-
-    The stand-in *is* the racing state rather than a mock of it, and that is
-    what makes the assertion deterministic: a test that started a thread and
-    hoped to land inside its import would fail to reproduce far more often
-    than it reproduced.
-
-    Skipping the correction is also correct and not merely safe — the thread
-    doing the importing came through ``_redirect_cache`` first, so the
-    environment variable the fresh import reads was already set.
-    """
-    monkeypatch.setenv("NUMBA_CACHE_DIR", "/tmp/set-by-the-other-thread")
-    half_built = types.ModuleType("numba")     # exactly: no ``config`` yet
-    assert not hasattr(half_built, "config")
-    monkeypatch.setitem(sys.modules, "numba", half_built)
-
-    compiled._redirect_cache()                 # must not raise
-
-    assert os.environ["NUMBA_CACHE_DIR"] == "/tmp/set-by-the-other-thread", \
-        "a caller's (or the other thread's) setting must survive"

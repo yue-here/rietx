@@ -222,11 +222,11 @@ roughly the shift (+1400 ppm).
   fired `INDEX_DOMINANT_ZONE` for two years on a fixture the base table could solve
   (WP-1041); the peak list blocked the certified pattern twice the same way (fitted
   satellites, then `_box_key` skipping unrefined leaves).
-- **The dichotomy traversal has a compiled twin, and the numpy loop is its oracle**
-  (WP-1508, `_kernels_numba.py`, under the model tier's `RIETX_COMPILED` switch). A
-  prune, the split or the push order changes in both, bit for bit;
-  `tests/test_indexing_kernels.py` compares one box on the bit and a whole search
-  *leaf by leaf* — the order, which box and candidate counts cannot see.
+- **The dichotomy traversal runs on numpy alone, and that loop is the oracle for any
+  compiled port** (WP-1940). Its numba twin left with numba. The numpy loop costs
+  1.03-1.09× on real patterns, and 10 s → ~200 s only on a synthetic box-bound
+  monoclinic list. A port goes into the `rietx-kernels` crate (`kernels/`), held to
+  the numpy loop on the bit and *leaf by leaf*, since box counts cannot see the order.
 - **An exact restriction keeps a superset of the rows in the set's own order, and
   rounds them as the whole computation did** (WP-1509). Equivalent reflections tie
   in Q and position breaks the tie, so a restriction is a mask, never a sort

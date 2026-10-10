@@ -88,11 +88,12 @@ PROJECTS_DIR_NAME = "rietx-projects"
 
 #: Switches the compiled kernel tier off (``0``/``off``/``no``/``false``), which
 #: makes every residual take the pure-numpy path.  A *runtime* knob and not a
-#: packaging one on purpose: numba is a required dependency so the fast path is
-#: what a default install gets, and an extra can only ever add a dependency,
-#: never subtract one — so this is what a user who cannot or will not run the
-#: compiled tier reaches for, and what keeps the numpy path exercised
-#: (``model/compiled.py``).
+#: packaging one on purpose: the ``rietx-kernels`` wheel is a required
+#: dependency so the fast path is what a default install gets, and an extra can
+#: only ever add a dependency, never subtract one — so this is what a user who
+#: cannot or will not run the compiled tier reaches for, and what keeps the
+#: numpy path exercised.  It also silences the warning an install without the
+#: wheel gives (``model/compiled.py``).
 COMPILED_ENV = "RIETX_COMPILED"
 #: Worker threads the compiled kernels split their rows across; unset means
 #: ``min(8, cpu_count)``.  Set it to ``1`` where the parallelism is already one

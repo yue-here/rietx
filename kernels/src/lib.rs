@@ -1,9 +1,28 @@
-//! The model kernels of rietx: `rietx/model/_kernels_numba.py` in Rust
-//! (WP-1940, from WP-1939's spike).
+//! The model kernels of rietx (WP-1940, from WP-1939's spike).  numba
+//! compiled them until WP-1940, from `rietx/model/_kernels_numba.py`, and
+//! these matched it bit for bit on all five wheel platforms.
 //!
-//! Every expression copies the numba line it replaces, association for
-//! association; that module's docstring is the contract.  Signatures are the
-//! numba ones, positionally, so `compiled._KERNELS` can hold these instead.
+//! `rietx/model/compiled.py` owns the loading, the fallback and every rule
+//! about when these run; read its docstring first.  What is here is only the
+//! arithmetic, and this header is its contract.  The signatures are the ones
+//! `compiled.py` calls, positionally.
+//!
+//! **Every expression is a transcription, not a derivation.**  Each one
+//! mirrors, operation for operation and association for association, the
+//! numpy expression it replaces in `model/profiles/pseudovoigt.py` and
+//! `model/forward.py`.  Where the two profile spellings differ they differ in
+//! exactly one place, the Gaussian exponent: `-4ln2·(x/Γ)²` in the forward
+//! against `((-4ln2)·u)·u` in the derivative bases.  That difference is the
+//! whole of the `spell` argument.  The Lorentzian is common to both, because
+//! `(4·u)·u` and `4·(u·u)` are bit-equal: multiplying by a power of two is
+//! exact.
+//!
+//! So the review question for any edit here is not "is this the right
+//! formula" but "is this the same rounding as the numpy line it copies".
+//! Rewriting `a * b * c` as `a * (b * c)` is a real change, and
+//! `tests/test_compiled_kernels.py` is what says so.  rustc never contracts a
+//! multiply and an add into one fused operation, so the source order is the
+//! rounding order.
 //!
 //! Two shapes are load-bearing, and both were measured (WP-1939's file):
 //!
@@ -20,7 +39,7 @@
 //!   reloaded them each iteration: the scatter ran at 0.59× numba that way.
 //!
 //! **Every argument is checked before the GIL is released**, where numba
-//! trusts `compiled.py`.  The checks are what make the raw writes sound, so
+//! trusted `compiled.py`.  The checks are what make the raw writes sound, so
 //! each binding runs all of them and a refusal is a `ValueError` naming the
 //! argument:
 //!
@@ -104,7 +123,7 @@ fn disjoint(outs: &[Span], ins: &[Span]) -> PyResult<()> {
 }
 
 /// An output plane as a raw pointer and its span, checked as numba and
-/// Cython check one: C-contiguous, writeable, and `x`'s shape.  The loops
+/// Cython checked one: C-contiguous, writeable, and `x`'s shape.  The loops
 /// write through the pointer at `x`'s indices, and `x`'s slices are
 /// bounds-checked, so the shape check is what keeps every write inside it.
 fn out2(name: &str, a: &Bound<'_, PyArray2<f64>>, like: [usize; 2]) -> PyResult<(P, Span)> {
@@ -137,7 +156,7 @@ fn pl<'a>(name: &str, a: &'a PyReadonlyArray2<'_, f64>) -> PyResult<(&'a [f64], 
 }
 
 /// Each node plane has `phi`'s shape.  The loops index all of them with
-/// `phi`'s width, where numba reads each with its own.
+/// `phi`'s width, where numba read each with its own.
 fn same_shape(phi: [usize; 2], planes: &[(&str, [usize; 2])]) -> PyResult<()> {
     for (name, s) in planes {
         if *s != phi {

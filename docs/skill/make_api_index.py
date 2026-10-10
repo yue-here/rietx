@@ -327,8 +327,8 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "`render_structure(g, **fig.recipe)`. Save the geometry "
                 "yourself with `json.dump`, since 5000 atoms is megabytes. The "
                 "search runs about a hundred id passes "
-                "(Measured: WP-1503, NAC cell 92 ms and 3143 atoms 565 ms, "
-                "against renders of 19-21 ms and 213-221 ms).",
+                "(Measured: WP-1940, NAC cell 1.3-1.4 s and 3143 atoms 22.6 s, "
+                "against renders of 97-113 ms and 1.02-1.06 s).",
                 ("rietx.viz.figure3d.FigureReport",),
             ),
             (

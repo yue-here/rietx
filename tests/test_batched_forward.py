@@ -28,8 +28,8 @@ implementations — the batched builder and the loop — and WP-1115's compiled
 tier is a third, with its own bar, held to it in
 ``tests/test_compiled_kernels.py``.  Letting these inherit the default made
 them pass here and fail on Linux CI, which is the measurement that produced
-the rule: numba's ``exp`` matches numpy's bit for bit on darwin/arm64 and
-misses it by ~3e-17 on Linux.
+the rule: the C library's ``exp``, which the kernels call, matches numpy's bit
+for bit on darwin/arm64 and misses it by ~3e-17 on Linux.
 """
 
 from __future__ import annotations

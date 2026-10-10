@@ -71,8 +71,8 @@ def test_a_missing_xdist_leaves_the_guard_inert():
 
     ``[dev]`` installs xdist, so this row is about the ``--no-deps`` and distro
     installs the package supports elsewhere (``model/compiled.py``'s soft
-    numba import is the same bargain) — the hook reads both options through
-    ``getattr`` for this reason.
+    import of the kernel wheel is the same bargain) — the hook reads both
+    options through ``getattr`` for this reason.
     """
     assert pytest_configure(SimpleNamespace(option=SimpleNamespace())) is None
 
