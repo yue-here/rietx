@@ -582,6 +582,80 @@ def _state_magnetic_width():
     return model, table, {}
 
 
+#: How far ``magnetic_stationary`` puts each angle from the direction the
+#: symmetry fixes, in rad.  Close enough that the forward quotient's I''·h/2
+#: is past ``REL_L2_MAX`` (measured 1.6e-2 on the azimuth at φ = π, 7.8e-3 on
+#: the polar angle), and far enough that the column is live (the azimuth's
+#: norm is 4.0e-4 of the scale's).
+STATIONARY_OFFSET_RAD = 1e-4
+
+
+def _magnetic_stationary(offset: float):
+    """One Mn moment along −**a** in the A-type Pnma group, angles freed.
+
+    Moment along **a** is a direction the symmetry fixes, so every
+    reflection's intensity is even in both angles about it: θ = π/2 and
+    φ = π are stationary, and both angle columns are exactly zero there.
+    ``offset`` moves both angles off it by that much, after the pattern is
+    simulated at the stationary direction.
+    """
+    import math
+
+    import rietx as rx
+    from rietx.schemas.instrument import BackgroundChebyshev
+    from rietx.schemas.pattern import PatternData
+    from rietx.schemas.structure import Moment
+    from tests import test_magnetic_solve as T
+    from tests.test_backend_shim import _free
+
+    truth = T.candidate_named("P n m a", T.MN_SITE, (0, 0, 0), T.A_TYPE_BNS)
+    ops, cent = truth.group.xyz_strings()
+    phase = T.perovskite(
+        moment=Moment.from_values((-3.5, 0.0, 0.0), "Mn3+"),
+        magnetic=rx.MagneticSymmetry(operations=list(ops),
+                                     centerings=list(cent)))
+    structure = rx.Structure(phases=[phase])
+    ins = rx.Instrument.constant_wavelength_neutron(T.LAMBDA_CW, fwhm_deg=0.35)
+    ins.background = BackgroundChebyshev.with_terms(2)
+    ins.background.coefficients[0].value = 40.0
+
+    empty = PatternData(two_theta=T.GRID.tolist(),
+                        intensity=np.zeros_like(T.GRID).tolist())
+    sim = compile_model(structure, ins, empty, mode="rietveld")
+    sim_table = ParameterTable(structure, ins)
+    y = sim.evaluate(sim_table.decode(sim_table.x0()))
+    pattern = PatternData(two_theta=sim.tt.tolist(),
+                          intensity=(np.asarray(y) * 1.03 + 2.0).tolist())
+
+    table = ParameterTable(structure, ins)
+    _free(table, ["phases.0.scale", "phases.0.atoms.1.moment.dof*",
+                  "instrument.background.c0"])
+    by_path = {e.path: e for e in table.entries}
+    base = "phases.0.atoms.1.moment"
+    assert by_path[f"{base}.dof1"].value == math.pi / 2
+    assert by_path[f"{base}.dof2"].value == math.pi
+    by_path[f"{base}.dof1"].value += offset
+    by_path[f"{base}.dof2"].value -= offset
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    return model, table, {}
+
+
+def _state_magnetic_stationary():
+    """WP-1929: a moment's two angles, beside the direction the symmetry fixes.
+
+    The third magnetic config, and it exists because the angle columns take
+    a path no other row reaches: central differences of the peak scalars
+    (``least_squares._CENTRAL_SCALARS``).  Near the stationary direction the
+    true column is I''·offset, and the forward quotient the angles took
+    before added I''·h/2 to it (issue #831).  At exactly the stationary
+    direction every column is dead, which ``_assert_columns`` skips, so
+    ``test_a_moment_angle_column_is_zero_at_a_stationary_direction`` asserts
+    that case against its exact oracle, zero.
+    """
+    return _magnetic_stationary(STATIONARY_OFFSET_RAD)
+
+
 def _state_satellites():
     """WP-1326: coordinate and ADP columns of a phase carrying a propagation vector.
 
@@ -733,6 +807,7 @@ CONFIGS = {"families": _state_families,
            "extra_peak": _state_extra_peak,
            "magnetic": _state_magnetic,
            "magnetic_width": _state_magnetic_width,
+           "magnetic_stationary": _state_magnetic_stationary,
            "satellites": _state_satellites, **STATES}
 
 #: the fast configs run everywhere; the two real-data ones are `slow`.
@@ -764,6 +839,7 @@ CONFIG_PARAMS = [
     _config("extra_peak"),
     _config("magnetic"),
     _config("magnetic_width"),
+    _config("magnetic_stationary"),
     _config("satellites"),
     _config("bodies"),
     _config("toy_lebail"),
@@ -1000,12 +1076,13 @@ def test_jacobian_matches_analytic(method, config):
                     what=f"{config}/{method} ")
 
 
-@pytest.mark.parametrize("config", ["magnetic", "magnetic_width"])
+@pytest.mark.parametrize("config", ["magnetic", "magnetic_width",
+                                    "magnetic_stationary"])
 def test_the_magnetic_config_declines_the_traced_backends_by_name(config):
     """The skip in ``_backend_jacobian`` above, made a measured fact.
 
-    WP-1327's config and WP-1343's are the magnetic models in this file, and
-    their autodiff rows are skipped rather than compared.  That is only honest
+    WP-1327's config, WP-1343's and WP-1929's are the magnetic models in this
+    file, and their autodiff rows are skipped rather than compared.  That is only honest
     if the twin really refuses — a twin that silently dropped the magnetic term
     would produce a Jacobian, agree with nothing, and the skip would be hiding
     it.  ``magnetic_width`` also asserts it is the split draw it claims to be.
@@ -1026,6 +1103,30 @@ def test_the_magnetic_config_declines_the_traced_backends_by_name(config):
             _jacobian_for(model, table, name)
     if not asked:
         pytest.skip("no autodiff backend installed")
+
+
+@pytest.mark.xdist_group("xb-magnetic_stationary")
+def test_a_moment_angle_column_is_zero_at_a_stationary_direction():
+    """At a direction the symmetry fixes, an angle's exact column is zero.
+
+    The intensity is even in each angle there, so zero is an exact oracle
+    and no step is involved.  Before WP-1929 the analytic chain differenced
+    the peak scalars forward and returned I''·h/2: 0.030 on the azimuth at
+    φ = π and 0.10 on the polar angle, against a modulus column of 1119
+    (issue #831 measured 0.0098 and 0.0013 on the two-site set's azimuths).
+    Central differences return 7.9e-12 and 7.3e-44, under 1e-14 of the
+    modulus's column.  The bar sits between the two.
+    """
+    model, table, _ = _magnetic_stationary(0.0)
+    J = _make_jacobian(model, table)(table.x0())
+    free = table.free_paths
+    n_data = len(model.tt)
+    norm = np.linalg.norm(J[:n_data], axis=0)
+    modulus = norm[free.index("phases.0.atoms.1.moment.dof0")]
+    assert modulus > 0.0
+    for name in ("dof1", "dof2"):
+        col = norm[free.index(f"phases.0.atoms.1.moment.{name}")]
+        assert col <= 1e-9 * modulus, (name, col, modulus)
 
 
 @pytest.mark.parametrize("config", CONFIG_PARAMS)

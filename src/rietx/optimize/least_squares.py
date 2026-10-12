@@ -160,6 +160,26 @@ _INTENSITY_ONLY = (
 )
 
 
+#: Paths whose peak scalars :func:`_peak_chain_column` differences
+#: **centrally** (WP-1929): a moment's direction angles.  A moment's intensity
+#: is an even function of an angle about every direction the symmetry fixes,
+#: so at such a direction the true column is zero.  The forward quotient
+#: returns I''·h/2 there instead, and h = ``FD_STEP``·|φ| makes it π times
+#: larger at φ = π than at 0.  Measured on the two-site Pnma set with both
+#: moments along **a** (issue #831): 0.0098 on Mn1's azimuth column and
+#: 0.0013 on Mn2's at φ = π, against an exact zero.  Central differences at
+#: steps from 1e-2 to 1e-8 all returned the zero, so the error was the
+#: branch's own.  Central, the two columns are 8e-44 and 2e-44.  Away from a
+#: stationary direction the change is O(h) relative, ~1e-6.
+#:
+#: The modulus is left forward on purpose.  |F_m|² ∝ μ² is even about μ = 0
+#: too, but a central column is exactly zero there, so a modulus started at
+#: zero could never move.  The angles share that fate at an exact symmetry
+#: direction, which is why the solve seeds them tilted
+#: (``crystallography.magnetic.moments.tilted_seed``).
+_CENTRAL_SCALARS = re.compile(r"^phases\.\d+\.atoms\.\d+\.moment\.dof[1-9]$")
+
+
 def _intensity_only(path: str, bkg_cols: dict[str, int]) -> bool:
     """Whether ``path`` can be refined without any peak moving or reshaping.
 
@@ -699,7 +719,8 @@ def _peak_chain_column(model: CompiledModel, table: ParameterTable,
                        values: dict[str, float], c: int, path: str,
                        intensities: list[np.ndarray] | None = None,
                        affected: "list[int] | range | None" = None,
-                       typical: float = 1.0) -> np.ndarray:
+                       typical: float = 1.0,
+                       central: bool = False) -> np.ndarray:
     """∂y/∂θ_c via the analytic bases + per-reflection scalar FD.
 
     Only the phases the column touches are re-derived (``phases.2.…`` leaves
@@ -718,11 +739,23 @@ def _peak_chain_column(model: CompiledModel, table: ParameterTable,
     -identical to the per-row loop); the claim verification is unchanged — a
     term whose coefficients are nonzero under a ``profile_derivs=False``
     build still raises through :func:`_require_basis`, naming the path.
+
+    ``central`` differences the scalars at θ ± h instead of θ + h and θ, for
+    a column whose scalars are **even** about a point the fit can stop on
+    (:data:`_CENTRAL_SCALARS`).  There the forward quotient returns
+    I''·h/2 for a derivative that is exactly zero, and only the central one
+    returns the zero (WP-1929).  It costs one more ``phase_peaks`` per phase
+    per column.
     """
     h = fd_step(theta[c], typical)
     tp = theta.copy()
     tp[c] += h
     values_p = table.decode(tp)
+    values_m = None
+    if central:
+        tm = theta.copy()
+        tm[c] -= h
+        values_m = table.decode(tm)
     if affected is None:
         affected = ([int(path.split(".")[1])] if path.startswith("phases.")
                     else range(len(model.phases)))
@@ -737,9 +770,9 @@ def _peak_chain_column(model: CompiledModel, table: ParameterTable,
         # component and nothing at all on the nuclear one, which is exactly
         # the separability the term needs to be identifiable.
         for component, pp in enumerate(bases.components(ip)):
-            peaks_p = model.phase_peaks(
-                ip, values_p, None if intensities is None else intensities[ip],
-                component=component)
+            inten_ip = None if intensities is None else intensities[ip]
+            peaks_p = model.phase_peaks(ip, values_p, inten_ip,
+                                        component=component)
             lay = pp.layout
             if not len(lay.i0):
                 continue
@@ -748,11 +781,23 @@ def _peak_chain_column(model: CompiledModel, table: ParameterTable,
             w2p = lay.gather(peaks_p, 2)
             int1 = lay.gather(peaks_p, 3)
             pair = pp.finite & np.isfinite(pos1)
+            if values_m is None:
+                # the expansion point's own scalars are the lower end
+                pos0, w10, w20, int0, step = (pp.pos, pp.w1, pp.w2, pp.inten, h)
+            else:
+                peaks_m = model.phase_peaks(ip, values_m, inten_ip,
+                                            component=component)
+                pos0 = lay.gather(peaks_m, 0)
+                w10 = lay.gather(peaks_m, 1)
+                w20 = lay.gather(peaks_m, 2)
+                int0 = lay.gather(peaks_m, 3)
+                pair = pair & np.isfinite(pos0)
+                step = 2.0 * h
             with np.errstate(invalid="ignore"):
-                d_i = np.where(pair, (int1 - pp.inten) / h, 0.0)
-                c_p = np.where(pair, pp.inten * ((pos1 - pp.pos) / h), 0.0)
-                c_g = np.where(pair, pp.inten * ((w1p - pp.w1) / h), 0.0)
-                c_e = np.where(pair, pp.inten * ((w2p - pp.w2) / h), 0.0)
+                d_i = np.where(pair, (int1 - int0) / step, 0.0)
+                c_p = np.where(pair, pp.inten * ((pos1 - pos0) / step), 0.0)
+                c_g = np.where(pair, pp.inten * ((w1p - w10) / step), 0.0)
+                c_e = np.where(pair, pp.inten * ((w2p - w20) / step), 0.0)
             terms = []
             if np.any(d_i != 0.0):
                 terms.append((d_i, pp.omega))
@@ -1091,6 +1136,10 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
                for c, (path, extra, _) in enumerate(identities)]
 
     typicals = _fd_typicals(table, identities)
+    # read over the column's reach, so a ``vars.X`` driving an angle is
+    # differenced as the angle is
+    central = [any(_CENTRAL_SCALARS.match(q) for q in (path, *extra))
+               for path, extra, _ in identities]
 
     fixed_intens = _lebail_snapshot(model)
 
@@ -1165,7 +1214,7 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
                 J[:n_data, c] = -sqrt_w * _peak_chain_column(
                     model, table, get_bases(), theta_t, values, c, path, intens,
                     affected=_affected_phases(model, path, extra),
-                    typical=typicals[c])
+                    typical=typicals[c], central=central[c])
             else:
                 fd_cols.append(c)
 
