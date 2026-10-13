@@ -1,4 +1,4 @@
-# WP-1957 — A phase with no reflection in range walks its scale under TRF
+# WP-1958 — A phase with no reflection in range walks its scale under TRF
 
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent

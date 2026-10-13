@@ -316,7 +316,7 @@ Counts on main `908c481` merged into this branch (`ff7a0f3`). Fast selection, ve
 
 **Gotchas.** `HIGH_CORRELATION` is now the only report on a collinear pair, and it lists the worst |ρ| first under `HIGH_CORRELATION_MAX`. A pair whose scales sit just under its threshold gets neither diagnostic. The ISO-TRUTH degenerate seed still holds the phantom, because its scale sits near zero. In one of five seeds the phantom was released at the answer, having picked up scale at the identity point.
 
-**Forward references.** 1339 (ask 3: ± seeds off the identity point is the only remedy for the wrong-sign start, and the hold no longer picks a side). 1420 (its goal names the identity-point subgroup as the case the hold cannot judge; under this rule a phantom with real scale there is not held at all). 1930 (the `lab6_cbn` failure on Linux). New WP-1957 for the `trf` scale walk the previous entry left unfiled: no open WP owns it. 1534 and 1463 are closed, and 1420 is about re-entry in a chain.
+**Forward references.** 1339 (ask 3: ± seeds off the identity point is the only remedy for the wrong-sign start, and the hold no longer picks a side). 1420 (its goal names the identity-point subgroup as the case the hold cannot judge; under this rule a phantom with real scale there is not held at all). 1930 (the `lab6_cbn` failure on Linux). New WP-1958 for the `trf` scale walk the previous entry left unfiled: no open WP owns it. 1534 and 1463 are closed, and 1420 is about re-entry in a chain.
 
 **Lanes.** None dispatched; one item kept, `land-ridge` (est 15).
 
