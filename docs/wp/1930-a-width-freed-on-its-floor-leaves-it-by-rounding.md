@@ -1,6 +1,6 @@
 # WP-1930 — a width freed on its floor leaves it by rounding
 
-Milestone: unscheduled · Status: 🔄 2026-10-09 — PR #849 ready; the band's Linux run is the nightly after merge
+Milestone: unscheduled · Status: 🔄 2026-10-13 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P1 2026-10-08 — a published acceptance number (VALIDATION.md, the landing page) that `main` reproduces on no platform, χ²_red 12.48 on Linux against 9.69 on macOS, every assertion green; `profile.y` defaults to 0.0, its floor, and six preset plans free it there
