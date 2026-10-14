@@ -646,3 +646,4 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1950](1950-rietx-inside-an-application.md) | Rietx inside an application | ⬜ | P3 | — |
 | [1960](1960-spherical-harmonics-texture.md) | Spherical-harmonics texture: preferred orientation with no single axis | ⬜ | P3 | — |
 | [1962](1962-xrd-ct-a-pattern-summed-over-the-voxels-its-beam-crosses.md) | XRD-CT: a pattern summed over the voxels its beam crosses | ⬜ | P3 | [1325](1325-parametric-series.md) |
+| [1963](1963-a-background-stiff-at-the-peak-width.md) | A background stiff at the peak width, at every angle | ⬜ | P3 | — ([1931](1931-the-background-order-scan-runs-to-its-cap.md) soft) |

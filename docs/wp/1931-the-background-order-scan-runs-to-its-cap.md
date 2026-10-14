@@ -83,6 +83,18 @@ claim the proposal makes and has not measured.
 
 ### Inherited
 
+- **2026-10-14, from WP-1963's filing: a candidate for the criterion the
+  selector waits on.** The resume condition below asks for a criterion that
+  does not read profile misfit as background. WP-1963 scopes one taken from the
+  instrument instead of the data (`docs/solver-survey.md` §C10): place the
+  knots a fixed number of peak FWHMs apart, or uniformly in Q, so that the
+  background's stiffness follows the peak width. It judges by this WP's
+  `worst_absorption` measure. It is not a fold, because it changes where the
+  knots go, not how the smoothing strength is chosen. One fact from the
+  filing that bears on this WP: at the default strength, the P-spline's
+  equivalent kernel is about three knot spacings wide (23.5° at 8° knots,
+  tr(H) 3.61; 9.1° at 3° knots, tr(H) 6.88; 2-50° at 0.001°, uniform σ).
+
 - **2026-10-11, from the issue triage (#833): task 1 is in PR #871, and the
   reporter measured task 2, which undercuts the selector and this WP's
   acceptance.** PR #871 (open, 2026-10-10) adds `BACKGROUND_ORDER_AT_CAP`
