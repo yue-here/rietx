@@ -645,3 +645,4 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1950](1950-rietx-inside-an-application.md) | Rietx inside an application | ⬜ | P3 | — |
 | [1960](1960-spherical-harmonics-texture.md) | Spherical-harmonics texture: preferred orientation with no single axis | ⬜ | P3 | — |
 | [1962](1962-xrd-ct-a-pattern-summed-over-the-voxels-its-beam-crosses.md) | XRD-CT: a pattern summed over the voxels its beam crosses | ⬜ | P3 | [1325](1325-parametric-series.md) |
+| [1963](1963-a-kernel-over-the-pattern-coordinates.md) | A kernel over the pattern coordinates: honest intervals where no pattern sees the parameter | ⬜ | P3 | [1325](1325-parametric-series.md) |
