@@ -69,7 +69,9 @@
 //! The structure figure's rasteriser is the other module, `raster.rs`, with a
 //! header of its own.  It joined in 1.1.0 (WP-1940 § Decisions item 9).  Its
 //! oracle is `rietx/viz/figure3d/raster.py`, and its bar is the bit on every
-//! platform, because it calls no library function.
+//! platform, because it calls no library function.  The dichotomy indexer's
+//! box test joined in 1.3.0 (`dichotomy.rs`), and the structure-solution
+//! engine's orbit sums and contact term in 1.4.0 (`solve.rs`, #562).
 
 use numpy::{
     Element, PyArray1, PyArray2, PyArrayMethods, PyReadonlyArray1, PyReadonlyArray2,
@@ -82,6 +84,7 @@ use std::f64::consts::{LN_2, PI};
 mod dichotomy;
 mod fcj;
 mod raster;
+mod solve;
 #[cfg(target_arch = "x86_64")]
 mod sleef;
 
@@ -599,5 +602,8 @@ fn rietx_kernels(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(raster::id_plane, m)?)?;
     m.add_function(wrap_pyfunction!(dichotomy::dichotomy_box_test, m)?)?;
     m.add_function(wrap_pyfunction!(dichotomy::dichotomy_child_key, m)?)?;
+    m.add_function(wrap_pyfunction!(solve::solve_orbit_sums, m)?)?;
+    m.add_function(wrap_pyfunction!(solve::solve_orbit_sums_one, m)?)?;
+    m.add_function(wrap_pyfunction!(solve::solve_clash, m)?)?;
     Ok(())
 }
