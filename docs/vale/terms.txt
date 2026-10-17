@@ -73,6 +73,7 @@ lanthanide
 ligand
 ligands
 linewidth
+Lp
 macromolecular
 magCIF
 methylammonium
@@ -111,6 +112,7 @@ scatterers
 Shubnikov
 spallation
 spinel
+structureless
 subcell
 sublattice
 supercell
@@ -129,6 +131,7 @@ uncentred
 uniaxial
 unindexed
 unmonochromated
+unprimed
 Wyckoff
 zincite
 
@@ -145,12 +148,17 @@ Uiso
 
 # Methods and functions named after people.
 Altomare
+Borda
 Brentano
 Brindley
+Bunge
 Caglioti
 Chebyshev
 Coelho
+Cracknell
+de
 Debye
+Deslattes
 Dollase
 Dreele
 Faddeeva
@@ -161,6 +169,10 @@ Guinier
 Hofmann
 Jacobian
 Jacobians
+Kessler
+Kirfel
+Kissel
+Kovalev
 Landé
 Langford
 Levenberg
@@ -178,26 +190,39 @@ Scherrer
 Schwarzenbach
 Shirane
 Suortti
+Thomlinson
 Voigt
 Von
+Waasmaier
+Weideman
+Wertheim
+Whittaker
 
 # Mathematics and statistics.
+additively
 affinely
 asymptote
 bijection
 centroid
 centroids
 combinatorial
+complexifies
 componentwise
 configurational
+congruences
+containments
+contrapositive
 contravariant
 convolved
 covariances
 decorrelate
 decorrelates
+decorrelating
 decorrelation
 degeneracies
+dependences
 eigenpairs
+equalities
 equilibrate
 equilibrated
 equilibrates
@@ -207,12 +232,15 @@ functionals
 identifiability
 injective
 integrand
+invariants
 isometry
 iteratively
 linearisation
 linearise
 linearised
 ln
+logit
+minimisations
 moduli
 monomial
 monomials
@@ -224,23 +252,34 @@ nullspace
 orthonormal
 parameterisation
 parameterisations
+parameterises
+pentadiagonal
 pointwise
 positivity
+precisions
 prefactor
+projective
+pseudoreal
 quadratically
 quantile
 quartic
 quaternion
+realification
 renormalised
 reparameterisation
 rescale
 rescaled
 rescales
 rescaling
+resolvability
+reweighting
 roundoff
+scalings
 semidefinite
+softplus
 symmetrised
 systematics
+tensored
 uncalibrated
 unconverged
 underdetermined
@@ -248,6 +287,7 @@ unmodelled
 unphysical
 unpolarised
 unscaled
+untransposed
 
 # Programs, libraries and formats.
 Bruker
@@ -270,26 +310,32 @@ pydantic
 pytest
 rietx
 Rigaku
+SARAh
 scipy
 spglib
 TOPAS
 
 # Words a reader of software documentation meets.
+autodiff
 backend
 backends
+branchless
 changelog
 docstring
 docstrings
 filesystem
 frontend
 lookups
+recurses
 refinable
 rietview
 roadmap
+selectable
 stderr
 stdout
 subcommand
 subcommands
+subtree
 tooltip
 traceback
 walkthrough

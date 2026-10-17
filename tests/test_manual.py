@@ -42,6 +42,8 @@ NOT_PAGES = {"_build", "_generated"}
 DOCS_PAGES = sorted(
     p for p in DOCS_TREE.rglob("*.md") if not NOT_PAGES & set(p.relative_to(DOCS_TREE).parts)
 )
+#: Part 2, moved here by WP-1986.
+THEORY_DIR = DOCS_TREE / "theory"
 
 # Everything on a built page that is *not* prose: a `$` inside a code block or
 # a script is not a rendering failure, and MathJax's own delimiters are `\(…\)`.
@@ -405,7 +407,7 @@ def test_the_tch_coefficients_in_print_are_the_ones_the_code_runs():
     """
     from rietx.model.profiles.pseudovoigt import _TCH_ETA, _TCH_GAMMA
 
-    text = (MANUAL_DIR / "profiles.md").read_text(encoding="utf-8")
+    text = (THEORY_DIR / "profiles.md").read_text(encoding="utf-8")
     for label, expected in (("prof-tch-gamma", _TCH_GAMMA), ("prof-tch-eta", _TCH_ETA)):
         block = re.search(rf":label: {label}\n(.*?)^```", text, re.S | re.M)
         assert block, f"{label}: equation not found in profiles.md"
@@ -595,7 +597,9 @@ YEAR_IN_CITATION = re.compile(r"[A-Za-z\u00c0-\u024f.]\s*,\s*(?:19|20)\d{2}[a-z]
 BIBLIO_LABEL_RULE = 'div.citation[role="doc-biblioentry"] > span.label'
 
 
-def test_every_citation_reads_as_author_and_year(built_manual):
+@pytest.mark.xdist_group("manual-build")
+@BOTH_BUILDS
+def test_every_citation_reads_as_author_and_year(build, request):
     """`conf.py` § bibtex: a citation names its author and year on the page.
 
     Three settings produce this and any one of them can be lost quietly, so
@@ -609,7 +613,7 @@ def test_every_citation_reads_as_author_and_year(built_manual):
     naming more than one work rendered as a flat comma list of six fragments.
     A citation carrying N years must carry N-1 semicolons.
     """
-    out, result = built_manual
+    out, result = request.getfixturevalue(build)
     assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
     not_author_year, bad_separator = [], []
     multi = 0
@@ -640,7 +644,9 @@ def test_every_citation_reads_as_author_and_year(built_manual):
 EQUATION_REF = re.compile(r'<a[^>]*href="[^"]*#equation-[^"]*"[^>]*>\((\d+\.\d+)\)</a>')
 
 
-def test_no_reference_is_doubly_bracketed(built_manual):
+@pytest.mark.xdist_group("manual-build")
+@BOTH_BUILDS
+def test_no_reference_is_doubly_bracketed(build, request):
     """A reference brings its own brackets, so the prose must not add a second
     pair.
 
@@ -655,7 +661,7 @@ def test_no_reference_is_doubly_bracketed(built_manual):
     Brackets of the *other* kind are left alone. `(via Scherrer, (6.3) in …)`
     is ordinary English and reads correctly.
     """
-    out, result = built_manual
+    out, result = request.getfixturevalue(build)
     assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
     doubled, seen = [], 0
     for page in sorted(out.rglob("*.html")):
@@ -683,7 +689,9 @@ def test_no_reference_is_doubly_bracketed(built_manual):
     )
 
 
-def test_the_bibliography_label_is_hidden_and_the_rule_reaches_all_of_them(built_manual):
+@pytest.mark.xdist_group("manual-build")
+@BOTH_BUILDS
+def test_the_bibliography_label_is_hidden_and_the_rule_reaches_all_of_them(build, request):
     """The other half of § G3, which no build warning can see.
 
     docutils gives every citation node a label and sphinxcontrib-bibtex
@@ -693,7 +701,7 @@ def test_the_bibliography_label_is_hidden_and_the_rule_reaches_all_of_them(built
     bibliography, so that is asserted rather than assumed: a label appearing
     anywhere else would be hidden too, silently.
     """
-    out, result = built_manual
+    out, result = request.getfixturevalue(build)
     assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
     css = (out / "_static" / "custom.css").read_text(encoding="utf-8")
     assert BIBLIO_LABEL_RULE in css, (
@@ -712,13 +720,12 @@ def test_the_bibliography_label_is_hidden_and_the_rule_reaches_all_of_them(built
     )
 
 
-#: Part 2 — the theory chapters, which are the manual's top-level `.md` files
-#: other than the root document.  Derived rather than listed, so a chapter
-#: added to Part 2 inherits the guards below (the `using/` subdirectory is
-#: Part 1 and `tests/test_manual_api.py` is its guard).
+#: Part 2 — the theory chapters, the new tree's Theory tab since WP-1986, less
+#: its generated bibliography.  The old tree's copies are one-line includes of
+#: these.  Derived rather than listed, so a chapter added to Theory inherits
+#: the guards below.
 def _part_two() -> list[Path]:
-    pages = [p for p in CHAPTERS
-             if p.parent == MANUAL_DIR and p.name not in {"manual.md"}]
+    pages = [p for p in DOCS_PAGES if p.parent == THEORY_DIR and p.name != "references.md"]
     assert len(pages) > 5, "Part 2 chapters not found — has the tree moved?"
     return pages
 
@@ -1165,32 +1172,32 @@ def _heading_slugs(source: Path) -> set[str]:
             if level <= HEADING_ANCHOR_DEPTH}
 
 
-#: Part 2 stays in the old tree until WP-1986 moves it, so until then a
-#: physics claim links the old tree's page on the site (WP-1983).
-_OLD_THEORY_LINK = re.compile(re.escape(DOCS_URL) + r"/([\w-]+\.html)(?:#(\S+))?$")
+#: A Part 2 chapter's old address on the site.  Concepts linked these until
+#: WP-1986 moved Part 2 into the Theory tab, and the old pages stay up until
+#: Part 1 retires, so a link to one would land and go stale in silence.
+_OLD_THEORY_LINK = re.compile(re.escape(DOCS_URL) + r"/([\w-]+)\.html(?:#\S*)?$")
+
+#: The tabs whose pages link Theory to back a physics claim (WP-1975 § F8).
+LINKING_TABS = {"concepts", "guides", "switching"}
 
 
-def _theory_link_failures(page: Path, text: str, out: Path, old_out: Path) -> list[str]:
+def _theory_link_failures(page: Path, text: str, out: Path) -> list[str]:
     """Each link from `page` into the Theory tab that the build did not write.
 
     The built page has to exist, and so does the section a fragment names, by
     its HTML id or by the MyST slug that resolves to one.  Read off the HTML,
-    because that is what the reader's click lands on.  A link to a Part 2
-    chapter on the site is read off the old tree's build `old_out`, by HTML id
-    alone, since that tree makes no heading slugs.
+    because that is what the reader's click lands on.  A link to a moved
+    chapter's old address on the site fails too, naming the relative link.
     """
     failures = []
+    # The tab's own index is not a moved chapter: `rietx.org/index.html` is the
+    # landing page.
+    moved = {p.stem for p in _part_two()} - {"index"}
     for target in _MD_LINK.findall(text):
-        if target.startswith(DOCS_URL + "/") and not _OLD_THEORY_LINK.match(target):
-            failures.append(f"{target}: not a link to a Part 2 chapter on the site")
-            continue
-        if old := _OLD_THEORY_LINK.match(target):
-            name, fragment = old.groups()
-            if (MANUAL_DIR / name).with_suffix(".md") not in _part_two():
-                failures.append(f"{target}: {name} is not a Part 2 chapter")
-            elif fragment and f'id="{fragment}"' not in (old_out / name).read_text(
-                    encoding="utf-8"):
-                failures.append(f"{target}: {name} has no section #{fragment}")
+        old = _OLD_THEORY_LINK.match(target)
+        if old and old.group(1) in moved:
+            failures.append(f"{target}: the chapter is in the Theory tab, so link "
+                            f"../theory/{old.group(1)}.md")
             continue
         if "://" in target or target.startswith("#"):
             continue
@@ -1213,46 +1220,38 @@ def _theory_link_failures(page: Path, text: str, out: Path, old_out: Path) -> li
 
 
 @pytest.mark.xdist_group("manual-build")
-def test_every_theory_link_from_concepts_and_guides_resolves(built_docs_tree, built_manual):
-    """A physics claim on a Concepts or Guides page links the Theory section
-    that derives it, and the link has to land (WP-1975 § F8)."""
+def test_every_theory_link_from_concepts_guides_and_switching_resolves(built_docs_tree):
+    """A physics claim on a Concepts, Guides or Switching page links the Theory
+    section that derives it, and the link has to land (WP-1975 § F8)."""
     out, result = built_docs_tree
     assert result.returncode == 0, "the new tree did not build"
-    old_out, old_result = built_manual
-    assert old_result.returncode == 0, "the old tree did not build"
     failures = [f"{page.relative_to(DOCS_TREE).as_posix()}: {failure}"
                 for page in DOCS_PAGES
-                if page.relative_to(DOCS_TREE).parts[0] in {"concepts", "guides"}
-                for failure in _theory_link_failures(
-                    page, page.read_text(encoding="utf-8"), out, old_out)]
+                if page.relative_to(DOCS_TREE).parts[0] in LINKING_TABS
+                for failure in _theory_link_failures(page, page.read_text(encoding="utf-8"), out)]
     assert not failures, "links into the Theory tab that land nowhere:\n" + "\n".join(failures)
 
 
 @pytest.mark.xdist_group("manual-build")
-def test_the_theory_link_check_fails_what_it_should(built_docs_tree, built_manual):
-    """The check above, made to fail on a missing page and a missing section,
-    in either tree, and on a site page that is not a Part 2 chapter."""
+def test_the_theory_link_check_fails_what_it_should(built_docs_tree):
+    """The check above, made to fail on a missing page, a missing section and
+    a moved chapter's old address."""
     out, result = built_docs_tree
     assert result.returncode == 0, "the new tree did not build"
-    old_out, old_result = built_manual
-    assert old_result.returncode == 0, "the old tree did not build"
     page = DOCS_TREE / "concepts" / "index.md"
     text = ("[ok](../theory/references.md) [ok](../theory/index.md#theory) "
+            "[ok](../theory/background.md#explicit-humps) "
             "[gone](../theory/no-such-page.md) [gone](../theory/index.md#no-such-section) "
+            "[gone](../theory/background.md#no-such-hump) "
             "[elsewhere](../reference/index.md) [web](https://example.org/theory/x.md) "
             "[root](../) "
-            f"[ok]({DOCS_URL}/background.html#explicit-humps) "
-            f"[ok]({DOCS_URL}/background.html) "
-            f"[gone]({DOCS_URL}/no-such-chapter.html) "
-            f"[gone]({DOCS_URL}/background.html#no-such-hump) "
-            f"[part one]({DOCS_URL}/manual.html) "
-            f"[typo]({DOCS_URL}/background.htm#explicit-humps)")
-    failures = _theory_link_failures(page, text, out, old_out)
+            f"[moved]({DOCS_URL}/background.html#explicit-humps) "
+            f"[part one]({DOCS_URL}/using/files.html) "
+            f"[landing]({DOCS_URL}/index.html) "
+            f"[skill]({DOCS_URL}/skill/rietx/SKILL.md)")
+    failures = _theory_link_failures(page, text, out)
     expected = ("no page theory/no-such-page.html", "no section #no-such-section",
-                "no-such-chapter.html is not a Part 2 chapter",
-                "background.html has no section #no-such-hump",
-                "manual.html is not a Part 2 chapter",
-                "background.htm#explicit-humps: not a link to a Part 2 chapter")
+                "no section #no-such-hump", "link ../theory/background.md")
     assert len(failures) == len(expected), failures
     for failure, words in zip(failures, expected):
         assert words in failure, failures

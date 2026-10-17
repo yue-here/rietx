@@ -332,7 +332,7 @@ def test_basis_is_not_the_plain_profile_and_that_is_the_point():
 
 # -- what the pseudo-Voigt approximation costs (WP-1408) -------------------
 
-#: The bounds `docs/manual/profiles.md` quotes for the TCH approximation, as
+#: The bounds `docs/docs/theory/profiles.md` quotes for the TCH approximation, as
 #: percentages. They are in the manual because a reader deciding between
 #: `"tchz_pv"` and `"voigt"` needs them; they are asserted here because a
 #: number in print with nothing measuring it is the class of defect that
@@ -376,7 +376,7 @@ def test_tch_reproduces_the_voigt_fwhm_to_the_bound_the_manual_quotes():
         worst = max(worst, abs(tch - true) / true)
     assert worst * 100.0 <= MANUAL_FWHM_ERROR_PCT, (
         f"TCH FWHM error {worst:.3%} exceeds the {MANUAL_FWHM_ERROR_PCT} % "
-        "docs/manual/profiles.md quotes")
+        "docs/docs/theory/profiles.md quotes")
     # ...and the bound is not slack by an order of magnitude, or the manual is
     # telling the reader something looser than the truth.
     assert worst * 100.0 > MANUAL_FWHM_ERROR_PCT / 2.0
@@ -385,7 +385,7 @@ def test_tch_reproduces_the_voigt_fwhm_to_the_bound_the_manual_quotes():
 def test_pseudo_voigt_shape_error_is_on_the_flanks_at_the_quoted_size():
     """The pseudo-Voigt's departure from the exact Voigt, where it lives.
 
-    Two claims in `docs/manual/profiles.md`, and the second is the one that
+    Two claims in `docs/docs/theory/profiles.md`, and the second is the one that
     matters: the error is not a peak-height error. The centre departure stays
     under 0.25 % across the range, while the worst, five times that, sits at
     x ≈ ±0.28 Γ — the steepest part of the flank, which is where a position or
@@ -407,8 +407,8 @@ def test_pseudo_voigt_shape_error_is_on_the_flanks_at_the_quoted_size():
         centre = float(err[len(x) // 2])
         assert centre < MANUAL_CENTRE_ERROR_PCT / 100.0, (
             f"centre error {centre:.3%} at Γ_L/Γ_G = {ratio} exceeds the "
-            f"{MANUAL_CENTRE_ERROR_PCT} % docs/manual/profiles.md quotes")
+            f"{MANUAL_CENTRE_ERROR_PCT} % docs/docs/theory/profiles.md quotes")
     assert worst * 100.0 <= MANUAL_SHAPE_ERROR_PCT, (
         f"pseudo-Voigt shape error {worst:.3%} exceeds the "
-        f"{MANUAL_SHAPE_ERROR_PCT} % docs/manual/profiles.md quotes")
+        f"{MANUAL_SHAPE_ERROR_PCT} % docs/docs/theory/profiles.md quotes")
     assert 0.2 < worst_at < 0.4, f"worst departure at x/Γ = {worst_at:.3f}, not the flank"

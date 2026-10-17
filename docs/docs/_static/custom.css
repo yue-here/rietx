@@ -1,0 +1,49 @@
+/* The styling pydata-sphinx-theme does not supply (WP-1986). */
+
+/* The bibliography under `bibtex_reference_style = "author_year"`.  docutils
+ * gives every citation node a label, and sphinxcontrib-bibtex documents that
+ * it cannot remove one, so the list would print [AS64] beside a citation
+ * reading [Abramowitz and Stegun, 1964].  Hide it and the entry starts at the
+ * author, which is the shape an author-year reference list has.  The selector
+ * is exact: tests/test_manual.py asserts every `span.label` in the built site
+ * sits inside a `doc-biblioentry`. */
+div.citation[role="doc-biblioentry"] > span.label {
+  display: none;
+}
+
+div.citation[role="doc-biblioentry"] {
+  display: block;
+  padding-left: 0;
+  margin-bottom: 0.6rem;
+}
+
+/* A numbered equation gets a column of its own for the number (WP-1408).
+ *
+ * Sphinx's `basic.css` floats `span.eqno` right and reserves nothing for it,
+ * so a wide equation is typeset under its own number.  A two-cell grid makes
+ * that collision impossible: the typeset math has one cell and the number the
+ * other.  `overflow-x` on the math cell turns an equation too wide for its
+ * cell into a scrollbar, and `safe center` left-aligns it once it overflows,
+ * so its left edge stays in reach.  `docs/docs/check_equations.py` measures
+ * whether each equation fits.  `:has()` scopes this to numbered equations. */
+div.math:has(> span.eqno) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 1rem;
+}
+
+div.math:has(> span.eqno) > span.eqno {
+  position: static;
+  transform: none;
+  float: none;
+  grid-area: 1 / 2;
+}
+
+div.math:has(> span.eqno) > mjx-container {
+  grid-area: 1 / 1;
+  display: flex;
+  justify-content: safe center;
+  overflow-x: auto;
+  overflow-y: hidden;
+}

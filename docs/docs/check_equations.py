@@ -1,7 +1,7 @@
 """Measure every numbered equation against the column it is typeset in (WP-1408).
 
-    .venv/bin/python -m pip install playwright     # once, see below
-    .venv/bin/python docs/manual/check_equations.py
+    uv pip install --python .venv/bin/python playwright     # once, see below
+    .venv/bin/python docs/docs/check_equations.py
 
 `make_screenshots.py`'s rule applied to a *measurement* rather than a picture.
 The manual's equation numbers are placed by CSS and their equations by MathJax
@@ -16,13 +16,13 @@ The chromium it drives is resolved by `make_screenshots.chromium_path()` — the
 cached build on a machine that has run a browser pass before, or
 `PLAYWRIGHT_CHROMIUM`.
 
-**What the numbers mean.** Furo pins the equation number with
-`position: absolute; right: .5rem`, over the page's fixed-width content column,
-and `basic.css` floats it; neither reserves space, so before WP-1408 a wide
-equation was typeset *under* its own number. `_static/custom.css` now lays a
-numbered equation out as a two-cell grid, which makes the collision impossible
-and turns the remaining question into a width: does the typeset math fit the
-cell the grid gives it? So each row carries
+**What the numbers mean.** Sphinx's `basic.css` floats the equation number
+and reserves no space for it, so a wide equation is typeset *under* its own
+number (WP-1408 measured it under the old theme, WP-1986 again under
+pydata-sphinx-theme: six equations, by up to 191 px). `_static/custom.css` lays
+a numbered equation out as a two-cell grid, which makes the collision
+impossible and turns the remaining question into a width: does the typeset
+math fit the cell the grid gives it? So each row carries
 
 * `ink` — the `mjx-math` box, the equation's actual typeset width;
 * `cell` — the client width of the `mjx-container` it sits in;
@@ -34,9 +34,9 @@ naming a sub-expression once), never by narrowing the number's column: the
 reader reads the equation, and a horizontal scrollbar in the middle of a
 derivation is a defect with a scrollbar on it.
 
-Measured at two viewport widths because the failure is width-dependent in
-principle. In practice Furo caps the content column, so both report the same
-numbers, and a run that disagrees between them has found something new.
+Measured at two viewport widths because the failure is width-dependent. The
+theme shows the page's own contents in a right-hand column at the wider one,
+so its text column is the narrower of the two (about 645 px against 720 px).
 """
 
 from __future__ import annotations
@@ -47,12 +47,13 @@ import sys
 import tempfile
 from pathlib import Path
 
-MANUAL_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(MANUAL_DIR))
+TREE = Path(__file__).resolve().parent
+# `make_screenshots.py` stays in the old tree until the GUI chapters move.
+sys.path.insert(0, str(TREE.parent / "manual"))
 
 from make_screenshots import chromium_path  # noqa: E402  (after the path insert)
 
-#: Where the measurement is taken.  Two widths, one capped column — see the
+#: Where the measurement is taken.  Two widths, and two text columns, see the
 #: module docstring.
 VIEWPORTS = ({"width": 1440, "height": 1000}, {"width": 1100, "height": 1000})
 
@@ -99,7 +100,7 @@ def build(out: Path) -> None:
     """A `-W` build of the manual into `out`, the same one the suite makes."""
     subprocess.run(
         [sys.executable, "-m", "sphinx", "-W", "-q", "-E", "-b", "html",
-         str(MANUAL_DIR), str(out)],
+         str(TREE), str(out)],
         check=True,
     )
 
@@ -147,7 +148,9 @@ def measure(out: Path) -> int:
                             if not bad and row["clear"] > REPORT_BELOW_CLEARANCE_PX:
                                 continue
                             mark = "FAIL" if bad else "    "
-                            name = f"{target.name}:{row['id'].removeprefix('equation-')}"
+                            # The path, not the name: two tabs each have an index.html.
+                            name = (f"{target.relative_to(out).as_posix()}:"
+                                    f"{row['id'].removeprefix('equation-')}")
                             print(f"{mark} {name:<29} {row['number']:>8} {row['ink']:>6} "
                                   f"{row['cell']:>6} {row['clear']:>6} {row['over']:>5}")
                             if bad:

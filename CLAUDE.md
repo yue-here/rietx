@@ -22,7 +22,7 @@ uv pip install --python .venv/bin/python -e ".[dev,jax,torch]"   # + optional ja
 .venv/bin/python -m tests.bethanechol_benchmark        # the graded indexing benchmark (~1 h; run it ALONE — engine budgets are wall-clock)
 .venv/bin/python -m ruff check src tests examples      # lint (must be clean)
 .venv/bin/python examples/nac_11bm.py                  # end-to-end demo + plot
-.venv/bin/python -m sphinx -W -q -b html docs/manual docs/manual/_build/html  # theory manual
+.venv/bin/python -m sphinx -W -q -b html docs/manual docs/manual/_build/html  # old manual (Theory is in docs/docs/)
 .venv/bin/python -m sphinx -W -q -b html docs/docs docs/docs/_build/html      # the new manual, beside the old until WP-1986
 .venv/bin/rietx gui my_sample.rex [--scratch]      # the refinement GUI (localhost:8731); --scratch works on a temp-dir copy
 npm --prefix gui ci && npm --prefix gui run build      # rebuild the GUI's committed dist
@@ -834,14 +834,14 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   adopted from its prose**, and a row the format states two ways is **refused** rather than chosen,
   exactly as a CIF whose angle contradicts its symbol is.
 - The **manual** (`docs/manual/`) is one `-W` Sphinx tree in two parts, guarded differently because
-  each fails differently. **Part 2 — Theory** (`tests/test_manual.py`): fenced constants are MyST
+  each fails differently. **Part 2 — Theory** (source in `docs/docs/theory/` since WP-1986, the old
+  tree's pages one-line includes of it; `tests/test_manual.py`): fenced constants are MyST
   substitutions injected from `docs/sphinx_shared.py` (both trees), every displayed equation carries a
   `*Source:*` line whose symbol must import, every bib entry is cited — so renaming a physics
   symbol or retuning a fenced constant means touching the manual in the same change, and **a WP
   that adds physics adds its equation there**, never only Part 1 prose (WP-1067). **Part 1 — Using
-  rietx** (`docs/manual/using/`, `tests/test_manual_api.py`): its failure mode is a *name*, so
-  every dotted
-  name and dot-path must resolve, every python block parses and either executes or carries a
+  rietx** (`docs/manual/using/`, `tests/test_manual_api.py`): its failure mode is a *name*, so every
+  dotted name and dot-path must resolve, every python block parses and either executes or carries a
   written reason, and the public call surface is partitioned into documented /
   excluded-with-a-reason / generated-deferred. That surface is **derived**
   (`tests/api_surface.py`'s docstring has the rules), never listed, so **adding a public method or

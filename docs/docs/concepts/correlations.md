@@ -10,7 +10,7 @@ They are taken from the last stage of the plan, where every freed parameter refi
 Each esd is multiplied by the Bérar-Lelann factor, which accounts for neighbouring residuals that are correlated with each other and so carry less independent information.
 Not every program applies this factor, so divide it out before comparing esds with another program's: `FitReport.identifiability.esd_inflation` holds it.
 The correlation matrix is not inflated, so a degenerate pair reads |ρ| ≈ 1.
-The [esd section of the theory](https://rietx.org/estimation.html#esds-and-the-berar-lelann-inflation) gives both formulas.
+The [esd section of the theory](../theory/estimation.md#esds-and-the-bérar-lelann-inflation) gives both formulas.
 
 An esd describes the minimum the fit stopped in.
 A trace phase whose scale trades against its peak width can have several minima at one χ², each with a tight esd.
@@ -63,7 +63,7 @@ rietx prevents this in three ways:
 A combination the data move a little, but below that cutoff, is still discarded.
 Its parameters keep esds, and those esds are too small, so `COVARIANCE_DIRECTION_DISCARDED` marks them.
 
-The [scale-and-B section](https://rietx.org/estimation.html#a-scale-and-a-b-the-range-cannot-separate) derives the test.
+The [scale-and-B section](../theory/estimation.md#a-scale-and-a-b-the-range-cannot-separate) derives the test.
 
 ## Derived quantities
 
@@ -74,14 +74,14 @@ So the diagonal-only esd is not a safe upper bound, and rietx reports both.
 
 A derived esd is empty when linear propagation cannot give one.
 That happens with no covariance (a replayed node), with no free parameter behind the quantity, at an angle the symmetry fixes, and at an angle within a few degrees of 0° or 180°.
-The [derived-quantities section](https://rietx.org/estimation.html#esds-of-derived-quantities) lists the four cases.
+The [derived-quantities section](../theory/estimation.md#esds-of-derived-quantities) lists the four cases.
 
 ## Parameters on a bound
 
 A parameter that finishes on its `min` or `max` stays in the covariance, and `RefinedParameter.at_bound` is true.
 Its esd is not an interval, since the value cannot go past the bound.
 `Refinement.profile_interval` gives a one-sided interval with the bound as one end.
-The [bound section](https://rietx.org/estimation.html#an-interval-for-a-parameter-on-its-bound) gives the quantile it uses.
+The [bound section](../theory/estimation.md#an-interval-for-a-parameter-on-its-bound) gives the quantile it uses.
 
 ## What to do about a correlation
 

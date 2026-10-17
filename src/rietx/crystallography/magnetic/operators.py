@@ -60,7 +60,7 @@ Conventions, stated by physics rather than by letter
   fractional action that :mod:`.isotropy` uses in its magnetic cells, some of
   which are sheared (P 2 2 2 at k = (½, ½, ½), for one).
 
-``docs/manual/parameterisation.md``'s "Magnetic moment constraints" section
+``docs/docs/theory/parameterisation.md``'s "Magnetic moment constraints" section
 carries these three equations — the axial-vector action, the crystal-axis
 magnitude and the Cartesian conversion — each with its *Source:* line back to
 this module, beside the Wyckoff coordinate/ADP derivation and the Stephens

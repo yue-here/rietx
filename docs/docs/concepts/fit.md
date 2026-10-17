@@ -25,7 +25,7 @@ flowchart LR
 The pattern is a `PatternData`, which `rx.read_pattern` builds from a file.
 The weights come from the file's esd column when it has one, and from counting statistics (√y) when it does not, which assumes the file holds counts.
 rietx never subtracts a background from the counts.
-The [weighting section of the theory](https://rietx.org/estimation.html#objective-and-weights) gives the objective function.
+The [weighting section of the theory](../theory/estimation.md#objective-and-weights) gives the objective function.
 
 The structure is a `Structure` holding one or more phases, each with its cell, space group and atoms.
 `rx.Structure.from_cif` reads one from a CIF.
@@ -82,7 +82,7 @@ A name the hold refused is recorded in `StageResult.blocked_by_hold`.
 rietx builds the reflection list, the range of points each peak spans, and the number of points used to integrate axial divergence.
 These stay fixed while the stage solves and are rebuilt before the next stage.
 A reflection entering the list mid-solve would make the residual jump, and fixing the list keeps it smooth.
-The [forward model](https://rietx.org/forward-model.html#discreteness-frozen-per-stage) states the rule.
+The [forward model](../theory/forward-model.md#discreteness-frozen-per-stage) states the rule.
 
 ### Fixing what the data cannot see
 
@@ -99,7 +99,7 @@ This is separate from `Refinement.hold`, which you set and which lasts until you
 The default solver is a bounded Levenberg-Marquardt with an analytic Jacobian, in double precision.
 Each parameter refines in its own units, and its `min` and `max` are hard bounds.
 Every stage but the last stops at a looser tolerance, since the parameters it frees keep refining in every later stage.
-The [solvers](https://rietx.org/estimation.html#solvers) and [convergence](https://rietx.org/estimation.html#convergence) sections give the details.
+The [solvers](../theory/estimation.md#solvers) and [convergence](../theory/estimation.md#convergence) sections give the details.
 
 ### Checking the answer
 

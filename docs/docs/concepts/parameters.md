@@ -23,7 +23,7 @@ A calibrated instrument carries over to every sample measured on it, and a backg
 
 Symmetry decides how many parameters a group has.
 The space group ties the lattice parameters, and an atom refines only along the directions its site symmetry allows.
-The [parameterisation chapter](https://rietx.org/parameterisation.html#site-symmetry-degrees-of-freedom) derives those directions.
+The [parameterisation chapter](../theory/parameterisation.md#site-symmetry-degrees-of-freedom) derives those directions.
 
 The angular column decides which groups can be told apart.
 Two parameters whose effects have the same shape over the measured range cannot be separated by the data.
@@ -51,7 +51,7 @@ TOPAS users know this as a named parameter.
 The instrument's peak shape and the specimen's broadening add.
 Gaussian variances add, so the phase's Gaussian size and strain terms add to Caglioti U, V and W.
 Lorentzian widths add, so its Lorentzian terms add to X and Y.
-The [profiles chapter](https://rietx.org/profiles.html#the-instrument-sample-width-split) gives the sum.
+The [profiles chapter](../theory/profiles.md#the-instrument--sample-width-split) gives the sum.
 
 The split only means something when the instrument is known.
 Calibrate it on a standard with a certified cell, and hold that cell while you do, so the cell cannot absorb the zero shift and the specimen displacement.
@@ -62,7 +62,7 @@ Which position corrections exist depends on the geometry.
 A flat plate has a specimen displacement, which goes as cos θ, and a transparency, which goes as sin 2θ.
 A capillary off the centre of the diffractometer has two offsets instead, which go as sin 2θ and cos 2θ.
 A correction the geometry does not have is fixed, and a stage cannot free it.
-The [peak positions chapter](https://rietx.org/peak-positions.html#aberration-shifts) gives each law.
+The [peak positions chapter](../theory/peak-positions.md#aberration-shifts) gives each law.
 
 ## Background
 
@@ -75,7 +75,7 @@ Three curves are available:
 - `BackgroundPSpline`, a spline whose coefficients refine under a smoothness penalty.
 
 `rx.auto_background` chooses the polynomial order or the spline's knot spacing from the pattern.
-The [background chapter](https://rietx.org/background.html#additive-background-models) gives each model and the penalty.
+The [background chapter](../theory/background.md#additive-background-models) gives each model and the penalty.
 
 ### How flexible a background should be
 
@@ -87,7 +87,7 @@ A comparison of one background term at a time misses it.
 
 A background too stiff to follow the real one leaves a smooth residual between the peaks.
 `FitReport.background` reports that side too, as the χ² and the serial correlation of the residual away from the peaks.
-The [bias section](https://rietx.org/background.html#background-flexibility-and-bias) covers both.
+The [bias section](../theory/background.md#background-flexibility-and-bias) covers both.
 
 ### Humps
 
@@ -125,7 +125,7 @@ A hump must be broad.
 One that refines narrower than {{ HUMP_MIN_WIDTH_MULT }} times the instrumental width at its position raises `HUMP_TOO_NARROW`.
 At that width it is a peak with no cell behind it, and its parameters are not quotable.
 An unindexed line needs a second phase, and the report's list of unmatched peaks shows where one is.
-The [humps section](https://rietx.org/background.html#explicit-humps) gives the hump's form and the width condition.
+The [humps section](../theory/background.md#explicit-humps) gives the hump's form and the width condition.
 
 :::{admonition} In other programs
 :class: note

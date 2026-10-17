@@ -60,7 +60,7 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
   independently of how that constant was chosen here.
 - Visser, J. W. (1969). *J. Appl. Cryst.* 2, 89–95 — the ITO **zone-indexing**
   method. Read and assessed (WP-1030), **not implemented**, and the no-go is
-  recorded in `docs/manual/engines.md` §"What a zone-indexing engine would and
+  recorded in `docs/docs/theory/engines.md` §"What a zone-indexing engine would and
   would not add": a constant 2θ offset splits ITO's coincidence peak rather
   than translating it, so it fails on exactly the uncalibrated laboratory data
   a third opinion would be wanted for. Recorded here because the assessment is

@@ -71,6 +71,8 @@ html_title = DIST_NAME
 # The old tree's mark.  Without a favicon a browser falls back to the origin
 # root, which belongs to the user Pages site this project sits under.
 html_favicon = "../manual/_static/favicon.svg"
+html_static_path = ["_static"]
+html_css_files = ["custom.css"]
 # A release's pages name stable/ as their canonical copy, so a search engine
 # sends a reader to the newest release rather than to an old one.
 html_baseurl = f"{DOCS_URL}/docs/{'dev' if _shared.DOCS_VERSION == 'dev' else 'stable'}/"

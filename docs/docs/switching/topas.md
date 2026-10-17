@@ -83,7 +83,7 @@ rietx refines one `dof` for each direction the site symmetry allows, and the coo
 Fluorapatite's O7 is on a general position, so it has three, as `phases.0.atoms.6.dof.0` to `phases.0.atoms.6.dof.2`.
 Flagging `z` on its own frees all three.
 An atom on a mirror plane has two directions, and one on a three-fold axis has one.
-The [parameterisation chapter](https://rietx.org/parameterisation.html#site-symmetry-degrees-of-freedom) derives the directions.
+The [parameterisation chapter](../theory/parameterisation.md#site-symmetry-degrees-of-freedom) derives the directions.
 
 ### The peak shape is the instrument plus the sample
 

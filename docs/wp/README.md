@@ -50,6 +50,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1932](1932-two-candidates-compared-across-a-reduction-boundary.md) | Two candidates compared across a reduction boundary | 2026-10-15 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 2026-10-09 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1968](1968-the-picker-offers-no-line-the-data-cannot-support.md) | The picker offers no line the data cannot support | 2026-10-15 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) | Guides and Theory move over, and the old tree retires | 2026-10-17 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [1988](1988-a-pr-put-up-for-review-is-watched.md) | A PR put up for review is watched by the session that opened it | 2026-10-16 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 
 ## Next, by priority
@@ -68,7 +69,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1967](1967-what-the-chemist-declares-reaches-the-extinction-screen.md) | What the chemist declares reaches the extinction screen | P2 | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [1969](1969-an-exhaustive-search-that-ends-in-no-cell.md) | An exhaustive search that ends in no cell | P2 | — ([1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1977](1977-a-flank-lobe-read-as-an-unindexed-peak.md) | A flank lobe read as an unindexed peak | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) | Guides and Theory move over, and the old tree retires | P2 | [1978](1978-the-new-manual-tree-and-its-page-contract.md), [1985](1985-report-and-diagnostic-text-in-one-voice.md), [1979](1979-the-manual-at-docs-one-tree-per-version.md) | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [1989](1989-the-released-arm-keeps-riding-hydrogens-riding.md) | The rigid-body check's released arm keeps riding hydrogens riding | P2 | — ([1806](1806-first-public-case-acridine-form-ix.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1991](1991-a-site-and-its-own-image-are-one-atom.md) | A site and its own image are one atom on every route | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1997](1997-the-direct-space-solver-on-main.md) | The direct-space solver on main: site classes, kernels, chemistry, engine and entry point | P2 | [1902](1902-the-solve-cost-as-a-quadratic-form.md), [1940](1940-the-kernel-tier-in-a-wheel.md) ([1901](1901-the-difference-fourier-map.md) soft) | [structure-solution](#structure-solution) |
@@ -666,7 +666,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1982](1982-vale-and-a-term-list-on-the-new-tree.md) | Vale and a term list on the new tree | ✅ 2026-10-16 | — | [1978](1978-the-new-manual-tree-and-its-page-contract.md) |
 | [1983](1983-the-concepts-tab.md) | The Concepts tab | ✅ 2026-10-17 | — | [1978](1978-the-new-manual-tree-and-its-page-contract.md) ([1981](1981-the-reference-pages-generated-from-their-authorities.md) soft) |
 | [1984](1984-the-switching-tab.md) | The Switching tab | ✅ 2026-10-17 | — | [1978](1978-the-new-manual-tree-and-its-page-contract.md) ([1981](1981-the-reference-pages-generated-from-their-authorities.md) soft) |
-| [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) | Guides and Theory move over, and the old tree retires | ⬜ | P2 | [1978](1978-the-new-manual-tree-and-its-page-contract.md), [1985](1985-report-and-diagnostic-text-in-one-voice.md), [1979](1979-the-manual-at-docs-one-tree-per-version.md) |
+| [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) | Guides and Theory move over, and the old tree retires | 🔄 2026-10-17 | P2 | [1978](1978-the-new-manual-tree-and-its-page-contract.md), [1985](1985-report-and-diagnostic-text-in-one-voice.md), [1979](1979-the-manual-at-docs-one-tree-per-version.md) |
 | [1987](1987-the-kernel-gate-on-the-macos-intel-runner.md) | The kernel gate on the macOS Intel runner | ⬜ | P3 | — |
 | [1988](1988-a-pr-put-up-for-review-is-watched.md) | A PR put up for review is watched by the session that opened it | 🔄 2026-10-16 | P4 | — |
 | [1994](1994-a-note-into-a-closed-wp-is-caught-at-handover.md) | A note written into a closed WP is caught at handover | ✅ 2026-10-16 | — | — |

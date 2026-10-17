@@ -84,7 +84,7 @@ The working state stays where it was.
 Whether a freed parameter is worth its place is a separate question.
 rietx answers it with the change in the Bayesian information criterion (BIC), which weighs the fall in χ² against the extra parameter.
 `Refinement.suggest` predicts it for each parameter the plan has not freed, and `rietx.report.compare_freed` measures it once a refit has freed one.
-The [theory chapter](https://rietx.org/estimation.html#which-parameter-to-free-next) gives both.
+The [theory chapter](../theory/estimation.md#which-parameter-to-free-next) gives both.
 
 ## Evidence beside the layers
 
@@ -104,4 +104,4 @@ A plan can absorb an error it cannot free and converge without suggesting anythi
 `fit(stage_reports=True)` builds a report at the end of each stage and leaves them on the refinement as `stage_reports_`.
 The fit's answer is the same with them or without.
 
-The [fit-to-report section](https://rietx.org/estimation.html#from-fit-to-report) of the theory states the layers formally.
+The [fit-to-report section](../theory/estimation.md#from-fit-to-report) of the theory states the layers formally.
