@@ -31,6 +31,7 @@ asserting it.
 
     magnetic_cell(space_group, k)                     -> MagneticCell
     candidates(space_group, site_xyz, k, ...)         -> CandidateSet
+    distortion_candidates(parent, k, sites=None)      -> tuple[DistortionCandidate, ...]
 
     compatible_cell(space_group)                      -> (3, 3) row-vector lattice, A
     reflections(lattice, d_min)                       -> ReflectionSet
@@ -2022,6 +2023,399 @@ def _expand_configurations(space: OrderParameterSpace,
             expanded = signs[:, None] * pattern[parent_index]
             out.append(expanded @ inverse.T)
     return np.array(out, dtype=np.float64)
+
+
+# --------------------------------------------------------------------------
+# the displacive candidates with their mode bases in Å (WP-1419)
+# --------------------------------------------------------------------------
+
+#: The scale (Å, rms over the cell) of the generic H-invariant displacement
+#: whose symmetry spglib reads to state a displacive candidate in a standard
+#: setting, and spglib's tolerance on it: the field is 50× the tolerance, so
+#: every operation of H survives it and no accidental one does.
+_PROBE_RMS = 0.05
+_PROBE_SYMPREC = 1e-3
+_PROBE_SEED = 1419
+
+
+@dataclass(frozen=True, eq=False)
+class DistortionCandidate:
+    """One displacive candidate of a parent: its child, (P, p) and its modes in Å.
+
+    ``candidate`` is :func:`candidates`' own (``kind="displacive"``), unchanged:
+    the irrep, the order-parameter direction and the grey isotropy group in
+    :attr:`MagneticCandidate.cell`.  ``child`` is that group's colourless part
+    stated as a phase in a **standard setting** of its space-group type, with
+    the parent's atoms at their undistorted positions, one atom per child
+    orbit; ``transform`` is (P, p) with r_parent = P·r_child + p, the
+    convention of :mod:`~rietx.crystallography.representation.distortion`.
+    ``basis`` is that module's :func:`distortion_basis` of the child: every
+    irrep with a non-zero subduction frequency under the child group, each
+    orbit's modes normalised over the child's primitive cell in Å, so Σ n_modes
+    is the child's number of free coordinates.  :attr:`driving` is the
+    component of the irrep the candidate was built from and :attr:`rest` the
+    others.
+
+    ``sites`` names the parent atoms whose displacement representation holds
+    the irrep (the sites :func:`candidates` was asked about that produced this
+    direction); the basis covers every parent atom regardless.
+    """
+
+    candidate: MagneticCandidate
+    child: object  # rietx.schemas.structure.Phase
+    transform: tuple[np.ndarray, np.ndarray]
+    basis: object  # rietx.crystallography.representation.distortion.ModeBasis
+    sites: tuple[str, ...]
+
+    @property
+    def k(self) -> KVector:
+        return self.candidate.k
+
+    @property
+    def irrep(self) -> str:
+        return self.candidate.irrep_label
+
+    @property
+    def direction(self) -> str:
+        return self.candidate.direction.label
+
+    @property
+    def label(self) -> str:
+        return self.candidate.label
+
+    @property
+    def child_group(self) -> str:
+        return str(self.child.space_group)
+
+    @property
+    def driving(self):
+        """The basis component of the irrep this candidate was built from (an ``IrrepModes``).
+
+        Not ``IrrepModes.primary``, which asks whether a component's own isotropy
+        group is the child's: the two can disagree (a secondary irrep whose group
+        is the child's reads ``primary=True`` there and is in :attr:`rest` here).
+        """
+        return self.basis.components[self._driving_index]
+
+    @property
+    def rest(self) -> tuple:
+        """Every other component: the further irreps the child also admits."""
+        return tuple(c for i, c in enumerate(self.basis.components)
+                     if i != self._driving_index)
+
+    @property
+    def _driving_index(self) -> int:
+        return _driving_component(self.basis, self.candidate)
+
+
+def _driving_component(basis, candidate: MagneticCandidate) -> int:
+    """The index of the component that carries the candidate's irrep at its k."""
+    k = tuple(str(c) for c in candidate.k)
+    # the basis names its arms through ``canonical_kvector``, the candidate keeps k
+    # as the caller spelled it: compare modulo the reciprocal lattice
+    hits = [i for i, c in enumerate(basis.components)
+            if c.irrep == candidate.irrep_label and any(
+                _irreps.equivalent_kvectors(candidate.space_group, arm, candidate.k)
+                for arm in c.arms)]
+    if len(hits) != 1:
+        raise RuntimeError(
+            f"the child of {candidate.label} at k = {k} has {len(hits)} mode components "
+            f"labelled {candidate.irrep_label!r} on that arm, not one; this is a bug")
+    return hits[0]
+
+
+def _group_signature(candidate: MagneticCandidate) -> frozenset:
+    """The candidate's colourless operations in its cell, as a comparable set."""
+    return frozenset((rot.tobytes(), tuple(np.round(tran, 9)))
+                     for rot, tran in _colourless_operations(candidate.group))
+
+
+def _colourless_operations(group: MagneticGroup) -> list[tuple[np.ndarray, np.ndarray]]:
+    """The group's spatial operations, each once, translations reduced mod 1."""
+    seen: dict = {}
+    for op in group.all_operations():
+        rot = np.array(op.rotation, dtype=np.int64)
+        tran = np.array([float(v) % 1.0 for v in op.translation])
+        tran[np.abs(tran - 1.0) < 1e-9] = 0.0
+        seen.setdefault((rot.tobytes(), tuple(np.round(tran, 9))), (rot, tran))
+    return list(seen.values())
+
+
+def _parent_metric_symmetric(parent, rotations) -> np.ndarray:
+    """The parent cell's metric, Reynolds-averaged over the parent point group."""
+    a, b, c, al, be, ga = parent.cell.lengths_angles()
+    ca, cb, cg = (np.cos(np.radians(v)) for v in (al, be, ga))
+    metric = np.array([[a * a, a * b * cg, a * c * cb],
+                       [a * b * cg, b * b, b * c * ca],
+                       [a * c * cb, b * c * ca, c * c]])
+    return sum(r.T @ metric @ r for r in rotations) / len(rotations)
+
+
+def _cell_from_metric(metric):
+    from ...schemas.common import Parameter
+    from ...schemas.structure import Cell
+
+    lengths = np.sqrt(np.diag(metric))
+    angles = [np.degrees(np.arccos(np.clip(metric[i, j] / (lengths[i] * lengths[j]), -1, 1)))
+              for i, j in ((1, 2), (0, 2), (0, 1))]
+    values = [float(v) for v in (*lengths, *angles)]
+    values = [round(v, 12) for v in values]
+    return Cell(**{n: Parameter(value=v) for n, v in
+                   zip(("a", "b", "c", "alpha", "beta", "gamma"), values)})
+
+
+def _standard_child(parent, parent_group, candidate: MagneticCandidate):
+    """The candidate's colourless group in a standard setting: (symbol, P, p).
+
+    The group is :func:`candidates`' operator list in the magnetic cell.  A
+    generic displacement of the parent's atoms, symmetrised over that list, is
+    handed to spglib, whose standardisation gives the setting; the symbol's
+    operations are then checked to be the list, element for element, so a
+    wrong (P, p) cannot pass silently.
+    """
+    import gemmi
+    import spglib
+
+    from ..symmetry import _group_arrays, group_key, site_orbit
+    from ..wyckoff import SPGLIB_REFUSALS
+
+    p_m = np.array([[float(v) for v in row] for row in candidate.cell.basis])
+    p_m_inv = np.linalg.inv(p_m)
+    _, rot_g, _ = _group_arrays(group_key(parent_group))
+    rot_g = np.rint(rot_g).astype(np.int64)
+    ops = _colourless_operations(candidate.group)
+
+    # the parent's atoms in the magnetic cell
+    shifts = [np.array([float(c) for c in shift]) for shift, _ in candidate.cell.translations]
+    positions, types = [], []
+    for index, atom in enumerate(parent.atoms):
+        xyz = np.array([float(atom.x.value), float(atom.y.value), float(atom.z.value)])
+        for image in site_orbit(parent_group, xyz).images:
+            for shift in shifts:
+                positions.append((p_m_inv @ (np.asarray(image, float) + shift)) % 1.0)
+                types.append(index + 1)
+    positions = np.array(positions)
+    positions[np.abs(positions - 1.0) < 1e-9] = 0.0
+
+    def image_of(rot, tran):
+        moved = (positions @ rot.T + tran) % 1.0
+        perm = np.empty(len(positions), dtype=np.int64)
+        for i, x in enumerate(moved):
+            d = x[None, :] - positions
+            d -= np.rint(d)
+            hit = np.flatnonzero(np.all(np.abs(d) < 1e-6, axis=1))
+            if len(hit) != 1:
+                raise RuntimeError("a candidate operation does not map the parent's atoms "
+                                   "onto themselves in the magnetic cell; this is a bug")
+            perm[i] = hit[0]
+        return perm
+
+    rng = np.random.default_rng(_PROBE_SEED)
+    raw = rng.standard_normal(positions.shape)
+    field = np.zeros_like(raw)
+    for rot, tran in ops:
+        field[image_of(rot, tran)] += raw @ rot.T.astype(float)
+    field /= len(ops)
+    metric_p = _parent_metric_symmetric(parent, rot_g)
+    metric_m = p_m.T @ metric_p @ p_m
+    rms = np.sqrt(np.einsum("ni,ij,nj->", field, metric_m, field) / len(field))
+    if rms < 1e-9:
+        raise RuntimeError(f"{candidate.label}: no displacement of the parent's atoms is "
+                           "invariant under its isotropy group; this is a bug")
+    field *= _PROBE_RMS / rms
+
+    lattice = np.linalg.cholesky(metric_m)
+    try:
+        data = spglib.get_symmetry_dataset((lattice, (positions + field) % 1.0, types),
+                                           symprec=_PROBE_SYMPREC)
+    except SPGLIB_REFUSALS:
+        data = None
+    if data is None:
+        raise ValueError(
+            f"DISTORTION_CHILD_UNIDENTIFIED: spglib names no space group for a generic "
+            f"displacement along {candidate.label} at k = "
+            f"{tuple(str(c) for c in candidate.k)}, so no standard setting can be stated")
+    if len(data.rotations) != len(ops):
+        raise ValueError(
+            f"DISTORTION_CHILD_LARGER: a generic displacement of the parent's atoms along "
+            f"{candidate.label} keeps {len(data.rotations)} operations in the magnetic cell, "
+            f"but the isotropy group has {len(ops)}: these atoms cannot realise the "
+            "direction's group, so its child is not this candidate's")
+
+    hall = spglib.get_spacegroup_type(data.hall_number).hall_symbol
+    sg = gemmi.find_spacegroup_by_ops(gemmi.symops_from_hall(hall))
+    t_m = np.asarray(data.transformation_matrix, dtype=np.float64)
+    shift = np.asarray(data.origin_shift, dtype=np.float64)
+    t_inv = np.linalg.inv(t_m)
+    big = p_m @ t_inv
+    small = -big @ shift
+    big = np.array([[float(Fraction(v).limit_denominator(48)) for v in row] for row in big])
+    small = np.array([float(Fraction(v).limit_denominator(48)) % 1.0 for v in small])
+
+    # every operation of the symbol, carried into the magnetic cell, is one of
+    # the candidate's, and the two lists hold the same number per unit volume
+    step = p_m_inv @ big  # columns: the standard cell's axes in magnetic fractions
+    origin = p_m_inv @ small
+    keyed = {(r.tobytes()): [] for r, _ in ops}
+    for r, t in ops:
+        keyed[r.tobytes()].append(t)
+    n_std = 0
+    for op in sg.operations():
+        n_std += 1
+        rot_s = np.array(op.rot, dtype=np.float64) / 24
+        tran_s = np.array(op.tran, dtype=np.float64) / 24
+        rot = step @ rot_s @ np.linalg.inv(step)
+        tran = step @ tran_s + origin - rot @ origin
+        rot_i = np.rint(rot).astype(np.int64)
+        found = np.max(np.abs(rot - rot_i)) < 1e-6 and any(
+            np.all(np.abs((tran - t) - np.rint(tran - t)) < 1e-6)
+            for t in keyed.get(rot_i.tobytes(), ()))
+        if not found:
+            raise RuntimeError(
+                f"{candidate.label}: the standard setting {sg.xhm()!r} under "
+                f"P = {big.tolist()}, p = {small.tolist()} holds an operation that is not "
+                "in the candidate's isotropy group; this is a bug")
+    if abs(n_std / abs(np.linalg.det(step)) - len(ops)) > 1e-6:
+        raise RuntimeError(
+            f"{candidate.label}: {sg.xhm()!r} holds {n_std} operations per standard cell "
+            f"and the isotropy group {len(ops)} per magnetic cell, which is "
+            f"{abs(np.linalg.det(step)):.4g} standard cells; this is a bug")
+    return sg.xhm(), big, small, metric_p
+
+
+def _child_phase(parent, symbol: str, big, metric_p, basis):
+    """The child phase: the parent's atoms, undistorted, one per child orbit."""
+    from ...schemas.common import Parameter
+    from ...schemas.structure import Atom, Phase
+    from ..symmetry import get_spacegroup, site_orbit
+
+    group = get_spacegroup(symbol)
+    taken = np.zeros(len(basis.positions), dtype=bool)
+    counts: dict[int, int] = {}
+    atoms = []
+    for n, x in enumerate(basis.positions):
+        if taken[n]:
+            continue
+        orbit = site_orbit(group, x)
+        for image in orbit.images:
+            d = np.asarray(image, float)[None, :] - basis.positions
+            d -= np.rint(d)
+            hit = np.flatnonzero(np.all(np.abs(d) < 1e-6, axis=1))
+            if len(hit) != 1 or basis.parent_atoms[hit[0]] != basis.parent_atoms[n]:
+                raise RuntimeError("a child orbit does not match the parent's atoms in the "
+                                   "child cell; this is a bug")
+            taken[hit[0]] = True
+        j = int(basis.parent_atoms[n])
+        counts[j] = counts.get(j, 0) + 1
+        source = parent.atoms[j]
+        atoms.append((j, counts[j], source, orbit.position))
+    total = {j: c for j, c in counts.items()}
+    out = []
+    for j, m, source, xyz in atoms:
+        label = source.label if total[j] == 1 else f"{source.label}_{m}"
+        out.append(Atom(label=label, species=source.species,
+                        x=Parameter(value=float(xyz[0])), y=Parameter(value=float(xyz[1])),
+                        z=Parameter(value=float(xyz[2])),
+                        occ=Parameter(value=source.occ.value),
+                        biso=Parameter(value=source.biso.value)))
+    return Phase(name=f"{parent.name} child {symbol}", space_group=symbol,
+                 cell=_cell_from_metric(big.T @ metric_p @ big), atoms=out)
+
+
+def distortion_candidates(parent, k, sites=None) -> tuple[DistortionCandidate, ...]:
+    """Every displacive candidate of ``parent`` at ``k``, with its child and modes in Å.
+
+    For each parent site (``sites``: atom labels, default every atom) this
+    calls :func:`candidates` with ``kind="displacive"`` and keeps each
+    (irrep, order-parameter direction) once, with the sites that carry it.
+    Each is then stated as a child: the candidate's isotropy group, colourless,
+    in a standard setting of its type with (P, p) to the parent, and the
+    parent's atoms at their undistorted positions.  Its mode basis is
+    :func:`~rietx.crystallography.representation.distortion.distortion_basis`
+    of that child: per irrep and orbit, in Å over the child's primitive cell in
+    the reference metric, for every irrep the child admits, so
+    Σ n_modes is the child's number of free coordinates.
+
+    This is the parent + irrep + direction → child workflow of Campbell,
+    Stokes, Tanner & Hatch (2006), *J. Appl. Cryst.* **39**, 607 (§ 4, the
+    complete mode set of a subgroup, p. 611), on the isotropy subgroups of
+    Stokes & Hatch (1988) and the AMPLIMODES normalisation of Perez-Mato,
+    Orobengoa & Aroyo (2010), *Acta Cryst.* A**66**, 558, eqs. (3)–(4).  The
+    perovskite cases are Howard & Stokes (1998), *Acta Cryst.* B**54**, 782:
+    R4+ (a,0,0) → I4/mcm, (a,a,0) → Imma, (a,a,a) → R-3c.
+
+    The candidate list is :func:`candidates`' (one direction per conjugacy
+    class, the k fence of 2k in the reciprocal lattice, the verification), and
+    so is the group; this function adds the setting and the basis.  A child
+    whose group a generic displacement of these atoms does not keep exactly
+    (``DISTORTION_CHILD_LARGER``) or spglib does not name
+    (``DISTORTION_CHILD_UNIDENTIFIED``) is refused.
+    """
+    from ..representation.distortion import _refuse_shared_sites, distortion_basis
+    from ..symmetry import resolve_group
+
+    _refuse_shared_sites(parent)  # before any group is built from atoms that share a site
+    parent_group = resolve_group(parent.space_group, parent.symmetry_operations)
+    labels = [a.label for a in parent.atoms]
+    if sites is None:
+        chosen = list(range(len(parent.atoms)))
+    else:
+        wanted = [sites] if isinstance(sites, str) else list(sites)
+        missing = [s for s in wanted if s not in labels]
+        if missing:
+            raise ValueError(f"sites {missing} are not atoms of {parent.name!r} ({labels})")
+        chosen = [labels.index(s) for s in wanted]
+
+    found: dict[tuple[str, str], tuple[MagneticCandidate, list[str]]] = {}
+    for index in chosen:
+        atom = parent.atoms[index]
+        xyz = (float(atom.x.value), float(atom.y.value), float(atom.z.value))
+        for cand in candidates(parent_group, xyz, k, kind="displacive"):
+            key = (cand.irrep_label, cand.direction.label)
+            if key in found:
+                # the direction label is gauge-dependent (order_parameter.py), and it
+                # is the same label across sites only because the gauge comes from the
+                # irrep's own matrices, which the 2k fence makes real: so say it
+                # rather than assume it
+                if _group_signature(cand) != _group_signature(found[key][0]):
+                    raise RuntimeError(
+                        f"{cand.label} on {atom.label!r} and on {found[key][1][0]!r} carry "
+                        "one direction label but different isotropy groups; this is a bug")
+                found[key][1].append(atom.label)
+            else:
+                found[key] = (cand, [atom.label])
+
+    out = []
+    for cand, on in found.values():
+        symbol, big, small, metric_p = _standard_child(parent, parent_group, cand)
+        bare = _child_phase_bare(parent, symbol, big, small, metric_p)
+        basis = distortion_basis(parent, bare, (big, small))
+        child = _child_phase(parent, symbol, big, metric_p, basis)
+        result = DistortionCandidate(candidate=cand, child=child, transform=(big, small),
+                                     basis=basis, sites=tuple(on))
+        result._driving_index  # noqa: B018 - the candidate's own irrep must be in the basis
+        out.append(result)
+    return tuple(out)
+
+
+def _child_phase_bare(parent, symbol: str, big, small, metric_p):
+    """The child's group and cell, which is all ``distortion_basis`` reads of it.
+
+    A phase must hold an atom, so it holds the parent's first one at its image
+    in the child cell; the atoms of the returned candidate are built after the
+    basis, from its positions.
+    """
+    from ...schemas.common import Parameter
+    from ...schemas.structure import Atom, Phase
+
+    source = parent.atoms[0]
+    xyz = np.array([float(source.x.value), float(source.y.value), float(source.z.value)])
+    x = (np.linalg.inv(big) @ (xyz - small)) % 1.0
+    atom = Atom(label=source.label, species=source.species,
+                x=Parameter(value=float(x[0])), y=Parameter(value=float(x[1])),
+                z=Parameter(value=float(x[2])))
+    return Phase(name=f"{parent.name} child {symbol}", space_group=symbol,
+                 cell=_cell_from_metric(big.T @ metric_p @ big), atoms=[atom])
 
 
 # --------------------------------------------------------------------------

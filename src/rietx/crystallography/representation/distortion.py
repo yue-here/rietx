@@ -100,6 +100,7 @@ complete mode set of a subgroup (p. 611).
 
 from __future__ import annotations
 
+import functools
 import itertools
 import math
 from dataclasses import dataclass
@@ -171,6 +172,7 @@ class ModeBasis:
     metric: np.ndarray  # (3, 3) G_ref in the child frame
     lattice_points: int
     child_group: str
+    parent_atoms: np.ndarray  # (N,) index of the parent atom each position is an image of
 
     @property
     def n_modes(self) -> int:
@@ -295,6 +297,34 @@ def _canonical(q: np.ndarray) -> np.ndarray:
     return np.array(out).T
 
 
+#: The groups the two caches below were called with, by :func:`group_key`.
+_GROUPS: dict = {}
+
+
+@functools.lru_cache(maxsize=256)
+def _small_irreps_cached(key, k):
+    return small_irreps(_GROUPS[key], k)
+
+
+@functools.lru_cache(maxsize=1024)
+def _representation_cached(key, xyz, k):
+    return magnetic_representation(_GROUPS[key], np.array(xyz), k, kind="polar")
+
+
+def _irreps_and_representations(group, k, sites):
+    """``small_irreps`` and each site's polar representation at ``k``, memoised.
+
+    Both are pure functions of (group, k, site) and cost most of a basis
+    (the factor-system checks); the candidates of one parent at one k ask for
+    the same ones once per child, so they are computed once per process.
+    """
+    key = group_key(group)
+    _GROUPS.setdefault(key, group)
+    k = tuple(k)
+    reps = [_representation_cached(key, tuple(float(v) for v in xyz), k) for xyz in sites]
+    return _small_irreps_cached(key, k), reps
+
+
 def _k_text(k) -> tuple[str, str, str]:
     return tuple(str(c) for c in k)  # type: ignore[return-value]
 
@@ -388,7 +418,25 @@ class _Reference:
     sites: tuple[np.ndarray, ...]  # the parent sites' positions
 
 
+def _refuse_shared_sites(parent) -> None:
+    """Refuse a parent whose atoms share a site: the modes carry no occupancy weight."""
+    group = _group(parent)
+    sites: list[np.ndarray] = []
+    for atom in parent.atoms:
+        xyz = np.array([_value(atom.x), _value(atom.y), _value(atom.z)])
+        orbit = site_orbit(group, xyz)
+        for t, other in enumerate(sites):
+            d = np.asarray(orbit.images) - other[None, :]
+            if np.any(np.all(np.abs(d - np.rint(d)) < _POSITION_TOL, axis=1)):
+                raise ValueError(
+                    f"parent atoms {parent.atoms[t].label!r} and {atom.label!r} share one site; "
+                    "a mixed-occupancy site is not handled, so give the site one atom (the "
+                    "modes carry no occupancy weight)")
+        sites.append(orbit.position)
+
+
 def _reference(parent, big, small) -> _Reference:
+    _refuse_shared_sites(parent)
     group = _group(parent)
     inv = np.linalg.inv(big)
     corners = np.array([big @ np.array(c, float) + small
@@ -402,13 +450,6 @@ def _reference(parent, big, small) -> _Reference:
     for s, atom in enumerate(parent.atoms):
         xyz = np.array([_value(atom.x), _value(atom.y), _value(atom.z)])
         orbit = site_orbit(group, xyz)
-        for t, other in enumerate(sites):
-            d = np.asarray(orbit.images) - other[None, :]
-            if np.any(np.all(np.abs(d - np.rint(d)) < _POSITION_TOL, axis=1)):
-                raise ValueError(
-                    f"parent atoms {parent.atoms[t].label!r} and {atom.label!r} share one site; "
-                    "a mixed-occupancy site is not handled, so give the site one atom (the "
-                    "modes carry no occupancy weight)")
         sites.append(orbit.position)
         n_conv += orbit.multiplicity
         for image in orbit.images:
@@ -616,9 +657,8 @@ def distortion_basis(parent, child, transform, *, reference: str = "average") ->
         star = _star_key(group, k, stars)
         kk = np.array([float(c) for c in k])
         fields: dict[str, list[np.ndarray]] = {}
-        irreps = small_irreps(group, k)
-        for s, xyz in enumerate(ref.sites):
-            rep = magnetic_representation(group, xyz, k, kind="polar")
+        irreps, reps = _irreps_and_representations(group, k, ref.sites)
+        for s, rep in enumerate(reps):
             orbit = rep.positions
             members = np.flatnonzero(ref.site == s)
             where = []
@@ -727,6 +767,7 @@ def distortion_basis(parent, child, transform, *, reference: str = "average") ->
         metric=g_ref,
         lattice_points=lattice_points,
         child_group=str(child.space_group),
+        parent_atoms=ref.site,
     )
 
 

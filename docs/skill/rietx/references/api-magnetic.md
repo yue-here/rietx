@@ -29,3 +29,11 @@ this; everything in `rx.` is `import rietx as rx`.*
 - `rietx.crystallography.representation.distortion.ModeAmplitude` — One irrep's share of a child's distortion, in Å.
   Fields: `k: tuple[str, str, str]`, `irrep: str`, `isotropy_group: str`, `primary: bool | None`, `n_modes: int`, `amplitude: float`, `mode_amplitudes: tuple[float, ...]`
 - `rietx.crystallography.representation.distortion.distortion_basis(parent, child, transform, *, reference: str = 'average') -> ModeBasis` — Every symmetry-adapted mode a child of `parent` admits, in Å.
+
+## Displacive candidates of a parent
+
+`distortion_candidates(parent, k, sites=None)` from `rietx.crystallography.magnetic.isotropy` lists every child a displacement at `k` can give: one per (irrep, direction) of `candidates(kind="displacive")` over the named sites (all by default), the child `Phase` in a standard setting with (P, p), and its `distortion_basis`, every irrep the child admits, in Å. `driving` is the candidate's own irrep, `rest` the others. The k fence (2k in the reciprocal lattice) is `candidates`'.
+
+- `rietx.crystallography.magnetic.isotropy.distortion_candidates(parent, k, sites=None) -> tuple[DistortionCandidate, ...]` — Every displacive candidate of `parent` at `k`, with its child and modes in Å.
+- `rietx.crystallography.magnetic.isotropy.DistortionCandidate` — One displacive candidate of a parent: its child, (P, p) and its modes in Å.
+  Fields: `candidate: MagneticCandidate`, `child: object`, `transform: tuple[np.ndarray, np.ndarray]`, `basis: object`, `sites: tuple[str, ...]`

@@ -459,6 +459,20 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                  "rietx.crystallography.representation.distortion.ModeAmplitude",
                  "rietx.crystallography.representation.distortion.distortion_basis"),
             ),
+            (
+                "Displacive candidates of a parent",
+                "`distortion_candidates(parent, k, sites=None)` from "
+                "`rietx.crystallography.magnetic.isotropy` lists every child a "
+                "displacement at `k` can give: one per (irrep, direction) of "
+                "`candidates(kind=\"displacive\")` over the named sites (all "
+                "by default), the child `Phase` in a standard setting with "
+                "(P, p), and its `distortion_basis`, every irrep the child "
+                "admits, in Å. `driving` is the candidate's own irrep, "
+                "`rest` the others. The k fence (2k in the reciprocal "
+                "lattice) is `candidates`'.",
+                ("rietx.crystallography.magnetic.isotropy.distortion_candidates",
+                 "rietx.crystallography.magnetic.isotropy.DistortionCandidate"),
+            ),
         ),
     ),
 }
