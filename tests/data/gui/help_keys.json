@@ -185,6 +185,8 @@
   "diagnostics:PEAK_KALPHA2_RESIDUAL",
   "diagnostics:PEAK_LIST_TOO_SHORT",
   "diagnostics:PEAK_NOT_SEPARABLE",
+  "diagnostics:PEAK_NO_INTENSITY",
+  "diagnostics:PEAK_POSITION_AT_BOUND",
   "diagnostics:PEAK_POSITION_PRECISION",
   "diagnostics:PEAK_SHOULDER_SEEDED",
   "diagnostics:PEAK_SIGMA_ASSUMED",

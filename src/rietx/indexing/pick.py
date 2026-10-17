@@ -201,7 +201,7 @@ def fit_peaks(data: PatternData, instrument: Instrument,
     # PEAK_EXPECTED_FALSE_LINES one about detecting in it; here the count and
     # the positions are the caller's own argument rather than anything the
     # pattern said
-    diags = [d for d in peak_diagnostics(pl, det)
+    diags = [d for d in peak_diagnostics(pl, det, windows=groups)
              if d.code not in ("PEAK_LIST_TOO_SHORT",
                                "PEAK_EXPECTED_FALSE_LINES")]
     return pl.model_copy(update={"diagnostics": diags})

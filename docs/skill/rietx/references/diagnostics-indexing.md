@@ -24,7 +24,8 @@ are read on the peak list, not on a `RefinementResult`.
 | `PEAK_AXIAL_TAIL` | (info) Read the flagged components as lattice lines, or exclude them unseen. They stay *usable*. On a well-aligned Bragg-Brentano pattern excluding them before indexing is usually right; the diagnostic's suggestion carries the SRM 660c numbers (Measured: WP-1043). |
 | `PEAK_KALPHA2_RESIDUAL` | (info) Treat it as a line of anything. Exclude it before indexing unless you believe a genuine reflection sits there. |
 | `PEAK_UNRESOLVED_SHOULDER`, `PEAK_UNRESOLVED_SPLIT` | Quote one of a pair as an independent line. |
-| `PEAK_WIDTH_CAPPED` | (info) Index on it. |
+| `PEAK_WIDTH_CAPPED`, `PEAK_NO_INTENSITY` | (info) Index on them: a width at 5× the width law is a hump, and a component with no intensity has no position |
+| `PEAK_POSITION_AT_BOUND` | (info/warning) Trust the flagged 2θ or its σ: the fit stopped on its bound, so the 2θ is the bound's. Warning: one is usable above the false-discovery bar |
 | `PEAK_CONTAMINATION_LINE` | Subtract it, or read one flag as the evidence. The finding is joint: five of the eight strongest reflections at one common ratio. An unfiltered tube leaks 0.14 of Kα, so a reported 0.3 is a reflection and not a ghost. Flagged lines leave `usable()` and are never stripped (Measured: WP-1442) |
 | `PEAK_ASYMMETRY_UNMODELLED` | Trust the *positions* of the flagged lines. σ cannot see the bias, and the low-angle lines are the ones indexing depends on most. |
 | `PEAK_WIDTH_LAW_MISMATCH` | Leave `instrument.profile` as declared. A factor near 13 is the `ProfileTCHZ` synchrotron default (W = 1e-3 deg², FWHM ≈ 0.03°) on lab data. |
