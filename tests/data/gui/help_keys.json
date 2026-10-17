@@ -235,6 +235,7 @@
   "diagnostics:SEQUENTIAL_WIDTH_GROWTH",
   "diagnostics:SERIES_PATTERN_FAILED",
   "diagnostics:SITE_SNAPPED_TO_SPECIAL_POSITION",
+  "diagnostics:SITE_TWINS_MERGED",
   "diagnostics:SIZE_NORMALISED_ACROSS_WAVELENGTHS",
   "diagnostics:SIZE_UNUSUALLY_SMALL",
   "diagnostics:SOLVE_B_TIED_PER_PARENT_SITE",

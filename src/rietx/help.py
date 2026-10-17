@@ -3749,6 +3749,20 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "rounded."
         ),
     ),
+    "SITE_TWINS_MERGED": HelpEntry(
+        title="Near-duplicate atoms merged onto a special position",
+        description=(
+            "A site's symmetry images fell in tight pairs, closer than 0.02 Å, so it "
+            "would have put twice the atoms in the cell. Reading the project, loading "
+            "the history or a model edit moved the site onto "
+            "the special position its orbit collapses to. This changes the multiplicity, "
+            "so it changes the density and every weight fraction. A CIF read says the "
+            "same thing as `CIF_SITE_TWINS_MERGED`, and the two never both fire. Check "
+            "the coordinate against its source, since a special position stated a few "
+            "1e-5 off is the usual cause. To keep a genuinely displaced atom, state it "
+            "at least 0.02 Å from its own images."
+        ),
+    ),
     "SIZE_NORMALISED_ACROSS_WAVELENGTHS": HelpEntry(
         title="Shared size term scaled across wavelengths",
         description=(

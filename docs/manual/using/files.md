@@ -229,9 +229,19 @@ reports `BISO_NEGATIVE`.
 
 A further note is a report rather than a repair. A site can sit within 1e-4 of a
 special position without being on it, as a file quoting five decimals often
-leaves one. Such a site has its orbit expanded at that position, so its
+leaves one. The 1e-4 bounds each operation's displacement R·x + t − x, so on a
+mirror, which moves the site by twice its offset, the reach is 5e-5. Such a site has its orbit expanded at that position, so its
 multiplicity is the special one, and `SITE_SNAPPED_TO_SPECIAL_POSITION` names
-the site, the shift and the multiplicity. The stored coordinates are unchanged
+the site, the shift and the multiplicity. A site further off whose own images
+still sit closer than 0.02 Å is one atom counted twice, so it is moved onto the
+special position they collapse to, at every boundary that can say so: a CIF read
+says so with `CIF_SITE_TWINS_MERGED`; the project readers' `to_structure` and
+`RefinementTree.load` say `SITE_TWINS_MERGED` on their own `diagnostics=`; and
+`Refinement` construction, `edit`, `set_values` and `checkout` move the site
+and the next `fit` or `run_stage` result says it. `Phase` itself stays strict:
+a phase built in code with a twin site is held as stated until it enters one of
+those. A split site, whose images are 0.2 Å or more apart, is
+left as stated. The stored coordinates are unchanged
 and the fit is unaffected, with one exception. Where the file states the
 multiplicity (`_atom_site_symmetry_multiplicity`, or the number in
 `_atom_site_Wyckoff_symbol`) and the site is within 1e-3 of the position that

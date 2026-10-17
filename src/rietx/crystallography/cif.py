@@ -20,6 +20,7 @@ from ..schemas.structure import (
 )
 from . import magcif
 from .magnetic.scattering import check_group_is_structure_symmetry
+from .symmetry import TWIN_DISTANCE as _TWIN_DISTANCE
 from .symmetry import (
     OperatorGroup,
     site_orbit,
@@ -308,13 +309,10 @@ def _number_fault(path: str, block, tags, label: str | None = None) -> None:
                     f"standard uncertainty in parentheses, as in '5.4307(2)')")
 
 
-#: Two atoms of a structure closer than this are one atom stated twice (Å).
-#: Far below any split-site separation a refined structure states — the
-#: closest pair of images of one partially occupied site in the 2026-10-06
-#: MAGNDATA sweep is 0.20 Å apart, at occupancies summing to at most 1 — and
-#: far above the 1e-3 Å twins rounding leaves when a special position is
-#: printed off by 1e-3.
-TWIN_DISTANCE = 0.02
+#: Two atoms of a structure closer than this are one atom stated twice (Å);
+#: defined beside the orbit in :mod:`.symmetry`, which every route applies
+#: (issue #1007), and quoted here for the listed-twice test below.
+TWIN_DISTANCE = _TWIN_DISTANCE
 
 #: Two occupancies agree, and two sites fill a position without overfilling it,
 #: to within this (absolute).  Occupancies are quoted to two or three decimals
@@ -350,29 +348,26 @@ def _merge_twins(path: str, sg, cell, atoms, diagnostics) -> list:
     position its orbit collapses to, and ``CIF_SITE_TWINS_MERGED`` says so.
     A split site, whose images stay apart, is untouched.
 
-    The orbit of a site and its collapse onto a special position are those of
-    :func:`.symmetry.site_orbit`: International Tables for Crystallography
+    The rule is :func:`.symmetry.site_twin_merge`'s, which
+    :func:`.twins.merge_site_twins` applies at every other boundary that builds
+    or changes a structure (issue #1007, reported there as
+    ``SITE_TWINS_MERGED``); this reader says the move on its own channel and
+    leaves nothing for them to move.  The orbit
+    and its collapse are those of International Tables for Crystallography
     vol. A (Wyckoff positions), with the tolerance-based site-symmetry search
     of Grosse-Kunstleve & Adams (2002), Acta Cryst. A58, 60.
     """
-    from .symmetry import site_orbit
+    from .symmetry import site_twin_merge
 
-    reach = TWIN_DISTANCE / min(cell.a, cell.b, cell.c)
     out = []
     for atom in atoms:
         xyz = np.array([atom.x.value, atom.y.value, atom.z.value])
-        tight = site_orbit(sg, xyz)
-        loose = site_orbit(sg, xyz, tol=reach)
-        if loose.multiplicity >= tight.multiplicity:
+        merge = site_twin_merge(sg, cell, xyz)
+        if merge is None:
             out.append(atom)
             continue
-        images = np.asarray(tight.images, dtype=np.float64)
-        gap = min(_cartesian_gap(cell, images[a] - images[b])
-                  for a in range(len(images)) for b in range(a))
-        if gap > TWIN_DISTANCE:
-            out.append(atom)
-            continue
-        snapped = [float(v) for v in loose.position]
+        gap = merge.gap
+        snapped = [float(v) for v in merge.position % 1.0]
         out.append(atom.model_copy(update={
             n: getattr(atom, n).model_copy(update={"value": v})
             for n, v in zip("xyz", snapped)}))
@@ -382,11 +377,11 @@ def _merge_twins(path: str, sg, cell, atoms, diagnostics) -> list:
                 where=[atom.label], value=gap,
                 message=(
                     f"{path}: site {atom.label!r} at "
-                    f"{[round(float(v), 6) for v in xyz]} puts {tight.multiplicity} "
+                    f"{[round(float(v), 6) for v in xyz]} puts {merge.before} "
                     f"atoms in the cell in pairs {gap:.2g} Å apart. It was read "
                     f"on the special position "
                     f"{[round(v, 6) for v in snapped]} "
-                    f"({loose.multiplicity} atoms)."),
+                    f"({merge.after} atoms)."),
                 suggestion="Check the coordinates against the source."))
     return out
 

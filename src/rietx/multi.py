@@ -28,6 +28,7 @@ import numpy as np
 from . import runs
 from .backend.api import backend_dtype_note
 from .crystallography.symmetry import reflection_label_row
+from .crystallography.twins import merge_site_twins
 from .history.events import _attach_progress, as_event_stream
 from .model.components import EXTRA_TICK_KEY
 from .model.forward import PHASE_SUPPORT_SIGMA, compile_model
@@ -951,6 +952,13 @@ class MultiHistogramRefinement:
         # distinct one is a caller's statement and is judged as one
         starts = ([structure] * len(instruments) if isinstance(structure, Structure)
                   else list(structure))
+        # twin sites meet the merge here, once per distinct structure so a
+        # shared one stays shared, and are said on the first result (#1007)
+        self._twin_findings: list[Diagnostic] = []
+        merged = {id(s): merge_site_twins(s, diagnostics=self._twin_findings)
+                  for s in {id(s): s for s in starts}.values()}
+        starts = [merged[id(s)] for s in starts]
+        structure = starts[0] if isinstance(structure, Structure) else starts
         for start in {id(s): s for s in starts}.values():
             _judge_magnetic_groups(start)       # a caller's statement (issue #597)
             _refuse_centroid_origin(start)
@@ -989,6 +997,11 @@ class MultiHistogramRefinement:
         #: what :meth:`report` reads besides the models, per histogram, taken
         #: with the result it reports on (:meth:`_freeze_answer`)
         self._answer: list[dict] | None = None
+
+    def _drain_twin_findings(self) -> list[Diagnostic]:
+        """The ``SITE_TWINS_MERGED`` findings of construction, said once."""
+        out, self._twin_findings = self._twin_findings, []
+        return out
 
     @property
     def n_histograms(self) -> int:
@@ -1290,7 +1303,8 @@ class MultiHistogramRefinement:
         # (DIAGNOSTIC_SCOPES: SPECIMEN) — and the plan's literal paths the
         # model will not free, a plan read decided before any stage too (FIT)
         opening_diags = (
-            _symmetry_silence_diagnostics(self.mtable.structures[0], mode)
+            self._drain_twin_findings()
+            + _symmetry_silence_diagnostics(self.mtable.structures[0], mode)
             + _joint_fixed_literals(plan.stages, self.mtable))
         self.mtable.set_vary(["*"], False)
         stage_results: list[StageResult] = []

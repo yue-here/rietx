@@ -45,6 +45,7 @@ from .crystallography.magnetic.moments import (
 )
 from .crystallography.magnetic.scattering import check_group_is_structure_symmetry
 from .crystallography.symmetry import reflection_label, reflection_label_row
+from .crystallography.twins import merge_site_twins
 from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
 from .history.store import fingerprint
@@ -1888,6 +1889,12 @@ class Refinement:
         self._backend = backend
         self._solver = solver
         self.structure = structure.model_copy(deep=True)
+        #: ``SITE_TWINS_MERGED`` findings a verb has made and no result has
+        #: yet carried (#1007): the schema is strict and has no channel, so a
+        #: verb that takes a structure in merges its twin sites and the next
+        #: ``fit``/``run_stage`` says so (:meth:`_drain_twin_findings`).
+        self._twin_findings: list[Diagnostic] = []
+        self._merge_twins()
         # A magnetic group has to be a symmetry of the structure it decorates
         # (issue #597).  Judged here, where a statement enters a fit, and not
         # on the schema or at compile: a refined phase whose group-related
@@ -2134,6 +2141,23 @@ class Refinement:
         tree.set_head(node.id)
         return self
 
+    def _merge_twins(self) -> None:
+        """Put every twin site of the working structure on its special position.
+
+        The one call every verb that brings a structure in makes
+        (construction, :meth:`edit`, :meth:`set_values`, :meth:`checkout`):
+        ``Phase`` validation is strict and moves nothing, and a coordinate
+        assigned after a phase was built never re-validates it.  What moved is
+        held in ``_twin_findings`` for the next result.
+        """
+        self.structure = merge_site_twins(self.structure,
+                                          diagnostics=self._twin_findings)
+
+    def _drain_twin_findings(self) -> list[Diagnostic]:
+        """The merges no result has reported yet; each is reported once."""
+        out, self._twin_findings = self._twin_findings, []
+        return out
+
     def _restore_state(self, state: RefinementState) -> None:
         """Make ``state`` the working state; ``checkout`` and keep-best share it.
 
@@ -2158,6 +2182,7 @@ class Refinement:
         # state whose pin had quietly expired (WP-1435)
         self._user_holds = set(state.holds)
         self._pending_reflections = [r.model_copy(deep=True) for r in state.reflections]
+        self._merge_twins()
         self._invalidate_fit()
 
     def branch(self, node_id: str | None = None) -> "Refinement":
@@ -2259,6 +2284,10 @@ class Refinement:
         if instrument is not None:
             require_two_theta(None, "Refinement.edit()", instrument=instrument)
         candidate = self.structure if structure is None else structure
+        # a proposed structure meets the twin merge before its table is built,
+        # since moving a site changes the symmetry its table is checked against
+        merged: list[Diagnostic] = []
+        candidate = merge_site_twins(candidate, diagnostics=merged)
         # No magnetic-group judgement here: ``edit`` receives refined state
         # plus one change (the GUI's funnel for every model edit), which is the
         # case :func:`_refined_state` exists for (issue #597).
@@ -2287,7 +2316,8 @@ class Refinement:
         # ``_apply_holds`` gives is the saying-so.
         self._apply_holds(table)
         if structure is not None:
-            self.structure = structure.model_copy(deep=True)
+            self.structure = candidate.model_copy(deep=True)
+            self._twin_findings.extend(merged)
         if instrument is not None:
             self.instrument = instrument.model_copy(deep=True)
             # An instrument edit is a deliberate redefinition of the instrument
@@ -2549,6 +2579,8 @@ class Refinement:
             by_path[path].value = float(value)
         table.refresh_ties()  # dependents follow their sources (b←a, x←dof)
         self._write_back(table)
+        # a value set next to its own image is the twin case #1007 describes
+        self._merge_twins()
         # the fitted curve and statistics described the *old* values
         self._invalidate_fit()
         if self.history is None:
@@ -4587,7 +4619,8 @@ class Refinement:
             declared_wavelengths = list(self._declared_wavelengths)
 
             diagnostics: list[Diagnostic] = (
-                _symmetry_silence_diagnostics(self.structure, mode)
+                self._drain_twin_findings()
+                + _symmetry_silence_diagnostics(self.structure, mode)
                 + _dispersion_diagnostics(self.structure, self.instrument)
                 + _resonant_absorber_diagnostics(self.structure,
                                                  self.instrument)
@@ -5075,7 +5108,8 @@ class Refinement:
                     # way out — or was cancelled, which reaches here with no
                     # ``fit_end`` to say so — recorded itself ``done``.
                     stream.close()  # we created it from a path/callable
-            diagnostics = order + _guard_diagnostics(guard)
+            diagnostics = (self._drain_twin_findings() + order
+                           + _guard_diagnostics(guard))
             diagnostics.extend(_covariance_diagnostics(stage.name, outcome,
                                                        answer=True))
             if mode == "pawley":
@@ -9451,7 +9485,9 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
                 f"but the tree was recorded against {expected[:8]}")
 
     state = node.state
-    structure = state.structure.model_copy(deep=True)
+    twins: list[Diagnostic] = []
+    structure = merge_site_twins(state.structure.model_copy(deep=True),
+                                 diagnostics=twins)
     instrument = state.instrument.model_copy(deep=True)
     table = ParameterTable(structure, instrument)
     for name, prm in state.variables.items():
@@ -9508,7 +9544,7 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
     result = _build_result(
         model, table, table.x0(), mode=state.mode,
         status=node.metrics.status or "converged", stage_results=[],
-        diagnostics=list(node.diagnostics), structure=structure)
+        diagnostics=twins + list(node.diagnostics), structure=structure)
     result.node_id = node.id
     result.tree_id = tree.header.tree_id
     return result

@@ -171,6 +171,7 @@ from ...crystallography.symmetry import (
     setting_diagnostics,
     site_orbit,
 )
+from ...crystallography.twins import merge_site_twins
 from ...schemas.common import Diagnostic, Parameter
 from ..formats.base import decode
 from . import coverage as _coverage
@@ -4344,6 +4345,10 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
     except Exception as exc:
         # e.g. a phase whose site lines were all inside a disabled #ifdef branch
         raise TopasInpError(f"{model.path or '<model>'}: {exc}") from exc
+    # a site whose own images coincide is one atom on its special position
+    # (#1007), said here because this is the channel the schema lacks
+    structure = merge_site_twins(structure, diagnostics=diagnostics,
+                                 source=model.path or "<model>")
     if diagnostics is not None:
         for ip, ph in enumerate(phases_in):
             part = magnetic_parts.get(ph.name)
