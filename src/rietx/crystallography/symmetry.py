@@ -851,6 +851,12 @@ class SiteOrbit:
         the stabiliser, in gemmi's own order, so each generates a *distinct*
         orbit image.
     images : (m,3) float — those images of ``position``, wrapped into [0,1).
+    stabilizer_ops : (h,) int — the indices, in the group's own operation
+        list, of the operations fixing the site (mod lattice), in the order of
+        ``stabilizer``.  Two sites of one group compare their site symmetries
+        as a subset test on these (a rigid body's atoms against its origin,
+        WP-1807), which the rotation parts alone cannot do: a 2₁ screw and a
+        2-fold share a rotation and fix different points.
     """
 
     position: np.ndarray
@@ -860,6 +866,7 @@ class SiteOrbit:
     rot: np.ndarray
     tran: np.ndarray
     images: np.ndarray
+    stabilizer_ops: np.ndarray
 
 
 def site_orbit(sg: gemmi.SpaceGroup, xyz: np.ndarray, *,
@@ -970,6 +977,7 @@ def site_orbit(sg: gemmi.SpaceGroup, xyz: np.ndarray, *,
         rot=np.array(all_rot[keep]),
         tran=np.array(all_tran[keep]),
         images=np.asarray(images),
+        stabilizer_ops=np.asarray(stab_ops, dtype=np.intp),
     )
 
 

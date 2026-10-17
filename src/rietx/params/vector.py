@@ -53,9 +53,11 @@ from ..crystallography.symmetry import (
     check_cell_angles,
     resolve_group,
     rotation_matrices,
+    site_orbit,
 )
 from ..crystallography.wyckoff import (
     adp_basis,
+    axial_basis,
     coordinate_basis,
     floating_origin_basis,
     stabilizer_rotations,
@@ -1599,53 +1601,45 @@ class ParameterTable:
             self._add(f"{base}.{c}", getattr(atom, c), force_fixed=True)
 
     def _collect_body(self, base: str, sg, phase, b: int, body) -> None:
-        """A rigid body: origin DOFs, three rotation DOFs, and its block.
+        """A rigid body: origin DOFs, its rotation DOFs, and its block.
 
         The origin is collected exactly as an atom's coordinates are
         (:meth:`_collect_atom_coords`): anchored displacement DOFs on its
-        site-symmetry basis.  A body whose origin, or any of whose atoms, sits
-        on a special position is refused for now (``RIGID_BODY_NOT_INVARIANT``;
-        WP-1807 takes the stabiliser's axial subspace for the rotation).  The rotation is an
-        **anchored increment** δω = E·θ about the record's R₀, zero at every
-        build and every commit, bounded per component by
-        ``RIGID_BODY_ROTATION_BOUND``; it has as many DOFs as the template's
-        inertia rank (two for a linear body, ``params.bodies``), and it is
-        never in ``_anchored_dofs`` (:attr:`_anchored_rotations` says why).
-        The block is declared after collection, through :meth:`add_derived`.
+        site-symmetry basis.  The rotation is an **anchored increment**
+        δω = E·θ about the record's R₀, zero at every build and every commit,
+        bounded per component by ``RIGID_BODY_ROTATION_BOUND``; it has as many
+        DOFs as E has columns (``params.bodies``): the template's inertia rank
+        at a general origin, and on a special position the axial directions
+        the origin's site symmetry fixes (WP-1807: 0, 1 or 3).  It is never in
+        ``_anchored_dofs`` (:attr:`_anchored_rotations` says why).  The block
+        is declared after collection, through :meth:`add_derived`.
+
+        Refused at build, each naming the body and the atom
+        (:meth:`_refuse_body_off_its_sites`, :meth:`_refuse_body_image_overlap`):
+        ``RIGID_BODY_NOT_INVARIANT`` for an atom whose site symmetry its origin
+        does not share, a torsion that moves an atom on a special position, or
+        a site body in rhombohedral axes; ``RIGID_BODY_IMAGE_OVERLAP`` for a
+        body that straddles a symmetry element.
         """
         from ..schemas.structure import RIGID_BODY_ROTATION_BOUND
         from .bodies import RigidBodyBlock
+        from .derived import cartesian_frame
 
         bbase = f"{base}.rigid_bodies.{b}"
-        xyz = np.array(body.origin.values())
-        if len(coordinate_basis(stabilizer_rotations(sg, xyz))) < 3:
-            raise ValueError(
-                f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has its "
-                f"origin {tuple(xyz)} on a special position of "
-                f"{phase.space_group!r}; a body on a special position is not "
-                "supported yet (WP-1807) — move the origin to a general "
-                "position")
+        xyz = np.array(body.origin.values(), dtype=np.float64)
+        origin = site_orbit(sg, xyz)
         index = {a.label: j for j, a in enumerate(phase.atoms)}
-        # the origin is not the only point a site can fix: a member atom on a
-        # special position keeps its coset split for the stage while the body
-        # turns it off the site, and the next compile counts |G_x| times as
-        # many images (S, O1, O2 of PbSO4 on the Pnma mirror: 8 S and 24 O in
-        # a cell of 4 and 16).  Keyed on the stabiliser the forward model's
-        # multiplicity is read from (``wyckoff.stabilizer_rotations``)
-        for label in body.atoms:
-            atom = phase.atoms[index[label]]
-            at = np.array([atom.x.value, atom.y.value, atom.z.value])
-            order = len(stabilizer_rotations(sg, at))
-            if order > 1:
-                raise ValueError(
-                    f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has its "
-                    f"atom {label!r} at {tuple(float(v) for v in at)} on a "
-                    f"special position of {phase.space_group!r} (site symmetry "
-                    f"of order {order}); a turn of the body moves it off the "
-                    f"site and the next stage counts {order}× its images, and a "
-                    "body on a special position is not supported yet (WP-1807) "
-                    "— refine that atom outside the body, or state the "
-                    "structure in a subgroup where its site is general")
+        self._refuse_body_off_its_sites(sg, phase, body, index, origin)
+        self._refuse_body_image_overlap(sg, phase, body, index)
+        # W, the axial directions the origin's site fixes, carried into the
+        # Cartesian frame at the stored cell: cell-independent in every
+        # setting the check above lets through, so fixed for the table's life
+        axial = axial_basis(list(origin.stabilizer))
+        site_axes = None
+        if len(axial) < 3:
+            m = np.asarray(cartesian_frame(phase.cell.lengths_angles()), dtype=np.float64)
+            w = (m @ axial.T.astype(np.float64)).reshape(3, len(axial))
+            site_axes = w / np.linalg.norm(w, axis=0) if len(axial) else w
         member = {label: i for i, label in enumerate(body.atoms)}
         try:
             block = RigidBodyBlock(
@@ -1656,8 +1650,11 @@ class ParameterTable:
                 torsions=[(member[t.axis[0]], member[t.axis[1]],
                            [member[m] for m in t.moves]) for t in body.torsions],
                 angles=[t.angle for t in body.torsions],
-                names=[t.name for t in body.torsions])
+                names=[t.name for t in body.torsions], site_axes=site_axes)
         except ValueError as exc:
+            code, sep, rest = str(exc).partition(": ")
+            if sep and code.startswith("RIGID_BODY_"):
+                raise ValueError(f"{code}: rigid body {body.name!r}: {rest}") from None
             raise ValueError(f"rigid body {body.name!r}: {exc}") from None
         before = set(self._anchored_dofs)
         self._collect_atom_coords(f"{bbase}.origin", sg, body.origin)
@@ -1681,6 +1678,157 @@ class ParameterTable:
                                       lo=-np.inf, hi=np.inf))
         self._anchored_torsions[bbase] = twists
         self._bodies.append((bbase, body.name, block))
+
+    def _refuse_body_off_its_sites(self, sg, phase, body, index, origin) -> None:
+        """``RIGID_BODY_NOT_INVARIANT``: the invariance rule (WP-1807, D4a, D7, D8).
+
+        Every member atom's site symmetry G_i must lie inside its origin's
+        G_o, as operations of the group (mod lattice), **and** fix the atom's
+        offset from the origin exactly, R(p − o) = p − o in unwrapped body
+        coordinates (-1 at (0,0,0) and (½,0,0) is one operation mod the
+        lattice and two elements to a turn): a turn about an axis
+        G_o allows commutes with G_o, so it carries an atom on an element of
+        G_o along that element, but an atom on an element G_o lacks is pushed
+        off it, and the next stage counts |G_i|× its images (#840: 8 S and
+        24 O in a PbSO₄ cell of 4 and 16).  With G_o = {1} this is #841's
+        check exactly.  A torsion moving an on-site atom takes it off the site
+        the same way.  In rhombohedral axes the 3-fold and 2-fold directions
+        turn with α, so a body held to them inside a stage would leave its
+        own site as the cell refines.
+        """
+        from ..crystallography.symmetry import SITE_TOL, _group_arrays, group_key
+
+        ops, rots, _ = _group_arrays(group_key(sg))
+        g_o = {int(i) for i in origin.stabilizer_ops}
+        where = tuple(float(v) for v in body.origin.values())
+        sites = {}
+        for label in body.atoms:
+            atom = phase.atoms[index[label]]
+            at = np.array([atom.x.value, atom.y.value, atom.z.value], dtype=np.float64)
+            orbit = site_orbit(sg, at)
+            sites[label] = orbit
+            extra = [int(i) for i in orbit.stabilizer_ops if int(i) not in g_o]
+            if not extra:
+                # membership mod the lattice is not enough: a turn about the
+                # origin keeps the atom on its element only if R(p − o) = p − o
+                # in the unwrapped body coordinates, else the atom's element is
+                # a lattice vector from the origin's (-1 at (0,0,0) and at
+                # (½,0,0); 2-folds at x = 0 and ½).  Both positions are known
+                # to SITE_TOL, and a true miss is a lattice vector, so 4 × it
+                # is a rounding bound
+                d = at - np.array(where, dtype=np.float64)
+                for g in orbit.stabilizer_ops:
+                    miss = rots[int(g)] @ d - d
+                    if float(np.abs(miss).max()) > 4.0 * SITE_TOL:
+                        raise ValueError(
+                            f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has "
+                            f"its atom {label!r} at {tuple(float(v) for v in at)} on "
+                            f"an element of operation {ops[int(g)].triplet()} that "
+                            f"is a lattice translation away from the one the body's "
+                            f"origin {where} is on: the operation holds the atom "
+                            "only modulo the lattice, and a turn about the origin "
+                            "takes it off — put the body's origin on that element "
+                            f"(body_from_atoms(..., origin={label!r})), or refine the "
+                            "atom outside the body")
+            if extra:
+                order = len(orbit.stabilizer_ops)
+                raise ValueError(
+                    f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has its "
+                    f"atom {label!r} at {tuple(float(v) for v in at)} on a "
+                    f"special position of {phase.space_group!r} (site symmetry "
+                    f"of order {order}), on the element of operation "
+                    f"{ops[extra[0]].triplet()} that the body's origin {where} "
+                    "is not on; a turn of the body moves it off the site and "
+                    f"the next stage counts {order}× its images — put the "
+                    "body's origin on that site (body_from_atoms(..., "
+                    f"origin={label!r})), refine the atom outside the body, or "
+                    "state the structure in a subgroup where its site is general")
+        for torsion in body.torsions:
+            for label in torsion.moves:
+                order = len(sites[label].stabilizer_ops)
+                if order > 1:
+                    raise ValueError(
+                        f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has "
+                        f"its torsion {torsion.name!r} move atom {label!r}, which "
+                        f"sits on a special position (site symmetry of order "
+                        f"{order}); the twist takes it off the site — a torsion "
+                        "on a site body may move only atoms in general positions")
+        if (len(g_o) > 1 and sg.ext == "R"
+                and any(abs(r).sum() != 3 or abs(np.trace(r)) != 3
+                        for r in origin.stabilizer)):
+            raise ValueError(
+                f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has its "
+                f"origin {where} on a site of {phase.space_group!r} in "
+                "rhombohedral axes, where the site's symmetry directions turn "
+                "with the refined α and the body would leave its site inside a "
+                "stage — state the phase in hexagonal axes (:H)")
+
+    def _refuse_body_image_overlap(self, sg, phase, body, index) -> None:
+        """``RIGID_BODY_IMAGE_OVERLAP``: a body that straddles a symmetry element.
+
+        Any space-group image of a body atom, other than the atom's own
+        position on its own site, nearer than
+        ``RIGID_BODY_OVERLAP_FACTOR`` × the covalent-radius sum to an atom of
+        the same body means the listed atoms and their images double part of
+        the molecule: #876's SO₄ moved 0.03 off the Pnma mirror built with its
+        S 0.32 Å from its own image and 8 S, 32 O in a cell of 4 and 16.
+        Exempt when either atom has a ``disorder_group``, which declares the
+        overlap.  Minimum image over the 27 neighbouring cells.
+        """
+        import gemmi
+
+        from ..crystallography.species import element_symbol
+        from ..crystallography.symmetry import _group_arrays, group_key
+        from ..schemas.structure import RIGID_BODY_OVERLAP_FACTOR
+        from .derived import cartesian_frame
+
+        ops, rot, tran = _group_arrays(group_key(sg))
+        m = np.asarray(cartesian_frame(phase.cell.lengths_angles()), dtype=np.float64)
+        atoms = [phase.atoms[index[label]] for label in body.atoms]
+        live = [i for i, a in enumerate(atoms) if a.disorder_group is None]
+        if not live:
+            return
+        xyz = np.array([[a.x.value, a.y.value, a.z.value] for a in atoms],
+                       dtype=np.float64)
+        elements = [element_symbol(a.species) for a in atoms]
+        radius = np.array([float(gemmi.Element(e).covalent_r) for e in elements])
+        shifts = np.array([(i, j, k) for i in (-1, 0, 1) for j in (-1, 0, 1)
+                           for k in (-1, 0, 1)], dtype=np.float64)
+        targets = xyz[live]
+        hits = []
+        for i in live:
+            own = {int(g) for g in site_orbit(sg, xyz[i]).stabilizer_ops}
+            for g in range(len(ops)):
+                if g in own:
+                    continue
+                image = rot[g] @ xyz[i] + tran[g]
+                d = image[None, None, :] - targets[:, None, :]
+                d = d - np.round(d) + shifts[None, :, :]
+                dist = np.sqrt(((d @ m.T) ** 2).sum(axis=2)).min(axis=1)
+                for k, j in enumerate(live):
+                    limit = RIGID_BODY_OVERLAP_FACTOR * (radius[i] + radius[j])
+                    if dist[k] < limit:
+                        hits.append((float(dist[k]), i, j, g, limit))
+        if not hits:
+            return
+        dist, i, j, g, limit = min(hits)
+        involved = sorted({elements[h[1]] for h in hits} | {elements[h[2]] for h in hits})
+        counts = {e: 0.0 for e in involved}
+        for a in phase.atoms:
+            e = element_symbol(a.species)
+            if e in counts:
+                counts[e] += float(a.occ.value) * site_orbit(
+                    sg, np.array([a.x.value, a.y.value, a.z.value])).multiplicity
+        tally = ", ".join(f"{e} {counts[e]:g}" for e in involved)
+        raise ValueError(
+            f"RIGID_BODY_IMAGE_OVERLAP: rigid body {body.name!r} has the image of "
+            f"its atom {body.atoms[i]!r} under {ops[g].triplet()} {dist:.3g} Å "
+            f"from its atom {body.atoms[j]!r} (under {limit:.3g} Å, "
+            f"{RIGID_BODY_OVERLAP_FACTOR:g} × their covalent radii), so the body "
+            "straddles a symmetry element and the cell counts the overlap twice: "
+            f"it holds {tally} per cell — put the body's origin on that element "
+            "and list one atom per image (body_from_atoms(..., origin=...)), or "
+            "give the atoms a disorder_group if the body is disordered across it")
 
     def _check_body_drift(self) -> None:
         """Refuse a body whose stored atoms sit off its map (WP-1805).
@@ -3171,9 +3319,10 @@ class ParameterTable:
                                  named: Callable[[str], bool]) -> list[str]:
         """The rotation half of :meth:`displace_anchored_dofs` (its docstring)."""
         from ..crystallography import rotation
+        from .bodies import SITE_AXIS_TOL
 
         moved: list[str] = []
-        for bbase, _, block in self._bodies:
+        for bbase, name, block in self._bodies:
             target = orientations.get(bbase)
             paths = self._anchored_rotations[bbase]
             if target is None or not (any(named(p) for p in paths)
@@ -3181,7 +3330,26 @@ class ParameterTable:
                 continue
             r_t = np.asarray(rotation.matrix_from_quaternion(
                 np.asarray(tuple(target), dtype=np.float64)), dtype=np.float64)
-            if block.n_rot == 3:
+            if block.site_axes is not None:
+                # a site body turns only about W (WP-1807): a target off it
+                # would leave the site, and θ cannot reach it anyway
+                omega = np.asarray(rotation.vector_from_matrix(r_t @ block.r0.T),
+                                   dtype=np.float64)
+                w = block.site_axes
+                off = float(np.linalg.norm(omega - w @ (w.T @ omega)))
+                if off > SITE_AXIS_TOL:
+                    allowed = ("no turn at all" if not w.shape[1] else
+                               "turns about "
+                               f"{tuple(round(float(v), 6) for v in w[:, 0])} only")
+                    raise ValueError(
+                        f"RIGID_BODY_NOT_INVARIANT: the target orientation of rigid "
+                        f"body {name!r} turns it {math.degrees(off):.3g}° about a "
+                        "direction its origin's site symmetry does not allow, which "
+                        f"would take it off its site; on this site it {allowed} "
+                        "(Cartesian)")
+                if not paths:
+                    continue
+            elif block.n_rot == 3:
                 omega = np.asarray(rotation.vector_from_matrix(r_t @ block.r0.T),
                                    dtype=np.float64)
             else:
