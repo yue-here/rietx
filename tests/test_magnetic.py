@@ -2140,7 +2140,8 @@ def test_the_capability_flag_is_derived_from_the_fields():
     # and the floating origin's ``"centroid"`` member 0.54, and WP-1325's
     # ``RefinementResult.parametric`` 0.55 and ``.parametric_form`` 0.56, and
     # WP-1960's ``Phase.texture`` 0.57, WP-1810's ``RigidBody.riding``
-    # 0.58, and WP-1325's ``RefinedParameter.equations`` 0.59.
+    # 0.58, WP-1325's ``RefinedParameter.equations`` 0.59, and C3's (#916)
+    # ``LeBailValidation`` screen counts and ``SupercellCheck.relation`` 0.59 (same cycle).
     assert caps.schema_version == "0.59"
 
 

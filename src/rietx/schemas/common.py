@@ -496,6 +496,13 @@ from .._nearmiss import did_you_mean
 #: 0.55 key ``tie``, so a 1.9.0 result opens and is written back as ``equation``.
 #: ``ParametricValue``, built on demand and never stored, carries
 #: ``provisional_on`` and ``joint_rejected`` beside ``form_rejected``.
+#: 0.59, C3 (issue #916), same cycle as the 0.59 above: ``LeBailValidation.predicted_but_absent_uncancellable``,
+#: ``.predicted_but_absent_uncancellable_in_window``, ``.absent_source`` and
+#: ``.n_lines_screened``,
+#: the line screen's counts beside the one it replaces; ``SupercellCheck.relation``,
+#: whether the parent is a sublattice or only indexes a subset of the lines.
+#: Additive, every new field defaulted to the reading an earlier document had
+#: (``None`` = not counted, ``"fitted_background"``, ``"sublattice"``).
 SCHEMA_VERSION = "0.59"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

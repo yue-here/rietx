@@ -921,14 +921,29 @@ Nothing else in the order changes, and a check that cannot decide changes
 nothing. That happens when there are too few such lines in range, as when the
 smaller cell's lines are all the larger one adds. It also happens when the
 extras are seen beyond chance only on lines the smaller cell explains, as for a
-pseudo-symmetric description of the smaller cell's own lattice. The check
-needs only the peak list, so it runs on a bare list too. Each pair asked is a
-`SupercellCheck` on the larger cell's `CellCandidate.supercell_checks`.
+pseudo-symmetric description of the smaller cell's own lattice. It also
+happens when the extras are seen above chance but not significantly: *refuted*
+means seen no more often than chance, since a non-significant test does not
+establish the null. The check needs only the peak list, so it runs on a bare
+list too. Each pair asked is a `SupercellCheck` on the larger cell's
+`CellCandidate.supercell_checks`.
+
+Which pairs are asked is a question about the lines, not the volumes
+(indexing thresholds 1.11). A cell is asked as the larger one whenever every
+observed line the smaller cell indexes it indexes too, and its own line set is
+the denser. That reaches a sublattice pair, and it reaches pairs that are not:
+a cubic I cell at √2 the edge of a cubic F truth, whose primitive volume is
+5.66 times the truth's, and a trigonal description with the truth's own
+volume, which outranked it on a synthetic silicon pattern. `SupercellCheck.relation`
+says which kind of pair it was. The extras are counted at the measured
+resolution, one FWHM, after the common shift the cell's own matches imply,
+never in the window the search matched with.
 
 | Field | Holds |
 |---|---|
 | `SupercellCheck.parent_cell`, `SupercellCheck.parent_system`, `SupercellCheck.parent_centring` | the smaller candidate this cell contains |
-| `SupercellCheck.index` | how many of the parent's primitive cells one of this cell's holds |
+| `SupercellCheck.index` | how many of the parent's primitive cells one of this cell's holds; 0 when the parent is not a sublattice |
+| `SupercellCheck.relation` | `sublattice`, or `containment` when the smaller cell only indexes a subset of this one's lines |
 | `SupercellCheck.n_extra`, `SupercellCheck.n_seen` | extra lines no extinction could remove, and how many sit on an observed line |
 | `SupercellCheck.n_seen_unexplained` | how many of those observed lines the smaller cell cannot index; `None` in a record from before thresholds version 1.7 |
 | `SupercellCheck.p0` | the chance that a position with no line reads as seen |
@@ -954,7 +969,11 @@ test, as a `LeBailValidation`.
 | `LeBailValidation.rwp`, `LeBailValidation.gof` | the fit's agreement |
 | `LeBailValidation.space_group` | the absence-free lattice group it used |
 | `LeBailValidation.n_reflections` | reflections in the fitted range |
-| `LeBailValidation.predicted_but_absent` | reflections the lattice predicts where the pattern has none |
+| `LeBailValidation.predicted_but_absent` | lines the lattice predicts where the pattern has nothing above the picker's background envelope at the measured width |
+| `LeBailValidation.predicted_but_absent_uncancellable` | of those, the lines no space group of the lattice could extinguish |
+| `LeBailValidation.predicted_but_absent_uncancellable_in_window` | of those, the lines inside the first twenty observed lines; the caveat reads this one |
+| `LeBailValidation.n_lines_screened` | the lines the screen asked about, merged at the resolution; the share `predicted_but_absent` is of |
+| `LeBailValidation.absent_source` | `line_screen`, or `fitted_background` when no peak list was supplied |
 | `LeBailValidation.unmatched_observed` | observed lines with no calculated reflection nearby |
 | `LeBailValidation.predicted_but_absent_two_theta`, `LeBailValidation.unmatched_observed_two_theta` | where each of those is, ° |
 | `LeBailValidation.status` | the underlying refinement's status; `failed` is evidence, not a crash |
@@ -963,10 +982,20 @@ test, as a `LeBailValidation`.
 
 The fit holds the cell. The candidate is the hypothesis under test, and letting
 it walk would validate a different cell from the one reported. What it frees is
-the background, exactly one peak-position parameter chosen from the candidate's
-own shift template, and then the widths. It is single-phase, which is a measured
-constraint rather than a simplification: Le Bail partitioning has nothing to
-arbitrate two phases claiming the same channel.
+the background, exactly one peak-position parameter chosen from the
+candidate's own shift template, and then the widths. It is single-phase,
+which is a measured constraint rather than a simplification: Le Bail
+partitioning has nothing to arbitrate two phases claiming the same channel.
+
+The absent count is not this fit's. A cell that needs intensity under many
+reflections can buy it from its own background: on a laboratory magnetite
+pattern the wrong primitive description drove its co-refined background below
+zero and read nothing absent of 163. So the count is a line screen's,
+computed from inputs the candidate cannot change: the peak list's positions,
+widths and shapes, the picker's background envelope, and the package's own
+overlap rule. A predicted line is absent when it is resolved from every picked
+line, the peak-list model is quiet there, and nothing stands above the
+envelope at the measured width.
 
 `LeBailValidation.rwp` is deliberately not a panel member. It costs a
 refinement, so it is computed for a shortlist rather than for every candidate,
@@ -974,8 +1003,12 @@ and reading it as a rank would reintroduce the blind spot it exists to close,
 since a bigger cell fits better. Read `predicted_but_absent` as "this cell
 predicts lines the pattern lacks", never as "this cell is too big". It counts
 against the lattice group, so a space-group extinction (a glide plane, a screw
-axis) refutes a perfectly correct cell, and only the extinction screen below
-separates the two.
+axis) shows in the count on a perfectly correct cell, and the extinction screen
+below separates the two. The caveat of the same name reads only the absences no
+extinction could cancel, inside the first twenty lines, and it caps rather
+than refutes: a correct cell's weak reflections below detection read absent
+too, over the whole range, so the count keeps `high` out of reach and the
+supercell check is what refutes.
 
 (the-confidence-gate)=
 ### The confidence gate
@@ -983,19 +1016,19 @@ separates the two.
 `CellCandidate.confidence` is `high`, `medium` or `low`. The top level is
 agreement between independent engines rather than a threshold on any statistic,
 and every reason a candidate falls short is a member of a closed vocabulary in
-`CellCandidate.confidence_caveats`. Seven of the thirteen refute the candidate
+`CellCandidate.confidence_caveats`. Six of the thirteen refute the candidate
 and drop it to `low`, each being positive evidence against the cell or evidence
-that the data cannot choose. The other six cap it at `medium`.
+that the data cannot choose. The other seven cap it at `medium`.
 
 | Caveat | Means | Effect |
 |---|---|---|
 | `geometric_ambiguity` | a distinct lattice fits the positions as well | refutes |
 | `fom_panel_disagrees` | the panel's members put different candidates first | refutes |
-| `predicted_but_absent` | the Le Bail fit found reflections where the pattern has no intensity | refutes |
 | `indexed_fraction_low` | the cell explains less than 90 % of the usable lines | refutes |
 | `volume_unphysical` | the volume is outside what the data can support | refutes |
 | `validation_failed` | the Le Bail fit raised or diverged | refutes |
 | `supercell_refuted` | a smaller reported cell explains the lines, and the extra ones this cell needs are seen no more often than chance | refutes |
+| `predicted_but_absent` | the line screen found lines this lattice predicts, that no extinction could remove, inside the first twenty lines, where the pattern has nothing | caps |
 | `engines_disagree` | fewer than every engine that ran found this lattice | caps |
 | `not_validated` | this candidate has no Le Bail fit behind it | caps |
 | `search_incomplete` | a budget expired, so a negative result elsewhere means nothing | caps |
@@ -1030,11 +1063,11 @@ alone, and still not it.
 
 On the corundum run above, the certified trigonal *R* lattice comes back at
 rank 1, found by two of the three engines, with a Le Bail fit that converged,
-and grades `low` on five caveats, so `best_or_none` returns `None`. Two of the
-five carry the reading. `predicted_but_absent` counts 12 reflections, the shape
-a space-group extinction takes when read from a lattice group that does not know
-about it, and the extinction screen below is what separates that from an
-oversized cell. `search_incomplete` is there because the ceiling cut the
+and grades `low`, so `best_or_none` returns `None`. `LeBailValidation.predicted_but_absent`
+counts the c-glide's reflections, the shape a space-group extinction takes
+when read from a lattice group that does not know about it; none of them is
+uncancellable, so the caveat is silent and the extinction screen below is what
+names the glide. `search_incomplete` is there because the ceiling cut the
 trailing systems. Neither says the cell is wrong. They say what has not been
 established, which is the whole difference between this answer and a confident
 one.
@@ -1084,11 +1117,11 @@ question was never asked.
 Read `IndexingResult.evidence` rather than the gate alone, and read
 `CandidateEvidence.lebail_rwp` beside the two detector counts instead of scoring
 on it. The three together are what let a reader notice that a detector
-has failed: on one measured pair, the correct cell reads
-`predicted_but_absent` 3 and its wrong rival reads 0, which is backwards, while
-Rwp reads 0.22 against 0.71. A reasoner given both can see that; the gate, reading
-one number, cannot. This is an argument for surfacing Rwp, never for ranking on
-it.
+has failed: on one measured pair, before C3 (thresholds 1.11) the correct cell read
+`predicted_but_absent` 3 and its wrong rival 0, which is backwards, while
+Rwp read 0.22 against 0.71. A reasoner given both could see that; the gate,
+reading one number, could not. This is an argument for surfacing Rwp, never for
+ranking on it.
 
 The same shape survives serialisation: `IndexingResult.model_dump` carries no
 `cell` key either, and `IndexingResult.evidence` is the companion projection to
