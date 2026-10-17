@@ -227,6 +227,15 @@ DATASETS: dict[str, Dataset] = {
         "characterisation: which group the data prefers, and the shape of the "
         "moment it carries",
         "characterisation"),
+    "srm1976a_plate": Dataset(
+        "srm1976a_corundum_xpert.xy",
+        "NIST SRM 1976a sintered corundum plate, lab Cu Ka on a "
+        "Philips/PANalytical X'Pert with X'Celerator, 2013; a genuinely "
+        "textured flat specimen, committed with its solved TOPAS refinement "
+        "(PO_Spherical_Harmonics at order 4).  The certificate certifies "
+        "relative intensities on another instrument, not this texture, so "
+        "every row referenced to it is cross-code",
+        "cross_code"),
 }
 
 
@@ -2548,6 +2557,73 @@ CLAIMS: tuple[Claim, ...] = (
                  "|m| 3.335 +/- 0.069 mu_B, c-component 0.996 of |m| "
                  "(bar 0.98)",
     ),
+    # ---- SRM 1976a plate: the spherical-harmonics texture against TOPAS --
+    Claim(
+        "test_acceptance_srm1976a_texture", "test_the_protocol_matches_before_any_number_is_compared",
+        "srm1976a_plate", ("identity", "ceiling"),
+        "Rexp reproduces TOPAS's, so both codes fitted the same channels under "
+        "the same weights before any coefficient is compared",
+        reference="Rexp depends on the data, the weights and the free-parameter "
+                  "count only; TOPAS records r_exp 5.24587644 % over start_X 20 "
+                  "with 33 refined parameters",
+        measured="Rexp 0.0524721 against 0.0524588, 2.5e-4 relative; 11793 "
+                 "channels, 27 free parameters",
+    ),
+    Claim(
+        "test_acceptance_srm1976a_texture", "test_c20_and_c40_agree_with_topas_with_no_conversion",
+        "srm1976a_plate", ("cross_code", "ceiling"),
+        "Phase.texture's C2,0 and C4,0 equal TOPAS's y20 and y40 with no "
+        "conversion factor, under TOPAS's protocol (cell held, ψ = 0)",
+        reference="the committed .inp's own y20 2.08901 and y40 0.87393; the "
+                  "bar is two of rietx's esds (which carry the Berar-Lelann "
+                  "factor, 4.35 here)",
+        measured="C2,0 2.0794(233), -0.41 esd; C4,0 0.8652(288), -0.30 esd; "
+                 "ratios 0.995 and 0.990",
+        starts=4,
+    ),
+    Claim(
+        "test_acceptance_srm1976a_texture", "test_the_measured_ratio_excludes_the_other_normalisations",
+        "srm1976a_plate", ("cross_code",),
+        "the n = 0 conversion is measured: of three readings of TOPAS's "
+        "harmonics, only ratio 1 (Von Dreele 1997, or Jarvinen's max-normalised "
+        "harmonics, which agree for every n = 0 term) closes both orders",
+        reference="ratios 1, sqrt((2l+1)/4pi) and sqrt(2l+1), each stated from "
+                  "its source in the suite's docstring; one convention must "
+                  "close every term",
+        measured="ratio 1 misses by 0.41 and 0.30 esd; sqrt((2l+1)/4pi) by 32.8 "
+                 "and 4.4; sqrt(2l+1) by 111 and 61",
+        starts=4,
+    ),
+    Claim(
+        "test_acceptance_srm1976a_texture", "test_c43_is_zero_within_error_in_both_codes",
+        "srm1976a_plate", ("characterisation",),
+        "the one n != 0 term is zero within error in both codes, so its "
+        "conversion factor (0.679 between the two surviving readings), sign "
+        "and azimuth are not measured by this plate",
+        reference="TOPAS's y43m 0.00178 against rietx's own esd; the factor "
+                  "waits for a forward TOPAS run (WP-1973)",
+        measured="C4,3 -0.0020(226); TOPAS's 0.00178 is 0.08 of that esd",
+        starts=4,
+    ),
+    Claim(
+        "test_acceptance_srm1976a_texture", "test_the_fit_reaches_topas_rwp_with_physical_displacements",
+        "srm1976a_plate", ("ceiling",),
+        "converged below TOPAS's Rwp with positive Biso and no texture "
+        "positivity finding",
+        measured="Rwp 0.1146 against TOPAS's 0.1248 (TCHZ against PVII, two "
+                 "lines against CuKa5); Biso Al 0.995, O 0.962 A^2 against "
+                 "TOPAS's beq 1.210, 1.065",
+        diagnostics=("!BISO_NEGATIVE", "!TEXTURE_NOT_POSITIVE"),
+    ),
+    Claim(
+        "test_acceptance_srm1976a_texture", "test_without_texture_the_plate_fits_measurably_worse",
+        "srm1976a_plate", ("own_result", "ceiling"),
+        "the positive arm: the same plate and protocol with no texture term "
+        "fits far worse, so the comparison above can fail",
+        reference="the texture-free fit on the identical protocol",
+        measured="Rwp 0.3562 against 0.1146; chi2_red 46.07 against 4.77 "
+                 "(ratio 9.7, bar 5)",
+    ),
 )
 
 
@@ -2753,6 +2829,15 @@ SUITE_INTROS: dict[str, str] = {
         "degenerate fit reaches a LOWER Rwp while its phase fractions move "
         "several sigma away from the reference.  An Rwp comparison would have "
         "chosen the wrong model."
+    ),
+    "test_acceptance_srm1976a_texture": (
+        "The spherical-harmonics texture (WP-1960) on a sintered NIST SRM 1976a "
+        "corundum plate, against the solved TOPAS refinement committed beside "
+        "the pattern, coefficient by coefficient (#131).  TOPAS states no "
+        "normalisation, so the conversion is measured: the n = 0 terms close "
+        "at ratio 1 and two other readings are excluded.  The one n != 0 term "
+        "is zero in both codes, so its factor, sign and azimuth wait for a "
+        "forward TOPAS run (WP-1973)."
     ),
     "test_acceptance_indexing":
         "The only externally *graded* feature in the package. Bergmann et al. "

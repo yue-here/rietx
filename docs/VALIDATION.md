@@ -98,6 +98,7 @@ either fine or broken depending on which seed the suite happened to pin.
 | `bethanechol` | `tests/data/bethanechol_indexing.json` | cross-code | Bergmann et al. (2004) Tables 5 and 6: ten sets of twenty 2theta positions for bethanechol chloride, the known P21/n cell, and every program's published score -- the only externally graded benchmark any feature in this package has |
 | `cr2wo6_hb2a` | `tests/data/gsas2_hb2a_cr2wo6_4K.dat` | characterisation | HFIR HB-2A constant-wavelength neutron (lambda 2.4067 A) Cr2WO6 at 4 K, below its ordering temperature, and its 150 K partner gsas2_hb2a_cr2wo6_150K.dat, above it -- the GSAS-II Magnetic-II tutorial pair, vendored verbatim.  No certified moment exists, so every row referenced to it is characterisation: a moment the report supports below T_N and refuses above it |
 | `lamno3_bt1` | `tests/data/gsas2_bt1_lamno3_50K.gsas` | characterisation | NIST BT-1 constant-wavelength neutron (lambda 1.5403 A, Cu(311)) LaMnO3 at 50 K, below its ordering temperature, with the tutorial's own structure file -- the GSAS-II Magnetic-I tutorial, vendored verbatim.  k = 0, and two magnetic groups index every line.  The tutorial quotes no moment, so every row referenced to it is characterisation: which group the data prefers, and the shape of the moment it carries |
+| `srm1976a_plate` | `tests/data/srm1976a_corundum_xpert.xy` | cross-code | NIST SRM 1976a sintered corundum plate, lab Cu Ka on a Philips/PANalytical X'Pert with X'Celerator, 2013; a genuinely textured flat specimen, committed with its solved TOPAS refinement (PO_Spherical_Harmonics at order 4).  The certificate certifies relative intensities on another instrument, not this texture, so every row referenced to it is cross-code |
 
 `consistency` is a fence, not a label: 11-BM calibrated its wavelength against
 SRM 660a LaB6 itself, so a refined LaB6 cell from that file reproduces the
@@ -1565,6 +1566,70 @@ The second moment dataset, and the k = 0 case: LaMnO3 at 50 K on BT-1, from the 
 **Referenced to:** the Pnma fit on the same protocol.  The tutorial reads the same pair and reports Rwp ~8.7 % against ~10 % at its Step 7, a protocol not adopted here
 
 **Measured:** Rwp 0.0631 against 0.0844 (ratio 0.75, bar 0.85); chi2 over 32.8-35.0 deg 67 against 2711 (ratio 0.025, bar 0.1); Pnma |m| 3.335 +/- 0.069 mu_B, c-component 0.996 of |m| (bar 0.98)
+
+### `tests/test_acceptance_srm1976a_texture.py`
+
+The spherical-harmonics texture (WP-1960) on a sintered NIST SRM 1976a corundum plate, against the solved TOPAS refinement committed beside the pattern, coefficient by coefficient (#131).  TOPAS states no normalisation, so the conversion is measured: the n = 0 terms close at ratio 1 and two other readings are excluded.  The one n != 0 term is zero in both codes, so its factor, sign and azimuth wait for a forward TOPAS run (WP-1973).
+
+#### `test_the_protocol_matches_before_any_number_is_compared`
+
+`identity` `ceiling` · dataset `srm1976a_plate`
+
+**Claims:** Rexp reproduces TOPAS's, so both codes fitted the same channels under the same weights before any coefficient is compared
+
+**Referenced to:** Rexp depends on the data, the weights and the free-parameter count only; TOPAS records r_exp 5.24587644 % over start_X 20 with 33 refined parameters
+
+**Measured:** Rexp 0.0524721 against 0.0524588, 2.5e-4 relative; 11793 channels, 27 free parameters
+
+#### `test_c20_and_c40_agree_with_topas_with_no_conversion`
+
+`cross_code` `ceiling` · dataset `srm1976a_plate` · survives 4 starts
+
+**Claims:** Phase.texture's C2,0 and C4,0 equal TOPAS's y20 and y40 with no conversion factor, under TOPAS's protocol (cell held, ψ = 0)
+
+**Referenced to:** the committed .inp's own y20 2.08901 and y40 0.87393; the bar is two of rietx's esds (which carry the Berar-Lelann factor, 4.35 here)
+
+**Measured:** C2,0 2.0794(233), -0.41 esd; C4,0 0.8652(288), -0.30 esd; ratios 0.995 and 0.990
+
+#### `test_the_measured_ratio_excludes_the_other_normalisations`
+
+`cross_code` · dataset `srm1976a_plate` · survives 4 starts
+
+**Claims:** the n = 0 conversion is measured: of three readings of TOPAS's harmonics, only ratio 1 (Von Dreele 1997, or Jarvinen's max-normalised harmonics, which agree for every n = 0 term) closes both orders
+
+**Referenced to:** ratios 1, sqrt((2l+1)/4pi) and sqrt(2l+1), each stated from its source in the suite's docstring; one convention must close every term
+
+**Measured:** ratio 1 misses by 0.41 and 0.30 esd; sqrt((2l+1)/4pi) by 32.8 and 4.4; sqrt(2l+1) by 111 and 61
+
+#### `test_c43_is_zero_within_error_in_both_codes`
+
+`characterisation` · dataset `srm1976a_plate` · survives 4 starts
+
+**Claims:** the one n != 0 term is zero within error in both codes, so its conversion factor (0.679 between the two surviving readings), sign and azimuth are not measured by this plate
+
+**Referenced to:** TOPAS's y43m 0.00178 against rietx's own esd; the factor waits for a forward TOPAS run (WP-1973)
+
+**Measured:** C4,3 -0.0020(226); TOPAS's 0.00178 is 0.08 of that esd
+
+#### `test_the_fit_reaches_topas_rwp_with_physical_displacements`
+
+`ceiling` · dataset `srm1976a_plate`
+
+**Claims:** converged below TOPAS's Rwp with positive Biso and no texture positivity finding
+
+**Measured:** Rwp 0.1146 against TOPAS's 0.1248 (TCHZ against PVII, two lines against CuKa5); Biso Al 0.995, O 0.962 A^2 against TOPAS's beq 1.210, 1.065
+
+**Diagnostics:** `BISO_NEGATIVE` asserted *absent*, `TEXTURE_NOT_POSITIVE` asserted *absent*
+
+#### `test_without_texture_the_plate_fits_measurably_worse`
+
+`own_result` `ceiling` · dataset `srm1976a_plate`
+
+**Claims:** the positive arm: the same plate and protocol with no texture term fits far worse, so the comparison above can fail
+
+**Referenced to:** the texture-free fit on the identical protocol
+
+**Measured:** Rwp 0.3562 against 0.1146; chi2_red 46.07 against 4.77 (ratio 9.7, bar 5)
 
 ## The one default this matrix decided
 
