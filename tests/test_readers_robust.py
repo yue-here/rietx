@@ -38,6 +38,7 @@ REAL_FIXTURES = [
     ("FAP.XRA", "gsas"),                  # GSAS STD, fixed-format, Poisson
     ("mg090.Cu311.gsas", "gsas"),         # GSAS ESD, 8-char positional fields
     ("nist_srm660c_100a.cif", "pdcif"),   # pdCIF through gemmi, two blocks
+    ("cod_2242872.cif", "pdcif"),         # pdCIF, a net column + weights, 173 kB
     ("qarr/corundum.prn", "xy"),          # two-column ASCII
     ("rigaku_nims.ras", "ras"),           # Rigaku text, marked sections
     ("panalytical_powder.xrdml", "xrdml"),      # XRDML 1.6, one scan, counts

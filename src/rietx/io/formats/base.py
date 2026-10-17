@@ -188,6 +188,11 @@ METADATA_KEYS: dict[str, str] = {
                          "**zero included**, because a file recording a zero is "
                          "saying the doublet was not used, and a format that "
                          "records nothing here is saying nothing",
+    "intensity_item": "the pdCIF intensity item read, where it is one whose "
+                      "definition says more than a count: "
+                      "`_pd_proc_intensity_net`, defined as background-"
+                      "subtracted. A label, not a measurement — the reader "
+                      "says when the numbers disagree with it",
     "intensity_unit": "the intensity unit the file *declares*. A claim, not a "
                       "measurement — see the σ note in the .ras reader",
     "count_time_s": "seconds per step, where the file gives enough to derive it",

@@ -3079,6 +3079,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "file. A repeat with a different intensity stops the read instead."
         ),
     ),
+    "PATTERN_INTENSITY_NET": HelpEntry(
+        title="The intensities are the file's net column",
+        description=(
+            "The pdCIF held no gross intensity column, so the reader took "
+            "`_pd_proc_intensity_net`, which the pdCIF dictionary defines as the values "
+            "after background subtraction. The numbers are used as the file states them. "
+            "Whether a background still needs refining is your call, and the next "
+            "diagnostic says when the column contradicts its label."
+        ),
+    ),
     "PATTERN_INTENSITY_SCALED": HelpEntry(
         title="The intensity scale could not be established",
         description=(
@@ -3096,6 +3106,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the first. The others are not in the pattern, and a fit to it describes one "
             "measurement of several. Pass `scan=` to choose, or list the scans first to "
             "see what each one is."
+        ),
+    ),
+    "PATTERN_NET_HAS_BACKGROUND": HelpEntry(
+        title="A net intensity column still carries background",
+        description=(
+            "The file's `_pd_proc_intensity_net` column is labelled background-subtracted "
+            "but never comes within 5σ of zero, so the background was not subtracted. "
+            "The reader leaves the numbers as they are. Refine a background (a Chebyshev "
+            "series, with a hump component for a broad amorphous or capillary hump) "
+            "instead of holding it at zero."
         ),
     ),
     "PATTERN_ROWS_DROPPED": HelpEntry(

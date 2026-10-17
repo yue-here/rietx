@@ -2896,3 +2896,126 @@ def test_a_v3_range_count_that_is_not_a_count_is_refused(tmp_path):
 
     with pytest.raises(ValueError, match="not a number of measurements"):
         rx.read_pattern(p)
+
+
+# ----------------------------------------------- pdCIF: the net intensity column
+# ``_pd_proc_intensity_net`` is the item a TOPAS deposit writes (WP-1806, #561).
+# It is read last of the intensity items, reported every time it is the one
+# read, and a column labelled net that never comes near zero is reported as
+# still carrying its background.  Nothing is repaired: y is the file's.
+
+def _write_pdcif(path, columns: dict[str, list[float]]):
+    """A one-block pdCIF holding ``columns`` as one loop, 2θ first."""
+    tags = list(columns)
+    rows = zip(*(columns[t] for t in tags))
+    text = ("data_synthetic\nloop_\n" + "".join(f"{t}\n" for t in tags)
+            + "".join(" ".join(repr(float(v)) for v in r) + "\n" for r in rows))
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+_TT = [10.0, 10.01, 10.02, 10.03, 10.04, 10.05]
+_Y = [400.0, 410.0, 900.0, 1200.0, 420.0, 405.0]
+#: weights with a variable counting time folded in, so σ = 1/√w is not √y
+_W = [0.0050, 0.0049, 0.0011, 0.0016, 0.0048, 0.0049]
+
+
+def test_a_net_column_reads_with_its_weights_and_is_reported(tmp_path):
+    """T1: the item TOPAS deposits, refused before it was in ``_PDCIF_Y``."""
+    p = _write_pdcif(tmp_path / "net.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": _W,
+        "_pd_proc_intensity_net": _Y})
+    found: list = []
+    pat = rx.read_pattern(p, diagnostics=found)
+    assert pat.intensity == _Y
+    assert pat.sigma == pytest.approx([1 / w ** 0.5 for w in _W], rel=1e-12)
+    assert "PATTERN_INTENSITY_NET" in [d.code for d in found]
+    assert pat.metadata["intensity_item"] == "_pd_proc_intensity_net"
+
+
+def test_the_same_values_as_a_total_column_read_identically_and_say_nothing(tmp_path):
+    """T2, the control: only the item's name differs, so only the report may."""
+    net = _write_pdcif(tmp_path / "net.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": _W,
+        "_pd_proc_intensity_net": _Y})
+    total = _write_pdcif(tmp_path / "total.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": _W,
+        "_pd_proc_intensity_total": _Y})
+    found: list = []
+    a, b = rx.read_pattern(net), rx.read_pattern(total, diagnostics=found)
+    assert (a.two_theta, a.intensity, a.sigma) == (b.two_theta, b.intensity, b.sigma)
+    assert found == []
+    assert "intensity_item" not in b.metadata
+
+
+def test_a_total_column_beside_a_net_one_wins(tmp_path):
+    """T3: net is last, so a file stating both reads as it did before."""
+    p = _write_pdcif(tmp_path / "both.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": _W,
+        "_pd_proc_intensity_net": [v - 300.0 for v in _Y],
+        "_pd_proc_intensity_total": _Y})
+    found: list = []
+    pat = rx.read_pattern(p, diagnostics=found)
+    assert pat.intensity == _Y
+    assert found == []
+
+
+def test_a_net_columns_own_su_wins_over_the_weights(tmp_path):
+    """T4: the su suffix rule reaches the net item with no code of its own."""
+    su = [21.0, 22.0, 33.0, 37.0, 22.5, 21.5]
+    p = _write_pdcif(tmp_path / "su.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": _W,
+        "_pd_proc_intensity_net": _Y, "_pd_proc_intensity_net_su": su})
+    assert rx.read_pattern(p).sigma == su
+
+
+def test_the_acridine_deposit_reads_its_weights_and_its_net_column_disagrees():
+    """T5, the real file (COD 2242872, ``tests/data/README.md``).
+
+    Its weights carry a variable counting time, so w·y is about 1 at low angle
+    and about 5 from 26 to 30°: a σ taken as √y instead would weigh the high
+    half wrongly by up to √5.  Its net column never comes within 14σ of zero,
+    so the contradiction fires.
+    """
+    import numpy as np
+
+    found: list = []
+    pat = rx.read_pattern(DATA / "cod_2242872.cif", diagnostics=found)
+    tt, y = np.array(pat.two_theta), np.array(pat.intensity)
+    s = np.array(pat.sigma)
+    assert len(tt) == 6601
+    assert (tt[0], tt[-1]) == (2.002, 35.002)
+    wy = y / s ** 2
+    assert np.median(wy[tt < 18.0]) == pytest.approx(1.05, abs=0.02)
+    assert np.median(wy[(tt >= 26.0) & (tt < 30.0)]) == pytest.approx(5.1, abs=0.1)
+    codes = [d.code for d in found]
+    assert codes == ["PATTERN_INTENSITY_NET", "PATTERN_NET_HAS_BACKGROUND"]
+    assert found[1].level == "warning"
+    assert found[1].value == pytest.approx(14.12, abs=0.01)
+
+
+def test_a_net_column_with_a_true_zero_baseline_is_only_reported(tmp_path):
+    """T6, the contradiction's negative arm: a subtracted pattern returns to
+    within noise of zero between its peaks, so only the info code fires."""
+    import numpy as np
+
+    rng = np.random.default_rng(1806)
+    tt = np.round(np.arange(10.0, 12.0, 0.01), 4)
+    peak = 2000.0 * np.exp(-0.5 * ((tt - 11.0) / 0.03) ** 2)
+    sig = np.sqrt(peak + 100.0)      # a background of 100 was subtracted
+    y = peak + rng.normal(0.0, 1.0, tt.size) * sig
+    p = _write_pdcif(tmp_path / "zero.cif", {
+        "_pd_proc_2theta_corrected": tt.tolist(),
+        "_pd_proc_ls_weight": (1.0 / sig ** 2).tolist(),
+        "_pd_proc_intensity_net": y.tolist()})
+    found: list = []
+    rx.read_pattern(p, diagnostics=found)
+    assert [d.code for d in found] == ["PATTERN_INTENSITY_NET"]
+
+
+def test_a_calculated_net_column_alone_is_still_refused(tmp_path):
+    """T7: ``_pd_calc_intensity_net`` is a model, never a measurement."""
+    p = _write_pdcif(tmp_path / "calc.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_calc_intensity_net": _Y})
+    with pytest.raises(ValueError, match="no pdCIF pattern block found"):
+        rx.read_pattern(p)

@@ -23,8 +23,20 @@ from .base import PatternFormat, ascending, pattern_data
 #: both, and is kept as it was so such a file reads as it did.
 _PDCIF_TT = ("_pd_proc_2theta_corrected", "_pd_meas_2theta_scan",
              "_pd_meas_2theta_range_inc")
+#: ``_pd_proc_intensity_net`` is **last**, so a file stating a total column
+#: beside it reads as it always did; a file stating only a net column (COD
+#: 2242872, a TOPAS-Academic deposit) was refused before it.
 _PDCIF_Y = ("_pd_proc_intensity_total", "_pd_meas_intensity_total",
-            "_pd_meas_counts_total")
+            "_pd_meas_counts_total", "_pd_proc_intensity_net")
+_PDCIF_NET = "_pd_proc_intensity_net"
+#: A net column whose every point stands at least this many σ above zero is
+#: reported as carrying a background.  The pdCIF dictionary defines the item as
+#: the intensities "after background subtraction", and a subtracted pattern
+#: returns to within a few σ of zero between its peaks; one that never does
+#: still holds its background.  5 is far below what that file shows (COD
+#: 2242872, labelled net, never comes within 14.1σ of zero; its minimum is 249
+#: counts) and far above where a true zero baseline sits (|y|/σ of order 1).
+NET_BACKGROUND_MIN_SIGMA = 5.0
 #: an su column is the intensity column's own: ``<intensity tag>`` + one of these
 _PDCIF_SU_SUFFIXES = ("_su", "_esd")
 
@@ -45,6 +57,17 @@ def read_pdcif(path: str | Path, *, block: str | None = None,
     w = 1/σ² (its pdCIF definition), so σ = 1/√w.  With none of these, or a
     weight of 0 on any point, ``sigma`` is left unset and the Poisson fallback
     applies downstream.
+
+    Intensity: the first of ``_pd_proc_intensity_total``,
+    ``_pd_meas_intensity_total``, ``_pd_meas_counts_total`` and
+    ``_pd_proc_intensity_net`` the block states.  A net column is read and
+    **reported, never repaired**: ``PATTERN_INTENSITY_NET`` (info) and
+    ``metadata["intensity_item"]`` say which item was read, because the item
+    is defined as background-subtracted and whether a background still needs
+    refining is the caller's call.  Where the column never comes within
+    :data:`NET_BACKGROUND_MIN_SIGMA` σ of zero the label and the numbers
+    disagree, and ``PATTERN_NET_HAS_BACKGROUND`` (warning) says so; y is never
+    shifted.
     """
     import gemmi
 
@@ -83,8 +106,47 @@ def read_pdcif(path: str | Path, *, block: str | None = None,
 
     tt, y, sigma = ascending(tt, y, sigma, path=p, fmt=PDCIF,
                              diagnostics=diagnostics)
+    net = y_tag == _PDCIF_NET
+    if net and diagnostics is not None:
+        diagnostics.extend(_net_findings(p, tt, y, sigma))
     return pattern_data(p, tt, y, sigma,
-                   source_file=p.name, format="pdcif", block=chosen.name)
+                   source_file=p.name, format="pdcif", block=chosen.name,
+                   intensity_item=y_tag if net else None)
+
+
+def _net_findings(p: Path, tt: np.ndarray, y: np.ndarray,
+                  sigma: np.ndarray | None) -> list[Diagnostic]:
+    """What reading a ``_pd_proc_intensity_net`` column says, and whether its
+    numbers agree with its label.
+
+    The σ is the one the pattern will be fitted with: the file's, else the
+    Poisson fallback √max(y, 1) that ``PatternData.sig()`` applies.
+    """
+    out = [Diagnostic(
+        level="info", code="PATTERN_INTENSITY_NET",
+        message=(f"{p.name}: the intensities are the file's "
+                 f"{_PDCIF_NET} column, which the pdCIF dictionary defines as "
+                 f"the values 'after background subtraction, normalization and "
+                 f"other correction factors have been applied'. Whether a "
+                 f"background still needs refining is the caller's call."),
+        where=[_PDCIF_NET])]
+    s = sigma if sigma is not None else np.sqrt(np.maximum(y, 1.0))
+    z = y / s
+    i = int(np.argmin(z))
+    if z[i] >= NET_BACKGROUND_MIN_SIGMA:
+        out.append(Diagnostic(
+            level="warning", code="PATTERN_NET_HAS_BACKGROUND",
+            message=(f"{p.name}: the {_PDCIF_NET} column is labelled "
+                     f"background-subtracted but never comes within "
+                     f"{NET_BACKGROUND_MIN_SIGMA:g}σ of zero (minimum "
+                     f"y = {y[i]:.6g} at 2θ = {tt[i]:.6g}°, {z[i]:.3g}σ), so "
+                     f"the background was not subtracted. The intensities are "
+                     f"read as the file states them; refine a background."),
+            value=float(z[i]), where=[_PDCIF_NET],
+            suggestion=("refine a background (a Chebyshev series, with a "
+                        "HumpComponent for a broad amorphous or capillary "
+                        "hump) rather than holding it at zero")))
+    return out
 
 
 def _first_loop(b, tags: tuple[str, ...]) -> np.ndarray | None:
@@ -125,8 +187,10 @@ PDCIF = PatternFormat(
     title="Powder CIF (pdCIF)",
     extensions=(".cif",),
     sniff="the .cif suffix, then a recognised 2θ + intensity loop",
-    sigma=("an explicit …_su/…_esd loop, else _pd_proc_ls_weight read as "
-           "w = 1/σ², else the Poisson fallback"),
+    sigma=("an explicit …_su/…_esd loop on the intensity column read "
+           "(_pd_proc_intensity_net, the last choice, included), else the su "
+           "in parentheses on every intensity, else _pd_proc_ls_weight read "
+           "as w = 1/σ², else the Poisson fallback"),
     matches=lambda p: p.suffix.lower() == ".cif",
     read=read_pdcif,
     options=("block",),
