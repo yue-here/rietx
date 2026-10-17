@@ -1153,7 +1153,7 @@ if klass is not None:
 | `two_theta_limits` | the whole pattern | the range classes are enumerated and judged over |
 | `k_sigma` | 3 | the matching window, in units of each line's σ |
 | `max_classes` | `None` | cap the number of classes fitted |
-| `refine_cell` | `False` | free the cell in the shared profile fit, so every class is screened at the refined cell (`ExtinctionScreen.cell`) |
+| `refine_cell` | `True` | Le Bail-refine the cell first, in a cell-free `profile_only` prefit, and screen every class at that cell (`ExtinctionScreen.cell`); `False` holds the candidate's cell |
 | `cancel` | `None` | cooperative cancellation |
 
 The pipeline is one shared profile fit of the absence-free lattice group, a
@@ -1164,15 +1164,32 @@ forbids refutes it, with the hkl named. Every class is fitted with the shared
 instrument frozen, so no class can compensate a missing reflection with a wider
 peak.
 
-The cell is held at the candidate's, so it has to be good. With
-`refine_cell=False` a cell off by a few parts in 10⁴ leaves a tan θ position
-error that the shared fit's one shift cannot absorb, and a line the true class
-forbids then shows intensity at its position: on the IUCr round-robin SRM 676a
-corundum (`tests/data/qarr/corundum.prn`) the certified cell gives `R - c -`
-and the same cell scaled by 1.0012 gives `R - - -`, whose members exclude
-`R -3 c`. Refine the cell by Le Bail first and screen that, or pass
-`refine_cell=True`, which frees it inside the shared fit (after the shift,
-before the widths); the classes still differ only in their reflection sets.
+By default the screen refines the cell before it screens anything: a
+`profile_only` Le Bail of the lattice group with the cell free, from a seeded
+background when the instrument's is the preset's all-zero start
+(`ExtinctionScreen.prefit_rwp` is its Rwp). Every class is then screened at that
+cell; the classes still differ only in their reflection sets. A held cell has
+to be good. With `refine_cell=False` a cell off by a few parts in 10⁴ leaves a
+tan θ position error that the shared fit's one shift cannot absorb, and a line
+the true class forbids then shows intensity at its position: on the IUCr
+round-robin SRM 676a corundum (`tests/data/qarr/corundum.prn`) the certified
+cell gives `R - c -` and the same cell scaled by 1.0012 gives `R - - -`, whose
+members exclude `R -3 c`. On the X-ray histogram of
+`tests/data/gsas2_pbso4.gpx` at a cell 0.1-0.2 % long, the held screen abstains,
+the prefit gives `P c - n`, and the same prefit from an unseeded background
+returns `P - - n`, which is why it seeds one.
+
+The reference fit is gated. When the absence-free class's own fit leaves
+more than half of the net signal's weighted power unexplained
+(`ExtinctionScreen.reference_rwp_net` above
+`rietx.indexing.extinction.REFERENCE_NET_RWP_MAX`, the net taken against the
+picker's background envelope so no fit can move it), every absence test would
+read that misfit. The screen then still ranks the classes, sets
+`ExtinctionScreen.status` to `"unreliable"`, says
+`EXTINCTION_SCREEN_UNRELIABLE`, and `ExtinctionScreen.best_or_none` returns
+`None`. A cell outside the basin a Le Bail can refine it from (a cell 0.4 % off
+held, or 1 % off with the prefit, on a synthetic Si pattern at synchrotron
+resolution) lands there rather than on a confident wrong class.
 
 A container halo has to be declared too. A capillary's amorphous halo is about
 1° wide and can sit on a forbidden position, and the screen's background (a
@@ -1198,8 +1215,10 @@ offer classes the lattice may not have.
 | `ExtinctionScreen.n_classes`, `ExtinctionScreen.n_screened` | classes enumerated, classes actually fitted |
 | `ExtinctionScreen.reference_rwp`, `ExtinctionScreen.reference_chi2`, `ExtinctionScreen.reference_lines` | the absence-free reference fit |
 | `ExtinctionScreen.profile_rwp` | the shared profile fit every class inherits |
+| `ExtinctionScreen.prefit_rwp` | the cell-free Le Bail prefit, `None` when the cell was held |
+| `ExtinctionScreen.reference_rwp_net` | the reference fit's misfit over the net signal, the gate's quantity |
 | `ExtinctionScreen.n_points` | channels in the fitted range |
-| `ExtinctionScreen.status` | the screen's own status |
+| `ExtinctionScreen.status` | the screen's own status: `"unreliable"` when the reference fit failed its gate |
 | `ExtinctionScreen.thresholds_version` | which thresholds produced the ranking |
 | `ExtinctionScreen.diagnostics` | findings, including the one that names the groups a class cannot separate |
 
@@ -1280,20 +1299,22 @@ a neighbour's tail, not even a total one, can manufacture a refutation.
 
 That is what returns the right answer here. α-Al₂O₃ is certified `R -3 c`, and
 over 20–90° with the widths seeded from the peak list the screen returns
-`R - c -` = {`R 3 c`, `R -3 c`} at ΔBIC −3434, with six testable positions all
-absent: the certified group listed, never chosen, beside the
-non-centrosymmetric partner no counting time separates from it.
+`R - c -` = {`R 3 c`, `R -3 c`} at ΔBIC −1301 (−3434 with the cell held), with
+six testable positions all absent: the certified group listed, never chosen,
+beside the non-centrosymmetric partner no counting time separates from it.
 
 Read `ExtinctionScreen.profile_rwp` before believing a refutation anyway. Every
 class is fitted with the shared instrument frozen, so a poor shared fit is a
-poor screen, and the gate above bounds what a neighbour can do rather than what
-a wrong profile can. Same specimen, same certified cell, over the whole 5–150° range with the
-round-robin instrument's declared widths: the shared fit reaches Rwp 0.262, four
-forbidden positions read as occupied, and the certified class is refuted. The
-20–90° arm above reads 0.259, so on this specimen the Rwp is poor in both and
-does not tell them apart. Give the screen a range and a width law its profile
-fit can actually match, and read `ExtinctionScreen.profile_rwp` to check that it
-did.
+poor screen, and the tail test above bounds what a neighbour can do rather than
+what a wrong profile can. Same specimen, same certified cell, over the whole
+5–150° range with the round-robin instrument's declared widths: the shared fit
+reaches Rwp 0.227 (0.262 held), two forbidden positions (four held) read as
+occupied, and the certified class is refuted. The reference-fit gate does not
+reach this case: the reference leaves a net Rwp of 0.28, well inside the bound,
+because the profile error is local to a few windows. The 20–90° arm reads 0.149,
+so here the Rwp does separate the two. Give the screen a range and a width law
+its profile fit can actually match, and read `ExtinctionScreen.profile_rwp` to
+check that it did.
 
 Refutation still outranks ΔBIC wherever a testable position does carry
 intensity. A class asserts absences, and no amount of evidence for it buys back

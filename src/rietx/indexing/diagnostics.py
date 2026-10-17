@@ -818,10 +818,43 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
     from .extinction import DECISIVE_DELTA_BIC
 
     out: list[Diagnostic] = []
+    if screen.status == "unreliable":
+        from .extinction import REFERENCE_NET_RWP_MAX
+
+        net = screen.reference_rwp_net
+        prefit = ("" if screen.prefit_rwp is None else
+                  f" (after a cell-free Le Bail prefit at Rwp "
+                  f"{screen.prefit_rwp:.3f})")
+        out.append(Diagnostic(
+            level="warning", code="EXTINCTION_SCREEN_UNRELIABLE",
+            message=(f"the reference fit of the lattice group "
+                     f"{screen.lattice_group}{prefit} leaves "
+                     + ("its net signal unmeasured" if net is None else
+                        f"a background-subtracted Rwp of {net:.3f}, above the "
+                        f"{REFERENCE_NET_RWP_MAX:g} at which the allowed lines "
+                        "are modelled well enough to read an absence against")
+                     + ", so every refutation and ΔBIC below measures that "
+                     "misfit; the classes are ranked but best_or_none() "
+                     "abstains"),
+            where=[f"{screen.system} {screen.centring}, cell "
+                   f"{_cell_str(screen.cell)}"],
+            suggestion=("the cell is the first suspect: a cell a few tenths of "
+                        "a per cent off at synchrotron resolution is outside "
+                        "the basin any Le Bail can refine it from.  Re-index or "
+                        "Le Bail-refine the cell from a better start, then "
+                        "check the range, the wavelength and the width law")))
     alive = [c for c in screen.candidates if not c.refuted and c.screened]
     unscreened = [c for c in screen.candidates if not c.refuted and not c.screened]
+    if not screen.candidates and screen.status == "cancelled":
+        return out + [Diagnostic(
+            level="warning", code="EXTINCTION_SYMBOL_AMBIGUOUS",
+            message=("the screen was stopped before any extinction class was "
+                     f"screened (lattice {screen.lattice_group}); nothing here "
+                     "says anything about the cell"),
+            where=[f"{screen.system} {screen.centring}"],
+            suggestion="run the screen again to completion")]
     if not screen.candidates:
-        return [Diagnostic(
+        return out + [Diagnostic(
             level="warning", code="EXTINCTION_SYMBOL_AMBIGUOUS",
             message=("No extinction class could be screened: the lattice "
                      f"{screen.lattice_group} produced no fittable reflections in "

@@ -257,7 +257,7 @@ shows. Same split as §7c: a refutation lives on the class it refutes.
 |---|---|
 | `EXTINCTION_GROUPS_NOT_SEPARABLE` | (info) Pick one of the listed space groups and call it the answer. Carry the list; `structure_from_candidate(cand, space_group=…)` accepts any member. |
 | `EXTINCTION_SYMBOL_AMBIGUOUS` | Read the ranked first class as the answer. The message says which reason applies. Only a runner-up inside the decisive ΔBIC margin is fixed by better data at the same setting. |
-| `EXTINCTION_FORBIDDEN_INTENSITY` | Keep this class. hkl and 2θ are named. A held cell off by ~10⁻³ refutes the *true* class: pass `refine_cell=True` or Le Bail-refine the cell first. It is not a position under a neighbour's tail (untestable, WP-1077), and not necessarily a violated absence: check the indexing result's `unmatched_observed` for an impurity line. A good ΔBIC does not excuse it: a testable position carrying intensity refutes the class however well it scores. |
+| `EXTINCTION_FORBIDDEN_INTENSITY` | Keep this class. A position it forbids carries intensity its own Le Bail fit cannot account for (hkl and 2θ named). A held cell (`refine_cell=False`) off by ~10⁻³ refutes the *true* class; the default refines it first. Two things it is not: a position under a neighbour's tail (untestable, WP-1077), and necessarily a violated absence — it can be an impurity line, so check the indexing result's `unmatched_observed`. A good ΔBIC does not excuse it: a testable position carrying intensity refutes the class however well it scores |
 | `EXTINCTION_CONDITIONS_PARTIAL` | (info) Read `conditions` as the complete condition list for this class. Read `space_groups`. |
 | `EXTINCTION_SCREEN_FAILED` | (error) Read the empty ranking, or any class's absence from it, as evidence about the symmetry. `screen.status` is `failed`. Validate the cell first (`index_pattern` with `data=`, §7d's sequence). |
 
@@ -282,11 +282,11 @@ Three things about the screen that change how you use its answer:
 3. **The absence-free class winning is a result, not a failure.** On NAC (I 2₁3)
    it is the *correct* answer: I-centring already extinguishes the very
    reflections the 2₁ screws would, so those screws are invisible in principle.
-   It is a *wrong* answer when the shared profile fit is bad, and
-   `ExtinctionScreen.profile_rwp` reports how good that fit was: on certified
-   corundum 0.259 over 20–90° (`R - c -`) and 0.262 over 5–150° with declared
-   widths (`R - - -` wins). It bounds trust and does not choose. Give it a range
-   and a width law its profile fit can match before reading a refutation.
+   It is a *wrong* answer when the shared profile fit is bad:
+   `ExtinctionScreen.profile_rwp` on certified corundum is 0.149 over 20–90°
+   (`R - c -`) and 0.227 over 5–150° with declared widths (`R - - -` wins), a
+   local misfit the `EXTINCTION_SCREEN_UNRELIABLE` gate does not reach. Give it a
+   range and a width law its profile fit can match before reading a refutation.
 
 **`where` names the paths on every guard code, `HIGH_CORRELATION` included**
 (WP-1007). Read `d.where`; never split a message like `"a ~ b (ρ=+0.994)"`.

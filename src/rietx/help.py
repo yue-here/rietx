@@ -1963,6 +1963,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "wavelength and the 2θ range."
         ),
     ),
+    "EXTINCTION_SCREEN_UNRELIABLE": HelpEntry(
+        title="The extinction screen's reference fit is too poor to read absences against",
+        description=(
+            "The absence-free reference fit leaves more than half of the pattern's net "
+            "signal, taken against its own background, unexplained. It has not modelled "
+            "the allowed lines, so every refutation and ΔBIC below it measures that "
+            "misfit. The classes are ranked, but `best_or_none()` abstains. The cell is "
+            "the first suspect, because a cell a few tenths of a per cent off at "
+            "synchrotron resolution is outside the basin a Le Bail fit can refine it "
+            "from. Re-index or Le Bail-refine the cell from a better start, then check "
+            "the range, the wavelength and the width law."
+        ),
+    ),
     "EXTINCTION_SYMBOL_AMBIGUOUS": HelpEntry(
         title="The extinction symbol is not settled",
         description=(
