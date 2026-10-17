@@ -1,0 +1,154 @@
+# r_metal_Pauling.dat -- metallic valences and radii of the elements, Pauling (1960) Table 11-1.
+#
+# CITE:  Pauling, L. (1960). The Nature of the Chemical Bond and the Structure
+#        of Molecules and Crystals, 3rd ed. Cornell University Press, Ithaca NY.
+#        Table 11-1, "Metallic valences and radii of the elements", p. 403.
+#        Check: Pauling, L. (1947). Atomic radii and interatomic distances in
+#        metals. J. Am. Chem. Soc. 69, 542-553. doi:10.1021/ja01195a024
+#        (Table I, pp. 544-545).
+#
+# STATUS: every number below is Pauling's, transcribed for this package from
+# the printed page; no file of anyone else's was copied. Three cells are
+# corrected misprints (CORRECTIONS below); every other value is as printed.
+# Cite the book, never this file or a copy, as the source of a radius.
+#
+# WHY TABLE 11-1 AND NOT TABLE 7-18. The book prints two R(1) tables.
+# Table 7-18, "Single-bond metallic radii" (p. 256, 49 elements, R(1) only),
+# is essentially the 1947 set (d-block 1947 values + 0.005 A; Cu-Pb as in
+# 1947). Table 11-1 (p. 403, 72 elements) carries the 1960 revision of the
+# valences and radii and is the only table with v and R(L12), Sb, Bi and the
+# lanthanides. They differ on 16 of the 49 shared elements, most at Tl
+# (0.112 A), In (0.076), Hg (0.054), Zn and Pb (0.036). Table 11-1 is used.
+#
+# TRANSCRIPTION (2026-10-02). Read cell by cell from 400-800 dpi images of
+# two copies of the 3rd edition (the Cornell fifth printing, 1964, and the
+# Oxford & IBH 1967 reprint of the fourth printing, 1963); both carry the
+# same misprints, so they come from the same plates. 72 entries, 216 cells,
+# in printed order: Li Be B / Na-S / K-Se / Rb-Te / Cs-Bi / Th U / Ce-Lu.
+#
+# CHECKS, with counts.
+#   1. Two machine readings of the table (one per copy) were compared with
+#      the page cell by cell; 112 disagreements, every one decided by the
+#      page image, and the page confirmed this transcription each time.
+#   2. Pauling's own relation between the two radius columns: for ligancy
+#      12 the change to bond number 1 is "0.600 log (v/12)" on the distance
+#      (p. 412; Eq. 11-1, p. 400: D(n) = D(1) - 0.600 log n), so
+#      R(L12) = R1 + 0.300 log(12/v). As printed it holds within the printed
+#      precision on 69 of 72 rows; the three breaks are Gd, Eu and Pm, below.
+#      After the two corrections it holds on 71 of 72 (Pm, kept as printed).
+#   3. The 1947 table: 32 of 72 R1 values unchanged, 38 revised in 1960, two
+#      (Tc, Pm) with no 1947 radius. Each revision was read on both pages.
+#
+# CORRECTIONS (column `as_printed` holds the printed cell; the value in the
+# row is the corrected one):
+#   Gd  R(L12) printed 2.804, corrected to 1.804. The relation gives
+#       1.623 + 0.300 log(12/3) = 1.804; Sm, with the same v = 3 and
+#       R1 = 1.623, prints 1.804; the 1947 table gives Gd R(CN12) 1.795
+#       (R1 1.614), also with leading digit 1. A slip of the leading digit.
+#   Eu  v printed 3, corrected to 2. The printed radii are right and imply
+#       v = 1.99 by the relation (2.084 - 1.850 = 0.234 = 0.300 log(12/v));
+#       the 1947 table prints Eu v = 2 with the same two radii, a valence
+#       taken there from Klemm & Bommer's lattice constants (1947, pp.
+#       545-546). The radii are as printed.
+#   Sr  the cell is labelled "Sn" in both copies. It sits in Sr's place
+#       (between Rb and Y) and its values, v 2, R(L12) 2.148, R1 1.914, are
+#       the 1947 table's Sr. Sn is printed separately, in its own place.
+# FLAGGED, NOT CORRECTED:
+#   Pm  R(L12) printed 1.834; the relation gives 1.633 + 0.300 log 4 = 1.814
+#       (residual +0.020 A). R1 1.633 sits on the Nd-Sm trend, so R(L12) is
+#       the suspect cell, but Pm has no 1947 entry and the page cannot decide
+#       it. Kept as printed, with the flag r12_off_relation.
+#
+# WHAT THEY ARE: R1 is "the metallic radius" (p. 404), the radius for a bond
+# of bond number 1 with "the same hybrid character as in the metals
+# themselves" (p. 256); R(L12) is "the metallic radius for ligancy 12" (p.
+# 404); v is "the assumed values of the metallic valence" (p. 404). Radii for
+# metal-metal contacts and for boride-type frameworks that Pauling treats
+# with the same scheme (pp. 365-366), in intermetallic and anion-free phases;
+# not ionic radii, and not this package's bond table, which uses Cordero et
+# al. (2008) through gemmi (model/geometry.py).
+#
+# COLUMNS:
+#   symbol      element symbol (the printed label, except the corrected Sr)
+#   v           metallic valence as used here (Eu corrected); a value printed
+#               in parentheses (P, S, Se, Te) is flagged v_assumed
+#   r12_A       R(L12), A, with the printed decimals (Gd corrected)
+#   r1_A        R1, A, with the printed decimals
+#   page        printed page of the table
+#   flags       - or comma-separated: v_assumed, v_corrected, r12_corrected,
+#               label_corrected, r12_off_relation
+#   as_printed  - or the printed cell(s) a correction replaced
+#
+# symbol  v  r12_A  r1_A  page  flags  as_printed
+Li      1  1.549  1.225  403  -                                -
+Be      2  1.123  0.889  403  -                                -
+B       3   0.98   0.80  403  -                                -
+Na      1  1.896  1.572  403  -                                -
+Mg      2  1.598  1.364  403  -                                -
+Al      3  1.429  1.248  403  -                                -
+Si   2.56  1.375  1.173  403  -                                -
+P       3   1.28   1.10  403  v_assumed                        -
+S       2   1.27   1.04  403  v_assumed                        -
+K       1  2.349  2.025  403  -                                -
+Ca      2  1.970  1.736  403  -                                -
+Sc      3  1.620  1.439  403  -                                -
+Ti      4  1.467  1.324  403  -                                -
+V       5  1.338  1.224  403  -                                -
+Cr      6  1.276  1.186  403  -                                -
+Mn      6  1.268  1.178  403  -                                -
+Fe      6  1.260  1.170  403  -                                -
+Co      6  1.252  1.162  403  -                                -
+Ni      6  1.244  1.154  403  -                                -
+Cu   5.56  1.276  1.176  403  -                                -
+Zn   4.56  1.339  1.213  403  -                                -
+Ga   3.56  1.404  1.246  403  -                                -
+Ge   2.56  1.444  1.242  403  -                                -
+As   1.56  1.476  1.210  403  -                                -
+Se      2   1.40   1.17  403  v_assumed                        -
+Rb      1   2.48   2.16  403  -                                -
+Sr      2  2.148  1.914  403  label_corrected                  label=Sn
+Y       3  1.797  1.616  403  -                                -
+Zr      4  1.597  1.454  403  -                                -
+Nb      5  1.456  1.342  403  -                                -
+Mo      6  1.386  1.296  403  -                                -
+Tc      6  1.361  1.271  403  -                                -
+Ru      6  1.336  1.246  403  -                                -
+Rh      6  1.342  1.252  403  -                                -
+Pd      6  1.373  1.283  403  -                                -
+Ag   5.56  1.442  1.342  403  -                                -
+Cd   4.56  1.508  1.382  403  -                                -
+In   3.56  1.579  1.421  403  -                                -
+Sn   2.56  1.623  1.421  403  -                                -
+Sb   1.56  1.657  1.391  403  -                                -
+Te      2   1.60   1.37  403  v_assumed                        -
+Cs      1   2.67   2.35  403  -                                -
+Ba      2  2.215  1.981  403  -                                -
+La      3  1.871  1.690  403  -                                -
+Hf      4  1.585  1.442  403  -                                -
+Ta      5  1.457  1.343  403  -                                -
+W       6  1.394  1.304  403  -                                -
+Re      6  1.373  1.283  403  -                                -
+Os      6  1.350  1.260  403  -                                -
+Ir      6  1.355  1.265  403  -                                -
+Pt      6  1.385  1.295  403  -                                -
+Au   5.56  1.439  1.339  403  -                                -
+Hg   4.56  1.512  1.386  403  -                                -
+Tl   3.56  1.595  1.437  403  -                                -
+Pb   2.56  1.704  1.502  403  -                                -
+Bi   1.56  1.776  1.510  403  -                                -
+Th      4  1.795  1.652  403  -                                -
+U       6  1.516  1.426  403  -                                -
+Ce    3.2  1.818  1.646  403  -                                -
+Pr      3  1.824  1.643  403  -                                -
+Nd      3  1.818  1.637  403  -                                -
+Pm      3  1.834  1.633  403  r12_off_relation                 -
+Sm      3  1.804  1.623  403  -                                -
+Eu      2  2.084  1.850  403  v_corrected                      v=3
+Gd      3  1.804  1.623  403  r12_corrected                    r12=2.804
+Tb    3.5  1.773  1.613  403  -                                -
+Dy      3  1.781  1.600  403  -                                -
+Ho      3  1.762  1.581  403  -                                -
+Er      3  1.761  1.580  403  -                                -
+Tm      3  1.759  1.578  403  -                                -
+Yb      2  1.933  1.699  403  -                                -
+Lu      3  1.738  1.557  403  -                                -
