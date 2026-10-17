@@ -4578,6 +4578,10 @@ class Refinement:
             # `fit(plan="profile_only")` refines no biso — and the GUI's plan panel
             # now names the difference, since nothing a user could read said it.
             table = self._prepare_table(restore=False)
+            # the contacts inside r₀ before any stage moves an atom, which
+            # RESTRAINT_PAIRS_STALE needs to tell a drifted pair from one the
+            # caller left out of the list on purpose
+            stale_since = _anti_bump_contacts_at_start(self.structure, mode)
 
             # the λ this Refinement was constructed with (or last edited to), so a
             # second λ-freeing call reports the cumulative move from the truly
@@ -4645,6 +4649,10 @@ class Refinement:
                                                    origins=origins))
             diagnostics.extend(_unknown_path_diagnostics(
                 stage_results, [e.path for e in table.entries]))
+            if mode == "rietveld":
+                # after the write-back: the search reads the answer's coordinates
+                diagnostics.extend(_restraint_pairs_stale_diagnostics(
+                    self.structure, stale_since))
 
             self.result_ = _build_result(
                 model, table, outcome.theta, mode=mode, status=outcome.status,
@@ -5043,6 +5051,7 @@ class Refinement:
 
         try:
             table = self._prepare_table(restore=True)
+            stale_since = _anti_bump_contacts_at_start(self.structure, mode)
             # the constructed (or last-edited) λ, not the value the previous stage
             # left behind: a second λ-freeing stage reports cumulatively, matching
             # the joint path, rather than a delta from its own predecessor (WP-1134).
@@ -5091,6 +5100,9 @@ class Refinement:
             self._model = model
             self._write_back(table)
             self._record_free_paths(table)
+            if mode == "rietveld":
+                diagnostics.extend(_restraint_pairs_stale_diagnostics(
+                    self.structure, stale_since))
 
             stage_result = StageResult(
                 name=stage.name, status=outcome.status, n_iterations=outcome.n_iterations,
@@ -9408,6 +9420,65 @@ def _roughness_regime_diagnostics(model: CompiledModel,
             suggestion="Drop the roughness block, or extend the measurement "
                        "to lower 2θ.",
         ))
+    return out
+
+
+#: how many stale pairs a ``RESTRAINT_PAIRS_STALE`` message spells out; the
+#: count is always given in full
+RESTRAINT_PAIRS_STALE_LISTED = 5
+
+
+def _anti_bump_contacts_at_start(structure: Structure, mode: str) -> list:
+    """Per phase, the contacts inside r₀ now (``None`` where nothing is searched)."""
+    from .model.restraints import anti_bump_contact_keys
+
+    if mode != "rietveld":
+        return [None] * len(structure.phases)
+    return [anti_bump_contact_keys(ph) for ph in structure.phases]
+
+
+def _restraint_pairs_stale_diagnostics(structure: Structure,
+                                       since: list) -> list[Diagnostic]:
+    """``RESTRAINT_PAIRS_STALE`` — a contact inside r₀ that no row restrains.
+
+    The anti-bump pair list is built by the caller, once, so the plan's row
+    count never moves (WP-1809's handover); the cost is that a pair which
+    drifts inside its minimum from outside the list is not restrained.  At
+    plan end each phase with an anti-bump row is searched at the answer's
+    coordinates (:func:`rietx.model.restraints.stale_anti_bump_pairs`), and
+    one warning per phase names what it found, closest-inside first.
+    ``since`` is the contacts inside r₀ where the run *started*
+    (:func:`~rietx.model.restraints.anti_bump_contact_keys`, per phase): the
+    list does not remember what it was built from, so a contact already inside
+    r₀ then — a bond the caller left out of the list — is theirs and never
+    named, which makes "entered" true.  ``run_stage`` runs it too, one stage's
+    start being its own ``since``.
+    """
+    from .model.restraints import stale_anti_bump_pairs
+
+    out: list[Diagnostic] = []
+    for phase, before in zip(structure.phases, since, strict=True):
+        if before is None:
+            continue
+        stale = stale_anti_bump_pairs(phase, since=before)
+        if not stale:
+            continue
+        lab = [a.label for a in phase.atoms]
+        shown = "; ".join(f"{lab[i]}–{lab[j]} {d:.3f} Å (r₀ {r0:.3g})"
+                          for i, j, d, r0 in stale[:RESTRAINT_PAIRS_STALE_LISTED])
+        more = len(stale) - RESTRAINT_PAIRS_STALE_LISTED
+        out.append(Diagnostic(
+            level="warning", code="RESTRAINT_PAIRS_STALE",
+            where=sorted({f"{phase.name} {lab[k]}" for i, j, _, _ in stale
+                          for k in (i, j)}),
+            value=float(len(stale)),
+            message=(f"phase {phase.name!r}: {len(stale)} contact(s) came inside "
+                     f"their anti-bump minimum during the run and have no row "
+                     f"in the pair list: "
+                     f"{shown}" + (f"; and {more} more" if more > 0 else "")),
+            suggestion="the list was built from other coordinates: rebuild it with "
+                       "anti_bump_restraints from these (or with a wider margin) "
+                       "and refit, then judge the contact"))
     return out
 
 

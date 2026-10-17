@@ -422,6 +422,17 @@ excluded from Rwp, the Durbin-Watson statistic and the Bérar-Lelann inflation,
 because they are not measurements of this pattern. `RefinementResult.restraints`
 is what they report back, and [](results.md) reads it.
 
+A fourth kind, `PlanarityRestraint`, holds four or more atoms to their
+least-squares plane. `PlanarityRestraint.atoms` lists their positional indices,
+`PlanarityRestraint.sigma` is the uncertainty in ångströms and
+`PlanarityRestraint.weight` multiplies the rows. It contributes one row per
+atom, √weight·d/σ, where d is that atom's signed distance from the plane, so
+it is order-free and has no target {eq}`par-planarity`.
+`PlanarityRestraint.op_indices` and `PlanarityRestraint.translations` give each
+listed atom's symmetry image, one entry per atom or none, for a ring that
+crosses a symmetry element. Leave them out and each atom takes the minimum
+image relative to the first.
+
 A distance obeys periodic boundary conditions, so the second atom is taken at a
 symmetry image. `BondRestraint.op_index` selects the symmetry operation and
 `BondRestraint.translation` the lattice shift; `AngleRestraint.op_index_i`,

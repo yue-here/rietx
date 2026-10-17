@@ -579,11 +579,13 @@ class RestraintRow(Base):
     ``deviation_over_sigma`` is the headline: a restraint fighting the data
     shows up as |deviation/σ| ≫ 1 (and, past a threshold, a ``RESTRAINT_TENSION``
     diagnostic).  ``atoms`` (bond/angle) or ``path`` (value) names the target;
-    exactly one is set.
+    exactly one is set.  A planarity restraint gives one row per atom: its
+    signed distance to the plane (target 0), ``atoms`` listing that atom first
+    and then the rest of the plane in restraint order.
     """
 
     phase_index: int | None = None
-    kind: Literal["bond", "angle", "value", "tether", "anti_bump"]
+    kind: Literal["bond", "angle", "value", "tether", "anti_bump", "planarity"]
     atoms: list[int] | None = None                  # bond (2) / angle (3) indices
     path: str | None = None                         # value-restraint dot-path
     computed: float                                 # Å (bond), deg (angle), or value
