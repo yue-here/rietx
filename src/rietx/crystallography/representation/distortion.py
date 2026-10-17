@@ -532,10 +532,12 @@ def _star_key(group, k, stars: list) -> int:
     return len(stars) - 1
 
 
-def _isotropy(field_frac, ref: _Reference, metric, n_child_ops) -> tuple[str, bool | None]:
-    """spglib's name for the group of the reference displaced by ``field_frac``.
+def _isotropy(field_frac, ref: _Reference, metric) -> tuple[str, int | None, int | None]:
+    """spglib's name, space-group number and operation count of the reference displaced by ``field_frac``.
 
-    The flag is ``None`` with the name ``"unidentified"`` when spglib refuses.
+    Name ``"unidentified"`` and both numbers ``None`` when spglib refuses.  The
+    operation count alone cannot tell a group from its supergroup, since spglib
+    lists only the operations that preserve the input cell.
     """
     import spglib
 
@@ -547,9 +549,8 @@ def _isotropy(field_frac, ref: _Reference, metric, n_child_ops) -> tuple[str, bo
     except SPGLIB_REFUSALS:  # the same refusal in spglib's other error mode
         data = None
     if data is None:
-        return "unidentified", None
-    name = f"{data.international} ({data.number})"
-    return name, len(data.rotations) == n_child_ops
+        return "unidentified", None, None
+    return f"{data.international} ({data.number})", int(data.number), len(data.rotations)
 
 
 def distortion_basis(parent, child, transform, *, reference: str = "average") -> ModeBasis:
@@ -691,8 +692,7 @@ def distortion_basis(parent, child, transform, *, reference: str = "average") ->
             f"the irrep subspaces span {total_dim} dimensions but the fields periodic on the "
             f"child lattice, less the translations, span {expected}; this is a bug")
 
-    components = []
-    n_child_ops = len(h_ops)
+    probes = []
     for members, q in spaces:
         modes = _orth(fix_h @ q)
         if not modes.shape[1]:
@@ -706,7 +706,18 @@ def distortion_basis(parent, child, transform, *, reference: str = "average") ->
         vectors = normalise_in_cell(fields_child, g_ref, lattice_points=lattice_points)
         generic = np.tensordot(_PROBE_AMPLITUDE * (1.0 + 0.618 * np.arange(len(vectors))),
                                vectors, axes=1)
-        name, primary = _isotropy(generic, ref, g_ref, n_child_ops)
+        probes.append((first, arms, vectors, generic))
+
+    # the child's own group, read the way each component's is: a generic field invariant
+    # under H has exactly H for its group
+    _, child_number, n_child_ops = _isotropy(sum(p[3] for p in probes), ref, g_ref)
+    components = []
+    for first, arms, vectors, generic in probes:
+        name, number, n_ops = _isotropy(generic, ref, g_ref)
+        # the operation count alone passes a supergroup whose extra operations do not
+        # preserve the child's cell, so the group itself is compared (#1002)
+        primary = (None if n_ops is None or child_number is None
+                   else n_ops == n_child_ops and number == child_number)
         components.append(IrrepModes(
             k=_k_text(first[1]), arms=arms, irrep=first[2], isotropy_group=name,
             primary=primary, vectors=vectors))
