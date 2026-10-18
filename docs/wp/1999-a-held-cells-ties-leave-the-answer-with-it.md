@@ -1,6 +1,6 @@
 # WP-1999 — a held cell's ties leave the answer with it
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-10-19 — claimed by @yue-here
 Track: A long run is not one fit
 Depends on: —
 Priority: P2 2026-10-18 — a reported value that is not a measurement, on the series path (a trajectory point with no fit behind it)
