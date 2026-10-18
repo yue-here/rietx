@@ -53,6 +53,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1969](1969-an-exhaustive-search-that-ends-in-no-cell.md) | An exhaustive search that ends in no cell | 2026-10-17 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md) | Guides and Theory move over, and the old tree retires | 2026-10-18 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [1988](1988-a-pr-put-up-for-review-is-watched.md) | A PR put up for review is watched by the session that opened it | 2026-10-16 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
+| [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | 2026-10-19 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 
 ## Next, by priority
 
@@ -73,7 +74,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1991](1991-a-site-and-its-own-image-are-one-atom.md) | A site and its own image are one atom on every route | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1997](1997-the-direct-space-solver-on-main.md) | The direct-space solver on main: site classes, kernels, chemistry, engine and entry point | P2 | [1902](1902-the-solve-cost-as-a-quadratic-form.md), [1940](1940-the-kernel-tier-in-a-wheel.md) ([1901](1901-the-difference-fourier-map.md) soft) | [structure-solution](#structure-solution) |
 | [1998](1998-a-suggestion-past-its-bound.md) | A suggestion whose gain lies past its bound | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | P2 | — | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -562,7 +562,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1524](1524-the-step-scans-last-two-blind-spots.md) | The step scan's last two blind spots | ⬜ | P3 | — |
 | [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 🔄 2026-10-13 | P2 | [1959](1959-the-dichotomy-grid-compiled-again.md) ([1520](1520-a-search-refines-each-assignment-once.md) soft) |
 | [1959](1959-the-dichotomy-grid-compiled-again.md) | The dichotomy grid compiled again, so a ceiling reaches svd | ✅ 2026-10-14 | — | — |
-| [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | ⬜ | P2 | — |
+| [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | 🔄 2026-10-19 | P2 | — |
 
 ### <a id="unscheduled-one-file-many-patterns"></a>One file, many patterns
 
