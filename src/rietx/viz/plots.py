@@ -238,16 +238,21 @@ def _spread(ys: list[float], min_gap: float) -> list[float]:
     return out
 
 
-def _x_values(two_theta, x_axis: str, wavelength: float | None):
+def _x_values(two_theta, x_axis: str, wavelength: float | None,
+              radiation: str | None = None):
     """The abscissa the panel is drawn against, and its axis label.
 
     Q = 4π sinθ/λ and d = λ/(2 sinθ) are the same measurement in a coordinate
     that does not depend on the wavelength, which is why neither label repeats
-    it and why the 2θ label must.
+    it and why the 2θ label must.  ``radiation`` (``"Cu Kα"``) goes on the 2θ
+    label before λ, in one form whichever of the two is known:
+    ``2θ (degrees), Cu Kα, λ = 1.54059 Å``.
     """
     tt = np.asarray(two_theta, dtype=float)
     if x_axis == "two_theta":
         label = r"$2\theta$ (degrees)"
+        if radiation is not None:
+            label += f", {radiation}"
         if wavelength is not None:
             label += f", $\\lambda$ = {wavelength:g} Å"
         return tt, label
@@ -1071,12 +1076,19 @@ def plot_result(result: RefinementResult, *, path: str | None = None,
     return _handed_back(fig, style)
 
 
-def _model_ticks(ref, data) -> dict[str, list[float]]:
-    """Each phase's reflection positions over ``data``'s range, at ``ref``'s
-    parameters as they stand: compiled as :meth:`Refinement.predict` compiles,
-    placed by :func:`~rietx.viz.snapshot.stage_ticks`, keyed by phase name.
-    A position does not depend on the windows, so this compiles the declared
-    stages' narrow ones rather than ``compile_model``'s closing default."""
+def _starting_model(ref, data):
+    """What ``ref`` draws over ``data`` at its parameters as they stand, from
+    one compile: each phase's reflection positions keyed by phase name, and
+    the background with the 2θ of the channels it was evaluated on.
+
+    Compiled as :meth:`Refinement.predict` compiles, so the background is
+    :meth:`CompiledModel.background` over the channels a fit would use: the
+    curve a fit over the pattern's whole range starts from.  A fit given
+    ``two_theta_limits`` maps its Chebyshev terms onto that narrower range
+    instead, so its starting curve differs.  The ticks are placed by
+    :func:`~rietx.viz.snapshot.stage_ticks`.  Neither depends on the windows,
+    so this compiles the declared stages' narrow ones rather than
+    ``compile_model``'s closing default."""
     from ..model.forward import WINDOW_AREA_TOL, compile_model
     from ..params.vector import ParameterTable
     from .snapshot import stage_ticks
@@ -1084,9 +1096,57 @@ def _model_ticks(ref, data) -> dict[str, list[float]]:
     compiled = compile_model(ref.structure, ref.instrument, data, mode="rietveld",
                              moving_paths=set(table.moving_paths),
                              window_area_tol=WINDOW_AREA_TOL)
-    rows = stage_ticks(compiled, table.decode(table.x0()), max_per_phase=10**9)
+    values = table.decode(table.x0())
+    rows = stage_ticks(compiled, values, max_per_phase=10**9)
     names = [p.name for p in ref.structure.phases]
-    return {names[int(key.split()[-1])]: row["two_theta"] for key, row in rows.items()}
+    ticks = {names[int(key.split()[-1])]: row["two_theta"]
+             for key, row in rows.items()}
+    return (ticks, np.asarray(compiled.tt, dtype=float),
+            np.asarray(compiled.background(values), dtype=float))
+
+
+def _stated_radiation(model, data) -> tuple[float | None, str | None]:
+    """The primary λ and the anode a pattern's figure can name, read and never
+    inferred: from ``model``'s source when there is a model, else from what the
+    file stated (``data.metadata``), else nothing.
+
+    A source carries no anode name, so an X-ray source is named only where its
+    lines are one entry of the radiation table to the last digit, which is
+    what a preset such as ``bragg_brentano(radiation="CuKa")`` builds.  A
+    wavelength near a Kα1 names nothing, because a synchrotron beam can sit
+    within any tolerance of one, and a neutron source is never named.  A
+    file's own ``anode`` is named when it is an element the table carries, as
+    Kα1 where the file records a Kα2 wavelength of zero (the doublet was not
+    used) and as Kα otherwise.
+    """
+    from ..schemas.instrument import _KA_DOUBLETS, _RADIATIONS
+
+    def spelt(key: str) -> str:            # "CuKa1" -> "Cu Kα1"
+        element, line = key.split("Ka")
+        return f"{element} Kα{line}"
+
+    if model is not None:
+        source = model.instrument.source
+        lines = tuple(line.wavelength.value for line in getattr(source, "lines", ()))
+        name = next((key for key, table in _RADIATIONS.items()
+                     if source.kind == "xray_cw" and lines == table), None)
+        return (getattr(source, "primary_wavelength", None),
+                spelt(name) if name is not None else None)
+
+    def stated(key: str) -> float | None:
+        try:
+            return float(data.metadata[key])
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    lam = stated("wavelength")
+    element = str(data.metadata.get("anode", "")).strip().capitalize()
+    name = None
+    if f"{element}Ka" in _KA_DOUBLETS:
+        name = spelt(f"{element}Ka1" if stated("wavelength_alpha2") == 0.0
+                     else f"{element}Ka")
+    return (lam if lam is not None and np.isfinite(lam) and lam > 0.0 else None,
+            name)
 
 
 def plot_pattern(data, *, path: str | None = None,
@@ -1116,15 +1176,33 @@ def plot_pattern(data, *, path: str | None = None,
     ``two_theta_range``, ``x_axis``/``wavelength``, ``y_scale``, ``style``,
     ``figsize``/``font_size``/``dpi`` and ``title`` mean exactly what they
     mean on :func:`plot_result`; the default size is the result panel's own,
-    so a before-and-after pair lines up.  A :class:`PatternData` carries no
-    wavelength either, so λ on the 2θ axis, and Q or d, need ``wavelength=``.
+    so a before-and-after pair lines up.
 
-    ``model``, a :class:`~rietx.Refinement`, adds one row of reflection ticks
-    per phase under the data, where the result panel puts them, at the
-    parameters as they stand and before any fit (WP-1544): the check that the
-    cell is close and λ is right before a fit is asked to find either. The
-    positions are :func:`rietx.viz.snapshot.stage_ticks`', every emission line
-    included. A row sits below the data floor, so it needs the linear axis.
+    A notebook output has no caption, so the 2θ label names the radiation
+    whenever something states it (WP-2037): ``2θ (degrees), Cu Kα, λ =
+    1.54059 Å``.  A :class:`PatternData` carries no wavelength of its own, so
+    the label reads ``model``'s source, else the anode and wavelength the file
+    recorded in ``data.metadata``, else stays ``2θ (degrees)``.  The anode is
+    named only where a preset built the source's lines from the radiation
+    table or the file names one, never from a wavelength's nearness
+    (:func:`_stated_radiation`), so a neutron or synchrotron source shows λ
+    alone.  An explicit ``wavelength=`` replaces both.  Q and d still need
+    ``wavelength=``, because the stated λ names the axis and converts nothing.
+
+    ``model``, a :class:`~rietx.Refinement`, draws what it already holds over
+    the data, at the parameters as they stand and before any fit (WP-1544,
+    WP-2037), so each part can be checked against the data before a fit uses
+    it.  One row of reflection ticks per phase goes under the data, where the
+    result panel puts them: the check that the cell is close and λ is right
+    before a fit is asked to find either.  The positions are
+    :func:`rietx.viz.snapshot.stage_ticks`', every emission line included.  The
+    background is drawn as the result panel draws it, dashed in the
+    background colour with its name in the gutter, over the channels a fit
+    would use: the check that it runs through the counts between the peaks.  A
+    background that is zero everywhere, the default instrument's, is not
+    drawn.  The intensity axis reaches the background where it leaves the
+    data's range, so a starting value far off is in the picture.  A row sits
+    below the data floor, so ``model=`` needs the linear axis.
 
     2θ only: every axis this draws (2θ, Q, d) is reached through an angle, and
     a time-of-flight pattern is refused by name rather than drawn as degrees.
@@ -1148,14 +1226,21 @@ def plot_pattern(data, *, path: str | None = None,
         tt, y_obs = tt[keep], y_obs[keep]
     hue = PALETTES[style]
 
-    x, x_label = _x_values(tt, x_axis, wavelength)
+    lam, radiation = ((wavelength, None) if wavelength is not None
+                      else _stated_radiation(model, data))
+    x, x_label = _x_values(tt, x_axis, lam, radiation)
     if x.size > 1 and x[0] > x[-1]:
         # mirrored rather than reversed, as the result panel does it
         x, y_obs = x[::-1], y_obs[::-1]
-    rows = ([(name, _x_values(np.asarray(pos, dtype=float), x_axis, wavelength)[0])
-             for name, pos in _model_ticks(model, data).items()]
-            if model is not None else [])
+    ticks, bkg_tt, y_bkg = (_starting_model(model, data) if model is not None
+                            else ({}, np.empty(0), np.empty(0)))
+    rows = [(name, _x_values(np.asarray(pos, dtype=float), x_axis, wavelength)[0])
+            for name, pos in ticks.items()]
     n_rows = len(rows)
+    inside = (bkg_tt >= tt.min()) & (bkg_tt <= tt.max())
+    bkg_tt, y_bkg = bkg_tt[inside], y_bkg[inside]
+    # zero everywhere is the default instrument's background: nothing to check
+    has_bkg = bool(y_bkg.size and np.any(y_bkg))
 
     with _style_context(plt, style, font_size):
         if figsize is None:
@@ -1178,6 +1263,13 @@ def plot_pattern(data, *, path: str | None = None,
             ax.axvspan(a, b, color=hue["zero"], alpha=0.5, lw=0, zorder=0)
         ax.plot(x, y_obs, marker="x", ms=0.24 * font_size, mew=0.6,
                 color=hue["obs"], ls="none", zorder=2)
+        if has_bkg:
+            # modelled, so dashed, in the result panel's background ink.  Over
+            # the markers, where the result panel draws its calculated curve:
+            # it is the model being checked, and under a full range's markers
+            # (5753 on FAP.XRA) it was hidden wherever it ran through the counts
+            ax.plot(_x_values(bkg_tt, x_axis, wavelength)[0], y_bkg, "--",
+                    lw=0.8, color=hue["bkg"], zorder=3)
 
         top = float(y_obs.max())
         if y_scale == "log":
@@ -1187,6 +1279,10 @@ def plot_pattern(data, *, path: str | None = None,
             floor = float(y_obs[y_obs > 0.0].min())
         else:
             floor = min(float(y_obs.min()), 0.0)
+        if has_bkg:
+            # model= is linear-only, so a background below zero is drawable
+            top = max(top, float(y_bkg.max()))
+            floor = min(floor, float(y_bkg.min()))
         forward, inverse, setter, floor = _y_scale(y_scale, floor, top)
         if setter is not None:
             ax.set_yscale(setter[0], **setter[1])
@@ -1226,14 +1322,18 @@ def plot_pattern(data, *, path: str | None = None,
                                    u_top, u_head)
         ax.set_xlabel(x_label)
 
-        # the gutter convention, with one name in it: at the foot of the data,
-        # where the result panel's block starts
+        # the gutter convention: the curve names as one block at the foot of
+        # the data, as the result panel's default block, background lowest
         fig_h = fig.get_size_inches()[1]
         ax_h_in = ax.get_position().height * fig_h
         min_gap = 1.15 * font_size * (u_head - u_bottom) / (ax_h_in * 72.0)
-        _gutter_label(ax,
-                      float(inverse(max(u_bottom, float(forward(floor))) + 0.55 * min_gap)),
-                      "observed", hue["obs"])
+        anchor = max(u_bottom, float(forward(floor))) + 0.55 * min_gap
+        names = [("observed", hue["obs"])]
+        if has_bkg:
+            names.append(("background", hue["bkg"]))
+        for i, (text, colour) in enumerate(names):
+            _gutter_label(ax, float(inverse(anchor + (len(names) - 1 - i) * min_gap)),
+                          text, colour)
         for i, ((name, _), y) in enumerate(zip(rows, row_y, strict=True)):
             colour = (hue["tick"] if n_rows == 1
                       else hue["phase"][i % len(hue["phase"])])

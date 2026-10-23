@@ -224,7 +224,7 @@ a change to what `diagnose` computes, so it stays inside the non-goal below.
       `guides/check.md`/`examples/guides/check.py` if the display replaces their f-string.
 - [x] Notebook displays: one monospace block per output, every `_repr_html_` (Decision 1),
       each diagnostic's explanation indented under its `help:` line.
-- [ ] `plot_pattern`: with `model=`, draw the model's background at its starting values, and
+- [x] `plot_pattern`: with `model=`, draw the model's background at its starting values, and
       name the radiation or λ from `model.instrument` or `data.metadata`, absent when neither
       knows it. Tests in `tests/test_viz.py`, and look at the figure.
 - [ ] Quickstart: a cell showing the background against the data once it is set (needs the

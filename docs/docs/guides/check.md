@@ -82,6 +82,9 @@ An offset that is the same at every angle points to a zero shift.
 An offset that grows with angle comes from the cell or the wavelength, which peak positions alone cannot tell apart.
 A peak with no tick is an impurity, or a phase you have not declared.
 
+The plot also draws the model's background at its starting values, as a dashed line.
+Between the peaks it should run through the observed counts.
+This model keeps the default background, which is zero everywhere, so none is drawn.
 `model=` needs the linear intensity axis, and refuses any other `y_scale`.
 
 ## Size the background from the diagnostics

@@ -19,11 +19,14 @@ import numpy as np
 import pytest
 
 import rietx as rx
+from rietx.schemas.common import Parameter
+from rietx.schemas.instrument import BackgroundChebyshev, NeutronSource
 from rietx.schemas.pattern import PatternData
 from rietx.viz.indexing import plot_candidates, plot_peak_list, plot_validation
 from rietx.viz.plots import PALETTES, plot_for_vlm, plot_pattern, plot_result
 from tests.test_refine_synthetic import (
     TRUE_A,
+    TRUE_BKG,
     WAVELENGTH,
     perturbed_models,
     synthesize,
@@ -201,6 +204,123 @@ def test_pattern_data_plot_forwards_and_refuses_what_the_result_refuses(fitted):
         pattern.plot(y_scale="logit")
     with pytest.raises(ValueError, match="contains no points"):
         pattern.plot(two_theta_range=(90.0, 91.0))
+
+
+# ----------------------------------------------------------------------
+# model=: the starting background, and the radiation on the 2θ label (WP-2037)
+# ----------------------------------------------------------------------
+def _starting(instrument=None, background=TRUE_BKG) -> rx.Refinement:
+    """The perturbed LaB6 model, its background set to ``background``."""
+    structure, ins = perturbed_models()
+    ins = instrument if instrument is not None else ins
+    ins.background = BackgroundChebyshev(
+        coefficients=[Parameter(value=v) for v in background])
+    return rx.Refinement(structure, ins, history=False)
+
+
+def _dashed(ax) -> list:
+    """The modelled curves on ``ax``: the only lines drawn dashed."""
+    return [line for line in ax.get_lines() if line.get_linestyle() == "--"]
+
+
+TWO_THETA = r"$2\theta$ (degrees)"
+
+
+def test_a_model_draws_its_starting_background_under_the_data(fitted):
+    """The background a fit would start from, dashed in the result panel's
+    background ink, over the channels the fit would use, with its name in the
+    gutter between the curve above it and the tick row below it."""
+    pattern, _ = fitted
+    OUT.mkdir(exist_ok=True)
+    ax = plot_pattern(pattern, model=_starting(),
+                      path=str(OUT / "viz_pattern_model_background.png")).get_axes()[0]
+    (line,) = _dashed(ax)
+    assert line.get_color() == PALETTES["light"]["bkg"]
+    # the synthetic pattern was drawn with TRUE_BKG on this same range, so the
+    # starting curve is that Chebyshev series, computed here independently
+    tt, y = np.asarray(line.get_xdata()), np.asarray(line.get_ydata())
+    lo, hi = pattern.two_theta[0], pattern.two_theta[-1]
+    expect = np.polynomial.chebyshev.chebval(2 * (tt - lo) / (hi - lo) - 1, TRUE_BKG)
+    assert np.allclose(y, expect, rtol=1e-12)
+    assert not ((tt >= EXCLUDED[0]) & (tt <= EXCLUDED[1])).any(), \
+        "drawn over the channels a fit would use, as the result's is"
+    assert [t.get_text() for t in ax.texts] == ["observed", "background", "LaB6"]
+    obs, bkg, row = (t.xy[1] for t in ax.texts)
+    assert obs > bkg > row
+
+    # a window draws the window's part of the same curve
+    windowed = plot_pattern(pattern, model=_starting(),
+                            two_theta_range=(8.0, 16.0)).get_axes()[0]
+    tt_w = np.asarray(_dashed(windowed)[0].get_xdata())
+    assert tt_w.min() >= 8.0 and tt_w.max() <= 16.0
+
+    # a starting value far above the counts is in the picture, not off it
+    tall = 3.0 * max(pattern.intensity)
+    high = plot_pattern(pattern, model=_starting(background=[tall])).get_axes()[0]
+    assert high.get_ylim()[1] > tall
+
+
+def test_no_model_and_a_zero_background_draw_no_background(fitted):
+    """Without a model nothing modelled is drawn; with the default instrument's
+    background, zero everywhere, there is nothing to check against the data."""
+    pattern, _ = fitted
+    bare = plot_pattern(pattern).get_axes()[0]
+    assert not _dashed(bare) and "background" not in [t.get_text() for t in bare.texts]
+    zero = plot_pattern(pattern, model=_starting(background=[0.0, 0.0])).get_axes()[0]
+    assert not _dashed(zero)
+    assert [t.get_text() for t in zero.texts] == ["observed", "LaB6"]
+
+
+@pytest.mark.parametrize("instrument, label", [
+    (lambda: rx.Instrument.bragg_brentano(radiation="CuKa"),
+     TWO_THETA + r", Cu Kα, $\lambda$ = 1.54059 Å"),
+    (lambda: rx.Instrument.bragg_brentano(radiation="MoKa1"),
+     TWO_THETA + r", Mo Kα1, $\lambda$ = 0.709317 Å"),
+    # one line 24 ppm from Mo Kα1, as a synchrotron can be: λ alone, since a
+    # source is named from the table's own lines and never by nearness
+    (lambda: rx.Instrument.debye_scherrer(wavelength=0.7093),
+     TWO_THETA + r", $\lambda$ = 0.7093 Å"),
+    # a neutron beam at Cu Kα1's λ is no copper tube: never matched from λ
+    (lambda: rx.Instrument(source=NeutronSource(wavelength=1.5405929)),
+     TWO_THETA + r", $\lambda$ = 1.54059 Å"),
+], ids=["doublet", "kalpha1", "synchrotron", "neutron"])
+def test_the_2theta_label_names_what_the_models_source_states(fitted, instrument,
+                                                               label):
+    pattern, _ = fitted
+    # the model's source wins over what the file recorded
+    noted = pattern.model_copy(update={"metadata": {"anode": "Ag",
+                                                    "wavelength": "0.5594"}})
+    ax = plot_pattern(noted, model=_starting(instrument())).get_axes()[0]
+    assert ax.get_xlabel() == label
+
+
+@pytest.mark.parametrize("metadata, label", [
+    ({"anode": "Cu", "wavelength": "1.540598"},
+     TWO_THETA + r", Cu Kα, $\lambda$ = 1.5406 Å"),
+    # a recorded Kα2 of zero says the doublet was not used
+    ({"anode": "CU ", "wavelength": "1.540598", "wavelength_alpha2": "0"},
+     TWO_THETA + r", Cu Kα1, $\lambda$ = 1.5406 Å"),
+    ({"anode": "Cu"}, TWO_THETA + ", Cu Kα"),
+    # an anode outside the package's table is not named; the λ still is
+    ({"anode": "W", "wavelength": "0.2"}, TWO_THETA + r", $\lambda$ = 0.2 Å"),
+    ({"wavelength": "not a number"}, TWO_THETA),
+    ({"source_file": "FAP.XRA", "format": "gsas-std"}, TWO_THETA),
+], ids=["anode", "kalpha1", "anode-only", "foreign-anode", "unreadable", "neither"])
+def test_without_a_model_the_label_reads_what_the_file_recorded(fitted, metadata,
+                                                                label):
+    pattern, _ = fitted
+    noted = pattern.model_copy(update={"metadata": metadata})
+    assert plot_pattern(noted).get_axes()[0].get_xlabel() == label
+
+
+def test_an_explicit_wavelength_replaces_what_the_model_and_file_state(fitted):
+    pattern, _ = fitted
+    noted = pattern.model_copy(update={"metadata": {"anode": "Cu",
+                                                    "wavelength": "1.540598"}})
+    cu = _starting(rx.Instrument.bragg_brentano(radiation="CuKa"))
+    for kw in ({}, {"model": cu}):
+        ax = plot_pattern(noted, wavelength=0.5, **kw).get_axes()[0]
+        assert ax.get_xlabel() == TWO_THETA + r", $\lambda$ = 0.5 Å", kw
 
 
 # ----------------------------------------------------------------------

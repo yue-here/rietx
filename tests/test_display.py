@@ -475,8 +475,8 @@ def test_pre_fit_ticks_are_where_the_fit_puts_its_own(fap):
     pre-fit rows are the result's own ticks over the same range."""
     import numpy as np
 
-    from rietx.viz.plots import _model_ticks
-    drawn = _model_ticks(fap["ref"], fap["data"])
+    from rietx.viz.plots import _starting_model
+    drawn, _, _ = _starting_model(fap["ref"], fap["data"])
     (name, own), = fap["result"].ticks.items()
     lo, hi = fap["result"].two_theta[0], fap["result"].two_theta[-1]
     pos = np.asarray(drawn[name])

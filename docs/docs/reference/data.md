@@ -156,12 +156,23 @@ assert fig.get_axes()[0].get_title() == "as read"
 ```
 
 This is the 11-BM NAC pattern drawn with `data.plot(wavelength=0.4139090)`.
-A `PatternData` carries no wavelength, so λ on the 2θ axis, and a Q or d axis, need `wavelength=`.
+A `PatternData` carries no wavelength of its own.
+The 2θ axis label names the radiation when something states it.
+With `model=`, the instrument's source states it.
+Without a model, the anode and wavelength the file recorded in `metadata` do.
+The label then reads `2θ (degrees), Cu Kα, λ = 1.54059 Å`.
+An anode is named only where the source or the file states one, so a neutron or synchrotron source shows λ alone.
+With neither, the label stays `2θ (degrees)`.
+`wavelength=` replaces both.
+A Q or d axis always needs `wavelength=`.
 
 `model=` takes a `Refinement` and draws one row of reflection ticks per phase under the data.
 The ticks sit at the model's current positions, one set per emission line, and no fit runs.
 They show whether a starting cell is close and the wavelength right.
 A cell 1 % too large puts every fluorapatite tick visibly to the left of its peak.
+`model=` also draws the background at its starting values, dashed, over the channels a fit would use.
+Between the peaks it should run through the observed counts.
+A background that is zero everywhere, as the default instrument's is, is not drawn.
 The rows sit below the data, so `model=` needs the linear intensity axis and refuses any other `y_scale`.
 
 ```python

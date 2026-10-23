@@ -227,7 +227,8 @@ class PatternData(Base):
     def plot(self, path: str | None = None, **kw):
         """Draw the pattern: :func:`rietx.viz.plots.plot_pattern`, the peer of
         :meth:`RefinementResult.plot`, forwarding ``**kw``; ``model=ref`` adds a
-        :class:`~rietx.Refinement`'s reflection ticks before any fit."""
+        :class:`~rietx.Refinement`'s reflection ticks and starting background
+        before any fit, and names its radiation on the 2θ label."""
         from ..viz.plots import plot_pattern
 
         return plot_pattern(self, path=path, **kw)
