@@ -42,7 +42,7 @@ OUTPUT = Path("rietx_output")
 # %% [markdown]
 # `rx.read_pattern` recognises the format from the file.
 # `rx.capabilities().reader_formats` lists every format it opens.
-# The pattern prints its range and step, and `sigma: None` when the file gives no esd column.
+# The pattern prints its range and step, and its `sigma` row reads `None` when the file gives no esd column.
 # The fit then weights each point by √y.
 
 # %%
@@ -67,8 +67,7 @@ diag
 # %% [markdown]
 # Read `signal_cutoffs` and `dead_channels` first.
 # They say where to set `TWO_THETA_LIMITS` and which channels to exclude.
-# `dead_channels` needs a σ column.
-# `coverage_plateau: None` says the file gave none, so an empty `dead_channels` means not checked.
+# `dead_channels` needs a σ column, and reads `not checked (no measured σ)` when the file gives none.
 # A `steps_per_fwhm` below five limits what the peak shape can tell you, and the fit reports it again.
 # A line in `contamination` needs its range excluded.
 # [How to check a pattern before fitting](https://rietx.org/docs/stable/guides/check.html#read-the-pattern-diagnostics) explains every row.

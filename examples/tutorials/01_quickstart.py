@@ -32,7 +32,7 @@ data
 
 # %% [markdown]
 # A pattern prints as its size and range.
-# `sigma: None` means the file has no esd column, so the fit weights each point by √y.
+# `sigma` reads `None` because the file has no esd column, so the fit weights each point by √y.
 #
 # ## Look before fitting
 #
@@ -53,15 +53,16 @@ diag = rx.diagnose(data, wavelength=1.5406)
 diag
 
 # %% [markdown]
-# The rows print in the order to read them.
-# Four of them decide how this pattern can be fitted.
+# The rows print under three headings.
+# The first group decides how this pattern can be fitted.
 #
-# - `dead_channels` is empty, but `coverage_plateau` is `None`. The file gives no σ, so dead channels could not be looked for.
+# - `signal_cutoffs` is `none`, so neither end of the scan falls below the level of the rest.
 # - `steps_per_fwhm` is below the five steps the IUCr guidelines ask for. No refinement recovers that, and the fit will report it again.
-# - `contamination` is empty, so no Kβ or tungsten Lα line was found.
+# - `contamination` is `none`, so no Kβ or tungsten Lα line was found.
 # - `signal_to_background` compares the tallest peaks with the median background.
 #
-# The last three rows are rough peak counts. Nothing in the fit reads them.
+# The second group reads `not checked` for the three checks that need a measured σ, which this file does not give.
+# The third group holds numbers rietx measures for its own use.
 # [How to check a pattern before fitting](https://rietx.org/docs/stable/guides/check.html#read-the-pattern-diagnostics) explains every row.
 #
 # ## Build a model
