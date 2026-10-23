@@ -657,6 +657,26 @@ RIGID_BODY_DRIFT_TOL = 1e-6
 #: for the increment to be bounded or re-anchored before it could get there.
 RIGID_BODY_ROTATION_BOUND = math.pi
 
+#: A symmetry image of a body atom nearer than this factor × the covalent-radius
+#: sum (gemmi's ``covalent_r``, Cordero et al. 2008, *Dalton Trans.* 2832) to an
+#: atom of the same body means the body straddles a symmetry element and the
+#: cell counts the overlap twice (``RIGID_BODY_IMAGE_OVERLAP``, WP-1807, #876).
+#: The factor sits below every bond, since a body on a site legitimately bonds
+#: to its own images (S to an O′ image on PbSO₄'s mirror, 1.47 Å): the
+#: shortest legitimate same-body image distances are C≡C across a centre,
+#: 1.18 Å (Allen et al. 2006, *International Tables* Vol. C, § 9.5, p. 799)
+#: against a 1.02 Å threshold, an X-ray riding O–H, 0.82 against 0.68,
+#: and N–H, 0.86 against 0.71; #876's doubled SO₄ sat at 0.32 Å against 1.20.
+RIGID_BODY_OVERLAP_FACTOR = 0.7
+
+#: How far (Å) a template point's image under the origin's site symmetry may
+#: land from a same-species template point and still count as that point
+#: (``crystallography.bodies.add_body`` on a special position, WP-1807).  A
+#: template typed to three decimals in Å, or built from five-decimal
+#: fractional coordinates in a 10 Å cell (1e-4 Å), lands well inside it; a
+#: genuinely asymmetric fragment misses by a bond-scale distance.
+RIGID_BODY_INVARIANCE_TOL = 1e-3
+
 
 class BodyOrigin(Base):
     """A rigid body's origin: the point (0, 0, 0) of its template, fractional.

@@ -89,6 +89,7 @@ from rietx.schemas.fraction import FRACTION_PROFILE_DCHI2
 from rietx.schemas.indexing import MAX_RELATIVE_SIGMA_Q, MIN_LINES_PER_DOF
 from rietx.schemas.interval import PARAMETER_INTERVAL_MAX_REFITS
 from rietx.schemas.plan import CLOSING_WINDOW_TOL
+from rietx.schemas.structure import RIGID_BODY_OVERLAP_FACTOR
 from rietx.schemas.suggest import SUGGEST_MIN_GAIN
 from rietx.strategy.staged import HUMP_MIN_WIDTH_MULT
 
@@ -283,6 +284,9 @@ MYST_SUBSTITUTIONS = {
     "SUGGEST_MIN_GAIN": SUGGEST_MIN_GAIN,
     "SUPERCELL_CHANCE_ALPHA": SUPERCELL_CHANCE_ALPHA,
     "SYMMETRY_ANGLE_TOL_DEG": SYMMETRY_ANGLE_TOL_DEG,
+    # a body atom's image this close (× the covalent-radius sum) to the body
+    # refuses it, RIGID_BODY_IMAGE_OVERLAP (WP-1807)
+    "RIGID_BODY_OVERLAP_FACTOR": RIGID_BODY_OVERLAP_FACTOR,
     "THRESHOLDS_VERSION": THRESHOLDS_VERSION,
     "VALIDITY_RADIUS_FWHM": VALIDITY_RADIUS_FWHM,
     "WINDOW_AREA_TOL": WINDOW_AREA_TOL,

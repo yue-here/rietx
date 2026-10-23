@@ -21,6 +21,9 @@ Two independent jobs, deliberately split between two libraries:
     subspace of that action on symmetric 3×3 matrices (Peterse & Palm, 1966,
     Acta Cryst. 20, 147; cross-check tables in Grosse-Kunstleve & Adams,
     2002, J. Appl. Cryst. 35, 477 — the cctbx implementation).
+  - Axial vectors (a rigid body's rotation increment, WP-1807): R acts as
+    det(R)·R, so the basis spans ∩ ker(det(R)·R − I) (Gallego et al., 2012,
+    J. Appl. Cryst. 45, 1236, eq. 3); :func:`axial_basis`.
 
 Both bases are returned as smallest-integer row vectors in a deterministic
 (RREF-derived) form, e.g. an ``x,x,z`` site gives ``[[1, 1, 0], [0, 0, 1]]``
@@ -154,6 +157,31 @@ def coordinate_basis(rotations: list[np.ndarray]) -> np.ndarray:
     """
     rows = [[Fraction(int(r[i][j]) - (i == j)) for j in range(3)]
             for r in rotations for i in range(3)]
+    return _nullspace_int(rows, 3)
+
+
+def axial_basis(rotations: list[np.ndarray]) -> np.ndarray:
+    """Integer basis of site-symmetry-invariant axial vectors, shape (k, 3).
+
+    An axial vector — a rotation increment, a magnetic moment without time
+    reversal — transforms as det(R)·R (Gallego et al., 2012, *J. Appl.
+    Cryst.* **45**, 1236, eq. (3), p. 1239), so the invariant directions span
+    ∩ ker(det(R)·R − I): :func:`coordinate_basis`'s algebra with the
+    determinant folded in.  Rows are fractional (direct-lattice) components;
+    the Cartesian directions are M·v.
+
+    **k is 0, 1 or 3**, never 2: det(R)·R is a proper rotation, a proper
+    rotation other than the identity fixes exactly one line, so the
+    intersection is all of ℝ³ only when every det(R)·R is the identity (site
+    symmetry 1 or −1) and at most a line otherwise.  A rigid body on a site
+    turns about exactly these directions (WP-1807), which is why its rotation
+    DOFs never number two.  With no rotations it is the identity basis.
+    """
+    rows = [[Fraction(round(np.linalg.det(r)) * int(r[i][j]) - (i == j))
+             for j in range(3)]
+            for r in rotations for i in range(3)]
+    if not rows:
+        return np.eye(3, dtype=np.int64)
     return _nullspace_int(rows, 3)
 
 

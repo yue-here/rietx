@@ -382,6 +382,47 @@ refined parameters, chained through the covariance of the origin, rotation and
 cell. A distance between two atoms of one body has no esd, because the template
 fixes it.
 
+A body whose origin sits on a special position lists one atom per image under
+the origin's site symmetry $G_o$, and the space group places the rest, as it
+does for any atom. Its origin keeps its site basis, and its rotation turns only
+about the axial directions $G_o$ leaves fixed. A rotation increment is an axial
+vector, which an operation with rotation part $R$ maps by $\det(R)\,R$ (the law
+a magnetic moment follows without time reversal {cite}`gallego2012`), so
+
+```{math}
+:label: par-body-site
+
+V \;=\; \bigcap_{g \in G_o} \ker\!\left(\det(R_g)\,R_g - I\right),
+\qquad
+E \;=\; \text{an orthonormal basis of } M V \,\cap\, \operatorname{span}(R_0 A),
+```
+
+{source}`rietx.crystallography.wyckoff.axial_basis`
+
+with $A$ the template's inertia axes. $\dim V$ is 0, 1 or 3, never 2:
+$\det(R)\,R$ is a proper rotation, and a proper rotation other than the
+identity fixes one line. So a body on a mirror or a 2-fold turns about one
+axis, a body on a centre turns freely, and a body on a site with two or more
+symmetry axes does not turn at all. A turn about a direction in $V$ commutes
+with every operation of $G_o$, so the listed atoms and their images move as one
+rigid set and stay on their sites through every stage and every commit, where
+the chart is the identity.
+
+Two refusals keep that true, both raised when the table is built and both
+naming the body and the atom. `RIGID_BODY_NOT_INVARIANT` refuses a body with an
+atom whose site symmetry its origin lacks, because a turn would push that atom
+off its symmetry element and the next stage would count its images twice. The
+same code refuses a torsion that moves an atom on a special position, a body
+on a site in rhombohedral axes, where the symmetry directions turn with the
+refined $\alpha$, and an `add_body` template that does not map onto itself
+under $G_o$. `RIGID_BODY_IMAGE_OVERLAP` refuses a body with a symmetry image
+of one of its atoms within {{ RIGID_BODY_OVERLAP_FACTOR }} times the
+covalent-radius sum of an atom of the same body, because such a body straddles
+a symmetry element and the cell would hold part of it twice. A body whose
+atoms carry a `disorder_group` is exempt, since that declares the overlap. The
+remedy for both is to put the origin on the element the atoms share
+(`body_from_atoms(..., origin=...)`).
+
 A named-bond torsion turns a declared set of the body's atoms by an angle
 $\varphi$ about the line through two other body atoms, before the pose, in
 the right-handed sense from the first axis atom to the second (TOPAS's

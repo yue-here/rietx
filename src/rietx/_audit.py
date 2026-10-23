@@ -2585,6 +2585,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.structure.RIGID_BODY_DRIFT_TOL", "constant", tier=1, value=1e-06,
         evidence=("numerical floor: roundoff drift measured at <= 1e-14 A, tolerance 1e-6 A "
                   "(docstring); refusing at it protects against a hand-edited body atom")),
+    Row("rietx.schemas.structure.RIGID_BODY_INVARIANCE_TOL", "constant", value=0.001),
+    Row("rietx.schemas.structure.RIGID_BODY_OVERLAP_FACTOR", "constant", value=0.7),
     Row("rietx.schemas.structure.RIGID_BODY_ROTATION_BOUND", "constant", tier=1, value=3.141592653589793,
         evidence=("arithmetic: the increment's Jacobian is singular only at |d omega| = 2 pi; +-pi "
                   "per component keeps |d omega| <= pi*sqrt(3) < 2 pi (docstring, WP-1803 review)")),
@@ -4251,6 +4253,8 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.schemas.sequential.SeriesEntry.rungs_raised",
     "rietx.schemas.sequential.SeriesEntry.rungs_tried",
     "rietx.schemas.sequential.SeriesEntry.rwp_fence",
+    "rietx.schemas.structure.RIGID_BODY_INVARIANCE_TOL",
+    "rietx.schemas.structure.RIGID_BODY_OVERLAP_FACTOR",
     "rietx.schemas.suggest.SUGGEST_ABSORPTION_MAX",
     "rietx.schemas.suggest.SUGGEST_GROUP_R2",
     "rietx.schemas.suggest.SUGGEST_MIN_GAIN",

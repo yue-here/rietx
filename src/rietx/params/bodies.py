@@ -18,6 +18,20 @@ the two lab directions perpendicular to its axis R₀·u, since a rotation about
 the axis moves nothing and a third DOF would be a flat direction that blinds
 every atom's esd.
 
+**On a special position E is read from the site** (WP-1807).  The origin's
+stabiliser G_o fixes the axial directions W = span{M·v : v ∈ V}, with
+V = ∩ ker(det(R)·R − I) (``wyckoff.axial_basis``; the law is Gallego et al.
+2012, *J. Appl. Cryst.* 45, 1236, eq. 3), and a turn commutes with every
+g ∈ G_o exactly when its axis lies in W: for an improper W_c,
+W_c·[ω]×·W_cᵀ = [det(W_c)·W_c·ω]×.  So E is an orthonormal basis of
+W ∩ span(R₀·A), A the template's inertia axes.  dim W is 0, 1 or 3, never 2
+(a nontrivial proper rotation fixes one line), so the cases are: dim W = 3,
+today's E; dim W = 1, W = span{n}, E = n for a body that is not linear, and
+for a linear one n when the axis is perpendicular to it and nothing when it
+is parallel; dim W = 0, no rotation DOF at all.  ``site_axes`` carries W in
+the Cartesian frame; it is cell-independent in every setting but
+rhombohedral axes, which the table refuses for a site body.
+
 Its Jacobian is closed-form, block by block (the design report's § 2.2):
 
 * ∂x_i/∂o = I;
@@ -34,7 +48,9 @@ the record in ``docs/DESIGN.md``): R₀ ← Exp(δω)·R₀ and θ ← 0, so eve
 starts at the identity of the exponential map, where its Jacobian is never
 singular (Triggs, McLauchlan, Hartley & Fitzgibbon 2000, *Bundle adjustment —
 a modern synthesis*, LNCS 1883, § 2.2).  The same call returns the k × k
-matrix ∂θ_old/∂θ_new that carries a solver outcome into the composed chart.
+matrix ∂θ_old/∂θ_new that carries a solver outcome into the composed chart;
+for a site body it is [[1]] (k = 1: J_l(ω*)·n = n when ω* ∥ n) and nothing
+at all for k = 0.
 **A torsion is an anchored rotation too** (WP-1808), composed by the same
 commit (:meth:`RigidBodyBlock.commit_torsions`): φ₀ ← φ₀ + δφ, δφ ← 0.  About
 one axis composing is addition, so its chart moves by a translation and
@@ -53,6 +69,7 @@ import numpy as np
 from ..backend import get_backend
 from ..crystallography import rotation
 from ..crystallography.fragments import Fragment
+from ..crystallography.symmetry import SITE_TOL
 from .derived import DerivedBlock, d_cartesian_frame_d_cell, fractional_frame
 
 CELL_NAMES = ("a", "b", "c", "alpha", "beta", "gamma")
@@ -142,10 +159,15 @@ class RigidBodyBlock(DerivedBlock):
     N_CELL = 6
 
     def __init__(self, *, phase_base: str, body_base: str, atom_bases: list[str],
-                 template: np.ndarray, q0, torsions=(), angles=(), names=()):
+                 template: np.ndarray, q0, torsions=(), angles=(), names=(),
+                 site_axes=None):
         self.template = np.asarray(template, dtype=np.float64)
         #: the template-frame axes the rotation DOFs turn about, (3, k)
         self.body_axes = rotation_axes(self.template)
+        #: W, the Cartesian axial directions the origin's site allows, (3, d)
+        #: orthonormal with d ∈ {0, 1, 3}; ``None`` for a general origin
+        self.site_axes = (None if site_axes is None or np.shape(site_axes)[1] == 3
+                          else np.asarray(site_axes, dtype=np.float64).reshape(3, -1))
         self._set_anchor(np.asarray(q0, dtype=np.float64))
         #: (axis_a, axis_b, moves) index triples into the template (WP-1808)
         self.torsions = [(int(a), int(b), np.asarray(m, dtype=np.intp))
@@ -199,8 +221,32 @@ class RigidBodyBlock(DerivedBlock):
 
     @property
     def n_rot(self) -> int:
-        """The number of rotation DOFs: the template's inertia rank, 2 or 3."""
-        return int(self.body_axes.shape[1])
+        """The number of rotation DOFs, E's columns: the template's inertia rank
+        (2 or 3) at a general origin, 0 or 1 on a site that fixes a direction."""
+        return int(self.axes.shape[1])
+
+    def _increment_basis(self, r0: np.ndarray) -> np.ndarray:
+        """E at anchor ``r0``: the module docstring's cases, (3, k)."""
+        if self.site_axes is None:
+            return np.eye(3) if self.body_axes.shape[1] == 3 else r0 @ self.body_axes
+        if self.site_axes.shape[1] == 0:
+            return np.zeros((3, 0))
+        n = self.site_axes[:, 0]
+        if self.body_axes.shape[1] == 3:
+            return n.reshape(3, 1)
+        u = r0 @ np.cross(self.body_axes[:, 0], self.body_axes[:, 1])
+        # |n·R₀u| < SITE_TOL: u perpendicular to n; |u − (n·u)n| < SITE_TOL: along it.
+        # The axis is held to ``site_orbit``'s own snap tolerance, since a tighter one
+        # refuses a body typed at CIF precision that passed the site check
+        c = abs(float(n @ u))
+        if c < SITE_TOL:
+            return n.reshape(3, 1)
+        if float(np.linalg.norm(u - (n @ u) * n)) < SITE_TOL:
+            return np.zeros((3, 0))
+        raise ValueError(
+            "RIGID_BODY_NOT_INVARIANT: a linear body on this site must lie "
+            "along its one allowed turn axis or perpendicular to it; its axis "
+            f"makes {float(np.degrees(np.arccos(min(c, 1.0)))):.3g}° with it")
 
     def rotation_paths(self, body_base: str) -> tuple[str, ...]:
         return tuple(f"{body_base}.rotation.{k}" for k in range(self.n_rot))
@@ -217,7 +263,7 @@ class RigidBodyBlock(DerivedBlock):
         self.q0 = q0
         self.r0 = (np.asarray(rotation.matrix_from_quaternion(q0), dtype=np.float64)
                    if r0 is None else r0)
-        self.axes = np.eye(3) if self.n_rot == 3 else self.r0 @ self.body_axes
+        self.axes = self._increment_basis(self.r0)
 
     def omega(self, theta_rot) -> np.ndarray:
         """δω = E·θ (rad, Cartesian) from the k rotation DOFs."""
@@ -338,8 +384,11 @@ class RigidBodyBlock(DerivedBlock):
         xp = get_backend()
         cell = tuple(x[:6])
         o = xp.stack(list(x[6:9]))
-        w = xp.matmul(xp.asarray(self.axes, dtype=np.float64),
-                      xp.stack(list(x[9:9 + self.n_rot])))
+        if self.n_rot:
+            w = xp.matmul(xp.asarray(self.axes, dtype=np.float64),
+                          xp.stack(list(x[9:9 + self.n_rot])))
+        else:   # a site that fixes every direction: no rotation input at all
+            w = xp.asarray(np.zeros(3), dtype=np.float64)
         minv = fractional_frame(cell)
         frame = xp.matmul(minv, xp.matmul(rotation.matrix_from_vector(w),
                                           xp.asarray(self.r0)))
@@ -405,6 +454,12 @@ class RigidBodyBlock(DerivedBlock):
         w = self.omega(theta_rot)
         axes_old = self.axes
         r_new = compose_rotation(w, self.r0)
+        if self.site_axes is not None:
+            # k = 1 about the site's fixed n: J_l(ω*)·n = n for ω* ∥ n, so the
+            # chart is the identity and E (n itself) does not move
+            self.r0 = r_new
+            self.axes = self._increment_basis(r_new)
+            return np.eye(self.n_rot)
         jl_inv = np.linalg.inv(np.asarray(rotation.left_jacobian(w), dtype=np.float64))
         self.r0 = r_new
         self.axes = np.eye(3) if self.n_rot == 3 else r_new @ self.body_axes

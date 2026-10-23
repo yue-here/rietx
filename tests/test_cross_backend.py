@@ -793,6 +793,50 @@ def _state_bodies():
     return model, table, {}
 
 
+def _state_bodies_site():
+    """A rigid body on a special position (WP-1807): k = 1 rotation DOF.
+
+    Hill's SO₄ on the PbSO₄ Pnma mirror with its origin on S, so E is the one
+    axial direction the mirror allows (b) and the block's rotation column is
+    E's single column rather than the identity's three — the derivative path
+    WP-1807 adds.  The rotation off zero after a commit, the cell and the
+    origin's two site DOFs free, Pb's site DOFs beside them.
+    """
+    from rietx.crystallography.bodies import body_from_atoms
+    from rietx.schemas.pattern import PatternData
+    from rietx.schemas.structure import Phase, Structure
+    from tests.test_rigid_body import _sulfate_on_the_pnma_mirror
+
+    phase = _sulfate_on_the_pnma_mirror().phases[0]
+    body = body_from_atoms(phase, ["S", "O1", "O2", "O3"], "SO4", origin="S",
+                           rotation_vary=True, origin_vary=True)
+    structure = Structure(phases=[Phase.model_validate(
+        {**phase.model_dump(), "rigid_bodies": [body.model_dump()]})])
+    for p in ("a", "b", "c"):
+        getattr(structure.phases[0].cell, p).vary = True
+    _, ins, _ = _lab_state()
+    tt = np.arange(10.0, 40.0, 0.02)
+    rng = np.random.default_rng(1807)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=(50.0 + 10.0 * rng.random(len(tt))).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for glob in ("phases.0.rigid_bodies.0.origin.dof.*",
+                 "phases.0.rigid_bodies.0.rotation.*", "phases.0.cell.*",
+                 "phases.0.atoms.0.dof.*", "phases.0.scale"):
+        assert table.set_vary([glob], True), glob
+    assert [p for p in table.free_paths if ".rotation." in p] == [
+        "phases.0.rigid_bodies.0.rotation.0"]
+    theta = table.x0()
+    theta[table.free_paths.index("phases.0.rigid_bodies.0.rotation.0")] = 0.07
+    table.commit(theta)
+    table.entries[table._paths["phases.0.rigid_bodies.0.rotation.0"]].value = -0.04
+    table.refresh_ties()
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    return model, table, {}
+
+
 def _state_texture():
     """Spherical-harmonics texture with the cell free beside it (WP-1960).
 
@@ -841,6 +885,7 @@ def _state_texture():
 CONFIGS = {"families": _state_families,
            "texture": _state_texture,
            "bodies": _state_bodies,
+           "bodies_site": _state_bodies_site,
            "families_voigt": _state_families_voigt,
            "axial_one_zero": _state_axial_one_zero,
            "sharp_widths": _state_sharp_widths,
@@ -889,6 +934,7 @@ CONFIG_PARAMS = [
     _config("magnetic_width"),
     _config("satellites"),
     _config("bodies"),
+    _config("bodies_site"),
     _config("toy_lebail"),
     _config("toy_pawley"),
     _config("toy_rich"),
