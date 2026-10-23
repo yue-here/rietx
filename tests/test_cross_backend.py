@@ -793,6 +793,39 @@ def _state_bodies():
     return model, table, {}
 
 
+def _state_parent_cell():
+    """A child's cell derived from its parent's and a Γ strain (WP-1419).
+
+    The new derivative path: the parent's edges and the strain reach the
+    child's six cell rows through ``ParentCellBlock``, a derived block, so
+    numpy takes ``_peak_chain_column`` through ``decode`` and the traced
+    backends differentiate ``evaluate_traced``.  The Cm child of the shipped
+    Pnma LaMnO₃ in 2a, a+b, c, whose one shear moves α′ and β′; the strain sits
+    off zero, where the pattern's dependence on it is not stationary.
+    """
+    import rietx as rx
+    from rietx.schemas.structure import Structure
+    from tests.test_parent_cell import _child
+
+    phase = _child((0.5, 0.5, 0), "S1", "(rank 2)#3").phase.model_copy(deep=True)
+    _, ins, _ = _lab_state()
+    ref = rx.Refinement(Structure(phases=[phase]), ins.model_copy(deep=True))
+    ref.set_values({"phases.0.parent_cell.strain.0": 0.003})
+    structure = ref.structure
+    tt = np.arange(10.0, 30.0, 0.02)
+    rng = np.random.default_rng(1419)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=(50.0 + 10.0 * rng.random(len(tt))).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for glob in ("phases.0.parent_cell.cell.*", "phases.0.parent_cell.strain.*",
+                 "phases.0.scale"):
+        assert table.set_vary([glob], True), glob
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    return model, table, {}
+
+
 def _state_texture():
     """Spherical-harmonics texture with the cell free beside it (WP-1960).
 
@@ -841,6 +874,7 @@ def _state_texture():
 CONFIGS = {"families": _state_families,
            "texture": _state_texture,
            "bodies": _state_bodies,
+           "parent_cell": _state_parent_cell,
            "families_voigt": _state_families_voigt,
            "axial_one_zero": _state_axial_one_zero,
            "sharp_widths": _state_sharp_widths,
@@ -889,6 +923,7 @@ CONFIG_PARAMS = [
     _config("magnetic_width"),
     _config("satellites"),
     _config("bodies"),
+    _config("parent_cell"),
     _config("toy_lebail"),
     _config("toy_pawley"),
     _config("toy_rich"),

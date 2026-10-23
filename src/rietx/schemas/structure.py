@@ -1003,6 +1003,37 @@ def refuse_moment_model_with_k(phase_name: str, present: Sequence[str]) -> None:
             "or drop the moment model to test the k")
 
 
+class ParentCell(Base):
+    """A child's cell stated as its parent's cell carried through (P, p), plus strain.
+
+    WP-1419 (#286, #293, #746): a child phase (a superstructure in the cell
+    ``transform`` makes of its parent's) whose ``parent_cell`` is set does not
+    refine its own six cell parameters.  It refines the **parent's** cell,
+    under the parent group's own constraints, and the Γ lattice strains its
+    own group allows and the parent's does not; the child's a, b, c, α, β, γ
+    are derived from them, G′ = Pᵀ·(G_parent + 2·L·E·L)·P
+    (``crystallography.metric``), and locked.  This is how a child cell whose
+    axes are not conventional for its own point group (a C-centred type in a
+    primitive doubled cell, so no tie or fixed angle states its metric) gets a
+    cell at all, and it is the convention of mode-amplitude refinement: the
+    parent's cell refined, the child's derived, a strain freed only where the
+    data show one.
+
+    ``space_group`` is the parent's symbol, ``transform`` the parent → child
+    (P, p) in ``transform_BNS_Pp_abc`` form (``"a,2b,b+c;0,0,0"``: the child's
+    axes as combinations of the parent's).  ``strain`` holds one dimensionless
+    amplitude per strain the child's group allows, in the order
+    ``crystallography.metric.strain_basis`` gives them; the parameter table
+    refuses a list of the wrong length and says how long it must be.  Built by
+    ``magnetic_supercell`` with every strain at zero and held.
+    """
+
+    space_group: str
+    transform: str
+    cell: Cell
+    strain: list[Parameter] = Field(default_factory=list)
+
+
 class Phase(_InheritsDeclaredDefaults):
     """A crystalline phase: symmetry, cell, atoms, scale, sample broadening."""
 
@@ -1206,6 +1237,11 @@ class Phase(_InheritsDeclaredDefaults):
     # one site can move along is held as ``"hold"`` holds it.  ``None`` (the
     # default) is exactly off: the table every earlier version built.
     floating_origin: Literal["hold", "centroid"] | None = None
+    # The cell as the parent's carried through (P, p) plus the Γ strains this
+    # phase's group allows (WP-1419; :class:`ParentCell`).  ``None`` (the
+    # default) is exactly off: the cell refines as its own six parameters under
+    # ``cell_constraints``, as every earlier version built it.
+    parent_cell: ParentCell | None = None
 
     @model_validator(mode="after")
     def _bodies_name_their_atoms(self) -> "Phase":

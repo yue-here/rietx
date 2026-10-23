@@ -102,6 +102,7 @@ from ...schemas.structure import (
     Cell,
     MagneticSymmetry,
     Moment,
+    ParentCell,
     Phase,
 )
 from ..symmetry import (
@@ -225,9 +226,10 @@ def child_basis(space_group, k) -> tuple[tuple[Fraction, ...], ...]:
     lattice has other primitive bases, and in some of them a mm2/4mm child is
     conventional where here it is not.  This rung does not choose between
     them: the pivot is the first ε = −1 vector, and a child whose group then
-    has no expressible metric is refused by :func:`magnetic_supercell` with
-    :func:`_unnamed_child`'s full text rather than restated in a cell picked
-    for it.
+    has no metric a tie or a fixed angle can state gets its cell through the
+    parent's (``Phase.parent_cell``, WP-1419) rather than a cell picked for it;
+    with ``parent_cell=False`` it is refused with :func:`_unnamed_child`'s
+    full text.
     """
     sg = _isotropy._irreps._resolve(space_group)
     kk = _isotropy.as_kvector(k)
@@ -289,22 +291,14 @@ def _child_cell_parameters(parent_cell, basis) -> tuple[float, ...]:
     γ is not 120 is a cell whose space-group constraint the refinement has to
     re-impose.  The snap is at 1e-12 on the cosine, far below any physical
     departure and far above the rounding it removes.
-    """
-    from ..adp import direct_metric_tensor
 
-    p = _matrix_of(basis)
-    g = p.T @ np.asarray(direct_metric_tensor(*parent_cell),
-                         dtype=np.float64) @ p
-    lengths = np.sqrt(np.diag(g))
-    angles = []
-    for i, j in ((1, 2), (0, 2), (0, 1)):
-        cosine = float(g[i, j] / (lengths[i] * lengths[j]))
-        for exact in (0.0, 0.5, -0.5):
-            if abs(cosine - exact) <= 1e-12:
-                cosine = exact
-                break
-        angles.append(float(np.degrees(np.arccos(np.clip(cosine, -1.0, 1.0)))))
-    return (float(lengths[0]), float(lengths[1]), float(lengths[2]), *angles)
+    The arithmetic is ``crystallography.metric``'s, which a ``parent_cell``
+    child's derived cell also runs (WP-1419), so the two agree to the bit with
+    every strain at zero.
+    """
+    from ..metric import cell_from_metric, child_metric
+
+    return cell_from_metric(child_metric(parent_cell, _matrix_of(basis)))
 
 
 # ---------------------------------------------------------------------------
@@ -469,6 +463,10 @@ class ChildGroup:
     cosets: tuple
     operations: tuple[str, ...] | None
     reason: str
+    #: the list's cell is not conventional for its own point group, so its
+    #: metric is stated through the parent's cell (``Phase.parent_cell``,
+    #: WP-1419) rather than read off a tabulated type
+    parent_metric: bool = False
 
     @property
     def group(self):
@@ -497,7 +495,8 @@ def _child_triplets(group: MagneticGroup) -> tuple[str, ...]:
 
 
 def _unnamed_child(group: MagneticGroup, head: str, transform: str,
-                   detail: str, *, nuclear_group: str = "parent") -> ChildGroup:
+                   detail: str, *, nuclear_group: str = "parent",
+                   parent_metric: bool = False) -> ChildGroup:
     """A :class:`ChildGroup` stated as its operation list — or the old refusal.
 
     **One thing an operation list cannot supply by itself: the cell metric
@@ -508,12 +507,17 @@ def _unnamed_child(group: MagneticGroup, head: str, transform: str,
     (:attr:`~rietx.crystallography.symmetry.OperatorGroup.closest_type`).
     That orientation lookup fails for a child cell whose axes are not
     conventional for its own point group (a c- or n-glide group doubled along
-    the glide's own translation), and there this function
-    still refuses: deriving the constraints straight from the rotation set is
-    the distortion-mode track's (WP-1419), not this rung's.  Refusing there is
-    the right call on this tree: building the phase anyway would move the
-    failure from this function to the first compile, where the message would
-    be about a crystal system rather than about a cell transform.
+    the glide's own translation, a C-centred type in a primitive doubled
+    cell).  There the metric comes from the **parent** instead (WP-1419): with
+    ``parent_metric`` the child is returned flagged, and
+    :func:`magnetic_supercell` states its cell as the parent's carried through
+    the transform plus the Γ strains the list allows (``Phase.parent_cell``,
+    ``crystallography.metric``), which needs no crystal system of the child at
+    all.  Without it (a parent with no symbol to carry, so no parent cell
+    constraints either) this still refuses: building the phase anyway would
+    move the failure from this function to the first compile, where the
+    message would be about a crystal system rather than about a cell
+    transform.
 
     ``nuclear_group`` is the branch of :func:`magnetic_supercell` that asked,
     and the refusal names it (issue #612): under ``"parent"`` the operation
@@ -529,6 +533,18 @@ def _unnamed_child(group: MagneticGroup, head: str, transform: str,
         closest = probe.closest_type.xhm()
         cell_constraints(probe)
     except ValueError as exc:
+        if parent_metric:
+            return ChildGroup(
+                named=False, symbol=head, label=label,
+                cosets=((Fraction(0), Fraction(0), Fraction(0)),
+                        *_cosets_of_the_operation_list(group)),
+                operations=triplets, parent_metric=True,
+                reason=_unnamed_reason(
+                    detail, triplets, label,
+                    "the parent's cell carried through the transform, plus "
+                    "the Γ strains this group allows and the parent's does "
+                    "not (Phase.parent_cell), because no tabulated group has "
+                    "this list's point group with this cell's axes"))
         if nuclear_group == "magnetic":
             raise ValueError(
                 f"magnetic_supercell(nuclear_group='magnetic'): the child cell "
@@ -544,7 +560,9 @@ def _unnamed_child(group: MagneticGroup, head: str, transform: str,
                 f"conventional for the magnetic group's nuclear part is the "
                 f"child-cell route, which it does not have yet (issue #612). "
                 f"Until then, restate the structure by hand in such a cell "
-                f"(group= with its transform=)."
+                f"(group= with its transform=), or state its cell through the "
+                f"parent's (parent_cell left unset or True), which needs the "
+                f"parent's group named rather than listed."
             ) from exc
         raise ValueError(
             f"magnetic_supercell(): the child cell {transform!r} carries the "
@@ -561,8 +579,10 @@ def _unnamed_child(group: MagneticGroup, head: str, transform: str,
             f"phase built on it would get the wrong site orbits and the wrong "
             f"systematic absences from a cell nothing constrains. State this "
             f"structure in the magnetic group's nuclear part "
-            f"(nuclear_group='magnetic'), or restate it by hand in a cell "
-            f"whose axes are conventional for the child point group."
+            f"(nuclear_group='magnetic'), restate it by hand in a cell "
+            f"whose axes are conventional for the child point group, or state "
+            f"its cell through the parent's (parent_cell left unset or True), "
+            f"which needs the parent's group named rather than listed."
         ) from exc
     constraint_source = (f"the closest standard type by point group and "
                          f"lattice ({closest!r})")
@@ -571,16 +591,21 @@ def _unnamed_child(group: MagneticGroup, head: str, transform: str,
         cosets=((Fraction(0), Fraction(0), Fraction(0)),
                 *_cosets_of_the_operation_list(group)),
         operations=triplets,
-        reason=(
-            f"{detail}. The child phase therefore carries its own "
-            f"{len(triplets)} symmetry operations ({', '.join(triplets)}) "
-            f"under the label {label!r}. Its cell's metric constraints come "
-            f"from {constraint_source}."))
+        reason=_unnamed_reason(detail, triplets, label, constraint_source))
+
+
+def _unnamed_reason(detail: str, triplets, label: str, constraint_source: str) -> str:
+    """``CHILD_GROUP_UNNAMED``'s text: why the list, and where the metric comes from."""
+    return (
+        f"{detail}. The child phase therefore carries its own "
+        f"{len(triplets)} symmetry operations ({', '.join(triplets)}) "
+        f"under the label {label!r}. Its cell's metric constraints come "
+        f"from {constraint_source}.")
 
 
 def resolve_child_group(group: MagneticGroup, symbol: str | None,
-                        transform: str, *, nuclear_group: str = "parent"
-                        ) -> ChildGroup:
+                        transform: str, *, nuclear_group: str = "parent",
+                        parent_metric: bool = False) -> ChildGroup:
     """The child's nuclear group as a symbol if one generates it, else as a list.
 
     **What this used to do, and why it changed.**  A parent operation carrying
@@ -622,7 +647,8 @@ def resolve_child_group(group: MagneticGroup, symbol: str | None,
             group, head, transform,
             "spglib identifies no nuclear space-group *type* for this "
             "operation list at all, so the setting is not one its tables "
-            "recognise", nuclear_group=nuclear_group)
+            "recognise", nuclear_group=nuclear_group,
+            parent_metric=parent_metric)
     # **Every setting of the identified type, not only its standard one.**
     # spglib identifies a *type*; which of its axis settings the child cell is
     # in is a separate fact, and the child cell's axes are whatever the
@@ -657,7 +683,7 @@ def resolve_child_group(group: MagneticGroup, symbol: str | None,
     return _unnamed_child(
         group, symbol, transform,
         f"spglib identifies the child's nuclear group as {symbol!r}, {detail}",
-        nuclear_group=nuclear_group)
+        nuclear_group=nuclear_group, parent_metric=parent_metric)
 
 
 def _cosets_of_the_operation_list(group: MagneticGroup
@@ -1117,7 +1143,8 @@ def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
                        ion: str | dict[str, str] | None = None,
                        g: float | dict[str, float] | None = None,
                        magnitude: float = 1.0,
-                       vary: bool = True, name: str | None = None
+                       vary: bool = True, name: str | None = None,
+                       parent_cell: bool | None = None
                        ) -> SupercellStatement:
     r"""The nuclear phase of ``parent`` restated in the magnetic cell of a k.
 
@@ -1193,6 +1220,18 @@ def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
     ``None`` (the default) leaves every moment's ``g`` unset, bit-identical to
     every call before this parameter grew a mapping form.  ``magnitude`` is
     the seed modulus in μ_B — a seed, not a claim.
+
+    ``parent_cell`` chooses how the child's **cell** is stated (WP-1419).
+    ``None`` (the default) gives its own six parameters, constrained by the
+    child group, wherever that group names a tabulated type in the child's
+    axes, and otherwise ``Phase.parent_cell``: the parent's cell carried
+    through the transform plus the Γ strains the child group allows, held at
+    zero.  That is how a child whose axes are not conventional for its own
+    point group (a C-centred type in a primitive doubled cell) is stated at all,
+    where it used to be refused.  ``True`` states every child that way, the
+    convention of mode-amplitude refinement (the parent's cell refined, the
+    child's derived, a strain freed only where the data show one); ``False``
+    never does, and refuses the children that need it, as before.
 
     Every number in the returned phase is derived; nothing is copied from a
     published structure.  The parent's cell, coordinates, occupancies and
@@ -1283,8 +1322,8 @@ def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
         transform = format_transform([list(row) for row in basis], origin)
     _refuse_a_contradicting_bns_number(group, bns_number)
     p_child = [[Fraction(v) for v in row] for row in basis]
-    parent_cell = parent.cell.lengths_angles()
-    child_cell = _child_cell_parameters(parent_cell, basis)
+    parent_values = parent.cell.lengths_angles()
+    child_cell = _child_cell_parameters(parent_values, basis)
 
     # The child's **nuclear** space group is the *parent's*, carried through the
     # same transform — not the magnetic candidate's, whose nuclear part is
@@ -1377,21 +1416,33 @@ def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
             f"of 1/24; symmetry operations are carried at that resolution "
             f"(gemmi's), so this origin cannot be stated. Choose an origin "
             f"shift in multiples of 1/24 — every tabulated origin choice is one")
-    lattice = _child_lattice(parent_cell, basis)
+    lattice = _child_lattice(parent_values, basis)
     # ``None`` when spglib will not even name the *type* — no longer a refusal:
     # the type is the leading half of a label and the operation list is the
     # group either way, so what used to stop the statement now only shortens
     # its label (#448).
     symbol = _identify_child_space_group(nuclear, lattice)
-    child_group = resolve_child_group(nuclear, symbol, transform,
-                                      nuclear_group=nuclear_group)
+    if parent_cell and parent.symmetry_operations is not None:
+        raise ValueError(
+            "magnetic_supercell(parent_cell=True): the parent states its group "
+            "as an operation list, so it has no tabulated setting whose cell "
+            "constraints its own cell could refine under. Name the parent's "
+            "group, or leave parent_cell unset.")
+    child_group = resolve_child_group(
+        nuclear, symbol, transform, nuclear_group=nuclear_group,
+        parent_metric=(parent.symmetry_operations is None
+                       and parent_cell is not False))
     symbol = child_group.label
     diagnostics: tuple[Diagnostic, ...] = ()
     if not child_group.named:
+        reason = child_group.reason
+        if parent_cell and not child_group.parent_metric:
+            reason += (". With parent_cell=True the cell is stated through the "
+                       "parent's instead (Phase.parent_cell)")
         diagnostics = (Diagnostic(
             level="info", code="CHILD_GROUP_UNNAMED",
             where=["space_group"],
-            message=f"magnetic_supercell(): {child_group.reason}",
+            message=f"magnetic_supercell(): {reason}",
             suggestion=(
                 "Quote the child group as its operation list, or as the "
                 "closest type with the cell beside it. Check the transform "
@@ -1466,6 +1517,8 @@ def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
         # the declaration, not a hold: the child's table derives which DOF
         # fixes the child group's origin (WP-1912)
         floating_origin=parent.floating_origin,
+        parent_cell=(_parent_cell(parent, transform, child_group.group)
+                     if child_group.parent_metric or parent_cell else None),
     )
     # the builder's own statement is judged here, once; a refined copy of it
     # is not (``check_group_is_structure_symmetry``)
@@ -1476,6 +1529,31 @@ def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
         group=group, site_map=tuple(site_map),
         k=None if k is None else tuple(str(c) for c in k),
         child_group_named=child_group.named, diagnostics=diagnostics)
+
+
+def _parent_cell(parent: Phase, transform: str, child_group) -> ParentCell:
+    """The child's cell as its parent's, carried through ``transform`` (WP-1419).
+
+    One held, zero amplitude per Γ strain the child's group allows
+    (``crystallography.metric.strain_basis``), so the derived cell is the one
+    :func:`_child_cell_parameters` gives, to the bit.  The parent's six
+    parameters are copied as values; whether they refine is a plan's choice,
+    and ``phases.*.cell.*`` reaches them.
+    """
+    from ..metric import in_parent_basis, rotations_of, strain_basis
+    from .operators import parse_transform
+
+    parent_sg = get_spacegroup(parent.space_group)
+    p_matrix, _origin = parse_transform(transform)
+    basis = strain_basis(rotations_of(parent_sg),
+                         in_parent_basis(p_matrix, rotations_of(child_group)),
+                         cell_constraints(parent_sg).fixed_angles)
+    values = parent.cell.lengths_angles()
+    return ParentCell(
+        space_group=parent.space_group, transform=transform,
+        cell=Cell(**{n: Parameter(value=v) for n, v in zip(
+            ("a", "b", "c", "alpha", "beta", "gamma"), values, strict=True)}),
+        strain=[Parameter(value=0.0) for _ in range(len(basis))])
 
 
 def _refuse_a_child_cell_smaller_than_the_parents(basis, transform: str, parent,

@@ -37,3 +37,11 @@ this; everything in `rx.` is `import rietx as rx`.*
 - `rietx.crystallography.magnetic.isotropy.distortion_candidates(parent, k, sites=None) -> tuple[DistortionCandidate, ...]` — Every displacive candidate of `parent` at `k`, with its child and modes in Å.
 - `rietx.crystallography.magnetic.isotropy.DistortionCandidate` — One displacive candidate of a parent: its child, (P, p) and its modes in Å.
   Fields: `candidate: MagneticCandidate`, `child: object`, `transform: tuple[np.ndarray, np.ndarray]`, `basis: object`, `sites: tuple[str, ...]`
+
+## The cell of a child, through its parent's
+
+A child phase with `parent_cell` set (`rx.ParentCell`: the parent's `space_group`, the parent → child `transform`, the parent's `cell`, one `strain` per Γ strain the child's group allows) refines the parent's cell under the parent's constraints, and its own a, b, c, α, β, γ are derived and locked: G′ = Pᵀ·(G_parent + 2·L·E·L)·P, E the dimensionless Green–Lagrange strain in the parent's axes. `magnetic_supercell` states a child this way wherever its group names no tabulated type in the child's axes (a C-centred type in a primitive doubled cell, refused before), and for every child with `parent_cell=True`; `False` keeps the old refusal. `phases.*.cell.*` frees the parent's edges, never a strain: free `phases.*.parent_cell.strain.*` by name, and seed it off zero first with `set_values`, since the pattern is even in a strain the parent's symmetry reverses, so its sign is a domain and zero is a stationary point.
+
+- `rietx.crystallography.magnetic.supercell.magnetic_supercell(parent: Phase, candidate=None, *, group=None, transform: str | None = None, k=None, bns_number: str | None = None, nuclear_group: str = 'parent', magnetic_species=None, ion: str | dict[str, str] | None = None, g: float | dict[str, float] | None = None, magnitude: float = 1.0, vary: bool = True, name: str | None = None, parent_cell: bool | None = None) -> SupercellStatement` — The nuclear phase of `parent` restated in the magnetic cell of a k.
+- `rx.ParentCell` — A child's cell stated as its parent's cell carried through (P, p), plus strain.
+  Fields: `space_group: str`, `transform: str`, `cell: Cell`, `strain: list[Parameter] = []`

@@ -1219,6 +1219,11 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.magnetic.scattering.METRIC_TOL", "constant", value=0.001),
     Row("rietx.crystallography.magnetic.scattering.P_MAGNETIC_FM", "constant", value=2.695),
     Row("rietx.crystallography.magnetic.supercell.CHILD_SITE_TOL", "constant", value=0.0001),
+    Row("rietx.crystallography.metric.COSINE_SNAP", "constant", tier=1, value=1e-12,
+        evidence=("numerical floor: P^T.G.P puts a symmetry-forced cosine within ~2e-16 of 0 or +-1/2 "
+                  "(hexagonal gamma 119.99999999999999 unsnapped); 1e-12 on a cosine is 6e-11 deg at 90, "
+                  "far below any refined departure. The literal main's _child_cell_parameters already "
+                  "used. test_the_cosine_snap_removes_round_off_and_nothing_physical")),
     Row("rietx.crystallography.neutron.NEUTRON_LAMBDA_EV_ANGSTROM", "constant", value=0.286014),
     Row("rietx.crystallography.neutron.SIGMA_ABS_REFERENCE_WAVELENGTH", "constant", value=1.798),
     Row("rietx.crystallography.representation.distortion._POSITION_TOL", "constant", value=1e-06),
@@ -2117,6 +2122,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.params.parametric.RANK_RTOL", "constant", tier=1, value=3.162277660168379e-08,
         evidence=("numerical floor: sqrt(PINV_RCOND) = 3.2e-8, the R diagonal at which the "
                   "covariance's pinv would discard the direction anyway (docstring derivation)")),
+    Row("rietx.params.parent_cell._DEG", "constant", tier=1, value=0.017453292519943295,
+        evidence="arithmetic: degrees to radians"),
     Row("rietx.params.vector.CELL_MIN_LENGTH_A", "constant", tier=2, value=1.5,
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): a, b, c floored "
                   "at Max(1.5, ...)"
@@ -2166,6 +2173,10 @@ ROWS: tuple[Row, ...] = (
                  "ten is rietx's.  The second pass counts the stages where it binds and removes "
                  "it if none do (B8)."),
         approved="2026-10-20"),
+    Row("rietx.params.vector.PARENT_CELL_DRIFT_TOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: the builder and every write-back store the derived child cell itself, "
+                  "so a stored cell agrees to the bit; 1e-9 relative sits above a 1e-13 round-off and below "
+                  "a 1e-6 deg edit. test_the_drift_tolerance_refuses_any_edit_and_passes_round_off")),
     Row("rietx.params.vector.SIZE_CAP_ARM_RTOL", "constant", tier=1, value=1e-06,
         evidence=("numerical floor: as STRAIN_CAP_ARM_RTOL; hysteresis pinned by "
                   "test_strain_cap.py:414")),

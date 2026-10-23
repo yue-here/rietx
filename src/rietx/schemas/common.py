@@ -537,6 +537,13 @@ from .._nearmiss import did_you_mean
 #: node ran at), the same rule.  And ``StageResult.n_lapack_fallbacks``, the
 #: decompositions a stage repeated with LAPACK's second driver, defaulting to
 #: 0, which every earlier stage took.
+#: Also in 0.59 (WP-1419, C2): ``Phase.parent_cell``, a ``ParentCell`` (the
+#: parent's ``space_group``, the parent → child ``transform``, the parent's
+#: ``cell`` and one ``strain`` amplitude per Γ strain the child's group
+#: allows), which makes the child's six cell parameters derived and locked.
+#: Additive and defaulted to ``None``, the 0.25 → 0.26 rule, so every stored
+#: document loads and refines as before; an older build refuses a phase
+#: carrying it.
 SCHEMA_VERSION = "0.59"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

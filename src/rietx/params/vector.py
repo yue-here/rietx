@@ -471,6 +471,14 @@ def unknown_paths_among(path_globs: Iterable[str], known: set[str]) -> list[str]
 #: Cell parameter names in table order — lengths first, then angles.
 _CELL_NAMES = ("a", "b", "c", "alpha", "beta", "gamma")
 
+#: Relative disagreement (on a length or an angle, against max(|value|, 1))
+#: between a ``Phase.parent_cell`` child's stored cell and the one its parent
+#: and strains give, past which the table refuses rather than overwrite it
+#: (WP-1419).  The builder and every write-back store the derived value itself,
+#: so a stored cell agrees to the bit; this only has to sit above a JSON round
+#: trip's zero and far below any edit a person makes.
+PARENT_CELL_DRIFT_TOL = 1e-9
+
 #: Fraction of the value a stage *starts from* that a cell length may travel
 #: within that stage, and an additive pad in Å so a small cell is not held
 #: tighter than a large one in absolute terms.
@@ -1204,6 +1212,9 @@ class ParameterTable:
         #: (body base path, body name, its block), in collection order
         #: (WP-1805): the write-back and the rigidity check walk this
         self._bodies: list[tuple[str, str, DerivedBlock]] = []
+        #: the cell blocks of ``Phase.parent_cell`` phases (WP-1419), declared
+        #: before every body block, which reads a phase's cell
+        self._cell_blocks: list[DerivedBlock] = []
         #: body base path → its rotation DOF paths: the **anchored-rotation**
         #: kind (WP-1805).  An increment δω = E·θ composed into the body's
         #: R₀ and zeroed at every :meth:`commit`, so its value is a step
@@ -1252,6 +1263,8 @@ class ParameterTable:
         self._rebuild()
         if self._origin:
             self._fix_origin()
+        for block in self._cell_blocks:
+            self.add_derived(block)
         if self._bodies:
             # the stored atoms are checked against their bodies before the
             # blocks write them, so an edit of a body atom is refused rather
@@ -1275,23 +1288,15 @@ class ParameterTable:
     def _collect(self, structure: Structure, instrument: Instrument) -> None:
         for ip, phase in enumerate(structure.phases):
             sg = resolve_group(phase.space_group, phase.symmetry_operations)
-            # The cell ties come from the *setting*, not from the crystal system
-            # alone: a c-unique monoclinic symbol fixes β, not γ, and an R group
-            # on rhombohedral axes ties c←a and α=β=γ rather than leaving c free
-            # (WP-1036, crystallography.symmetry.CellConstraints).
-            constraints = cell_constraints(sg)
-            check_cell_angles(sg, {name: getattr(phase.cell, name).value
-                                   for name in ("alpha", "beta", "gamma")})
             base = f"phases.{ip}"
-            for name in _CELL_NAMES:
-                p: Parameter = getattr(phase.cell, name)
-                if name in constraints.ties:
-                    self._add(f"{base}.cell.{name}", p, tie=AffineTie.identity(
-                        f"{base}.cell.{constraints.ties[name]}"))
-                elif name in constraints.fixed_angles:
-                    self._add(f"{base}.cell.{name}", p, force_fixed=True)
-                else:
-                    self._add(f"{base}.cell.{name}", p)
+            if phase.parent_cell is not None:
+                self._collect_parent_cell(base, sg, phase)
+            else:
+                # The cell ties come from the *setting*, not from the crystal
+                # system alone: a c-unique monoclinic symbol fixes β, not γ,
+                # and an R group on rhombohedral axes ties c←a and α=β=γ rather
+                # than leaving c free (WP-1036, symmetry.CellConstraints).
+                self._collect_cell(f"{base}.cell", sg, phase.cell)
             self._add(f"{base}.scale", phase.scale)
             self._add(f"{base}.extinction", phase.extinction)
             if phase.preferred_orientation is not None:
@@ -1349,6 +1354,102 @@ class ParameterTable:
         self._add_instrument_row(instrument, "instrument.zero_shift",
                                  instrument.zero_shift)
         self._collect_instrument(instrument)
+
+    def _collect_cell(self, prefix: str, sg, cell) -> None:
+        """Six cell entries under ``prefix``, tied and fixed as ``sg`` says."""
+        constraints = cell_constraints(sg)
+        check_cell_angles(sg, {name: getattr(cell, name).value
+                               for name in ("alpha", "beta", "gamma")})
+        for name in _CELL_NAMES:
+            p: Parameter = getattr(cell, name)
+            if name in constraints.ties:
+                self._add(f"{prefix}.{name}", p, tie=AffineTie.identity(
+                    f"{prefix}.{constraints.ties[name]}"))
+            elif name in constraints.fixed_angles:
+                self._add(f"{prefix}.{name}", p, force_fixed=True)
+            else:
+                self._add(f"{prefix}.{name}", p)
+
+    def _collect_parent_cell(self, base: str, sg, phase) -> None:
+        """The cell of a phase that states it through its parent (WP-1419).
+
+        The parent's six entries go in under ``{base}.parent_cell.cell``,
+        constrained by the **parent's** group, then one entry per Γ strain
+        the child's group allows (``{base}.parent_cell.strain.j``), then the
+        child's own six entries **locked**: a :class:`~rietx.params.
+        parent_cell.ParentCellBlock`, declared after collection, is their one
+        writer.  The child's own group is never asked for cell constraints,
+        which is the point: its axes need not be conventional for its point
+        group (a C-centred type in a primitive doubled cell), and the metric
+        it allows is the parent's plus the strains.
+
+        Refused by name: a child group that is not a subgroup of the parent's
+        under the transform, a strain list of the wrong length (the message
+        says the right one), and a stored child cell that is not the one the
+        parent and strains give, beyond :data:`PARENT_CELL_DRIFT_TOL` — an
+        edit of the child's cell would otherwise be overwritten silently, as a
+        body atom's would (``_check_body_drift``).
+        """
+        from ..crystallography import metric
+        from ..crystallography.magnetic.operators import parse_transform
+        from .parent_cell import ParentCellBlock
+
+        declared = phase.parent_cell
+        try:
+            parent_sg = resolve_group(declared.space_group)
+        except (RuntimeError, ValueError) as exc:
+            raise ValueError(
+                f"{base}.parent_cell.space_group {declared.space_group!r} is not "
+                f"a space group this package resolves ({exc})") from exc
+        self._collect_cell(f"{base}.parent_cell.cell", parent_sg, declared.cell)
+        p_matrix, _origin = parse_transform(declared.transform)
+        try:
+            basis = metric.strain_basis(
+                metric.rotations_of(parent_sg),
+                metric.in_parent_basis(p_matrix, metric.rotations_of(sg)),
+                cell_constraints(parent_sg).fixed_angles)
+        except ValueError as exc:
+            raise ValueError(
+                f"{base}.parent_cell: the phase's group under the transform "
+                f"{declared.transform!r} against the parent "
+                f"{declared.space_group!r}: {exc}") from exc
+        if len(declared.strain) != len(basis):
+            raise ValueError(
+                f"{base}.parent_cell.strain has {len(declared.strain)} "
+                f"amplitude(s); the phase's group allows {len(basis)} Γ "
+                f"strain(s) that the parent {declared.space_group!r} does not, "
+                f"so it needs exactly {len(basis)} (zero and held is the "
+                f"parent's metric carried through the transform)")
+        strains = [f"{base}.parent_cell.strain.{j}" for j in range(len(basis))]
+        for path, p in zip(strains, declared.strain, strict=True):
+            self._add(path, p)
+        for name in _CELL_NAMES:
+            self._add(f"{base}.cell.{name}", getattr(phase.cell, name),
+                      force_fixed=True)
+        block = ParentCellBlock(f"{base}.parent_cell.cell", f"{base}.cell",
+                                strains, [[float(v) for v in row] for row in p_matrix],
+                                basis)
+        # the parent's tied entries hold their source's value only after the
+        # rebuild, so the drift test reads the sources through the constraints
+        cons = cell_constraints(parent_sg)
+        parent_values = {n: getattr(declared.cell, n).value for n in _CELL_NAMES}
+        for name, src in cons.ties.items():
+            parent_values[name] = parent_values[src]
+        x = np.array([parent_values[n] for n in _CELL_NAMES]
+                     + [p.value for p in declared.strain], dtype=np.float64)
+        derived = block.evaluate(x)
+        stored = np.array(phase.cell.lengths_angles(), dtype=np.float64)
+        drift = np.abs(derived - stored) / np.maximum(np.abs(stored), 1.0)
+        if float(drift.max()) > PARENT_CELL_DRIFT_TOL:
+            worst = int(np.argmax(drift))
+            raise ValueError(
+                f"{base}.cell.{_CELL_NAMES[worst]} is stored as "
+                f"{stored[worst]!r}, but the parent's cell and strains give "
+                f"{derived[worst]!r}: the child's cell is derived "
+                f"(Phase.parent_cell) and an edit of it would be overwritten. "
+                f"Edit the parent's cell or a strain instead, or drop "
+                f"parent_cell to refine the six parameters directly")
+        self._cell_blocks.append(block)
 
     def _collect_texture(self, base: str, sg, phase) -> None:
         """One ``phases.i.texture.<name>`` entry per term the Laue class allows.
@@ -4255,6 +4356,12 @@ class ParameterTable:
             base = f"phases.{ip}"
             for name in ("a", "b", "c", "alpha", "beta", "gamma"):
                 put(getattr(phase.cell, name), f"{base}.cell.{name}")
+            if phase.parent_cell is not None:
+                for name in ("a", "b", "c", "alpha", "beta", "gamma"):
+                    put(getattr(phase.parent_cell.cell, name),
+                        f"{base}.parent_cell.cell.{name}")
+                for j, p in enumerate(phase.parent_cell.strain):
+                    put(p, f"{base}.parent_cell.strain.{j}")
             put(phase.scale, f"{base}.scale")
             put(phase.extinction, f"{base}.extinction")
             if phase.preferred_orientation is not None:
