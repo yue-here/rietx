@@ -286,8 +286,8 @@ roughly the shift (+1400 ppm).
   And **a χ² takes its difference and its covariance in one frame**: an engine's
   `cov_af` is in the setting it refined in, so it meets a reduced A..F only through
   `reduce.reduction`'s map. Unmapped, it moved groups in all 99 bethanechol dedups (1518).
-  Exact because **a reduced cell is the exact image of its input**: a sign gemmi picks
-  inside ε is not a change of basis, so M·G·Mᵀ's replaces it (#797, WP-1923).
+  Exact because **a reduced cell is the exact image of its input**: built from M·G·Mᵀ, never
+  gemmi's vector, whose ε-picked signs leak into values (#797, WP-1923, WP-2035).
 - **Two reduced cells are compared across the reduction's boundaries** (WP-1932): call
   `equal_reduced`, `equal_reduced_many` or `same_lattice`, never a ΔᵀΣ⁺Δ of your own on
   two reduced vectors, which split one lattice 4 784 times on bethanechol (#834). The

@@ -268,6 +268,23 @@ def test_same_lattice_sees_through_a_setting_change():
     assert np.isnan(chi2)          # the covariance-free fallback ran
 
 
+def test_symmetry_zero_components_at_rounding_level_do_not_split_a_lattice():
+    """A monoclinic reduced D, E is zero; M·G·Mᵀ returns it as ~1e-18 noise of
+    either sign (WP-2035), which a purely relative test calls a difference —
+    the two settings of one prior lattice then dedup apart on some platforms
+    (CI, Linux, py3.11 and 3.14: ``test_two_settings_of_one_prior_lattice``)."""
+    red = np.array([1.9720631506620304e-02, 1.2753091867002138e-02,
+                    3.7144002961060477e-03, -9.0e-19, -1.12e-18,
+                    2.1241323203985479e-03])
+    noisy = red.copy()
+    noisy[3], noisy[4] = 4e-19, 2e-19
+    assert equal_reduced(red, noisy)[0]
+    # a real difference in the same slots still separates
+    real = red.copy()
+    real[3] = 1e-4
+    assert not equal_reduced(red, real)[0]
+
+
 def test_same_lattice_separates_genuinely_different_cells():
     a = af_from_cell((7.0, 8.0, 9.0, 85.0, 95.0, 100.0))
     b = af_from_cell((7.0, 8.0, 9.3, 85.0, 95.0, 100.0))
@@ -347,19 +364,31 @@ def test_the_map_needs_no_sign_the_reduction_chose(cell):
 @given(lengths, lengths, lengths, angles, angles, angles)
 @example(3.0, 11.0, 14.197202585325392, 65.0, 65.0, 65.0)           # #797
 @example(3.4481, 3.4481, 7.9668, 90.0, 89.9999997, 90.0)
+@example(3.2, 16.0, 23.602486327493914, 81.0, 66.0, 65.0)           # WP-2035
+@example(3.0, 4.0, 5.0, 89.99999, 70.0, 80.0)                       # WP-2035
 def test_the_reduced_cell_is_the_exact_image_of_its_input(centring, a, b, c,
                                                           al, be, ga):
     """WP-1923: M·G·Mᵀ of the input under the recorded change of basis *is*
     the reduced metric, and it is gemmi's reduced vector to within the
     reduction's own ε.  Not ``is_niggli``: that predicate tests signs without
-    ε, and it fails gemmi's own output on fp ties (``ReducedCell``'s note)."""
+    ε, and it fails gemmi's own output on fp ties (``ReducedCell``'s note).
+
+    WP-2035's cell (found by WP-1930) left gemmi's vector with every sign
+    agreeing and ξ 2|η| off the image, G₂₃ at 1.1e-7 of max|G| on F and
+    5.4e-8 on C, so a check of the signs alone kept it.  The primitive cell
+    one angle 1e-5° from a right angle does the same through ξ (2.9e-7 on
+    P): hypothesis's angles almost never land within ε of 90°."""
+    cell = (a, b, c, al, be, ga)
+    assume(_valid(cell))
+    _assert_exact_image(cell, centring)
+
+
+def _assert_exact_image(cell, centring):
     import gemmi
 
     from rietx.crystallography.lattice import direct_metric_tensor
     from rietx.indexing.reduce import NIGGLI_EPS_RELATIVE, _basis_change
 
-    cell = (a, b, c, al, be, ga)
-    assume(_valid(cell))
     r = reduce_cell(cell, centring)
     m = _basis_change(r.change_of_basis)
     image = m @ np.asarray(direct_metric_tensor(*cell)) @ m.T
@@ -374,6 +403,28 @@ def test_the_reduced_cell_is_the_exact_image_of_its_input(centring, a, b, c,
     theirs = np.array([[A, zeta / 2, eta / 2], [zeta / 2, B, xi / 2],
                        [eta / 2, xi / 2, C]])
     assert np.max(np.abs(got - theirs)) <= eps
+
+
+_NEAR_RIGHT = st.tuples(st.floats(min_value=1e-7, max_value=1e-5),
+                        st.sampled_from([-1.0, 1.0]))
+
+
+@pytest.mark.parametrize("centring", ["P", "C", "I", "F", "R"])
+@settings(max_examples=40, deadline=None,
+          suppress_health_check=[HealthCheck.filter_too_much])
+@given(lengths, lengths, lengths, angles, angles, angles,
+       st.integers(0, 2), _NEAR_RIGHT)
+def test_the_exact_image_holds_with_one_angle_within_epsilon_of_90(
+        centring, a, b, c, al, be, ga, which, offset):
+    """WP-2035's sweep: one angle 1e-7–1e-5° either side of 90° puts a
+    Niggli parameter within the reduction's ε of zero, where gemmi's
+    ``normalize`` and Křivý–Gruber steps disagree on a sign.  On ``main``'s
+    sign-gated path about 30 % of such P cells left the exact image."""
+    angs = [al, be, ga]
+    angs[which] = 90.0 + offset[1] * offset[0]
+    cell = (a, b, c, *angs)
+    assume(_valid(cell))
+    _assert_exact_image(cell, centring)
 
 
 _SETTING_STEPS = st.sampled_from([(1, 0, 0, 1), (1, 0, 1, 1), (1, 0, -2, 1),

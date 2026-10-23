@@ -212,19 +212,19 @@ def reduce_cell(cell: tuple[float, ...], centring: str = "P", *,
     """Niggli (default) or Delaunay reduction, with the change of basis kept.
 
     **The reduced cell is the exact image of the input under that change of
-    basis** (WP-1923).  Inside ε a reduction step treats a near-zero ξ, η or ζ
+    basis** (WP-1923, WP-2035): it is built from M·G·Mᵀ, never read off
+    gemmi's G6 vector.  Inside ε a reduction step treats a near-zero ξ, η or ζ
     as zero and may hand it either sign, and gemmi records no basis change for
-    it.  Flipping one sign is not a change of basis, so the reduced metric then
-    sat one ε from the input's.  Measured on the cell of issue #797, (3, 11,
-    14.1972, 65°, 65°, 65°): η = −1.753e-5 out of ``niggli_reduce`` against
-    +1.753e-5 in M·G·Mᵀ, the other five parameters agreeing to 1.7e-16.  So
-    where any entry's sign disagrees with M·G·Mᵀ, the cell is built from
-    M·G·Mᵀ; elsewhere gemmi's cell is kept as it was, to the bit.  The image
-    differs from gemmi's vector by under ε, which is all the reduction promised.
-    Over 27 300 reductions of ``tests/test_acceptance_indexing.py``'s searches,
-    792 had a sign to correct: 440 of the 447 distinct cells by under 1e-14
-    of the metric's scale (a right angle's rounding), seven by up to 1e-10,
-    and none near #797's 1.7e-7.
+    it.  Flipping one sign is not a change of basis, so gemmi's vector then
+    sat one ε from the input's image.  Measured on the cell of issue #797,
+    (3, 11, 14.1972, 65°, 65°, 65°): η = −1.753e-5 out of ``niggli_reduce``
+    against +1.753e-5 in M·G·Mᵀ.  A sign check alone does not catch every
+    such case (WP-2035): on the F-centred cell (3.2, 16.0, 23.6025 Å, 81°,
+    66°, 65°) a normalisation flipped ζ and kept η = −1.26e-5, a Křivý-Gruber
+    step then moved ξ by that wrongly signed η, and a second normalisation put
+    η's sign back.  Every sign agreed at the end, and ξ was 2|η| = 2.5e-5 off
+    the image (1.1e-7 of max|G|).  The image differs from gemmi's vector by
+    under ε, which is all the reduction promised.
     """
     import gemmi
 
@@ -239,22 +239,11 @@ def reduce_cell(cell: tuple[float, ...], centring: str = "P", *,
     else:
         raise ValueError(f"kind must be 'niggli' or 'delaunay', not {kind!r}")
     gv.normalize(epsilon=eps)
-    out = gv.get_cell()
     triplet = gv.change_of_basis.triplet()
-    reduced = (out.a, out.b, out.c, out.alpha, out.beta, out.gamma)
-    image = _metric_image(cell, triplet)
-    if np.any(image * _metric_of_g6(gv.parameters) < 0.0):
-        reduced = _cell_from_metric(image)
     return ReducedCell(
-        cell=reduced, change_of_basis=triplet, centring=centring,
-        kind=kind, already_reduced=already)
-
-
-def _metric_of_g6(g6: Sequence[float]) -> np.ndarray:
-    """The direct metric of gemmi's G6 vector (A, B, C, ξ, η, ζ)."""
-    a, b, c, xi, eta, zeta = g6
-    return np.array([[a, zeta / 2, eta / 2], [zeta / 2, b, xi / 2],
-                     [eta / 2, xi / 2, c]])
+        cell=_cell_from_metric(_metric_image(cell, triplet)),
+        change_of_basis=triplet, centring=centring, kind=kind,
+        already_reduced=already)
 
 
 def _metric_image(cell: tuple[float, ...], triplet: str) -> np.ndarray:
@@ -618,7 +607,13 @@ def _equal_as_given(red_a, red_b, cov_a, cov_b) -> tuple[bool, float]:
     the whole of it)."""
     delta = np.asarray(red_a) - np.asarray(red_b)
     if cov_a is None or cov_b is None:
+        # a component that is zero by symmetry (a monoclinic D, E) comes out of
+        # M·G·Mᵀ as rounding noise of either sign, ~1e-16 of the metric's scale
+        # (WP-2035); relative to *itself* two such noises are never equal, so the
+        # scale has a floor at the vector's own rounding level (1e-12 of its
+        # largest component, ~1e4 times double epsilon)
         scale = np.maximum(np.abs(red_a), np.abs(red_b))
+        scale = np.maximum(scale, 1e-12 * float(scale.max()))
         ok = bool(np.all(np.abs(delta) <= CELL_EQUALITY_RELATIVE * scale))
         return ok, float("nan")
     sigma = np.asarray(cov_a) + np.asarray(cov_b)
