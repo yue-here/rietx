@@ -38,10 +38,13 @@ import numpy as np
 
 from ..backend import get_backend
 from ..crystallography.lattice import direct_metric_tensor
+from ..optimize import lapack
+from ..params.derived import cartesian_frame
 from ..schemas.structure import (
     AngleRestraint,
     AntiBumpRestraint,
     BondRestraint,
+    PlanarityRestraint,
     TetherRestraint,
 )
 
@@ -59,6 +62,12 @@ _COS_CLAMP = 1.0 - 1e-9
 #: a minimum-image candidate closer than this (Å²) is treated as a coincident
 #: self-image and skipped (matters only for same-atom M–M restraints).
 _COINCIDENT_D2 = 1e-6
+#: a planarity set is refused when its two smallest scatter eigenvalues lie
+#: within this fraction of the largest: no direction is uniquely the
+#: flattest, so no normal is defined.  The points lie on a line (or
+#: coincide), or spread alike in every direction (a regular tetrahedron's
+#: corners) (WP-1809, #759 § 3a).
+PLANE_DEGENERATE_REL = 1e-6
 
 
 # ----------------------------------------------------------------------
@@ -107,14 +116,46 @@ class _Value:
 
 
 @dataclass
+class _Plane:
+    """A planarity restraint: one row per entry, its distance to the LS plane.
+
+    Each entry ``m`` is atom ``atoms[m]`` at its frozen image
+    ``R[m]·x + t[m] + n[m]``.  ``normal`` is the plane normal (Cartesian, in
+    :func:`~rietx.params.derived.cartesian_frame`'s frame) at compile, frozen only as
+    the sign reference for the eigenvector: an eigensolver's sign is
+    arbitrary, and the rows are signed.
+    """
+
+    phase: int
+    atoms: list
+    R: list
+    t: list
+    n: list
+    sigma: float
+    weight: float
+    normal: np.ndarray
+
+    @property
+    def n_rows(self) -> int:
+        return len(self.atoms)
+
+
+def _item_rows(it) -> int:
+    return it.n_rows if isinstance(it, _Plane) else 1
+
+
+@dataclass
 class CompiledRestraints:
-    """The frozen restraint rows of a compiled model, in schema order."""
+    """The frozen restraint rows of a compiled model, in schema order.
+
+    One row per item, except a planarity item, which has one per atom.
+    """
 
     items: list
 
     @property
     def n_rows(self) -> int:
-        return len(self.items)
+        return sum(_item_rows(it) for it in self.items)
 
 
 # ----------------------------------------------------------------------
@@ -154,9 +195,52 @@ def resolve_phase_restraints(phase, ip: int, sites, cell) -> list:
             out.append(_Angle(ip, r.atom_i, r.atom_j, r.atom_k,
                              ri, ti, ni, rk, tk, nk,
                              r.target_deg, r.sigma, r.weight))
+        elif isinstance(r, PlanarityRestraint):
+            out.append(_resolve_plane(phase, ip, sites, cell, g, r))
         else:  # ValueRestraint
             out.append(_Value(r.path, r.target, r.sigma, r.weight, ip))
     return out
+
+
+def _resolve_plane(phase, ip, sites, cell, g, r) -> _Plane:
+    """Freeze each entry's image and the normal's sign; refuse a line.
+
+    The first entry sits where it is stored unless an image is named; every
+    other entry left ``None`` takes the image nearest the centroid of the
+    entries resolved so far, so a plane of eight or ten atoms stays inside
+    one molecule where a symmetry copy of a neighbour sits closer to the
+    first atom than the far side of the ring does.
+    """
+    ops = r.op_indices or [None] * len(r.atoms)
+    trs = r.translations or [(0, 0, 0)] * len(r.atoms)
+    eye, zero = np.eye(3), np.zeros(3)
+    placed: list[np.ndarray] = []
+    Rs, ts, ns = [], [], []
+    for m, (j, op, tr) in enumerate(zip(r.atoms, ops, trs, strict=True)):
+        if m == 0 and op is None:
+            rot, t, n = eye, zero, np.asarray(tr, dtype=np.float64)
+        else:
+            rot, t, n = _resolve_image(sites, j, np.mean(placed, axis=0),
+                                       _atom_xyz(phase, j), op, tr, g)
+        Rs.append(rot)
+        ts.append(t)
+        ns.append(n)
+        placed.append(rot @ _atom_xyz(phase, j) + t + n)
+    pts = np.array([rot @ _atom_xyz(phase, j) + t + n for j, rot, t, n
+                    in zip(r.atoms, Rs, ts, ns, strict=True)])
+    cart = pts @ np.asarray(cartesian_frame(cell), dtype=np.float64).T
+    d = cart - cart.mean(axis=0)
+    lam, vec = lapack.eigh(d.T @ d)
+    if lam[1] - lam[0] <= PLANE_DEGENERATE_REL * max(lam[2], 1e-300):
+        labels = [phase.atoms[j].label for j in r.atoms]
+        raise ValueError(
+            f"planarity restraint on {phase.name!r} atoms {labels}: no direction "
+            f"is uniquely the flattest (scatter eigenvalues {lam[0]:.3g}, "
+            f"{lam[1]:.3g}, {lam[2]:.3g} Å²), so no plane normal is defined: the "
+            "points lie on a line, or spread alike in every direction; restrain "
+            "a set that is close to one plane, or use bond and angle restraints")
+    return _Plane(ip, list(r.atoms), Rs, ts, ns, r.sigma, r.weight,
+                  vec[:, 0].copy())
 
 
 def _atom_xyz(phase, j: int) -> np.ndarray:
@@ -231,10 +315,15 @@ def _resolve_image(sites, j, reference, base_xyz, op_index, translation, g):
 # traceable residual value (xp ops — one differentiable function)
 # ----------------------------------------------------------------------
 def restraint_residual(compiled: CompiledRestraints, values: dict):
-    """√w·(computed − target)/σ rows, one per compiled restraint (traceable)."""
+    """√w·(computed − target)/σ rows, traceable: one per compiled restraint, and
+    one per listed atom for a planarity item."""
     xp = get_backend()
     rows = []
     for it in compiled.items:
+        if isinstance(it, _Plane):
+            pref = math.sqrt(it.weight) / it.sigma
+            rows.extend(d * pref for d in _plane_distances(it, values))
+            continue
         if isinstance(it, _Bond):
             computed, target = _bond_distance(it, values), it.target
         elif isinstance(it, _Angle):
@@ -249,6 +338,33 @@ def restraint_residual(compiled: CompiledRestraints, values: dict):
             dev = xp.minimum(dev, 0.0 * dev)
         rows.append(dev * (math.sqrt(it.weight) / it.sigma))
     return xp.stack(rows)
+
+
+def _plane_distances(it: "_Plane", values: dict):
+    """The signed distances (Å) of a planarity item's entries to their LS plane.
+
+    Traceable: the normal is ``xp.linalg.eigh``'s eigenvector of the smallest
+    eigenvalue of the Cartesian scatter matrix, signed against the frozen
+    compile-time normal (the sign has zero derivative, and +1 where the two
+    are perpendicular).
+    """
+    xp = get_backend()
+    ip = it.phase
+    amat = cartesian_frame(_cell_tuple(values, ip))
+    pts = xp.stack([
+        xp.matmul(amat, xp.asarray(R) @ _xyz_traced(values, ip, j, xp)
+                  + xp.asarray(t) + xp.asarray(n))
+        for j, R, t, n in zip(it.atoms, it.R, it.t, it.n, strict=True)])
+    d = pts - xp.sum(pts, axis=0) / len(it.atoms)
+    scatter = xp.einsum("ki,kj->ij", d, d)
+    _, vec = xp.linalg.eigh(scatter)
+    normal = vec[:, 0]
+    # sign(0) = 0 would zero the whole plane where the normal turns
+    # perpendicular to the frozen one; the numpy twin takes +1 there
+    dot = xp.sum(normal * xp.asarray(it.normal))
+    normal = normal * xp.where(dot >= 0.0, 1.0 + 0.0 * dot, -1.0 + 0.0 * dot)
+    dist = xp.matmul(d, normal)
+    return [dist[m] for m in range(len(it.atoms))]
 
 
 def _cell_tuple(values: dict, ip: int) -> tuple:
@@ -358,16 +474,71 @@ def restraint_partials(compiled: CompiledRestraints, values: dict, table
     structural columns use.
     """
     idx = table._paths
-    r_phys = np.zeros((len(compiled.items), len(table.entries)), dtype=np.float64)
-    for row, it in enumerate(compiled.items):
+    r_phys = np.zeros((compiled.n_rows, len(table.entries)), dtype=np.float64)
+    row = 0
+    for it in compiled.items:
         pref = math.sqrt(it.weight) / it.sigma
+        if isinstance(it, _Plane):
+            _plane_row_partials(r_phys, row, it, values, idx, pref)
+            row += it.n_rows
+            continue
         if isinstance(it, _Bond):
             _bond_row_partials(r_phys, row, it, values, idx, pref)
         elif isinstance(it, _Angle):
             _angle_row_partials(r_phys, row, it, values, idx, pref)
         else:  # _Value: ∂row/∂path = √w/σ
             r_phys[row, idx[it.path]] += pref
+        row += 1
     return r_phys
+
+
+def _plane_geometry_np(it: _Plane, values: dict):
+    """Host twin of :func:`_plane_distances`, with what the partials need."""
+    ip = it.phase
+    cell = _cell_tuple(values, ip)
+    amat = np.asarray(cartesian_frame(cell), dtype=np.float64)
+    frac = np.array([R @ _xyz_np(values, ip, j) + t + n for j, R, t, n
+                     in zip(it.atoms, it.R, it.t, it.n, strict=True)])
+    d = frac @ amat.T
+    d = d - d.mean(axis=0)
+    lam, vec = lapack.eigh(d.T @ d)
+    normal = vec[:, 0] * (1.0 if float(vec[:, 0] @ it.normal) >= 0.0 else -1.0)
+    return d @ normal, dict(cell=cell, amat=amat, frac=frac, d=d, lam=lam,
+                            vec=vec, normal=normal)
+
+
+def _plane_row_partials(r_phys, row0, it, values, idx, pref) -> None:
+    """∂dₖ/∂p for every row of a planarity item (exact eigenvector derivative).
+
+    With D_m the centred Cartesian points, M = Σ D_m D_mᵀ, n its unit
+    eigenvector of the smallest eigenvalue λ and P = Σ_{i≠0} vᵢvᵢᵀ/(λᵢ − λ)
+    the pseudo-inverse of M − λI, a move of point m gives
+    dn = −P(dₘ I + D_m nᵀ)·dp_m (Magnus 1985, *Econometric Theory* 1, 179,
+    Theorem 1), so ∂dₖ/∂p_m = n(δₖₘ − 1/N − D_mᵀPDₖ) − dₘPDₖ.  A fractional
+    coordinate enters through p = A·(R·x + t + n); the cell through A, and
+    since the distances depend on the points only through their inner
+    products, dA = ½·A⁻ᵀ·∂G serves for every cell parameter.
+    """
+    dist, s = _plane_geometry_np(it, values)
+    d, lam, vec, normal, amat = s["d"], s["lam"], s["vec"], s["normal"], s["amat"]
+    n_pts = len(it.atoms)
+    pinv = sum(np.outer(vec[:, i], vec[:, i]) / (lam[i] - lam[0]) for i in (1, 2))
+    pd = d @ pinv                                  # row k: P·D_k
+    a_inv_t = np.linalg.inv(amat).T
+    dg = _metric_g_derivs(s["cell"])
+    ip = it.phase
+    for k in range(n_pts):
+        row = row0 + k
+        # g[m] = ∂d_k/∂p_m (Cartesian), for every point m
+        coef = (np.arange(n_pts) == k) - 1.0 / n_pts - d @ pd[k]
+        g = coef[:, None] * normal[None, :] - dist[:, None] * pd[k][None, :]
+        for m, (j, R) in enumerate(zip(it.atoms, it.R, strict=True)):
+            _scatter_xyz(r_phys, row, idx, ip, j, pref * (R.T @ (amat.T @ g[m])))
+        cell_row = []
+        for gq in dg:
+            da = 0.5 * a_inv_t @ gq
+            cell_row.append(pref * float(np.sum(g * (s["frac"] @ da.T))))
+        _scatter_cell(r_phys, row, idx, ip, cell_row)
 
 
 def _scatter_xyz(r_phys, row, idx, ip, j, vec3) -> None:
@@ -453,6 +624,18 @@ def summarise_restraints(compiled: CompiledRestraints | None, values: dict,
     rows = []
     chi2 = 0.0
     for it in compiled.items:
+        if isinstance(it, _Plane):
+            dist, _ = _plane_geometry_np(it, values)
+            for k, dk in enumerate(dist):
+                dev_sig = float(dk) / it.sigma
+                chi2 += it.weight * dev_sig * dev_sig
+                rows.append(RestraintRow(
+                    phase_index=it.phase, kind="planarity",
+                    atoms=[it.atoms[k]] + it.atoms[:k] + it.atoms[k + 1:],
+                    computed=float(dk), target=0.0, sigma=it.sigma,
+                    weight=it.weight, deviation=float(dk),
+                    deviation_over_sigma=dev_sig))
+            continue
         if isinstance(it, _Bond):
             computed, target = _bond_value_np(it, values), it.target
             kind = {"max": "tether", "min": "anti_bump"}.get(it.side, "bond")
@@ -492,8 +675,9 @@ def anti_bump_restraints(phase, min_distance, *, sigma: float = 0.05,
     stages.  (WP-1803's record has the engine freeze the list at plan compile;
     this builder is the caller-side form of the same freeze.)  A pair enters
     when its image distance is under its minimum plus ``margin`` (Å); a pair
-    that later comes closer from outside the list is not seen, and nothing
-    names it yet, which is what the margin is for.
+    that later comes closer from outside the list is not seen by the
+    list, which is what the margin is for; :func:`stale_anti_bump_pairs` names
+    it at the end of a fit.
 
     ``min_distance`` is a number (every pair), a mapping from an unordered
     species pair ``(a, b)`` to Å, or a callable ``(species_i, species_j) ->
@@ -560,23 +744,126 @@ def anti_bump_restraints(phase, min_distance, *, sigma: float = 0.05,
                 # and wide enough for the cut: |Δx_k| ≤ (r0 + margin)·|a*_k|
                 reach = [range(-m, m + 1) for m in
                          np.ceil((r0 + margin) * astar).astype(int) + 1]
-                for na in reach[0]:
-                    for nb in reach[1]:
-                        for nc in reach[2]:
-                            n = centre + np.array([na, nb, nc], dtype=np.float64)
-                            if (same_body and identity
-                                    and np.array_equal(n, -np.round(tr))):
-                                # the body's own copy: its geometry is the
-                                # template's; every other image is another
-                                # molecule and is kept
-                                continue
-                            dx = img + n - x_i
-                            d2 = float(dx @ (g @ dx))
-                            if d2 < _COINCIDENT_D2:
-                                continue
-                            if math.sqrt(d2) < r0 + margin:
-                                rows.append(AntiBumpRestraint(
-                                    atom_i=i, atom_j=j, min_distance=r0,
-                                    sigma=sigma, weight=weight, op_index=mi,
-                                    translation=tuple(int(v) for v in n)))
+                # every shift at once, in the order a, b, c nested loops give
+                shifts = centre + np.stack(np.meshgrid(*reach, indexing="ij"),
+                                           axis=-1).reshape(-1, 3)
+                dx = img + shifts - x_i
+                d2 = np.einsum("ki,ij,kj->k", dx, g, dx)
+                hit = (d2 >= _COINCIDENT_D2) & (np.sqrt(d2) < r0 + margin)
+                for n in shifts[hit]:
+                    if (same_body and identity
+                            and np.array_equal(n, -np.round(tr))):
+                        # the body's own copy: its geometry is the
+                        # template's; every other image is another
+                        # molecule and is kept
+                        continue
+                    rows.append(AntiBumpRestraint(
+                        atom_i=i, atom_j=j, min_distance=r0,
+                        sigma=sigma, weight=weight, op_index=mi,
+                        translation=tuple(int(v) for v in n)))
     return rows
+
+
+#: two contacts of one atom pair are one contact when their distances agree to
+#: this (Å): a symmetry copy of a listed contact is restrained by its row
+_SAME_CONTACT_A = 1e-6
+
+
+def _inside_contacts(phase, listed):
+    """Every contact inside its r₀ at the phase's coordinates, listed or not.
+
+    r₀ is read off the rows: per unordered species pair, the largest
+    ``min_distance`` any row of that pair states; a species pair with no row
+    is not searched (#677's rule: no minimum nobody gave).  Returns
+    ``(key, distance, r0)`` with ``key = (atom_i, atom_j, op_index,
+    translation)`` naming the contact itself, in the builder's own order.
+    """
+    from ..crystallography.structure_factor import compile_phase_sites
+
+    sp = [a.species for a in phase.atoms]
+    rule: dict[tuple[str, str], float] = {}
+    for r in listed:
+        key = tuple(sorted((sp[r.atom_i], sp[r.atom_j])))
+        rule[key] = max(rule.get(key, 0.0), r.min_distance)
+    sites = compile_phase_sites(phase)
+    g = _metric_g(phase.cell.lengths_angles())
+    out = []
+    for c in anti_bump_restraints(phase, rule, margin=0.0):
+        x_i = _atom_xyz(phase, c.atom_i)
+        R, t = sites.ops[c.atom_j][0][c.op_index], sites.ops[c.atom_j][1][c.op_index]
+        dx = (np.asarray(R) @ _atom_xyz(phase, c.atom_j) + np.asarray(t)
+              + np.asarray(c.translation, dtype=np.float64) - x_i)
+        d = math.sqrt(float(dx @ (g @ dx)))
+        out.append(((c.atom_i, c.atom_j, c.op_index, tuple(c.translation)),
+                    d, c.min_distance))
+    return out
+
+
+def anti_bump_contact_keys(phase) -> frozenset:
+    """The contacts inside their r₀ right now, as keys for ``since=`` (WP-1809).
+
+    Take it at the coordinates a fit *starts* from and hand it to
+    :func:`stale_anti_bump_pairs` at the answer, which then reports only a
+    contact that was not inside r₀ then.  Empty when the phase has no
+    anti-bump row.
+    """
+    listed = [r for r in phase.restraints if isinstance(r, AntiBumpRestraint)]
+    if not listed:
+        return frozenset()
+    return frozenset(k for k, _, _ in _inside_contacts(phase, listed))
+
+
+def stale_anti_bump_pairs(phase, *, since=None) -> list[tuple[int, int, float, float]]:
+    """Contacts inside their minimum that no anti-bump row restrains (WP-1809).
+
+    The caller builds the pair list once (:func:`anti_bump_restraints`), so a
+    pair that drifts inside r₀ from outside it gets no row.  This searches the
+    phase at its present coordinates with the builder itself (no margin) and
+    returns ``(atom_i, atom_j, distance, r0)`` for every contact closer than
+    its r₀ that matches no row, sorted by how far inside r₀ it sits.
+
+    **``since`` is what makes "entered from outside" true.**  The list does
+    not remember the coordinates it was built from, so a pair the caller left
+    out on purpose (a bonded C–C under a 3.3 Å rule) is indistinguishable
+    from a drifted one by the answer alone.  ``since`` is
+    :func:`anti_bump_contact_keys` taken at the coordinates the run started
+    from: a contact inside r₀ there is the caller's own state and is never
+    named.  Without it, every unlisted contact under r₀ is returned.
+
+    r₀ is the strictest ``min_distance`` any row states for the contact's
+    species pair, so a contact is held to a minimum a row of its *species*
+    stated, not necessarily one for its atoms.  A contact is matched to a row
+    of the same two atoms whose image sits at the same distance (to
+    ``_SAME_CONTACT_A``), so a symmetry copy of a listed contact is not
+    named.  A body's own pairs in its own copy are skipped, as the builder
+    skips them.  Empty when the phase has no anti-bump row.
+    """
+    from ..crystallography.structure_factor import compile_phase_sites
+
+    listed = [r for r in phase.restraints if isinstance(r, AntiBumpRestraint)]
+    if not listed:
+        return []
+    sites = compile_phase_sites(phase)
+    g = _metric_g(phase.cell.lengths_angles())
+    known: dict[tuple[int, int], list[float]] = {}
+    for r in listed:
+        x_i = _atom_xyz(phase, r.atom_i)
+        rot, tr, n = _resolve_image(sites, r.atom_j, x_i, _atom_xyz(phase, r.atom_j),
+                                    r.op_index, r.translation, g)
+        dx = rot @ _atom_xyz(phase, r.atom_j) + tr + n - x_i
+        key = (min(r.atom_i, r.atom_j), max(r.atom_i, r.atom_j))
+        known.setdefault(key, []).append(math.sqrt(float(dx @ (g @ dx))))
+    out = []
+    seen: set[tuple[int, int, float]] = set()
+    for ck, d, r0 in _inside_contacts(phase, listed):
+        if since is not None and ck in since:
+            continue
+        key = (min(ck[0], ck[1]), max(ck[0], ck[1]))
+        if any(abs(d - k) <= _SAME_CONTACT_A for k in known.get(key, ())):
+            continue
+        tag = (*key, round(d, 6))
+        if tag in seen:
+            continue
+        seen.add(tag)
+        out.append((key[0], key[1], d, r0))
+    return sorted(out, key=lambda p: p[2] - p[3])

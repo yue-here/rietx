@@ -219,6 +219,7 @@
   "diagnostics:RECIPE_ZERO_WEIGHT_EXCLUDED",
   "diagnostics:RESOLUTION_NOT_POSITIVE",
   "diagnostics:RESOLUTION_UNCONSTRAINED",
+  "diagnostics:RESTRAINT_PAIRS_STALE",
   "diagnostics:RESTRAINT_TENSION",
   "diagnostics:RIGID_BODY_MISFIT",
   "diagnostics:RIGID_BODY_UNSUPPORTED",

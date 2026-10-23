@@ -318,6 +318,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
     "_restraint_tension_diagnostics": (
         (ABSENT,), "soft restraints are refused in a joint fit "
                    "(run_multi_least_squares), so there is no tension to report"),
+    "_restraint_pairs_stale_diagnostics": (
+        (ABSENT,), "soft restraints are refused in a joint fit "
+                   "(run_multi_least_squares), so there is no anti-bump list "
+                   "to have gone stale (WP-1809)"),
     "_stage_order_diagnostics": (
         (ABSENT,), "not called from multi.py: the magnetic-width ordering rule "
                    "(WP-1343) is checked by Refinement.fit and run_stage, and "

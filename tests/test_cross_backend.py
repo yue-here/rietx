@@ -274,6 +274,44 @@ def _state_toy_body():
     return model, table, {}
 
 
+def _state_toy_planarity():
+    """A planarity restraint's rows (WP-1809): an eigenvector, per atom.
+
+    The rows are signed distances to a least-squares plane, so their numpy
+    Jacobian is the closed-form eigenvector derivative while the traced
+    backends differentiate ``xp.linalg.eigh`` itself, and the fd row
+    differences the residual: three opinions on a path no other config has.
+    A buckled ring in a triclinic cell, one atom entering twice through a
+    lattice image, every coordinate and the whole cell free.
+    """
+    from rietx.schemas.common import Parameter as P
+    from rietx.schemas.pattern import PatternData
+    from rietx.schemas.structure import Atom, Cell, Phase, PlanarityRestraint, Structure
+
+    xyz = [(0.10, 0.20, 0.30), (0.25, 0.22, 0.31), (0.30, 0.35, 0.28),
+           (0.20, 0.45, 0.33), (0.07, 0.38, 0.27)]
+    cell = Cell(**{k: P(value=v, vary=True) for k, v in zip(
+        ("a", "b", "c", "alpha", "beta", "gamma"),
+        (7.1, 8.3, 9.2, 81.0, 97.0, 104.0), strict=True)})
+    structure = Structure(phases=[Phase(
+        name="ring", space_group="P1", cell=cell, scale=P(value=1e-3),
+        atoms=[Atom(label=f"C{k}", species="C", x=P(value=x, vary=True),
+                    y=P(value=y, vary=True), z=P(value=z, vary=True))
+               for k, (x, y, z) in enumerate(xyz)],
+        restraints=[PlanarityRestraint(
+            atoms=[0, 1, 2, 3, 4, 0], sigma=0.02,
+            op_indices=[None, None, None, None, None, 0],
+            translations=[(0, 0, 0)] * 5 + [(0, 0, 1)])])])
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    tt = np.arange(20.0, 40.0, 0.1)
+    pattern = PatternData(two_theta=tt.tolist(), intensity=np.ones_like(tt).tolist())
+    table = ParameterTable(structure, ins)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    assert model.restraints is not None and model.restraints.n_rows == 6
+    return model, table, {}
+
+
 def _state_families_variable():
     """A **named variable** carrying the columns instead of a model path (WP-1119).
 
@@ -848,6 +886,7 @@ CONFIGS = {"families": _state_families,
            "families_variable": _state_families_variable,
            "centroid_origin": _state_centroid_origin,
            "toy_body": _state_toy_body,
+           "toy_planarity": _state_toy_planarity,
            "capillary_offsets": _state_capillary_offsets,
            "extra_components": _state_extra_components,
            "extra_peak": _state_extra_peak,
@@ -882,6 +921,7 @@ CONFIG_PARAMS = [
     _config("families_variable"),
     _config("centroid_origin"),
     _config("toy_body"),
+    _config("toy_planarity"),
     _config("capillary_offsets"),
     _config("extra_components"),
     _config("extra_peak"),

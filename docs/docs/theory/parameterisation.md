@@ -448,6 +448,48 @@ $\sqrt{w}\,\max(0, d - d_{\max})/\sigma$ and an anti-bump
 $\sqrt{w}\,\min(0, d - d_{\min})/\sigma$, each zero on its flat side. An
 anti-bump pair list is built once from the starting coordinates and kept for
 the whole plan, so the number of restraint rows never changes between stages.
+The price is that a pair drifting inside $d_{\min}$ from outside the list has
+no row, so at plan end the phase is searched again at the answer's
+coordinates and any such pair is named (`RESTRAINT_PAIRS_STALE`). A contact
+already inside $d_{\min}$ where the run started, such as a bonded pair the
+caller left out of the list, is not named: it did not drift in.
+
+A planarity restraint on $N \ge 4$ atoms contributes one row per atom, its
+signed distance to their least-squares plane {cite}`schomaker1959`. With
+$\mathbf{D}_k = \mathbf{p}_k - \bar{\mathbf{p}}$ the Cartesian positions
+about their centroid and $\mathbf{n}$ the unit eigenvector of the smallest
+eigenvalue $\lambda$ of $M = \sum_k \mathbf{D}_k\mathbf{D}_k^\top$,
+
+```{math}
+:label: par-planarity
+
+r_k \;=\; \sqrt{w}\,\frac{d_k}{\sigma}, \qquad
+d_k = \mathbf{n}^\top\mathbf{D}_k, \qquad
+\sum_k d_k^2 = \lambda ,
+```
+
+{source}`rietx.model.restraints.restraint_residual`
+
+so the restrained quantity is order-free and needs no reference triple; TOPAS
+restrains the same geometry with `Flatten` and `AI_Flatten`
+{cite}`coelho2018topas`. Its derivative is the eigenvector's
+{cite}`magnus1985`: with $P = \sum_{i \ne 0} \mathbf{v}_i\mathbf{v}_i^\top /
+(\lambda_i - \lambda)$ the pseudo-inverse of $M - \lambda I$,
+
+```{math}
+:label: par-planarity-derivative
+
+\frac{\partial d_k}{\partial \mathbf{p}_m} \;=\;
+\mathbf{n}\,\Big(\delta_{km} - \frac{1}{N}
+- \mathbf{D}_m^\top P\,\mathbf{D}_k\Big) \;-\; d_m\,P\,\mathbf{D}_k ,
+```
+
+{source}`rietx.model.restraints.restraint_partials`
+
+chained to the fractional coordinates through the Cartesian frame and to the
+cell through the metric. $P$ needs the two smallest eigenvalues apart: a set
+whose points lie on a line, or spread alike in every direction (a regular
+tetrahedron's corners), has no plane, and compiling it raises.
 
 ## Weighting the restraints
 

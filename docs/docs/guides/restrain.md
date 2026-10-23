@@ -77,6 +77,14 @@ So the data place the bonds, and the restraints add little.
 When a restraint is in tension, either correct its target, loosen its sigma, or accept that the data overrule it.
 The full script is `examples/guides/restrain.py`.
 
+## Hold a ring or a group planar
+
+A fourth kind, `PlanarityRestraint`, holds four or more atoms to their least-squares plane.
+`PlanarityRestraint.atoms` lists their positional indices, `PlanarityRestraint.sigma` is the uncertainty in ångströms and `PlanarityRestraint.weight` multiplies the rows.
+It adds one row per atom, √weight × d / σ, where d is that atom's signed distance from the plane, so it is order-free and has no target {eq}`par-planarity`.
+`PlanarityRestraint.op_indices` and `PlanarityRestraint.translations` give each listed atom's symmetry image, one entry per atom or none, for a ring that crosses a symmetry element.
+Leave them out and each atom takes the minimum image relative to the first.
+
 ## Choose the symmetry image
 
 A bond or an angle may reach an atom in a neighbouring unit cell, or a symmetry copy of it.

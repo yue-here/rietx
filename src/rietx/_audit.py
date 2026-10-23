@@ -742,6 +742,10 @@ ROWS: tuple[Row, ...] = (
     Row("RECIPE_ZERO_WEIGHT_EXCLUDED", "code"),
     Row("RESOLUTION_NOT_POSITIVE", "code"),
     Row("RESOLUTION_UNCONSTRAINED", "code"),
+    Row("RESTRAINT_PAIRS_STALE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a pair distance against the caller's own anti-bump minimum r0, for "
+                  "a contact entered since the run began that no row restrains; a warning that "
+                  "names the pair, moves no value and gates nothing")),
     Row("RESTRAINT_TENSION", "code"),
     Row("RIGID_BODY_MISFIT", "code"),
     Row("RIGID_BODY_UNSUPPORTED", "code"),
@@ -1808,6 +1812,14 @@ ROWS: tuple[Row, ...] = (
                   "rhombohedral and unreduced monoclinic (beta 135-150 deg) cells, where one "
                   "shell alone missed 72 of 2518 pairs within 4 A, tests/test_restraints.py "
                   "(WP-2002, 2026-10-21)")),
+    Row("rietx.model.restraints.PLANE_DEGENERATE_REL", "constant", tier=1, value=1e-06,
+        evidence=("arithmetic: the plane normal is the scatter matrix's smallest-eigenvalue "
+                  "eigenvector (Schomaker et al. 1959, Acta Cryst. 12, 600), undefined when "
+                  "that eigenvalue is degenerate, and its derivative grows as "
+                  "1/(lambda1 - lambda0) (Magnus 1985); 1e-6 of the largest eigenvalue is a "
+                  "conditioning floor, as rcond is: a 5 A set is refused only within ~5 mA "
+                  "of having no flattest direction; gates a refusal at compile, not a fit "
+                  "action")),
     Row("rietx.model.restraints._COINCIDENT_D2", "constant", tier=1, value=1e-06,
         evidence=("numerical floor: any value between roundoff and the shortest real interatomic "
                   "d^2 gives the same image")),
@@ -1816,6 +1828,11 @@ ROWS: tuple[Row, ...] = (
                   "unsupported restraint targets; value chosen, not sqrt(eps)")),
     Row("rietx.model.restraints._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: pi/180"),
+    Row("rietx.model.restraints._SAME_CONTACT_A", "constant", tier=1, value=1e-06,
+        evidence=("arithmetic: symmetry copies of one contact sit at exactly one distance, so "
+                  "matching a contact to a listed row by distance is an identity test; 1e-6 A "
+                  "only absorbs float64 rounding (~1e-15 relative) and sits 1e3 below a "
+                  "bond-length esd of 1e-3 A")),
     Row("rietx.model.tof_spectrum.POINT_BY_POINT_ITYP", "constant", tier=1, value=10,
         evidence="format: GSAS Technical Manual p. 129, 222 define ITYP 10 (docstring)"),
     Row("rietx.optimize.bccg._CAUCHY_ARMIJO", "constant", tier=3, value=0.0001,
@@ -2230,6 +2247,10 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("rietx.refine.PAWLEY_UNRESOLVED_REL", "constant", value=0.3),
     Row("rietx.refine.RESONANT_ABSORBER_SEVERE_BARN", "constant", value=1000.0),
+    Row("rietx.refine.RESTRAINT_PAIRS_STALE_LISTED", "constant", tier="invariant", value=5,
+        evidence=("answer-invariant: shortens the spelled-out list only; the count, value and "
+                  "where are the same at any cap; tests/test_planarity_restraints.py::test_the_"
+                  "listing_cap_changes_the_message_and_nothing_else")),
     Row("rietx.refine.RESTRAINT_TENSION_SIGMA", "constant", value=3.0),
     Row("rietx.refine.ROUGHNESS_MIN_DEPRESSION", "constant", value=0.01),
     Row("rietx.refine.SCALE_B_SEPARATION_FLOOR", "constant", tier=1, value=6.324555320336758e-08,
@@ -3338,6 +3359,8 @@ ROWS: tuple[Row, ...] = (
     Row("RECIPE_FIT_RANGE_CHANNELS.suggestion", "suggestion", value=1),
     Row("RESOLUTION_NOT_POSITIVE.suggestion", "suggestion", value=1),
     Row("RESOLUTION_UNCONSTRAINED.suggestion", "suggestion", value=1),
+    Row("RESTRAINT_PAIRS_STALE.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence="arithmetic: names the builder that makes the missing rows"),
     Row("RESTRAINT_TENSION.suggestion", "suggestion", value=1),
     Row("RIGID_BODY_MISFIT.suggestion", "suggestion", value=1),
     Row("RIGID_BODY_UNSUPPORTED.suggestion", "suggestion", value=1),

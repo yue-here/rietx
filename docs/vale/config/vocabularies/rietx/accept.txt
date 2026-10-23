@@ -236,6 +236,7 @@ Pawley
 [pP]erovskite
 [pP]hotoabsorption
 Pitschke
+[pP]lanarity
 [pP]ointwise
 [pP]olycrystal
 [pP]olycrystalline

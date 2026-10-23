@@ -851,12 +851,63 @@ class AntiBumpRestraint(Base):
     translation: tuple[int, int, int] = (0, 0, 0)
 
 
+class PlanarityRestraint(Base):
+    """Four or more atoms restrained to their least-squares plane (WP-1809).
+
+    One residual row per listed atom, √weight·dₖ/sigma, where dₖ is the signed
+    distance (Å) of atom k from the plane of best fit through all of them: the
+    plane through their centroid normal to the eigenvector of the smallest
+    eigenvalue of their Cartesian scatter matrix (Schomaker, Waser, Marsh &
+    Bergman 1959, *Acta Cryst.* 12, 600).  The rows' sum of squares is that
+    eigenvalue, Σdₖ², so the term is order-free and needs no reference
+    triple.  TOPAS's ``Flatten`` and ``AI_Flatten`` restrain the same
+    geometry (Coelho, *TOPAS-Academic V6 Technical Reference*, 2016, pp. 119,
+    159, which also asks for more than three sites); here the rows are the
+    signed distances themselves, so the penalty is smooth at the plane.
+
+    ``atoms`` are positional indices into ``Phase.atoms``; an index may repeat
+    under a different image (a ring across an inversion centre).  Each entry's
+    image is ``op_indices[k]``/``translations[k]`` as on
+    :class:`BondRestraint`; an entry left ``None`` takes the minimum image
+    relative to the centroid of the entries before it, so the plane stays in
+    one molecule, and the first entry sits where it is stored unless named.
+    ``translations`` go with ``op_indices``: a translation on an entry other
+    than the first with no ``op_index`` is refused rather than ignored.  A set whose two smallest scatter eigenvalues are degenerate (the
+    points on a line or coincident, or spread alike in every direction like a
+    regular tetrahedron's corners) has no plane, and compiling it raises.
+    """
+
+    atoms: list[int] = Field(min_length=4)
+    sigma: float = Field(gt=0.0)  # Å
+    weight: float = Field(default=1.0, ge=0.0)
+    op_indices: list[int | None] | None = None
+    translations: list[tuple[int, int, int]] | None = None
+
+    @model_validator(mode="after")
+    def _one_image_per_atom(self) -> "PlanarityRestraint":
+        for name in ("op_indices", "translations"):
+            got = getattr(self, name)
+            if got is not None and len(got) != len(self.atoms):
+                raise ValueError(
+                    f"planarity restraint: {len(got)} {name} for "
+                    f"{len(self.atoms)} atoms; give one per atom or none")
+        if self.translations is not None:
+            ops = self.op_indices or [None] * len(self.atoms)
+            for k, (op, tr) in enumerate(zip(ops, self.translations, strict=True)):
+                if k > 0 and op is None and tuple(tr) != (0, 0, 0):
+                    raise ValueError(
+                        f"planarity restraint: translation {tuple(tr)} on entry "
+                        f"{k} has no op_index, so it would be ignored; name the "
+                        "operation (0 is the identity) or drop the translation")
+        return self
+
+
 #: A soft observational restraint on one phase — a bond length, a bond angle,
 #: or a single parameter value.  Each contributes one residual row that is kept
 #: in the covariance (JᵀJ) but excluded from Rwp/Durbin-Watson/Bérar-Lelann
 #: (they are soft observations, not data — the standard Rietveld convention).
 Restraint = (BondRestraint | AngleRestraint | ValueRestraint | TetherRestraint
-             | AntiBumpRestraint)
+             | AntiBumpRestraint | PlanarityRestraint)
 
 
 class MagneticSymmetry(Base):
@@ -1542,6 +1593,9 @@ class Phase(_InheritsDeclaredDefaults):
                 check(r.atom_i, "atom_i")
                 check(r.atom_j, "atom_j")
                 check(r.atom_k, "atom_k")
+            elif isinstance(r, PlanarityRestraint):
+                for k, idx in enumerate(r.atoms):
+                    check(idx, f"atoms[{k}]")
         return self
 
 

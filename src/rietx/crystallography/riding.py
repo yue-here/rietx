@@ -19,7 +19,10 @@ measure:
   libration: aromatic C–H 1.083, C=C–H 1.077, X₃C–H 1.099, X₂C–H₂ 1.092,
   C–CH₃ 1.059, alcohol O–H 0.967, acid O–H 1.015, X₂N–H 1.009 Å (the H—N(3)
   row, n = 95, Note 21).  The table's X₃N⁺–H row (1.033 Å, n = 87) is not
-  typed: the X-ray column has no ammonium length to pair it with.
+  typed: the X-ray column has no ammonium length to pair it with.  The
+  pairing of ``NH`` is itself a choice: SHELXL's 0.86 Å is its planar N–H
+  (``AFIX 43``), while X₂N–H does not restrict the nitrogen's hybridisation.
+  It is a fair pair for a riding default, not a like-for-like row.
 * **A joint X-ray + neutron fit takes the neutron lengths**: the hydrogen's
   scattering signal is in the neutron histogram (a design choice of this
   package), and the X-ray pattern barely constrains it.  So
