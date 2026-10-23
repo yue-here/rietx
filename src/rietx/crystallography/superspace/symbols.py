@@ -565,7 +565,14 @@ def _entry_of(group: SuperspaceGroup):
 def symbol(group: SuperspaceGroup) -> str:
     """The one-line symbol, under Stokes 2011 § 5.2 steps 1-4 (step 3 against
     the other groups over the same basic group and q), with ITC-C's spelling
-    where Stokes 2011 Table 9 says it differs from the conventions."""
+    where Stokes 2011 Table 9 says it differs from the conventions.
+
+    A magnetic group gets its magnetic superspace symbol
+    (:func:`.magnetic.magnetic_symbol`; Stokes & Campbell 2022 p. 366)."""
+    if group.is_magnetic:
+        from .magnetic import magnetic_symbol
+
+        return magnetic_symbol(group)
     e = _entry_of(group)
     printed = e.assigned if e is not None else symbol_candidates(group)[0]
     return ITC_C_EXCEPTIONS.get(printed, (printed,))[0]
@@ -606,10 +613,11 @@ def parse_symbol(text: str) -> SuperspaceGroup:
     The basic group is read in the setting the symbol names (origin choice 2
     where ITA offers two, hexagonal axes); the group is found among those
     :func:`~rietx.crystallography.superspace.generation.generate` derives for
-    that basic group and q (module docstring).  Refused by name: a second
-    modulation vector (d > 1), a magnetic symbol (a 1′, N-W2), a symbol with
-    no q (ambiguous, Yamamoto et al. 1985), and a symbol matching no group or
-    several.
+    that basic group and q (module docstring).  A magnetic symbol — primes, a
+    ``.1``, or a ``.1'`` with its extra phase letter — is read by
+    :func:`.magnetic.parse_magnetic_symbol`.  Refused by name: a second
+    modulation vector (d > 1), a symbol with no q (ambiguous, Yamamoto et
+    al. 1985), and a symbol matching no group or several.
     """
 
     m = _SYMBOL.match(str(text))
@@ -623,9 +631,10 @@ def parse_symbol(text: str) -> SuperspaceGroup:
         raise ValueError(f"{text!r} gives a second modulation vector: superspace "
                          f"groups are built here for d = 1 only")
     hm = m.group("hm")
-    if "'" in hm or "′" in hm or ".1" in hm:
-        raise ValueError(f"{text!r} is a magnetic superspace symbol (it carries "
-                         f"1'); magnetic superspace groups are N-W2, not built here")
+    if "'" in hm or "′" in hm or hm.rstrip().endswith(".1"):
+        from .magnetic import parse_magnetic_symbol
+
+        return parse_magnetic_symbol(text)
     q = ModulationVector.parse(m.group("q"))
     want = _letters(tail)
     settings = _settings_named(hm)

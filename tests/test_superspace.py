@@ -127,9 +127,12 @@ def test_de_wolff_composition_rule_tau3_is_tau1_plus_eps1_tau2():
 
 
 @pytest.mark.parametrize("text, why", [
-    ("x1,x2,x3,x4,-1", "N-W2"),
-    ("x1,x2,x3,x4,+1", "N-W2"),
+    # a time-reversal field other than ±1 (θ = ±1 itself is read, WP-1992)
+    ("x1,x2,x3,x4,0", "time-reversal field is \\+1 or -1"),
+    ("x1,x2,x3,x4,2", "time-reversal field is \\+1 or -1"),
+    ("x1,x2,x3,x4,-1'", "time reversal twice"),
     ("x1,x2,x3,x4,x5", "d > 1"),
+    ("x1,x2,x3,x4,x5,-1", "d > 1"),
     ("x1,x2,x3,x5", "d > 1"),
     ("x1+x4,x2,x3,x4", "depends on x4"),
     ("x1,x2,x3,2x4", "epsilon"),
@@ -137,6 +140,18 @@ def test_de_wolff_composition_rule_tau3_is_tau1_plus_eps1_tau2():
 def test_operation_strings_refused_by_name(text, why):
     with pytest.raises(ValueError, match=why.replace(">", ">")):
         SuperspaceOperator.from_xyz(text)
+
+
+@pytest.mark.parametrize("text, theta", [
+    ("x1,x2,x3,x4,-1", -1), ("x1,x2,x3,x4,+1", 1), ("x1,x2,x3,x4+1/2,-1", -1),
+    ("(x+1/2,-y,-z,-t)'", -1),
+])
+def test_time_reversal_is_read_where_n_w1_refused_it(text, theta):
+    """The two θ rows N-W1 refused now parse (WP-1992); the neighbours θ = 0,
+    θ = 2 and a fifth coordinate stay refused above."""
+    op = SuperspaceOperator.from_xyz(text)
+    assert op.theta == theta
+    assert SuperspaceOperator.from_xyz(op.xyz(magnetic=True)) == op
 
 
 def test_modulation_vector_spellings():
@@ -193,6 +208,19 @@ def test_an_operation_inconsistent_with_q_is_refused():
     ops = (IDENTITY, SuperspaceOperator.from_xyz("-x1,-x2,x3,-x4"))
     with pytest.raises(ValueError, match="free direction"):
         SuperspaceGroup(ModulationVector.parse("(0,0,γ)"), ops)
+
+
+def test_number_is_written_only_by_the_caller():
+    """``SuperspaceGroup.number`` has one writer, the caller (#682 review,
+    follow-up 1).  16.1.9.1 is P222(0,0,γ)000's four-part number as Stokes &
+    Campbell 2022 (Acta Cryst. A78, 364, p. 366) quote it; it is carried
+    verbatim, and nothing the package derives from the group invents one."""
+    gens = ("-x1,-x2,x3,x4", "x1,-x2,-x3,-x4")
+    g = SuperspaceGroup.from_operations("(0,0,γ)", gens, number="16.1.9.1")
+    assert g.number == "16.1.9.1"
+    assert SuperspaceGroup.from_operations("(0,0,γ)", gens).number is None
+    assert g.transformed(SuperspaceTransform.build(s_eps=-1)).number is None
+    assert all(h.number is None for h in superspace_groups(16))
 
 
 # ---------------------------------------------------------------------------
@@ -359,7 +387,8 @@ def test_a_printed_symbol_that_is_admissible_but_not_the_nicest():
 @pytest.mark.parametrize("text, why", [
     ("Pbnm", "no modulation vector"),
     ("Pbnm(00γ)s00(α00)00", "second modulation vector"),
-    ("Pbnm1'(00γ)s00s", "magnetic"),
+    # a type-2/4 symbol needs one letter per generator plus one for 1′
+    ("Pbnm1'(00γ)s00", "one per generator plus one"),
     ("Pbnm(00γ)s0", "letters"),
     # an ε = −1 generator (the mirror normal to c, q ∥ c) always prints 0
     ("Pbnm(00γ)00s", "no superspace group"),
