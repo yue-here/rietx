@@ -1,6 +1,6 @@
 # WP-2037 — a tutorial reads without decoding: the maintainer's notes as rules, the quickstart's fixes, and the checks that hold them
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-10-23 — claimed by @yue-here
 Track: The repo's own process
 Depends on: — (1986 soft, the tutorials' home under Start)
 Priority: P3 2026-10-23 — a shipped tutorial describes output it no longer shows and nothing flags it; a reader works around it by reading the output
