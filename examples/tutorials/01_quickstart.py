@@ -72,8 +72,8 @@ diag
 # The CIF has atoms too. A Le Bail fit ignores them.
 #
 # The background is a six-term Chebyshev polynomial.
-# Its constant term starts at the 5th percentile of the counts, which sits near the background level between the peaks.
-# At zero, the first Le Bail extraction would count the background under each peak as peak intensity.
+# Its constant term starts at the 5th percentile of the counts, and its other five terms at zero.
+# Left at zero, the first Le Bail extraction would count all the background under each peak as peak intensity.
 # `rx.auto_background(data).background` would size a penalised spline instead.
 # On this pattern the spline reports hundreds of correlated coefficient pairs.
 # They would crowd the diagnostics below.
@@ -94,7 +94,21 @@ ref
 # Only the background varies so far.
 # The fit's plan sets the refine flags afresh at each stage, as [About a fit](https://rietx.org/docs/stable/concepts/fit.html#the-plan) describes.
 #
-# Before fitting, draw the model's reflection positions under the data.
+# Before fitting, draw the model over the data.
+# Start at the high-angle end, where the peaks are weak enough to show the background.
+# Expect the dashed starting background to run along the lowest counts between the peaks.
+
+# %%
+data.plot(model=ref, two_theta_range=(100, 130))
+
+# %% [markdown]
+# The dashed line is the starting background, flat at the 5th percentile of the counts.
+# Here it runs along the lowest counts between the peaks.
+# Below about 60° the counts between the peaks sit higher, as the first plot shows, so there the flat start lies under them.
+# The plan's first stage, `bkg`, refines all six terms to the counts before anything else moves.
+# The axis label names the radiation and its wavelength, read from the instrument.
+#
+# Now draw the model's reflection positions under the strong peaks.
 # Expect a tick under every peak.
 
 # %%
@@ -139,8 +153,8 @@ result
 #    The `closing` stage runs at the solver's default, and its values are the ones to quote.
 #    `max|Δθ|/esd` is the largest final step of any parameter in units of its own esd.
 # 2. The diagnostics outrank every statistic.
-#    Under each one, `at:` names the parameters, `help:` says what to do, and `means:` says what the code means.
-#    `FLOOR_HIT` says the Lorentzian width term `y` ended on its lower limit of zero.
+#    Under each one, `help:` says what to do and `means:` says what the code means.
+#    A finding about particular parameters names them on an `at:` line.
 #    `PATTERN_UNDERSAMPLED` is the step count from `diagnose`.
 # 3. The agreement indices come last. Rwp compares two fits of the same data over the same channels, and says little on its own.
 #
@@ -183,8 +197,8 @@ best
 
 # %% [markdown]
 # The kept pass carries its own diagnostics, and they differ from the first pass's.
-# `FLOOR_HIT` is gone, because `y` ended above zero this time.
-# `RESOLUTION_UNCONSTRAINED` says the peak widths are not quotable until the instrument's own widths are calibrated on a standard.
+# `RESOLUTION_UNCONSTRAINED` is new, and its `at:` line names U, V and W.
+# It says the peak widths are not quotable until the instrument's own widths are calibrated on a standard.
 # Notebook 04 does that calibration.
 #
 # The cell's esds are counting statistics.
