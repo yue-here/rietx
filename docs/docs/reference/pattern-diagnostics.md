@@ -15,8 +15,11 @@ A time-of-flight pattern is refused, because every field is an angle or derived 
 
 ## Fields
 
-`PatternDiagnostics` has eighteen fields.
-`print(d)` lists every field, starting with `signal_cutoffs`, and prints an empty finding as `none`.
+`PatternDiagnostics` has nineteen fields.
+`print(d)` puts the range in its first line and the other fields under three headings.
+The first holds the rows checked on every pattern, the second the rows that matter on some instruments, and the third rietx's own measurements.
+Each number prints to three significant figures.
+An empty finding prints as `none`, and a check that could not run prints as `not checked`.
 `auto_background` reads two of them to choose its defaults: `amorphous_hump_score` and `air_scatter_gain`.
 
 | Field | Is | Reads as |
@@ -30,6 +33,7 @@ A time-of-flight pattern is refused, because every field is an angle or derived 
 | `PatternDiagnostics.steps_per_fwhm` | the median, over the resolved peaks, of how many channels span a peak's FWHM | [Peak sampling](#peak-sampling); `None` when no peak was measurable |
 | `PatternDiagnostics.n_peaks_measured` | how many peaks that median was taken over | |
 | `PatternDiagnostics.contamination` | the lines of a Kβ or tungsten Lα contamination finding, each a `ContaminationFlag` | an empty list is the usual answer ([Contamination](#contamination)) |
+| `PatternDiagnostics.contamination_searches` | the ghost searches the contamination screen ran, `"kbeta"` and `"tungsten_la"` | an empty list means the screen ran none, so an empty `contamination` was not checked; `None` on an object written before the field existed |
 | `PatternDiagnostics.air_scatter_gain` | how much of the envelope's cubic-fit residual variance a 1/(2θ) column explains | a nested-model test for the low-angle air-scatter rise; above 0.3, `auto_background` turns the 1/(2θ) background term on |
 | `PatternDiagnostics.amorphous_hump_score` | the RMS of the envelope residual after both the cubic and the 1/(2θ) term, over the median level | what is left is broad non-polynomial structure, such as amorphous content or capillary glass; above about 0.05 it calls for a more flexible background |
 | `PatternDiagnostics.baseline_lambda` | the arPLS stiffness the whiteness rule picked for this pattern | |
@@ -109,6 +113,7 @@ This check needs the file's own σ column and answers nothing without it.
 Under the Poisson fallback σ = √max(y, 1), a dead cell and a channel that honestly counted zero are the same two numbers, so there is nothing to tell apart.
 An empty list on a pattern whose `coverage_plateau` is `None` means not checked.
 That is a different answer from checked and clean.
+`print(d)` shows it as `not checked (no measured σ)`.
 
 Nothing is excluded for you.
 A fit range is declared in `excluded_regions` on the pattern or the project ([How to limit the fit range or leave out a region](../guides/range.md)), and it is a protocol decision.
@@ -208,6 +213,8 @@ The Kβ position depends on the anode, so the screen needs `wavelength=`, and a 
 Measured on the 11-BM pattern, `diagnose(data)` and `diagnose(data, wavelength=0.4139090)` both return an empty list.
 The first asked nothing, and the second has a synchrotron wavelength, which has no anode.
 `diagnose(source=)` skips the screen for a neutron source and for one whose `Source.kbeta` is `"monochromator"` ([X-ray source](instrument.md#x-ray-source)).
+`PatternDiagnostics.contamination_searches` tells the two answers apart.
+It lists the searches that ran, and it is empty in each case above, so `print(d)` reads `not checked`.
 
 The joint test gives up some sensitivity on purpose.
 A Kβ image injected into six round-robin patterns is found on every one of them from about 10 % of its parent upwards.

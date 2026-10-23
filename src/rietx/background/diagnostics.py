@@ -644,6 +644,13 @@ class PatternDiagnostics(Base):
       and an *empty list means nothing was flagged or nothing was checked*:
       the Kβ position is anode-specific, so a wavelength that matches no
       tabulated Kα1 (:func:`identify_anode`) is silently skipped.
+      ``contamination_searches`` tells the two apart.
+    * ``contamination_searches`` — the ghost searches the screen ran,
+      ``"kbeta"`` and ``"tungsten_la"``.  ``[]`` means it ran none, so an
+      empty ``contamination`` is *not checked*: no ``wavelength``, one
+      matching no tabulated Kα1, a source whose beam carries neither line
+      (:func:`ghost_searches`), or no peak to search from.  ``None`` is an
+      object written before the field existed (WP-2037), which cannot say.
     * ``baseline_lambda`` — the arPLS stiffness the whiteness rule selects
       for this pattern (:func:`rietx.background.select_arpls_lambda`).
     * ``steps_per_fwhm`` / ``n_peaks_measured`` — how finely the peaks were
@@ -690,28 +697,56 @@ class PatternDiagnostics(Base):
     steps_per_fwhm: float | None = None
     n_peaks_measured: int = 0
     contamination: list[ContaminationFlag] = Field(default_factory=list)
+    contamination_searches: list[str] | None = None
     coverage_plateau: float | None = None
     coverage_regions: list[CoverageRegion] = Field(default_factory=list)
     signal_cutoffs: list[SignalCutoff] = Field(default_factory=list)
     dead_channels: list[DeadChannelRun] = Field(default_factory=list)
 
-    #: The order ``print`` shows the fields in (WP-1544): what bounds the range
-    #: first, then the sampling, then what a background is built from, and the
-    #: σ-relative census last. Every field appears once (``tests/test_display.py``).
-    _READING_ORDER: ClassVar[tuple[str, ...]] = (
-        "signal_cutoffs", "dead_channels", "coverage_plateau", "coverage_regions",
-        "steps_per_fwhm", "n_peaks_measured", "contamination",
-        "air_scatter_gain", "amorphous_hump_score", "baseline_lambda",
-        "signal_to_background", "noise_sigma_median",
-        "peak_fraction", "n_peaks", "peak_density_per_deg")
+    #: The headings ``print`` shows the fields under, in reading order
+    #: (WP-2037, the maintainer's choice of 2026-10-23): what anyone refining
+    #: checks, what matters on some instruments, and the numbers rietx
+    #: measures for its own use.  Every field appears once, the range in the
+    #: head and ``contamination_searches`` inside the ``contamination`` row
+    #: (``tests/test_display.py``).
+    _READING_ORDER: ClassVar[tuple[tuple[str, tuple[str, ...]], ...]] = (
+        ("checked on every pattern",
+         ("signal_cutoffs", "steps_per_fwhm", "n_peaks_measured", "contamination",
+          "signal_to_background")),
+        ("matters on some instruments",
+         ("dead_channels", "coverage_plateau", "coverage_regions", "air_scatter_gain",
+          "amorphous_hump_score")),
+        ("rietx's own measurements",
+         ("baseline_lambda", "noise_sigma_median", "peak_fraction", "n_peaks",
+          "peak_density_per_deg")),
+    )
 
     def __str__(self) -> str:
-        """Every field in :attr:`_READING_ORDER`, an empty list printed as
-        ``none`` because here "checked, and nothing" is the finding."""
-        from .._display import tree
+        """Every field under its heading in :attr:`_READING_ORDER`, each bare
+        number to three significant figures.  An empty field says whether its
+        check ran: ``none`` where it ran and found nothing, ``not checked``
+        where it could not run.  Which it was is read off fields:
+        ``coverage_plateau`` is ``None`` without a measured σ, and
+        ``contamination_searches`` lists the searches that ran."""
+        from .._display import significant, tree
         head = (f"PatternDiagnostics of {self.n_points} points, "
                 f"{self.two_theta_min:g}–{self.two_theta_max:g}° 2θ")
-        return tree(self, order=self._READING_ORDER, show_empty=True, head=head)
+        values = {name: significant(value) for name in type(self).model_fields
+                  if isinstance(value := getattr(self, name), float)}
+        if self.coverage_plateau is None:
+            unmeasured = "not checked (no measured σ)"
+            values["coverage_plateau"] = unmeasured
+            for name in ("dead_channels", "coverage_regions"):
+                if not getattr(self, name):
+                    values[name] = unmeasured
+        if self.steps_per_fwhm is None:
+            values["steps_per_fwhm"] = "not measured (no peak measurable)"
+        if not self.contamination and self.contamination_searches == []:
+            values["contamination"] = "not checked"
+        elif not self.contamination and self.contamination_searches is None:
+            values["contamination"] = "none, or not checked (not recorded)"
+        return tree(self, groups=self._READING_ORDER, show_empty=True, head=head,
+                    values=values)
 
 
 def background_envelope(two_theta: np.ndarray, y: np.ndarray, *,
@@ -1543,8 +1578,12 @@ def diagnose(data: PatternData, *, wavelength: float | None = None,
     air_gain = float(1.0 - (r_air @ r_air) / rss_cubic) if rss_cubic > 0 else 0.0
     hump = float(np.sqrt(np.mean(r_air ** 2)) / max(med_env, 1e-12))
 
+    # Which searches ran is recorded beside the flags, because an empty list of
+    # flags reads the same for "looked, and clean" and "never looked".
+    searches: tuple[str, ...] = ()
     flags: list[ContaminationFlag] = []
     if wavelength is not None and len(ghost_idx):
+        searches = _searches_run(wavelength, source)
         flags = _contamination_flags(tt, net, sigma, ghost_idx, wavelength,
                                      source=source)
 
@@ -1576,6 +1615,7 @@ def diagnose(data: PatternData, *, wavelength: float | None = None,
         steps_per_fwhm=steps,
         n_peaks_measured=n_measured,
         contamination=flags,
+        contamination_searches=list(searches),
         coverage_plateau=plateau,
         coverage_regions=coverage,
         signal_cutoffs=cutoffs,
@@ -1629,6 +1669,14 @@ def identify_anode(wavelength: float) -> str | None:
     return None
 
 
+def _searches_run(wavelength: float, source: object | None) -> tuple[str, ...]:
+    """The ghost searches the screen runs at ``wavelength``: those
+    :func:`ghost_searches` leaves for ``source``, and none when
+    :func:`identify_anode` names no anode.  One decision, read by the screen
+    and recorded by :func:`diagnose` as ``contamination_searches``."""
+    return ghost_searches(source) if identify_anode(wavelength) is not None else ()
+
+
 def contamination_flags_from_peaks(
     two_theta: np.ndarray, intensity: np.ndarray,
     two_theta_esd: np.ndarray | None, wavelength: float, *,
@@ -1666,7 +1714,7 @@ def contamination_flags_from_peaks(
     than :data:`GHOST_MIN_PARENTS` parents in range is a silence rather than a
     clean bill, exactly as an unrecognised wavelength is.
     """
-    searches = ghost_searches(source)
+    searches = _searches_run(wavelength, source)
     anode = identify_anode(wavelength)
     if anode is None or not searches:
         return []

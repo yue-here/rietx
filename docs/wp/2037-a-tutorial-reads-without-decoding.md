@@ -218,7 +218,7 @@ a change to what `diagnose` computes, so it stays inside the non-goal below.
       `line-length = 79`), `ruff format` over the sources, and a check that fails on
       unformatted ones. First confirm that `build.py`'s parser still round-trips the
       formatted cells (`test_parse_refuses_what_it_cannot_round_trip`).
-- [ ] Display: align the values in `_display.tree`'s key/value lines, cut the digits, and make
+- [x] Display: align the values in `_display.tree`'s key/value lines, cut the digits, and make
       `PatternDiagnostics` say "not checked" where a check did not run. Three headings
       (Decision 2). Update `tests/test_display.py`, and
       `guides/check.md`/`examples/guides/check.py` if the display replaces their f-string.

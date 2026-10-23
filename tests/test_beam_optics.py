@@ -132,10 +132,16 @@ def _pattern_with_kbeta_ghosts() -> rx.PatternData:
 def test_diagnose_reads_the_declared_source():
     # the control: undeclared flags the images, the declared sources do not
     data = _pattern_with_kbeta_ghosts()
-    assert diagnose(data, wavelength=LAM).contamination
-    assert diagnose(data, wavelength=LAM, source=_neutron()).contamination == []
+    undeclared = diagnose(data, wavelength=LAM)
+    assert undeclared.contamination
+    assert undeclared.contamination_searches == ["kbeta", "tungsten_la"]
+    # and a skip is recorded as one, so the empty list does not read as clean
+    neutron = diagnose(data, wavelength=LAM, source=_neutron())
+    assert neutron.contamination == [] and neutron.contamination_searches == []
     mono = rx.Instrument.bragg_brentano(monochromator_two_theta=26.6).source
-    assert diagnose(data, wavelength=LAM, source=mono).contamination == []
+    behind_mono = diagnose(data, wavelength=LAM, source=mono)
+    assert behind_mono.contamination == [] and behind_mono.contamination_searches == []
+    assert diagnose(data, wavelength=0.4139).contamination_searches == [], "no anode"
 
 
 def test_the_xrdml_reader_names_the_optics_a_file_lists():

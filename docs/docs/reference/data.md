@@ -102,10 +102,10 @@ print(data)
 ```text
 [10.9545 21.9089  1.    ]
 PatternData of 3 points, 10–10.04° 2θ, median step 0.02°
-  intensity: [120, 480, 0]
-  sigma: None
+  intensity:        [120, 480, 0]
+  sigma:            None
   excluded_regions: none
-  metadata: none
+  metadata:         none
 ```
 
 `sig()` returns the file's `sigma` where the file had one, and √max(y, 1) where it did not.

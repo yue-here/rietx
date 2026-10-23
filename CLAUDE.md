@@ -589,7 +589,7 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   uPlot, WP-1461), redrawing in place so the zoom survives a stage. The page it replaced cost
   the fit's thread 4.51-6.03 MB a stage; `rietx html` writes one on demand, module inlined.
 - **A display reads fields and never computes; a designed view is a `__str__` override** (WP-1544;
-  the three rules and the figure rule are `_display.py`'s docstring and `viz.plots._pyplot`'s).
+  the four rules and the figure rule are `_display.py`'s docstring and `viz.plots._pyplot`'s).
 - **A per-stage charge is judged on the shortest fit, never the typical one** (WP-1413): it is
   near-constant, so `nac` at 0.354 s spends 50 ms on six snapshots against a 17.7 ms budget.
   **That one is paid** (WP-1438): a ratio is the wrong test where the absolute charge is 50 ms,

@@ -3,7 +3,7 @@
 Text is the authority and HTML a projection of the same rows, because an agent
 reads stdout and a person reads a notebook cell, and the two must not disagree.
 
-Three rules hold for everything here:
+Four rules hold for everything here:
 
 - **A display reads fields; it never computes.** IPython builds text/plain *and*
   text/html for every displayed value, so a renderer calling ``report()`` or
@@ -13,6 +13,11 @@ Three rules hold for everything here:
 - **No colour of its own.** HTML is semantic tags only: JupyterLab's and
   GitHub's sanitisers strip styles, and a colour here would be a fourth surface
   beside ``viz/theme.py``'s three.
+- **A display is laid out to be read** (WP-2037): values in one aligned
+  column, numbers to the digits that carry meaning, a unit where there is
+  one, and an empty state that says whether the check ran.  The last is read
+  off a field like any other value, so a view whose empty list means two
+  things needs a field that tells them apart.
 
 Private: nothing here is API.  The hooks that call it (``__repr_args__``,
 ``__str__``, ``_repr_pretty_``, ``_repr_html_``) are the surface.
@@ -20,6 +25,7 @@ Private: nothing here is API.  The hooks that call it (``__repr_args__``,
 
 from __future__ import annotations
 
+import math
 import numbers
 
 import numpy as np
@@ -113,6 +119,30 @@ def _number(value: float, esd: float | None = None) -> str:
     return f"{value:.8g}"
 
 
+#: The significant figures :func:`significant` keeps: enough to read a number
+#: against a threshold quoted to one or two (five steps per FWHM, a gain of
+#: 0.3, a score of 0.05).
+SIGNIFICANT = 3
+
+
+def significant(value: float, digits: int = SIGNIFICANT) -> str:
+    """``value`` to ``digits`` significant figures: ``4.65``, ``146``, ``0.843``.
+
+    Written out from 1e-4 up to 1e6, with the digits before the point kept
+    whole (``10000``, never ``1e+04``), and as ``1e+07`` outside that range.
+    A view passes its bare numbers through this; a ``Parameter`` never comes
+    here, since a cell length needs its decimals and its esd says how many
+    (:func:`_number`).
+    """
+    if not math.isfinite(value) or value == 0:
+        return f"{value:g}"
+    # the decade after rounding, so 9.996 prints "10.0" and not "10.00"
+    decade = math.floor(math.log10(abs(float(f"{value:.{digits - 1}e}"))))
+    if not -4 <= decade < 6:
+        return f"{value:.{digits}g}"
+    return f"{value:.{max(digits - 1 - decade, 0)}f}"
+
+
 def parameter_text(p) -> str:
     """One ``Parameter`` on one line: ``value(esd) unit``, and ``(vary)`` when
     it is free.  Bounds stay in ``Refinement.parameters()``, where every row
@@ -171,10 +201,10 @@ def _leaf(value) -> str | None:
     return repr(value) if isinstance(value, str) else str(value)
 
 
-def _fields(model, order=None, show_empty=False):
+def _fields(model, order=None, show_empty=False, keep=()):
     names = list(order) if order is not None else list(type(model).model_fields)
     return [(name, getattr(model, name)) for name in names
-            if show_empty or _shown(getattr(model, name))]
+            if show_empty or name in keep or _shown(getattr(model, name))]
 
 
 def _one_line(model) -> str | None:
@@ -188,23 +218,44 @@ def _one_line(model) -> str | None:
     return line if len(line) <= ONE_LINE_WIDTH else None
 
 
-def _tree_lines(model, indent: str, order=None, show_empty=False) -> list[str]:
+def _aligned(rows: list, indent: str) -> list[str]:
+    """One block's lines.  A ``(label, text)`` row is one line, its text in
+    the column after the block's longest label; a list of lines (a nested
+    block, opened by its own first line) is kept as it was built."""
+    width = max((len(row[0]) for row in rows if isinstance(row, tuple)), default=0)
     lines = []
-    for name, value in _fields(model, order, show_empty):
+    for row in rows:
+        if isinstance(row, tuple):
+            label, text = row
+            lines.append(f"{indent}{label.ljust(width)} {text}")
+        else:
+            lines += row
+    return lines
+
+
+def _tree_lines(model, indent: str, order=None, show_empty=False, values=None) -> list[str]:
+    values = values or {}
+    rows: list = []
+    for name, value in _fields(model, order, show_empty, keep=values):
+        label = f"{name}:"
+        if name in values:
+            rows.append((label, values[name]))
+            continue
         if show_empty and not _shown(value):
-            lines.append(f"{indent}{name}: {'None' if value is None else 'none'}")
+            rows.append((label, "None" if value is None else "none"))
             continue
         leaf = _leaf(value)
         long_container = (leaf is not None and len(indent) + len(name) + len(leaf) > ONE_LINE_WIDTH
                           and isinstance(value, (list, tuple, dict))
                           and not isinstance(summarise(value), _Elided))
         if leaf is not None and not long_container:
-            lines.append(f"{indent}{name}: {leaf}")
+            rows.append((label, leaf))
         elif _is_model(value):
-            lines += _model_lines(f"{indent}{name}: ", value, indent + "  ")
+            first, *rest = _model_lines("", value, indent + "  ")
+            rows.append((label, first) if not rest else [f"{indent}{label} {first}", *rest])
         else:
-            lines += _container_lines(name, value, indent)
-    return lines
+            rows.append(_container_lines(name, value, indent))
+    return _aligned(rows, indent)
 
 
 def _designed(model) -> bool:
@@ -228,37 +279,53 @@ def _model_lines(prefix: str, model, indent: str) -> list[str]:
 def _container_lines(name, value, indent: str) -> list[str]:
     items = list(value.items()) if isinstance(value, dict) else list(enumerate(value))
     lines = [f"{indent}{name}: {len(items)} {_kind([v for _, v in items])}"]
+    rows: list = []
     for key, item in items[:TREE_ROWS]:
         key_text = f"[{key}]" if isinstance(value, (list, tuple)) else str(key)
         label = key_text if isinstance(value, (list, tuple)) else key_text + ":"
         leaf = _leaf(item)
         if leaf is not None:
-            lines.append(f"{indent}  {label} {leaf}")
+            rows.append((label, leaf))
         elif _is_model(item):
-            lines += _model_lines(f"{indent}  {label} ", item, indent + "    ")
+            first, *rest = _model_lines("", item, indent + "    ")
+            rows.append((label, first) if not rest
+                        else [f"{indent}  {label} {first}", *rest])
         else:
-            lines += _container_lines(key_text, item, indent + "  ")
+            rows.append(_container_lines(key_text, item, indent + "  "))
+    lines += _aligned(rows, indent + "  ")
     if len(items) > TREE_ROWS:
         lines.append(f"{indent}  … {len(items) - TREE_ROWS} more")
     return lines
 
 
-def tree(model, *, order=None, show_empty: bool = False, head: str | None = None) -> str:
+def tree(model, *, order=None, groups=None, show_empty: bool = False,
+         head: str | None = None, values=None) -> str:
     """A schema as an indented field tree: one line per ``Parameter``, a model
     that fits on one line kept on one, ``None`` and empty fields left out.
+    The one-line fields of a block print their values in one column.
 
     A designed view passes ``order`` (the fields to print, in reading order)
     and ``show_empty`` where an empty list is itself a finding ("checked, and
     nothing"), and ``head`` for a first line that says what the object is of.
+    ``groups`` replaces ``order`` with ``(heading, fields)`` pairs, each field
+    printed under its heading.  ``values`` maps a field to the text it prints:
+    a number cut to its meaningful digits (:func:`significant`), or an empty
+    state that says why it is empty.  The view reads that text off fields.
     """
     if _is_parameter(model):
         return parameter_text(model)
-    if order is None and not show_empty and head is None:
+    if (order is None and groups is None and not show_empty and head is None
+            and values is None):
         one = _one_line(model)
         if one is not None:
             return one
     first = head or type(model).__name__
-    return "\n".join([first] + _tree_lines(model, "  ", order, show_empty))
+    if groups is None:
+        return "\n".join([first] + _tree_lines(model, "  ", order, show_empty, values))
+    lines = [first]
+    for heading, names in groups:
+        lines += ["  " + heading, *_tree_lines(model, "    ", names, show_empty, values)]
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------

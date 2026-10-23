@@ -732,13 +732,13 @@ A development build of 1.10 printed this on 2026-10-20, so the version strings a
 
 ```text
 Provenance
-  package_version: '1.10.0.dev0'
-  schema_version: '0.59'
-  backend: 'numpy'
-  dtype: 'float64'
-  solver: 'lm'
+  package_version:           '1.10.0.dev0'
+  schema_version:            '0.59'
+  backend:                   'numpy'
+  dtype:                     'float64'
+  solver:                    'lm'
   report_thresholds_version: '1.12'
-  created_utc: '2026-10-20T02:29:39Z'
+  created_utc:               '2026-10-20T02:29:39Z'
 ```
 
 | Field | Holds |

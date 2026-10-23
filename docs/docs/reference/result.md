@@ -427,6 +427,7 @@ print(series.summary(deliverable="series"))
 
 Every rietx object prints as text you can read, and a notebook cell shows the same text.
 A model prints as an indented tree with one line per parameter: its value with the esd in brackets, its unit, and `(vary)` when it is free.
+The one-line fields of a block print their values in one column.
 Fields that are `None` or empty are left out.
 A long sequence prints as a count and a range, in `repr` and in `print` alike, so a pattern never prints its channels:
 
@@ -440,10 +441,10 @@ print(data)
 
 ```text
 PatternData of 500 points, 10–19.98° 2θ, median step 0.02°
-  intensity: <500 floats 100…599>
-  sigma: None
+  intensity:        <500 floats 100…599>
+  sigma:            None
   excluded_regions: none
-  metadata: none
+  metadata:         none
 ```
 
 The numbers are still there.
@@ -454,7 +455,7 @@ These objects print a view of their own:
 | Object | Prints |
 |---|---|
 | `PatternData` | the range and step, then whether σ came with the file |
-| `PatternDiagnostics` | every field, `signal_cutoffs` first, an empty finding as `none` |
+| `PatternDiagnostics` | every field under three headings, each number to three significant figures; an empty finding as `none`, and a check that could not run as `not checked` |
 | `RefinementResult` | the termination view in [Printing a result](#printing-a-result) |
 | `RefinedParameter`, `ParameterRow` | `path  value(esd)  state` on one line, so `ref.parameters()` reads as a table |
 | `Diagnostic` | `level[CODE]: message`, then `at:` with the paths and `help:` with the suggestion |

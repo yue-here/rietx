@@ -72,21 +72,82 @@ def test_a_free_parameter_is_marked_and_carries_its_esd(fap):
     assert text.endswith(" Å (vary)") and "(" in text.split()[0]
 
 
-def test_diagnostics_print_every_field_in_reading_order(fap):
+def test_diagnostics_print_every_field_under_its_heading(fap):
+    """Three headings, the maintainer's choice of 2026-10-23 (WP-2037): every
+    field once, the range in the head, and ``contamination_searches`` read by
+    the ``contamination`` row rather than printed as one of its own."""
     from rietx.background.diagnostics import PatternDiagnostics
-    order = PatternDiagnostics._READING_ORDER
-    fields = set(PatternDiagnostics.model_fields) - {"n_points", "two_theta_min",
-                                                     "two_theta_max"}
+    groups = PatternDiagnostics._READING_ORDER
+    order = [name for _, names in groups for name in names]
+    fields = set(PatternDiagnostics.model_fields) - {
+        "n_points", "two_theta_min", "two_theta_max", "contamination_searches"}
     assert sorted(order) == sorted(fields), "every field once, the range in the head"
+    assert [heading for heading, _ in groups] == [
+        "checked on every pattern", "matters on some instruments",
+        "rietx's own measurements"]
     lines = str(rx.diagnose(fap["data"], wavelength=1.5406)).splitlines()
-    assert lines[1] == "  signal_cutoffs: none", "an empty finding is printed, first"
-    assert [ln.split(":")[0].strip() for ln in lines[1:]] == list(order)
+    expected = []
+    for heading, names in groups:
+        expected += [heading, *names]
+    assert [ln.split(":")[0].strip() for ln in lines[1:]] == expected
+    assert lines[1] == "  checked on every pattern"
+    assert lines[2].startswith("    signal_cutoffs:"), "an empty finding is printed, first"
 
 
-def test_a_pattern_prints_its_sigma_even_when_absent(fap):
+def test_diagnostics_cut_their_numbers_and_say_which_checks_did_not_run(fap):
+    """Each empty state is read off a field, never recomputed: FAP.XRA has no
+    σ column, so the three σ checks did not run, and the ghost screen runs
+    only when it was given a wavelength."""
+    d = rx.diagnose(fap["data"], wavelength=1.5406)
+    rows = {ln.split(":")[0].strip(): ln.split(":", 1)[1].strip()
+            for ln in str(d).splitlines()[1:] if ":" in ln}
+    for name in ("dead_channels", "coverage_plateau", "coverage_regions"):
+        assert rows[name] == "not checked (no measured σ)", name
+    assert rows["contamination"] == "none", "the screen ran and found nothing"
+    assert d.contamination_searches == ["kbeta", "tungsten_la"]
+    assert rows["signal_cutoffs"] == "none"
+    assert rows["steps_per_fwhm"] == "4.65" and rows["baseline_lambda"] == "10000"
+    assert rows["peak_density_per_deg"] == "0.843"
+
+    blind = rx.diagnose(fap["data"])
+    assert blind.contamination == [] and blind.contamination_searches == []
+    assert "    contamination:        not checked" in str(blind).splitlines()
+
+    measured = d.model_copy(update={"coverage_plateau": 1.0})
+    lines = str(measured).splitlines()
+    assert "    dead_channels:        none" in lines, "σ measured: checked, and nothing"
+    assert "    coverage_plateau:     1.00" in lines
+    unmeasurable = d.model_copy(update={"steps_per_fwhm": None, "n_peaks_measured": 0})
+    assert ("    steps_per_fwhm:       not measured (no peak measurable)"
+            in str(unmeasurable).splitlines())
+    unrecorded = d.model_copy(update={"contamination_searches": None})
+    assert ("    contamination:        none, or not checked (not recorded)"
+            in str(unrecorded).splitlines())
+
+
+def test_a_number_is_cut_to_three_significant_figures():
+    from rietx._display import significant
+    cases = {4.6463609: "4.65", 146.22781: "146", 10000.0: "10000",
+             0.84318498: "0.843", 12.041595: "12.0", 9.996: "10.0",
+             123456.7: "123457", 1e7: "1e+07", 1.234e-5: "1.23e-05", 0.0: "0",
+             -0.0517: "-0.0517"}
+    assert {x: significant(x) for x in cases} == cases
+
+
+def test_a_block_prints_its_values_in_one_column(fap):
+    """WP-2037: the one-line fields of a block share a value column; a field
+    that opens a block of its own keeps ``name: Type``.  A ``Parameter`` keeps
+    its own digits, since a wavelength needs them."""
     lines = str(fap["data"]).splitlines()
     assert lines[0].startswith("PatternData of 5753 points, 15–130.04° 2θ")
-    assert "  sigma: None" in lines
+    assert "  sigma:            None" in lines
+    starts ={len(ln) - len(ln.split(":", 1)[1].lstrip()) for ln in lines[1:]}
+    assert starts == {len("  excluded_regions: ")}, lines
+    text = str(fap["instrument"]).splitlines()
+    assert "  source: Source" in text, "a block's opener keeps its form"
+    assert "    polarization: 0.5" in text
+    assert "    kind:         'xray_cw'" in text, "padded to its longest sibling"
+    assert any("wavelength=1.5405929 Å" in ln for ln in text)
 
 
 def test_a_parameter_row_prints_on_one_line(fap):

@@ -19,30 +19,50 @@ This runs on the GSAS-II tutorial fluorapatite pattern that ships with rietx:
 
 <!-- output of examples/guides/check.py -->
 ```text
-signal cutoffs: []
-dead channels: [] | sigma measured: False
-steps per FWHM: 4.6 over 76 peaks
-contamination: []
-air-scatter gain: 0.75
+PatternDiagnostics of 5753 points, 15–130.04° 2θ
+  checked on every pattern
+    signal_cutoffs:       none
+    steps_per_fwhm:       4.65
+    n_peaks_measured:     76
+    contamination:        none
+    signal_to_background: 146
+  matters on some instruments
+    dead_channels:        not checked (no measured σ)
+    coverage_plateau:     not checked (no measured σ)
+    coverage_regions:     not checked (no measured σ)
+    air_scatter_gain:     0.745
+    amorphous_hump_score: 0.162
+  rietx's own measurements
+    baseline_lambda:      10000
+    noise_sigma_median:   12.0
+    peak_fraction:        0.524
+    n_peaks:              97
+    peak_density_per_deg: 0.843
 ```
 
-`print(d)` lists all eighteen fields, starting with `signal_cutoffs`.
-Read the five above in this order:
+The rows fall under three headings.
+Read the first group on every pattern.
+The second group matters on some instruments and specimens: a detector with dead cells, a bank of detectors, air scatter at low angle, or an amorphous hump.
+The third holds numbers rietx measures for its own use, such as the baseline stiffness it chose.
+A row reads `none` when its check ran and found nothing, and `not checked` when the check could not run.
+
+Read these five rows in this order:
 
 1. `signal_cutoffs` names an end of the range where the counts collapsed and stayed down, behind a beamstop or past the detector's edge.
    Its `two_theta` is where to set the fit range.
    Every other field is measured over the whole range, so after you trim, call `diagnose` again on the trimmed range.
-2. `dead_channels` names short runs that count almost nothing with a tiny σ.
+2. `steps_per_fwhm` is how many 2θ steps span the top of a typical peak.
+   The IUCr guidelines ask for five to ten {cite}`mccusker1999`.
+   This pattern has 4.65, so the integrated intensities are slightly under-sampled, and the fit reports `PATTERN_UNDERSAMPLED`.
+   Only a new measurement at a finer step fixes it.
+3. `contamination` lists Kβ or tungsten Lα lines, each at a fixed ratio to its parent reflection.
+   Without a wavelength the row reads `not checked`.
+   A synchrotron wavelength reads the same, because it has no anode lines.
+4. `dead_channels` names short runs that count almost nothing with a tiny σ.
    Such a channel can carry thousands of times the weight of a live one, and it drags the background down to meet it.
    Exclude it as [How to limit the fit range or leave out a region](range.md) shows.
-   The check needs the file to give a σ for each point, so on this pattern, which gives none, the empty list means not checked.
-   `coverage_plateau` is `None` when σ was not measured.
-3. `steps_per_fwhm` is how many 2θ steps span the top of a typical peak.
-   The IUCr guidelines ask for five to ten {cite}`mccusker1999`.
-   This pattern has 4.6, so the integrated intensities are slightly under-sampled, and the fit reports `PATTERN_UNDERSAMPLED`.
-   Only a new measurement at a finer step fixes it.
-4. `contamination` lists Kβ or tungsten Lα lines, each at a fixed ratio to its parent reflection.
-   It stays empty without a wavelength, and for a synchrotron wavelength, which has no anode lines.
+   The check needs the file to give a σ for each point.
+   This pattern gives none, so the row reads `not checked (no measured σ)`.
 5. `air_scatter_gain` measures the low-angle rise from air scatter.
    Above 0.3, `auto_background` adds a 1/2θ term to the background.
 
@@ -79,7 +99,7 @@ It returns the model with the scores it chose on:
 ```text
 BackgroundPSpline with 41 coefficients
 knot step 3°: hump score 0.162, trigger 0.05
-air-scatter term True: gain 0.75, trigger 0.3
+air-scatter term True: gain 0.745, trigger 0.3
 ```
 
 It sets the knots 3° apart because `amorphous_hump_score` is above its trigger, and 8° apart otherwise.
@@ -92,4 +112,4 @@ The full script is `examples/guides/check.py`.
 ## See also
 
 - [How to limit the fit range or leave out a region](range.md) acts on what this check finds.
-- [Pattern diagnostics](../reference/pattern-diagnostics.md) gives all eighteen fields and the measurements behind them.
+- [Pattern diagnostics](../reference/pattern-diagnostics.md) gives every field and the measurements behind them.

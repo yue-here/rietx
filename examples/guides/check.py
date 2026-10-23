@@ -14,12 +14,7 @@ from rietx.examples import examples_dir
 
 data = rx.read_pattern(examples_dir() / "FAP.XRA")
 d = rx.diagnose(data, wavelength=1.5406)
-
-print("signal cutoffs:", d.signal_cutoffs)
-print("dead channels:", d.dead_channels, "| sigma measured:", d.coverage_plateau is not None)
-print(f"steps per FWHM: {d.steps_per_fwhm:.1f} over {d.n_peaks_measured} peaks")
-print("contamination:", d.contamination)
-print(f"air-scatter gain: {d.air_scatter_gain:.2f}")
+print(d)
 # guide: end
 
 # guide: ticks start
@@ -35,13 +30,15 @@ print(type(background).__name__, "with", len(background.coefficients), "coeffici
 print(f"knot step {choice.knot_step_deg:g}°: hump score "
       f"{choice.amorphous_hump_score:.3f}, trigger {choice.hump_trigger:g}")
 print(f"air-scatter term {choice.air_scatter}: gain "
-      f"{choice.air_scatter_gain:.2f}, trigger {choice.air_scatter_trigger:g}")
+      f"{choice.air_scatter_gain:.3g}, trigger {choice.air_scatter_trigger:g}")
 # guide: background end
 
 assert d.signal_cutoffs == [] and d.dead_channels == [] and d.contamination == []
+assert d.contamination_searches == ["kbeta", "tungsten_la"]  # checked, and clean
 assert d.coverage_plateau is None  # FAP.XRA carries no esd column
-assert round(d.steps_per_fwhm, 1) == 4.6 and d.n_peaks_measured == 76
-assert round(d.air_scatter_gain, 2) == 0.75
+assert round(d.steps_per_fwhm, 2) == 4.65 and d.n_peaks_measured == 76
+assert round(d.air_scatter_gain, 3) == 0.745
+assert round(d.signal_to_background) == 146
 assert type(background).__name__ == "BackgroundPSpline"
 assert len(background.coefficients) == 41
 assert background.air_scatter is not None
