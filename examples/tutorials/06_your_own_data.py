@@ -28,11 +28,16 @@ import numpy as np
 import rietx as rx
 from rietx.examples import examples_dir
 
-PATTERN = examples_dir() / "FAP.XRA"            # ✏️ your pattern
-CIFS = [examples_dir() / "fluorapatite.cif"]    # ✏️ one CIF per crystalline phase
-instrument = rx.Instrument.bragg_brentano(radiation="CuKa")  # ✏️ the anode: "CuKa", "CoKa", "MoKa", ...
-TWO_THETA_LIMITS = (15, 130)                    # ✏️ the range to fit, in degrees 2θ; None fits all of it
-OUTPUT = Path("rietx_output")                   # where the last cell writes
+# ✏️ your pattern
+PATTERN = examples_dir() / "FAP.XRA"
+# ✏️ one CIF per crystalline phase
+CIFS = [examples_dir() / "fluorapatite.cif"]
+# ✏️ the anode: "CuKa", "CoKa", "MoKa", ...
+instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
+# ✏️ the range to fit, in degrees 2θ; None fits all of it
+TWO_THETA_LIMITS = (15, 130)
+# where the last cell writes
+OUTPUT = Path("rietx_output")
 
 # %% [markdown]
 # `rx.read_pattern` recognises the format from the file.
@@ -52,7 +57,11 @@ data.plot()
 # The instrument's source gives it the wavelength and the lines the beam can carry, so it can screen for Kβ and tungsten Lα lines.
 
 # %%
-diag = rx.diagnose(data, wavelength=instrument.source.primary_wavelength, source=instrument.source)
+diag = rx.diagnose(
+    data,
+    wavelength=instrument.source.primary_wavelength,
+    source=instrument.source,
+)
 diag
 
 # %% [markdown]
@@ -74,7 +83,8 @@ phases = [phase for cif in CIFS for phase in rx.Structure.from_cif(cif).phases]
 structure = rx.Structure(phases=phases)
 
 instrument.background = rx.BackgroundChebyshev.with_terms(6)
-instrument.background.coefficients[0].value = float(np.percentile(data.intensity, 5))
+c0 = float(np.percentile(data.intensity, 5))
+instrument.background.coefficients[0].value = c0
 
 ref = rx.Refinement(structure, instrument)
 ref
@@ -83,7 +93,8 @@ ref
 # Draw the model's reflection positions under the data before fitting.
 
 # %%
-data.plot(model=ref, two_theta_range=(25, 35))  # ✏️ any 10° with strong peaks
+# ✏️ any 10° with strong peaks
+data.plot(model=ref, two_theta_range=(25, 35))
 
 # %% [markdown]
 # Every observed peak in the window should have a tick under it.
@@ -102,7 +113,11 @@ data.plot(model=ref, two_theta_range=(25, 35))  # ✏️ any 10° with strong pe
 
 # %%
 lebail = rx.Refinement(structure, instrument).fit(
-    data, mode="lebail", plan="profile_only", two_theta_limits=TWO_THETA_LIMITS)
+    data,
+    mode="lebail",
+    plan="profile_only",
+    two_theta_limits=TWO_THETA_LIMITS,
+)
 lebail.plot()
 
 # %% [markdown]
@@ -118,7 +133,11 @@ lebail.plot()
 # [Plan presets](https://rietx.org/docs/stable/reference/plans.html) draws its stages and those of every other plan.
 
 # %%
-result = ref.fit(data, plan="mccusker_structural", two_theta_limits=TWO_THETA_LIMITS)
+result = ref.fit(
+    data,
+    plan="mccusker_structural",
+    two_theta_limits=TWO_THETA_LIMITS,
+)
 result.plot()
 
 # %% [markdown]
@@ -151,7 +170,8 @@ result.parameters
 # `turn="-15x"` tips the view, and `atom_labels=True` names the sites.
 
 # %%
-rx.viz.render_structure(ref.structure)  # ✏️ view=, turn=, phase=1 for a second phase
+# ✏️ view=, turn=, phase=1 for a second phase
+rx.viz.render_structure(ref.structure)
 
 # %% [markdown]
 # ## Save the results
@@ -169,6 +189,12 @@ ref.write_cif(OUTPUT / "refined.cif")
 result.plot(path=OUTPUT / "fit.png")
 rex = OUTPUT / "refinement.rex"
 if not rex.exists():
-    rx.Project.create(rex, pattern=PATTERN, structure=ref.structure, instrument=ref.instrument,
-                      plan="mccusker_structural", two_theta_limits=TWO_THETA_LIMITS).save()
+    rx.Project.create(
+        rex,
+        pattern=PATTERN,
+        structure=ref.structure,
+        instrument=ref.instrument,
+        plan="mccusker_structural",
+        two_theta_limits=TWO_THETA_LIMITS,
+    ).save()
 sorted(item.name for item in OUTPUT.iterdir())

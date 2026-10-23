@@ -56,7 +56,8 @@ lab6_cif.write_text(
     "_atom_site_fract_y\n_atom_site_fract_z\n_atom_site_B_iso_or_equiv\n"
     "La1 La 0 0 0 0.25\n"
     "B1  B  0.1996 0.5 0.5 0.35\n",
-    encoding="utf-8")
+    encoding="utf-8",
+)
 lab6 = rx.Structure.from_cif(lab6_cif)
 
 # %% [markdown]
@@ -72,7 +73,8 @@ ceo2_cif.write_text(
     "_atom_site_fract_y\n_atom_site_fract_z\n_atom_site_B_iso_or_equiv\n"
     "Ce1 Ce 0 0 0 0.3\n"
     "O1  O  0.25 0.25 0.25 0.6\n",
-    encoding="utf-8")
+    encoding="utf-8",
+)
 ceo2 = rx.Structure.from_cif(ceo2_cif)
 
 # %% [markdown]
@@ -104,7 +106,10 @@ rng = np.random.default_rng(0)
 standard = lab6.model_copy(deep=True)
 standard.phases[0].scale.value = 0.006
 y = rx.Refinement(standard, instrument).predict(two_theta)
-standard_data = rx.PatternData(two_theta=two_theta, intensity=rng.poisson(y).astype(float))
+standard_data = rx.PatternData(
+    two_theta=two_theta,
+    intensity=rng.poisson(y).astype(float),
+)
 standard_data.plot(two_theta_range=(15, 70))
 
 # %% [markdown]
@@ -114,16 +119,20 @@ standard_data.plot(two_theta_range=(15, 70))
 # rietx reads a size back at the source's longest emission line, so the conversion uses that line too.
 
 # %%
-TRUE_SIZE = 300.0      # Å, coherent domain size
-TRUE_STRAIN = 1.0e-3   # Δd/d
+TRUE_SIZE = 300.0  # Å, coherent domain size
+TRUE_STRAIN = 1.0e-3  # Δd/d
 wavelength = max(line.wavelength.value for line in instrument.source.lines)
 
 sample_truth = ceo2.model_copy(deep=True)
-sample_truth.phases[0].scale.value = 0.0016
-sample_truth.phases[0].lor_size.value = size_coefficient_for_size(TRUE_SIZE, wavelength)
-sample_truth.phases[0].lor_strain.value = strain_coefficient_for_microstrain(TRUE_STRAIN)
+phase = sample_truth.phases[0]
+phase.scale.value = 0.0016
+phase.lor_size.value = size_coefficient_for_size(TRUE_SIZE, wavelength)
+phase.lor_strain.value = strain_coefficient_for_microstrain(TRUE_STRAIN)
 y = rx.Refinement(sample_truth, instrument).predict(two_theta)
-sample_data = rx.PatternData(two_theta=two_theta, intensity=rng.poisson(y).astype(float))
+sample_data = rx.PatternData(
+    two_theta=two_theta,
+    intensity=rng.poisson(y).astype(float),
+)
 
 # %% [markdown]
 # ## Calibrate the instrument on the standard
@@ -160,9 +169,15 @@ calibrated
 # Now compare the refined terms with the instrument that made the data.
 
 # %%
-TRUE_INSTRUMENT = ["instrument.profile.u", "instrument.profile.v", "instrument.profile.w",
-                   "instrument.profile.x", "instrument.profile.y", "instrument.zero_shift",
-                   "instrument.geometry.sample_displacement"]
+TRUE_INSTRUMENT = [
+    "instrument.profile.u",
+    "instrument.profile.v",
+    "instrument.profile.w",
+    "instrument.profile.x",
+    "instrument.profile.y",
+    "instrument.zero_shift",
+    "instrument.geometry.sample_displacement",
+]
 [calibrated.parameter(path) for path in TRUE_INSTRUMENT]
 
 # %% [markdown]
@@ -231,7 +246,10 @@ result.microstructure[0]
 # %%
 skipped = rx.Instrument.bragg_brentano(radiation="CuKa")
 skipped.background = rx.BackgroundChebyshev.with_terms(4)
-uncalibrated = rx.Refinement(ceo2, skipped).fit(sample_data, plan="lab_sample_refine")
+uncalibrated = rx.Refinement(ceo2, skipped).fit(
+    sample_data,
+    plan="lab_sample_refine",
+)
 uncalibrated
 
 # %% [markdown]

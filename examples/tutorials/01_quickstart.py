@@ -81,7 +81,8 @@ diag
 structure = rx.Structure.from_cif(examples_dir() / "fluorapatite.cif")
 instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 instrument.background = rx.BackgroundChebyshev.with_terms(6)
-instrument.background.coefficients[0].value = float(np.percentile(data.intensity, 5))
+c0 = float(np.percentile(data.intensity, 5))
+instrument.background.coefficients[0].value = c0
 
 ref = rx.Refinement(structure, instrument)
 ref
@@ -120,7 +121,12 @@ data.plot(model=ref, two_theta_range=(25, 35))
 
 # %%
 LIMITS = (15, 130)
-result = ref.fit(data, mode="lebail", plan="profile_only", two_theta_limits=LIMITS)
+result = ref.fit(
+    data,
+    mode="lebail",
+    plan="profile_only",
+    two_theta_limits=LIMITS,
+)
 result
 
 # %% [markdown]
@@ -147,8 +153,18 @@ result
 # The intensities and the profile converge only by alternating, so run the plan twice more.
 
 # %%
-second = ref.fit(data, mode="lebail", plan="profile_only", two_theta_limits=LIMITS)
-third = ref.fit(data, mode="lebail", plan="profile_only", two_theta_limits=LIMITS)
+second = ref.fit(
+    data,
+    mode="lebail",
+    plan="profile_only",
+    two_theta_limits=LIMITS,
+)
+third = ref.fit(
+    data,
+    mode="lebail",
+    plan="profile_only",
+    two_theta_limits=LIMITS,
+)
 ref.history
 
 # %% [markdown]

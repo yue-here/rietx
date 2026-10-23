@@ -9,8 +9,8 @@ name: CI
 #
 # What runs per push, and per PR once it is out of draft:
 #
-#   lint                          ruff over src/tests/examples, Vale over the
-#                                 manual, and on a PR the skill size
+#   lint                          ruff over src/tests/examples, the tutorials'
+#                                 format, Vale over the manual, and on a PR the skill size
 #                                 limits against its base; the one job a
 #                                 draft PR runs (~40 s)
 #   changes                       `scope`: docs when a PR changes only the
@@ -123,6 +123,9 @@ jobs:
       - run: uv venv --python 3.13
       - run: uv pip install -e ".[dev]"
       - run: .venv/bin/python -m ruff check src tests examples
+      # the tutorials' layout, one argument a line at 79 columns (WP-2037,
+      # examples/tutorials/ruff.toml); the rest of the tree is not formatted
+      - run: .venv/bin/python -m ruff format --check examples/tutorials
       - name: Vale over the manual
         # The prose linter over docs/docs/ (WP-1982; rules and layers in
         # .vale.ini).  An error-level alert fails the job, and a warning is

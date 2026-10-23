@@ -45,7 +45,8 @@ cif.write_text(
     "C1  C  0.25 0.7627 0.0850 0.80\n"
     "O1  O  0.25 0.9231 0.0952 1.25\n"
     "O2  O  0.4729 0.6801 0.0870 1.19\n",
-    encoding="utf-8")
+    encoding="utf-8",
+)
 truth = rx.Structure.from_cif(cif)
 
 # %% [markdown]
@@ -64,8 +65,10 @@ two_theta = np.arange(10, 80, 0.02)
 y = rx.Refinement(truth, true_instrument).predict(two_theta) - 200.0
 truth.phases[0].scale.value *= 20000 / y.max()
 y = rx.Refinement(truth, true_instrument).predict(two_theta)
-data = rx.PatternData(two_theta=two_theta,
-                      intensity=np.random.default_rng(0).poisson(y).astype(float))
+data = rx.PatternData(
+    two_theta=two_theta,
+    intensity=np.random.default_rng(0).poisson(y).astype(float),
+)
 data.plot()
 
 # %% [markdown]
@@ -136,7 +139,12 @@ chosen
 # With a real unknown, start from the formula and a wide window, and let the search run longer.
 
 # %%
-spec = SearchSpec(systems=("orthorhombic",), min_volume=200, max_volume=250, max_d_axis=8.5)
+spec = SearchSpec(
+    systems=("orthorhombic",),
+    min_volume=200,
+    max_volume=250,
+    max_d_axis=8.5,
+)
 indexing = rx.index_pattern(peaks, data=data, instrument=lab, spec=spec)
 indexing
 
@@ -182,7 +190,8 @@ structure.phases[0].space_group
 # %%
 instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 instrument.background = rx.BackgroundChebyshev.with_terms(4)
-instrument.background.coefficients[0].value = float(np.percentile(data.intensity, 5))
+c0 = float(np.percentile(data.intensity, 5))
+instrument.background.coefficients[0].value = c0
 
 ref = rx.Refinement(structure, instrument)
 first = ref.fit(data, mode="lebail", plan="profile_only")

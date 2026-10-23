@@ -47,7 +47,11 @@ result.status
 # Check that against the data before constraining anything.
 
 # %%
-OXYGENS = ["phases.0.atoms.4.biso", "phases.0.atoms.5.biso", "phases.0.atoms.6.biso"]
+OXYGENS = [
+    "phases.0.atoms.4.biso",
+    "phases.0.atoms.5.biso",
+    "phases.0.atoms.6.biso",
+]
 [result.parameter(path) for path in OXYGENS]
 
 # %% [markdown]
@@ -76,7 +80,11 @@ tied = ref.fit(data, plan="mccusker_structural", two_theta_limits=(15, 130))
 # Run it from where the tied fit ended, and expect a warning about the pair.
 
 # %%
-SHIFTS = ["instrument.zero_shift", "instrument.geometry.sample_displacement", "phases.0.cell.a"]
+SHIFTS = [
+    "instrument.zero_shift",
+    "instrument.geometry.sample_displacement",
+    "phases.0.cell.a",
+]
 both = ref.fit(data, plan="lab_bragg_brentano", two_theta_limits=(15, 130))
 [both.parameter(path) for path in SHIFTS]
 
@@ -85,7 +93,11 @@ both = ref.fit(data, plan="lab_bragg_brentano", two_theta_limits=(15, 130))
 # Ask the diagnostics which pairs they found correlated with the zero shift.
 
 # %%
-[d for d in both.diagnostics if d.code == "HIGH_CORRELATION" and "instrument.zero_shift" in d.where]
+[
+    d
+    for d in both.diagnostics
+    if d.code == "HIGH_CORRELATION" and "instrument.zero_shift" in d.where
+]
 
 # %% [markdown]
 # The first warning says the zero shift and the displacement move together completely.

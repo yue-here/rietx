@@ -214,7 +214,7 @@ a change to what `diagnose` computes, so it stays inside the non-goal below.
 - [ ] Sweep 02-06 for the same patterns: grep
       `drift|walk|hands|takes it up|pedestal|stops early|five nodes|comfortable`, and stage
       counts and node counts written before the closing stage. Fix them and rebuild.
-- [ ] Code layout: `examples/tutorials/ruff.toml` (extending the root config, with
+- [x] Code layout: `examples/tutorials/ruff.toml` (extending the root config, with
       `line-length = 79`), `ruff format` over the sources, and a check that fails on
       unformatted ones. First confirm that `build.py`'s parser still round-trips the
       formatted cells (`test_parse_refuses_what_it_cannot_round_trip`).

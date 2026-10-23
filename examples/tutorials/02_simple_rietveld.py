@@ -40,8 +40,7 @@ instrument.geometry.axial_hl.value = 0.02
 instrument.background = rx.BackgroundChebyshev.with_terms(6)
 
 ref = rx.Refinement(structure, instrument)
-result = ref.fit(data, plan="mccusker_structural",
-                 two_theta_limits=(15, 130))
+result = ref.fit(data, plan="mccusker_structural", two_theta_limits=(15, 130))
 print(result)
 
 # %% [markdown]
@@ -106,7 +105,11 @@ result.stages[6].freed
 # A phosphate's P–O bonds are close to 1.54 Å.
 
 # %%
-[bond for bond in result.geometry.bonds if bond.atom_1 == "P3" and bond.atom_2.startswith("O")]
+[
+    bond
+    for bond in result.geometry.bonds
+    if bond.atom_1 == "P3" and bond.atom_2.startswith("O")
+]
 
 # %% [markdown]
 # Each row is one bond from P3.
@@ -150,10 +153,14 @@ rx.viz.render_structure(ref.structure, turn="-15x")
 # `project.fit()` refines and records each stage there, and `project.save()` writes the settings.
 
 # %%
-project = rx.Project.create(Path(tempfile.mkdtemp()) / "fluorapatite.rex",
-                            pattern=examples_dir() / "FAP.XRA",
-                            structure=ref.structure, instrument=ref.instrument,
-                            plan="mccusker_structural", two_theta_limits=(15, 130))
+project = rx.Project.create(
+    Path(tempfile.mkdtemp()) / "fluorapatite.rex",
+    pattern=examples_dir() / "FAP.XRA",
+    structure=ref.structure,
+    instrument=ref.instrument,
+    plan="mccusker_structural",
+    two_theta_limits=(15, 130),
+)
 project.fit()
 project.save()
 project

@@ -44,7 +44,8 @@ cif.write_text(
     "_atom_site_fract_y\n_atom_site_fract_z\n_atom_site_B_iso_or_equiv\n"
     "La1 La 0 0 0 0.4\n"
     "B1  B  0.1996 0.5 0.5 0.4\n",
-    encoding="utf-8")
+    encoding="utf-8",
+)
 lab6 = rx.Structure.from_cif(cif)
 
 # %% [markdown]
@@ -54,8 +55,8 @@ lab6 = rx.Structure.from_cif(cif)
 
 # %%
 TEMPERATURES = [300, 400, 500, 600, 700, 800, 900]
-A0 = 4.1566          # Å, the cell edge at 300 K
-EXPANSION = 5e-6     # per K
+A0 = 4.1566  # Å, the cell edge at 300 K
+EXPANSION = 5e-6  # per K
 TRUE_A = [A0 * (1 + EXPANSION * (t - 300)) for t in TEMPERATURES]
 
 # %% [markdown]
@@ -84,7 +85,8 @@ def simulate(a, seed):
         getattr(specimen.phases[0].cell, edge).value = a
     specimen.phases[0].scale.value = 5e-4
     y = rx.Refinement(specimen, true_instrument).predict(two_theta)
-    counts = np.random.default_rng(seed).poisson(np.maximum(y, 1.0)).astype(float)
+    rng = np.random.default_rng(seed)
+    counts = rng.poisson(np.maximum(y, 1.0)).astype(float)
     return rx.PatternData(two_theta=two_theta, intensity=counts)
 
 
@@ -102,9 +104,15 @@ patterns[0]
 folder = work / "ramp"
 folder.mkdir()
 for scan, pattern in enumerate(patterns, start=8):
-    np.savetxt(folder / f"scan{scan}.xy", np.column_stack([pattern.two_theta, pattern.intensity]),
-               fmt="%.4f %.0f", encoding="utf-8")
-log = "scan,temperature_K\n" + "".join(f"{scan},{t}\n" for scan, t in enumerate(TEMPERATURES, start=8))
+    np.savetxt(
+        folder / f"scan{scan}.xy",
+        np.column_stack([pattern.two_theta, pattern.intensity]),
+        fmt="%.4f %.0f",
+        encoding="utf-8",
+    )
+log = "scan,temperature_K\n" + "".join(
+    f"{scan},{t}\n" for scan, t in enumerate(TEMPERATURES, start=8)
+)
 (folder / "temperatures.csv").write_text(log, encoding="utf-8")
 
 sorted(path.name for path in folder.glob("*.xy"))
@@ -114,9 +122,15 @@ sorted(path.name for path in folder.glob("*.xy"))
 # Sort on the number in the name instead, and look each temperature up in the log rather than assuming the order.
 
 # %%
-files = sorted(folder.glob("*.xy"), key=lambda path: int(re.search(r"\d+", path.stem).group()))
+files = sorted(
+    folder.glob("*.xy"),
+    key=lambda path: int(re.search(r"\d+", path.stem).group()),
+)
 with open(folder / "temperatures.csv", encoding="utf-8", newline="") as handle:
-    temperature_of = {f"scan{row['scan']}": float(row["temperature_K"]) for row in csv.DictReader(handle)}
+    temperature_of = {
+        f"scan{row['scan']}": float(row["temperature_K"])
+        for row in csv.DictReader(handle)
+    }
 
 loaded = [rx.read_pattern(path) for path in files]
 loaded_x = [temperature_of[path.stem] for path in files]
@@ -165,8 +179,16 @@ instrument.background = rx.BackgroundChebyshev.with_terms(3)
 # `carry=["phases.*", "instrument.zero_shift"]` would restart the background and the peak widths on every pattern.
 
 # %%
-series = rx.refine_sequential(loaded, structure, instrument, carry=["*"], plan="mccusker_default",
-                              x=loaded_x, x_label="T (K)", labels=scans)
+series = rx.refine_sequential(
+    loaded,
+    structure,
+    instrument,
+    carry=["*"],
+    plan="mccusker_default",
+    x=loaded_x,
+    x_label="T (K)",
+    labels=scans,
+)
 series
 
 # %% [markdown]
@@ -225,8 +247,16 @@ series.plot("phases.0.cell.a")
 # `summary(deliverable="series")` prints the rows that decide whether a trajectory can be quoted.
 
 # %%
-both = rx.refine_sequential(loaded, structure, instrument, plan="mccusker_default",
-                            x=loaded_x, x_label="T (K)", labels=scans, direction="both")
+both = rx.refine_sequential(
+    loaded,
+    structure,
+    instrument,
+    plan="mccusker_default",
+    x=loaded_x,
+    x_label="T (K)",
+    labels=scans,
+    direction="both",
+)
 print(both.summary(deliverable="series"))
 
 # %% [markdown]
@@ -250,8 +280,15 @@ both.backward.trajectory("phases.0.cell.a")
 # %%
 jumped = list(loaded)
 jumped[4] = simulate(TRUE_A[4] * 1.02, seed=15)
-series_jump = rx.refine_sequential(jumped, structure, instrument, plan="mccusker_default",
-                                   x=loaded_x, x_label="T (K)", labels=scans)
+series_jump = rx.refine_sequential(
+    jumped,
+    structure,
+    instrument,
+    plan="mccusker_default",
+    x=loaded_x,
+    x_label="T (K)",
+    labels=scans,
+)
 series_jump
 
 # %% [markdown]
@@ -282,8 +319,15 @@ series_jump.trajectory("phases.0.cell.a")
 # %%
 broken = list(loaded)
 broken[4] = simulate(TRUE_A[4] * 1.05, seed=15)
-series_broken = rx.refine_sequential(broken, structure, instrument, plan="mccusker_default",
-                                     x=loaded_x, x_label="T (K)", labels=scans)
+series_broken = rx.refine_sequential(
+    broken,
+    structure,
+    instrument,
+    plan="mccusker_default",
+    x=loaded_x,
+    x_label="T (K)",
+    labels=scans,
+)
 series_broken
 
 # %% [markdown]

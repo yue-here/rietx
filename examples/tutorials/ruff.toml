@@ -1,0 +1,11 @@
+# The tutorials' code is read by people new to Python, so it is laid out by
+# `ruff format` at 79 columns: a call that does not fit takes one argument per
+# line (WP-2037). The notebooks are built from these sources, and build.py is
+# a tool rather than a page, so neither is formatted here.
+extend = "../../pyproject.toml"
+line-length = 79
+# the root's default first-party roots, which a nested config resolves from here
+src = ["../..", "../../src"]
+
+[format]
+exclude = ["*.ipynb", "build.py"]
