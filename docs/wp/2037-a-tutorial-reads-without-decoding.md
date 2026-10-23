@@ -207,7 +207,7 @@ a change to what `diagnose` computes, so it stays inside the non-goal below.
       the parameter table renders in the body font with right-aligned paths.
 - [ ] Fold the rules into the local skills (maintainer's machine, no commit here). Record the
       final wording, and anything `yue-prose` already covered, in the handover entry.
-- [ ] `examples/tutorials/README.md`: the repo-side tutorial rules (prose matches the output,
+- [x] `examples/tutorials/README.md`: the repo-side tutorial rules (prose matches the output,
       and a rebuild rereads it; each model piece shown before a fit uses it; code layout).
 - [ ] Quickstart prose: each stale line and each word in § What the quickstart shows today.
       Rebuild.

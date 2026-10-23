@@ -177,7 +177,7 @@ structure = structure_from_candidate(candidate)
 structure.phases[0].space_group
 
 # %% [markdown]
-# As in notebook 01, start the background at the data's floor and run the plan twice.
+# As in notebook 01, start the background's constant term at the 5th percentile of the counts, and run the plan twice.
 
 # %%
 instrument = rx.Instrument.bragg_brentano(radiation="CuKa")

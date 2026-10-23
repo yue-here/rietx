@@ -90,7 +90,7 @@ data.plot(model=ref, two_theta_range=(25, 35))  # ✏️ any 10° with strong pe
 # From an anode the ticks include each reflection's Kα2 line, so most peaks have a pair.
 # An offset that is the same at every angle points to the zero shift.
 # An offset that grows with angle points to the cell or the wavelength.
-# A fit will not walk far to correct it.
+# Least squares moves a tick only while it still overlaps its peak, so correct a larger offset in the CIF or the instrument first.
 # A peak with no tick points to a phase you have not given a CIF for.
 # [Check the starting cell against the peaks](https://rietx.org/docs/stable/guides/check.html#check-the-starting-cell-against-the-peaks) shows what a wrong cell looks like.
 #
