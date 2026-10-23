@@ -157,6 +157,27 @@ today.
 - `.vale.ini` and `docs/vale/rietx/Metaphor.yml`.
 - `docs/docs/guides/check.md` and `examples/guides/check.py`: the f-string workaround.
 
+### Decisions, 2026-10-23
+
+The maintainer chose both on 2026-10-23, from a brief that measured GitHub's render first.
+
+1. **A notebook display is one monospace block** (the brief's option a). Every
+   `_repr_html_` that mixes `<pre>`, `<table>` and `<details>` becomes one `<pre>`. GitHub's
+   sanitiser strips `<details>` and `<summary>`, and both GitHub and JupyterLab right-align a
+   bare table's cells in the body font. Each diagnostic's explanation stays in the notebook
+   form, as indented text under its `help:` line. The text form keeps leaving it out
+   (WP-1985). Rejected: a pointer to `rietx.help.explain` in place of the paragraph, the
+   rustc `--explain` pattern, because it makes the reader run code to decode a warning. Also
+   rejected: keeping the fold with monospace inside it, which leaves several blocks.
+2. **`PatternDiagnostics` prints all fifteen rows under three headings** (option a): the
+   rows checked on every pattern, the rows that matter on some instruments, and rietx's own
+   measurements. Rejected: hiding the third group from the print, which would reverse
+   WP-1544's every-field test.
+
+The "not checked" state for `contamination` needs a field, since an empty list today means
+both "clean" and "no wavelength given". Recording which searches ran is a record field, not
+a change to what `diagnose` computes, so it stays inside the non-goal below.
+
 ### Invariants
 
 - `_display.py`'s three rules: a display reads fields and never computes; no glosses (a
@@ -178,9 +199,12 @@ today.
 
 ## Tasks
 
-- [ ] On the maintainer's machine, first: look at GitHub's render of 01's Out[6]-Out[8], and
+- [x] On the maintainer's machine, first: look at GitHub's render of 01's Out[6]-Out[8], and
       record which cause note 10 was: the stale prose, or the paragraphs described under
-      **How the fit result renders**.
+      **How the fit result renders**. Both, measured 2026-10-23 in headless Chrome on the
+      `notebooks.githubusercontent.com` frame: the sanitiser strips `<details>`/`<summary>`,
+      so every explanation renders open in the body font between two `<pre>` blocks, and
+      the parameter table renders in the body font with right-aligned paths.
 - [ ] Fold the rules into the local skills (maintainer's machine, no commit here). Record the
       final wording, and anything `yue-prose` already covered, in the handover entry.
 - [ ] `examples/tutorials/README.md`: the repo-side tutorial rules (prose matches the output,
@@ -195,11 +219,11 @@ today.
       unformatted ones. First confirm that `build.py`'s parser still round-trips the
       formatted cells (`test_parse_refuses_what_it_cannot_round_trip`).
 - [ ] Display: align the values in `_display.tree`'s key/value lines, cut the digits, and make
-      `PatternDiagnostics` say "not checked" where a check did not run. Settle the third kind
-      of row with the maintainer. Update `tests/test_display.py`, and
+      `PatternDiagnostics` say "not checked" where a check did not run. Three headings
+      (Decision 2). Update `tests/test_display.py`, and
       `guides/check.md`/`examples/guides/check.py` if the display replaces their f-string.
-- [ ] Fit result's HTML display: one monospace block per output. Either the explanation
-      paragraph appears in the text display too, or it leaves the HTML.
+- [ ] Notebook displays: one monospace block per output, every `_repr_html_` (Decision 1),
+      each diagnostic's explanation indented under its `help:` line.
 - [ ] `plot_pattern`: with `model=`, draw the model's background at its starting values, and
       name the radiation or λ from `model.instrument` or `data.metadata`, absent when neither
       knows it. Tests in `tests/test_viz.py`, and look at the figure.
