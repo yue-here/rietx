@@ -22,6 +22,7 @@ anisotropy
 antiparallel
 antiphase
 antisite
+aragonite
 attenuator
 bcc
 beamline
@@ -349,6 +350,7 @@ docstrings
 filesystem
 frontend
 lookups
+quickstart
 recurses
 refinable
 renderer
@@ -378,3 +380,8 @@ ulp
 
 # People the manual names (start/this-manual.md).
 Yue
+
+# Authors the tutorials cite (examples/tutorials).
+Dal
+Negro
+Ungaretti

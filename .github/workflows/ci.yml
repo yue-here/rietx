@@ -126,8 +126,9 @@ jobs:
       # the tutorials' layout, one argument a line at 79 columns (WP-2037,
       # examples/tutorials/ruff.toml); the rest of the tree is not formatted
       - run: .venv/bin/python -m ruff format --check examples/tutorials
-      - name: Vale over the manual
-        # The prose linter over docs/docs/ (WP-1982; rules and layers in
+      - name: Vale over the manual and the tutorials
+        # The prose linter over docs/docs/ and the tutorials' markdown cells
+        # (WP-2037, extracted by `build.py --prose`) (WP-1982; rules and layers in
         # .vale.ini).  An error-level alert fails the job, and a warning is
         # printed for whoever edits the page; suggestions are left to a local
         # run.  Here rather than in the suite because Vale is a Go binary, not
@@ -142,7 +143,8 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$VALE" -C "$RUNNER_TEMP" vale
           "$RUNNER_TEMP/vale" sync
           .venv/bin/python -c "import sys; sys.path.insert(0, 'docs'); import reference_pages; reference_pages.write_bodies()"
-          "$RUNNER_TEMP/vale" --minAlertLevel=warning docs/docs
+          .venv/bin/python examples/tutorials/build.py --prose
+          "$RUNNER_TEMP/vale" --minAlertLevel=warning docs/docs examples/tutorials/_prose
       - name: Skill size limits
         # Here rather than in the suite because a draft runs this job alone,
         # and a WP branch lives as a draft: the author sees each capped file's

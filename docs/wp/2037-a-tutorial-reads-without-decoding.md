@@ -229,7 +229,7 @@ a change to what `diagnose` computes, so it stays inside the non-goal below.
       knows it. Tests in `tests/test_viz.py`, and look at the figure.
 - [ ] Quickstart: a cell showing the background against the data once it is set (needs the
       previous task).
-- [ ] Enforcement: `build.py` lists the cells whose text output changed, with the markdown
+- [x] Enforcement: `build.py` lists the cells whose text output changed, with the markdown
       cell under each. Run Vale's `rietx` style (at least `Metaphor` and `Terms`) over the
       tutorials' markdown cells, by extracting them to a temporary `.md`.
 - [ ] Rebuild every notebook, then run the tests below.

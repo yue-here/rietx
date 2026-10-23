@@ -61,6 +61,7 @@ Nothing on the page should make them decode something.
   The markdown before a cell says what to expect.
   The markdown after it says what the output showed, in the output's own words.
 - A rebuild that changes an output rereads the markdown under it.
+  `build.py` lists each such cell with the first line of that markdown.
   Nothing else catches prose that has fallen behind its output.
 - Each piece of the model gets a cell that shows it against the data before a fit uses it.
 - A thing keeps one name on a page.
@@ -70,6 +71,10 @@ Nothing on the page should make them decode something.
 - A call that does not fit 79 columns takes one argument per line, with a trailing comma.
   `ruff format examples/tutorials` lays the sources out that way, and `ruff format --check examples/tutorials` fails on one it has not.
   Never pad the `=` signs into a column: PEP 8 forbids spaces around a keyword `=`.
+
+The manual's prose linter reads the markdown cells too.
+`python examples/tutorials/build.py --prose` writes them to `_prose/`, and `vale examples/tutorials/_prose` checks them against the manual's rules.
+CI runs both, and fails on an error.
 
 A template is listed in `build.py`'s `UNEXECUTED`: its build executes it and commits it without outputs, so nothing from the example files reads as the reader's own.
 

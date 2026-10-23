@@ -146,7 +146,7 @@ held = ref.fit(data, plan="lab_bragg_brentano", two_theta_limits=(15, 130))
 # ## The final structural fit
 #
 # `lab_bragg_brentano` refines the profile and the instrument but leaves the atoms alone.
-# Refine the structure once more, with the zero shift held, the displacement as just measured, and the tie in place.
+# Refine the structure once more, with the zero shift held, the displacement at the value the last fit measured, and the tie in place.
 
 # %%
 final = ref.fit(data, plan="mccusker_structural", two_theta_limits=(15, 130))

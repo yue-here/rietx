@@ -110,6 +110,8 @@ docs/vale/Microsoft/
 # Copied at Sphinx build time from examples/tutorials/ (docs/sphinx_shared.py's
 # copy_tutorials, called by docs/docs/conf.py).
 docs/docs/start/tutorials/
+# The tutorials' markdown cells, extracted for Vale (`build.py --prose`).
+examples/tutorials/_prose/
 
 # The landing page (docs/landing/, WP-1331).  Three rules, and they are here
 # rather than beside the rules they answer because ORDER decides: the last

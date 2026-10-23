@@ -50,12 +50,12 @@ lab6 = rx.Structure.from_cif(cif)
 
 # %% [markdown]
 # The ramp runs from 300 K to 900 K in steps of 100 K.
-# The cell edge grows by 5 × 10⁻⁶ of its 300 K length per kelvin, which is 0.05 % a step.
+# The lattice parameter a grows by 5 × 10⁻⁶ of its 300 K length per kelvin, which is 0.05 % a step.
 # `TRUE_A` holds the edge each pattern is made with.
 
 # %%
 TEMPERATURES = [300, 400, 500, 600, 700, 800, 900]
-A0 = 4.1566  # Å, the cell edge at 300 K
+A0 = 4.1566  # Å, the lattice parameter a at 300 K
 EXPANSION = 5e-6  # per K
 TRUE_A = [A0 * (1 + EXPANSION * (t - 300)) for t in TEMPERATURES]
 
@@ -72,7 +72,7 @@ true_instrument.background.coefficients[1].value = -6.0
 true_instrument.background.coefficients[2].value = 1.5
 
 # %% [markdown]
-# `simulate` makes one pattern at a given cell edge: `predict` computes it, and Poisson counts are drawn from it.
+# `simulate` makes one pattern at a given lattice parameter a: `predict` computes it, and Poisson counts are drawn from it.
 # It stays a function because the ramp calls it once a pattern, and the last two sections call it again.
 
 # %%
@@ -292,7 +292,7 @@ series_jump = rx.refine_sequential(
 series_jump
 
 # %% [markdown]
-# `SEQUENTIAL_DISCONTINUITY` marks the step, once for each cell edge, because the cubic cell ties b and c to a.
+# `SEQUENTIAL_DISCONTINUITY` marks the step, once for each of a, b and c, because the cubic cell ties b and c to a.
 # It cannot tell a real change from a failed fit, so check the pattern's own fit before reading the jump as physics.
 # [Check a step against two independent fits](https://rietx.org/docs/stable/guides/path.html#check-a-step-against-two-independent-fits) shows the check rietx runs for you.
 #

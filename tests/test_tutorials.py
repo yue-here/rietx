@@ -235,6 +235,39 @@ def test_check_sees_a_template_with_outputs(tmp_path):
     (tmp_path / f"{stem}.ipynb").write_text(nbformat.writes(nb), encoding="utf-8")
     assert build.check(tmp_path) == [f"{stem}.ipynb: a template is committed without outputs"]
 
+
+def test_a_rebuild_names_the_markdown_under_a_changed_output():
+    """A cell whose text output moved is listed with the markdown that
+    describes it; an inserted cell and an unchanged one are not (WP-2037)."""
+    v4 = nbformat.v4
+
+    def nb(*cells):
+        return v4.new_notebook(cells=list(cells))
+
+    def code(source, text, n):
+        out = v4.new_output("execute_result", data={"text/plain": text}, execution_count=n)
+        return v4.new_code_cell(source, outputs=[out], execution_count=n)
+
+    old = nb(code("a", "1", 1), v4.new_markdown_cell("A is one."),
+             code("b", "2", 2), v4.new_markdown_cell("B is two.\nMore."))
+    new = nb(code("z", "0", 1), v4.new_markdown_cell("Z is new."),
+             code("a", "1", 2), v4.new_markdown_cell("A is one."),
+             code("b", "3", 3), v4.new_markdown_cell("B is two.\nMore."))
+    assert build.changed_outputs(old, new) == [
+        "Out[1] 'z': reread 'Z is new.'",
+        "Out[3] 'b': reread 'B is two.'"]
+    assert build.changed_outputs(new, new) == []
+
+
+def test_prose_writes_only_the_markdown(tmp_path):
+    """``--prose`` hands Vale the markdown cells and none of the code."""
+    (tmp_path / "01_x.py").write_text(
+        "# %% [markdown]\n# # Title\n#\n# Some words.\n# %%\nx = 1\n# %% [markdown]\n# More.\n",
+        encoding="utf-8", newline="\n")
+    (written,) = build.prose(tmp_path, tmp_path / "out")
+    assert written.read_text(encoding="utf-8") == "# Title\n\nSome words.\n\nMore.\n"
+
+
 def test_problems_sees_stderr_and_a_home_path():
     v4 = nbformat.v4
     cell = v4.new_code_cell("x", outputs=[

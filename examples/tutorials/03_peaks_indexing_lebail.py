@@ -155,7 +155,7 @@ indexing
 # Yet the verdict line says NO CELL.
 # rietx names a single cell only when exactly one candidate reaches high confidence, and this one is low for the reasons in its row.
 #
-# - `predicted_but_absent`: the indexer tests a candidate in the lattice's highest-symmetry space group, and that group has no systematic absences. Aragonite's real space group, Pmcn, has glide planes that remove some reflections. Those reflections are predicted but absent.
+# - `predicted_but_absent`: the indexer tests a candidate in the lattice's highest-symmetry space group, and that group has no systematic absences. Aragonite's real space group, `P m c n`, has glide planes that remove some reflections. Those reflections are predicted but absent.
 # - `indexed_fraction_low`: some usable lines sit at no reflection of this lattice. Most are weak false lines the picker found near strong peaks. The line near 36° is two reflections 0.05° apart, fitted as one line between them.
 #
 # The candidate's `INDEX_IMPURITY_LINES` warning comes from the indexer's own quick Le Bail fit, whose Rwp in the candidate's row is poor.
@@ -213,7 +213,7 @@ best
 # `FLOOR_HIT` says the profile's Y term, the Lorentzian width that grows as tan θ, refined to its lower limit.
 # The pattern was made with no such term, so here the limit is the right answer.
 #
-# The table under the summary starts with the refined cell edges.
+# The table under the summary starts with the refined lattice parameters.
 # They match the CIF's cell, in the candidate's order of axes.
 # Now look at the fit.
 
@@ -224,7 +224,7 @@ best.plot()
 # The fit puts a reflection under every peak and leaves only small residuals, so the lattice is right.
 #
 # Some ticks stand over no peak, such as those near 11° and 15.5°.
-# They are reflections P m m m allows and aragonite's glide planes remove.
+# They are reflections `P m m m` allows and aragonite's glide planes remove.
 #
 # What this does not settle is the space group.
 # That is a question about which reflections are absent, and it comes after the cell is refined.

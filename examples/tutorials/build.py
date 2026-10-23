@@ -17,12 +17,17 @@ notebook carries it uncommented, as jupytext does.  A cell of nothing but
     python examples/tutorials/build.py              # rebuild every notebook
     python examples/tutorials/build.py 01_quickstart  # rebuild one
     python examples/tutorials/build.py --check      # exit 1 if a notebook's cells or stamp are stale
+    python examples/tutorials/build.py --prose      # write the markdown cells to _prose/ for Vale
 
 A rebuild of unchanged code on one machine changes nothing.  Timing is not
 recorded, cell ids are positional, and the notebook metadata holds only what
 a reader needs.  The figures' bytes still depend on the matplotlib that drew
 them, so a rebuild on another machine moves them; ``--check`` therefore
 compares cells and the version stamp, never outputs.
+
+A rebuild lists each code cell whose text output changed, with the markdown
+cell under it (WP-2037).  That markdown says what the output showed, and no
+check can tell whether it still does, so whoever ran the build rereads it.
 
 A build **fails on any stderr output**.  A warning prints the absolute path of
 the file that raised it, and a notebook committed with one carries the
@@ -178,6 +183,61 @@ def build(path: Path) -> Path:
     return out
 
 
+def _text_outputs(cell) -> list[str]:
+    """The text a code cell printed or returned: what its markdown describes."""
+    texts = []
+    for out in cell.get("outputs", []):
+        if out.get("output_type") == "stream":
+            texts.append(out.get("text", ""))
+        elif "text/plain" in out.get("data", {}):
+            texts.append(out["data"]["text/plain"])
+    return texts
+
+
+def changed_outputs(old, new) -> list[str]:
+    """One line per code cell of ``new`` whose text output differs from the
+    same code's in ``old``, naming the markdown cell under it.
+
+    A cell is matched by its source, so an inserted cell moves nothing; a cell
+    whose code changed counts as changed.  A figure's bytes are not compared,
+    for the reason ``--check`` gives.
+    """
+    before: dict[str, list[list[str]]] = {}
+    for cell in old.cells:
+        if cell.cell_type == "code":
+            before.setdefault(cell.source, []).append(_text_outputs(cell))
+    found = []
+    for i, cell in enumerate(new.cells):
+        if cell.cell_type != "code" or not cell.get("outputs"):
+            continue
+        seen = before.get(cell.source)
+        if seen and seen.pop(0) == _text_outputs(cell):
+            continue
+        under = next((c for c in new.cells[i + 1:] if c.cell_type == "markdown"), None)
+        first = under.source.splitlines()[0] if under is not None else "(no markdown follows)"
+        found.append(f"Out[{cell.execution_count}] {cell.source.splitlines()[0]!r}: "
+                     f"reread {first!r}")
+    return found
+
+
+def prose(directory: Path = HERE, out: Path | None = None) -> list[Path]:
+    """Each tutorial's markdown cells as one ``.md`` file in ``out``, for Vale.
+
+    ``out`` defaults to ``_prose/`` beside the sources, which ``.vale.ini``
+    names and git ignores.  Vale matches a section against the path it is
+    given, so run it on that relative path.
+    """
+    out = out or directory / "_prose"
+    out.mkdir(exist_ok=True)
+    written = []
+    for path in sources(directory):
+        md = [text for kind, text in parse(path) if kind == "markdown"]
+        target = out / f"{path.stem}.md"
+        target.write_text("\n\n".join(md) + "\n", encoding="utf-8", newline="\n")
+        written.append(target)
+    return written
+
+
 def check(directory: Path = HERE) -> list[str]:
     import nbformat
 
@@ -203,18 +263,33 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("names", nargs="*", help="stems to rebuild (default: all)")
     parser.add_argument("--check", action="store_true", help="report stale notebooks, build nothing")
+    parser.add_argument("--prose", action="store_true",
+                        help="write the markdown cells to _prose/ for Vale, build nothing")
     args = parser.parse_args(argv)
     if args.check:
         stale = check()
         for line in stale:
             print(line)
         return 1 if stale else 0
+    if args.prose:
+        for path in prose():
+            print(f"wrote {path.relative_to(HERE.parent.parent)}")
+        return 0
     chosen = [p for p in sources() if not args.names or p.stem in args.names]
     unknown = set(args.names) - {p.stem for p in chosen}
     if unknown:
         parser.error(f"no tutorial named {sorted(unknown)}")
+    import nbformat
+
     for path in chosen:
-        print(f"wrote {build(path).name}")
+        nb_path = path.with_suffix(".ipynb")
+        old = (nbformat.reads(nb_path.read_text(encoding="utf-8"), as_version=4)
+               if nb_path.exists() else nbformat.v4.new_notebook())
+        out = build(path)
+        print(f"wrote {out.name}")
+        new = nbformat.reads(out.read_text(encoding="utf-8"), as_version=4)
+        for line in changed_outputs(old, new):
+            print(f"  {line}")
     return 0
 
 
