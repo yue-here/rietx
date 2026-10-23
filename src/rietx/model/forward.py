@@ -275,7 +275,8 @@ def window_fwhm_mult(eta: np.ndarray, tol: float | None = None) -> np.ndarray:
 AXIAL_SIZING_FLOOR = 0.02
 
 #: How far outside the fitted range, in °2θ, a reflection is still generated
-#: (``compile_model``).  A peak centred just outside the range still puts its
+#: (``compile_model``, and the satellite report arm, through
+#: :func:`generation_window`).  A peak centred just outside the range still puts its
 #: tail inside it, and the reflection list is frozen for the stage while the
 #: zero and the geometry move.  The margin is on top of the geometry's own
 #: shift at the values the stage compiles from, which the window follows
@@ -1076,6 +1077,21 @@ class CompiledModel:
                 values[f"instrument.geometry.{CAPILLARY_OFFSETS[1]}"],
                 self.radius_mm)
         return shift
+
+    def generation_window(self, values: dict[str, float]) -> tuple[float, float]:
+        """:func:`generation_window` at ``values``: the Bragg 2θ to enumerate over.
+
+        The window :func:`compile_model` froze this model's reflection list
+        over, re-taken at ``values`` (zero, geometry shift and line
+        wavelengths), for a builder that enumerates its own list at the
+        current state: the satellite report arm's lattice, satellite and
+        centring-forbidden positions.  Returned at ``min(line_lambdas)``.
+        """
+        return generation_window(
+            self.tt_min, self.tt_max, values["instrument.zero_shift"],
+            self.line_lambdas(values),
+            lambda theta, tt_bragg: self._position_shift_deg(theta, tt_bragg,
+                                                             values))
 
     def apparent_two_theta(self, tt_bragg: np.ndarray,
                            values: dict[str, float]) -> np.ndarray:
@@ -3651,6 +3667,51 @@ def _compile_extra_peaks(instrument, tt: np.ndarray, lams: list[float],
 SCALE_PATH = "instrument.background.scale"
 
 
+def generation_window(tt_min: float, tt_max: float, zero: float, lambdas,
+                      shift) -> tuple[float, float]:
+    """The Bragg 2θ window to enumerate reflections over, at ``min(lambdas)``.
+
+    Returns ``(two_theta_min, two_theta_max)`` for a generator called at the
+    shortest wavelength.  A reflection is wanted if **any** line draws it
+    inside ``[tt_min, tt_max]``.  The shortest line sits lowest, so the
+    enumeration runs at λ_min, and the low cutoff is set in the *longest*
+    line's frame and translated (same d, so sin θ ∝ λ): a Kα1 image below the
+    range whose Kα2 partner lies inside is kept.
+
+    The window is in Bragg angle and a peak is drawn at the Bragg angle plus
+    the zero and the geometry's own shift, so it is widened by the geometry's
+    shift beyond the zero over the fitted range: by the largest one at the low
+    edge and by the smallest one at the high edge, and never narrowed, so a
+    geometry with no shift keeps the window it always had, bit for bit.  A
+    fixed margin alone left a reflection whose drawn peak sits inside the range
+    ungenerated once the shift passed it (WP-1908).  On top of that it adds
+    :data:`REFLECTION_MARGIN_DEG`, and it caps at backscatter, since
+    d_min = λ/(2·sin θ_max) folds back past 180° and a window widened beyond it
+    would generate *fewer* reflections, not more.
+
+    ``shift(theta, tt_bragg)`` is the zero plus the geometry's shift at Bragg
+    angle ``tt_bragg``, in °2θ.  :func:`compile_model` passes its compile-time
+    estimate, and :meth:`CompiledModel.generation_window` the model's own
+    :meth:`~CompiledModel.apparent_two_theta` shift at given values, so the
+    satellite report arm (``report/satellites``) enumerates over the same
+    window as the model it reports on.  The arm kept its own copy until
+    WP-2034: no margin, a 179° cap and the low cutoff in the shortest line's
+    frame, so on a Cu Kα doublet a satellite whose Kα2 image alone lies in
+    range was never enumerated.  Every caller filters on the drawn position
+    afterwards, so a superset is harmless and a subset is the defect.
+    """
+    grid = np.linspace(tt_min, tt_max, 33)
+    extra = np.asarray(shift(0.5 * grid, grid), dtype=np.float64) - zero
+    extra = extra[np.isfinite(extra)]
+    widen_lo = max(float(extra.max()), 0.0) if extra.size else 0.0
+    widen_hi = max(-float(extra.min()), 0.0) if extra.size else 0.0
+    lo_eff = max(tt_min - zero - REFLECTION_MARGIN_DEG - widen_lo, 0.1)
+    hi_eff = min(tt_max - zero + REFLECTION_MARGIN_DEG + widen_hi, 180.0)
+    sin_lo = np.sin(np.radians(lo_eff / 2.0)) * min(lambdas) / max(lambdas)
+    gen_min = max(2.0 * np.degrees(np.arcsin(min(sin_lo, 1.0))), 0.05)
+    return gen_min, hi_eff
+
+
 def compile_model(structure: Structure, instrument: Instrument, pattern: PatternData,
                   *, mode: Mode = "rietveld",
                   two_theta_limits: tuple[float, float] | None = None,
@@ -3797,27 +3858,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     tt_bragg, a, b, geom.goniometer_radius_mm)
         return shift
 
-    # a reflection is kept if *any* line lands in range: the min-λ line sits
-    # lowest, so generate with λ_min and translate the low-2θ cutoff from the
-    # max-λ line's frame (same d ⇒ sinθ ∝ λ).  The window is in Bragg angle and
-    # a peak is drawn at the Bragg angle plus the zero and the geometry's shift,
-    # so it is widened by the geometry's shift beyond the zero over the fitted
-    # range: by the largest one at the low edge and by the smallest one at the
-    # high edge, and never narrowed, so a geometry with no shift keeps the
-    # window it always had, bit for bit.  A fixed margin alone left a
-    # reflection whose drawn peak sits inside the range ungenerated once the
-    # shift passed it (WP-1908).
-    _grid = np.linspace(tt_min, tt_max, 33)
-    _extra = np.asarray(_shift_est(0.5 * _grid, _grid), dtype=np.float64) - zero
-    _extra = _extra[np.isfinite(_extra)]
-    widen_lo = max(float(_extra.max()), 0.0) if _extra.size else 0.0
-    widen_hi = max(-float(_extra.min()), 0.0) if _extra.size else 0.0
-    # capped at backscatter: d_min = λ/(2·sin θ_max) folds back past 180°, so
-    # a window widened beyond it would generate *fewer* reflections, not more
-    lo_eff = max(tt_min - zero - REFLECTION_MARGIN_DEG - widen_lo, 0.1)
-    hi_eff = min(tt_max - zero + REFLECTION_MARGIN_DEG + widen_hi, 180.0)
-    sin_lo = np.sin(np.radians(lo_eff / 2.0)) * lam_gen / max(lams)
-    gen_min = max(2.0 * np.degrees(np.arcsin(min(sin_lo, 1.0))), 0.05)
+    # a reflection is kept if *any* line draws it in range, over the window
+    # the satellite report arm shares (``generation_window``, WP-2034), here at
+    # the geometry's shift at the values the stage compiles from (WP-1908)
+    gen_min, hi_eff = generation_window(tt_min, tt_max, zero, lams, _shift_est)
 
     # Anomalous scattering: f′ + i·f″ per species, frozen for the stage.  The
     # source owns it (it is a property of the wavelength, not the structure),

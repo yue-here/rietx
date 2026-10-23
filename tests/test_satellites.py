@@ -1400,3 +1400,134 @@ def test_the_shared_grid_gives_every_candidate_its_own_list_bit_for_bit():
                                         two_theta_min=8.0).d
             assert d.dtype == one.dtype and d.tobytes() == one.tobytes(), \
                 (symbol, k)
+
+
+# ===================================== the arm's generation window (WP-2034)
+
+
+def _doublet(displacement: float = 0.0, zero: float = 0.0) -> rx.Instrument:
+    """A Cu Kα1/Kα2 flat plate: the doublet whose two frames the window spans."""
+    ins = rx.Instrument.bragg_brentano(radiation="CuKa")
+    ins.source.dispersion = None      # declined, not inherited (CLAUDE.md)
+    ins.geometry.sample_displacement.value = displacement
+    ins.zero_shift.value = zero
+    return ins
+
+
+def _drawn(model, values, d: np.ndarray) -> list[np.ndarray]:
+    """Each emission line's drawn 2θ for the d-spacings ``d``, unfiltered."""
+    from rietx.crystallography.lattice import two_theta_deg
+
+    return [np.asarray(model.apparent_two_theta(
+                np.asarray(two_theta_deg(d, lam), dtype=np.float64), values))
+            for lam in model.line_lambdas(values)]
+
+
+def _straddling(model_values, d: float) -> float:
+    """A range start just below the drawn Kα2 image of spacing ``d``.
+
+    Just below Kα2 rather than midway, so the Kα1 image sits the whole doublet
+    splitting outside: the old window widened by the spread of the geometry's
+    shift over the range, and that slack must not cover the case.
+    """
+    model, values = model_values
+    k1, k2 = (float(t[0]) for t in _drawn(model, values, np.array([d])))
+    assert k1 + 0.01 < k2, "the doublet must put Kα2 above Kα1"
+    return float(np.floor((k2 - 0.002) * 1e4) / 1e4)
+
+
+def _doublet_model(structure, instrument, start: float, span: float = 15.0):
+    tt = np.arange(start, start + span, 0.01)
+    data = rx.PatternData(two_theta=tt.tolist(),
+                          intensity=np.ones_like(tt).tolist())
+    model = compile_model(structure, instrument, data)
+    return model, _values(structure, instrument)
+
+
+def _in_range(model, values, d: np.ndarray) -> np.ndarray:
+    """The held-out oracle: every drawn image of ``d`` inside the fitted range.
+
+    Unique to 1e-6°, so it is blind to how the generator merges orbits and
+    tests only *which positions* the arm can reach.
+    """
+    out = np.concatenate(_drawn(model, values, d))
+    out = out[np.isfinite(out) & (out >= model.tt_min) & (out <= model.tt_max)]
+    return np.unique(np.round(out, 6))
+
+
+#: (1 0 3/2) of k = (0 0 1/2) on ``CELL``: d = 2.8284 Å, drawn by Cu Kα1 at
+#: 31.607° and by Kα2 at 31.688°, 0.6° from any nuclear line
+_STRIP_D = 2.0 * np.sqrt(2.0)
+
+
+@pytest.mark.parametrize("displacement,zero", [(0.0, 0.0), (0.3, -0.02)])
+def test_the_arm_enumerates_a_satellite_whose_kalpha2_image_alone_is_in_range(
+        displacement, zero):
+    """A satellite whose Kα1 image lies below ``tt_min`` and whose Kα2 image inside.
+
+    ``compile_model`` generates in the shortest line's frame and translates the
+    low cutoff from the longest line's, so it keeps that reflection; the arm's
+    own copy of the window applied the cutoff in the shortest line's frame, so
+    the (1 0 3/2) satellite of k = (0 0 1/2) was never enumerated and a residual
+    peak sitting exactly on its Kα2 image was indexed by nothing (WP-2034).
+    """
+    instrument = _doublet(displacement, zero)
+    structure = rx.Structure(phases=[_phase(None)])
+    probe = _doublet_model(structure, instrument, 20.0, 50.0)
+    start = _straddling(probe, _STRIP_D)
+    model, values = _doublet_model(structure, instrument, start)
+    k1, k2 = (float(t[0]) for t in _drawn(model, values, np.array([_STRIP_D])))
+    # the case is the strip, or it proves nothing
+    assert k1 < model.tt_min <= k2 <= model.tt_max
+
+    pos, _ = model.reflection_positions(0, values)
+    ticks = pos[np.isfinite(pos)]
+    arm = analyse_satellites(model, values, residual_two_theta=[k2],
+                             ticks=ticks, structure=structure)[0]
+    # the peak needs a k: it is on no tick and on no lattice point
+    assert arm.n_unexplained == 1, arm.note
+    half = {c.vector: c for c in arm.candidates}["(0, 0, 1/2)"]
+    assert half.matched == 1, arm.note
+    assert half.worst_offset_deg == pytest.approx(0.0, abs=1e-9)
+
+
+@pytest.mark.parametrize("d_strip", [_STRIP_D, 1.0 / np.sqrt(1 / 16 + 1 / 25)],
+                         ids=["satellite_103/2", "lattice_110"])
+def test_the_arms_lists_are_every_image_in_range_at_a_doublet_edge(d_strip):
+    """Each list the arm builds holds every drawn image in range, and no other.
+
+    The oracle enumerates the reciprocal lattice of ``P m m m`` and every
+    zone-boundary candidate's H ± k by brute force over integer H, and places
+    each line's image with the model's own ``apparent_two_theta``; it shares
+    no window with either copy.  The range starts between the Kα1 and Kα2
+    images of (1 0 3/2) of k = (0 0 1/2), or of the nuclear (1 1 0), so the
+    old window's frame error drops a position from the satellite list or the
+    lattice list.
+    """
+    from rietx.crystallography.lattice import d_spacings
+    from rietx.report.satellites import _lattice_positions, _satellite_positions
+
+    instrument = _doublet(0.2, 0.01)
+    structure = rx.Structure(phases=[_phase(None)])
+    start = _straddling(_doublet_model(structure, instrument, 20.0, 50.0),
+                        d_strip)
+    model, values = _doublet_model(structure, instrument, start)
+
+    r = np.arange(-8, 9)
+    hkl = np.stack(np.meshgrid(r, r, r, indexing="ij"), -1).reshape(-1, 3)
+    hkl = hkl[np.any(hkl != 0, axis=1)].astype(np.float64)
+
+    lattice = np.unique(np.round(_lattice_positions(model, values, 0), 6))
+    expected = _in_range(model, values, d_spacings(hkl, *CELL))
+    assert np.array_equal(lattice, expected), (
+        np.setdiff1d(expected, lattice), np.setdiff1d(lattice, expected))
+
+    candidates = zone_boundary_candidates("P m m m")
+    listed = _satellite_positions(model, values, 0, [c.k for c in candidates])
+    for c, got in zip(candidates, listed, strict=True):
+        k = np.array([float(Fraction(v)) for v in c.k])
+        sat = np.vstack([hkl + k, hkl - k, k[None, :]])
+        want = _in_range(model, values, d_spacings(sat, *CELL))
+        got = np.unique(np.round(got, 6))
+        assert np.array_equal(got, want), (
+            c.vector, np.setdiff1d(want, got), np.setdiff1d(got, want))

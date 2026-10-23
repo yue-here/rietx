@@ -36,14 +36,14 @@ under any emission line lands inside the fitted range is enumerated.
 
 ## Tasks
 
-- [ ] A test that fails on the current tree: a synthetic doublet pattern with
+- [x] A test that fails on the current tree: a synthetic doublet pattern with
       a satellite whose Kα1 image lies below `tt_min` and whose Kα2 image lies
       inside, which the arm must enumerate.
-- [ ] One helper, called by `compile_model` and by the arm, so the margin, the
+- [x] One helper, called by `compile_model` and by the arm, so the margin, the
       cap and the per-line frame are written once. Every satellite and
       reflection list in the tree is unchanged except where the old window
       cut one off. Name each list that changes.
-- [ ] Skill: none expected, since no field or code changes.
+- [x] Skill: none expected, since no field or code changes.
 
 ## Acceptance
 
@@ -56,8 +56,53 @@ under any emission line lands inside the fitted range is enumerated.
 
 - [WP-1908](1908-a-tick-misses-the-displacement-shift.md) (PR #942);
   [WP-1326](1326-satellites-without-a-moment.md).
+- #1130: taken by @mustachefeeling, with the plan this WP's handover follows.
 
 ## Handover log
+
+- **2026-10-23** — done on `wp2034/satellite-window`, as planned on #1130
+  (taken by @mustachefeeling).
+  `model.forward.generation_window(tt_min, tt_max, zero, lambdas, shift)` is
+  the one window. It holds the zero, the geometry's shift over 33 points of
+  the range, `REFLECTION_MARGIN_DEG`, the 180° cap, and the low cutoff
+  translated from the longest line's frame to the shortest line's.
+  `compile_model` calls it with its compile-time `_shift_est`. The new
+  `CompiledModel.generation_window(values)` calls it with the model's own
+  `_position_shift_deg` at given values. `report.satellites`'
+  `_satellite_positions`, `_lattice_positions` and
+  `_centring_forbidden_positions` all call that method, and
+  `_generation_window` is gone. `_centring_forbidden_positions` already took
+  its `d_max` in the longest line's frame. It now takes both bounds in the
+  shortest line's frame, which is the frame the window is returned in.
+
+  *Tests* (`tests/test_satellites.py` § WP-2034, each failing on `12f459e5`).
+  - `test_the_arm_enumerates_a_satellite_whose_kalpha2_image_alone_is_in_range`
+    has two cases: no shift, and a 0.3 mm displacement with a −0.02° zero.
+    The case is (1 0 3/2) of k = (0 0 1/2) on a 4 × 5 × 6 Å `P m m m` cell
+    under Cu Kα. The range starts 0.002° below its Kα2 image. On main the
+    peak was indexed by nothing (`matched` 0). Here (0, 0, 1/2) matches it
+    at 0°.
+  - `test_the_arms_lists_are_every_image_in_range_at_a_doublet_edge` has two
+    cases: the satellite strip, and the nuclear (1 1 0). The arm's lattice
+    list and every zone-boundary candidate's satellite list must equal a
+    brute-force enumeration over integer H, placed by `apparent_two_theta`.
+    On main the lattice list lacked 28.535099° and the satellite list of
+    (0, 0, 1/2) lacked 31.596593°.
+
+  *What moved.* A probe wrapped the window and the arm's three builders. For
+  each call it set main's answer beside the new one: main's
+  `report/satellites.py` was loaded as a sibling module, and main's
+  `compile_model` window formula was run inline. Two runs:
+  - the fast selection: 11 250 passed;
+  - the 15 slow files that reach the arm or build a report: 91 passed. These
+    include the Cu doublet patterns FAP, SRM 660c, SRM 676a and Stephens, and
+    the neutron sets.
+
+  Across both runs, all 12 350 `compile_model` windows are bit-identical, so
+  no model list moves. Of the arm's lists, 762 were compared, and none lost a
+  position. Only the new tests' lists gained one. So no real pattern in the
+  tree has a satellite or lattice image in the strip, and the WP's "unmeasured
+  on a real pattern" now reads "measured: none reaches it".
 
 - **2026-10-23** — created by WP-1326's close, from its `### Inherited` entry
   of 2026-10-15. No open WP owns the arm's window. 1418's M-8 rewrites the
