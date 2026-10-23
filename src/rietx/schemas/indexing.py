@@ -159,6 +159,15 @@ from .structure import Cell
 #: where it was the constant, so a high-resolution list now matches within its
 #: own widths.  A run whose first pass finds an agreed lattice, and a lab list
 #: with lines 0.05 degrees or wider, answer as at 1.9.
+#: 1.11, also (#939): ``determine_extinction_symbol`` refines the cell by default
+#: (``refine_cell=True``: a cell-free ``profile_only`` Le Bail of the lattice
+#: group, from a seeded background when the instrument's is all zero) and
+#: abstains when its reference fit fails the ``REFERENCE_NET_RWP_MAX`` gate
+#: (``status="unreliable"``, ``EXTINCTION_SCREEN_UNRELIABLE``);
+#: ``ExtinctionScreen`` gains ``prefit_rwp`` and ``reference_rwp_net``.  Every pinned class held (synthetic P 2₁/c, FAP,
+#: NAC, certified corundum), with their ΔBIC moved (corundum −3434 → −1301,
+#: FAP −16 → −83); the PbSO₄ X-ray histogram at a 0.1-0.2 % cell went from an
+#: abstention to ``P c - n``.
 INDEXING_THRESHOLDS_VERSION = "1.11"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
@@ -2232,6 +2241,18 @@ class ExtinctionScreen(Base):
     profile_rwp: float = float("inf")
     #: the declared facts the members were filtered by (``restrict=``)
     prior: ExtinctionPrior | None = None
+    #: Rwp of the cell-free ``profile_only`` Le Bail the screen ran first
+    #: (``refine_cell=True``, the default); ``None`` when the cell was held
+    prefit_rwp: float | None = None
+    #: the reference fit's background-subtracted Rwp (Toby 2006): the weighted
+    #: misfit as a fraction of the net signal.  Above
+    #: :data:`~rietx.indexing.extinction.REFERENCE_NET_RWP_MAX` the screen is
+    #: ``"unreliable"``; ``None`` until the reference fit ran
+    reference_rwp_net: float | None = None
+    #: ``"converged"``; ``"failed"`` (no reference fit, nothing ranked);
+    #: ``"unreliable"`` (ranked, but the reference fit left more of the net
+    #: signal unexplained than any absence test can be read against, so
+    #: :meth:`best_or_none` abstains); ``"cancelled"``
     status: str = "converged"
     thresholds_version: str = INDEXING_THRESHOLDS_VERSION
     diagnostics: list[Diagnostic] = Field(default_factory=list)
@@ -2239,13 +2260,15 @@ class ExtinctionScreen(Base):
     def best_or_none(self) -> ExtinctionCandidate | None:
         """The one extinction class, or None.
 
-        Returns a class only when it was fitted, is not refuted, rests on at
-        least one absence the data could **test** (or is the absence-free class
-        itself, whose claim is that there is nothing to see), is separated from
-        the next surviving class by a decisive ΔBIC margin, and **no unrefuted
-        class was left unfitted** — a ``max_classes`` cap or a cancelled run
-        leaves an unasked question, which must not read as a clean answer.  Every
-        other situation returns None with the reason in :attr:`diagnostics`.
+        Returns a class only when the reference fit passed its gate (``status``
+        is not ``"unreliable"``), the class was fitted, is not refuted, rests on
+        at least one absence the data could **test** (or is the absence-free
+        class itself, whose claim is that there is nothing to see), is separated
+        from the next surviving class by a decisive ΔBIC margin, and **no
+        unrefuted class was left unfitted** — a ``max_classes`` cap or a
+        cancelled run leaves an unasked question, which must not read as a clean
+        answer.  Every other situation returns None with the reason in
+        :attr:`diagnostics`.
 
         With a declared :attr:`prior`, only classes it leaves a member in can be
         returned and the margin is taken to the next such class — that is the
@@ -2258,6 +2281,8 @@ class ExtinctionScreen(Base):
         """
         from ..indexing.extinction import DECISIVE_DELTA_BIC
 
+        if self.status == "unreliable":
+            return None                 # the absence tests read the misfit
         if any(not c.refuted and not c.screened for c in self.candidates):
             return None                 # an unasked question, not a clean answer
         alive = [c for c in self.candidates if not c.refuted]

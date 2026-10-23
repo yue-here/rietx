@@ -114,6 +114,7 @@ from dataclasses import dataclass, field
 import gemmi
 import numpy as np
 
+from ..optimize.cancel import RefinementCancelled
 from ..optimize.statistics import _chi2_absolute
 from ..schemas.common import Diagnostic
 from ..schemas.indexing import (
@@ -138,6 +139,20 @@ from .workflow import (
 #: evidence; anything less is reported as an ambiguity rather than resolved,
 #: which is the same posture ``ShiftScreen.separable`` takes one module over.
 DECISIVE_DELTA_BIC = 10.0
+
+#: Background-subtracted Rwp of the **reference** fit (the absence-free class
+#: under the frozen shared profile) above which the screen abstains, reported
+#: as ``EXTINCTION_SCREEN_UNRELIABLE``.  The quantity is Toby's (2006, *Powder
+#: Diffr.* **21**, 67) background-subtracted R_wp: the weighted misfit as a
+#: fraction of the pattern's own *net* signal, so the bound is a statement about
+#: the data rather than a count of anything.  Its square is the share of the net
+#: signal's weighted power the lattice leaves unexplained, so this bound admits
+#: a reference that leaves at most half of it.  A reference past it has not
+#: modelled the *allowed* lines, and every absence test downstream reads that
+#: misfit — measured on a synthetic Si pattern at 11-BM-like resolution with
+#: the cell 0.4 % off: reference Rwp 0.75, ``F d - -`` "untestable" and
+#: ``F - - -`` returned by ``best_or_none`` as a confident answer.
+REFERENCE_NET_RWP_MAX = 0.7071
 
 #: Crystal systems that share one *lattice*, keyed by the candidate's system.
 #: The powder determines a lattice, not a crystal system: a hexagonal metric
@@ -760,13 +775,94 @@ def _fit_class(candidate: CellCandidate, data: PatternData, instrument: Instrume
     return ref, result
 
 
+def _background_unseeded(background) -> bool:
+    """Is this the preset's all-zero start, which a Le Bail extraction hands to
+    the reflections (``auto_background``'s ``seed`` docstring, WP-1542)?
+
+    Only the two coefficient-only kinds can be unseeded; a fixed or measured
+    curve is the caller's declaration and is never replaced.
+    """
+    if getattr(background, "kind", None) not in ("chebyshev", "pspline"):
+        return False
+    return all(float(c.value) == 0.0 for c in background.coefficients)
+
+
+def _prefit(data: PatternData, candidate: CellCandidate, instrument: Instrument,
+            symbol: str, two_theta_limits, cancel=None):
+    """The screen's own cell-free Le Bail of the lattice group (``refine_cell``).
+
+    ``profile_only`` — background, zero, **cell**, then the widths — from a
+    seeded background when the caller's is the preset's all-zero start.  This is
+    the route the extinction-screen harness measured on PbSO₄ (#726): the true
+    ``P c - n`` at ΔBIC −560 where a cell stage inside the shared fit alone gave
+    −296, and where that stage plus a seeded background gave a confident wrong
+    ``P c - -``.  Returns the fitted instrument, the candidate at the refined
+    cell, and the prefit's Rwp.
+
+    The replacement is a seeded **P-spline whatever the kind it replaces**: the
+    all-zero start is the preset's own Chebyshev, which a caller who declared one
+    cannot be told from, and a seeded Chebyshev of the preset's order returned
+    ``R - - -`` on the certified corundum cell and at every offset up to ×1.005
+    where the seeded P-spline returns ``R - c -`` (WP-1910's fixture).  A
+    Chebyshev with any non-zero coefficient is a declaration and is kept.
+    ``cancel`` reaches the fit, which raises
+    :class:`~rietx.optimize.cancel.RefinementCancelled` out of it.
+    """
+    from ..background.auto import auto_background
+    from ..refine import Refinement
+
+    ins = instrument
+    if _background_unseeded(ins.background):
+        ins = ins.model_copy(deep=True)
+        ins.background = auto_background(data, two_theta_limits=two_theta_limits,
+                                         source=ins.source, seed=True).background
+    ref = Refinement(structure_from_candidate(candidate, space_group=symbol),
+                     ins, history=False)
+    result = ref.fit(data, mode="lebail", plan="profile_only",
+                     two_theta_limits=two_theta_limits, telemetry=False,
+                     cancel=cancel if hasattr(cancel, "is_set") else None)
+    cell = tuple(float(v) for v in
+                 ref.fitted_structure.phases[0].cell.lengths_angles())
+    return (ref.fitted_instrument, candidate.model_copy(update={"cell": cell}),
+            float(result.statistics.rwp))
+
+
+def _reference_net_rwp(result) -> float | None:
+    """The gate's quantity: the reference fit's weighted misfit over the net
+    signal, the net taken against the **picker's** envelope rather than the
+    fit's own background.
+
+    Toby (2006)'s background-subtracted R_wp, with one change that is the whole
+    point: the fit's background is a parameter of the very fit being judged,
+    and a fit that has lost the peaks can buy a small ratio by moving it — sink
+    the background and let the Le Bail intensities carry the pedestal, and the
+    ratio divides by the pedestal (seen on a real synchrotron pattern whose
+    prefit walked the cell out of its basin; ``tests/test_extinction_gate.py``
+    builds the mechanism).
+    ``peaks._debiased_envelope`` (a rolling low quantile, debiased) is fixed
+    before any candidate exists, so no fit can move the denominator.  ``None``
+    when the pattern carries no net signal at all.
+    """
+    from .peaks import _debiased_envelope
+
+    tt = np.asarray(result.two_theta, dtype=np.float64)
+    y_obs = np.asarray(result.y_obs, dtype=np.float64)
+    w = 1.0 / np.asarray(result.sigma, dtype=np.float64) ** 2
+    net = y_obs - _debiased_envelope(tt, y_obs)
+    denom = float(w @ (net * net))
+    if not denom > 0.0:
+        return None
+    diff = y_obs - np.asarray(result.y_calc, dtype=np.float64)
+    return float(np.sqrt(float(w @ (diff * diff)) / denom))
+
+
 def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                                 instrument: Instrument, *,
                                 peaks: PeakList | None = None,
                                 two_theta_limits: tuple[float, float] | None = None,
                                 k_sigma: float = ABSENT_SIGMA,
                                 max_classes: int | None = None,
-                                refine_cell: bool = False,
+                                refine_cell: bool = True,
                                 restrict: ExtinctionPrior | dict | None = None,
                                 cancel=None) -> ExtinctionScreen:
     """Rank the extinction classes of a lattice.
@@ -794,15 +890,25 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     reading, and a screen run in the higher symmetry would enumerate classes the
     lattice may not have.
 
-    ``refine_cell=False`` (default) holds the cell at ``candidate.cell``, so the
-    screen takes it as certified quality: a cell off by more than a few parts
-    in 10⁴ leaves a tan θ position error the shared fit's one shift cannot
-    absorb, and the true class can be refuted at an absent-line position (SRM
-    676a corundum: ``R - c -`` at the certified cell, ``R - - -`` once the cell
-    is scaled by 1.0012, the factor the test measures, #726).  ``refine_cell=True`` frees the cell in the
-    shared profile fit, after the shift and before the widths, and every class
-    is then screened at the refined cell (``ExtinctionScreen.cell`` is that
-    cell); the classes still differ only in their reflection sets.
+    ``refine_cell=True`` (default) runs a cell-free ``profile_only`` Le Bail of
+    the lattice group first (:func:`_prefit`, from a seeded background when the
+    caller's is the preset's all-zero start), and screens every class at its
+    refined cell with its fitted instrument as the shared fit's start
+    (``ExtinctionScreen.cell`` is that cell, ``prefit_rwp`` its Rwp); the
+    classes still differ only in their reflection sets.  ``refine_cell=False``
+    holds the cell at ``candidate.cell``, so the screen takes it as certified
+    quality: a cell off by more than a few parts in 10⁴ leaves a tan θ position
+    error the shared fit's one shift cannot absorb, and the true class can be
+    refuted at an absent-line position (SRM 676a corundum: ``R - c -`` at the
+    certified cell, ``R - - -`` once the cell is scaled by 1.0012, #726).
+
+    **The reference fit is gated** (:data:`REFERENCE_NET_RWP_MAX`): when the
+    absence-free class's own fit leaves more than half of the net signal's
+    weighted power unexplained, every absence test would read that misfit, so
+    the screen still ranks the classes but sets ``status="unreliable"``, says
+    ``EXTINCTION_SCREEN_UNRELIABLE`` and :meth:`ExtinctionScreen.best_or_none`
+    abstains.  A cell the prefit could not bring into its basin (0.4 % off at
+    synchrotron resolution) lands here rather than on a confident wrong class.
 
     ``restrict`` declares facts about the specimen — chirality (Sohncke),
     centrosymmetry, polarity — as an :class:`ExtinctionPrior` (or its dict).
@@ -815,7 +921,9 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     one it emptied.
 
     Cost is one refinement per surviving class (~0.1 s each on a 3750-point
-    pattern, after a ~2 s profile fit).  ``max_classes`` caps it; the classes left
+    pattern), after **two** profile Le Bail fits: the cell-free prefit and the
+    shared one (the pair took about 1 s on SRM 676a's 7251 points, numpy, warm
+    Apple-silicon Mac; ``refine_cell=False`` skips the first).  ``max_classes`` caps it; the classes left
     unfitted are reported with ``screened=False`` and, because an unasked question
     must not read as a clean answer, :meth:`ExtinctionScreen.best_or_none` then
     abstains.
@@ -852,36 +960,37 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     # class would inherit it — so it comes back as a failed screen with a reason
     # rather than as a traceback, the same way ``validate_by_lebail`` reports a
     # candidate the physics refuses.
+    which = "reference"
     try:
+        if refine_cell:
+            which = "cell-free prefit"
+            ins, candidate, screen.prefit_rwp = _prefit(
+                data, candidate, ins, symbol, two_theta_limits, cancel)
+            screen.cell = candidate.cell
+            which = "reference"
         pre = Refinement(structure_from_candidate(candidate, space_group=symbol),
                          ins, history=False)
         tt_max = float(np.max(data.tt()))
         if two_theta_limits is not None:
             tt_max = min(tt_max, float(two_theta_limits[1]))
         plan = validation_plan(candidate, ins, two_theta_max=tt_max)
-        if refine_cell:
-            from ..strategy.staged import Stage
-
-            plan.stages.insert(2, Stage(
-                "cell", ["phases.*.cell.*"],
-                window_slack_deg=plan.stages[1].window_slack_deg))
         profile = pre.fit(data, mode="lebail", plan=plan,
                           two_theta_limits=two_theta_limits,
                           telemetry=False)      # the screen's own, not a run
         screen.profile_rwp = float(profile.statistics.rwp)
         frozen = pre.fitted_instrument
-        if refine_cell:
-            refined = tuple(float(v) for v in
-                            pre.fitted_structure.phases[0].cell.lengths_angles())
-            candidate = candidate.model_copy(update={"cell": refined})
-            screen.cell = refined
         ref_fit, ref_result = _fit_class(candidate, data, frozen, symbol,
                                          two_theta_limits)
+    except RefinementCancelled:
+        # a stop pressed during the prefit: no class was asked, so the screen
+        # is an unasked question rather than a failure with a reason
+        screen.status = "cancelled"
+        return screen
     except Exception as exc:                          # noqa: BLE001
         screen.status = "failed"
         screen.diagnostics = [Diagnostic(
             level="error", code="EXTINCTION_SCREEN_FAILED",
-            message=(f"The reference Le Bail fit of the lattice group {symbol} "
+            message=(f"The {which} Le Bail fit of the lattice group {symbol} "
                      f"raised {type(exc).__name__}: {str(exc).rstrip('.')}, so no class could be "
                      "screened against it."),
             where=[f"{candidate.system} {candidate.centring}, cell "
@@ -930,6 +1039,12 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
 
     screen.two_theta_range = (float(tt_data.min()), float(tt_data.max()))
     screen.reference_rwp = float(ref_result.statistics.rwp)
+    screen.reference_rwp_net = _reference_net_rwp(ref_result)
+    if (screen.reference_rwp_net is None
+            or not screen.reference_rwp_net <= REFERENCE_NET_RWP_MAX):
+        # the classes are still ranked, so the reader sees what the screen
+        # would have said; ``best_or_none`` reads the status and abstains
+        screen.status = "unreliable"
     screen.reference_chi2 = _chi2_absolute(ref_result.statistics)
     screen.reference_lines = int(n_lines)
     screen.n_points = int(ref_result.statistics.n_points)
@@ -1046,7 +1161,10 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                 f"{entry.forbidden_two_theta[0]:.3f}°")
 
     screen.n_screened = sum(1 for e in entries if e.screened)
-    if cancel is not None and bool(cancel):
+    if cancel is not None and bool(cancel) and screen.status != "unreliable":
+        # the gate's verdict outranks the stop: ``best_or_none`` abstains on
+        # "unreliable" and not on "cancelled", so overwriting it would hand
+        # back the class the gate withheld
         screen.status = "cancelled"
     for entry in entries:
         entry.diagnostics = extinction_class_diagnostics(entry)
@@ -1070,7 +1188,7 @@ def _row_line_labels(rows, primary, labels) -> np.ndarray:
                     dtype=np.int64)
 
 
-__all__ = ["DECISIVE_DELTA_BIC", "AbsenceClass", "absence_classes", "admits",
+__all__ = ["DECISIVE_DELTA_BIC", "REFERENCE_NET_RWP_MAX", "AbsenceClass", "absence_classes", "admits",
            "compatible_groups", "determine_extinction_symbol",
            "extinction_symbol", "is_polar", "laue_classes", "line_index",
            "reflection_conditions", "testable_mask"]

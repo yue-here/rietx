@@ -371,10 +371,13 @@ def test_every_wrong_class_is_refuted_by_a_named_reflection(mono_screen):
 def test_a_cancelled_screen_abstains_and_says_which_classes_it_reached():
     """WP-1006's token works here unchanged, and the granularity is one class.
 
-    It is deliberately *not* threaded into the individual fits: a
+    It is deliberately *not* threaded into the individual class fits: a
     ``RefinementCancelled`` raised inside one would be indistinguishable from a
     class whose physics failed, and a cancelled run would come back looking like
     a refutation. Each class fit is ~0.1 s, so between-class is granular enough.
+    The cell-free prefit (``refine_cell=True``) *does* take the token, being a
+    five-stage fit, and a stop there returns before any class exists
+    (``test_extinction_gate``); this test holds the cell to reach the classes.
     """
     from rietx.optimize.cancel import CancelToken
 
@@ -384,7 +387,7 @@ def test_a_cancelled_screen_abstains_and_says_which_classes_it_reached():
     token.cancel()
     screen = determine_extinction_symbol(
         data, _candidate(MONO_CELL, "monoclinic"), instrument,
-        two_theta_limits=MONO_RANGE, cancel=token)
+        two_theta_limits=MONO_RANGE, cancel=token, refine_cell=False)
     assert screen.status == "cancelled"
     assert screen.n_classes and screen.n_screened == 0
     assert screen.best_or_none() is None

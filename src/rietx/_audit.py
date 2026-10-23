@@ -535,6 +535,13 @@ ROWS: tuple[Row, ...] = (
     Row("EXTINCTION_GROUPS_NOT_SEPARABLE", "code"),
     Row("EXTINCTION_PRIOR_APPLIED", "code"),
     Row("EXTINCTION_SCREEN_FAILED", "code"),
+    Row("EXTINCTION_SCREEN_UNRELIABLE", "code", tier=3, ambiguity=2,
+        evidence=("warning; fires when the absence-free reference fit leaves more than "
+                  "REFERENCE_NET_RWP_MAX of the net weighted power unexplained; the silent side "
+                  "holds on four real families, the firing side is shown on synthetic Si only"),
+        grounds=("Withholds the pick and keeps the ranking, and no default path calls the "
+                 "pick; ruled 2026-10-21 (PR #939)."),
+        approved="2026-10-21"),
     Row("EXTINCTION_SYMBOL_AMBIGUOUS", "code"),
     Row("EXTRA_PEAK_NO_INTENSITY", "code"),
     Row("EXTRA_PEAK_ON_REFLECTION", "code"),
@@ -1365,6 +1372,15 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.engines._INDEX_MIN_DEFECT", "constant", value=1e-06),
     Row("rietx.indexing.engines._INDEX_MIN_ROWS", "constant", value=15000),
     Row("rietx.indexing.extinction.DECISIVE_DELTA_BIC", "constant", value=10.0),
+    Row("rietx.indexing.extinction.REFERENCE_NET_RWP_MAX", "constant", tier=3, value=0.7071,
+        evidence=("Statistic: Toby (2006)'s background-subtracted Rwp over the picker's "
+                  "envelope (the envelope is rietx's own). Right or nearly right cells read "
+                  "<= 0.36 on 11-BM NAC, GSAS-II FAP, GSAS-II PbSO4 X-ray and SRM 676a; cells "
+                  "outside the basin read >= 1.6, shown on synthetic Si only. Fails on an "
+                  "unmodelled second phase carrying half the net power, and by arithmetic on "
+                  "weak data (S < N)."),
+        grounds="Kept on both grounds, ruled 2026-10-21 (PR #939).",
+        approved="2026-10-21"),
     Row("rietx.indexing.extinction._MODULI", "constant", value=(2, 3, 4, 6)),
     Row("rietx.indexing.fom.FOM_N", "constant", value=20),
     Row("rietx.indexing.fom.LINE_COINCIDENCE_RTOL", "constant", value=1e-09),
@@ -3214,7 +3230,13 @@ ROWS: tuple[Row, ...] = (
     Row("EXTINCTION_GROUPS_NOT_SEPARABLE.suggestion", "suggestion", value=1),
     Row("EXTINCTION_PRIOR_APPLIED.suggestion", "suggestion", value=1),
     Row("EXTINCTION_SCREEN_FAILED.suggestion", "suggestion", value=2),
-    Row("EXTINCTION_SYMBOL_AMBIGUOUS.suggestion", "suggestion", value=3),
+    Row("EXTINCTION_SCREEN_UNRELIABLE.suggestion", "suggestion", tier=3, ambiguity=2, value=1,
+        evidence=("lists the causes without ranking them: the cell, a phase the reference does "
+                  "not model, weak data (S < N), the range, the wavelength, the width law"),
+        grounds=("No order is claimed, so no cause is steered away from; ruled 2026-10-21 "
+                 "(PR #939) once it listed them unranked."),
+        approved="2026-10-21"),
+    Row("EXTINCTION_SYMBOL_AMBIGUOUS.suggestion", "suggestion", value=4),
     Row("EXTRA_PEAK_NO_INTENSITY.suggestion", "suggestion", value=1),
     Row("EXTRA_PEAK_ON_REFLECTION.suggestion", "suggestion", value=1),
     Row("FLAT_DIRECTION.suggestion", "suggestion", value=1),

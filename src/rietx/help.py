@@ -1990,6 +1990,31 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "wavelength and the 2θ range."
         ),
     ),
+    "EXTINCTION_SCREEN_UNRELIABLE": HelpEntry(
+        title="The extinction screen's reference fit is too poor to read absences against",
+        description=(
+            "The absence-free reference fit leaves more than half of the pattern's net "
+            "signal, taken against its own background, unexplained. It has not modelled "
+            "the allowed lines, so every refutation and ΔBIC below it may measure that "
+            "misfit. The classes are ranked, but `best_or_none()` abstains. Any of these "
+            "can cause it, in no order: the cell (a few tenths of a per cent off at "
+            "synchrotron resolution is outside the basin a Le Bail fit can refine it "
+            "from; re-index it from a better start), a phase the reference does not "
+            "model, weak data (for a perfect fit the quantity is about √(N/(N+S)), N the "
+            "channels and S the weighted net Bragg power, so it passes the bound whenever "
+            "S < N; counting longer helps and re-indexing does not), the range, the "
+            "wavelength and the width law. The bound, 1/√2 (at most half "
+            "of the net weighted power unexplained), sits between every right or nearly "
+            "right cell (≤ 0.36) and every cell outside the refinable basin (≥ 1.6) on "
+            "synthetic Si and P 2₁/c, 11-BM NAC, the GSAS-II fluorapatite and PbSO₄ "
+            "patterns and SRM 676a corundum; untested beyond them, and a second phase "
+            "carrying half the net weighted power trips it at a right cell. The gate does "
+            "not reach a local misfit: on certified SRM 676a corundum "
+            "(`R -3 c`) the shared profile fit's `profile_rwp` is 0.149 over 20–90°, where "
+            "`R - c -` wins, and 0.227 over 5–150° with declared widths, where `R - - -` "
+            "wins, with this code silent in both (measured on that one pattern)."
+        ),
+    ),
     "EXTINCTION_SYMBOL_AMBIGUOUS": HelpEntry(
         title="The extinction symbol is not settled",
         description=(

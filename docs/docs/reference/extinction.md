@@ -45,7 +45,7 @@ screen = rx.determine_extinction_symbol(data, idx.candidates[0], ins, peaks=peak
 | `two_theta_limits` | `None`, the whole pattern | the range the classes are enumerated over and judged in |
 | `k_sigma` | 3.0 (`rietx.indexing.workflow.ABSENT_SIGMA`) | the detection threshold of the absence test, in σ of the intensity integrated over a window of ±½ FWHM |
 | `max_classes` | `None` | fit at most this many classes, fewest absences first; a value under 1 still fits one |
-| `refine_cell` | `False` | free the cell inside the shared profile fit, so every class is screened at the refined cell |
+| `refine_cell` | `True` | Le Bail-refine the cell first, in a cell-free `profile_only` fit, and screen every class at that cell (`ExtinctionScreen.cell`); `False` holds the candidate's cell |
 | `restrict` | `None` | an `ExtinctionPrior`, or its dict, that filters each class's members ([Declaring what the chemistry rules out](#declaring-what-the-chemistry-rules-out)) |
 | `cancel` | `None` | a cancel token, read before each class's fit |
 
@@ -90,10 +90,19 @@ Each class's representative, the member whose reflections are generated, is the 
 
 ### The cell it is screened at
 
-With `refine_cell=False` the cell is held at the candidate's, so it has to be good.
-A cell off by a few parts in 10⁴ leaves a tan θ position error that the shared fit's one shift cannot absorb, and a line the true class forbids then shows intensity at its position.
+By default the screen refines the cell before it screens anything: a `profile_only` Le Bail of the lattice group with the cell free, from a seeded background when the instrument's is the preset's all-zero start (`ExtinctionScreen.prefit_rwp` is its Rwp).
+Every class is then screened at that cell, and the classes still differ only in their reflection sets.
+A held cell has to be good.
+With `refine_cell=False` a cell off by a few parts in 10⁴ leaves a tan θ position error that the shared fit's one shift cannot absorb, and a line the true class forbids then shows intensity at its position.
 On the IUCr round-robin SRM 676a corundum (`tests/data/qarr/corundum.prn`), the certified cell gives `R - c -` and the same cell scaled by 1.0012 gives `R - - -`, whose members exclude `R -3 c`.
-Refine the cell by Le Bail first and screen that, or pass `refine_cell=True`, which frees the cell after the shift and before the widths; `ExtinctionScreen.cell` is then the refined cell, and the classes still differ only in their reflection sets.
+On the X-ray histogram of `tests/data/gsas2_pbso4.gpx` at a cell 0.1-0.2 % long, the held screen abstains, the cell-free fit gives `P c - n`, and the same fit from an unseeded background returns `P - - n`, which is why it seeds one.
+
+### The reference fit is gated
+
+When the absence-free class's own fit leaves more than half of the net signal's weighted power unexplained, every absence test would read that misfit.
+`ExtinctionScreen.reference_rwp_net` is that quantity, the weighted misfit over the net signal, taken against the peak picker's background envelope so no fit can move it, and `rietx.indexing.extinction.REFERENCE_NET_RWP_MAX` is the bound (1/√2, after Toby {cite}`toby2006`).
+Above it the screen still ranks the classes, sets `ExtinctionScreen.status` to `"unreliable"`, says [`EXTINCTION_SCREEN_UNRELIABLE`](diagnostics-indexing.md#extinction_screen_unreliable), and `ExtinctionScreen.best_or_none` returns `None`.
+A cell outside the basin a Le Bail can refine it from (0.4 % off held, or 1 % off with the cell-free fit, on a synthetic Si pattern at synchrotron resolution) lands there rather than on a confident wrong class.
 
 ### A container halo
 
@@ -112,7 +121,7 @@ Even that returns a class, which lists its space groups, so the type cannot expr
 |---|---|
 | `ExtinctionScreen.candidates` | the `ExtinctionCandidate` list, ranked as below |
 | `ExtinctionScreen.lattice_group` | the absence-free group every class is compared against |
-| `ExtinctionScreen.cell` | the cell screened: the candidate's, or the refined one under `refine_cell=True` |
+| `ExtinctionScreen.cell` | the cell screened: the refined one by default, the candidate's under `refine_cell=False` |
 | `ExtinctionScreen.system`, `ExtinctionScreen.centring` | the candidate's crystal system and centring |
 | `ExtinctionScreen.wavelength` | the primary emission line's wavelength, Å |
 | `ExtinctionScreen.two_theta_range` | the fitted channels' first and last 2θ, which is part of the answer |
@@ -122,8 +131,10 @@ Even that returns a class, which lists its space groups, so the type cannot expr
 | `ExtinctionScreen.reference_lines` | distinct lines the lattice group predicts in range |
 | `ExtinctionScreen.n_points` | channels in the fitted range, the N of every ΔBIC |
 | `ExtinctionScreen.profile_rwp` | the shared profile fit every class inherits its instrument from |
+| `ExtinctionScreen.prefit_rwp` | the cell-free Le Bail fit, `None` when the cell was held |
+| `ExtinctionScreen.reference_rwp_net` | the reference fit's misfit over the net signal, the gate's quantity |
 | `ExtinctionScreen.prior` | the declared `ExtinctionPrior`, or `None` |
-| `ExtinctionScreen.status` | `"converged"`, `"failed"` (no class could be screened) or `"cancelled"` |
+| `ExtinctionScreen.status` | `"converged"`, `"failed"` (no class could be screened), `"unreliable"` (ranked, but the reference fit failed its gate) or `"cancelled"` |
 | `ExtinctionScreen.thresholds_version` | the indexing thresholds version that produced the ranking |
 | `ExtinctionScreen.diagnostics` | findings about the answer |
 
