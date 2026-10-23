@@ -896,18 +896,6 @@ class PhaseMicrostructure(Base):
         body = table_text(MICROSTRUCTURE_HEADER, rows, "  ") if rows else []
         return "\n".join([head, *body, *("  " + line for line in tail)])
 
-    def _repr_html_(self) -> str:
-        """The terms as a table between the head line and the verdict lines."""
-        from .._display import (
-            MICROSTRUCTURE_HEADER,
-            microstructure_sections,
-            pre_html,
-            table_html,
-        )
-        head, rows, tail = microstructure_sections(self)
-        table = table_html(MICROSTRUCTURE_HEADER, rows) if rows else ""
-        return pre_html(head) + table + pre_html("\n".join(tail))
-
 
 class MomentAngleTest(Base):
     """One round of the stationary-angle test on a stage's covariance (WP-1929).
@@ -1413,7 +1401,7 @@ def _cap_high_correlation(diagnostics: list[Diagnostic]) -> list[Diagnostic]:
 DELIVERABLES = ("phase_id", "qpa", "structure", "series")
 
 
-def _diagnostic_lines(diagnostics: list[Diagnostic]) -> list[str]:
+def _diagnostic_lines(diagnostics: list[Diagnostic], notebook: bool = False) -> list[str]:
     """Section 2a: the first stop condition — every diagnostic, resolved or not.
 
     Present even at zero (WP-1302's acceptance: the stop-condition lines are
@@ -1423,13 +1411,15 @@ def _diagnostic_lines(diagnostics: list[Diagnostic]) -> list[str]:
     The header count is the *stored* list's — accurate, uncapped; only the
     rows actually printed below are bounded (:func:`_cap_high_correlation`),
     so "23 unresolved" can be followed by fewer than 23 lines without lying
-    about how many there are.
+    about how many there are.  ``notebook`` adds each code's explanation
+    (:func:`rietx._display.diagnostic_lines`).
     """
+    from .._display import diagnostic_lines
     if not diagnostics:
         return ["  diagnostics: none"]
     lines = [f"  diagnostics: {len(diagnostics)} unresolved"]
     for d in _cap_high_correlation(diagnostics):
-        lines += [f"    {line}" for line in str(d).splitlines()]
+        lines += diagnostic_lines(d, "    ", notebook=notebook)
     return lines
 
 
@@ -1930,10 +1920,12 @@ class RefinementResult(Base):
                                            joint=self.parametric_form_joint)
 
     def _repr_html_(self) -> str:
-        """The termination view, then the refined parameters as a table
-        (WP-1544). The text is what ``print`` gives; the table is the same
-        numbers as ``parameters``."""
-        from .._display import _number, diagnostics_html, pre_html, table_html
+        """The notebook form, in one ``<pre>`` (WP-1544, WP-2037): the
+        termination view ``print`` gives, with each diagnostic's explanation
+        under its ``help:`` line, then the refined parameters as a table of
+        the same numbers as ``parameters``."""
+        from .._display import _number, pre_html, table_text
+        lines = self._text_lines(notebook=True)
         rows = [(p.path, _number(p.value, p.stderr),
                  "" if p.at_bound is None else str(p.at_bound).lower())
                 for p in self.parameters]
@@ -1944,12 +1936,9 @@ class RefinementResult(Base):
             header += ("equations",)
             rows = [(*row, ", ".join(p.equations or ()))
                     for row, p in zip(rows, self.parameters, strict=True)]
-        table = table_html(header, rows) if rows else ""
-        before, after = self._text_parts()
-        before.append(_diagnostic_lines(self.diagnostics)[0])
-        return (pre_html("\n".join(before))
-                + diagnostics_html(_cap_high_correlation(self.diagnostics))
-                + pre_html("\n".join(after)) + table)
+        if rows:
+            lines += [f"  parameters: {len(rows)}", *table_text(header, rows, "    ")]
+        return pre_html("\n".join(lines))
 
     def __str__(self) -> str:
         """The termination view a bare result can answer (WP-1302): per-stage
@@ -1962,16 +1951,16 @@ class RefinementResult(Base):
         is what a caller holding only the result — the return value of
         ``fit()``, or one read back from a project — can print without it.
         """
-        before, after = self._text_parts()
-        return "\n".join(before + _diagnostic_lines(self.diagnostics) + after)
+        return "\n".join(self._text_lines())
 
-    def _text_parts(self) -> tuple[list[str], list[str]]:
-        """The lines before the diagnostics and the lines after them, so the
-        HTML view can fold each diagnostic between the two."""
-        before = [f"RefinementResult: {self.status} ({self.mode})"]
-        before += _stage_lines(self.stages, self.statistics.max_shift_over_esd)
-        after = _parametric_lines(self.parametric, self.parametric_form,
-                                  self.parametric_form_joint)
-        after.append(_provenance_line(self.provenance))
-        after.append(_agreement_line(self.statistics))
-        return before, after
+    def _text_lines(self, notebook: bool = False) -> list[str]:
+        """The termination view's lines; ``notebook`` adds each diagnostic's
+        explanation (:func:`_diagnostic_lines`)."""
+        lines = [f"RefinementResult: {self.status} ({self.mode})"]
+        lines += _stage_lines(self.stages, self.statistics.max_shift_over_esd)
+        lines += _diagnostic_lines(self.diagnostics, notebook)
+        lines += _parametric_lines(self.parametric, self.parametric_form,
+                                   self.parametric_form_joint)
+        lines.append(_provenance_line(self.provenance))
+        lines.append(_agreement_line(self.statistics))
+        return lines

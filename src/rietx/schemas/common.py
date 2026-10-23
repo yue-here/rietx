@@ -978,8 +978,9 @@ class Diagnostic(Base):
 
         ``warning[CODE]: message`` heads it, then ``at:`` with the paths and
         ``help:`` with the suggestion, each indented on its own line.  The
-        explanation is left out because it is the same for every finding; a
-        notebook folds it under the headline.
+        explanation is left out because it is the same for every finding
+        (WP-1985).  A notebook form prints it as ``means:`` under ``help:``
+        (:func:`rietx._display.diagnostic_lines`).
         """
         lines = [f"{self.level}[{self.code}]: {self.message}"]
         if self.where:

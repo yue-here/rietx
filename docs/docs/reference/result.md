@@ -470,8 +470,13 @@ These objects print a view of their own:
 | `Trajectory` | one row per point: its label, its x and its value with the esd |
 
 A `Refinement` reads only its own fields when it prints.
-It never calls `Refinement.summary`, which builds a report, and a notebook asks for every displayed object twice.
-In a notebook the tabular parts arrive as HTML tables: a result's refined parameters, a refinement's varying parameters, an indexing result's candidates, a peak list, a trajectory and a phase's microstructure terms.
+It never calls `Refinement.summary`, which builds a report.
+A notebook asks for the text each time a cell displays the refinement.
+In a notebook, a `RefinementResult`, an `IndexingResult` and a `PeakList` add to their text.
+Under each diagnostic's `help:` line, a `means:` line gives its `Diagnostic.explanation`.
+A result then lists `RefinementResult.parameters` in columns headed `path`, `value` and `at_bound`.
+An `equations` column follows when a parametric equation set a row.
+The display is one block of fixed-width text, so its columns stay aligned in GitHub's notebook viewer as well as in JupyterLab.
 A `StructureFigure` from `render_structure` displays as its picture.
 
 A figure behaves in a notebook as any returned value does.

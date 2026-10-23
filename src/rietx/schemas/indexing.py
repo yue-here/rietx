@@ -951,10 +951,10 @@ class PeakList(Base):
         each peak's flags, as :meth:`IndexingResult.best_or_none` is over the
         candidates.
         """
-        head, rows, tail = self._text_sections()
-        return "\n".join(head + rows + tail)
+        return "\n".join(self._text_lines())
 
-    def _text_sections(self) -> tuple[list[str], list[str], list[str]]:
+    def _text_lines(self, notebook: bool = False) -> list[str]:
+        from .._display import diagnostic_lines
         head = [f"PeakList: {len(self.peaks)} peaks, {len(self.usable())} usable, "
                 f"{self.two_theta_min:g}–{self.two_theta_max:g}° 2θ, "
                 f"λ = {self.wavelength:g} Å, source {self.source}",
@@ -967,19 +967,14 @@ class PeakList(Base):
         # before the list was built, so it prints as IndexingResult's does
         tail = []
         for d in self.diagnostics:
-            tail += [f"  {line}" for line in str(d).splitlines()]
-        return head, rows, tail
+            tail += diagnostic_lines(d, "  ", notebook=notebook)
+        return head + rows + tail
 
     def _repr_html_(self) -> str:
-        """The peaks as a table between the count line and the diagnostics."""
-        from .._display import diagnostics_html, pre_html, table_html
-        head, _, _ = self._text_sections()
-        rows = [(str(i), f"{p.two_theta:.4f}", f"{p.two_theta_esd:.4f}",
-                 f"{p.intensity:.1f}", f"{p.fwhm:.3f}", p.origin, ", ".join(p.flags))
-                for i, p in enumerate(self.peaks)]
-        table = table_html(("#", "two_theta", "two_theta_esd", "intensity", "fwhm",
-                            "origin", "flags"), rows) if rows else ""
-        return pre_html(head[0]) + table + diagnostics_html(self.diagnostics)
+        """The notebook form: the text in one ``<pre>``, each diagnostic's
+        explanation under its ``help:`` line (WP-2037)."""
+        from .._display import pre_html
+        return pre_html("\n".join(self._text_lines(notebook=True)))
 
     @classmethod
     def from_positions(cls, two_theta: np.ndarray, wavelength: float, *,
@@ -1854,7 +1849,7 @@ class IndexingEvidence(Base):
 
 
 def _candidate_label(c: CellCandidate) -> str:
-    """Which candidate a finding is about, as the text and HTML views say it."""
+    """Which candidate a finding is about, as its ``on:`` line says it."""
     return f"candidate {c.system} {c.centring} V={c.volume:.1f}"
 
 
@@ -1924,13 +1919,13 @@ class IndexingResult(Base):
         :meth:`best_or_none` is the one rule it calls, a filter over the
         candidates.
         """
-        head, candidates, tail = self._text_sections()
-        return "\n".join(head + candidates + tail)
+        return "\n".join(self._text_lines())
 
-    def _text_sections(self) -> tuple[list[str], list[str], list[str]]:
-        """The run line, the candidate lines, and the verdict with every
-        diagnostic: :meth:`__str__` joins them, ``_repr_html_`` swaps the middle
-        one for a table."""
+    def _text_lines(self, notebook: bool = False) -> list[str]:
+        """The run line, the candidate lines, the verdict and every
+        diagnostic; ``notebook`` adds each code's explanation
+        (:func:`rietx._display.diagnostic_lines`)."""
+        from .._display import diagnostic_lines
         result = self
         lines: list[str] = []
         lines.append(f"engines: {', '.join(result.engines_run) or 'none'}   "
@@ -1942,7 +1937,6 @@ class IndexingResult(Base):
             lines.append(f"search INCOMPLETE in: {', '.join(incomplete)} — a negative "
                          "result there is not evidence")
         lines.append("")
-        head, lines = lines, []
         if not result.candidates:
             lines.append("no candidate cell in the systems searched.")
         for i, c in enumerate(result.candidates, start=1):
@@ -1958,19 +1952,16 @@ class IndexingResult(Base):
                             if c.lebail is not None else ""))
             if c.confidence_caveats:
                 lines.append(f"      not higher because: {', '.join(c.confidence_caveats)}")
-        candidates, lines = lines, self._verdict_lines()
+        lines += self._verdict_lines()
         # ``where`` is load-bearing for the run-level codes: it names which
         # systems INDEX_BUDGET_EXHAUSTED left truncated or unreached, which no
         # message restates, and ``str(diag)`` prints it as ``at:``
         for diag in result.diagnostics:
-            lines += [f"  {line}" for line in str(diag).splitlines()]
+            lines += diagnostic_lines(diag, "  ", notebook=notebook)
         for c in result.candidates:
             for diag in c.diagnostics:
-                # ``on:`` straight under the headline, where the HTML fold has it
-                first, *rest = str(diag).splitlines()
-                lines += [f"  {first}", f"    on: {_candidate_label(c)}",
-                          *(f"  {line}" for line in rest)]
-        return head, candidates, lines
+                lines += diagnostic_lines(diag, "  ", on=_candidate_label(c), notebook=notebook)
+        return lines
 
     def _verdict_lines(self) -> list[str]:
         best = self.best_or_none()
@@ -1981,26 +1972,10 @@ class IndexingResult(Base):
                 f"{best.cell[3]:.3f} {best.cell[4]:.3f} {best.cell[5]:.3f}°"]
 
     def _repr_html_(self) -> str:
-        """The candidates as a table between the run line and the verdict,
-        then the diagnostics with their detail folded."""
-        from .._display import diagnostics_html, pre_html, table_html
-        head, _, _ = self._text_sections()
-        rows = []
-        for i, c in enumerate(self.candidates, start=1):
-            a, b, cc, al, be, ga = c.cell
-            rows.append((str(i), c.confidence, f"{c.system} {c.centring}",
-                         f"{a:.5f} {b:.5f} {cc:.5f}", f"{al:.3f} {be:.3f} {ga:.3f}",
-                         f"{c.volume:.2f}", f"{c.n_indexed}/{c.n_lines}",
-                         f"{c.chi2_red:.2f}",
-                         f"{c.lebail.rwp:.4f}" if c.lebail is not None else "",
-                         ", ".join(c.confidence_caveats)))
-        table = table_html(("#", "confidence", "lattice", "a b c (Å)", "α β γ (°)",
-                            "V (Å³)", "indexed", "chi2_red", "Le Bail Rwp",
-                            "confidence_caveats"), rows) if rows else ""
-        folds = diagnostics_html(self.diagnostics) + "".join(
-            diagnostics_html(c.diagnostics, context=_candidate_label(c)) for c in self.candidates)
-        return (pre_html("\n".join(head)) + table
-                + pre_html("\n".join(self._verdict_lines()).lstrip("\n")) + folds)
+        """The notebook form: the text in one ``<pre>``, each diagnostic's
+        explanation under its ``help:`` line (WP-2037)."""
+        from .._display import pre_html
+        return pre_html("\n".join(self._text_lines(notebook=True)))
 
     def best_or_none(self) -> CellCandidate | None:
         """The single candidate, or None.

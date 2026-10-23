@@ -1,7 +1,14 @@
 """How a rietx object reads when printed, shown in a notebook, or logged (WP-1544).
 
-Text is the authority and HTML a projection of the same rows, because an agent
-reads stdout and a person reads a notebook cell, and the two must not disagree.
+Text is the authority, because an agent reads stdout and a person reads a
+notebook cell, and the two must not disagree.  The notebook form is the text
+form in one ``<pre>`` (WP-2037), with two additions: a result's refined
+parameters as a table, and each diagnostic's explanation as ``means:`` under
+its ``help:`` line (:func:`diagnostic_lines`).  It is one block because
+GitHub's sanitiser strips ``<details>``, and GitHub and JupyterLab both draw a
+bare ``<table>`` in the body font with its cells right-aligned.  An object
+whose notebook form would add nothing has no ``_repr_html_``, so a notebook
+shows its text.
 
 Four rules hold for everything here:
 
@@ -9,10 +16,11 @@ Four rules hold for everything here:
   text/html for every displayed value, so a renderer calling ``report()`` or
   ``summary()`` would run a report's rival fits twice per cell.
 - **No glosses.** A renderer prints a field's name, or the label ``help.py``
-  carries for it.  What a name *is* is written there and nowhere else (WP-1202).
-- **No colour of its own.** HTML is semantic tags only: JupyterLab's and
-  GitHub's sanitisers strip styles, and a colour here would be a fourth surface
-  beside ``viz/theme.py``'s three.
+  carries for it.  What a name *is* is written there and nowhere else (WP-1202),
+  and so is what a diagnostic code means, which the notebook form prints.
+- **No colour of its own.** The notebook form is one ``<pre>`` with no style:
+  JupyterLab's and GitHub's sanitisers strip styles, and a colour here would be
+  a fourth surface beside ``viz/theme.py``'s three.
 - **A display is laid out to be read** (WP-2037): values in one aligned
   column, numbers to the digits that carry meaning, a unit where there is
   one, and an empty state that says whether the check ran.  The last is read
@@ -329,7 +337,7 @@ def tree(model, *, order=None, groups=None, show_empty: bool = False,
 
 
 # ---------------------------------------------------------------------------
-# The parameter table: one row builder, a text and an HTML renderer
+# The parameter table: one row builder and its text layout
 # ---------------------------------------------------------------------------
 
 def row_state(row) -> str:
@@ -350,7 +358,8 @@ def row_state(row) -> str:
 
 
 def parameter_cells(row) -> tuple[str, str, str]:
-    """``(path, value(esd), state)``: the one row both renderers draw."""
+    """``(path, value(esd), state)``: the one row a ``ParameterRow`` prints,
+    alone or in a ``Refinement``'s table."""
     return row.path, _number(row.value, row.esd), row_state(row)
 
 
@@ -390,7 +399,7 @@ MICROSTRUCTURE_HEADER = ("path", "value", "unavailable")
 
 def microstructure_sections(block) -> tuple[str, list[tuple[str, str, str]], list[str]]:
     """A ``PhaseMicrostructure`` as a head line, one row a term and two tail
-    lines: :meth:`__str__` lays the rows out as text, ``_repr_html_`` as a table.
+    lines, which :meth:`__str__` lays out with :func:`table_text`.
 
     The head carries the phase and the two constants a size was read with, the
     rows each reading with its esd (Å for a size, Δd/d bare) or the reason it
@@ -449,58 +458,74 @@ def table_text(header: tuple[str, ...], rows: list[tuple[str, ...]], indent: str
     return out
 
 
-def table_html(header: tuple[str, ...], rows: list[tuple[str, ...]], caption: str | None = None) -> str:
-    """The same rows as a bare ``<table>``: no style, so the notebook's own
-    theme draws it and a sanitiser has nothing to strip."""
-    from html import escape
-    parts = ["<table>"]
-    if caption:
-        parts.append(f"<caption>{escape(caption)}</caption>")
-    parts.append("<thead><tr>" + "".join(f"<th>{escape(h)}</th>" for h in header)
-                 + "</tr></thead><tbody>")
-    for cells in rows:
-        parts.append("<tr>" + "".join(f"<td>{escape(c)}</td>" for c in cells) + "</tr>")
-    parts.append("</tbody></table>")
-    return "".join(parts)
-
-
 PARAMETER_HEADER = ("path", "value", "state")
 
 
 def pre_html(text: str) -> str:
-    """Text in a ``<pre>``, escaped: the HTML form of a view with no table."""
+    """Text in one ``<pre>``, escaped: the whole of a notebook form."""
     from html import escape
     return f"<pre>{escape(text)}</pre>"
 
 
-def diagnostics_html(diagnostics, context: str | None = None) -> str:
-    """Each diagnostic as a ``<details>``: the headline shown, the rest folded.
+# ---------------------------------------------------------------------------
+# A diagnostic, as text and in a notebook
+# ---------------------------------------------------------------------------
 
-    The summary is ``str(d)``'s first line.  The fold holds what the text form
-    prints under it (``at:``, ``help:``) and the code's explanation, which
-    the text form leaves out because it is the same for every finding
-    (WP-1985).  ``context`` names what the findings are about, such as one
-    indexing candidate.
+#: The column a notebook form wraps a diagnostic's prose at.  A ``<pre>`` does
+#: not wrap, and GitHub's notebook frame shows about 100 monospace characters
+#: (measured in headless Chrome, 2026-10-23, WP-2037).  88, black's and ruff's
+#: default line length, keeps every line inside that frame with room to spare.
+NOTEBOOK_WIDTH = 88
+
+#: The labels of the lines under a headline that the notebook form wraps.
+#: ``at:`` and ``on:`` name paths and a candidate, and stay on one line.
+_PROSE_LABELS = ("  help: ", "  means: ")
+
+
+def diagnostic_lines(d, indent: str = "", *, on: str | None = None,
+                     notebook: bool = False) -> list[str]:
+    """A ``Diagnostic`` as the lines a view prints, each after ``indent``.
+
+    The text form is ``str(d)``, with ``on:`` under the headline when ``on``
+    names what the finding is about, such as one indexing candidate.  The
+    notebook form adds the code's explanation as ``means:`` after ``help:``,
+    and wraps the headline, ``help:`` and ``means:`` at :data:`NOTEBOOK_WIDTH`,
+    each continuation under the text after its label.  The text form leaves
+    the explanation out, because it is the same for every finding (WP-1985).
     """
-    from html import escape
-    parts = []
-    for d in diagnostics:
-        head, *rest = str(d).splitlines()
-        if context:
-            rest.insert(0, f"  on: {context}")
-        body = "".join(f"<p>{escape(line.strip())}</p>" for line in rest)
-        if d.explanation:
-            body += f"<p>{escape(d.explanation)}</p>"
-        parts.append(f"<details><summary>{escape(head)}</summary>{body}</details>")
-    return "".join(parts)
+    head, *rest = str(d).splitlines()
+    if on is not None:
+        rest.insert(0, f"  on: {on}")
+    if not notebook:
+        return [indent + line for line in (head, *rest)]
+    if d.explanation:
+        after = next((i + 1 for i, line in enumerate(rest) if line.startswith("  help: ")),
+                     len(rest))
+        rest.insert(after, f"  means: {d.explanation}")
+    width = NOTEBOOK_WIDTH - len(indent)
+    lines = _wrapped(head, f"{d.level}[{d.code}]: ", width)
+    for line in rest:
+        label = next((p for p in _PROSE_LABELS if line.startswith(p)), None)
+        lines += [line] if label is None else _wrapped(line, label, width)
+    return [indent + line for line in lines]
+
+
+def _wrapped(line: str, label: str, width: int) -> list[str]:
+    """``line`` broken at spaces to ``width``, each line after the first
+    indented to sit under the text after ``label``.  A path or a number is
+    never split, even when it is longer than the room."""
+    import textwrap
+    return textwrap.wrap(line[len(label):], width, initial_indent=label,
+                         subsequent_indent=" " * len(label),
+                         break_long_words=False, break_on_hyphens=False) or [line]
 
 
 # ---------------------------------------------------------------------------
 # Refinement (not a schema, so it has no tree)
 # ---------------------------------------------------------------------------
 
-def refinement_parts(ref) -> tuple[list[str], list, int]:
-    """The head lines, the free rows and the row count for a ``Refinement``.
+def refinement_text(ref) -> str:
+    """A ``Refinement``'s head lines, then its free rows as a table.
 
     Reads the object's own fields and builds its parameter table, which is a
     pure function of them (milliseconds, no fit, no file written).
@@ -523,23 +548,10 @@ def refinement_parts(ref) -> tuple[list[str], list, int]:
         rows = ref.parameters()
     except Exception as exc:   # a display never raises over a model it is showing
         head.append(f"  parameters: not available ({type(exc).__name__}: {exc})")
-        return head, [], 0
+        return "\n".join(head)
     free = [r for r in rows if row_state(r) == "vary"]   # a held vary flag is not free
     head.append(f"  parameters: {len(free)} of {len(rows)} vary; "
                 "ref.parameters() lists every row")
-    return head, free, len(rows)
-
-
-def refinement_text(ref) -> str:
-    head, free, _ = refinement_parts(ref)
     if free:
         head += table_text(PARAMETER_HEADER, [parameter_cells(r) for r in free], "    ")
     return "\n".join(head)
-
-
-def refinement_html(ref) -> str:
-    head, free, _ = refinement_parts(ref)
-    html = pre_html("\n".join(head))
-    if free:
-        html += table_html(PARAMETER_HEADER, [parameter_cells(r) for r in free])
-    return html

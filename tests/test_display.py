@@ -178,9 +178,9 @@ def test_a_distance_prints_on_one_line_and_so_does_its_table():
 
 
 def test_displaying_a_refinement_runs_nothing(fap, monkeypatch):
-    """IPython builds text/plain and text/html for every displayed value, so a
-    view that called ``summary()`` would build a report, and a report's layer
-    2 runs rival fits, twice per cell."""
+    """IPython builds every form a displayed value has, so a view that called
+    ``summary()`` would build a report, and a report's layer 2 runs rival
+    fits, on every displayed cell."""
     ref = fap["ref"]
 
     def refuse(*a, **k):
@@ -188,16 +188,15 @@ def test_displaying_a_refinement_runs_nothing(fap, monkeypatch):
     for name in ("fit", "report", "summary"):
         monkeypatch.setattr(type(ref), name, refuse)
     text = str(ref)
-    html = ref._repr_html_()
     assert "last fit: converged" in text
-    assert "<table>" in html and "phases.0.cell.a" in html
+    assert any(line.split()[:1] == ["phases.0.cell.a"] for line in text.splitlines())
 
 
 def test_html_is_escaped_and_carries_no_style(fap):
-    from rietx._display import table_html
-    html = table_html(("path", "value"), [("<script>", "a & b")], caption="<x>")
-    assert "<script>" not in html and "&lt;script&gt;" in html and "a &amp; b" in html
-    html = fap["ref"]._repr_html_()
+    from rietx.schemas.common import Diagnostic
+    d = Diagnostic(level="warning", code="NOT_A_CODE_HERE", message="<script> & more")
+    html = fap["result"].model_copy(update={"diagnostics": [d]})._repr_html_()
+    assert "<script>" not in html and "&lt;script&gt; &amp; more" in html
     assert "style" not in html and "<script" not in html
 
 
@@ -253,11 +252,129 @@ def test_a_structure_figure_carries_a_dark_copy_drawn_from_what_it_was(fap):
         assert list(alone._repr_mimebundle_()[0]) == ["image/png"]
 
 
-def test_a_result_html_is_its_text_and_its_parameter_table(fap):
+def _notebook_text(obj) -> str:
+    """The text inside an object's one ``<pre>``, unescaped."""
+    import html
+    page = obj._repr_html_()
+    assert page.startswith("<pre>") and page.endswith("</pre>")
+    return html.unescape(page[len("<pre>"):-len("</pre>")])
+
+
+def _flat(text: str) -> str:
+    return " ".join(text.split())
+
+
+def test_a_result_notebook_form_is_its_text_and_its_parameter_table(fap):
+    """WP-2037: one ``<pre>``, the text ``print`` gives and then the refined
+    parameters laid out as text, one row each under a header."""
     result = fap["result"]
-    html = result._repr_html_()
-    assert html.startswith("<pre>RefinementResult: ")
-    assert html.count("<tr>") == 1 + len(result.parameters)
+    text, table = _notebook_text(result).split(f"\n  parameters: {len(result.parameters)}\n")
+    assert text.startswith("RefinementResult: ")
+    rows = table.splitlines()
+    assert rows[0].split() == ["path", "value", "at_bound"]
+    assert [row.split()[0] for row in rows[1:]] == [p.path for p in result.parameters]
+    explained = [d for d in result.diagnostics if d.explanation]
+    text = _flat(text)
+    for d in explained:
+        text = text.replace(" means: " + _flat(d.explanation), "", 1)
+    assert text == _flat(str(result)), "the text form, and nothing else"
+
+
+def test_a_result_notebook_form_says_what_each_diagnostic_means_and_print_does_not(fap):
+    """WP-2037, decision 1: the explanation (``rietx.help.explain``) is in
+    the notebook form, as ``means:`` under ``help:``, wrapped at the
+    notebook's width with each continuation under the text after its label.
+    ``print``, which an agent reads, leaves it out (WP-1985)."""
+    from rietx._display import NOTEBOOK_WIDTH
+    from rietx.schemas.common import Diagnostic
+    long = Diagnostic(level="warning", code="BOUND_HIT",
+                      message="a refined to its upper bound " + "and kept going " * 8,
+                      where=["phases.0.cell.a"], suggestion="check the tie " * 10)
+    floor = Diagnostic(level="warning", code="FLOOR_HIT", message="y refined to its floor",
+                       where=["instrument.profile.y"])
+    unknown = Diagnostic(level="info", code="NOT_A_CODE_HERE", message="from another version")
+    result = fap["result"].model_copy(update={"diagnostics": [long, floor, unknown]})
+    notebook, printed = _notebook_text(result), str(result)
+    for d in (long, floor):
+        assert "means: " + _flat(d.explanation) in _flat(notebook)
+        assert d.explanation.split(".")[0] not in printed
+    assert "means:" not in printed and _flat(notebook).count("means:") == 2
+    lines = notebook.splitlines()
+    label = "    warning[BOUND_HIT]: "
+    head = next(i for i, line in enumerate(lines) if line.startswith(label))
+
+    def under(line, label):
+        return line.startswith(" " * len(label)) and line[len(label)] != " "
+    assert under(lines[head + 1], label), "under the message"
+    helps = [i for i, line in enumerate(lines) if line.startswith("      help: ")]
+    means = [i for i, line in enumerate(lines) if line.startswith("      means: ")]
+    assert under(lines[helps[0] + 1], "      help: ")
+    assert helps[0] < means[0] and under(lines[means[0] + 1], "      means: ")
+    assert lines[means[1] - 1] == "      at: instrument.profile.y", "no help: it follows at:"
+    last = lines.index("    info[NOT_A_CODE_HERE]: from another version")
+    assert max(len(line) for line in lines[head:last + 1]) <= NOTEBOOK_WIDTH
+    assert last > means[1] and "means:" not in lines[last + 1], "an unknown code means nothing"
+
+
+@pytest.mark.parametrize("name", ["result", "peaks", "indexing"])
+def test_every_notebook_form_is_one_pre(fap, name):
+    """WP-2037, decision 1: GitHub's sanitiser strips ``<details>``, and GitHub
+    and JupyterLab draw a bare table in the body font, right-aligned.  So
+    every ``_repr_html_`` in the package is one ``<pre>`` and nothing else,
+    and the instances here are one per class that has one, found in the
+    source so a new one cannot land untested."""
+    import ast
+
+    from rietx.schemas.common import Diagnostic, Provenance
+    from rietx.schemas.indexing import CellCandidate, IndexingResult, PeakList
+    owners = set()
+    for path in Path(rx.__file__).parent.rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        if "_repr_html_" in source:
+            owners |= {node.name for node in ast.walk(ast.parse(source))
+                       if isinstance(node, ast.ClassDef)
+                       and any(getattr(f, "name", None) == "_repr_html_" for f in node.body)}
+    d = Diagnostic(level="warning", code="BOUND_HIT", message="a refined to its upper bound",
+                   where=["phases.0.cell.a"], suggestion="check the tie")
+    cand = CellCandidate(cell=(5.43, 5.43, 5.43, 90, 90, 90), cell_esd=(1e-4,) * 3 + (0,) * 3,
+                         system="cubic", diagnostics=[d])
+    build = {
+        "result": lambda: fap["result"].model_copy(update={"diagnostics": [d]}),
+        "peaks": lambda: PeakList.from_positions([21.07, 26.22], 1.5406).model_copy(
+            update={"diagnostics": [d]}),
+        "indexing": lambda: IndexingResult(
+            candidates=[cand], diagnostics=[d], engines_run=["svd"], systems_searched=["cubic"],
+            provenance=Provenance(package_version="test", created_utc="2026-10-07T00:00:00Z")),
+    }
+    assert owners == {"RefinementResult", "PeakList", "IndexingResult"}, (
+        "a new _repr_html_: give it an instance here")
+    page = build[name]()._repr_html_()
+    assert page.startswith("<pre>") and page.endswith("</pre>") and page.count("<pre>") == 1
+    for tag in ("<details", "<summary", "<table", "<p>"):
+        assert tag not in page
+    assert "means: " in page
+
+
+@pytest.mark.parametrize("name", ["ref", "microstructure", "trajectory", "moment"])
+def test_a_view_a_notebook_form_would_not_add_to_shows_its_text(fap, name):
+    """WP-2037: where one ``<pre>`` of the text would be all a notebook form
+    carried, the object has none, and a notebook shows its text as it is."""
+    formatters = pytest.importorskip("IPython.core.formatters")
+    from rietx.schemas.results import MicrostructureTerm, PhaseMicrostructure
+    from rietx.schemas.sequential import MagneticTrajectory, Trajectory
+    obj = {
+        "ref": lambda: fap["ref"],
+        "microstructure": lambda: PhaseMicrostructure(
+            phase_index=0, scherrer_k=0.9, terms=[MicrostructureTerm(
+                path="phases.0.lor_size", kind="size", coefficient=0.27, value=298.9, esd=2.2)]),
+        "trajectory": lambda: Trajectory(path="phases.0.cell.a", x=[300.0], value=[4.1566],
+                                         stderr=[4.3e-6], labels=["300 K"], positions=[0]),
+        "moment": lambda: MagneticTrajectory(
+            path="magnetic.Cr1", x=[10.0], value=[2.1], stderr=[0.1], labels=["10 K"],
+            supported=[True], measured=[True], status=["converged"]),
+    }[name]()
+    bundle, _ = formatters.DisplayFormatter().format(obj)
+    assert bundle == {"text/plain": str(obj)}
 
 
 def test_an_indexing_result_prints_its_candidates_and_verdict():
@@ -271,9 +388,7 @@ def test_an_indexing_result_prints_its_candidates_and_verdict():
     text = str(res)
     assert text.splitlines()[0].startswith("engines: svd   systems: cubic")
     assert "5.43000 5.43000 5.43000 Å" in text and "NO CELL" in text
-    html = res._repr_html_()
-    assert html.count("<tr>") == 2 and "5.43000 5.43000 5.43000" in html
-    assert "NO CELL" in html and "found by" not in html, "the table replaces the lines"
+    assert _notebook_text(res) == text, "no diagnostic, so nothing to add"
 
 
 def test_a_peak_list_prints_one_row_per_peak():
@@ -284,8 +399,7 @@ def test_a_peak_list_prints_one_row_per_peak():
     lines = text.splitlines()
     assert lines[0].startswith("PeakList: 3 peaks, 3 usable")
     assert len(lines) == 2 + 3 and "26.2200" in lines[3]
-    html = peaks._repr_html_()
-    assert html.count("<tr>") == 4 and "26.2200" in html
+    assert _notebook_text(peaks) == text, "no diagnostic, so nothing to add"
 
 
 def test_a_microstructure_block_prints_one_row_a_term_and_its_verdict():
@@ -311,8 +425,6 @@ def test_a_microstructure_block_prints_one_row_a_term_and_its_verdict():
     assert lines[4].split() == ["phases.0.lor_strain", "0.000966(42)"]
     assert lines[5:] == ["  size_agreement: 7.91   strain_agreement: None",
                          "  separable: None   size_strain_collinearity: None"]
-    html = block._repr_html_()
-    assert html.count("<tr>") == 4 and "298.9(22) Å" in html and "separable: None" in html
 
 
 def test_a_trajectory_prints_one_row_a_point_with_its_esd():
@@ -329,31 +441,33 @@ def test_a_trajectory_prints_one_row_a_point_with_its_esd():
     assert lines[1].split() == ["label", "T", "(K)", "value"]
     assert lines[2].split() == ["300", "K", "300", "4.1566025(43)"]
     assert lines[3].split() == ["400", "K", "400", "4.1586809"]
-    html = traj._repr_html_()
-    assert html.count("<tr>") == 3 and "<th>T (K)</th>" in html and "4.1566025(43)" in html
     moment = MagneticTrajectory(path="magnetic.Cr1", x=[10.0], value=[2.1], stderr=[0.1],
                                 labels=["10 K"], supported=[True], measured=[True],
                                 status=["converged"])
-    assert str(moment).startswith("MagneticTrajectory") and "<table>" not in moment._repr_html_()
+    assert str(moment).startswith("MagneticTrajectory")
 
 
-def test_a_diagnostic_prints_its_headline_and_folds_the_rest():
-    """The text form is rustc's; the HTML shows the headline and folds the
-    suggestion, the paths and the code's explanation (WP-1985)."""
-    from rietx._display import diagnostics_html
+def test_a_diagnostic_prints_rustc_s_form_and_a_notebook_adds_what_it_means():
+    """The text form is rustc's (WP-1985).  The notebook form adds the code's
+    explanation as ``means:`` after ``help:`` (WP-2037), and ``on:`` sits
+    under the headline in both."""
+    from rietx._display import diagnostic_lines
     from rietx.help import explain
     from rietx.schemas.common import Diagnostic
     d = Diagnostic(level="warning", code="BOUND_HIT", message="a refined to its upper bound",
                    where=["phases.0.cell.a"], suggestion="check the tie")
     assert str(d).splitlines() == ["warning[BOUND_HIT]: a refined to its upper bound",
                                    "  at: phases.0.cell.a", "  help: check the tie"]
-    html = diagnostics_html([d], context="candidate cubic P")
-    head, fold = html.split("</summary>")
-    assert head == "<details><summary>warning[BOUND_HIT]: a refined to its upper bound"
-    assert fold.index("on: candidate") < fold.index("at: phases") < fold.index("help: check")
-    assert explain("BOUND_HIT").description in fold
+    text = diagnostic_lines(d, "  ", on="candidate cubic P")
+    assert text == ["  warning[BOUND_HIT]: a refined to its upper bound",
+                    "    on: candidate cubic P", "    at: phases.0.cell.a",
+                    "    help: check the tie"]
+    notebook = diagnostic_lines(d, "  ", on="candidate cubic P", notebook=True)
+    assert notebook[:4] == text and notebook[4].startswith("    means: ")
+    assert _flat(" ".join(notebook[4:])) == "means: " + _flat(explain("BOUND_HIT").description)
     unknown = Diagnostic(level="info", code="NOT_A_CODE_HERE", message="from another version")
-    assert unknown.explanation is None and "<p>" not in diagnostics_html([unknown])
+    assert unknown.explanation is None
+    assert diagnostic_lines(unknown, notebook=True) == diagnostic_lines(unknown)
 
 
 def test_pre_fit_ticks_are_where_the_fit_puts_its_own(fap):

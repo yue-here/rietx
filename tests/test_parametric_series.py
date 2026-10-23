@@ -755,7 +755,8 @@ def test_a_line_equation_is_rejected_by_a_ramp_that_bends(bow, rejected):
         {"vars.a_0", "vars.a_1"}
         | {f"hist.{h}.phases.0.cell.{k}" for h in range(10) for k in "abc"})
     assert result.for_histogram(3).parameter("phases.0.cell.a").equations == ["a"]
-    assert "<th>equations</th>" in result._repr_html_()
+    assert ["path", "value", "at_bound", "equations"] in [
+        line.split() for line in result._repr_html_().splitlines()]
     # the equation's covariance: its diagonal is each esd squared, bit for bit, and
     # at each pattern's coordinate the equation is that pattern's row
     (equation,) = result.parametric_equations
@@ -784,7 +785,8 @@ def test_a_line_equation_is_rejected_by_a_ramp_that_bends(bow, rejected):
         # field reads unrecorded, never "no equation"
         single = rx.refine(patterns[0], *_start_models(), plan="mccusker_default")
         assert single.parameters and all(p.equations == [] for p in single.parameters)
-        assert "<th>equations</th>" not in single._repr_html_()
+        assert ["path", "value", "at_bound"] in [
+            line.split() for line in single._repr_html_().splitlines()]
         old = single.parameters[0].model_dump(mode="json", exclude={"equations"})
         assert type(single.parameters[0]).model_validate(old).equations is None
     if rejected:
