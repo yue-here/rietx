@@ -24,7 +24,6 @@ What is pinned, and against what:
 
 from __future__ import annotations
 
-import re
 from fractions import Fraction
 from pathlib import Path
 
@@ -391,8 +390,13 @@ UNLUCKY_SEED_AT_M = 41
 
 
 def _setting(cands):
-    """What the probe decides, per candidate: the child's group, (P, p) and its atoms."""
-    return [(c.label, c.child_group, np.asarray(c.transform[0]).tolist(),
+    """What the probe decides, per candidate: the child's group, (P, p) and its atoms.
+
+    A refused candidate reads as its refusal's code, so a refusal fails a
+    comparison with a stated child.
+    """
+    return [(c.label, c.refusal.code) if c.refusal is not None else
+            (c.label, c.child_group, np.asarray(c.transform[0]).tolist(),
              np.asarray(c.transform[1]).tolist(),
              [(a.label, a.x.value, a.y.value, a.z.value) for a in c.child.atoms])
             for c in cands]
@@ -419,8 +423,8 @@ def test_the_probe_tolerance_and_scale_decide_no_child(at_r, at_gamma, at_x_and_
     """A tolerance 1000× tighter, or a field 5× smaller or 4× larger: the same children.
 
     The bound on ``_PROBE_SYMPREC`` and ``_PROBE_RMS``: the operation check fixes
-    an answered child's group, and this pins the raise path, a false
-    ``DISTORTION_CHILD_LARGER`` (any raise fails the test) on every call.
+    an answered child's group, and this pins the refusal path, a false
+    ``DISTORTION_CHILD_LARGER`` (any refusal or raise fails the test) on every call.
     """
     for name, value in probe.items():
         monkeypatch.setattr(I, name, value)
@@ -429,11 +433,25 @@ def test_the_probe_tolerance_and_scale_decide_no_child(at_r, at_gamma, at_x_and_
 
 
 def test_a_tolerance_at_the_probe_scale_finds_extra_operations(at_gamma, monkeypatch):
-    """The positive arm: past the field's rms, spglib keeps the parent's 48 operations."""
-    parent, _ = at_gamma
+    """The positive arm: past the field's rms, spglib keeps the parent's 48 operations.
+
+    The three low-symmetry children (Cm twice and P1, 2, 2 and 1 operations)
+    keep more on every draw, some draw keeping all 48, so each is refused as
+    ``DISTORTION_CHILD_LARGER``; it is still returned, beside the three
+    children (P4mm, R3m, Amm2) a later draw states.
+    """
+    parent, expected = at_gamma
     monkeypatch.setattr(I, "_PROBE_SYMPREC", 4 * I._PROBE_RMS)
-    with pytest.raises(ValueError, match="DISTORTION_CHILD_LARGER.* keeps 48 operations"):
-        I.distortion_candidates(parent, K_GAMMA, sites="Mn")
+    cands = I.distortion_candidates(parent, K_GAMMA, sites="Mn")
+    assert [c.label for c in cands] == [c.label for c in expected]
+    refused = [c for c in cands if c.refusal is not None]
+    assert sorted(c.refusal.operations for c in refused) == [1, 2, 2]
+    for c in refused:
+        assert c.refusal.code == "DISTORTION_CHILD_LARGER", c.refusal.message
+        assert len(c.refusal.draws) == I._PROBE_DRAWS and 48 in c.refusal.draws
+        assert all(n > c.refusal.operations for n in c.refusal.draws), c.refusal.draws
+        assert "cannot realise" in c.refusal.message
+    assert sorted(_number(c) for c in cands if c.refusal is None) == [38, 99, 160]
 
 
 @pytest.mark.parametrize("seed", [1, 2026, *UNLUCKY_SEEDS, UNLUCKY_SEED_AT_M])
@@ -454,5 +472,147 @@ def test_one_unlucky_draw_does_not_refuse_a_child(request, monkeypatch, parent_f
     parent, _ = request.getfixturevalue(parent_from)
     monkeypatch.setattr(I, "_PROBE_SEED", seed)
     monkeypatch.setattr(I, "_PROBE_DRAWS", 1)
-    with pytest.raises(ValueError, match=r"DISTORTION_CHILD_LARGER.*" + re.escape(label)):
-        I.distortion_candidates(parent, k, sites=sites)
+    refused = _refused(I.distortion_candidates(parent, k, sites=sites))
+    assert [(name, code) for name, code, _ in refused] == [(label, "DISTORTION_CHILD_LARGER")]
+
+
+# --------------------------------------------------------------------------
+# #996 follow-ups (review rounds 1-3): the refusal's code, and one refusal
+# no longer costs the call its other candidates
+# --------------------------------------------------------------------------
+
+def _parent_group(parent):
+    return resolve_group(parent.space_group, parent.symmetry_operations)
+
+
+def _refused(cands):
+    return [(c.label, c.refusal.code, c.refusal.draws) for c in cands if c.refusal is not None]
+
+
+def test_a_stated_child_carries_no_refusal(at_r, at_gamma, at_x_and_m):
+    """The positive arm of the refusal record: every child the suite states has none."""
+    for _parent, _k, _sites, cands in _every_call(at_r, at_gamma, at_x_and_m):
+        assert cands and all(c.refusal is None and c.child is not None for c in cands)
+
+
+def test_fewer_operations_than_the_group_is_not_reported_as_more(at_gamma, monkeypatch):
+    """A draw keeping fewer operations than the isotropy group is a tolerance miss.
+
+    The probe's lattice is the parent's metric averaged over the parent's point
+    group.  Skipping the average on a parent whose c is 1.3 % longer than a
+    hands spglib a tetragonal lattice for the R3m child at Γ, which the field
+    (rms 0.05 Å, 50× the tolerance) cannot hide: spglib keeps fewer than the
+    group's 6 operations on every draw.  On main this read as
+    ``DISTORTION_CHILD_LARGER`` ("these atoms cannot realise the direction's
+    group"), which points the user the wrong way (review round 1).
+    """
+    parent, cands = at_gamma
+    rhombohedral = [c for c in cands if _number(c) == 160]  # R3m, Γ4− (a,a,a)
+    assert len(rhombohedral) == 1, [(c.label, c.child_group) for c in cands]
+    strained = parent.model_copy(deep=True)
+    strained.cell.c.value = 1.013 * parent.cell.a.value
+
+    def unaveraged(phase, _rotations):
+        a, b, c, al, be, ga = phase.cell.lengths_angles()
+        assert al == be == ga == 90.0
+        return np.diag([a * a, b * b, c * c])
+
+    monkeypatch.setattr(I, "_parent_metric_symmetric", unaveraged)
+    with pytest.raises(ValueError) as info:
+        I._standard_child(strained, _parent_group(strained), rhombohedral[0].candidate)
+    message = str(info.value)
+    assert message.startswith("DISTORTION_CHILD_SMALLER: "), message
+    assert "cannot realise" not in message
+    refusal = info.value.refusal
+    assert refusal.code == "DISTORTION_CHILD_SMALLER" and refusal.operations == 6
+    assert len(refusal.draws) == I._PROBE_DRAWS
+    assert all(n is not None and n < 6 for n in refusal.draws), refusal.draws
+
+
+def test_one_refused_candidate_leaves_the_others(at_r, monkeypatch):
+    """A refused child comes back as a refusal beside the others, not as an abort.
+
+    One draw at seed 142 refuses S6(a,b) at R on O (review round 2's unlucky
+    seed).  On main that raised, and the call lost its 15 other candidates.
+    """
+    parent, expected = at_r
+    monkeypatch.setattr(I, "_PROBE_SEED", UNLUCKY_SEEDS[0])
+    monkeypatch.setattr(I, "_PROBE_DRAWS", 1)
+    cands = I.distortion_candidates(parent, K_R, sites=["O"])
+    assert [c.label for c in cands] == [c.label for c in expected]
+    ((label, code, draws),) = _refused(cands)
+    assert (label, code) == ("S6(a,b)", "DISTORTION_CHILD_LARGER")
+    (refused,) = [c for c in cands if c.refusal is not None]
+    assert draws == (16,) and refused.refusal.operations == 8
+    assert refused.child is None and refused.child_group is None and refused.basis is None
+    assert refused.refusal.message.startswith("DISTORTION_CHILD_LARGER: ")
+    with pytest.raises(ValueError, match="DISTORTION_CHILD_LARGER"):
+        refused.driving  # noqa: B018 - a refused candidate has no basis to read
+    stated = [c for c in cands if c.refusal is None]
+    assert _setting(stated) == _setting([c for c in expected if c.label != "S6(a,b)"])
+
+
+def _scripted_draws(monkeypatch, script):
+    """spglib's answer to the probe's draws, draw by draw, from ``script``.
+
+    The real path cannot be steered into a mixed sequence, so the probe's own
+    call (and only that one: ``distortion_basis`` calls spglib too) is
+    replaced: ``"more"`` and ``"fewer"`` answer the true dataset with twice
+    the operations or one fewer, ``"none"`` raises spglib's own refusal.
+    """
+    import sys
+    from types import SimpleNamespace
+
+    from spglib.error import SpglibError
+
+    real = spglib.get_symmetry_dataset
+    calls = []
+
+    def scripted(cell, *args, **kwargs):
+        data = real(cell, *args, **kwargs)
+        if sys._getframe(1).f_code.co_name != "_standard_child":
+            return data
+        outcome = script[len(calls) % len(script)]
+        calls.append(outcome)
+        n = len(data.rotations)
+        if outcome == "none":
+            raise SpglibError("scripted: no space group")
+        return SimpleNamespace(rotations=np.zeros((2 * n if outcome == "more" else n - 1, 3, 3)))
+
+    monkeypatch.setattr(spglib, "get_symmetry_dataset", scripted)
+    return calls
+
+
+@pytest.mark.parametrize(("script", "code"), [
+    (("more", "none", "none"), "DISTORTION_CHILD_LARGER"),     # round 3's case
+    (("none", "more", "none"), "DISTORTION_CHILD_LARGER"),
+    (("fewer", "none", "none"), "DISTORTION_CHILD_SMALLER"),
+    (("more", "fewer", "none"), "DISTORTION_CHILD_SMALLER"),
+    (("fewer", "more", "more"), "DISTORTION_CHILD_SMALLER"),
+    (("more", "more", "more"), "DISTORTION_CHILD_LARGER"),      # every draw agrees
+    (("fewer", "fewer", "fewer"), "DISTORTION_CHILD_SMALLER"),
+    (("none", "none", "none"), "DISTORTION_CHILD_UNIDENTIFIED"),
+    (("none", "none", "more"), "DISTORTION_CHILD_LARGER"),      # the last draw, as on main
+], ids=lambda v: "-".join(v) if isinstance(v, tuple) else None)
+def test_the_code_comes_from_every_draw_not_the_last(at_gamma, monkeypatch, script, code):
+    """When every draw fails, the code reads all of them, and the message names each.
+
+    Review round 3: draw 1 keeping extra operations and draw 3 refused by
+    spglib raised ``DISTORTION_CHILD_UNIDENTIFIED`` on main, from the last draw
+    alone.  The scripted draws replace spglib's answer to the probe only.
+    """
+    parent, cands = at_gamma
+    target = cands[0]
+    calls = _scripted_draws(monkeypatch, script)
+    with pytest.raises(ValueError) as info:
+        I._standard_child(parent, _parent_group(parent), target.candidate)
+    assert calls == list(script)
+    message = str(info.value)
+    assert message.startswith(f"{code}: "), message
+    refusal = info.value.refusal
+    assert refusal.code == code and len(refusal.draws) == 3
+    for i, outcome in enumerate(script):
+        n = refusal.draws[i]
+        assert (n is None) == (outcome == "none")
+        assert outcome == "none" or (n > refusal.operations) == (outcome == "more")
+        assert f"draw {i + 1} " in message

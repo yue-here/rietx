@@ -469,7 +469,11 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "(P, p), and its `distortion_basis`, every irrep the child "
                 "admits, in Å. `driving` is the candidate's own irrep, "
                 "`rest` the others. The k fence (2k in the reciprocal "
-                "lattice) is `candidates`'.",
+                "lattice) is `candidates`'. A candidate whose child the probe "
+                "refuses still comes back, with `child` `None` and `refusal` "
+                "set (its `code`, `message` and each draw's operation count): "
+                "`DISTORTION_CHILD_LARGER` (the atoms cannot realise the "
+                "group), `_SMALLER` (a tolerance miss) or `_UNIDENTIFIED`.",
                 ("rietx.crystallography.magnetic.isotropy.distortion_candidates",
                  "rietx.crystallography.magnetic.isotropy.DistortionCandidate"),
             ),

@@ -2044,6 +2044,82 @@ _PROBE_SEED = 1419
 _PROBE_DRAWS = 3
 
 
+@dataclass(frozen=True)
+class DistortionRefusal:
+    """Why a displacive candidate has no child: the code, the message and every draw.
+
+    ``draws`` holds one entry per draw of the probe, in order: the number of
+    operations spglib found in the magnetic cell for the parent's atoms moved
+    along a generic displacement the isotropy group keeps, or ``None`` where
+    spglib named no space group.  ``operations`` is the isotropy group's own
+    count there.  A child is refused only when every draw disagrees with it,
+    and ``code`` is one of three, chosen from all the draws, never from the
+    last alone.  They are refusal prefixes, not ``Diagnostic`` codes:
+
+    * ``DISTORTION_CHILD_SMALLER`` — at least one draw spglib identified kept
+      **fewer** operations than the isotropy group.  The displacement is
+      invariant under the whole group by construction, so a draw that loses one
+      is a miss of the probe's tolerance (``_PROBE_SYMPREC``), not a property of
+      the atoms; and while the probe misses, no draw can be read as evidence
+      about the atoms, so this code wins over the other two.
+    * ``DISTORTION_CHILD_LARGER`` — every draw spglib identified kept **more**
+      operations than the isotropy group.  An accidental extra operation
+      survives a draw by chance, but a genuine one, which these atoms cannot
+      break, survives every draw: the atoms cannot realise the direction's
+      group, so its child is not this candidate's.
+    * ``DISTORTION_CHILD_UNIDENTIFIED`` — spglib named no space group on any
+      draw, so no standard setting can be stated.
+
+    ``message`` names the candidate, the code and each draw's outcome.
+    """
+
+    code: str
+    message: str
+    draws: tuple[int | None, ...]
+    operations: int
+
+
+class _ChildRefused(ValueError):
+    """:func:`_standard_child`'s refusal, carrying its :class:`DistortionRefusal`."""
+
+    def __init__(self, refusal: DistortionRefusal):
+        super().__init__(refusal.message)
+        self.refusal = refusal
+
+
+def _draw_text(n: int | None) -> str:
+    return "spglib named no group" if n is None else f"{n} operations"
+
+
+def _refusal(candidate: MagneticCandidate, draws: list[int | None],
+             operations: int) -> DistortionRefusal:
+    """The refusal of a child every draw disagreed with, its code chosen from all the draws."""
+    seen = ", ".join(f"draw {i} {_draw_text(n)}" for i, n in enumerate(draws, start=1))
+    seen = f"({seen}; the isotropy group has {operations})"
+    named = [n for n in draws if n is not None]
+    k = tuple(str(c) for c in candidate.k)
+    if any(n < operations for n in named):
+        code = "DISTORTION_CHILD_SMALLER"
+        text = (f"a generic displacement of the parent's atoms along {candidate.label} at "
+                f"k = {k} keeps fewer operations in the magnetic cell than the isotropy group "
+                f"on at least one of {len(draws)} draws {seen}: the displacement keeps every "
+                f"operation of the group by construction, so spglib's tolerance "
+                f"({_PROBE_SYMPREC:g}) missed some, which says nothing about the atoms")
+    elif named:
+        code = "DISTORTION_CHILD_LARGER"
+        text = (f"a generic displacement of the parent's atoms along {candidate.label} at "
+                f"k = {k} keeps more operations in the magnetic cell than the isotropy group "
+                f"on every draw spglib identified {seen}: these atoms cannot realise the "
+                "direction's group, so its child is not this candidate's")
+    else:
+        code = "DISTORTION_CHILD_UNIDENTIFIED"
+        text = (f"spglib names no space group for a generic displacement along "
+                f"{candidate.label} at k = {k} on any draw {seen}, so no standard "
+                "setting can be stated")
+    return DistortionRefusal(code=code, message=f"{code}: {text}", draws=tuple(draws),
+                             operations=operations)
+
+
 @dataclass(frozen=True, eq=False)
 class DistortionCandidate:
     """One displacive candidate of a parent: its child, (P, p) and its modes in Å.
@@ -2065,13 +2141,21 @@ class DistortionCandidate:
     ``sites`` names the parent atoms whose displacement representation holds
     the irrep (the sites :func:`candidates` was asked about that produced this
     direction); the basis covers every parent atom regardless.
+
+    ``refusal`` is ``None`` for a stated child.  A candidate whose child the
+    probe refuses (:class:`DistortionRefusal`: its code, message and every
+    draw) is still returned, with ``child``, ``transform`` and ``basis`` set to
+    ``None``, so one refusal does not cost the call its other candidates;
+    :attr:`child_group` is then ``None``, and :attr:`driving` and :attr:`rest`
+    raise the refusal's message.
     """
 
     candidate: MagneticCandidate
-    child: object  # rietx.schemas.structure.Phase
-    transform: tuple[np.ndarray, np.ndarray]
-    basis: object  # rietx.crystallography.representation.distortion.ModeBasis
+    child: object  # rietx.schemas.structure.Phase, None when refused
+    transform: tuple[np.ndarray, np.ndarray] | None
+    basis: object  # rietx.crystallography.representation.distortion.ModeBasis, None when refused
     sites: tuple[str, ...]
+    refusal: DistortionRefusal | None = None
 
     @property
     def k(self) -> KVector:
@@ -2090,8 +2174,13 @@ class DistortionCandidate:
         return self.candidate.label
 
     @property
-    def child_group(self) -> str:
-        return str(self.child.space_group)
+    def child_group(self) -> str | None:
+        """The child's space-group symbol, or ``None`` when the child is refused."""
+        return None if self.child is None else str(self.child.space_group)
+
+    def _stated(self) -> None:
+        if self.refusal is not None:
+            raise ValueError(self.refusal.message)
 
     @property
     def driving(self):
@@ -2101,11 +2190,13 @@ class DistortionCandidate:
         group is the child's: the two can disagree (a secondary irrep whose group
         is the child's reads ``primary=True`` there and is in :attr:`rest` here).
         """
+        self._stated()
         return self.basis.components[self._driving_index]
 
     @property
     def rest(self) -> tuple:
         """Every other component: the further irreps the child also admits."""
+        self._stated()
         return tuple(c for i, c in enumerate(self.basis.components)
                      if i != self._driving_index)
 
@@ -2221,6 +2312,7 @@ def _standard_child(parent, parent_group, candidate: MagneticCandidate):
     metric_m = p_m.T @ metric_p @ p_m
     lattice = np.linalg.cholesky(metric_m)
     rng = np.random.default_rng(_PROBE_SEED)
+    draws: list[int | None] = []  # each draw's operation count, None where spglib named none
     for _ in range(_PROBE_DRAWS):  # a refusal needs every draw to disagree with H
         raw = rng.standard_normal(positions.shape)
         field = np.zeros_like(raw)
@@ -2237,19 +2329,11 @@ def _standard_child(parent, parent_group, candidate: MagneticCandidate):
                                                symprec=_PROBE_SYMPREC)
         except SPGLIB_REFUSALS:
             data = None
-        if data is not None and len(data.rotations) == len(ops):
+        draws.append(None if data is None else len(data.rotations))
+        if draws[-1] == len(ops):
             break
-    if data is None:
-        raise ValueError(
-            f"DISTORTION_CHILD_UNIDENTIFIED: spglib names no space group for a generic "
-            f"displacement along {candidate.label} at k = "
-            f"{tuple(str(c) for c in candidate.k)}, so no standard setting can be stated")
-    if len(data.rotations) != len(ops):
-        raise ValueError(
-            f"DISTORTION_CHILD_LARGER: a generic displacement of the parent's atoms along "
-            f"{candidate.label} keeps {len(data.rotations)} operations in the magnetic cell, "
-            f"but the isotropy group has {len(ops)}: these atoms cannot realise the "
-            "direction's group, so its child is not this candidate's")
+    else:
+        raise _ChildRefused(_refusal(candidate, draws, len(ops)))
 
     hall = spglib.get_spacegroup_type(data.hall_number).hall_symbol
     sg = gemmi.find_spacegroup_by_ops(gemmi.symops_from_hall(hall))
@@ -2356,11 +2440,16 @@ def distortion_candidates(parent, k, sites=None) -> tuple[DistortionCandidate, .
     The candidate list is :func:`candidates`' (one direction per conjugacy
     class, the k fence of 2k in the reciprocal lattice, the verification), and
     so is the group; this function adds the setting and the basis.  A child
-    whose group a generic displacement of these atoms does not keep exactly
-    (``DISTORTION_CHILD_LARGER``) or spglib does not name
-    (``DISTORTION_CHILD_UNIDENTIFIED``) is refused, after ``_PROBE_DRAWS``
-    independent draws of the displacement have each failed, since one can by
-    chance.
+    whose group a generic displacement of these atoms does not keep exactly is
+    refused, after ``_PROBE_DRAWS`` independent draws of the displacement have
+    each failed, since one can by chance.  The refusal is returned in its place
+    rather than raised, so the other candidates still come back: the candidate
+    carries a :class:`DistortionRefusal` and no child.  Its code is chosen from
+    every draw: ``DISTORTION_CHILD_SMALLER`` when a draw kept fewer operations
+    than the group (a miss of the probe's tolerance, not of the atoms),
+    ``DISTORTION_CHILD_LARGER`` when every draw spglib identified kept more
+    (the atoms cannot realise the group), and
+    ``DISTORTION_CHILD_UNIDENTIFIED`` when spglib named no group on any draw.
     """
     from ..representation.distortion import _refuse_shared_sites, distortion_basis
     from ..symmetry import resolve_group
@@ -2398,7 +2487,13 @@ def distortion_candidates(parent, k, sites=None) -> tuple[DistortionCandidate, .
 
     out = []
     for cand, on in found.values():
-        symbol, big, small, metric_p = _standard_child(parent, parent_group, cand)
+        try:
+            symbol, big, small, metric_p = _standard_child(parent, parent_group, cand)
+        except _ChildRefused as refused:
+            out.append(DistortionCandidate(candidate=cand, child=None, transform=None,
+                                           basis=None, sites=tuple(on),
+                                           refusal=refused.refusal))
+            continue
         bare = _child_phase_bare(parent, symbol, big, small, metric_p)
         basis = distortion_basis(parent, bare, (big, small))
         child = _child_phase(parent, symbol, big, metric_p, basis)
