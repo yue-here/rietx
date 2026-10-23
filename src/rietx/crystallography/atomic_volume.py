@@ -105,6 +105,13 @@ VOLUME_RATIO_BOUNDS = (0.8, 1.25)
 
 _TOKEN = re.compile(r"([A-Z][a-z]?)|([(\[])|([)\]])|(\d+(?:\.\d+)?)|(\s+)")
 _LEADING_COUNT = re.compile(r"\s*(\d+(?:\.\d+)?)")
+#: A count written ``n.m`` straight after an element or a bracket and straight
+#: before the next element or bracket, with ``n`` not zero.  The string reads two
+#: ways: the decimal count n.m (``Fe2.95O4``), or a hydrate written with a full
+#: stop, n of the first part and m of the second (``CuSO4.5H2O``).  Both readings
+#: are grammatical and they differ, so the formula is refused.  ``n = 0`` reads
+#: one way only (``Mg0.5SiO3``), because no formula writes a count of zero.
+_DOT_TWO_WAYS = re.compile(r"(?<=[A-Za-z)\]])(\d+)\.(\d+)(?=[A-Z(\[])")
 
 
 def _element(symbol: str, formula: str) -> str:
@@ -154,6 +161,13 @@ def _parse_part(part: str, formula: str) -> dict[str, float]:
 def _parse_formula(formula: str) -> dict[str, float]:
     """Element counts of a chemical formula; the grammar is in
     :func:`formula_unit_volume`."""
+    for m in _DOT_TWO_WAYS.finditer(formula):
+        if int(m.group(1)) != 0:
+            raise ValueError(
+                f"{formula!r} reads two ways: the count {m.group(0)}, or the "
+                f"adduct {formula[:m.end(1)]} · {formula[m.start(2):]}. Write "
+                "an adduct with '·' (\"CuSO4·5H2O\"), and put a space after "
+                "a decimal count (\"Fe2.95 O4\")")
     counts: dict[str, float] = {}
     for part in re.split(r"[·•*]", formula):
         m = _LEADING_COUNT.match(part)
@@ -180,7 +194,11 @@ def formula_unit_volume(formula: str,
     ``formula`` is written as a chemist writes it (``"C7H6O2"``).  Spaces are
     ignored, so a CIF ``_chemical_formula_sum`` (``"C7 H6 O2"``) reads too.
     Brackets take a count, ``·`` or ``*`` joins an adduct with an optional
-    leading count (``"CuSO4·5H2O"``), and counts may be decimal.  A symbol that
+    leading count (``"CuSO4·5H2O"``), and counts may be decimal.  A full stop
+    that reads both as a decimal count and as a hydrate's dot raises, naming
+    ``·`` (``"CuSO4.5H2O"``: 4.5 O, or CuSO4 with 5 H2O); a decimal count
+    under 1 reads one way (``"Mg0.5SiO3"``), and a space after a decimal count
+    ends the doubt (``"Fe2.95 O4"``).  A symbol that
     is not an element, or one the table has no volume for, raises naming it.  The esd is
     eq. (13)'s: the table's mean errors summed as Σ nᵢ Δvᵢ, and the expansion
     coefficient's error in quadrature, measured from the 298 K the table is

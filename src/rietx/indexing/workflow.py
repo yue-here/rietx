@@ -681,7 +681,10 @@ def index_pattern(peaks: PeakList | None = None, *,
     far from a whole number.  It reports and never narrows.  The search window
     a formula implies is :meth:`~rietx.indexing.engines.SearchSpec.from_formula`,
     declared by the caller, because narrowing is the caller's own act.  A
-    formula the table cannot read raises before peaks are picked.
+    formula the table cannot read raises before peaks are picked.  The result
+    records the formula and temperature the check read
+    (:attr:`~rietx.schemas.indexing.IndexingResult.formula`), so a reopened
+    result says what its Z checks were measured against.
     """
     from ..history.events import as_event_stream
     from ..optimize.cancel import RefinementCancelled
@@ -715,6 +718,8 @@ def index_pattern(peaks: PeakList | None = None, *,
         from ..crystallography.atomic_volume import formula_unit_volume
 
         formula_unit_volume(formula, temperature)   # a bad formula raises here
+    # what the result records the Z check read at: nothing, with no formula
+    checked_at = None if formula is None else float(temperature)
     if data is not None:
         # Checked whether or not the peaks are picked here: ``data`` also drives
         # whole-profile validation below, so a TOF pattern handed in beside a
@@ -813,6 +818,7 @@ def index_pattern(peaks: PeakList | None = None, *,
             engines_run=[], systems_searched=[], quality=quality,
             wavelength=peaks.wavelength, n_usable_lines=len(peaks.usable()),
             validated=False, provenance=provenance, preset=ran_preset,
+            formula=formula, temperature=checked_at,
             diagnostics=list(quality.diagnostics))
         out = result.model_copy(update={
             "diagnostics": list(result.diagnostics)
@@ -1036,7 +1042,7 @@ def index_pattern(peaks: PeakList | None = None, *,
         fom_panel_disagrees=outcome.fom_panel_disagrees, quality=quality,
         validated=validated, wavelength=peaks.wavelength,
         n_usable_lines=len(peaks.usable()), provenance=provenance,
-        preset=ran_preset,
+        preset=ran_preset, formula=formula, temperature=checked_at,
         diagnostics=list(quality.diagnostics) + outcome.diagnostics
         + _pair_shift_diagnostics(quality))
     out = result.model_copy(update={

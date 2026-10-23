@@ -57,6 +57,8 @@ The last block is the run's diagnostics, where a truncated search says so.
 | `--preset` | `quick` (the default: every engine and system under a whole-run ceiling, truncation reported) or `full` (no ceiling) |
 | `--ceiling` | print the cost arithmetic for these options and exit without searching |
 | `--shift-allowance` | a measured systematic 2θ shift in degrees. Without one the engines assume 0.05° and cap every candidate's confidence, because a cell found inside a widened window absorbs the shift |
+| `--formula` | the specimen's chemical formula, with `·` before a hydrate. Each candidate is checked for a whole number of formula units and `INDEX_Z_NOT_INTEGER` reports one that is not; the search is not narrowed |
+| `--temperature` | the pattern's temperature in K for `--formula`'s volumes, 298 by default |
 | `--no-validate` | skip the whole-profile Le Bail validation, which caps every candidate at `medium` |
 | `--json FILE` | also write the whole `IndexingResult` as JSON |
 

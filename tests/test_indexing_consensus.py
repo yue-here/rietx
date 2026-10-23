@@ -640,6 +640,33 @@ def test_a_supercell_the_pattern_shows_rises_above_its_parent_and_a_phantom_does
         assert ordered[0] is (child if first == "child" else parent)
 
 
+def test_the_check_hands_each_cell_its_own_corrected_lines(cubic_peaks,
+                                                          monkeypatch):
+    """WP-2030: the child is asked on its shift-corrected lines and the parent
+    on its own, the lines each candidate's panel scored it on."""
+    from rietx.indexing import ambiguity
+    from rietx.indexing.engines import scored_positions
+
+    double = (TRUE_A, TRUE_A, 2 * TRUE_A, 90.0, 90.0, 90.0)
+    parent = _candidate(TRUE_A).model_copy(update={
+        "shift_template": "constant", "shift_coefficient": 0.03})
+    child = _candidate(TRUE_A, cell=double, system="tetragonal",
+                       lattice_group="P 4/m m m", volume=2 * TRUE_A ** 3)
+    seen = {}
+    real = ambiguity.supercell_chance
+
+    def spy(*args, **kwargs):
+        seen["child"], seen["parent"] = args[4], kwargs["parent_q_obs"]
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(ambiguity, "supercell_chance", spy)
+    supercell_checks([parent, child], cubic_peaks, q_match=cubic_peaks.q_esd(),
+                     k_sigma=3.0)
+    assert np.array_equal(seen["child"], scored_positions(cubic_peaks, child)[0])
+    assert np.array_equal(seen["parent"], scored_positions(cubic_peaks, parent)[0])
+    assert not np.array_equal(seen["parent"], seen["child"])
+
+
 def test_a_phantom_supercell_is_refuted_graded_down_and_told_where_to_look(
         cubic_peaks):
     """The check on a list, the caveat it raises, and the message that names it.

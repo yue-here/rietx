@@ -56,6 +56,7 @@ Most of the 51 left out are `duplicate_line` copies (40), the rest `no_intensity
 | `PeakList.wavelength` | the primary emission line, Å |
 | `PeakList.two_theta_min`, `PeakList.two_theta_max` | the range the lines were picked over: the first and last channel detection kept, or the lowest and highest position of a list built from positions |
 | `PeakList.source` | `"fitted"` when this package measured the lines, `"positions"` when they were handed in |
+| `PeakList.instrument_undeclared` | the instrument blocks the picker found at their defaults on a laboratory source, keyed by block; empty when nothing was, or the source is not a lab tube; `None` on a list no picker made |
 | `PeakList.thresholds_version` | which set of indexing thresholds produced the list, `rietx.schemas.indexing.INDEXING_THRESHOLDS_VERSION` at the time |
 | `PeakList.diagnostics` | what the picker noticed, as `Diagnostic` entries |
 
@@ -411,6 +412,10 @@ The list abstains for one of three reasons, each written into `DataQualityReport
 - fewer than two usable lines;
 - no system supported;
 - a fitted list whose median σ(Q)/Q is above 1e-3, where cells differing by 0.1 % in a lattice parameter cannot be told apart.
+
+On a fitted list picked with a laboratory source, a tube's Kα doublet or one anode's Kα1, whose axial apertures or profile were left at their defaults, the suggestion names declaring them first, since a re-pick is the cheapest remedy.
+The list records those blocks at its pick, in `PeakList.instrument_undeclared`, so `index_pattern(peaks)` with no instrument still names them.
+On a synchrotron or neutron source the defaults are what a correct declaration looks like, so nothing is named.
 
 The precision test runs only on a list whose σ was measured.
 On a list built from positions every σ is the assumed 0.02°, and refusing on it would quote an assumed precision as a measured one.

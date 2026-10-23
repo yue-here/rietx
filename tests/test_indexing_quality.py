@@ -565,3 +565,75 @@ def test_gate_on_a_picked_lab_pattern():
     assert report.supports_indexing == (len(peaks.usable())
                                         >= PEAK_MIN_USABLE_LINES)
     assert quality_diagnostics(report, peaks)
+
+
+# ----------------------------------------------------------------------
+# WP-2030: the instrument lead reads the declared source
+# ----------------------------------------------------------------------
+def test_a_lab_source_is_read_off_the_declaration():
+    from rietx import Instrument
+    from rietx.indexing.diagnostics import lab_source
+
+    assert lab_source(Instrument.bragg_brentano())                  # Cu Kα doublet
+    assert lab_source(Instrument.bragg_brentano(radiation="MoKa1"))  # Kα1 alone
+    assert lab_source(Instrument.debye_scherrer(wavelength=1.5405929))
+    # a synchrotron line states no anode, and nor does a rounded one typed by hand
+    assert not lab_source(Instrument.debye_scherrer(wavelength=0.4139090))
+    assert not lab_source(Instrument.debye_scherrer(wavelength=1.5406))
+
+
+def test_a_synchrotron_declaration_is_never_named_as_missing():
+    """A correctly set-up synchrotron instrument has zero axial apertures and
+    a narrow profile, the two defaults the lab lead names, so on such a source
+    the lead would call a correct declaration missing (WP-1510's review)."""
+    from rietx import Instrument
+
+    coarse = _fitted(np.linspace(15.0, 130.0, 40), esd=0.5)
+    sync = Instrument.debye_scherrer(wavelength=0.4139090)
+    d = next(x for x in assess_peak_list(coarse, instrument=sync).diagnostics
+             if x.code == "INDEX_DATA_INSUFFICIENT")
+    assert d.suggestion.startswith("Extend the 2θ range")
+    assert "instrument.profile" not in d.where
+
+
+def test_the_list_records_what_it_was_picked_with():
+    """``index_pattern(peaks)`` with no instrument is the documented two-step
+    flow; the lead reaches it through the list's own record, which outranks an
+    instrument handed in beside the list (WP-2030)."""
+    from rietx import Instrument
+
+    coarse = _fitted(np.linspace(15.0, 130.0, 40), esd=0.5)
+    recorded = coarse.model_copy(update={"instrument_undeclared": {
+        "instrument.profile": "instrument.profile is the default ProfileTCHZ"}})
+    d = next(x for x in assess_peak_list(recorded).diagnostics
+             if x.code == "INDEX_DATA_INSUFFICIENT")
+    assert d.suggestion.startswith("Declare the instrument")
+    assert "instrument.profile" in d.where
+
+    # picked with everything declared: the record says so, and a bare
+    # instrument handed in later does not override it
+    clean = coarse.model_copy(update={"instrument_undeclared": {}})
+    d = next(x for x in assess_peak_list(
+        clean, instrument=Instrument.bragg_brentano()).diagnostics
+        if x.code == "INDEX_DATA_INSUFFICIENT")
+    assert d.suggestion.startswith("Extend the 2θ range")
+
+
+def test_the_picker_writes_the_record():
+    from pathlib import Path
+
+    from rietx import Instrument
+    from rietx.indexing import pick_peaks
+    from rietx.io.readers import read_pattern
+
+    data = read_pattern(Path(__file__).parent / "data" / "qarr" / "zincite.prn")
+    data = data.model_copy(update={
+        "two_theta": data.two_theta[:1500], "intensity": data.intensity[:1500],
+        "sigma": None if data.sigma is None else data.sigma[:1500]})
+    lab = pick_peaks(data, Instrument.bragg_brentano())
+    assert set(lab.instrument_undeclared) == {"instrument.geometry",
+                                              "instrument.profile"}
+    sync = pick_peaks(data, Instrument.debye_scherrer(wavelength=1.5406))
+    assert sync.instrument_undeclared == {}
+    # a hand-built list has no picker, so no record
+    assert PeakList.from_positions([20.0, 30.0], 1.5406).instrument_undeclared is None

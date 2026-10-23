@@ -877,6 +877,37 @@ def test_an_extra_seen_only_on_a_parent_line_supports_nothing():
     assert ev.verdict() == "undecided"
 
 
+def test_the_parent_explains_lines_on_its_own_shift_correction():
+    """WP-2030: which lines the parent explains is asked on the parent's claim.
+
+    Each candidate carries its own fitted shift, so the child's corrected
+    lines and the parent's are not the same lines.  Here the child's
+    correction leaves the lines 0.2 % short in d of the parent's (a metric
+    scale, so the pair stays a superlattice pair), while the parent's own
+    correction puts them exactly on its lattice.  Asked on the child's lines,
+    as before 2030, the parent explains none of them, both seen extras count
+    as unexplained and the child reads supported, which would move it above a
+    parent that explains every line.  Asked on the parent's, it explains them
+    all, and the pair is undecided as the unshifted case above is.
+    """
+    a, e = 4.1566, 2e-3
+    rival = (a / np.sqrt(2.0), a / np.sqrt(2.0), a, 90.0, 90.0, 90.0)
+    child = tuple(v * (1.0 + e) for v in (a, a, a * (1.0 - 1e-3))) + (90.0,) * 3
+    q_parent, esd = _lines((a,) * 3 + (90.0,) * 3, two_theta_max=145.0,
+                           esd_deg=0.02)
+    q_child = q_parent / (1.0 + e) ** 2
+
+    on_child = supercell_chance(rival, "P", child, "P", q_child, esd)
+    assert on_child.n_seen_unexplained == on_child.n_seen >= 2
+    assert on_child.verdict() == "supported"
+
+    ev = supercell_chance(rival, "P", child, "P", q_child, esd,
+                          parent_q_obs=q_parent)
+    assert (ev.n_extra, ev.n_seen) == (on_child.n_extra, on_child.n_seen)
+    assert ev.n_seen_unexplained == 0 and ev.p_value_unexplained == 1.0
+    assert ev.verdict() == "undecided"
+
+
 def test_the_uncancellable_extras_answer_without_the_class():
     """WP-1446's failure, reproduced, and answered without the extinction class.
 

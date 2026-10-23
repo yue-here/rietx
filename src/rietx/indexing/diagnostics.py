@@ -335,9 +335,31 @@ def refinement_width_diagnostics(measured: float,
         suggestion=suggestion, value=ratio)]
 
 
+def lab_source(instrument: Instrument) -> bool:
+    """Does ``instrument`` declare a laboratory X-ray tube?
+
+    Read off the declared source, never guessed from the pattern (WP-2030): a
+    constant-wavelength X-ray source carrying a Kα doublet, or whose one line is
+    an anode's Kα1 exactly as :meth:`~rietx.schemas.instrument.Instrument.
+    bragg_brentano`'s ``radiation=`` writes it.  A synchrotron or neutron
+    source is not one, and nor is a single line typed by hand (``1.5406``): it
+    states no anode, so this answers ``False`` and nothing is said that the
+    declaration does not support.
+    """
+    from ..schemas.instrument import _KA_DOUBLETS
+
+    source = instrument.source
+    if source.kind != "xray_cw":
+        return False
+    if len(source.lines) >= 2:
+        return True
+    kalpha1 = {pair[0] for pair in _KA_DOUBLETS.values()}
+    return source.lines[0].wavelength.value in kalpha1
+
+
 def undeclared_instrument(instrument: Instrument) -> dict[str, str]:
     """What the instrument a peak list was picked with still leaves at default,
-    keyed by the block that holds it.
+    keyed by the block that holds it, on a laboratory source (:func:`lab_source`).
 
     The picker holds both and applies them (:func:`~rietx.indexing.pick_peaks`),
     so a default stands in for a measurement.  Axial divergence at S/L = H/L = 0
@@ -346,8 +368,14 @@ def undeclared_instrument(instrument: Instrument) -> dict[str, str]:
     and the separation floor are a lab pattern's several times over.  Measured
     on one lab capillary pattern (WP-1510, ``solution case 1``): declaring both
     took median σ(Q)/Q from 1.05e-3 to 6.9e-4 and the gate passed.
+
+    On any other source it is empty: a correctly declared synchrotron
+    instrument has zero axial apertures and a narrow profile too, so the same
+    two tests would name a correct declaration as missing (WP-2030).
     """
     out: dict[str, str] = {}
+    if not lab_source(instrument):
+        return out
     geo = instrument.geometry
     if not fcj_live(geo.axial_sl.value, geo.axial_hl.value):
         out["instrument.geometry"] = (
@@ -382,9 +410,16 @@ def quality_diagnostics(report: DataQualityReport, peaks: PeakList,
         # the instrument is named first because it is the cheapest of the
         # remedies: a re-pick, where the others are a new measurement
         # only a fitted list was picked with an instrument; a position list
-        # has no picker to re-run
-        missing = ({} if instrument is None or peaks.source != "fitted"
-                   else undeclared_instrument(instrument))
+        # has no picker to re-run.  What the list recorded at its pick is the
+        # instrument it was picked with, so it outranks one handed in beside
+        # it; a list from before the record falls back to that one (WP-2030)
+        if peaks.source != "fitted":
+            missing = {}
+        elif peaks.instrument_undeclared is not None:
+            missing = dict(peaks.instrument_undeclared)
+        else:
+            missing = ({} if instrument is None
+                       else undeclared_instrument(instrument))
         if missing:
             suggestion = ("Declare the instrument before re-picking, because "
                           "a default widens each position's esd: "

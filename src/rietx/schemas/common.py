@@ -537,6 +537,12 @@ from .._nearmiss import did_you_mean
 #: node ran at), the same rule.  And ``StageResult.n_lapack_fallbacks``, the
 #: decompositions a stage repeated with LAPACK's second driver, defaulting to
 #: 0, which every earlier stage took.
+#: Also in 0.59 (WP-2030): ``IndexingResult.formula`` and ``.temperature``, the
+#: formula and temperature the Z check read, and ``PeakList.instrument_undeclared``,
+#: the instrument blocks the picker found at default on a lab source.  Additive
+#: and defaulted to ``None``, "not recorded", the 0.25 → 0.26 rule;
+#: ``index_pattern`` writes the first two on every result, ``pick_peaks`` and
+#: ``fit_peaks`` the third on every list.
 SCHEMA_VERSION = "0.59"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

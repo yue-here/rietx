@@ -708,6 +708,7 @@ def _integral(x: np.ndarray) -> np.ndarray:
 def supercell_chance(parent_cell: tuple[float, ...], parent_centring: str,
                      child_cell: tuple[float, ...], child_centring: str,
                      q_obs: np.ndarray, q_esd: np.ndarray, *,
+                     parent_q_obs: np.ndarray | None = None,
                      child_hkl: np.ndarray | None = None,
                      q_range: tuple[float, float] | None = None,
                      k_sigma: float = MATCH_SIGMA,
@@ -750,6 +751,11 @@ def supercell_chance(parent_cell: tuple[float, ...], parent_centring: str,
     ``p_value_unexplained``, and :meth:`SupercellEvidence.verdict` reads it for
     *supported*.  An extra seen on a parent line says nothing about the larger
     cell, and on a pseudo-symmetric child that is where the seen extras are.
+    ``q_obs`` is the child's claim, the observed lines corrected by the
+    child's own shift, and ``parent_q_obs`` the same lines in the same order
+    corrected by the parent's (WP-2030): whether the parent explains a line is
+    a question about the parent's claim, so it is asked on the parent's lines.
+    ``None`` reads ``q_obs`` for both, right when neither carries a shift.
 
     **What counts as an extra.**  A counted reflection whose parent coordinates
     are not integral (:func:`_parent_coordinates`), inside ``q_range``
@@ -777,8 +783,10 @@ def supercell_chance(parent_cell: tuple[float, ...], parent_centring: str,
 
     obs = np.asarray(q_obs, dtype=np.float64)
     esd = np.asarray(q_esd, dtype=np.float64)
+    obs_parent = (obs if parent_q_obs is None
+                  else np.asarray(parent_q_obs, dtype=np.float64))
     # a window per observed line is the contract, as in extras_absent_in_range
-    if not len(obs) or len(esd) != len(obs):
+    if not len(obs) or len(esd) != len(obs) or len(obs_parent) != len(obs):
         return None
     q_lo, q_hi = ((float(np.min(obs)), float(np.max(obs))) if q_range is None
                   else (float(q_range[0]), float(q_range[1])))
@@ -804,14 +812,16 @@ def supercell_chance(parent_cell: tuple[float, ...], parent_centring: str,
     # which observed lines the parent explains: one of its lattice lines, in its
     # **own** metric, inside that line's window.  The child's metric is right
     # for asking whether a reflection is an extra and wrong here, since a
-    # pseudo-symmetric child moves the parent's lines off the observed ones.
-    # Out to the widest window past the range, so a line near the top is asked
-    # against every parent line that could explain it
-    q_top = q_hi + k_sigma * float(np.max(esd))
+    # pseudo-symmetric child moves the parent's lines off the observed ones;
+    # and for the same reason the lines are the parent's shift-corrected ones,
+    # never the child's (WP-2030).  Out to the widest window past the range,
+    # so a line near the top is asked against every parent line that could
+    # explain it
+    q_top = max(q_hi, float(np.max(obs_parent))) + k_sigma * float(np.max(esd))
     n_top = int(np.ceil(max(tuple(parent_cell)[:3]) * np.sqrt(q_top))) + 1
     hkl_p = trial_hkl(n_top, parent_centring)
     q_own = design_matrix(hkl_p) @ af_from_cell(tuple(parent_cell))
-    explained = _nearest_gap(obs, q_own[q_own <= q_top]) <= k_sigma * esd
+    explained = _nearest_gap(obs_parent, q_own[q_own <= q_top]) <= k_sigma * esd
 
     if child_hkl is None:
         hkl, q = lattice, q_lattice

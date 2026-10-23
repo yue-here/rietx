@@ -298,6 +298,15 @@ def _index(argv: list[str]) -> int:
                         "scatter a template leaves; without one the engines "
                         "assume 0.05° and cap confidence, because a cell found "
                         "in a widened window absorbs the shift")
+    p.add_argument("--formula", default=None,
+                   help="the specimen's chemical formula (e.g. C7H6O2; write a "
+                        "hydrate with '·'). Each candidate is checked for a "
+                        "whole number of formula units by Hofmann's (2002) "
+                        "volumes, reported as INDEX_Z_NOT_INTEGER; it never "
+                        "narrows the search")
+    p.add_argument("--temperature", type=float, default=298.0,
+                   help="the pattern's temperature in K, for --formula's "
+                        "volumes (default 298)")
     p.add_argument("--no-validate", action="store_true",
                    help="skip the whole-profile Le Bail validation (caps every "
                         "candidate at medium)")
@@ -342,7 +351,8 @@ def _index(argv: list[str]) -> int:
 
     result = index_pattern(data=data, instrument=instrument,
                            spec=spec, preset=args.preset, engines=engine_names,
-                           validate=not args.no_validate)
+                           validate=not args.no_validate,
+                           formula=args.formula, temperature=args.temperature)
     print(result)
     if args.json:
         from pathlib import Path

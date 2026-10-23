@@ -184,7 +184,9 @@ def supercell_checks(candidates: Sequence[CellCandidate], peaks: PeakList, *,
     ratio of 2 to 4, which is what :func:`~.ambiguity.supercell_chance`
     enumerates; it decides the rest.  The child is scored on
     :func:`~.engines.scored_positions` — its own shift-corrected lines, the ones
-    the panel scored it on — and in the window the search matched with.
+    the panel scored it on — and in the window the search matched with.  Which
+    lines the parent explains is asked on the parent's own shift-corrected
+    lines, for the same reason (WP-2030).
     """
     from ..crystallography.lattice import cell_volume
     from ..schemas.indexing import SupercellCheck
@@ -199,21 +201,25 @@ def supercell_checks(candidates: Sequence[CellCandidate], peaks: PeakList, *,
 
     volume = [float(cell_volume(*c.cell)) / _LATTICE_POINTS.get(c.centring, 1)
               for c in candidates]
+    corrected: dict[int, np.ndarray] = {}
+
+    def lines_of(k: int) -> np.ndarray:
+        if k not in corrected:
+            corrected[k] = scored_positions(peaks, candidates[k])[0]
+        return corrected[k]
+
     for j, child in enumerate(candidates):
         child.supercell_checks = []
-        q_obs = None
         for i, parent in enumerate(candidates):
             ratio = volume[j] / volume[i] if i != j and volume[i] > 0 else 0.0
             index = round(ratio)
             if not 2 <= index <= MAX_AMBIGUITY_INDEX \
                     or abs(ratio - index) > _DERIVATIVE_VOLUME_RTOL * index:
                 continue
-            if q_obs is None:
-                q_obs, _tt = scored_positions(peaks, child)
             try:
                 ev = supercell_chance(parent.cell, parent.centring, child.cell,
-                                      child.centring, q_obs, q_match,
-                                      k_sigma=k_sigma)
+                                      child.centring, lines_of(j), q_match,
+                                      parent_q_obs=lines_of(i), k_sigma=k_sigma)
             except (ValueError, RuntimeError, np.linalg.LinAlgError):
                 # an unanswered pair orders nothing, as ``_partners`` declines
                 ev = None

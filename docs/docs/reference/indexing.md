@@ -239,6 +239,10 @@ assert round(spec.max_volume, 2) == 1503.5       # 8 x 150.35 x 1.25
 The floor never drops below the 15 Å³ default.
 Every other `SearchSpec` field passes through as a keyword.
 
+A formula is written as a chemist writes it, with brackets, `·` before water of crystallisation (`"CuSO4·5H2O"`) and decimal counts.
+A full stop that reads both as a decimal count and as a hydrate's dot is refused: `"CuSO4.5H2O"` could be 4.5 O or CuSO4 with 5 H2O, so `formula_unit_volume` raises `ValueError` naming `·`.
+A count under 1 reads one way (`"Mg0.5SiO3"`), and a space after a decimal count ends the doubt (`"Fe2.95 O4"`, as a CIF writes `_chemical_formula_sum`).
+
 `from_formula` raises `ValueError` when `min_volume` or `max_volume` is passed beside the formula, for a `z` that is not a whole number of at least 1 with its minimum no larger than its maximum, when the formula's ceiling falls below the floor, and for a formula or temperature `formula_unit_volume` refuses.
 
 One crystal scatters about Hofmann's estimate by {{ VOLUME_SCATTER_PCT }} %, and the window is wider still, because a window that excludes the true cell makes the search return a wrong one.
@@ -247,7 +251,7 @@ The volumes were fitted to organic and metal-organic crystals, and an ionic comp
 Passing `formula=` to `index_pattern` checks each candidate instead of narrowing the search.
 A cell whose volume holds a fractional number of formula units carries [`INDEX_Z_NOT_INTEGER`](diagnostics-indexing.md#index_z_not_integer), a warning whose `value` is the implied Z.
 It fires when the nearest whole number is more than {{ Z_INTEGER_TOLERANCE_PCT }} % away, twice one crystal's scatter, so it is silent above Z = {{ Z_CHECK_SILENT_ABOVE }}.
-The candidate keeps its rank and its grade.
+The candidate keeps its rank and its grade, and `IndexingResult.formula` records the formula the check read.
 [Volume from a formula](../theory/indexing.md#volume-from-a-formula) gives the estimate.
 
 ## The result object
@@ -268,6 +272,8 @@ It has no `cell` and no `best`: the only route to one cell is `IndexingResult.be
 | `IndexingResult.n_usable_lines` | the usable lines the answer is about |
 | `IndexingResult.wavelength` | the primary wavelength, Å |
 | `IndexingResult.preset` | the preset that set the ceiling, `"custom"` when your own `total_budget_seconds` did, or `None` on a result recorded before presets |
+| `IndexingResult.formula` | the `formula=` each candidate's Z check read, or `None` when none was given (and on a result recorded before 1.10) |
+| `IndexingResult.temperature` | the temperature in K that check read the volumes at, `None` whenever `formula` is |
 | `IndexingResult.provenance` | the package version and time, with every search setting in `Provenance.notes` |
 | `IndexingResult.thresholds_version` | which set of gates and vocabularies produced the grades, `rietx.schemas.indexing.INDEXING_THRESHOLDS_VERSION` at the time |
 | `IndexingResult.diagnostics` | the run-level findings |
