@@ -1850,7 +1850,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "tight pairs and would scatter as twice the atoms. The reader moved the site "
             "onto the special position. The usual cause is a relation such as (x, 2x, z) "
             "printed with one coordinate rounded. Check the coordinates against the "
-            "source."
+            "source. The occupancy is kept, so the site's atoms per cell change with its "
+            "multiplicity, and the message gives both counts. The reader merges only where "
+            "the occupancy at the position, summed over the atoms sharing it and each "
+            "times the images before over the images after, is above 1; otherwise it "
+            "keeps the stated site and says `SITE_TWINS_KEPT`."
         ),
     ),
     "CIF_SPECIES_NORMALISED": HelpEntry(
@@ -3824,6 +3828,54 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "many atoms the site puts in the cell, so it changes the density and every "
             "weight fraction. If it matches the source, the coordinates were only "
             "rounded."
+        ),
+    ),
+    "SITE_DOFS_RENUMBERED": HelpEntry(
+        title="Coordinate directions of a site renumbered",
+        description=(
+            "A site's coordinates moved close enough to a special position that its "
+            "coordinate degrees of freedom changed (`dof.1` was y on the general position "
+            "and is z on a mirror at y = 1/4), and a hold, tie or free path sat on one of "
+            "them. Each follows its direction to the new number; one on a direction the "
+            "position now fixes or couples is dropped. The message names every one that "
+            "followed and every one that was dropped. Nothing was moved: this is the "
+            "bookkeeping of a site that gained symmetry without a merge, for instance "
+            "within 5e-5 of a mirror or after a fit wrote the coordinate back."
+        ),
+    ),
+    "SITE_TWINS_KEPT": HelpEntry(
+        title="Near-duplicate atoms left as stored",
+        description=(
+            "A site lies within 5e-4 (fractional, per coordinate) of a special position, "
+            "so its symmetry images fall in tight pairs, and the occupancy at that "
+            "position, summed over the atoms sharing it and each times the images before "
+            "over the images after, is at most 1. The numbers read two ways: one atom "
+            "stated off its special position, or a split pair of part-atoms (#1088). "
+            "Nothing was moved, and the model counts the second reading. The message "
+            "gives the atoms per cell each reading implies, and the suggestion gives the "
+            "occupancy to state on the special position for each. Every boundary applies "
+            "the same gate: a project file, a CIF, a stored history and a model edit."
+        ),
+    ),
+    "SITE_TWINS_MERGED": HelpEntry(
+        title="Near-duplicate atoms merged onto a special position",
+        description=(
+            "A site lay within 5e-4 (fractional, per coordinate) of a special position, "
+            "so its symmetry images fell in tight pairs, and the occupancy at that "
+            "position, summed over the atoms sharing it and each times the images before "
+            "over the images after, is above 1: the unchanged site would put more than "
+            "one atom at one place. The site was moved onto the special position its "
+            "orbit collapses to. Coordinates the position fixes lose `vary`, and an "
+            "anisotropic tensor is projected onto the tensors the position allows; the "
+            "message says each. This changes the multiplicity, so it changes the density "
+            "and every weight fraction. A CIF read says the same thing as "
+            "`CIF_SITE_TWINS_MERGED`, and the two never both fire. The occupancy is kept, "
+            "so the site's atoms per cell change with its multiplicity, and the message "
+            "gives both counts. Check the coordinate against its source, since a special "
+            "position stated a few 1e-5 off is the usual cause. To keep a genuinely "
+            "displaced atom, state it more than 5e-4 (fractional) from the position. "
+            "A hold or tie on a coordinate degree of freedom that the position "
+            "renumbers follows it, or is dropped and named in the message."
         ),
     ),
     "SIZE_NORMALISED_ACROSS_WAVELENGTHS": HelpEntry(

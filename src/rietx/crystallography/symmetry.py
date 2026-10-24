@@ -760,7 +760,10 @@ def rotation_matrices(sg) -> np.ndarray:
 #: Default tolerance, in fractional coordinates, for "this operation fixes this
 #: site".  A structure whose coordinates are quoted to five decimals — the
 #: ICSD's usual precision — can miss an exact relation such as y = 2x by 1e-4,
-#: which is why the boundary sits here rather than at roundoff.
+#: which is why the boundary sits here rather than at roundoff.  It bounds each
+#: operation's displacement R·x + t − x, so on a mirror, which moves a site by
+#: twice its offset, the effective reach is ``SITE_TOL``/2 (issue #1007); a
+#: site further off whose images still coincide is :func:`site_twin_merge`'s.
 SITE_TOL = 1e-4
 
 #: Relative slack making the :data:`SITE_TOL` comparison **inclusive**.  A
@@ -1004,6 +1007,155 @@ def expand_positions(sg: gemmi.SpaceGroup, xyz: np.ndarray, *, tol: float = SITE
     :func:`site_orbit` for why that is a derivation and not a count.
     """
     return [p for p, _ in expand_orbit(sg, xyz, tol=tol)]
+
+
+#: Two images of one site closer than this are one atom stated twice (Å).  It
+#: now decides only whether a *listed* site is another site's image
+#: (``cif._sites_listed_twice``); a site's own twin is :data:`TWIN_COORD_TOL`'s.
+TWIN_DISTANCE = 0.02
+
+#: How far a coordinate may sit from a special position and still be taken as
+#: *on* it, per coordinate, fractional (#1014, rounds 4-5).  Under the gate in
+#: :func:`.twins.applied_twin_merges` the reach decides one thing: whether
+#: atoms that would overfill one place are the same place.  It is a distance
+#: bar: 5e-4 of a cell edge is 0.002 Å in a 4 Å axis and
+#: 0.02 Å in a 40 Å one, small against the ~1 Å at which two different atoms
+#: can share a cell, and being fractional it follows the cell.
+TWIN_COORD_TOL = 5e-4
+
+#: A rotation of the site group turns an offset δ into a displacement R·x+t−x of
+#: up to 3δ per coordinate (a mirror 2δ, a hexagonal axis up to 3δ), so the
+#: operation search runs at this multiple of :data:`TWIN_COORD_TOL` and the
+#: snapped position is then held to :data:`TWIN_COORD_TOL` itself.
+_TWIN_SEARCH_FACTOR = 3.0
+
+
+@dataclass(frozen=True)
+class TwinMerge:
+    """A site whose own images coincide, and the special position they collapse to.
+
+    Attributes
+    ----------
+    position : (3,) float — the special position, on the lattice branch
+        nearest the given coordinates (so a caller's -0.1 stays near -0.1).
+        No coordinate is moved by more than :data:`TWIN_COORD_TOL`.
+    gap : float — the largest distance between two images of the given
+        coordinates that the merge collapses onto one, Å.
+    before, after : int — the multiplicity at the given coordinates and at
+        ``position``.
+    """
+
+    position: np.ndarray
+    gap: float
+    before: int
+    after: int
+
+
+def _orthogonalizer(cell) -> np.ndarray:
+    """Fractional → Cartesian (Å) matrix of a ``gemmi.UnitCell`` or a six-tuple."""
+    if not isinstance(cell, gemmi.UnitCell):
+        cell = gemmi.UnitCell(*(float(v) for v in cell))
+    return np.array(cell.orth.mat.tolist(), dtype=np.float64)
+
+
+def site_twin_merge(sg, cell, xyz, *, tol: float = SITE_TOL,
+                    reach: float = TWIN_COORD_TOL) -> TwinMerge | None:
+    """The special position a site's coinciding images collapse to, or ``None``.
+
+    :func:`site_orbit` snaps a site within ``tol`` (fractional) of a special
+    position.  Its test compares |R·x + t − x|, which on a mirror is twice the
+    offset, so the effective reach there is ``tol``/2: PbSO₄'s S2 moved 6e-5
+    off the Pnma mirror is a general position, and its two images sit
+    2·6e-5·b = 0.0004 Å apart — one atom counted twice (issue #1007).  A site
+    whose special position lies within ``reach`` (:data:`TWIN_COORD_TOL`,
+    fractional, **per coordinate**) of every coordinate belongs on it, at any
+    occupancy; the occupancy is kept, so a part-occupied split pair that a fit
+    leaves this tight loses content, which the merge's message states both
+    ways (#1088).  Because every coordinate moves by at most ``reach``, every
+    pair of images the merge collapses is as close as that allows: the test is
+    on the move, not on the nearest pair, which is how a site 0.0024 off a
+    mirror in a long cell was merged for the sake of a tight pair in another
+    axis.  A site that would have to move further, a split site (whose images
+    stay apart), a site already on its position and one far from any give
+    ``None``.
+
+    ``cell`` is a ``gemmi.UnitCell`` or (a, b, c, α, β, γ); it only measures
+    ``gap``.  The orbit and its collapse are those of :func:`site_orbit`:
+    International Tables for Crystallography vol. A (Wyckoff positions), with
+    the tolerance-based site-symmetry search of Grosse-Kunstleve & Adams
+    (2002), Acta Cryst. A58, 60.  Moved here from the CIF reader (#765), which
+    applied it to files only.
+    """
+    m = _orthogonalizer(cell)
+    search = reach * _TWIN_SEARCH_FACTOR
+    if search <= tol:
+        return None
+    x = np.asarray(xyz, dtype=np.float64).reshape(3)
+    _, all_rot, all_tran = _group_arrays(group_key(sg))
+    # the cheap screen: an operation within ``search`` of fixing x that
+    # ``tol`` does not admit is the only way a looser orbit can be smaller
+    d = all_rot @ x + all_tran - x
+    d = np.abs(d - np.round(d))
+    bound = 1.0 + _SITE_TOL_SLACK
+    admitted = np.all(d <= search * bound, axis=1)
+    if not np.any(admitted & ~np.all(d <= tol * bound, axis=1)):
+        return None
+    tight = site_orbit(sg, x, tol=tol)
+    # Each admitted operation is kept or dropped on its own move: the distance
+    # from x to the nearest fixed point of the cyclic group it generates.
+    # Keeping an operation whose own move exceeds ``reach`` would refuse the
+    # whole site for the sake of one coordinate (#1014 round 5, item 1), so
+    # that operation is dropped and the rest are kept.
+    kept = [i for i in np.flatnonzero(admitted)
+            if _operation_move(all_rot[i], all_tran[i], x) <= reach * bound]
+    p = all_rot[kept] @ x + all_tran[kept]
+    p -= np.round(p - x)                 # each image on the branch nearest x
+    snapped = p.mean(axis=0)
+    delta = snapped - x
+    delta -= np.round(delta)
+    if float(np.max(np.abs(delta))) > reach * bound:
+        return None
+    position = x + delta
+    # the average is a fixed point only when the kept operations close into a
+    # group, so the stabiliser is measured at the point itself, as ``site_orbit``
+    loose = site_orbit(sg, position, tol=_COINCIDENCE_TOL)
+    if loose.multiplicity >= tight.multiplicity:
+        return None
+    # the pairs the merge collapses: each stated image goes to the nearest
+    # image of the merged position, and images sharing one are the pairs
+    images = np.asarray(tight.images, dtype=np.float64)
+    target = np.asarray(loose.images, dtype=np.float64)
+    to_target = images[:, None, :] - target[None, :, :]
+    to_target -= np.round(to_target)
+    owner = np.argmin(np.linalg.norm(to_target @ m.T, axis=-1), axis=1)
+    diff = images[:, None, :] - images[None, :, :]
+    diff -= np.round(diff)
+    norms = np.linalg.norm(diff @ m.T, axis=-1)
+    same = owner[:, None] == owner[None, :]
+    gap = float(norms[same].max())
+    return TwinMerge(position=position, gap=gap,
+                     before=tight.multiplicity, after=loose.multiplicity)
+
+
+def _operation_move(rot: np.ndarray, tran: np.ndarray, x: np.ndarray) -> float:
+    """How far ``x`` moves onto the fixed point of the cyclic group one operation generates.
+
+    The mean of ``x, g·x, g²·x, …`` over the operation's order, each image on
+    the lattice branch nearest ``x``, is that fixed point, and a mirror gives
+    half its displacement.  The largest per-coordinate move is returned.
+    """
+    r = np.rint(rot)
+    n, power = 1, r.copy()
+    while not np.array_equal(power, np.eye(3)) and n < 12:
+        power = power @ r
+        n += 1
+    images, p = [x], x
+    for _ in range(n - 1):
+        p = rot @ p + tran
+        p = p - np.round(p - x)
+        images.append(p)
+    mean = np.mean(images, axis=0)
+    return float(np.max(np.abs(mean - x)))
 
 
 #: How many snapped sites a ``SITE_SNAPPED_TO_SPECIAL_POSITION`` message names

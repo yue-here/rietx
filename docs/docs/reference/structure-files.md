@@ -71,6 +71,7 @@ Refine such a value, or set a physical start before a stage holds it.
 A fit that keeps a negative B reports [`BISO_NEGATIVE`](diagnostics-refinement.md#biso_negative).
 
 A site within 1e-4 of a special position, as a file quoting five decimals often leaves one, has its orbit expanded at that position.
+The 1e-4 bounds each operation's displacement R·x + t − x, so on a mirror, which moves the site by twice its offset, the reach is 5e-5.
 Its multiplicity is the special one, and [`SITE_SNAPPED_TO_SPECIAL_POSITION`](diagnostics-structures.md#site_snapped_to_special_position) names the site, the shift and the multiplicity.
 The stored coordinates are unchanged and the fit is unaffected, with one exception.
 Where the file states the multiplicity (`_atom_site_symmetry_multiplicity`, or the number in `_atom_site_Wyckoff_symbol`) and the site is within 1e-3 of the position that multiplicity names, the reader moves the site onto it.
@@ -81,7 +82,19 @@ The multiplicity decides how many atoms a site puts in the cell, so it sets the 
 Compare it against the file's own `_atom_site_symmetry_multiplicity`.
 
 Two more repairs guard the same count.
-A site slightly off a special position whose images fall in tight pairs is moved onto the position, [`CIF_SITE_TWINS_MERGED`](diagnostics-structures.md#cif_site_twins_merged).
+A site within 5e-4 (fractional, per coordinate) of a special position, further off than a snap reaches, may be one atom counted twice, so it is moved onto the special position they collapse to, at every boundary that can say so, where the site as stored would put more than one atom at one place.
+The gate is the same at every boundary, readers included: the occupancy at the position, summed over the atoms sharing it and each × (images before / images after), must be above 1.
+A CIF read says a merge with [`CIF_SITE_TWINS_MERGED`](diagnostics-structures.md#cif_site_twins_merged); the project readers' `to_structure` say `SITE_TWINS_MERGED` on their own `diagnostics=`; `RefinementTree.load` and `Refinement` construction, `edit`, `set_values` and `checkout` say it on `RefinementTree.load`'s `diagnostics=` or on the next `fit` or `run_stage` result.
+Where the product is 1 or below, the stated numbers read both as one atom off its position and as a split pair of part-atoms, so the site is left as stored and `SITE_TWINS_KEPT` gives both readings and the occupancy each implies.
+A hold, user tie or free path on a coordinate degree of freedom follows its direction when a site gains symmetry, on every route that moves the site (a fit's write-back, `set_values`, `edit`, a branch, a stored history); one on a direction the position fixes or couples is dropped, and `SITE_TWINS_MERGED` or `SITE_DOFS_RENUMBERED` names it.
+A merged site's coordinates that the position fixes lose `vary`, and an anisotropic tensor is projected onto the tensors the position allows, so the merged model still builds its table.
+`Phase` itself stays strict: a phase built in code with a twin site is held as stated until it enters one of those.
+The merge keeps the occupancy, so the site's atoms per cell change with its multiplicity, and each message gives both counts (multiplicity × occupancy).
+For one atom stated off its position that is the repair.
+A part-occupied split pair that a fit left within 5e-4 of the position loses content instead (issue #1088), so on such a site the message says so and the suggestion gives the occupancy that keeps it.
+A split site, further than that from every special position, is left as stated.
+The occupancy test sums over every atom sharing the position, so Fe 0.5 and Mn 0.5 on one site merge together.
+A hold or user tie on a coordinate degree of freedom (`…dof.k`) follows its direction when the site gains symmetry, or is dropped and named in the message where the position fixes that direction.
 Two sites of one species on one orbit with identical properties are one site listed twice, and the second is dropped, [`CIF_SITE_LISTED_TWICE`](diagnostics-structures.md#cif_site_listed_twice).
 A pair that differs in any property is refused.
 

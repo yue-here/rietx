@@ -13,6 +13,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from ..crystallography.twins import (
+    carry_state_constraints,
+    merge_site_twins,
+    numbering_moves,
+)
 from ..schemas.common import SCHEMA_VERSION, Diagnostic
 from ..schemas.history import (
     Annotation,
@@ -38,6 +43,50 @@ HEAD = "head"
 
 def _utcnow() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+#: What ``carry_state_constraints`` puts between a message and its constraint note.
+_CONSTRAINTS = " Constraints: "
+
+
+def _merge_stored_twins(pending: Sequence[Any]) -> list[Diagnostic]:
+    """Put each stored site whose own images coincide on its special position.
+
+    Applied to every node's structure as a log is read (issue #1007), so a
+    coordinate a script or an older release stored a few 1e-5 off a mirror
+    counts the atoms it does everywhere else.  A site whose merge would halve a
+    part-occupied split pair is left as stored and said as ``SITE_TWINS_KEPT``
+    (Yue's ruling on #1014).  Nodes of one history repeat the same site but
+    not its coordinate (a refined one differs in every node), so the finding
+    is said once per phase and atom, naming how many nodes held it.
+    """
+    found: dict[tuple[str, tuple[str, ...]], list[Diagnostic]] = {}
+    for item in pending:
+        if not isinstance(item, HistoryNode):
+            continue
+        local: list[Diagnostic] = []
+        merged = merge_site_twins(item.state.structure, diagnostics=local,
+                                  source="this history")
+        if local:
+            moves = numbering_moves(item.state.structure, merged)
+            item.state.structure = merged
+            carry_state_constraints(item.state, moves, local)
+        for d in local:
+            found.setdefault((d.code, tuple(d.where)), []).append(d)
+    out: list[Diagnostic] = []
+    for group in found.values():
+        first = group[0]
+        # every node's own constraint note, said once: the first node is often
+        # the root, which holds nothing, while a later one holds the hold
+        # (#1014, round 5)
+        head = first.message.split(_CONSTRAINTS, 1)[0]
+        notes = list(dict.fromkeys(
+            part for d in group for part in d.message.split(_CONSTRAINTS)[1:]))
+        message = head + "".join(_CONSTRAINTS + n for n in notes)
+        if len(group) > 1:
+            message += f" (stored in {len(group)} nodes)"
+        out.append(first.model_copy(update={"message": message}))
+    return out
 
 
 class RefinementTree:
@@ -96,7 +145,11 @@ class RefinementTree:
         ``DECLARED_RANGE_RESTORED`` per parameter; where any node's value lies
         outside that range the parameter is left as stored in all of them, as
         ``DECLARED_RANGE_NOT_RESTORED``.  No value ever moves
-        (:func:`~rietx.schemas.migrate.restore_declared_ranges`).
+        (:func:`~rietx.schemas.migrate.restore_declared_ranges`).  The other
+        repair moves a coordinate: a site within 5e-4 (fractional) of its
+        special position (a stored ``y = 0.2501`` on a mirror at ¼) is put on the
+        special position they collapse to, in every node that stored it, and
+        said once per site as ``SITE_TWINS_MERGED`` (issue #1007).
 
         Records are applied **in file order**, replaying exactly what the
         in-memory tree did as each was appended: a node record advances HEAD
@@ -137,6 +190,7 @@ class RefinementTree:
                     for c in declared_range_repairs(model, at, prefix):
                         found.setdefault(c["path"], []).append((item.id, c))
         notes = restore_declared_ranges(found, "this history")
+        notes.extend(_merge_stored_twins(pending))
         if diagnostics is not None:
             diagnostics.extend(notes)
 

@@ -86,6 +86,7 @@ from typing import Any
 
 import numpy as np
 
+from ...crystallography.twins import merge_site_twins
 from ...model.profiles.caglioti import GAUSSIAN_VARIANCE_TO_FWHM_SQUARED
 from ...schemas.common import Diagnostic
 from .coverage import Stance
@@ -1830,6 +1831,10 @@ def to_structure(model: Gsas2Model, *, phase: str | int | None = None,
             f"schema refuses ({exc}).  The file's own numbers are on "
             f"`model.phases`") from exc
 
+    # a site whose own images coincide is one atom on its special position
+    # (#1007), said here because this is the channel the schema lacks
+    structure = merge_site_twins(structure, diagnostics=diagnostics,
+                                 source=named)
     if diagnostics is not None:
         for raw, (canonical, wheres) in rewrites.items():
             choice = chosen.isotope.get(raw, _NATURAL)

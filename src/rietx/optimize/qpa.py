@@ -41,7 +41,12 @@ from ..crystallography.attenuation import (
 from ..crystallography.lattice import cell_volume
 from ..crystallography.neutron import linear_attenuation_neutron
 from ..crystallography.species import _parse_species, element_symbol
-from ..crystallography.symmetry import as_group, expand_positions, resolve_group
+from ..crystallography.symmetry import (
+    as_group,
+    expand_positions,
+    resolve_group,
+)
+from ..crystallography.twins import applied_twin_merges
 from ..schemas.common import Diagnostic
 from ..schemas.results import (
     MicroabsorptionCorrection,
@@ -143,9 +148,19 @@ def phase_zmv(space_group, cell: tuple[float, float, float, float, float, float]
     :func:`crystallography.symmetry.expand_positions`; that path must only be
     fed coordinates that are genuinely on their site, because an atom refined
     to within the dedup tolerance of a special position would otherwise
-    collapse its orbit and mis-weigh the cell.
+    collapse its orbit and mis-weigh the cell.  A site whose own images sit
+    within :data:`~rietx.crystallography.symmetry.TWIN_COORD_TOL` of a special position counts
+    at the special position they collapse to, as ``Phase`` construction
+    moves it there (issue #1007).
     """
     sg = as_group(space_group) if multiplicities is None else None
+    atoms = list(atoms)
+    applied: dict = {}
+    if sg is not None:
+        applied, _ = applied_twin_merges(
+            sg, cell, [np.array([x, y, z], dtype=np.float64)
+                       for _, x, y, z, _ in atoms],
+            [float(occ) for *_, occ in atoms])
     volume = cell_volume(*cell)
     cell_mass = 0.0
     element_counts: dict[str, float] = {}
@@ -154,7 +169,13 @@ def phase_zmv(space_group, cell: tuple[float, float, float, float, float, float]
         if multiplicities is not None:
             multiplicity = int(multiplicities[idx])
         else:
-            multiplicity = len(expand_positions(sg, np.array([x, y, z], dtype=np.float64)))
+            # a site whose own images coincide counts once, on the special
+            # position its orbit collapses to — what a ``Phase`` holding
+            # these coordinates would be moved to at construction (#1007)
+            merge = applied.get(idx)
+            multiplicity = (merge.after if merge is not None
+                            else len(expand_positions(
+                                sg, np.array([x, y, z], dtype=np.float64))))
         count = float(occ) * multiplicity
         cell_mass += count * atomic_weight(species)
         sym = element_symbol(species)

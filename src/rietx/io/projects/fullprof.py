@@ -166,6 +166,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ...crystallography.twins import merge_site_twins
 from ...schemas.common import Diagnostic, Parameter
 from ..formats.base import decode
 
@@ -1957,6 +1958,7 @@ def occupancy_factor(phase: FullProfPhase, where: str | None = None) -> float:
     import numpy as np
 
     from ...crystallography.symmetry import expand_positions
+    from ...crystallography.twins import applied_twin_merges
 
     where = where or f"phase {phase.index} ({phase.name!r})"
     try:
@@ -1971,11 +1973,33 @@ def occupancy_factor(phase: FullProfPhase, where: str | None = None) -> float:
             f"structure factor from — and dropping it would leave its R_Bragg "
             f"reporting for a phase the Structure lacks")
     general = len(list(sg.operations()))
-    ratios: list[float] = []
-    for atom in phase.atoms:
-        xyz = np.array([atom.values[k].value for k in ("x", "y", "z")], float)
-        multiplicity = len(expand_positions(sg, xyz))
-        ratios.append(atom.values["occ"].value * general / multiplicity)
+    # a site whose own images coincide is counted on the special position it
+    # collapses to, as the ``Phase`` built from it will hold it (#1007)
+    cell = (tuple(phase.cell[k].value for k in _CELL_COLUMNS)
+            if all(k in phase.cell for k in _CELL_COLUMNS) else None)
+    xyzs = [np.array([a.values[k].value for k in ("x", "y", "z")], float)
+            for a in phase.atoms]
+    applied, kept = ({}, {}) if cell is None else applied_twin_merges(
+        sg, cell, xyzs, [a.values["occ"].value for a in phase.atoms])
+
+    def ratios_under(merges: dict) -> list[float]:
+        return [a.values["occ"].value * general / (
+                    merges[j].after if j in merges
+                    else len(expand_positions(sg, xyzs[j])))
+                for j, a in enumerate(phase.atoms)]
+
+    ratios = ratios_under(applied)
+    # ``Occ`` is m/M, so a column that only agrees with itself once a site the
+    # gate left as stored is read on its special position is the file saying
+    # so: the site's own stated number is the evidence the gate lacks here
+    if kept and (max(ratios, key=abs) == 0.0 or any(
+            abs(r - max(ratios, key=abs)) > _OCCUPANCY_RTOL * abs(max(ratios, key=abs))
+            for r in ratios)):
+        merged_ratios = ratios_under({**applied, **kept})
+        top = max(merged_ratios, key=abs)
+        if top != 0.0 and all(abs(r - top) <= _OCCUPANCY_RTOL * abs(top)
+                              for r in merged_ratios):
+            ratios = merged_ratios
     reference = max(ratios, key=abs)
     if reference == 0.0 or any(
             abs(r - reference) > _OCCUPANCY_RTOL * abs(reference) for r in ratios):
@@ -3015,7 +3039,10 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
         structure = rx.Structure(phases=phases)
     except Exception as exc:
         raise FullProfPcrError(f"{model.path or '<model>'}: {exc}") from exc
-    return structure
+    # a site whose own images coincide is one atom on its special position
+    # (#1007), said here because this is the channel the schema lacks
+    return merge_site_twins(structure, diagnostics=diagnostics,
+                            source=model.path or "<model>")
 
 
 # ------------------------------------------------------------------- the writer
