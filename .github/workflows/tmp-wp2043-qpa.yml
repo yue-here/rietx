@@ -1,0 +1,42 @@
+# WP-2043, temporary: never merged. The QPA guide's first fit on the macOS
+# runner and on Linux, under 1.9.0 and under the 1.10 tree, compiled tier on
+# and off. Runs only on a push to its own branch.
+name: tmp WP-2043 QPA esd probe
+on:
+  push:
+    branches: [tmp/wp2043-macos-qpa]
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+        tree: [v1.9.0, wp2043-cut-1-10-0]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      MPLBACKEND: Agg
+      RIETX_TELEMETRY: "0"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: probe
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ matrix.tree }}
+          path: tree
+      - uses: astral-sh/setup-uv@v7
+      - run: uv venv --python 3.13
+      - run: uv pip install -e ./tree
+      - run: .venv/bin/python -c "import numpy; numpy.show_config()"
+      - name: compiled tier on
+        run: .venv/bin/python probe/.github/wp2043/qpa_probe.py out-compiled.json
+      - name: compiled tier off
+        env:
+          RIETX_COMPILED: "0"
+        run: .venv/bin/python probe/.github/wp2043/qpa_probe.py out-numpy.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: qpa-${{ matrix.os }}-${{ matrix.tree }}
+          path: out-*.json
