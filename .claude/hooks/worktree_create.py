@@ -59,7 +59,7 @@ VENV = session_start.VENV_FIX  # names the architecture on an arm64 Mac (python_
 
 
 def sh(*args: str, cwd: Path, check: bool = True) -> subprocess.CompletedProcess:
-    proc = subprocess.run(args, cwd=cwd, capture_output=True, text=True)
+    proc = subprocess.run(args, cwd=cwd, capture_output=True, encoding="utf-8", errors="replace")
     if check and proc.returncode != 0:
         raise RuntimeError(f"{' '.join(args)}: {proc.stderr.strip()}")
     return proc
@@ -96,7 +96,7 @@ def clash_refusal(root: Path, wp: str) -> str:
 
 
 def main() -> int:
-    payload = json.load(sys.stdin)
+    payload = json.loads(sys.stdin.buffer.read())
     root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or payload.get("cwd") or Path.cwd())
     name = payload.get("name")
     if not name:
@@ -130,7 +130,7 @@ def main() -> int:
         except OSError as exc:
             print(f"worktree {name}: claim not written ({exc})", file=sys.stderr)
 
-    venv = subprocess.run(VENV, shell=True, cwd=path, capture_output=True, text=True)
+    venv = subprocess.run(VENV, shell=True, cwd=path, capture_output=True, encoding="utf-8", errors="replace")
     if venv.returncode != 0:
         print(f"worktree {name}: venv build failed — run `{VENV}` there:\n{venv.stderr}", file=sys.stderr)
     else:

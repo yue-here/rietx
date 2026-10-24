@@ -139,7 +139,7 @@ The atoms and the phase scale are fixed in both modes, and no other code was com
 
 rietx multiplies every esd by the Bérar-Lelann factor for serially correlated residuals, and GSAS-II does not.
 `RefinedParameter.stderr_uncorrected` is rietx's esd without the factor, so compare a GSAS-II esd with it.
-On the fluorapatite pattern of the `LabData` tutorial the factor is 2.15, so `stderr` is about twice `stderr_uncorrected` there.
+On the fluorapatite pattern of the `LabData` tutorial the factor is 2.17, so `stderr` is about twice `stderr_uncorrected` there.
 [Estimation](../theory/estimation.md#esds-and-the-bérar-lelann-inflation) says why rietx applies the factor and what each program reports.
 
 ## Moving files across

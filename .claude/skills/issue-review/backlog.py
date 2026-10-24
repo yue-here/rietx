@@ -281,7 +281,8 @@ def gh_json(root: Path, *args: str, timeout: int) -> tuple:
     for _attempt in range(2):
         try:
             proc = subprocess.run(
-                ["gh", *args], cwd=root, capture_output=True, text=True, timeout=timeout
+                ["gh", *args], cwd=root, capture_output=True, encoding="utf-8", errors="replace",
+                timeout=timeout,
             )
         except OSError as exc:
             return None, f"gh: {exc}"
@@ -378,7 +379,7 @@ def commit_references(root: Path, since: str) -> list:
     proc = subprocess.run(
         ["git", "log", "origin/main", f"--since={since}", "--name-only",
          "--format=%x1e%h%x1f%P%x1f%as%x1f%s%x1f%b%x1f"],
-        cwd=root, capture_output=True, text=True,
+        cwd=root, capture_output=True, encoding="utf-8", errors="replace",
     )
     if proc.returncode != 0:
         return []
@@ -411,7 +412,8 @@ def main(argv: list) -> int:
     out_dir = Path(argv[1])
     only = {int(a.lstrip("#")) for a in argv[2:]}
     top = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True
+        ["git", "rev-parse", "--show-toplevel"], capture_output=True,
+        encoding="utf-8", errors="replace",
     )
     root = Path(top.stdout.strip() or ".").resolve()
 

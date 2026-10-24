@@ -55,6 +55,20 @@ it for a sample-broadening coefficient at its softplus floor. This WP fixes
 the plan and its texts. A general "esd exceeds value" diagnostic is not in
 it.
 
+### Inherited
+
+- **2026-10-24, from WP-2043 (the 1.10 cut): a second case, where it moves a
+  weight fraction.** `examples/guides/qpa.py`'s first fit (11-BM NAC with a
+  CaF₂ impurity, `mccusker_structural`, 2-24°) frees the extinction of CaF₂,
+  which declares none. It walks to 1361 ± 2116 µm², parked on the step in the
+  Sabine Laue factor at x = 1 (WP-2044 owns that step), correlated with the
+  scale at ρ = +0.998. CaF₂ reads 3.08 ± 2.24 wt% against 1.37 ± 0.07 with
+  extinction and Biso held. With WP-2044's continuous factor in place (numpy
+  prototype) it reads 3.58 ± 3.53 wt%, and `HIGH_CORRELATION` fires. The guide
+  teaches this case on purpose, so a fix here changes its page. The evidence
+  may move this WP's row, since the parameter moves a quoted fraction by more
+  than its own value.
+
 ## Non-goals
 
 - A general significance diagnostic for every freed parameter (above).

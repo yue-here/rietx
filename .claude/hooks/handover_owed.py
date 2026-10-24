@@ -80,7 +80,7 @@ def _git(root: Path, *args: str) -> Optional[str]:
         # own 15 s budget (.claude/settings.json), and a git call slow enough
         # to matter is one more reason to let the stop through.
         proc = subprocess.run(
-            ["git", *args], cwd=root, capture_output=True, text=True, timeout=5
+            ["git", *args], cwd=root, capture_output=True, encoding="utf-8", errors="replace", timeout=5
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -192,7 +192,7 @@ def nudge(payload: dict) -> Optional[str]:
 
 
 def main() -> int:
-    payload = json.load(sys.stdin)
+    payload = json.loads(sys.stdin.buffer.read())
     reason = nudge(payload)
     if reason is None:
         return 0

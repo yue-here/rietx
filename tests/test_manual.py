@@ -1063,7 +1063,10 @@ def test_every_page_of_the_new_tree_keeps_the_page_contract():
     ("# Title\n\nAn answer.\n\n## Part\n\nRecall that a plate is flat.\n", ["back-reference"]),
     ("# Title\n\nAn answer.\n\n## Part\n\nPeaks above 90° shift. As above, so below.\n", []),
     ("# Title\n\nAn answer.\n\n```text\n# not a heading\n```\n", []),
-    ("# Title\n\n" + "A sentence. " * 5000, ["over the 50000 cap"]),
+    # Its own id: pytest puts the id in PYTEST_CURRENT_TEST, and Windows refuses
+    # an environment variable over 32 767 characters (WP-2043).
+    pytest.param("# Title\n\n" + "A sentence. " * 5000, ["over the 50000 cap"],
+                 id="over-the-cap"),
 ])
 def test_the_page_contract_fails_what_it_should(text, expected):
     """Each rule, made to fail once, with the message that names it."""

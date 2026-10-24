@@ -38,22 +38,22 @@ result.plot(path="fit.png")                          # obs/calc/diff/ticks
 Output of the full script (trimmed at the `…`):
 
 ```text
-Le Bail:  status=converged  Rwp=0.1435  GoF=5.44  a=10.251214 A
-Rietveld: status=converged  Rwp=0.0933  GoF=3.54
-          a = 10.251216 +/- 0.000040 A (COD reference 10.257(1); high-accuracy powder ~10.2497-10.2506)
-          [warning] FLOOR_HIT: phases.1.atoms.0.biso refined to its floor (ρ=+0.187)
-          [info] CAPILLARY_OFFSET_UNAVAILABLE: this capillary geometry declares no goniometer radius, …
+Le Bail:  status=converged  Rwp=0.1436  GoF=5.44  a=10.251213 A
+Rietveld: status=converged  Rwp=0.0930  GoF=3.53
+          a = 10.251216 +/- 0.000039 A (COD reference 10.257(1); high-accuracy powder ~10.2497-10.2506)
+          warning[FLOOR_HIT]: phases.1.atoms.0.biso refined to its floor (ρ=+0.188).
+          info[CAPILLARY_OFFSET_UNAVAILABLE]: This capillary geometry declares no goniometer radius, …
 
-FitReport: Rwp=0.0933 GoF=3.54; 53 regions, top 15 shown (74% of χ²); 53 unmatched observed peak(s); …
-  region  14.22- 14.54 deg  localRwp=0.154  chi2share=13.6%  max|d/sig|=49.5
+FitReport: 53 misfit regions. The top 15 carry 74% of χ² and the other 38 carry 15%.
+  region  14.22- 14.54 deg  localRwp=0.154  chi2share=13.7%  max|d/sig|=49.6
   …
 
 Refinement history (every stage is a restorable checkpoint):
-t5544a638  13 nodes  data=11BM_NAC.fxye
+t5544a638  15 nodes  data=11BM_NAC.fxye
  n0000  root                   —
  n0001  stage:bkg              Rwp 3.1772
  …
-*n0012  stage:biso             Rwp 0.0933
+*n0014  stage:closing          Rwp 0.0930
 ```
 
 ## Current features

@@ -53,7 +53,7 @@ is read-only for a session: %s"""
 def _git(cwd: Path, *args: str) -> Optional[str]:
     try:
         proc = subprocess.run(
-            ["git", "-C", str(cwd), *args], capture_output=True, text=True, timeout=10
+            ["git", "-C", str(cwd), *args], capture_output=True, encoding="utf-8", errors="replace", timeout=10
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -128,7 +128,7 @@ def refusal(payload: dict) -> Optional[str]:
 
 
 def main() -> int:
-    payload = json.load(sys.stdin)
+    payload = json.loads(sys.stdin.buffer.read())
     reason = refusal(payload)
     if reason is None:
         return 0
