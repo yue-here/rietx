@@ -1,9 +1,8 @@
 # WP-2037 — Attention is a cost: two channels, a response per code, relevance by purpose
 
-Milestone: generality · Status: 🔄 2026-10-24 — 9 of 14 tasks landed (the record, the result-field help, the response column and the purposes, the derived level and the view, the deliverables, the snap floor, the skill); next the caller override, the silence harness, the batch aggregate
+Milestone: generality · Status: ✅ 2026-10-24 — closed: diagnostics print by purpose, a caller's per-code levels with usable_under, the batch aggregate and suite metric, the silence harness; the agent round did not fire the tripwire
 Track: The registry and the guard
 Depends on: 2001
-Priority: P2 2026-10-23 — a scoping WP other WPs wait on: 2003's first demotion takes the shape this WP sets, and every audit from 2003 on fills the column it installs
 
 ## Goal
 
@@ -142,7 +141,7 @@ with the `info` rows collapsed beside their help text; nothing is hidden from th
 student or the expert. The "N unresolved" header goes.
 
 **4. The audited response is a default, and the caller may set it.** A per-code override
-on `summary()` and in settings, in the compiler's allow-warn-deny form. The audited
+on `summary()` and in settings (the settings half superseded, Decision 6), in the compiler's allow-warn-deny form. The audited
 default is one table row; the override is the audit's caller class and needs no tier.
 The expert who disagrees with a response and the pipeline that treats one code as
 blocking both get what they want without touching the default.
@@ -174,6 +173,13 @@ blocking both get what they want without touching the default.
 The 248 unaudited code rows are not re-levelled here. WP-2004 to 2007 fill the response
 column as they tier each code, under the tests this WP installs, so WP-2003's first
 demotion already follows clause 1.
+
+**The tier of each rule this WP adds** (written 2026-10-24, second session; the template
+line the filing left out). The purpose table's rows are physics, tier 1: each says which
+parameters a result number depends on, citing the coupling. The caller override is the
+`caller` class: an empty map by default, so the package decides nothing until a caller
+names a code. The batch aggregate decides nothing and reports numbers (DESIGN § Rules 1,
+kind 3). The silence registry is a test, not a runtime rule. None adds a threshold.
 
 ### How it is measured
 
@@ -218,17 +224,15 @@ tiering into interruptive and non-interruptive; van der Sijs 2006, Paterno 2009)
 5. The softening of unanimity for a recorded, cheap-to-undo default is deferred to its
    own brief, [WP-2038](2038-the-softening-a-brief-not-a-change.md); it reopens the
    fourth review for a reason unrelated to attention.
-
-### Inherited
-
-- **2026-10-24, from [WP-2040](2040-the-tutorials-link-the-manual-at-first-mention.md):
-  a display change leaves the tutorials' committed outputs stale, and no check sees it.**
-  WP-2040 rebuilt all seven notebooks on `origin/main` `99b00b82e`. Four of them (01, 02b,
-  04, 05) still carried the diagnostics format from before `b6d3430c7`. Notebook 01's prose
-  described the `help:` and `at:` lines that format printed, and WP-2040 rewrote it.
-  `build.py --check` compares cells and never outputs, so it stayed green. When a later task
-  here changes what a result, a summary or a series prints, rebuild the notebooks
-  (`examples/tutorials/build.py`) and reread each cell the rebuild lists.
+6. (2026-10-24) Clause 4's "in settings" is dropped. `usable` stays a function of the
+   stored result alone, and a caller's map reaches the yes/no reading through
+   `result.usable_under(levels)`. Reason: `usable` is a property with no argument, so it
+   could see a map only through a per-user file, and one stored result would then read
+   usable on one machine and not on another; the structure solver's trial cost
+   (`solve/cost.py`) reads `usable` too. Linters keep such a map per project, never per
+   user (Rust's `[lints]`, pytest's `filterwarnings`; recalled). Chosen over the map in
+   `~/.rietx/settings.json`, over storing the map on the result at fit time, and over
+   stopping at `summary(levels=)`.
 
 ## Non-goals
 
@@ -261,21 +265,23 @@ tiering into interruptive and non-interruptive; van der Sijs 2006, Paterno 2009)
 - [x] `DELIVERABLES` extended with `cell`, `microstructure`, `calibration`, `magnetic`,
       each with its deciding rows in `_deliverable_lines`, the skill § 4b table and
       `SeriesResult.summary`'s refusal text updated.
-- [ ] The caller override: `summary(levels={code: "allow"|"warn"|"deny"})`, the same map
+- [x] The caller override: `summary(levels={code: "allow"|"warn"|"deny"})`, the same map
       in settings, `usable` reading a caller's `deny`; one `caller` row in the table.
-- [ ] The batch aggregate: `rx.diagnostics_summary(results, deliverable=)` (firing rate
+      *Superseded in part 2026-10-24 (Decision 6):* no settings file; a caller's `deny`
+      reaches `result.usable_under(levels)`, and `usable` reads the result alone.
+- [x] The batch aggregate: `rx.diagnostics_summary(results, deliverable=)` (firing rate
       per code, warnings per fit, Pareto); the suite metric built on it and pinned as a
       meta-test over the acceptance suites' collected diagnostics.
-- [ ] A test of silence per warning code that has a fixture today, and the harness for
+- [x] A test of silence per warning code that has a fixture today, and the harness for
       the rest (a registry a code's silence fixture is added to; absence listed, not
       failed, until 2004-2007 fill it).
 - [x] The snap floor from the file's printed precision in `crystallography/cif.py`,
       tier 1, with the FAP case silent and a real snap still firing.
-- [ ] Before/after counts on the four families in the handover; the agent run
+- [x] Before/after counts on the four families in the handover; the agent run
       registered, run once, reported beside the v1.3 baseline.
 - [x] `FLOOR_HIT` on a freed extinction handed to 2004 as an `### Inherited` entry (done
       at filing; keep it current).
-- [ ] Tests + PNGs; the fast count moved by exactly the tests added.
+- [x] Tests + PNGs; the fast count moved by exactly the tests added.
 - [x] Skill: § 4's "Act on each `d.suggestion`" becomes *declare your purpose with
       `ref.summary(deliverable=…)` and act on the warnings it prints under it;
       `result.diagnostics` holds every row*; the § 4b table gains the new deliverable
@@ -291,7 +297,7 @@ beside the v1.3 baseline.
 
 ```sh
 .venv/bin/python -m pytest tests/test_audit_table.py tests/test_help.py -q
-.venv/bin/python -m pytest tests/test_results.py tests/test_summary*.py -q        # the filter and the derived level
+.venv/bin/python -m pytest tests/test_summary_levels.py tests/test_summary_deliverables.py tests/test_termination_view.py tests/test_display.py -q   # the filter, the derived level, the override (2026-10-24: test_results.py never existed)
 .venv/bin/python examples/skill_worked_default.py                                # the FAP before/after, by eye against 2037-attention/examples.md
 .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
 npm --prefix gui test && npm --prefix gui run check
@@ -310,6 +316,199 @@ npm --prefix gui test && npm --prefix gui run check
   termination view), WP-1985 (the help seat for codes).
 
 ## Handover log
+
+- **2026-10-24** — the agent round recorded, the last task. The tripwire of Decision 3 did
+  not fire, so the quiet default stands. Eight agents on Sonnet fitted the same four problems,
+  four with the old view and four with the quiet one. Every one of the eight stopped on a
+  criterion the package states, and the quiet arm passed 4 of 4 against 3 of 4. At four
+  cells an arm this catches a collapse and nothing finer, so it says the quiet view did not
+  break agents, not that it helps them.
+
+  *Measured* (round 2.3 of `tests/ev*_report_agent/PROTOCOL.md`, registered at `5d8796917`
+  10:58 before the first cell at 11:03, outcome at `35b9c7605`, branch
+  `agent-round-quiet-view-407bde`, not yet merged here; `claude-sonnet-5-5`, effort pinned,
+  episodes N1, C1, W1, W2). Arm a was rietx at `5d64a86`, arm b at `4bfde33d7`.
+
+  | read-out | arm a (old view) | arm b (quiet view) | v1.3 baseline |
+  |---|---|---|---|
+  | stopped on a criterion the package states | 4 of 4 | 4 of 4 | 7 of 8 (another harness) |
+  | verdict passed (`scorer.py`) | 3 of 4 | 4 of 4 | — |
+  | called `summary(deliverable=…)` | 3 of 4 | 4 of 4 | — |
+
+  The registered "worse" was a drop of 2 or more on either of the first two rows. A blind
+  Sonnet classifier and the round's author agreed on every stop class. a/N1 failed by
+  overclaiming `converged` on the zero-against-displacement tie. Eight cells spent 4.56 M
+  tokens, 4.14 M of them cache reads ($2.25 at list price). The record (streams, scorecards,
+  `cells.json`) is outside the repo at `~/rietx-agent-rounds/r-2026-10-24-record/`. The
+  round's own § "After the run" lists five defects, none touching what a cell saw. One is
+  that every cell wrote a scratch file to `/tmp`. Read by the rule's letter, that drops the
+  W1 pair, and the three pairs left give the same answer. The maintainer's user-level
+  CLAUDE.md reaches every cell in both arms.
+
+  **Closed** the same day, on the maintainer's word: `agent-round-quiet-view-407bde` merged
+  here, so the round's registration and `launch.py` land with #1145; the narrative is in
+  v1.10's record; the user-facing changes of both sessions are staged in the 1.10.0 notes,
+  part 1's for the first time (its session had not staged them). No `### Inherited` remains.
+  Next is WP-2003, the maintainer's order.
+
+- **2026-10-24** — second session, three of the five remaining tasks and the judge's open
+  items; the agent round runs in its own session.
+  A caller can now set a code's level per call, quieting it, raising it or making it
+  blocking. A result reopened from a project can print its diagnostics under a purpose, and
+  a pipeline asks `usable_under` with its own blocking codes. `usable` itself still means
+  the same on every machine, because the maintainer dropped the settings file (Decision 6).
+  A batch's diagnostics can be counted in one call, and the eight comparison standards' counts are
+  pinned. Every code the audit declares a warning now has a test that it fires on its fault
+  and stays silent beside it. The counts say where the noise is: three codes make 87 % of
+  the standards' warning rows, and none has an audited response yet. On cpd-1a, 49 of 57
+  warnings still print in full under `qpa`, so the view stays loud until WP-2005 audits
+  them. Not done: the registered agent round, the tripwire of Decision 3.
+
+  *Done* (each item ticked in its commit): the judge's open items and the in-call half of
+  the override (`98116ae20`: `magnetic` reads the nuclear-intensity terms; the
+  `PATTERN_UNDERSAMPLED` scope gains `magnetic`; the reading rule names `summary()`;
+  `RefinementResult.summary(deliverable=, levels=)`; `levels=` on the three summaries and
+  `diagnostic_view`; `Refinement.summary` a declared seat owned by 2004, with five rows).
+  The batch aggregate and the suite metric came from a lane, with the skill entry moved to a
+  new `api-batch.md` (`0c2695a1a`). Every notebook was rebuilt and four stale sentences were
+  reworded (`6efaddac2`). The silence harness came from a lane (`4bfde33d7`).
+  `usable_under` and Decision 6, the record's clause 4 amended (`83ab9b020`). The review's
+  fixes (`756fa18bd`). The forward references, and main merged (`8a45fdee4`; WP-2040's
+  tutorial links conflicted in three scripts, theirs kept where it covered the same
+  staleness, every notebook rebuilt on the merged sources). The WP's acceptance block had
+  named `tests/test_results.py`, which never existed; corrected. Inherited pruned: WP-2040's
+  note on stale tutorial outputs, consumed by the two rebuilds, whose 18 flagged cells were
+  reread.
+
+  *Decisions this session made, for the maintainer to reverse.*
+  - A bare result gained `summary(deliverable=)`, rather than the rule naming
+    `Refinement.summary`, so the rule is followable on a reopened result.
+  - An override never lowers an error, an unknown code or word is refused, and the header
+    counts the rows the map set.
+  - The skill entry for the aggregate goes in `api-batch.md`, per root CLAUDE.md, not in
+    `api.md`. It is paid for by shortening the body's §9c link label `[batch-operating]` to
+    `[operating]`: body 16 999 of 17 000 B.
+  - The suite metric runs over `rietx.viz.compare.STANDARDS`, which root CLAUDE.md calls the
+    acceptance suites' protocols.
+  - The new seat's owner is 2004: the seat-owner test admits 2002-2007, and the summary is
+    the report's seam.
+  - The lanes' choices:
+    - `pareto` lists only codes with a warning row;
+    - the suite collects by fitting directly, since a `RunRecord` holds dicts;
+    - a warning code is any code with one raise site at `warning` (131 codes; 123 if all
+      sites must be);
+    - one pair per code, so `SITE_SNAPPED_TO_SPECIAL_POSITION`'s orbit-snap site keeps its
+      firing case in `tests/test_symmetry_orbits.py:193`;
+    - `FLOOR_HIT`'s pair tests the decision rule, not a solve.
+
+  *Measured* (`[dev]` venv, darwin/arm64, compiled tier on).
+  - Four families, before (`5d64a86`) and after (`4bfde33d7`). Rows are raised levels;
+    lines are those of the printed diagnostics section.
+
+    | family | warning rows | `str(result)` lines | under its purpose |
+    |---|---|---|---|
+    | FAP worked default | 4 → 3 | 12 → 5 | 12 → 7 (`structure`) |
+    | NAC 11-BM | 0 (1 info) | 4 → 3 | 4 → 2 (`structure`) |
+    | cpd-1a | 57 → 57 | 97 → 37 | 97 → 81 (`qpa`) |
+    | Cr₂WO₆ magnetic | 1 → 1 | 10 → 5 | — → 7 (`magnetic`, new) |
+
+    cpd-1a's 57 rows are 24 `HIGH_CORRELATION`, 22 `FLAT_DIRECTION`, 9 `FLOOR_HIT`, 1
+    `SPACE_GROUP_SETTING_ASSUMED` and 1 `DISPERSION_NEGLECTED`; 49 are warnings under
+    `qpa`. The scripts are in the scratchpad (`fam/families.py`, `fam/table.py`), not the
+    tree.
+  - The suite metric over the eight standards. `DISPERSION_NEGLECTED` fired on 7,
+    `FLOOR_HIT` on 5, `HIGH_CORRELATION` and `FLAT_DIRECTION` on 4. The fits carry 77
+    warning rows at their raised level, 9.6 a fit. The Pareto runs 44 % (`HIGH_CORRELATION`),
+    69 % and 87 % (`FLOOR_HIT`). Warnings per fit by purpose run 7.5 (`phase_id`) to 9.375
+    (`calibration`). The collect takes 13-14 s, with another session's suite running.
+  - `python -m tests.silence`: 122 of 131 warning codes have no pair, and 9 do.
+  - Fast selection on the branch tip before the merge (`4bfde33d7`): 11 447 passed, 265
+    skipped, 27 xfailed, none failed, in 8:14, beside another session's pytest, with
+    `JUPYTER_PREFER_ENV_PATH=1` (Gotchas). On the merged tree (`8a45fdee4`, main through `6fe7a5bbb`): 11 450 passed, 265 skipped, 27 xfailed, none failed, 13:15. Main moved by about 30 commits during the handover, so the branch was merged again (`fd32512d2`, main through `269e93ca3`): 11 630 passed, 265 skipped, 27 xfailed, none failed, 9:50, same venv and switch; the suite-metric slow test still matches its pin there. No base was
+    measured, so the +N check is the added-test tool's count: 26 added test functions, 5.93 s in all (`tests/test_silence.py` 3.45 s for 4, its listed half 1.5 s of that for the raise-site walk; `tests/test_termination_view.py` 2.41 s for 3, each a small fit; every other file under 0.1 s); none joins the slow tail.
+  - The full selection did not run: nothing here moves a fitted number. The suite metric's
+    slow test ran once (13.6 s), and the tutorial, landing and example tests ran on the
+    rebuilt notebooks (107 passed).
+  - Lanes:
+
+    | lane | est | requests | main at dispatch | lane base | re-read | main requests | left in main | main edits after | redo | model | lane $ | main $ | in-session $ | saved $ |
+    |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+    | batch-aggregate | 35 | 89 | 307K | 96K | 17K of 219K | 46 | 76K | 6 | 0 | opus-5-5 | 6.34 | 4.45 | 12.15 | +0.57 |
+    | silence-harness | 25 | 50 | 383K | 95K | 0K of 0K | 4 | 13K | 1 | 0 | opus-5-5 | 3.25 | 0.52 | 7.36 | +3.47 |
+
+    Kept here: judge-items (est 15) and the in-call override (est 15). The tool counts them
+    as 0 kept. Actual/estimated requests were 2.27. Selective policy row:
+    `lane when main > 150K and item >= 20 requests | 266 | +7%`.
+
+  *Code review* (`high --fix 99b00b82e..HEAD`), six findings. Four were fixed in
+  `756fa18bd`:
+  - the aggregate built a view per purpose per result, and now reads `warning_under` off
+    one;
+  - the invariance test could raise `StopIteration` on a warning-free fit;
+  - the pin spelled the distribution name;
+  - the `summary:plan` row did not say that `None` applies no strategy veto.
+
+  Two were declined. The header counts a `warn` on a row already raised as a warning, which
+  is literally true and harmless. The deliverable note bypasses the notebook wrapper, which
+  `_repr_html_` never reaches.
+
+  *Gotchas.*
+  - A user-level Jupyter kernel spec on this Mac (`~/Library/Jupyter/kernels/python3`)
+    points at a deleted venv. The two kernel tests in `tests/test_display.py` fail without
+    `JUPYTER_PREFER_ENV_PATH=1`, on any branch.
+  - The suite pin was written on darwin/arm64. A correlation at threshold on Linux would turn
+    the nightly red, naming the code that moved.
+  - `Refinement.report()` writes `Statistics.identifiability_clause` into the result, the
+    declared cross-document write of WP-1108. So the invariance test compares everything
+    but that.
+  - `build.py --check` never compares outputs, so a display change needs a rebuild and a
+    reread of the cells it lists (WP-2040's note).
+  - A one-line `SEQUENTIAL_PERSISTENT_FINDING` hides which code persisted. Forwarded to 2003.
+
+  *Generality* (the `generality-review` judge on the branch at `756fa18bd`, before the
+  merge: each verdict and would-change line verbatim, its tables condensed to their findings;
+  the author's answer follows each `weak`; no item `fails`).
+
+  **`Refinement.summary:deliverable`: weak.** The case for printing more by default is stronger on the evidence. The tier rests on a test that answers a different question: the test shows the fit's result is unchanged, but the choice this default makes is how much of the diagnostics the reader sees. Would change the verdict: the row citing Decision 3 and the pending agent run as its grounds, or the run itself reported beside the v1.3 baseline.
+  *Author:* the row now cites Decision 3 and the owed run; the run is Next (1).
+
+  **`Refinement.summary:plot`: holds.** Would change the verdict: a plot path whose writing touches the fit's state.
+
+  **`Refinement.summary:plan`: weak.** Its evidence described the mechanism wrongly: with `plan=None` the plan-stage veto is skipped but the free-path veto stands (`report/__init__.py:487`, `:529`), and the default ignores the plan the last `fit()` ran (`self._last_plan`, `refine.py:4932`), which the same summary prints as the protocol run. Would change the verdict: the evidence corrected to "no plan-stage veto; the free-path veto stands", and the reason for ignoring `_last_plan` written into the row. Better still, a test showing the printed suggestions under both.
+  *Author:* evidence corrected, with the stale-`_last_plan` reason; whether `None` should mean `_last_plan` is a report decision, forwarded to 2004.
+
+  **`Refinement.summary:report`: holds.** Would change the verdict: a summary built with `report=None` that prints differently from one given `ref.report(plan=...)` under the same plan.
+
+  **`Refinement.summary:levels`: holds for the default**, citation wrong: "never lowers an error" is a choice inside the switch, and clause 4 does not say it. Would change the verdict: a default path (GUI route, `fit`, `build_report`) passing `levels=`.
+  *Author:* the row now names the rule as this WP's choice, put to the maintainer (3b).
+
+  **`PATTERN_UNDERSAMPLED` scope gains `magnetic`: holds.** Would change the verdict: a magnetic fit on disk where an undersampled pattern left the moment within its esd of a reference value.
+
+  **3a. `PURPOSES["magnetic"]`: holds, two gaps**: the cell and rigid bodies are left out with no written reason (rigid bodies are missing from `qpa` too, so `RIGID_BODY_MISFIT` reads `info` under both). Would change the verdict: a written reason for leaving out the cell and rigid bodies, or a magnetic fit where a cell- or rigid-body-path code read `info` and a refiner would have acted.
+
+  **3b. The override rule: weak.** The case against the "never lower an error" half is stronger than the change admits. The record's clause 4 says the caller may set the audited response, and an error is an audited response. `MODEL_FAR_FROM_DATA`, the one error a fit raises, fires on Rwp > 0.8 alone on a tier-3 threshold (`_audit.py:2259`); inferred, a well-fitted pattern averaging under about 1.6 counts a channel crosses it, and its caller cannot `allow` it, while a refused `allow` is dropped in silence. Would change the verdict: a dated ruling that clause 4 excludes errors, written into the record. Alternatively, a refused `allow` that raises or is reported rather than ignored, or `MODEL_FAR_FROM_DATA`'s threshold shown not to fire on a well-fitted low-count pattern.
+  *Author:* put to the maintainer at this handover (allow an error, refuse it loudly, or keep it ignored); the low-count `MODEL_FAR_FROM_DATA` case is 2005's threshold.
+
+  **3c. `usable_under`: holds.** Would change the verdict: a package reader other than the caller found calling `usable_under`.
+
+  **3d. `RefinementResult.summary(deliverable=)`: holds, seat missing**: its defaults and `SeriesResult.summary`'s new `levels=None` are not in `DEFAULT_SEATS`, though `print(result)` is the more-read path. Would change the verdict: none on the behaviour. The table gap closes by seating `rietx.schemas.results.RefinementResult.summary` and `rietx.schemas.sequential.SeriesResult.summary`.
+
+  **3e. `rx.diagnostics_summary`: holds.** Ranking by rows lets a pair-keyed code dominate, but `n_results` rides beside it. Would change the verdict: a field added that turns a rate into a verdict, for example a "noisy code" flag above a fraction.
+
+  **3f. The suite metric: holds as a prompt**, but the eight standards are four families (the four `qarr` round-robin pure phases share one instrument; NAC and the LaB₆ capillary are both 11-BM), so "fired on 4/8" is one family. Would change the verdict: a family key per standard in the pin, so a rate reads "1 of 4 families" where that is the truth.
+
+  **3g. The silence registry: holds as a harness**: it verifies rather than validates, its fixtures sit far from the thresholds, and the enforced half left out errors. Would change the verdict: the enforced half widened to `response="error"`, a sentence saying a pair verifies and does not meet the mechanical ground, and a silent fixture placed near each threshold.
+  *Author:* the enforced half now covers `error` and the docstring says a pair verifies; fixtures near each threshold are left to the audit that tiers each code.
+
+  **Next**, in order:
+  1. The agent round's result from [its session](#local_346f1fb3-fdd7-48da-ace8-6aa909d0fef0)
+     (`agent-round-2037`, branch `agent-round-quiet-view`; it registers in
+     `tests/ev*_report_agent/PROTOCOL.md` before running and touches nothing here). Record
+     its rates beside the v1.3 baseline. A worse result than its registered threshold
+     reverts clause 3's quiet default and keeps the ordering (Decision 3). Merge its branch
+     here only on the maintainer's word.
+  2. Tick task 11 and close (✅), moving the narrative to v1.10's record.
+  3. Then WP-2003, the maintainer's order.
 
 - **2026-10-24** — first session (began 2026-10-23), nine of the fourteen tasks.
   A fit's diagnostics now print by what they mean for the caller's purpose. With no

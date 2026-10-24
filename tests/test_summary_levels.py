@@ -37,15 +37,15 @@ FAP = {
 #: The purposes each FAP code is a warning under; ``info`` under every other.
 #: A whole site bears on every number read from its atoms (structure, the
 #: fraction its multiplicity sets, a moment it carries); extinction on the
-#: intensities a structure and a fraction are read from; the instrument widths
+#: intensities a structure, a fraction and a moment are read from; the instrument widths
 #: on a size, a strain and a calibration; undersampling by its audited scope.
 #: ``series`` follows every free path, so every warning is one there.
 WARNING_UNDER = {
     "SITE_SNAPPED_TO_SPECIAL_POSITION": {"structure", "qpa", "magnetic", "series"},
-    "FLOOR_HIT": {"structure", "qpa", "series"},
+    "FLOOR_HIT": {"structure", "qpa", "magnetic", "series"},
     "RESOLUTION_UNCONSTRAINED": {"microstructure", "calibration", "series"},
     "PATTERN_UNDERSAMPLED": {"qpa", "structure", "microstructure", "calibration",
-                             "series"},
+                             "magnetic", "series"},
 }
 
 
@@ -163,11 +163,12 @@ def test_with_no_deliverable_every_row_is_one_line_and_the_rule_closes_it():
         "  diagnostics: 4 rows, 0 errors; no deliverable given, so none is printed in full",
         "    SITE_SNAPPED_TO_SPECIAL_POSITION at phases.0.atoms.0: "
         "warning under qpa, structure, magnetic",
-        "    FLOOR_HIT at phases.0.extinction: warning under qpa, structure",
+        "    FLOOR_HIT at phases.0.extinction: warning under qpa, structure, magnetic",
         "    RESOLUTION_UNCONSTRAINED at instrument.profile.u, .v, .w: "
         "warning under microstructure, calibration",
-        "    PATTERN_UNDERSAMPLED: warning under qpa, structure, microstructure, calibration",
-        "    pass deliverable= for the rows that decide your purpose; "
+        "    PATTERN_UNDERSAMPLED: warning under qpa, structure, microstructure, calibration, "
+        "magnetic",
+        "    pass deliverable= to summary() for the rows that decide your purpose; "
         "every row is in result.diagnostics",
     ]
 
@@ -193,11 +194,11 @@ def test_under_cell_every_fap_row_is_one_line():
     assert lines[1:] == [
         "    info: SITE_SNAPPED_TO_SPECIAL_POSITION at phases.0.atoms.0 "
         "(warning under qpa, structure, magnetic)",
-        "    info: FLOOR_HIT at phases.0.extinction (warning under qpa, structure)",
+        "    info: FLOOR_HIT at phases.0.extinction (warning under qpa, structure, magnetic)",
         "    info: RESOLUTION_UNCONSTRAINED at instrument.profile.u, .v, .w "
         "(warning under microstructure, calibration)",
         "    info: PATTERN_UNDERSAMPLED (warning under qpa, structure, microstructure, "
-        "calibration)",
+        "calibration, magnetic)",
     ]
     assert (_view_lines(list(FAP.values()), "microstructure")[0]
             == "  diagnostics under microstructure: 2 warnings, 0 errors, 2 info")
@@ -212,7 +213,8 @@ def test_an_error_prints_in_full_with_a_deliverable_or_without():
     assert bare[0] == ("  diagnostics: 2 rows, 1 error; no deliverable given, "
                        "so only the error is printed in full")
     assert bare[1:4] == full
-    assert bare[4] == "    FLOOR_HIT at phases.0.extinction: warning under qpa, structure"
+    assert bare[4] == ("    FLOOR_HIT at phases.0.extinction: "
+                       "warning under qpa, structure, magnetic")
     cell = _view_lines([FAP["FLOOR_HIT"], err], "cell")
     assert cell[0] == "  diagnostics under cell: 0 warnings, 1 error, 1 info"
     assert cell[1:4] == full
@@ -267,3 +269,99 @@ def test_a_code_still_on_the_response_baseline_keeps_its_level_everywhere():
     assert "CELL_RUNAWAY" in _audit.RESPONSE_BASELINE
     runaway = _d("CELL_RUNAWAY", ["phases.0.cell.a"])
     assert {level_under(runaway, p) for p in PURPOSES} == {"warning"}
+
+
+# ---------------------------------------------------------------- clause 4
+def _result(diagnostics):
+    from rietx.schemas.common import Provenance
+    from rietx.schemas.results import RefinementResult, Statistics
+    return RefinementResult(
+        status="converged", mode="rietveld", parameters=[], diagnostics=diagnostics,
+        statistics=Statistics(rwp=0.1, rp=0.08, rexp=0.05, chi2=4.0, gof=2.0,
+                              n_points=100, n_free_parameters=5),
+        provenance=Provenance(package_version="0.0.0+test"))
+
+
+def _lines_with(diagnostics, deliverable, levels):
+    from rietx.schemas.results import _diagnostic_lines
+    return _diagnostic_lines(diagnostics, deliverable, levels=levels)
+
+
+def test_a_callers_levels_replace_the_audited_level_under_every_purpose():
+    """``allow`` quiets a code to info, ``warn`` makes it a warning under every
+    purpose, ``deny`` an error; the header counts the rows the map set."""
+    from rietx.schemas.results import _NAMED_PURPOSES, diagnostic_view
+
+    levels = {"FLOOR_HIT": "allow", "RESOLUTION_UNCONSTRAINED": "deny",
+              "PATTERN_UNDERSAMPLED": "warn"}
+    for deliverable in (None, "structure", "cell"):
+        rows = {r.diagnostic.code: r
+                for r in diagnostic_view(list(FAP.values()), deliverable, levels)}
+        assert rows["FLOOR_HIT"].level == "info" and not rows["FLOOR_HIT"].full
+        assert rows["RESOLUTION_UNCONSTRAINED"].level == "error"
+        assert rows["RESOLUTION_UNCONSTRAINED"].full
+        assert rows["PATTERN_UNDERSAMPLED"].level == "warning"
+        assert rows["PATTERN_UNDERSAMPLED"].warning_under == _NAMED_PURPOSES
+        assert rows["SITE_SNAPPED_TO_SPECIAL_POSITION"].override is None
+    lines = _lines_with(list(FAP.values()), None, levels)
+    assert lines[0] == ("  diagnostics: 4 rows, 1 error; 3 set by levels=; "
+                        "no deliverable given, so only the error is printed in full")
+    assert lines[1] == "    error[RESOLUTION_UNCONSTRAINED]: m"
+    assert "    FLOOR_HIT at phases.0.extinction: info" in lines
+    assert "    PATTERN_UNDERSAMPLED: warning under every purpose" in lines
+    assert ("    info: FLOOR_HIT at phases.0.extinction"
+            in _lines_with(list(FAP.values()), "structure", levels))
+
+
+def test_a_callers_allow_never_lowers_an_error():
+    """Clause 1: an unusable fit is unusable for every purpose and every reader."""
+    from rietx.schemas.results import diagnostic_view
+
+    bound = _d("BOUND_HIT", ["phases.0.cell.a"], level="error")
+    (row,) = diagnostic_view([bound], "cell", {"BOUND_HIT": "allow"})
+    assert (row.level, row.full, row.override) == ("error", True, None)
+
+
+def test_a_callers_levels_refuse_an_unknown_code_or_word():
+    from rietx.schemas.results import diagnostic_view
+
+    with pytest.raises(ValueError, match="unknown diagnostic code.*FLOOR_HITT"):
+        diagnostic_view(list(FAP.values()), None, {"FLOOR_HITT": "allow"})
+    with pytest.raises(ValueError, match="unknown level.*'ignore'.*'allow', 'warn', 'deny'"):
+        diagnostic_view(list(FAP.values()), None, {"FLOOR_HIT": "ignore"})
+
+
+def test_a_bare_result_can_follow_the_reading_rule():
+    """The rule ``str(result)`` closes on names ``summary()``, and a bare
+    result has one taking ``deliverable=``: the generality review's (c)."""
+    from rietx.schemas.results import DIAGNOSTICS_READING_RULE, RESULT_DELIVERABLE_NOTE
+
+    result = _result(list(FAP.values()))
+    assert str(result) == result.summary()
+    assert DIAGNOSTICS_READING_RULE in str(result)
+    text = result.summary(deliverable="structure").splitlines()
+    assert "  diagnostics under structure: 3 warnings, 0 errors, 1 info" in text
+    assert "    warning[FLOOR_HIT]: m" in text
+    assert f"    {RESULT_DELIVERABLE_NOTE}" in text
+    assert DIAGNOSTICS_READING_RULE not in "\n".join(text)
+    with pytest.raises(ValueError, match="unknown deliverable"):
+        result.summary(deliverable="cells")
+    assert "error[FLOOR_HIT]" in result.summary(levels={"FLOOR_HIT": "deny"})
+
+
+def test_usable_under_a_callers_deny_and_never_above_usable():
+    """Clause 4, ruled 2026-10-24: a denied code makes the fit unusable to
+    the caller who denied it, ``usable`` itself reads nothing but the result,
+    and an override never lifts an error."""
+    result = _result(list(FAP.values()))
+    assert result.usable and result.usable_under({})
+    assert not result.usable_under({"FLOOR_HIT": "deny"})
+    assert result.usable, "usable is the result's own reading, never the caller's"
+    assert result.usable_under({"FLOOR_HIT": "allow", "PATTERN_UNDERSAMPLED": "warn"})
+
+    bound = _result([_d("MODEL_FAR_FROM_DATA", [], level="error")])
+    assert not bound.usable and not bound.usable_under({"MODEL_FAR_FROM_DATA": "allow"})
+    stopped = _result(list(FAP.values())).model_copy(update={"status": "max_iter"})
+    assert not stopped.usable_under({})
+    with pytest.raises(ValueError, match="unknown diagnostic code"):
+        result.usable_under({"FLOOR_HITT": "deny"})

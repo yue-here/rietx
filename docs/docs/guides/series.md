@@ -23,7 +23,7 @@ SeriesResult: 7 pattern(s), rietveld, direction=forward
   diagnostics: 2 rows, 0 errors; no deliverable given, so none is printed in full
     SEQUENTIAL_PERSISTENT_FINDING: warning under every purpose
     SEQUENTIAL_PERSISTENT_FINDING at instrument.geometry.goniometer_radius_mm: info
-    pass deliverable= for the rows that decide your purpose; every row is in result.diagnostics
+    pass deliverable= to summary() for the rows that decide your purpose; every row is in result.diagnostics
   trajectory (T (K)):
     [1/7] p000 x=300 converged Rwp=0.0409
     [2/7] p001 x=400 converged Rwp=0.0409

@@ -82,6 +82,26 @@ def test_workspace_carries_the_core_the_manual_and_the_contract(tmp_path):
     assert not list((tmp_path / "ws").glob("*.condition.json"))
 
 
+def test_a_build_s_own_skill_tree_is_the_one_copied(tmp_path):
+    """2.3's arms are two builds of the package, and each workspace carries
+    that build's skill rather than this checkout's; a directory with no
+    SKILL.md is refused rather than copied as an empty skill."""
+    tree = tmp_path / "other-skill"
+    (tree / "references").mkdir(parents=True)
+    (tree / "SKILL.md").write_text("# another build's body\n", encoding="utf-8")
+    (tree / "references" / "api.md").write_text("rows\n", encoding="utf-8")
+    pa.write_workspaces(tmp_path / "ws", tmp_path / "truth", python="p",
+                        only=["E1"], skill_src=tree)
+    shipped = tmp_path / "ws" / "E1" / "skill"
+    assert ({p.relative_to(shipped) for p in shipped.rglob("*") if p.is_file()}
+            == {Path("SKILL.md"), Path("references/api.md")})
+    assert (shipped / "SKILL.md").read_text(encoding="utf-8") == (
+        "# another build's body\n")
+    with pytest.raises(ValueError, match="no SKILL.md"):
+        pa.write_workspaces(tmp_path / "ws2", tmp_path / "truth", python="p",
+                            only=["E1"], skill_src=tmp_path / "empty")
+
+
 def test_unknown_episode_id_is_refused(tmp_path):
     with pytest.raises(ValueError, match="unknown episode id"):
         pa.write_workspaces(tmp_path / "ws", tmp_path / "truth",

@@ -66,6 +66,7 @@ open under the same track; neither tiers a gate.
 
 ### Inherited
 
+- **From WP-2037 (2026-10-24, second session, PR #1145): a seat of yours, and the suite's alarm numbers.** `rietx.refine.Refinement.summary` is now a declared default seat owned by this WP (`_audit.DEFAULT_SEATS`), its five defaults rowed by 2037: `levels` caller-tier, `deliverable`/`plot`/`plan`/`report` answer-invariant (`tests/test_termination_view.py::test_summary_leaves_the_result_as_it_found_it`). `plan=None` skips the plan-stage veto (the free-path veto stands) and ignores the plan the last `fit()` ran (`Refinement._last_plan`, which the same summary prints as the protocol run), so a suggestion for a parameter an earlier stage freed can print as active; whether `None` should mean `_last_plan` is this WP's report decision. The generality judge also asked that `RefinementResult.summary` (and, for 2003, `SeriesResult.summary`) become declared seats: their `deliverable=`/`levels=` defaults are unseated though `print(result)` is the more-read path. `tests/suite_alarms.py` pins the eight `rietx compare` standards' firing table (`tests/data/suite_alarms.json`, written darwin/arm64, a prompt never a verdict); a retier here that moves a code's firing re-pins it with `python -m tests.suite_alarms --write`.
 - **From WP-2037 (2026-10-24, first session): the response column is installed; fill it as each code is tiered.** `rietx._audit.Row` has `response` (the level the reader owes; `tests/test_audit_table.py` holds it equal to every raise site's literal `level=`), `responds` (one sentence; a `warning`'s must name a result number or a plan outcome, `rietx.purposes.RESULT_NUMBERS`/`PLAN_OUTCOMES`) and `scope` (the purposes a code with no `where` bears on, or `("all",)`). Filling a row means deleting its line from `RESPONSE_BASELINE` (253 at landing). Four rows are filled as the worked example: `FLOOR_HIT`, `PATTERN_UNDERSAMPLED` (scope `qpa, structure, microstructure, calibration`), `RESOLUTION_UNCONSTRAINED`, `SITE_SNAPPED_TO_SPECIAL_POSITION`, all with their tiers left unaudited. **20 codes raise at more than one level or at a computed one**, and 8 more through a helper `docs/reference_pages.diagnostic_index` cannot read (the list is in `test_audit_table.py`'s level test docstring); each takes a response only once split into two codes, since a level is never a threshold. WPs 2005-2007 inherit the same column. The silence-fixture registry is 2037's next item and not yet built.
 - **From WP-2037 (2026-10-23, at filing): `FLOOR_HIT` on a freed extinction is a plan question, and every code this WP tiers also takes a response.** The skill's worked default on FAP (`examples/skill_worked_default.py`, `mccusker_structural`, a lab powder) frees `phases.0.extinction` and reports `FLOOR_HIT` on it at ρ = +0.057, a warning about a parameter the plan had no reason to free; whether the plan frees extinction on a Bragg-Brentano powder is this WP's to rule, not a level question. And once 2037 lands, `_audit.Row.response` (`warning`/`error`/`info`, one sentence on what the reader does) and `Row.scope` (for a code with no `where`) are filled here for each code as it is tiered, with a silence fixture per warning code; the meta-tests are 2037's.
 
@@ -112,6 +113,16 @@ open under the same track; neither tiers a gate.
       in; the eval fixtures that pin the version updated in the same commit.
 - [ ] Goldens re-pinned only if no further from reference; the FAP report golden and the
       slow NAC golden regenerated once, on the final tree.
+- [ ] A refused `allow` is reported, never dropped (ruled by the maintainer 2026-10-24,
+      `docs/milestones/generality.md` § The rule, clause 4). A caller's `levels=` map keeps
+      errors unlowerable, but today an `allow` on a diagnostic raised as an error is ignored
+      in silence. `schemas.results.diagnostic_view` gives that row `override=None`, and
+      `_diagnostic_header` counts only the rows a map set. Report it in the diagnostics
+      header beside "N set by levels=" (for example "1 allow refused: an error stays an
+      error"), in the three `summary()` methods and in `usable_under`'s docstring. A test
+      covers an `allow` on `MODEL_FAR_FROM_DATA`. The low-count case that makes this matter
+      (Rwp > 0.8 on a well-fitted pattern averaging under about 1.6 counts a channel,
+      inferred) is that code's threshold, which WP-2005 owns.
 - [ ] Tests + PNGs; the fast count moved by exactly the tests added.
 - [ ] Skill: none here. List each `references/judging.md` (5 546 words) and
       `diagnostics-reading.md` row that names a demoted gate, for 2008 (DESIGN.md § Rules,

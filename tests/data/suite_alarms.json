@@ -1,0 +1,76 @@
+{
+ "comment": "rx.diagnostics_summary over rietx.viz.compare.STANDARDS' reference fits, a prompt and never a verdict (tests/suite_alarms.py). Re-pin with python -m tests.suite_alarms --write.",
+ "written_on": "darwin/arm64, rietx 1.10.0.dev0",
+ "standards": {
+  "brucite": {
+   "BISO_UNUSUALLY_LARGE": "warning",
+   "BOUND_HIT": "warning",
+   "DISPERSION_NEGLECTED": "info",
+   "FLAT_DIRECTION": "warning",
+   "FLOOR_HIT": "warning",
+   "HIGH_CORRELATION": "warning"
+  },
+  "corundum": {
+   "DISPERSION_NEGLECTED": "info",
+   "FLAT_DIRECTION": "warning",
+   "FLOOR_HIT": "warning",
+   "HIGH_CORRELATION": "warning",
+   "SPACE_GROUP_SETTING_ASSUMED": "warning"
+  },
+  "fap": {
+   "DISPERSION_NEGLECTED": "info",
+   "PATTERN_UNDERSAMPLED": "warning",
+   "SITE_SNAPPED_TO_SPECIAL_POSITION": "warning"
+  },
+  "fluorite": {
+   "DISPERSION_NEGLECTED": "info",
+   "FLAT_DIRECTION": "warning",
+   "FLOOR_HIT": "warning",
+   "HIGH_CORRELATION": "warning"
+  },
+  "lab6_capillary": {
+   "CAPILLARY_OFFSET_UNAVAILABLE": "info",
+   "DISPERSION_NEGLECTED": "info"
+  },
+  "nac": {
+   "CAPILLARY_OFFSET_UNAVAILABLE": "info",
+   "FLOOR_HIT": "warning"
+  },
+  "srm660c": {
+   "CONSTRAINT_ACTIVE": "info",
+   "DISPERSION_NEGLECTED": "info",
+   "RESOLUTION_NOT_POSITIVE": "warning",
+   "RESOLUTION_UNCONSTRAINED": "warning"
+  },
+  "zincite": {
+   "DISPERSION_NEGLECTED": "warning",
+   "FLAT_DIRECTION": "warning",
+   "FLOOR_HIT": "warning",
+   "HIGH_CORRELATION": "warning"
+  }
+ },
+ "n_results": {
+  "BISO_UNUSUALLY_LARGE": 1,
+  "BOUND_HIT": 1,
+  "CAPILLARY_OFFSET_UNAVAILABLE": 2,
+  "CONSTRAINT_ACTIVE": 1,
+  "DISPERSION_NEGLECTED": 7,
+  "FLAT_DIRECTION": 4,
+  "FLOOR_HIT": 5,
+  "HIGH_CORRELATION": 4,
+  "PATTERN_UNDERSAMPLED": 1,
+  "RESOLUTION_NOT_POSITIVE": 1,
+  "RESOLUTION_UNCONSTRAINED": 1,
+  "SITE_SNAPPED_TO_SPECIAL_POSITION": 1,
+  "SPACE_GROUP_SETTING_ASSUMED": 1
+ },
+ "warnings_per_result": {
+  "phase_id": 7.5,
+  "qpa": 7.875,
+  "structure": 7.875,
+  "cell": 7.75,
+  "microstructure": 9.25,
+  "calibration": 9.375,
+  "magnetic": 7.875
+ }
+}

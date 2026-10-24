@@ -38,7 +38,7 @@ How to drive `rietx` on real data: the order of work, and the checks before you 
 | §8 a result that makes no sense | [surprises](references/surprises.md) |
 | §9 the trajectory, and the history DAG | [history](references/history.md) |
 | §9b a ramp, a sweep or a tray of patterns | [series](references/series.md) |
-| §9c a batch: deciding; operating | [batch](references/batch.md), [batch-operating](references/batch-operating.md) |
+| §9c a batch: deciding; operating | [batch](references/batch.md), [operating](references/batch-operating.md), [api-batch](references/api-batch.md) |
 | §9d a human watching, or a finished run on disk | [watching](references/watching.md) |
 
 Read signatures from the package, never from memory: `rx.capabilities()`, `rx.help_for(path)`, `inspect.signature(obj)`. A failure raises. Dump an answer with `model_dump(mode="json")`.

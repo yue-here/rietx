@@ -1526,12 +1526,43 @@ class DiagnosticRow:
     warning under, in the purpose table's order and never ``series``: that
     purpose follows every path (``"*"``), so on a single result it would be
     listed wherever any other is and says nothing a reader can act on.
+    ``override`` is the word of the caller's ``levels=`` map that set
+    ``level`` (clause 4), or ``None`` where the audited level stands.
     """
 
     diagnostic: Diagnostic
     level: str
     full: bool
     warning_under: tuple[str, ...]
+    override: str | None = None
+
+
+#: The words a caller's ``levels=`` map takes (WP-2037, clause 4), in the
+#: compiler's allow-warn-deny form (Clang's ``-W``/``-Wno-``/``-Werror=``,
+#: Rust's lint levels), and the level each sets: ``allow`` quiets a code to
+#: ``info``, ``warn`` makes it a warning under every purpose, ``deny`` an
+#: error.
+LEVEL_OVERRIDES: dict[str, str] = {"allow": "info", "warn": "warning", "deny": "error"}
+
+
+def _check_levels(levels: dict[str, str] | None) -> dict[str, str]:
+    """A caller's ``levels=`` map, refused where a code or a word is unknown:
+    a misspelt code would otherwise override nothing and say nothing
+    (WP-1076).  The codes are :data:`rietx.help.DIAGNOSTIC_HELP`'s, which its
+    test holds equal to the raise sites."""
+    if not levels:
+        return {}
+    from ..help import DIAGNOSTIC_HELP
+
+    unknown = sorted(code for code in levels if code not in DIAGNOSTIC_HELP)
+    if unknown:
+        raise ValueError(f"levels=: unknown diagnostic code(s) {', '.join(unknown)}; "
+                         "the codes are rietx.help.DIAGNOSTIC_HELP's")
+    words = sorted({w for w in levels.values() if w not in LEVEL_OVERRIDES})
+    if words:
+        raise ValueError(f"levels=: unknown level(s) {', '.join(map(repr, words))}; one of "
+                         f"{', '.join(repr(w) for w in LEVEL_OVERRIDES)}")
+    return dict(levels)
 
 
 #: The purposes a row's ``warning_under`` can name: every one but ``series``
@@ -1543,7 +1574,8 @@ _VIEW_RANK = {"error": 0, "warning": 1}
 
 
 def diagnostic_view(diagnostics: list[Diagnostic],
-                    deliverable: str | None = None) -> list[DiagnosticRow]:
+                    deliverable: str | None = None,
+                    levels: dict[str, str] | None = None) -> list[DiagnosticRow]:
     """The rows every renderer of a diagnostics list prints (WP-2037, clause 3):
     the text summary, ``str(result)``, the notebook HTML and the GUI panel.
 
@@ -1555,27 +1587,51 @@ def diagnostic_view(diagnostics: list[Diagnostic],
     not infer it.  Rows come errors first, then warnings, then the rest, each
     in stored order.  An unknown deliverable is refused, naming every one.
 
+    ``levels`` maps a code to ``"allow"``, ``"warn"`` or ``"deny"``
+    (:data:`LEVEL_OVERRIDES`; clause 4): the caller's word replaces the
+    audited level under every purpose, so the expert who disagrees with a
+    response and the pipeline that treats a code as blocking get what they
+    want without touching the default.  It never lowers a diagnostic raised
+    at ``error``, since an unusable fit is unusable for every purpose
+    (clause 1).  An unknown code or word is refused.
+
     Every row of ``diagnostics`` comes back, uncapped: a renderer that prints
     bounds the pair-keyed codes first (:func:`_cap_high_correlation`), and
     the stored list stays the one its counts are taken from.
     """
     if deliverable is not None:
         _check_deliverable(deliverable)
+    levels = _check_levels(levels)
     rows = []
     for d in diagnostics:
-        under = (tuple(p for p in _NAMED_PURPOSES if level_under(d, p) == "warning")
-                 if d.level == "warning" else ())
-        level = d.level if deliverable is None else level_under(d, deliverable)
+        override = levels.get(d.code) if d.level != "error" else None
+        if override is not None:
+            level = LEVEL_OVERRIDES[override]
+            under = _NAMED_PURPOSES if level == "warning" else ()
+        else:
+            under = (tuple(p for p in _NAMED_PURPOSES if level_under(d, p) == "warning")
+                     if d.level == "warning" else ())
+            level = d.level if deliverable is None else level_under(d, deliverable)
         full = level == "error" or (deliverable is not None and level == "warning")
-        rows.append(DiagnosticRow(d, level, full, under))
+        rows.append(DiagnosticRow(d, level, full, under, override))
     return sorted(rows, key=lambda r: _VIEW_RANK.get(r.level, 2))
 
 
 #: The reading rule, closing a summary that was given no deliverable: the
 #: output says how to see more, so the skill need only name the field
 #: (WP-2037 clause 3; WP-1338's cheapest place, the package's own output).
-DIAGNOSTICS_READING_RULE = ("pass deliverable= for the rows that decide your "
-                            "purpose; every row is in result.diagnostics")
+#: It names ``summary()`` because every object that prints it has one taking
+#: ``deliverable=``: :meth:`rietx.refine.Refinement.summary`,
+#: :meth:`RefinementResult.summary` and
+#: :meth:`rietx.schemas.sequential.SeriesResult.summary`.
+DIAGNOSTICS_READING_RULE = ("pass deliverable= to summary() for the rows that decide "
+                            "your purpose; every row is in result.diagnostics")
+
+#: Closing a bare result's view under a deliverable: the rows that decide the
+#: purpose need the compiled model, so they are named rather than left out
+#: in silence.
+RESULT_DELIVERABLE_NOTE = ("the deliverable's deciding rows need the compiled model: "
+                           "Refinement.summary(deliverable=...)")
 
 
 def _count(n: int, noun: str) -> str:
@@ -1616,28 +1672,33 @@ def _one_line(row: DiagnosticRow, deliverable: str | None) -> str:
     head = d.code + (f" at {_compress_paths(d.where)}" if d.where else "")
     if deliverable is None:
         return f"{head}: {_warning_under_text(row.warning_under)}" \
-            if d.level == "warning" else f"{head}: {d.level}"
+            if row.level == "warning" else f"{head}: {row.level}"
     # under a deliverable a short row is one at ``info`` for it
-    if d.level == "warning":
+    if d.level == "warning" and row.override is None:
         return f"info: {head} ({_warning_under_text(row.warning_under)})"
     return f"info: {head}"
 
 
 def _diagnostic_header(rows: list[DiagnosticRow], deliverable: str | None) -> str:
     n_errors = sum(r.level == "error" for r in rows)
+    n_set = sum(r.override is not None for r in rows)
+    # the rows whose level the caller's map set, so a level the package did
+    # not raise is never read as the package's
+    by_caller = f"; {n_set} set by levels=" if n_set else ""
     if deliverable is None:
         shown = ("none is printed in full" if not n_errors else
                  "only the error is printed in full" if n_errors == 1 else
                  "only the errors are printed in full")
-        return (f"  diagnostics: {_count(len(rows), 'row')}, {_count(n_errors, 'error')}; "
-                f"no deliverable given, so {shown}")
+        return (f"  diagnostics: {_count(len(rows), 'row')}, {_count(n_errors, 'error')}"
+                f"{by_caller}; no deliverable given, so {shown}")
     n_warnings = sum(r.level == "warning" for r in rows)
     n_info = len(rows) - n_errors - n_warnings
     return (f"  diagnostics under {deliverable}: {_count(n_warnings, 'warning')}, "
-            f"{_count(n_errors, 'error')}, {n_info} info")
+            f"{_count(n_errors, 'error')}, {n_info} info{by_caller}")
 
 
-def _diagnostic_parts(diagnostics: list[Diagnostic], deliverable: str | None = None
+def _diagnostic_parts(diagnostics: list[Diagnostic], deliverable: str | None = None,
+                      levels: dict[str, str] | None = None
                       ) -> tuple[str, list[tuple[DiagnosticRow, str | None]], str | None]:
     """The diagnostics section as its header, its printed rows each with its
     one-line form (``None`` for a row printed in full), and the reading rule
@@ -1650,7 +1711,7 @@ def _diagnostic_parts(diagnostics: list[Diagnostic], deliverable: str | None = N
     a pair that is a warning under the deliverable is never cut to make room
     for stronger pairs that are ``info`` for it.
     """
-    stored = diagnostic_view(diagnostics, deliverable)
+    stored = diagnostic_view(diagnostics, deliverable, levels)
     if not stored:
         return "  diagnostics: none", [], None
     rows = []
@@ -1658,7 +1719,7 @@ def _diagnostic_parts(diagnostics: list[Diagnostic], deliverable: str | None = N
         pool = [r for r in stored if r.full is full]
         found = [r.diagnostic for r in pool]
         capped = _cap_high_correlation(found)
-        rows += pool if capped is found else diagnostic_view(capped, deliverable)
+        rows += pool if capped is found else diagnostic_view(capped, deliverable, levels)
     # the cap's own row says how many it left out, which its code alone does not
     printed = [(r, None if r.full or r.diagnostic.code in _OMITTED_CODES
                 else _one_line(r, deliverable)) for r in rows]
@@ -1667,7 +1728,8 @@ def _diagnostic_parts(diagnostics: list[Diagnostic], deliverable: str | None = N
 
 
 def _diagnostic_lines(diagnostics: list[Diagnostic], deliverable: str | None = None,
-                      *, notebook: bool = False) -> list[str]:
+                      *, notebook: bool = False,
+                      levels: dict[str, str] | None = None) -> list[str]:
     """Section 2a: the first stop condition, as :func:`diagnostic_view` prints it.
 
     Present even at zero (WP-1302's acceptance: the stop-condition lines are
@@ -1679,10 +1741,14 @@ def _diagnostic_lines(diagnostics: list[Diagnostic], deliverable: str | None = N
     each row means while ``print`` stays one line a row (WP-2039, WP-2037).
     """
     from .._display import diagnostic_lines, short_lines, wrapped_note
-    header, printed, rule = _diagnostic_parts(diagnostics, deliverable)
+    header, printed, rule = _diagnostic_parts(diagnostics, deliverable, levels)
     lines = [header]
     for row, short in printed:
-        lines += (diagnostic_lines(row.diagnostic, "    ", notebook=notebook)
+        # a full row prints the level the view gave it, which the caller's
+        # map can have moved off the one the package raised
+        d = (row.diagnostic if row.level == row.diagnostic.level
+             else row.diagnostic.model_copy(update={"level": row.level}))
+        lines += (diagnostic_lines(d, "    ", notebook=notebook)
                   if short is None else
                   short_lines(row.diagnostic, short, "    ", notebook=notebook))
     if rule:
@@ -2049,9 +2115,30 @@ class RefinementResult(Base):
         counted the day it is written, with nothing here to edit.  ``False``
         means do not read the values; ``True`` is not a pass — the warnings
         still name what each number may not be quoted as (class docstring).
+
+        It reads nothing but the result, so a stored result answers the same
+        on every machine, and the package's own readers (the structure
+        solver's trial cost) never depend on a caller's preferences.  A caller
+        who treats a code as blocking asks :meth:`usable_under` instead.
         """
         return (self.status == "converged"
                 and not any(d.level == "error" for d in self.diagnostics))
+
+    def usable_under(self, levels: dict[str, str]) -> bool:
+        """:attr:`usable` with the caller's per-code override applied
+        (WP-2037 clause 4): ``levels`` maps a code to ``"allow"``, ``"warn"``
+        or ``"deny"``, as ``summary(levels=…)`` takes it, and a code the
+        caller denies makes the fit unusable to them.  The override never
+        lowers an error, so ``usable_under`` is never ``True`` where
+        :attr:`usable` is ``False``.  An unknown code or word is refused.
+
+        A method rather than a setting the property reads (ruled 2026-10-24):
+        :attr:`usable` stays a function of the stored result alone, and the
+        map is the caller's to keep, beside the code that applies it.
+        """
+        return (self.status == "converged"
+                and not any(row.level == "error"
+                            for row in diagnostic_view(self.diagnostics, None, levels)))
 
     # -- numpy views -------------------------------------------------------
     def sig(self) -> np.ndarray:
@@ -2221,14 +2308,38 @@ class RefinementResult(Base):
         is what a caller holding only the result — the return value of
         ``fit()``, or one read back from a project — can print without it.
         """
-        return "\n".join(self._text_lines())
+        return self.summary()
 
-    def _text_lines(self, notebook: bool = False) -> list[str]:
+    def summary(self, *, deliverable: str | None = None,
+                levels: dict[str, str] | None = None) -> str:
+        """``str(result)`` with its diagnostics read under ``deliverable``
+        (WP-2037): the errors and the warnings for that purpose in full, the
+        rest one line each, as :func:`diagnostic_view` gives them.  So the
+        reading rule ``str(result)`` closes on can be followed by a caller
+        holding only the result.  ``levels`` is the caller's per-code
+        override, ``{code: "allow" | "warn" | "deny"}``
+        (:func:`diagnostic_view`).
+
+        It filters the diagnostics and adds nothing else: the rows that decide
+        a purpose need the compiled model, and a closing line names
+        :meth:`rietx.refine.Refinement.summary`, which prints them.  An
+        unknown deliverable, code or level is refused.
+        """
+        if deliverable is not None:
+            _check_deliverable(deliverable)
+        _check_levels(levels)
+        return "\n".join(self._text_lines(deliverable=deliverable, levels=levels))
+
+    def _text_lines(self, notebook: bool = False, deliverable: str | None = None,
+                    levels: dict[str, str] | None = None) -> list[str]:
         """The termination view's lines; ``notebook`` adds each diagnostic's
         explanation (:func:`_diagnostic_lines`)."""
         lines = [f"RefinementResult: {self.status} ({self.mode})"]
         lines += _stage_lines(self.stages, self.statistics.max_shift_over_esd)
-        lines += _diagnostic_lines(self.diagnostics, notebook=notebook)
+        lines += _diagnostic_lines(self.diagnostics, deliverable, notebook=notebook,
+                                   levels=levels)
+        if deliverable is not None:
+            lines.append(f"    {RESULT_DELIVERABLE_NOTE}")
         lines += _parametric_lines(self.parametric, self.parametric_form,
                                    self.parametric_form_joint)
         lines.append(_provenance_line(self.provenance))

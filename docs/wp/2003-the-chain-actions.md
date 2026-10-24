@@ -3,7 +3,7 @@
 Milestone: generality · Status: ⬜
 Track: The audits
 Depends on: 2002, 2037
-Priority: P2 2026-10-23 — 2002 closed (its last item, the width twin hold, reaches no chain action); the seam the maintainer's own example (a series discontinuity) lives in; waits on 2037, whose clause 1 sets the shape its first demotion takes
+Priority: P2 2026-10-24 — 2037 closed, so its clause 1 and the response column this WP's first demotion takes are in place; the maintainer's next after 2037; the seam the maintainer's own example (a series discontinuity) lives in
 
 ## Goal
 
@@ -86,6 +86,7 @@ the bar.
 
 ### Inherited
 
+- **From WP-2037 (2026-10-24, second session, PR #1145): what this WP waited on has landed, and one cost of the quiet view is yours.** The demotion shape and the response column were part 1's; part 2 adds `summary(levels=…)` on `SeriesResult` too, `rx.diagnostics_summary(results)` (a batch's firing rate per code, warnings per result per purpose, the Pareto), and `tests/silence.py`, where a code given `response="warning"` must add a fire/silent pair. The cost: with no deliverable a `SEQUENTIAL_PERSISTENT_FINDING` row prints as one line, `SEQUENTIAL_PERSISTENT_FINDING: warning under every purpose`, which no longer says *which* per-pattern code persisted (tutorial 05, cells 19 and 34; the code is in the message). A wrapper code's one-line form is this WP's to shape when it tiers the code. WP-2037 stays open only for its registered agent round (session `agent-round-2037`, branch `agent-round-quiet-view`), which reaches no chain action.
 - **From WP-2037 (2026-10-24, first session): the seat and the view this WP's demotion lands in exist.** `rietx.help.RESULT_FIELD_HELP` describes every field of `RefinementResult`, `StageResult`, `SeriesEntry` and `SeriesResult` keyed `Type.field`, crossed both ways against `model_fields` by `tests/test_help.py::test_every_result_field_has_an_entry`, so adding `SeriesResult.steps` fails until its entry is written, and `rietx.help.explain("SeriesResult.steps")` then answers it. Every code row in `rietx._audit` now carries `response`/`responds`/`scope` or sits on the shrink-only `RESPONSE_BASELINE`, so a code this WP adds enters with a response (its level at every raise site, one level only). `schemas.results.level_under` and `diagnostic_view` decide what a summary prints in full; `SeriesResult.summary(deliverable="series")` prints its rows under `series`, which follows every path (`rietx.purposes`). Clause 1's 2026-10-18 reversal is written into `generality.md` § Demotion.
 - **From WP-2037 (2026-10-23, at filing): a demoted verdict becomes a field, not an `info` row that fires on every run.** The maintainer adopted 2037's clause 1 that day, reversing § Demotion's 2026-10-18 shape, so the discontinuity demotion in Context lands as `SeriesResult.steps` (every step in esds, largest first) with its explanation in `rietx.help` keyed to the field and one line in the trajectory block, and emits no diagnostic (`2037-attention/examples.md` § 5 is the mock-up). The `info`-record task in Tasks follows that shape once 2037 lands; 2037's response column and silence fixture apply to every code this WP keeps.
 

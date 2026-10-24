@@ -71,7 +71,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 #: projections land (``license_placement``, ``include_execution``, both
 #: marker-declared).  Episode fixtures unchanged, landing states re-measured
 #: 2026-08-19; contract + prompts changed, so no 2.2 cell pools with 2.1
-PROTOCOL_VERSION = "2.2"
+#: 2.3 (WP-2037 Decision 3): the condition axis is the package build — two
+#: non-editable installs, each workspace carrying its build's skill — and
+#: cells launch as ``claude -p`` (``launch.py``) rather than Workflow
+#: agents, so user-level skills stay out.  Prompt, contract, episodes and
+#: scorer unchanged; a 2.3 cell pools with no earlier python cell, the
+#: launch route and the skill both having moved
+PROTOCOL_VERSION = "2.3"
 
 #: shim-enforced hard stop on refinement calls per episode — a runaway guard
 #: (tests/CLAUDE.md), never a timer; the prompt advertises 6

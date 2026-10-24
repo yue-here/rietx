@@ -116,13 +116,13 @@ result = ref.fit(data, plan=<span class="s">"mccusker_structural"</span>, two_th
   diagnostics: 3 rows, 0 errors; no deliverable given,
     so none is printed in full
     <span class="w">FLOOR_HIT</span> at phases.0.extinction:
-      warning under qpa, structure
+      warning under qpa, structure, magnetic
     <span class="w">RESOLUTION_UNCONSTRAINED</span> at instrument.profile.u,
       .v, .w: warning under microstructure, calibration
     <span class="w">PATTERN_UNDERSAMPLED</span>: warning under qpa,
-      structure, microstructure, calibration
-    pass deliverable= for the rows that decide your
-      purpose; every row is in result.diagnostics
+      structure, microstructure, calibration, magnetic
+    pass deliverable= to summary() for the rows that
+      decide your purpose; every row is in result.diagnostics
   …
   Rwp 0.0898 / Rexp 0.0559 (GoF 1.60), Rp 0.0699,
   χ² 2.6, DW 1.02</pre></div>

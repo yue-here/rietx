@@ -46,7 +46,7 @@ print(result)
 # %% [markdown]
 # Three warnings came back, one line each.
 # A warning matters for some uses of a fit and not others, so each line ends with the [purposes](https://rietx.org/docs/stable/reference/result.html#printing-a-result) it is a warning under.
-# `structure` is the atoms, `qpa` the phase fractions, `microstructure` the crystallite size and strain, and `calibration` an instrument calibrated on a standard.
+# `structure` is the atoms, `qpa` the phase fractions, `microstructure` the crystallite size and strain, `calibration` an instrument calibrated on a standard, and `magnetic` a magnetic structure's moments.
 #
 # - [`FLOOR_HIT`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#floor-hit): the extinction coefficient ended on its floor of 0, so this specimen shows no extinction to measure.
 # - [`RESOLUTION_UNCONSTRAINED`](https://rietx.org/docs/stable/reference/diagnostics-refinement.html#resolution-unconstrained): the peaks are mostly Lorentzian, so do not quote the Gaussian widths U, V and W.

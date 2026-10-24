@@ -506,7 +506,8 @@ def test_a_notebook_prints_the_views_rows_and_says_what_each_means():
     from rietx._display import NOTEBOOK_WIDTH
     lines = _notebook_text(result).splitlines()
     error = lines.index("    error[BOUND_HIT]: a ran to its bound")
-    short = lines.index("    FLOOR_HIT at phases.0.extinction: warning under qpa, structure")
+    short = lines.index("    FLOOR_HIT at phases.0.extinction: warning under qpa, structure, "
+                        "magnetic")
     assert error < short and lines[short + 1].startswith("      means: ")
     assert any(line.startswith("      means: ") for line in lines[error:short])
     assert "ext refined" not in "\n".join(lines), "a short row's message is in result.diagnostics"

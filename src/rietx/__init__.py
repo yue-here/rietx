@@ -73,6 +73,7 @@ from .project import Project
 from .refine import _VERSION as __version__
 from .refine import NoPhasesError, Refinement, estimate_mu_r, refine, replay
 from .report import FitReport, RegionAttribution, SuggestedAction, build_report
+from .report.batch import DiagnosticsSummary, diagnostics_summary
 from .schemas import (
     AnisoU,
     Atom,
@@ -143,6 +144,7 @@ __all__ = [
     "CellCandidate",
     "CoordinateTable",
     "DataRef",
+    "DiagnosticsSummary",
     "FitReport",
     "FractionProfile",
     "FractionProfilePoint",
@@ -211,6 +213,7 @@ __all__ = [
     "build_report",
     "capabilities",
     "diagnose",
+    "diagnostics_summary",
     "format_su",
     "help_for",
     "help_key_for",

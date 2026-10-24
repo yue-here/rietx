@@ -204,6 +204,26 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 #: A technique's own index, ``api-<name>.md``: its title, the load
 #: condition the body's routing row names, and its sections, as above.
 TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ...]]] = {
+    "batch": (
+        "The batch index",
+        "Load it when you hold many results fitted as separate jobs and want "
+        "their diagnostics read as one table rather than one fit at a time.",
+        (
+            (
+                "Diagnostics over a batch",
+                "`rx.diagnostics_summary(results)` counts a batch's "
+                "diagnostics: each code's count of results fired on, the "
+                "warning rows a result carries per purpose, and the codes "
+                "ranked by their share of the warnings. Every level is taken "
+                "from the view `summary()` prints, so `deliverable=` and "
+                "`levels=` mean what they mean there. A code that fires on "
+                "most of a batch is a statement about the model or plan the "
+                "batch shares (`references/batch.md`, 9c.18).",
+                ("rx.diagnostics_summary", "rx.DiagnosticsSummary",
+                 "rietx.report.batch.CodeTally", "rietx.report.batch.ParetoRow"),
+            ),
+        ),
+    ),
     "figure": (
         "The figure index",
         "Load it when you want a picture of a structure: a refined model to "

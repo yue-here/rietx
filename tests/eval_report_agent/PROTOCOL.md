@@ -1,7 +1,10 @@
 # Runner protocol — agent-in-the-loop FitReport eval
 
-**Protocol version: 2.2** (`build_fixtures.PROTOCOL_VERSION`; stamped into
-every condition marker and quoted by every run record).  **2.2 registered
+**Protocol version: 2.3** (`build_fixtures.PROTOCOL_VERSION`; stamped into
+every condition marker and quoted by every run record).  **2.3 registered
+2026-10-24, before any 2.3 run** (WP-2037 Decision 3; § The 2.3 quiet-view
+round — the condition is the package build, python arm only, cells launched
+by `launch.py`).  **2.2 registered
 2026-08-19, before any 2.2 run** (WP-1107; § The 2.2 placement round —
 answer contract v3, two shim projections, and the wording revisions; every
 episode fixture and decision band below stands).  **2.1 registered
@@ -22,6 +25,237 @@ per-stage `trajectory`, split delivery from instruction on the condition
 axis, and added the real pair R1/R2 — 30 runs, invalidated as a delivery
 measurement by its own truth rows (§ Episode validity) but productive of
 every mechanism 2.0 is registered against.
+
+## The 2.3 quiet-view round (WP-2037) — registered 2026-10-24, before any 2.3 run
+
+**The question.**  WP-2037 changes what `print(result)` shows when no
+deliverable is declared.  Errors print in full.  Every other diagnostic
+prints as one line naming the purposes it is a warning under, and the block
+closes on "pass deliverable= to summary() for the rows that decide your
+purpose; every row is in result.diagnostics".  The maintainer's Decision 3
+(2026-10-23) lands this quiet default now, with this round as its tripwire:
+a worse result reverts the quiet default and keeps the ordering.  The worry
+it answers is WP-2037's own judge's: agents stopped on a criterion the
+package states seven times in eight, and the quiet view no longer prints
+each row's help.  The round asks whether that collapses.
+
+**A smoke check, and named as one.**  Four cells an arm can catch a
+collapse and nothing finer.  The record says eight runs cannot tell 7 of 8
+from 5 of 8 (Fisher p = 0.57, `docs/milestones/generality.md` § A contested
+demotion).  At four an arm the only split Fisher's test separates at
+p < 0.05 is 4 of 4 against 0 of 4 (p = 0.029); 4 against 1 is p = 0.14.
+
+### The two arms — the install is the condition
+
+Python arm only.  Each arm is rietx built **non-editable** from a commit
+archive into its own venv outside the repo
+(`uv venv --python cpython-3.12-macos-aarch64-none`; CPython 3.12.10,
+arm64, the compiled tier available in both).  Both builds report
+`1.10.0.dev0`, so the version string does not name the arm.
+
+- **`a` — before**: `664c8b8bb`, main's first parent of PR #1142's merge.
+  `print(result)` prints every diagnostic with its `help:` line under a
+  "N unresolved" header.
+- **`b` — after**: `4bfde33d7` on `wp2037-attention-part2` (#1142 plus
+  part 2's first five commits).  The quiet view above, and
+  `summary(deliverable=…)` prints that purpose's rows in full.
+
+*Why not `5d64a86`*, the commit the commissioning session named as "main
+just before #1142": it is where WP-2037's part-1 branch forked.  Main then
+took 28 more commits before #1142 merged onto `664c8b8bb`, among them
+WP-2039's rewrite of the text views (`_display.py` +231 lines,
+`schemas/results.py`).  Against `5d64a86` the print would differ by WP-2039
+as well as by WP-2037.  `664c8b8bb..99b00b82e` is exactly #1142.
+
+**What differs that an agent reads**, measured at build:
+
+- *The print.*  At each episode's default-plan landing state the two builds
+  give the same status, Rwp and diagnostics: N1 Rwp 0.10080 with 2 rows, C1
+  0.09169 with 4, W1 0.14010 with 1, W2 0.23899 with 4, all converged.  No
+  episode lands with an error-level row, so at a default landing the after
+  view prints no row in full.  The report block of `ref.summary()` is
+  identical in both: the identifiability clause with its ≥ 10 % band, the
+  regions, the `next:` line.  Only the diagnostics block differs.
+- *The skill.*  Each workspace carries its own build's `docs/skill/rietx`,
+  since the skill ships in the wheel beside the code it describes
+  (`python_arm.write_workspaces(skill_src=)`, new in 2.3).  SKILL.md §4
+  opens "`print(result)` shows per-stage status, the diagnostics …  Act on
+  each `d.suggestion`" in `a` and "Declare your purpose with
+  `ref.summary(deliverable=…)`; act on each warning it prints in full" in
+  `b`.  `b`'s §4b table gains Cell, Calibration and Magnetic rows, and five
+  sentences are cut (the Le Bail stop note, rule 6's `lab_calibrate`
+  clause, the `resolution_limited` sentence, §6's abstention link, the
+  provenance parenthetical).  `references/api.md`'s two `summary()`
+  signatures gain `levels=`; `batch.md` 9c.18 names
+  `rx.diagnostics_summary`; `references/api-batch.md` is new.
+- *Nothing else.*  `episode.json` and the truth records are byte-identical
+  across arms.  `prompt.md` differs in one character, the venv directory's
+  letter.  Workspaces are `~/rietx-agent-rounds/r-2026-10-24/{a,b}/RUNS/
+  python__sonnet/<eid>`, so a path names the arm by letter only.  The truth
+  tree waits in a scratch directory away from every workspace until
+  scoring.
+
+### Launch — `launch.py`, new in 2.3
+
+Earlier rounds ran cells as Workflow `agent()` calls, which inherit the
+launching session's user-level skills; this machine has a user-level
+`rietx` skill.  2.3 runs each cell as
+
+    claude -p "<RUNNER>" --model sonnet --effort medium --session-id <uuid>
+        --permission-mode bypassPermissions --setting-sources project,local
+        --output-format stream-json --verbose --max-budget-usd 15
+
+in its workspace, under a rebuilt environment (`HOME`, `USER`, `LOGNAME`,
+`SHELL`, `LANG`, `PATH`; an inherited `OLDPWD` would name the checkout).
+`RUNNER` is `launch.RUNNER`, identical in every cell but the path: "Your
+working directory is {workspace}. Read prompt.md there and carry out the
+episode it describes. Work only inside that directory: read nothing outside
+it."  The $15 is a runaway guard; a cell that hits it is invalid.  A
+one-word Haiku call through the launcher, in an empty scratch directory with
+no fit (6 s, $0.002 at list price), checked the route before registration:
+`apiKeySource` none (the subscription), and an init event listing no
+user-level skill.
+
+**The matrix**: {a, b} × {N1, C1, W1, W2} × sonnet, N = 1, effort `medium`.
+**Eight cells, approved by the maintainer 2026-10-24**; any rerun or extra
+cell needs a new approval.  Two waves of four, each wave holding both arms
+of two episodes so a pair runs under the same machine load: N1 and C1, then
+W1 and W2.  Expected answers unchanged from their 2.0 registrations: N1
+`ambiguous` + {extend_range_or_calibrate}; C1 `converged` +
+displacement within {abs: 0.005} of −0.0790 + {none}; W1
+`impurity_suspected` + {add_phase}; W2 `assumption_wrong` +
+{fix_instrument_model}.  Re-measured 2026-10-24 on main `6fe7a5bbb`
+(`[dev]` venv, darwin/arm64): `test_landing_states.py`'s six N1/C1/W1/W2
+rows pass in 19.5 s; N1's rivals tie at χ² 4.0929 against 4.0618 (ratio
+1.0077, band [0.99, 1.01]); C1's decide at 4.1049 against 3.5463 (1.1575 ≥
+1.10), the swap recovering displacement −0.0790; W1's CaF₂ moves χ² 28.22 →
+12.41 (2.2744); W2's doublet moves it 7.122 → 2.670 (2.6676) and empties
+the Kα2 positions, 30 unmatched → 0.
+
+### Read-outs, fixed in advance
+
+- **(1) The stopping criterion the agent states** — the R11 taxonomy of
+  `tests/eval_agent_surface/PROTOCOL.md`, the read-out behind the v1.3
+  figure.  It is read from the **closing text**: the last assistant message
+  plus `answer.json`'s `summary` and `caveats`.  The closing text falls in
+  exactly one of six classes: *a criterion the package states* / *an
+  agreement index alone* / *an external comparison* / *a script exiting* /
+  *an instruction* / *none* (ended waiting).  The first class means the
+  closing text gives, as a reason the verdict holds or the work stops,
+  something the package printed or ships: a diagnostic code or its
+  message, a report statement (the identifiability clause or its ≥ 10 %
+  band, an exchange row, unmatched peaks, a suggested action), a skill row
+  (§4b, §10, a numbered rule), or a field's verdict (`exchangeable`,
+  `separable`, `at_bound`).  Rwp or GoF alone is the second class, and so
+  is the solver's `converged` beside them; a certificate or literature
+  value is the third.  A closing text giving several reasons takes the
+  first class if any reason is in it.  **Classified blind to arm**: a fresh Sonnet
+  subagent gets the eight closing texts under shuffled ids, with arm letters
+  and venv paths removed, and this rubric verbatim.  Its class is the
+  read-out; my own reading is reported beside it wherever the two differ.
+- **(2) The verdict grade** — `scorer.py`'s `passed` (verdict ∧ tolerance
+  where registered ∧ next_action ∈ the set), with `overclaimed` and
+  `underclaimed` beside it.
+- **(3) Mined from each transcript**, over the agent's own tool inputs (the
+  *probed* surface): (i) it passed `deliverable=` to any call; (ii) it
+  called `summary(deliverable=…)`; (iii) it read `result.diagnostics`
+  (`.diagnostics` in its code); and (iv) which view came back in a tool
+  result: `b`'s closing sentence, or `a`'s "unresolved" header.  (iv) is
+  descriptive.  An agent that never prints a result never sees either view,
+  and that is part of what the arm measures.
+
+**The baseline beside them**: v1.3's round 1.1 (WP-1307, 2026-08-29), where
+seven of eight runs stopped on a §4b deliverable row and none of the 86-run
+campaign's did (`docs/milestones/generality.md` near its lines 262-275 and
+545; `docs/milestones/v1.3.md`).  It is another harness, other episodes (an
+in-situ ramp, a four-phase reel), other models (sonnet, opus-5) and a
+narrower criterion (a §4b row), so it gives the scale the rates are read
+against and is never the control.  The control is arm `a`.
+
+### "Worse", as a number
+
+Over the valid episode pairs, **arm `b` is worse if its count on (1)
+stated-criterion stops, or on (2) passes, is at least 2 below arm `a`'s.**
+A difference of 1 reverts nothing.  The rates behind the choice, binomial
+with four cells an arm: if both arms share a true stop rate of 7/8 the stop
+read-out fires by chance with probability 0.05, and at 5/8 or 1/2 with
+0.14; a collapse from 7/8 to 1/8 fires it with probability 0.93, and a drop
+from 7/8 to 5/8 only 0.33, which is the finer difference this round cannot
+see.  Two read-outs each able to fire make the round's chance false alarm
+up to about one in four at mid rates; that is the price of catching a
+collapse at N = 4, and a reverted default is cheap to restore on a second
+measurement.  Fewer than three valid pairs make the round inconclusive:
+recorded as such, nothing reverts, and a rerun is the maintainer's call.
+
+### Audit, and what invalidates a cell
+
+- **The condition reached the cell**, checked per transcript: the init
+  event lists no user-level skill; every python process that imports rietx
+  runs the arm's own venv; no Skill call loads a `rietx` skill.  A failure
+  invalidates the cell.
+- **Forbidden reads**, as § The python-capable arm: any path outside the
+  workspace and the arm's own venv (the other arm's venv or workspaces, the
+  repo, the truth tree, the round's record), and the network.  A violation
+  invalidates the cell.
+- **The cap**: a ninth fit-bearing script run invalidates the cell, counted
+  by hand from the Bash calls with `usage_row.fit_bearing_runs` as the
+  pointer.
+- A cell that ends without `answer.json`, or on the budget guard, scores
+  failed on (2) and is classified on (1) like any other.
+- No mid-round change.  A defect found mid-round is recorded post-hoc and
+  fixed for a successor.
+
+**Recorded per cell**: model ID as the init event reports it, wall seconds,
+turns, and tokens (input, output, cache read, cache write) with the
+list-price cost off the `result` event.  The record (streams, transcripts,
+scorecards, mined rows) lives outside the repo at
+`~/rietx-agent-rounds/r-2026-10-24-record/{a,b}/`.  The result is reported
+to WP-2037's session, which records it in its WP.
+
+### After the run, recorded post-hoc (2026-10-24)
+
+All eight cells ran on `claude-sonnet-5-5`, registration `5d8796917` first.
+**Outcome**: (1) stated-criterion stops, `a` 4 of 4 and `b` 4 of 4, the
+blind classifier and my reading agreeing on every cell (a/W1 and b/W2 at
+medium confidence, each giving the unmatched-peak list or a code beside an
+Rwp drop); (2) passes, `a` 3 of 4 and `b` 4 of 4.  Neither read-out falls
+by 2, so the registered "worse" is not met.  a/N1 failed by overclaiming
+`converged` on the tie: its zero-against-displacement test held both at
+zero (the plan overrode its holds, `HOLD_BLOCKED_PLAN`), and it then applied
+the 1.10 band to zero shift against sample transparency (1.145) with the
+certified cell held.  Eight cells spent 4.56 M tokens, 4.14 M of them cache
+reads, $2.25 at list price.  The per-cell table is the record's
+`cells.json`; WP-2037 holds the reading.
+
+Defects found during the run.  None touched what a cell saw:
+
+- **A session can end twice.**  `claude -p` wakes the agent when a
+  background task it started ends after its answer.  b/N1 and b/W2 each took
+  one more turn to acknowledge a killed command, outputs written before the
+  wake and unchanged.  Tokens are summed over both `result` events, and the
+  closing text holds both final messages.
+- **The session transcript repeats rows.**  Claude Code 2.1.310 writes
+  `api-request-blob` rows repeating each assistant message as sent, so the
+  miner counted those tool calls twice (a/C1: 21 for 11).  The record keeps
+  the raw file as `launches/<eid>/session.jsonl` and mines a copy without
+  them; `launch.py` now writes both.
+- **`launch.json`'s wall clock was wrong** for a cell collected after a
+  slower one.  The `result` events' `duration_ms` is the figure quoted, and
+  `launch.py` no longer writes the field.
+- **Every cell opened with `cat > /tmp/x`**, an empty file outside the
+  workspace, which stalled on stdin until it was backgrounded at 120 s.
+  b/W1 also wrote its first inspection script to `/tmp/x.py` and ran it; the
+  script reads only the workspace's `episode.json`.  By the rule's purpose
+  (no information from outside the workspace) all eight cells are valid.  By
+  its letter b/W1 is not, the W1 pair drops, and the three pairs left give
+  stops 3 against 3 and passes 2 against 3: the same answer.
+- **The maintainer's user-level CLAUDE.md reaches a cell** under
+  `--setting-sources project,local` (WP-1504's amendment; not re-measured
+  here), constant across arms.  The closing prose reads in its style.  Whether it also
+  prompted the `/tmp` file is not measured.  A successor wanting it out
+  needs a separate configuration directory.
+- Thinking text in the transcripts is 0-408 characters a cell, so `voiced`
+  is a floor.
 
 ## The 2.1 targeted round (WP-1065) — registered 2026-08-13, before any 2.1 run
 

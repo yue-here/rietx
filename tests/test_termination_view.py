@@ -232,6 +232,44 @@ def test_summary_refuses_a_plan_beside_a_report():
         ref.summary(plan=rx.RefinementPlan.mccusker_default(), report=report)
 
 
+def test_summary_leaves_the_result_as_it_found_it(tmp_path):
+    """The evidence behind the ``Refinement.summary`` seat's answer-invariant
+    rows in ``rietx._audit``: every option of the view reads a finished fit
+    and moves nothing in it.  The one field it writes is the report's
+    declared cross-document write, ``Statistics.identifiability_clause``
+    (WP-1108), a sentence and no fitted number."""
+    def answer(res):
+        return res.model_dump(mode="json", exclude={"statistics": {"identifiability_clause"}})
+
+    ref, result = _fit()
+    before = answer(result)
+    # any code will do for the override; the fit need raise no warning
+    first = next((d.code for d in result.diagnostics), "FLOOR_HIT")
+    ref.summary(deliverable="qpa", plot=str(tmp_path / "fit.png"),
+                plan=rx.RefinementPlan.mccusker_default(), levels={first: "deny"})
+    ref.summary(report=ref.report())
+    assert answer(ref.result_) == before
+
+
+def test_summary_levels_denies_a_warning_and_says_who_set_it():
+    """WP-2037 clause 4: a caller's ``deny`` prints a warning in full as an
+    error, and the header says the caller set it."""
+    ref, result = _fit()
+    warned = [d.code for d in result.diagnostics if d.level == "warning"]
+    assert warned, "the fixture fit must raise a warning for deny to act on"
+    first = warned[0]
+    text = ref.summary(levels={first: "deny"})
+    assert f"error[{first}]" in text
+    assert "1 set by levels=" in text
+
+
+def test_summary_levels_refuses_an_unknown_code_before_building_the_report(monkeypatch):
+    ref, _result = _fit()
+    monkeypatch.setattr(ref, "report", lambda **_: pytest.fail("the report was built"))
+    with pytest.raises(ValueError, match="unknown diagnostic code"):
+        ref.summary(levels={"FLOOR_HITT": "allow"})
+
+
 def test_summary_protocol_names_the_plan_and_held_reasons():
     ref, _result = _fit()
     text = ref.summary()

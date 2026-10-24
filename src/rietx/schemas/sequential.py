@@ -1194,7 +1194,8 @@ class SeriesResult(Base):
 
     def summary(self, *, max_entries: int = 5,
                 deliverable: str | None = None,
-                parametric: RefinementResult | None = None) -> str:
+                parametric: RefinementResult | None = None,
+                levels: dict[str, str] | None = None) -> str:
         """The series termination view (WP-1302): the trajectory table, the
         ``SEQUENTIAL_*`` rows, first and last ``max_entries`` with the count.
 
@@ -1222,6 +1223,10 @@ class SeriesResult(Base):
         curve they describe, and the deliverable's functional-form row reads
         them.  A chain has no coefficients of its own, so without one that
         row says the form was not measured.
+
+        ``levels`` is the caller's per-code override,
+        ``{code: "allow" | "warn" | "deny"}`` (WP-2037 clause 4,
+        :func:`~rietx.schemas.results.diagnostic_view`).
         """
         n = len(self.entries)
         lines = [f"SeriesResult: {n} pattern(s), {self.mode}, "
@@ -1232,7 +1237,8 @@ class SeriesResult(Base):
         # A series has one deliverable of its own; any other is refused below,
         # by _deliverable_lines, naming where it is decided
         lines += _diagnostic_lines(self.diagnostics,
-                                   "series" if deliverable == "series" else None)
+                                   "series" if deliverable == "series" else None,
+                                   levels=levels)
         lines.append(f"  trajectory ({self.x_label}):")
         shown = (list(range(n)) if n <= 2 * max_entries else
                 [*range(max_entries), None, *range(n - max_entries, n)])

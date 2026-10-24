@@ -153,6 +153,7 @@ from .schemas.results import (
     StageResult,
     _agreement_line,
     _check_deliverable,
+    _check_levels,
     _diagnostic_lines,
     _provenance_line,
     _stage_lines,
@@ -5917,7 +5918,8 @@ class Refinement:
 
     def summary(self, *, deliverable: str | None = None, plot: str | None = None,
                plan: RefinementPlan | str | None = None,
-               report: FitReport | None = None) -> str:
+               report: FitReport | None = None,
+               levels: dict[str, str] | None = None) -> str:
         """The termination view (WP-1302): "done, or not, and why" from one call.
 
         ``report`` takes the :class:`~rietx.report.schemas.FitReport` this
@@ -5952,6 +5954,13 @@ class Refinement:
         purposes it is a warning under.  An unknown one is refused before
         anything is built.
 
+        ``levels`` is the caller's per-code override,
+        ``{code: "allow" | "warn" | "deny"}`` (WP-2037 clause 4,
+        :func:`~rietx.schemas.results.diagnostic_view`): the caller's word
+        replaces the audited level, and never lowers an error.  Its default,
+        ``None``, overrides nothing.  An unknown code or word is refused before
+        anything is built, as an unknown deliverable is.
+
         ``plot`` writes :func:`~rietx.viz.plots.plot_for_vlm` to that path and
         names it on the last line — the picture confirms the text, the text
         stays the criterion.  Without it, the line names the call instead.
@@ -5965,6 +5974,7 @@ class Refinement:
         if deliverable is not None:
             # refused before the report is built, the expensive half of this call
             _check_deliverable(deliverable)
+        _check_levels(levels)
         result = self.result_
         if report is not None and plan is not None:
             raise ValueError(
@@ -5975,7 +5985,7 @@ class Refinement:
 
         lines = [f"Refinement.summary: {result.status} ({result.mode})"]
         lines += _stage_lines(result.stages, result.statistics.max_shift_over_esd)
-        lines += _diagnostic_lines(result.diagnostics, deliverable)
+        lines += _diagnostic_lines(result.diagnostics, deliverable, levels=levels)
         lines += self._report_stop_condition_lines(report)
         lines.append(self._next_parameter_line())
         if deliverable is not None:

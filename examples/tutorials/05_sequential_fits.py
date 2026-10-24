@@ -334,7 +334,8 @@ series_broken
 
 # %% [markdown]
 # [`SEQUENTIAL_RWP_OUTLIER`](https://rietx.org/docs/stable/reference/diagnostics-series.html#sequential-rwp-outlier) names the 700 K pattern.
-# Every attempt left its Rwp far above the fence, the limit the series sets from the patterns accepted before it.
+# The row's message is in `series_broken.diagnostics`.
+# It says every attempt left its Rwp far above the fence, the limit the series sets from the patterns accepted before it.
 # The series kept the best attempt and moved on.
 # Read that pattern's own diagnostics.
 

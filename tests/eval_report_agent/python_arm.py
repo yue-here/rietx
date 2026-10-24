@@ -184,11 +184,16 @@ def render_prompt(eid: str, *, python: str,
 
 
 def write_workspaces(workspace_dir: Path, truth_dir: Path, *, python: str,
-                     only: list[str] | None = None) -> list[Path]:
+                     only: list[str] | None = None,
+                     skill_src: Path | None = None) -> list[Path]:
     """Write python-arm workspaces + the truth tree; returns the dirs.
 
     The truth records are byte-identical to the JSON arms' — one truth tree
     serves the whole round, whichever arm built it last.
+
+    ``skill_src`` is the skill tree to copy, this checkout's by default.  A
+    round whose arms are two builds of the package (2.3) passes each build's
+    own tree, since the skill ships in the wheel beside the code it describes.
     """
     if _inside_repo(workspace_dir):
         raise ValueError(
@@ -197,7 +202,10 @@ def write_workspaces(workspace_dir: Path, truth_dir: Path, *, python: str,
             "(PROTOCOL.md 2.0 § The python-capable arm)")
     wanted = tuple(only or bf.EPISODE_IDS)
     episodes = bf.assemble_episodes(wanted)
-    skill_src = REPO_ROOT / "docs" / "skill" / "rietx"
+    if skill_src is None:
+        skill_src = REPO_ROOT / "docs" / "skill" / "rietx"
+    if not (skill_src / "SKILL.md").is_file():
+        raise ValueError(f"{skill_src} holds no SKILL.md; not a skill tree")
     workspace_dir.mkdir(parents=True, exist_ok=True)
     truth_dir.mkdir(parents=True, exist_ok=True)
     written = []
@@ -235,10 +243,14 @@ def main(argv: list[str] | None = None) -> None:
                              "on every use")
     parser.add_argument("--only", nargs="*", choices=bf.EPISODE_IDS,
                         help="subset of episodes (default: all nine)")
+    parser.add_argument("--skill", type=Path, default=None,
+                        help="the skill tree to copy into each workspace "
+                             "(default: this checkout's docs/skill/rietx)")
     args = parser.parse_args(argv)
     python = ensure_venv(args.venv)
     written = write_workspaces(args.workspace, args.truth,
-                               python=str(python), only=args.only)
+                               python=str(python), only=args.only,
+                               skill_src=args.skill)
     for wdir in written:
         print(wdir)
 

@@ -118,10 +118,21 @@ PURPOSES: dict[str, Purpose] = {
              "against them."),
     ),
     "magnetic": Purpose(
-        depends=("phases.*.atoms.*.moment.*", "phases.*.magnetic_lor_*", "phases.*.scale"),
+        depends=("phases.*.atoms.*.moment.*", "phases.*.magnetic_lor_*", "phases.*.scale",
+                 "phases.*.atoms.*.x", "phases.*.atoms.*.y", "phases.*.atoms.*.z",
+                 "phases.*.atoms.*.dof.*", "phases.*.atoms.*.occ",
+                 "phases.*.atoms.*.biso", "phases.*.atoms.*.u*",
+                 "phases.*.atoms.*.adp.*",
+                 "phases.*.extinction", "phases.*.preferred_orientation.*",
+                 "phases.*.texture.*", "instrument.background.*", "instrument.polarization",
+                 "instrument.geometry.surface_roughness.*"),
         why=("A moment is measured against the nuclear intensity through the phase scale "
-             "the two share (Halpern & Johnson 1939, Phys. Rev. 55, 898), and the magnetic "
-             "coherence length is a width term of its own (WP-1343)."),
+             "the two share (Halpern & Johnson 1939, Phys. Rev. 55, 898), so every term "
+             "that sets the nuclear intensity the scale is read from moves it, as under "
+             "qpa: the coordinates and occupancies through |F|², and the displacement "
+             "parameters, extinction, texture, the angle-dependent intensity factors and "
+             "the background, which trade against the scale; the magnetic coherence length "
+             "is a width term of its own (WP-1343)."),
     ),
 }
 

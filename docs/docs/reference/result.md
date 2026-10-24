@@ -335,7 +335,14 @@ Past each cap a `HIGH_CORRELATION_OMITTED` or `FLAT_DIRECTION_OMITTED` row gives
 `print(result)`, which is `str(result)`, is the view a bare `RefinementResult` can answer on its own.
 It shows each stage's status, the last stage's convergence number (max|Δθ|/esd), every diagnostic, the provenance, and the agreement indices last.
 It is given no deliverable, so an error prints in full and every other diagnostic on one line, its code, its paths and the purposes it is a warning under.
-It needs no compiled model, so it works on a result read back from a project or handed across a process boundary.
+`RefinementResult.summary(deliverable="qpa")` prints the same view with the diagnostics read under that purpose: the errors and the warnings for it in full, the rest one line each.
+It adds nothing else, and its last diagnostic line names `Refinement.summary`, which prints the rows that decide the purpose.
+Both need no compiled model, so they work on a result read back from a project or handed across a process boundary.
+Every `summary()` also takes `levels=`, a map from a code to `"allow"`, `"warn"` or `"deny"`.
+The caller's word replaces the audited level under every purpose, so an expert can quiet a code and a pipeline can print one as an error.
+It never lowers a diagnostic raised as an error, and the diagnostics header counts the rows it set.
+`RefinementResult.usable_under({"PATTERN_UNDERSAMPLED": "deny"})` is `usable` under the same map, so a pipeline can treat a code as blocking.
+`usable` itself reads nothing but the stored result, so it answers the same on every machine.
 It stays under 80 lines on a five-stage fit.
 [A first fit in Python](../start/first-fit.md) shows one.
 
@@ -428,6 +435,55 @@ The other three purposes are refused there by name, and `Refinement.summary(deli
 ```python
 print(series.summary(deliverable="series"))
 ```
+
+## Diagnostics over a batch
+
+A batch of fits is read as counts rather than row by row.
+`diagnostics_summary(results)` takes a list of `RefinementResult`s and returns a `DiagnosticsSummary`.
+Every level it counts comes from the view `summary()` prints.
+So a count never disagrees with a printed row.
+`deliverable=` and `levels=` mean what they mean to `summary()`.
+An unknown deliverable, code or level word is refused the same way, even on an empty list.
+
+| Field | Is |
+|---|---|
+| `DiagnosticsSummary.n_results` | the number of results in the batch |
+| `DiagnosticsSummary.deliverable` | the deliverable the counts were taken under, or `None` |
+| `DiagnosticsSummary.levels` | the caller's `levels=` map, empty when none was given |
+| `DiagnosticsSummary.codes` | one `CodeTally` per code that fired, most results first |
+| `DiagnosticsSummary.warnings_per_result` | the mean number of warning rows a result carries, keyed by purpose |
+| `DiagnosticsSummary.pareto` | one `ParetoRow` per code with a warning row, largest share first |
+
+A `CodeTally` counts one code, named by `CodeTally.code`.
+`CodeTally.n_results` is the number of results it fired on.
+`CodeTally.rate` is that number over the batch.
+`CodeTally.n_rows` counts all its rows.
+`CodeTally.n_error`, `CodeTally.n_warning` and `CodeTally.n_info` split those rows by level.
+Under a deliverable, a row's level is its level for that purpose.
+Without one, a row's level is the level it was raised at.
+
+`DiagnosticsSummary.pareto` is the "bad actor" ranking of alarm management (ISA-18.2).
+`ParetoRow.code` names the code.
+`ParetoRow.n_warning` counts its warning rows.
+`ParetoRow.share` is that count over every warning row in the batch.
+`ParetoRow.cumulative` adds the shares down the ranking, so the last row reads 1.0.
+A code that fired only as `info` or `error` is in `codes` and not in `pareto`.
+
+Without a deliverable, `warnings_per_result` has a key for every purpose except `"series"`.
+Each value is counted under that purpose.
+With a deliverable, it has that key alone.
+An empty list gives `n_results` 0 and empty tallies:
+
+<!-- api-doc: no-exec — needs a batch of completed fits -->
+```python
+summary = rx.diagnostics_summary(results, deliverable="qpa")
+print(summary)
+```
+
+`print(summary)` shows the Pareto table.
+Each row gives the code, the results it fired on, its warning rows and the cumulative share.
+The counts decide nothing.
+A code that fires on most of a batch says something the fits share, such as the model or the plan.
 
 ## Objects in a notebook or a terminal
 

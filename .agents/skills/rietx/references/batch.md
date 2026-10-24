@@ -136,7 +136,10 @@ effect is conditional rather than graded.)*
 **9c.18 Read a code that fires on every fit as a statement about the model,
 and reduce the volume before reading it at all.** Per-pattern diagnostics do
 not scale and are not meant to: on 275 patterns `BOUND_HIT` fired **1289
-times, 4.7 per pattern**, and `BACKGROUND_ABSORPTION` **841**. A code with no
+times, 4.7 per pattern**, and `BACKGROUND_ABSORPTION` **841**.
+`rx.diagnostics_summary(results)` is that rollup in one call: each code's count
+of fits fired on, and the codes ranked by their share of the warnings
+(signatures: [`api-batch.md`](api-batch.md)). A code with no
 per-pattern variation carries no per-pattern information —
 `PHASE_UNCONSTRAINED` on a fifth phase fired **275/275** and a
 species-fallback code **36/36** — and the finding is one level up: a single

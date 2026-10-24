@@ -78,7 +78,8 @@ print(result)
 without the model that produced it. It lists each stage's status, every
 diagnostic and the provenance, with the agreement indices last. An error prints
 in full and every other diagnostic on one line, naming the purposes it is a
-warning under, because a bare result is given no deliverable.
+warning under, because `print` passes no deliverable.
+`result.summary(deliverable="qpa")` takes one.
 
 ```text
 RefinementResult: converged (rietveld)
@@ -87,7 +88,7 @@ RefinementResult: converged (rietveld)
   stage closing: converged (4 evals, ftol=solver default), max|Δθ|/esd=0.000
   diagnostics: 1 row, 0 errors; no deliverable given, so none is printed in full
     CAPILLARY_OFFSET_UNAVAILABLE at instrument.geometry.goniometer_radius_mm: info
-    pass deliverable= for the rows that decide your purpose; every row is in result.diagnostics
+    pass deliverable= to summary() for the rows that decide your purpose; every row is in result.diagnostics
   provenance: rietx ..., backend=numpy, solver=lm
   Rwp 0.1337 / Rexp 0.0357 (GoF 3.75), Rp 0.0723, χ² 14.0, DW 0.11
 ```
