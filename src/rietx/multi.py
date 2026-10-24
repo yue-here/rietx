@@ -63,6 +63,7 @@ from .params.parametric import (
 )
 from .params.vector import is_variable_path
 from .refine import (
+    _DISPLACEMENT_PATH,
     _PHASE_PREFIX,
     _VERSION,
     _WAVELENGTH_PINNED_BY_HELD_HISTOGRAM,
@@ -117,6 +118,7 @@ from .refine import (
     _uncorrected,
     _unknown_path_diagnostics,
     _utcnow,
+    _vars_driven_cell_escapes,
     _wavelength_calibration_diagnostics,
     _width_census_diagnostics,
     _width_twin_flats,
@@ -259,7 +261,8 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                      "one structure, asked of it as declared, before any stage"),
     "_occupancy_flag_diagnostics": (
         (SPECIMEN,), "an occupancy is the one structure's, so a refined value "
-                     "past a full site is told once, read off histogram 0"),
+                     "past a full site is told once, a per-histogram one in "
+                     "each histogram that holds it (WP-2028, _occupancy_once)"),
     "_origin_diagnostics": (
         (SPECIMEN,), "each histogram's table derives the same floating-origin "
                      "hold from its copy of the one structure (WP-1912); asked "
@@ -278,7 +281,13 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (FIT,), "a stage's budget is spent by the one joint solve"),
     "_phase_support_diagnostics": (
         (FIT,), "a phase is unseen only when every histogram misses it, so the "
-                "statement is joint"),
+                "statement is joint; a phase held in some patterns only is "
+                "_per_pattern_hold_diagnostics' (WP-2028)"),
+    "_per_pattern_hold_diagnostics": (
+        (FIT,), "joint-only (WP-2028): the answer's support hold kept a "
+                "phase's hist.h structure in the patterns that cannot see "
+                "it; one finding per phase, naming every such pattern, read "
+                "off StageResult.held"),
     "_scale_b_ridge_diagnostics": (
         (FIT,), "the probe stacks every histogram, since a phase's scales are "
                 "per histogram and its displacement parameters shared (WP-1534)"),
@@ -354,13 +363,18 @@ GUARD_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                       "about that pattern — the neutron case McCusker exempts "
                       "is one histogram, not the fit"),
     "nonpositive_adps": (
-        (SPECIMEN,), "one structure, one set of tensors"),
+        (SPECIMEN,), "the structure's tensors, asked of every histogram's "
+                     "table, since a U can be per histogram (WP-1325): one "
+                     "finding per site, a per-histogram site named hist.h "
+                     "(WP-2028, _specimen_once)"),
     "large_biso": (
-        (SPECIMEN,), "the Lindemann bound is the cell's; asked once, of "
-                     "histogram 0's compile (every histogram's gives the same)"),
+        (SPECIMEN,), "the Lindemann bound is the cell's, and a B or a cell "
+                     "can be per histogram: asked of every histogram's "
+                     "compile, one finding per path (WP-2028)"),
     "negative_biso": (
-        (SPECIMEN,), "one structure's B values, asked once, of histogram 0's "
-                     "compile"),
+        (SPECIMEN,), "the structure's B values, asked of every histogram's "
+                     "compile, one finding per path, a per-histogram B named "
+                     "hist.h (WP-2028)"),
     "nonpositive_strain": (
         (SPECIMEN,), "one coefficient set, but each histogram measures its own "
                      "directions: a phase is named once, from the first "
@@ -923,6 +937,43 @@ def _reset_cell_runaway_multi(mtable, start_values: list[dict[str, float]]
     return list(seen.values())
 
 
+def _vars_driven_cell_escapes_multi(mtable, start_values: list[dict[str, float]]
+                                    ) -> list[tuple[str, list[str]]]:
+    """:func:`~rietx.refine._vars_driven_cell_escapes` for the joint runner
+    (WP-2028): a cell a free ``vars.`` column drives outside its window,
+    named and never reset, for that function's reasons.
+
+    :func:`_reset_cell_runaway_multi` reads free cell columns, so a cell that
+    is a dependent of a ``vars.`` coefficient (a WP-1325 parametric target,
+    set per pattern through ``hist.h.`` rows) walks past it unseen.  Each
+    histogram's table is asked with its own start values, and a dependent is
+    spelled as the joint result spells it (bare if shared, ``hist.h.``
+    otherwise).  A coefficient is one shared column, so a driver is one row
+    however many histograms it reaches, its dependents merged.
+    """
+    merged: dict[str, list[str]] = {}
+    for h, table in enumerate(mtable.tables):
+        for driver, escaped in _vars_driven_cell_escapes(table, start_values[h]):
+            row = merged.setdefault(mtable._canonical(h, driver), [])
+            for dependent in escaped:
+                scoped = mtable._canonical(h, dependent)
+                if scoped not in row:
+                    row.append(scoped)
+    return list(merged.items())
+
+
+def _merge_unresolved(first: list[tuple[str, list[str]]],
+                      second: list[tuple[str, list[str]]]
+                      ) -> list[tuple[str, list[str]]]:
+    """Two solves' driven escapes as one record, merged by driver, so a
+    driver still escaping after both is named once (``refine._run_stage``'s
+    rule)."""
+    merged = dict(first)
+    for driver, escaped in second:
+        merged[driver] = sorted(set(merged.get(driver, [])) | set(escaped))
+    return list(merged.items())
+
+
 def _refuse_centroid_origin(structure: Structure) -> None:
     """A joint fit refuses ``Phase.floating_origin = "centroid"`` (WP-1912).
 
@@ -1469,6 +1520,10 @@ class MultiHistogramRefinement:
                 # stage found it before the answer is measured below, and is held
                 # for the second solve with the collapse's paths (WP-2002, B8).
                 cell_runaway = _reset_cell_runaway_multi(self.mtable, start_values)
+                # a cell a free coefficient drives is invisible to the reset
+                # above by construction — named, never put back (WP-2028)
+                unresolved = _vars_driven_cell_escapes_multi(self.mtable,
+                                                             start_values)
                 if cell_runaway:
                     self.mtable._rebuild_columns()
                     outcome = dataclasses.replace(outcome, theta=self.mtable.x0())
@@ -1553,6 +1608,9 @@ class MultiHistogramRefinement:
                         cell_reset = cell_reset + put_back
                         freed = [p for p in freed if p not in put_back]
                         second = dataclasses.replace(second, theta=self.mtable.x0())
+                    unresolved = _merge_unresolved(
+                        unresolved,
+                        _vars_driven_cell_escapes_multi(self.mtable, start_values))
                     outcome = dataclasses.replace(
                         second, cost_initial=outcome.cost_initial,
                         n_iterations=outcome.n_iterations + second.n_iterations,
@@ -1564,7 +1622,7 @@ class MultiHistogramRefinement:
                                                   + second.n_degenerate_cell_probes),
                         n_lapack_fallbacks=(outcome.n_lapack_fallbacks
                                             + second.n_lapack_fallbacks))
-                runaway_diag = _cell_runaway_diagnostic(cell_runaway)
+                runaway_diag = _cell_runaway_diagnostic(cell_runaway, unresolved)
                 answer_runaway = [] if runaway_diag is None else [runaway_diag]
                 if runaway_diag is not None:
                     cell_runaway_diags.append(runaway_diag)
@@ -1961,16 +2019,18 @@ class MultiHistogramRefinement:
             self.mtable.structures[0], stage_results,
             basis="with everything else held, in the histogram that shows it best",
             decided=False, sigma=support_sigma)
+        # the patterns where the support hold kept a phase's per-pattern
+        # structure, which PHASE_UNCONSTRAINED's joint statement cannot name
+        # (WP-2028): a record of the hold, read off the answer's stage
+        diagnostics = diagnostics + _per_pattern_hold_diagnostics(
+            stage_results, mt, self.mtable.structures[0])
         # a phase whose scales and B no histogram's range can separate, and
         # what its fraction is conditional on (WP-1534)
         diagnostics = diagnostics + _scale_b_ridge_diagnostics(
             models, per_values, self.mtable.structures[0], stage_results)
-        # a refined occupancy past a full site (WP-2002, SPECIMEN): read off
-        # histogram 0, as the microstructure block below is, since an
-        # occupancy is the one structure's
-        diagnostics = diagnostics + _occupancy_flag_diagnostics(
-            per_values[0], set(mt.tables[0].moving_paths), mt.structures[0],
-            esd_hist0)
+        # a refined occupancy past a full site (WP-2002, SPECIMEN): asked of
+        # every histogram, since an occupancy can be per histogram (WP-2028)
+        diagnostics = diagnostics + _occupancy_once(mt, per_values, per_esds)
 
         weight_note = ("unit (each point's esd governs)"
                        if all(w == 1.0 for w in weights)
@@ -1990,6 +2050,9 @@ class MultiHistogramRefinement:
             two_theta=histograms[0].two_theta, y_obs=histograms[0].y_obs,
             y_calc=histograms[0].y_calc, y_background=histograms[0].y_background,
             sigma=histograms[0].sigma, ticks=histograms[0].ticks,
+            # the ticks' labels beside them, so the mirror names its
+            # reflections (WP-2028; WP-1986 found them dropped)
+            tick_hkl=histograms[0].tick_hkl,
             qpa=histograms[0].qpa,
             # WP-1131: one block per phase, read off **histogram 0** — the
             # reference wavelength, whose value scale is exactly 1.0, so its
@@ -2082,7 +2145,7 @@ class MultiHistogramRefinement:
         # diagonal esd is the true combined marginal — cross-terms with the
         # other histograms' columns do not enter a single path's variance).
         for e in mt.tables[0].entries:
-            if mt.sharing.is_shared(e.path) and (e.vary or e.tie is not None):
+            if _row_shared(mt, e) and (e.vary or e.tie is not None):
                 sd = None if e.path in withheld[0] else esd0.get(e.path)
                 # the single fit's rule (``refine._uncorrected``, WP-2002 B4):
                 # the joint solve's own factor, read off its weighted residual
@@ -2097,7 +2160,7 @@ class MultiHistogramRefinement:
                                          corr[np.ix_(cm, cm)] if corr is not None else None)
                    if stderr is not None else {})
             for e in table.entries:
-                if not mt.sharing.is_shared(e.path) and (e.vary or e.tie is not None):
+                if not _row_shared(mt, e) and (e.vary or e.tie is not None):
                     row = f"hist.{h}.{e.path}"
                     sd = None if e.path in withheld[h] else esd.get(e.path)
                     params.append(RefinedParameter(
@@ -2112,11 +2175,14 @@ class MultiHistogramRefinement:
         mt = self.mtable
         free = mt.free_paths
         report = GuardReport(background_correlations=bg_scoped)
-        # the shared structure is the same object across histograms → check once
-        report.nonpositive_adps = check_adp_positive_definite(mt.tables[0])
-        # the specimen's two model-reading guards (GUARD_SCOPES: SPECIMEN)
-        report.large_biso = check_biso_plausible(mt.tables[0], models[0])
-        report.negative_biso = check_biso_negative(mt.tables[0], models[0])
+        # the specimen's three table-reading guards (GUARD_SCOPES: SPECIMEN),
+        # asked of every histogram, since a structural path can be per
+        # histogram (WP-1325): one finding per path, a per-histogram one
+        # named with its histogram (WP-2028)
+        report.nonpositive_adps = _specimen_once(
+            mt, models, lambda t, _m: check_adp_positive_definite(t))
+        report.large_biso = _specimen_once(mt, models, check_biso_plausible)
+        report.negative_biso = _specimen_once(mt, models, check_biso_negative)
         report.nonpositive_strain = _stephens_once(mt, models)
         report.nonpositive_texture = _texture_once(mt, models)
         if outcome.correlation is not None and len(free) > 1:
@@ -2142,6 +2208,101 @@ class MultiHistogramRefinement:
                     raise
         report.at_bounds = at_bounds
         return _guard_diagnostics(report) + _size_sharing_diagnostics(mt)
+
+
+def _row_shared(mtable, entry) -> bool:
+    """Whether a table entry is one column of the joint fit, or a row per
+    histogram.
+
+    An entry is shared when its own path is, and a **tied** one also needs
+    every source of its tie shared: ``u11`` of an anisotropic site is a
+    follower of the site's ``adp.k`` columns, so under
+    ``per_histogram=["phases.*.atoms.*.adp.*"]`` it is each histogram's own
+    although no glob names it (WP-2028).
+    """
+    share = mtable.sharing.is_shared
+    if not share(entry.path):
+        return False
+    return entry.tie is None or all(share(src) for src, _ in entry.tie.terms)
+
+
+#: the entries that move an ADP site: the free columns, and the U^ij rows
+#: they drive
+_ADP_LEAVES = tuple(f"adp.{k}" for k in range(6)) + (
+    "u11", "u22", "u33", "u12", "u13", "u23")
+
+
+def _specimen_path(mtable, h: int, path: str) -> str:
+    """``path`` as the joint result spells it in histogram ``h``.
+
+    A shared path is bare and a per-histogram one ``hist.h.``-scoped
+    (:meth:`~rietx.params.multi.MultiParameterTable._canonical`).  An ADP
+    finding names its site (``phases.0.atoms.1``), which is no table entry:
+    the site is the histogram's own when **any** entry that moves it is
+    (``adp.k`` is the column a joint fit frees, ``u11`` only its follower).
+    """
+    if _ADP_SITE.fullmatch(path):
+        shared = all(mtable.sharing.is_shared(f"{path}.{leaf}")
+                     for leaf in _ADP_LEAVES)
+    else:
+        shared = mtable.sharing.is_shared(path)
+    return path if shared else f"hist.{h}.{path}"
+
+
+#: an ADP finding's subject: a site, not an entry
+_ADP_SITE = re.compile(r"phases\.\d+\.atoms\.\d+")
+
+
+def _specimen_once(mtable, models, check) -> list[GuardFinding]:
+    """A specimen guard asked of every histogram's table and model (WP-2028).
+
+    Before WP-2028 ``_top_diagnostics`` asked histogram 0 alone, on the
+    reason "every histogram's gives the same".  That held while the
+    structure was one object.  Since WP-1325 a path can be per histogram
+    (``SharingMap.per_histogram``, a parametric target), and a bad value in
+    another histogram's copy fired nothing.  :func:`_stephens_once`'s shape:
+    each histogram is asked, and a finding is kept once per path as the
+    joint result spells it, so a shared path is one finding named bare and a
+    per-histogram path one finding per histogram that holds the value, named
+    ``hist.h.…``.  A histogram's finding keeps its own number; for a shared
+    path the first histogram's is kept, which every table holds the same.
+    """
+    seen: dict[tuple[str, ...], GuardFinding] = {}
+    for h, (table, model) in enumerate(zip(mtable.tables, models, strict=True)):
+        for finding in check(table, model):
+            paths = tuple(_specimen_path(mtable, h, p) for p in finding.paths)
+            if paths != finding.paths:
+                message = finding.message
+                for bare, scoped in zip(finding.paths, paths, strict=True):
+                    message = message.replace(bare, scoped, 1)
+                finding = dataclasses.replace(finding, paths=paths,
+                                              message=message)
+            seen.setdefault(paths, finding)
+    return list(seen.values())
+
+
+def _occupancy_once(mtable, per_values, per_esds) -> list[Diagnostic]:
+    """``OCCUPANCY_ABOVE_ONE`` for the joint fit, asked of every histogram.
+
+    :func:`_specimen_once`'s shape (WP-2028).  An occupancy can be per
+    histogram (``SharingMap.per_histogram``), and histogram 0's copy says
+    nothing of histogram 1's.  A shared occupancy is one finding named bare,
+    a per-histogram one a finding per histogram that holds a value above 1,
+    named ``hist.h.…`` with its own value and esd.
+    """
+    seen: dict[str, Diagnostic] = {}
+    for h, table in enumerate(mtable.tables):
+        for d in _occupancy_flag_diagnostics(
+                per_values[h], set(table.moving_paths), mtable.structures[h],
+                per_esds[h] if per_esds else {}):
+            (path,) = d.where
+            scoped = _specimen_path(mtable, h, path)
+            if scoped != path:
+                d = d.model_copy(update={
+                    "where": [scoped],
+                    "message": f"{d.message} (histogram {h})"})
+            seen.setdefault(scoped, d)
+    return list(seen.values())
 
 
 def _stephens_once(mtable, models) -> list[GuardFinding]:
@@ -2346,6 +2507,71 @@ def _parametric_unseen_diagnostics(mtable, unseen: dict[str, frozenset[int]]
             suggestion=("Quote the equation's coefficients. Narrow the subset to "
                         "the patterns that see the phase if the equation should "
                         "hold only where it is measured.")))
+    return out
+
+
+def _per_pattern_hold_diagnostics(stage_results: list[StageResult], mtable,
+                                  structure: Structure) -> list[Diagnostic]:
+    """``PHASE_HELD_IN_PATTERNS`` — a phase's per-pattern structure held in
+    some patterns at the answer (WP-2028).
+
+    A record of what the fit did, never a verdict.  The answer-producing
+    stage's support hold (``StageResult.held``) holds a ``hist.h.`` copy of a
+    phase's structure wherever pattern h cannot see the phase
+    (:func:`_unseen`, WP-1325).  ``PHASE_UNCONSTRAINED`` names only a phase
+    no histogram sees, so before this nothing said "held in 12 of 33
+    patterns".  One finding per phase: ``where`` is the held rows, ``value``
+    the number of patterns.  A shared path held is the joint statement's,
+    ``PHASE_UNCONSTRAINED``; a parametric target is ``vars.``-driven and its
+    blind patterns are ``PARAMETRIC_TARGET_UNSEEN``'s, so neither is repeated
+    here, and a phase held in *every* pattern is ``PHASE_UNCONSTRAINED``'s
+    (a one-histogram joint fit is that case).  The scale-B ridge's displacement hold and the flat-moment hold
+    are their own codes' (``SCALE_B_INSEPARABLE``, the moment record) and
+    are left out.
+    """
+    if not stage_results:
+        return []
+    last = stage_results[-1]
+    ridge = set(last.scale_b_held or ())
+    targets = {f"hist.{k}.{r.target}" for r in mtable.parametric
+               for k in r.patterns}
+    by_phase: dict[int, dict[int, list[str]]] = {}
+    for path in last.held:
+        h = mtable._owner(path)
+        if h is None or path in targets:
+            continue
+        bare = _unscoped(path)
+        m = _PHASE_PREFIX.match(bare)
+        if m is None or bare.endswith(".scale") or ".moment." in bare:
+            continue
+        ip = int(m.group(1))
+        # ``refine._DISPLACEMENT_PATH`` is the one spelling of the columns the
+        # ridge hold takes: ``adp.k`` is the free column of an anisotropic site
+        if ip in ridge and _DISPLACEMENT_PATH.match(bare):
+            continue
+        by_phase.setdefault(ip, {}).setdefault(h, []).append(path)
+    n = mtable.n_histograms
+    out: list[Diagnostic] = []
+    for ip in sorted(by_phase):
+        patterns = sorted(by_phase[ip])
+        if len(patterns) == n:
+            # held in every pattern is a phase no pattern sees, which is
+            # ``PHASE_UNCONSTRAINED``'s statement and not repeated here
+            continue
+        where = [p for h in patterns for p in by_phase[ip][h]]
+        name = (structure.phases[ip].name if ip < len(structure.phases)
+                else f"phase {ip}")
+        shown = ", ".join(str(h) for h in patterns[:10])
+        more = f" and {len(patterns) - 10} more" if len(patterns) > 10 else ""
+        out.append(Diagnostic(
+            level="info", code="PHASE_HELD_IN_PATTERNS",
+            where=where, value=float(len(patterns)),
+            message=(f"Phase {ip} ({name}) was held in {len(patterns)} of {n} "
+                     f"patterns ({'histogram' if len(patterns) == 1 else 'histograms'} "
+                     f"{shown}{more}) by stage {last.name!r}: those patterns "
+                     f"cannot see it, so their own copies of its structure "
+                     f"({len(where)} row{'' if len(where) == 1 else 's'}) keep "
+                     f"the values the stage started from and carry no esd.")))
     return out
 
 

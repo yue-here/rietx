@@ -196,6 +196,7 @@
   "diagnostics:PEAK_UNRESOLVED_SPLIT",
   "diagnostics:PEAK_WIDTH_CAPPED",
   "diagnostics:PEAK_WIDTH_LAW_MISMATCH",
+  "diagnostics:PHASE_HELD_IN_PATTERNS",
   "diagnostics:PHASE_UNCONSTRAINED",
   "diagnostics:QPA_ESD_UNAVAILABLE",
   "diagnostics:QPA_FRACTION_RANGE",

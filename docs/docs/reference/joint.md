@@ -248,7 +248,9 @@ Its curves, statistics, ticks, phase quantities and diagnostics move to the top 
 The view's `parameters` keep the shared rows and that pattern's own rows.
 Its own rows lose their `hist.<h>.` prefix, so they are spelled as a single fit spells them.
 Every other pattern's rows are dropped.
-The view carries no `tick_hkl` and no `phase_agreement`, so read those on the `HistogramResult`.
+The view carries that pattern's `tick_hkl` and `phase_agreement`, and the joint result's own `tick_hkl` mirrors pattern 0's beside its `ticks`.
+The view's `diagnostics` are that pattern's own, followed by the top-level findings a reader of that pattern needs, each once.
+These are a finding whose `where` names one of its `hist.<h>.` rows, a `STAGE_FREED_NOTHING` whose `value` is its index, and the fit-wide `SCALE_B_INSEPARABLE`, `PARAMETRIC_OUT_OF_RANGE`, `PARAMETRIC_FORM_REJECTED` and `STAGE_PATH_UNKNOWN`.
 `RefinementResult.statistics` carries the joint solve's `Statistics.max_shift_over_esd`, one shift per column of the joint parameter vector against its esd, and every view carries the same figure.
 On the two LaB6 patterns a converged fit reads between 5 × 10⁻⁷ and 2.2 × 10⁻³ across both solvers, and a stage starved to one iteration reads 4.0 under LM and 17.9 under TRF.
 
@@ -260,6 +262,13 @@ A finding about the shared structure, the joint solve or the plan goes once on `
 So a mixed X-ray and neutron fit whose X-ray source declines anomalous dispersion raises `DISPERSION_NEGLECTED` on the X-ray pattern only.
 The same holds for `SPECIES_FALLBACK_NEUTRAL`, and `NEUTRON_RESONANT_ABSORBER` goes on the neutron pattern only.
 `STAGE_MAX_ITER` and `SPACE_GROUP_SETTING_ASSUMED` appear at the top level, once each.
+
+A structural path can belong to one pattern (`SharingMap(per_histogram=...)`, or a parametric target).
+So the structure's guards, `ADP_NOT_POSITIVE_DEFINITE`, `BISO_NEGATIVE`, `BISO_UNUSUALLY_LARGE` and `OCCUPANCY_ABOVE_ONE`, read every pattern's values.
+A shared path is named once, bare, and a per-pattern one by its `hist.<h>.` path in each pattern that holds the value.
+`CELL_RUNAWAY` names a cell that a free `vars.` coefficient drives out of its window, with the coefficient, as a single fit does.
+`PHASE_HELD_IN_PATTERNS` (info) names a phase whose per-pattern structure the last stage held in the patterns that cannot see it, with their count.
+`PHASE_UNCONSTRAINED` names a phase that no pattern sees, and `PHASE_HELD_IN_PATTERNS` is not raised for a phase held in every pattern.
 
 `BACKGROUND_ABSORPTION` is the one finding on both lists.
 It is raised on its pattern's list and repeated once on `RefinementResult.diagnostics`, where it keeps its `hist.<h>.` path.

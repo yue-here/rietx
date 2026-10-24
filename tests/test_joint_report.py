@@ -447,3 +447,300 @@ def test_a_per_histogram_row_is_reported_on_its_own_histogram(two_patterns):
     bare = _one_stage(two_patterns, ["phases.0.cell.b"], sharing=sharing)
     assert sorted(d.where[0] for d in _codes(bare, "STAGE_PATH_NOT_FREE")) == [
         "hist.0.phases.0.cell.b", "hist.1.phases.0.cell.b"]
+
+
+# ------------------------------------------------------------ WP-2028 -----
+# A joint fit's guards and findings read every histogram.  Each test below
+# was run on main 12f459e5 first and failed there; the controls pass on both.
+
+def _biso_fit(patterns, b0, b1, *, per_histogram=True):
+    """A one-stage joint fit with La's B set to ``b0`` in histogram 0's start
+    and ``b1`` in histogram 1's, per histogram unless ``per_histogram`` is
+    off (then both must agree).  B is never freed, so the value the guard
+    reads is the one set here."""
+    structure, instruments = perturbed_inputs()
+    other = structure.model_copy(deep=True)
+    structure.phases[0].atoms[0].biso.value = b0
+    other.phases[0].atoms[0].biso.value = b1
+    sharing = (SharingMap(per_histogram=["phases.0.atoms.*.biso"])
+               if per_histogram else None)
+    ref = MultiHistogramRefinement([structure, other], instruments,
+                                   sharing=sharing)
+    return ref.fit(patterns, plan=RefinementPlan(stages=[
+        Stage("only", ["phases.*.scale", "instrument.background.*"],
+              max_iter=5)]))
+
+
+@pytest.mark.parametrize("b0, b1, code, where", [
+    # the WP's test: the bad value in histogram 1 alone
+    (0.5, -0.5, "BISO_NEGATIVE", ["hist.1.phases.0.atoms.0.biso"]),
+    (0.5, 60.0, "BISO_UNUSUALLY_LARGE", ["hist.1.phases.0.atoms.0.biso"]),
+    # the positive arm: histogram 0 alone, which main already read
+    (-0.5, 0.5, "BISO_NEGATIVE", ["hist.0.phases.0.atoms.0.biso"]),
+    # both: one finding per path, so two here
+    (-0.5, -0.4, "BISO_NEGATIVE", ["hist.0.phases.0.atoms.0.biso",
+                                   "hist.1.phases.0.atoms.0.biso"]),
+], ids=["negative-in-1", "large-in-1", "negative-in-0", "negative-in-both"])
+def test_a_specimen_guard_fires_on_the_histogram_that_holds_the_value(
+        two_patterns, b0, b1, code, where):
+    result = _biso_fit(two_patterns, b0, b1)
+    assert sorted(p for d in _codes(result, code) for p in d.where) == where
+    for d in _codes(result, code):
+        assert d.where[0] in d.message
+
+
+def test_a_shared_biso_is_named_once_and_a_clean_pair_names_nothing(two_patterns):
+    shared = _biso_fit(two_patterns, -0.5, -0.5, per_histogram=False)
+    (found,) = _codes(shared, "BISO_NEGATIVE")
+    assert found.where == ["phases.0.atoms.0.biso"]
+    clean = _biso_fit(two_patterns, 0.5, 0.5)
+    assert not _codes(clean, "BISO_NEGATIVE")
+    assert not _codes(clean, "BISO_UNUSUALLY_LARGE")
+
+
+def test_a_joint_cell_driven_out_of_its_window_names_its_coefficient(
+        two_patterns, monkeypatch):
+    """The joint twin of ``refine._vars_driven_cell_escapes`` (review of #385
+    finding 1).  A parametric cell is a dependent of its ``vars.`` columns,
+    so the joint reset, which reads free cell columns, cannot see it walk.
+    The walk is forced here: the solve's answer is moved 30 % along
+    ``vars.a_0`` before the stage commits it, outside the ±15 % window."""
+    import dataclasses
+
+    import numpy as np
+
+    from rietx import multi
+    from rietx.schemas.parametric import CoordinateTable, ParametricEquation
+
+    real = multi.run_multi_least_squares
+    calls = []
+
+    def walked(models, mtable, **kw):
+        out = real(models, mtable, **kw)
+        calls.append(kw.get("stage"))
+        if len(calls) > 1:      # the first solve walks, nothing after it
+            return out
+        theta = np.array(out.theta, dtype=float)
+        theta[mtable.free_paths.index("vars.a_0")] *= 1.3
+        return dataclasses.replace(out, theta=theta)
+
+    monkeypatch.setattr(multi, "run_multi_least_squares", walked)
+    structure, instruments = perturbed_inputs()
+    ref = MultiHistogramRefinement(
+        structure, instruments,
+        coordinates=CoordinateTable(columns={"T": [300.0, 500.0]},
+                                    units={"T": "K"}),
+        parametric=[ParametricEquation(name="a", target="phases.0.cell.a",
+                                       basis="polynomial", terms=[[], ["T"]])])
+    result = ref.fit(two_patterns, plan=RefinementPlan(stages=[
+        Stage("only", ["phases.*.scale", "vars.*"], max_iter=3)]))
+    (found,) = _codes(result, "CELL_RUNAWAY")
+    assert "vars.a_0" in found.where
+    assert {"hist.0.phases.0.cell.a", "hist.1.phases.0.cell.a"} <= set(found.where)
+    assert "vars.a_0 drives" in found.message
+    assert "not put back" in found.message
+
+
+def test_a_joint_cell_inside_its_window_names_nothing(two_patterns):
+    """The control: the same parametric fit, unwalked."""
+    from rietx.schemas.parametric import CoordinateTable, ParametricEquation
+
+    structure, instruments = perturbed_inputs()
+    ref = MultiHistogramRefinement(
+        structure, instruments,
+        coordinates=CoordinateTable(columns={"T": [300.0, 500.0]},
+                                    units={"T": "K"}),
+        parametric=[ParametricEquation(name="a", target="phases.0.cell.a",
+                                       basis="polynomial", terms=[[], ["T"]])])
+    result = ref.fit(two_patterns, plan=RefinementPlan(stages=[
+        Stage("only", ["phases.*.scale", "vars.*"], max_iter=3)]))
+    assert not _codes(result, "CELL_RUNAWAY")
+
+
+def _vanished_phase_fit():
+    """test_held_phase's series shape: pattern 0 lacks the second phase,
+    pattern 1 has it, every phase path per histogram."""
+    import rietx as rx
+    from tests.test_held_phase import _absent_phase_inputs, _pattern_with_both_phases
+    from tests.test_held_phase import synthesize as one_phase
+
+    blind, ins = _absent_phase_inputs()
+    seen = blind.model_copy(deep=True)
+    seen.phases[1].scale.value = blind.phases[0].scale.value
+    ref = rx.MultiHistogramRefinement(
+        [blind, seen], [ins, ins.model_copy(deep=True)],
+        sharing=SharingMap(per_histogram=["phases.*"]))
+    result = ref.fit([one_phase(), _pattern_with_both_phases()],
+                     plan=rx.RefinementPlan(stages=[
+                         rx.Stage("scale_bkg", ["phases.*.scale",
+                                                "instrument.background.*"]),
+                         rx.Stage("cell", ["phases.*.cell.*"])]))
+    return ref, result
+
+
+@pytest.fixture(scope="module")
+def vanished_phase_fit():
+    return _vanished_phase_fit()
+
+
+def test_a_hold_made_in_some_patterns_is_named_with_its_count(vanished_phase_fit):
+    _, result = vanished_phase_fit
+    assert result.stages[-1].held == ["hist.0.phases.1.cell.a"]
+    (found,) = _codes(result, "PHASE_HELD_IN_PATTERNS")
+    assert found.level == "info"
+    assert found.where == ["hist.0.phases.1.cell.a"]
+    assert found.value == 1.0
+    assert "held in 1 of 2 patterns (histogram 0)" in found.message
+    # the phase is seen by the joint fit, so the joint code stays silent
+    assert not _codes(result, "PHASE_UNCONSTRAINED")
+
+
+def test_a_fit_that_held_nothing_per_pattern_names_nothing(two_patterns):
+    result = _one_stage(two_patterns, ["phases.*.cell.*"],
+                        sharing=SharingMap(per_histogram=["phases.*"]))
+    assert not _codes(result, "PHASE_HELD_IN_PATTERNS")
+
+
+def test_a_histogram_view_keeps_its_reflections_and_structure_r(two_patterns):
+    """WP-1986's gap: ``for_histogram`` copied ``ticks`` alone."""
+    result = _one_stage(two_patterns, [])
+    for h, hr in enumerate(result.histograms):
+        view = result.for_histogram(h)
+        assert hr.tick_hkl and view.tick_hkl == hr.tick_hkl
+        assert hr.phase_agreement
+        assert view.phase_agreement == hr.phase_agreement
+    # the top level mirrors histogram 0, its ticks and their labels together
+    assert result.ticks == result.histograms[0].ticks
+    assert result.tick_hkl == result.histograms[0].tick_hkl
+
+
+def test_a_histogram_view_carries_the_fit_findings_that_name_it(vanished_phase_fit):
+    """A finding scoped to histogram h sits beside h's own; histogram 1's
+    view does not carry histogram 0's hold."""
+    _, result = vanished_phase_fit
+    zero = [d.code for d in result.for_histogram(0).diagnostics]
+    one = [d.code for d in result.for_histogram(1).diagnostics]
+    assert zero.count("PHASE_HELD_IN_PATTERNS") == 1
+    assert "PHASE_HELD_IN_PATTERNS" not in one
+
+
+def test_a_stage_that_freed_nothing_in_a_histogram_reaches_its_view(two_patterns):
+    """``STAGE_FREED_NOTHING``'s ``value`` is the histogram's index."""
+    from rietx.schemas.instrument import BackgroundChebyshev
+
+    structure, instruments = perturbed_inputs()
+    # a fourth term on histogram 0 alone, so the literal reaches only it
+    instruments[0].background = BackgroundChebyshev.with_terms(4)
+    ref = MultiHistogramRefinement(structure, instruments)
+    result = ref.fit(two_patterns, plan=RefinementPlan(stages=[
+        Stage("only", ["instrument.background.c3"], max_iter=3)]))
+    (top,) = _codes(result, "STAGE_FREED_NOTHING")
+    assert top.value == 1.0
+    assert not [d for d in result.for_histogram(0).diagnostics
+                if d.code == "STAGE_FREED_NOTHING"]
+    assert [d for d in result.for_histogram(1).diagnostics
+            if d.code == "STAGE_FREED_NOTHING"] == [top]
+
+
+def test_a_fit_level_finding_appears_once_in_every_view(two_patterns):
+    """The FIT findings a reader of one pattern must see
+    (``SCALE_B_INSEPARABLE``, ``PARAMETRIC_OUT_OF_RANGE``,
+    ``PARAMETRIC_FORM_REJECTED``, ``STAGE_PATH_UNKNOWN``) are copied once
+    into each view, never once per histogram."""
+    result = _one_stage(two_patterns, ["phases.0.no_such_path"])
+    (top,) = _codes(result, "STAGE_PATH_UNKNOWN")
+    for h in range(2):
+        mine = [d for d in result.for_histogram(h).diagnostics
+                if d.code == "STAGE_PATH_UNKNOWN"]
+        assert mine == [top]
+
+
+# ------------------------------------------- WP-2028, review round 1 -----
+
+def test_a_phase_held_in_every_pattern_is_unconstrained_not_held_in_patterns():
+    """Two patterns, neither showing phase 1, its structure per histogram:
+    ``PHASE_UNCONSTRAINED`` says it, and ``PHASE_HELD_IN_PATTERNS`` (a hold
+    in *some* patterns) does not repeat it (review of #1128, item 1)."""
+    import rietx as rx
+    from tests.test_held_phase import _absent_phase_inputs
+    from tests.test_held_phase import synthesize as one_phase
+
+    blind, ins = _absent_phase_inputs()
+    ref = rx.MultiHistogramRefinement(
+        [blind, blind.model_copy(deep=True)], [ins, ins.model_copy(deep=True)],
+        sharing=SharingMap(per_histogram=["phases.*"]))
+    result = ref.fit([one_phase(), one_phase()], plan=rx.RefinementPlan(stages=[
+        rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+        rx.Stage("cell", ["phases.*.cell.*"])]))
+    assert result.stages[-1].held        # the control: something was held
+    assert _codes(result, "PHASE_UNCONSTRAINED")
+    assert not _codes(result, "PHASE_HELD_IN_PATTERNS")
+    for h in range(2):
+        assert not [d for d in result.for_histogram(h).diagnostics
+                    if d.code == "PHASE_HELD_IN_PATTERNS"]
+
+
+def _hold_stub(held, ridge, n):
+    from types import SimpleNamespace as NS
+    last = NS(held=held, scale_b_held=ridge, name="cell")
+    table = NS(parametric=[], n_histograms=n,
+               _owner=lambda p: int(p.split(".")[1]) if p.startswith("hist.")
+               else None)
+    structure = NS(phases=[NS(name="A"), NS(name="B")])
+    return [last], table, structure
+
+
+@pytest.mark.parametrize("leaf, ridge_phases, fires", [
+    ("adp.1", {0}, False),      # an anisotropic column the ridge took
+    ("biso", {0}, False),       # the isotropic one, as before
+    ("u12", {0}, False),
+    ("adp.1", set(), True),     # control: not a ridge hold
+    ("cell.a", {0}, True),      # control: a ridge hold takes displacements only
+])
+def test_the_ridge_exclusion_reads_the_displacement_columns_refine_does(
+        leaf, ridge_phases, fires):
+    from rietx.multi import _per_pattern_hold_diagnostics
+
+    held = [f"hist.0.phases.0.atoms.0.{leaf}"]
+    stages, table, structure = _hold_stub(held, ridge_phases, 3)
+    assert bool(_per_pattern_hold_diagnostics(stages, table, structure)) is fires
+
+
+def test_an_adp_site_is_scoped_by_the_columns_that_move_it():
+    """``adp.k`` is what a joint fit frees; ``u11`` merely follows it (review
+    of #1128, item 3)."""
+    from types import SimpleNamespace as NS
+
+    from rietx.multi import _row_shared, _specimen_path
+
+    per_adp = NS(sharing=SharingMap(per_histogram=["phases.*.atoms.*.adp.*"]))
+    assert _specimen_path(per_adp, 1, "phases.0.atoms.0") == "hist.1.phases.0.atoms.0"
+    plain = NS(sharing=SharingMap())
+    assert _specimen_path(plain, 1, "phases.0.atoms.0") == "phases.0.atoms.0"
+    # a follower row is its source's, not its own name's
+    u11 = NS(path="phases.0.atoms.0.u11",
+             tie=NS(terms=(("phases.0.atoms.0.adp.0", 1.0),)))
+    assert not _row_shared(per_adp, u11)
+    assert _row_shared(plain, u11)
+    assert _row_shared(plain, NS(path="phases.0.cell.a", tie=None))
+
+
+def test_an_occupancy_above_one_in_one_histograms_copy_is_named(two_patterns):
+    """Review of #1128, item 4: ``OCCUPANCY_ABOVE_ONE`` read histogram 0."""
+    structure, instruments = perturbed_inputs()
+    other = structure.model_copy(deep=True)
+    structure.phases[0].atoms[0].occ.value = 0.5
+    other.phases[0].atoms[0].occ.value = 1.4
+
+    def fit(sharing):
+        ref = MultiHistogramRefinement(
+            [structure.model_copy(deep=True), other.model_copy(deep=True)],
+            instruments, sharing=sharing)
+        return ref.fit(two_patterns, plan=RefinementPlan(stages=[
+            Stage("occ", ["phases.*.scale", "instrument.background.*",
+                          "phases.0.atoms.0.occ"], max_iter=2)]))
+
+    own = fit(SharingMap(per_histogram=["phases.0.atoms.*.occ"]))
+    (found,) = _codes(own, "OCCUPANCY_ABOVE_ONE")
+    assert found.where == ["hist.1.phases.0.atoms.0.occ"]
+    assert "histogram 1" in found.message

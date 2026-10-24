@@ -3387,6 +3387,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
         anchor="theory/profiles.html#the-instrument-sample-width-split",
     ),
+    "PHASE_HELD_IN_PATTERNS": HelpEntry(
+        title="A phase was held in some patterns of a joint fit",
+        description=(
+            "In a joint fit where a phase's structure is per pattern, the last stage "
+            "held that structure in the patterns that cannot see the phase. The "
+            "message counts them, and the held rows are named in where. In those "
+            "patterns the rows keep the values the stage started from and carry no "
+            "esd, while the patterns that see the phase refine their own. This "
+            "records what the fit did and asks for nothing. PHASE_UNCONSTRAINED "
+            "covers a phase that no pattern sees."
+        ),
+    ),
     "PHASE_UNCONSTRAINED": HelpEntry(
         title="The data cannot see this phase",
         description=(
