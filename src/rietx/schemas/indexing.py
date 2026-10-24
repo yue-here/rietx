@@ -159,6 +159,13 @@ from .structure import Cell
 #: where it was the constant, so a high-resolution list now matches within its
 #: own widths.  A run whose first pass finds an agreed lattice, and a lab list
 #: with lines 0.05 degrees or wider, answer as at 1.9.
+#: 1.11, also (#934 (c)): the picker names every bound its group fit ends on:
+#: ``PEAK_POSITION_AT_BOUND`` and ``PEAK_NO_INTENSITY`` are new, and the
+#: ``where`` entries of those two, ``PEAK_WIDTH_CAPPED`` and
+#: ``PEAK_EXPECTED_FALSE_LINES`` carry each line's bound and value.  No flag,
+#: threshold or ``usable()`` moved; the number stays 1.11, the release
+#: cycle's one bump, because a list's diagnostics are part of what this string
+#: stamps, as its flags were at 1.10.
 INDEXING_THRESHOLDS_VERSION = "1.11"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is

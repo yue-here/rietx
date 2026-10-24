@@ -23,6 +23,8 @@ address a consumer can act on.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 import numpy as np
 
@@ -32,12 +34,17 @@ from ..schemas.common import Diagnostic
 from ..schemas.indexing import (
     MAX_RELATIVE_SIGMA_Q,
     PEAK_MIN_USABLE_LINES,
+    PEAK_NO_INTENSITY_SIGMA,
+    PEAK_POSITION_BOUND_FWHM,
+    PEAK_WIDTH_BOUND_FACTORS,
     PEAK_WIDTH_CENSUS_N,
     DataQualityReport,
+    ObservedPeak,
     PeakList,
 )
 from ..schemas.instrument import Instrument, ProfileTCHZ
-from .peaks import Detection, fdr_screen
+from ..strategy.staged import BOUND_HIT_RTOL
+from .peaks import Detection, PeakGroup, fdr_screen
 
 #: Physical cause of each shift template, for the messages.  The template names
 #: themselves come from ``report/layer2.py``'s ``_POSITION_ACTIONS`` — one
@@ -60,6 +67,8 @@ WIDTH_MISMATCH_RATIO = 3.0
 
 
 def peak_diagnostics(peaks: PeakList, detection: Detection | None = None,
+                     *,
+                     windows: Sequence[PeakGroup] | Mapping[int, Any] | None = None,
                      ) -> list[Diagnostic]:
     """Translate a peak list's flags and a detection's width census.
 
@@ -67,7 +76,18 @@ def peak_diagnostics(peaks: PeakList, detection: Detection | None = None,
     that arrives from outside — ``PeakList.from_positions``, i.e. the form the
     bethanechol benchmark comes in — needs the same translation without any
     detection to go with it.
+
+    ``windows`` are the fitting windows ``ObservedPeak.group`` indexes, read
+    for the bounds the fit ran into (each a multiple of its window's seed
+    FWHM).  Detection's own groups by default, which is what
+    :func:`~rietx.indexing.pick_peaks` fitted; a caller that fitted other
+    windows passes those (:func:`~rietx.indexing.fit_peaks` does).  A mapping
+    keyed by group number serves a caller whose numbers are not a
+    ``0..n-1`` sequence, each value anything with a ``seed_fwhm`` (the peak
+    editor passes its own ``GroupMeta`` windows).
     """
+    if windows is None and detection is not None:
+        windows = detection.groups
     out: list[Diagnostic] = []
     usable = peaks.usable()
 
@@ -132,16 +152,23 @@ def peak_diagnostics(peaks: PeakList, detection: Detection | None = None,
 
     capped = [p for p in peaks.peaks if "width_capped" in p.flags]
     if capped:
+        f_hi = PEAK_WIDTH_BOUND_FACTORS[1]
         out.append(Diagnostic(
             level="info", code="PEAK_WIDTH_CAPPED",
             message=(f"{len(capped)} component(s) ran into the width bound of "
-                     "five times the pattern's own width law at their angle, "
-                     "and are excluded from usable()."),
-            where=[f"{p.two_theta:.4f}°" for p in capped],
+                     f"{f_hi:g} times the pattern's own width law at their "
+                     "angle (PEAK_WIDTH_BOUND_FACTORS), and are excluded from "
+                     "usable()."),
+            where=[_at(p, f"FWHM {p.fwhm:.4f}°"
+                       + (f", Γ_G/Γ_L bound {f_hi * s:.4f}° each"
+                          if (s := _seed_fwhm(p, windows)) else ""))
+                   for p in capped],
             suggestion=("On a steep or structured background, check whether "
                         "the background envelope followed it. For a broad "
                         "second phase, pick it separately at its own "
                         "width.")))
+
+    out.extend(_bound_diagnostics(peaks, windows))
 
     tails = [p for p in peaks.peaks if "axial_tail" in p.flags]
     if tails:
@@ -217,11 +244,137 @@ def _false_line_diagnostic(peaks: PeakList, det: Detection) -> Diagnostic:
                     "weak_line.")
     return Diagnostic(
         level="info", code="PEAK_EXPECTED_FALSE_LINES", message=message,
-        where=[f"{p.two_theta:.4f}°" for p in weak],
+        where=[_at(p, f"I/σ_I {_significance(p):.2f}, bar "
+                      f"{screen.z_threshold:.2f}") for p in weak],
         suggestion=("Keep weak_line components unless the list is known to "
                     "carry flank or tail junk. Count longer to tell weak "
                     "lines from noise."),
         value=screen.expected_false)
+
+
+def _at(p: ObservedPeak, detail: str) -> str:
+    """A ``where`` entry: the line's 2θ, then the number the statement is
+    about in brackets, so a reader acting on one line reads its value
+    without re-deriving it from the list."""
+    return f"{p.two_theta:.4f}° ({detail})"
+
+
+def _significance(p: ObservedPeak) -> float:
+    """I/σ_I, or NaN where the esd is not a finite positive number."""
+    esd = float(p.intensity_esd)
+    return (float(p.intensity) / esd if math.isfinite(esd) and esd > 0.0
+            else float("nan"))
+
+
+def _seed_fwhm(p: ObservedPeak,
+               windows: Sequence[PeakGroup] | Mapping[int, Any] | None
+               ) -> float | None:
+    """The seed FWHM of the window ``p`` was fitted in, which every bound of
+    the group's fit is a multiple of (``peakfit._GroupModel.bounds``).
+
+    ``None`` where no windows stand behind the list, or where ``p.group`` is
+    not one of them (the peak editor numbers a window a person opened past
+    detection's): the bound is then named by its rule, without a number.  Not
+    a test of ``p`` lying inside the window: a component on its position
+    bound may have left it.
+    """
+    if windows is None:
+        return None
+    if isinstance(windows, Mapping):
+        window = windows.get(p.group)
+    else:
+        window = windows[p.group] if 0 <= p.group < len(windows) else None
+    if window is None:
+        return None
+    s = float(window.seed_fwhm)
+    return s if math.isfinite(s) and s > 0.0 else None
+
+
+def _bound_diagnostics(peaks: PeakList,
+                       windows: Sequence[PeakGroup] | Mapping[int, Any] | None) -> list[Diagnostic]:
+    """One diagnostic per bound of the picker's group fit that a component
+    ended on, each ``where`` entry naming the bound and the value (#934 (c)).
+
+    The fit has three kinds of bound (``peakfit._GroupModel.bounds``): each
+    position within :data:`~rietx.schemas.indexing.PEAK_POSITION_BOUND_FWHM`
+    of the group's seed FWHM from its seed (``position_at_bound``); each
+    intensity ≥ 0 (``no_intensity``, which also carries the
+    :data:`~rietx.schemas.indexing.PEAK_NO_INTENSITY_SIGMA` floor, so the
+    entry says which of the two put it there); and the two widths between
+    :data:`~rietx.schemas.indexing.PEAK_WIDTH_BOUND_FACTORS` × the seed FWHM,
+    whose upper end is ``width_capped`` (``PEAK_WIDTH_CAPPED``).  The lower
+    end is a positivity floor and gets no flag: one width there is a pure
+    Gaussian or Lorentzian line, which is a shape, not a failure, and both
+    there at once never happened on the public corpus or the reproducers.
+    """
+    out: list[Diagnostic] = []
+    moved = [p for p in peaks.peaks if "position_at_bound" in p.flags]
+    if moved:
+        # the hazard is a line still offered at full weight: one under the
+        # false-discovery bar is already marked as evidence a consumer weighs
+        offered = [p for p in moved
+                   if p.usable and "weak_line" not in p.flags]
+        out.append(Diagnostic(
+            level="info",
+            code="PEAK_POSITION_AT_BOUND",
+            message=(f"{len(moved)} component(s) ended on their position "
+                     f"bound, {PEAK_POSITION_BOUND_FWHM:g} of the group's "
+                     "seed FWHM from where they were seeded "
+                     "(PEAK_POSITION_BOUND_FWHM): the fit stopped on its "
+                     "bound, so the reported 2θ is the bound's; "
+                     f"{len(offered)} of them usable and above the "
+                     "false-discovery bar"),
+            where=[_at(p, (f"bound ±{PEAK_POSITION_BOUND_FWHM * s:.4f}°"
+                           if (s := _seed_fwhm(p, windows)) else "at the bound")
+                       + f", I/σ_I {_significance(p):.1f}")
+                   for p in moved],
+            suggestion=("the reported 2θ is the bound's: the fit stopped on "
+                        "its bound, and its σ(2θ) is the curvature there, "
+                        "which leaves out how far past the bound the fit "
+                        "would have moved"),
+            value=float(len(offered))))
+
+    empty = [p for p in peaks.peaks if "no_intensity" in p.flags]
+    if empty:
+        n_zero = sum(_at_zero(p) for p in empty)
+        # the fit's own cause is the zero bound or the floor; a component the
+        # editor's ``set_flags`` marked by hand on a line the data can tell
+        # from zero is neither, and its entry must not print a comparison
+        # that is false
+        by_hand = [p for p in empty
+                   if not _at_zero(p)
+                   and not _significance(p) < PEAK_NO_INTENSITY_SIGMA
+                   and not math.isnan(_significance(p))]
+        out.append(Diagnostic(
+            level="info", code="PEAK_NO_INTENSITY",
+            message=(f"{len(empty)} component(s) excluded from usable() and "
+                     "kept in peaks so a report can say why: "
+                     f"{n_zero} on the fit's zero-intensity bound, "
+                     f"{len(empty) - n_zero - len(by_hand)} under "
+                     f"PEAK_NO_INTENSITY_SIGMA ({PEAK_NO_INTENSITY_SIGMA:g}) "
+                     f"of their own esd and {len(by_hand)} marked by hand"),
+            where=[_at(p, f"I = {float(p.intensity):.3g}, at the zero bound"
+                       if _at_zero(p) else
+                       f"I/σ_I {_significance(p):.2f}, marked by hand"
+                       if p in by_hand else
+                       f"I/σ_I {_significance(p):.2f} < "
+                       f"{PEAK_NO_INTENSITY_SIGMA:g}")
+                   for p in empty],
+            suggestion=("these components are excluded from usable() and "
+                        "kept in peaks so a report can say why; a component "
+                        "on the zero bound has a 2θ and σ(2θ) that are not "
+                        "measurements, one under its esd has a weak "
+                        "gradient and a large σ(2θ), and one marked by hand "
+                        "was withheld by the caller, whatever its "
+                        "intensity"),
+            value=float(n_zero)))
+    return out
+
+
+def _at_zero(p: ObservedPeak) -> bool:
+    """On the zero-intensity bound, by the refinement's own bound test
+    (``no_intensity``'s first half, ``pick._flags_for``)."""
+    return float(p.intensity) <= BOUND_HIT_RTOL
 
 
 def _width_diagnostics(det: Detection) -> list[Diagnostic]:

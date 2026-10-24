@@ -740,6 +740,24 @@ ROWS: tuple[Row, ...] = (
     Row("PEAK_KALPHA2_RESIDUAL", "code"),
     Row("PEAK_LIST_TOO_SHORT", "code"),
     Row("PEAK_NOT_SEPARABLE", "code"),
+    Row("PEAK_NO_INTENSITY", "code", tier=1, ambiguity=1,
+        evidence="Arithmetic: a record of main's no_intensity flag, which "
+                 "pick._flags_for sets for a component on its zero-intensity bound "
+                 "or under PEAK_NO_INTENSITY_SIGMA of its own esd (that threshold "
+                 "owned by its own row) and which the editor's set_flags can set by "
+                 "hand. The message names the three causes and says what is true of "
+                 "all of them, that the component is excluded from usable() and kept "
+                 "in peaks; it moves no flag, threshold or usable() (Yue, #993 "
+                 "round 2, 2026-10-21)."),
+    Row("PEAK_POSITION_AT_BOUND", "code", tier=1, ambiguity=1,
+        evidence="Arithmetic: a record of main's position_at_bound flag, a component whose "
+                 "fitted 2θ equals its box bound (PEAK_POSITION_BOUND_FWHM × the window's "
+                 "seed FWHM) to 1e-8 relative, so the reported 2θ is the bound's and "
+                 "its σ is the curvature there, which leaves out how far past "
+                 "the bound the fit would have moved. It moves no flag, threshold or usable(); the level "
+                 "is info everywhere (Yue's ruling, #993 round 2, 2026-10-21: of the "
+                 "19 usable above-bar components freed on 16 Oct, 12 moved away from "
+                 "the lattice's line and 7 towards it)."),
     Row("PEAK_POSITION_PRECISION", "code"),
     Row("PEAK_SHOULDER_SEEDED", "code"),
     Row("PEAK_SIGMA_ASSUMED", "code"),
@@ -3360,6 +3378,18 @@ ROWS: tuple[Row, ...] = (
     Row("PEAK_KALPHA2_RESIDUAL.suggestion", "suggestion", value=1),
     Row("PEAK_LIST_TOO_SHORT.suggestion", "suggestion", value=1),
     Row("PEAK_NOT_SEPARABLE.suggestion", "suggestion", value=1),
+    Row("PEAK_NO_INTENSITY.suggestion", "suggestion", value=1, tier=1, ambiguity=1,
+        evidence="Arithmetic: says only what holds for all three causes, that the "
+                 "component is excluded from usable() and kept in peaks so a report "
+                 "can say why, and that a component on the zero bound has a 2θ and "
+                 "σ(2θ) that are not measurements, one under its esd a weak "
+                 "gradient and a large σ(2θ) (Yue, #993 round 3, 2026-10-22)."),
+    Row("PEAK_POSITION_AT_BOUND.suggestion", "suggestion", value=1, tier=1, ambiguity=1,
+        evidence="Arithmetic: the reported 2θ is the box bound's, the fit stopped "
+                 "on it, and σ(2θ) is the curvature there, which leaves out how "
+                 "far past the bound the fit would have moved. It says nothing "
+                 "of the line's true position, which the 16 Oct re-solve showed the "
+                 "bound does not predict (Yue, #993 round 2, 2026-10-21)."),
     Row("PEAK_POSITION_PRECISION.suggestion", "suggestion", value=1),
     Row("PEAK_SHOULDER_SEEDED.suggestion", "suggestion", value=1),
     Row("PEAK_SIGMA_ASSUMED.suggestion", "suggestion", value=1),
