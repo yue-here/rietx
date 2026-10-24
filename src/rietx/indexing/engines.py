@@ -42,6 +42,7 @@ import numpy as np
 from ..schemas.common import Diagnostic
 from ..schemas.indexing import (
     METRIC_DOF,
+    PEAK_NEVER_DRIVEN_FLAGS,
     PEAK_UNDRIVEN_FLAGS,
     TRUSTED_SHIFT_SOURCES,
     CellCandidate,
@@ -1177,13 +1178,17 @@ def search_line_order(peaks: PeakList, spec: SearchSpec) -> np.ndarray:
     """
     q = peaks.q()
     inten = peaks.intensity()
-    eligible = np.flatnonzero([not set(p.flags) & PEAK_UNDRIVEN_FLAGS
-                               for p in peaks.usable()]).astype(np.int64)
-    floor = min(DRIVEN_MIN_LINES, len(q))
+    flags = [set(p.flags) for p in peaks.usable()]
+    eligible = np.flatnonzero(
+        [not f & (PEAK_UNDRIVEN_FLAGS | PEAK_NEVER_DRIVEN_FLAGS)
+         for f in flags]).astype(np.int64)
+    never = np.flatnonzero([bool(f & PEAK_NEVER_DRIVEN_FLAGS)
+                            for f in flags]).astype(np.int64)
+    floor = min(DRIVEN_MIN_LINES, len(q) - len(never))
     if len(eligible) < floor:
         # too few lines left to determine a metric: the strongest flagged lines
         # come back, in the order the ranking below would take them
-        rest = np.setdiff1d(np.arange(len(q)), eligible)
+        rest = np.setdiff1d(np.arange(len(q)), np.union1d(eligible, never))
         rest = rest[np.lexsort((q[rest], -inten[rest]))][:floor - len(eligible)]
         eligible = np.sort(np.concatenate([eligible, rest]))
     n = min(spec.n_search_lines, len(eligible))

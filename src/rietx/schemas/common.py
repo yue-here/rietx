@@ -537,6 +537,10 @@ from .._nearmiss import did_you_mean
 #: node ran at), the same rule.  And ``StageResult.n_lapack_fallbacks``, the
 #: decompositions a stage repeated with LAPACK's second driver, defaulting to
 #: 0, which every earlier stage took.
+#: Also in 0.59 (WP-1969, #933): ``PeakFlag`` gains ``residue_misfit``, written
+#: only by ``index_residue`` on a pick standing on the subtracted phase's
+#: profile.  Additive: no existing list carries it, and an older build refuses
+#: a list that does.
 SCHEMA_VERSION = "0.59"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

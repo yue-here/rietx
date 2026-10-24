@@ -189,6 +189,14 @@ A list whose lines all carry one intensity, such as `PeakList.from_positions` wi
 
 Under every rule, what a cell leaves is reported rather than hidden: `CellCandidate.n_search_unindexed` counts the driven lines it left, and `CellCandidate.unindexed_two_theta` lists every usable line it left, the residue a second phase would explain.
 
+To index that residue, pass the result to `rietx.indexing.index_residue` with the pattern and instrument.
+It fits the first cell (or the one you name with `candidate=`) by the same Le Bail protocol that validated it, subtracts its peaks, picks what remains with the widths that fit refined, and indexes the picks as a second result.
+A pick standing on more of the subtracted profile than its own height is flagged `residue_misfit`: it counts as a line no candidate explains, and so lowers the grade, but never drives the search.
+A single-phase pattern therefore leaves nothing to search: on SRM 660c every pick is such a line, and the second result abstains.
+A cell whose Le Bail fit needs widths more than three times the list's own to describe the pattern does not fit it, so nothing is picked from its residue and the result says why; a list passed in as positions has assumed widths, so this test is skipped for it.
+On a synthetic Si pattern with MgO at 0.3 of its scale, the second result holds MgO's cell second, behind a body-centred cell with √2 times MgO's edge, which the flagged lines favour.
+Read a second result's candidate on its own grade, and refine both phases together before quoting either cell, because each was validated alone.
+
 #### Priors from a structural analogue
 
 A prior steers the search and never gates it.

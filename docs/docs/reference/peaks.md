@@ -102,8 +102,8 @@ Q rather than d or 2θ is the working coordinate, because Q is linear in the rec
 
 ### The flags
 
-`ObservedPeak.flags` holds members of a closed vocabulary of nineteen.
-Ten take a line out of `PeakList.usable`; the other nine report evidence and leave it in.
+`ObservedPeak.flags` holds members of a closed vocabulary of twenty.
+Ten take a line out of `PeakList.usable`; the other ten report evidence and leave it in.
 [Peak flags](settings.md#peak-flags) gives each flag's meaning as the GUI shows it.
 
 | Flag | Written when | Usable? |
@@ -126,6 +126,7 @@ Ten take a line out of `PeakList.usable`; the other nine report evidence and lea
 | `axial_tail` | the line is under a quarter of a stronger group-mate's area, within 3.5 FWHM on its axial-divergence tail side | yes |
 | `kalpha2_residual` | the line is under a quarter of a stronger group-mate's area, within its FWHM of that line's predicted Kα2 position | yes |
 | `weak_line` | the line's $I/\sigma_I$ fails the pattern's false-discovery threshold (Benjamini-Hochberg at q = 0.01) | yes; scored, and drives a search only to make up six lines |
+| `residue_misfit` | `index_residue` only: the pick stands on more of the subtracted first phase's profile than its own height | yes, but it never drives a search, whatever the floor |
 | `unnamed_neighbour` | `fit_peaks` only: the window holds a component you did not name | yes |
 
 A contamination line is flagged and left out, never subtracted, because stripping redistributes the noise and biases what is left.

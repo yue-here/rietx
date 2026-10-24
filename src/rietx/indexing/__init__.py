@@ -158,6 +158,7 @@ from .trial_error import index_table, search_trial_error
 from .workflow import (
     absent_reflections,
     index_pattern,
+    index_residue,
     structure_from_candidate,
     validate_by_lebail,
 )
@@ -216,6 +217,7 @@ __all__ = [
     "hnf_matrices",
     "index_diagnostics",
     "index_pattern",
+    "index_residue",
     "indexed_fraction",
     "lattice_group",
     "m20",

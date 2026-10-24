@@ -615,6 +615,10 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_PANEL_REDUCED", "code"),
     Row("INDEX_PREDICTED_BUT_ABSENT", "code"),
     Row("INDEX_PRIOR_USED", "code"),
+    Row("INDEX_RESIDUE_PASS", "code", tier="caller", ambiguity=3,
+        evidence=("raised only by workflow.index_residue; no default path calls it. Its "
+                  "width-ratio refusal reuses WIDTH_MISMATCH_RATIO, itself unaudited, and is "
+                  "tiered with that constant in WP-2007, not here")),
     Row("INDEX_SEARCH_INCOMPLETE", "code"),
     Row("INDEX_SHIFT_ALLOWANCE", "code"),
     Row("INDEX_SHIFT_DETECTED", "code"),
@@ -1419,6 +1423,7 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.trial_error.SOLVE_CHUNK", "constant", value=200000),
     Row("rietx.indexing.workflow.ABSENT_SIGMA", "constant", value=3.0),
     Row("rietx.indexing.workflow.ABSENT_WINDOW_FWHM", "constant", value=0.5),
+    Row("rietx.indexing.workflow.RESIDUE_MISFIT_RATIO", "constant", value=1.0),
     Row("rietx.indexing.workflow.VALIDATION_METRIC_REL", "constant", value=0.01),
     Row("rietx.indexing.workflow.VALIDATION_SLACK_BOUNDS_DEG", "constant", value=(0.3, 6.0)),
     Row("rietx.io.formats.base.HEAD_BYTES", "constant", value=4096),
@@ -3258,6 +3263,9 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_PANEL_REDUCED.suggestion", "suggestion", value=1),
     Row("INDEX_PREDICTED_BUT_ABSENT.suggestion", "suggestion", value=1),
     Row("INDEX_PRIOR_USED.suggestion", "suggestion", value=2),
+    Row("INDEX_RESIDUE_PASS.suggestion", "suggestion", tier=2, value=1,
+        evidence=("joint multiphase refinement of every phase against the pattern: Hill & Howard "
+                  "(1987) J. Appl. Cryst. 20, 467 (recalled; not in the local corpus)")),
     Row("INDEX_SEARCH_INCOMPLETE.suggestion", "suggestion", value=1),
     Row("INDEX_SHIFT_ALLOWANCE.suggestion", "suggestion", value=1),
     Row("INDEX_SHIFT_DETECTED.suggestion", "suggestion", value=1),
@@ -4065,6 +4073,7 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.indexing.trial_error.SOLVE_CHUNK",
     "rietx.indexing.workflow.ABSENT_SIGMA",
     "rietx.indexing.workflow.ABSENT_WINDOW_FWHM",
+    "rietx.indexing.workflow.RESIDUE_MISFIT_RATIO",
     "rietx.indexing.workflow.VALIDATION_METRIC_REL",
     "rietx.indexing.workflow.VALIDATION_SLACK_BOUNDS_DEG",
     "rietx.indexing.workflow.index_pattern:cancel",

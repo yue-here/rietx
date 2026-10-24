@@ -675,6 +675,14 @@ PEAK_ASSUMED_ESD_DEG = 0.02
 #: from :data:`PEAK_UNUSABLE_FLAGS` for that reason, and it does not move
 #: :data:`INDEXING_THRESHOLDS_VERSION`: no ``pick_peaks`` answer changes, and a
 #: list that can carry the flag comes from a call that did not exist at 1.3.
+#: ``residue_misfit`` — only :func:`~rietx.indexing.index_residue` writes it
+#: (WP-1969): the pick stands on more of the subtracted first phase's profile
+#: than its own height (``RESIDUE_MISFIT_RATIO``), so it is as likely the first
+#: cell's misfit as a second phase's line.  **Flagged, not dropped**: it stays in
+#: ``usable()``, so the second result's ``unindexed_two_theta``,
+#: ``indexed_fraction`` and grade are charged for it like any line, and it is in
+#: :data:`PEAK_NEVER_DRIVEN_FLAGS`, so it never drives the search — not even
+#: through the :data:`~rietx.indexing.engines.DRIVEN_MIN_LINES` floor.
 PeakFlag = Literal[
     "ghost_kbeta",
     "ghost_tungsten",
@@ -695,6 +703,7 @@ PeakFlag = Literal[
     "weak_line",
     "unresolved_split",
     "width_capped",
+    "residue_misfit",
 ]
 
 #: FWHM multiple within which a weak component may be read as a stronger
@@ -756,6 +765,13 @@ PEAK_UNUSABLE_FLAGS: frozenset[str] = frozenset(
 #: it carries ``weak_line`` too, while on the real acceptance lists 2–10
 #: usable components carry it alone at I/σ_I up to 29.
 PEAK_UNDRIVEN_FLAGS: frozenset[str] = frozenset({"weak_line"})
+
+#: Flags that keep a line scored and take it out of the driven set **for good**:
+#: unlike :data:`PEAK_UNDRIVEN_FLAGS` the line is not taken back when fewer than
+#: :data:`~rietx.indexing.engines.DRIVEN_MIN_LINES` unflagged lines remain,
+#: because a residue of nothing but the first phase's misfit would then be
+#: searched as if it were lines.  ``residue_misfit`` only.
+PEAK_NEVER_DRIVEN_FLAGS: frozenset[str] = frozenset({"residue_misfit"})
 
 #: Standard deviations above χ²_red = 1 at which a group's fit is **refuted**, and
 #: therefore above which a ΔBIC verdict on adding one more component to it cannot

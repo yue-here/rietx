@@ -1463,6 +1463,17 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
             "placed by hand is never tested."
         ),
     ),
+    "residue_misfit": HelpEntry(
+        title="Standing on the subtracted phase",
+        label="misfit",
+        description=(
+            "Written only by `index_residue`. This pick in the residue stands on more of "
+            "the subtracted first phase's profile than its own height, so it is as likely "
+            "the first cell's misfit as a line of a second phase. It stays usable, so the "
+            "second result counts it as a line no candidate explains and grades "
+            "accordingly, but it never drives the search. The height rule was measured on two synthetic pairs, Si with MgO and Si with NaCl, and is untested beyond them."
+        ),
+    ),
     "unresolved_split": HelpEntry(
         title="Split the data cannot resolve",
         label="split",
@@ -2723,9 +2734,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "After a whole-pattern Le Bail fit of this cell, some observed peaks sit "
             "where it predicts no reflection. A handful of such lines points to a second "
-            "phase. Many of them point to a wrong cell. This package does not index "
-            "multi-phase patterns, so subtract the solved phase before you index the "
-            "remainder."
+            "phase. Many of them point to a wrong cell. To look for the second phase, "
+            "pass the result to `rietx.indexing.index_residue`, which subtracts the "
+            "first cell and indexes the remainder."
         ),
     ),
     "INDEX_INLIER_RETRY": HelpEntry(
@@ -2740,6 +2751,24 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "`unindexed_two_theta`. A cell that leaves the weak lines is the phase, and "
             "the residue is a second phase or the picker's junk. Pass `n_unindexed='inliers'` "
             "to search this way from the start, or an integer to forbid the retry."
+        ),
+    ),
+    "INDEX_RESIDUE_PASS": HelpEntry(
+        title="This result indexes what another cell left of the pattern",
+        description=(
+            "`index_residue` fitted the named cell to the pattern by Le Bail, subtracted "
+            "its peaks, picked the remainder at that fit's widths and indexed it. Picks "
+            "standing on more of the subtracted profile than their own height were "
+            "dropped as that fit's misfit, and `where` lists them. When that fit needed "
+            "widths more than three times the list's own, the cell does not describe the "
+            "pattern and nothing was picked; the message says so. A candidate here is a "
+            "second phase only if it earns a grade of its own. A residue too short to "
+            "search abstains, which is the answer on a single-phase pattern (SRM 660c and "
+            "synthetic Si left no usable residue line). Refine both phases together "
+            "before you quote either cell. The misfit cut, one height of subtracted "
+            "profile (`RESIDUE_MISFIT_RATIO`), was measured on synthetic Si + MgO only, "
+            "untested beyond it; a second phase's line under a stronger first-phase line "
+            "is dropped with the misfit."
         ),
     ),
     "INDEX_MULTIPLE_SOLUTIONS": HelpEntry(

@@ -94,7 +94,7 @@ result.
 | Code | What it means you must not do |
 |---|---|
 | `INDEX_PREDICTED_BUT_ABSENT` | Keep or reject this candidate on this code alone. Prefer a smaller cell only if its own Le Bail fit indexes the same lines, and run the extinction screen (§7e) first (Measured: WP-1545, aragonite in P m c n is correct with 4 of 105 absent). **Do not check this with Rwp**: (Measured: an oversized cell scores 0.379 against a correct 0.216, a gap smaller than the spread between specimens) |
-| `INDEX_IMPURITY_LINES` | Read it as one thing. The count says which (Measured: 95 unmatched lines on LaB6 with the metric 1 % off, the table in `indexing/workflow.py`). A multi-phase pattern is not indexed: a second phase means subtracting the solved one first. |
+| `INDEX_IMPURITY_LINES` | Read it as one thing. The count says which (Measured: 95 unmatched lines on LaB6 with the metric 1 % off, the table in `indexing/workflow.py`). A multi-phase pattern is not indexed in one pass: subtract the solved phase with `rietx.indexing.index_residue` and index the residue (`INDEX_RESIDUE_PASS`). |
 | `INDEX_BRAVAIS_AMBIGUOUS` | Refine in the higher symmetry because it was reported. Refine in the stated system and *test* the higher one, never the reverse. A disagreement between gemmi and spglib is information, not a bug. |
 | `INDEX_VOLUME_UNPHYSICAL` | Quote the cell. |
 | `INDEX_SUPERCELL_REFUTED` | Quote the larger cell, or read its old rank as evidence for it. The counts are on `supercell_checks`. If the chemistry predicts a superstructure, look at the pattern at `absent_two_theta`. (Measured: on the finished acceptance searches it put brucite's and 11-BM NAC's truths first, and it kept every truth tested as a child, the lowest at p = 0.0072) |
