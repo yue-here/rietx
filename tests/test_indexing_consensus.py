@@ -197,9 +197,11 @@ def test_the_result_type_has_no_singleton_accessor():
     ({}, "high"),
     ({"found_by": ["dichotomy"]}, "low"),
     ({"lebail": None}, "medium"),
+    # capping since thresholds 1.11 (C3): a count a truth's undetected weak
+    # lines can raise keeps ``high`` out of reach; the pairwise check refutes
     ({"lebail": LeBailValidation(rwp=0.4, gof=2.4, space_group="P m -3 m",
                                  n_reflections=153, predicted_but_absent=117)},
-     "low"),
+     "medium"),
     ({"lebail": LeBailValidation(rwp=float("inf"), gof=float("inf"),
                                  space_group="P m -3 m", n_reflections=0,
                                  status="failed")}, "low"),
@@ -247,6 +249,24 @@ def test_two_high_candidates_are_not_a_singleton():
     codes = {d.code for d in index_diagnostics(result)}
     assert "INDEX_MULTIPLE_SOLUTIONS" in codes
     assert "INDEX_ABSTAINED" in codes
+
+
+def test_the_abstention_names_the_refuting_caveats_the_gate_uses():
+    """The suggestion's list of caveats to act on first is read off the gate's
+    own set, so it cannot keep naming one the gate moved to a cap (C3 moved
+    ``predicted_but_absent``)."""
+    from rietx.indexing.diagnostics import index_diagnostics
+    from rietx.schemas.indexing import INDEX_REFUTING_CAVEATS
+
+    a, b = _candidate(TRUE_A), _candidate(2 * TRUE_A)
+    for cand in (a, b):
+        cand.confidence = "high"
+    text = next(d.suggestion for d in index_diagnostics(_result([a, b]))
+                if d.code == "INDEX_ABSTAINED")
+    refuting_part = text.split("(")[1].split(")")[0]
+    named = {w.strip() for w in refuting_part.split(",")}
+    assert named == INDEX_REFUTING_CAVEATS
+    assert "predicted_but_absent" not in refuting_part
 
 
 def test_an_ambiguous_winner_is_not_a_singleton():
@@ -816,23 +836,49 @@ def test_index_pattern_recovers_the_cell_and_refutes_its_supercells(lab6_pattern
     assert result.validated and result.search_complete == {"cubic": True}
     assert result.provenance.notes["engines"] == ", ".join(engine_names())
 
-    # the supercells that index every observed line are refuted by the pattern,
-    # not by the panel — this is the blind spot validation exists to close.
-    # Only the checked subset carries a verdict: validation costs a refinement
-    # each, so the rest must say **not_validated** rather than look clean, and
-    # that half of the claim is the one a widening candidate list can break.
+    # the supercells that index every observed line are refuted by the
+    # pattern, not by the panel — this is the blind spot validation exists to
+    # close.  Since C3 (thresholds 1.11) the refutation is the pairwise check
+    # (``supercell_refuted``: the lines a superlattice adds over the truth,
+    # that no extinction could remove, are seen no more often than chance)
+    # and the line screen's absent count **caps**.  Only the checked subset
+    # carries a verdict: validation costs a refinement each, so the rest must
+    # say **not_validated** rather than look clean, and that half of the
+    # claim is the one a widening candidate list can break.
     supercells = [c for c in result.candidates if c.volume > 2 * best.volume]
     assert supercells, "the F/I supercells should be proposed and then refuted"
     tested = [c for c in supercells if c.lebail is not None]
     assert tested, "no supercell reached validation at all"
     for cand in supercells:
-        assert cand.confidence == "low"
+        assert cand.confidence != "high"
         if cand.lebail is None:
             assert "not_validated" in cand.confidence_caveats
             continue
+        assert cand.lebail.absent_source == "line_screen"
         assert "predicted_but_absent" in cand.confidence_caveats
         assert any(d.code == "INDEX_PREDICTED_BUT_ABSENT"
                    for d in cand.diagnostics)
+    # the true superlattices — the 2a cells and the P description of the
+    # a√2 I lattice — are refuted against their parents and grade low
+    doubled = [c for c in supercells if c.cell[0] == pytest.approx(2 * TRUE_A, rel=1e-3)]
+    assert len(doubled) >= 2
+    for cand in doubled + [c for c in supercells if c.centring == "P"
+                           and c.cell[0] == pytest.approx(np.sqrt(2) * TRUE_A, rel=1e-3)]:
+        assert cand.confidence == "low"
+        assert any(k.verdict == "refuted" for k in cand.supercell_checks or []), cand.cell
+        assert "supercell_refuted" in cand.confidence_caveats
+    # the a√2 I cell is no superlattice (primitive volume 2.83× the truth's):
+    # it misses the 321 line and predicts three lines P has none at (M = 7,
+    # 15, 23), so neither direction of the containment check is asked and
+    # the screen's two windowed absences cap it at medium — what a true
+    # cell reads on lab data (C3: magnetite 2) and so never a
+    # refutation.  It ranks below the truth and cannot reach ``high``.
+    (root2,) = [c for c in supercells if c.centring == "I"
+                and c.cell[0] == pytest.approx(np.sqrt(2) * TRUE_A, rel=1e-3)]
+    assert root2.confidence == "medium"
+    assert root2.confidence_caveats == ["predicted_but_absent"]
+    assert root2.lebail.predicted_but_absent_uncancellable_in_window >= 1
+    assert result.candidates.index(root2) > result.candidates.index(best)
 
 
 def test_a_peaks_only_run_abstains_by_declaration(cubic_peaks):
@@ -931,9 +977,10 @@ def test_the_evidence_view_is_a_projection_with_caveat_kinds():
 
     The refuting/capping split lived only in ``INDEX_REFUTING_CAVEATS``, a
     package constant no JSON consumer can see, so the serialized answer could
-    name ``predicted_but_absent`` and ``not_validated`` in the same list
+    name ``supercell_refuted`` and ``not_validated`` in the same list
     without saying that one argues against the cell and the other only says a
-    question was never asked.  ``evidence()`` computes the view from the live
+    question was never asked (``predicted_but_absent`` was the refuting
+    example until thresholds 1.11 made it capping).  ``evidence()`` computes the view from the live
     fields on each call, so the two representations cannot disagree."""
     from typing import get_args
 
@@ -942,7 +989,7 @@ def test_the_evidence_view_is_a_projection_with_caveat_kinds():
     from rietx.schemas.indexing import IndexingEvidence
 
     refuted = _candidate(
-        TRUE_A, confidence="low",
+        TRUE_A, confidence="medium",
         confidence_caveats=["predicted_but_absent", "not_validated"],
         lebail=LeBailValidation(rwp=0.379, gof=2.1, space_group="P m -3 m",
                                 n_reflections=153, predicted_but_absent=117,
@@ -960,7 +1007,7 @@ def test_the_evidence_view_is_a_projection_with_caveat_kinds():
     ev = result.evidence()
     assert [c.index for c in ev.candidates] == [0, 1]
     kinds = {c.name: c.kind for c in ev.candidates[0].caveats}
-    assert kinds == {"predicted_but_absent": "refuting",
+    assert kinds == {"predicted_but_absent": "capping",     # 1.11: caps (C3)
                      "not_validated": "capping"}
     assert ev.candidates[1].caveats[0].kind == "capping"
 
@@ -1105,3 +1152,24 @@ def test_a_monoclinic_candidate_is_reported_in_its_conventional_setting():
     out = to_cell_candidate(cand, peaks)
     assert out.change_of_basis == ((1, 0, 0), (0, 1, 0), (0, 0, 1))
     assert out.engine_cell == out.cell
+
+
+def test_the_fallback_panel_is_scored_at_the_resolution_like_the_search_panel(
+        monkeypatch):
+    """``to_cell_candidate`` builds its own panel when the engine brought none
+    (a prior, or a ``_panel_for`` that raised); it must ask the reversed member
+    the way ``_panel_for`` does, with the peak list's widths.  Spied, because on
+    a clean list the two members' values can coincide."""
+    from rietx.indexing import engines
+
+    cand, peaks = _monoclinic_engine_candidate(
+        (4.541, 4.884, 10.198, 90.0, 98.22, 90.0))
+    assert not cand.fom
+    calls = []
+    real = engines.fom_panel
+    monkeypatch.setattr(engines, "fom_panel",
+                        lambda *a, **kw: calls.append(kw.get("fwhm_obs")) or real(*a, **kw))
+    engines.to_cell_candidate(cand, peaks)
+    engines._panel_for(cand, peaks, 3.0)
+    assert len(calls) == 2 and all(w is not None for w in calls)
+    assert np.array_equal(calls[0], calls[1])

@@ -254,8 +254,26 @@ def _shift_path(candidate: CellCandidate, instrument: Instrument) -> str:
 
 
 def validation_plan(candidate: CellCandidate, instrument: Instrument,
-                    two_theta_max: float | None = None):
+                    two_theta_max: float | None = None, *,
+                    freeze_profile: bool = False):
     """The staged plan a Le Bail validation runs, and what it deliberately omits.
+
+    ``freeze_profile`` (C3) drops the two width stages: the profile stays at
+    the instrument's declared values, seeded from the peak list's measured
+    width by :func:`seed_widths` where the declared one is inconsistent, so
+    every candidate is fitted with one **shared** profile the way the
+    extinction screen's ``_screen_plan`` fits every class with one.  The
+    reason is the same: a per-candidate profile lets a wrong cell buy back an
+    unmatched observed line by broadening its neighbour.  The absent count no
+    longer reads this fit at all (the line screen does), so what the fit
+    keeps is the forward question — is there a reflection under every
+    observed peak — and an Rwp for a reader.  **Off by default, measured**:
+    frozen at the *declared* profile, SRM 660c's own cell validates at Rwp
+    0.57 against 0.10 with the widths free, and the rival/truth Rwp ratio the
+    acceptance rows read falls from above 2 to 1.78, while nothing the fit
+    reports gates any more.  The shared pre-fit F1 asked for needs a
+    cell-free width law fitted to the peak list; until that lands,
+    ``validate_by_lebail(freeze_profile=True)`` is the caller's choice.
 
     **The cell is held.**  ``profile_only`` — the ordinary Le Bail plan — frees
     ``phases.*.cell.*``, and it must not here: the candidate *is* the hypothesis
@@ -285,17 +303,21 @@ def validation_plan(candidate: CellCandidate, instrument: Instrument,
     # caller without a range gets the conservative cap
     slack = (validation_window_slack_deg(two_theta_max)
              if two_theta_max is not None else VALIDATION_SLACK_BOUNDS_DEG[1])
-    return RefinementPlan(stages=[
+    stages = [
         Stage("bkg", ["instrument.background.*"], window_slack_deg=slack),
         Stage("shift", [_shift_path(candidate, instrument)],
               window_slack_deg=slack),
-        Stage("profile_w", ["instrument.profile.w"], window_slack_deg=slack),
-        Stage("profile", ["instrument.profile.u", "instrument.profile.v",
-                          "instrument.profile.x", "instrument.profile.y"],
-              window_slack_deg=slack),
+    ]
+    if not freeze_profile:
+        stages += [
+            Stage("profile_w", ["instrument.profile.w"], window_slack_deg=slack),
+            Stage("profile", ["instrument.profile.u", "instrument.profile.v",
+                              "instrument.profile.x", "instrument.profile.y"],
+                  window_slack_deg=slack),
+        ]
     # a validation verdict compares candidates fitted alike, and pays for no
     # closing stage (WP-2002, the sixth round's Q1 and Q2)
-    ], closing_window_tol=None)
+    return RefinementPlan(stages=stages, closing_window_tol=None)
 
 
 def seed_widths(instrument: Instrument, peaks: PeakList) -> tuple[Instrument, bool]:
@@ -340,9 +362,26 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
                        two_theta_limits: tuple[float, float] | None = None,
                        k_sigma: float = ABSENT_SIGMA,
                        with_result: bool = False,
-                       cancel=None) -> LeBailValidation:
+                       cancel=None, screen=None,
+                       pattern_screen=None,
+                       freeze_profile: bool = False) -> LeBailValidation:
     """Fit ``candidate`` to the whole pattern by Le Bail and report the three
     detectors.
+
+    **Since C3 the absent count is the line screen's, not this fit's.**  With
+    a ``peaks`` list the candidate is screened against the picker's envelope
+    and the peak list's widths and shapes (``indexing/screen.py``), inputs it
+    cannot buy, and ``predicted_but_absent`` is that count with the
+    uncancellable and windowed-uncancellable counts beside it
+    (``absent_source="line_screen"``); the fit keeps the forward question and
+    an Rwp for a reader, with the widths free unless ``freeze_profile``
+    (:func:`validation_plan` says why the default is free).  ``screen`` is a ready
+    :class:`~rietx.indexing.screen.LineScreen` for this candidate and
+    ``pattern_screen`` the run's :class:`~rietx.indexing.screen.PatternScreen`,
+    both optional; ``index_pattern`` passes the second so the pattern is
+    enveloped once.  With no peak list the count is the fitted-background
+    detector's (``"fitted_background"``), whose measured failure is in
+    :func:`absent_reflections`.
 
     ``with_result=True`` additionally returns the
     :class:`~rietx.schemas.results.RefinementResult` the fit produced, as
@@ -424,10 +463,27 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
     ins = instrument
     if peaks is not None:
         ins, _seeded = seed_widths(ins, peaks)
+        if screen is None:
+            from .screen import PatternScreen, screen_for
+
+            if pattern_screen is None or not pattern_screen.has_pattern:
+                # the search's matching window and this call's fitted range,
+                # as index_pattern's run-wide screen has them: the per-line
+                # σ is the measurement, not the tolerance a search matched
+                # with, and lines the fit never covered are not absent
+                from .engines import DEFAULT_UNKNOWN_SHIFT_DEG, absence_window
+                from .screen import MATCH_SIGMA
+
+                pattern_screen = PatternScreen.from_peaks(
+                    peaks, q_match=absence_window(peaks), data=data,
+                    instrument=instrument, two_theta_limits=two_theta_limits,
+                    p0_floor_deg=MATCH_SIGMA * DEFAULT_UNKNOWN_SHIFT_DEG)
+            screen = screen_for(pattern_screen, candidate, peaks)
     tt_max = float(np.max(data.tt()))
     if two_theta_limits is not None:
         tt_max = min(tt_max, float(two_theta_limits[1]))
-    plan = validation_plan(candidate, ins, two_theta_max=tt_max)
+    plan = validation_plan(candidate, ins, two_theta_max=tt_max,
+                           freeze_profile=freeze_profile)
 
     ref = Refinement(structure, ins, history=False)
     try:
@@ -454,12 +510,21 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
         return (failed, None) if with_result else failed
 
     rows = [r for r in ref.reflection_table() if r.line == 0]
-    positions = np.array([r.two_theta for r in rows], dtype=np.float64)
-    absent_tt, _ratio = absent_reflections(
-        np.asarray(result.two_theta), np.asarray(result.y_obs),
-        np.asarray(result.y_background), np.asarray(result.sigma),
-        positions, predicted_fwhm(positions, ref.fitted_instrument),
-        k_sigma=k_sigma) if len(positions) else ([], [])
+    extra: dict = {}
+    if screen is not None and screen.absent is not None:
+        absent_tt = screen.absent_two_theta
+        extra = dict(
+            predicted_but_absent_uncancellable=screen.n_absent_uncancellable,
+            predicted_but_absent_uncancellable_in_window=(
+                screen.n_absent_uncancellable_in_window),
+            absent_source="line_screen", n_lines_screened=screen.n_lines)
+    else:
+        positions = np.array([r.two_theta for r in rows], dtype=np.float64)
+        absent_tt, _ratio = absent_reflections(
+            np.asarray(result.two_theta), np.asarray(result.y_obs),
+            np.asarray(result.y_background), np.asarray(result.sigma),
+            positions, predicted_fwhm(positions, ref.fitted_instrument),
+            k_sigma=k_sigma) if len(positions) else ([], [])
 
     layer0 = build_layer0(result)
     unmatched = [u.two_theta for u in layer0.unmatched
@@ -471,7 +536,7 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
         unmatched_observed=len(unmatched),
         predicted_but_absent_two_theta=[round(v, 4) for v in absent_tt],
         unmatched_observed_two_theta=[round(float(v), 4) for v in unmatched],
-        status=result.status, n_stages=len(result.stages))
+        status=result.status, n_stages=len(result.stages), **extra)
     return (validation, result) if with_result else validation
 
 
@@ -553,7 +618,8 @@ def _restrict_to_supported(spec, quality):
 
 
 def _stream_system_snapshot(progress, system: str, units: dict, names,
-                            peaks, spec, quality, top: int) -> None:
+                            peaks, spec, quality, top: int,
+                            screen=None) -> None:
     """Grade what every completed system holds so far, and stream it (WP-1042).
 
     Runs as its **own ladder unit** (``consensus:<system>``, ``add``-ed like the
@@ -581,7 +647,7 @@ def _stream_system_snapshot(progress, system: str, units: dict, names,
     results = [merge_engine_units(units[name]) for name in names
                if units[name]]
     outcome = consensus(results, peaks, spec=spec, quality=quality, top=top,
-                        ambiguity=False)
+                        ambiguity=False, screen=screen)
     apply_gate(outcome.candidates, engines_run=outcome.engines_run,
                panel_disagrees=outcome.fom_panel_disagrees, validated=False,
                search_complete=outcome.search_complete,
@@ -749,6 +815,18 @@ def index_pattern(peaks: PeakList | None = None, *,
     spec = _restrict_to_supported(spec, quality)
     names = tuple(engines) if engines is not None else engine_names()
     top = CONSENSUS_CHECK_TOP if check_top is None else check_top
+    # the line screen's candidate-independent facts, once per run (C3): the
+    # envelope and the peak-list model with a pattern, the resolution windows
+    # and the chance rate without one
+    from .engines import absence_window, effective_shift_allowance
+    from .screen import PatternScreen
+
+    # the screen's indexed set feeds the containment refuter, an absence
+    # test, so it reads the assumed bound and never the widths' window (#951)
+    pattern_screen = PatternScreen.from_peaks(
+        peaks, q_match=absence_window(peaks, spec, quality), k_sigma=spec.k_sigma,
+        data=data if validate else None, instrument=instrument,
+        p0_floor_deg=spec.k_sigma * effective_shift_allowance(spec, quality)[0])
 
     # analogue priors steer the queue (WP-1045): the systems they name run
     # first, everything else keeps SYSTEM_ORDER — reordered, never narrowed
@@ -856,7 +934,8 @@ def index_pattern(peaks: PeakList | None = None, *,
                 # graded (WP-1042); a system the token interrupted has not,
                 # and its candidates stay provisional in the log
                 _stream_system_snapshot(progress, system, units, names, peaks,
-                                        spec, quality, top)
+                                        spec, quality, top,
+                                        screen=pattern_screen)
         return [merge_engine_units(units[name]) for name in names
                 if units[name]]
 
@@ -939,7 +1018,7 @@ def index_pattern(peaks: PeakList | None = None, *,
     # unasked
     outcome = consensus(results, peaks, spec=spec, quality=quality, top=top,
                         cancel=run_cancel, priors=prior_cands,
-                        ambiguity=False)
+                        ambiguity=False, screen=pattern_screen)
     if len(names) == 1:
         outcome.diagnostics.append(single_engine_diagnostic(names[0]))
     if prior_reports:
@@ -973,7 +1052,8 @@ def index_pattern(peaks: PeakList | None = None, *,
             try:
                 cand.lebail = validate_by_lebail(
                     cand, data, instrument, peaks=peaks,
-                    two_theta_limits=two_theta_limits, cancel=fit_cancel)
+                    two_theta_limits=two_theta_limits, cancel=fit_cancel,
+                    pattern_screen=pattern_screen)
             except RefinementCancelled:
                 # a truncated fit is not evidence about the candidate: leave
                 # ``lebail = None``, which reads ``not_validated`` (capping)

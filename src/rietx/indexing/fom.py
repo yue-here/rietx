@@ -476,6 +476,141 @@ def predicted_seen_fraction(q_obs: np.ndarray, q_esd: np.ndarray,
         blind_spot=_BLIND["predicted_seen_fraction"])
 
 
+#: The resolution multiple for every **reversed** question (predicted line →
+#: observed line): two positions closer than this many FWHM are one line as far
+#: as a peak list can tell, and a predicted line is *seen* only within this
+#: distance of a picked component.  One, not :data:`~rietx.model.forward.PAWLEY_OVERLAP_FWHM_FRAC`'s
+#: half: 0.5 is where least squares stops apportioning intensity, while a
+#: *picker* separates two equal components only from about one FWHM (the
+#: Rayleigh (1879, Phil. Mag. 8, 261) and Sparrow (1916, Astrophys. J. 44, 76)
+#: criteria put "two lines or one" at about a width).  Measured
+#: on the tetragonal control set: at 0.5 a true cell whose 0.0003 × b split
+#: reaches 0.9 FWHM at 60° was refuted as a resolved split; at 1 every control
+#: passes.  The forward question — does this cell index that observed line —
+#: keeps the **search** window (``engines.match_window``, 3σ_eff with the
+#: shift allowance folded in), which on a synchrotron pattern is six FWHM wide:
+#: asked in that window, a resolved orthorhombic split scored 0.99 on this
+#: member and the hR cell that outranked the truth in issue #916 scored 0.78;
+#: at the resolution they read 0.56 and 0.34 against the truth's 0.73.  An
+#: allowance bounds a common offset and belongs to the forward match alone;
+#: the common shift the forward matches imply (:func:`common_shift`) is what
+#: places the reversed question.  A constant that will be tuned again on the
+#: acceptance corpus; floored by ``k_sigma`` × σ(2θ) of the component asked
+#: against, so a position-only list keeps a window.
+RESOLUTION_FWHM = 1.0
+
+
+def two_theta_of_q(q: np.ndarray, wavelength: float) -> np.ndarray:
+    """°2θ of Q = 1/d², the inverse of :func:`~rietx.schemas.indexing.q_of_two_theta`."""
+    return np.degrees(2.0 * np.arcsin(np.clip(
+        wavelength * np.sqrt(np.maximum(np.asarray(q, dtype=np.float64), 0.0))
+        / 2.0, -1.0, 1.0)))
+
+
+def resolution_half_width(fwhm_at: np.ndarray, fwhm_comp: np.ndarray,
+                          esd_comp: np.ndarray, *, k_sigma: float = MATCH_SIGMA,
+                          resolution: float = RESOLUTION_FWHM) -> np.ndarray:
+    """Half-width (°2θ) of the reversed window about a component: the resolution
+    times the mean of the local width law and the component's own FWHM, floored
+    by ``k_sigma`` × that component's σ(2θ)."""
+    return np.maximum(resolution * 0.5 * (np.asarray(fwhm_at, dtype=np.float64)
+                                          + np.asarray(fwhm_comp, dtype=np.float64)),
+                      k_sigma * np.asarray(esd_comp, dtype=np.float64))
+
+
+def merge_at_resolution(tt_pred: np.ndarray, fwhm_pred: np.ndarray, *,
+                        resolution: float = RESOLUTION_FWHM) -> list[np.ndarray]:
+    """Group ascending predicted positions closer than the resolution into lines.
+
+    Each group is an index array; a position joins the open group when it sits
+    within ``resolution`` × the mean FWHM of the group's last member.  Without
+    this a split cell counts a truth's one glide absence once per partner, so a
+    tetragonal description of a cubic truth read its three absences eight
+    times (F1's first pass).
+    """
+    tt = np.asarray(tt_pred, dtype=np.float64)
+    fw = np.asarray(fwhm_pred, dtype=np.float64)
+    if not len(tt):
+        return []
+    groups: list[list[int]] = [[0]]
+    for k in range(1, len(tt)):
+        last = groups[-1][-1]
+        if tt[k] - tt[last] < resolution * 0.5 * (fw[k] + fw[last]):
+            groups[-1].append(k)
+        else:
+            groups.append([k])
+    return [np.asarray(g, dtype=np.int64) for g in groups]
+
+
+def common_shift(tt_obs: np.ndarray, tt_pred: np.ndarray,
+                 idx: np.ndarray) -> float:
+    """The common 2θ offset (°) the forward matches imply: the median of
+    observed − predicted over the indexed lines, 0 when nothing is indexed.
+
+    An allowance is not a correction (WP-1038); this is the one correction the
+    forward matches themselves carry, used only to place the reversed question.
+    """
+    idx = np.asarray(idx)
+    hit = idx >= 0
+    if not np.any(hit):
+        return 0.0
+    return float(np.median(np.asarray(tt_obs, dtype=np.float64)[hit]
+                           - np.asarray(tt_pred, dtype=np.float64)[idx[hit]]))
+
+
+def seen_at_resolution(tt_pred: np.ndarray, fwhm_at: np.ndarray,
+                       tt_comp: np.ndarray, fwhm_comp: np.ndarray,
+                       esd_comp: np.ndarray, *, k_sigma: float = MATCH_SIGMA,
+                       resolution: float = RESOLUTION_FWHM
+                       ) -> tuple[np.ndarray, np.ndarray]:
+    """``(seen, j)``: whether each predicted position lies within the reversed
+    window of its nearest component ``j``.  Nothing is seen on an empty list."""
+    pred = np.asarray(tt_pred, dtype=np.float64)
+    comp = np.asarray(tt_comp, dtype=np.float64)
+    if not len(pred) or not len(comp):
+        return np.zeros(len(pred), dtype=bool), np.full(len(pred), -1)
+    gap = np.abs(pred[:, None] - comp[None, :])
+    j = np.argmin(gap, axis=1)
+    half = resolution_half_width(fwhm_at, np.asarray(fwhm_comp)[j],
+                                 np.asarray(esd_comp)[j], k_sigma=k_sigma,
+                                 resolution=resolution)
+    return gap[np.arange(len(pred)), j] <= half, j
+
+
+def predicted_seen_fraction_at_resolution(
+        two_theta_obs: np.ndarray, two_theta_esd: np.ndarray,
+        fwhm_obs: np.ndarray, two_theta_pred: np.ndarray, *,
+        shift: float = 0.0, k_sigma: float = MATCH_SIGMA,
+        resolution: float = RESOLUTION_FWHM) -> FigureOfMerit:
+    """:func:`predicted_seen_fraction` asked at the **resolution** (C3, F1 § 3.2).
+
+    The predicted lines are merged at ``resolution`` × the local FWHM, moved by
+    the candidate's common ``shift``, and each merged line is *seen* when a
+    picked component lies within :func:`resolution_half_width`.  Same name and
+    blind spot as the windowed member it replaces in the panel: a space-group
+    extinction or an undetected weak line still counts against a correct cell,
+    which is why it ranks and never refutes.
+    """
+    obs = np.asarray(two_theta_obs, dtype=np.float64)
+    pred = np.sort(np.asarray(two_theta_pred, dtype=np.float64))
+    if not len(pred) or not len(obs):
+        return FigureOfMerit(name="predicted_seen_fraction", value=0.0,
+                            n_lines=len(obs), n_possible=len(pred),
+                            k_sigma=k_sigma,
+                            blind_spot=_BLIND["predicted_seen_fraction"])
+    order = np.argsort(obs)
+    fw_at = np.interp(pred, obs[order], np.asarray(fwhm_obs, dtype=np.float64)[order])
+    groups = merge_at_resolution(pred, fw_at, resolution=resolution)
+    merged = np.array([float(np.mean(pred[g])) for g in groups]) + shift
+    fw_m = np.array([float(np.mean(fw_at[g])) for g in groups])
+    seen, _j = seen_at_resolution(merged, fw_m, obs, fwhm_obs, two_theta_esd,
+                                  k_sigma=k_sigma, resolution=resolution)
+    return FigureOfMerit(
+        name="predicted_seen_fraction", value=float(np.mean(seen)),
+        n_lines=len(obs), n_possible=len(merged), k_sigma=k_sigma,
+        blind_spot=_BLIND["predicted_seen_fraction"])
+
+
 def _reversed_pair(q_obs: np.ndarray, q_esd: np.ndarray, q_pred: np.ndarray,
                    m_pred: np.ndarray, *, n: int = FOM_N,
                    k_sigma: float = MATCH_SIGMA,
@@ -593,11 +728,21 @@ def fom_panel(q_obs: np.ndarray, q_esd: np.ndarray, intensity: np.ndarray,
               cell: tuple[float, ...], system: str, centring: str,
               wavelength: float, *, k_sigma: float = MATCH_SIGMA,
               n_unindexed: int = 0,
-              q_match: np.ndarray | None = None) -> list[FigureOfMerit]:
+              q_match: np.ndarray | None = None,
+              fwhm_obs: np.ndarray | None = None) -> list[FigureOfMerit]:
     """Every figure of merit for one candidate, in one pass over the predictions.
 
     ``n_unindexed`` must be the same count the *search* was allowed — see
     :func:`trimmed_mean` for the measurement that makes them one number.
+
+    ``fwhm_obs`` (°2θ per observed line, the peak list's) switches the reversed
+    member to the **resolution**: :func:`predicted_seen_fraction_at_resolution`
+    at :data:`RESOLUTION_FWHM`, after the common shift the forward matches
+    imply.  Without it the member is asked in the matching window, which on a
+    synchrotron pattern is six FWHM wide and cannot see a resolved split
+    (C3; the numbers are on :data:`RESOLUTION_FWHM`).  Every caller that holds
+    a fitted peak list passes it; a position-only list has an assumed width
+    and still gets the σ floor.
 
     **``q_match`` is the matching window and ``q_esd`` is the measurement, and the
     panel needs both** — CLAUDE.md's rule that a fitted σ is the right weight and
@@ -636,6 +781,15 @@ def fom_panel(q_obs: np.ndarray, q_esd: np.ndarray, intensity: np.ndarray,
     # out of every candidate's panel alike — the same members for all, so Borda
     # still ranks — and their reasons travel on the quality report, never here
     undefined = panel_undefined(len(np.asarray(q_obs)))
+    if fwhm_obs is None:
+        seen = predicted_seen_fraction(q_obs, match, q_pred, k_sigma=k_sigma)
+    else:
+        # the forward match decides the common shift; the reversed question
+        # is then asked at the resolution, never in the search window
+        idx, _ = match_lines(q_obs, match, q_pred, k_sigma=k_sigma)
+        seen = predicted_seen_fraction_at_resolution(
+            two_theta_obs, two_theta_esd, fwhm_obs, tt_pred,
+            shift=common_shift(two_theta_obs, tt_pred, idx), k_sigma=k_sigma)
     members = [
         m20(q_obs, q_esd, q_pred, k_sigma=k_sigma, n_unindexed=n_unindexed),
         f_n(two_theta_obs, two_theta_esd, tt_pred, k_sigma=k_sigma,
@@ -643,7 +797,7 @@ def fom_panel(q_obs: np.ndarray, q_esd: np.ndarray, intensity: np.ndarray,
         indexed_fraction(q_obs, match, q_pred, k_sigma=k_sigma),
         indexed_fraction(q_obs, match, q_pred, intensity=intensity,
                          k_sigma=k_sigma),
-        predicted_seen_fraction(q_obs, match, q_pred, k_sigma=k_sigma),
+        seen,
         m_rev,
         m_sym,
     ]

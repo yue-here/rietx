@@ -412,12 +412,20 @@ The verdict is one of three, at a significance level of 0.01:
 - undecided: even seeing every extra could not have reached the level, or the extras are seen beyond chance only on lines the smaller cell already explains, as on a pseudo-symmetric description of the smaller cell's own lattice. Nothing moves.
 
 Nothing else in the order changes, and a refuted cell is never moved up.
+*Refuted* means seen no more often than chance, since a non-significant test does not establish the null, so extras seen above chance but not significantly leave the verdict `"undecided"`.
 The check needs only the peak list, so it runs on a bare list too.
+
+Which pairs are asked is a question about the lines, not the volumes (indexing thresholds 1.11).
+A cell is asked as the larger one whenever every observed line the smaller cell indexes it indexes too, and its own line set is the denser.
+That reaches a sublattice pair, and it reaches pairs that are not: a cubic I cell at √2 the edge of a cubic F truth, whose primitive volume is 5.66 times the truth's, and a trigonal description with the truth's own volume, which outranked it on a synthetic silicon pattern.
+`SupercellCheck.relation` says which kind of pair it was.
+The extras are counted at the measured resolution, one FWHM, after the common shift the cell's own matches imply, never in the window the search matched with.
 
 | Field | Holds |
 |---|---|
 | `SupercellCheck.parent_cell`, `SupercellCheck.parent_system`, `SupercellCheck.parent_centring` | the smaller candidate this cell contains |
-| `SupercellCheck.index` | how many of the parent's primitive cells one of this cell's holds |
+| `SupercellCheck.index` | how many of the parent's primitive cells one of this cell's holds; 0 when the parent is not a sublattice |
+| `SupercellCheck.relation` | `"sublattice"`, or `"containment"` when the smaller cell only indexes a subset of this one's lines |
 | `SupercellCheck.n_extra`, `SupercellCheck.n_seen` | the extra lines in range no extinction could remove, and how many sit on an observed line |
 | `SupercellCheck.n_seen_unexplained` | of those seen, the ones on an observed line the parent cannot index; `None` in a record from before thresholds version 1.7 |
 | `SupercellCheck.p0` | the chance that a position with no line reads as seen |
@@ -443,7 +451,11 @@ The middle one is the classic doubled-cell false positive, which is why validati
 | `LeBailValidation.rwp`, `LeBailValidation.gof` | the fit's agreement; both infinite when the fit raised |
 | `LeBailValidation.space_group` | the absence-free lattice group the fit used |
 | `LeBailValidation.n_reflections` | the primary line's reflections in the fitted range |
-| `LeBailValidation.predicted_but_absent` | of those, the ones with no net intensity above the fitted background: under 3σ over half a FWHM either side |
+| `LeBailValidation.predicted_but_absent` | lines the lattice predicts where the pattern has nothing above the picker's background envelope at the measured width |
+| `LeBailValidation.predicted_but_absent_uncancellable` | of those, the lines no space group of the lattice could extinguish |
+| `LeBailValidation.predicted_but_absent_uncancellable_in_window` | of those, the lines inside the first twenty observed lines; the caveat reads this one |
+| `LeBailValidation.n_lines_screened` | the lines the screen asked about, merged at the resolution; the share `predicted_but_absent` is of |
+| `LeBailValidation.absent_source` | `"line_screen"`, or `"fitted_background"` when no peak list was supplied |
 | `LeBailValidation.unmatched_observed` | observed peaks with no calculated reflection nearby, as the fit report's Layer 0 counts them |
 | `LeBailValidation.predicted_but_absent_two_theta`, `LeBailValidation.unmatched_observed_two_theta` | where each of those is, ° 2θ |
 | `LeBailValidation.status` | the fit's status; `"failed"` when the fit raised, which is evidence about the cell and not a crash |
@@ -452,17 +464,23 @@ The middle one is the classic doubled-cell false positive, which is why validati
 
 The fit holds the cell.
 The candidate is the hypothesis under test, and letting it walk would validate a different cell from the one reported.
-It frees the background, then exactly one peak-position parameter chosen from the candidate's own shift template (the zero shift by default, and always on a geometry other than Bragg-Brentano), then `W`, then `U`, `V`, `X` and `Y` together.
-When the declared instrument's widths disagree with the picked lines', `W` starts from the lines' median FWHM.
+It frees the background and exactly one peak-position parameter chosen from the candidate's own shift template (the zero shift by default, and always on a geometry other than Bragg-Brentano).
+The profile is frozen at the peak list's measured width, shared by every candidate, so a wrong cell cannot broaden a neighbour to cover a line it does not explain.
 The fit is single-phase, a measured constraint rather than a simplification: Le Bail partitioning has nothing to arbitrate two phases claiming the same channel.
 
 The test runs on the checked candidates only: the top `check_top`, plus every candidate every engine found, since those are the only ones the gate could promote.
 A candidate outside that set, or one whose fit the clock stopped, keeps `lebail = None`.
 
+The absent count is not this fit's.
+A cell that needs intensity under many reflections can buy it from its own background: on a laboratory magnetite pattern the wrong primitive description drove its co-refined background below zero and read nothing absent of 163.
+So the count is a line screen's, computed from inputs the candidate cannot change: the peak list's positions, widths and shapes, the picker's background envelope, and the package's own overlap rule.
+A predicted line is absent when it is resolved from every picked line, the peak-list model is quiet there, and nothing stands above the envelope at the measured width.
+
 `LeBailValidation.rwp` is not a panel member.
 It costs a refinement, so it is computed for a shortlist rather than for every candidate, and reading it as a rank would bring back the blind spot it exists to close, since a bigger cell with more free intensities fits better.
 Read `predicted_but_absent` as "this cell predicts lines the pattern lacks", never as "this cell is too big".
-It counts against the lattice group, so a space-group extinction (a glide plane, a screw axis) refutes a correct cell, and only the extinction screen afterwards separates the two ([The extinction symbol](extinction.md)).
+It counts against the lattice group, so a space-group extinction (a glide plane, a screw axis) shows in the count on a correct cell, and the extinction screen afterwards separates the two ([The extinction symbol](extinction.md)).
+The caveat of the same name reads only the absences no extinction could cancel, inside the first twenty lines, and it caps rather than refutes: a correct cell's weak reflections below detection read absent too, over the whole range, so the count keeps `high` out of reach and the supercell check is what refutes.
 A nonzero count raises [`INDEX_PREDICTED_BUT_ABSENT`](diagnostics-indexing.md#index_predicted_but_absent), and unmatched observed lines raise [`INDEX_IMPURITY_LINES`](diagnostics-indexing.md#index_impurity_lines).
 
 ### The confidence gate
@@ -474,19 +492,19 @@ A nonzero count raises [`INDEX_PREDICTED_BUT_ABSENT`](diagnostics-indexing.md#in
 - `medium` otherwise: at least two finders, and only capping caveats.
 
 Every reason a candidate falls short is a member of a closed vocabulary in `CellCandidate.confidence_caveats`.
-Seven of the thirteen refute the candidate, each being evidence against the cell or evidence that the data cannot choose.
-The other six cap it.
+Six of the thirteen refute the candidate, each being evidence against the cell or evidence that the data cannot choose.
+The other seven cap it.
 The count of caveats decides nothing.
 
 | Caveat | Written when | Effect |
 |---|---|---|
 | `geometric_ambiguity` | the candidate has an ambiguity partner, or the ambiguity walk never reached it | refutes |
 | `fom_panel_disagrees` | the panel's members put different candidates first; written on every candidate of the run | refutes |
-| `predicted_but_absent` | the Le Bail fit ran and `LeBailValidation.predicted_but_absent` is above zero | refutes |
 | `indexed_fraction_low` | the `indexed_fraction` member is below 0.9, or missing | refutes |
 | `volume_unphysical` | the volume is below 15 Å³, or above 1.5 times Smith's envelope for its system | refutes |
 | `validation_failed` | the Le Bail fit's status is `"failed"` or `"diverged"` | refutes |
 | `supercell_refuted` | a `SupercellCheck` on this candidate reads `"refuted"` | refutes |
+| `predicted_but_absent` | the line screen found lines this lattice predicts, that no extinction could remove, inside the first twenty lines, where the pattern has nothing | caps |
 | `engines_disagree` | some engine that ran did not find this lattice | caps |
 | `not_validated` | this candidate has no Le Bail fit behind it | caps |
 | `search_incomplete` | the candidate's own crystal system was not searched to completion | caps |
@@ -514,8 +532,8 @@ Never take `candidates[0]` because it is ranked first.
 The ranking orders the hypotheses and the gate judges them, which are different questions.
 The order leads with corroboration and moves a supercell by its checks, which is closer to the gate's reading than a panel ranking alone, and still not it.
 
-On the default corundum run above, the certified trigonal R lattice comes back first, found by two of the three engines, with a converged Le Bail fit at Rwp 0.28 that reads 11 of 85 reflections absent.
-It grades `low` on four caveats, so `best_or_none` returns `None`.
-`predicted_but_absent` has the shape a space-group extinction takes when read against a lattice group that does not know about it, and the extinction screen ([The extinction symbol](extinction.md)) is what separates that from an oversized cell.
+On the default corundum run above, the certified trigonal R lattice comes back first, found by two of the three engines, with a converged Le Bail fit.
+It grades `low`, so `best_or_none` returns `None`.
+`LeBailValidation.predicted_but_absent` counts the c-glide's reflections, the shape a space-group extinction takes when read against a lattice group that does not know about it; none of them is a line no space group could extinguish, so the caveat is silent, and the extinction screen ([The extinction symbol](extinction.md)) is what names the glide.
 `geometric_ambiguity` is there on every candidate because the ceiling stopped the run before the ambiguity walk, and `fom_panel_disagrees` because the panel's members split.
-None of the four says the cell is wrong; they say what has not been established, which is the difference between this answer and a confident one.
+None of the caveats says the cell is wrong; they say what has not been established, which is the difference between this answer and a confident one.

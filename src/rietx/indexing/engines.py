@@ -1586,7 +1586,8 @@ def to_cell_candidate(cand: EngineCandidate, peaks: PeakList, *,
     if not panel and reflection_ceiling_ok(fit.cell, peaks.wavelength, tt_max):
         panel = fom_panel(q, q_esd, inten, tt, tt_esd, fit.cell, cand.system,
                           cand.centring, peaks.wavelength, k_sigma=k_sigma,
-                          n_unindexed=n_unindexed, q_match=q_match)
+                          n_unindexed=n_unindexed, q_match=q_match,
+                          fwhm_obs=_peak_fwhm(peaks))
     esd = np.asarray(fit.cell_esd, dtype=np.float64)
     vol_esd = _volume_esd(fit)
     n_left, residue = None, None
@@ -2091,6 +2092,13 @@ def agreement(cand: EngineCandidate) -> int:
     return len({f for f in cand.found_by if f != PRIOR_FINDER}) or 1
 
 
+def _peak_fwhm(peaks: PeakList) -> np.ndarray:
+    """The usable lines' fitted widths (°2θ): they put the panel's reversed
+    member at the resolution (C3), and every route that builds a panel passes
+    them, so a candidate is scored on one definition of *seen*."""
+    return np.array([p.fwhm for p in peaks.usable()], dtype=np.float64)
+
+
 def _panel_for(cand: EngineCandidate, peaks: PeakList, k_sigma: float,
                n_unindexed: int = 0, q_match: np.ndarray | None = None):
     tt_esd = peaks.two_theta_esd()
@@ -2102,7 +2110,7 @@ def _panel_for(cand: EngineCandidate, peaks: PeakList, k_sigma: float,
         return fom_panel(q, peaks.q_esd(), peaks.intensity(), tt, tt_esd,
                          cand.cell, cand.system, cand.centring, peaks.wavelength,
                          k_sigma=k_sigma, n_unindexed=n_unindexed,
-                         q_match=q_match)
+                         q_match=q_match, fwhm_obs=_peak_fwhm(peaks))
     except (ValueError, RuntimeError):
         return []
 

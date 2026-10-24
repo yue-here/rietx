@@ -39,14 +39,21 @@ over the panel, two-opinion Bravais, ambiguity) → Le Bail validation → the
 gate. Three load-bearing rules. **`high` requires zero caveats**, and
 `IndexCaveat`/`INDEX_REFUTING_CAVEATS` (`schemas/indexing.py`) are the whole
 gate: any caveat in the refuting set drops a cell to `low`, the rest cap at `medium`, and
-*count* deliberately separates nothing. **Whole-profile validation is
-mandatory** — the FoM panel sees ≤20 lines, so `validate_by_lebail`'s
-`predicted_but_absent` is what catches an oversized cell (117 of 153 for a
-doubled cell against 0 of 28 for the truth, Rwp moving only 0.216 → 0.379);
-Layer 0's `unmatched_calc` **cannot** serve (Le Bail assigns ~nothing to a
-phantom, so it fires on 68 % of the truth's reflections against 55 % of a doubled cell's), nor `unmatched_observed` as a caveat
-(its level is the *specimen's* — 10-188 across 21 correct candidates —
-comparative only, WP-1041). **The validation fit holds the cell**, freeing
+*count* deliberately separates nothing. **Every reversed question is asked of
+inputs a candidate cannot buy, at the measured resolution** (C3, #916,
+`screen.py`: peak list + picker's envelope + the one overlap rule, after the
+common shift the forward matches imply) — never the candidate's own Le Bail
+fit (magnetite's wrong P description bought a negative background and read 0
+of 163 absent, WP-1043) and never the search window (±0.15° on a 0.023° FWHM
+read a resolved split as *supported*). The oversized cell is **capped** by the
+line screen (`predicted_but_absent`, the windowed uncancellable count) and
+**refuted** by the generalised supercell check; the whole-profile Le Bail stays
+**mandatory for the forward direction** (`unmatched_observed`, Rwp for a
+reader; `freeze_profile` is off, measured in `validation_plan`). Layer 0's
+`unmatched_calc` **cannot** serve (Le Bail assigns ~nothing to a phantom, so it
+fires on 68 % of the truth's reflections against 55 % of a doubled cell's), nor
+`unmatched_observed` as a caveat (its level is the *specimen's* — 10-188 across
+21 correct candidates — comparative only, WP-1041). **The validation fit holds the cell**, freeing
 exactly one peak-position parameter from the candidate's own shift template.
 On real data with no measured shift, `high` is *unreachable* by design
 (`shift_allowance_assumed`); the fix is evidence, not a bigger constant
@@ -123,7 +130,8 @@ failing on a bad starting basin; the only *stochastic* engine
 (`SearchSpec.seed` is part of its answer, never `hash()` of a name — python
 salts per process) and the only one reading observed intensities. All three
 rank on the FoM **panel** via `rank_candidates`, never on a member —
-supercells index every observed line and lose only on the reversed members.
+supercells index every observed line and lose only on the reversed members,
+asked at the resolution (`fom_panel(..., fwhm_obs=)`, C3).
 Seven members: M₂₀, F_N, three coverage fractions, and Oishi-Tomiyasu
 (2013)'s `m_rev`/`m_sym` (the reversed direction as a *ratio* where ours is
 a windowed fraction — on a doubled axis `m_rev` separates truth from
@@ -184,6 +192,13 @@ wider than the shift manufactures a confident wrong singleton** (at 0.060° SRM
 660c returns a cell 293 000 ppm off at `high`), so headroom scales the
 amplitude's *standard error*, never the pair scatter; and **an allowance is not
 a correction** — it finds lines, only `shift_template` moves the cell.
+
+**The reversed questions are not asked in the search window** (C3): a common
+shift is estimated from the forward matches (`fom.common_shift`) and never
+applied as a window; the reversed one is `RESOLUTION_FWHM` (1 FWHM, floored by
+3σ; 0.5 refuted a true unresolved split). The capping count takes de Wolff's
+window (first twenty lines: truths 0–2, wrong cells 7–79), the pairwise test
+the full range, whose null p₀ already discounts unseen weak lines.
 
 **The tolerance an engine searches with is not the per-line σ.** A fitted σ(2θ)
 is the right *weight* and the wrong *matching window*: certified corundum's
@@ -257,16 +272,22 @@ roughly the shift (+1400 ppm).
   lattice above the cubic truth with **115 fast indexing tests green** — so run
   `tests/test_acceptance_indexing.py` before closing anything that touches an engine.
 - Read a `predicted_but_absent` firing as "this cell predicts lines the pattern
-  lacks", **never** "this cell is too big": it counts against the *lattice* group,
-  so a space-group extinction (corundum's R-3c c-glide) refutes a correct cell, and
-  only the extinction screen separates the two. Choose acceptance datasets **by
-  space group** — SRM 660c (P m -3 m) is the control that proved it. **So the
-  reversed members cannot order two fitted candidates either**: asked pairwise the
-  question demotes SRM 676a's own cell as readily as brucite's supercell, the two
-  populations interleaving (WP-1446). Asked of the extras no extinction can
-  cancel and judged against **chance** it separates (`supercell_chance`; never
-  the screen's class, which moves with 2θ range), and a refuted child sits below
-  its parent **across corroboration tiers**, being refuted, not outscored (1449).
+  lacks", **never** "this cell is too big", and since C3 **it caps; the lattice
+  statement that refutes is the generalised superset check**. The full-range
+  count shows a space-group extinction (corundum's R-3c c-glide); the caveat
+  reads only the uncancellable lines inside de Wolff's window, so a glide never
+  raises it and the extinction screen separates glide from oversized cell.
+  Choose acceptance datasets **by space group** — SRM 660c (P m -3 m) is the
+  control that proved it. **So the reversed members cannot order two fitted
+  candidates either**: asked pairwise the question demotes SRM 676a's own cell
+  as readily as brucite's supercell, the two populations interleaving
+  (WP-1446). Asked of the extras no extinction can cancel and judged against
+  **chance** it separates (`screen.containment_evidence`: indexed-set
+  containment with the denser line set as the child, generalising
+  `supercell_chance`'s index 2–4; never the screen's class, which moves with
+  2θ range), *refuted* meaning seen no more often than chance (k ≤ n·p₀), and
+  a refuted child sits below its parent **across corroboration tiers**, being
+  refuted, not outscored (1449).
 - The known-cell scoreboard is *never wrong, and silent more often than right* —
   **never round it up**, and **keep the found-but-not-first bucket** (collapsing it
   into right-or-wrong is how the old board named nine datasets under a total of

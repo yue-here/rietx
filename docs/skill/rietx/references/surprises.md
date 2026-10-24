@@ -223,8 +223,8 @@ further.**
 **8.17 "Is there intensity here?" is not one question — it depends on what else
 your hypothesis predicts nearby.** Two detectors in this package ask it with the
 same window (±½ FWHM) and the same threshold (3σ), and they must use different
-null models. WP-1024's `predicted_but_absent` asks it against the fitted
-**background**, which is right for an oversized cell's phantom reflection because
+null models. WP-1024's `predicted_but_absent` asks it against the picker's
+**envelope**, which is right for an oversized cell's phantom reflection because
 a phantom sits in a *gap*. WP-1025's extinction screen asks it at a **forbidden**
 position, which sits inside a dense predicted pattern — and measured on the FAP
 lab pattern, the 003 that P 6₃/m forbids is 0.89 FWHM from an allowed neighbour

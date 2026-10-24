@@ -1140,9 +1140,14 @@ def test_a_certified_lab_pattern_indexes_and_is_graded_honestly(corundum_index):
 
     # the gate still refuses to promote it, and every caveat names something real
     assert best.confidence == "low"
-    assert set(best.confidence_caveats) >= {
-        "engines_disagree", "predicted_but_absent"}
+    assert "engines_disagree" in best.confidence_caveats
+    # the c-glide shows in the screen's count and never in the caveat (C3):
+    # every one of its absences is cancellable, and the window holds no
+    # uncancellable one (the record measured 5 over the full range, 0 in it)
     assert best.lebail is not None and best.lebail.predicted_but_absent > 0
+    assert best.lebail.absent_source == "line_screen"
+    assert best.lebail.predicted_but_absent_uncancellable_in_window == 0
+    assert "predicted_but_absent" not in best.confidence_caveats
     assert res.best_or_none() is None, (
         "a cell was returned as the answer with caveats standing")
 
@@ -1350,12 +1355,15 @@ def test_a_hexagonal_lab_pattern_recovers_its_lattice(zincite_index):
     Kihara & Donnay's cell, **all 27 usable lines indexed**, M₂₀ = 910, and both
     engines agree.
 
-    It is graded ``low`` anyway, on three caveats that each name something real,
-    and the second is the point of this row.  ``predicted_but_absent`` is **4**:
-    P6₃mc has a 6₃ screw (00l absent for l odd) and a c-glide, neither of which
-    the *lattice* hexagonal P knows about — so this is the extinction blind spot
-    again, now measured on a third space group.  With LaB₆ (no absences, 0) and
+    It is graded ``low`` anyway, on caveats that each name something real,
+    and the second is the point of this row.  ``predicted_but_absent`` counts
+    the 6₃ screw (00l absent for l odd) and the c-glide of P6₃mc, neither of
+    which the *lattice* hexagonal P knows about — the extinction blind spot
+    again, measured on a third space group.  With LaB₆ (no absences, 0) and
     corundum (a c-glide, 11-12) that makes a table rather than an anecdote.
+    Since C3 the caveat reads only the absences no extinction could cancel,
+    inside the first twenty lines, so the screw and the glide are counted and
+    the caveat stays silent on the correct cell.
     """
     res = zincite_index
     a_ref, c_ref = QARR_PHASES["zincite"][1][0], QARR_PHASES["zincite"][1][2]
@@ -1371,9 +1379,11 @@ def test_a_hexagonal_lab_pattern_recovers_its_lattice(zincite_index):
     assert best.fom_value("m20") > 300.0
     assert set(best.found_by) == set(res.engines_run)
 
-    # the extinction blind spot, third data point: a 6_3 screw and a c-glide
+    # the extinction blind spot, third data point: a 6_3 screw and a c-glide,
+    # counted and cancellable, so the caveat is silent (C3)
     assert best.lebail is not None and best.lebail.predicted_but_absent > 0
-    assert "predicted_but_absent" in best.confidence_caveats
+    assert best.lebail.predicted_but_absent_uncancellable_in_window == 0
+    assert "predicted_but_absent" not in best.confidence_caveats
     assert best.confidence == "low"
     assert res.best_or_none() is None
 
@@ -1593,8 +1603,14 @@ def test_magnetites_correct_cell_is_ranked_first_and_graded_below_its_rival(
     slamming it, a bound worth knowing before anyone redesigns the detector
     around this row.
 
-    The gate still abstains, so nothing wrong is returned; what this row pins is
-    that the *reason* it abstains is not the reason a reader would guess.
+    **Since C3 the count is the line screen's, and the inversion is gone.**
+    Against the picker's envelope at the peak list's widths the rival reads
+    its absences (the record measured 54 of 92 merged lines, 28 of them
+    uncancellable) where its own fit read 0; the truth's d-glide absences are
+    counted but cancellable.  The bought background is still what the
+    rival's fit does, regenerated below, and it no longer blinds anything.
+
+    The gate still abstains, so nothing wrong is returned.
     """
     res = magnetite_index
     assert res.candidates
@@ -1617,19 +1633,25 @@ def test_magnetites_correct_cell_is_ranked_first_and_graded_below_its_rival(
         "forward coverage should be identical — if it is not, this row is no "
         "longer about the reversed direction")
 
-    # …and the detector reads them backwards, for the reason in the docstring
+    # …and the screen reads them the right way round (C3): the rival's
+    # phantoms are absent against an envelope it cannot refit
     assert best.lebail is not None and rival.lebail is not None
+    assert best.lebail.absent_source == rival.lebail.absent_source == "line_screen"
     assert best.lebail.predicted_but_absent > 0, (
-        "F d -3 m's d-glide should refute the *correct* cell here")
-    assert rival.lebail.predicted_but_absent == 0, (
+        "F d -3 m's d-glide should show in the *correct* cell's count here")
+    assert rival.lebail.predicted_but_absent >= 30, (
         f"{rival.lebail.predicted_but_absent} of "
-        f"{rival.lebail.n_reflections}: the over-parameterised Le Bail fit "
-        "should leave nothing detectably absent")
+        f"{rival.lebail.n_lines_screened}: the screen should read the "
+        "rival's phantoms where its own fit read none")
+    assert rival.lebail.predicted_but_absent_uncancellable_in_window \
+        > best.lebail.predicted_but_absent_uncancellable_in_window
+    assert "predicted_but_absent" in rival.confidence_caveats
+    assert ("predicted_but_absent" in best.confidence_caveats) == (
+        best.lebail.predicted_but_absent_uncancellable_in_window > 0)
     assert rival.lebail.n_reflections > 3 * best.lebail.n_reflections
     assert rival.lebail.rwp > 2.0 * best.lebail.rwp, (
         "the separation the docstring explains — same root cause as the "
-        "detector's blindness, and not a licence to rank on a Le Bail Rwp")
-    assert "predicted_but_absent" in best.confidence_caveats
+        "old detector's blindness, and not a licence to rank on a Le Bail Rwp")
 
     # the mechanism, regenerated rather than quoted (WP-1043): re-fit the
     # rival and read the background its own validation bought
@@ -1647,7 +1669,9 @@ def test_magnetites_correct_cell_is_ranked_first_and_graded_below_its_rival(
     assert np.mean(net > 3.0 * np.asarray(rival_fit.sigma)) > 0.99, (
         "with a negative background every channel reads as net intensity, "
         "and a detector asking 'is there nothing here' can never fire")
-    assert "predicted_but_absent" not in rival.confidence_caveats
+    # …which is why the count no longer asks that fit: the same call's
+    # screen count is the one on the candidate
+    assert _val.predicted_but_absent == rival.lebail.predicted_but_absent
 
     # nothing wrong is returned either way
     assert res.best_or_none() is None
@@ -1747,13 +1771,18 @@ def test_short_wavelength_data_is_indexed_by_the_engines_that_enumerate_nothing(
         assert cand.n_indexed < by_centring["I"].n_indexed
         assert cand is res.candidates[-1]
 
-    # and the whole profile picks between them, which is what it is for: the I
-    # description predicts nothing that is not seen, the P description of the
-    # same axes predicts 92 reflections the pattern does not contain
-    assert by_centring["I"].lebail.predicted_but_absent == 0, (
+    # and the line screen picks between them, which is what it is for: the I
+    # description predicts nothing uncancellable the window lacks (its
+    # absences are weak high-angle lines, 16 of 837 reflections measured),
+    # the P description of the same axes predicts many lines the pattern
+    # does not contain
+    assert by_centring["I"].lebail.predicted_but_absent_uncancellable_in_window == 0, (
         f"{by_centring['I'].lebail.predicted_but_absent} of "
-        f"{by_centring['I'].lebail.n_reflections}")
+        f"{by_centring['I'].lebail.n_lines_screened}")
+    assert "predicted_but_absent" not in by_centring["I"].confidence_caveats
     assert by_centring["P"].lebail.predicted_but_absent > 50
+    assert by_centring["P"].lebail.predicted_but_absent \
+        > 2 * by_centring["I"].lebail.predicted_but_absent
 
     # **The panel's ranking defect, and what answers it** (WP-1041, WP-1449).
     # The whole panel is written out because the margins are the argument

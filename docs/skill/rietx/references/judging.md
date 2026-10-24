@@ -262,7 +262,7 @@ nothing and most of the residual the detector looks for goes with it. What
 survives is a noise excursion near a tick. Measured on a synthetic LaB₆ pattern
 (WP-1024): 19 of the certified cell's own 28 reflections
 and 84 of a doubled cell's 153, 68 % against 55 %, so it does not separate them. The count that does is `LeBailValidation.predicted_but_absent`, which
-integrates net intensity above the fitted background over each predicted
+integrates net intensity above the picker's envelope over each predicted
 position. The blind direction is the one de Wolff's M₂₀ has, and it is why
 Oishi-Tomiyasu (2013, *J. Appl. Cryst.* **46**, 1277) reversed the figure.
 

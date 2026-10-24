@@ -159,6 +159,19 @@ from .structure import Cell
 #: where it was the constant, so a high-resolution list now matches within its
 #: own widths.  A run whose first pass finds an agreed lattice, and a lab list
 #: with lines 0.05 degrees or wider, answer as at 1.9.
+#: 1.11, C3 (issue #916), same cycle as the 1.11 above: the reversed questions are asked at the measured
+#: **resolution** (``indexing.fom.RESOLUTION_FWHM``) by a candidate-independent
+#: line screen (``indexing/screen.py``), never in the search window or of the
+#: candidate's own fit.  ``predicted_seen_fraction`` is the screen's seen
+#: fraction after the candidate's common shift; ``supercell_checks`` asks child
+#: against parent by containment of the indexed observed set with the denser
+#: line set as the child, so cubic I √2·a₀ over cubic F a₀ and a trigonal
+#: description of a cubic truth are now asked and refuted; ``verdict`` gains
+#: a middle band (refuted needs the extras seen no more often than chance,
+#: ``n_seen ≤ n_extra·p0``); ``LeBailValidation.predicted_but_absent`` is the
+#: screen's count against the picker's envelope, with the uncancellable and
+#: windowed-uncancellable counts beside it, and the ``predicted_but_absent``
+#: caveat fires on the windowed count and **caps** rather than refutes.
 INDEXING_THRESHOLDS_VERSION = "1.11"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
@@ -542,9 +555,15 @@ Confidence = Literal["high", "medium", "low"]
 #: supplied at all (``IndexingResult.validated`` is then False) or because the
 #: run's ceiling expired part-way down the shortlist, which
 #: ``INDEX_BUDGET_EXHAUSTED`` counts: the run-level flag and this caveat are
-#: therefore not each other's negation.  ``predicted_but_absent`` — the Le Bail fit found reflections where
-#: the pattern has no intensity, the classic oversized-cell false positive M₂₀
-#: cannot see.  ``indexed_fraction_low`` — below
+#: therefore not each other's negation.  ``predicted_but_absent`` — the line
+#: screen found reflections this lattice predicts, that no extinction could
+#: remove, inside de Wolff's window (the first twenty lines), where the
+#: pattern has nothing above the picker's background envelope
+#: (``LeBailValidation.predicted_but_absent_uncancellable_in_window``).
+#: **Capping** since thresholds 1.11: a true cell's weak general reflections
+#: below detection read absent too (corundum 5 over the full range, 0 in the
+#: window), so the count keeps ``high`` out of reach and the pairwise
+#: ``supercell_refuted`` is what refutes.  ``indexed_fraction_low`` — below
 #: :data:`INDEX_MIN_INDEXED_FRACTION` of the usable lines.  ``search_incomplete``
 #: — a budget expired, so a *negative* result elsewhere in the domain means
 #: nothing.  ``shift_allowance_assumed`` — the matching window was widened by an
@@ -587,7 +606,7 @@ IndexCaveat = Literal[
 #: constant read by :func:`rietx.indexing.consensus.confidence_for` rather than
 #: a chain of conditions.
 INDEX_REFUTING_CAVEATS: frozenset[str] = frozenset({
-    "geometric_ambiguity", "fom_panel_disagrees", "predicted_but_absent",
+    "geometric_ambiguity", "fom_panel_disagrees",
     "indexed_fraction_low", "volume_unphysical", "validation_failed",
     "supercell_refuted"})
 
@@ -1086,8 +1105,16 @@ class SupercellCheck(Base):
     parent_cell: tuple[float, float, float, float, float, float]
     parent_system: str
     parent_centring: str
-    #: how many of the parent's primitive cells one of this lattice's holds
+    #: how many of the parent's primitive cells one of this lattice's holds;
+    #: 0 when the parent is not a sublattice (``relation="containment"``)
     index: int
+    #: ``"sublattice"``: the parent is an index-2-to-4 sublattice of this
+    #: lattice.  ``"containment"`` (thresholds 1.11): every observed line the
+    #: parent indexes, this lattice indexes, and this one's line set is the
+    #: denser — the relation ``indexing.screen.contains`` asks, which reaches
+    #: cubic I √2·a₀ over cubic F a₀ and a trigonal description of a cubic
+    #: truth, neither a sublattice pair
+    relation: Literal["sublattice", "containment"] = "sublattice"
     n_extra: int
     n_seen: int
     p0: float
@@ -1161,9 +1188,27 @@ class LeBailValidation(Base):
     #: the reflections whose absence is not yet established.
     space_group: str
     n_reflections: int
-    #: reflections the lattice predicts where the pattern has no intensity, from
-    #: Layer 0's ``unmatched_calc``
+    #: lines the lattice predicts where the pattern has no intensity.  Since
+    #: thresholds 1.11 the line screen's count (``indexing/screen.py``): merged
+    #: predicted lines, testable (resolved from every picked component and
+    #: quiet in the peak-list model) and with nothing above the picker's
+    #: background envelope at the measured width — inputs the candidate
+    #: cannot buy.  With no peak list supplied it is the older count against
+    #: the fit's own background (``absent_source``).
     predicted_but_absent: int = 0
+    #: of those, the lines no space group of this lattice could extinguish
+    #: (``ambiguity.uncancellable``); ``None`` before C3 (thresholds 1.11) or without a screen
+    predicted_but_absent_uncancellable: int | None = None
+    #: of *those*, the lines inside de Wolff's window — positions up to the
+    #: Q of the 20th usable line, where a true cell's lines are strong enough
+    #: to be detected.  The ``predicted_but_absent`` caveat fires on this one.
+    predicted_but_absent_uncancellable_in_window: int | None = None
+    #: which detector produced the count
+    absent_source: Literal["line_screen", "fitted_background"] = "fitted_background"
+    #: the screen's denominator: predicted lines merged at the resolution in
+    #: the peak list's range.  ``n_reflections`` is the fit's and counts every
+    #: reflection, so ``predicted_but_absent`` is a share of *this* number
+    n_lines_screened: int | None = None
     #: observed peaks with no calculated reflection nearby — impurity content, or
     #: a wrong cell.  Layer 0's ``unmatched_obs``
     unmatched_observed: int = 0
@@ -1948,7 +1993,9 @@ class IndexingResult(Base):
                          f"{c.n_indexed}/{c.n_lines} lines;  chi2_red {c.chi2_red:.2f}"
                          + (f";  Le Bail Rwp {c.lebail.rwp:.4f}, "
                             f"{c.lebail.predicted_but_absent} of "
-                            f"{c.lebail.n_reflections} reflections absent"
+                            + (f"{c.lebail.n_lines_screened} lines absent"
+                               if c.lebail.n_lines_screened is not None else
+                               f"{c.lebail.n_reflections} reflections absent")
                             if c.lebail is not None else ""))
             if c.confidence_caveats:
                 lines.append(f"      not higher because: {', '.join(c.confidence_caveats)}")

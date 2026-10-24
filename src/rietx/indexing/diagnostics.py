@@ -23,6 +23,7 @@ address a consumer can act on.
 from __future__ import annotations
 
 import math
+from typing import get_args
 
 import numpy as np
 
@@ -30,10 +31,12 @@ from ..crystallography.atomic_volume import VOLUME_SCATTER, formula_unit_volume
 from ..model.profiles.fcj import fcj_live
 from ..schemas.common import Diagnostic
 from ..schemas.indexing import (
+    INDEX_REFUTING_CAVEATS,
     MAX_RELATIVE_SIGMA_Q,
     PEAK_MIN_USABLE_LINES,
     PEAK_WIDTH_CENSUS_N,
     DataQualityReport,
+    IndexCaveat,
     PeakList,
 )
 from ..schemas.instrument import Instrument, ProfileTCHZ
@@ -555,18 +558,30 @@ def candidate_diagnostics(cand, *, formula: str | None = None,
                         "one.")))
 
     lebail = cand.lebail
-    if lebail is not None and lebail.predicted_but_absent:
+    if lebail is not None and "predicted_but_absent" in cand.confidence_caveats:
         tt = lebail.predicted_but_absent_two_theta
+        if lebail.absent_source == "line_screen":
+            message = (
+                f"{lebail.predicted_but_absent_uncancellable_in_window} of the "
+                "lines this lattice predicts inside the first twenty observed "
+                "lines, that no extinction could remove, have nothing above the "
+                "picker's background envelope at the measured width "
+                f"({lebail.predicted_but_absent} absent over the whole range, "
+                f"{lebail.predicted_but_absent_uncancellable} uncancellable).")
+        else:
+            message = (
+                f"{lebail.predicted_but_absent} of {lebail.n_reflections} "
+                "reflections this lattice predicts have no net intensity "
+                "above the fitted background.")
         out.append(Diagnostic(
             level="warning", code="INDEX_PREDICTED_BUT_ABSENT",
-            message=(f"{lebail.predicted_but_absent} of {lebail.n_reflections} "
-                     "reflections this lattice predicts have no net intensity "
-                     "above the fitted background."),
+            message=message,
             where=where + ([f"first at {tt[0]:.3f}°"] if tt else []),
-            suggestion=("Compare the smaller cell that indexes the same lines, "
-                        "and read this count beside lebail.rwp. Rwp moves "
-                        "little on an oversized cell (0.379 against 0.216 for "
-                        "the correct one).")))
+            suggestion=("Compare the smaller cell that indexes the same lines: "
+                        "the pairwise supercell check against it is what "
+                        "refutes, this count only caps. Read the count beside "
+                        "lebail.rwp. Rwp moves little on an oversized cell "
+                        "(0.379 against 0.216 for the correct one).")))
 
     refuting = [c for c in cand.supercell_checks or [] if c.verdict == "refuted"]
     if refuting:
@@ -643,6 +658,13 @@ def _z_not_integer(cand, formula: str, temperature: float,
                     "then weigh this beside the figures of merit."))
 
 
+def _refuting_caveat_names() -> str:
+    """The refuting caveats, read off :data:`INDEX_REFUTING_CAVEATS` in the
+    vocabulary's own order, so the text cannot name a set the gate no longer
+    uses."""
+    return ", ".join(c for c in get_args(IndexCaveat) if c in INDEX_REFUTING_CAVEATS)
+
+
 def index_diagnostics(result, instrument=None) -> list[Diagnostic]:
     """Result-level ``INDEX_*`` messages: abstention, coverage, validation.
 
@@ -684,11 +706,9 @@ def index_diagnostics(result, instrument=None) -> list[Diagnostic]:
                      "No candidate cell was found in the systems searched."),
             where=[f"searched: {', '.join(result.systems_searched) or 'nothing'}"],
             suggestion=(("Read each candidate's confidence_caveats and act on "
-                         "the refuting ones first (geometric_ambiguity, "
-                         "predicted_but_absent, fom_panel_disagrees, "
-                         "indexed_fraction_low, volume_unphysical, "
-                         "validation_failed, supercell_refuted). The others "
-                         "cap confidence, and better data closes most of them.")
+                         "the refuting ones first "
+                         f"({_refuting_caveat_names()}). The others cap "
+                         "confidence, and better data closes most of them.")
                         if top else
                         "Read search_complete before you treat the absence as "
                         "evidence.")))
