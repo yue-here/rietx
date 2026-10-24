@@ -270,14 +270,18 @@ def read_members(setup: SeriesSetup,
     one protocol over N specimens, and a region excluded because the sample
     holder scatters there is excluded in all of them.  The 2θ limits are the
     other half and travel as ``fit``'s own argument, since that is where the
-    library takes them.
+    library takes them.  A member's own exclusions (a pdCIF's zero-weight
+    points) stay: the project's regions are added to them, never put in place
+    of them.
     """
     from ..io.readers import read_pattern
 
     out = []
     for member in setup.members:
         data = read_pattern(member.path, **member.options)
-        data.excluded_regions = [tuple(r) for r in excluded_regions]
+        data.excluded_regions = list(data.excluded_regions) + [
+            tuple(r) for r in excluded_regions
+            if tuple(r) not in data.excluded_regions]
         out.append(data)
     return out
 

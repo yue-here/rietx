@@ -174,7 +174,11 @@ class Project:
         # ``two_theta_range``, which is a 2θ by its name.
         require_two_theta(data, "Project.create()")
         if excluded_regions:
-            data.excluded_regions = [tuple(r) for r in excluded_regions]
+            # The union, never a replacement: the reader's own exclusions (a
+            # pdCIF's zero-weight points) are not the caller's to overwrite.
+            data.excluded_regions = list(data.excluded_regions) + [
+                tuple(r) for r in excluded_regions
+                if tuple(r) not in data.excluded_regions]
 
         plan_spec = _as_plan_spec(plan)
         doc = ProjectDoc(

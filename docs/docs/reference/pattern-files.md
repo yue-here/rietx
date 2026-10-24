@@ -211,6 +211,7 @@ A reader refuses to write any other key, because the GUI's import wizard and a p
 | `anode` | the X-ray target element the file names |
 | `wavelength` | the primary wavelength in Å the file states; recorded and never used |
 | `wavelength_alpha2` | the Kα2 wavelength in Å the file states; a stated zero says no doublet was used |
+| `intensity_item` | the pdCIF intensity item read, where its definition says more than a count (`_pd_proc_intensity_net`, defined as background-subtracted); a label, not a measurement |
 | `intensity_unit` | the intensity unit the file declares, a claim the reader checks before trusting |
 | `count_time_s` | seconds per step, where the file gives enough to derive it |
 | `temperature_k` | the specimen temperature the scan records; the series coordinate of an in-situ run |
@@ -224,6 +225,7 @@ from rietx.io.formats.base import METADATA_KEYS
 assert list(METADATA_KEYS) == [
     "source_file", "format", "block", "title", "sample", "x_label",
     "scan_axis", "scan", "scan_count", "anode", "wavelength",
-    "wavelength_alpha2", "intensity_unit", "count_time_s", "temperature_k",
-    "goniometer_radius_mm", "beam_optics", "diffracted_beam_optics"]
+    "wavelength_alpha2", "intensity_item", "intensity_unit", "count_time_s",
+    "temperature_k", "goniometer_radius_mm", "beam_optics",
+    "diffracted_beam_optics"]
 ```
