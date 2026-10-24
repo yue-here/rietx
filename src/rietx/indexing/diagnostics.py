@@ -876,6 +876,11 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
     if alive and not admissible:
         reasons.append("the declared prior leaves no member in any surviving "
                        "class")
+    if screen.density_contradicts_z():
+        reasons.append("the declared density does not give "
+                       + (f"the declared Z = {screen.prior.z}"
+                          if screen.prior.z is not None else "a whole Z")
+                       + " on this cell")
     if top.n_absent and top.n_testable == 0:
         reasons.append("none of its absences is testable in this range")
     if unscreened:
@@ -905,15 +910,28 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
     ``info`` when the declaration only narrowed the classes the data rank;
     ``warning`` when it emptied the class the data rank first, since that is
     either the declaration doing work the data could not, or the data
-    contradicting it — and the reader must see which before acting.
+    contradicting it — and the reader must see which before acting.  Also a
+    ``warning`` when a declared density does not give the Z on this cell.
+    Each removed group is named with the facts it fails, and each member of
+    the answer's class kept at a Z′ that is not whole with the special
+    positions it needs.
     """
-    declared = ", ".join(f"{k}={v}" for k, v in screen.prior.declared().items())
+    prior = screen.prior
+    declared = ", ".join(f"{k}={v}" for k, v in prior.declared().items())
     removed = [c for c in screen.candidates if c.excluded_groups]
     emptied = [c.symbol for c in removed if not c.space_groups]
     first_emptied = bool(alive) and not alive[0].space_groups
+    contradicted = screen.density_contradicts_z()
     n_removed = sum(len(c.excluded_groups) for c in removed)
     message = (f"the declared prior ({declared}) removed {n_removed} space "
                f"group(s) from {len(removed)} class(es)")
+    if contradicted:
+        message = (f"the declared density and formula put "
+                   f"{screen.z_from_density:.2f} formula units in this cell, "
+                   + (f"not the declared z = {prior.z}"
+                      if prior.z is not None else "not one whole number")
+                   + ", so no group was filtered by Z and best_or_none() "
+                     "abstains; " + message)
     if emptied:
         message += f", emptying {', '.join(emptied)}"
     if first_emptied and top.space_groups:
@@ -924,19 +942,39 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
         message += (f"; the data's leading class {alive[0].symbol} is among "
                     "them and the declaration admits no member of any "
                     "surviving class, so there is no admissible answer")
+
+    def _named(c) -> str:
+        return ", ".join(f"{g} ({c.exclusion_reasons[g]})"
+                         if g in c.exclusion_reasons else g
+                         for g in c.excluded_groups)
+
     return Diagnostic(
-        level="warning" if first_emptied else "info",
+        level="warning" if (first_emptied or contradicted) else "info",
         code="EXTINCTION_PRIOR_APPLIED",
         message=message + ".  A filter on the members, never evidence: no ΔBIC "
                           "moved and every class was fitted",
-        where=[f"{c.symbol}: excluded {', '.join(c.excluded_groups)}"
-               for c in removed],
+        where=[f"{c.symbol}: excluded {_named(c)}" for c in removed]
+        + _special_lines(top, screen.z),
         suggestion=("check the declaration before the answer: a class it "
                     "emptied that leads on the data is either chemistry doing "
                     "what a powder cannot, or a wrong declaration (a racemate "
                     "declared enantiopure, a polar sample measured as a "
-                    "centrosymmetric twin).  best_or_none() abstains when the "
-                    "data prefer an excluded class by the decisive margin"))
+                    "centrosymmetric twin, a Z read off the wrong cell).  "
+                    "best_or_none() abstains when the data prefer an excluded "
+                    "class by the decisive margin"))
+
+
+def _special_lines(top, z) -> list[str]:
+    """The Z′ statements of the answer's class, one per member — or one line
+    when every member needs special positions, as an ionic solid's do, since
+    the statement then tells no member from another."""
+    notes = top.special_positions
+    if not notes:
+        return []
+    if len(top.space_groups) > 1 and len(notes) == len(top.space_groups):
+        return [f"{top.symbol}: every member holds Z = {z} only with formula "
+                "units on special positions (special_positions names them)"]
+    return [f"{top.symbol}: {note}" for note in notes.values()]
 
 
 def _cell_str(cell) -> str:

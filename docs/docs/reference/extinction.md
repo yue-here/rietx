@@ -123,6 +123,8 @@ Even that returns a class, which lists its space groups, so the type cannot expr
 | `ExtinctionScreen.n_points` | channels in the fitted range, the N of every ΔBIC |
 | `ExtinctionScreen.profile_rwp` | the shared profile fit every class inherits its instrument from |
 | `ExtinctionScreen.prior` | the declared `ExtinctionPrior`, or `None` |
+| `ExtinctionScreen.z` | the formula units per cell the member filter used, or `None` |
+| `ExtinctionScreen.z_from_density` | the Z the declared density gives on `cell`, not rounded, or `None` |
 | `ExtinctionScreen.status` | `"converged"`, `"failed"` (no class could be screened) or `"cancelled"` |
 | `ExtinctionScreen.thresholds_version` | the indexing thresholds version that produced the ranking |
 | `ExtinctionScreen.diagnostics` | findings about the answer |
@@ -155,6 +157,8 @@ A returned class still lists every space group it admits, and nothing in the pac
 | `ExtinctionCandidate.representative` | the H-M symbol whose reflections were generated, which identifies the class |
 | `ExtinctionCandidate.space_groups` | every space group in the class, in IT number order; with a declared prior only the members it admits, possibly none |
 | `ExtinctionCandidate.excluded_groups` | the members a declared prior removed; empty without one |
+| `ExtinctionCandidate.exclusion_reasons` | for each removed member, the declared facts it fails |
+| `ExtinctionCandidate.special_positions` | for each kept member at which the declared Z′ is not whole, the special positions a formula unit needs |
 | `ExtinctionCandidate.laue_classes` | `space_groups` grouped by Laue class |
 | `ExtinctionCandidate.conditions` | the derived reflection conditions, such as `00l: l = 2n`, for a person to check |
 | `ExtinctionCandidate.conditions_complete` | `False` when the conditions leave some absence unnamed; the absence set is what the screen uses either way |
@@ -224,10 +228,13 @@ print(prior.declared())          # {'sohncke': True}
 | `ExtinctionPrior.sohncke` | `True`: only Sohncke groups, with no inversion, mirror or glide (an enantiopure chiral compound); `False`: only the others |
 | `ExtinctionPrior.centrosymmetric` | `True` or `False`: only groups with, or without, an inversion centre (a second-harmonic signal says `False`) |
 | `ExtinctionPrior.polar` | `True`: only the polar groups, whose point group leaves a direction fixed (a pyroelectric response); `False`: only the others |
+| `ExtinctionPrior.z` | formula units per cell; with `formula`, removes the groups whose orbits cannot hold that content |
+| `ExtinctionPrior.density` | measured density in g/cm³, which fixes Z through the formula weight and the screened cell's volume; needs `formula` |
+| `ExtinctionPrior.formula` | the formula unit, written as a chemist writes it (`"Cu12Sb4S13"`); a fractional count declares a shared site |
 | `ExtinctionPrior.declared` | the method returning the facts actually declared, by name |
 
 Each field is `None` by default, which declares nothing, and each is read off the group's own operators.
-A contradictory declaration, `sohncke=True` with `centrosymmetric=True` or `polar=True` with `centrosymmetric=True`, is refused when it is built.
+A contradictory declaration, `sohncke=True` with `centrosymmetric=True` or `polar=True` with `centrosymmetric=True`, is refused when it is built, and so are a `density` without a `formula` and a `formula` with neither `z` nor `density`.
 
 The prior filters members and nothing else.
 Every class is still fitted and ranked on the data, `ExtinctionCandidate.excluded_groups` names what it removed, and `EXTINCTION_PRIOR_APPLIED` reports it, as a warning when it emptied the class the data rank first.
@@ -240,6 +247,20 @@ screen = rx.determine_extinction_symbol(data, candidate, ins,
 ```
 
 On a P 2₁ specimen declared enantiopure, the answer is `P 1 21 1` holding `P 1 21 1` alone, where the data alone leave {`P 1 21 1`, `P 1 21/m 1`}.
+
+### The content per cell
+
+With `z` and `formula`, a group is removed when some element's atoms per cell, Z times its count in the formula, cannot sit on whole orbits of the group.
+The orbits are derived from the group's operators; a Wyckoff position with no free parameter is one orbit and holds its count once.
+This is the test of an ordered model.
+An element written with a fractional count (`Cu0.5Au0.5`) shares a site, and is not counted.
+Where Z is not a whole multiple of a kept member's general multiplicity (Z′ below one, or 3/2), the member stays and `ExtinctionCandidate.special_positions` names the special positions a formula unit then sits on.
+A molecule there must carry that site's symmetry, which nothing declared says, so this is a statement and never an exclusion: a P 2₁ salt at Z = 2 keeps P 2₁/m, with each formula unit on an inversion centre or a mirror.
+`ExtinctionCandidate.exclusion_reasons` names the fact each removed group fails.
+
+A `density` gives Z = ρ·V·N_A / M on the screened cell, `ExtinctionScreen.z_from_density`.
+It must sit within 8 % of the declared `z`, or, with none declared, of exactly one whole number, and `ExtinctionScreen.z` is the Z the filter used.
+When it does not, nothing is filtered by Z, `ExtinctionScreen.density_contradicts_z()` is `True`, `EXTINCTION_PRIOR_APPLIED` is a warning and `best_or_none` abstains.
 
 ## On real data
 

@@ -28,6 +28,7 @@ from rietx.crystallography.site_classes import (
     SiteAssignmentCapError,
     _letter_rank,
     count_site_assignments,
+    holds,
     site_assignments,
     site_classes,
 )
@@ -111,6 +112,74 @@ def test_classes_match_international_tables(setting):
     assert classes[-1].dof == 3
     assert classes[-1].multiplicity == len(get_spacegroup(setting).operations())
 
+
+
+#: One space group per crystal class (WP-2033): the Wyckoff multiplicities in
+#: letter order, a first, as International Tables A prints them in the
+#: Positions block, with the printed page.  Read from the page images of
+#: Vol. A, 5th ed. (Hahn ed., 2002, the held copy), unique axis b and cell
+#: choice 1 for the monoclinic groups, origin choice 2 for I 4₁/a m d, hexagonal
+#: axes for R -3.  The derivation reads none of this; the transcription's
+#: record (two readings, five planted-error checks) is kept outside the tree.
+ITA_BY_CLASS = {
+    "P 1": (113, (1,)),
+    "P -1": (115, (1, 1, 1, 1, 1, 1, 1, 1, 2)),
+    "C 1 2 1": (125, (2, 2, 4)),
+    "C 1 m 1": (145, (2, 4)),
+    "P 1 21/m 1": (165, (2, 2, 2, 2, 2, 4)),
+    "F 2 2 2": (213, (4, 4, 4, 4, 8, 8, 8, 8, 8, 8, 16)),
+    "C m m 2": (239, (2, 2, 4, 4, 4, 8)),
+    "C m c m": (301, (4, 4, 4, 8, 8, 8, 8, 16)),
+    "P 4": (332, (1, 1, 2, 4)),
+    "P -4": (341, (1, 1, 1, 1, 2, 2, 2, 4)),
+    "I 4/m": (357, (2, 2, 4, 4, 4, 8, 8, 8, 16)),
+    "I 4 2 2": (379, (2, 2, 4, 4, 4, 8, 8, 8, 8, 8, 16)),
+    "P 4 m m": (383, (1, 1, 2, 4, 4, 4, 8)),
+    "P -4 21 m": (411, (2, 2, 2, 4, 4, 8)),
+    "I 41/a m d:2": (485, (4, 4, 8, 8, 8, 16, 16, 16, 32)),
+    "P 3": (491, (1, 1, 1, 3)),
+    "R -3:H": (501, (3, 3, 6, 9, 9, 18)),
+    "P 3 2 1": (507, (1, 1, 2, 2, 3, 3, 6)),
+    "P 3 m 1": (521, (1, 1, 1, 3, 6)),
+    "P -3 m 1": (541, (1, 1, 2, 2, 3, 3, 6, 6, 6, 12)),
+    "P 6": (553, (1, 2, 3, 6)),
+    "P -6": (561, (1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 6)),
+    "P 6/m": (563, (1, 1, 2, 2, 2, 3, 3, 4, 6, 6, 6, 12)),
+    "P 6 2 2": (567, (1, 1, 2, 2, 2, 3, 3, 4, 6, 6, 6, 6, 6, 12)),
+    "P 6 m m": (579, (1, 2, 3, 6, 6, 12)),
+    "P -6 m 2": (587, (1, 1, 1, 1, 1, 1, 2, 2, 2, 3, 3, 6, 6, 6, 12)),
+    "P 6/m m m": (595, (1, 1, 2, 2, 2, 3, 3, 4, 6, 6, 6, 6, 6, 12, 12, 12, 12, 24)),
+    "F 2 3": (605, (4, 4, 4, 4, 16, 24, 24, 48)),
+    "P a -3": (631, (4, 4, 8, 24)),
+    "P 43 3 2": (649, (4, 4, 8, 12, 24)),
+    "F -4 3 m": (659, (4, 4, 4, 4, 16, 24, 24, 48, 96)),
+    "I a -3 d": (717, (16, 16, 24, 24, 32, 48, 48, 96)),
+}
+
+
+def test_the_by_class_list_has_one_group_per_crystal_class():
+    classes = [get_spacegroup(s).point_group_hm() for s in ITA_BY_CLASS]
+    assert len(set(classes)) == len(classes) == 32
+
+
+@pytest.mark.parametrize("setting", list(ITA_BY_CLASS))
+def test_orbit_sizes_match_international_tables_on_every_crystal_class(setting):
+    page, expected = ITA_BY_CLASS[setting]
+    derived = [c.multiplicity for c in site_classes(setting)]
+    # site_classes lists the general position last, ITA's letter order
+    assert tuple(derived) == expected, f"ITA A p. {page}"
+
+
+def test_holds_is_a_placement_existing():
+    """``holds`` answers what :func:`count_site_assignments` counts, for every
+    count up to twice the general multiplicity: the existence question needs
+    no count."""
+    for setting in ("F m -3 m", "P 1 21/m 1", "I 21 3", "P 6/m m m", "P -1"):
+        classes = site_classes(setting)
+        top = 2 * max(c.multiplicity for c in classes)
+        for n in range(1, top + 1):
+            assert holds(classes, n) == (
+                count_site_assignments(classes, {"Si": n}) > 0), (setting, n)
 
 @pytest.mark.parametrize("setting", list(ITA))
 def test_ita_triplets_through_the_existing_site_seam(setting):

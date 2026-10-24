@@ -159,6 +159,11 @@ from .structure import Cell
 #: where it was the constant, so a high-resolution list now matches within its
 #: own widths.  A run whose first pass finds an agreed lattice, and a lab list
 #: with lines 0.05 degrees or wider, answer as at 1.9.
+#: Also in 1.11 (WP-2033, #935's other half): ``ExtinctionPrior`` gains ``z``,
+#: ``density`` and ``formula``, which remove the members whose orbits cannot
+#: hold the declared content and name the special positions a Z′ below one
+#: needs.  Only a screen that declares one of them can answer differently;
+#: with none declared every screen answers as before.
 INDEXING_THRESHOLDS_VERSION = "1.11"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
@@ -2037,11 +2042,24 @@ class ExtinctionPrior(Base):
     or a glide; a second-harmonic signal says ``centrosymmetric=False``; a
     pyroelectric response says ``polar=True``.  ``None`` declares nothing.
 
+    **The content per cell** (WP-2033): ``z`` formula units of ``formula``, or
+    a measured ``density`` that fixes Z through the formula weight and the
+    screened cell.  A group is then removed when some element's atoms per cell
+    cannot sit on whole orbits of it — the test of an ordered model; a
+    fractional formula count declares a shared site and is not counted
+    (:func:`rietx.indexing.extinction.content_exclusion`).  Where Z is not a
+    whole multiple of a member's general multiplicity (Z′ < 1, as for #935's
+    P 2₁ salt against P 2₁/m) the member is kept and the special positions a
+    formula unit then needs are named, since a molecule's own symmetry is not
+    declared (:func:`rietx.indexing.extinction.special_site_note`).
+
     **A filter, never evidence.**  It decides which members of each class are
     admissible and is reported as ``EXTINCTION_PRIOR_APPLIED`` with every group
     it removed; it never enters a ΔBIC, every class is still fitted, and a class
     it empties stays in the ranking, so a declaration the data contradict is
-    visible rather than silently obeyed.
+    visible rather than silently obeyed.  A density that does not give the
+    declared ``z`` (or, alone, any one whole number) on the screened cell
+    filters nothing and makes the screen abstain.
     """
 
     #: only Sohncke groups (proper rotations, screws and translations): an
@@ -2052,6 +2070,16 @@ class ExtinctionPrior(Base):
     #: only groups whose point group leaves a direction fixed (``True``: the
     #: ten polar classes) or none (``False``)
     polar: bool | None = None
+    #: formula units per cell.  With :attr:`formula` it removes the groups
+    #: whose orbits cannot hold that content; alone it names only what a
+    #: Z′ below one needs
+    z: int | None = Field(default=None, ge=1)
+    #: measured density in g/cm³, which fixes Z through :attr:`formula`'s
+    #: weight and the screened cell's volume
+    density: float | None = Field(default=None, gt=0.0)
+    #: the formula unit as a chemist writes it (``"Cu12Sb4S13"``, brackets and
+    #: ``·`` adducts allowed); a fractional count declares a shared site
+    formula: str | None = None
 
     @model_validator(mode="after")
     def _consistent(self) -> "ExtinctionPrior":
@@ -2061,13 +2089,25 @@ class ExtinctionPrior(Base):
         if self.polar is True and self.centrosymmetric is True:
             raise ValueError("polar=True and centrosymmetric=True cannot both "
                              "hold: an inversion centre reverses every direction")
+        if self.density is not None and self.formula is None:
+            raise ValueError("a density gives Z only through the formula "
+                             "weight: declare the formula with it")
+        if self.formula is not None:
+            if self.z is None and self.density is None:
+                raise ValueError("a formula alone filters nothing: declare "
+                                 "it with a z or a density")
+            from ..crystallography.atomic_volume import formula_counts
+
+            formula_counts(self.formula)       # a symbol that is no element raises
         return self
 
-    def declared(self) -> dict[str, bool]:
+    def declared(self) -> dict[str, bool | int | float | str]:
         """The facts actually declared, by name."""
         return {k: v for k, v in (("sohncke", self.sohncke),
                                   ("centrosymmetric", self.centrosymmetric),
-                                  ("polar", self.polar)) if v is not None}
+                                  ("polar", self.polar), ("z", self.z),
+                                  ("density", self.density),
+                                  ("formula", self.formula)) if v is not None}
 
 
 class ExtinctionCandidate(Base):
@@ -2107,6 +2147,14 @@ class ExtinctionCandidate(Base):
     space_groups: list[str] = Field(default_factory=list)
     #: members the declared :class:`ExtinctionPrior` removed (empty without one)
     excluded_groups: list[str] = Field(default_factory=list)
+    #: for each of :attr:`excluded_groups`, the declared facts it fails
+    #: (``"sohncke=True"``, ``"z=2: S 26 per cell is no sum of its orbits …"``)
+    exclusion_reasons: dict[str, str] = Field(default_factory=dict)
+    #: for each admitted member at which the declared Z is not a whole multiple
+    #: of its general multiplicity (Z′ not whole): the special positions a
+    #: formula unit then sits on.  A statement, never an exclusion — a molecule
+    #: there must carry the site's symmetry, which nothing declared says
+    special_positions: dict[str, str] = Field(default_factory=dict)
     #: :attr:`space_groups` grouped by Laue class (gemmi's symbol).  More than
     #: one key means the members differ in which reflections are *equivalent*
     #: — the intensity partition inside an overlapped multiplet — and not in any
@@ -2207,9 +2255,27 @@ class ExtinctionScreen(Base):
     profile_rwp: float = float("inf")
     #: the declared facts the members were filtered by (``restrict=``)
     prior: ExtinctionPrior | None = None
+    #: formula units per cell the member filter used: the declared ``z``, or
+    #: the one whole number the declared density gives on :attr:`cell`.
+    #: ``None`` with no Z declared, and when a declared density does not give
+    #: one — then nothing is filtered by Z and :meth:`best_or_none` abstains
+    z: int | None = None
+    #: Z the declared density and formula give on :attr:`cell`, not rounded;
+    #: ``None`` without a declared density
+    z_from_density: float | None = None
     status: str = "converged"
     thresholds_version: str = INDEXING_THRESHOLDS_VERSION
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+
+    def density_contradicts_z(self) -> bool:
+        """Did a declared density fail to give the Z on the screened cell?
+
+        True when :attr:`prior` declares a density and :attr:`z` is ``None``:
+        the density gives another Z than the declared one, or, with none
+        declared, no single whole number.
+        """
+        return (self.prior is not None and self.prior.density is not None
+                and self.z is None)
 
     def best_or_none(self) -> ExtinctionCandidate | None:
         """The one extinction class, or None.
@@ -2226,6 +2292,8 @@ class ExtinctionScreen(Base):
         returned and the margin is taken to the next such class — that is the
         declaration used — but a class it emptied that the data prefer by the
         decisive margin makes this abstain: the data contradict the declaration.
+        So does a declared density that gives no Z, or another Z than the one
+        declared, on the screened cell (:attr:`z` is then ``None``).
 
         A returned class still lists every space group it admits.  There is no
         accessor anywhere in this module that yields one space group from the
@@ -2235,6 +2303,8 @@ class ExtinctionScreen(Base):
 
         if any(not c.refuted and not c.screened for c in self.candidates):
             return None                 # an unasked question, not a clean answer
+        if self.density_contradicts_z():
+            return None                 # the declaration disagrees with the cell
         alive = [c for c in self.candidates if not c.refuted]
         admissible = [c for c in alive if c.space_groups]
         if not admissible:

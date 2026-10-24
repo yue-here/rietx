@@ -32,6 +32,16 @@ Nothing changes for a caller who declares nothing.
   `symmetry.site_orbit`), but no group's list of available orbit sizes.
   `indexing/diagnostics.py`'s `INDEX_Z_NOT_INTEGER` (WP-1510) already turns a
   formula and a volume into Z for the search, and WP-2030 owns its window.
+- **Correction (2026-10-23, the build).** The tree already lists every orbit
+  size of a group. `crystallography/site_classes.py` (WP-1997, provisional,
+  not exported) derives every Wyckoff position of a group from its
+  operators, with exact affine stabilisers on the 1/24 grid, checked against
+  spglib on all 564 gemmi settings (`test_every_setting_matches_spglib`). It
+  also counts a composition's placements, using a position with no free
+  parameter once. This WP reuses it rather than deriving the orbits a second
+  time. It adds `site_classes.holds`, which asks the existence question
+  without the count, and the check against ITA on one group per crystal
+  class.
 - **The first decision is what "cannot hold" means.** Each element's count
   per cell, Z × its count in the formula, must be a sum of the group's orbit
   sizes. That test is exact for an ionic solid. A molecular crystal with
@@ -40,6 +50,28 @@ Nothing changes for a caller who declares nothing.
   where P2₁/m would need the molecule on a mirror or an inversion centre. So
   decide between a hard exclusion and a reported, weaker statement for
   Z′ < 1, and record the reason here.
+
+  Decided 2026-10-23: **a hard exclusion only where the atom count fails.**
+  A group is removed when some element's atoms per cell, Z × its count in
+  the formula, are no sum of the group's orbits. A Wyckoff position with no
+  free parameter is one orbit and counts once; one with free parameters can
+  be used any number of times. That is exact for an ordered model, and it is
+  the only reading made. An element whose formula count is fractional
+  (`Cu0.5Au0.5`) declares a shared site and is not counted. The test is per
+  element, so it never removes a group an ordered structure can occupy.
+  **A Z′ that is not whole is a statement, never an exclusion**: Z′ < 1, and
+  also 3/2 and the like, wherever Z is not a whole multiple of a member's
+  general multiplicity. The member stays, and
+  `ExtinctionCandidate.special_positions` names the special positions a
+  formula unit then needs, with their site symmetries. The reason: a
+  molecule on a special position must carry that symmetry, and neither the
+  molecule's symmetry nor whether the formula unit is one molecule is
+  declared. The atom count cannot see either. #935's P2₁ salt at Z = 2
+  therefore keeps P2₁/m, which needs each formula unit on −1 (2a–2d) or m
+  (2e). A declared density fixes Z = ρ·V·N_A / M on the screened cell. It
+  must lie within `Z_INTEGER_TOLERANCE` (8 %) of the declared `z`, or, with
+  no `z`, of exactly one whole number. Otherwise Z filters nothing and
+  `best_or_none` abstains. Proposed on #1129, for the maintainer's review.
 - **Rules that bind the work** (from 1967): each fact is read off the group's
   operators, never a table. `INDEXING_THRESHOLDS_VERSION` bumps when an
   answer can move. A new diagnostic code needs its skill row and its
@@ -53,19 +85,19 @@ Nothing changes for a caller who declares nothing.
 
 ## Tasks
 
-- [ ] Every Wyckoff orbit size of a group, derived from its operators (the
+- [x] Every Wyckoff orbit size of a group, derived from its operators (the
       site orbits of the special positions plus the general position), held
       against ITA's multiplicities on one group per crystal class.
-- [ ] Decide the Z′ < 1 rule (Context) and record it here as
+- [x] Decide the Z′ < 1 rule (Context) and record it here as
       `Decided YYYY-MM-DD:`.
-- [ ] `ExtinctionPrior` gains `z` and `density` (with the formula `density`
+- [x] `ExtinctionPrior` gains `z` and `density` (with the formula `density`
       needs). They are validated against each other where both are given,
       filtered as the other three are, and reported under
       `EXTINCTION_PRIOR_APPLIED`.
-- [ ] Tests: #935's P2₁ case, an ionic case where Z excludes a group outright,
+- [x] Tests: #935's P2₁ case, an ionic case where Z excludes a group outright,
       and every extinction screen in the tree unchanged with nothing
       declared.
-- [ ] Skill and audit rows for any new code or field. The manual's extinction
+- [x] Skill and audit rows for any new code or field. The manual's extinction
       page names the two new fields.
 
 ## Acceptance
@@ -93,3 +125,25 @@ extinction screen answers as on `main`.
   close 1967 and file this half on its own. No open WP owns a declared Z for
   the extinction screen. 2030 holds Z in the search, not the screen. 1910
   holds the screen at a small cell error.
+- **2026-10-23** — built on `wp2033/declared-z-filter` by @mustachefeeling
+  (claimed on #1129), one commit off `main`. All five tasks are done.
+  `ExtinctionPrior` gains `z`, `density` and `formula`;
+  `ExtinctionCandidate` gains `exclusion_reasons` and `special_positions`;
+  `ExtinctionScreen` gains `z`, `z_from_density` and
+  `density_contradicts_z()`. `indexing/extinction.py` gains
+  `content_exclusion`, `special_site_note`, `declared_z` and
+  `exclusion_reasons` (which `admits` now reads), and `crystallography`
+  gains `site_classes.holds` and `atomic_volume.formula_counts`. One
+  `_audit` row is added, `N_A_CM3_PER_A3` at tier 1. There is no new
+  diagnostic code, and `INDEXING_THRESHOLDS_VERSION` stays at 1.11 with an
+  "Also in 1.11" note.
+  *ITA*: 32 groups, one per crystal class, 247 positions. Letters,
+  multiplicities and site symmetries all agree with the derivation, read
+  from the held Vol. A 5th-ed. page images; the pages are cited in
+  `tests/test_site_classes.py`.
+  *Open for the maintainer*: a density-specific tolerance (8 % is borrowed
+  from the Hofmann-volume check); the per-element test against the stronger
+  joint one (`site_assignments`); and the disorder convention.
+  *Gate*: fast suite on the final tree, on a Mac, `-n 4 --dist loadgroup`:
+  11 333 passed, 265 skipped, 27 xfailed, 0 failed (`--junitxml`: 11 625
+  tests, 292 skipped, 0 failures, 0 errors).

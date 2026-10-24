@@ -1971,13 +1971,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "EXTINCTION_PRIOR_APPLIED": HelpEntry(
         title="Declared facts removed space groups from the extinction classes",
         description=(
-            "You declared facts about the specimen (chirality, centrosymmetry or "
-            "polarity), and they removed space groups from some classes. The declaration "
-            "only filters the members of each class. Every class was still fitted, and no "
-            "ΔBIC moved. It is a warning when the class the data rank first was emptied: "
-            "either the chemistry is doing what a powder cannot, or the declaration is "
-            "wrong. `best_or_none()` abstains when the data prefer an emptied class by "
-            "the decisive margin. Check the declaration before you read the answer."
+            "You declared facts about the specimen (chirality, centrosymmetry, "
+            "polarity, or the formula units per cell as a Z or a density), and they "
+            "removed space groups from some classes. Each removed group is named with "
+            "the fact it fails. A declared Z removes a group when some element's atoms "
+            "per cell cannot sit on whole orbits of it (a position with no free parameter "
+            "is one orbit, used once), the test of an ordered model. "
+            "Where Z is not a whole multiple of a kept group's general multiplicity "
+            "(Z′ below one), the group stays and the message names the special "
+            "positions a formula unit then needs, since a molecule there must carry "
+            "that symmetry. The declaration only filters the members of each class. "
+            "Every class was still fitted, and no ΔBIC moved. It is a warning when the "
+            "class the data rank first was emptied: either the chemistry is doing what a "
+            "powder cannot, or the declaration is wrong. It is also a warning when a "
+            "declared density does not give the declared Z on this cell; nothing is then "
+            "filtered by Z. `best_or_none()` abstains in both cases. Check the "
+            "declaration before you read the answer."
         ),
     ),
     "EXTINCTION_SCREEN_FAILED": HelpEntry(
