@@ -467,7 +467,9 @@ class RefinementPlan:
         position contributes only its allowed directions, a fully fixed one
         contributes none, so the glob is always safe).  The displacement
         stage frees ``biso`` on isotropic sites and the ``adp.*`` patterns on
-        anisotropic ones, whichever each site declares.  Kept separate from
+        anisotropic ones, whichever each site declares.  A child stated on
+        mode amplitudes (``Phase.distortion_modes``, WP-1419) frees its
+        amplitudes in the coordinates stage, since they are its coordinates.  Kept separate from
         :meth:`mccusker_default` so profile-only workflows never free
         structural parameters by accident."""
         return cls(stages=[
@@ -478,7 +480,10 @@ class RefinementPlan:
             Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                               "instrument.profile.x", "instrument.profile.y"]),
             *_EXTRA_COMPONENT_STAGE,
-            Stage("coordinates", ["phases.*.atoms.*.dof.*"]),
+            # a child stated on mode amplitudes (WP-1419) refines them here:
+            # they reparametrise its coordinates, so this is the same stage
+            Stage("coordinates", ["phases.*.atoms.*.dof.*",
+                                  "phases.*.distortion_modes.modes.*.amplitude"]),
             Stage("biso", list(_DISPLACEMENT_GLOBS)),
             # March-Dollase preferred orientation (WP-0307) turns on *after* the
             # displacement stage: r, occupancies and ADPs all rescale intensity

@@ -213,7 +213,8 @@ def moment_frame(basis, cell) -> np.ndarray:
 #: along it, and for several of these groups that point is a fixed point of a
 #: residual point-group element the candidate's own magnetic group still
 #: carries (one negating the other frame rows while fixing the first) — the
-#: identical shape ``Stage.distortion_seed`` exists for on a whole-vector
+#: identical shape ``displacive_statement``'s seed
+#: (``representation.distortion.DISTORTION_SEED``) exists for on a whole-vector
 #: A = 0 (|F|² even in the amplitude vector, WP-1419), here on one DOF rather
 #: than the whole vector, and with the same fix: move it off the stationary
 #: point before the stage that frees it.  Small and nonzero, never tuned
@@ -229,8 +230,8 @@ def moment_frame(basis, cell) -> np.ndarray:
 #: (still strictly nonzero, so the stationary point is broken exactly the
 #: same way in every unit test of :func:`tilted_seed` itself) both entries
 #: recover exactly, identically to the untouched pre-fix code. 0.15 was the
-#: number this stage started with by analogy to ``distortion_seed``'s own
-#: docstring examples, not measured against this workflow's own multi-start
+#: number this stage started with by analogy to the fork's ``distortion_seed``
+#: docstring examples (a field that never reached ``main``), not measured against this workflow's own multi-start
 #: sweep before being shipped as a default — the mistake this note exists to
 #: name for whoever tunes it next.
 SEED_TILT = 0.02

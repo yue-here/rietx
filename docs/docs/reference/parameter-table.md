@@ -160,6 +160,25 @@ With several sources the allowed region is a slanted boundary, and the solver ca
 It is given the smallest range containing every allowed point, which rules out no answer you asked for and can leave a corner where two sources together push the dependent outside its bounds.
 If a fit lands in that corner, writing the values back to the models refuses, naming the parameter, its bounds and the tie that drove it.
 
+## A child refined on its mode amplitudes
+
+A superstructure of a known parent can refine as that parent plus a displacement field, one absolute amplitude per symmetry-adapted mode, rather than as free coordinates.
+`rietx.crystallography.representation.distortion.displacive_statement` takes the parent `Phase`, the stated child `Phase` and the transform (P, p) with `r_parent` = P·`r_child` + p, and returns a `DisplaciveStatement`: the child, with its `distortion_modes` record set and its coordinates rewritten from it, plus the per-parent-site Biso ties (`DisplaciveStatement.biso_ties`, for `Refinement.tie`) and the seed it applied (`DisplaciveStatement.seed`).
+
+The record is a `DistortionModes`.
+`DistortionModes.parent_space_group` and `DistortionModes.transform` say what the modes were built from, `DistortionModes.reference_cell` the metric of the parent cell before any strain they were normalised in, and `DistortionModes.base` the parent-derived position of each atom.
+Each entry of `DistortionModes.modes` is a `DistortionMode`: `DistortionMode.irrep`, `DistortionMode.k`, `DistortionMode.isotropy_group`, `DistortionMode.index` and `DistortionMode.site` say which mode it is, `DistortionMode.parent_invariant` whether it is the identity irrep's, `DistortionMode.vectors` its displacement of each atom per Å, and `DistortionMode.amplitude` the refined amplitude in Å.
+Compare a published table on `isotropy_group`, never on `irrep`, which is rietx's own label.
+
+Every atom a mode moves sits at its base plus the sum of amplitude times vector, and its x, y and z are derived rows of the parameter table: free the amplitudes, `phases.*.distortion_modes.modes.*.amplitude`, which the `mccusker_structural` plan does in its coordinates stage.
+The amplitudes are absolute, so a second fit, a `set_values` of something else, or a replayed node leaves the coordinates where the amplitudes put them.
+A coordinate edited by hand is refused when the table is built, as is a mode vector the atom's site symmetry forbids; to move the atoms, set the amplitudes.
+
+A child stated at its parent's positions is seeded, because every amplitude outside the identity irrep has an exactly zero gradient there and a fit started there cannot move.
+A block freed with all those amplitudes exactly zero is refused for the same reason.
+The seed's first mode is positive, which picks one domain: the sign of a driving amplitude is a domain label, and only the relative signs inside a basis are measured.
+The equations are in {ref}`the theory chapter <ch-parameterisation>`.
+
 ## Restraints
 
 A restraint adds a row to the residual and leaves the table as it is.

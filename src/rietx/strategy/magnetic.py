@@ -1492,16 +1492,14 @@ def _release(fitted, seeded):
 
 def _parent_site_ties(statement) -> tuple[tuple[str, str, float, float], ...]:
     """Ties that make every child Biso the Biso of the first child atom of the
-    same parent atom (``SupercellStatement.site_map``), as ``_fit`` takes them."""
-    first: dict[int, int] = {}
-    ties = []
-    for i, (parent_atom, _coset) in enumerate(statement.site_map):
-        if parent_atom not in first:
-            first[parent_atom] = i
-            continue
-        ties.append((f"phases.0.atoms.{i}.biso",
-                     f"phases.0.atoms.{first[parent_atom]}.biso", 1.0, 0.0))
-    return tuple(ties)
+    same parent atom (``SupercellStatement.site_map``), as ``_fit`` takes them.
+
+    The one derivation is ``representation.distortion.parent_site_ties``,
+    which ``displacive_statement`` calls too (Yue, #724: "the derivation should
+    be written once")."""
+    from ..crystallography.representation.distortion import parent_site_ties
+
+    return parent_site_ties([parent_atom for parent_atom, _coset in statement.site_map])
 
 
 def _without_cell(plan: RefinementPlan) -> RefinementPlan:

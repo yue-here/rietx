@@ -453,11 +453,22 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "Σ `n_modes` its free coordinates. `irrep` is this package's "
                 "small-irrep label: compare a published table on "
                 "`isotropy_group`. `distortion_basis` returns the modes alone, "
-                "per irrep. Provisional: refining them is a later WP-1419 chunk.",
+                "per irrep. To **refine** on them, `displacive_statement(parent, "
+                "child, (P, p))` returns the child with `Phase.distortion_modes`: "
+                "one absolute amplitude per mode (Å, "
+                "`phases.*.distortion_modes.modes.*.amplitude`), its atoms' "
+                "coordinates derived as base + Σ A·v, freed by "
+                "`mccusker_structural`'s coordinates stage. A child at its parent "
+                "is seeded (`DISTORTION_SEED`), since the gradient there is "
+                "exactly zero; the driving mode's sign is a domain label. Apply "
+                "its `biso_ties` with `Refinement.tie`. Provisional: the record "
+                "and the reported A_τ may still move.",
                 ("rietx.crystallography.representation.distortion.mode_amplitudes",
                  "rietx.crystallography.representation.distortion.ModeDecomposition",
                  "rietx.crystallography.representation.distortion.ModeAmplitude",
-                 "rietx.crystallography.representation.distortion.distortion_basis"),
+                 "rietx.crystallography.representation.distortion.distortion_basis",
+                 "rietx.crystallography.representation.distortion.displacive_statement",
+                 "rietx.crystallography.representation.distortion.DisplaciveStatement"),
             ),
             (
                 "Displacive candidates of a parent",
@@ -487,7 +498,7 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
 #: ``tests/api_surface_deferred.txt`` defers them from the manual (WP-1805: no
 #: raised cap).  ``tests/test_skill.py`` holds every name here to a real field.
 TECHNIQUE_FIELDS: dict[str, frozenset[str]] = {
-    "rx.Phase": frozenset({"rigid_bodies"}),
+    "rx.Phase": frozenset({"rigid_bodies", "distortion_modes"}),
     "rx.ParameterRow": frozenset({"body"}),
 }
 

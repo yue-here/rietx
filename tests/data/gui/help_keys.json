@@ -345,6 +345,7 @@
   "parameters:phases.*.cell.beta",
   "parameters:phases.*.cell.c",
   "parameters:phases.*.cell.gamma",
+  "parameters:phases.*.distortion_modes.modes.*.amplitude",
   "parameters:phases.*.extinction",
   "parameters:phases.*.gauss_size",
   "parameters:phases.*.gauss_strain",

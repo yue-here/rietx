@@ -838,7 +838,57 @@ def _state_texture():
     return model, table, {}
 
 
+def _state_distortion_modes():
+    """WP-1419: a child refined on its mode amplitudes, the coordinates derived.
+
+    NaTaO₃'s P4/mbm child of the cubic perovskite (one M-point mode on O2),
+    stated by ``displacive_statement`` and set off its seed to 0.2 Å: an
+    amplitude column falls to ``_peak_chain_column`` and reaches O2's x and
+    y through C; the traced backends differentiate the same affine rows.
+    The cell, scale and Biso free beside it.
+    """
+    from rietx.crystallography.representation.distortion import displacive_statement
+    from rietx.schemas.structure import Atom, Cell, Phase, Structure
+
+    P = Parameter
+
+    def atom(label, sp, x, y, z):
+        return Atom(label=label, species=sp, x=P(value=x), y=P(value=y), z=P(value=z))
+
+    a, c = 5.5503, 3.9335
+    parent = Phase(name="cubic", space_group="P m -3 m", cell=Cell.cubic(a / 2 ** 0.5),
+                   atoms=[atom("Ta", "Ta", 0, 0, 0), atom("Na", "Na", 0.5, 0.5, 0.5),
+                          atom("O", "O", 0.5, 0, 0)])
+    child = Phase(name="NaTaO3", space_group="P 4/m b m",
+                  cell=Cell(a=P(value=a), b=P(value=a), c=P(value=c), alpha=P(value=90.0),
+                            beta=P(value=90.0), gamma=P(value=90.0)),
+                  atoms=[atom("Ta", "Ta", 0, 0, 0), atom("Na", "Na", 0, 0.5, 0.5),
+                         atom("O1", "O", 0, 0, 0.5), atom("O2", "O", 0.25, 0.75, 0)],
+                  scale=P(value=1e-2, min=0.0))
+    phase = displacive_statement(parent, child, ([[1, 1, 0], [-1, 1, 0], [0, 0, 1]],
+                                                 [0, 0, 0])).phase
+    structure = Structure(phases=[phase])
+    _, ins, _ = _lab_state()
+    tt = np.arange(15.0, 60.0, 0.02)
+    rng = np.random.default_rng(5)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=(50.0 + 10.0 * rng.random(len(tt))).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for glob in ("phases.0.distortion_modes.modes.*.amplitude", "phases.0.cell.*",
+                 "phases.0.scale", "phases.0.atoms.*.biso"):
+        assert table.set_vary([glob], True), glob
+    amp = table.free_paths.index("phases.0.distortion_modes.modes.0.amplitude")
+    theta = table.x0()
+    theta[amp] = 0.2
+    table.commit(theta)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    return model, table, {}
+
+
 CONFIGS = {"families": _state_families,
+           "distortion_modes": _state_distortion_modes,
            "texture": _state_texture,
            "bodies": _state_bodies,
            "families_voigt": _state_families_voigt,
@@ -889,6 +939,7 @@ CONFIG_PARAMS = [
     _config("magnetic_width"),
     _config("satellites"),
     _config("bodies"),
+    _config("distortion_modes"),
     _config("toy_lebail"),
     _config("toy_pawley"),
     _config("toy_rich"),

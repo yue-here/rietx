@@ -417,6 +417,72 @@ neutron means of the *International Tables* Vol. C § 9.5 for neutron data
 (C–H 1.06–1.10 Å, N–H 1.009 Å, O–H 0.967 Å). A joint X-ray and neutron fit takes the
 neutron lengths, because the hydrogen signal is in the neutron histogram.
 
+## Distortion-mode amplitudes
+
+A child structure stated as its parent plus a displacement field
+(the phase's `distortion_modes` record) refines on the amplitudes of that field's
+symmetry-adapted modes, not on its coordinates. Each atom a mode moves sits at
+
+```{math}
+:label: par-modes
+
+\mathbf{x}_j \;=\; \mathbf{b}_j \;+\; \sum_\nu A_\nu\,\mathbf{v}_{\nu j},
+```
+
+{source}`rietx.crystallography.representation.distortion.displacive_statement`
+
+with $\mathbf{b}_j$ the parent-derived base position in child fractions and
+$\mathbf{v}_{\nu j}$ mode $\nu$'s displacement of atom $j$ per Å of amplitude,
+normalised so that $\sum \mathrm{mult}\,|\boldsymbol{\varepsilon}|^2 = 1$ over a
+primitive cell of the child lattice, in the parent's metric before any strain,
+$P^{\mathsf{T}} G_{\text{parent}} P$ {cite}`perezmato2010`. The row is affine,
+so it is a row of the parameter table's constraint block like a site-symmetry
+DOF's, with one difference: its constant is the base, never the stored
+coordinate. The amplitude is therefore absolute, as an anisotropic ADP is, and
+a rebuild reproduces the coordinate from the amplitudes alone. The modes are
+complete (one per free coordinate of the child), so an atom a mode moves has
+no coordinate DOF of its own.
+
+The parent structure is a stationary point of the fit. A parent operation $g$
+that the child lost maps it to a domain-related structure with the same powder pattern
+{cite}`perezmato2010`, so with $D(g)$ the action of $g$ on the amplitude vector,
+
+```{math}
+:label: par-modes-even
+
+\chi^2\bigl(D(g)\,\mathbf{A}\bigr) = \chi^2(\mathbf{A})
+\;\;\forall g \in G
+\quad\Longrightarrow\quad
+\nabla\chi^2(\mathbf{0}) \in \operatorname{Fix} D(G),
+```
+
+{source}`rietx.params.vector.ParameterTable`
+
+and the fixed subspace of $D(G)$ is the identity irrep's: the parent's own free
+coordinates. Every other amplitude has an exactly zero gradient at
+$\mathbf{A} = \mathbf{0}$, the whole block at once, and a fit started there
+moves only by its finite difference's step. The parameter table refuses to
+free such a block. {func}`~rietx.crystallography.representation.distortion.displacive_statement`
+seeds a child that sits at its parent with a vector of norm
+{{ DISTORTION_SEED }} Å in the span of the non-identity modes, along a
+direction whose stabiliser in $G$ is exactly the child's group $H$:
+
+```{math}
+:label: par-modes-seed
+
+\{\,g \in G : D(g)\,\mathbf{A}_{\text{seed}} = \mathbf{A}_{\text{seed}}\,\}
+\;=\; H .
+```
+
+{source}`rietx.crystallography.representation.distortion.DISTORTION_SEED`
+
+A seed along one basis mode can sit on a higher-symmetry sub-direction, which
+would leave every mode that sub-direction forbids at a stationary point of the
+residual symmetry. The first mode's sign is positive, which chooses one domain;
+the sign of a driving amplitude is a domain label and only the relative signs
+inside a basis are measured {cite}`perezmato2010`. A child that is already
+distorted starts at its own decomposition and is never re-seeded.
+
 ## Soft restraints
 
 A bond-length, angle or value restraint contributes one row to the residual

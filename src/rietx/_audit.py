@@ -1221,6 +1221,14 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.magnetic.supercell.CHILD_SITE_TOL", "constant", value=0.0001),
     Row("rietx.crystallography.neutron.NEUTRON_LAMBDA_EV_ANGSTROM", "constant", value=0.286014),
     Row("rietx.crystallography.neutron.SIGMA_ABS_REFERENCE_WAVELENGTH", "constant", value=1.798),
+    Row("rietx.crystallography.representation.distortion.DISTORTION_SEED", "constant",
+        tier="invariant", value=0.01,
+        evidence=("answer-invariant by measured margin (WP-1419): the act is physics (chi2 is even "
+                  "in the amplitude vector, so every non-identity column is exactly zero at A = 0, "
+                  "#286 2026-09-16, Perez-Mato 2010 sec. 7); the magnitude 0.003/0.01/0.03 A gives "
+                  "converged amplitudes within 0.01 esd of each other on synthetic NaTaO3 P4/mbm "
+                  "and LaMnO3 Pnma, two perovskites, untested beyond them; tests/"
+                  "test_displacive_statement.py::test_the_seed_magnitude_does_not_move_the_answer")),
     Row("rietx.crystallography.representation.distortion._POSITION_TOL", "constant", value=1e-06),
     Row("rietx.crystallography.representation.distortion._PROBE_AMPLITUDE", "constant", value=0.05),
     Row("rietx.crystallography.representation.distortion._PROBE_SYMPREC", "constant", value=0.001),
@@ -2166,6 +2174,16 @@ ROWS: tuple[Row, ...] = (
                  "ten is rietx's.  The second pass counts the stages where it binds and removes "
                  "it if none do (B8)."),
         approved="2026-10-20"),
+    Row("rietx.params.vector.DISTORTION_DRIFT_TOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: the write-back stores what the affine rows compute, which a "
+                  "numpy sum meets to ~1e-16 (docstring); refusing past it protects a "
+                  "hand-edited mode-moved coordinate, RIGID_BODY_DRIFT_TOL's rule (WP-1419); "
+                  "tests/test_distortion_block.py::test_a_hand_edited_coordinate_is_refused_"
+                  "and_round_off_is_not")),
+    Row("rietx.params.vector.DISTORTION_SITE_TOL", "constant", tier=1, value=1e-08,
+        evidence=("linear-algebra round-off: R.v - v of an allowed mode vector is ~1e-15, a "
+                  "forbidden one O(1) (docstring, WP-1419); tests/test_distortion_block.py::"
+                  "test_a_mode_vector_its_site_does_not_allow_is_refused")),
     Row("rietx.params.vector.SIZE_CAP_ARM_RTOL", "constant", tier=1, value=1e-06,
         evidence=("numerical floor: as STRAIN_CAP_ARM_RTOL; hysteresis pinned by "
                   "test_strain_cap.py:414")),

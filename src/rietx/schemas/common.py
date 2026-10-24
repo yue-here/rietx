@@ -537,7 +537,13 @@ from .._nearmiss import did_you_mean
 #: node ran at), the same rule.  And ``StageResult.n_lapack_fallbacks``, the
 #: decompositions a stage repeated with LAPACK's second driver, defaulting to
 #: 0, which every earlier stage took.
-SCHEMA_VERSION = "0.59"
+#: 0.59 → 0.60 (WP-1419): ``Phase.distortion_modes``, a child stated as
+#: its parent plus absolute mode amplitudes (``DistortionModes``: the parent
+#: group, the transform, the reference metric, one base position per atom and
+#: a ``DistortionMode`` per mode with ``amplitude: Parameter``).  Additive and
+#: defaulted to ``None``, exactly off, the 0.25 → 0.26 rule; written by
+#: ``displacive_statement``.  An older build refuses a phase carrying it.
+SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated

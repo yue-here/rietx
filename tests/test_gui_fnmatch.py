@@ -114,10 +114,15 @@ def _vocabulary() -> list[str]:
         fwhm=Parameter(value=8.0, min=HUMP_FWHM_MIN,
                        transform="softplus"))]
 
+    # a child on mode amplitudes (WP-1419): mccusker_structural frees its
+    # amplitudes, and no other model has that path
+    from tests.test_help import _distortion_phase
+
     paths: list[str] = []
     for structure, instrument in (
         (lab6_structure, lab6_instrument),
         (Structure(phases=[brucite]), lab_instrument),
+        (Structure(phases=[_distortion_phase()]), lab_instrument),
     ):
         for entry in ParameterTable(structure, instrument).entries:
             if entry.path not in paths:

@@ -345,11 +345,13 @@ def mode_fixed_path(path: str, mode: Mode) -> bool:
     # width would be a dead column, as the moment it broadens (``.atoms.``)
     # already is here.
     # A rigid body's origin and rotation (WP-1805) move nothing but its atoms'
-    # coordinates, so they are structural parameters too.
+    # coordinates, so they are structural parameters too, and so is a
+    # distortion-mode amplitude (WP-1419), which writes only coordinates.
     # A texture coefficient (WP-1960) multiplies |F|², which an intensity model
     # does not compute, so its column is dead there: measured on March-Dollase's
     # r, its single-axis sibling, which ended 1.7e-13 from its start.
     return (".atoms." in path or ".rigid_bodies." in path
+            or ".distortion_modes." in path
             or (path.startswith("phases.") and path.endswith(".scale"))
             or (path.startswith("phases.") and ".texture." in path)
             or _MAGNETIC_WIDTH_PATH.match(path) is not None)

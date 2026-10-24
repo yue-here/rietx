@@ -29,6 +29,7 @@ BodyTorsion.moves
 BodyTorsion.name
 BodyTorsion.vary
 ParameterRow.body
+Phase.distortion_modes
 Phase.rigid_bodies
 RigidBody.atoms
 RigidBody.name

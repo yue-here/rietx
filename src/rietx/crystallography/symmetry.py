@@ -100,6 +100,24 @@ def refuse_operation_list(phase, fmt: str) -> None:
             f"(Structure.to_cif) carries the list")
 
 
+def refuse_distortion_modes(phase, fmt: str) -> None:
+    """Refuse, by name, a phase refined on mode amplitudes (WP-1419).
+
+    For a writer whose format refines atom coordinates and has no mode
+    parameterisation: written anyway, the amplitudes and the base they are
+    absolute against would be dropped, and a refinement there would free the
+    coordinates the amplitudes were deriving.  The coordinates themselves are
+    a plain structure, and saying how to write them is the way out.
+    """
+    if getattr(phase, "distortion_modes", None) is not None:
+        raise ValueError(
+            f"phase {phase.name!r} cannot be written to {fmt}: its coordinates "
+            f"are derived from {len(phase.distortion_modes.modes)} distortion-mode "
+            f"amplitudes (Phase.distortion_modes), which {fmt} cannot state. To "
+            f"write the structure as it stands, as plain coordinates, drop the "
+            f"record: phase.model_copy(update={{'distortion_modes': None}})")
+
+
 def restate_in_hexagonal_axes(phase, fmt: str):
     """``(phase, restated)``: an R lattice on rhombohedral axes in hexagonal ones.
 

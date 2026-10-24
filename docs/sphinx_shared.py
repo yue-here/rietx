@@ -32,6 +32,7 @@ from rietx._about import REPO_URL
 from rietx.crystallography.atomic_volume import VOLUME_RATIO_BOUNDS, VOLUME_SCATTER
 from rietx.crystallography.dispersion import NEAR_EDGE_EV
 from rietx.crystallography.magnetic.moments import MOMENT_DIRECTION_SUPPORT
+from rietx.crystallography.representation.distortion import DISTORTION_SEED
 from rietx.crystallography.scattering import _itc_handover
 from rietx.crystallography.symmetry import SYMMETRY_ANGLE_TOL_DEG
 from rietx.examples import list_examples
@@ -211,6 +212,7 @@ MYST_SUBSTITUTIONS = {
     # the moment-direction floor both the hold and the stationary-angle test
     # read, and that test's level (WP-1929)
     "MOMENT_DIRECTION_SUPPORT": f"{MOMENT_DIRECTION_SUPPORT:.0e}",
+    "DISTORTION_SEED": f"{DISTORTION_SEED:g}",
     "STATIONARY_ANGLE_LEVEL": STATIONARY_ANGLE_LEVEL,
     # the parametric form test's level (WP-1325)
     "PARAMETRIC_FORM_LEVEL": FORM_TEST_LEVEL,

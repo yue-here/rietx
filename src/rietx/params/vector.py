@@ -92,6 +92,22 @@ _SIGMA_MAX = float(np.sqrt(np.finfo(np.float64).max))
 #: 1e-12 moves the moment by 1e-12 of its modulus.
 _MOMENT_REFRAME_TOL = 1e-12
 
+#: How far (child fractions) a stored coordinate of an atom a distortion mode
+#: moves may sit from ``base + Σ A·v`` before it counts as edited by hand
+#: (WP-1419).  The write-back stores exactly what the rows compute, so a fitted
+#: model differs by round-off only (the affine row's own sum against a numpy
+#: sum, 1e-16 here); anything past this bound was edited, and silently moving
+#: it back would undo the edit without a word, so the table refuses it naming
+#: the coordinate (``RIGID_BODY_DRIFT_TOL``'s rule for a body atom).
+DISTORTION_DRIFT_TOL = 1e-9
+
+#: How far (relative to the vector's own size) a mode vector may leave its
+#: atom's site-symmetry subspace, R·v = v for every rotation of the site's
+#: stabiliser, before the mode is refused (WP-1419).  Linear-algebra round-off:
+#: the vectors are averages of permutation-times-rotation matrices, so a true
+#: zero sits at 1e-15 and a vector the site forbids is O(1) off.
+DISTORTION_SITE_TOL = 1e-8
+
 
 def _is_wavelength(path: str) -> bool:
     return (path.startswith("instrument.source.lines.")
@@ -1248,6 +1264,12 @@ class ParameterTable:
         #: (:meth:`set_vary`).  Restored when the fix moves off the entry, so a
         #: take-back leaves the row as the caller left it, never silently fixed.
         self._origin_wanted: dict[str, bool] = {}
+        #: phase base path → (its amplitude paths, which of them are invariant
+        #: under the whole parent group), for every phase with
+        #: ``Phase.distortion_modes`` (WP-1419).  Built by
+        #: :meth:`_collect_distortion_modes`; read by
+        #: :meth:`_refuse_unseeded_distortion`.  Empty for every other table.
+        self._distortion: dict[str, tuple[tuple[str, ...], tuple[bool, ...]]] = {}
         self._collect(structure, instrument)
         self._rebuild()
         if self._origin:
@@ -1260,6 +1282,8 @@ class ParameterTable:
             self._check_body_drift()
             for _, _, block in self._bodies:
                 self.add_derived(block)
+        if self._distortion:
+            self._refuse_unseeded_distortion()
 
     # -- collection ----------------------------------------------------
     def _add(self, path: str, p: Parameter, *, force_fixed: bool = False,
@@ -1332,10 +1356,13 @@ class ParameterTable:
             self._collect_microstrain(base, sg, phase)
             owner = {label: body.name for body in phase.rigid_bodies
                      for label in body.atoms}
+            moved = self._collect_distortion_modes(base, phase)
             for j, atom in enumerate(phase.atoms):
                 if atom.label in owner:
                     self._collect_body_atom_coords(f"{base}.atoms.{j}", atom,
                                                    owner[atom.label])
+                elif j in moved:
+                    self._collect_mode_atom_coords(f"{base}.atoms.{j}", sg, phase, j)
                 else:
                     self._collect_atom_coords(f"{base}.atoms.{j}", sg, atom)
                 self._add(f"{base}.atoms.{j}.occ", atom.occ)
@@ -1485,6 +1512,140 @@ class ParameterTable:
             self._anchored_dofs[path] = tuple(
                 (f"{base}.{c}", float(basis[k][c_idx]))
                 for c_idx, c in enumerate(("x", "y", "z")) if basis[k][c_idx] != 0)
+
+    def _collect_distortion_modes(self, base: str, phase) -> set[int]:
+        """One absolute amplitude per mode of ``Phase.distortion_modes`` (WP-1419).
+
+        Each mode contributes ``phases.i.distortion_modes.modes.m.amplitude``
+        (Å), built in one pass here rather than through ``Refinement.tie``
+        (480 tie calls took 202 s on #286's kickoff; the block takes
+        milliseconds).  Returns the indices of the atoms some mode moves, whose
+        coordinates :meth:`_collect_mode_atom_coords` then derives from these
+        entries.  The amplitudes are unbounded, like the ADP and Stephens DOFs:
+        a sign is a domain label, so no box is physical.
+        """
+        modes = phase.distortion_modes
+        if modes is None:
+            return set()
+        paths = []
+        for m, mode in enumerate(modes.modes):
+            path = f"{base}.distortion_modes.modes.{m}.amplitude"
+            self._add(path, mode.amplitude)
+            paths.append(path)
+        self._distortion[base] = (tuple(paths),
+                                  tuple(mode.parent_invariant for mode in modes.modes))
+        return {j for j in range(len(phase.atoms))
+                if any(any(v != 0.0 for v in mode.vectors[j]) for mode in modes.modes)}
+
+    def _collect_mode_atom_coords(self, base: str, sg, phase, j: int) -> None:
+        """An atom a distortion mode moves: x, y, z derived from the amplitudes.
+
+        The rows are x = base + Σ_ν A_ν·v_ν (child fractions), one per
+        coordinate, with the record's ``base`` as the constant, **never the
+        stored coordinate** (WP-1419).  That is what makes the amplitude
+        absolute: no anchored displacement DOF exists for the atom, so
+        :attr:`anchored_dof_paths` does not list it and no re-basing
+        (WP-1432) can reach it, and a rebuild reproduces the coordinate from
+        the amplitudes alone.  The mode basis is complete (Σ n_modes equals the
+        child's free coordinates, asserted by ``distortion_basis``), so freeing
+        no coordinate DOF here loses no freedom.  A coordinate no mode moves is
+        held at the stored value, as a fixed special position's is.
+
+        Three refusals, each naming what to do.  A coordinate declared
+        ``vary=True``: the amplitudes are its one writer.  A stored coordinate
+        further than :data:`DISTORTION_DRIFT_TOL` from ``base + Σ A·v``: an
+        edit of a derived coordinate, which a silent rewrite would undo.  A
+        mode vector outside the atom's site-symmetry subspace (R·v ≠ v for a
+        rotation of the base position's stabiliser, past
+        :data:`DISTORTION_SITE_TOL`): the
+        orbit expansion would then carry the field onto the atom's own images
+        with the wrong sign, which is the case where the phase's group and the
+        mode field's stabiliser differ (milestone row D).
+        """
+        atom = phase.atoms[j]
+        modes = phase.distortion_modes
+        label = f"{base} ({atom.label!r})"
+        if any(getattr(atom, c).vary for c in ("x", "y", "z")):
+            raise ValueError(
+                f"{label} is moved by distortion modes; its coordinates are derived "
+                "from the mode amplitudes — refine "
+                "phases.*.distortion_modes.modes.*.amplitude and set vary=False here")
+        xyz = np.array([atom.x.value, atom.y.value, atom.z.value], dtype=np.float64)
+        origin = np.array(modes.base[j], dtype=np.float64)
+        vectors = np.array([mode.vectors[j] for mode in modes.modes], dtype=np.float64)
+        amps = np.array([mode.amplitude.value for mode in modes.modes], dtype=np.float64)
+        # the site symmetry at the base: a vector the site forbids moves the
+        # stored atom off its special position, where the stored coordinate's
+        # own stabiliser no longer sees the operation it breaks
+        rotations = stabilizer_rotations(sg, origin)
+        for mode, v in zip(modes.modes, vectors, strict=True):
+            size = float(np.abs(v).max())
+            if size == 0.0:
+                continue
+            off = max(float(np.abs(np.asarray(r, dtype=np.float64) @ v - v).max())
+                      for r in rotations)
+            if off > DISTORTION_SITE_TOL * size:
+                raise ValueError(
+                    f"{label}: distortion mode {mode.irrep} #{mode.index} ({mode.site}) "
+                    f"moves it by {v.tolist()} per Å, which its site symmetry does not "
+                    f"allow (R·v − v up to {off:.3g}); the phase's group carries an "
+                    "operation the mode field is not invariant under.  Restate the "
+                    "child with displacive_statement, whose group is the field's own")
+        placed = origin + amps @ vectors
+        drift = np.abs(xyz - placed)
+        if float(drift.max()) > DISTORTION_DRIFT_TOL:
+            c = "xyz"[int(np.argmax(drift))]
+            raise ValueError(
+                f"{label}.{c} = {xyz['xyz'.index(c)]!r} but its distortion modes place it "
+                f"at {placed['xyz'.index(c)]!r} (base + Σ amplitude·vector).  The "
+                "coordinates of a mode-moved atom are derived: move it with "
+                "set_values on phases.*.distortion_modes.modes.*.amplitude, or restate "
+                "the child with displacive_statement")
+        paths = self._distortion[base.split(".atoms.")[0]][0]
+        for c_idx, c in enumerate(("x", "y", "z")):
+            p: Parameter = getattr(atom, c)
+            terms = tuple((paths[m], float(vectors[m, c_idx]))
+                          for m in range(len(paths)) if vectors[m, c_idx] != 0.0)
+            if terms:
+                self._add(f"{base}.{c}", p,
+                          tie=AffineTie(terms=terms, const=float(origin[c_idx])))
+            else:
+                self._add(f"{base}.{c}", p, force_fixed=True)
+
+    def _refuse_unseeded_distortion(self) -> None:
+        """Refuse a free distortion block sitting exactly at the parent (WP-1419).
+
+        χ²(D(g)·A) = χ²(A) for every lost parent operation g, D(g) its action on
+        the amplitude vector (it maps the child to a domain-related structure
+        with the same powder pattern), so at A = 0 the gradient lies in the fixed subspace of the
+        parent group's action: every amplitude outside the identity irrep has
+        an **exactly** zero column there, the whole block at once (#286,
+        2026-09-16: dχ²/du −2.9e-8 at 0 against −1.57e7 at 0.005; Perez-Mato,
+        Orobengoa & Aroyo 2010, *Acta Cryst.* A66, 558, § 7).  A stage that
+        frees such a block can move only through the finite difference's own
+        step, which is not a measurement.  ``_collect_microstrain``'s all-zero
+        refusal is the precedent.  A block whose free amplitudes are all
+        identity-irrep (``parent_invariant``) is accepted: its column at the
+        parent is not forced to zero.  Asked of what moves (C's rows), so a
+        variable driving an amplitude counts as freeing it.
+        """
+        reach = np.asarray(abs(self._reach).sum(axis=1)).ravel()
+        for base, (paths, invariant) in self._distortion.items():
+            broken = [p for p, inv in zip(paths, invariant, strict=True) if not inv]
+            if not broken:
+                continue
+            idx = [self._paths[p] for p in broken]
+            if not any(reach[i] > 0.0 for i in idx):
+                continue
+            if all(self.entries[i].value == 0.0 for i in idx):
+                raise ValueError(
+                    f"{base}.distortion_modes: every amplitude outside the identity "
+                    "irrep is exactly zero, where the pattern is invariant under every "
+                    "lost parent operation's action on the block, so its gradient there "
+                    "is exactly zero and the stage "
+                    "cannot move off the parent.  State the child with "
+                    "displacive_statement, which seeds it, or set_values a small "
+                    "non-zero amplitude before freeing the block")
 
     def _declare_origin(self, ip: int, sg, phase) -> None:
         """Record where phase ``ip``'s origin floats and what could hold it (WP-1912).
@@ -3344,6 +3505,8 @@ class ParameterTable:
                 e.vary = vary
                 hits.append(e.path)
         self._rebuild()
+        if vary and self._distortion:
+            self._refuse_unseeded_distortion()
         return hits
 
     @staticmethod
@@ -4281,6 +4444,11 @@ class ParameterTable:
             for b, body in enumerate(phase.rigid_bodies):
                 for c in ("x", "y", "z"):
                     put(getattr(body.origin, c), f"{base}.rigid_bodies.{b}.origin.{c}")
+            if phase.distortion_modes is not None:
+                # the amplitudes; the coordinates they derive are written with
+                # the atoms below, from their rows
+                for m, mode in enumerate(phase.distortion_modes.modes):
+                    put(mode.amplitude, f"{base}.distortion_modes.modes.{m}.amplitude")
             for j, atom in enumerate(phase.atoms):
                 # coordinates too — without this, refined positions vanish at
                 # the next stage's recompile (models feed compile_phase_sites)

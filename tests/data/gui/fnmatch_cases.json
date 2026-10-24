@@ -74,7 +74,10 @@
   "instrument.background.c3",
   "instrument.extra_components.0.position",
   "instrument.extra_components.0.height",
-  "instrument.extra_components.0.fwhm"
+  "instrument.extra_components.0.fwhm",
+  "phases.0.distortion_modes.modes.0.amplitude",
+  "phases.0.distortion_modes.modes.1.amplitude",
+  "phases.0.distortion_modes.modes.2.amplitude"
  ],
  "patterns": [
   {
@@ -153,7 +156,10 @@
     70,
     71,
     72,
-    73
+    73,
+    74,
+    75,
+    76
    ]
   },
   {
@@ -226,7 +232,10 @@
     64,
     65,
     66,
-    67
+    67,
+    74,
+    75,
+    76
    ]
   },
   {
@@ -429,6 +438,14 @@
     71,
     72,
     73
+   ]
+  },
+  {
+   "pattern": "phases.*.distortion_modes.modes.*.amplitude",
+   "matches": [
+    74,
+    75,
+    76
    ]
   },
   {

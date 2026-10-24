@@ -82,7 +82,11 @@ PARAMETER_GROUPS = (
       ("Rigid bodies",
        "A rigid body moves a group of atoms as one unit. "
        "Its rotation and torsions refine as increments from the stored geometry.",
-       ("phases.*.rigid_bodies.*",)))),
+       ("phases.*.rigid_bodies.*",)),
+      ("Distortion modes",
+       "A child stated as its parent plus a distortion refines one absolute amplitude per "
+       "symmetry-adapted mode, and the coordinates of the atoms the modes move follow.",
+       ("phases.*.distortion_modes.*",)))),
     ("Phase amount and intensity corrections",
      "The phase scale carries how much of the phase the pattern shows. "
      "The others correct intensities for the specimen. "

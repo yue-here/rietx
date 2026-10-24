@@ -1123,6 +1123,26 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
         typical="a few degrees to a few tens of degrees from a sensible start",
         anchor="theory/parameterisation.html#rigid-bodies",
     ),
+    "phases.*.distortion_modes.modes.*.amplitude": HelpEntry(
+        title="Distortion-mode amplitude",
+        description=(
+            "The amplitude, in Å, of one symmetry-adapted displacive mode of a child "
+            "stated as its parent plus a distortion (the phase's `distortion_modes` record, "
+            "built by "
+            "`displacive_statement`). The atoms the mode moves sit at their base "
+            "positions plus the sum of amplitude times mode vector over all modes, so the "
+            "amplitude is absolute and those atoms have no coordinate parameters of their "
+            "own. Unit: AMPLIMODES's, the mode normalised over a primitive cell of the "
+            "child in the parent metric before any strain. The sign of the driving mode is a "
+            "domain label; relative signs inside a basis are measured (Perez-Mato et al. "
+            "2010, § 7). At the parent every amplitude outside the "
+            "identity irrep has an exactly zero gradient, so a block freed there is "
+            "refused: start from the statement's seed."
+        ),
+        unit="Å", default=None,
+        typical="0 to about 1.5 Å for an octahedral tilt",
+        anchor="theory/parameterisation.html#distortion-mode-amplitudes",
+    ),
     "phases.*.atoms.*.occ": HelpEntry(
         title="Site occupancy",
         description=(
