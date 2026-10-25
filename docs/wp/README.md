@@ -77,7 +77,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | P2 | — ([1510](1510-what-the-chemist-knows-reaches-the-search.md) soft) | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [2048](2048-a-non-finite-step-ends-a-stage-rather-than-the-fit.md) | A non-finite step ends a stage rather than the fit | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2049](2049-a-frame-no-phase-is-seen-in-holds-the-instrument-too.md) | A frame no phase is seen in holds the instrument's peak terms too | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2051](2051-compiled-per-evaluation-windows.md) | Windows resized at every evaluation, fast enough to measure | P2 | [2047](2047-windows-follow-the-parameters-between-solves.md) | [Unscheduled](#unscheduled) |
+| [2051](2051-compiled-per-evaluation-windows.md) | Windows resized at every evaluation, fast enough to measure | P2 | [2047](2047-windows-follow-the-parameters-between-solves.md) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -476,10 +476,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 
 ## <a id="unscheduled"></a>Unscheduled
 
-| WP | Title | Status | Priority | Depends on |
-|---|---|---|---|---|
-| [2051](2051-compiled-per-evaluation-windows.md) | Windows resized at every evaluation, fast enough to measure | ⬜ | P2 | [2047](2047-windows-follow-the-parameters-between-solves.md) |
-
 ### <a id="unscheduled-coming-from-another-code"></a>Coming from another code
 
 | WP | Title | Status | Priority | Depends on |
@@ -596,6 +592,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2048](2048-a-non-finite-step-ends-a-stage-rather-than-the-fit.md) | A non-finite step ends a stage rather than the fit | ⬜ | P2 | — |
 | [2049](2049-a-frame-no-phase-is-seen-in-holds-the-instrument-too.md) | A frame no phase is seen in holds the instrument's peak terms too | ⬜ | P2 | — |
 | [2050](2050-a-correlation-with-a-flat-direction-is-not-reported.md) | A correlation with a flat direction is not reported as one | ⬜ | P3 | — |
+| [2051](2051-compiled-per-evaluation-windows.md) | Windows resized at every evaluation, fast enough to measure | ⬜ | P2 | [2047](2047-windows-follow-the-parameters-between-solves.md) |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 

@@ -1,6 +1,7 @@
 # WP-2051 — Windows resized at every evaluation, fast enough to measure
 
 Milestone: unscheduled · Status: ⬜
+Track: What fires, and what stays silent
 Depends on: 2047 (`forward.rewindow`, `fcj.fcj_node_counts` and probes 7 and 8 land with it)
 Priority: P2 2026-10-25 — the decision the maintainer asked to test soon: whether rietx adopts per-evaluation windows
 
