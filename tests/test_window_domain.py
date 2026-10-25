@@ -263,6 +263,8 @@ def _family(family, cold=False):
         import matplotlib.pyplot as plt
         plt.close("all")
         return {"data": data, "plan": plan, "kw": kw, "stages": stages,
+                "window_loss": [(s.window_loss, s.window_area_tol) for s in res.stages],
+                "codes": {d.code for d in res.diagnostics},
                 "structure": ref.fitted_structure.model_copy(deep=True),
                 "instrument": ref.fitted_instrument.model_copy(deep=True)}
     finally:
@@ -449,6 +451,19 @@ _GROWTH_FAILS = {
     "lab6": "'profile' widens peaks 1.5x: 6.5 % of a peak's area lost (bound 2 %)",
     "cpd1a": "'profile' widens peaks 2.8x: 5.8 % lost; 'sample_broadening' 3.0 %",
 }
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("family", FAMILIES)
+def test_no_protocol_stage_ends_on_stale_windows(family):
+    """WP-2047: every stage of the four protocols ends with its frozen windows
+    dropping less than its own tolerance at its answer (1.61 % at most, LaB6's
+    ``profile`` stage, against 2 %), so ``STAGE_WINDOWS_STALE`` stays silent
+    on every fit the acceptance suites run."""
+    f = _family(family)
+    for loss, tol in f["window_loss"]:
+        assert loss is not None and loss < fwd.recorded_window_tol(tol), f["window_loss"]
+    assert "STAGE_WINDOWS_STALE" not in f["codes"]
 
 
 @pytest.mark.slow

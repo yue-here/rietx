@@ -30,7 +30,12 @@ from .backend.api import backend_dtype_note
 from .crystallography.symmetry import reflection_label_row
 from .history.events import _attach_progress, as_event_stream
 from .model.components import EXTRA_TICK_KEY
-from .model.forward import PHASE_SUPPORT_SIGMA, compile_model, recorded_window_tol
+from .model.forward import (
+    PHASE_SUPPORT_SIGMA,
+    compile_model,
+    recorded_window_tol,
+    window_loss,
+)
 from .model.microstructure import microstructure_table
 from .optimize.blocked import BlockJacobian
 from .optimize.cancel import RefinementCancelled
@@ -126,6 +131,7 @@ from .refine import (
     _wavelength_calibration_diagnostics,
     _width_census_diagnostics,
     _width_twin_flats,
+    _window_loss_diagnostics,
 )
 from .report.magnetic import moment_angle_stationary_diagnostics
 from .report.schemas import THRESHOLDS_VERSION
@@ -280,6 +286,9 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (FIT,), "a probe count summed over the joint search"),
     "_unknown_path_diagnostics": (
         (FIT,), "a stage's globs are the plan's, matched against every table"),
+    "_window_loss_diagnostics": (
+        (FIT,), "one finding per stage, read off the record, which keeps the "
+                "worst histogram's loss (WP-2047)"),
     "_max_iter_diagnostics": (
         (FIT,), "a stage's budget is spent by the one joint solve"),
     "_frozen_compile_diagnostics": (
@@ -1650,6 +1659,11 @@ class MultiHistogramRefinement:
                 # with what else it stopped (WP-1342's record, scoped as the
                 # joint result spells a row)
                 still = set(held)
+                # what each histogram's frozen windows drop at the answer
+                # (WP-2047); the record keeps the worst
+                losses = [x for x in (window_loss(m, v) for m, v in zip(
+                    models, self.mtable.decode(outcome.theta), strict=True))
+                    if x is not None]
                 stage_results.append(StageResult(
                     name=stage.name, status=outcome.status,
                     n_iterations=outcome.n_iterations,
@@ -1668,7 +1682,8 @@ class MultiHistogramRefinement:
                     unknown_paths=unknown_paths, unreached_histograms=unreached,
                     seeded=seeded, blocked_by_hold=blocked_by_hold,
                     moment_angle_tests=outcome.moment_angle_tests,
-                    cell_reset=cell_reset, collapsed=restored))
+                    cell_reset=cell_reset, collapsed=restored,
+                    window_loss=max(losses) if losses else None))
                 if stream is not None:
                     rwp, rows = self._stage_end_rows(models, outcome.theta)
                     stream.emit("stage_end", stage=stage.name, status=outcome.status,
@@ -1677,7 +1692,8 @@ class MultiHistogramRefinement:
                                 cost_initial=outcome.cost_initial,
                                 cost_final=outcome.cost_final, rwp=rwp,
                                 held=list(held), released=list(released),
-                                n_histograms=self.n_histograms, histograms=rows)
+                                n_histograms=self.n_histograms, histograms=rows,
+                                window_loss=stage_results[-1].window_loss)
 
         assert models is not None and outcome is not None
         # the result's curves and statistics from a compile at the values it
@@ -2041,6 +2057,7 @@ class MultiHistogramRefinement:
             listing="[e.path for t in ref.mtable.tables for e in t.entries]")
         diagnostics = diagnostics + _unreached_histogram_diagnostics(
             stage_results, [h.label for h in histograms])
+        diagnostics = diagnostics + _window_loss_diagnostics(stage_results)
         # the floating-origin hold every histogram's table derives from its
         # copy of the one structure (WP-1912): asked of each and told once
         diagnostics = diagnostics + _joint_origin_findings(stage_results,

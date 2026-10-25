@@ -464,6 +464,29 @@ def _pattern_failed_silent() -> list:
     return _failed_series(lambda n: n <= 2)
 
 
+def _windows_stale(axial_to: float | None) -> list:
+    """The synthetic LaB₆ compiled at ``axial_sl`` 0.03, then measured at
+    ``axial_to`` (``None``: where it compiled), through the record."""
+    from rietx.model.forward import WINDOW_AREA_TOL, compile_model, window_loss
+    from rietx.params.vector import ParameterTable
+    from rietx.refine import _window_loss_diagnostics
+    from rietx.schemas.results import StageResult
+    from tests.test_refine_synthetic import perturbed_models, synthesize
+
+    structure, ins = perturbed_models()
+    ins.geometry.axial_sl.value = ins.geometry.axial_hl.value = 0.03
+    model = compile_model(structure, ins, synthesize(),
+                          window_area_tol=WINDOW_AREA_TOL, moving_paths=set())
+    t = ParameterTable(structure, ins)
+    if axial_to is not None:
+        t.entries[t._paths["instrument.geometry.axial_sl"]].value = axial_to
+        t.refresh_ties()
+    loss = window_loss(model, t.decode(t.x0()))
+    return _window_loss_diagnostics([StageResult(
+        name="s", status="converged", n_iterations=1, cost_initial=1.0,
+        cost_final=1.0, window_loss=loss)])
+
+
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -495,6 +518,9 @@ SILENCE: dict[str, Pair] = {
         _pattern_failed_fires, _pattern_failed_silent, "tests/test_series_error_policy.py"),
     "SITE_SNAPPED_TO_SPECIAL_POSITION": Pair(
         _snap_fires, _snap_silent, "tests/test_cif_stated_columns.py"),
+    "STAGE_WINDOWS_STALE": Pair(
+        functools.partial(_windows_stale, 0.3), functools.partial(_windows_stale, None),
+        "tests/test_window_loss.py"),
 }
 
 

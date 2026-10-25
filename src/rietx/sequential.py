@@ -264,7 +264,9 @@ MIN_POINTS_FOR_PERSISTENCE = 5
 #: last stage moves the zero and the widths fires it on every pattern (the QPA
 #: round-robin sample-1 chain, 1.3-2.1e-2), and promoting it would turn a
 #: statement about compile sizing into a warning about the model.
-NOT_A_SERIES_FINDING = frozenset({"FROZEN_COMPILE_STALE"})
+#: ``STAGE_WINDOWS_STALE`` (WP-2047) is the same kind: a stage outgrowing the
+#: windows it was solved on is about where it started, not the model.
+NOT_A_SERIES_FINDING = frozenset({"FROZEN_COMPILE_STALE", "STAGE_WINDOWS_STALE"})
 
 #: A phase width is called a soak when it reaches this multiple of the first
 #: width the series measured **and** the fit's GoF reaches

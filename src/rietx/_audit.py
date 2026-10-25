@@ -483,6 +483,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.StageResult.status",
     "rietx.schemas.results.StageResult.unknown_paths",
     "rietx.schemas.results.StageResult.unreached_histograms",
+    "rietx.schemas.results.StageResult.window_loss",
     "rietx.schemas.results.Statistics.chi2",
     "rietx.schemas.results.Statistics.durbin_watson",
     "rietx.schemas.results.Statistics.gof",
@@ -959,6 +960,28 @@ ROWS: tuple[Row, ...] = (
     Row("STAGE_MAX_ITER", "code"),
     Row("STAGE_PATH_NOT_FREE", "code"),
     Row("STAGE_PATH_UNKNOWN", "code"),
+    Row("STAGE_WINDOWS_STALE", "code", tier=3, ambiguity=3,
+        evidence=("warning; fires when StageResult.window_loss, the Bragg intensity a "
+                  "stage's frozen windows drop at its answer against windows sized there, "
+                  "passes 1x the stage's own window_area_tol, which moves with "
+                  "WINDOW_AREA_TOL; 0.5x fired on two normal profile stages; the four "
+                  "acceptance protocols' stage answers reach 1.61 % against 2 % (1.24x "
+                  "margin) and 2e-5 against the closing 1e-3, and the QPA round-robin "
+                  "chain's runaway before WP-2045 reads 73 % (WP-2047 probes 3, 5 and 6, "
+                  "one family); reported only for the last stage and the one before a "
+                  "closing stage, since the calibrate guide's sample_profile stage ends "
+                  "at 12 % and the stages after it repair it (one synthetic fit; this "
+                  "stage selection is the session's judgement, not yet ruled)"),
+        grounds=("No surveyed program reports this: GSAS-II, MAUD, RIETAN-FP and "
+                 "EasyDiffraction resize every evaluation, TOPAS rebuilds its buffer past "
+                 "a width tolerance, FullProf never does, BGMN documents no rule. The "
+                 "stage ran on windows it sized itself, so the gap is said out loud; "
+                 "the report and its threshold ruled 2026-10-25 (WP-2047, option 1)."),
+        approved="2026-10-25", response="warning",
+        responds=("treat the result, and every parameter the named stage freed, as "
+                  "unconfirmed: refit from starting values nearer the data rather than "
+                  "polishing, and compare Rwp and the axial terms"),
+        scope=("all",)),
     Row("STEPHENS_STRAIN_NOT_POSITIVE", "code"),
     Row("STRAIN_UNUSUALLY_LARGE", "code"),
     Row("TEXTURE_NOT_POSITIVE", "code"),
@@ -3801,6 +3824,15 @@ ROWS: tuple[Row, ...] = (
     Row("STAGE_MAX_ITER.suggestion", "suggestion", value=1),
     Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=1),
     Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=2),
+    Row("STAGE_WINDOWS_STALE.suggestion", "suggestion", value=1, tier=3, ambiguity=3,
+        evidence=("WP-2045's re-solve from the runaway went from axial_sl 558 to 4114, "
+                  "behind the warning against polishing; both runaway steps were the "
+                  "stage's first accepted step from its start (WP-2047 probe 2), behind "
+                  "naming the start; no start was varied, so the remedy is unmeasured"),
+        grounds=("The start is the one lever the caller holds that the measured steps "
+                 "depend on; the remedies that removed the runaway (WP-2045's tolerance "
+                 "schedule, WP-2047's per-evaluation windows) are the package's."),
+        approved="2026-10-25"),
     Row("STEPHENS_STRAIN_NOT_POSITIVE.suggestion", "suggestion", value=1),
     Row("STRAIN_UNUSUALLY_LARGE.suggestion", "suggestion", value=1),
     Row("TEXTURE_NOT_POSITIVE.suggestion", "suggestion", value=1),

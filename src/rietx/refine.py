@@ -63,6 +63,7 @@ from .model.forward import (
     Mode,
     compile_model,
     recorded_window_tol,
+    window_loss,
 )
 from .model.geometry import cell_volumes, geometry_table
 from .model.microstructure import microstructure_table
@@ -161,6 +162,7 @@ from .schemas.results import (
 )
 from .schemas.structure import Structure
 from .strategy.staged import (
+    CLOSING_STAGE_NAME,
     CORRELATION_GUARD,
     PLAN_PRESETS,
     RefinementPlan,
@@ -460,6 +462,9 @@ class _StageHold:
     #: plan starts its support hold from it too.  ``None`` outside Rietveld
     #: mode, where the result reads the screen itself.
     significance: np.ndarray | None = None
+    #: ``StageResult.window_loss`` (WP-2047): measured on the stage's own
+    #: frozen model at its answer, which only ``_run_stage`` still holds
+    window_loss: float | None = None
 
 
 def _tie_terms(source: "str | dict[str, float] | Sequence[tuple[str, float]]",
@@ -2528,7 +2533,8 @@ class Refinement:
 
     def _record(self, tree: RefinementTree, action: NodeAction, model: CompiledModel,
                 table: ParameterTable, outcome, diagnostics,
-                held_scales: set[int] | None = None) -> str:
+                held_scales: set[int] | None = None,
+                window_loss: float | None = None) -> str:
         values = table.decode(outcome.theta)
         y_calc = model.evaluate(values)
         stats = compute_statistics(model.y_obs, y_calc, model.sigma,
@@ -2541,7 +2547,8 @@ class Refinement:
         metrics = NodeMetrics(
             statistics=stats, status=outcome.status, n_iterations=outcome.n_iterations,
             cost_initial=outcome.cost_initial, cost_final=outcome.cost_final,
-            stderr=stderr, held_scale_phases=sorted(held_scales or ()))
+            stderr=stderr, held_scale_phases=sorted(held_scales or ()),
+            window_loss=window_loss)
         node = tree.add(
             parents=[self._head_id] if self._head_id else [],
             action=action, state=self.snapshot(model=model),
@@ -4773,6 +4780,10 @@ class Refinement:
 
         guard = check_guards(table, outcome, correlation_guard, model=model,
                              scan_exchangeability=stage_index == n_stages)
+        # what the frozen windows drop at the answer, against windows sized
+        # there (WP-2047): after the collapse and the Le Bail update, so it
+        # reads the answer the stage hands on
+        loss = window_loss(model, table.decode(outcome.theta))
         if events is not None:
             # a real number, not the raw least-squares cost: additive on the
             # existing kind (history/events.py's rule), paid only when a
@@ -4801,7 +4812,8 @@ class Refinement:
                         termination=outcome.termination,
                         cost_initial=outcome.cost_initial,
                         cost_final=outcome.cost_final, rwp=stage_rwp,
-                        held=list(held), released=list(released))
+                        held=list(held), released=list(released),
+                        window_loss=loss)
         final_held = set(held)
         kept_axes = {b: a for b, a in flat_axes.items()
                      if f"{b}.moment.dof2" in final_held}
@@ -4820,7 +4832,8 @@ class Refinement:
             origin=model.origin,
             # Le Bail and Pawley read the screen alone, which the result
             # measures on its own compile as it always has
-            significance=support if mode == "rietveld" else None)
+            significance=support if mode == "rietveld" else None,
+            window_loss=loss)
 
     def fit(self, data: PatternData, *, mode: Mode = "rietveld",
             plan: RefinementPlan | str = "mccusker_default",
@@ -5190,6 +5203,7 @@ class Refinement:
                                                    origins=origins))
             diagnostics.extend(_unknown_path_diagnostics(
                 stage_results, [e.path for e in table.entries]))
+            diagnostics.extend(_window_loss_diagnostics(stage_results))
 
             self.result_ = _build_result(
                 model, table, outcome.theta, mode=mode, status=outcome.status,
@@ -5433,6 +5447,7 @@ class Refinement:
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths,
+                window_loss=hold.window_loss,
                 seeded=hold.seeded,
                 cell_reset=hold.cell_reset, collapsed=hold.collapsed,
                 # checked, trivially: one histogram has no elsewhere
@@ -5464,7 +5479,8 @@ class Refinement:
                     phase_support_sigma=phase_support_sigma,
                     correlation_guard=plan.correlation_guard,
                 ), model, table, outcome, stage_diagnostics,
-                    held_scales=_held_scale_phases(stage_results[-1]))
+                    held_scales=_held_scale_phases(stage_results[-1]),
+                    window_loss=stage_results[-1].window_loss)
         diagnostics.extend(restated.values())
         # the converged vector's own findings, and nothing earlier: the same
         # ``guard`` object ``_build_result`` projects ``at_bound`` from
@@ -5726,6 +5742,7 @@ class Refinement:
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths, unreached_histograms={},
+                window_loss=hold.window_loss,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
                 moment_angle_tests=outcome.moment_angle_tests)
@@ -5738,6 +5755,7 @@ class Refinement:
                 table, [stage_result], origins=[(stage.name, hold.origin)]))
             diagnostics.extend(_unknown_path_diagnostics(
                 [stage_result], [e.path for e in table.entries]))
+            diagnostics.extend(_window_loss_diagnostics([stage_result]))
 
             # before the node is recorded, which is where `_run_plan` writes it
             # too; the two call sites must not disagree about when a stage's
@@ -5760,7 +5778,8 @@ class Refinement:
                     phase_support_sigma=phase_support_sigma,
                     correlation_guard=correlation_guard,
                 ), model, table, outcome, diagnostics,
-                    held_scales=_held_scale_phases(stage_result))
+                    held_scales=_held_scale_phases(stage_result),
+                    window_loss=stage_result.window_loss)
 
             # after the node, which keeps its as-optimised metrics: the result
             # is measured on a compile at the values it returns (#272)
@@ -7310,6 +7329,60 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
             message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
                      f"{why}, so nothing was freed for it."),
             where=[name_of(row)], suggestion=fix))
+    return out
+
+
+def _window_loss_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
+    """``STAGE_WINDOWS_STALE``: a stage ended on frozen windows dropping more
+    of the Bragg intensity than its compile allows each peak.
+
+    WP-2047.  A stage sizes its windows when it compiles, so a peak that moves
+    or broadens while it solves spills past them, and the frozen model then
+    rewards that direction with a χ² it does not have.  On the QPA round-robin
+    chain before WP-2045 the warm stage reached ``axial_sl`` 558 that way,
+    "converged", with its windows dropping 73 % of the intensity.  The
+    threshold is the stage's own window tolerance, so no number is new; the
+    four acceptance protocols' stages stay at or under 1.73 % against 2 %.
+
+    ``warning``, and only on the stages whose answer reaches the result with
+    at most one refit: the last stage, and the one before it when the last is
+    the plan's closing stage.  Every stage records its loss, but an earlier
+    one is refitted from its answer on fresh windows by every stage after it,
+    and that repaired the one stale earlier stage measured: the calibrate
+    guide's ``sample_profile`` stage frees the sample broadening from zero and
+    ends at 12 %, and the guide's size lands within its esd of the truth.  The
+    runaway above was the last declared stage, which only the closing stage
+    refits, and that did not repair it.  One per stage, since each compiled
+    its own windows.  ``FROZEN_COMPILE_STALE`` is the last stage's χ² read at
+    the result, and misses half of the runaway, where frozen and fresh fit
+    equally badly.
+    """
+    # the closing stage is the one a plan appended: its name, and a recorded
+    # fraction, which no declared stage of a plan carries (``None``); the name
+    # alone would take a user's own last stage called "closing" for it
+    reach = stage_results[-1:]
+    if (len(stage_results) > 1 and stage_results[-1].name == CLOSING_STAGE_NAME
+            and stage_results[-1].window_area_tol is not None):
+        reach = stage_results[-2:]
+    out = []
+    for sr in reach:
+        tol = recorded_window_tol(sr.window_area_tol)
+        if sr.window_loss is None or not sr.window_loss > tol:
+            continue
+        out.append(Diagnostic(
+            level="warning", code="STAGE_WINDOWS_STALE",
+            message=(f"Stage {sr.name!r} ended with its peak windows, sized "
+                     f"where it started, dropping {100 * sr.window_loss:.3g} % "
+                     "of the Bragg intensity that windows sized at its answer "
+                     f"hold, against the {100 * tol:.3g} % each window may "
+                     "drop. Its peaks moved or broadened past the windows it "
+                     "was solved on, so its answer may fit that loss rather "
+                     "than the data."),
+            value=sr.window_loss,
+            suggestion=("Refit from starting values nearer the data, and do "
+                        "not polish this answer: on the case measured, a "
+                        "further stage from it ran further away."),
+        ))
     return out
 
 

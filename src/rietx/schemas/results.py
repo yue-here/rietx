@@ -1009,6 +1009,23 @@ class StageResult(Base):
     #: fraction: the 2 % and 0.1 % windows of one answer differ by up to 0.6 %
     #: in χ².
     window_area_tol: float | None = None
+    #: the share of the Bragg intensity this stage's frozen windows dropped at
+    #: its answer, against windows sized there (``forward.window_loss``,
+    #: WP-2047).  Windows are sized when a stage compiles, so a peak that moves
+    #: or broadens during the solve spills past them, and the stage may have
+    #: fitted that loss rather than the data.  Negative where the peaks
+    #: narrowed.  Past ``recorded_window_tol(window_area_tol)`` the frozen
+    #: windows drop more than the compile allows each peak, and
+    #: ``STAGE_WINDOWS_STALE`` reports the stage when its answer reaches the
+    #: result (the last stage, and the one before a closing stage); an
+    #: earlier stage is refitted by every later one.  At most 1.73 % at the 2 %
+    #: tolerance on the four acceptance protocols, and 73 % on the QPA
+    #: round-robin chain's runaway before WP-2045.
+    #:
+    #: ``None`` means nobody looked: a result stored before the field, or a
+    #: stage with no Bragg intensity to compare.  Writers: the three runners
+    #: that build a ``StageResult``.
+    window_loss: float | None = None
     #: steps the bounded-LM driver held on a linear-inequality constraint (the
     #: Stephens strain cone, or the Γ_G² floor of WP-1938 D7) during this
     #: stage: the step for the box alone crossed a row, and the step solved

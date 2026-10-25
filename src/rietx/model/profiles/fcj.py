@@ -126,6 +126,17 @@ def fcj_extent_deg(two_theta_deg: np.ndarray, sl: float, hl: float) -> np.ndarra
     return np.abs(np.degrees(np.arccos(cphi)) - np.degrees(tt))
 
 
+def _node_rule(closing: bool) -> tuple[float, int, int, float]:
+    """(nodes per FWHM, min, max, skip ratio): the closing rule or the declared one.
+
+    The one selection :func:`fcj_node_count` and :func:`fcj_node_counts` share.
+    """
+    if closing:
+        return (CLOSING_NODES_PER_FWHM, CLOSING_MIN_NODES, CLOSING_MAX_NODES,
+                CLOSING_SKIP_EXTENT_FWHM_RATIO)
+    return NODES_PER_FWHM, MIN_NODES, MAX_NODES, SKIP_EXTENT_FWHM_RATIO
+
+
 def fcj_node_count(two_theta_deg: float, fwhm_deg: float, sl: float, hl: float,
                    *, closing: bool = False) -> int:
     """Frozen per-reflection quadrature size; 0 → treat peak as symmetric.
@@ -138,15 +149,33 @@ def fcj_node_count(two_theta_deg: float, fwhm_deg: float, sl: float, hl: float,
     """
     if not fcj_live(sl, hl):
         return 0
-    per_fwhm, n_min, n_max, skip = (
-        (CLOSING_NODES_PER_FWHM, CLOSING_MIN_NODES, CLOSING_MAX_NODES,
-         CLOSING_SKIP_EXTENT_FWHM_RATIO) if closing
-        else (NODES_PER_FWHM, MIN_NODES, MAX_NODES, SKIP_EXTENT_FWHM_RATIO))
+    per_fwhm, n_min, n_max, skip = _node_rule(closing)
     extent = float(fcj_extent_deg(np.array(two_theta_deg), sl, hl))
     if extent < skip * fwhm_deg:
         return 0
     n = int(np.ceil(4.0 + per_fwhm * extent / max(fwhm_deg, 1e-6)))
     return int(np.clip(n, n_min, n_max))
+
+
+def fcj_node_counts(two_theta_deg: np.ndarray, fwhm_deg: np.ndarray, sl: float,
+                    hl: float, *, closing: bool = False) -> np.ndarray:
+    """:func:`fcj_node_count` over arrays, by the same rule.
+
+    For ``forward.rewindow`` (WP-2047), which sizes every reflection at once
+    and was 80 % of its time in the per-reflection call.  ``compile_model``
+    keeps the scalar one: a vectorised transcendental may land an ulp from the
+    scalar, and a count sitting on a ceiling would then move every converged
+    fit for nothing.
+    """
+    tt = np.asarray(two_theta_deg, dtype=np.float64)
+    if not fcj_live(sl, hl):
+        return np.zeros(tt.shape, dtype=np.int64)
+    per_fwhm, n_min, n_max, skip = _node_rule(closing)
+    fwhm = np.asarray(fwhm_deg, dtype=np.float64)
+    extent = np.asarray(fcj_extent_deg(tt, sl, hl), dtype=np.float64)
+    n = np.clip(np.ceil(4.0 + per_fwhm * extent / np.maximum(fwhm, 1e-6)),
+                n_min, n_max).astype(np.int64)
+    return np.where(extent < skip * fwhm, 0, n)
 
 
 def fcj_offsets_weights(two_theta_deg: float, sl: float, hl: float,

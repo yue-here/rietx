@@ -561,6 +561,11 @@ from .._nearmiss import did_you_mean
 #: ``ExtinctionScreen.reference_rwp_net``, the cell-free Le Bail's Rwp and the
 #: reference fit's background-subtracted Rwp, and ``"unreliable"`` as a
 #: ``status`` value.  Additive and defaulted to ``None``, the 0.25 → 0.26 rule.
+#: Also in 0.60 (WP-2047): ``StageResult.window_loss`` and
+#: ``NodeMetrics.window_loss``, the share of the Bragg intensity a stage's
+#: frozen windows dropped at its answer.  Additive and defaulted to ``None``,
+#: "nobody looked", the 0.25 → 0.26 rule; all three runners write it on every
+#: stage, and ``Refinement._record`` on every stage node.
 SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

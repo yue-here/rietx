@@ -351,6 +351,12 @@ class NodeMetrics(Base):
     #: it commits; ``[]`` on every other kind of node and on one written
     #: before the field, which replays by the recount as it always did.
     held_scale_phases: list[int] = Field(default_factory=list)
+    #: ``StageResult.window_loss`` of the stage this node commits (WP-2047):
+    #: the gap above, measured at the answer as the share of the Bragg
+    #: intensity the frozen windows dropped.  Written by ``Refinement._record``;
+    #: ``None`` on every other kind of node, on a replay, and on one written
+    #: before the field.
+    window_loss: float | None = None
 
 
 class HistoryNode(Base):

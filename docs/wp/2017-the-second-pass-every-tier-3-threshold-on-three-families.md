@@ -81,6 +81,8 @@ LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
 
 - **From WP-2045 (2026-10-25, PR #1161): `FTOL` now ends two stages of every plan, and the intermediate-tolerance rows were re-measured.** The last declared stage runs at `optimize.lm.FTOL` as well as the closing stage, so refitting the start-test families at 1e-8 and 1e-10 moves both. The four intermediate-tolerance rows' shared evidence now reads 0.000 esd on FAP, cpd-1a and NAC, 0.009 on cpd-1a with zircon declared (your inherited 0.035), and 8.82 on SRM 660c's mirrored axial minima, the one strict xfail (`tests/test_staged_start_invariance.py`, macOS arm64, `[dev]`). Converging the last declared stage costs 1.04-1.07× the evaluations, so the rows' "1.00-2.15x fewer" now nets that out.
 
+- **From WP-2047 (2026-10-25, PR #1171): `STAGE_WINDOWS_STALE` is a new tier-3 row on one family.** Each stage records `StageResult.window_loss`, the Bragg intensity its frozen windows drop at its answer against windows sized there (`forward.window_loss`), and the code fires past the stage's own `window_area_tol` on the last stage and the one before a closing stage. The threshold is no new number, but its separation is measured on one family: the four protocols' stages at most 1.73 % against 2 % (2e-5 against the closing 1e-3), and the QPA chain cpd-1a → cpd-1b under the pre-2045 schedule 73.4 %. The which-stages rule is a session judgement resting on one more fit: the calibrate guide's `sample_profile` stage ends at 12.1 % and the stages after it repair it. A second and third family that run away, or that stay stale behind later stages, would test both halves.
+
 ## Non-goals
 
 - New actions or new thresholds. A measurement that suggests one goes to the maintainer.

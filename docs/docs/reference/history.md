@@ -227,6 +227,7 @@ In the walkthrough of [A first fit in Python](../start/first-fit.md#worked-examp
 | `NodeMetrics.cost_final` | the cost it reached |
 | `NodeMetrics.stderr` | esds by dot-path, in physical units |
 | `NodeMetrics.held_scale_phases` | the phases whose own scale the stage held, which `replay` reads to quote them no fraction |
+| `NodeMetrics.window_loss` | the stage's `StageResult.window_loss`, the share of the Bragg intensity its windows dropped at its answer; `None` on any other node and on a replay |
 
 The cost is half the sum of squared weighted residuals, ½‖r‖², restraint and penalty rows included.
 On the walkthrough's last node it fell from 144 805 to 137 594 in 10 evaluations.

@@ -793,6 +793,16 @@ A warm-started chain over the round robin: what changes when only the starting p
 
 **Measured:** axial_sl 0.0082 at Rwp 0.1398, against 0.1373 for the independent fit (2026-10-25, macOS arm64); the parent tree fails it at 557.8
 
+#### `test_the_hostile_pairs_runaway_reports_its_stale_windows`
+
+`ceiling` · dataset `qarr`
+
+**Claims:** a regression bar, no accuracy claim: under the tolerance schedule before WP-2045, cpd-1b's warm stage ends with its frozen windows dropping over half the Bragg intensity, and every cpd-1a stage under the 2 % each window may drop
+
+**Referenced to:** the stage's own window_area_tol, 2 %, is the reporting threshold; the bar of 0.5 on the runaway is loose on purpose
+
+**Measured:** 73.4 % on cpd-1b's warm stage at axial_sl 557.8, and at most 1.32 % on cpd-1a (2026-10-25, macOS arm64, WP-2047)
+
 #### `test_series_exports`
 
 `identity` · dataset `qarr`

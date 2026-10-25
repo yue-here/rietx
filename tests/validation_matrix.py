@@ -1244,6 +1244,19 @@ CLAIMS: tuple[Claim, ...] = (
                  "fails it at 557.8",
     ),
     Claim(
+        "test_acceptance_sequential",
+        "test_the_hostile_pairs_runaway_reports_its_stale_windows", "qarr",
+        ("ceiling",),
+        "a regression bar, no accuracy claim: under the tolerance schedule "
+        "before WP-2045, cpd-1b's warm stage ends with its frozen windows "
+        "dropping over half the Bragg intensity, and every cpd-1a stage under "
+        "the 2 % each window may drop",
+        reference="the stage's own window_area_tol, 2 %, is the reporting "
+                  "threshold; the bar of 0.5 on the runaway is loose on purpose",
+        measured="73.4 % on cpd-1b's warm stage at axial_sl 557.8, and at most "
+                 "1.32 % on cpd-1a (2026-10-25, macOS arm64, WP-2047)",
+    ),
+    Claim(
         "test_acceptance_sequential", "test_series_exports", "qarr",
         ("identity",),
         "the series CSV and trajectory plot exist with the declared columns "
