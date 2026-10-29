@@ -1,6 +1,6 @@
 # WP-2062 — Pawley is the structure-free default
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-10-29 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: 2011 (the indexer's validation, built provisionally as Pawley); 1910 soft (the extinction screen's fits)
 Priority: P2 2026-10-27 — a scoping WP, the decision with a named user that other WPs wait on (1542, 1910's fit mode)
