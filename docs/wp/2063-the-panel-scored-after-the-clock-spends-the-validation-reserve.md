@@ -49,8 +49,10 @@ fit is bounded, so the validation reserve reaches validation and
 - [ ] Re-measure `quick` on NAC (`docs/wp/2011-probe/probe16_schedule.py`,
       `RESERVE=`) and, if the fits now see the reserve, lower
       `VALIDATION_RESERVE_FRACTION` with its row's evidence.
-- [ ] Unit replay digests (`python -m tests.unit_replay`) and
+- [x] Unit replay digests (`python -m tests.unit_replay`) and
       `tests/test_acceptance_indexing.py` unchanged, or each move named.
+      Replay: 22 of 22 digests unchanged. Acceptance: 44 passed (macOS
+      arm64, `[dev]`, on d4e1fdde3).
 
 ## Acceptance
 
