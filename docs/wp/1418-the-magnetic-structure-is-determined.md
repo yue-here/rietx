@@ -125,6 +125,49 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
 
+- **2026-10-29, from the issue triage (issue #795): the reporter's proposed
+  answers to M-8's four decisions, and what landed beside them.** On
+  2026-10-20 the reporter answered the four questions in the 2026-10-08
+  entry below and asked for a ruling before building K1. Their proposals:
+  1. Placement: `indexing/kvector.py` under `src/rietx/indexing/CLAUDE.md`,
+     with `report/satellites.py` as its consumer. That package already holds
+     the no-singleton result, `Budget`/`Deadline`, `ambiguity.chance_rate` and
+     `lattice_point_group`, and WP-2007 audits its codes and constants.
+  2. First form: K1 now, on the rational grid (denominator ≤ 64) through the
+     existing exact generator; K3 after WP-1993's N-W3a
+     (`satellite_positions` at a real q). K1 prints its grid step and strata,
+     so a general k the grid misses fires `K_SEARCH_AT_CHANCE`.
+  3. Schema: a `KSearchResult` beside `SatelliteEvidence`, with no `.k` and a
+     gated `best_or_none()`. `SatelliteCandidate` gains `score`,
+     `null_threshold`, `k_esd`, `stratum` and `equivalents` only in K2, in
+     one `REPORT_THRESHOLDS`/schema bump taken with the move of both
+     satellite types to `rietx.report.satellites` (the 2026-10-23 entry).
+  4. This WP takes K3. K4 is N-W5's, K6 waits on the fenced residual
+     indexing, and K7 is N-W10's mixed-satellite test.
+  Also proposed: tiers for the codes and constants (`K_SEARCH_AT_CHANCE`,
+  `K_SEARCH_FEW_PEAKS` and every search constant at tier 3;
+  `K_SEARCH_PARTNER` and the partner distance at tier 1; `PARTNER_N_ESD` = 3
+  at tier 3; `search_kvector` a `DEFAULT_SEATS` entry owned by WP-2007, its
+  `radius=None` default at tier 3 with `radius_source` recorded); #678's
+  amendment A6 (the match radius) moving here from N-W8; K0 extending
+  `indexing/pick.py`'s `pick_peaks`; K2 adding no code to `solve_magnetic`.
+  The same day they measured the Magnetic-IV gap (k = (1,0,0) on Fmmm),
+  which became PRs #1071 (the k = −k points of the phase's own lattice,
+  merged `dbe8b38f`) and #1102 (the note names peaks on centring-forbidden
+  positions, merged `d71a7583`). Both are recorded in WP-1326's log, and
+  neither is part of M-8.
+  Checked against the tree at `c220c00ae`: `chance_rate`
+  (`indexing/ambiguity.py:549`), `lattice_point_group` (`:484`), `Budget` and
+  `Deadline` (`indexing/engines.py:663`, `:692`), `pick_peaks`
+  (`indexing/pick.py:52`), `K_MAX_DENOMINATOR` = 64
+  (`representation/irreps.py:160`) and `best_or_none` on the indexing results
+  exist as named. `satellite_positions` does not exist yet: WP-1993 is ⬜
+  with its A2 split still undecided. No `kvector` module exists. Prior art,
+  read in GSAS-II 5.8.4's `k_vector_search.py` (Zhang & Paddison 2024): it
+  searches a Hinuma (2017) k-path's special points, then its edges, then
+  optionally a 0.01 grid over the zone. It scores by the worst Δd/d after a
+  one-to-one assignment against a user threshold, with no chance baseline.
+
 - **2026-10-23, from [1326](1326-satellites-without-a-moment.md)'s close
   (originally WP-1541, 2026-10-03): the satellite types have no provisional
   declaration a test can see.** `SatelliteEvidence` and `SatelliteCandidate`

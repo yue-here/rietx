@@ -341,6 +341,25 @@ No program surveyed uses a pdCIF weight column at all. rietx's whole-column fall
 therefore never trusts the file less than practice does. GSAS-II's unused code shows one
 intent: a null weight means an excluded point.
 
+## Searching for a propagation vector
+
+Surveyed 2026-10-29 in the issue triage, for M-8's k-search (#795, WP-1418).
+
+- GSAS-II 5.8.4, checked: `GSASII/k_vector_search.py`, class `kVector` (Zhang & Paddison,
+  2024). It builds a k-path with seekpath (Hinuma et al. 2017, *Comput. Mater. Sci.* 128,
+  140). `option` sets the scope: 0, the default, searches the path's high-symmetry points
+  only; 1 adds its edges; 2 adds a grid over the whole Brillouin zone, step `kstep`
+  0.01 per axis (docstring, `:119-227`). Each k is scored by a one-to-one assignment of
+  predicted to observed satellites (`scipy.optimize.linear_sum_assignment`,
+  `updateCandidateList`, `:412-509`). The largest Δd/d is compared with the caller's
+  `threshold`, which has no default. A k under it is returned directly (`kOptFinder`,
+  `:511-620`). Nothing estimates how often random peaks would pass the same threshold.
+- FullProf, recalled and not checked this session: the `K_Search` program scans a grid of k
+  over the zone and ranks by how many satellites it indexes.
+
+So both programs score by agreement alone. A chance baseline, as #795 proposes, is not
+practice in either.
+
 ## The tier-2 rows resting on a program default
 
 | Row | Programs that agree | Dissent |
