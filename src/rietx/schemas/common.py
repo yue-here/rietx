@@ -577,6 +577,8 @@ from .._nearmiss import did_you_mean
 #: cannot be rebuilt as every step, so a document's ``discontinuities`` key is
 #: dropped at read (``SeriesResult``'s ``mode="before"`` validator) and its
 #: ``steps`` reads ``None``, "not recorded".
+#: Also in 0.60 (WP-2011): ``LeBailValidation.mode``, additive, its default
+#: ``"lebail"`` being what every record written before it ran.
 SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

@@ -1562,6 +1562,10 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.representation.distortion._PROBE_AMPLITUDE", "constant", value=0.05),
     Row("rietx.crystallography.representation.distortion._PROBE_SYMPREC", "constant", value=0.001),
     Row("rietx.crystallography.representation.distortion._RANK_TOL", "constant", value=1e-08),
+    Row("rietx.crystallography.representation.incommensurate.DELTA_GRID", "constant", tier=1, value=24,
+        evidence=('a numerical setting measured against a finer grid: the internal translations of a (3+1)D operation are multiples of 1/2, 1/3, 1/4 and 1/6 (the commensurate part of q takes components 0, 1/2, 1/3, 2/3), and the M.v cross terms of centred and screw operations are not derived to stay on the grid; tests/test_incommensurate_irreps.py::test_the_isotropy_search_finds_the_same_groups_on_a_finer_delta_grid runs isotropy_superspace_groups at 24 and at 72 (which holds the cross products 1/3*1/3 and 1/3*1/6) over P n m a (0,0,g) and (0,g,0), P 63/m m c (0,0,g) and (1/3,1/3,g), C m c a, I 41/a m d, R -3 m, F d -3 m and P 31 2 1 (all (0,0,g) unless stated) and asserts the same groups irrep by irrep, with a positive arm (a grid of 4 finds different groups), so the 1/24 search lost no group on those lines (those cases only, at one lambda)')),
+    Row("rietx.crystallography.representation.incommensurate.LINE_ATOL", "constant", tier=1, value=1e-08,
+        evidence=("numerical floor: the relative rank cut of `_null` (rcond kind), s > tol*max(1, s[0]); measured and asserted: tests/test_incommensurate_irreps.py::test_line_atol_sits_in_a_gap_of_the_relative_singular_values records the relative singular values _null cuts over the isotropy groups of every irrep of P n m a at (0,0,g) and P m -3 m at (g,g,g) (344 580 values): largest dropped 7e-15, smallest kept 6.5e-2, so any tolerance from 1e-13 to 1e-2 returns the same subspaces there; 1e-8 sits inside 12 empty orders of magnitude (those cases only, not other lines, at one lambda)")),
     Row("rietx.crystallography.representation.irreps.IRREP_ATOL", "constant", value=1e-08),
     Row("rietx.crystallography.representation.irreps.K_FLOAT_TOL", "constant", value=1e-09),
     Row("rietx.crystallography.representation.irreps.K_MAX_DENOMINATOR", "constant", value=64),
@@ -1624,6 +1628,14 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.superspace.generation._F0", "constant", value=0.0),
     Row("rietx.crystallography.superspace.generation._GRID", "constant", value=24),
     Row("rietx.crystallography.superspace.generation._QR_COMPONENTS", "constant", value=(0.0, 0.5, 1.0, 0.3333333333333333, 0.6666666666666666)),
+    Row("rietx.crystallography.superspace.magnetic.N_MAGNETIC_SUPERSPACE_GROUPS_D1", "constant", tier=2, value=9303,
+        evidence=('published count: Stokes & Campbell (2022), Acta Cryst. A78, 364, Table 6, the d = 1 total; tests/test_magnetic_superspace.py asserts it equals the sum of the four type counts')),
+    Row("rietx.crystallography.superspace.magnetic.N_MAGNETIC_SUPERSPACE_TYPES_D1", "constant", tier=2, value=(775, 775, 3100, 4653),
+        evidence=('published counts: Stokes & Campbell (2022), Acta Cryst. A78, 364, Table 6, the d = 1 row; tests/test_magnetic_superspace.py reproduces types 1-3 exactly and keeps the type-4 gap (4 651 found) visible')),
+    Row("rietx.crystallography.superspace.magnetic._F0", "constant", tier=1, value=0.0,
+        evidence=('arithmetic: the exact rational 0 (zero translation component, free-axis q component)')),
+    Row("rietx.crystallography.superspace.magnetic._HALF", "constant", tier=1, value=0.5,
+        evidence=('arithmetic: the exact rational 1/2, the half-lattice translation of the a/b/c/A/B/C/I centring vectors and of the half-sum over the basis')),
     Row("rietx.crystallography.superspace.operators._ZERO3", "constant", value=(0.0, 0.0, 0.0)),
     Row("rietx.crystallography.symmetry.MAX_HKL_GRID_POINTS", "constant", value=30000000),
     Row("rietx.crystallography.symmetry.SITE_TOL", "constant", value=0.0001),
@@ -1720,7 +1732,18 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.engines.QUICK_TOTAL_BUDGET_SECONDS", "constant", value=120.0),
     Row("rietx.indexing.engines.SAME_SOLUTION_RTOL", "constant", value=0.001),
     Row("rietx.indexing.engines.SEARCH_POOL_MULTIPLE", "constant", value=2),
-    Row("rietx.indexing.engines.VALIDATION_RESERVE_FRACTION", "constant", value=0.08),
+    Row("rietx.indexing.engines.VALIDATION_RESERVE_FRACTION", "constant", tier=3, value=0.15,
+        evidence=("WP-2011, quick on the final tree, cheapest-first validation, Pawley, one run "
+                  "each (macOS arm64): at 0.08 11-BM NAC validated nothing on either spec (the "
+                  "panel scoring after the search's stop took the reserve: 4 s overrun + 6.5 s "
+                  "consensus); at 0.15 its true cell validated on both; at 0.20 also its leader. "
+                  "Zircon, FAP, corundum, LaB6 validated every checked cell at all three, with "
+                  "the same systems searched and incomplete; NAC's default spec lost the "
+                  "orthorhombic system at 0.15; one synchrotron pattern"),
+        grounds=("A share of the user's ceiling moved from search to the mandatory check; the "
+                 "smallest measured share that validates a heavy synchrotron pattern's true "
+                 "cell.  Set under the maintainer's delegation of 2026-10-28 (WP-2011)."),
+        approved="2026-10-28"),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_FWHM", "constant", value=1.0),
     Row("rietx.indexing.engines.WIDTH_ALLOWANCE_QUANTILE", "constant", value=0.25),
     Row("rietx.indexing.engines._INDEX_MARGIN", "constant", value=1e-06),
@@ -1961,24 +1984,52 @@ ROWS: tuple[Row, ...] = (
         evidence=("WP-1459 (outside PR #453): the off-data ridge is as wide as the phase's "
                   "largest on-data intensity; the floor of 1 has no stated source and binds "
                   "only where that intensity is under 1 or absent; inline in "
-                  "build_pawley_restraint until the B14 lift"),
-        grounds=("Opt-in Pawley mode: acts only on reflections outside the data, whose "
-                 "intensity nothing constrains; kept at 1.0 (B12, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                  "build_pawley_restraint until the B14 lift.  WP-2011 probe 9 (2026-10-28): "
+                  "with each pattern and its sigma divided by the maximum count, the ridge's "
+                  "scale fell to 0.005-0.095 on 11-BM NAC, GSAS-II FAP and CPD corundum and "
+                  "zircon, and to 0 on two synthetic LaB6 wrong cells, so the floor bound; "
+                  "on those six no unmatched count, status or Rwp moved.  Over all 14 cells "
+                  "no unmatched count or status moved and Rwp moved by at most 2e-4, bar "
+                  "synthetic LaB6's truth (0.164 to 0.262), which carries no off-data "
+                  "reflection, so not the floor: a unit dependence left to WP-2062"),
+        grounds=("On index_pattern's default path since WP-2011, where a validation fit "
+                 "carries off-data reflections (four of probe 9's nine true cells, two of "
+                 "its four wrong cells): acts only on reflections outside the data, "
+                 "whose intensity nothing constrains, and binding on a pattern scaled to a "
+                 "maximum of 1 moved none of the validation's readings; kept at 1.0 (WP-2011 "
+                 "ruling 3, 2026-10-28)."),
+        approved="2026-10-28"),
     Row("rietx.model.forward.PAWLEY_OVERLAP_FWHM_FRAC", "constant", tier=3, value=0.5,
         evidence=("WP-0306: 'the point past which least squares cannot apportion intensity'; LaB6 "
-                  "only (synchrotron and Cu, tests/test_pawley.py), never swept; second pass owed"),
-        grounds=("Opt-in Pawley mode: an overlapped group gets an equal-split restraint and is "
-                 "flagged PAWLEY_OVERLAP_UNRESOLVED rather than split confidently; kept at the "
-                 "LaB6 value (B12, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                  "only (synchrotron and Cu, tests/test_pawley.py).  WP-2011 probe 9 "
+                  "(2026-10-28), the validation fit on 14 cells (SRM 660c, 11-BM NAC, GSAS-II "
+                  "FAP, six CPD pure phases, synthetic LaB6's truth and three wrong cells, CPD "
+                  "magnetite's P rival): 0.25 and 1.0 regroup reflections (zircon 12, 24, 30 "
+                  "grouped) and move no unmatched or absent count or status, and Rwp by at "
+                  "most 1e-4.  The sweep moved the line screen's testable mask too "
+                  "(extinction.testable_mask calls _overlap_groups).  The peak picker's copies "
+                  "(indexing/pick.py, peaks.py:308) are not swept"),
+        grounds=("On three default paths: the peak picker's duplicate and unresolved flags, "
+                 "the line screen's testable mask, and "
+                 "since WP-2011 every index_pattern validation, where an overlapped group gets "
+                 "an equal-split restraint and is flagged PAWLEY_OVERLAP_UNRESOLVED rather than "
+                 "split confidently.  The validation reads the group's sum, which the restraint "
+                 "leaves free, and its readings did not move over 0.25-1.0; kept at 0.5 "
+                 "(WP-2011 ruling 3, 2026-10-28)."),
+        approved="2026-10-28"),
     Row("rietx.model.forward.PAWLEY_OVERLAP_LAMBDA", "constant", tier=3, value=1.0,
         evidence=("WP-0306, WP-1459: unit weight, per-group intensity scaling; Cu LaB6 (221)/(300) "
                   "sum 0.6 % off, split esd ~112 %; without the off-data ridge a (6 0 2) reached "
-                  "1.45e8 against a median of 81; synthetic LaB6 and FAP only; second pass owed"),
-        grounds=("Opt-in Pawley mode: the weight acts only on directions the data do not "
-                 "constrain, and the group sum stays free; kept at 1.0 (B12, ruled 2026-10-19)."),
-        approved="2026-10-19"),
+                  "1.45e8 against a median of 81.  WP-2011 probe 9 (2026-10-28), the "
+                  "validation fit on the 14 cells PAWLEY_OVERLAP_FWHM_FRAC's row names: 0.1 and "
+                  "10 move no unmatched count or status, and Rwp by at most 7e-4 (CPD corundum "
+                  "at 10)"),
+        grounds=("On index_pattern's default path since WP-2011: the weight acts only on "
+                 "directions the data do not constrain (an overlapped group's split, and the "
+                 "off-data ridge toward zero), and the group sum stays free; the "
+                 "validation's readings did not move over two decades; kept at 1.0 (WP-2011 "
+                 "ruling 3, 2026-10-28)."),
+        approved="2026-10-28"),
     Row("rietx.model.forward.REFLECTION_MARGIN_DEG", "constant", tier=3, value=0.5,
         evidence=("reflection-list margin past the scan; measured 2026-10-21 on SRM 660c, FAP, cpd-1a and 11-BM NAC: fails on FAP (0.124 sigma at "
                   "129.98 deg, 0.016 esd) and cpd-1a (0.119 sigma, 0.103 esd on fluorite lor_strain), "
@@ -2261,6 +2312,17 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.optimize.bccg._CAUCHY_HALVINGS", "constant", tier=1, value=60,
         evidence=("arithmetic: 2^-60 = 8.7e-19 sits below fp64 epsilon, so no further halving "
                   "changes the point")),
+    Row("rietx.optimize.bccg._CHOLESKY_SHIFT", "constant", tier=2, value=0.001,
+        evidence=("Lin & Moré (1999) SIAM J. Sci. Comput. 21, 24, § 3 Algorithm 3.1 (checked "
+                  "2026-10-28): alpha_S = 1e-3, doubled until the factor exists, on a matrix "
+                  "scaled to unit column 2-norms; lm scales A to a unit diagonal, which differs, "
+                  "and they report 1e-6 gave similar results.  It moves the preconditioner; on a "
+                  "singular face, which of the equal-model points CG reaches")),
+    Row("rietx.optimize.bccg._CHOLESKY_SHIFTS", "constant", tier=1, value=40,
+        evidence=("arithmetic: one unshifted try, then 39 shifts up to 1e-3 * 2^38 = 2.7e8 "
+                  "times the diagonal; scaled to a unit diagonal, a semidefinite block's "
+                  "off-diagonal row sums are at most n - 1, so Gershgorin makes the shifted "
+                  "block positive definite for any n below 2.7e8")),
     Row("rietx.optimize.bccg._CONVERGED_FRACTION", "constant", tier=3, value=0.0001,
         evidence=("Coelho (2005) J. Appl. Cryst. 38, 455, § 2 termination (docstring; paper not on "
                   "disk)"),
@@ -2357,6 +2419,21 @@ ROWS: tuple[Row, ...] = (
         grounds=("B11 (ruled 2026-10-19): a budget is treated as not affecting the answer "
                  "once a test confirms its margin under both LM and TRF."),
         approved="2026-10-19"),
+    Row("rietx.optimize.least_squares.PAWLEY_SPARSE_DENSITY", "constant", tier=3, value=0.05,
+        evidence=("WP-2011: banded windows break even against dense BLAS at 0.05 at 5995 x 343 "
+                  "and 59498 x 2224 (macOS arm64); either side A agrees with the dense JtJ to "
+                  "2e-15; NAC candidates at 0.022-0.023 (monoclinic 47 s dense-built, 34 s "
+                  "sparse, one run each), FAP.XRA's closing stage at 0.38 (115 ms a build "
+                  "against 2 ms); past the cut the step has the exact (shifted) Cholesky factor "
+                  "and a projected search, measured on the ill-conditioned case past it: zircon "
+                  "and corundum as monoclinic (601, 576 columns, 0.06), 157 and 128 products a "
+                  "solve against 1204 and 1154, readings unchanged; two families; second pass "
+                  "owed (refits of three families on either side)"),
+        grounds=("A solver-path switch no refiner has a view on: which arithmetic forms JtJ, "
+                 "never which answer.  Confirmed under the maintainer's delegation of "
+                 "2026-10-28 ('use your best judgement'), once its unmeasured case was built "
+                 "(WP-2011, PR #1191)."),
+        approved="2026-10-28"),
     Row("rietx.optimize.least_squares.STATIONARY_ANGLE_LEVEL", "constant", tier=3, value=0.95,
         evidence=("the profile interval's own level, PARAMETER_INTERVAL_LEVEL, held equal by "
                   "test; at one angle its chi-bar-squared cut is the one-sided interval's 2.706 "
@@ -4656,7 +4733,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.indexing.engines.SearchSpec:shift_template",
     "rietx.indexing.engines.SearchSpec:systems",
     "rietx.indexing.engines.SearchSpec:total_budget_seconds",
-    "rietx.indexing.engines.VALIDATION_RESERVE_FRACTION",
     "rietx.indexing.engines.WIDTH_ALLOWANCE_FWHM",
     "rietx.indexing.engines.WIDTH_ALLOWANCE_QUANTILE",
     "rietx.indexing.engines._INDEX_MARGIN",

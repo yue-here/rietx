@@ -36,7 +36,7 @@ print(result)
 | `engines` | `None` | which engines to run; `None` runs every registered one |
 | `quality` | `None` | a `DataQualityReport` you already computed; `None` runs `assess_peak_list` |
 | `shift_from_pairs` | `True` | measure the shift allowance from harmonic reflection pairs, when `quality` is not given |
-| `validate` | `True` | run the whole-profile Le Bail test when `data` and `instrument` are both given |
+| `validate` | `True` | run the whole-profile Pawley test when `data` and `instrument` are both given |
 | `check_top` | `None` | how many of the top candidates get the expensive checks; `None` is three |
 | `two_theta_limits` | `None` | the range the validation fits run over |
 | `formula` | `None` | a chemical formula each candidate's implied Z is checked against ([A volume window from the formula](#a-volume-window-from-the-formula)) |
@@ -50,7 +50,7 @@ A list that cannot be searched in any crystal system is not an error.
 The answer comes back with no candidates, an empty `IndexingResult.engines_run`, and [`INDEX_DATA_INSUFFICIENT`](diagnostics-indexing.md#index_data_insufficient) from the quality report, before any budget is spent.
 A list that can be searched but is short of the twenty lines the classical figures of merit need is searched over the systems it supports, ranked on the reduced panel, and capped ([Enough lines, and precise enough](peaks.md#enough-lines-and-precise-enough)).
 
-The run goes in this order: the quality report, which may end it; a shift template adopted from the screen when it is safe to name ([The systematic shift](peaks.md#the-systematic-shift-and-the-window-it-opens)); the engines, one crystal system at a time; a second pass under the inlier rule when no lattice has two engines behind it; the declared prior cells; the merge, the ranking, the supercell checks and the lattice-symmetry screen; the Le Bail validation; the geometrical-ambiguity walk on what the clock leaves; and the confidence gate.
+The run goes in this order: the quality report, which may end it; a shift template adopted from the screen when it is safe to name ([The systematic shift](peaks.md#the-systematic-shift-and-the-window-it-opens)); the engines, one crystal system at a time; a second pass under the inlier rule when no lattice has two engines behind it; the declared prior cells; the merge, the ranking, the supercell checks and the lattice-symmetry screen; the whole-profile validation; the geometrical-ambiguity walk on what the clock leaves; and the confidence gate.
 
 ### Three engines, and why the default is all of them
 
@@ -98,8 +98,9 @@ There are two budgets, and they bound different things.
 The slices run system by system: every engine finishes one system before any engine starts the next, cubic first and triclinic last.
 So a binding ceiling cuts trailing systems for every engine alike, and a completed system holds every engine's answer, which the agreement gate needs.
 
-Under a ceiling, the search stops 8 % of it early when validation is going to run, so the validation fits are not starved.
-Each fit then draws an equal slice of what remains, and a fast fit's surplus goes to the later ones.
+Under a ceiling, the search stops 15 % of it early when validation is going to run, so the validation fits are not starved.
+The fits then run cheapest first, by the number of reflections each refines, and each may use whatever the clock still holds.
+That order finishes the most fits before the ceiling.
 `rietx.indexing.engines.estimate_ceiling` is the arithmetic for choosing a value before starting, and [`rietx index --ceiling`](cli.md#the-cost-ceiling) prints it.
 
 After a run, every crystal system is in one of three states:
@@ -442,7 +443,7 @@ Before discarding a refuted cell whose chemistry makes it likely, look at the pa
 ### The whole-profile test
 
 Four of the panel's members read only the first twenty lines, and none of the seven sees intensity.
-A Le Bail fit against the whole pattern sees three things the panel cannot: lines beyond the twentieth, reflections predicted where there is no intensity, and impurity content.
+A Pawley fit against the whole pattern sees three things the panel cannot: lines beyond the twentieth, reflections predicted where there is no intensity, and impurity content.
 The middle one is the classic doubled-cell false positive, which is why validation is part of the default run.
 `CellCandidate.lebail` is that test, as a `LeBailValidation`.
 
@@ -461,13 +462,17 @@ The middle one is the classic doubled-cell false positive, which is why validati
 | `LeBailValidation.status` | the fit's status; `"failed"` when the fit raised, which is evidence about the cell and not a crash |
 | `LeBailValidation.n_stages` | the stages the fit ran, of the validation plan's four |
 | `LeBailValidation.diagnostics` | findings from the fit; [`INDEX_VALIDATION_FAILED`](diagnostics-indexing.md#index_validation_failed) when it raised |
+| `LeBailValidation.mode` | the decomposition the fit ran: `"pawley"` since 1.11, `"lebail"` on a record written before it |
 
 The fit holds the cell.
 The candidate is the hypothesis under test, and letting it walk would validate a different cell from the one reported.
 It frees the background, then exactly one peak-position parameter chosen from the candidate's own shift template (the zero shift by default, and always on a geometry other than Bragg-Brentano), then `W`, then `U`, `V`, `X` and `Y` together.
 When the declared instrument's widths disagree with the picked lines', `W` starts from the lines' median FWHM.
 `freeze_profile=True` drops the two width stages and keeps the profile at the peak list's measured width, shared by every candidate, so a wrong cell cannot broaden a neighbour to cover a line it does not explain.
-The fit is single-phase, a measured constraint rather than a simplification: Le Bail partitioning has nothing to arbitrate two phases claiming the same channel.
+The fit is single-phase, since a candidate is one lattice.
+The fit is Pawley, and the type keeps its Le Bail name.
+One Le Bail pass re-extracts the intensities only between solves, and on the true cells of nine real patterns it left a width on its lower bound for corundum and zircon and up to four times as many observed lines unmatched.
+A Pawley fit refines the intensities in the same solve.
 
 The test runs on the checked candidates only: the top `check_top`, plus every candidate every engine found, since those are the only ones the gate could promote.
 A candidate outside that set, or one whose fit the clock stopped, keeps `lebail = None`.
@@ -478,7 +483,9 @@ So the count is a line screen's, computed from inputs the candidate cannot chang
 A predicted line is absent when it is resolved from every picked line, the peak-list model is quiet there, and nothing stands above the envelope at the measured width.
 
 `LeBailValidation.rwp` is not a panel member.
-It costs a refinement, so it is computed for a shortlist rather than for every candidate, and reading it as a rank would bring back the blind spot it exists to close, since a bigger cell with more free intensities fits better.
+It costs a refinement, so it is computed for a shortlist rather than for every candidate, and reading it as a rank would bring back the blind spot it exists to close.
+A converged fit of a cell that predicts every reflection of another cell fits at least as well as that cell, so `rwp` separates a wrong metric. It cannot separate an oversized cell, or a primitive cell standing in for a centred one.
+On a laboratory magnetite pattern the wrong primitive description reads 0.174 against the true cell's 0.180.
 Read `predicted_but_absent` as "this cell predicts lines the pattern lacks", never as "this cell is too big".
 It counts against the lattice group, so a space-group extinction (a glide plane, a screw axis) shows in the count on a correct cell, and the extinction screen afterwards separates the two ([The extinction symbol](extinction.md)).
 The caveat of the same name reads only the absences no extinction could cancel, inside the first twenty lines, and it caps rather than refutes: a correct cell's weak reflections below detection read absent too, over the whole range, so the count keeps `high` out of reach and the supercell check is what refutes.
@@ -503,12 +510,12 @@ The count of caveats decides nothing.
 | `fom_panel_disagrees` | the panel's members put different candidates first; written on every candidate of the run | refutes |
 | `indexed_fraction_low` | the intensity share the cell explains (`indexed_intensity_fraction`, falling back to the `indexed_fraction` line count where there is none) is below 0.9, or missing | refutes |
 | `volume_unphysical` | the volume is below 15 Å³, or above 1.5 times Smith's envelope for its system | refutes |
-| `validation_failed` | the Le Bail fit's status is `"failed"` or `"diverged"` | refutes |
+| `validation_failed` | the validation fit's status is `"failed"` or `"diverged"` | refutes |
 | `supercell_refuted` | a `SupercellCheck` on this candidate reads `"refuted"` | refutes |
 | `indexed_lines_low` | the intensity share passes 0.9 but the `indexed_fraction` line count is below 0.9, as a sub-cell missing a superstructure would be | caps |
 | `predicted_but_absent` | the line screen found lines this lattice predicts, that no extinction could remove, inside the first twenty lines, where the pattern has nothing | caps |
 | `engines_disagree` | some engine that ran did not find this lattice | caps |
-| `not_validated` | this candidate has no Le Bail fit behind it | caps |
+| `not_validated` | this candidate has no validation fit behind it | caps |
 | `search_incomplete` | the candidate's own crystal system was not searched to completion | caps |
 | `shift_allowance_assumed` | the matching window was widened by an assumed allowance | caps |
 | `fom_panel_reduced` | the list is too short for `m20` and `f_n` | caps |
@@ -534,7 +541,7 @@ Never take `candidates[0]` because it is ranked first.
 The ranking orders the hypotheses and the gate judges them, which are different questions.
 The order leads with corroboration and moves a supercell by its checks, which is closer to the gate's reading than a panel ranking alone, and still not it.
 
-On the default corundum run above, the certified trigonal R lattice comes back first, found by two of the three engines, with a converged Le Bail fit.
+On the default corundum run above, the certified trigonal R lattice comes back first, found by two of the three engines, with a converged Pawley fit.
 It grades `low`, so `best_or_none` returns `None`.
 `LeBailValidation.predicted_but_absent` counts the c-glide's reflections, the shape a space-group extinction takes when read against a lattice group that does not know about it; none of them is a line no space group could extinguish, so the caveat is silent, and the extinction screen ([The extinction symbol](extinction.md)) is what names the glide.
 `geometric_ambiguity` is there on every candidate because the ceiling stopped the run before the ambiguity walk, and `fom_panel_disagrees` because the panel's members split.

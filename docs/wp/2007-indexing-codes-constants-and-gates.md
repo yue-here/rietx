@@ -40,6 +40,17 @@ ranking over one population and is the regression gate, not a family.
 
 ### Inherited
 
+- **2026-10-27, from WP-2011: the indexer's validation fit is Pawley, and no row
+  records its mode.** `rietx.indexing.workflow.VALIDATION_MODE` (`"pawley"`) is a
+  module string, so the walk cannot see it; `LeBailValidation.mode` records it per
+  candidate. The generality review of that branch rated the switch *holds* (tier 2 on
+  `docs/practice.md`'s survey: TOPAS defaults to Pawley) and put its seat here: record
+  it in the evidence of `rietx.indexing.workflow.index_pattern:validate` when this WP
+  audits that row, unless the maintainer brings the indexing schemas into
+  `RECORD_SCHEMAS`. The three tier-3 Pawley constants' ground ("opt-in Pawley mode")
+  no longer holds on `index_pattern`'s path, and `PAWLEY_OVERLAP_FWHM_FRAC` was already
+  read by the peak picker (WP-2011 § Tasks holds the ruling owed).
+
 - **2026-10-23, from [1510](1510-what-the-chemist-knows-reaches-the-search.md) (closed):
   `Z_INTEGER_TOLERANCE` and `INDEX_Z_NOT_INTEGER` (`_audit.py:1155`, `:625`) rest on a
   volume that misses inorganic cells.** On fluorapatite's true cell the implied Z is 1.14, so

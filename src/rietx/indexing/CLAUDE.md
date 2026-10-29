@@ -35,7 +35,7 @@ picker's envelope (`REFERENCE_NET_RWP_MAX`).
 
 `index_pattern(peaks | data+instrument)` (`workflow.py`): quality gate →
 engines → `consensus.py` (merge on the reduced cell, `found_by` union, Borda
-over the panel, two-opinion Bravais, ambiguity) → Le Bail validation → the
+over the panel, two-opinion Bravais, ambiguity) → whole-profile validation → the
 gate. Three load-bearing rules. **`high` requires zero caveats**, and
 `IndexCaveat`/`INDEX_REFUTING_CAVEATS` (`schemas/indexing.py`) are the whole
 gate: any caveat in the refuting set drops a cell to `low`, the rest cap at `medium`, and
@@ -47,10 +47,10 @@ fit (magnetite's wrong P description bought a negative background and read 0
 of 163 absent, WP-1043) and never the search window (±0.15° on a 0.023° FWHM
 read a resolved split as *supported*). The oversized cell is **capped** by the
 line screen (`predicted_but_absent`, the windowed uncancellable count) and
-**refuted** by the generalised supercell check; the whole-profile Le Bail stays
-**mandatory for the forward direction** (`unmatched_observed`, Rwp for a
-reader; `freeze_profile` is off, measured in `validation_plan`). Layer 0's
-`unmatched_calc` **cannot** serve (Le Bail assigns ~nothing to a phantom, so it
+**refuted** by the generalised supercell check; the whole-profile fit — **Pawley**, since one
+Le Bail pass stalls (WP-2011) — stays **mandatory for the forward direction**
+(`unmatched_observed`, Rwp for a reader; `freeze_profile` is off, measured in
+`validation_plan`). Layer 0's `unmatched_calc` **cannot** serve (a phantom gets ~nothing, so it
 fires on 68 % of the truth's reflections against 55 % of a doubled cell's), nor
 `unmatched_observed` as a caveat (its level is the *specimen's* — 10-188 across
 21 correct candidates — comparative only, WP-1041). **The validation fit holds the cell**, freeing
@@ -74,8 +74,8 @@ On real data with no measured shift, `high` is *unreachable* by design
   would fire on every empty system of a run that found its cell elsewhere).
 - **`quick` is the default preset**: every engine, every requested system,
   a whole-run ceiling (`SEARCH_PRESETS`/`SEARCH_PRESET_INFO`, bijection by
-  meta-test, quoted live by `capabilities()` and the agent schema),
-  validation fits each drawing an equal **slice** of the remaining clock.
+  meta-test, quoted live), validation **cheapest first** in a reserve that
+  **anything run after the search's stop spends** (WP-2011: the FoM panel).
   Nothing is narrowed — a binding ceiling reports, and what it cuts is
   trailing low-symmetry systems, cheapest-first ordering's documented cost.
   A declared `total_budget_seconds` is never overridden and records

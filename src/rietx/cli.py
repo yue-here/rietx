@@ -299,7 +299,7 @@ def _index(argv: list[str]) -> int:
                         "assume 0.05° and cap confidence, because a cell found "
                         "in a widened window absorbs the shift")
     p.add_argument("--no-validate", action="store_true",
-                   help="skip the whole-profile Le Bail validation (caps every "
+                   help="skip the whole-profile validation fit (caps every "
                         "candidate at medium)")
     p.add_argument("--json", metavar="FILE", default=None,
                    help="write the full IndexingResult as JSON")
@@ -367,7 +367,7 @@ def _print_ceiling(spec, engine_names, *, validate: bool) -> None:
           f"(search {est.search_seconds:.0f} + probe {est.probe_seconds:.0f}, "
           "arithmetic on the per-system budgets; "
           f"+ validation {est.validation_calls} fits x {lo:g}-{hi:g} s, "
-          "a measured range — Le Bail cost is data-dependent)")
+          "a measured range — the fit's cost is data-dependent)")
     print(f"measured typical: {t_lo:g}-{t_hi:g} s per real dataset "
           "(searches finish their systems early far more often than not)")
     print(f"a --total-budget binds within ~{est.granularity_seconds:g} s "

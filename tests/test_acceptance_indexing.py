@@ -1649,28 +1649,46 @@ def test_magnetites_correct_cell_is_ranked_first_and_graded_below_its_rival(
     assert ("predicted_but_absent" in best.confidence_caveats) == (
         best.lebail.predicted_but_absent_uncancellable_in_window > 0)
     assert rival.lebail.n_reflections > 3 * best.lebail.n_reflections
-    assert rival.lebail.rwp > 2.0 * best.lebail.rwp, (
-        "the separation the docstring explains — same root cause as the "
-        "old detector's blindness, and not a licence to rank on a Le Bail Rwp")
+    # the rival indexes every line the truth does, so a converged fit of it
+    # is at least as good (WP-2011: 0.174 against 0.180).  One Le Bail pass
+    # read 0.65 against 0.21, and this row pinned that stall as a separation
+    assert rival.lebail.mode == best.lebail.mode == "pawley"
+    assert rival.lebail.rwp < 1.05 * best.lebail.rwp, (
+        rival.lebail.rwp, best.lebail.rwp)
 
-    # the mechanism, regenerated rather than quoted (WP-1043): re-fit the
-    # rival and read the background its own validation bought
+    # the mechanism, regenerated rather than quoted (WP-1043): fit the rival
+    # by one Le Bail pass of the validation plan and read the background it
+    # bought, then the shipped Pawley validation's
     from rietx.indexing.pick import pick_peaks
-    from rietx.indexing.workflow import validate_by_lebail
+    from rietx.indexing.workflow import (
+        seed_widths,
+        structure_from_candidate,
+        validate_by_lebail,
+        validation_plan,
+    )
+    from rietx.refine import Refinement
     data, ins = _qarr("magnetit.prn")
     peaks = pick_peaks(data, ins)
-    _val, rival_fit = validate_by_lebail(rival, data, ins, peaks=peaks,
-                                         with_result=True)
-    bkg = np.asarray(rival_fit.y_background)
-    net = np.asarray(rival_fit.y_obs) - bkg
+    seeded, _ = seed_widths(ins, peaks)
+    lebail_fit = Refinement(structure_from_candidate(rival), seeded,
+                            history=False).fit(
+        data, mode="lebail", telemetry=False,
+        plan=validation_plan(rival, seeded,
+                             two_theta_max=float(np.max(data.tt()))))
+    bkg = np.asarray(lebail_fit.y_background)
+    net = np.asarray(lebail_fit.y_obs) - bkg
     assert bkg.mean() < 0.0, (
-        f"the bought input: the rival's co-refined background should sit "
-        f"below zero (measured mean −5.8 counts), got {bkg.mean():.1f}")
-    assert np.mean(net > 3.0 * np.asarray(rival_fit.sigma)) > 0.99, (
+        f"the bought input: the rival's co-refined Le Bail background should "
+        f"sit below zero (measured mean −7.3 counts), got {bkg.mean():.1f}")
+    assert np.mean(net > 3.0 * np.asarray(lebail_fit.sigma)) > 0.99, (
         "with a negative background every channel reads as net intensity, "
         "and a detector asking 'is there nothing here' can never fire")
-    # …which is why the count no longer asks that fit: the same call's
-    # screen count is the one on the candidate
+    _val, rival_fit = validate_by_lebail(rival, data, ins, peaks=peaks,
+                                         with_result=True)
+    assert np.mean(rival_fit.y_background) > 0.0, (
+        "the Pawley fit buys no background (measured mean +13.8 counts)")
+    # the count asks neither fit: the same call's screen count is the one on
+    # the candidate
     assert _val.predicted_but_absent == rival.lebail.predicted_but_absent
 
     # nothing wrong is returned either way

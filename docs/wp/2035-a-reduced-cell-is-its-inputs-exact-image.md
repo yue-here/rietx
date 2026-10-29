@@ -38,6 +38,20 @@ CI runs pins the case.
   exact image of the candidate. #949's bethanechol run moved no grade
   (WP-1932's close), so no measured answer depends on this case yet.
 
+### Inherited
+
+- **From WP-2011, 2026-10-28: a second failing case after the merge.**
+  `test_the_exact_image_holds_with_one_angle_within_epsilon_of_90[P]` fails
+  on hypothesis's example centring P, a = b = 3.0, c = 21.0 Å, α = β = γ =
+  65°, `which=0`, `offset=(6.90495131727726e-06, -1.0)`. The worst entry is
+  G₃₃: 347.14339676 against 347.14333602 for M·G·Mᵀ, 6.07e-5 absolute
+  against a bar of 5.33e-5. Found by the fast selection on macOS arm64,
+  `[dev]`, on `origin/main` (`1fae8887`) merged into WP-2011's branch. It
+  also fails against a snapshot of WP-2011's base (`6f0f65fa6`), which
+  holds none of that session's solver change, so it is this WP's defect.
+  The example lives in that worktree's local hypothesis database only; CI
+  cannot replay it until the test pins it with `@example`.
+
 ## Non-goals
 
 - The comparison across boundaries (WP-1932, shipped).

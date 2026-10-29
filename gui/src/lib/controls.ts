@@ -101,7 +101,7 @@ export const SEARCH_FIELDS: ControlField[] = [
 /** The `IndexingControls` fields beside `search`, in display order. */
 export const CONTROL_FIELDS: ControlField[] = [
   { name: "engines", kind: "engines", label: "engines" },
-  { name: "validate_candidates", kind: "toggle", label: "Le Bail validation" },
+  { name: "validate_candidates", kind: "toggle", label: "whole-profile validation" },
   { name: "check_top", kind: "int", label: "check top", optional: true },
 ];
 

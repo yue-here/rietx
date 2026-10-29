@@ -106,6 +106,18 @@ and is not proposed here. No code is ported.
 
 ### Inherited
 
+- **2026-10-27, from WP-2011: the indexer's validation fit is Pawley, and this
+  screen's fits are not.** `validate_by_lebail` runs `mode="pawley"`
+  (`workflow.VALIDATION_MODE`) and records `LeBailValidation.mode`. The screen's
+  reference fit reuses `validation_plan` with its own `mode="lebail"`
+  (`extinction.py:983`), as do `_fit_class` (`:773`) and the cell-free prefit
+  (`:825`), so nothing here changed. Two facts bear on moving them. One Le Bail
+  pass of that plan left `w` on its floor on true corundum and zircon (WP-2011
+  § Re-measured 2026-10-27). And a Pawley fit's `n_free_parameters` includes
+  its intensity block, so `hamilton_justified`'s `n_lines + n_free_parameters`
+  (`:1137-1141`) would count the intensities twice (read, not run). Whether the
+  screen moves is WP-2062's decision 2.
+
 - **2026-10-18, from WP-1986 (writing the indexing guide): the shipped
   fluorapatite pattern is a public case of this WP's failure.** `FAP.XRA`,
   Cu Kα lab, true group P 6₃/m. `pick_peaks` over 15-60°, then

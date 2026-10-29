@@ -1432,6 +1432,101 @@ def _pawley_intensity_columns(model: CompiledModel, bases: DerivativeBases,
         J[n_below:n_below + n_res, n_table:] = model.pawley.restraint
 
 
+#: Largest fraction of the Pawley intensity block's entries that may be
+#: nonzero for its normal matrix to be formed sparse
+#: (:func:`_pawley_normal_equations`); past it the stage keeps the dense
+#: build, bit for bit the path before WP-2011.  A sparse product's work grows
+#: as the square of this fraction and BLAS's not at all: measured on banded
+#: windows (macOS arm64), the two break even at 0.05 both at 5 995 × 343 and
+#: at 59 498 × 2 224, and at 0.2 the sparse one is 12-13× slower.  11-BM NAC's
+#: candidates sit at 0.022-0.023, where the sparse build took a monoclinic
+#: candidate's fit from 47 s to 34 s (one run each) against a probe that built
+#: A dense and then preconditioned it.  A lab pattern's Lorentzian windows
+#: reach much further: FAP.XRA's closing stage, on windows dropping 1e-3 of
+#: each peak, sits at 0.38 where its other stages sit at 0.03, and there the
+#: sparse build took 115 ms against 2 ms.  Past the cut the step has the
+#: dense free block's exact (shifted) Cholesky factor and a projected search
+#: (:func:`.bccg.projected_cg`): on lab pseudo-symmetric candidates there
+#: (zircon and corundum as monoclinic, 601 and 576 columns, 0.06) the largest
+#: solve took 157 and 128 products against 1204 and 1154, readings unchanged.
+#: Below it the incomplete-LU path keeps its weak case: FAP as monoclinic C
+#: (944 columns, 0.041) still spends a solve's whole budget, 12 s a fit.
+PAWLEY_SPARSE_DENSITY = 0.05
+
+
+def _pawley_tail_pattern(model: CompiledModel) -> tuple[np.ndarray, np.ndarray]:
+    """Where the Pawley intensity columns of :func:`_make_jacobian` can be
+    nonzero, as CSC ``(row indices, indptr)`` over the intensity block.
+
+    A column is nonzero on its reflection's windows, one per emission line,
+    and on the Pawley-restraint rows that name it.
+    :func:`_pawley_intensity_columns` is its one writer, every other branch of
+    :func:`_make_jacobian` writing ``[:, :n_table]``.  The windows are frozen
+    at stage compile, so this reads every row of ``CompiledPhase.batch``, a
+    superset of the finite rows a call writes, and never θ.
+    """
+    _data, _pen, pawley_blk, _restr, _origin = row_layout.layout(model)
+    rows, cols = [], []
+    for cp, (a, _b) in zip(model.phases, model.pawley.phase_slices, strict=True):
+        lay = cp.batch
+        if lay is None or not len(lay.i0):
+            continue
+        width = lay.width.astype(np.intp)
+        first = np.repeat(np.cumsum(width) - width, width)
+        rows.append(np.repeat(lay.i0.astype(np.intp), width)
+                    + np.arange(int(width.sum()), dtype=np.intp) - first)
+        cols.append(np.repeat(a + lay.k.astype(np.intp), width))
+    if model.pawley.restraint is not None:
+        r_rows, r_cols = np.nonzero(model.pawley.restraint)
+        rows.append(pawley_blk.start + r_rows.astype(np.intp))
+        cols.append(r_cols.astype(np.intp))
+    row = np.concatenate(rows) if rows else np.zeros(0, dtype=np.intp)
+    col = np.concatenate(cols) if cols else np.zeros(0, dtype=np.intp)
+    # column-major and without repeats: two lines' windows of one reflection
+    # overlap, and a repeated entry would be summed into the column twice
+    order = np.lexsort((row, col))
+    row, col = row[order], col[order]
+    keep = np.ones(len(row), dtype=bool)
+    keep[1:] = (np.diff(row) != 0) | (np.diff(col) != 0)
+    row, col = row[keep], col[keep]
+    return row, np.searchsorted(col, np.arange(model.pawley.n + 1, dtype=np.intp))
+
+
+def _pawley_normal_equations(model: CompiledModel, n_table: int):
+    """``(JᵀJ, −Jᵀr)`` with the intensity block sparse, for
+    :func:`.lm.minimize`'s ``normal_equations`` above its BVLS cut (WP-2011).
+
+    The pattern is :func:`_pawley_tail_pattern`'s, read once per solve.  Each
+    call gathers the tail's values over it from the dense J, which stays
+    whole for the covariance.  Scanning the dense J for its nonzeros instead
+    cost 0.32 s of a 0.48 s build at 61 000 × 2230.  A is returned CSR, b
+    dense.  ``None`` where more than :data:`PAWLEY_SPARSE_DENSITY` of the
+    block is in the pattern: the driver then forms A dense, as before.
+    """
+    from scipy import sparse
+
+    n_rows, n_int = row_layout.n_rows(model), model.pawley.n
+    row, indptr = _pawley_tail_pattern(model)
+    if len(row) > PAWLEY_SPARSE_DENSITY * n_rows * n_int:
+        return None
+    tail = n_table + np.repeat(np.arange(n_int, dtype=np.intp), np.diff(indptr))
+
+    def normal_equations(J, r: np.ndarray):
+        Jh = to_host_fp64(J)
+        Jt = Jh[:, :n_table]
+        Jp = sparse.csc_matrix((Jh[row, tail], row, indptr), shape=(n_rows, n_int))
+        A_pp = (Jp.T @ Jp).tocsr()
+        b = -np.concatenate([Jt.T @ r, Jp.T @ r])
+        if not n_table:
+            return A_pp, b
+        A_pt = sparse.csr_matrix(Jp.T @ Jt)
+        A = sparse.bmat([[sparse.csr_matrix(Jt.T @ Jt), A_pt.T], [A_pt, A_pp]],
+                        format="csr")
+        return A, b
+
+    return normal_equations
+
+
 def _column_extras(table: ParameterTable) -> list[list[str]]:
     """Per free column, the *other* physical paths it moves through C.
 
@@ -2190,7 +2285,8 @@ def _tracked(residual, tracker: _StepTracker, events, stage: str, table):
 
 
 def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
-                inequalities, events, stage: str, track=None, table=None):
+                inequalities, events, stage: str, track=None, table=None,
+                normal_equations=None):
     """Run the bounded-LM driver, adapted to the scipy result shape.
 
     The two drivers are kept interchangeable at exactly this point: everything
@@ -2208,6 +2304,7 @@ def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
     (:func:`.lm._measured_curvature`) evaluate the residual too, but as
     derivative information, like scipy's finite-difference Jacobian calls, so
     they emit nothing and ``nfev`` leaves them out (WP-1953).
+    ``normal_equations`` is the driver's own (:func:`.lm.minimize`).
     """
     from . import lm as lm_mod
 
@@ -2229,7 +2326,8 @@ def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
                            max_nfev=max_nfev, ftol=ftol,
                            inequalities=inequalities,
                            callback=accept_cb if track is not None else None,
-                           on_trial=trial_cb if events is not None else None)
+                           on_trial=trial_cb if events is not None else None,
+                           normal_equations=normal_equations)
 
 
 class _StepTracker:
@@ -2608,9 +2706,20 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
             + texture_positivity_inequalities(model, table, x0[:n_table])
             + gaussian_width_inequalities(model, table, x0[:n_table])
             + lorentzian_width_inequalities(model, table, x0[:n_table]), n_aux)
+        from . import lm as lm_mod
+
+        # a Pawley block past the BVLS cut takes its normal matrix sparse,
+        # where its windows are narrow enough (``PAWLEY_SPARSE_DENSITY``), so
+        # the projected CG can precondition (WP-2011).  numpy only: the
+        # pattern is read off the writer in ``_make_jacobian``, and the
+        # traced backends' columns were never checked against it
+        normal_equations = (_pawley_normal_equations(model, n_table)
+                            if model.pawley is not None and backend == "numpy"
+                            and len(x0) > lm_mod.BVLS_MAX_COLUMNS else None)
         res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
                           ftol=ftol, inequalities=ineqs, events=events, stage=stage,
-                          track=tracker, table=table)
+                          track=tracker, table=table,
+                          normal_equations=normal_equations)
         n_truncated, truncated_by = res.n_truncated, res.truncated_by
     else:
         with lapack.scipy_trf():

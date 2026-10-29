@@ -513,6 +513,12 @@ def _normaliser(basic: _Basic) -> tuple:
     P: lattice automorphism with P K P⁻¹ = K, one per coset K·P; p: every
     origin shift on the 1/24 grid with P g P⁻¹ ∈ G for the generators g,
     reduced modulo the lattice and with polar components zeroed.
+
+    These are the external blocks (S_R, S_v) of the equivalence map of
+    Stokes, Campbell & van Smaalen (2011), *Acta Cryst.* A**67**, 45,
+    eq. (13), restricted to maps that normalise the basic space group — the
+    change of basic cell of van Smaalen, Campbell & Stokes (2013),
+    *Acta Cryst.* A**69**, 75, § 3.1 and conclusions.
     """
     rots = basic.rotations
     rk = {_key9(r) for r in rots}
@@ -524,7 +530,7 @@ def _normaliser(basic: _Basic) -> tuple:
         conj = np.einsum("nij,jk,nkl->nil", cand, np.asarray(g, float), inv)
         rnd = np.round(conj)
         integral = np.all(np.abs(conj - rnd) < 1e-9, axis=(1, 2))
-        member = np.array([_key9(x) in rk for x in rnd])
+        member = np.array([_key9(x) in rk for x in rnd], dtype=bool)
         ok &= integral & member
     cand, inv = cand[ok], inv[ok]
     # one P per coset K·P
@@ -667,6 +673,10 @@ class _Space:
     def apply_element(self, node: _Node, el: _Element) -> _Node:
         """Conjugate by a basic-group normaliser element (P, p):
         R′ = PRP⁻¹, v′ = Pv + p − R′p, M′ = MP⁻¹, δ′ = δ − M′·p."""
+        return self.canonical(*self.element_raw(node, el))
+
+    def element_raw(self, node: _Node, el: _Element) -> tuple:
+        """:meth:`apply_element` before :meth:`canonical`: (axes, q_r, δ)."""
         ms = self.ms(node.axes, node.qr)
         w = el.w
         new_d = [None] * len(node.deltas)
@@ -686,18 +696,24 @@ class _Space:
                 imgs = support
             axes_new = tuple(sorted(imgs))
         qr_new = _rowmat(node.qr, el.p_inv)
-        return self.canonical(axes_new, qr_new, new_d)
+        return axes_new, qr_new, new_d
 
     def apply_minus_q(self, node: _Node) -> _Node:
         """q → −q: M → −M, δ → −δ (S_ε = −1)."""
-        return self.canonical(node.axes, tuple(-x for x in node.qr),
-                              tuple((-x) % 1 for x in node.deltas))
+        return self.canonical(*self.minus_q_raw(node))
+
+    def minus_q_raw(self, node: _Node) -> tuple:
+        return (node.axes, tuple(-x for x in node.qr),
+                tuple((-x) % 1 for x in node.deltas))
 
     def apply_shift_q(self, node: _Node, h) -> _Node:
         """q → q + H, H ∈ L*: δ → δ + H·v (S_M = H)."""
+        return self.canonical(*self.shift_q_raw(node, h))
+
+    def shift_q_raw(self, node: _Node, h) -> tuple:
         d = tuple((node.deltas[i] + sum(h[k] * v[k] for k in range(3))) % 1
                   for i, (_, v) in enumerate(self.basic.ops))
-        return self.canonical(node.axes, tuple(node.qr[k] + h[k] for k in range(3)), d)
+        return node.axes, tuple(node.qr[k] + h[k] for k in range(3)), d
 
     def neighbours(self, node: _Node):
         for el in self.elements:
@@ -934,7 +950,7 @@ def _to_standard(basic: _Basic, target: _Basic, free=()):
         conj = np.einsum("nij,jk,nkl->nil", cand, np.asarray(g, float), inv)
         rnd = np.round(conj)
         ok &= np.all(np.abs(conj - rnd) < 1e-9, axis=(1, 2))
-        ok &= np.array([_key9(x) in rk for x in rnd])
+        ok &= np.array([_key9(x) in rk for x in rnd], dtype=bool)
     if free:
         f = np.asarray(free, dtype=float)
         rows = np.einsum("fi,nij->nfj", f, inv)                 # q ↦ q P⁻¹
@@ -996,6 +1012,23 @@ def _automorphism_candidates_between(src: tuple, dst: tuple) -> np.ndarray:
 def _node_of(group: SuperspaceGroup):
     """(space, node) for ``group`` brought to its basic group's standard
     setting, centrings without internal parts."""
+    sp, transforms = _standard_transforms(group)
+    return sp, sp.canonical(*_raw_node(sp, _apply_transforms(group, transforms)))
+
+
+def _apply_transforms(group: SuperspaceGroup, transforms) -> SuperspaceGroup:
+    for t in transforms:
+        group = group.transformed(t)
+    return group
+
+
+def _standard_transforms(group: SuperspaceGroup):
+    """(space, transforms): the space of ``group``'s basic group and the
+    coordinate changes, applied in order, that take ``group`` to its standard
+    setting with centrings free of internal parts."""
+    if group.is_magnetic:
+        raise ValueError("a magnetic group is brought to the standard setting "
+                         "through its family or maximal subgroup (.magnetic)")
     basic_in = _basic_from_ops(group.basic_operations())
     number = _identify_basic(basic_in)
     sp = _space(number)
@@ -1011,11 +1044,18 @@ def _node_of(group: SuperspaceGroup):
             f"setting")
     from .operators import SuperspaceTransform
     p_m, p = found
-    g = group.transformed(SuperspaceTransform.build(p_m, p))
+    transforms = [SuperspaceTransform.build(p_m, p)]
+    g = group.transformed(transforms[0])
     # remove internal parts of the centrings with an integer S_M
     if any(c.delta for c in g.centerings):
         h = _clear_centrings(g)
-        g = g.transformed(SuperspaceTransform.build(s_m=h))
+        transforms.append(SuperspaceTransform.build(s_m=h))
+    return sp, transforms
+
+
+def _raw_node(sp: _Space, g: SuperspaceGroup) -> tuple:
+    """(axes, q_r, δ per standard representative) of a group already in the
+    standard setting of ``sp``, before :meth:`_Space.canonical`."""
     # the family is the span of the free directions; it must be a span of axes
     axes = tuple(sorted({i for f in g.q.free for i in range(3) if f[i]}))
     if len(axes) != len(g.q.free):
@@ -1031,7 +1071,7 @@ def _node_of(group: SuperspaceGroup):
             raise AssertionError("standardised group off the standard representatives")
         # a centring shift with δ_c = 0 leaves δ unchanged
         d.append(op.delta)
-    return sp, sp.canonical(axes, qr, d)
+    return axes, qr, d
 
 
 def _clear_centrings(g: SuperspaceGroup) -> tuple:
@@ -1044,7 +1084,14 @@ def _clear_centrings(g: SuperspaceGroup) -> tuple:
 
 def canonical_key(group: SuperspaceGroup) -> tuple:
     """A key equal for two groups iff they are equivalent (Stokes 2011
-    eq. (13)): the basic group's type and the smallest node of the orbit."""
+    eq. (13)): the basic group's type and the smallest node of the orbit.
+
+    A magnetic group's key is :func:`.magnetic.magnetic_canonical_key`'s,
+    which compares θ as well (Stokes & Campbell 2022 p. 367)."""
+    if group.is_magnetic:
+        from .magnetic import magnetic_canonical_key
+
+        return magnetic_canonical_key(group)
     sp, node = _node_of(group)
     orbit = sp.orbit(node)
     best = min(orbit, key=_Node.key)
@@ -1055,7 +1102,9 @@ def equivalent(a: SuperspaceGroup, b: SuperspaceGroup) -> bool:
     """Whether two (3+1)D superspace groups are equivalent as operator lists:
     related by a change of basic cell and origin, q → ±q + H and an
     internal-origin shift (Stokes 2011 eq. (13); van Smaalen et al. 2013).
-    Never a string comparison (Yamamoto et al. 1985 §§ 2-3)."""
+    Never a string comparison (Yamamoto et al. 1985 §§ 2-3).  For magnetic
+    groups the time-reversal sign of every operation is compared too
+    (Stokes & Campbell 2022 p. 367)."""
     return canonical_key(a) == canonical_key(b)
 
 

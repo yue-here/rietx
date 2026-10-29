@@ -196,6 +196,9 @@ from .structure import Cell
 #: Every pinned class held (synthetic P 2₁/c, FAP, NAC, certified corundum),
 #: with their ΔBIC moved (corundum −3434 → −1301, FAP −16 → −83); the PbSO₄
 #: X-ray histogram at a 0.1-0.2 % cell went from an abstention to ``P c - n``.
+#: Also 1.12 (WP-2011): the whole-pattern validation fits by Pawley, so every
+#: candidate's ``lebail.rwp`` and ``unmatched_observed`` move, and a cell that
+#: predicts every reflection of another now reads that cell's Rwp or lower.
 INDEXING_THRESHOLDS_VERSION = "1.12"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
@@ -1210,8 +1213,15 @@ class BravaisOpinion(Base):
     reduced_cell: tuple[float, float, float, float, float, float] = (0.0,) * 6
 
 
+#: how a summary line names :attr:`LeBailValidation.mode`
+_MODE_NAMES = {"lebail": "Le Bail", "pawley": "Pawley"}
+
+
 class LeBailValidation(Base):
-    """A candidate cell tested against the **whole pattern** by a Le Bail fit.
+    """A candidate cell tested against the **whole pattern** by a structure-free fit.
+
+    The fit is Pawley since WP-2011 and was Le Bail before it; :attr:`mode`
+    says which, and the class keeps its name.
 
     Why this is mandatory rather than optional: the figure-of-merit panel is
     computed on ≤20 lines and is structurally blind to three things the whole
@@ -1226,15 +1236,10 @@ class LeBailValidation(Base):
     deliberately *not* a member of the ranking panel: the panel ranks every
     candidate and this costs a refinement, so it is computed for the shortlist
     only and used to *validate* rather than to order.  Reading it as a rank would
-    also reintroduce the blind spot it exists to close — a bigger cell fits
-    better.
+    also reintroduce the blind spot it exists to close: a converged fit of a
+    bigger cell fits at least as well.
 
-    The fit is **single-phase**, and that is a measured constraint rather than a
-    simplification (WP-1028): ``CompiledModel.lebail_update`` partitions
-    ``max(y_obs − y_bkg, 0)`` per phase with nothing to arbitrate two phases
-    claiming the same channel, so two phases inflate one another without bound
-    (measured Rwp 742–9 281 % against 7.5–24.8 % for one).  A candidate is
-    therefore never validated against a multi-phase hypothesis.
+    The fit is **single-phase**, since a candidate is one lattice.
     """
 
     rwp: float
@@ -1271,12 +1276,16 @@ class LeBailValidation(Base):
     #: ° 2θ of each, so the report is actionable rather than a count
     predicted_but_absent_two_theta: list[float] = Field(default_factory=list)
     unmatched_observed_two_theta: list[float] = Field(default_factory=list)
-    #: the underlying refinement's status; ``"failed"`` when the Le Bail fit
+    #: the underlying refinement's status; ``"failed"`` when the fit
     #: raised, which is itself evidence against the candidate but is reported as
     #: a failure rather than converted into a score
     status: str = "converged"
     n_stages: int = 0
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+    #: the decomposition the fit ran.  ``validate_by_lebail`` writes
+    #: ``"pawley"`` since WP-2011 (schema 0.60).  A record written before then
+    #: carries no key and was a Le Bail fit, which is what the default reads.
+    mode: Literal["lebail", "pawley"] = "lebail"
 
 
 class CellCandidate(Base):
@@ -1879,7 +1888,7 @@ class CandidateEvidence(Base):
     #: members exist is a property of the peak list, not of the candidate —
     #: ``IndexingEvidence.fom_undefined`` names the absent ones with reasons
     fom: dict[str, float] = Field(default_factory=dict)
-    #: ``True`` when a Le Bail fit ran on *this* candidate — distinct from
+    #: ``True`` when a validation fit ran on *this* candidate — distinct from
     #: ``IndexingResult.validated`` (a pattern was supplied at all): under a
     #: budget the shortlist can be validated only partway down
     validated: bool = False
@@ -2047,7 +2056,7 @@ class IndexingResult(Base):
                          f"   V = {c.volume:.2f} Å³")
             lines.append(f"      found by {', '.join(c.found_by)};  indexed "
                          f"{c.n_indexed}/{c.n_lines} lines;  chi2_red {c.chi2_red:.2f}"
-                         + (f";  Le Bail Rwp {c.lebail.rwp:.4f}, "
+                         + (f";  {_MODE_NAMES[c.lebail.mode]} Rwp {c.lebail.rwp:.4f}, "
                             f"{c.lebail.predicted_but_absent} of "
                             + (f"{c.lebail.n_lines_screened} lines absent"
                                if c.lebail.n_lines_screened is not None else

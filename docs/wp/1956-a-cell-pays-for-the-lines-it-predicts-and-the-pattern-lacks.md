@@ -102,6 +102,24 @@ engine or the ranking. Indexing is provisional by declaration
 
 ### Inherited
 
+- **2026-10-28, from WP-2011: the line screen raises on a peak list with no
+  usable peak.** `validate_by_lebail` with such a list fails inside
+  `screen.fwhm_at` with numpy's `ValueError: array of sample points is
+  empty`, where it should decline. The list arises from `pick_peaks` on a
+  pattern divided by its maximum with no σ column: the Poisson fallback
+  √max(y, 1) puts every point under the noise. `index_pattern` stops before
+  validating on such a list, so only a direct call reaches it (WP-2011
+  § Re-measured 2026-10-28, "Found on the way").
+- **2026-10-27, from WP-2011: on the no-peak-list path the fitted-background
+  count moved with the fit's mode.** The Pawley background no longer sinks
+  under a wrong cell, so the count reads more absences there (LaB6 with its
+  cell 1 % long 0 → 14 of 28, a×√5 59 → 167, magnetite's P rival 0 → 3), and
+  NAC's true cell reads 20, its weak real reflections, where Le Bail read 0
+  (WP-2011 § Re-measured 2026-10-27). With a peak list the line screen's count
+  is unchanged in every row. Tutorial 03's candidate now validates at Rwp
+  0.044 with 0 unmatched; the 125-against-200 background in the entry below
+  was the Le Bail fit's and was not re-measured under Pawley.
+
 - **2026-10-24, from WP-2041: the detector also goes blind on the *correct* cell, and
   that grade is `high`.** Tutorial 03's synthetic aragonite (P m c n, flat 200-count
   background, `examples/tutorials/03_peaks_indexing_lebail.py`) indexes at `high` over

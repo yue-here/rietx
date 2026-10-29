@@ -341,6 +341,72 @@ No program surveyed uses a pdCIF weight column at all. rietx's whole-column fall
 therefore never trusts the file less than practice does. GSAS-II's unused code shows one
 intent: a null weight means an excluded point.
 
+## Structure-free fitting: Le Bail or Pawley
+
+Surveyed 2026-10-27 for WP-2062, one agent across the seven programs, with the GSAS-II lines
+checked by the lead. Terms follow Le Bail (2005): a Le Bail fit sets each intensity by the
+Rietveld partition formula between least-squares steps and never refines it, and a Pawley fit
+makes each intensity a least-squares parameter. A program's own label is not reliable: BGMN
+calls its Pawley-type mode "LeBail". TOPAS was read at Technical Reference v5 (§8), not v9.
+
+| Program | Offers | Default or first steer | Le Bail re-extraction | Pawley overlap handling |
+|---|---|---|---|---|
+| rietx | both | no default argument picks either (`mode` defaults to `rietveld`); the indexer's validation fit is Pawley since WP-2011 | `lebail_cycles` = 3 partitions before each least-squares *run*, none inside it | seeded from one Le Bail partition; overlapped groups held by an equal-split restraint and flagged |
+| GSAS-II 5.8.4 | both | neither is on by default (`doPawley` and the histogram's `LeBail` both False); a "Start Le Bail extraction?" button on each histogram, Pawley a Phase › General checkbox | once per least-squares iteration under the default analytic Hessian (checked) | reflections exactly overlapped by symmetry tied equal; a negative-intensity penalty, weight 0 by default |
+| FullProf 8.20 | Le Bail only (`Jbt` = 2, profile matching) | the manual advises profile matching before Rietveld when the model is crude | every least-squares cycle (ran); stops when χ² changes by < 1e-3 | not offered |
+| TOPAS (TR v5) | both | Pawley: "The default is Pawley refinement, the keyword lebail triggers a Le Bail refinement" (§8, p.84) | every iteration, a "two-step cyclic process"; "convergence is usually slow" | each intensity a parameter from 1; no rule stated |
+| RIETAN-FP 3.12 | Le Bail, plus a "hybrid" decomposition that refines intensities after it | Le Bail first; Wilson-statistics start advised | after every cycle | hybrid step only: reflections within `RWID` × FWHM set equal, groups of at most `MREG` |
+| BGMN 4.2.23 | one mode it calls "LeBail", refining one intensity per peak (Pawley-type) | automatic when a structure lists no atoms | n/a | intensities ≥ 0; no overlap rule found |
+| MAUD 3.07 | both | new phases are atomic; the help text says start with Le Bail, then switch to Pawley | end of each refinement iteration, up to 5 inner iterations | intensities bounded 0 to 1e9; no overlap rule |
+| EasyDiffraction 0.21.1 | neither | n/a | n/a | n/a |
+
+What the table settles. **Every program that has Le Bail re-extracts the intensities inside the
+refinement, once per least-squares cycle or iteration.** rietx re-extracts only between whole
+solves, so one rietx Le Bail pass is one cycle of everyone else's. Of the two programs that
+offer both, TOPAS defaults to Pawley and GSAS-II defaults to neither. MAUD steers Le Bail
+first and then Pawley. No program makes a structure-free fit the default mode.
+
+**GSAS-II** (source, checked). `GetFobsSq`, the Le Bail update, runs at the end of every
+derivative pass (`GSASIIstrMath.py:4808`, `:4929`) and overwrites the calculated F² with the
+extracted one when the phase-histogram's `LeBail` flag is set (`:3782-3783`). The scripting
+default is `DoLeBail(cycles=10)` (`GSASIIstrMain.py:761`). Pawley ties come from
+`GetPawleyConstr` (`GSASIIstrIO.py:955-998`): equal index sums in the uniaxial and cubic
+classes, |Δd|/d < 1e-4 elsewhere, so a near-overlap stays free. "Pawley create" seeds every
+intensity at 100.0 (`GSASIIphsGUI.py:12546`); an optional estimate scales the observed peak
+height (`:12563-12626`).
+
+**FullProf** (manual, July 2001, shipped with 8.20; ran). `Jbt` = 2 refines intensities "using
+iteratively the Rietveld formula" with the scale fixed (PDF p.15). A run of the shipped
+`pbso.pcr` with every refinement code at zero moved χ² 78.8, 10.4, 5.89, 5.17, 4.81 over its
+first five cycles, so the intensities alone move once a cycle. The stop rule is the
+2005-11-08 news entry. The manual warns profile matching is "more prone to instabilities"
+when profile or microstructure parameters refine (p.14). Pawley is named but is no `Jbt` value.
+
+**TOPAS** (Technical Reference v5 §8, pp.84-85, and the User Manual pp.41-42, 60; read from a
+public copy, not re-read by the lead). Pawley has "better and faster convergence" and keeps the
+A matrix charge flipping uses. The indexing GUI refines each selected solution by Pawley or Le
+Bail and reports Rwp.
+
+**RIETAN-FP** (manual, paraphrased). Le Bail is simple, needs no large normal matrix and
+gives no negative intensities, but needs a more exact starting cell, and overlapped
+intensities stay near their starting values (§10.4). The hybrid decomposition exists because
+of those convergence problems (§11.1).
+
+**MAUD** (source at the v3.07 tag). The default structure-factor model is atomic
+(`Phase.java:337`); `src/help/pawley.txt` advises Le Bail first, then Pawley with the
+extracted values carried over.
+
+**Le Bail (2005)**, *Powder Diffr.* 20, 316-326. §IV.B (p.318): the method "requires as good
+starting cell and profile parameters as the Rietveld method itself". §IV.C (pp.318-319): two
+round robins could not show either method better, and Le Bail can also give negative
+intensities when the background is overestimated. §VI (p.321): Kariuki et al. (1999) tested
+cell hypotheses by Le Bail, "faster than with the Pawley method", and one partition pass may be
+"insufficient for attaining the minimum Rwp" when calculation and observation differ widely.
+The paper gives no timings.
+
+Not determined: TOPAS v9 and its Pawley overlap rule, FullProf's current manual, the Profex
+5.7.2 manual. MAUD, BGMN and RIETAN-FP were not run.
+
 ## Searching for a propagation vector
 
 Surveyed 2026-10-29 in the issue triage, for M-8's k-search (#795, WP-1418).

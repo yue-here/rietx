@@ -58,7 +58,7 @@ assert row.validated is False and row.lebail_rwp is None
 | `CandidateEvidence.found_by` | the finders that reached it |
 | `CandidateEvidence.n_indexed`, `CandidateEvidence.n_lines` | its coverage |
 | `CandidateEvidence.fom` | the panel members that ranked it, name to value |
-| `CandidateEvidence.validated` | whether a Le Bail fit ran on this candidate, which `IndexingEvidence.validated` does not say |
+| `CandidateEvidence.validated` | whether a validation fit ran on this candidate, which `IndexingEvidence.validated` does not say |
 | `CandidateEvidence.lebail_status`, `CandidateEvidence.lebail_rwp` | that fit's status and Rwp; `None` when it did not run |
 | `CandidateEvidence.predicted_but_absent`, `CandidateEvidence.unmatched_observed` | that fit's two counts; `None` when it did not run |
 | `CandidateEvidence.ambiguity_partners` | how many ambiguity partners it has |
@@ -79,7 +79,7 @@ The streamed per-system shortlists `index_pattern` sends on its event stream use
 
 ## Drawing the result
 
-`rietx.viz.plot_indexing` draws the ranked candidates as tick rows against the peak list, and a Le Bail panel for one candidate.
+`rietx.viz.plot_indexing` draws the ranked candidates as tick rows against the peak list, and a validation-fit panel for one candidate.
 It takes the result and the `PeakList` the search ran on.
 
 <!-- api-doc: no-exec — it needs a result from a real search -->
@@ -93,7 +93,7 @@ It returns a dict of figures, in drawing order:
 
 - `"peaks"`, always: the peak list, drawn over the profile when `data` is given;
 - `"candidates"`, when the result has any: up to `n` (default 5) ranked candidates as tick rows, matched in the window the search used;
-- `"validation"`: the Le Bail panel for `candidates[candidate]`.
+- `"validation"`: the validation-fit panel for `candidates[candidate]`.
 
 For the validation panel, pass `validation=` a pair from `rietx.indexing.validate_by_lebail` with `with_result=True` to draw a fit already in hand, or `data` and `instrument` to run that fit, or neither to draw the stored positions-only panel when the candidate carries one.
 `path=` saves each figure as `{path}_{name}.png`, and `style="dark"` draws all three dark.
@@ -102,7 +102,7 @@ A wrong cell that scores well usually looks wrong at once, which is why the pict
 ## From a candidate to a phase
 
 A candidate is a lattice, and a refinement needs a `Structure`.
-`rietx.indexing.structure_from_candidate` builds the single-phase model the Le Bail validation itself uses.
+`rietx.indexing.structure_from_candidate` builds the single-phase model the whole-pattern validation itself uses.
 
 <!-- api-doc: no-exec — it needs a candidate from a real search -->
 ```python

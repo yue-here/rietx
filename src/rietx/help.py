@@ -2722,7 +2722,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "The search found more distinct lattices than the list reports, so "
             "lower-ranked cells are left out. The limit exists because each reported "
-            "candidate costs a Le Bail fit. An engine that returned a full pool may also "
+            "candidate costs a validation fit. An engine that returned a full pool may also "
             "have held more. The omitted cells were never judged and rejected. Raise "
             "`max_candidates` to see further down the ranking."
         ),
@@ -2772,7 +2772,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "INDEX_IMPURITY_LINES": HelpEntry(
         title="Observed peaks have no matching reflection",
         description=(
-            "After a whole-pattern Le Bail fit of this cell, some observed peaks sit "
+            "After the whole-pattern fit of this cell, some observed peaks sit "
             "where it predicts no reflection. A handful of such lines points to a second "
             "phase. Many of them point to a wrong cell. This package does not index "
             "multi-phase patterns, so subtract the solved phase before you index the "
@@ -2799,7 +2799,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Two or more candidate lattices each satisfy the full confidence gate. The "
             "evidence does not choose between them, so no single cell is returned. "
             "Naming one would be a guess with a confidence attached. Compare their "
-            "figures of merit and Le Bail fits, and extend the 2θ range, because one "
+            "figures of merit, and their validation fits where neither cell predicts "
+            "every reflection of the other (a candidate's `supercell_checks` says), since "
+            "such a cell fits at least as well. Extend the 2θ range, because one "
             "high-angle reflection often separates them."
         ),
     ),
@@ -2836,8 +2838,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "corundum, 2 on the round-robin magnetite and PbSO₄, against 7 to 79 for "
             "the wrong cells tested (Si's cubic I √2·a₀ 11–12, cubic P 2a₀ 76–79); "
             "measured on those patterns, untested beyond them. Do not check it with "
-            "Rwp: an oversized cell scored 0.379 against a correct 0.216, a "
-            "gap smaller than the spread between specimens. Without a peak list the "
+            "Rwp: a converged fit of a cell that predicts every reflection of another "
+            "fits at least as well (0.164 against 0.164 for a doubled cell on rietx's "
+            "synthetic LaB6 pattern). Without a peak list the "
             "count is the fitted background's, over the whole range. Compare the "
             "smaller cell that indexes the same lines, and run the extinction screen "
             "before you reject this one."
@@ -2936,9 +2939,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         ),
     ),
     "INDEX_VALIDATION_FAILED": HelpEntry(
-        title="The Le Bail check of a candidate failed",
+        title="The validation fit of a candidate failed",
         description=(
-            "The whole-pattern Le Bail fit that validates this candidate raised an "
+            "The whole-pattern fit that validates this candidate raised an "
             "error, so nothing was measured for it. The candidate is neither supported "
             "nor refuted. A mis-declared instrument profile, or a wavelength on an "
             "absorption edge, fails every candidate alike. Check those first."
@@ -4440,9 +4443,10 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
         title="Le Bail cycles",
         description=(
             "How many cycles of intensity partitioning run before each solve in "
-            "`lebail` mode. The setting is ignored in `rietveld` and `pawley` modes, "
-            "where the intensities come from the structure or from the fitted Pawley "
-            "intensities."
+            "`lebail` mode. In `pawley` mode the same partition seeds the intensities "
+            "on a stage that carries none in, and the solve then refines them. The "
+            "setting is ignored in `rietveld` mode, where the intensities come from "
+            "the structure."
         ),
         default="3",
         typical="3",
@@ -4493,7 +4497,7 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "Extra 2θ on each side of a reflection's integration window, replacing the "
             "default (`WINDOW_MIN_DEG`). A fit whose starting model may sit far from "
-            "the data declares it, such as the Le Bail validation that an indexing "
+            "the data declares it, such as the whole-pattern validation that an indexing "
             "candidate goes through. Empty takes the default."
         ),
         unit="deg 2θ", default="null",
@@ -4867,7 +4871,7 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "How many candidates the final list holds after the engines are merged and "
             "ranked. It also sets the validation cost, since every reported candidate "
-            "needs a Le Bail fit. Each engine hands five times this number to the "
+            "needs a validation fit. Each engine hands five times this number to the "
             "merge, so the cap never decides a rank."
         ),
         default="12",
@@ -4917,7 +4921,7 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
         anchor="reference/indexing.html#three-engines-and-why-the-default-is-all-of-them",
     ),
     "validate_candidates": HelpEntry(
-        title="Le Bail validation",
+        title="Whole-profile validation",
         description=(
             "Whole-profile validation of the top candidates. Turning it off caps every "
             "candidate at medium confidence, because the figure-of-merit panel cannot "
@@ -4932,8 +4936,8 @@ SEARCH_FIELD_HELP: dict[str, HelpEntry] = {
         title="Candidates checked in depth",
         description=(
             "How many candidates get the per-candidate checks: the ambiguity search and "
-            "the Le Bail fit. Empty takes the package default plus every candidate that "
-            "the confidence gate could promote."
+            "the whole-pattern validation fit. Empty takes the package default plus "
+            "every candidate that the confidence gate could promote."
         ),
         typical="empty",
         anchor="reference/indexing.html#the-whole-profile-test",

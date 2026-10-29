@@ -50,6 +50,17 @@ the verdict line and the `INDEX_ABSTAINED` diagnostic off that output.
   issue #916's mechanism (a candidate's fit buys its absences by sinking the background) on the
   *correct* cell. WP-1956 owns the repair; this WP changes no indexer code.
 
+### Inherited
+
+- **2026-10-27, from WP-2011: notebook 03's indexing prose was rewritten for the
+  Pawley validation.** The candidate now validates at Rwp 0.044 with 0 unmatched
+  peaks, so the `INDEX_IMPURITY_LINES` paragraph went, and the row's 24 of 87
+  absent lines are stated with what the gate reads of them: the absent lines no
+  space group could remove, inside the first twenty lines, of which there are
+  none (`examples/tutorials/03_peaks_indexing_lebail.py`, near line 163). The
+  verdict is still `high`. The 125-against-200 background quoted in § Context
+  was the Le Bail fit's; not re-measured under Pawley.
+
 ## Non-goals
 
 - Changing when the indexer abstains: WP-1969 and `src/rietx/indexing/`.

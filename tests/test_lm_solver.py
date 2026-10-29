@@ -666,6 +666,70 @@ def test_a_block_above_the_bvls_cut_takes_the_projected_cg_step(monkeypatch):
     assert np.array_equal(side, exact_side)
 
 
+def test_a_sparse_normal_matrix_reaches_the_dense_answer():
+    """WP-2011: ``normal_equations`` may hand the driver a sparse A above the
+    BVLS cut, as a Pawley stage does, and the step is then the preconditioned
+    projected CG's.  On a banded, mildly nonlinear fit with a floor that
+    binds, both builds converge to the same point."""
+    from scipy import sparse
+
+    n = lm.BVLS_MAX_COLUMNS + 72
+    rng = np.random.default_rng(8)
+    m = 4 * n + 20
+    rows = np.concatenate([np.arange(4 * j, 4 * j + 20) for j in range(n)])
+    cols = np.repeat(np.arange(n), 20)
+    B = sparse.csc_matrix((rng.uniform(0.2, 1.0, len(rows)), (rows, cols)),
+                          shape=(m, n)).toarray()
+    y = B @ rng.uniform(-0.5, 1.0, n) + 0.05 * rng.standard_normal(m)
+
+    def residual(x):
+        return y - B @ x - 0.1 * np.sin(B @ x)
+
+    def jacobian(x):
+        return -(B * (1.0 + 0.1 * np.cos(B @ x))[:, None])
+
+    def sparse_normal(J, r):
+        Js = sparse.csc_matrix(J)
+        return (Js.T @ Js).tocsr(), -(Js.T @ r)
+
+    lo, hi = np.zeros(n), np.full(n, np.inf)
+    x0 = np.full(n, 0.5)
+    dense = lm.minimize(residual, jacobian, x0, lo=lo, hi=hi)
+    out = lm.minimize(residual, jacobian, x0, lo=lo, hi=hi,
+                      normal_equations=sparse_normal)
+    assert dense.status > 0 and out.status > 0
+    assert np.count_nonzero(out.active_mask) > n // 10
+    np.testing.assert_allclose(out.x, dense.x, rtol=0.0,
+                               atol=1e-8 * float(np.max(np.abs(dense.x))))
+    assert out.cost == pytest.approx(dense.cost, rel=1e-10)
+
+
+def test_a_sparse_normal_matrix_takes_every_dense_operation():
+    """The curvature the driver holds rewrites A's diagonal, and a sparse A
+    at or under the cut is solved by BVLS on its dense copy, bit for bit."""
+    from scipy import sparse
+
+    rng = np.random.default_rng(2)
+    J = rng.standard_normal((30, 10))
+    A, b = J.T @ J, J.T @ rng.standard_normal(30)
+    A[0, 9] = A[9, 0] = 0.0
+    values = np.diag(A) + rng.uniform(0.0, 1.0, 10)
+    As = sparse.csr_matrix(A)
+    np.testing.assert_array_equal(lm._with_diagonal(As, values).toarray(),
+                                  lm._with_diagonal(A.copy(), values))
+    # a curvature far above the diagonal it replaces: a + (v − a) misses v by
+    # an ulp on ~0.4 % of such entries, so the write must not take that route
+    a = rng.uniform(1.0, 2.0, 4000)
+    v = a * rng.uniform(3.0, 1000.0, 4000)
+    np.testing.assert_array_equal(
+        lm._with_diagonal(sparse.diags(a).tocsr(), v).diagonal(), v)
+    lo, hi = np.full(10, -0.1), np.full(10, 0.1)
+    dense = lm._solve_step(A, b, 0.3, np.zeros(10), lo, hi, n_rows=30)
+    out = lm._solve_step(As, b, 0.3, np.zeros(10), lo, hi, n_rows=30)
+    np.testing.assert_array_equal(out[0], dense[0])
+    np.testing.assert_array_equal(out[1], dense[1])
+
+
 def _vanishing_column():
     """φ enters only as φ²·bump against data carrying the opposite bump, so
     φ = 0 is the minimum, its column 2φ·bump vanishes there, and χ² keeps a

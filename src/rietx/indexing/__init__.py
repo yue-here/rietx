@@ -48,7 +48,7 @@ search reads observed **intensities**.
 WP-1024 closes the loop with :func:`index_pattern`, the public entry point and a
 peer of :func:`rietx.refine`.  It merges the engines' candidates as reduced
 cells, ranks them on the whole figure-of-merit panel, enumerates geometrical
-ambiguity, validates the survivors against the **whole profile** by a Le Bail fit
+ambiguity, validates the survivors against the **whole profile** by a Pawley fit
 (:func:`validate_by_lebail`), and gates confidence on **agreement** between the
 engines (:mod:`rietx.indexing.consensus`).  The rule the whole milestone is built
 around is enforced by the return type rather than by documentation:

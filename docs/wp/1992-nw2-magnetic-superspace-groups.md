@@ -63,11 +63,11 @@ redistribution, so rietx ships a generator and pins published counts.
 
 ## Tasks
 
-- [ ] The spgrep check at an irrational k, recorded here before any design.
-- [ ] θ on `SuperspaceOperator` and {1′|000½}; MSSG generation per irrep through the real-k door.
-- [ ] #682's three follow-ups.
-- [ ] Tests: the P222/I222, SrFeO₃ and Stokes & Campbell (2022) Fig. 4 pins; the 9 303 d = 1 MSSG count as an opt-in slow test
-- [ ] Skill: none expected while the package stays unexported; say why at handover
+- [x] The spgrep check at an irrational k, recorded here before any design.
+- [x] θ on `SuperspaceOperator` and {1′|000½}; MSSG generation per irrep through the real-k door.
+- [x] #682's three follow-ups.
+- [x] Tests: the P222/I222, SrFeO₃ and Stokes & Campbell (2022) Fig. 4 pins; the 9 303 d = 1 MSSG count as an opt-in slow test
+- [x] Skill: none expected while the package stays unexported; say why at handover
 
 ## Acceptance
 
@@ -90,3 +90,24 @@ redistribution, so rietx ships a generator and pins published counts.
   merged. Checked against the tree at `138d55dc`: N-W1 is on `main`, and the
   irreps code sits in `representation/irreps.py`. No open WP owns it: WP-1418
   and WP-1419 own the commensurate magnetic track. Next: the spgrep check.
+- **2026-10-20** — built on `nw2/group-half` (three commits: #682's three
+  follow-ups, then θ / {1′|000½} / the MSSGs over an SSG, then the real-k door
+  and the group of an irrep). The spgrep check, recorded here as the first
+  task asked (spike `checks/spikes/nw2-step0-20261006/spgrep_real_k.md`,
+  2026-10-06, spgrep 0.7.0): on the nine lines Pnma (0,0,γ), (½,0,γ),
+  (0,γ,0), (0,½,γ), P6₃/mmc (0,0,γ), (⅓,⅓,γ), I4/mmm (α,α,0), (0,0,γ) and
+  P4/ncc (½,½,γ) spgrep's G_k at an irrational γ equals the hand rule by index
+  with orders 4, 4, 4, 4, 12, 6, 4, 8, 8; a rational k as a float reproduces
+  the exact group 18/18; spgrep snaps a near-rational k below |Rᵀk − k| ≈ 1e-8;
+  `real=True` declines on 6 of the 9 lines. So the door computes the group from
+  a declared line (`little_group_on_line`) and spgrep stays a dev-only oracle,
+  its arms now unit tests (`tests/test_incommensurate_irreps.py`). Pins: Stokes
+  & Campbell 2022 Tables 1–3, p. 365, p. 369 (12 and 40) and Fig. 4's group;
+  Perez-Mato 2012 Table 1 and p. 17; SrFeO₃'s six MSSGs with Gallego 2016
+  Fig. 6's (n, m) and symbols; the polar-axial shift sign on P4 and P6₃.
+  Table 6: types 1–3 = 775/775/3100 as printed, type 4 = 4651 against 4653
+  (strict xfail, open; ~1 min single-core). Fast suite (`.venv-test` [dev],
+  macOS arm64, alone): 11000 passed, 121 skipped, 2 xfailed, 7 min 14 s.
+  Skill: none, the package stays unexported. spgrep stays in the `dev` extra:
+  l. 43's "a dependency" reads "a test oracle" (noted on the PR).
+

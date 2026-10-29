@@ -2,9 +2,9 @@
 validation it drives.
 
 ``index_pattern`` runs the engines, deduplicates their candidates as reduced
-cells, enumerates geometrical ambiguities, validates the survivors by a Le Bail
-fit, and gates confidence on **agreement**.  Its API cannot express a confident
-wrong singleton: it returns an
+cells, enumerates geometrical ambiguities, validates the survivors by a
+whole-pattern Pawley fit, and gates confidence on **agreement**.  Its API
+cannot express a confident wrong singleton: it returns an
 :class:`~rietx.schemas.indexing.IndexingResult`, which has no ``.cell``, and the
 only route to one cell is ``best_or_none()``.
 
@@ -33,40 +33,45 @@ strong-negative-residual count — as ``predicted_but_absent``.  It cannot serve
 and the reason is structural rather than a threshold: Le Bail extraction sets each
 reflection's intensity from ``max(y_obs − y_bkg, 0)``, so a reflection predicted
 where there is nothing is assigned ~nothing and produces **no negative residual
-to detect**.  What the detector then finds is 5σ noise excursions that happen to
+to detect**.  A Pawley intensity at such a position refines to the same nothing
+(0-2 counts against 50-743 for real lines under magnetite's primitive rival,
+WP-2011).  What the detector then finds is 5σ noise excursions that happen to
 sit near a tick.  Measured on a synthetic LaB₆ pattern (Poisson noise, 15-145° 2θ
 at 0.02°, the protocol ``tests/test_indexing_consensus.py`` pins),
 ``unmatched_calc`` fired on **19 of the certified cell's own 28 reflections** and
 on 84 of a doubled cell's 153 — 68 % against 55 %, no more often on the wrong
 cell, so it does not separate them at all.  :func:`absent_reflections` asks the question directly instead — is there net
 intensity above the *fitted* background at this position? — and separates them
-cleanly: 0 of 28 against 117 of 153.
+cleanly: 0 of 28 against 117 of 153.  Since C3 (#941) a candidate with a peak
+list is counted by the line screen instead (``indexing/screen.py``), and this
+detector serves only a call without one.
 
 **The two detectors and ``lebail_rwp`` catch different failures, which is why all
-three are reported.**  Same measurement, four cells:
+three are reported.**  Same synthetic pattern under the Pawley validation
+(WP-2011, noise seed 11, no peak list), four cells:
 
 | candidate | Rwp | predicted_but_absent | unmatched_observed |
 |---|---|---|---|
-| truth | 0.216 | 0/28 | 0 |
-| doubled cell | 0.379 | **117/153** | 0 |
-| a·√5 supercell | 0.957 | 27/204 | 4 |
-| metric 1 % off | 0.984 | 0/30 | **95** |
+| truth | 0.164 | 0/28 | 0 |
+| doubled cell | 0.164 | **123/153** | 0 |
+| a·√5 supercell | 0.233 | 167/204 | 4 |
+| metric 1 % off | 0.503 | 14/28 | **23** |
 
-Read the table by column.  Rwp is decisive on a *wrong metric* (0.98 against 0.22)
-and nearly silent on an *oversized* one (0.379 — well under twice the truth's, and
-on real data a gap that size is inside the spread between specimens); the oversized
-cell is caught only by column three.  A wrong metric is caught from the other side
-by column four, where 95 observed peaks have no calculated reflection.  The a·√5
-row is the useful reminder that these overlap: its fit is already refuted by Rwp,
-so its low absent *fraction* costs nothing — a badly-fitted background is what
-makes that count unreliable, and a badly-fitted background comes with an Rwp that
-says so.
+Read the table by column.  Rwp is decisive on a *wrong metric* (0.50 against
+0.16) and silent on an *oversized* one: the doubled cell predicts a line at every
+position the truth does, so its converged fit is the truth's fit.  The oversized
+cell is caught by column three.  A wrong metric is caught from the other side by
+column four, where 23 observed peaks have no calculated reflection.  The a·√5
+cell misses the truth's lines whose index sum times five is not a sum of three
+squares, (111) among them, which is where its 4 unmatched peaks and its Rwp come
+from.  Under the Le Bail validation this table read 0.379 for the doubled cell,
+a gap the stalled fit made rather than the lattice (WP-2011).
 
 ``lebail_rwp`` is the figure the literature names; it is **not** a member of the
 ranking panel.  The panel ranks every candidate and this costs a refinement, so
 it is computed for the shortlist only — and ranking on it would reintroduce the
 blind spot validation exists to close, since a bigger cell with more free
-intensities fits better.
+intensities fits at least as well.
 """
 
 from __future__ import annotations
@@ -99,8 +104,8 @@ from .fom import lattice_group
 #: why the 2θ of every flagged reflection travels with the count: a caller can
 #: look at the pattern, which no threshold can do for them.
 ABSENT_SIGMA = 3.0
-#: The metric wrongness, as |Δd|/d, whose displacement the Le Bail
-#: validation's windows must *capture* rather than lose (an assumed tolerance
+#: The metric wrongness, as |Δd|/d, whose displacement the validation
+#: fit's windows must *capture* rather than lose (an assumed tolerance
 #: stated as one, like :data:`~rietx.indexing.engines.DEFAULT_UNKNOWN_SHIFT_DEG`
 #: one level down).  The candidate under test may be metrically wrong — that
 #: is what the validation exists to measure — and a wrong metric must read as
@@ -108,6 +113,10 @@ ABSENT_SIGMA = 3.0
 #: *absent*, which is the oversized-cell signal.  1 % is the canonical wrong
 #: metric the separation table grades (``test_indexing_consensus``).
 VALIDATION_METRIC_REL = 0.01
+#: The decomposition the validation fit runs, recorded on every
+#: :class:`~rietx.schemas.indexing.LeBailValidation` it writes.  Pawley since
+#: WP-2011; :func:`validate_by_lebail` says why.
+VALIDATION_MODE = "pawley"
 #: Bounds on the derived slack: the floor keeps a short-range synchrotron
 #: validation from collapsing to tail-only windows (a candidate also carries
 #: zero-shift wrongness), the cap keeps tan θ from exploding near 180°.
@@ -143,7 +152,7 @@ ABSENT_WINDOW_FWHM = 0.5
 def structure_from_candidate(candidate: CellCandidate, *,
                              space_group: str | None = None,
                              name: str = "candidate") -> Structure:
-    """A single-phase :class:`Structure` for Le Bail validation of a cell.
+    """A single-phase :class:`Structure` for the whole-pattern validation of a cell.
 
     The scaffold itself — the cell and the mandatory dummy atom — is
     :func:`~rietx.schemas.structure.lebail_scaffold`, shared with the cell a
@@ -177,6 +186,28 @@ def structure_from_candidate(candidate: CellCandidate, *,
     return lebail_scaffold(symbol, candidate.cell, name=name)
 
 
+def validation_size(candidate: CellCandidate, wavelength: float,
+                    data: PatternData,
+                    two_theta_limits: tuple[float, float] | None = None) -> int:
+    """The reflections a candidate's validation fit will refine, before it runs.
+
+    The count of its lattice group's reflections over the fitted range, which
+    is what a Pawley fit's cost grows with (one intensity each): on 11-BM NAC
+    837, 999 and 1241 reflections cost 5.1, 6.5 and 11.7 s.  ``index_pattern``
+    orders the fits on it under a ceiling.
+    """
+    from ..crystallography.symmetry import generate_reflections
+
+    tt = data.tt()
+    lo, hi = float(np.min(tt)), float(np.max(tt))
+    if two_theta_limits is not None:
+        lo, hi = max(lo, float(two_theta_limits[0])), min(hi, float(two_theta_limits[1]))
+    symbol = candidate.lattice_group or lattice_group(candidate.system,
+                                                      candidate.centring)
+    return len(generate_reflections(symbol, candidate.cell, wavelength, hi,
+                                    lo).hkl)
+
+
 def absent_reflections(two_theta: np.ndarray, y_obs: np.ndarray,
                        y_background: np.ndarray, sigma: np.ndarray,
                        positions: np.ndarray, fwhm: np.ndarray, *,
@@ -191,7 +222,7 @@ def absent_reflections(two_theta: np.ndarray, y_obs: np.ndarray,
     actually carries rather than against a fraction of the strongest peak.
 
     The *fitted* background is what makes this better than the same question
-    asked of the peak list: a Le Bail fit has co-refined it under the P-spline or
+    asked of the peak list: the validation fit has co-refined it under the P-spline or
     Chebyshev model, so a sloping background is not mistaken for intensity.  The
     same fact is the test's limit — a badly-fitted background makes the count
     unreliable, which is why the module docstring reads the count beside Rwp
@@ -256,7 +287,7 @@ def _shift_path(candidate: CellCandidate, instrument: Instrument) -> str:
 def validation_plan(candidate: CellCandidate, instrument: Instrument,
                     two_theta_max: float | None = None, *,
                     freeze_profile: bool = False):
-    """The staged plan a Le Bail validation runs, and what it deliberately omits.
+    """The staged plan the validation fit runs, and what it deliberately omits.
 
     ``freeze_profile`` (C3) drops the two width stages: the profile stays at
     the instrument's declared values, seeded from the peak list's measured
@@ -269,13 +300,14 @@ def validation_plan(candidate: CellCandidate, instrument: Instrument,
     keeps is the forward question — is there a reflection under every
     observed peak — and an Rwp for a reader.  **Off by default, measured**:
     frozen at the *declared* profile, SRM 660c's own cell validates at Rwp
-    0.57 against 0.10 with the widths free, and the rival/truth Rwp ratio the
-    acceptance rows read falls from above 2 to 1.78, while nothing the fit
-    reports gates any more.  The shared pre-fit F1 asked for needs a
+    0.46 against 0.09 with the widths free (0.57 against 0.10 under the Le
+    Bail fit #941 measured), while nothing the fit reports gates any more.
+    Frozen, the Pawley fit still leaves FAP's true cell 31 unmatched peaks
+    against 5 free (WP-2011).  The shared pre-fit F1 asked for needs a
     cell-free width law fitted to the peak list; until that lands,
     ``validate_by_lebail(freeze_profile=True)`` is the caller's choice.
 
-    **The cell is held.**  ``profile_only`` — the ordinary Le Bail plan — frees
+    **The cell is held.**  ``profile_only`` — the ordinary structure-free plan — frees
     ``phases.*.cell.*``, and it must not here: the candidate *is* the hypothesis
     under test, and letting it walk means validating a different cell from the one
     the result reports.  A candidate whose metric is slightly wrong is supposed to
@@ -365,8 +397,9 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
                        cancel=None, screen=None,
                        pattern_screen=None,
                        freeze_profile: bool = False) -> LeBailValidation:
-    """Fit ``candidate`` to the whole pattern by Le Bail and report the three
-    detectors.
+    """Fit ``candidate`` to the whole pattern by Pawley and report the three
+    detectors.  The name predates WP-2011's switch from Le Bail, and
+    ``LeBailValidation.mode`` records which fit ran.
 
     **Since C3 the absent count is the line screen's, not this fit's.**  With
     a ``peaks`` list the candidate is screened against the picker's envelope
@@ -415,27 +448,33 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
     a fit statistic as the evidence for a correction is the habit CLAUDE.md's
     "never an Rwp comparison as its evidence" rule exists to break.
 
-    **Le Bail rather than Pawley is a cost choice, not a discrimination one.**
-    Both extractions leave one free intensity per reflection, and the intensities
-    are arbitrary in both: this partition hands overlapping reflections whatever
-    share of ``max(y_obs − y_bkg, 0)`` the current profile ratio asks for, which
-    is no more constrained than a least-squares intensity is.  What it costs is
-    nothing in θ, where Pawley appends a
-    :class:`~rietx.model.forward.PawleyBlock` and its overlap restraints for
-    every candidate validated.  (A previous revision argued the opposite — that
-    Le Bail is the *constrained* fit and therefore the discriminating one — from
-    a measured magnetite Rwp pair.  The numbers were real, the mechanism was not
-    established, and it contradicted both this module's own detector and
-    WP-1020's panel decision; WP-1043 carries the retraction.)
+    **Pawley rather than Le Bail, because one Le Bail pass does not converge**
+    (WP-2011).  Both leave one free intensity per reflection.  Le Bail
+    re-extracts them only between least-squares runs, so a single pass refines
+    the widths against intensities partitioned at the starting profile.  On the
+    true cells of nine real patterns that pass left ``w`` on its floor for
+    corundum and zircon, and 21 and 44 observed peaks unmatched.  Pawley refines
+    the intensities in the same solve, hits no floor, and leaves 12 and 11.  On a
+    wrong cell the Le Bail background sinks to buy intensity back: −7 counts
+    under magnetite's primitive rival, and 19 against a true 29.7 under LaB6's
+    a·√5 cell.  Pawley's stays within 2 counts of the truth.  Five or ten Le Bail
+    passes did not close the gap and cost more than one Pawley fit.  Pawley's
+    cost is its :class:`~rietx.model.forward.PawleyBlock`: about equal below
+    ~450 reflections, several times more on 11-BM NAC's 837
+    (:data:`~rietx.indexing.engines.MEASURED_VALIDATION_SECONDS`).
 
-    Single-phase by construction, and that is a measured constraint rather than a
-    simplification: ``CompiledModel.lebail_update`` partitions
-    ``max(y_obs − y_bkg, 0)`` per phase with nothing to arbitrate two phases
-    claiming the same channel, so two phases inflate one another without bound
-    (WP-1028, measured Rwp 742-9 281 % against 7.5-24.8 % for one phase, and it
-    survives seeding both the widths and the background — so it is the partition,
-    not the starting point).  A candidate is never validated against a
-    multi-phase hypothesis.
+    **So ``rwp`` cannot separate a cell from a supercell or decentred
+    description of it.**  A
+    converged decomposition of a supercell or a decentred cell has a free
+    intensity at every position the parent has, so it fits at least as well:
+    magnetite's primitive rival reads 0.174 against the true F cell's 0.180.
+    Le Bail's stalled pass read 0.65 against 0.21, a gap the old acceptance rows
+    pinned and that was an artefact of the stall.  The line screen's counts and
+    the supercell check separate such cells; ``rwp`` separates a wrong *metric*.
+    (A still older revision argued Le Bail was the *constrained* fit and therefore
+    the discriminating one; WP-1043 carries that retraction.)
+
+    Single-phase by construction, since a candidate is one lattice.
 
     A fit that *raises* comes back as ``status="failed"`` with an infinite Rwp
     rather than as an exception: a candidate the physics refuses is evidence
@@ -487,7 +526,7 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
 
     ref = Refinement(structure, ins, history=False)
     try:
-        result = ref.fit(data, mode="lebail", plan=plan,
+        result = ref.fit(data, mode=VALIDATION_MODE, plan=plan,
                          two_theta_limits=two_theta_limits, cancel=cancel,
                          # one validation fit per candidate: a run directory
                          # each would bury the search that asked for them
@@ -497,10 +536,10 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
     except Exception as exc:                        # noqa: BLE001
         failed = LeBailValidation(
             rwp=float("inf"), gof=float("inf"), space_group=symbol,
-            n_reflections=0, status="failed",
+            n_reflections=0, status="failed", mode=VALIDATION_MODE,
             diagnostics=[Diagnostic(
                 level="warning", code="INDEX_VALIDATION_FAILED",
-                message=(f"The Le Bail validation of {candidate.system} "
+                message=(f"The whole-pattern validation of {candidate.system} "
                          f"{symbol} raised {type(exc).__name__}: "
                          f"{str(exc).rstrip('.')}."),
                 where=[f"cell {candidate.cell}"],
@@ -536,7 +575,8 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
         unmatched_observed=len(unmatched),
         predicted_but_absent_two_theta=[round(v, 4) for v in absent_tt],
         unmatched_observed_two_theta=[round(float(v), 4) for v in unmatched],
-        status=result.status, n_stages=len(result.stages), **extra)
+        status=result.status, n_stages=len(result.stages),
+        mode=VALIDATION_MODE, **extra)
     return (validation, result) if with_result else validation
 
 
@@ -718,9 +758,13 @@ def index_pattern(peaks: PeakList | None = None, *,
     behaviour: no ceiling beyond ``budget_seconds`` per (engine × system).
     The result records which preset governed (``IndexingResult.preset`` —
     ``"custom"`` when the caller's own ceiling did), and under a declared
-    ceiling each validation fit draws an equal **slice** of the remaining
-    clock, so one heavy candidate cannot starve the rest of the shortlist
-    (measured: unbudgeted fits were 74 of fap's 84 s).
+    ceiling the validation fits run cheapest first, by the reflections each
+    refines (:func:`validation_size`), each on whatever the run's clock holds:
+    by a common deadline that order finishes the most fits.  A heavy candidate
+    then waits behind every lighter one rather than starving them, which the
+    equal slice of WP-1042 was for (measured then: unbudgeted fits were 74 of
+    fap's 84 s); WP-2011 replaced the slice because, sliced in rank order,
+    none of 11-BM NAC's Pawley fits finished.
 
     **The (engine × system) units run system-major** (WP-1042): every engine
     finishes one system before any engine starts the next, in ``SYSTEM_ORDER``
@@ -784,7 +828,7 @@ def index_pattern(peaks: PeakList | None = None, *,
     if data is not None:
         # Checked whether or not the peaks are picked here: ``data`` also drives
         # whole-profile validation below, so a TOF pattern handed in beside a
-        # ready-made PeakList would still reach a Le Bail fit.
+        # ready-made PeakList would still reach a whole-pattern fit.
         require_two_theta(data, "index_pattern()", instrument=instrument)
     if peaks is None:
         if data is None or instrument is None:
@@ -1028,42 +1072,43 @@ def index_pattern(peaks: PeakList | None = None, *,
             prior_reports, jumped, outcome.candidates))
     checked = checked_indices(outcome.candidates, outcome.engines_run, top=top)
     validated = False
-    slices_expired = 0
     if validate and data is not None and instrument is not None:
         progress.add(len(checked))
-        for pos, i in enumerate(checked):
+        # under a declared ceiling the fits run cheapest first, by the
+        # reflections each will refine, and each runs on whatever the clock
+        # holds (WP-2011): for a common deadline that order maximises the fits
+        # finished.  Equal slices in rank order (WP-1042) finished none of
+        # 11-BM NAC's two or three under Pawley, whose true cell needs 5 s of
+        # a share under 5 s.  Unbudgeted, the order changes no fit
+        order = list(checked)
+        if deadline is not None and len(order) > 1 and not bool(run_cancel):
+            def size(i: int) -> float:
+                # outside validate_by_lebail's net: a candidate whose list
+                # cannot be counted goes last (unknown cost) and its own fit
+                # still reports what failed, rather than aborting the run
+                try:
+                    return validation_size(outcome.candidates[i],
+                                           peaks.wavelength, data,
+                                           two_theta_limits)
+                except Exception:                   # noqa: BLE001
+                    return float("inf")
+
+            order.sort(key=size)    # stable: ties keep rank order
+        for i in order:
             if run_cancel is not None and bool(run_cancel):
                 break
             cand = outcome.candidates[i]
             label = f"validate:{cand.system} {cand.centring}"
             progress.start(label, system=cand.system, validation=True)
-            # budgeted validation (WP-1042): under a declared ceiling each fit
-            # draws an equal slice of the remaining clock, so one heavy
-            # candidate cannot starve the rest of the shortlist (unbudgeted
-            # fits measured 74 of fap's 84 s).  A fast fit's surplus flows to
-            # the later slices, which re-divide what actually remains.
-            fit_cancel = run_cancel
-            slice_deadline = None
-            if deadline is not None:
-                slice_deadline = Deadline(
-                    max(deadline.remaining, 1e-3) / (len(checked) - pos),
-                    cancel=run_cancel)
-                fit_cancel = slice_deadline
             try:
                 cand.lebail = validate_by_lebail(
                     cand, data, instrument, peaks=peaks,
-                    two_theta_limits=two_theta_limits, cancel=fit_cancel,
+                    two_theta_limits=two_theta_limits, cancel=run_cancel,
                     pattern_screen=pattern_screen)
             except RefinementCancelled:
                 # a truncated fit is not evidence about the candidate: leave
                 # ``lebail = None``, which reads ``not_validated`` (capping)
                 progress.end(label, validation=True, status="cancelled")
-                if slice_deadline is not None \
-                        and not slice_deadline.cancelled_by_user():
-                    # only this candidate's slice ran out — the next still
-                    # gets its share of what remains
-                    slices_expired += 1
-                    continue
                 break
             progress.end(label, validation=True, status=cand.lebail.status)
         validated = True
@@ -1082,7 +1127,7 @@ def index_pattern(peaks: PeakList | None = None, *,
                       and search_cancel is not run_cancel
                       and bool(search_cancel))
     if deadline is not None and not deadline.cancelled_by_user() \
-            and (deadline.expired() or search_expired or slices_expired):
+            and (deadline.expired() or search_expired):
         requested = ordered_systems
         outcome.diagnostics.append(budget_exhausted_diagnostic(
             float(spec.total_budget_seconds),
@@ -1093,8 +1138,7 @@ def index_pattern(peaks: PeakList | None = None, *,
                                  if s not in outcome.systems_searched],
             candidates_not_validated=sum(
                 1 for i in checked if outcome.candidates[i].lebail is None)
-            if validated else 0,
-            ceiling_hit=deadline.expired() or search_expired))
+            if validated else 0))
 
     # the gate's ``checked`` is what the enumeration actually covered, not what
     # was scheduled: under a fired token the two differ, and a candidate whose

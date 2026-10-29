@@ -207,6 +207,56 @@ def test_a_validation_stopped_mid_loop_caps_and_never_refutes(
                cand.confidence_caveats for cand in res.candidates)
 
 
+@pytest.mark.parametrize("ceiling", [600.0, None])
+def test_under_a_ceiling_validation_runs_cheapest_first(
+        cubic_peaks, tiny_pattern, monkeypatch, ceiling):
+    """Under a declared ceiling the validation fits run in order of the
+    reflections each refines, the order that finishes the most fits by a
+    common deadline (WP-2011); with no ceiling they run in rank order, as
+    they always did.  Each fit runs on the run's clock, with no slice."""
+    import importlib
+
+    import rietx.indexing.workflow as workflow
+
+    consensus = importlib.import_module("rietx.indexing.consensus")
+    peaks, _cell = cubic_peaks
+    data, instrument, _a = tiny_pattern
+    real_fit, real_checked = workflow.validate_by_lebail, consensus.checked_indices
+    ranked, seen = [], []
+
+    def checked(candidates, *args, **kwargs):
+        out = real_checked(candidates, *args, **kwargs)
+        if not seen:    # the list validation visits; ambiguity asks again after
+            ranked[:] = [candidates[i] for i in out]
+        return out
+
+    def record(cand, *args, **kwargs):
+        seen.append((cand, kwargs["cancel"]))
+        return real_fit(cand, *args, **kwargs)
+
+    monkeypatch.setattr(consensus, "checked_indices", checked)
+    monkeypatch.setattr(workflow, "validate_by_lebail", record)
+    # no ceiling is preset "full": under the default "quick" a None is filled
+    index_pattern(peaks, data=data, instrument=instrument,
+                  spec=SearchSpec(systems=("cubic",), max_candidates=3,
+                                  total_budget_seconds=ceiling),
+                  engines=("dichotomy",),
+                  preset="full" if ceiling is None else None)
+    visited = [c for c, _ in seen]
+    assert len(visited) == len(ranked) >= 2
+    if ceiling is None:
+        assert visited == ranked
+        assert all(token is None for _, token in seen)
+    else:
+        size = {id(c): workflow.validation_size(c, peaks.wavelength, data)
+                for c in ranked}
+        assert visited == sorted(ranked, key=lambda c: size[id(c)])
+        # the order is not the rank order here, so the sort is what put it so
+        assert visited != ranked
+        # one token, the run's own: no fit draws a slice of it
+        assert len({id(token) for _, token in seen}) == 1
+
+
 @pytest.fixture(scope="module")
 def tiny_pattern():
     """A small forward-modelled cubic pattern — just enough for a Le Bail

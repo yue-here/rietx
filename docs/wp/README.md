@@ -48,6 +48,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1997](1997-the-direct-space-solver-on-main.md) | The direct-space solver on main: site classes, kernels, chemistry, engine and entry point | 2026-10-24 | P2 | [structure-solution](#structure-solution) |
 | [2003](2003-the-chain-actions.md) | The chain actions: what a series decides between patterns | 2026-10-26 | P2 | [generality](#generality-the-audits) |
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 2026-10-24 | P3 | [generality](#generality-the-audits) |
+| [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) | A candidate is judged on a fit that converged | 2026-10-28 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | 2026-10-21 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-10-26 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2034](2034-the-satellite-window-is-compile-models-window.md) | The satellite arm generates over `compile_model`'s window, not a copy of it | 2026-10-27 | P3 | [magnetic](#magnetic) |
@@ -83,6 +84,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2052](2052-a-fit-keeps-each-sites-multiplicity.md) | A fit keeps each site's multiplicity from start to answer | P2 | — ([1991](1991-a-site-and-its-own-image-are-one-atom.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2054](2054-the-report-names-asymmetry-with-fcj-off.md) | The report names an asymmetric residual the model cannot draw | P2 | — ([1977](1977-a-flank-lobe-read-as-an-unindexed-peak.md), [2004](2004-the-fitreport-reasons-for-the-caller.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2062](2062-pawley-is-the-structure-free-default.md) | Pawley is the structure-free default | P2 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
 
@@ -591,7 +593,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1989](1989-the-released-arm-keeps-riding-hydrogens-riding.md) | The rigid-body check's released arm keeps riding hydrogens riding | ⬜ | P2 | — ([1806](1806-first-public-case-acridine-form-ix.md) soft) |
 | [1991](1991-a-site-and-its-own-image-are-one-atom.md) | A site and its own image are one atom on every route | 🔄 2026-10-29 | P2 | — |
 | [1998](1998-a-suggestion-past-its-bound.md) | A suggestion whose gain lies past its bound | ⬜ | P2 | — |
-| [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) | A candidate is judged on a fit that converged | ⬜ | P3 | [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) |
+| [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) | A candidate is judged on a fit that converged | 🔄 2026-10-28 | P2 | [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | ⬜ | P2 | — |
 | [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 🔄 2026-10-26 | P2 | — ([1325](1325-parametric-series.md), [1421](1421-the-result-reproduces-its-own-number.md) soft) |
 | [2029](2029-whether-the-centroid-fixes-a-polar-origin-by-default.md) | Whether the centroid fixes a polar origin by default | ⬜ | P3 | — ([1912](1912-a-polar-axis-has-no-origin.md) soft) |
@@ -607,6 +609,8 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2054](2054-the-report-names-asymmetry-with-fcj-off.md) | The report names an asymmetric residual the model cannot draw | ⬜ | P2 | — ([1977](1977-a-flank-lobe-read-as-an-unindexed-peak.md), [2004](2004-the-fitreport-reasons-for-the-caller.md) soft) |
 | [2055](2055-a-picked-line-held-at-its-position-bound.md) | The picker holds a line shape the lab pattern does not have | ⬜ | P3 | — |
 | [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | ⬜ | P2 | — |
+| [2062](2062-pawley-is-the-structure-free-default.md) | Pawley is the structure-free default | ⬜ | P2 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) |
+| [2063](2063-the-panel-scored-after-the-clock-spends-the-validation-reserve.md) | The FoM panel scored after the clock spends the validation reserve | ⬜ | P3 | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 

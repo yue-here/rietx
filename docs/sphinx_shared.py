@@ -33,6 +33,12 @@ from rietx.crystallography.atomic_volume import VOLUME_RATIO_BOUNDS, VOLUME_SCAT
 from rietx.crystallography.dispersion import NEAR_EDGE_EV
 from rietx.crystallography.magnetic.moments import MOMENT_DIRECTION_SUPPORT
 from rietx.crystallography.scattering import _itc_handover
+from rietx.crystallography.superspace import (
+    ITC_C_EXCEPTIONS,
+    N_MAGNETIC_SUPERSPACE_GROUPS_D1,
+    N_BRAVAIS_CLASSES_D1,
+    N_SUPERSPACE_GROUPS_D1,
+)
 from rietx.crystallography.symmetry import SYMMETRY_ANGLE_TOL_DEG
 from rietx.examples import list_examples
 from rietx.gui.textdoc import FORMAT_VERSION as RXT_FORMAT_VERSION
@@ -239,6 +245,14 @@ MYST_SUBSTITUTIONS = {
     # listing showed two, because a standard whose data may not ship in the
     # wheel leaves `list_examples()` and nothing reads the sentence again.
     "N_EXAMPLES": len(list_examples()),
+    # The (3+1)D counts the superspace chapter quotes (#682 review): the
+    # literature counts the tests pin, and how many printed symbols ITC-C
+    # spells differently from the Stokes 2011 § 5.2 convention.
+    "N_SUPERSPACE_GROUPS_D1": N_SUPERSPACE_GROUPS_D1,
+    "N_BRAVAIS_CLASSES_D1": N_BRAVAIS_CLASSES_D1,
+    "N_ITC_C_EXCEPTIONS": len(ITC_C_EXCEPTIONS),
+    # Stokes & Campbell 2022 Table 6's d = 1 magnetic count (WP-1992).
+    "N_MAGNETIC_SUPERSPACE_GROUPS_D1": N_MAGNETIC_SUPERSPACE_GROUPS_D1,
     # The `.rxt` document's own version and precision (WP-1009 asked for this
     # explicitly: a format bump that misses the manual must fail the docs
     # build).  `gui-power.md` states the grammar normatively, so both numbers

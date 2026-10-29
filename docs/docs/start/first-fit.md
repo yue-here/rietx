@@ -203,7 +203,7 @@ Only one of those directions carries evidence. A Le Bail intensity is extracted
 from the counts in the reflection's own window, so a reflection the pattern does
 not show is assigned almost nothing, and nothing in the report reads the
 absence. Reading it takes a count of predicted positions carrying no intensity
-above the fitted background. An indexing run's Le Bail check reports that
+above the fitted background. An indexing run's validation reports that
 count, as `LeBailValidation.predicted_but_absent`
 ([`INDEX_PREDICTED_BUT_ABSENT`](../reference/diagnostics-indexing.md#index_predicted_but_absent)).
 Texture can empty a reflection the same way, so either one shows up in the

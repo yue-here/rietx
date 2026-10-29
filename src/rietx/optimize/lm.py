@@ -10,7 +10,11 @@ paper pairs the schedule with the bound-constrained conjugate gradient of
 WP-1937 and above :data:`BVLS_MAX_COLUMNS` until WP-1953.  Above that cut,
 where only a Pawley block reaches, the step is now projected conjugate
 gradients (:func:`.bccg.projected_cg`), because BCCG's was measured wrong in
-sign there.
+sign there.  A Pawley stage whose windows are narrow hands the driver its
+normal matrix sparse there (``normal_equations``, WP-2011), and the CG is then
+preconditioned by an incomplete LU of the free block: on 11-BM NAC's
+2224-reflection monoclinic candidate the fit fell from 376 s to 34-38 s at the
+same Rwp to four decimals.
 Independent implementation from the papers; TOPAS is closed source and none of
 it was consulted.
 
@@ -112,6 +116,7 @@ from dataclasses import dataclass, field
 from typing import Callable
 
 import numpy as np
+from scipy import sparse
 from scipy.optimize import lsq_linear, nnls
 
 from ..backend.linalg64 import require_fp64, to_host_fp64
@@ -386,6 +391,8 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
              callback: Callable[[np.ndarray, float], None] | None = None,
              on_trial: Callable[[np.ndarray, float, bool, float, float],
                                 None] | None = None,
+             normal_equations: Callable[[np.ndarray, np.ndarray],
+                                        tuple] | None = None,
              ) -> LMOutcome:
     """Minimise ``S(θ) = r(θ)ᵀr(θ)`` subject to ``lo ≤ θ ≤ hi`` (and ``T·θ+c ≥ 0``).
 
@@ -455,6 +462,13 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
     clamp.  A trial the linear model discards unevaluated (no descent
     promised, or a promise under the fp64 floor) never reaches the residual
     and never fires it.
+
+    ``normal_equations(J, r)`` returns ``(A, b) = (JᵀJ, −Jᵀr)`` in place of
+    :func:`_normal_equations`.  It may return A as a ``scipy.sparse`` matrix,
+    which a caller does only above :data:`BVLS_MAX_COLUMNS`, where the step is
+    projected CG's and a sparse A is what lets it precondition
+    (:func:`_solve_step`).  A Pawley stage passes one that knows each
+    intensity column's rows (``least_squares._pawley_normal_equations``).
     """
     if max_nfev < 1:
         # scipy's TRF refuses the same budget in the same words.  Run on, it
@@ -463,6 +477,7 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
         raise ValueError("`max_nfev` must be None or positive integer.")
     x = _clip_to_bounds(np.asarray(x0, dtype=np.float64).copy(), lo, hi)
     ineqs = list(inequalities or [])
+    build = _normal_equations if normal_equations is None else normal_equations
 
     r = residual(x)
     require_fp64(r, "least-squares residual")
@@ -495,17 +510,17 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
         n_outer += 1
         J = jacobian(x)
         n_jev += 1
-        A, b = _normal_equations(J, r)
+        A, b = build(J, r)
         # each column keeps the largest norm it has had this stage (Moré
         # 1978, MINPACK's ``mode=1``): a column that shrinks towards a
         # stationary point keeps the damping its scale earned, rather than
         # taking the largest step and dragging λ up for every parameter.  A
         # curvature measured this stage stays its column's diagonal where it
         # is the larger.
-        col = np.sqrt(np.maximum(np.diag(A), 0.0))
+        col = np.sqrt(np.maximum(_diagonal(A), 0.0))
         col_max = col if col_max is None else np.maximum(col_max, col)
         if np.any(curvature > 0.0):
-            A[np.diag_indices(len(x))] = np.maximum(np.diag(A), curvature)
+            A = _with_diagonal(A, np.maximum(_diagonal(A), curvature))
         scale = np.maximum(col_max, np.sqrt(curvature))
         lam_start = lam
 
@@ -593,7 +608,9 @@ def minimize(residual: Callable[[np.ndarray], np.ndarray],
                     c = _measured_curvature(residual, x, s, i, lo, hi, ineqs)
                     if c is not None and c > A[i, i] + lam * scale[i] ** 2:
                         curvature[i] = c
-                        A[i, i] = c
+                        diag = _diagonal(A).copy()
+                        diag[i] = c
+                        A = _with_diagonal(A, diag)
                         scale[i] = max(scale[i], np.sqrt(c))
                         lam = lam_start
         if spent:
@@ -667,6 +684,23 @@ def _normal_equations(J, r: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     # step that can never run below fp64 whatever built the columns
     Jh = to_host_fp64(J)
     return Jh.T @ Jh, -(Jh.T @ r)
+
+
+def _diagonal(A) -> np.ndarray:
+    """A's diagonal, dense or ``scipy.sparse`` (``normal_equations``)."""
+    return A.diagonal() if sparse.issparse(A) else np.diag(A)
+
+
+def _with_diagonal(A, values: np.ndarray):
+    """A with its diagonal replaced by ``values``: in place for a dense A, as
+    a new matrix for a sparse one, whose stored pattern need not hold every
+    diagonal entry.  The old diagonal is subtracted out and ``values`` added
+    to the zero left, so each entry is ``values`` exactly, as the dense write
+    makes it: ``a + (v − a)`` need not round back to v."""
+    if sparse.issparse(A):
+        return (A - sparse.diags(A.diagonal()) + sparse.diags(values)).tocsr()
+    A[np.diag_indices(len(values))] = values
+    return A
 
 
 def _furthest_moved(step: np.ndarray, x: np.ndarray,
@@ -754,16 +788,54 @@ def _solve_step(A: np.ndarray, b: np.ndarray, lam: float, x: np.ndarray,
     makes no eigenvalue cut, and on FAP.XRA's Pawley fit that is the
     difference between BVLS's Rwp 0.0803 and TRF's 0.0782, which it reaches.
 
+    **A sparse A** (``minimize``'s ``normal_equations``, WP-2011) is scaled
+    and damped sparse, and the projected CG then preconditions on the free
+    block's incomplete LU.  Unpreconditioned, a pseudo-symmetric Pawley
+    candidate's solves spent nearly their whole budget: on 11-BM NAC's
+    monoclinic candidate of 2224 reflections (59 498 points, macOS arm64,
+    ``[dev]``) the fit took 376 s, 65 % of it in the CG and 22 % forming the
+    dense JᵀJ.  The sparse A alone took it to 163 s, and the preconditioner to
+    34-38 s: ~120 Hessian products a solve against ~4000, the last stage 13
+    iterations against 89, Rwp 0.12592 against 0.12591.  On 15 other
+    validation cells (30-849 columns) and two NAC candidates of 1223-1241
+    reflections, Rwp to four decimals and every other reading were unchanged;
+    those two ran 10.5 s and 8.9 s against 11.1 s and 12.0 s dense.
+    FAP.XRA's Pawley fit, well conditioned, ran 1.3-1.4 s against 1.1 s, at
+    the same Rwp to seven decimals, its profile stage taking 12 iterations
+    against 9.
+    A sparse A at or under the cut is densified, since BVLS needs the
+    eigendecomposition.
+
+    **A dense A** past the cut takes the face's Newton step through the free
+    block's Cholesky factor, shifted where the block is singular, and a
+    projected search along it (WP-2011).  Pseudo-symmetric Pawley candidates
+    built from lab patterns put one reflection of most pairs on its zero
+    floor.  Cutting CG at the first bound did that one bound per restart,
+    and the largest solve spent its whole budget.  On zircon's candidate
+    (601 columns) the largest solve now takes 157 products against 1204, the
+    validation 1 274 against 16 851, and its step solves 0.18 s against
+    0.77 s.  On corundum's (576 columns) the figures are 128 against 1154,
+    787 against 12 654, and 0.14 s against 0.65 s.  Rwp, unmatched and absent
+    lines are unchanged on both, and FAP.XRA's Pawley fit is unchanged to
+    seven decimals with the same iterations per stage (macOS arm64,
+    ``[dev]``).
+
     Returns the step and which bound each variable was solved onto (−1 lower,
     +1 upper, 0 neither), so the caller can land those variables *exactly* on
     the bound the solve chose.
     """
     n = len(b)
-    d = np.sqrt(np.maximum(np.diag(A), 0.0)) if scale is None else scale
+    if sparse.issparse(A) and n <= BVLS_MAX_COLUMNS:
+        A = A.toarray()
+    d = np.sqrt(np.maximum(_diagonal(A), 0.0)) if scale is None else scale
     d = np.where(d > 0.0, d, 1.0)
     inv_d = 1.0 / d
-    A_s = A * np.outer(inv_d, inv_d)
-    A_s[np.diag_indices(n)] += lam
+    if sparse.issparse(A):
+        D = sparse.diags(inv_d)
+        A_s = (D @ A @ D + lam * sparse.identity(n)).tocsr()
+    else:
+        A_s = A * np.outer(inv_d, inv_d)
+        A_s[np.diag_indices(n)] += lam
     b_s = b * inv_d
     if n > BVLS_MAX_COLUMNS:
         y, side = bccg.projected_cg(A_s, b_s, (lo - x) * d, (hi - x) * d)
@@ -828,7 +900,10 @@ def _solve_constrained_step(A: np.ndarray, b: np.ndarray, lam: float, x: np.ndar
     Returns the step and which bound each variable was solved onto, as
     :func:`_solve_step` does: −1 for an active lower box row, +1 for an
     active upper one.  The caller lands those variables exactly on the bound.
+    A sparse A is densified: the route is an eigendecomposition.
     """
+    if sparse.issparse(A):
+        A = A.toarray()
     n = len(b)
     eps = float(np.finfo(np.float64).eps)
     d = np.sqrt(np.maximum(np.diag(A), 0.0)) if scale is None else scale

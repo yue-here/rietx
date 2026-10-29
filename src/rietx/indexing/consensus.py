@@ -85,7 +85,7 @@ from .quality import VOLUME_ENVELOPE_SLACK
 
 #: Candidates that get the **expensive** per-candidate checks — geometrical
 #: ambiguity (which enumerates 55 derivative lattices and predicts reflections for
-#: each) and Le Bail validation (a refinement, ~0.6 s measured).  Three, plus
+#: each) and whole-pattern validation (a refinement, ~0.6 s measured).  Three, plus
 #: every candidate an engine consensus could promote, so the cap never removes a
 #: candidate the gate might otherwise call ``high``: see :func:`checked_indices`,
 #: which is one rule read by both call sites so "which candidates were checked"
@@ -98,7 +98,7 @@ class ConsensusOutcome:
     """Ranked candidates and the result-level facts the gate needs.
 
     Separate from :class:`~rietx.schemas.indexing.IndexingResult` because this
-    is the *pre-validation* answer: :func:`consensus` stops before the Le Bail
+    is the *pre-validation* answer: :func:`consensus` stops before the validation
     fits so ``index_pattern`` can decide which candidates to spend a refinement
     on, and :func:`apply_gate` runs after.
     """
@@ -373,7 +373,7 @@ def checked_indices(candidates: Sequence[CellCandidate],
     ``SearchSpec.max_candidates``.
 
     One function rather than two similar loops because ambiguity enumeration and
-    Le Bail validation must cover the *same* candidates: a candidate validated but
+    whole-pattern validation must cover the *same* candidates: a candidate validated but
     not checked for ambiguity could reach ``high`` with an unenumerated partner.
 
     Since WP-1046 the second set is *mostly* inside the first — agreement is the

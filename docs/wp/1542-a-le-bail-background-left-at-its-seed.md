@@ -43,6 +43,18 @@ here (2026-10-03, at the maintainer's request).
 
 ### Inherited
 
+- **2026-10-27, from WP-2011 and WP-2062: every surveyed program re-extracts
+  Le Bail intensities inside the refinement, and rietx does not.** GSAS-II
+  re-extracts once per least-squares iteration (`GSASIIstrMath.py:4808`,
+  checked), FullProf once per cycle (ran), and TOPAS, RIETAN-FP and MAUD
+  likewise (`docs/practice.md` § Structure-free fitting). rietx partitions
+  `lebail_cycles` times before each solve and never inside one. That is a
+  candidate cause beside the background for issue #740's plateau. WP-2062's
+  decision 0 (repair Le Bail by re-extracting per iteration, or use Pawley
+  where rietx picks the method) and its decision 4 may move this WP's
+  priority. The indexer's validation is Pawley since WP-2011, so a Le Bail
+  background no longer reaches `index_pattern`.
+
 - **2026-10-24, from WP-2039: a model's starting background is now drawn before a fit.**
   `data.plot(model=ref)` draws the background at its starting values, dashed, over the
   channels a fit would use (`viz.plots._starting_model`). An `auto_background()` model

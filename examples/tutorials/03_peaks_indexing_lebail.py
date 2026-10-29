@@ -160,16 +160,16 @@ indexing
 #
 # The verdict line names it.
 # rietx names a single cell only when exactly one candidate reaches [high confidence](https://rietx.org/docs/stable/reference/indexing.html#the-confidence-gate), and this one does.
-# Its row indexes 51 of the 54 usable lines, and none of the reflections it predicts is missing from the indexer's [quick Le Bail fit](https://rietx.org/docs/stable/reference/indexing.html#the-whole-profile-test).
+# Its row indexes 51 of the 54 usable lines, and the indexer's own [whole-pattern fit](https://rietx.org/docs/stable/reference/indexing.html#the-whole-profile-test), a Pawley fit, reaches Rwp 0.044.
+# The row also counts 24 of the 87 lines it predicts as absent from the pattern.
+# The gate reads only the absent lines that no space group could remove, inside the first twenty lines, and here there are none.
 # The three lines it leaves are the candidate's [`unindexed_two_theta`](https://rietx.org/docs/stable/reference/indexing.html#one-candidate), printed below.
 # The one near 36° is two reflections 0.05° apart, fitted as one line between them.
 #
 # The verdict depends on every search finishing.
 # An engine stopped by `budget_seconds` makes the row say [`search_incomplete`](https://rietx.org/docs/stable/reference/indexing.html#presets-budgets-and-the-three-states-of-a-system), and the verdict line then says NO CELL.
 #
-# The candidate's [`INDEX_IMPURITY_LINES`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-impurity-lines) warning comes from the indexer's own quick Le Bail fit, whose Rwp in the candidate's row is poor.
-# A poor fit leaves many peaks unmatched, so that count is not evidence of a second phase.
-# Our own Le Bail fit below settles it.
+# That fit leaves no observed peak unmatched, so the row raises no [`INDEX_IMPURITY_LINES`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-impurity-lines) warning and gives no sign of a second phase.
 #
 # [`best_or_none()`](https://rietx.org/docs/stable/reference/indexing.html#the-result-object) returns a cell only when the gate passes.
 # Here it returns the candidate.
