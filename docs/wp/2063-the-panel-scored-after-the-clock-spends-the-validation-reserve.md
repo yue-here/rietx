@@ -40,11 +40,11 @@ fit is bounded, so the validation reserve reaches validation and
 
 ## Tasks
 
-- [ ] Profile `fom_panel` on NAC's 80-candidate merge and decide between
+- [x] Profile `fom_panel` on NAC's 80-candidate merge and decide between
       making `lattice_reflections`/`laue_multiplicity` cheaper (vectorised, or
       cached per reduced cell: consensus re-scores cells the units already
-      scored) and bounding the post-search scoring by the clock.
-- [ ] Read the clock inside trial_error's per-base loop as well, so a unit
+      scored) and bounding the post-search scoring by the clock. Done exactly: whole-merge scoring 3.5-6.5× cheaper in CPU, every panel bit-identical; no cap added.
+- [x] Read the clock inside trial_error's per-base loop as well, so a unit
       stops within one assignment, not one base set.
 - [ ] Re-measure `quick` on NAC (`docs/wp/2011-probe/probe16_schedule.py`,
       `RESERVE=`) and, if the fits now see the reserve, lower

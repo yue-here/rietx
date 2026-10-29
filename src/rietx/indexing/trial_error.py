@@ -426,6 +426,11 @@ def _search_system(peaks: PeakList, system: str, basis: np.ndarray,
                 rows, combos, q_all[lines], basis, spec, vol_max)
             n_solved += len(combos)
             for af, combo in zip(af_batch, combo_batch):
+                # and per assignment, so a unit stops within one: a base set
+                # can hold enough to overrun the clock by 0.8 s (WP-2063)
+                if budget.expired():
+                    return found, {"solves": float(n_solved),
+                                   "seconds": round(budget.elapsed, 3)}, False
                 # keyed on the centring as well as the metric, because ``seen``
                 # spans the centring loop — see ``engines.solution_key`` for the
                 # two ways a lazier key silently discards a real hypothesis
