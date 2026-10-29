@@ -1,6 +1,6 @@
 # WP-2063 — the FoM panel scored after the clock spends the validation reserve
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-10-29 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-28 — cost-only: under `quick` a heavy pattern pays 9 s of search for it (WP-2011 raised the reserve 8 → 15 % to cover it); no wrong answer
