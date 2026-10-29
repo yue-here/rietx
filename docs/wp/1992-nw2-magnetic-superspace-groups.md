@@ -1,9 +1,8 @@
 # WP-1992 — N-W2 (group half): magnetic superspace groups generated from the operators
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-10-29 — θ on the superspace operators, {1′|000½}, the MSSGs over an SSG and the (M)SSG of an irrep at an incommensurate k, pinned against Stokes & Campbell (2022) and Perez-Mato et al. (2012); PR #1060, unexported
 Track: Data and metadata in, a structure out
 Depends on: — (N-W1 landed as PR #682; 1419 soft, the `representation/` package it extends)
-Priority: P3 2026-10-16 — library code with a contributor ready to build it, but no user-visible result until N-W5 (the magnetic Fourier forward model) lands on it
 
 ## Goal
 
@@ -51,8 +50,6 @@ function-level references, and the hand-typed 775/24 counts.
 
 Licensing: papers only (#678 § Prior art). The ISO(3+d)D tables forbid
 redistribution, so rietx ships a generator and pins published counts.
-
-### Inherited
 
 ## Non-goals
 
@@ -110,4 +107,18 @@ redistribution, so rietx ships a generator and pins published counts.
   macOS arm64, alone): 11000 passed, 121 skipped, 2 xfailed, 7 min 14 s.
   Skill: none, the package stays unexported. spgrep stays in the `dev` extra:
   l. 43's "a dependency" reads "a test oracle" (noted on the PR).
-
+- **2026-10-29** — PR #1060 (head `7d6b0f17`) merged as `44de0f62` by
+  `/pr-review`, after four rounds. Closes the WP: every task was ticked by
+  the contributor's own entry above, which the maintainer accepted as
+  written (ruled 2026-10-29; CONTRIBUTING now welcomes it). What the merge
+  makes possible: N-W5 (the magnetic Fourier forward model) and M-8's
+  incommensurate k (WP-1418, issue #795) can ask for the magnetic superspace
+  group of an irrep through `crystallography/superspace/`, which stays
+  unexported. What it does not do: no schema, forward-model or public-API
+  change, and the Table 6 type-4 count stays a strict xfail (4651 against
+  the published 4653). Gotcha: the isotropy search runs on a δ grid
+  (`incommensurate.DELTA_GRID` = 24); a slow test compares it with 72 irrep
+  by irrep on the tested lines only, at one λ. Gate: `7d6b0f17` merged onto
+  main `6c043e56` (tree `0b5fc537`), macOS arm64, `[dev,jax]`: fast suite
+  12 319 passed, 205 skipped, 32 xfailed; `-m slow` 422 passed, 14 skipped,
+  16 xfailed; main after the merge is content-identical to that tree.
