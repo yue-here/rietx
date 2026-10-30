@@ -1,6 +1,6 @@
 # WP-2063 — the FoM panel scored after the clock spends the validation reserve
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-10-29 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-28 — cost-only: under `quick` a heavy pattern pays 9 s of search for it (WP-2011 raised the reserve 8 → 15 % to cover it); no wrong answer
@@ -40,17 +40,19 @@ fit is bounded, so the validation reserve reaches validation and
 
 ## Tasks
 
-- [ ] Profile `fom_panel` on NAC's 80-candidate merge and decide between
+- [x] Profile `fom_panel` on NAC's 80-candidate merge and decide between
       making `lattice_reflections`/`laue_multiplicity` cheaper (vectorised, or
       cached per reduced cell: consensus re-scores cells the units already
-      scored) and bounding the post-search scoring by the clock.
-- [ ] Read the clock inside trial_error's per-base loop as well, so a unit
+      scored) and bounding the post-search scoring by the clock. Done exactly: whole-merge scoring 3.5-6.5× cheaper in CPU, every panel bit-identical; no cap added.
+- [x] Read the clock inside trial_error's per-base loop as well, so a unit
       stops within one assignment, not one base set.
 - [ ] Re-measure `quick` on NAC (`docs/wp/2011-probe/probe16_schedule.py`,
       `RESERVE=`) and, if the fits now see the reserve, lower
       `VALIDATION_RESERVE_FRACTION` with its row's evidence.
-- [ ] Unit replay digests (`python -m tests.unit_replay`) and
+- [x] Unit replay digests (`python -m tests.unit_replay`) and
       `tests/test_acceptance_indexing.py` unchanged, or each move named.
+      Replay: 22 of 22 digests unchanged. Acceptance: 44 passed (macOS
+      arm64, `[dev]`, on d4e1fdde3).
 
 ## Acceptance
 

@@ -56,6 +56,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-10-25 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2041](2041-a-tutorial-shows-the-indexer-abstain.md) | A tutorial shows the indexer abstain | 2026-10-24 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 2026-10-25 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [2063](2063-the-panel-scored-after-the-clock-spends-the-validation-reserve.md) | The FoM panel scored after the clock spends the validation reserve | 2026-10-29 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## Next, by priority
 
@@ -610,7 +611,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2055](2055-a-picked-line-held-at-its-position-bound.md) | The picker holds a line shape the lab pattern does not have | ⬜ | P3 | — |
 | [2060](2060-the-likelihood-interval-where-an-esd-cannot-be-read.md) | The likelihood interval where an esd cannot be read as one | ⬜ | P2 | — |
 | [2062](2062-pawley-is-the-structure-free-default.md) | Pawley is the structure-free default | ⬜ | P2 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) |
-| [2063](2063-the-panel-scored-after-the-clock-spends-the-validation-reserve.md) | The FoM panel scored after the clock spends the validation reserve | ⬜ | P3 | — |
+| [2063](2063-the-panel-scored-after-the-clock-spends-the-validation-reserve.md) | The FoM panel scored after the clock spends the validation reserve | 🔄 2026-10-29 | P3 | — |
 
 ### <a id="unscheduled-a-long-run-is-not-one-fit"></a>A long run is not one fit
 

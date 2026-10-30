@@ -214,25 +214,32 @@ def laue_multiplicity(hkl: np.ndarray, system: str, centring: str = "P"
     of tuples per reflection — the cost profile :func:`predicted_lines` exists to
     escape (683 ms against 1.8 ms on a 17 Å cubic cell), and ``N^cal`` needs one
     multiplicity per reflection over the whole enumeration, per candidate.  So the
-    orbit images are formed for every reflection at once and counted by sorting an
-    integer encoding of each image, which is exact rather than approximate: the
-    encoding is a bijection on the index range in play.
+    orbit is counted for every reflection at once, in integers, which is exact
+    rather than approximate.
+
+    **The orbit is counted by its stabiliser, never by listing it** (WP-2063).
+    The images of ``h`` under the R rotations and their negatives are a list of
+    2R in which every element of ⟨G, −1⟩ appears equally often, so the orbit
+    size is 2R over the number of entries equal to ``h`` itself (R·h = ±h).
+    Each image is compared through an integer encoding that is a bijection on
+    the index range in play, and the encoding is linear, so the images' codes
+    are one product with ``h`` and the −h test is a sign.  It replaced sorting
+    every image's code, which was most of the panel's cost: 6.7 s of 9.1 s
+    over one NAC merge, 0.36 s after.
     """
     h = np.atleast_2d(np.asarray(hkl, dtype=np.int64))
     if not len(h):
         return np.zeros(0, dtype=np.int64)
     rot = _laue_rotations(lattice_group(system, centring))
-    # (N, R, 3) images, then their Friedel mates — a Laue group contains the
-    # inversion, so the mates are usually already present; the stack costs one
-    # concatenation and removes the "usually" from that sentence
-    images = np.einsum("rij,nj->nri", rot, h)
-    images = np.concatenate([images, -images], axis=1)
-    base = 2 * int(np.abs(images).max()) + 1
-    key = ((images[:, :, 0] * base) + images[:, :, 1]) * base + images[:, :, 2]
-    key.sort(axis=1)
-    distinct = np.ones_like(key, dtype=bool)
-    distinct[:, 1:] = np.diff(key, axis=1) != 0
-    return distinct.sum(axis=1).astype(np.int64)
+    # a row sum of |R| times max|h| bounds every component of every image
+    span = int(np.abs(rot).sum(axis=2).max()) * int(np.abs(h).max())
+    base = 2 * span + 1
+    weight = np.array([base * base, base, 1], dtype=np.int64)
+    code = h @ weight
+    image_code = h @ (weight @ rot).T                    # (N, R): code of R·h
+    fixed = (np.count_nonzero(image_code == code[:, None], axis=1)
+             + np.count_nonzero(image_code == -code[:, None], axis=1))
+    return ((2 * len(rot)) // fixed).astype(np.int64)
 
 
 def match_lines(q_obs: np.ndarray, q_esd: np.ndarray, q_pred: np.ndarray, *,
@@ -529,17 +536,20 @@ def merge_at_resolution(tt_pred: np.ndarray, fwhm_pred: np.ndarray, *,
     times (F1's first pass).
     """
     tt = np.asarray(tt_pred, dtype=np.float64)
-    fw = np.asarray(fwhm_pred, dtype=np.float64)
     if not len(tt):
         return []
-    groups: list[list[int]] = [[0]]
-    for k in range(1, len(tt)):
-        last = groups[-1][-1]
-        if tt[k] - tt[last] < resolution * 0.5 * (fw[k] + fw[last]):
-            groups[-1].append(k)
-        else:
-            groups.append([k])
-    return [np.asarray(g, dtype=np.int64) for g in groups]
+    starts = _line_starts(tt, fwhm_pred, resolution)
+    return np.split(np.arange(len(tt), dtype=np.int64), starts[1:])
+
+
+def _line_starts(tt: np.ndarray, fw: np.ndarray, resolution: float) -> np.ndarray:
+    """Where each of :func:`merge_at_resolution`'s groups starts.  The group's
+    last member is always the previous position, so the test is one
+    comparison per neighbour pair."""
+    tt = np.asarray(tt, dtype=np.float64)
+    fw = np.asarray(fw, dtype=np.float64)
+    joins = tt[1:] - tt[:-1] < resolution * 0.5 * (fw[1:] + fw[:-1])
+    return np.concatenate([[0], np.flatnonzero(~joins) + 1]).astype(np.int64)
 
 
 def common_shift(tt_obs: np.ndarray, tt_pred: np.ndarray,
@@ -600,9 +610,18 @@ def predicted_seen_fraction_at_resolution(
                             blind_spot=_BLIND["predicted_seen_fraction"])
     order = np.argsort(obs)
     fw_at = np.interp(pred, obs[order], np.asarray(fwhm_obs, dtype=np.float64)[order])
-    groups = merge_at_resolution(pred, fw_at, resolution=resolution)
-    merged = np.array([float(np.mean(pred[g])) for g in groups]) + shift
-    fw_m = np.array([float(np.mean(fw_at[g])) for g in groups])
+    starts = _line_starts(pred, fw_at, resolution)
+    size = np.diff(np.append(starts, len(pred)))
+    # a lone position is its own mean (x / 1 is exact); a merged line takes
+    # ``np.mean`` over its members, batched one row per line of equal size,
+    # which sums each row as the per-line call did (checked bit for bit)
+    merged, fw_m = pred[starts], fw_at[starts]
+    for s in np.unique(size[size > 1]):
+        at = np.flatnonzero(size == s)
+        rows = starts[at, None] + np.arange(s)
+        merged[at] = np.mean(pred[rows], axis=1)
+        fw_m[at] = np.mean(fw_at[rows], axis=1)
+    merged = merged + shift
     seen, _j = seen_at_resolution(merged, fw_m, obs, fwhm_obs, two_theta_esd,
                                   k_sigma=k_sigma, resolution=resolution)
     return FigureOfMerit(
