@@ -417,6 +417,7 @@
   "result_fields:RefinementResult.cell_volumes",
   "result_fields:RefinementResult.data_support",
   "result_fields:RefinementResult.diagnostics",
+  "result_fields:RefinementResult.distortion_totals",
   "result_fields:RefinementResult.geometry",
   "result_fields:RefinementResult.histograms",
   "result_fields:RefinementResult.identifiability",

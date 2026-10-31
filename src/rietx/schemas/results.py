@@ -776,6 +776,59 @@ class CellVolume(Base):
     stderr_diagonal: float | None = None
 
 
+class DistortionTotal(Base):
+    """One irrep block of a child refined on its mode amplitudes, at fit close (WP-1419).
+
+    A block is every mode of ``Phase.distortion_modes`` sharing one ``(irrep,
+    k, isotropy_group)``, over all parent sites: fixed by symmetry before the
+    fit, never found from the data (#286, 2026-09-16).  ``modes`` are the
+    block's indices in ``Phase.distortion_modes.modes`` and ``n_modes`` their
+    count, m.  ``a_tau`` is the block's amplitude, the norm √(Σ A_ν²) of its
+    mode amplitudes in Å, the AMPLIMODES unit the record is normalised in, so
+    it does not depend on the basis inside the block (Perez-Mato, Orobengoa &
+    Aroyo 2010, *Acta Cryst.* A**66**, 558, eqs. 5–7).
+
+    ``esd`` is a_tau's esd from the block's own covariance, √(c·Cov·cᵀ) with
+    c = A/a_tau, through the same covariance every reported esd comes from
+    (Bérar–Lelann factor included, applied once).  ``esd_label`` says what it
+    is, on every block whatever its size: a linearised esd of a norm is
+    undefined at a_tau = 0 and biased up (the Rice distribution's) below about
+    2 esd.  ``t2`` is Hotelling's T² = Aᵀ·Cov⁻¹·A over the block's amplitudes,
+    with m beside it and no p: χ² is even in a symmetry-breaking amplitude, so
+    where the block's truth may be zero T² ≈ 4 × the likelihood ratio and a
+    χ²_m p is wrong exactly there (``rietx.help``).  ``esd`` and ``t2`` are
+    ``None`` where the fit measured no covariance (no free amplitude in the
+    block, a column the data cannot see, a singular block, or ``esd`` at
+    a_tau = 0).
+
+    ``driving`` says a generic displacement inside this block alone has
+    exactly the child's group (``None`` where the record's parent operations
+    do not map its reference structure onto itself, so the action the answer
+    is read from cannot be built), the block's isotropy group being the child's
+    own (Perez-Mato 2010 p. 561, primary and secondary); LaMnO₃'s Pnma has no
+    such block, its R4+ and M3+ being needed together.  ``sign_convention``
+    states which sign the amplitudes carry, and ``largest_displacement`` is the
+    largest atomic displacement this block's amplitudes put on any atom of
+    the child, in Å in the record's reference metric (ISODISPLACE's figure).
+    No verdict, threshold or correlation field: the block's comparison is
+    ``Refinement.distortion_block_tests``.
+    """
+
+    phase: int
+    irrep: str
+    k: tuple[str, str, str]
+    isotropy_group: str
+    modes: list[int]
+    n_modes: int
+    a_tau: float
+    esd: float | None = None
+    esd_label: str
+    t2: float | None = None
+    driving: bool | None
+    sign_convention: str
+    largest_displacement: float
+
+
 class GeometryTable(Base):
     """Bonding geometry of the converged model, with propagated esds (WP-1072).
 
@@ -2041,6 +2094,11 @@ class RefinementResult(Base):
     # (WP-1072) — see :class:`GeometryTable`.  Rietveld-only, and None when the
     # result did not come from a fit that had a compiled model to search.
     geometry: GeometryTable | None = None
+    # One row per irrep block of every phase stated on mode amplitudes
+    # (WP-1419), its A_τ, esd and T² read off the final covariance, which is
+    # never serialized: the ``geometry`` carrier argument.  ``None`` when no
+    # phase carries ``distortion_modes``.
+    distortion_totals: list[DistortionTotal] | None = None
 
     # Each phase's cell volume with its esd through the cell covariance
     # (WP-1933), in every mode, since a Le Bail cell is a measurement too —

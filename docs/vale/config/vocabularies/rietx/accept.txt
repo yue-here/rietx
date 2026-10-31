@@ -140,6 +140,7 @@ HCl
 [hH]kl
 Hofmann
 [hH]olohedry
+Hotelling
 [hH]ydrogens
 [iI]dentifiability
 [iI]nequivalent

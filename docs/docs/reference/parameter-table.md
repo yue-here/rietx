@@ -179,6 +179,69 @@ A block freed with all those amplitudes exactly zero is refused for the same rea
 The seed's first mode is positive, which picks one domain: the sign of a driving amplitude is a domain label, and only the relative signs inside a basis are measured.
 The equations are in {ref}`the theory chapter <ch-parameterisation>`.
 
+### What the fit reports about the blocks
+
+The unit the result reports on is the irrep block: every mode sharing one `DistortionMode.irrep`, `DistortionMode.k` and `DistortionMode.isotropy_group`, over all parent sites, fixed by symmetry before the fit.
+`rietx.report.distortion_blocks` lists a phase's blocks with their mode indices.
+A fit of a phase carrying `Phase.distortion_modes` returns one `DistortionTotal` per block in `RefinementResult.distortion_totals`, which is `None` when no phase carries modes.
+
+| field | what it is |
+|---|---|
+| `DistortionTotal.phase`, `DistortionTotal.irrep`, `DistortionTotal.k`, `DistortionTotal.isotropy_group` | which block |
+| `DistortionTotal.modes`, `DistortionTotal.n_modes` | its indices in `DistortionModes.modes`, and their count m |
+| `DistortionTotal.a_tau` | the block's amplitude, the norm of its mode amplitudes in Å, the same in any basis inside the block |
+| `DistortionTotal.esd` | the esd of `a_tau` from the block's own covariance, the covariance every reported esd comes from |
+| `DistortionTotal.esd_label` | "linearised; undefined at A_τ = 0 and Rice-biased below about 2 esd", on every block |
+| `DistortionTotal.t2` | Hotelling's T² = Aᵀ·Cov⁻¹·A over the block's amplitudes, with m beside it and no p |
+| `DistortionTotal.driving` | whether a displacement inside this block alone has the child's own group; `None` where the record's parent operations do not map its reference structure onto itself |
+| `DistortionTotal.sign_convention` | which sign the amplitudes carry: the fitted domain, as the fit left it |
+| `DistortionTotal.largest_displacement` | the largest atomic displacement the block puts on the child, Å |
+
+`esd` and `t2` are `None` where the fit measured no covariance for the block: an amplitude not freed, a column the data cannot see, or, for `esd`, `a_tau` exactly 0.
+T² carries no p because χ² is even in an amplitude that breaks the parent's symmetry: where a block's truth may be zero, T² is about four times the likelihood ratio, so a p against χ²<sub>m</sub> is wrong exactly where the question is asked.
+A correlation inside one block is an artefact of the basis chosen inside it; `a_tau`, its esd, `t2` and the block comparison below are the same in any basis.
+
+### Comparing blocks by a refit
+
+`Refinement.distortion_block_tests(data, hold=..., detectability_bar=..., detectability_probe=...)` holds blocks at 0 and refits, after a fit that freed them.
+`hold` is a list whose items are a block or a set of blocks held together, each named by its `(irrep, k, isotropy_group)` key or by its `DistortionTotal`; `None` holds every block that is not the identity irrep's and that the fit freed throughout, each alone; a block the fit freed only in part is skipped, and a named one raises.
+Each item gets one restricted refit: its amplitudes at 0, everything else the fit freed free again, starting from the fit's optimum.
+It runs on a private copy, so the refinement, its history and its result are unchanged, and it costs one refit per item (0.5 to 1.4 s each on the five blocks of the BT-1 LaMnO₃ `Pnma` fit, macOS arm64).
+
+It returns a `DistortionBlockTests`, with one `DistortionBlockTest` per item in `DistortionBlockTests.tests`:
+
+| field | what it is |
+|---|---|
+| `DistortionBlockTest.phase`, `DistortionBlockTest.held` | the held blocks |
+| `DistortionBlockTest.m` | the number of free amplitudes held |
+| `DistortionBlockTest.delta_bic` | ΔBIC at N/f², f the restricted fit's, as `compare_freed` charges it; positive favours the blocks |
+| `DistortionBlockTest.lambda_`, `DistortionBlockTest.lambda_p` | Λ = Δχ²/(χ²<sub>red</sub>·f²) with the full fit's χ²<sub>red</sub> and f, and its upper-tail p against χ²<sub>m</sub> |
+| `DistortionBlockTest.chi2_restricted`, `DistortionBlockTest.chi2_full` | the χ² of each fit, not reduced |
+| `DistortionBlockTest.esd_inflation_restricted`, `DistortionBlockTest.esd_inflation_full`, `DistortionBlockTest.chi2_red_full`, `DistortionBlockTest.n_points` | the numbers the two statistics were computed from |
+| `DistortionBlockTest.a_det` | the predicted smallest amplitude of the held set whose ΔBIC reaches the bar, Å, when a bar was passed |
+| `DistortionBlockTest.wall_s` | the restricted refit's wall time |
+
+`rietx.report.block_comparison` computes `delta_bic`, `lambda_` and `lambda_p` from stated numbers.
+Λ is Hamilton's F form on rietx's esd scale: it holds its size on white-noise nulls, but under model misfit it can call a block that absorbs the misfit, so it is not a test of zero.
+No row carries a verdict.
+
+A restricted refit that lands below the full fit by more than the solver's own stopping tolerance (a relative `rietx.optimize.lm.FTOL`) proves the full fit stopped short of its optimum; one within it is round-off, as a held true zero gives, and starts nothing.
+The call then refits the full model from that restricted optimum, with the held blocks re-seeded as `displacive_statement` seeds them, and tests every item again.
+`DistortionBlockTests.restarts` records each restart as a `DistortionRestart`: `DistortionRestart.held` names the set that triggered it, `DistortionRestart.chi2_full_before`, `DistortionRestart.chi2_restricted` and `DistortionRestart.chi2_full_after` the three χ², and `DistortionRestart.lowered` whether the refit lowered the full χ².
+The full χ² falls by more than that tolerance at every restart, so the loop ends without a cap; a restart that does not lower it is recorded and ends the loop.
+After a restart the rows compare against the restarted fit, which is `DistortionBlockTests.restarted_result`; otherwise that field is `None`.
+
+`detectability_bar` and `detectability_probe` have no default: without a bar `a_det` is not computed, and a bar without a probe raises (`DistortionBlockTests.detectability_bar` and `DistortionBlockTests.detectability_probe` record the ones used).
+The smallest detectable amplitude is the minimum over the held modes j of A<sub>0</sub>·[χ²<sub>red</sub>·f²·(m·ln(N/f²) + bar)/λ<sub>j</sub>(A<sub>0</sub>)]<sup>1/p<sub>j</sub></sup>, with χ²<sub>red</sub> the full fit's and f the restricted fit's.
+λ<sub>j</sub> is one predict per mode at the caller's probe amplitude A<sub>0</sub> (`detectability_probe`, Å) from the restricted optimum, on the file's σ.
+The scaling λ ∝ A<sup>p</sup> holds to leading order only, so no probe is built in: at 0.1 Å on two blocks of LaMnO₃ at one noise seed the test holds `a_det` within 2.1 % (p = 4) and 3.7 % (p = 2) of the bisected crossing, and that is all that has been shown.
+p<sub>j</sub> is 4 for a mode the pattern has no first-order term along at that structure, which `AmplitudeAction.even` reads from the structure's symmetry, and 2 otherwise.
+`rietx.report.detectability_target` and `rietx.report.detectability_amplitude` are the two steps.
+Measured against the strength at which half of the planted seeds gave ΔBIC above a bar of 6, on LaMnO₃ synthetic white noise, `a_det` was off by +2 % on a five-mode Γ block, +9 to +12 % on a ten-mode zone-boundary block, and +48 % on a one-mode block of a 57-mode P1 child, whose signal the other free modes absorb; it is uncalibrated on misfit.
+
+`rietx.crystallography.representation.distortion.amplitude_action` returns the `AmplitudeAction` of a phase on mode amplitudes: the parent group acting on its mode fields over the child cell.
+`AmplitudeAction.stabiliser` gives the operations that leave a set of amplitudes unchanged, the structure's own symmetry, and `AmplitudeAction.even` the modes along which the pattern has no first-order term there.
+
 ## Restraints
 
 A restraint adds a row to the residual and leaves the table as it is.

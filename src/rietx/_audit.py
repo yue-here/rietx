@@ -229,6 +229,7 @@ RECORD_SCHEMAS: tuple[str, ...] = (
     "rietx.schemas.sequential.SeriesEntry",
     "rietx.schemas.results.RefinementResult",
     "rietx.schemas.results.Statistics",
+    "rietx.report.schemas.DistortionBlockTests",
     "rietx.schemas.indexing.IndexingResult",
     "rietx.schemas.indexing.PeakList",
 )
@@ -446,6 +447,10 @@ def row_source(name: str, kind: str, value: object = None) -> str:
 #: Fields of :data:`RECORD_SCHEMAS` that report no action the filing named.
 #: An audit that finds one reporting an action moves it into :data:`ROWS`.
 OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
+    "rietx.report.schemas.DistortionBlockTests.detectability_bar",
+    "rietx.report.schemas.DistortionBlockTests.detectability_probe",
+    "rietx.report.schemas.DistortionBlockTests.restarted_result",
+    "rietx.report.schemas.DistortionBlockTests.tests",
     "rietx.schemas.indexing.IndexingResult.candidates",
     "rietx.schemas.indexing.IndexingResult.diagnostics",
     "rietx.schemas.indexing.IndexingResult.engine_stats",
@@ -472,6 +477,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.RefinementResult.cell_volumes",
     "rietx.schemas.results.RefinementResult.data_support",
     "rietx.schemas.results.RefinementResult.diagnostics",
+    "rietx.schemas.results.RefinementResult.distortion_totals",
     "rietx.schemas.results.RefinementResult.geometry",
     "rietx.schemas.results.RefinementResult.histograms",
     "rietx.schemas.results.RefinementResult.identifiability",
@@ -1242,6 +1248,13 @@ ROWS: tuple[Row, ...] = (
                  "checks the pattern unchanged before writing, and a caller has no verb to do it "
                  "by hand (B2, ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.report.schemas.DistortionBlockTests.restarts", "action", tier=1, ambiguity=1,
+        evidence=("arithmetic: a restricted fit is the full model with parameters held at 0, so "
+                  "its chi2 cannot lie below the full optimum (Kerman et al. 2012, Acta Cryst. A68, "
+                  "222, p. 231); one below it by more than the solver's own ftol proves the full "
+                  "fit stopped short, every refiner would refit, and the caller's own fit is "
+                  "untouched; tests/test_distortion_totals.py::"
+                  "test_a_restricted_fit_below_the_full_one_restarts_the_full_fit")),
     Row("rietx.schemas.results.StageResult.blocked_by_hold", "action", tier="caller", ambiguity=1,
         evidence=("opt-in: Refinement.hold(), nothing held by default; the caller's hold outranks a"
                   " plan glob (WP-1435)")),
@@ -2973,6 +2986,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine._CENTROID_SITES_NAMED", "constant", value=12),
     Row("rietx.report.body_misfit.MISFIT_ALPHA", "constant", value=0.001),
     Row("rietx.report.body_misfit.MISFIT_BIC", "constant", value=10.0),
+    Row("rietx.report.distortion.EVEN_EXPONENT", "constant", tier=1, value=4,
+        evidence=("symmetry: along a mode with no part invariant under the structure's own "
+                  "group the pattern has no first-order term, so dy ~ A^2 and lambda ~ A^4 "
+                  "(Perez-Mato, Orobengoa & Aroyo 2010 sec. 7; WP-1419); the wrong exponent "
+                  "misses the bisected crossing by a factor 1.3-6, tests/"
+                  "test_distortion_totals.py::test_a_det_meets_the_bisected_crossing")),
+    Row("rietx.report.distortion.LINEAR_EXPONENT", "constant", tier=1, value=2,
+        evidence=("arithmetic: a mode with a first-order term moves the pattern linearly, so "
+                  "lambda = sum((dy/sigma)^2) ~ A^2 (WP-1419); tests/"
+                  "test_distortion_totals.py::test_a_det_meets_the_bisected_crossing")),
     Row("rietx.report.layer0.LAYER0_MATCH_TOL_DEG", "constant", value=0.08),
     Row("rietx.report.layer2.BACKGROUND_INCREASE_CAP", "constant", value=0.6),
     Row("rietx.report.layer2.IMPURITY_SIGMA", "constant", value=8.0),

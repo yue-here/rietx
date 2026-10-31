@@ -597,6 +597,12 @@ from .._nearmiss import did_you_mean
 #: ``displacive_statement``.  An older build refuses a phase carrying it.
 #: Also in 0.60 (WP-2011): ``LeBailValidation.mode``, additive, its default
 #: ``"lebail"`` being what every record written before it ran.
+#: Also in 0.60 (WP-1419 C4a): ``RefinementResult.distortion_totals``, one
+#: ``DistortionTotal`` per irrep block of a phase on mode amplitudes (A_τ, its
+#: esd and label, T², ``driving`` (``None`` where the record's parent
+#: operations miss its reference structure), the sign convention, the largest
+#: displacement), additive and defaulted to ``None`` where no phase carries
+#: ``distortion_modes``.
 #: Also in 0.60 (#941's follow-ups): ``LeBailValidation.n_lines_screened_in_window``,
 #: ``.predicted_but_absent_density_in_window`` and
 #: ``.predicted_but_absent_excess_in_window``, the windowed count's density and
