@@ -595,3 +595,116 @@ def test_nothing_declared_moves_no_screen(nacl_screens, tetrahedrite_screens):
         assert all(not c.excluded_groups and not c.exclusion_reasons
                    and not c.special_positions and not c.count_notes
                    for c in screen.candidates)
+
+
+# ----------------------------------------------------------------------
+# #1140's follow-ups (Yue's review of 2026-10-27, not blocking)
+# ----------------------------------------------------------------------
+HEMIHYDRATE = "CaSO4·0.5H2O"
+
+
+def test_an_ordered_hemihydrate_counts_its_o_per_cell():
+    """Follow-up 1: a fractional formula count is a shared site only where the
+    model is not declared ordered.  Declared ordered, the hemihydrate's O 4.5
+    per formula unit is whole per cell and is counted: at Z = 2 that is O 9,
+    which P 2₁'s one orbit (2) cannot make; at Z = 4, O 18 it can."""
+    from rietx.crystallography.atomic_volume import formula_counts
+    from rietx.indexing.extinction import content_exclusion, exclusion_reasons
+
+    counts = formula_counts(HEMIHYDRATE)
+    assert counts["O"] == 4.5
+    p21 = gemmi.find_spacegroup_by_name("P 1 21 1")
+    assert "O 9" in content_exclusion(p21, 2, counts, ordered=True)
+    assert content_exclusion(p21, 4, counts, ordered=True) is None
+    ordered = ExtinctionPrior(z=2, formula=HEMIHYDRATE, ordered=True)
+    assert any("O 9" in why for why in exclusion_reasons(ordered, p21, 2, counts))
+    # not declared ordered, the fraction still declares a shared site
+    assert content_exclusion(p21, 2, counts) is None
+    # and the shared-site reading of disordered CuAu flips under ordered=True,
+    # where no site is shared: two Cu per cell fit no orbit of Fm-3m
+    fm3m = gemmi.find_spacegroup_by_name("F m -3 m")
+    assert "Cu 2" in content_exclusion(fm3m, 4, {"Cu": 0.5, "Au": 0.5},
+                                       ordered=True)
+
+
+def test_atoms_per_cell_that_are_not_whole_are_never_counted():
+    """Follow-up 1's other arm: where count × Z is not whole no ordered model
+    holds the element at all, and it is not counted even under ordered=True.
+    Wüstite Fe0.95O at Z = 4 is 3.8 Fe per cell; its O 4 is still counted.
+    The decimal is read as written: Cu0.7 at Z = 10 is Cu 7, not 7.000…1."""
+    from rietx.indexing.extinction import content_exclusion
+
+    fm3m = gemmi.find_spacegroup_by_name("F m -3 m")
+    p21 = gemmi.find_spacegroup_by_name("P 1 21 1")
+    assert content_exclusion(fm3m, 4, {"Fe": 0.95, "O": 1.0}, ordered=True) is None
+    assert content_exclusion(p21, 2, {"Fe": 0.75, "O": 1.0}, ordered=True) is None
+    assert "O 3" in content_exclusion(p21, 3, {"Fe": 0.95, "O": 1.0}, ordered=True)
+    assert content_exclusion(p21, 1, {"O": 4.5}, ordered=True) is None
+    assert "Cu 7" in content_exclusion(p21, 10, {"Cu": 0.7}, ordered=True)
+
+
+def test_a_collapsed_note_line_names_its_own_kind(tetrahedrite_screens):
+    """Follow-up 2: unordered tetrahedrite at Z = 2 keeps I 2₁3, whose note is
+    the "no sum" kind (Z = 2 is no sum of 8, 12, 24), beside five members that
+    hold Z only on special positions.  The class line must not say every
+    member needs special positions."""
+    from rietx.indexing.extinction import _places_no_whole_unit
+
+    stated = tetrahedrite_screens[2]
+    best = stated.best_or_none()
+    notes = best.special_positions
+    assert len(notes) == len(best.space_groups) == 6
+    assert [g for g, n in notes.items() if _places_no_whole_unit(n)] == ["I 21 3"]
+    lines = [w for w in _note(stated).where
+             if "special positions" in w or "no sum of this group" in w]
+    assert lines == [
+        "I - - -: I 2 3, I m -3, I 4 3 2, I -4 3 m, I m -3 m hold Z = 2 only "
+        "with formula units on special positions (special_positions names them)",
+        f"I - - -: {notes['I 21 3']}"]
+    assert not any("every member" in w for w in _note(stated).where)
+
+
+def test_a_class_whose_every_note_is_no_sum_collapses_to_that_kind():
+    """Follow-up 2: the P 2₁ class at Z = 3, where 3 is no sum of 2 or of 2
+    and 4, collapses to one line that says so, not "special positions"."""
+    from rietx.indexing.diagnostics import _special_lines
+    from rietx.indexing.extinction import special_site_note
+
+    members = ["P 1 21 1", "P 1 21/m 1"]
+    entry = ExtinctionCandidate(
+        symbol="P 1 21 1", representative="P 1 21/m 1", space_groups=members,
+        special_positions={g: special_site_note(gemmi.find_spacegroup_by_name(g), 3)
+                           for g in members})
+    assert _special_lines(entry, 3) == [
+        "P 1 21 1: no member holds Z = 3 as whole formula units, Z being no sum "
+        "of its orbit multiplicities, so the formula unit is not one molecule "
+        "(special_positions gives them)"]
+
+
+@pytest.fixture(scope="module")
+def z_alone_screens():
+    return (_screen("P 1 21 1", restrict={"z": 2}),
+            _screen("P 1 21 1", restrict={"z": 2, "sohncke": True}))
+
+
+def test_a_z_with_no_formula_says_it_filters_nothing_and_why(z_alone_screens):
+    """Follow-up 3: a ``z`` alone has no atoms per cell to count, so it filters
+    no group; the diagnostic says that rather than "removed 0 space group(s)
+    from 0 class(es)", and still names what P 2₁/m needs at Z′ = 1/2."""
+    alone, chiral = z_alone_screens
+    note = _note(alone)
+    assert note.level == "info"
+    assert note.message.startswith("the declared z=2 filters no group: with no "
+                                   "formula there are no atoms per cell")
+    assert "removed 0" not in note.message
+    assert any(w.startswith("P 1 21 1: P 1 21/m 1 holds Z = 2 with Z′ = 1/2")
+               for w in note.where)
+    assert all(not c.excluded_groups for c in alone.candidates)
+    # beside a fact that does filter, the count stays and z says it added none
+    removed = [c for c in chiral.candidates if c.excluded_groups]
+    assert all("z=" not in why for c in removed
+               for why in c.exclusion_reasons.values())
+    n = sum(len(c.excluded_groups) for c in removed)
+    assert _note(chiral).message.startswith(
+        f"the declared prior (sohncke=True, z=2) removed {n} space group(s) from "
+        f"{len(removed)} class(es); z=2 filtered none of them: with no formula")
