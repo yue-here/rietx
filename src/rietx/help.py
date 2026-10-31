@@ -888,6 +888,18 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
     "phases.*.cell.alpha": _CELL_ANGLE,
     "phases.*.cell.beta": _CELL_ANGLE,
     "phases.*.cell.gamma": _CELL_ANGLE,
+    # the parent cell's edges are cell lengths and angles too: ``phases.*.cell.a``
+    # claims them on purpose, since fnmatch's ``*`` spans the dots
+    # (``phases.0.parent_cell.cell.a``), and ``tests/test_help.py`` pins that
+    "phases.*.parent_cell.strain.*": HelpEntry(
+        title="Strain",
+        description=(
+            "Strain the parent forbids; seed it off zero."
+        ),
+        unit=None, default="0.0",
+        typical="1e-4 to 1e-2",
+        anchor="theory/peak-positions.html#a-child-s-cell-through-its-parent",
+    ),
     "phases.*.scale": HelpEntry(
         title="Phase scale",
         description=(
@@ -3238,6 +3250,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "equation in those patterns. Quote the equation's coefficients. If the "
             "equation should hold only where it is measured, narrow the subset to the "
             "patterns that see the phase."
+        ),
+    ),
+    "PARENT_STRAIN_HELD": HelpEntry(
+        title="A parent cell refined with its strain held",
+        description=(
+            "A stage freed the cell edges of a phase whose cell is stated through its "
+            "parent (`Phase.parent_cell`) while one of its lattice strains stayed held. "
+            "The cell glob frees the parent's edges and never a strain, because a strain "
+            "at exactly zero has no gradient to leave it by. The child's cell is then the "
+            "parent's carried through the transform with no shear beyond the held value. "
+            "To test for a shear, seed the strain off zero with `set_values` and free "
+            "`phases.*.parent_cell.strain.*` in a stage's `turn_on`."
         ),
     ),
     "PATTERN_DEAD_CHANNELS": HelpEntry(
