@@ -870,3 +870,112 @@ def test_the_scale_rows_count_toward_the_patterns_a_phase_was_held_in(
     assert bool(found) is fires
     if fires and held[-1].startswith("hist.1"):
         assert found[0].value == 2.0 and len(found) == 1
+
+
+# ------------------------- WP-2028, the joint screens (#1205, ruling 2) -----
+# The tables ``check_guards`` builds after its loop run on the joint matrix,
+# since that is what was solved; the declared-peak screen runs per histogram,
+# since a declared peak is one instrument's.
+
+def _screened_fit(patterns, *, peak_in=None):
+    """The LaB6 pair, cell, scales, backgrounds and zeros free, with a declared
+    peak at 30° in histogram ``peak_in``'s instrument alone (both ranges hold
+    30°), freed by a glob that reaches only that histogram."""
+    from tests.test_extra_components import make_peak
+
+    structure, instruments = perturbed_inputs()
+    turn_on = list(TURN_ON)
+    if peak_in is not None:
+        instruments[peak_in].extra_components = [make_peak(center=30.0, area=50.0)]
+        turn_on.append("instrument.extra_components.*")
+    ref = MultiHistogramRefinement(structure, instruments)
+    result = ref.fit(patterns, plan=RefinementPlan(stages=[
+        Stage("only", turn_on, max_iter=10)]))
+    return ref, result
+
+
+@pytest.fixture(scope="module")
+def screened(two_patterns):
+    return _screened_fit(two_patterns, peak_in=1)
+
+
+def test_the_joint_matrix_tables_reach_the_result_and_every_report(screened):
+    ref, result = screened
+    free = set(ref.mtable.free_paths)
+    ident = result.identifiability
+    assert ident.top_correlations and ident.soft_modes
+    # named by the joint columns: a shared row bare, a histogram's own scoped
+    for c in ident.top_correlations:
+        assert {c.path_a, c.path_b} <= free
+    rhos = [abs(c.rho) for c in ident.top_correlations]
+    assert rhos == sorted(rhos, reverse=True) and rhos[0] <= 1.0
+    eig = [m.eigenvalue for m in ident.soft_modes]
+    assert eig == sorted(eig)
+    for m in ident.soft_modes:
+        assert set(m.loadings) <= free
+    # the joint matrix shows what no histogram's own rows can: one mode
+    # joining a shared column to both histograms' own
+    assert any(any(not p.startswith("hist.") for p in m.loadings)
+               and {p.split(".")[1] for p in m.loadings
+                    if p.startswith("hist.")} == {"0", "1"}
+               for m in ident.soft_modes)
+
+    for h in (0, 1):
+        view = result.for_histogram(h).identifiability
+        own = f"hist.{h}."
+
+        def spelt(p, own=own):
+            return p[len(own):] if p.startswith(own) else p
+
+        # every view keeps the whole table, its own rows unscoped
+        assert [(c.path_a, c.path_b, c.rho) for c in view.top_correlations] == [
+            (spelt(c.path_a), spelt(c.path_b), c.rho)
+            for c in ident.top_correlations]
+        assert [m.loadings for m in view.soft_modes] == [
+            {spelt(k): v for k, v in m.loadings.items()}
+            for m in ident.soft_modes]
+        assert not any(p.startswith(own) for c in view.top_correlations
+                       for p in (c.path_a, c.path_b))
+        evidence = ref.report(h).identifiability
+        assert evidence.top_correlations == view.top_correlations
+        assert evidence.soft_modes == view.soft_modes
+
+
+def test_a_declared_peak_is_screened_on_its_own_histogram_only(screened):
+    _, result = screened
+    peaks = result.identifiability.extra_peak_absorption
+    assert peaks and all(k.startswith("hist.1.") for k in peaks)
+    assert result.for_histogram(0).identifiability.extra_peak_absorption == {}
+    assert result.for_histogram(1).identifiability.extra_peak_absorption == {
+        k[len("hist.1."):]: v for k, v in peaks.items()}
+
+
+def test_a_fit_with_no_declared_peak_screens_none(two_patterns):
+    """The control: the tables arrive, the peak screen stays empty."""
+    _, result = _screened_fit(two_patterns)
+    assert result.identifiability.extra_peak_absorption == {}
+    assert result.identifiability.top_correlations
+
+
+def test_the_soft_modes_of_a_block_jacobian_are_the_dense_matrixs():
+    """A WP-1325 joint fit keeps its Jacobian in blocks; the soft-mode screen
+    reads it there and gets what the dense matrix gives."""
+    import numpy as np
+
+    from rietx.optimize.blocked import BlockJacobian
+    from rietx.optimize.identifiability import soft_modes
+
+    rng = np.random.default_rng(7)
+    n_cols = 5
+    maps = [np.array([0, 1, 2]), np.array([0, 3, 4])]   # column 0 shared
+    blocks = [rng.normal(size=(40, 3)), rng.normal(size=(30, 3))]
+    blocks[1][:, 2] = 0.98 * blocks[1][:, 1] + 0.02 * rng.normal(size=30)
+    bj = BlockJacobian(blocks, maps, [40, 30], [0, 0], n_cols)
+    paths = [f"p{i}" for i in range(n_cols)]
+    blocked, dense = soft_modes(bj, paths), soft_modes(bj.toarray(), paths)
+    assert len(blocked) == len(dense) == 3
+    for b, d in zip(blocked, dense, strict=True):
+        assert b.eigenvalue == pytest.approx(d.eigenvalue, rel=1e-9, abs=1e-12)
+        assert b.loadings.keys() == d.loadings.keys()
+        for k in d.loadings:
+            assert b.loadings[k] == pytest.approx(d.loadings[k], abs=1e-9)
