@@ -333,7 +333,7 @@ The background section reads that pattern's own absorption screen, which the joi
 A declared peak is one instrument's, so its screen runs on that pattern's rows too, and `Identifiability.extra_peak_absorption` keeps it under the same keys.
 The worst correlations (`Identifiability.top_correlations`) and the softest modes (`Identifiability.soft_modes`) are measured once, on the joint matrix that was solved, and named by the joint paths.
 A soft mode can then join a shared parameter to each pattern's own: on the two-wavelength LaB6 pair in `tests/test_joint_report.py` the softest mode joins the shared cell with both patterns' zero shifts.
-Every pattern's view keeps both tables whole, with its own rows unscoped as in its `parameters` and another pattern's rows still scoped, and every pattern's report quotes them.
+Every pattern's view keeps both tables whole, with its own rows bare (no `hist.<h>.` prefix), as in its `parameters` and another pattern's rows still scoped, and every pattern's report quotes them.
 The joint path runs no screen for exchangeable parameters, so that table is empty.
 
 The specimen has one crystallite size, so every pattern's report carries the joint result's microstructure block, read off the shared column at pattern 0's wavelength.
