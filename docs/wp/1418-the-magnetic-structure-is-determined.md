@@ -845,6 +845,27 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
   unanswered. Checked against the tree at d87c8cc91: no `search_kvector`
   exists, and M-8 is unticked.
 
+- 2026-10-31, from the issue triage (issue #1197): `isotropy.candidates`
+  labels a candidate's magnetic group in `MagneticCell`'s reduced basis, which
+  is left-handed (det < 0) at every k ≠ 0 tried. A change of basis with det <
+  0 swaps the two members of an enantiomorphic pair, so where the group type
+  has one, `bns_number` (and `identification`) names the mirror type. The
+  reporter's case: `P 42 c m`, k = (0, 0, 1/2), `S5(rank 1)#1` prints 78.22,
+  and the same operators carried to the right-handed cell a, b, 2c identify as
+  76.10 (the parent's 4₂ becomes a 4₁ in 2c). `magnetic_supercell` catches it
+  only because its own check runs in a right-handed cell, which is where the
+  48 refusals in PR #1108's 430-pair sweep come from (all P4₂ parents at k =
+  (0, 0, 1/2)). Checked against the tree at d87c8cc91: the issue's snippet
+  prints 78.22 and 76.10 as stated. A wider probe
+  (`scratchpad/lane-B/r1197_sweep.py`) found every candidate cell at k = (0,
+  0, 1/2) left-handed (4 of 4 for `P 42 c m`, 2/2 `P 41`, 2/2 `P 31`, 3/3 `P
+  61`, 6/6 `P 41 21 2`), none at k = 0 (`P n m a`, 0 of 4). The class reaches
+  beyond the reporter's P4₂ parents: `P 31` `S1(a)` and `P 61` `S3(a,b)` print
+  144.6 where the right-handed cell gives 145.9 (the 3₁/3₂ pair). Fix
+  direction from the reporter: identify in a right-handed cell (or flip the
+  reduced basis's handedness) before labelling, with a test over the
+  enantiomorphic pairs.
+
 ## Non-goals
 
 - Modulated and incommensurate structures (superspace): issue #258 holds the
