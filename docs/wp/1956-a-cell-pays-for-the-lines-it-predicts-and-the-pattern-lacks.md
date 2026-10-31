@@ -210,6 +210,40 @@ engine or the ranking. Indexing is provisional by declaration
   sibling mechanism (the floored p₀ in the null) with an alternative rule,
   `split`, measured against g; weigh the two in one review.
 
+- 2026-10-31, from the issue triage (issue #1263): the containment refuter
+  counts its chance rate p₀ in windows floored at k_sigma × the assumed shift
+  (0.15° 2θ when no shift is declared or measured, `bd38ca4af`), while the
+  seen count it is compared with (`fom.seen_at_resolution`) uses the
+  resolution window after the candidate's common shift, with no floor. So
+  `n_seen ≤ n_extra·p₀`, both binomial p-values and
+  `INDEX_SUPERCELL_REFUTED`'s "against {n_extra·p₀} expected by chance"
+  compare a count with the chance rate of a different, wider window.
+  `SupercellEvidence.p0`'s docstring ("over the same range and windows") and
+  `containment_evidence`'s ("the pattern's chance rate at the resolution")
+  claim the windows match; they match only when the floor does not bind.
+  Checked against the tree at d87c8cc91: `PatternScreen.from_peaks` floors the
+  half-width at `p0_floor_deg` (`screen.py:194-197`), `index_pattern` passes
+  `spec.k_sigma × effective_shift_allowance` (`workflow.py:878`) and
+  `validate_by_lebail` passes `MATCH_SIGMA × DEFAULT_UNKNOWN_SHIFT_DEG`
+  (`workflow.py:519`), and `seen_at_resolution` (`fom.py:561`) has no floor.
+  Reproduced on a synthetic P -1 list (`lane-A/r1263.py`, FWHM 0.032°, 5-90°):
+  478 lines give p₀ 0.788 floored against 0.356 unfloored, and a 10⁵-point
+  Monte Carlo of `seen_at_resolution` gives 0.359, so the reported chance rate
+  is 2.2× the seen test's own. The reporter measured 2.3-3.0× on #1230's three
+  truths. The floor exists for #951's row
+  (`test_a_narrow_window_does_not_refute_a_superstructure_the_list_cannot_see`),
+  where it keeps the **power** check p₀ⁿ < α from refuting at n = 2. The
+  proposal, `split`, keeps the floored p₀ for the power check and reads the
+  null at the unfloored one; it adds no constant, returns aP1, aP2 and big_mP1
+  to #1, keeps #951's row and passes 217 acceptance-file tests. PR #1251's
+  rule (g) does the same on those three, and split + g also passes. Every arm,
+  g included, frees some wrong children whose only refuters were other wrong
+  cells, the truth staying first. Which rule lands (g, split or both) is the
+  maintainer's: it narrows the approved tier-3 `INDEX_SUPERCELL_REFUTED`
+  action, and it turns on a reading of #951 (the assumed shift bounds what the
+  test may claim, not its null). Split alone also corrects the message's
+  number, which g leaves as it is.
+
 ## Non-goals
 
 - The blind search and enumeration ceilings (WP-1924), dedup across a reduction
