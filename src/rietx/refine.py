@@ -5262,6 +5262,9 @@ class Refinement:
                 # the report has to arrive before the first stage runs rather
                 # than after the answer it spoiled.
                 + _stage_order_diagnostics(plan, table, mode)
+                # WP-1418: a moment no stage frees is decided by the plan
+                # before any stage, and nothing after the answer can say it
+                + _held_moment_diagnostics(plan, table, self.structure, mode)
                 # a plan read too, and here for the same reason: a literal a
                 # stage cannot free is decided by the model before any stage
                 + _fixed_literal_diagnostics(plan.stages, table, self._ties))
@@ -6906,6 +6909,75 @@ def _stage_order_diagnostics(plan, table,
                     "held at zero, then the widths beside the converged "
                     "moment, then both together. Use plan=\"magnetic_width\" "
                     "or strategy.staged.MAGNETIC_WIDTH_STAGE_PATHS as stages.")))
+    return out
+
+
+def _held_moment_diagnostics(plan, table, structure: Structure,
+                             mode: Mode) -> list[Diagnostic]:
+    """``PLAN_FREES_NO_MOMENT`` — a plan that never frees a moment the
+    structure carries, read before the first stage (WP-1418, issue #1082).
+
+    Of the presets only ``magnetic_width`` and ``magnetic_structural`` name
+    ``…moment.dof*``, so a magnetic phase under ``mccusker_default`` or
+    ``mccusker_structural`` comes back with every moment at its start value,
+    no esd and no row in ``result.parameters``.  Nothing else says so: the
+    nuclear terms absorb what the held moment misplaces, and on #1082's
+    synthetic child with the moment started 20 % high the fit reported a
+    Biso finding instead.  One diagnostic per phase, whose ``where`` is the
+    modulus path of each held site, the key a series' moment rows carry, so
+    ``SEQUENTIAL_MOMENT_HOLD`` can name this as the cause on exactly the
+    patterns it fired on, then the phase's ``scale``.  The scale is the
+    coupling: a moment is measured against the nuclear intensity through the
+    scale the two share (Halpern & Johnson 1939, Phys. Rev. 55, 898), so a
+    held moment moves what the nuclear values beside it are read from, and
+    that path is what a diagnostic's level under ``purpose="structure"`` or
+    ``"qpa"`` is derived from (``purposes.py``; neither lists a moment path),
+    where it would otherwise read ``info``.
+
+    Asked of the table, as :func:`_stage_order_diagnostics` asks it: every
+    glob of :meth:`~rietx.strategy.staged.RefinementPlan.run_stages` through
+    ``would_free``, so a moment a later stage frees, or a tie whose source a
+    stage frees, counts as freed.  **A moment the caller holds is theirs**
+    (``Refinement.hold``, WP-1435): it is left out, and a phase whose every
+    moment is held says nothing.  Rietveld mode only, since Le Bail and
+    Pawley force-fix every ``.atoms.`` path and compute no magnetic
+    structure factor to hold.
+    """
+    if mode != "rietveld":
+        return []
+    sites: dict[str, list[str]] = {}
+    for e in table.entries:
+        if _MOMENT_DOF.match(e.path) and not e.held and not e.locked:
+            bases = sites.setdefault(e.path.split(".")[1], [])
+            base = e.path.rsplit(".", 1)[0]
+            if base not in bases:
+                bases.append(base)
+    if not sites:
+        return []
+    freed = table.would_free(
+        [g for stage in plan.run_stages() for g in stage.turn_on])
+    moving = {p.split(".")[1] for p in freed if _MOMENT_DOF.match(p)}
+    start = table.decode(table.x0())
+    out: list[Diagnostic] = []
+    for ip, bases in sites.items():
+        if ip in moving:
+            continue
+        atoms = structure.phases[int(ip)].atoms
+        held = ", ".join(
+            f"{atoms[int(b.split('.')[3])].label} "
+            f"{abs(float(start.get(f'{b}.dof0', 0.0))):.4g} μ_B"
+            for b in bases)
+        out.append(Diagnostic(
+            level="warning", code="PLAN_FREES_NO_MOMENT",
+            where=[*(f"{b}.dof0" for b in bases), f"phases.{ip}.scale"],
+            message=(
+                f"This plan frees no moment of phase {ip}; the moments are "
+                f"held at their start ({held}), so they carry no esd and are "
+                f"not refined values."),
+            suggestion=(
+                "Name phases.*.atoms.*.moment.dof* in a stage, or use "
+                "plan=\"magnetic_structural\", which frees the moments before "
+                "the coordinates and keeps them free to the end.")))
     return out
 
 

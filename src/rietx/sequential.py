@@ -2699,17 +2699,30 @@ def _moment_diagnostics(series: SeriesResult) -> list[Diagnostic]:
                  if not m]
         name = traj.atom or site
         reseeded = [e.label for e in series.entries if site in e.floored]
+        # WP-1418: a pattern whose plan freed no moment says so itself
+        # (``PLAN_FREES_NO_MOMENT``, keyed on this modulus path), and that is
+        # the cause of its missing esd, so the sentence names it there
+        unfreed = {e.label for e in series.entries
+                   if any(d.code == "PLAN_FREES_NO_MOMENT" and site in d.where
+                          for d in e.diagnostics)}
         if n_held or blind:
             message = (
                 f"{name}: the moment is unsupported on {n_held} of {n} pattern(s) "
                 f"({100.0 * n_held / n:.0f}% of the series), with |m| at or "
                 f"below {MOMENT_SUPPORT_SIGMA:g}× its own esd.")
+            by_plan = [lab for lab in blind if lab in unfreed]
+            no_esd = [lab for lab in blind if lab not in unfreed]
+            for labels, why in (
+                    (by_plan, "because the plan frees no moment, so the "
+                              "modulus is held at its start there"),
+                    (no_esd, "because the modulus has no esd there")):
+                if labels:
+                    message += (
+                        f" {len(labels)} more pattern(s) give no verdict at "
+                        f"all ({', '.join(labels[:4])}"
+                        f"{' …' if len(labels) > 4 else ''}), {why}.")
             if blind:
-                message += (
-                    f" {len(blind)} more pattern(s) give no verdict at all "
-                    f"({', '.join(blind[:4])}{' …' if len(blind) > 4 else ''}"
-                    f"), because the modulus has no esd there. They are left "
-                    f"out of the onset.")
+                message += " They are left out of the onset."
             if reseeded:
                 message += (
                     f" The modulus was reseeded to its floor "

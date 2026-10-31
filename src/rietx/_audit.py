@@ -887,6 +887,17 @@ ROWS: tuple[Row, ...] = (
         responds=("read a value in a listed pattern's row, or that pattern's fraction of "
                   "the phase, as the value handed in rather than a measurement")),
     Row("PHASE_UNCONSTRAINED", "code"),
+    Row("PLAN_FREES_NO_MOMENT", "code", tier=1, ambiguity=1,
+        evidence=("a statement about the plan: fires exactly when a phase has a moment DOF "
+                  "neither locked nor held by the caller and no glob of run_stages() frees "
+                  "any of its moment DOFs through ParameterTable.would_free, so the moment "
+                  "is the start value with no esd; takes no action (WP-1418, #1082: a "
+                  "synthetic k = (0, 0, 1/2) child under mccusker_default and "
+                  "mccusker_structural kept 3.6 against 3.0 mu_B and said nothing)"),
+        response="warning",
+        responds=("read every moment in result as the value supplied, not refined, and refit "
+                  "under a plan that frees phases.*.atoms.*.moment.dof* before quoting a "
+                  "moment or the nuclear values beside it")),
     Row("QPA_ESD_UNAVAILABLE", "code"),
     Row("QPA_FRACTION_RANGE", "code", tier=1, ambiguity=3,
         evidence=("arithmetic: an info record on every width profile whose fit carries an esd, "
@@ -4120,6 +4131,10 @@ ROWS: tuple[Row, ...] = (
     Row("PEAK_WIDTH_CAPPED.suggestion", "suggestion", value=1),
     Row("PEAK_WIDTH_LAW_MISMATCH.suggestion", "suggestion", value=2),
     Row("PHASE_UNCONSTRAINED.suggestion", "suggestion", value=1),
+    Row("PLAN_FREES_NO_MOMENT.suggestion", "suggestion", value=1, tier=1, ambiguity=1,
+        evidence=("arithmetic: a parameter no stage frees cannot be refined, so the remedy "
+                  "names the glob that frees the moment DOFs and the preset that names it "
+                  "(magnetic_structural, WP-1418); it moves nothing by itself")),
     Row("QPA_ESD_UNAVAILABLE.suggestion", "suggestion", value=1),
     Row("QPA_FRACTION_RANGE.suggestion", "suggestion", tier=2, ambiguity=3, value=1,
         evidence=("profile-likelihood interval in place of the Wald esd: Venzon & Moolgavkar (1988)"

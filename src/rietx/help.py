@@ -3586,6 +3586,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "phases seen in range."
         ),
     ),
+    "PLAN_FREES_NO_MOMENT": HelpEntry(
+        title="The plan never refines the magnetic moment",
+        description=(
+            "The structure carries a magnetic moment and no stage of the plan frees "
+            "it. Every moment stays at the value you supplied, with no esd, and is "
+            "not a result. The nuclear parameters can absorb part of what a wrong "
+            "moment misplaces, so read them with that in mind too. The presets "
+            "`mccusker_default` and `mccusker_structural` free no moment. Use "
+            "`magnetic_structural`, or name `phases.*.atoms.*.moment.dof*` in a "
+            "stage. A moment you hold with `hold` is left out of this check."
+        ),
+    ),
     "QPA_ESD_UNAVAILABLE": HelpEntry(
         title="No weight fraction has an esd",
         description=(
@@ -3909,6 +3921,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "In some patterns the refined moment lies within the noise of its own esd. "
             "That reads as a moment the data do not support, and says nothing about a "
             "small moment. Patterns where the modulus has no esd give no verdict at all. "
+            "When the plan frees no moment, every pattern is one of these and the "
+            "modulus is the start value; `PLAN_FREES_NO_MOMENT` fires on each, and "
+            "the message says so. "
             "The value shown is the modulus the fit reached. Quote these points as held."
         ),
     ),
