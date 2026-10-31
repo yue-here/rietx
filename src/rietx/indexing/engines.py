@@ -419,39 +419,49 @@ class SearchSpec:
     def from_formula(cls, formula: str, *,
                      z: int | tuple[int, int] | None = None,
                      temperature: float = 298.0, **fields) -> SearchSpec:
-        """A spec whose volume window comes from the chemical formula (WP-1510).
+        """A spec whose volume ceiling comes from the chemical formula
+        (WP-1510; a ceiling only since WP-2030).
 
         One formula unit's volume is Hofmann's (2002) sum of average atomic
         volumes at ``temperature`` in K
         (:func:`~rietx.crystallography.atomic_volume.formula_unit_volume`).
-        The window holds ``z`` formula units, widened to the ratio bounds
-        :data:`~rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS`
-        (V_obs/V_est from 0.8 to 1.25).  Hofmann found 1746 of 182 239
-        structures beyond them.  The window takes that wide bound rather than
-        the 4 % scatter of one crystal, because a window that excludes the true
-        cell makes the search return a wrong answer.
+        ``max_volume`` is ``z`` formula units times the upper ratio bound,
+        1.25 (:data:`~rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS`).
+        Hofmann's 0.8-1.25 band is where he starts calling a structure
+        unusual, not an error bound he measured: about 1 % of his 182 239 CSD
+        structures lie past 25 % either way (1746), and the typical scatter is
+        about 4 % (Fig. 1).  The window has no floor, for any formula.  An
+        ionic or mainly inorganic cell comes out smaller than the estimate
+        (his § 3 (iii)): every inorganic cell measured lies at 0.38-0.87 of it,
+        and nine of the 16 below 0.57, so a floor would exclude the truth.  A
+        ceiling only tolerates that direction.  What it does not hold is a
+        cell larger than its formula: a framework whose formula leaves out
+        what fills its pores (HKUST-1 reads 2.28).
 
         ``z`` counts formula units in the conventional cell: an integer, a
-        ``(min, max)`` pair, or ``None``.  ``None`` sets only the floor of one
-        formula unit and leaves ``max_volume`` to the data-quality envelope,
-        because a formula says nothing about how many units the cell holds.
-        The floor never drops below :data:`DEFAULT_MIN_VOLUME`: both are lower
-        bounds, so the larger binds.  Every other field passes through
-        ``fields``.
+        ``(min, max)`` pair, or ``None``.  Only the largest ``z`` sets the
+        ceiling: **a pair's minimum is checked and then ignored**, so
+        ``z=(4, 8)`` and ``z=(1, 8)`` give the same spec, and nothing here
+        raises a floor from it (1.10.0's window did).  **With ``z=None`` the
+        window narrows nothing:** ``min_volume`` stays
+        :data:`DEFAULT_MIN_VOLUME` and ``max_volume`` is left to the
+        data-quality envelope, because a formula says nothing about how many
+        units the cell holds.  Every other field passes through ``fields``,
+        ``min_volume`` included, for a caller who declares a floor of their own.
 
         Narrowing the search is the caller's own act, so ``index_pattern``
         never builds this window from its ``formula=`` argument, which only
-        reports (``INDEX_Z_NOT_INTEGER``).
+        records the formula units each cell holds
+        (:attr:`~rietx.schemas.indexing.CellCandidate.formula_units`).
         """
         from ..crystallography.atomic_volume import (
             VOLUME_RATIO_BOUNDS,
             formula_unit_volume,
         )
 
-        clash = sorted({"min_volume", "max_volume"} & fields.keys())
-        if clash:
-            raise ValueError(f"from_formula sets {' and '.join(clash)} from the "
-                             "formula; build SearchSpec directly to declare it")
+        if "max_volume" in fields:
+            raise ValueError("from_formula sets max_volume from the formula; "
+                             "build SearchSpec directly to declare it")
         if z is None:
             z_min, z_max = 1, None
         elif isinstance(z, (tuple, list)):
@@ -464,15 +474,17 @@ class SearchSpec:
             raise ValueError(f"z must be a whole number of formula units, at "
                              f"least 1, with min <= max; got {z!r}")
         v_fu, _ = formula_unit_volume(formula, temperature)
-        low, high = VOLUME_RATIO_BOUNDS
-        v_min = max(DEFAULT_MIN_VOLUME, z_min * v_fu * low)
-        v_max = None if z_max is None else z_max * v_fu * high
-        if v_max is not None and v_max < v_min:
-            # the floor binds above the formula's ceiling: an empty window
-            # would search nothing and report silence
+        v_max = None if z_max is None else z_max * v_fu * VOLUME_RATIO_BOUNDS[1]
+        floor = fields.get("min_volume", DEFAULT_MIN_VOLUME)
+        if floor is None:
+            raise ValueError("min_volume must be a number of Å³, not None; "
+                             "leave it out for the default floor")
+        if v_max is not None and v_max < floor:
+            # the floor binds above the formula's ceiling: an empty window would
+            # search nothing and report silence
             raise ValueError(f"{formula!r} with z={z!r} allows at most "
-                             f"{v_max:.1f} Å³, below the {v_min:g} Å³ floor")
-        return cls(min_volume=v_min, max_volume=v_max, **fields)
+                             f"{v_max:.1f} Å³, below the {floor:g} Å³ floor")
+        return cls(max_volume=v_max, **fields)
 
     def engine_pool(self) -> int:
         """Candidates one (engine × system) unit hands to the merge.

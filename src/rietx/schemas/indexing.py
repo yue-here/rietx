@@ -204,7 +204,13 @@ from .structure import Cell
 #: Also 1.12 (WP-2030): ``INDEX_DATA_INSUFFICIENT`` names an undeclared
 #: instrument first only on a laboratory source, read off the declared source
 #: (``diagnostics.lab_source``), and reads it from the list's own record when
-#: no instrument is passed.  No search, rank or grade moves.
+#: no instrument is passed.  No search, rank or grade moves.  Part 2:
+#: ``SearchSpec.from_formula`` sets a ceiling only, for every formula, so a
+#: search declared through it no longer drops the cells below 0.8 of the
+#: formula's volume and can rank a smaller cell it used to exclude.  And
+#: ``INDEX_Z_NOT_INTEGER`` (``Z_INTEGER_TOLERANCE`` 0.08) is withdrawn: it fired
+#: on 12 of 16 true inorganic cells, and the number it judged is now recorded
+#: as ``CellCandidate.formula_units``.  No rank or grade moves without a formula.
 #: Also 1.12 (WP-2011): the whole-pattern validation fits by Pawley, so every
 #: candidate's ``lebail.rwp`` and ``unmatched_observed`` move, and a cell that
 #: predicts every reflection of another now reads that cell's Rwp or lower.
@@ -1407,6 +1413,19 @@ class CellCandidate(Base):
     #: :data:`IndexCaveat` vocabulary
     confidence_caveats: list[IndexCaveat] = Field(default_factory=list)
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+    #: formula units this cell's volume holds by Hofmann's (2002) average atomic
+    #: volumes (WP-2030): :attr:`volume` over one formula unit's volume at the
+    #: run's temperature (``IndexingResult.formula`` and ``.temperature``).
+    #: Written by :func:`rietx.index_pattern` when it is given ``formula=``;
+    #: ``None`` means no formula was given.  A number, judged by no diagnostic.
+    #: On an organic or metal-organic cell the true Z usually lies within a few
+    #: per cent of it (one crystal scatters about 4 %, Hofmann Fig. 1).  An
+    #: ionic or mainly inorganic cell reads low, often far low (his § 3 (iii)):
+    #: the 16 inorganic standards measured read 0.38-0.87 of their Z.  The one
+    #: bound that holds for any formula is the window's ceiling, so the true Z
+    #: is at least this number over 1.25, short of a porous framework whose
+    #: formula leaves its pore contents out.
+    formula_units: float | None = None
 
     @property
     def a(self) -> float:
@@ -2057,13 +2076,14 @@ class IndexingResult(Base):
     #: ``total_budget_seconds`` did, or ``None`` on a result recorded before
     #: presets existed.  The ceiling itself is in ``provenance.notes``.
     preset: str | None = None
-    #: the chemical formula each candidate's ``INDEX_Z_NOT_INTEGER`` check read
-    #: (WP-2030), written verbatim by :func:`rietx.index_pattern` from its
-    #: ``formula=``.  ``None`` means no formula was given, so no candidate was
-    #: checked against one; a result recorded before 0.60 also reads ``None``.
-    #: It checked the answer and never narrowed the search.
+    #: the chemical formula each candidate's
+    #: :attr:`~CellCandidate.formula_units` was read against (WP-2030), written
+    #: verbatim by :func:`rietx.index_pattern` from its ``formula=``.  ``None``
+    #: means no formula was given, so no candidate was read against one; a
+    #: result recorded before 0.60 also reads ``None``.  It never narrowed the
+    #: search.
     formula: str | None = None
-    #: the temperature in K that check read Hofmann's (2002) volumes at,
+    #: the temperature in K Hofmann's (2002) volumes were read at,
     #: written by :func:`rietx.index_pattern` beside :attr:`formula` and
     #: ``None`` whenever :attr:`formula` is, since without a formula no
     #: temperature was read.
@@ -2075,7 +2095,8 @@ class IndexingResult(Base):
     def _temperature_needs_a_formula(self):
         if self.formula is None and self.temperature is not None:
             raise ValueError("IndexingResult.temperature is the temperature "
-                             "the formula's Z check read, so it needs a formula")
+                             "the formula's volumes were read at, so it needs a "
+                             "formula")
         return self
 
     def __str__(self) -> str:

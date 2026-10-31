@@ -422,6 +422,21 @@ The paper gives no timings.
 Not determined: TOPAS v9 and its Pawley overlap rule, FullProf's current manual, the Profex
 5.7.2 manual. MAUD, BGMN and RIETAN-FP were not run.
 
+## A volume window from the formula, in indexing
+
+Checked by the maintainer in the sources on 2026-10-24 (#1121) and entered for WP-2030;
+only what each program asks the user for is recorded here.
+
+| Program | What the indexer takes for the volume | A volume from the formula |
+|---|---|---|
+| rietx | `SearchSpec.min_volume`/`max_volume`, default 15 Å³ and the data's envelope; `SearchSpec.from_formula` sets a ceiling, `z` × Hofmann's (2002) estimate × 1.25, and no floor (WP-2030) | yes, on the caller's request |
+| GSAS-II 5.8.4 | a start volume, and no composition (`GSASIIpwdGUI.py`, checked) | no |
+| DICVOL06 | VOLMIN and VOLMAX from the user, ceiling 2500 Å³ by default, and optionally a measured density and formula weight (`dicvol06.inf`, card 4, checked) | no |
+
+Neither program estimates a volume from the formula, so the volume range is always the user's.
+`from_formula`'s ceiling therefore rests on no program default; its audit row is tier 2 on
+Hofmann's citation and the 21 published cells it was checked against.
+
 ## Machinery and the heuristics that drive it
 
 Surveyed 2026-10-30 by the lead for issue #1224, which proposes landing machinery (what an

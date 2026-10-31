@@ -163,7 +163,7 @@ N_A_CM3_PER_A3 = 0.602214076
 #: How far a measured density may put Z from a whole number, as a fraction of
 #: Z (WP-2033, ruled by the maintainer on PR #1140).  The density is the
 #: error of a **measurement**, not the 8 % scatter of a volume estimated from
-#: atom counts (:data:`~rietx.indexing.diagnostics.Z_INTEGER_TOLERANCE`).  The
+#: atom counts, the 8 % the withdrawn ``INDEX_Z_NOT_INTEGER`` allowed (WP-2030).  The
 #: figure is the one *International Tables* Vol. C (2006), ch. 3.2, §3.2.1,
 #: p. 156 gives for assigning Z: measured and calculated density "should agree
 #: within at least 1.5%" (Richards & Lindley, doi:10.1107/97809553602060000586).

@@ -723,7 +723,6 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED", "code"),
     Row("INDEX_VALIDATION_FAILED", "code"),
     Row("INDEX_VOLUME_UNPHYSICAL", "code"),
-    Row("INDEX_Z_NOT_INTEGER", "code"),
     Row("K_VECTOR_UNSEPARATED", "code", tier=3, ambiguity=2,
         evidence=("info; fires when the top two k trials' best eligible ΔBIC lie within "
                   "SOLVE_K_TIE_DELTA_BIC, charged at N/f² since WP-2002 B12; Ba2FeSbSe5 1.5 K "
@@ -1568,7 +1567,19 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.atomic_volume.TABLE_TEMPERATURE", "constant", value=298.0),
     Row("rietx.crystallography.atomic_volume.THERMAL_EXPANSION", "constant", value=9.5e-05),
     Row("rietx.crystallography.atomic_volume.THERMAL_EXPANSION_ESD", "constant", value=3e-06),
-    Row("rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS", "constant", value=(0.8, 1.25)),
+    Row("rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS", "constant", tier=2,
+        evidence=("citation: Hofmann (2002) Acta Cryst. B58, 489, section 3: past 25 % either "
+                  "way lie 1746 of 182 239 CSD structures (about 1 %; typical scatter 4 %, "
+                  "Fig. 1), where he starts calling a structure unusual, not a measured error "
+                  "bound. SearchSpec.from_formula reads the upper edge only, as a ceiling for "
+                  "every formula (WP-2030, ruled on #1121 2026-10-24): his section 3 (iii) puts "
+                  "ionic cells below the estimate, the direction a ceiling tolerates. Checked on "
+                  "21 published cells in test_indexing_formula.py: 16 inorganic (NIST SRM "
+                  "660c/640c/676a, the IUCr CPD round robin, 11-BM, GSAS-II tutorials, COD) at "
+                  "0.375-0.866 and 4 organic at 1.000-1.044 lie under it; HKUST-1, its pore "
+                  "contents left out of the formula, reads 2.283 and does not. The lower edge "
+                  "sets only Composition.volume_window's lower edge and the manual's quoted band (in_volume_window and the search read the ceiling alone)"),
+        value=(0.8, 1.25)),
     Row("rietx.crystallography.atomic_volume.VOLUME_SCATTER", "constant", value=0.04),
     Row("rietx.crystallography.attenuation._HC_EV_ANGSTROM", "constant", value=12398.4198),
     Row("rietx.crystallography.attenuation._NA_BARN", "constant", value=0.602214076),
@@ -1827,7 +1838,6 @@ ROWS: tuple[Row, ...] = (
                   "not checked"),
         value=0.0005),
     Row("rietx.indexing.diagnostics.WIDTH_MISMATCH_RATIO", "constant", value=3.0),
-    Row("rietx.indexing.diagnostics.Z_INTEGER_TOLERANCE", "constant", value=0.08),
     Row("rietx.indexing.dichotomy.ACCEPT_SPACING_FRAC", "constant", value=0.25),
     Row("rietx.indexing.dichotomy.ANGLE_STEP_DEG", "constant", value=5.0),
     Row("rietx.indexing.dichotomy.ANNEAL_FACTOR", "constant", value=4.0),
@@ -4074,7 +4084,12 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.workflow.index_pattern:validate", "default", value=True),
     Row("rietx.indexing.workflow.index_pattern:check_top", "default", value=None),
     Row("rietx.indexing.workflow.index_pattern:two_theta_limits", "default", value=None),
-    Row("rietx.indexing.workflow.index_pattern:formula", "default", value=None),
+    Row("rietx.indexing.workflow.index_pattern:formula", "default", tier="caller", ambiguity=1,
+        value=None,
+        evidence=("opt-in: formula=None by default; a formula is recorded on the result and "
+                  "as each candidate's formula_units, and moves no search, rank or grade "
+                  "(WP-2030 withdrew INDEX_Z_NOT_INTEGER, which fired on 12 of 16 true "
+                  "inorganic cells)")),
     Row("rietx.indexing.workflow.index_pattern:temperature", "default", value=298.0),
     Row("rietx.indexing.workflow.index_pattern:events", "default", value=None),
     Row("rietx.indexing.workflow.index_pattern:cancel", "default", value=None),
@@ -4214,7 +4229,6 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED.suggestion", "suggestion", value=1),
     Row("INDEX_VALIDATION_FAILED.suggestion", "suggestion", value=1),
     Row("INDEX_VOLUME_UNPHYSICAL.suggestion", "suggestion", value=1),
-    Row("INDEX_Z_NOT_INTEGER.suggestion", "suggestion", value=1),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),
@@ -4615,8 +4629,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "INDEX_VALIDATION_FAILED.suggestion",
     "INDEX_VOLUME_UNPHYSICAL",
     "INDEX_VOLUME_UNPHYSICAL.suggestion",
-    "INDEX_Z_NOT_INTEGER",
-    "INDEX_Z_NOT_INTEGER.suggestion",
     "LAUE_CLASS_NOT_SEPARABLE",
     "LAUE_CLASS_NOT_SEPARABLE.suggestion",
     "LEBAIL_ALTERNATION_STOPPED",
@@ -4837,7 +4849,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.crystallography.atomic_volume.TABLE_TEMPERATURE",
     "rietx.crystallography.atomic_volume.THERMAL_EXPANSION",
     "rietx.crystallography.atomic_volume.THERMAL_EXPANSION_ESD",
-    "rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS",
     "rietx.crystallography.atomic_volume.VOLUME_SCATTER",
     "rietx.crystallography.attenuation._HC_EV_ANGSTROM",
     "rietx.crystallography.attenuation._NA_BARN",
@@ -4935,7 +4946,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.indexing.consensus.CONSENSUS_CHECK_TOP",
     "rietx.indexing.diagnostics.BRAGG_BRENTANO_CELL_PPM",
     "rietx.indexing.diagnostics.WIDTH_MISMATCH_RATIO",
-    "rietx.indexing.diagnostics.Z_INTEGER_TOLERANCE",
     "rietx.indexing.dichotomy.ACCEPT_SPACING_FRAC",
     "rietx.indexing.dichotomy.ANGLE_STEP_DEG",
     "rietx.indexing.dichotomy.ANNEAL_FACTOR",
@@ -5057,7 +5067,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.indexing.workflow.index_pattern:data",
     "rietx.indexing.workflow.index_pattern:engines",
     "rietx.indexing.workflow.index_pattern:events",
-    "rietx.indexing.workflow.index_pattern:formula",
     "rietx.indexing.workflow.index_pattern:instrument",
     "rietx.indexing.workflow.index_pattern:peaks",
     "rietx.indexing.workflow.index_pattern:preset",
@@ -5403,7 +5412,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "INDEX_SYSTEMS_NOT_COVERED",
     "INDEX_VALIDATION_FAILED",
     "INDEX_VOLUME_UNPHYSICAL",
-    "INDEX_Z_NOT_INTEGER",
     "K_VECTOR_UNSEPARATED",
     "LANDE_G_ASSUMED",
     "LAUE_CLASS_NOT_SEPARABLE",

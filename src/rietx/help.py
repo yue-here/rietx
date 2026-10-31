@@ -2994,17 +2994,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "measure more lines."
         ),
     ),
-    "INDEX_Z_NOT_INTEGER": HelpEntry(
-        title="Cell holds a fractional number of formula units",
-        description=(
-            "With the formula you gave and typical atomic volumes, the cell holds a "
-            "number of formula units far from a whole number. A sub- or supercell of the "
-            "true cell does this. So does a formula that misses a solvent or "
-            "counter-ion, and so does an ionic specimen, where volumes run large. A "
-            "correct cell can fire occasionally. Check the formula first and weigh the "
-            "result beside the figures of merit."
-        ),
-    ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
         title="Two propagation vectors fit equally well",
         description=(

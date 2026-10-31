@@ -150,7 +150,6 @@
   "diagnostics:INDEX_SYSTEMS_NOT_COVERED",
   "diagnostics:INDEX_VALIDATION_FAILED",
   "diagnostics:INDEX_VOLUME_UNPHYSICAL",
-  "diagnostics:INDEX_Z_NOT_INTEGER",
   "diagnostics:K_VECTOR_UNSEPARATED",
   "diagnostics:LANDE_G_ASSUMED",
   "diagnostics:LAUE_CLASS_NOT_SEPARABLE",
