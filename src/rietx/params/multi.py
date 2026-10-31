@@ -177,6 +177,25 @@ class SharingMap:
         return not (path.startswith("instrument.") or path.endswith(".scale"))
 
 
+def row_shared(sharing: SharingMap, entry) -> bool:
+    """Whether a table entry is one column of the joint fit, or a row per
+    histogram.
+
+    An entry is shared when its own path is, and a **tied** one also needs
+    every source of its tie shared: ``u11`` of an anisotropic site is a
+    follower of the site's ``adp.k`` columns, so under
+    ``per_histogram=["phases.*.atoms.*.adp.*"]`` it is each histogram's own
+    although no glob names it (WP-2028).  The one rule behind
+    :meth:`MultiParameterTable.row_path`, which the joint result's rows,
+    ``MultiHistogramRefinement.parameters()`` and :meth:`~MultiParameterTable.known_paths`
+    all spell with.
+    """
+    if not sharing.is_shared(entry.path):
+        return False
+    return entry.tie is None or all(sharing.is_shared(src)
+                                    for src, _ in entry.tie.terms)
+
+
 def _display_unit(path: str) -> str | None:
     """The unit a reported coefficient's target is quoted in, or ``None``.
 
@@ -702,12 +721,28 @@ class MultiParameterTable:
                     blocked[canon] = None
         return sorted(blocked)
 
+    def row_path(self, h: int, entry) -> str:
+        """The name histogram ``h``'s ``entry`` goes by in the joint result.
+
+        Bare when the entry is one column of the joint fit, ``hist.h.``-scoped
+        when it is a row per histogram (:func:`row_shared`).  It differs from
+        :meth:`_canonical` only for a tied row whose sources are per
+        histogram, which ``_canonical`` names bare by its own path.
+        """
+        return entry.path if row_shared(self.sharing, entry) else f"hist.{h}.{entry.path}"
+
     def _names(self, h: int) -> set[str]:
-        """Every name a glob can match in histogram ``h``: bare and scoped."""
+        """Every name a glob can match in histogram ``h``: bare and scoped.
+
+        The scoped names include :meth:`row_path`'s, so every path the joint
+        result and ``MultiHistogramRefinement.parameters()`` print is a known
+        one, and a literal copied from either is never ``STAGE_PATH_UNKNOWN``.
+        """
         names: set[str] = set()
         for e in self.tables[h].entries:
             names.add(e.path)
             names.add(self._canonical(h, e.path))
+            names.add(self.row_path(h, e))
         return names
 
     def known_paths(self) -> set[str]:
