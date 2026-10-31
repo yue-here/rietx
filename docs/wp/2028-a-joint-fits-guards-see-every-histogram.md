@@ -1,6 +1,6 @@
 # WP-2028 — a joint fit's guards see every histogram
 
-Milestone: unscheduled · Status: 🔄 2026-10-28 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`); 4 measured, not wired; 7's census closed 2026-10-31 (#1205; two follow-on items open); 8 measured on #1124
+Milestone: unscheduled · Status: 🔄 2026-10-31 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`) and 7's census as PR #1205 (`d0d4831d`); 4 measured, not wired; 8 measured on #1124; the two follow-on items 7's census opened are listed as tasks
 Track: What fires, and what stays silent
 Depends on: — (1341 closed: it built the joint report this WP completes; 1325
 soft: its parametric codes and per-pattern holds are what tasks 3 and 6
@@ -219,6 +219,8 @@ shows the findings that name histogram h.
   WP-2001 and WP-2004 (the tier rule).
 
 ## Handover log
+
+- **2026-10-31** (`/pr-review`) — task 7's census merged from outside as PR #1205 (`d0d4831d`) after two rounds. The contributor's 2026-10-28 and 2026-10-31 entries, ticks and `Status:` edit stand as written, as WP-2030's did (ruled 2026-10-29), so this entry adds the merge record. Round 2 built the three rulings: a shared B is tested against the loosest bound among the histograms that hold it and the message names that histogram (`_large_biso_once`), a per-histogram B keeps its own cell's bound, and the identifiability screens and a read-only joint `parameters()` became their own tasks. Gated in a stack of seven on `main` `d87c8cc9` (tree `21beeca9`, Mac arm64, Python 3.12, `[dev,jax]`): full suite 13 427 passed, 230 skipped, 48 xfailed, 0 failed; GUI, ruff and the `-W` manual build clean. #1257 stayed out on a hung CI job, and `main` after the six merges equals the checked six-PR tree `86997f50`. Gap, not blocking: `docs/releases/1.11.0.md` does not say that a shared B over per-histogram cells now fires only past the loosest bound, where 1.10.0 read histogram 0 alone.
 
 - **2026-10-31** — review round on #1205 (task 7's census closed). The
   maintainer ruled on the three open questions. (1) *Lindemann bound for a
