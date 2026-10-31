@@ -1,6 +1,6 @@
 # WP-1968 — the picker offers no line the data cannot support
 
-Milestone: unscheduled · Status: 🔄 2026-10-26 — every task landed (#947, #948, #1048, #993, and the PNGs as #1179); the close is owed
+Milestone: unscheduled · Status: 🔄 2026-10-31 — every task landed (#947, #948, #1048, #993, #1179); the close waits on one inherited question from WP-2002: whether the flat-silicon control's evidence for the driven-set exclusion is an artefact of the synthetic draw's truncated tails
 Track: What fires, and what stays silent
 Depends on: 1909 soft (the 1σ floor this bar succeeds, and its census)
 Priority: P2 2026-10-14 — a defect that fires wrongly: off-lattice components reach every engine as usable lines, and every benchmark harness filters them by hand
@@ -160,6 +160,10 @@ name.
   a survey (Sparrow's criterion).
 
 ## Handover log
+
+- **2026-10-31** (ghostshift close-batch, not closed) — all six tasks are ticked and landed (#947, #948, #993, #1048, #1179 and the help entries). One inherited question is still open, and it says it is this WP's to decide. The WP-2002 session found that the flat-silicon control in `test_916s_flat_silicon_is_driven_by_its_own_lines` only shows the driven-set exclusion is needed when the silicon pattern is drawn at the 2 % windows. Drawn at the closing stage's windows (full peak tails), the picker flags 3 fewer `weak_line` components, and the stripped control then indexes. So the evidence that the `weak_line` exclusion is needed on #916's flat silicon rests on the truncated tails of a synthetic draw. The test already says so in a comment and draws at `WINDOW_AREA_TOL`.
+  *Checked against main `1314c69ea`*: the test still draws at `WINDOW_AREA_TOL` (`tests/test_indexing_driven_set.py`, line 145) and no entry in this log answers the question. Not measured here: whether a real flat-silicon pattern (the #916 data) flags extra weak components, which is what would show the exclusion is needed on a measured pattern.
+  *Next*: decide, with that measurement, whether the exclusion's control is kept on the synthetic draw as a documented limit, or rebuilt on measured silicon. Then close: ✅, delete `Priority:` and `### Inherited`, narrative to the v1.11 record. #934 is the maintainer's to close.
 
 - **2026-10-26** — PR #1179 (the PNG task, by @mustachefeeling) merged as
   `6ecf7fa3`. `tests/peak_pictures.draw_pick` draws what `pick_peaks` fitted:
