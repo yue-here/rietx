@@ -865,13 +865,14 @@ class GeometryTable(Base):
     (A–B, B–C and C–D each a bond of this table), once per chain and not
     again reversed, up to :data:`~rietx.model.geometry.MAX_TORSIONS_PER_ATOM`
     about each asymmetric-unit atom.  The central bond's first atom B sits at its published
-    position.  An older document carries none and reads as an empty list,
-    which here means "not listed", not "no torsions".
+    position.  ``None`` means the listing never ran (an older document carries
+    no ``torsions`` key); ``[]`` means it ran and found no torsion, as for a
+    structure with no chain of three bonds.
     """
 
     distances: list[GeometryDistance] = Field(default_factory=list)
     angles: list[GeometryAngle] = Field(default_factory=list)
-    torsions: list[GeometryTorsion] = Field(default_factory=list)
+    torsions: list[GeometryTorsion] | None = None
     #: the listing criteria actually used, so a row can be read without
     #: knowing which version of the module produced it
     bond_slack: float = 0.0           # Å, added to the covalent-radius sum

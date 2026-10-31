@@ -18,7 +18,7 @@ The two most important criteria for judging a refinement are the profile fit and
 | `GeometryTable.distances` | one `GeometryDistance` per neighbour | every asymmetric-unit atom's whole environment, so the rows naming an atom count its coordination number and a bond between two sites is listed twice, once from each end |
 | `GeometryTable.bonds`, `GeometryTable.contacts` | the two halves of that list | split by `GeometryDistance.bonded` |
 | `GeometryTable.angles` | one `GeometryAngle` per pair of bonded neighbours | at every vertex, over that vertex's complete bonded environment; a contact is never an arm |
-| `GeometryTable.torsions` | one `GeometryTorsion` per chain A–B–C–D of three bonds | each torsion once, never again read from its other end |
+| `GeometryTable.torsions` | one `GeometryTorsion` per chain A–B–C–D of three bonds | each torsion once, never again read from its other end; `None` on a table written before the field existed, an empty list where the listing ran and found none |
 | `GeometryTable.bond_slack` | the slack added to the covalent-radius sum, in Å | 0.4 Å |
 | `GeometryTable.contact_max` | the listing radius for non-bonded contacts, in Å; bonds are found past it | 3.5 Å |
 | `GeometryTable.notes` | where coverage stopped | empty means nothing was bounded |

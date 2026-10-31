@@ -599,8 +599,8 @@ from .._nearmiss import did_you_mean
 #: ``"lebail"`` being what every record written before it ran.
 #: Also in 0.60 (WP-1815): ``GeometryTable.torsions``, a ``GeometryTorsion``
 #: per torsion over bonded chains (four labels, indices and symmetry codes, the
-#: angle in (−180°, 180°] and its two esds), defaulted to the empty list, which
-#: an older table reads as "not listed"; and ``TorsionRestraint`` joins the
+#: angle in (−180°, 180°] and its two esds), defaulted to ``None``, which an
+#: older table reads as "not listed" (``[]`` is "listed, none found"); and ``TorsionRestraint`` joins the
 #: ``Restraint`` union, ``RestraintRow.kind`` gaining ``"torsion"``.  Additive:
 #: no existing document carries either, and an older build refuses one that
 #: does.  ``GeometryRequest`` is an argument and is never stored.

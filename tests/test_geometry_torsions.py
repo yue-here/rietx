@@ -54,10 +54,10 @@ from rietx.model.forward import compile_model
 from rietx.model.geometry import geometry_from_sites, request_table
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
-from rietx.schemas.results import GeometryRequest
+from rietx.schemas.results import GeometryRequest, GeometryTable
 from rietx.schemas.structure import Atom, Cell, Phase, Structure, TorsionRestraint
 from rietx.strategy.staged import RefinementPlan, Stage
-from tests.test_body_torsions import INS, LABELS, POSE_GLOBS, TWIST
+from tests.test_body_torsions import INS, LABELS, POSE_GLOBS, TWIST, _save_fit_png
 from tests.test_body_torsions import _structure as biphenyl_structure
 from tests.test_body_torsions import _synthesize as biphenyl_pattern
 
@@ -327,9 +327,11 @@ def biphenyl_fit():
     result = ref.fit(pattern, plan=RefinementPlan(stages=[
         Stage("pose", POSE_GLOBS, max_iter=100),
         Stage("twist", ["phases.*.rigid_bodies.*.torsions.*.twist"], max_iter=200)]))
+    _save_fit_png(result, "geometry_torsion_biphenyl_30deg")
     return ref, result
 
 
+@pytest.mark.xdist_group("biphenyl-torsion-fit")
 def test_a_template_fixed_bond_and_torsion_report_no_esd(biphenyl_fit):
     """A body moves as a whole, so a distance or a torsion inside one ring is
     the template's: its partials do not vanish one by one (every atom
@@ -347,6 +349,7 @@ def test_a_template_fixed_bond_and_torsion_report_no_esd(biphenyl_fit):
     assert all(abs(wrap(t.angle)) < 1e-6 for t in got.torsions)
 
 
+@pytest.mark.xdist_group("biphenyl-torsion-fit")
 def test_the_twist_torsion_carries_the_twist_esd_once(biphenyl_fit):
     """C1–C0–C6–C7 turns one for one with the twist, so its esd is the twist
     parameter's — the same covariance, read once.  The parameter's esd
@@ -564,6 +567,20 @@ def test_a_bad_request_is_refused_by_name():
         ref.geometry({"phase_index": 3, "distances": [["C1", "C2"]]})
 
 
+def test_an_old_table_reads_none_and_a_listing_that_found_none_reads_empty():
+    """``torsions`` is a claim: ``None`` where no listing ran (a table written
+    before WP-1815 has no such key), ``[]`` only where it ran and found none."""
+    old = GeometryTable.model_validate({"distances": [], "angles": []})
+    assert old.torsions is None
+    assert GeometryTable().torsions is None
+    cart = np.array([[0.0, 0.0, 0.0], [1.5, 0.0, 0.0], [3.0, 0.0, 0.0],
+                     [3.5, 1.4, 0.0]]) + 2.0
+    structure = Structure(phases=[chain_phase(cart, cell=(9.0, 9.0, 9.0,
+                                                          90.0, 90.0, 90.0))])
+    ran = Refinement(structure, LAB, history=False).geometry()
+    assert ran.torsions == []
+
+
 def test_a_straight_chain_is_noted_not_listed():
     """A–B–C collinear: no torsion is defined, and the request says so."""
     cart = np.array([[0.0, 0.0, 0.0], [1.5, 0.0, 0.0], [3.0, 0.0, 0.0],
@@ -576,6 +593,7 @@ def test_a_straight_chain_is_noted_not_listed():
     assert len(got.notes) == 1 and "straight" in got.notes[0]
 
 
+@pytest.mark.xdist_group("biphenyl-torsion-fit")
 def test_with_no_live_fit_the_values_stand_and_the_esds_are_none(biphenyl_fit):
     """The covariance is never serialised, so a refinement holding the fitted
     model but no fit of its own (a reopened model, an edit, a checkout) has
