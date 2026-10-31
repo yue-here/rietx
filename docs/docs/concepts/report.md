@@ -10,7 +10,7 @@ Pass the plan you ran as `plan=`, so the report does not suggest freeing what th
 `rx.build_report(result)` builds one from a `RefinementResult` alone.
 Without the compiled model it can fill Layer 0 only, and its `layer1_available` is false.
 
-Printing a report shows Rwp, the goodness of fit, a short summary and each suggestion still active.
+Printing a report shows Rwp, the goodness of fit, a short summary, the sentence on numbers not yet validated (below) and each suggestion still active.
 Rwp counts every point, background included, and `FitReport.background` also gives the background-subtracted Rwp.
 R<sub>Bragg</sub> and R<sub>F</sub> are on the result, per phase, in `RefinementResult.phase_agreement`.
 They are computed from intensities the model itself partitioned, so they favour the model and are not evidence that a change helped.
@@ -94,6 +94,7 @@ Some evidence does not fit the three layers and is reported beside them:
 - `FitReport.identifiability`, the statistics that qualify an esd (reduced χ², the Bérar-Lelann inflation, the Durbin-Watson statistic) and the strongest correlations;
 - `FitReport.lebail_gap`, the Rwp against that of a Le Bail partition of the same peaks, where a ratio well above 1 says the intensities are what is wrong;
 - `FitReport.restraints`, `FitReport.geometry` and `FitReport.microstructure`, the bond restraints, the bond lengths and angles, and the size and strain readings.
+- `FitReport.not_independently_measured`, one sentence naming each reported number from a feature that rietx has not yet compared with an independent measurement, such as a certified cell or a weighed composition. It states the package's own record, the same for every fit, and says nothing about this fit's quality.
 
 These still report when Layer 1 abstains.
 

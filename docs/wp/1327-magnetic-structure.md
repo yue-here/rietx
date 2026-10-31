@@ -148,8 +148,12 @@ rule above applies to the form factors.
   package's moment has no independent measurement, read from 2010's feature registry. A
   published moment refined from the same pattern verifies the code; an independently
   measured moment (magnetometry, a single-crystal experiment) would validate it. The
-  2026-10-19 note below describes the label as first proposed; 2010's task list
-  carries the wording change for this file.
+  2026-10-19 note below describes the label as first proposed. *Built (2010, 2026-10-31):*
+  the sentence is `FitReport.not_independently_measured`, written by `build_report` from
+  `rietx.features` and printed by `str(report)`. For a moment it reads "Not yet validated
+  against an independent measurement, in rietx's own record: Magnetic moments, magnetic
+  form factor, magnetic widths (phases.0.atoms.0.moment.dof0, …)", naming each moment
+  path once beside the other unvalidated numbers of the same report.
 - **From WP-2002 (2026-10-23, 8th session, PR #1113): a joint fit can hold a moment direction its record does not name.** In `MultiHistogramRefinement.fit`, a phase `_rehold_multi` releases is then scanned by `_rehold_flat_moments_multi` (`multi.py` ~852); a direction it finds flat is restored and held in the table, but `held` (~1496) subtracts `released`, so that path is missing from `held` and from `carried_hold`, the next stage does not lift it, and `StageResult.collapsed` is then not a subset of `held`. Found by the lane that added `collapsed`; predates it; a fix may move values.
 - **2026-10-23, from [1326](1326-satellites-without-a-moment.md)'s close: a
   k ≠ 0 moment refined on real data, and the published structure each pattern

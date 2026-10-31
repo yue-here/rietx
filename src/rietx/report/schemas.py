@@ -1645,6 +1645,13 @@ class FitReport(Base):
     #: individually None when the fit did not measure them.
     identifiability: IdentifiabilityEvidence | None = None
     summary: str = ""
+    #: the numbers this report carries from a feature that no independent
+    #: measurement has validated (WP-2010; DESIGN.md § Rules, 2): one sentence
+    #: naming each such number once, by feature, read from
+    #: :mod:`rietx.features`.  It states what the package's own validation
+    #: record holds, the same for every fit, and says nothing about this one.
+    #: Empty when the report carries no such number
+    not_independently_measured: str = ""
 
     # -- Layer 1
     attribution: list[RegionAttribution] = Field(default_factory=list)
@@ -1694,10 +1701,13 @@ class FitReport(Base):
 
     def __str__(self) -> str:
         """The report as a person scans it: the agreement, ``summary`` one
-        sentence a line, then each active suggestion (WP-1985).  ``repr``
+        sentence a line, the numbers no independent measurement has validated
+        (WP-2010), then each active suggestion (WP-1985).  ``repr``
         keeps every field."""
         lines = [f"FitReport: Rwp {self.rwp:.4f}, GoF {self.gof:.2f}"]
         lines += [f"  {line}" for line in self.summary.splitlines()]
+        if self.not_independently_measured:
+            lines.append(f"  {self.not_independently_measured}")
         lines += [f"  suggestion: {a.kind}, confidence {a.confidence:.2f}"
                   for a in self.suggested_actions if a.active]
         return "\n".join(lines)

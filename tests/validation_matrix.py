@@ -87,12 +87,16 @@ TIERS: dict[str, str] = {
     ),
     "prediction": (
         "A parameter-free prediction written down **before** the "
-        "measurement, then checked.  The strongest evidence in this repo and "
-        "the rarest: the capillary correction's ΔB = c(µR)·λ²/2 predicted "
-        "0.016875 Å² and the refits moved every Biso by 0.01687, and the "
-        "dispersion prediction (each phase's Bragg-power ratio, no free "
-        "parameters) beat itself — predicted RMS 0.83 wt %, measured 0.69 "
-        "(0.62 on 1.9.0)."
+        "measurement, then checked.  What it is checked against decides what "
+        "it shows, and each row names that kind (`reference_kind`, WP-2010): "
+        "against an independent measurement it validates, as the dispersion "
+        "prediction does against the round robin's weighed compositions "
+        "(predicted RMS 0.83 wt %, measured 0.69, 0.62 on 1.9.0); against the "
+        "package's own arithmetic, its own earlier result or another code it "
+        "verifies, however exact the agreement.  The capillary correction's "
+        "ΔB = c(µR)·λ²/2 predicted 0.016875 Å² and the refits moved every "
+        "Biso by 0.01687, which shows the code computes the reparameterisation "
+        "it claims and says nothing about the specimen."
     ),
     "ceiling": (
         "**Not a tier.**  A regression bar — `status == 'converged'`, "
@@ -107,6 +111,50 @@ TIERS: dict[str, str] = {
 #: not, and a row that carries only it must say so rather than look like an
 #: anchor.
 CLAIM_TIERS = tuple(t for t in TIERS if t != "ceiling")
+
+#: What a ``prediction`` row is checked against (WP-2010; DESIGN.md § Rules,
+#: 2).  Only the first validates; the other three verify.
+REFERENCE_KINDS: dict[str, str] = {
+    "independent_measurement": (
+        "a measurement that did not come from a refinement: a certified "
+        "value, a weighed composition, a composition from another probe"),
+    "own_arithmetic": (
+        "the package's own equation or statistic, such as an exact "
+        "reparameterisation or a collinearity it computes"),
+    "own_result": (
+        "another result of this package: a solo fit, or a table a "
+        "milestone of it measured"),
+    "another_code": "another program's converged result on the same data",
+}
+
+#: The tiers whose reference value is an independent measurement whatever
+#: the row (a ``prediction`` row validates only by :data:`REFERENCE_KINDS`).
+VALIDATING_TIERS = ("certificate", "spread")
+
+#: DESIGN.md § Rules, 2: a dataset is unused, sealed or development data.
+DATASET_STATES = ("unused", "sealed", "development")
+
+
+def validates(claim: Claim) -> bool:
+    """Whether a row compares a result with an independent measurement.
+
+    The rule of 2026-10-27 (DESIGN.md § Rules, 2), applied to the tiers
+    rather than by hand: ``certificate`` and ``spread`` validate, and
+    ``prediction`` validates only where its ``reference_kind`` is
+    ``independent_measurement``.  Everything else verifies or, for
+    ``characterisation``, does neither.
+    """
+    if any(t in VALIDATING_TIERS for t in claim.tiers):
+        return True
+    return ("prediction" in claim.tiers
+            and claim.reference_kind == "independent_measurement")
+
+
+def verifies(claim: Claim) -> bool:
+    """Whether a row checks the code against a reference value of its own kind."""
+    if any(t in ("identity", "own_result", "cross_code") for t in claim.tiers):
+        return True
+    return "prediction" in claim.tiers and not validates(claim)
 
 
 @dataclass(frozen=True)
@@ -123,6 +171,12 @@ class Dataset:
     path: str
     description: str
     role: str  # "absolute" | "cross_code" | "consistency" | "characterisation"
+    #: DESIGN.md § Rules, 2's three states, one of :data:`DATASET_STATES`.
+    #: Every dataset in the tree has been run by the people who change the
+    #: package, so each is development data: an independent measurement it
+    #: carries calibrates as much as it validates, and the record says so.
+    #: The sealed families are outside the tree (yue-here/rietx#1052)
+    state: str = "development"
 
 
 DATASETS: dict[str, Dataset] = {
@@ -260,6 +314,16 @@ class Claim:
     starts: int = 1
     #: diagnostic codes the row asserts are present (or absent, "!" prefixed)
     diagnostics: tuple[str, ...] = field(default_factory=tuple)
+    #: the features of :data:`rietx.features.FEATURES` the bar is *about*
+    #: (WP-2010): the feature its tolerance was set to test, never every
+    #: feature its fit happened to use, or every QPA row would validate the
+    #: profile.  Empty for a protocol, reader, export or render row
+    features: tuple[str, ...] = field(default_factory=tuple)
+    #: what kind of value a ``prediction`` row is checked against, one of
+    #: :data:`REFERENCE_KINDS`; required on every ``prediction`` row and
+    #: empty on every other, since it is what decides whether the row
+    #: verifies or validates (:func:`validates`)
+    reference_kind: str = ""
 
 
 CLAIMS: tuple[Claim, ...] = (
@@ -286,6 +350,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "1.9.0 read -0.2 and +6.3 ppm and 10.1x, before WP-2002's "
                  "width twin hold (#1113) moved the ignore arm's cell",
         diagnostics=("EXTRA_PEAK_ON_REFLECTION",),
+        features=("extra_components",),
     ),
     Claim(
         "test_acceptance_extra_peaks", "test_the_excluded_regions_alternative_is_quoted_and_never_gated",
@@ -301,6 +366,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "case for declaring is the retained channels and the measured "
                  "intruder, not cell accuracy. A pattern with few reflections "
                  "is where that changes, and LaB6 is not one",
+        features=("extra_components",),
     ),
     Claim(
         "test_acceptance_extra_peaks", "test_the_declared_holder_lines_come_back_where_they_were_put",
@@ -315,6 +381,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "areas 125.7(37) and 123.5(19) against 120, 1.5 and 1.8 sigma "
                  "high, which is the on-reflection degeneracy being real.  "
                  "1.9.0 read areas 125.6(37) and 123.4(19)",
+        features=("extra_components",),
     ),
     Claim(
         "test_acceptance_extra_peaks", "test_the_declared_peaks_are_ticks_and_not_background",
@@ -327,6 +394,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="4 ticks under the reserved key (two peaks x two emission "
                  "lines); across 3xFWHM of each centre the reported background "
                  "swings < 2 % of the peak standing on it",
+        features=("extra_components",),
     ),
     Claim(
         "test_acceptance_extra_peaks", "test_the_arms_are_plotted_for_inspection",
@@ -335,6 +403,7 @@ CLAIMS: tuple[Claim, ...] = (
         "inspection",
         measured="12 PNGs to tests/output/; the ignore arm's residual carries "
                  "the whole injected doublet and the declare arm's is flat",
+        features=("extra_components",),
     ),
     # ---- 11-BM LaB6 + cBN: identifiability decides, not Rwp -------------
     Claim(
@@ -374,6 +443,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "is NOT a truth claim about cBN's lattice parameter",
         measured="a = 3.616521(17) A, +17 ppm from TOPAS (16.8 on 1.9.0 and "
                  "on 1.10.0; this row read +16 before)",
+        features=("lattice_metric",),
     ),
     Claim(
         "test_acceptance_lab6_cbn", "test_the_one_free_coordinate_agrees",
@@ -385,6 +455,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="x = 0.19836 (shared-broadening plan), 5.4e-4 from TOPAS; "
                  "1.9.0 read 0.19839 and 5.1e-4, before WP-2002's closing "
                  "stage (#1085)",
+        features=("atomic_coordinates",),
     ),
     Claim(
         "test_acceptance_lab6_cbn", "test_rwp_is_worse_than_topas_and_the_reason_is_the_peak_shape",
@@ -401,6 +472,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "the 11 % of channels where the calculated Bragg part is "
                  "more than half the total, mean delta/sigma +1.10 -- a shape "
                  "deficit at the peak tops, not a background or scale one",
+        features=("instrument_profile",),
     ),
     Claim(
         "test_acceptance_lab6_cbn", "test_the_qpa_agrees_with_topas_within_its_own_esd",
@@ -413,6 +485,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "exists and none is claimed",
         measured="LaB6 17.787 +- 0.319 wt %, 0.120 outside the interval, "
                  "i.e. 0.38 of its own esd; 1.9.0 read 17.791, 0.116 and 0.36",
+        features=("qpa",),
     ),
     Claim(
         "test_acceptance_lab6_cbn", "test_the_lowest_rwp_is_the_worst_answer",
@@ -429,6 +502,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "16.779(194) against 17.787(319) wt % -- the better Rwp is "
                  "5.8 sigma outside TOPAS's interval; 1.9.0 read Rwp 0.1289 "
                  "and 16.850(192) wt %, 5.5 sigma",
+        features=("qpa", "size_strain"),
     ),
     Claim(
         "test_acceptance_lab6_cbn", "test_the_correlation_diagnostic_separates_the_two",
@@ -443,6 +517,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "both phases' twins from size_strain on; before WP-2002 "
                  "COVARIANCE_DIRECTION_DISCARDED named all six widths on Linux "
                  "x86-64 (WP-1930)",
+        features=("esds",),
     ),
     Claim(
         "test_acceptance_lab6_cbn",
@@ -462,6 +537,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "HIGH_CORRELATION in all ten and esds of 8.9 to 3420",
         starts=10,
         diagnostics=("HIGH_CORRELATION", "COVARIANCE_DIRECTION_DISCARDED"),
+        features=("esds",),
     ),
     Claim(
         "test_acceptance_lab6_cbn", "test_the_shared_fit_reaches_one_minimum_on_every_platform",
@@ -478,6 +554,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "10.15182 on macOS arm64 and Linux x86-64, agreeing to 1e-12 "
                  "relative, and eight rounding-level changes to w's start on "
                  "one machine gave the same digits",
+        features=("instrument_profile",),
     ),
     Claim(
         "test_acceptance_lab6_cbn", "test_the_fits_render",
@@ -506,6 +583,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "8.75 % and -0.0791 mm, before WP-2002's closing stage "
                  "(#1085). Before WP-1938 the width sat on its clamp at 12 "
                  "reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %",
+        features=("lattice_metric", "wavelength", "position_aberrations"),
     ),
     Claim(
         "test_acceptance_srm660c", "test_srm660c_extinction_does_no_harm",
@@ -522,6 +600,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "the warm-extended stage runs none (WP-2002, #1085); 1.9.0 "
                  "read Rwp 0.0875138, a 4.1568823, and agreement to 9e-11 "
                  "and 6e-10 A",
+        features=("primary_extinction",),
     ),
     # ---- SRM 676a: certificate grade on the ratio only ------------------
     Claim(
@@ -541,6 +620,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "within 2.9e-5; Rwp 14.4 %, GoF 1.60 against a GoF floor of "
                  "1.5-1.9 for analytical-PSF lab fits (Cline 2015); 1.9.0 read "
                  "+30, -312 / -282 ppm, Rwp 14.6 % and GoF 1.63",
+        features=("lattice_metric",),
     ),
     Claim(
         "test_acceptance_srm676a",
@@ -574,6 +654,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "read alpha 55.288, agreement 4.8e-10 and 4.9e-9, -328 / "
                  "-336 ppm, Rwp 0.147 and GoF 1.64",
         starts=2,
+        features=("lattice_metric",),
     ),
     # ---- PowderLine: the only fixtures with TWO reference engines --------
     Claim(
@@ -591,6 +672,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "where it can mean something",
         measured="every free parameter inside the span with margin; the two "
                  "engines' own gap is 386-2668 ppm",
+        features=("lattice_metric",),
     ),
     Claim(
         "test_acceptance_powderline",
@@ -609,6 +691,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="worst deviation from TOPAS 96 ppm (bar 200) against an "
                  "engine-to-engine gap of 2668 ppm (bar 1000); the ratio "
                  "asserted under a tenth; 1.9.0 read 98 ppm",
+        features=("lattice_metric",),
     ),
     Claim(
         "test_acceptance_powderline",
@@ -639,6 +722,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "reported singular",
         measured="within the 20 % band; the two engines' size/strain answers "
                  "for the same specimen differ by six orders of magnitude",
+        features=("qpa",),
     ),
     Claim(
         "test_acceptance_powderline", "test_lab6_cell_is_held_exactly_where_the_recipe_put_it",
@@ -669,6 +753,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="median 0.5 %, worst 1.0 % over ten reflections; 1.9.0 read "
                  "1.2 % and 2.3 %, before WP-2002's width twin hold and floor "
                  "removal (#1113)",
+        features=("instrument_profile",),
     ),
     Claim(
         "test_acceptance_powderline", "test_lab6_rwp_is_reported_beside_both_engines",
@@ -718,6 +803,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "extra_components stage at max_iter); GSAS-II's own "
                  "committed position 8.77e10 with esd exactly 0",
         diagnostics=("HIGH_CORRELATION", "STAGE_MAX_ITER"),
+        features=("extra_components",),
     ),
     Claim(
         "test_acceptance_powderline", "test_the_written_tables_reproduce_the_answer_they_came_from",
@@ -752,6 +838,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "(#1085); channel count 5750 exactly (GU GV GW "
                  "read as a Gaussian variance, #735; before: Rwp 0.0970, "
                  "Rp 0.0774, cell +114/+112 ppm)",
+        features=("lattice_metric", "atomic_coordinates"),
     ),
     Claim(
         "test_acceptance_fap",
@@ -768,6 +855,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="lor_size 0.0323 (-3.6 %, Rwp 0.0958) with the variance "
                  "reading; 0.0495 (+48 %, Rwp 0.1096) with the old one; 1.9.0 "
                  "read 0.0326 (-2.7 %, Rwp 0.0953) and 0.0497 (Rwp 0.1090)",
+        features=("instrument_profile",),
     ),
     Claim(
         "test_acceptance_fap", "test_tying_the_similar_atoms_bisos_buys_precision",
@@ -794,6 +882,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "Biso sites move by < 0.5 sigma.  1.9.0 read 0.3647(1513) / "
                  "0.6016(1590) / 0.5377(1078) against 0.5150(754), 0.99 / "
                  "0.54 / 0.21",
+        features=("displacement_parameters",),
     ),
     Claim(
         "test_acceptance_fap",
@@ -814,6 +903,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "read 0.07824432 on all five starts, 343 columns at the "
                  "profile stage and 0.8 s idle (macOS arm64)",
         starts=5,
+        features=("lebail_pawley",),
     ),
     Claim(
         "test_acceptance_fap",
@@ -854,6 +944,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "Rietveld-vs-Le Bail agreement is held to 5e-4 A",
         measured="a = 10.251216(39) A, Rwp 9.3 %; CaF2 lands at 5.4646 A; "
                  "1.9.0 read the esd as 40",
+        features=("lattice_metric", "lebail_pawley"),
     ),
     Claim(
         "test_acceptance_nac",
@@ -867,6 +958,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "freed — freeing it was measured to run away to E ~ 0.31",
         measured="min E > 0.8 on the main phase; phases[1].extinction == 0.0 "
                  "exactly",
+        features=("primary_extinction",),
     ),
     Claim(
         "test_acceptance_nac", "test_nac_termination_view_golden_shape", "nac",
@@ -906,6 +998,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "closure exact to 1e-6.  1.9.0 read 4.92, 1.1 and 2.19; "
                  "WP-2002's closing stage (#1085) took them to 5.08 and 2.26 "
                  "and its width twin hold (#1113) to 5.10 and 2.30",
+        features=("bragg_intensities", "qpa"),
     ),
     Claim(
         "test_acceptance_qpa_roundrobin",
@@ -921,6 +1014,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "makes the attribution single-valued",
         measured="zincite mean < -1.0, corundum mean > +0.5, fluorite "
                  "|mean| < 2.0 wt %",
+        features=("anomalous_dispersion", "qpa"),
     ),
     Claim(
         "test_acceptance_qpa_roundrobin",
@@ -943,6 +1037,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "(WP-2002; 1.9.0 ran eight stages and held nothing); the "
                  "fractions are the row above's",
         diagnostics=("!PHASE_UNCONSTRAINED",),
+        features=("qpa",),
     ),
     Claim(
         "test_acceptance_qpa_roundrobin", "test_sample2_brucite_march_dollase",
@@ -955,6 +1050,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "a detection rather than a fitted nothing)",
         measured="r ~ 0.67; worst fraction 3.0 wt % (zincite); H Biso held "
                  "at exactly 2.5; 1.9.0 read 2.8 wt %",
+        features=("march_dollase", "qpa"),
     ),
     Claim(
         "test_acceptance_qpa_roundrobin", "test_sample2_brucite_spherical_harmonics",
@@ -970,6 +1066,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "J 1.45 and 1.46; min P 0.47 and 0.39.  Measured by WP-1960 "
                  "before WP-2002: 3.41, 2.71 and 2.80; the closing stage "
                  "(#1085) and the width twin hold (#1113) each moved them",
+        features=("spherical_harmonics_texture", "qpa"),
     ),
     Claim(
         "test_acceptance_qpa_roundrobin",
@@ -986,6 +1083,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "to improve (measured -9.1 to -9.3)",
         measured="corundum +24, magnetite -15, zircon -9 wt %",
         diagnostics=("BRINDLEY_OUTSIDE_REGIME",),
+        features=("qpa",),
     ),
     # ---- dispersion: the pre-registered prediction -----------------------
     Claim(
@@ -1000,6 +1098,8 @@ CLAIMS: tuple[Claim, ...] = (
         measured="worst 1.37 wt % (was 5.13); 1.20 on 1.9.0, before "
                  "WP-2002's closing stage (#1085, 1.34) and width twin hold "
                  "(#1113)",
+        features=("anomalous_dispersion", "qpa"),
+        reference_kind="independent_measurement",
     ),
     Claim(
         "test_acceptance_dispersion",
@@ -1015,6 +1115,8 @@ CLAIMS: tuple[Claim, ...] = (
         measured="RMS 2.26 -> 0.69 wt % (0.62 on 1.9.0, before WP-2002's "
                  "closing stage and width twin hold); zincite's -1 wt % mean "
                  "bias goes to |mean| < 1.0 (-0.63)",
+        features=("anomalous_dispersion",),
+        reference_kind="own_result",
     ),
     Claim(
         "test_acceptance_dispersion", "test_zincite_cell_does_not_move",
@@ -1028,6 +1130,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "on, and dispersion moves that split",
         measured="a 9.3e-6 and c 1.5e-5 A apart (0.04 of c's esd of "
                  "3.7e-4 A); 1.9.0 read 2.7e-7 and 8.5e-7 A",
+        features=("anomalous_dispersion",),
     ),
     Claim(
         "test_acceptance_dispersion",
@@ -1043,6 +1146,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "where the fit statistic does not see the fix",
         measured="B(O) 0.018 -> 0.432 A^2; 0.047 -> 0.456 on 1.9.0, before "
                  "WP-2002's closing stage (#1085) and width twin hold (#1113)",
+        features=("anomalous_dispersion",),
     ),
     Claim(
         "test_acceptance_dispersion",
@@ -1053,6 +1157,7 @@ CLAIMS: tuple[Claim, ...] = (
         reference="the dispersion-off baseline, at 2e-6 A — well inside the "
                   "21e-6 A esd, so the anchor is safe either way",
         measured="a = 4.156882 A both ways",
+        features=("anomalous_dispersion",),
     ),
     Claim(
         "test_acceptance_dispersion",
@@ -1066,6 +1171,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "claim — no certified Biso exists for this specimen",
         measured="B(La) and B(B) move ~12 % / ~22 %; Rwp 8.743 -> 8.721 % "
                  "(8.751 -> 8.730 % on 1.9.0)",
+        features=("anomalous_dispersion",),
     ),
     Claim(
         "test_acceptance_dispersion",
@@ -1077,6 +1183,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "directions",
         measured="exact",
         diagnostics=("DISPERSION_NEGLECTED", "!DISPERSION_NEGLECTED"),
+        features=("anomalous_dispersion",),
     ),
     # ---- capillary absorption: the identity tier -------------------------
     Claim(
@@ -1091,6 +1198,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "the estimator/resolver agreement is floating-point "
                   "(rel=1e-9)",
         measured="muR 0.679, method rouse_cylinder, not out of range",
+        features=("attenuation_estimate",),
     ),
     Claim(
         "test_acceptance_capillary",
@@ -1109,6 +1217,8 @@ CLAIMS: tuple[Claim, ...] = (
                  "+0.016875 against a predicted 0.016875 (to 3e-9); 1.9.0 "
                  "read 4.0e-9, -1.8e-11 A and +0.01687, before WP-2002's "
                  "closing stage (#1085)",
+        features=("capillary_absorption",),
+        reference_kind="own_arithmetic",
     ),
     Claim(
         "test_acceptance_capillary", "test_fit_quality_and_the_circular_cell",
@@ -1122,6 +1232,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "deliberately generous",
         measured="16 ppm from the SRM 660a certificate; Rwp 8.81 % (8.88 % "
                  "on 1.9.0)",
+        features=("capillary_absorption",),
     ),
     Claim(
         "test_acceptance_capillary",
@@ -1134,6 +1245,8 @@ CLAIMS: tuple[Claim, ...] = (
                   "dispersion moves B(La) the other way and 2.6x further",
         measured="Delta B still 0.016875 to 1e-5 (4.2e-9; 3.5e-6 on 1.9.0); "
                  "dispersion moves B(La) by about -0.044 A^2",
+        features=("capillary_absorption",),
+        reference_kind="own_arithmetic",
     ),
     # ---- sequential: own-result comparisons ------------------------------
     Claim(
@@ -1145,6 +1258,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "than restated, so what differs between the two suites is "
                   "only the chaining",
         measured="identical to the independent fits' record",
+        features=("qpa", "sequential_series"),
     ),
     Claim(
         "test_acceptance_sequential", "test_chained_agrees_with_independent_fits",
@@ -1159,6 +1273,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "lands 0.0020-0.0043 above its independent fit (bar 0.005); "
                  "chained and independent weight fractions within 0.07 wt %.  "
                  "1.9.0 read 0.1278 either way, within 0.07 wt %",
+        features=("sequential_series",),
     ),
     Claim(
         "test_acceptance_sequential", "test_cells_are_stable_across_the_series",
@@ -1170,6 +1285,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "shape check that separates a measured trajectory from an "
                   "ordering artefact",
         measured="per-phase spread < 20e-4 A with no monotone drift",
+        features=("sequential_series",),
     ),
     Claim(
         "test_acceptance_sequential", "test_warm_start_iteration_cost_is_reported",
@@ -1188,6 +1304,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "last declared stage); 1.9.0 read 403 vs 1214 at identical "
                  "mean Rwp (365 carrying everything).  1.10.0's hostile series "
                  "did not finish (next row)",
+        features=("sequential_series",),
     ),
     Claim(
         "test_acceptance_sequential",
@@ -1211,6 +1328,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "stage that follows cpd-1b's warm rung (Rwp 0.760)",
         diagnostics=("SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED",
                      "SEQUENTIAL_RWP_OUTLIER"),
+        features=("sequential_series",),
     ),
     Claim(
         "test_acceptance_sequential",
@@ -1228,6 +1346,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "0.064-0.080x the running maximum against a factor of 3.0 "
                  "(2026-10-25, macOS arm64, after WP-2045; 0.34-0.39x on "
                  "2026-10-24, Linux x86-64, with cpd-1b's runaway in the chain)",
+        features=("sequential_series",),
     ),
     Claim(
         "test_acceptance_sequential",
@@ -1242,6 +1361,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="axial_sl 0.0082 at Rwp 0.1398, against 0.1373 for the "
                  "independent fit (2026-10-25, macOS arm64); the parent tree "
                  "fails it at 557.8",
+        features=("sequential_series",),
     ),
     Claim(
         "test_acceptance_sequential",
@@ -1255,6 +1375,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "threshold; the bar of 0.5 on the runaway is loose on purpose",
         measured="73.4 % on cpd-1b's warm stage at axial_sl 557.8, and at most "
                  "1.32 % on cpd-1a (2026-10-25, macOS arm64, WP-2047)",
+        features=("sequential_series",),
     ),
     Claim(
         "test_acceptance_sequential", "test_series_exports", "qarr",
@@ -1263,6 +1384,7 @@ CLAIMS: tuple[Claim, ...] = (
         "and one row per pattern",
         reference="the export contract itself",
         measured="exact",
+        features=("sequential_series",),
     ),
     # ---- Stephens: inadmissibility, and the start-dependence axis --------
     Claim(
@@ -1289,6 +1411,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "module declines the closing stage",
         starts=4,
         diagnostics=("STEPHENS_STRAIN_NOT_POSITIVE",),
+        features=("stephens_strain",),
     ),
     Claim(
         "test_acceptance_stephens", "test_corundum_is_reported_isotropic",
@@ -1307,6 +1430,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "0.043), and the closing stage (#1085) alone gave 4.52x, so "
                  "the ratio rides the Lorentzian split's flat direction; "
                  "never leaves the cone at any seed",
+        features=("stephens_strain",),
     ),
     Claim(
         "test_acceptance_stephens",
@@ -1323,6 +1447,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "certificate-grade c/a is asserted not to move (rel=1e-4)",
         measured="Delta BIC -18.1 at N/f^2 (-18.0 on 1.9.0) and Hamilton "
                  "refuses; Hamilton at raw N says justified; c/a unmoved",
+        features=("stephens_strain",),
     ),
     Claim(
         "test_acceptance_stephens",
@@ -1340,6 +1465,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "(0.17995 against 0.17877 on 1.9.0; 0.17946 against 0.17844 "
                  "before WP-1938)",
         starts=4,
+        features=("stephens_strain",),
     ),
     Claim(
         "test_acceptance_stephens",
@@ -1356,6 +1482,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "closing stage), which is why that row carries starts=4",
         starts=4,
         diagnostics=("STEPHENS_STRAIN_NOT_POSITIVE",),
+        features=("stephens_strain",),
     ),
     # ---- WP-1026: indexing, the first externally graded feature ----------
     # Four rows verify the transcription itself.  Two hundred numbers were typed
@@ -1370,6 +1497,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "applied to BOTH ICDD entries, which is why the global score "
                   "runs over twenty numbers and not ten",
         measured="10 sets x 20 lines, all ascending",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1385,6 +1513,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="First 4 sums to +9 and Best of all to +12, both exact; the "
                  "four programs the +9 is the best of scored -14, -8, -4 and +5 "
                  "individually",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1397,6 +1526,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "and prints both columns; the arithmetic linking them is "
                   "never stated, and eighty values have to agree",
         measured="C = A - 0.100 and D = B - 0.100 to 5e-13 on all four pairs",
+        features=("indexing", "peak_shift_screen"),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1410,6 +1540,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "lets twenty survivors extend past A's last line",
         measured="13 of 13 and 15 of 15 common lines identical to 1e-12; both "
                  "B sets reach beyond their A set's maximum",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1424,6 +1555,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "data and no typo in either survives it",
         measured="3 unexplained of 20 in every 46-1964 set, 7 in 43-1748, 0 in "
                  "both new measurements",
+        features=("indexing",),
     ),
     # Three rows verify the benchmark **runner** rather than a search: the score
     # is generated by tests/bethanechol_benchmark.py, which is a module you run,
@@ -1444,6 +1576,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="default: max_d_axis 20, max_volume 2000, all 7 systems, "
                  "n_unindexed at the package default; manual: monoclinic only, "
                  "800-1200 A^3, 5-20 A, n_unindexed 8",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1457,6 +1590,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "package grades itself by is the transcribed one",
         measured="rank 1 -> +1; ranks 2..10 -> 0; rank 11 and absent -> -1 "
                  "(consensus returns twelve, and the rule has no 11th bucket)",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1475,6 +1609,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="the returned setting matches at rank 2 of a planted list; a "
                  "doubled axis, a foreign metric and a C-centred description of "
                  "the same metric all fail",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1492,6 +1627,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="source == 'positions' and sigma_assumed on every line of all "
                  "ten sets; supports_indexing True on all ten; shift.source "
                  "'unavailable'",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1511,6 +1647,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "and N_poss = 31 against the published 0.0006 and 32; the "
                  "residual gap is the printed cell's own rounding (3 dp on the "
                  "axes, 2 on beta).  Floored, the same data give 5.8 and 32.3",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1532,6 +1669,8 @@ CLAIMS: tuple[Claim, ...] = (
                  "+0.080 deg and 46-1964 +0.058, not the quoted 0.10 -- so "
                  "subtracting 0.100 overshoots to -0.020 and -0.043, which is "
                  "why Table 5 does not show C as uniformly easier than A",
+        features=("peak_shift_screen",),
+        reference_kind="own_arithmetic",
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1566,6 +1705,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "1.9.0 read a +110 and c +57 ppm, 45 of 47 lines and "
                   "chi2_red 0.67; the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list",
         diagnostics=("INDEX_SHIFT_FROM_PAIRS",),
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1597,6 +1737,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "-54 -> +5, M20 23.7 -> 160.0, F_N 16.6 -> 114.9 and Le Bail "
                   "Rwp 0.285 -> 0.224: the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list, and WP-2002's closing stage and width twin hold (#1085, #1113) moved the Le Bail checks",
         diagnostics=("INDEX_SHIFT_FROM_PAIRS",),
+        features=("indexing", "peak_shift_screen"),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1620,6 +1761,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "within one pair of each other, so a MAGNITUDE is measured "
                   "and a CAUSE is not",
         diagnostics=("INDEX_SHIFT_FROM_PAIRS",),
+        features=("peak_shift_screen",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1641,6 +1783,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "reaches where the pair screen declines -- a bare 20-line "
                   "list supplies too few pairs to concentrate, the published "
                   "bethanechol failure, and this needs none",
+        features=("peak_shift_screen",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1655,6 +1798,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "the lattice allows, which breaks eq. (4)'s weighting "
                   "outright.  A line no lattice can index is not a shifted "
                   "line, and the column does not pretend otherwise",
+        features=("peak_shift_screen",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1677,6 +1821,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "-0.0382 until WP-1510, when two of its five pairs turned "
                   "out to be one line fitted twice)",
         diagnostics=("INDEX_SHIFT_FROM_PAIRS",),
+        features=("peak_shift_screen",),
     ),
     Claim(
         "test_acceptance_indexing", "test_the_phantom_lines_are_what_had_blocked_it",
@@ -1692,6 +1837,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="8 of 62 flagged not_separable, 47 usable (50 before WP-1510 "
                   "took out five duplicate copies); before the fix "
                   "neither engine could index this certified pattern at all",
+        features=("peak_picking_and_fitting",),
     ),
     Claim(
         "test_acceptance_indexing", "test_a_three_phase_mixture_abstains",
@@ -1705,6 +1851,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "score cannot tell a multiphase pattern from a single-phase "
                   "one of lower symmetry",
         measured="best_or_none() is None; no candidate reaches high",
+        features=("indexing",),
     ),
     # ---- SRM 660c indexed: the absolute anchor, and the phase with no
     # extinctions that turns the corundum caveat into a control ------------
@@ -1740,6 +1887,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "search now promotes to high, this four-system one does not.  "
                  "best_or_none() returns None",
         diagnostics=("INDEX_SHIFT_ALLOWANCE",),
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1779,6 +1927,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "are mostly impurity, at which point the member is noise for "
                  "every candidate alike",
         starts=2,
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1824,6 +1973,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "finished search.  1.9.0 read 25 of 29 lines: the peak "
                  "picker's changes before #1050 (#947 to #951, not bisected among them) took "
                  "one line from the usable list",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1860,6 +2010,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "fit seen by a different instrument, so it stays surfaced "
                  "and never ranked on.  best_or_none() returns None either "
                  "way.  The 99.6 % was measured on 1.9.0 and not re-run",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1894,6 +2045,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "components nobody has verified, which is why the flags "
                  "report instead of refusing",
         diagnostics=("PEAK_AXIAL_TAIL", "PEAK_KALPHA2_RESIDUAL"),
+        features=("peak_picking_and_fitting",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1911,6 +2063,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="5 axial-divergence tails, 1 Kalpha2 residual, 0 lines of "
                  "LaB6; the sign flips at 90 deg on every one of them",
         diagnostics=("PEAK_KALPHA2_ALIAS",),
+        features=("peak_picking_and_fitting",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1931,6 +2084,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "predicted 0.0415, the rest being the aberrations SRM 660c's "
                  "own docstring names).  Search: +0.009 +- 0.016, consistent "
                  "with none",
+        features=("indexing", "peak_shift_screen"),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1949,6 +2103,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "difference).  0 partners from the cubic side; from the "
                  "tetragonal side the cubic is found at index 2 with ZERO "
                  "discriminating reflections",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1966,6 +2121,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="the half-volume tetragonal cell is ranked in the same list, "
                  "found_by both engines; neither partner reaches high and "
                  "neither carries geometric_ambiguity",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -2009,6 +2165,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "(ze +0.033), still finds the certified cell (+5 ppm), which "
                  "one engine cannot promote past low",
         diagnostics=("!INDEX_SHIFT_ALLOWANCE",),
+        features=("indexing",),
     ),
     # ---- the round-robin pure phases, NAC, FAP and the unknown ----------
     Claim(
@@ -2037,6 +2194,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "keeps a 17-line high unreachable",
         diagnostics=("INDEX_PANEL_REDUCED", "INDEX_ABSTAINED",
                      "!INDEX_DATA_INSUFFICIENT"),
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -2054,6 +2212,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "both engines.  predicted_but_absent = 4 (the 6_3 screw and "
                  "c-glide of P 6_3 m c, invisible to the lattice hexagonal P), "
                  "so graded low and best_or_none() is None",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -2075,6 +2234,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "the P twin 44, and 6 absent: the peak picker's changes "
                  "before #1050 took one line from the usable list, and "
                  "WP-2002's width twin hold moved the Le Bail check",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -2115,6 +2275,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "no-goes have died on this one dataset.  A recorded no-go "
                  "inherits the defects of the run that produced it",
         diagnostics=("INDEX_SEARCH_INCOMPLETE", "INDEX_ABSTAINED"),
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -2143,6 +2304,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "touched and still prefers a wrong cell -- the row now pins "
                  "that directly.  best_or_none() None and nothing reaches high, "
                  "which is the half that did not move",
+        features=("indexing",),
     ),
     Claim(
         "test_acceptance_indexing",
@@ -2162,6 +2324,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "search_complete False on two of the four, so the null is not "
                  "dressed up as an exhausted domain",
         diagnostics=("INDEX_ABSTAINED", "INDEX_SEARCH_INCOMPLETE"),
+        features=("indexing",),
     ),
     # ---- Nd2Ru2O7: the refinable wavelength ----------------------------
     Claim(
@@ -2178,6 +2341,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="neutron Rwp 0.05234 alone -> 0.06216 jointly (+19 %); X-ray "
                  "0.09176 -> 0.09186 (+0.1 %), a ratio of ~170; 1.9.0 read "
                  "0.05259 -> 0.06226 (+18 %), 0.09365 -> 0.09373 and ~200",
+        features=("wavelength", "joint_refinement"),
     ),
     Claim(
         "test_acceptance_wavelength",
@@ -2193,6 +2357,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="0.06216 held -> 0.05490 freed, against a 0.05234 solo floor: "
                  "74 % of the gap recovered; X-ray unchanged to 0.03 %; 1.9.0 "
                  "read 0.06226 -> 0.05502 against 0.05259, 75 %",
+        features=("wavelength", "joint_refinement"),
     ),
     Claim(
         "test_acceptance_wavelength",
@@ -2209,6 +2374,8 @@ CLAIMS: tuple[Claim, ...] = (
                  "lambda 1.540400 -> 1.5407972(795) A = +257.9 ppm, agreeing "
                  "to 2 %; the move is 5.0x its own esd; 1.9.0 read "
                  "1.5407968(843), +257.6 ppm and 4.7x",
+        features=("wavelength", "joint_refinement"),
+        reference_kind="own_result",
     ),
     Claim(
         "test_acceptance_wavelength",
@@ -2226,6 +2393,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "hist.1.instrument.source.lines.0.wavelength; zero on "
                  "histogram 0 and zero on the both-held fit",
         diagnostics=("WAVELENGTH_CALIBRATION",),
+        features=("wavelength", "joint_refinement"),
     ),
     Claim(
         "test_acceptance_wavelength", "test_the_cell_belongs_to_the_synchrotron",
@@ -2244,6 +2412,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "above the published value; x(O 48f) 0.33001(41) against a "
                  "published 0.33012(7), inside its own esd; 1.9.0 read "
                  "10.342904(51) and 0.32994(43)",
+        features=("lattice_metric", "joint_refinement"),
     ),
     Claim(
         "test_acceptance_wavelength",
@@ -2261,6 +2430,8 @@ CLAIMS: tuple[Claim, ...] = (
                  "histograms' Rwp agree to 6e-5 relative, x(O) to 1.5e-6.  "
                  "1.9.0 read +257.6 and -256.7 ppm (0.34 %), Rwp identical to "
                  "5 decimals and x(O) to 1.2e-6",
+        features=("wavelength", "joint_refinement"),
+        reference_kind="own_arithmetic",
     ),
     Claim(
         "test_acceptance_wavelength",
@@ -2280,6 +2451,8 @@ CLAIMS: tuple[Claim, ...] = (
                  "The pre-1938 tree gives 0.00322, Linux's figure. Since "
                  "WP-2002: 0.0102922 at four starts, spread 2.2e-9 (1.5e-9 "
                  "when WP-2002 measured it), y = -0.0210949(191) off any bound",
+        features=("esds", "joint_refinement"),
+        reference_kind="own_arithmetic",
     ),
     Claim(
         "test_acceptance_wavelength",
@@ -2305,6 +2478,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "and Y's floor to the caller: 0.0164535 (0.527 of 0.0312, "
                  "the esd now 0.018997), Delta chi2 there 0.0069 over a cut "
                  "of 21.048, 10 refits",
+        features=("esds", "joint_refinement"),
     ),
     Claim(
         "test_acceptance_wavelength", "test_the_fits_render",
@@ -2356,6 +2530,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "Background choice moves it <0.1 ppm and dispersion is inert "
                  "(Si far above its edge), so the residual is the asymmetry "
                  "convention alone -- the next row proves it",
+        features=("wavelength", "axial_divergence"),
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2377,6 +2552,8 @@ CLAIMS: tuple[Claim, ...] = (
                  "source of the lambda~zero indeterminacy; Rwp 0.0724; 1.9.0 "
                  "read 35 sigma and Rwp 0.0736, before WP-2002's closing "
                  "stage (#1085)",
+        features=("wavelength", "axial_divergence"),
+        reference_kind="another_code",
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2394,6 +2571,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "instrument.source.lines.0.wavelength; zero on the lambda-held "
                  "fit",
         diagnostics=("WAVELENGTH_CALIBRATION",),
+        features=("wavelength",),
     ),
     Claim(
         "test_acceptance_si640c", "test_biso_is_positive_and_agrees_with_xnd",
@@ -2407,6 +2585,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "the prior bad-intensity-model attempt drove Biso negative",
         measured="Biso 0.42188(1897) against 0.438984(1711), 0.90 combined "
                  "sigma; positive (0.42198(1880) on 1.9.0)",
+        features=("displacement_parameters",),
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2423,6 +2602,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="lambda~zero -0.920 (XND -0.897); zero~axial +0.914 (XND "
                  "zero~asym +0.941); no HIGH_CORRELATION; max |rho| < 0.98",
         diagnostics=("!HIGH_CORRELATION",),
+        features=("wavelength",),
     ),
     Claim(
         "test_acceptance_si640c", "test_the_held_cell_is_the_certificate",
@@ -2457,6 +2637,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "on 1.9.0) -- the "
                  "same order as NIST's 0.0065/0.0086, the split apportioned "
                  "differently; both positive and finite",
+        features=("size_strain",),
     ),
     # ---- the manual's background-peak worked example, on this same scan ----
     # docs/docs/concepts/parameters.md rests its "Humps" comparison on
@@ -2485,6 +2666,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "1.9.0 read 0.119977 -> 0.082503 against 0.088596, Biso "
                  "0.414(65) and GoF 1.9695 -> 1.3544",
         diagnostics=("!HIGH_CORRELATION",),
+        features=("extra_components",),
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2510,6 +2692,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "neither value moves by 0.12 of the wider esd.  1.9.0 read "
                  "5.567(220) at 4.178 deg, 1608x, 6.5x and 6.4x, and 0.11",
         diagnostics=("!HUMP_TOO_NARROW",),
+        features=("extra_components",),
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2531,6 +2714,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "HUMP_TOO_NARROW in either arm.  1.9.0 read 4.18(9) / "
                  "5.57(22), 5.245(32) and 1.94(8), Rwp 0.082503 -> 0.077152",
         diagnostics=("!HIGH_CORRELATION", "!HUMP_TOO_NARROW"),
+        features=("background_curve", "extra_components"),
     ),
     # ---- the measured blank: the same container, scanned empty (WP-1309) ----
     # The rows above fit the container's halo with three free parameters; these
@@ -2557,6 +2741,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "all under the specimen's sigma; zero HIGH_CORRELATION; "
                  "1.9.0 read 0.119977 -> 0.082503 -> 0.079310",
         diagnostics=("!HIGH_CORRELATION",),
+        features=("measured_background",),
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2579,6 +2764,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "(regression dilution, this blank's sigma/I is 8-17 %).  "
                  "1.9.0 read 0.8374(113), 1.1 and 14.3 esd, 0.074011 -> "
                  "0.073748 and 0.079310 -> 0.077327",
+        features=("measured_background",),
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2595,6 +2781,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "1.00; unity costs 2.4 % of Rwp where the issue measured "
                  "2.2 %, and the refined scale lands inside the bracket; "
                  "1.9.0 read 0.077949 / 0.077315 / 0.079219 and 2.5 %",
+        features=("measured_background",),
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2614,6 +2801,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "while Rwp under one weight *prefers* the six-term arm "
                  "(0.075953 against 0.076946); 1.9.0 read 0.8374(113), "
                  "0.6935(196), 6.3 and 0.076381 against 0.077327",
+        features=("background_curve", "measured_background"),
     ),
     Claim(
         "test_acceptance_si640c",
@@ -2632,6 +2820,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "1.9.0); down the scan the sigma-weighted "
                  "minimum sits at s = 0.90 where the common-weight minimum is "
                  "at 0.85, which is where the refined scale is",
+        features=("measured_background",),
     ),
     Claim(
         "test_acceptance_si640c", "test_the_blank_arms_render",
@@ -2665,6 +2854,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "0.9994 of |m|; Rwp 0.1047 against 0.2035 nuclear-only "
                  "(bar 0.65x); 1.9.0 read 2.124 +/- 0.043 (50 sigma), 0.9998 "
                  "and Rwp 0.1042, before WP-2002's closing stage (#1085)",
+        features=("magnetic_structure",),
     ),
     Claim(
         "test_acceptance_magnetic", "test_the_4k_moment_does_not_depend_on_its_in_plane_seed",
@@ -2675,6 +2865,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "1.6e-12 relative; 8.4e-6 and 2.8e-9 on 1.9.0, before "
                  "WP-2002's closing stage (#1085)",
         starts=2,
+        features=("magnetic_structure",),
     ),
     Claim(
         "test_acceptance_magnetic", "test_the_150k_null_finds_no_moment",
@@ -2695,6 +2886,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "closing stage then either; TRF stopped at 0.067 +/- 0.83; "
                  "the esd read 3.24 before WP-1929 left the stationary polar "
                  "angle out of the covariance",
+        features=("magnetic_structure",),
     ),
     # ---- LaMnO3 on BT-1: WP-1327's second dataset, k = 0 ----
     Claim(
@@ -2716,6 +2908,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "before WP-1929); Rwp 0.0629 against 0.1379 nuclear-only "
                  "(bar 0.6x).  1.9.0 read 3.558 +/- 0.044, (3.543, 0, "
                  "0.325), 0.091 rad and Rwp 0.0631 against 0.1381",
+        features=("magnetic_structure",),
     ),
     Claim(
         "test_acceptance_magnetic_lamno3", "test_pn_ma_beats_pnma_at_the_tutorials_pair",
@@ -2732,6 +2925,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "|m| 3.337 +/- 0.069 mu_B, c-component 0.997 of |m| "
                  "(bar 0.98); 1.9.0 read 0.0631 against 0.0844, 67 against "
                  "2711 (0.025) and 3.335",
+        features=("magnetic_structure",),
     ),
     # ---- SRM 1976a plate: the spherical-harmonics texture against TOPAS --
     Claim(
@@ -2760,6 +2954,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "before WP-2002's closing stage (#1085): 2.0794(233), -0.41 "
                  "and 0.8652(288), -0.30",
         starts=4,
+        features=("spherical_harmonics_texture",),
     ),
     Claim(
         "test_acceptance_srm1976a_texture", "test_the_measured_ratio_excludes_the_other_normalisations",
@@ -2774,6 +2969,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "and 4.4; sqrt(2l+1) by 112 and 61 (0.41, 0.30, 32.8 and 111 "
                  "before the closing stage)",
         starts=4,
+        features=("spherical_harmonics_texture",),
     ),
     Claim(
         "test_acceptance_srm1976a_texture", "test_c43_is_zero_within_error_in_both_codes",
@@ -2785,6 +2981,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "waits for a forward TOPAS run (WP-1973)",
         measured="C4,3 -0.0021(225); TOPAS's 0.00178 is 0.08 of that esd",
         starts=4,
+        features=("spherical_harmonics_texture",),
     ),
     Claim(
         "test_acceptance_srm1976a_texture", "test_the_fit_reaches_topas_rwp_with_physical_displacements",
@@ -2806,12 +3003,13 @@ CLAIMS: tuple[Claim, ...] = (
         measured="Rwp 0.3563 against 0.1142; chi2_red 46.09 against 4.74 "
                  "(ratio 9.7, bar 5); 0.3562, 0.1146, 46.07 and 4.77 before "
                  "the closing stage",
+        features=("spherical_harmonics_texture",),
     ),
 )
 
 
 #: **How many starts a quoted number has to survive.**  WP-0601 measured the
-#: reason this is a validation axis and not a solver detail: sweeping
+#: reason this is a verification axis and not a solver detail: sweeping
 #: ``Stage.strain_seed`` over 400/800/1600/3000 on round-robin brucite leaves
 #: the Stephens coefficients spanning ~100 % relative spread under *both*
 #: drivers, and moves the unconstrained fit in and out of the physical cone
@@ -2837,6 +3035,92 @@ CLAIMS: tuple[Claim, ...] = (
 START_DEPENDENCE_RULE = 3
 
 
+#: **What verifies a feature no claim above verifies** (WP-2010).  A feature
+#: ships verified or does not ship (DESIGN.md § Rules, 2), and the matrix holds
+#: only the acceptance suites, so a feature verified by a unit test names it
+#: here: against a formula, a published table, another code or a known
+#: synthetic answer.  ``tests/test_validation_matrix.py`` requires an entry for
+#: every feature with no verifying claim and checks each named test exists.
+#: The TOF pair read a file and are never evaluated; the fit's refusal of a
+#: flight-time pattern is their fence and is named with them.
+FEATURE_TESTS: dict[str, tuple[str, ...]] = {
+    "capillary_offsets": (
+        "test_capillary_displacement.py::test_eq4_is_the_ray_trace_to_first_order",
+        "test_capillary_displacement.py::test_an_injected_displacement_is_recovered_on_both_axes",
+    ),
+    "tof_calibration": (
+        "test_tof_axis.py::test_a_synthetic_bank_converts_back_to_the_d_spacings_it_was_built_from",
+        "test_tof_axis.py::test_fit_refuses_a_tof_pattern_against_a_cw_instrument",
+    ),
+    "tof_profile": (
+        "test_instrument_tof.py::test_the_default_type_three_block_is_read_in_the_manuals_order",
+        "test_tof_axis.py::test_fit_refuses_a_tof_pattern_against_a_cw_instrument",
+    ),
+    "neutron_scattering": (
+        "test_neutron_scattering.py::test_natural_element_scattering_lengths_match_gemmi_sears_1992",
+    ),
+    "rigid_bodies": (
+        "test_rigid_body.py::test_body_esds_equal_the_central_fd_chain",
+        "test_rigid_body.py::test_orientation_recovered_from_a_synthetic_pattern",
+    ),
+    "restraints": (
+        "test_restraints.py::test_restraint_jacobian_matches_fd_per_kind",
+        "test_restraints.py::test_bond_restraint_recovers_perturbed_coordinate",
+    ),
+    "flat_plate_absorption": (
+        "test_flat_plate.py::test_reflection_matches_the_defining_integral",
+        "test_flat_plate.py::test_transmission_matches_the_defining_integral",
+    ),
+    "surface_roughness": (
+        "test_surface_roughness.py::test_suortti_matches_an_independent_transcription_of_the_published_form",
+        "test_surface_roughness.py::test_injected_roughness_is_recovered_and_is_resolved_not_merely_fitted",
+    ),
+    "size_strain": (
+        "test_profile_size.py::test_the_size_coefficient_maps_to_one_size_at_every_angle",
+        "test_profile_size.py::test_delta_q_is_scherrer_in_q_whatever_the_instrument",
+    ),
+    "microstructure_readings": (
+        "test_microstructure.py::test_the_strain_coefficient_is_360_over_pi_times_the_strain",
+        "test_microstructure.py::test_a_size_reads_back_the_crystallite_it_was_built_from",
+    ),
+    "magnetic_determination": (
+        "test_magnetic_irreps.py::test_character_tables_agree_with_the_spgrep_oracle_for_all_230_groups",
+        "test_magnetic_isotropy.py::test_pnma_at_gamma_has_exactly_four_maximal_magnetic_subgroups",
+    ),
+    "satellites": (
+        "test_satellites.py::test_the_manuals_two_worked_examples_on_a_c_lattice",
+        "test_satellites.py::test_a_satellite_orbit_is_a_multiplicity",
+    ),
+    "background_estimation": (
+        "test_profiles_background.py::test_the_whittaker_baseline_solves_its_defining_system",
+        "test_profiles_background.py::test_arpls_recovers_baseline_under_peaks",
+    ),
+    "peak_picking_and_fitting": (
+        "test_peak_picking.py::test_group_jacobian_matches_finite_differences",
+        "test_peak_picking.py::test_recovered_positions_and_esds_on_a_clean_group",
+    ),
+    "extinction_symbols": (
+        "test_extinction_symbol.py::test_the_condition_derivation_is_measured_over_the_whole_table",
+        "test_extinction_symbol.py::test_corundum_returns_the_class_its_certificate_names",
+    ),
+    "derived_geometry": (
+        "test_geometry_table.py::test_corundum_matches_the_published_geometry",
+        "test_geometry_table.py::test_esd_matches_a_monte_carlo_through_decode",
+    ),
+    "parametric_refinement": (
+        "test_parametric_series.py::test_a_constant_declaration_is_refine_multi_bit_for_bit",
+        "test_parametric_series.py::test_a_parametric_slope_recovers_a_known_expansion_within_its_esd",
+    ),
+    "distortion_modes": (
+        "test_distortion_modes.py::test_lamno3_reproduces_table_13",
+    ),
+    "subgroup_enumeration": (
+        "test_subgroups.py::test_each_published_subgroup_is_present_with_its_transformation",
+        "test_subgroups.py::test_pmmm_has_eight_fmmm_subgroups",
+    ),
+}
+
+
 #: **The convergence schedule every acceptance number above was produced at**
 #: (WP-1123, flipping what WP-1113 measured and left opt-in).
 #:
@@ -2855,7 +3139,7 @@ START_DEPENDENCE_RULE = 3
 #: * *Why the suites here ride it rather than decline it.*  These rows compare
 #:   against certificates and other codes, and what a reader needs to know is
 #:   whether the *shipped* package reproduces them.  A suite pinned to a
-#:   schedule nobody runs would validate a configuration that does not ship.
+#:   schedule nobody runs would verify a configuration that does not ship.
 #:   Each names the setting explicitly all the same, for the reason
 #:   ``dispersion`` is named: an inherited default re-baselines silently.
 #: * *Where it is declined.*  ``RefinementPlan.intermediate_ftol = None``
@@ -2934,7 +3218,7 @@ DISPERSION_DEFAULT_ON = True
 GAPS: tuple[tuple[str, str], ...] = (
     ("Every acceptance number in the repo is a Cu Ka measurement.",
      "Six anodes ship (Cr/Fe/Co/Cu/Mo/Ag plus Ka1-only variants) and what is "
-     "validated for the other five is the wavelength table and its checks, "
+     "verified for the other five is the wavelength table and its checks, "
      "not a refinement.  The cheapest close is one Co Ka pattern from an "
      "Fe-bearing specimen — the routine real case, since Cu Ka fluoresces Fe "
      "(mu/rho 297.7 vs 56.2) — which would exercise dispersion, absorption "
@@ -2961,7 +3245,7 @@ GAPS: tuple[tuple[str, str], ...] = (
      "3.5e-8 A from numpy fp64 is real-hardware evidence for the fp64-host "
      "boundary, and no CI job reproduces it.  A green macOS job must not be "
      "read as 'MPS verified'."),
-    ("Multi-phase CIF round-tripping is not validated.",
+    ("Multi-phase CIF round-tripping is not verified.",
      "write_refinement_cif's round trip is checked single-phase only; a "
      "multi-phase re-read was never a v0.3 commitment.  Whatever the frozen "
      "API says about CIF round-tripping has to narrow to that."),
@@ -3182,7 +3466,7 @@ def render_markdown() -> str:
 
     w("## Start dependence\n")
     w("How many independent starting points a quoted number has to survive. "
-      "This is\na validation axis because it was measured to change a "
+      "This is\na verification axis because it was measured to change a "
       "conclusion: sweeping the\nStephens strain seed over 400/800/1600/3000 "
       "on round-robin brucite leaves the\ncoefficients spanning ~100 % "
       "relative spread under *both* solvers, and moves the\nunconstrained fit "
@@ -3221,6 +3505,43 @@ def render_markdown() -> str:
       "against\nSRM 660a LaB6 itself, so a refined LaB6 cell from that file "
       "reproduces the\ncertificate by construction. A guard refuses to let "
       "any such dataset carry a\n`certificate` row.\n")
+
+    w("## Features\n")
+    w("Each feature of `rietx.features.FEATURES` (WP-2010), with what verifies "
+      "it and what\nvalidates it. A claim names the feature its bar is about "
+      "(`Claim.features`). A\nclaim validates only against an independent "
+      "measurement: `certificate` and\n`spread` rows do, and a `prediction` "
+      "row does only where its `reference_kind` is\n`independent_measurement`. "
+      "Every dataset in the tree is development data, so a\nvalidation here is "
+      "a validation on development data (DESIGN.md § Rules, 2). A\nfeature with "
+      "no independent measurement is *not yet validated*, which says\nnothing "
+      "against it and is not *provisional*.\n")
+    w("The `prediction` rows that verify rather than validate, by that rule: "
+      + ", ".join(f"`{c.test}` ({c.reference_kind})"
+                  for c in CLAIMS
+                  if "prediction" in c.tiers and not validates(c)) + ".\n")
+    from rietx.features import FEATURES
+    for name, feature in FEATURES.items():
+        rows = [c for c in CLAIMS if name in c.features]
+        verifying = [c for c in rows if verifies(c)]
+        validating = [c for c in rows if validates(c)]
+        w(f"### `{name}`\n")
+        w(f"{feature.title}.\n")
+        parts = []
+        if verifying:
+            parts.append(", ".join(f"`{c.test}`" for c in verifying))
+        if name in FEATURE_TESTS:
+            parts.append("unit tests " + ", ".join(
+                f"`tests/{t}`" for t in FEATURE_TESTS[name]))
+        w("**Verified by:** " + "; ".join(parts) + "\n")
+        if validating:
+            for c in validating:
+                ds = DATASETS[c.dataset]
+                w(f"**Validated by:** `{c.test}`, dataset `{c.dataset}` "
+                  f"({ds.state} data). Mismatch: {c.measured}\n")
+            w("**State:** validated on development data.\n")
+        else:
+            w("**State:** not yet validated.\n")
 
     w("## The matrix\n")
     for module in _suite_order():

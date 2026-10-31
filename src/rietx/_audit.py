@@ -184,6 +184,8 @@ NOT_WALKED: dict[str, str] = {
     "compare_app": "the comparison page's port",
     "data": "bundled tables, read by modules the walk covers",
     "examples.py": "the shipped example projects",
+    "features.py": ("the feature registry: names, help keys and Theory headings, and one bit "
+                    "the report quotes"),
     "gui": ("beyond its import pre-fill and its symmetry edit gates: the server and 3D "
             "viewer's ports, payload caps and drawing tolerances"),
     "help.py": "the explanation text",

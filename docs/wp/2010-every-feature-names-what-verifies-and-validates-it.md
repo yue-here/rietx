@@ -123,17 +123,42 @@ symbols, joint fits) and get one or a declared exception.
 
 ## Tasks
 
-- [ ] The list of the 15 features with no acceptance claim, in this file, with what
+- [x] The list of the 15 features with no acceptance claim, in this file, with what
       verifies each today (a unit test by name, a cross-code pin) or `unverified`.
-- [ ] Each `unverified` feature verified (a test against a formula or another code) or
+      Re-derived on main at 8b9c0a3ae (2026-10-31): the 15 of #1051's first pass, plus two
+      features that landed since it (distortion modes, subgroup enumeration). None is
+      `unverified`; each names the test that verifies it against a formula, a published
+      table, another code or a known synthetic answer. Two read a file and are never
+      evaluated, and the fit's refusal is their fence.
+
+      | Feature | Verified by (`tests/…::`) | Against |
+      |---|---|---|
+      | Capillary offsets | `test_capillary_displacement.py::test_eq4_is_the_ray_trace_to_first_order` | a ray trace, to second order in d/R |
+      | TOF calibration (DIFC, DIFA, DIFB, TZERO) | `test_tof_axis.py::test_a_synthetic_bank_converts_back_to_the_d_spacings_it_was_built_from` | the d-spacings a synthetic bank was built from; fenced from fitting by `test_tof_axis.py::test_fit_refuses_a_tof_pattern_against_a_cw_instrument` |
+      | TOF peak shape and incident spectrum | `test_instrument_tof.py::test_the_default_type_three_block_is_read_in_the_manuals_order` | the GSAS manual's coefficient order (read only); never evaluated, fenced by the same refusal |
+      | Neutron scattering lengths | `test_neutron_scattering.py::test_natural_element_scattering_lengths_match_gemmi_sears_1992` | gemmi's independent copy of Sears (1992) |
+      | Rigid bodies | `test_rigid_body.py::test_body_esds_equal_the_central_fd_chain` | a central finite-difference chain; and `::test_orientation_recovered_from_a_synthetic_pattern` |
+      | Soft restraints | `test_restraints.py::test_restraint_jacobian_matches_fd_per_kind` | finite differences of the augmented residual; and `::test_bond_restraint_recovers_perturbed_coordinate` |
+      | Flat-plate absorption | `test_flat_plate.py::test_reflection_matches_the_defining_integral` | the defining integral, numerically; and `::test_transmission_matches_the_defining_integral` |
+      | Surface roughness | `test_surface_roughness.py::test_suortti_matches_an_independent_transcription_of_the_published_form` | Suortti (1972) transcribed independently; and `::test_injected_roughness_is_recovered_and_is_resolved_not_merely_fitted` |
+      | A width read as a size or a strain | `test_microstructure.py::test_the_strain_coefficient_is_360_over_pi_times_the_strain` | a hand computation; and `::test_a_size_reads_back_the_crystallite_it_was_built_from` |
+      | Magnetic candidates (representation analysis) | `test_magnetic_irreps.py::test_character_tables_agree_with_the_spgrep_oracle_for_all_230_groups` | spgrep, all 230 groups; and `test_magnetic_isotropy.py::test_pnma_at_gamma_has_exactly_four_maximal_magnetic_subgroups` |
+      | Satellites of a propagation vector | `test_satellites.py::test_the_manuals_two_worked_examples_on_a_c_lattice` | the manual's worked examples; and `::test_a_satellite_orbit_is_a_multiplicity` (enumeration) |
+      | Model-free background estimate | `test_profiles_background.py::test_arpls_recovers_baseline_under_peaks` | a known synthetic baseline; the Whittaker system itself gains a test in this WP |
+      | Extinction symbols | `test_extinction_symbol.py::test_the_condition_derivation_is_measured_over_the_whole_table` | International Tables' conditions over every setting; and `::test_corundum_returns_the_class_its_certificate_names` |
+      | Bond lengths and angles with esds | `test_geometry_table.py::test_corundum_matches_the_published_geometry` | Lewis, Schwarzenbach & Flack (1982); and `::test_esd_matches_a_monte_carlo_through_decode` |
+      | Parametric refinement | `test_parametric_series.py::test_a_constant_declaration_is_refine_multi_bit_for_bit` | `refine_multi`, bit for bit; and `::test_a_parametric_slope_recovers_a_known_expansion_within_its_esd` |
+      | Distortion-mode amplitudes (since #1051) | `test_distortion_modes.py::test_lamno3_reproduces_table_13` | Perez-Mato et al. (2010) Table 13 |
+      | Subgroup enumeration (since #1051) | `test_subgroups.py::test_each_published_subgroup_is_present_with_its_transformation` | International Tables A1; and `::test_pmmm_has_eight_fmmm_subgroups` |
+- [x] Each `unverified` feature verified (a test against a formula or another code) or
       fenced until it is.
-- [ ] The feature registry: each feature with its help keys, its Theory section and the
+- [x] The feature registry: each feature with its help keys, its Theory section and the
       claims that reference it (a `features` field on `Claim`); the four featureless
       topics given a section or a declared exception.
-- [ ] The state per feature, derived: what verifies it, what validates it with the
+- [x] The state per feature, derived: what verifies it, what validates it with the
       mismatch, its domain and the development-data flag, and *not yet validated* where
       the second is empty; `docs/VALIDATION.md` regenerated with the feature table.
-- [ ] `prediction` claims retiered by rule: a claim validates only against an
+- [x] `prediction` claims retiered by rule: a claim validates only against an
       independent measurement. The reviewer's count at feae4c75e: 9 `prediction` claims,
       of which 6 (two capillary identities, three Nd₂Ru₂O₇ joint-wavelength, one Si 640c
       against XND) are referenced to the package's own arithmetic or another code and a
@@ -141,22 +166,22 @@ symbols, joint fits) and get one or a declared exception.
       claim is an identity. The meta-test enumerates them. `TIERS["prediction"]`'s
       text, which calls the capillary ΔB prediction the strongest evidence in the repo,
       rewritten to say which kind of reference value a prediction checks against.
-- [ ] The matrix's own prose uses of *validate* in verification's sense reworded
+- [x] The matrix's own prose uses of *validate* in verification's sense reworded
       (start dependence as "a validation axis", "would validate a configuration", the
       anode wavelength tables, the multi-phase CIF round trip), `docs/VALIDATION.md`
       regenerated.
-- [ ] The report sentence: a result that reports a quantity from a feature with no
+- [x] The report sentence: a result that reports a quantity from a feature with no
       independent measurement lists it once, read from the registry; absent otherwise.
-- [ ] The meta-test: the feature list partitions the help vocabulary and the Theory
+- [x] The meta-test: the feature list partitions the help vocabulary and the Theory
       headings both ways; every claim and test a feature names exists; every
       `prediction` claim names its reference value's kind.
-- [ ] Root CLAUDE.md § Invariants: the clause "Every physics function cites its
+- [x] Root CLAUDE.md § Invariants: the clause "Every physics function cites its
       reference" names the meta-test.
-- [ ] 1327's `### Inherited` note updated: the report sentence's wording for the moment.
+- [x] 1327's `### Inherited` note updated: the report sentence's wording for the moment.
 - [ ] Follow-ups filed: the ceria round robin as a microstructure measurement; references
       for data already in the tree (a Le Bail cell against the SRM 660c and 676a
       certificates, published space groups for the extinction symbols, LaMnO₃'s Pn′ma′).
-- [ ] Tests; the fast count moved by exactly the tests added.
+- [x] Tests; the fast count moved by exactly the tests added.
 - [ ] Skill: none. The report sentence is the package's own output (DESIGN.md § Rules, 3).
 
 ## Acceptance
@@ -184,6 +209,34 @@ confirm the new test goes red naming it.
   patterns are served from the first author's University of Denver page.
 
 ## Handover log
+
+- **2026-10-31 (build, the reporter's PR)** — the registry, the join, the retier by rule
+  and the report sentence, as ruled on #1051.
+
+  *Done.* The first commit carries the list: 17 features no acceptance claim references
+  on main at 8b9c0a3ae, the 15 of #1051 plus distortion modes and subgroup enumeration,
+  each with its verifying test; none unverified, the TOF pair fenced by the fit's
+  refusal. `rietx.features` registers 45 features (help keys, Theory headings or a
+  declared exception for TOF shape, peak picking, extinction symbols and joint fits) and
+  22 exemptions. `Claim.features` joins 125 of 143 claims; `FEATURE_TESTS` names the unit
+  tests for the 19 features no claim verifies (the 17, plus size/strain and peak
+  picking, whose claims are `characterisation` only). `reference_kind` on every
+  `prediction` row and `validates()` apply the rule: 8 of 9 predictions verify (the
+  seven of the ruling and the bethanechol zeroshift row, checked against the package's
+  own collinearity), 11 features are validated, all on development data.
+  `FitReport.not_independently_measured` is the report sentence. One new test checks
+  the Whittaker baseline against its defining system.
+
+  *Measured.* Fast suite, Linux x86-64, Python 3.12, `[dev]`, `-n 8`, on 8443d05e0:
+  13246 passed, 163 skipped, 32 xfailed, 0 failed, 5:51. Tests added: 300 in the fast
+  selection (`test_validation_matrix.py` 730 → 1024; 5 in `test_features_report.py`; 1
+  in `test_profiles_background.py`). On `examples/srm660c_lab.py`'s fit the sentence
+  names 21 of 26 free parameters and both derived blocks, 970 characters.
+
+  *For the maintainer.* The rule's count is 8, not 6 or 7; the sentence is on nearly
+  every Rietveld report under the literal reading; `test_the_held_cell_is_the_certificate`
+  keeps its tier, joined to no feature. All three are in the PR body. The ceria round
+  robin is not filed (yours, per the entry below).
 
 - **2026-10-31** — a wording ruling and a consistency read of the rule set, no code.
 

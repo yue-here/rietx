@@ -25,13 +25,18 @@ from tests.validation_matrix import (
     CLAIM_TIERS,
     CLAIMS,
     CLOSING_WINDOW_TOL_DEFAULT,
+    DATASET_STATES,
     DATASETS,
     DISPERSION_DEFAULT_ON,
+    FEATURE_TESTS,
     GAPS,
     INTERMEDIATE_FTOL_DEFAULT,
+    REFERENCE_KINDS,
     START_DEPENDENCE_RULE,
     TIERS,
     render_markdown,
+    validates,
+    verifies,
 )
 
 TESTS = pathlib.Path(__file__).resolve().parent
@@ -328,3 +333,215 @@ def test_the_generated_doc_is_committed_and_current() -> None:
         "docs/VALIDATION.md has drifted from tests/validation_matrix.py.  "
         "Regenerate it: `.venv/bin/python -m tests.validation_matrix`  "
         "(the doc is generated output — edit the registry, not the doc).")
+
+
+# ---------------------------------------------------------------------------
+# The feature registry and its join (WP-2010).  ``rietx.features`` names every
+# feature once; these hold it to the help vocabulary and the Theory headings,
+# both ways, and to the claims and tests that verify and validate it.
+# ---------------------------------------------------------------------------
+
+THEORY = ROOT / "docs" / "docs" / "theory"
+
+
+def _theory_headings() -> list[str]:
+    """Every H2 and H3 of the Theory tab, ``"<page> § <heading text>"``.
+
+    Fenced blocks are skipped, so a ``## `` inside a code example is not a
+    heading; ``index.md`` and ``references.md`` hold no topic.
+    """
+    out: list[str] = []
+    for page in sorted(THEORY.glob("*.md")):
+        if page.name in ("index.md", "references.md"):
+            continue
+        fence = False
+        for line in page.read_text(encoding="utf-8").splitlines():
+            if line.startswith("```"):
+                fence = not fence
+                continue
+            if fence:
+                continue
+            for marks in ("## ", "### "):
+                if line.startswith(marks):
+                    out.append(f"{page.stem} § {line[len(marks):].strip()}")
+    return out
+
+
+def _partition_errors(vocabulary: list[str], features, not_features) -> list[str]:
+    """What breaks the partition: a key claimed twice, unclaimed, or dead.
+
+    ``vocabulary`` is the live set (help keys and Theory headings together);
+    each must be claimed by exactly one feature or exempted once, and every
+    key a feature or an exemption names must be live.
+    """
+    owner: dict[str, str] = {}
+    errors: list[str] = []
+    for name, f in features.items():
+        for key in (*f.parameters, *f.instrument_fields, *f.theory):
+            if key in owner:
+                errors.append(f"{key!r} is claimed by {owner[key]} and {name}")
+            owner[key] = name
+    for key in not_features:
+        if key in owner:
+            errors.append(f"{key!r} is claimed by {owner[key]} and exempted")
+        owner[key] = "NOT_FEATURES"
+    live = set(vocabulary)
+    errors += [f"{key!r} is claimed by no feature and not exempted"
+               for key in vocabulary if key not in owner]
+    errors += [f"{key!r} ({who}) names nothing on the tree"
+               for key, who in owner.items() if key not in live]
+    return errors
+
+
+def _vocabulary() -> list[str]:
+    from rietx.help import INSTRUMENT_FIELD_HELP, PARAMETER_HELP
+
+    return [*PARAMETER_HELP, *INSTRUMENT_FIELD_HELP, *_theory_headings()]
+
+
+def test_the_features_partition_the_help_vocabulary_and_the_theory_headings() -> None:
+    """Both ways: a new family or heading no feature claims fails by name,
+    and so does a key the registry names that the tree no longer has."""
+    from rietx.features import FEATURES, NOT_FEATURES
+
+    errors = _partition_errors(_vocabulary(), FEATURES, NOT_FEATURES)
+    assert not errors, (
+        "the feature registry does not partition the help vocabulary and the "
+        "Theory headings:\n  " + "\n  ".join(errors) + "\nA new help family "
+        "or Theory heading joins a feature in src/rietx/features.py (or "
+        "NOT_FEATURES with its reason); a renamed one is renamed there too.")
+
+
+def test_the_partition_check_names_a_new_family_and_a_dead_key() -> None:
+    """The positive arm: the check above can fail, and says which key."""
+    from dataclasses import replace
+
+    from rietx.features import FEATURES, NOT_FEATURES
+
+    vocabulary = [*_vocabulary(), "phases.*.throwaway_family"]
+    errors = _partition_errors(vocabulary, FEATURES, NOT_FEATURES)
+    assert errors == ["'phases.*.throwaway_family' is claimed by no feature "
+                      "and not exempted"]
+    feats = dict(FEATURES)
+    feats["qpa"] = replace(feats["qpa"], theory=(*feats["qpa"].theory,
+                                                 "corrections § Gone"))
+    errors = _partition_errors(_vocabulary(), feats, NOT_FEATURES)
+    assert errors == ["'corrections § Gone' (qpa) names nothing on the tree"]
+
+
+def test_a_feature_with_no_theory_heading_declares_why() -> None:
+    """The four featureless topics: a heading or a declared exception, not
+    both and not neither."""
+    from rietx.features import FEATURES
+
+    for name, f in FEATURES.items():
+        assert bool(f.theory) != bool(f.no_theory.strip()), (
+            f"{name}: give it Theory headings or a no_theory reason, never "
+            "both or neither")
+    assert sorted(n for n, f in FEATURES.items() if f.no_theory) == [
+        "extinction_symbols", "joint_refinement", "peak_picking_and_fitting",
+        "tof_profile"]
+
+
+@pytest.mark.parametrize("claim", CLAIMS, ids=lambda c: c.test)
+def test_a_claim_names_registered_features(claim) -> None:
+    from rietx.features import FEATURES
+
+    unknown = [f for f in claim.features if f not in FEATURES]
+    assert not unknown, (
+        f"{claim.test} names feature(s) {unknown} that rietx.features does "
+        "not register")
+    assert len(set(claim.features)) == len(claim.features)
+
+
+def test_every_feature_is_verified_by_a_claim_or_a_named_test() -> None:
+    """A feature ships verified or does not ship (DESIGN.md § Rules, 2)."""
+    from rietx.features import FEATURES
+
+    verified = {f for c in CLAIMS if verifies(c) for f in c.features}
+    bare = sorted(f for f in FEATURES
+                  if f not in verified and f not in FEATURE_TESTS)
+    assert not bare, (
+        f"features no claim and no named test verifies: {bare}.  Name the "
+        "test that checks each against a formula, a published table, another "
+        "code or a known answer in validation_matrix.FEATURE_TESTS, write one, "
+        "or fence the feature until one exists.")
+    assert set(FEATURE_TESTS) <= set(FEATURES), (
+        f"FEATURE_TESTS names features the registry lacks: "
+        f"{sorted(set(FEATURE_TESTS) - set(FEATURES))}")
+
+
+def test_every_test_a_feature_names_exists() -> None:
+    """By AST, as the claims are: the name must be a ``def test_*``."""
+    missing = []
+    for feature, tests in FEATURE_TESTS.items():
+        for node_id in tests:
+            module, name = node_id.split("::")
+            path = TESTS / module
+            if not path.exists():
+                missing.append(f"{feature}: {node_id} (no file)")
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            names = {n.name for n in ast.walk(tree)
+                     if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+            if name not in names:
+                missing.append(f"{feature}: {node_id}")
+    assert not missing, f"FEATURE_TESTS names tests that do not exist: {missing}"
+
+
+@pytest.mark.parametrize("claim", CLAIMS, ids=lambda c: c.test)
+def test_every_prediction_names_its_reference_values_kind(claim) -> None:
+    """The kind decides whether the row verifies or validates (WP-2010)."""
+    if "prediction" in claim.tiers:
+        assert claim.reference_kind in REFERENCE_KINDS, (
+            f"{claim.test} is a prediction and names reference_kind "
+            f"{claim.reference_kind!r}; use one of {sorted(REFERENCE_KINDS)}")
+    else:
+        assert not claim.reference_kind, (
+            f"{claim.test} names a reference_kind but is not a prediction")
+
+
+def test_the_predictions_that_verify_rather_than_validate() -> None:
+    """The retier of 2026-10-31 by rule, enumerated so a change shows here.
+
+    Yue's ruling on #1051 counted 6 or 7 of the 9 ``prediction`` rows; the rule
+    gives 8: his seven (two capillary identities, three Nd₂Ru₂O₇
+    joint-wavelength rows, Si 640c against XND, the v0.3 microabsorption table)
+    and the bethanechol zeroshift row, whose prediction is checked against the
+    package's own collinearity statistic.  The ninth, the dispersion fractions
+    against the weighed compositions, validates.
+    """
+    verifying = {c.test for c in CLAIMS
+                 if "prediction" in c.tiers and not validates(c)}
+    assert verifying == {
+        "test_capillary_absorption_is_an_exact_reparameterisation",
+        "test_the_absorption_shift_is_independent_of_dispersion",
+        "test_the_refined_wavelength_is_the_solo_cell_disagreement",
+        "test_swapping_which_wavelength_is_held_measures_the_same_ratio",
+        "test_the_neutron_widths_leave_one_esd_at_every_start",
+        "test_the_symmetric_window_recovers_xnd_to_sub_ppm",
+        "test_the_microabsorption_shape_was_mostly_dispersion",
+        "test_the_2004_zeroshift_hypothesis_cannot_be_tested_on_these_data",
+    }
+    validating = {c.test for c in CLAIMS
+                  if "prediction" in c.tiers and validates(c)}
+    assert validating == {"test_sample1_fractions_beat_the_dispersion_free_fit"}
+
+
+def test_the_registry_bit_is_the_matrix_derivation() -> None:
+    """``Feature.independently_measured`` is a copy the report reads at run
+    time; this is what keeps it the matrix's answer."""
+    from rietx.features import FEATURES
+
+    validated = {f for c in CLAIMS if validates(c) for f in c.features}
+    wrong = sorted(n for n, f in FEATURES.items()
+                   if f.independently_measured != (n in validated))
+    assert not wrong, (
+        f"rietx.features disagrees with the matrix on {wrong}: set "
+        "independently_measured to whether a validating claim names it")
+    assert len(validated) == 11
+
+
+def test_every_dataset_state_is_one_of_rule_twos_three() -> None:
+    for key, ds in DATASETS.items():
+        assert ds.state in DATASET_STATES, f"{key}: state {ds.state!r}"

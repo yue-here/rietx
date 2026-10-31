@@ -51,7 +51,7 @@ Asserts no accuracy at all.  Either the *shape* of a known systematic (that a ce
 
 ### `prediction`
 
-A parameter-free prediction written down **before** the measurement, then checked.  The strongest evidence in this repo and the rarest: the capillary correction's ΔB = c(µR)·λ²/2 predicted 0.016875 Å² and the refits moved every Biso by 0.01687, and the dispersion prediction (each phase's Bragg-power ratio, no free parameters) beat itself — predicted RMS 0.83 wt %, measured 0.69 (0.62 on 1.9.0).
+A parameter-free prediction written down **before** the measurement, then checked.  What it is checked against decides what it shows, and each row names that kind (`reference_kind`, WP-2010): against an independent measurement it validates, as the dispersion prediction does against the round robin's weighed compositions (predicted RMS 0.83 wt %, measured 0.69, 0.62 on 1.9.0); against the package's own arithmetic, its own earlier result or another code it verifies, however exact the agreement.  The capillary correction's ΔB = c(µR)·λ²/2 predicted 0.016875 Å² and the refits moved every Biso by 0.01687, which shows the code computes the reparameterisation it claims and says nothing about the specimen.
 
 ### `ceiling`
 
@@ -60,7 +60,7 @@ A parameter-free prediction written down **before** the measurement, then checke
 ## Start dependence
 
 How many independent starting points a quoted number has to survive. This is
-a validation axis because it was measured to change a conclusion: sweeping the
+a verification axis because it was measured to change a conclusion: sweeping the
 Stephens strain seed over 400/800/1600/3000 on round-robin brucite leaves the
 coefficients spanning ~100 % relative spread under *both* solvers, and moves the
 unconstrained fit in and out of the physical cone (15, 12, 0, 0 reflections
@@ -104,6 +104,427 @@ either fine or broken depending on which seed the suite happened to pin.
 SRM 660a LaB6 itself, so a refined LaB6 cell from that file reproduces the
 certificate by construction. A guard refuses to let any such dataset carry a
 `certificate` row.
+
+## Features
+
+Each feature of `rietx.features.FEATURES` (WP-2010), with what verifies it and what
+validates it. A claim names the feature its bar is about (`Claim.features`). A
+claim validates only against an independent measurement: `certificate` and
+`spread` rows do, and a `prediction` row does only where its `reference_kind` is
+`independent_measurement`. Every dataset in the tree is development data, so a
+validation here is a validation on development data (DESIGN.md § Rules, 2). A
+feature with no independent measurement is *not yet validated*, which says
+nothing against it and is not *provisional*.
+
+The `prediction` rows that verify rather than validate, by that rule: `test_the_microabsorption_shape_was_mostly_dispersion` (own_result), `test_capillary_absorption_is_an_exact_reparameterisation` (own_arithmetic), `test_the_absorption_shift_is_independent_of_dispersion` (own_arithmetic), `test_the_2004_zeroshift_hypothesis_cannot_be_tested_on_these_data` (own_arithmetic), `test_the_refined_wavelength_is_the_solo_cell_disagreement` (own_result), `test_swapping_which_wavelength_is_held_measures_the_same_ratio` (own_arithmetic), `test_the_neutron_widths_leave_one_esd_at_every_start` (own_arithmetic), `test_the_symmetric_window_recovers_xnd_to_sub_ppm` (another_code).
+
+### `lattice_metric`
+
+Cell and Bragg's law.
+
+**Verified by:** `test_the_cbn_cell_agrees_with_topas_to_better_than_50_ppm`, `test_srm660c_lab6_rietveld`, `test_srm676a_corundum_cell_anchor`, `test_the_two_descriptions_of_the_r_lattice_refine_to_the_same_cell`, `test_drx_cells_land_inside_the_two_engines_envelope`, `test_drx_agrees_with_topas_far_more_closely_than_the_engines_agree`, `test_fap_lab_rietveld_matches_gsas`, `test_nac_lebail_then_rietveld`, `test_the_cell_belongs_to_the_synchrotron`
+
+**Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data). Mismatch: a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
+
+**Validated by:** `test_srm676a_corundum_cell_anchor`, dataset `srm676a` (development data). Mismatch: c/a +29 ppm; absolute axes -314 / -284 ppm with |da - dc| within 2.9e-5; Rwp 14.4 %, GoF 1.60 against a GoF floor of 1.5-1.9 for analytical-PSF lab fits (Cline 2015); 1.9.0 read +30, -312 / -282 ppm, Rwp 14.6 % and GoF 1.63
+
+**State:** validated on development data.
+
+### `wavelength`
+
+Emission lines, wavelength scales, harmonics, wavelength-cell degeneracy.
+
+**Verified by:** `test_srm660c_lab6_rietveld`, `test_the_refined_wavelength_is_the_solo_cell_disagreement`, `test_the_diagnostic_reports_the_ppm_and_nothing_claims_rwp`, `test_swapping_which_wavelength_is_held_measures_the_same_ratio`, `test_the_refined_wavelength_recovers_xnds_calibration_error`, `test_the_symmetric_window_recovers_xnd_to_sub_ppm`, `test_the_wavelength_calibration_diagnostic_fires_once_and_reports_the_ppm`
+
+**Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data). Mismatch: a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
+
+**State:** validated on development data.
+
+### `position_aberrations`
+
+Zero, specimen displacement and transparency.
+
+**Verified by:** `test_srm660c_lab6_rietveld`
+
+**Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data). Mismatch: a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
+
+**State:** validated on development data.
+
+### `capillary_offsets`
+
+Capillary offsets along and across the beam.
+
+**Verified by:** unit tests `tests/test_capillary_displacement.py::test_eq4_is_the_ray_trace_to_first_order`, `tests/test_capillary_displacement.py::test_an_injected_displacement_is_recovered_on_both_axes`
+
+**State:** not yet validated.
+
+### `tof_calibration`
+
+Time-of-flight calibration (DIFC, DIFA, DIFB, TZERO).
+
+**Verified by:** unit tests `tests/test_tof_axis.py::test_a_synthetic_bank_converts_back_to_the_d_spacings_it_was_built_from`, `tests/test_tof_axis.py::test_fit_refuses_a_tof_pattern_against_a_cw_instrument`
+
+**State:** not yet validated.
+
+### `tof_profile`
+
+Time-of-flight peak shape and incident spectrum.
+
+**Verified by:** unit tests `tests/test_instrument_tof.py::test_the_default_type_three_block_is_read_in_the_manuals_order`, `tests/test_tof_axis.py::test_fit_refuses_a_tof_pattern_against_a_cw_instrument`
+
+**State:** not yet validated.
+
+### `instrument_profile`
+
+Caglioti/TCH pseudo-Voigt and true Voigt.
+
+**Verified by:** `test_lab6_drawn_peak_widths_match_the_reference_profile`, `test_fap_lorentzian_matches_gsas_lx_on_gsas_own_model`
+
+**State:** not yet validated.
+
+### `axial_divergence`
+
+Finger-Cox-Jephcoat axial divergence.
+
+**Verified by:** `test_the_refined_wavelength_recovers_xnds_calibration_error`, `test_the_symmetric_window_recovers_xnd_to_sub_ppm`
+
+**State:** not yet validated.
+
+### `bragg_intensities`
+
+Bragg intensities: structure factor, X-ray f0, occupancy, Lorentz-polarisation, Rietveld mode.
+
+**Verified by:** `test_sample1_fractions_within_participant_spread`
+
+**Validated by:** `test_sample1_fractions_within_participant_spread`, dataset `qarr` (development data). Mismatch: worst 5.10 wt % (1f zincite), traces <= 1.3, RMS 2.30; closure exact to 1e-6.  1.9.0 read 4.92, 1.1 and 2.19; WP-2002's closing stage (#1085) took them to 5.08 and 2.26 and its width twin hold (#1113) to 5.10 and 2.30
+
+**State:** validated on development data.
+
+### `neutron_scattering`
+
+Neutron scattering lengths.
+
+**Verified by:** unit tests `tests/test_neutron_scattering.py::test_natural_element_scattering_lengths_match_gemmi_sears_1992`
+
+**State:** not yet validated.
+
+### `anomalous_dispersion`
+
+Anomalous scattering f′ and f″ (Source.dispersion).
+
+**Verified by:** `test_sample1_fractions_beat_the_dispersion_free_fit`, `test_the_microabsorption_shape_was_mostly_dispersion`, `test_zincite_cell_does_not_move`, `test_srm660c_lattice_parameter_is_untouched`, `test_the_neglect_diagnostic_clears_when_the_block_is_on`
+
+**Validated by:** `test_sample1_fractions_beat_the_dispersion_free_fit`, dataset `qarr` (development data). Mismatch: worst 1.37 wt % (was 5.13); 1.20 on 1.9.0, before WP-2002's closing stage (#1085, 1.34) and width twin hold (#1113)
+
+**State:** validated on development data.
+
+### `displacement_parameters`
+
+Isotropic and anisotropic displacement parameters.
+
+**Verified by:** `test_tying_the_similar_atoms_bisos_buys_precision`, `test_biso_is_positive_and_agrees_with_xnd`
+
+**State:** not yet validated.
+
+### `atomic_coordinates`
+
+Fractional coordinates and site-symmetry DOFs.
+
+**Verified by:** `test_the_one_free_coordinate_agrees`, `test_fap_lab_rietveld_matches_gsas`
+
+**State:** not yet validated.
+
+### `rigid_bodies`
+
+Rigid bodies (origin, rotation, torsions; riding H).
+
+**Verified by:** unit tests `tests/test_rigid_body.py::test_body_esds_equal_the_central_fd_chain`, `tests/test_rigid_body.py::test_orientation_recovered_from_a_synthetic_pattern`
+
+**State:** not yet validated.
+
+### `restraints`
+
+Soft restraints and their weighting (Phase.restraints).
+
+**Verified by:** unit tests `tests/test_restraints.py::test_restraint_jacobian_matches_fd_per_kind`, `tests/test_restraints.py::test_bond_restraint_recovers_perturbed_coordinate`
+
+**State:** not yet validated.
+
+### `primary_extinction`
+
+Primary extinction (Sabine).
+
+**Verified by:** `test_nac_extinction_on_the_main_phase_is_bounded_and_unbiasing`
+
+**State:** not yet validated.
+
+### `march_dollase`
+
+Preferred orientation, March-Dollase.
+
+**Verified by:** `test_sample2_brucite_march_dollase`
+
+**Validated by:** `test_sample2_brucite_march_dollase`, dataset `qarr` (development data). Mismatch: r ~ 0.67; worst fraction 3.0 wt % (zincite); H Biso held at exactly 2.5; 1.9.0 read 2.8 wt %
+
+**State:** validated on development data.
+
+### `spherical_harmonics_texture`
+
+Preferred orientation, spherical harmonics.
+
+**Verified by:** `test_sample2_brucite_spherical_harmonics`, `test_c20_and_c40_agree_with_topas_with_no_conversion`, `test_the_measured_ratio_excludes_the_other_normalisations`, `test_without_texture_the_plate_fits_measurably_worse`
+
+**Validated by:** `test_sample2_brucite_spherical_harmonics`, dataset `qarr` (development data). Mismatch: worst fraction 3.71 wt % at order 4, 2.91 at order 6, against March-Dollase's 3.01; C2,0 1.40(4) and 1.39(5); J 1.45 and 1.46; min P 0.47 and 0.39.  Measured by WP-1960 before WP-2002: 3.41, 2.71 and 2.80; the closing stage (#1085) and the width twin hold (#1113) each moved them
+
+**State:** validated on development data.
+
+### `qpa`
+
+Quantitative phase analysis and microabsorption.
+
+**Verified by:** `test_the_qpa_agrees_with_topas_within_its_own_esd`, `test_drx_phase_scales_are_the_same_answer_as_topas`, `test_sample1_fractions_within_participant_spread`, `test_a_supported_trace_phase_is_never_held`, `test_sample2_brucite_march_dollase`, `test_sample2_brucite_spherical_harmonics`, `test_sample1_fractions_beat_the_dispersion_free_fit`, `test_chained_qpa_within_participant_spread`
+
+**Validated by:** `test_sample1_fractions_within_participant_spread`, dataset `qarr` (development data). Mismatch: worst 5.10 wt % (1f zincite), traces <= 1.3, RMS 2.30; closure exact to 1e-6.  1.9.0 read 4.92, 1.1 and 2.19; WP-2002's closing stage (#1085) took them to 5.08 and 2.26 and its width twin hold (#1113) to 5.10 and 2.30
+
+**Validated by:** `test_sample2_brucite_march_dollase`, dataset `qarr` (development data). Mismatch: r ~ 0.67; worst fraction 3.0 wt % (zincite); H Biso held at exactly 2.5; 1.9.0 read 2.8 wt %
+
+**Validated by:** `test_sample2_brucite_spherical_harmonics`, dataset `qarr` (development data). Mismatch: worst fraction 3.71 wt % at order 4, 2.91 at order 6, against March-Dollase's 3.01; C2,0 1.40(4) and 1.39(5); J 1.45 and 1.46; min P 0.47 and 0.39.  Measured by WP-1960 before WP-2002: 3.41, 2.71 and 2.80; the closing stage (#1085) and the width twin hold (#1113) each moved them
+
+**Validated by:** `test_sample1_fractions_beat_the_dispersion_free_fit`, dataset `qarr` (development data). Mismatch: worst 1.37 wt % (was 5.13); 1.20 on 1.9.0, before WP-2002's closing stage (#1085, 1.34) and width twin hold (#1113)
+
+**Validated by:** `test_chained_qpa_within_participant_spread`, dataset `qarr` (development data). Mismatch: identical to the independent fits' record
+
+**State:** validated on development data.
+
+### `attenuation_estimate`
+
+Attenuation coefficients from composition.
+
+**Verified by:** `test_estimated_mu_r_matches_the_documented_capillary`
+
+**State:** not yet validated.
+
+### `capillary_absorption`
+
+Capillary absorption (Rouse).
+
+**Verified by:** `test_capillary_absorption_is_an_exact_reparameterisation`, `test_the_absorption_shift_is_independent_of_dispersion`
+
+**State:** not yet validated.
+
+### `flat_plate_absorption`
+
+Flat-plate absorption (thin specimen).
+
+**Verified by:** unit tests `tests/test_flat_plate.py::test_reflection_matches_the_defining_integral`, `tests/test_flat_plate.py::test_transmission_matches_the_defining_integral`
+
+**State:** not yet validated.
+
+### `surface_roughness`
+
+Surface roughness (Suortti, Pitschke).
+
+**Verified by:** unit tests `tests/test_surface_roughness.py::test_suortti_matches_an_independent_transcription_of_the_published_form`, `tests/test_surface_roughness.py::test_injected_roughness_is_recovered_and_is_resolved_not_merely_fitted`
+
+**State:** not yet validated.
+
+### `size_strain`
+
+Isotropic size and strain widths.
+
+**Verified by:** unit tests `tests/test_profile_size.py::test_the_size_coefficient_maps_to_one_size_at_every_angle`, `tests/test_profile_size.py::test_delta_q_is_scherrer_in_q_whatever_the_instrument`
+
+**State:** not yet validated.
+
+### `microstructure_readings`
+
+A width read as a domain size or a strain.
+
+**Verified by:** unit tests `tests/test_microstructure.py::test_the_strain_coefficient_is_360_over_pi_times_the_strain`, `tests/test_microstructure.py::test_a_size_reads_back_the_crystallite_it_was_built_from`
+
+**State:** not yet validated.
+
+### `stephens_strain`
+
+Stephens anisotropic strain.
+
+**Verified by:** `test_corundum_block_is_inert_and_hamilton_blesses_it_only_at_raw_n`
+
+**State:** not yet validated.
+
+### `magnetic_structure`
+
+Magnetic moments, magnetic form factor, magnetic widths.
+
+**Verified by:** `test_the_4k_moment_does_not_depend_on_its_in_plane_seed`
+
+**State:** not yet validated.
+
+### `magnetic_determination`
+
+Representation analysis and magnetic candidates (solve_magnetic).
+
+**Verified by:** unit tests `tests/test_magnetic_irreps.py::test_character_tables_agree_with_the_spgrep_oracle_for_all_230_groups`, `tests/test_magnetic_isotropy.py::test_pnma_at_gamma_has_exactly_four_maximal_magnetic_subgroups`
+
+**State:** not yet validated.
+
+### `satellites`
+
+Satellites of a propagation vector (Phase.propagation_vector).
+
+**Verified by:** unit tests `tests/test_satellites.py::test_the_manuals_two_worked_examples_on_a_c_lattice`, `tests/test_satellites.py::test_a_satellite_orbit_is_a_multiplicity`
+
+**State:** not yet validated.
+
+### `background_curve`
+
+Chebyshev / P-spline background and air scatter.
+
+**Verified by:** `test_the_chebyshev6_arm_relaxes_the_peak_onto_the_envelope`, `test_a_longer_polynomial_eats_the_measured_scale`
+
+**State:** not yet validated.
+
+### `measured_background`
+
+A measured (blank) background and its scale.
+
+**Verified by:** `test_a_measured_blank_beats_the_polynomial_and_the_fitted_hump`, `test_the_refined_scale_rejects_the_only_value_the_code_could_express`, `test_the_hand_set_scan_puts_the_minimum_where_the_scale_landed`, `test_a_longer_polynomial_eats_the_measured_scale`
+
+**State:** not yet validated.
+
+### `background_estimation`
+
+Model-free background estimate (auto_background).
+
+**Verified by:** unit tests `tests/test_profiles_background.py::test_the_whittaker_baseline_solves_its_defining_system`, `tests/test_profiles_background.py::test_arpls_recovers_baseline_under_peaks`
+
+**State:** not yet validated.
+
+### `extra_components`
+
+Humps and declared extra peaks.
+
+**Verified by:** `test_declaring_the_intruder_recovers_the_clean_cell`, `test_the_excluded_regions_alternative_is_quoted_and_never_gated`, `test_the_declared_holder_lines_come_back_where_they_were_put`, `test_the_declared_peaks_are_ticks_and_not_background`, `test_one_hump_beats_three_more_polynomial_terms`, `test_the_peak_is_diffuse_by_three_orders_and_frees_the_structural_esd`, `test_the_chebyshev6_arm_relaxes_the_peak_onto_the_envelope`
+
+**State:** not yet validated.
+
+### `lebail_pawley`
+
+Le Bail and Pawley intensity extraction (modes).
+
+**Verified by:** `test_a_pawley_fit_past_the_bvls_cut_converges_every_stage`, `test_nac_lebail_then_rietveld`
+
+**State:** not yet validated.
+
+### `indexing`
+
+Indexing: engines, figures of merit, lattice ambiguity, supercells.
+
+**Verified by:** `test_every_set_is_twenty_ascending_lines`, `test_table_5_reconstruction_sums_to_the_published_globals`, `test_the_zeroshift_correction_is_exactly_the_paper_s`, `test_the_intensity_cut_is_a_subset_of_the_same_measurement`, `test_the_published_cell_reproduces_the_paper_s_impurity_counts`, `test_the_runner_adopts_the_paper_s_domain_from_the_fixture`, `test_the_scoring_rule_is_the_paper_s_and_reads_it_from_the_fixture`, `test_the_published_cell_is_recognised_in_the_setting_the_search_returns`, `test_published_figures_of_merit_are_reproduced_unfloored`, `test_positions_alone_cannot_separate_lab6_from_a_half_volume_rival`, `test_the_cross_code_cell_leads_because_the_engines_agree_on_it`
+
+**Validated by:** `test_a_certified_lab_pattern_indexes_and_is_graded_honestly`, dataset `srm676a` (development data). Mismatch: ranked first, trigonal R, a +89 ppm and c +60 ppm, 44 of 46 lines, chi2_red 0.55.  Confidence low on three caveats: engines_disagree, predicted_but_absent (11 -- the R-3c c-glide, not an oversized cell) and fom_panel_disagrees.  best_or_none() returns None.  WP-1038 cleared two of the former four: the shift is now MEASURED before the search from harmonic reflection pairs (-0.0641 deg, against an independently known -0.065), so shift_allowance_assumed no longer fires, and the measured window crosses the 0.9 bar unaided (indexed fraction 0.957).  WP-1110 and WP-1510 took two no_intensity components and five duplicate copies out of the usable list, so the row reads 45 of 47 where it read 51 of 55 (the 49-line and +101 ppm figures of the assumed 0.05 deg window are WP-1038's, not re-run).  The wider window is not free: a window that cannot rule out a constant must stay at |c| everywhere, where the true cos(theta) deviation has fallen to 0.26|c| by 150 deg.  1.9.0 read a +110 and c +57 ppm, 45 of 47 lines and chi2_red 0.67; the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list
+
+**Validated by:** `test_declaring_the_shift_template_is_what_recovers_the_certificate`, dataset `srm676a` (development data). Mismatch: fitted shift -0.0699 +/- 0.0192 deg; a +89 -> -111 ppm, c +60 -> -96 ppm, c/a -29 -> +15 ppm; M20 23.3 -> 187.1, F_N 15.3 -> 145.0, Le Bail Rwp 0.256 -> 0.176.  Since WP-1038 the two mechanisms are cleanly separated: the pair-MEASURED magnitude widens the window and finds lines (both calls index 44 of 46, so indexed_fraction_low has already cleared before the template is declared), and the DECLARED shape is what moves the cell.  Three routes to one systematic, none told the answer: -0.0641 from pairs pre-search, -0.0749 from the post-candidate fit, -0.065 measured against the certificate.  Still low, on caveats that have nothing to do with the shift.  1.9.0 read -0.0749 +/- 0.0187 deg, a +110 -> -114 and c +57 -> -109 ppm, c/a -54 -> +5, M20 23.7 -> 160.0, F_N 16.6 -> 114.9 and Le Bail Rwp 0.285 -> 0.224: the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list, and WP-2002's closing stage and width twin hold (#1085, #1113) moved the Le Bail checks
+
+**Validated by:** `test_a_certified_cubic_cell_is_recovered_with_no_extinction_caveat`, dataset `srm660c` (development data). Mismatch: cubic P ranked first, a -127 ppm against the CIF's 4.156780 A; predicted_but_absent 0 of 30 and predicted_seen_fraction 1.000 against corundum's 0.58.  Still low, but the caveat list has been shrinking by evidence and is now ONE: fom_panel_disagrees.  WP-1038 cleared shift_allowance_assumed (this pattern's +0.0345 deg is measured from harmonic pairs before the search), and WP-1039 cleared engines_disagree -- trial_error was not failing to find the certified cell, it was solving from the wrong base lines, because its pool took the lowest-Q lines of the whole list and five of this pattern's low-angle components are not lines of the phase.  Drawn from the strongest-N selection instead, BOTH engines find it.  Agreement was necessary and not sufficient: a cubic-only search now promotes to high, this four-system one does not.  best_or_none() returns None
+
+**Validated by:** `test_the_shift_screen_survives_the_tail_components_but_the_search_cannot`, dataset `srm660c` (development data). Mismatch: tail components carry sigma ~0.005 deg against the real lines' ~0.0005; after the quadrature allowance that 100x contrast is 1.005.  Screen: +0.0367 +- 0.0015 (0.88 of the predicted 0.0415, the rest being the aberrations SRM 660c's own docstring names).  Search: +0.009 +- 0.016, consistent with none
+
+**Validated by:** `test_what_the_unflagged_tail_components_cost_the_certified_cell`, dataset `srm660c` (development data). Mismatch: a = 4.156801 A, +5 ppm, M20 3266, ZERO caveats, confidence high -- a first on real data, against -127 ppm with none of the three.  But best_or_none() is None: the a*sqrt2 cell (5.878605) reached high in BOTH its I and P descriptions, all three engines finding all three cells; since WP-1449 the P one is refuted as an index-2 superlattice of the I one (supercell_refuted, low) and the I one still reaches high.  The 'best_or_none() non-None' claim recorded here before WP-1041 held only while trial_error's scale-invariant dedup key could return one cubic candidate per search, denying the supercells its vote -- the flagship result was protected by a bug rather than by the gate.  Everything that refutes the supercell is measured and ungated: Rwp 0.100 vs 0.860/0.654, predicted_seen_fraction 1.00 vs 0.88/0.49, m_rev 2245 vs 6.8/1.9, unmatched_observed 21 vs 168/129 (169/127 and Rwp 0.861/0.660 on 1.9.0, before WP-2002's width twin hold moved the Le Bail checks), while the one gated detector (predicted_but_absent) reads 0 for all three.  Also measured: declaring the probe-trimmed screen's own sigma_sys (0.0078, the residual the template LEAVES) gives a window 4.9x too tight for the shift's amplitude (0.038): the search matches uncorrected positions, and only svd, which fits a zero error inside the search (ze +0.033), still finds the certified cell (+5 ppm), which one engine cannot promote past low
+
+**State:** validated on development data.
+
+### `peak_shift_screen`
+
+A systematic 2theta shift measured before the cell.
+
+**Verified by:** `test_the_zeroshift_correction_is_exactly_the_paper_s`, `test_the_2004_zeroshift_hypothesis_cannot_be_tested_on_these_data`
+
+**Validated by:** `test_declaring_the_shift_template_is_what_recovers_the_certificate`, dataset `srm676a` (development data). Mismatch: fitted shift -0.0699 +/- 0.0192 deg; a +89 -> -111 ppm, c +60 -> -96 ppm, c/a -29 -> +15 ppm; M20 23.3 -> 187.1, F_N 15.3 -> 145.0, Le Bail Rwp 0.256 -> 0.176.  Since WP-1038 the two mechanisms are cleanly separated: the pair-MEASURED magnitude widens the window and finds lines (both calls index 44 of 46, so indexed_fraction_low has already cleared before the template is declared), and the DECLARED shape is what moves the cell.  Three routes to one systematic, none told the answer: -0.0641 from pairs pre-search, -0.0749 from the post-candidate fit, -0.065 measured against the certificate.  Still low, on caveats that have nothing to do with the shift.  1.9.0 read -0.0749 +/- 0.0187 deg, a +110 -> -114 and c +57 -> -109 ppm, c/a -54 -> +5, M20 23.7 -> 160.0, F_N 16.6 -> 114.9 and Le Bail Rwp 0.285 -> 0.224: the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list, and WP-2002's closing stage and width twin hold (#1085, #1113) moved the Le Bail checks
+
+**Validated by:** `test_a_certified_shift_is_recovered_from_the_peak_list_alone`, dataset `srm660c` (development data). Mismatch: +0.0345 deg from 10 agreeing pairs of 19 admitted, z = 16.9 against 200 structureless replicates -- within 0.4 sigma of the reference-based fit it never saw, and 0.83 of the geometric prediction (the same 0.75-1.0 band the reference-based screen sits in, for the same reason).  separable is False: constant and cos_theta concentrate within one pair of each other, so a MAGNITUDE is measured and a CAUSE is not
+
+**Validated by:** `test_the_svd_zero_error_is_a_third_road_to_the_anchors_shift`, dataset `srm660c` (development data). Mismatch: +0.0329 deg, within 0.003 of both.  Started AT the certified cell, so this measures the COLUMN and not the search; the search's own use of it is asserted against an exactly known injected shift in test_indexing_engines.py.  It also reaches where the pair screen declines -- a bare 20-line list supplies too few pairs to concentrate, the published bethanechol failure, and this needs none
+
+**Validated by:** `test_the_svd_zero_error_is_a_third_road_to_corundums_shift`, dataset `srm676a` (development data). Mismatch: -0.0674 deg, within 0.003 of both.  Needs trim=1: the list opens on a 5.17 deg edge artifact 3.9x beyond the longest d the lattice allows, which breaks eq. (4)'s weighting outright.  A line no lattice can index is not a shifted line, and the column does not pretend otherwise
+
+**Validated by:** `test_the_shift_screen_survives_the_tail_components_but_the_search_cannot`, dataset `srm660c` (development data). Mismatch: tail components carry sigma ~0.005 deg against the real lines' ~0.0005; after the quadrature allowance that 100x contrast is 1.005.  Screen: +0.0367 +- 0.0015 (0.88 of the predicted 0.0415, the rest being the aberrations SRM 660c's own docstring names).  Search: +0.009 +- 0.016, consistent with none
+
+**State:** validated on development data.
+
+### `peak_picking_and_fitting`
+
+pick_peaks, fit_peaks and their flags.
+
+**Verified by:** unit tests `tests/test_peak_picking.py::test_group_jacobian_matches_finite_differences`, `tests/test_peak_picking.py::test_recovered_positions_and_esds_on_a_clean_group`
+
+**State:** not yet validated.
+
+### `extinction_symbols`
+
+Extinction symbols (determine_extinction_symbol).
+
+**Verified by:** unit tests `tests/test_extinction_symbol.py::test_the_condition_derivation_is_measured_over_the_whole_table`, `tests/test_extinction_symbol.py::test_corundum_returns_the_class_its_certificate_names`
+
+**State:** not yet validated.
+
+### `derived_geometry`
+
+Bond lengths and angles with esds.
+
+**Verified by:** unit tests `tests/test_geometry_table.py::test_corundum_matches_the_published_geometry`, `tests/test_geometry_table.py::test_esd_matches_a_monte_carlo_through_decode`
+
+**State:** not yet validated.
+
+### `esds`
+
+Esds: Berar-Lelann inflation, intervals at a bound, scale-B separation.
+
+**Verified by:** `test_the_neutron_widths_leave_one_esd_at_every_start`
+
+**State:** not yet validated.
+
+### `sequential_series`
+
+Sequential (chained) series.
+
+**Verified by:** `test_chained_qpa_within_participant_spread`, `test_chained_agrees_with_independent_fits`, `test_the_hostile_series_exercises_the_reseed_fence`, `test_the_first_rung_bound_moves_no_accepted_value`, `test_series_exports`
+
+**Validated by:** `test_chained_qpa_within_participant_spread`, dataset `qarr` (development data). Mismatch: identical to the independent fits' record
+
+**State:** validated on development data.
+
+### `joint_refinement`
+
+Joint multi-histogram refinement (refine_multi).
+
+**Verified by:** `test_the_refined_wavelength_is_the_solo_cell_disagreement`, `test_the_diagnostic_reports_the_ppm_and_nothing_claims_rwp`, `test_the_cell_belongs_to_the_synchrotron`, `test_swapping_which_wavelength_is_held_measures_the_same_ratio`, `test_the_neutron_widths_leave_one_esd_at_every_start`
+
+**State:** not yet validated.
+
+### `parametric_refinement`
+
+A parameter as a function of each pattern's coordinates.
+
+**Verified by:** unit tests `tests/test_parametric_series.py::test_a_constant_declaration_is_refine_multi_bit_for_bit`, `tests/test_parametric_series.py::test_a_parametric_slope_recovers_a_known_expansion_within_its_esd`
+
+**State:** not yet validated.
+
+### `distortion_modes`
+
+Distortion-mode amplitudes in a stated child.
+
+**Verified by:** unit tests `tests/test_distortion_modes.py::test_lamno3_reproduces_table_13`
+
+**State:** not yet validated.
+
+### `subgroup_enumeration`
+
+Subgroups: t- and k-subgroups, conjugacy classes, standard settings.
+
+**Verified by:** unit tests `tests/test_subgroups.py::test_each_published_subgroup_is_present_with_its_transformation`, `tests/test_subgroups.py::test_pmmm_has_eight_fmmm_subgroups`
+
+**State:** not yet validated.
 
 ## The matrix
 
@@ -1707,7 +2128,7 @@ are recorded rather than tuned away:
 A matrix that lists only what passed is marketing. These are the holes a reader
 should know about before trusting a number, each with what would close it.
 
-- **Every acceptance number in the repo is a Cu Ka measurement.** Six anodes ship (Cr/Fe/Co/Cu/Mo/Ag plus Ka1-only variants) and what is validated for the other five is the wavelength table and its checks, not a refinement.  The cheapest close is one Co Ka pattern from an Fe-bearing specimen — the routine real case, since Cu Ka fluoresces Fe (mu/rho 297.7 vs 56.2) — which would exercise dispersion, absorption and the per-anode K-beta contamination check at once.
+- **Every acceptance number in the repo is a Cu Ka measurement.** Six anodes ship (Cr/Fe/Co/Cu/Mo/Ag plus Ka1-only variants) and what is verified for the other five is the wavelength table and its checks, not a refinement.  The cheapest close is one Co Ka pattern from an Fe-bearing specimen — the routine real case, since Cu Ka fluoresces Fe (mu/rho 297.7 vs 56.2) — which would exercise dispersion, absorption and the per-anode K-beta contamination check at once.
 
 - **No dataset here can constrain a low-angle intensity correction.** The qarr phases first reflect at 25.6/28.3/31.8 deg and SRM 660c at 21.4, so surface roughness (WP-0502) has a negative acceptance result only: two of three phases collapse to the identity and raise ROUGHNESS_UNCONSTRAINED.  Closing it needs a pattern starting below ~15 deg with real low-angle reflections.
 
@@ -1717,7 +2138,7 @@ should know about before trusting a number, each with what would close it.
 
 - **The Apple-GPU (MPS) evidence is maintainer-machine-only.** Every torch-mps assertion is gated on torch.backends.mps.is_available(), which is False on hosted macOS runners.  The all-fp32 refinement landing 3.5e-8 A from numpy fp64 is real-hardware evidence for the fp64-host boundary, and no CI job reproduces it.  A green macOS job must not be read as 'MPS verified'.
 
-- **Multi-phase CIF round-tripping is not validated.** write_refinement_cif's round trip is checked single-phase only; a multi-phase re-read was never a v0.3 commitment.  Whatever the frozen API says about CIF round-tripping has to narrow to that.
+- **Multi-phase CIF round-tripping is not verified.** write_refinement_cif's round trip is checked single-phase only; a multi-phase re-read was never a v0.3 commitment.  Whatever the frozen API says about CIF round-tripping has to narrow to that.
 
 - **The bit-identity goldens hold on one platform, by measurement.** tests/test_backend_shim.py's array_equal gate — the check that says no refactor changed a single computed number — is pinned to darwin/arm64 (GOLDEN_PLATFORM) and skips elsewhere.  WP-1002's CI matrix measured why: a numpy change does not move the goldens (2.4.6 and 2.5.1 agree bit for bit) but Linux x86-64 diverges on every state, by 1 ulp on quantities that are a single arithmetic chain and up to ~1100 ulp (1.7e-13 relative) on y_calc, which accumulates ~130 windows of transcendentals.  That gradient with chain length identifies a libm and summation-order difference, not a code difference, and even the worst of it is ten orders below the tightest physical bar here.  A hosted macOS/arm64 runner then reproduced 7 of 8 states at identical numpy/scipy/Accelerate and missed toy_rich by exactly one ulp, so the pin is really to a machine image and **no CI environment asserts these bits at all** — maintainer-machine evidence, the same shape as the MPS gap.  A tolerance wide enough to absorb a libm difference would absorb a real one too, so the gate stays exact and CI reports it instead.
 

@@ -283,6 +283,37 @@ def _twin(model, structure, instrument, window_area_tol):
     return twin
 
 
+def not_independently_measured(paths, *, geometry: bool = False,
+                                microstructure: bool = False) -> str:
+    """The report's one sentence naming the numbers from unvalidated features.
+
+    WP-2010 (DESIGN.md § Rules, 2): a result that reports a number from a
+    feature no independent measurement has validated says so once, naming
+    each such number.  ``paths`` are the refined parameters the result
+    reports; ``geometry`` and ``microstructure`` say whether the report carries
+    those derived blocks, whose features are keyed on their Theory headings.
+    The state is read from :mod:`rietx.features`, the same for every fit; the
+    empty string when nothing qualifies.
+    """
+    from rietx.features import (
+        FEATURES,
+        parameters_without_independent_measurement,
+    )
+
+    groups = [f"{FEATURES[name].title} ({', '.join(found)})"
+              for name, found in
+              parameters_without_independent_measurement(paths).items()]
+    for flag, name, field in ((geometry, "derived_geometry", "FitReport.geometry"),
+                              (microstructure, "microstructure_readings",
+                               "FitReport.microstructure")):
+        if flag and not FEATURES[name].independently_measured:
+            groups.append(f"{FEATURES[name].title} ({field})")
+    if not groups:
+        return ""
+    return ("Not yet validated against an independent measurement, in rietx's "
+            "own record: " + "; ".join(groups) + ".")
+
+
 def build_report(result: RefinementResult, *, model=None, values=None,
                  plan=None, free_paths: list[str] | None = None,
                  structure=None, instrument=None, held: list[str] | None = None,
@@ -373,6 +404,10 @@ def build_report(result: RefinementResult, *, model=None, values=None,
     result.statistics.identifiability_clause = clause
     if clause is not None:
         report.summary += "\n" + clause
+    report.not_independently_measured = not_independently_measured(
+        [p.path for p in result.parameters],
+        geometry=report.geometry is not None and bool(report.geometry.distances),
+        microstructure=bool(report.microstructure))
     if model is None or values is None:
         return report
     # The moment arm (WP-1327) is computed **above** the Layer-1 gate, because
