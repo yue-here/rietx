@@ -830,6 +830,21 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 - 2026-10-26 issue triage: #455 closed. The reporter's re-run of the cubic `P n -3 m:1` case on main at 7472e200 gave one partition in 9 of 9 seed × basis runs, the condition this WP's 2026-10-15 note set. Checked against the tree at c0e32ab29.
 
+- 2026-10-31, from the issue triage (issue #795): the reporter splits K1 under
+  #1224's machinery-before-heuristics rule (2026-10-29). K1a is the machinery,
+  and nothing in it ranks or chooses. It gives the candidate k's by stratum,
+  with denominator, radius, strata and exclusion windows as required
+  arguments. It scores any named k. It reports the shuffle null's full sample,
+  with its threshold as a number. It adds the equivalents and
+  `K_SEARCH_PARTNER`. K1b is the heuristic: `search_kvector` and its ranked
+  result, the default radius, `K_SEARCH_AT_CHANCE` and the few-peaks floor,
+  both nulls measured on one grid, and the validation arm. Decisions 1
+  (placement) and 2 (rational grid now, or real k after N-W3) of the
+  2026-10-08 entry gate K1a. Decision 3 (schema) concerns only K1b, and
+  decision 4 changes neither. All four are still the maintainer's and
+  unanswered. Checked against the tree at d87c8cc91: no `search_kvector`
+  exists, and M-8 is unticked.
+
 ## Non-goals
 
 - Modulated and incommensurate structures (superspace): issue #258 holds the
