@@ -482,6 +482,29 @@ without failing on it.
 | `auto_background:seed` (not from the data) | all seven start from zero, a constant or the user's numbers | none |
 | `BRINDLEY_MU_R_FENCE` | the citation; FullProf prints the same classes as text | not asked of the others |
 
+## Dropping candidates in a search race
+
+Surveyed 2026-10-31 by the lead, for #1262's assignment race (WP-1997): when may a search over
+several discrete configurations stop running one, if dropping the right one makes the answer
+wrong? Hyperparameter search and algorithm configuration answer this. All from recall; no
+source was opened, so every row is inferred. The lead's reading of AutoML practice ends
+around early 2026.
+
+| Source | What it does | Fit to the race |
+|---|---|---|
+| Successive halving, Karnin et al. (2013) ICML; Jamieson & Talwalkar (2016) AISTATS | Run every configuration on a small budget, keep the better half, double the budget, repeat. Fixed budget: it drops half whatever the margin | What #1262 ships. Right when the short-budget ranking predicts the final one |
+| Hyperband, Li et al. (2018) JMLR 18, 185 | Runs halving at several levels of aggressiveness, one bracket dropping nothing | Bounds the cost of a misleading early ranking to a constant factor of budget. Hedges rather than tests |
+| Hoeffding races, Maron & Moore (1994) NeurIPS 6 | Drops a configuration once a confidence bound puts it worse than the leader | Fixed confidence: the form an all-or-nothing loss asks for |
+| F-Race, Birattari et al. (2002) GECCO; irace, López-Ibáñez et al. (2016) Oper. Res. Perspect. 3, 43 | Racing with a Friedman test across instances or seeds, from algorithm configuration | The closest field. Needs a run-to-run spread, so several seeds per configuration |
+| LUCB, Kalyanakrishnan et al. (2012) ICML | Fixed-confidence best-arm identification with a sample bound | The bandit statement of the same problem |
+| SMAC3's intensification, Lindauer et al. (2022) JMLR 23, 54 | Re-runs a challenger against the incumbent on more seeds before rejecting it | A library form of racing |
+| Optuna `SuccessiveHalvingPruner`, `HyperbandPruner` | Library implementations of the two halving rows above | Same algorithm as #1262; a dependency would hold the race's state outside the byte-identical checkpoint |
+| TPE, Bergstra et al. (2011) NeurIPS 24 (Optuna's and Hyperopt's default sampler) | Models where good results came from to choose the next configuration to try | Not this problem: the assignments are few (six for NAC) and all are tried. Nor the inner search, where many coordinates and cheap evaluations favour annealing, as in DASH, FOX and TOPAS |
+
+What it adds up to. Halving is established practice under a fixed budget. Under an all-or-nothing
+loss, practice is racing: drop only past the measured noise. Ruled 2026-10-31 (WP-1997): halving
+ships, and racing is the next solver PR's first task.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
