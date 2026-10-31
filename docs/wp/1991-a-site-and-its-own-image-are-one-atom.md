@@ -56,6 +56,29 @@ CLAUDE.md, "a silent correction is a reader's to make").
 
 - 2026-10-26 issue triage: #1088 shows this WP's Priority premise "a refined coordinate cannot drift there" holds only for a site already special. A general atom at occupancy ½ refined onto a mirror is snapped by the next stage compile, and the default plan's closing stage then returns 10 O per cell for 12 (10 of 16 noise draws). The mid-fit case is WP-2052's, outside this WP and PR #1014. Checked against the tree at c0e32ab29.
 
+- 2026-10-31, from the issue triage (issue #1264): a series carry names the
+  wrong atom when the built structure's atom order or count differs from the
+  declared one. `SequentialRefinement._fit_one` maps the carry's displaced DOF
+  paths to the built numbering with `_displaced_as_built(displaced,
+  numbering_moves(self.structure, ref.structure))` (`sequential.py:1930`).
+  `numbering_moves` lists only sites whose own DOFs renumbered, so
+  `_displaced_as_built` passes every other path through by index
+  (`sequential.py:788-803`). If a `prepare` hook drops an atom ahead of a tied
+  site, the path names the wrong atom, `_reanchor_carried` misses the hook's
+  tie, and the warmed variable adds the fitted displacement a second time. The
+  same symptom as #1223's item 1 (PR #1223's round-1 fix), from a different
+  cause. The reporter corrects their own trigger: on main `merge_site_twins`
+  never removes or reorders an atom, so the merge alone cannot cause this. A
+  `prepare` hook that drops or reorders atoms can. Checked against the tree at
+  d87c8cc91 with the issue's script (`scratchpad/lane-B/r1264.py`). With no
+  atom dropped, pattern 2 starts O3's z at 0.8268, where pattern 1 left it.
+  With O1 dropped, O3 moves from atom 4 to atom 3 and pattern 2 starts at
+  0.8437, i.e. the fitted 0.0168 added again. Fix direction: map `displaced`
+  through the label-matched atom index (`twins._matched_atoms`, which
+  `numbering_moves` already uses) for every site, not only renumbered ones.
+  This is the case this WP's 2026-10-31 handover left uncovered ("an atom
+  shifting index ... worth an issue of its own").
+
 ## Non-goals
 
 - Changing `SITE_TOL`.
