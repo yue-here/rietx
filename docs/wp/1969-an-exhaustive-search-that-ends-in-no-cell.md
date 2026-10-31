@@ -73,6 +73,31 @@ second pass on the residue. Both are tasks below.
   branch, and passes because it declares 3. It takes
   `INDEXING_THRESHOLDS_VERSION` 1.10, as five other open PRs do.
 
+- 2026-10-31, from the issue triage (issue #1198, about draft PR #1043): the
+  second pass on the residue (this WP's open follow-up, `index_residue` in PR
+  #1043) was measured on 26 real runs, the IUCr CPD round robin sample 1
+  (cpd-1a … 1h, Madsen et al. 2001) and the 11-BM LaB₆ + cBN mixture, each
+  phase subtracted in turn with its true cell passed as `candidate=`. With the
+  residue fit in Le Bail, its free widths ran away on balanced mixtures
+  (fitted/measured FWHM 6.4-2692×) and the width guard refused 17 of 26 runs.
+  Since PR #1043 runs that fit in `VALIDATION_MODE` (Pawley, after #1191;
+  pushed `c82d9b23`), 1 of 26 is refused (cpd-1b with a 1.4 wt % trace
+  subtracted, correctly) and widths sit at 0.87-1.7× on 25. So the runaway is
+  gone from what `index_residue` runs. Checked against the tree at d87c8cc91:
+  `index_residue` is not on `main`; `validate_by_lebail` takes no mode
+  argument there and fits in `VALIDATION_MODE = "pawley"` (`workflow.py:119`,
+  `:529`), so no public call on `main` reaches the Le Bail runaway. What still
+  stands: with the largest phase subtracted, the second search finds the true
+  minor phase in 0 of 8 CPD lab mixtures, so the miss is in the second search,
+  not in the fit. With widths held, `residue_misfit` flags 0 of 103 true
+  minor-phase lines, and SRM 660c alone returns LaB₆ itself as a "second
+  phase" because a declared width law at 0.63× the measured one passes
+  `WIDTH_MISMATCH_RATIO`. The measurement behind #1043's
+  `RESIDUE_MISFIT_RATIO` is the same run (tables at PR #1043,
+  issuecomment-6515145543). Whether `index_residue` may claim real-mixture use
+  before the second search finds lab-Cu minor phases is the maintainer's
+  decision.
+
 ## Non-goals
 
 - The absent-line side of acceptance (WP-1956, PR #941).
