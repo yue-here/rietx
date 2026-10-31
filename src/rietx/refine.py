@@ -6923,11 +6923,11 @@ def _held_moment_diagnostics(plan, table, structure: Structure,
     no esd and no row in ``result.parameters``.  Nothing else says so: the
     nuclear terms absorb what the held moment misplaces, and on #1082's
     synthetic child with the moment started 20 % high the fit reported a
-    Biso finding instead.  One diagnostic per phase, whose ``where`` is the
-    modulus path of each held site, the key a series' moment rows carry, so
-    ``SEQUENTIAL_MOMENT_HOLD`` can name this as the cause on exactly the
-    patterns it fired on, then the phase's ``scale``.  The scale is the
-    coupling: a moment is measured against the nuclear intensity through the
+    Biso finding instead.  One diagnostic per phase.  Its ``where`` holds two
+    kinds of path: first the modulus path of each held site, the key a
+    series' moment rows carry, so ``SEQUENTIAL_MOMENT_HOLD`` can name this
+    as the cause on exactly the patterns it fired on; last the phase's
+    ``scale``, which is not a site.  The scale is the coupling: a moment is measured against the nuclear intensity through the
     scale the two share (Halpern & Johnson 1939, Phys. Rev. 55, 898), so a
     held moment moves what the nuclear values beside it are read from, and
     that path is what a diagnostic's level under ``purpose="structure"`` or

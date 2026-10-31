@@ -891,7 +891,9 @@ ROWS: tuple[Row, ...] = (
         evidence=("a statement about the plan: fires exactly when a phase has a moment DOF "
                   "neither locked nor held by the caller and no glob of run_stages() frees "
                   "any of its moment DOFs through ParameterTable.would_free, so the moment "
-                  "is the start value with no esd; takes no action (WP-1418, #1082: a "
+                  "is the start value with no esd; where = each held site's modulus path, then "
+                  "the phase's scale (the coupling, so the level stays warning under "
+                  "structure and qpa); takes no action (WP-1418, #1082: a "
                   "synthetic k = (0, 0, 1/2) child under mccusker_default and "
                   "mccusker_structural kept 3.6 against 3.0 mu_B and said nothing)"),
         response="warning",
