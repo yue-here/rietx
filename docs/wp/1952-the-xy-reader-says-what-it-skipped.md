@@ -110,6 +110,17 @@ documentation only.
   already has. The second `TEMP` value is still undefined by any document
   either side holds.
 
+- 2026-10-31, from the issue triage (issue #1240): `read_pattern` reads a
+  G(r), S(Q) or F(Q) file (PDFgetX2, PDFgetX3, a bare `.gr`) as a 2θ pattern
+  through the xy fallback, with no diagnostic. Reproduced at d87c8cc91: a
+  small `#L r(A) G(r)` file as `.gr` and as `.dat`, and a bare `.gr`, all read
+  as two_theta 1.0-4.0° with an empty diagnostics list. The fix is in flight
+  as the reporter's PR #1241 (open, one maintainer review round answered at
+  6bbbbff2), which refuses such files by name; its suffix-only tier was
+  approved at tier 3 on the PR on 2026-10-31. A session here should read what
+  #1241 lands before touching the xy reader's skip report, since both edit the
+  same fallback.
+
 ## Non-goals
 
 - A CSV reader (a new format entry, if the decision below wants one).
