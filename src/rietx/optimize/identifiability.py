@@ -45,7 +45,7 @@ import numpy as np
 
 from ..schemas.results import CorrelationPair, ExchangeRow, SoftMode
 from . import lapack
-from .statistics import block_projection_r2, column_norms
+from .statistics import _is_blocked, block_projection_r2, column_norms
 
 #: how many worst-|ρ| pairs the carrier keeps — a size cap, not a judgment
 #: threshold (the report decides where comment starts)
@@ -140,17 +140,37 @@ def soft_modes(jac: np.ndarray, free_paths: list[str],
     carried as spurious null directions.  The eigenvector sign is
     canonicalised (largest component positive) so serialized loadings are
     stable run to run.
+
+    A joint fit's :class:`~rietx.optimize.blocked.BlockJacobian` (WP-1325) is
+    read block by block, never made dense: its columns are normalised in
+    every block, and the Gram is the blocks' products scattered onto θ's
+    columns, the matrix the dense branch forms (WP-2028, the joint screens).
     """
-    J = np.asarray(jac, dtype=np.float64)
-    if J.ndim != 2 or J.shape[1] != len(free_paths):
-        return []
-    # a tiny column is live, and squaring it would call it zero (WP-1463)
-    norms = column_norms(J)
-    keep = np.nonzero(norms > 0.0)[0]
-    if len(keep) < 2:
-        return []
-    Jn = J[:, keep] / norms[keep]
-    gram = Jn.T @ Jn
+    if _is_blocked(jac):
+        from .blocked import column_norms as blocked_column_norms
+
+        if jac.shape[1] != len(free_paths):
+            return []
+        norms = blocked_column_norms(jac)
+        keep = np.nonzero(norms > 0.0)[0]
+        if len(keep) < 2:
+            return []
+        unit = np.zeros(jac.shape[1], dtype=np.float64)
+        unit[keep] = 1.0 / norms[keep]
+        full, _ = jac.scaled_columns(unit).normal_equations(
+            np.zeros(jac.shape[0], dtype=np.float64))
+        gram = full[np.ix_(keep, keep)]
+    else:
+        J = np.asarray(jac, dtype=np.float64)
+        if J.ndim != 2 or J.shape[1] != len(free_paths):
+            return []
+        # a tiny column is live, and squaring it would call it zero (WP-1463)
+        norms = column_norms(J)
+        keep = np.nonzero(norms > 0.0)[0]
+        if len(keep) < 2:
+            return []
+        Jn = J[:, keep] / norms[keep]
+        gram = Jn.T @ Jn
     gram = 0.5 * (gram + gram.T)
     eigvals, eigvecs = lapack.eigh(gram)
     out = []

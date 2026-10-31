@@ -1,6 +1,6 @@
 # WP-2028 — a joint fit's guards see every histogram
 
-Milestone: unscheduled · Status: 🔄 2026-10-28 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`); 4 measured, not wired; 7's census closed 2026-10-31 (#1205; two follow-on items open); 8 measured on #1124
+Milestone: unscheduled · Status: 🔄 2026-10-28 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`); 4 measured, not wired; 7's census closed 2026-10-31 (#1205); its joint screens built 2026-10-31, the joint `parameters()` open; 8 measured on #1124
 Track: What fires, and what stays silent
 Depends on: — (1341 closed: it built the joint report this WP completes; 1325
 soft: its parametric codes and per-pattern holds are what tasks 3 and 6
@@ -173,7 +173,7 @@ that caveat until 1421 lands.
       and fold it or record why it stays, as `DIAGNOSTIC_SCOPES` does. Say
       whether a joint `parameters()` is owed. Include the declared-peak and
       parameter-space screens the joint path skips (Context item 7).
-- [ ] Joint identifiability screens (census, ruled 2026-10-31 on #1205): the
+- [x] Joint identifiability screens (census, ruled 2026-10-31 on #1205): the
       tables `check_guards` builds after the loop (`measured_top_correlations`,
       `soft_modes`) run on the joint matrix, since that is what was solved; the
       declared-peak absorption screen runs per histogram, since a declared peak
@@ -219,6 +219,27 @@ shows the findings that name histogram h.
   WP-2001 and WP-2004 (the tier rule).
 
 ## Handover log
+
+- **2026-10-31** — the joint identifiability screens, from outside (#1205's
+  second ruling). `_joint_identifiability` fills the joint result's carrier:
+  `top_correlations` from the joint correlation matrix, the one
+  `HIGH_CORRELATION` thresholds, and `soft_modes` from the joint Jacobian,
+  both named by the joint paths, beside each histogram's background screen
+  and, new, its declared-peak screen (`extra_peak_absorption`, on that
+  histogram's rows, keys `hist.<h>.`). `for_histogram(h)` hands a view its
+  own screen rows unscoped and keeps the joint tables whole, its own rows
+  unscoped and another histogram's still scoped, so `report(h)` quotes them.
+  `soft_modes` reads a WP-1325 `BlockJacobian` block by block (it raised
+  `TypeError` there before); on random blocks it matches the dense matrix to
+  1e-9. The exchangeability scan is not run: the ruling named the two tables.
+  No threshold, code or field is added: the report's existing
+  `SOFT_MODE_NOTABLE_EIGENVALUE` now sees a joint fit's modes. *Measured* on
+  `tests/test_joint_report.py`'s LaB6 pair (cell, scales, backgrounds, zeros
+  free, a peak declared at 30° in pattern 1): on `main` both reports' tables
+  are empty; here the worst pair is the shared `a` with pattern 1's zero
+  (ρ = 0.879), the softest mode (eigenvalue 0.087) joins `a` with both
+  patterns' zeros, and the peak is screened in pattern 1 alone. The four new
+  tests fail on `main` `e4ddbcda` and pass here.
 
 - **2026-10-31** — review round on #1205 (task 7's census closed). The
   maintainer ruled on the three open questions. (1) *Lindemann bound for a
