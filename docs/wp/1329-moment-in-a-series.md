@@ -1,6 +1,6 @@
 # WP-1329 — the moment in a series: the onset, the hold, the trajectory
 
-Milestone: magnetic · Status: 🔄 2026-10-25 — all five tasks landed; task 5, the real Ba₂FeSbSe₅ ramp on LLB G4.1, by PR #1073; ready to close
+Milestone: magnetic · Status: 🔄 2026-10-31 — all five checklist tasks landed (task 5, the Ba₂FeSbSe₅ ramp, by PR #1073); three folded notes in Inherited are still owed (the provisional declaration, the powder-twin fence, the joint-fit moment hold), so it stays open
 Depends on: 1327 (the moment); 1326 soft (the satellite arm per pattern)
 Priority: P3 2026-09-23 — waits on 1327's moment; P2 when it lands
 
@@ -190,6 +190,14 @@ chain on the same data is reported as a range, never gated.
   [1325](1325-parametric-series.md) the parametric question.
 
 ## Handover log
+
+- **2026-10-31** (ghostshift close-batch, not closed) — the checklist is finished and the WP is not. Five of five tasks are ticked and verified (task 5 by PR #1073, merged 2026-10-25, its test `test_ba2fesbse5_ramp_the_moment_grows_below_the_onset_both_ways` is in `tests/test_magnetic_series.py`). But `### Inherited` still holds three notes that ask for work and sit on no checklist, so closing would delete them: nothing reads a closed WP again (`closed_wp_writes.py`). The WP stays open until each is done or handed to an owner.
+  *Still owed, each checked against the tree today*:
+  (1) **The provisional declaration for `MagneticTrajectory` and `MagneticOnset`** (from WP-1541, 2026-10-03). Both are still defined in `rietx.schemas.sequential`, and `PROVISIONAL_MODULES` (`tests/api_surface.py`) has no key for that module or a magnetic-series module. Only the compatibility page's prose names them provisional (`reference/compatibility.md`, § Provisional by declaration). The note's fix: move both into their own module, re-export from `rietx.schemas.sequential`, declare it, drop the prose sentence.
+  (2) **The powder twin read as path dependence** (from WP-1938 D13, 2026-10-11). The maintainer asked for a new WP and it was folded here by the fold-first rule. `sequential._angle_paths` and the two fences still take an angle modulo a turn only; nothing in `sequential.py` compares a moment's direction modulo the twins a powder cannot separate (time reversal for all moments of a phase, a mirror that fixes the site). The note's test series is `tests/test_moment_angle_chart.py`.
+  (3) **A joint fit never holds a per-pattern moment as flat** (from WP-1325, 2026-10-14). `multi._flat_moments_multi` still compares scoped free paths against bare entry names. The note says it was found by reading the code and never run, and this session did not run it either.
+  The other Inherited notes are informational (1964 owns the critical-exponent law; the `k` naming rule is in root CLAUDE.md; PR #522's `above_fence` hook is built) and can go with the section when it is deleted.
+  *Next*: a maintainer ruling on where (1)-(3) live. Cheapest: tick them here as tasks and run them in one session (the twin fence and the joint hold share `sequential.py`/`multi.py` and the moment-angle fixtures). Or file one WP for them under the magnetic milestone and close this one. Either way the close then moves this narrative to the v1.11 record.
 
 ### 2026-10-25 — task 5 landed: the Ba₂FeSbSe₅ ramp on LLB G4.1, by `/pr-review`
 
