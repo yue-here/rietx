@@ -377,7 +377,8 @@ def _screen_diagnostics(status: str, net: float | None) -> list:
     from rietx.indexing.diagnostics import extinction_diagnostics
 
     return extinction_diagnostics(SimpleNamespace(
-        status=status, reference_rwp_net=net, prefit_rwp=None, candidates=[],
+        status=status, reference_rwp_net=net, perfect_fit_rwp_net=None,
+        prefit_rwp=None, candidates=[],
         lattice_group="F m -3 m", system="cubic", centring="F",
         cell=(5.4311, 5.4311, 5.4311, 90.0, 90.0, 90.0), two_theta_range=(12.1, 60.0)))
 

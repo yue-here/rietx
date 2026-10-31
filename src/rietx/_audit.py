@@ -602,7 +602,9 @@ ROWS: tuple[Row, ...] = (
     Row("EXTINCTION_SCREEN_UNRELIABLE", "code", tier=3, ambiguity=2,
         evidence=("warning; fires when the absence-free reference fit leaves more than "
                   "REFERENCE_NET_RWP_MAX of the net weighted power unexplained; the silent side "
-                  "holds on four real families, the firing side is shown on synthetic Si only"),
+                  "holds on four real families; the firing side is shown on synthetic Si and on "
+                  "SRM 676a at x1.02 and the GSAS-II FAP at x0.99 (both 1.00), and misses "
+                  "PbSO4 X-ray at x0.99 (0.45, a wrong class returned)"),
         grounds=("Withholds the pick and keeps the ranking, and no default path calls the "
                  "pick; ruled 2026-10-21 (PR #939)."),
         approved="2026-10-21", response="warning",
@@ -1914,10 +1916,12 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.extinction.REFERENCE_NET_RWP_MAX", "constant", tier=3, value=0.7071,
         evidence=("Statistic: Toby (2006)'s background-subtracted Rwp over the picker's "
                   "envelope (the envelope is rietx's own). Right or nearly right cells read "
-                  "<= 0.36 on 11-BM NAC, GSAS-II FAP, GSAS-II PbSO4 X-ray and SRM 676a; cells "
-                  "outside the basin read >= 1.6, shown on synthetic Si only. Fails on an "
-                  "unmodelled second phase carrying half the net power, and by arithmetic on "
-                  "weak data (S < N)."),
+                  "0.12-0.19 on the default path (cell refined) on 11-BM NAC, GSAS-II FAP, GSAS-II PbSO4 X-ray and SRM 676a (<= 0.36 with the cell held); cells "
+                  "outside the basin read 1.0-2.3 on synthetic Si, SRM 676a (x1.02), FAP "
+                  "(x0.99), NAC (x0.99, x1.02) and PbSO4 (x1.02), but PbSO4 at x0.99 reads 0.45 "
+                  "and passes. Fails on an unmodelled second phase carrying half the net power, "
+                  "by arithmetic on weak data (S < N), and where the envelope rides into a "
+                  "continuum of lines."),
         grounds="Kept on both grounds, ruled 2026-10-21 (PR #939).",
         approved="2026-10-21"),
     Row("rietx.indexing.extinction._MODULI", "constant", value=(2, 3, 4, 6)),
