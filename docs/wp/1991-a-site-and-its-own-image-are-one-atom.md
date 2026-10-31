@@ -52,32 +52,40 @@ answer is the merge at a distance, never a looser snap. And the merge must
 happen where a diagnostics channel exists: `ParameterTable` has none (root
 CLAUDE.md, "a silent correction is a reader's to make").
 
-### Inherited
+Superseded in part, 2026-10-31: the Priority line's premise "a refined
+coordinate cannot drift there" holds only for a site already special. #1088
+showed a general atom at occupancy ½ refined onto a mirror is snapped by the
+next stage compile, and the default plan's closing stage then returns 10 O per
+cell for 12 (10 of 16 noise draws). That mid-fit case is WP-2052's, outside this
+WP (checked at c0e32ab29, 2026-10-26).
 
-- 2026-10-26 issue triage: #1088 shows this WP's Priority premise "a refined coordinate cannot drift there" holds only for a site already special. A general atom at occupancy ½ refined onto a mirror is snapped by the next stage compile, and the default plan's closing stage then returns 10 O per cell for 12 (10 of 16 noise draws). The mid-fit case is WP-2052's, outside this WP and PR #1014. Checked against the tree at c0e32ab29.
+### An atom's number is not its identity (#1264)
 
-- 2026-10-31, from the issue triage (issue #1264): a series carry names the
-  wrong atom when the built structure's atom order or count differs from the
-  declared one. `SequentialRefinement._fit_one` maps the carry's displaced DOF
-  paths to the built numbering with `_displaced_as_built(displaced,
-  numbering_moves(self.structure, ref.structure))` (`sequential.py:1930`).
-  `numbering_moves` lists only sites whose own DOFs renumbered, so
-  `_displaced_as_built` passes every other path through by index
-  (`sequential.py:788-803`). If a `prepare` hook drops an atom ahead of a tied
-  site, the path names the wrong atom, `_reanchor_carried` misses the hook's
-  tie, and the warmed variable adds the fitted displacement a second time. The
-  same symptom as #1223's item 1 (PR #1223's round-1 fix), from a different
-  cause. The reporter corrects their own trigger: on main `merge_site_twins`
-  never removes or reorders an atom, so the merge alone cannot cause this. A
-  `prepare` hook that drops or reorders atoms can. Checked against the tree at
-  d87c8cc91 with the issue's script (`scratchpad/lane-B/r1264.py`). With no
-  atom dropped, pattern 2 starts O3's z at 0.8268, where pattern 1 left it.
-  With O1 dropped, O3 moves from atom 4 to atom 3 and pattern 2 starts at
-  0.8437, i.e. the fitted 0.0168 added again. Fix direction: map `displaced`
-  through the label-matched atom index (`twins._matched_atoms`, which
-  `numbering_moves` already uses) for every site, not only renumbered ones.
-  This is the case this WP's 2026-10-31 handover left uncovered ("an atom
-  shifting index ... worth an issue of its own").
+Issue #1264 (mustachefeeling, 2026-10-31), the case the 2026-10-31 handover
+left uncovered. A dot-path names an atom by its index, so a path read by index
+across two structures whose atom lists differ names the wrong atom.
+`numbering_moves` listed only sites whose own DOFs renumbered, and every other
+path crossed by index. In a series, a `prepare` hook that removes an atom ahead
+of a site tied by the `constrain` hook made `_displaced_as_built` miss the tie,
+and the warmed variable added the fitted displacement again. Reproduced at
+`1314c69ea` with the issue's script: pattern 2 started O3's z at 0.8437 for
+0.8268. The merge alone cannot cause it, since `merge_site_twins` never removes
+or reorders an atom.
+
+The same index crossing sat in three more places, all measured at `1314c69ea`.
+`_carry_into` read the previous pattern's values (built numbering) into the
+declared structure by index; with O1 removed from every pattern, O2 started
+pattern 2 at O3's general position, off its mirror. `_reanchor_carried` read the
+source's values against the built table's paths. And `Refinement.edit`, the
+GUI's remove-atom route, kept holds, ties and free paths by index: removing O1
+moved a hold on O2's Biso onto O3's and dropped a tie on O3 as "no such
+parameter".
+
+The tier of the rule this adds: an automatic action of Rule 1's first kind
+(`docs/DESIGN.md` § Rules). Where a label is unique in both structures, the atom
+is the same atom, and every refiner would carry its constraint to it. An atom
+the match cannot place has its constraints dropped, with a warning on `edit`.
+No diagnostic code, number or default is added, so `rietx._audit` is unchanged.
 
 ## Non-goals
 
@@ -86,13 +94,24 @@ CLAUDE.md, "a silent correction is a reader's to make").
 
 ## Tasks
 
-- [ ] Find every route that expands an orbit without the CIF reader's merge,
+- [x] Find every route that expands an orbit without the CIF reader's merge,
   and the one place a merge with a diagnostic can sit for all of them.
-- [ ] Apply the twin merge there, renaming the code off `CIF_` (keep the old
-  code readable for stored results, or record the break).
-- [ ] Tests: the issue's δy sweep reads 4 S at every step, and the warning
-  fires from δy = 6e-5 to the 0.02 Å boundary
-- [ ] Skill: the reference row for the renamed code
+  (PR #1014, `b0019706`: `twins.merge_site_twins`.)
+- [x] Apply the twin merge there, renaming the code off `CIF_` (keep the old
+  code readable for stored results, or record the break). (PR #1014:
+  `SITE_TWINS_MERGED`; the reader keeps `CIF_SITE_TWINS_MERGED`.)
+- [x] Tests: the issue's δy sweep reads 4 S at every step, and the warning
+  fires from δy = 6e-5 to the 0.02 Å boundary (PR #1014,
+  `tests/test_site_twins_merged.py`)
+- [x] Skill: the reference row for the renamed code (PR #1014,
+  `references/diagnostics-reading.md`)
+- [x] #1264: every path read across a changed atom list follows its atom by
+  label (`twins.atom_moves`, `renumber_path`): the series carry, the
+  displaced paths, the re-anchor, and `Refinement.edit`'s registers.
+- [ ] Anisotropic ADP DOFs (`phases.i.atoms.j.adp.k`) are not renumbered by
+  `numbering_moves`, so a hold or tie on `adp.k` of a site that merges is not
+  carried. Read off the code in PR #1223's review, never probed: probe it,
+  then fix or fence.
 
 ## Acceptance
 
