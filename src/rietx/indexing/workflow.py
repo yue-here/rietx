@@ -236,23 +236,38 @@ def absent_reflections(two_theta: np.ndarray, y_obs: np.ndarray,
     row regenerates that pathology, and the repair direction — inputs the
     candidate cannot buy — is recorded there, with an Rwp ratio ruled out.
     """
+    pos = np.asarray(positions, dtype=np.float64)
+    bad, ratio = absent_mask(two_theta, y_obs, y_background, sigma, pos, fwhm,
+                             k_sigma=k_sigma)
+    return ([float(v) for v in pos[bad]], [float(v) for v in ratio[bad]])
+
+
+def absent_mask(two_theta: np.ndarray, y_obs: np.ndarray,
+                y_background: np.ndarray, sigma: np.ndarray,
+                positions: np.ndarray, fwhm: np.ndarray, *,
+                k_sigma: float = ABSENT_SIGMA) -> tuple[np.ndarray, np.ndarray]:
+    """:func:`absent_reflections` as ``(absent, net_over_sigma)``, one entry per
+    position in the order given, so a caller pairs each verdict with its line
+    by index rather than by its 2θ (a position is not a key).  A position with
+    no channel inside its window is not absent and its ratio is NaN: outside
+    the fitted range, or in a gap between scanned windows, is not evidence.
+    """
     tt = np.asarray(two_theta, dtype=np.float64)
     net = np.asarray(y_obs, dtype=np.float64) - np.asarray(y_background,
                                                            dtype=np.float64)
     sig = np.asarray(sigma, dtype=np.float64)
-    pos_bad: list[float] = []
-    ratio_bad: list[float] = []
-    for pos, width in zip(np.asarray(positions, dtype=np.float64),
-                          np.asarray(fwhm, dtype=np.float64)):
-        inside = np.abs(tt - pos) <= ABSENT_WINDOW_FWHM * max(float(width), 1e-6)
+    pos = np.asarray(positions, dtype=np.float64)
+    bad = np.zeros(len(pos), dtype=bool)
+    ratio = np.full(len(pos), np.nan)
+    for i, (p, width) in enumerate(zip(pos, np.asarray(fwhm, dtype=np.float64))):
+        inside = np.abs(tt - p) <= ABSENT_WINDOW_FWHM * max(float(width), 1e-6)
         if not np.any(inside):
             continue                     # outside the fitted range: not evidence
         total = float(net[inside].sum())
         noise = float(np.sqrt((sig[inside] ** 2).sum()))
-        if total < k_sigma * noise:
-            pos_bad.append(float(pos))
-            ratio_bad.append(total / max(noise, 1e-300))
-    return pos_bad, ratio_bad
+        ratio[i] = total / max(noise, 1e-300)
+        bad[i] = total < k_sigma * noise
+    return bad, ratio
 
 
 def _shift_path(candidate: CellCandidate, instrument: Instrument) -> str:
@@ -303,9 +318,14 @@ def validation_plan(candidate: CellCandidate, instrument: Instrument,
     0.46 against 0.09 with the widths free (0.57 against 0.10 under the Le
     Bail fit #941 measured), while nothing the fit reports gates any more.
     Frozen, the Pawley fit still leaves FAP's true cell 31 unmatched peaks
-    against 5 free (WP-2011).  The shared pre-fit F1 asked for needs a
-    cell-free width law fitted to the peak list; until that lands,
-    ``validate_by_lebail(freeze_profile=True)`` is the caller's choice.
+    against 5 free (WP-2011).  Across the acceptance corpus's real families
+    and both PbSO₄ histograms (#941's follow-ups, re-measured under the
+    Pawley fit on the same searches) freezing moves no candidate's rank or
+    grade, raises the true cell's Rwp 1.1-4.9× (1.5-5.7× under Le Bail),
+    narrows the best rival's Rwp over it on 8 of 13 runs and widens it on
+    none, and changes a run's time by -9 to +9 s.  The shared pre-fit F1
+    asked for needs a cell-free width law fitted to the peak list; until that
+    lands, ``validate_by_lebail(freeze_profile=True)`` is the caller's choice.
 
     **The cell is held.**  ``profile_only`` — the ordinary structure-free plan — frees
     ``phases.*.cell.*``, and it must not here: the candidate *is* the hypothesis
@@ -556,7 +576,11 @@ def validate_by_lebail(candidate: CellCandidate, data: PatternData,
             predicted_but_absent_uncancellable=screen.n_absent_uncancellable,
             predicted_but_absent_uncancellable_in_window=(
                 screen.n_absent_uncancellable_in_window),
-            absent_source="line_screen", n_lines_screened=screen.n_lines)
+            absent_source="line_screen", n_lines_screened=screen.n_lines,
+            n_lines_screened_in_window=screen.n_lines_in_window,
+            predicted_but_absent_density_in_window=(
+                screen.n_absent_uncancellable_in_window / screen.n_lines_in_window
+                if screen.n_lines_in_window else None))
     else:
         positions = np.array([r.two_theta for r in rows], dtype=np.float64)
         absent_tt, _ratio = absent_reflections(
@@ -1123,8 +1147,9 @@ def index_pattern(peaks: PeakList | None = None, *,
     # between candidates and between one candidate's derivative cells (#895),
     # so a fired token leaves the question unasked
     # (capping) rather than half-answered
-    from .consensus import enumerate_ambiguity
+    from .consensus import absence_excess, enumerate_ambiguity
 
+    absence_excess(outcome.candidates)
     enumerate_ambiguity(outcome, peaks, top=top, cancel=run_cancel)
 
     # the reserve boundary is part of the ceiling's scheduling: a search it

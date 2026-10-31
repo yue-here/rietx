@@ -1752,8 +1752,8 @@ def merge_engine_units(units: Sequence[EngineResult]) -> EngineResult:
     return out
 
 
-def dedup_groups(cands: Sequence[EngineCandidate],
-                 ) -> list[list[EngineCandidate]]:
+def dedup_groups(cands: Sequence[EngineCandidate], *, cancel=None,
+                 keep: int = 0) -> list[list[EngineCandidate]]:
     """Group candidates that are the same lattice, best-fitting member first.
 
     WP-1020's χ² equality on the **Niggli-reduced** A..F, so a setting change is
@@ -1794,12 +1794,25 @@ def dedup_groups(cands: Sequence[EngineCandidate],
       walk then reads, and leaves the pass at ~7 s.  Only where ``reduce.stacked_pinv_exact`` measures
       every stacked χ² equal to the pair's own, bit for bit; elsewhere the
       pass asks one pair at a time, as before.
+
+    **A stop ends the walk only where the rest could not reach a shortlist
+    of ``keep``** (WP-1924, #780).  The pass costs about n² over distinct
+    lattices, 10.7 s at 6 819, and nothing read the token while it ran.  Once
+    ``cancel`` is set, the walk ends at the first candidate indexing fewer
+    lines than the first ``keep`` groups' leaders all do.  The walk goes most
+    lines first and never moves an earlier group's first member, so every
+    leader the full pass would add past that point indexes fewer lines than
+    ``keep`` leaders already held, and :func:`rank_candidates`' pre-rank
+    (most lines, then smallest volume) cannot shortlist it.  Within a line
+    count the walk runs on, because the pre-rank breaks that tie on volume.
+    So a deadline that fires here leaves the ranked list as it was, and an
+    unset token or ``keep = 0`` changes nothing.
     """
-    return _dedup_groups(cands, fast=True)
+    return _dedup_groups(cands, fast=True, cancel=cancel, keep=keep)
 
 
 def _dedup_groups(cands: Sequence[EngineCandidate], *, fast: bool,
-                  ) -> list[list[EngineCandidate]]:
+                  cancel=None, keep: int = 0) -> list[list[EngineCandidate]]:
     """:func:`dedup_groups`, with its caches and volume index switchable."""
     from bisect import bisect_left, bisect_right
     from itertools import islice
@@ -1851,6 +1864,10 @@ def _dedup_groups(cands: Sequence[EngineCandidate], *, fast: bool,
     rtol = DEDUP_VOLUME_RTOL
     stacked = fast and stacked_pinv_exact()
     for cand, red, volume, key, cov, gate in prepared:
+        if (keep and len(kept) >= keep
+                and cand.n_indexed < kept[keep - 1][0][0].n_indexed
+                and cancel is not None and bool(cancel)):
+            break
         if fast:
             vols, ids, unbounded = by_volume.setdefault(
                 (cand.system, cand.centring), ([], [], []))
@@ -1952,11 +1969,11 @@ def _ask_stacked(cand: EngineCandidate, red: np.ndarray, volume: float,
     return 4 * size
 
 
-def dedup_candidates(cands: Sequence[EngineCandidate],
-                     ) -> list[EngineCandidate]:
+def dedup_candidates(cands: Sequence[EngineCandidate], *, cancel=None,
+                     keep: int = 0) -> list[EngineCandidate]:
     """The best-fitting member of each distinct lattice — :func:`dedup_groups`
     with the membership dropped."""
-    return [group[0] for group in dedup_groups(cands)]
+    return [group[0] for group in dedup_groups(cands, cancel=cancel, keep=keep)]
 
 
 def _reduced_volume(red: np.ndarray) -> float:
@@ -1972,7 +1989,7 @@ def rank_candidates(cands: Sequence[EngineCandidate], peaks: PeakList, *,
                     shortlist: int | None = 4,
                     q_match: np.ndarray | None = None,
                     deduped: bool = False,
-                    ) -> list[EngineCandidate]:
+                    cancel=None) -> list[EngineCandidate]:
     """Dedup, score with the FoM panel, and rank by **agreement, then** Borda.
 
     **Ranking happens here rather than in each engine, and it is not on a
@@ -2024,6 +2041,12 @@ def rank_candidates(cands: Sequence[EngineCandidate], peaks: PeakList, *,
     ``q_match`` is the σ(Q) the *search* matched with — pass the same array the
     engine assigned lines with, or the panel judges these candidates by a window
     they were never selected under (:func:`~rietx.indexing.fom.fom_panel`).
+
+    ``cancel`` reaches the dedup only, which once it is set stops where the
+    rest could not reach the shortlist (:func:`dedup_groups`), so the list
+    returned is the one an unstopped pass returns.  It is not read with no
+    shortlist, where every candidate is owed a score, nor when a candidate is
+    corroborated, since the dedup's walk does not order on agreement.
     """
     n_unindexed = _panel_trim(n_unindexed)
     # ``deduped``: the caller's list is exactly what :func:`dedup_candidates`
@@ -2031,13 +2054,20 @@ def rank_candidates(cands: Sequence[EngineCandidate], peaks: PeakList, *,
     # come back in the same (stable) order, each meets the same first members in
     # the same deterministic tests, and none matched one then.  Measured on
     # corundum's tetragonal unit, the repeat was 53.6 s of a 303 s unit (WP-1509)
-    kept = list(cands) if deduped else dedup_candidates(cands)
+    cap = (None if shortlist is None
+           else max(shortlist * max_candidates, max_candidates))
+    if deduped:
+        kept = list(cands)
+    else:
+        stoppable = cap is not None and not any(corroborated(c) for c in cands)
+        kept = dedup_candidates(cands, cancel=cancel if stoppable else None,
+                                keep=cap or 0)
     # agreement leads the cheap pre-rank too: a candidate cut here never reaches
     # the panel, so applying the key only to the final sort would leave the same
     # truncation deciding an order it is not entitled to decide
     kept.sort(key=lambda c: (not corroborated(c), -c.n_indexed, c.volume))
-    if shortlist is not None:
-        kept = kept[:max(shortlist * max_candidates, max_candidates)]
+    if cap is not None:
+        kept = kept[:cap]
     if not kept:
         return []
     for cand in kept:

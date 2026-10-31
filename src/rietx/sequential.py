@@ -140,6 +140,7 @@ import numpy as np
 
 from . import runs
 from .backend.api import backend_dtype_note
+from .crystallography.twins import merge_site_twins, numbering_moves
 from .history.events import EventStream, _attach_progress, as_event_stream
 from .history.tree import RefinementTree
 from .optimize.cancel import RefinementCancelled
@@ -707,6 +708,101 @@ def _carry_into(structure: Structure, instrument: Instrument,
     return displaced
 
 
+#: An atom's fields its site symmetry constrains: what decides its DOF numbering.
+_SITE_FIELDS = ("x", "y", "z", "aniso")
+
+
+def _with_site_fields(structure: Structure,
+                      fields: dict[tuple[int, str], dict[str, Any]]) -> Structure:
+    """``structure`` with the named atoms' :data:`_SITE_FIELDS` replaced, unvalidated.
+
+    Keyed by (phase index, atom label).  ``model_copy`` for
+    ``merge_site_twins``' reason: the swap is a numbering device, and an
+    assignment would re-run every validator of the phase.
+    """
+    if not fields:
+        return structure
+    phases = list(structure.phases)
+    for i, phase in enumerate(phases):
+        mine = {label: f for (ip, label), f in fields.items() if ip == i}
+        if mine:
+            phases[i] = phase.model_copy(update={"atoms": [
+                a.model_copy(update=mine[a.label]) if a.label in mine else a
+                for a in phase.atoms]})
+    return structure.model_copy(update={"phases": phases})
+
+
+def _constrain_in_declared_numbering(ref: Refinement, declared: Structure,
+                                     constrain, index: int) -> None:
+    """Run the ``constrain`` hook against the DOF numbering of the series' own structure.
+
+    A hook is written once and names DOFs as the declared structure numbers
+    them (``phases.0.atoms.4.dof.2``, z on the general position).  But a
+    coordinate DOF's number is the site symmetry's, and pattern n starts
+    from pattern n-1's fit: a site that fit left within reach of a special
+    position is merged onto it when pattern n's ``Refinement`` is built, and
+    its DOFs renumber (on PbSO₄'s y = ¼ mirror, z is ``dof.1`` and
+    ``dof.2`` does not exist).  The hook's literal paths would then refuse,
+    or name another direction in silence (#1014, round 5).
+
+    So where a site's numbering differs from the declared one, the hook runs
+    with that site's coordinates (and tensor) as declared, merged as pattern
+    one's construction merges them, and the warm ones are put back after it,
+    carrying what the hook declared through the renumbering exactly as
+    every ``Refinement`` verb does (``Refinement._carry_twin_moves``): a
+    hold follows its direction, and what cannot follow is named on the site's
+    ``SITE_TWINS_MERGED`` (or ``SITE_DOFS_RENUMBERED``) finding.  A site the
+    hook itself moved keeps the hook's coordinates.  Where nothing renumbered
+    the hook runs on the model as built, as it always did.
+    """
+    declared = merge_site_twins(declared)
+    moves = numbering_moves(declared, ref.structure)
+    if not moves:
+        constrain(index, ref)
+        return
+    warm = ref.structure
+    swapped: dict[tuple[int, str], tuple[dict, dict]] = {}
+    for old_site, new_site in moves.sites.items():
+        _, i, _, jo = old_site.split(".")
+        jn = new_site.split(".")[3]
+        d_atom = declared.phases[int(i)].atoms[int(jo)]
+        w_atom = warm.phases[int(i)].atoms[int(jn)]
+        swapped[(int(i), w_atom.label)] = (
+            {f: getattr(d_atom, f) for f in _SITE_FIELDS},
+            {f: getattr(w_atom, f) for f in _SITE_FIELDS})
+    ref.structure = _with_site_fields(warm, {k: d for k, (d, _) in swapped.items()})
+    constrain(index, ref)
+    hooked = ref.structure
+
+    def unmoved(i: int, label: str, d: dict) -> bool:
+        atoms = [a for a in hooked.phases[i].atoms if a.label == label]
+        return len(atoms) == 1 and all(getattr(atoms[0], c).value == d[c].value
+                                       for c in "xyz")
+
+    ref.structure = _with_site_fields(hooked, {
+        (i, label): w for (i, label), (d, w) in swapped.items()
+        if unmoved(i, label, d)})
+    ref._carry_twin_moves(numbering_moves(hooked, ref.structure), ref._twin_findings)
+
+
+def _displaced_as_built(displaced: Sequence[str], moves) -> list[str]:
+    """``displaced`` (the carry's DOF paths, declared numbering) in the built numbering.
+
+    A DOF the site's renumbering moves follows it (:class:`~.DofMove`'s
+    ``path``); one with no parallel direction on the new position is gone and
+    drops out, since nothing can tie it there.  Paths of a site that did not
+    renumber are unchanged.
+    """
+    out: list[str] = []
+    for path in displaced:
+        move = moves.get(path)
+        if move is None:
+            out.append(path)
+        elif move.path is not None:
+            out.append(move.path)
+    return out
+
+
 def _reanchor_carried(ref: Refinement, displaced: Sequence[str],
                       source: tuple[Structure, Instrument],
                       previous_vars: dict[str, float]) -> None:
@@ -1167,6 +1263,15 @@ class SequentialRefinement:
             and nominates the first match in table order as the source.  Each
             pattern has its own table, so re-declaring against it is the only
             spelling that means the same thing on every pattern.
+
+            A coordinate DOF (``phases.0.atoms.4.dof.2``) is named as the
+            series' own structure numbers it, on every pattern.  Its number
+            is the site symmetry's, and a site a fit left within reach of a
+            special position is merged onto it when the next pattern's
+            ``Refinement`` is built, which renumbers its DOFs; the hook still
+            runs against the declared numbering, and what it declared follows
+            the renumbering as every verb's constraints do (a finding names
+            what moved or was dropped; #1014, round 5).
 
             Every rung of the ladder is a fresh ``Refinement`` and gets the
             hook, as do the cold refits `verify_steps` runs — a
@@ -1818,7 +1923,13 @@ class SequentialRefinement:
             ref._pending_reflections = [r.model_copy(deep=True)
                                         for r in previous_hkl]
         if constrain is not None:
-            constrain(index, ref)
+            # ``displaced`` reads the declared numbering and ``ref`` the built
+            # one, which the warm start's merge (or a site leaving its
+            # position) renumbered; read before the hook, whose ties follow
+            # the build
+            displaced = _displaced_as_built(
+                displaced, numbering_moves(self.structure, ref.structure))
+            _constrain_in_declared_numbering(ref, self.structure, constrain, index)
             if previous is not None:
                 _reanchor_carried(ref, displaced, previous, previous_vars or {})
         _carry_variables(ref, previous_vars or {}, self.carry)

@@ -17,7 +17,8 @@ parabola on the 0.01 deg grid is good to well under the 0.01 deg bar.
 
 Three builders owe the same answer and each has a test: the single-histogram
 result (``refine._build_result``), the joint runner's
-(``multi.MultiHistogramRefinement._ticks``) and the live view's
+(``multi.MultiHistogramRefinement._build_result``, through
+``refine._tick_rows``) and the live view's
 (``viz.snapshot.stage_ticks``).
 """
 

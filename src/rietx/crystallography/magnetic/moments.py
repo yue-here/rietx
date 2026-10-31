@@ -449,11 +449,9 @@ def canonical_dofs(dofs) -> tuple[np.ndarray, np.ndarray]:
 def d_moment_d_dofs(frame, dofs) -> np.ndarray:
     """``(n, 3)`` — ∂(crystal-axis components)/∂DOF, analytic.
 
-    Not used by the forward model, which takes the whole-model finite-
-    difference column for a moment DOF under the ``_make_jacobian`` gate; it is
-    here so that a finite-difference check has something exact to be checked
-    *against*, and so the analytic branch, when it lands, has one authority for
-    the chain rule rather than a second derivation.
+    The one authority for this chain rule: the analytic moment column
+    (``scattering.d_magnetic_f2_d_dofs``, WP-1327) reads it, and so does the
+    check that holds it against finite differences.
     """
     e = np.asarray(frame, dtype=np.float64).reshape(-1, 3)
     n = len(e)

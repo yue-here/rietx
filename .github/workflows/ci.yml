@@ -297,12 +297,19 @@ jobs:
         # record's refresh (tests/CLAUDE.md § Budgets in tests).  The
         # documentation (tutorial notebooks, guide scripts, manual builds)
         # executes on the newest Python alone (tests/documentation.py says
-        # what that trades).
+        # what that trades).  faulthandler_timeout makes a case still running
+        # after 10 min print every thread's stack, its own file and line
+        # included, and leaves it running: the cap above stays the runaway
+        # guard.  Without it a case that never ends shows as `[ 99%]` and then
+        # silence until the cap kills the workers, which names nothing (#1249,
+        # WP-2065).  600 s is 4-10x the slowest passing case of each leg,
+        # 63-152 s on main run 41045940948 once the two P -1 rows of
+        # tests/test_subgroups.py left the fast tier.
         env:
           RIETX_DOCS: ${{ matrix.docs || 'skip' }}
         run: >-
           .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
-          --shard ${{ matrix.shard }}/2
+          --shard ${{ matrix.shard }}/2 -o faulthandler_timeout=600
           --junitxml=junit.xml -o junit_duration_report=total
       - name: Upload per-test timings
         if: always()
@@ -337,9 +344,10 @@ jobs:
         # jit-compile bound; an actions/cache of tests/.jax_cache was measured
         # not to help (8:18 warm against 8:12 cold — weekly.yml's note, kept
         # with the job it explains), so there is no cache step.
+        # faulthandler_timeout as in the fast job.
         run: >-
           .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
-          --jax-cases
+          --jax-cases -o faulthandler_timeout=600
           --junitxml=junit.xml -o junit_duration_report=total
       - name: Upload per-test timings
         if: always()

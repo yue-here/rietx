@@ -33,6 +33,7 @@
   import { labelFor, type HelpCorpus } from "../lib/help";
   import { clone } from "../lib/model";
   import {
+    absentText,
     caveatTone,
     cellText,
     collectTo,
@@ -726,8 +727,9 @@ can rise when validation and ambiguity run, never fall">
             <tr>
               <th></th><th>cell</th><th>lattice</th>
               {#each columns as name (name)}<th>{name}</th>{/each}
-              <th>Rwp</th><th title="reflections predicted where the pattern has
-                no intensity — the oversized-cell detector">absent</th>
+              <th>Rwp</th><th title="lines predicted where the pattern has no
+                intensity, of the lines screened; 'in window' is the count the
+                predicted_but_absent caveat caps on — the oversized-cell detector">absent</th>
               <th>engines</th><th></th>
             </tr>
           </thead>
@@ -758,7 +760,7 @@ and this cell's predicted lines through the data"
                   <td>{v === null ? "—" : v.toFixed(1)}</td>
                 {/each}
                 <td>{c.lebail ? (c.lebail.rwp * 100).toFixed(1) + "%" : "—"}</td>
-                <td>{c.lebail ? `${c.lebail.predicted_but_absent}/${c.lebail.n_reflections}` : "—"}</td>
+                <td>{c.lebail ? absentText(c.lebail) : "—"}</td>
                 <td class="flags">
                   {#each c.found_by as e (e)}<span class="chip note">{e}</span>{/each}
                 </td>

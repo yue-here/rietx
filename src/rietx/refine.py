@@ -1774,6 +1774,21 @@ def _vars_driven_cell_escapes(table: ParameterTable,
     return out
 
 
+def _merge_unresolved(first: list[tuple[str, list[str]]],
+                      second: list[tuple[str, list[str]]]
+                      ) -> list[tuple[str, list[str]]]:
+    """Two solves' driven escapes as one record, merged by driver, so a
+    driver still escaping after both is named once, not twice.
+
+    One rule for both runners, :meth:`Refinement._run_stage` and the joint
+    stage loop in ``multi.py`` (WP-2028 task 7).
+    """
+    merged = dict(first)
+    for driver, escaped in second:
+        merged[driver] = sorted(set(merged.get(driver, [])) | set(escaped))
+    return list(merged.items())
+
+
 def _cell_runaway_withheld(table: ParameterTable,
                            named: Iterable[str]) -> set[str]:
     """The paths whose esd a result withholds, given the paths one stage's
@@ -2610,9 +2625,10 @@ class Refinement:
         its coordinate DOFs, so a hold on ``dof.1`` (y on the general position)
         would read z on the mirror and keep the wrong coordinate fixed with
         nothing saying so.  Each register
-        follows its DOFs (:func:`~.crystallography.twins.carry_constraints`),
-        and what cannot follow is dropped and named in the site's
-        ``SITE_TWINS_MERGED`` message.
+        follows its DOFs (:func:`~.crystallography.twins.carry_constraints`;
+        a hold onto the coupled direction where the position couples
+        coordinates), and what cannot follow is dropped and named in the
+        site's ``SITE_TWINS_MERGED`` message.
         """
         if "_user_holds" not in self.__dict__:
             return            # construction: no constraint has been declared yet
@@ -4838,10 +4854,9 @@ class Refinement:
             # collapse-restore's own second solve landed on -- merged by
             # driver rather than concatenated, so a driver still escaping
             # after both solves is named once, not twice
-            merged = dict(cell_runaway_unresolved)
-            for driver, escaped in _vars_driven_cell_escapes(table, start_values):
-                merged[driver] = sorted(set(merged.get(driver, [])) | set(escaped))
-            cell_runaway_unresolved = list(merged.items())
+            cell_runaway_unresolved = _merge_unresolved(
+                cell_runaway_unresolved,
+                _vars_driven_cell_escapes(table, start_values))
             # the record is one stage: the second solve's answer, the first
             # solve's starting cost, and the iterations of both — the whole
             # point being that the hold cost something and it must be visible
@@ -7929,9 +7944,9 @@ def _reflection_tick_support(model: CompiledModel, ip: int,
 
     A tick carries its *reflection's* support, the largest window norm
     ‖y/σ‖₂ over every emission-line image of that hkl (WP-1458, WP-1523).
-    One authority for both tick builders, this module's :func:`_build_result` and
-    ``multi.MultiHistogramRefinement._ticks`` (WP-1344), so the joint fit's
-    low-angle boundary asks the question the single fit's does.
+    One authority for :func:`_tick_rows`, the tick builder both the single and
+    the joint path call (WP-1344, WP-2028), so the joint fit's low-angle
+    boundary asks the question the single fit's does.
     """
     if not n_rows:
         return np.array([])
@@ -7950,6 +7965,115 @@ def _extra_peak_tick_support(model: CompiledModel,
     for _, j, s in images:
         best[j] = max(best.get(j, 0.0), s)
     return [best[j] for _, j, _ in images]
+
+
+def _tick_rows(model: CompiledModel, structure: Structure,
+               values: dict[str, float]
+               ) -> tuple[dict[str, list[float]], dict[str, list[list[int]]],
+                          dict[str, list[float]]]:
+    """Every tick row of one histogram: positions, Miller indices and
+    support, keyed alike.
+
+    One builder for both paths, this module's :func:`_build_result` and each
+    histogram of ``multi.MultiHistogramRefinement._build_result`` (WP-2028
+    task 7), so a joint fit draws the rows a single fit draws: a magnetic
+    phase's own ``"<phase> (magnetic)"`` row (issue #278) and the declared
+    peaks' ``EXTRA_TICK_KEY`` row as well as one row per phase.
+    """
+    # Tick positions cover **every** emission line, not just the primary one.
+    # The calculated pattern really does have a peak at each Kα2 position, and
+    # a tick list that omitted them would make the FitReport flag every Kα2
+    # peak as an unindexed impurity.
+    #
+    # `tick_hkl` is built here and not anywhere downstream, because a second
+    # answer to *where* a tick goes is the thing this must not become: the
+    # index is carried through the same sort the positions are, so a tick and
+    # its Miller index cannot come apart (WP-1438).
+    #
+    # `tick_support` rides beside the positions on the same terms, carried
+    # through the same filter and sort, so the low-angle boundary can ask
+    # which ticks have anything behind them without pairing by position
+    # (WP-1458).  Each tick carries its *reflection's* support: the largest
+    # window norm in σ (`CompiledModel.reflection_support`, WP-1523) over every
+    # emission-line image of that hkl, so a Kα2 or λ/2 image is judged with the
+    # reflection it is an image of, as its index already says.  It is not a
+    # result field; `_low_angle_diagnostics` is its one reader.
+    ticks = {}
+    tick_hkl = {}
+    tick_support = {}
+    for ip, cp in enumerate(model.phases):
+        name = structure.phases[ip].name
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        # where the forward model puts each peak, and which reflection each
+        # position is, from the one walk every tick builder shares
+        # (`CompiledModel.reflection_positions`, WP-1908): the zero shift and
+        # the geometry's own shift are in it, and `hkl` is the reflection list
+        # tiled once per emission line, so a Kα2 image says it is the same hkl
+        # (H, m), not H: a satellite is labelled by its order (WP-1326)
+        pos, hkl = model.reflection_positions(ip, values)
+        n_lines = len(model.line_wavelengths)
+        sup = _reflection_tick_support(model, ip, values, n_lines)
+        keep = np.isfinite(pos)
+        if cp.magnetic is not None:
+            # issue #278: a magnetic phase's reflections are drawn as their
+            # own tick row, as a second phase would be -- split by a purity
+            # cut on the magnetic fraction (MAGNETIC_TICK_PURITY: see its
+            # docstring for why the mask on ``CompiledPhase`` is not enough
+            # on a k != 0 supercell).  One
+            # fraction per *reflection*, tiled once per emission line (each
+            # line already ``cp.reflections``-ordered, as ``pos`` is) before
+            # the positions are sorted.
+            # ``tick_hkl`` and ``tick_support`` are carried through the same
+            # mask and the same sort as the positions, so a split row keeps its
+            # Miller indices and its support.
+            d = np.asarray(cp.reflections.d, dtype=np.float64)
+            f_nuc = np.asarray(model._nuclear_f2(ip, d, values, cell),
+                               dtype=np.float64)
+            f_mag = np.asarray(model._magnetic_f2(ip, d, values, cell),
+                               dtype=np.float64)
+            total = f_nuc + f_mag
+            with np.errstate(invalid="ignore", divide="ignore"):
+                frac = np.where(total > 0.0, f_mag / total, 0.0)
+            mag_hkl = frac >= 1.0 - MAGNETIC_TICK_PURITY
+            mag_row = np.tile(mag_hkl, n_lines)
+            rows_out = ((name, keep & ~mag_row),
+                        (f"{name} (magnetic)", keep & mag_row))
+        else:
+            rows_out = ((name, keep),)
+        for key, sel in rows_out:
+            pos_k, hkl_k, sup_k = pos[sel], hkl[sel], sup[sel]
+            order = np.argsort(pos_k, kind="stable")
+            ticks[key] = [float(v) for v in pos_k[order]]
+            tick_hkl[key] = [reflection_label_row(r) for r in hkl_k[order]]
+            tick_support[key] = [float(v) for v in sup_k[order]]
+
+    # Declared sharp peaks are ticks too, under one reserved key.  This is the
+    # whole of the member contract's clause 2 for `PeakComponent`: a hump joins
+    # the reported background, a peak joins this list, and the destination is
+    # read from `model.components.COMPONENT_AGGREGATE` rather than inferred.
+    #
+    # Without it Layer 0's `unmatched_obs` reports every declared peak as an
+    # unindexed impurity — the Kα2-ticks lesson one rank over, and the same
+    # failure: a peak the model *does* put intensity at, reported as
+    # unexplained because nothing wrote it down.
+    #
+    # No zero-shift is added, unlike a phase's: the centre is the *apparent*
+    # position by declaration and carries its own aberrations (see
+    # `PeakComponent`).  That, and where each emission line's image falls, is
+    # `CompiledModel.extra_peak_tick_positions` — one authority, because a
+    # joint fit's histograms owe the same list, and a second copy is how a
+    # joint fit ends up disagreeing with a single one.
+    #
+    # Accepted wrinkle, recorded rather than special-cased: Layer 0's
+    # `Region.n_reflections` counts ticks, so these inflate that count in their
+    # own regions.  It is right for segmentation and for the unmatched logic,
+    # and mislabelled as a count of reflections.
+    extra_ticks = model.extra_peak_tick_positions(values)
+    if extra_ticks:
+        ticks[EXTRA_TICK_KEY] = extra_ticks
+        tick_support[EXTRA_TICK_KEY] = _extra_peak_tick_support(model, values)
+    return ticks, tick_hkl, tick_support
 
 
 def _uncorrected(stderr: float | None, esd_inflation: float | None) -> float | None:
@@ -8033,99 +8157,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                 equations=[],
             ))
 
-    # Tick positions cover **every** emission line, not just the primary one.
-    # The calculated pattern really does have a peak at each Kα2 position, and
-    # a tick list that omitted them would make the FitReport flag every Kα2
-    # peak as an unindexed impurity.
-    #
-    # `tick_hkl` is built here and not anywhere downstream, because a second
-    # answer to *where* a tick goes is the thing this must not become: the
-    # index is carried through the same sort the positions are, so a tick and
-    # its Miller index cannot come apart (WP-1438).
-    #
-    # `tick_support` rides beside the positions on the same terms, carried
-    # through the same filter and sort, so the low-angle boundary can ask
-    # which ticks have anything behind them without pairing by position
-    # (WP-1458).  Each tick carries its *reflection's* support: the largest
-    # window norm in σ (`CompiledModel.reflection_support`, WP-1523) over every
-    # emission-line image of that hkl, so a Kα2 or λ/2 image is judged with the
-    # reflection it is an image of, as its index already says.  It is not a
-    # result field; `_low_angle_diagnostics` is its one reader.
-    ticks = {}
-    tick_hkl = {}
-    tick_support = {}
-    for ip, cp in enumerate(model.phases):
-        name = structure.phases[ip].name
-        cell = tuple(values[f"phases.{ip}.cell.{k}"]
-                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
-        # where the forward model puts each peak, and which reflection each
-        # position is, from the one walk every tick builder shares
-        # (`CompiledModel.reflection_positions`, WP-1908): the zero shift and
-        # the geometry's own shift are in it, and `hkl` is the reflection list
-        # tiled once per emission line, so a Kα2 image says it is the same hkl
-        # (H, m), not H: a satellite is labelled by its order (WP-1326)
-        pos, hkl = model.reflection_positions(ip, values)
-        n_lines = len(model.line_wavelengths)
-        sup = _reflection_tick_support(model, ip, values, n_lines)
-        keep = np.isfinite(pos)
-        if cp.magnetic is not None:
-            # issue #278: a magnetic phase's reflections are drawn as their
-            # own tick row, as a second phase would be -- split by a purity
-            # cut on the magnetic fraction (MAGNETIC_TICK_PURITY: see its
-            # docstring for why the mask on ``CompiledPhase`` is not enough
-            # on a k != 0 supercell).  One
-            # fraction per *reflection*, tiled once per emission line (each
-            # line already ``cp.reflections``-ordered, as ``pos`` is) before
-            # the positions are sorted.
-            # ``tick_hkl`` and ``tick_support`` are carried through the same
-            # mask and the same sort as the positions, so a split row keeps its
-            # Miller indices and its support.
-            d = np.asarray(cp.reflections.d, dtype=np.float64)
-            f_nuc = np.asarray(model._nuclear_f2(ip, d, values, cell),
-                               dtype=np.float64)
-            f_mag = np.asarray(model._magnetic_f2(ip, d, values, cell),
-                               dtype=np.float64)
-            total = f_nuc + f_mag
-            with np.errstate(invalid="ignore", divide="ignore"):
-                frac = np.where(total > 0.0, f_mag / total, 0.0)
-            mag_hkl = frac >= 1.0 - MAGNETIC_TICK_PURITY
-            mag_row = np.tile(mag_hkl, n_lines)
-            rows_out = ((name, keep & ~mag_row),
-                        (f"{name} (magnetic)", keep & mag_row))
-        else:
-            rows_out = ((name, keep),)
-        for key, sel in rows_out:
-            pos_k, hkl_k, sup_k = pos[sel], hkl[sel], sup[sel]
-            order = np.argsort(pos_k, kind="stable")
-            ticks[key] = [float(v) for v in pos_k[order]]
-            tick_hkl[key] = [reflection_label_row(r) for r in hkl_k[order]]
-            tick_support[key] = [float(v) for v in sup_k[order]]
-
-    # Declared sharp peaks are ticks too, under one reserved key.  This is the
-    # whole of the member contract's clause 2 for `PeakComponent`: a hump joins
-    # the reported background, a peak joins this list, and the destination is
-    # read from `model.components.COMPONENT_AGGREGATE` rather than inferred.
-    #
-    # Without it Layer 0's `unmatched_obs` reports every declared peak as an
-    # unindexed impurity — the Kα2-ticks lesson one rank over, and the same
-    # failure: a peak the model *does* put intensity at, reported as
-    # unexplained because nothing wrote it down.
-    #
-    # No zero-shift is added, unlike a phase's: the centre is the *apparent*
-    # position by declaration and carries its own aberrations (see
-    # `PeakComponent`).  That, and where each emission line's image falls, is
-    # `CompiledModel.extra_peak_tick_positions` — one authority, because
-    # `multi.MultiHistogramRefinement._ticks` owes the same list and a second
-    # copy there is how a joint fit ends up disagreeing with this one.
-    #
-    # Accepted wrinkle, recorded rather than special-cased: Layer 0's
-    # `Region.n_reflections` counts ticks, so these inflate that count in their
-    # own regions.  It is right for segmentation and for the unmatched logic,
-    # and mislabelled as a count of reflections.
-    extra_ticks = model.extra_peak_tick_positions(values)
-    if extra_ticks:
-        ticks[EXTRA_TICK_KEY] = extra_ticks
-        tick_support[EXTRA_TICK_KEY] = _extra_peak_tick_support(model, values)
+    # every row, and its labels and support, from the one builder the joint
+    # fit's histograms call too (`_tick_rows`)
+    ticks, tick_hkl, tick_support = _tick_rows(model, structure, values)
 
     # Quantitative phase analysis from the refined scales.  Le Bail scales are
     # degenerate with the extracted intensities, so QPA is Rietveld-only.  σ(W)
@@ -9798,7 +9832,7 @@ def _quantify_phases(table: ParameterTable, theta: np.ndarray,
                       unmeasured=unmeasured, held=held_only)
     if qpa is None:
         return None, _qpa_unavailable_diagnostics(structure, values)
-    diagnostics = microabsorption_diagnostics(qpa)
+    diagnostics = microabsorption_diagnostics(qpa, structure)
     if blind_paths:
         diagnostics = diagnostics + _qpa_esd_unavailable_diagnostics(
             structure, values, blind_paths, where_of or (lambda p: p))
@@ -9896,6 +9930,13 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
         suggestion="Free fewer parameters at once, or check the diagnostics "
                    "for a correlation or bound hit in the same stage.",
     )]
+
+
+def _moves_scale(path: str, held_reach: dict[str, set[str]], scale: str) -> bool:
+    """Whether held column ``path`` is phase ``scale``'s, by its name or by
+    what it moved (``StageResult.held_reach``), either spelled bare or
+    ``hist.h.``-scoped."""
+    return any(_unscoped(n) == scale for n in (path, *held_reach.get(path, ())))
 
 
 def _held_by_phase(stage_results: list[StageResult], n_phases: int
@@ -10035,6 +10076,10 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
     """
     n_phases = len(support_by_phase)
     held_paths, held_stages = _held_by_phase(stage_results or [], n_phases)
+    held_reach: dict[str, set[str]] = {}
+    for sr in stage_results or []:
+        for q, moved in sr.held_reach.items():
+            held_reach.setdefault(q, set()).update(moved)
     out: list[Diagnostic] = []
     for ip in range(n_phases):
         prefix = f"phases.{ip}."
@@ -10078,8 +10123,11 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
         clauses = []
         # a phase with no line in range has its scale held too (WP-1958), and
         # the scale is not a structural parameter, so it is named on its own
-        # (a joint fit's per-histogram scale is scoped ``hist.h.``)
-        structural = [p for p in held if _unscoped(p) != f"{prefix}scale"]
+        # (a joint fit's per-histogram scale is scoped ``hist.h.``).  A held
+        # column is the scale's by what it moves, not by its name: a held
+        # ``vars.S`` driving the scale is the scale held (#1103, round 2)
+        structural = [p for p in held
+                      if not _moves_scale(p, held_reach, f"{prefix}scale")]
         scale_held = len(structural) < len(held)
         if held:
             stages = held_stages[ip]

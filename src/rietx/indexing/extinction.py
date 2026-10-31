@@ -154,6 +154,25 @@ DECISIVE_DELTA_BIC = 10.0
 #: ``F - - -`` returned by ``best_or_none`` as a confident answer.
 REFERENCE_NET_RWP_MAX = 0.7071
 
+#: Avogadro's number times 10⁻²⁴ cm³ per Å³, so that a density in g/cm³, a
+#: cell volume in Å³ and a formula weight in g/mol give the formula units per
+#: cell as Z = ρ·V·N_A_CM3_PER_A3 / M.  N_A = 6.022 140 76 × 10²³ mol⁻¹ is exact
+#: in the SI since 2019 (CODATA 2018).
+N_A_CM3_PER_A3 = 0.602214076
+
+#: How far a measured density may put Z from a whole number, as a fraction of
+#: Z (WP-2033, ruled by the maintainer on PR #1140).  The density is the
+#: error of a **measurement**, not the 8 % scatter of a volume estimated from
+#: atom counts (:data:`~rietx.indexing.diagnostics.Z_INTEGER_TOLERANCE`).  The
+#: figure is the one *International Tables* Vol. C (2006), ch. 3.2, §3.2.1,
+#: p. 156 gives for assigning Z: measured and calculated density "should agree
+#: within at least 1.5%" (Richards & Lindley, doi:10.1107/97809553602060000586).
+#: Z ∝ ρ·V, so the fraction carries over, the cell's own volume being far
+#: better known.  At Z ≳ 33 two whole numbers fit that window and the density
+#: no longer names one, which :func:`declared_z` reports as ambiguity, never as
+#: contradiction.
+DENSITY_Z_TOLERANCE = 0.015
+
 #: Crystal systems that share one *lattice*, keyed by the candidate's system.
 #: The powder determines a lattice, not a crystal system: a hexagonal metric
 #: carries both the trigonal-P and the hexagonal groups, and the trigonal ones
@@ -301,16 +320,172 @@ def admits(prior: ExtinctionPrior | None, sg: gemmi.SpaceGroup) -> bool:
     Each fact is read off the group's own operators: Sohncke (proper motions
     only, the groups an enantiopure compound can occupy; Flack 2003, *Helv.
     Chim. Acta* **86**, 905) and centrosymmetric from gemmi, polar from
-    :func:`is_polar`.
+    :func:`is_polar`.  A declared Z needs the cell for a density, so the
+    screen asks :func:`exclusion_reasons` with the Z it settled; this asks
+    the three facts that need no cell.
+    """
+    return not exclusion_reasons(prior, sg)
+
+
+def exclusion_reasons(prior: ExtinctionPrior | None, sg: gemmi.SpaceGroup,
+                      z: int | None = None,
+                      counts: dict[str, float] | None = None) -> list[str]:
+    """The declared facts this space group fails, each named; empty admits it.
+
+    The three facts that need no cell come first.  A declared model
+    (``prior.ordered``) adds the content test, with ``z`` the formula units
+    per cell the screen settled (:func:`declared_z`) and ``counts`` the
+    declared formula's element counts (:func:`content_exclusion`); it runs
+    only on a group the cheap facts left, since it derives the group's orbits.
+    Without ``ordered`` a group that fails the count is kept and the screen
+    says so (``ExtinctionCandidate.count_notes``).
     """
     if prior is None:
-        return True
+        return []
+    out = []
     if prior.sohncke is not None and sg.is_sohncke() != prior.sohncke:
-        return False
+        out.append(f"sohncke={prior.sohncke}")
     if (prior.centrosymmetric is not None
             and sg.is_centrosymmetric() != prior.centrosymmetric):
-        return False
-    return not (prior.polar is not None and is_polar(sg) != prior.polar)
+        out.append(f"centrosymmetric={prior.centrosymmetric}")
+    if prior.polar is not None and is_polar(sg) != prior.polar:
+        out.append(f"polar={prior.polar}")
+    if not out and prior.ordered and z is not None and counts:
+        why = content_exclusion(sg, z, counts)
+        if why is not None:
+            out.append(f"z={z}, ordered: {why}")
+    return out
+
+
+def content_exclusion(sg: gemmi.SpaceGroup, z: int,
+                      counts: dict[str, float]) -> str | None:
+    """Why ``z`` formula units of ``counts`` cannot occupy this group, or None.
+
+    Each element's atoms per cell, Z times its count in the formula, must sit
+    on whole orbits of the group: a sum of Wyckoff multiplicities in which a
+    position with no free parameter counts at most once, since it is one
+    orbit, and one with free parameters any number of times
+    (:func:`~rietx.crystallography.site_classes.holds`).  The orbits are
+    derived from the group's operators
+    (:func:`~rietx.crystallography.site_classes.site_classes`, *International
+    Tables for Crystallography*, Vol. A, 5th ed., ed. Hahn, 2002, sect.
+    8.3.2), never read from a table.
+
+    That is exact for an **ordered** model, where every site is one element
+    at full occupancy, and it is the only reading this makes.  A disordered
+    one (CuAu, Cu₃Au written with whole counts) can place its atoms on a
+    shared site this test cannot see, so it **removes** a group only when
+    the caller declares the model ordered (``ExtinctionPrior.ordered``);
+    otherwise the screen only states the failure.  A formula count that is
+    not a whole number (``Cu0.5Au0.5``) declares a site the element shares,
+    and that element is not counted.  The test is per element, so two
+    elements competing for one fixed position are not caught: it never
+    removes a group an ordered structure can occupy.
+    """
+    from ..crystallography.site_classes import holds, site_classes
+
+    classes = site_classes(sg)
+    for element, n in counts.items():
+        if n != int(n):
+            continue                     # a shared site, declared as such
+        count = int(n) * int(z)
+        if not holds(classes, count):
+            sizes = ", ".join(str(m) for m in sorted({c.multiplicity
+                                                      for c in classes}))
+            return f"{element} {count} per cell is no sum of its orbits ({sizes})"
+    return None
+
+
+def special_site_note(sg: gemmi.SpaceGroup, z: int) -> str | None:
+    """What ``z`` formula units need in this group when Z′ is not whole, or None.
+
+    Z′ = Z / (the general multiplicity).  Where it is not a whole number,
+    some formula units sit on special positions, and a molecule sitting on one
+    must itself carry that site's symmetry.  Whether the formula unit is one
+    molecule is not declared, and the atom count of :func:`content_exclusion`
+    cannot see a molecule's symmetry, so this is a statement and never an
+    exclusion (#935: a P 2₁ salt at Z = 2 against P 2₁/m, Z′ = 1/2, which
+    needs each cation on an inversion centre or a mirror).
+
+    The remainder is what the general positions leave: the smallest
+    ``Z − k·(general multiplicity)`` the special positions can make, so as many
+    general orbits as fit
+    (:func:`~rietx.crystallography.site_classes.holds`, a fixed position once,
+    a free one any number of times).  When none can, no placement of whole
+    formula units exists, and the note says so instead of listing positions
+    that cannot add up to it (P 2₁/m at Z = 3: the remainder 3 is no sum of 2s).
+    """
+    from fractions import Fraction
+
+    from ..crystallography.site_classes import holds, site_classes
+
+    classes = site_classes(sg)
+    general = max(c.multiplicity for c in classes)
+    if int(z) % general == 0:
+        return None
+    head = f"{sg.xhm()} holds Z = {z} with Z′ = {Fraction(int(z), general)}"
+    special = [c for c in classes if c.multiplicity < general]
+    rest = next((int(z) - k * general
+                 for k in range(int(z) // general, -1, -1)
+                 if holds(special, int(z) - k * general)), None)
+    if rest is None:
+        sizes = ", ".join(str(m) for m in sorted({c.multiplicity for c in classes}))
+        return (f"{head}, and Z = {z} is no sum of this group's orbit "
+                f"multiplicities ({sizes}): no placement of whole formula "
+                "units exists, so the formula unit is not one molecule")
+    on = [c for c in special if c.multiplicity <= rest]
+    by_symmetry: dict[str, list[str]] = {}
+    for c in on:
+        by_symmetry.setdefault(c.site_symmetry or "?", []).append(c.wyckoff)
+    sites = " or ".join(f"{sym} ({', '.join(w)})" for sym, w in by_symmetry.items())
+    return (f"{head}: {rest} formula unit(s) per cell sit on special positions, "
+            f"of site symmetry {sites}; a molecule there must carry that "
+            "symmetry itself")
+
+
+def density_zs(z_rho: float) -> list[int]:
+    """Every whole Z within :data:`DENSITY_Z_TOLERANCE` of the density's Z."""
+    import math
+
+    tol = DENSITY_Z_TOLERANCE
+    return [k for k in range(max(1, math.floor(z_rho / (1.0 + tol))),
+                             math.ceil(z_rho / (1.0 - tol)) + 1)
+            if abs(z_rho / k - 1.0) <= tol]
+
+
+def declared_z(prior: ExtinctionPrior | None,
+               volume: float) -> tuple[int | None, float | None]:
+    """The Z the member filter uses, and the Z a declared density implies.
+
+    ``volume`` is the screen's cell, in Å³.  A declared density gives
+    Z = ρ·V·N_A / M through the formula weight (gemmi's standard atomic
+    weights).  The definition ρ = Z·M / (N_A·V), N_A exact in the SI
+    (BIPM, *The International System of Units*, 9th ed., 2019), is the manual's
+    Theory tab, "Volume from a formula".  It must sit within
+    :data:`DENSITY_Z_TOLERANCE`, the error of a measured density, of the
+    declared ``z``, or, with no ``z``, of exactly one whole number, which is
+    then the Z.  Otherwise the first value is None and
+    nothing is filtered by Z.  Which of two ways that happens is
+    :func:`density_zs`: none within the window is a **contradiction**
+    (:meth:`~rietx.schemas.indexing.ExtinctionScreen.density_contradicts_z`,
+    and the screen abstains); several is an **ambiguity**, which a measured
+    density meets above Z ≈ 33 and which is no statement about the cell.
+    """
+    if prior is None:
+        return None, None
+    if prior.density is None:
+        return prior.z, None
+    from ..crystallography.atomic_volume import formula_counts
+    from ..optimize.qpa import atomic_weight
+
+    weight = sum(n * atomic_weight(el)
+                 for el, n in formula_counts(prior.formula).items())
+    z_rho = float(prior.density) * float(volume) * N_A_CM3_PER_A3 / weight
+    if prior.z is not None:
+        return (prior.z if abs(z_rho / prior.z - 1.0) <= DENSITY_Z_TOLERANCE
+                else None), z_rho
+    near = density_zs(z_rho)
+    return (near[0] if len(near) == 1 else None), z_rho
 
 
 def laue_classes(space_groups: list[str]) -> dict[str, list[str]]:
@@ -917,7 +1092,13 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     synchrotron resolution) lands here rather than on a confident wrong class.
 
     ``restrict`` declares facts about the specimen — chirality (Sohncke),
-    centrosymmetry, polarity — as an :class:`ExtinctionPrior` (or its dict).
+    centrosymmetry, polarity, and the content per cell as a ``z`` or a
+    ``density`` with its ``formula`` — as an :class:`ExtinctionPrior` (or its
+    dict).  The content is settled on the screened cell (:func:`declared_z`)
+    and tested by :func:`content_exclusion`, which removes a group only under
+    ``ordered=True`` and otherwise states the failure
+    (``ExtinctionCandidate.count_notes``); :func:`special_site_note` names
+    what a kept member at a Z′ that is not whole needs.
     It filters each class's members (``space_groups`` keeps the admitted ones,
     ``excluded_groups`` the rest) and changes nothing else: every class is
     fitted and ranked on the data exactly as without it, and
@@ -1059,6 +1240,17 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                               screen.two_theta_range[0])
     screen.n_classes = len(classes)
 
+    # the declared Z, settled on the cell the classes are screened at
+    from ..crystallography.atomic_volume import formula_counts
+    from ..crystallography.lattice import cell_volume
+
+    screen.z, screen.z_from_density = declared_z(
+        prior, float(cell_volume(*candidate.cell)))
+    if screen.z_from_density is not None and prior.z is None:
+        screen.z_candidates = density_zs(screen.z_from_density)
+    counts = (formula_counts(prior.formula)
+              if prior is not None and prior.formula else None)
+
     # 3a — what each class forbids, and which of those the data can test.  No
     # fit yet: this is what orders the screen and what ``n_added`` counts.
     entries: list[ExtinctionCandidate] = []
@@ -1068,12 +1260,19 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         orbit_absent = _orbit_absences(sg, orbits)
         absent_line = np.logical_and.reduceat(orbit_absent[by_line], starts)
         forbidden = np.flatnonzero(absent_line)
-        admitted = [g for g in cls.space_groups
-                    if admits(prior, gemmi.find_spacegroup_by_name(g))]
+        admitted, reasons = [], {}
+        for g in cls.space_groups:
+            why = exclusion_reasons(prior, gemmi.find_spacegroup_by_name(g),
+                                    screen.z, counts)
+            if why:
+                reasons[g] = "; ".join(why)
+            else:
+                admitted.append(g)
         entry = ExtinctionCandidate(
             symbol=cls.symbol, representative=cls.representative,
             space_groups=admitted,
             excluded_groups=[g for g in cls.space_groups if g not in admitted],
+            exclusion_reasons=reasons,
             laue_classes=laue_classes(admitted), conditions=list(cls.conditions),
             conditions_complete=cls.conditions_complete,
             n_lines=int(n_lines - len(forbidden)), n_absent=int(len(forbidden)))
@@ -1172,6 +1371,13 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         # "unreliable" and not on "cancelled", so overwriting it would hand
         # back the class the gate withheld
         screen.status = "cancelled"
+    if screen.z is not None:
+        # what the declared Z says of each kept member, on the classes the data
+        # leave standing: it derives each group's orbits, seconds for a cubic
+        # F class, and a refuted class's answer is never read
+        for entry in entries:
+            if not entry.refuted:
+                _content_notes(entry, screen.z, counts, prior)
     for entry in entries:
         entry.diagnostics = extinction_class_diagnostics(entry)
     screen.candidates = sorted(
@@ -1179,6 +1385,26 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                                 e.n_absent))
     screen.diagnostics = extinction_diagnostics(screen)
     return screen
+
+
+def _content_notes(entry: ExtinctionCandidate, z: int,
+                   counts: dict[str, float] | None,
+                   prior: ExtinctionPrior) -> None:
+    """Fill the statements the declared Z makes about each kept member.
+
+    The count a group's orbits cannot hold is a statement here, and the
+    group's removal only under ``prior.ordered`` (:func:`exclusion_reasons`),
+    which has then already run it.
+    """
+    for g in entry.space_groups:
+        member = gemmi.find_spacegroup_by_name(g)
+        why = (content_exclusion(member, z, counts)
+               if counts and not prior.ordered else None)
+        if why is not None:
+            entry.count_notes[g] = why
+        note = special_site_note(member, z)
+        if note is not None:
+            entry.special_positions[g] = note
 
 
 def _row_line_labels(rows, primary, labels) -> np.ndarray:
@@ -1194,7 +1420,8 @@ def _row_line_labels(rows, primary, labels) -> np.ndarray:
                     dtype=np.int64)
 
 
-__all__ = ["DECISIVE_DELTA_BIC", "REFERENCE_NET_RWP_MAX", "AbsenceClass", "absence_classes", "admits",
-           "compatible_groups", "determine_extinction_symbol",
+__all__ = ["DECISIVE_DELTA_BIC", "DENSITY_Z_TOLERANCE", "N_A_CM3_PER_A3", "REFERENCE_NET_RWP_MAX", "AbsenceClass",
+           "absence_classes", "admits", "compatible_groups", "content_exclusion",
+           "declared_z", "density_zs", "determine_extinction_symbol", "exclusion_reasons",
            "extinction_symbol", "is_polar", "laue_classes", "line_index",
-           "reflection_conditions", "testable_mask"]
+           "reflection_conditions", "special_site_note", "testable_mask"]

@@ -164,55 +164,93 @@ def _volume(a, b, c, al=90.0, be=90.0, ga=90.0):
     return a * b * c * math.sqrt(1 - ca * ca - cb * cb - cg * cg + 2 * ca * cb * cg)
 
 
-_HEX = (90.0, 90.0, 120.0)
+_DATA = Path(__file__).parent / "data"
+#: NIST certifies SRM 640c's and SRM 676a's cells at 22.5 °C
+#: (``tests/data/README.md``, both certificates).
+_NIST_CERTIFIED_K = 273.15 + 22.5
+
+
+def _gallery(key: str) -> float:
+    """The volume of a cell in ``tests/indexing_gallery.TRUTHS``, the tree's
+    one copy of the round-robin and standards cells: imported, not retyped."""
+    from tests.indexing_gallery import TRUTHS
+
+    return _volume(*TRUTHS[key][0])
+
+
+def _si640c() -> float:
+    from tests.test_acceptance_si640c import A_CERT
+
+    return _volume(A_CERT, A_CERT, A_CERT)
+
+
+def _cif(name: str) -> tuple[int, float, float]:
+    """(Z, V, T) as a vendored COD CIF states them: ``_cell_formula_units_Z``,
+    ``_cell_volume`` and the cell's measurement temperature (the
+    diffraction temperature where the file gives no other), else 298 K."""
+    import re
+
+    text = (_DATA / name).read_text(encoding="utf-8")
+
+    def item(tag):
+        m = re.search(rf"^{tag}\s+'?([-0-9.]+)", text, re.M)
+        return None if m is None else float(m.group(1))
+
+    t = item("_cell_measurement_temperature") or item("_diffrn_ambient_temperature")
+    return int(item("_cell_formula_units_Z")), item("_cell_volume"), t or 298.0
+
+
 #: Known cells, each with its source: ``(formula, Z, V_true Å³, T K, organic)``.
 #: The inorganic rows are every inorganic standard in ``tests/data/`` with a
 #: certified, published or cross-code cell (``tests/data/README.md`` and
-#: ``tests/indexing_gallery.py`` name each), plus halite's literature cell, the
-#: one row of WP-2030's table the tree holds no pattern for.  The organic and
-#: metal-organic rows are the published cells in ``tests/data/`` and two more.
-#: T is the cell's own temperature where its source states one, else 298 K.
+#: ``tests/indexing_gallery.py`` name each), plus halite.  The organic and
+#: metal-organic rows are the published cells in ``tests/data/`` and one more.
+#: Each value is read from where the tree already holds it, the gallery, the
+#: SRM 640c test or a vendored CIF, never retyped.  T is the cell's own
+#: temperature where its source states one, else 298 K.
 KNOWN_CELLS: dict[str, tuple[str, int, float, float, bool]] = {
-    # NIST SRM 660c certificate, nist_srm660c_100a.cif, at 20.85 °C
-    "LaB6": ("LaB6", 1, _volume(4.156780, 4.156780, 4.156780), 294.0, False),
-    # NIST SRM 640c certificate, the header of 11BM_Si640c.xy
-    "Si": ("Si", 8, _volume(5.4311946, 5.4311946, 5.4311946), 298.0, False),
-    # NIST SRM 676a certificate (indexing_gallery.TRUTHS)
-    "corundum": ("Al2O3", 6, _volume(4.759355, 4.759355, 12.99231, *_HEX), 298.0, False),
-    # 11-BM NAC's cell (gallery); Z = 4 from COD 1000236 (cod_1000236.cif,
+    # NIST SRM 660c certificate, nist_srm660c_100a.cif's _meas block, at 20.85 °C
+    "LaB6": ("LaB6", 1, _gallery("lab6"), 294.0, False),
+    # NIST SRM 640c certificate, a = 5.4311946 Å at 22.5 °C
+    "Si": ("Si", 8, _si640c(), _NIST_CERTIFIED_K, False),
+    # NIST SRM 676a certificate, a = 4.759355, c = 12.99231 Å at 22.5 °C
+    "corundum": ("Al2O3", 6, _gallery("corundum"), _NIST_CERTIFIED_K, False),
+    # 11-BM NAC's cell (gallery); Z from COD 1000236 (cod_1000236.cif,
     # Courbion & Férey 1988, J. Solid State Chem.)
-    "NAC": ("Na2Ca3Al2F14", 4, _volume(10.2510, 10.2510, 10.2510), 298.0, False),
+    "NAC": ("Na2Ca3Al2F14", _cif("cod_1000236.cif")[0], _gallery("nac"), 298.0, False),
     # GSAS's converged cell in FAP.EXP (cross-code)
-    "fluorapatite": ("Ca5P3O12F", 2, _volume(9.3717, 9.3717, 6.8859, *_HEX), 298.0, False),
+    "fluorapatite": ("Ca5P3O12F", 2, _gallery("fap"), 298.0, False),
     # the IUCr CPD round robin's literature cells (indexing_gallery.SPECIMENS)
-    "zincite": ("ZnO", 2, _volume(3.2499, 3.2499, 5.2066, *_HEX), 298.0, False),
-    "zircon": ("ZrSiO4", 4, _volume(6.6042, 6.6042, 5.9796), 298.0, False),
-    "brucite": ("Mg(OH)2", 1, _volume(3.142, 3.142, 4.766, *_HEX), 298.0, False),
-    "magnetite": ("Fe3O4", 8, _volume(8.3941, 8.3941, 8.3941), 298.0, False),
-    "fluorite": ("CaF2", 4, _volume(5.4631, 5.4631, 5.4631), 298.0, False),
-    # a = 5.6402 Å, the cell the tree's NaCl tests use (test_neutron_cw.py)
-    "halite": ("NaCl", 4, _volume(5.6402, 5.6402, 5.6402), 298.0, False),
+    "zincite": ("ZnO", 2, _gallery("zincite"), 298.0, False),
+    "zircon": ("ZrSiO4", 4, _gallery("zircon"), 298.0, False),
+    "brucite": ("Mg(OH)2", 1, _gallery("brucite"), 298.0, False),
+    "magnetite": ("Fe3O4", 8, _gallery("magnetite"), 298.0, False),
+    "fluorite": ("CaF2", 4, _gallery("fluorite"), 298.0, False),
+    # COD 9003308 (cod_9003308.cif): Walker et al. (2004), Am. Mineral. 89,
+    # 204, a = 5.6401 Å at 25 °C
+    "halite": ("NaCl", *_cif("cod_9003308.cif"), False),
     # cubic BN in 11BM_LaB6_cBN_mg2044: TOPAS's cell (test_acceptance_lab6_cbn.py)
     "cBN": ("BN", 4, _volume(3.616463, 3.616463, 3.616463), 295.0, False),
     # GSAS-II's converged cells in the vendored tutorial projects
     "anglesite": ("PbSO4", 4, _volume(8.480443, 5.398619, 6.960131), 298.0, False),
     "hausmannite": ("Mn3O4", 4, _volume(5.763447, 5.763447, 9.452202), 10.0, False),
     "LCMO": ("La0.8Ca0.2MnO3", 4, _volume(5.482827, 5.466795, 7.724880), 50.0, False),
-    # COD 9007744 (cod_9007744.cif, Acta Cryst. C 1990), its own V
-    "YBCO": ("Ba2 Cu2.941 O6.822 Y", 1, 174.065, 298.0, False),
-    # COD 2104364 (cod_2104364.cif) at 100 K, its own V
-    "paracetamol": ("C8H9NO2", 4, 751.00, 100.0, True),
-    # COD 7252065 at 298 K: Rajput & Dalvi (2026), CrystEngComm,
-    # doi:10.1039/D6CE00164E
-    "benzoic acid": ("C7H6O2", 4, 617.1, 298.0, True),
+    # COD 9007744 (cod_9007744.cif, Acta Cryst. C 1990), which states no
+    # temperature
+    "YBCO": ("Ba2 Cu2.941 O6.822 Y", *_cif("cod_9007744.cif"), False),
+    # COD 2104364 (cod_2104364.cif) at 100 K
+    "paracetamol": ("C8H9NO2", *_cif("cod_2104364.cif"), True),
+    # COD 7252065 (cod_7252065.cif) at 298 K: Rajput & Dalvi (2026),
+    # CrystEngComm, doi:10.1039/D6CE00164E
+    "benzoic acid": ("C7H6O2", *_cif("cod_7252065.cif"), True),
     # Bergmann, Le Bail, Shirley & Zlokazov (2004), Z. Kristallogr. 219, 783
     "bethanechol chloride": ("C7H17ClN2O2", 4,
                              _volume(8.875, 16.408, 7.137, 90.0, 93.84, 90.0), 298.0, True),
     # COD 4002052 (cod_4002052.cif) at 273 K: HKUST-1, a porous framework
     # written without its pore contents
-    "HKUST-1": ("C18H6Cu3O12", 16, 18131.5, 273.0, True),
+    "HKUST-1": ("C18H6Cu3O12", *_cif("cod_4002052.cif"), True),
     # COD 4003235 (cod_4003235.cif) at 293 K, a hybrid lead iodide
-    "hybrid iodide": ("C10H36I10N4Pb3", 4, 4118.0, 293.0, True),
+    "hybrid iodide": ("C10H36I10N4Pb3", *_cif("cod_4003235.cif"), True),
 }
 
 #: Measured on this tree (WP-2030, 2026-10-23): V_true / (Z × V_est), the

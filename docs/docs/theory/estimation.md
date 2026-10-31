@@ -23,7 +23,7 @@ The Jacobian is assembled column by column, taking exact work wherever it
 exists: linear background columns, analytic peak-chain columns (everything
 flowing through per-peak position, width, mixing and intensity), analytic
 site-DOF columns for coordinates and anisotropic ADPs over the frozen operator
-subsets, analytic axial columns for the FCJ apertures, and plain forward
+subsets, analytic columns for magnetic-moment moduli, analytic axial columns for the FCJ apertures, and plain forward
 differences as the fallback.
 Under a differentiable backend the same residual is traced and columns
 come from forward-mode autodiff, whose cost scales with the parameter

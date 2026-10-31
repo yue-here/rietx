@@ -8,8 +8,9 @@ Priority: P2 2026-10-23 — 2002 closed with the width twin hold; the evidence e
 ## Goal
 
 Every tier-3 threshold the single-fit audit kept is measured on three unrelated dataset
-families, against an independent reference where one exists. Each one either holds (its
-evidence line gains the families and the reference distance), moves to tier 1 or
+families, against an independent measurement where one exists and otherwise a reference
+value under its protocol (DESIGN.md § Rules, 2). Each one either holds (its evidence line
+gains the families and the distance from each reference value), moves to tier 1 or
 `invariant` (a test now bounds it), or goes back to the maintainer as a ruling with the
 measurement that failed it.
 
@@ -57,9 +58,10 @@ ten to fifteen fit campaigns, not one per row:
   factors, `SCHERRER_K`, `BOND_SLACK_ANG` and `STEPS_PER_FWHM_*` (the judge's 2026-10-20
   reading).
 
-**The held-out family stays held out.** The Nd₂Ru₂O₇ pair (`tests/data/mg090*`: 11-BM
-X-ray and NCNR BT-1 neutron, one specimen, a published joint refinement) is evidence for no
-audit; it is run once at the milestone's close (`generality.md` § Acceptance).
+**Nd₂Ru₂O₇ is cited by no audit.** The pair (`tests/data/mg090*`: 11-BM X-ray and NCNR
+BT-1 neutron, one specimen, a published joint refinement) is evidence for no audit; it is
+run once at the milestone's close (`generality.md` § Acceptance). It is development data,
+not a sealed family in DESIGN.md § Rules, 2's sense (ruled 2026-10-27).
 
 **Families on disk** (WP-2002 § Context): the four round-robin standards and the qarr
 set (weighed compositions), 11-BM NAC and SRM 660c, the FAP suite, the Durham tutorials
@@ -85,7 +87,7 @@ LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
 
 - 2026-10-26 issue triage: #1052 (mustachefeeling, 2026-10-19) offers three held-out families for the milestone's close, and says the reporter will run them at the open and the close: Zr₆(BDC)₃(Fum)₃ on Diamond I11 (Tollitt et al. 2021, Angew. Chem. 60, 26939; pattern deposited CC BY 3.0), HfIn on a lab Empyrean, Cu Kα₁/Kα₂, flat plate (Oliynyk et al. 2018, Inorg. Chem. 57, 7966; not deposited, kept local by the reporter), and CrCl₂(pyrimidine) on ILL D1B at 1.5 K and 30 K, k ≠ 0 (Pitcairn et al. 2023, JACS 145, 1783; data doi:10.17639/nott.7257). Checked against the tree at c0e32ab29: none of the three is in `tests/data/README.md`, and the milestone's named held-out family is still only the Nd₂Ru₂O₇ pair (`11a68d96e`, 2026-10-19). Until the maintainer rules on #1052, do not use any of the three as second-pass evidence here: a public download makes the MOF and the magnet easy to reach for, and using one would end its use as held-out evidence.
 
-- Decided 2026-10-26 (maintainer, #1052): all three offered families are adopted as held-out beside Nd₂Ru₂O₇ (`docs/milestones/generality.md` § Acceptance). So none of them is audit evidence in this pass, permanently rather than while the issue is open.
+- Decided 2026-10-26 (maintainer, #1052): all three offered families are adopted as held-out beside Nd₂Ru₂O₇ (`docs/milestones/generality.md` § Acceptance). So none of them is audit evidence in this pass, nor in any pass before the milestone's close, when they are spent into development data (ruled 2026-10-27, replacing the 2026-10-26 "for good").
 
 ## Non-goals
 

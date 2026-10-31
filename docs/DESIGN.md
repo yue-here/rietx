@@ -11,8 +11,8 @@ section a work package links, not the whole file.
 ## Why this package exists
 
 **rietx exists so that a scientist can trust a Rietveld refinement they did not drive
-by hand.** Trust is built four ways. Every result is checked against a published
-reference where one exists, and where none does the method, its source and its code are
+by hand.** Trust is built four ways. Every result is checked against an independent
+measurement where one exists, and where none does the method, its source and its code are
 stated plainly. The package decides alone only where every competent refiner would
 decide the same way; where the data can rank the alternatives it ranks them, and where
 they cannot it reports the number and stops. Every action is recorded. The report says
@@ -61,20 +61,63 @@ number. A sentence that nobody would use to make a choice does not belong here.
 
 2. **Verification and validation.** rietx is written by agents, so both are its
    foundation and not a check at the end. The words carry the field's meanings (Roache
-   1998; Oberkampf & Roy 2010). *Verification* asks whether the code computes its model
-   correctly: an analytic Jacobian against finite differences, a refactor that
-   reproduces every number, two backends or two codes agreeing on the same data under
-   the same protocol. *Validation* asks whether the model matches the specimen: a
-   certified cell, a weighed composition, an inter-laboratory spread, a prediction
-   written down before the measurement. In `tests/validation_matrix.py`'s tiers,
-   `identity`, `own_result` and `cross_code` verify; `certificate`, `spread` and
-   `prediction` validate. A topic ships validated against a published reference where
-   the literature has one. Where none exists, its equation, its source and its code are
-   stated plainly and the topic is declared not yet validated until a reference
-   arrives. That state is separate from *provisional*, which rietx keeps for an API
-   that may still change (PEP 411's sense). Every physics function cites its reference. A pinned number that moves has moved
-   for the right reason only if the new value is no further from its reference than
-   the old.
+   1998; Oberkampf & Roy 2010, chapters 2 and 10 to 13). A check compares a result with
+   a *reference value*, and the kind of reference value decides which of the two the
+   check is.
+
+   *Verification* asks whether the code computes its model correctly, and it is the
+   package's gate: a feature ships verified or does not ship. Its forms: an exact
+   identity (a reparameterisation that provably cannot move the fit, a sum that must
+   close); an analytic Jacobian against finite differences; a refactor that reproduces
+   every number; two backends agreeing on one residual; and, weakest, two codes
+   agreeing on the same data under the same protocol, or a published refinement of the
+   same pattern reproduced under its protocol. The last is weakest because its
+   reference value is a model's answer and can share the model's error. Under a
+   different protocol it verifies nothing and measures only drift. In
+   `tests/validation_matrix.py`'s tiers, `identity`, `own_result` and `cross_code`
+   verify. `characterisation`, which records the shape of a known error or that a model
+   is inadmissible, claims no accuracy and is neither. Every physics function cites its
+   source.
+
+   *Validation* asks whether the model matches the specimen, and its reference value is
+   an *independent measurement*: a certified cell, a weighed composition (judged against
+   the inter-laboratory spread of refinements), a composition from another probe. A
+   prediction written down before the measurement validates only against an
+   independent measurement; checked against the package's own arithmetic or another
+   code, it verifies. So `certificate` and `spread` validate, and `prediction` validates
+   where its reference value is an independent measurement. A validation result reports
+   the mismatch in the quantity's own units, with the measurement's uncertainty and the
+   fit's esd beside it, over a stated domain (the families, laboratories and instruments
+   it was measured on), never only a pass; and it says whether the data is development
+   data. Where no claim compares a topic with an independent measurement, the equation,
+   its source and its code are stated plainly, and the topic is recorded *not yet
+   validated* until one does. A result that reports a number from such a topic says so
+   once in its report, naming each such number. That is the one place the fact reaches a
+   reader of results (the writer is WP-2010's). That state is
+   separate from *provisional*, which rietx keeps for an API that may still change (PEP
+   411's sense). The validation record is for the developers. An agent or a user
+   chooses a feature by the sample and the data, and whether the package has validated
+   the feature should not move that choice. So the record is kept in the matrix and its
+   generated page, and no surface an agent reads to choose a feature carries a
+   validation verdict: `capabilities()`, the help entries, the agent skill and the GUI's
+   help (ruled 2026-10-27).
+
+   *A dataset is unused, sealed or development data.* Data that nobody who changes the
+   package has run is unused. A family is sealed when its first run is on the tree as it
+   stood when the work it judges began (a milestone's open, or the commit its acceptance
+   row names), and nothing between then and the close is chosen or reworked on it by
+   anyone who changes the package. Running it for another purpose, such as a benchmark
+   whose results steer no change, leaves the seal intact. It is run again at the close,
+   its mismatch against each reference value is reported for both runs, and it is then
+   spent. Every other dataset that has been run is development data: data used to choose
+   a threshold, a default or a plan, data a change was reworked on until a number came
+   back, and data whose results the developers have seen (Oberkampf & Roy pp. 31-32, 44
+   and 401). An independent measurement it carries calibrates as much as it validates. A
+   test on it still measures, but weakly, and the record says so. Nothing goes from
+   development data back to sealed. A pinned number that moves has moved for
+   the right reason only if the new value is no further from its reference value than
+   the old; that rule tunes the package toward the development data, and only the sealed
+   families show whether the tuning generalises.
 
 3. **Feedback teaches.** The report, each diagnostic's explanation and the manual bring
    a non-expert to competent steering, since steering is what the package leaves to
@@ -97,10 +140,11 @@ number. A sentence that nobody would use to make a choice does not belong here.
    it fired. Kind 2 ranks with evidence and picks only in Rule 1's two cases. Kind 3
    reports the number and stops. An Rwp comparison is never its evidence.
 
-   *A new topic.* Its reference is named before the code is written: dataset,
-   published number, tolerance. Its equation is in the manual with its source, its
-   off state reproduces every earlier number, and without a reference it is declared
-   not yet validated.
+   *A new topic.* A test that verifies it lands with the code (Rule 2's gate). Where an
+   independent measurement exists, it is named before the code is written: the dataset,
+   the measured value with its uncertainty, and the mismatch the test will report. Where
+   none exists, the topic is recorded not yet validated. Its equation is in the manual
+   with its source, and its off state reproduces every earlier number.
 
    *A new API.* It takes the shape the surface already has: a verb in, a typed result
    out, a raise on failure, documented or deferred with a reason. The signature and
@@ -118,7 +162,7 @@ number. A sentence that nobody would use to make a choice does not belong here.
   condition number ⇒ GPUs compute fp32 Jacobian columns only, fp64 host solve.
   - *Amendment (2026-07-24).* `[torch]` is pulled into **v0.4** as WP-0408.
     Because jax-metal is abandoned, Apple-GPU acceleration can only come
-    through torch, and torch-MPS is also what validates the fp32-Jacobian-
+    through torch, and torch-MPS is also what verifies the fp32-Jacobian-
     column policy (WP-0403) on real hardware instead of CPU simulation — the
     maintainer has no CUDA machine. The "one autodiff backend at a time"
     discipline is preserved by **sequencing rather than by milestone**: torch
@@ -704,12 +748,12 @@ units of the optimal one and `intensity_fraction_of_optimal = µt·e^(1−µt)` 
 how many counts the specimen preparation cost. It is reported, never acted on —
 a badly chosen thickness costs statistics, not accuracy.
 
-**Validation lesson.** The coefficient b₂ is printed as "−0·0375" in the
+**Verification lesson.** The coefficient b₂ is printed as "−0·0375" in the
 available scan of Rouse when it is −0·3750. That error is invisible against a
 constant-θ slice of the paper's own table — which constrains only a₁ and a₂ —
 and is 0.08 wrong at µR = 1. It was caught by a quadrature of the exact ITC
 integral, which shares no constant with any published fit. The general rule:
-**a fit of two arguments must be validated across both**, and the strongest
+**a fit of two arguments must be checked across both**, and the strongest
 anchor is the integral a fit approximates, not another code's transcription of
 the same fit.
 
@@ -719,12 +763,13 @@ the same fit.
   absences, TCH polynomials); hypothesis property tests (profile
   normalization, F symmetry invariance, Jacobian agreement incl. stage
   boundaries).
-- FitReport validation by **synthetic misfit injection**: perturb exactly one
+- FitReport verification by **synthetic misfit injection**: perturb exactly one
   known cause, assert the report recovers it, ranks it first, and reports
   *low confidence* in deliberately-collinear setups; calibration over the
   injection ensemble. Without this the confidence numbers are decorative.
 - Absolute accuracy anchors to NIST certificates (with stated uncertainties);
-  GSAS-II results are consistency checks with convention-aware tolerances.
+  GSAS-II results are cross-code verification (Rule 2) with convention-aware
+  tolerances.
 - Real-data acceptance per milestone, committed in `tests/` and marked
   `slow`; provenance for every dataset in `tests/data/README.md`.
 
@@ -735,7 +780,7 @@ Two things about that document are load-bearing. It is **generated** from
 `tests/validation_matrix.py` and a fast test fails when the two drift, so it
 cannot go stale the way the hand-maintained README table did (it claimed eight
 suites while nine were committed). And the vocabulary needed **seven**
-referents where this section's prose implies three: alongside `certificate`,
+tiers where this section's prose implies three: alongside `certificate`,
 `cross_code` and `spread` sit `identity` (referenced to floating-point
 arithmetic, not to any physical quantity), `own_result`, and two that are
 kinds of *evidence* rather than kinds of tolerance — `characterisation` (a row
@@ -863,7 +908,7 @@ item would need its own work package, and several sit behind the v2 fence.
 the analytic chain covers everything shipped. So for someone *running a
 refinement today* the backends offer no accuracy or capability the numpy path
 lacks, and cost 10-30× in Jacobian time (v0.4 record). Their present value is
-to the maintainer: they are how the analytic Jacobian is validated, which is
+to the maintainer: they are how the analytic Jacobian is verified, which is
 why torch keeps a place after the GPU story collapsed. Everything below is
 about what the *property* of being differentiable makes possible, not about
 what the backends do now.
@@ -875,7 +920,7 @@ what the backends do now.
   finite differences — measured at 6.2e-3 relative error on SRM 660c's cell `a`
   against 4.3e-5 for central differences, an error that lands in that
   parameter's esd. With autodiff, new physics is exact on day one and the
-  analytic column becomes a later optimisation, validated against the autodiff
+  analytic column becomes a later optimisation, verified against the autodiff
   one by the agreement matrix that already exists. That inverts the workflow
   from derive-then-ship to ship-then-optimise.
 - **Honest uncertainties — the strongest candidate.** Today's esds are

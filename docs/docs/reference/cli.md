@@ -58,10 +58,11 @@ The last block is the run's diagnostics, where a truncated search says so.
 | `--ceiling` | print the cost arithmetic for these options and exit without searching |
 | `--shift-allowance` | a measured systematic 2θ shift in degrees. Without one the engines assume 0.05° and cap every candidate's confidence, because a cell found inside a widened window absorbs the shift |
 | `--formula` | the specimen's chemical formula, with `·` before a hydrate. Each candidate is checked for a whole number of formula units and `INDEX_Z_NOT_INTEGER` reports one that is not; the search is not narrowed |
-| `--temperature` | the pattern's temperature in K for `--formula`'s volumes, 298 by default |
+| `--temperature` | the pattern's temperature in K for `--formula`'s volumes, 298 by default. Given without `--formula` it is refused, since it would change nothing |
 | `--no-validate` | skip the whole-profile validation fit, which caps every candidate at `medium` |
 | `--json FILE` | also write the whole `IndexingResult` as JSON |
 
+A formula the parser cannot read, or a temperature that is not a positive finite number of kelvin, is refused before the pattern is read, as a usage error with exit code 2.
 Anything the pattern reader repaired or assumed goes to stderr before the answer.
 A reversed scan or a dropped duplicate changes every number under it.
 

@@ -343,6 +343,26 @@ def test_the_skipped_brindley_advice_follows_its_reason():
     assert diag.suggestion.startswith("Supply particle_radius_um")
 
 
+def test_the_skipped_brindley_advice_names_a_phase_still_missing_its_radius():
+    """One radius is enough to record the skip, so "the radii were supplied"
+    was said of a model with a phase still missing its radius (#1103, round
+    2).  The message and the advice name that phase; the positive arm, every
+    radius given, still says the radii were supplied."""
+    from rietx.optimize.qpa import microabsorption_diagnostics
+
+    structure, values, compute_qpa = _three_phase_decoded([0.4, None, 0.4])
+    qpa = compute_qpa(structure, values, wavelength=1.5406, unmeasured=[2])
+    (diag,) = microabsorption_diagnostics(qpa, structure)
+    assert "radii were supplied" not in diag.suggestion
+    assert diag.suggestion.endswith("Supply particle_radius_um on CaF2 too.")
+    assert diag.message.endswith("No particle_radius_um on phase(s) CaF2 either.")
+    structure, values, compute_qpa = _three_phase_decoded([0.4, 0.4, 0.4])
+    qpa = compute_qpa(structure, values, wavelength=1.5406, unmeasured=[2])
+    (diag,) = microabsorption_diagnostics(qpa, structure)
+    assert diag.suggestion.endswith("The radii were supplied.")
+    assert "either" not in diag.message
+
+
 def test_a_lone_phase_seen_is_whole_by_definition_with_no_esd():
     structure, values, compute_qpa = _three_phase_decoded([None] * 3)
     cov = np.diag([1e-10, 1e-10])

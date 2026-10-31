@@ -1335,3 +1335,268 @@ def test_a_note_the_merge_adds_after_its_content_sentence_is_found():
     assert message_notes("x. Atoms per cell (multiplicity × occupancy): 8 × 1 = 8 → 4 × 1 = 4.") == ""
     assert message_notes("no content sentence") == ""
 
+
+
+# ------------------------------------- #1014's follow-ups (Yue's round 6, not blocking)
+#
+# Each coupled position below is from International Tables vol. A: P 6₃/mmc 12k
+# (x, 2x, z), P m-3m 24m (x, x, z), and R-3m 18h (x, -x, z) in the hexagonal
+# setting.  On each, one DOF moves x and y together and the other moves z.
+
+_COUPLED = [
+    ("P 63/m m c", (5.0, 5.0, 8.0, 90, 90, 120), lambda x: 2 * x, 12),
+    ("P m -3 m", (5.0, 5.0, 5.0, 90, 90, 90), lambda x: x, 24),
+    ("R -3 m:H", (5.0, 5.0, 14.0, 90, 90, 120), lambda x: -x, 18),
+]
+
+
+def _onto_coupled(group, cell, y_of_x, hold: list[int], *, free: list[int] = (),
+                  tie: tuple[int, int] | None = None):
+    """A general site moved within the reach of the coupled position, as ``set_values``
+    moves one; ``hold``, ``free`` and ``tie`` name DOFs on the general position."""
+    x, z = 0.17, 0.0705
+    ref = rx.Refinement(Structure(phases=[_phase(group, cell, (x, 0.29, z))]),
+                        INSTRUMENT, history=False)
+    site = "phases.0.atoms.0"
+    if hold:
+        ref.hold([f"{site}.dof.{k}" for k in hold])
+    if free:
+        ref.set_vary([f"{site}.dof.{k}" for k in free], True)
+    if tie is not None:
+        ref.tie(f"{site}.dof.{tie[0]}", f"{site}.dof.{tie[1]}")
+    ref.set_values({f"{site}.dof.1": (y_of_x(x) % 1.0) + 2e-4 - 0.29})
+    return ref, site
+
+
+def _directions(ref) -> np.ndarray:
+    """The site's DOF directions in (x, y, z) at its position now, read off the group."""
+    from rietx.crystallography.wyckoff import coordinate_basis, stabilizer_rotations
+    phase = ref.structure.phases[0]
+    a = phase.atoms[0]
+    return coordinate_basis(stabilizer_rotations(
+        resolve_group(phase.space_group, None), np.array([a.x.value, a.y.value, a.z.value])))
+
+
+@pytest.mark.parametrize("group, cell, y_of_x, mult", _COUPLED)
+@pytest.mark.parametrize("held", [[0], [1], [2], [0, 2]])
+def test_a_hold_on_a_coordinate_the_position_couples_holds_the_coupled_direction(
+        group, cell, y_of_x, mult, held):
+    """Round 6's first follow-up: a hold on x (or y) of a site merged onto a position
+    that couples x and y was dropped, so x refined.  The coupled direction is the only
+    one that moves x, so every direction moving a held coordinate must be held, and
+    none other."""
+    ref, site = _onto_coupled(group, cell, y_of_x, held)
+    assert _multiplicity(ref.structure.phases[0], "X") == mult
+    basis = _directions(ref)
+    assert len(basis) == 2
+    want = {f"{site}.dof.{k}" for k, v in enumerate(basis)
+            if any(v[c] != 0 for c in held)}
+    assert ref._user_holds == want
+    rows = {r.path: r for r in ref.parameters()}
+    assert all(bool(rows[p].held_because) == (p in want) for p in rows if ".dof." in p)
+    (d,) = [d for d in ref._twin_findings if d.code == "SITE_TWINS_MERGED"]
+    assert "was dropped" not in d.message
+    if held != [2]:
+        assert "the special position couples x and y" in d.message
+
+
+@pytest.mark.parametrize("free, frees_xy", [([0], False), ([0, 1], True)])
+def test_a_free_path_frees_the_coupled_direction_only_where_both_coordinates_were_free(
+        free, frees_xy):
+    group, cell, y_of_x, _ = _COUPLED[0]
+    ref, site = _onto_coupled(group, cell, y_of_x, [], free=free)
+    assert (f"{site}.dof.0" in ref._free_paths) == frees_xy
+    if not frees_xy:
+        (d,) = [d for d in ref._twin_findings if d.code == "SITE_TWINS_MERGED"]
+        assert f"the free path on {site}.dof.0 was dropped" in d.message
+        assert "not free" in d.message
+
+
+def test_a_tie_on_a_coupled_coordinate_is_dropped_and_says_coupled():
+    """A tie needs one direction per path; x alone has none on (x, 2x, z)."""
+    group, cell, y_of_x, _ = _COUPLED[0]
+    ref, site = _onto_coupled(group, cell, y_of_x, [], tie=(0, 2))     # x follows z
+    assert not ref._ties
+    (d,) = [d for d in ref._twin_findings if d.code == "SITE_TWINS_MERGED"]
+    assert f"the tie on {site}.dof.0 was dropped" in d.message
+    assert "coupled with another by the special position" in d.message
+
+
+def test_a_hold_on_the_coupled_direction_holds_x_and_y_when_the_site_leaves_it():
+    """The other direction: on (x, 2x, z) ``dof.0`` moves x and y together.  An edit
+    taking the site off the position must hold both, not drop the hold."""
+    group, cell, _, _ = _COUPLED[0]
+    ref = rx.Refinement(Structure(phases=[_phase(group, cell, (0.17, 0.34, 0.0705))]),
+                        INSTRUMENT, history=False)
+    site = "phases.0.atoms.0"
+    assert len(_directions(ref)) == 2
+    ref.hold([f"{site}.dof.0"])
+    candidate = ref.structure.model_copy(deep=True)
+    candidate.phases[0].atoms[0].y.value = 0.31
+    ref.edit(structure=candidate)
+    assert len(_directions(ref)) == 3
+    assert ref._user_holds == {f"{site}.dof.0", f"{site}.dof.1"}       # x and y, not z
+    (d,) = [d for d in ref._twin_findings if d.code == "SITE_DOFS_RENUMBERED"]
+    assert "no longer couples x and y" in d.message
+
+
+def test_a_loaded_history_carries_its_recorded_actions_through_the_merge(
+        tmp_path, pbso4, pattern):
+    """Round 5/6: ``RefinementTree.load`` carried each node's state and not its action,
+    so a ``cherry_pick`` of a stage whose ``turn_on`` names ``dof.2`` (z on the general
+    position) asked for a DOF the merged site no longer has, and one naming ``dof.1``
+    (y) would have freed z.  O5 stored at y = 0.2501 merges onto the mirror (x, z)."""
+    j = _o5(pbso4)
+    site = f"phases.0.atoms.{j}"
+    path = tmp_path / "acts.jsonl"
+    ref = rx.Refinement(Structure(phases=[pbso4]), INSTRUMENT, history=path)
+    ref.run_stage(pattern, Stage("z", ["phases.*.scale", f"{site}.dof.2"], max_iter=2))
+    ref.set_vary([f"{site}.dof.1"], True)
+    ref.set_vary([f"{site}.dof.1"], False)
+    ref.set_values({f"{site}.dof.2": 1e-4})
+    ref.hold([f"{site}.dof.2"])
+    lines = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        doc = json.loads(line)
+        if doc.get("node") is not None:
+            doc["node"]["state"]["structure"]["phases"][0]["atoms"][j]["y"]["value"] = 0.2501
+        lines.append(json.dumps(doc))
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    found: list = []
+    tree = RefinementTree.load(path, diagnostics=found)
+    acts = {tree[n].action.kind + str(i): tree[n].action for i, n in enumerate(tree.order)}
+    stage = next(a for a in acts.values() if a.kind == "stage")
+    assert stage.turn_on == ["phases.*.scale", f"{site}.dof.1"]       # z, renumbered
+    set_vary = [a for a in acts.values() if a.kind == "set_vary"]
+    assert [a.turn_on for a in set_vary] == [[], []]                  # y: fixed on the mirror
+    assert [a.turn_off for a in set_vary] == [[], []]
+    (set_value,) = [a for a in acts.values() if a.kind == "set_value"]
+    assert set_value.values == {f"{site}.dof.1": 1e-4}
+    (set_hold,) = [a for a in acts.values() if a.kind == "set_hold"]
+    assert set_hold.held == [f"{site}.dof.1"]
+    (d,) = [d for d in found if d.code == "SITE_TWINS_MERGED"]
+    assert f"the recorded stage's turn_on on {site}.dof.2 now reads {site}.dof.1" in d.message
+    assert f"the recorded set_vary's turn_on on {site}.dof.1 was dropped" in d.message
+
+
+def test_a_series_hook_names_dofs_as_the_series_own_structure_numbers_them(pbso4, pattern):
+    """Round 5/6: pattern n is built from pattern n-1's fit, so a site that fit left
+    within reach of the mirror is merged and renumbered before the ``constrain=`` hook
+    runs, and the hook's ``dof.2`` (z, as the declared structure numbers it) raised
+    "unknown parameter path"; its ``dof.1`` (y) would have held z.  ``prepare`` stands
+    in for the warm start here, moving O5 to y = 0.2501 on the second pattern."""
+    from rietx.sequential import SequentialRefinement
+    from rietx.strategy.staged import RefinementPlan
+    j = _o5(pbso4)
+    site = f"phases.0.atoms.{j}"
+    seen: dict[int, tuple] = {}
+
+    def prepare(index, data, structure, instrument):
+        if index == 1:
+            structure.phases[0].atoms[j].y.value = 0.2501
+
+    def constrain(index, ref):
+        ref.hold([f"{site}.dof.1", f"{site}.dof.2"])              # y and z
+        inner = ref.fit
+
+        def fit(*args, **kwargs):
+            seen[index] = (set(ref._user_holds), _y(ref.structure, "O5"), _z_dofs(ref, j),
+                           [d.message for d in ref._twin_findings
+                            if d.code == "SITE_TWINS_MERGED"])
+            return inner(*args, **kwargs)
+        ref.fit = fit
+
+    plan = RefinementPlan(stages=[Stage("scale", ["phases.*.scale"], max_iter=2)])
+    SequentialRefinement(Structure(phases=[pbso4]), INSTRUMENT).fit(
+        [pattern, pattern], plan=plan, prepare=prepare, constrain=constrain)
+    assert seen[0][0] == {f"{site}.dof.1", f"{site}.dof.2"}
+    holds, y, z, messages = seen[1]
+    assert y == 0.25 and z == [1]
+    assert holds == {f"{site}.dof.1"}                                 # z held, y fixed
+    (message,) = messages
+    assert f"the hold on {site}.dof.2 now reads {site}.dof.1" in message
+    assert f"the hold on {site}.dof.1 was dropped" in message
+
+
+def test_a_tie_through_a_scaled_dof_rescales_its_target_and_its_constant():
+    """Round 6's last follow-up.  With old direction = s × new, a value θ is s·θ on the
+    new DOF, so θₜ = c·θ₁ + k becomes θₜ' = (sₜ·c/s₁)·θ₁' + sₜ·k; the carry divided by
+    s₁ alone.  No s differs from 1 today (the next test), so this is the arithmetic for
+    the day the normalisation changes."""
+    from rietx.crystallography.twins import carry_constraints
+    from rietx.schemas.params import TieSpec
+    moves = {"a.dof.0": ("a.dof.0", 2.0), "a.dof.1": ("a.dof.1", 0.5)}    # (new, s)
+    tie = TieSpec(terms=[("a.dof.1", 3.0)], const=0.1, user=True)
+    _, ties, _, _ = carry_constraints(moves, ties={"a.dof.0": tie})
+    assert ties["a.dof.0"].terms == [("a.dof.1", pytest.approx(12.0))]
+    assert ties["a.dof.0"].const == pytest.approx(0.2)
+    # and the identity: θ₀' = 2θ₀ and θ₁' = θ₁/2 satisfy it wherever the old tie held
+    t1 = 0.7
+    assert 2 * (3.0 * t1 + 0.1) == pytest.approx(12.0 * (0.5 * t1) + 0.2)
+
+
+def test_parallel_basis_vectors_are_equal_so_every_dof_scale_is_one():
+    """Pins the assumption the tie carry used to rest on: ``_nullspace_int`` scales each
+    basis vector to coprime integers with its first nonzero entry positive, so two
+    parallel ones are equal.  Swept over every site a set of positions reaches in all
+    230 groups (each group's ITA standard setting); fails if the normalisation changes."""
+    import gemmi
+
+    from rietx.crystallography.twins import _dof_moves
+    from rietx.crystallography.wyckoff import coordinate_basis, stabilizer_rotations
+    a, b, c = 0.1137, 0.2291, 0.3713
+    points = [(a, b, c), (a, a, c), (a, 2 * a, c), (2 * a, a, c), (a, -a, c), (a, a, a),
+              (0, b, c), (0.25, b, c), (a, b, 0), (a, b, 0.25), (a, 0, c), (0, 0, c),
+              (1 / 3, 2 / 3, c), (a, 0, 0), (0, b, b), (0.5, b, b), (a, 0.25, 0.125)]
+    scales = set()
+    for number in range(1, 231):
+        sg = gemmi.find_spacegroup_by_number(number)
+        bases = {tuple(map(tuple, coordinate_basis(stabilizer_rotations(sg, np.array(p)))))
+                 for p in points}
+        for b1 in bases:
+            for b2 in bases:
+                if b1 != b2:
+                    scales.update(m.scale for m in _dof_moves(
+                        np.array(b1).reshape(-1, 3), np.array(b2).reshape(-1, 3),
+                        "s").values() if m.path is not None)
+    assert scales == {1.0}
+
+
+def test_a_hook_tie_on_a_renumbered_sites_dof_is_reanchored_not_added_twice(pbso4):
+    """Round 1 of #1223.  ``displaced`` is the carry's, read in the declared numbering;
+    the hook's tie is in the built one, and the two differ wherever a warm start
+    renumbers the site.  Declared on the y = 1/4 mirror, O5's z is ``dof.1``; a warm
+    start off the mirror builds it as ``dof.2``, which the declared list never held,
+    so the re-anchor missed the tie and the warmed variable added the fitted
+    displacement to a coordinate that already held it, once per pattern.  The second
+    pattern must start z where the first fit left it."""
+    from rietx.sequential import SequentialRefinement
+    from rietx.strategy.staged import RefinementPlan
+    j = _o5(pbso4)
+    site = f"phases.0.atoms.{j}"
+    data = _pattern(Structure(phases=[pbso4]))
+    y0 = pbso4.atoms[j].y.value
+    start, _ = _merge(Structure(phases=[_moved(pbso4, "O5", y=0.25 - y0, z=0.01)]))
+    started: dict[int, float] = {}
+
+    def prepare(index, data, structure, instrument):
+        if index == 1:
+            structure.phases[0].atoms[j].y.value = 0.30        # off the mirror
+
+    def constrain(index, ref):
+        ref.add_variable("dz", 0.0, min=-0.05, max=0.05)
+        # z, as the declared structure numbers it (x, z on the mirror)
+        ref.tie(f"{site}.dof.1", "vars.dz")
+        inner = ref.fit
+
+        def fit(*args, **kwargs):
+            started[index] = ref.structure.phases[0].atoms[j].z.value
+            return inner(*args, **kwargs)
+        ref.fit = fit
+
+    plan = RefinementPlan(stages=[Stage("dz", ["vars.*"], max_iter=8)])
+    series = SequentialRefinement(start, INSTRUMENT).fit(
+        [data, data], plan=plan, prepare=prepare, constrain=constrain)
+    fitted = {p.path: p.value for p in series[0].parameters}[f"{site}.z"]
+    assert abs(fitted - start.phases[0].atoms[j].z.value) > 1e-3      # the fit moved it
+    assert started[1] == pytest.approx(fitted, abs=1e-9)

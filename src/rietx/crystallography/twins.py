@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from typing import NamedTuple
 
 import numpy as np
 
@@ -150,32 +151,92 @@ def _kept_message(atom, phase_name: str | None, source: str | None, xyz, merge: 
     return message, suggestion
 
 
-def _dof_moves(sg, before: np.ndarray, after: np.ndarray, prefix: str,
-               new_prefix: str | None = None) -> dict[str, tuple[str | None, float]]:
+class DofMove(NamedTuple):
+    """Where one coordinate DOF of a site goes when the site's symmetry changes.
+
+    ``path`` is the new DOF whose direction is parallel to the old one, with
+    ``scale`` = s such that old direction = s × new, so a value θ on the old
+    DOF is s·θ on the new one and a coefficient c on it is c/s; ``None`` where
+    no new direction is parallel.  ``linked`` names every new DOF the old one
+    shares a direction with (:func:`_linked`), each with its direction in
+    (x, y, z): the parallel one, or, where the position couples coordinates,
+    as (x, 2x, z) in P 6₃/mmc does, the coupled direction that moves this one
+    (#1014, round 6).  A hold follows ``linked``; a tie and a value need the
+    single direction ``path``.  ``direction`` is the old DOF's own, in
+    (x, y, z), for the message.
+
+    ``linked`` and ``direction`` default to ``()``, which means *not computed*,
+    not an answer: the carry reads an empty ``linked`` as "the position fixes
+    this direction", so a hand-built ``DofMove`` that leaves it out drops a hold
+    in silence.  :func:`_dof_moves` is the only writer and always fills both.
+    """
+
+    path: str | None
+    scale: float
+    linked: tuple[tuple[str, tuple[int, ...]], ...] = ()
+    direction: tuple[int, ...] = ()
+
+
+def _expansion(basis: np.ndarray, v: np.ndarray) -> np.ndarray | None:
+    """The coefficients c with ``v`` = Σₖ cₖ·basisₖ, or ``None`` outside their span."""
+    if len(basis) == 0:
+        return None
+    b = np.asarray(basis, dtype=np.float64).T
+    c = np.linalg.lstsq(b, np.asarray(v, dtype=np.float64), rcond=None)[0]
+    return c if np.allclose(b @ c, v, atol=1e-9) else None
+
+
+def _linked(old_basis: np.ndarray, new_basis: np.ndarray) -> set[tuple[int, int]]:
+    """The (old k, new j) DOF pairs that share a direction.
+
+    New direction j and old direction k are linked where moving along one
+    moves along the other: j written in the old directions uses k (a site
+    gaining symmetry, whose new directions lie in the old span), or k written
+    in the new directions uses j (a site losing it).  A parallel pair is the
+    one-to-one case.  On PbSO₄'s y = ¼ mirror, x and z each link to one new
+    DOF and y to none: the position fixes it.  On (x, 2x, z) in P 6₃/mmc,
+    the new direction [1, 2, 0] is old x + 2 × old y, so both old x and old y
+    link to it: the position couples them.
+    """
+    pairs: set[tuple[int, int]] = set()
+    for j, n in enumerate(new_basis):
+        c = _expansion(old_basis, n)
+        if c is not None:
+            pairs.update((k, j) for k, ck in enumerate(c) if abs(ck) > 1e-9)
+    for k, b in enumerate(old_basis):
+        a = _expansion(new_basis, b)
+        if a is not None:
+            pairs.update((k, j) for j, aj in enumerate(a) if abs(aj) > 1e-9)
+    return pairs
+
+
+def _dof_moves(old_basis: np.ndarray, new_basis: np.ndarray, prefix: str,
+               new_prefix: str | None = None) -> dict[str, DofMove]:
     """Where each coordinate DOF of a site goes when the site's symmetry changes.
 
     ``phases.i.atoms.j.dof.k`` is the k-th direction the site symmetry allows,
     so a site that moves onto a special position renumbers them: PbSO₄'s O5 has
     x, y, z as DOFs 0-2 on the general position and x, z as DOFs 0-1 on the
-    y = ¼ mirror, where ``dof.1`` is z (#1014, round 4).  Old DOF k maps to the
-    new DOF whose direction is parallel to its own, with the factor ``s``
-    such that old direction = s × new (a coefficient c on the old DOF is c/s on
-    the new one), and to ``None`` where no new direction is parallel: the
-    position fixes that coordinate (or mixes it), and nothing carries over.
+    y = ¼ mirror, where ``dof.1`` is z (#1014, round 4).  Each old DOF's
+    :class:`DofMove` names its parallel new DOF, if any, and every new DOF it
+    is linked to (:func:`_linked`).
     """
-    old_basis = coordinate_basis(stabilizer_rotations(sg, before))
-    new_basis = coordinate_basis(stabilizer_rotations(sg, after))
-    moves: dict[str, tuple[str | None, float]] = {}
+    pairs = _linked(old_basis, new_basis)
+    new_site = new_prefix or prefix
+    moves: dict[str, DofMove] = {}
     for k, old in enumerate(old_basis):
         old = np.asarray(old, dtype=np.float64)
-        target: tuple[str | None, float] = (None, 1.0)
+        target, scale = None, 1.0
         for j, new in enumerate(new_basis):
             new = np.asarray(new, dtype=np.float64)
-            scale = float(old @ new) / float(new @ new)
-            if np.allclose(old, scale * new, atol=1e-9):
-                target = (f"{new_prefix or prefix}.dof.{j}", scale)
+            s = float(old @ new) / float(new @ new)
+            if np.allclose(old, s * new, atol=1e-9):
+                target, scale = f"{new_site}.dof.{j}", s
                 break
-        moves[f"{prefix}.dof.{k}"] = target
+        linked = tuple((f"{new_site}.dof.{j}", tuple(int(v) for v in new_basis[j]))
+                       for j in range(len(new_basis)) if (k, j) in pairs)
+        moves[f"{prefix}.dof.{k}"] = DofMove(target, scale, linked,
+                                             tuple(int(v) for v in old_basis[k]))
     return moves
 
 
@@ -192,7 +253,7 @@ class CoordinateSnapshot:
 
 
 class NumberingMoves(dict):
-    """:func:`numbering_moves`' result: ``{old DOF path: (new DOF path | None, scale)}``.
+    """:func:`numbering_moves`' result: ``{old DOF path: DofMove}``.
 
     The keys read the *old* structure's atom numbering, the diagnostics a caller
     reports read the new one's, and the two differ whenever an atom was inserted
@@ -266,7 +327,7 @@ def numbering_moves(old: Structure | CoordinateSnapshot,
                 continue
             if len(bo) == len(bn) and np.array_equal(np.asarray(bo), np.asarray(bn)):
                 continue
-            moves.update(_dof_moves(sg, xo, xn, f"phases.{i}.atoms.{jo}",
+            moves.update(_dof_moves(bo, bn, f"phases.{i}.atoms.{jo}",
                                     f"phases.{i}.atoms.{jn}"))
             moves.sites[f"phases.{i}.atoms.{jo}"] = f"phases.{i}.atoms.{jn}"
     return moves
@@ -287,62 +348,225 @@ def _matched_atoms(lo: Sequence[str], ln: Sequence[str]) -> list[tuple[int, int]
             if lo.count(label) == 1 and ln.count(label) == 1]
 
 
-def carry_constraints(moves: dict[str, tuple[str | None, float]], *,
+def _move(m) -> DofMove:
+    """A move as :class:`DofMove`; a bare ``(path, scale)`` pair links its parallel DOF only."""
+    if isinstance(m, DofMove):
+        return m
+    path, scale = m[0], m[1]
+    return DofMove(path, scale, ((path, ()),) if path is not None else ())
+
+
+def _along(linked) -> str:
+    return " and ".join(f"{p} (along {list(v)} in x, y, z)" if v else p
+                        for p, v in linked)
+
+
+def _coords(v: Sequence[int]) -> str:
+    """The coordinates a direction moves, as words: ``[1, 2, 0]`` → ``"x and y"``."""
+    names = ["xyz"[i] for i, c in enumerate(v) if c]
+    return ", ".join(names[:-1]) + " and " + names[-1] if len(names) > 1 else "".join(names)
+
+
+def _coupling(m: DofMove, targets) -> str:
+    """Why a path on ``m``'s DOF now covers ``targets`` rather than one parallel DOF."""
+    old = {i for i, c in enumerate(m.direction) if c}
+    if len(targets) == 1 and {i for i, c in enumerate(targets[0][1]) if c} > old:
+        return (f"the special position couples {_coords(targets[0][1])}, and this is "
+                f"the one direction that moves {_coords(m.direction)}")
+    return (f"the site's new position no longer couples {_coords(m.direction)}, and "
+            f"each of these moves part of the direction it named")
+
+
+def _carry_paths(moves: dict, paths: Iterable[str], what: str, notes: list[str], *,
+                 free: bool = False) -> list[str]:
+    """``paths`` (holds, or with ``free`` free paths) carried through ``moves``.
+
+    A hold follows every new DOF its direction is linked to
+    (:attr:`DofMove.linked`): on a parallel one it is the same hold renumbered,
+    and where the position couples it with another coordinate, as
+    (x, 2x, z) does x with y, the coupled direction is the only one that moves
+    x, so holding x holds it (#1014, round 6).  A hold linked to nothing is on
+    a direction the position fixes, and is dropped.  A free path frees a new
+    DOF only where every old direction linked to it was free, so freeing x
+    alone does not free the (x, 2x, z) direction, which moves y too.  Paths
+    ``moves`` does not name (another site, a glob) pass unchanged.
+    """
+    paths = list(paths)
+    out: list[str] = []
+    if free:
+        sources: dict[str, set[str]] = {}
+        for old, m in moves.items():
+            for new, _ in _move(m).linked:
+                sources.setdefault(new, set()).add(old)
+        given = set(paths)
+    for path in paths:
+        if path not in moves:
+            if path not in out:
+                out.append(path)
+            continue
+        m = _move(moves[path])
+        targets = list(m.linked)
+        if free:
+            targets = [(p, v) for p, v in targets if sources[p] <= given]
+        if not targets:
+            if not m.linked:
+                why = "the special position fixes that direction"
+            else:
+                why = (f"the special position couples it with a direction that was "
+                       f"not free ({_along(m.linked)})")
+            notes.append(f"the {what} on {path} was dropped: {why}")
+            continue
+        if m.path is not None and [p for p, _ in targets] == [m.path]:
+            if m.path != path:
+                notes.append(f"the {what} on {path} now reads {m.path}")
+        else:
+            notes.append(f"the {what} on {path} now covers {_along(targets)}: "
+                         f"{_coupling(m, targets)}")
+        for p, _ in targets:
+            if p not in out:
+                out.append(p)
+    return out
+
+
+def _carry_tie(moves: dict, target: str, spec: TieSpec) -> tuple[str | None, TieSpec | None, str]:
+    """One tie through ``moves``: its new target and spec, or ``None`` and the reason.
+
+    A DOF value is a displacement along the DOF's direction, so with old
+    direction = s × new a value θ on the old DOF is s·θ on the new one
+    (:class:`DofMove`).  The tie θₜ = Σ cᵢ·θᵢ + k then reads
+    s_t·θₜ = Σ (s_t·cᵢ/sᵢ)·(sᵢ·θᵢ) + s_t·k on the new DOFs: each coefficient
+    takes the target's scale over its source's, and the constant the target's
+    (#1014, round 6).  ``_nullspace_int`` scales every basis vector to coprime
+    integers with its first nonzero entry positive, so two parallel ones are
+    equal and every s is 1 today
+    (``test_parallel_basis_vectors_are_equal_so_every_dof_scale_is_one``); this
+    is the arithmetic for the day that changes.  A tie needs one direction per
+    path, so a target or source the position fixes or couples drops it.
+    """
+    def one(path: str) -> tuple[str | None, float, DofMove | None]:
+        if path not in moves:
+            return path, 1.0, None
+        m = _move(moves[path])
+        return m.path, m.scale, m
+
+    new_target, s_t, m_t = one(target)
+    sources = [(one(p), c) for p, c in spec.terms]
+    lost = [m for path, _, m in [(new_target, s_t, m_t), *(o for o, _ in sources)]
+            if path is None]
+    if lost:
+        why = ("coupled with another by the special position, and a tie needs "
+               "a single direction" if any(m.linked for m in lost)
+               else "fixed by the special position")
+        return None, None, f"the tie on {target} was dropped: a direction it uses is {why}"
+    terms = [(p, float(s_t * c / s)) for (p, s, _), c in sources]
+    note = ""
+    if new_target != target or any(p != q for (p, _), (q, _) in
+                                   zip(terms, spec.terms, strict=True)):
+        note = f"the tie on {target} now reads {new_target}"
+    return new_target, spec.model_copy(update={
+        "terms": terms, "const": float(s_t * spec.const)}), note
+
+
+def carry_constraints(moves: dict[str, DofMove], *,
                       holds: Iterable[str] = (),
                       ties: dict[str, TieSpec] | None = None,
                       free_paths: Iterable[str] = ()
                       ) -> tuple[list[str], dict[str, TieSpec], list[str], list[str]]:
     """``holds``, user ``ties`` and ``free_paths`` carried through a DOF renumbering.
 
-    ``moves`` is what :func:`numbering_moves` returns.  A hold or a free path
-    on a DOF follows it to its new number; one on a DOF the position now fixes
-    is dropped.  A tie is carried only if its target and every source survive,
-    its coefficients rescaled; otherwise it is dropped (a source that moved
+    ``moves`` is what :func:`numbering_moves` returns, for one site.  A hold
+    follows its direction, onto the coupled direction where the position
+    couples it with another coordinate, and is dropped where the position fixes
+    it; a free path follows only onto a direction every coordinate it moves was
+    free on (:func:`_carry_paths`).  A tie is carried only if its target and
+    every source keep a single direction, its coefficients and constant
+    rescaled (:func:`_carry_tie`); otherwise it is dropped (a source that moved
     would otherwise change meaning in silence).  Returns
     ``(holds, ties, free_paths, notes)``, ``notes`` naming each thing dropped
-    and each hold or tie that now sits on a different DOF number.
+    and each hold or tie that now sits on a different DOF.
     """
     notes: list[str] = []
-
-    def one(path: str) -> str | None:
-        if path not in moves:
-            return path
-        return moves[path][0]
-
-    def path_list(paths: Iterable[str], what: str) -> list[str]:
-        out: list[str] = []
-        for path in paths:
-            new = one(path)
-            if new is None:
-                notes.append(f"the {what} on {path} was dropped: the special "
-                             f"position fixes or couples that direction")
-                continue
-            if new != path:
-                notes.append(f"the {what} on {path} now reads {new}")
-            if new not in out:
-                out.append(new)
-        return out
-
-    held = path_list(holds, "hold")
-    free = path_list(free_paths, "free path")
+    held = _carry_paths(moves, holds, "hold", notes)
+    free = _carry_paths(moves, free_paths, "free path", notes, free=True)
     new_ties: dict[str, TieSpec] = {}
     for target, spec in (ties or {}).items():
-        new_target = one(target)
-        sources = [(one(p), c / moves[p][1] if p in moves else c)
-                   for p, c in spec.terms]
-        if new_target is None or any(p is None for p, _ in sources):
-            notes.append(f"the tie on {target} was dropped: a direction it "
-                         f"uses is fixed by the special position")
-            continue
-        if new_target != target or any(
-                p != q for (p, _), (q, _) in zip(sources, spec.terms, strict=True)):
-            notes.append(f"the tie on {target} now reads {new_target}")
-        new_ties[new_target] = spec.model_copy(update={
-            "terms": [(p, float(c)) for p, c in sources]})
+        new_target, new_spec, note = _carry_tie(moves, target, spec)
+        if note:
+            notes.append(note)
+        if new_target is not None:
+            new_ties[new_target] = new_spec
     return held, new_ties, free, notes
 
 
-def carry_state_constraints(state, moves: dict[str, tuple[str | None, float]],
+def _site_moves(moves: dict) -> Iterable[tuple[str, dict]]:
+    """``moves`` split by site, as ``(old site path, its moves)``."""
+    for site in sorted({path.rsplit(".dof.", 1)[0] for path in moves}):
+        yield site, {p: m for p, m in moves.items()
+                     if p.rsplit(".dof.", 1)[0] == site}
+
+
+def carry_action_constraints(action, moves: dict[str, DofMove]) -> dict[str, list[str]]:
+    """A recorded ``NodeAction``'s paths carried through a DOF renumbering, in place.
+
+    A node records the paths its action named (a stage's ``turn_on``, a
+    ``set_vary``'s ``turn_on``/``turn_off``, a ``set_value``'s ``values``, a
+    ``set_hold``'s ``held``/``unheld``, a ``set_tie``'s ``ties``/``untied``)
+    in the numbering of the state it acted on.  When a log is loaded and that
+    site merges, the state's registers follow (:func:`carry_state_constraints`)
+    and so must these, or a ``cherry_pick`` of a stage whose ``turn_on`` names
+    y's ``dof.1`` frees z on the merged site (#1014, round 5).  A turn-on is
+    carried as a free path and a turn-off, hold or release as a hold; a value
+    is a displacement, s·θ on the new DOF, and is dropped with its DOF.
+    Returns ``{new site path: notes}``.
+    """
+    out: dict[str, list[str]] = {}
+    kind = action.kind
+    for site, site_moves in _site_moves(moves):
+        notes: list[str] = []
+        action.turn_on = _carry_paths(site_moves, action.turn_on,
+                                      f"recorded {kind}'s turn_on", notes, free=True)
+        for field in ("turn_off", "held", "unheld"):
+            setattr(action, field, _carry_paths(
+                site_moves, getattr(action, field), f"recorded {kind}'s {field}", notes))
+        values: dict[str, float] = {}
+        for path, value in action.values.items():
+            if path not in site_moves:
+                values[path] = value
+                continue
+            m = _move(site_moves[path])
+            if m.path is None:
+                notes.append(f"the recorded {kind}'s value on {path} was dropped: the "
+                             f"special position {'couples' if m.linked else 'fixes'} "
+                             f"that direction")
+                continue
+            values[m.path] = m.scale * value
+            if m.path != path:
+                notes.append(f"the recorded {kind}'s value on {path} now reads {m.path}")
+        action.values = values
+        ties: dict[str, TieSpec] = {}
+        for target, spec in action.ties.items():
+            new_target, new_spec, note = _carry_tie(site_moves, target, spec)
+            if note:
+                notes.append(f"recorded {kind}: {note}")
+            if new_target is not None:
+                ties[new_target] = new_spec
+        action.ties = ties
+        untied: list[str] = []
+        for path in action.untied:
+            new = _move(site_moves[path]).path if path in site_moves else path
+            if new is None:
+                notes.append(f"the recorded {kind}'s untie of {path} was dropped: "
+                             f"the special position takes that direction")
+            elif new not in untied:
+                untied.append(new)
+        action.untied = untied
+        if notes:
+            new_site = moves.new_site(site) if isinstance(moves, NumberingMoves) else site
+            out.setdefault(new_site, []).extend(notes)
+    return out
+
+
+def carry_state_constraints(state, moves: dict[str, DofMove],
                             found: list[Diagnostic]) -> None:
     """:func:`carry_constraints` on a ``RefinementState``'s registers, in place.
 
@@ -351,9 +575,7 @@ def carry_state_constraints(state, moves: dict[str, tuple[str | None, float]],
     they follow it.  What is dropped is named in the site's
     ``SITE_TWINS_MERGED`` message in ``found``, replaced in the list.
     """
-    for site in sorted({path.rsplit(".dof.", 1)[0] for path in moves}):
-        site_moves = {p: m for p, m in moves.items()
-                      if p.rsplit(".dof.", 1)[0] == site}
+    for site, site_moves in _site_moves(moves):
         holds, ties, free, notes = carry_constraints(
             site_moves, holds=state.holds, ties=state.ties,
             free_paths=state.free_paths)

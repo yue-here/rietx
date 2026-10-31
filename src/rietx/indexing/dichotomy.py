@@ -136,10 +136,24 @@ MAX_TRIAL_HKL = 200_000
 #: finish has not covered its domain, and "nothing found" must not be able to mean
 #: "nothing looked at".
 MAX_GRID_CELLS = 400_000
+#: Bytes of survivor lists the grid's next stage may hold (WP-1924, #780).  The
+#: cell cap counts cells, and siblings share their parent's list, so a stage
+#: holds the *distinct* parents' lists, which the count does not bound: a
+#: triclinic grid's 400 010 cells held enough to reach 18.4 GB before an OOM kill.
+#: The previous stage's lists are alive while the next is built, so the grid's
+#: own peak is up to twice this.  Overflow is :data:`MAX_GRID_CELLS`' overflow.
+MAX_GRID_BYTES = 1 << 30
 #: Raw leaves held before an intermediate dedup pass.  Bounds memory on a
 #: degenerate search (a wildly over-tolerant peak list can accept thousands of
 #: near-identical boxes) without changing the answer.
 DEDUP_EVERY = 2_000
+#: Accepted leaves one (system) unit may hold before it stops (WP-1924, #780).
+#: Nothing else bounds a unit's harvest: :data:`DEDUP_EVERY` runs between
+#: systems, and a harvest of *distinct* lattices survives it anyway (6 816 of
+#: 6 819 orthorhombic leaves in five minutes on one long list, 7 GB at 70 min).
+#: Reaching it ends the unit as a size cap does, ``complete = False``.  The
+#: largest finished harvests measured are about 7 000 (a bethanechol unit).
+MAX_HARVEST = 20_000
 
 
 def _pivots(basis: np.ndarray) -> list[tuple[int, float]]:
@@ -777,13 +791,16 @@ def search_dichotomy(peaks: PeakList, *, spec: SearchSpec | None = None,
             spec.min_volume, vol_max, search, tt_all, anchors)
         raw.extend(found)
         raw_deduped = raw_deduped and not found
-        if len(raw) > DEDUP_EVERY:
+        # a stopped run leaves the dedup to ``rank_candidates``, whose pass
+        # can stop early without moving the ranked list (WP-1924)
+        if len(raw) > DEDUP_EVERY and not (cancel is not None and bool(cancel)):
             raw = dedup_candidates(raw)
             raw_deduped = True
         result.search_complete[system] = complete
         result.stats[f"{system}.seconds"] = round(budget.elapsed, 3)
         result.stats[f"{system}.boxes"] = float(n_boxes)
         result.stats[f"{system}.rows_per_box"] = round(n_rows / max(n_boxes, 1), 1)
+        result.stats[f"{system}.harvest"] = float(len(found))
         if not complete:
             # the token (the run's ceiling or the caller) outranks the
             # unit's own clock, and a unit neither stopped hit a size cap,
@@ -806,7 +823,8 @@ def search_dichotomy(peaks: PeakList, *, spec: SearchSpec | None = None,
     result.candidates = rank_candidates(raw, peaks, k_sigma=spec.k_sigma,
                                         n_unindexed=n_miss_any,
                                         max_candidates=spec.engine_pool(),
-                                        q_match=sigma, deduped=raw_deduped)
+                                        q_match=sigma, deduped=raw_deduped,
+                                        cancel=cancel)
     result.stats["candidates.raw"] = float(len(raw))
     if len(result.candidates) >= spec.engine_pool():
         for system in result.systems_searched:
@@ -880,7 +898,8 @@ def _grid_pass(basis: np.ndarray, lo0: np.ndarray, hi0: np.ndarray, rows0,
     returns the survivors a box's children inherit, or ``None`` for an
     impossible box.  Returns ``(frontier, n_boxes, n_rows, complete)``;
     ``frontier`` is ``None`` when the budget expired, and ``complete`` is
-    ``False`` for that or for an overflowed grid (:data:`MAX_GRID_CELLS`).
+    ``False`` for that or for an overflowed grid (:data:`MAX_GRID_CELLS`,
+    :data:`MAX_GRID_BYTES`).
     """
     piv = _pivots(basis)
     frontier = [(lo0, hi0, rows0)]
@@ -888,6 +907,10 @@ def _grid_pass(basis: np.ndarray, lo0: np.ndarray, hi0: np.ndarray, rows0,
     n_rows = 0
     for stage in range(len(piv)):
         nxt: list = []
+        #: bytes of the distinct survivor lists ``nxt`` holds; a list is
+        #: counted once however many children share it
+        held = 0
+        lists: set[int] = set()
         for lo, hi, rows in frontier:
             if budget.expired():
                 return None, n_boxes, n_rows, False
@@ -901,7 +924,10 @@ def _grid_pass(basis: np.ndarray, lo0: np.ndarray, hi0: np.ndarray, rows0,
                 child_lo, child_hi = lo.copy(), hi.copy()
                 child_lo[stage], child_hi[stage] = a, b
                 nxt.append((child_lo, child_hi, kept))
-            if len(nxt) > MAX_GRID_CELLS:
+            if id(kept) not in lists:
+                lists.add(id(kept))
+                held += kept.nbytes
+            if len(nxt) > MAX_GRID_CELLS or held > MAX_GRID_BYTES:
                 return nxt, n_boxes, n_rows, False
         frontier = nxt
     return frontier, n_boxes, n_rows, True
@@ -946,8 +972,9 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
     guarantee rather than a preference.  Phase 2 bisects those survivors, best
     first, depth-first inside each.
 
-    A frontier cap (:data:`MAX_GRID_CELLS`) keeps phase 1's memory bounded, and
-    hitting it returns ``search_complete = False`` — an overflowed grid has not
+    Two frontier caps (:data:`MAX_GRID_CELLS`, :data:`MAX_GRID_BYTES`) keep
+    phase 1's memory bounded and one harvest cap (:data:`MAX_HARVEST`) phase
+    2's, and hitting any returns ``search_complete = False`` — an overflowed grid has not
     covered its domain, and that must not look like "nothing there".
     """
     lo0, hi0 = _initial_box(basis, spec)
@@ -1186,6 +1213,9 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
 
         if unique or width <= tol_accept or depth >= MAX_DEPTH:
             leaf(lo, hi, width, ids)
+            # an empty stack is a finished unit, whatever its harvest
+            if len(found) >= MAX_HARVEST and stack:
+                return found, (n_boxes, n_rows), False
             continue
 
         # bisect the dimension that moves Q most — the one whose own width, times

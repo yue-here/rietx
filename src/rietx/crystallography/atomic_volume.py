@@ -135,16 +135,25 @@ _DOT_TWO_WAYS = re.compile(
     + r")\s*(?:[·•*]|$))")
 
 
+#: Isotope symbols a formula may write, and the element whose volume each takes.
+#: Hofmann's table is per element: deuterium is hydrogen, and a deuterated
+#: formula (``C6D6``, the ``D2O`` of :data:`_ADDUCT_MOLECULES`) counts its D
+#: as H.
+_ISOTOPES = {"D": "H"}
+
+
 def _element(symbol: str, formula: str) -> str:
     if symbol in HOFMANN_VOLUMES:
         return symbol
+    if symbol in _ISOTOPES:
+        return _ISOTOPES[symbol]
     if symbol in _NO_VOLUME:
         raise ValueError(f"{formula!r}: Hofmann (2002) gives no average volume "
                          f"for {symbol}, so this formula has no estimate")
     raise ValueError(f"{formula!r}: {symbol!r} is not an element symbol")
 
 
-def _parse_part(part: str, formula: str) -> dict[str, float]:
+def _parse_part(part: str, formula: str, element=None) -> dict[str, float]:
     stack: list[dict[str, float]] = [{}]
     last: dict[str, float] | None = None
     pos = 0
@@ -155,7 +164,7 @@ def _parse_part(part: str, formula: str) -> dict[str, float]:
         pos = m.end()
         symbol, opening, closing, count, _space = m.groups()
         if symbol:
-            el = _element(symbol, formula)
+            el = (element or _element)(symbol, formula)
             stack[-1][el] = stack[-1].get(el, 0.0) + 1.0
             last = {el: 1.0}
         elif opening:
@@ -179,9 +188,10 @@ def _parse_part(part: str, formula: str) -> dict[str, float]:
     return stack[0]
 
 
-def _parse_formula(formula: str) -> dict[str, float]:
+def _parse_formula(formula: str, element=None) -> dict[str, float]:
     """Element counts of a chemical formula; the grammar is in
-    :func:`formula_unit_volume`."""
+    :func:`formula_unit_volume`.  ``element`` checks each symbol (default: an
+    element Hofmann's table has a volume for)."""
     for m in _DOT_TWO_WAYS.finditer(formula):
         if int(m.group(1)) != 0:
             raise ValueError(
@@ -195,12 +205,31 @@ def _parse_formula(formula: str) -> dict[str, float]:
         body = part[m.end():] if m else part
         if not body.strip():
             raise ValueError(f"{formula!r}: an empty part")
-        for el, n in _parse_part(body, formula).items():
+        for el, n in _parse_part(body, formula, element).items():
             counts[el] = counts.get(el, 0.0) + factor * n
     counts = {el: n for el, n in counts.items() if n != 0.0}
     if not counts or any(n < 0.0 for n in counts.values()):
         raise ValueError(f"{formula!r} holds no positive element count")
     return counts
+
+
+def _any_element(symbol: str, formula: str) -> str:
+    import gemmi
+
+    if gemmi.Element(symbol).atomic_number > 0 and gemmi.Element(symbol).name == symbol:
+        return symbol
+    raise ValueError(f"{formula!r}: {symbol!r} is not an element symbol")
+
+
+def formula_counts(formula: str) -> dict[str, float]:
+    """Element counts of a chemical formula, for any element gemmi knows.
+
+    The grammar of :func:`formula_unit_volume` (brackets, ``·`` adducts,
+    decimal counts, spaces ignored), without its restriction to the elements
+    Hofmann (2002) gives a volume for: a count needs no volume.  A symbol that
+    is not an element raises naming it.
+    """
+    return _parse_formula(formula, _any_element)
 
 
 def formula_unit_volume(formula: str,
@@ -220,7 +249,8 @@ def formula_unit_volume(formula: str,
     followed by a whole solvent molecule (:data:`_ADDUCT_MOLECULES`), with any
     whitespace or none before it or inside it.  Every other decimal count reads one way (``"Fe2.95O4"``,
     ``"Li1.05Mn1.95O4"``, ``"Mg0.5SiO3"``).  A symbol that
-    is not an element, or one the table has no volume for, raises naming it.  The esd is
+    is not an element, or one the table has no volume for, raises naming it; ``D``
+    reads as H (``"C6D6"``).  The esd is
     eq. (13)'s: the table's mean errors summed as Σ nᵢ Δvᵢ, and the expansion
     coefficient's error in quadrature, measured from the 298 K the table is
     quoted at.  It is ``None`` when an element has no mean error (Ac, Am).
@@ -230,8 +260,9 @@ def formula_unit_volume(formula: str,
     candidate cell must use.  The module docstring has both, the temperature
     reading and the scope: organic and metal-organic crystals.
     """
-    if not temperature > 0.0:
-        raise ValueError(f"temperature must be positive kelvin, got {temperature!r}")
+    if not (math.isfinite(temperature) and temperature > 0.0):
+        raise ValueError(f"temperature must be a positive, finite number of kelvin, "
+                         f"got {temperature!r}")
     counts = _parse_formula(formula)
     a, t0 = THERMAL_EXPANSION, TABLE_TEMPERATURE
     tabulated = sum(n * HOFMANN_VOLUMES[el][0] for el, n in counts.items())
@@ -247,4 +278,4 @@ def formula_unit_volume(formula: str,
 
 __all__ = ["HOFMANN_VOLUMES", "TABLE_TEMPERATURE", "THERMAL_EXPANSION",
            "THERMAL_EXPANSION_ESD", "VOLUME_RATIO_BOUNDS", "VOLUME_SCATTER",
-           "formula_unit_volume"]
+           "formula_counts", "formula_unit_volume"]

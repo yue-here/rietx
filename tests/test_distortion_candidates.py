@@ -616,3 +616,147 @@ def test_the_code_comes_from_every_draw_not_the_last(at_gamma, monkeypatch, scri
         assert (n is None) == (outcome == "none")
         assert outcome == "none" or (n > refusal.operations) == (outcome == "more")
         assert f"draw {i + 1} " in message
+
+
+# --------------------------------------------------------------------------
+# #806 follow-up: the child's setting is read by the one standardiser the
+# package has, ``subgroups``' exact (P, p) check (WP-1919, #1189)
+# --------------------------------------------------------------------------
+
+#: Every child the suite states (Γ on Mn, R on O, X and M on every site), as
+#: main d35ffeda7's float route gave it before the switch: label, symbol,
+#: P (rows) and p, r_parent = P·r_child + p.
+MAIN_FLOAT_SETTINGS = [
+    ("G", "S9(rank 1)#1", "P 4 m m", "1 0 0; 0 1 0; 0 0 1", "0 0 0"),
+    ("G", "S9(rank 1)#2", "R 3 m:H", "1 0 1; -1 1 1; 0 -1 1", "0 0 0"),
+    ("G", "S9(rank 1)#3", "A m m 2", "0 1 1; 0 1 -1; -1 0 0", "0 0 0"),
+    ("G", "S9(rank 2)#1", "P 1 m 1", "1 0 0; 0 0 1; 0 -1 0", "0 0 0"),
+    ("G", "S9(rank 2)#2", "C 1 m 1", "1 -1 0; 1 1 0; 0 0 1", "0 0 0"),
+    ("G", "S9(a,b,c)", "P 1", "1 0 0; 0 1 0; 0 0 1", "0 0 0"),
+    ("R", "S4(a)", "F m -3 m", "2 0 0; 0 2 0; 0 0 -2", "0 0 0"),
+    ("R", "S6(rank 1)#1", "I 4/m m m", "1 1 0; -1 1 0; 0 0 -2", "0 0 0"),
+    ("R", "S6(rank 1)#2", "I 4/m c m", "1 1 0; -1 1 0; 0 0 -2", "1/2 1/2 0"),
+    ("R", "S6(a,b)", "F m m m", "0 2 0; 0 0 -2; 2 0 0", "0 0 0"),
+    ("R", "S8(rank 1)#1", "I 4/m m m", "1 1 0; -1 1 0; 0 0 -2", "1/2 1/2 0"),
+    ("R", "S8(rank 1)#2", "R -3 m:H", "0 1 2; 1 -1 2; -1 0 2", "0 0 0"),
+    ("R", "S8(rank 1)#3", "I m m a", "1 0 1; 1 0 -1; 0 -2 0", "0 0 0"),
+    ("R", "S8(rank 2)#1", "C 1 2/m 1", "2 0 -1; 0 0 1; 0 2 0", "1/2 0 1/2"),
+    ("R", "S8(rank 2)#2", "C 1 2/m 1", "1 -1 -1; 1 1 -1; -2 0 0", "0 0 0"),
+    ("R", "S8(a,b,c)", "P -1", "-1 0 -1; 0 1 1; -1 -1 0", "0 0 0"),
+    ("R", "S10(rank 1)#1", "I 4/m c m", "1 1 0; -1 1 0; 0 0 -2", "0 0 0"),
+    ("R", "S10(rank 1)#2", "R -3 c:H", "0 1 2; 1 -1 2; -1 0 2", "0 0 0"),
+    ("R", "S10(rank 1)#3", "I m m a", "1 0 -1; -1 0 -1; 0 -2 0", "0 0 0"),
+    ("R", "S10(rank 2)#1", "C 1 2/m 1", "2 0 -1; 0 0 1; 0 2 0", "1/2 0 1/2"),
+    ("R", "S10(rank 2)#2", "C 1 2/c 1", "1 -1 -1; 1 1 -1; -2 0 0", "1/2 0 1/2"),
+    ("R", "S10(a,b,c)", "P -1", "-1 0 -1; 0 1 1; -1 -1 0", "0 0 0"),
+    ("X", "S5(a)", "P 4/m m m", "0 1 0; 1 0 0; 0 0 2", "0 0 1/2"),
+    ("X", "S9(rank 1)#1", "P m m a", "0 0 1; 0 1 0; 2 0 0", "0 0 1/2"),
+    ("X", "S9(rank 1)#2", "C m c m", "1 1 0; 1 -1 0; 0 0 2", "0 0 1/2"),
+    ("X", "S9(a,b)", "P 1 21/m 1", "0 0 1; 1 0 0; 0 -2 0", "0 0 1/2"),
+    ("X", "S8(a)", "P 4/m m m", "0 1 0; 1 0 0; 0 0 2", "0 0 0"),
+    ("X", "S10(rank 1)#1", "P m m a", "0 1 0; 0 0 1; -2 0 0", "0 0 0"),
+    ("X", "S10(rank 1)#2", "C m c m", "-1 1 0; 1 1 0; 0 0 2", "0 0 0"),
+    ("X", "S10(a,b)", "P 1 21/m 1", "0 0 1; 1 0 0; 0 -2 0", "0 0 0"),
+    ("X", "S1(a)", "P 42/m m c", "0 1 0; 1 0 0; 0 0 2", "0 0 1/2"),
+    ("M", "S5(a)", "P 4/n m m:1", "1 1 0; 1 -1 0; 0 0 1", "1/2 1/2 0"),
+    ("M", "S9(rank 1)#1", "C m m m", "0 2 0; 2 0 0; 0 0 1", "1/2 0 0"),
+    ("M", "S9(rank 1)#2", "P m m a", "1 0 -1; 1 0 1; 0 1 0", "0 1/2 0"),
+    ("M", "S9(a,b)", "P 1 2/m 1", "1 0 1; 1 0 -1; 0 -1 0", "1/2 0 0"),
+    ("M", "S3(a)", "P 4/n m m:1", "1 1 0; 1 -1 0; 0 0 1", "0 0 0"),
+    ("M", "S2(a)", "P 4/m m m", "1 1 0; 1 -1 0; 0 0 1", "1/2 1/2 0"),
+    ("M", "S4(a)", "P 4/m b m", "1 1 0; 1 -1 0; 0 0 1", "1/2 1/2 0"),
+    ("M", "S6(a)", "P 4/m b m", "1 1 0; 1 -1 0; 0 0 1", "0 0 0"),
+    ("M", "S8(a)", "P 4/m m m", "1 1 0; 1 -1 0; 0 0 1", "0 0 0"),
+    ("M", "S10(rank 1)#1", "C m m a", "0 2 0; 2 0 0; 0 0 1", "1/2 1/2 0"),
+    ("M", "S10(rank 1)#2", "P m n a", "1 0 1; -1 0 1; 0 1 0", "0 0 0"),
+    ("M", "S10(a,b)", "P 1 2/c 1", "1 0 -2; 1 0 0; 0 1 0", "0 0 0"),
+]
+
+
+def _subgroup_of(symbol, transform):
+    """The subgroup ``symbol`` under (P, p) names, in the parent's coordinates, exactly.
+
+    Two (P, p) the affine normaliser of the subgroup relates give one answer
+    (``MaximalSubgroup.describes``' comparison, for any subgroup).
+    """
+    from rietx.crystallography.representation import subgroups as S
+
+    big, small = transform
+    P = tuple(tuple(Fraction(v) if isinstance(v, str) else S._q(float(v)) for v in row)
+              for row in big)
+    p = tuple(Fraction(v) if isinstance(v, str) else S._q(float(v)) for v in small)
+    return S._rebuild(symbol, (P, p)).key()
+
+
+def test_every_child_is_the_subgroup_mains_float_route_named(at_r, at_gamma, at_x_and_m):
+    """The identity: the exact route names the same subgroup as main's float route, 43 of 43.
+
+    Compared as the subgroup each (symbol, P, p) describes in the parent's
+    axes, so a (P, p) the normaliser relates would pass and a wrong one would
+    not; the table holds every child the suite states.  On these 43 the two
+    routes agree entry by entry too (measured 2026-10-31 with both routes on
+    the same probe, at seeds 1419, 1, 2026, 142, 194 and 41).
+    """
+    (_, r), (_, g), (_, xm) = at_r, at_gamma, at_x_and_m
+    stated = {("G", c.label): c for c in g} | {("R", c.label): c for c in r}
+    stated |= {(name, c.label): c for name, k in (("X", K_X), ("M", K_M)) for c in xm[k]}
+    assert sorted(stated) == sorted((k, label) for k, label, *_ in MAIN_FLOAT_SETTINGS)
+    for k, label, symbol, big, small in MAIN_FLOAT_SETTINGS:
+        c = stated[(k, label)]
+        assert c.child_group == symbol, (k, label)
+        old = ([row.split() for row in big.split(";")], small.split())
+        assert _subgroup_of(symbol, c.transform) == _subgroup_of(symbol, old), (k, label)
+    # the positive arm: the I4/mcm tilt with its origin half a parent cell off is another subgroup
+    c = stated[("R", "S10(rank 1)#1")]
+    assert _subgroup_of(c.child_group, (c.transform[0], c.transform[1] + [0.5, 0, 0])) != (
+        _subgroup_of(c.child_group, c.transform))
+
+
+def test_the_child_setting_is_read_by_the_subgroups_standardiser(at_gamma, at_x_and_m,
+                                                                 monkeypatch):
+    """#806: one standardiser.  ``_standard_child`` hands the candidate's own list to
+    ``subgroups._exact_setting`` and returns its answer in the parent's axes.
+
+    No input of ``distortion_candidates`` was found where main's float route
+    (``limit_denominator(48)``, a 1e-6 operation check) and the exact one
+    disagree (measured 2026-10-31: every child of the 230 standard settings at
+    each k with 2k in L*, and every maximal subgroup of index <= 4 of the 230
+    types), so this pins the route rather than an answer.  Its arms: the check
+    sees the candidate's group, and an origin a quarter cell off is refused.
+    """
+    from types import SimpleNamespace
+
+    from rietx.crystallography.representation import subgroups as S
+
+    real = S._exact_setting
+    seen = []
+
+    def spy(group, data, cell, bound, place=None):
+        answer = real(group, data, cell, bound, place)
+        seen.append((group, data, cell, bound, answer))
+        return answer
+
+    monkeypatch.setattr(S, "_exact_setting", spy)
+    parent, _ = at_x_and_m
+    cands = [c for c in at_x_and_m[1][K_M] if c.refusal is None]
+    for c in cands:
+        before = len(seen)
+        symbol, big, small, _ = I._standard_child(parent, _parent_group(parent), c.candidate)
+        assert len(seen) == before + 1, "the child's setting did not go through _exact_setting"
+        group, data, cell, bound, (_, named, (P, p)) = seen[-1]
+        assert named == symbol == c.child_group
+        ops = c.candidate.group.all_operations()  # the candidate's list, colour dropped
+        assert group.order == len({op.rotation for op in ops})
+        assert all(group.contains(op.rotation, op.translation) for op in ops)
+        basis = np.array([[float(v) for v in row] for row in c.candidate.cell.basis])
+        assert np.array_equal(basis @ np.array(P, dtype=float), big)
+        assert np.allclose(basis @ np.array(p, dtype=float), small, rtol=0, atol=1e-12)
+    assert len(seen) == len(cands) == 12
+
+    # the negative arm: spglib's origin moved by a quarter of a: not the group, refused
+    group, data, cell, bound, _ = seen[0]
+    wrong = SimpleNamespace(hall_number=data.hall_number,
+                            transformation_matrix=data.transformation_matrix,
+                            origin_shift=np.asarray(data.origin_shift) + [0.25, 0, 0])
+    with pytest.raises(RuntimeError, match="is not the subgroup's operation list"):
+        real(group, wrong, cell, bound)
