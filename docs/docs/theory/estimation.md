@@ -113,9 +113,11 @@ which some overlapping reflection stands higher. An isolated line contributes 1
 and the weaker of an exactly coincident pair contributes 0, so the pair is one
 observation. The guideline built on it asks for at least
 {{ OBS_PER_PARAMETER_MIN }} and preferably {{ OBS_PER_PARAMETER_PREFERRED }}
-effective observations per structural parameter. Those are the atomic ones,
-since peak positions rather than intensities pay for the cell, profile and
-background terms.
+effective observations per structural parameter. Those are the ones that
+move an atom, whatever their names: an atom's own coordinates, occupancy and
+displacement, and a mode amplitude, a named variable or a rigid body's pose
+that drives them. Peak positions rather than intensities pay for the cell,
+profile and background terms.
 
 The estimate is not a theorem, and both papers say so: the approach "may not
 have a rigorous basis". Its own $\alpha$ is a case in point. The paper's check

@@ -239,11 +239,15 @@ class DataSupport(Base):
     reflections at one 2θ are one observation.
 
     ``n_structural_parameters`` counts the free parameters §9 is about — the
-    atomic ones (coordinate DOFs, occupancies, Biso, ADP DOFs), matched as
-    ``phases.*.atoms.*``.  Cell, zero, profile, background, scale, preferred
-    orientation and extinction are excluded: they are determined by peak
-    positions and shape rather than by the integrated intensities being
-    counted here.  The complement is
+    ones that move an atom (coordinate DOFs, occupancies, Biso, ADP DOFs).
+    A free parameter counts when it is an atom entry (``phases.*.atoms.*``)
+    or reaches one: a mode amplitude, a named variable ``vars.X`` tied to an
+    atom entry, a rigid body's origin, rotation and twists (WP-2067,
+    :func:`~rietx.optimize.statistics.structural_free_paths`).  Cell, zero,
+    profile, background, scale, preferred orientation and extinction are
+    excluded: they are determined by peak positions and shape rather than by
+    the integrated intensities being counted here, and the cell stays out
+    when a rigid body reads it to place its atoms.  The complement is
     ``Statistics.n_free_parameters − n_structural_parameters`` — not repeated
     as a field, because that count already has an authority.
 
