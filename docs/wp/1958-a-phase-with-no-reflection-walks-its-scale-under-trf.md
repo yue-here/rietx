@@ -1,6 +1,6 @@
 # WP-1958 — A phase with no reflection in range walks its scale under TRF
 
-Milestone: unscheduled · Status: 🔄 2026-10-24 — merged from outside as PR #1103 (`594d7beb`); the close is owed (the v1.10 record's narrative and ✅)
+Milestone: unscheduled · Status: 🔄 2026-10-31 — merged from outside as PR #1103 (`594d7beb`), its follow-ups as PR #1176 (`0a6142c3`); the close is owed (the v1.10 record's narrative and ✅)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-13 — a quoted fraction is wrong, but `PHASE_UNCONSTRAINED` and `QPA_ESD_UNAVAILABLE` fire, and only `solver="trf"` reaches it
@@ -94,6 +94,8 @@ Relevant rules, restated:
 - #954, the public report of this defect.
 
 ## Handover log
+
+- **2026-10-31** (`/pr-review`) — the follow-ups merged from outside as PR #1176 (`0a6142c3`) after two rounds: the QPA trajectory's basis flag, a variable-held scale's message, joint scales tied to one variable, and the missing-radius advice. Round 2 closed the review's gap: `_constant_link_reach` (`multi.py`) blocks every coefficient of a link whose basis is not constant, so a + b·T on a scale over one wide and one narrow scan leaves the narrow scan's phase unmeasured, and a test pins it. `references/series.md` gains a measured bullet on `qpa_trajectory` and `basis_changes`. Gated in a stack of seven on `main` `d87c8cc9` (tree `21beeca9`, Mac arm64, Python 3.12, `[dev,jax]`): full suite 13 427 passed, 230 skipped, 48 xfailed, 0 failed; GUI, ruff and the `-W` manual build clean. #1257 stayed out on a hung CI job, and `main` after the six merges equals the checked six-PR tree `86997f50`. Two follow-ups from the PR's description wait to be placed: a test that the covariance read is exact, and `PARAMETRIC_TARGET_UNSEEN` on scale targets.
 
 - **2026-10-24** — PR #1103 merged (`594d7beb`, review round 3), by `/pr-review`.
   *Done*: every task. A phase with no reflection in the fitted range keeps the
