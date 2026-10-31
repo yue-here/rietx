@@ -96,7 +96,8 @@ second pass on the residue. Both are tasks below.
   `RESIDUE_MISFIT_RATIO` is the same run (tables at PR #1043,
   issuecomment-6515145543). Whether `index_residue` may claim real-mixture use
   before the second search finds lab-Cu minor phases is the maintainer's
-  decision.
+  decision. Decided 2026-10-31: Yue closed #1198 in favour of PR #1043's
+  thread, so the real-mixture question is answered there, not on the issue.
 
 ## Non-goals
 
