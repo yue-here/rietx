@@ -68,6 +68,28 @@ its tier.
   2867-2868. The 20/20 count is the issue's, not re-run here. This bears on
   the code's tier and its suggestion row when this WP tiers it.
 
+- 2026-10-31, from the issue triage (issue #1219): `LOW_ANGLE_UNMODELLED`'s
+  suggestion has a dissenter and erases its own evidence. Shown a low-angle
+  excess, competent refiners act three ways (model air scatter; cut a
+  beam-stop tail; model and keep a real diffuse component), and the help entry
+  already says the package does not choose between them. On a synthetic family
+  with a planted low-angle rise (cubic perovskite capillary, rise 20× the mean
+  background at 5°, 3° decay), the code fired on 12/12 fits cut at 9-16° and
+  suggested "Raise the pattern's lower limit to 22.6°"; cut at 22°, it fell
+  silent on 3/3, χ²_red read 0.98-1.00, and 42 % of the file's counts lay
+  below the cut with nothing reporting it. WP-1517's row 6 records the same
+  steer from an agent round: the agent cut past a strong line and nothing said
+  so. The issue proposes keeping the statistic and message, dropping the
+  `suggestion=`, adding the signed residual over the first 1°, and pointing at
+  a new `result.fit_range` (the new WP); the help entry loses its "Raise the
+  lower limit … or add the air-scatter term" sentence the same way. Checked
+  against the tree at d87c8cc91: the suggestion is built at `refine.py` ~9636
+  as quoted; `LOW_ANGLE_UNMODELLED` (`_audit.py:739`) and
+  `LOW_ANGLE_UNMODELLED.suggestion` (4171) are untiered; the help text at
+  `help.py` ~3037 carries the "Raise the lower limit" sentence. The 12/12 and
+  3/3 counts are the issue's, not re-run here. The retext is a `suggestion=`
+  site, so it goes in this WP's batch to the maintainer.
+
 ## Non-goals
 
 - The holds, releases, seeds and bound tests: 2002.
