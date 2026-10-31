@@ -1490,6 +1490,17 @@ PEAK_FLAG_HELP: dict[str, HelpEntry] = {
             "placed by hand is never tested."
         ),
     ),
+    "residue_misfit": HelpEntry(
+        title="Standing on the subtracted phase",
+        label="misfit",
+        description=(
+            "Written only by `index_residue`. This pick in the residue stands on more of "
+            "the subtracted first phase's profile than its own height, so it is as likely "
+            "the first cell's misfit as a line of a second phase. It stays usable, so the "
+            "second result counts it as a line no candidate explains and grades "
+            "accordingly, but it never drives the search. The height rule separates the misfit from true lines on two 11-BM mixtures; on the IUCr CPD lab mixtures it flags about 6 % of true minor-phase lines and misses 15 % of the misfit."
+        ),
+    ),
     "unresolved_split": HelpEntry(
         title="Split the data cannot resolve",
         label="split",
@@ -2806,9 +2817,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         description=(
             "After the whole-pattern fit of this cell, some observed peaks sit "
             "where it predicts no reflection. A handful of such lines points to a second "
-            "phase. Many of them point to a wrong cell. This package does not index "
-            "multi-phase patterns, so subtract the solved phase before you index the "
-            "remainder."
+            "phase. Many of them point to a wrong cell. To look for the second phase, "
+            "pass the result to `rietx.indexing.index_residue`, which subtracts the "
+            "first cell and indexes the remainder."
         ),
     ),
     "INDEX_INLIER_RETRY": HelpEntry(
@@ -2823,6 +2834,30 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "`unindexed_two_theta`. A cell that leaves the weak lines is the phase, and "
             "the residue is a second phase or the picker's junk. Pass `n_unindexed='inliers'` "
             "to search this way from the start, or an integer to forbid the retry."
+        ),
+    ),
+    "INDEX_RESIDUE_PASS": HelpEntry(
+        title="This result indexes what another cell left of the pattern",
+        description=(
+            "`index_residue` fitted the named cell to the pattern with the validation's own "
+            "Pawley fit, subtracted "
+            "its peaks, picked the remainder at that fit's widths and indexed it. Picks "
+            "standing on more of the subtracted profile than their own height are "
+            "flagged `residue_misfit` as that fit's misfit, and `where` lists them; they "
+            "stay usable lines, so the grade counts them as unindexed, and they never "
+            "drive the search. When that fit needed "
+            "widths more than three times the list's own, the cell does not describe the "
+            "pattern and nothing was picked; the message says so. A candidate here is a "
+            "second phase only if it earns a grade of its own. A residue too short to "
+            "search abstains, which is the answer on a single-phase pattern (synthetic Si "
+            "left no pick, SRM 660c only flagged ones). Measured on real mixtures with "
+            "the largest phase subtracted, it found LaB6 first under 11-BM's cBN but no "
+            "second phase in the eight IUCr CPD lab mixtures. Refine both phases together "
+            "before you quote either cell. The misfit cut, one height of subtracted "
+            "profile (`RESIDUE_MISFIT_RATIO`), separates misfit from true lines on two "
+            "11-BM mixtures but not on the IUCr CPD lab mixtures, where it flags about 6 % "
+            "of true minor-phase lines; a second phase's line under a stronger first-phase "
+            "line is flagged with the misfit, scored but not driving."
         ),
     ),
     "INDEX_MULTIPLE_SOLUTIONS": HelpEntry(

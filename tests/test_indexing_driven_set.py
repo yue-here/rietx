@@ -160,3 +160,22 @@ def test_916s_flat_silicon_is_driven_by_its_own_lines(tmp_path):
         p.flags = [f for f in p.flags if f != "weak_line"]
     assert len(search_line_order(stripped, spec)) == 18
     assert not index_pattern(stripped, spec=spec, preset="full").candidates
+
+
+def test_a_residue_misfit_line_is_scored_and_never_driven_even_below_the_floor():
+    """``residue_misfit`` (index_residue) is the one flag the
+    ``DRIVEN_MIN_LINES`` floor does not take back."""
+    from rietx.schemas.indexing import PEAK_NEVER_DRIVEN_FLAGS
+
+    assert PEAK_NEVER_DRIVEN_FLAGS == frozenset({"residue_misfit"})
+    plain = _peaks(impurities=False)
+    tt = plain.two_theta()
+    keep = np.sort(tt)[:3]
+    peaks = plain.model_copy(deep=True)
+    peaks.peaks = [p for p in peaks.peaks if np.isin(p.two_theta, np.sort(tt)[:9])]
+    for p in peaks.peaks:
+        if not np.isin(p.two_theta, keep):
+            p.flags = [*p.flags, "residue_misfit"]
+    assert len(peaks.usable()) == 9               # scored
+    sel = search_line_order(peaks, _spec())
+    assert sorted(sel) == [0, 1, 2]               # never driven: no refill

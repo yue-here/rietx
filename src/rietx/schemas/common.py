@@ -561,6 +561,10 @@ from .._nearmiss import did_you_mean
 #: ``ExtinctionScreen.reference_rwp_net``, the cell-free Le Bail's Rwp and the
 #: reference fit's background-subtracted Rwp, and ``"unreliable"`` as a
 #: ``status`` value.  Additive and defaulted to ``None``, the 0.25 → 0.26 rule.
+#: Also in 0.60 (WP-1969, #933): ``PeakFlag`` gains ``residue_misfit``, written
+#: only by ``index_residue`` on a pick standing on the subtracted phase's
+#: profile.  Additive: no existing list carries it, and an older build refuses
+#: a list that does.
 #: Also in 0.60 (WP-2033): ``ExtinctionPrior.z``, ``.density``, ``.formula`` and
 #: ``.ordered``, ``ExtinctionCandidate.exclusion_reasons``, ``.special_positions``
 #: and ``.count_notes``, and ``ExtinctionScreen.z``, ``.z_from_density`` and

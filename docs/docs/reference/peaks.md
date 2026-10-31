@@ -103,8 +103,8 @@ Q rather than d or 2θ is the working coordinate, because Q is linear in the rec
 
 ### The flags
 
-`ObservedPeak.flags` holds members of a closed vocabulary of nineteen.
-Ten take a line out of `PeakList.usable`; the other nine report evidence and leave it in.
+`ObservedPeak.flags` holds members of a closed vocabulary of twenty.
+Ten take a line out of `PeakList.usable`; the other ten report evidence and leave it in.
 [Peak flags](settings.md#peak-flags) gives each flag's meaning as the GUI shows it.
 
 | Flag | Written when | Usable? |
@@ -127,9 +127,18 @@ Ten take a line out of `PeakList.usable`; the other nine report evidence and lea
 | `axial_tail` | the line is under a quarter of a stronger group-mate's area, within 3.5 FWHM on its axial-divergence tail side | yes |
 | `kalpha2_residual` | the line is under a quarter of a stronger group-mate's area, within its FWHM of that line's predicted Kα2 position | yes |
 | `weak_line` | the line's $I/\sigma_I$ fails the pattern's false-discovery threshold (Benjamini-Hochberg at q = 0.01) | yes; scored, and drives a search only to make up six lines |
+| `residue_misfit` | `index_residue` only: the pick stands on more of the subtracted first phase's profile than its own height | yes, but it never drives a search, whatever the floor |
 | `unnamed_neighbour` | `fit_peaks` only: the window holds a component you did not name | yes |
 
 A contamination line is flagged and left out, never subtracted, because stripping redistributes the noise and biases what is left.
+
+To index the residue a cell leaves, pass the result to `rietx.indexing.index_residue` with the pattern and instrument.
+It fits the first cell (or the one you name with `candidate=`) with the validation's Pawley fit, subtracts its peaks, picks what remains with the widths that fit refined, and indexes the picks as a second result.
+A pick standing on more of the subtracted profile than its own height is flagged `residue_misfit`: it counts as an unexplained line and lowers the grade, but never drives the search.
+On a single-phase pattern the residue holds no pick (synthetic Si) or only such lines (SRM 660c), so the second result abstains.
+A cell whose fit needs widths more than three times the list's own does not describe the pattern: nothing is picked from its residue and the result says why (skipped for a list passed in as positions, whose widths are assumed).
+On synthetic Si with MgO at 0.05 to 0.3 of its scale, the second result holds MgO's cell first.
+Each cell was validated alone: refine both phases together before quoting either.
 
 The evidence flags leave a line in because one pattern cannot say what the line is.
 A real reflection can stand on an extrapolated background, on a stronger line's axial tail or at a predicted Kα2 position, and on the certified laboratory patterns a component under the false-discovery bar is often a real weak line the certified cell indexes.
