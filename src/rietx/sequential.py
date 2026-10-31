@@ -140,7 +140,12 @@ import numpy as np
 
 from . import runs
 from .backend.api import backend_dtype_note
-from .crystallography.twins import merge_site_twins, numbering_moves
+from .crystallography.twins import (
+    atom_moves,
+    merge_site_twins,
+    numbering_moves,
+    renumber_path,
+)
 from .history.events import EventStream, _attach_progress, as_event_stream
 from .history.tree import RefinementTree
 from .optimize.cancel import RefinementCancelled
@@ -675,8 +680,13 @@ def _carry_into(structure: Structure, instrument: Instrument,
     and reach for a narrower glob when a parameter must provably not be chained
     — not on the assumption that a big jump needs one.
     """
-    previous = {e.path: e.value
-                for e in ParameterTable(source[0], source[1]).entries}
+    # the source is the last pattern's model *as built*, after its
+    # ``prepare``; an atom that hook removed or reordered has another number
+    # here, so each value is read onto the atom it belongs to (#1264)
+    atoms = atom_moves(source[0], structure)
+    previous = {new: e.value
+                for e in ParameterTable(source[0], source[1]).entries
+                if (new := renumber_path(e.path, atoms)) is not None}
     table = ParameterTable(structure, instrument)
 
     def named(path: str) -> bool:
@@ -790,16 +800,17 @@ def _displaced_as_built(displaced: Sequence[str], moves) -> list[str]:
 
     A DOF the site's renumbering moves follows it (:class:`~.DofMove`'s
     ``path``); one with no parallel direction on the new position is gone and
-    drops out, since nothing can tie it there.  Paths of a site that did not
-    renumber are unchanged.
+    drops out, since nothing can tie it there.  A path of a site that did not
+    renumber still follows its atom, whose number changes when ``prepare``
+    removed or reordered one ahead of it (:meth:`~.NumberingMoves.renumber`),
+    and drops out with an atom that hook removed (#1264).
     """
     out: list[str] = []
     for path in displaced:
         move = moves.get(path)
-        if move is None:
-            out.append(path)
-        elif move.path is not None:
-            out.append(move.path)
+        new = moves.renumber(path) if move is None else move.path
+        if new is not None:
+            out.append(new)
     return out
 
 
@@ -831,7 +842,10 @@ def _reanchor_carried(ref: Refinement, displaced: Sequence[str],
     tied = [p for p in displaced if p in ref._ties]
     if not tied:
         return
-    absorbed = {e.path: e.value for e in ParameterTable(*source).entries}
+    # in this pattern's atom numbering, as ``displaced`` already is (#1264)
+    atoms = atom_moves(source[0], ref.structure)
+    absorbed = {new: e.value for e in ParameterTable(*source).entries
+                if (new := renumber_path(e.path, atoms)) is not None}
     absorbed.update({f"{VAR_PREFIX}{name}": value
                      for name, value in previous_vars.items()})
     table = ref._working_table()
@@ -1271,7 +1285,12 @@ class SequentialRefinement:
             ``Refinement`` is built, which renumbers its DOFs; the hook still
             runs against the declared numbering, and what it declared follows
             the renumbering as every verb's constraints do (a finding names
-            what moved or was dropped; #1014, round 5).
+            what moved or was dropped; #1014, round 5).  The *atom* number is
+            the built model's: a `prepare` that removes or reorders atoms
+            changes it, so a hook beside one finds its atom by label, as
+            ``[a.label for a in ref.structure.phases[0].atoms].index("O3")``
+            does.  The carry itself follows each atom by label across that
+            change (#1264).
 
             Every rung of the ladder is a fresh ``Refinement`` and gets the
             hook, as do the cold refits `verify_steps` runs — a

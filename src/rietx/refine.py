@@ -2629,9 +2629,20 @@ class Refinement:
         a hold onto the coupled direction where the position couples
         coordinates), and what cannot follow is dropped and named in the
         site's ``SITE_TWINS_MERGED`` message.
+
+        An atom removed, inserted or reordered ahead of a site changes its
+        number whether or not its DOFs moved, so every register is first read
+        into the new structure's atom numbering
+        (:meth:`~.crystallography.twins.NumberingMoves.renumber`), and a
+        constraint on an atom the new structure no longer has is dropped and
+        named in a warning (#1264).  Without it a hold on the atom after a
+        removed one held its neighbour.
         """
         if "_user_holds" not in self.__dict__:
             return            # construction: no constraint has been declared yet
+        if isinstance(moves, NumberingMoves) and moves.atoms:
+            self._renumber_atoms(moves)
+            moves = moves.in_new_numbering()
         sites = sorted({path.rsplit(".dof.", 1)[0] for path in moves})
         for site in sites:
             site_moves = {p: m for p, m in moves.items()
@@ -2662,6 +2673,41 @@ class Refinement:
                              + "."),
                     suggestion="check the holds and ties on this site's "
                                "coordinates against parameters()."))
+
+    def _renumber_atoms(self, moves: NumberingMoves) -> None:
+        """Read every constraint register into ``moves``' new atom numbering.
+
+        A path on an atom that is gone is dropped, and a tie with it when its
+        target or any source is.  A dropped hold or tie is named in one
+        warning, the way ``_apply_ties`` names a tie that stopped applying; a
+        free path is the plan's to re-declare and goes without one.
+        """
+        dropped: list[str] = []
+        holds: list[str] = []
+        for p in sorted(self._user_holds):
+            new = moves.renumber(p)
+            if new is None:
+                dropped.append(f"the hold on {p}")
+            else:
+                holds.append(new)
+        self._user_holds = set(holds)
+        self._free_paths = list(dict.fromkeys(
+            new for p in self._free_paths if (new := moves.renumber(p))))
+        self._held = [new for p in self._held if (new := moves.renumber(p))]
+        ties: dict[str, TieSpec] = {}
+        for target, spec in self._ties.items():
+            new_target = moves.renumber(target)
+            terms = [(moves.renumber(p), c) for p, c in spec.terms]
+            if new_target is None or any(p is None for p, _ in terms):
+                dropped.append(f"the tie {target} = {spec.describe()}")
+                continue
+            ties[new_target] = spec.model_copy(update={"terms": terms})
+        self._ties = ties
+        if dropped:
+            warnings.warn(
+                f"{len(dropped)} constraint(s) named an atom this model no longer "
+                f"has and were dropped: {'; '.join(dropped)}.", UserWarning,
+                stacklevel=4)
 
     def _drain_twin_findings(self) -> list[Diagnostic]:
         """The merges no result has reported yet; each is reported once."""
@@ -2839,7 +2885,10 @@ class Refinement:
         # forbids rather than describes, so there is nothing in it to go
         # stale, and dropping it at an edit would be the one way a
         # declaration could lapse without anybody saying so.  The warning
-        # ``_apply_holds`` gives is the saying-so.
+        # ``_apply_holds`` gives is the saying-so.  A hold on an atom the edit
+        # removed is the exception, dropped with its own warning by the carry
+        # above: kept, its path would hold whichever atom took the number
+        # (#1264).
         self._apply_holds(table)
         if structure is not None:
             self.structure = candidate.model_copy(deep=True)
