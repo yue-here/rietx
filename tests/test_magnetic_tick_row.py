@@ -144,3 +144,37 @@ def test_a_non_magnetic_phase_draws_one_tick_row(tmp_path):
     write_html(result, str(out))
     html = out.read_text(encoding="utf-8")
     assert _tick_trace_names(html) == ["tetragonal"]
+
+
+def test_a_joint_fit_draws_the_magnetic_row_in_each_neutron_histogram():
+    """WP-2028 task 7: a joint fit's histograms take the single fit's tick
+    builder, so the "(magnetic)" row reaches them too.
+
+    The joint path had its own copy of the tick loop without the #278 split,
+    so on a joint fit the screw-absent (1 0 0) and the other magnetic-only
+    reflections drew on the nuclear row.  The X-ray histogram does not see the
+    moment, so it keeps one row, as a single X-ray fit of the phase does.
+    """
+    instruments = [neutron(),
+                   rx.Instrument.constant_wavelength_neutron(1.5, fwhm_deg=0.3),
+                   rx.Instrument.debye_scherrer(1.5406)]
+    data = [simulate(mnf2(), ins, seed=seed)
+            for ins, seed in zip(instruments, (1, 2, 3), strict=True)]
+    joint = rx.MultiHistogramRefinement(rx.Structure(phases=[mnf2()]),
+                                        instruments)
+    result = joint.fit(data, plan=rx.RefinementPlan(stages=[
+        rx.Stage("scale", ["phases.*.scale", "instrument.background.c*"])]))
+
+    magnetic = "MnF2 (magnetic)"
+    for h in (0, 1):
+        hist = result.histograms[h]
+        assert list(hist.ticks) == ["MnF2", magnetic], (h, list(hist.ticks))
+        assert hist.ticks[magnetic], h
+        assert [1, 0, 0] in hist.tick_hkl[magnetic], h
+        assert [1, 0, 0] not in hist.tick_hkl["MnF2"], h
+        assert {k: len(v) for k, v in hist.tick_hkl.items()} == {
+            k: len(v) for k, v in hist.ticks.items()}
+    assert list(result.histograms[2].ticks) == ["MnF2"]
+    # the top level mirrors histogram 0's rows, as it always has
+    assert result.ticks == result.histograms[0].ticks
+    assert result.tick_hkl == result.histograms[0].tick_hkl

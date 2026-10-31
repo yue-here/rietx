@@ -287,7 +287,9 @@ A pattern where the path is absent has no point.
 The gap is a real thing, such as a phase not yet in the model or a stage that did not run.
 `len(trajectory)` is therefore the number of points with a value, and not the number of patterns.
 
-`SeriesResult.qpa_trajectory` gives a phase's weight fraction as a percentage.
+`SeriesResult.qpa_trajectory` gives a phase's weight fraction as a percentage, as a `QPATrajectory`.
+Its `QPATrajectory.path`, `QPATrajectory.x`, `QPATrajectory.x_label`, `QPATrajectory.value`, `QPATrajectory.stderr`, `QPATrajectory.labels` and `QPATrajectory.positions` read as a `Trajectory`'s.
+`QPATrajectory.unmeasured` lists, per point, the phases that pattern quoted no fraction for, and `QPATrajectory.basis_changes` says whether the points are fractions of different sets of phases, as when a reflection crosses the range edge part-way through the series (WP-1958).
 `SeriesResult.agreement_trajectory` gives a phase's structure agreement index, with `metric="r_bragg"` (the default) or `"r_f"`.
 `SeriesResult.agreement_phases` lists the phases that carry one.
 A phase can carry an agreement index without a weight fraction, because a weight fraction needs Z and a molar mass and an R index does not.

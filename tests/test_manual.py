@@ -473,7 +473,8 @@ def test_every_article_carries_its_doi_in_the_one_case_the_file_uses():
 #: it normally takes.  `srd128`'s author is the braced corporate name `{NIST}`,
 #: which pybtex keeps whole because the braces make it non-alphabetic.  A list
 #: rather than a bound, so a second one has to say what it is.
-LONG_SINGLE_AUTHOR_LABELS = {"srd128": "{NIST}, a braced corporate author"}
+LONG_SINGLE_AUTHOR_LABELS = {"srd128": "{NIST}, a braced corporate author",
+                             "bipm2019": "{BIPM}, a braced corporate author"}
 
 LABEL_TAIL = re.compile(r"^(.*?)(\d{2})([a-z]?)$")
 

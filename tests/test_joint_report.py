@@ -505,6 +505,40 @@ def test_a_shared_biso_is_named_once_and_a_clean_pair_names_nothing(two_patterns
     assert not _codes(clean, "BISO_UNUSUALLY_LARGE")
 
 
+def _shared_biso_two_cells(patterns, biso, cell1_scale):
+    """A joint fit whose B is shared and whose cell is per histogram:
+    histogram 1's cell is ``cell1_scale`` times histogram 0's along a, so its
+    volume per atom, and with it the Lindemann bound, is larger."""
+    structure, instruments = perturbed_inputs()
+    other = structure.model_copy(deep=True)
+    structure.phases[0].atoms[0].biso.value = biso
+    other.phases[0].atoms[0].biso.value = biso
+    other.phases[0].cell.a.value *= cell1_scale
+    ref = MultiHistogramRefinement(
+        [structure, other], instruments,
+        sharing=SharingMap(per_histogram=["phases.0.cell.*"]))
+    return ref.fit(patterns, plan=RefinementPlan(stages=[
+        Stage("only", ["phases.*.scale", "instrument.background.*"],
+              max_iter=5)]))
+
+
+def test_a_shared_biso_is_tested_against_the_loosest_cell(two_patterns):
+    """#1205 ruling: a B read against several cells fires only past the
+    loosest bound, naming that histogram.  Histogram 0's cell alone would
+    flag B = 20 here; histogram 1's larger cell admits it."""
+    admitted = _shared_biso_two_cells(two_patterns, 20.0, 3.0)
+    far = _shared_biso_two_cells(two_patterns, 20.0, 1.0)
+    # the control: equal cells, histogram 0's bound is the bound, B is flagged
+    assert _codes(far, "BISO_UNUSUALLY_LARGE")
+    # a cell large enough that its bound admits the B: nothing fires
+    assert not _codes(admitted, "BISO_UNUSUALLY_LARGE")
+    past = _shared_biso_two_cells(two_patterns, 400.0, 1.5)
+    (found,) = _codes(past, "BISO_UNUSUALLY_LARGE")
+    assert found.where == ["phases.0.atoms.0.biso"]
+    assert "loosest of 2" in found.message
+    assert "histogram 1" in found.message
+
+
 def test_a_joint_cell_driven_out_of_its_window_names_its_coefficient(
         two_patterns, monkeypatch):
     """The joint twin of ``refine._vars_driven_cell_escapes`` (review of #385

@@ -65,7 +65,7 @@ rietx's own (WP-1449); this module generalises its reach.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -158,6 +158,10 @@ class PatternScreen:
     model: np.ndarray | None = None
     comp_tt: np.ndarray | None = None
     comp_fwhm: np.ndarray | None = None
+    #: :func:`screen_for`'s answers, keyed by the lattice and the positions it
+    #: was scored on: a candidate is screened once per run, however many
+    #: consensus calls (streamed snapshots included) and its validation ask
+    _memo: dict = field(default_factory=dict, repr=False, compare=False)
 
     @classmethod
     def from_peaks(cls, peaks: PeakList, *, q_match: np.ndarray | None = None,
@@ -314,6 +318,10 @@ class LineScreen:
         return len(self.two_theta)
 
     @property
+    def n_lines_in_window(self) -> int:
+        return int(self.in_window.sum())
+
+    @property
     def seen_fraction(self) -> float:
         return float(np.mean(self.seen)) if len(self.seen) else 0.0
 
@@ -343,7 +351,8 @@ class LineScreen:
 def screen_candidate(pattern: PatternScreen, cell: tuple[float, ...],
                      system: str, centring: str, *,
                      q_obs: np.ndarray | None = None,
-                     two_theta_obs: np.ndarray | None = None) -> LineScreen:
+                     two_theta_obs: np.ndarray | None = None,
+                     absence: bool = True) -> LineScreen:
     """Screen one candidate lattice against the pattern's facts.
 
     ``q_obs``/``two_theta_obs`` are the positions the candidate is scored on
@@ -357,10 +366,13 @@ def screen_candidate(pattern: PatternScreen, cell: tuple[float, ...],
     closer than the resolution; ask *seen* at the resolution; with a pattern,
     ask *testable* (resolved from every component by the Pawley overlap rule
     and quiet in the peak-list model) and *absent* (nothing above the envelope
-    at the measured width, :func:`~rietx.indexing.workflow.absent_reflections`).
+    at the measured width, :func:`~rietx.indexing.workflow.absent_mask`).
+    ``absence=False`` skips that last, grid-wide step and leaves ``testable``
+    and ``absent`` ``None``: the containment refuter reads only ``seen``,
+    ``indexed`` and ``uncancellable``.
     """
     from .extinction import _model_is_quiet, testable_mask
-    from .workflow import ABSENT_SIGMA, absent_reflections
+    from .workflow import ABSENT_SIGMA, absent_mask
 
     cell = tuple(float(v) for v in cell)
     obs_q = pattern.obs_q if q_obs is None else np.asarray(q_obs, dtype=np.float64)
@@ -413,28 +425,44 @@ def screen_candidate(pattern: PatternScreen, cell: tuple[float, ...],
                      hkl=m_hkl, uncancellable=m_free, seen=seen,
                      in_window=in_window, indexed=indexed, shift_deg=shift,
                      n_raw=int(len(tt)))
-    if pattern.has_pattern:
+    if pattern.has_pattern and absence:
         testable = testable_mask(m_tt, pattern.comp_tt, m_fw, pattern.comp_fwhm,
                                  pattern.grid_tt)
         quiet = _model_is_quiet(pattern.grid_tt, pattern.model, pattern.envelope,
                                 pattern.grid_sigma, m_tt, m_fw, k_sigma=ABSENT_SIGMA)
-        bad, _ratio = absent_reflections(pattern.grid_tt, pattern.grid_y,
-                                         pattern.envelope, pattern.grid_sigma,
-                                         m_tt, m_fw, k_sigma=ABSENT_SIGMA)
-        nothing = np.isin(np.round(m_tt, 9), np.round(np.asarray(bad), 9))
+        # paired with the merged lines by index, never by position
+        nothing, _ratio = absent_mask(pattern.grid_tt, pattern.grid_y,
+                                      pattern.envelope, pattern.grid_sigma,
+                                      m_tt, m_fw, k_sigma=ABSENT_SIGMA)
         out.testable = testable & quiet
         out.absent = out.testable & nothing
     return out
 
 
-def screen_for(pattern: PatternScreen, candidate, peaks: PeakList) -> LineScreen:
+def screen_for(pattern: PatternScreen, candidate, peaks: PeakList, *,
+               absence: bool = True) -> LineScreen:
     """:func:`screen_candidate` on a :class:`~rietx.schemas.indexing.CellCandidate`,
-    scored on its own shift-corrected lines (``engines.scored_positions``)."""
+    scored on its own shift-corrected lines (``engines.scored_positions``).
+
+    Answered once per lattice and positions on this ``pattern``: a screen
+    with the absence step answers a later request without it, and one
+    without is recomputed only when the absences are asked for."""
     from .engines import scored_positions
 
     q, tt = scored_positions(peaks, candidate)
-    return screen_candidate(pattern, candidate.cell, candidate.system,
-                            candidate.centring, q_obs=q, two_theta_obs=tt)
+    q = np.asarray(q, dtype=np.float64)
+    tt = np.asarray(tt, dtype=np.float64)
+    key = (tuple(float(v) for v in candidate.cell), candidate.system,
+           candidate.centring, q.tobytes(), tt.tobytes())
+    hit = pattern._memo.get(key)
+    if hit is not None and (hit.absent is not None or not absence
+                            or not pattern.has_pattern):
+        return hit
+    out = screen_candidate(pattern, candidate.cell, candidate.system,
+                           candidate.centring, q_obs=q, two_theta_obs=tt,
+                           absence=absence)
+    pattern._memo[key] = out
+    return out
 
 
 def contains(child: LineScreen, parent: LineScreen) -> bool:
@@ -453,6 +481,12 @@ def contains(child: LineScreen, parent: LineScreen) -> bool:
     themselves, so the relation stays antisymmetric and
     ``consensus.below_refuting_parents``'s "a parent is strictly smaller than
     its child" holds without a tiebreak.
+
+    The relation chooses which pairs are asked. It does not decide the
+    verdict. On a dense low-symmetry pattern the density order can make a true
+    cell the child of a wrong one, whose lines merge into fewer resolved
+    positions. The verdict never refutes a child seen more often than its
+    parent (#1230).
     """
     if len(child.indexed) != len(parent.indexed):
         return False
@@ -484,6 +518,8 @@ def containment_evidence(pattern: PatternScreen, child: LineScreen,
     :meth:`~rietx.indexing.ambiguity.SupercellEvidence.verdict`'s three bands.
     ``index`` is the sublattice index where the parent is a true sublattice
     of the child (index 2–4), else 0 with ``relation="containment"``.
+    Both cells' own seen fractions ride along, and a child seen more often
+    than its parent is never refuted (#1230).
     """
     from scipy.stats import binom
 
@@ -526,7 +562,9 @@ def containment_evidence(pattern: PatternScreen, child: LineScreen,
         p0=p0, p_value=tail(k),
         extra_seen_unexplained=tuple(bool(v) for v in alone[extra]),
         p_value_unexplained=tail(k_un),
-        relation="containment" if index == 0 else "sublattice")
+        relation="containment" if index == 0 else "sublattice",
+        child_seen_fraction=child.seen_fraction,
+        parent_seen_fraction=parent.seen_fraction)
 
 
 __all__ = ["SCREEN_WINDOW_LINES", "LineScreen", "PatternScreen",

@@ -561,6 +561,12 @@ from .._nearmiss import did_you_mean
 #: ``ExtinctionScreen.reference_rwp_net``, the cell-free Le Bail's Rwp and the
 #: reference fit's background-subtracted Rwp, and ``"unreliable"`` as a
 #: ``status`` value.  Additive and defaulted to ``None``, the 0.25 → 0.26 rule.
+#: Also in 0.60 (WP-2033): ``ExtinctionPrior.z``, ``.density``, ``.formula`` and
+#: ``.ordered``, ``ExtinctionCandidate.exclusion_reasons``, ``.special_positions``
+#: and ``.count_notes``, and ``ExtinctionScreen.z``, ``.z_from_density`` and
+#: ``.z_candidates``: the content per cell a caller declares and what the screen
+#: says of it.  Additive, every one defaulted to ``None`` or empty, the 0.25 → 0.26
+#: rule.
 #: Also in 0.60 (WP-2047): ``StageResult.window_loss`` and
 #: ``NodeMetrics.window_loss``, the share of the Bragg intensity a stage's
 #: frozen windows dropped at its answer.  Additive and defaulted to ``None``,
@@ -598,6 +604,11 @@ from .._nearmiss import did_you_mean
 #: Additive and defaulted to ``None``, the 0.25 → 0.26 rule, so every stored
 #: document loads and refines as before; an older build refuses a phase
 #: carrying it.
+#: Also in 0.60 (#941's follow-ups): ``LeBailValidation.n_lines_screened_in_window``,
+#: ``.predicted_but_absent_density_in_window`` and
+#: ``.predicted_but_absent_excess_in_window``, the windowed count's density and
+#: its excess over the run's cleanest candidate.  Additive and defaulted to
+#: ``None``, the 0.25 → 0.26 rule.
 SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

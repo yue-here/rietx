@@ -657,6 +657,129 @@ def test_the_pks_escape_survives_a_comment_header_and_a_short_scan(tmp_path):
         rx.read_pattern(peaks)
 
 
+# ---------------------------------------------------------- total scattering
+#: Synthetic files in the header shapes of the three writers (issue #1240).
+#: Numbers are made up; the shapes are the writers' own output layouts, and
+#: PDFgetX2's lines end in CRLF because the real files were written on Windows.
+_R = [0.5 + 0.1 * i for i in range(40)]
+_Q = [1.0 + 0.2 * i for i in range(40)]
+
+
+def _rows(x, n_extra=0):
+    pad = "    1.000000e+000" * n_extra
+    return "".join(f"  {a:.6e}    {(-1) ** i * 0.3 * a:.6e}{pad}\n"
+                   for i, a in enumerate(x))
+
+
+def _pdfgetx2(fname, s_label, columns, x, n_extra=0, pad_lines=0):
+    head_lines = [
+        "History written:  Mon Jan  1 00:00:00 2024", "Produced by someone",
+        "####### Get_XPDF #######", "", "##### General_Setting",
+        "title=X-ray PDF",
+        "iqfilesurfix=.iq    sqfilesurfix=.sq    fqfilesurfix=.fq    grfilesurfix=.gr",
+        "##### Sample_Setup information    num_atoms=2",
+        "#L symbol valence fractions z user_f1 user_f2 user_macoef",
+        "Ce   0   1.000000   58   0.000000   0.000000   0.000000",
+        *[f"padkey{i}=0    other{i}=1.000000" for i in range(pad_lines)],
+        f"#F {fname}", "#D Mon Jan  1 00:00:01 2024", "#C ", f"#S 1    {s_label}",
+        "#D ", f"#L {columns}"]
+    text = "\n".join(head_lines) + "\n" + _rows(x, n_extra)
+    return text.replace("\n", "\r\n")
+
+
+def _pdfgetx3(outputtype, columns, x):
+    return ("[DEFAULT]\n\nversion = diffpy.pdfgetx-2.1.0\n\n"
+            "# input and output specifications\ndataformat = twotheta\n"
+            f"inputfile = sample.xy\noutputtype = {outputtype}\n\n"
+            "# PDF calculation setup\nmode = xray\nwavelength = 0.1617\n"
+            "composition = Ce 1.0 O 2.0\nrpoly = 0.9\nqmaxinst = 25\nqmin = 0.5\n"
+            "qmax = 25\n\n# End of config ------------------------------\n\n"
+            f"#### start data\n#S 1\n#L {columns}\n" + _rows(x))
+
+
+_TOTAL_SCATTERING_SHAPES = {
+    # issue #192's case: a small file whose one header line labels r against G(r)
+    "small.dat": ("#L r(A) G(r)\n" + _rows(_R), "G(r)", "#L line"),
+    "x2.gr": (_pdfgetx2("x2.gr", "G(r)", "r(A)    G(r)    d_r    d_Gr", _R, 2),
+              "G(r)", "PDFgetX2"),
+    # a real PDFgetX2 header runs to about 6 kB, past the 4 kB sniff window, so
+    # its #L line is out of reach and the banner is what is matched
+    "x2_long.gr": (_pdfgetx2("x2_long.gr", "G(r)", "r(A)    G(r)    d_r    d_Gr",
+                             _R, 2, pad_lines=150), "G(r)", "PDFgetX2"),
+    "x2.sq": (_pdfgetx2("x2.sq", "S(Q)", "Q(/A)    S(Q)    d_Q    d_S(Q)    Ce-Ce",
+                        _Q, 3), "S(Q)", "PDFgetX2"),
+    "x2.fq": (_pdfgetx2("x2.fq", "F(Q)", "Q(/A)    F(Q)    d_Q    d_F(Q)", _Q, 2),
+              "F(Q)", "PDFgetX2"),
+    "x3.gr": (_pdfgetx3("gr", "r(Å)  G(Å$^{-2}$)", _R), "G(r)", "PDFgetX3"),
+    "x3.sq": (_pdfgetx3("sq", "Q(Å$^{-1}$)  S(a.u.)", _Q), "S(Q)", "PDFgetX3"),
+    "x3.fq": (_pdfgetx3("fq", "Q(Å$^{-1}$)  F(Å$^{-1}$)", _Q), "F(Q)", "PDFgetX3"),
+    # PDFgetX3 1.0 writes its configuration block behind "#", with CRLF ends;
+    # the #L line is cut so only the header can claim it
+    "x3v1.gr": ("".join("#" + line + "\r\n" for line in _pdfgetx3(
+        "gr", "x", []).replace("version = diffpy.pdfgetx-2.1.0",
+                                "version = pdfgetx3-1.0-r2152-20130314")
+        .split("#### start data")[0].splitlines())
+        + "#### start data\r\n#S 1\r\n" + _rows(_R).replace("\n", "\r\n"),
+        "G(r)", "PDFgetX3"),
+    "bare.gr": ("".join(f"{a:.4f} {0.3 * a:.4f}\n" for a in _R), "G(r)",
+                "matched on the name and not the columns"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(_TOTAL_SCATTERING_SHAPES))
+def test_a_total_scattering_file_is_refused_by_name_not_read_as_2theta(tmp_path, name):
+    """Issue #1240: every one of these fell to ``xy`` and came back as a 2θ
+    pattern with nothing a reader would act on.  Each is now claimed, refused
+    with ``PATTERN_TOTAL_SCATTERING`` at ``error``, and the message names the
+    function, the evidence that matched and #192."""
+    from rietx.io.formats import TotalScatteringRefused
+
+    text, function, evidence = _TOTAL_SCATTERING_SHAPES[name]
+    p = tmp_path / name
+    p.write_bytes(text.encode("utf-8"))
+
+    fmt = identify_format(p)
+    assert fmt.name == "total_scattering" and fmt.refuses
+    diags = []
+    with pytest.raises(TotalScatteringRefused) as refusal:
+        rx.read_pattern(p, diagnostics=diags)
+    assert isinstance(refusal.value, ValueError)   # every refusal's class
+    message = str(refusal.value)
+    assert name in message and function in message and evidence in message
+    assert "#192" in message
+    assert [(d.level, d.code) for d in diags] == [("error", "PATTERN_TOTAL_SCATTERING")]
+    assert refusal.value.diagnostic is diags[0]
+    # the escape is offered exactly where only the name was evidence
+    assert ("opens under any other name" in message) == (name == "bare.gr")
+
+
+def test_a_2theta_xy_and_a_q_axis_chi_are_not_claimed_as_total_scattering(tmp_path):
+    """The converse arm.  Only an #L label line, a writer's header or the
+    suffix claims a file: a 2θ ``.xy`` whose comment mentions G(r) still reads,
+    a SPEC-style ``#L`` labelling 2θ still reads, an ``#L`` labelling an
+    intensity on Q is a diffraction pattern and is not this code's, and a
+    Q-axis ``.chi`` keeps the answer its own reader gives."""
+    rows = "".join(f"{10.0 + 0.02 * i:.2f} {500 + i % 7}\n" for i in range(60))
+    mentions = tmp_path / "scan.xy"
+    mentions.write_text("# compare with the G(r) from PDFgetX3 later\n" + rows,
+                        encoding="utf-8")
+    spec = tmp_path / "spec.dat"
+    spec.write_text("#S 1 ascan\n#L 2Theta  Detector\n" + rows, encoding="utf-8")
+    iq = tmp_path / "iq.dat"
+    iq.write_text("#L Q(1/A)  I(Q)\n" + rows, encoding="utf-8")
+
+    for p in (mentions, spec):
+        assert identify_format(p).name == "xy"
+        assert len(rx.read_pattern(p).two_theta) == 60
+    assert identify_format(iq).name == "xy"
+
+    chi = tmp_path / "qaxis.chi"
+    chi.write_text("qaxis.chi\nQ (A-1)\nIntensity\n    60\n" + rows, encoding="utf-8")
+    assert identify_format(chi).name == "chi"
+    with pytest.raises(ValueError, match="scattering vector"):
+        rx.read_pattern(chi)
+
+
 def test_a_byte_order_mark_means_text_even_though_utf16_is_full_of_nuls(tmp_path):
     """The one carve-out, and it is not hypothetical: ASCII-range UTF-16LE is
     *valid* UTF-8 with interleaved NULs, and Windows vendor software exports it.

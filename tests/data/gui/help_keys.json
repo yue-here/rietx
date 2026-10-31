@@ -182,6 +182,7 @@
   "diagnostics:PATTERN_ROWS_DROPPED",
   "diagnostics:PATTERN_SCAN_REVERSED",
   "diagnostics:PATTERN_SIGMA_CONSTANT",
+  "diagnostics:PATTERN_TOTAL_SCATTERING",
   "diagnostics:PATTERN_UNDERSAMPLED",
   "diagnostics:PATTERN_WEIGHT_UNUSABLE",
   "diagnostics:PATTERN_X_AXIS_ASSUMED",
