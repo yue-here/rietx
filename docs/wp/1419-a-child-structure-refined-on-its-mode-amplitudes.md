@@ -552,6 +552,45 @@ the reporter's fork.
   `_audit.py` and `references/api-magnetic.md`, files 3a will likely share,
   so whichever merges second may need a sync or a rebase.
 
+- 2026-10-31, from the issue triage (issue #286): chunk 4 is split under
+  #1224's machinery-before-heuristics rule (reporter, 2026-10-29 and
+  2026-10-30). C4a is the quantities. It gives each irrep block's A_τ with its
+  esd, and T² as a reported number with no p-value. It adds `DistortionTotal`,
+  and a restricted refit per named block that reports ΔBIC, Λ with its p, and
+  both χ². It also gives A_det, with the support bar as a required argument.
+  C4a is open as PR #1238. It builds question 5 (where `distortion_support`
+  lives) as a `Refinement` method, pending a ruling. C4b is the verdict: the
+  ΔBIC > 6 bar, `DISTORTION_MODE_UNSUPPORTED` and its scope rule. It waits on
+  the reporter's 2026-10-22 questions 1-4, which are unanswered. Q1 replaces
+  the "Hotelling T² gate" this WP recorded on 2026-10-11. The reason: T²
+  against χ²_m called a zero-truth block at p < 0.05 on 0.47-0.63 of seeds. Q2
+  puts the bar at 6 rather than 0. Q3 sets the warning's scope. Q4 adds a
+  verdict field, against `FreedComparison`'s precedent. The 2026-10-23
+  follow-up says A_det keeps its "uncalibrated on misfit" label for good. On a
+  planted misfit it misses the 50 % point by −10 % and +34 %. Checked against
+  the tree at d87c8cc91: `distortion_support` and
+  `DISTORTION_MODE_UNSUPPORTED` do not exist, and C3a is on main (PR #1107).
+  The reporter's figures were not re-run.
+
+- 2026-10-31, from the issue triage (issue #1247): `distortion_candidates`
+  raises `RuntimeError: a candidate operation does not map the parent's atoms
+  onto themselves in the magnetic cell; this is a bug` for every centred
+  parent. The reporter's sweep over the first ITB setting of all 230 types
+  found 1318 of 1318 calls on I, F, C, A and R lattices failing, and every P
+  lattice stated. Cause, read from the code: `_standard_child`
+  (`magnetic/isotropy.py:2276`) lists each atom once per `site_orbit` image,
+  whose images already include the centrings, then adds every
+  `candidate.cell.translations` shift (`:2301-2308`). At k = 0 those shifts
+  are the centrings again, so each position appears more than once and
+  `image_of` finds two hits (`:2318-2321`). The reporter's dedupe modulo the
+  magnetic cell makes all 4940 calls of the sweep state a child that passes
+  the exact setting check. Checked against the tree at d87c8cc91: rocksalt
+  NaCl (`F m -3 m`) raises at k = 0 and at k = (1/2, 1/2, 1/2), reproduced
+  with the issue's snippet (`scratchpad/lane-B/r1247.py`). The tests use only
+  the primitive cubic perovskite. The fix turns a self-declared bug into
+  candidates, so it changes what a released call does and owes a release note
+  under § Changed, as PR #1135 did.
+
 ## Non-goals
 
 - Moment modes (SARAh-style basis-vector amplitudes): 1327 owns

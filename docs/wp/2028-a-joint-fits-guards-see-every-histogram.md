@@ -129,6 +129,31 @@ The joint fit's curves come from the last stage's compile, not a compile at
 the answer, which is WP-1421's; a Layer 0 reading after a width stage carries
 that caveat until 1421 lands.
 
+### Inherited
+
+- 2026-10-31, from the issue triage (issue #1124): task 8's measurement,
+  posted by the claimant 2026-10-28. Nothing wired. No source they read
+  defines observations per parameter over several patterns: McCusker 1999 §9
+  is one pattern, pdCIF keeps `_reflns_number_observed` per block, the GSAS
+  manual's joint χ² counts points; GSAS-II, FullProf and TOPAS manuals not
+  surveyed beyond their notes. Three candidates on seven public fits (LaB6
+  pair and three variants, corundum X-ray + neutron, MnF₂ three patterns,
+  `mg090`): (a) per pattern fires on a pattern short on its own while the
+  joint fit is supported (1.0 beside a joint 6.0) and charges a column to a
+  pattern that cannot see it; (b) #1128's candidate counts a per-pattern
+  column once per pattern, so it reads 3.6 and 3.0 where each pattern carries
+  5.0 and 6.0 and would fall as 1/N on a series; (c) the sum over-counts
+  repeats of one radiation. With every structural column shared no candidate
+  fires. Their recommendation: none; record "no agreed joint definition;
+  WP-2028 task 8 measured three candidates on #1124" in the
+  `_data_support_diagnostics` scope reason, leave `support=None`, and re-point
+  the four comments naming WP-1341 (`multi.py:249`, `:441`, `:2095`, `:2098`
+  on their tree) to this WP, in task 7's PR #1205 or a follow-up. A narrowed
+  (b), asked only when every free structural column is shared, is defined in
+  the comment if a number is wanted; it reads 6.0–25.3 on the shared fits and
+  fires on none. Checked against the tree at d87c8cc91: task 8 is still
+  unticked; PR #1205 (task 7) is open and leaves task 8 to #1124.
+
 ## Non-goals
 
 - The joint fit's compile at the answer (the #272 sibling): WP-1421.

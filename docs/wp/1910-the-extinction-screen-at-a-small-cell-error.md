@@ -258,6 +258,26 @@ and is not proposed here. No code is ported.
   scan should report the decisive position's ratio beside each class, never the class alone.
   Probe scripts: the 2026-10-26 triage scratchpad, not kept.
 
+- 2026-10-31, from the issue triage (issue #726): point 2 measured (reporter,
+  2026-10-30, main at e016f187d). The fixture is the corundum acceptance case
+  (SRM 676a). By default `index_pattern` lists the hP description of R -3 c's
+  metric at ranks 9-10 of 12, with `supercell_refuted` among its caveats.
+  Under `shift_template="cos_theta"` it ranks 2-3 of 12, directly under the
+  truth. Nothing says the screen on it cannot reach R -3 c. Its own caveats
+  keep it `low`, so `best_or_none()` never returns it. A caller walking the
+  list can still screen it and get a P class whose members exclude the
+  specimen's group. The reporter offers option (a): a caveat on the P
+  candidate when an R candidate with the same metric is listed
+  (`centring_twin_listed`), which `extinction.compatible_groups` would honour.
+  They would build it after PR #1170 merges. Checked against the tree at
+  d87c8cc91: no `centring_twin` name exists under `src/`. This WP's Acceptance
+  line already has (a)'s shape, while its point-2 task names the choice as the
+  maintainer's. Also unanswered: the 2026-10-19 local-baseline check (branch
+  `idx/726-local-baseline`, held). Its pre-registered cost rule failed on the
+  prefit arm: false refutations fell from 17 to 8, while inconsistent classes
+  refuted fell from 126 to 112. The reporter asked five questions, the first
+  being whether to open it or drop it.
+
 ## Non-goals
 
 - Loosening the absence test or `_model_is_quiet` (WP-1077).
