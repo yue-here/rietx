@@ -1,6 +1,6 @@
 # WP-1956 — a cell pays for the lines it predicts and the pattern lacks
 
-Milestone: unscheduled · Status: 🔄 2026-10-25 — C3 merged (PR #941); open: the `fom_panel_disagrees` revisit, and tutorial 03's absence count (WP-2041)
+Milestone: unscheduled · Status: 🔄 2026-10-31 — C3 merged (PR #941) and #941's follow-ups (PR #1177, `8260c78b`); open: the `fom_panel_disagrees` revisit, and tutorial 03's absence count (WP-2041)
 Track: What fires, and what stays silent
 Depends on: 1449 soft (the index 2–4 refutation it widens); 1511 soft (one Le Bail protocol per cell)
 Priority: P2 2026-10-13 — the absent-line detector fires on the truth and is blind on every wrong cell, and a distorted cell ranks first; no grade is confident today only because the run-level `fom_panel_disagrees` fires, which the reporter measured quiet on arms where a wrong cell reached `medium`
@@ -353,3 +353,5 @@ absences; Si, corundum and magnetite keep their correct cells.
   passed (WP-2036's guide-precision cause). Task 5 stays open: nothing
   revisited `fom_panel_disagrees` on the #916 arms. *Next:* task 5, and
   WP-2041 re-measures tutorial 03's absence count on this tree.
+
+- **2026-10-31** (`/pr-review`) — PR #1177 (by @mustachefeeling) merged as `8260c78b` after two rounds: the four things #941 left open. `RESOLUTION_FWHM` stays 1.0: swept 0.5-1.0 on 15 real runs, one rank moves (PbSO₄ X-ray at 0.7, the truth second behind a cell within 0.5 % of its metric), and nothing above 1.0 ran on real data. The windowed cap gains a density form and an excess over the run's cleanest candidate, reported and never gated (`LeBailValidation.*_in_window`). `INDEX_PREDICTED_BUT_ABSENT` reads the validation's counts and fires at `info` when every uncancellable absence lies above de Wolff's window. The screen pairs absences with merged lines by index, and `screen_for` is memoised per run. Re-measured under the Pawley validation (#1191): identical cell for cell. Gated in a stack of seven on `main` `d87c8cc9` (tree `21beeca9`, Mac arm64, Python 3.12, `[dev,jax]`): full suite 13 427 passed, 230 skipped, 48 xfailed, 0 failed; GUI, ruff and the `-W` manual build clean. #1257 stayed out on a hung CI job, and `main` after the six merges equals the checked six-PR tree `86997f50`. Gap, not blocking: the `RESOLUTION_FWHM` row's source list counts 12 sources and omits SRM 676a, which the sweep ran.

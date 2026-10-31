@@ -156,6 +156,7 @@ WALKED: dict[str, int] = {
     "io/formats/gsas.py": 2006,
     "io/formats/pdcif.py": 2006,
     "io/formats/peaklist.py": 2006,
+    "io/formats/total_scattering.py": 2006,
     "io/instrument_profile.py": 2006,
     "io/projects/fullprof.py": 2006,
     "io/projects/registry.py": 2006,
@@ -695,7 +696,8 @@ ROWS: tuple[Row, ...] = (
                   "observed lines with nothing above the picker's envelope; the trigger is "
                   "> 0, so the true magnetite and PbSO4 cells (count 2) are capped and "
                   "LaB6's wrong a-sqrt2 I cell reads 2 as well: at the bottom of the range "
-                  "the count separates nothing (PR #941 round 4)"),
+                  "the count separates nothing (PR #941 round 4); absences only outside the "
+                  "window are said at info and cap nothing (#941 follow-ups)"),
         grounds=("Caps the candidate's confidence and ranks nothing; the pairwise supercell "
                  "check is what refutes, and the diagnostic says so; the count is de Wolff's "
                  "window, the > 0 trigger is rietx's own (C3, ruled 2026-10-21; a density "
@@ -711,7 +713,8 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SUPERCELL_REFUTED", "code", tier=3, ambiguity=2,
         evidence=("warning; fires when the containment refuter reads 'refuted' for a pair "
                   "beyond index 4: the extra lines no extinction could remove sit on an "
-                  "observed line no more often than chance p0 predicts; it ranks the "
+                  "observed line no more often than chance p0 predicts and the child's own "
+                  "lines are seen no more often than its parent's (#1230); it ranks the "
                   "superlattice below its parent and leaves it in the list; the explanation "
                   "names the weak superstructure the radiation barely sees (PR #941 round 4)"),
         grounds=("Ranks below the parent and withholds nothing else; a superstructure is "
@@ -832,6 +835,31 @@ ROWS: tuple[Row, ...] = (
     Row("PATTERN_ROWS_DROPPED", "code"),
     Row("PATTERN_SCAN_REVERSED", "code"),
     Row("PATTERN_SIGMA_CONSTANT", "code"),
+    Row("PATTERN_TOTAL_SCATTERING", "code", tier=3, ambiguity=1,
+        evidence=("error; a refusal by file shape (issue #1240). It fires when the file's own "
+                  "#L line labels its first two columns r and G/g, or Q and S/F; when its "
+                  "header is PDFgetX2's (a 'History written' line and the Get_XPDF banner) or "
+                  "PDFgetX3's ([DEFAULT], bare or behind #, with qmaxinst or a PDFgetX3 version); or, with "
+                  "neither, on a .gr/.sq/.fq suffix, which the message says matched the name "
+                  "only. An abscissa labelled r or Q is not 2θ by definition, so reading it as "
+                  "2θ is wrong arithmetic, and no reader in the build reads G(r), S(Q) or F(Q) "
+                  "(#192 is fenced). An ordinary 2θ .xy, one whose comment mentions G(r), and a "
+                  "Q-axis .chi are not claimed (tests/test_readers.py). The label and header "
+                  "halves stand on what the file says; the suffix-only half is a judgement "
+                  "about naming habits. Negative control over 27 524 local text-suffixed "
+                  "files (1 658 macOS metadata files excluded): it claimed 40, all "
+                  "PDF-community files (10 by header, 25 by an #L line, 5 .gr by suffix "
+                  "alone, all genuine G(r)), and no 2θ pattern"),
+        grounds=("The suffix-only tier refuses a bare G(r) file that reads as a plain "
+                 "two-column profile, where io/CLAUDE.md § Refusals gates suffix matches "
+                 "negatively; it is the only evidence these files carry, and the message "
+                 "says the name matched and that renaming the file gets past it; approved "
+                 "by Yue, 2026-10-31 (PR #1241)."),
+        approved="2026-10-31",
+        response="error",
+        responds=("nothing to fit: open the diffraction pattern the reduction started from, or "
+                  "rename a 2θ scan that only carries a .gr, .sq or .fq suffix"),
+        scope=("all",)),
     Row("PATTERN_UNDERSAMPLED", "code", response="warning",
         responds=("read an intensity- or width-derived number (a fraction, an ADP, a size, "
                   "a strain, an instrument width) as less certain than its esd, and "
@@ -1330,7 +1358,10 @@ ROWS: tuple[Row, ...] = (
                   "every fraction; the set is what the last stage held plus the answer's own "
                   "no-line count, so a line a zero shift moved into range cannot quote the "
                   "handed-in value (#1103 item 1), and in a joint fit a scale shared with a "
-                  "histogram that has lines counts as measured in every histogram (item 2)")),
+                  "histogram that has lines counts as measured in every histogram (item 2), "
+                  "as does a per-histogram scale a free column ties to that phase's scale in "
+                  "such a histogram (a constant ParametricEquation's vars., #1103 follow-up; a "
+                  "polynomial link leaves it unmeasured, its narrow value being the start value)")),
     Row("rietx.schemas.indexing.PeakList.instrument_undeclared", "action", tier=1, ambiguity=1,
         evidence=("reads the declaration: the picker checks the instrument only where "
                   "indexing.diagnostics.lab_source finds a laboratory tube in the declared "
@@ -1890,17 +1921,37 @@ ROWS: tuple[Row, ...] = (
         grounds="Kept on both grounds, ruled 2026-10-21 (PR #939).",
         approved="2026-10-21"),
     Row("rietx.indexing.extinction._MODULI", "constant", value=(2, 3, 4, 6)),
+    Row("rietx.indexing.extinction.DENSITY_Z_TOLERANCE", "constant", tier=2,
+        evidence="Richards & Lindley (2006), International Tables for Crystallography "
+                 "Vol. C, ch. 3.2, sect. 3.2.1, p. 156: when Z is assigned, measured and "
+                 "calculated density \"should agree within at least 1.5%\"; the test "
+                 "|z_rho/Z - 1| is that ratio.  The chapter gives no esd basis for the "
+                 "1.5 %, so it reads as an upper bound on normal agreement.  Tested on NaCl "
+                 "against a handbook density (2.165 g/cm3, 0.1 % from the computed one) and "
+                 "on a density 5 % off, which gives no Z (WP-2033).",
+        value=0.015),
+    Row("rietx.indexing.extinction.N_A_CM3_PER_A3", "constant", tier=1,
+        evidence="Physics: Avogadro's number, exact in the SI since 2019 (CODATA 2018, "
+                 "6.02214076e23 /mol), times 1e-24 cm3 per A3, so Z = rho*V*N_A/M with rho "
+                 "in g/cm3, V in A3 and M in g/mol (WP-2033).  The same value qpa.ZMV.density "
+                 "uses inline.",
+        value=0.602214076),
     Row("rietx.indexing.fom.FOM_N", "constant", value=20),
     Row("rietx.indexing.fom.LINE_COINCIDENCE_RTOL", "constant", value=1e-09),
     Row("rietx.indexing.fom.MATCH_SIGMA", "constant", value=3.0),
     Row("rietx.indexing.fom.RESOLUTION_FWHM", "constant", tier=3, value=1.0,
-        evidence=("Merge distance, seen half-width and p0's scale, in FWHM. 1.0 over 0.5 on the "
-                  "synthetic tetragonal set (0.5 refuted a true 0.9-FWHM split); holds on the "
-                  "real acceptance corpus (no truth lost rank, PR #941). Rayleigh/Sparrow put "
-                  "one line or two at 0.58-0.85 FWHM and do not cover the seen window or p0. "
-                  "Fails where a real split under 1 FWHM ties a truth with its higher-symmetry "
-                  "description."),
-        grounds="Kept, ruled 2026-10-21 (PR #941); a 0.5-1.0 sweep on real families is owed.",
+        evidence=("Three roles, tested together: merge distance, seen half-width and p0's scale, "
+                  "in FWHM. 1.0 over 0.5 on the synthetic tetragonal set (0.5 refuted a true "
+                  "0.9-FWHM split). Swept 0.5-1.0 on 15 real runs from 12 sources (the CPD "
+                  "round robin's seven patterns, NIST SRM 660c, 11-BM NAC, the GSAS-II FAP, "
+                  "Hill's PbSO4 X-ray and neutron histograms, one with no truth to rank): the "
+                  "one rank move is PbSO4 X-ray at 0.7, between that pattern's near-duplicate "
+                  "cells. Rayleigh/Sparrow put one line or two at 0.58-0.85 FWHM and do not "
+                  "cover the seen window or p0. Fails where a real split under 1 FWHM ties a "
+                  "truth with its higher-symmetry description."),
+        grounds=("Kept, ruled 2026-10-21 (PR #941); the real-family sweep (PR #1177) found "
+                 "nothing below 1.0 better. Bounded above only by the synthetic tests, a "
+                 "1.7-FWHM split; nothing above 1.0 was run on real data."),
         approved="2026-10-21"),
     Row("rietx.indexing.fom._AGGREGATE_FLOOR_RTOL", "constant", value=1e-06),
     Row("rietx.indexing.fom._BOUNDARY_RTOL", "constant", value=1e-09),

@@ -617,6 +617,38 @@ def _stale_silent() -> list:
     return _restraint_pairs_stale_diagnostics(*_stale_structure(drift=False))
 
 
+
+def _read_text_pattern(name: str, text: str) -> list:
+    """``read_pattern``'s diagnostics for a text file, whether or not it is
+    refused: the refusal appends its record before it raises."""
+    from rietx.io.formats import TotalScatteringRefused
+    from rietx.io.readers import read_pattern
+
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = pathlib.Path(tmp) / name
+        path.write_text(text, encoding="utf-8")
+        try:
+            read_pattern(path, diagnostics=found)
+        except TotalScatteringRefused:
+            pass
+    return found
+
+
+_TS_ROWS = "".join(f"{10.0 + 0.02 * i:.2f} {500 + i % 7}\n" for i in range(60))
+
+
+def _total_scattering_fires() -> list:
+    """Issue #192's case: one ``#L`` line labelling r against G(r)."""
+    return _read_text_pattern("small.dat", "#L r(A) G(r)\n" + _TS_ROWS)
+
+
+def _total_scattering_silent() -> list:
+    """The same rows labelled 2θ by a SPEC ``#L`` line, and a ``.xy`` whose
+    comment only mentions G(r): both are diffraction scans."""
+    return (_read_text_pattern("spec.dat", "#L 2Theta  Detector\n" + _TS_ROWS)
+            + _read_text_pattern("scan.xy", "# compare with the G(r) later\n" + _TS_ROWS))
+
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -637,6 +669,8 @@ SILENCE: dict[str, Pair] = {
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
         _net_background_fires, _net_background_silent, "tests/test_readers.py"),
+    "PATTERN_TOTAL_SCATTERING": Pair(
+        _total_scattering_fires, _total_scattering_silent, "tests/test_readers.py"),
     "PATTERN_UNDERSAMPLED": Pair(
         _undersampled_fires, _undersampled_silent, "tests/test_data_support.py"),
     "PATTERN_WEIGHT_UNUSABLE": Pair(

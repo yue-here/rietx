@@ -622,8 +622,12 @@ the reporter's fork.
 ## Acceptance
 
 On the shipped BT-1 LaMnO₃ pattern against Pm-3m, A_τ reproduces Perez-Mato
-et al. 2010 Table 13 within its esds and Hotelling's T² is reported for the
-block (decided 2026-10-11, #286);
+et al. 2010 Table 13 within 0.03 Å, the bar `test_lamno3_reproduces_table_13`
+holds the shipped decomposition to, and Hotelling's T² is reported for the
+block (decided 2026-10-11, #286; the bar ruled by Yue 2026-10-31 on #1238,
+replacing "within its esds": the pattern is at 50 K and Table 13 at 300 K, so
+an esd bar measures the temperature difference, and M2+ sits 3.9 esd off at
+0.3334(69) Å against 0.36);
 every A = 0 control equals |det P|² × parent; the ten named settings and
 every shipped fixture are bit-identical.
 

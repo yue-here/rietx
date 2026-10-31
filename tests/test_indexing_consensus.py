@@ -1010,6 +1010,13 @@ def test_index_pattern_recovers_the_cell_and_refutes_its_supercells(lab6_pattern
     assert root2.confidence_caveats == ["predicted_but_absent"]
     assert root2.lebail.predicted_but_absent_uncancellable_in_window >= 1
     assert result.candidates.index(root2) > result.candidates.index(best)
+    # the density compared across candidates (#941's follow-up), written by
+    # the run: the truth is the cleanest (excess 0), the a√2 I cell carries
+    # its windowed absences over and above it, which the raw count shares
+    # with magnetite's and PbSO₄'s true cells
+    assert best.lebail.predicted_but_absent_excess_in_window == 0.0
+    assert root2.lebail.predicted_but_absent_excess_in_window == pytest.approx(
+        root2.lebail.predicted_but_absent_uncancellable_in_window)
 
 
 def test_a_peaks_only_run_abstains_by_declaration(cubic_peaks):
