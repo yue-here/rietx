@@ -77,8 +77,8 @@ a finding.
    stop?
 4. The case for acting. Would every competent refiner act here anyway? What
    does leaving it to the caller cost: extra calls, reruns, or a number moved
-   off its reference (a certified cell, a weighed composition, the cross-code
-   envelope)? Quote any measurement of that cost.
+   off its reference (a certified cell, a weighed composition, or the cross-code
+   envelope, which only verifies)? Quote any measurement of that cost.
 5. Which tier, with its source? For tier 2, what the cited program does *by
    default*, and whether you checked that in this repository or recall it. A
    dissenting program keeps a statistic, threshold or default at tier 2; a
@@ -87,8 +87,10 @@ a finding.
    that none exists.
 6. How many unrelated dataset families support the threshold, counted by
    laboratory, instrument and material and never by file, and the reference
-   each was measured against? Agreement with another program verifies the
-   code and validates nothing (Rule 2).
+   each was measured against, and whether each is development data? Agreement
+   with another program, or with a published refinement of the same pattern
+   under its protocol, verifies the code and validates nothing; under another
+   protocol it measures only drift (Rule 2).
 7. Which record field or diagnostic code says that it fired?
 
 A name added to `UNAUDITED_BASELINE` needs a reason, because the list only

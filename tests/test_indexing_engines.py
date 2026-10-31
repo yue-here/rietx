@@ -801,6 +801,57 @@ def test_dichotomy_recovers_a_monoclinic_cell():
     assert_same_lattice(result.candidates[0].cell, cell)
 
 
+def test_the_grid_frontier_is_bounded_by_its_lists_bytes(monkeypatch):
+    """The grid counts the bytes of its distinct survivor lists as well as
+    its cells, and overflows on either (WP-1924, #780's 2026-10-30 report).
+
+    A triclinic grid's 400 010 cells held lists enough to reach 18.4 GB and an
+    OOM kill, under a cell cap they never reached.  Siblings share one list,
+    so a list is counted once: a test handing every box the same array never
+    overflows, and one handing each box a fresh array does, through the cap's
+    existing "outgrew a size cap" report.
+    """
+    from rietx.indexing import dichotomy
+
+    basis = metric_basis("tetragonal")
+    lo0, hi0 = dichotomy._initial_box(basis, spec_for("tetragonal"))
+    shared = np.arange(1000, dtype=np.uint16)
+    monkeypatch.setattr(dichotomy, "MAX_GRID_BYTES", 4 * shared.nbytes)
+    budget = Budget(600.0)
+    *_rest, complete = dichotomy._grid_pass(
+        basis, lo0, hi0, shared, lambda rows, lo, hi: shared, budget)
+    assert complete
+    frontier, *_rest, complete = dichotomy._grid_pass(
+        basis, lo0, hi0, shared, lambda rows, lo, hi: rows.copy(), budget)
+    assert not complete and frontier is not None
+
+    peaks, _cell = synthetic_peaks("tetragonal")
+    monkeypatch.setattr(dichotomy, "MAX_GRID_BYTES", 1)
+    result = search_dichotomy(peaks, spec=spec_for("tetragonal"))
+    assert not result.search_complete["tetragonal"]
+    (diag,) = [d for d in result.diagnostics if d.code == "INDEX_SEARCH_INCOMPLETE"]
+    assert "outgrew a size cap on tetragonal" in diag.message
+
+
+def test_a_dichotomy_unit_stops_at_its_harvest_cap(monkeypatch):
+    """A unit's accepted leaves are bounded inside the unit (WP-1924, #780's
+    2026-10-30 report: 6 816 distinct orthorhombic lattices in five minutes,
+    7 GB at 70 min).  Reaching the cap ends the unit as a size cap does."""
+    from rietx.indexing import dichotomy
+
+    peaks, _cell = synthetic_peaks("tetragonal")
+    full = search_dichotomy(peaks, spec=spec_for("tetragonal"))
+    assert full.search_complete["tetragonal"]
+    assert full.stats["tetragonal.harvest"] >= 2, "the case no longer harvests"
+    monkeypatch.setattr(dichotomy, "MAX_HARVEST", 1)
+    result = search_dichotomy(peaks, spec=spec_for("tetragonal"))
+    # one leaf can add a candidate per centring before the cap is read
+    assert 1 <= result.stats["tetragonal.harvest"] < full.stats["tetragonal.harvest"]
+    assert not result.search_complete["tetragonal"]
+    (diag,) = [d for d in result.diagnostics if d.code == "INDEX_SEARCH_INCOMPLETE"]
+    assert "outgrew a size cap on tetragonal" in diag.message
+
+
 def test_dichotomy_holds_its_frontier_as_indices_until_a_cell_is_popped(
         monkeypatch):
     """Phase 2 holds the grid's survivor lists as narrow indices and gathers
@@ -1153,6 +1204,53 @@ def test_trial_error_survives_an_impurity_among_the_base_lines():
     result = search_trial_error(peaks, spec=spec_for("tetragonal"))
     assert result.candidates, "an impurity among the base lines lost the cell"
     assert_same_lattice(result.candidates[0].cell, cell)
+
+
+def test_a_stopped_dedup_leaves_the_ranked_list_as_it_was(monkeypatch):
+    """A token set while the dedup runs ends its walk only where the rest could
+    not reach the shortlist (WP-1924, #780: 10.7 s at 6 819 distinct lattices,
+    about n², with nothing reading the token).
+
+    Under the default preset the deadline *is* the token, so a dedup that
+    stopped on a count of candidates walked would hand every ceiling-bound
+    run a different pool.  Stopping where the next candidate indexes fewer
+    lines than ``keep`` leaders already held keeps the full pass's first
+    groups and the very list :func:`rank_candidates` returns unstopped.  The
+    harvest holds several line counts, so the stopped walk is shorter.
+    """
+    from rietx.indexing import dichotomy, engines
+    from rietx.optimize.cancel import CancelToken
+
+    raw: list = []
+    ranked = dichotomy.rank_candidates
+
+    def recording(cands, *args, **kw):
+        raw.extend(cands)
+        return ranked(cands, *args, **kw)
+
+    monkeypatch.setattr(dichotomy, "rank_candidates", recording)
+    peaks, _cell = synthetic_peaks("cubic")
+    search_dichotomy(peaks, spec=spec_for("cubic", n_unindexed=4))
+    monkeypatch.setattr(dichotomy, "rank_candidates", ranked)
+    full = engines.dedup_groups(raw)
+    idle = engines.dedup_groups(raw, cancel=CancelToken(), keep=1)
+    assert [[id(c) for c in g] for g in idle] == [[id(c) for c in g] for g in full]
+    stop = CancelToken()
+    stop.cancel()
+    part = engines.dedup_groups(raw, cancel=stop, keep=1)
+    assert len(part) < len(full), "the harvest no longer holds two line counts"
+    assert [g[0] for g in part] == [g[0] for g in full[:len(part)]]
+    # every lattice it left out indexes fewer lines than the one it kept last,
+    # so the pre-rank's volume tie-break saw the whole leading line count
+    assert all(g[0].n_indexed < part[-1][0].n_indexed for g in full[len(part):])
+
+    def ranked_ids(cancel, n):
+        out = engines.rank_candidates(raw, peaks, max_candidates=n, shortlist=1,
+                                      cancel=cancel)
+        return [id(c) for c in out]
+
+    for n in (1, 2, 3):
+        assert ranked_ids(stop, n) == ranked_ids(None, n)
 
 
 def test_the_fast_dedup_groups_exactly_as_the_plain_pass(monkeypatch):
@@ -1849,6 +1947,55 @@ def test_the_base_pool_is_a_prefix_of_the_selected_search_lines():
     assert not np.array_equal(np.sort(pool), np.sort(old_pool))
     assert peaks.two_theta()[pool].min() > tt[19], (
         "the pool is still drawn from lines the selection declined")
+
+
+def test_trial_error_reads_its_budget_between_the_solutions_of_one_base(
+        monkeypatch):
+    """WP-1924: a unit stops inside a base, not at the next one.
+
+    The budget was read once per base set, and one base's scoring is the long
+    step: an outside pattern ran a unit 282 s on a 60 s budget.  So a budget that
+    expires once one solution is scored must stop the unit before the second,
+    where a per-base read would score the whole base first.  Counted, never
+    timed: the budget here expires on a count of scored solutions.
+    """
+    from rietx.indexing import trial_error
+
+    peaks, _cell = synthetic_peaks("cubic")
+    calls = {"score": 0, "first_base": None}
+    real_score, real_solve = trial_error._score, trial_error._solve_assignments
+
+    def score(*args, **kwargs):
+        calls["score"] += 1
+        return real_score(*args, **kwargs)
+
+    def solve(*args, **kwargs):
+        # the scores before the second batch are the first scored base's
+        if calls["score"] and calls["first_base"] is None:
+            calls["first_base"] = calls["score"]
+        return real_solve(*args, **kwargs)
+
+    monkeypatch.setattr(trial_error, "_score", score)
+    monkeypatch.setattr(trial_error, "_solve_assignments", solve)
+    finished = trial_error.search_trial_error(peaks, spec=spec_for("cubic"),
+                                              probe=False)
+    assert finished.search_complete["cubic"]
+    # the precondition: without a stop, one base scores several solutions
+    assert calls["first_base"] is not None and calls["first_base"] > 1, calls
+
+    class ExpiresOnceScored(Budget):
+        def expired(self) -> bool:
+            return calls["score"] >= 1
+
+    calls["score"] = 0
+    monkeypatch.setattr(trial_error, "Budget", ExpiresOnceScored)
+    cut = trial_error.search_trial_error(peaks, spec=spec_for("cubic"),
+                                         probe=False)
+    assert calls["score"] == 1, (
+        f"{calls['score'] - 1} more solution(s) scored after the budget "
+        "expired on the first; the budget is read only between bases")
+    assert not cut.search_complete["cubic"]
+    assert "cubic.seconds" in cut.stats, "the clock rides the cut return"
 
 
 @pytest.mark.parametrize("engine", ["dichotomy", "trial_error"])

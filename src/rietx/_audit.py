@@ -3,7 +3,7 @@
 The rule lives in ``docs/milestones/generality.md`` § The rule and is not
 restated here beyond what a row needs.  Each part of a heuristic is tiered on
 its own: (1) physics or arithmetic; (2) established practice, a citation that
-validated it or the same choice made *by default* in an established Rietveld
+tested it or the same choice made *by default* in an established Rietveld
 program (the seven rietx-bench runs: GSAS-II, FullProf, TOPAS, RIETAN-FP,
 BGMN, MAUD, EasyDiffraction), whatever the other six do; (3) rietx's own, kept only on the record's two grounds with the
 maintainer's dated approval.  ``invariant`` is the record's answer-invariant
@@ -156,6 +156,7 @@ WALKED: dict[str, int] = {
     "io/formats/gsas.py": 2006,
     "io/formats/pdcif.py": 2006,
     "io/formats/peaklist.py": 2006,
+    "io/formats/total_scattering.py": 2006,
     "io/instrument_profile.py": 2006,
     "io/projects/fullprof.py": 2006,
     "io/projects/registry.py": 2006,
@@ -695,7 +696,8 @@ ROWS: tuple[Row, ...] = (
                   "observed lines with nothing above the picker's envelope; the trigger is "
                   "> 0, so the true magnetite and PbSO4 cells (count 2) are capped and "
                   "LaB6's wrong a-sqrt2 I cell reads 2 as well: at the bottom of the range "
-                  "the count separates nothing (PR #941 round 4)"),
+                  "the count separates nothing (PR #941 round 4); absences only outside the "
+                  "window are said at info and cap nothing (#941 follow-ups)"),
         grounds=("Caps the candidate's confidence and ranks nothing; the pairwise supercell "
                  "check is what refutes, and the diagnostic says so; the count is de Wolff's "
                  "window, the > 0 trigger is rietx's own (C3, ruled 2026-10-21; a density "
@@ -711,7 +713,8 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SUPERCELL_REFUTED", "code", tier=3, ambiguity=2,
         evidence=("warning; fires when the containment refuter reads 'refuted' for a pair "
                   "beyond index 4: the extra lines no extinction could remove sit on an "
-                  "observed line no more often than chance p0 predicts; it ranks the "
+                  "observed line no more often than chance p0 predicts and the child's own "
+                  "lines are seen no more often than its parent's (#1230); it ranks the "
                   "superlattice below its parent and leaves it in the list; the explanation "
                   "names the weak superstructure the radiation barely sees (PR #941 round 4)"),
         grounds=("Ranks below the parent and withholds nothing else; a superstructure is "
@@ -831,6 +834,31 @@ ROWS: tuple[Row, ...] = (
     Row("PATTERN_ROWS_DROPPED", "code"),
     Row("PATTERN_SCAN_REVERSED", "code"),
     Row("PATTERN_SIGMA_CONSTANT", "code"),
+    Row("PATTERN_TOTAL_SCATTERING", "code", tier=3, ambiguity=1,
+        evidence=("error; a refusal by file shape (issue #1240). It fires when the file's own "
+                  "#L line labels its first two columns r and G/g, or Q and S/F; when its "
+                  "header is PDFgetX2's (a 'History written' line and the Get_XPDF banner) or "
+                  "PDFgetX3's ([DEFAULT], bare or behind #, with qmaxinst or a PDFgetX3 version); or, with "
+                  "neither, on a .gr/.sq/.fq suffix, which the message says matched the name "
+                  "only. An abscissa labelled r or Q is not 2θ by definition, so reading it as "
+                  "2θ is wrong arithmetic, and no reader in the build reads G(r), S(Q) or F(Q) "
+                  "(#192 is fenced). An ordinary 2θ .xy, one whose comment mentions G(r), and a "
+                  "Q-axis .chi are not claimed (tests/test_readers.py). The label and header "
+                  "halves stand on what the file says; the suffix-only half is a judgement "
+                  "about naming habits. Negative control over 27 524 local text-suffixed "
+                  "files (1 658 macOS metadata files excluded): it claimed 40, all "
+                  "PDF-community files (10 by header, 25 by an #L line, 5 .gr by suffix "
+                  "alone, all genuine G(r)), and no 2θ pattern"),
+        grounds=("The suffix-only tier refuses a bare G(r) file that reads as a plain "
+                 "two-column profile, where io/CLAUDE.md § Refusals gates suffix matches "
+                 "negatively; it is the only evidence these files carry, and the message "
+                 "says the name matched and that renaming the file gets past it; approved "
+                 "by Yue, 2026-10-31 (PR #1241)."),
+        approved="2026-10-31",
+        response="error",
+        responds=("nothing to fit: open the diffraction pattern the reduction started from, or "
+                  "rename a 2θ scan that only carries a .gr, .sq or .fq suffix"),
+        scope=("all",)),
     Row("PATTERN_UNDERSAMPLED", "code", response="warning",
         responds=("read an intensity- or width-derived number (a fraction, an ADP, a size, "
                   "a strain, an instrument width) as less certain than its esd, and "
@@ -1329,7 +1357,10 @@ ROWS: tuple[Row, ...] = (
                   "every fraction; the set is what the last stage held plus the answer's own "
                   "no-line count, so a line a zero shift moved into range cannot quote the "
                   "handed-in value (#1103 item 1), and in a joint fit a scale shared with a "
-                  "histogram that has lines counts as measured in every histogram (item 2)")),
+                  "histogram that has lines counts as measured in every histogram (item 2), "
+                  "as does a per-histogram scale a free column ties to that phase's scale in "
+                  "such a histogram (a constant ParametricEquation's vars., #1103 follow-up; a "
+                  "polynomial link leaves it unmeasured, its narrow value being the start value)")),
     Row("rietx.schemas.indexing.PeakList.instrument_undeclared", "action", tier=1, ambiguity=1,
         evidence=("reads the declaration: the picker checks the instrument only where "
                   "indexing.diagnostics.lab_source finds a laboratory tube in the declared "
@@ -1735,7 +1766,18 @@ ROWS: tuple[Row, ...] = (
         evidence=('arithmetic: the exact rational 1/2, the half-lattice translation of the a/b/c/A/B/C/I centring vectors and of the half-sum over the basis')),
     Row("rietx.crystallography.superspace.operators._ZERO3", "constant", value=(0.0, 0.0, 0.0)),
     Row("rietx.crystallography.symmetry.MAX_HKL_GRID_POINTS", "constant", value=30000000),
-    Row("rietx.crystallography.symmetry.SITE_TOL", "constant", value=0.0001),
+    Row("rietx.crystallography.symmetry.SITE_TOL", "constant", value=0.0001,
+        evidence=("unaudited, for the maintainer's tier. Besides site_orbit's snap it has two "
+                  "rigid-body uses (WP-1807, #1005). (1) params.vector._refuse_body_off_its_"
+                  "sites holds the exact invariance miss to _BODY_SITE_MISS_FACTOR x SITE_TOL, "
+                  "the two positions' snap residuals (at most 6 x SITE_TOL, 8 chosen). (2) "
+                  "params.bodies.RigidBodyBlock._increment_basis compares a linear body's "
+                  "unit-vector residuals |n.u| and |u - (n.u)n|, a tilt in radians, with this "
+                  "fractional tolerance, so the two checks agree only for a body long against "
+                  "its cell: a CO2-like body (C-O 1.16 A) in the P n m a mirror passes the site "
+                  "check and is refused at '90 deg' from an O typed 4e-5 off the mirror at "
+                  "b = 6 A and 2e-5 at b = 20 A, inside the mirror's 5e-5 reach; diacetylene "
+                  "(COD 1577467) builds to 5e-5 on every atom (measured 2026-10-29)")),
     Row("rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG", "constant", value=0.001),
     Row("rietx.crystallography.symmetry.TWIN_COORD_TOL", "constant", tier=1, value=0.0005,
         evidence=("arithmetic on the gate's role: under the one gate the reach decides only "
@@ -1804,7 +1846,29 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.dichotomy.MAX_ANGLE_COSINE", "constant", value=0.8660254037844387),
     Row("rietx.indexing.dichotomy.MAX_ASSIGN_PASSES", "constant", value=4),
     Row("rietx.indexing.dichotomy.MAX_DEPTH", "constant", value=60),
+    Row("rietx.indexing.dichotomy.MAX_GRID_BYTES", "constant", tier=3,
+        evidence="an overflow ends the grid as MAX_GRID_CELLS' does, reported as "
+                 "INDEX_SEARCH_INCOMPLETE 'outgrew a size cap'; finished units replay to "
+                 "their digests (tests.unit_replay); "
+                 "tests/test_indexing_engines.py::test_the_grid_frontier_is_bounded_by_its_lists_bytes",
+        grounds="The cap is rietx's own choice, a memory bound on a laptop: 1 GiB of "
+                "survivor lists, so the grid's own peak stays near 2 GiB. A search whose "
+                "grid would outgrow it is reported incomplete rather than killed by the OS; "
+                "nothing is ranked by it, and #780's monoclinic case holds about a third of it.",
+        approved="2026-10-31",
+        value=1073741824),
     Row("rietx.indexing.dichotomy.MAX_GRID_CELLS", "constant", value=400000),
+    Row("rietx.indexing.dichotomy.MAX_HARVEST", "constant", tier=3,
+        evidence="reaching it ends the unit as a size cap does, reported as "
+                 "INDEX_SEARCH_INCOMPLETE 'outgrew a size cap'; finished units replay to "
+                 "their digests (tests.unit_replay); "
+                 "tests/test_indexing_engines.py::test_a_dichotomy_unit_stops_at_its_harvest_cap",
+        grounds="The cap is rietx's own choice, a memory and dedup-time bound: about "
+                "three times the largest finished harvest measured (a bethanechol unit's "
+                "7 000 leaves). A unit that would accept more is reported incomplete rather "
+                "than growing for hours; nothing is ranked by it.",
+        approved="2026-10-31",
+        value=20000),
     Row("rietx.indexing.dichotomy.MAX_TRIAL_HKL", "constant", value=200000),
     Row("rietx.indexing.dichotomy._SAME_BOX_RTOL", "constant", value=0.001),
     Row("rietx.indexing.engines.ANCHOR_LINES", "constant", value=5),
@@ -1867,17 +1931,37 @@ ROWS: tuple[Row, ...] = (
         grounds="Kept on both grounds, ruled 2026-10-21 (PR #939).",
         approved="2026-10-21"),
     Row("rietx.indexing.extinction._MODULI", "constant", value=(2, 3, 4, 6)),
+    Row("rietx.indexing.extinction.DENSITY_Z_TOLERANCE", "constant", tier=2,
+        evidence="Richards & Lindley (2006), International Tables for Crystallography "
+                 "Vol. C, ch. 3.2, sect. 3.2.1, p. 156: when Z is assigned, measured and "
+                 "calculated density \"should agree within at least 1.5%\"; the test "
+                 "|z_rho/Z - 1| is that ratio.  The chapter gives no esd basis for the "
+                 "1.5 %, so it reads as an upper bound on normal agreement.  Tested on NaCl "
+                 "against a handbook density (2.165 g/cm3, 0.1 % from the computed one) and "
+                 "on a density 5 % off, which gives no Z (WP-2033).",
+        value=0.015),
+    Row("rietx.indexing.extinction.N_A_CM3_PER_A3", "constant", tier=1,
+        evidence="Physics: Avogadro's number, exact in the SI since 2019 (CODATA 2018, "
+                 "6.02214076e23 /mol), times 1e-24 cm3 per A3, so Z = rho*V*N_A/M with rho "
+                 "in g/cm3, V in A3 and M in g/mol (WP-2033).  The same value qpa.ZMV.density "
+                 "uses inline.",
+        value=0.602214076),
     Row("rietx.indexing.fom.FOM_N", "constant", value=20),
     Row("rietx.indexing.fom.LINE_COINCIDENCE_RTOL", "constant", value=1e-09),
     Row("rietx.indexing.fom.MATCH_SIGMA", "constant", value=3.0),
     Row("rietx.indexing.fom.RESOLUTION_FWHM", "constant", tier=3, value=1.0,
-        evidence=("Merge distance, seen half-width and p0's scale, in FWHM. 1.0 over 0.5 on the "
-                  "synthetic tetragonal set (0.5 refuted a true 0.9-FWHM split); holds on the "
-                  "real acceptance corpus (no truth lost rank, PR #941). Rayleigh/Sparrow put "
-                  "one line or two at 0.58-0.85 FWHM and do not cover the seen window or p0. "
-                  "Fails where a real split under 1 FWHM ties a truth with its higher-symmetry "
-                  "description."),
-        grounds="Kept, ruled 2026-10-21 (PR #941); a 0.5-1.0 sweep on real families is owed.",
+        evidence=("Three roles, tested together: merge distance, seen half-width and p0's scale, "
+                  "in FWHM. 1.0 over 0.5 on the synthetic tetragonal set (0.5 refuted a true "
+                  "0.9-FWHM split). Swept 0.5-1.0 on 15 real runs from 12 sources (the CPD "
+                  "round robin's seven patterns, NIST SRM 660c, 11-BM NAC, the GSAS-II FAP, "
+                  "Hill's PbSO4 X-ray and neutron histograms, one with no truth to rank): the "
+                  "one rank move is PbSO4 X-ray at 0.7, between that pattern's near-duplicate "
+                  "cells. Rayleigh/Sparrow put one line or two at 0.58-0.85 FWHM and do not "
+                  "cover the seen window or p0. Fails where a real split under 1 FWHM ties a "
+                  "truth with its higher-symmetry description."),
+        grounds=("Kept, ruled 2026-10-21 (PR #941); the real-family sweep (PR #1177) found "
+                 "nothing below 1.0 better. Bounded above only by the synthetic tests, a "
+                 "1.7-FWHM split; nothing above 1.0 was run on real data."),
         approved="2026-10-21"),
     Row("rietx.indexing.fom._AGGREGATE_FLOOR_RTOL", "constant", value=1e-06),
     Row("rietx.indexing.fom._BOUNDARY_RTOL", "constant", value=1e-09),
@@ -2816,6 +2900,25 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.params.vector._BACKSTOP_THETA_MAX_DEG", "constant", tier=1, value=89.0,
         evidence=("numerical floor: pole guard at 2theta = 180 deg; moves no number for any pattern"
                   " ending below 2theta = 178 deg")),
+    Row("rietx.params.vector._BODY_SITE_MISS_FACTOR", "constant", tier=1, value=8.0,
+        evidence=("arithmetic: _refuse_body_off_its_sites's exact test R(p - o) = p - o, in "
+                  "units of symmetry.SITE_TOL. For an operation fixing a body atom and its "
+                  "origin mod the lattice the miss is a lattice vector plus the two positions' "
+                  "residuals from their sites, each at most SITE_TOL per component for an "
+                  "operation site_orbit's step 1 admitted and at most 3 x SITE_TOL for one the "
+                  "snap added, so an atom on the origin's own element misses by at most "
+                  "6 x SITE_TOL and one on an element a lattice vector away by at least "
+                  "1 - 6 x SITE_TOL. Any factor from 6 to 1/SITE_TOL - 6 refuses the same "
+                  "inputs; 8 keeps a factor of two over 6. The step-1 case, 2 x, is attained "
+                  "and never exceeded on 25 site pairs in 17 groups (corner and hill-climbed "
+                  "typed offsets, hexagonal, trigonal and cubic included; WP-1807 follow-up, "
+                  "#1005 round 2, #1226 round 1). Tested: an atom and origin typed SITE_TOL/2 "
+                  "off the P n m a mirror on opposite sides build at 8 and are refused at 1.9; "
+                  "the mirror a lattice vector away is refused "
+                  "(tests/test_rigid_body_special.py)"),
+        grounds=("Decides no input differently from any other value in its window, so no "
+                 "refiner's choice turns on it; the decision itself, a body atom on an "
+                 "element a lattice vector from its origin's, is RIGID_BODY_NOT_INVARIANT's")),
     Row("rietx.params.vector._MOMENT_REFRAME_TOL", "constant", tier=1, value=1e-12,
         evidence=("numerical floor: ~4.5e3 eps, above roundoff; a frame moved 1e-12 moves the "
                   "moment by 1e-12 of its modulus (docstring)")),

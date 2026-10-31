@@ -6,7 +6,7 @@
      Guarded by: tests/test_validation_matrix.py (fast suite) -->
 
 Every real-data assertion in this repository, and what its tolerance is
-referenced to. A bar without its referent is not a claim: `abs(a - 4.156780) <
+referenced to. A bar without its reference value is not a claim: `abs(a - 4.156780) <
 2e-4` and `abs(delta_a) < 1e-9` look alike and are not remotely the same
 statement — the first is a certified value the fit does not reach and does not
 claim to, the second is two of our own fits that must agree to floating point.
@@ -463,7 +463,7 @@ The one cross-code comparison. GSAS-II's converged fluorapatite tutorial, with i
 
 **Claims:** a user constraint on three chemically equivalent sites reduces the parameter count and tightens the esd, without moving the values the free refinement measured
 
-**Referenced to:** the same protocol's own free fit on the same 5750 channels, the only difference being the tie.  The esd bar is referenced twice: to the best of the three free esds (0.1078 A^2) and to their inverse-variance combination (0.0769), which is what the constraint has to beat to have recovered the information rather than merely divided by root-N.  The identity half is that the three tied rows carry the *same* value and esd to 1e-12, since they are one parameter.  Rwp is deliberately not a referent: it moves by 0.05 % of itself, so no bar on it could distinguish a good constraint from a bad one
+**Referenced to:** the same protocol's own free fit on the same 5750 channels, the only difference being the tie.  The esd bar is referenced twice: to the best of the three free esds (0.1078 A^2) and to their inverse-variance combination (0.0769), which is what the constraint has to beat to have recovered the information rather than merely divided by root-N.  The identity half is that the three tied rows carry the *same* value and esd to 1e-12, since they are one parameter.  Rwp is deliberately not a reference value: it moves by 0.05 % of itself, so no bar on it could distinguish a good constraint from a bad one
 
 **Measured:** 20 -> 18 free parameters, 287.5 -> 319.4 points per parameter; B(O) 0.3469(1526) / 0.6005(1610) / 0.5137(1086) free against 0.4985(763) tied, the three free values 0.99 / 0.63 / 0.14 of their own esds from the tied value (esds with Berar-Lelann eqs (10)-(12), #674); the four untied Biso sites move by < 0.5 sigma.  1.9.0 read 0.3647(1513) / 0.6016(1590) / 0.5377(1078) against 0.5150(754), 0.99 / 0.54 / 0.21
 
@@ -637,7 +637,7 @@ The same round robin with anomalous scattering applied — a pre-registered, par
 
 **Claims:** the sharpest single dispersion result: B(O) comes off its floor once Zn's missing f' stops being absorbed by a displacement parameter, while Rwp barely moves
 
-**Referenced to:** physical plausibility, not a reference value — B(O) below 0.1 A^2 is a parameter pinned on a bound, and 0.2-1.2 is the range an oxide oxygen actually occupies.  Rwp is asserted only one-sided, because this is exactly a case where the fit statistic does not see the fix
+**Referenced to:** physical plausibility, not a measured value — B(O) below 0.1 A^2 is a parameter pinned on a bound, and 0.2-1.2 is the range an oxide oxygen actually occupies.  Rwp is asserted only one-sided, because this is exactly a case where the fit statistic does not see the fix
 
 **Measured:** B(O) 0.018 -> 0.432 A^2; 0.047 -> 0.456 on 1.9.0, before WP-2002's closing stage (#1085) and width twin hold (#1113)
 

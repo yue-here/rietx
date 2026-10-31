@@ -304,7 +304,7 @@ def test_the_file_esds_are_used_rather_than_poisson():
 
 # ------------------------------------------------------- measured answers ---
 def test_the_qpa_agrees_with_topas_within_its_own_esd(shared):
-    """Cross-code QPA — there is no weighing, so TOPAS is the only referent.
+    """Cross-code QPA — there is no weighing, so TOPAS is the only reference value.
 
     The bar is **this fit's own esd**, and the comparison is against TOPAS's
     two-model interval rather than a single number, because that interval is

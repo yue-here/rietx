@@ -2278,13 +2278,16 @@ def _standard_child(parent, parent_group, candidate: MagneticCandidate):
 
     The group is :func:`candidates`' operator list in the magnetic cell.  A
     generic displacement of the parent's atoms, symmetrised over that list, is
-    handed to spglib, whose standardisation gives the setting; the symbol's
-    operations are then checked to be the list, element for element, so a
-    wrong (P, p) cannot pass silently.
+    handed to spglib, whose standardisation gives the setting.  The setting is
+    then read by the one standardiser the package has, that of
+    :func:`~rietx.crystallography.representation.subgroups.maximal`: spglib's
+    matrix and origin are snapped to rationals and P⁻¹HP is checked to be the
+    symbol's operations exactly, in ``Fraction`` arithmetic, so a wrong (P, p)
+    cannot pass silently.
     """
-    import gemmi
     import spglib
 
+    from ..representation import subgroups as _subgroups
     from ..symmetry import _group_arrays, group_key, site_orbit
     from ..wyckoff import SPGLIB_REFUSALS
 
@@ -2347,45 +2350,33 @@ def _standard_child(parent, parent_group, candidate: MagneticCandidate):
     else:
         raise _ChildRefused(_refusal(candidate, draws, len(ops)))
 
-    hall = spglib.get_spacegroup_type(data.hall_number).hall_symbol
-    sg = gemmi.find_spacegroup_by_ops(gemmi.symops_from_hall(hall))
-    t_m = np.asarray(data.transformation_matrix, dtype=np.float64)
-    shift = np.asarray(data.origin_shift, dtype=np.float64)
-    t_inv = np.linalg.inv(t_m)
-    big = p_m @ t_inv
-    small = -big @ shift
-    big = np.array([[float(Fraction(v).limit_denominator(48)) for v in row] for row in big])
-    small = np.array([float(Fraction(v).limit_denominator(48)) % 1.0 for v in small])
+    # the setting is read exactly, by the standardiser of ``subgroups.maximal``:
+    # H, the candidate's colourless group in the magnetic cell, must be
+    # spglib's standard setting of the type under (P, p), operation for
+    # operation and lattice for lattice, in Fraction arithmetic
+    group = _subgroups._from_pairs((op.rotation, op.translation)
+                                   for op in candidate.group.all_operations())
+    index = round(len(rot_g) * abs(_operators._rational_determinant(candidate.cell.basis))
+                  / len(ops))
+    bound = max(_subgroups._PROBE_DENOMINATOR_FLOOR,
+                _subgroups._PROBE_DENOMINATOR_PER_INDEX * index)
+    basis = _fraction_matrix(candidate.cell.basis)
+    inverse = _fraction_matrix(_exact_inverse(candidate.cell.basis))
 
-    # every operation of the symbol, carried into the magnetic cell, is one of
-    # the candidate's, and the two lists hold the same number per unit volume
-    step = p_m_inv @ big  # columns: the standard cell's axes in magnetic fractions
-    origin = p_m_inv @ small
-    keyed = {(r.tobytes()): [] for r, _ in ops}
-    for r, t in ops:
-        keyed[r.tobytes()].append(t)
-    n_std = 0
-    for op in sg.operations():
-        n_std += 1
-        rot_s = np.array(op.rot, dtype=np.float64) / 24
-        tran_s = np.array(op.tran, dtype=np.float64) / 24
-        rot = step @ rot_s @ np.linalg.inv(step)
-        tran = step @ tran_s + origin - rot @ origin
-        rot_i = np.rint(rot).astype(np.int64)
-        found = np.max(np.abs(rot - rot_i)) < 1e-6 and any(
-            np.all(np.abs((tran - t) - np.rint(tran - t)) < 1e-6)
-            for t in keyed.get(rot_i.tobytes(), ()))
-        if not found:
-            raise RuntimeError(
-                f"{candidate.label}: the standard setting {sg.xhm()!r} under "
-                f"P = {big.tolist()}, p = {small.tolist()} holds an operation that is not "
-                "in the candidate's isotropy group; this is a bug")
-    if abs(n_std / abs(np.linalg.det(step)) - len(ops)) > 1e-6:
-        raise RuntimeError(
-            f"{candidate.label}: {sg.xhm()!r} holds {n_std} operations per standard cell "
-            f"and the isotropy group {len(ops)} per magnetic cell, which is "
-            f"{abs(np.linalg.det(step)):.4g} standard cells; this is a bug")
-    return sg.xhm(), big, small, metric_p
+    def in_the_parent_cell(p):  # the child's origin, its parent fractions reduced mod 1
+        p = [x - (x.numerator // x.denominator)
+             for x in (sum(basis[i][j] * p[j] for j in range(3)) for i in range(3))]
+        return tuple(sum(inverse[i][j] * p[j] for j in range(3)) for i in range(3))
+
+    try:
+        _, symbol, (big_m, small_m) = _subgroups._exact_setting(
+            group, data, _subgroups._I3, bound, in_the_parent_cell)
+    except RuntimeError as error:
+        raise RuntimeError(f"{candidate.label}: {error}") from None
+    big = np.array([[float(sum(basis[i][m] * big_m[m][j] for m in range(3)))
+                     for j in range(3)] for i in range(3)])
+    small = np.array([float(sum(basis[i][m] * small_m[m] for m in range(3))) for i in range(3)])
+    return symbol, big, small, metric_p
 
 
 def _child_phase(parent, symbol: str, big, metric_p, basis):

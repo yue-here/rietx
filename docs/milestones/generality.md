@@ -44,7 +44,8 @@ open; 2006 still confirms the reader codes row by row.
 
 ## The rule
 
-Every heuristic is sorted into one of three tiers, and each part of it separately: the
+Every heuristic is sorted into one of three tiers or into a class with no tier
+(`invariant`, `caller`, below), and each part of it separately: the
 statistic it computes, the threshold it tests against, and the action it takes. A statistic
 may be tier 2 while its threshold is tier 3 (ΔBIC: Schwarz 1978 and the Kass–Raftery bands
 are cited; the effective sample size N/f² is rietx's own). A threshold derived from another
@@ -61,8 +62,8 @@ inherits `rcond`'s tier, the 2 is tiered on its own evidence).
    on what a report lists, once a test shows the report is complete inside the cap and
    its notes count what lies outside it, or for a cap on distance the report states the
    distance (WP-2002's fifth round, Q6, 2026-10-21; confirmed in the sixth round, Q4).
-2. **Established practice.** Something a known code has already validated: a citation
-   that validated it, or the same choice made *by default* in an established Rietveld
+2. **Established practice.** Something the field has already settled: a citation that
+   tested it, or the same choice made *by default* in an established Rietveld
    program. The programs are the seven rietx-bench runs: GSAS-II, FullProf, TOPAS,
    RIETAN-FP, BGMN, MAUD and EasyDiffraction (widened from the first three on
    2026-10-21). A row resting on a program default names the programs it checked and what
@@ -83,10 +84,11 @@ inherits `rcond`'s tier, the 2 is tiered on its own evidence).
    - the mechanical ground: it holds across at least three unrelated dataset families,
      counted by laboratory, instrument and material rather than by file (a 1 213-record
      archive from one source is one family), with a stated case where it fails. *Holds*
-     is measured against each family's independent reference (DESIGN.md § Rules, 2). For
-     a number the reference is a certified or published value, which validates, or the
-     cross-code envelope, which only verifies. The row says which, and the action leaves
-     the number no further from it. For a flag it is a known truth
+     is measured against each family's reference (DESIGN.md § Rules, 2). For a number
+     the reference is a certified or independently measured value, which validates, or a
+     published refinement and the cross-code envelope under their protocol, which only
+     verify. The row says which, and whether the family is development data, and the
+     action leaves the number no further from it. For a flag it is a known truth
      (an injected misfit, a weighed impurity), and the flag fires where the fault is and
      stays silent where it is not; and
    - the judgement ground, answered by the implementing agent and approved by the
@@ -130,9 +132,9 @@ inherits `rcond`'s tier, the 2 is tiered on its own evidence).
    `evidence` naming the one family and the table row tiered `3` with grounds that say so,
    and the diagnostic's explanation names the families its threshold was measured on and
    says it is untested beyond them. That wording is kept apart from DESIGN.md § Rules,
-   2's *not yet validated*, which means a topic with no published reference; a threshold
-   checked against a certified value on one family is validated there and untested
-   elsewhere (ruled 2026-10-19). The row is re-tiered when a second and third family arrive. The whole field is in
+   2's *not yet validated*, which means a topic with no independent measurement; a threshold
+   checked against a certified value on one family is checked there, on development
+   data, and untested elsewhere (ruled 2026-10-19; wording narrowed 2026-10-27). The row is re-tiered when a second and third family arrive. The whole field is in
    scope (DESIGN.md § Why this package exists), so rare features will multiply. Chosen at
    the fourth review over demoting by construction, which would strip every rare feature
    of its one unanimous action; the maintainer may reverse it.
@@ -260,11 +262,12 @@ margin that makes it unanimous is a threshold the audit tiers (the maintainer,
 2026-10-18).
 
 **A moved golden** is DESIGN.md § Rules, 2's last sentence applied. A demotion that moves a
-pinned number has moved it for the right reason only if the new value is no further from the independent reference (a certified cell, a
-weighed composition, the cross-code envelope) than the old. Re-pinning records old, new,
+pinned number has moved it for the right reason only if the new value is no further from the reference (a certified cell, a
+weighed composition, or the cross-code envelope, which only verifies) than the old. Re-pinning records old, new,
 dataset and reference distance in the WP handover. A number that moved away from its
 reference is evidence the action mattered, and the item goes back through the two grounds.
-A pin with no independent reference (a report text golden, a bit-identity golden) is
+A pin whose reference value is rietx's own earlier output (a report text golden, a
+bit-identity golden) is
 re-pinned only where the ruling says the number should move, with the mechanism that moved
 it named in the handover, and is restored bit-identical where the ruling says it should not.
 
@@ -354,7 +357,7 @@ and the validation matrix already measures, so it runs whatever the gate decides
 session can check without asking what was intended. The session that opens each WP
 sharpens its own row here.
 
-- **Every verdict and every action has a tier** (2001–2007). The audit table names each
+- **Every verdict and every action has a tier or a class** (2001–2007). The audit table names each
   diagnostic code that carries a verdict, each automatic action and each threshold
   constant with its tier, its evidence and, for tier 3, the two grounds and the approval
   date. Each code and action row also states the kind of ambiguity DESIGN.md § Rules, 1
@@ -384,23 +387,43 @@ sharpens its own row here.
   outside the generated API files is vocabulary, or a trap naming a source outside
   rietx's runs; no row states a verdict the package no longer makes or a rule measured
   on rietx's own data; the total falls and the caps re-land at the new sizes.
-- **Every feature names what verifies it and what validates it** (2010). A feature with no
-  validating reference is declared not yet validated where a caller reads it, and a test
-  holds the feature list equal to the validation matrix and to the help vocabulary.
+- **Every feature names what verifies it and what validates it** (2010). The feature list
+  partitions the help vocabulary and the Theory headings both ways. Each feature names the
+  tests that verify it and, where one exists, the independent measurement that validates it,
+  with the measured mismatch, its domain and whether the data was development data; a
+  feature no test verifies is verified or fenced before the close; the prediction claims
+  referenced to the package's own arithmetic or another code (six to seven of nine, over
+  four features) are retiered as verification. The record is the validation matrix's and
+  its generated page, kept for
+  developers, and a result that reports a number from a topic with no independent
+  measurement says so in its report (ruled 2026-10-27).
 - **The rulebooks state Rule 1's three outcomes** (2001, 2009): act and record where every
   competent refiner would act, rank where the data can rank, otherwise report the number
   with its meaning; and the rule that rewards a firing code is rewritten.
-- **A held-out family moved no number away from its reference** (every audit, checked at
-  close). Families named at 2002's open and used as evidence by no audit; at
-  close the standards' acceptance protocol is run on them and every number with a
-  reference is no further from it than at the open. The one row that measures generality
+- **A sealed family moved no number away from its reference value** (every audit, checked
+  at close). The families are sealed in DESIGN.md § Rules, 2's sense: first run on the
+  tree at 2002's open, and nothing chosen or reworked on them before the close. At close
+  the same recipe runs again, and every number with a reference value is no further from
+  it than at the open. Each mismatch is reported in the quantity's units, with the
+  reference value's uncertainty and the fit's esd. The one row that measures generality
   rather than the audit (fourth review). Named at 2002's open (2026-10-19): the Nd₂Ru₂O₇
   pair (`tests/data/mg090*`, 11-BM X-ray and NCNR BT-1 neutron, a published joint
-  refinement), WP-2002 § The batch giving the reason. Added 2026-10-26 (#1052, decided by
-  the maintainer): Zr₆(BDC)₃(Fum)₃ on Diamond I11, HfIn on a lab Bragg–Brentano instrument
-  and CrCl₂(pyrimidine) on ILL D1B, each with a peer-reviewed refinement; the reporter runs
-  them, the open baseline on the tree at 2002's open commit. WP-2017 keeps them out of audit
-  evidence.
+  refinement), WP-2002 § The batch giving the reason. It is not sealed: it sits in seven
+  test files and carries three prediction claims (verification under the narrowed rule),
+  so it is development data. No audit cites it, so that its close run, like the sealed
+  families', measures drift from a published refinement on data the audits did not tune
+  on. Added 2026-10-26 (#1052, decided by the maintainer):
+  Zr₆(BDC)₃(Fum)₃ on Diamond I11, HfIn on a lab Bragg–Brentano instrument and
+  CrCl₂(pyrimidine) on ILL D1B, each with a peer-reviewed refinement of the same pattern.
+  Run under McCusker's plan rather than each paper's protocol, the comparison validates
+  nothing and measures drift from the published answer between the open and the close,
+  which is what this row asks. HfIn's EDX composition is the set's one independent
+  measurement. HfIn also sits in the reporter's own benchmarks, and it stays sealed while
+  no result on it is cited in a PR or steers a change before the close. The reporter ran
+  the open baseline on 2026-10-28 on `2df48c95e`, the code at 2002's open, with the recipe
+  fixed before the first fit. WP-2017 cites none of them; at the close they are spent and
+  become development data (ruled 2026-10-27, replacing the 2026-10-26 "out of audit
+  evidence for good").
 - **An agent given the number reaches the answer the verdict gave** (2004, 2008). For each
   demoted class the harness is run once (twice where the explanation is reworked),
   registered first and approved per session, and
@@ -483,7 +506,8 @@ reverse it knowing what it would be giving up.
   ranking or a number by its kind rather than always to a number. The expensive-rerun
   exception is Rule 1's four protections. *Holds* on the mechanical ground is measured
   against each family's reference (Rule 2), and a one-family threshold is declared not
-  yet validated. Four audit WPs (2002 to 2005) lost a skill task that sent a demoted
+  yet validated (reversed 2026-10-19 below: such a threshold is declared untested beyond
+  its families). Four audit WPs (2002 to 2005) lost a skill task that sent a demoted
   verdict's meaning into the skill, which the skill decision below had already reversed.
   The judge asks Rule 4's questions, and no longer whether a caller could see the action.
   The questions the rules left open went to the maintainer, who ruled on four the same
@@ -493,10 +517,9 @@ reverse it knowing what it would be giving up.
   three outcomes replace the preference order** "record field, then code, then action"
   in the rulebooks (2001, 2009): the order pointed a session away from acting where
   every competent refiner would act, which Rule 1's token clause says costs more than
-  the action. **Rule 2 became verification and validation** in the field's sense (Roache
-  1998; Oberkampf & Roy 2010), and a topic without a reference is *not yet validated*,
-  since `provisional` already means an API that may change (PEP 411). A reference code's
-  result on the same data verifies; it does not validate. **The milestone was renamed**
+  the action. **Rule 2 became verification and validation** in the field's sense; its
+  text is DESIGN.md § Rules, 2, narrowed on 2026-10-27 (the last bullet of this
+  section). **The milestone was renamed**
   from "pay for established heuristics, leave the reasoning to the caller", which
   restated the superseded first north star and contradicted Rule 1's first two kinds.
   Three more rulings followed. **A code whose threshold decided its existence becomes an
@@ -588,7 +611,7 @@ reverse it knowing what it would be giving up.
   sourced practice, as Rule 3 already did. Chosen over leaving the exception in this
   record alone. **A threshold measured on fewer than three families is declared untested
   beyond them**, and *not yet validated* stays Rule 2's term for a topic with no
-  reference. Chosen over one phrase for both, which would let a reader take "checked on
+  reference (since 2026-10-31, no claim against an independent measurement). Chosen over one phrase for both, which would let a reader take "checked on
   one dataset" for "no reference exists". **A poor agent result reworks the explanation
   and does not hold a demotion back** (§ The rule). Chosen over a block until agents
   recover, which would keep a verdict that failed its tests steering agents, on a harness
@@ -649,6 +672,34 @@ reverse it knowing what it would be giving up.
   for 285 codes and eight purposes nobody writes by hand. The softening of unanimity for a
   recorded, cheap-to-undo default was deferred to its own brief, WP-2038: it reopens the
   fourth review for a reason unrelated to attention.
+- **Rule 2 narrowed to the book's meaning, and the validation record is for the
+  developers** (2026-10-27, the maintainer, in session; WP-2010 § Context has the
+  measurements). Agreement with another code or a published refinement of the same
+  pattern verifies; validation needs an independent measurement and reports the mismatch
+  in the quantity's units with the measurement's uncertainty and the fit's esd over a
+  stated domain, saying whether the data is development data; a dataset is unused,
+  development data or sealed, and a sealed family is spent into development data at the
+  close, which replaces the 2026-10-26 "out of audit evidence for good" on #1052. The
+  wording followed on 2026-10-31 (the maintainer, in session): "independent measurement"
+  and "reference value" replace "referent", which had carried both meanings, and the
+  unused state closes the gap a dataset nobody has run fell into. The
+  maintainer's ground for the second half: which feature to use follows from the sample
+  and the data by the agent's own reasoning, and whether the package has validated the
+  feature should not move that choice. So no surface an agent reads to choose a feature
+  carries a verdict, the GUI help field waits, no harness round measures the label, and
+  a result that reports a number from a topic with no independent measurement says so once in its
+  report, the one place the fact reaches a reader of results. Chosen over the earlier
+  proposal of three verdict words (not yet validated, validated on development data,
+  validated blind) shown wherever a caller reads a feature, and over leaving Rule 2's
+  word wider than its cited source. Measured behind it, by a hand reading of the audit
+  table's evidence text: of 66 rows citing an acceptance dataset, 11 were selected on
+  development data in Rule 2's sense, 3 of those by whether a number moved toward its
+  reference value, all three on the CPD round robin's weighed compositions, so the
+  development-data risk is real and narrow; a physics feature carries at most one tier-3
+  number (rietx's own, unsourced) on its path, the background picker 13 and the staged
+  plan 15. Reversed on a user's or a handover's report that the report sentence is
+  ignored or misread, in which case the record stays for the handovers and the sentence
+  goes.
 
 ## The two reviews at the open
 
