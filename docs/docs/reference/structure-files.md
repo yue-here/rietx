@@ -439,4 +439,13 @@ Every other magnetic phase is refused by name, naming the phase and the reason:
 `rietx.io.projects.fullprof.magnetic_reading(model, phase)` asks before building.
 It returns the reading (the counterpart, the operations and the moments) for a phase that maps, and the refusal's reason as a string for one that does not.
 `to_structure(model, nuclear_only=True)` omits every magnetic phase, and reports each as [`FULLPROF_MAGNETIC_PHASE_OMITTED`](diagnostics-projects.md#fullprof_magnetic_phase_omitted) on the `diagnostics=` list.
+
+A `Jbt = 10` phase (`Jbt = -10` for the moment as M, φ, θ) holds the nuclear and the magnetic structure in one block: every site's nuclear columns, and a moment line on the sites with `N_t = 1`.
+It is read as the `Jbt = 0` phase and the `Jbt = ±1` phase it combines, under every condition above, and builds as one phase carrying its own moments.
+FullProf generates such a phase's reflections from its symbol and computes its structure factor from its SYMM list, so the built phase's space group is the group the SYMM operators form.
+Three more conditions come from running FullProf 8.20 on these files, and each is refused by name when it fails:
+
+- the symbol extinguishes no reflection its lattice allows (FullProf's own examples write `P -1` or `I -1` over the full operator list), because FullProf drops a magnetic reflection the symbol forbids;
+- no propagation vector is given, not even k = 0, because FullProf then computes no magnetic part on the fundamental reflections;
+- a moment line is under `N_t = 1`, which is how FullProf reads the spherical form under `Jbt = -10`, though its manual names `N_t = -1`.
 `write_fullprof_pcr` refuses a magnetic phase.

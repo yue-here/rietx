@@ -593,6 +593,16 @@ ROWS: tuple[Row, ...] = (
                   "check whatever trades against it before quoting an ADP, an occupancy or "
                   "a scale")),
     Row("FROZEN_COMPILE_STALE", "code"),
+    Row("FULLPROF_LIMITS_NOT_APPLIED", "code", tier=1, ambiguity=1,
+        evidence=("info; a record of what a read did not carry: the file's Nre count "
+                  "declares LINE-47 hard limits (FullProf manual p. 126, NUMPAR "
+                  "LowLIMIT HighLIMIT), which the reader reads onto "
+                  "FullProfModel.parameter_limits and applies to no bound; fires "
+                  "exactly when Nre > 0 and diagnostics= is passed; acts on nothing"),
+        response="info",
+        responds=("decide per limit whether the parameter it names should be held "
+                  "inside it, and set that Parameter's min and max if so"),
+        scope=("all",)),
     Row("FULLPROF_MAGNETIC_PHASE_OMITTED", "code"),
     Row("FULLPROF_MAGNETIC_PHASE_READ", "code"),
     Row("FULLPROF_OCCUPANCY_UNCHECKED", "code"),
@@ -3995,7 +4005,7 @@ ROWS: tuple[Row, ...] = (
     Row("EXTRA_PEAK_ON_REFLECTION.suggestion", "suggestion", value=1),
     Row("FLAT_DIRECTION.suggestion", "suggestion", value=1),
     Row("FLOOR_HIT.suggestion", "suggestion", value=1),
-    Row("FULLPROF_MAGNETIC_PHASE_OMITTED.suggestion", "suggestion", value=1),
+    Row("FULLPROF_MAGNETIC_PHASE_OMITTED.suggestion", "suggestion", value=2),
     Row("FULLPROF_MAGNETIC_PHASE_READ.suggestion", "suggestion", value=1),
     Row("FULLPROF_OCCUPANCY_UNCHECKED.suggestion", "suggestion", value=1),
     Row("FULLPROF_TIE_DROPPED.suggestion", "suggestion", value=3),
