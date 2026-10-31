@@ -244,6 +244,30 @@ engine or the ranking. Indexing is provisional by declaration
   test may claim, not its null). Split alone also corrects the message's
   number, which g leaves as it is.
 
+- 2026-10-31, from the issue triage (issue #1267): under `preset="quick"`, at
+  one commit (`e016f187d`) with fixed seeds and synthetic inputs,
+  `fom_panel_disagrees` (and the truth's grade it lowers, medium → low) on the
+  tP c/a 1.01 negative arm fired in 3 of 3 runs with six busy loops on the
+  machine and stayed quiet unloaded. Every run took 108-115 s and returned 12
+  candidates, so the 120 s ceiling bound each time; the distinct-class count
+  among the candidates moved 9 (quiet) → 11-12 (loaded). Under a 4× ceiling
+  (`total_budget_seconds=480`) all three runs were quiet. This is the
+  measurement behind the reporter's addendum on #916, which withdrew their
+  earlier "the flag moves with the commit". Checked against the tree at
+  d87c8cc91: `quick` fills `QUICK_TOTAL_BUDGET_SECONDS` = 120 s (`engines.py`)
+  when the caller leaves the ceiling `None`, the search stops
+  `VALIDATION_RESERVE_FRACTION` (0.15) early, validation runs cheapest first
+  and stops at the first cancelled fit (`workflow.py:1083-1114`), and
+  `fom_panel_disagrees` is computed from the panel winners of whatever was
+  ranked (`consensus.py`). So the mechanism the reporter proposes (the clock
+  reaches different units and fits under load) is consistent with the code; it
+  was not instrumented, and not re-run here. Consequence for this WP's open
+  task "Revisit `fom_panel_disagrees` only on the same arms": run that revisit
+  under `preset="full"` or a declared ceiling long enough that no arm binds,
+  or its readings move with machine load. Whether `quick` should become
+  reproducible for a given input (budget by work units, or a deterministic
+  cut) is a change to WP-1042's ruled design and is the maintainer's.
+
 ## Non-goals
 
 - The blind search and enumeration ceilings (WP-1924), dedup across a reduction
