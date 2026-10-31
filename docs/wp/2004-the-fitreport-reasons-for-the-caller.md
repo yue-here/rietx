@@ -117,6 +117,14 @@ open under the same track; neither tiers a gate.
   per pattern) and agrees with 2003's B9 ruling that none should be a default:
   each either misses the case or clips a real 2-3 nm phase.
 
+- 2026-10-31, from the issue triage (issue #1215): the issue asks for no
+  change to `too_stiff` beyond printing the analytic null beside the
+  off-region pair (text only, carried by the new residual-structure WP). It
+  measured `too_stiff` silent on a hump of 0.1, 0.3 and 0.6 × mean background
+  and firing at 1.2 × on a synthetic capillary family, where the fitted
+  background's bulge above its own hull read 2.3 / 9.8 / 41 / 82 %. Not re-run
+  here.
+
 ## Non-goals
 
 - The holds the rival fits run: 2002.
