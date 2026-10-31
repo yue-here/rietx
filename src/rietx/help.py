@@ -1744,6 +1744,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "claims, and the phase needs a space group that leaves this angle free."
         ),
     ),
+    "CIF_EMPTY_BLOCK_SKIPPED": HelpEntry(
+        title="Data blocks that state nothing were skipped",
+        description=(
+            "The file holds more than one data block, and the structure was read "
+            "from the only one with atom sites. Every other block has no tags, or "
+            "only _audit_ tags, which record how the file was made and state no "
+            "cell, site or symmetry, such as an empty block a writer puts "
+            "ahead of the structure. The message names each "
+            "block skipped. Nothing is to be done. A file with two blocks holding "
+            "atom sites, or one beside a block stating anything else, is refused, "
+            "naming the blocks."
+        ),
+    ),
     "CIF_MAGNETIC_CENTERING_ASSUMED": HelpEntry(
         title="Magnetic centring loop missing",
         description=(

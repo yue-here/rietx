@@ -538,6 +538,20 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("CHILD_GROUP_UNNAMED", "code"),
     Row("CIF_CELL_ANGLE_CORRECTED", "code"),
+    Row("CIF_EMPTY_BLOCK_SKIPPED", "code", tier=1, ambiguity=1,
+        evidence=("a reading rule from the format's definition: cif_core.dic 3.3.0 files the "
+                  "AUDIT category and its children under PUBLICATION, recording the data "
+                  "block's creation and updating and stating no cell, site or symmetry, so a "
+                  "block with no tags or only _audit_ tags carries no structure and the one "
+                  "block with atom sites is the file's structure; fires exactly when such "
+                  "blocks were skipped and names each (issue #1063, item 1)"),
+        grounds=("Unanimity: every competent refiner reads the one block that holds the "
+                 "structure when the others state nothing; the dissenting case, two blocks "
+                 "with atom sites or one beside a block stating anything beyond _audit_ "
+                 "items, is refused naming the blocks, never chosen between."),
+        response="info",
+        responds=("note that the structure was read from the one block with atom sites and "
+                  "which blocks, stating nothing, were skipped")),
     Row("CIF_MAGNETIC_CENTERING_ASSUMED", "code"),
     Row("CIF_MAGNETIC_ION_UNCHARGED", "code"),
     Row("CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED", "code"),
