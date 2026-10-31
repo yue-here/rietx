@@ -88,6 +88,35 @@ open under the same track; neither tiers a gate.
 
 - **From WP-2002 (2026-10-19, PR #1050).** 2002's batch class B13 proposes handing 15 rows to this WP, pending the maintainer's ruling: seven `background.diagnostics` constants that feed `diagnose()`'s fields and no code (`COVERAGE_*`, `CUTOFF_*` except `CUTOFF_MIN_DEG`), the four `optimize.identifiability` report caps, `refine.MAGNETIC_TICK_PURITY` (its comment at `refine.py` ~768 disagrees with its code at ~7020), and `optimize.statistics.EFFECTIVE_OBS_ALPHA`, `OBS_PER_PARAMETER_MIN` and `OBS_PER_PARAMETER_PREFERRED`. The table: `2002-batch/batch.md` § The B13 hand-off table.
 
+- 2026-10-31, from the issue triage (issue #1212): the width-growth record
+  field C7 asks for has the blind spot of the code it replaces. On a synthetic
+  chain where a vanishing minor phase broadens into an unmodelled broad
+  component (LaB6 plus a cubic perovskite whose lines sit within 0.3 % of
+  LaB6's, the issue's script), its `lor_strain` grows from 0.041(7) to
+  4.53(2.29), 110×, while GoF rises 1.00 → 2.98 and its fraction climbs to
+  18.8 wt % against a truth of 0. `SEQUENTIAL_WIDTH_GROWTH` stays silent
+  because the growth test asks for more than 3 combined esds (4.49 < 3 ×
+  2.29), and a runaway width is a flat direction whose esd grows with it. A
+  slightly weaker phase at the start also fails the reference test (value >
+  3σ), and the trajectory is then not judged at all. Checked against the tree
+  at d87c8cc91 (`[dev]`, macOS arm64): the issue's script reproduces its table
+  to the printed digits, and the series codes are
+  `SEQUENTIAL_PERSISTENT_FINDING`, `SEQUENTIAL_RESEED`,
+  `SEQUENTIAL_RWP_OUTLIER`, with no width-growth finding. Both tests are in
+  `sequential._width_growth_diagnostics` (~line 2671: the reference's
+  `value[k] > WIDTH_GROWTH_SIGMA * sd[k]`, the growth's `grown >
+  WIDTH_GROWTH_SIGMA * combined`). The issue proposes, for this WP's field:
+  take the reference as the first finite positive width and record whether it
+  was measured, rather than skipping an unmeasured one; carry the width ratio
+  and the GoF ratio as the primary columns, and the growth in esds as a
+  secondary column with the note that a runaway width's esd grows with it. It
+  reports that WP-1465's survey has no existing series pass GoF 1.14 against
+  its first pattern, so relaxing the reference should move nothing on the
+  suite; that needs a re-count on the tree. It also measured three default
+  width bounds (physical limits, the flag thresholds as bounds, a ±10 % band
+  per pattern) and agrees with 2003's B9 ruling that none should be a default:
+  each either misses the case or clips a real 2-3 nm phase.
+
 ## Non-goals
 
 - The holds the rival fits run: 2002.
