@@ -651,8 +651,9 @@ class RestraintRow(Base):
     """
 
     phase_index: int | None = None
-    kind: Literal["bond", "angle", "value", "tether", "anti_bump", "planarity"]
-    atoms: list[int] | None = None                  # bond (2) / angle (3) indices
+    kind: Literal["bond", "angle", "value", "tether", "anti_bump", "planarity",
+                  "torsion"]
+    atoms: list[int] | None = None                  # bond (2) / angle (3) / torsion (4) indices
     path: str | None = None                         # value-restraint dot-path
     computed: float                                 # Å (bond), deg (angle), or value
     target: float
@@ -681,6 +682,11 @@ class RestraintReport(Base):
     restraint_chi2: float
     n_restraints: int
     weight_scale: float = 1.0
+
+
+#: An atom named in a :class:`GeometryRequest` entry: its label, or its label
+#: and the CIF ``n_klm`` code of the image wanted (WP-1815).
+AtomRef = str | tuple[str, str]
 
 
 class GeometryDistance(Base):
@@ -758,6 +764,67 @@ class GeometryAngle(Base):
     symmetry_3: str | None = "."
 
 
+class GeometryTorsion(Base):
+    """One torsion angle A–B–C–D, in degrees (WP-1815).
+
+    Klyne and Prelog's sign (1960, *Experientia* 16, 521), as cif_core's
+    ``_geom_torsion.angle`` states it: looking along B → C, the angle is
+    positive when the bond B–A turns clockwise, by less than 180°, to eclipse
+    C–D.  The range is (−180°, 180°], so an anti chain reads 180, never −180.
+    Each atom carries the CIF ``n_klm`` code of its image (``None`` past
+    :data:`~rietx.model.geometry.SYMMETRY_CODE_MAX_SHIFT`), and indices into
+    ``structure.phases[phase_index].atoms`` as :class:`GeometryDistance`
+    does.
+
+    esd conventions are :class:`GeometryDistance`'s exactly: ``stderr`` is
+    J·Cov·Jᵀ through the whole covariance with ∂φ/∂p analytic through atan2,
+    exact at 0° and 180°; ``stderr_diagonal`` drops the refined parameters'
+    correlations; both are ``None`` where nothing the angle depends on was
+    refined, where symmetry or a rigid body's template holds it fixed (its
+    variance cancels to roundoff), where a source measured nothing, or where
+    no covariance was estimated.
+    """
+
+    phase_index: int
+    atom_1: str
+    atom_2: str
+    atom_3: str
+    atom_4: str
+    atom_index_1: int
+    atom_index_2: int
+    atom_index_3: int
+    atom_index_4: int
+    angle: float                      # degrees, (−180, 180]
+    stderr: float | None = None
+    stderr_diagonal: float | None = None
+    symmetry_1: str | None = "."
+    symmetry_2: str | None = "."
+    symmetry_3: str | None = "."
+    symmetry_4: str | None = "."
+
+
+class GeometryRequest(Base):
+    """Particular distances, angles and torsions to measure (WP-1815).
+
+    The input of :meth:`~rietx.Refinement.geometry`.  Each entry names its
+    atoms in chain order, by label (``"C1"``) or by label and CIF symmetry
+    code (``("C1", "2_655")``, an operation of the space group's listed order
+    and a lattice shift, as :class:`GeometryDistance` codes its images).  An
+    atom given by label alone sits at the image nearest the atom it is
+    measured from, which is the chain's previous atom for a distance or a
+    torsion and the vertex for an angle's two arms.  The first atom of a
+    distance or a torsion and the vertex of an angle sit where they are
+    stored unless a code is given.  ``phase_index`` says which phase the
+    labels belong to.
+    """
+
+    phase_index: int = 0
+    distances: list[tuple[AtomRef, AtomRef]] = Field(default_factory=list)
+    angles: list[tuple[AtomRef, AtomRef, AtomRef]] = Field(default_factory=list)
+    torsions: list[tuple[AtomRef, AtomRef, AtomRef, AtomRef]] = Field(
+        default_factory=list)
+
+
 class CellVolume(Base):
     """One phase's unit-cell volume in Å³, with its esd (WP-1933).
 
@@ -790,12 +857,21 @@ class GeometryTable(Base):
     Present for Rietveld fits with atoms; ``None`` in Le Bail and Pawley mode,
     where the dummy atom the mode requires is not a structure.  ``notes``
     records every place coverage was bounded — a per-atom contact cap, a phase
-    too large to search — because a table that silently stopped early reads
+    too large to search, a torsion cap, a chain with a straight bond angle
+    and so no torsion — because a table that silently stopped early reads
     exactly like one that found nothing more.
+
+    ``torsions`` (WP-1815) lists every torsion A–B–C–D over bonded chains
+    (A–B, B–C and C–D each a bond of this table), once per chain and not
+    again reversed, up to :data:`~rietx.model.geometry.MAX_TORSIONS_PER_ATOM`
+    about each asymmetric-unit atom.  The central bond's first atom B sits at its published
+    position.  An older document carries none and reads as an empty list,
+    which here means "not listed", not "no torsions".
     """
 
     distances: list[GeometryDistance] = Field(default_factory=list)
     angles: list[GeometryAngle] = Field(default_factory=list)
+    torsions: list[GeometryTorsion] = Field(default_factory=list)
     #: the listing criteria actually used, so a row can be read without
     #: knowing which version of the module produced it
     bond_slack: float = 0.0           # Å, added to the covalent-radius sum

@@ -139,3 +139,13 @@ calibrated pattern's wavelength, free the other's
 `WAVELENGTH_CALIBRATION` on `result.histograms[1].diagnostics`. (Measured:
 WP-1986, synthetic corundum, `examples/guides/joint.py`: +297.3 ppm recovered,
 5.1 ppm a esd.)
+
+**Ask for a torsion before you change the model.** `result.geometry.torsions`
+holds the torsion angles over bonded chains, Klyne-Prelog's sign in
+(−180°, 180°], at most 36 about each atom (`notes` counts the rest). For a row
+the table left out, call `ref.geometry({"torsions": [["C1", "C2", "C3",
+"C4"]], "distances": [["O1", ("N2", "2_555")]]})`: a label alone takes the
+image nearest the atom before it, and `(label, "n_klm")` names one. Its esds
+come from the last fit's covariance, which an edit or a checkout drops, after
+which every esd is `None`. (Measured: WP-1815, the published torsion loops of a
+TOPAS-6 and a SHELXL refinement reproduced to their printed digits.)

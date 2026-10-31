@@ -194,6 +194,7 @@ Kessler
 Kirfel
 Kissel
 Kleeberg
+Klyne
 Kovalev
 Landé
 Langford
@@ -208,6 +209,7 @@ Maxwellian
 Olds
 Pawley
 Pitschke
+Prelog
 Rachinger
 Raftery
 Rez

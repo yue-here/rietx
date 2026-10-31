@@ -168,6 +168,7 @@ Kirfel
 Kissel
 [kK]lassengleiche
 Kleeberg
+Klyne
 Kovalev
 Landé
 Langford
@@ -255,6 +256,7 @@ Pitschke
 [pP]ositivity
 [pP]recisions
 [pP]refactor
+Prelog
 [pP]rm
 [pP]rojective
 [pP]seudoreal

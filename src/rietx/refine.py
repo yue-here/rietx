@@ -154,6 +154,8 @@ from .schemas.plan import (
 from .schemas.results import (
     DELIVERABLES,
     AbsorptionCorrection,
+    GeometryRequest,
+    GeometryTable,
     Identifiability,
     PhaseAgreement,
     PhaseTexture,
@@ -6402,6 +6404,55 @@ class Refinement:
     # ------------------------------------------------------------------
     # exporters (WP-0309): reflection table, refinement CIF, QPA table
     # ------------------------------------------------------------------
+    def geometry(self, request: GeometryRequest | dict | None = None
+                 ) -> GeometryTable | None:
+        """Distances, angles and torsions with esds, or the ones ``request`` names.
+
+        With no ``request``, the whole bonding table
+        (:func:`~rietx.model.geometry.geometry_table`): bonds, contacts, angles
+        and torsions over bonded chains, the one ``result_.geometry`` carries.
+        With a :class:`~rietx.schemas.results.GeometryRequest` (or a dict
+        validated as one), only the distances, angles and torsions it names,
+        each atom by label or by label and CIF symmetry code — so a chain the
+        table's caps left out, a contact past its radius or a torsion over
+        atoms that are not bonded is measured on demand (WP-1815).
+
+        **Answered while the last fit's covariance is live.**  After
+        :meth:`fit` or :meth:`run_stage`, the values are that answer's and the
+        esds are J·Cov·Jᵀ through its covariance — the one its parameter esds
+        were read off, the Bérar-Lelann factor already in it, so nothing here
+        multiplies again and a row the table lists carries the numbers
+        ``result_.geometry`` does.  The covariance is never serialized, so with
+        no live fit (before one, after an edit, a checkout or a replay) the
+        values are the current model's and every esd is ``None``.  ``None`` in
+        Le Bail and Pawley mode and with no phase, as for the table.
+        """
+        from .crystallography.structure_factor import compile_phase_sites
+        from .model.geometry import geometry_from_sites, request_table
+
+        live = self._answer_covariance
+        if (live is not None and self._model is not None
+                and live[0] is self.result_ and self._answer is not None):
+            if self._model.mode != "rietveld" or not self._model.phases:
+                return None
+            _result, table, theta, stderr_internal, correlation = live
+            structure = self._answer["structure"]
+            sites_of = [cp.sites for cp in self._model.phases]
+        else:
+            if self._mode != "rietveld" or not self.structure.phases:
+                return None
+            structure = self.structure
+            table = ParameterTable(structure, self.instrument)
+            theta, stderr_internal, correlation = table.x0(), None, None
+            sites_of = [compile_phase_sites(p) for p in structure.phases]
+        if request is None:
+            return geometry_from_sites(sites_of, table, theta, structure,
+                                       stderr_internal=stderr_internal,
+                                       correlation=correlation)
+        return request_table(request, sites_of, table, theta, structure,
+                             stderr_internal=stderr_internal,
+                             correlation=correlation)
+
     def reflection_table(self) -> list["ReflectionRow"]:
         """Every (emission line, reflection) of the last fit as typed rows.
 

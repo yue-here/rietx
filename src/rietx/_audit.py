@@ -2297,11 +2297,27 @@ ROWS: tuple[Row, ...] = (
                   "never dropped (31 on corundum with the cap at 2, "
                   "tests/test_geometry_table.py); tests/data's structures reach 20 a site "
                   "(WP-2002)")),
+    Row("rietx.model.geometry.MAX_TORSIONS_PER_ATOM", "constant", tier=1, value=36,
+        evidence=("report scope (tier 1's cap clause, ruled 2026-10-21): the note counts "
+                  "exactly what the cap drops, the kept torsions are each atom's first in "
+                  "chain order and each carries the esd it has uncapped (fluorapatite at a "
+                  "cap of 5, tests/test_geometry_torsions.py), and Refinement.geometry"
+                  "(request=) answers any chain by name. 36 = 4 bonds x (4-1) x (4-1), so "
+                  "every chain of a molecule whose atoms have at most four bonds is listed "
+                  "whole: the five molecular structures in tests/data never reach it, while "
+                  "LaB6 (La with 24 B) has 4 374 chains (WP-1815)")),
     Row("rietx.model.geometry.SYMMETRY_CODE_MAX_SHIFT", "constant", tier=1, value=4,
         evidence="format: CIF symmetry code digit = shift + 5, so -4..+4 (docstring)"),
     Row("rietx.model.geometry.VARIANCE_CANCELLATION_FLOOR", "constant", tier=1, value=1e-12,
         evidence=("numerical floor: about 4.5e3 x fp64 eps, five orders below the smallest powder "
                   "esd (docstring); stops 90.00000000000(43)")),
+    Row("rietx.model.geometry._KEY_OFFSET", "constant", tier=1, value=0.41421356237309515,
+        evidence=("numerical setting with a domain test: where a 1e-4-cell position key puts "
+                  "its boundaries; any offset leaves distinct atoms (>0.5 A apart) with distinct "
+                  "keys, and an irrational one keeps every decimal CIF coordinate and its "
+                  "images off a boundary. Rounding to the nearest 1e-4 put LaMnO3's 0.48775 on a "
+                  "tie and listed 20 of 298 chains twice; tests/test_geometry_torsions.py checks "
+                  "no reversal is listed, by positions to 1e-6 (WP-1815)")),
     Row("rietx.model.geometry._COINCIDENT_D2", "constant", tier=1, value=1e-06,
         evidence=("numerical floor: any value between roundoff and the shortest real interatomic "
                   "d^2 (>0.1 A^2) gives the same lists")),
@@ -2471,6 +2487,11 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.model.restraints._COS_CLAMP", "constant", tier=1, value=0.999999999,
         evidence=("numerical floor: affects only angles within 0.0026 deg of 0 or 180, which are "
                   "unsupported restraint targets; value chosen, not sqrt(eps)")),
+    Row("rietx.model.restraints._TORSION_SIN2_FLOOR", "constant", tier=1,
+        value=1.999999943436137e-09,
+        evidence=("derived: 1 - _COS_CLAMP**2, the sin^2 of the bond angle at the clamp "
+                  "restraints already applies, with no free factor; a chain bent less than "
+                  "that has no torsion (WP-1815)")),
     Row("rietx.model.restraints._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: pi/180"),
     Row("rietx.model.restraints._SAME_CONTACT_A", "constant", tier=1, value=1e-06,

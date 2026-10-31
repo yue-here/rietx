@@ -1,6 +1,6 @@
 # Derived quantities
 
-This page gives the quantities a fit computes from its refined parameters: interatomic distances and angles, each phase's cell volume, and each phase's crystallite size and microstrain in physical units, each with its esd.
+This page gives the quantities a fit computes from its refined parameters: interatomic distances, angles and torsion angles, each phase's cell volume, and each phase's crystallite size and microstrain in physical units, each with its esd.
 
 All three are fields of the `RefinementResult` a fit returns.
 [The refinement result](result.md) gives the rest of the result.
@@ -11,13 +11,14 @@ Each esd is propagated through the parameter covariance, as [Esds of derived qua
 
 The IUCr guidelines rank the distances and angles above every R value.
 The two most important criteria for judging a refinement are the profile fit and the chemical sense of the structure {cite}`mccusker1999`.
-`RefinementResult.geometry` is a `GeometryTable` that carries the distances and angles.
+`RefinementResult.geometry` is a `GeometryTable` that carries the distances, angles and torsion angles.
 
 | Field | Is | Reads as |
 |---|---|---|
 | `GeometryTable.distances` | one `GeometryDistance` per neighbour | every asymmetric-unit atom's whole environment, so the rows naming an atom count its coordination number and a bond between two sites is listed twice, once from each end |
 | `GeometryTable.bonds`, `GeometryTable.contacts` | the two halves of that list | split by `GeometryDistance.bonded` |
 | `GeometryTable.angles` | one `GeometryAngle` per pair of bonded neighbours | at every vertex, over that vertex's complete bonded environment; a contact is never an arm |
+| `GeometryTable.torsions` | one `GeometryTorsion` per chain A–B–C–D of three bonds | each torsion once, never again read from its other end |
 | `GeometryTable.bond_slack` | the slack added to the covalent-radius sum, in Å | 0.4 Å |
 | `GeometryTable.contact_max` | the listing radius for non-bonded contacts, in Å; bonds are found past it | 3.5 Å |
 | `GeometryTable.notes` | where coverage stopped | empty means nothing was bounded |
@@ -28,8 +29,10 @@ Past the slack a pair is still listed, as a contact, out to `GeometryTable.conta
 The guidelines ask for both kinds: "interatomic distances (both bonding and nonbonding) should be reasonable" {cite}`mccusker1999`.
 The slack and the search radius are conventions rather than physical constants, and the table records the values it used.
 
-Two limits write a note.
+Four limits write a note.
 Each atom keeps its 24 nearest contacts, and a note counts the contacts the cap dropped.
+Each atom keeps 36 torsions about the bonds it starts, and a note counts the torsions that cap dropped.
+A chain with a straight bond angle has no torsion, and a note counts those chains.
 A phase with more than 200 asymmetric-unit atoms is not searched, and a note names it.
 
 A row's value is `GeometryDistance.distance` in ångströms, or `GeometryAngle.angle` in degrees.
@@ -44,6 +47,58 @@ The code holds a lattice shift of −4 to +4 along each axis, and an image that 
 The distance and its esd are unaffected.
 `GeometryDistance.symmetry_1` is always `.`, the published position.
 So is `GeometryAngle.symmetry_2`, the vertex, while `GeometryAngle.symmetry_1` and `GeometryAngle.symmetry_3` code the two arms.
+
+### Torsion angles
+
+A `GeometryTorsion` is the torsion angle of a chain A–B–C–D whose three links are bonds of the table.
+`GeometryTorsion.angle` is in degrees, in the range (−180°, 180°], so an anti chain reads 180 and never −180.
+Its sign is Klyne and Prelog's, the one the CIF dictionary states for `_geom_torsion`: looking along B → C, the angle is positive when the bond B–A turns clockwise, by less than 180°, to eclipse C–D {cite}`klyne1960`.
+Equation {eq}`par-torsion-restraint` gives the angle.
+`GeometryTorsion.atom_1`, `GeometryTorsion.atom_2`, `GeometryTorsion.atom_3` and `GeometryTorsion.atom_4` are the labels in chain order.
+`GeometryTorsion.atom_index_1`, `GeometryTorsion.atom_index_2`, `GeometryTorsion.atom_index_3` and `GeometryTorsion.atom_index_4` are the indices into `Phase.atoms`.
+`GeometryTorsion.phase_index` says which phase.
+`GeometryTorsion.symmetry_1`, `GeometryTorsion.symmetry_3` and `GeometryTorsion.symmetry_4` code the images of A, C and D as a distance's codes do.
+B sits at its published position in the table, so its `GeometryTorsion.symmetry_2` is `.`.
+The esds, `GeometryTorsion.stderr` and `GeometryTorsion.stderr_diagonal`, follow the distances' conventions.
+Their partials are analytic, so a torsion at exactly 180° has a finite esd.
+
+Torsions are listed about each asymmetric-unit atom B in turn, over its bonds B–C nearest first, then A and D nearest first.
+The 36 kept about one atom are every chain a molecule of atoms with at most four bonds has, so a molecular structure is listed whole.
+A densely bonded inorganic phase reaches the cap: in LaB₆ the La has 24 bonded B and 4 374 chains.
+The cap changes which rows are listed, never an esd.
+
+### Asking for particular rows
+
+`Refinement.geometry()` returns the same table.
+`Refinement.geometry(request)` returns only the rows a `GeometryRequest` names, so a torsion past the cap, a contact past the listing radius, or a torsion over atoms that are not bonded can be measured too.
+A plain dictionary with the same fields is accepted in place of the object.
+
+| Field | Is |
+|---|---|
+| `GeometryRequest.distances` | pairs of atoms |
+| `GeometryRequest.angles` | triples of atoms, the vertex in the middle |
+| `GeometryRequest.torsions` | chains of four atoms |
+| `GeometryRequest.phase_index` | which phase the labels name; 0 by default |
+
+Each atom is its label, such as `"C1"`, or its label and a CIF symmetry code, such as `("C1", "2_655")`.
+An atom given by its label alone sits at the image nearest the atom it is measured from.
+That is the previous atom of a distance or a torsion, and the vertex for an angle's two arms.
+The first atom of a distance or a torsion, and an angle's vertex, sit at their published positions unless a code says otherwise.
+Each row in the answer names the image it used, so the codes it prints reproduce it.
+A torsion whose chain has a straight bond angle has none, and the answer's notes say so.
+An unknown label, or a code that is not of the form `n_klm`, raises.
+
+<!-- api-doc: no-exec — it needs a refinement of a structure with these labels that has run -->
+```python
+got = ref.geometry({"torsions": [["C2", "C3", "C4", "C5"]],
+                    "distances": [["O1", ("N2", "2_555")]]})
+got.torsions[0].angle, got.torsions[0].stderr
+```
+
+The answer has esds while the last fit's covariance is still live, which is from the end of `Refinement.fit` or `Refinement.run_stage` to the next edit.
+The esds come from the covariance the fit's parameter esds were read off, with the Bérar-Lelann factor already in it, so a row the table lists carries the same numbers in both.
+With no live fit, before one, after an edit or a checkout, the values are the current model's and every esd is `None`.
+The verb returns `None` in Le Bail and Pawley mode, as the result does.
 
 A distance prints on one line, such as `Ca1–O5  2.3898(50) Å  5_565` from the fluorapatite tutorial fit.
 
@@ -85,13 +140,14 @@ The guideline is about correlation between coordinates, so a table quoted from a
 
 An esd is `None` when it cannot be measured.
 That is an absence, and it never means σ = 0.
-Four routes lead there:
+Four routes lead there, for a torsion as for a distance:
 
 - The result has no covariance behind it.
   Any evaluate-only pass, a replay of a history node included, has distances and no esds at all.
 - Nothing free reaches the row.
 - Symmetry fixes the value, as for a fluorite Ca–F distance with the cell held, or a rutile O–Ti–O angle, which stays at exactly 90° however the one free coordinate moves.
   The variance then reaches zero by cancelling terms, and a variance below {{ VARIANCE_CANCELLATION_FLOOR }} of the sum of those terms counts as zero.
+  A rigid body's template fixes a distance or a torsion inside it the same way, and so does an inversion centre for a torsion A–B–B′–A′ across it.
 - The angle is within {{ ANGLE_LINEARISATION_LIMIT_DEG }}° of 0° or 180°.
   Such an angle is a stationary point, where the linear propagation of {eq}`est-derived` does not hold.
 

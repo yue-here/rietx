@@ -528,11 +528,12 @@ TECHNIQUE_FIELDS: dict[str, frozenset[str]] = {
 
 #: Union members a technique owns, elided from a field's rendered annotation
 #: for the same reason: ``Phase.restraints`` is an everyday field, but the
-#: tether, anti-bump and planarity kinds are the rigid-body track's, and their verbs get
-#: their own index in WP-1812 (WP-1809: no raised cap).  Deferred from the
-#: manual in ``tests/api_surface_deferred.txt`` meanwhile.
+#: tether, anti-bump, planarity and torsion kinds are the rigid-body track's,
+#: and their verbs get their own index in WP-1812 (WP-1809, WP-1815: no raised
+#: cap).  The manual documents them in the restraints guide.
 TECHNIQUE_MEMBERS: frozenset[str] = frozenset({"TetherRestraint", "AntiBumpRestraint",
-                                               "PlanarityRestraint"})
+                                               "PlanarityRestraint",
+                                               "TorsionRestraint"})
 
 HEADER = """# The API index
 
