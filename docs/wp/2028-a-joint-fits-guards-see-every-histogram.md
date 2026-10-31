@@ -1,6 +1,6 @@
 # WP-2028 — a joint fit's guards see every histogram
 
-Milestone: unscheduled · Status: 🔄 2026-10-28 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`); 4 measured, not wired; 7's census closed 2026-10-31 (#1205; two follow-on items open); 8 measured on #1124
+Milestone: unscheduled · Status: 🔄 2026-10-28 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`); 4 measured, not wired; 7's census closed 2026-10-31 (#1205); its joint `parameters()` built 2026-10-31, the joint screens open; 8 measured on #1124
 Track: What fires, and what stays silent
 Depends on: — (1341 closed: it built the joint report this WP completes; 1325
 soft: its parametric codes and per-pattern holds are what tasks 3 and 6
@@ -178,7 +178,7 @@ that caveat until 1421 lands.
       `soft_modes`) run on the joint matrix, since that is what was solved; the
       declared-peak absorption screen runs per histogram, since a declared peak
       is one instrument's. This adds output, so it is its own change.
-- [ ] A joint `parameters()` (census, ruled 2026-10-31 on #1205): read-only
+- [x] A joint `parameters()` (census, ruled 2026-10-31 on #1205): read-only
       first, returning the single fit's `ParameterRow` with paths spelled as
       the joint table spells them; `set_vary` and `set_values` on the joint
       follow when someone needs them. Re-point `STAGE_PATH_UNKNOWN`'s
@@ -219,6 +219,28 @@ shows the findings that name histogram h.
   WP-2001 and WP-2004 (the tier rule).
 
 ## Handover log
+
+- **2026-10-31** — the joint `parameters()`, from outside (#1205's third
+  ruling). `MultiHistogramRefinement.parameters()` returns the single fit's
+  `ParameterRow` for every table entry, held rows included, before or after a
+  fit: a shared row once, at its first histogram's place, and a per-histogram
+  one per histogram, `hist.<h>.`-scoped. Each row is read off its own
+  histogram's table by `Refinement.parameters()`'s rules (`mode_fixed` for
+  `"rietveld"`, `needs_held_cell` from that histogram's cell, the esd from
+  `result_.parameters` under the same path). The spelling is the joint
+  result's, now `MultiParameterTable.row_path` (the `_row_shared` rule moved
+  to `params.multi.row_shared`). It differs from `_canonical` for a tied row
+  whose sources are per histogram: under `per_histogram=["phases.0.cell.a"]`
+  a cubic `b` is `hist.1.phases.0.cell.b`. So that every listed path is one
+  the joint fit accepts, `known_paths` adds that spelling, and
+  `STAGE_PATH_NOT_FREE` matches it: on `main` the literal
+  `hist.1.phases.0.cell.b` fired `STAGE_PATH_UNKNOWN` for a path the result
+  itself prints, and here it is `STAGE_PATH_NOT_FREE` naming
+  `hist.1.phases.0.cell.a`. `STAGE_PATH_UNKNOWN`'s suggestion names
+  `ref.parameters()` on both paths, and a locked joint literal's
+  `STAGE_PATH_NOT_FREE` suggestion points at `held_because` there, as a single
+  fit's does. No other joint finding's text moves. `set_vary` and `set_values` on the
+  joint are not built.
 
 - **2026-10-31** — review round on #1205 (task 7's census closed). The
   maintainer ruled on the three open questions. (1) *Lindemann bound for a

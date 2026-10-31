@@ -28,6 +28,7 @@ import numpy as np
 from . import runs
 from .backend.api import backend_dtype_note
 from .crystallography.twins import merge_site_twins
+from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
 from .model.forward import (
     PHASE_SUPPORT_SIGMA,
@@ -58,6 +59,7 @@ from .params.multi import (
     SharingMap,
     _longest_wavelength,
     _unscoped,
+    row_shared,
 )
 from .params.parametric import (
     FORM_TEST_LEVEL,
@@ -133,6 +135,8 @@ from .refine import (
     _width_census_diagnostics,
     _width_twin_flats,
     _window_loss_diagnostics,
+    mode_fixed_column,
+    mode_fixed_path,
 )
 from .report.magnetic import moment_angle_stationary_diagnostics
 from .report.schemas import THRESHOLDS_VERSION
@@ -144,6 +148,7 @@ from .schemas.parametric import (
     ParametricFormReading,
     ParametricFormTest,
 )
+from .schemas.params import ParameterRow, TieSpec
 from .schemas.pattern import PatternData, require_two_theta
 from .schemas.plan import check_phase_support_sigma
 from .schemas.results import (
@@ -1231,6 +1236,66 @@ class MultiHistogramRefinement:
     def fitted_instruments(self) -> list[Instrument]:
         return self.mtable.instruments
 
+    def parameters(self) -> list[ParameterRow]:
+        """Every parameter of the joint fit as data, held rows included (WP-2028).
+
+        The counterpart of :meth:`Refinement.parameters
+        <rietx.refine.Refinement.parameters>`, with the same
+        :class:`~rietx.schemas.params.ParameterRow`, and of
+        ``result_.parameters``, which lists only what a fit refined.  This is
+        the surface before a fit, and after one it carries that fit's esds.
+
+        **Paths are the joint result's**
+        (:meth:`~rietx.params.multi.MultiParameterTable.row_path`): a shared
+        parameter is one row under its bare path, at its first histogram's
+        place, as ``set_vary`` returns it; a per-histogram one is a row per
+        histogram, ``hist.<h>.``-scoped.  Histograms are walked in order and
+        each table's entries in θ order.  A path read here is one a stage's
+        ``turn_on`` accepts and one ``result_.parameters`` and the findings
+        print.  A tie's sources are spelled the same way.
+
+        Each row is read off its own histogram's table, by the single fit's
+        rules: ``esd`` from the most recent fit's ``result_.parameters`` under
+        the same path; ``mode_fixed`` for ``"rietveld"``, the only mode a
+        joint fit runs; ``needs_held_cell`` from that histogram's own cell and
+        wavelength.  Read-only: ``set_vary`` and ``set_values`` on the joint
+        fit are not built (#1205's ruling), and the plan's globs are how a
+        joint fit frees a row.
+        """
+        mt = self.mtable
+        esd = ({p.path: p.stderr for p in self.result_.parameters}
+               if self.result_ is not None else {})
+        rows: list[ParameterRow] = []
+        seen: set[str] = set()
+        for h, table in enumerate(mt.tables):
+            by_path = {e.path: e for e in table.entries}
+            blocked = (table._wavelength_paths()
+                       if table._cell_is_free() else frozenset())
+            reach = table.entry_reach()
+            owned = table.body_rows()
+            origin = table.origin_holds
+            for e in table.entries:
+                path = mt.row_path(h, e)
+                if path in seen:
+                    continue
+                seen.add(path)
+                tie = (None if e.tie is None else TieSpec(
+                    terms=[(mt.row_path(h, by_path[src]), float(c))
+                           for src, c in e.tie.terms],
+                    const=float(e.tie.const)))
+                rows.append(ParameterRow(
+                    path=path, value=e.value, vary=e.vary, lo=e.lo, hi=e.hi,
+                    tie=tie, locked=e.locked, held=e.held, esd=esd.get(path),
+                    mode_fixed=(mode_fixed_column(reach[e.path], "rietveld")
+                                if e.path in reach
+                                else mode_fixed_path(e.path, "rietveld")),
+                    needs_held_cell=e.path in blocked,
+                    body=owned.get(e.path),
+                    origin_axis=origin[e.path][1] if e.path in origin else None,
+                    help_key=help_key_for(e.path),
+                ))
+        return rows
+
     # ------------------------------------------------------------------
     def fit(self, data: list[PatternData], *, mode: str = "rietveld",
             plan: RefinementPlan | str = "mccusker_default",
@@ -2108,8 +2173,7 @@ class MultiHistogramRefinement:
         # records.  The near-miss draws on both spellings a glob can match
         # here, so a bare typo is answered bare and a scoped one scoped.
         diagnostics = diagnostics + _unknown_path_diagnostics(
-            stage_results, sorted(mt.known_paths()),
-            listing="[e.path for t in ref.mtable.tables for e in t.entries]")
+            stage_results, sorted(mt.known_paths()))
         diagnostics = diagnostics + _unreached_histogram_diagnostics(
             stage_results, [h.label for h in histograms])
         diagnostics = diagnostics + _window_loss_diagnostics(stage_results)
@@ -2340,19 +2404,9 @@ class MultiHistogramRefinement:
 
 
 def _row_shared(mtable, entry) -> bool:
-    """Whether a table entry is one column of the joint fit, or a row per
-    histogram.
-
-    An entry is shared when its own path is, and a **tied** one also needs
-    every source of its tie shared: ``u11`` of an anisotropic site is a
-    follower of the site's ``adp.k`` columns, so under
-    ``per_histogram=["phases.*.atoms.*.adp.*"]`` it is each histogram's own
-    although no glob names it (WP-2028).
-    """
-    share = mtable.sharing.is_shared
-    if not share(entry.path):
-        return False
-    return entry.tie is None or all(share(src) for src, _ in entry.tie.terms)
+    """Whether a table entry is one column of the joint fit
+    (:func:`~rietx.params.multi.row_shared`, read with ``mtable``'s map)."""
+    return row_shared(mtable.sharing, entry)
 
 
 #: the entries that move an ADP site: the free columns, and the U^ij rows
@@ -2921,13 +2975,25 @@ def _unreached_histogram_diagnostics(stage_results: list[StageResult],
     return out
 
 
+def _row_name(mtable, h: int, table, path: str) -> str:
+    """``path`` in histogram ``h`` as the joint result spells it: an entry by
+    :meth:`~rietx.params.multi.MultiParameterTable.row_path`, anything else
+    (a site, ``phases.0.atoms.1``) by its own path's sharing."""
+    i = table._paths.get(path)
+    return (mtable._canonical(h, path) if i is None
+            else mtable.row_path(h, table.entries[i]))
+
+
 def _joint_fixed_literals(stages, mtable) -> list[Diagnostic]:
     """``STAGE_PATH_NOT_FREE`` for a joint plan (#803, WP-1341).
 
     ``refine._fixed_literal_diagnostics`` asked of each histogram's table,
-    with the joint fit's second name for each row.  A literal then matches a
-    row exactly when :meth:`~rietx.params.multi.MultiParameterTable.set_vary`
-    would match it.  That is also the "matched" of
+    with the joint fit's second name for each row, the one
+    :meth:`~rietx.params.multi.MultiParameterTable.row_path` gives and
+    ``MultiHistogramRefinement.parameters()`` prints.  A literal then matches
+    a row by either of the names ``set_vary`` reads, and a tied row whose
+    sources are per histogram by its scoped name too (WP-2028), so a path
+    copied from the listing is answered here rather than in silence.  That is also the "matched" of
     :meth:`~rietx.params.multi.MultiParameterTable.unreached_histograms`, so
     on any one histogram a literal gets this finding (it matched a fixed row)
     or ``STAGE_FREED_NOTHING`` (it matched none), never both.
@@ -2942,7 +3008,7 @@ def _joint_fixed_literals(stages, mtable) -> list[Diagnostic]:
     for h, table in enumerate(mtable.tables):
         for d in _fixed_literal_diagnostics(
                 stages, table, mtable.parametric_targets(h),
-                canonical=lambda p, h=h: mtable._canonical(h, p)):
+                canonical=lambda p, h=h, t=table: _row_name(mtable, h, t, p)):
             key = d.where[0]
             if key in found:
                 found[key][1].append(h)

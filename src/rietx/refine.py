@@ -7449,11 +7449,10 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
             fix = None      # every coordinate of the site is fixed by symmetry
         elif sources:
             fix = f"Free {', '.join(sources)} instead."
-        elif canonical is None:
-            fix = "Read held_because for this row in ref.parameters()."
         else:
-            # a joint fit has no parameters() to point at
-            fix = None
+            # a joint fit's ``parameters()`` spells the row as ``where`` does
+            # (WP-2028)
+            fix = "Read held_because for this row in ref.parameters()."
         out.append(Diagnostic(
             level="warning", code="STAGE_PATH_NOT_FREE",
             message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
@@ -7517,9 +7516,7 @@ def _window_loss_diagnostics(stage_results: list[StageResult]) -> list[Diagnosti
 
 
 def _unknown_path_diagnostics(stage_results: list[StageResult],
-                              known: list[str], *,
-                              listing: str = "ref.parameters()"
-                              ) -> list[Diagnostic]:
+                              known: list[str]) -> list[Diagnostic]:
     """``STAGE_PATH_UNKNOWN`` — a stage asked for a parameter by a name no row has.
 
     Issue #265: ``turn_on=["instrument.source.wavelength"]`` freed nothing,
@@ -7556,8 +7553,8 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
     paths the second and third are usually siblings of the first: for the
     issue's typo they were ``lines.0.weight`` and ``profile.w``.
 
-    ``listing`` is the call the suggestion names for seeing every path, which
-    is the caller's: a joint fit has no ``parameters()``.
+    The suggestion names ``ref.parameters()`` for seeing every path, which a
+    joint fit has too (WP-2028), spelling its rows as ``known`` does.
     """
     by_path: dict[str, list[str]] = {}
     for sr in stage_results:
@@ -7585,7 +7582,7 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
                      "for it."
                      + (f" {hint[:1].upper()}{hint[1:]}" if hint else "")),
             where=[path],
-            suggestion=(f"Correct the path ({listing} lists every path this "
+            suggestion=("Correct the path (ref.parameters() lists every path this "
                         "model has), or write a glob if the stage should "
                         "reach a component that only some models declare."),
         ))
