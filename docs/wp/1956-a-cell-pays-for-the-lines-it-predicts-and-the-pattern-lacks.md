@@ -165,6 +165,25 @@ engine or the ranking. Indexing is provisional by declaration
   merge they go to the 1.11 notes, with "schema 0.59, indexing thresholds 1.11" read as
   0.60 and 1.12. WP-2043's `### Inherited` holds #1152's line the same way.
 
+- 2026-10-31, from the issue triage (issue #916): task 5 measured (reporter,
+  2026-10-30, addendum 2026-10-31, main at e016f187d, 19 runs from 4 sources).
+  Removing `fom_panel_disagrees` is still unsafe after the repair. Without it,
+  6 runs promote a wrong cell, and on LaB₆ as picked three reach `high`. The
+  reporter measured a lattice-aware form ("TL"). It fires only when the
+  members' co-winners share no lattice, comparing lattices by line set at 1e-3
+  relative in Q. TL promotes no wrong cell. It lifts three truths: #916 arm b
+  and brucite to `medium`, and zincite to `high`. Its tolerance has under a
+  factor of 3 of margin on LaB₆'s 0.12 % tetragonal descent, so the tolerance
+  needs its own measurement before code. The addendum looks at one commit
+  under `preset="quick"`. There the flag on the tP c/a 1.01 negative arm flips
+  with machine load. It fired on 3 of 3 runs with six busy loops and was quiet
+  unloaded, because load changes which cells get validated inside the ~120 s
+  ceiling. A flag that fires by wall clock at fixed inputs is a
+  reproducibility cost of its own. The reporter asks the maintainer to choose:
+  make the flag lattice-aware (a rule change), or close task 5 as "kept".
+  Checked against the tree at d87c8cc91: `fom_panel_disagrees` is unchanged
+  and task 5 is unticked. The figures were not re-run.
+
 ## Non-goals
 
 - The blind search and enumeration ceilings (WP-1924), dedup across a reduction
