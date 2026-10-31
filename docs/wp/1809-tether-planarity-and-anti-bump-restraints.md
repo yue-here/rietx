@@ -1,6 +1,6 @@
 # WP-1809 — Tether, planarity and anti-bump restraints, pairs frozen per plan
 
-Milestone: rigid-bodies · Status: 🔄 2026-10-30 — planarity and `RESTRAINT_PAIRS_STALE` merged from outside as PR #995 (`737963bc`), their follow-ups as PR #1222 (`6bb24b77`); the tasks to be checked against them, the skill row brought up to date, and the WP closed
+Milestone: rigid-bodies · Status: 🔄 2026-10-31 — planarity and RESTRAINT_PAIRS_STALE merged from outside as PR #995, their follow-ups as PR #1222; every task is ticked and the skill row is current; the close waits on one inherited decision: whether the anti-bump builder reads the radii tables
 Depends on: —
 Priority: P3 2026-10-06 — needs no body; it can run beside WP-1804
 
@@ -88,10 +88,10 @@ issue #561, sized M. It needs no body.
 ## Tasks
 
 - [x] Tether and anti-bump rows; the pair-list builder (built by the caller, #888)
-- [ ] Planarity rows; `RESTRAINT_PAIRS_STALE` at plan end
-- [ ] Manual Part 2 equations for the new kinds
-- [ ] Tests (the acceptance below)
-- [ ] Skill: a reference row for `RESTRAINT_PAIRS_STALE`
+- [x] Planarity rows; `RESTRAINT_PAIRS_STALE` at plan end (PRs #995, #1222)
+- [x] Manual Part 2 equations for the new kinds (`docs/docs/theory/parameterisation.md`, § Soft restraints)
+- [x] Tests (the acceptance below) (`tests/test_one_sided_restraints.py`, `tests/test_planarity_restraints.py`)
+- [x] Skill: a reference row for `RESTRAINT_PAIRS_STALE` (`references/diagnostics.md`, brought up to date 2026-10-31)
 
 ## Acceptance
 
@@ -108,6 +108,12 @@ issue #561, sized M. It needs no body.
 - Issue #561; PR #596; issue #777 and PR #778 (the minimum-image shift).
 
 ## Handover log
+
+- **2026-10-31** (ghostshift close-batch, not closed) — every task is done and ticked, and the skill row that PR #1222's review left open is brought up to date. One decision inherited from the issue triage is still the maintainer's, so the WP stays open. The question: should the anti-bump pair-list builder read minimum distances from the radii tables now on main (Shannon, Pyykkö and Pauling, in `crystallography/radii.py`, landed through PR #1016), and say which pairs got no row? Today `anti_bump_restraints` takes the caller's number, a species-pair mapping or a callable, and a pair with no stated minimum gets no row. The 2026-10-12 entry called reading the radii "still this WP's decision" and nothing since answers it.
+  *Done* (each checked against the tree): planarity rows and `RESTRAINT_PAIRS_STALE` (PRs #995, #1222; `tests/test_planarity_restraints.py`); the Theory-tab equations (`docs/docs/theory/parameterisation.md`, § Soft restraints); the tests. `tests/test_one_sided_restraints.py` and `tests/test_planarity_restraints.py`: 42 passed, 2 warnings (`-m "not slow"`, macOS arm64, worktree `.venv` `[dev]`, Python 3.12, alone). The skill row: `references/diagnostics.md` now says the level drops to `info` under `summary(deliverable=…)` of `cell`, `phase_id`, `microstructure` or `calibration` (the `scope` of `("qpa", "structure", "magnetic")` in `_audit.py`, applied by `schemas.results.level_under`), and gives both remedies the code's suggestion gives, rebuild the list or lower a real contact's minimum. The three committed copies were re-synced with `rietx skill --install . --copy`.
+  *Resolved from Inherited*: the 2026-10-11 note that this WP's PR may create `api-bodies.md` was answered the other way. `docs/skill/make_api_index.py` elides the three restraint kinds from the everyday index and leaves their verbs to WP-1812's own index, with no raised cap. The planarity form (#759 § 3 (a)) is built as the distance-to-plane form. Amendment (c), an atom in two bodies refused by name, is built (`RIGID_BODY_SHARED_ATOM`).
+  *Left*: (1) the radii decision above. (2) `test_planarity_rows_leave_the_data_statistics_bit_identical` does not declare the compiled path (`compiled.set_enabled`), a review nit from #1222 that was not asked to block. It asserts bit-identity between two builds in one process, so the path cannot differ between its two sides.
+  *Next*: the maintainer rules on the radii question. Two readings: (a) close with the caller's own minimum as the settled design, and record that radii stay a later convenience; (b) add a radii-backed default to the builder first. The first needs one sentence in this WP, then the close (the v1.11 record's narrative, ✅, delete `Priority:` and `### Inherited`).
 
 - **2026-10-30** (`/pr-review`) — #995's follow-ups merged from outside as PR #1222 (`6bb24b77`), five `WP-1809:` commits. The contributor sorted the round 1 and 2 items: seven built, five already on main, one declined with a measured alternative. Built: a torch-mps test of the planarity columns (on the device, rms 1.228004e-3 Å out of plane against numpy's 1.228009e-3 Å); one `RESTRAINT_TENSION` finding per plane; `eigh` named on `Backend.linalg`; a `scope` of `("qpa", "structure", "magnetic")` on `RESTRAINT_PAIRS_STALE`, so it reads `info` under the cell, phase-id, microstructure and calibration purposes; r₀ stated in its audit evidence; the restrain guide's centroid rule for planes. Declined: skipping the stale search on `telemetry=False`, because a user passes that to leave a fit unrecorded and would lose a correctness warning. The search runs instead only where a coordinate or cell parameter moved. On a 20-atom body with 29 contact rows that costs about 46 ms at the end of a 0.81 s fit, and a fit that moves nothing pays 0.5 ms. The ring test's bound holds on Linux (rms 1.228009e-3 Å, the same to seven digits across 28 perturbed starts). Open: the skill row for `RESTRAINT_PAIRS_STALE` (`references/diagnostics.md`, three copies) still gives one remedy and says "warning, plan end", and needs one clause each to stay true. `test_planarity_rows_leave_the_data_statistics_bit_identical` does not yet declare the compiled path. No task is ticked. Gate (a stack of eleven PRs on main `b40bc994`, tree `307eff83`; macOS arm64, `[dev,jax]`, Python 3.12): 13 217 passed, 216 skipped, 48 xfailed, 0 failed, with ruff, the `-W` manual build and the GUI ladder green.
 
