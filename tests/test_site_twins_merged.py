@@ -1628,12 +1628,13 @@ def _series_with_o3_dropped(pbso4, drop_at: tuple[int, ...]):
         inner = ref.fit
 
         def fit(*args, **kwargs):
-            started[index] = {a.label: (a.x.value, a.y.value, a.z.value)
-                              for a in ref.structure.phases[0].atoms}
+            # the warm rung's start; a later rung of the ladder starts cold
+            started.setdefault(index, {a.label: (a.x.value, a.y.value, a.z.value)
+                                       for a in ref.structure.phases[0].atoms})
             return inner(*args, **kwargs)
         ref.fit = fit
 
-    plan = RefinementPlan(stages=[Stage("dz", ["vars.*"], max_iter=8)])
+    plan = RefinementPlan(stages=[Stage("dz", ["vars.*", "phases.*.scale"], max_iter=20)])
     chain = SequentialRefinement(Structure(phases=[pbso4]), INSTRUMENT)
     chain.fit([data, data], plan=plan, prepare=prepare, constrain=constrain)
     fitted = {a.label: (a.x.value, a.y.value, a.z.value)
