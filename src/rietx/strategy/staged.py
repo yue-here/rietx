@@ -1654,12 +1654,20 @@ def check_biso_plausible(table, model) -> list[GuardFinding]:
     those multiplicities feed is weighted by occupancy, since the bound is per
     atom rather than per site.
     """
+    return [GuardFinding.large_biso(p, b, bound)
+            for p, b, bound in biso_over_bound(table, model)]
+
+
+def biso_over_bound(table, model) -> list[tuple[str, float, float]]:
+    """``(path, B, bound)`` for each isotropic B past its cell's Lindemann
+    bound: the numbers :func:`check_biso_plausible` words, kept apart so a
+    joint fit can set one B against several cells' bounds (WP-2028)."""
     from ..crystallography.lattice import cell_volume
 
     if model is None:
         return []
     values = {e.path: e.value for e in table.entries}
-    out: list[GuardFinding] = []
+    out: list[tuple[str, float, float]] = []
     for ip, cp in enumerate(model.phases):
         base = f"phases.{ip}"
         try:
@@ -1684,7 +1692,7 @@ def check_biso_plausible(table, model) -> list[GuardFinding]:
             path = f"{base}.atoms.{j}.biso"
             biso = values.get(path)
             if biso is not None and biso > bound:
-                out.append(GuardFinding.large_biso(path, biso, bound))
+                out.append((path, float(biso), bound))
     return out
 
 
@@ -2054,6 +2062,34 @@ def check_discarded_directions(jac, free: list[str],
     return [GuardFinding.discarded_direction(paths, n)]
 
 
+def _correlation_findings(corr, free: list[str], threshold: float
+                          ) -> tuple[list["GuardFinding"], list["GuardFinding"]]:
+    """``high_correlations`` and ``flat_directions`` off one correlation matrix.
+
+    One loop for both runners, :func:`check_guards` and the joint fit's
+    ``_top_diagnostics`` (WP-2028 task 7): every pair above ``threshold`` is a
+    correlation, and one at or above ``FLAT_DIRECTION_RHO`` is a flat
+    direction as well.
+    """
+    high: list[GuardFinding] = []
+    flat: list[GuardFinding] = []
+    for i in range(len(free)):
+        for j in range(i + 1, len(free)):
+            if abs(corr[i, j]) > threshold:
+                high.append(GuardFinding.correlation(free[i], free[j], corr[i, j]))
+                # |ρ| = 1.000 is a rank statement, not a strong
+                # correlation, and saying so in the same vocabulary as
+                # ρ = 0.96 undersells it.  Reported *beside* the
+                # correlation rather than instead of it: the
+                # SEQUENTIAL_PERSISTENT_FINDING precedent, where the
+                # sharper finding rides alongside the ones it sharpens,
+                # so no existing consumer loses a row it counts on.
+                if abs(corr[i, j]) >= FLAT_DIRECTION_RHO:
+                    flat.append(GuardFinding.flat_direction(
+                        free[i], free[j], corr[i, j]))
+    return high, flat
+
+
 def check_guards(table, outcome, threshold: float,
                  background_threshold: float = BACKGROUND_ABSORPTION_GUARD,
                  roughness_threshold: float = ROUGHNESS_ABSORPTION_GUARD,
@@ -2087,22 +2123,8 @@ def check_guards(table, outcome, threshold: float,
 
     if outcome.correlation is not None and len(free) > 1:
         corr = np.asarray(outcome.correlation)
-        for i in range(len(free)):
-            for j in range(i + 1, len(free)):
-                if abs(corr[i, j]) > threshold:
-                    report.high_correlations.append(
-                        GuardFinding.correlation(free[i], free[j], corr[i, j]))
-                    # |ρ| = 1.000 is a rank statement, not a strong
-                    # correlation, and saying so in the same vocabulary as
-                    # ρ = 0.96 undersells it.  Reported *beside* the
-                    # correlation rather than instead of it: the
-                    # SEQUENTIAL_PERSISTENT_FINDING precedent, where the
-                    # sharper finding rides alongside the ones it sharpens,
-                    # so no existing consumer loses a row it counts on.
-                    if abs(corr[i, j]) >= FLAT_DIRECTION_RHO:
-                        report.flat_directions.append(
-                            GuardFinding.flat_direction(
-                                free[i], free[j], corr[i, j]))
+        report.high_correlations, report.flat_directions = (
+            _correlation_findings(corr, free, threshold))
         # measured once (WP-1056): the same matrix the loop above thresholds
         report.measured_top_correlations = top_correlations(corr, free)
 

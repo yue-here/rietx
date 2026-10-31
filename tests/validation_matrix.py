@@ -10,12 +10,12 @@ the doc cannot drift the way a hand-maintained table does.  Regenerate with
 (the same convention the backend goldens use).
 
 The reason this exists is that a tolerance is meaningless without its
-referent.  ``abs(a - 4.156780) < 2e-4`` and ``abs(Δa) < 1e-9`` look like the
-same kind of statement and are not: the first is a certified value with a
-stated uncertainty the fit does not reach and does not claim to, the second is
-two of our own fits that must agree to floating-point.  Sorting every bar in
-the tree by its referent is what turns a pile of numbers into a claim about
-what this package has been shown to do.
+reference value.  ``abs(a - 4.156780) < 2e-4`` and ``abs(Δa) < 1e-9`` look
+like the same kind of statement and are not: the first is a certified value
+with a stated uncertainty the fit does not reach and does not claim to, the
+second is two of our own fits that must agree to floating-point.  Sorting
+every bar in the tree by its reference value is what turns a pile of numbers
+into a claim about what this package has been shown to do.
 
 **Judge a correction by what it changed, never by Δ Rwp.**  That is the v0.5
 milestone's method result, and it is why the vocabulary below has
@@ -783,7 +783,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "recovered the information rather than merely divided by "
                   "root-N.  The identity half is that the three tied rows "
                   "carry the *same* value and esd to 1e-12, since they are "
-                  "one parameter.  Rwp is deliberately not a referent: it "
+                  "one parameter.  Rwp is deliberately not a reference value: it "
                   "moves by 0.05 % of itself, so no bar on it could "
                   "distinguish a good constraint from a bad one",
         measured="20 -> 18 free parameters, 287.5 -> 319.4 points per "
@@ -1036,7 +1036,7 @@ CLAIMS: tuple[Claim, ...] = (
         "the sharpest single dispersion result: B(O) comes off its floor "
         "once Zn's missing f' stops being absorbed by a displacement "
         "parameter, while Rwp barely moves",
-        reference="physical plausibility, not a reference value — B(O) below "
+        reference="physical plausibility, not a measured value — B(O) below "
                   "0.1 A^2 is a parameter pinned on a bound, and 0.2-1.2 is "
                   "the range an oxide oxygen actually occupies.  Rwp is "
                   "asserted only one-sided, because this is exactly a case "
@@ -3157,7 +3157,7 @@ def render_markdown() -> str:
       "     Regenerate: .venv/bin/python -m tests.validation_matrix\n"
       "     Guarded by: tests/test_validation_matrix.py (fast suite) -->\n")
     w("Every real-data assertion in this repository, and what its tolerance "
-      "is\nreferenced to. A bar without its referent is not a claim: "
+      "is\nreferenced to. A bar without its reference value is not a claim: "
       "`abs(a - 4.156780) <\n2e-4` and `abs(delta_a) < 1e-9` look alike and "
       "are not remotely the same\nstatement — the first is a certified value "
       "the fit does not reach and does not\nclaim to, the second is two of "

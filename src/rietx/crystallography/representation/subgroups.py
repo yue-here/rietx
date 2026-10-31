@@ -267,12 +267,23 @@ class _Group:
 def _from_operations(ops) -> _Group:
     """A :class:`_Group` from gemmi operations (all of them, centrings included)."""
     den = gemmi.Op.DEN
+    return _from_pairs((tuple(tuple(int(v) // den for v in row) for row in op.rot),
+                        tuple(Fraction(int(t), den) for t in op.tran)) for op in ops)
+
+
+def _from_pairs(pairs) -> _Group:
+    """A :class:`_Group` from exact (W, w) pairs: every operation, centrings included.
+
+    W is an integer 3×3 and w a rational 3-vector in the group's own
+    coordinates, whose unit cell is a cell of the group's lattice; a w with
+    W = 1 adds a centring to it.
+    """
     vectors = [(Fraction(1), Fraction(0), Fraction(0)), (Fraction(0), Fraction(1), Fraction(0)),
                (Fraction(0), Fraction(0), Fraction(1))]
     reps = {}
-    for op in ops:
-        W = tuple(tuple(int(v) // den for v in row) for row in op.rot)
-        w = tuple(Fraction(int(t), den) for t in op.tran)
+    for W, w in pairs:
+        W = tuple(tuple(int(v) for v in row) for row in W)
+        w = tuple(_q(t) for t in w)
         if W == _I3:
             vectors.append(w)
         reps.setdefault(W, w)
@@ -654,13 +665,35 @@ def _standardise(H: _Group, metric: np.ndarray, index: int = 1):
     if data is None:
         raise RuntimeError("no exact standard setting for a subgroup: spglib names no group "
                            "for the probe; this is a bug")
+    return _exact_setting(H, data, H.L, bound, lambda p: _short_origin(p, H))
+
+
+def _exact_setting(H: _Group, data, cell, bound: int, place=None):
+    """(number, symbol, (P, p)) of H from spglib's dataset, checked exactly.
+
+    ``data`` is spglib's answer for a probe of H whose unit cell has the
+    columns of ``cell`` as its axes, in H's own coordinates (H's primitive
+    lattice for :func:`_standardise`, the magnetic cell for
+    ``distortion_candidates``).  spglib's matrix and origin are floats: each
+    is snapped to the nearest ratio with a denominator up to ``bound``, and
+    ``place`` may then move the origin p (by a translation that leaves the
+    subgroup as it is).  The result is accepted only if P⁻¹HP is spglib's
+    standard setting of the type exactly, operation list and lattice, in
+    ``Fraction`` arithmetic; otherwise this raises.
+    """
     std, symbol, number = _standard(int(data.hall_number))
     M = tuple(tuple(Fraction(float(x)).limit_denominator(bound) for x in row)
               for row in data.transformation_matrix)
     o = tuple(Fraction(float(x)).limit_denominator(bound) for x in data.origin_shift)
-    P = _mm(H.L, _inv(M))
-    p = _short_origin(tuple(-x for x in _mv(P, o)), H)
-    if H.transformed(P, p).key() != std.key():
+    P = _mm(_mat(cell), _inv(M))
+    p = tuple(-x for x in _mv(P, o))
+    if place is not None:
+        p = place(p)
+    try:
+        same = H.transformed(P, p).key() == std.key()
+    except _NotIntegral:  # P carries some W of H to a non-integral matrix: no setting of H
+        same = False
+    if not same:
         raise RuntimeError(f"no exact standard setting for a subgroup: spglib's {symbol!r} under "
                            f"P = {_text(P)}, p = {_text(p)} is not the subgroup's operation "
                            "list; this is a bug")

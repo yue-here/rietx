@@ -507,7 +507,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   not just statistical significance.
 - **A new correction, default or automatic action answers by its kind** (DESIGN.md § Rules, 1 and
   4): where every competent refiner would act, act and record it in a field; where the data can
-  rank the alternatives, rank them with evidence; otherwise report the number with its meaning.
+  rank the alternatives, rank them with evidence, picking only in Rule 1's two cases; otherwise
+  report the number with its meaning.
   **Never an Rwp comparison as its evidence**: of v0.5's eight corrections, two provably cannot
   move Rwp, one moves it the wrong way when it is right, and the two largest accuracy wins are
   invisible in it (`docs/milestones/v0.5.md`). **Nor an R_Bragg comparison** (WP-1069): I(obs) is
@@ -988,7 +989,7 @@ clause here only if it changes behavior outside `indexing/`.** Three do:
 is held to per-column agreement with the analytic Jacobian in `tests/test_cross_backend.py` —
 **whose configs must grow whenever a new derivative path does**, or no backend row covers it.
 Apple-GPU execution is *slower* than numpy (46-182×, launch-latency-bound): `torch-mps` buys
-precision validation, not speed (the v0.4 record). Also since v0.4: true Voigt (`shape="voigt"`,
+precision verification, not speed (the v0.4 record). Also since v0.4: true Voigt (`shape="voigt"`,
 TCHZ still the default), soft restraints, the Bérar-Lelann esd inflation. v2 fence: FPA, neutron
 **TOF** — and the **peaks buffer with FPA**, never before:
 shape reuse needs > 2.8-4.2 FCJ images a window point (WP-1122).

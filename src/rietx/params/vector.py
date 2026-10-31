@@ -94,6 +94,19 @@ _SIGMA_MAX = float(np.sqrt(np.finfo(np.float64).max))
 #: 1e-12 moves the moment by 1e-12 of its modulus.
 _MOMENT_REFRAME_TOL = 1e-12
 
+#: The exact invariance test of :meth:`ParameterTable._refuse_body_off_its_sites`,
+#: in units of ``symmetry.SITE_TOL``.  For an operation fixing both a body atom
+#: and its origin (mod the lattice), R(p − o) − (p − o) is a lattice vector
+#: plus the two positions' residuals from their sites, each at most SITE_TOL
+#: per component for an operation ``site_orbit``'s step 1 admitted and at most
+#: 3 × SITE_TOL for one the snap added.  Taking the larger, the two positions
+#: miss by at most 6 × SITE_TOL on the atom's own element (the step-1 case is
+#: 2 ×, attained and never exceeded on 25 site pairs in 17 groups); on an
+#: element a lattice vector away the miss is at least 1 − 6 × SITE_TOL.  Any
+#: factor from 6 to 1/SITE_TOL − 6 refuses the same inputs; 8 keeps a
+#: factor-of-two margin over 6, so float rounding there cannot decide.
+_BODY_SITE_MISS_FACTOR = 8.0
+
 #: How far (child fractions) a stored coordinate of an atom a distortion mode
 #: moves may sit from ``base + Σ A·v`` before it counts as edited by hand
 #: (WP-1419).  The write-back stores exactly what the rows compute, so a fitted
@@ -1849,12 +1862,12 @@ class ParameterTable:
                 # in the unwrapped body coordinates, else the atom's element is
                 # a lattice vector from the origin's (-1 at (0,0,0) and at
                 # (½,0,0); 2-folds at x = 0 and ½).  Both positions are known
-                # to SITE_TOL, and a true miss is a lattice vector, so 4 × it
-                # is a rounding bound
+                # to SITE_TOL, and a true miss is a lattice vector, so
+                # _BODY_SITE_MISS_FACTOR × it is a rounding bound
                 d = at - np.array(where, dtype=np.float64)
                 for g in orbit.stabilizer_ops:
                     miss = rots[int(g)] @ d - d
-                    if float(np.abs(miss).max()) > 4.0 * SITE_TOL:
+                    if float(np.abs(miss).max()) > _BODY_SITE_MISS_FACTOR * SITE_TOL:
                         raise ValueError(
                             f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has "
                             f"its atom {label!r} at {tuple(float(v) for v in at)} on "

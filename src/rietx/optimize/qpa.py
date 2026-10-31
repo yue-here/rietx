@@ -308,7 +308,9 @@ def brindley_correction(w_measured, densities, mus, radii_um, *,
 BRINDLEY_MU_R_FENCE = 0.05
 
 
-def microabsorption_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnostic]:
+def microabsorption_diagnostics(qpa: QuantitativePhaseAnalysis,
+                                structure: Structure | None = None,
+                                ) -> list[Diagnostic]:
     """Structured diagnostics for the Brindley correction's applicability.
 
     Two things are worth saying loudly (Taylor & Matulis 1991, J. Appl.
@@ -318,6 +320,13 @@ def microabsorption_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnost
     fractions can be *worse* than the uncorrected ones while looking more
     authoritative — and a correction the user asked for (radii supplied) that
     could not run must not stay quiet.
+
+    ``structure`` is the model the QPA was computed from.  A skipped
+    correction leaves every row's radius empty (:class:`PhaseQuantity` fills
+    its microabsorption fields only when the correction ran), so the
+    structure is what says, for a skip with a phase unmeasured, whether the
+    radii were all supplied or which phases still lack one.  ``None`` makes
+    neither claim.
     """
     out: list[Diagnostic] = []
     if qpa.microabsorption_skipped is not None:
@@ -326,7 +335,7 @@ def microabsorption_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnost
             where=[r.name for r in qpa.phases],
             message=qpa.microabsorption_skipped,
             suggestion=(
-                unmeasured_advice(qpa) + " The radii were supplied."
+                unmeasured_advice(qpa) + _radius_advice(structure)
                 if qpa.unmeasured_phases else
                 "Supply particle_radius_um on every phase, and use a "
                 "wavelength inside the attenuation tables."),
@@ -346,6 +355,23 @@ def microabsorption_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnost
                        "named as an unquantified systematic.",
         ))
     return out
+
+
+def _radius_advice(structure: Structure | None) -> str:
+    """The radius half of a skip's advice when a phase is unmeasured: "the
+    radii were supplied" only when every phase carries one (#1103's review:
+    one radius is enough to record the skip, so the sentence was said of a
+    model with a phase still missing its radius)."""
+    if structure is None:
+        return ""
+    bare = _phases_without_radius(structure)
+    if bare:
+        return f" Supply particle_radius_um on {', '.join(bare)} too."
+    return " The radii were supplied."
+
+
+def _phases_without_radius(structure: Structure) -> list[str]:
+    return [p.name for p in structure.phases if p.particle_radius_um is None]
 
 
 def unmeasured_causes(qpa: QuantitativePhaseAnalysis) -> tuple[list[str], list[str]]:
@@ -501,7 +527,10 @@ def compute_qpa(structure: Structure, values: dict[str, float],
                 "Brindley correction skipped: the mixture's mean attenuation "
                 "needs every phase's fraction, and "
                 + "; ".join(f"{n} has none ({unmeasured_reason(qpa, n)})"
-                            for n in qpa.unmeasured_phases) + ".")
+                            for n in qpa.unmeasured_phases) + "."
+                + (f" No particle_radius_um on phase(s) {', '.join(bare)} "
+                   "either." if (bare := _phases_without_radius(structure))
+                   else ""))
     else:
         _apply_microabsorption(qpa, structure, zmvs, [w_of[ip] for ip in measured],
                                wavelength, source_kind)

@@ -197,7 +197,7 @@ def supercell_checks(candidates: Sequence[CellCandidate], peaks: PeakList, *,
     screens = []
     for cand in candidates:
         try:
-            screens.append(screen_for(screen, cand, peaks))
+            screens.append(screen_for(screen, cand, peaks, absence=False))
         except (ValueError, RuntimeError, np.linalg.LinAlgError):
             screens.append(None)
     for j, child in enumerate(candidates):
@@ -233,6 +233,43 @@ def supercell_checks(candidates: Sequence[CellCandidate], peaks: PeakList, *,
                 p_value=ev.p_value, verdict=ev.verdict(),
                 n_seen_unexplained=ev.n_seen_unexplained,
                 absent_two_theta=[float(t) for t in tt]))
+
+
+def absence_excess(candidates: Sequence[CellCandidate]) -> None:
+    """Write ``lebail.predicted_but_absent_excess_in_window`` on every
+    candidate the line screen validated, in place (#941's follow-up).
+
+    The windowed uncancellable count read as a **density compared across
+    candidates**: A − N_w·d_min, where d_min is the lowest
+    ``predicted_but_absent_density_in_window`` among the run's screened
+    candidates.  The field's figures of merit are densities read
+    comparatively (de Wolff 1968's M₂₀ divides by the lines a cell predicts up
+    to the twentieth observed one; Smith & Snyder 1979's F_N by N_poss; EXPO's
+    WRIP20, Altomare *et al.* 2009, against the best candidate), and the raw
+    count is not: magnetite's and PbSO₄'s true cells read 2, as LaB₆'s wrong
+    a√2 I cell does on synthetic data.  Measured at ``RESOLUTION_FWHM`` 1.0
+    on the acceptance corpus's real families (SRM 676a corundum with and
+    without the cos θ shift declared, zincite, zircon, brucite, magnetite,
+    fluorite, fluorapatite, 11-BM NAC, SRM 660c LaB₆ as picked and
+    calibrated) and both PbSO₄ histograms (neutron and lab X-ray), every true
+    cell reads an excess of 0 to 0.06, magnetite's and PbSO₄ neutron's
+    included, and every oversized cell at least 1; two cells within 0.5 % of
+    PbSO₄'s metric, with the truth's line set, read what it reads.  The
+    excess comes from the line screen, so it is identical under the Le Bail
+    and the Pawley validation fit.  **Reported, not gated**: the
+    cleanest candidate of a list that missed the truth, and a lone candidate,
+    read 0 whatever their count, so it cannot replace the cap.
+    """
+    screened = [c for c in candidates
+                if c.lebail is not None
+                and c.lebail.predicted_but_absent_density_in_window is not None]
+    if not screened:
+        return
+    d_min = min(c.lebail.predicted_but_absent_density_in_window for c in screened)
+    for c in screened:
+        c.lebail.predicted_but_absent_excess_in_window = float(
+            c.lebail.predicted_but_absent_uncancellable_in_window
+            - c.lebail.n_lines_screened_in_window * d_min)
 
 
 def _parent_key(check) -> tuple:
@@ -759,7 +796,7 @@ def apply_gate(candidates: Sequence[CellCandidate], *,
 
 
 __all__ = ["CONSENSUS_CHECK_TOP", "VOLUME_ENVELOPE_SLACK", "ConsensusOutcome",
-           "above_supported_parents", "apply_gate", "below_refuting_parents",
+           "above_supported_parents", "absence_excess", "apply_gate", "below_refuting_parents",
            "bravais_opinion",
            "caveats_for", "checked_indices", "consensus", "grade",
            "merge_engine_candidates", "supercell_checks"]

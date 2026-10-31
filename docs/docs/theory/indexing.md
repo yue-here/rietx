@@ -256,6 +256,27 @@ excludes the true cell makes the search return a wrong one. The volumes are
 fitted to organic and metal-organic crystals, and an ionic compound comes out
 too large.
 
+A measured density fixes $Z$ the other way round, through the definition of
+the density of a crystal of $Z$ formula units of weight $M$ in a cell of volume
+$V$:
+
+```{math}
+:label: idx-density-z
+
+Z \;=\; \frac{\rho\, V\, N_A}{M},
+```
+
+{source}`rietx.indexing.extinction.declared_z`
+
+with $N_A = 6.022\,140\,76 \times 10^{23}\ \mathrm{mol}^{-1}$, exact in the SI since
+2019 {cite}`bipm2019`, so that $\rho$ in g/cm$^3$, $V$ in Å$^3$ and $M$ in
+g/mol give $Z = 0.602\,214\,076\,\rho V / M$. The error of $Z$ is the error of
+the density, since the cell volume is far better known. *International Tables*
+Vol. C asks that measured and calculated density "agree within at least 1.5%"
+{cite}`richards2006`; the screen takes {{ DENSITY_Z_TOLERANCE_PCT }} %
+and not the 8 % scatter of a volume estimated from atom counts. A density that
+fits two whole numbers (above $Z$ = {{ DENSITY_Z_AMBIGUOUS_ABOVE }}) names none.
+
 ## Figures of merit, in both directions
 
 The classical figures are de Wolff's {cite}`dewolff1968`

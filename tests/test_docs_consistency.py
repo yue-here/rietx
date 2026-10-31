@@ -253,6 +253,8 @@ PRIORITIES = wp_index.PRIORITIES
 #                                                          Landed 992, +1 headroom
 #   2026-10-24  CLAUDE.md                     993 -> 994  for #1103: the absent-phase clause rewrapped at
 #                                                          100 columns, one line longer (Yue's round 2)
+#   2026-10-31  CLAUDE.md                     994 -> 995  for WP-2010: the answer-by-kind bullet says a ranking
+#                                                          picks only in Rule 1's two cases, one line longer
 #   2026-09-27  docs/ROADMAP.md               880 -> 571  for WP-1507: the WP tables left for the
 #                                                          generated docs/wp/README.md; prose only now
 #   2026-09-28  docs/ROADMAP.md               571 -> 579  for the structure track (1510-1517): one new
@@ -269,6 +271,11 @@ PRIORITIES = wp_index.PRIORITIES
 #                                                          #193): the flight-time axis row, and the two
 #                                                          new reader kinds (a calibration reader and the
 #                                                          opt-in legacy layer); landed 560
+#   2026-10-30  src/rietx/io/CLAUDE.md        561 -> 563  for the total-scattering refusal (issue #1240):
+#                                                          its per-format row; landed 562
+#   2026-10-31  src/rietx/io/CLAUDE.md        563 -> 565  for Yue's review of #1241: § Refusals' fourth
+#                                                          case (a name-only refusal) and the table
+#                                                          row's no-fixture sentence; landed LANDED
 SIZE_CAPS: dict[str, int | None] = {
     # 739 -> 755 (WP-1102): two standing rules for the component seam — that an
     # additive non-Bragg term is a union *member* and not a new field, and that
@@ -465,7 +472,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # 978 -> 983 (WP-1966, 2026-10-14): the browser bullet, the three rules
     # that keep rietx running under wasm32 Pyodide, where no CI job looks.
     # Landed 982, +1 headroom.
-    "CLAUDE.md": 994,
+    "CLAUDE.md": 995,
     # 672 -> 676 (WP-1102): the Current focus rewrite at 1102's close names the
     # milestone's one break and what makes 1103 the seam's proving case.
     # 676 -> 682 (WP-1407): a new Unscheduled group, "The formats a lab still
@@ -748,7 +755,14 @@ SIZE_CAPS: dict[str, int | None] = {
     # is a reader accepting a named deviation only when asked.  The long form
     # is in the module docstrings (`io/instrument_tof.py`, `io/formats/gsas.py`,
     # `io/legacy/__init__.py`).  Landed at 560; the +1 is headroom.
-    "src/rietx/io/CLAUDE.md": 561,
+    # 561 -> 563 (issue #1240): the `total_scattering` row of § Per format, the
+    # table every reader is listed in, so a refusal missing from it would read
+    # as a format nobody claims.  The row carries two rules the next refusal
+    # needs: that header evidence can sit past the 4 kB window and be matched
+    # on a banner rather than by escalating, and that a Windows-written header
+    # ends in `\r`, which `$` under `re.M` does not match.  Landed at 562; the
+    # +1 is headroom.
+    "src/rietx/io/CLAUDE.md": 565,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs

@@ -36,7 +36,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1913](1913-what-the-benchmark-agents-wrote-by-hand.md) | What the benchmark agents wrote by hand: a mixed site, a special-position retry loop, and `.esd` | 2026-10-08 | P3 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) | A magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out | 2026-10-29 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1919](1919-maximal-subgroups-generated-from-the-operators.md) | Maximal subgroups, their conjugacy classes, (P, p) and Wyckoff splittings, generated from the group's own operators | 2026-10-30 | P3 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
-| [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 2026-10-13 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 2026-10-31 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1931](1931-the-background-order-scan-runs-to-its-cap.md) | The background order scan runs to its cap | 2026-10-12 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 2026-10-09 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) | A cell pays for the lines it predicts and the pattern lacks | 2026-10-25 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -50,9 +50,10 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1997](1997-the-direct-space-solver-on-main.md) | The direct-space solver on main: site classes, kernels, chemistry, engine and entry point | 2026-10-24 | P2 | [structure-solution](#structure-solution) |
 | [2003](2003-the-chain-actions.md) | The chain actions: what a series decides between patterns | 2026-10-26 | P2 | [generality](#generality-the-audits) |
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 2026-10-24 | P3 | [generality](#generality-the-audits) |
+| [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 2026-10-31 | P3 | [generality](#generality-the-audits) |
 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) | A candidate is judged on a fit that converged | 2026-10-28 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | 2026-10-21 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
-| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-10-26 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-10-28 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 2026-10-30 | P2 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [2034](2034-the-satellite-window-is-compile-models-window.md) | The satellite arm generates over `compile_model`'s window, not a copy of it | 2026-10-27 | P3 | [magnetic](#magnetic) |
 | [2035](2035-a-reduced-cell-is-its-inputs-exact-image.md) | A reduced cell is its input's exact image, near a right angle too | 2026-10-26 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
@@ -472,7 +473,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2005](2005-refine-py-codes-and-literals.md) | `refine.py`'s codes and its inline literals | ⬜ | P3 | [2002](2002-the-single-fit-actions.md) |
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 🔄 2026-10-24 | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) |
 | [2007](2007-indexing-codes-constants-and-gates.md) | Indexing: its codes, constants and gates | ⬜ | P3 | [2001](2001-the-rule-the-table-and-the-guard.md) |
-| [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | ⬜ | P3 | — |
+| [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 🔄 2026-10-31 | P3 | — |
 | [2015](2015-the-declared-geometry-picks-the-plan.md) | The declared geometry picks the plan, and a geometry can be unstated | ⬜ | P2 | — |
 | [2016](2016-a-cif-adp-off-symmetry-by-rounding-is-projected.md) | A literature CIF's U^ij that breaks site symmetry only by rounding is projected, and says so | ⬜ | P3 | — |
 | [2017](2017-the-second-pass-every-tier-3-threshold-on-three-families.md) | The second pass: every surviving tier-3 threshold measured on three families | ⬜ | P2 | [2002](2002-the-single-fit-actions.md) |
@@ -599,7 +600,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1998](1998-a-suggestion-past-its-bound.md) | A suggestion whose gain lies past its bound | ⬜ | P2 | — |
 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) | A candidate is judged on a fit that converged | 🔄 2026-10-28 | P2 | [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | ⬜ | P2 | — |
-| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 🔄 2026-10-26 | P2 | — ([1325](1325-parametric-series.md), [1421](1421-the-result-reproduces-its-own-number.md) soft) |
+| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 🔄 2026-10-28 | P2 | — ([1325](1325-parametric-series.md), [1421](1421-the-result-reproduces-its-own-number.md) soft) |
 | [2029](2029-whether-the-centroid-fixes-a-polar-origin-by-default.md) | Whether the centroid fixes a polar origin by default | ⬜ | P3 | — ([1912](1912-a-polar-axis-has-no-origin.md) soft) |
 | [2035](2035-a-reduced-cell-is-its-inputs-exact-image.md) | A reduced cell is its input's exact image, near a right angle too | 🔄 2026-10-26 | P3 | — |
 | [2044](2044-the-sabine-laue-factor-is-continuous.md) | The Sabine Laue factor is continuous at x = 1 | ✅ 2026-10-24 | — | — |
@@ -633,7 +634,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1519](1519-distinct-lattice-tests-as-one-stacked-solve.md) | The distinct-lattice χ² tests run as one stacked solve | ✅ 2026-09-29 | — | — ([1518](1518-dedup-weighs-a-difference-in-its-own-frame.md) soft) |
 | [1520](1520-a-search-refines-each-assignment-once.md) | A search refines each line assignment once (gated: build only if assignments repeat) | ⬜ | P3 | — |
 | [1524](1524-the-step-scans-last-two-blind-spots.md) | The step scan's last two blind spots | ⬜ | P3 | — |
-| [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 🔄 2026-10-13 | P2 | [1959](1959-the-dichotomy-grid-compiled-again.md) ([1520](1520-a-search-refines-each-assignment-once.md) soft) |
+| [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 🔄 2026-10-31 | P2 | [1959](1959-the-dichotomy-grid-compiled-again.md) ([1520](1520-a-search-refines-each-assignment-once.md) soft) |
 | [1959](1959-the-dichotomy-grid-compiled-again.md) | The dichotomy grid compiled again, so a ceiling reaches svd | ✅ 2026-10-14 | — | — |
 | [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | ⬜ | P2 | — |
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 🔄 2026-10-25 | P2 | — |

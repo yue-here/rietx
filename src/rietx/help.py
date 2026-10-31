@@ -2014,13 +2014,25 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "EXTINCTION_PRIOR_APPLIED": HelpEntry(
         title="Declared facts removed space groups from the extinction classes",
         description=(
-            "You declared facts about the specimen (chirality, centrosymmetry or "
-            "polarity), and they removed space groups from some classes. The declaration "
-            "only filters the members of each class. Every class was still fitted, and no "
-            "ΔBIC moved. It is a warning when the class the data rank first was emptied: "
-            "either the chemistry is doing what a powder cannot, or the declaration is "
-            "wrong. `best_or_none()` abstains when the data prefer an emptied class by "
-            "the decisive margin. Check the declaration before you read the answer."
+            "You declared facts about the specimen (chirality, centrosymmetry, "
+            "polarity, or the formula units per cell as a Z or a density), and they "
+            "removed space groups from some classes. Each removed group is named with "
+            "the fact it fails. A declared Z tests whether some element's atoms "
+            "per cell can sit on whole orbits of a group (a position with no free parameter "
+            "is one orbit, used once), the test of an ordered model. A group that fails "
+            "the count is kept and named, since a disordered alloy written with whole counts "
+            "fails it on its true group, and is removed only when you declare the model "
+            "`ordered`. "
+            "Where Z is not a whole multiple of a kept group's general multiplicity "
+            "(Z′ below one), the group stays and the message names the special "
+            "positions a formula unit then needs, since a molecule there must carry "
+            "that symmetry. The declaration only filters the members of each class. "
+            "Every class was still fitted, and no ΔBIC moved. It is a warning when the "
+            "class the data rank first was emptied: either the chemistry is doing what a "
+            "powder cannot, or the declaration is wrong. It is also a warning when a "
+            "declared density does not give the declared Z on this cell; nothing is then "
+            "filtered by Z. `best_or_none()` abstains in both cases. Check the "
+            "declaration before you read the answer."
         ),
     ),
     "EXTINCTION_SCREEN_FAILED": HelpEntry(
@@ -2861,7 +2873,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Rwp: a converged fit of a cell that predicts every reflection of another "
             "fits at least as well (0.164 against 0.164 for a doubled cell on rietx's "
             "synthetic LaB6 pattern). Without a peak list the "
-            "count is the fitted background's, over the whole range. Compare the "
+            "count is the fitted background's, over the whole range. Absences that "
+            "sit only above the window are reported at info level and cap nothing. "
+            "Compare the "
             "smaller cell that indexes the same lines, and run the extinction screen "
             "before you reject this one."
         ),
@@ -2946,7 +2960,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Measured: it refutes Si's cubic I √2·a₀ (0 of 12 extra lines seen) and "
             "kept every truth tested as a child, the lowest at p = 0.0072; on the "
             "finished acceptance searches it put brucite's and 11-BM NAC's truths "
-            "first. Untested beyond those patterns."
+            "first. Untested beyond those patterns. A cell whose own lines are seen more "
+            "often than the smaller cell's is never refuted: an oversized cell cannot "
+            "do that. On dense low-symmetry patterns chance alone covers most of the "
+            "range, and three synthetic truths were refuted before this rule."
         ),
     ),
     "INDEX_SYSTEMS_NOT_COVERED": HelpEntry(
@@ -3318,6 +3335,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "weight and the fit is unweighted. The reader kept the values, because a "
             "uniform error is legal. Goodness of fit and χ² mean something only if every "
             "point has that error. A placeholder in the error field is the usual cause."
+        ),
+    ),
+    "PATTERN_TOTAL_SCATTERING": HelpEntry(
+        title="The file holds a total-scattering function, not a pattern",
+        description=(
+            "The file holds a reduced total-scattering function: G(r), the pair "
+            "distribution function on a real-space axis r in Å, or S(Q) or F(Q) on "
+            "a scattering-vector axis Q in Å⁻¹. Neither axis is 2θ. rietx does not "
+            "read total-scattering data yet (issue #192), so the file is refused "
+            "rather than read as a powder pattern, which would fit a Bragg model to "
+            "it and report a plausible Rwp. The file is recognised by its own "
+            "column labels (an #L line naming r and G, or Q and S or F), by a "
+            "PDFgetX2 or PDFgetX3 header, or, with neither, by a .gr, .sq or .fq "
+            "suffix alone; the message says which. Refine the diffraction pattern "
+            "the reduction started from instead. A 2θ scan that only carries one of "
+            "those suffixes opens under any other name."
         ),
     ),
     "PATTERN_UNDERSAMPLED": HelpEntry(

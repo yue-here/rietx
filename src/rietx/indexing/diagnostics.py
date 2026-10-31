@@ -776,24 +776,41 @@ def candidate_diagnostics(cand, *, formula: str | None = None,
             suggestion=("Refine in the lower symmetry and test the higher "
                         "one.")))
 
+    # keyed on the validation's own counts, not on the caveat (#941 round 1):
+    # the code then reads the same on a candidate validated directly, before
+    # the gate has run, and on a validation the gate reads as failed; and a
+    # count outside de Wolff's window is said, at ``info``, rather than lost
     lebail = cand.lebail
-    if lebail is not None and "predicted_but_absent" in cand.confidence_caveats:
+    in_window = outside = 0
+    # a diverged fit is as unread as a failed one: consensus.caveats_for
+    # reports both as validation_failed, and this block must not say otherwise
+    if lebail is not None and lebail.status not in ("failed", "diverged"):
+        if lebail.absent_source == "line_screen":
+            in_window = lebail.predicted_but_absent_uncancellable_in_window or 0
+            outside = (lebail.predicted_but_absent_uncancellable or 0) - in_window
+        else:
+            in_window = lebail.predicted_but_absent
+    if in_window > 0 or outside > 0:
         tt = lebail.predicted_but_absent_two_theta
         if lebail.absent_source == "line_screen":
             message = (
-                f"{lebail.predicted_but_absent_uncancellable_in_window} of the "
+                f"{in_window} of the "
                 "lines this lattice predicts inside the first twenty observed "
                 "lines, that no extinction could remove, have nothing above the "
                 "picker's background envelope at the measured width "
                 f"({lebail.predicted_but_absent} absent over the whole range, "
-                f"{lebail.predicted_but_absent_uncancellable} uncancellable).")
+                f"{lebail.predicted_but_absent_uncancellable} uncancellable)."
+                + ("" if in_window else " None of them is in the window, so "
+                   "the count caps nothing: above it a correct cell's weak "
+                   "general reflections go undetected too."))
         else:
             message = (
                 f"{lebail.predicted_but_absent} of {lebail.n_reflections} "
                 "reflections this lattice predicts have no net intensity "
                 "above the fitted background.")
         out.append(Diagnostic(
-            level="warning", code="INDEX_PREDICTED_BUT_ABSENT",
+            level="warning" if in_window else "info",
+            code="INDEX_PREDICTED_BUT_ABSENT",
             message=message,
             where=where + ([f"first at {tt[0]:.3f}°"] if tt else []),
             suggestion=("Compare the smaller cell that indexes the same lines: "
@@ -802,7 +819,10 @@ def candidate_diagnostics(cand, *, formula: str | None = None,
                         "separate them: a converged fit of a cell that "
                         "predicts every reflection of another fits at least "
                         "as well (0.164 against 0.164 for a doubled cell on "
-                        "rietx's synthetic LaB6 pattern).")))
+                        "rietx's synthetic LaB6 pattern)."
+                        if in_window else
+                        "Look at the pattern at these positions if the cell "
+                        "is in doubt; the grade does not read them.")))
 
     refuting = [c for c in cand.supercell_checks or [] if c.verdict == "refuted"]
     if refuting:
@@ -1154,6 +1174,11 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
     if alive and not admissible:
         reasons.append("the declared prior leaves no member in any surviving "
                        "class")
+    if screen.density_contradicts_z():
+        reasons.append("the declared density does not give "
+                       + (f"the declared Z = {screen.prior.z}"
+                          if screen.prior.z is not None else "a whole Z")
+                       + " on this cell")
     if top.n_absent and top.n_testable == 0:
         reasons.append("none of its absences is testable in this range")
     if unscreened:
@@ -1183,15 +1208,36 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
     ``info`` when the declaration only narrowed the classes the data rank;
     ``warning`` when it emptied the class the data rank first, since that is
     either the declaration doing work the data could not, or the data
-    contradicting it — and the reader must see which before acting.
+    contradicting it — and the reader must see which before acting.  Also a
+    ``warning`` when a declared density does not give the Z on this cell.
+    Each removed group is named with the facts it fails, each member of the
+    answer's class kept at a Z′ that is not whole with the special positions it
+    needs, and each kept member whose orbits cannot hold the declared count with
+    that statement.  A density that fits several whole Z is said to, and only
+    declares nothing.
     """
-    declared = ", ".join(f"{k}={v}" for k, v in screen.prior.declared().items())
+    prior = screen.prior
+    declared = ", ".join(f"{k}={v}" for k, v in prior.declared().items())
     removed = [c for c in screen.candidates if c.excluded_groups]
     emptied = [c.symbol for c in removed if not c.space_groups]
     first_emptied = bool(alive) and not alive[0].space_groups
+    contradicted = screen.density_contradicts_z()
     n_removed = sum(len(c.excluded_groups) for c in removed)
     message = (f"the declared prior ({declared}) removed {n_removed} space "
                f"group(s) from {len(removed)} class(es)")
+    if contradicted:
+        message = (f"the declared density and formula put "
+                   f"{screen.z_from_density:.2f} formula units in this cell, "
+                   + (f"not the declared z = {prior.z}"
+                      if prior.z is not None else "not one whole number")
+                   + ", so no group was filtered by Z and best_or_none() "
+                     "abstains; " + message)
+    elif prior.density is not None and screen.z is None and screen.z_candidates:
+        message = (f"the declared density and formula put "
+                   f"{screen.z_from_density:.2f} formula units in this cell, "
+                   f"which fits Z = {', '.join(map(str, screen.z_candidates))} "
+                   "within the density's tolerance, so no group was filtered "
+                   "by Z (declare z to filter); " + message)
     if emptied:
         message += f", emptying {', '.join(emptied)}"
     if first_emptied and top.space_groups:
@@ -1202,19 +1248,47 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
         message += (f"; the data's leading class {alive[0].symbol} is among "
                     "them and the declaration admits no member of any "
                     "surviving class, so there is no admissible answer")
+
+    def _named(c) -> str:
+        return ", ".join(f"{g} ({c.exclusion_reasons[g]})"
+                         if g in c.exclusion_reasons else g
+                         for g in c.excluded_groups)
+
     return Diagnostic(
-        level="warning" if first_emptied else "info",
+        level="warning" if (first_emptied or contradicted) else "info",
         code="EXTINCTION_PRIOR_APPLIED",
         message=message + ".  A filter on the members, never evidence: no ΔBIC "
                           "moved and every class was fitted",
-        where=[f"{c.symbol}: excluded {', '.join(c.excluded_groups)}"
-               for c in removed],
+        where=[f"{c.symbol}: excluded {_named(c)}" for c in removed]
+        + _special_lines(top, screen.z) + _count_lines(top),
         suggestion=("check the declaration before the answer: a class it "
                     "emptied that leads on the data is either chemistry doing "
                     "what a powder cannot, or a wrong declaration (a racemate "
                     "declared enantiopure, a polar sample measured as a "
-                    "centrosymmetric twin).  best_or_none() abstains when the "
-                    "data prefer an excluded class by the decisive margin"))
+                    "centrosymmetric twin, a Z read off the wrong cell).  "
+                    "best_or_none() abstains when the data prefer an excluded "
+                    "class by the decisive margin"))
+
+
+def _special_lines(top, z) -> list[str]:
+    """The Z′ statements of the answer's class, one per member — or one line
+    when every member needs special positions, as an ionic solid's do, since
+    the statement then tells no member from another."""
+    notes = top.special_positions
+    if not notes:
+        return []
+    if len(top.space_groups) > 1 and len(notes) == len(top.space_groups):
+        return [f"{top.symbol}: every member holds Z = {z} only with formula "
+                "units on special positions (special_positions names them)"]
+    return [f"{top.symbol}: {note}" for note in notes.values()]
+
+
+def _count_lines(top) -> list[str]:
+    """What the declared Z says of the answer's class members whose orbits
+    cannot hold some element's count: kept, a disordered model may share a site."""
+    return [f"{top.symbol}: {g} kept though {why} (a disordered model shares "
+            "a site; ExtinctionPrior(ordered=True) removes it)"
+            for g, why in top.count_notes.items()]
 
 
 def _cell_str(cell) -> str:
