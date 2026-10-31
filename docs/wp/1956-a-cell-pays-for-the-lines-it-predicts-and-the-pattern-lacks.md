@@ -184,6 +184,32 @@ engine or the ranking. Indexing is provisional by declaration
   Checked against the tree at d87c8cc91: `fom_panel_disagrees` is unchanged
   and task 5 is unticked. The figures were not re-run.
 
+- 2026-10-31, from the issue triage (issue #1230, in PR #1251): since #941's
+  merge (`fe4cbcc32`) the containment refuter demotes the true cell of three
+  clean synthetic low-symmetry patterns under `preset="full"`: aP1 #1 → #2,
+  aP2 and big_mP1 #1 → #12, each truth carrying `supercell_refuted` against a
+  wrong "parent" of M₂₀ 4-9 that leaves 1-49 observed lines unindexed. The
+  reporter names three causes: `screen.contains` asks only that the child
+  index what the parent indexes; the denser line set is the child even when
+  the "parent" is 4-6× its volume; and on a dense list p₀ (0.63-0.82 with the
+  0.15° floor) sits at the truth's own seen fraction. Checked against the tree
+  at d87c8cc91: `containment_evidence` (`screen.py:475`) still compares
+  `n_seen ≤ n_extra·p₀` with `p₀` from `PatternScreen.from_peaks`, floored by
+  `p0_floor_deg` (`workflow.py:878`, k_sigma × the effective shift allowance),
+  and nothing in it reads either cell's seen fraction. PR #1251 (contributor,
+  head `195c38e8`, mergeable) builds neither of the issue's recommended
+  options. It measured option 1 (equal indexed sets) failing NAC's acceptance
+  row and option 3 (primitive-volume guard) leaving big_mP1 at #11, and builds
+  arm g instead: a child seen more often than its parent
+  (`child_seen_fraction` > `parent_seen_fraction`, new `SupercellEvidence`
+  fields) reads `undecided`, never `refuted`. It reports all three truths back
+  at #1, #941's Acceptance pairs still refuted, 211 acceptance tests passed
+  and no no-answer control promoted. It touches `_audit.py` and asks whether
+  the approved `INDEX_SUPERCELL_REFUTED` row's evidence text should say the
+  condition is now narrower; that is the maintainer's. Issue #1263 is the
+  sibling mechanism (the floored p₀ in the null) with an alternative rule,
+  `split`, measured against g; weigh the two in one review.
+
 ## Non-goals
 
 - The blind search and enumeration ceilings (WP-1924), dedup across a reduction
