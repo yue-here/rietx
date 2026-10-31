@@ -12,6 +12,15 @@ oracles; :mod:`~rietx.solve.tempering`, the planned ladder, one seed of parallel
 tempering with its acceptance record, and the polish; and
 :mod:`~rietx.solve.cluster`, distinct solutions under the group's Euclidean
 normaliser and the ranked list with its evidence, no grade and no structure.
+The entry point (#562 S2b, WP number pending) is three more:
+:mod:`~rietx.solve.workflow`, ``solve_structure`` — the units (the race over a
+composition's site-class assignments, the seeds, the prior-off control seeds,
+a consensus per space group) on the event stream and the cancel token ``fit``
+uses, checkpointed and resumable (#998), and ``merge_seed_results`` for seeds
+run as separate processes; :mod:`~rietx.solve.solution`, the answer: ranked
+candidates with their evidence, no structure of its own and no grade; and
+:mod:`~rietx.solve.engines`, the run's settings, every search setting the
+caller's, and the engine registry.
 Nothing here is exported from :mod:`rietx`; the package becomes public, as a
-provisional module, with the entry point that returns candidates.
+provisional module, when the entry point is exported.
 """

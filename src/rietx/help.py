@@ -64,6 +64,7 @@ __all__ = [
     "SEARCH_FIELD_HELP",
     "RESULT_FIELD_HELP",
     "RESULT_FIELD_TYPES",
+    "SOLVE_FIELD_HELP",
     "INSTRUMENT_FIELD_HELP",
     "STAGE_FIELD_HELP",
     "UNIT_DISPLAY",
@@ -5808,6 +5809,116 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "`backward`, which carries none of its own."
         ),
     ),
+}
+
+
+#: One entry per field of :class:`~rietx.solve.solution.SolveSpecSpec`, the
+#: structure-solution run's settings (#562 S2b).  Settings, not refined
+#: quantities: ``default`` is the schema's own value rendered as JSON, crossed
+#: by ``tests/test_solve_entry.py`` as the search arm's are by
+#: ``tests/test_help.py``, and ``None`` for the search settings, which have no
+#: default: the engine chooses none of them (yue-here/rietx#1224).  ``typical``
+#: quotes what the engine's tests ran at, as a measurement, not a
+#: recommendation.  Not yet in :func:`help_registry`: the route's arms are the
+#: GUI's (``gui/src/lib/help.ts``), and the solve form is S7b's.
+SOLVE_FIELD_HELP: dict[str, HelpEntry] = {
+    "engine": HelpEntry(
+        title="Solve engine",
+        description=("The search that runs. One is built, parallel tempering in direct "
+                     "space (tempering); charge flipping is planned."),
+        typical='"tempering"'),
+    "seeds": HelpEntry(
+        title="Seeds",
+        description=("The independent starts, by index. A candidate's seeds say how many of "
+                     "them reached it. Run seeds as separate processes with one index each "
+                     "and merge the results; the merge is the in-process answer."),
+        typical="four in the engine's tests"),
+    "control_seeds": HelpEntry(
+        title="Control seeds",
+        description=("Seeds run with every prior at zero weight: the data alone. Each "
+                     "candidate reports its RMSD from the control arm's best structure and "
+                     "that structure's chi-squared. Empty runs no control, and both read "
+                     "none."),
+        typical="two in the engine's tests"),
+    "replicas": HelpEntry(
+        title="Replicas per seed",
+        description=("Temperatures on the planned geometric ladder of one seed. The top "
+                     "temperature is the spread of J over random structures, measured on "
+                     "each run."),
+        typical="6 in the engine's tests"),
+    "sweeps": HelpEntry(
+        title="Sweeps per seed",
+        description=("One move per replica per sweep, for each seed and control seed."),
+        typical="2 000 recovered a rigid 14-atom fragment, 20 000 NAC's six free sites"),
+    "race_sweeps": HelpEntry(
+        title="First race round",
+        description=("When a composition is declared, its site-class assignments race: each "
+                     "runs this many sweeps, the better half by lowest J continues for "
+                     "twice as many, until one is left. A multiple of 1 000, the boundary a "
+                     "round continues from."),
+        typical="2 000 on NAC"),
+    "span": HelpEntry(
+        title="Ladder span",
+        description=("Top over bottom temperature of the geometric ladder "
+                     "(tempering.Ladder.planned's span). Above 1."),
+        typical="30 on the engine's two cases"),
+    "step": HelpEntry(
+        title="Move sizes",
+        description=("The move size at the bottom and the top rung, geometric between "
+                     "(Ladder.planned's step). Two positive lengths."),
+        unit="Å",
+        typical="[0.05, 1.0] on the engine's two cases"),
+    "swap_every": HelpEntry(
+        title="Swap cadence",
+        description=("Sweeps between two rounds of neighbour swaps on the ladder "
+                     "(tempering.temper's swap_every)."),
+        typical="10 in the engine's tests"),
+    "exchange": HelpEntry(
+        title="Exchange probability",
+        description=("The probability that a move on a free site is an exchange with a free "
+                     "site of the same class holding another species, instead of a "
+                     "displacement (tempering.temper's exchange). In [0, 1]."),
+        typical="0.1 on NAC"),
+    "n_random": HelpEntry(
+        title="Random structures for the ladder",
+        description=("How many uniform random structures the top temperature is measured "
+                     "from (tempering.random_spread's n). At least 2."),
+        typical="64 in the engine's tests"),
+    "cluster_tol": HelpEntry(
+        title="Clustering tolerance",
+        description=("The RMSD after the best equivalent alignment within which two "
+                     "polished states are one solution (cluster.cluster's tol)."),
+        unit="Å",
+        typical="0.35 in the engine's tests"),
+    "polish_maxiter": HelpEntry(
+        title="Polish iterations",
+        description=("The cap on L-BFGS-B iterations when each rung's best state is taken "
+                     "to its local minimum (tempering.polish's maxiter)."),
+        typical="200 in the engine's tests"),
+    "seed": HelpEntry(
+        title="Base seed",
+        description=("Every unit's random generator is drawn from this, the unit's kind and "
+                     "its index, so seed k is the same chain in any run that names it.")),
+    "heartbeat_sweeps": HelpEntry(
+        title="Heartbeat",
+        description=("Sweeps between two solve_step events inside a unit, each carrying the "
+                     "leader, its change and the ladder's acceptance; none sends no "
+                     "heartbeat. Changes nothing the run computes."),
+        default=None),
+    "checkpoint_every_s": HelpEntry(
+        title="Checkpoint interval",
+        description=("The shortest time between two checkpoint writes at the engine's "
+                     "boundaries; 0 writes at every one. A finished unit always writes. "
+                     "Read only with a checkpoint path, and changes nothing the run "
+                     "computes."),
+        unit="s",
+        default="0.0"),
+    "total_budget_seconds": HelpEntry(
+        title="Whole-run ceiling",
+        description=("Wall-clock seconds for the whole run, or none. A run the ceiling stops "
+                     "returns what it has, every candidate marked partial, and names the "
+                     "units it did not reach."),
+        unit="s"),
 }
 
 

@@ -159,6 +159,7 @@ A threshold compared across two `report_thresholds_version` values compares two 
 | `Capabilities.project_formats` | one `ProjectFormatCapability` per format of another program's refinement this build reads ([How to open a GSAS, TOPAS or FullProf refinement](../guides/foreign.md)) |
 | `Capabilities.search_presets` | one `SearchPresetCapability` per indexing search preset |
 | `Capabilities.indexing_engines` | one `EngineCapability` per indexing engine |
+| `Capabilities.solve_engines` | one `EngineCapability` per structure-solution engine (provisional; the entry point is not exported yet) |
 | `Capabilities.crystal_systems` | the crystal systems in the order an indexing search enters them, from cubic to triclinic. Each system takes longer to search than the one before it |
 | `Capabilities.centrings` | for each crystal system, the Bravais centring letters it admits |
 | `Capabilities.shift_templates` | the systematic-shift models the indexing screen can fit |
