@@ -1,6 +1,6 @@
 # WP-2065 — a hung fast job names its test, and the hang is fixed
 
-Milestone: unscheduled · Status: 🔄 2026-10-31 — the cause was one 10-13 min case, now `slow` on main (PR #1254); both fast jobs set `faulthandler_timeout` (PR #1256); acceptance waits on twenty fast jobs
+Milestone: unscheduled · Status: 🔄 2026-10-31 — the cause was one 10-13 min case, now slow on main (PR #1254); both fast jobs set faulthandler_timeout (PR #1256); the twenty-job count is met (169 fast jobs green in 36 runs since #1256); the planted-test proof that the dump reaches the CI log is open
 Track: The repo's own process
 Depends on: —
 Priority: P1 2026-10-31 — a required check red on main: the `fast` job hangs at `[ 99%]` and is cancelled at its 40-min cap, 8 times in about 15 hours, main's own push run among them; every PR it hits waits 40 min and reruns
@@ -137,6 +137,11 @@ handover, showing the dump with the test id.
 - pytest docs, "faulthandler"; pytest-timeout README.
 
 ## Handover log
+
+- **2026-10-31** (ghostshift close-batch, not closed) — the first half of the acceptance is met, and the WP stays open for the second half. CI has gone 36 runs without a `fast` job hanging since the dump flag merged, and 40 since the slow case moved to the nightly. The remaining item is a maintainer's call: a planted sleeping test on a throwaway PR to show the stack dump reaches the job log. Until then no log has shown it, so a future hang is not yet known to name its test.
+  *Measured* (`gh run list --workflow ci.yml --limit 150` and each run's jobs, 2026-10-31 to 22:42Z): PR #1254 merged at 11:09:56Z and PR #1256 at 12:06:59Z. Runs created from 11:10Z on: 40 runs, 189 `fast` jobs (the three Python legs' shards plus `fast jax`) passed, none ended in a cap cancel from a post-fix base. Runs created from 12:07Z on: 36 runs, 169 `fast` jobs passed. The other jobs in the window were skipped matrix placeholders or cancelled by a newer push after 0-20 minutes (`cancel-in-progress`).
+  *One cap cancel in the window, and why it does not count*: run 41200349124 (PR #1226, `fast py3.11 1/2`) printed `[ 99%]` at 12:53Z and was cancelled at 13:06Z, 40.3 min after it started. Its checkout is `refs/pull/1226/merge` = `aae52725`, a merge of the PR head into `d35ffeda7`. That is the main commit of the first hang in the triage table, before #1254, so the run still carried the 10-13 min case. Its log shows the pytest command without `-o faulthandler_timeout=600`, so it predates #1256 too. A pull-request run builds from the merge ref made when the PR last synchronised, not from today's main.
+  *Next*: (1) the maintainer decides whether to spend a CI run on the planted-test proof (the acceptance's second sentence) or to waive it, since the dump was shown under local `-n 2` and the 36 clean runs show the hang itself is gone. (2) Then close: delete `Priority:` and the `### Inherited` section if one has arrived, move this narrative to the v1.11 record, and close #1249 through the PR that closes the WP.
 
 - **2026-10-31** — the fix. There was no hang. One fast-tier case from #1189
   enumerates 151 739 subgroups and runs 10-13 minutes on a CI runner. Placed
