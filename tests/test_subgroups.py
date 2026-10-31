@@ -613,6 +613,47 @@ def test_site_constraints_letter_on_a_line_off_the_axes(group):
         assert site_constraints(group, x).wyckoff == w.label, (group, w.label)
 
 
+@pytest.mark.parametrize("group", ["F d -3 m:2", "P b n m", "I 1 21 1", "P 1 21/c 1"])
+def test_site_constraints_letter_ignores_whole_cell_shifts(group):
+    """A coordinate stored outside [0, 1) names the same position, so the same letter.
+
+    Review round 2: (1/8, 1/8, 1/8) in ``F d -3 m:2`` read 8a in the cell and 8b
+    shifted by 4, 7 or -5 cells, because the shift search covers a few cells and
+    a miss fell back to spglib's letter.  ``I 1 21 1`` is not a Hall setting, so
+    its letters come through (P, p).
+    """
+    from rietx.crystallography.wyckoff import site_constraints
+
+    named = S.wyckoff_positions(group)
+    table = S._positions_for(S._group_of(group)).table
+    points = [[float(v) for v in table.generic(i)] for i in range(len(named.positions))]
+    if group == "F d -3 m:2":
+        points.append([1 / 8, 1 / 8, 1 / 8])
+    for x in points:
+        home = site_constraints(group, x).wyckoff
+        for shift in (1, 4, 7, -5):
+            assert site_constraints(group, [v + shift for v in x]).wyckoff == home, (group, x, shift)
+    if group == "F d -3 m:2":
+        assert site_constraints(group, [1 / 8 + 4] * 3).wyckoff == "8a"
+
+
+def test_site_constraints_reuses_the_positions_table_per_group():
+    """One build per group: repeated calls on a group must not rebuild its table.
+
+    Review round 2 measured 4-5x the per-call cost of ``main`` from building
+    ``_Positions`` afresh on every call.
+    """
+    from unittest import mock
+
+    from rietx.crystallography.wyckoff import site_constraints
+
+    site_constraints("P b n m", (0.1, 0.2, 0.25))
+    with mock.patch.object(S, "_Positions", wraps=S._Positions) as built:
+        for _ in range(5):
+            site_constraints("P b n m", (0.1, 0.2, 0.25))
+    assert built.call_count == 0
+
+
 def test_a_splitting_prints_the_transform_g_s_own_labels_belong_to():
     """A group outside spglib's 530 Hall settings is lettered through (P, p); the printed
     table says which, and says nothing extra for a group that is in one."""

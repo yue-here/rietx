@@ -263,9 +263,11 @@ def site_constraints(space_group, xyz, *, tol: float = SITE_TOL) -> SiteConstrai
     position count as on it).  Raises ``RuntimeError`` if spglib does not
     recover the requested group from the probe cell — that indicates
     coordinates given in a setting inconsistent with the operators, not a
-    tolerance issue.  **The Wyckoff letter and the oriented site-symmetry
-    symbol are both spglib's**, so they are available only for a group spglib
-    names; an :class:`~rietx.crystallography.symmetry.OperatorGroup` gets the
+    tolerance issue.  **The oriented site-symmetry symbol is spglib's; the
+    Wyckoff letter is the one**
+    :func:`~rietx.crystallography.representation.subgroups.wyckoff_positions`
+    **gives** (spglib's own only where that table cannot place the point), and
+    both are available only for a group spglib names; an :class:`~rietx.crystallography.symmetry.OperatorGroup` gets the
     constraint bases and the multiplicity — read off its own operations — with
     ``wyckoff`` and ``site_symmetry`` both empty, rather than a plausible wrong
     symbol for the type spglib would identify from the probe cell (the comment

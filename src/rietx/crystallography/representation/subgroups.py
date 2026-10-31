@@ -1425,6 +1425,26 @@ def wyckoff_positions(group) -> WyckoffPositions:
                                             for i in range(len(pos.table.classes))))
 
 
+_POSITIONS_CACHE: dict = {}
+_POSITIONS_BY_SYMBOL: dict = {}   # the same objects, found without rebuilding the group
+
+
+def _positions_for(G: _Group) -> _Positions:
+    """:class:`_Positions` of a group, built once per group identity (``G.key()``).
+
+    Keyed on the group's canonical key, not the object: ``_group_of`` returns a
+    fresh ``_Group`` per call, which an ``lru_cache`` on the object would miss.
+    """
+    key = G.key()
+    hit = _POSITIONS_CACHE.get(key)
+    if hit is None:
+        if len(_POSITIONS_CACHE) >= 64:
+            _POSITIONS_CACHE.clear()
+            _POSITIONS_BY_SYMBOL.clear()
+        hit = _POSITIONS_CACHE[key] = _Positions(G)
+    return hit
+
+
 def _letter_at(group, xyz, site_order: int, tol: float) -> str | None:
     """The letter :func:`wyckoff_positions` gives the position holding ``xyz``, or None.
 
@@ -1435,11 +1455,19 @@ def _letter_at(group, xyz, site_order: int, tol: float) -> str | None:
     with ``tol``: a point with a free parameter has no exact rational form on
     a line like x + y = 1/2.  None when the point lies on no single position
     or on one whose site symmetry is not ``site_order``; the caller keeps its
-    own letter, as the tolerance, not the table, would be at fault.
+    own letter, as the tolerance, not the table, would be at fault.  ``xyz`` is
+    wrapped into [0, 1) first: a stored coordinate outside the cell names the
+    same position, and the shift search below covers only a few cells.
     """
-    pos = _Positions(_group_of(group))
+    sg = as_group(group)
+    pos = _POSITIONS_BY_SYMBOL.get(sg.xhm()) if isinstance(sg, gemmi.SpaceGroup) else None
+    if pos is None:
+        pos = _positions_for(_from_operations(sg.operations()))
+        if isinstance(sg, gemmi.SpaceGroup):
+            _POSITIONS_BY_SYMBOL[sg.xhm()] = pos
     table = pos.table
-    x = np.array([float(v) for v in pos.to_standard(tuple(Fraction(float(v)) for v in xyz))])
+    wrapped = tuple(Fraction(float(v) % 1.0) for v in xyz)
+    x = np.array([float(v) for v in pos.to_standard(wrapped)])
     shifts = np.array(list(itertools.product(range(-3, 4), repeat=3)), dtype=np.float64)
     hits = set()
     for i, comps in enumerate(table.components):
