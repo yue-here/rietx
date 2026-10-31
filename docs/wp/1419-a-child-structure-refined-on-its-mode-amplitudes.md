@@ -572,6 +572,25 @@ the reporter's fork.
   `DISTORTION_MODE_UNSUPPORTED` do not exist, and C3a is on main (PR #1107).
   The reporter's figures were not re-run.
 
+- 2026-10-31, from the issue triage (issue #1247): `distortion_candidates`
+  raises `RuntimeError: a candidate operation does not map the parent's atoms
+  onto themselves in the magnetic cell; this is a bug` for every centred
+  parent. The reporter's sweep over the first ITB setting of all 230 types
+  found 1318 of 1318 calls on I, F, C, A and R lattices failing, and every P
+  lattice stated. Cause, read from the code: `_standard_child`
+  (`magnetic/isotropy.py:2276`) lists each atom once per `site_orbit` image,
+  whose images already include the centrings, then adds every
+  `candidate.cell.translations` shift (`:2301-2308`). At k = 0 those shifts
+  are the centrings again, so each position appears more than once and
+  `image_of` finds two hits (`:2318-2321`). The reporter's dedupe modulo the
+  magnetic cell makes all 4940 calls of the sweep state a child that passes
+  the exact setting check. Checked against the tree at d87c8cc91: rocksalt
+  NaCl (`F m -3 m`) raises at k = 0 and at k = (1/2, 1/2, 1/2), reproduced
+  with the issue's snippet (`scratchpad/lane-B/r1247.py`). The tests use only
+  the primitive cubic perovskite. The fix turns a self-declared bug into
+  candidates, so it changes what a released call does and owes a release note
+  under § Changed, as PR #1135 did.
+
 ## Non-goals
 
 - Moment modes (SARAh-style basis-vector amplitudes): 1327 owns
