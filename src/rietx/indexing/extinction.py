@@ -351,14 +351,15 @@ def exclusion_reasons(prior: ExtinctionPrior | None, sg: gemmi.SpaceGroup,
     if prior.polar is not None and is_polar(sg) != prior.polar:
         out.append(f"polar={prior.polar}")
     if not out and prior.ordered and z is not None and counts:
-        why = content_exclusion(sg, z, counts)
+        why = content_exclusion(sg, z, counts, ordered=True)
         if why is not None:
             out.append(f"z={z}, ordered: {why}")
     return out
 
 
 def content_exclusion(sg: gemmi.SpaceGroup, z: int,
-                      counts: dict[str, float]) -> str | None:
+                      counts: dict[str, float], *,
+                      ordered: bool = False) -> str | None:
     """Why ``z`` formula units of ``counts`` cannot occupy this group, or None.
 
     Each element's atoms per cell, Z times its count in the formula, must sit
@@ -377,23 +378,46 @@ def content_exclusion(sg: gemmi.SpaceGroup, z: int,
     shared site this test cannot see, so it **removes** a group only when
     the caller declares the model ordered (``ExtinctionPrior.ordered``);
     otherwise the screen only states the failure.  A formula count that is
-    not a whole number (``Cu0.5Au0.5``) declares a site the element shares,
-    and that element is not counted.  The test is per element, so two
-    elements competing for one fixed position are not caught: it never
+    not a whole number reads two ways, and ``ordered`` is what tells them
+    apart.  Without it, the count declares a site the element shares
+    (``Cu0.5Au0.5`` at Z = 4, two Cu on the four sites of 4a) and that element
+    is not counted.  With it no site is shared, so the fraction belongs to the
+    formula unit (a hemihydrate's ``·0.5H2O``) and the element is counted
+    whenever its atoms per cell, count × Z, are a whole number.  Where they are
+    not (``Fe0.95O`` at Z = 4, 3.8 Fe), no ordered model holds them and the
+    element is still not counted: removing every group would be a judgement
+    on the declaration, which this does not make.  The test is per element,
+    so two elements competing for one fixed position are not caught: it never
     removes a group an ordered structure can occupy.
     """
+    from fractions import Fraction
+
     from ..crystallography.site_classes import holds, site_classes
 
     classes = site_classes(sg)
     for element, n in counts.items():
-        if n != int(n):
+        # the decimal as written, so 0.7 × 10 is 7 and not 7.000000000000001
+        per_cell = Fraction(str(n)) * int(z)
+        if n != int(n) and (not ordered or per_cell.denominator != 1):
             continue                     # a shared site, declared as such
-        count = int(n) * int(z)
+        count = int(per_cell)
         if not holds(classes, count):
             sizes = ", ".join(str(m) for m in sorted({c.multiplicity
                                                       for c in classes}))
             return f"{element} {count} per cell is no sum of its orbits ({sizes})"
     return None
+
+
+#: The clause that marks a :func:`special_site_note` of the "no sum" kind: Z is
+#: no sum of the group's orbit multiplicities, so no formula unit sits whole.
+#: The other kind names the special positions; a reader telling the two apart
+#: (``diagnostics._special_lines``) asks :func:`_places_no_whole_unit`.
+_NO_WHOLE_PLACEMENT = "no placement of whole formula units exists"
+
+
+def _places_no_whole_unit(note: str) -> bool:
+    """Is this :func:`special_site_note` the "no sum" kind (no placement exists)?"""
+    return _NO_WHOLE_PLACEMENT in note
 
 
 def special_site_note(sg: gemmi.SpaceGroup, z: int) -> str | None:
@@ -431,8 +455,8 @@ def special_site_note(sg: gemmi.SpaceGroup, z: int) -> str | None:
     if rest is None:
         sizes = ", ".join(str(m) for m in sorted({c.multiplicity for c in classes}))
         return (f"{head}, and Z = {z} is no sum of this group's orbit "
-                f"multiplicities ({sizes}): no placement of whole formula "
-                "units exists, so the formula unit is not one molecule")
+                f"multiplicities ({sizes}): {_NO_WHOLE_PLACEMENT}, so the "
+                "formula unit is not one molecule")
     on = [c for c in special if c.multiplicity <= rest]
     by_symmetry: dict[str, list[str]] = {}
     for c in on:
