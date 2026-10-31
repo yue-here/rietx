@@ -50,6 +50,24 @@ its tier.
 - **From WP-2002 (2026-10-20, PR #1050): `HUMP_MIN_WIDTH_MULT` is a diagnostic threshold** (it gates `HUMP_TOO_NARROW`; it also floors a hump's width in the extinction screen, `indexing/extinction.py:737`), so it belongs with the other diagnostic-only constants handed here (B13). The suggestions of `SIZE_UNUSUALLY_SMALL` and `STRAIN_UNUSUALLY_LARGE` said a finite `Parameter.max` silences them; neither reads `max`, and both now say the flag changes nothing in the fit.
 - **From WP-2002 (2026-10-19, PR #1050).** 2002's batch class B13 proposes handing 34 constants to this WP, pending the maintainer's ruling. Each is the threshold of a code raised in `refine.py` and gates no action. The list with each code is `2002-batch/batch.md` § The B13 hand-off table, and each row's provenance is in `2002-batch/inventory.json`. If WPs 2005-2007 are cancelled at the gate after 2004, these rows need another home.
 
+- 2026-10-31, from the issue triage (issue #1215): `AIR_SCATTER_UNDECLARED`
+  fires on clean data whose background is too stiff at the low edge. On a
+  synthetic rutile Bragg–Brentano family (Cu Kα1 + Kα2, rietx's own forward
+  model, no air scatter in the truth) it fires on 20/20 clean patterns under
+  `auto_background`'s P-spline and on 0/20 under the truth's own 4-term
+  Chebyshev: the 1/(2θ) column removes χ² because the spline cannot follow the
+  low edge (#833's comment, WP-1931). The issue proposes a message that names
+  the measurement ("a 1/(2θ)-shaped low-edge residual removes X % of χ²") and
+  lists a background too stiff at the edge beside air scatter, and applies the
+  unanimity test to the suggestion: a refiner whose spline is stiff at the
+  edge would not declare air scatter. Checked against the tree at d87c8cc91:
+  the code is raised at `refine.py:9715`; `AIR_SCATTER_UNDECLARED` and
+  `AIR_SCATTER_UNDECLARED.suggestion` are both untiered in `_audit.ROWS`
+  (lines 547, 4067) and on the baselines (4354-4355); its two constants
+  `AIR_SCATTER_UNDECLARED_FRACTION` 0.005 and `_SCORE` 25.0 are rows
+  2867-2868. The 20/20 count is the issue's, not re-run here. This bears on
+  the code's tier and its suggestion row when this WP tiers it.
+
 ## Non-goals
 
 - The holds, releases, seeds and bound tests: 2002.
