@@ -183,7 +183,7 @@ The equations are in {ref}`the theory chapter <ch-parameterisation>`.
 
 The unit the result reports on is the irrep block: every mode sharing one `DistortionMode.irrep`, `DistortionMode.k` and `DistortionMode.isotropy_group`, over all parent sites, fixed by symmetry before the fit.
 `rietx.report.distortion_blocks` lists a phase's blocks with their mode indices.
-A fit of a phase carrying `Phase.distortion_modes` returns one `DistortionTotal` per block in `RefinementResult.distortion_totals`, which is `None` when no phase carries modes.
+A fit of a phase carrying `Phase.distortion_modes` returns one `DistortionTotal` per block in `RefinementResult.distortion_totals`, which is `None` when no phase carries modes, and also on a joint fit's result, whose builder writes none of the per-phase technique fields (geometry, cell volumes and this one alike): there `None` does not mean the phases carry no modes.
 
 | field | what it is |
 |---|---|

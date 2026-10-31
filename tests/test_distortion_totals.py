@@ -843,6 +843,17 @@ def test_a_det_needs_the_callers_probe_and_records_it(gamma_null):
 
 
 @SYN
+@pytest.mark.parametrize("bad", [0.0, -0.1, float("nan"), float("inf")])
+def test_a_det_refuses_a_probe_that_is_not_positive(gamma_null, bad):
+    """A probe of 0 would read as 'no mode moves the pattern', a negative one as a negative A_det."""
+    ref, data, _ = gamma_null
+    key = block_key(ref.structure.phases[0], GAMMA[1])
+    with pytest.raises(ValueError, match="detectability_probe"):
+        ref.distortion_block_tests(data, hold=[key], detectability_bar=6.0,
+                                   detectability_probe=bad)
+
+
+@SYN
 def test_a_block_key_survives_a_json_round_trip_and_a_foreign_total_is_refused(gamma_null):
     """A key read back from ``model_dump(mode="json")`` is a list and still names one block;
     a ``DistortionTotal`` of another refinement's phase raises the intended message."""

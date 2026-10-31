@@ -417,7 +417,8 @@ def distortion_block_tests(refinement, data, *, hold=None,
     <rietx.crystallography.representation.distortion.AmplitudeAction.even>`),
     and ``None`` computes none: the bar has no default.  ``detectability_probe``
     (Å) is the amplitude each mode's one predict is made at; it is the
-    caller's, **required with a bar** (``ValueError`` otherwise), because
+    caller's, **required with a bar** and **positive** (``ValueError``
+    otherwise, naming the argument), because
     λ_j ∝ A^p_j holds to leading order only and no one value has been shown to
     hold the error under a stated bar for every block.  ``hold=None`` holds
     every block that is not parent-invariant **and that the fit freed
@@ -442,6 +443,11 @@ def distortion_block_tests(refinement, data, *, hold=None,
     if detectability_bar is not None and detectability_probe is None:
         raise ValueError("detectability_bar needs detectability_probe, the amplitude (Å) of "
                          "the one predict per mode A_det is read from; it has no default")
+    if detectability_probe is not None and not (
+            math.isfinite(detectability_probe) and detectability_probe > 0.0):
+        raise ValueError(f"detectability_probe must be a positive amplitude in Å, got "
+                         f"{detectability_probe!r}: a probe of 0 gives every λ_j = 0 "
+                         "(read as 'no mode moves the pattern') and a negative one a negative A_det")
     sets = held_sets(refinement.structure, hold, set(_free_paths(refinement.result_)))
     full = refinement
     restarts: list[DistortionRestart] = []
