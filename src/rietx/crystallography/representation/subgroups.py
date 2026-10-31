@@ -1,12 +1,14 @@
-"""Maximal subgroups of a space group, generated from its own operations.
+"""Maximal subgroups of a space group and Wyckoff splittings, generated from its own operations.
 
-**Public API — WP-1919, PR 1.**
+**Public API — WP-1919.**
 
 ::
 
     maximal(group, kind="both", max_index=None, *, index=None, supercell=None)
                                               -> tuple[MaximalSubgroup, ...]
     is_maximal(group, symbol, transform)      -> bool
+    wyckoff_positions(group)                  -> WyckoffPositions
+    wyckoff_splitting(group, sub)             -> WyckoffSplitting
 
 ``group`` is any symbol gemmi resolves, a ``gemmi.SpaceGroup``, or an
 :class:`~rietx.crystallography.symmetry.OperatorGroup`, in any setting.
@@ -53,6 +55,16 @@ spglib version or the move to moyo (#426).  Compare two transformations by
 the subgroup they describe (:meth:`MaximalSubgroup.describes`), never
 entry by entry.  Two-origin types come out in spglib's default, origin
 choice 1, and rhombohedral ones on hexagonal axes.
+
+**Wyckoff positions** (Souvignier et al. 2016, ITA A § 1.4.4.2; A1 ch. 3.1) are the
+classes of points whose site-symmetry groups are conjugate in G, found on the
+1/24 grid of a Hall setting's conventional cell and joined by an exact test
+(a point is on a position when an image of it lies on the fixed component of
+the site-symmetry group of a point of that position's orbit); 1731 over the
+230 types.  The letters are spglib's, read through spglib's own frame, and
+belong to the setting and (P, p) the result names.  A **splitting**
+decomposes the G-orbit of a generic point of each G position into H-orbits,
+maps each by (P, p) into H's setting and identifies it there exactly.
 """
 
 from __future__ import annotations
@@ -69,10 +81,12 @@ import spglib
 
 from ..magnetic.operators import _rational_determinant, _rational_inverse
 from ..symmetry import as_group
-from ..wyckoff import SPGLIB_REFUSALS
+from ..wyckoff import SPGLIB_REFUSALS, coordinate_basis
 from .irreps import _row_hnf
 
-__all__ = ["MAX_INDEX", "MaximalSubgroup", "is_maximal", "maximal"]
+__all__ = ["MAX_INDEX", "MaximalSubgroup", "WyckoffPosition", "WyckoffPositions",
+           "WyckoffSplitting", "is_maximal", "maximal", "wyckoff_positions",
+           "wyckoff_splitting"]
 
 #: The largest index :func:`maximal` lists by default.  Every maximal subgroup
 #: of a space group that is not isomorphic to it has index 2, 3 or 4
@@ -947,3 +961,577 @@ def is_maximal(group, symbol: str, transform) -> bool:
     if any(_below(U, other, p) for other in _invariant_subspaces(mats, p)):
         return False
     return True
+
+
+# ---------------------------------------------------------------- Wyckoff positions
+
+#: The grid the positions are found on.  Every fixed coordinate of a special
+#: position in the ITA settings is a multiple of 1/24 (the finest are the
+#: eighths of the d-glide groups and the twelfths of the hexagonal ones), so
+#: the 1/24 grid of the conventional cell meets every Wyckoff position of a
+#: group in an ITA setting; the 1731 positions of the 230 types are the check.
+_WYCKOFF_GRID = 24
+
+#: Free-parameter values of a generic point of a position: rationals whose
+#: denominators are primes far from the 1/24 grid, so no free parameter lands
+#: on a special value and the point's site symmetry is the position's own
+#: (asserted where it is used).
+_GENERIC_VALUES = (Fraction(137, 1009), Fraction(271, 1013), Fraction(419, 1019))
+
+
+@dataclass(frozen=True)
+class WyckoffPosition:
+    """One Wyckoff position of a space group, in the group's own setting.
+
+    ``letter`` and ``site_symmetry`` (the oriented symbol) are spglib's, for
+    the setting :attr:`WyckoffPositions.standard` names; ``multiplicity`` is
+    the number of points of one orbit in the group's conventional cell,
+    ``site_order`` the order of the site-symmetry group.  ``point`` is the
+    first point of the conventional cell's 1/24 grid whose site symmetry is
+    exactly the position's, **not ITA's representative**: it sits off zero
+    wherever zero has higher symmetry (on ``P m m m`` the line 2i gives
+    ``(1/24, 0, 0)``, since ``(0, 0, 0)`` is 1a).  ``directions`` are the
+    integer directions the free parameters move it along, so the position is
+    the orbit of ``point + Σ θ_j · directions[j]`` at the θ_j that keep the
+    site symmetry exactly the position's; θ = 0 generally does not.
+    """
+
+    letter: str
+    multiplicity: int
+    site_symmetry: str
+    site_order: int
+    point: tuple[Fraction, Fraction, Fraction]
+    directions: tuple[tuple[int, int, int], ...]
+
+    @property
+    def label(self) -> str:
+        """Multiplicity and letter, ITA's Wyckoff symbol: ``"4f"``."""
+        return f"{self.multiplicity}{self.letter}"
+
+
+@dataclass(frozen=True)
+class WyckoffPositions:
+    """The Wyckoff positions of a space group, found from its operations.
+
+    The positions themselves come from the group's operations alone: points
+    whose site-symmetry groups are conjugate in G form one position
+    (Souvignier et al. 2016, ITA A § 1.4.4.2).  The letters are ITA's labelling convention,
+    not theory, and are spglib's for the setting ``standard`` (Togo,
+    Shinohara & Tanaka 2024).  When the group is given in one of spglib's 530
+    Hall settings that is its own setting and ``transform`` is the identity;
+    otherwise the group is standardised to spglib's default setting and
+    ``transform`` = (P, p), with r_group = P·r_standard + p, is the
+    transformation the letters belong to.  A different (P, p) related by the
+    affine normaliser can permute letters within a Wyckoff set (A1
+    § 3.1.1.6.5).
+    """
+
+    symbol: str
+    number: int
+    standard: str
+    transform: tuple[tuple[tuple[Fraction, ...], ...], tuple[Fraction, ...]]
+    positions: tuple[WyckoffPosition, ...]
+
+    def __str__(self) -> str:
+        return (f"{self.symbol} ({self.number}): "
+                + " ".join(w.label for w in self.positions))
+
+
+@dataclass(frozen=True)
+class WyckoffSplitting:
+    """How each Wyckoff position of G splits into positions of a subgroup H.
+
+    ``rows`` pairs each of G's labels with the labels of the H-orbits one
+    G-orbit splits into, ``(("2d", ("2c", "2d")), …)``, in G's letter order.
+    H's labels belong to ``transform``, the (P, p) with r_G = P·r_H + p that
+    states H (A1 § 3.1.1.6.5: another (P, p) can permute them within a Wyckoff
+    set); G's labels belong to ``group_transform``, the identity when G is in
+    one of spglib's Hall settings (:class:`WyckoffPositions`).  Every row
+    satisfies Σ m_H = m_G·|det P|.
+    """
+
+    group: str
+    subgroup: str
+    transform: tuple[tuple[tuple[Fraction, ...], ...], tuple[Fraction, ...]]
+    group_transform: tuple[tuple[tuple[Fraction, ...], ...], tuple[Fraction, ...]]
+    rows: tuple[tuple[str, tuple[str, ...]], ...]
+
+    def __getitem__(self, label: str) -> tuple[str, ...]:
+        for g, h in self.rows:
+            if g == label:
+                return h
+        raise KeyError(f"{label!r} is not a Wyckoff position of {self.group}")
+
+    def __str__(self) -> str:
+        lines = [f"{self.group} > {self.subgroup}  P = {_text(self.transform[0])}, "
+                 f"p = {_text(self.transform[1])}"]
+        if self.group_transform != _IDENTITY:  # G's own labels belong to this (P, p)
+            lines.append(f"  {self.group}'s labels: P = {_text(self.group_transform[0])}, "
+                         f"p = {_text(self.group_transform[1])}")
+        lines += [f"  {g} -> {'; '.join(h)}" for g, h in self.rows]
+        return "\n".join(lines)
+
+
+_IDENTITY = (tuple(tuple(Fraction(int(i == j)) for j in range(3)) for i in range(3)),
+             (Fraction(0), Fraction(0), Fraction(0)))
+
+
+def _conventional_ops(G: _Group):
+    """Every operation of G modulo Z³: the representatives times the centrings."""
+    centrings = _coset_vectors(G.L, _IDENTITY[0])  # the lattice points in the unit cell
+    ops = sorted({(W, _frac_part(_add(w, c))) for W, w in G.reps.items() for c in centrings})
+    return ops, len(centrings)
+
+
+class _Table:
+    """The positions of one group in its own coordinates, with what identifies them.
+
+    ``classes`` holds, per position: (letter, symbol, multiplicity, site order,
+    anchor point, directions); ``components`` holds, per position, the
+    fixed-point equations N·x = c of the site-symmetry group of every point
+    of the anchor's orbit, keyed by its rotation set.
+    """
+
+    def __init__(self, G: _Group, letters):
+        self.G = G
+        self.ops, self.centrings = _conventional_ops(G)
+        self.classes = []
+        self.components = []
+        for anchor, stab in _grid_orbits(self.ops):
+            if len(stab) == 1 and any(c[3] == 1 for c in self.classes):
+                continue  # every point with trivial site symmetry is on the general position
+            if self._hits(anchor, frozenset(stab)):
+                continue  # an orbit of a position already found
+            self._add(anchor, stab)
+        letters(self)  # fills each class's letter and site-symmetry symbol
+        order = sorted(range(len(self.classes)),
+                       key=lambda i: (self.classes[i][0].isupper(), self.classes[i][0]))
+        self.classes = [self.classes[i] for i in order]
+        self.components = [self.components[i] for i in order]
+
+    def _add(self, anchor, stab):
+        rots = [np.array(W, dtype=np.int64) for W in stab]
+        directions = tuple(tuple(int(v) for v in row) for row in coordinate_basis(rots))
+        self.classes.append([None, None, len(self.ops) // len(stab), len(stab),
+                             anchor, directions])
+        # the site-symmetry group of each point of the anchor's orbit, by
+        # conjugating the anchor's own: g·(R, s)·g⁻¹ fixes g·anchor
+        own = [(W, _sub(anchor, _mv(W, anchor))) for W in stab]
+        comps: dict = {}
+        seen = set()
+        for W, w in self.ops:
+            z = _frac_part(_add(_mv(W, anchor), w))
+            if z in seen:
+                continue
+            seen.add(z)
+            shift = _sub(z, _add(_mv(W, anchor), w))  # z = g·anchor + an integer vector
+            Wi = _int_mat(_inv(W))
+            rots2, N, c = [], [], []
+            for R, s in own:
+                R2 = _int_mat(_mm(_mm(W, R), Wi))
+                s2 = _sub(_add(_add(_mv(W, s), w), shift), _mv(R2, _add(w, shift)))
+                rots2.append(R2)
+                for r in range(3):
+                    N.append(tuple(R2[r][k] - (r == k) for k in range(3)))
+                    c.append(-s2[r])
+            comps.setdefault(frozenset(rots2), []).append((tuple(N), tuple(c)))
+        self.components.append(comps)
+
+    def _stabiliser(self, x):
+        """(rotation set, N, c): the affine site-symmetry group of x as N·y = c."""
+        rots, N, c = [], [], []
+        for W, w in self.ops:
+            d = _sub(_add(_mv(W, x), w), x)
+            if _integral(d):
+                rots.append(W)
+                s = _sub(x, _mv(W, x))  # the full translation of the operation fixing x
+                for i in range(3):
+                    N.append(tuple(W[i][k] - (i == k) for k in range(3)))
+                    c.append(-s[i])
+        return frozenset(rots), tuple(N), tuple(c)
+
+    def _hits(self, x, key=None) -> list[int]:
+        """The positions found so far whose fixed components hold x, modulo Z³.
+
+        ``key`` is x's site-symmetry rotation set when the caller has it already.
+        """
+        if key is None:
+            key = self._stabiliser(x)[0]
+        hits = []
+        for i, comps in enumerate(self.components):
+            if self.classes[i][3] != len(key) or key not in comps:
+                continue
+            for N, c in comps[key]:
+                rhs = tuple(ci - sum(N[r][k] * x[k] for k in range(3)) for r, ci in enumerate(c))
+                if _integer_solvable(N, rhs):
+                    hits.append(i)
+                    break
+        return hits
+
+    def identify(self, x) -> int:
+        """Index of the position holding the point ``x`` (exact).
+
+        x is on a position exactly when some image of x lies on the fixed
+        component of the site-symmetry group of a point of that position's
+        orbit with no larger site symmetry; images under G are the components
+        listed, images under Z³ the integer solution of N·(x + u) = c.
+        """
+        hits = self._hits(x)
+        if len(hits) != 1:
+            raise RuntimeError(f"the point {_text(x)} lies on {len(hits)} Wyckoff positions "
+                               "of the table; this is a bug")
+        return hits[0]
+
+    def generic(self, i):
+        """A point of position ``i`` with generic free parameters, its site symmetry checked."""
+        anchor, directions = self.classes[i][4], self.classes[i][5]
+        x = anchor
+        for value, d in zip(_GENERIC_VALUES, directions):
+            x = _add(x, tuple(value * v for v in d))
+        if len(self._stabiliser(x)[0]) != self.classes[i][3]:
+            raise RuntimeError("a generic point of a Wyckoff position has a larger site "
+                               "symmetry than the position; this is a bug")
+        return x
+
+
+def _integer_solvable(N, rhs) -> bool:
+    """Whether N·u = rhs has an integer solution u (N integer, rhs rational).
+
+    Column operations bring N to lower echelon form one row at a time (the
+    columns stay an integer basis of the same image lattice), and each pivot
+    fixes one coordinate of u, which must come out an integer.
+    """
+    if any(v.denominator != 1 for v in rhs):
+        return False
+    A = [list(row) for row in N]
+    b = [int(v) for v in rhs]
+    col = 0
+    for i in range(len(A)):
+        if col < 3:
+            while True:
+                nz = [j for j in range(col, 3) if A[i][j]]
+                if len(nz) <= 1:
+                    break
+                j0 = min(nz, key=lambda j: abs(A[i][j]))
+                for row in A:
+                    row[col], row[j0] = row[j0], row[col]
+                for j in range(col + 1, 3):
+                    q = A[i][j] // A[i][col]
+                    if q:
+                        for row in A:
+                            row[j] -= q * row[col]
+            nz = [j for j in range(col, 3) if A[i][j]]
+            if nz:
+                j0 = nz[0]
+                for row in A:
+                    row[col], row[j0] = row[j0], row[col]
+                if b[i] % A[i][col]:
+                    return False
+                v = b[i] // A[i][col]
+                for r in range(len(A)):
+                    b[r] -= v * A[r][col]
+                col += 1
+                continue
+        if b[i]:
+            return False
+    return True
+
+
+def _grid_orbits(ops):
+    """(first point, stabiliser rotations) per orbit of the 1/24 grid, in point order.
+
+    The orbits are joined into positions by :meth:`_Table.identify`'s exact
+    test, never by comparing grid points: two pieces of one fixed line can
+    meet the cell as two segments a lattice translation apart.
+    """
+    from scipy.sparse import coo_matrix
+    from scipy.sparse.csgraph import connected_components
+
+    D = _WYCKOFF_GRID
+    if any((v * D).denominator != 1 for _, w in ops for v in w):
+        raise RuntimeError("a Hall setting's translations are not multiples of 1/24; "
+                           "this is a bug")
+    R = np.array([W for W, _ in ops], dtype=np.int32)
+    t = np.array([[int(v * D) for v in w] for _, w in ops], dtype=np.int32)
+    g = np.stack(np.meshgrid(np.arange(D), np.arange(D), np.arange(D), indexing="ij"),
+                 -1).reshape(-1, 3).astype(np.int32)
+    n_points = len(g)
+    images = (np.einsum("kij,nj->nki", R, g) + t[None]) % D  # (point, op, axis)
+    fixed = (images == g[:, None, :]).all(-1)
+    flat = (images[..., 0] * D + images[..., 1]) * D + images[..., 2]
+    rows = np.repeat(np.arange(n_points), len(ops))
+    graph = coo_matrix((np.ones(len(rows), dtype=np.int8), (rows, flat.ravel())),
+                       shape=(n_points, n_points))
+    _, label = connected_components(graph, directed=False)
+    # the grid is in lexicographic order, so each orbit's first index is its first point
+    _, first = np.unique(label, return_index=True)
+    out = []
+    for i in sorted(first):
+        anchor = tuple(Fraction(int(v), D) for v in g[i])
+        out.append((anchor, [ops[k][0] for k in np.nonzero(fixed[i])[0]]))
+    return out
+
+
+@lru_cache(maxsize=None)
+def _hall_group(hall: int) -> _Group:
+    return _from_operations(gemmi.symops_from_hall(spglib.get_spacegroup_type(hall).hall_symbol))
+
+
+@lru_cache(maxsize=None)
+def _halls_by_number() -> dict[int, tuple[int, ...]]:
+    """Every type's Hall numbers, from one pass over the 530 settings."""
+    out: dict[int, list[int]] = {}
+    for h in range(1, 531):
+        out.setdefault(int(spglib.get_spacegroup_type(h).number), []).append(h)
+    return {n: tuple(hs) for n, hs in out.items()}
+
+
+def _halls_of(number: int) -> tuple[int, ...]:
+    return _halls_by_number().get(number, ())
+
+
+def _hall_of(G: _Group, number: int) -> int | None:
+    """spglib's Hall number of the setting G is in, or None when G is in none of them."""
+    key = G.key()
+    return next((h for h in _halls_of(number) if _hall_group(h).key() == key), None)
+
+
+@lru_cache(maxsize=None)
+def _hall_table(hall: int) -> _Table:
+    """The positions of a Hall setting, lettered by spglib in that setting."""
+    return _Table(_hall_group(hall), lambda table: _spglib_letters(table, hall))
+
+
+def _spglib_letters(table: _Table, hall: int) -> None:
+    """Give each position spglib's letter for this Hall setting, through spglib's own frame.
+
+    spglib names an atom in *its* standardised frame, x_std = M·x + o, which
+    can differ from the input frame by an element of the affine normaliser
+    even when the input is already in the setting asked for, so the letter it
+    gives an atom belongs to the position holding the atom's *image*.  (M, o)
+    is checked to map the group onto itself exactly before it is used.
+    """
+    G = table.G
+    metric = _metric(G)
+    cell = np.linalg.cholesky(metric)  # rows: the conventional a, b, c (Cartesian)
+    positions, numbers, first = [], [], []
+    generics = [table.generic(species) for species in range(len(table.classes))]
+    for species, x in enumerate(generics):
+        orbit = sorted({_frac_part(_add(_mv(W, x), w)) for W, w in table.ops})
+        first.append(len(positions))
+        positions += [[float(v) for v in y] for y in orbit]
+        numbers += [species + 1] * len(orbit)
+    # two generic orbits more, as in the subgroup probe: one atom alone would be P-1
+    for extra, x in enumerate(_PROBE_POINTS):
+        orbit = sorted({_frac_part(_add(_mv(W, x), w)) for W, w in table.ops})
+        positions += [[float(v) for v in y] for y in orbit]
+        numbers += [len(table.classes) + extra + 1] * len(orbit)
+    try:
+        data = spglib.get_symmetry_dataset((cell, positions, numbers), symprec=_PROBE_SYMPREC,
+                                           hall_number=hall)
+    except SPGLIB_REFUSALS:
+        data = None
+    if data is None or int(data.hall_number) != hall:
+        raise RuntimeError(f"spglib does not name Hall setting {hall} for its own probe; "
+                           "this is a bug")
+    M = tuple(tuple(Fraction(float(v)).limit_denominator(_PROBE_DENOMINATOR_FLOOR) for v in row)
+              for row in data.transformation_matrix)
+    o = tuple(Fraction(float(v)).limit_denominator(_PROBE_DENOMINATOR_FLOOR)
+              for v in data.origin_shift)
+    P = _inv(M)
+    p = tuple(-v for v in _mv(P, o))
+    if G.transformed(P, p).key() != G.key():
+        raise RuntimeError(f"spglib's frame for Hall setting {hall} is not a normaliser "
+                           "element of the group; this is a bug")
+    for species, cls in enumerate(table.classes):
+        image = _add(_mv(M, generics[species]), o)
+        target = table.classes[table.identify(image)]
+        if target[0] is not None:
+            raise RuntimeError(f"spglib's frame maps two positions of Hall setting {hall} "
+                               "onto one; this is a bug")
+        target[0] = str(data.wyckoffs[first[species]])
+        target[1] = str(data.site_symmetry_symbols[first[species]])
+
+
+class _Positions:
+    """A group's positions in its own coordinates: a Hall table, possibly through (P, p)."""
+
+    def __init__(self, G: _Group):
+        self.G = G
+        number, symbol, transform = _standardise(G, _metric(G))
+        hall = _hall_of(G, number)
+        if hall is None:  # not a Hall setting: letters through spglib's standardisation
+            self.transform = transform
+            self.table = _hall_table(_hall_of(_standard_of_symbol(symbol)[0], number))
+            self.standard = symbol
+        else:
+            self.transform = _IDENTITY
+            self.table = _hall_table(hall)
+            self.standard = _xhm_of_hall(hall)
+        self.number = number
+        P, p = self.transform
+        self.scale = abs(_rational_determinant(P))  # standard cell volume / this cell's
+        self._Q = _inv(P)
+
+    def to_standard(self, x):
+        return _mv(self._Q, _sub(x, self.transform[1]))
+
+    def position(self, i) -> WyckoffPosition:
+        letter, site, mult, order, anchor, directions = self.table.classes[i]
+        P, p = self.transform
+        point = _add(_mv(P, anchor), p)
+        dirs = []
+        for d in directions:
+            v = _mv(P, tuple(Fraction(x) for x in d))
+            den = 1
+            for x in v:
+                den = den * x.denominator // math.gcd(den, x.denominator)
+            v = [int(x * den) for x in v]
+            g = math.gcd(*v)
+            dirs.append(tuple(x // g for x in v))
+        if (mult / self.scale).denominator != 1:  # pragma: no cover - a cell holds whole orbits
+            raise RuntimeError("a Wyckoff multiplicity is not whole in this cell; this is a bug")
+        return WyckoffPosition(letter=letter, multiplicity=int(mult / self.scale),
+                               site_symmetry=site, site_order=order,
+                               point=_frac_part(point), directions=tuple(dirs))
+
+    def label(self, i) -> str:
+        return self.position(i).label
+
+
+def _xhm_of_hall(hall: int) -> str:
+    sg = gemmi.find_spacegroup_by_ops(gemmi.symops_from_hall(
+        spglib.get_spacegroup_type(hall).hall_symbol))
+    return sg.xhm() if sg is not None else spglib.get_spacegroup_type(hall).international_full
+
+
+def wyckoff_positions(group) -> WyckoffPositions:
+    """The Wyckoff positions of ``group``, found from its operations alone.
+
+    ``group`` is any symbol gemmi resolves, a ``gemmi.SpaceGroup`` or an
+    :class:`~rietx.crystallography.symmetry.OperatorGroup`, in any setting.
+    The positions are the classes of points whose site-symmetry groups are
+    conjugate in the group (Souvignier et al. 2016, ITA A § 1.4.4.2), found on the
+    1/24 grid of the conventional cell and identified exactly; over the 230
+    types they number 1731, ITA's total.  The letters are spglib's (Togo,
+    Shinohara & Tanaka 2024), stated as belonging to the setting and (P, p)
+    the result names (A1 § 3.1.1.6.5).  Positions come in letter order, the
+    general position last.
+    """
+    pos = _Positions(_group_of(group))
+    return WyckoffPositions(symbol=as_group(group).xhm(), number=pos.number, standard=pos.standard,
+                            transform=pos.transform,
+                            positions=tuple(pos.position(i)
+                                            for i in range(len(pos.table.classes))))
+
+
+def _letter_at(group, xyz, site_order: int, tol: float) -> str | None:
+    """The letter :func:`wyckoff_positions` gives the position holding ``xyz``, or None.
+
+    ``xyz`` is a float fractional point with ``site_order`` operations in its
+    site-symmetry group (``wyckoff.site_constraints`` has both), ``tol`` its
+    distance to a special position.  The test is :meth:`_Table._hits`' (an
+    image of the point solves N·(x + u) = c over the integers), made on floats
+    with ``tol``: a point with a free parameter has no exact rational form on
+    a line like x + y = 1/2.  None when the point lies on no single position
+    or on one whose site symmetry is not ``site_order``; the caller keeps its
+    own letter, as the tolerance, not the table, would be at fault.
+    """
+    pos = _Positions(_group_of(group))
+    table = pos.table
+    x = np.array([float(v) for v in pos.to_standard(tuple(Fraction(float(v)) for v in xyz))])
+    shifts = np.array(list(itertools.product(range(-3, 4), repeat=3)), dtype=np.float64)
+    hits = set()
+    for i, comps in enumerate(table.components):
+        if table.classes[i][3] != site_order:
+            continue
+        for N, c in (nc for ncs in comps.values() for nc in ncs):
+            Nf = np.array(N, dtype=np.float64)
+            res = Nf @ x - np.array([float(v) for v in c]) + shifts @ Nf.T
+            if (np.abs(res).max(axis=1) < tol).any():
+                hits.add(i)
+                break
+    return table.classes[hits.pop()][0] if len(hits) == 1 else None
+
+
+def _subgroup_of(sub):
+    """(symbol, (P, p)) of a :class:`MaximalSubgroup` or a ``(symbol, transform)`` pair."""
+    if isinstance(sub, MaximalSubgroup):
+        return sub.symbol, sub.transform
+    symbol, transform = sub
+    return symbol, (_mat(transform[0]), tuple(_q(x) for x in transform[1]))
+
+
+def _coset_vectors(L, sub_L):
+    """Representatives of the lattice L modulo its sublattice ``sub_L`` (both column bases)."""
+    sub_inv = _inv(sub_L)
+    zero = (Fraction(0), Fraction(0), Fraction(0))
+    found = {zero}
+    frontier = [zero]
+    while frontier:
+        new = []
+        for v in frontier:
+            for col in _columns(L):
+                u = _reduce(_add(v, col), sub_L, sub_inv)
+                if u not in found:
+                    found.add(u)
+                    new.append(u)
+        frontier = new
+    return sorted(found)
+
+
+def wyckoff_splitting(group, sub) -> WyckoffSplitting:
+    """How every Wyckoff position of ``group`` splits in the subgroup ``sub``.
+
+    ``sub`` is a :class:`MaximalSubgroup` of ``group`` (from :func:`maximal`)
+    or any subgroup as a pair ``(symbol, (P, p))``, r_group = P·r_sub + p,
+    maximal or not.  For each position of G a generic point's G-orbit is
+    decomposed into H-orbits, each mapped by (P, p) into H's setting and
+    identified there exactly (Müller 2011, ITA A1 ch. 3.1; the procedure
+    Aroyo, Perez-Mato, Capillas & Wondratschek 2011 describe in A1 § 1.7.4).  The result carries the (P, p)
+    H's labels belong to (A1 § 3.1.1.6.5), and every row is checked against
+    Σ m_H = m_G·|det P|.  Raises ``ValueError`` when ``sub`` is not a
+    subgroup of ``group``.
+    """
+    G = _group_of(group)
+    symbol, transform = _subgroup_of(sub)
+    where = f"{symbol} under P = {_text(transform[0])}, p = {_text(transform[1])}"
+    try:
+        H = _rebuild(symbol, transform)
+    except _NotIntegral:
+        raise ValueError(f"{where} is not a subgroup of the group") from None
+    if not H.is_subgroup_of(G):
+        raise ValueError(f"{where} is not a subgroup of the group")
+    P, p = transform
+    Q = _inv(P)
+    det_P = abs(_rational_determinant(P))
+    g_pos = _Positions(G)
+    h_pos = _Positions(_standard_of_symbol(symbol)[0])
+    cosets = _coset_vectors(G.L, H.L)
+    rows = []
+    for i in range(len(g_pos.table.classes)):
+        g_label = g_pos.label(i)
+        P0, p0 = g_pos.transform
+        x = _add(_mv(P0, g_pos.table.generic(i)), p0)  # a generic point, in G's coordinates
+        orbit = {_reduce(_add(_add(_mv(W, x), w), t), H.L, H.Linv)
+                 for W, w in G.reps.items() for t in cosets}
+        seen: set = set()
+        found = []
+        for z in sorted(orbit):
+            if z in seen:
+                continue
+            h_orbit = {_reduce(_add(_mv(W, z), w), H.L, H.Linv) for W, w in H.reps.items()}
+            seen |= h_orbit
+            j = h_pos.table.identify(h_pos.to_standard(_mv(Q, _sub(z, p))))
+            pos = h_pos.position(j)
+            if pos.multiplicity * abs(_rational_determinant(H.L)) != len(h_orbit) * det_P:
+                raise RuntimeError(f"an orbit of {len(h_orbit)} points of {symbol} was "
+                                   f"identified as {pos.label}; this is a bug")
+            found.append((j, pos))
+        if sum(pos.multiplicity for _, pos in found) \
+                != g_pos.position(i).multiplicity * det_P:  # pragma: no cover - implied above
+            raise RuntimeError("Σ m_H ≠ m_G·|det P|; this is a bug")
+        rows.append((g_label, tuple(pos.label for _, pos in sorted(found, key=lambda f: f[0]))))
+    return WyckoffSplitting(group=as_group(group).xhm(),
+                            subgroup=symbol, transform=(P, p),
+                            group_transform=g_pos.transform, rows=tuple(rows))

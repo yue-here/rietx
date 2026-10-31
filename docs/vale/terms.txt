@@ -28,6 +28,7 @@ bcc
 beamline
 beamstop
 beamtime
+Bmmm
 Bravais
 brucite
 carbonyl
@@ -39,6 +40,7 @@ chiral
 chirality
 CIF
 CIFs
+Cmmm
 collinear
 collinearity
 conjugacy
@@ -68,6 +70,7 @@ goniometer
 hkl
 holohedry
 hydrogens
+Immm
 inequivalent
 interatomic
 intermetallic
@@ -95,6 +98,7 @@ monochromator
 monoclinic
 multiplet
 nanocrystalline
+NiAsS
 Niggli
 nonbonding
 normaliser
@@ -116,6 +120,7 @@ polycrystalline
 polyhedra
 polyimide
 pseudosymmetry
+PtGeSe
 pyroelectric
 rhombohedral
 rutile
@@ -396,3 +401,4 @@ Yue
 Dal
 Negro
 Ungaretti
+ZrBeSi

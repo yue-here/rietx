@@ -1663,6 +1663,21 @@ ROWS: tuple[Row, ...] = (
                   "and the exact Fraction check then accepts it or raises; a larger factor costs "
                   "nothing and changes no accepted (P, p). tests/test_subgroups.py::"
                   "test_an_isomorphic_series_standardises_past_the_floor_of_the_denominator_bound")),
+    Row("rietx.crystallography.representation.subgroups._WYCKOFF_GRID", "constant", tier=1,
+        value=24,
+        evidence=("theory and measurement: every fixed coordinate of a special position in an ITA "
+                  "setting is a multiple of 1/24 (eighths of the d-glide groups, twelfths of the "
+                  "hexagonal ones), so the 1/24 grid meets every position; the grid only seeds "
+                  "orbits, which an exact test joins. tests/test_subgroups.py counts 1731 over the "
+                  "230 types and the same positions in all 530 Hall settings. Supporting evidence, "
+                  "not asserted by a test: a 1/48 grid gave the same 1731, letter by letter "
+                  "(2026-10-30)")),
+    Row("rietx.crystallography.representation.subgroups._GENERIC_VALUES", "constant",
+        tier="invariant", value=(0.13577799801783944, 0.2675222112537019, 0.4111874386653582),
+        evidence=("answer-invariant: any free-parameter values off the special ones give the same "
+                  "orbit splitting; _Table.generic checks that the point's site symmetry is the "
+                  "position's own and raises otherwise, so a value that hit a special position "
+                  "could only raise, never mislabel")),
     Row("rietx.crystallography.riding.RIDING_MIN_SEPARATION", "constant", value=1e-06),
     Row("rietx.crystallography.rotation.SERIES_THRESHOLD", "constant", value=0.25),
     Row("rietx.crystallography.rotation.UNIT_TOLERANCE", "constant", value=1e-09),

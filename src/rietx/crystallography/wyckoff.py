@@ -319,8 +319,16 @@ def site_constraints(space_group, xyz, *, tol: float = SITE_TOL) -> SiteConstrai
             f"({sg.xhm()}): the coordinates are not consistent with this "
             "group's setting")
 
+    # spglib names the atom in its own standardised frame, which in some
+    # settings differs from the input's by a normaliser element that permutes
+    # letters; the table in representation.subgroups maps it back, so this
+    # letter and wyckoff_positions(group)'s agree.  Where the snapped point
+    # does not identify cleanly the table says nothing and spglib's letter stays.
+    from .representation.subgroups import _letter_at
+    letter = _letter_at(sg, xyz, len(rots), tol) or str(dataset.wyckoffs[0])
+
     return SiteConstraints(
-        wyckoff=f"{orbit.multiplicity}{dataset.wyckoffs[0]}",
+        wyckoff=f"{orbit.multiplicity}{letter}",
         site_symmetry=dataset.site_symmetry_symbols[0],
         multiplicity=orbit.multiplicity,
         coord_basis=coord,

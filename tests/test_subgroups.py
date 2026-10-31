@@ -27,6 +27,22 @@ checks P⁻¹HP against that setting exactly.  What is pinned, and against what:
   and (P, p) as maximal by :func:`is_maximal`, and every class is complete.
   3767 subgroups, 1104 t and 2663 k, about 15-30 CPU-s in all (a second or less for
   one group), so the sweep runs in the fast suite.
+
+**Wyckoff positions and splittings** (the second half):
+
+* **The reference set** (validation).  Splittings ITA A1 prints, quoted from the
+  page images: ch. 1.6 pp. 47-49 (AlB₂ → ZrBeSi and CaIn₂, pyrite → PdS₂ and
+  NiAsS, PdS₂ → PtGeSe, rutile → trirutile) and ch. 3.1 pp. 468 and 470 (Cmmm →
+  Immm in two settings, and the closed forms of the I-4m2 and P4₂/n series at
+  p = 3, 5, 7, the latter in both origin choices).  Each is computed in A1's own
+  (P, p), so its labels compare exactly, and the subgroup is also one
+  :func:`maximal` generates.
+* **The frame map** (verification).  spglib labels atoms in its own frame; in
+  the 17 Hall settings where that frame permutes letters, the letters agree
+  with spglib's on its own standard cell, and differ without the map.
+* **Slow, all 230 types** (about 3-4 CPU-min in all, so ``slow``, per group): the
+  1731 positions, the same positions in each of the 530 Hall settings, and
+  Σ m_H = m_G·|det P| on all 33 792 rows at index ≤ 4.
 """
 
 from __future__ import annotations
@@ -327,19 +343,23 @@ def test_every_maximal_subgroup_of_index_at_most_four_standardises_exactly(numbe
 # ---------------------------------------------------------------- review round (#1189)
 
 @pytest.mark.parametrize("group, p", [
-    pytest.param("P -1", 29, marks=pytest.mark.slow),
-    pytest.param("P -1", 53, marks=pytest.mark.slow),
+    ("P -1", 29), ("P -1", 53),
     ("P 6/m m m", 17), ("P 6/m m m", 29), ("P -3 m 1", 29)])
 def test_an_isomorphic_series_standardises_past_the_floor_of_the_denominator_bound(group, p):
     """The inversion centre of a p-fold supercell sits at 1/2p in the child's axes, a
     hexagonal origin at 3p: the old bound of 48 failed the first from p = 29 (the
     hexagonal p = 17 row is a non-regression: spglib's float happened to round).
 
-    The two P -1 rows are ``slow``: on CI they took 92-130 s (p = 29) and 600-812 s
-    (p = 53) a leg, and the 812 s row ran a fast shard past its 40-min limit.  The fast
-    rows still guard the bound: under the old fixed 48, P 6/m m m and P -3 m 1 at
-    p = 29 both raise (no exact standard setting), each in a few seconds."""
-    result = maximal(group, index=p, kind="k")
+    P-1 goes through ``supercell=`` (pa, b, c), as the review reproduced it:
+    ``index=`` lists every one of the p² + p + 1 lattices with p complements each,
+    some 150 000 subgroups at p = 53, where one lattice
+    holds the same inversion centres at 1/2p.  That is what let the two P -1 rows
+    leave the ``slow`` tier: under the old fixed 48, P -1 at p = 29 and P 6/m m m and
+    P -3 m 1 at p = 29 all raise (no exact standard setting)."""
+    if group == "P -1":
+        result = maximal(group, supercell=diag(p, 1, 1), kind="k")
+    else:
+        result = maximal(group, index=p, kind="k")
     assert result
     assert all(s.index == p and s.prime == p and is_maximal(group, s.symbol, s.transform)
                for s in result)
@@ -389,3 +409,251 @@ def test_the_invariant_subspace_cache_holds_bases_not_spans():
     assert len(found) == 1 + 183 + 183  # every line and plane of F_13^3 is invariant under -1
     assert all(isinstance(b, tuple) and len(b) <= 2 for b in found)  # never p^d vectors
     assert S._invariant_subspaces.cache_info().maxsize is not None
+
+
+# ================================================================ Wyckoff positions (PR 2)
+#
+# The splittings ITA A1 prints, each quoted from the page as a literature value
+# (page images viewed 2026-10-30): (name, G, H, P, p, {G label: H labels}).  A1's
+# own (P, p) is passed, so the labels belong to it and compare exactly; the
+# subgroup itself is also found by maximal() up to the normaliser.  For the two
+# series rows A1 prints a closed form in p, evaluated here at p = 3, 5, 7.
+Q = Fraction(1, 4)
+
+
+def i4m2_series(p):
+    """A1 Example 3.1.1.6.5 (p. 468): I-4m2 > I-4m2 (pa, pb, c), position 2a."""
+    h = (p - 1) // 2
+    return ("2a",) + ("8g",) * h + ("8i",) * h + ("16j",) * ((p - 1) * (p - 3) // 8)
+
+
+def p42n_series(p, origin):
+    """A1 Example 3.1.1.6.7 (p. 468): P4₂/n > P4₂/n (a, b, pc), position 2a, no origin
+    shift: 2a for origin choice 1, and for choice 2 also 2a if p = 4n + 1 but 2b if
+    p = 4n − 1; then (p − 1)/2 × 4f."""
+    first = "2b" if origin == 2 and p % 4 == 3 else "2a"
+    return (first,) + ("4f",) * ((p - 1) // 2)
+
+
+SPLITTINGS = [
+    # ch. 1.6, Fig. 1.6.4.3, p. 48: AlB₂ (Al 1a, B 2d) → ZrBeSi and → CaIn₂
+    ("ZrBeSi", "P 6/m m m", "P 63/m m c", diag(1, 1, 2), ZERO,
+     {"1a": ("2a",), "2d": ("2c", "2d")}),
+    ("CaIn2", "P 6/m m m", "P 63/m m c", diag(1, 1, 2), (0, 0, -H),
+     {"1a": ("2b",), "2d": ("4f",)}),
+    # ch. 1.6, Fig. 1.6.4.1, p. 47: pyrite (Fe 4a, S 8c) → PdS₂, NiAsS; PdS₂ → PtGeSe
+    ("PdS2", "P a -3", "P b c a", I3, ZERO, {"4a": ("4a",), "8c": ("8c",)}),
+    ("NiAsS", "P a -3", "P 21 3", I3, ZERO, {"4a": ("4a",), "8c": ("4a", "4a")}),
+    ("PtGeSe", "P b c a", "P b c 21", I3, (-Q, 0, 0), {"4a": ("4a",), "8c": ("4a", "4a")}),
+    # ch. 1.6, Fig. 1.6.4.4, p. 49: rutile (Ti 2a, O 4f) → trirutile ZnSb₂O₆, a, b, 3c
+    ("trirutile", "P 42/m n m", "P 42/m n m", diag(1, 1, 3), ZERO,
+     {"2a": ("2a", "4e"), "4f": ("4f", "8j")}),
+    # ch. 3.1, Example 3.1.4.4, p. 470: Cmmm 4k (0, 0, z) → 2 × 4i in either Immm with
+    # 2c; in the Bmmm setting (4k at 0, y, 0, b doubled) the conventional Immm reads 2 × 4g
+    ("Cmmm Immm o", "C m m m", "I m m m", diag(1, 1, 2), ZERO, {"4k": ("4i", "4i")}),
+    ("Cmmm Immm c/2", "C m m m", "I m m m", diag(1, 1, 2), (0, 0, H), {"4k": ("4i", "4i")}),
+    ("Bmmm Immm", "B m m m", "I m m m", diag(1, 2, 1), ZERO, {"4k": ("4g", "4g")}),
+]
+for _p in (3, 5, 7):
+    SPLITTINGS += [
+        (f"I-4m2 p={_p}", "I -4 m 2", "I -4 m 2", diag(_p, _p, 1), ZERO, {"2a": i4m2_series(_p)}),
+        (f"P42/n:1 p={_p}", "P 42/n:1", "P 42/n:1", diag(1, 1, _p), ZERO,
+         {"2a": p42n_series(_p, 1)}),
+        (f"P42/n:2 p={_p}", "P 42/n:2", "P 42/n:2", diag(1, 1, _p), ZERO,
+         {"2a": p42n_series(_p, 2)}),
+    ]
+
+
+@pytest.mark.parametrize("name, group, symbol, P, p, expected", SPLITTINGS,
+                         ids=[r[0] for r in SPLITTINGS])
+def test_each_published_splitting_is_reproduced_in_its_own_transformation(
+        name, group, symbol, P, p, expected):
+    result = S.wyckoff_splitting(group, (symbol, (P, p)))
+    assert result.transform == (S._mat(P), tuple(S._q(x) for x in p))  # the labels' (P, p)
+    for g_label, h_labels in expected.items():
+        assert result[g_label] == h_labels, (name, g_label)
+    # the subgroup is one maximal() generates, up to the affine normaliser
+    det = abs(int(S._rational_determinant(S._mat(P))))
+    pool = maximal(group) if det <= S.MAX_INDEX else maximal(group, supercell=P)
+    assert len(found(pool, symbol, P, p)) == 1
+
+
+def test_the_two_alb2_subgroups_split_2d_the_two_ways_a1_describes():
+    """A1 p. 48: one subgroup keeps 6̄m2 and splits 2d, the other keeps 2d whole on 3m."""
+    keep, split = (S.wyckoff_splitting("P 6/m m m", ("P 63/m m c", (diag(1, 1, 2), o)))
+                   for o in ((0, 0, -H), ZERO))
+    assert keep["2d"] == ("4f",) and split["2d"] == ("2c", "2d")
+    four_f = next(w for w in S.wyckoff_positions("P 63/m m c").positions if w.label == "4f")
+    assert four_f.site_order == 6 and len(four_f.directions) == 1  # 3m., z free
+
+
+def test_a_maximal_subgroup_and_its_own_pair_give_one_splitting():
+    for s in maximal("P 42/m n m"):
+        assert S.wyckoff_splitting("P 42/m n m", s) == \
+            S.wyckoff_splitting("P 42/m n m", (s.symbol, s.transform))
+
+
+def test_a_splitting_names_the_transformations_its_labels_belong_to():
+    s = next(s for s in maximal("P 6/m m m") if s.describes("P 63/m m c", (diag(1, 1, 2), ZERO)))
+    result = S.wyckoff_splitting("P 6/m m m", s)
+    assert result.transform == s.transform and result.group_transform == S._IDENTITY
+    assert result.group == "P 6/m m m" and result.subgroup == s.symbol
+    # a group in none of spglib's 530 Hall settings takes its letters through a (P, p)
+    off = S.wyckoff_splitting("C 4 2 2", ("C 4 2 2", (diag(1, 1, 3), ZERO)))
+    assert off.group_transform != S._IDENTITY
+    assert off.group_transform == S.wyckoff_positions("C 4 2 2").transform
+    with pytest.raises(KeyError):
+        result["9z"]
+
+
+def test_a_pair_that_is_not_a_subgroup_is_refused():
+    with pytest.raises(ValueError, match="is not a subgroup of the group"):
+        S.wyckoff_splitting("P m -3 m", ("I m -3 m", (diag(2, 1, 1), ZERO)))  # not integral
+    with pytest.raises(ValueError, match="is not a subgroup of the group"):
+        S.wyckoff_splitting("P n m a", ("P 21 21 21", (I3, ZERO)))  # A1's origin dropped
+    # the transposed basis of a published subgroup (the Rᵀ trap) is refused too
+    P = ((0, -2, 0), (1, -1, 0), (0, 0, 1))
+    S.wyckoff_splitting("P 31 1 2", ("C 1 2 1", (P, ZERO)))
+    with pytest.raises(ValueError, match="is not a subgroup of the group"):
+        S.wyckoff_splitting("P 31 1 2", ("C 1 2 1", (tuple(zip(*P)), ZERO)))
+
+
+@pytest.mark.parametrize("group", ["P m -3 m", "F d -3 m:2", "R -3 m:H", "R -3 m:R",
+                                   "P 1 21/c 1", "C m c e", "P 63/m m c", "I 41/a m d:1"])
+def test_each_position_is_what_its_point_and_directions_say(group):
+    """An independent reading: :func:`site_constraints` (float site orbits, symmetry.py)
+    gives each position's generic point the same multiplicity and free directions."""
+    from rietx.crystallography.wyckoff import site_constraints
+
+    table = S.wyckoff_positions(group)
+    for w in table.positions:
+        x = [float(v) for v in w.point]
+        for d, t in zip(w.directions, (0.0137, 0.0213, 0.0291)):
+            x = [xi + t * di for xi, di in zip(x, d)]
+        sc = site_constraints(group, x)
+        assert sc.multiplicity == w.multiplicity, (group, w.label)
+        assert len(sc.coord_basis) == len(w.directions), (group, w.label)
+    assert table.positions[-1].site_order == 1  # the general position comes last
+
+
+def test_rhombohedral_axes_keep_the_letters_and_divide_the_multiplicities_by_three():
+    hexagonal, rhombohedral = (S.wyckoff_positions(g) for g in ("R -3 m:H", "R -3 m:R"))
+    assert [w.letter for w in hexagonal.positions] == [w.letter for w in rhombohedral.positions]
+    assert [w.multiplicity for w in hexagonal.positions] == \
+        [3 * w.multiplicity for w in rhombohedral.positions]
+    assert rhombohedral.transform == S._IDENTITY  # a Hall setting of its own
+
+
+# the 17 Hall settings in which spglib names a probe already in the setting through a
+# normaliser element that permutes letters (measured 2026-10-30, spglib 2.8.0)
+PERMUTED_FRAMES = [65, 68, 71, 73, 76, 79, 85, 88, 92, 96, 98, 100, 101, 102, 104, 106, 107]
+
+
+@pytest.mark.parametrize("hall", PERMUTED_FRAMES)
+def test_the_letters_follow_spglibs_frame_and_not_the_input_order(hall):
+    """spglib labels an atom in its own standardised frame, so a letter belongs to the
+    position holding the atom's image.  The check: spglib's letters on its *own*
+    standard cell, where its frame is the identity, agree with ours coordinate by
+    coordinate; and the positive arm, that taking the letters in the input order (no
+    frame map) gives other letters in these settings."""
+    import numpy as np
+    import spglib
+
+    table = S._hall_table(hall)
+    positions, numbers = [], []
+    for i in range(len(table.classes)):
+        x = table.generic(i)
+        orbit = sorted({S._frac_part(S._add(S._mv(W, x), w)) for W, w in table.ops})
+        positions += [[float(v) for v in y] for y in orbit]
+        numbers += [i + 1] * len(orbit)
+    lattice = np.linalg.cholesky(S._metric(table.G))
+    first = spglib.get_symmetry_dataset((lattice, positions, numbers), hall_number=hall)
+    raw = [first.wyckoffs[numbers.index(i + 1)] for i in range(len(table.classes))]
+    assert raw != [c[0] for c in table.classes]  # the frame map acts here
+    again = spglib.get_symmetry_dataset(
+        (first.std_lattice, first.std_positions, first.std_types), hall_number=hall)
+    assert np.allclose(again.transformation_matrix, np.eye(3))
+    for xyz, letter in zip(again.std_positions, again.wyckoffs):
+        x = tuple(Fraction(float(v)).limit_denominator(10 ** 5) for v in xyz)
+        assert table.classes[table.identify(x)][0] == letter
+
+
+@pytest.mark.parametrize("hall", PERMUTED_FRAMES + [1, 2, 3, 62, 227, 304, 488, 523])
+def test_site_constraints_names_the_letter_wyckoff_positions_gives(hall):
+    """``site_constraints`` and ``wyckoff_positions`` name one letter for one site.
+
+    The positive arm is the 17 settings whose spglib frame permutes letters: the
+    letter ``site_constraints`` took from spglib in the input order belonged to
+    another position there (measured 2026-10-31 on 8 of them: 16 of 54 wrong).
+    The other Hall numbers are default settings, where the two always agreed.
+    """
+    from rietx.crystallography.wyckoff import site_constraints
+
+    symbol = S._xhm_of_hall(hall)
+    table = S._hall_table(hall)
+    named = S.wyckoff_positions(symbol)
+    assert named.transform == S._IDENTITY  # a Hall setting: the letters are the table's own
+    for i, w in enumerate(named.positions):
+        x = [float(v) for v in table.generic(i)]
+        assert site_constraints(symbol, x).wyckoff == w.label, (symbol, w.label)
+
+
+@pytest.mark.parametrize("group", ["P 42/n c m:2", "P n -3 m:2", "P -4 b 2", "P 4/m b m"])
+def test_site_constraints_letter_on_a_line_off_the_axes(group):
+    """Positions whose free direction is not an axis (x, 1/2 - x, z) have no exact
+    rational form for a float point, so the letter is read with the tolerance."""
+    from rietx.crystallography.wyckoff import site_constraints
+
+    named = S.wyckoff_positions(group)
+    pos = S._Positions(S._group_of(group))
+    assert named.transform == S._IDENTITY
+    table = pos.table
+    for i, w in enumerate(named.positions):
+        x = [float(v) for v in table.generic(i)]
+        assert site_constraints(group, x).wyckoff == w.label, (group, w.label)
+
+
+def test_a_splitting_prints_the_transform_g_s_own_labels_belong_to():
+    """A group outside spglib's 530 Hall settings is lettered through (P, p); the printed
+    table says which, and says nothing extra for a group that is in one."""
+    off = "I 1 21 1"  # gemmi's setting, not a Hall one
+    shown = str(S.wyckoff_splitting(off, maximal(off)[0]))
+    assert S.wyckoff_splitting(off, maximal(off)[0]).group_transform != S._IDENTITY
+    assert f"{off}'s labels: P = " in shown
+    assert "'s labels" not in str(S.wyckoff_splitting("P m -3 m", maximal("P m -3 m")[0]))
+
+
+# ---------------------------------------------------------------- all 230 types, slow
+
+@pytest.mark.slow
+def test_the_positions_of_the_230_types_number_1731():
+    """ITA's total (ITA A, 2016, ch. 1.4), from the operations alone."""
+    assert sum(len(S.wyckoff_positions(standard_symbol(n)).positions)
+               for n in range(1, 231)) == 1731
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("number", range(1, 231))
+def test_every_hall_setting_of_a_type_letters_its_positions_alike(number):
+    """Setting invariance: each of the type's Hall settings (530 in all: unique axes,
+    cell choices, origin choices, both rhombohedral axes) has the positions of its
+    default setting, letter by letter, with the same site order and freedom."""
+    def signature(hall):
+        return sorted((c[0], c[3], len(c[5])) for c in S._hall_table(hall).classes)
+    halls = S._halls_of(number)
+    assert all(signature(h) == signature(halls[0]) for h in halls[1:])
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("number", range(1, 231))
+def test_every_splitting_row_at_index_at_most_four_conserves_multiplicity(number):
+    """Σ m_H = m_G·|det P| on every row, summed from the labels' own table entries."""
+    group = standard_symbol(number)
+    m_g = {w.label: w.multiplicity for w in S.wyckoff_positions(group).positions}
+    for s in maximal(group):
+        m_h = {w.label: w.multiplicity for w in S.wyckoff_positions(s.symbol).positions}
+        det = abs(S._rational_determinant(s.transform[0]))
+        result = S.wyckoff_splitting(group, s)
+        assert [g for g, _ in result.rows] == list(m_g)
+        for g, hs in result.rows:
+            assert sum(m_h[h] for h in hs) == m_g[g] * det, (group, str(s), g, hs)
