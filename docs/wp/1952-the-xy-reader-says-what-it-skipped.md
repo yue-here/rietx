@@ -91,6 +91,36 @@ documentation only.
 
 - 2026-10-26 issue triage: #1064 (mustachefeeling, 2026-10-20), the remainder after PR #1080. Checked against the tree at c0e32ab29: PR #1080 (`4b93ccda6`) reads FullProf's `XYDATA` heading (`io/formats/xy.py:139-185`), carries `TEMP` into `metadata["temperature_k"]`, and refuses an `INTER` multiplier other than 1 or `Interpol = 1` by name; reproduced, a file with `fac_y = 2` raises naming the value. Two parts remain. (1) Apply `fac_x` to x and `fac_y` to y and σ, with an info diagnostic naming the factor, as the FullProf manual (2001, p. 74, `Ins = 10`) defines them; `Interpol = 1` stays refused. The PR deferred this only because a new code needed `help.py` and `_audit.py` rows while #1050 rewrote them, and #1050 merged 2026-10-20. The new code takes an `_audit` row at tier 1 (the format's own definition). (2) An `axis` reader option (`"two_theta"` or `"tof"`) the ASCII reader honours as the caller's declaration, recorded in `metadata` as declared, and refused with both quoted where the file states a contradicting unit. Reproduced: a headerless 2000-18000 µs bank raises "x axis runs 2000° to 18000° … not 2θ", and `axis="tof"` raises "unknown reader option 'axis'" (`READER_OPTIONS` is `bank`, `block`, `scan`, `io/formats/base.py:142`). A new option needs its `help.py` entry and a `PatternFormat.options` row (`io/CLAUDE.md` § Options). The PR's open question: real `XYDATA` files write two values on the `TEMP` line and the manual names one; the reader takes the first.
 
+- 2026-10-31, from the issue triage (issue #1064): the reporter (2026-10-28)
+  offers to build this WP's two #1064 parts now, as one PR off `main`, and
+  leave the rest of the WP (the σ ≤ 0 rule and its record field, the
+  decimal-comma refusal, line-numbered reports) to its own design pass. The
+  PR: `fac_x` scales x and `fac_y` scales y and σ, a non-unit factor reported
+  by an info diagnostic with its `help.py` entry and a tier-1 `_audit` row,
+  unit factors silent, `Interpol = 1` still refused; and an `axis` reader
+  option, `"two_theta"` or `"tof"`, recorded in `metadata` as declared and
+  refused with both quoted where the file states a contradicting unit, with
+  its `help.py` entry and `PatternFormat.options` row. Tests: the `fac_y = 2`
+  file and the headerless 2000–18000 µs bank read correctly, and every
+  existing xy-dispatched file reads with the same arrays and no new
+  diagnostic. Checked against the tree at d87c8cc91: `READER_OPTIONS` is still
+  `bank`, `block`, `scan` (`io/formats/base.py:142`); the option's values are
+  the existing `schemas.pattern.AxisKind = Literal["two_theta", "tof"]`
+  (`schemas/pattern.py:22`), so the name follows a vocabulary the package
+  already has. The second `TEMP` value is still undefined by any document
+  either side holds.
+
+- 2026-10-31, from the issue triage (issue #1240): `read_pattern` reads a
+  G(r), S(Q) or F(Q) file (PDFgetX2, PDFgetX3, a bare `.gr`) as a 2θ pattern
+  through the xy fallback, with no diagnostic. Reproduced at d87c8cc91: a
+  small `#L r(A) G(r)` file as `.gr` and as `.dat`, and a bare `.gr`, all read
+  as two_theta 1.0-4.0° with an empty diagnostics list. The fix is in flight
+  as the reporter's PR #1241 (open, one maintainer review round answered at
+  6bbbbff2), which refuses such files by name; its suffix-only tier was
+  approved at tier 3 on the PR on 2026-10-31. A session here should read what
+  #1241 lands before touching the xy reader's skip report, since both edit the
+  same fallback.
+
 ## Non-goals
 
 - A CSV reader (a new format entry, if the decision below wants one).

@@ -86,6 +86,30 @@ that it did not.
   217.5 mm scales the reported displacement by R/217.5 on any other goniometer; the preset
   could refuse a missing radius, as `Geometry(kind="bragg_brentano")` already does (B9.15).
 
+- 2026-10-31, from the issue triage (issue #1233): on the NIST SRM 660c
+  certification pattern (`tests/data/nist_srm660c_100a.cif`, Bragg-Brentano,
+  Cu Kα, R = 217.5 mm, 20.3-150.9°), `pawley_default` and `profile_only` free
+  the zero and leave specimen displacement at 0, and return a = 4.157067 /
+  4.157065 Å, +69 ppm from the certificate cell at the scan's temperature
+  (4.156780 Å). The NIST protocol (zero held at 0, displacement and axial
+  divergence freed) returns +24 ppm in both modes, so the plan accounts for
+  about 45 ppm of cell bias, with the offset and axial terms not separated.
+  The mechanism: below 90° the zero and the −2s·cosθ/R displacement are
+  near-collinear (correlation −0.9999 with the cell, 20-90°), above 90° they
+  separate, and a displacement fitted as a zero leaves a tanθ-shaped remainder
+  the cell absorbs (about 80 ppm on unweighted positions at s = 0.079 mm).
+  Checked against the tree at d87c8cc91: both structure-free presets free
+  `instrument.zero_shift` and no displacement, and `PLAN_PRESETS` remaps
+  `mccusker_default` to them for `mode="lebail"` and `mode="pawley"`, so this
+  WP's geometry-picked default must cover that remap too, not only
+  `mccusker_default`. The numbers were not re-run in triage. The issue's other
+  two suggestions (a report finding when the free offset's angular form does
+  not match the declared geometry; documentation that cell accuracy from a
+  standard needs the instrument's aberration model) fit this WP's notification
+  and manual tasks. SRM 660c is a candidate for the lab Bragg-Brentano family
+  in the measurement task, with the certificate as the reference; issue #1259
+  asks for the Le Bail/Pawley validation row on the same data.
+
 ## Non-goals
 
 - The limits half of B9 (occupancy, March-Dollase r): WP-2002's demotions.

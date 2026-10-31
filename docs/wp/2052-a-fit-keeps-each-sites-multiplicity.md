@@ -74,6 +74,23 @@ and reuse it for every compile, reporting a site whose fresh split differs; (2) 
 
 ### Inherited
 
+- 2026-10-31, from the issue triage (issue #1088): the reporter's view on the
+  decision owed before code (2026-10-28). Option 1 (decide each site's orbit
+  split once per `fit()` and reuse it for every stage compile and the closing
+  compile), with option 2 beside it (after option 1, a site whose fresh orbit
+  would differ at the end is reported with its atoms per cell both ways, in a
+  sentence naming the cause). Not option 3, which rewrites an occupancy the
+  caller set. Their grounds are the 2026-10-26 measurements recorded here (the
+  closing stage giving 10 O per cell at χ²_red 23.2 on noise-free data, 10 of
+  16 Poisson draws failing, O1's y walking to −818.75 under an occupancy
+  stage) and GSAS-II reading the multiplicity once at setup. Checked against
+  the tree at d87c8cc91: PR #1014 (merged 2026-10-29, WP-1991) covers the verb
+  boundaries only. There a part-occupied site at or below occupancy × (images
+  before / after) = 1 is left as stored with `SITE_TWINS_KEPT` giving both
+  readings, and its PR body states that a stage compile mid-fit is outside it.
+  So this WP's mid-fit case is unchanged, and the ruling stays the
+  maintainer's.
+
 ## Non-goals
 
 - Changing `SITE_TOL` (#215: five-decimal files).

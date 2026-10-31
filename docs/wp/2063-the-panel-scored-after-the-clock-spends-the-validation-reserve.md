@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-10-28 — cost-only: under `quick` a heavy pattern pays 9 s of search for it (WP-2011 raised the reserve 8 → 15 % to cover it); no wrong answer
+Priority: P2 2026-10-31 — was P3: issue #1231 shows a `full` run overrunning its declared `total_budget_seconds` by minutes, every candidate left unvalidated (a defect that fires wrongly, as WP-1924 rates a ceiling overrun)
 
 ## Goal
 
@@ -37,6 +37,35 @@ fit is bounded, so the validation reserve reaches validation and
   orthorhombic.
 - **The tier of each rule this WP adds**: none planned. A cheaper panel moves
   no number if it is exact; a budgeted one would add a cap, tier 3.
+
+### Inherited
+
+- 2026-10-31, from the issue triage (issue #1231): since #1191 (`6c043e56b`) a
+  `preset="full"` run with `total_budget_seconds=900` overruns its ceiling by
+  minutes on dense synthetic low-symmetry patterns (aP2 1038 s, big_mP1 953 s;
+  656 s and 565 s the commit before), and on aP2 every one of the 12
+  candidates reads `not_validated` where the parent validated the top three.
+  Two causes. (1) A Pawley validation fit honours its cancel late: the token
+  is read between residual evaluations
+  (`optimize.least_squares._cancellable`), and one step on thousands of Pawley
+  intensities outlasts the deadline. The reporter measured a 3931-reflection
+  monoclinic rival cancelled at 155 s under `Deadline(30)`. Since WP-2011 the
+  fits run cheapest first on the run's own clock (`workflow.py:1083-1114`), so
+  the first heavy fit started before the ceiling runs past it and the run ends
+  wherever its step ends. Reproduced at d87c8cc91 (`lane-A/r1231.py`, macOS
+  arm64, 11-BM NAC): under `Deadline(15)` the true cI cell (827 reflections)
+  converged at 14.6 s, and a tP description of the same metric (4552
+  reflections) raised `RefinementCancelled` in stage `bkg` at 25.9 s, 10.9 s
+  late. `validation_size` already counts a fit's reflections before it runs
+  (it sets the order), so a fit could be skipped when its estimated cost
+  exceeds the time left, or the Pawley step could read the token inside its
+  solve. (2) trial_error read its budget once per base combination: fixed by
+  WP-1924 (`1f2e48e7a`, merged with #1244), which reads it before each
+  `_score`; a 60 s triclinic unit now stops at 60.17 s. That also does this
+  WP's second task ("Read the clock inside trial_error's per-base loop"),
+  which can be ticked citing WP-1924. Re-rate this WP P3 → P2: a declared
+  ceiling overrun by minutes with every candidate left unvalidated is a defect
+  that fires wrongly, as WP-1924's own priority line rates a ceiling overrun.
 
 ## Tasks
 
