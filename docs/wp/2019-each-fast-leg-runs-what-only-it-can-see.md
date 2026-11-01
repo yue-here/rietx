@@ -1,6 +1,6 @@
 # WP-2019 — each fast leg runs what only it can see, and the tail is cut again
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — all seven tasks done; the ten-run acceptance read 25.0 min median against 15 and is not met (PR #PRNUM), waiting on a ruling
+Milestone: unscheduled · Status: 🔄 2026-11-01 — all seven tasks done; the ten-run acceptance read 25.0 min median against 15 and is not met (PR #1293), waiting on a ruling
 Track: The repo's own process
 Depends on: —
 Priority: P2 2026-10-23 — was P3: three of the five latest main runs have a slowest fast job over 20 min on the refreshed shard record; the wait 1547 was P2 for is back
@@ -267,7 +267,7 @@ runner and 27 min on another, so shard balance is no longer what sets the wait.
 The counts criterion holds. Nothing here changes the code, and the WP does not
 close.
 
-- **Done.** The last open task, *Re-measure*, is read and ticked. Its
+- **Done** (PR #1293). The last open task, *Re-measure*, is read and ticked. Its
   acceptance is not met, so Status stays 🔄. The two `### Inherited` entries
   are consumed and deleted: the 2065 one asked that the ten runs sit on a tree
   with PR #1254 (`2c2e23666`, 10-31 10:40), which they do, and the 1547 one
