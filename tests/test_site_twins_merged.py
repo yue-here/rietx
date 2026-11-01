@@ -1699,24 +1699,24 @@ def test_an_edit_that_removes_an_atom_moves_each_constraint_onto_its_own_atom(pb
                                         "phases.0.atoms.2": "phases.0.atoms.0"}),
     (["A", "B", "C"], ["A", "B2", "C"], {}),                           # renamed in place
     (["A", "B", "C"], ["A", "B", "C", "D"], {}),                       # appended
-    (["O", "O", "S"], ["O", "O"], {"phases.0.atoms.2": None}),          # repeated labels
+    (["O", "O", "S"], ["O", "O"], {}),             # repeated labels; S's number names nothing
     (["O", "O", "S"], ["O", "O", "S", "O"], {}),                       # a repeat appended
     (["O", "S", "O"], ["O", "O"], {"phases.0.atoms.1": None,            # one place only
                                    "phases.0.atoms.2": "phases.0.atoms.1"}),
-    (["O", "O"], ["O"], {"phases.0.atoms.0": None,                      # which O went?
-                         "phases.0.atoms.1": None}),
+    (["O", "O"], ["O"], {"phases.0.atoms.0": None}),                    # which O went?
     (["X", "A", "X"], ["A", "X", "X"], {"phases.0.atoms.0": "phases.0.atoms.1",
                                         "phases.0.atoms.1": "phases.0.atoms.0"}),
     (["O", "O", "S"], ["O", "S"], {"phases.0.atoms.0": None,            # which O went?
                                    "phases.0.atoms.1": None,
                                    "phases.0.atoms.2": "phases.0.atoms.1"}),
-    (["A", "B", "C"], ["A", "C2"], {"phases.0.atoms.1": None,          # removed and renamed:
-                                    "phases.0.atoms.2": None}),        # which one went?
+    (["A", "B", "C"], ["A", "C2"], {"phases.0.atoms.1": None}),        # removed and renamed:
+                                                                       # which one went?
 ])
 def test_atom_moves_names_every_atom_whose_number_changes(old, new, expected):
     """``twins.atom_moves``: a label held equally often by both pairs in order, an atom
     renamed in place pairs by position, and an atom it cannot place maps to nothing
-    rather than to an index (the generality review's two cases are the last two)."""
+    where another atom took its number (the generality review's two cases are the last
+    two).  One whose number names no atom keeps its path, which names nothing."""
     from rietx.crystallography.twins import CoordinateSnapshot, atom_moves, renumber_path
 
     def snap(labels):

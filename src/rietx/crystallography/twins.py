@@ -317,9 +317,12 @@ def atom_moves(old: Structure | CoordinateSnapshot,
     An atom's dot-path is its index, so a structure with an atom removed,
     inserted or reordered ahead of it names it by another number, and a path
     read across the two by index names the wrong atom in silence (#1264).
-    Atoms are matched as :func:`_matched_atoms` matches them; an atom with no
-    partner maps to ``None``.  Phases are matched by position.  Empty when
-    every atom keeps its number, which is the common case.
+    Atoms are matched as :func:`_matched_atoms` matches them.  An atom with no
+    partner maps to ``None`` where another atom now has its number, and is left
+    out where its number names no atom: its paths then name nothing, as they
+    always did, so a hold on it is kept as ``Refinement.edit`` keeps one
+    (WP-1435).  Phases are matched by position.  Empty when every atom keeps
+    its number, which is the common case.
     """
     old = old if isinstance(old, CoordinateSnapshot) else coordinate_snapshot(old)
     new = new if isinstance(new, CoordinateSnapshot) else coordinate_snapshot(new)
@@ -331,6 +334,8 @@ def atom_moves(old: Structure | CoordinateSnapshot,
         partner = dict(_matched_atoms(lo, ln))
         for jo in range(len(lo)):
             jn = partner.get(jo)
+            if jn is None and jo >= len(ln):
+                continue                      # its number names no atom here
             if jn != jo:
                 out[f"phases.{i}.atoms.{jo}"] = (None if jn is None
                                                  else f"phases.{i}.atoms.{jn}")

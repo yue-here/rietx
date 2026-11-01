@@ -2680,8 +2680,9 @@ class Refinement:
     def _renumber_atoms(self, moves: NumberingMoves) -> None:
         """Read every constraint register into ``moves``' new atom numbering.
 
-        A path on an atom that is gone is dropped, and a tie with it when its
-        target or any source is.  A dropped hold or tie is named in one
+        A path on an atom that is gone, whose number another atom now has, is
+        dropped, and a tie with it when its target or any source is
+        (:func:`~.crystallography.twins.atom_moves`).  A dropped hold or tie is named in one
         warning, the way ``_apply_ties`` names a tie that stopped applying; a
         free path is the plan's to re-declare and goes without one.
         """
@@ -2889,9 +2890,9 @@ class Refinement:
         # stale, and dropping it at an edit would be the one way a
         # declaration could lapse without anybody saying so.  The warning
         # ``_apply_holds`` gives is the saying-so.  A hold on an atom the edit
-        # removed is the exception, dropped with its own warning by the carry
-        # above: kept, its path would hold whichever atom took the number
-        # (#1264).
+        # removed is the one exception, and only where another atom took its
+        # number: kept, it would hold that atom, so the carry above drops it
+        # with its own warning (#1264).
         self._apply_holds(table)
         if structure is not None:
             self.structure = candidate.model_copy(deep=True)
