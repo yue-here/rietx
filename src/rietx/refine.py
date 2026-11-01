@@ -588,9 +588,13 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
         return []
     prefixes = tuple(f"phases.{ip}." for ip in sorted(absent))
     scales = tuple(f"phases.{ip}.scale" for ip in sorted(flat_scales))
+    # and with every phase unseen, an instrument column reaching the pattern
+    # through phase peaks alone is as flat as their cells (WP-2049)
+    peak_only = ((lambda p: _peak_only_instrument_path(model, p))
+                 if _every_phase_unseen(model, absent) else None)
     reach = table.column_reach()
     return [p for p in table.free_paths
-            if _only_moves(reach.get(p, [p]), prefixes, scales)]
+            if _only_moves(reach.get(p, [p]), prefixes, scales, peak_only)]
 
 
 def _lineless_phases(model: CompiledModel) -> set[int]:
@@ -1447,7 +1451,8 @@ def _hold_flat_moments(model: CompiledModel, table: ParameterTable
 
 
 def _only_moves(reached: list[str], prefixes: tuple[str, ...],
-                scales: tuple[str, ...] = ()) -> bool:
+                scales: tuple[str, ...] = (),
+                peak_only: Callable[[str], bool] | None = None) -> bool:
     """Whether a column moves nothing but structural paths of these phases.
 
     **The rule is "all", never "any"**, and it is the flatness argument rather
@@ -1480,11 +1485,49 @@ def _only_moves(reached: list[str], prefixes: tuple[str, ...],
     A column left with no model path at all is **not** held: it moves nothing
     the data could see either way, so it is not a flat direction *of a phase*,
     and ``all()`` over nothing would hold it on a vacuous truth.
+
+    ``peak_only`` is :func:`_peak_only_instrument_path` bound to the model,
+    passed only when **every** phase is unseen (WP-2049).  An instrument entry
+    the pattern reads through phase peaks alone is then as flat as the cells:
+    a zero shift fitted to a blank frame read −0.0229 ± 0.0048° (4.8σ).
     """
     moved = [p for p in reached if not is_variable_path(p)]
     return bool(moved) and all(
-        p.startswith(prefixes) and (not p.endswith(".scale") or p in scales)
+        (p.startswith(prefixes) and (not p.endswith(".scale") or p in scales))
+        or (peak_only is not None and peak_only(p))
         for p in moved)
+
+
+#: The FCJ axial ratios.  They shape every phase reflection and nothing else
+#: (``extra_peak_curve`` applies no FCJ), so they reach the pattern through
+#: phase peaks alone.  Named here because ``scalar_chain_supported`` leaves
+#: them out for a different reason: they move the quadrature nodes, so their
+#: Jacobian column is not the per-peak chain's.
+_AXIAL_PATHS = ("instrument.geometry.axial_sl", "instrument.geometry.axial_hl")
+
+
+def _peak_only_instrument_path(model: CompiledModel, path: str) -> bool:
+    """Whether instrument entry ``path`` reaches the pattern only through the
+    phases' reflections (WP-2049).
+
+    The authority is :meth:`CompiledModel.scalar_chain_supported`: a path whose
+    effect flows only through the per-peak position, width, shape and
+    intensity, a claim ``_peak_chain_column`` verifies wherever it is used.  It
+    already knows that a declared sharp peak (``Instrument.extra_components``)
+    reads the polarisation and the line weights, so with one compiled those
+    two stay free here.  The background and every extra component reach the
+    pattern without a phase and are never peak-only.  An instrument row the
+    chain does not claim (a TOF bank's calibration, say) stays free: the
+    conservative answer, since a wrong hold freezes a measurement.
+    """
+    return path.startswith("instrument.") and (
+        path in _AXIAL_PATHS or model.scalar_chain_supported(path))
+
+
+def _every_phase_unseen(model: CompiledModel, absent: set[int]) -> bool:
+    """Whether ``absent`` holds every phase of ``model`` (and there is one)."""
+    n = len(model.phases)
+    return n > 0 and set(range(n)) <= absent
 
 
 def _reach_beyond_self(table: ParameterTable, columns: list[str],
@@ -1999,8 +2042,11 @@ def _released_phases(model: CompiledModel, table: ParameterTable,
         return []
     prefixes = tuple(f"phases.{ip}." for ip in sorted(seen))
     reach = reach or {}
+    # an instrument column held because no phase was seen (WP-2049) reaches
+    # every phase's peaks, so any phase seen gives it gradient again
     return [p for p in held
             if any(name.startswith(prefixes)
+                   or _peak_only_instrument_path(model, name)
                    for name in (p, *reach.get(p, ())))]
 
 
@@ -2165,7 +2211,13 @@ def _answer_significance(model: CompiledModel, table: ParameterTable,
             and f"phases.{ip}.scale" in moving]
     if not seen:
         return out
-    held_of = {ip: [c for c in held if ip in _phases_reached([c], reach)]
+    # an instrument column held because no phase was seen (WP-2049) shapes
+    # every phase's peaks, so each phase is measured with it freed
+    peak_only = [c for c in held
+                 if any(_peak_only_instrument_path(model, n)
+                        for n in (c, *reach.get(c, ())))]
+    held_of = {ip: [c for c in held
+                    if ip in _phases_reached([c], reach) or c in peak_only]
                for ip in seen}
     free = list(table.free_paths)
     # the moment angles the solve's covariance left out at a stationary
@@ -10291,6 +10343,30 @@ def _held_by_phase(stage_results: list[StageResult], n_phases: int
     return paths, [list(s) for s in stages]
 
 
+def _instrument_held(stage_results: list[StageResult]
+                     ) -> tuple[list[str], list[str]]:
+    """The instrument columns the support hold took because no phase was seen
+    (WP-2049), and the stages that held them, off the stage records.
+
+    The support hold is the one hold that takes a column naming no phase and
+    moving none, so such a column in ``held`` is this hold's, bar the
+    instrument widths the width-twin test held (:attr:`~StageResult.
+    width_twins_held`), which are left out.
+    """
+    paths: dict[str, None] = {}
+    stages: dict[str, None] = {}
+    for sr in stage_results:
+        twins = set(sr.width_twins_held or ())
+        for path in sr.held:
+            names = (path, *sr.held_reach.get(path, ()))
+            if path in twins or any("phases." in n for n in names):
+                continue
+            if any(_unscoped(n).startswith("instrument.") for n in names):
+                paths[path] = None
+                stages[sr.name] = None
+    return list(paths), list(stages)
+
+
 def _phase_support_diagnostics(support_by_phase: np.ndarray,
                                line_counts: np.ndarray,
                                tt_range: tuple[float, float],
@@ -10373,6 +10449,8 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
         for q, moved in sr.held_reach.items():
             held_reach.setdefault(q, set()).update(moved)
     out: list[Diagnostic] = []
+    # said once, on the first finding: the hold is about every phase at once
+    instrument_held, instrument_stages = _instrument_held(stage_results or [])
     for ip in range(n_phases):
         prefix = f"phases.{ip}."
         # the scale is what makes a phase visible, so a free scale is how a
@@ -10384,12 +10462,12 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
         no_lines = int(line_counts[ip]) == 0
         lacks = no_lines if unmeasured is None else (ip in unmeasured or no_lines)
         scale_only = lacks and not no_lines
-        if not unconstrained and not held and not lacks:
+        if not (unconstrained or held or lacks or instrument_held):
             continue
         support = float(support_by_phase[ip])
         if support >= sigma and not lacks:
             continue
-        if n_phases < 2 and not held and not lacks:
+        if n_phases < 2 and not (held or lacks or instrument_held):
             continue
         name = structure.phases[ip].name
         if no_lines:
@@ -10475,6 +10553,16 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
             clauses.append(f"{len(unconstrained)} of its parameters "
                            f"{'was' if len(unconstrained) == 1 else 'were'} "
                            f"refined without signal.")
+        if instrument_held and not out:
+            # WP-2049: with no phase seen, the instrument's peak terms are as
+            # flat as the cells, so their values are the ones handed in
+            n = len(instrument_held)
+            clauses.append(
+                f"No phase was seen, so {n} instrument parameter"
+                f"{'' if n == 1 else 's'} reaching the pattern only through "
+                f"phase peaks {'was' if n == 1 else 'were'} held too, for "
+                f"stage{'' if len(instrument_stages) == 1 else 's'} "
+                f"{', '.join(instrument_stages)}: {', '.join(instrument_held)}.")
         message = " ".join([cause, *clauses])
         out.append(Diagnostic(
             level="warning", code="PHASE_UNCONSTRAINED",

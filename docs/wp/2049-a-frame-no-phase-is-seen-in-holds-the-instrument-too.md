@@ -75,7 +75,7 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
 
 ## Tasks
 
-- [ ] Hold, in `_run_stage`'s support pass, each free instrument column whose
+- [x] Hold, in `_run_stage`'s support pass, each free instrument column whose
       reach (`column_reach`) lies wholly in unseen phases, beside the phases'
       own paths; record it in `StageResult.held` and `PHASE_UNCONSTRAINED`'s
       message.

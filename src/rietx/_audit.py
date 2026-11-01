@@ -1208,7 +1208,10 @@ ROWS: tuple[Row, ...] = (
                   "StageResult.collapsed says which (B14); WP-1958 (#954, decided "
                   "2026-10-16): with no line in range the scale is held too, its column "
                   "zero at every value (tier 1), and TRF walked bcc Fe's to 164.7 on "
-                  "WP-1534's fixture"),
+                  "WP-1534's fixture; WP-2049: with every phase unseen, an instrument "
+                  "column reaching the pattern only through phase peaks is held too, "
+                  "free a blank frame's zero shift read -0.0129 +/- 0.0015 deg (8.7 "
+                  "sigma, truth 0.006)"),
         grounds=("No competent refiner lets a phase the data cannot see refine its cell, and the "
                  "hold touches only what the data cannot determine; on by default, which no "
                  "program does (B1, ruled 2026-10-19). The lineless branch, which holds the "
