@@ -602,7 +602,10 @@ class SupercellEvidence:
     extra_q: tuple[float, ...]
     #: whether each extra line sits inside some observed line's window
     extra_seen: tuple[bool, ...]
-    #: the chance rate, :func:`chance_rate` over the same range and windows
+    #: the chance rate of the seen test: the share of the range inside the
+    #: windows ``extra_seen`` is asked in (:func:`chance_rate` on this route,
+    #: ``PatternScreen.p0`` on containment's).  The null of ``n_seen``, of
+    #: ``n_seen_unexplained`` and of both p-values (#1263).
     p0: float
     #: one-sided binomial P(X ≥ n_seen) for X ~ B(n_extra, p0): the probability
     #: of seeing at least this many extras had the child's extra lines not
@@ -627,6 +630,11 @@ class SupercellEvidence:
     #: parent is never *refuted* (:attr:`child_seen_more`, #1230).
     child_seen_fraction: float | None = None
     parent_seen_fraction: float | None = None
+    #: the chance rate the power check (:attr:`p_floor`) reads, counted in
+    #: windows floored at the assumed shift bound (``PatternScreen.p0_power``,
+    #: #951).  ``None`` means no floor, and the check reads ``p0``.  At least
+    #: ``p0`` wherever set, since the floor only widens a window.
+    p0_power: float | None = None
 
     @property
     def n_extra(self) -> int:
@@ -652,8 +660,13 @@ class SupercellEvidence:
     @property
     def p_floor(self) -> float:
         """The p-value had **every** extra been seen, p₀ⁿ — the most this test
-        could have said for the child on these data."""
-        return float(self.p0 ** self.n_extra)
+        could have said for the child on these data.
+
+        Read at :attr:`p0_power` where one is set: whether the test had the
+        power to refute is bounded by the assumed shift, which the seen
+        count's own windows do not carry (#951)."""
+        rate = self.p0 if self.p0_power is None else self.p0_power
+        return float(rate ** self.n_extra)
 
     def verdict(self, alpha: float = SUPERCELL_CHANCE_ALPHA) -> str:
         """``"supported"``, ``"refuted"`` or ``"undecided"``.
