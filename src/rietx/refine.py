@@ -525,7 +525,9 @@ def _tie_terms(source: "str | dict[str, float] | Sequence[tuple[str, float]]",
 
 def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
                              support: np.ndarray | None = None, *,
-                             sigma: float | None = PHASE_SUPPORT_SIGMA
+                             sigma: float | None = PHASE_SUPPORT_SIGMA,
+                             at_answer: bool = False,
+                             tried: Iterable[str] = (),
                              ) -> list[str]:
     """The free columns that move nothing but phases the data cannot see.
 
@@ -576,6 +578,27 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     ``phase_support_sigma`` (WP-2002, B1), and ``None`` there calls no phase
     unseen on its significance, so only a phase with no line in range is held
     and no significance is measured.
+
+    **The instrument's peak-only columns are held at the answer, never at the
+    start on a significance** (WP-2049).  With every phase unseen they are as
+    flat as the cells.  But a phase under 3σ at a stage's start is not at
+    zero, and its zero shift and widths still have gradient: they are how a
+    weak real phase misregistered at the start climbs into view.  Measured on
+    ``tests/test_phase_significance.py``'s weak LaB₆ (a scale 1/2000 of the
+    ramp's) from the unfitted start: 2.53σ after ``scale_bkg``, 4.05σ once the
+    zero shift had moved, 18.9σ after the cell.  Held from the start on that
+    2.53σ, the phase was never seen.  So the stage solves with them free, and
+    ``at_answer`` (the collapse) holds them where every phase is still unseen,
+    restored to where the stage found them.  A phase with no line in range
+    leaves their columns identically zero, so with every phase lineless they
+    are held from the start.
+
+    ``tried`` is what the previous stage's answer held.  A column there was
+    free for that stage's first solve, and the phases were judged unseen with
+    it free, so this stage holds it from its start: WP-1523's prior, one
+    family wider.  Without it each later stage restarted the chase from the
+    values handed in.  Frame 87 of the planted series took 511 iterations in
+    11 solves against main's 111 in 6, 402 of them in the closing stage.
     """
     lineless = _lineless_phases(model)
     absent = set(lineless)
@@ -590,8 +613,14 @@ def _unsupported_phase_paths(model: CompiledModel, table: ParameterTable,
     scales = tuple(f"phases.{ip}.scale" for ip in sorted(flat_scales))
     # and with every phase unseen, an instrument column reaching the pattern
     # through phase peaks alone is as flat as their cells (WP-2049)
-    peak_only = ((lambda p: _peak_only_instrument_path(model, p))
-                 if _every_phase_unseen(model, absent) else None)
+    tried = set(tried)
+    every = _every_phase_unseen(model, absent if at_answer else lineless)
+    prior = not every and bool(tried) and _every_phase_unseen(model, absent)
+
+    def flat(p: str) -> bool:
+        return (every or p in tried) and _peak_only_instrument_path(model, p)
+
+    peak_only = flat if every or prior else None
     reach = table.column_reach()
     return [p for p in table.free_paths
             if _only_moves(reach.get(p, [p]), prefixes, scales, peak_only)]
@@ -1560,6 +1589,7 @@ def _hold_unsupported_phases(model: CompiledModel, table: ParameterTable,
                              prior: np.ndarray | None = None,
                              seeded_phases: Iterable[int] = (), *,
                              sigma: float | None = PHASE_SUPPORT_SIGMA,
+                             tried: Iterable[str] = (),
                              ) -> tuple[list[str], dict[str, list[str]], set[int]]:
     """Apply :func:`_unsupported_phase_paths`; returns what it held, its reach
     and the phases it judged unseen.
@@ -1603,7 +1633,7 @@ def _hold_unsupported_phases(model: CompiledModel, table: ParameterTable,
     measures nothing and holds only a phase with no line in range (WP-1958).
     """
     if sigma is None:
-        held = _unsupported_phase_paths(model, table, sigma=None)
+        held = _unsupported_phase_paths(model, table, sigma=None, tried=tried)
         reach = _reach_beyond_self(table, held)
         if held:
             table.set_vary(held, False)
@@ -1615,7 +1645,8 @@ def _hold_unsupported_phases(model: CompiledModel, table: ParameterTable,
         prior = np.array(prior, dtype=np.float64)
         prior[list(seeded_phases)] = np.inf
         support = np.minimum(support, prior)
-    held = _unsupported_phase_paths(model, table, support, sigma=sigma)
+    held = _unsupported_phase_paths(model, table, support, sigma=sigma,
+                                    tried=tried)
     reach = _reach_beyond_self(table, held)
     if held:
         table.set_vary(held, False)
@@ -4605,6 +4636,9 @@ class Refinement:
         # raised — one plan runs a whole series, and a path one pattern's
         # model lacks must not end the chain.
         unknown_paths = table.unknown_paths(stage.turn_on)
+        # what the previous stage's answer held, which the support hold reads
+        # as tried and flat (WP-2049, ``_unsupported_phase_paths``)
+        tried = list(self._held)
         if self._held:
             # lift the previous stage's hold before this one decides its own:
             # a phase invisible then may be plain now, and a cumulative plan
@@ -4725,7 +4759,7 @@ class Refinement:
         # previous answer's significance where a plan hands one in (WP-1523).
         held, held_reach, unseen = _hold_unsupported_phases(
             model, table, prior_significance, seeded_phases,
-            sigma=phase_support_sigma)
+            sigma=phase_support_sigma, tried=tried)
         # kept apart, because the release below judges each hold by its own
         # question: a moment DOF the *phase* hold took (every free structural
         # path of an invisible phase, ``moment.dof0`` included) stays with the
@@ -4894,7 +4928,8 @@ class Refinement:
         flat_now, collapse_axes = (([], {}) if stopped
                                    else _flat_moment_scan(model, table))
         collapsed_phase = _unsupported_phase_paths(model, table, support,
-                                                   sigma=phase_support_sigma)
+                                                   sigma=phase_support_sigma,
+                                                   at_answer=True)
         collapsed = collapsed_phase + flat_now
         # the support hold's columns once the release and the collapse have
         # acted: taken now, because a late scale-B hold below re-holds some of
