@@ -11,10 +11,17 @@ internal trial (``telemetry=False``, no history):
 
 * the **body** arm: the body's own DOFs (origin, rotation, torsions) and the
   caller's ``free`` globs;
-* the **released** arm: the body removed and its atoms' coordinates freed, held
-  near the template by soft restraints on every template bond and bonded angle
-  (observational restraints, Waser 1963, *Acta Cryst.* **16**, 1091), with the
-  same ``free`` globs.
+* the **released** arm: the body removed and its heavy atoms' coordinates
+  freed, held near the template by soft restraints on every template bond and
+  bonded angle among them (observational restraints, Waser 1963, *Acta Cryst.*
+  **16**, 1091), with the same ``free`` globs.  Each riding hydrogen
+  (``RigidBody.riding``, WP-1810) keeps riding: its coordinate DOFs are tied
+  to its parent's, so it takes its parent's every shift and its parent–H
+  vector stays as the body placed it.  The arm then adds 3·n_heavy − n_pose
+  parameters, read off the fit (36 on acridine, 14 heavy atoms against a
+  6-DOF pose; issue #1008, WP-1989).  :func:`released_arm` builds it, and
+  ``Refinement.released_arm`` is the same builder for a caller who fits it by
+  hand or frees other members.
 
 Both arms are history-free
 :meth:`~rietx.refine.Refinement._trial` trials, so they carry
@@ -22,8 +29,17 @@ the caller's declarations (2θ limits, user ties, named variables, holds,
 backend, solver).  A tie, variable-bearing tie or hold on a path of the released
 body — or of a later body of its phase, whose index the removal shifts — cannot
 mean the same thing in the released arm and is dropped there; the row's
-``dropped`` lists each.  The body arm's glob ``torsions.*.twist`` frees the
-body's torsions (WP-1808, #823).
+``dropped`` lists each.  The arm's own rider ties are declared after that
+drop, so it never reaches them.  The body arm's glob ``torsions.*.twist``
+frees the body's torsions (WP-1808, #823).
+
+**What riding by tie is.**  The tie is on the coordinate DOFs, which are
+displacements in fractional coordinates, so at a held cell the parent–H
+vector is kept exactly.  It is the riding model in its constant-vector form:
+the H is not re-placed from its parent's neighbours, so a turn of the heavy
+skeleton turns the body arm's H and leaves the released arm's where it points,
+and a refined cell rescales the vector by the cell strain.  Re-placing it is
+riding on a free atom (#759), not built.
 
 The two are compared on the **data** χ² (restraint rows excluded, as every
 ``Statistics`` field is) with the package's two model-comparison tests, both at
@@ -36,8 +52,11 @@ strong": Kass & Raftery 1995, *J. Am. Stat. Assoc.* **90**, 773).  It fires on
 the **conjunction**, so a serially correlated residual cannot make a released
 molecule's noise-fitting look significant.
 
-**Where.**  The released arm's bond and angle deviations from the template, in
-units of their restraint σ, ranked; the message names the worst three.
+**Where.**  The released arm's restrained bond and angle deviations from the
+template, in units of their restraint σ, ranked; the message names the worst
+three.  A bond or angle with a riding H in it is not restrained: the tie
+holds its bond exactly, and its angle would restrain the skeleton's turn
+against an H that cannot turn.
 
 **Not found.**  A template bond wrong by more than ``BOND_SLACK_ANG`` beyond
 its covalent-radii sum is not found as a bond, so it is neither restrained in
@@ -53,7 +72,7 @@ solved.
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -93,6 +112,136 @@ class BodyMisfitRow:
 class BodyMisfitResult:
     rows: list[BodyMisfitRow]
     diagnostics: list[Diagnostic]
+
+
+@dataclass
+class ReleasedArm:
+    """One body's released arm, built by :func:`released_arm`.
+
+    Fit it as the check does: a ``Refinement`` over ``structure``, each of
+    ``ties`` declared with ``Refinement.tie(path, source)``, and a stage
+    freeing ``free`` beside the scale and background globs.
+    """
+
+    #: the structure with the body removed and ``restraints`` added
+    structure: Structure
+    phase_index: int
+    #: the body's name
+    body: str
+    #: the member labels whose coordinate DOFs ``free`` frees
+    freed: list[str]
+    #: each riding H that rides, by label, and the parent label it is tied to
+    riders: dict[str, str]
+    #: the restraints added, at the geometry the body placed its atoms in
+    restraints: list[BondRestraint | AngleRestraint]
+    #: the coordinate-DOF globs of the freed members
+    free: list[str]
+    #: each rider's DOF path and its source, ``{parent DOF path: coefficient}``
+    ties: dict[str, dict[str, float]]
+
+
+def _body_at(structure: Structure, body: str, phase: int | None):
+    hits = [(ip, b) for ip, ph in enumerate(structure.phases)
+            if phase is None or ip == phase
+            for b, x in enumerate(ph.rigid_bodies) if x.name == body]
+    if len(hits) != 1:
+        names = sorted({x.name for ph in structure.phases for x in ph.rigid_bodies})
+        raise ValueError(
+            f"{'no' if not hits else 'more than one'} rigid body named {body!r}"
+            + (f" in phase {phase}" if phase is not None else "")
+            + (" (name the phase with phase=)" if hits else "")
+            + f"; bodies: {names or 'none'}")
+    return hits[0]
+
+
+def _rider_ties(phase, ip: int, rider: int, parent: int) -> dict[str, dict[str, float]]:
+    """The rider's DOF rows as its parent's: B_Hᵀ·θ_H = B_Pᵀ·θ_P, so both
+    atoms take one fractional shift."""
+    from ..crystallography.symmetry import resolve_group
+    from ..crystallography.wyckoff import coordinate_basis, stabilizer_rotations
+
+    sg = resolve_group(phase.space_group, phase.symmetry_operations)
+
+    def basis(j):
+        a = phase.atoms[j]
+        return np.asarray(coordinate_basis(stabilizer_rotations(
+            sg, np.array([a.x.value, a.y.value, a.z.value]))), dtype=np.float64)
+
+    bh, bp = basis(rider), basis(parent)
+    if not len(bp):
+        return {}           # a parent with no freedom: the rider is held with it
+    c = np.linalg.lstsq(bh.T, bp.T, rcond=None)[0] if len(bh) else None
+    if c is None or not np.allclose(bh.T @ c, bp.T, atol=1e-12):
+        raise ValueError(
+            f"{phase.atoms[rider].label!r} cannot take every shift of its parent "
+            f"{phase.atoms[parent].label!r}: its site symmetry allows fewer "
+            "directions; free it with freed=")
+    return {f"phases.{ip}.atoms.{rider}.dof.{k}": {
+        f"phases.{ip}.atoms.{parent}.dof.{m}": float(c[k, m])
+        for m in range(len(bp)) if c[k, m] != 0.0}
+        for k in range(len(bh))}
+
+
+def released_arm(structure: Structure, body: str, *, phase: int | None = None,
+                 freed: Iterable[str] | None = None, bond_sigma: float = 0.02,
+                 angle_sigma: float = 2.0) -> ReleasedArm:
+    """The released arm of the rigid body ``body``: the model the misfit check
+    compares the body with.
+
+    The body is removed from its phase and its atoms stay where it placed
+    them.  ``freed`` lists the member labels whose coordinates the arm frees;
+    by default every member that is not a riding H.  Each riding H not in
+    ``freed`` rides: its DOFs are tied to its parent's (the nearest atom of
+    the template that does not ride, the rule
+    :func:`~rietx.crystallography.riding.set_riding_lengths` places it by), so
+    it adds no parameter.  ``freed=body.atoms`` frees every member, riding H
+    included, as the check did before WP-1989.  A member neither freed nor
+    riding is held where the body placed it.
+
+    Every template bond and bonded angle with a freed atom in it and no rider
+    is restrained at its placed value, bonds at ``bond_sigma`` (Å) and angles
+    at ``angle_sigma`` (deg), by the geometry table's bonding criterion.
+    ``phase`` names the phase when two phases carry a body of that name.
+    """
+    from ..crystallography.riding import riding_parents
+    from ..crystallography.structure_factor import compile_phase_sites
+
+    ip, b = _body_at(structure, body, phase)
+    ph = structure.phases[ip]
+    rb = ph.rigid_bodies[b]
+    chosen = [lab for lab in rb.atoms if lab not in rb.riding] if freed is None \
+        else list(dict.fromkeys(freed))
+    outside = sorted(set(chosen) - set(rb.atoms))
+    if outside:
+        raise ValueError(f"freed= names atoms that are not members of {body!r}: {outside}")
+    index = {a.label: j for j, a in enumerate(ph.atoms)}
+    riders = {h: p for h, p in riding_parents(rb).items() if h not in chosen}
+    free_j = {index[lab] for lab in chosen}
+    rider_j = {index[h] for h in riders}
+    _, bonds, angles = _template_geometry(ph, rb)
+    sites = compile_phase_sites(ph)
+    ident = {j: _identity_op(sites, j) for j in (index[lab] for lab in rb.atoms)}
+
+    def kept(*js):
+        return not rider_j & set(js) and bool(free_j & set(js))
+    restraints: list[BondRestraint | AngleRestraint] = [
+        BondRestraint(atom_i=i, atom_j=j, target=d, sigma=bond_sigma, op_index=ident[j])
+        for i, j, d in bonds if kept(i, j)]
+    restraints += [AngleRestraint(atom_i=i, atom_j=k, atom_k=j, target_deg=a,
+                                  sigma=angle_sigma, op_index_i=ident[i],
+                                  op_index_k=ident[j])
+                   for i, k, j, a in angles if kept(i, k, j)]
+    released = structure.model_copy(deep=True)
+    released.phases[ip] = ph.model_copy(update={
+        "rigid_bodies": [x for x in ph.rigid_bodies if x.name != rb.name],
+        "restraints": [*ph.restraints, *restraints]}, deep=True)
+    ties: dict[str, dict[str, float]] = {}
+    for h, p in riders.items():
+        ties.update(_rider_ties(released.phases[ip], ip, index[h], index[p]))
+    return ReleasedArm(
+        structure=released, phase_index=ip, body=rb.name, freed=chosen, riders=riders,
+        restraints=restraints,
+        free=[f"phases.{ip}.atoms.{index[lab]}.dof.*" for lab in chosen], ties=ties)
 
 
 def _element(species: str) -> str:
@@ -162,11 +311,13 @@ def _later_bodies(ip: int, b: int):
     return hit
 
 
-def _fit(ref, structure, data, globs, max_iter, drop=None):
+def _fit(ref, structure, data, globs, max_iter, drop=None, ties=None):
     """One arm: a trial over the caller's declarations, on ``structure``.
 
     ``drop`` (a path predicate) removes the ties and holds that could not mean
-    the same thing on ``structure``; the paths dropped are returned.
+    the same thing on ``structure``; the paths dropped are returned.  ``ties``
+    (``ReleasedArm.ties``) are the arm's own, declared once ``structure`` is
+    in, so the drop never reaches them.
     """
     from ..strategy.staged import RefinementPlan, Stage
 
@@ -181,6 +332,13 @@ def _fit(ref, structure, data, globs, max_iter, drop=None):
             trial._user_holds.discard(path)
             dropped.append(f"hold {path}")
     trial.edit(structure=structure)
+    if ties:
+        # the caller's free set names the removed body's rows, and a tie's
+        # table build would restore it and warn they are gone; the arm's one
+        # stage replaces the free set anyway
+        trial._free_paths = []
+        for path, source in ties.items():
+            trial.tie(path, source)
     res = trial.fit(data, mode=ref._mode, telemetry=False,
                     two_theta_limits=ref._two_theta_limits,
                     plan=RefinementPlan(stages=[
@@ -224,7 +382,6 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
             "would read as a misshapen one. Call ref.fit(...) first.")
     from scipy.stats import f as f_dist
 
-    from ..crystallography.structure_factor import compile_phase_sites
     from ..optimize.statistics import _chi2_absolute, effective_sample_size
     from ..params.derived import cartesian_frame
     from .layer2 import _hamilton_f, delta_bic, hamilton_justified
@@ -235,8 +392,8 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
     for ip, phase in enumerate(base.phases):
         if not phase.rigid_bodies:
             continue
-        sites = compile_phase_sites(phase)
         labels = [a.label for a in phase.atoms]
+        index = {lab: j for j, lab in enumerate(labels)}
         for b, body in enumerate(phase.rigid_bodies):
             bb = f"phases.{ip}.rigid_bodies.{b}"
             _, res_a, _ = _fit(ref, base.model_copy(deep=True), data,
@@ -244,24 +401,15 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
                                 f"{bb}.torsions.*.twist"], max_iter)
             if on_arm is not None:
                 on_arm(body.name, "body", res_a)
-            # the released arm: same model, this body's atoms freed and held
-            # by restraints at the geometry the body placed them in
-            members, bonds, angles = _template_geometry(phase, body)
-            ident = {j: _identity_op(sites, j) for j in members}
-            restraints = [BondRestraint(atom_i=i, atom_j=j, target=d, sigma=bond_sigma,
-                                        op_index=ident[j]) for i, j, d in bonds]
-            restraints += [AngleRestraint(atom_i=i, atom_j=k, atom_k=j, target_deg=a,
-                                          sigma=angle_sigma, op_index_i=ident[i],
-                                          op_index_k=ident[j]) for i, k, j, a in angles]
-            released_phase = phase.model_copy(update={
-                "rigid_bodies": [x for x in phase.rigid_bodies if x.name != body.name],
-                "restraints": [*phase.restraints, *restraints]}, deep=True)
-            released = base.model_copy(deep=True)
-            released.phases[ip] = released_phase
+            # the released arm: same model, this body's heavy atoms freed and
+            # held by restraints at the geometry the body placed them in, each
+            # riding H tied to its parent (WP-1989)
+            arm = released_arm(base, body.name, phase=ip, bond_sigma=bond_sigma,
+                               angle_sigma=angle_sigma)
+            members = [index[lab] for lab in body.atoms]
             ref_b, res_b, dropped = _fit(
-                ref, released, data,
-                [*free, *(f"phases.{ip}.atoms.{j}.dof.*" for j in members)],
-                max_iter, drop=_later_bodies(ip, b))
+                ref, arm.structure, data, [*free, *arm.free], max_iter,
+                drop=_later_bodies(ip, b), ties=arm.ties)
             if on_arm is not None:
                 on_arm(body.name, "released", res_b)
             sa, sb = res_a.statistics, res_b.statistics
@@ -280,28 +428,27 @@ def rigid_body_misfit(ref, data, *, free: tuple[str, ...] = (
             fires = (hamilton_justified(chi_a, chi_b, n, k_a, added, alpha=alpha,
                                         n_effective=n_eff)
                      and dbic > bic_threshold)
-            # where: the released geometry against the template, in σ units
+            # where: the released geometry against the template, in σ units,
+            # for each restrained bond and angle
             fitted = ref_b.fitted_structure.phases[ip]
-            _, bonds_after, angles_after = _template_geometry(fitted, body)
-            after_b = {(i, j): d for i, j, d in bonds_after}
-            after_a = {(i, k, j): a for i, k, j, a in angles_after}
             devs = []
             m = np.asarray(cartesian_frame(fitted.cell.lengths_angles()))
 
             def cart(j, ph=fitted, m=m):
                 return m @ np.array([ph.atoms[j].x.value, ph.atoms[j].y.value,
                                      ph.atoms[j].z.value])
-            for i, j, d in bonds:
-                d1 = after_b.get((i, j), float(np.linalg.norm(cart(i) - cart(j))))
-                devs.append((f"{labels[i]}–{labels[j]}", d, d1, (d1 - d) / bond_sigma))
-            for i, k, j, a in angles:
-                a1 = after_a.get((i, k, j))
-                if a1 is None:
+            for r in arm.restraints:
+                if isinstance(r, BondRestraint):
+                    i, j, d = r.atom_i, r.atom_j, r.target
+                    d1 = float(np.linalg.norm(cart(i) - cart(j)))
+                    devs.append((f"{labels[i]}–{labels[j]}", d, d1, (d1 - d) / bond_sigma))
+                else:
+                    i, k, j, a = r.atom_i, r.atom_j, r.atom_k, r.target_deg
                     u, v = cart(i) - cart(k), cart(j) - cart(k)
                     a1 = math.degrees(math.acos(np.clip(
                         u @ v / (np.linalg.norm(u) * np.linalg.norm(v)), -1, 1)))
-                devs.append((f"{labels[i]}–{labels[k]}–{labels[j]}", a, a1,
-                             (a1 - a) / angle_sigma))
+                    devs.append((f"{labels[i]}–{labels[k]}–{labels[j]}", a, a1,
+                                 (a1 - a) / angle_sigma))
             devs.sort(key=lambda r: -abs(r[3]))
             row = BodyMisfitRow(
                 phase_index=ip, body=body.name, chi2_body=chi_a, chi2_released=chi_b,
