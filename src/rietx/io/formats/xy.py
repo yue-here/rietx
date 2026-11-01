@@ -36,9 +36,25 @@ ILL instruments write this layout.  ``tsamp`` becomes
 ``metadata["temperature_k"]`` — the series coordinate of a variable-temperature
 run (``io/CLAUDE.md`` § Metadata) — and only the first value is read, being the
 one the manual names; a file writing a second value says nothing the manual
-defines about it.  A multiplier other than 1, or ``Interpol = 1``, changes
-what the numbers *are* and is **refused by name** rather than read as written,
-which before this was what happened, silently.
+defines about it.  The multipliers are **applied** as the manual defines them
+— x times ``fac_x``, y and σ times ``fac_y`` — and a factor other than 1 says
+so (``XYDATA_INTER_APPLIED``, at ``info``), since every number the pattern
+holds is then not the number the file wrote.  A file with no σ column gets the
+Poisson fallback on the multiplied y, which is what FullProf computes too.  The
+manual does not say which comes first, so it was measured: FullProf 8.20
+(``fp2k``, run as a black box on synthetic files) refines a file of y/2 under
+``fac_y = 2`` to the same χ² as the file of y under ``fac_y = 1``, which puts σ
+at √(fac_y·y) and not at fac_y·√y.  ``Interpol = 1`` asks for an
+interpolation to a constant step and stays **refused by name**: reading the
+points as measured would be a different pattern from FullProf's.
+
+**The caller may declare the axis** (``axis="two_theta"`` or ``"tof"``,
+:data:`~rietx.schemas.pattern.AxisKind`'s spellings).  A headerless bank of
+flight times is three plain columns, and no value can say it is not 2θ in
+degrees (``io/CLAUDE.md`` § The axis is never trusted), so the declaration is
+the evidence and is recorded as one (``metadata["declared_axis"]``).  A file
+that states its own unit and contradicts the declaration is refused, quoting
+both: the reader cannot know which of the two is wrong.
 """
 
 from __future__ import annotations
@@ -107,6 +123,13 @@ _TOF_HINT_RE = re.compile(r"time[-\s]?of[-\s]?flight|\btof\b", re.I)
 
 _COMMENT_MARKERS = ("#", "!", "'", "/")
 
+#: The ``axis`` reader option's values, :data:`AxisKind`'s, and what each is in
+#: words — for the refusal that quotes a declaration against the file's unit.
+_AXIS_WORDS: dict[str, str] = {
+    "two_theta": "2θ in degrees",
+    "tof": "a flight time in µs",
+}
+
 
 def _stated_axis(comments: list[str]
                  ) -> tuple[AxisKind | None, str | None, str | None]:
@@ -141,19 +164,23 @@ def _stated_axis(comments: list[str]
 _XYDATA_HEADING_LINES = 6
 
 
-def _xydata_heading(lines: list[str], path: Path) -> float | None:
-    """The sample temperature an ``XYDATA`` heading states, refusing what changes the numbers.
+def _xydata_heading(lines: list[str], path: Path
+                    ) -> tuple[float | None, float, float]:
+    """``(tsamp, fac_x, fac_y)`` from an ``XYDATA`` heading, refusing what cannot be applied.
 
     ``lines`` are the five heading lines after the keyword.  ``INTER fac_x
-    fac_y Interpol`` with a multiplier other than 1 means FullProf scales the
-    x values, or y and σ, before it uses them; ``Interpol = 1`` means it
-    interpolates them to a constant step.  Neither is applied here, so either
-    is refused, naming the file and the value, rather than read as written.
-    Returns ``tsamp`` from ``TEMP tsamp``, or ``None`` where the heading has
-    no ``TEMP`` line, a value that is not a number, or one that is not
-    positive (a file recording zero records nothing).
+    fac_y Interpol`` holds the multipliers FullProf applies to the x values and
+    to y and σ before it uses them (the manual, PDF p. 74, ``Ins = 10``); both
+    are 1 where the heading has no ``INTER`` line.  A multiplier that is not a
+    positive finite number would reverse or collapse the axis or flip the
+    intensities' sign, so it is refused by name, as is ``Interpol = 1``, which
+    asks FullProf to interpolate the data to a constant step.  ``tsamp`` is
+    ``TEMP tsamp``, or ``None`` where the heading has no ``TEMP`` line, a value
+    that is not a number, or one that is not positive (a file recording zero
+    records nothing).
     """
     temperature = None
+    fac_x = fac_y = 1.0
     for line in lines:
         parts = line.split()
         if not parts:
@@ -166,15 +193,15 @@ def _xydata_heading(lines: list[str], path: Path) -> float | None:
                 raise ValueError(
                     f"{path}: the XYDATA heading's INTER line {line.strip()!r} "
                     f"does not start with two numbers (fac_x, fac_y)") from None
+            for label, factor in (("fac_x", fac_x), ("fac_y", fac_y)):
+                if not (np.isfinite(factor) and factor > 0.0):
+                    raise ValueError(
+                        f"{path}: the XYDATA heading states INTER {label} = "
+                        f"{factor:g}. FullProf multiplies by it before using "
+                        f"the data, and a multiplier that is not a positive "
+                        f"number would reverse or collapse the axis or flip "
+                        f"the sign of every intensity, so the file is refused.")
             interpol = values[2] if len(values) > 2 else "0"
-            if fac_x != 1.0 or fac_y != 1.0:
-                raise ValueError(
-                    f"{path}: the XYDATA heading states INTER multipliers "
-                    f"fac_x = {fac_x:g}, fac_y = {fac_y:g}. FullProf multiplies "
-                    f"the x values by fac_x and y and σ by fac_y before using "
-                    f"them, and this reader does not, so the file is refused "
-                    f"rather than read with every value off by that factor. "
-                    f"Re-export it with the factors applied and INTER 1 1.")
             if interpol.strip() == "1":
                 raise ValueError(
                     f"{path}: the XYDATA heading states Interpol = 1, which "
@@ -188,10 +215,33 @@ def _xydata_heading(lines: list[str], path: Path) -> float | None:
             except ValueError:
                 continue
             temperature = value if value > 0.0 else None
-    return temperature
+    return temperature, fac_x, fac_y
 
 
-def read_xy(path: str | Path, *,
+def _inter_applied(path: Path, fac_x: float, fac_y: float, axis: AxisKind,
+                   has_sigma: bool) -> Diagnostic:
+    """``XYDATA_INTER_APPLIED`` — the record that the numbers are not the file's."""
+    noun = "2θ" if axis == "two_theta" else "flight time"
+    acts, where = [], []
+    if fac_x != 1.0:
+        acts.append(f"every {noun} value multiplied by fac_x = {fac_x:g}")
+        where.append(axis)
+    if fac_y != 1.0:
+        acts.append(f"every intensity{' and σ' if has_sigma else ''} "
+                    f"multiplied by fac_y = {fac_y:g}")
+        where.extend(["intensity", "sigma"] if has_sigma else ["intensity"])
+    tail = ("" if has_sigma or fac_y == 1.0 else
+            " The file has no σ column, so σ is the Poisson value of the "
+            "multiplied intensity, as FullProf computes it.")
+    return Diagnostic(
+        level="info", code="XYDATA_INTER_APPLIED",
+        message=(f"{path.name}: the XYDATA heading's INTER line states "
+                 f"multipliers, and the reader applied them as FullProf does: "
+                 f"{' and '.join(acts)}.{tail}"),
+        where=where)
+
+
+def read_xy(path: str | Path, *, axis: str | None = None,
             diagnostics: list[Diagnostic] | None = None) -> PatternData:
     """Rows of ``x y [σ]``, read by position; x is 2θ unless the file states a flight time.
 
@@ -204,8 +254,18 @@ def read_xy(path: str | Path, *,
     because a header sits above its data.  A header row with the data's own
     count is out of this check's reach; the axis check in ``read_pattern``
     still sees one landing at or below 0°.
+
+    ``axis`` is the caller's declaration of what x is, ``"two_theta"`` or
+    ``"tof"``; ``None`` leaves it to the file (the module docstring).  An
+    ``XYDATA`` heading's ``INTER`` multipliers are applied before the order of
+    the points is checked, so a scan stored backwards is still reversed and
+    reported as one.
     """
     p = Path(path)
+    if axis is not None and axis not in _AXIS_WORDS:
+        raise ValueError(
+            f"{p.name}: axis={axis!r} is not an abscissa a pattern holds; "
+            f"declare one of {sorted(_AXIS_WORDS)}")
     rows: list[tuple[int, list[str], list[float]]] = []
     comments: list[str] = []
     # the mark decides the codec, so a UTF-16 export from Windows vendor
@@ -213,10 +273,10 @@ def read_xy(path: str | Path, *,
     text = p.read_text(encoding=head(p).encoding, errors="replace")
     lines = text.splitlines()
     heading = 0
-    temperature = None
+    temperature, fac_x, fac_y = None, 1.0, 1.0
     if lines and lines[0].lstrip("\ufeff").startswith("XYDATA"):
         heading = _XYDATA_HEADING_LINES
-        temperature = _xydata_heading(lines[1:heading], p)
+        temperature, fac_x, fac_y = _xydata_heading(lines[1:heading], p)
     for n, line in enumerate(lines, 1):
         if n <= heading:
             continue
@@ -260,8 +320,23 @@ def read_xy(path: str | Path, *,
     n_cols = arr.shape[1]
     sigma = arr[:, 2] if n_cols >= 3 and np.any(arr[:, 2] > 0) else None
 
-    axis, stated, other = _stated_axis(comments)
-    if axis is None:
+    stated_axis, stated, other = _stated_axis(comments)
+    if axis is not None:
+        # The caller's declaration.  It settles a file that states nothing, and
+        # one whose stated unit this reader cannot classify (the unit is still
+        # kept verbatim as ``x_label``).  A unit the file states and this reader
+        # recognises is a second declaration, and two that disagree are a
+        # contradiction: refused, quoting both, never resolved by picking one.
+        found = (other if other is not None else
+                 None if stated_axis in (None, axis) else _AXIS_WORDS[stated_axis])
+        if found is not None:
+            raise ValueError(
+                f"{p.name}: axis={axis!r} was declared, and the file states its "
+                f"x-axis unit as {stated!r}, which is {found}. The declaration "
+                f"and the file contradict each other, so the file is refused "
+                f"rather than read either way. Drop axis= to read it by its own "
+                f"statement, or correct the unit line if the file is wrong.")
+    elif stated_axis is None:
         # No recognised declaration: the axis is *assumed*, which is the third
         # row of the policy and the one that has to speak.  ``note`` carries the
         # TOF hint when there is one — a file that mentions a flight time
@@ -278,11 +353,21 @@ def read_xy(path: str | Path, *,
                    remedy=("Export the bank in time-of-flight or in 2θ: those "
                            "are the two abscissae PatternData holds."),
                    diagnostics=diagnostics if (stated or hint) else None)
-        axis = "two_theta"
+    declared = axis
+    axis = declared or stated_axis or "two_theta"
+    if fac_x != 1.0 or fac_y != 1.0:
+        arr[:, 0] *= fac_x
+        arr[:, 1] *= fac_y
+        if sigma is not None:
+            sigma = sigma * fac_y
+        if diagnostics is not None:
+            diagnostics.append(_inter_applied(p, fac_x, fac_y, axis,
+                                              sigma is not None))
     x, y, sig = ascending(arr[:, 0], arr[:, 1], sigma, path=p, fmt=XY,
                           axis=axis, diagnostics=diagnostics)
     return pattern_data(p, x, y, sig, axis=axis, source_file=p.name, format="xy",
-                        x_label=stated, temperature_k=temperature)
+                        x_label=stated, temperature_k=temperature,
+                        declared_axis=declared)
 
 
 XY = PatternFormat(
@@ -293,7 +378,10 @@ XY = PatternFormat(
           "is 2θ in degrees unless a comment states the x-axis unit: a flight "
           "time (Mantid's 'The X-axis unit is: Time-of-flight') reads it in "
           "microseconds, and any other stated unit is named and refused",
-    sigma="the third column when present and positive, else the Poisson fallback",
+    sigma="the third column when present and positive, else the Poisson "
+          "fallback; a FullProf XYDATA heading's INTER fac_y multiplies y and "
+          "σ alike",
+    options=("axis",),
     # last, but no longer *total*: a file with a NUL in its first 4 kB is not
     # claimed, so a binary vendor pattern reaches identify_format's refusal —
     # which names the formats this build reads — instead of reaching

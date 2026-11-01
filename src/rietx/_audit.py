@@ -539,7 +539,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
 })
 
 ROWS: tuple[Row, ...] = (
-    # code: 257
+    # code: 258
     Row("ABSORPTION_ESTIMATE_UNAVAILABLE", "code"),
     Row("ABSORPTION_MU_R_OUT_OF_RANGE", "code"),
     Row("ABSORPTION_PLATE_THICKNESS", "code"),
@@ -1141,6 +1141,18 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_SPECIES_WRITTEN_NEUTRAL", "code"),
     Row("WAVELENGTH_CALIBRATION", "code"),
     Row("XRDML_ATTENUATOR_APPLIED", "code"),
+    Row("XYDATA_INTER_APPLIED", "code", tier=1, ambiguity=1,
+        evidence=("info; a record of an act the file's own heading asks for: the FullProf "
+                  "manual (Rodriguez-Carvajal, An Introduction to the Program FullProf 2000, "
+                  "LLB, July 2001, PDF p. 74, Ins = 10) defines INTER fac_x as the internal "
+                  "multiplier of the x values and fac_y as that of y and sigma, so the "
+                  "numbers the file means are the written ones times the factors; that "
+                  "a file with no sigma column takes sqrt(fac_y*y) was measured on fp2k 8.20 "
+                  "run as a black box on synthetic files (#1064); fires exactly when a "
+                  "factor is not 1"),
+        response="info",
+        responds=("nothing: compare the pattern with the file's own columns only after "
+                  "multiplying them by the factors the message names")),
     # action: 24
     Row("rietx.schemas.results.StageResult.held", "action", tier=3, ambiguity=1,
         evidence=("WP-1301/1523: free, an absent phase's cell walked 14.9 A from truth over 13 "
