@@ -108,10 +108,37 @@ a drawn peak as a separate phase. Measured on the IUCr CPD QPA round robin
 - [x] Survey prior art for the same test. Record what each code does.
 - [x] Choose and land the rule. Keep `EXTRA_PEAK_ON_REFLECTION` on the same
       authority or split it with a reason.
-- [ ] Re-measure WP-1908's twelve fits. A real impurity must still read as
+- [x] Re-measure WP-1908's twelve fits. A real impurity must still read as
       unmatched: use a synthetic pattern with a second phase added.
+      Each fit was run on origin/main at 52cec09a1 and on this branch. Rwp
+      agrees to four places, so only the report differs. `unmatched_obs`
+      before → after: 1a 5→3, 1b 11→6, 1c 9→3, 1d 6→3, 1e 7→4, 1f 6→3,
+      1g 5→2, 1h 7→3, 1c 20-40° 10→9, 1c 25-33° 1→0, cpd-2 9→3, cpd-4
+      17→11, SRM 660c with the apertures at 0 11→0, refined 12→0.
+      `unmatched_calc` is unchanged everywhere. 66 rows left the list, and
+      65 of them sat 0.08-0.38° from a line drawn at 125-24175 counts,
+      below it except for six SRM 660c rows above 140°. The one exception
+      is 35.14° on the diverged 1c 20-40° fit, beside a line drawn at 0
+      counts. What remains on 1a-1h and
+      cpd-2 is 2-5 rows at 5.0-5.9°, the start of the scan 13-20° from any
+      line, plus 32.66° on 1c (5.0σ, beside a fluorite line drawn at 46
+      counts) and 26.96° on 1b (6σ, 1.26° from any line). Active actions
+      that moved: cpd-1b loses `add_impurity_phase` 0.50, and SRM 660c at
+      zero apertures loses `add_impurity_phase` 0.50 while
+      `increase_background_flexibility` 0.47 stays (WP-2054's question).
+      cpd-4 keeps `add_impurity_phase` 0.40 on lines at 119-135° that the
+      observed curve separates from their neighbours, on a fit at Rwp
+      0.28. The 1c 20-40° fit diverges (Rwp 0.92) on both trees, so its
+      nine rows are displaced lines and stay listed. The synthetic
+      second phase, silicon beside LaB₆: every silicon line above 8σ that
+      sits 0.3-2.0° from a LaB₆ line is still listed (28.44°, 47.30°,
+      56.12°, 69.13°, 76.38°, 94.95°, 114.09°). The one silicon line not
+      listed, 88.03°, sits 0.04° from a LaB₆ tick, which the 0.08° window
+      already hid.
 - [x] Tests + obs/calc/diff PNGs of the flank-lobe cases to `tests/output/`.
-- [ ] Skill: the `unmatched_obs` reference row, if what it means changes.
+- [x] Skill: the `unmatched_obs` reference row, if what it means changes.
+      `references/judging.md` § 4b, one sentence inside its budget, and the
+      manual's `concepts/report.md`.
 
 ## Acceptance
 
