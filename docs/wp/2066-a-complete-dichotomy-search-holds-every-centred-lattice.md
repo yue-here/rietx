@@ -172,6 +172,130 @@ with `search_complete=True`; acceptance rows keep their rankings.
 
 ## Handover log
 
+### 2026-11-01 (2nd session) — option 1 and V3 built; the F list waits on its owner
+
+The dichotomy engine now finds the C-centred lattices it used to lose
+while calling its search complete. On all five of #1258's lists the true
+lattice comes back first, once, in its conventional C setting or as the
+dense list's true P cell, and every search reports complete. The search
+visits exactly the boxes it did before. What it costs is leaf work: more
+leaves are accepted and refined: 1.1 to 2.7 times as many on the C
+lists, and 55 where there were 2 on the dense list. One task stays open. The reporter's orthorhombic-F
+lab list, the one real-data case against V3, is not on this machine, so
+whether the wrong A/B cells above its truth are refuted is not known.
+
+**Done.** Task 1 records the ruling. A (option 1):
+`dichotomy._swap_images` derives the extra letters from `axis_swaps`
+(monoclinic A, orthorhombic A and B). The leaf replays them beside the
+admitted ones, and `_relabel` re-sets an accepted one to C through
+`conventional_fit`. `reduce.conventional_setting` now takes monoclinic A
+(a↔c, then the C reduction) and orthorhombic A, B (the centred face's
+axes become a, b, shorter first). With P admitted the union trial set is
+every hkl, so the recursion is bit-identical. A search restricted to C
+widens its union by the images, and drops an image that breaks the trial
+cap and reports incomplete. B (V3): `_accept(q_drive=)` anneals on the
+lines up to `q_hi_search`, the recursion's own top (highest driven Q
+plus its largest k·σ). The closing passes assign every line, and where
+the cut dropped any they run until the assignment repeats (see Review).
+A list whose every line is below the cut takes the old path. No constant
+is added.
+`_test_box` and `kernels/src/dichotomy.rs` are untouched. Fixtures in
+`tests/test_indexing_engines.py`: the orthorhombic C list, the same list
+restricted to C, and the B repro (fast), the monoclinic C list with a > c
+(slow). Each fails on `main` (checked on a snapshot) or before the
+restricted-C fix. The indexing rulebook has one rule, and 1.11.0's
+staging file one note under Changed.
+
+**Settled here: monoclinic I is not replayed.** Two reasons. The
+C-reduced cell has |a·c| ≤ a²/2 and |a·c| ≤ c², so |cos β| ≤ 1/√2 = 0.707,
+inside the 30° obliquity bound (0.866). The previous entry's reason for I,
+a C lattice whose every C and A setting lies past that bound, therefore
+cannot occur. And a lattice whose only in-domain description is I has no
+admitted-letter description inside the declared d bounds, so it lies
+outside the domain the search claims. Measured by enumerating every
+b-unique cell with coefficients up to 4 (scratch `i_question.py`): with
+wide d bounds 0 of 2000 random C lattices are I-only; with bounds equal
+to the draw's own axis range, 15 of 1000 and 7 of 1000. The alternative,
+replaying I, would need an I→C re-set and a replay per leaf.
+
+**Measured** (macOS arm64, this worktree's `[dev]` venv, compiled tier
+on; load 150-210 on 10 cores from concurrent shifts, so boxes are the
+cost and wall seconds are noise). #1258's lists on the final tree, against
+`main` from the previous entry:
+
+| list | truth rank | candidates at the truth's primitive volume | boxes | accepted leaves (main → branch) |
+|---|---|---|---|---|
+| C m m m 4.2 / 12.9 / 5.9 | absent → 1 | 1 | 43 599, unchanged | 39 → 74 |
+| control C m m m 4.2 / 5.9 / 12.9 | 1 → 1 | 1 | 49 007, unchanged | 64 → 174 |
+| C 1 2/c 1, a > c | absent → 1 | 1 | 5 428 291, unchanged | 646 → 948 |
+| control C 1 2/c 1 | 1 → 1 | 1 | 14 328 646, unchanged | 1 315 → 1 447 |
+| B repro, 381 lines | absent → 1 (381/381) | 1 | 50 666, unchanged | 2 → 55 |
+
+The monoclinic truths come back at (12.3, 6.1, 9.5, β 115°) and
+(10.2, 3.9, 7.4, β 104°), the conventional C cells. The orthorhombic
+control returns 42 candidates against 25, its first three unchanged.
+
+**Gates (in flight, paused).** Unit replay on the final tree: brucite
+hexagonal and trigonal and corundum cubic unchanged; corundum hexagonal,
+trigonal and tetragonal and both synthetic monoclinic units moved, every
+unit complete and every truth at rank 1 where it was. Indexing acceptance:
+44 passed, 1 failed, the fluorapatite row
+(`test_the_cross_code_cell_leads_because_the_engines_agree_on_it`): the
+in-band cell reported is (9.37440, 6.88745), 128 of 135 lines, where the
+row needs 129. A dichotomy-only probe of that list gives 131 of 135 after
+the settling fix, so the 128-line member comes from the merge, not from
+this engine alone. Not yet explained; not yet run: fast selection,
+`reader_output`.
+
+**Review.** `/code-review high` (no `--fix`, since the gate chain was
+queued on this tree) gave ten findings. Fixed: a search restricted to C
+lost the lattice (the images were gated on P); `_relabel` dropped a leaf
+it could not re-set (now kept in its own letter); the kernel parity
+trace recorded `tt_all` where it meant the leaf's width (`a[-3]` →
+`a[-5]`). Fixed after the acceptance suite confirmed it: (2) the closing
+passes could end before the high-Q assignment settled. The lines above
+V3's cut meet the cell only at σ, and two passes left the fluorapatite
+row's true cell at 128 of 135 lines (`main` 131), failing
+`test_the_cross_code_cell_leads_because_the_engines_agree_on_it`. Where
+V3 cut any line, the closing passes now run until the assignment
+repeats, at most `MAX_ASSIGN_PASSES` (an existing constant); elsewhere two
+as before. A dichotomy-only probe of that list: `main` 131/135, two
+passes 128/135, settled 131/135. This reads the ruling's "two closing
+passes as now" as "closing passes over every line", which the ruling's
+point was; the maintainer may read it otherwise. Declined: (4)
+`engine_cell` reports the re-set C cell with an identity change. The
+engine's output is the C cell, and its hkl were carried through the same
+change. (5) `conventional_setting` re-sets A/B while the caller relabels.
+No engine produces A or B outside `_relabel`, and `SearchSpecSpec`
+refuses those letters. (6) Orthorhombic C from svd or trial_error keeps
+its axis order: that is `main`'s behaviour, not widened. (9) Face-letter
+tables in two modules, each guarded. (10) The extra `_accept` work: the
+cost above, forwarded to WP-1520. (7) The B fixture's budget is far above
+its few seconds; its docstring now says so.
+
+**Generality** (`generality-review`, unedited verdict lines):
+- Item 1, V3: **weak.** "Would change the verdict: the orthorhombic-F
+  list re-measured on the branch with its rank stated, plus the indexing
+  acceptance suite and unit-replay digests unchanged or each move named."
+  Author: the gates are below; the F list is the open task.
+- Item 2, `_swap_images`: **holds.** Tier 1, derived and tested.
+- Item 3, `_relabel` and the re-set: **holds on every default path**,
+  with a defect off it: a python `SearchSpec` admitting A had its images
+  labelled A in the C setting. Fixed: only C is moved.
+- Item 4, no monoclinic I: **holds**, asking for the measurement and the
+  domain argument here, replacing the previous entry's "not checked".
+
+**Gotchas.** `python -m tests.unit_replay` needs `capture DIR` then
+`replay DIR UNIT…`, and a comparison against `main` replays the same
+pickles with `PYTHONPATH=<main snapshot>/src`. The kernel test's
+`_accept` wrapper must pass `**kw` (`q_drive` is a keyword).
+
+**Next.** Get the orthorhombic-F lab list from the reporter (#780 set),
+re-measure its truth rank on this branch and say whether the A/B cells
+above it are refuted. That closes the WP. If they are not refuted, the
+question is the panel's, not the search's: the search is now complete
+there either way.
+
 ### 2026-11-01 — both fixes for A measured; the choice waits on the maintainer
 
 The tree still loses the issue's C-centred lattices. All five rows
