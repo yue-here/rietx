@@ -61,7 +61,7 @@ under any emission line lands inside the fitted range is enumerated.
 
 ## Handover log
 
-- **2026-10-31** (close, ghostshift batch) — closed. A satellite whose image under one emission line falls inside the fitted range is now enumerated, even when the other line's image of it falls outside. The report's satellite arm and the forward model share one window. Nothing else moved: no reflection list in the tree changed, and no real pattern in the tree has a satellite in the strip where the two windows used to disagree.
+- **2026-10-31** (close, ghostshift batch, PR #1287) — closed. A satellite whose image under one emission line falls inside the fitted range is now enumerated, even when the other line's image of it falls outside. The report's satellite arm and the forward model share one window. Nothing else moved: no reflection list in the tree changed, and no real pattern in the tree has a satellite in the strip where the two windows used to disagree.
   *Done*: all three tasks landed in PR #1139 (`2cf63737`). This session closed the bookkeeping: ✅, the `Priority:` line deleted, the narrative moved to the v1.11 record. The WP has no `### Inherited` section to consume.
   *Checked against the tree and `gh`*: `model.forward.generation_window` exists (module function and `CompiledModel.generation_window`), PR #1139 is merged, and claim issue #1130 is closed. Acceptance: `tests/test_satellites.py` (inside the 200 passed, 2 warnings of the run named under WP-1958's entry; `-m "not slow"`, macOS arm64, `[dev]`, Python 3.12, alone). `tests/test_satellites_acceptance.py` is a slow file and was not run here. PR #1139's gate ran it with the whole `-m slow` suite: 417 passed, 14 skipped, 15 xfailed.
   *What it does not do*: no release is owed (P3).

@@ -110,7 +110,7 @@ CI runs pins the case.
 
 ## Handover log
 
-- **2026-10-31** (ghostshift close-batch, not closed) — the code is finished and the test is not. A reduced cell is the exact image of its input on main, as PR #1136 shipped. But issue #1252, a fast-suite property test that fails on main about 1 run in 40, is still open and unfixed, and it is this WP's own Inherited task. So the WP stays open.
+- **2026-10-31** (ghostshift close-batch, PR #1287, not closed) — the code is finished and the test is not. A reduced cell is the exact image of its input on main, as PR #1136 shipped. But issue #1252, a fast-suite property test that fails on main about 1 run in 40, is still open and unfixed, and it is this WP's own Inherited task. So the WP stays open.
   *Checked against main `1314c69ea`*: `tests/test_indexing_reduce.py` still ends the exact-image property by comparing `reduce_cell` with gemmi's `niggli_reduce` at ε = `NIGGLI_EPS_RELATIVE`·V^(1/3) (lines 442-452). No `@example` pins the issue's case P (3.0, 3.0, 21.0, 89.99999°, 65°, 65°), and the one commit to that file after the WP's own (`7de1da3dc`, 37 added lines) is a `bravais_screen` case, not this property. The Inherited entry of 2026-10-31 stands as written: the defect is in the test's reference, not in `reduce_cell`, and the fix is a tighter reference or a bar near 2 ε plus the `@example`. #1252 is open.
   *Next*: the #1252 task, then the close (the v1.11 record's narrative, ✅, delete `Priority:` and `### Inherited`). It is P2 because the fast check goes red on main at random.
 

@@ -69,7 +69,7 @@ Relevant rules, restated:
 
 ## Handover log
 
-- **2026-10-31** (close, ghostshift batch) — closed. A phase with no reflection in the fitted range keeps the scale it was given under both solvers and has no weight fraction. The other fractions are relative to the phases seen in range, and the report says so. Nothing is owed: every task landed in PR #1103, and its follow-ups in PR #1176.
+- **2026-10-31** (close, ghostshift batch, PR #1287) — closed. A phase with no reflection in the fitted range keeps the scale it was given under both solvers and has no weight fraction. The other fractions are relative to the phases seen in range, and the report says so. Nothing is owed: every task landed in PR #1103, and its follow-ups in PR #1176.
   *Done*: the two PRs' handover entries below are the record. This session only closed the bookkeeping: ✅, the `Priority:` line and the consumed `### Inherited` section deleted (it held the #954 decision, built by #1103), and the narrative moved to the v1.11 record.
   *Checked against the tree and `gh`*: #1103 (`594d7beb`) is in the `v1.10.0` tag and #1176 (`0a6142c3`) is not, so it ships in 1.11 (`docs/releases/1.11.0.md` carries its notes). The WP's status line asked for the v1.10 record. That release is cut, and protocol rule 5 names the record of the release in flight, so the narrative went to v1.11 and says #1103 shipped in 1.10.0. Acceptance: `tests/test_scale_b_ridge.py` and `tests/test_qpa.py`, run with `-m "not slow"` beside `test_satellites.py` and `test_rigid_body_special.py`: 200 passed, 2 warnings (macOS arm64, worktree `.venv` `[dev]`, Python 3.12, nothing else running).
   *What it does not do*: no release is owed. The WP was P3.
