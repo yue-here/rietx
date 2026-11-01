@@ -18,6 +18,7 @@ import pytest
 from rietx.purposes import PURPOSES
 from rietx.schemas.common import Diagnostic
 from rietx.schemas.results import level_under
+from tests.test_data_support import _FAMILY_COUNTS, _cross_backend_state
 
 
 def _d(code: str, where: list[str], level: str = "warning") -> Diagnostic:
@@ -96,26 +97,24 @@ def test_a_named_variable_bears_on_every_purpose():
     assert {level_under(driven, p) for p in PURPOSES} == {"warning"}
 
 
-@pytest.mark.parametrize("state", ["_state_distortion_modes", "_state_bodies",
-                                   "_state_bodies_site", "_state_families_variable"])
+@pytest.mark.parametrize("state", [state for state, _ in _FAMILY_COUNTS])
 def test_a_path_that_moves_an_atom_bears_where_a_coordinate_does(state):
     """A warning naming a mode amplitude, a rigid body's origin, rotation or
     twist, or a variable tied to an atom entry is about the coordinates it
     moves, so it keeps its level under every purpose a coordinate's does
     (WP-2067; under qpa and magnetic each read as info before).  The paths are
-    the data-support count's own reading of what a column reaches.  A new
-    family that drives atoms is checked once its state joins the list above,
-    and then fails until the purpose table lists it
-    (``rietx.purposes._ATOM_DRIVERS``)."""
+    the data-support count's own reading of what a column reaches, on the
+    states that count is tested on.  A new family that drives atoms is checked
+    once its state joins ``tests.test_data_support._FAMILY_COUNTS``, and then
+    fails until the purpose table lists it (``rietx.purposes._ATOM_DRIVERS``)."""
     from rietx.optimize.statistics import structural_free_paths
-    from tests import test_cross_backend as tcb
 
     def warned(path):
         return {p for p in PURPOSES
                 if level_under(_d("FLOOR_HIT", [path]), p) == "warning"}
 
     coordinate = warned("phases.0.atoms.0.x")
-    _, table, _ = getattr(tcb, state)()
+    _, table, _ = _cross_backend_state(state)
     paths = [p for p in structural_free_paths(table) if ".atoms." not in p]
     assert paths
     assert {p: sorted(coordinate - warned(p)) for p in paths} == {p: [] for p in paths}

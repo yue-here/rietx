@@ -2637,8 +2637,9 @@ class ParameterTable:
         writes: the block is that row's only writer, as the space group is a
         locked coordinate's.  Every input must exist and must not be written
         by this block or a later one, so the blocks apply in one pass in
-        declaration order.  Every frame input must be an input.  The outputs' values are written from the map at
-        once, so the table never holds a derived row that disagrees with it.
+        declaration order.  Every frame input must be an input.  The outputs'
+        values are written from the map at once, so the table never holds a
+        derived row that disagrees with it.
         """
         for q in (*block.inputs, *block.outputs):
             if q not in self._paths:
