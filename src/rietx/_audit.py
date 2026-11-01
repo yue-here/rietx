@@ -570,6 +570,20 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-19"),
     Row("CHILD_GROUP_UNNAMED", "code"),
     Row("CIF_CELL_ANGLE_CORRECTED", "code"),
+    Row("CIF_EMPTY_BLOCK_SKIPPED", "code", tier=1, ambiguity=1,
+        evidence=("a reading rule from the format's definition: cif_core.dic 3.3.0 files the "
+                  "AUDIT category and its children under PUBLICATION, recording the data "
+                  "block's creation and updating and stating no cell, site or symmetry, so a "
+                  "block with no tags or only _audit_ tags carries no structure and the one "
+                  "block with atom sites is the file's structure; fires exactly when such "
+                  "blocks were skipped and names each (issue #1063, item 1)"),
+        grounds=("Unanimity: every competent refiner reads the one block that holds the "
+                 "structure when the others state nothing; the dissenting case, two blocks "
+                 "with atom sites or one beside a block stating anything beyond _audit_ "
+                 "items, is refused naming the blocks, never chosen between."),
+        response="info",
+        responds=("note that the structure was read from the one block with atom sites and "
+                  "which blocks, stating nothing, were skipped")),
     Row("CIF_MAGNETIC_CENTERING_ASSUMED", "code"),
     Row("CIF_MAGNETIC_ION_UNCHARGED", "code"),
     Row("CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED", "code"),
@@ -608,7 +622,9 @@ ROWS: tuple[Row, ...] = (
     Row("EXTINCTION_SCREEN_UNRELIABLE", "code", tier=3, ambiguity=2,
         evidence=("warning; fires when the absence-free reference fit leaves more than "
                   "REFERENCE_NET_RWP_MAX of the net weighted power unexplained; the silent side "
-                  "holds on four real families, the firing side is shown on synthetic Si only"),
+                  "holds on four real families; the firing side is shown on synthetic Si and on "
+                  "SRM 676a at x1.02 and the GSAS-II FAP at x0.99 (both 1.00), and misses "
+                  "PbSO4 X-ray at x0.99 (0.45, a wrong class returned)"),
         grounds=("Withholds the pick and keeps the ranking, and no default path calls the "
                  "pick; ruled 2026-10-21 (PR #939)."),
         approved="2026-10-21", response="warning",
@@ -625,6 +641,16 @@ ROWS: tuple[Row, ...] = (
                   "check whatever trades against it before quoting an ADP, an occupancy or "
                   "a scale")),
     Row("FROZEN_COMPILE_STALE", "code"),
+    Row("FULLPROF_LIMITS_NOT_APPLIED", "code", tier=1, ambiguity=1,
+        evidence=("info; a record of what a read did not carry: the file's Nre count "
+                  "declares LINE-47 hard limits (FullProf manual p. 126, NUMPAR "
+                  "LowLIMIT HighLIMIT), which the reader reads onto "
+                  "FullProfModel.parameter_limits and applies to no bound; fires "
+                  "exactly when Nre > 0 and diagnostics= is passed; acts on nothing"),
+        response="info",
+        responds=("decide per limit whether the parameter it names should be held "
+                  "inside it, and set that Parameter's min and max if so"),
+        scope=("all",)),
     Row("FULLPROF_MAGNETIC_PHASE_OMITTED", "code"),
     Row("FULLPROF_MAGNETIC_PHASE_READ", "code"),
     Row("FULLPROF_OCCUPANCY_UNCHECKED", "code"),
@@ -729,7 +755,6 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED", "code"),
     Row("INDEX_VALIDATION_FAILED", "code"),
     Row("INDEX_VOLUME_UNPHYSICAL", "code"),
-    Row("INDEX_Z_NOT_INTEGER", "code"),
     Row("K_VECTOR_UNSEPARATED", "code", tier=3, ambiguity=2,
         evidence=("info; fires when the top two k trials' best eligible ΔBIC lie within "
                   "SOLVE_K_TIE_DELTA_BIC, charged at N/f² since WP-2002 B12; Ba2FeSbSe5 1.5 K "
@@ -946,6 +971,19 @@ ROWS: tuple[Row, ...] = (
         responds=("read a value in a listed pattern's row, or that pattern's fraction of "
                   "the phase, as the value handed in rather than a measurement")),
     Row("PHASE_UNCONSTRAINED", "code"),
+    Row("PLAN_FREES_NO_MOMENT", "code", tier=1, ambiguity=1,
+        evidence=("a statement about the plan: fires exactly when a phase has a moment DOF "
+                  "neither locked nor held by the caller and no glob of run_stages() frees "
+                  "any of its moment DOFs through ParameterTable.would_free, so the moment "
+                  "is the start value with no esd; where = each held site's modulus path, then "
+                  "the phase's scale (the coupling, so the level stays warning under "
+                  "structure and qpa); takes no action (WP-1418, #1082: a "
+                  "synthetic k = (0, 0, 1/2) child under mccusker_default and "
+                  "mccusker_structural kept 3.6 against 3.0 mu_B and said nothing)"),
+        response="warning",
+        responds=("read every moment in result as the value supplied, not refined, and refit "
+                  "under a plan that frees phases.*.atoms.*.moment.dof* before quoting a "
+                  "moment or the nuclear values beside it")),
     Row("QPA_ESD_UNAVAILABLE", "code"),
     Row("QPA_FRACTION_RANGE", "code", tier=1, ambiguity=3,
         evidence=("arithmetic: an info record on every width profile whose fit carries an esd, "
@@ -1581,7 +1619,19 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.atomic_volume.TABLE_TEMPERATURE", "constant", value=298.0),
     Row("rietx.crystallography.atomic_volume.THERMAL_EXPANSION", "constant", value=9.5e-05),
     Row("rietx.crystallography.atomic_volume.THERMAL_EXPANSION_ESD", "constant", value=3e-06),
-    Row("rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS", "constant", value=(0.8, 1.25)),
+    Row("rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS", "constant", tier=2,
+        evidence=("citation: Hofmann (2002) Acta Cryst. B58, 489, section 3: past 25 % either "
+                  "way lie 1746 of 182 239 CSD structures (about 1 %; typical scatter 4 %, "
+                  "Fig. 1), where he starts calling a structure unusual, not a measured error "
+                  "bound. SearchSpec.from_formula reads the upper edge only, as a ceiling for "
+                  "every formula (WP-2030, ruled on #1121 2026-10-24): his section 3 (iii) puts "
+                  "ionic cells below the estimate, the direction a ceiling tolerates. Checked on "
+                  "21 published cells in test_indexing_formula.py: 16 inorganic (NIST SRM "
+                  "660c/640c/676a, the IUCr CPD round robin, 11-BM, GSAS-II tutorials, COD) at "
+                  "0.375-0.866 and 4 organic at 1.000-1.044 lie under it; HKUST-1, its pore "
+                  "contents left out of the formula, reads 2.283 and does not. The lower edge "
+                  "sets only Composition.volume_window's lower edge and the manual's quoted band (in_volume_window and the search read the ceiling alone)"),
+        value=(0.8, 1.25)),
     Row("rietx.crystallography.atomic_volume.VOLUME_SCATTER", "constant", value=0.04),
     Row("rietx.crystallography.attenuation._HC_EV_ANGSTROM", "constant", value=12398.4198),
     Row("rietx.crystallography.attenuation._NA_BARN", "constant", value=0.602214076),
@@ -1707,6 +1757,21 @@ ROWS: tuple[Row, ...] = (
                   "and the exact Fraction check then accepts it or raises; a larger factor costs "
                   "nothing and changes no accepted (P, p). tests/test_subgroups.py::"
                   "test_an_isomorphic_series_standardises_past_the_floor_of_the_denominator_bound")),
+    Row("rietx.crystallography.representation.subgroups._WYCKOFF_GRID", "constant", tier=1,
+        value=24,
+        evidence=("theory and measurement: every fixed coordinate of a special position in an ITA "
+                  "setting is a multiple of 1/24 (eighths of the d-glide groups, twelfths of the "
+                  "hexagonal ones), so the 1/24 grid meets every position; the grid only seeds "
+                  "orbits, which an exact test joins. tests/test_subgroups.py counts 1731 over the "
+                  "230 types and the same positions in all 530 Hall settings. Supporting evidence, "
+                  "not asserted by a test: a 1/48 grid gave the same 1731, letter by letter "
+                  "(2026-10-30)")),
+    Row("rietx.crystallography.representation.subgroups._GENERIC_VALUES", "constant",
+        tier="invariant", value=(0.13577799801783944, 0.2675222112537019, 0.4111874386653582),
+        evidence=("answer-invariant: any free-parameter values off the special ones give the same "
+                  "orbit splitting; _Table.generic checks that the point's site symmetry is the "
+                  "position's own and raises otherwise, so a value that hit a special position "
+                  "could only raise, never mislabel")),
     Row("rietx.crystallography.riding.RIDING_MIN_SEPARATION", "constant", value=1e-06),
     Row("rietx.crystallography.rotation.SERIES_THRESHOLD", "constant", value=0.25),
     Row("rietx.crystallography.rotation.UNIT_TOLERANCE", "constant", value=1e-09),
@@ -1840,7 +1905,6 @@ ROWS: tuple[Row, ...] = (
                   "not checked"),
         value=0.0005),
     Row("rietx.indexing.diagnostics.WIDTH_MISMATCH_RATIO", "constant", value=3.0),
-    Row("rietx.indexing.diagnostics.Z_INTEGER_TOLERANCE", "constant", value=0.08),
     Row("rietx.indexing.dichotomy.ACCEPT_SPACING_FRAC", "constant", value=0.25),
     Row("rietx.indexing.dichotomy.ANGLE_STEP_DEG", "constant", value=5.0),
     Row("rietx.indexing.dichotomy.ANNEAL_FACTOR", "constant", value=4.0),
@@ -1927,10 +1991,12 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.extinction.REFERENCE_NET_RWP_MAX", "constant", tier=3, value=0.7071,
         evidence=("Statistic: Toby (2006)'s background-subtracted Rwp over the picker's "
                   "envelope (the envelope is rietx's own). Right or nearly right cells read "
-                  "<= 0.36 on 11-BM NAC, GSAS-II FAP, GSAS-II PbSO4 X-ray and SRM 676a; cells "
-                  "outside the basin read >= 1.6, shown on synthetic Si only. Fails on an "
-                  "unmodelled second phase carrying half the net power, and by arithmetic on "
-                  "weak data (S < N)."),
+                  "0.12-0.19 on the default path (cell refined) on 11-BM NAC, GSAS-II FAP, GSAS-II PbSO4 X-ray and SRM 676a (<= 0.36 with the cell held); cells "
+                  "outside the basin read 1.0-2.3 on synthetic Si, SRM 676a (x1.02), FAP "
+                  "(x0.99), NAC (x0.99, x1.02) and PbSO4 (x1.02), but PbSO4 at x0.99 reads 0.45 "
+                  "and passes. Fails on an unmodelled second phase carrying half the net power, "
+                  "by arithmetic on weak data (S < N), and where the envelope rides into a "
+                  "continuum of lines."),
         grounds="Kept on both grounds, ruled 2026-10-21 (PR #939).",
         approved="2026-10-21"),
     Row("rietx.indexing.extinction._MODULI", "constant", value=(2, 3, 4, 6)),
@@ -2310,11 +2376,27 @@ ROWS: tuple[Row, ...] = (
                   "never dropped (31 on corundum with the cap at 2, "
                   "tests/test_geometry_table.py); tests/data's structures reach 20 a site "
                   "(WP-2002)")),
+    Row("rietx.model.geometry.MAX_TORSIONS_PER_ATOM", "constant", tier=1, value=36,
+        evidence=("report scope (tier 1's cap clause, ruled 2026-10-21): the note counts "
+                  "exactly what the cap drops, the kept torsions are each atom's first in "
+                  "chain order and each carries the esd it has uncapped (fluorapatite at a "
+                  "cap of 5, tests/test_geometry_torsions.py), and Refinement.geometry"
+                  "(request=) answers any chain by name. 36 = 4 bonds x (4-1) x (4-1), so "
+                  "every chain of a molecule whose atoms have at most four bonds is listed "
+                  "whole: the five molecular structures in tests/data never reach it, while "
+                  "LaB6 (La with 24 B) has 4 374 chains (WP-1815)")),
     Row("rietx.model.geometry.SYMMETRY_CODE_MAX_SHIFT", "constant", tier=1, value=4,
         evidence="format: CIF symmetry code digit = shift + 5, so -4..+4 (docstring)"),
     Row("rietx.model.geometry.VARIANCE_CANCELLATION_FLOOR", "constant", tier=1, value=1e-12,
         evidence=("numerical floor: about 4.5e3 x fp64 eps, five orders below the smallest powder "
                   "esd (docstring); stops 90.00000000000(43)")),
+    Row("rietx.model.geometry._KEY_OFFSET", "constant", tier=1, value=0.41421356237309515,
+        evidence=("numerical setting with a domain test: where a 1e-4-cell position key puts "
+                  "its boundaries; any offset leaves distinct atoms (>0.5 A apart) with distinct "
+                  "keys, and an irrational one keeps every decimal CIF coordinate and its "
+                  "images off a boundary. Rounding to the nearest 1e-4 put LaMnO3's 0.48775 on a "
+                  "tie and listed 20 of 298 chains twice; tests/test_geometry_torsions.py checks "
+                  "no reversal is listed, by positions to 1e-6 (WP-1815)")),
     Row("rietx.model.geometry._COINCIDENT_D2", "constant", tier=1, value=1e-06,
         evidence=("numerical floor: any value between roundoff and the shortest real interatomic "
                   "d^2 (>0.1 A^2) gives the same lists")),
@@ -2484,6 +2566,11 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.model.restraints._COS_CLAMP", "constant", tier=1, value=0.999999999,
         evidence=("numerical floor: affects only angles within 0.0026 deg of 0 or 180, which are "
                   "unsupported restraint targets; value chosen, not sqrt(eps)")),
+    Row("rietx.model.restraints._TORSION_SIN2_FLOOR", "constant", tier=1,
+        value=1.999999943436137e-09,
+        evidence=("derived: 1 - _COS_CLAMP**2, the sin^2 of the bond angle at the clamp "
+                  "restraints already applies, with no free factor; a chain bent less than "
+                  "that has no torsion (WP-1815)")),
     Row("rietx.model.restraints._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: pi/180"),
     Row("rietx.model.restraints._SAME_CONTACT_A", "constant", tier=1, value=1e-06,
@@ -4097,7 +4184,12 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.workflow.index_pattern:validate", "default", value=True),
     Row("rietx.indexing.workflow.index_pattern:check_top", "default", value=None),
     Row("rietx.indexing.workflow.index_pattern:two_theta_limits", "default", value=None),
-    Row("rietx.indexing.workflow.index_pattern:formula", "default", value=None),
+    Row("rietx.indexing.workflow.index_pattern:formula", "default", tier="caller", ambiguity=1,
+        value=None,
+        evidence=("opt-in: formula=None by default; a formula is recorded on the result and "
+                  "as each candidate's formula_units, and moves no search, rank or grade "
+                  "(WP-2030 withdrew INDEX_Z_NOT_INTEGER, which fired on 12 of 16 true "
+                  "inorganic cells)")),
     Row("rietx.indexing.workflow.index_pattern:temperature", "default", value=298.0),
     Row("rietx.indexing.workflow.index_pattern:events", "default", value=None),
     Row("rietx.indexing.workflow.index_pattern:cancel", "default", value=None),
@@ -4188,7 +4280,7 @@ ROWS: tuple[Row, ...] = (
     Row("EXTRA_PEAK_ON_REFLECTION.suggestion", "suggestion", value=1),
     Row("FLAT_DIRECTION.suggestion", "suggestion", value=1),
     Row("FLOOR_HIT.suggestion", "suggestion", value=1),
-    Row("FULLPROF_MAGNETIC_PHASE_OMITTED.suggestion", "suggestion", value=1),
+    Row("FULLPROF_MAGNETIC_PHASE_OMITTED.suggestion", "suggestion", value=2),
     Row("FULLPROF_MAGNETIC_PHASE_READ.suggestion", "suggestion", value=1),
     Row("FULLPROF_OCCUPANCY_UNCHECKED.suggestion", "suggestion", value=1),
     Row("FULLPROF_TIE_DROPPED.suggestion", "suggestion", value=3),
@@ -4237,7 +4329,6 @@ ROWS: tuple[Row, ...] = (
     Row("INDEX_SYSTEMS_NOT_COVERED.suggestion", "suggestion", value=1),
     Row("INDEX_VALIDATION_FAILED.suggestion", "suggestion", value=1),
     Row("INDEX_VOLUME_UNPHYSICAL.suggestion", "suggestion", value=1),
-    Row("INDEX_Z_NOT_INTEGER.suggestion", "suggestion", value=1),
     Row("LANDE_G_ASSUMED.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence="arithmetic: names the argument that overrides the default"),
     Row("LAUE_CLASS_NOT_SEPARABLE.suggestion", "suggestion", value=1),
@@ -4313,6 +4404,10 @@ ROWS: tuple[Row, ...] = (
     Row("PEAK_WIDTH_CAPPED.suggestion", "suggestion", value=1),
     Row("PEAK_WIDTH_LAW_MISMATCH.suggestion", "suggestion", value=2),
     Row("PHASE_UNCONSTRAINED.suggestion", "suggestion", value=1),
+    Row("PLAN_FREES_NO_MOMENT.suggestion", "suggestion", value=1, tier=1, ambiguity=1,
+        evidence=("arithmetic: a parameter no stage frees cannot be refined, so the remedy "
+                  "names the glob that frees the moment DOFs and the preset that names it "
+                  "(magnetic_structural, WP-1418); it moves nothing by itself")),
     Row("QPA_ESD_UNAVAILABLE.suggestion", "suggestion", value=1),
     Row("QPA_FRACTION_RANGE.suggestion", "suggestion", tier=2, ambiguity=3, value=1,
         evidence=("profile-likelihood interval in place of the Wald esd: Venzon & Moolgavkar (1988)"
@@ -4638,8 +4733,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "INDEX_VALIDATION_FAILED.suggestion",
     "INDEX_VOLUME_UNPHYSICAL",
     "INDEX_VOLUME_UNPHYSICAL.suggestion",
-    "INDEX_Z_NOT_INTEGER",
-    "INDEX_Z_NOT_INTEGER.suggestion",
     "LAUE_CLASS_NOT_SEPARABLE",
     "LAUE_CLASS_NOT_SEPARABLE.suggestion",
     "LEBAIL_ALTERNATION_STOPPED",
@@ -4860,7 +4953,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.crystallography.atomic_volume.TABLE_TEMPERATURE",
     "rietx.crystallography.atomic_volume.THERMAL_EXPANSION",
     "rietx.crystallography.atomic_volume.THERMAL_EXPANSION_ESD",
-    "rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS",
     "rietx.crystallography.atomic_volume.VOLUME_SCATTER",
     "rietx.crystallography.attenuation._HC_EV_ANGSTROM",
     "rietx.crystallography.attenuation._NA_BARN",
@@ -4958,7 +5050,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.indexing.consensus.CONSENSUS_CHECK_TOP",
     "rietx.indexing.diagnostics.BRAGG_BRENTANO_CELL_PPM",
     "rietx.indexing.diagnostics.WIDTH_MISMATCH_RATIO",
-    "rietx.indexing.diagnostics.Z_INTEGER_TOLERANCE",
     "rietx.indexing.dichotomy.ACCEPT_SPACING_FRAC",
     "rietx.indexing.dichotomy.ANGLE_STEP_DEG",
     "rietx.indexing.dichotomy.ANNEAL_FACTOR",
@@ -5080,7 +5171,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.indexing.workflow.index_pattern:data",
     "rietx.indexing.workflow.index_pattern:engines",
     "rietx.indexing.workflow.index_pattern:events",
-    "rietx.indexing.workflow.index_pattern:formula",
     "rietx.indexing.workflow.index_pattern:instrument",
     "rietx.indexing.workflow.index_pattern:peaks",
     "rietx.indexing.workflow.index_pattern:preset",
@@ -5426,7 +5516,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "INDEX_SYSTEMS_NOT_COVERED",
     "INDEX_VALIDATION_FAILED",
     "INDEX_VOLUME_UNPHYSICAL",
-    "INDEX_Z_NOT_INTEGER",
     "K_VECTOR_UNSEPARATED",
     "LANDE_G_ASSUMED",
     "LAUE_CLASS_NOT_SEPARABLE",

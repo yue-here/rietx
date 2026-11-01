@@ -1,6 +1,6 @@
 # WP-2033 — a declared Z or density filters an extinction class's members
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-10-31 — all five tasks merged from outside as PR #1140 (`e4ddbcda`); the close is owed
 Track: Data and metadata in, a structure out
 Depends on: — (1967 soft, closed: the `ExtinctionPrior` filter this extends; 2030 soft: the formula's Z check in the search)
 Priority: P3 2026-10-23 — a workaround covers it: the user drops the groups by hand after the screen, as #935 describes
@@ -151,3 +151,5 @@ extinction screen answers as on `main`.
   *Gate*: fast suite on the final tree, on a Mac, `-n 4 --dist loadgroup`:
   11 333 passed, 265 skipped, 27 xfailed, 0 failed (`--junitxml`: 11 625
   tests, 292 skipped, 0 failures, 0 errors).
+
+- **2026-10-31** (`/pr-review`) — merged from outside as PR #1140 (`e4ddbcda`) after four rounds. The contributor's ticks and the Context's `Decided 2026-10-23` stand as written. **The density tolerance is 1.5 %**, not the 8 % the Context and the 2026-10-23 entry name: `DENSITY_Z_TOLERANCE = 0.015`, tier 2, cited to ITC Vol. C (2006) ch. 3.2 § 3.2.1 p. 156 ("should agree within at least 1.5%"). Yue agreed on 2026-10-31 to replace the 1 % ruled on 2026-10-27 with the cited figure. At 1.5 % two whole numbers fit a measured density from Z ≈ 33 up, and the screen reports that as ambiguity. Gated in a stack of seven on `main` `d87c8cc9` (tree `21beeca9`, Mac arm64, Python 3.12, `[dev,jax]`): full suite 13 427 passed, 230 skipped, 48 xfailed, 0 failed; GUI, ruff and the `-W` manual build clean. #1257 stayed out on a hung CI job, and `main` after the six merges equals the checked six-PR tree `86997f50`. Gap, not blocking: the `z_candidates` field comment (`schemas/indexing.py:2444`) still says Z ≳ 50.

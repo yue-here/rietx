@@ -58,6 +58,30 @@ The reporter's figures, not re-run here: the 2026-10-30 pattern is private and g
 
 **The scheduling question after WP-1959** (2026-10-14). At load ~3 the grid cost 57 s of CPU, not the Profile's 157 s (load 110-180). WP-1959 compiled the box test and refused boxes outside the obliquity bound, and on #780 dichotomy now returns the cell at an 8 s CPU ceiling. svd still never starts under such ceilings, because dichotomy holds the whole ceiling until its unit completes, so the run's candidate has no second finder and cannot reach `high`. The reporter's 2026-10-14 measurements (numpy grid, before WP-1959) put the starvation in the per-unit budget equalling the run's ceiling, and propose capping each (engine × system) unit at a share of `total_budget_seconds` (per-engine thirds, or the 30 s slice, which behaved the same on ten lists). A d cut and fewer driving lines left dichotomy's grid unchanged (273 871 survivors under every rule). Two follow-ups they placed outside this WP: the consensus list's 12-cell cap can drop a cell its only finder ranks first (devitrite, COD 1535730), and trial_error's monoclinic unit reached 9.2 GB on glutaric acid-isonicotinamide Form II (COD 1567181).
 
+### Inherited
+
+- 2026-10-31, from the issue triage (issue #780): the reporter answered the
+  2026-10-30 decision's two requests (reporter, 2026-10-31, on d35ffeda7,
+  corrected the same day). (1) 49 dichotomy units overflowed `MAX_GRID_CELLS`,
+  and phase 2 accepted the true lattice in 6 of them. All 6 were monoclinic
+  units, and two did so inside the default 30 s budget. So the answer is not
+  "none", and under the 2026-10-30 decision phase 2 keeps running on a
+  truncated frontier. None of the 28 triclinic overflows accepted the truth.
+  18 could not hold it (volume ceiling), 5 lost it from the truncated
+  frontier, and 5 did not reach it in 600 s. Triclinic phase 2 popped at most
+  about 800 of ~400 000 frontier cells. In one monoclinic unit `_accept`
+  reached the truth leaf and rejected it. All 30 of that unit's accepted
+  leaves are index-2 supercells; that is #1258. (2) Orthorhombic acceptance,
+  on a 276-line list with a triclinic truth: 6 402 distinct lattices were
+  accepted in 300 s. They leave a median of 12 of 276 lines unindexed, at a
+  median 7.6× the truth's volume. The best M₂₀ is 6.18, against 2243 for the
+  true cell. `INDEX_SHIFT_ALLOWANCE` fired with an assumed 0.0309° allowance,
+  so the window is about ±3 FWHM. Whether that acceptance is loose remains the
+  maintainer's judgement. Checked against the tree at d87c8cc91:
+  `MAX_GRID_BYTES` and `MAX_HARVEST` are on main (PR #1244), so the memory
+  half no longer rests on these counts. The figures were not re-run (private
+  pattern).
+
 ## Non-goals
 
 - Shrinking the metric box to buy speed (`indexing/CLAUDE.md`).

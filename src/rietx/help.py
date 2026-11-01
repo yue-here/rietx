@@ -1744,6 +1744,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "claims, and the phase needs a space group that leaves this angle free."
         ),
     ),
+    "CIF_EMPTY_BLOCK_SKIPPED": HelpEntry(
+        title="Data blocks that state nothing were skipped",
+        description=(
+            "The file holds more than one data block, and the structure was read "
+            "from the only one with atom sites. Every other block has no tags, or "
+            "only _audit_ tags, which record how the file was made and state no "
+            "cell, site or symmetry, such as an empty block a writer puts "
+            "ahead of the structure. The message names each "
+            "block skipped. Nothing is to be done. A file with two blocks holding "
+            "atom sites, or one beside a block stating anything else, is refused, "
+            "naming the blocks."
+        ),
+    ),
     "CIF_MAGNETIC_CENTERING_ASSUMED": HelpEntry(
         title="Magnetic centring loop missing",
         description=(
@@ -2058,12 +2071,25 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "model, weak data (for a perfect fit the quantity is about √(N/(N+S)), N the "
             "channels and S the weighted net Bragg power, so it passes the bound whenever "
             "S < N; counting longer helps and re-indexing does not), the range, the "
-            "wavelength and the width law. The bound, 1/√2 (at most half "
-            "of the net weighted power unexplained), sits between every right or nearly "
-            "right cell (≤ 0.36) and every cell outside the refinable basin (≥ 1.6) on "
+            "wavelength and the width law. `ExtinctionScreen.perfect_fit_rwp_net` is that "
+            "perfect-fit value, and the message says from the pair which failed: past the "
+            "bound too, either the data are weak or the envelope sits inside the lines "
+            "over that range (the pair cannot tell which; counting longer helps only the "
+            "first); below it, the reference misfits them. The bound, "
+            "1/√2 (at most half of the net weighted power unexplained), was measured on "
             "synthetic Si and P 2₁/c, 11-BM NAC, the GSAS-II fluorapatite and PbSO₄ "
-            "patterns and SRM 676a corundum; untested beyond them, and a second phase "
-            "carrying half the net weighted power trips it at a right cell. The gate does "
+            "patterns and SRM 676a corundum; every right cell of the four real patterns reads 0.12-0.19 on the default path "
+            "(cell refined; ≤ 0.36 was measured with the cell held), "
+            "and cells outside the refinable basin read 1.0-2.3 (corundum at ×1.02, "
+            "fluorapatite at ×0.99, NAC at ×0.99 and ×1.02, PbSO₄ at ×1.02, Si at ×1.01) "
+            "but one: PbSO₄ X-ray at ×0.99 reads 0.45, passes, and returns a wrong class. "
+            "Untested beyond them, and a second phase carrying half the net weighted power "
+            "trips it at a right cell. The net is taken against the peak picker's rolling "
+            "low-quantile envelope, which rides up into the lines where they form a "
+            "continuum (low symmetry, high angle), so a good reference fit over such a "
+            "range can read above the bound: GSAS-II's own fit of the PbSO₄ X-ray pattern "
+            "reads 0.436 against the envelope and 0.245 against its fitted background over "
+            "110-160°. The gate does "
             "not reach a local misfit: on certified SRM 676a corundum "
             "(`R -3 c`) the shared profile fit's `profile_rwp` is 0.149 over 20–90°, where "
             "`R - c -` wins, and 0.227 over 5–150° with declared widths, where `R - - -` "
@@ -2144,6 +2170,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "past the windows it was solved on, so the solve may have stopped short of the "
             "minimum that windows sized at the answer give. Run one more stage with nothing "
             "new freed and compare. A plan's closing stage does this already."
+        ),
+    ),
+    "FULLPROF_LIMITS_NOT_APPLIED": HelpEntry(
+        title="A FullProf file's parameter limits were not applied",
+        description=(
+            "The FullProf file holds hard limits on some refined parameters, one line "
+            "each after the phases, counted by its `Nre` flag. A limit names a FullProf "
+            "parameter number, which can drive several values at once. The reader keeps "
+            "every limit on the model it read and sets no bound from it, so the built "
+            "structure's parameters are free to leave those intervals. Set a "
+            "parameter's min and max where it should stay inside its limit."
         ),
     ),
     "FULLPROF_MAGNETIC_PHASE_OMITTED": HelpEntry(
@@ -2994,17 +3031,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "measure more lines."
         ),
     ),
-    "INDEX_Z_NOT_INTEGER": HelpEntry(
-        title="Cell holds a fractional number of formula units",
-        description=(
-            "With the formula you gave and typical atomic volumes, the cell holds a "
-            "number of formula units far from a whole number. A sub- or supercell of the "
-            "true cell does this. So does a formula that misses a solvent or "
-            "counter-ion, and so does an ionic specimen, where volumes run large. A "
-            "correct cell can fire occasionally. Check the formula first and weigh the "
-            "result beside the figures of merit."
-        ),
-    ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
         title="Two propagation vectors fit equally well",
         description=(
@@ -3619,6 +3645,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "phases seen in range."
         ),
     ),
+    "PLAN_FREES_NO_MOMENT": HelpEntry(
+        title="The plan never refines the magnetic moment",
+        description=(
+            "The structure carries a magnetic moment and no stage of the plan frees "
+            "it. Every moment stays at the value you supplied, with no esd, and is "
+            "not a result. The nuclear parameters can absorb part of what a wrong "
+            "moment misplaces, so read them with that in mind too. Its `where` lists the "
+            "modulus path of each held site, then the phase's `scale`, which is not a "
+            "site: the moment and the nuclear values share that scale, and its presence "
+            "keeps the level at warning under every purpose the scale reaches "
+            "(`structure`, `qpa`). The presets "
+            "`mccusker_default` and `mccusker_structural` free no moment. Use "
+            "`magnetic_structural`, or name `phases.*.atoms.*.moment.dof*` in a "
+            "stage. A moment you hold with `hold` is left out of this check."
+        ),
+    ),
     "QPA_ESD_UNAVAILABLE": HelpEntry(
         title="No weight fraction has an esd",
         description=(
@@ -3942,6 +3984,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "In some patterns the refined moment lies within the noise of its own esd. "
             "That reads as a moment the data do not support, and says nothing about a "
             "small moment. Patterns where the modulus has no esd give no verdict at all. "
+            "When the plan frees no moment, every pattern is one of these and the "
+            "modulus is the start value; `PLAN_FREES_NO_MOMENT` fires on each, and "
+            "the message says so. "
             "The value shown is the modulus the fit reached. Quote these points as held."
         ),
     ),

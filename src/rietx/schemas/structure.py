@@ -928,12 +928,66 @@ class PlanarityRestraint(Base):
         return self
 
 
+class TorsionRestraint(Base):
+    """A soft restraint on the torsion angle of four atoms A–B–C–D (WP-1815).
+
+    One residual row √weight·Δ/sigma, where Δ is the **circular difference**
+    of the torsion from ``target_deg``, wrapped into (−180°, 180°], so a
+    target of 180° is as smooth as any other: the row does not see the branch
+    cut of the angle itself, only the one opposite the target.  The angle is
+    Klyne and Prelog's (1960, *Experientia* 16, 521): looking along B → C, it
+    is positive when the bond B–A must turn clockwise, by less than 180°, to
+    eclipse C–D (the cif_core ``_geom_torsion.angle`` sign).  Its partials are
+    the ones :class:`~rietx.schemas.results.GeometryTorsion` reports esds with
+    (``model.restraints._torsion_row_partials``), so a geometry row is a
+    restraint row, as for bonds and angles (WP-1072's reuse rule).
+
+    ``atoms`` are four positional indices into ``Phase.atoms`` in chain order.
+    Images are given or resolved entry by entry, as on
+    :class:`PlanarityRestraint`: ``op_indices[k]``/``translations[k]`` name an
+    entry's image (an index into the atom's orbit, as on
+    :class:`BondRestraint`); an entry left ``None`` takes the minimum image of
+    its atom relative to the entry before it, so the chain follows its bonds,
+    and the first sits where it is stored unless named.  A chain with a
+    straight bond angle (A–B–C or B–C–D at 180°) has no torsion, so compiling
+    one raises.
+    """
+
+    atoms: list[int] = Field(min_length=4, max_length=4)
+    target_deg: float
+    sigma: float = Field(gt=0.0)  # degrees
+    weight: float = Field(default=1.0, ge=0.0)
+    op_indices: list[int | None] | None = None
+    translations: list[tuple[int, int, int]] | None = None
+
+    @model_validator(mode="after")
+    def _one_image_per_atom(self) -> "TorsionRestraint":
+        if not math.isfinite(self.target_deg):
+            raise ValueError("torsion restraint: target_deg must be finite")
+        for name in ("op_indices", "translations"):
+            got = getattr(self, name)
+            if got is not None and len(got) != 4:
+                raise ValueError(
+                    f"torsion restraint: {len(got)} {name} for 4 atoms; give "
+                    "one per atom or none")
+        if self.translations is not None:
+            ops = self.op_indices or [None] * 4
+            for k, (op, tr) in enumerate(zip(ops, self.translations, strict=True)):
+                if k > 0 and op is None and tuple(tr) != (0, 0, 0):
+                    raise ValueError(
+                        f"torsion restraint: translation {tuple(tr)} on entry {k} "
+                        "has no op_index, so it would be ignored; name the "
+                        "operation (0 is the identity) or drop the translation")
+        return self
+
+
 #: A soft observational restraint on one phase — a bond length, a bond angle,
-#: or a single parameter value.  Each contributes one residual row that is kept
-#: in the covariance (JᵀJ) but excluded from Rwp/Durbin-Watson/Bérar-Lelann
-#: (they are soft observations, not data — the standard Rietveld convention).
+#: a torsion, or a single parameter value.  Each contributes residual rows that
+#: are kept in the covariance (JᵀJ) but excluded from Rwp/Durbin-Watson/
+#: Bérar-Lelann (they are soft observations, not data — the standard Rietveld
+#: convention).
 Restraint = (BondRestraint | AngleRestraint | ValueRestraint | TetherRestraint
-             | AntiBumpRestraint | PlanarityRestraint)
+             | AntiBumpRestraint | PlanarityRestraint | TorsionRestraint)
 
 
 class MagneticSymmetry(Base):
@@ -1747,7 +1801,7 @@ class Phase(_InheritsDeclaredDefaults):
                 check(r.atom_i, "atom_i")
                 check(r.atom_j, "atom_j")
                 check(r.atom_k, "atom_k")
-            elif isinstance(r, PlanarityRestraint):
+            elif isinstance(r, (PlanarityRestraint, TorsionRestraint)):
                 for k, idx in enumerate(r.atoms):
                     check(idx, f"atoms[{k}]")
         return self

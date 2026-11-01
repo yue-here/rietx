@@ -584,11 +584,15 @@ from .._nearmiss import did_you_mean
 #: dropped at read (``SeriesResult``'s ``mode="before"`` validator) and its
 #: ``steps`` reads ``None``, "not recorded".
 #: Also in 0.60 (WP-2030): ``IndexingResult.formula`` and ``.temperature``, the
-#: formula and temperature the Z check read, and ``PeakList.instrument_undeclared``,
+#: formula and temperature read, and ``PeakList.instrument_undeclared``,
 #: the instrument blocks the picker found at default on a lab source.  Additive
 #: and defaulted to ``None``, "not recorded", the 0.25 → 0.26 rule;
 #: ``index_pattern`` writes the first two on every result, ``pick_peaks`` and
-#: ``fit_peaks`` the third on every list.
+#: ``fit_peaks`` the third on every list.  Part 2 added
+#: ``CellCandidate.formula_units``, the units a cell holds by Hofmann's
+#: volumes, written by ``index_pattern`` when a formula is given and ``None``
+#: otherwise (additive, the same rule); ``INDEX_Z_NOT_INTEGER``, which judged
+#: that number, is gone, so a document carrying one still reads.
 #: Also in 0.60 (WP-1419 C3a): ``Phase.distortion_modes``, a child stated as
 #: its parent plus absolute mode amplitudes (``DistortionModes``: the parent
 #: group, the transform, the reference metric, one base position per atom and
@@ -597,6 +601,16 @@ from .._nearmiss import did_you_mean
 #: ``displacive_statement``.  An older build refuses a phase carrying it.
 #: Also in 0.60 (WP-2011): ``LeBailValidation.mode``, additive, its default
 #: ``"lebail"`` being what every record written before it ran.
+#: Also in 0.60 (#939's follow-ups): ``ExtinctionScreen.perfect_fit_rwp_net``,
+#: what that Rwp would read for a fit leaving only the noise, √(N/(N+S)).
+#: Additive and defaulted to ``None``, the same rule.
+#: Also in 0.60 (WP-1815): ``GeometryTable.torsions``, a ``GeometryTorsion``
+#: per torsion over bonded chains (four labels, indices and symmetry codes, the
+#: angle in (−180°, 180°] and its two esds), defaulted to ``None``, which an
+#: older table reads as "not listed" (``[]`` is "listed, none found"); and ``TorsionRestraint`` joins the
+#: ``Restraint`` union, ``RestraintRow.kind`` gaining ``"torsion"``.  Additive:
+#: no existing document carries either, and an older build refuses one that
+#: does.  ``GeometryRequest`` is an argument and is never stored.
 #: Also in 0.60 (WP-1419 C4a): ``RefinementResult.distortion_totals``, one
 #: ``DistortionTotal`` per irrep block of a phase on mode amplitudes (A_τ, its
 #: esd and label, T², ``driving`` (``None`` where the record's parent

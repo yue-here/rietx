@@ -191,6 +191,24 @@ REFUSED_TAGS: tuple[tuple[str, str], ...] = (
 )
 
 
+#: Tag families of the magnetic-CIF draft that ``cif_mag.dic`` replaced (issue
+#: #1063, item 3), each refused **by name** when a file states it.  The
+#: dictionary defines none of them under any name or alias (0.9.9, whose
+#: revision history opens at 0.1.0, 2016-05-24, "Initial automatic conversion
+#: from draft magCIF format"), and no source this package holds maps them onto
+#: its items, so a file written in them is not read: as an ordinary CIF it
+#: finds no atom sites, or reads its nuclear half and drops the moments in
+#: silence.  Matched as case-blind tag **prefixes**.  Other ``_magnetic_``
+#: spellings (``_magnetic_space_group_standard_setting``,
+#: ``_magnetic_propagation_vector_``) are not in this list and refuse nothing:
+#: they are written beside the dictionary's own items in files that read.
+DRAFT_TAGS: tuple[tuple[str, str], ...] = (
+    ("_magnetic_atom_site_", "the sites or their moments"),
+    ("_magnetic_cell_", "the cell"),
+    ("_magnetic_space_group_symop_operation_", "the magnetic operators"),
+)
+
+
 class MagCifError(ValueError):
     """Raised naming the file, the construct and what would make it readable.
 
@@ -479,6 +497,34 @@ def refuse_modulation(text: str, path: str) -> None:
         f"(3+d)-dimensional moment model; nothing in this package has one, and "
         f"the incommensurate fence is stated in the manual's interchange "
         f"chapter.")
+
+
+def refuse_draft_tags(text: str, path: str) -> None:
+    """Raise naming every :data:`DRAFT_TAGS` tag the file states.
+
+    A refusal and not a read: mapping the draft's items onto the dictionary's
+    needs a source for what each meant, and this package has none.  Run before
+    the reader decides whether the file has atom sites at all, because a file
+    written wholly in these tags has none under the dictionary's names and was
+    refused as "no atom sites found", which names the wrong cause.
+    """
+    found = sorted({match.group(1) for tag, _what in DRAFT_TAGS
+                    for match in re.finditer(
+                        rf"(?mi)^\s*({re.escape(tag)}[A-Za-z0-9_.\-]*)", text)})
+    if not found:
+        return
+    families = "; ".join(f"{tag}* ({what})" for tag, what in DRAFT_TAGS
+                         if any(t.lower().startswith(tag) for t in found))
+    shown = ", ".join(found[:4]) + (f" and {len(found) - 4} more"
+                                    if len(found) > 4 else "")
+    raise MagCifError(
+        f"{path} uses the pre-2016 draft magnetic-CIF tags: {shown}. "
+        f"cif_mag.dic, which replaced that draft in 2016, defines none of "
+        f"{families} under any name or alias, and this reader has no source "
+        f"mapping them onto its items, so the file is refused rather than read "
+        f"without its magnetic structure. Re-export it with the dictionary's "
+        f"tags: _space_group_symop_magn_operation.xyz, the _atom_site_moment "
+        f"loop, and the ordinary _cell_ and _atom_site_ items.")
 
 
 def read_magnetic_symmetry(block, text: str, path: str, *,
