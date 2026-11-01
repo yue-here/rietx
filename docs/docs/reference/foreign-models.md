@@ -48,6 +48,8 @@ The models differ from each other because the formats do, and each one changes a
 | `FullProfModel.lambda_slot` | the refinable-wavelength slot of the zero-shift line, read for provenance. It can hold a stale value FullProf never used, so `lambda1` is the wavelength |
 | `FullProfModel.zero_shift` | the zero correction and the sample-displacement terms, with their codewords decoded |
 | `FullProfModel.background` | the background points the file declares, as (2θ, value) with their codewords |
+| `FullProfModel.background_kind`, `FullProfModel.background_coefficients` | which background the file's `Nba` selects (interpolated points, or a polynomial, Fourier or Chebyshev series), and a series' coefficients with their codewords. A background held in a companion `.bac` file is refused at read |
+| `FullProfModel.parameter_limits` | the hard limits the file's `Nre` count declares, one per refined parameter number. They are reported at the build (`FULLPROF_LIMITS_NOT_APPLIED`) and set no bound |
 | `FullProfModel.excluded_regions`, `FullProfModel.fitted_range` | what the run left out, and the range it fitted |
 | `FullProfModel.user_scatterers` | a neutron file's LINE-12 user scattering lengths, each read as the isotope it is the Sears b of. A name that is not an element and a mass number with that b is refused at read |
 | `FullProfModel.dispersion` | an X-ray file's LINE-12 f′ and f″ per element, as stated. A pair differing from rietx's Cromer-Liberman value at the file's wavelength is refused at read |

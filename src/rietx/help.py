@@ -2146,6 +2146,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "new freed and compare. A plan's closing stage does this already."
         ),
     ),
+    "FULLPROF_LIMITS_NOT_APPLIED": HelpEntry(
+        title="A FullProf file's parameter limits were not applied",
+        description=(
+            "The FullProf file holds hard limits on some refined parameters, one line "
+            "each after the phases, counted by its `Nre` flag. A limit names a FullProf "
+            "parameter number, which can drive several values at once. The reader keeps "
+            "every limit on the model it read and sets no bound from it, so the built "
+            "structure's parameters are free to leave those intervals. Set a "
+            "parameter's min and max where it should stay inside its limit."
+        ),
+    ),
     "FULLPROF_MAGNETIC_PHASE_OMITTED": HelpEntry(
         title="A FullProf magnetic phase was left out",
         description=(
