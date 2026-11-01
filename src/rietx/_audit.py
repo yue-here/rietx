@@ -1191,8 +1191,10 @@ ROWS: tuple[Row, ...] = (
                   "LLB, July 2001, PDF p. 74, Ins = 10) defines INTER fac_x as the internal "
                   "multiplier of the x values and fac_y as that of y and sigma, so the "
                   "numbers the file means are the written ones times the factors; that "
-                  "a file with no sigma column takes sqrt(fac_y*y) was measured on fp2k 8.20 "
-                  "run as a black box on synthetic files (#1064); fires exactly when a "
+                  "a file with no sigma column takes sqrt(fac_y*y), which equals fac_y*sqrt(y) "
+                  "of the written column, the counting statistics every file with no sigma "
+                  "column already assumes, and was also measured on fp2k 8.20 run as a "
+                  "black box on synthetic files (#1064); fires exactly when a "
                   "factor is not 1"),
         response="info",
         responds=("nothing: compare the pattern with the file's own columns only after "

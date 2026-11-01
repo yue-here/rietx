@@ -145,7 +145,7 @@ READER_OPTIONS: dict[str, ReaderOption] = {
         help="what the x column is, declared by the caller: 'two_theta' (2θ "
              "in degrees) or 'tof' (a flight time in µs), the spellings of "
              "PatternData's own axis. For a file that states no unit, such as "
-             "a headerless time-of-flight bank, whose numbers cannot say what "
+             "a time-of-flight bank with no header, whose numbers cannot say what "
              "they are. Recorded in the pattern's metadata as declared; a file "
              "stating a unit that contradicts it is refused, quoting both"),
     "bank": ReaderOption(
