@@ -636,8 +636,7 @@ result = ref.fit(data, events=show)
 
 Each event carries `record` (always `"event"`), `v` (the event schema version), `t` (a Unix time), `kind` and an open `data` dictionary.
 A fit emits five kinds: `fit_start` and `fit_end` for the run, `stage_start` and `stage_end` for each stage, and `eval` for each residual evaluation.
-An indexing search adds `index_start` and `index_end`.
-A structure-solution run adds `solve_start`, `solve_step` and `solve_end`, and draws its units (a race round, a seed, a control seed, a per-group consensus) as `stage_start`/`stage_end`, as indexing does.
+An indexing search adds `index_start` and `index_end`, a structure solution `solve_start`, `solve_step` and `solve_end`.
 A five-stage fit of the fluorapatite tutorial pattern emitted 1 `fit_start`, 5 `stage_start`, 102 `eval`, 5 `stage_end` and 1 `fit_end`.
 
 | Kind | `data` keys in this version |
@@ -647,9 +646,9 @@ A five-stage fit of the fluorapatite tutorial pattern emitted 1 `fit_start`, 5 `
 | `eval` | `stage`, `n_eval`, `cost`, `accepted`, `lam`, `step_norm`, `values` |
 | `stage_end` | `stage`, `status`, `termination`, `n_iterations`, `cost_initial`, `cost_final`, `rwp`, `held`, `released` |
 | `fit_end` | `status`, `rwp`, `gof`, `node_id` |
-| `solve_start` | `engine`, `space_groups`, `n_assignments`, `seeds`, `control_seeds`, `replicas`, `sweeps`, `race_sweeps`, `span`, `step`, `swap_every`, `exchange`, `n_random`, `cluster_tol`, `polish_maxiter`, `heartbeat_sweeps`, `total_budget_seconds`, `n_reflections`, `chi2_floor`, `resumed`, `n_stages` |
-| `solve_step` | `unit`, `unit_kind`, `sweep`, `sweeps`, `moves`, `leader_j`, `leader_chi2_ratio`, `leader_changed`, `sweeps_since_improvement`, `replica_temperatures`, `replica_acceptance`, `swap_acceptance` |
-| `solve_end` | `status`, `partial`, `n_candidates`, `units_not_run` |
+| `solve_start` | `engine`, `space_groups`, `seeds`, `n_stages`, … |
+| `solve_step` | `unit`, `sweep`, `leader_j`, … |
+| `solve_end` | `status`, `partial`, `n_candidates` |
 
 Read `data` with `.get`, because a version may add keys to a kind without a version change.
 A cancelled run's `fit_end` has `status` `"cancelled"`, the abandoned `stage`, the `completed` stage names and `node_id`, and no `rwp` or `gof`, because there is no fitted result.
