@@ -647,6 +647,20 @@ def _rung_stamp(rung: str, *, escalation: bool) -> dict[str, Any]:
     return stamp
 
 
+def _values_onto(source: tuple[Structure, Instrument],
+                 structure: Structure) -> dict[str, float]:
+    """Every entry value of ``source``'s table, keyed in ``structure``'s atom numbering.
+
+    The source is a pattern's model *as built*, after its ``prepare``; an
+    atom that hook removed or reordered has another number in ``structure``,
+    so each value is read onto the atom it belongs to, and a value on an atom
+    ``structure`` lacks is left out (#1264).
+    """
+    atoms = atom_moves(source[0], structure)
+    return {new: e.value for e in ParameterTable(*source).entries
+            if (new := renumber_path(e.path, atoms)) is not None}
+
+
 def _carry_into(structure: Structure, instrument: Instrument,
                 source: tuple[Structure, Instrument],
                 carry: Sequence[str]) -> list[str]:
@@ -680,13 +694,7 @@ def _carry_into(structure: Structure, instrument: Instrument,
     and reach for a narrower glob when a parameter must provably not be chained
     — not on the assumption that a big jump needs one.
     """
-    # the source is the last pattern's model *as built*, after its
-    # ``prepare``; an atom that hook removed or reordered has another number
-    # here, so each value is read onto the atom it belongs to (#1264)
-    atoms = atom_moves(source[0], structure)
-    previous = {new: e.value
-                for e in ParameterTable(source[0], source[1]).entries
-                if (new := renumber_path(e.path, atoms)) is not None}
+    previous = _values_onto(source, structure)
     table = ParameterTable(structure, instrument)
 
     def named(path: str) -> bool:
@@ -843,9 +851,7 @@ def _reanchor_carried(ref: Refinement, displaced: Sequence[str],
     if not tied:
         return
     # in this pattern's atom numbering, as ``displaced`` already is (#1264)
-    atoms = atom_moves(source[0], ref.structure)
-    absorbed = {new: e.value for e in ParameterTable(*source).entries
-                if (new := renumber_path(e.path, atoms)) is not None}
+    absorbed = _values_onto(source, ref.structure)
     absorbed.update({f"{VAR_PREFIX}{name}": value
                      for name, value in previous_vars.items()})
     table = ref._working_table()

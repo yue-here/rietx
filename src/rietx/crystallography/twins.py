@@ -415,18 +415,42 @@ def _matched_atoms(lo: Sequence[str], ln: Sequence[str]) -> list[tuple[int, int]
     :func:`atom_moves` maps it to ``None``, where passing its index through
     would name whichever atom now has that number.  A rename beside a removal
     is one of those, since nothing in the labels says which atom went.
+
+    One block of atoms inserted or removed at a single place the labels fix
+    is matched by position on either side of it, first: appending an ``O``
+    to a phase already holding one changes that label's count, and the label
+    rule alone would then lose both.  Where the block could sit at more than
+    one place (``O O S`` to ``O S``) the labels do not say which atoms went,
+    and the label rule decides.
     """
-    if list(lo) == list(ln):
+    lo, ln = list(lo), list(ln)
+    if lo == ln:
         return [(j, j) for j in range(len(lo))]
-    pairs = []
-    for label in dict.fromkeys(lo):
-        old = [j for j, x in enumerate(lo) if x == label]
-        new = [j for j, x in enumerate(ln) if x == label]
-        if len(old) == len(new):
-            pairs.extend(zip(old, new, strict=True))
+    if len(lo) != len(ln):
+        short, long_ = (lo, ln) if len(lo) < len(ln) else (ln, lo)
+        k = len(long_) - len(short)
+        head = 0
+        while head < len(short) and short[head] == long_[head]:
+            head += 1
+        tail = 0
+        while tail < len(short) and short[-1 - tail] == long_[-1 - tail]:
+            tail += 1
+        if head == len(short) - tail:        # the block fits at one place only
+            kept = [*range(head), *range(head + k, len(long_))]
+            return (list(enumerate(kept)) if short is lo
+                    else [(jo, jn) for jn, jo in enumerate(kept)])
+    old_at: dict[str, list[int]] = {}
+    new_at: dict[str, list[int]] = {}
+    for j, x in enumerate(lo):
+        old_at.setdefault(x, []).append(j)
+    for j, x in enumerate(ln):
+        new_at.setdefault(x, []).append(j)
+    pairs = [pair for label, old in old_at.items()
+             if len(old) == len(new_at.get(label, ()))
+             for pair in zip(old, new_at[label], strict=True)]
     if len(lo) == len(ln):
         pairs.extend((j, j) for j in range(len(lo))
-                     if lo[j] not in ln and ln[j] not in lo)
+                     if lo[j] not in new_at and ln[j] not in old_at)
     return sorted(pairs)
 
 

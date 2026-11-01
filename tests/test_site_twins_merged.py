@@ -1700,6 +1700,11 @@ def test_an_edit_that_removes_an_atom_moves_each_constraint_onto_its_own_atom(pb
     (["A", "B", "C"], ["A", "B2", "C"], {}),                           # renamed in place
     (["A", "B", "C"], ["A", "B", "C", "D"], {}),                       # appended
     (["O", "O", "S"], ["O", "O"], {"phases.0.atoms.2": None}),          # repeated labels
+    (["O", "O", "S"], ["O", "O", "S", "O"], {}),                       # a repeat appended
+    (["O", "S", "O"], ["O", "O"], {"phases.0.atoms.1": None,            # one place only
+                                   "phases.0.atoms.2": "phases.0.atoms.1"}),
+    (["O", "O"], ["O"], {"phases.0.atoms.0": None,                      # which O went?
+                         "phases.0.atoms.1": None}),
     (["X", "A", "X"], ["A", "X", "X"], {"phases.0.atoms.0": "phases.0.atoms.1",
                                         "phases.0.atoms.1": "phases.0.atoms.0"}),
     (["O", "O", "S"], ["O", "S"], {"phases.0.atoms.0": None,            # which O went?
