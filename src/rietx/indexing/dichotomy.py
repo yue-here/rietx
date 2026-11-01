@@ -1447,8 +1447,11 @@ def _accept(basis: np.ndarray, system: str, centring: str, spec: SearchSpec,
       holding the truth refined onto cells indexing 288 and 273 lines, and the
       truth, which indexes all 381, was not returned.  So the annealed passes
       assign only lines up to ``q_drive``, the search window's own top
-      (highest driven Q plus its k·σ), and the two closing passes at σ assign
-      every line as before.  Where every line lies below it nothing changes.
+      (highest driven Q plus its k·σ), and the closing passes at σ assign
+      every line, running until the assignment repeats (at most
+      :data:`MAX_ASSIGN_PASSES`) since the lines above the cut meet the cell
+      only there.  Where every line lies below the cut nothing changes: two
+      closing passes, as before.
 
     The χ² bar is ``k_sigma²`` and it is not arbitrary: every assigned line is
     within k·σ by construction, so k² is the largest reduced χ² an honest
@@ -1468,7 +1471,13 @@ def _accept(basis: np.ndarray, system: str, centring: str, spec: SearchSpec,
             else np.arange(len(q_all)))
     if len(near) == len(q_all):
         near = None                                # every line is resolved
-    for extra, floor in enumerate(schedule + [0.0, 0.0]):
+    # **the lines above the cut meet the cell first at σ, so the closing
+    # passes run until the assignment repeats**, up to MAX_ASSIGN_PASSES.
+    # Two passes were enough while the annealed ones had seen every line; on
+    # the GSAS-II fluorapatite list they stopped the true cell at 128 of 135
+    # lines where a settled assignment reaches 131 (WP-2066).
+    closing = [0.0] * (2 if near is None else MAX_ASSIGN_PASSES)
+    for extra, floor in enumerate(schedule + closing):
         if not reflection_ceiling_ok(cell, wavelength, tt_max):
             return None
         if near is not None and extra < len(schedule):
