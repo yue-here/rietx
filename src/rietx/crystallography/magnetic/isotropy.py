@@ -2308,6 +2308,19 @@ def _standard_child(parent, parent_group, candidate: MagneticCandidate):
                 types.append(index + 1)
     positions = np.array(positions)
     positions[np.abs(positions - 1.0) < 1e-9] = 0.0
+    # a centred parent's centrings arrive twice, in site_orbit's images and in
+    # the cell's translations (at k = 0 they are the same vectors), and a
+    # magnetic cell smaller than the conventional one folds images together:
+    # keep each atom once modulo the magnetic cell, by image_of's own test
+    keep: list[int] = []
+    for n, x in enumerate(positions):
+        d = x[None, :] - positions[keep]
+        d -= np.rint(d)
+        same = np.all(np.abs(d) < 1e-6, axis=1)
+        if not any(types[m] == types[n] for m, hit in zip(keep, same) if hit):
+            keep.append(n)
+    positions = positions[keep]
+    types = [types[n] for n in keep]
 
     def image_of(rot, tran):
         moved = (positions @ rot.T + tran) % 1.0
