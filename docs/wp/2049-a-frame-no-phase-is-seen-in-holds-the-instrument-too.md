@@ -124,7 +124,7 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
   and `_parametric_unseen` take `models`. `refine._instrument_held` reads the
   last stage's record, and the `PHASE_UNCONSTRAINED` clause quotes it once.
   `where` is unchanged. The skill row, `help.py` and the audit row's evidence
-  are updated, and v1.11's record has the paragraph. Seven tests are in
+  are updated, and v1.11's record has the paragraph. Six tests (seven cases) are in
   `tests/test_held_phase.py`. Two tests whose premise moved now read the
   record: `test_phase_significance._assert_prior_holds` allows a second solve
   when a stage collapsed something, and `test_joint_xray_neutron`'s flat data
@@ -146,7 +146,7 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
   after `scale_bkg`, and it needs the zero shift to reach 4.05σ. Holding only
   at the answer, with no prior, cost 511 iterations in 11 solves.
   `tests.reader_output` exit 0. Acceptance files before the new tests: 105
-  passed, 2 xfailed. FAST_COUNTS
+  passed, 2 xfailed. Fast suite on the final tree (`-m "not slow"`, `[dev]`, macOS arm64, alone under the ghostshift serial lock): 13193 passed, 310 skipped, 32 xfailed, 1 failed, 9:42. The failure is `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`, a `FileNotFoundError` on this machine's Jupyter kernel spec, which points at another project's deleted venv; this branch does not touch the display path. Added: 6 tests, 7 cases, 7.31 s together in `tests/test_held_phase.py`; none joins the slow tail.
 
   *Review.* `/code-review high --fix` made seven findings. Fixed: 1, the
   parametric report called an instrument target seen; 4, the clause reported
