@@ -40,7 +40,10 @@ That is 3.3 × 10⁻¹¹ from the special position (1/3, 2/3, z), inside the fil
 | `diagnostics` | `None` | a list that collects each repair and report |
 
 The reader takes a file with one data block.
-A file holding several is refused, so split a multi-phase CIF into one file per phase.
+Of several blocks, it reads the one holding atom sites when every other block states nothing: no tags, or only `_audit_` tags, such as an empty `data_global` ahead of the structure.
+[`CIF_EMPTY_BLOCK_SKIPPED`](diagnostics-structures.md#cif_empty_block_skipped) names each block skipped.
+Any other file of several blocks is refused, naming the blocks: two blocks with atom sites, or one beside a block that states anything else.
+Choosing a block is not yet supported, so split a multi-phase CIF into one file per phase.
 
 It reads the cell, the space group, and each site's label, species, coordinates, occupancy and displacement parameter.
 The space group comes back as the extended Hermann-Mauguin symbol gemmi resolves, which names its setting (`F d -3 m:1`).
@@ -191,6 +194,9 @@ An operation list takes its crystal system and cell ties from the tabulated grou
 A file whose space group cannot be resolved at all, from an ordinary tag or a parent symbol, is refused by name.
 
 ### What a magCIF read refuses
+
+A file using the pre-2016 draft magnetic tags (`_magnetic_atom_site_*`, `_magnetic_cell_*`, `_magnetic_space_group_symop_operation_*`) is refused by name.
+The magnetic dictionary defines none of them under any name or alias, and reading the file as an ordinary CIF would find no atom sites or drop its moments.
 
 A modulated structure is refused by name, because reading only its amplitude at k = 0 would return a collinear structure for a modulated one.
 That covers a moment, displacement, occupancy or rotation stated as Fourier amplitudes or a special function, a cell or site wave vector, a superspace group, and a moment row flagged as modulated.

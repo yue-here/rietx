@@ -32,6 +32,7 @@
   "diagnostics:CELL_RUNAWAY",
   "diagnostics:CHILD_GROUP_UNNAMED",
   "diagnostics:CIF_CELL_ANGLE_CORRECTED",
+  "diagnostics:CIF_EMPTY_BLOCK_SKIPPED",
   "diagnostics:CIF_MAGNETIC_CENTERING_ASSUMED",
   "diagnostics:CIF_MAGNETIC_ION_UNCHARGED",
   "diagnostics:CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED",
