@@ -298,6 +298,8 @@ _BRACKETED = re.compile(r"\[([^\]]*)\]")
 #: quoted ``'1/2 0 0'`` or a bracketed ``[1/2 0 0]``, with or without a leading
 #: sequence id in the loop row.
 DRAFT_KVEC_TAG = "_magnetic_propagation_vector_kxkykz"
+#: The dictionary's spelling, as the refusal names it.
+PARENT_KVEC_TAG = "_parent_propagation_vector.kxkykz"
 _DRAFT_KVEC_BLOCK = re.compile(
     rf"(?i){DRAFT_KVEC_TAG}\b(?P<body>(?:(?!\n\s*(?:loop_|_[A-Za-z]|data_))"
     r"[\s\S])*)")
@@ -330,13 +332,27 @@ def propagation_vectors(text: str) -> tuple[tuple[str, str, str], ...]:
     an incommensurate k) is returned verbatim, so the caller refuses it by name
     rather than rounding it into a commensurate one.
     """
-    out: list[tuple[str, str, str]] = []
-    for block in _KVEC_BLOCK.finditer(text):
+    return tuple(k for _tag, k in _tagged_propagation_vectors(text))
+
+
+def _tagged_propagation_vectors(
+        text: str) -> tuple[tuple[str, tuple[str, str, str]], ...]:
+    """:func:`propagation_vectors`, each k beside the tag it was read under.
+
+    The refusal names the tag a file actually used, so a file that wrote only
+    the 2016 tag is not told about the draft's and the reverse.  Both scans run
+    over the text with text-field content blanked: a ``_parent_propagation_
+    vector.kxkykz [1/2 0 0]`` quoted in a ``_publ_section_comment`` is prose,
+    not a k (review of #1284).
+    """
+    out: list[tuple[str, tuple[str, str, str]]] = []
+    for block in _KVEC_BLOCK.finditer(_without_text_fields(text)):
         for group in _BRACKETED.finditer(block.group("body")):
             parts = group.group(1).replace(",", " ").split()
             if len(parts) == 3:
-                out.append((parts[0], parts[1], parts[2]))
-    return tuple(out) + _draft_propagation_vectors(text)
+                out.append((PARENT_KVEC_TAG, (parts[0], parts[1], parts[2])))
+    return tuple(out) + tuple((DRAFT_KVEC_TAG, k)
+                              for k in _draft_propagation_vectors(text))
 
 
 def _draft_propagation_vectors(text: str) -> tuple[tuple[str, str, str], ...]:
@@ -541,7 +557,8 @@ def refuse_modulation(text: str, path: str) -> None:
     prevent (WP-1118).
     """
     found = [(tag, what) for tag, what in REFUSED_TAGS
-             if re.search(rf"(?m)^\s*{re.escape(tag)}[._]", text)]
+             if re.search(rf"(?m)^\s*{re.escape(tag)}[._]",
+                          _without_text_fields(text))]
     if not found:
         return
     named = "; ".join(f"{tag}* ({what})" for tag, what in found)
@@ -746,8 +763,8 @@ def refuse_a_magnetic_supercell(block, text: str, path: str) -> None:
     an enlargement of it.
     """
     child = _value(block, "_parent_space_group.child_transform_Pp_abc")
-    kvectors = propagation_vectors(text)
-    nonzero = [k for k in kvectors if not is_commensurate_zero(k)]
+    tagged = _tagged_propagation_vectors(text)
+    nonzero = [(t, k) for t, k in tagged if not is_commensurate_zero(k)]
     child_det = _transform_determinant(child)
     is_supercell_transform = child_det is None or abs(child_det) != 1
     if not is_supercell_transform and not nonzero:
@@ -756,10 +773,10 @@ def refuse_a_magnetic_supercell(block, text: str, path: str) -> None:
     if is_supercell_transform:
         reason.append(f"_parent_space_group.child_transform_Pp_abc {child!r}")
     if nonzero:
-        reason.append("_parent_propagation_vector.kxkykz (or the draft's "
-                      f"{DRAFT_KVEC_TAG}) "
-                      + ", ".join("[" + " ".join(k) + "]" for k in nonzero))
-    incommensurate = [k for k in nonzero
+        for tag in dict.fromkeys(t for t, _k in nonzero):
+            reason.append(tag + " " + ", ".join(
+                "[" + " ".join(k) + "]" for t, k in nonzero if t == tag))
+    incommensurate = [k for _t, k in nonzero
                       if any(not (_RATIONAL.match(c) or _INTEGER_DECIMAL.match(c))
                              for c in k)]
     fence = (" The k stated here is not a rational, so this is an "
