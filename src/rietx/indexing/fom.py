@@ -195,14 +195,20 @@ def _laue_rotations(symbol: str) -> np.ndarray:
     ``Rᵀ`` because the action on *hkl* is the transposed rotation (CLAUDE.md,
     and the comment in ``crystallography.symmetry.generate_reflections``), and
     deduplicated because a centred group's operation list repeats every rotation
-    once per centring vector.
+    once per centring vector.  **The set is checked closed under composition**,
+    because :func:`laue_multiplicity` counts an orbit by its stabiliser, which
+    is exact only over a group.
     """
     from ..crystallography.symmetry import get_spacegroup, rotation_matrices
 
     rots = rotation_matrices(get_spacegroup(symbol))
     rot_int = np.rint(np.transpose(rots, (0, 2, 1))).astype(np.int64)
     uniq = {tuple(int(v) for v in r.ravel()) for r in rot_int}
-    return np.array(sorted(uniq), dtype=np.int64).reshape(-1, 3, 3)
+    out = np.array(sorted(uniq), dtype=np.int64).reshape(-1, 3, 3)
+    products = np.einsum("aij,bjk->abik", out, out).reshape(-1, 9)
+    if not {tuple(int(v) for v in p) for p in products} <= uniq:
+        raise ValueError(f"the rotations of {symbol!r} are not a group")
+    return out
 
 
 def laue_multiplicity(hkl: np.ndarray, system: str, centring: str = "P"
@@ -547,7 +553,7 @@ def merge_at_resolution(tt_pred: np.ndarray, fwhm_pred: np.ndarray, *,
     if not len(tt):
         return []
     starts = _line_starts(tt, fwhm_pred, resolution)
-    return np.split(np.arange(len(tt), dtype=np.int64), starts[1:])
+    return np.split(np.arange(len(tt), dtype=np.intp), starts[1:])
 
 
 def _line_starts(tt: np.ndarray, fw: np.ndarray, resolution: float) -> np.ndarray:
@@ -557,7 +563,28 @@ def _line_starts(tt: np.ndarray, fw: np.ndarray, resolution: float) -> np.ndarra
     tt = np.asarray(tt, dtype=np.float64)
     fw = np.asarray(fw, dtype=np.float64)
     joins = tt[1:] - tt[:-1] < resolution * 0.5 * (fw[1:] + fw[:-1])
-    return np.concatenate([[0], np.flatnonzero(~joins) + 1]).astype(np.int64)
+    return np.concatenate([[0], np.flatnonzero(~joins) + 1]).astype(np.intp)
+
+
+def line_means(tt: np.ndarray, starts: np.ndarray) -> np.ndarray:
+    """Each merged line's position, the mean of its members, for groups of
+    ascending ``tt`` beginning at ``starts`` (:func:`merge_at_resolution`).
+
+    The one definition of a merged line's position, read by the panel and the
+    line screen.  A lone position is its own mean (x / 1 is exact); a merged
+    line takes ``np.mean`` over its members, batched one row per line of equal
+    size, which sums each row as a per-line call does (checked bit for bit,
+    WP-2063).
+    """
+    tt = np.asarray(tt, dtype=np.float64)
+    starts = np.asarray(starts, dtype=np.intp)
+    size = np.diff(np.append(starts, len(tt)))
+    merged = tt[starts]
+    for s in np.unique(size[size > 1]):
+        at = np.flatnonzero(size == s)
+        rows = starts[at, None] + np.arange(s)
+        merged[at] = np.mean(tt[rows], axis=1)
+    return merged
 
 
 def common_shift(tt_obs: np.ndarray, tt_pred: np.ndarray,
@@ -623,17 +650,7 @@ def predicted_seen_fraction_at_resolution(
                             blind_spot=_BLIND["predicted_seen_fraction"])
     order = np.argsort(obs)
     fw_at = np.interp(pred, obs[order], np.asarray(fwhm_obs, dtype=np.float64)[order])
-    starts = _line_starts(pred, fw_at, resolution)
-    size = np.diff(np.append(starts, len(pred)))
-    # a lone position is its own mean (x / 1 is exact); a merged line takes
-    # ``np.mean`` over its members, batched one row per line of equal size,
-    # which sums each row as the per-line call did (checked bit for bit)
-    merged = pred[starts]
-    for s in np.unique(size[size > 1]):
-        at = np.flatnonzero(size == s)
-        rows = starts[at, None] + np.arange(s)
-        merged[at] = np.mean(pred[rows], axis=1)
-    merged = merged + shift
+    merged = line_means(pred, _line_starts(pred, fw_at, resolution)) + shift
     # the width law read at the shifted merged line, as the line screen reads
     # it (``screen.screen_candidate``): one definition of seen for both
     fw_m = np.interp(merged, obs[order],
