@@ -159,6 +159,7 @@ def _rider_ties(phase, ip: int, rider: int, parent: int) -> dict[str, dict[str, 
     atoms take one fractional shift."""
     from ..crystallography.symmetry import resolve_group
     from ..crystallography.wyckoff import coordinate_basis, stabilizer_rotations
+    from ..optimize import lapack
 
     sg = resolve_group(phase.space_group, phase.symmetry_operations)
 
@@ -170,7 +171,7 @@ def _rider_ties(phase, ip: int, rider: int, parent: int) -> dict[str, dict[str, 
     bh, bp = basis(rider), basis(parent)
     if not len(bp):
         return {}           # a parent with no freedom: the rider is held with it
-    c = np.linalg.lstsq(bh.T, bp.T, rcond=None)[0] if len(bh) else None
+    c = lapack.lstsq(bh.T, bp.T)[0] if len(bh) else None
     if c is None or not np.allclose(bh.T @ c, bp.T, atol=1e-12):
         raise ValueError(
             f"{phase.atoms[rider].label!r} cannot take every shift of its parent "
