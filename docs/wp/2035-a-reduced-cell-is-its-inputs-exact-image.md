@@ -1,6 +1,6 @@
 # WP-2035 — a reduced cell is its input's exact image, near a right angle too
 
-Milestone: unscheduled · Status: 🔄 2026-10-31 — merged from outside as PR #1136 (6823e532); the close is owed once issue #1252's test fix lands (the property test still compares against gemmi at epsilon, with no example pinning the 89.99999 case)
+Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here (ghostshift runner): the #1252 test fix, then the close
 Track: What fires, and what stays silent
 Depends on: — (1923, closed: the exact change of basis; 1932, closed: the boundary-free comparison that reads it)
 Priority: P2 2026-10-31 — was P3: issue #1252 shows the property test drawing a failing case fresh in about 1 run in 40 (CI sets no derandomize and keeps no database), so the fast check goes red on main at random; the defect is in the test's gemmi-at-ε reference, not in `reduce_cell`
