@@ -672,6 +672,7 @@ def _total_scattering_silent() -> list:
     return (_read_text_pattern("spec.dat", "#L 2Theta  Detector\n" + _TS_ROWS)
             + _read_text_pattern("scan.xy", "# compare with the G(r) later\n" + _TS_ROWS))
 
+
 def _stage_solve(*, nan_column: bool) -> list:
     """``STAGE_NOT_FINITE`` for one solve of the one-column cell of
     ``tests/test_issue_283_cell_bounds.py``.  ``nan_column`` makes every
