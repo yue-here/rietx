@@ -2318,8 +2318,8 @@ class MultiHistogramRefinement:
         # shared parameters reported once, from histogram 0's covariance (its
         # diagonal esd is the true combined marginal — cross-terms with the
         # other histograms' columns do not enter a single path's variance).
-        # the single fit's membership rule (``refine._build_result``,
-        # WP-1999): a row is reported iff its table can move it
+        # The single fit's membership rule (``refine._build_result``,
+        # WP-1999): a row is reported iff its table can move it.
         moving = [set(table.moving_paths) for table in mt.tables]
         for e in mt.tables[0].entries:
             if _row_shared(mt, e) and e.path in moving[0]:

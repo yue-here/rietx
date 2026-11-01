@@ -543,13 +543,14 @@ def test_a_reset_cell_is_held_for_its_stage_and_the_stage_solves_again(
 
 def test_a_reset_cells_stderr_is_withheld(lebail_pair_fits):
     """Review of #385 round 3: the esd is withheld only where the reset
-    happened in the stage that produced the answer, and on every path tied to
-    a withheld one (a tie inherits its source's blindness).
+    happened in the stage that produced the answer.
 
     "end": the answer stage put ``phases.1.cell.a`` back and held it, so the
     row has left ``parameters`` (a held path does, as WP-1301's collapse
     does), and the cubic ``b``/``c`` tied to it leave with it (WP-1999), while
-    phase 0, never reset, keeps its esd.  "early": the same reset fired in
+    phase 0, never reset, keeps its esd.  So "end" no longer shows a tied
+    row inheriting a withheld esd: since WP-1999 that happens only where the
+    named cell stays a free column.  "early": the same reset fired in
     ``cell``, and the later stages refined the cell again from its start, so
     the value reported is a fit result and every cell row carries the esd that
     last stage measured.  Before round 3 "early" withheld ``a``'s esd off the

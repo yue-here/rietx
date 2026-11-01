@@ -14,6 +14,8 @@ the 44 rows of the 11-BM NAC walkthrough.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from rietx import (
@@ -30,6 +32,8 @@ from tests.test_refine_synthetic import perturbed_models, synthesize
 
 pytestmark = pytest.mark.xdist_group("reported-rows-move")
 
+OUT = Path(__file__).parent / "output"
+
 CELL_FOLLOWERS = ("cell.b", "cell.c")
 
 
@@ -41,16 +45,17 @@ def _every_fixed_row_follows_a_free_one(result) -> None:
     """The membership rule as a property of the answer alone.
 
     A row reported with ``vary=False`` is there only as a follower, so the
-    phase or instrument block it belongs to must have a free row reported
-    beside it.  Weaker than set-equality with ``moving_paths``, which needs
-    the answer stage's table, and enough to fail on the pre-WP-1999 filter.
+    phase, site or instrument block it belongs to must have a free row
+    reported inside it (a coordinate's free DOF is ``….atoms.j.dof.k``).
+    Weaker than set-equality with ``moving_paths``, which needs the answer
+    stage's table, and enough to fail on the pre-WP-1999 filter.
     """
     free = {p.path for p in result.parameters if p.vary}
     for p in result.parameters:
         if p.vary:
             continue
-        assert p.stderr is not None or any(
-            f.rsplit(".", 1)[0] == p.path.rsplit(".", 1)[0] for f in free), p.path
+        block = p.path.rsplit(".", 1)[0] + "."
+        assert p.stderr is not None or any(f.startswith(block) for f in free), p.path
 
 
 # ----------------------------------------------------------------------
@@ -61,7 +66,10 @@ def held_fit():
     """The absent-phase fixture: phase 1 is cubic and its scale floors."""
     structure, ins = _absent_phase_inputs()
     ref = Refinement(structure, ins, history=False)
-    return ref.fit(synthesize(), plan="mccusker_default")
+    result = ref.fit(synthesize(), plan="mccusker_default")
+    OUT.mkdir(exist_ok=True)
+    result.plot(OUT / "reported_rows_held_phase.png")
+    return result
 
 
 def test_a_held_cells_followers_leave_with_it(held_fit):
@@ -100,6 +108,8 @@ def test_a_held_certified_cell_reports_no_cell_row():
     ref = Refinement(structure, ins, history=False)
     ref.hold("phases.0.cell.*")
     result = ref.fit(synthesize(), plan="lab_calibrate")
+    OUT.mkdir(exist_ok=True)
+    result.plot(OUT / "reported_rows_held_certified_cell.png")
     assert not [p for p in _paths(result) if ".cell." in p]
     _every_fixed_row_follows_a_free_one(result)
 
@@ -110,12 +120,15 @@ def test_a_coordinate_no_stage_freed_is_not_reported():
     structure, ins = perturbed_models()
     default = Refinement(structure, ins, history=False).fit(
         synthesize(), plan="mccusker_default")
+    OUT.mkdir(exist_ok=True)
+    default.plot(OUT / "reported_rows_coordinate_default.png")
     assert x not in _paths(default)
     _every_fixed_row_follows_a_free_one(default)
 
     structure, ins = perturbed_models()
     structural = Refinement(structure, ins, history=False).fit(
         synthesize(), plan="mccusker_structural")
+    structural.plot(OUT / "reported_rows_coordinate_structural.png")
     row = structural.parameter(x)
     assert row.vary is False and row.stderr is not None
 
@@ -141,5 +154,8 @@ def test_the_joint_fit_reports_the_same_membership():
                             "instrument.zero_shift"]),
     ])
     result = MultiHistogramRefinement(structure, instruments).fit(patterns, plan=plan)
+    OUT.mkdir(exist_ok=True)
+    for h in range(len(patterns)):
+        result.for_histogram(h).plot(OUT / f"reported_rows_joint_h{h}.png")
     assert not [p for p in _paths(result) if ".cell." in p]
     assert [p for p in result.parameters if p.vary]
