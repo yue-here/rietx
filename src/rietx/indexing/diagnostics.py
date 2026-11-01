@@ -1269,7 +1269,8 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
         message=message + ".  A filter on the members, never evidence: no ΔBIC "
                           "moved and every class was fitted",
         where=[f"{c.symbol}: excluded {_named(c)}" for c in removed]
-        + _special_lines(top, screen.z) + _count_lines(top),
+        + _special_lines(top, screen.z) + _count_lines(top)
+        + _uncounted_lines(prior, screen.z),
         suggestion=("check the declaration before the answer: a class it "
                     "emptied that leads on the data is either chemistry doing "
                     "what a powder cannot, or a wrong declaration (a racemate "
@@ -1322,6 +1323,20 @@ def _count_lines(top) -> list[str]:
     return [f"{top.symbol}: {g} kept though {why} (a disordered model shares "
             "a site; ExtinctionPrior(ordered=True) removes it)"
             for g, why in top.count_notes.items()]
+
+
+def _uncounted_lines(prior, z) -> list[str]:
+    """The elements an ordered count could not test: their atoms per cell are
+    not whole, so no group was removed for them and none was counted."""
+    if not (prior.ordered and prior.formula and z is not None):
+        return []
+    from ..crystallography.atomic_volume import formula_counts
+    from .extinction import uncounted_elements
+
+    skipped = uncounted_elements(z, formula_counts(prior.formula))
+    return [f"ordered: {el} not counted, {per_cell:g} atoms per cell at z={z} "
+            "is not whole, so no ordered model holds it (the other elements "
+            "were counted)" for el, per_cell in skipped.items()]
 
 
 def _cell_str(cell) -> str:

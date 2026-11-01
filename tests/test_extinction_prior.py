@@ -708,3 +708,20 @@ def test_a_z_with_no_formula_says_it_filters_nothing_and_why(z_alone_screens):
     assert _note(chiral).message.startswith(
         f"the declared prior (sohncke=True, z=2) removed {n} space group(s) from "
         f"{len(removed)} class(es); z=2 filtered none of them: with no formula")
+
+
+def test_an_element_an_ordered_count_skips_is_named_in_the_note():
+    """Review of #1271: ``Fe0.95O`` at Z = 4 is 3.8 Fe per cell, which no ordered
+    model holds; the element is skipped, and the note now says so rather than
+    reading as if the whole formula was counted.  Hemihydrate H at Z = 2 is
+    whole, so it is counted and named nowhere."""
+    from rietx.indexing.diagnostics import _uncounted_lines
+    from rietx.indexing.extinction import uncounted_elements
+
+    assert uncounted_elements(4, {"Fe": 0.95, "O": 1.0}) == {"Fe": pytest.approx(3.8)}
+    assert uncounted_elements(2, {"Ca": 1.0, "H": 1.0, "O": 4.5}) == {}
+    prior = ExtinctionPrior(z=4, formula="Fe0.95O", ordered=True)
+    (line,) = _uncounted_lines(prior, 4)
+    assert line.startswith("ordered: Fe not counted, 3.8 atoms per cell at z=4")
+    # only an ordered declaration skips; a disordered one counts the fraction as a site
+    assert _uncounted_lines(ExtinctionPrior(z=4, formula="Fe0.95O"), 4) == []

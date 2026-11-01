@@ -201,6 +201,13 @@ from .structure import Cell
 #: orbits cannot hold the declared content (removing them only under
 #: ``ordered=True``) and the special positions a Z′ below one needs.  Only a screen that declares one of them can answer differently;
 #: with none declared every screen answers as before.
+#: Also 1.12 (WP-2033, #1140's follow-ups): under ``ordered=True`` a fractional
+#: formula count whose atoms per cell are whole (``CaSO4·0.5H2O`` at Z = 2) is
+#: now counted, so the screen removes groups it used to keep; ``z`` with no
+#: formula opens ``EXTINCTION_PRIOR_APPLIED`` with "filters no group" rather
+#: than "removed 0 space group(s)"; the collapsed special-position ``where``
+#: line splits by note kind; an element an ordered count cannot test (atoms per
+#: cell not whole) gets its own ``where`` line.
 #: Also 1.12 (WP-2030): ``INDEX_DATA_INSUFFICIENT`` names an undeclared
 #: instrument first only on a laboratory source, read off the declared source
 #: (``diagnostics.lab_source``), and reads it from the list's own record when

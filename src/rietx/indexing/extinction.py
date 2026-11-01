@@ -390,14 +390,11 @@ def content_exclusion(sg: gemmi.SpaceGroup, z: int,
     so two elements competing for one fixed position are not caught: it never
     removes a group an ordered structure can occupy.
     """
-    from fractions import Fraction
-
     from ..crystallography.site_classes import holds, site_classes
 
     classes = site_classes(sg)
     for element, n in counts.items():
-        # the decimal as written, so 0.7 × 10 is 7 and not 7.000000000000001
-        per_cell = Fraction(str(n)) * int(z)
+        per_cell = _atoms_per_cell(n, z)
         if n != int(n) and (not ordered or per_cell.denominator != 1):
             continue                     # a shared site, declared as such
         count = int(per_cell)
@@ -406,6 +403,29 @@ def content_exclusion(sg: gemmi.SpaceGroup, z: int,
                                                       for c in classes}))
             return f"{element} {count} per cell is no sum of its orbits ({sizes})"
     return None
+
+
+def _atoms_per_cell(n: float, z: int):
+    """``n`` atoms per formula unit times ``z``, as an exact ``Fraction``: the
+    decimal as written, so 0.7 × 10 is 7 and not 7.000000000000001."""
+    from fractions import Fraction
+
+    return Fraction(str(n)) * int(z)
+
+
+def uncounted_elements(z: int, counts: dict[str, float]) -> dict[str, float]:
+    """The elements an ``ordered`` count cannot test, with their atoms per cell.
+
+    A fractional formula count whose atoms per cell, count × Z, are not whole
+    (``Fe0.95O`` at Z = 4, 3.8 Fe) fits no ordered model, and
+    :func:`content_exclusion` skips the element rather than remove every group,
+    which would be a judgement on the declaration.  This names what it skipped,
+    so a reader of ``EXTINCTION_PRIOR_APPLIED`` can see the count did not cover
+    the whole formula.
+    """
+    return {el: float(per_cell) for el, n in counts.items()
+            if n != int(n)
+            and (per_cell := _atoms_per_cell(n, z)).denominator != 1}
 
 
 #: The clause that marks a :func:`special_site_note` of the "no sum" kind: Z is
