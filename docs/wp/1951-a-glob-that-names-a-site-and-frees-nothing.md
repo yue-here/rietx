@@ -1,9 +1,8 @@
 # WP-1951 — a glob that names a site and frees nothing
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here
+Milestone: unscheduled · Status: ✅ 2026-11-01 — a stage glob naming one site that frees nothing is reported, set_vary warns, the verbs name the nearest path; PR #1304, warning-vs-info level open for the maintainer
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-10-11 — a request to free one site's coordinates, or an unknown path on `set_vary`, frees nothing and says nothing; the caller can read `freed` or the return value
 
 ## Goal
 
@@ -136,6 +135,138 @@ Every shipped preset fires nothing new on the acceptance fixtures.
 
 ## Handover log
 
+- **2026-11-01** — PR #1304. A stage that asks to refine one atom's position
+  by a pattern, where the atom sits on a fully fixed special position (Ti on
+  rutile's 2a), now says so, where it used to freeze the atom without a word.
+  `set_vary` now warns when a call changes nothing it named, and every verb
+  that refuses an unknown path names the nearest real one. Wildcard patterns
+  stay silent, as WP-1414 decided, and no shipped plan can trigger the new
+  report. A joint fit does not get it yet (WP-2028 inherits that).
+
+  *Done:* all five tasks (ticked above with what did each).
+  `refine._site_glob_diagnostics` adds a branch to the existing
+  `STAGE_PATH_NOT_FREE`: a glob whose fixed segments name an existing site
+  (`phases.<i>.atoms.<j>.`) and that frees no row by `_frees_for_request`. It
+  says why when the glob reached the coordinates: site symmetry fixes every
+  one (no suggestion, as for the literal), a rigid body places them, or they
+  move through `dof` rows (named). A biso freed by the same request answers a
+  one-site `adp.*` (the displacement stages' pair, copied per atom).
+  `Refinement.set_vary` warns (`UserWarning`) on an unknown literal with the
+  nearest path, and when freeing on a declined phase literal or site glob,
+  through the same two builders, after the call has committed. `hold`,
+  `unhold`, `untie`, `tie`, `set_values` and `profile_interval` keep raising
+  and name the nearest path (`_path_hint`, retired spellings first). The audit
+  row for `STAGE_PATH_NOT_FREE` gets tier 1, ambiguity 1, response `warning`;
+  its `.suggestion` row counts 2 sites and stays unaudited.
+
+  *Reader-facing text* (new; `python -m tests.reader_output` exit 0, the
+  standard fit unchanged, since it names no site):
+  `Stage 'only' asked for phases.0.atoms.0.dof.*, which matches no
+  parameter, so nothing was freed for it. Every coordinate of
+  phases.0.atoms.0 is fixed by its site symmetry, so the site has no dof
+  rows.`, and as a warning `set_vary freed nothing for 'instrument.zero',
+  which names no parameter of this model. Did you mean
+  'instrument.zero_shift'?`.
+
+  *Review:* `/code-review high --fix` found seven; three fixed in
+  `85a1aac5`: the census test `test_multi_diagnostics` was red for the new
+  helper (now an `ABSENT` row in `multi.DIAGNOSTIC_SCOPES`),
+  `profile_interval`'s hint now goes through `_path_hint`, `set_vary` passes
+  a real `Stage`. Its warning-order finding was fixed after the judge's pass
+  (warn after commit). Declined: the joint fit (waits on PR #1270, forwarded
+  to WP-2028); the GUI not surfacing `set_vary`'s warnings (a design choice,
+  below); the package-built site globs (`report/body_misfit`'s released arm,
+  an internal trial whose findings are not surfaced, and `io/recipe`'s
+  flagged coordinates, which can name a fixed site only after a caller ran
+  `fix_special_positions` on a stored plan, and then the report is true);
+  the audit evidence now names both. A second runner merged origin/main
+  (one conflict, WP-2028's `### Inherited`, both entries kept) and added
+  `STAGE_PATH_NOT_FREE`'s pair to `tests/silence.py`, which main's
+  WP-2037 rule asks of every code whose audit row says `warning`; the
+  fast suite was red on its absence until then.
+
+  *Generality* (judge re-run on the final merged tree, since the first
+  pass's verbatim text was lost with the earlier runner's context; pasted
+  unedited):
+
+  ### STAGE_PATH_NOT_FREE (code)
+
+  **Verdict: holds** on tier 1 and ambiguity 1. The evidence for reporting is stronger. The `warning` level is contested for one case: a site that symmetry fixes completely.
+
+  | Question | Author's answer | Found | Verdict |
+  |---|---|---|---|
+  | 1 What it decides | It treats a glob naming one concrete site that frees nothing as the caller's claim (WP file, Context) | It fires only on a `phases.<i>.atoms.<j>.` glob. No preset names one (`test_no_preset_names_one_site`). | holds |
+  | 2, 5 Kind and tier | "arithmetic on the table … no threshold" (WP file, tier paragraph) | Agrees: the test is whether any matched row can move. Pinned by `test_a_glob_naming_one_site_that_frees_nothing_says_why`, `test_a_site_glob_that_frees_something_or_names_no_site_stays_silent` and `test_ti_on_rutile_reports_its_site_symmetry` (`tests/test_params_surface.py`). | holds |
+  | 3 Case against | none given | GSAS-II 5.8.4 accepts an X flag (its "refine position" box) on a fully fixed atom. It holds each coordinate as "Fixed by symmetry" and lists it in a printed hold list. It gives no warning (`GSASIIstrIO.py:1775-1791`, `GSASIImapvars.py:1587-1591`, read on disk in rietx-bench). A script that loops over every site gets one warning per fixed site. | bears on the level only |
+  | 4 Case for | issue #896: the stage froze the site in silence | A user who ticked one site got no answer. The other cases name a real fix. | holds |
+  | 7 What records it | `where=[glob]` | Yes. A joint fit does not report it yet, deferred to WP-2028 (`multi.DIAGNOSTIC_SCOPES`). | holds |
+  | Level | `responds`: "…or none where the site symmetry fixes every coordinate" | That clause names no action, and a coordinate fixed by symmetry is exact. The record says two consequences get two codes (generality.md, Attention is a cost, clause 2). WP-1414's literal case (`phases.0.atoms.0.z`) already warns, so a split needs a sibling `info` code covering both. | maintainer's call. I lean towards an `info` sibling as a follow-up. |
+
+  What would change it: a ruling on whether "the plan did not reach what it asked" covers a site with nothing to reach.
+
+  ### STAGE_PATH_NOT_FREE.suggestion
+
+  **Verdict: weak.** The new site's advice is mostly arithmetic. But the row stays unaudited while the code row's `responds` now relies on it.
+
+  | Question | Author's answer | Found | Verdict |
+  |---|---|---|---|
+  | Baseline | none given | The name was already on the list, so no rule is broken | holds |
+  | 3 Case against | none given | The rigid-body advice frees `phases.*.rigid_bodies.*…`: every body in every phase, wider than the one site asked about (`refine._site_glob_diagnostics`). | finding |
+  | 4 Case for | none given | "Free <site>.dof.*" is what any refiner would do | holds |
+
+  What would change it: auditing this row in the same change, with the body glob narrowed to the owning body.
+
+  ### set_vary warning and the near-miss in the verbs (outside the table)
+
+  **Verdict: weak.** The near-miss holds. Warning rather than raising on an unknown literal is the weak part.
+
+  | Question | Author's answer | Found | Verdict |
+  |---|---|---|---|
+  | 1 What it decides | "the return value already says what changed and a glob that declines rows is how plans work" (`set_vary` docstring) | That reason covers globs. An unknown literal has no healthy reading, and `hold` and `set_values` raise on the same fact. DESIGN Rule 4 asks a new API for "a raise on failure". | weak |
+  | 4 Case for warning | It returns the same list as before (1.11.0 notes) | No caller breaks | holds |
+  | Near-miss | "the same tests on a second surface" (WP file) | It shows one nearest path (difflib, 0.6 cutoff, in `_nearmiss`, which the audit does not walk). The caller decides. This matches STAGE_PATH_UNKNOWN. | holds |
+  | 7 What records it | none given | Only the UserWarning. The history node records `turn_on=[]` and nothing of the miss. | finding |
+
+  What would change it: a maintainer ruling on whether `set_vary` raises on an unknown literal, which would be a breaking change.
+
+  *Author's answers.* Level: kept at `warning`, beside WP-1414's literal
+  case; the split is the maintainer's question below. Suggestion: the
+  rigid-body glob repeats the wording of `hold`'s refusal (WP-1805), so
+  narrowing it to the owning body is one change for both sites, forwarded to
+  WP-1805's `### Inherited`; the row stays unaudited. `set_vary`: it warns
+  because raising would break a caller that passes a list mixing a typo with
+  good paths, which today gets the good ones freed; whether to break that is
+  the maintainer's, below.
+
+  *Open question for the maintainer (warning or info).* A fully fixed site
+  leaves the reader nothing to do. At `warning` (this PR), the sentence sits
+  among the fit's warnings beside the literal `phases.0.atoms.0.z`, which has
+  warned since WP-1414. At `info` under a new code, it sits below the
+  warnings and does not mark the fit as needing attention; the literal case
+  should move with it, which changes WP-1414's output. GSAS-II says nothing.
+  Recommendation, a lean: keep `warning`, since the caller asked for a
+  refinement that will not happen. If you prefer `info`, move both cases
+  under one sibling code. A second, smaller question: `set_vary` warns on an
+  unknown literal where `hold` raises; keep warning (lean), since raising is
+  a breaking change for mixed lists.
+
+  *Measured* (`[dev]` venv, macOS arm64, Python 3.12, alone on the machine
+  via `serial.py`): FAST_COUNTS. Added 28 tests: 27 in
+  `tests/test_params_surface.py`, one silence pair in `tests/test_silence.py`. Full suite not run: the change moves no
+  measured number (diagnostics and warnings only).
+
+  *Not generalised, on purpose:* a glob with a concrete site index the model
+  lacks (`phases.0.atoms.7.dof.*`) stays silent, being an index typo that
+  `STAGE_PATH_UNKNOWN`'s shared rule would have to own; a concrete phase
+  index on another family (`phases.0.microstrain.dof.*`) stays silent, each
+  family needing its own reason; the symmetry subject from
+  `gui.symmetry.held_causes` was not imported into the literal message (not a
+  one-liner from `refine.py`).
+
+  *Next:* the maintainer rules on the new reader text (PR #1304 body), on
+  the warning-or-info question above, and on `set_vary` warning rather
+  than raising. Then merge. After PR #1270 merges, WP-2028 wires the site builder into the
+  joint fit.
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issue #896).
   Checked against the tree at `d80ca5f4`: `held_because` and the row's fields
   already give the reason, Ti on rutile has no `dof` rows, and a glob naming
