@@ -95,6 +95,10 @@ def test_a_named_variable_bears_on_every_purpose():
     driven = _d("FLOOR_HIT", ["vars.shared_b"])
     assert {level_under(driven, p) for p in PURPOSES} == {"warning"}
 
+    # a path that moves an atom without an ``atoms.`` name (a mode amplitude,
+    # a rigid body's pose) is checked on the data-support count's own states,
+    # in tests/test_data_support.py, which builds them already (WP-2067)
+
 
 def test_an_unknown_purpose_is_refused_by_name():
     with pytest.raises(ValueError, match="'phase_id'"):
