@@ -227,7 +227,15 @@ reaches the same wrong A/B lattices, labelled C.
 **Done.** Claimed the WP. Re-checked the findings: `dichotomy.py`'s
 commits since the triage sha `d87c8cc91` (WP-2030's volume window) touch
 neither the prune, `_accept` nor `CENTRINGS`, and every row reproduces.
-`### Inherited`: none to prune.
+`### Inherited`: none to prune. The branch changes docs only. Its fast
+selection on the same venv and machine gave 13 161 passed, 310 skipped,
+32 xfailed and 1 failed. The failure is
+`test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`.
+It also fails alone, because this Mac's user Jupyter kernel spec points at a
+deleted interpreter (`FileNotFoundError`). That is machine-local, not this
+branch. `tests/test_docs_consistency.py`: 25 passed. `python -m
+tests.reader_output`: exit 0. The indexing acceptance suite was not run,
+because no engine code changed.
 
 **Not done.** No fixtures. The C m m m list (under 3 s) and the B repro
 (under 1 s) can be fast tests; the monoclinic C lists take 30-190 s here and
