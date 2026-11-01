@@ -116,6 +116,35 @@ none of their reported pairs involves it.
 
 ## Handover log
 
+- **2026-11-01** — ghostshift runner, PR #1306 (draft), branch
+  `wp2050-flat-direction-correlation`. **Paused at task 2 on a file
+  boundary, not a design question.** Task 1 landed: the premise
+  re-measured (Context, "superseded in part"), the practice survey, and
+  `statistics.resolved_correlation` with 8 tests
+  (`tests/test_resolved_correlation.py`, 8 passed, `[dev]`, macOS arm64).
+  The shift lead had told this runner to stay out of `src/strategy/` and
+  `refine.py` while WP-2049's runner works there. Task 2 needs
+  `strategy/staged.py`, in two functions WP-2049's tasks do not reach.
+  In `check_guards`, before `_correlation_findings`, pass
+  `resolved_correlation(corr, covariance_jacobian(outcome, free))`'s
+  matrix when `outcome.jac is not None and not outcome.n_aux`, so the
+  findings and `measured_top_correlations` read one matrix (WP-1056's
+  rule). And in `_correlation_findings`, say what was left out:
+  `GuardFinding.flat_direction` gains a clause for a pair of unresolved
+  members, along the lines of "ρ against either is not determined and is
+  not reported". The joint twin in `multi.py` passes a `BlockJacobian`,
+  which the helper returns unchanged; leave it. After that: re-pin
+  `tests/data/suite_alarms.json` (brucite 36 → 35; 76/8 = 9.5 → 75/8 =
+  9.375 warnings per result), the `HIGH_CORRELATION` and `FLAT_DIRECTION`
+  rows of `references/diagnostics.md`, an `_audit` row for the cut, and
+  `python -m tests.reader_output` (the message changes, so it goes to Yue
+  before merge). Measured with `docs/wp/2050-batch/simulate.py`: brucite
+  35 at k = 0, ±1, ±4, +7, ±20; the other seven unchanged at k = 0, +4.
+  Not generalised: the esds. `lor_size`'s own esd moves 55 % across the
+  nudges (0.185 against 0.287) for the same reason, and the three members'
+  esds (≈ 6000) are rounding too. The correlation feeds
+  `stderr_physical`, so fixing that belongs to the esd authority
+  (`normal_covariance`) and to its own WP.
 - **2026-10-25** — filed by WP-2036's session after a measurement lane
   reproduced the nightly's alarm red on an arm64 Mac. No open WP owns the
   guard: WP-2037, which made the pin, is closed. Next: the first task.
