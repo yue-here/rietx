@@ -132,9 +132,13 @@ papers only.
       recorded as `Decided YYYY-MM-DD:` and answered on #1258.
       Decided 2026-11-01: option 1; V3 adopted (maintainer, in chat).
       The answer on #1258 is the lead's to post.
-- [ ] A: the chosen fix, with the duplicate settings merged before ranking
+- [x] A: the chosen fix, with the duplicate settings merged before ranking
       (one lattice, one candidate) and the C setting reduced; the compiled
       kernel transcribed in the same commit if `_test_box` changes.
+      Option 1: `dichotomy._swap_images` derives the letters (monoclinic A,
+      orthorhombic A and B), the leaf replays them, `_relabel` re-sets an
+      accepted one to C through `conventional_fit`. `_test_box` and the
+      kernel are untouched. Monoclinic I is not replayed (handover entry).
 - [ ] B: the annealed passes bounded as decided, the closing passes unchanged.
 - [ ] Tests: the issue's orthorhombic and monoclinic C lists and the B repro
       as fixtures (exact positions, `search_complete` asserted beside the

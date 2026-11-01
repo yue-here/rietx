@@ -236,6 +236,21 @@ def test_axis_swaps_are_derived_from_the_subspace():
     assert axis_swaps(metric_basis("monoclinic")) == [(0, 2)]
 
 
+def test_swap_images_are_the_centrings_the_prune_maps_c_onto():
+    """WP-2066: the letters a leaf replays beside the admitted ones are the
+    admitted face letters moved by the system's own axis swaps.  Monoclinic C
+    gives A, orthorhombic C gives A and B, and no other system gives any."""
+    from rietx.indexing.dichotomy import _swap_images
+    from rietx.indexing.engines import CENTRINGS
+
+    got = {s: _swap_images(CENTRINGS[s], axis_swaps(metric_basis(s)))
+           for s in SYSTEM_ORDER}
+    assert got["monoclinic"] == {"A": "C"}
+    assert got["orthorhombic"] == {"A": "C", "B": "C"}
+    assert all(not v for s, v in got.items()
+               if s not in ("monoclinic", "orthorhombic"))
+
+
 def test_predicted_reflection_count_matches_the_generator_it_guards():
     """The ceiling must count the same box ``generate_reflections`` allocates.
 

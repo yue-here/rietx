@@ -58,6 +58,8 @@ of the driven lines with the strongest of them anchored
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 
 from ..model import compiled
@@ -71,6 +73,7 @@ from .engines import (
     SearchSpec,
     TrialIndex,
     assign_lines,
+    conventional_fit,
     dedup_candidates,
     effective_shift_allowance,
     incomplete_diagnostic,
@@ -225,6 +228,52 @@ def _preserves_subspace(basis: np.ndarray, order: list[int]) -> bool:
         if not np.allclose(basis.T @ coef, moved, atol=1e-9):
             return False
     return True
+
+
+#: The axis each face-centring letter's centred face is normal to
+_FACE_LETTERS = {"A": 0, "B": 1, "C": 2}
+
+
+def _swap_images(centrings: tuple[str, ...] | list[str],
+                swaps: list[tuple[int, int]]) -> dict[str, str]:
+    """The centring letters the axis-swap prune maps the admitted ones onto,
+    each with the admitted letter it is an image of (WP-2066).
+
+    A swap is a setting change of the *metric*, and the prune in
+    :func:`_test_box` searches one of each pair of swapped halves.  It is not
+    a setting change of the *centring*: a↔c maps C to A, and the orthorhombic
+    permutations map C to A or B.  A C lattice whose every C description lies
+    in the pruned half therefore appears in the kept half only as A or B, and
+    a leaf that replays only the admitted letters reports it as P at twice
+    its volume (#1258).  Replaying these images at the leaf asks, in the kept
+    half, exactly what the C search would have asked in the pruned one, so it
+    restores the completeness the prune promised without searching a single
+    extra box.
+
+    **Derived, not tabulated**: each face letter is moved by the swaps
+    :func:`axis_swaps` returns, to closure.  P, I, F and R name no face and
+    map to themselves.  Monoclinic C gives A; orthorhombic C gives A and B;
+    every other system gives nothing.
+    """
+    by_axis = {v: k for k, v in _FACE_LETTERS.items()}
+    out: dict[str, str] = {}
+    for letter in centrings:
+        if letter not in _FACE_LETTERS:
+            continue
+        orbit = {_FACE_LETTERS[letter]}
+        grew = True
+        while grew:
+            grew = False
+            for i, j in swaps:
+                for a, b in ((i, j), (j, i)):
+                    if a in orbit and b not in orbit:
+                        orbit.add(b)
+                        grew = True
+        for axis in sorted(orbit):
+            image = by_axis[axis]
+            if image not in centrings and image not in out:
+                out[image] = letter
+    return out
 
 
 def _initial_box(basis: np.ndarray, spec: SearchSpec
@@ -1015,6 +1064,13 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
     if not order:
         return [], (0, 0), False
     masks = {c: masks[c] for c in order}
+    # **the swap images of the admitted centrings are replayed at the leaf**
+    # (``_swap_images``, WP-2066), and only while "P" is kept: P's set is every
+    # hkl, so the union, the search set and every box test stay what they
+    # were.  Without P the system is already reported incomplete.
+    images = (_swap_images(order, axis_swaps(basis)) if "P" in masks else {})
+    for letter in images:
+        masks[letter] = centring_allows(hkl_all, letter)
     union = np.logical_or.reduce(list(masks.values()))
     hkl_all = hkl_all[union]
     dm_all = design_matrix(hkl_all)
@@ -1102,7 +1158,9 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
         """A converged box: dedup it, replay the centred passes, refine.
 
         ``rows`` are the box's surviving trial rows, as indices into
-        ``m_full``.
+        ``m_full``.  The replay covers the swap images too
+        (:func:`_swap_images`), and a cell accepted under one is reported in
+        the letter it images (:func:`_relabel`).
         """
         theta = 0.5 * (lo + hi)
         key = _box_key(basis.T @ theta)
@@ -1132,6 +1190,8 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
                            hkl_c, dm_c, indices[centring], q_all, sigma,
                            wavelength, tt_max, vol_min, vol_max, width,
                            search_lines, tt_all, n_miss, anchors)
+            if cand is not None and centring in images:
+                cand = _relabel(cand, images[centring])
             if cand is not None:
                 found.append(cand)
 
@@ -1318,6 +1378,24 @@ def _inside_domain(af: np.ndarray, spec: SearchSpec) -> bool:
         if abs(af[p]) > bound * (1.0 + 1e-6):
             return False
     return True
+
+
+def _relabel(cand: EngineCandidate, target: str) -> EngineCandidate | None:
+    """A candidate accepted under a swap image, re-set to the letter it images.
+
+    ``engines.conventional_fit`` carries A..F, its covariance, the cell and
+    its esds through one exact map, and the assigned hkl follow the same
+    change (h' = M·h).  The result is one lattice under one name, so
+    ``dedup_candidates`` merges it with any leaf that found the same lattice
+    as C, and the report holds one candidate where it would hold two.
+    ``None`` where the fit is not a lattice's metric and has no setting.
+    """
+    fit, change = conventional_fit(cand.fit, cand.system, cand.centring)
+    if change is None:
+        return None
+    m = np.asarray(change, dtype=np.int64)
+    hkl = np.asarray(cand.hkl, dtype=np.int64) @ m.T
+    return replace(cand, fit=fit, centring=target, hkl=hkl)
 
 
 def _accept(basis: np.ndarray, system: str, centring: str, spec: SearchSpec,
