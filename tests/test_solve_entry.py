@@ -167,9 +167,10 @@ class Nac:
                           if sorted(s.sites) == want]
         self.truth = [(a.species, truth[a.label]) for a in self.phase.atoms]
 
-    def solve(self, spec, **kw):
+    def solve(self, spec, priors=None, **kw):
         kw.setdefault("telemetry", False)
-        return wf.solve_structure(self.cost, self.phase, instrument=self.ins, priors=_priors(),
+        return wf.solve_structure(self.cost, self.phase, instrument=self.ins,
+                                  priors=_priors() if priors is None else priors,
                                   composition=NAC_COMPOSITION, spec=spec, biso=NAC_BISO, **kw)
 
     def rmsd(self, cand) -> float:
@@ -554,11 +555,21 @@ def test_a_killed_checkpoint_write_leaves_the_last_one_whole(tmp_path, monkeypat
 
 def test_the_assignment_race_resumes_byte_identical(nac, tmp_path):
     """A stop inside the race's third round, which continues each chain from
-    its second-round state, resumes to the same bytes."""
+    its second-round state, resumes to the same bytes.
+
+    The clash term is weighted 0, so the race runs on the data term alone.
+    Its numpy path is ~95 % of a NAC sweep (``chemistry.site_clash``) wherever
+    the compiled ``solve_clash`` declines, as on CI's ``[dev]`` install; the
+    three runs below took 683 s there (CI py3.11, 2026-10-31) and 9.6 s
+    without it.  A resume with the clash term on is the acridine test's
+    (``test_an_interrupted_run_resumes_byte_identical``, weight 1); what is
+    the race's own, the round hand-over and the stop inside a round, does not
+    read the term."""
     spec = _spec(seeds=(0,), control_seeds=(), sweeps=1000, race_sweeps=1000,
                  heartbeat_sweeps=500)
+    data_only = _priors(PriorWeights(clash=0.0, coordination=0.0))
     events: list[dict] = []
-    whole = nac.solve(spec, events=events.append)
+    whole = nac.solve(spec, priors=data_only, events=events.append)
     assert len(whole.races[0].rounds) == 3
     third = whole.races[0].rounds[2]
     assert third.sweeps == 4000 and len(third.ran) == 2
@@ -572,11 +583,11 @@ def test_the_assignment_race_resumes_byte_identical(nac, tmp_path):
     ck = tmp_path / "race.ckpt"
     token = CancelToken()
     target = f"race:{nac.phase.space_group}:a{third.ran[1]}:r2"
-    cut = nac.solve(spec, checkpoint=ck, cancel=token,
+    cut = nac.solve(spec, priors=data_only, checkpoint=ck, cancel=token,
                     events=_cancel_at(token, target, 3500))
     assert cut.status == "cancelled" and cut.races[0].winner is None
     assert json.loads(ck.read_text(encoding="utf-8"))["current"]["state"]["done"] == 3000
-    again = nac.solve(spec, checkpoint=ck)
+    again = nac.solve(spec, priors=data_only, checkpoint=ck)
     assert again.comparable_json() == whole.comparable_json()
 
 
