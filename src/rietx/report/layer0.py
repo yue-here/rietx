@@ -20,6 +20,8 @@ All quantities are 1/σ²-weighted; both Δ and Δ/σ views are reported.
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 from scipy.signal import find_peaks, peak_prominences
 
@@ -105,7 +107,10 @@ def on_drawn_flank(y_obs: np.ndarray, y_calc: np.ndarray, sigma: np.ndarray,
     the residual a peak, so the test adds no number of its own.  A foreign
     line that the observed curve does not resolve from a stronger neighbour is
     explained too.  No positions test can separate it from a shape misfit,
-    and the region list still carries its χ².
+    and the region list still carries its χ².  That reach grows with the
+    neighbour's height: a line 8-12σ tall beside a Lorentzian of FWHM 0.1°
+    is hidden out to 2 FWHM at 10³ counts, 3-4 at 10⁴ and 6 at 10⁵, where
+    the 0.08° tick window alone hid it out to 0.8.
     """
     n = len(y_calc)
     uphill = [s for s in (-1, 1) if 0 <= i + s < n and y_calc[i + s] > y_calc[i]]
@@ -114,13 +119,20 @@ def on_drawn_flank(y_obs: np.ndarray, y_calc: np.ndarray, sigma: np.ndarray,
         # line no tick marks (a blank's, a declared extra peak's)
         path = [i]
         j = i + step
+        # strictly uphill: a flat run of the curve (a held background, a
+        # masked span) would otherwise carry the walk to a peak far away
         while step and 0 <= j < n and y_calc[j] > y_calc[path[-1]]:
             path.append(j)
             j += step
         apex = path[-1]
         if apex in (0, n - 1):
             continue
-        if peak_prominences(y_calc, [apex])[0][0] < min_sigma * sigma[apex]:
+        with warnings.catch_warnings():
+            # a flat channel's prominence is 0, which is the answer here
+            warnings.filterwarnings(
+                "ignore", message="some peaks have a prominence of 0")
+            prominence = peak_prominences(y_calc, [apex])[0][0]
+        if prominence < min_sigma * sigma[apex]:
             continue
         p = np.asarray(path)
         seen = np.maximum.accumulate(y_obs[p])
