@@ -125,6 +125,8 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
 
+- **2026-11-01, from [WP-1919](1919-maximal-subgroups-generated-from-the-operators.md)'s close: the maximal-subgroup list this WP wanted now exists.** `rietx.crystallography.representation.subgroups.maximal(group, kind, max_index)` returns every maximal t- and k-subgroup of a space group, each with its conjugacy class and its (P, p) checked exactly (PR #1189). `strategy/magnetic.py` `_maximal_subgroups` is still maximal only among the classes enumerated at the winner's k, so the descent audit can take its nuclear part from the new list. Wyckoff splittings come from `wyckoff_splitting(group, sub)` (PR #1239).
+
 - **2026-10-23, from [1326](1326-satellites-without-a-moment.md)'s close
   (originally WP-1541, 2026-10-03): the satellite types have no provisional
   declaration a test can see.** `SatelliteEvidence` and `SatelliteCandidate`
