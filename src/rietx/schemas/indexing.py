@@ -998,11 +998,20 @@ class PeakList(Base):
 
     @model_validator(mode="after")
     def _q_matches_two_theta(self) -> "PeakList":
-        """Q is derived, so it cannot be allowed to drift from 2θ.
+        """Q and σ(Q) are derived, so neither may drift from 2θ and σ(2θ).
 
-        Cheap (one vectorised pass) and it makes the derived field
+        Cheap (one vectorised pass) and it makes the derived fields
         self-guarding: a caller that builds a peak by hand and forgets Q gets an
         error here rather than a silently mis-indexed pattern later.
+
+        ``q_esd`` is checked the same way (#1236): the engines weight lines by
+        :meth:`q_esd`, so an edit to ``two_theta_esd`` that left the stored
+        ``q_esd`` behind would never reach the search, and nothing would say
+        so.  The tolerance is relative only: σ(Q) is ~1e-5 Å⁻², so the position
+        check's floor of 1.0 would make it an absolute 1e-9 Å⁻², blind to an
+        edit of a line whose σ(2θ) is below ~1e-7°.  A pair where both
+        numbers are non-finite agrees: an infinite σ(2θ) gives an infinite or
+        undefined σ(Q), and both mean "unmeasured".
         """
         if not self.peaks:
             return self
@@ -1017,6 +1026,22 @@ class PeakList(Base):
                 f"but 1/d² at λ = {self.wavelength} Å is {float(want[k])!r}; "
                 "build peaks with PeakList.from_positions or "
                 "indexing.pick_peaks rather than setting q by hand")
+        esd = np.array([p.two_theta_esd for p in self.peaks])
+        with np.errstate(invalid="ignore"):
+            want_esd = q_esd_of_two_theta(tt, esd, self.wavelength)
+        got_esd = np.array([p.q_esd for p in self.peaks])
+        agree = (np.isclose(got_esd, want_esd, rtol=1e-9, atol=0.0)
+                 | (~np.isfinite(got_esd) & ~np.isfinite(want_esd)))
+        if not agree.all():
+            k = int(np.flatnonzero(~agree)[0])
+            raise ValueError(
+                f"peak {k} at 2θ = {tt[k]:.4f}° carries q_esd = "
+                f"{float(got_esd[k])!r} but two_theta_esd = {float(esd[k])!r}° gives "
+                f"σ(1/d²) = {float(want_esd[k])!r} at λ = {self.wavelength} Å; "
+                "set both fields together, deriving q_esd with "
+                "rietx.schemas.indexing.q_esd_of_two_theta, or rebuild the "
+                "list with indexing.pick_peaks or PeakList.from_positions "
+                "(which marks every σ assumed)")
         return self
 
     def usable(self) -> list[ObservedPeak]:
