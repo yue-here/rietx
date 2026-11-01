@@ -3642,7 +3642,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the specimen and belongs out of the model, or the range must cover a "
             "reflection of it. With no reflection in range, the scale is held too, the "
             "phase has no weight fraction, and the other fractions are relative to the "
-            "phases seen in range."
+            "phases seen in range. When no phase is seen at all, the instrument terms "
+            "that act only through the peaks are held as well: the zero shift, the "
+            "specimen displacement and the profile widths. The message names them."
         ),
     ),
     "PLAN_FREES_NO_MOMENT": HelpEntry(
