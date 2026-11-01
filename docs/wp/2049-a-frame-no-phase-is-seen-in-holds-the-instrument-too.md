@@ -1,9 +1,8 @@
 # WP-2049 — a frame no phase is seen in holds the instrument's peak terms too
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: ✅ 2026-11-01 — a frame no phase is seen in holds its peak-only instrument columns, single and joint; PR #1305's widened tier-3 hold re-approved 2026-11-01
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-25 — a confident number fitted to noise (zero shift at 4.8σ on a blank frame) and a series step flagged from it; sub-onset frames of a ramp are where it lands
 
 ## Goal
 
@@ -44,6 +43,25 @@ is what the committed signals record. The probe is
 Which rung wins is rounding. That an instrument column is refined on a frame
 with no seen phase is not: it happens whenever the warm rung is accepted.
 
+**Superseded in part, 2026-11-01** (`62034506e`, macOS arm64, `[dev]`). The
+series no longer reaches outcome B: at k = −3, −2, −1, 0, +1, +2, +3 and +5
+the ladder accepted `warm_staged` on frame 87, with the scale at 0 and the
+instrument rows carrying no esd. So the nightly row this WP was filed for
+is not red here by that route. The class still stands. Frame 87 fitted
+alone from `cubic_model` under `mccusker_default` returns a zero shift of
+−0.0129 ± 0.0015° (8.7σ, truth 0.006°), U..Y refined beside it, and
+`HIGH_CORRELATION` on U and V at ρ −0.991. That direct fit is the test this
+WP pins (`tests/test_held_phase.py`, `blank_frame`). Probe:
+`~/.cache/ghostshift/rietx/wp-2049/direct87.py` (not committed).
+
+**What qualifies, as built.** An instrument entry is peak-only when
+`CompiledModel.scalar_chain_supported` claims it, or it is one of the two FCJ
+axial ratios. That predicate is the authority that already says which paths
+reach the pattern only through per-peak scalars. It already knows that a
+declared sharp peak (`extra_components`) reads the polarisation and the line
+weights, so with one compiled those stay free. The hold reads the column's
+reach off C and asks the predicate of each reached entry.
+
 The tier of the rule this WP adds: physics. A column whose every reach is an
 unseen phase is flat by the same argument WP-1301 made for a cell, so the
 action is of Rule 1's first kind (`docs/DESIGN.md` § Rules). Which columns
@@ -56,15 +74,18 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
 
 ## Tasks
 
-- [ ] Hold, in `_run_stage`'s support pass, each free instrument column whose
+- [x] Hold, in `_run_stage`'s support pass, each free instrument column whose
       reach (`column_reach`) lies wholly in unseen phases, beside the phases'
       own paths; record it in `StageResult.held` and `PHASE_UNCONSTRAINED`'s
       message.
-- [ ] The joint twin in `multi.py`, and a series' carry: a held instrument
+- [x] The joint twin in `multi.py`, and a series' carry: a held instrument
       value carries from the last frame that measured it.
-- [ ] Tests: frame 87 at both nudges gives a held zero shift; the planted
-      series' committed signals hold at k = 0 and k = +1.
-- [ ] Skill: `PHASE_UNCONSTRAINED`'s row says the instrument can be held too.
+- [x] Tests: frame 87 at both nudges gives a held zero shift; the planted
+      series' committed signals hold at k = 0 and k = +1.  The k = +1 series
+      is a measurement, not a row (settled by Claude under cost: the fast
+      direct-fit rows pin the mechanism at both nudges, and a second
+      248-frame series would add 35-60 s to every nightly to re-test it).
+- [x] Skill: `PHASE_UNCONSTRAINED`'s row says the instrument can be held too.
 
 ## Acceptance
 
@@ -80,6 +101,87 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
 
 ## Handover log
 
+- **2026-11-01** — closed by a ghostshift runner. PR #1305. A blank frame no
+  longer quotes a zero shift or a peak width fitted to noise. When no phase is
+  seen at a stage's answer, the stage puts every instrument term the pattern
+  reads only through phase peaks back where it found them and holds them. The
+  next stage holds them from its start. A weak real phase still gets its zero
+  shift. A hold taken at the start on a reading under 3σ hid the fast suite's
+  weak LaB₆, so the start waits for an answer. A joint fit does this per histogram, and a series carries the
+  last measured value across the blank frame. The nightly route the WP was
+  filed for no longer reproduces on main, but the class did, by a direct fit.
+  One question is the maintainer's: the tier-3 `StageResult.held` audit row was
+  approved for a narrower hold.
+
+  *Done.* `refine._peak_only_instrument_path` asks
+  `CompiledModel.scalar_chain_supported`, plus the two FCJ axial ratios.
+  `refine._every_phase_unseen` gates it. `_unsupported_phase_paths` takes the
+  instrument at the answer (`at_answer=True`, the collapse), and at a stage's
+  start only for a column the previous answer held (`tried`) or where every
+  phase is lineless. `_released_phases` and `_answer_significance` read it
+  too.
+  `multi._unseen` / `_only_unseen` / `_unsupported_paths_multi` / `_rehold_multi`
+  and `_parametric_unseen` take `models`. `refine._instrument_held` reads the
+  last stage's record, and the `PHASE_UNCONSTRAINED` clause quotes it once.
+  `where` is unchanged. The skill row, `help.py` and the audit row's evidence
+  are updated, and v1.11's record has the paragraph. Six tests (seven cases) are in
+  `tests/test_held_phase.py`. Two tests whose premise moved now read the
+  record: `test_phase_significance._assert_prior_holds` allows a second solve
+  when a stage collapsed something, and `test_joint_xray_neutron`'s flat data
+  finds its per-histogram widths in `StageResult.held`. Against main's source, the two blank-frame rows,
+  the series carry and the joint row fail (measured). Two rows import the new
+  helpers. The all-never-any row passes on both, as it should.
+
+  *Measured* (macOS arm64, `[dev]`, `62034506e`). Frame 87 alone under
+  `mccusker_default`: on main the zero shift read −0.0129 ± 0.0015° (truth
+  0.006°), with U~V at ρ −0.991. Here it is held. The 86-88 chain read
+  −0.0229 ± 0.0039° at frame 87 on main. Here frame 87 quotes none, and frames
+  86 and 88 land within 4 esd of truth. Series signals equal the committed
+  record at k = 0 and k = +1. A misregistered start (frame 86, zero shift
+  started 0.03-0.4° off) is bit-identical to main at 0.03-0.1°. At 0.2-0.4°
+  both branches fail at Rwp 0.4332. Cost on frame 87 alone: 56 iterations in
+  9 solves, against main's 111 in 6. Held from the start on a significance,
+  which was the first version, the weak LaB₆ of
+  `test_a_weak_real_phase_is_still_refined[unfitted]` was never seen: 2.53σ
+  after `scale_bkg`, and it needs the zero shift to reach 4.05σ. Holding only
+  at the answer, with no prior, cost 511 iterations in 11 solves.
+  `tests.reader_output` exit 0. Acceptance files before the new tests: 105
+  passed, 2 xfailed. Fast suite on the final tree (`-m "not slow"`, `[dev]`, macOS arm64, alone under the ghostshift serial lock): 13193 passed, 310 skipped, 32 xfailed, 1 failed, 9:42. The failure is `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`, a `FileNotFoundError` on this machine's Jupyter kernel spec, which points at another project's deleted venv; this branch does not touch the display path. Added: 6 tests, 7 cases, 7.31 s together in `tests/test_held_phase.py`; none joins the slow tail.
+
+  *Review.* `/code-review high --fix` made seven findings. Fixed: 1, the
+  parametric report called an instrument target seen; 4, the clause reported
+  holds a later stage had released; 5, a stale number in a docstring.
+  Declined: 2 (no joint diagnostic names a blank histogram's held instrument
+  rows), which went to WP-2028's Inherited as reader output. 3 (the clause
+  infers the hold from the record, and a field would be reader output). 6
+  (instrument paths kept out of `where`, so `sequential`'s aggregation key
+  holds). 7 (a misregistered start): the measurement above found no route
+  closed, but the fast suite then found a weak real phase that needs its zero
+  shift from the start, and the hold moved to the answer.
+
+  *Generality* (the judge's verdicts, condensed; full report in the session).
+  Item 1, `StageResult.held`: **weak**. The flatness argument is sound and
+  has one measured cost, but `grounds` and `approved` (2026-10-23) cover only
+  the phase hold. The judge also named an unmeasured misregistered start;
+  author's answer: measured since. A strong phase lost nothing. A weak one
+  did, under the first version, and the hold now waits for an answer. Item 2, the
+  predicate and gate: **holds**. Item 3, the clause and the help sentence:
+  **weak**. The help list read as complete, so it now says "for example". The
+  instrument paths stay out of `where`; that is latent until the code gets a
+  response row.
+
+  *Settled by Claude.* No full-length series row at k = +1, under cost: the
+  fast rows pin the mechanism at both nudges. Instrument paths stay out of
+  `PHASE_UNCONSTRAINED.where`, under `sequential`'s aggregation key.
+
+  Next: the maintainer re-approves or narrows the widened `StageResult.held`
+  row, then merges #1305. The reader-output change on a blank frame comes
+  with it: instrument rows leave `result.parameters`, and one sentence joins
+  `PHASE_UNCONSTRAINED`.
+  *Ruled* 2026-11-01, Yue in chat, "1305: 1." (option 1: "Re-approve the
+  widened entry and merge."). It approves the widened tier-3
+  `StageResult.held` audit row, now `approved="2026-11-01"` with grounds naming
+  the instrument terms, and the reader-output change on a blank frame.
 - **2026-10-25** — filed by WP-2036's session after a measurement lane
   reproduced the nightly's planted-series red on an arm64 Mac. No open WP owns
   the hold: WP-1301 is closed, and what its fix did not cover is a new WP.
