@@ -760,3 +760,126 @@ def test_the_child_setting_is_read_by_the_subgroups_standardiser(at_gamma, at_x_
                             origin_shift=np.asarray(data.origin_shift) + [0.25, 0, 0])
     with pytest.raises(RuntimeError, match="is not the subgroup's operation list"):
         real(group, wrong, cell, bound)
+
+
+# --------------------------------------------------------------------------
+# #1247: a centred parent.  ``_standard_child`` listed each atom once per
+# ``site_orbit`` image, which already carries the centrings, and again per
+# shift of the magnetic cell's translations, which at k = 0 are those
+# centrings: every position twice, and ``image_of`` raised "this is a bug".
+# --------------------------------------------------------------------------
+
+def _cell(a, b, c, alpha=90.0, beta=90.0, gamma=90.0):
+    return rx.Cell(**{n: P_(value=v) for n, v in zip(
+        ("a", "b", "c", "alpha", "beta", "gamma"), (a, b, c, alpha, beta, gamma))})
+
+
+def _rocksalt():
+    """NaCl, B1: Na on 4a, Cl on 4b of F m -3 m."""
+    return rx.Phase(name="NaCl", space_group="F m -3 m", cell=rx.Cell.cubic(5.64), atoms=[
+        _atom("Na", "Na", 0, 0, 0), _atom("Cl", "Cl", 0.5, 0.5, 0.5)])
+
+
+def _mosi2():
+    """MoSi₂, C11b: Mo on 2a, Si on 4e (0, 0, ⅓) of I 4/m m m."""
+    return rx.Phase(name="MoSi2", space_group="I 4/m m m", cell=_cell(3.2, 3.2, 7.85), atoms=[
+        _atom("Mo", "Mo", 0, 0, 0), _atom("Si", "Si", 0, 0, 1 / 3)])
+
+
+def _c2m():
+    """A synthetic C 1 2/m 1 parent: one atom on 2a, one on 4i."""
+    return rx.Phase(name="C2m", space_group="C 1 2/m 1", cell=_cell(9.0, 4.0, 5.0, beta=105.0),
+                    atoms=[_atom("A", "Na", 0, 0, 0), _atom("X", "Cl", 0.3, 0, 0.2)])
+
+
+def _rhombohedral():
+    """A synthetic R -3 m parent on hexagonal axes: one atom on 3a, one on 6c."""
+    return rx.Phase(name="R-3m", space_group="R -3 m:H", cell=_cell(3.0, 3.0, 15.0, gamma=120.0),
+                    atoms=[_atom("A", "Na", 0, 0, 0), _atom("X", "Cl", 0, 0, 0.25)])
+
+
+CENTRED = [
+    pytest.param(_rocksalt, K_GAMMA, 6, id="F-rocksalt-Gamma"),
+    pytest.param(_rocksalt, K_R, 8, id="F-rocksalt-L"),
+    pytest.param(_mosi2, K_GAMMA, 8, id="I-MoSi2-Gamma"),
+    pytest.param(_c2m, K_GAMMA, 4, id="C-C2m-Gamma"),
+    pytest.param(_rhombohedral, K_GAMMA, 8, id="R-R-3m-Gamma"),
+]
+
+
+def _order(symbol) -> int:
+    """|G| per conventional cell: the point operations times the centrings."""
+    ops = gemmi.find_spacegroup_by_name(symbol).operations()
+    return len(ops.sym_ops) * len(ops.cen_ops)
+
+
+def _index_of_the_candidate(parent, candidate) -> Fraction:
+    """[G : H] from the candidate's own list: |G| × (cell volume ratio) / |H in its cell|."""
+    det = abs(I._operators._rational_determinant(candidate.cell.basis))
+    return Fraction(_order(parent.space_group)) * det / len(I._colourless_operations(
+        candidate.group))
+
+
+def _index_of_the_child(parent, symbol, big) -> Fraction:
+    """[G : H] from the stated child: |G| × det P / |H| in its standard setting."""
+    det = Fraction(abs(float(np.linalg.det(big)))).limit_denominator(1000)
+    return Fraction(_order(parent.space_group)) * det / _order(symbol)
+
+
+@pytest.mark.parametrize(("build", "k", "n"), CENTRED)
+def test_a_centred_parent_states_every_child(build, k, n):
+    """#1247: each (irrep, direction) of a centred parent gets a child, of the candidate's index.
+
+    The loop is ``distortion_candidates``' own without the mode basis, which
+    costs seconds a candidate at L and is built below at Γ only.  Before the
+    fix every one of these calls raised.
+    Each child's index, from the symbol spglib named and (P, p), is the one the
+    candidate's operator list in its magnetic cell implies, and an integer.
+    """
+    parent = build()
+    group = _parent_group(parent)
+    seen = {}
+    for atom in parent.atoms:
+        xyz = (atom.x.value, atom.y.value, atom.z.value)
+        for c in I.candidates(group, xyz, k, kind="displacive"):
+            seen.setdefault((c.irrep_label, c.direction.label), c)
+    assert len(seen) == n
+    for c in seen.values():
+        symbol, big, _small, _ = I._standard_child(parent, group, c)
+        index = _index_of_the_candidate(parent, c)
+        assert index.denominator == 1, (c.label, index)
+        assert _index_of_the_child(parent, symbol, big) == index, (c.label, symbol)
+
+
+@pytest.mark.parametrize(("build", "numbers"), [
+    pytest.param(_rocksalt, [1, 8, 8, 44, 107, 160], id="F-rocksalt"),
+    pytest.param(_mosi2, None, id="I-MoSi2"),
+    pytest.param(_c2m, None, id="C-C2m"),
+])
+def test_a_centred_parents_children_hold_its_atoms(build, numbers):
+    """#1247 through the public call at Γ: every child stated, with the parent's atoms per volume.
+
+    The dedupe keeps each atom once modulo the magnetic cell: the child's atoms,
+    each over its own orbit in its conventional cell, are the parent's per
+    conventional cell times det P, so no image was merged that is not the same
+    atom and none was kept twice.  Rocksalt's children are those of Γ4− (T1u),
+    the polar vector irrep of O_h: (a,0,0) I4mm, (a,a,a) R3m, (a,a,0) Imm2,
+    Cm twice and P1 (C4v, C3v, C2v, Cs, Cs, C1; Stokes & Hatch 1988,
+    *Isotropy Subgroups of the 230 Crystallographic Space Groups*).
+    """
+    parent = build()
+    group = _parent_group(parent)
+    per_cell = sum(len(site_orbit(group, (a.x.value, a.y.value, a.z.value)).images)
+                   for a in parent.atoms)
+    cands = I.distortion_candidates(parent, K_GAMMA)
+    assert cands and all(c.refusal is None for c in cands), _refused(cands)
+    for c in cands:
+        child_group = resolve_group(c.child.space_group, c.child.symmetry_operations)
+        held = sum(len(site_orbit(child_group, (a.x.value, a.y.value, a.z.value)).images)
+                   for a in c.child.atoms)
+        assert held == round(per_cell * abs(np.linalg.det(c.transform[0]))), c.label
+        assert _index_of_the_child(parent, c.child_group, c.transform[0]) == (
+            _index_of_the_candidate(parent, c.candidate)), c.label
+    if numbers is not None:
+        assert sorted(_number(c) for c in cands) == numbers
+        assert len({c.irrep for c in cands}) == 1

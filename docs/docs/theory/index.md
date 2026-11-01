@@ -15,7 +15,7 @@ Every displayed equation carries a source line naming that symbol, and the build
 - [Parameterisation and constraints](parameterisation.md) builds the parameter vector and ties its entries.
 - [Representation analysis](representation-analysis.md) derives the magnetic structures a propagation vector allows.
 - [Superspace groups](superspace.md) describes a crystal modulated along one direction.
-- [Maximal subgroups](subgroups.md) builds every maximal subgroup of a space group from its operations.
+- [Maximal subgroups and Wyckoff splittings](subgroups.md) builds every maximal subgroup of a space group, and how its Wyckoff positions split, from its operations.
 - [Indexing](indexing.md) says what a list of line positions can tell about a lattice.
 - [Search engines](engines.md) finds a cell from that list.
 - [Reading a paper against its own numbers](method.md) shows how three misprinted equations were caught.

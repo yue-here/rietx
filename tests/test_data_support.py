@@ -36,8 +36,10 @@ from rietx.model.forward import compile_model
 from rietx.optimize.statistics import (
     STRUCTURAL_PARAMETER_GLOB,
     count_unique_reflections,
+    data_support,
     effective_observations,
     measured_mask,
+    structural_free_paths,
 )
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
@@ -931,3 +933,80 @@ def test_the_interval_the_finding_quotes_really_excludes_the_run():
     assert not mask[600] and not mask[601]
     # and it is not a wide cut: at most one live channel a side
     assert int((~mask).sum()) <= 4
+
+
+# --------------------------------------------------------------------------
+# what drives an atom, not what it is called (WP-2067, issue #1250)
+# --------------------------------------------------------------------------
+
+#: One public synthetic state per family that drives atoms, with the count by
+#: hand: every free ``phases.*`` path except the cell and the scale (WP-2067's
+#: table), and for the variables every ``vars.X`` tied to an atom entry.  The
+#: name test counted 4, 3, 2 and 0.
+_FAMILY_COUNTS = [
+    # mode amplitudes reach x, y, z through affine rows of C: four Biso + one A
+    ("_state_distortion_modes", 5),
+    # a body reaches its atoms through a derived block: one free atom's three
+    # DOFs + origin (3) + rotation (3) + two twists
+    ("_state_bodies", 11),
+    # the same on a site: two DOFs + origin (2) + one rotation
+    ("_state_bodies_site", 5),
+    # vars.B drives two Biso, vars.D a coordinate DOF; vars.S drives the scale
+    ("_state_families_variable", 2),
+]
+
+
+def _cross_backend_state(name):
+    from tests import test_cross_backend as tcb
+
+    return getattr(tcb, name)()
+
+
+@pytest.mark.parametrize("state, expected", _FAMILY_COUNTS)
+def test_the_count_reads_what_a_column_reaches(state, expected):
+    """A free column that reaches an atom entry counts, whatever its own path.
+
+    Asserted through :func:`data_support` as the fit calls it, so the ratio
+    the band is read against moves with the count: 15/5, 38/11, 17/5, 22/2.
+    """
+    model, table, _ = _cross_backend_state(state)
+    ds = data_support(model, table.decode(table.x0()), table)
+    assert ds.n_structural_parameters == expected
+    assert ds.observations_per_parameter == pytest.approx(
+        ds.n_unique_reflections / expected)
+
+
+def test_a_variable_on_a_coordinate_dof_is_the_parameter_counted():
+    """``vars.D`` tied to ``atoms.1.dof.0`` is the free column, and the DOF it
+    drives is not free, so the name test counted neither (#1250's sibling).
+
+    The negative arm sits in the same table: ``vars.S`` drives the phase scale,
+    which §9 leaves out, so it is not counted however it is spelled.
+    """
+    _, table, _ = _cross_backend_state("_state_families_variable")
+    assert "phases.0.atoms.1.dof.0" not in table.free_paths
+    assert structural_free_paths(table) == ["vars.B", "vars.D"]
+
+
+@pytest.mark.parametrize("state", ["_state_bodies", "_state_bodies_site"])
+def test_a_body_frame_is_not_a_structural_parameter(state):
+    """Through C the cell reaches every body atom, since the block reads it to
+    turn Å into fractions, and it is still not counted: it is the block's
+    ``frame_inputs``, which peak positions pay for (McCusker §9)."""
+    _, table, _ = _cross_backend_state(state)
+    cell = [p for p in table.free_paths if ".cell." in p]
+    reach = table.column_reach()
+    assert cell and all(any(".atoms." in q for q in reach[p]) for p in cell)
+    assert not set(cell) & set(structural_free_paths(table))
+
+
+@pytest.mark.parametrize("state", ["_state_families", "_state_families_tied"])
+def test_plain_atoms_count_what_the_name_test_counted(state):
+    """The positive arm: with no variable, mode or body, the reach test is the
+    name test, path for path, so every plain-atom fit's record is unchanged."""
+    import fnmatch
+
+    _, table, _ = _cross_backend_state(state)
+    assert structural_free_paths(table) == [
+        p for p in table.free_paths
+        if fnmatch.fnmatch(p, STRUCTURAL_PARAMETER_GLOB)]

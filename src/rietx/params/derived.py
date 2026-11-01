@@ -146,6 +146,14 @@ class DerivedBlock(ABC):
     inputs: tuple[str, ...]
     #: entry paths written, in the order of :meth:`evaluate`'s result
     outputs: tuple[str, ...]
+    #: the inputs the map reads as the **frame** it places its outputs in,
+    #: not as a freedom of what it places: a rigid body reads its phase's cell
+    #: only to turn Å into fractions.  A subset of :attr:`inputs`; none by
+    #: default.  Read by the data-support count (WP-2067), which counts a
+    #: column that reaches an atom through a block only through the block's
+    #: other inputs, since the cell is paid for by peak positions whatever rows
+    #: it also moves (McCusker et al. 1999, §9)
+    frame_inputs: tuple[str, ...] = ()
 
     @abstractmethod
     def evaluate(self, x: np.ndarray) -> np.ndarray:

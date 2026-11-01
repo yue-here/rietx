@@ -244,17 +244,24 @@ Hofmann's set the standard deviation of $V_{\mathrm{obs}}/V_{\mathrm{est}}$ is
 
 Two uncertainties answer two questions. The tabulated mean errors say how well
 each average is known, about 0.5 % of an organic formula unit. One crystal
-scatters about the average by {{ VOLUME_SCATTER_PCT }} %, and a check on one
-candidate cell uses that. A cell of volume $V$ implies $Z = V/V_{\mathrm{fu}}$
-formula units. It is reported when the nearest whole number $n$ needs
-$\lvert Z/n - 1 \rvert$ above {{ Z_INTEGER_TOLERANCE_PCT }} %, twice the
-scatter. Above $Z$ = {{ Z_CHECK_SILENT_ABOVE }} every value lies that close to
-a whole number, so the check is silent there. A search window from a formula
-takes the paper's wider bounds instead, $V_{\mathrm{obs}}/V_{\mathrm{est}}$
-from {{ VOLUME_RATIO_LOW }} to {{ VOLUME_RATIO_HIGH }}, because a window that
-excludes the true cell makes the search return a wrong one. The volumes are
-fitted to organic and metal-organic crystals, and an ionic compound comes out
-too large.
+scatters about the average by about {{ VOLUME_SCATTER_PCT }} % (Hofmann's
+Fig. 1). A cell of volume $V$ holds $V/V_{\mathrm{fu}}$ formula units by the
+table, which `index_pattern(formula=)` records on each candidate. Hofmann calls
+a structure unusual past $V_{\mathrm{obs}}/V_{\mathrm{est}}$ =
+{{ VOLUME_RATIO_LOW }} or {{ VOLUME_RATIO_HIGH }}, where about 1 % of his
+182 239 structures lie (1746). That band is a mark of the unusual, not an
+error bound he measured. The volumes are fitted to organic and metal-organic
+crystals, and he notes that ionic, small-cell structures come out
+overestimated by 25 to 75 % and that the table may not apply to inorganic
+substances (§ 3 (iii)). Inorganic standards read from 0.38 to 0.87: fifteen of
+the sixteen measured lie under {{ VOLUME_RATIO_LOW }} (halite's 0.87 is inside the
+25 %), and nine of them under 0.57, which his § 3 (i) puts down to a wrong $Z$. So against this
+table a correct inorganic cell looks like a wrong $Z$, and no test for a whole
+number of formula units can be silent on true inorganic cells. None is made.
+A search window from a formula takes the one side that holds for every
+formula, the ceiling at {{ VOLUME_RATIO_HIGH }}, because a window that excludes
+the true cell makes the search return a wrong one. A cell larger than its
+formula, a framework with its pore contents left out, lies above it.
 
 A measured density fixes $Z$ the other way round, through the definition of
 the density of a crystal of $Z$ formula units of weight $M$ in a cell of volume

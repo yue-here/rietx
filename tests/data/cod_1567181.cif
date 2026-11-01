@@ -1,0 +1,291 @@
+#------------------------------------------------------------------------------
+#$Date: 2023-05-05 05:46:21 +0300 (Fri, 05 May 2023) $
+#$Revision: 283357 $
+#$URL: file:///home/coder/svn-repositories/_RELOADED_COD/cod-reloaded/cif/1/56/71/1567181.cif $
+#------------------------------------------------------------------------------
+#
+# This file is available in the Crystallography Open Database (COD),
+# http://www.crystallography.net/
+#
+# All data on this site have been placed in the public domain by the
+# contributors.
+#
+data_1567181
+loop_
+_publ_author_name
+'Linberg, Kevin'
+'R&#xf6;der, Bettina'
+'Al-Sabbagh, Dominik'
+'Emmerling, Franziska'
+'Michalchuk, Adam A. L.'
+_publ_section_title
+;
+ Controlling polymorphism in molecular cocrystals by variable temperature
+ ball milling.
+;
+_journal_issue                   0
+_journal_name_full               'Faraday discussions'
+_journal_page_first              178
+_journal_page_last               193
+_journal_paper_doi               10.1039/d2fd00115b
+_journal_volume                  241
+_journal_year                    2023
+_chemical_formula_moiety         'C5 H8 O4,C6 H6 N2 O1'
+_chemical_formula_sum            'C11 H14 N2 O5'
+_chemical_formula_weight         254.24
+_chemical_melting_point          409
+_chemical_name_mineral           'Form II'
+_chemical_name_systematic
+;
+Glutaric acid isonicotinamide
+;
+_space_group_IT_number           14
+_space_group_name_Hall           '-P 2yab'
+_space_group_name_H-M_alt        'P 1 21/a 1'
+_symmetry_cell_setting           monoclinic
+_symmetry_Int_Tables_number      14
+_symmetry_space_group_name_H-M   'P 1 21/a 1'
+_audit_creation_date             2022-4-21
+_audit_creation_method           'made by TOPAS Out_CIF_IUCr macro'
+_audit_update_record
+;
+2022-05-04 deposited with the CCDC.	2022-06-24 downloaded from the CCDC.
+;
+_cell_angle_alpha                90
+_cell_angle_beta                 99.325(2)
+_cell_angle_gamma                90
+_cell_formula_units_Z            4
+_cell_length_a                   26.371(7)
+_cell_length_b                   5.2029(13)
+_cell_length_c                   8.904(2)
+_cell_measurement_pressure       0
+_cell_measurement_radiation      'Cu K\a~1~'
+_cell_measurement_temperature    298
+_cell_measurement_wavelength     1.5406
+_cell_volume                     1205.5(5)
+_computing_structure_refinement  'TOPAS-6 (Bruker AXS 2018)'
+_diffrn_ambient_environment      air
+_diffrn_ambient_pressure         0
+_diffrn_ambient_temperature      298
+_diffrn_measurement_device_type  'D8 Discover, Bruker AXS'
+_diffrn_radiation_type           'Cu K\a~1~'
+_diffrn_radiation_wavelength     1.5406
+_diffrn_source                   'sealed X-ray tube'
+_diffrn_source_target            Cu
+_exptl_absorpt_coefficient_mu    0.950
+_exptl_absorpt_correction_type   none
+_exptl_crystal_colour            white
+_exptl_crystal_density_diffrn    1.401
+_exptl_crystal_description       powder
+_pd_meas_2theta_range_inc        0.009
+_pd_meas_2theta_range_max        50.0026
+_pd_meas_2theta_range_min        5
+_pd_meas_number_of_points        5000
+_pd_meas_scan_method             step
+_pd_proc_ls_prof_R_factor        6.153
+_pd_proc_ls_prof_wR_factor       ???
+_pd_spec_mount_mode              transmission
+_pd_spec_shape                   cylinder
+_refine_ls_goodness_of_fit_all   8.580
+_refine_ls_R_factor_all          ???
+_cod_data_source_file            d2fd00115b2.cif
+_cod_data_source_block           TOPAS-CIF-macro
+_cod_depositor_comments          'Adding full bibliography for 1567181.cif.'
+_cod_original_cell_volume        1205.6(5)
+_cod_original_sg_symbol_H-M      P21/a
+_cod_original_formula_sum        ' C11 H14 N2 O5'
+_cod_database_code               1567181
+loop_
+_symmetry_equiv_pos_as_xyz
+'x, y, z '
+'-x+1/2, y+1/2, -z '
+'-x, -y, -z '
+'x+1/2, -y+1/2, z '
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_thermal_displace_type
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_occupancy
+_atom_site_U_iso_or_equiv
+_atom_site_calc_flag
+_atom_site_refinement_flags
+_atom_site_disorder_assembly
+_atom_site_disorder_group
+O1 O Uiso 0.12800 0.43780 0.65330 1.000 0.0127 . . . .
+O2 O Uiso 0.17070 0.64740 0.49430 1.000 0.0127 . . . .
+O3 O Uiso 0.30710 0.36070 0.90030 1.000 0.0127 . . . .
+O4 O Uiso 0.35260 0.00280 0.88770 1.000 0.0127 . . . .
+C1 C Uiso 0.16700 0.47260 0.60020 1.000 0.0127 . . . .
+C2 C Uiso 0.21620 0.32730 0.64640 1.000 0.0127 . . . .
+C3 C Uiso 0.21370 0.12440 0.76710 1.000 0.0127 . . . .
+C4 C Uiso 0.26410 -0.02360 0.79970 1.000 0.0127 . . . .
+C5 C Uiso 0.30930 0.13490 0.86770 1.000 0.0127 . . . .
+H1 H Uiso 0.24280 0.45700 0.68290 1.000 0.0127 . . . .
+H2 H Uiso 0.22540 0.25550 0.55630 1.000 0.0127 . . . .
+H3 H Uiso 0.18570 0.00510 0.73350 1.000 0.0127 . . . .
+H4 H Uiso 0.20710 0.20640 0.85860 1.000 0.0127 . . . .
+H5 H Uiso 0.27310 -0.09710 0.70630 1.000 0.0127 . . . .
+H6 H Uiso 0.26100 -0.16280 0.87080 1.000 0.0127 . . . .
+H7 H Uiso 0.38060 0.10740 0.86750 1.000 0.0127 . . . .
+H8 H Uiso 0.13890 0.65330 0.42450 1.000 0.0127 . . . .
+O5 O Uiso 0.93490 1.32060 0.05560 1.000 0.0127 . . . .
+N1 N Uiso 1.08200 0.87580 0.38940 1.000 0.0127 . . . .
+N2 N Uiso 0.89970 0.94960 0.11910 1.000 0.0127 . . . .
+C6 C Uiso 1.03750 0.75850 0.39840 1.000 0.0127 . . . .
+C7 C Uiso 0.99110 0.83170 0.31440 1.000 0.0127 . . . .
+C8 C Uiso 0.98990 1.03650 0.21480 1.000 0.0127 . . . .
+C9 C Uiso 1.03570 1.15970 0.20410 1.000 0.0127 . . . .
+C10 C Uiso 1.08070 1.07390 0.29310 1.000 0.0127 . . . .
+C11 C Uiso 0.93870 1.11030 0.12380 1.000 0.0127 . . . .
+H9 H Uiso 1.11360 1.16580 0.28540 1.000 0.0127 . . . .
+H10 H Uiso 1.03950 0.61980 0.46630 1.000 0.0127 . . . .
+H11 H Uiso 1.03650 1.30110 0.13920 1.000 0.0127 . . . .
+H12 H Uiso 0.95980 0.73880 0.32530 1.000 0.0127 . . . .
+H13 H Uiso 0.90050 0.81340 0.05600 1.000 0.0127 . . . .
+H14 H Uiso 0.87430 0.96160 0.18160 1.000 0.0127 . . . .
+loop_
+_geom_angle_atom_site_label_1
+_geom_angle_atom_site_label_2
+_geom_angle_atom_site_label_3
+_geom_angle
+_geom_angle_site_symmetry_1
+_geom_angle_site_symmetry_2
+_geom_angle_site_symmetry_3
+_geom_angle_publ_flag
+C1 O2 H8 109.00 . . . no
+C5 O4 H7 111.00 . . . no
+C6 N1 C10 117.30 . . . yes
+C11 N2 H14 124.00 . . . no
+H13 N2 H14 121.00 . . . no
+C11 N2 H13 115.00 . . . no
+O1 C1 C2 124.61 . . . yes
+O1 C1 O2 123.00 . . . yes
+O2 C1 C2 112.39 . . . yes
+C1 C2 C3 114.23 . . . no
+C2 C3 C4 110.52 . . . no
+C3 C4 C5 114.36 . . . no
+O3 C5 O4 123.06 . . . yes
+O3 C5 C4 124.41 . . . yes
+O4 C5 C4 112.53 . . . yes
+C1 C2 H2 107.00 . . . no
+C3 C2 H1 111.00 . . . no
+C3 C2 H2 112.00 . . . no
+C1 C2 H1 106.00 . . . no
+H1 C2 H2 106.00 . . . no
+C4 C3 H3 109.00 . . . no
+H3 C3 H4 108.00 . . . no
+C2 C3 H4 109.00 . . . no
+C2 C3 H3 110.00 . . . no
+C4 C3 H4 110.00 . . . no
+C3 C4 H5 111.00 . . . no
+H5 C4 H6 109.00 . . . no
+C3 C4 H6 110.00 . . . no
+C5 C4 H5 106.00 . . . no
+C5 C4 H6 107.00 . . . no
+N1 C6 C7 123.46 . . . yes
+C6 C7 C8 119.08 . . . no
+C7 C8 C9 118.11 . . . no
+C7 C8 C11 117.79 . . . no
+C9 C8 C11 124.10 . . . no
+C8 C9 C10 119.08 . . . no
+N1 C10 C9 122.95 . . . yes
+O5 C11 N2 122.62 . . . yes
+O5 C11 C8 118.64 . . . yes
+N2 C11 C8 118.74 . . . yes
+N1 C6 H10 116.00 . . . no
+C7 C6 H10 121.00 . . . no
+C6 C7 H12 120.00 . . . no
+C8 C7 H12 121.00 . . . no
+C8 C9 H11 121.00 . . . no
+C10 C9 H11 120.00 . . . no
+N1 C10 H9 119.00 . . . no
+C9 C10 H9 118.00 . . . no
+loop_
+_geom_bond_atom_site_label_1
+_geom_bond_atom_site_label_2
+_geom_bond_distance
+_geom_bond_site_symmetry_1
+_geom_bond_site_symmetry_2
+_geom_bond_publ_flag
+O1 C1 1.2131 . . yes
+O2 C1 1.3250 . . yes
+O3 C5 1.2138 . . yes
+O4 C5 1.3199 . . yes
+O2 H8 0.9600 . . no
+O4 H7 0.9600 . . no
+O5 C11 1.2475 . . yes
+N1 C10 1.3376 . . yes
+N1 C6 1.3366 . . yes
+N2 C11 1.3208 . . yes
+N2 H14 0.9400 . . no
+N2 H13 0.9100 . . no
+C1 C2 1.5004 . . no
+C2 C3 1.5155 . . no
+C3 C4 1.5227 . . no
+C4 C5 1.4945 . . no
+C2 H2 0.9500 . . no
+C2 H1 0.9900 . . no
+C3 H3 0.9700 . . no
+C3 H4 0.9600 . . no
+C4 H6 0.9700 . . no
+C4 H5 0.9800 . . no
+C6 C7 1.3803 . . no
+C7 C8 1.3834 . . no
+C8 C9 1.3842 . . no
+C8 C11 1.5075 . . no
+C9 C10 1.3895 . . no
+C6 H10 0.9400 . . no
+C7 H12 0.9700 . . no
+C9 H11 0.9400 . . no
+C10 H9 1.0000 . . no
+loop_
+_geom_hbond_atom_site_label_D
+_geom_hbond_atom_site_label_H
+_geom_hbond_atom_site_label_A
+_geom_hbond_distance_DH
+_geom_hbond_distance_HA
+_geom_hbond_distance_DA
+_geom_hbond_angle_DHA
+_geom_hbond_site_symmetry_A
+_geom_hbond_publ_flag
+O4 H7 O5 0.9600 2.0500 2.5958 114.00 4_466 yes
+O2 H8 N1 0.9600 1.8800 2.6548 136.00 1_455 yes
+N2 H13 O4 0.9100 2.4400 3.2402 148.00 4_554 yes
+N2 H14 O1 0.9400 2.5500 3.0303 112.00 3_666 yes
+C2 H1 O3 0.9900 2.4100 3.0218 119.00 . yes
+C10 H9 O4 1.0000 2.5900 3.4034 139.00 2_666 yes
+C7 H12 O1 0.9700 2.5300 3.4937 171.00 3_666 yes
+PROBLEM: Short Inter D-H...H-X Contact H3 .. H14 ..
+1.87 Ang. RESPONSE: Consequence of an intermoelcular hydrogen bond.
+loop_
+_geom_torsion_atom_site_label_1
+_geom_torsion_atom_site_label_2
+_geom_torsion_atom_site_label_3
+_geom_torsion_atom_site_label_4
+_geom_torsion
+_geom_torsion_site_symmetry_1
+_geom_torsion_site_symmetry_2
+_geom_torsion_site_symmetry_3
+_geom_torsion_site_symmetry_4
+_geom_torsion_publ_flag
+C10 N1 C6 C7 -0.10 . . . . no
+C6 N1 C10 C9 -0.05 . . . . no
+O2 C1 C2 C3 -179.80 . . . . no
+O1 C1 C2 C3 0.68 . . . . no
+C1 C2 C3 C4 176.56 . . . . no
+C2 C3 C4 C5 64.66 . . . . no
+C3 C4 C5 O4 -177.05 . . . . no
+C3 C4 C5 O3 2.36 . . . . no
+N1 C6 C7 C8 0.16 . . . . no
+C6 C7 C8 C9 -0.07 . . . . no
+C6 C7 C8 C11 179.52 . . . . no
+C11 C8 C9 C10 -179.63 . . . . no
+C7 C8 C11 O5 166.78 . . . . no
+C7 C8 C11 N2 -13.40 . . . . no
+C9 C8 C11 O5 -13.66 . . . . no
+C9 C8 C11 N2 166.17 . . . . no
+C7 C8 C9 C10 -0.06 . . . . no
+C8 C9 C10 N1 0.13 . . . . no

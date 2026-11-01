@@ -482,7 +482,7 @@ def _permutation(rot, tran, ref: _Reference, inv, small) -> np.ndarray:
     rinv = np.linalg.inv(rot)
     back = (ref.parent_frac - tran[None, :]) @ rinv.T
     child = _wrap((back - small[None, :]) @ inv.T)
-    perm = np.empty(len(child), dtype=np.int64)
+    perm = np.empty(len(child), dtype=np.intp)
     for i, c in enumerate(child):
         d = c[None, :] - ref.child_frac
         d -= np.rint(d)
@@ -1343,3 +1343,169 @@ def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_S
     return DisplaciveStatement(
         phase=phase, basis=basis, transform=(big, small), site_map=site_map,
         biso_ties=parent_site_ties(site_map), seed=seeded)
+
+
+# --------------------------------------------------------------------------
+# the parent group on a stated child's amplitudes (WP-1419 C4a)
+# --------------------------------------------------------------------------
+
+@dataclass(frozen=True, eq=False)
+class AmplitudeAction:
+    """The parent group acting on a stated child's mode fields (:func:`amplitude_action`).
+
+    ``fields[ν]`` is mode ν's displacement field over every atom of the child
+    cell, child fractions per Å; ``operations`` holds one (R, perm) per
+    operation g of the parent group G whose rotation keeps the child lattice,
+    lost translations included, modulo that lattice, with
+    (g·u)_{perm[n]} = R·u_n.  ``n_child`` is the order of the phase's own group
+    H counted the same way, and ``parent_invariant`` is the record's flag per
+    mode.  An operation that changes the child lattice is left out: it maps a
+    field over the child cell to one with another period, which no list of the
+    cell's atoms can hold.
+    """
+
+    fields: np.ndarray
+    operations: tuple[tuple[np.ndarray, np.ndarray], ...]
+    n_child: int
+    parent_invariant: np.ndarray
+
+    def field(self, amplitudes) -> np.ndarray:
+        """The displacement field Σ_ν A_ν·fields[ν] over the child cell."""
+        return np.tensordot(np.asarray(amplitudes, dtype=np.float64), self.fields, axes=1)
+
+    @staticmethod
+    def act(operation, field: np.ndarray) -> np.ndarray:
+        """g·u for one (R, perm) of :attr:`operations`."""
+        rot, perm = operation
+        out = np.empty_like(field)
+        out[..., perm, :] = field @ rot.T
+        return out
+
+    def stabiliser(self, amplitudes) -> list[tuple[np.ndarray, np.ndarray]]:
+        """The operations that leave the field of ``amplitudes`` unchanged, to round-off.
+
+        The structure's own symmetry in G, within the child lattice
+        (Perez-Mato, Orobengoa & Aroyo 2010, *Acta Cryst.* A**66**, 558).
+        """
+        u = self.field(amplitudes)
+        tol = _RANK_TOL * max(float(np.abs(u).max()) if u.size else 0.0, 1e-300)
+        return [g for g in self.operations if float(np.abs(self.act(g, u) - u).max()) <= tol]
+
+    def even(self, amplitudes) -> np.ndarray:
+        """Per mode: whether the pattern has no first-order term along it at ``amplitudes``.
+
+        True where the mode has no component invariant under the structure's
+        own symmetry (:meth:`stabiliser`): the pattern is invariant under that
+        group, so its gradient lies in the invariant fields, and a mode outside
+        them moves the pattern at second order in its amplitude, Δχ² at fourth.
+        At the parent (every amplitude outside the identity irrep zero) the
+        whole of G is the symmetry, and the record's ``parent_invariant``
+        answers for every operation, those that change the child lattice
+        included.  Elsewhere the stabiliser is read within the child lattice,
+        so a mode whose invariant part only an operation outside it would
+        remove reads False.
+        """
+        a = np.asarray(amplitudes, dtype=np.float64)
+        if not np.any(a[~self.parent_invariant]):
+            return ~self.parent_invariant
+        stab = self.stabiliser(a)
+        scale = max(float(np.abs(self.fields).max()), 1e-300)
+        out = np.zeros(len(a), dtype=bool)
+        for j, f in enumerate(self.fields):
+            mean = sum(self.act(g, f) for g in stab) / len(stab)
+            out[j] = float(np.abs(mean).max()) <= _RANK_TOL * scale
+        return out
+
+
+def amplitude_action(phase) -> AmplitudeAction:
+    """The parent group's action on the mode fields of ``phase`` (WP-1419).
+
+    ``phase`` carries ``Phase.distortion_modes`` (:func:`displacive_statement`).
+    Every operation g of the parent group G maps the child's displacement field
+    onto another, and χ² is invariant under it (χ²(g·u) = χ²(u), the
+    statement's seed argument; Perez-Mato, Orobengoa & Aroyo 2010, *Acta
+    Cryst.* A**66**, 558, eqs. 3–4 and § 7).  Built from the record alone: the
+    parent group is ``parent_space_group`` restated in the child frame through
+    ``transform``, and the field over the whole child cell is each listed
+    atom's ``vectors`` carried through the phase's own group.  A polar child's
+    ``base`` carries the global translation the statement removed, so each
+    operation is matched with the smallest uniform offset that maps every atom
+    onto one of its own species.
+    """
+    from ..magnetic.operators import parse_transform
+
+    record = phase.distortion_modes
+    if record is None:
+        raise ValueError(f"phase {phase.name!r} has no distortion_modes")
+    big, small = (np.asarray(x, dtype=np.float64) for x in parse_transform(record.transform))
+    inv = np.linalg.inv(big)
+    vectors = np.array([m.vectors for m in record.modes], dtype=np.float64)  # (M, J, 3)
+    rot_h, tran_h = _operations(_group(phase))
+
+    # the whole child cell: every image of each listed atom, its fields carried along
+    pos: list[np.ndarray] = []
+    species: list[str] = []
+    fields: list[np.ndarray] = []
+    for j, (xyz, atom) in enumerate(zip(np.asarray(record.base, dtype=np.float64),
+                                        phase.atoms, strict=True)):
+        for r, t in zip(rot_h, tran_h):
+            image = _wrap(r @ xyz + t)
+            if pos:
+                d = np.asarray(pos) - image[None, :]
+                d -= np.rint(d)
+                if np.any(np.all(np.abs(d) < 1e-5, axis=1)):
+                    continue
+            pos.append(image)
+            species.append(element_symbol(atom.species))
+            fields.append(vectors[:, j, :] @ r.T.astype(np.float64))
+    positions = np.asarray(pos)
+    field = np.transpose(np.asarray(fields), (1, 0, 2))  # (M, N, 3)
+    metric = _cell_metric_from(record.reference_cell)
+
+    codes = np.unique(np.asarray(species), return_inverse=True)[1]
+
+    def matched(rc, tc) -> np.ndarray | None:
+        """perm[n] = m with g·r_n ≡ r_m + δ for one uniform δ, the smallest that works."""
+        moved = positions @ rc.T + tc[None, :]
+        best = None
+        for m0 in np.flatnonzero(codes == codes[0]):
+            delta = moved[0] - positions[m0]
+            delta -= np.rint(delta)
+            d = (moved - delta)[:, None, :] - positions[None, :, :]
+            d -= np.rint(d)
+            hits = np.all(np.abs(d) < 1e-5, axis=2) & (codes[:, None] == codes[None, :])
+            if not np.all(hits.sum(axis=1) == 1):
+                continue
+            size = float(delta @ metric @ delta)
+            if best is None or size < best[0]:
+                best = (size, np.argmax(hits, axis=1).astype(np.intp))
+        return None if best is None else best[1]
+
+    rot_g, tran_g = _operations(resolve_group(record.parent_space_group, None))
+    lost_all = _lost_translations(big)
+    seen: dict[tuple, tuple[np.ndarray, np.ndarray]] = {}
+    for r, t in zip(rot_g, tran_g):
+        rc = inv @ r.astype(np.float64) @ big
+        if float(np.abs(rc - np.rint(rc)).max()) > _POSITION_TOL:
+            continue  # changes the child lattice
+        rc = np.rint(rc)
+        for lost in lost_all:
+            tc = inv @ (r.astype(np.float64) @ small + t + lost - small)
+            perm = matched(rc, tc)
+            if perm is None:
+                raise RuntimeError(
+                    "a parent operation did not map the child's reference structure onto "
+                    "itself; the record's base, transform and parent group disagree")
+            seen.setdefault((rc.astype(np.int64).tobytes(), perm.tobytes()), (rc, perm))
+    return AmplitudeAction(
+        fields=field, operations=tuple(seen.values()), n_child=len(rot_h),
+        parent_invariant=np.array([m.parent_invariant for m in record.modes], dtype=bool))
+
+
+def _cell_metric_from(cell) -> np.ndarray:
+    """The metric of an (a, b, c, α, β, γ) tuple, Å and degrees."""
+    a, b, c, al, be, ga = (float(v) for v in cell)
+    ca, cb, cg = (math.cos(math.radians(v)) for v in (al, be, ga))
+    return np.array([[a * a, a * b * cg, a * c * cb],
+                     [a * b * cg, b * b, b * c * ca],
+                     [a * c * cb, b * c * ca, c * c]], dtype=np.float64)

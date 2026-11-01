@@ -50,7 +50,11 @@ V_obs/V_est from 0.8 to 1.25 (Table 3's caption defines the lower edge).
 1746 of the 182 239 structures lie beyond it.  737 of those are off by more
 than 75 %, mainly because the database's Z was wrong.  A search window must not
 exclude the true cell, so it takes this wide boundary rather than the 4 %
-scatter.
+scatter, and only its **upper** edge: an inorganic cell lies under 0.8 (15 of
+the 16 measured), so the lower edge would exclude the truth.  The search
+(``SearchSpec.from_formula``) and ``Composition.check`` use the ceiling alone;
+the lower edge is quoted by ``Composition.volume_window`` for a caller who
+knows the specimen is organic.
 """
 
 from __future__ import annotations
