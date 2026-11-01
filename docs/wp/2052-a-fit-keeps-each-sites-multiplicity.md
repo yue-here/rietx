@@ -72,6 +72,18 @@ and reuse it for every compile, reporting a site whose fresh split differs; (2) 
 (3) conserve occupancy × multiplicity at a snap (the reporter declines it, as
 `gui/symmetry.py::_collisions` does). Record the ruling here as `Decided YYYY-MM-DD: …`.
 
+Decided 2026-11-01: option 1 with option 2 beside it. Each `fit()` and `run_stage()` decides
+every site's orbit split once, from the coordinates it starts at, and hands that split to
+every compile it makes, the closing compile included. A site whose returned coordinates
+give another split at a fresh compile is reported as `SITE_MULTIPLICITY_KEPT`, with the atoms
+per cell both ways. Option 3 is not taken. Settled by Claude under established practice:
+GSAS-II reads a site's multiplicity once, at setup, and keeps it for the whole refinement
+(the Practice paragraph above). The reporter recommends the same pair. The labels "decision
+owed" and "the ruling stays the maintainer's" were written by Claude triage sessions
+(43d164c7f, 8609e90dc), so they are evidence rather than a ruling, and none of the
+maintainer's triggers holds. The change moves what some fits return, so the PR goes to the
+maintainer under the reader-output rule before merge.
+
 ### Inherited
 
 - 2026-10-31, from the issue triage (issue #1088): the reporter's view on the
@@ -99,7 +111,7 @@ and reuse it for every compile, reporting a site whose fresh split differs; (2) 
 
 ## Tasks
 
-- [ ] Take the decision above and record it.
+- [x] Take the decision above and record it.
 - [ ] Find every compile inside one fit that re-decides an orbit split: stage compiles, the
   closing stage, `_final_compile`, the joint fit in `multi.py`, a series pattern's fits in
   `sequential.py`, and rigid-body atoms (#1005).
