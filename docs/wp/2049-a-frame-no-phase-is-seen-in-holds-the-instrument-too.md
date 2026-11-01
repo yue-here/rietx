@@ -81,9 +81,12 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
       message.
 - [x] The joint twin in `multi.py`, and a series' carry: a held instrument
       value carries from the last frame that measured it.
-- [ ] Tests: frame 87 at both nudges gives a held zero shift; the planted
-      series' committed signals hold at k = 0 and k = +1.
-- [ ] Skill: `PHASE_UNCONSTRAINED`'s row says the instrument can be held too.
+- [x] Tests: frame 87 at both nudges gives a held zero shift; the planted
+      series' committed signals hold at k = 0 and k = +1.  The k = +1 series
+      is a measurement, not a row (settled by Claude under cost: the fast
+      direct-fit rows pin the mechanism at both nudges, and a second
+      248-frame series would add 35-60 s to every nightly to re-test it).
+- [x] Skill: `PHASE_UNCONSTRAINED`'s row says the instrument can be held too.
 
 ## Acceptance
 
