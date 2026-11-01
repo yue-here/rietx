@@ -1,6 +1,6 @@
 # WP-2050 — a correlation with a flat direction is not reported as one
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — all four tasks landed (PR #1306); awaiting Yue's approval of the cut's tier-3 row and the FLAT_DIRECTION wording
+Milestone: unscheduled · Status: 🔄 2026-11-01 — all four tasks landed (PR #1306); ruled by Yue 2026-11-01 (the cut approved, no FLAT_DIRECTION clause)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-25 — a warning whose count is rounding: brucite carries 35 to 42 by a 1e-14 start nudge, and the alarm pin cannot hold it on any platform
@@ -97,22 +97,24 @@ none of their reported pairs involves it.
       wants reported. Tier: derived (the cut is the Jacobian's accuracy).
 - [x] Apply it in the guard loop. Say in the message what was left out and why,
       rather than dropping it silently. `check_guards` reads the resolved
-      matrix for the findings and `measured_top_correlations` alike; a
-      `FLAT_DIRECTION` pair of unresolved members adds "ρ against either is
-      not determined and is not reported". The cut became absolute,
+      matrix for the findings and `measured_top_correlations` alike. The
+      message clause this task added was dropped by Yue's ruling of
+      2026-11-01 (handover log): the withheld pairs are named by
+      `resolved_correlation`'s mask, which a nightly test asserts. The cut became absolute,
       n·FD_STEP² on the unit-diagonal matrix (the Frobenius bound on n
       columns' forward-difference error), after corundum's triple sat at
       1.2-1.9e-12 of |λ|max, above the relative FD_STEP².
 - [x] Tests: brucite's count is the same at the nudges in
       `docs/wp/2050-batch/`; re-pin `tests/data/suite_alarms.json`.
       `test_suite_alarms.py::test_brucites_correlation_findings_do_not_move_under_a_rounding_nudge`
-      (k = 0, ±4; slow) and `tests/test_resolved_correlation.py`. The re-pin
+      (k = 0, ±4; slow), `test_the_closing_stage_names_the_flat_width_triple_unresolved`
+      (four round-robin standards; slow) and `tests/test_resolved_correlation.py`. The re-pin
       moves every purpose's warnings per result down by exactly 1/8: the one
       warning brucite lost is `lor_size ~ lor_strain`, whose determined ρ is
       −0.896, under the 0.98 guard.
 - [x] Skill: `HIGH_CORRELATION`'s row in `references/diagnostics.md`, if the
-      message changes. The `FLAT_DIRECTION` row carries it, since that is the
-      message that changed.
+      message changes. No message changes after the ruling, so no skill row
+      does.
 
 ## Acceptance
 
@@ -127,6 +129,44 @@ none of their reported pairs involves it.
   WP-1110 item 14 (`normal_covariance`), WP-2036 (found it on the nightly).
 
 ## Handover log
+
+- **2026-11-01** — ruling applied, PR #1306.
+
+  *Ruled* (Yue, in chat, 2026-11-01: "as you recommend"). (1) Drop the
+  clause from `FLAT_DIRECTION`, so its message reads as on `main`, and
+  revert every test, skill row, help entry and docs line quoting it. (2)
+  Keep the unresolved pairs out of the report: a `HIGH_CORRELATION` pair
+  with one unresolved member stays `nan` and unreported, so the only change
+  a user sees is one fewer warning on brucite (36 → 35). (3) A nightly test
+  calls `statistics.resolved_correlation` on brucite, corundum, zincite and
+  fluorite and asserts the Gaussian size, Gaussian strain and W columns
+  come back unresolved and brucite's zero-shift/displacement pair does
+  not. (4) The cut n·FD_STEP² is approved, its free factor named as a
+  module constant with a tier-3 `rietx._audit` row. The design rule behind
+  it: a correlation whose value is rounding is not shown to users, and the
+  developer's signal is a callable function a nightly test asserts on.
+
+  *Done.* `GuardFinding.flat_direction` and the skill's three
+  `diagnostics.md` copies are back to `main`, and the clause's fast test is
+  gone (`help.py` and the manual never quoted it).
+  `statistics.FD_COLUMN_ERROR` = 1.0 is the per-column error in units of
+  FD_STEP, with its tier-3 row (approved 2026-11-01, grounds the margins
+  below, evidence from the generality review).
+  `test_suite_alarms.py::test_the_closing_stage_names_the_flat_width_triple_unresolved`
+  (slow, four parametrised rows, about 5 s in all) wraps `check_guards` to
+  take the closing stage's Jacobian and asserts the mask. WP-1460's
+  Inherited note and the function's docstring no longer mention a clause.
+
+  *Gates* (macOS arm64, `[dev]`). Acceptance command: 17 passed (13 before,
+  plus the four new rows). `test_audit_table.py`, `test_help.py`,
+  `test_docs_consistency.py` and `test_resolved_correlation.py` with it: 99
+  passed. `tests/audit_delta.py` against `origin/main`: 1 added, 0 new at
+  `unaudited`. `python -m tests.reader_output`: exit 0, unchanged. Ruff
+  clean. Fast suite: 1 failed, 13194 passed, 310 skipped, 32 xfailed
+  (passed+skipped −1, the clause test removed). The failure is the same
+  environmental `test_display.py` kernel row as before.
+
+  *Next.* Review and merge PR #1306. Nothing waits on a ruling.
 
 - **2026-11-01** — ghostshift runner, PR #1306. All four tasks landed. Two
   maintainer calls wait before merge (below).
