@@ -604,6 +604,13 @@ from .._nearmiss import did_you_mean
 #: Also in 0.60 (#939's follow-ups): ``ExtinctionScreen.perfect_fit_rwp_net``,
 #: what that Rwp would read for a fit leaving only the noise, √(N/(N+S)).
 #: Additive and defaulted to ``None``, the same rule.
+#: Also in 0.60 (WP-1815): ``GeometryTable.torsions``, a ``GeometryTorsion``
+#: per torsion over bonded chains (four labels, indices and symmetry codes, the
+#: angle in (−180°, 180°] and its two esds), defaulted to ``None``, which an
+#: older table reads as "not listed" (``[]`` is "listed, none found"); and ``TorsionRestraint`` joins the
+#: ``Restraint`` union, ``RestraintRow.kind`` gaining ``"torsion"``.  Additive:
+#: no existing document carries either, and an older build refuses one that
+#: does.  ``GeometryRequest`` is an argument and is never stored.
 #: Also in 0.60 (#941's follow-ups): ``LeBailValidation.n_lines_screened_in_window``,
 #: ``.predicted_but_absent_density_in_window`` and
 #: ``.predicted_but_absent_excess_in_window``, the windowed count's density and

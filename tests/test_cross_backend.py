@@ -312,6 +312,47 @@ def _state_toy_planarity():
     return model, table, {}
 
 
+def _state_toy_torsion():
+    """Two torsion restraints' rows (WP-1815): a circular difference via atan2.
+
+    The numpy Jacobian is the closed-form torsion gradient chained through
+    ``cartesian_frame`` and the metric, the traced backends differentiate
+    ``xp.arctan2`` of the same two arguments, and the fd row differences the
+    residual.  One chain sits 2.6° short of its 180° target, so the row is
+    read beside the cut the angle has and the difference does not; the other
+    is at 99° against a target of 60°, its fourth atom named through an
+    explicit image.  Every coordinate and the whole cell are free, in a
+    triclinic cell.
+    """
+    from rietx.schemas.common import Parameter as P
+    from rietx.schemas.pattern import PatternData
+    from rietx.schemas.structure import Atom, Cell, Phase, Structure, TorsionRestraint
+
+    xyz = [(0.10, 0.20, 0.30), (0.25, 0.22, 0.31), (0.30, 0.35, 0.28),
+           (0.45, 0.37, 0.295), (0.36, 0.43, 0.44)]
+    cell = Cell(**{k: P(value=v, vary=True) for k, v in zip(
+        ("a", "b", "c", "alpha", "beta", "gamma"),
+        (7.1, 8.3, 9.2, 81.0, 97.0, 104.0), strict=True)})
+    structure = Structure(phases=[Phase(
+        name="chain", space_group="P1", cell=cell, scale=P(value=1e-3),
+        atoms=[Atom(label=f"C{k}", species="C", x=P(value=x, vary=True),
+                    y=P(value=y, vary=True), z=P(value=z, vary=True))
+               for k, (x, y, z) in enumerate(xyz)],
+        restraints=[
+            TorsionRestraint(atoms=[0, 1, 2, 3], target_deg=180.0, sigma=2.0),
+            TorsionRestraint(atoms=[0, 1, 2, 4], target_deg=60.0, sigma=3.0,
+                             op_indices=[None, None, None, 0],
+                             translations=[(0, 0, 0)] * 3 + [(0, 0, 0)])])])
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    tt = np.arange(20.0, 40.0, 0.1)
+    pattern = PatternData(two_theta=tt.tolist(), intensity=np.ones_like(tt).tolist())
+    table = ParameterTable(structure, ins)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    assert model.restraints is not None and model.restraints.n_rows == 2
+    return model, table, {}
+
+
 def _state_families_variable():
     """A **named variable** carrying the columns instead of a model path (WP-1119).
 
@@ -1115,6 +1156,7 @@ CONFIGS = {"families": _state_families,
            "centroid_origin": _state_centroid_origin,
            "toy_body": _state_toy_body,
            "toy_planarity": _state_toy_planarity,
+           "toy_torsion": _state_toy_torsion,
            "capillary_offsets": _state_capillary_offsets,
            "extra_components": _state_extra_components,
            "extra_peak": _state_extra_peak,
@@ -1152,6 +1194,7 @@ CONFIG_PARAMS = [
     _config("centroid_origin"),
     _config("toy_body"),
     _config("toy_planarity"),
+    _config("toy_torsion"),
     _config("capillary_offsets"),
     _config("extra_components"),
     _config("extra_peak"),
