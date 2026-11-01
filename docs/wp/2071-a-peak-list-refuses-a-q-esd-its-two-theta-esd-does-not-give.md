@@ -1,6 +1,6 @@
 # WP-2071 — A peak list refuses a q_esd that its two_theta_esd does not give
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-31 — a silent no-op, but no package path produces it: only a caller's hand edit of `two_theta_esd` does, and rebuilding through `PeakList.from_positions` is the workaround
