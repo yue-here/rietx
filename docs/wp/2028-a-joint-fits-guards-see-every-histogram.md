@@ -131,6 +131,16 @@ that caveat until 1421 lands.
 
 ### Inherited
 
+- 2026-11-01, from WP-1951 (issue #896): a single fit now reports a stage
+  glob that names one site (`phases.0.atoms.0.dof.*`) and frees nothing,
+  through `refine._site_glob_diagnostics` beside
+  `_fixed_literal_diagnostics`. A joint fit does not: `multi.
+  _joint_fixed_literals` calls only the literal builder, and WP-1951 left
+  it alone because PR #1270 is reshaping that wrapper. Once #1270 merges,
+  giving the site builder the literal one's `canonical` argument and
+  calling it there per histogram closes the gap. Check first that a site glob matching nothing everywhere
+  cannot also draw `STAGE_FREED_NOTHING`, which fires only where a glob
+  matched another histogram's rows.
 - 2026-10-31, from the issue triage (issue #1124): task 8's measurement,
   posted by the claimant 2026-10-28. Nothing wired. No source they read
   defines observations per parameter over several patterns: McCusker 1999 §9

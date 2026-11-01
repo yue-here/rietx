@@ -1104,8 +1104,11 @@ def test_a_glob_naming_one_site_that_frees_nothing_says_why(pattern, glob, says,
     ["phases.0.atoms.1.x", "phases.0.atoms.1.dof.*"],
     # a site the model does not have is a typo of the index, not this rule's
     ["phases.0.atoms.7.dof.*"],
+    # the displacement stages' pair, copied for one isotropic atom: the
+    # biso it freed answers the adp.* that matched nothing
+    ["phases.0.atoms.0.biso", "phases.0.atoms.0.adp.*"],
 ], ids=["wildcard-index", "wildcard-atom", "site-frees-biso", "site-dof",
-        "tie-and-source", "no-such-site"])
+        "tie-and-source", "no-such-site", "biso-or-adp"])
 def test_a_site_glob_that_frees_something_or_names_no_site_stays_silent(
         pattern, turn_on):
     ref = rx.Refinement(*perturbed_models(), history=False)
@@ -1175,6 +1178,18 @@ def test_set_vary_is_silent_on_a_sweep_or_a_request_it_honoured(args):
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         ref.set_vary(*args)
+
+
+def test_set_vary_commits_before_it_warns():
+    """A caller turning warnings into errors keeps the half the call did."""
+    import warnings
+
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(UserWarning, match="phases.0.atoms.0.dof"):
+            ref.set_vary(["phases.*.cell.*", "phases.0.atoms.0.dof.*"])
+    assert {r.path for r in ref.parameters() if r.vary} >= {"phases.0.cell.a"}
 
 
 @pytest.mark.parametrize("verb, arg", [

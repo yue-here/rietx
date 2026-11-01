@@ -3134,8 +3134,9 @@ class Refinement:
                     f"{blocked[0]!r} is held by this refinement and cannot be "
                     "freed; unhold it first if you mean to refine it")
         hits = table.set_vary(globs, vary)
-        for message in self._set_vary_findings(table, globs, vary):
-            warnings.warn(message, UserWarning, stacklevel=2)
+        # warned once the call has committed, so a caller turning warnings
+        # into errors loses nothing the call did
+        findings = self._set_vary_findings(table, globs, vary)
         # A carried hold (WP-1301) is lifted at the start of the next stage, so
         # a path the caller has just declared on must leave it: otherwise the
         # lift re-frees a parameter the caller explicitly fixed, and the
@@ -3145,15 +3146,16 @@ class Refinement:
             self._held = [p for p in self._held if p not in declared]
         self._free_paths = list(table.free_paths)
         self._free_set_declared = True
-        if self.history is None:
-            return hits
-        node = self.history.add(
-            parents=[self._head_id] if self._head_id else [],
-            action=NodeAction(kind="set_vary",
-                              turn_on=hits if vary else [],
-                              turn_off=[] if vary else hits),
-            state=self.snapshot())
-        self._head_id = node.id
+        if self.history is not None:
+            node = self.history.add(
+                parents=[self._head_id] if self._head_id else [],
+                action=NodeAction(kind="set_vary",
+                                  turn_on=hits if vary else [],
+                                  turn_off=[] if vary else hits),
+                state=self.snapshot())
+            self._head_id = node.id
+        for message in findings:
+            warnings.warn(message, UserWarning, stacklevel=2)
         return hits
 
     def _set_vary_findings(self, table: ParameterTable, globs: list[str],
@@ -3172,9 +3174,7 @@ class Refinement:
                        "parameter of this model."
                        + (f" {hint[:1].upper()}{hint[1:]}" if hint else ""))
         if vary:
-            from types import SimpleNamespace
-
-            request = [SimpleNamespace(name="set_vary", turn_on=globs)]
+            request = [Stage("set_vary", globs)]
             subject = "a set_vary call"
             for d in (_fixed_literal_diagnostics(request, table, self._ties,
                                                  subject=subject)
@@ -7836,6 +7836,12 @@ def _frees_for_request(entry, turn_on, user_ties) -> bool:
                for src, _ in entry.tie.terms)
 
 
+def _reaches_displacement(glob: str, site: str) -> bool:
+    """Does ``glob`` reach the site's displacement, as ``biso`` or ``adp.k``?"""
+    return any(fnmatch.fnmatchcase(f"{site}.{tail}", glob)
+               for tail in ("biso", "adp.0"))
+
+
 def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
                            subject: str | None = None) -> list[Diagnostic]:
     """``STAGE_PATH_NOT_FREE`` — a glob that names one site and frees nothing.
@@ -7859,7 +7865,10 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
     symmetry ties whose sources the request does not free.  The message then
     says why when the glob reached the coordinates: the site's symmetry fixes
     them all, a rigid body places them, or they move through the site's
-    ``dof`` rows, which the suggestion names.
+    ``dof`` rows, which the suggestion names.  One family is asked two ways:
+    the shipped displacement stages free ``…biso`` beside ``…adp.*``, so a
+    request copying that pair for one isotropic atom has its ``adp.*`` answered
+    by the ``biso`` it freed, and stays silent.
 
     A plan read, like :func:`_fixed_literal_diagnostics`, and one diagnostic
     per glob naming its stages.  ``where`` is the glob, as
@@ -7873,10 +7882,19 @@ def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
             m = _SITE_GLOB.match(glob)
             if m is None or is_literal_path(glob):
                 continue
-            rows = [e for e in entries if e.path.startswith(f"{m.group(1)}.")]
+            site = m.group(1)
+            rows = [e for e in entries if e.path.startswith(f"{site}.")]
             if not rows or any(fnmatch.fnmatchcase(e.path, glob)
                                and _frees_for_request(e, stage.turn_on, user_ties)
                                for e in rows):
+                continue
+            if (_reaches_displacement(glob, site) and any(
+                    _reaches_displacement(e.path, site)
+                    and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on)
+                    and _frees_for_request(e, stage.turn_on, user_ties)
+                    for e in rows)):
+                # ``biso`` and ``adp.*`` are one displacement asked two ways:
+                # the shipped stages name both, so either answers it
                 continue
             names = asked.setdefault(glob, [])
             if stage.name not in names:
