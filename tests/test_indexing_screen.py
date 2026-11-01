@@ -549,6 +549,8 @@ def test_a_dense_triclinic_truth_is_not_refuted_by_a_cell_six_times_its_volume(d
     supercell_checks(cands, peaks, q_match=absence_window(peaks), k_sigma=3.0, screen=pattern)
     (check,) = cands[0].supercell_checks
     assert check.relation == "containment" and check.verdict == "undecided"
+    # the record carries both rates, so its verdict can be reproduced from it
+    assert check.p0 == pytest.approx(ev.p0) and check.p0_power == pytest.approx(ev.p0_power)
     assert below_refuting_parents(cands)[0] is cands[0]
 
 
