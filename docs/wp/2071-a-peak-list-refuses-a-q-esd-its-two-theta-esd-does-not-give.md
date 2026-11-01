@@ -1,9 +1,8 @@
 # WP-2071 — A peak list refuses a q_esd that its two_theta_esd does not give
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here (ghostshift runner)
+Milestone: unscheduled · Status: ✅ 2026-11-01 — the list refuses a `q_esd` its `two_theta_esd` does not give (PR #1281)
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-10-31 — a silent no-op, but no package path produces it: only a caller's hand edit of `two_theta_esd` does, and rebuilding through `PeakList.from_positions` is the workaround
 
 ## Goal
 
@@ -80,6 +79,57 @@ the new test file or `tests/test_peak_picking.py` covers both checks.
 
 ## Handover log
 
+- **2026-11-01** — closed, PR #1281. A peak list now refuses a line whose stored σ(Q)
+  does not follow from its σ(2θ), as it already refused a stale Q. Before, a script that
+  edited one line's σ(2θ) got a list that loaded clean while the indexer, which weights
+  lines by σ(Q), never saw the edit; that is why #1236's weighting arm read "no effect".
+  Now the reload raises, names the peak and both numbers, and says to set both fields
+  together. Nothing a package constructor writes is affected, and no default or stored
+  format moved.
+  - *Done.* `PeakList._q_matches_two_theta` (`schemas/indexing.py`) checks `q_esd`
+    against `q_esd_of_two_theta(two_theta, two_theta_esd, wavelength)` in the same pass:
+    `np.isclose` at rtol 1e-9, atol 0, since σ(Q) is ~1e-5 Å⁻² and the position check's
+    floor of 1.0 would make it an absolute 1e-9 Å⁻². A pair with both values non-finite
+    agrees. The message leads with deriving `q_esd` through `q_esd_of_two_theta` (keeps a
+    fitted list's provenance) and names `pick_peaks`/`from_positions` second, noting that
+    `from_positions` marks every σ assumed. Three tests in `tests/test_peak_picking.py`:
+    the issue's reproduction raises (and a directly edited `q_esd`), a non-finite pair
+    loads while a half-finite one is refused, a picked list round-trips through JSON with
+    every `q_esd` at the derived value. Two hand-built test peaks carried a `q_esd` their
+    `two_theta_esd` did not give and now derive it (`test_peak_bounds._peak`, the existing
+    q-drift test's good peak). `reference/peaks.md` states the check and how to change an
+    esd.
+  - *Old files.* The formula line of `q_esd_of_two_theta` has not changed since WP-1018
+    introduced it, and `peaks_of_group`'s `q_esd` line has derived from the very esd it
+    stores since WP-1027 (`git log -S`/`-L`), so no saved `peaks.json` from a shipped
+    release should fail to load.
+  - *Measured* (`[dev]` venv, darwin arm64). With the new branch disabled, both refusal
+    tests fail with DID NOT RAISE; restored by the inverse edit. Fast selection on
+    `ca001086b`: 12879 passed, 305 skipped, 32 xfailed, 1 failed, 19:12 under load
+    (load average ~52 from another session). The failure is environmental:
+    `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`
+    launches the user's Jupyter kernel spec, which points at a deleted venv. The later
+    commits change a docstring, the message text, a manual sentence and a test-helper
+    name; the peak files plus `test_manual_api.py` on the head: 103 passed. +3 tests;
+    no baseline run on main (CI's job). Full suite not run: the change moves no measured
+    number.
+  - *Review.* `/code-review high --fix`: four findings, three accepted (message order,
+    manual wording "the same way" → "also", helper renamed `_reloaded_with`). Declined:
+    `gui/session.py:2150` `_load_peaks` turns every `ValueError` into
+    `PEAKS_WRONG_PATTERN`, so a drifted `peaks.json` reads as "wrong pattern". It already
+    did for a drifted Q; fixing it adds a GUI error code, outside this WP. Not filed: only a
+    hand-edited `peaks.json` reaches it.
+  - *Generality.* The `generality-review` judge, summarised: verdict holds; the case for
+    acting is stronger (kind 1, the data settle it: σ(Q) is fixed by σ(2θ), 2θ and λ). No
+    row needed: no code, no action field, an inline literal the table cannot see. If the
+    1e-9 were ever lifted to a constant it would be tier 1, and the sibling `q` check's 1e-9
+    should move with it. Its one caveat, an older release writing σ(Q) differently, is
+    answered under *Old files*. It also caught an overstated docstring reason, fixed in
+    `11d5c49ad`.
+  - *Not generalised.* `two_theta_esd_fit` stays untied (a deliberately separate number,
+    #934), and `d` is a property. Test builders in `test_peak_fdr.py` and
+    `test_peak_resolvability.py` never enter a `PeakList`, so they keep placeholder values.
+  - *Next:* none in this WP.
 - **2026-10-31** — created by the issue triage from #1236. No open WP owns the peak-list
   schema: WP-1520 (a search refines each assignment once) reads `q_esd` but owns the
   refinement memo, and WP-1915 (an unmeasured direction poisons a candidate's esds) owns
