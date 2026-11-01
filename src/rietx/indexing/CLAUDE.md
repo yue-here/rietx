@@ -271,6 +271,15 @@ roughly the shift (+1400 ppm).
   skipped that and put a pseudo-cubic trigonal R description of the certified LaB6
   lattice above the cubic truth with **115 fast indexing tests green** — so run
   `tests/test_acceptance_indexing.py` before closing anything that touches an engine.
+- **A prune that quotients by a setting change quotients the metric, never the
+  centring** (WP-2066, #1258). The axis swaps map C to A in monoclinic and to A or
+  B in orthorhombic, so a C lattice whose every C setting lay in the pruned half
+  came back as P at twice its volume, the search reporting itself complete. The
+  leaf replays the images (`dichotomy._swap_images`, derived from `axis_swaps`,
+  never tabulated) and re-sets an accepted one to C through `conventional_fit`, so
+  dedup sees one lattice. **A leaf's width is measured on the driven lines, so its
+  refinement anneals there**: `_accept`'s wide passes assign lines up to the search
+  window's top, and only the closing passes at σ assign every line.
 - Read a `predicted_but_absent` firing as "this cell predicts lines the pattern lacks",
   **never** "this cell is too big", and since C3 **it caps; the lattice statement that
   refutes is the generalised superset check**. The full-range count shows a space-group
