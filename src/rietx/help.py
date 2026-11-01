@@ -2062,7 +2062,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
         title="Two extinction screens of the same cell name different classes",
         description=(
             "With the default `refine_cell=True` the screen compares every class at "
-            "the profile its cell-free Le Bail prefit left: that prefit's cell, widths, "
+            "the profile its cell-free Le Bail fit left: that fit's cell, widths, "
             "zero and seeded background. When it names a class, the screen runs again "
             "at the same cell, held, from the instrument you declared "
             "(`ExtinctionScreen.held_screen`). The two fail differently, so they are a "
@@ -2077,7 +2077,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "PbSO₄ X-ray pattern and 11-BM NAC, with each cell scaled by ×0.97 to ×1.03: "
             "it fired on six offsets where the default named a wrong class (corundum, "
             "fluorapatite, the P 2₁/c) and on none of the 51 where the default was right. "
-            "It cannot see a wrong class where the prefit's own cell is off, so both "
+            "It cannot see a wrong class where the cell-free fit's own cell is off, so both "
             "screens name it (corundum ×0.985, P 2₁/c ×0.9975), nor where the held "
             "screen names nothing (PbSO₄ at ×0.99 and ×1.0125, where the default "
             "names `P c - -`)."
