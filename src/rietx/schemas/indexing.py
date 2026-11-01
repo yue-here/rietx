@@ -1007,8 +1007,9 @@ class PeakList(Base):
         ``q_esd`` is checked the same way (#1236): the engines weight lines by
         :meth:`q_esd`, so an edit to ``two_theta_esd`` that left the stored
         ``q_esd`` behind would never reach the search, and nothing would say
-        so.  The tolerance is relative only, because σ(Q) is ~1e-5 Å⁻² and the
-        position check's floor of 1.0 would pass any value.  A pair where both
+        so.  The tolerance is relative only: σ(Q) is ~1e-5 Å⁻², so the position
+        check's floor of 1.0 would make it an absolute 1e-9 Å⁻², blind to an
+        edit of a line whose σ(2θ) is below ~1e-7°.  A pair where both
         numbers are non-finite agrees: an infinite σ(2θ) gives an infinite or
         undefined σ(Q), and both mean "unmeasured".
         """
