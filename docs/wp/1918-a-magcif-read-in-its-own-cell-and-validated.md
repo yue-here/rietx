@@ -1,6 +1,6 @@
 # WP-1918 — a magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out
 
-Milestone: unscheduled · Status: 🔄 2026-10-29 — FullProf's `_parent_space_group.name_H-M` spelling read, from outside as PR #1193 (`cd1c39ff`); the six maintainer decisions and I-a onwards open
+Milestone: unscheduled · Status: 🔄 2026-11-01 — FullProf's `_parent_space_group.name_H-M` spelling read, from outside as PR #1193 (`cd1c39ff`); an empty second block skipped and the draft magnetic tags refused, as PR #1257 (`1c55eda6`, #1063 items 1 and 3); the six maintainer decisions and I-a onwards open
 Track: Coming from another code
 Depends on: — (1911 soft: the structure-level setting transform the BNS restatement uses)
 Priority: P2 2026-10-08 — a refusal that fires on readable files: 615 of the 900 supercell refusals name a double count the file does not have
@@ -237,6 +237,8 @@ transcriptions were deliberately not copied. TOPAS is a black box.
   the CIF writer.
 
 ## Handover log
+
+- **2026-11-01** (`/pr-review`) — #1063's items 1 and 3 merged from outside as PR #1257 (`1c55eda6`). A CIF whose other data blocks state nothing, or only `_audit_` tags, now reads its one structure block. It records the skip as the info code `CIF_EMPTY_BLOCK_SKIPPED` (tier 1). The pre-2016 draft magnetic tags are refused by name. That refusal is the maintainer's call on file "B" in #1063: refuse. No task of this WP is ticked by it. Follow-ups, not blocking: `refuse_a_magnetic_supercell` does not consult `_magnetic_propagation_vector_kxkykz`. `refuse_draft_tags` matches `^\s*<tag>` over the raw text, so it would fire inside a semicolon text field. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
 
 - **2026-10-29** (`/pr-review`) — merged from outside as PR #1193 (`cd1c39ff`): where `_parent_space_group.name_H-M_alt` is absent, the reader takes FullProf's `_parent_space_group.name_H-M`, which `cif_mag.dic` does not define, and says so with `CIF_MAGNETIC_PARENT_TAG_UNDEFINED` (info, tier 1). Two tags naming different groups raise `MagCifError` quoting both. Review noted one gap for this WP: `magcif.py` promises the known tags as lists (`READ_TAGS`, `IGNORED_TAGS`, `PRIVATE_TAGS`), and this tag is in none of them, so the completeness oracle cannot see it. None of this WP's tasks is ticked by it; the six decisions stand.
 
