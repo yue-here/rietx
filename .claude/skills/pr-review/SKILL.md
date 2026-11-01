@@ -212,7 +212,8 @@ a competent person would choose, the practice it rests on, and the crux.
 Each item reads without this run's context, so a WP number or a name the run
 coined carries a gloss. Open with how many items need a judgement. Approving
 the batch approves its posts; the triage decided their content. Group: PRs by other authors (§ Triage), then
-governance calls, then tier rulings by class (step 6b), then held reviews,
+governance calls, then tier rulings by class (step 6b), then reader-output
+changes with their diffs (step 6c), then held reviews,
 then held merges.
 `AskUserQuestion` only for ≤ 4 genuine multi-way choices. Then apply in one
 pass — post, merge, close — with a step-10 line each. **A gate main has moved
@@ -443,6 +444,22 @@ line if the checkpoint ended it. Close with
      (the ruling's date) into the PR's rows. Push them to its branch where
      `gh pr view N --json maintainerCanModify` says true; otherwise ask the
      contributor in the review.
+6c. **What a reader receives** (ruled 2026-11-01). The package should pass no
+   junk back to a reader, a person or an agent, so every change to what a
+   reader receives goes to the user before merge. A PR changes it when either
+   holds:
+   - `.venv/bin/python -m tests.reader_output`, run in the bench on the merged
+     tree, exits 1. It prints the diff of one standard fit's printed result,
+     report and diagnostics against the base (about 25 s).
+   - The diff changes a result or report type's fields, which shows in the
+     generated `docs/skill/rietx/references/api*.md`. A diagnostic code new
+     to the audit table (step 6b's printout) counts too.
+
+   Either way it is a question for the batch: the before and after text, and
+   your reading of whether each added line tells this fit's reader something.
+   A line that reads the same for every fit, repeats another field, or gives
+   no action is the junk the ruling names. #1266 added 930 characters to every
+   report that way, and it reached the user only because its author flagged it.
 7. **`/code-review medium N`** for `src/` changes above step 6's ~200 lines;
    name the level (unnamed, it reuses whatever was typed last). **Never while a
    suite holds the bench**: the review forks into the session's working
@@ -470,7 +487,8 @@ line if the checkpoint ended it. Close with
    green on the merged tree**, nothing else mid-suite, against the main that is
    there *now*; no execution-shaped file without the step-4 read; no
    conformance finding; every audit-table row tiered and every tier-3 row
-   ruled (step 6b); no new public surface undocumented; every data file
+   ruled (step 6b); no change to what a reader receives that the user has
+   not seen (step 6c); no new public surface undocumented; every data file
    with provenance (and a licence if in the wheel); no maintainer-machinery
    edit; no open question. Name which each merge satisfied. **Say which PRs
    you merged**: `origin/main` moves under every live WP session. Close only
