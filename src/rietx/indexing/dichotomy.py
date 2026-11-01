@@ -1065,12 +1065,17 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
         return [], (0, 0), False
     masks = {c: masks[c] for c in order}
     # **the swap images of the admitted centrings are replayed at the leaf**
-    # (``_swap_images``, WP-2066), and only while "P" is kept: P's set is every
-    # hkl, so the union, the search set and every box test stay what they
-    # were.  Without P the system is already reported incomplete.
-    images = (_swap_images(order, axis_swaps(basis)) if "P" in masks else {})
-    for letter in images:
+    # (``_swap_images``, WP-2066).  With "P" kept, P's set is every hkl, so
+    # the union, the search set and every box test stay what they were.
+    # Without P (a caller's centrings, or the cap) the images widen the union,
+    # as the recursion must see their rows too, and an image that does not fit
+    # the cap is dropped and reported like any other.
+    images = _swap_images(order, axis_swaps(basis))
+    for letter in list(images):
         masks[letter] = centring_allows(hkl_all, letter)
+        if int(np.logical_or.reduce(list(masks.values())).sum()) > MAX_TRIAL_HKL:
+            del masks[letter], images[letter]
+            complete_union = False
     union = np.logical_or.reduce(list(masks.values()))
     hkl_all = hkl_all[union]
     dm_all = design_matrix(hkl_all)
@@ -1383,7 +1388,7 @@ def _inside_domain(af: np.ndarray, spec: SearchSpec) -> bool:
     return True
 
 
-def _relabel(cand: EngineCandidate, target: str) -> EngineCandidate | None:
+def _relabel(cand: EngineCandidate, target: str) -> EngineCandidate:
     """A candidate accepted under a swap image, re-set to the letter it images.
 
     ``engines.conventional_fit`` carries A..F, its covariance, the cell and
@@ -1391,11 +1396,13 @@ def _relabel(cand: EngineCandidate, target: str) -> EngineCandidate | None:
     change (h' = M·h).  The result is one lattice under one name, so
     ``dedup_candidates`` merges it with any leaf that found the same lattice
     as C, and the report holds one candidate where it would hold two.
-    ``None`` where the fit is not a lattice's metric and has no setting.
+    Where the fit has no setting to choose (``conventional_setting`` returns
+    ``None``), the candidate is kept as found, in its own letter: an A or B
+    description is still the lattice, and an accepted cell is never dropped.
     """
     fit, change = conventional_fit(cand.fit, cand.system, cand.centring)
     if change is None:
-        return None
+        return cand
     m = np.asarray(change, dtype=np.int64)
     hkl = np.asarray(cand.hkl, dtype=np.int64) @ m.T
     return replace(cand, fit=fit, centring=target, hkl=hkl)

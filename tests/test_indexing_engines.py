@@ -287,6 +287,22 @@ def test_a_c_lattice_whose_every_c_setting_the_prune_drops_is_found():
     assert best.n_indexed == best.n_lines
 
 
+def test_a_search_restricted_to_c_still_replays_its_images():
+    """WP-2066: with the centrings restricted to C there is no P to make the
+    union every hkl, so the images widen the recursion's trial set.  The
+    restricted search finds the same lattice and still reports complete."""
+    peaks = _exact_list("C m m m", (4.2, 12.9, 5.9, 90.0, 90.0, 90.0), 60.0)
+    result = search_dichotomy(peaks, spec=SearchSpec(
+        systems=("orthorhombic",), centrings={"orthorhombic": ("C",)},
+        min_d_axis=2.0, max_d_axis=14.0, max_volume=1500.0,
+        shift_allowance_deg=1e-9, budget_seconds=DEFAULT_TEST_BUDGET))
+
+    assert result.search_complete["orthorhombic"]
+    best = result.candidates[0]
+    assert best.centring == "C"
+    assert best.cell[:3] == pytest.approx((4.2, 12.9, 5.9), abs=2e-3)
+
+
 @pytest.mark.slow
 def test_a_c_monoclinic_lattice_with_a_longer_than_c_is_found():
     """#1258, WP-2066: C 1 2/c 1 (12.3, 6.1, 9.5, β 115°) has no C setting
@@ -318,7 +334,8 @@ def test_the_leaf_holding_a_dense_lists_truth_is_polished_onto_it():
     on the 20 driven lines and many σ coarse above them, and annealing over
     every line refined it onto cells indexing 288 and 273 of 381, with the
     search reported complete.  Annealing on the lines up to the driven
-    window's top returns the truth first, indexing all 381."""
+    window's top returns the truth first, indexing all 381.  Fast: a few
+    seconds under heavy load, the budget a runaway guard."""
     cell = (13.8, 19.1, 16.0, 90.0, 97.5, 90.0)
     peaks = _exact_list("P 1 21/c 1", cell, 40.0)
     result = search_dichotomy(peaks, spec=SearchSpec(
