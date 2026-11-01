@@ -710,13 +710,24 @@ class SupercellEvidence:
         better in the reverse direction.  The refutation would overturn that
         reading of the panel's own reversed member at the same resolution.
         The pair then reads *supported* or *undecided*.  Measured cause: on
-        dense low-symmetry patterns the assumed shift bound floors p₀ at
+        dense low-symmetry patterns the assumed shift bound floored p₀ at
         0.63–0.82, at or above a true cell's own seen fraction.  Containment's
         density order can make the true cell the child of a wrong one, whose
         lines merge into fewer resolved positions.  So "seen no more often than
         chance" refuted three synthetic truths, which fell from first to second
         and to twelfth.  Their seen fractions were 0.63, 0.42 and 0.54 against
         their refuting parents' 0.37, 0.26–0.29 and 0.38–0.49.
+
+        **p₀ is the seen test's own chance rate, and only the power check reads
+        the floor** (#1263).  ``n_seen`` is counted at the resolution after the
+        candidate's common shift, with no floor, so its null is the share of
+        the range those windows cover.  Read at the floored rate, the null put
+        the expected count of #1230's three truths at 2.3–3.0× the seen
+        test's own (aP1: 112 of 183 seen against 115 at p₀ 0.628, and 37.7 at
+        the 0.206 a Monte Carlo of the seen test gives).  The floor still bounds
+        what the test could claim: #951's 0-of-2 pair has p₀² 1e-4 in the
+        seen test's windows and 0.030 in the floored ones, and stays
+        undecided (:attr:`p_floor`).
         """
         p_unexplained = (self.p_value if self.p_value_unexplained is None
                          else self.p_value_unexplained)
