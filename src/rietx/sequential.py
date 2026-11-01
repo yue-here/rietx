@@ -140,7 +140,11 @@ import numpy as np
 
 from . import runs
 from .backend.api import backend_dtype_note
-from .crystallography.twins import merge_site_twins, numbering_moves
+from .crystallography.twins import (
+    matched_site_paths,
+    merge_site_twins,
+    numbering_moves,
+)
 from .history.events import EventStream, _attach_progress, as_event_stream
 from .history.tree import RefinementTree
 from .optimize.cancel import RefinementCancelled
@@ -785,21 +789,30 @@ def _constrain_in_declared_numbering(ref: Refinement, declared: Structure,
     ref._carry_twin_moves(numbering_moves(hooked, ref.structure), ref._twin_findings)
 
 
-def _displaced_as_built(displaced: Sequence[str], moves) -> list[str]:
+def _displaced_as_built(displaced: Sequence[str], moves,
+                        sites: dict[str, str] | None = None) -> list[str]:
     """``displaced`` (the carry's DOF paths, declared numbering) in the built numbering.
 
     A DOF the site's renumbering moves follows it (:class:`~.DofMove`'s
     ``path``); one with no parallel direction on the new position is gone and
-    drops out, since nothing can tie it there.  Paths of a site that did not
-    renumber are unchanged.
+    drops out, since nothing can tie it there.  Every other atom path follows
+    its atom by label (``sites``, :func:`~.twins.matched_site_paths`), so an
+    atom dropped or reordered ahead of it does not leave the path naming
+    another atom (#1264); an atom the built structure lacks drops out.  Paths
+    that name no atom are unchanged.
     """
     out: list[str] = []
     for path in displaced:
         move = moves.get(path)
-        if move is None:
+        if move is not None:
+            if move.path is not None:
+                out.append(move.path)
+            continue
+        parts = path.split(".")
+        if sites is None or len(parts) < 4 or parts[2] != "atoms":
             out.append(path)
-        elif move.path is not None:
-            out.append(move.path)
+        elif (site := sites.get(".".join(parts[:4]))) is not None:
+            out.append(".".join([site, *parts[4:]]))
     return out
 
 
@@ -1928,7 +1941,8 @@ class SequentialRefinement:
             # position) renumbered; read before the hook, whose ties follow
             # the build
             displaced = _displaced_as_built(
-                displaced, numbering_moves(self.structure, ref.structure))
+                displaced, numbering_moves(self.structure, ref.structure),
+                matched_site_paths(self.structure, ref.structure))
             _constrain_in_declared_numbering(ref, self.structure, constrain, index)
             if previous is not None:
                 _reanchor_carried(ref, displaced, previous, previous_vars or {})

@@ -333,6 +333,23 @@ def numbering_moves(old: Structure | CoordinateSnapshot,
     return moves
 
 
+def matched_site_paths(old: Structure | CoordinateSnapshot,
+                       new: Structure | CoordinateSnapshot) -> dict[str, str]:
+    """``{old site path: new site path}`` for every atom both structures hold.
+
+    :func:`numbering_moves` lists only the sites whose DOFs renumbered; this is
+    the same label match (:func:`_matched_atoms`) for *every* site, so a path
+    read in ``old``'s atom order can be named in ``new``'s when an atom was
+    dropped, added or reordered ahead of it (#1264).  An atom with no partner
+    is absent.
+    """
+    old = old if isinstance(old, CoordinateSnapshot) else coordinate_snapshot(old)
+    new = new if isinstance(new, CoordinateSnapshot) else coordinate_snapshot(new)
+    return {f"phases.{i}.atoms.{jo}": f"phases.{i}.atoms.{jn}"
+            for i, (po, pn) in enumerate(zip(old.phases, new.phases, strict=False))
+            for jo, jn in _matched_atoms(po[2], pn[2])}
+
+
 def _matched_atoms(lo: Sequence[str], ln: Sequence[str]) -> list[tuple[int, int]]:
     """(old index, new index) of the atoms two label lists both hold.
 
