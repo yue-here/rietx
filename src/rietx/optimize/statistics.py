@@ -279,6 +279,87 @@ def discarded_directions(jac: np.ndarray) -> tuple[int, np.ndarray]:
     return (n_gone, touched) if len(touched) >= 1 else none
 
 
+def resolved_correlation(corr: np.ndarray, jac: np.ndarray
+                         ) -> tuple[np.ndarray, np.ndarray]:
+    """The correlation matrix with every direction the Jacobian cannot resolve
+    projected out, and the columns those directions dominate (WP-2050).
+
+    Returns ``(rho, unresolved)``.  ``rho`` is ``corr`` where nothing is
+    unresolved.  Otherwise a pair of resolved columns carries the correlation
+    of the covariance with the unresolved subspace removed, a pair with one
+    unresolved column is ``nan`` (its ρ is not determined), and a pair of
+    unresolved columns keeps ``corr``'s value, which is ±1 to rounding.
+    ``unresolved`` is a boolean mask over the columns of ``jac``.
+
+    **The cut is the Jacobian's own accuracy, not a tolerance.**  The forward
+    differences of the peak chain carry a relative error of order
+    :data:`~rietx.optimize.least_squares.FD_STEP` per column (5e-7 measured
+    against jax on lab brucite, :func:`~.least_squares._fd_typicals`).  An
+    equilibrated singular value below ``FD_STEP·σ_max`` lies inside that
+    error, so an eigenvalue of the unit-diagonal normal matrix at or below
+    ``FD_STEP²·|λ|max`` is a direction the data has not been shown to move.
+    The covariance still inverts it, and rounding then sets it: on brucite's
+    Gaussian-size, Gaussian-strain and W triple it sat between 2.7e-15 and
+    4.9e-14 of |λ|max under 1e-14 nudges to one start value, while the next
+    direction stayed at 1.3-1.4e-10.  Every column carries a rounding-level
+    loading on such a direction, divided by that eigenvalue, so a ρ against
+    one of its members, and between two columns that load on it weakly, is
+    rounding too: ``lor_size ~ lor_strain`` read −0.995 or −0.9975 or fell
+    under the guard as the nudge moved, and −0.896 ± 0.003 projected.
+
+    GSAS-II computes its correlations off a pseudo-inverse truncated the same
+    way, at a relative cut of 1e-6 on the normal matrix's singular values
+    (``SVDtol``, ``GSASIImath.setHcorr``).  That cut would also remove
+    brucite's 1.4e-10 zero-shift/displacement direction, whose correlations
+    hold to 2e-5 under the same nudges and which a refiner wants reported.
+
+    **Which columns it dominates** is :func:`discarded_directions`' *touched*
+    test with this cut: the subspace adds at least ``Σ_gone v_i²/cut`` to
+    column *i*'s equilibrated variance, and the column is unresolved when that
+    is at least the variance the resolved directions give it.  A dead column
+    and a joint fit's :class:`~.blocked.BlockJacobian` are left as they are.
+    """
+    from .least_squares import FD_STEP
+
+    corr = np.asarray(corr, dtype=float)
+    n = corr.shape[0]
+    unresolved = np.zeros(n, dtype=bool)
+    if _is_blocked(jac):
+        return corr, unresolved
+    jac = to_host_fp64(jac)
+    if jac.ndim != 2 or jac.shape[1] != n:
+        return corr, unresolved
+    s = column_rescale(jac)
+    if s is not None:
+        jac = jac * s
+    JTJ = jac.T @ jac
+    JTJ = 0.5 * (JTJ + JTJ.T)
+    d = np.sqrt(np.diag(JTJ))
+    live = np.flatnonzero(d > 0.0)
+    if len(live) < 2:
+        return corr, unresolved
+    sub = JTJ[np.ix_(live, live)] / np.outer(d[live], d[live])
+    lam, vec = lapack.eigh(sub)
+    cut = FD_STEP ** 2 * np.abs(lam).max()
+    gone = np.abs(lam) <= cut
+    if not gone.any():
+        return corr, unresolved
+    kept_var = (vec[:, ~gone] ** 2 / np.abs(lam[~gone])).sum(axis=1)
+    lost_var = (vec[:, gone] ** 2).sum(axis=1) / cut
+    member = lost_var >= kept_var
+    unresolved[live[member]] = True
+    k = (vec[:, ~gone] / np.abs(lam[~gone])) @ vec[:, ~gone].T
+    sd = np.sqrt(np.diag(k))
+    rho = np.array(corr, copy=True)
+    res = live[~member]
+    rho[np.ix_(res, res)] = (k / np.outer(sd, sd))[np.ix_(~member, ~member)]
+    un = live[member]
+    rho[np.ix_(un, res)] = np.nan
+    rho[np.ix_(res, un)] = np.nan
+    rho[res, res] = 1.0
+    return rho, unresolved
+
+
 def normal_covariance(jac: np.ndarray, resid: np.ndarray, n_free: int, *,
                       chi2_floor: bool = False,
                       what: str = "residual entering the covariance solve",

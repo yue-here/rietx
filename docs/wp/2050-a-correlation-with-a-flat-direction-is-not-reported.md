@@ -47,6 +47,34 @@ first, and survey how GSAS-II and TOPAS report a correlation with an
 undetermined parameter. The datasets it must hold on are the eight alarm
 standards, brucite above all.
 
+**Superseded in part, 2026-11-01** (re-measured on `62034506e`, after
+WP-2048 merged; macOS arm64, `[dev]`). The counts reproduce: brucite 36 at
+k = 0 and 42 at a +4e-14 scale nudge, 35 at −4, ±1 and +7. Two findings
+change the frame.
+
+- **The partner rule alone cannot hold the count.** `lor_size ~ lor_strain`
+  is a pair of non-members, and it flips too: −0.995 at k = 0, −0.9975 at +4,
+  under the guard at −4. Both columns load weakly on the flat direction, and
+  that loading is divided by an eigenvalue rounding sets. With the direction
+  projected out the pair reads −0.896 and −0.893.
+- **What marks the direction is its eigenvalue, not an esd.** In the
+  unit-diagonal normal matrix of the closing stage, the triple's eigenvalue is
+  2.7e-15 to 4.9e-14 of the largest across the nudges. That is an 18-fold
+  spread, so rounding sets it. The next direction (zero shift with sample
+  displacement) holds at 1.3e-10 to 1.4e-10. The forward-difference columns
+  are accurate to about `FD_STEP` = 1e-6 relative, so an eigenvalue under
+  FD_STEP² = 1e-12 of the largest lies inside the Jacobian's own error.
+
+The test is `statistics.resolved_correlation` (task 1). The guard reads the
+correlation with every direction under that cut projected out. A pair with
+one member of such a direction is `nan` there and is never thresholded. A pair
+of members keeps its full-matrix ρ, which is ±1 to rounding and stays a
+`FLAT_DIRECTION`. Simulated in-process on the eight alarm standards
+(`docs/wp/2050-batch/simulate.py`), brucite gives 35 warnings at all eight
+nudges (k = 0, ±1, ±4, +7, ±20) and the other seven are unchanged at k = 0
+and +4. Corundum, zincite and fluorite carry the same unresolved triple, and
+none of their reported pairs involves it.
+
 ## Non-goals
 
 - Brucite's flat triple itself: the Gaussian size, Gaussian strain and W
@@ -55,9 +83,18 @@ standards, brucite above all.
 
 ## Tasks
 
-- [ ] Survey practice (above) and pick the test for "this partner's ρ is not
+- [x] Survey practice (above) and pick the test for "this partner's ρ is not
       determined", measured on brucite's triple and on the other seven
       standards, with no pair dropped that a refiner would want reported.
+      Survey: `docs/practice.md` § Correlations against a parameter the data
+      does not determine. Test: `statistics.resolved_correlation`, cut
+      FD_STEP² × |λ|max, members by `discarded_directions`' touched rule;
+      `top_correlations` skips a `nan` pair. Settled by Claude under
+      established practice (GSAS-II's truncated pseudo-inverse) and the
+      measurement above, which chose the cut. GSAS-II's own 1e-6 lost: it
+      would also project out the zero-shift/displacement direction at
+      1.4e-10, whose pairs hold to 2e-5 under the nudges and which a refiner
+      wants reported. Tier: derived (the cut is the Jacobian's accuracy).
 - [ ] Apply it in the guard loop. Say in the message what was left out and why,
       rather than dropping it silently.
 - [ ] Tests: brucite's count is the same at the nudges in
