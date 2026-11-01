@@ -11,7 +11,7 @@ cannot claim, and why that layer abstains rather than guessing:
 * per-region local Rwp / χ² share over peak-cluster regions segmented from the
   union of calculated tick positions and observed/residual peaks (so an
   unindexed impurity peak still gets a region);
-* unmatched-peak lists: residual peaks with no calculated reflection nearby
+* unmatched-peak lists: residual peaks that no peak the model draws explains
   (impurity / missing-phase candidates) and calculated reflections with no
   observed intensity.
 
@@ -21,7 +21,7 @@ All quantities are 1/σ²-weighted; both Δ and Δ/σ views are reported.
 from __future__ import annotations
 
 import numpy as np
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, peak_prominences
 
 from ..schemas.results import RefinementResult
 from .background import assess_background
@@ -60,7 +60,8 @@ def residual_peak_indices(resid_norm: np.ndarray, *,
     """Indices of the positive residual peaks — one definition, two readers.
 
     :func:`build_layer0` keeps the ones with no calculated tick within
-    ``match_tol_deg`` as ``unmatched_obs`` and drops the rest; the satellite
+    ``match_tol_deg``, and not on the flank of a drawn peak
+    (:func:`on_drawn_flank`), as ``unmatched_obs`` and drops the rest; the satellite
     arm (:mod:`rietx.report.satellites`) needs the **whole** list, because a
     residual peak sitting on a nuclear line, or on a reciprocal-lattice point
     the nuclear structure factor forbids, is the k = 0 evidence — and it sorts
@@ -70,6 +71,62 @@ def residual_peak_indices(resid_norm: np.ndarray, *,
     """
     peaks, _ = find_peaks(resid_norm, height=min_peak_sigma, distance=5)
     return peaks
+
+
+def on_drawn_flank(y_obs: np.ndarray, y_calc: np.ndarray, sigma: np.ndarray,
+                   i: int, *, min_sigma: float) -> bool:
+    """Whether residual peak ``i`` is part of a peak the model draws (WP-1977).
+
+    A misfit of a peak's shape, width or asymmetry leaves a positive lobe on
+    its flank, often 1-3 FWHM from the apex: 0.15-0.19° below strong zincite
+    lines on cpd-1c, and 0.1-0.34° below each LaB₆ line on SRM 660c with the
+    axial apertures at 0 (#1106).  A fixed matching window cannot tell such a
+    lobe from a foreign line, because the right width depends on the peak's
+    width *and* its height.  The difference curve can, and a refiner reads it
+    so (McCusker et al. 1999): the lobe lies on the observed flank of the
+    drawn peak, while a foreign line stands on its own, with a valley between
+    it and its neighbour.  The test makes that reading explicit.
+
+    From channel ``i`` it walks uphill along the calculated curve to the apex
+    of the drawn peak it sits on.  Uphill can be either way at a valley of the
+    curve, so both directions are tried, and a channel at an apex is its own.
+    The residual is part of that peak when both hold:
+
+    * the apex is a peak the data can see.  Its prominence in ``y_calc`` is at
+      least ``min_sigma`` times σ at the apex.  This excludes a wiggle of a
+      smooth background and a reflection the counting noise hides, and the
+      pattern edge is never an apex;
+    * the observed curve has no resolved valley on the way.  Along the path it
+      never falls ``min_sigma`` σ below the highest point it has reached.
+
+    The calculated curve is ``y_calc`` whole, so a line of a fixed background
+    component (a measured blank, #1217) or of a declared extra peak explains a
+    lobe exactly as a reflection does.  ``min_sigma`` is the level that made
+    the residual a peak, so the test adds no number of its own.  A foreign
+    line that the observed curve does not resolve from a stronger neighbour is
+    explained too.  No positions test can separate it from a shape misfit,
+    and the region list still carries its χ².
+    """
+    n = len(y_calc)
+    uphill = [s for s in (-1, 1) if 0 <= i + s < n and y_calc[i + s] > y_calc[i]]
+    for step in uphill or [0]:
+        # no uphill neighbour: channel i is itself a drawn apex, the case of a
+        # line no tick marks (a blank's, a declared extra peak's)
+        path = [i]
+        j = i + step
+        while step and 0 <= j < n and y_calc[j] > y_calc[path[-1]]:
+            path.append(j)
+            j += step
+        apex = path[-1]
+        if apex in (0, n - 1):
+            continue
+        if peak_prominences(y_calc, [apex])[0][0] < min_sigma * sigma[apex]:
+            continue
+        p = np.asarray(path)
+        seen = np.maximum.accumulate(y_obs[p])
+        if np.all(seen - y_obs[p] < min_sigma * sigma[p]):
+            return True
+    return False
 
 
 def lebail_gap(model, values: dict[str, float], *, rwp_rietveld: float,
@@ -170,6 +227,12 @@ def background_clause(bg: BackgroundEvidence) -> str | None:
 #: component sitting on a line the model already predicts", which is the same
 #: question this answers and must not be answered with a different number — a
 #: component inside Layer 0's tolerance is one Layer 0 would have matched.
+#: Since WP-1977 a residual peak outside it can still be explained, by
+#: :func:`on_drawn_flank`.  That test stays out of the second consumer on
+#: purpose: it asks whether a lobe belongs to the curve around a line, and
+#: ``EXTRA_PEAK_ON_REFLECTION`` asks whether a declared centre coincides with
+#: a line.  A declared peak that the data resolve from its neighbour is a
+#: legitimate one wherever it sits on that neighbour's flank.
 LAYER0_MATCH_TOL_DEG = 0.08
 
 
@@ -220,10 +283,14 @@ def build_layer0(result: RefinementResult, *, top_n: int = 15,
         ))
     regions.sort(key=lambda r: -r.chi2_share)
 
-    # --- unmatched peaks
+    # --- unmatched peaks: no tick within the window, and not a lobe on the
+    # flank of a peak the model draws (WP-1977)
     unmatched: list[UnmatchedPeak] = []
     for i in peaks_obs:
-        if len(ticks) == 0 or np.min(np.abs(ticks - tt[i])) > match_tol_deg:
+        if len(ticks) and np.min(np.abs(ticks - tt[i])) <= match_tol_deg:
+            continue
+        if not on_drawn_flank(y_obs, y_calc, sigma, int(i),
+                              min_sigma=min_peak_sigma):
             unmatched.append(UnmatchedPeak(
                 two_theta=float(tt[i]), height_over_sigma=float(resid_norm[i]),
                 kind="unmatched_obs"))

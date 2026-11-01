@@ -605,7 +605,9 @@ class UnmatchedPeak(Base):
 
     two_theta: float
     height_over_sigma: float
-    kind: str  # "unmatched_obs" (no calc tick nearby) | "unmatched_calc"
+    # "unmatched_obs" (no calc tick nearby, and not on the flank of a peak the
+    # model draws: layer0.on_drawn_flank) | "unmatched_calc"
+    kind: str
 
 
 class SatelliteCandidate(Base):

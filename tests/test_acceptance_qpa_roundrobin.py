@@ -329,6 +329,29 @@ def test_sample1_fractions_within_participant_spread(sample1_results, sample):
 
 @pytest.mark.slow
 @pytest.mark.xdist_group("qpa-sample1")
+@pytest.mark.parametrize("sample", SAMPLE1)
+def test_no_flank_lobe_reads_as_unindexed(sample1_results, sample):
+    """WP-1977's acceptance.  Each strong line leaves a misfit lobe on its
+    flank, 0.15-0.29° below it on cpd-1c and cpd-1f, and with the ticks on the
+    peaks (WP-1908) the 0.08° window put them outside.  They are part of the
+    drawn peak, so Layer 0 lists none within 0.5° of a strong line (drawn
+    height above a tenth of the pattern's tallest).  On the tree before the
+    rule, cpd-1c listed six, at up to 12σ."""
+    result = sample1_results[sample]
+    tt = np.asarray(result.two_theta)
+    bragg = np.asarray(result.y_calc) - np.asarray(result.y_background)
+    ticks = np.concatenate([np.asarray(v) for v in result.ticks.values()])
+    height = bragg[np.clip(np.searchsorted(tt, ticks), 0, len(tt) - 1)]
+    strong = ticks[height > 0.1 * bragg.max()]
+    report = rx.build_report(result)
+    near = [(round(u.two_theta, 2), round(u.height_over_sigma, 1))
+            for u in report.unmatched if u.kind == "unmatched_obs"
+            and np.min(np.abs(strong - u.two_theta)) < 0.5]
+    assert near == [], f"{sample}: {near}"
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("qpa-sample1")
 def test_a_supported_trace_phase_is_never_held(sample1_results):
     """``cell_window``'s own counter-example, one tier up (WP-1301).
 

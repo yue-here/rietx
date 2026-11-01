@@ -733,14 +733,21 @@ def test_abstained_branch_actions_carry_execution_too(truth):
 
 def test_broad_peak_lobes_cap_impurity_without_reindex():
     """The broad-peak variant: residual lobes of 0.66°-wide peaks under a
-    0.05° zero error read as unmatched (the 0.08° matching tolerance is tiny
-    against the peak), and pre-WP they bought ``add_impurity_phase`` at 0.7.
-    They all sit within a fraction of a FWHM of a calculated position, so the
-    call is capped — and *no* reindex pointer is emitted, because the
-    validity failures here are saturated-fit artefacts (4 of 12 misfitting
-    regions, below the widespread-failure fraction; the true shift is inside
-    the validity radius of these broad peaks)."""
-    from rietx.report.schemas import IMPURITY_SHIFT_CAP
+    0.05° zero error.  The 0.08° matching tolerance is tiny against the peak,
+    and pre-WP-1054 the lobes bought ``add_impurity_phase`` at 0.7.
+
+    Since WP-1977 Layer 0 explains them: each lies on the observed flank of
+    the peak the model draws, with no valley between, so none is listed and
+    no impurity call is made.  Layer 2's own guard stays measured on the same
+    lobes, as the residual peaks the 0.08° window alone would list.  They sit
+    within a fraction of a FWHM of a calculated position, so the call they
+    reach is capped, and *no* reindex pointer is emitted: the validity
+    failures here are saturated-fit artefacts (4 of 12 misfitting regions,
+    below the widespread-failure fraction; the true shift is inside the
+    validity radius of these broad peaks)."""
+    from rietx.report.layer0 import LAYER0_MATCH_TOL_DEG, residual_peak_indices
+    from rietx.report.layer2 import layer0_actions
+    from rietx.report.schemas import IMPURITY_SHIFT_CAP, UnmatchedPeak
 
     structure, ins, data = _broad_truth(0.6)
     perturbed = ins.model_copy(deep=True)
@@ -748,15 +755,27 @@ def test_broad_peak_lobes_cap_impurity_without_reindex():
 
     report = _report_for(structure, perturbed, data)
     assert report.abstained_reason, "the lobes must abstain the report"
-    strong = [u for u in report.unmatched
-              if u.kind == "unmatched_obs" and u.height_over_sigma > 8.0]
-    assert strong, "the residual lobes must still appear as unmatched"
+    assert not [u for u in report.unmatched if u.kind == "unmatched_obs"
+                and u.height_over_sigma > 8.0], report.unmatched
+    kinds = [a.kind for a in report.suggested_actions]
+    assert "add_impurity_phase" not in kinds, kinds
+    assert "reindex_or_recheck_cell" not in kinds, kinds
 
-    impurity = report.action("add_impurity_phase")
+    result, _, _ = _result_for(structure, perturbed, data)
+    tt = np.asarray(result.two_theta)
+    resid = (np.asarray(result.y_obs) - np.asarray(result.y_calc)) / result.sig()
+    ticks = np.concatenate([np.asarray(v) for v in result.ticks.values()])
+    lobes = [UnmatchedPeak(two_theta=float(tt[i]),
+                           height_over_sigma=float(resid[i]),
+                           kind="unmatched_obs")
+             for i in residual_peak_indices(resid, min_peak_sigma=5.0)
+             if np.min(np.abs(ticks - tt[i])) > LAYER0_MATCH_TOL_DEG]
+    assert [u for u in lobes if u.height_over_sigma > 8.0], \
+        "the fixture must still make lobes the 0.08° window misses"
+    capped = layer0_actions(lobes, report.attribution, ticks=ticks.tolist())
+    impurity = next(a for a in capped if a.kind == "add_impurity_phase")
     assert impurity.confidence <= IMPURITY_SHIFT_CAP, impurity
     assert impurity.alternatives[0] == "reindex_or_recheck_cell", impurity
-    assert "reindex_or_recheck_cell" not in [a.kind
-                                             for a in report.suggested_actions]
 
     _plot_state(structure, perturbed, data, "wp1054_broad_zero_lobes")
 

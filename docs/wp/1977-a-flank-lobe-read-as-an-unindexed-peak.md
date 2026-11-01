@@ -106,11 +106,11 @@ a drawn peak as a separate phase. Measured on the IUCr CPD QPA round robin
       `unmatched_obs` with its distance to the nearest tick, that tick's
       calculated height and the local FWHM.
 - [x] Survey prior art for the same test. Record what each code does.
-- [ ] Choose and land the rule. Keep `EXTRA_PEAK_ON_REFLECTION` on the same
+- [x] Choose and land the rule. Keep `EXTRA_PEAK_ON_REFLECTION` on the same
       authority or split it with a reason.
 - [ ] Re-measure WP-1908's twelve fits. A real impurity must still read as
       unmatched: use a synthetic pattern with a second phase added.
-- [ ] Tests + obs/calc/diff PNGs of the flank-lobe cases to `tests/output/`.
+- [x] Tests + obs/calc/diff PNGs of the flank-lobe cases to `tests/output/`.
 - [ ] Skill: the `unmatched_obs` reference row, if what it means changes.
 
 ## Acceptance
