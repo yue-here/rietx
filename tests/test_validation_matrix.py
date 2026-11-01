@@ -531,3 +531,46 @@ def test_the_predictions_that_verify_rather_than_validate() -> None:
 def test_every_dataset_state_is_one_of_rule_twos_three() -> None:
     for key, ds in DATASETS.items():
         assert ds.state in DATASET_STATES, f"{key}: state {ds.state!r}"
+
+
+def test_a_dataset_must_state_its_state() -> None:
+    """No default: a dataset added without a state would read as development
+    data because nothing said otherwise."""
+    from tests.validation_matrix import Dataset
+
+    with pytest.raises(TypeError):
+        Dataset("x.xy", "a pattern", "absolute")  # type: ignore[call-arg]
+    Dataset("x.xy", "a pattern", "absolute", state="unused")
+
+
+#: validating rows that join no feature, each with its reason (a claim about an
+#: identity names no feature a user switches on)
+VALIDATES_NO_FEATURE = {
+    "test_the_held_cell_is_the_certificate":
+        "an identity: the held cell is read back, no refined feature is compared",
+}
+
+
+@pytest.mark.parametrize("claim", [c for c in CLAIMS if validates(c)],
+                         ids=lambda c: c.test)
+def test_a_validating_claim_states_its_domain_and_its_feature(claim) -> None:
+    """A validation result is stated over a domain (Oberkampf & Roy), and a
+    validating row that joins no feature validates nothing, silently."""
+    assert claim.domain.strip(), f"{claim.test} validates and states no domain"
+    assert claim.reference.strip(), f"{claim.test} validates against no reference"
+    if not claim.features:
+        assert claim.test in VALIDATES_NO_FEATURE, (
+            f"{claim.test} is a validating row that names no feature: name "
+            "the feature its bar tests, or declare why in VALIDATES_NO_FEATURE")
+
+
+@pytest.mark.parametrize("claim", [c for c in CLAIMS if not validates(c)],
+                         ids=lambda c: c.test)
+def test_a_row_that_does_not_validate_claims_no_domain(claim) -> None:
+    assert not claim.domain, f"{claim.test} does not validate but names a domain"
+
+
+def test_the_exemption_names_a_validating_row_with_no_feature() -> None:
+    by_test = {c.test: c for c in CLAIMS}
+    for test in VALIDATES_NO_FEATURE:
+        assert validates(by_test[test]) and not by_test[test].features

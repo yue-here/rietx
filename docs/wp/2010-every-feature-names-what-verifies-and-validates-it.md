@@ -214,6 +214,22 @@ confirm the new test goes red naming it.
 
 ## Handover log
 
+- **2026-11-01 (round 1 of #1266)** — the report sentence taken out, and the review's two
+  findings fixed.
+
+  *Done.* The maintainer's ruling removed `FitReport.not_independently_measured` and
+  everything that served it (`Feature.independently_measured`, `feature_of`,
+  `parameters_without_independent_measurement`, `tests/test_features_report.py`, the registry-bit
+  meta-test, the `report.md` lines, the `api.md` copies). § Features now prints each validating
+  row's reference value, its domain (a new required `Claim.domain` on the 16 rows that validate)
+  and its mismatch. Two joins named a feature the bar does not test: the sample-1 fractions row no
+  longer joins `bragg_intensities` (a new unit test checks the Lorentz-polarisation factor against
+  its published forms, and `test_structure_factor_against_reference` covers occupancy), and the
+  chained-QPA row no longer joins `sequential_series`. Validated features: 9, from 11, all on
+  development data. `Dataset.state` has no default, and a validating row that joins no feature
+  must be declared. `DATASET_STATES` still lists `unused` and `sealed`, which no dataset
+  carries: they are Rule 2's vocabulary, kept for the sealed families outside the tree.
+
 - **2026-10-31 (build, the reporter's PR)** — the registry, the join, the retier by rule
   and (since removed) the report sentence, as ruled on #1051.
 

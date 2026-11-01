@@ -175,8 +175,10 @@ class Dataset:
     #: Every dataset in the tree has been run by the people who change the
     #: package, so each is development data: an independent measurement it
     #: carries calibrates as much as it validates, and the record says so.
-    #: The sealed families are outside the tree (yue-here/rietx#1052)
-    state: str = "development"
+    #: The sealed families are outside the tree (yue-here/rietx#1052).  No
+    #: default: a new dataset states its state, or it would read as
+    #: development data because nothing said otherwise
+    state: str
 
 
 DATASETS: dict[str, Dataset] = {
@@ -184,19 +186,22 @@ DATASETS: dict[str, Dataset] = {
         "nist_srm660c_100a.cif",
         "NIST SRM 660c LaB6, lab Cu Ka doublet + graphite analyzer; the "
         "certification measurement itself",
-        "absolute"),
+        "absolute",
+        state="development"),
     "srm676a": Dataset(
         "qarr/corundum.prn",
         "NIST SRM 676a corundum, lab Cu Ka; the round robin's pure-phase "
         "pattern doubles as the cell-anchor specimen",
-        "absolute"),
+        "absolute",
+        state="development"),
     "lab6_cbn": Dataset(
         "11BM_LaB6_cBN_mg2044.xye",
         "APS 11-BM synchrotron NIST SRM 660b LaB6 + cubic BN two-phase "
         "mixture, lambda = 0.413680 A from the .prm; propagated esds from "
         "twelve analyser crystals. No weighed composition exists, so every "
         "row referenced to it is cross-code",
-        "cross_code"),
+        "cross_code",
+        state="development"),
     "si640c": Dataset(
         "11BM_Si640c.xy",
         "APS 11-BM synchrotron NIST SRM 640c silicon, run 4918 (Feb 2010), the "
@@ -204,46 +209,54 @@ DATASETS: dict[str, Dataset] = {
         "stated 0.412359 A and refined against the held certificate cell.  "
         "Real propagated esds (twelve analysers).  The refined wavelength is "
         "cross-code against XND 1.42; the held cell is the NIST certificate",
-        "cross_code"),
+        "cross_code",
+        state="development"),
     "nac": Dataset(
         "11BM_NAC.fxye",
         "APS 11-BM synchrotron Na2Ca3Al2F14 with a CaF2 impurity, "
         "lambda = 0.4139090 A from the .prm",
-        "characterisation"),
+        "characterisation",
+        state="development"),
     "fap": Dataset(
         "FAP.XRA",
         "GSAS-II LabData tutorial fluorapatite; FAP.EXP is GSAS's converged "
         "fit and supplies both the reference values and the protocol",
-        "cross_code"),
+        "cross_code",
+        state="development"),
     "powderline_lab6": Dataset(
         "powderline/example_LaB6/input.json",
         "NSLS-II 28-ID-1 SRM 660c LaB6, lambda = 0.1665 A, as a PowderLine "
         "recipe with the SRM cell HELD -- an instrument-profile calibration, "
         "so there is no cell to compare and the reference is the profile "
         "GSAS-II and TOPAS each drew",
-        "cross_code"),
+        "cross_code",
+        state="development"),
     "powderline_drx33": Dataset(
         "powderline/example_DRX_33/input.json",
         "NSLS-II 28-ID-1 disordered-rocksalt cathode + Li4MgWO6, two phases, "
         "as a PowderLine recipe.  The only dataset here with TWO committed "
         "reference engines, and they disagree by 2668 ppm on the cubic cell",
-        "cross_code"),
+        "cross_code",
+        state="development"),
     "hl2": Dataset(
         "hl2_peaks.txt",
         "74 peaks from a genuinely UNIDENTIFIED laboratory pattern -- our own "
         "derived product from datalab-org/guillemot's MIT examples, carried "
         "with attribution; the compound is unknown and stays unknown",
-        "characterisation"),
+        "characterisation",
+        state="development"),
     "qarr": Dataset(
         "qarr",
         "IUCr CPD QPA round-robin patterns (samples 1a-1h, 2, 4 and six pure "
         "phases), Cu Ka doublet, graphite diffracted-beam monochromator",
-        "absolute"),
+        "absolute",
+        state="development"),
     "srm660a_capillary": Dataset(
         "11BM_LaB6_660a.fxye",
         "APS 11-BM SRM 660a LaB6 in the beamline's documented 0.81 mm Kapton "
         "bore; lambda was calibrated against this very standard",
-        "consistency"),
+        "consistency",
+        state="development"),
     "ndruo_joint": Dataset(
         "mg090.fxye",
         "Nd2Ru2O7 pyrochlore, one specimen, two histograms: APS 11-BM "
@@ -255,14 +268,16 @@ DATASETS: dict[str, Dataset] = {
         "the X-ray wavelength and refine the neutron one -- the only "
         "one-specimen two-wavelength pair in the suite, hence the only "
         "dataset that can exercise a refinable wavelength at all",
-        "cross_code"),
+        "cross_code",
+        state="development"),
     "bethanechol": Dataset(
         "bethanechol_indexing.json",
         "Bergmann et al. (2004) Tables 5 and 6: ten sets of twenty 2theta "
         "positions for bethanechol chloride, the known P21/n cell, and every "
         "program's published score -- the only externally graded benchmark any "
         "feature in this package has",
-        "cross_code"),
+        "cross_code",
+        state="development"),
     "cr2wo6_hb2a": Dataset(
         "gsas2_hb2a_cr2wo6_4K.dat",
         "HFIR HB-2A constant-wavelength neutron (lambda 2.4067 A) Cr2WO6 at "
@@ -271,7 +286,8 @@ DATASETS: dict[str, Dataset] = {
         "tutorial pair, vendored verbatim.  No certified moment exists, so "
         "every row referenced to it is characterisation: a moment the report "
         "supports below T_N and refuses above it",
-        "characterisation"),
+        "characterisation",
+        state="development"),
     "lamno3_bt1": Dataset(
         "gsas2_bt1_lamno3_50K.gsas",
         "NIST BT-1 constant-wavelength neutron (lambda 1.5403 A, Cu(311)) "
@@ -281,7 +297,8 @@ DATASETS: dict[str, Dataset] = {
         "tutorial quotes no moment, so every row referenced to it is "
         "characterisation: which group the data prefers, and the shape of the "
         "moment it carries",
-        "characterisation"),
+        "characterisation",
+        state="development"),
     "srm1976a_plate": Dataset(
         "srm1976a_corundum_xpert.xy",
         "NIST SRM 1976a sintered corundum plate, lab Cu Ka on a "
@@ -290,7 +307,8 @@ DATASETS: dict[str, Dataset] = {
         "(PO_Spherical_Harmonics at order 4).  The certificate certifies "
         "relative intensities on another instrument, not this texture, so "
         "every row referenced to it is cross-code",
-        "cross_code"),
+        "cross_code",
+        state="development"),
 }
 
 
@@ -324,6 +342,11 @@ class Claim:
     #: empty on every other, since it is what decides whether the row
     #: verifies or validates (:func:`validates`)
     reference_kind: str = ""
+    #: what the validation covers, in words: the phases, the instruments and
+    #: the range the bar was met over (Oberkampf & Roy: a validation result is
+    #: stated over a domain).  Required on every row that validates
+    #: (:func:`validates`), empty on the rest
+    domain: str = ""
 
 
 CLAIMS: tuple[Claim, ...] = (
@@ -584,6 +607,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "(#1085). Before WP-1938 the width sat on its clamp at 12 "
                  "reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %",
         features=("lattice_metric", "wavelength", "position_aberrations"),
+        domain="one phase (LaB6), one laboratory instrument (Cu Ka doublet, graphite analyser), the cell at the certification measurement's 20.85 C; not the certificate's own 22.5 C band",
     ),
     Claim(
         "test_acceptance_srm660c", "test_srm660c_extinction_does_no_harm",
@@ -621,6 +645,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "1.5-1.9 for analytical-PSF lab fits (Cline 2015); 1.9.0 read "
                  "+30, -312 / -282 ppm, Rwp 14.6 % and GoF 1.63",
         features=("lattice_metric",),
+        domain="one phase (corundum), one laboratory instrument (Cu Ka), c/a and both axes; the absolute axes are not at certificate grade",
     ),
     Claim(
         "test_acceptance_srm676a",
@@ -998,7 +1023,8 @@ CLAIMS: tuple[Claim, ...] = (
                  "closure exact to 1e-6.  1.9.0 read 4.92, 1.1 and 2.19; "
                  "WP-2002's closing stage (#1085) took them to 5.08 and 2.26 "
                  "and its width twin hold (#1113) to 5.10 and 2.30",
-        features=("bragg_intensities", "qpa"),
+        features=("qpa",),
+        domain="the eight sample-1 mixtures (corundum, zincite and fluorite, 1a-1h), one laboratory instrument (Cu Ka doublet, graphite monochromator); phase weight fractions only, to the published participant spread, not to the weighing uncertainty",
     ),
     Claim(
         "test_acceptance_qpa_roundrobin",
@@ -1051,6 +1077,7 @@ CLAIMS: tuple[Claim, ...] = (
         measured="r ~ 0.67; worst fraction 3.0 wt % (zincite); H Biso held "
                  "at exactly 2.5; 1.9.0 read 2.8 wt %",
         features=("march_dollase", "qpa"),
+        domain="the sample-2 mixture (corundum, zincite, fluorite and brucite), one laboratory instrument; phase weight fractions to the participant spread, with brucite's March-Dollase axis refined",
     ),
     Claim(
         "test_acceptance_qpa_roundrobin", "test_sample2_brucite_spherical_harmonics",
@@ -1067,6 +1094,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "before WP-2002: 3.41, 2.71 and 2.80; the closing stage "
                  "(#1085) and the width twin hold (#1113) each moved them",
         features=("spherical_harmonics_texture", "qpa"),
+        domain="the sample-2 mixture (corundum, zincite, fluorite and brucite), one laboratory instrument; phase weight fractions at spherical-harmonics orders 4 and 6, to the participant spread",
     ),
     Claim(
         "test_acceptance_qpa_roundrobin",
@@ -1100,6 +1128,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "(#1113)",
         features=("anomalous_dispersion", "qpa"),
         reference_kind="independent_measurement",
+        domain="the eight sample-1 mixtures (corundum, zincite and fluorite, 1a-1h), one laboratory instrument (Cu Ka doublet, graphite monochromator); phase weight fractions only, to 2.5 wt %, with anomalous dispersion on",
     ),
     Claim(
         "test_acceptance_dispersion",
@@ -1258,7 +1287,8 @@ CLAIMS: tuple[Claim, ...] = (
                   "than restated, so what differs between the two suites is "
                   "only the chaining",
         measured="identical to the independent fits' record",
-        features=("qpa", "sequential_series"),
+        features=("qpa",),
+        domain="the eight sample-1 mixtures (corundum, zincite and fluorite, 1a-1h), one laboratory instrument (Cu Ka doublet, graphite monochromator); phase weight fractions only, fitted as a chained series, to the participant spread",
     ),
     Claim(
         "test_acceptance_sequential", "test_chained_agrees_with_independent_fits",
@@ -1706,6 +1736,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "chi2_red 0.67; the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list",
         diagnostics=("INDEX_SHIFT_FROM_PAIRS",),
         features=("indexing",),
+        domain="one phase (corundum), one laboratory pattern (Cu Ka); the top-ranked cell's two axes, to 150 ppm",
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1738,6 +1769,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "Rwp 0.285 -> 0.224: the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list, and WP-2002's closing stage and width twin hold (#1085, #1113) moved the Le Bail checks",
         diagnostics=("INDEX_SHIFT_FROM_PAIRS",),
         features=("indexing", "peak_shift_screen"),
+        domain="one phase (corundum), one laboratory pattern (Cu Ka); the cell with the shift template declared",
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1762,6 +1794,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "and a CAUSE is not",
         diagnostics=("INDEX_SHIFT_FROM_PAIRS",),
         features=("peak_shift_screen",),
+        domain="one phase (LaB6), one laboratory pattern (Cu Ka); the displacement term from the peak list alone",
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1784,6 +1817,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "list supplies too few pairs to concentrate, the published "
                   "bethanechol failure, and this needs none",
         features=("peak_shift_screen",),
+        domain="one phase (LaB6), one laboratory pattern (Cu Ka); the shift read by the SVD zero-error column from a cell started at the certified one",
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1799,6 +1833,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "outright.  A line no lattice can index is not a shifted "
                   "line, and the column does not pretend otherwise",
         features=("peak_shift_screen",),
+        domain="one phase (corundum), one laboratory pattern (Cu Ka); the shift read by the SVD zero-error column",
     ),
     Claim(
         "test_acceptance_indexing",
@@ -1888,6 +1923,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "best_or_none() returns None",
         diagnostics=("INDEX_SHIFT_ALLOWANCE",),
         features=("indexing",),
+        domain="one phase (LaB6), one laboratory pattern (Cu Ka); the cubic cell at 200 ppm",
     ),
     Claim(
         "test_acceptance_indexing",
@@ -2085,6 +2121,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "own docstring names).  Search: +0.009 +- 0.016, consistent "
                  "with none",
         features=("indexing", "peak_shift_screen"),
+        domain="one phase (LaB6), one laboratory pattern (Cu Ka) with its tail components in the peak list; the shift screen",
     ),
     Claim(
         "test_acceptance_indexing",
@@ -2166,6 +2203,7 @@ CLAIMS: tuple[Claim, ...] = (
                  "one engine cannot promote past low",
         diagnostics=("!INDEX_SHIFT_ALLOWANCE",),
         features=("indexing",),
+        domain="one phase (LaB6), one laboratory pattern (Cu Ka); the cell with the off-lattice components removed (an attribution probe, not a protocol)",
     ),
     # ---- the round-robin pure phases, NAC, FAP and the unknown ----------
     Claim(
@@ -2617,6 +2655,7 @@ CLAIMS: tuple[Claim, ...] = (
                   "refined.  XND held 5.4311948, 0.4 ppm above, negligible "
                   "against every band here and stated in the docstring",
         measured="cell.b and cell.c both exactly 5.4311946 A, esd None",
+        domain="one phase (Si), the NIST SRM 640c cell held at its certified value, so the bar is an identity",
     ),
     Claim(
         "test_acceptance_si640c",
@@ -3055,6 +3094,10 @@ FEATURE_TESTS: dict[str, tuple[str, ...]] = {
     "tof_profile": (
         "test_instrument_tof.py::test_the_default_type_three_block_is_read_in_the_manuals_order",
         "test_tof_axis.py::test_fit_refuses_a_tof_pattern_against_a_cw_instrument",
+    ),
+    "bragg_intensities": (
+        "test_crystallography.py::test_structure_factor_against_reference",
+        "test_lorentz_polarization.py::test_the_factor_matches_the_published_form_at_both_polarisations",
     ),
     "neutron_scattering": (
         "test_neutron_scattering.py::test_natural_element_scattering_lengths_match_gemmi_sears_1992",
@@ -3538,7 +3581,10 @@ def render_markdown() -> str:
             for c in validating:
                 ds = DATASETS[c.dataset]
                 w(f"**Validated by:** `{c.test}`, dataset `{c.dataset}` "
-                  f"({ds.state} data). Mismatch: {c.measured}\n")
+                  f"({ds.state} data).\n")
+                w(f"- *Reference value:* {c.reference}")
+                w(f"- *Domain:* {c.domain}")
+                w(f"- *Mismatch:* {c.measured}\n")
             w("**State:** validated on development data.\n")
         else:
             w("**State:** not yet validated.\n")

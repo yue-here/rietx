@@ -124,9 +124,17 @@ Cell and Bragg's law.
 
 **Verified by:** `test_the_cbn_cell_agrees_with_topas_to_better_than_50_ppm`, `test_srm660c_lab6_rietveld`, `test_srm676a_corundum_cell_anchor`, `test_the_two_descriptions_of_the_r_lattice_refine_to_the_same_cell`, `test_drx_cells_land_inside_the_two_engines_envelope`, `test_drx_agrees_with_topas_far_more_closely_than_the_engines_agree`, `test_fap_lab_rietveld_matches_gsas`, `test_nac_lebail_then_rietveld`, `test_the_cell_belongs_to_the_synchrotron`
 
-**Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data). Mismatch: a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
+**Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data).
 
-**Validated by:** `test_srm676a_corundum_cell_anchor`, dataset `srm676a` (development data). Mismatch: c/a +29 ppm; absolute axes -314 / -284 ppm with |da - dc| within 2.9e-5; Rwp 14.4 %, GoF 1.60 against a GoF floor of 1.5-1.9 for analytical-PSF lab fits (Cline 2015); 1.9.0 read +30, -312 / -282 ppm, Rwp 14.6 % and GoF 1.63
+- *Reference value:* NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-6 at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
+- *Domain:* one phase (LaB6), one laboratory instrument (Cu Ka doublet, graphite analyser), the cell at the certification measurement's 20.85 C; not the certificate's own 22.5 C band
+- *Mismatch:* a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
+
+**Validated by:** `test_srm676a_corundum_cell_anchor`, dataset `srm676a` (development data).
+
+- *Reference value:* NIST SRM 676a certificate a = 4.759355(80), c = 12.99231(15) A (k = 2, 22.5 C).  c/a's relative k=2 uncertainty is ~21 ppm and the bar is 100 ppm — a small multiple of it.  The absolute bar is 600 ppm, nowhere near certificate grade, and the uniformity check |da - dc| < 1.5e-4 is what stops an esd laundering a many-sigma systematic
+- *Domain:* one phase (corundum), one laboratory instrument (Cu Ka), c/a and both axes; the absolute axes are not at certificate grade
+- *Mismatch:* c/a +29 ppm; absolute axes -314 / -284 ppm with |da - dc| within 2.9e-5; Rwp 14.4 %, GoF 1.60 against a GoF floor of 1.5-1.9 for analytical-PSF lab fits (Cline 2015); 1.9.0 read +30, -312 / -282 ppm, Rwp 14.6 % and GoF 1.63
 
 **State:** validated on development data.
 
@@ -136,7 +144,11 @@ Emission lines, wavelength scales, harmonics, wavelength-cell degeneracy.
 
 **Verified by:** `test_srm660c_lab6_rietveld`, `test_the_refined_wavelength_is_the_solo_cell_disagreement`, `test_the_diagnostic_reports_the_ppm_and_nothing_claims_rwp`, `test_swapping_which_wavelength_is_held_measures_the_same_ratio`, `test_the_refined_wavelength_recovers_xnds_calibration_error`, `test_the_symmetric_window_recovers_xnd_to_sub_ppm`, `test_the_wavelength_calibration_diagnostic_fires_once_and_reports_the_ppm`
 
-**Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data). Mismatch: a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
+**Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data).
+
+- *Reference value:* NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-6 at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
+- *Domain:* one phase (LaB6), one laboratory instrument (Cu Ka doublet, graphite analyser), the cell at the certification measurement's 20.85 C; not the certificate's own 22.5 C band
+- *Mismatch:* a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
 
 **State:** validated on development data.
 
@@ -146,7 +158,11 @@ Zero, specimen displacement and transparency.
 
 **Verified by:** `test_srm660c_lab6_rietveld`
 
-**Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data). Mismatch: a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
+**Validated by:** `test_srm660c_lab6_rietveld`, dataset `srm660c` (development data).
+
+- *Reference value:* NIST's cell recomputed for this dataset's 20.85 C block, 4.156780 A, under an explicitly interim +-2e-4 A band; the certificate's own +-8e-6 at 22.5 C is NOT claimed and the residual is a characterised cotTheta/sin2Theta aberration (divergence, tube tails, monochromator passband) fenced to the v2 FPA work
+- *Domain:* one phase (LaB6), one laboratory instrument (Cu Ka doublet, graphite analyser), the cell at the certification measurement's 20.85 C; not the certificate's own 22.5 C band
+- *Mismatch:* a = 4.156882(21) A, +24 ppm; Rwp 8.74 %, GoF 1.89; zero_shift held at exactly 0.0; displacement -0.0790 mm vs the CIF's -0.07877. The Gaussian width is real at all 60 reflections. 1.9.0 read +25 ppm (24.6 against 24.5), Rwp 8.75 % and -0.0791 mm, before WP-2002's closing stage (#1085). Before WP-1938 the width sat on its clamp at 12 reflections, and the fit read 4.156895 A, +28 ppm, Rwp 8.67 %
 
 **State:** validated on development data.
 
@@ -194,11 +210,9 @@ Finger-Cox-Jephcoat axial divergence.
 
 Bragg intensities: structure factor, X-ray f0, occupancy, Lorentz-polarisation, Rietveld mode.
 
-**Verified by:** `test_sample1_fractions_within_participant_spread`
+**Verified by:** unit tests `tests/test_crystallography.py::test_structure_factor_against_reference`, `tests/test_lorentz_polarization.py::test_the_factor_matches_the_published_form_at_both_polarisations`
 
-**Validated by:** `test_sample1_fractions_within_participant_spread`, dataset `qarr` (development data). Mismatch: worst 5.10 wt % (1f zincite), traces <= 1.3, RMS 2.30; closure exact to 1e-6.  1.9.0 read 4.92, 1.1 and 2.19; WP-2002's closing stage (#1085) took them to 5.08 and 2.26 and its width twin hold (#1113) to 5.10 and 2.30
-
-**State:** validated on development data.
+**State:** not yet validated.
 
 ### `neutron_scattering`
 
@@ -214,7 +228,11 @@ Anomalous scattering f′ and f″ (Source.dispersion).
 
 **Verified by:** `test_sample1_fractions_beat_the_dispersion_free_fit`, `test_the_microabsorption_shape_was_mostly_dispersion`, `test_zincite_cell_does_not_move`, `test_srm660c_lattice_parameter_is_untouched`, `test_the_neglect_diagnostic_clears_when_the_block_is_on`
 
-**Validated by:** `test_sample1_fractions_beat_the_dispersion_free_fit`, dataset `qarr` (development data). Mismatch: worst 1.37 wt % (was 5.13); 1.20 on 1.9.0, before WP-2002's closing stage (#1085, 1.34) and width twin hold (#1113)
+**Validated by:** `test_sample1_fractions_beat_the_dispersion_free_fit`, dataset `qarr` (development data).
+
+- *Reference value:* the weighed composition at 2.5 wt %, tightened from the participant spread's 6.0/2.0 — the tightening IS the claim, and it was written down before the refits
+- *Domain:* the eight sample-1 mixtures (corundum, zincite and fluorite, 1a-1h), one laboratory instrument (Cu Ka doublet, graphite monochromator); phase weight fractions only, to 2.5 wt %, with anomalous dispersion on
+- *Mismatch:* worst 1.37 wt % (was 5.13); 1.20 on 1.9.0, before WP-2002's closing stage (#1085, 1.34) and width twin hold (#1113)
 
 **State:** validated on development data.
 
@@ -264,7 +282,11 @@ Preferred orientation, March-Dollase.
 
 **Verified by:** `test_sample2_brucite_march_dollase`
 
-**Validated by:** `test_sample2_brucite_march_dollase`, dataset `qarr` (development data). Mismatch: r ~ 0.67; worst fraction 3.0 wt % (zincite); H Biso held at exactly 2.5; 1.9.0 read 2.8 wt %
+**Validated by:** `test_sample2_brucite_march_dollase`, dataset `qarr` (development data).
+
+- *Reference value:* participant spread again on the fractions; the March coefficient is judged as physics (r < 1 means platy, and 0.4 < r < 0.9 is far enough from the r = 1 identity to be a detection rather than a fitted nothing)
+- *Domain:* the sample-2 mixture (corundum, zincite, fluorite and brucite), one laboratory instrument; phase weight fractions to the participant spread, with brucite's March-Dollase axis refined
+- *Mismatch:* r ~ 0.67; worst fraction 3.0 wt % (zincite); H Biso held at exactly 2.5; 1.9.0 read 2.8 wt %
 
 **State:** validated on development data.
 
@@ -274,7 +296,11 @@ Preferred orientation, spherical harmonics.
 
 **Verified by:** `test_sample2_brucite_spherical_harmonics`, `test_c20_and_c40_agree_with_topas_with_no_conversion`, `test_the_measured_ratio_excludes_the_other_normalisations`, `test_without_texture_the_plate_fits_measurably_worse`
 
-**Validated by:** `test_sample2_brucite_spherical_harmonics`, dataset `qarr` (development data). Mismatch: worst fraction 3.71 wt % at order 4, 2.91 at order 6, against March-Dollase's 3.01; C2,0 1.40(4) and 1.39(5); J 1.45 and 1.46; min P 0.47 and 0.39.  Measured by WP-1960 before WP-2002: 3.41, 2.71 and 2.80; the closing stage (#1085) and the width twin hold (#1113) each moved them
+**Validated by:** `test_sample2_brucite_spherical_harmonics`, dataset `qarr` (development data).
+
+- *Reference value:* participant spread on the fractions, the bar March-Dollase meets on the same protocol; C2,0 is judged as physics (positive is platy with psi = 0 on a reflection plate, and five esd from the C = 0 identity is a detection)
+- *Domain:* the sample-2 mixture (corundum, zincite, fluorite and brucite), one laboratory instrument; phase weight fractions at spherical-harmonics orders 4 and 6, to the participant spread
+- *Mismatch:* worst fraction 3.71 wt % at order 4, 2.91 at order 6, against March-Dollase's 3.01; C2,0 1.40(4) and 1.39(5); J 1.45 and 1.46; min P 0.47 and 0.39.  Measured by WP-1960 before WP-2002: 3.41, 2.71 and 2.80; the closing stage (#1085) and the width twin hold (#1113) each moved them
 
 **State:** validated on development data.
 
@@ -284,15 +310,35 @@ Quantitative phase analysis and microabsorption.
 
 **Verified by:** `test_the_qpa_agrees_with_topas_within_its_own_esd`, `test_drx_phase_scales_are_the_same_answer_as_topas`, `test_sample1_fractions_within_participant_spread`, `test_a_supported_trace_phase_is_never_held`, `test_sample2_brucite_march_dollase`, `test_sample2_brucite_spherical_harmonics`, `test_sample1_fractions_beat_the_dispersion_free_fit`, `test_chained_qpa_within_participant_spread`
 
-**Validated by:** `test_sample1_fractions_within_participant_spread`, dataset `qarr` (development data). Mismatch: worst 5.10 wt % (1f zincite), traces <= 1.3, RMS 2.30; closure exact to 1e-6.  1.9.0 read 4.92, 1.1 and 2.19; WP-2002's closing stage (#1085) took them to 5.08 and 2.26 and its width twin hold (#1113) to 5.10 and 2.30
+**Validated by:** `test_sample1_fractions_within_participant_spread`, dataset `qarr` (development data).
 
-**Validated by:** `test_sample2_brucite_march_dollase`, dataset `qarr` (development data). Mismatch: r ~ 0.67; worst fraction 3.0 wt % (zincite); H Biso held at exactly 2.5; 1.9.0 read 2.8 wt %
+- *Reference value:* the weighed composition is truth; the tolerance is the published participant spread (Madsen 2001 Fig. 2), 6.0 wt % for majors and 2.0 for traces below 5 wt %.  Never sigma(W): those esds are 0.1-0.7 wt %, several times below the measured errors
+- *Domain:* the eight sample-1 mixtures (corundum, zincite and fluorite, 1a-1h), one laboratory instrument (Cu Ka doublet, graphite monochromator); phase weight fractions only, to the published participant spread, not to the weighing uncertainty
+- *Mismatch:* worst 5.10 wt % (1f zincite), traces <= 1.3, RMS 2.30; closure exact to 1e-6.  1.9.0 read 4.92, 1.1 and 2.19; WP-2002's closing stage (#1085) took them to 5.08 and 2.26 and its width twin hold (#1113) to 5.10 and 2.30
 
-**Validated by:** `test_sample2_brucite_spherical_harmonics`, dataset `qarr` (development data). Mismatch: worst fraction 3.71 wt % at order 4, 2.91 at order 6, against March-Dollase's 3.01; C2,0 1.40(4) and 1.39(5); J 1.45 and 1.46; min P 0.47 and 0.39.  Measured by WP-1960 before WP-2002: 3.41, 2.71 and 2.80; the closing stage (#1085) and the width twin hold (#1113) each moved them
+**Validated by:** `test_sample2_brucite_march_dollase`, dataset `qarr` (development data).
 
-**Validated by:** `test_sample1_fractions_beat_the_dispersion_free_fit`, dataset `qarr` (development data). Mismatch: worst 1.37 wt % (was 5.13); 1.20 on 1.9.0, before WP-2002's closing stage (#1085, 1.34) and width twin hold (#1113)
+- *Reference value:* participant spread again on the fractions; the March coefficient is judged as physics (r < 1 means platy, and 0.4 < r < 0.9 is far enough from the r = 1 identity to be a detection rather than a fitted nothing)
+- *Domain:* the sample-2 mixture (corundum, zincite, fluorite and brucite), one laboratory instrument; phase weight fractions to the participant spread, with brucite's March-Dollase axis refined
+- *Mismatch:* r ~ 0.67; worst fraction 3.0 wt % (zincite); H Biso held at exactly 2.5; 1.9.0 read 2.8 wt %
 
-**Validated by:** `test_chained_qpa_within_participant_spread`, dataset `qarr` (development data). Mismatch: identical to the independent fits' record
+**Validated by:** `test_sample2_brucite_spherical_harmonics`, dataset `qarr` (development data).
+
+- *Reference value:* participant spread on the fractions, the bar March-Dollase meets on the same protocol; C2,0 is judged as physics (positive is platy with psi = 0 on a reflection plate, and five esd from the C = 0 identity is a detection)
+- *Domain:* the sample-2 mixture (corundum, zincite, fluorite and brucite), one laboratory instrument; phase weight fractions at spherical-harmonics orders 4 and 6, to the participant spread
+- *Mismatch:* worst fraction 3.71 wt % at order 4, 2.91 at order 6, against March-Dollase's 3.01; C2,0 1.40(4) and 1.39(5); J 1.45 and 1.46; min P 0.47 and 0.39.  Measured by WP-1960 before WP-2002: 3.41, 2.71 and 2.80; the closing stage (#1085) and the width twin hold (#1113) each moved them
+
+**Validated by:** `test_sample1_fractions_beat_the_dispersion_free_fit`, dataset `qarr` (development data).
+
+- *Reference value:* the weighed composition at 2.5 wt %, tightened from the participant spread's 6.0/2.0 — the tightening IS the claim, and it was written down before the refits
+- *Domain:* the eight sample-1 mixtures (corundum, zincite and fluorite, 1a-1h), one laboratory instrument (Cu Ka doublet, graphite monochromator); phase weight fractions only, to 2.5 wt %, with anomalous dispersion on
+- *Mismatch:* worst 1.37 wt % (was 5.13); 1.20 on 1.9.0, before WP-2002's closing stage (#1085, 1.34) and width twin hold (#1113)
+
+**Validated by:** `test_chained_qpa_within_participant_spread`, dataset `qarr` (development data).
+
+- *Reference value:* the QPA suite's own MAJOR_TOL/TRACE_TOL, imported rather than restated, so what differs between the two suites is only the chaining
+- *Domain:* the eight sample-1 mixtures (corundum, zincite and fluorite, 1a-1h), one laboratory instrument (Cu Ka doublet, graphite monochromator); phase weight fractions only, fitted as a chained series, to the participant spread
+- *Mismatch:* identical to the independent fits' record
 
 **State:** validated on development data.
 
@@ -422,15 +468,35 @@ Indexing: engines, figures of merit, lattice ambiguity, supercells.
 
 **Verified by:** `test_every_set_is_twenty_ascending_lines`, `test_table_5_reconstruction_sums_to_the_published_globals`, `test_the_zeroshift_correction_is_exactly_the_paper_s`, `test_the_intensity_cut_is_a_subset_of_the_same_measurement`, `test_the_published_cell_reproduces_the_paper_s_impurity_counts`, `test_the_runner_adopts_the_paper_s_domain_from_the_fixture`, `test_the_scoring_rule_is_the_paper_s_and_reads_it_from_the_fixture`, `test_the_published_cell_is_recognised_in_the_setting_the_search_returns`, `test_published_figures_of_merit_are_reproduced_unfloored`, `test_positions_alone_cannot_separate_lab6_from_a_half_volume_rival`, `test_the_cross_code_cell_leads_because_the_engines_agree_on_it`
 
-**Validated by:** `test_a_certified_lab_pattern_indexes_and_is_graded_honestly`, dataset `srm676a` (development data). Mismatch: ranked first, trigonal R, a +89 ppm and c +60 ppm, 44 of 46 lines, chi2_red 0.55.  Confidence low on three caveats: engines_disagree, predicted_but_absent (11 -- the R-3c c-glide, not an oversized cell) and fom_panel_disagrees.  best_or_none() returns None.  WP-1038 cleared two of the former four: the shift is now MEASURED before the search from harmonic reflection pairs (-0.0641 deg, against an independently known -0.065), so shift_allowance_assumed no longer fires, and the measured window crosses the 0.9 bar unaided (indexed fraction 0.957).  WP-1110 and WP-1510 took two no_intensity components and five duplicate copies out of the usable list, so the row reads 45 of 47 where it read 51 of 55 (the 49-line and +101 ppm figures of the assumed 0.05 deg window are WP-1038's, not re-run).  The wider window is not free: a window that cannot rule out a constant must stay at |c| everywhere, where the true cos(theta) deviation has fallen to 0.26|c| by 150 deg.  1.9.0 read a +110 and c +57 ppm, 45 of 47 lines and chi2_red 0.67; the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list
+**Validated by:** `test_a_certified_lab_pattern_indexes_and_is_graded_honestly`, dataset `srm676a` (development data).
 
-**Validated by:** `test_declaring_the_shift_template_is_what_recovers_the_certificate`, dataset `srm676a` (development data). Mismatch: fitted shift -0.0699 +/- 0.0192 deg; a +89 -> -111 ppm, c +60 -> -96 ppm, c/a -29 -> +15 ppm; M20 23.3 -> 187.1, F_N 15.3 -> 145.0, Le Bail Rwp 0.256 -> 0.176.  Since WP-1038 the two mechanisms are cleanly separated: the pair-MEASURED magnitude widens the window and finds lines (both calls index 44 of 46, so indexed_fraction_low has already cleared before the template is declared), and the DECLARED shape is what moves the cell.  Three routes to one systematic, none told the answer: -0.0641 from pairs pre-search, -0.0749 from the post-candidate fit, -0.065 measured against the certificate.  Still low, on caveats that have nothing to do with the shift.  1.9.0 read -0.0749 +/- 0.0187 deg, a +110 -> -114 and c +57 -> -109 ppm, c/a -54 -> +5, M20 23.7 -> 160.0, F_N 16.6 -> 114.9 and Le Bail Rwp 0.285 -> 0.224: the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list, and WP-2002's closing stage and width twin hold (#1085, #1113) moved the Le Bail checks
+- *Reference value:* NIST SRM 676a a = 4.759355(80), c = 12.99231(15) A (k = 2). Both axes are asserted at 150 ppm.  An earlier version of this row asserted c as a RANGE of 1000-5000 ppm and called it 'what an uncalibrated lab pattern costs'; it was not, it was dichotomy's duplicate-leaf hash skipping the leaf that held the certificate's c (WP-1026, _box_key)
+- *Domain:* one phase (corundum), one laboratory pattern (Cu Ka); the top-ranked cell's two axes, to 150 ppm
+- *Mismatch:* ranked first, trigonal R, a +89 ppm and c +60 ppm, 44 of 46 lines, chi2_red 0.55.  Confidence low on three caveats: engines_disagree, predicted_but_absent (11 -- the R-3c c-glide, not an oversized cell) and fom_panel_disagrees.  best_or_none() returns None.  WP-1038 cleared two of the former four: the shift is now MEASURED before the search from harmonic reflection pairs (-0.0641 deg, against an independently known -0.065), so shift_allowance_assumed no longer fires, and the measured window crosses the 0.9 bar unaided (indexed fraction 0.957).  WP-1110 and WP-1510 took two no_intensity components and five duplicate copies out of the usable list, so the row reads 45 of 47 where it read 51 of 55 (the 49-line and +101 ppm figures of the assumed 0.05 deg window are WP-1038's, not re-run).  The wider window is not free: a window that cannot rule out a constant must stay at |c| everywhere, where the true cos(theta) deviation has fallen to 0.26|c| by 150 deg.  1.9.0 read a +110 and c +57 ppm, 45 of 47 lines and chi2_red 0.67; the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list
 
-**Validated by:** `test_a_certified_cubic_cell_is_recovered_with_no_extinction_caveat`, dataset `srm660c` (development data). Mismatch: cubic P ranked first, a -127 ppm against the CIF's 4.156780 A; predicted_but_absent 0 of 30 and predicted_seen_fraction 1.000 against corundum's 0.58.  Still low, but the caveat list has been shrinking by evidence and is now ONE: fom_panel_disagrees.  WP-1038 cleared shift_allowance_assumed (this pattern's +0.0345 deg is measured from harmonic pairs before the search), and WP-1039 cleared engines_disagree -- trial_error was not failing to find the certified cell, it was solving from the wrong base lines, because its pool took the lowest-Q lines of the whole list and five of this pattern's low-angle components are not lines of the phase.  Drawn from the strongest-N selection instead, BOTH engines find it.  Agreement was necessary and not sufficient: a cubic-only search now promotes to high, this four-system one does not.  best_or_none() returns None
+**Validated by:** `test_declaring_the_shift_template_is_what_recovers_the_certificate`, dataset `srm676a` (development data).
 
-**Validated by:** `test_the_shift_screen_survives_the_tail_components_but_the_search_cannot`, dataset `srm660c` (development data). Mismatch: tail components carry sigma ~0.005 deg against the real lines' ~0.0005; after the quadrature allowance that 100x contrast is 1.005.  Screen: +0.0367 +- 0.0015 (0.88 of the predicted 0.0415, the rest being the aberrations SRM 660c's own docstring names).  Search: +0.009 +- 0.016, consistent with none
+- *Reference value:* The displacement was measured independently against the certificate as a -0.065 deg cos(theta) term (WP-1023).  This row never supplies it: the search fits the template after each candidate survives, from the pattern alone.  The cell and the figures of merit are asserted TOGETHER, because f_n's stated blind spot is that a refined shift can manufacture a large figure of merit on its own
+- *Domain:* one phase (corundum), one laboratory pattern (Cu Ka); the cell with the shift template declared
+- *Mismatch:* fitted shift -0.0699 +/- 0.0192 deg; a +89 -> -111 ppm, c +60 -> -96 ppm, c/a -29 -> +15 ppm; M20 23.3 -> 187.1, F_N 15.3 -> 145.0, Le Bail Rwp 0.256 -> 0.176.  Since WP-1038 the two mechanisms are cleanly separated: the pair-MEASURED magnitude widens the window and finds lines (both calls index 44 of 46, so indexed_fraction_low has already cleared before the template is declared), and the DECLARED shape is what moves the cell.  Three routes to one systematic, none told the answer: -0.0641 from pairs pre-search, -0.0749 from the post-candidate fit, -0.065 measured against the certificate.  Still low, on caveats that have nothing to do with the shift.  1.9.0 read -0.0749 +/- 0.0187 deg, a +110 -> -114 and c +57 -> -109 ppm, c/a -54 -> +5, M20 23.7 -> 160.0, F_N 16.6 -> 114.9 and Le Bail Rwp 0.285 -> 0.224: the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list, and WP-2002's closing stage and width twin hold (#1085, #1113) moved the Le Bail checks
 
-**Validated by:** `test_what_the_unflagged_tail_components_cost_the_certified_cell`, dataset `srm660c` (development data). Mismatch: a = 4.156801 A, +5 ppm, M20 3266, ZERO caveats, confidence high -- a first on real data, against -127 ppm with none of the three.  But best_or_none() is None: the a*sqrt2 cell (5.878605) reached high in BOTH its I and P descriptions, all three engines finding all three cells; since WP-1449 the P one is refuted as an index-2 superlattice of the I one (supercell_refuted, low) and the I one still reaches high.  The 'best_or_none() non-None' claim recorded here before WP-1041 held only while trial_error's scale-invariant dedup key could return one cubic candidate per search, denying the supercells its vote -- the flagship result was protected by a bug rather than by the gate.  Everything that refutes the supercell is measured and ungated: Rwp 0.100 vs 0.860/0.654, predicted_seen_fraction 1.00 vs 0.88/0.49, m_rev 2245 vs 6.8/1.9, unmatched_observed 21 vs 168/129 (169/127 and Rwp 0.861/0.660 on 1.9.0, before WP-2002's width twin hold moved the Le Bail checks), while the one gated detector (predicted_but_absent) reads 0 for all three.  Also measured: declaring the probe-trimmed screen's own sigma_sys (0.0078, the residual the template LEAVES) gives a window 4.9x too tight for the shift's amplitude (0.038): the search matches uncorrected positions, and only svd, which fits a zero error inside the search (ze +0.033), still finds the certified cell (+5 ppm), which one engine cannot promote past low
+**Validated by:** `test_a_certified_cubic_cell_is_recovered_with_no_extinction_caveat`, dataset `srm660c` (development data).
+
+- *Reference value:* P m -3 m extinguishes nothing, so if predicted_but_absent means what WP-1026 read it to mean -- space-group extinctions counted against the LATTICE group, the only model that exists before determine_extinction_symbol runs -- it must be silent here and is 11-12 on R-3c corundum.  The cell bar is 200 ppm and is set by a defect this same file measures, not by the data: a tighter one would assert the tail components below do not exist
+- *Domain:* one phase (LaB6), one laboratory pattern (Cu Ka); the cubic cell at 200 ppm
+- *Mismatch:* cubic P ranked first, a -127 ppm against the CIF's 4.156780 A; predicted_but_absent 0 of 30 and predicted_seen_fraction 1.000 against corundum's 0.58.  Still low, but the caveat list has been shrinking by evidence and is now ONE: fom_panel_disagrees.  WP-1038 cleared shift_allowance_assumed (this pattern's +0.0345 deg is measured from harmonic pairs before the search), and WP-1039 cleared engines_disagree -- trial_error was not failing to find the certified cell, it was solving from the wrong base lines, because its pool took the lowest-Q lines of the whole list and five of this pattern's low-angle components are not lines of the phase.  Drawn from the strongest-N selection instead, BOTH engines find it.  Agreement was necessary and not sufficient: a cubic-only search now promotes to high, this four-system one does not.  best_or_none() returns None
+
+**Validated by:** `test_the_shift_screen_survives_the_tail_components_but_the_search_cannot`, dataset `srm660c` (development data).
+
+- *Reference value:* The displacement is PREDICTED, parameter-free, from NIST's own recorded -0.07877 mm at R = 217.5 mm through model.corrections.displacement_shift_deg: +0.0415 deg cos theta.  fit_shift_model weights by each line's own sigma; the search adds DEFAULT_UNKNOWN_SHIFT_DEG = 0.05 deg in quadrature to every sigma, which is flat
+- *Domain:* one phase (LaB6), one laboratory pattern (Cu Ka) with its tail components in the peak list; the shift screen
+- *Mismatch:* tail components carry sigma ~0.005 deg against the real lines' ~0.0005; after the quadrature allowance that 100x contrast is 1.005.  Screen: +0.0367 +- 0.0015 (0.88 of the predicted 0.0415, the rest being the aberrations SRM 660c's own docstring names).  Search: +0.009 +- 0.016, consistent with none
+
+**Validated by:** `test_what_the_unflagged_tail_components_cost_the_certified_cell`, dataset `srm660c` (development data).
+
+- *Reference value:* An attribution probe, not a protocol: the off-lattice components are identified USING the certificate, which no user of an unknown phase can do.  What it establishes is that the pipeline's arithmetic is sound to the ppm and that what stands between it and a blind certified answer is a peak list.  Three things are supplied -- the five off-lattice components removed, the systematic measured rather than assumed, the cos_theta template declared
+- *Domain:* one phase (LaB6), one laboratory pattern (Cu Ka); the cell with the off-lattice components removed (an attribution probe, not a protocol)
+- *Mismatch:* a = 4.156801 A, +5 ppm, M20 3266, ZERO caveats, confidence high -- a first on real data, against -127 ppm with none of the three.  But best_or_none() is None: the a*sqrt2 cell (5.878605) reached high in BOTH its I and P descriptions, all three engines finding all three cells; since WP-1449 the P one is refuted as an index-2 superlattice of the I one (supercell_refuted, low) and the I one still reaches high.  The 'best_or_none() non-None' claim recorded here before WP-1041 held only while trial_error's scale-invariant dedup key could return one cubic candidate per search, denying the supercells its vote -- the flagship result was protected by a bug rather than by the gate.  Everything that refutes the supercell is measured and ungated: Rwp 0.100 vs 0.860/0.654, predicted_seen_fraction 1.00 vs 0.88/0.49, m_rev 2245 vs 6.8/1.9, unmatched_observed 21 vs 168/129 (169/127 and Rwp 0.861/0.660 on 1.9.0, before WP-2002's width twin hold moved the Le Bail checks), while the one gated detector (predicted_but_absent) reads 0 for all three.  Also measured: declaring the probe-trimmed screen's own sigma_sys (0.0078, the residual the template LEAVES) gives a window 4.9x too tight for the shift's amplitude (0.038): the search matches uncorrected positions, and only svd, which fits a zero error inside the search (ze +0.033), still finds the certified cell (+5 ppm), which one engine cannot promote past low
 
 **State:** validated on development data.
 
@@ -440,15 +506,35 @@ A systematic 2theta shift measured before the cell.
 
 **Verified by:** `test_the_zeroshift_correction_is_exactly_the_paper_s`, `test_the_2004_zeroshift_hypothesis_cannot_be_tested_on_these_data`
 
-**Validated by:** `test_declaring_the_shift_template_is_what_recovers_the_certificate`, dataset `srm676a` (development data). Mismatch: fitted shift -0.0699 +/- 0.0192 deg; a +89 -> -111 ppm, c +60 -> -96 ppm, c/a -29 -> +15 ppm; M20 23.3 -> 187.1, F_N 15.3 -> 145.0, Le Bail Rwp 0.256 -> 0.176.  Since WP-1038 the two mechanisms are cleanly separated: the pair-MEASURED magnitude widens the window and finds lines (both calls index 44 of 46, so indexed_fraction_low has already cleared before the template is declared), and the DECLARED shape is what moves the cell.  Three routes to one systematic, none told the answer: -0.0641 from pairs pre-search, -0.0749 from the post-candidate fit, -0.065 measured against the certificate.  Still low, on caveats that have nothing to do with the shift.  1.9.0 read -0.0749 +/- 0.0187 deg, a +110 -> -114 and c +57 -> -109 ppm, c/a -54 -> +5, M20 23.7 -> 160.0, F_N 16.6 -> 114.9 and Le Bail Rwp 0.285 -> 0.224: the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list, and WP-2002's closing stage and width twin hold (#1085, #1113) moved the Le Bail checks
+**Validated by:** `test_declaring_the_shift_template_is_what_recovers_the_certificate`, dataset `srm676a` (development data).
 
-**Validated by:** `test_a_certified_shift_is_recovered_from_the_peak_list_alone`, dataset `srm660c` (development data). Mismatch: +0.0345 deg from 10 agreeing pairs of 19 admitted, z = 16.9 against 200 structureless replicates -- within 0.4 sigma of the reference-based fit it never saw, and 0.83 of the geometric prediction (the same 0.75-1.0 band the reference-based screen sits in, for the same reason).  separable is False: constant and cos_theta concentrate within one pair of each other, so a MAGNITUDE is measured and a CAUSE is not
+- *Reference value:* The displacement was measured independently against the certificate as a -0.065 deg cos(theta) term (WP-1023).  This row never supplies it: the search fits the template after each candidate survives, from the pattern alone.  The cell and the figures of merit are asserted TOGETHER, because f_n's stated blind spot is that a refined shift can manufacture a large figure of merit on its own
+- *Domain:* one phase (corundum), one laboratory pattern (Cu Ka); the cell with the shift template declared
+- *Mismatch:* fitted shift -0.0699 +/- 0.0192 deg; a +89 -> -111 ppm, c +60 -> -96 ppm, c/a -29 -> +15 ppm; M20 23.3 -> 187.1, F_N 15.3 -> 145.0, Le Bail Rwp 0.256 -> 0.176.  Since WP-1038 the two mechanisms are cleanly separated: the pair-MEASURED magnitude widens the window and finds lines (both calls index 44 of 46, so indexed_fraction_low has already cleared before the template is declared), and the DECLARED shape is what moves the cell.  Three routes to one systematic, none told the answer: -0.0641 from pairs pre-search, -0.0749 from the post-candidate fit, -0.065 measured against the certificate.  Still low, on caveats that have nothing to do with the shift.  1.9.0 read -0.0749 +/- 0.0187 deg, a +110 -> -114 and c +57 -> -109 ppm, c/a -54 -> +5, M20 23.7 -> 160.0, F_N 16.6 -> 114.9 and Le Bail Rwp 0.285 -> 0.224: the peak picker's changes before #1050 (#947 to #951, not bisected among them) took one line from the usable list, and WP-2002's closing stage and width twin hold (#1085, #1113) moved the Le Bail checks
 
-**Validated by:** `test_the_svd_zero_error_is_a_third_road_to_the_anchors_shift`, dataset `srm660c` (development data). Mismatch: +0.0329 deg, within 0.003 of both.  Started AT the certified cell, so this measures the COLUMN and not the search; the search's own use of it is asserted against an exactly known injected shift in test_indexing_engines.py.  It also reaches where the pair screen declines -- a bare 20-line list supplies too few pairs to concentrate, the published bethanechol failure, and this needs none
+**Validated by:** `test_a_certified_shift_is_recovered_from_the_peak_list_alone`, dataset `srm660c` (development data).
 
-**Validated by:** `test_the_svd_zero_error_is_a_third_road_to_corundums_shift`, dataset `srm676a` (development data). Mismatch: -0.0674 deg, within 0.003 of both.  Needs trim=1: the list opens on a 5.17 deg edge artifact 3.9x beyond the longest d the lattice allows, which breaks eq. (4)'s weighting outright.  A line no lattice can index is not a shifted line, and the column does not pretend otherwise
+- *Reference value:* NIST's own recorded specimen displacement, -0.07877 mm at R = 217.5 mm, PREDICTS +0.0415 deg cos(theta) parameter-free through model.corrections; the reference-based screen fits +0.0367 +/- 0.0015 against it.  The reflection-pair method (Dong, Wu & Chen 1999) sees neither: only harmonic pairs among the list's own lines, m sin(theta) = sin(theta'), which hold for any lattice
+- *Domain:* one phase (LaB6), one laboratory pattern (Cu Ka); the displacement term from the peak list alone
+- *Mismatch:* +0.0345 deg from 10 agreeing pairs of 19 admitted, z = 16.9 against 200 structureless replicates -- within 0.4 sigma of the reference-based fit it never saw, and 0.83 of the geometric prediction (the same 0.75-1.0 band the reference-based screen sits in, for the same reason).  separable is False: constant and cos_theta concentrate within one pair of each other, so a MAGNITUDE is measured and a CAUSE is not
 
-**Validated by:** `test_the_shift_screen_survives_the_tail_components_but_the_search_cannot`, dataset `srm660c` (development data). Mismatch: tail components carry sigma ~0.005 deg against the real lines' ~0.0005; after the quadrature allowance that 100x contrast is 1.005.  Screen: +0.0367 +- 0.0015 (0.88 of the predicted 0.0415, the rest being the aberrations SRM 660c's own docstring names).  Search: +0.009 +- 0.016, consistent with none
+**Validated by:** `test_the_svd_zero_error_is_a_third_road_to_the_anchors_shift`, dataset `srm660c` (development data).
+
+- *Reference value:* Coelho (2003) sec. 2.3 eq. (7): a zero error enters Q through Ze (pi/360)(4/lambda^2) sin(2theta), appended to the SVD design matrix.  It sees neither certified positions (the reference-based screen, +0.0367 deg) nor harmonic pairs (WP-1038, +0.0359 deg on the constant template) -- only a candidate lattice -- so the three share no input
+- *Domain:* one phase (LaB6), one laboratory pattern (Cu Ka); the shift read by the SVD zero-error column from a cell started at the certified one
+- *Mismatch:* +0.0329 deg, within 0.003 of both.  Started AT the certified cell, so this measures the COLUMN and not the search; the search's own use of it is asserted against an exactly known injected shift in test_indexing_engines.py.  It also reaches where the pair screen declines -- a bare 20-line list supplies too few pairs to concentrate, the published bethanechol failure, and this needs none
+
+**Validated by:** `test_the_svd_zero_error_is_a_third_road_to_corundums_shift`, dataset `srm676a` (development data).
+
+- *Reference value:* as above, against -0.0673 deg from harmonic pairs and -0.0650 deg measured against the SRM 676a certificate
+- *Domain:* one phase (corundum), one laboratory pattern (Cu Ka); the shift read by the SVD zero-error column
+- *Mismatch:* -0.0674 deg, within 0.003 of both.  Needs trim=1: the list opens on a 5.17 deg edge artifact 3.9x beyond the longest d the lattice allows, which breaks eq. (4)'s weighting outright.  A line no lattice can index is not a shifted line, and the column does not pretend otherwise
+
+**Validated by:** `test_the_shift_screen_survives_the_tail_components_but_the_search_cannot`, dataset `srm660c` (development data).
+
+- *Reference value:* The displacement is PREDICTED, parameter-free, from NIST's own recorded -0.07877 mm at R = 217.5 mm through model.corrections.displacement_shift_deg: +0.0415 deg cos theta.  fit_shift_model weights by each line's own sigma; the search adds DEFAULT_UNKNOWN_SHIFT_DEG = 0.05 deg in quadrature to every sigma, which is flat
+- *Domain:* one phase (LaB6), one laboratory pattern (Cu Ka) with its tail components in the peak list; the shift screen
+- *Mismatch:* tail components carry sigma ~0.005 deg against the real lines' ~0.0005; after the quadrature allowance that 100x contrast is 1.005.  Screen: +0.0367 +- 0.0015 (0.88 of the predicted 0.0415, the rest being the aberrations SRM 660c's own docstring names).  Search: +0.009 +- 0.016, consistent with none
 
 **State:** validated on development data.
 
@@ -488,11 +574,9 @@ Esds: Berar-Lelann inflation, intervals at a bound, scale-B separation.
 
 Sequential (chained) series.
 
-**Verified by:** `test_chained_qpa_within_participant_spread`, `test_chained_agrees_with_independent_fits`, `test_the_hostile_series_exercises_the_reseed_fence`, `test_the_first_rung_bound_moves_no_accepted_value`, `test_series_exports`
+**Verified by:** `test_chained_agrees_with_independent_fits`, `test_the_hostile_series_exercises_the_reseed_fence`, `test_the_first_rung_bound_moves_no_accepted_value`, `test_series_exports`
 
-**Validated by:** `test_chained_qpa_within_participant_spread`, dataset `qarr` (development data). Mismatch: identical to the independent fits' record
-
-**State:** validated on development data.
+**State:** not yet validated.
 
 ### `joint_refinement`
 
