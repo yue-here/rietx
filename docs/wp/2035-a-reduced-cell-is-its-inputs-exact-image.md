@@ -1,6 +1,6 @@
 # WP-2035 — a reduced cell is its input's exact image, near a right angle too
 
-Milestone: unscheduled · Status: 🔄 2026-10-26 — merged from outside as PR #1136 (`6823e532`); the close is owed (the v1.11 record's narrative and ✅)
+Milestone: unscheduled · Status: 🔄 2026-10-31 — merged from outside as PR #1136 (6823e532); the close is owed once issue #1252's test fix lands (the property test still compares against gemmi at epsilon, with no example pinning the 89.99999 case)
 Track: What fires, and what stays silent
 Depends on: — (1923, closed: the exact change of basis; 1932, closed: the boundary-free comparison that reads it)
 Priority: P2 2026-10-31 — was P3: issue #1252 shows the property test drawing a failing case fresh in about 1 run in 40 (CI sets no derandomize and keeps no database), so the fast check goes red on main at random; the defect is in the test's gemmi-at-ε reference, not in `reduce_cell`
@@ -109,6 +109,10 @@ CI runs pins the case.
   (the ε every comparison in it uses).
 
 ## Handover log
+
+- **2026-10-31** (ghostshift close-batch, PR #1287, not closed) — the code is finished and the test is not. A reduced cell is the exact image of its input on main, as PR #1136 shipped. But issue #1252, a fast-suite property test that fails on main about 1 run in 40, is still open and unfixed, and it is this WP's own Inherited task. So the WP stays open.
+  *Checked against main `1314c69ea`*: `tests/test_indexing_reduce.py` still ends the exact-image property by comparing `reduce_cell` with gemmi's `niggli_reduce` at ε = `NIGGLI_EPS_RELATIVE`·V^(1/3) (lines 442-452). No `@example` pins the issue's case P (3.0, 3.0, 21.0, 89.99999°, 65°, 65°), and the one commit to that file after the WP's own (`7de1da3dc`, 37 added lines) is a `bravais_screen` case, not this property. The Inherited entry of 2026-10-31 stands as written: the defect is in the test's reference, not in `reduce_cell`, and the fix is a tighter reference or a bar near 2 ε plus the `@example`. #1252 is open.
+  *Next*: the #1252 task, then the close (the v1.11 record's narrative, ✅, delete `Priority:` and `### Inherited`). It is P2 because the fast check goes red on main at random.
 
 - **2026-10-26** — merged from outside as PR #1136 (`6823e532`), after four
   review rounds; the claim issue #1131 is closed. Every task above is done, so
