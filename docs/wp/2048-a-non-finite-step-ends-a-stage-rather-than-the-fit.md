@@ -85,7 +85,7 @@ stage's starting values (WP-1528's log, PR #736).
       stage ends at its start and says `STAGE_NOT_FINITE`.
 - [ ] Tests: the nudged start that raised now returns a result with the
       diagnostic; the test above stays green at all six starts.
-- [ ] Skill: the new diagnostic code's row in `references/diagnostics.md`.
+- [x] Skill: the new diagnostic code's row in `references/diagnostics.md`.
 
 ## Acceptance
 
