@@ -241,6 +241,15 @@ def _group_phase(phase, group: str):
                             deep=True)
 
 
+#: Assignments one group may carry.  A ladder's generator is seeded by
+#: ``1000·group + assignment`` (problem) and ``500 + that`` (control), so a
+#: group of 500 or more assignments would seed its control ladder a like the
+#: problem ladder a + 500, and one of 1000 or more would meet the next group's.
+#: A guard rather than a wider stride, which would move every converged run's
+#: ladder.
+MAX_ASSIGNMENTS_PER_GROUP = 500
+
+
 def _ladder(problem: tp.SearchProblem, spec: SolveSpec, index: int) -> tp.Ladder:
     rng = np.random.default_rng(unit_seed(spec, "ladder", index))
     t_top, _ = tp.random_spread(problem, rng, n=spec.n_random)
@@ -261,6 +270,12 @@ def _searches(cost, phase, instrument, priors, groups, composition, units, spec,
             if not assigns:
                 raise SolveRefused(f"the composition has no placement on the site classes of "
                                    f"{g}")
+            if len(assigns) > MAX_ASSIGNMENTS_PER_GROUP:
+                raise SolveRefused(
+                    f"{g} has {len(assigns)} site-class assignments of the composition, "
+                    f"more than the {MAX_ASSIGNMENTS_PER_GROUP} a group may carry (each ladder "
+                    "is seeded by its index, and above that two would share a generator): "
+                    "declare units= or a smaller composition")
             sets = []
             for ai, a in enumerate(assigns):
                 count: dict[str, int] = {}

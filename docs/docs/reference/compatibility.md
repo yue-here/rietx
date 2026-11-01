@@ -57,7 +57,10 @@ answer the same kind of question:
   `data` dict is declared open on both sides, so a new key in it is the contract
   working rather than a change to it. A new event kind bumps, and so did the run
   header line (version 3), which a reader validating every line as an event
-  would refuse.
+  would refuse. Version 4 added the `solve_start`, `solve_step` and `solve_end`
+  kinds, and a line's `v` is now checked against its kind: a kind is refused
+  on a line claiming a version older than the one that introduced it, and a
+  newer `v` with a known kind is read.
 - The report gates and thresholds (`Capabilities.report_thresholds_version`) and
   the indexing gates (`Capabilities.indexing_thresholds_version`).
 

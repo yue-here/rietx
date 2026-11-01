@@ -11,6 +11,9 @@ the contamination screen of ``diagnose``, a finding the verb does not read.
 WP-2003 adds the series seat: ``refine_sequential`` and
 ``SequentialRefinement.fit``'s channels, ``on_result`` and ``history``, each
 switched on against a three-pattern chain.
+#562 S2b adds the solve seat: ``solve_structure``'s ``events``, ``cancel``,
+``label`` and ``telemetry``, and ``SolveSpec.heartbeat_sweeps``, each switched
+on against one run with every channel at its default.
 """
 
 from __future__ import annotations
@@ -24,9 +27,11 @@ import pytest
 import rietx as rx
 from rietx import runs
 from rietx._about import RUNS_DIR_NAME, STATE_DIR_NAME
+from rietx.model import compiled
 from rietx.optimize.cancel import CancelToken
 from rietx.strategy.staged import resolve_plan
 from tests.test_refine_synthetic import perturbed_models, synthesize
+from tests.test_solve_entry import Acr, _spec
 
 pytestmark = pytest.mark.xdist_group("telemetry")
 
@@ -185,3 +190,58 @@ def test_a_recorded_series_is_the_series_unrecorded(ramp, series_baseline, tmp_p
                                                     recording):
     assert _chain(ramp) == series_baseline
     assert _recorded(tmp_path) == 1, "one run directory for one job"
+
+
+# ===================================================================================
+# the solve seat (#562 S2b)
+# ===================================================================================
+@pytest.fixture(scope="module")
+def solver():
+    """One synthetic acridine problem, solved under a declared compiled tier
+    (a bit-identity assertion says which path produced its bytes)."""
+    was = compiled.set_enabled(True)
+    try:
+        yield Acr()
+    finally:
+        compiled.set_enabled(was)
+
+
+#: One seed, no control seed, 1 000 sweeps: a run short enough to repeat per
+#: channel, long enough to cross a rebuild boundary and polish a state.
+def _solved(solver, heartbeat=None, **kw):
+    spec = _spec(seeds=(0,), control_seeds=(), sweeps=1000, heartbeat_sweeps=heartbeat)
+    return solver.solve(spec, **kw)
+
+
+def _solve_answer(res):
+    """Every field but what a run's own bookkeeping owns, and the spec: the
+    heartbeat is a field of it, so the spec cannot be compared across it."""
+    return res.model_dump_json(exclude={"timings", "provenance", "resumed", "spec"})
+
+
+@pytest.fixture(scope="module")
+def solve_baseline(solver):
+    return _solve_answer(_solved(solver))
+
+
+@pytest.mark.parametrize("channel", ["events", "cancel", "label", "heartbeat"])
+def test_a_solve_observed_is_the_solve_unobserved(solver, solve_baseline, channel):
+    got: list[dict] = []
+    kw = {"events": {"events": got.append}, "cancel": {"cancel": CancelToken()},
+          "label": {"label": "observed"}, "heartbeat": {"heartbeat": 250, "events": got.append}}
+    res = _solved(solver, **kw[channel])
+    assert _solve_answer(res) == solve_baseline
+    if channel in ("events", "heartbeat"):
+        assert got, "the channel under test never received a line"
+    if channel == "heartbeat":
+        assert any(e["kind"] == "solve_step" for e in got)
+
+
+def test_a_recorded_solve_is_the_solve_unrecorded(solver, solve_baseline, tmp_path):
+    was = runs.set_enabled(True)
+    try:
+        res = _solved(solver, telemetry=tmp_path, label="recorded")
+    finally:
+        runs.set_enabled(was)
+    assert _solve_answer(res) == solve_baseline
+    assert len(runs.discover(tmp_path)) == 1

@@ -219,6 +219,8 @@ DEFAULT_SEATS: dict[str, int] = {
     "rietx.sequential.SequentialRefinement.fit": 2003,
     "rietx.indexing.workflow.index_pattern": 2007,
     "rietx.indexing.engines.SearchSpec": 2007,
+    "rietx.solve.workflow.solve_structure": 2007,
+    "rietx.solve.engines.SolveSpec": 2007,
     "rietx.crystallography.representation.subgroups.maximal": 2006,
 }
 
@@ -230,6 +232,8 @@ RECORD_SCHEMAS: tuple[str, ...] = (
     "rietx.schemas.results.Statistics",
     "rietx.schemas.indexing.IndexingResult",
     "rietx.schemas.indexing.PeakList",
+    "rietx.solve.solution.SolutionResult",
+    "rietx.solve.solution.RaceRecord",
 )
 
 
@@ -468,6 +472,28 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.indexing.PeakList.two_theta_max",
     "rietx.schemas.indexing.PeakList.two_theta_min",
     "rietx.schemas.indexing.PeakList.wavelength",
+    "rietx.solve.solution.SolutionResult.candidates",
+    "rietx.solve.solution.SolutionResult.engines_run",
+    "rietx.solve.solution.SolutionResult.space_groups_searched",
+    "rietx.solve.solution.SolutionResult.races",
+    "rietx.solve.solution.SolutionResult.layouts",
+    "rietx.solve.solution.SolutionResult.records",
+    "rietx.solve.solution.SolutionResult.search_complete",
+    "rietx.solve.solution.SolutionResult.seeds_run",
+    "rietx.solve.solution.SolutionResult.control_seeds_run",
+    "rietx.solve.solution.SolutionResult.units_not_run",
+    "rietx.solve.solution.SolutionResult.status",
+    "rietx.solve.solution.SolutionResult.partial",
+    "rietx.solve.solution.SolutionResult.resumed",
+    "rietx.solve.solution.SolutionResult.spec",
+    "rietx.solve.solution.SolutionResult.phase",
+    "rietx.solve.solution.SolutionResult.n_reflections",
+    "rietx.solve.solution.SolutionResult.chi2_floor",
+    "rietx.solve.solution.SolutionResult.timings",
+    "rietx.solve.solution.SolutionResult.provenance",
+    "rietx.solve.solution.RaceRecord.space_group",
+    "rietx.solve.solution.RaceRecord.n_assignments",
+    "rietx.solve.solution.RaceRecord.rounds",
     "rietx.schemas.results.RefinementResult.cell_volumes",
     "rietx.schemas.results.RefinementResult.data_support",
     "rietx.schemas.results.RefinementResult.diagnostics",
@@ -1284,6 +1310,24 @@ ROWS: tuple[Row, ...] = (
                  "ruled 2026-10-21)."),
         approved="2026-10-21"),
     Row("rietx.schemas.sequential.SeriesEntry.rung", "action"),
+    Row("rietx.solve.solution.RaceRecord.winner", "action", tier=2, ambiguity=2,
+        evidence=("successive halving over a group's site-class assignments: every assignment "
+                  "runs one seed of race_sweeps sweeps, the better half by lowest J continues "
+                  "each chain for twice the sweeps, until one is left, and only that winner "
+                  "gets the seeds and a candidate (solve/workflow.py race_assignments, "
+                  "_assemble); Karnin, Koren & Somekh 2013, ICML, Sequential Halving; "
+                  "Jamieson & Talwalkar 2016, AISTATS"),
+        grounds=("Measured: on the NAC composition round 0 was decisive, the deposited "
+                 "assignment's J 1.2-1.4 against >= 8.4 for the rest "
+                 "(tests/test_solve_entry.py, the slow race test). Not measured: a "
+                 "composition-only case where round 0 is close, so that dropping half "
+                 "whatever the margin could drop the right assignment, and one seed per "
+                 "assignment gives no run-to-run spread to judge a margin against. Racing "
+                 "replaces the fixed drop as the next solver PR's first task (several seeds "
+                 "per assignment in round 0, an assignment dropped only when its best J is "
+                 "worse than the leader's beyond the seed spread; WP-1997, #1273). The result "
+                 "records every round's J, so a reader sees what the race dropped."),
+        approved="2026-10-31"),
     Row("rietx.schemas.sequential.SeriesEntry.reseeded", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rwp_fence", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
@@ -3302,6 +3346,11 @@ ROWS: tuple[Row, ...] = (
                   "holds that edge on P2_12_12_1: a = b gains isometries beyond the "
                   "general 16, a cell 1e-9 relative from a = b gives the same index, "
                   "and one 5e-3 off gives 16 again")),
+    Row("rietx.solve.workflow.MAX_ASSIGNMENTS_PER_GROUP", "constant", tier=1, value=500,
+        evidence=("arithmetic, not a tuning: a ladder's generator is seeded by 1000*group + "
+                  "assignment and its control ladder by 500 + that (solve/workflow.py "
+                  "_searches), so 500 is the stride's own half-width: above it control ladder "
+                  "a meets problem ladder a + 500")),
     Row("rietx.solve.cost.NAMED_REFLECTIONS", "constant", value=5),
     Row("rietx.solve.cost.NUISANCE_RCOND", "constant", value=1e-12),
     Row("rietx.solve.chemistry.OCCUPANCY_MAX_DENOMINATOR", "constant", tier=3, value=12,
@@ -3992,6 +4041,30 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.indexing.engines.SearchSpec:seed", "default", value=0),
     Row("rietx.indexing.engines.SearchSpec:prior_cells", "default", value=()),
     Row("rietx.indexing.engines.SearchSpec:prior_spacegroups", "default", value=()),
+    Row("rietx.solve.workflow.solve_structure:composition", "default", tier="caller", ambiguity=1, value=None,
+        evidence=("opt-in: composition=None declares no composition; exactly one of composition= and units= is the caller's (solve_structure refuses both or neither), and the composition is atoms per cell by species")),
+    Row("rietx.solve.workflow.solve_structure:units", "default", tier="caller", ambiguity=1, value=None,
+        evidence=("opt-in: units=None declares no free sites or rigid fragments; exactly one of composition= and units= is the caller's, and the units are used as given")),
+    Row("rietx.solve.workflow.solve_structure:space_groups", "default", tier="caller", ambiguity=1, value=None,
+        evidence=("opt-in: None searches the phase's own space group, the one the caller's Pawley or Le Bail fit was run in; a list names others, and the package picks none")),
+    Row("rietx.solve.workflow.solve_structure:biso", "default", tier="caller", ambiguity=1, value=None,
+        evidence=("opt-in: required with composition= (solve_structure refuses its absence) and unread with units=, which carry their own; the B of every placed free site is the caller's")),
+    Row("rietx.solve.workflow.solve_structure:checkpoint", "default", tier="caller", ambiguity=1, value=None,
+        evidence=("opt-in: checkpoint=None writes no checkpoint and resumes none; a path is the caller's, and a resume from it is byte-identical to the uninterrupted run (tests/test_solve_entry.py, the resume tests)")),
+    Row("rietx.solve.workflow.solve_structure:events", "default", tier="invariant", ambiguity=1, value=None,
+        evidence=("answer-invariant: an observation channel; tests/test_answer_invariant_defaults.py asserts one solve run's every field but its timings, provenance and spec equal with it on (#562 S2b)")),
+    Row("rietx.solve.workflow.solve_structure:cancel", "default", tier="invariant", ambiguity=1, value=None,
+        evidence=("answer-invariant: a cancel token nobody sets; tests/test_answer_invariant_defaults.py asserts one solve run's every field but its timings, provenance and spec equal with it on (#562 S2b)")),
+    Row("rietx.solve.workflow.solve_structure:label", "default", tier="invariant", ambiguity=1, value=None,
+        evidence=("answer-invariant: a run's name; tests/test_answer_invariant_defaults.py asserts one solve run's every field but its timings, provenance and spec equal with it on (#562 S2b)")),
+    Row("rietx.solve.workflow.solve_structure:telemetry", "default", tier="invariant", ambiguity=1, value=None,
+        evidence=("answer-invariant: the run recorder, one run a job; tests/test_answer_invariant_defaults.py asserts one solve run's every field but its timings, provenance and spec equal with it on (#562 S2b)")),
+    Row("rietx.solve.engines.SolveSpec:heartbeat_sweeps", "default", tier="invariant", ambiguity=1, value=None,
+        evidence=("answer-invariant: the solve_step cadence, an observation read off the running chain and written to the stream; tests/test_answer_invariant_defaults.py asserts one solve run's every field but its timings, provenance and spec equal with it on (#562 S2b)")),
+    Row("rietx.solve.engines.SolveSpec:checkpoint_every_s", "default", tier="invariant", ambiguity=1, value=0.0,
+        evidence=("answer-invariant: the shortest interval between two checkpoint writes, read only with checkpoint=; a write is a copy of the engine's state at a rebuild boundary, and tests/test_solve_entry.py asserts an interrupted run resumed from its checkpoint equals the uninterrupted run byte for byte, with the default 0.0 writing at every boundary (#562 S2b)")),
+    Row("rietx.solve.engines.SolveSpec:total_budget_seconds", "default", tier="caller", ambiguity=1, value=None,
+        evidence=("off state: None sets no whole-run ceiling; the run ends when its units do. A number is the caller's, a stop it causes is recorded (status 'budget', partial, units_not_run), and no default path passes one")),
     Row("rietx.crystallography.representation.subgroups.maximal:kind", "default", tier=1, ambiguity=1,
         value="both",
         evidence=("theory: a maximal subgroup is either t or k (Hermann's theorem, Wondratschek 2011, "

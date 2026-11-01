@@ -30,6 +30,7 @@ import pytest
 import rietx as rx
 from rietx import runs
 from rietx.history.events import KIND_SINCE, EventKind, EventRecord, read_events
+from rietx.model import compiled
 from rietx.optimize.cancel import CancelToken
 from rietx.solve import cluster as cl
 from rietx.solve import engines as en
@@ -101,6 +102,20 @@ class Acr:
         kw.setdefault("telemetry", False)
         return wf.solve_structure(self.cost, self.phase, instrument=self.ins, priors=_priors(),
                                   units=[FragmentUnit(acridine(), biso=3.0)], spec=spec, **kw)
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _declared_tier():
+    """The compiled tier, declared rather than inherited: ``comparable_json``
+    carries ``UnitRecord.compiled``, and a bit-identity assertion says which
+    path produced its bytes (tests/CLAUDE.md § A test that pins a number
+    declares which path produced it).  On, so ``RIETX_COMPILED=0`` runs the
+    same bytes; where the wheel did not load the entry points decline and both
+    sides are the numpy path.  Module-scoped so the recorded run below, a
+    module fixture too, is built under it."""
+    was = compiled.set_enabled(True)
+    yield
+    compiled.set_enabled(was)
 
 
 @pytest.fixture(scope="module")
@@ -581,6 +596,17 @@ def test_merged_seed_results_equal_the_in_process_run(acr, acr_run, tmp_path):
     assert merged.comparable_json() == whole.comparable_json()
     with pytest.raises(ValueError, match="not seeds of one run"):
         wf.merge_seed_results([paths[0], whole.model_copy(update={"chi2_floor": 1.0})])
+
+
+def test_a_group_with_too_many_assignments_is_refused_not_collided(acr, monkeypatch):
+    """Ladder generators are keyed ``1000·group + assignment`` and ``500 +`` that, so
+    the 501st assignment's problem ladder would share a generator with the 1st's control
+    ladder; the run refuses by name before any ladder is built."""
+    monkeypatch.setattr(wf, "site_assignments",
+                        lambda classes, comp: list(range(wf.MAX_ASSIGNMENTS_PER_GROUP + 1)))
+    with pytest.raises(wf.SolveRefused, match="more than the 500 a group may carry"):
+        wf.solve_structure(acr.cost, acr.phase, instrument=acr.ins, priors=_priors(),
+                           composition={"C": 1}, biso=1.0, spec=ACR_SPEC, telemetry=False)
 
 
 # ===================================================================================
