@@ -2849,6 +2849,12 @@ class Refinement:
         # and the settings the last fit ran under, so a trial's refits hold
         # an absent phase by the caller's rule (WP-2002, B1)
         ref._plan_settings = dict(self._plan_settings)
+        # and the orbit split of the call in flight, if any (WP-2052): a trial
+        # made inside a fit (a profile-interval refit, a stage report's
+        # verification) refits at the multiplicity the answer it is measured
+        # against was solved at.  ``None`` outside a call, as for a fresh one.
+        ref._orbit_split = (None if self._orbit_split is None
+                            else list(self._orbit_split))
         # The branch is built from ``self.instrument``, which carries the last
         # stage's *refined* λ — so its own ``__init__`` snapshot would declare a
         # refined value.  A branch is "a second working tree over the same
@@ -5860,9 +5866,6 @@ class Refinement:
         compile keeps the solve's orbit split, so the gap is never one of
         composition (WP-2052).
         """
-        kept = (_multiplicity_kept_diagnostics(self.structure,
-                                               orbit_split_of(model))
-                if mode == "rietveld" else [])
         if mode == "pawley":
             return model, []
         fresh = compile_model(
@@ -5897,6 +5900,10 @@ class Refinement:
             ((model.y_obs - model.evaluate(values)) / model.sigma) ** 2))
         chi2_fresh = float(np.sum(
             ((fresh.y_obs - fresh.evaluate(values)) / fresh.sigma) ** 2))
+        # read off the compile the result is measured on (WP-2052)
+        kept = (_multiplicity_kept_diagnostics(self.structure,
+                                               orbit_split_of(fresh))
+                if mode == "rietveld" else [])
         return fresh, kept + _frozen_compile_diagnostics(chi2_frozen, chi2_fresh)
 
     def _stage_report(self, name, plan, data, mode, table, model, outcome,

@@ -170,10 +170,10 @@ def _multiplicity_kept_diagnostics(structure, split: list,
     """``SITE_MULTIPLICITY_KEPT`` for each site a fresh compile would recount.
 
     ``structure`` is a :class:`~rietx.schemas.structure.Structure` at the
-    coordinates a fit returns.  ``split`` is the orbit split the fit solved
-    with, decided once at its start (``Refinement._decide_orbit_split``).  A site whose returned
-    coordinates give another split at a fresh compile is one the fit carried
-    across ``SITE_TOL`` of a special position.  The usual case is a
+    coordinates a fit returns.  A fit decides each site's split once, at its
+    start (``Refinement._decide_orbit_split``).  A site whose returned
+    coordinates give fewer images at a fresh compile is one the fit carried
+    within ``SITE_TOL`` of a special position.  The usual case is a
     half-occupied general atom, a split pair across a mirror, that the data
     do not resolve: its cost is even in the distance off the mirror, so the
     solver stops on it (WP-2052, issue #1088).  The fit counted the site at the
@@ -181,8 +181,11 @@ def _multiplicity_kept_diagnostics(structure, split: list,
     Every later compile decides from the coordinates, so the message gives the
     atoms per cell both ways and says which one the result used.
 
-    The test is arithmetic and has no threshold: any change of a site's
-    image count is reported.
+    ``split`` is the split the result was measured on.  A compile keeps a
+    site's images and never drops them (:func:`compile_phase_sites`), so a
+    site reported here has fewer images at a fresh compile than the result
+    counted.  The test is arithmetic and has no threshold: any loss is
+    reported.
     """
     out: list[Diagnostic] = []
     for i, (phase, ops) in enumerate(zip(structure.phases, split, strict=True)):
@@ -190,7 +193,7 @@ def _multiplicity_kept_diagnostics(structure, split: list,
         for j, (atom, (rot, _), (rot_now, _)) in enumerate(
                 zip(phase.atoms, ops, fresh, strict=True)):
             m_fit, m_now = len(rot), len(rot_now)
-            if m_fit == m_now:
+            if m_now >= m_fit:
                 continue
             occ = atom.occ.value
             on_position = occ * m_fit / m_now
@@ -216,11 +219,7 @@ def _multiplicity_kept_diagnostics(structure, split: list,
                     f"fitted content; if it is a split pair the data do not "
                     f"resolve, state it more than {TWIN_COORD_TOL:g} "
                     f"(fractional) from the special position, or the next fit "
-                    f"counts it at {m_now} positions." if m_now < m_fit else
-                    f"state the site on the special position to keep the "
-                    f"fitted count, or more than {TWIN_COORD_TOL:g} "
-                    f"(fractional) from it to have it counted at {m_now} "
-                    f"positions.")))
+                    f"counts it at {m_now} positions.")))
     return out
 
 
@@ -246,18 +245,23 @@ def compile_phase_sites(phase: Phase,
     kept**, because the isotope is the scatterer (see
     :mod:`rietx.crystallography.neutron`).
 
-    ``ops`` is an orbit split decided earlier, one ``(R, t)`` pair per atom,
-    reused instead of deciding it again from the current coordinates.  A fit
-    passes the split it decided at its start, so no stage and no closing
-    compile changes a site's multiplicity (WP-2052).  ``None`` decides it here.
+    ``ops`` is an orbit split decided earlier, one ``(R, t)`` pair per atom.
+    A fit passes the split it decided at its start, so no stage and no
+    closing compile takes images away from a site that has moved onto a
+    special position (WP-2052).  A site whose current coordinates need *more*
+    images than ``ops`` holds has left a special position, which a rigid
+    body's pose can do, and gets the current split: fewer images than its
+    position has is no structure at all.  ``None`` decides every site here.
     """
+    fresh = phase_orbit_split(phase)
     if ops is None:
-        ops = phase_orbit_split(phase)
+        ops = fresh
     elif len(ops) != len(phase.atoms):
         raise ValueError(
             f"phase {phase.name!r}: an orbit split for {len(ops)} atoms was "
             f"handed to a phase of {len(phase.atoms)}")
-    ops = list(ops)
+    ops = [kept if len(kept[0]) >= len(now[0]) else now
+           for kept, now in zip(ops, fresh, strict=True)]
     species: list[str] = []
     aniso: list[bool] = []
     for atom in phase.atoms:

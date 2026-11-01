@@ -3960,6 +3960,14 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
         raise ValueError(
             f"an orbit split for {len(orbit_split)} phases was handed to a "
             f"structure of {len(structure.phases)}")
+    if orbit_split is not None:
+        # here, before the species boundary below re-walks every atom's
+        # species for a ValueError that is no species' fault
+        for phase, ops in zip(structure.phases, orbit_split, strict=True):
+            if len(ops) != len(phase.atoms):
+                raise ValueError(
+                    f"phase {phase.name!r}: an orbit split for {len(ops)} atoms "
+                    f"was handed to a phase of {len(phase.atoms)}")
     if window_area_tol is None:
         window_area_tol = CLOSING_WINDOW_TOL
     if not 0.0 < window_area_tol < 1.0:

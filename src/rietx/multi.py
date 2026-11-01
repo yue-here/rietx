@@ -1896,7 +1896,7 @@ class MultiHistogramRefinement:
         # the histograms share one set of coordinates, so the shared
         # structure's sites are asked once, as the opening findings are
         kept = _multiplicity_kept_diagnostics(self.mtable.structures[0],
-                                              orbit_split_of(models[0]))
+                                              orbit_split_of(fresh[0]))
         return fresh, kept + _frozen_compile_diagnostics(*pairs[worst],
                                                          histogram=worst)
 

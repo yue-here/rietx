@@ -1097,8 +1097,10 @@ ROWS: tuple[Row, ...] = (
                   "operation by Mult*frac/nOps (GSASIIstrMath.py:1279), so a fit keeps the "
                   "orbit split it started with for every stage and its closing compile "
                   "(WP-2052, #1088). The report is arithmetic with no threshold: it fires "
-                  "exactly when a returned site's fresh split has another image count, and "
-                  "gives the atoms per cell both ways")),
+                  "exactly when a returned site's fresh split has fewer images than the "
+                  "result counted, and gives the atoms per cell both ways. A site that "
+                  "gains images (a rigid body moving one off a special position) takes "
+                  "them at the next compile, as before WP-2052")),
     Row("SITE_TWINS_KEPT", "code", tier=1, ambiguity=3,
         response="warning",
         responds=("decide which reading of the site the file meant before quoting a weight "

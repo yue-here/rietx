@@ -184,3 +184,32 @@ def test_a_split_for_another_structure_is_refused():
     with pytest.raises(ValueError, match="orbit split for 3 atoms"):
         compile_model(structure, _instrument(), data,
                       orbit_split=[split[0][:3]])
+
+
+def test_a_trial_made_inside_a_call_refits_at_its_split():
+    """A profile-interval refit is a trial: it inherits the call's split."""
+    ref = rx.Refinement(rx.Structure(phases=[_toy(0.27, occ=0.5)]),
+                        _instrument(), history=False)
+    assert ref._trial(record=False)._orbit_split is None
+    assert ref._decide_orbit_split()
+    trial = ref._trial(record=False)
+    assert [[len(r) for r, _ in p] for p in trial._orbit_split] == \
+        [[len(r) for r, _ in p] for p in ref._orbit_split]
+    assert not trial._decide_orbit_split()        # it reuses, never re-decides
+
+
+def test_a_site_that_leaves_its_special_position_gets_its_full_orbit():
+    """Kept images are never dropped, and missing ones are never withheld.
+
+    A rigid body's pose can carry an atom off a mirror.  Four images of a
+    general position are no structure, so the compile takes the eight the
+    coordinates need, as it did before WP-2052, and nothing is reported.
+    """
+    data = rx.PatternData(two_theta=GRID.tolist(), intensity=[1.0] * len(GRID))
+    on = rx.Structure(phases=[_toy(0.25, occ=0.5)])
+    off = rx.Structure(phases=[_toy(0.27, occ=0.5)])
+    special = orbit_split_of(compile_model(on, _instrument(), data))
+    assert len(special[0][O1][0]) == 4
+    model = compile_model(off, _instrument(), data, orbit_split=special)
+    assert len(orbit_split_of(model)[0][O1][0]) == 8
+    assert _multiplicity_kept_diagnostics(off, orbit_split_of(model)) == []
