@@ -1,6 +1,6 @@
 # WP-2048 — a non-finite step ends a stage rather than the fit
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-25 — a raise out of a public `fit`, on a path few fits run (TRF on a wrong cell), with no workaround but another start
