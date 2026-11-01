@@ -174,7 +174,10 @@ maintainer under the reader-output rule before merge.
   failed, 13190 passed, 310 skipped, 32 xfailed; four of the five were this branch's (a page
   cap, the GUI help-key fixture, the joint runner's scope census, the silence pair) and are
   fixed, the fifth is `test_display`'s stale Jupyter kernel spec on this Mac.
-  FAST_SUITE_LINE
+  Final fast suite (`-m "not slow"`, arm64 macOS, `[dev]`, no other suite running): 1 failed,
+  13199 passed, 310 skipped, 32 xfailed; the failure is `test_display`'s stale Jupyter kernel
+  spec on this Mac, unrelated. This branch adds 12 cases in `test_site_multiplicity_kept.py` and
+  one silence-pair row; the file costs 2.41 s locally. Full suite not run.
 
   *Review* (`/code-review high --fix`). Applied: a trial made inside a call inherits its split
   (`_carry_into`); the split length is checked before the species boundary. Applied after
