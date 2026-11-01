@@ -408,7 +408,7 @@ def _cubic_pair_pattern(wavelength: float = 0.4139, seed: int = 7):
 
 
 def _fit_with_injected_escape(stages, *, mode, escape_at, restore_at,
-                              second_escape=None, log=None):
+                              second_escape=None, log=None, refs=None):
     """Fit :func:`_cubic_pair` under ``stages`` with the escape **injected**:
     ``escape_at``'s first solve answers ``ESCAPE`` times what it found for
     ``ESCAPED``, and ``restore_at``'s solve (if that stage runs) answers the
@@ -461,6 +461,8 @@ def _fit_with_injected_escape(stages, *, mode, escape_at, restore_at,
         mp.setattr(refine_module, "run_least_squares", solve)
         mp.setattr(refine_module, "_unsupported_phase_paths", lambda *a, **k: [])
         ref = Refinement(_cubic_pair(), ins, history=False)
+        if refs is not None:     # the working model, for a value no row reports
+            refs.append(ref)
         # the declared stages' reset; the closing stage is tests/test_closing_stage.py's
         result = ref.fit(_cubic_pair_pattern(), mode=mode,
                          plan=RefinementPlan(stages=list(stages), closing_window_tol=None))
@@ -488,9 +490,11 @@ def lebail_pair_fits():
     out = {}
     for name, stages in (("end", _LEBAIL_STAGES[:2]), ("early", _LEBAIL_STAGES)):
         log: list = []
+        refs: list = []
         out[name] = (_fit_with_injected_escape(
             stages, mode="lebail", escape_at="cell", restore_at="widths",
-            log=log), log)
+            log=log, refs=refs), log)
+        out[f"{name}_ref"] = refs[0]
     return out
 
 
@@ -522,8 +526,12 @@ def test_a_reset_cell_is_held_for_its_stage_and_the_stage_solves_again(
     assert "held while the stage solved again" in diag.message
     assert "window edge" not in diag.message
     start = TRUE_A * CUBIC_TWIN
-    for n in "bc":   # the held a has left ``parameters``; its tied b, c report it
-        assert _cell_rows(end, 1)[n].value == pytest.approx(start, rel=1e-14)
+    # the held a has left ``parameters`` and its tied b, c with it (WP-1999),
+    # so the value it was held at is read off the working model
+    held = lebail_pair_fits["end_ref"].fitted_structure.phases[1].cell
+    for n in "abc":
+        assert _cell_rows(end, 1)[n] is None, n
+        assert getattr(held, n).value == pytest.approx(start, rel=1e-14), n
     # the earlier stage reset nothing, and says so rather than staying silent
     assert end.stages[0].cell_reset == []
 
@@ -540,7 +548,7 @@ def test_a_reset_cells_stderr_is_withheld(lebail_pair_fits):
 
     "end": the answer stage put ``phases.1.cell.a`` back and held it, so the
     row has left ``parameters`` (a held path does, as WP-1301's collapse
-    does), and the cubic ``b``/``c`` tied to it report ``stderr=None``, while
+    does), and the cubic ``b``/``c`` tied to it leave with it (WP-1999), while
     phase 0, never reset, keeps its esd.  "early": the same reset fired in
     ``cell``, and the later stages refined the cell again from its start, so
     the value reported is a fit result and every cell row carries the esd that
@@ -552,9 +560,8 @@ def test_a_reset_cells_stderr_is_withheld(lebail_pair_fits):
     assert len(fired) == 1 and fired[0].where == [ESCAPED]
     assert [s.name for s in end.stages][-1] == "cell"
     rows = _cell_rows(end, 1)
-    assert rows["a"] is None
-    for n in "bc":
-        assert rows[n] is not None and rows[n].stderr is None, f"end: phases.1.cell.{n}"
+    for n in "abc":
+        assert rows[n] is None, f"end: phases.1.cell.{n}"
     for n, row in _cell_rows(end, 0).items():
         assert row is not None and row.stderr is not None, f"end: phases.0.cell.{n}"
 

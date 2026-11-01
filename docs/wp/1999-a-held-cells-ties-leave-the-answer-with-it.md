@@ -35,22 +35,51 @@ The second also drops followers of a user-fixed source, which every result
 reports today with esd `None`. That changes the reported set for ordinary fits,
 so measure how many goldens and tests move before choosing.
 
+- The tier of each rule this WP adds: none. It changes which rows a result
+  lists and adds no flag, threshold, default or automatic action.
+
 ## Tasks
 
-- [ ] Reproduce with a single fit (a cubic phase whose scale is floored) and
-  with WP-1545's notebook 05 broken series.
-- [ ] Choose the narrow or the `moving_paths` rule, with the count of moved
-  tests for each.
-- [ ] The fix at `refine.py:6953`, and a test that a held source's followers
-  leave `parameters` and the trajectory.
-- [ ] Find the siblings: any other surface that lists a tied row beside its
-  source (`Refinement.parameters()`, the GUI's parameter table, a CIF export,
-  `stage_reports_`), and say which hold the same leak.
+- [x] Reproduce with a single fit (a cubic phase whose scale is floored) and
+  with WP-1545's notebook 05 broken series. Single fit on main 62034506e (the
+  absent-phase fixture, `mccusker_default`): `phases.1.cell.a` held and absent,
+  `b` and `c` reported at 5.2 with `vary=False` and no esd. Notebook 05's
+  broken series on the fixed tree: `a`, `b` and `c` all have six points and no
+  700 K point.
+- [x] Choose the narrow or the `moving_paths` rule, with the count of moved
+  tests for each. Rows each rule drops, measured on six fits (probe in the
+  handover): the narrow rule drops 2 rows on the held fit and none elsewhere;
+  the `moving_paths` rule drops 4 on the held fit, 1 on LaB6 `mccusker_default`
+  (the B site's `x`), 3 on LaB6 `lab_calibrate` with the cell held (`b`, `c`,
+  `x`), 1 on LaB6 Le Bail, 0 on LaB6 `mccusker_structural`, and 16 of 44 on the
+  11-BM NAC walkthrough (coordinates of sites no stage frees). Tests moved by
+  the `moving_paths` rule: 3 of the 1064 in the 25 files that read result rows
+  (one count, two pins of "a held source's followers report with no esd").
+  The narrow rule would move the same two pins and not the count. **Chose
+  `moving_paths`** (settled by Claude under root CLAUDE.md's "can this
+  parameter move? is `moving_paths`" and the result contract's "a fixed
+  parameter is absent"; the change to what a fit returns goes to the
+  maintainer before merge under the 2026-11-01 reader-output ruling).
+- [x] The fix at `refine.py:6953` (now `_build_result`, `refine.py:8428`), and
+  a test that a held source's followers leave `parameters` and the trajectory
+  (`tests/test_reported_rows_move.py`).
+- [ ] Find the siblings. Same leak, fixed: the joint fit's own row builder
+  (`MultiHistogramRefinement._parameters`), and `stage_reports_`, which builds through
+  `_build_result` and so inherits the fix. Not leaks: `Refinement.parameters()`
+  and the GUI's parameter table read the whole table by design, each held row
+  naming its reason; the CIF export writes all six cell edges from the model
+  and only reads esds from the rows. Statements of the old rule rewritten:
+  `RefinedParameter`'s docstring, `reference/parameter-table.md`,
+  `_display.refined_parameter_text`, `refine._moved`,
+  `topas_refined._result_rows`, root CLAUDE.md's hold clause. Left alone:
+  `sequential._path_dependence_diagnostics`' docstring still cites "a tie row
+  off a source never freed" as one reason for its esd filter; the filter is
+  still right, and the function is WP-1991's.
 
 ## Acceptance
 
 ```sh
-.venv/bin/python -m pytest tests/test_held_phase.py tests/test_sequential.py -n auto --dist loadgroup
+.venv/bin/python -m pytest tests/test_held_phase.py tests/test_sequential.py tests/test_reported_rows_move.py -n auto --dist loadgroup
 ```
 
 ## Handover log

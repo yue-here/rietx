@@ -2318,8 +2318,11 @@ class MultiHistogramRefinement:
         # shared parameters reported once, from histogram 0's covariance (its
         # diagonal esd is the true combined marginal — cross-terms with the
         # other histograms' columns do not enter a single path's variance).
+        # the single fit's membership rule (``refine._build_result``,
+        # WP-1999): a row is reported iff its table can move it
+        moving = [set(table.moving_paths) for table in mt.tables]
         for e in mt.tables[0].entries:
-            if _row_shared(mt, e) and (e.vary or e.tie is not None):
+            if _row_shared(mt, e) and e.path in moving[0]:
                 sd = None if e.path in withheld[0] else esd0.get(e.path)
                 # the single fit's rule (``refine._uncorrected``, WP-2002 B4):
                 # the joint solve's own factor, read off its weighted residual
@@ -2334,7 +2337,7 @@ class MultiHistogramRefinement:
                                          corr[np.ix_(cm, cm)] if corr is not None else None)
                    if stderr is not None else {})
             for e in table.entries:
-                if not _row_shared(mt, e) and (e.vary or e.tie is not None):
+                if not _row_shared(mt, e) and e.path in moving[h]:
                     row = f"hist.{h}.{e.path}"
                     sd = None if e.path in withheld[h] else esd.get(e.path)
                     params.append(RefinedParameter(

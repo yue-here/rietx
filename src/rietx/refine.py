@@ -6688,9 +6688,9 @@ _CELL_UNITS = {"a": "Å", "b": "Å", "c": "Å", "alpha": "°", "beta": "°", "ga
 
 def _moved(p: RefinedParameter) -> bool:
     """Whether a result row moved in the fit: a free row, or a tied one carrying
-    an esd, which only a free source gives it.  A tied row whose sources were
-    all held is listed too (the membership filter is "varied or tied") and
-    carries none."""
+    an esd, which only a free source gives it.  Since WP-1999 a tied row whose
+    sources were all held is not listed at all, so the esd test only separates
+    a follower of a free source the data gave no gradient (no esd)."""
     return p.vary or p.stderr is not None
 
 
@@ -8426,11 +8426,16 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         p for d in (diagnostics if cell_runaway is None else cell_runaway)
         if d.code == "CELL_RUNAWAY" for p in d.where))
     params = []
-    # a derived row (a rigid body's atom, WP-1805) moves with θ as a tied row
-    # does and carries its esd through the block, so it is reported like one
-    derived = table.derived_paths()
+    # A row is reported iff the fit could move it: ``moving_paths``, the free
+    # columns and every row C carries them to (WP-1999).  So a tied row is in
+    # while a source of its tie is free, and a derived row (a rigid body's
+    # atom, WP-1805) while an input of its block is.  A follower of a source
+    # that is fixed, or held for the stage (WP-1301), is a constant no column
+    # reached: it leaves with its source, as a cubic ``b`` beside an absent
+    # ``a`` or a coordinate whose site DOF no stage freed.
+    moving = set(table.moving_paths)
     for e in table.entries:
-        if e.vary or e.tie is not None or e.path in derived:
+        if e.path in moving:
             stderr = None if e.path in withheld else stderr_phys.get(e.path)
             params.append(RefinedParameter(
                 path=e.path, value=e.value, vary=e.vary, stderr=stderr,
