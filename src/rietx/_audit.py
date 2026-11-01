@@ -229,6 +229,7 @@ RECORD_SCHEMAS: tuple[str, ...] = (
     "rietx.schemas.sequential.SeriesEntry",
     "rietx.schemas.results.RefinementResult",
     "rietx.schemas.results.Statistics",
+    "rietx.report.schemas.DistortionBlockTests",
     "rietx.schemas.indexing.IndexingResult",
     "rietx.schemas.indexing.PeakList",
 )
@@ -446,6 +447,10 @@ def row_source(name: str, kind: str, value: object = None) -> str:
 #: Fields of :data:`RECORD_SCHEMAS` that report no action the filing named.
 #: An audit that finds one reporting an action moves it into :data:`ROWS`.
 OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
+    "rietx.report.schemas.DistortionBlockTests.detectability_bar",
+    "rietx.report.schemas.DistortionBlockTests.detectability_probe",
+    "rietx.report.schemas.DistortionBlockTests.restarted_result",
+    "rietx.report.schemas.DistortionBlockTests.tests",
     "rietx.schemas.indexing.IndexingResult.candidates",
     "rietx.schemas.indexing.IndexingResult.diagnostics",
     "rietx.schemas.indexing.IndexingResult.engine_stats",
@@ -472,6 +477,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.RefinementResult.cell_volumes",
     "rietx.schemas.results.RefinementResult.data_support",
     "rietx.schemas.results.RefinementResult.diagnostics",
+    "rietx.schemas.results.RefinementResult.distortion_totals",
     "rietx.schemas.results.RefinementResult.geometry",
     "rietx.schemas.results.RefinementResult.histograms",
     "rietx.schemas.results.RefinementResult.identifiability",
@@ -1280,6 +1286,13 @@ ROWS: tuple[Row, ...] = (
                  "checks the pattern unchanged before writing, and a caller has no verb to do it "
                  "by hand (B2, ruled 2026-10-19)."),
         approved="2026-10-19"),
+    Row("rietx.report.schemas.DistortionBlockTests.restarts", "action", tier=1, ambiguity=1,
+        evidence=("arithmetic: a restricted fit is the full model with parameters held at 0, so "
+                  "its chi2 cannot lie below the full optimum (Kerman et al. 2012, Acta Cryst. A68, "
+                  "222, p. 231); one below it by more than the solver's own ftol proves the full "
+                  "fit stopped short, every refiner would refit, and the caller's own fit is "
+                  "untouched; tests/test_distortion_totals.py::"
+                  "test_a_restricted_fit_below_the_full_one_restarts_the_full_fit")),
     Row("rietx.schemas.results.StageResult.blocked_by_hold", "action", tier="caller", ambiguity=1,
         evidence=("opt-in: Refinement.hold(), nothing held by default; the caller's hold outranks a"
                   " plan glob (WP-1435)")),
@@ -2363,11 +2376,27 @@ ROWS: tuple[Row, ...] = (
                   "never dropped (31 on corundum with the cap at 2, "
                   "tests/test_geometry_table.py); tests/data's structures reach 20 a site "
                   "(WP-2002)")),
+    Row("rietx.model.geometry.MAX_TORSIONS_PER_ATOM", "constant", tier=1, value=36,
+        evidence=("report scope (tier 1's cap clause, ruled 2026-10-21): the note counts "
+                  "exactly what the cap drops, the kept torsions are each atom's first in "
+                  "chain order and each carries the esd it has uncapped (fluorapatite at a "
+                  "cap of 5, tests/test_geometry_torsions.py), and Refinement.geometry"
+                  "(request=) answers any chain by name. 36 = 4 bonds x (4-1) x (4-1), so "
+                  "every chain of a molecule whose atoms have at most four bonds is listed "
+                  "whole: the five molecular structures in tests/data never reach it, while "
+                  "LaB6 (La with 24 B) has 4 374 chains (WP-1815)")),
     Row("rietx.model.geometry.SYMMETRY_CODE_MAX_SHIFT", "constant", tier=1, value=4,
         evidence="format: CIF symmetry code digit = shift + 5, so -4..+4 (docstring)"),
     Row("rietx.model.geometry.VARIANCE_CANCELLATION_FLOOR", "constant", tier=1, value=1e-12,
         evidence=("numerical floor: about 4.5e3 x fp64 eps, five orders below the smallest powder "
                   "esd (docstring); stops 90.00000000000(43)")),
+    Row("rietx.model.geometry._KEY_OFFSET", "constant", tier=1, value=0.41421356237309515,
+        evidence=("numerical setting with a domain test: where a 1e-4-cell position key puts "
+                  "its boundaries; any offset leaves distinct atoms (>0.5 A apart) with distinct "
+                  "keys, and an irrational one keeps every decimal CIF coordinate and its "
+                  "images off a boundary. Rounding to the nearest 1e-4 put LaMnO3's 0.48775 on a "
+                  "tie and listed 20 of 298 chains twice; tests/test_geometry_torsions.py checks "
+                  "no reversal is listed, by positions to 1e-6 (WP-1815)")),
     Row("rietx.model.geometry._COINCIDENT_D2", "constant", tier=1, value=1e-06,
         evidence=("numerical floor: any value between roundoff and the shortest real interatomic "
                   "d^2 (>0.1 A^2) gives the same lists")),
@@ -2537,6 +2566,11 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.model.restraints._COS_CLAMP", "constant", tier=1, value=0.999999999,
         evidence=("numerical floor: affects only angles within 0.0026 deg of 0 or 180, which are "
                   "unsupported restraint targets; value chosen, not sqrt(eps)")),
+    Row("rietx.model.restraints._TORSION_SIN2_FLOOR", "constant", tier=1,
+        value=1.999999943436137e-09,
+        evidence=("derived: 1 - _COS_CLAMP**2, the sin^2 of the bond angle at the clamp "
+                  "restraints already applies, with no free factor; a chain bent less than "
+                  "that has no torsion (WP-1815)")),
     Row("rietx.model.restraints._DEG", "constant", tier=1, value=0.017453292519943295,
         evidence="arithmetic: pi/180"),
     Row("rietx.model.restraints._SAME_CONTACT_A", "constant", tier=1, value=1e-06,
@@ -3039,6 +3073,16 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.refine._CENTROID_SITES_NAMED", "constant", value=12),
     Row("rietx.report.body_misfit.MISFIT_ALPHA", "constant", value=0.001),
     Row("rietx.report.body_misfit.MISFIT_BIC", "constant", value=10.0),
+    Row("rietx.report.distortion.EVEN_EXPONENT", "constant", tier=1, value=4,
+        evidence=("symmetry: along a mode with no part invariant under the structure's own "
+                  "group the pattern has no first-order term, so dy ~ A^2 and lambda ~ A^4 "
+                  "(Perez-Mato, Orobengoa & Aroyo 2010 sec. 7; WP-1419); the wrong exponent "
+                  "misses the bisected crossing by a factor 1.3-6, tests/"
+                  "test_distortion_totals.py::test_a_det_meets_the_bisected_crossing")),
+    Row("rietx.report.distortion.LINEAR_EXPONENT", "constant", tier=1, value=2,
+        evidence=("arithmetic: a mode with a first-order term moves the pattern linearly, so "
+                  "lambda = sum((dy/sigma)^2) ~ A^2 (WP-1419); tests/"
+                  "test_distortion_totals.py::test_a_det_meets_the_bisected_crossing")),
     Row("rietx.report.layer0.LAYER0_MATCH_TOL_DEG", "constant", value=0.08),
     Row("rietx.report.layer2.BACKGROUND_INCREASE_CAP", "constant", value=0.6),
     Row("rietx.report.layer2.IMPURITY_SIGMA", "constant", value=8.0),

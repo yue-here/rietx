@@ -130,6 +130,7 @@ from .params.vector import (
     is_variable_path,
     retired_spelling,
 )
+from .report.distortion import distortion_totals as _distortion_totals
 from .report.magnetic import (
     magnetic_width_findings,
     moment_angle_stationary_diagnostics,
@@ -154,6 +155,8 @@ from .schemas.plan import (
 from .schemas.results import (
     DELIVERABLES,
     AbsorptionCorrection,
+    GeometryRequest,
+    GeometryTable,
     Identifiability,
     PhaseAgreement,
     PhaseTexture,
@@ -3908,6 +3911,40 @@ class Refinement:
             state=self.snapshot())
         self._head_id = node.id
 
+    def distortion_block_tests(self, data: PatternData, *, hold=None,
+                               detectability_bar: float | None = None,
+                               detectability_probe: float | None = None):
+        """Refit with irrep blocks held at 0 and compare, for any blocks the caller names (WP-1419).
+
+        For a child stated on mode amplitudes and fitted on ``data`` with its
+        blocks free.  ``hold`` is a list whose items are a block, or a set of
+        blocks held at 0 together, each named by its ``(irrep, k,
+        isotropy_group)`` key or its
+        :class:`~rietx.schemas.results.DistortionTotal`; ``None`` holds every
+        block that is not parent-invariant and that the fit freed throughout,
+        each alone.  Every item gets one
+        restricted refit from this fit's optimum, freeing everything else this
+        fit freed, and one :class:`~rietx.report.DistortionBlockTest` row: ΔBIC
+        at N/f² (the restricted fit's f, as :func:`~rietx.report.compare_freed`),
+        Λ = Δχ²/(χ²_red·f²) with the full fit's χ²_red and f and its p against
+        χ²_m, both χ², and, when ``detectability_bar`` is given, A_det at that
+        bar (no default: without it none is computed) and
+        ``detectability_probe``, the amplitude in Å of its one predict per mode
+        (the caller's, required with a bar).  A restricted fit below
+        the full one restarts the full fit from there and tests every set
+        again; each restart is recorded.  No verdict is read and no warning
+        raised.  Opt-in because it refits (one refit per held set).
+
+        Runs on a private copy: this refinement, its history and its result
+        are left as they are, and a restarted full fit is returned on the
+        record (``restarted_result``).
+        """
+        from .report.distortion import distortion_block_tests
+
+        return distortion_block_tests(self, data, hold=hold,
+                                      detectability_bar=detectability_bar,
+                                      detectability_probe=detectability_probe)
+
     def suggest(self, data: PatternData, *, top_n: int = 5,
                 include: "str | list[str]" = "*",
                 exclude: "list[str] | tuple[str, ...]" = (),
@@ -6405,6 +6442,55 @@ class Refinement:
     # ------------------------------------------------------------------
     # exporters (WP-0309): reflection table, refinement CIF, QPA table
     # ------------------------------------------------------------------
+    def geometry(self, request: GeometryRequest | dict | None = None
+                 ) -> GeometryTable | None:
+        """Distances, angles and torsions with esds, or the ones ``request`` names.
+
+        With no ``request``, the whole bonding table
+        (:func:`~rietx.model.geometry.geometry_table`): bonds, contacts, angles
+        and torsions over bonded chains, the one ``result_.geometry`` carries.
+        With a :class:`~rietx.schemas.results.GeometryRequest` (or a dict
+        validated as one), only the distances, angles and torsions it names,
+        each atom by label or by label and CIF symmetry code — so a chain the
+        table's caps left out, a contact past its radius or a torsion over
+        atoms that are not bonded is measured on demand (WP-1815).
+
+        **Answered while the last fit's covariance is live.**  After
+        :meth:`fit` or :meth:`run_stage`, the values are that answer's and the
+        esds are J·Cov·Jᵀ through its covariance — the one its parameter esds
+        were read off, the Bérar-Lelann factor already in it, so nothing here
+        multiplies again and a row the table lists carries the numbers
+        ``result_.geometry`` does.  The covariance is never serialized, so with
+        no live fit (before one, after an edit, a checkout or a replay) the
+        values are the current model's and every esd is ``None``.  ``None`` in
+        Le Bail and Pawley mode and with no phase, as for the table.
+        """
+        from .crystallography.structure_factor import compile_phase_sites
+        from .model.geometry import geometry_from_sites, request_table
+
+        live = self._answer_covariance
+        if (live is not None and self._model is not None
+                and live[0] is self.result_ and self._answer is not None):
+            if self._model.mode != "rietveld" or not self._model.phases:
+                return None
+            _result, table, theta, stderr_internal, correlation = live
+            structure = self._answer["structure"]
+            sites_of = [cp.sites for cp in self._model.phases]
+        else:
+            if self._mode != "rietveld" or not self.structure.phases:
+                return None
+            structure = self.structure
+            table = ParameterTable(structure, self.instrument)
+            theta, stderr_internal, correlation = table.x0(), None, None
+            sites_of = [compile_phase_sites(p) for p in structure.phases]
+        if request is None:
+            return geometry_from_sites(sites_of, table, theta, structure,
+                                       stderr_internal=stderr_internal,
+                                       correlation=correlation)
+        return request_table(request, sites_of, table, theta, structure,
+                             stderr_internal=stderr_internal,
+                             correlation=correlation)
+
     def reflection_table(self) -> list["ReflectionRow"]:
         """Every (emission line, reflection) of the last fit as typed rows.
 
@@ -8268,6 +8354,12 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     volumes = cell_volumes(table, theta, structure,
                            stderr_internal=stderr_internal, correlation=correlation)
 
+    # Each irrep block of a child on mode amplitudes (WP-1419): A_τ, its esd and
+    # T² off the same final covariance, for geometry's reason.  Quantities only.
+    distortion_totals = _distortion_totals(table, theta, structure, values,
+                                           stderr_internal=stderr_internal,
+                                           correlation=correlation)
+
     # The widths read as a coherent domain size and a Δd/d (WP-1131), built
     # here for geometry's reason — the esds come off the same final Jacobian —
     # and through the same λ selector the size bound and the size flag use, so
@@ -8454,6 +8546,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         sigma=model.sigma.tolist(),
         ticks=ticks, tick_hkl=tick_hkl, radiation=_radiation(model, values),
         qpa=qpa, restraints=restraints_report, geometry=geometry,
+        distortion_totals=distortion_totals,
         cell_volumes=volumes,
         microstructure=microstructure,
         phase_agreement=_phase_agreement(model, values, structure),
