@@ -233,6 +233,37 @@ SRM 660c fixture, ignoring two holder lines moves the cell 0.4 ppm and reports a
 the clean fit's. Rwp rises 4.4× in the same arm, and an esd scales with √χ², so the larger
 esd reports the worse fit; it does not measure the bias.
 
+## When a peak counts as explained by a reflection
+
+Surveyed 2026-11-01 for WP-1977, on when Layer 0 should call a residual peak unindexed.
+
+- GSAS-II 5.8.4, checked. `IndexPeaks` (`GSASIIindex.py:311-352`) gives a picked peak the
+  nearest calculated d-spacing, one peak to one line, with no tolerance at all. Unindexed
+  lines are counted afterwards for M20 (`calc_M20`, :163-190). The automatic peak search
+  drops a pick within 2 × FWHM of another (`GSASIIpwdGUI.py:825`), which spaces peaks and
+  matches nothing. No check of a difference-curve peak after a Rietveld fit was found.
+- FullProf 8.20, checked. The manual has no report of unaccounted or impurity peaks. WinPLOTR
+  finds peaks from zero crossings of the derivative, above a fraction of the largest
+  derivative amplitude (`WINPLOTR.pdf` § 5.4.1). It sets no angular window.
+- TOPAS, inferred from a summarised fetch of the Durham manual (§ 12.3), not read directly.
+  `index_max_th2_error` (default 0.05° 2θ) marks un-indexed lines in indexing. No
+  residual-peak check after a fit was found.
+- Indexing programs, checked in the docs FullProf bundles. DICVOL marks a line outside a
+  fixed absolute error (default 0.03° 2θ) as impurity or spurious (`dicvol06.inf:139-157`).
+  ITO's `TOLG` is 0.06° 2θ (`ito15.inf:337-342`). TREOR's window is fixed in sin²θ
+  (`treor90.inf:786-805`), so it widens with angle and not with the peak width.
+- McCusker et al. (1999) and Toby (2006), inferred (recall, no local copy). Both tell the
+  reader to read the difference curve by eye. A derivative-shaped residual at a line is a
+  position, width or asymmetry misfit, and a peak where no line is calculated is a foreign
+  phase. Neither gives a numeric rule.
+
+So the programs match an *observed* peak list to calculated lines, inside indexing, with a
+fixed angular or sin²θ window. None scales the window with the peak width, and none flags a
+difference-curve peak after a Rietveld fit. rietx's `unmatched_obs` has no direct precedent.
+The flank test it now uses is the reader's eye made explicit. A residual peak whose observed
+curve rises without a resolved valley into a peak the model draws is part of that peak, and
+one separated from it by a valley is a line of its own.
+
 ## Sequential refinement
 
 Surveyed 2026-10-24 for WP-2003, one agent across the seven programs. A chain here is N
