@@ -370,6 +370,15 @@ absences; Si, corundum and magnetite keep their correct cells.
   The proxy the judge names (#951's guard rests on n = 2, not on the shift)
   predates this branch and goes to the maintainer with the rule.
 
+  *Gate* on the final tree (`f4f6f3c14` plus this entry; `main` had not moved
+  from `b0e0e4b71`): the fast selection 13 188 passed, 310 skipped, 32 xfailed,
+  0 failed in 8:13 alone on the machine (`[dev]`, macOS arm64, Python 3.12.10).
+  One test added (`test_the_null_is_the_chance_rate_of_the_seen_test_itself`,
+  0.02 s); the dense row was rewritten, not added. No pre-branch baseline was
+  run locally, so the +1 is CI's to confirm. The full suite did not run; the
+  slow rows this change can move are `test_acceptance_indexing.py`'s, measured
+  above. ruff clean.
+
   *Not done.* The three #1230 truths under `preset="full"` were not re-run here;
   the reporter's runs read #1 for `split + g`, and `g` alone already holds them
   at #1 on main.
