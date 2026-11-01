@@ -374,6 +374,35 @@ def mode_fixed_path(path: str, mode: Mode) -> bool:
             or _MAGNETIC_WIDTH_PATH.match(path) is not None)
 
 
+def _parameter_row(e, *, tie: "TieSpec | None", esd: float | None, mode: Mode,
+                   blocked, reach, owned, origin, path: str | None = None,
+                   lo: float | None = None, hi: float | None = None) -> ParameterRow:
+    """The one place an ``Entry`` becomes a :class:`ParameterRow` (WP-2028).
+
+    ``Refinement.parameters`` and ``MultiHistogramRefinement.parameters`` both
+    call it, so the two listings cannot drift.  Every ``Entry`` field not named
+    in the keywords is copied by name from ``dataclasses.fields(Entry)``: a
+    field added to ``Entry`` and ``ParameterRow`` reaches both surfaces, and one
+    added to ``Entry`` alone fails ``ParameterRow`` (``extra="forbid"``) in the
+    first call rather than reading as an empty answer.  The keywords are what a
+    joint fit respells: ``path``, ``tie`` (its sources under the joint result's
+    paths), and ``lo``/``hi`` (a shared row's intersected window).
+    """
+    kw = {f.name: getattr(e, f.name) for f in dataclasses.fields(e)}
+    kw.update(
+        path=e.path if path is None else path,
+        lo=e.lo if lo is None else lo, hi=e.hi if hi is None else hi,
+        tie=tie, esd=esd,
+        mode_fixed=(mode_fixed_column(reach[e.path], mode)
+                    if e.path in reach else mode_fixed_path(e.path, mode)),
+        needs_held_cell=e.path in blocked,
+        body=owned.get(e.path),
+        origin_axis=origin[e.path][1] if e.path in origin else None,
+        help_key=help_key_for(e.path),
+    )
+    return ParameterRow(**kw)
+
+
 def mode_fixed_column(reached: list[str], mode: Mode) -> bool:
     """Whether ``mode`` force-fixes every model path this column moves.
 
@@ -3135,24 +3164,11 @@ class Refinement:
         reach = table.entry_reach()
         owned = table.body_rows()
         origin = table.origin_holds
-        rows = []
-        for e in table.entries:
-            rows.append(ParameterRow(
-                path=e.path, value=e.value, vary=e.vary, lo=e.lo, hi=e.hi,
-                tie=(TieSpec._from_tie(e.tie, user=e.path in self._applied_ties)
-                     if e.tie is not None else None),
-                locked=e.locked,
-                held=e.held,
-                esd=esd.get(e.path),
-                mode_fixed=(mode_fixed_column(reach[e.path], mode)
-                            if e.path in reach
-                            else mode_fixed_path(e.path, mode)),
-                needs_held_cell=e.path in blocked,
-                body=owned.get(e.path),
-                origin_axis=origin[e.path][1] if e.path in origin else None,
-                help_key=help_key_for(e.path),
-            ))
-        return rows
+        return [_parameter_row(
+            e, tie=(TieSpec._from_tie(e.tie, user=e.path in self._applied_ties)
+                    if e.tie is not None else None),
+            esd=esd.get(e.path), mode=mode, blocked=blocked, reach=reach,
+            owned=owned, origin=origin) for e in table.entries]
 
     def set_vary(self, path_globs: list[str] | str, vary: bool = True) -> list[str]:
         """Free (or hold) every parameter matching ``path_globs``.
@@ -7822,11 +7838,10 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
             fix = None      # every coordinate of the site is fixed by symmetry
         elif sources:
             fix = f"Free {', '.join(sources)} instead."
-        elif canonical is None:
-            fix = "Read held_because for this row in ref.parameters()."
         else:
-            # a joint fit has no parameters() to point at
-            fix = None
+            # a joint fit's ``parameters()`` spells the row as ``where`` does
+            # (WP-2028)
+            fix = "Read held_because for this row in ref.parameters()."
         out.append(Diagnostic(
             level="warning", code="STAGE_PATH_NOT_FREE",
             message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
@@ -7890,9 +7905,7 @@ def _window_loss_diagnostics(stage_results: list[StageResult]) -> list[Diagnosti
 
 
 def _unknown_path_diagnostics(stage_results: list[StageResult],
-                              known: list[str], *,
-                              listing: str = "ref.parameters()"
-                              ) -> list[Diagnostic]:
+                              known: list[str]) -> list[Diagnostic]:
     """``STAGE_PATH_UNKNOWN`` — a stage asked for a parameter by a name no row has.
 
     Issue #265: ``turn_on=["instrument.source.wavelength"]`` freed nothing,
@@ -7929,8 +7942,8 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
     paths the second and third are usually siblings of the first: for the
     issue's typo they were ``lines.0.weight`` and ``profile.w``.
 
-    ``listing`` is the call the suggestion names for seeing every path, which
-    is the caller's: a joint fit has no ``parameters()``.
+    The suggestion names ``ref.parameters()`` for seeing every path, which a
+    joint fit has too (WP-2028), spelling its rows as ``known`` does.
     """
     by_path: dict[str, list[str]] = {}
     for sr in stage_results:
@@ -7958,7 +7971,7 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
                      "for it."
                      + (f" {hint[:1].upper()}{hint[1:]}" if hint else "")),
             where=[path],
-            suggestion=(f"Correct the path ({listing} lists every path this "
+            suggestion=("Correct the path (ref.parameters() lists every path this "
                         "model has), or write a glob if the stage should "
                         "reach a component that only some models declare."),
         ))
