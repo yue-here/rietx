@@ -127,7 +127,13 @@ so measure how many goldens and tests move before choosing.
   passed + 3 failed; every failure but one pinned the leak and was re-pinned,
   the one being `test_display`'s kernel test, which fails on this Mac's stale
   Jupyter kernel spec. `python -m tests.reader_output`: exit 0, the printed
-  LaB6 text is unchanged; the change is in the field. FAST_SUITE_LINE
+  LaB6 text is unchanged; the change is in the field. Fast suite (`-m "not slow"`, `[dev]`, darwin/arm64, tree 50be32b56, run under
+  the shift's suite lock): 13191 passed, 310 skipped, 32 xfailed, 1 failed in 8:18.
+  The failure is `test_display`'s kernel test again (the stale kernel spec). The 5
+  added tests are 5 passes and cost 4.14 s on one local run, the slowest 1.28 s
+  (`tests.added_test_times`), so none joins the slow tail. No local baseline count,
+  so the +5 is not checked against main; CI's run is the comparison. The full
+  suite did not run: the brief allowed the fast selection once.
 
   *Review.* `/code-review high --fix`: nine findings, seven fixed (commit
   a5eefefe1). Declined: simplifying `refine._moved`, since it changes what
