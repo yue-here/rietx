@@ -124,6 +124,22 @@ def test_stage_boundaries_keep_the_split_too(truth):
                                                    rel=1e-3, abs=1.0)
 
 
+def test_a_joint_fit_keeps_the_split_too(truth):
+    """The joint runner decides the split once per histogram, as ``fit`` does."""
+    from rietx import MultiHistogramRefinement
+
+    multi = MultiHistogramRefinement(
+        rx.Structure(phases=[_toy(0.27, occ=0.5, free=True)]),
+        [_instrument(), _instrument()])
+    res = multi.fit([truth, truth], plan=rx.RefinementPlan(stages=[ALL]),
+                    telemetry=False)
+    o1 = multi.fitted_structures[0].phases[0].atoms[O1]
+    assert abs(o1.y.value - 0.25) < 5e-5
+    assert res.statistics.chi2 < 1e-6
+    kept = [d for d in res.diagnostics if d.code == "SITE_MULTIPLICITY_KEPT"]
+    assert [d.where for d in kept] == [[f"phases.0.atoms.{O1}"]]
+
+
 @pytest.mark.parametrize(("occ", "delta", "o_per_cell"), [
     (0.5, 4e-5, 10), (0.5, 6e-5, 12), (1.0, 4e-5, 12), (1.0, 6e-5, 12)])
 def test_a_fresh_compile_decides_from_the_coordinates(truth, occ, delta,

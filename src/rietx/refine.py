@@ -44,12 +44,11 @@ from .crystallography.magnetic.moments import (
     MOMENT_DOF_PATH as _MOMENT_DOF,
 )
 from .crystallography.magnetic.scattering import check_group_is_structure_symmetry
-from .crystallography.structure_factor import phase_orbit_split
-from .crystallography.symmetry import (
-    TWIN_COORD_TOL,
-    reflection_label,
-    reflection_label_row,
+from .crystallography.structure_factor import (
+    _multiplicity_kept_diagnostics,
+    phase_orbit_split,
 )
+from .crystallography.symmetry import reflection_label, reflection_label_row
 from .crystallography.twins import (
     NumberingMoves,
     carry_constraints,
@@ -8931,64 +8930,6 @@ def _frozen_compile_diagnostics(chi2_frozen: float, chi2_fresh: float, *,
             f"{100 * rel:.2g} % apart. The result reports the fresh "
             f"figure and {kept}."),
         value=rel)]
-
-
-def _multiplicity_kept_diagnostics(structure: Structure, split: list,
-                                   ) -> list[Diagnostic]:
-    """``SITE_MULTIPLICITY_KEPT`` for each site a fresh compile would recount.
-
-    ``split`` is the orbit split the fit solved with, decided once at its
-    start (``Refinement._decide_orbit_split``).  A site whose returned
-    coordinates give another split at a fresh compile is one the fit carried
-    across ``SITE_TOL`` of a special position.  The usual case is a
-    half-occupied general atom, a split pair across a mirror, that the data
-    do not resolve: its cost is even in the distance off the mirror, so the
-    solver stops on it (WP-2052, issue #1088).  The fit counted the site at the
-    multiplicity it started with, as GSAS-II does for a whole refinement.
-    Every later compile decides from the coordinates, so the message gives the
-    atoms per cell both ways and says which one the result used.
-
-    The test is arithmetic and has no threshold: any change of a site's
-    image count is reported.
-    """
-    out: list[Diagnostic] = []
-    for i, (phase, ops) in enumerate(zip(structure.phases, split, strict=True)):
-        fresh = phase_orbit_split(phase)
-        for j, (atom, (rot, _), (rot_now, _)) in enumerate(
-                zip(phase.atoms, ops, fresh, strict=True)):
-            m_fit, m_now = len(rot), len(rot_now)
-            if m_fit == m_now:
-                continue
-            occ = atom.occ.value
-            on_position = occ * m_fit / m_now
-            out.append(Diagnostic(
-                level="warning", code="SITE_MULTIPLICITY_KEPT",
-                where=[f"phases.{i}.atoms.{j}"],
-                value=occ * (m_fit - m_now),
-                message=(
-                    f"site {atom.label!r} of phase {phase.name!r} was fitted at "
-                    f"{m_fit} positions in the cell, the orbit it started the "
-                    f"fit with: {m_fit} × {occ:g} = {m_fit * occ:g} atoms per "
-                    f"cell. At the coordinates the fit returns, "
-                    f"{[round(a.value, 6) for a in (atom.x, atom.y, atom.z)]}, "
-                    f"a fresh compile counts {m_now} positions: {m_now} × "
-                    f"{occ:g} = {m_now * occ:g} atoms per cell. The result, "
-                    f"its statistics and its weight fractions use the fitted "
-                    f"count. Later compiles decide from the coordinates and use "
-                    f"the fresh count. They include predict() on a new grid, "
-                    f"suggest(), a new Refinement and the next fit."),
-                suggestion=(
-                    f"if the site is one atom on the special position, state "
-                    f"it there at occupancy {on_position:g}, which keeps the "
-                    f"fitted content; if it is a split pair the data do not "
-                    f"resolve, state it more than {TWIN_COORD_TOL:g} "
-                    f"(fractional) from the special position, or the next fit "
-                    f"counts it at {m_now} positions." if m_now < m_fit else
-                    f"state the site on the special position to keep the "
-                    f"fitted count, or more than {TWIN_COORD_TOL:g} "
-                    f"(fractional) from it to have it counted at {m_now} "
-                    f"positions.")))
-    return out
 
 
 #: a Pawley overlap group is reported unresolved when *any* member carries a

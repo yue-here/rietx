@@ -252,6 +252,7 @@
   "diagnostics:SEQUENTIAL_WIDTH_GROWTH",
   "diagnostics:SERIES_PATTERN_FAILED",
   "diagnostics:SITE_DOFS_RENUMBERED",
+  "diagnostics:SITE_MULTIPLICITY_KEPT",
   "diagnostics:SITE_SNAPPED_TO_SPECIAL_POSITION",
   "diagnostics:SITE_TWINS_KEPT",
   "diagnostics:SITE_TWINS_MERGED",
