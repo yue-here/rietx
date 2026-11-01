@@ -263,7 +263,7 @@ npm --prefix gui test && npm --prefix gui run check
   lines show only to a caller who passes `diagnostics=[]` or draws an ellipsoid
   figure. The new tests cost 0.55 s and 0.04 s locally. `tests/silence.py` needs a
   pair only for a `warning` code, and this one is info, so none was added.
-  FULL_COUNTS
+  The fast selection (`-m "not slow"`, whole suite) did not run here: its turn in the ghostshift suite lock queue had not come after 80 minutes behind other runners' suites, so I withdrew it. What ran, on the merged tree (main fetched 2026-11-01, `[dev]` venv, darwin/arm64, beside other sessions): the 15 files touching this change (docs consistency, audit table, help, gui help, silence, skill x4, render_structure, cif_blocks, schemas, robustness_external, manual_api, structure3d), 935 passed, 1 skipped, 81 s; ruff clean. The two new tests are in that count; no whole-suite passed+skipped delta was measured. CI's fast matrix is the whole-suite gate.
 
   *Review.* `/code-review high --fix` found no bug and six minor points. Fixed: the
   singular ("1 sites"), the test's prefix slicing. Declined: the `where` paths point
