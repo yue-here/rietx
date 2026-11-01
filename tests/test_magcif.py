@@ -1218,11 +1218,11 @@ def test_a_moment_tag_in_a_text_field_does_not_make_a_cif_magnetic(tmp_path):
     prose mentions ``_atom_site_moment.`` stays on the nuclear arm."""
     from rietx.crystallography import cif
     prose = "\n_publ_section_comment\n;\n_atom_site_moment.label is a tag.\n;\n"
-    nuclear = (Path(__file__).parent / "data" / "fluorapatite.cif").read_text()
+    nuclear = (Path(__file__).parent / "data" / "fluorapatite.cif").read_text(encoding="utf-8")
     assert not cif._magnetic_content(nuclear + prose)
     assert cif._magnetic_content(nuclear + "\n_atom_site_moment.label x\n")
     path = tmp_path / "n.cif"
-    path.write_text(nuclear + prose)
+    path.write_text(nuclear + prose, encoding="utf-8")
     assert structure_from_cif(str(path)).phases[0].magnetic_symmetry is None
 
 
