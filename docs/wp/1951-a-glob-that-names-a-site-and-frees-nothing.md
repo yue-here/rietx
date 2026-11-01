@@ -69,6 +69,11 @@ set_vary("instrument.zero")` returns `[]` silently, while `hold` raises
 'unknown parameter path' with no near-miss. Both are one call to
 `rietx._nearmiss` away, and are unowned."
 
+**The tier of each rule this WP adds** (written 2026-11-01). The site-glob
+branch of `STAGE_PATH_NOT_FREE` is tier 1, ambiguity 1: it is arithmetic on
+the table (does any matched row move?), with no threshold. `set_vary`'s
+warning and the verbs' near-miss are the same tests on a second surface.
+
 ## Non-goals
 
 - A `held_by` enum on `ParameterRow`. The row's fields already say it.
@@ -80,20 +85,38 @@ set_vary("instrument.zero")` returns `[]` silently, while `hold` raises
 
 ## Tasks
 
-- [ ] Read 1414's two pinned tests and say whether any case is a
+- [x] Read 1414's two pinned tests and say whether any case is a
       concrete-site glob. If one is, put the question to the maintainer and
       record the answer as `Decided YYYY-MM-DD:`.
-- [ ] `STAGE_PATH_NOT_FREE` (or a sibling code) for a concrete-site glob
+      *Done 2026-11-01:* the `dof-glob` case (`phases.0.atoms.1.dof.*` on
+      LaB6) is a concrete-site glob, but it matches B's free `dof.0` and is
+      the test's positive arm. The rule fires only when the glob frees
+      nothing, so that case still passes unchanged. The `pattern` case and
+      the hump test have no numeric segment. No question for the maintainer.
+- [x] `STAGE_PATH_NOT_FREE` (or a sibling code) for a concrete-site glob
       that matches no row, naming the site and why (site symmetry, from the
       same text the literal case uses).
-- [ ] `Refinement.set_vary` and `hold` on an unknown literal: the
+      *Done:* `refine._site_glob_diagnostics`, the same code. It fires when
+      no row the glob matches can move (`_frees_for_request`), which also
+      covers a glob matching only locked or symmetry-tied rows.
+- [x] `Refinement.set_vary` and `hold` on an unknown literal: the
       near-miss message `STAGE_PATH_UNKNOWN` gives a stage. `set_vary`
       warns. Whether `hold` keeps raising is recorded.
-- [ ] Tests: rutile Ti's `dof.*` fires, `phases.*.atoms.*.dof.*` on the same
+      *Done:* `set_vary` warns (`UserWarning`) on an unknown literal, and
+      when freeing on a declined phase literal or site glob, with the
+      stage's text. `hold` keeps raising, since it always has and a hold on
+      nothing is a claim; the refusal now names the nearest path, as do
+      `unhold`, `untie`, `tie`, `set_values` and `profile_interval`.
+- [x] Tests: rutile Ti's `dof.*` fires, `phases.*.atoms.*.dof.*` on the same
       model stays silent, every preset on the acceptance fixtures fires
       nothing new.
-- [ ] Skill: `surprises.md` § 8.28 gains the concrete-site case. The
+      *Done:* `tests/test_params_surface.py`. The preset half is structural
+      (`test_no_preset_names_one_site`): the rule needs a concrete site
+      index, and no preset glob has one.
+- [x] Skill: `surprises.md` § 8.28 gains the concrete-site case. The
       diagnostics reference row if the code is new.
+      *Done:* § 8.28, trimmed to stay inside the file's byte budget. The
+      code is not new, so the row stands; `help.py`'s entry gains the case.
 
 ## Acceptance
 

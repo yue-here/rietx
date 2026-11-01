@@ -4,7 +4,9 @@ Four surfaces answer a name that does not exist with the name that does: a
 top-level attribute (``rietx.__getattr__``), a schema field
 (``schemas.common.Base.__getattr__``), a ``Stage``/``RefinementPlan`` field
 (``strategy.staged``), and a stage ``turn_on`` path that names no parameter
-(``STAGE_PATH_UNKNOWN``, WP-1414).  They share this module so that "closest"
+(``STAGE_PATH_UNKNOWN``, WP-1414).  The ``Refinement`` verbs that take a
+path answer an unknown one through it too (``refine._path_hint``, WP-1951).
+They share this module so that "closest"
 means one thing everywhere, and a change to it is one edit.
 
 Standard-library only and importing nothing from the package, because

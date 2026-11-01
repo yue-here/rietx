@@ -4254,7 +4254,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "that follows another parameter. Nothing was freed for it, yet the fit "
             "converged. The parameter kept its value. Free the parameter it follows, or "
             "for a coordinate free the directions that the site symmetry allows. If the "
-            "model holds it fixed, there is nothing to refine."
+            "model holds it fixed, there is nothing to refine. A pattern that names one "
+            "atom site, such as phases.0.atoms.0.dof.*, gets the same report when it "
+            "frees nothing at that site. An atom on a fully fixed special position has "
+            "no directions, so its dof.* pattern matches no parameter."
         ),
     ),
     "STAGE_PATH_UNKNOWN": HelpEntry(

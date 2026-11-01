@@ -358,6 +358,12 @@ A held row is skipped by a wildcard name, as a locked one is.
 A literal path to a row you held raises `ValueError`, saying to `Refinement.unhold` it first.
 A row the current mode fixes is the exception to the matching rule: `set_vary` frees it, and the next stage drops it again and reports it as `mode_fixed`.
 
+`set_vary` warns with a `UserWarning` when a call changes nothing it named.
+A literal path the model lacks gets the nearest real path.
+When freeing, a phase path or a pattern naming one atom site gets the reason a stage gives under `STAGE_PATH_NOT_FREE`.
+On LaB6, `set_vary("phases.0.atoms.0.dof.*")` returns `[]` and warns that every coordinate of La on 1a is fixed by its site symmetry.
+A wildcard pattern such as `phases.*.atoms.*.x` declines rows without a warning, since a sweep declining rows is how plans work.
+
 The `vary` flags on the models you passed in are the starting declaration only.
 Once `set_vary`, a hold, a tie or a stage has declared a free set, the table reads that set, even when it is empty.
 A plan replaces the flags at every stage, so `vary=False` alone does not keep a parameter fixed, and `Refinement.hold` does ([How to keep a parameter fixed whatever the plan frees](../guides/hold.md)).
@@ -368,7 +374,7 @@ It raises `ValueError` on four refusals, each with its own remedy.
 
 | Refusal | Message | Remedy |
 |---|---|---|
-| unknown path | `unknown parameter path(s): [...]` | correct the name |
+| unknown path | `unknown parameter path(s): [...]`, with the nearest real path for each | correct the name |
 | locked | `... is structurally fixed (symmetry, or a representation that owns this channel) and cannot be set` | none; the structure owns the value |
 | tied | `... follows 'phases.0.cell.a' as an affine tie; set that instead` | set the source |
 | out of bounds | `... lies outside its bounds [0.0, inf]` | a value inside them, since the bounded solver cannot start outside |

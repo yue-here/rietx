@@ -62,6 +62,7 @@ from __future__ import annotations
 import math
 import re
 
+from .._nearmiss import did_you_mean
 from ..optimize.cancel import RefinementCancelled
 from ..schemas.interval import (
     PARAMETER_INTERVAL_BRACKET_GROWTH,
@@ -149,7 +150,8 @@ def _refined_row(refinement, result, path: str):
         return row
     current = next((r for r in refinement.parameters() if r.path == path), None)
     if current is None:
-        raise ValueError(f"unknown parameter path {path!r}")
+        hint = did_you_mean(path, [r.path for r in refinement.parameters()], n=1)
+        raise ValueError(f"unknown parameter path {path!r}" + (f"; {hint}" if hint else ""))
     why = current.held_because
     if why:
         raise ValueError(f"{path!r} cannot be pinned and profiled on its own "
