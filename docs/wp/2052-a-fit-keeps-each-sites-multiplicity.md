@@ -120,10 +120,16 @@ maintainer under the reader-output rule before merge.
 - [x] A finding at the end naming each site whose fresh split differs, with atoms per cell both
   ways; and `FROZEN_COMPILE_STALE`'s text stops advising another stage when the gap is a
   multiplicity change.
-- [ ] The coordinate walk: a coordinate DOF whose column is zero at a special position walked
+- [x] The coordinate walk: a coordinate DOF whose column is zero at a special position walked
   819 cells in one stage. Decide whether to wrap it at the answer or report it.
-- [ ] Tests: the issue's toy, noise-free, under the default plan, returns 12 O per cell; the
+  Decided 2026-11-01: neither. The walk needed the snapped compile, and with the split kept
+  it does not recur: the noise-free four-stage plan with an occupancy stage ends 2.3e-6 off
+  the mirror, and 16 Poisson draws under the same plan end within 2.7e-3. Settled by Claude
+  under that measurement; a revert of the freeze brings the walk back (the test below).
+- [x] Tests: the issue's toy, noise-free, under the default plan, returns 12 O per cell; the
   `predict()` δ sweep pins both occupancies; a revert of the freeze fails it.
+  `tests/test_site_multiplicity_kept.py`. At occupancy 1 the sweep reads 12 O at both
+  offsets now, because WP-1991's construction gate merges that site onto the mirror.
 - [ ] Skill: the reference row for the new or changed finding code.
 
 ## Acceptance
