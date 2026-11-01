@@ -103,6 +103,18 @@ so measure how many goldens and tests move before choosing.
   merge, because the change moves an ordinary fit's `parameters` list and
   the `RefinedParameter` docstring's literal "varied or tied" said otherwise.
 
+  *Ruled 2026-11-01 by Yue, "option 1"*: `RefinementResult.parameters` lists
+  a row only when `ParameterTable.moving_paths` holds it, over the narrow
+  rule. *Consumer audit* (the flip condition: a user-facing reader needing a
+  fixed row from `result.parameters`): none found. Of 35 reading sites in
+  `src/` and about 15 in `examples/` and the manual, the CIF writer and the
+  recipe CSVs take values from the model and only esds from the rows (a
+  dropped row had none); the GUI and `.rxt` read `Refinement.parameters()`;
+  the rest read free rows, esds, or trajectories, where a dropped row is a
+  constant the series did not measure. So nothing needed fixing;
+  `test_the_cif_still_states_every_row_the_answer_dropped` pins that the CIF
+  still carries every cell length and coordinate, a dropped one with no su.
+
   *Done.* `refine._build_result` and `MultiHistogramRefinement._parameters`
   keep a row iff `ParameterTable.moving_paths` holds it (each joint table
   asks its own). `stage_reports_` builds through `_build_result` and
@@ -112,7 +124,8 @@ so measure how many goldens and tests move before choosing.
   `topas_refined._result_rows`, a benchmark comment, a TOPAS test docstring,
   root CLAUDE.md's hold clause. New `tests/test_reported_rows_move.py`
   (5 tests: held cell, held-phase trajectory, held certified cell, unfreed
-  coordinate, joint fit), each failing on the old filter (mutation run: 5 of
+  coordinate, joint fit; the ruling session added two, the CIF and the
+  withheld esd), each failing on the old filter (mutation run: 5 of
   5 red). Re-pinned: `test_result_rows` (Le Bail NAC count 18 tied → 2), two
   `test_cell_runaway_safety` rows and one joint twin (the held value now
   read off the working model), two `test_parametric_series` asserts.
@@ -139,10 +152,12 @@ so measure how many goldens and tests move before choosing.
   a5eefefe1). Declined: simplifying `refine._moved`, since it changes what
   `summary()` prints; and a test that a tie inherits a withheld esd. The
   "end" arm of `test_a_reset_cells_stderr_is_withheld` carried that check
-  through the rows this WP removes, so `_cell_runaway_withheld`'s tie loop
-  now has no test in either builder. A fixture that keeps a reset cell free
-  at the answer (a late restore, or a free `vars.X` driving it) would. No
-  open WP owns it.
+  through the rows this WP removes. The ruling session added
+  `test_a_tied_row_inherits_a_withheld_esd`, which rebuilds a LaB6 answer
+  from its own covariance with a `CELL_RUNAWAY` finding handed in, so `b`
+  and `c` must lose their esd with `a` (fails with the tie loop disabled).
+  *Not done:* the joint builder's copy of that loop (`multi.py`) is still
+  untested, and no real fit reaches the case, since a reset cell is held.
 
   *Gotchas.* `Refinement.parameters()` and the GUI's parameter table are not
   this leak: they list the whole table by design, each held row naming why.
@@ -151,10 +166,8 @@ so measure how many goldens and tests move before choosing.
   right and the function is WP-1991's, so it was left. WP-1325 inherits that
   a held coefficient's target rows leave `parameters`.
 
-  Next: the maintainer confirms the `moving_paths` rule or asks for the
-  narrow one (a two-line change in each builder, with the coordinate and
-  `lab_calibrate` tests dropped). Then the tie-withholding test above, if
-  anyone takes it.
+  Next: merge, the rule being ruled. The joint builder's withholding test
+  above, if anyone takes it.
 - **2026-10-18** — filed by WP-1545's session. No open WP owns it: WP-1420 is
   about a held phase *re-entering* a chain, and this is a reporting leak a
   single fit shows too.
