@@ -1,6 +1,6 @@
 # WP-2066 — a complete dichotomy search holds every centred lattice and polishes its truth leaf
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — options for A measured; waits on the maintainer's decision (first task)
+Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here (ghostshift runner); building option 1 + V3 as ruled
 Track: What fires, and what stays silent
 Depends on: — (1924 soft: the same engine, the same #780 units)
 Priority: P2 2026-10-31 — a defect that fires wrongly: `search_complete=True` while the true cell is absent, on 22-32 % of C-centred monoclinic lattices by the reporter's draw; end to end the gate abstains rather than promoting the supercell (all `low`, `INDEX_ABSTAINED`), so a clean pattern returns no cell rather than a wrong one
@@ -128,8 +128,10 @@ papers only.
 
 ## Tasks
 
-- [ ] **Decision (maintainer):** A's option 1 or 2, and whether V3 is wanted,
+- [x] **Decision (maintainer):** A's option 1 or 2, and whether V3 is wanted,
       recorded as `Decided YYYY-MM-DD:` and answered on #1258.
+      Decided 2026-11-01: option 1; V3 adopted (maintainer, in chat).
+      The answer on #1258 is the lead's to post.
 - [ ] A: the chosen fix, with the duplicate settings merged before ranking
       (one lattice, one candidate) and the C setting reduced; the compiled
       kernel transcribed in the same commit if `_test_box` changes.
