@@ -253,12 +253,16 @@ def _swap_images(centrings: tuple[str, ...] | list[str],
     **Derived, not tabulated**: each face letter is moved by the swaps
     :func:`axis_swaps` returns, to closure.  P, I, F and R name no face and
     map to themselves.  Monoclinic C gives A; orthorhombic C gives A and B;
-    every other system gives nothing.
+    every other system gives nothing.  Only C is moved, because C is the one
+    face letter ``engines.CENTRINGS`` admits and the one
+    ``reduce.conventional_setting`` re-sets an image to; a python caller
+    admitting A itself would otherwise get its images labelled A in the C
+    setting.
     """
     by_axis = {v: k for k, v in _FACE_LETTERS.items()}
     out: dict[str, str] = {}
     for letter in centrings:
-        if letter not in _FACE_LETTERS:
+        if letter != "C":
             continue
         orbit = {_FACE_LETTERS[letter]}
         grew = True
