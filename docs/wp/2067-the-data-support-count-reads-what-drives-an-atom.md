@@ -1,6 +1,6 @@
 # WP-2067 — The data-support count reads what drives an atom, not its name
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — the count reads what each free column reaches, from outside as PR #1276 (`3c1e3ad7`, #1250); close owed once the maintainer has ticked the tasks
+Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: — (1419 soft: the mode-amplitude family; 1805 soft: the rigid-body family)
 Priority: P2 2026-10-31 — a number on the reassuring side of McCusker's band that nothing flags, on paths few fits run yet (mode amplitudes, rigid bodies)
