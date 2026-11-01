@@ -1737,7 +1737,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "CIF_ANISO_COLLAPSED": HelpEntry(
         title="Anisotropic displacement read as isotropic",
         description=(
-            "The file carries anisotropic displacement parameters (U_ij) for some "
+            "The file carries anisotropic displacement parameters (`U^ij`) for some "
             "sites, and the reader keeps only each site's equivalent isotropic value "
             "unless asked, because reading a file must not change which parameters a "
             "refinement plan frees. The message counts the sites. Nothing is wrong "
