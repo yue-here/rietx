@@ -113,9 +113,11 @@ which some overlapping reflection stands higher. An isolated line contributes 1
 and the weaker of an exactly coincident pair contributes 0, so the pair is one
 observation. The guideline built on it asks for at least
 {{ OBS_PER_PARAMETER_MIN }} and preferably {{ OBS_PER_PARAMETER_PREFERRED }}
-effective observations per structural parameter. Those are the atomic ones,
-since peak positions rather than intensities pay for the cell, profile and
-background terms.
+effective observations per structural parameter. Those are the ones that
+move an atom, whatever their names: an atom's own coordinates, occupancy and
+displacement, and a mode amplitude, a named variable or a rigid body's pose
+that drives them. Peak positions rather than intensities pay for the cell,
+profile and background terms.
 
 The estimate is not a theorem, and both papers say so: the approach "may not
 have a rigorous basis". Its own $\alpha$ is a case in point. The paper's check
@@ -315,7 +317,10 @@ honestly. Four cases qualify:
   variance below {{ VARIANCE_CANCELLATION_FLOOR }} of its own form's absolute
   terms. A symmetry-fixed 90° angle has exactly zero variance while its partials
   against $x$, $y$ and $z$ do not vanish, so the quadratic form lands on
-  roundoff;
+  roundoff. A torsion held at 180° by an inversion centre cancels one step
+  earlier, between the two images of one atom, so every net partial is
+  roundoff; its absolute terms are therefore taken from the partials before
+  they are summed;
 * an angle within {{ ANGLE_LINEARISATION_LIMIT_DEG }}° of 0° or 180°, where the
   angle is a stationary point of the coordinates and the linearisation the
   propagation rests on does not hold at all.

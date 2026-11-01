@@ -601,6 +601,56 @@ cell through the metric. $P$ needs the two smallest eigenvalues apart: a set
 whose points lie on a line, or spread alike in every direction (a regular
 tetrahedron's corners), has no plane, and compiling it raises.
 
+A torsion restraint on a chain A–B–C–D contributes one row, the circular
+difference of its torsion angle φ from the target $\phi_0$. With
+$\mathbf{b}_1 = \mathbf{p}_B - \mathbf{p}_A$,
+$\mathbf{b}_2 = \mathbf{p}_C - \mathbf{p}_B$ and
+$\mathbf{b}_3 = \mathbf{p}_D - \mathbf{p}_C$ in Cartesian coordinates, and
+$\mathbf{n}_1 = \mathbf{b}_1 \times \mathbf{b}_2$,
+$\mathbf{n}_2 = \mathbf{b}_2 \times \mathbf{b}_3$,
+
+```{math}
+:label: par-torsion-restraint
+
+\phi = \operatorname{atan2}\!\big(|\mathbf{b}_2|\,\mathbf{b}_1\cdot\mathbf{n}_2,\;
+\mathbf{n}_1\cdot\mathbf{n}_2\big), \qquad
+r \;=\; \sqrt{w}\,\frac{\operatorname{atan2}\!\big(\sin(\phi - \phi_0),\,
+\cos(\phi - \phi_0)\big)}{\sigma} ,
+```
+
+{source}`rietx.model.restraints.restraint_residual`
+
+with φ positive when, looking along B → C, the bond B–A turns clockwise to
+eclipse C–D {cite}`klyne1960`, in (−180°, 180°]. The row is smooth wherever φ
+is, a target of 180° included: the difference has its cut opposite the
+target, not at ±180°. Its derivative is analytic through `atan2`
+{cite}`blondel1996`: with $L = |\mathbf{b}_2|$,
+$f_1 = \mathbf{b}_1\cdot\mathbf{b}_2/L^2$ and
+$f_3 = \mathbf{b}_3\cdot\mathbf{b}_2/L^2$,
+
+```{math}
+:label: par-torsion-restraint-derivative
+
+\frac{\partial\phi}{\partial\mathbf{p}_A} = -\frac{L\,\mathbf{n}_1}{|\mathbf{n}_1|^2},
+\quad
+\frac{\partial\phi}{\partial\mathbf{p}_D} = \frac{L\,\mathbf{n}_2}{|\mathbf{n}_2|^2},
+\quad
+\frac{\partial\phi}{\partial\mathbf{p}_B} = f_3\,\frac{\partial\phi}{\partial\mathbf{p}_D}
+- (1 + f_1)\,\frac{\partial\phi}{\partial\mathbf{p}_A},
+\quad
+\frac{\partial\phi}{\partial\mathbf{p}_C} = f_1\,\frac{\partial\phi}{\partial\mathbf{p}_A}
+- (1 + f_3)\,\frac{\partial\phi}{\partial\mathbf{p}_D} ,
+```
+
+{source}`rietx.model.restraints.restraint_partials`
+
+chained to the fractional coordinates and the cell as for a plane. A central
+difference of φ itself would straddle the ±180° cut at an anti chain and return
+a slope of order 360°/h. The torsion rows of the geometry table use the same
+two equations at $\sigma = w = 1$. A chain with a straight bond angle has
+$\mathbf{n}_1$ or $\mathbf{n}_2$ zero and no torsion, and compiling a
+restraint on one raises.
+
 ## Weighting the restraints
 
 A stage scales every restraint at once. The minimised quantity is then

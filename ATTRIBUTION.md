@@ -104,7 +104,7 @@ used. Sources under GPL were **studied only**; no GPL code has been ported.
 - Hofmann, D. W. M. (2002). *Acta Cryst.* B58, 489–493 — the volume of a
   formula unit as a sum of average atomic volumes, eq. (1), with the esd of
   eq. (13), in `crystallography/atomic_volume.py`. `SearchSpec.from_formula`
-  and `INDEX_Z_NOT_INTEGER` are built on it (WP-1510). The table itself is
+  and `CellCandidate.formula_units` are built on it (WP-1510). The table itself is
   under Data tables.
 - Smith, G. S. & Snyder, R. L. (1979). *J. Appl. Cryst.* 12, 60–65 — the F_N
   figure of merit. (`indexing/fom.py` implements both, with a per-line-σ floor on
