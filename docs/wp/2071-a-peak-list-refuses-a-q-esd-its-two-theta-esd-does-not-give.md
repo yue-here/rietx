@@ -56,7 +56,7 @@ to load; the message must say how to rebuild it.
 
 ## Tasks
 
-- [ ] The `q_esd` check in `_q_matches_two_theta` (or a sibling validator), relative
+- [x] The `q_esd` check in `_q_matches_two_theta` (or a sibling validator), relative
       tolerance, non-finite pairs agree, message naming the remedy.
 - [ ] Tests: the issue's reproduction now raises; both constructors' lists pass; a JSON
       round trip of a picked list passes; a non-finite pair passes. Make it fail once on
