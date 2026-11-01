@@ -207,8 +207,15 @@ isolated peaks still read as `unmatched_obs`.
   real lobes fail it (cpd-1c 0.23-0.50, SRM 660c 0.08-0.18 of the
   prominence), so it would un-explain them. Declined: the indexing workflow
   counts `unmatched_observed` through `build_layer0`, so its numbers move
-  with no `INDEXING_THRESHOLDS_VERSION` bump. Indexing is another runner's
-  this shift; the indexing acceptance suite was not run. Declined: three
+  with no `INDEXING_THRESHOLDS_VERSION` bump. Indexing was another runner's
+  area this shift, so it was left unbumped. Measured afterwards on the
+  merged head d90e81e24: `tests/test_acceptance_indexing.py` 45 passed, and
+  22 captured engine units (brucite, corundum, two synthetic monoclinic)
+  replay to the same digests, candidate counts and completeness under this
+  branch and under origin/main. No rank or grade moves, since consensus and
+  the gate never read the count. Only the reported `unmatched_observed`
+  and `INDEX_IMPURITY_LINES` move. By 1.12's precedent (WP-2011 bumped for
+  a move of that same count) a bump to 1.13 looks owed. Declined: three
   reader texts still say "match no reflection", which stays true of what is
   listed. Declined: three test and speed cleanups.
 
