@@ -2324,6 +2324,22 @@ def _free_values(table, theta: np.ndarray) -> list[float]:
     return table.free_values(theta)
 
 
+def _cancel_check(cancel, stage: str):
+    """A function raising :class:`RefinementCancelled` once ``cancel`` is set.
+
+    The residual reads it at each evaluation boundary (:func:`_cancellable`)
+    and the LM driver inside a step's bounded solve, between factorisations
+    (:func:`.bccg.projected_cg`), where one step on a large Pawley block
+    outlasted a deadline by 20 s (WP-2063).
+    """
+    def check() -> None:
+        if cancel.is_set():
+            raise RefinementCancelled(
+                f"cancelled during stage {stage!r}" if stage else "cancelled",
+                stage=stage)
+    return check
+
+
 def _cancellable(residual, cancel, stage: str):
     """``residual`` behind a read of ``cancel`` at each evaluation boundary.
 
@@ -2331,11 +2347,10 @@ def _cancellable(residual, cancel, stage: str):
     :func:`run_multi_least_squares`.  ``__wrapped__`` lets ``inspect.unwrap``
     reach the closure underneath.
     """
+    check = _cancel_check(cancel, stage)
+
     def checked(theta: np.ndarray):
-        if cancel.is_set():
-            raise RefinementCancelled(
-                f"cancelled during stage {stage!r}" if stage else "cancelled",
-                stage=stage)
+        check()
         return residual(theta)
 
     checked.__wrapped__ = residual
@@ -2374,7 +2389,7 @@ def _tracked(residual, tracker: _StepTracker, events, stage: str, table):
 
 def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
                 inequalities, events, stage: str, track=None, table=None,
-                normal_equations=None):
+                normal_equations=None, cancel=None):
     """Run the bounded-LM driver, adapted to the scipy result shape.
 
     The two drivers are kept interchangeable at exactly this point: everything
@@ -2392,7 +2407,8 @@ def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
     (:func:`.lm._measured_curvature`) evaluate the residual too, but as
     derivative information, like scipy's finite-difference Jacobian calls, so
     they emit nothing and ``nfev`` leaves them out (WP-1953).
-    ``normal_equations`` is the driver's own (:func:`.lm.minimize`).
+    ``normal_equations`` is the driver's own (:func:`.lm.minimize`), and
+    ``cancel`` is also read inside each step's bounded solve.
     """
     from . import lm as lm_mod
 
@@ -2415,7 +2431,9 @@ def _lm_outcome(residual, jacobian, x0, lo, hi, *, max_nfev, ftol,
                            inequalities=inequalities,
                            callback=accept_cb if track is not None else None,
                            on_trial=trial_cb if events is not None else None,
-                           normal_equations=normal_equations)
+                           normal_equations=normal_equations,
+                           check=(None if cancel is None
+                                  else _cancel_check(cancel, stage)))
 
 
 class _StepTracker:
@@ -2807,7 +2825,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
         res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
                           ftol=ftol, inequalities=ineqs, events=events, stage=stage,
                           track=tracker, table=table,
-                          normal_equations=normal_equations)
+                          normal_equations=normal_equations, cancel=cancel)
         n_truncated, truncated_by = res.n_truncated, res.truncated_by
     else:
         with lapack.scipy_trf():
@@ -3068,7 +3086,8 @@ def run_multi_least_squares(models: list[CompiledModel],
         res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
                           ftol=ftol,
                           inequalities=_joint_width_inequalities(models, mtable, x0),
-                          events=events, stage=stage, track=tracker, table=mtable)
+                          events=events, stage=stage, track=tracker, table=mtable,
+                          cancel=cancel)
     else:
         with lapack.scipy_trf():
             res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",

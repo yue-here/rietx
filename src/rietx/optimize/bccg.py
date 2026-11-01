@@ -51,6 +51,7 @@ is also what makes the Levenberg-Marquardt λ of :mod:`.lm` dimensionless.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -312,7 +313,9 @@ def _cauchy_point(H: np.ndarray, g: np.ndarray, lo: np.ndarray,
 
 
 def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
-                 budget: int | None = None) -> tuple[np.ndarray, np.ndarray]:
+                 budget: int | None = None,
+                 check: Callable[[], None] | None = None
+                 ) -> tuple[np.ndarray, np.ndarray]:
     """Minimise ``½yᵀHy − gᵀy`` over ``lo ≤ y ≤ hi`` by projected conjugate
     gradients, the step :mod:`.lm` takes above its BVLS cut (WP-1953).
 
@@ -373,6 +376,12 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
     monoclinic C test candidate (944 columns) went from Rwp 0.07715 to
     0.07755 that way.  The measurement is :func:`.lm._solve_step`'s.
 
+    **``check`` is called before every factorisation and every CG product**,
+    and abandons the step by raising.  One step can be long: on a Pawley
+    candidate with 4552 reflections it refactorised 1099 times in 27 s, and
+    a cancel read only between residual evaluations landed 20 s late
+    (WP-2063, issue #1231).  The call changes no arithmetic.
+
     Returns the step and which bound each variable was fixed on (−1 lower,
     +1 upper, 0 neither), the convention :func:`.lm._solve_step` lands
     variables exactly on.
@@ -387,6 +396,8 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
     # where it failed, and the direction is then r)
     factored, ilu = None, None
     while spent < budget:
+        if check is not None:
+            check()
         grad = H @ y - g
         spent += 1
         r = np.where(fixed, 0.0, -grad)
@@ -418,6 +429,8 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
         p = z
         stalled = False
         while spent < budget:
+            if check is not None:
+                check()
             q = H @ p
             spent += 1
             pq = float(p @ q)

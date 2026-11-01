@@ -77,6 +77,14 @@ fit is bounded, so the validation reserve reaches validation and
       stops within one assignment, not one base set. Done by WP-1924
       (`1f2e48e7a`), which reads it before each `_score`; this branch's own
       read one line above it was removed at the merge as a duplicate.
+- [x] Issue #1231's first cause: a Pawley validation fit honours its cancel
+      late. Profiled (`docs/wp/2063-probe/probe2_late_cancel.py`, NAC's cI
+      metric described as tP, `Deadline(15)`): one LM step's projected CG
+      refactorised 1099 times in 27 s of the 35 s. The token is now read
+      before every factorisation and CG product
+      (`least_squares._cancel_check` → `lm.minimize(check=)` →
+      `bccg.projected_cg`): 20.18 s late before, 0.01 s after. Unset, a fit
+      is bit-identical (`test_a_bounded_step_reads_the_cancel_and_changes_nothing_while_unset`).
 - [ ] Re-measure `quick` on NAC (`docs/wp/2011-probe/probe16_schedule.py`,
       `RESERVE=`) and, if the fits now see the reserve, lower
       `VALIDATION_RESERVE_FRACTION` with its row's evidence.
