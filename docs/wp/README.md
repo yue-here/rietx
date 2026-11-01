@@ -42,7 +42,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1988](1988-a-pr-put-up-for-review-is-watched.md) | A PR put up for review is watched by the session that opened it | 2026-10-23 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [1991](1991-a-site-and-its-own-image-are-one-atom.md) | A site and its own image are one atom on every route | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1997](1997-the-direct-space-solver-on-main.md) | The direct-space solver on main: site classes, kernels, chemistry, engine and entry point | 2026-10-24 | P2 | [structure-solution](#structure-solution) |
-| [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | 2026-10-19 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | 2026-11-01 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2003](2003-the-chain-actions.md) | The chain actions: what a series decides between patterns | 2026-10-26 | P2 | [generality](#generality-the-audits) |
 | [2006](2006-readers-crystallography-gui-and-the-dead-surface.md) | Readers, crystallography and GUI codes, and the dead surface | 2026-10-24 | P3 | [generality](#generality-the-audits) |
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 2026-10-31 | P3 | [generality](#generality-the-audits) |
@@ -640,7 +640,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1524](1524-the-step-scans-last-two-blind-spots.md) | The step scan's last two blind spots | ⬜ | P3 | — |
 | [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 🔄 2026-10-31 | P2 | [1959](1959-the-dichotomy-grid-compiled-again.md) ([1520](1520-a-search-refines-each-assignment-once.md) soft) |
 | [1959](1959-the-dichotomy-grid-compiled-again.md) | The dichotomy grid compiled again, so a ceiling reaches svd | ✅ 2026-10-14 | — | — |
-| [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | 🔄 2026-10-19 | P2 | — |
+| [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md) | A held cell's ties leave the answer with it | 🔄 2026-11-01 | P2 | — |
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 🔄 2026-10-25 | P2 | — |
 
 ### <a id="unscheduled-one-file-many-patterns"></a>One file, many patterns
