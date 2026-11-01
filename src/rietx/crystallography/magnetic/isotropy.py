@@ -95,7 +95,8 @@ irrep has no real gauge; the direction label is gauge-dependent) are in
    ĥ in — never :func:`~.operators.moment_to_cartesian`'s, which rebuilds the
    cell from its six parameters in a standard orientation.  The two frames
    agree only for an axis-aligned cell, and a k ≠ 0 child cell is usually
-   rotated or left-handed; M⊥ needs both vectors in one frame (issue #534).
+   rotated (and was left-handed too until #1197); M⊥ needs both vectors in
+   one frame (issue #534).
 
 What a powder measures, and the domains
 ---------------------------------------

@@ -536,7 +536,8 @@ def test_one_refused_candidate_leaves_the_others(at_r, monkeypatch):
     """A refused child comes back as a refusal beside the others, not as an abort.
 
     One draw at seed 55 refuses S6(a,b) at R on O (review round 2's unlucky
-    seed was 142, before #1197 made the magnetic cell right-handed).  On main that raised, and the call lost its 15 other candidates.
+    seed was 142, before #1197 made the magnetic cell right-handed).  On main
+    that raised, and the call lost its 15 other candidates.
     """
     parent, expected = at_r
     monkeypatch.setattr(I, "_PROBE_SEED", UNLUCKY_SEEDS[0])

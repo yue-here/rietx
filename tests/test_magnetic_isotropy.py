@@ -1095,18 +1095,17 @@ def _in_the_unreduced_child_cell(candidate):
         format_transform(isotropy._exact_inverse(step), (Fraction(0),) * 3))
 
 
-@pytest.mark.parametrize("group, label, bns", [
+@pytest.mark.parametrize("group, xyz, label, bns", [
     # 4₂ with c/2 along c is 4₁ in 2c (BNS 76; 78 is the 4₃ mirror)
-    ("P 42 c m", "S5(rank 1)#1", "76.10"),
+    ("P 42 c m", (0, 0, 0), "S5(rank 1)#1", "76.10"),
     # 3₁ with c/3 along c: the unprimed threefold is the one at 2c'/3, a 3₂
     # in 2c (BNS 145; 144 is the 3₁ mirror); P 6₁'s square is a 3₁ and goes
     # the same way
-    ("P 31", "S1(a)", "145.9"),
-    ("P 61", "S3(a,b)", "145.9"),
+    ("P 31", (0.1, 0.2, 0.3), "S1(a)", "145.9"),
+    ("P 61", (0.1, 0.2, 0.3), "S3(a,b)", "145.9"),
 ])
-def test_an_enantiomorphic_candidate_carries_its_own_handedness(group, label, bns):
+def test_an_enantiomorphic_candidate_carries_its_own_handedness(group, xyz, label, bns):
     """The three swaps #1197 and its triage measured, pinned at the right-handed number."""
-    xyz = (0, 0, 0) if group == "P 42 c m" else (0.1, 0.2, 0.3)
     found = isotropy.candidates(group, xyz, (0, 0, Fraction(1, 2)))
     (candidate,) = [c for c in found.candidates if c.label == label]
     assert candidate.bns_number == bns
@@ -1131,9 +1130,9 @@ def test_the_reduced_cell_retry_keeps_the_handedness(columns):
     child = _in_the_unreduced_child_cell(candidate)              # a, b, 2c of the parent
     p = [[Fraction(v) for v in row] for row in columns]
     group = child.transformed(format_transform(isotropy._exact_inverse(p), (Fraction(0),) * 3))
-    metric = np.array(columns, dtype=np.float64).T @ np.diag([4.0, 4.0, 8.4])
+    lattice = np.array(columns, dtype=np.float64).T @ np.diag([4.0, 4.0, 8.4])  # rows, Å
     assert identify(group).bns_number == "76.10"
-    assert isotropy._identify_in_a_reduced_cell(group, metric).bns_number == "76.10"
+    assert isotropy._identify_in_a_reduced_cell(group, lattice).bns_number == "76.10"
 
 
 def test_moment_cartesian_is_the_row_vector_lattice_transpose():
