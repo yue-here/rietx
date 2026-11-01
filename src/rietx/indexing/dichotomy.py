@@ -1104,7 +1104,9 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
     # depth 60 in monoclinic, the cap — so the leftmost branch never terminates
     # and **zero** leaves were reached in 445 000 boxes.  The right scale is the
     # gap between neighbouring observed lines: below a quarter of it a line cannot
-    # be confused with its neighbour, which is all the refinement needs.
+    # be confused with its neighbour, which is all the refinement needs.  That
+    # holds on the driven lines only, so the refinement anneals on the lines up
+    # to ``q_hi_search`` and takes the rest at σ (``_accept``, WP-2066).
     spacing = (float(np.median(np.diff(np.sort(q_search))))
                if len(q_search) > 1 else 0.0)
     tol_accept = max(float(np.min(tol_search)), ACCEPT_SPACING_FRAC * spacing)
@@ -1189,7 +1191,8 @@ def _search_one(basis: np.ndarray, system: str, centrings: tuple[str, ...],
             cand = _accept(basis, system, centring, spec, theta,
                            hkl_c, dm_c, indices[centring], q_all, sigma,
                            wavelength, tt_max, vol_min, vol_max, width,
-                           search_lines, tt_all, n_miss, anchors)
+                           search_lines, tt_all, n_miss, anchors,
+                           q_drive=q_hi_search)
             if cand is not None and centring in images:
                 cand = _relabel(cand, images[centring])
             if cand is not None:
@@ -1405,7 +1408,8 @@ def _accept(basis: np.ndarray, system: str, centring: str, spec: SearchSpec,
             tt_max: float, vol_min: float, vol_max: float,
             width: float, search_lines: np.ndarray,
             two_theta: np.ndarray, n_miss: int,
-            anchors: np.ndarray | None = None) -> EngineCandidate | None:
+            anchors: np.ndarray | None = None,
+            q_drive: float | None = None) -> EngineCandidate | None:
     """Turn a converged box into a refined candidate, or reject it.
 
     Assign, refine, repeat — with the match window **annealed** from the box's own
@@ -1425,6 +1429,15 @@ def _accept(basis: np.ndarray, system: str, centring: str, spec: SearchSpec,
       lost the ranking to an exact supercell indexing all 88.  Tightening by 4× a
       pass lets each refinement correct the assignment before the window closes on
       it — the same reason a staged refinement plan exists one rank up.
+    * *annealing on the lines the box resolves* (WP-2066).  The stopping rule
+      measures a box's width on the driven lines only, so on a dense list a
+      leaf fine enough there is many σ coarse far above them, and the first
+      wide pass assigns wrong hkl up there.  On #1258's 381-line list the leaf
+      holding the truth refined onto cells indexing 288 and 273 lines, and the
+      truth, which indexes all 381, was not returned.  So the annealed passes
+      assign only lines up to ``q_drive``, the search window's own top
+      (highest driven Q plus its k·σ), and the two closing passes at σ assign
+      every line as before.  Where every line lies below it nothing changes.
 
     The χ² bar is ``k_sigma²`` and it is not arbitrary: every assigned line is
     within k·σ by construction, so k² is the largest reduced χ² an honest
@@ -1440,12 +1453,22 @@ def _accept(basis: np.ndarray, system: str, centring: str, spec: SearchSpec,
     previous: bytes | None = None
     boot = 0.5 * width / max(spec.k_sigma, 1e-12)
     schedule = [boot * ANNEAL_FACTOR ** -i for i in range(MAX_ASSIGN_PASSES)]
+    near = (np.flatnonzero(q_all <= q_drive) if q_drive is not None
+            else np.arange(len(q_all)))
+    if len(near) == len(q_all):
+        near = None                                # every line is resolved
     for extra, floor in enumerate(schedule + [0.0, 0.0]):
         if not reflection_ceiling_ok(cell, wavelength, tt_max):
             return None
-        line_index, assigned = assign_lines(
-            q_all, np.maximum(sigma, floor), hkl, af, k_sigma=spec.k_sigma,
-            design=dm, index=index)
+        if near is not None and extra < len(schedule):
+            sub, assigned = assign_lines(
+                q_all[near], np.maximum(sigma[near], floor), hkl, af,
+                k_sigma=spec.k_sigma, design=dm, index=index)
+            line_index = near[sub]
+        else:
+            line_index, assigned = assign_lines(
+                q_all, np.maximum(sigma, floor), hkl, af,
+                k_sigma=spec.k_sigma, design=dm, index=index)
         if len(line_index) < basis.shape[0] + 1:
             return None
         key = line_index.tobytes()

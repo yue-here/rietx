@@ -339,10 +339,10 @@ def test_the_compiled_search_reaches_the_numpy_loops_leaves(system,
         trace.append(("leaf", _bits(lo), _bits(hi), rows.tobytes(), got))
         return got
 
-    def accept(basis, system_, centring, spec, theta, *a):
+    def accept(basis, system_, centring, spec, theta, *a, **kw):
         # a[-3] is the leaf's width
         trace.append(("accept", centring, _bits(theta), _bits(a[-3])))
-        return real_accept(basis, system_, centring, spec, theta, *a)
+        return real_accept(basis, system_, centring, spec, theta, *a, **kw)
 
     monkeypatch.setattr(dichotomy, "_centred_replay", replay)
     monkeypatch.setattr(dichotomy, "_accept", accept)
@@ -385,9 +385,9 @@ def test_the_compiled_search_reaches_the_numpy_loops_leaves_where_boxes_are_obli
         trace.append(("leaf", _bits(lo), _bits(hi), rows.tobytes(), got))
         return got
 
-    def accept(basis, system_, centring, spec, theta, *a):
+    def accept(basis, system_, centring, spec, theta, *a, **kw):
         trace.append(("accept", centring, _bits(theta), _bits(a[-3])))
-        return real_accept(basis, system_, centring, spec, theta, *a)
+        return real_accept(basis, system_, centring, spec, theta, *a, **kw)
 
     def outside(af_lo, af_hi):
         refused = real_outside(af_lo, af_hi)

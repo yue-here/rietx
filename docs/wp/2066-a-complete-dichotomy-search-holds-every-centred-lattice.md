@@ -139,7 +139,10 @@ papers only.
       orthorhombic A and B), the leaf replays them, `_relabel` re-sets an
       accepted one to C through `conventional_fit`. `_test_box` and the
       kernel are untouched. Monoclinic I is not replayed (handover entry).
-- [ ] B: the annealed passes bounded as decided, the closing passes unchanged.
+- [x] B: the annealed passes bounded as decided, the closing passes unchanged.
+      `_accept(q_drive=)`: the annealed passes assign the lines up to the
+      search set's own top, `q_hi_search` (highest driven Q plus its k·σ), no
+      new constant; a list whose every line is below it takes the old path.
 - [ ] Tests: the issue's orthorhombic and monoclinic C lists and the B repro
       as fixtures (exact positions, `search_complete` asserted beside the
       truth's presence at its primitive volume); unit replay digests and
