@@ -1139,6 +1139,53 @@ def test_a_decimal_k_that_is_exactly_an_integer_is_gamma(tmp_path):
     with pytest.raises(magcif.MagCifError, match="magnetic supercell"):
         _read(tmp_path, "LaMnO3", k="0.0 0.0 1/2")
 
+def test_a_k_given_only_under_the_draft_kvector_tag_still_reaches_the_supercell_refusal(
+        tmp_path):
+    """Review of #1257, follow-up 1: ``refuse_a_magnetic_supercell`` read only
+    ``_parent_propagation_vector.kxkykz``, so a file stating k != 0 under the
+    draft's ``_magnetic_propagation_vector_kxkykz`` alone skipped the refusal.
+    Quoted loop rows, a bracketed value and a single-item spelling all count;
+    k = 0 under that tag still reads (the control beside the dictionary's
+    items, as in the test above)."""
+    for value in ("1 '1/2 0 0'", "1 [1/2 0 0]"):
+        extra = ("\nloop_\n_magnetic_propagation_vector_seq_id\n"
+                 f"_magnetic_propagation_vector_kxkykz\n{value}\n")
+        with pytest.raises(magcif.MagCifError, match="magnetic supercell") as e:
+            _read(tmp_path, "LaMnO3", extra=extra)
+        assert "_magnetic_propagation_vector_kxkykz" in str(e.value)
+    with pytest.raises(magcif.MagCifError, match="magnetic supercell"):
+        _read(tmp_path, "LaMnO3",
+              extra="\n_magnetic_propagation_vector_kxkykz '0 1/2 0'\n")
+    assert magcif.propagation_vectors(
+        "_magnetic_propagation_vector_kxkykz '1/2 0 0'\n") == (
+        ("1/2", "0", "0"),)
+    baseline = _stored(_read(tmp_path, "LaMnO3").phases[0])
+    zero = ("\nloop_\n_magnetic_propagation_vector_seq_id\n"
+            "_magnetic_propagation_vector_kxkykz\n1 '0 0 0'\n")
+    assert _stored(_read(tmp_path, "LaMnO3", extra=zero).phases[0]) == baseline
+
+
+def test_a_draft_tag_inside_a_text_field_is_not_a_draft_tag(tmp_path):
+    """Review of #1257, follow-up 2: ``refuse_draft_tags`` matched
+    ``^\\s*<tag>`` over the raw text, so a line of a semicolon text field that
+    began with a draft tag refused a dictionary-conformant file.  The field's
+    content is prose, not a tag; a real draft tag outside it still refuses."""
+    field = ("\n_publ_section_comment\n;\n"
+             "_magnetic_atom_site_moment_label is the draft's name for it.\n"
+             "  _magnetic_cell_length_a likewise.\n;\n")
+    baseline = _stored(_read(tmp_path, "LaMnO3").phases[0])
+    assert _stored(_read(tmp_path, "LaMnO3", extra=field).phases[0]) == baseline
+    with pytest.raises(magcif.MagCifError,
+                       match="pre-2016 draft magnetic-CIF tags") as e:
+        _read(tmp_path, "LaMnO3",
+              extra=field + "\n_magnetic_cell_length_b  5.0\n")
+    assert "_magnetic_cell_length_b" in str(e.value)
+    assert "_magnetic_cell_length_a" not in str(e.value)
+    # the helper keeps the delimiters and the line count
+    text = "a\n;\n_x\n;\nb"
+    assert magcif._without_text_fields(text) == "a\n;\n\n;\nb"
+
+
 def test_an_incommensurate_k_is_refused_with_its_own_sentence(tmp_path):
     """A k that is not a rational has no commensurate cell to be read in at
     all, which is a different refusal from the supercell one and says so."""
