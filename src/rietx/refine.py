@@ -130,6 +130,7 @@ from .params.vector import (
     is_variable_path,
     retired_spelling,
 )
+from .report.distortion import distortion_totals as _distortion_totals
 from .report.magnetic import (
     magnetic_width_findings,
     moment_angle_stationary_diagnostics,
@@ -154,6 +155,8 @@ from .schemas.plan import (
 from .schemas.results import (
     DELIVERABLES,
     AbsorptionCorrection,
+    GeometryRequest,
+    GeometryTable,
     Identifiability,
     PhaseAgreement,
     PhaseTexture,
@@ -359,11 +362,13 @@ def mode_fixed_path(path: str, mode: Mode) -> bool:
     # width would be a dead column, as the moment it broadens (``.atoms.``)
     # already is here.
     # A rigid body's origin and rotation (WP-1805) move nothing but its atoms'
-    # coordinates, so they are structural parameters too.
+    # coordinates, so they are structural parameters too, and so is a
+    # distortion-mode amplitude (WP-1419), which writes only coordinates.
     # A texture coefficient (WP-1960) multiplies |F|², which an intensity model
     # does not compute, so its column is dead there: measured on March-Dollase's
     # r, its single-axis sibling, which ended 1.7e-13 from its start.
     return (".atoms." in path or ".rigid_bodies." in path
+            or ".distortion_modes." in path
             or (path.startswith("phases.") and path.endswith(".scale"))
             or (path.startswith("phases.") and ".texture." in path)
             or _MAGNETIC_WIDTH_PATH.match(path) is not None)
@@ -1772,6 +1777,21 @@ def _vars_driven_cell_escapes(table: ParameterTable,
     return out
 
 
+def _merge_unresolved(first: list[tuple[str, list[str]]],
+                      second: list[tuple[str, list[str]]]
+                      ) -> list[tuple[str, list[str]]]:
+    """Two solves' driven escapes as one record, merged by driver, so a
+    driver still escaping after both is named once, not twice.
+
+    One rule for both runners, :meth:`Refinement._run_stage` and the joint
+    stage loop in ``multi.py`` (WP-2028 task 7).
+    """
+    merged = dict(first)
+    for driver, escaped in second:
+        merged[driver] = sorted(set(merged.get(driver, [])) | set(escaped))
+    return list(merged.items())
+
+
 def _cell_runaway_withheld(table: ParameterTable,
                            named: Iterable[str]) -> set[str]:
     """The paths whose esd a result withholds, given the paths one stage's
@@ -2608,12 +2628,24 @@ class Refinement:
         its coordinate DOFs, so a hold on ``dof.1`` (y on the general position)
         would read z on the mirror and keep the wrong coordinate fixed with
         nothing saying so.  Each register
-        follows its DOFs (:func:`~.crystallography.twins.carry_constraints`),
-        and what cannot follow is dropped and named in the site's
-        ``SITE_TWINS_MERGED`` message.
+        follows its DOFs (:func:`~.crystallography.twins.carry_constraints`;
+        a hold onto the coupled direction where the position couples
+        coordinates), and what cannot follow is dropped and named in the
+        site's ``SITE_TWINS_MERGED`` message.
+
+        An atom removed, inserted or reordered ahead of a site changes its
+        number whether or not its DOFs moved, so every register is first read
+        into the new structure's atom numbering
+        (:meth:`~.crystallography.twins.NumberingMoves.renumber`), and a
+        constraint on an atom the new structure no longer has is dropped and
+        named in a warning (#1264).  Without it a hold on the atom after a
+        removed one held its neighbour.
         """
         if "_user_holds" not in self.__dict__:
             return            # construction: no constraint has been declared yet
+        if isinstance(moves, NumberingMoves) and moves.atoms:
+            self._renumber_atoms(moves)
+            moves = moves.in_new_numbering()
         sites = sorted({path.rsplit(".dof.", 1)[0] for path in moves})
         for site in sites:
             site_moves = {p: m for p, m in moves.items()
@@ -2644,6 +2676,42 @@ class Refinement:
                              + "."),
                     suggestion="check the holds and ties on this site's "
                                "coordinates against parameters()."))
+
+    def _renumber_atoms(self, moves: NumberingMoves) -> None:
+        """Read every constraint register into ``moves``' new atom numbering.
+
+        A path on an atom that is gone, whose number another atom now has, is
+        dropped, and a tie with it when its target or any source is
+        (:func:`~.crystallography.twins.atom_moves`).  A dropped hold or tie is named in one
+        warning, the way ``_apply_ties`` names a tie that stopped applying; a
+        free path is the plan's to re-declare and goes without one.
+        """
+        dropped: list[str] = []
+        holds: list[str] = []
+        for p in sorted(self._user_holds):
+            new = moves.renumber(p)
+            if new is None:
+                dropped.append(f"the hold on {p}")
+            else:
+                holds.append(new)
+        self._user_holds = set(holds)
+        self._free_paths = list(dict.fromkeys(
+            new for p in self._free_paths if (new := moves.renumber(p))))
+        self._held = [new for p in self._held if (new := moves.renumber(p))]
+        ties: dict[str, TieSpec] = {}
+        for target, spec in self._ties.items():
+            new_target = moves.renumber(target)
+            terms = [(moves.renumber(p), c) for p, c in spec.terms]
+            if new_target is None or any(p is None for p, _ in terms):
+                dropped.append(f"the tie {target} = {spec.describe()}")
+                continue
+            ties[new_target] = spec.model_copy(update={"terms": terms})
+        self._ties = ties
+        if dropped:
+            warnings.warn(
+                f"{len(dropped)} constraint(s) named an atom this model no longer "
+                f"has and were dropped: {'; '.join(dropped)}.", UserWarning,
+                stacklevel=4)
 
     def _drain_twin_findings(self) -> list[Diagnostic]:
         """The merges no result has reported yet; each is reported once."""
@@ -2821,7 +2889,10 @@ class Refinement:
         # forbids rather than describes, so there is nothing in it to go
         # stale, and dropping it at an edit would be the one way a
         # declaration could lapse without anybody saying so.  The warning
-        # ``_apply_holds`` gives is the saying-so.
+        # ``_apply_holds`` gives is the saying-so.  A hold on an atom the edit
+        # removed is the one exception, and only where another atom took its
+        # number: kept, it would hold that atom, so the carry above drops it
+        # with its own warning (#1264).
         self._apply_holds(table)
         if structure is not None:
             self.structure = candidate.model_copy(deep=True)
@@ -3890,6 +3961,40 @@ class Refinement:
             state=self.snapshot())
         self._head_id = node.id
 
+    def distortion_block_tests(self, data: PatternData, *, hold=None,
+                               detectability_bar: float | None = None,
+                               detectability_probe: float | None = None):
+        """Refit with irrep blocks held at 0 and compare, for any blocks the caller names (WP-1419).
+
+        For a child stated on mode amplitudes and fitted on ``data`` with its
+        blocks free.  ``hold`` is a list whose items are a block, or a set of
+        blocks held at 0 together, each named by its ``(irrep, k,
+        isotropy_group)`` key or its
+        :class:`~rietx.schemas.results.DistortionTotal`; ``None`` holds every
+        block that is not parent-invariant and that the fit freed throughout,
+        each alone.  Every item gets one
+        restricted refit from this fit's optimum, freeing everything else this
+        fit freed, and one :class:`~rietx.report.DistortionBlockTest` row: ΔBIC
+        at N/f² (the restricted fit's f, as :func:`~rietx.report.compare_freed`),
+        Λ = Δχ²/(χ²_red·f²) with the full fit's χ²_red and f and its p against
+        χ²_m, both χ², and, when ``detectability_bar`` is given, A_det at that
+        bar (no default: without it none is computed) and
+        ``detectability_probe``, the amplitude in Å of its one predict per mode
+        (the caller's, required with a bar).  A restricted fit below
+        the full one restarts the full fit from there and tests every set
+        again; each restart is recorded.  No verdict is read and no warning
+        raised.  Opt-in because it refits (one refit per held set).
+
+        Runs on a private copy: this refinement, its history and its result
+        are left as they are, and a restarted full fit is returned on the
+        record (``restarted_result``).
+        """
+        from .report.distortion import distortion_block_tests
+
+        return distortion_block_tests(self, data, hold=hold,
+                                      detectability_bar=detectability_bar,
+                                      detectability_probe=detectability_probe)
+
     def suggest(self, data: PatternData, *, top_n: int = 5,
                 include: "str | list[str]" = "*",
                 exclude: "list[str] | tuple[str, ...]" = (),
@@ -4836,10 +4941,9 @@ class Refinement:
             # collapse-restore's own second solve landed on -- merged by
             # driver rather than concatenated, so a driver still escaping
             # after both solves is named once, not twice
-            merged = dict(cell_runaway_unresolved)
-            for driver, escaped in _vars_driven_cell_escapes(table, start_values):
-                merged[driver] = sorted(set(merged.get(driver, [])) | set(escaped))
-            cell_runaway_unresolved = list(merged.items())
+            cell_runaway_unresolved = _merge_unresolved(
+                cell_runaway_unresolved,
+                _vars_driven_cell_escapes(table, start_values))
             # the record is one stage: the second solve's answer, the first
             # solve's starting cost, and the iterations of both — the whole
             # point being that the hold cost something and it must be visible
@@ -5234,10 +5338,10 @@ class Refinement:
             # `fit(plan="profile_only")` refines no biso — and the GUI's plan panel
             # now names the difference, since nothing a user could read said it.
             table = self._prepare_table(restore=False)
-            # the contacts inside r₀ before any stage moves an atom, which
-            # RESTRAINT_PAIRS_STALE needs to tell a drifted pair from one the
-            # caller left out of the list on purpose
-            stale_since = _anti_bump_contacts_at_start(self.structure, mode)
+            # the phases before any stage moves an atom, whose contacts inside
+            # r₀ RESTRAINT_PAIRS_STALE needs to tell a drifted pair from one
+            # the caller left out of the list on purpose
+            stale_since = _anti_bump_start_phases(self.structure, mode)
 
             # the λ this Refinement was constructed with (or last edited to), so a
             # second λ-freeing call reports the cumulative move from the truly
@@ -5260,6 +5364,9 @@ class Refinement:
                 # the report has to arrive before the first stage runs rather
                 # than after the answer it spoiled.
                 + _stage_order_diagnostics(plan, table, mode)
+                # WP-1418: a moment no stage frees is decided by the plan
+                # before any stage, and nothing after the answer can say it
+                + _held_moment_diagnostics(plan, table, self.structure, mode)
                 # a plan read too, and here for the same reason: a literal a
                 # stage cannot free is decided by the model before any stage
                 + _fixed_literal_diagnostics(plan.stages, table, self._ties))
@@ -5783,7 +5890,7 @@ class Refinement:
 
         try:
             table = self._prepare_table(restore=True)
-            stale_since = _anti_bump_contacts_at_start(self.structure, mode)
+            stale_since = _anti_bump_start_phases(self.structure, mode)
             # the constructed (or last-edited) λ, not the value the previous stage
             # left behind: a second λ-freeing stage reports cumulatively, matching
             # the joint path, rather than a delta from its own predecessor (WP-1134).
@@ -6385,6 +6492,55 @@ class Refinement:
     # ------------------------------------------------------------------
     # exporters (WP-0309): reflection table, refinement CIF, QPA table
     # ------------------------------------------------------------------
+    def geometry(self, request: GeometryRequest | dict | None = None
+                 ) -> GeometryTable | None:
+        """Distances, angles and torsions with esds, or the ones ``request`` names.
+
+        With no ``request``, the whole bonding table
+        (:func:`~rietx.model.geometry.geometry_table`): bonds, contacts, angles
+        and torsions over bonded chains, the one ``result_.geometry`` carries.
+        With a :class:`~rietx.schemas.results.GeometryRequest` (or a dict
+        validated as one), only the distances, angles and torsions it names,
+        each atom by label or by label and CIF symmetry code — so a chain the
+        table's caps left out, a contact past its radius or a torsion over
+        atoms that are not bonded is measured on demand (WP-1815).
+
+        **Answered while the last fit's covariance is live.**  After
+        :meth:`fit` or :meth:`run_stage`, the values are that answer's and the
+        esds are J·Cov·Jᵀ through its covariance — the one its parameter esds
+        were read off, the Bérar-Lelann factor already in it, so nothing here
+        multiplies again and a row the table lists carries the numbers
+        ``result_.geometry`` does.  The covariance is never serialized, so with
+        no live fit (before one, after an edit, a checkout or a replay) the
+        values are the current model's and every esd is ``None``.  ``None`` in
+        Le Bail and Pawley mode and with no phase, as for the table.
+        """
+        from .crystallography.structure_factor import compile_phase_sites
+        from .model.geometry import geometry_from_sites, request_table
+
+        live = self._answer_covariance
+        if (live is not None and self._model is not None
+                and live[0] is self.result_ and self._answer is not None):
+            if self._model.mode != "rietveld" or not self._model.phases:
+                return None
+            _result, table, theta, stderr_internal, correlation = live
+            structure = self._answer["structure"]
+            sites_of = [cp.sites for cp in self._model.phases]
+        else:
+            if self._mode != "rietveld" or not self.structure.phases:
+                return None
+            structure = self.structure
+            table = ParameterTable(structure, self.instrument)
+            theta, stderr_internal, correlation = table.x0(), None, None
+            sites_of = [compile_phase_sites(p) for p in structure.phases]
+        if request is None:
+            return geometry_from_sites(sites_of, table, theta, structure,
+                                       stderr_internal=stderr_internal,
+                                       correlation=correlation)
+        return request_table(request, sites_of, table, theta, structure,
+                             stderr_internal=stderr_internal,
+                             correlation=correlation)
+
     def reflection_table(self) -> list["ReflectionRow"]:
         """Every (emission line, reflection) of the last fit as typed rows.
 
@@ -6904,6 +7060,75 @@ def _stage_order_diagnostics(plan, table,
                     "held at zero, then the widths beside the converged "
                     "moment, then both together. Use plan=\"magnetic_width\" "
                     "or strategy.staged.MAGNETIC_WIDTH_STAGE_PATHS as stages.")))
+    return out
+
+
+def _held_moment_diagnostics(plan, table, structure: Structure,
+                             mode: Mode) -> list[Diagnostic]:
+    """``PLAN_FREES_NO_MOMENT`` — a plan that never frees a moment the
+    structure carries, read before the first stage (WP-1418, issue #1082).
+
+    Of the presets only ``magnetic_width`` and ``magnetic_structural`` name
+    ``…moment.dof*``, so a magnetic phase under ``mccusker_default`` or
+    ``mccusker_structural`` comes back with every moment at its start value,
+    no esd and no row in ``result.parameters``.  Nothing else says so: the
+    nuclear terms absorb what the held moment misplaces, and on #1082's
+    synthetic child with the moment started 20 % high the fit reported a
+    Biso finding instead.  One diagnostic per phase.  Its ``where`` holds two
+    kinds of path: first the modulus path of each held site, the key a
+    series' moment rows carry, so ``SEQUENTIAL_MOMENT_HOLD`` can name this
+    as the cause on exactly the patterns it fired on; last the phase's
+    ``scale``, which is not a site.  The scale is the coupling: a moment is measured against the nuclear intensity through the
+    scale the two share (Halpern & Johnson 1939, Phys. Rev. 55, 898), so a
+    held moment moves what the nuclear values beside it are read from, and
+    that path is what a diagnostic's level under ``purpose="structure"`` or
+    ``"qpa"`` is derived from (``purposes.py``; neither lists a moment path),
+    where it would otherwise read ``info``.
+
+    Asked of the table, as :func:`_stage_order_diagnostics` asks it: every
+    glob of :meth:`~rietx.strategy.staged.RefinementPlan.run_stages` through
+    ``would_free``, so a moment a later stage frees, or a tie whose source a
+    stage frees, counts as freed.  **A moment the caller holds is theirs**
+    (``Refinement.hold``, WP-1435): it is left out, and a phase whose every
+    moment is held says nothing.  Rietveld mode only, since Le Bail and
+    Pawley force-fix every ``.atoms.`` path and compute no magnetic
+    structure factor to hold.
+    """
+    if mode != "rietveld":
+        return []
+    sites: dict[str, list[str]] = {}
+    for e in table.entries:
+        if _MOMENT_DOF.match(e.path) and not e.held and not e.locked:
+            bases = sites.setdefault(e.path.split(".")[1], [])
+            base = e.path.rsplit(".", 1)[0]
+            if base not in bases:
+                bases.append(base)
+    if not sites:
+        return []
+    freed = table.would_free(
+        [g for stage in plan.run_stages() for g in stage.turn_on])
+    moving = {p.split(".")[1] for p in freed if _MOMENT_DOF.match(p)}
+    start = table.decode(table.x0())
+    out: list[Diagnostic] = []
+    for ip, bases in sites.items():
+        if ip in moving:
+            continue
+        atoms = structure.phases[int(ip)].atoms
+        held = ", ".join(
+            f"{atoms[int(b.split('.')[3])].label} "
+            f"{abs(float(start.get(f'{b}.dof0', 0.0))):.4g} μ_B"
+            for b in bases)
+        out.append(Diagnostic(
+            level="warning", code="PLAN_FREES_NO_MOMENT",
+            where=[*(f"{b}.dof0" for b in bases), f"phases.{ip}.scale"],
+            message=(
+                f"This plan frees no moment of phase {ip}; the moments are "
+                f"held at their start ({held}), so they carry no esd and are "
+                f"not refined values."),
+            suggestion=(
+                "Name phases.*.atoms.*.moment.dof* in a stage, or use "
+                "plan=\"magnetic_structural\", which frees the moments before "
+                "the coordinates and keeps them free to the end.")))
     return out
 
 
@@ -7927,9 +8152,9 @@ def _reflection_tick_support(model: CompiledModel, ip: int,
 
     A tick carries its *reflection's* support, the largest window norm
     ‖y/σ‖₂ over every emission-line image of that hkl (WP-1458, WP-1523).
-    One authority for both tick builders, this module's :func:`_build_result` and
-    ``multi.MultiHistogramRefinement._ticks`` (WP-1344), so the joint fit's
-    low-angle boundary asks the question the single fit's does.
+    One authority for :func:`_tick_rows`, the tick builder both the single and
+    the joint path call (WP-1344, WP-2028), so the joint fit's low-angle
+    boundary asks the question the single fit's does.
     """
     if not n_rows:
         return np.array([])
@@ -7948,6 +8173,115 @@ def _extra_peak_tick_support(model: CompiledModel,
     for _, j, s in images:
         best[j] = max(best.get(j, 0.0), s)
     return [best[j] for _, j, _ in images]
+
+
+def _tick_rows(model: CompiledModel, structure: Structure,
+               values: dict[str, float]
+               ) -> tuple[dict[str, list[float]], dict[str, list[list[int]]],
+                          dict[str, list[float]]]:
+    """Every tick row of one histogram: positions, Miller indices and
+    support, keyed alike.
+
+    One builder for both paths, this module's :func:`_build_result` and each
+    histogram of ``multi.MultiHistogramRefinement._build_result`` (WP-2028
+    task 7), so a joint fit draws the rows a single fit draws: a magnetic
+    phase's own ``"<phase> (magnetic)"`` row (issue #278) and the declared
+    peaks' ``EXTRA_TICK_KEY`` row as well as one row per phase.
+    """
+    # Tick positions cover **every** emission line, not just the primary one.
+    # The calculated pattern really does have a peak at each Kα2 position, and
+    # a tick list that omitted them would make the FitReport flag every Kα2
+    # peak as an unindexed impurity.
+    #
+    # `tick_hkl` is built here and not anywhere downstream, because a second
+    # answer to *where* a tick goes is the thing this must not become: the
+    # index is carried through the same sort the positions are, so a tick and
+    # its Miller index cannot come apart (WP-1438).
+    #
+    # `tick_support` rides beside the positions on the same terms, carried
+    # through the same filter and sort, so the low-angle boundary can ask
+    # which ticks have anything behind them without pairing by position
+    # (WP-1458).  Each tick carries its *reflection's* support: the largest
+    # window norm in σ (`CompiledModel.reflection_support`, WP-1523) over every
+    # emission-line image of that hkl, so a Kα2 or λ/2 image is judged with the
+    # reflection it is an image of, as its index already says.  It is not a
+    # result field; `_low_angle_diagnostics` is its one reader.
+    ticks = {}
+    tick_hkl = {}
+    tick_support = {}
+    for ip, cp in enumerate(model.phases):
+        name = structure.phases[ip].name
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        # where the forward model puts each peak, and which reflection each
+        # position is, from the one walk every tick builder shares
+        # (`CompiledModel.reflection_positions`, WP-1908): the zero shift and
+        # the geometry's own shift are in it, and `hkl` is the reflection list
+        # tiled once per emission line, so a Kα2 image says it is the same hkl
+        # (H, m), not H: a satellite is labelled by its order (WP-1326)
+        pos, hkl = model.reflection_positions(ip, values)
+        n_lines = len(model.line_wavelengths)
+        sup = _reflection_tick_support(model, ip, values, n_lines)
+        keep = np.isfinite(pos)
+        if cp.magnetic is not None:
+            # issue #278: a magnetic phase's reflections are drawn as their
+            # own tick row, as a second phase would be -- split by a purity
+            # cut on the magnetic fraction (MAGNETIC_TICK_PURITY: see its
+            # docstring for why the mask on ``CompiledPhase`` is not enough
+            # on a k != 0 supercell).  One
+            # fraction per *reflection*, tiled once per emission line (each
+            # line already ``cp.reflections``-ordered, as ``pos`` is) before
+            # the positions are sorted.
+            # ``tick_hkl`` and ``tick_support`` are carried through the same
+            # mask and the same sort as the positions, so a split row keeps its
+            # Miller indices and its support.
+            d = np.asarray(cp.reflections.d, dtype=np.float64)
+            f_nuc = np.asarray(model._nuclear_f2(ip, d, values, cell),
+                               dtype=np.float64)
+            f_mag = np.asarray(model._magnetic_f2(ip, d, values, cell),
+                               dtype=np.float64)
+            total = f_nuc + f_mag
+            with np.errstate(invalid="ignore", divide="ignore"):
+                frac = np.where(total > 0.0, f_mag / total, 0.0)
+            mag_hkl = frac >= 1.0 - MAGNETIC_TICK_PURITY
+            mag_row = np.tile(mag_hkl, n_lines)
+            rows_out = ((name, keep & ~mag_row),
+                        (f"{name} (magnetic)", keep & mag_row))
+        else:
+            rows_out = ((name, keep),)
+        for key, sel in rows_out:
+            pos_k, hkl_k, sup_k = pos[sel], hkl[sel], sup[sel]
+            order = np.argsort(pos_k, kind="stable")
+            ticks[key] = [float(v) for v in pos_k[order]]
+            tick_hkl[key] = [reflection_label_row(r) for r in hkl_k[order]]
+            tick_support[key] = [float(v) for v in sup_k[order]]
+
+    # Declared sharp peaks are ticks too, under one reserved key.  This is the
+    # whole of the member contract's clause 2 for `PeakComponent`: a hump joins
+    # the reported background, a peak joins this list, and the destination is
+    # read from `model.components.COMPONENT_AGGREGATE` rather than inferred.
+    #
+    # Without it Layer 0's `unmatched_obs` reports every declared peak as an
+    # unindexed impurity — the Kα2-ticks lesson one rank over, and the same
+    # failure: a peak the model *does* put intensity at, reported as
+    # unexplained because nothing wrote it down.
+    #
+    # No zero-shift is added, unlike a phase's: the centre is the *apparent*
+    # position by declaration and carries its own aberrations (see
+    # `PeakComponent`).  That, and where each emission line's image falls, is
+    # `CompiledModel.extra_peak_tick_positions` — one authority, because a
+    # joint fit's histograms owe the same list, and a second copy is how a
+    # joint fit ends up disagreeing with a single one.
+    #
+    # Accepted wrinkle, recorded rather than special-cased: Layer 0's
+    # `Region.n_reflections` counts ticks, so these inflate that count in their
+    # own regions.  It is right for segmentation and for the unmatched logic,
+    # and mislabelled as a count of reflections.
+    extra_ticks = model.extra_peak_tick_positions(values)
+    if extra_ticks:
+        ticks[EXTRA_TICK_KEY] = extra_ticks
+        tick_support[EXTRA_TICK_KEY] = _extra_peak_tick_support(model, values)
+    return ticks, tick_hkl, tick_support
 
 
 def _uncorrected(stderr: float | None, esd_inflation: float | None) -> float | None:
@@ -8031,99 +8365,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                 equations=[],
             ))
 
-    # Tick positions cover **every** emission line, not just the primary one.
-    # The calculated pattern really does have a peak at each Kα2 position, and
-    # a tick list that omitted them would make the FitReport flag every Kα2
-    # peak as an unindexed impurity.
-    #
-    # `tick_hkl` is built here and not anywhere downstream, because a second
-    # answer to *where* a tick goes is the thing this must not become: the
-    # index is carried through the same sort the positions are, so a tick and
-    # its Miller index cannot come apart (WP-1438).
-    #
-    # `tick_support` rides beside the positions on the same terms, carried
-    # through the same filter and sort, so the low-angle boundary can ask
-    # which ticks have anything behind them without pairing by position
-    # (WP-1458).  Each tick carries its *reflection's* support: the largest
-    # window norm in σ (`CompiledModel.reflection_support`, WP-1523) over every
-    # emission-line image of that hkl, so a Kα2 or λ/2 image is judged with the
-    # reflection it is an image of, as its index already says.  It is not a
-    # result field; `_low_angle_diagnostics` is its one reader.
-    ticks = {}
-    tick_hkl = {}
-    tick_support = {}
-    for ip, cp in enumerate(model.phases):
-        name = structure.phases[ip].name
-        cell = tuple(values[f"phases.{ip}.cell.{k}"]
-                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
-        # where the forward model puts each peak, and which reflection each
-        # position is, from the one walk every tick builder shares
-        # (`CompiledModel.reflection_positions`, WP-1908): the zero shift and
-        # the geometry's own shift are in it, and `hkl` is the reflection list
-        # tiled once per emission line, so a Kα2 image says it is the same hkl
-        # (H, m), not H: a satellite is labelled by its order (WP-1326)
-        pos, hkl = model.reflection_positions(ip, values)
-        n_lines = len(model.line_wavelengths)
-        sup = _reflection_tick_support(model, ip, values, n_lines)
-        keep = np.isfinite(pos)
-        if cp.magnetic is not None:
-            # issue #278: a magnetic phase's reflections are drawn as their
-            # own tick row, as a second phase would be -- split by a purity
-            # cut on the magnetic fraction (MAGNETIC_TICK_PURITY: see its
-            # docstring for why the mask on ``CompiledPhase`` is not enough
-            # on a k != 0 supercell).  One
-            # fraction per *reflection*, tiled once per emission line (each
-            # line already ``cp.reflections``-ordered, as ``pos`` is) before
-            # the positions are sorted.
-            # ``tick_hkl`` and ``tick_support`` are carried through the same
-            # mask and the same sort as the positions, so a split row keeps its
-            # Miller indices and its support.
-            d = np.asarray(cp.reflections.d, dtype=np.float64)
-            f_nuc = np.asarray(model._nuclear_f2(ip, d, values, cell),
-                               dtype=np.float64)
-            f_mag = np.asarray(model._magnetic_f2(ip, d, values, cell),
-                               dtype=np.float64)
-            total = f_nuc + f_mag
-            with np.errstate(invalid="ignore", divide="ignore"):
-                frac = np.where(total > 0.0, f_mag / total, 0.0)
-            mag_hkl = frac >= 1.0 - MAGNETIC_TICK_PURITY
-            mag_row = np.tile(mag_hkl, n_lines)
-            rows_out = ((name, keep & ~mag_row),
-                        (f"{name} (magnetic)", keep & mag_row))
-        else:
-            rows_out = ((name, keep),)
-        for key, sel in rows_out:
-            pos_k, hkl_k, sup_k = pos[sel], hkl[sel], sup[sel]
-            order = np.argsort(pos_k, kind="stable")
-            ticks[key] = [float(v) for v in pos_k[order]]
-            tick_hkl[key] = [reflection_label_row(r) for r in hkl_k[order]]
-            tick_support[key] = [float(v) for v in sup_k[order]]
-
-    # Declared sharp peaks are ticks too, under one reserved key.  This is the
-    # whole of the member contract's clause 2 for `PeakComponent`: a hump joins
-    # the reported background, a peak joins this list, and the destination is
-    # read from `model.components.COMPONENT_AGGREGATE` rather than inferred.
-    #
-    # Without it Layer 0's `unmatched_obs` reports every declared peak as an
-    # unindexed impurity — the Kα2-ticks lesson one rank over, and the same
-    # failure: a peak the model *does* put intensity at, reported as
-    # unexplained because nothing wrote it down.
-    #
-    # No zero-shift is added, unlike a phase's: the centre is the *apparent*
-    # position by declaration and carries its own aberrations (see
-    # `PeakComponent`).  That, and where each emission line's image falls, is
-    # `CompiledModel.extra_peak_tick_positions` — one authority, because
-    # `multi.MultiHistogramRefinement._ticks` owes the same list and a second
-    # copy there is how a joint fit ends up disagreeing with this one.
-    #
-    # Accepted wrinkle, recorded rather than special-cased: Layer 0's
-    # `Region.n_reflections` counts ticks, so these inflate that count in their
-    # own regions.  It is right for segmentation and for the unmatched logic,
-    # and mislabelled as a count of reflections.
-    extra_ticks = model.extra_peak_tick_positions(values)
-    if extra_ticks:
-        ticks[EXTRA_TICK_KEY] = extra_ticks
-        tick_support[EXTRA_TICK_KEY] = _extra_peak_tick_support(model, values)
+    # every row, and its labels and support, from the one builder the joint
+    # fit's histograms call too (`_tick_rows`)
+    ticks, tick_hkl, tick_support = _tick_rows(model, structure, values)
 
     # Quantitative phase analysis from the refined scales.  Le Bail scales are
     # degenerate with the extracted intensities, so QPA is Rietveld-only.  σ(W)
@@ -8159,6 +8403,12 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                               correlation=correlation)
     volumes = cell_volumes(table, theta, structure,
                            stderr_internal=stderr_internal, correlation=correlation)
+
+    # Each irrep block of a child on mode amplitudes (WP-1419): A_τ, its esd and
+    # T² off the same final covariance, for geometry's reason.  Quantities only.
+    distortion_totals = _distortion_totals(table, theta, structure, values,
+                                           stderr_internal=stderr_internal,
+                                           correlation=correlation)
 
     # The widths read as a coherent domain size and a Δd/d (WP-1131), built
     # here for geometry's reason — the esds come off the same final Jacobian —
@@ -8292,7 +8542,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # Does the data support it (WP-1071): the observation/parameter ratio and
     # the step size, both reported and neither gating.  Built before the
     # result so the diagnostic and the record quote one measurement.
-    support = data_support(model, values, list(table.free_paths))
+    support = data_support(model, values, table)
     diagnostics = diagnostics + _data_support_diagnostics(support, model)
 
     # The region below the first reflection (Q3): read off the fit's own
@@ -8346,6 +8596,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         sigma=model.sigma.tolist(),
         ticks=ticks, tick_hkl=tick_hkl, radiation=_radiation(model, values),
         qpa=qpa, restraints=restraints_report, geometry=geometry,
+        distortion_totals=distortion_totals,
         cell_volumes=volumes,
         microstructure=microstructure,
         phase_agreement=_phase_agreement(model, values, structure),
@@ -9137,21 +9388,58 @@ RESTRAINT_TENSION_SIGMA = 3.0
 
 
 def _restraint_tension_diagnostics(report, structure: Structure) -> list[Diagnostic]:
-    """Flag restraints the data fights (|deviation/σ| beyond the threshold)."""
+    """Flag restraints the data fights (|deviation/σ| beyond the threshold).
+
+    One finding per restraint, a plane included: its rows are one per atom
+    (each atom's distance to the plane, consecutive in the report, as many as
+    the plane has atoms), so a strained plane is one finding whose ``where``
+    is the atoms out of it past the threshold, worst first, rather than one
+    finding per atom each naming the whole plane.
+    """
     out: list[Diagnostic] = []
-    for row in report.rows:
-        if abs(row.deviation_over_sigma) <= RESTRAINT_TENSION_SIGMA:
+    rows = report.rows
+    k = 0
+    while k < len(rows):
+        row = rows[k]
+        if row.kind == "planarity":
+            plane = rows[k:k + len(row.atoms)]
+            k += len(plane)
+            found = _plane_tension(plane, structure)
+        else:
+            k += 1
+            found = (None if abs(row.deviation_over_sigma) <= RESTRAINT_TENSION_SIGMA
+                     else (_restraint_where(row, structure),
+                           f"The {row.kind} restraint deviates "
+                           f"{row.deviation_over_sigma:+.1f}σ from its target "
+                           f"({row.computed:.4g} vs {row.target:.4g})."))
+        if found is None:
             continue
+        where, message = found
         out.append(Diagnostic(
-            level="warning", code="RESTRAINT_TENSION",
-            where=_restraint_where(row, structure),
-            message=(f"The {row.kind} restraint deviates "
-                     f"{row.deviation_over_sigma:+.1f}σ from its target "
-                     f"({row.computed:.4g} vs {row.target:.4g})."),
+            level="warning", code="RESTRAINT_TENSION", where=where, message=message,
             suggestion="Loosen its sigma, correct the target, or raise sigma "
                        "so the measured pattern overrides the prior.",
         ))
     return out
+
+
+def _plane_tension(plane: list, structure: Structure) -> tuple | None:
+    """``(where, message)`` for a planarity restraint's rows past the
+    threshold, worst first, or ``None`` where none is."""
+    out = sorted((r for r in plane
+                  if abs(r.deviation_over_sigma) > RESTRAINT_TENSION_SIGMA),
+                 key=lambda r: -abs(r.deviation_over_sigma))
+    if not out:
+        return None
+    phase = structure.phases[plane[0].phase_index]
+    lab = [a.label for a in phase.atoms]
+    shown = ", ".join(f"{lab[r.atoms[0]]} {r.deviation_over_sigma:+.1f}σ "
+                      f"({r.computed:+.4g} Å)" for r in out)
+    return (list(dict.fromkeys(f"{phase.name} {lab[r.atoms[0]]}" for r in out)),
+            f"The planarity restraint on "
+            f"{', '.join(lab[j] for j in plane[0].atoms)} has {len(out)} of "
+            f"{len(plane)} atoms more than {RESTRAINT_TENSION_SIGMA:g}σ from "
+            f"its plane: {shown}.")
 
 
 #: Rwp above which a fit is reported as a **model/data mismatch** rather than
@@ -9759,7 +10047,7 @@ def _quantify_phases(table: ParameterTable, theta: np.ndarray,
                       unmeasured=unmeasured, held=held_only)
     if qpa is None:
         return None, _qpa_unavailable_diagnostics(structure, values)
-    diagnostics = microabsorption_diagnostics(qpa)
+    diagnostics = microabsorption_diagnostics(qpa, structure)
     if blind_paths:
         diagnostics = diagnostics + _qpa_esd_unavailable_diagnostics(
             structure, values, blind_paths, where_of or (lambda p: p))
@@ -9857,6 +10145,13 @@ def _max_iter_diagnostics(stage_results: list[StageResult]) -> list[Diagnostic]:
         suggestion="Free fewer parameters at once, or check the diagnostics "
                    "for a correlation or bound hit in the same stage.",
     )]
+
+
+def _moves_scale(path: str, held_reach: dict[str, set[str]], scale: str) -> bool:
+    """Whether held column ``path`` is phase ``scale``'s, by its name or by
+    what it moved (``StageResult.held_reach``), either spelled bare or
+    ``hist.h.``-scoped."""
+    return any(_unscoped(n) == scale for n in (path, *held_reach.get(path, ())))
 
 
 def _held_by_phase(stage_results: list[StageResult], n_phases: int
@@ -9996,6 +10291,10 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
     """
     n_phases = len(support_by_phase)
     held_paths, held_stages = _held_by_phase(stage_results or [], n_phases)
+    held_reach: dict[str, set[str]] = {}
+    for sr in stage_results or []:
+        for q, moved in sr.held_reach.items():
+            held_reach.setdefault(q, set()).update(moved)
     out: list[Diagnostic] = []
     for ip in range(n_phases):
         prefix = f"phases.{ip}."
@@ -10039,8 +10338,11 @@ def _phase_support_diagnostics(support_by_phase: np.ndarray,
         clauses = []
         # a phase with no line in range has its scale held too (WP-1958), and
         # the scale is not a structural parameter, so it is named on its own
-        # (a joint fit's per-histogram scale is scoped ``hist.h.``)
-        structural = [p for p in held if _unscoped(p) != f"{prefix}scale"]
+        # (a joint fit's per-histogram scale is scoped ``hist.h.``).  A held
+        # column is the scale's by what it moves, not by its name: a held
+        # ``vars.S`` driving the scale is the scale held (#1103, round 2)
+        structural = [p for p in held
+                      if not _moves_scale(p, held_reach, f"{prefix}scale")]
         scale_held = len(structural) < len(held)
         if held:
             stages = held_stages[ip]
@@ -10706,13 +11008,29 @@ def _roughness_regime_diagnostics(model: CompiledModel,
 RESTRAINT_PAIRS_STALE_LISTED = 5
 
 
-def _anti_bump_contacts_at_start(structure: Structure, mode: str) -> list:
-    """Per phase, the contacts inside r₀ now (``None`` where nothing is searched)."""
-    from .model.restraints import anti_bump_contact_keys
+def _anti_bump_start_phases(structure: Structure, mode: str) -> list:
+    """Per phase, a copy of it as the run starts (``None`` where nothing is searched).
+
+    A copy rather than its contacts inside r₀: those cost a whole pair search,
+    23 ms a call on paracetamol (20 atoms, P2₁/n), and the two a run makes were
+    12 % of a 0.40 s scale-and-background fit of it.  A run that moves no
+    coordinate and no cell length or angle cannot bring a contact inside r₀,
+    so the search waits for the end of the run and is made only where the
+    geometry moved.
+    """
+    from .schemas.structure import AntiBumpRestraint
 
     if mode != "rietveld":
         return [None] * len(structure.phases)
-    return [anti_bump_contact_keys(ph) for ph in structure.phases]
+    return [ph.model_copy(deep=True)
+            if any(isinstance(r, AntiBumpRestraint) for r in ph.restraints) else None
+            for ph in structure.phases]
+
+
+def _contact_geometry(phase) -> tuple:
+    """Everything a phase's contacts are measured from that a fit can move."""
+    return (tuple((a.x.value, a.y.value, a.z.value) for a in phase.atoms),
+            phase.cell.lengths_angles())
 
 
 def _restraint_pairs_stale_diagnostics(structure: Structure,
@@ -10725,20 +11043,23 @@ def _restraint_pairs_stale_diagnostics(structure: Structure,
     plan end each phase with an anti-bump row is searched at the answer's
     coordinates (:func:`rietx.model.restraints.stale_anti_bump_pairs`), and
     one warning per phase names what it found, closest-inside first.
-    ``since`` is the contacts inside r₀ where the run *started*
-    (:func:`~rietx.model.restraints.anti_bump_contact_keys`, per phase): the
-    list does not remember what it was built from, so a contact already inside
-    r₀ then — a bond the caller left out of the list — is theirs and never
-    named, which makes "entered" true.  ``run_stage`` runs it too, one stage's
+    ``since`` is each phase as the run *started* (:func:`_anti_bump_start_phases`),
+    whose contacts inside r₀
+    (:func:`~rietx.model.restraints.anti_bump_contact_keys`) are the caller's:
+    the list does not remember what it was built from, so a contact already
+    inside r₀ then — a bond the caller left out of the list — is theirs and
+    never named, which makes "entered" true.  A phase whose coordinates and
+    cell are bit-for-bit where they started has the same contacts, so none
+    entered and neither search runs.  ``run_stage`` runs it too, one stage's
     start being its own ``since``.
     """
-    from .model.restraints import stale_anti_bump_pairs
+    from .model.restraints import anti_bump_contact_keys, stale_anti_bump_pairs
 
     out: list[Diagnostic] = []
-    for phase, before in zip(structure.phases, since, strict=True):
-        if before is None:
+    for phase, start in zip(structure.phases, since, strict=True):
+        if start is None or _contact_geometry(start) == _contact_geometry(phase):
             continue
-        stale = stale_anti_bump_pairs(phase, since=before)
+        stale = stale_anti_bump_pairs(phase, since=anti_bump_contact_keys(start))
         if not stale:
             continue
         lab = [a.label for a in phase.atoms]

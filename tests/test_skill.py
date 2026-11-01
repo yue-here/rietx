@@ -665,7 +665,11 @@ def test_every_technique_field_is_a_field_and_deferred():
     """`make_api_index.TECHNIQUE_FIELDS` keeps a technique's fields out of
     `api.md` (WP-1805).  Each name must be a live field of its model, or a
     rename leaves a dead skip behind, and each must be deferred from the
-    manual too, since nothing documents it until its technique index lands."""
+    manual too, since nothing documents it until its technique index lands,
+    unless the manual already names it (`Phase.distortion_modes`, which the
+    reference documents while `api-magnetic.md` carries its verb): the
+    partition test then holds it, and deferring it as well would grow the
+    bucket past its ceiling for a name that is documented."""
     import rietx as rx
 
     deferred = set((ROOT / "tests" / "api_surface_deferred.txt")
@@ -676,7 +680,11 @@ def test_every_technique_field_is_a_field_and_deferred():
         cls = getattr(rx, dotted[len("rx."):])
         for name in names:
             assert name in cls.model_fields, (dotted, name)
-            assert f"{cls.__name__}.{name}" in deferred, (dotted, name)
+            dotted_name = f"{cls.__name__}.{name}"
+            assert dotted_name in deferred or any(
+                dotted_name in md.read_text(encoding="utf-8")
+                for md in (ROOT / "docs" / "docs" / "reference").glob("*.md")
+            ), (dotted, name)
             assert f"`{name}:" not in API_INDEX.read_text(encoding="utf-8").split(
                 f"- `{dotted}`")[1].split("\n- ")[0], (dotted, name)
 

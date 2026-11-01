@@ -616,3 +616,270 @@ def test_the_code_comes_from_every_draw_not_the_last(at_gamma, monkeypatch, scri
         assert (n is None) == (outcome == "none")
         assert outcome == "none" or (n > refusal.operations) == (outcome == "more")
         assert f"draw {i + 1} " in message
+
+
+# --------------------------------------------------------------------------
+# #806 follow-up: the child's setting is read by the one standardiser the
+# package has, ``subgroups``' exact (P, p) check (WP-1919, #1189)
+# --------------------------------------------------------------------------
+
+#: Every child the suite states (Γ on Mn, R on O, X and M on every site), as
+#: main d35ffeda7's float route gave it before the switch: label, symbol,
+#: P (rows) and p, r_parent = P·r_child + p.
+MAIN_FLOAT_SETTINGS = [
+    ("G", "S9(rank 1)#1", "P 4 m m", "1 0 0; 0 1 0; 0 0 1", "0 0 0"),
+    ("G", "S9(rank 1)#2", "R 3 m:H", "1 0 1; -1 1 1; 0 -1 1", "0 0 0"),
+    ("G", "S9(rank 1)#3", "A m m 2", "0 1 1; 0 1 -1; -1 0 0", "0 0 0"),
+    ("G", "S9(rank 2)#1", "P 1 m 1", "1 0 0; 0 0 1; 0 -1 0", "0 0 0"),
+    ("G", "S9(rank 2)#2", "C 1 m 1", "1 -1 0; 1 1 0; 0 0 1", "0 0 0"),
+    ("G", "S9(a,b,c)", "P 1", "1 0 0; 0 1 0; 0 0 1", "0 0 0"),
+    ("R", "S4(a)", "F m -3 m", "2 0 0; 0 2 0; 0 0 -2", "0 0 0"),
+    ("R", "S6(rank 1)#1", "I 4/m m m", "1 1 0; -1 1 0; 0 0 -2", "0 0 0"),
+    ("R", "S6(rank 1)#2", "I 4/m c m", "1 1 0; -1 1 0; 0 0 -2", "1/2 1/2 0"),
+    ("R", "S6(a,b)", "F m m m", "0 2 0; 0 0 -2; 2 0 0", "0 0 0"),
+    ("R", "S8(rank 1)#1", "I 4/m m m", "1 1 0; -1 1 0; 0 0 -2", "1/2 1/2 0"),
+    ("R", "S8(rank 1)#2", "R -3 m:H", "0 1 2; 1 -1 2; -1 0 2", "0 0 0"),
+    ("R", "S8(rank 1)#3", "I m m a", "1 0 1; 1 0 -1; 0 -2 0", "0 0 0"),
+    ("R", "S8(rank 2)#1", "C 1 2/m 1", "2 0 -1; 0 0 1; 0 2 0", "1/2 0 1/2"),
+    ("R", "S8(rank 2)#2", "C 1 2/m 1", "1 -1 -1; 1 1 -1; -2 0 0", "0 0 0"),
+    ("R", "S8(a,b,c)", "P -1", "-1 0 -1; 0 1 1; -1 -1 0", "0 0 0"),
+    ("R", "S10(rank 1)#1", "I 4/m c m", "1 1 0; -1 1 0; 0 0 -2", "0 0 0"),
+    ("R", "S10(rank 1)#2", "R -3 c:H", "0 1 2; 1 -1 2; -1 0 2", "0 0 0"),
+    ("R", "S10(rank 1)#3", "I m m a", "1 0 -1; -1 0 -1; 0 -2 0", "0 0 0"),
+    ("R", "S10(rank 2)#1", "C 1 2/m 1", "2 0 -1; 0 0 1; 0 2 0", "1/2 0 1/2"),
+    ("R", "S10(rank 2)#2", "C 1 2/c 1", "1 -1 -1; 1 1 -1; -2 0 0", "1/2 0 1/2"),
+    ("R", "S10(a,b,c)", "P -1", "-1 0 -1; 0 1 1; -1 -1 0", "0 0 0"),
+    ("X", "S5(a)", "P 4/m m m", "0 1 0; 1 0 0; 0 0 2", "0 0 1/2"),
+    ("X", "S9(rank 1)#1", "P m m a", "0 0 1; 0 1 0; 2 0 0", "0 0 1/2"),
+    ("X", "S9(rank 1)#2", "C m c m", "1 1 0; 1 -1 0; 0 0 2", "0 0 1/2"),
+    ("X", "S9(a,b)", "P 1 21/m 1", "0 0 1; 1 0 0; 0 -2 0", "0 0 1/2"),
+    ("X", "S8(a)", "P 4/m m m", "0 1 0; 1 0 0; 0 0 2", "0 0 0"),
+    ("X", "S10(rank 1)#1", "P m m a", "0 1 0; 0 0 1; -2 0 0", "0 0 0"),
+    ("X", "S10(rank 1)#2", "C m c m", "-1 1 0; 1 1 0; 0 0 2", "0 0 0"),
+    ("X", "S10(a,b)", "P 1 21/m 1", "0 0 1; 1 0 0; 0 -2 0", "0 0 0"),
+    ("X", "S1(a)", "P 42/m m c", "0 1 0; 1 0 0; 0 0 2", "0 0 1/2"),
+    ("M", "S5(a)", "P 4/n m m:1", "1 1 0; 1 -1 0; 0 0 1", "1/2 1/2 0"),
+    ("M", "S9(rank 1)#1", "C m m m", "0 2 0; 2 0 0; 0 0 1", "1/2 0 0"),
+    ("M", "S9(rank 1)#2", "P m m a", "1 0 -1; 1 0 1; 0 1 0", "0 1/2 0"),
+    ("M", "S9(a,b)", "P 1 2/m 1", "1 0 1; 1 0 -1; 0 -1 0", "1/2 0 0"),
+    ("M", "S3(a)", "P 4/n m m:1", "1 1 0; 1 -1 0; 0 0 1", "0 0 0"),
+    ("M", "S2(a)", "P 4/m m m", "1 1 0; 1 -1 0; 0 0 1", "1/2 1/2 0"),
+    ("M", "S4(a)", "P 4/m b m", "1 1 0; 1 -1 0; 0 0 1", "1/2 1/2 0"),
+    ("M", "S6(a)", "P 4/m b m", "1 1 0; 1 -1 0; 0 0 1", "0 0 0"),
+    ("M", "S8(a)", "P 4/m m m", "1 1 0; 1 -1 0; 0 0 1", "0 0 0"),
+    ("M", "S10(rank 1)#1", "C m m a", "0 2 0; 2 0 0; 0 0 1", "1/2 1/2 0"),
+    ("M", "S10(rank 1)#2", "P m n a", "1 0 1; -1 0 1; 0 1 0", "0 0 0"),
+    ("M", "S10(a,b)", "P 1 2/c 1", "1 0 -2; 1 0 0; 0 1 0", "0 0 0"),
+]
+
+
+def _subgroup_of(symbol, transform):
+    """The subgroup ``symbol`` under (P, p) names, in the parent's coordinates, exactly.
+
+    Two (P, p) the affine normaliser of the subgroup relates give one answer
+    (``MaximalSubgroup.describes``' comparison, for any subgroup).
+    """
+    from rietx.crystallography.representation import subgroups as S
+
+    big, small = transform
+    P = tuple(tuple(Fraction(v) if isinstance(v, str) else S._q(float(v)) for v in row)
+              for row in big)
+    p = tuple(Fraction(v) if isinstance(v, str) else S._q(float(v)) for v in small)
+    return S._rebuild(symbol, (P, p)).key()
+
+
+def test_every_child_is_the_subgroup_mains_float_route_named(at_r, at_gamma, at_x_and_m):
+    """The identity: the exact route names the same subgroup as main's float route, 43 of 43.
+
+    Compared as the subgroup each (symbol, P, p) describes in the parent's
+    axes, so a (P, p) the normaliser relates would pass and a wrong one would
+    not; the table holds every child the suite states.  On these 43 the two
+    routes agree entry by entry too (measured 2026-10-31 with both routes on
+    the same probe, at seeds 1419, 1, 2026, 142, 194 and 41).
+    """
+    (_, r), (_, g), (_, xm) = at_r, at_gamma, at_x_and_m
+    stated = {("G", c.label): c for c in g} | {("R", c.label): c for c in r}
+    stated |= {(name, c.label): c for name, k in (("X", K_X), ("M", K_M)) for c in xm[k]}
+    assert sorted(stated) == sorted((k, label) for k, label, *_ in MAIN_FLOAT_SETTINGS)
+    for k, label, symbol, big, small in MAIN_FLOAT_SETTINGS:
+        c = stated[(k, label)]
+        assert c.child_group == symbol, (k, label)
+        old = ([row.split() for row in big.split(";")], small.split())
+        assert _subgroup_of(symbol, c.transform) == _subgroup_of(symbol, old), (k, label)
+    # the positive arm: the I4/mcm tilt with its origin half a parent cell off is another subgroup
+    c = stated[("R", "S10(rank 1)#1")]
+    assert _subgroup_of(c.child_group, (c.transform[0], c.transform[1] + [0.5, 0, 0])) != (
+        _subgroup_of(c.child_group, c.transform))
+
+
+def test_the_child_setting_is_read_by_the_subgroups_standardiser(at_gamma, at_x_and_m,
+                                                                 monkeypatch):
+    """#806: one standardiser.  ``_standard_child`` hands the candidate's own list to
+    ``subgroups._exact_setting`` and returns its answer in the parent's axes.
+
+    No input of ``distortion_candidates`` was found where main's float route
+    (``limit_denominator(48)``, a 1e-6 operation check) and the exact one
+    disagree (measured 2026-10-31: every child of the 230 standard settings at
+    each k with 2k in L*, and every maximal subgroup of index <= 4 of the 230
+    types), so this pins the route rather than an answer.  Its arms: the check
+    sees the candidate's group, and an origin a quarter cell off is refused.
+    """
+    from types import SimpleNamespace
+
+    from rietx.crystallography.representation import subgroups as S
+
+    real = S._exact_setting
+    seen = []
+
+    def spy(group, data, cell, bound, place=None):
+        answer = real(group, data, cell, bound, place)
+        seen.append((group, data, cell, bound, answer))
+        return answer
+
+    monkeypatch.setattr(S, "_exact_setting", spy)
+    parent, _ = at_x_and_m
+    cands = [c for c in at_x_and_m[1][K_M] if c.refusal is None]
+    for c in cands:
+        before = len(seen)
+        symbol, big, small, _ = I._standard_child(parent, _parent_group(parent), c.candidate)
+        assert len(seen) == before + 1, "the child's setting did not go through _exact_setting"
+        group, data, cell, bound, (_, named, (P, p)) = seen[-1]
+        assert named == symbol == c.child_group
+        ops = c.candidate.group.all_operations()  # the candidate's list, colour dropped
+        assert group.order == len({op.rotation for op in ops})
+        assert all(group.contains(op.rotation, op.translation) for op in ops)
+        basis = np.array([[float(v) for v in row] for row in c.candidate.cell.basis])
+        assert np.array_equal(basis @ np.array(P, dtype=float), big)
+        assert np.allclose(basis @ np.array(p, dtype=float), small, rtol=0, atol=1e-12)
+    assert len(seen) == len(cands) == 12
+
+    # the negative arm: spglib's origin moved by a quarter of a: not the group, refused
+    group, data, cell, bound, _ = seen[0]
+    wrong = SimpleNamespace(hall_number=data.hall_number,
+                            transformation_matrix=data.transformation_matrix,
+                            origin_shift=np.asarray(data.origin_shift) + [0.25, 0, 0])
+    with pytest.raises(RuntimeError, match="is not the subgroup's operation list"):
+        real(group, wrong, cell, bound)
+
+
+# --------------------------------------------------------------------------
+# #1247: a centred parent.  ``_standard_child`` listed each atom once per
+# ``site_orbit`` image, which already carries the centrings, and again per
+# shift of the magnetic cell's translations, which at k = 0 are those
+# centrings: every position twice, and ``image_of`` raised "this is a bug".
+# --------------------------------------------------------------------------
+
+def _cell(a, b, c, alpha=90.0, beta=90.0, gamma=90.0):
+    return rx.Cell(**{n: P_(value=v) for n, v in zip(
+        ("a", "b", "c", "alpha", "beta", "gamma"), (a, b, c, alpha, beta, gamma))})
+
+
+def _rocksalt():
+    """NaCl, B1: Na on 4a, Cl on 4b of F m -3 m."""
+    return rx.Phase(name="NaCl", space_group="F m -3 m", cell=rx.Cell.cubic(5.64), atoms=[
+        _atom("Na", "Na", 0, 0, 0), _atom("Cl", "Cl", 0.5, 0.5, 0.5)])
+
+
+def _mosi2():
+    """MoSi₂, C11b: Mo on 2a, Si on 4e (0, 0, ⅓) of I 4/m m m."""
+    return rx.Phase(name="MoSi2", space_group="I 4/m m m", cell=_cell(3.2, 3.2, 7.85), atoms=[
+        _atom("Mo", "Mo", 0, 0, 0), _atom("Si", "Si", 0, 0, 1 / 3)])
+
+
+def _c2m():
+    """A synthetic C 1 2/m 1 parent: one atom on 2a, one on 4i."""
+    return rx.Phase(name="C2m", space_group="C 1 2/m 1", cell=_cell(9.0, 4.0, 5.0, beta=105.0),
+                    atoms=[_atom("A", "Na", 0, 0, 0), _atom("X", "Cl", 0.3, 0, 0.2)])
+
+
+def _rhombohedral():
+    """A synthetic R -3 m parent on hexagonal axes: one atom on 3a, one on 6c."""
+    return rx.Phase(name="R-3m", space_group="R -3 m:H", cell=_cell(3.0, 3.0, 15.0, gamma=120.0),
+                    atoms=[_atom("A", "Na", 0, 0, 0), _atom("X", "Cl", 0, 0, 0.25)])
+
+
+CENTRED = [
+    pytest.param(_rocksalt, K_GAMMA, 6, id="F-rocksalt-Gamma"),
+    pytest.param(_rocksalt, K_R, 8, id="F-rocksalt-L"),
+    pytest.param(_mosi2, K_GAMMA, 8, id="I-MoSi2-Gamma"),
+    pytest.param(_c2m, K_GAMMA, 4, id="C-C2m-Gamma"),
+    pytest.param(_rhombohedral, K_GAMMA, 8, id="R-R-3m-Gamma"),
+]
+
+
+def _order(symbol) -> int:
+    """|G| per conventional cell: the point operations times the centrings."""
+    ops = gemmi.find_spacegroup_by_name(symbol).operations()
+    return len(ops.sym_ops) * len(ops.cen_ops)
+
+
+def _index_of_the_candidate(parent, candidate) -> Fraction:
+    """[G : H] from the candidate's own list: |G| × (cell volume ratio) / |H in its cell|."""
+    det = abs(I._operators._rational_determinant(candidate.cell.basis))
+    return Fraction(_order(parent.space_group)) * det / len(I._colourless_operations(
+        candidate.group))
+
+
+def _index_of_the_child(parent, symbol, big) -> Fraction:
+    """[G : H] from the stated child: |G| × det P / |H| in its standard setting."""
+    det = Fraction(abs(float(np.linalg.det(big)))).limit_denominator(1000)
+    return Fraction(_order(parent.space_group)) * det / _order(symbol)
+
+
+@pytest.mark.parametrize(("build", "k", "n"), CENTRED)
+def test_a_centred_parent_states_every_child(build, k, n):
+    """#1247: each (irrep, direction) of a centred parent gets a child, of the candidate's index.
+
+    The loop is ``distortion_candidates``' own without the mode basis, which
+    costs seconds a candidate at L and is built below at Γ only.  Before the
+    fix every one of these calls raised.
+    Each child's index, from the symbol spglib named and (P, p), is the one the
+    candidate's operator list in its magnetic cell implies, and an integer.
+    """
+    parent = build()
+    group = _parent_group(parent)
+    seen = {}
+    for atom in parent.atoms:
+        xyz = (atom.x.value, atom.y.value, atom.z.value)
+        for c in I.candidates(group, xyz, k, kind="displacive"):
+            seen.setdefault((c.irrep_label, c.direction.label), c)
+    assert len(seen) == n
+    for c in seen.values():
+        symbol, big, _small, _ = I._standard_child(parent, group, c)
+        index = _index_of_the_candidate(parent, c)
+        assert index.denominator == 1, (c.label, index)
+        assert _index_of_the_child(parent, symbol, big) == index, (c.label, symbol)
+
+
+@pytest.mark.parametrize(("build", "numbers"), [
+    pytest.param(_rocksalt, [1, 8, 8, 44, 107, 160], id="F-rocksalt"),
+    pytest.param(_mosi2, None, id="I-MoSi2"),
+    pytest.param(_c2m, None, id="C-C2m"),
+])
+def test_a_centred_parents_children_hold_its_atoms(build, numbers):
+    """#1247 through the public call at Γ: every child stated, with the parent's atoms per volume.
+
+    The dedupe keeps each atom once modulo the magnetic cell: the child's atoms,
+    each over its own orbit in its conventional cell, are the parent's per
+    conventional cell times det P, so no image was merged that is not the same
+    atom and none was kept twice.  Rocksalt's children are those of Γ4− (T1u),
+    the polar vector irrep of O_h: (a,0,0) I4mm, (a,a,a) R3m, (a,a,0) Imm2,
+    Cm twice and P1 (C4v, C3v, C2v, Cs, Cs, C1; Stokes & Hatch 1988,
+    *Isotropy Subgroups of the 230 Crystallographic Space Groups*).
+    """
+    parent = build()
+    group = _parent_group(parent)
+    per_cell = sum(len(site_orbit(group, (a.x.value, a.y.value, a.z.value)).images)
+                   for a in parent.atoms)
+    cands = I.distortion_candidates(parent, K_GAMMA)
+    assert cands and all(c.refusal is None for c in cands), _refused(cands)
+    for c in cands:
+        child_group = resolve_group(c.child.space_group, c.child.symmetry_operations)
+        held = sum(len(site_orbit(child_group, (a.x.value, a.y.value, a.z.value)).images)
+                   for a in c.child.atoms)
+        assert held == round(per_cell * abs(np.linalg.det(c.transform[0]))), c.label
+        assert _index_of_the_child(parent, c.child_group, c.transform[0]) == (
+            _index_of_the_candidate(parent, c.candidate)), c.label
+    if numbers is not None:
+        assert sorted(_number(c) for c in cands) == numbers
+        assert len({c.irrep for c in cands}) == 1

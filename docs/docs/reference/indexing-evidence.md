@@ -69,6 +69,10 @@ That split lives in a package constant, `rietx.schemas.indexing.INDEX_REFUTING_C
 A reader told `predicted_but_absent` and `not_validated` in the same breath needs to know that the first argues against the cell while the second only says a question was never asked.
 A `geometric_ambiguity` caveat beside `CandidateEvidence.ambiguity_partners` of 0 means the ambiguity walk never reached the candidate ([The confidence gate](indexing.md#the-confidence-gate)).
 
+The windowed absent count has a density and an excess beside it on `CellCandidate.lebail`, reported and never gating.
+`LeBailValidation.n_lines_screened_in_window` is the lines inside the first twenty observed lines, and `LeBailValidation.predicted_but_absent_density_in_window` is the windowed count over them.
+`LeBailValidation.predicted_but_absent_excess_in_window` is that count above what the run's lowest density implies for this cell's window lines; it is 0 for the cleanest candidate and for a lone one.
+
 Read `CandidateEvidence.lebail_rwp` beside the two counts rather than scoring on it.
 The three together let a reader notice a detector failing: on the magnetite pair recorded in the type's docstring, before indexing thresholds 1.12 the correct cell read `predicted_but_absent` 2 and its wrong rival 0, which is backwards, while Rwp read 0.25 against 0.79.
 A reader given all three could see that, and the gate, reading one number, could not.

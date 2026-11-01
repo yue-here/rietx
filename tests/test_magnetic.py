@@ -2170,7 +2170,8 @@ def test_the_capability_flag_is_derived_from_the_fields():
     # WP-1960's ``Phase.texture`` 0.57, WP-1810's ``RigidBody.riding``
     # 0.58, and WP-1325's ``RefinedParameter.equations`` 0.59, which indexing C4's
     # ``CellCandidate.n_search_unindexed`` and ``.unindexed_two_theta`` share,
-    # and WP-2042's ``RefinementResult.radiation`` 0.60.
+    # WP-2042's ``RefinementResult.radiation`` 0.60, and WP-1419's
+    # ``Phase.distortion_modes``, in the same number.
     assert caps.schema_version == "0.60"
 
 

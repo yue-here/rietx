@@ -46,6 +46,12 @@ the free atom at $s = 3$ Å⁻¹, and negative past 3.85 Å⁻¹. So rietx compu
 Y³⁺ as neutral Y past the first $s$ beyond 2 Å⁻¹ where the two curves meet,
 {{ Y3_HANDOVER_STOL }} Å⁻¹. $f_0$ has a kink there and no step.
 
+The table's O²⁻ row is not Waasmaier & Kirfel's own work either. The authors'
+README, reprinted in the data file, says their fit is to the tabulated Dirac-Fock
+values of Rez, Rez & Grant {cite}`rez1994` (Table 2). rietx therefore credits
+that row to both papers, and a written CIF names both in
+`_atom_type_scat_source`.
+
 $f'/f''$ come from the Cromer-Liberman tabulation
 {cite}`cromer1970,cromer1981`, the crystallographic reference calculation and
 what {cite}`itc-c` §4.2.6 tabulates. That choice makes a disagreement with

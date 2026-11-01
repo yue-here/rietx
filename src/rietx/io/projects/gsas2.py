@@ -1925,6 +1925,7 @@ def from_structure(structure, *,
 
     from ...crystallography.symmetry import (
         get_spacegroup,
+        refuse_distortion_modes,
         refuse_magnetic_phase,
         refuse_operation_list,
         refuse_propagation_vector,
@@ -1949,6 +1950,7 @@ def from_structure(structure, *,
                 "to a magCIF, whose magnetic loops GSAS-II's CIF import drops "
                 "without a warning (measured on GSAS-II 5.6.3)")
         refuse_operation_list(phase, "a GSAS-II phase CIF")
+        refuse_distortion_modes(phase, "a GSAS-II phase CIF")
         phase, restated = restate_in_hexagonal_axes(
             phase, "a GSAS-II phase CIF")
         if restated:

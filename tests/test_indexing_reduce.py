@@ -257,6 +257,43 @@ def test_the_spglib_fallbacks_survive_a_process_that_imported_spgrep():
     assert done.stdout.strip().endswith("OK")
 
 
+#: A candidate whose cell esd is NaN reached ``bravais_screen`` from the
+#: consensus on a synthetic hR pattern with three impurity lines, and the floor
+#: ``max(esd, 1e-6)`` let the NaN through, since ``max(nan, x)`` is nan.
+#: spglib 2.8 answers ``symprec=nan`` with a segmentation fault, so the probe
+#: runs in its own process: a regression fails this test instead of killing the
+#: worker that runs it.
+_NAN_ESD_PROBE = """
+import numpy as np
+from rietx.indexing.consensus import bravais_opinion
+from rietx.indexing.reduce import bravais_screen
+
+cell = (4.0, 4.0, 4.0, 90.0, 90.0, 90.0)
+for esd in (np.array([np.nan, 1e-3, 1e-3, 0.0, 0.0, 0.0]), float("inf")):
+    try:
+        bravais_screen(cell, cell_esd=esd)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"no refusal for cell_esd={esd!r}")
+    assert bravais_opinion(cell, "P", cell_esd=esd) is None
+print("OK")
+"""
+
+
+def test_a_non_finite_cell_esd_is_refused_before_spglib():
+    """A NaN or infinite esd is refused before it becomes spglib's ``symprec``.
+
+    ``bravais_opinion`` already declines a screen that raises, so the refusal
+    turns a crash of the whole indexing run into a candidate with no Bravais
+    opinion.
+    """
+    done = subprocess.run([sys.executable, "-c", _NAN_ESD_PROBE],
+                          capture_output=True, text=True, timeout=300)
+    assert done.returncode == 0, (done.returncode, done.stderr[-2000:])
+    assert done.stdout.strip().endswith("OK")
+
+
 # ----------------------------------------------------------------------
 # Dedup
 # ----------------------------------------------------------------------

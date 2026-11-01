@@ -561,6 +561,12 @@ from .._nearmiss import did_you_mean
 #: ``ExtinctionScreen.reference_rwp_net``, the cell-free Le Bail's Rwp and the
 #: reference fit's background-subtracted Rwp, and ``"unreliable"`` as a
 #: ``status`` value.  Additive and defaulted to ``None``, the 0.25 → 0.26 rule.
+#: Also in 0.60 (WP-2033): ``ExtinctionPrior.z``, ``.density``, ``.formula`` and
+#: ``.ordered``, ``ExtinctionCandidate.exclusion_reasons``, ``.special_positions``
+#: and ``.count_notes``, and ``ExtinctionScreen.z``, ``.z_from_density`` and
+#: ``.z_candidates``: the content per cell a caller declares and what the screen
+#: says of it.  Additive, every one defaulted to ``None`` or empty, the 0.25 → 0.26
+#: rule.
 #: Also in 0.60 (WP-2047): ``StageResult.window_loss`` and
 #: ``NodeMetrics.window_loss``, the share of the Bragg intensity a stage's
 #: frozen windows dropped at its answer.  Additive and defaulted to ``None``,
@@ -577,8 +583,45 @@ from .._nearmiss import did_you_mean
 #: cannot be rebuilt as every step, so a document's ``discontinuities`` key is
 #: dropped at read (``SeriesResult``'s ``mode="before"`` validator) and its
 #: ``steps`` reads ``None``, "not recorded".
+#: Also in 0.60 (WP-2030): ``IndexingResult.formula`` and ``.temperature``, the
+#: formula and temperature read, and ``PeakList.instrument_undeclared``,
+#: the instrument blocks the picker found at default on a lab source.  Additive
+#: and defaulted to ``None``, "not recorded", the 0.25 → 0.26 rule;
+#: ``index_pattern`` writes the first two on every result, ``pick_peaks`` and
+#: ``fit_peaks`` the third on every list.  Part 2 added
+#: ``CellCandidate.formula_units``, the units a cell holds by Hofmann's
+#: volumes, written by ``index_pattern`` when a formula is given and ``None``
+#: otherwise (additive, the same rule); ``INDEX_Z_NOT_INTEGER``, which judged
+#: that number, is gone, so a document carrying one still reads.
+#: Also in 0.60 (WP-1419 C3a): ``Phase.distortion_modes``, a child stated as
+#: its parent plus absolute mode amplitudes (``DistortionModes``: the parent
+#: group, the transform, the reference metric, one base position per atom and
+#: a ``DistortionMode`` per mode with ``amplitude: Parameter``).  Additive and
+#: defaulted to ``None``, exactly off, the 0.25 → 0.26 rule; written by
+#: ``displacive_statement``.  An older build refuses a phase carrying it.
 #: Also in 0.60 (WP-2011): ``LeBailValidation.mode``, additive, its default
 #: ``"lebail"`` being what every record written before it ran.
+#: Also in 0.60 (#939's follow-ups): ``ExtinctionScreen.perfect_fit_rwp_net``,
+#: what that Rwp would read for a fit leaving only the noise, √(N/(N+S)).
+#: Additive and defaulted to ``None``, the same rule.
+#: Also in 0.60 (WP-1815): ``GeometryTable.torsions``, a ``GeometryTorsion``
+#: per torsion over bonded chains (four labels, indices and symmetry codes, the
+#: angle in (−180°, 180°] and its two esds), defaulted to ``None``, which an
+#: older table reads as "not listed" (``[]`` is "listed, none found"); and ``TorsionRestraint`` joins the
+#: ``Restraint`` union, ``RestraintRow.kind`` gaining ``"torsion"``.  Additive:
+#: no existing document carries either, and an older build refuses one that
+#: does.  ``GeometryRequest`` is an argument and is never stored.
+#: Also in 0.60 (WP-1419 C4a): ``RefinementResult.distortion_totals``, one
+#: ``DistortionTotal`` per irrep block of a phase on mode amplitudes (A_τ, its
+#: esd and label, T², ``driving`` (``None`` where the record's parent
+#: operations miss its reference structure), the sign convention, the largest
+#: displacement), additive and defaulted to ``None`` where no phase carries
+#: ``distortion_modes``.
+#: Also in 0.60 (#941's follow-ups): ``LeBailValidation.n_lines_screened_in_window``,
+#: ``.predicted_but_absent_density_in_window`` and
+#: ``.predicted_but_absent_excess_in_window``, the windowed count's density and
+#: its excess over the run's cleanest candidate.  Additive and defaulted to
+#: ``None``, the 0.25 → 0.26 rule.
 SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

@@ -196,9 +196,31 @@ from .structure import Cell
 #: Every pinned class held (synthetic P 2₁/c, FAP, NAC, certified corundum),
 #: with their ΔBIC moved (corundum −3434 → −1301, FAP −16 → −83); the PbSO₄
 #: X-ray histogram at a 0.1-0.2 % cell went from an abstention to ``P c - n``.
+#: Also 1.12 (WP-2033, #935's other half): ``ExtinctionPrior`` gains ``z``,
+#: ``density`` and ``formula`` (and ``ordered``), which name the members whose
+#: orbits cannot hold the declared content (removing them only under
+#: ``ordered=True``) and the special positions a Z′ below one needs.  Only a screen that declares one of them can answer differently;
+#: with none declared every screen answers as before.
+#: Also 1.12 (WP-2030): ``INDEX_DATA_INSUFFICIENT`` names an undeclared
+#: instrument first only on a laboratory source, read off the declared source
+#: (``diagnostics.lab_source``), and reads it from the list's own record when
+#: no instrument is passed.  No search, rank or grade moves.  Part 2:
+#: ``SearchSpec.from_formula`` sets a ceiling only, for every formula, so a
+#: search declared through it no longer drops the cells below 0.8 of the
+#: formula's volume and can rank a smaller cell it used to exclude.  And
+#: ``INDEX_Z_NOT_INTEGER`` (``Z_INTEGER_TOLERANCE`` 0.08) is withdrawn: it fired
+#: on 12 of 16 true inorganic cells, and the number it judged is now recorded
+#: as ``CellCandidate.formula_units``.  No rank or grade moves without a formula.
 #: Also 1.12 (WP-2011): the whole-pattern validation fits by Pawley, so every
 #: candidate's ``lebail.rwp`` and ``unmatched_observed`` move, and a cell that
 #: predicts every reflection of another now reads that cell's Rwp or lower.
+#: Also 1.12 (#939's follow-ups): ``EXTINCTION_SCREEN_UNRELIABLE``'s message
+#: says whether weak data or misfit failed the gate, from
+#: ``ExtinctionScreen.perfect_fit_rwp_net``; no threshold or verdict moved.
+#: Also 1.12 (#1230): a containment child whose own lines are seen more often
+#: than its parent's (``SupercellEvidence.child_seen_more``) is never
+#: ``refuted``, so a dense low-symmetry truth no longer sits below a wrong cell
+#: that p₀ near the truth's own seen fraction let refute it.
 INDEXING_THRESHOLDS_VERSION = "1.12"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
@@ -971,16 +993,34 @@ class PeakList(Base):
     two_theta_min: float
     two_theta_max: float
     source: Literal["fitted", "positions"] = "fitted"
+    #: The instrument blocks the picker found at their defaults on a
+    #: laboratory source, keyed by block, written by
+    #: :func:`~rietx.indexing.pick_peaks` and :func:`~rietx.indexing.fit_peaks`
+    #: from :func:`~rietx.indexing.diagnostics.picked_undeclared` (WP-2030).
+    #: Empty when the source is a lab tube and nothing was left at default;
+    #: ``None`` when nothing was checked: the source is not a lab tube, no picker
+    #: recorded it (a position list), or the list was picked before 0.60.  It is how ``index_pattern(peaks)`` with no instrument
+    #: can still name the instrument first in ``INDEX_DATA_INSUFFICIENT``.
+    instrument_undeclared: dict[str, str] | None = None
     thresholds_version: str = INDEXING_THRESHOLDS_VERSION
     diagnostics: list[Diagnostic] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _q_matches_two_theta(self) -> "PeakList":
-        """Q is derived, so it cannot be allowed to drift from 2θ.
+        """Q and σ(Q) are derived, so neither may drift from 2θ and σ(2θ).
 
-        Cheap (one vectorised pass) and it makes the derived field
+        Cheap (one vectorised pass) and it makes the derived fields
         self-guarding: a caller that builds a peak by hand and forgets Q gets an
         error here rather than a silently mis-indexed pattern later.
+
+        ``q_esd`` is checked the same way (#1236): the engines weight lines by
+        :meth:`q_esd`, so an edit to ``two_theta_esd`` that left the stored
+        ``q_esd`` behind would never reach the search, and nothing would say
+        so.  The tolerance is relative only: σ(Q) is ~1e-5 Å⁻², so the position
+        check's floor of 1.0 would make it an absolute 1e-9 Å⁻², blind to an
+        edit of a line whose σ(2θ) is below ~1e-7°.  A pair where both
+        numbers are non-finite agrees: an infinite σ(2θ) gives an infinite or
+        undefined σ(Q), and both mean "unmeasured".
         """
         if not self.peaks:
             return self
@@ -995,6 +1035,22 @@ class PeakList(Base):
                 f"but 1/d² at λ = {self.wavelength} Å is {float(want[k])!r}; "
                 "build peaks with PeakList.from_positions or "
                 "indexing.pick_peaks rather than setting q by hand")
+        esd = np.array([p.two_theta_esd for p in self.peaks])
+        with np.errstate(invalid="ignore"):
+            want_esd = q_esd_of_two_theta(tt, esd, self.wavelength)
+        got_esd = np.array([p.q_esd for p in self.peaks])
+        agree = (np.isclose(got_esd, want_esd, rtol=1e-9, atol=0.0)
+                 | (~np.isfinite(got_esd) & ~np.isfinite(want_esd)))
+        if not agree.all():
+            k = int(np.flatnonzero(~agree)[0])
+            raise ValueError(
+                f"peak {k} at 2θ = {tt[k]:.4f}° carries q_esd = "
+                f"{float(got_esd[k])!r} but two_theta_esd = {float(esd[k])!r}° gives "
+                f"σ(1/d²) = {float(want_esd[k])!r} at λ = {self.wavelength} Å; "
+                "set both fields together, deriving q_esd with "
+                "rietx.schemas.indexing.q_esd_of_two_theta, or rebuild the "
+                "list with indexing.pick_peaks or PeakList.from_positions "
+                "(which marks every σ assumed)")
         return self
 
     def usable(self) -> list[ObservedPeak]:
@@ -1270,6 +1326,23 @@ class LeBailValidation(Base):
     #: the peak list's range.  ``n_reflections`` is the fit's and counts every
     #: reflection, so ``predicted_but_absent`` is a share of *this* number
     n_lines_screened: int | None = None
+    #: of those, the lines inside de Wolff's window: the denominator of the
+    #: absence density below
+    n_lines_screened_in_window: int | None = None
+    #: ``predicted_but_absent_uncancellable_in_window`` over
+    #: ``n_lines_screened_in_window``: the share of the lines this cell
+    #: asserts inside the window that read absent where no extinction could
+    #: explain it.  The density form of the count, as Smith & Snyder's (1979)
+    #: F_N weighs its lines by N/N_poss.  Reported only; the caveat fires on
+    #: the count
+    predicted_but_absent_density_in_window: float | None = None
+    #: the windowed uncancellable absences above what the lowest density
+    #: among the run's screened candidates implies for this cell's window
+    #: lines, A − N_w·d_min: the density compared across candidates, as
+    #: WRIP20 (Altomare et al. 2009) is read against the best candidate.
+    #: 0 for the cleanest candidate and for a lone one, so it cannot stand in
+    #: for the count.  Written by ``index_pattern``; reported only
+    predicted_but_absent_excess_in_window: float | None = None
     #: observed peaks with no calculated reflection nearby — impurity content, or
     #: a wrong cell.  Layer 0's ``unmatched_obs``
     unmatched_observed: int = 0
@@ -1368,6 +1441,19 @@ class CellCandidate(Base):
     #: :data:`IndexCaveat` vocabulary
     confidence_caveats: list[IndexCaveat] = Field(default_factory=list)
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+    #: formula units this cell's volume holds by Hofmann's (2002) average atomic
+    #: volumes (WP-2030): :attr:`volume` over one formula unit's volume at the
+    #: run's temperature (``IndexingResult.formula`` and ``.temperature``).
+    #: Written by :func:`rietx.index_pattern` when it is given ``formula=``;
+    #: ``None`` means no formula was given.  A number, judged by no diagnostic.
+    #: On an organic or metal-organic cell the true Z usually lies within a few
+    #: per cent of it (one crystal scatters about 4 %, Hofmann Fig. 1).  An
+    #: ionic or mainly inorganic cell reads low, often far low (his § 3 (iii)):
+    #: the 16 inorganic standards measured read 0.38-0.87 of their Z.  The one
+    #: bound that holds for any formula is the window's ceiling, so the true Z
+    #: is at least this number over 1.25, short of a porous framework whose
+    #: formula leaves its pore contents out.
+    formula_units: float | None = None
 
     @property
     def a(self) -> float:
@@ -2018,8 +2104,28 @@ class IndexingResult(Base):
     #: ``total_budget_seconds`` did, or ``None`` on a result recorded before
     #: presets existed.  The ceiling itself is in ``provenance.notes``.
     preset: str | None = None
+    #: the chemical formula each candidate's
+    #: :attr:`~CellCandidate.formula_units` was read against (WP-2030), written
+    #: verbatim by :func:`rietx.index_pattern` from its ``formula=``.  ``None``
+    #: means no formula was given, so no candidate was read against one; a
+    #: result recorded before 0.60 also reads ``None``.  It never narrowed the
+    #: search.
+    formula: str | None = None
+    #: the temperature in K Hofmann's (2002) volumes were read at,
+    #: written by :func:`rietx.index_pattern` beside :attr:`formula` and
+    #: ``None`` whenever :attr:`formula` is, since without a formula no
+    #: temperature was read.
+    temperature: float | None = None
     thresholds_version: str = INDEXING_THRESHOLDS_VERSION
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _temperature_needs_a_formula(self):
+        if self.formula is None and self.temperature is not None:
+            raise ValueError("IndexingResult.temperature is the temperature "
+                             "the formula's volumes were read at, so it needs a "
+                             "formula")
+        return self
 
     def __str__(self) -> str:
         """The candidate table, the verdict and every diagnostic (WP-1544).
@@ -2149,11 +2255,33 @@ class ExtinctionPrior(Base):
     or a glide; a second-harmonic signal says ``centrosymmetric=False``; a
     pyroelectric response says ``polar=True``.  ``None`` declares nothing.
 
+    **The content per cell** (WP-2033): ``z`` formula units of ``formula``, or
+    a measured ``density`` that fixes Z through the formula weight and the
+    screened cell.  A group whose orbits cannot hold some element's atoms per
+    cell is named in ``count_notes`` and kept; only under ``ordered=True`` is
+    it removed, the count being the test of an ordered model; a
+    fractional formula count declares a shared site and is not counted
+    (:func:`rietx.indexing.extinction.content_exclusion`).  Where Z is not a
+    whole multiple of a member's general multiplicity (Z′ < 1, as for #935's
+    P 2₁ salt against P 2₁/m) the member is kept and the special positions a
+    formula unit then needs are named, since a molecule's own symmetry is not
+    declared (:func:`rietx.indexing.extinction.special_site_note`).
+
     **A filter, never evidence.**  It decides which members of each class are
     admissible and is reported as ``EXTINCTION_PRIOR_APPLIED`` with every group
     it removed; it never enters a ΔBIC, every class is still fitted, and a class
     it empties stays in the ranking, so a declaration the data contradict is
-    visible rather than silently obeyed.
+    visible rather than silently obeyed.  A density that does not give the
+    declared ``z`` (or, alone, any whole number) on the screened cell
+    filters nothing and makes the screen abstain; one that fits several whole
+    numbers (above Z ≈ 33) only filters nothing.
+
+    **A count its orbits cannot hold is a statement, not a removal, unless the
+    model is declared ordered.**  A disordered alloy written with whole counts
+    (CuAu, Cu₃Au) puts its atoms on a shared site and its true group fails the
+    count, which a competent refiner would not remove.  So by default the
+    screen keeps the group and names the failure
+    (``ExtinctionCandidate.count_notes``); ``ordered=True`` removes it.
     """
 
     #: only Sohncke groups (proper rotations, screws and translations): an
@@ -2164,6 +2292,21 @@ class ExtinctionPrior(Base):
     #: only groups whose point group leaves a direction fixed (``True``: the
     #: ten polar classes) or none (``False``)
     polar: bool | None = None
+    #: formula units per cell.  With :attr:`formula` and :attr:`ordered` it
+    #: removes the groups whose orbits cannot hold that content (without
+    #: ``ordered`` it only names the failure); alone it names only what a
+    #: Z′ below one needs
+    z: int | None = Field(default=None, ge=1)
+    #: measured density in g/cm³, which fixes Z through :attr:`formula`'s
+    #: weight and the screened cell's volume
+    density: float | None = Field(default=None, gt=0.0)
+    #: the formula unit as a chemist writes it (``"Cu12Sb4S13"``, brackets and
+    #: ``·`` adducts allowed); a fractional count declares a shared site
+    formula: str | None = None
+    #: every site is one element at full occupancy (no mixed or partial
+    #: sites): only then does a group whose orbits cannot hold the declared
+    #: content get **removed**, instead of named in ``count_notes``
+    ordered: bool | None = None
 
     @model_validator(mode="after")
     def _consistent(self) -> "ExtinctionPrior":
@@ -2173,13 +2316,29 @@ class ExtinctionPrior(Base):
         if self.polar is True and self.centrosymmetric is True:
             raise ValueError("polar=True and centrosymmetric=True cannot both "
                              "hold: an inversion centre reverses every direction")
+        if self.density is not None and self.formula is None:
+            raise ValueError("a density gives Z only through the formula "
+                             "weight: declare the formula with it")
+        if self.formula is not None:
+            if self.z is None and self.density is None:
+                raise ValueError("a formula alone filters nothing: declare "
+                                 "it with a z or a density")
+            from ..crystallography.atomic_volume import formula_counts
+
+            formula_counts(self.formula)       # a symbol that is no element raises
+        if self.ordered and self.formula is None:
+            raise ValueError("ordered=True removes groups by the declared "
+                             "content: declare the formula with a z or a density")
         return self
 
-    def declared(self) -> dict[str, bool]:
+    def declared(self) -> dict[str, bool | int | float | str]:
         """The facts actually declared, by name."""
         return {k: v for k, v in (("sohncke", self.sohncke),
                                   ("centrosymmetric", self.centrosymmetric),
-                                  ("polar", self.polar)) if v is not None}
+                                  ("polar", self.polar), ("z", self.z),
+                                  ("density", self.density),
+                                  ("formula", self.formula),
+                                  ("ordered", self.ordered)) if v is not None}
 
 
 class ExtinctionCandidate(Base):
@@ -2219,6 +2378,21 @@ class ExtinctionCandidate(Base):
     space_groups: list[str] = Field(default_factory=list)
     #: members the declared :class:`ExtinctionPrior` removed (empty without one)
     excluded_groups: list[str] = Field(default_factory=list)
+    #: for each of :attr:`excluded_groups`, the declared facts it fails
+    #: (``"sohncke=True"``, ``"z=2: S 26 per cell is no sum of its orbits …"``)
+    exclusion_reasons: dict[str, str] = Field(default_factory=dict)
+    #: for each admitted member at which the declared Z is not a whole multiple
+    #: of its general multiplicity (Z′ not whole): the special positions a
+    #: formula unit then sits on.  A statement, never an exclusion — a molecule
+    #: there must carry the site's symmetry, which nothing declared says.
+    #: Filled for the classes the data leave standing, never for a refuted one
+    special_positions: dict[str, str] = Field(default_factory=dict)
+    #: for each admitted member whose orbits cannot hold some element's atoms
+    #: per cell at the declared Z (``"Cu 2 per cell is no sum of its orbits
+    #: …"``): kept, since a disordered model can share a site, and removed only
+    #: under ``ExtinctionPrior.ordered`` (then in :attr:`exclusion_reasons`).
+    #: Filled for the classes the data leave standing
+    count_notes: dict[str, str] = Field(default_factory=dict)
     #: :attr:`space_groups` grouped by Laue class (gemmi's symbol).  More than
     #: one key means the members differ in which reflections are *equivalent*
     #: — the intensity partition inside an overlapped multiplet — and not in any
@@ -2327,6 +2501,26 @@ class ExtinctionScreen(Base):
     #: :data:`~rietx.indexing.extinction.REFERENCE_NET_RWP_MAX` the screen is
     #: ``"unreliable"``; ``None`` until the reference fit ran
     reference_rwp_net: float | None = None
+    #: what ``reference_rwp_net`` would read for a fit that left only the
+    #: counting noise: √(N/(N + S)), N the fitted channels and S the weighted
+    #: net Bragg power.  Past the bound too, either the data are too weak for the
+    #: gate (S < N) or the picker's envelope sits inside the lines over this range
+    #: (the pair cannot tell which); below it, the gap to ``reference_rwp_net`` is
+    #: misfit.  ``None``
+    #: until the reference fit ran
+    perfect_fit_rwp_net: float | None = None
+    #: formula units per cell the member filter used: the declared ``z``, or
+    #: the one whole number the declared density gives on :attr:`cell`.
+    #: ``None`` with no Z declared, and when a declared density does not give
+    #: one — then nothing is filtered by Z and :meth:`best_or_none` abstains
+    z: int | None = None
+    #: Z the declared density and formula give on :attr:`cell`, not rounded;
+    #: ``None`` without a declared density
+    z_from_density: float | None = None
+    #: every whole Z within the density's tolerance of :attr:`z_from_density`,
+    #: when no ``z`` is declared; more than one is an ambiguity (a measured
+    #: density at Z ≳ 50), none a contradiction
+    z_candidates: list[int] = Field(default_factory=list)
     #: ``"converged"``; ``"failed"`` (no reference fit, nothing ranked);
     #: ``"unreliable"`` (ranked, but the reference fit left more of the net
     #: signal unexplained than any absence test can be read against, so
@@ -2334,6 +2528,20 @@ class ExtinctionScreen(Base):
     status: str = "converged"
     thresholds_version: str = INDEXING_THRESHOLDS_VERSION
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+
+    def density_contradicts_z(self) -> bool:
+        """Did a declared density fail to give the Z on the screened cell?
+
+        True when :attr:`prior` declares a density, one was computed
+        (:attr:`z_from_density`), and it names no Z: it is outside the
+        tolerance of the declared ``z``, or, with none declared, of every
+        whole number.  A density that fits *several* whole numbers is an
+        ambiguity, not a contradiction, and is False; so is a screen that never
+        computed one (cancelled, failed, or no reflections).
+        """
+        return (self.prior is not None and self.prior.density is not None
+                and self.z_from_density is not None and self.z is None
+                and (self.prior.z is not None or not self.z_candidates))
 
     def best_or_none(self) -> ExtinctionCandidate | None:
         """The one extinction class, or None.
@@ -2352,6 +2560,9 @@ class ExtinctionScreen(Base):
         returned and the margin is taken to the next such class — that is the
         declaration used — but a class it emptied that the data prefer by the
         decisive margin makes this abstain: the data contradict the declaration.
+        So does a declared density that gives another Z than the one declared,
+        or no whole Z, on the screened cell (:meth:`density_contradicts_z`); a
+        density that fits several whole Z does not.
 
         A returned class still lists every space group it admits.  There is no
         accessor anywhere in this module that yields one space group from the
@@ -2363,6 +2574,8 @@ class ExtinctionScreen(Base):
             return None                 # the absence tests read the misfit
         if any(not c.refuted and not c.screened for c in self.candidates):
             return None                 # an unasked question, not a clean answer
+        if self.density_contradicts_z():
+            return None                 # the declaration disagrees with the cell
         alive = [c for c in self.candidates if not c.refuted]
         admissible = [c for c in alive if c.space_groups]
         if not admissible:

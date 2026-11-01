@@ -40,7 +40,10 @@ That is 3.3 × 10⁻¹¹ from the special position (1/3, 2/3, z), inside the fil
 | `diagnostics` | `None` | a list that collects each repair and report |
 
 The reader takes a file with one data block.
-A file holding several is refused, so split a multi-phase CIF into one file per phase.
+Of several blocks, it reads the one holding atom sites when every other block states nothing: no tags, or only `_audit_` tags, such as an empty `data_global` ahead of the structure.
+[`CIF_EMPTY_BLOCK_SKIPPED`](diagnostics-structures.md#cif_empty_block_skipped) names each block skipped.
+Any other file of several blocks is refused, naming the blocks: two blocks with atom sites, or one beside a block that states anything else.
+Choosing a block is not yet supported, so split a multi-phase CIF into one file per phase.
 
 It reads the cell, the space group, and each site's label, species, coordinates, occupancy and displacement parameter.
 The space group comes back as the extended Hermann-Mauguin symbol gemmi resolves, which names its setting (`F d -3 m:1`).
@@ -89,7 +92,7 @@ A site within 5e-4 (fractional, per coordinate) of a special position, further o
 The gate is the same at every boundary, readers included: the occupancy at the position, summed over the atoms sharing it and each × (images before / images after), must be above 1.
 A CIF read says a merge with [`CIF_SITE_TWINS_MERGED`](diagnostics-structures.md#cif_site_twins_merged); the project readers' `to_structure` say `SITE_TWINS_MERGED` on their own `diagnostics=`; `RefinementTree.load` and `Refinement` construction, `edit`, `set_values` and `checkout` say it on `RefinementTree.load`'s `diagnostics=` or on the next `fit` or `run_stage` result.
 Where the product is 1 or below, the stated numbers read both as one atom off its position and as a split pair of part-atoms, so the site is left as stored and `SITE_TWINS_KEPT` gives both readings and the occupancy each implies.
-A hold, user tie or free path on a coordinate degree of freedom follows its direction when a site's symmetry changes (onto or off a special position), on every route that moves the site (a fit's write-back, `set_values`, `edit`, a branch, a stored history); one on a direction the position fixes or couples is dropped, and `SITE_TWINS_MERGED` or `SITE_DOFS_RENUMBERED` names it.
+A hold, user tie or free path on a coordinate degree of freedom follows its direction when a site's symmetry changes (onto or off a special position), on every route that moves the site (a fit's write-back, `set_values`, `edit`, a branch, a stored history); where the position couples coordinates, as (x, 2x, z) in P 6₃/mmc does x and y, a hold on x holds the coupled direction, the one direction that moves x. One on a direction the position fixes, and a tie on a coupled one, is dropped, and `SITE_TWINS_MERGED` or `SITE_DOFS_RENUMBERED` names it. A stored history's recorded actions (a stage's `turn_on`, a `set_value`'s values) follow the same renumbering on load, and a series' `constrain=` hook runs against the DOF numbering of the series' own structure.
 A merged site's coordinates that the position fixes lose `vary`, and an anisotropic tensor is projected onto the tensors the position allows, so the merged model still builds its table.
 `Phase` itself stays strict: a phase built in code with a twin site is held as stated until it enters one of those.
 The merge keeps the occupancy, so the site's atoms per cell change with its multiplicity, and each message gives both counts (multiplicity × occupancy).
@@ -191,6 +194,9 @@ An operation list takes its crystal system and cell ties from the tabulated grou
 A file whose space group cannot be resolved at all, from an ordinary tag or a parent symbol, is refused by name.
 
 ### What a magCIF read refuses
+
+A file using the pre-2016 draft magnetic tags (`_magnetic_atom_site_*`, `_magnetic_cell_*`, `_magnetic_space_group_symop_operation_*`) is refused by name.
+The magnetic dictionary defines none of them under any name or alias, and reading the file as an ordinary CIF would find no atom sites or drop its moments.
 
 A modulated structure is refused by name, because reading only its amplitude at k = 0 would return a collinear structure for a modulated one.
 That covers a moment, displacement, occupancy or rotation stated as Fourier amplitudes or a special function, a cell or site wave vector, a superspace group, and a moment row flagged as modulated.
@@ -439,4 +445,13 @@ Every other magnetic phase is refused by name, naming the phase and the reason:
 `rietx.io.projects.fullprof.magnetic_reading(model, phase)` asks before building.
 It returns the reading (the counterpart, the operations and the moments) for a phase that maps, and the refusal's reason as a string for one that does not.
 `to_structure(model, nuclear_only=True)` omits every magnetic phase, and reports each as [`FULLPROF_MAGNETIC_PHASE_OMITTED`](diagnostics-projects.md#fullprof_magnetic_phase_omitted) on the `diagnostics=` list.
+
+A `Jbt = 10` phase (`Jbt = -10` for the moment as M, φ, θ) holds the nuclear and the magnetic structure in one block: every site's nuclear columns, and a moment line on the sites with `N_t = 1`.
+It is read as the `Jbt = 0` phase and the `Jbt = ±1` phase it combines, under every condition above, and builds as one phase carrying its own moments.
+FullProf generates such a phase's reflections from its symbol and computes its structure factor from its SYMM list, so the built phase's space group is the group the SYMM operators form.
+Three more conditions come from running FullProf 8.20 on these files, and each is refused by name when it fails:
+
+- the symbol extinguishes no reflection its lattice allows (FullProf's own examples write `P -1` or `I -1` over the full operator list), because FullProf drops a magnetic reflection the symbol forbids;
+- no propagation vector is given, not even k = 0, because FullProf then computes no magnetic part on the fundamental reflections;
+- a moment line is under `N_t = 1`, which is how FullProf reads the spherical form under `Jbt = -10`, though its manual names `N_t = -1`.
 `write_fullprof_pcr` refuses a magnetic phase.

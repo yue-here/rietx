@@ -419,39 +419,49 @@ class SearchSpec:
     def from_formula(cls, formula: str, *,
                      z: int | tuple[int, int] | None = None,
                      temperature: float = 298.0, **fields) -> SearchSpec:
-        """A spec whose volume window comes from the chemical formula (WP-1510).
+        """A spec whose volume ceiling comes from the chemical formula
+        (WP-1510; a ceiling only since WP-2030).
 
         One formula unit's volume is Hofmann's (2002) sum of average atomic
         volumes at ``temperature`` in K
         (:func:`~rietx.crystallography.atomic_volume.formula_unit_volume`).
-        The window holds ``z`` formula units, widened to the ratio bounds
-        :data:`~rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS`
-        (V_obs/V_est from 0.8 to 1.25).  Hofmann found 1746 of 182 239
-        structures beyond them.  The window takes that wide bound rather than
-        the 4 % scatter of one crystal, because a window that excludes the true
-        cell makes the search return a wrong answer.
+        ``max_volume`` is ``z`` formula units times the upper ratio bound,
+        1.25 (:data:`~rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS`).
+        Hofmann's 0.8-1.25 band is where he starts calling a structure
+        unusual, not an error bound he measured: about 1 % of his 182 239 CSD
+        structures lie past 25 % either way (1746), and the typical scatter is
+        about 4 % (Fig. 1).  The window has no floor, for any formula.  An
+        ionic or mainly inorganic cell comes out smaller than the estimate
+        (his § 3 (iii)): every inorganic cell measured lies at 0.38-0.87 of it,
+        and nine of the 16 below 0.57, so a floor would exclude the truth.  A
+        ceiling only tolerates that direction.  What it does not hold is a
+        cell larger than its formula: a framework whose formula leaves out
+        what fills its pores (HKUST-1 reads 2.28).
 
         ``z`` counts formula units in the conventional cell: an integer, a
-        ``(min, max)`` pair, or ``None``.  ``None`` sets only the floor of one
-        formula unit and leaves ``max_volume`` to the data-quality envelope,
-        because a formula says nothing about how many units the cell holds.
-        The floor never drops below :data:`DEFAULT_MIN_VOLUME`: both are lower
-        bounds, so the larger binds.  Every other field passes through
-        ``fields``.
+        ``(min, max)`` pair, or ``None``.  Only the largest ``z`` sets the
+        ceiling: **a pair's minimum is checked and then ignored**, so
+        ``z=(4, 8)`` and ``z=(1, 8)`` give the same spec, and nothing here
+        raises a floor from it (1.10.0's window did).  **With ``z=None`` the
+        window narrows nothing:** ``min_volume`` stays
+        :data:`DEFAULT_MIN_VOLUME` and ``max_volume`` is left to the
+        data-quality envelope, because a formula says nothing about how many
+        units the cell holds.  Every other field passes through ``fields``,
+        ``min_volume`` included, for a caller who declares a floor of their own.
 
         Narrowing the search is the caller's own act, so ``index_pattern``
         never builds this window from its ``formula=`` argument, which only
-        reports (``INDEX_Z_NOT_INTEGER``).
+        records the formula units each cell holds
+        (:attr:`~rietx.schemas.indexing.CellCandidate.formula_units`).
         """
         from ..crystallography.atomic_volume import (
             VOLUME_RATIO_BOUNDS,
             formula_unit_volume,
         )
 
-        clash = sorted({"min_volume", "max_volume"} & fields.keys())
-        if clash:
-            raise ValueError(f"from_formula sets {' and '.join(clash)} from the "
-                             "formula; build SearchSpec directly to declare it")
+        if "max_volume" in fields:
+            raise ValueError("from_formula sets max_volume from the formula; "
+                             "build SearchSpec directly to declare it")
         if z is None:
             z_min, z_max = 1, None
         elif isinstance(z, (tuple, list)):
@@ -464,15 +474,17 @@ class SearchSpec:
             raise ValueError(f"z must be a whole number of formula units, at "
                              f"least 1, with min <= max; got {z!r}")
         v_fu, _ = formula_unit_volume(formula, temperature)
-        low, high = VOLUME_RATIO_BOUNDS
-        v_min = max(DEFAULT_MIN_VOLUME, z_min * v_fu * low)
-        v_max = None if z_max is None else z_max * v_fu * high
-        if v_max is not None and v_max < v_min:
-            # the floor binds above the formula's ceiling: an empty window
-            # would search nothing and report silence
+        v_max = None if z_max is None else z_max * v_fu * VOLUME_RATIO_BOUNDS[1]
+        floor = fields.get("min_volume", DEFAULT_MIN_VOLUME)
+        if floor is None:
+            raise ValueError("min_volume must be a number of Å³, not None; "
+                             "leave it out for the default floor")
+        if v_max is not None and v_max < floor:
+            # the floor binds above the formula's ceiling: an empty window would
+            # search nothing and report silence
             raise ValueError(f"{formula!r} with z={z!r} allows at most "
-                             f"{v_max:.1f} Å³, below the {v_min:g} Å³ floor")
-        return cls(min_volume=v_min, max_volume=v_max, **fields)
+                             f"{v_max:.1f} Å³, below the {floor:g} Å³ floor")
+        return cls(max_volume=v_max, **fields)
 
     def engine_pool(self) -> int:
         """Candidates one (engine × system) unit hands to the merge.
@@ -1752,8 +1764,8 @@ def merge_engine_units(units: Sequence[EngineResult]) -> EngineResult:
     return out
 
 
-def dedup_groups(cands: Sequence[EngineCandidate],
-                 ) -> list[list[EngineCandidate]]:
+def dedup_groups(cands: Sequence[EngineCandidate], *, cancel=None,
+                 keep: int = 0) -> list[list[EngineCandidate]]:
     """Group candidates that are the same lattice, best-fitting member first.
 
     WP-1020's χ² equality on the **Niggli-reduced** A..F, so a setting change is
@@ -1794,12 +1806,25 @@ def dedup_groups(cands: Sequence[EngineCandidate],
       walk then reads, and leaves the pass at ~7 s.  Only where ``reduce.stacked_pinv_exact`` measures
       every stacked χ² equal to the pair's own, bit for bit; elsewhere the
       pass asks one pair at a time, as before.
+
+    **A stop ends the walk only where the rest could not reach a shortlist
+    of ``keep``** (WP-1924, #780).  The pass costs about n² over distinct
+    lattices, 10.7 s at 6 819, and nothing read the token while it ran.  Once
+    ``cancel`` is set, the walk ends at the first candidate indexing fewer
+    lines than the first ``keep`` groups' leaders all do.  The walk goes most
+    lines first and never moves an earlier group's first member, so every
+    leader the full pass would add past that point indexes fewer lines than
+    ``keep`` leaders already held, and :func:`rank_candidates`' pre-rank
+    (most lines, then smallest volume) cannot shortlist it.  Within a line
+    count the walk runs on, because the pre-rank breaks that tie on volume.
+    So a deadline that fires here leaves the ranked list as it was, and an
+    unset token or ``keep = 0`` changes nothing.
     """
-    return _dedup_groups(cands, fast=True)
+    return _dedup_groups(cands, fast=True, cancel=cancel, keep=keep)
 
 
 def _dedup_groups(cands: Sequence[EngineCandidate], *, fast: bool,
-                  ) -> list[list[EngineCandidate]]:
+                  cancel=None, keep: int = 0) -> list[list[EngineCandidate]]:
     """:func:`dedup_groups`, with its caches and volume index switchable."""
     from bisect import bisect_left, bisect_right
     from itertools import islice
@@ -1851,6 +1876,10 @@ def _dedup_groups(cands: Sequence[EngineCandidate], *, fast: bool,
     rtol = DEDUP_VOLUME_RTOL
     stacked = fast and stacked_pinv_exact()
     for cand, red, volume, key, cov, gate in prepared:
+        if (keep and len(kept) >= keep
+                and cand.n_indexed < kept[keep - 1][0][0].n_indexed
+                and cancel is not None and bool(cancel)):
+            break
         if fast:
             vols, ids, unbounded = by_volume.setdefault(
                 (cand.system, cand.centring), ([], [], []))
@@ -1952,11 +1981,11 @@ def _ask_stacked(cand: EngineCandidate, red: np.ndarray, volume: float,
     return 4 * size
 
 
-def dedup_candidates(cands: Sequence[EngineCandidate],
-                     ) -> list[EngineCandidate]:
+def dedup_candidates(cands: Sequence[EngineCandidate], *, cancel=None,
+                     keep: int = 0) -> list[EngineCandidate]:
     """The best-fitting member of each distinct lattice — :func:`dedup_groups`
     with the membership dropped."""
-    return [group[0] for group in dedup_groups(cands)]
+    return [group[0] for group in dedup_groups(cands, cancel=cancel, keep=keep)]
 
 
 def _reduced_volume(red: np.ndarray) -> float:
@@ -1972,7 +2001,7 @@ def rank_candidates(cands: Sequence[EngineCandidate], peaks: PeakList, *,
                     shortlist: int | None = 4,
                     q_match: np.ndarray | None = None,
                     deduped: bool = False,
-                    ) -> list[EngineCandidate]:
+                    cancel=None) -> list[EngineCandidate]:
     """Dedup, score with the FoM panel, and rank by **agreement, then** Borda.
 
     **Ranking happens here rather than in each engine, and it is not on a
@@ -2024,6 +2053,12 @@ def rank_candidates(cands: Sequence[EngineCandidate], peaks: PeakList, *,
     ``q_match`` is the σ(Q) the *search* matched with — pass the same array the
     engine assigned lines with, or the panel judges these candidates by a window
     they were never selected under (:func:`~rietx.indexing.fom.fom_panel`).
+
+    ``cancel`` reaches the dedup only, which once it is set stops where the
+    rest could not reach the shortlist (:func:`dedup_groups`), so the list
+    returned is the one an unstopped pass returns.  It is not read with no
+    shortlist, where every candidate is owed a score, nor when a candidate is
+    corroborated, since the dedup's walk does not order on agreement.
     """
     n_unindexed = _panel_trim(n_unindexed)
     # ``deduped``: the caller's list is exactly what :func:`dedup_candidates`
@@ -2031,13 +2066,20 @@ def rank_candidates(cands: Sequence[EngineCandidate], peaks: PeakList, *,
     # come back in the same (stable) order, each meets the same first members in
     # the same deterministic tests, and none matched one then.  Measured on
     # corundum's tetragonal unit, the repeat was 53.6 s of a 303 s unit (WP-1509)
-    kept = list(cands) if deduped else dedup_candidates(cands)
+    cap = (None if shortlist is None
+           else max(shortlist * max_candidates, max_candidates))
+    if deduped:
+        kept = list(cands)
+    else:
+        stoppable = cap is not None and not any(corroborated(c) for c in cands)
+        kept = dedup_candidates(cands, cancel=cancel if stoppable else None,
+                                keep=cap or 0)
     # agreement leads the cheap pre-rank too: a candidate cut here never reaches
     # the panel, so applying the key only to the final sort would leave the same
     # truncation deciding an order it is not entitled to decide
     kept.sort(key=lambda c: (not corroborated(c), -c.n_indexed, c.volume))
-    if shortlist is not None:
-        kept = kept[:max(shortlist * max_candidates, max_candidates)]
+    if cap is not None:
+        kept = kept[:cap]
     if not kept:
         return []
     for cand in kept:

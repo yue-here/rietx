@@ -146,6 +146,15 @@ def test_every_record_field_is_an_action_row_or_declared_other():
                      + "\n".join(_audit.row_source(name, "action") for name in new))
 
 
+def test_the_indexing_records_are_walked():
+    """#1123's follow-up: the lab-source check decides what a peak list records,
+    so the walk reaches IndexingResult and PeakList and that field is an action."""
+    assert {"rietx.schemas.indexing.IndexingResult",
+            "rietx.schemas.indexing.PeakList"} <= set(_audit.RECORD_SCHEMAS)
+    row = ROWS["rietx.schemas.indexing.PeakList.instrument_undeclared"]
+    assert (row.kind, row.tier) == ("action", 1)
+
+
 def test_an_audited_row_carries_its_evidence():
     """Self-certification is the failure the table exists against, so a tier
     names its source; tier 3, and a tier-2 action, also carry the two-ground

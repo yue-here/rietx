@@ -2663,6 +2663,38 @@ def test_a_stored_synthetic_witness_reverifies_and_its_negation_does_not():
                                      witness=witness, dual=0.1))
 
 
+def test_a_witness_whose_stored_margin_is_wrong_does_not_reverify():
+    """:func:`isotropy._verify_witness` recomputes ``margin`` from ``interior`` and refuses a record that disagrees (review of #853, follow-up 2).
+
+    Everything else in the record is left as issued, so the margin is the
+    only thing that can refuse it.  **Positive arm:** the issued margin
+    re-verifies, and so does one moved by a tenth of the 4(n + S)ε rounding
+    allowance.  **Planted faults**, each refused: the margin doubled,
+    halved, zeroed, negated, NaN, and moved by ten allowances.  Before the
+    re-check every one of them re-verified.
+    """
+    from dataclasses import replace
+
+    _, parts = isotropy._farkas_certificate(SYNTHETIC_STACK, SYNTHETIC_OUT)
+    y = parts["y"]
+    witness = isotropy.Witness(
+        draw=1, t=tuple(SYNTHETIC_OUT), live=(0, 1, 2), y=tuple(y), weights=None,
+        kernel_dim=0, kernel_residual=0.0, kernel_amplitude_ratio=float("inf"),
+        ratio=parts["ratio"], rounding_bound=parts["rounding_bound"], exact=True,
+        d=(1.0 / float(np.linalg.norm(y)), 1.0),
+        interior=tuple(parts["interior"]), margin=parts["margin"])
+    mu = witness.margin
+    allowance = 4.0 * (2 + 3) * float(np.finfo(np.float64).eps)    # n = 2 amplitudes, S = 3 shells
+    assert 1e-2 < mu < 1.0
+    for margin in (mu, mu + 0.1 * allowance, mu - 0.1 * allowance):
+        assert isotropy._verify_witness(SYNTHETIC_STACK, replace(witness, margin=margin))[0], margin
+    for margin in (2.0 * mu, 0.5 * mu, 0.0, -mu, float("nan"), mu + 10.0 * allowance):
+        holds, ratio, off = isotropy._verify_witness(SYNTHETIC_STACK, replace(witness, margin=margin))
+        assert not holds, margin
+        # the certificate itself still holds: the margin is what refused it
+        assert ratio >= isotropy.FARKAS_FLOOR and off <= 1e-12
+
+
 #: ``P m -3 m`` at (0, 0, ½), general site: 14 families, eight of them with a
 #: common kernel on their live shells (S5(a), S8(a) and the six S9/S10).
 PM3M_X = ("P m -3 m", P21C_SITE, P21C_K)
@@ -3059,7 +3091,7 @@ def test_a_stored_known_answer_witness_reverifies_from_its_literals(known_answer
         rounding_bound=7.9e-15, exact=True, d=(1.0 / float(np.linalg.norm(y)), 0.00495),
         # the quoted y's own direction: strictly inside the PSD cone (ratio 1e-10), so
         # a valid interior, with the small margin that goes with the quoted point
-        interior=tuple(y / float(np.linalg.norm(y))), margin=2.3e-11)
+        interior=tuple(y / float(np.linalg.norm(y))), margin=2.3156608666263582e-11)
     holds, ratio, off = isotropy._verify_witness(grams[b], witness)
     assert holds and ratio >= isotropy.FARKAS_FLOOR and off <= 1e-9
     assert witness.d[0] == pytest.approx(0.00494, rel=2e-3)
@@ -3067,6 +3099,49 @@ def test_a_stored_known_answer_witness_reverifies_from_its_literals(known_answer
     assert isotropy._verify_witness(np.einsum("ki,skl,lj->sij", q, grams[b], q), witness)[0]
     assert not isotropy._verify_witness(grams[b], replace(witness, y=tuple(-y)))[0]
     assert not isotropy._verify_witness(grams[a], witness)[0]
+    # the margin is part of the record: the 2.3e-11 this literal carried before the
+    # re-check (review of #853, follow-up 2) is 0.7 % off and no longer re-verifies
+    assert not isotropy._verify_witness(grams[b], replace(witness, margin=2.3e-11))[0]
+
+
+@pytest.mark.xdist_group("magnetic-known-answer")
+def test_powder_equivalent_hands_the_callers_little_group_to_the_span_certificate(
+        known_answer_stack, monkeypatch):
+    """``powder_equivalent(little=…)`` is the group the domain operations are taken from, and nothing rebuilds it (review of #853, follow-up 1).
+
+    S1(rank 1)#1 → S1(a,b) is proved by the span certificate, so the pair
+    reaches :func:`isotropy._domain_patterns`.  With the caller's group,
+    every call receives that very object and ``little_group`` is never
+    called.  **Positive arm:** with none, the group is built exactly once,
+    in :func:`isotropy.powder_equivalent`, and that same object is the one
+    the domain operations read.  Both calls give one answer.  Before the
+    fix ``_powder_equivalent`` built a second group for the patterns.
+    """
+    found, reflections = known_answer_stack[0], known_answer_stack[1]
+    pick = {c.label: c for c in found}
+    a, b = pick["S1(rank 1)#1"], pick["S1(a,b)"]
+    built, seen = [], []
+    little_group, domain_patterns = irreps.little_group, isotropy._domain_patterns
+
+    def spy_little_group(*args, **kwargs):
+        built.append(little_group(*args, **kwargs))
+        return built[-1]
+
+    def spy_domain_patterns(candidate, little):
+        seen.append(little)
+        return domain_patterns(candidate, little)
+
+    monkeypatch.setattr(irreps, "little_group", spy_little_group)
+    monkeypatch.setattr(isotropy, "_domain_patterns", spy_domain_patterns)
+    mine = little_group(found.space_group, found.k)
+    given = isotropy.powder_equivalent(a, b, reflections, draws=1, restarts=4, little=mine)
+    assert seen and all(g is mine for g in seen)
+    assert built == []
+
+    seen.clear()
+    default = isotropy.powder_equivalent(a, b, reflections, draws=1, restarts=4)
+    assert len(built) == 1 and seen and all(g is built[0] for g in seen)
+    assert given == default
 
 
 def test_the_quote_target_is_never_below_the_accept_floor():
@@ -3480,7 +3555,7 @@ def _f43m_witness():
         draw=106, t=F43M_WITNESS_T, live=F43M_WITNESS_LIVE, y=F43M_WITNESS_Y, weights=None,
         kernel_dim=0, kernel_residual=0.0, kernel_amplitude_ratio=float("inf"), ratio=6.1e-10,
         rounding_bound=6.0e-15, exact=True, d=(1.0 / float(np.linalg.norm(y)), 0.00524),
-        interior=F43M_WITNESS_INTERIOR, margin=8.42e-7)
+        interior=F43M_WITNESS_INTERIOR, margin=8.423242435045702e-07)
 
 
 @pytest.mark.xdist_group("magnetic-f43m")

@@ -70,6 +70,7 @@ from ..crystallography.magnetic.scattering import (
     NON_MAGNETIC_SOURCE_KINDS,
     MagneticSites,
     compile_magnetic_sites,
+    d_magnetic_f2_d_dofs,
     magnetic_f2,
     magnetic_reflections,
     merge_magnetic,
@@ -992,7 +993,8 @@ class CompiledModel:
 
         The tick half of the member contract's clause 2, written once because
         **two** result builders owe it: ``refine._build_result`` and
-        ``multi.MultiHistogramRefinement._ticks``.  A copy in each is how a
+        ``multi.MultiHistogramRefinement._build_result``, through their one
+        tick builder ``refine._tick_rows`` (WP-2028).  A copy in each is how a
         joint fit ends up reporting a declared peak as an unindexed impurity
         while a single-histogram fit does not — the ``ticks`` failure this
         exists to prevent, one surface over.
@@ -1179,8 +1181,9 @@ class CompiledModel:
 
         This is the one place that walks a phase's cell, lines and positions
         for a tick.  ``refine._build_result``, ``multi.MultiHistogramRefinement
-        ._ticks`` and ``viz.snapshot.stage_ticks`` each carried their own copy
-        until WP-1908's review, and a copy is how a builder forgets the shift.
+        ._build_result`` and ``viz.snapshot.stage_ticks`` each carried their
+        own copy until WP-1908's review, and a copy is how a builder forgets
+        the shift.  The first two now share ``refine._tick_rows`` (WP-2028).
         A time-of-flight axis owes a twin here, not a fifth walk.  Positions come
         from :meth:`apparent_two_theta`, so they are where the model draws each
         peak.  The satellite report's lattice enumerates differently and calls
@@ -2513,6 +2516,68 @@ class CompiledModel:
         """
         return self.phases[ip].magnetic is None
 
+    def moment_grad_supported(self, ip: int) -> bool:
+        """Whether the analytic moment columns are exact for phase ip (WP-1327).
+
+        True for a Rietveld phase carrying a moment, with one declared
+        exclusion: a phase drawing its magnetic component on its own family
+        (:meth:`mag_split`) **while extinction is evaluated**.  There the
+        attenuation reads the total |F|², so a moment also moves the nuclear
+        component through E and the magnetic one through f2_m·dE/d|F|², a
+        cross-component term :meth:`moment_intensity_grad` does not write.
+        Such a phase keeps the peak-chain column, which re-runs
+        :meth:`phase_peaks` per component and is exact for it.  The split
+        draw with extinction skipped — the WP-1343 default — is covered: the
+        moment then moves the magnetic component alone.
+        """
+        cp = self.phases[ip]
+        if self.mode != "rietveld" or cp.magnetic is None:
+            return False
+        return not (self.mag_split(ip) and not cp.skip_extinction)
+
+    def moment_f2_grads(self, ip: int, values: dict[str, float]
+                        ) -> dict[tuple[int, int], np.ndarray]:
+        """``{(j, k): (N,)}`` ∂(p²⟨|F_⊥|²⟩)/∂ moment DOF k of atom j (WP-1327).
+
+        Every DOF of the phase at once, because the projected total F_⊥ they
+        all need is the expensive half
+        (``crystallography.magnetic.scattering.d_magnetic_f2_d_dofs``).  The
+        caller caches it for one Jacobian evaluation.
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        xyz, occ, biso, _u, _a = self._site_values(ip, values, cell)
+        stol = 1.0 / (2.0 * np.asarray(d, dtype=np.float64))
+        return d_magnetic_f2_d_dofs(cp.mag_members, cp.mag_seg, cp.mag_counts,
+                                    stol, cp.magnetic, cell, xyz, occ, biso,
+                                    self._moment_dofs(ip, values))
+
+    def moment_intensity_grad(self, ip: int, df2: np.ndarray,
+                              values: dict[str, float]
+                              ) -> list[list[np.ndarray]]:
+        """Per component, per line, ∂intensity for a moment column (WP-1327).
+
+        ``df2`` is the column's ∂(p²⟨|F_⊥|²⟩), already summed through C over
+        the DOFs it moves.  One entry per drawn component, in
+        ``DerivativeBases.components`` order.  On the ordinary draw the
+        magnetic term is part of the one total |F|², so the chain is the
+        coordinate columns' (:meth:`_f2_derivative_chain`).  On a split draw
+        with extinction skipped (the only split case
+        :meth:`moment_grad_supported` admits) the nuclear component does not
+        move and the magnetic one carries the same chain, its E factor being
+        exactly 1.
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        moved = self._f2_derivative_chain(ip, values, cell, d, df2)
+        if not self.mag_split(ip):
+            return [moved]
+        return [[np.zeros_like(col) for col in moved], moved]
+
     def _structural_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
                                    values: dict[str, float], kernel
                                    ) -> list[np.ndarray] | None:
@@ -2533,6 +2598,27 @@ class CompiledModel:
         nuc = self._nuclear_mask(ip)
         if nuc is not None:
             df2 = df2 * nuc
+        return self._f2_derivative_chain(ip, values, cell, d, df2)
+
+    def _f2_derivative_chain(self, ip: int, values: dict[str, float],
+                             cell: tuple, d: np.ndarray, df2: np.ndarray,
+                             f2_total: np.ndarray | None = None
+                             ) -> list[np.ndarray]:
+        """Per-line ∂intensity from a ∂|F|² that moves the phase's whole term.
+
+        Everything :meth:`phase_peaks` applies after the structure factor, for
+        a parameter that moves only |F|²: scale · multiplicity · P · w · Lp ·
+        G · absorption · roughness, with G = E + x·dE/dx where extinction is
+        evaluated.  The coordinate and ADP columns reach it with ∂|F_N|², the
+        moment columns (WP-1327) with ∂(p²⟨|F_⊥|²⟩) — both are terms of the
+        one total |F|² that the non-split draw scales and attenuates.
+
+        ``f2_total`` is that total, when the caller already holds it; it is
+        read only where extinction is evaluated, and built here only then —
+        a stage that cannot move extinction off zero pays no structure-factor
+        evaluation per column for a factor it multiplies by exactly 1.
+        """
+        cp = self.phases[ip]
         d_base = values[f"phases.{ip}.scale"] * cp.reflections.multiplicity * df2
         # March-Dollase P multiplies the intensity and does not depend on the
         # coordinates/ADPs, so a structural move chains through it unchanged —
@@ -2556,7 +2642,10 @@ class CompiledModel:
         ext = values[f"phases.{ip}.extinction"]
         # the extinction variable x is built from the whole reflection, so the
         # magnetic term belongs in it exactly as it does in ``phase_peaks``
-        f2 = self._total_f2(ip, d, values, cell)
+        f2 = None
+        if not cp.skip_extinction:
+            f2 = (self._total_f2(ip, d, values, cell) if f2_total is None
+                  else f2_total)
         vol = cell_volume(*cell)
         out = []
         # λ read through ``line_lambdas``, never off the frozen tuple: a joint

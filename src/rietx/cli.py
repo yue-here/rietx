@@ -298,12 +298,33 @@ def _index(argv: list[str]) -> int:
                         "scatter a template leaves; without one the engines "
                         "assume 0.05° and cap confidence, because a cell found "
                         "in a widened window absorbs the shift")
+    p.add_argument("--formula", default=None,
+                   help="the specimen's chemical formula (e.g. C7H6O2; write a "
+                        "hydrate with '·'). Each candidate records the "
+                        "formula units it holds by Hofmann's (2002) volumes "
+                        "(formula_units); it never narrows the search")
+    p.add_argument("--temperature", type=float, default=None,
+                   help="the pattern's temperature in K, for --formula's "
+                        "volumes (default 298); needs --formula")
     p.add_argument("--no-validate", action="store_true",
                    help="skip the whole-profile validation fit (caps every "
                         "candidate at medium)")
     p.add_argument("--json", metavar="FILE", default=None,
                    help="write the full IndexingResult as JSON")
     args = p.parse_args(argv)
+    # a bad formula or temperature is a usage error, refused before the
+    # pattern is read, never a traceback from deep in the run; and a flag that
+    # would change nothing is refused rather than ignored
+    if args.temperature is not None and args.formula is None:
+        p.error("--temperature sets only --formula's volumes; give --formula too")
+    from .crystallography.atomic_volume import TABLE_TEMPERATURE, formula_unit_volume
+
+    temperature = TABLE_TEMPERATURE if args.temperature is None else args.temperature
+    if args.formula is not None:
+        try:
+            formula_unit_volume(args.formula, temperature)
+        except ValueError as exc:
+            p.error(str(exc))
 
     from .indexing import SearchSpec, index_pattern
     from .io.readers import read_pattern
@@ -342,7 +363,8 @@ def _index(argv: list[str]) -> int:
 
     result = index_pattern(data=data, instrument=instrument,
                            spec=spec, preset=args.preset, engines=engine_names,
-                           validate=not args.no_validate)
+                           validate=not args.no_validate,
+                           formula=args.formula, temperature=temperature)
     print(result)
     if args.json:
         from pathlib import Path

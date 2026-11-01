@@ -277,8 +277,36 @@ def test_every_scat_source_is_short_enough_for_checkcif():
 
     ion = next(iter(_ITC_IONS))
     values = {blocks._scat_source(symbol, probe)
-              for symbol in ("Ca", ion) for probe in ("xray", "neutron", None)}
+              for symbol in ("Ca", ion, "O2-") for probe in ("xray", "neutron", None)}
     assert max(len(v) for v in values) <= blocks.SCAT_SOURCE_MAX, values
+
+
+def test_the_o2_row_is_not_credited_to_the_1995_paper():
+    """The ``O2-`` row of the f0 file is Waasmaier & Kirfel's fit to Rez, Rez &
+    Grant (1994), not a row of their 1995 paper (#1039); ``O1-`` and the
+    neutral atom still are."""
+    from rietx.io.cif import blocks
+
+    assert blocks._scat_source("O2-", "xray") == "W&K, Rez et al. (1994)"
+    assert blocks._scat_source("O2-", None).startswith("W&K, Rez")
+    for symbol in ("O", "O1-"):
+        assert blocks._scat_source(symbol, "xray") == "Waasmaier & Kirfel (1995)"
+    assert blocks._scat_source("O2-", "neutron") == "Sears (1992)"
+
+
+def test_a_written_oxide_cif_carries_the_o2_credit(tmp_path):
+    """The route a user reaches: an ``O2-`` site written through ``to_cif``
+    names Rez et al. (1994) in its ``_atom_type_scat_source`` loop (#1039)."""
+    structure = rx.Structure(phases=[rx.Phase(
+        name="CaO", space_group="F m -3 m", cell=rx.Cell.cubic(4.81),
+        atoms=[_site("Ca1", "Ca2+", (0.0, 0.0, 0.0)),
+               _site("O1", "O2-", (0.5, 0.5, 0.5))])])
+    _path, doc = _written(structure, tmp_path)
+    block = doc.sole_block()
+    sources = _loop(block, "_atom_type_scat_source")
+    assert [v for v in sources if "Rez et al. (1994)" in v] == [
+        "W&K, Rez et al. (1994); Sears (1992)"]
+    assert sum("Waasmaier & Kirfel (1995)" in v for v in sources) == 1
 
 
 def test_a_digitless_ion_is_respelled_by_name(tmp_path):

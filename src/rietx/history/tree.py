@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from ..crystallography.twins import (
+    carry_action_constraints,
     carry_state_constraints,
     merge_site_twins,
     numbering_moves,
@@ -59,30 +60,48 @@ def _merge_stored_twins(pending: Sequence[Any]) -> list[Diagnostic]:
     (Yue's ruling on #1014).  Nodes of one history repeat the same site but
     not its coordinate (a refined one differs in every node), so the finding
     is said once per phase and atom, naming how many nodes held it.
+
+    A node's action names paths too (a stage's ``turn_on``, a ``set_value``'s
+    ``values``), in the numbering of the state it acted on, which is its
+    parent's; they follow that state's renumbering
+    (:func:`~rietx.crystallography.twins.carry_action_constraints`), or a
+    ``cherry_pick`` of the stage would free another direction on the merged
+    site (#1014, round 5).
     """
     found: dict[tuple[str, tuple[str, ...]], list[Diagnostic]] = {}
+    renumbered: dict[str, dict] = {}
+    action_notes: dict[str, list[str]] = {}
     for item in pending:
         if not isinstance(item, HistoryNode):
             continue
         local: list[Diagnostic] = []
         merged = merge_site_twins(item.state.structure, diagnostics=local,
                                   source="this history")
+        moves: dict = {}
         if local:
             moves = numbering_moves(item.state.structure, merged)
             item.state.structure = merged
             carry_state_constraints(item.state, moves, local)
+        renumbered[item.id] = moves
+        acted_on = renumbered.get(item.parents[0], {}) if item.parents else moves
+        if acted_on:
+            for site, notes in carry_action_constraints(item.action, acted_on).items():
+                action_notes.setdefault(site, []).extend(notes)
         for d in local:
             found.setdefault((d.code, tuple(d.where)), []).append(d)
     out: list[Diagnostic] = []
-    for group in found.values():
+    for (code, where), group in found.items():
         first = group[0]
         # every node's own constraint note, said once: the first node is often
         # the root, which holds nothing, while a later one holds the hold
         # (#1014, round 5)
         head = first.message.split(_CONSTRAINTS, 1)[0]
-        notes = list(dict.fromkeys(
-            part for d in group for part in d.message.split(_CONSTRAINTS)[1:]))
-        message = head + "".join(_CONSTRAINTS + n for n in notes)
+        notes = [note for d in group for part in d.message.split(_CONSTRAINTS)[1:]
+                 for note in part.removesuffix(".").split("; ")]
+        if code == "SITE_TWINS_MERGED" and len(where) == 1:
+            notes.extend(action_notes.pop(where[0], []))
+        notes = list(dict.fromkeys(notes))
+        message = head + (_CONSTRAINTS + "; ".join(notes) + "." if notes else "")
         if len(group) > 1:
             message += f" (stored in {len(group)} nodes)"
         out.append(first.model_copy(update={"message": message}))

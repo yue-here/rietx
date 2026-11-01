@@ -3,7 +3,7 @@
 Milestone: generality · Status: ⬜
 Track: The prose
 Depends on: 2001 (2008 soft)
-Priority: P4 2026-10-19 — 2001 closed, leaving 2008 as its only soft dependency; changes no number and no decision in the package; last, and small
+Priority: P3 2026-10-30 — was P4: the 2026-10-30 Inherited entry measures a cost every session pays (root alone about 21k tokens a request); a cost-only item with no user at the wall
 
 ## Goal
 
@@ -47,6 +47,7 @@ plus a pointer.
 
 ### Inherited
 
+- **2026-10-30, from the maintainer, via the claude-config workflow harvest: the evidence is paid for on every request.** Sizes on `origin/main` at d35ffeda7: root CLAUDE.md 86 001 B (12 700 words, about 21k tokens at 4 B a token), loaded on every request of every session. `gui/` 77 677 B, `src/rietx/io/` 51 398 B, `src/rietx/indexing/` 26 202 B and `tests/` 19 428 B load with their subtree, so an `io/` session carries about 34k. The cache re-reads all of it on each request: root alone is about 2.1M tokens per 100 requests. The maintainer's ruling: a rulebook carries the rule and a one-clause reason; incidents, shas and measurements go where a session reads them on demand. The findings pass therefore covers every clause that is evidence, numbered or not, and the handover reports each rulebook's bytes before and after beside the word counts. claude-config's `workflow/LESSONS.md` took the same split on 2026-10-30, with an `EVIDENCE.md` beside it.
 - **2026-10-20, from [2014](2014-a-heuristic-meets-the-judge-on-every-path.md)'s filing: outside PRs write findings into the rulebooks.** Four of the twelve open outside PRs that touch `_audit.py` edit a CLAUDE.md (three `src/rietx/indexing/`, one `src/rietx/io/`), some with one-dataset findings stated as rules: #941 adds "magnetite's wrong P description bought a negative background and read 0 of 163 absent", #1048 a NAC line count. After this WP's findings pass, only `/wp-handover` step 7 audits a rulebook edit, and an outside PR never reaches it. 2014 adds the class to `/pr-review`'s list of what outsiders miss; this WP owns the rule's wording, so word it for `/pr-review` as well as for the handover.
 
 ## Non-goals

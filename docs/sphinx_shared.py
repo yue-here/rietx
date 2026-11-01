@@ -32,13 +32,20 @@ from rietx._about import REPO_URL
 from rietx.crystallography.atomic_volume import VOLUME_RATIO_BOUNDS, VOLUME_SCATTER
 from rietx.crystallography.dispersion import NEAR_EDGE_EV
 from rietx.crystallography.magnetic.moments import MOMENT_DIRECTION_SUPPORT
+from rietx.crystallography.representation.distortion import DISTORTION_SEED
 from rietx.crystallography.scattering import _itc_handover
+from rietx.crystallography.superspace import (
+    ITC_C_EXCEPTIONS,
+    N_MAGNETIC_SUPERSPACE_GROUPS_D1,
+    N_BRAVAIS_CLASSES_D1,
+    N_SUPERSPACE_GROUPS_D1,
+)
 from rietx.crystallography.symmetry import SYMMETRY_ANGLE_TOL_DEG
 from rietx.examples import list_examples
 from rietx.gui.textdoc import FORMAT_VERSION as RXT_FORMAT_VERSION
 from rietx.gui.textdoc import VALUE_DIGITS as RXT_VALUE_DIGITS
 from rietx.indexing.ambiguity import MAX_AMBIGUITY_INDEX, SUPERCELL_CHANCE_ALPHA
-from rietx.indexing.diagnostics import Z_INTEGER_TOLERANCE
+from rietx.indexing.extinction import DENSITY_Z_TOLERANCE
 from rietx.indexing.dichotomy import ANGLE_STEP_DEG, AXIS_STEP
 from rietx.indexing.engines import (
     DEFAULT_N_UNINDEXED,
@@ -212,6 +219,7 @@ MYST_SUBSTITUTIONS = {
     # the moment-direction floor both the hold and the stationary-angle test
     # read, and that test's level (WP-1929)
     "MOMENT_DIRECTION_SUPPORT": f"{MOMENT_DIRECTION_SUPPORT:.0e}",
+    "DISTORTION_SEED": f"{DISTORTION_SEED:g}",
     "STATIONARY_ANGLE_LEVEL": STATIONARY_ANGLE_LEVEL,
     # the parametric form test's level (WP-1325)
     "PARAMETRIC_FORM_LEVEL": FORM_TEST_LEVEL,
@@ -225,20 +233,28 @@ MYST_SUBSTITUTIONS = {
     "MAX_AMBIGUITY_INDEX": MAX_AMBIGUITY_INDEX,
     "MAX_RELATIVE_SIGMA_Q": MAX_RELATIVE_SIGMA_Q,
     "MIN_LINES_PER_DOF": MIN_LINES_PER_DOF,
-    # the formula-volume window and the Z check (WP-1510): the scatter of one
-    # crystal, the ratio bounds the window takes, the tolerance at twice the
-    # scatter, and the Z above which every value is within it of a whole number
+    # the formula-volume window (WP-1510, a ceiling only since WP-2030): the
+    # scatter of one crystal, and Hofmann's band, whose upper edge is the ceiling
     "VOLUME_SCATTER_PCT": f"{VOLUME_SCATTER * 100:.2f}",
     "VOLUME_RATIO_LOW": f"{VOLUME_RATIO_BOUNDS[0]:g}",
     "VOLUME_RATIO_HIGH": f"{VOLUME_RATIO_BOUNDS[1]:g}",
-    "Z_INTEGER_TOLERANCE_PCT": f"{Z_INTEGER_TOLERANCE * 100:g}",
-    "Z_CHECK_SILENT_ABOVE": f"{0.5 / Z_INTEGER_TOLERANCE:g}",
+    "DENSITY_Z_TOLERANCE_PCT": f"{DENSITY_Z_TOLERANCE * 100:g}",
+    # two whole numbers fit a window of ±DENSITY_Z_TOLERANCE·Z once Z passes this
+    "DENSITY_Z_AMBIGUOUS_ABOVE": f"{0.5 / DENSITY_Z_TOLERANCE:g}",
     # How many example projects the wheel carries.  A *count* in prose is the
     # same class of stale number as a retuned threshold, and it rots the same
     # silent way: `using/first-refinement.md` said "Three" while the page's own
     # listing showed two, because a standard whose data may not ship in the
     # wheel leaves `list_examples()` and nothing reads the sentence again.
     "N_EXAMPLES": len(list_examples()),
+    # The (3+1)D counts the superspace chapter quotes (#682 review): the
+    # literature counts the tests pin, and how many printed symbols ITC-C
+    # spells differently from the Stokes 2011 § 5.2 convention.
+    "N_SUPERSPACE_GROUPS_D1": N_SUPERSPACE_GROUPS_D1,
+    "N_BRAVAIS_CLASSES_D1": N_BRAVAIS_CLASSES_D1,
+    "N_ITC_C_EXCEPTIONS": len(ITC_C_EXCEPTIONS),
+    # Stokes & Campbell 2022 Table 6's d = 1 magnetic count (WP-1992).
+    "N_MAGNETIC_SUPERSPACE_GROUPS_D1": N_MAGNETIC_SUPERSPACE_GROUPS_D1,
     # The `.rxt` document's own version and precision (WP-1009 asked for this
     # explicitly: a format bump that misses the manual must fail the docs
     # build).  `gui-power.md` states the grammar normatively, so both numbers

@@ -219,9 +219,11 @@ It is what `ProjectDoc.indexing` persists, so a run can be repeated from a store
 ### A volume window from the formula
 
 A formula says roughly how much room one formula unit takes in a crystal.
-`rietx.indexing.SearchSpec.from_formula` turns that into a volume window.
+`rietx.indexing.SearchSpec.from_formula` turns that into a volume ceiling.
 One formula unit's volume is the sum of Hofmann's average atomic volumes {cite}`hofmann2002`, from `rietx.crystallography.atomic_volume.formula_unit_volume`.
-The window holds `z` formula units, widened to the bounds {{ VOLUME_RATIO_LOW }} to {{ VOLUME_RATIO_HIGH }} on the ratio of observed to estimated volume, outside which about 1 % of the structures Hofmann fitted lie.
+The ceiling is `z` formula units times {{ VOLUME_RATIO_HIGH }}, the top of Hofmann's {{ VOLUME_RATIO_LOW }}-{{ VOLUME_RATIO_HIGH }} band on observed over estimated volume.
+That band is where he starts calling a structure unusual, not a measured error bound: about 1 % of his 182 239 structures lie past it, and the typical scatter is about 4 %.
+There is no floor, for any formula: an ionic or inorganic cell comes out far smaller than the estimate.
 
 ```python
 from rietx.crystallography.atomic_volume import formula_unit_volume
@@ -231,24 +233,30 @@ volume, esd = formula_unit_volume("C7H6O2")      # benzoic acid, at 298 K
 assert (round(volume, 2), round(esd, 2)) == (150.35, 0.93)
 
 spec = SearchSpec.from_formula("C7H6O2", z=(2, 8), max_d_axis=32.0)
-assert round(spec.min_volume, 2) == 240.56       # 2 x 150.35 x 0.8
 assert round(spec.max_volume, 2) == 1503.5       # 8 x 150.35 x 1.25
+assert spec.min_volume == 15.0                   # the default: no floor
 ```
 
 `z` counts formula units in the conventional cell: an integer, a `(min, max)` pair or `None`.
-`None` sets only the floor of one formula unit and leaves the ceiling to the quality report's envelope, because a formula says nothing about how many units the cell holds.
-The floor never drops below the 15 Å³ default.
-Every other `SearchSpec` field passes through as a keyword.
+Only the largest `z` sets the ceiling; a pair's minimum is ignored.
+With `z=None` the window narrows nothing, since a formula does not say how many units the cell holds.
+Every other field passes through, `min_volume` included.
 
-`from_formula` raises `ValueError` when `min_volume` or `max_volume` is passed beside the formula, for a `z` that is not a whole number of at least 1 with its minimum no larger than its maximum, when the formula's ceiling falls below the floor, and for a formula or temperature `formula_unit_volume` refuses.
+A formula is written as a chemist writes it, with brackets, `·` before water of crystallisation (`"CuSO4·5H2O"`) and decimal counts.
+A full stop that reads both as a decimal count and as a hydrate's dot is refused: `"CuSO4.5H2O"` could be 4.5 O or CuSO4 with 5 H2O, so `formula_unit_volume` raises `ValueError` naming `·`, whitespace before or inside the molecule included.
+That is a decimal count, with no leading zero in its fractional part, followed by a whole solvent molecule that ends the part: H2O, D2O, NH3, H2O2, HCl, CO2, CH3OH, CH4O, C2H5OH, C2H6O, CH3CN, C6H6 or C4H8O.
+Every other decimal count is read as written: `"Fe2.95O4"`, `"Ca9.5(PO4)6F2"`, `"Mg0.5SiO3"`.
+A molecule outside that list (`"ZnCl2.2C5H5N"`) reads as it did in 1.10.0 (2.2 Cl); write it with `·`.
+A spaced sum ending in a listed molecule after a decimal count is refused too (`"Mg1.5 H2 O"`).
 
-One crystal scatters about Hofmann's estimate by {{ VOLUME_SCATTER_PCT }} %, and the window is wider still, because a window that excludes the true cell makes the search return a wrong one.
-The volumes were fitted to organic and metal-organic crystals, and an ionic compound comes out too large, so the floor can exclude its cell.
+`from_formula` raises `ValueError` when `max_volume` is passed beside the formula, for a `z` that is not a whole number of at least 1 with its minimum no larger than its maximum, when the ceiling falls below the floor, and for a formula or temperature `formula_unit_volume` refuses.
 
-Passing `formula=` to `index_pattern` checks each candidate instead of narrowing the search.
-A cell whose volume holds a fractional number of formula units carries [`INDEX_Z_NOT_INTEGER`](diagnostics-indexing.md#index_z_not_integer), a warning whose `value` is the implied Z.
-It fires when the nearest whole number is more than {{ Z_INTEGER_TOLERANCE_PCT }} % away, twice one crystal's scatter, so it is silent above Z = {{ Z_CHECK_SILENT_ABOVE }}.
-The candidate keeps its rank and its grade.
+It holds every inorganic standard measured (0.38 to 0.87) and organic one (1.00 to 1.04).
+A framework whose formula leaves out its pore contents can sit above it, at 2.28 for one measured.
+
+`index_pattern(formula=)` records the formula units each candidate's volume holds, `CellCandidate.formula_units`, and moves no search or rank.
+No diagnostic judges it: a correct inorganic cell reads 0.4 to 0.9 of its Z, like a wrong Z.
+The true Z is at least `formula_units` / {{ VOLUME_RATIO_HIGH }}.
 [Volume from a formula](../theory/indexing.md#volume-from-a-formula) gives the estimate.
 
 ## The result object
@@ -269,6 +277,8 @@ It has no `cell` and no `best`: the only route to one cell is `IndexingResult.be
 | `IndexingResult.n_usable_lines` | the usable lines the answer is about |
 | `IndexingResult.wavelength` | the primary wavelength, Å |
 | `IndexingResult.preset` | the preset that set the ceiling, `"custom"` when your own `total_budget_seconds` did, or `None` on a result recorded before presets |
+| `IndexingResult.formula` | the `formula=` each candidate's `formula_units` was read against, or `None` when none was given (and on a result recorded before 1.11) |
+| `IndexingResult.temperature` | the temperature in K the volumes were read at, `None` whenever `formula` is |
 | `IndexingResult.provenance` | the package version and time, with every search setting in `Provenance.notes` |
 | `IndexingResult.thresholds_version` | which set of gates and vocabularies produced the grades, `rietx.schemas.indexing.INDEXING_THRESHOLDS_VERSION` at the time |
 | `IndexingResult.diagnostics` | the run-level findings |
@@ -307,6 +317,7 @@ Printing a result gives the run line, one block per candidate with its grade and
 | `CellCandidate.confidence` | `"high"`, `"medium"` or `"low"` |
 | `CellCandidate.confidence_caveats` | every reason it is not `"high"`, from a closed vocabulary |
 | `CellCandidate.diagnostics` | the findings about this candidate |
+| `CellCandidate.formula_units` | the formula units its volume holds by Hofmann's volumes, with `formula=`; otherwise `None` |
 
 `CellCandidate.to_cell` returns `cell` as a `Cell` with every parameter fixed, and the esds stay on `cell_esd`, since a `Parameter` carries none.
 `CellCandidate.fom_value` reads one panel member by name and returns `None` rather than raising, because which members exist depends on what the list could support.

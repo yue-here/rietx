@@ -461,6 +461,72 @@ neutron means of the *International Tables* Vol. C § 9.5 for neutron data
 (C–H 1.06–1.10 Å, N–H 1.009 Å, O–H 0.967 Å). A joint X-ray and neutron fit takes the
 neutron lengths, because the hydrogen signal is in the neutron histogram.
 
+## Distortion-mode amplitudes
+
+A child structure stated as its parent plus a displacement field
+(the phase's `distortion_modes` record) refines on the amplitudes of that field's
+symmetry-adapted modes, not on its coordinates. Each atom a mode moves sits at
+
+```{math}
+:label: par-modes
+
+\mathbf{x}_j \;=\; \mathbf{b}_j \;+\; \sum_\nu A_\nu\,\mathbf{v}_{\nu j},
+```
+
+{source}`rietx.crystallography.representation.distortion.displacive_statement`
+
+with $\mathbf{b}_j$ the parent-derived base position in child fractions and
+$\mathbf{v}_{\nu j}$ mode $\nu$'s displacement of atom $j$ per Å of amplitude,
+normalised so that $\sum \mathrm{mult}\,|\boldsymbol{\varepsilon}|^2 = 1$ over a
+primitive cell of the child lattice, in the parent's metric before any strain,
+$P^{\mathsf{T}} G_{\text{parent}} P$ {cite}`perezmato2010`. The row is affine,
+so it is a row of the parameter table's constraint block like a site-symmetry
+DOF's, with one difference: its constant is the base, never the stored
+coordinate. The amplitude is therefore absolute, as an anisotropic ADP is, and
+a rebuild reproduces the coordinate from the amplitudes alone. The modes are
+complete (one per free coordinate of the child), so an atom a mode moves has
+no coordinate DOF of its own.
+
+The parent structure is a stationary point of the fit. A parent operation $g$
+that the child lost maps it to a domain-related structure with the same powder pattern
+{cite}`perezmato2010`, so with $D(g)$ the action of $g$ on the amplitude vector,
+
+```{math}
+:label: par-modes-even
+
+\chi^2\bigl(D(g)\,\mathbf{A}\bigr) = \chi^2(\mathbf{A})
+\;\;\forall g \in G
+\quad\Longrightarrow\quad
+\nabla\chi^2(\mathbf{0}) \in \operatorname{Fix} D(G),
+```
+
+{source}`rietx.params.vector.ParameterTable`
+
+and the fixed subspace of $D(G)$ is the identity irrep's: the parent's own free
+coordinates. Every other amplitude has an exactly zero gradient at
+$\mathbf{A} = \mathbf{0}$, the whole block at once, and a fit started there
+moves only by its finite difference's step. The parameter table refuses to
+free such a block. {func}`~rietx.crystallography.representation.distortion.displacive_statement`
+seeds a child that sits at its parent with a vector of norm
+{{ DISTORTION_SEED }} Å in the span of the non-identity modes, along a
+direction whose stabiliser in $G$ is exactly the child's group $H$:
+
+```{math}
+:label: par-modes-seed
+
+\{\,g \in G : D(g)\,\mathbf{A}_{\text{seed}} = \mathbf{A}_{\text{seed}}\,\}
+\;=\; H .
+```
+
+{source}`rietx.crystallography.representation.distortion.DISTORTION_SEED`
+
+A seed along one basis mode can sit on a higher-symmetry sub-direction, which
+would leave every mode that sub-direction forbids at a stationary point of the
+residual symmetry. The first mode's sign is positive, which chooses one domain;
+the sign of a driving amplitude is a domain label and only the relative signs
+inside a basis are measured {cite}`perezmato2010`. A child that is already
+distorted starts at its own decomposition and is never re-seeded.
+
 ## Soft restraints
 
 A bond-length, angle or value restraint contributes one row to the residual
@@ -534,6 +600,56 @@ chained to the fractional coordinates through the Cartesian frame and to the
 cell through the metric. $P$ needs the two smallest eigenvalues apart: a set
 whose points lie on a line, or spread alike in every direction (a regular
 tetrahedron's corners), has no plane, and compiling it raises.
+
+A torsion restraint on a chain A–B–C–D contributes one row, the circular
+difference of its torsion angle φ from the target $\phi_0$. With
+$\mathbf{b}_1 = \mathbf{p}_B - \mathbf{p}_A$,
+$\mathbf{b}_2 = \mathbf{p}_C - \mathbf{p}_B$ and
+$\mathbf{b}_3 = \mathbf{p}_D - \mathbf{p}_C$ in Cartesian coordinates, and
+$\mathbf{n}_1 = \mathbf{b}_1 \times \mathbf{b}_2$,
+$\mathbf{n}_2 = \mathbf{b}_2 \times \mathbf{b}_3$,
+
+```{math}
+:label: par-torsion-restraint
+
+\phi = \operatorname{atan2}\!\big(|\mathbf{b}_2|\,\mathbf{b}_1\cdot\mathbf{n}_2,\;
+\mathbf{n}_1\cdot\mathbf{n}_2\big), \qquad
+r \;=\; \sqrt{w}\,\frac{\operatorname{atan2}\!\big(\sin(\phi - \phi_0),\,
+\cos(\phi - \phi_0)\big)}{\sigma} ,
+```
+
+{source}`rietx.model.restraints.restraint_residual`
+
+with φ positive when, looking along B → C, the bond B–A turns clockwise to
+eclipse C–D {cite}`klyne1960`, in (−180°, 180°]. The row is smooth wherever φ
+is, a target of 180° included: the difference has its cut opposite the
+target, not at ±180°. Its derivative is analytic through `atan2`
+{cite}`blondel1996`: with $L = |\mathbf{b}_2|$,
+$f_1 = \mathbf{b}_1\cdot\mathbf{b}_2/L^2$ and
+$f_3 = \mathbf{b}_3\cdot\mathbf{b}_2/L^2$,
+
+```{math}
+:label: par-torsion-restraint-derivative
+
+\frac{\partial\phi}{\partial\mathbf{p}_A} = -\frac{L\,\mathbf{n}_1}{|\mathbf{n}_1|^2},
+\quad
+\frac{\partial\phi}{\partial\mathbf{p}_D} = \frac{L\,\mathbf{n}_2}{|\mathbf{n}_2|^2},
+\quad
+\frac{\partial\phi}{\partial\mathbf{p}_B} = f_3\,\frac{\partial\phi}{\partial\mathbf{p}_D}
+- (1 + f_1)\,\frac{\partial\phi}{\partial\mathbf{p}_A},
+\quad
+\frac{\partial\phi}{\partial\mathbf{p}_C} = f_1\,\frac{\partial\phi}{\partial\mathbf{p}_A}
+- (1 + f_3)\,\frac{\partial\phi}{\partial\mathbf{p}_D} ,
+```
+
+{source}`rietx.model.restraints.restraint_partials`
+
+chained to the fractional coordinates and the cell as for a plane. A central
+difference of φ itself would straddle the ±180° cut at an anti chain and return
+a slope of order 360°/h. The torsion rows of the geometry table use the same
+two equations at $\sigma = w = 1$. A chain with a straight bond angle has
+$\mathbf{n}_1$ or $\mathbf{n}_2$ zero and no torsion, and compiling a
+restraint on one raises.
 
 ## Weighting the restraints
 

@@ -473,11 +473,42 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "Σ `n_modes` its free coordinates. `irrep` is this package's "
                 "small-irrep label: compare a published table on "
                 "`isotropy_group`. `distortion_basis` returns the modes alone, "
-                "per irrep. Provisional: refining them is a later WP-1419 chunk.",
+                "per irrep. To **refine** on them, `displacive_statement(parent, "
+                "child, (P, p))` returns the child with `Phase.distortion_modes`: "
+                "one absolute amplitude per mode (Å, "
+                "`phases.*.distortion_modes.modes.*.amplitude`), its atoms' "
+                "coordinates derived as base + Σ A·v, freed by "
+                "`mccusker_structural`'s coordinates stage. A child at its parent "
+                "is seeded (`DISTORTION_SEED`), since the gradient there is "
+                "exactly zero; the driving mode's sign is a domain label. Apply "
+                "its `biso_ties` with `Refinement.tie`. Provisional: the record "
+                "and the reported A_τ may still move.",
                 ("rietx.crystallography.representation.distortion.mode_amplitudes",
                  "rietx.crystallography.representation.distortion.ModeDecomposition",
                  "rietx.crystallography.representation.distortion.ModeAmplitude",
-                 "rietx.crystallography.representation.distortion.distortion_basis"),
+                 "rietx.crystallography.representation.distortion.distortion_basis",
+                 "rietx.crystallography.representation.distortion.displacive_statement",
+                 "rietx.crystallography.representation.distortion.DisplaciveStatement"),
+            ),
+            (
+                "What a fit on mode amplitudes reports",
+                "A fit of a phase carrying `Phase.distortion_modes` returns "
+                "`RefinementResult.distortion_totals`: one `DistortionTotal` per "
+                "irrep block (every mode of one irrep, k and isotropy group), "
+                "with A_τ in Å, its esd from the block's covariance (linearised; "
+                "undefined at A_τ = 0, Rice-biased below about 2 esd) and "
+                "Hotelling's T² with m and no p. "
+                "`ref.distortion_block_tests(data, hold=None, "
+                "detectability_bar=None, detectability_probe=None)` refits with each named block, or set of "
+                "blocks, held at 0 and returns ΔBIC at N/f², Λ and its p, both χ² "
+                "and, with a bar and your probe amplitude, A_det; a restricted fit below the full one "
+                "restarts the full fit and is recorded. Numbers only, no verdict; "
+                "readings in `references/magnetic.md`.",
+                ("rietx.schemas.results.DistortionTotal",
+                 "rietx.report.DistortionBlockTests",
+                 "rietx.report.DistortionBlockTest",
+                 "rietx.report.block_comparison",
+                 "rietx.report.detectability_amplitude"),
             ),
             (
                 "Displacive candidates of a parent",
@@ -511,17 +542,19 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
 #: ``tests/api_surface_deferred.txt`` defers them from the manual (WP-1805: no
 #: raised cap).  ``tests/test_skill.py`` holds every name here to a real field.
 TECHNIQUE_FIELDS: dict[str, frozenset[str]] = {
-    "rx.Phase": frozenset({"rigid_bodies"}),
+    "rx.Phase": frozenset({"rigid_bodies", "distortion_modes"}),
+    "rx.RefinementResult": frozenset({"distortion_totals"}),
     "rx.ParameterRow": frozenset({"body"}),
 }
 
 #: Union members a technique owns, elided from a field's rendered annotation
 #: for the same reason: ``Phase.restraints`` is an everyday field, but the
-#: tether, anti-bump and planarity kinds are the rigid-body track's, and their verbs get
-#: their own index in WP-1812 (WP-1809: no raised cap).  Deferred from the
-#: manual in ``tests/api_surface_deferred.txt`` meanwhile.
+#: tether, anti-bump, planarity and torsion kinds are the rigid-body track's,
+#: and their verbs get their own index in WP-1812 (WP-1809, WP-1815: no raised
+#: cap).  The manual documents them in the restraints guide.
 TECHNIQUE_MEMBERS: frozenset[str] = frozenset({"TetherRestraint", "AntiBumpRestraint",
-                                               "PlanarityRestraint"})
+                                               "PlanarityRestraint",
+                                               "TorsionRestraint"})
 
 HEADER = """# The API index
 

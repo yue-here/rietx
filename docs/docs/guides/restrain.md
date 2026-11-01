@@ -83,7 +83,18 @@ A fourth kind, `PlanarityRestraint`, holds four or more atoms to their least-squ
 `PlanarityRestraint.atoms` lists their positional indices, `PlanarityRestraint.sigma` is the uncertainty in ångströms and `PlanarityRestraint.weight` multiplies the rows.
 It adds one row per atom, √weight × d / σ, where d is that atom's signed distance from the plane, so it is order-free and has no target {eq}`par-planarity`.
 `PlanarityRestraint.op_indices` and `PlanarityRestraint.translations` give each listed atom's symmetry image, one entry per atom or none, for a ring that crosses a symmetry element.
-Leave them out and each atom takes the minimum image relative to the first.
+Leave them out and each atom takes the image nearest the centroid of the atoms listed before it, so a large plane stays inside one molecule.
+
+## Hold a torsion angle
+
+A fifth kind, `TorsionRestraint`, holds the torsion angle of a chain of four atoms near a target.
+`TorsionRestraint.atoms` lists the four positional indices in chain order, `TorsionRestraint.target_deg` is the target in degrees, `TorsionRestraint.sigma` the uncertainty in degrees and `TorsionRestraint.weight` multiplies the row.
+The row is √weight × Δ / σ, where Δ is the angle's circular difference from the target, wrapped into (−180°, 180°] {eq}`par-torsion-restraint`.
+So a target of 180° is as smooth as any other, and an angle of −179.9° is 0.1° from it.
+The sign is Klyne and Prelog's, the one `GeometryTorsion` reports, so a value read off the geometry table is a valid target.
+`TorsionRestraint.op_indices` and `TorsionRestraint.translations` give each atom's symmetry image, one entry per atom or none.
+Leave them out and each atom takes the image nearest the atom before it, so the chain follows its bonds.
+A chain with a straight bond angle has no torsion, and a restraint on one is refused when the stage compiles.
 
 ## Choose the symmetry image
 

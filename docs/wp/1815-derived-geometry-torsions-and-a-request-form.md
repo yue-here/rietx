@@ -1,6 +1,6 @@
 # WP-1815 — derived geometry: torsions, a request form, one table every writer reads
 
-Milestone: rigid-bodies · Status: ⬜
+Milestone: rigid-bodies · Status: 🔄 2026-11-01 — torsion rows, the request form and `TorsionRestraint` merged from outside as PR #1261 (`9c6ccf7d`); the CIF torsion loop and the skill row remain
 Depends on: 1804 (the derived block's local Jacobian, for body atoms)
 Priority: P3 2026-10-16 — a view over what the fit already knows; WP-1933's CIF torsion loop waits on it
 
@@ -75,6 +75,8 @@ Three rules the reporter measured, to keep:
 - Issues #759, #756.
 
 ## Handover log
+
+- **2026-11-01** (`/pr-review`) — merged from outside as PR #1261 (`9c6ccf7d`). `GeometryTable.torsions` holds a `GeometryTorsion` per torsion over bonded chains. Each has its angle in (-180°, 180°] and two esds. `GeometryRequest` is the request form. It is an argument and is never stored. `TorsionRestraint` joins the `Restraint` union, and `RestraintRow.kind` gains `"torsion"`. `torsions` defaults to `None`, so an older table reads "not listed", while `[]` means "listed, none found". Schema 0.60 carries a note. Three audit rows came with it, all tier 1 and held by the generality judge: `MAX_TORSIONS_PER_ATOM`, `_KEY_OFFSET` and `_TORSION_SIN2_FLOOR`. The branch was synced with main once before merge (the schema-history note, `9a7df4a5`). The PR does not build the CIF torsion loop, so that task stays open with WP-1933 waiting on it. It ticked nothing, and the first three task boxes are built and left for the maintainer. Follow-up, not blocking: `docs/skill/rietx/references/numbers.md:143` could say that `torsions` is `None` on a reopened pre-0.60 result. What ran: the PR was replayed in a stack with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green. `main` now equals that tree.
 
 - **2026-10-16** — created, from the 2026-10-16 issue triage (issue #759).
   The maintainer took the triage's recommendation: this WP first, WP-1814

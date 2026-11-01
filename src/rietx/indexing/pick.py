@@ -44,7 +44,7 @@ from ..schemas.indexing import (
 from ..schemas.instrument import Instrument
 from ..schemas.pattern import PatternData, require_two_theta
 from ..strategy.staged import BOUND_HIT_RTOL
-from .diagnostics import peak_diagnostics
+from .diagnostics import peak_diagnostics, picked_undeclared
 from .peakfit import GroupFit, fit_group, fit_group_at, reseed_candidate
 from .peaks import Detection, FdrScreen, PeakGroup, detect_peaks, fdr_screen, group_at
 
@@ -104,7 +104,7 @@ def pick_peaks_with_state(data: PatternData, instrument: Instrument, *,
         peaks=peaks, wavelength=lam0,
         two_theta_min=float(det.two_theta[0]),
         two_theta_max=float(det.two_theta[-1]),
-        source="fitted")
+        source="fitted", instrument_undeclared=picked_undeclared(instrument))
     return pl.model_copy(update={
         "diagnostics": peak_diagnostics(pl, det)}), det, fits
 
@@ -196,7 +196,7 @@ def fit_peaks(data: PatternData, instrument: Instrument,
         peaks=peaks, wavelength=lam0,
         two_theta_min=float(det.two_theta[0]),
         two_theta_max=float(det.two_theta[-1]),
-        source="fitted")
+        source="fitted", instrument_undeclared=picked_undeclared(instrument))
     # PEAK_LIST_TOO_SHORT is a statement about indexing a pattern, and
     # PEAK_EXPECTED_FALSE_LINES one about detecting in it; here the count and
     # the positions are the caller's own argument rather than anything the

@@ -558,6 +558,8 @@ def test_the_contact_cap_note_counts_exactly_what_it_dropped(monkeypatch):
     """
     import re
 
+    # the torsion cap's own note is test_the_torsion_cap_... (WP-1815)'s
+    monkeypatch.setattr(geom, "MAX_TORSIONS_PER_ATOM", 10 ** 6)
     monkeypatch.setattr(geom, "MAX_CONTACTS_PER_ATOM", 10 ** 6)
     full, *_ = _table_for(corundum_phase())
     assert not full.notes
@@ -595,7 +597,9 @@ def test_a_bond_past_the_contact_radius_is_found():
     g, *_ = _table_for(phase)
     assert _distances(g, "Cs", "Cl") == [3.5706] * 8
     assert _distances(g, "Cl", "Cs") == [3.5706] * 8
-    assert g.contacts == [] and not g.notes
+    # no contact note; the eight-fold Cs–Cl chains are over the torsion cap
+    # (WP-1815), which notes say in their own words
+    assert g.contacts == [] and not [n for n in g.notes if "contact" in n]
     assert len([a for a in g.angles if a.atom_2 == "Cs"]) == 28
 
 

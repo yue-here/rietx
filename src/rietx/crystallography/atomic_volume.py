@@ -50,7 +50,11 @@ V_obs/V_est from 0.8 to 1.25 (Table 3's caption defines the lower edge).
 1746 of the 182 239 structures lie beyond it.  737 of those are off by more
 than 75 %, mainly because the database's Z was wrong.  A search window must not
 exclude the true cell, so it takes this wide boundary rather than the 4 %
-scatter.
+scatter, and only its **upper** edge: an inorganic cell lies under 0.8 (15 of
+the 16 measured), so the lower edge would exclude the truth.  The search
+(``SearchSpec.from_formula``) and ``Composition.check`` use the ceiling alone;
+the lower edge is quoted by ``Composition.volume_window`` for a caller who
+knows the specimen is organic.
 """
 
 from __future__ import annotations
@@ -105,18 +109,55 @@ VOLUME_RATIO_BOUNDS = (0.8, 1.25)
 
 _TOKEN = re.compile(r"([A-Z][a-z]?)|([(\[])|([)\]])|(\d+(?:\.\d+)?)|(\s+)")
 _LEADING_COUNT = re.compile(r"\s*(\d+(?:\.\d+)?)")
+#: The molecules a full-stop adduct names: the solvents and ligands of a
+#: crystallisation, written as the formula of one molecule.  A hydrate's dot is
+#: ``X.nH2O`` for these.  Chemists write it for others too (``ZnCl2.2C5H5N``,
+#: the pyridine, DMF and DMSO solvates), and those still read one way here, as
+#: main's parser reads them: the refusal covers this list and claims no more.
+_ADDUCT_MOLECULES = ("H2O", "D2O", "NH3", "H2O2", "HCl", "CO2", "CH3OH", "CH4O",
+                     "C2H5OH", "C2H6O", "CH3CN", "C6H6", "C4H8O")
+
+
+def _spaced(molecule: str) -> str:
+    """``molecule`` as a pattern that tolerates whitespace between its element
+    tokens (``H2 O``), so a spaced copy of the same string is the same string."""
+    return r"\s*".join(re.findall(r"[A-Z][a-z]?\d*", molecule))
+
+
+#: A count ``n.m`` straight after an element or a bracket, with ``n`` not zero,
+#: whose ``m`` can be an adduct count (no leading zero: nobody writes ``05H2O``)
+#: and is followed, past any whitespace (spaces, tabs, a non-breaking space
+#: from a PDF), by a whole adduct molecule that ends the part
+#: (``CuSO4.5H2O``, ``CuSO4.5 H2O``, ``CuSO4.5  H2 O``).  The string reads two
+#: ways: the decimal count n.m, or n of the first part and m of the adduct.
+#: Both are grammatical and they differ, so the formula is refused.  Every other
+#: decimal reads one way: ``Fe2.95O4``, ``Li1.05Mn1.95O4`` and ``Ca9.5(PO4)6F2``
+#: are doped oxides, and ``n = 0`` (``Mg0.5SiO3``) writes no count of zero.
+_DOT_TWO_WAYS = re.compile(
+    r"(?<=[A-Za-z)\]])(\d+)\.([1-9]\d*)(?=\s*(?:"
+    + "|".join(_spaced(m) for m in _ADDUCT_MOLECULES)
+    + r")\s*(?:[·•*]|$))")
+
+
+#: Isotope symbols a formula may write, and the element whose volume each takes.
+#: Hofmann's table is per element: deuterium is hydrogen, and a deuterated
+#: formula (``C6D6``, the ``D2O`` of :data:`_ADDUCT_MOLECULES`) counts its D
+#: as H.
+_ISOTOPES = {"D": "H"}
 
 
 def _element(symbol: str, formula: str) -> str:
     if symbol in HOFMANN_VOLUMES:
         return symbol
+    if symbol in _ISOTOPES:
+        return _ISOTOPES[symbol]
     if symbol in _NO_VOLUME:
         raise ValueError(f"{formula!r}: Hofmann (2002) gives no average volume "
                          f"for {symbol}, so this formula has no estimate")
     raise ValueError(f"{formula!r}: {symbol!r} is not an element symbol")
 
 
-def _parse_part(part: str, formula: str) -> dict[str, float]:
+def _parse_part(part: str, formula: str, element=None) -> dict[str, float]:
     stack: list[dict[str, float]] = [{}]
     last: dict[str, float] | None = None
     pos = 0
@@ -127,7 +168,7 @@ def _parse_part(part: str, formula: str) -> dict[str, float]:
         pos = m.end()
         symbol, opening, closing, count, _space = m.groups()
         if symbol:
-            el = _element(symbol, formula)
+            el = (element or _element)(symbol, formula)
             stack[-1][el] = stack[-1].get(el, 0.0) + 1.0
             last = {el: 1.0}
         elif opening:
@@ -151,9 +192,16 @@ def _parse_part(part: str, formula: str) -> dict[str, float]:
     return stack[0]
 
 
-def _parse_formula(formula: str) -> dict[str, float]:
+def _parse_formula(formula: str, element=None) -> dict[str, float]:
     """Element counts of a chemical formula; the grammar is in
-    :func:`formula_unit_volume`."""
+    :func:`formula_unit_volume`.  ``element`` checks each symbol (default: an
+    element Hofmann's table has a volume for)."""
+    for m in _DOT_TWO_WAYS.finditer(formula):
+        if int(m.group(1)) != 0:
+            raise ValueError(
+                f"{formula!r} reads two ways: the count {m.group(0)}, or the "
+                f"adduct {formula[:m.end(1)]} · {formula[m.start(2):]}. Write "
+                "an adduct with '·' (\"CuSO4·5H2O\")")
     counts: dict[str, float] = {}
     for part in re.split(r"[·•*]", formula):
         m = _LEADING_COUNT.match(part)
@@ -161,12 +209,31 @@ def _parse_formula(formula: str) -> dict[str, float]:
         body = part[m.end():] if m else part
         if not body.strip():
             raise ValueError(f"{formula!r}: an empty part")
-        for el, n in _parse_part(body, formula).items():
+        for el, n in _parse_part(body, formula, element).items():
             counts[el] = counts.get(el, 0.0) + factor * n
     counts = {el: n for el, n in counts.items() if n != 0.0}
     if not counts or any(n < 0.0 for n in counts.values()):
         raise ValueError(f"{formula!r} holds no positive element count")
     return counts
+
+
+def _any_element(symbol: str, formula: str) -> str:
+    import gemmi
+
+    if gemmi.Element(symbol).atomic_number > 0 and gemmi.Element(symbol).name == symbol:
+        return symbol
+    raise ValueError(f"{formula!r}: {symbol!r} is not an element symbol")
+
+
+def formula_counts(formula: str) -> dict[str, float]:
+    """Element counts of a chemical formula, for any element gemmi knows.
+
+    The grammar of :func:`formula_unit_volume` (brackets, ``·`` adducts,
+    decimal counts, spaces ignored), without its restriction to the elements
+    Hofmann (2002) gives a volume for: a count needs no volume.  A symbol that
+    is not an element raises naming it.
+    """
+    return _parse_formula(formula, _any_element)
 
 
 def formula_unit_volume(formula: str,
@@ -180,8 +247,14 @@ def formula_unit_volume(formula: str,
     ``formula`` is written as a chemist writes it (``"C7H6O2"``).  Spaces are
     ignored, so a CIF ``_chemical_formula_sum`` (``"C7 H6 O2"``) reads too.
     Brackets take a count, ``·`` or ``*`` joins an adduct with an optional
-    leading count (``"CuSO4·5H2O"``), and counts may be decimal.  A symbol that
-    is not an element, or one the table has no volume for, raises naming it.  The esd is
+    leading count (``"CuSO4·5H2O"``), and counts may be decimal.  A full stop
+    that reads both as a decimal count and as a hydrate's dot raises, naming
+    ``·`` (``"CuSO4.5H2O"``: 4.5 O, or CuSO4 with 5 H2O); that is a count
+    followed by a whole solvent molecule (:data:`_ADDUCT_MOLECULES`), with any
+    whitespace or none before it or inside it.  Every other decimal count reads one way (``"Fe2.95O4"``,
+    ``"Li1.05Mn1.95O4"``, ``"Mg0.5SiO3"``).  A symbol that
+    is not an element, or one the table has no volume for, raises naming it; ``D``
+    reads as H (``"C6D6"``).  The esd is
     eq. (13)'s: the table's mean errors summed as Σ nᵢ Δvᵢ, and the expansion
     coefficient's error in quadrature, measured from the 298 K the table is
     quoted at.  It is ``None`` when an element has no mean error (Ac, Am).
@@ -191,8 +264,9 @@ def formula_unit_volume(formula: str,
     candidate cell must use.  The module docstring has both, the temperature
     reading and the scope: organic and metal-organic crystals.
     """
-    if not temperature > 0.0:
-        raise ValueError(f"temperature must be positive kelvin, got {temperature!r}")
+    if not (math.isfinite(temperature) and temperature > 0.0):
+        raise ValueError(f"temperature must be a positive, finite number of kelvin, "
+                         f"got {temperature!r}")
     counts = _parse_formula(formula)
     a, t0 = THERMAL_EXPANSION, TABLE_TEMPERATURE
     tabulated = sum(n * HOFMANN_VOLUMES[el][0] for el, n in counts.items())
@@ -208,4 +282,4 @@ def formula_unit_volume(formula: str,
 
 __all__ = ["HOFMANN_VOLUMES", "TABLE_TEMPERATURE", "THERMAL_EXPANSION",
            "THERMAL_EXPANSION_ESD", "VOLUME_RATIO_BOUNDS", "VOLUME_SCATTER",
-           "formula_unit_volume"]
+           "formula_counts", "formula_unit_volume"]

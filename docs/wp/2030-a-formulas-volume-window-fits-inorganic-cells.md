@@ -1,6 +1,6 @@
 # WP-2030 — A formula's volume window fits inorganic cells, and a hydrate parses
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-01 — part 1 merged from outside as PR #1123 (`a1ce786c`), its follow-ups as PR #1253 (`349ec37b`) and part 2 (the ceiling-only window) as PR #1237 (`4505cbaf`); the GUI formula field and the stale `duplicate_line` marks remain, and #1121 stays open for them
 Track: Data and metadata in, a structure out
 Depends on: — (1510 soft, closed 2026-10-23: the window, the Z check and the review findings this carries)
 Priority: P2 2026-10-23 — a defect that fires wrongly: the skill sends an agent through `SearchSpec.from_formula` before its first search, and the window excludes the true cell of 7 of 8 inorganic solids measured (fluorapatite abstained where the unwindowed search ranked the truth first); indexing is a path few fits run
@@ -144,37 +144,37 @@ to the table arrives tiered (CI's `tests/audit_delta.py`).
 
 ## Tasks
 
-- [ ] Re-measure the table above on this tree, at the true z and at
+- [x] Re-measure the table above on this tree, at the true z and at
       `z=None`, adding any inorganic standard in `tests/data/` it lacks.
       Pin it in `tests/test_indexing_formula.py`.
-- [ ] Decide the inorganic rule from that measurement. Candidates: a
+- [x] Decide the inorganic rule from that measurement. Candidates: a
       ceiling-only window outside Hofmann's population, since every measured
       miss is an overestimate; a cited inorganic volume source; or the window
       kept with a warning. Record the choice, the rejected options and why in
       the handover. Test that every measured true cell lies inside its window.
-- [ ] `INDEX_Z_NOT_INTEGER`: silent on every measured true cell, still firing
+- [x] (withdrawn, not met: no test can do both; see the 2026-10-30 entry) `INDEX_Z_NOT_INTEGER`: silent on every measured true cell, still firing
       on an injected cell of non-integer Z.
-- [ ] Fluorapatite: `from_formula("Ca5P3O12F", z=2)` holds the 523.6 Å³ cell,
+- [x] Fluorapatite: `from_formula("Ca5P3O12F", z=2)` holds the 523.6 Å³ cell,
       and the windowed search on `FAP.XRA` ranks it where the unwindowed one
       does.
-- [ ] Hydrate: `CuSO4.5H2O` is refused, naming `·`, or read as a hydrate.
+- [x] Hydrate: `CuSO4.5H2O` is refused, naming `·`, or read as a hydrate.
       `Mg0.5SiO3` still reads 0.5 Mg and `CuSO4·5H2O` is unchanged. Test all
       three.
 - [ ] `formula` and `temperature` recorded on `IndexingResult`, with the
       writer named (root CLAUDE.md: a declared name is a claim). `formula`
       reaches the CLI and the GUI's indexing call.
-- [ ] The instrument-first lead fires only on a lab source. Decide whether
+- [x] The instrument-first lead fires only on a lab source. Decide whether
       `PeakList` records its instrument so `index_pattern(peaks)` sees the
       lead. Test both.
-- [ ] Supercell: judge the parent's lines with the parent's own shift. Replay
+- [x] Supercell (superseded by #941, dropped from this PR; see item 6 of the 2026-10-23 entry): judge the parent's lines with the parent's own shift. Replay
       the captured searches and run the indexing acceptance. Then write or
       decline the supported-promotion rule in `src/rietx/indexing/CLAUDE.md`.
 - [ ] GUI: fix the stale `duplicate_line` marks or decline them, with the
       reason in the handover.
-- [ ] Audit rows for every value changed or name added (tiers above).
-- [ ] Manual: `docs/docs/theory/indexing.md` and `reference/indexing.md`
+- [x] Audit rows for every value changed or name added (tiers above).
+- [x] Manual: `docs/docs/theory/indexing.md` and `reference/indexing.md`
       state the window's scope; a staged release note.
-- [ ] Skill: § 7d and `abstention.md` say when the window applies. Stay
+- [x] Skill: § 7d and `abstention.md` say when the window applies. Stay
       inside `tests/skill_caps.py`'s budget and re-sync the copies
       (`rietx skill --install . --copy`).
 
@@ -203,9 +203,150 @@ unwindowed one does, and `CuSO4.5H2O` never reads as 4.5 O.
   3609–3620. Formula-unit volumes from ion volumes.
 - WP-1510 (closed 2026-10-23): the window, the Z check, the review findings.
   WP-1986's 2026-10-18 entry: the measurement above.
+- #1121: the claim, and the plan of two PRs (the measurement and the fixes
+  that need no ruling, then the window rule once it is chosen).
 
 ## Handover log
 
+- **2026-11-01** (`/pr-review`) — part 2 merged from outside as PR #1237 (`4505cbaf`), adding to the contributor's own 2026-10-30 entry and ticks, which stand as written. The formula's volume window is a ceiling only (Hofmann 2002, factor 1.25), and `VOLUME_RATIO_BOUNDS` is tier 2. `INDEX_Z_NOT_INTEGER` and `Z_INTEGER_TOLERANCE` are deleted. The test fired on true inorganic cells, whose ratio to the estimate runs 0.38 to 0.87, and the number survives as `formula_units`. `solve.chemistry` applies the ceiling too. The 2026-10-30 entry says `in_volume_window` "reads both edges" of the band. That was true when it was written and is not true now. The `Status:` line no longer says "claimed by @mustachefeeling", since part 2 landed. Issue #1121 stays open. The file's tasks leave two things for it: the GUI half of the `formula` task, which waits on the maintainer's choice between an `IndexingControls` field and a project-document field, and the stale `duplicate_line` marks. Closing #1121 is the maintainer's. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
+
+- **2026-10-31** (`/pr-review`) — #1123's follow-ups merged from outside as PR #1253 (`349ec37b`), three `WP-2030:` commits, after one round. Built from the round 1 to 3 lists: (a) `_audit.RECORD_SCHEMAS` walks `IndexingResult` and `PeakList`. `PeakList.instrument_undeclared` is an action row at tier 1, and the other 23 fields sit in `OTHER_RECORD_FIELDS`. The review held the row at tier 1, since it records only whether the geometry and profile blocks equal their defaults, on a source `lab_source` identifies as a lab tube. `CellCandidate`, which holds `LeBailValidation.mode`, is not walked, because the walk does not recurse into list fields. WP-2007 § Inherited leaves bringing the indexing schemas into the walk to the maintainer, so this is early. (b) `rietx index` refuses a formula it cannot read and a temperature that is not a positive finite number of kelvin as a usage error (exit 2, no traceback), before it reads the pattern. `--temperature` without `--formula` is refused. A run with no temperature still hands `index_pattern` 298 K. (c) `KNOWN_CELLS` reads each cell from its source. Halite comes from COD 9003308 (a = 5.6401 Å at 298.15 K; 5.6402 Å could not be sourced) and benzoic acid from COD 7252065, each vendored with a `tests/data/README.md` row. Si and corundum read the certificate's 22.5 °C (295.65 K). Nine rows import `indexing_gallery.TRUTHS` and four read their vendored CIFs. No pinned ratio moves past its 5e-4 bar (Si 0.53689 → 0.53701, corundum 0.37468 → 0.37476, halite 0.86595 → 0.86590). (d) `D` reads as H, so `C6D6`, `CD3OD` and `CuSO4·5D2O` read as their H forms, and `CuSO4.5D2O` is still refused as two-way. `temperature=inf` is refused in `formula_unit_volume` and `SearchSpec.from_formula`. Item (e), a solvate off the 13-molecule list (`ZnCl2.2C5H5N`) reading as a decimal, was left as is, with no issue opened. Round 3's line on the spaced sum (`"Mg1.5 H2 O"`) is in #1237, part 2, which is open. #1253 and #1237 touch adjacent hunks in `tests/test_indexing_formula.py` (the `KNOWN_CELLS` block above `MEASURED`) and `src/rietx/cli.py` (the `--formula` help), so the second to merge may need a hand merge. 15 of the 16 new cases in `tests/test_indexing_formula_input.py` fail on main's `src`. `tests.audit_delta` reports 1 added, 0 new at `unaudited`, no tier-3 row. No task is ticked. "Audit rows for every value changed or name added" gains one row and stays open. Still open: the window rule (#1121), the Z check, fluorapatite, the GUI half of `formula`, the `duplicate_line` marks, the manual's scope sentences and the skill. Gate (the six PRs of this round merged together onto main `766c3505d`; macOS arm64, `[dev,jax]`, Python 3.12): fast 12 884 passed, 223 skipped, 32 xfailed; slow 435 passed, 18 skipped, 16 xfailed, with one GUI-boot socket timeout under load that passed alone in 5 s; ruff and the `-W` manual build clean.
+
+- **2026-10-30** (`/pr-review`) — part 1 merged from outside as PR #1123 (`a1ce786c`) after three rounds. The contributor's ticks, `Status:` decisions and the 2026-10-23 entry stand as written (ruled 2026-10-29), so this entry adds the merge record. Round 3 accepted `lab_lines()` matching Kα1, Kα2 and the weighted mean, so 1.5418 Å and 0.71073 Å read as lab sources. It withdrew the schema-number item: 0.60 stays, because `schemas/common.py` keeps main's number for a PR rebased over a bump. `027aacae` shortens the formula paragraph of `reference/indexing.md` to fit its twin cap. One gotcha is left, not blocking. With `\s*` allowed inside an adduct, a spaced CIF sum whose fractional count is followed by exactly an adduct's atoms at the end of the part (`"Mg1.5 H2 O"`) now refuses as two-way, where 1.10.0 read it one way. The refusal names its cause and such a sum is unlikely in a real file, so the regex stays. A line in the manual's spaced-sum sentence would stop it reading as a promise. The GUI half of the `formula` task is still open, as the 2026-10-23 entry says. Part 2 waits on the window rule (#1121). Gate (a stack of eleven PRs on main `b40bc994`, tree `307eff83`; macOS arm64, `[dev,jax]`, Python 3.12): 13 217 passed, 216 skipped, 48 xfailed, 0 failed, with ruff, the `-W` manual build and the GUI ladder green.
+
+- **2026-10-30** — Part 2 of 2 (#1121): the window rule the maintainer chose
+  on 2026-10-24 ("Option A, for every formula"), and what rests on it.
+
+  *Decided (the maintainer, #1121).* A ceiling only, for every formula, tier
+  2. Rejected: Jenkins et al. (1999) ion volumes (calibrated for lattice
+  energies through a cube root; cation volumes for Li-Cs and Mg-Ba only; the
+  oxide ion alone, 43 ± 15 Å³, exceeds the formula-unit volume of every dense
+  oxide measured), a floor kept for carbon-bearing formulas (calcite 0.659
+  and aragonite 0.610 would fall below it; Hofmann's own Table 3 lists metal
+  formates at 0.75-0.78), and the window kept with a warning (it holds 1 of
+  16 inorganic cells).
+
+  *Done.* (1) `SearchSpec.from_formula` sets `max_volume` = z × V_est × 1.25
+  and leaves `min_volume` at the 15 Å³ default (a caller may pass one); with
+  `z=None` it narrows nothing. All 16 inorganic and 4 organic known cells lie
+  inside their window (a test per cell); HKUST-1 (2.283) does not.
+  `VOLUME_RATIO_BOUNDS` is tier 2. (2) Hofmann's band is worded as he means
+  it in the docstrings and the manual: where he starts calling a structure
+  unusual, about 1 % of the CSD past it (1746 of 182 239), typical scatter
+  about 4 % (Fig. 1). (3) *The Z check (task 3), not met and withdrawn.*
+  Against Hofmann's Table 3 a correct inorganic cell looks like a wrong Z:
+  nine of the 16 sit below 0.57, his class (i). With no floor the volume
+  bounds Z from one side only (Z ≥ V/(1.25 V_est)), so no whole-number test
+  can be silent on true cells and fire on a wrong one, for any formula.
+  `INDEX_Z_NOT_INTEGER`, `Z_INTEGER_TOLERANCE` and their rows are gone; the
+  number is recorded as `CellCandidate.formula_units`, and
+  `index_pattern:formula` is tier caller. This is not WP-2033's scope (its
+  Non-goals name the search's Z check as 2030's). (4) Fluorapatite:
+  `from_formula("Ca5P3O12F", z=2)` holds the 523.6 Å³ cell (fast test), and a
+  slow acceptance row checks the windowed `FAP.XRA` search ranks it where the
+  hand-ceilinged one does. (5) Skill § 7d and `abstention.md` say the window
+  is a ceiling, `z=None` narrows nothing, `formula_units` is not grounds to
+  drop a cell, and a framework without its pore contents sits above the
+  ceiling (HKUST-1 2.28; `SiO2` meets it at FAU's framework density, 13.3 T
+  per 1000 Å³ in the IZA database, so a less dense framework lies above).
+  (6) `docs/practice.md`: GSAS-II 5.8.4 and DICVOL06 take the volume range
+  from the user; neither estimates it from a formula.
+
+  *Measured* (pearl, one pinned core per arm, preset full, monoclinic only,
+  `max_d_axis` 20 Å, 900 s per engine × system; every search was cut by that
+  budget, so a rank is what the search reached in it). Truth rank, window
+  (floor and ceiling) / ceiling / no volume: bethanechol set E 1 / 1 / 1, set
+  Aa not found in any arm, paracetamol (exact positions from COD 2104364's
+  cell, 36 lines) 1 / 1 / 1. CPU: E 1807 / 1869 / 2035 s, Aa 1024 / 1069 /
+  1963 s, paracetamol 1531 / 1833 / 2154 s (pearl's load varied 8-40 during
+  the runs).
+
+  *Not done, for a part 3.* `formula` in the GUI's indexing call (half of
+  task 6): `tests/test_search_controls.py` files `formula` and `temperature`
+  as call-time inputs, the specimen's chemistry, so a form field means
+  either an `IndexingControls` field or a project-document field, a choice
+  for the maintainer. The stale `duplicate_line` marks (task 9): not
+  attempted. `solve.chemistry`'s `in_volume_window` still reads both edges
+  of the band, so it reads `False` on a true inorganic cell; it is a
+  reported flag in the solve path, outside this WP.
+
+- **2026-10-23** — Part 1 of 2 (#1121): the measurement, and the fixes that
+  need no ruling. The window holds the true cell of 1 of 16 inorganic solids
+  and 4 of 5 organic or metal-organic ones; the window rule is the
+  maintainer's choice, set out on #1121 with these numbers. A hydrate written
+  with a full stop is refused, the result records its formula, the
+  instrument lead reads the declared source. (The supercell item was
+  superseded by #941 on rebase.)
+
+  *Done.* (1) `tests/test_indexing_formula.py` pins 21 known cells, each
+  with its source: 16 inorganic (the NIST certificates for LaB6, Si and
+  corundum; NAC, fluorapatite, the five round-robin minerals, cBN, three
+  GSAS-II tutorial cells and COD's YBCO; halite's 5.6402 Å) and 5 organic
+  or metal-organic (paracetamol, benzoic acid from COD 7252065, bethanechol
+  chloride, HKUST-1, a hybrid iodide). V_obs/V_est: 0.375-0.649 on 15
+  inorganic cells, halite 0.866; 1.000-1.044 on four organic ones, HKUST-1
+  2.283 (its formula leaves the pores' contents out, Hofmann § 3 (ii)). The
+  window at the true Z holds halite and the four; at `z=None` the floor of
+  one formula unit still excludes the three Z = 1 cells (LaB6, brucite,
+  YBCO). **The Context table's NAC row uses z = 8; COD 1000236 gives Z = 4**,
+  so its midpoint ratio is 1.61, not 3.22, and the cell is still outside.
+  (2) `INDEX_Z_NOT_INTEGER` fires on 12 of the 16 inorganic true cells and
+  is silent on every organic one; the four it spares imply the wrong whole
+  number (Si 4.30 for 8). (3) `formula_unit_volume` refuses a full stop
+  that reads both as a decimal count and as a hydrate's dot, naming `·`
+  (tier 1: refusing an ambiguous string rather than guessing). What is refused is a
+  decimal count of 1 or more straight after an element or a bracket and
+  followed, past any whitespace, by one of the 13 adduct molecules that ends
+  the part. Every other decimal reads as 1.10.0 read it: `Mg0.5SiO3`,
+  `CuSO4·5H2O`, a spaced CIF formula and the doped oxides `Fe2.95O4`,
+  `Li1.05Mn1.95O4` and `Ca9.5(PO4)6F2` are unchanged. A solvate whose molecule
+  is not on the list (`ZnCl2.2C5H5N`) still reads as a decimal, as it did. (4) `IndexingResult.formula` and `.temperature`, written
+  by `index_pattern` on both its paths (`None` with no formula), and
+  `rietx index --formula --temperature`. (5) `diagnostics.lab_source` reads
+  the declared source: a Kα doublet, or one line within 5e-4 Å of an
+  anode's Kα1, Kα2 or weighted mean (`radiation=`'s value, GSAS-II's six
+  decimals, a vendor header's 1.5418). The instrument lead fires only there. `PeakList` records the
+  undeclared blocks (`instrument_undeclared`, written by `pick_peaks` and
+  `fit_peaks`) rather than the whole instrument, and the record outranks
+  an instrument handed in later. (6) *Dropped on the 2026-10-25 rebase:* the supercell change
+  (`supercell_chance(parent_q_obs=)`) is not in this PR. C3 (#941) rewrote
+  `consensus.supercell_checks` to ask containment on `screen_for`, which
+  scores every candidate on its own `scored_positions`, so the parent is
+  already read on its own shift correction. One audit row was owed and is
+  there: `LAB_LINE_TOLERANCE_ANGSTROM` (tier 1, arithmetic: the six anodes'
+  lines are at least 0.14 Å apart, so 5e-4 Å names one anode at most). The
+  other new names are record fields on `IndexingResult` and `PeakList`,
+  which `_audit.RECORD_SCHEMAS` does not walk, so the table cannot see them
+  and "no row owed" there shows only that.
+
+  *Measured* (own `[dev]` venv, macOS arm64, pearl offline). On the
+  supercell change this PR dropped on the 2026-10-25 rebase, a replay of the
+  22 consensus calls the indexing acceptance makes (100 parent-child pairs,
+  20 candidates carrying a shift) moved no count, verdict or order; that
+  measures the dropped change, and this PR touches no consensus code.
+  `tests/test_acceptance_indexing.py`: 44 passed in 14:44, on the tree before
+  the rebase. Fluorapatite on
+  `FAP.XRA` (hexagonal and trigonal, preset full, the acceptance row's
+  budgets): unwindowed 157 s, truth ranked 1; the shipped window
+  (738-1153 Å³) 28 s, truth absent, the 1050 Å³ cells lead; a ceiling alone
+  (15-1153 Å³) 36 s, truth ranked 1. Bethanechol sets Aa and E (monoclinic,
+  20 Å axes, default budgets, every search budget-truncated): the window
+  took 70 and 76 s, the ceiling alone 89 and 95 s, no volume 97 and 111 s;
+  set E ranked the truth 8th windowed and 1st in both others, Aa nowhere.
+
+  *Not done, for part 2.* The window rule (task 2) and what rests on it:
+  the Z check (task 3; no tolerance silences it on every measured true cell
+  and still fires on an injected Z = 2.5, since LaB6 and YBCO sit 48 % from
+  1, so it needs the same population test the window does), the
+  fluorapatite task (4), the audit rows the rule adds (10), the manual's
+  scope sentences (11) and the skill (12). `formula` in the GUI's indexing
+  call (half of task 6): it needs an `IndexingControls` field, so the form,
+  its vitest corpus and a rebuilt dist, which belongs with task 9's GUI
+  work. The stale `duplicate_line` marks (9): not attempted. Hofmann (2002)
+  is not on this machine (the corpus path above is the maintainer's) and
+  Jenkins et al. (1999) is closed; neither was read here.
+
+  *Next.* The maintainer's choice of window rule on #1121, then part 2.
 - **2026-10-23** — created by WP-1510's close, from its `### Inherited`
   (WP-1986's window measurement, 2026-10-18) and the review findings its
   2026-10-03 entries left open. No open WP owned `from_formula`, Hofmann, a

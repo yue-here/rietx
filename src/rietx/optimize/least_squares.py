@@ -91,6 +91,8 @@ DEFAULT_SOLVER = "lm"
 #: ADPs (``adp``, tied to the six U^ij).  Both get analytic columns that chain
 #: the structure-factor derivative through the site's constraint directions.
 _STRUCTURAL_PATH = re.compile(r"^phases\.(\d+)\.atoms\.(\d+)\.(dof|adp)\.\d+$")
+#: a moment DOF, with its phase, atom and DOF index (WP-1327's analytic branch)
+_MOMENT_PATH = re.compile(r"^phases\.(\d+)\.atoms\.(\d+)\.moment\.dof(\d+)$")
 #: March-Dollase coefficient — an analytic intensity-multiplier column
 #: (``po_intensity_grad``), not the peak-chain FD path.
 _PO_PATH = re.compile(r"^phases\.(\d+)\.preferred_orientation\.r$")
@@ -1307,6 +1309,76 @@ def _structural_column(model: CompiledModel, table: ParameterTable,
     return _accumulate(len(model.tt), [(pp.layout, terms)])
 
 
+def _moment_column(model: CompiledModel, table: ParameterTable,
+                   bases: DerivativeBases, values: dict[str, float], c: int,
+                   ip: int, reach: list[str],
+                   grads: dict[tuple[int, int], np.ndarray]) -> np.ndarray:
+    """∂y/∂θ_c for a column moving moment moduli of phase ip only (WP-1327).
+
+    The moment enters only p²⟨|F_⊥|²⟩, so only the intensity scalar moves.
+    ``grads`` is :meth:`CompiledModel.moment_f2_grads` for the phase at this
+    θ, one array per DOF; the column's ∂|F|² is their sum weighted by the
+    column's coefficients in C, so a tie or a named variable driving several
+    sites' DOFs is carried exactly (the DOFs are affine in θ, however
+    non-affine the moment is in them).  ``reach`` is every DOF path the
+    column moves, its own included; the dispatch has already checked that
+    nothing else is in it.
+    """
+    C, _ = table.constraint_block()
+    df2 = None
+    for q in reach:
+        m = _MOMENT_PATH.match(q)
+        w = float(C[table._paths[q], c])
+        if w == 0.0:
+            continue
+        term = w * grads[(int(m.group(2)), int(m.group(3)))]
+        df2 = term if df2 is None else df2 + term
+    if df2 is None:
+        return np.zeros(len(model.tt))
+    parts = []
+    for pp, dint in zip(bases.components(ip),
+                        model.moment_intensity_grad(ip, df2, values),
+                        strict=True):
+        coef = np.where(pp.finite, _gather_per_line(pp.layout, dint), 0.0)
+        parts.append((pp.layout,
+                      [(coef, pp.omega)] if np.any(coef != 0.0) else []))
+    return _accumulate(len(model.tt), parts)
+
+
+def _moment_reach_ok(path: str, extra: list[str]) -> bool:
+    """Whether ``_moment_column`` claims this column: moduli of one phase only.
+
+    Its reach is moment **moduli** (``dof0``) of one phase, any atom — the
+    affine block can tie two sites' moduli or drive them from a variable, and
+    the branch sums those.  Anything else (a cell, a coordinate, another
+    phase's moment) takes the peak-chain column.
+
+    **An angle is declined by name, and the reason is measured, not a gap in
+    the derivative** (``d_magnetic_f2_d_dofs`` returns the angle rows, held to
+    the same exact oracle).  A moment seeded on a direction the symmetry fixes
+    — (2.5, 0, 2.5) on P 1 2/m 1 puts the azimuth at exactly 0 — sits where
+    the pattern is even in the angle, so its exact column is zero up to
+    round-off (2.3e-16 of the modulus column there).  Where that direction is
+    a *maximum* along the angle, whether the solver leaves it depends on that
+    round-off: on ``test_magnetic_moment_frame``'s fixture the analytic arm
+    stopped at φ = 0 with χ² 10.9 above the minima at φ = ±0.047 on
+    darwin/arm64, while on linux/x86-64 the round-off column walked off
+    unaided.  The peak chain's forward difference reads ½·r″·h there and
+    walks off on both.  That escape is truncation, which is not a mechanism
+    anyone chose; the analytic angle column waits on one that is — an angle
+    seeded off its stationary point before the stage that frees it,
+    ``moments.tilted_seed``'s shape for the same stationary point, in its own
+    PR.  The decline stands on either platform.  A modulus has no such point a
+    fit can start at: a varied moment of zero is refused by the schema.
+    """
+    m = _MOMENT_PATH.match(path)
+    if m is None or m.group(3) != "0":
+        return False
+    prefix = f"phases.{m.group(1)}.atoms."
+    return all((n := _MOMENT_PATH.match(q)) and n.group(3) == "0"
+               and q.startswith(prefix) for q in extra)
+
+
 def _po_column(model: CompiledModel, bases: DerivativeBases,
                values: dict[str, float], ip: int) -> np.ndarray:
     """∂y/∂r for the March coefficient: only the intensity scalar moves.
@@ -1742,6 +1814,15 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
                                                profile_derivs=need_profile)
             return bases
 
+        # WP-1327: one ∂|F_⊥|² per moment DOF, built once per phase per
+        # evaluation and shared by every moment column of that phase
+        moment_grads: dict[int, dict[tuple[int, int], np.ndarray]] = {}
+
+        def get_moment_grads(ip: int) -> dict[tuple[int, int], np.ndarray]:
+            if ip not in moment_grads:
+                moment_grads[ip] = model.moment_f2_grads(ip, values)
+            return moment_grads[ip]
+
         for c, (path, extra, own) in enumerate(identities):
             if bkg_mix[c] is not None:
                 # y is linear in the coefficient: ∂y/∂c_n = basis row; the
@@ -1765,6 +1846,13 @@ def _make_jacobian(model: CompiledModel, table: ParameterTable):
                 J[:n_data, c] = -sqrt_w * _structural_column(
                     model, table, get_bases(), values, c,
                     int(dof.group(1)), int(dof.group(2)), rows, grad)
+            elif ((mom := _MOMENT_PATH.match(path))
+                    and model.moment_grad_supported(int(mom.group(1)))
+                    and _moment_reach_ok(path, extra)):
+                ip = int(mom.group(1))
+                J[:n_data, c] = -sqrt_w * _moment_column(
+                    model, table, get_bases(), values, c, ip, [path, *extra],
+                    get_moment_grads(ip))
             elif ((po := _PO_PATH.match(path)) and model.mode == "rietveld"
                     and own
                     and not model.mag_split(int(po.group(1)))):

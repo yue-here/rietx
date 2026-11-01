@@ -77,6 +77,38 @@ ranks anything.
 **Licensing.** Concepts only from the issue and from FCJ (Finger, Cox & Jephcoat 1994);
 nothing ported.
 
+### Inherited
+
+- 2026-10-31, from the issue triage (issue #1106): the reporter (2026-10-29)
+  brings evidence for direction (a) and one new ask, with no code and no
+  threshold. Per peak region they fit the residual on the model's own net line
+  P and its derivatives P′, P″, P‴ (P‴ the odd direction left once a free
+  position takes P′), each with a counting-noise t not divided by the
+  serial-correlation factor f, rolled up per term as a coherent z, an
+  incoherent χ² and an rms t. Synthetic (rietx's own forward model, so one
+  source): axial asymmetry 0.02 with FCJ off, which Layer 1 reads today as
+  position (rms t 4.6–5.0), shows shift rms 5.9–6.6 and odd rms 3.4–3.8 in 3
+  of 3; a 5 % high-angle second line, silent in Layer 1 today, shows odd rms
+  2.83–3.51; the null over 20 clean fits has the largest per-term rms at 1.32.
+  Dividing by f biases the null low and eats the signal (the second line falls
+  to 1.99–2.17 against 1.18). On four public patterns with FCJ refined every
+  term reads far above N(0,1); the odd term is one-signed on SRM 1976a
+  (coherent z +31.5) and FAP (+16.3) and has no net sign on SRM 660c (+0.5),
+  so an always-present odd column would report something on most lab fits. The
+  ask: a `t_noise` field on `BasisCoefficient` beside `stderr` and
+  `significant`, the per-term rollups printed ungated on both maturity
+  branches, `significant` untouched until WP-2004 rules on the gates; about
+  1.6 ms in `report()`; one extra run per additive fixed component reads a
+  blank mismatch (2e-4 in d gives 3/3, its control 0/3). They recommend the
+  Layer 1 seat over a Layer 0 field and leave it to the maintainer. Tiers as
+  they state them: the statistic tier 2 (Rao 1948 score test, Ramsey 1969,
+  Turin 1960), the null tier 1, the region rule (4 % of peak height, ≥ 6
+  points) tier 3, a BH q per region that never gates. Checked against the tree
+  at d87c8cc91: `BasisCoefficient` (`report/schemas.py:922`) carries `kind`,
+  `value`, `stderr`, `significant`, `share`, and no noise-only t. A new field
+  on the report is a public schema change; the decision belongs with this WP's
+  first task.
+
 ## Non-goals
 
 - The `unmatched_obs` matching window and a flank-lobe filter on `add_impurity_phase` (the

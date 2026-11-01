@@ -312,6 +312,47 @@ def _state_toy_planarity():
     return model, table, {}
 
 
+def _state_toy_torsion():
+    """Two torsion restraints' rows (WP-1815): a circular difference via atan2.
+
+    The numpy Jacobian is the closed-form torsion gradient chained through
+    ``cartesian_frame`` and the metric, the traced backends differentiate
+    ``xp.arctan2`` of the same two arguments, and the fd row differences the
+    residual.  One chain sits 2.6° short of its 180° target, so the row is
+    read beside the cut the angle has and the difference does not; the other
+    is at 99° against a target of 60°, its fourth atom named through an
+    explicit image.  Every coordinate and the whole cell are free, in a
+    triclinic cell.
+    """
+    from rietx.schemas.common import Parameter as P
+    from rietx.schemas.pattern import PatternData
+    from rietx.schemas.structure import Atom, Cell, Phase, Structure, TorsionRestraint
+
+    xyz = [(0.10, 0.20, 0.30), (0.25, 0.22, 0.31), (0.30, 0.35, 0.28),
+           (0.45, 0.37, 0.295), (0.36, 0.43, 0.44)]
+    cell = Cell(**{k: P(value=v, vary=True) for k, v in zip(
+        ("a", "b", "c", "alpha", "beta", "gamma"),
+        (7.1, 8.3, 9.2, 81.0, 97.0, 104.0), strict=True)})
+    structure = Structure(phases=[Phase(
+        name="chain", space_group="P1", cell=cell, scale=P(value=1e-3),
+        atoms=[Atom(label=f"C{k}", species="C", x=P(value=x, vary=True),
+                    y=P(value=y, vary=True), z=P(value=z, vary=True))
+               for k, (x, y, z) in enumerate(xyz)],
+        restraints=[
+            TorsionRestraint(atoms=[0, 1, 2, 3], target_deg=180.0, sigma=2.0),
+            TorsionRestraint(atoms=[0, 1, 2, 4], target_deg=60.0, sigma=3.0,
+                             op_indices=[None, None, None, 0],
+                             translations=[(0, 0, 0)] * 3 + [(0, 0, 0)])])])
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    tt = np.arange(20.0, 40.0, 0.1)
+    pattern = PatternData(two_theta=tt.tolist(), intensity=np.ones_like(tt).tolist())
+    table = ParameterTable(structure, ins)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    assert model.restraints is not None and model.restraints.n_rows == 2
+    return model, table, {}
+
+
 def _state_families_variable():
     """A **named variable** carrying the columns instead of a model path (WP-1119).
 
@@ -579,9 +620,9 @@ def _state_extra_peak():
 def _state_magnetic():
     """WP-1327: a moment DOF and the structural columns of a magnetic phase.
 
-    The **only** config here whose model is magnetic, and it exists because
-    two derivative paths are new: the moment modulus (no analytic branch
-    claims ``…moment.dof*``, so it takes the peak-chain column), and a
+    The first config here whose model is magnetic, and it exists because
+    two derivative paths are new: the moment modulus (the analytic
+    ``_moment_column`` since WP-1327's last task; the peak chain before), and a
     coordinate DOF on a phase carrying a moment, which
     ``CompiledModel.structural_grad_supported`` drops from the analytic
     structural branch because ``d_f2_d_xyz`` carries no magnetic term — a
@@ -594,6 +635,8 @@ def _state_magnetic():
     so the comparison this config actually makes is the analytic assembly
     against central differences.  ``test_the_magnetic_config_declines_the_traced_
     backends_by_name`` asserts the decline, so the skip below cannot go silent.
+    The moment column is also held to an exact oracle, which central
+    differences are not, in ``test_moment_jacobian.py``.
     """
     import rietx as rx
     from rietx.schemas.instrument import BackgroundChebyshev
@@ -687,6 +730,37 @@ def _state_magnetic_width():
                           moving_paths=set(table.moving_paths),
                           window_area_tol=WINDOW_AREA_TOL)
     return model, table, {}
+
+
+def _state_magnetic_angles_tied():
+    """WP-1327's analytic moment branch on the shapes ``magnetic`` lacks.
+
+    ``magnetic`` frees one modulus on a one-dimensional subspace.  The branch
+    claims any column whose reach is moment **moduli** of one phase, so an
+    affine tie between two sites' moduli, and a named variable driving one of
+    them, are new ways to widen C onto it, which is what obliges a row here
+    (root CLAUDE.md § Backends).  The angles
+    beside it — a site's own azimuth, and a named variable driving the other
+    site's — are columns the dispatch declines by name and builds on the peak
+    chain (``_moment_reach_ok``), so this row also holds that the decline
+    leaves them right.  ``test_moment_jacobian`` holds every column of the
+    same state to an exact oracle; here the ``fd`` opinion meets the
+    assembled Jacobian, and the traced rows decline by name as on
+    ``magnetic``.
+    """
+    from tests.test_moment_jacobian import M0, M1, PLANE, _build, _ortho
+
+    return (*_build(_ortho([(2.0, 1.0, 0.0), (-1.0, 1.5, 0.0)], PLANE),
+                    # the zero shift is the row's peak-chain column, which
+                    # ``test_every_fd_column_meets_a_converged_oracle`` needs
+                    [f"{M0}.dof0", f"{M0}.dof1", "phases.0.scale",
+                     "instrument.background.c0", "instrument.zero_shift"],
+                    ties=[(f"{M1}.dof0",
+                           AffineTie(terms=((f"{M0}.dof0", -0.8),
+                                            (f"{VAR_PREFIX}MU", 0.5)),
+                                     const=0.3)),
+                          (f"{M1}.dof1", AffineTie.identity(f"{VAR_PREFIX}PHI"))],
+                    variables=[("PHI", 0.7), ("MU", 0.4)]), {})
 
 
 def _state_satellites():
@@ -875,6 +949,44 @@ def _state_bodies_site():
     return model, table, {}
 
 
+def _state_bodies_site_fixed():
+    """A rigid body on a site that fixes every direction (WP-1807): k = 0.
+
+    HKUST-1's BTC linker (COD 4002052) with its origin on the .3m site of
+    Fm-3m: the 3-fold and its mirrors leave no turn, so the block has no
+    rotation input and the traced ``evaluate_traced`` takes its no-rotation
+    branch (``bodies_site`` covers k = 1).  The origin's one site DOF along
+    [1, −1, 1], the cell and Cu's site DOF free; 10-22° keeps the 26 Å cell
+    to 33 reflections, so the traced compile stays a check.
+    """
+    from rietx.crystallography.bodies import body_from_atoms
+    from rietx.crystallography.cif import structure_from_cif
+    from rietx.schemas.pattern import PatternData
+    from rietx.schemas.structure import Phase, Structure
+    from tests.test_rigid_body_special import DATA, _fixed
+
+    phase = _fixed(structure_from_cif(str(DATA / "cod_4002052.cif")).phases[0])
+    body = body_from_atoms(phase, ["C1", "C2", "C3", "O1", "H3"], "BTC",
+                           origin=(0.156915, 0.343085, 0.156915), origin_vary=True)
+    structure = Structure(phases=[Phase.model_validate(
+        {**phase.model_dump(), "rigid_bodies": [body.model_dump()]})])
+    structure.phases[0].cell.a.vary = True
+    _, ins, _ = _lab_state()
+    tt = np.arange(10.0, 22.0, 0.02)
+    rng = np.random.default_rng(1807)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=(50.0 + 10.0 * rng.random(len(tt))).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for glob in ("phases.0.rigid_bodies.0.origin.dof.*", "phases.0.cell.*",
+                 "phases.0.atoms.0.dof.*", "phases.0.scale"):
+        assert table.set_vary([glob], True), glob
+    assert not [e.path for e in table.entries if ".rotation." in e.path]
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    return model, table, {}
+
+
 def _state_texture():
     """Spherical-harmonics texture with the cell free beside it (WP-1960).
 
@@ -981,10 +1093,61 @@ def _state_extinction_strong():
     return model, table, {}
 
 
+def _state_distortion_modes():
+    """WP-1419: a child refined on its mode amplitudes, the coordinates derived.
+
+    NaTaO₃'s P4/mbm child of the cubic perovskite (one M-point mode on O2),
+    stated by ``displacive_statement`` and set off its seed to 0.2 Å: an
+    amplitude column falls to ``_peak_chain_column`` and reaches O2's x and
+    y through C; the traced backends differentiate the same affine rows.
+    The cell, scale and Biso free beside it.
+    """
+    from rietx.crystallography.representation.distortion import displacive_statement
+    from rietx.schemas.structure import Atom, Cell, Phase, Structure
+
+    P = Parameter
+
+    def atom(label, sp, x, y, z):
+        return Atom(label=label, species=sp, x=P(value=x), y=P(value=y), z=P(value=z))
+
+    a, c = 5.5503, 3.9335
+    parent = Phase(name="cubic", space_group="P m -3 m", cell=Cell.cubic(a / 2 ** 0.5),
+                   atoms=[atom("Ta", "Ta", 0, 0, 0), atom("Na", "Na", 0.5, 0.5, 0.5),
+                          atom("O", "O", 0.5, 0, 0)])
+    child = Phase(name="NaTaO3", space_group="P 4/m b m",
+                  cell=Cell(a=P(value=a), b=P(value=a), c=P(value=c), alpha=P(value=90.0),
+                            beta=P(value=90.0), gamma=P(value=90.0)),
+                  atoms=[atom("Ta", "Ta", 0, 0, 0), atom("Na", "Na", 0, 0.5, 0.5),
+                         atom("O1", "O", 0, 0, 0.5), atom("O2", "O", 0.25, 0.75, 0)],
+                  scale=P(value=1e-2, min=0.0))
+    phase = displacive_statement(parent, child, ([[1, 1, 0], [-1, 1, 0], [0, 0, 1]],
+                                                 [0, 0, 0])).phase
+    structure = Structure(phases=[phase])
+    _, ins, _ = _lab_state()
+    tt = np.arange(15.0, 60.0, 0.02)
+    rng = np.random.default_rng(5)
+    pattern = PatternData(two_theta=tt.tolist(),
+                          intensity=(50.0 + 10.0 * rng.random(len(tt))).tolist())
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    for glob in ("phases.0.distortion_modes.modes.*.amplitude", "phases.0.cell.*",
+                 "phases.0.scale", "phases.0.atoms.*.biso"):
+        assert table.set_vary([glob], True), glob
+    amp = table.free_paths.index("phases.0.distortion_modes.modes.0.amplitude")
+    theta = table.x0()
+    theta[amp] = 0.2
+    table.commit(theta)
+    model = compile_model(structure, ins, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    return model, table, {}
+
+
 CONFIGS = {"families": _state_families,
+           "distortion_modes": _state_distortion_modes,
            "texture": _state_texture,
            "bodies": _state_bodies,
            "bodies_site": _state_bodies_site,
+           "bodies_site_fixed": _state_bodies_site_fixed,
            "families_voigt": _state_families_voigt,
            "axial_one_zero": _state_axial_one_zero,
            "sharp_widths": _state_sharp_widths,
@@ -993,11 +1156,13 @@ CONFIGS = {"families": _state_families,
            "centroid_origin": _state_centroid_origin,
            "toy_body": _state_toy_body,
            "toy_planarity": _state_toy_planarity,
+           "toy_torsion": _state_toy_torsion,
            "capillary_offsets": _state_capillary_offsets,
            "extra_components": _state_extra_components,
            "extra_peak": _state_extra_peak,
            "magnetic": _state_magnetic,
            "magnetic_width": _state_magnetic_width,
+           "magnetic_angles_tied": _state_magnetic_angles_tied,
            "satellites": _state_satellites,
            "extinction_strong": _state_extinction_strong, **STATES}
 
@@ -1029,15 +1194,19 @@ CONFIG_PARAMS = [
     _config("centroid_origin"),
     _config("toy_body"),
     _config("toy_planarity"),
+    _config("toy_torsion"),
     _config("capillary_offsets"),
     _config("extra_components"),
     _config("extra_peak"),
     _config("magnetic"),
     _config("magnetic_width"),
+    _config("magnetic_angles_tied"),
     _config("satellites"),
     _config("bodies"),
     _config("extinction_strong"),
+    _config("distortion_modes"),
     _config("bodies_site"),
+    _config("bodies_site_fixed"),
     _config("toy_lebail"),
     _config("toy_pawley"),
     _config("toy_rich"),
@@ -1273,7 +1442,8 @@ def test_jacobian_matches_analytic(method, config):
                     what=f"{config}/{method} ")
 
 
-@pytest.mark.parametrize("config", ["magnetic", "magnetic_width"])
+@pytest.mark.parametrize("config", ["magnetic", "magnetic_width",
+                                    "magnetic_angles_tied"])
 def test_the_magnetic_config_declines_the_traced_backends_by_name(config):
     """The skip in ``_backend_jacobian`` above, made a measured fact.
 

@@ -1,6 +1,6 @@
 # WP-1419 — a child structure refined on its mode amplitudes
 
-Milestone: magnetic · Status: 🔄 2026-10-22 — C1's mode basis (PR #950) and C2's `distortion_candidates` (PR #996) landed from outside, on C0a #842 and C0b #889, with #1002's `primary` fix (PR #1022); task 2 is next; #996's follow-ups (refusals beside the answer) merged as PR #1135 (`f2ca3bc9`)
+Milestone: magnetic · Status: 🔄 2026-10-30 — C1's mode basis (PR #950) and C2's `distortion_candidates` (PR #996) landed from outside, on C0a #842 and C0b #889, with #1002's `primary` fix (PR #1022); task 2 is next; chunk 4's first half (`RefinementResult.distortion_totals`) merged from outside as PR #1238 (`4a93e858`); `distortion_candidates` states a centred parent's children instead of raising, from outside as PR #1275 (`c1bc1975`, #1247); #996's follow-ups (refusals beside the answer) merged as PR #1135 (`f2ca3bc9`); C3a's mode-amplitude block merged as PR #1107 (`e016f187`), the derived cell and the candidate route (3b) remain
 Depends on: 1418 (the mode vectors: irreps, projection, isotropy subgroups);
 1327 soft (the operator-list phase both would share)
 Priority: P3 2026-09-23 — waits on 1418's mode vectors; P2 when they land
@@ -552,6 +552,45 @@ the reporter's fork.
   `_audit.py` and `references/api-magnetic.md`, files 3a will likely share,
   so whichever merges second may need a sync or a rebase.
 
+- 2026-10-31, from the issue triage (issue #286): chunk 4 is split under
+  #1224's machinery-before-heuristics rule (reporter, 2026-10-29 and
+  2026-10-30). C4a is the quantities. It gives each irrep block's A_τ with its
+  esd, and T² as a reported number with no p-value. It adds `DistortionTotal`,
+  and a restricted refit per named block that reports ΔBIC, Λ with its p, and
+  both χ². It also gives A_det, with the support bar as a required argument.
+  C4a is open as PR #1238. It builds question 5 (where `distortion_support`
+  lives) as a `Refinement` method, pending a ruling. C4b is the verdict: the
+  ΔBIC > 6 bar, `DISTORTION_MODE_UNSUPPORTED` and its scope rule. It waits on
+  the reporter's 2026-10-22 questions 1-4, which are unanswered. Q1 replaces
+  the "Hotelling T² gate" this WP recorded on 2026-10-11. The reason: T²
+  against χ²_m called a zero-truth block at p < 0.05 on 0.47-0.63 of seeds. Q2
+  puts the bar at 6 rather than 0. Q3 sets the warning's scope. Q4 adds a
+  verdict field, against `FreedComparison`'s precedent. The 2026-10-23
+  follow-up says A_det keeps its "uncalibrated on misfit" label for good. On a
+  planted misfit it misses the 50 % point by −10 % and +34 %. Checked against
+  the tree at d87c8cc91: `distortion_support` and
+  `DISTORTION_MODE_UNSUPPORTED` do not exist, and C3a is on main (PR #1107).
+  The reporter's figures were not re-run.
+
+- 2026-10-31, from the issue triage (issue #1247): `distortion_candidates`
+  raises `RuntimeError: a candidate operation does not map the parent's atoms
+  onto themselves in the magnetic cell; this is a bug` for every centred
+  parent. The reporter's sweep over the first ITB setting of all 230 types
+  found 1318 of 1318 calls on I, F, C, A and R lattices failing, and every P
+  lattice stated. Cause, read from the code: `_standard_child`
+  (`magnetic/isotropy.py:2276`) lists each atom once per `site_orbit` image,
+  whose images already include the centrings, then adds every
+  `candidate.cell.translations` shift (`:2301-2308`). At k = 0 those shifts
+  are the centrings again, so each position appears more than once and
+  `image_of` finds two hits (`:2318-2321`). The reporter's dedupe modulo the
+  magnetic cell makes all 4940 calls of the sweep state a child that passes
+  the exact setting check. Checked against the tree at d87c8cc91: rocksalt
+  NaCl (`F m -3 m`) raises at k = 0 and at k = (1/2, 1/2, 1/2), reproduced
+  with the issue's snippet (`scratchpad/lane-B/r1247.py`). The tests use only
+  the primitive cubic perovskite. The fix turns a self-declared bug into
+  candidates, so it changes what a released call does and owes a release note
+  under § Changed, as PR #1135 did.
+
 ## Non-goals
 
 - Moment modes (SARAh-style basis-vector amplitudes): 1327 owns
@@ -565,7 +604,7 @@ the reporter's fork.
       AMPLIMODES' convention), the engine hook (affine block first, analytic
       contraction when measured slow), and the operator-list phase shared
       with 1327.
-- [ ] `Phase.distortion_modes` and `displacive_statement`; the child's
+- [x] `Phase.distortion_modes` and `displacive_statement`; the child's
       coordinates derived through C; the Biso ties per parent site.
 - [ ] `DISTORTION_MODE_UNSUPPORTED` and `CHILD_GROUP_UNNAMED` as
       `GuardFinding`s with `help.py` entries; their skill rows in
@@ -583,8 +622,12 @@ the reporter's fork.
 ## Acceptance
 
 On the shipped BT-1 LaMnO₃ pattern against Pm-3m, A_τ reproduces Perez-Mato
-et al. 2010 Table 13 within its esds and Hotelling's T² is reported for the
-block (decided 2026-10-11, #286);
+et al. 2010 Table 13 within 0.03 Å, the bar `test_lamno3_reproduces_table_13`
+holds the shipped decomposition to, and Hotelling's T² is reported for the
+block (decided 2026-10-11, #286; the bar ruled by Yue 2026-10-31 on #1238,
+replacing "within its esds": the pattern is at 50 K and Table 13 at 300 K, so
+an esd bar measures the temperature difference, and M2+ sits 3.9 esd off at
+0.3334(69) Å against 0.36);
 every A = 0 control equals |det P|² × parent; the ten named settings and
 every shipped fixture are bit-identical.
 
@@ -606,6 +649,12 @@ every shipped fixture are bit-identical.
   `operator-list-basis`, as a reference implementation only.
 
 ## Handover log
+
+- **2026-11-01 (2nd session)** (`/pr-review`) — chunk 4, first half, merged from outside as PR #1238 (`4a93e858`). `RefinementResult.distortion_totals` holds one `DistortionTotal` per irrep block of a phase on mode amplitudes. Each carries A_τ with its esd and label, T², `driving`, the sign convention and the largest displacement. It is `None` on a joint fit. The per-block tests verb refuses a `detectability_probe` unless it is finite and positive. Three audit rows came with it, all tier 1 and held by the generality judge: `EVEN_EXPONENT`, `LINEAR_EXPONENT` and the `DistortionBlockTests.restarts` action. The branch was synced with main once before merge (the schema-history note, `c3f78eba`). No task is ticked by it. Open, owed to this file: PR #1108 (C2, a child's cell through its parent's) has round 2 resolved and waits on a rebase. Its `TECHNIQUE_FIELDS["rx.Phase"]` entry collides with #1238's. #1108's item 3 is a follow-up for this WP and is owed here when #1108 merges. What ran: the PR was replayed in a stack with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green. `main` now equals that tree.
+
+- **2026-11-01** (`/pr-review`) — the centred-parent failure merged from outside as PR #1275 (`c1bc1975`), closing #1247. It is the defect that WP-1919's 2026-10-31 entry reported: `distortion_candidates` raised "a candidate operation does not map the parent's atoms onto themselves" for every centred parent. Now it states the children. The parent atoms' images are deduplicated by type and position, and two parent atoms that share a position are both kept. No task in the list is ticked by it. Follow-up, not blocking: only rocksalt at Γ asserts which children come back. Rocksalt at L, MoSi2, C2/m and R-3m assert counts and index only, and the L case bypasses the public call. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
+
+- **2026-10-30** (`/pr-review`) — C3a merged from outside as PR #1107 (`e016f187`) after three rounds. `displacive_statement(parent, child, (P, p))` states a child as its parent plus one absolute amplitude per symmetry-adapted mode, and `Phase.distortion_modes` carries the record. The parameter table derives each moved atom's coordinates from the amplitudes as base + Σ A·v, so no anchored DOF exists for those atoms. Amplitude columns take the whole-model finite-difference column (`_peak_chain_column`), with a cross-backend row. Round 3 found the ±seed test asserting what it is for, |A₊ + A₋| ≤ 1e-3 esd, with 8.0e-7 esd measured on both platforms in its docstring, and the missing journals and three uncited functions now cite Perez-Mato, Orobengoa & Aroyo (2010). 0.60 stays as the schema number. A sync commit `2da66e61` (keep both 0.60 notes beside #1123's, in `schemas/common.py` and `docs/releases/1.11.0.md`) was pushed to the contributor's branch before the merge, and main after it is content-identical to the gated tree `307eff83`. Not done, by design: the derived cell and the candidate route, which are 3b and wait on C2's chunk. Follow-up raised in round 1 and owed by the contributor: `optimize.statistics.data_support` counts structural parameters with the glob `phases.*.atoms.*` (`STRUCTURAL_PARAMETER_GLOB`), so a phase refined on mode amplitudes counts only its Biso. Ticked: `Phase.distortion_modes` and `displacive_statement`. Gate (a stack of eleven PRs on main `b40bc994`, tree `307eff83`; macOS arm64, `[dev,jax]`, Python 3.12): 13 217 passed, 216 skipped, 48 xfailed, 0 failed, with ruff, the `-W` manual build and the GUI ladder green.
 
 - **2026-10-29** (`/pr-review`) — #996's follow-ups merged from outside as PR #1135 (`f2ca3bc9`): `distortion_candidates` returns a candidate whose child it refuses, with `refusal` (a `DistortionRefusal`) and `child`, `transform` and `basis` `None`, where 1.10.0 raised `ValueError` for the whole call. A draw keeping fewer operations than the isotropy group reads `DISTORTION_CHILD_SMALLER`, and the code is chosen from every draw. This changes what a released call does, so its note is under 1.11.0 § Changed. C2's derived cell (#1108) and C3a's amplitude block (#1107) are still open PRs with review items.
 

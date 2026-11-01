@@ -42,12 +42,12 @@ It refuses a format that holds one measurement per file.
 
 The readers are tried in a fixed order, and the first whose test matches reads the file.
 Magic bytes and archive manifests come first, then a required first line or XML root, then a suffix, then a looser text test.
-The two peak-list refusals come next, then the ASCII reader, and the refusal of an unrecognised `.raw` comes last, so it can shadow no reader.
+The two peak-list refusals and the total-scattering refusal come next, then the ASCII reader, and the refusal of an unrecognised `.raw` comes last, so it can shadow no reader.
 `ReaderCapability.sniff` gives each format's test in words, `ReaderCapability.sigma` says where its esds come from, and `ReaderCapability.refuses` says why a refused format is declined.
 
 | Format | `name` | Suffixes | Option | Esds |
 |---|---|---|---|---|
-| Bruker/Siemens DIFFRAC binary, versions 3 and 4 | `bruker_raw` | `.raw` | `scan` | measured per file: whole numbers are counts, a rate whose product with the step time is whole gets √(y·t)/t, anything else withholds σ |
+| Bruker/Siemens DIFFRAC binary, versions 2, 3 and 4 | `bruker_raw` | `.raw` | `scan` | measured per file: whole numbers are counts, a rate whose product with the step time is whole gets √(y·t)/t, anything else withholds σ |
 | Philips PC-APD binary scan | `philips_rd` | `.rd`, `.sd` | none | Poisson on the decoded counts |
 | Rigaku SmartLab Studio II measurement | `rasx` | `.rasx` | `scan` | measured per file, as for `.ras` |
 | Bruker DIFFRAC.MEASUREMENT experiment | `brml` | `.brml` | `scan` | through the automatic absorber factor a, σ = √(y/a)·a |
@@ -64,9 +64,11 @@ The two peak-list refusals come next, then the ASCII reader, and the refusal of 
 |---|---|---|---|
 | Peak list from DIFFRAC-AT or RRUFF | `dif_peaklist` | `.dif` | a table of reflections, recognised by its hkl columns |
 | Peak list from Stoe or PANalytical | `peak_list` | `.pks`, `.udi` | a table of reflections, recognised by the suffix alone because no sample file was available |
+| Total-scattering function, G(r), S(Q) or F(Q), from PDFgetX2, PDFgetX3 or a bare export | `total_scattering` | `.gr`, `.sq`, `.fq` | not a powder pattern: an r or Q axis, recognised by an `#L` line labelling r and G or Q and S/F, or a PDFgetX2 or PDFgetX3 header, whatever the suffix; with neither, by the suffix alone. Refused with [`PATTERN_TOTAL_SCATTERING`](diagnostics-files.md#pattern_total_scattering) until rietx reads total scattering (#192) |
 | Unrecognised binary `.raw` | `raw_unclaimed` | `.raw` | six vendors write `.raw`, and this file matched none of the readers |
 
 A file misnamed `.dif`, `.pks` or `.udi` that reads as a plain profile still reaches the ASCII reader.
+A 2θ scan that only carries a `.gr`, `.sq` or `.fq` suffix opens under any other name.
 `capabilities()` lists the formats in the order they are tried:
 
 ```python
@@ -75,13 +77,14 @@ from rietx import capabilities
 caps = capabilities()
 assert [fmt.name for fmt in caps.reader_formats] == [
     "bruker_raw", "philips_rd", "rasx", "brml", "ras", "uxd", "xrdml", "udf",
-    "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "xy", "raw_unclaimed"]
+    "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "total_scattering", "xy",
+    "raw_unclaimed"]
 assert [opt.name for opt in caps.reader_options] == ["bank", "block", "scan"]
 ```
 
 ### Format notes
 
-- `bruker_raw` reads versions 3 (`RAW1.01`) and 4 (`RAW4.00`). Versions 1 and 2 are refused by name, because no corroborated description of either exists. A version 3 file whose declared ranges leave non-zero bytes over is refused, naming the offset. A trailing run of zeros is accepted.
+- `bruker_raw` reads versions 2 (`RAW2`), 3 (`RAW1.01`) and 4 (`RAW4.00`). Version 1 is refused by name, because no description of it exists. A version 2 file is read when it holds one range and its header and counts account for its size exactly; a version 2 file with more than one range is refused by name. A version 3 file whose declared ranges leave non-zero bytes over is refused, naming the offset. A trailing run of zeros is accepted.
 - `philips_rd` stores each intensity √-compressed, and the reader decodes it as counts = v²//100. The header states the file's length twice and its maximum intensity once, and a disagreement is refused.
 - `rasx` and `ras` read an attenuator column and never apply it. [`RAS_ATTENUATOR_PRESENT`](diagnostics-files.md#ras_attenuator_present) names the 2θ range it covers.
 - `brml` locates every column from the file's own data views. A detector frame (a recorded view longer than one point) is refused.

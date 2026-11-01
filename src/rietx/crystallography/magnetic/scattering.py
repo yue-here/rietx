@@ -639,9 +639,12 @@ def magnetic_f2(members, seg, counts, stol, msites: MagneticSites, cell,
     solve — and rather than approximate either by freezing it against a cell
     that is still refining, the traced twin **declines by name**
     (``backend.traced.make_traced_residual``) and jax/torch fall back to the
-    host path for a magnetic phase.  The numpy answer is exact and the
-    Jacobian column for a moment DOF is the peak chain's, which re-runs the
-    forward model at a perturbed θ and needs no tracing at all.
+    host path for a magnetic phase.  The numpy answer is exact, and so is
+    the Jacobian column for a moment modulus: analytic since WP-1327's last
+    task (:func:`d_magnetic_f2_d_dofs`,
+    ``optimize.least_squares._moment_column``).  An angle column, and a split
+    draw with extinction evaluated, take the peak chain's re-run of the
+    forward model.
     """
     m_hkl = np.asarray(members, dtype=np.float64)
     seg_i = np.asarray(seg, dtype=np.int64)
@@ -676,6 +679,75 @@ def magnetic_f2(members, seg, counts, stol, msites: MagneticSites, cell,
     summed = np.zeros(n, dtype=np.float64)
     np.add.at(summed, seg_i, f2)
     return (P_MAGNETIC_FM ** 2) * summed / np.asarray(counts, dtype=np.float64)
+
+
+def d_magnetic_f2_d_dofs(members, seg, counts, stol, msites: MagneticSites,
+                         cell, xyz, occ, biso, dofs: list[np.ndarray]
+                         ) -> dict[tuple[int, int], np.ndarray]:
+    """``{(j, k): (N,)}`` — ∂(p²·⟨|F_⊥|²⟩)/∂ moment DOF k of atom j, analytic.
+
+    The arguments are :func:`magnetic_f2`'s, and so is the arithmetic up to
+    the point where a moment enters.  F is **linear** in every site's moment
+    (the form factor, the Debye-Waller factor, the phases and the axial
+    matrices do not depend on it), and a DOF moves its own site's moment
+    only, through :func:`~.moments.d_moment_d_dofs`.  So ∂F/∂d is the forward
+    orbit sum of that one atom with m replaced by ∂m/∂d.  The perpendicular
+    projection P = I − Q̂Q̂ᵀ is real, symmetric and idempotent, so
+
+        ∂|F_⊥|²/∂d = 2·Re[(P·F)ᴴ · ∂F/∂d]
+
+    with no ∂P term, Q̂ being a function of h and the cell alone (Halpern &
+    Johnson, 1939, *Phys. Rev.* **55**, 898; the Wirtinger form of a real
+    quadratic in a complex vector, Brandwood, 1983, *IEE Proc. F* **130**, 11).  Averaged over the
+    same frozen Laue orbit as the forward model and multiplied by p².  The
+    derivation, with the exact oracles the tests hold it to, is WP-1327's
+    analytic-branch entry (PR #1206).
+
+    Every carrying atom's DOFs are returned in one call, because the
+    projected total F_⊥ is the expensive half and is shared by all of them.
+    """
+    from .moments import d_moment_d_dofs
+
+    m_hkl = np.asarray(members, dtype=np.float64)
+    seg_i = np.asarray(seg, dtype=np.int64)
+    n = len(counts)
+    stol_mem = np.asarray(stol, dtype=np.float64)[seg_i]
+    cart = _crystalaxis_to_cartesian(cell)
+    total = np.zeros((len(seg_i), 3), dtype=np.complex128)
+    per_atom = {}
+    for j in range(msites.n_asym):
+        if not msites.carries[j]:
+            continue
+        m_crystal = moment_from_dofs(msites.frames[j], dofs[j])
+        mats = np.asarray(msites.mom_mat[j])                             # (m, 3, 3)
+        m_cart = (mats @ m_crystal) @ cart.T                             # (m, 3)
+        rot, tran = msites.ops[j]
+        positions = np.asarray(rot) @ np.asarray(xyz[j], dtype=np.float64) \
+            + np.asarray(tran, dtype=np.float64)
+        phase = np.exp(2.0j * np.pi * (positions @ m_hkl.T))             # (m, M)
+        amp = (float(occ[j]) * _form_factor(msites, j, stol_mem)
+               * np.exp(-float(biso[j]) * stol_mem * stol_mem))
+        total = total + amp[:, None] * np.einsum(
+            "km,kc->mc", phase, m_cart.astype(np.complex128))
+        per_atom[j] = (mats, phase, amp)
+
+    q = m_hkl @ reciprocal_cartesian_basis(cell).T
+    qhat = q / np.sqrt((q * q).sum(axis=1))[:, None]
+    perp = total - qhat * (qhat.astype(np.complex128) * total).sum(axis=1)[:, None]
+    perp_conj = np.conj(perp)
+    norm = (P_MAGNETIC_FM ** 2) / np.asarray(counts, dtype=np.float64)
+    out: dict[tuple[int, int], np.ndarray] = {}
+    for j, (mats, phase, amp) in per_atom.items():
+        dm = d_moment_d_dofs(msites.frames[j], dofs[j])                  # (n, 3)
+        dm_cart = np.einsum("kab,nb->kna", mats, dm) @ cart.T            # (m, n, 3)
+        d_f = amp[:, None, None] * np.einsum(
+            "km,knc->mnc", phase, dm_cart.astype(np.complex128))         # (M, n, 3)
+        d_f2 = 2.0 * np.real(np.einsum("mc,mnc->mn", perp_conj, d_f))    # (M, n)
+        for k in range(d_f2.shape[1]):
+            summed = np.zeros(n, dtype=np.float64)
+            np.add.at(summed, seg_i, d_f2[:, k])
+            out[(j, k)] = norm * summed
+    return out
 
 
 def _form_factor(msites: MagneticSites, j: int, stol):

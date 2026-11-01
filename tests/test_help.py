@@ -235,6 +235,10 @@ def _variant_models() -> list[tuple[Structure, Instrument]]:
         # by ``body_from_atoms`` in a P1 cell, so the body decodes them back.
         (Structure(phases=[_body_phase()]),
          Instrument(source=Source(lines=[EmissionLine(wavelength=1.540598)]))),
+        # A child on mode amplitudes (WP-1419): its amplitudes are a family no
+        # other model declares
+        (Structure(phases=[_distortion_phase()]),
+         Instrument(source=Source(lines=[EmissionLine(wavelength=1.540598)]))),
         (structure, Instrument(
             source=TOFSource(
                 difc=5123.45, two_theta_bank_deg=90.0,
@@ -275,6 +279,23 @@ def _body_phase() -> Phase:
     body = body.model_copy(update={"torsions": [
         BodyTorsion(name="t", axis=("C1", "O1"), moves=["H1"])]})
     return phase.model_copy(update={"rigid_bodies": [body]})
+
+
+def _distortion_phase() -> Phase:
+    """#286's toy: a P 1 Sr pair at ¼ and ¾ of a c-doubled cell, on its modes."""
+    from rietx.crystallography.representation.distortion import displacive_statement
+
+    def phase(name, c, zs):
+        return Phase(name=name, space_group="P1",
+                     cell=Cell(a=Parameter(value=4.0), b=Parameter(value=4.0),
+                               c=Parameter(value=c), alpha=Parameter(value=90.0),
+                               beta=Parameter(value=90.0), gamma=Parameter(value=90.0)),
+                     atoms=[Atom(label=f"Sr{i}", species="Sr", x=Parameter(value=0.0),
+                                 y=Parameter(value=0.0), z=Parameter(value=z))
+                            for i, z in enumerate(zs)])
+
+    return displacive_statement(phase("parent", 4.0, [0.5]), phase("child", 8.0, [0.25, 0.75]),
+                                ([[1, 0, 0], [0, 1, 0], [0, 0, 2]], [0, 0, 0])).phase
 
 
 def _all_models() -> list[tuple[Structure, Instrument]]:

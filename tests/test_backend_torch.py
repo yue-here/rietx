@@ -359,6 +359,34 @@ def test_mps_columns_are_fp32_on_device_and_fp64_on_host():
 
 
 @requires_mps
+def test_mps_planarity_columns_run_on_the_device_and_agree():
+    """A planarity restraint's rows are ``xp.linalg.eigh`` differentiated
+    forward (WP-1809), and some torch releases have no Apple-GPU kernel for
+    it, which would raise ``NotImplementedError`` here rather than in a
+    user's fit.  The columns, data rows and planarity rows together, agree
+    with torch's own fp64 ones under the WP-0403 bars (torch 2.15.0 on an
+    M-series Mac, 2026-10-29: it runs on the device)."""
+    from rietx.backend.linalg64 import (
+        COLUMN_COSINE_MIN,
+        COLUMN_REL_L2_MAX,
+        column_agreement,
+    )
+    from rietx.backend.torch_backend import make_torch_jacobian
+    from tests.test_cross_backend import _state_toy_planarity
+
+    model, table, _ = _state_toy_planarity()
+    theta = table.x0()
+    J_ref = make_torch_jacobian(model, table)(theta)
+    J_mps = make_torch_jacobian(model, table, device="mps")(theta)
+    n_data = len(model.tt)
+    assert J_mps.shape == J_ref.shape and J_mps.shape[0] == n_data + 6
+    assert np.abs(J_mps[n_data:]).max() > 0, "no planarity column reached the rows"
+    rel, cos = column_agreement(J_ref, J_mps)
+    assert rel < COLUMN_REL_L2_MAX, f"worst column rel-L2 {rel:.3e}"
+    assert cos > COLUMN_COSINE_MIN, f"worst column cosine {cos:.8f}"
+
+
+@requires_mps
 @pytest.mark.slow
 def test_mps_refine_matches_numpy_cell():
     """End-to-end on real data: an MPS fp32-column refinement of SRM 676a

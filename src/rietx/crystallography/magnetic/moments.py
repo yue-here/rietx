@@ -213,7 +213,8 @@ def moment_frame(basis, cell) -> np.ndarray:
 #: along it, and for several of these groups that point is a fixed point of a
 #: residual point-group element the candidate's own magnetic group still
 #: carries (one negating the other frame rows while fixing the first) — the
-#: identical shape ``Stage.distortion_seed`` exists for on a whole-vector
+#: identical shape ``displacive_statement``'s seed
+#: (``representation.distortion.DISTORTION_SEED``) exists for on a whole-vector
 #: A = 0 (|F|² even in the amplitude vector, WP-1419), here on one DOF rather
 #: than the whole vector, and with the same fix: move it off the stationary
 #: point before the stage that frees it.  Small and nonzero, never tuned
@@ -229,8 +230,8 @@ def moment_frame(basis, cell) -> np.ndarray:
 #: (still strictly nonzero, so the stationary point is broken exactly the
 #: same way in every unit test of :func:`tilted_seed` itself) both entries
 #: recover exactly, identically to the untouched pre-fix code. 0.15 was the
-#: number this stage started with by analogy to ``distortion_seed``'s own
-#: docstring examples, not measured against this workflow's own multi-start
+#: number this stage started with by analogy to the fork's ``distortion_seed``
+#: docstring examples (a field that never reached ``main``), not measured against this workflow's own multi-start
 #: sweep before being shipped as a default — the mistake this note exists to
 #: name for whoever tunes it next.
 SEED_TILT = 0.02
@@ -448,11 +449,9 @@ def canonical_dofs(dofs) -> tuple[np.ndarray, np.ndarray]:
 def d_moment_d_dofs(frame, dofs) -> np.ndarray:
     """``(n, 3)`` — ∂(crystal-axis components)/∂DOF, analytic.
 
-    Not used by the forward model, which takes the whole-model finite-
-    difference column for a moment DOF under the ``_make_jacobian`` gate; it is
-    here so that a finite-difference check has something exact to be checked
-    *against*, and so the analytic branch, when it lands, has one authority for
-    the chain rule rather than a second derivation.
+    The one authority for this chain rule: the analytic moment column
+    (``scattering.d_magnetic_f2_d_dofs``, WP-1327) reads it, and so does the
+    check that holds it against finite differences.
     """
     e = np.asarray(frame, dtype=np.float64).reshape(-1, 3)
     n = len(e)

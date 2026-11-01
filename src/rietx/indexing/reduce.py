@@ -283,6 +283,14 @@ def bravais_screen(cell: tuple[float, ...], centring: str = "P", *,
     import gemmi
     import spglib
 
+    # checked before anything runs, because the floor below cannot catch it:
+    # ``max(nan, 1e-6)`` is nan, and spglib 2.8 answers ``symprec=nan`` with a
+    # segmentation fault, which kills the process instead of raising an error
+    # :func:`~rietx.indexing.consensus.bravais_opinion` can decline
+    esd = float(np.max(np.atleast_1d(np.asarray(cell_esd, dtype=np.float64))[:3]))
+    if not np.isfinite(esd):
+        raise ValueError(f"cell_esd must be finite to scale the symprec sweep; "
+                         f"got {cell_esd!r}")
     reduced = reduce_cell(cell, centring)
     uc = gemmi.UnitCell(*reduced.cell)
     by_obliquity = {}
@@ -299,7 +307,6 @@ def bravais_screen(cell: tuple[float, ...], centring: str = "P", *,
         ops = gemmi.find_lattice_symmetry(uc, "P", tol)
         by_obliquity[tol] = _SYSTEM_BY_SYM_OPS.get(len(ops.sym_ops), "triclinic")
 
-    esd = float(np.max(np.atleast_1d(np.asarray(cell_esd, dtype=np.float64))[:3]))
     esd = max(esd, 1e-6)
     lat = lattice_vectors(reduced.cell)
     by_symprec, symbols = {}, {}

@@ -251,6 +251,28 @@ def test_underdetermined_system_raises_rather_than_returning_a_cell():
         refine_candidate(q[:4], np.full(4, 1e-4), hkl[:4], system="triclinic")
 
 
+@pytest.mark.parametrize("af", [
+    (0.10842207029868996, 0.0, 0.020401079871357843, 0.0, 0.05444080748121834, 0.0),
+    (0.1832223251700092, 0.0, 0.0204081229733431, 0.0, 0.09523818855212737, 0.0),
+    (0.08118109359915754, 0.0, 0.020408111413012586, 0.0, 0.027210605492824242, 0.0),
+])
+def test_a_metric_direction_no_line_constrains_raises_whatever_the_rounding(af):
+    """Twenty h0l lines leave a monoclinic B unconstrained, so the fit raises.
+
+    The solve leaves B at about ±1e-17, not at 0.  A negative value was always
+    refused as not positive definite; a positive one passed and returned
+    all-NaN cell esds (macOS arm64: the first two rows), which a synthetic hR
+    search with three impurity lines carried to spglib as ``symprec=nan``.
+    The metrics are the dichotomy engine's, from that search.
+    """
+    hkl = np.array([(h, 0, ell) for h in range(-3, 4) for ell in range(0, 6)
+                    if (h, ell) != (0, 0) and not (ell == 0 and h < 0)][:20])
+    q = design_matrix(hkl) @ np.asarray(af)
+    q = q * (1.0 + 1e-5 * np.sin(np.arange(len(q))))
+    with pytest.raises(ValueError):
+        refine_candidate(q, 1e-4 * q, hkl, system="monoclinic")
+
+
 # ----------------------------------------------------------------------
 # Figures of merit
 # ----------------------------------------------------------------------

@@ -620,10 +620,24 @@ class SupercellEvidence:
     #: line set is the denser; ``index`` 0).  C3's ``screen.containment_evidence``
     #: writes the second; :func:`supercell_chance` always the first.
     relation: str = "sublattice"
+    #: the screen's seen fraction of the child's and of the parent's own merged
+    #: lines at the resolution (``LineScreen.seen_fraction``, the panel's
+    #: ``predicted_seen_fraction``).  ``None`` where not measured, as on
+    #: :func:`supercell_chance`'s route.  A child seen more often than its
+    #: parent is never *refuted* (:attr:`child_seen_more`, #1230).
+    child_seen_fraction: float | None = None
+    parent_seen_fraction: float | None = None
 
     @property
     def n_extra(self) -> int:
         return len(self.extra_q)
+
+    @property
+    def child_seen_more(self) -> bool:
+        """Whether the child's own lines are seen more often than the parent's."""
+        return (self.child_seen_fraction is not None
+                and self.parent_seen_fraction is not None
+                and self.child_seen_fraction > self.parent_seen_fraction)
 
     @property
     def n_seen(self) -> int:
@@ -673,12 +687,30 @@ class SupercellEvidence:
         and all 4 seen extras lie on lines the rival explains.  The same p₀
         is the null for both counts, which is conservative for support, since a
         random position lands on an unexplained line no more often than on any.
+
+        **A child seen more often than its parent is never refuted**
+        (:attr:`child_seen_more`, #1230).  An oversized description adds lines
+        the pattern lacks, so its own seen fraction falls below its parent's.
+        Every child #941's Acceptance table refutes does: 0.08–0.31 against the
+        synthetic Si truth's 0.73, 0.54–0.57 against the tetragonal truth's
+        1.0.  A child seen more often than its parent explains the pattern
+        better in the reverse direction.  The refutation would overturn that
+        reading of the panel's own reversed member at the same resolution.
+        The pair then reads *supported* or *undecided*.  Measured cause: on
+        dense low-symmetry patterns the assumed shift bound floors p₀ at
+        0.63–0.82, at or above a true cell's own seen fraction.  Containment's
+        density order can make the true cell the child of a wrong one, whose
+        lines merge into fewer resolved positions.  So "seen no more often than
+        chance" refuted three synthetic truths, which fell from first to second
+        and to twelfth.  Their seen fractions were 0.63, 0.42 and 0.54 against
+        their refuting parents' 0.37, 0.26–0.29 and 0.38–0.49.
         """
         p_unexplained = (self.p_value if self.p_value_unexplained is None
                          else self.p_value_unexplained)
         if p_unexplained < alpha:
             return "supported"
-        if self.p_floor < alpha and self.n_seen <= self.n_extra * self.p0:
+        if (self.p_floor < alpha and self.n_seen <= self.n_extra * self.p0
+                and not self.child_seen_more):
             return "refuted"
         return "undecided"
 

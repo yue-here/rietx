@@ -103,6 +103,21 @@ When the absence-free class's own fit leaves more than half of the net signal's 
 `ExtinctionScreen.reference_rwp_net` is that quantity, the weighted misfit over the net signal, taken against the peak picker's background envelope so no fit can move it, and `rietx.indexing.extinction.REFERENCE_NET_RWP_MAX` is the bound (1/√2, after Toby {cite}`toby2006`).
 Above it the screen still ranks the classes, sets `ExtinctionScreen.status` to `"unreliable"`, says [`EXTINCTION_SCREEN_UNRELIABLE`](diagnostics-indexing.md#extinction_screen_unreliable), and `ExtinctionScreen.best_or_none` returns `None`.
 A cell outside the basin a Le Bail can refine it from (0.4 % off held, or 1 % off with the cell-free fit, on a synthetic Si pattern at synchrotron resolution) lands there rather than on a confident wrong class.
+So does a real one: SRM 676a corundum at 1.02 times its certified cell reads 1.00 where the certified cell reads 0.19, and the GSAS-II fluorapatite at 0.99 times its cell reads 1.00 where its own reads 0.12; in both the cell-free fit leaves the cell more than 0.5 % off.
+The gate does not catch every such cell.
+The PbSO₄ X-ray histogram at 0.99 times its index cell reads 0.45: the cell-free fit stops about 0.3 % short, and the screen returns `P c - -` where the specimen is `P c - n`.
+
+`ExtinctionScreen.perfect_fit_rwp_net` is what `reference_rwp_net` would read for a fit that left only the counting noise: √(N/(N+S)), with N the fitted channels and S the weighted net Bragg power, since a background channel's net is that noise.
+It is past the bound exactly when S < N.
+The diagnostic reads the pair: when the perfect-fit value is past the bound too, no cell or model passes it, and the message names two causes it cannot tell apart (weak data, where counting longer helps, or the envelope sitting inside the lines over the range, where it does not); otherwise the reference misfits the data, by the ratio of the two (√(χ²/N)).
+On the four real patterns above it is 0.03-0.09, so there S ≫ N and every reading past the bound is misfit.
+
+The envelope has a known weakness where the lines form a continuum, as at high angle in a low-symmetry pattern.
+It is a rolling low quantile, and when no window holds a background channel it lands in the tails of the lines, the net shrinks, and a good fit reads worse.
+GSAS-II's own Rietveld fit of the PbSO₄ X-ray histogram reads 0.136 against the envelope and 0.128 against its fitted background over 15-60°, but 0.436 and 0.245 over 110-160°.
+Over the whole 15-160° range the low-angle lines carry most of the weighted power and the two read 0.155 and 0.138, so the bias matters when the fitted range is high angle or the whole pattern is a continuum.
+The perfect-fit value divides by the same envelope and rises with it, so in a continuum a weak-data reading may be the envelope's.
+When a reference fit that looks good reads above the bound on a low-symmetry pattern, the envelope is a cause to check beside those the diagnostic lists.
 
 ### A container halo
 
@@ -133,7 +148,11 @@ Even that returns a class, which lists its space groups, so the type cannot expr
 | `ExtinctionScreen.profile_rwp` | the shared profile fit every class inherits its instrument from |
 | `ExtinctionScreen.prefit_rwp` | the cell-free Le Bail fit, `None` when the cell was held |
 | `ExtinctionScreen.reference_rwp_net` | the reference fit's misfit over the net signal, the gate's quantity |
+| `ExtinctionScreen.perfect_fit_rwp_net` | what `reference_rwp_net` would read for a fit leaving only the noise, √(N/(N+S)) |
 | `ExtinctionScreen.prior` | the declared `ExtinctionPrior`, or `None` |
+| `ExtinctionScreen.z` | the formula units per cell the member filter used, or `None` |
+| `ExtinctionScreen.z_from_density` | the Z the declared density gives on `cell`, not rounded, or `None` |
+| `ExtinctionScreen.z_candidates` | with a density and no `z`, every whole Z within the density's tolerance; several is an ambiguity, none a contradiction |
 | `ExtinctionScreen.status` | `"converged"`, `"failed"` (no class could be screened), `"unreliable"` (ranked, but the reference fit failed its gate) or `"cancelled"` |
 | `ExtinctionScreen.thresholds_version` | the indexing thresholds version that produced the ranking |
 | `ExtinctionScreen.diagnostics` | findings about the answer |
@@ -166,6 +185,9 @@ A returned class still lists every space group it admits, and nothing in the pac
 | `ExtinctionCandidate.representative` | the H-M symbol whose reflections were generated, which identifies the class |
 | `ExtinctionCandidate.space_groups` | every space group in the class, in IT number order; with a declared prior only the members it admits, possibly none |
 | `ExtinctionCandidate.excluded_groups` | the members a declared prior removed; empty without one |
+| `ExtinctionCandidate.exclusion_reasons` | for each removed member, the declared facts it fails |
+| `ExtinctionCandidate.count_notes` | for each kept member whose orbits cannot hold an element's atoms per cell at the declared Z, the failed count; a statement, since a disordered model shares a site |
+| `ExtinctionCandidate.special_positions` | for each kept member at which the declared Z′ is not whole, the special positions a formula unit needs |
 | `ExtinctionCandidate.laue_classes` | `space_groups` grouped by Laue class |
 | `ExtinctionCandidate.conditions` | the derived reflection conditions, such as `00l: l = 2n`, for a person to check |
 | `ExtinctionCandidate.conditions_complete` | `False` when the conditions leave some absence unnamed; the absence set is what the screen uses either way |
@@ -235,10 +257,14 @@ print(prior.declared())          # {'sohncke': True}
 | `ExtinctionPrior.sohncke` | `True`: only Sohncke groups, with no inversion, mirror or glide (an enantiopure chiral compound); `False`: only the others |
 | `ExtinctionPrior.centrosymmetric` | `True` or `False`: only groups with, or without, an inversion centre (a second-harmonic signal says `False`) |
 | `ExtinctionPrior.polar` | `True`: only the polar groups, whose point group leaves a direction fixed (a pyroelectric response); `False`: only the others |
+| `ExtinctionPrior.z` | formula units per cell; with `formula` and `ordered`, removes the groups whose orbits cannot hold that content, otherwise names them |
+| `ExtinctionPrior.density` | measured density in g/cm³, which fixes Z through the formula weight and the screened cell's volume; needs `formula` |
+| `ExtinctionPrior.formula` | the formula unit, written as a chemist writes it (`"Cu12Sb4S13"`); a fractional count declares a shared site |
+| `ExtinctionPrior.ordered` | `True`: every site is one element at full occupancy, so a group whose orbits cannot hold the declared content is removed; needs `formula` |
 | `ExtinctionPrior.declared` | the method returning the facts actually declared, by name |
 
 Each field is `None` by default, which declares nothing, and each is read off the group's own operators.
-A contradictory declaration, `sohncke=True` with `centrosymmetric=True` or `polar=True` with `centrosymmetric=True`, is refused when it is built.
+A contradictory declaration, `sohncke=True` with `centrosymmetric=True` or `polar=True` with `centrosymmetric=True`, is refused when it is built, and so are a `density` without a `formula` and a `formula` with neither `z` nor `density`.
 
 The prior filters members and nothing else.
 Every class is still fitted and ranked on the data, `ExtinctionCandidate.excluded_groups` names what it removed, and `EXTINCTION_PRIOR_APPLIED` reports it, as a warning when it emptied the class the data rank first.
@@ -251,6 +277,25 @@ screen = rx.determine_extinction_symbol(data, candidate, ins,
 ```
 
 On a P 2₁ specimen declared enantiopure, the answer is `P 1 21 1` holding `P 1 21 1` alone, where the data alone leave {`P 1 21 1`, `P 1 21/m 1`}.
+
+### The content per cell
+
+With `z` and `formula`, some element's atoms per cell, Z times its count in the formula, may not sit on whole orbits of a group.
+The orbits are derived from the group's operators (*International Tables for Crystallography*, Vol. A, 5th ed., 2002, sect. 8.3.2); a Wyckoff position with no free parameter is one orbit and holds its count once.
+This is the test of an ordered model, and the group stays: `ExtinctionCandidate.count_notes` states the failed count.
+A disordered alloy written with whole counts (`CuAu`, `Cu3Au`) fails it on its true `F m -3 m`, which a refiner of a disordered alloy would not remove.
+Declare `ordered=True` and the group is removed instead, with `exclusion_reasons` saying so.
+An element written with a fractional count (`Cu0.5Au0.5`) shares a site, and is not counted either way.
+Where Z is not a whole multiple of a kept member's general multiplicity (Z′ below one, or 3/2), the member stays and `ExtinctionCandidate.special_positions` names the special positions a formula unit then sits on.
+A molecule there must carry that site's symmetry, which nothing declared says, so this is a statement and never an exclusion: a P 2₁ salt at Z = 2 keeps P 2₁/m, with each formula unit on an inversion centre or a mirror.
+Where no sum of the group's orbit multiplicities makes Z at all (P 2₁/m at Z = 3), the note says that instead of listing positions.
+`ExtinctionCandidate.exclusion_reasons` names the fact each removed group fails.
+
+A `density` gives Z = ρ·V·N_A / M on the screened cell, `ExtinctionScreen.z_from_density`.
+It must sit within {{ DENSITY_Z_TOLERANCE_PCT }} % of the declared `z`, the agreement *International Tables* Vol. C asks of a measured density, or, with none declared, of exactly one whole number, and `ExtinctionScreen.z` is the Z the filter used.
+When it sits outside that of the declared `z`, or of every whole number, nothing is filtered by Z, `ExtinctionScreen.density_contradicts_z()` is `True`, `EXTINCTION_PRIOR_APPLIED` is a warning and `best_or_none` abstains.
+When several whole numbers fit (above Z ≈ {{ DENSITY_Z_AMBIGUOUS_ABOVE }}), nothing is filtered by Z either, `ExtinctionScreen.z_candidates` lists them, and the screen does not abstain: declare `z` to filter.
+A screen that never computed a Z (cancelled, failed) does not say the density contradicts it.
 
 ## On real data
 

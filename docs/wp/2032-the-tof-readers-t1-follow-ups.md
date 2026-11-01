@@ -82,6 +82,8 @@ WP-2006 (the dead surface) tiers such names, so tell it if 4 or 5 removes one.
 
 ## Handover log
 
+- **2026-10-30** (`/pr-review`, after the close) — the two follow-ups asked on #1122 merged from outside as PR #1138 (`a25650ed`), docs only. `src/rietx/io/CLAUDE.md` now names `FPATH1`'s token reading as a deviation, in the records bullet, as `BNKPAR`'s is named. The `gsas` row's `TIME_MAP` sentence keeps its rule and drops the bug's history, which this log holds. The file stays at its 561-line cap after #1202 (WP-2059) edited it too. Still unowned: real SNS `.prm` files whose `ICONS` records write explicit zeros do not read end to end.
+
 - **2026-10-23 (closed)** — PR #1122 by @mustachefeeling merged as
   `e6e97630`, after one review round (`/pr-review`, at `049d1097`). It lands
   all five tasks, so this WP closes. The review read every source hunk.

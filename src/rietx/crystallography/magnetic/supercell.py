@@ -945,9 +945,9 @@ def _seed_moments(group: MagneticGroup, positions, ions, magnitude: float,
     tilted_seed` (WP-1418 stage (b)) rather than the whole magnitude on the
     allowed basis's first row alone: a rank ≥ 2 basis (a multi-copy irrep or a
     general/kernel direction) used to leave every other DOF starting at a
-    stationary point of χ², the same shape ``Stage.distortion_seed`` exists
-    to fix for a whole amplitude vector at A = 0 — see that function's
-    docstring.
+    stationary point of χ², the same shape ``displacive_statement``'s seed
+    (``representation.distortion.DISTORTION_SEED``) fixes for a whole
+    amplitude vector at A = 0 — see that function's docstring.
 
     cell is the **child** cell, and it is not optional: crystal-axis
     components are on unit vectors along the cell axes, so their modulus is

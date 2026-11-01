@@ -121,6 +121,21 @@ their manuals discusses it.
 | EasyDiffraction | none | H_G² floored at machine ε; a negative H_L passes | none |
 | BGMN | no Caglioti widths | fatal error | Profex writes B1 ≤ 0.01 and k2 ≤ 1e-4 into the files it creates |
 
+## Limits a control file declares
+
+Checked 2026-10-30 for PR #1199 (the `.pcr` reader's `Nre` limits), FullProf only.
+
+FullProf's hard limits (`Nre` > 0, one LINE 47 per limit) clamp in least squares, not only
+in simulated annealing (ran). On FullProf's own `ce1.pcr` (`Cry = 0`, which ships two limits),
+a limit of [5.400, 5.405] Å on cell a, below its converged 5.41222(3), held a at 5.40500(3)
+from the first cycle. The volume went from 158.536 to 157.902 Å³. The `.out` file lists the
+limits it read and converts a cell limit to its internal metric. A limit applies to the first
+value carrying its codeword, and that value must have a positive sign and a unit multiplier.
+Other values tied to it follow through their multipliers (manual § Hard limits for parameters,
+LINE 47; checked). The periodic boundary type (`IBOUND = 1`) was not tested. MAUD's declared
+limits are not enforced by its least squares (§ Peak-width limits above). The other five
+programs were not surveyed for this.
+
 ## Instrument and specimen widths refined together
 
 Read 2026-10-23 (WP-2002, 8th session), after removing rietx's U and Y floors exposed the
@@ -407,6 +422,68 @@ The paper gives no timings.
 Not determined: TOPAS v9 and its Pawley overlap rule, FullProf's current manual, the Profex
 5.7.2 manual. MAUD, BGMN and RIETAN-FP were not run.
 
+## A volume window from the formula, in indexing
+
+Checked by the maintainer in the sources on 2026-10-24 (#1121) and entered for WP-2030;
+only what each program asks the user for is recorded here.
+
+| Program | What the indexer takes for the volume | A volume from the formula |
+|---|---|---|
+| rietx | `SearchSpec.min_volume`/`max_volume`, default 15 Å³ and the data's envelope; `SearchSpec.from_formula` sets a ceiling, `z` × Hofmann's (2002) estimate × 1.25, and no floor (WP-2030) | yes, on the caller's request |
+| GSAS-II 5.8.4 | a start volume, and no composition (`GSASIIpwdGUI.py`, checked) | no |
+| DICVOL06 | VOLMIN and VOLMAX from the user, ceiling 2500 Å³ by default, and optionally a measured density and formula weight (`dicvol06.inf`, card 4, checked) | no |
+
+Neither program estimates a volume from the formula, so the volume range is always the user's.
+`from_formula`'s ceiling therefore rests on no program default; its audit row is tier 2 on
+Hofmann's citation and the 21 published cells it was checked against.
+
+## Machinery and the heuristics that drive it
+
+Surveyed 2026-10-30 by the lead for issue #1224, which proposes landing machinery (what an
+agent operates) before heuristics (the automatic route through it). Software engineering
+calls this the separation of mechanism and policy. Read in full only where marked checked.
+
+| Source | What it does or says | Read |
+|---|---|---|
+| Wulf et al. (1974) Commun. ACM 17, 337, HYDRA's design principle 2 | Separating mechanism from policy "leaves the complex decisions in the hands of the person who should make them". A kernel holds mechanisms, and "policy decisions certainly are not" in it. It credits Brinch Hansen (1970) for the argument | checked (OCR of the scan) |
+| Levin et al. (1975) SOSP 5, 132 | Complete separation is impractical. The scheduler keeps a parametrised policy in the kernel, so the policy outside sets its parameters | inferred from two course summaries; paper not reached |
+| scikit-learn, Buitinck et al. (2013) arXiv:1309.0238, §2.1 and §4 | Every estimator parameter has a "sensible default" giving "a baseline solution", for non-experts. Every parameter is a public constructor argument. Model selection (`GridSearchCV`) is a meta-estimator built only from that public interface | checked |
+| cctbx and PHENIX, Grosse-Kunstleve & Adams (2003) IUCr Comput. Comm. Newsl. 1 | "PHENIX depends on the cctbx, but not vice versa", which keeps the toolbox a reusable library. High-level refinement protocols are written in Python above it | search excerpt; page refused (403) |
+| TOPAS, Coelho (2018) J. Appl. Cryst. 51, 210 | A least-squares kernel driven by an input language whose macros, `topas.inc` among them, carry the refinement recipes as text a user reads and overrides | bibliographic only; inferred from the input format |
+| X Window System, via Raymond (2003) *The Art of Unix Programming* | X's designers shipped "mechanism, not policy". Users met inconsistent interfaces as a result | secondary blog quoting the book |
+| Sadowski et al. (2018) ICSE-SEIP, Google's code review | Small changes get first feedback in a median under an hour, very large ones in about 5 hours; the median change is about 24 lines | secondary summaries; paper not reached |
+
+What it adds up to. The principle has been settled since the 1970s. Two refinements matter for a
+rietx rule. First, mechanism is allowed a default (scikit-learn, Levin) provided the default is
+an exposed, overridable parameter; rietx's form of that condition is the audit tier, so a
+default that needs no ruling (tier 1 or 2), or a required argument on an opt-in verb (a `caller`
+row), can land with its machinery. Second, policy has to follow: X shows the cost of mechanism
+shipped with no policy, and scikit-learn's defaults exist for the non-expert. rietx separates per
+audit row, finer than cctbx's per-package split, because its thresholds sit inside machinery
+modules. No test in the tree checks import direction between the two (checked by grep).
+
+## Grading the evidence behind a heuristic
+
+Surveyed 2026-10-30 by the lead, asked whether the audit's tiers (`docs/milestones/
+generality.md` § The rule) match how other fields grade the evidence behind a model choice.
+None of the sources below is a Rietveld program, since none of the seven grades its own
+defaults.
+
+| Source | What it grades | Its counterpart in the tiers | Read |
+|---|---|---|---|
+| GRADE, Guyatt et al. (2008) BMJ 336, 924 | Quality of evidence, and separately the strength of a recommendation | The tier grades a statistic or threshold, and the judgement ground decides the action whatever its tier | abstract and summaries; that a strong recommendation may rest on weak evidence is recalled from later GRADE papers, not checked |
+| Sandia PCMM, Pilch, Oberkampf & Trucano (2007) SAND2007-5948 | Four maturity levels on six elements, one of them uncertainty quantification and sensitivity analysis | No element: a consequence axis was considered and not taken (generality.md § Decisions, 2026-10-20) | Sandia's abstract; level criteria not read |
+| NASA-STD-7009A (2016) | Five levels per factor, among them input pedigree, use history and results robustness | Pedigree is the tier. Use history is tier 2's program default | NASA summaries; the handbook's level criteria not read |
+| Sculley et al. (2015) NeurIPS 28 | Names fixed thresholds and configuration as hidden debt | The reason the table exists | secondary summaries |
+| Simmons, Nelson & Simonsohn (2011); Steegen et al. (2016) | Each analysis choice is a degree of freedom; a multiverse analysis reports the answer across every reasonable choice | The three-family ground with its stated failing case; no multiverse | secondary summaries |
+
+Measured on the tree at 44de0f62a: 1266 rows; 871 `unaudited` under the shrink-only baseline,
+149 tier 1, 41 tier 2, 142 tier 3, 44 `invariant`, 19 `caller`. Of the 41 tier-2 rows, 40 cite
+a dated source and one (`StageResult.window_area_tol`) rests on program defaults alone. All 142
+tier-3 rows carry an `approved` date. That date is not tied to the row's value: a value retuned
+under the same tier keeps it, and `tests/audit_delta.py` prints the change for the judge
+without failing on it.
+
 ## The tier-2 rows resting on a program default
 
 | Row | Programs that agree | Dissent |
@@ -419,6 +496,29 @@ Not determined: TOPAS v9 and its Pawley overlap rule, FullProf's current manual,
 | `CELL_MIN_LENGTH_A` (1.5 Å) | TOPAS | none floor a cell length; the floor binds on no real cell |
 | `auto_background:seed` (not from the data) | all seven start from zero, a constant or the user's numbers | none |
 | `BRINDLEY_MU_R_FENCE` | the citation; FullProf prints the same classes as text | not asked of the others |
+
+## Dropping candidates in a search race
+
+Surveyed 2026-10-31 by the lead, for #1262's assignment race (WP-1997): when may a search over
+several discrete configurations stop running one, if dropping the right one makes the answer
+wrong? Hyperparameter search and algorithm configuration answer this. All from recall; no
+source was opened, so every row is inferred. The lead's reading of AutoML practice ends
+around early 2026.
+
+| Source | What it does | Fit to the race |
+|---|---|---|
+| Successive halving, Karnin et al. (2013) ICML; Jamieson & Talwalkar (2016) AISTATS | Run every configuration on a small budget, keep the better half, double the budget, repeat. Fixed budget: it drops half whatever the margin | What #1262 ships. Right when the short-budget ranking predicts the final one |
+| Hyperband, Li et al. (2018) JMLR 18, 185 | Runs halving at several levels of aggressiveness, one bracket dropping nothing | Bounds the cost of a misleading early ranking to a constant factor of budget. Hedges rather than tests |
+| Hoeffding races, Maron & Moore (1994) NeurIPS 6 | Drops a configuration once a confidence bound puts it worse than the leader | Fixed confidence: the form an all-or-nothing loss asks for |
+| F-Race, Birattari et al. (2002) GECCO; irace, López-Ibáñez et al. (2016) Oper. Res. Perspect. 3, 43 | Racing with a Friedman test across instances or seeds, from algorithm configuration | The closest field. Needs a run-to-run spread, so several seeds per configuration |
+| LUCB, Kalyanakrishnan et al. (2012) ICML | Fixed-confidence best-arm identification with a sample bound | The bandit statement of the same problem |
+| SMAC3's intensification, Lindauer et al. (2022) JMLR 23, 54 | Re-runs a challenger against the incumbent on more seeds before rejecting it | A library form of racing |
+| Optuna `SuccessiveHalvingPruner`, `HyperbandPruner` | Library implementations of the two halving rows above | Same algorithm as #1262; a dependency would hold the race's state outside the byte-identical checkpoint |
+| TPE, Bergstra et al. (2011) NeurIPS 24 (Optuna's and Hyperopt's default sampler) | Models where good results came from to choose the next configuration to try | Not this problem: the assignments are few (six for NAC) and all are tried. Nor the inner search, where many coordinates and cheap evaluations favour annealing, as in DASH, FOX and TOPAS |
+
+What it adds up to. Halving is established practice under a fixed budget. Under an all-or-nothing
+loss, practice is racing: drop only past the measured noise. Ruled 2026-10-31 (WP-1997): halving
+ships, and racing is the next solver PR's first task.
 
 ## Sources
 

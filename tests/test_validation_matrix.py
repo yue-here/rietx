@@ -101,13 +101,13 @@ def test_row_tiers_come_from_the_closed_vocabulary(claim) -> None:
 
 
 @pytest.mark.parametrize("claim", CLAIMS, ids=lambda c: c.test)
-def test_every_claiming_row_states_its_referent(claim) -> None:
+def test_every_claiming_row_states_its_reference_value(claim) -> None:
     """`ceiling` alone claims nothing; anything else must say against what."""
     claims_something = any(t in CLAIM_TIERS for t in claim.tiers)
     if claims_something:
         assert claim.reference.strip(), (
             f"{claim.test} carries tier(s) {claim.tiers} but no reference.  A "
-            "tolerance without its referent is not a claim.")
+            "tolerance without its reference value is not a claim.")
     assert claim.claim.strip(), f"{claim.test} does not say what it claims"
     assert claim.measured.strip(), (
         f"{claim.test} records no measured margin.  Freezing it is how a bar "

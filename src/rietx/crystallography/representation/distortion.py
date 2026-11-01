@@ -15,6 +15,12 @@ decomposes a given child into amplitudes A_τ per (k, irrep, direction).
     distortion_basis(parent, child, transform, *, reference="average") -> ModeBasis
     mode_amplitudes(parent, child, transform, *, reference="average", tolerance=1.5)
                                                                       -> ModeDecomposition
+    displacive_statement(parent, child, transform, *, seed=DISTORTION_SEED,
+                         reference="average", tolerance=1.5)        -> DisplaciveStatement
+    parent_site_ties(site_map, *, phase_index=0)                     -> tuple of Biso ties
+
+``displacive_statement`` is WP-1419 chunk 3 (2026-10-21): the child as its
+parent plus absolute, refinable mode amplitudes (``Phase.distortion_modes``).
 
 ``parent`` and ``child`` are :class:`~rietx.schemas.structure.Phase` objects.
 ``transform`` is (P, p) with r_parent = P·r_child + p: the columns of P are the
@@ -476,7 +482,7 @@ def _permutation(rot, tran, ref: _Reference, inv, small) -> np.ndarray:
     rinv = np.linalg.inv(rot)
     back = (ref.parent_frac - tran[None, :]) @ rinv.T
     child = _wrap((back - small[None, :]) @ inv.T)
-    perm = np.empty(len(child), dtype=np.int64)
+    perm = np.empty(len(child), dtype=np.intp)
     for i, c in enumerate(child):
         d = c[None, :] - ref.child_frac
         d -= np.rint(d)
@@ -610,6 +616,12 @@ def distortion_basis(parent, child, transform, *, reference: str = "average") ->
     normalised over the child's primitive cell in the reference metric
     (Perez-Mato, Orobengoa & Aroyo 2010, eqs. 3–4; module docstring).
     """
+    return _distortion_basis(parent, child, transform, reference)[0]
+
+
+def _distortion_basis(parent, child, transform, reference: str
+                      ) -> tuple[ModeBasis, _Reference]:
+    """:func:`distortion_basis`, with the reference structure it was built on."""
     big, small = _transform(transform)
     inv = np.linalg.inv(big)
     group = _group(parent)
@@ -779,7 +791,7 @@ def distortion_basis(parent, child, transform, *, reference: str = "average") ->
         lattice_points=lattice_points,
         child_group=str(child.space_group),
         parent_atoms=ref.site,
-    )
+    ), ref
 
 
 # --------------------------------------------------------------------------
@@ -867,3 +879,633 @@ def _count(species) -> str:
     for s in species:
         counts[s] = counts.get(s, 0) + 1
     return ", ".join(f"{n} {s}" for s, n in sorted(counts.items()))
+
+
+# --------------------------------------------------------------------------
+# the statement: a child as its parent plus refinable amplitudes (WP-1419 C3)
+# --------------------------------------------------------------------------
+
+#: The norm (Å, in the AMPLIMODES unit) of the seed :func:`displacive_statement`
+#: puts on a child that sits exactly at its parent.  The pattern is invariant
+#: under every lost parent operation's action on the amplitude vector, so at
+#: A = 0 every amplitude outside the identity irrep has an exactly zero
+#: gradient (#286, 2026-09-16; Perez-Mato, Orobengoa & Aroyo 2010 § 7), and a
+#: fit has to start off it.  The magnitude is ours: small and non-zero, never
+#: tuned toward an answer (``moments.SEED_TILT``'s rule for moments), here a
+#: largest per-atom move of about 0.005 Å on NaTaO₃.  Measured on two
+#: perovskites (synthetic NaTaO₃ P4/mbm and LaMnO₃ Pnma) at 0.003, 0.01 and
+#: 0.03 Å; untested beyond them.
+DISTORTION_SEED = 0.01
+
+
+@dataclass(frozen=True, eq=False)
+class DisplaciveStatement:
+    """A child phase stated as its parent plus mode amplitudes (WP-1419).
+
+    ``phase`` is the child with ``Phase.distortion_modes`` set and the
+    coordinates of every moved atom written as ``base + Σ A·v``; it refines on
+    the amplitudes (``phases.*.distortion_modes.modes.*.amplitude``).
+    ``basis`` is the :class:`ModeBasis` the modes come from and ``transform``
+    the (P, p) it was built with.  ``site_map[j]`` is the index in
+    ``parent.atoms`` of the parent atom child atom j is an image of, and
+    ``biso_ties`` ties every child Biso to the first child atom of its parent
+    site (:func:`parent_site_ties`), as ``(path, source, coefficient,
+    constant)`` for ``Refinement.tie``.  ``seed`` maps each amplitude path to
+    the value the statement seeded it with, and is empty when the child was
+    already distorted (it starts at its own decomposition and is never
+    re-seeded).  Paths assume the phase is ``phases.0``.
+    """
+
+    phase: object
+    basis: ModeBasis
+    transform: tuple[np.ndarray, np.ndarray]
+    site_map: tuple[int, ...]
+    biso_ties: tuple[tuple[str, str, float, float], ...]
+    seed: dict[str, float]
+
+
+def parent_site_ties(site_map, *, phase_index: int = 0
+                     ) -> tuple[tuple[str, str, float, float], ...]:
+    """Tie every child Biso to the Biso of the first child atom of its parent atom.
+
+    ``site_map[j]`` is the parent atom child atom j comes from.  One
+    displacement parameter per parent site is what a child refined against its
+    parent can measure: free child Biso alone can manufacture the superstructure
+    intensity the model is being tested for (WP-1419 § The problem).
+    Written once (Yue, #724, 2026-10-05), for ``solve_magnetic``'s
+    ``tie_to_parent`` and for :func:`displacive_statement`.
+    """
+    first: dict[int, int] = {}
+    ties = []
+    for i, parent_atom in enumerate(site_map):
+        if parent_atom not in first:
+            first[parent_atom] = i
+            continue
+        ties.append((f"phases.{phase_index}.atoms.{i}.biso",
+                     f"phases.{phase_index}.atoms.{first[parent_atom]}.biso", 1.0, 0.0))
+    return tuple(ties)
+
+
+def _format_transform(big, small) -> str:
+    """(P, p) as ``transform_BNS_Pp_abc`` text: the child's axes, then its origin."""
+    def frac(v: float) -> Fraction:
+        f = Fraction(float(v)).limit_denominator(96)
+        if abs(float(f) - float(v)) > 1e-9:
+            raise ValueError(f"transform entry {v!r} is not a simple rational")
+        return f
+
+    def term(f: Fraction, letter: str | None) -> str:
+        mag = abs(f)
+        if letter is None:
+            return f"{mag.numerator}" if mag.denominator == 1 else f"{mag.numerator}/{mag.denominator}"
+        head = letter if mag.numerator == 1 else f"{mag.numerator}{letter}"
+        return head if mag.denominator == 1 else f"{head}/{mag.denominator}"
+
+    def component(coeff, const) -> str:
+        out = ""
+        for f, letter in zip(coeff, "abc"):
+            if f == 0:
+                continue
+            out += ("-" if f < 0 else ("+" if out else "")) + term(f, letter)
+        if const != 0 or not out:
+            out += ("-" if const < 0 else ("+" if out else "")) + term(const, None)
+        return out
+
+    cols = [component([frac(big[i][j]) for i in range(3)], Fraction(0)) for j in range(3)]
+    offs = [component([Fraction(0)] * 3, frac(v)) for v in small]
+    return f"{','.join(cols)};{','.join(offs)}"
+
+
+def _cell_of(metric: np.ndarray) -> tuple[float, ...]:
+    """(a, b, c, α, β, γ) of a metric tensor, Å and degrees."""
+    a, b, c = (math.sqrt(float(metric[i, i])) for i in range(3))
+    angle = [math.degrees(math.acos(max(-1.0, min(1.0, float(metric[i, j]) / (x * y)))))
+             for (i, j), (x, y) in (((1, 2), (b, c)), ((0, 2), (a, c)), ((0, 1), (a, b)))]
+    return (a, b, c, *angle)
+
+
+def _child_images(child):
+    """Every atom of the child cell, with the index of the listed atom it images.
+
+    Also the image that *is* each listed atom (the one nearest its stored
+    position, modulo the lattice), so the representative's displacement can be
+    read off the paired field.
+    """
+    group = _group(child)
+    pos, species, owner, rep = [], [], [], []
+    for j, atom in enumerate(child.atoms):
+        xyz = np.array([_value(atom.x), _value(atom.y), _value(atom.z)])
+        images = [_wrap(np.asarray(im, dtype=np.float64))
+                  for im in site_orbit(group, xyz).images]
+        d = np.array(images) - xyz[None, :]
+        d -= np.rint(d)
+        rep.append(len(pos) + int(np.argmin(np.abs(d).max(axis=1))))
+        for im in images:
+            pos.append(im)
+            species.append(element_symbol(atom.species))
+            owner.append(j)
+    return np.array(pos), tuple(species), np.array(owner), rep
+
+
+def _pair(positions, species, basis: ModeBasis, tolerance: float) -> tuple[np.ndarray, np.ndarray]:
+    """Pair the child's atoms with the parent's images: (raw field, partner).
+
+    ``partner[i]`` is the reference atom child atom i is paired with and
+    ``field[n]`` the minimal-image displacement of reference atom n, child
+    fractions; same element, nearest in the reference metric, at most
+    ``tolerance`` Å apart.
+    """
+    from scipy.optimize import linear_sum_assignment
+
+    ref_pos, ref_species = basis.positions, basis.species
+    if len(positions) != len(ref_pos) or sorted(species) != sorted(ref_species):
+        raise ValueError(
+            f"CHILD_ATOMS_UNPAIRED: the child cell holds {len(positions)} atoms "
+            f"({_count(species)}) and the parent's image of it {len(ref_pos)} "
+            f"({_count(ref_species)}); a mode decomposition needs the same atoms, one to one")
+    chol = np.linalg.cholesky(basis.metric)
+    disp = np.zeros_like(ref_pos)
+    partner = np.empty(len(positions), dtype=np.int64)
+    for element in sorted(set(ref_species)):
+        rows = [i for i, s in enumerate(ref_species) if s == element]
+        cols = [i for i, s in enumerate(species) if s == element]
+        delta = positions[cols][None, :, :] - ref_pos[rows][:, None, :]
+        delta -= np.rint(delta)
+        cost = np.linalg.norm(delta @ chol, axis=2)
+        r_idx, c_idx = linear_sum_assignment(cost)
+        worst = float(cost[r_idx, c_idx].max())
+        if worst > tolerance:
+            raise ValueError(
+                f"CHILD_ATOMS_UNPAIRED: a {element} atom of the child sits {worst:.3f} A from "
+                f"the nearest free parent image, beyond tolerance={tolerance} A; check the "
+                "transform and the origin shift")
+        for r, c in zip(r_idx, c_idx):
+            disp[rows[r]] = delta[r, c]
+            partner[cols[c]] = rows[r]
+    return disp, partner
+
+
+def _whitener(basis: ModeBasis) -> np.ndarray:
+    """Lᵀ/√lattice_points with L·Lᵀ = G_ref: |Lᵀ·u|² / lp is the AMPLIMODES norm."""
+    return np.linalg.cholesky(basis.metric).T / math.sqrt(basis.lattice_points)
+
+
+def _site_modes(comp: IrrepModes, ref: _Reference, labels, whiten) -> list[tuple[str, np.ndarray]]:
+    """One irrep's modes re-based so that each moves one parent orbit.
+
+    The parent's orbits are G-invariant, so each irrep's H-invariant subspace
+    splits into its intersections with the fields on one orbit (the per-orbit
+    modes AMPLIMODES tabulates, Orobengoa et al. 2009 § 2.3, *J. Appl. Cryst.* **42**, 820).  The split is
+    orthogonal, so the modes stay orthonormal in the AMPLIMODES unit.  Where
+    the global translation was removed at Γ, part of a polar irrep couples
+    several orbits and cannot be split; that part keeps one basis, labelled
+    with every orbit it moves.  Each piece takes :func:`_canonical`'s basis,
+    so the result does not depend on the LAPACK build.
+    """
+    inv_w = np.linalg.inv(whiten)
+    n_atoms = len(ref.species)
+    q = np.array([(v @ whiten.T).reshape(-1) for v in comp.vectors]).T  # (3N, m)
+    taken = np.zeros((q.shape[0], q.shape[0]))
+    out: list[tuple[str, np.ndarray]] = []
+
+    def unwhiten(cols: np.ndarray) -> list[np.ndarray]:
+        # a component the symmetry zeroes comes back at 1e-17, and a true zero
+        # is what tells the table a coordinate is not moved (held, as a fixed
+        # special position's is), so round-off is taken to it
+        out = []
+        for c in cols.T:
+            v = c.reshape(n_atoms, 3) @ inv_w.T
+            v[np.abs(v) < _RANK_TOL * float(np.abs(v).max())] = 0.0
+            out.append(v)
+        return out
+
+    for s, label in enumerate(labels):
+        rows = np.repeat(ref.site == s, 3)
+        if not rows.any():
+            continue
+        outside = q[~rows]
+        if outside.size:
+            _, sv, vt = np.linalg.svd(outside, full_matrices=True)
+            rank = int(np.sum(sv > _RANK_TOL * max(1.0, sv[0] if sv.size else 0.0)))
+            null = vt[rank:].T
+        else:
+            null = np.eye(q.shape[1])
+        if null.shape[1] == 0:
+            continue
+        piece = _canonical(_orth(q @ null))
+        taken += piece @ piece.T
+        out.extend((label, v) for v in unwhiten(piece))
+    rest = q @ q.T - taken
+    left = _orth(rest)
+    if left.shape[1]:
+        piece = _canonical(left)
+        moved = sorted({int(ref.site[n]) for n in range(n_atoms)
+                        if np.abs(piece.reshape(n_atoms, 3, -1)[n]).max() > _RANK_TOL})
+        label = "+".join(labels[s] for s in moved)
+        out.extend((label, v) for v in unwhiten(piece))
+    if len(out) != comp.n_modes:
+        raise RuntimeError("the per-orbit split lost or gained a mode; this is a bug")
+    return out
+
+
+def _lost_translations(big) -> list[np.ndarray]:
+    """The parent lattice vectors inside one child cell, one per coset of the child lattice.
+
+    The translations the child's cell hides: the parent group acts on a field
+    over the child cell only with them included, so the symmetry-adapted modes
+    are those of the whole parent group (Perez-Mato, Orobengoa & Aroyo 2010,
+    *Acta Cryst.* A**66**, 558, eqs. 3–4; Orobengoa et al. 2009, *J. Appl.
+    Cryst.* **42**, 820, § 2.2).
+    """
+    inv = np.linalg.inv(big)
+    corners = np.array([big @ np.array(c, float) for c in itertools.product((0, 1), repeat=3)])
+    lo = np.floor(corners.min(axis=0)).astype(int)
+    hi = np.ceil(corners.max(axis=0)).astype(int)
+    seen: dict[tuple, np.ndarray] = {}
+    for t in itertools.product(*(range(a, b + 1) for a, b in zip(lo, hi))):
+        c = _wrap(inv @ np.array(t, float))
+        key = tuple(np.round(c, 6))
+        seen.setdefault(key, np.array(t, float))
+    if abs(len(seen) - abs(np.linalg.det(big))) > 1e-6:
+        raise RuntimeError("the parent lattice vectors in the child cell miscount; this is a bug")
+    return list(seen.values())
+
+
+def _parent_actions(parent, ref: _Reference, big, small) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Every operation of G modulo the child lattice, as (child-frame R, permutation).
+
+    (g·u)_{n'} = R·u_{perm(n')}: the whole parent group, its lost translations
+    included, acting on a field over the child cell, the action whose
+    invariant subspaces are the modes (Perez-Mato, Orobengoa & Aroyo 2010,
+    *Acta Cryst.* A**66**, 558, eqs. 3–4).
+    """
+    inv = np.linalg.inv(big)
+    rot_g, tran_g = _operations(_group(parent))
+    lost_all = _lost_translations(big)
+    seen: dict[tuple, tuple[np.ndarray, np.ndarray]] = {}
+    for r, t in zip(rot_g, tran_g):
+        rc = inv @ r.astype(float) @ big
+        for lost in lost_all:
+            perm = _permutation(r, t + lost, ref, inv, small)
+            seen.setdefault((r.tobytes(), perm.tobytes()), (rc, perm))
+    return list(seen.values())
+
+
+def _act(action, field: np.ndarray) -> np.ndarray:
+    rc, perm = action
+    return field[perm] @ rc.T
+
+
+def _stabiliser_order(field: np.ndarray, actions) -> int:
+    """How many of ``actions`` leave ``field`` unchanged, to round-off.
+
+    The order of the field's stabiliser in the parent group's action on the
+    child cell, which the seed checks against the child group's order so that
+    a seeded field keeps exactly H and no higher symmetry (Perez-Mato,
+    Orobengoa & Aroyo 2010, *Acta Cryst.* A**66**, 558).
+    """
+    scale = max(float(np.abs(field).max()), 1e-300)
+    return sum(1 for a in actions if float(np.abs(_act(a, field) - field).max())
+               <= _RANK_TOL * scale)
+
+
+def _generic_seed(n: int) -> list[np.ndarray]:
+    """Directions to try for the seed, generic first: no two coefficients equal.
+
+    Unit vectors; the first coefficient is positive in each (the driving
+    mode's sign is a domain choice, Perez-Mato, Orobengoa & Aroyo 2010 § 7,
+    *Acta Cryst.* A**66**, 558).
+    """
+    base = 1.0 + 0.618 * np.arange(n)
+    out = []
+    for signs in (np.ones(n), np.array([(-1.0) ** (i * (i - 1) // 2) for i in range(n)])):
+        c = base * signs
+        out.append(c / np.linalg.norm(c))
+    return out
+
+
+def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_SEED,
+                         reference: str = "average",
+                         tolerance: float = 1.5) -> DisplaciveStatement:
+    """State ``child`` as ``parent`` plus refinable mode amplitudes (WP-1419).
+
+    The child's coordinates become x_j = base_j + Σ_ν A_ν·v_νj, with one
+    absolute amplitude A_ν (Å) per symmetry-adapted mode of
+    :func:`distortion_basis`, so a fit refines the amplitudes and the
+    coordinates follow (Perez-Mato, Orobengoa & Aroyo 2010, *Acta Cryst.* A66,
+    558, eqs. 3–7).  Any stated child is accepted: a single-k isotropy
+    subgroup, a multi-k child such as LaMnO₃'s Pnma, or a P1 supercell
+    carrying every mode.  Its group is kept as stated, so the phase's one
+    operator list is the full child group H, and every consumer — reflections,
+    multiplicities, the cell, the orbit expansion of the mode field — reads it.
+    The statement checks that this is safe: every operation of H carries each
+    mode's representative vectors onto the mode's own field at the image
+    atoms, with sign +1 (milestone row D).
+
+    **The modes are re-based per parent orbit** (:func:`_site_modes`), so each
+    carries the label of the parent atom it moves, and they come with the
+    primary irreps first.  The amplitudes are the child's own decomposition
+    (as :func:`mode_amplitudes` reads it, round-off below ``_RANK_TOL`` taken
+    as zero); the record's ``base`` carries a polar child's global translation,
+    which is not a mode.
+
+    **The seed.**  A lost parent operation maps the child to a domain-related
+    structure with the same powder pattern, so χ²(D(g)·A) = χ²(A) for the
+    action D(g) of every parent operation on the amplitude vector, and its
+    gradient at A = 0 lies in the identity irrep's subspace:
+    every other amplitude has an exactly zero column at the parent (#286,
+    2026-09-16, measured; Perez-Mato 2010 § 7 for the domains).  So when every
+    amplitude outside the identity irrep is zero, the statement sets them to a
+    vector of norm ``seed`` (Å), along a direction whose stabiliser in G is
+    exactly H, checked on the parent operations' actions: a seed along one
+    basis mode can sit on a higher-symmetry sub-direction and leave the other
+    modes at a stationary point of the residual symmetry (``moments.SEED_TILT``
+    records that shape for moments).  The first mode's sign is positive, which
+    chooses a domain; the relative signs are the generic direction's, recorded
+    in ``seed`` and never tuned.  A child already distorted is never
+    re-seeded.  ``seed=0`` states the child at the parent unseeded, which a fit
+    then refuses to free (``ParameterTable``).
+
+    A mixed-occupancy parent site is refused (two parent atoms on one site,
+    ``_reference``), as are atoms that do not pair one to one
+    (``CHILD_ATOMS_UNPAIRED``).  The cell is the child's own, under its own
+    group's constraints.
+    """
+    from ...schemas.common import Parameter
+    from ...schemas.structure import DistortionMode, DistortionModes
+
+    basis, ref = _distortion_basis(parent, child, transform, reference)
+    big, small = basis.transform
+    labels = [a.label for a in parent.atoms]
+    whiten = _whitener(basis)
+
+    # the modes, per parent orbit, primary irreps first
+    order = sorted(range(len(basis.components)),
+                   key=lambda i: basis.components[i].primary is not True)
+    actions = _parent_actions(parent, ref, big, small)
+    modes: list[tuple[IrrepModes, int, str, bool, np.ndarray]] = []
+    for i in order:
+        comp = basis.components[i]
+        for index, (label, v) in enumerate(_site_modes(comp, ref, labels, whiten)):
+            invariant = all(float(np.abs(_act(a, v) - v).max()) <= _RANK_TOL * max(
+                float(np.abs(v).max()), 1e-300) for a in actions)
+            modes.append((comp, index, label, invariant, v))
+
+    # the child's own field, paired with the reference
+    positions, species, owner, reps = _child_images(child)
+    raw, partner = _pair(positions, species, basis, tolerance)
+    shift = raw.mean(axis=0)
+    disp = raw - shift[None, :]
+
+    def inner(u, v) -> float:
+        return float(np.einsum("ni,ij,nj->", u, basis.metric, v)) / basis.lattice_points
+
+    amps = np.array([inner(v, disp) for *_, v in modes])
+    amps[np.abs(amps) < _RANK_TOL] = 0.0
+    fields = np.array([v for *_, v in modes]) if modes else np.zeros((0, len(ref.species), 3))
+    left = disp - np.tensordot(amps, fields, axes=1)
+    if math.sqrt(max(inner(left, left), 0.0)) > _POSITION_TOL:
+        raise ValueError(
+            "the child's displacement field is not reached by its own modes (residual "
+            f"{math.sqrt(inner(left, left)):.3g} A): its atoms do not have the symmetry "
+            "its group states")
+
+    # row D made concrete: the declared group carries each mode onto itself
+    rot_h, tran_h = _operations(_group(child))
+    for comp, index, label, _, v in modes:
+        for r, t in zip(rot_h, tran_h):
+            image = _wrap(basis.positions @ r.T.astype(float) + t[None, :])
+            for n, pos in enumerate(image):
+                d = basis.positions - pos[None, :]
+                d -= np.rint(d)
+                hit = np.flatnonzero(np.all(np.abs(d) < 1e-5, axis=1))
+                if len(hit) != 1 or float(np.abs(r @ v[n] - v[hit[0]]).max()) > (
+                        _RANK_TOL * max(float(np.abs(v).max()), 1e-300) + 1e-12):
+                    raise RuntimeError(
+                        f"mode {comp.irrep} #{index} ({label}) is not carried onto itself by "
+                        "an operation of the child's group; the phase's operator list and "
+                        "the mode field's stabiliser differ, which is a bug")
+
+    # the seed
+    broken = [i for i, (*_, inv_, _v) in enumerate(modes) if not inv_]
+    seeded: dict[str, float] = {}
+    if seed > 0.0 and broken and not np.any(amps[broken]):
+        n_h = len(rot_h)
+        for direction in _generic_seed(len(broken)):
+            trial = amps.copy()
+            trial[broken] = seed * direction
+            if _stabiliser_order(np.tensordot(trial, fields, axes=1), actions) == n_h:
+                amps = trial
+                seeded = {f"phases.0.distortion_modes.modes.{i}.amplitude": float(amps[i])
+                          for i in broken}
+                break
+        else:
+            raise ValueError(
+                f"no seed direction in the child's modes has exactly the child's group "
+                f"{child.space_group!r} as its stabiliser in the parent group: a generic "
+                "distortion of the parent in this cell has more symmetry than the stated "
+                "child, so the child is not an isotropy subgroup of its displacements; "
+                "state it in the group a generic distortion reaches")
+
+    # the record and the coordinates it derives
+    placed = np.tensordot(amps, fields, axes=1) if len(modes) else np.zeros_like(disp)
+    atoms = []
+    base_rows = []
+    for j, atom in enumerate(child.atoms):
+        i = reps[j]
+        n = int(partner[i])
+        xyz = np.array([_value(atom.x), _value(atom.y), _value(atom.z)])
+        origin = ref.child_frac[n] + shift
+        origin = origin + np.rint(xyz - origin)
+        base_rows.append(tuple(float(c) for c in origin))
+        moved = any(np.any(v[n] != 0.0) for *_, v in modes)
+        if not moved:
+            atoms.append(atom)
+            continue
+        new = origin + placed[n]
+        atoms.append(atom.model_copy(update={
+            c: getattr(atom, c).model_copy(update={"value": float(new[k]), "vary": False})
+            for k, c in enumerate("xyz")}))
+    site_map = tuple(int(ref.site[partner[reps[j]]]) for j in range(len(child.atoms)))
+    record = DistortionModes(
+        parent_space_group=str(parent.space_group),
+        transform=_format_transform(big, small),
+        reference_cell=_cell_of(basis.metric),
+        base=base_rows,
+        modes=[DistortionMode(
+            irrep=comp.irrep, k=comp.k, isotropy_group=comp.isotropy_group, index=index,
+            site=label, parent_invariant=invariant,
+            vectors=[tuple(float(x) for x in v[partner[reps[j]]])
+                     for j in range(len(child.atoms))],
+            amplitude=Parameter(value=float(a), unit="A"))
+            for (comp, index, label, invariant, v), a in zip(modes, amps, strict=True)])
+    phase = child.model_copy(update={"atoms": atoms, "distortion_modes": record})
+    return DisplaciveStatement(
+        phase=phase, basis=basis, transform=(big, small), site_map=site_map,
+        biso_ties=parent_site_ties(site_map), seed=seeded)
+
+
+# --------------------------------------------------------------------------
+# the parent group on a stated child's amplitudes (WP-1419 C4a)
+# --------------------------------------------------------------------------
+
+@dataclass(frozen=True, eq=False)
+class AmplitudeAction:
+    """The parent group acting on a stated child's mode fields (:func:`amplitude_action`).
+
+    ``fields[ν]`` is mode ν's displacement field over every atom of the child
+    cell, child fractions per Å; ``operations`` holds one (R, perm) per
+    operation g of the parent group G whose rotation keeps the child lattice,
+    lost translations included, modulo that lattice, with
+    (g·u)_{perm[n]} = R·u_n.  ``n_child`` is the order of the phase's own group
+    H counted the same way, and ``parent_invariant`` is the record's flag per
+    mode.  An operation that changes the child lattice is left out: it maps a
+    field over the child cell to one with another period, which no list of the
+    cell's atoms can hold.
+    """
+
+    fields: np.ndarray
+    operations: tuple[tuple[np.ndarray, np.ndarray], ...]
+    n_child: int
+    parent_invariant: np.ndarray
+
+    def field(self, amplitudes) -> np.ndarray:
+        """The displacement field Σ_ν A_ν·fields[ν] over the child cell."""
+        return np.tensordot(np.asarray(amplitudes, dtype=np.float64), self.fields, axes=1)
+
+    @staticmethod
+    def act(operation, field: np.ndarray) -> np.ndarray:
+        """g·u for one (R, perm) of :attr:`operations`."""
+        rot, perm = operation
+        out = np.empty_like(field)
+        out[..., perm, :] = field @ rot.T
+        return out
+
+    def stabiliser(self, amplitudes) -> list[tuple[np.ndarray, np.ndarray]]:
+        """The operations that leave the field of ``amplitudes`` unchanged, to round-off.
+
+        The structure's own symmetry in G, within the child lattice
+        (Perez-Mato, Orobengoa & Aroyo 2010, *Acta Cryst.* A**66**, 558).
+        """
+        u = self.field(amplitudes)
+        tol = _RANK_TOL * max(float(np.abs(u).max()) if u.size else 0.0, 1e-300)
+        return [g for g in self.operations if float(np.abs(self.act(g, u) - u).max()) <= tol]
+
+    def even(self, amplitudes) -> np.ndarray:
+        """Per mode: whether the pattern has no first-order term along it at ``amplitudes``.
+
+        True where the mode has no component invariant under the structure's
+        own symmetry (:meth:`stabiliser`): the pattern is invariant under that
+        group, so its gradient lies in the invariant fields, and a mode outside
+        them moves the pattern at second order in its amplitude, Δχ² at fourth.
+        At the parent (every amplitude outside the identity irrep zero) the
+        whole of G is the symmetry, and the record's ``parent_invariant``
+        answers for every operation, those that change the child lattice
+        included.  Elsewhere the stabiliser is read within the child lattice,
+        so a mode whose invariant part only an operation outside it would
+        remove reads False.
+        """
+        a = np.asarray(amplitudes, dtype=np.float64)
+        if not np.any(a[~self.parent_invariant]):
+            return ~self.parent_invariant
+        stab = self.stabiliser(a)
+        scale = max(float(np.abs(self.fields).max()), 1e-300)
+        out = np.zeros(len(a), dtype=bool)
+        for j, f in enumerate(self.fields):
+            mean = sum(self.act(g, f) for g in stab) / len(stab)
+            out[j] = float(np.abs(mean).max()) <= _RANK_TOL * scale
+        return out
+
+
+def amplitude_action(phase) -> AmplitudeAction:
+    """The parent group's action on the mode fields of ``phase`` (WP-1419).
+
+    ``phase`` carries ``Phase.distortion_modes`` (:func:`displacive_statement`).
+    Every operation g of the parent group G maps the child's displacement field
+    onto another, and χ² is invariant under it (χ²(g·u) = χ²(u), the
+    statement's seed argument; Perez-Mato, Orobengoa & Aroyo 2010, *Acta
+    Cryst.* A**66**, 558, eqs. 3–4 and § 7).  Built from the record alone: the
+    parent group is ``parent_space_group`` restated in the child frame through
+    ``transform``, and the field over the whole child cell is each listed
+    atom's ``vectors`` carried through the phase's own group.  A polar child's
+    ``base`` carries the global translation the statement removed, so each
+    operation is matched with the smallest uniform offset that maps every atom
+    onto one of its own species.
+    """
+    from ..magnetic.operators import parse_transform
+
+    record = phase.distortion_modes
+    if record is None:
+        raise ValueError(f"phase {phase.name!r} has no distortion_modes")
+    big, small = (np.asarray(x, dtype=np.float64) for x in parse_transform(record.transform))
+    inv = np.linalg.inv(big)
+    vectors = np.array([m.vectors for m in record.modes], dtype=np.float64)  # (M, J, 3)
+    rot_h, tran_h = _operations(_group(phase))
+
+    # the whole child cell: every image of each listed atom, its fields carried along
+    pos: list[np.ndarray] = []
+    species: list[str] = []
+    fields: list[np.ndarray] = []
+    for j, (xyz, atom) in enumerate(zip(np.asarray(record.base, dtype=np.float64),
+                                        phase.atoms, strict=True)):
+        for r, t in zip(rot_h, tran_h):
+            image = _wrap(r @ xyz + t)
+            if pos:
+                d = np.asarray(pos) - image[None, :]
+                d -= np.rint(d)
+                if np.any(np.all(np.abs(d) < 1e-5, axis=1)):
+                    continue
+            pos.append(image)
+            species.append(element_symbol(atom.species))
+            fields.append(vectors[:, j, :] @ r.T.astype(np.float64))
+    positions = np.asarray(pos)
+    field = np.transpose(np.asarray(fields), (1, 0, 2))  # (M, N, 3)
+    metric = _cell_metric_from(record.reference_cell)
+
+    codes = np.unique(np.asarray(species), return_inverse=True)[1]
+
+    def matched(rc, tc) -> np.ndarray | None:
+        """perm[n] = m with g·r_n ≡ r_m + δ for one uniform δ, the smallest that works."""
+        moved = positions @ rc.T + tc[None, :]
+        best = None
+        for m0 in np.flatnonzero(codes == codes[0]):
+            delta = moved[0] - positions[m0]
+            delta -= np.rint(delta)
+            d = (moved - delta)[:, None, :] - positions[None, :, :]
+            d -= np.rint(d)
+            hits = np.all(np.abs(d) < 1e-5, axis=2) & (codes[:, None] == codes[None, :])
+            if not np.all(hits.sum(axis=1) == 1):
+                continue
+            size = float(delta @ metric @ delta)
+            if best is None or size < best[0]:
+                best = (size, np.argmax(hits, axis=1).astype(np.intp))
+        return None if best is None else best[1]
+
+    rot_g, tran_g = _operations(resolve_group(record.parent_space_group, None))
+    lost_all = _lost_translations(big)
+    seen: dict[tuple, tuple[np.ndarray, np.ndarray]] = {}
+    for r, t in zip(rot_g, tran_g):
+        rc = inv @ r.astype(np.float64) @ big
+        if float(np.abs(rc - np.rint(rc)).max()) > _POSITION_TOL:
+            continue  # changes the child lattice
+        rc = np.rint(rc)
+        for lost in lost_all:
+            tc = inv @ (r.astype(np.float64) @ small + t + lost - small)
+            perm = matched(rc, tc)
+            if perm is None:
+                raise RuntimeError(
+                    "a parent operation did not map the child's reference structure onto "
+                    "itself; the record's base, transform and parent group disagree")
+            seen.setdefault((rc.astype(np.int64).tobytes(), perm.tobytes()), (rc, perm))
+    return AmplitudeAction(
+        fields=field, operations=tuple(seen.values()), n_child=len(rot_h),
+        parent_invariant=np.array([m.parent_invariant for m in record.modes], dtype=bool))
+
+
+def _cell_metric_from(cell) -> np.ndarray:
+    """The metric of an (a, b, c, α, β, γ) tuple, Å and degrees."""
+    a, b, c, al, be, ga = (float(v) for v in cell)
+    ca, cb, cg = (math.cos(math.radians(v)) for v in (al, be, ga))
+    return np.array([[a * a, a * b * cg, a * c * cb],
+                     [a * b * cg, b * b, b * c * ca],
+                     [a * c * cb, b * c * ca, c * c]], dtype=np.float64)

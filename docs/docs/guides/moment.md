@@ -115,4 +115,5 @@ The full script is `examples/guides/moment.py`.
 ## See also
 
 - [`solve_magnetic`](../reference/magnetic.md#solve_magnetic) refits its own nuclear reference under the stages you give it, which is the step both routes here build on.
+- `plan="magnetic_structural"` stages route 2's refit: the moment moduli, then every moment degree of freedom, then the nuclear terms in the standard order, with the moments free to the end ([Plans](../concepts/plans.md)). A plan that frees no moment says so with [`PLAN_FREES_NO_MOMENT`](../reference/diagnostics-refinement.md#plan_frees_no_moment).
 - [How to keep a parameter fixed whatever the plan frees](hold.md) is the other way to keep a nuclear term at its reference value: `Refinement.hold` pins it against every stage of every plan, where route 1 leaves it out of the stages.

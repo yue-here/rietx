@@ -377,7 +377,8 @@ def _screen_diagnostics(status: str, net: float | None) -> list:
     from rietx.indexing.diagnostics import extinction_diagnostics
 
     return extinction_diagnostics(SimpleNamespace(
-        status=status, reference_rwp_net=net, prefit_rwp=None, candidates=[],
+        status=status, reference_rwp_net=net, perfect_fit_rwp_net=None,
+        prefit_rwp=None, candidates=[],
         lattice_group="F m -3 m", system="cubic", centring="F",
         cell=(5.4311, 5.4311, 5.4311, 90.0, 90.0, 90.0), two_theta_range=(12.1, 60.0)))
 
@@ -583,23 +584,44 @@ def _windows_stale(axial_to: float | None) -> list:
         cost_final=1.0, window_loss=loss)])
 
 
+def _held_moment(plan: str, *, moment: bool = True) -> list:
+    """``refine._held_moment_diagnostics`` on the #1081 synthetic child's
+    start (moment 3.6 against 3.0 μ_B), read off the table before any stage,
+    as ``fit`` reads it; ``moment=False`` drops every moment block."""
+    from rietx import Instrument, Structure
+    from rietx.params.vector import ParameterTable
+    from rietx.refine import _held_moment_diagnostics
+    from rietx.strategy.staged import resolve_plan
+    from tests.test_magnetic_structural_preset import _start
+
+    phase = _start()
+    if not moment:
+        for atom in phase.atoms:
+            atom.moment = None
+        phase.magnetic_symmetry = None
+    structure = Structure(phases=[phase])
+    table = ParameterTable(
+        structure, Instrument.constant_wavelength_neutron(1.54, fwhm_deg=0.35))
+    return _held_moment_diagnostics(resolve_plan(plan, "rietveld"), table,
+                                    structure, "rietveld")
+
+
 def _stale_structure(*, drift: bool):
     """The carbons of ``tests/test_planarity_restraints.py`` with the bond
-    C1-C2 left out of the pair list, and the contact keys of where the run
-    started.  ``drift`` walks C5 from 4.0 to 2.5 A of C3, past r0 from outside
-    the list."""
-    from rietx.model.restraints import anti_bump_contact_keys
+    C1-C2 left out of the pair list, and the phase as the run started.
+    ``drift`` walks C5 from 4.0 to 2.5 A of C3, past r0 from outside the
+    list; without it C5 moves to 3.9 A, still outside, so the search runs and
+    the bond the caller left out is all it could name."""
     from rietx.schemas.common import Parameter
     from rietx.schemas.structure import Structure
     from tests.test_planarity_restraints import _bonded_c
 
-    ph = _bonded_c(False).phases[0]
-    since = anti_bump_contact_keys(ph)
-    if drift:
-        ph = ph.model_copy(update={"atoms": [
-            *ph.atoms[:4],
-            ph.atoms[4].model_copy(update={"y": Parameter(value=0.70 + 2.5 / 12)})]})
-    return Structure(phases=[ph]), [since]
+    start = _bonded_c(False).phases[0]
+    ph = start.model_copy(update={"atoms": [
+        *start.atoms[:4],
+        start.atoms[4].model_copy(update={
+            "y": Parameter(value=0.70 + (2.5 if drift else 3.9) / 12)})]})
+    return Structure(phases=[ph]), [start]
 
 
 def _stale_fires() -> list:
@@ -611,12 +633,44 @@ def _stale_fires() -> list:
 
 
 def _stale_silent() -> list:
-    """The same list where nothing moved: the bond the caller left out is
-    inside r0 from the start, and is theirs."""
+    """The same list where C5 moved but stayed outside r0: the bond the caller
+    left out is inside r0 from the start, and is theirs."""
     from rietx.refine import _restraint_pairs_stale_diagnostics
 
     return _restraint_pairs_stale_diagnostics(*_stale_structure(drift=False))
 
+
+
+def _read_text_pattern(name: str, text: str) -> list:
+    """``read_pattern``'s diagnostics for a text file, whether or not it is
+    refused: the refusal appends its record before it raises."""
+    from rietx.io.formats import TotalScatteringRefused
+    from rietx.io.readers import read_pattern
+
+    found: list = []
+    with tempfile.TemporaryDirectory() as tmp:
+        path = pathlib.Path(tmp) / name
+        path.write_text(text, encoding="utf-8")
+        try:
+            read_pattern(path, diagnostics=found)
+        except TotalScatteringRefused:
+            pass
+    return found
+
+
+_TS_ROWS = "".join(f"{10.0 + 0.02 * i:.2f} {500 + i % 7}\n" for i in range(60))
+
+
+def _total_scattering_fires() -> list:
+    """Issue #192's case: one ``#L`` line labelling r against G(r)."""
+    return _read_text_pattern("small.dat", "#L r(A) G(r)\n" + _TS_ROWS)
+
+
+def _total_scattering_silent() -> list:
+    """The same rows labelled 2θ by a SPEC ``#L`` line, and a ``.xy`` whose
+    comment only mentions G(r): both are diffraction scans."""
+    return (_read_text_pattern("spec.dat", "#L 2Theta  Detector\n" + _TS_ROWS)
+            + _read_text_pattern("scan.xy", "# compare with the G(r) later\n" + _TS_ROWS))
 
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
@@ -638,8 +692,15 @@ SILENCE: dict[str, Pair] = {
         _parametric_range_fires, _parametric_range_silent, "tests/test_parametric_series.py"),
     "PATTERN_NET_HAS_BACKGROUND": Pair(
         _net_background_fires, _net_background_silent, "tests/test_readers.py"),
+    "PATTERN_TOTAL_SCATTERING": Pair(
+        _total_scattering_fires, _total_scattering_silent, "tests/test_readers.py"),
     "PATTERN_UNDERSAMPLED": Pair(
         _undersampled_fires, _undersampled_silent, "tests/test_data_support.py"),
+    "PLAN_FREES_NO_MOMENT": Pair(
+        functools.partial(_held_moment, "mccusker_structural"),
+        lambda: (_held_moment("magnetic_structural")
+                 + _held_moment("mccusker_structural", moment=False)),
+        "tests/test_magnetic_structural_preset.py"),
     "PATTERN_WEIGHT_UNUSABLE": Pair(
         _weight_unusable_fires, _weight_unusable_silent, "tests/test_readers.py"),
     "RESOLUTION_UNCONSTRAINED": Pair(

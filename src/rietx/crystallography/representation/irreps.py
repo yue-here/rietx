@@ -30,6 +30,13 @@ these names and these conventions.**
     inversion_character(irrep)                -> complex | None
     inversion_parity(irrep)                   -> int | None
 
+    # the real-k door (WP-1992): k on a declared symmetry line
+    little_group_on_line(space_group, q, lambdas=None)          -> LittleGroup
+    extended_little_group_on_line(space_group, q, lambdas=None) -> (LittleGroup, ε per op)
+    factor_system_free_exponents(little)      -> (n, n, d) object array of Fraction
+    canonical_line(space_group, q)            -> ModulationVector
+    star_on_line(space_group, q)              -> tuple[ModulationVector, ...]
+
 ``space_group`` is anything :func:`~rietx.crystallography.symmetry.get_spacegroup`
 resolves — an H-M symbol, a setting symbol with its ``:`` extension, or a
 ``gemmi.SpaceGroup``.  ``k`` is a triple of **rationals** (``Fraction``, ``int``,
@@ -113,6 +120,23 @@ zone boundary is larger than that set, and a face line such as (u, 0, 1/2)
 gives other phases, which go through ``exp``).  The irrep
 matrices come out of a numerical eigendecomposition and carry
 :data:`IRREP_ATOL`.
+
+**An incommensurate k is a declared line, never a float** (WP-1992).  A k
+with an irrational component is k = r + Σ λ_j d_j: a
+:class:`~rietx.crystallography.superspace.ModulationVector` (r exact, the d_j
+integer directions) plus the values λ_j.  Its little group is exact —
+f R = f on every free direction and Rᵀr − r ∈ L*, the shared line rule
+:func:`~rietx.crystallography.superspace.line_rule` — so it cannot snap to a
+nearby rational point's larger group as a float tolerance does (spgrep
+0.7.0 snaps below |Rᵀk − k| ≈ 1e-8, measured by WP-1992's first task).
+:func:`as_kvector`, :data:`K_MAX_DENOMINATOR` and :data:`K_FLOAT_TOL` serve the
+commensurate door only and are unchanged.  On a line the factor system splits
+into an exact rational exponent (−r·a) and the free part −Σλ_j d_j·a, which
+needs the λ_j; G_k does not depend on them, its irreps' matrices do.  2k is
+never a lattice vector there, so :attr:`LittleGroup.has_minus_k` is False and
+the k/−k pair is carried by the ε = −1 cosets of the extended group G_{k,−k}
+(Perez-Mato, Ribeiro, Petříček & Aroyo, 2012, *J. Phys.: Condens. Matter*
+**24**, 163201, eq. (16)).
 
 **Labels.**  The labels here are positional (``S1``, ``S2``, … in a
 deterministic order: by dimension, then by character) and are **not** CDML
@@ -203,9 +227,10 @@ def _as_fraction(value, *, what: str) -> Fraction:
         if abs(float(f) - float(value)) > K_FLOAT_TOL:
             raise ValueError(
                 f"{what} component {float(value)!r} is not a rational with denominator "
-                f"<= {K_MAX_DENOMINATOR}. Small irreps are defined here for a commensurate "
-                "k only; an incommensurate propagation vector needs the superspace route "
-                "and is not implemented. Pass an exact Fraction if the value is rational."
+                f"<= {K_MAX_DENOMINATOR}. This entry point is for a commensurate k; for an "
+                "incommensurate one declare its line and use little_group_on_line(space_group, "
+                "q, lambdas) with q a superspace.ModulationVector such as '(0,0,γ)'. Pass an "
+                "exact Fraction if the value is rational."
             )
         return f
     raise TypeError(f"{what} component of type {type(value).__name__} is not a rational")
@@ -517,6 +542,11 @@ class LittleGroup:
     operation ``SmallIrrep.matrices[i]`` belongs to.  ``indices`` gives each
     one's position in the parent operation list, which is what a caller needs
     to line these up with a site orbit or with an oracle's own list.
+
+    ``line`` and ``lambdas`` describe an incommensurate k = r + Σλ_j d_j
+    (module docstring); ``k`` then holds r, the exact rational part.  Their one
+    writer is :func:`little_group_on_line` (and the extended variant); every
+    rational-k builder leaves both ``None``, which means "k is ``k``".
     """
 
     k: KVector
@@ -525,6 +555,19 @@ class LittleGroup:
     indices: tuple[int, ...]
     centrings: tuple[KVector, ...]
     spacegroup: str | None = None
+    line: object | None = None            # superspace.ModulationVector
+    lambdas: tuple[float, ...] | None = None
+
+    @property
+    def k_value(self) -> np.ndarray:
+        """k as floats: ``k`` itself, or r + Σλ_j d_j on a line (needs λ)."""
+        out = np.array([float(c) for c in self.k])
+        if self.line is not None:
+            if self.lambdas is None:
+                raise ValueError("this little group was built without the line's λ values")
+            for lam, d in zip(self.lambdas, self.line.free):
+                out = out + float(lam) * np.asarray(d, dtype=float)
+        return out
 
     @property
     def order(self) -> int:
@@ -589,7 +632,10 @@ class LittleGroup:
 
     @property
     def has_minus_k(self) -> bool:
-        """True when 2k is a reciprocal lattice vector, i.e. −k ≡ k."""
+        """True when 2k is a reciprocal lattice vector, i.e. −k ≡ k.  Never
+        on an incommensurate line, where 2k has an irrational part."""
+        if self.line is not None:
+            return False
         return _is_reciprocal_lattice_vector(
             tuple(2 * c for c in self.k), self.centrings  # type: ignore[arg-type]
         )
@@ -686,7 +732,8 @@ def factor_system_exponents(little: LittleGroup) -> np.ndarray:
     an all-zero table is the linear case.  On the zone boundary of a
     non-symmorphic group it may or may not be all zero (P n m a at
     (0, 0, 1/2) is not; P 1 2₁/c 1 at (1/2, 0, 0) is), and a non-zero table
-    can still be a coboundary (F d -3 m at L).
+    can still be a coboundary (F d -3 m at L).  On a line this is the rational
+    part (−r·a_ij); :func:`factor_system_free_exponents` is the rest.
     """
     _, shifts = little.composition
     n = little.order
@@ -695,6 +742,27 @@ def factor_system_exponents(little: LittleGroup) -> np.ndarray:
         for j in range(n):
             phase = -sum(kc * ac for kc, ac in zip(little.k, shifts[i][j]))
             out[i, j] = phase - Fraction(math.floor(phase))
+    return out
+
+
+def factor_system_free_exponents(little: LittleGroup) -> np.ndarray:
+    """The free part of a line's factor system: ``(n, n, d)`` of exact
+    ``Fraction`` d_j·a_ij, so that ω(i, j) = exp(2πi(e_ij − Σ_j λ_j d_j·a_ij))
+    with e_ij from :func:`factor_system_exponents`.  All zero off a line.
+
+    ω(i, j) = exp(−2πi k·a_ij) is Bradley & Cracknell (1972), *The
+    Mathematical Theory of Symmetry in Solids*, § 3.7 pp. 155-157; k on a
+    declared line, r + Σ_j λ_j d_j, is Perez-Mato, Ribeiro, Petříček & Aroyo
+    (2012), *J. Phys.: Condens. Matter* **24**, 163201, eq. (16).
+    """
+    _, shifts = little.composition
+    n = little.order
+    free = () if little.line is None else little.line.free
+    out = np.empty((n, n, len(free)), dtype=object)
+    for i in range(n):
+        for j in range(n):
+            for f, d in enumerate(free):
+                out[i, j, f] = sum(Fraction(int(dc)) * ac for dc, ac in zip(d, shifts[i][j]))
     return out
 
 
@@ -724,7 +792,30 @@ def factor_system(little: LittleGroup) -> np.ndarray:
     for i in range(n):
         for j in range(n):
             out[i, j] = _phase(exps[i, j])
+    if little.line is not None:
+        _require_little_group_of_k(little)
+        free = factor_system_free_exponents(little)
+        if np.any(free != 0):
+            if little.lambdas is None:
+                raise ValueError(
+                    "the factor system on this line depends on λ (d·a_ij ≠ 0); build "
+                    "the little group with little_group_on_line(..., lambdas=...)")
+            lam = np.asarray(little.lambdas, dtype=float)
+            ph = np.array([[sum(float(x) * lv for x, lv in zip(free[i, j], lam))
+                            for j in range(n)] for i in range(n)])
+            out = out * np.exp(-2j * np.pi * ph)
     return out
+
+
+def _require_little_group_of_k(little: LittleGroup) -> None:
+    from ..superspace.operators import line_rule
+
+    for r in little.rotations:
+        rule = line_rule(r.tolist(), little.line)
+        if rule is None or rule[0] != 1:
+            raise ValueError(
+                "this is the extended group G_{k,-k} (it holds an operation sending "
+                "k to -k); small irreps are those of G_k, little_group_on_line")
 
 
 # --------------------------------------------------------------------------
@@ -937,6 +1028,114 @@ def small_irreps(space_group, k) -> tuple[SmallIrrep, ...]:
     p. 170).
     """
     return small_irreps_of(little_group(space_group, k))
+
+
+# --------------------------------------------------------------------------
+# the real-k door: k on a declared line
+# --------------------------------------------------------------------------
+
+def _as_line(q):
+    from ..superspace.operators import ModulationVector
+
+    return ModulationVector.parse(q)
+
+
+def _line_members(space_group, q, *, extended: bool):
+    from ..superspace.operators import line_rule
+
+    sg = _resolve(space_group)
+    cens = _centrings(sg)
+    keep, eps = [], []
+    for i, op in enumerate(sg.operations().sym_ops):
+        r = _op_rotation(op)
+        rule = line_rule(r.tolist(), q)
+        if rule is None or (rule[0] == -1 and not extended):
+            continue
+        if _is_reciprocal_lattice_vector(rule[1], cens):
+            keep.append(i)
+            eps.append(rule[0])
+    return sg, cens, keep, tuple(eps)
+
+
+def _line_group(sg, cens, keep, q, lambdas) -> LittleGroup:
+    ops = sg.operations().sym_ops
+    lam = None
+    if lambdas is not None:
+        lam = tuple(float(x) for x in (lambdas if np.ndim(lambdas) else (lambdas,)))
+        if len(lam) != len(q.free):
+            raise ValueError(f"{len(q.free)} λ value(s) needed for q = {q.label()}")
+    return LittleGroup(
+        k=tuple(Fraction(c) for c in q.rational),  # type: ignore[arg-type]
+        rotations=np.array([_op_rotation(ops[i]) for i in keep],
+                           dtype=np.int64).reshape(len(keep), 3, 3),
+        translations=tuple(_op_translation(ops[i]) for i in keep),
+        indices=tuple(keep), centrings=cens, spacegroup=sg.xhm(), line=q, lambdas=lam)
+
+
+def little_group_on_line(space_group, q, lambdas=None) -> LittleGroup:
+    """G_k for k on a declared incommensurate line, exactly.
+
+    ``q`` is a :class:`~rietx.crystallography.superspace.ModulationVector` or
+    its text (``"(0,0,γ)"``, ``"(1/2,0,γ)"``, ``"(α,α,0)"``), r and d in the
+    conventional reciprocal basis; ``lambdas`` the λ_j, needed only for the
+    irreps' matrices (G_k itself does not depend on them).  An operation is
+    kept iff d R = d for every free direction and Rᵀr − r ∈ L*
+    (:func:`~rietx.crystallography.superspace.line_rule`; Bradley & Cracknell
+    1972 § 3.4 for the little group).  The λ_j are taken rationally
+    independent of each other and of 1, which is what "incommensurate" means;
+    the line is declared, never inferred from a float, so no tolerance
+    decides membership.
+    """
+    qv = _as_line(q)
+    sg, cens, keep, _ = _line_members(space_group, qv, extended=False)
+    return _line_group(sg, cens, keep, qv, lambdas)
+
+
+def extended_little_group_on_line(space_group, q, lambdas=None
+                                  ) -> tuple[LittleGroup, tuple[int, ...]]:
+    """G_{k,−k} on a declared line and ε per operation.
+
+    Adds to :func:`little_group_on_line` the operations with d R = −d and
+    Rᵀr + r ∈ L* (Perez-Mato et al. 2012 eq. (16)); ε = ±1 is the operation's
+    action on the internal coordinate, the ε of
+    :class:`~rietx.crystallography.superspace.SuperspaceOperator` (de Wolff,
+    Janssen & Janner 1981; Stokes, Campbell & van Smaalen 2011 eq. (1)).  The
+    returned group has no small irreps of its own (:func:`factor_system`
+    refuses it); it is the bridge from the 3D group to the superspace
+    operators.
+    """
+    qv = _as_line(q)
+    sg, cens, keep, eps = _line_members(space_group, qv, extended=True)
+    return _line_group(sg, cens, keep, qv, lambdas), eps
+
+
+def canonical_line(space_group, q):
+    """The line with r reduced into the first cell of the true reciprocal
+    lattice (:func:`canonical_kvector`), the free directions kept."""
+    from ..superspace.operators import ModulationVector
+
+    qv = _as_line(q)
+    return ModulationVector(canonical_kvector(space_group, qv.rational), qv.free)
+
+
+def star_on_line(space_group, q) -> tuple:
+    """The distinct arms (Rᵀr mod L*, Rᵀd) of the star of a line point, as
+    ``ModulationVector`` values.  Their
+    number times |G_k / T| is the order of the point group."""
+    from ..superspace.operators import ModulationVector
+
+    sg = _resolve(space_group)
+    qv = _as_line(q)
+    seen: dict = {}
+    for op in sg.operations().sym_ops:
+        r = _op_rotation(op)
+        arm_r = tuple(sum(Fraction(int(r[a][b])) * qv.rational[a] for a in range(3))
+                      for b in range(3))
+        arm_d = tuple(tuple(int(sum(int(r[a][b]) * d[a] for a in range(3))) for b in range(3))
+                      for d in qv.free)
+        key = (canonical_kvector(sg, arm_r), arm_d)
+        seen.setdefault(key, None)
+    return tuple(ModulationVector(r, d) for r, d in sorted(seen))
 
 
 def inversion_character(irrep: SmallIrrep) -> complex | None:

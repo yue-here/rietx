@@ -140,6 +140,49 @@ rule above applies to the form factors.
 
 ### Inherited
 
+- **From WP-1329 (closed 2026-11-01), three notes it could not finish, folded here
+  because this WP owns the moment and its hold.** Each was read against main
+  `4a93e8587` before the move (the code, not a run); none was run.
+  (1) *The moment in a joint fit is never held as flat when its DOFs are per-histogram*
+  (WP-1325's finding, 2026-10-14; found by reading, never run). Under
+  `SharingMap(per_histogram=["phases.*"])` a moment DOF's scoped name is
+  `hist.{h}.…`, and `multi._flat_moments_multi` compares scoped free paths against each
+  table's bare entry names, so none matches and nothing is held;
+  `_turn_flat_axes_multi` then writes one turn into every table. WP-1325 fixed the same
+  class for a phase's cell (`multi._unseen` judges each entry in its own histogram). The
+  task: run it on a two-histogram moment with a flat direction first, then fix by the
+  same rule if it holds.
+  (2) *A powder twin is read as path dependence* (WP-1938 D13, 2026-10-11). Reversing
+  every moment gives the same powder pattern, and so does a mirror of the lattice that
+  fixes the site. On `tests/test_moment_angle_chart.py`'s series (one Mn on **a** in
+  P m m m) the backward chain, where the azimuth is unmeasured (esd 10²-10⁴), lands on a
+  twin: φ = 0.077 under LM, −0.077 under TRF, against the forward chain's 3.065 at
+  equal χ². `sequential._angle_difference` takes an angle modulo a whole turn only, so
+  both fences (`_path_dependence_diagnostics`, `_discontinuity_steps`) report up to
+  97σ. The task: compare a moment's direction modulo the twins the powder cannot
+  separate. Time reversal is universal and a phase reverses all its moments together. A
+  mirror depends on the crystal and the site. The GUI's disagreement column must measure
+  what the fences do (`sequential._angle_paths`).
+  (3) *`MagneticTrajectory` and `MagneticOnset` ship without a provisional declaration a
+  test can see* (WP-1541, 2026-10-03). Both live in `rietx.schemas.sequential` beside 102
+  stable names, so no `PROVISIONAL_MODULES` prefix covers them, and only the
+  compatibility page's prose says they are provisional. The fix: move both to a module of
+  their own (for example `rietx.schemas.magnetic_series`), re-export them from
+  `rietx.schemas.sequential`, declare it in `tests/api_surface.py` with the reason that
+  they were measured on one synthetic ramp, one two-pattern pair and one real k ≠ 0 ramp
+  (PR #1073), and the bracket-folding rule changed after they landed (#589); then drop
+  the prose sentence.
+
+- **From WP-2010 (2026-10-27): the magnetic "not yet validated" label became a report
+  sentence, and a published moment would verify, not validate.** The maintainer ruled
+  that the validation record is for the developers (DESIGN.md § Rules, 2, narrowed that
+  day): no help entry or `capabilities()` arm says a feature is unvalidated. What a
+  caller sees instead is one sentence in the fit report beside a moment, saying the
+  package's moment has no independent measurement, read from 2010's feature registry. A
+  published moment refined from the same pattern verifies the code; an independently
+  measured moment (magnetometry, a single-crystal experiment) would validate it. The
+  2026-10-19 note below describes the label as first proposed; 2010's task list
+  carries the wording change for this file.
 - **From WP-2002 (2026-10-23, 8th session, PR #1113): a joint fit can hold a moment direction its record does not name.** In `MultiHistogramRefinement.fit`, a phase `_rehold_multi` releases is then scanned by `_rehold_flat_moments_multi` (`multi.py` ~852); a direction it finds flat is restored and held in the table, but `held` (~1496) subtracts `released`, so that path is missing from `held` and from `carried_hold`, the next stage does not lift it, and `StageResult.collapsed` is then not a subset of `held`. Found by the lane that added `collapsed`; predates it; a fix may move values.
 - **2026-10-23, from [1326](1326-satellites-without-a-moment.md)'s close: a
   k ≠ 0 moment refined on real data, and the published structure each pattern
@@ -381,6 +424,34 @@ rule above applies to the form factors.
   must still validate") and `Refinement.__init__` calling it on a refined phase
   disagree; whichever option lands decides which one is right.
 
+- 2026-10-31, from the issue triage (issue #1260): the published LaMnO₃
+  references this WP's 2026-10-19 Inherited note said nobody had searched for.
+  Huang et al. (1997), *Phys. Rev. B* 55, 14987: magnetic group Pn′ma′ (p.
+  14988), spin along a, μ(Mn) = 3.65(3) μ_B at 14 K and 2.09(3) μ_B at 121 K
+  (Table IV, sample IIa, NIST BT-1). Moussa et al. (1996), *Phys. Rev. B* 54,
+  15149: μ(Mn) = 3.87(3) μ_B at 1.4 K (Table I, Orphée G4.2, λ = 2.59 Å, Pbnm,
+  moment along b, which is a in the Pnma setting). The proposed acceptance:
+  `solve_magnetic` ranks Pn′ma′ (BNS 62.448) first; the 50 K |m| lies within
+  the interval spanned by each paper's value scaled to 50 K by that paper's
+  own temperature curve (Huang Fig. 2, Moussa Fig. 5; reading them is part of
+  the work); the moment lies along a; the report says the c component has no
+  published value (Moussa p. 15154 calls the G_x component too weak to
+  measure). Tiering, under DESIGN.md § Rules 2: Huang verifies once the
+  tutorial pattern is confirmed to be Huang's (the tutorial credits Q. Huang;
+  whether it is sample IIa is not established). Moussa validates only if a
+  powder neutron refinement of a different specimen, laboratory and instrument
+  counts as an independent measurement. Rule 2's examples (a certified cell, a
+  weighed composition, a composition from another probe) do not settle it, and
+  WP-2010's wording for this WP names magnetometry or a single-crystal
+  experiment. That ruling is the maintainer's. Checked against the tree at
+  d87c8cc91: `tests/test_acceptance_magnetic_lamno3.py` pins `PN_MA =
+  "62.448"`; `docs/VALIDATION.md` records `lamno3_bt1` as `characterisation`
+  with |m| 3.560 ± 0.043 μ_B and m = (3.546, 0, 0.317) μ_B. The group-ranking
+  test is WP-1418's (`test_lamno3_at_50k_ranks_a_type_first_of_four`); only
+  its tier would change. Open PR #1266 (WP-2010) lists #1260 as a filed
+  follow-up and tags the LaMnO₃ claims `features=("magnetic_structure",)` at
+  `characterisation`, which agrees with the issue.
+
 ## Non-goals
 
 - Determining a magnetic structure: representation analysis, k-SUBGROUPSMAG,
@@ -490,6 +561,13 @@ rule above applies to the form factors.
   [1312](1312-neutron-followthrough.md) the joint-fit audit this term joins.
 
 ## Handover log
+
+- **2026-11-01** (ghostshift close-batch, PR #1287) — no work on the moment this session. WP-1329 closed and its three unfinished notes were folded into this WP's `### Inherited`: the joint-fit hold of a per-histogram moment, the powder-twin reading of path dependence in the series fences, and the provisional declaration for `MagneticTrajectory` and `MagneticOnset`. The maintainer ruled the fold on 2026-11-01. This WP was chosen because it owns the moment and its hold, and no session or open pull request holds it. Nothing else in the WP moved, and the code of the three notes was read, not run.
+  Next: unchanged (the analytic moment branch); the three notes wait in `### Inherited`, and note (1) should be run on a two-histogram moment before it is fixed.
+
+### 2026-10-31 — the moment moduli's analytic Jacobian landed from outside
+
+PR #1206 merged (`ce2e03d7`) after two `/pr-review` rounds. This is the handover entry the review promised the contributor, and it holds what the PR's code comments point at. A moment modulus's Jacobian column is now analytic. An angle column keeps the peak chain's forward difference. `scattering.d_magnetic_f2_d_dofs` gives ∂(p²⟨|F_⊥|²⟩)/∂(every moment DOF of a phase) in one pass. F is linear in each moment and P = I − Q̂Q̂ᵀ is real, symmetric and idempotent, so ∂|F_⊥|²/∂d = 2·Re[(P·F)ᴴ·∂F/∂d] with no ∂P term. `least_squares._moment_column` takes the moduli of one phase at any atom, with an affine tie between two sites or a named variable summed through C. `_moment_reach_ok` declines everything else by name. The exact oracle holds the built columns to 2.6e-14 (bar 3e-13), where the replaced peak-chain column sits at 5.0e-7. A modulus driven by a variable meets it at 2.7e-14. Angles stay declined because an exact angle column is 2.3e-16 of the modulus column at a start the symmetry fixes. On `test_magnetic_moment_frame`'s P 1 2/m 1 fixture the fits from β₀ = 101.1° and 103.0° then stopped at φ = 0, with χ² 10.9 and 3.7 above the minima at φ = ±0.047, and the pinned |m| = 3.1772(5) failed (3.1804, 3.1766). That stall was measured on darwin/arm64. On linux/x86-64 the round-off column walked off unaided, so leaving depends on round-off, and the decline stands on both. Measured on the pre-split head with the angles analytic too: Cr₂WO₆ 4 K shows no measurable change in time; eight collinear sites fit in 0.22-0.32 s against 0.39-0.52 s; a near-flat case (Pmmm with b → a, the azimuth about c flat) agrees in the modulus esd to ≤ 6e-6 and has no angle esd in either arm; a 24-DOF fit with a near-singular normal matrix moved every esd by 1.65 %. The 8-site n = 3 fit takes about 52 s either way, 96 % of it in `stationary_angle_test` → `_joint_newton` (its finite-difference second derivatives), which #1207 proposes to make analytic. After the split, with the moduli alone, Cr₂WO₆ 4 K against the same fit with the modulus columns forced to the forward difference: χ² 4.4e-11 relative, values 5.5e-6 esd, esds 7.2e-7 relative, Rwp 0.10475 in both. The either-way test's bars carry both platforms: values 1.0e-9 esd (darwin/arm64) and 4.1e-9 (linux/x86-64), esds 5.9e-7 and 6.0e-7 relative, against bars of 1e-4 and 6e-6. No `_audit` row changed (`tests.audit_delta`: no row or declaration changed). The angle seed and the angles' dispatch left the PR under #1224's ruling that a machinery PR adds no tier-3 row, and they return together in their own PR. That PR owes the tilt varied over at least three unrelated families (the frame fixture, Cr₂WO₆ 4 K, LaMnO₃ BT-1, and the 20 simulated structures `SEED_TILT` was first measured on), a comparison with the curvature-sign step #1207 would allow, and a positive arm that asserts the seed's record and the seeded minimum, since the unseeded stall depends on the platform. Still declined: a split magnetic draw (WP-1343) with extinction evaluated, whose cross-component term E(|F|²_tot) is not written, and every traced backend, by name. CI at the head had `fast py3.11 2/2` hang after 99 % with no failing test. The Jacobian task stays unticked, and its note "No analytic moment branch yet" now holds for angles only. Gate (the six PRs of this round merged together onto main `766c3505d`; macOS arm64, `[dev,jax]`, Python 3.12): fast 12 884 passed, 223 skipped, 32 xfailed; slow 435 passed, 18 skipped, 16 xfailed, with one GUI-boot socket timeout under load that passed alone in 5 s; ruff and the `-W` manual build clean.
 
 ### 2026-10-07 — #612's refusals landed from outside
 

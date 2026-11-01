@@ -712,6 +712,41 @@ def test_a_supercell_the_pattern_shows_rises_above_its_parent_and_a_phantom_does
         assert ordered[0] is (child if first == "child" else parent)
 
 
+def test_the_check_screens_each_cell_on_its_own_corrected_lines(cubic_peaks,
+                                                                monkeypatch):
+    """WP-2030, on #941's containment check: which lines a parent indexes is
+    read on the parent's own shift correction, never the child's.
+
+    ``screen_for`` hands each candidate its own ``scored_positions``; a parent
+    read on the child's lines indexes none of them and every extra the child
+    sees reads unexplained, which is "supported" for the wrong reason.
+    """
+    from rietx.indexing import screen
+    from rietx.indexing.engines import scored_positions
+
+    double = (TRUE_A, TRUE_A, 2 * TRUE_A, 90.0, 90.0, 90.0)
+    parent = _candidate(TRUE_A).model_copy(update={
+        "shift_template": "constant", "shift_coefficient": 0.03})
+    child = _candidate(TRUE_A, cell=double, system="tetragonal",
+                       lattice_group="P 4/m m m", volume=2 * TRUE_A ** 3)
+    seen = []
+    real = screen.screen_candidate
+
+    def spy(pattern, cell, system, centring, **kwargs):
+        seen.append((tuple(cell), kwargs["q_obs"]))
+        return real(pattern, cell, system, centring, **kwargs)
+
+    monkeypatch.setattr(screen, "screen_candidate", spy)
+    supercell_checks([parent, child], cubic_peaks, q_match=cubic_peaks.q_esd(),
+                     k_sigma=3.0)
+    by_cell = dict(seen)
+    assert np.array_equal(by_cell[tuple(float(v) for v in parent.cell)],
+                          scored_positions(cubic_peaks, parent)[0])
+    assert np.array_equal(by_cell[tuple(float(v) for v in child.cell)],
+                          scored_positions(cubic_peaks, child)[0])
+    assert not np.array_equal(*by_cell.values())
+
+
 def test_a_phantom_supercell_is_refuted_graded_down_and_told_where_to_look(
         cubic_peaks):
     """The check on a list, the caveat it raises, and the message that names it.
@@ -975,6 +1010,13 @@ def test_index_pattern_recovers_the_cell_and_refutes_its_supercells(lab6_pattern
     assert root2.confidence_caveats == ["predicted_but_absent"]
     assert root2.lebail.predicted_but_absent_uncancellable_in_window >= 1
     assert result.candidates.index(root2) > result.candidates.index(best)
+    # the density compared across candidates (#941's follow-up), written by
+    # the run: the truth is the cleanest (excess 0), the a√2 I cell carries
+    # its windowed absences over and above it, which the raw count shares
+    # with magnetite's and PbSO₄'s true cells
+    assert best.lebail.predicted_but_absent_excess_in_window == 0.0
+    assert root2.lebail.predicted_but_absent_excess_in_window == pytest.approx(
+        root2.lebail.predicted_but_absent_uncancellable_in_window)
 
 
 def test_a_peaks_only_run_abstains_by_declaration(cubic_peaks):

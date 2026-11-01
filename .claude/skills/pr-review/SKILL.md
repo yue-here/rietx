@@ -97,12 +97,15 @@ whether a maintainer has commented — **and the reason for its rank**:
 2. **Outside PR edits `docs/ROADMAP.md` or `docs/wp/**`** — a governance
    question for the user (`CONTRIBUTING.md` § Maintainer-only machinery), cheap
    and blocking nothing. Author-conditional: on the maintainer's own PR it is
-   the work. **The two edits CONTRIBUTING hands a contributor are not the
+   the work. **The edits CONTRIBUTING hands a contributor are not the
    question**: a claim (the WP's `Status:` line set to `🔄 <date> — claimed by
-   @…`, with `docs/wp/README.md` regenerated) and a handover-log entry for the
-   work the PR does. Read the hunk; only what goes beyond those two ranks here.
-   A claim that merges leaves `Status:` reading "claimed" on main, so the step 9
-   handover entry is what rewrites it.
+   @…`, with `docs/wp/README.md` regenerated), and, for the work the PR does,
+   a handover-log entry, ticked tasks, a moved `Status:` line and the
+   decisions that work made (ruled 2026-10-29, on #1103 and #1140). Read the
+   hunk; only what goes beyond those ranks here, and a `Status:` set to ✅ is
+   beyond them, since closing the WP stays the maintainer's. A claim that
+   merges leaves `Status:` reading "claimed" on main, so the step 9 handover
+   entry is what rewrites it.
 3. **`DIRTY`** — not a review: post a one-line rebase request and move on.
    A conflict on bookkeeping alone is the exception: step 4 syncs it, and the
    PR keeps its place. GitHub computes the field lazily; once main has moved
@@ -144,8 +147,8 @@ bookkeeping syncs, and nothing beyond them.
   WP file's last touch (`git log -1 -- docs/wp/NNNN-*.md`). A 🔄 kept open by
   the same contributor's earlier PRs is usually free, and the user answers in
   a word.
-- Outside edit to `docs/ROADMAP.md` / `docs/wp/**` beyond a claim or its own
-  handover entry (rank 2) → question to the batch; the PR **stays** (its code
+- Outside edit to `docs/ROADMAP.md` / `docs/wp/**` beyond the edits rank 2
+  lists → question to the batch; the PR **stays** (its code
   half is reviewable).
 - Touches an execution-shaped path (step 4's list) → batch.
 - Already reviewed and nothing since → skip, naming the sha. Test:
@@ -195,14 +198,22 @@ Ending means: ask the batch, apply the answers, write the report, kill this
 run's waiters (step 5), and name the resume command (`/pr-review all` after
 the user's `/compact` or `/clear`). Nothing is carried in a file.
 
-**The batch**: one numbered message; per item the PR and what it changes in
-plain words, the question, what it blocks (held review / merge / nothing),
-and your recommendation with its reason. Each item reads without this run's
-context, so a WP number or a name the run coined carries a gloss. A genuine
-judgement call adds why it matters, each option's consequence and the
-practice it rests on. A clear-cut item stays one line. Open with how many
-items need a judgement. Group: PRs by other authors (§ Triage), then
-governance calls, then tier rulings by class (step 6b), then held reviews,
+**The batch**: one numbered message. Triage each question before it joins
+(the maintainer's instructions, § "Before you bring me a decision"). A
+question no trigger covers is settled in the run and listed at the batch's
+end under "Settled for you": the choice, its grounds, the alternative. A run
+without those instructions batches every question. Per item: the PR and what
+it changes in plain words, the question, which trigger sent it, what it
+blocks (held review / merge / nothing), and the recommendation with its
+confidence (clear call, lean, close call). A clear call is one line: "I will
+do X because Y, unless you object." A lean or close call adds why it
+matters, ending in an importance word (minor, moderate, serious), the options
+a competent person would choose, the practice it rests on, and the crux.
+Each item reads without this run's context, so a WP number or a name the run
+coined carries a gloss. Open with how many items need a judgement. Approving
+the batch approves its posts; the triage decided their content. Group: PRs by other authors (§ Triage), then
+governance calls, then tier rulings by class (step 6b), then reader-output
+changes with their diffs (step 6c), then held reviews,
 then held merges.
 `AskUserQuestion` only for ≤ 4 genuine multi-way choices. Then apply in one
 pass — post, merge, close — with a step-10 line each. **A gate main has moved
@@ -293,24 +304,30 @@ line if the checkpoint ended it. Close with
 
    - **`docs/wp/README.md`**: regenerate it with `wp_index.py`.
    - **The schema number**, `src/rietx/schemas/common.py` and the pin in
-     `tests/test_magnetic.py`. Main is at N, and the PR wrote P, usually N
-     too. The PR's change takes M, the next number after N. Keep main's
-     ladder notes, then the PR's with its transition rewritten to `N → M`.
-     Drop a sentence in it that only coordinated the number with other open
-     PRs, and say so in the review. In the pin's comment keep main's sentence
-     and append the PR's item at M. **Then set `SCHEMA_VERSION = "M"` and
-     the pin's `assert` by hand.** Where P is N, both lines sit outside the
-     conflict and merge clean at N. (That is git's default conflict style.
-     `--conflict=diff3` draws them inside the hunk.) A sync that resolves
-     only the marked hunks then leaves two schema changes under one number.
-     In a dry run of #911 onto `edad5b5a` (2026-10-12) the pin test passed
-     and `git diff --check` was clean that way. **Every other line the PR
-     adds that quotes P moves to M too**: a `_declared_since` stamp on a
-     class it adds, a release note, the manual, a skill row. Those lines
-     merge clean at P. A stale `_declared_since` also makes
-     `newest_declared_since()` skip a repair the new class needs. The
-     block's grep is whole-word: without `-w`, 0.50 matched 0.500000E+01 in
-     #911's GSAS fixtures.
+     `tests/test_magnetic.py`. It moves once per release cycle (the comment
+     above `SCHEMA_VERSION`, decided 2026-10-15). The first change after a
+     release bumps it, and every later change adds an `Also in M` note under
+     that number. So a sync never renumbers onto main. Read R, the number at
+     the last release tag (`git show <tag>:src/rietx/schemas/common.py`), and
+     M, main's number. Where M is R, main has not bumped this cycle, and the
+     PR's own bump merges as written. Where M is past R, the PR's change
+     shares M. Keep main's notes, then the PR's, its heading rewritten to
+     `Also in M (<its WP or issue>)`. Drop a sentence in it that only
+     coordinated the number with other open PRs, and say so in the review.
+     In the pin's comment keep main's sentence and append the PR's item "in
+     the same number". **Where the PR wrote a number P past M, set
+     `SCHEMA_VERSION` and the pin's `assert` back to M by hand.** When the
+     PR's base already carried M, its line merges clean at P, outside any
+     conflict. **Every other line the PR adds that quotes P moves to M
+     too**: a `_declared_since` stamp on a class it adds, a release note, the
+     manual, a skill row. Those lines merge clean at P. A stamp at P makes
+     `newest_declared_since()` decide which documents to walk from a number
+     no document carries. The block's grep is whole-word: without `-w`, 0.50
+     matched 0.500000E+01 in #911's GSAS fixtures.
+     `INDEXING_THRESHOLDS_VERSION` in `src/rietx/schemas/indexing.py` moves
+     the same way, with `Also <M>` notes and no pin. On 2026-10-30 #1107
+     and #1123 both added 0.60 notes, and the sync kept both, #1123's first
+     (`2da66e61`).
    - **`docs/releases/<next>.md`**, the staging file: keep both sides when
      every hunk only adds, main's lines first. `git checkout --conflict=diff3
      -- <file>` shows each hunk's base. An empty `|||||||` section is an
@@ -325,13 +342,13 @@ line if the checkpoint ended it. Close with
    git diff --name-only --diff-filter=U           # the files to resolve
    python3 .claude/hooks/wp_index.py              # when the index conflicts
    # resolve the schema number and the staging file as above, then:
-   git diff origin/main -- src/rietx/schemas/common.py | grep -x '+SCHEMA_VERSION = "M"'   # exits 1 while the constant is stale
-   git diff -U0 origin/main | grep -n -w -F 'P'   # read every hit: main's own item, or now M
+   git diff origin/main -- src/rietx/schemas/common.py | grep '^[-+]SCHEMA_VERSION'   # prints nothing once M was past R
+   git diff -U0 origin/main | grep -n -w -F 'P'   # where P was past M: read every hit, now M
    git diff --check                               # no conflict markers left
    .venv/bin/python -m pytest tests/test_magnetic.py -k capability_flag_is_derived
-   git add <each file resolved or renumbered>
+   git add <each file resolved>
    git status --short                             # nothing modified beyond those
-   git commit -m "Merge main; <what was synced, e.g. renumber SCHEMA_VERSION to M>" \
+   git commit -m "Merge main; <what was synced, e.g. keep both M notes>" \
      -m "Synced with Claude Code on behalf of @yue-here."
    gh pr view N --json headRepositoryOwner,headRepository,headRefName
    git push https://github.com/OWNER/REPO.git HEAD:refs/heads/BRANCH
@@ -342,7 +359,7 @@ line if the checkpoint ended it. Close with
    fast-forward, so it never needs `--force`. A rejected push means the
    contributor pushed in the meantime: fetch and start again. The push
    reruns CI, and step 9 waits for it to go green. Name the sync commit in the
-   review, and say what it renumbered. Measured on #585 (2026-10-01): the
+   review, and say what it synced. Measured on #585 (2026-10-01): the
    synced head had no conflict markers, passed `wp_index.py --check` and
    merged clean onto main. Against main it changed only the PR's own 18
    files.
@@ -427,6 +444,22 @@ line if the checkpoint ended it. Close with
      (the ruling's date) into the PR's rows. Push them to its branch where
      `gh pr view N --json maintainerCanModify` says true; otherwise ask the
      contributor in the review.
+6c. **What a reader receives** (ruled 2026-11-01). The package should pass no
+   junk back to a reader, a person or an agent, so every change to what a
+   reader receives goes to the user before merge. A PR changes it when either
+   holds:
+   - `.venv/bin/python -m tests.reader_output`, run in the bench on the merged
+     tree, exits 1. It prints the diff of one standard fit's printed result,
+     report and diagnostics against the base (about 25 s).
+   - The diff changes a result or report type's fields, which shows in the
+     generated `docs/skill/rietx/references/api*.md`. A diagnostic code new
+     to the audit table (step 6b's printout) counts too.
+
+   Either way it is a question for the batch: the before and after text, and
+   your reading of whether each added line tells this fit's reader something.
+   A line that reads the same for every fit, repeats another field, or gives
+   no action is the junk the ruling names. #1266 added 930 characters to every
+   report that way, and it reached the user only because its author flagged it.
 7. **`/code-review medium N`** for `src/` changes above step 6's ~200 lines;
    name the level (unnamed, it reuses whatever was typed last). **Never while a
    suite holds the bench**: the review forks into the session's working
@@ -454,7 +487,8 @@ line if the checkpoint ended it. Close with
    green on the merged tree**, nothing else mid-suite, against the main that is
    there *now*; no execution-shaped file without the step-4 read; no
    conformance finding; every audit-table row tiered and every tier-3 row
-   ruled (step 6b); no new public surface undocumented; every data file
+   ruled (step 6b); no change to what a reader receives that the user has
+   not seen (step 6c); no new public surface undocumented; every data file
    with provenance (and a licence if in the wheel); no maintainer-machinery
    edit; no open question. Name which each merge satisfied. **Say which PRs
    you merged**: `origin/main` moves under every live WP session. Close only

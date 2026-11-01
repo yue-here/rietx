@@ -78,8 +78,8 @@ REAL_FIXTURES = [
 #: vendored and truncated above, but **no V5 file exists anywhere**, and V5's
 #: header is 810 bytes against V3's 250 — so a cut lands at depths the V3 file
 #: cannot reach, and this arm is the only truncation coverage that version has.
-SYNTHETIC_FIXTURES = ["uxd", "rasx", "brml", "raw4", "raw3", "gsas_esd", "udf",
-                      "philips_v5"]
+SYNTHETIC_FIXTURES = ["uxd", "rasx", "brml", "raw4", "raw3", "raw2", "gsas_esd",
+                      "udf", "philips_v5"]
 
 
 def _synthesize(kind: str, path: Path) -> Path:
@@ -93,6 +93,7 @@ def _synthesize(kind: str, path: Path) -> Path:
     from tests.writers_xrd import (
         CORUNDUM_HEAD,
         write_philips_rd,
+        write_raw2,
         write_raw3,
         write_raw4,
     )
@@ -119,6 +120,9 @@ def _synthesize(kind: str, path: Path) -> Path:
                  intensity=[500.0 + i % 7 for i in range(200)]),
             dict(start=40.0, step=0.02, extras=[(100, 40), (110, 32)],
                  intensity=[300.0 + i % 5 for i in range(200)])])
+    if kind == "raw2":
+        # the real file is local-only, so this arm is v2's truncation coverage
+        return write_raw2(path, [500.0 + i % 7 for i in range(200)])
     if kind == "raw4":
         return write_raw4(path, [
             dict(start=10.0, step=0.02,

@@ -501,9 +501,17 @@ def predicted_seen_fraction(q_obs: np.ndarray, q_esd: np.ndarray,
 #: at the resolution they read 0.56 and 0.34 against the truth's 0.73.  An
 #: allowance bounds a common offset and belongs to the forward match alone;
 #: the common shift the forward matches imply (:func:`common_shift`) is what
-#: places the reversed question.  A constant that will be tuned again on the
-#: acceptance corpus; floored by ``k_sigma`` × σ(2θ) of the component asked
-#: against, so a position-only list keeps a window.
+#: places the reversed question.  Swept from 0.5 to 1.0 on the acceptance
+#: corpus's real families (#941's follow-ups, 15 runs from 12 sources: the CPD
+#: round robin's seven patterns, NIST SRM 660c, 11-BM NAC, the GSAS-II FAP and
+#: Hill's PbSO4 X-ray and neutron histograms, one of which has no truth to
+#: rank): one true cell's rank moves, PbSO4 X-ray at 0.7, where the truth
+#: ranks 2nd behind a cell within 0.5 % of its metric; every other truth ranks
+#: 1st with the same grade at every value, so the synthetic split above sets
+#: it.  The sweep stops at 1.0: it shows nothing below 1.0 does better and
+#: cannot show that 1.0 beats a larger value.  Floored by
+#: ``k_sigma`` × σ(2θ) of the component asked against, so a position-only
+#: list keeps a window.
 RESOLUTION_FWHM = 1.0
 
 
@@ -596,8 +604,13 @@ def predicted_seen_fraction_at_resolution(
 
     The predicted lines are merged at ``resolution`` × the local FWHM, moved by
     the candidate's common ``shift``, and each merged line is *seen* when a
-    picked component lies within :func:`resolution_half_width`.  Same name and
-    blind spot as the windowed member it replaces in the panel: a space-group
+    picked component lies within :func:`resolution_half_width`.  Given the
+    screen's positions and common shift it reads the screen's seen fraction
+    exactly (``test_the_panel_and_the_screen_share_one_definition_of_seen``);
+    the two can still differ by their inputs, since the panel's shift comes from
+    the search window and its positions stop at the last observed line, where
+    the screen's shift reads the absence window over the pattern's range.
+    Same name and blind spot as the windowed member it replaces in the panel: a space-group
     extinction or an undetected weak line still counts against a correct cell,
     which is why it ranks and never refutes.
     """
@@ -615,13 +628,16 @@ def predicted_seen_fraction_at_resolution(
     # a lone position is its own mean (x / 1 is exact); a merged line takes
     # ``np.mean`` over its members, batched one row per line of equal size,
     # which sums each row as the per-line call did (checked bit for bit)
-    merged, fw_m = pred[starts], fw_at[starts]
+    merged = pred[starts]
     for s in np.unique(size[size > 1]):
         at = np.flatnonzero(size == s)
         rows = starts[at, None] + np.arange(s)
         merged[at] = np.mean(pred[rows], axis=1)
-        fw_m[at] = np.mean(fw_at[rows], axis=1)
     merged = merged + shift
+    # the width law read at the shifted merged line, as the line screen reads
+    # it (``screen.screen_candidate``): one definition of seen for both
+    fw_m = np.interp(merged, obs[order],
+                     np.asarray(fwhm_obs, dtype=np.float64)[order])
     seen, _j = seen_at_resolution(merged, fw_m, obs, fwhm_obs, two_theta_esd,
                                   k_sigma=k_sigma, resolution=resolution)
     return FigureOfMerit(

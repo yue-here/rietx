@@ -201,7 +201,12 @@ def test_the_restraint_flattens_a_ring_the_data_hold_buckled():
     """Positive arm and its control, from one pattern simulated off the
     buckled ring (±0.15 Å): free coordinates and no restraint end buckled
     (0.148 Å rms measured), the same fit with the rows ends flat to its σ
-    (1.2e-3 Å measured at σ = 1e-3 Å)."""
+    (1.2e-3 Å measured at σ = 1e-3 Å).  The 3e-3 bound's margin, measured
+    2026-10-29 on macOS arm64 and Linux x86_64 alike, every value the same to
+    the seven digits printed: this seed gives 1.228009e-3 Å, unchanged to
+    seven digits with one start coordinate scaled by 1 + k·1e-14
+    (k = ±1, ±3, ±7, 20), and noise seeds 0-19 span 1.167e-3 to 1.305e-3 Å
+    (sd 3.7e-5), so the bound sits 46 sd above the worst of them."""
     from rietx import Refinement
     from rietx.strategy.staged import RefinementPlan, Stage
 
@@ -524,9 +529,182 @@ def test_the_listing_cap_changes_the_message_and_nothing_else(monkeypatch):
     got = {}
     for cap in (2, 100):
         monkeypatch.setattr(refine, "RESTRAINT_PAIRS_STALE_LISTED", cap)
-        (d,) = refine._restraint_pairs_stale_diagnostics(structure, [()])
+        # the phase as the run started: the torsion at 0°, so the geometry moved
+        (d,) = refine._restraint_pairs_stale_diagnostics(structure,
+                                                         [_torsion_phase(0.0)])
         got[cap] = d
     assert got[2].value == got[100].value == 7.0
     assert got[2].where == got[100].where
     assert "7 contact(s)" in got[2].message and "and 5 more" in got[2].message
     assert "more" not in got[100].message
+
+
+# ------------------------------ follow-ups (yue-here, #995 rounds 1 and 2)
+def test_planarity_rows_leave_the_data_statistics_bit_identical():
+    """WP-1809's acceptance: the data rows, and Rwp, χ², DW and n_points built
+    from them, are bit-identical with and without a plane's rows, at the same
+    parameters and at a fit's answer."""
+    from rietx import Refinement
+    from rietx.optimize.statistics import compute_statistics
+
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.profile.w.value = 8e-3
+    pattern = _pattern_of(_ring(0.15, False), ins, 5)
+    m0 = compile_model(_ring(0.15, False), ins, pattern, mode="rietveld")
+    mr = compile_model(_ring(0.15, True), ins, pattern, mode="rietveld")
+    table = ParameterTable(_ring(0.15, False), ins)
+    theta = table.x0()
+    r0 = _make_residual(m0, table)(theta)
+    rr = _make_residual(mr, table)(theta)
+    n_data = len(m0.tt)
+    assert len(rr) == len(r0) + 6 == n_data + 6
+    assert np.array_equal(rr[:n_data], r0[:n_data])
+    assert np.abs(rr[n_data:]).max() > 1.0      # the rows are there and not idle
+
+    ref = Refinement(_ring(0.15, True), ins, history=False)
+    result = ref.fit(pattern, plan=_ring_plan())
+    answer = ParameterTable(ref.structure, ref.instrument)
+    values = answer.decode(answer.x0())
+    unrestrained = compile_model(
+        ref.structure.model_copy(update={"phases": [
+            ref.structure.phases[0].model_copy(update={"restraints": []})]}),
+        ref.instrument, pattern, mode="rietveld")
+    st = compute_statistics(unrestrained.y_obs, unrestrained.evaluate(values),
+                            unrestrained.sigma,
+                            n_free=result.statistics.n_free_parameters)
+    assert result.restraints.n_restraints == 6
+    assert result.statistics.n_points == len(pattern.two_theta)
+    assert (result.statistics.rwp, result.statistics.chi2) == (st.rwp, st.chi2)
+    _save_fit_png(result, "planarity_restraints_bit_identical")
+
+
+def _ring_plan():
+    from rietx.strategy.staged import RefinementPlan, Stage
+
+    return RefinementPlan(stages=[
+        Stage("scale", ["phases.*.scale", "instrument.background.*"], max_iter=50),
+        Stage("xyz", ["phases.*.scale", "instrument.background.*",
+                      "phases.*.atoms.[0-5].dof.*"], max_iter=200),
+        # c_w = 0 silences the rows without removing them
+        Stage("silent", ["phases.*.scale", "instrument.background.*"], max_iter=20,
+              restraint_weight_scale=0.0)])
+
+
+def test_a_planes_row_count_is_constant_across_a_plans_stages(monkeypatch):
+    """WP-1809's acceptance: every stage compiles the plane's six rows,
+    whether it frees the plane's coordinates, holds them, or weights the
+    rows at c_w = 0."""
+    import importlib
+
+    from rietx import Refinement
+
+    refine = importlib.import_module("rietx.refine")
+    seen = []
+    real = refine.compile_model
+
+    def spy(*a, **k):
+        model = real(*a, **k)
+        seen.append(None if model.restraints is None else model.restraints.n_rows)
+        return model
+
+    monkeypatch.setattr(refine, "compile_model", spy)
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.profile.w.value = 8e-3
+    pattern = _pattern_of(_ring(0.15, False), ins, 5)
+    result = Refinement(_ring(0.15, True), ins, history=False).fit(
+        pattern, plan=_ring_plan())
+    assert [st.name for st in result.stages][:3] == ["scale", "xyz", "silent"]
+    assert len(seen) >= len(result.stages), seen
+    assert set(seen) == {6}, seen
+    assert result.restraints.n_restraints == 6
+
+
+def test_a_strained_plane_is_one_tension_finding_naming_its_atoms_out():
+    """A plane fought by the data was one ``RESTRAINT_TENSION`` per atom, each
+    naming the whole plane; it is one finding whose ``where`` holds the atoms
+    out of the plane, worst first, while a flat plane beside it and a bond
+    after it keep their own behaviour."""
+    import importlib
+
+    from rietx.schemas.structure import BondRestraint
+
+    refine = importlib.import_module("rietx.refine")
+    # a square in z = 5 Å with a fifth atom 0.3 Å above it, off-centre: from
+    # the plane, in σ, C0..C4 sit at -6.75, -1.04, -4.47, -10.17, +22.44
+    xyz = [(0.4, 0.4, 0.5), (0.6, 0.4, 0.5), (0.6, 0.6, 0.5), (0.4, 0.6, 0.5),
+           (0.45, 0.53, 0.53),
+           (0.1, 0.1, 0.1), (0.2, 0.11, 0.1), (0.22, 0.2, 0.1), (0.1, 0.23, 0.1)]
+    phase = _phase(xyz, PlanarityRestraint(atoms=[0, 1, 2, 3, 4], sigma=0.01))
+    phase = phase.model_copy(update={"restraints": [
+        PlanarityRestraint(atoms=[5, 6, 7, 8], sigma=0.01),          # flat
+        phase.restraints[0],
+        BondRestraint(atom_i=5, atom_j=6, target=2.0, sigma=0.01)]})
+    s = Structure(phases=[phase])
+    model, table = _compiled(phase)
+    rep = summarise_restraints(model.restraints, table.decode(table.x0()))
+    assert [r.kind for r in rep.rows] == ["planarity"] * 9 + ["bond"]
+    found = [d for d in refine._restraint_tension_diagnostics(rep, s)
+             if d.code == "RESTRAINT_TENSION"]
+    assert len(found) == 2, [d.message for d in found]
+    plane, bond = found
+    assert plane.where == ["p C4", "p C3", "p C0", "p C2"]       # C1 is inside 3σ
+    assert "4 of 5 atoms" in plane.message and "C0, C1, C2, C3, C4" in plane.message
+    assert bond.where == ["p C5", "p C6"]
+
+
+def test_a_stale_contact_warns_where_a_coordinate_is_quoted():
+    """``RESTRAINT_PAIRS_STALE``'s ``where`` holds atom labels, so its level
+    under a purpose comes from its audit row's ``scope``: a warning for the
+    purposes whose numbers depend on atom coordinates, ``info`` for the rest
+    (a contact moves no line position, width or instrument term)."""
+    from fnmatch import fnmatchcase
+
+    from rietx import _audit
+    from rietx.purposes import PURPOSES
+    from rietx.schemas.results import Diagnostic, level_under
+
+    (row,) = [r for r in _audit.ROWS if r.name == "RESTRAINT_PAIRS_STALE"]
+    reads_coordinates = {name for name, p in PURPOSES.items()
+                         if p.depends != ("*",)
+                         and any(fnmatchcase("phases.0.atoms.0.x", g) for g in p.depends)}
+    assert set(row.scope) == reads_coordinates
+    d = Diagnostic(level="warning", code="RESTRAINT_PAIRS_STALE",
+                   where=["p Li1", "p O2"], value=1.0, message="m", suggestion="s")
+    for name in PURPOSES:
+        want = "warning" if name in reads_coordinates | {"series"} else "info"
+        assert level_under(d, name) == want, name
+
+
+def test_a_run_that_moves_no_atom_and_no_cell_runs_no_contact_search(monkeypatch):
+    """No coordinate and no cell parameter moved, so no contact can have come
+    inside r₀: the run makes neither search, while a run that frees a
+    coordinate makes each once."""
+    from rietx import Refinement
+    from rietx.model import restraints
+    from rietx.strategy.staged import RefinementPlan, Stage
+
+    calls = []
+    for name in ("anti_bump_contact_keys", "stale_anti_bump_pairs"):
+        real = getattr(restraints, name)
+
+        def spy(*a, _real=real, _name=name, **k):
+            calls.append(_name)
+            return _real(*a, **k)
+
+        monkeypatch.setattr(restraints, name, spy)
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.profile.w.value = 8e-3
+    pattern = _pattern_of(_li_o_o(1.8, False), ins, 3)
+    scale = Stage("scale", ["phases.*.scale", "instrument.background.*"], max_iter=30)
+    ref = Refinement(_li_o_o(2.3, False), ins, history=False)
+    held = ref.fit(pattern, plan=RefinementPlan(stages=[scale]))
+    assert calls == [] and not [d for d in held.diagnostics
+                                if d.code == "RESTRAINT_PAIRS_STALE"]
+    ref.run_stage(pattern, scale)
+    assert calls == []
+    moved = ref.fit(pattern, plan=RefinementPlan(stages=[scale, Stage(
+        "xyz", ["phases.*.scale", "instrument.background.*",
+                "phases.*.atoms.2.dof.0"], max_iter=100)]))
+    assert sorted(calls) == ["anti_bump_contact_keys", "stale_anti_bump_pairs"]
+    assert [d.where for d in moved.diagnostics
+            if d.code == "RESTRAINT_PAIRS_STALE"] == [["p Li1", "p O2"]]

@@ -8,7 +8,9 @@ below is quoted in a comment from a real file at a real line so that the
 evidence for it is checkable. The corpus is the maintainer's own unpublished
 research data, so the files are cited as **corpus file 1** to **6** and the map
 from number to file is not public; the maintainer holds it in the private
-repository ``yue-here/rietx-corpus-map``. Where a real file is the *only*
+repository ``yue-here/rietx-corpus-map``. **Example file 1** and **2** are two
+files of FullProf's own distributed example set, cited by number for the same
+reason. Where a real file is the *only*
 evidence for a block's position, that is said, and where there is no evidence at all the construct is **refused
 by name** rather than parsed on a guess.
 
@@ -34,7 +36,10 @@ only in the one shape that maps onto rietx's model (WP-1328): a pure magnetic
 phase restating a nuclear phase of the same file in the same cell with k = 0,
 its SYMM/MSYM pairs a magnetic space group. :func:`to_structure` then puts the
 moments and the group on that nuclear phase (:func:`magnetic_reading`,
-``FULLPROF_MAGNETIC_PHASE_READ``). Every other magnetic phase — the
+``FULLPROF_MAGNETIC_PHASE_READ``). A ``Jbt = ±10`` phase — nuclear and magnetic
+in one block, LINE 25b — is that same pair written once, and is read by
+splitting it into the two (:func:`combined_reading`), so the two spellings of
+one structure cannot read differently. Every other magnetic phase — the
 Fourier-component forms, basis functions, a non-axial moment matrix, a phase
 with no nuclear counterpart in its cell — is **refused** by
 :func:`to_structure`, naming the phase and its reason
@@ -42,12 +47,22 @@ with no nuclear counterpart in its cell — is **refused** by
 reader was written against have a magnetic phase, so silently returning their
 nuclear half is the single most damaging thing it could do.
 
+**Read at every value the manual defines:** ``Nor`` (the preferred-orientation
+function, built as March-Dollase where it is one, :func:`_preferred_orientation`),
+``Dum`` and ``Opt`` (recorded; no line, no model effect), ``Nre`` (its LINE-47
+limits read onto :attr:`FullProfModel.parameter_limits` and reported, never
+applied), and the analytic backgrounds ``Nba = 0, -1, -3, -4, -5`` (their
+coefficients read onto :attr:`FullProfModel.background_coefficients`; no
+background is built from a ``.pcr`` of any kind).
+
 **Refused by name, at read:** neutron time-of-flight (``Job = -1``), the
 multi-pattern ``NPATT`` layout (a different grammar throughout, not merely a
-different control-line header), a polynomial or Fourier background, single-
-crystal/integrated-intensity jobs (``Cry``), restraint blocks, and every
-control-line flag whose non-zero meaning would add lines this reader has no
-file to establish the position of. The one such flag read is ``Nsc``. On a
+different control-line header), a background held in a companion ``.bac``
+file (``Nba = 1, -2``), single-crystal/integrated-intensity jobs (``Cry``), a
+second wavelength's own widths (``Ratio < 0``), a profile with a shape-parameter
+line (``Npr = 4`` or above 7), and every control-line flag whose non-zero
+meaning would add lines this reader has no file to establish the position of.
+The one such flag read is ``Nsc``. On a
 neutron file its LINE-12 user scattering lengths are FullProf's only way to
 state an isotope (issue #558), so each is read as the isotope whose Sears b it
 states. On an X-ray file each line must be ``ITY = 2`` anomalous dispersion
@@ -160,6 +175,8 @@ the background points, the zero-shift line and the absorption line carry it
 
 from __future__ import annotations
 
+import dataclasses
+import itertools
 import math
 import re
 from dataclasses import dataclass, field
@@ -229,6 +246,20 @@ MAGNETIC_PHASE_REFUSAL = (
     "states, and `rietx.Structure.from_cif` reads one (WP-1328).")
 
 
+#: When a ``Jbt = ±10`` phase's moments are refused, the rule they were held
+#: to, once: :func:`combined_reading` splits the phase into the nuclear phase
+#: and the ``Jbt = ±1`` phase it is the union of, so every condition
+#: :data:`MAGNETIC_PHASE_REFUSAL` states applies to its magnetic half.
+COMBINED_PHASE_REFUSAL = (
+    "A Jbt = ±10 phase is a nuclear phase and the Jbt = ±1 phase restating it, "
+    "written as one block, and it is read as that pair: its symmetry as "
+    "SYMM/MSYM pairs (Isy = -1) that are the space group's own operators, each "
+    "moment matrix the Shubnikov axial action eps*det(R)*R, k = 0, a real "
+    "moment per site (no imaginary part or magnetic phase) and an M + element "
+    "+ charge form-factor label. What reads in every case: the structure "
+    "restated as a magCIF, which `rietx.Structure.from_cif` reads (WP-1328).")
+
+
 class FullProfPcrError(ValueError):
     """Raised naming the file and the offending line, never a bare parse miss.
 
@@ -268,17 +299,35 @@ _CONTROL_FIELDS = (
 #: they change weighting, the profile function or FullProf's own parameter
 #: numbering, none of which moves a line. ``corpus file 4`` has ``Aut 1``.
 _MUST_BE_ZERO = {
-    "nor": "its meaning is not established by any file here",
-    "dum": "its meaning is not established by any file here",
     "res": "a resolution-function filename line follows it",
     "ste": "its meaning is not established by any file here",
-    "nre": "restraint blocks follow it and their position is unevidenced",
     "cry": "it selects a single-crystal or integrated-intensity job, which is "
            "not a powder profile refinement",
     "uni": "it changes what the abscissa is, and reading a non-2θ axis as 2θ "
            "is the one repair a reader may never make",
     "cor": "its meaning is not established by any file here",
-    "opt": "its meaning is not established by any file here",
+}
+
+#: The control-line flags read at every value the FullProf manual defines
+#: (*An Introduction to the Program FullProf 2000*, July 2001; PDF pages), and
+#: refused by name at any other. None of them adds a line before the phases.
+#:
+#: * ``Nor`` (p. 70) selects the preferred-orientation function: 0 the
+#:   exponential one (eq. 3.31, p. 54), 1 the modified March function (eq. 3.32,
+#:   p. 55). Which one decides how :func:`to_structure` reads ``Pref1``/``Pref2``.
+#: * ``Dum`` (p. 68) controls convergence and R_Bragg bookkeeping inside
+#:   FullProf (1 drops the shift criterion, 2 stops on local divergence, 3 leaves
+#:   reflections near excluded regions out of R_Bragg). Recorded, no model effect.
+#: * ``Opt`` (p. 68) lets FullProf choose faster code paths. Recorded, no model
+#:   effect.
+#:
+#: ``Nre`` (p. 68) is a count, read separately: it adds that many LINE-47
+#: parameter-limit lines after the last phase (p. 126), read by
+#: :func:`_read_trailing` onto :attr:`FullProfModel.parameter_limits`.
+_DEFINED_VALUES = {
+    "nor": (0, 1),
+    "dum": (0, 1, 2, 3),
+    "opt": (0, 1),
 }
 
 #: ``!Ipr Ppl Ioc Mat Pcr Ls1 Ls2 Ls3 NLI Prf Ins Rpa Sym Hkl Fou Sho Ana`` —
@@ -289,7 +338,9 @@ _OUTPUT_FIELDS = (
     "ins", "rpa", "sym", "hkl", "fou", "sho", "ana")
 
 #: ``! Lambda1  Lambda2    Ratio    Bkpos    Wdt    Cthm     muR   AsyLim
-#: Rpolarz  2nd-muR -> Patt# 1`` — corpus file 2:10, values on :11.
+#: Rpolarz  2nd-muR -> Patt# 1`` — corpus file 2:10, values on :11. The
+#: manual's LINE 8 is the first nine ("9 reals", p. 75) and 15 of FullProf's
+#: own example files write only those, so ``mur2`` is read where present.
 _PATTERN_FIELDS = (
     "lambda1", "lambda2", "ratio", "bkpos", "wdt", "cthm", "mur", "asylim",
     "rpolarz", "mur2")
@@ -385,6 +436,40 @@ _N_T_EXTRA_LINES = {0: 0, 2: 2}
 #: already carries the factor 2 of the exponent) that no file here settles, and
 #: a wrong factor is a silently wrong Debye-Waller factor at high Q.
 _BETA_COLUMNS = ("beta11", "beta22", "beta33", "beta12", "beta13", "beta23")
+
+#: The analytic backgrounds' LINE 17, by ``Nba``: which coefficient groups
+#: follow the zero-shift line, each **six values on one line and their six
+#: codewords on the next**. From the manual (pp. 85-86): ``Nba = 0`` is the
+#: 6-coefficient 2θ polynomial, ``-3`` the 12-coefficient one, ``-1`` the
+#: polynomial plus the Debye-like terms ``Bc`` and ``D``. From FullProf's
+#: release notes, which postdate the manual's background table, ``-4`` is a
+#: cosine Fourier series (13 May 2001) and ``-5`` Chebyshev polynomials "up to
+#: 24 coefficients" (17 June 2011), both "in the usual place (like for the case
+#: Nba=-3)". The counts for those two are FullProf 8.20's: every one of its
+#: example files writes ``-4`` as three groups ("Fourier cosine series, up to
+#: 18 coefficients", 3 files) and ``-5`` as four (7 files), where the 2001 note
+#: says 12 for ``-4`` — so a 12-term ``-4`` file is refused at its third group
+#: rather than read on a guess. The position, right after LINE 14 (and LINE 15,
+#: refused here), is the manual's "The right place to input this line is
+#: detailed in the LINE 14", and one of FullProf's own examples (example
+#: file 1) writes its ``Nba = 0`` pair exactly there. ``Nba = 1`` and ``-2`` also read LINE 17, but over a
+#: background from a companion ``.bac`` file, and are refused at the control
+#: line.
+_BACKGROUND_LINES = {
+    0: ("back",),
+    -1: ("back", "bc", "d"),
+    -3: ("back", "back"),
+    -4: ("back", "back", "back"),
+    -5: ("back", "back", "back", "back"),
+}
+
+
+def _background_kind(nba: int) -> str:
+    """What :attr:`FullProfModel.background` and its coefficients mean."""
+    if nba >= 2:
+        return "linear_interpolation"
+    return {0: "polynomial_6", -1: "polynomial_6_debye", -3: "polynomial_12",
+            -4: "fourier_cosine_18", -5: "chebyshev_24"}[nba]
 
 
 # ------------------------------------------------------------ codeword grammar
@@ -566,6 +651,25 @@ class SoftMomentConstraint:
     atom_index: int | None = None
 
 
+@dataclass(frozen=True)
+class ParameterLimit:
+    """One LINE-47 hard limit (``Nre``), as the manual states it (p. 126).
+
+    ``NUMPAR LowLIMIT HighLIMIT Step IBOUND NAMPAR``: the refined parameter's
+    *number* (a codeword's ``INT(CODEWORD/10)``, so it names a parameter of
+    this file, never a value), the interval FullProf holds it in, and the
+    simulated-annealing step and boundary type, which a least-squares job
+    (``Cry = 0``) does not use. ``name`` is the file's own label for it.
+    """
+
+    number: int
+    low: float
+    high: float
+    step: float | None = None
+    ibound: int | None = None
+    name: str = ""
+
+
 @dataclass
 class FullProfPhase:
     """One phase block, nuclear or magnetic.
@@ -595,10 +699,24 @@ class FullProfPhase:
     soft_moment_constraints: list = field(default_factory=list)
     labelled_index: int | None = None
     r_bragg: float | None = None
+    #: LINE 22's comment, after column 20, where a ``Jbt = ±10`` phase writes
+    #: ``Mag…`` to announce LINE 23a; empty for every other phase.
+    symbol_comment: str = ""
+    #: LINE 23a's ``TIME_REV`` flags (±1 per operator of the space group, in the
+    #: order FullProf lists them in its own output), read where the comment
+    #: starts ``Mag``.
+    time_reversal: tuple = ()
 
     @property
     def jbt(self) -> int:
         return int(self.control["jbt"])
+
+    @property
+    def is_combined(self) -> bool:
+        """``Jbt = ±10``: one phase with nuclear and magnetic parts (manual
+        p. 90), its atoms in LINE 25b's layout. Built as a nuclear phase whose
+        moments :func:`magnetic_reading` reads, or refused naming why."""
+        return abs(self.jbt) == 10
 
     @property
     def is_magnetic(self) -> bool:
@@ -648,8 +766,24 @@ class FullProfModel:
     pattern: dict = field(default_factory=dict)
     cycles: dict = field(default_factory=dict)
     #: ``(2θ position, Value)`` per interpolated background point. The codeword
-    #: is **inline** as the third column here, not on a following line.
+    #: is **inline** as the third column here, not on a following line. Empty
+    #: under a polynomial ``Nba``, whose terms are
+    #: :attr:`background_coefficients`.
     background: list = field(default_factory=list)
+    #: How the background is stated, from ``Nba`` (:data:`_BACKGROUND_LINES`):
+    #: ``"linear_interpolation"`` (``Nba >= 2`` points), ``"polynomial_6"`` (0),
+    #: ``"polynomial_6_debye"`` (-1), ``"polynomial_12"`` (-3),
+    #: ``"fourier_cosine_18"`` (-4) or ``"chebyshev_24"`` (-5). Read and
+    #: reported: no background is built from a ``.pcr``, whichever kind.
+    background_kind: str | None = None
+    #: An analytic ``Nba``'s LINE-17 coefficients: ``"back"`` (6, 12, 18 or 24
+    #: terms of the form :attr:`background_kind` names), and under ``Nba = -1``
+    #: the Debye-like ``"bc"`` and ``"d"`` (6 each), each a :class:`Value` with
+    #: its codeword.
+    background_coefficients: dict = field(default_factory=dict)
+    #: ``Nre``'s LINE-47 hard limits, one :class:`ParameterLimit` per line, read
+    #: and reported by :func:`to_structure`, never applied as bounds.
+    parameter_limits: list = field(default_factory=list)
     #: ``(low, high)`` per excluded region, in file order.
     excluded_regions: list = field(default_factory=list)
     #: A neutron file's LINE-12 user scattering lengths (``Nsc > 0``), keyed by
@@ -720,6 +854,8 @@ class FullProfModel:
 
         gather(self.zero_shift.values())
         gather(v for _, v in self.background)
+        for values in self.background_coefficients.values():
+            gather(values)
         for ph in self.phases:
             gather(ph.profile.values())
             gather(ph.cell.values())
@@ -1145,6 +1281,9 @@ def _strip(raw: str) -> str:
 class _Line:
     number: int
     text: str
+    #: The line as written, for the one field located by column: LINE 22's
+    #: space-group symbol, "in the first 20 positions" (manual p. 95).
+    raw: str = ""
 
 
 class _Cursor:
@@ -1293,6 +1432,31 @@ def _block(cur: _Cursor, names: tuple, what: str, *, trailing: int = 0
     return _row(names, values, codewords), model
 
 
+def _read_background_coefficients(cur: _Cursor, model: FullProfModel) -> None:
+    """A polynomial ``Nba``'s LINE 17: groups of six values and six codewords.
+
+    Exactly six on each line, because the manual writes each as "(6 reals)" and
+    a count surprise is the only sign a positional walk gets that it is on the
+    wrong line.
+    """
+    nba = model.control["nba"]
+    for n, group in enumerate(_BACKGROUND_LINES.get(nba, ())):
+        what = (f"the Nba = {nba} background {group!r} line (group {n + 1} of "
+                f"{len(_BACKGROUND_LINES[nba])})")
+        lines = []
+        for part in (what, f"{what}'s codewords"):
+            line, numbers = cur.floats(part, at_least=0)
+            if len(numbers) != 6:
+                raise cur._fail(part, f"expected 6 numbers, found {len(numbers)} "
+                                      f"in {line.text!r}", line)
+            lines.append(numbers)
+        values, codewords = lines
+        model.background_coefficients.setdefault(group, ())
+        model.background_coefficients[group] += tuple(
+            Value(value=v, codeword=c) for v, c in zip(values, codewords,
+                                                         strict=True))
+
+
 # ------------------------------------------------------------------- the reader
 
 
@@ -1349,7 +1513,7 @@ def read_fullprof_pcr(path: str | Path) -> FullProfModel:
         if m := _PHASE_COMMENT.search(text):
             r_braggs.append((int(m.group(1)), float(m.group(2))))
 
-    data = [_Line(number=i + 1, text=stripped)
+    data = [_Line(number=i + 1, text=stripped, raw=raw_lines[i])
             for i, stripped in ((i, _strip(text)) for i, text in enumerate(raw_lines))
             if stripped]
     cur = _Cursor(path, data)
@@ -1383,8 +1547,13 @@ def read_fullprof_pcr(path: str | Path) -> FullProfModel:
 
     job = model.control["job"]
     if job not in (0, 1):
-        kind = {-1: "neutron time-of-flight", -2: "energy-dispersive X-ray",
-                2: "energy-dispersive X-ray", 3: "neutron time-of-flight"}
+        # The manual's LINE 4 (p. 69): 2 and 3 are FullProf's *pattern
+        # calculation* modes for X-rays and constant-wavelength neutrons, -3
+        # for time of flight. -2 is not in it.
+        kind = {-1: "neutron time-of-flight",
+                2: "pattern calculation, X-ray",
+                3: "pattern calculation, neutron constant wavelength",
+                -3: "pattern calculation, neutron time-of-flight"}
         named = kind.get(job, "a job this reader does not know")
         raise FullProfPcrError(
             f"{path}: Job = {job} ({named}). rietx models "
@@ -1399,35 +1568,55 @@ def read_fullprof_pcr(path: str | Path) -> FullProfModel:
                 f"{model.control[name]}, and this reader only handles 0, because "
                 f"{why}. No file it was written against states a non-zero value, "
                 f"so reading on would be a guess at the layout.")
+    for name, defined in _DEFINED_VALUES.items():
+        if model.control[name] not in defined:
+            raise FullProfPcrError(
+                f"{path}: control-line field {name.capitalize()} = "
+                f"{model.control[name]}, and the FullProf manual defines "
+                f"{', '.join(map(str, defined))} only, so what this value does to "
+                f"the file's layout or model is not stated anywhere")
     # A negative count is not "none of them": `range(-1)` is empty, so an
     # excluded-region block declared negative would leave its lines to be
     # reinterpreted by whatever reads next. Refused rather than clamped.
-    if model.control["nex"] < 0:
-        raise FullProfPcrError(
-            f"{path}: Nex = {model.control['nex']} — an excluded-region count "
-            f"cannot be negative")
+    for name, what in (("nex", "an excluded-region count"),
+                       ("nre", "a parameter-limit count")):
+        if model.control[name] < 0:
+            raise FullProfPcrError(
+                f"{path}: {name.capitalize()} = {model.control[name]} — {what} "
+                f"cannot be negative")
     if model.control["nph"] < 1:
         raise FullProfPcrError(
             f"{path}: Nph = {model.control['nph']} — a .pcr with no phase states "
             f"no model to read")
     nba = model.control["nba"]
-    if nba < 2:
+    if nba not in _BACKGROUND_LINES and nba < 2:
         raise FullProfPcrError(
-            f"{path}: Nba = {nba}. Only an interpolated background of two or "
-            f"more points is evidenced here (51 and 32 points, in two real "
-            f"files); Nba 0 or 1 selects a polynomial or a debye/"
-            f"Fourier background whose coefficient line's *position* in the "
-            f"single-pattern layout no file establishes, and a negative Nba "
-            f"selects a background model this reader does not know.")
+            f"{path}: Nba = {nba}. "
+            + (f"It selects a background read from a companion CODFIL.bac file "
+               f"({'refined as four polynomial coefficients over it' if nba == 1 else 'smoothed by a Fourier filter'}, "
+               f"manual pp. 69-70), and the model this reader would return "
+               f"lacks that file's points."
+               if nba in (1, -2) else
+               "Nba >= 2 interpolated points, the analytic forms 0, -1, -3, -4 "
+               "and -5, and 1 and -2 (a companion background file) are what the "
+               "FullProf manual and release notes define. Below -5 the manual's "
+               "'cubic splines' (p. 69) and the -5 Chebyshev series of the "
+               "2011 notes cannot both hold, and no file here settles which."))
+    model.background_kind = _background_kind(nba)
 
     _, output = cur.ints("the Ipr/Ppl output-control line",
                          expect=len(_OUTPUT_FIELDS))
     model.output = dict(zip(_OUTPUT_FIELDS, output, strict=True))
 
-    _, pattern = cur.floats("the Lambda1/Lambda2 line",
-                            at_least=len(_PATTERN_FIELDS))
-    model.pattern = dict(zip(_PATTERN_FIELDS, pattern[:len(_PATTERN_FIELDS)],
-                             strict=True))
+    lambda_line, pattern = cur.floats("the Lambda1/Lambda2 line",
+                                      at_least=len(_PATTERN_FIELDS) - 1)
+    model.pattern = dict(zip(_PATTERN_FIELDS, pattern[:len(_PATTERN_FIELDS)]))
+    if model.pattern["ratio"] < 0:
+        raise FullProfPcrError(
+            f"{path}: line {lambda_line.number}: Ratio = "
+            f"{model.pattern['ratio']!r}. A negative ratio adds a U2/V2/W2 line "
+            f"for the second wavelength to every phase (LINE 32, manual p. 109), "
+            f"and rietx's emission lines share one Caglioti U/V/W.")
     _, cycles = cur.floats("the NCY/Eps/Thmin line", at_least=len(_CYCLE_FIELDS))
     model.cycles = dict(zip(_CYCLE_FIELDS, cycles[:len(_CYCLE_FIELDS)],
                             strict=True))
@@ -1436,12 +1625,14 @@ def read_fullprof_pcr(path: str | Path) -> FullProfModel:
     # unlike the atom and profile blocks. Read as `Nba` lines exactly, and the
     # count is the invariant rather than something the loop is trusted for: a
     # dropped point moves the interpolated background under every peak it spans.
-    for i in range(nba):
-        _, numbers = cur.floats(f"background point {i + 1} of {nba}", at_least=2)
+    points = nba if nba >= 2 else 0
+    for i in range(points):
+        _, numbers = cur.floats(f"background point {i + 1} of {points}",
+                                at_least=2)
         codeword = numbers[2] if len(numbers) > 2 else None
         model.background.append(
             (numbers[0], Value(value=numbers[1], codeword=codeword)))
-    if len(model.background) != nba:  # pragma: no cover - the loop is exact
+    if len(model.background) != points:  # pragma: no cover - the loop is exact
         raise FullProfPcrError(
             f"{path}: parsed {len(model.background)} background points from a "
             f"declared Nba = {nba}")
@@ -1470,6 +1661,7 @@ def read_fullprof_pcr(path: str | Path) -> FullProfModel:
             f"{path}: line {zero_line.number}: MORE = {zero[8]!r} on the "
             f"zero-shift line, which adds instrument lines whose position no "
             f"file here establishes")
+    _read_background_coefficients(cur, model)
 
     for index in range(1, model.control["nph"] + 1):
         model.phases.append(_read_phase(cur, path, index))
@@ -1519,9 +1711,20 @@ def read_fullprof_pcr(path: str | Path) -> FullProfModel:
     # which `io/CLAUDE.md` requires, instead of surfacing from whatever consumer
     # first touched `Value.code`.
     try:
-        model.parameter_numbers  # noqa: B018 - the decode is the point
+        numbers = model.parameter_numbers
     except FullProfPcrError as exc:
         raise FullProfPcrError(f"{path}: {exc}") from exc
+    # A limit on a parameter no codeword refines limits nothing, and is the
+    # signature of a line read in the wrong place (`_parameter_limit`).
+    unrefined = [lim for lim in model.parameter_limits
+                 if lim.number not in numbers]
+    if unrefined:
+        raise FullProfPcrError(
+            f"{path}: Nre limit(s) on parameter "
+            f"{', '.join(str(lim.number) for lim in unrefined)}, which no "
+            f"codeword in the file refines — a limit names a parameter by the "
+            f"number its codewords carry (manual p. 126), so these lines are "
+            f"not limits on this refinement")
     return model
 
 
@@ -1555,12 +1758,14 @@ def _read_phase(cur: _Cursor, path: Path, index: int) -> FullProfPhase:
                 f"every line after this one.")
 
     jbt = phase.jbt
-    if jbt not in (0, 1, -1):
+    if jbt not in (0, 1, -1, 10, -10):
         raise FullProfPcrError(
-            f"{where}: Jbt = {jbt}. Only Jbt 0 (nuclear) and Jbt ±1 (magnetic, "
-            f"the moment in components or in spherical form) are read here; the others select Le Bail intensity "
-            f"extraction, a combined nuclear+magnetic phase or a form-factor "
-            f"phase, each of which changes the atom block's own layout. In "
+            f"{where}: Jbt = {jbt}. Only Jbt 0 (nuclear), Jbt ±1 (magnetic, "
+            f"the moment in components or in spherical form) and Jbt ±10 "
+            f"(nuclear and magnetic in one phase) are read here; the others "
+            f"select Le Bail intensity extraction, a rigid-body or a "
+            f"form-factor phase, each of which changes the atom block's own "
+            f"layout. In "
             f"particular the **Fourier-component** magnetic forms — a phase "
             f"whose moments are stated as amplitudes per propagation vector "
             f"rather than as one moment per site — are outside rietx's "
@@ -1587,7 +1792,7 @@ def _read_phase(cur: _Cursor, path: Path, index: int) -> FullProfPhase:
                 f"{where}: {name.capitalize()} = {int(phase.control[name])} and "
                 f"{why}, at a position no file this reader was written against "
                 f"establishes")
-    if jbt == 0 and ang_or_mom != 0:
+    if jbt in (0, 10, -10) and ang_or_mom != 0:
         raise FullProfPcrError(
             f"{where}: Ang = {ang_or_mom} and angle-restraint lines follow it, "
             f"at a position no file here establishes")
@@ -1599,8 +1804,27 @@ def _read_phase(cur: _Cursor, path: Path, index: int) -> FullProfPhase:
             f"model that was refined")
 
     sg_line = cur.take(f"phase {index} space-group symbol")
-    phase.space_group_raw = sg_line.text
-    phase.space_group = normalize_space_group(sg_line.text)
+    symbol = sg_line.text
+    if phase.is_combined:
+        # LINE 22: "Space group symbol must be given in the first 20 positions
+        # of the line" and the comment "must start after the 20th column"
+        # (Rodríguez-Carvajal 2001, manual p. 95). Read by column for Jbt ±10
+        # only, the one phase whose comment carries meaning, so every other
+        # phase keeps its old reading.
+        # A comment marker is cut first: `<--` written from column 20 would
+        # otherwise leave its `<` inside the symbol's field.
+        raw = sg_line.raw
+        cut = min((i for i in (raw.find(m) for m in ("!", "#", "<--")) if i >= 0),
+                  default=len(raw))
+        symbol = raw[:min(20, cut)].strip()
+        phase.symbol_comment = raw[20:cut].strip() if cut > 20 else ""
+        if not symbol:
+            raise FullProfPcrError(
+                f"{where}: line {sg_line.number}: {sg_line.raw!r} has no "
+                f"space-group symbol in its first 20 columns, where the manual "
+                f"puts it (p. 95)")
+    phase.space_group_raw = symbol
+    phase.space_group = normalize_space_group(symbol)
 
     isy = phase.isy
     if abs(jbt) == 1 and isy not in (-1, -2):
@@ -1608,12 +1832,14 @@ def _read_phase(cur: _Cursor, path: Path, index: int) -> FullProfPhase:
             f"{where}: a magnetic phase (Jbt {jbt}) with Isy = {isy}. The magnetic "
             f"sub-grammar is selected by Isy and only -1 (SYMM/MSYM pairs) and "
             f"-2 (SYMM/BASR/BASI triples) are evidenced here")
-    if jbt == 0 and isy != 0:
+    if phase.is_combined:
+        _read_combined_symmetry(cur, phase, where, sg_line)
+    elif jbt == 0 and isy != 0:
         raise FullProfPcrError(
             f"{where}: a nuclear phase (Jbt 0) with Isy = {isy}, which supplies "
             f"the symmetry operators explicitly instead of deriving them from "
             f"the space-group symbol — a block no file here states the shape of")
-    if isy != 0:
+    if isy != 0 and not phase.is_combined:
         phase.magnetic = _read_magnetic_symmetry(cur, where, isy)
 
     nat = int(phase.control["nat"])
@@ -1626,6 +1852,7 @@ def _read_phase(cur: _Cursor, path: Path, index: int) -> FullProfPhase:
     for i in range(nat):
         phase.atoms.append(
             _read_magnetic_atom(cur, where, i + 1, nat) if abs(jbt) == 1
+            else _read_combined_atom(cur, where, i + 1, nat) if abs(jbt) == 10
             else _read_nuclear_atom(cur, where, i + 1, nat))
     # A dropped site is a silently wrong structure factor, so the count is an
     # invariant rather than something the walk is trusted to get right — the
@@ -1636,6 +1863,13 @@ def _read_phase(cur: _Cursor, path: Path, index: int) -> FullProfPhase:
 
     scale, phase.strain_model = _block(
         cur, _SCALE_COLUMNS, f"phase {index} scale/shape line", trailing=1)
+    if (phase.strain_model or 0) > 8:
+        # FullProf's own writer labels the block that follows: "! 5 additional
+        # strain parameters (IstrainModel>8)" (example file 2 of FullProf's set).
+        raise FullProfPcrError(
+            f"{where}: Strain-Model = {phase.strain_model} adds a block of "
+            f"strain parameters after the Pref/Asy line, a model rietx's "
+            f"strain terms do not state")
     width, phase.size_model = _block(
         cur, _WIDTH_COLUMNS, f"phase {index} U/V/W width line", trailing=1)
     phase.cell, _ = _block(cur, _CELL_COLUMNS, f"phase {index} cell line")
@@ -1646,7 +1880,16 @@ def _read_phase(cur: _Cursor, path: Path, index: int) -> FullProfPhase:
     # and origin choice are unaffected — the R branch is disjoint from them.
     phase.space_group = normalize_space_group(
         phase.space_group_raw, {k: v.value for k, v in phase.cell.items()})
-    asym, _ = _block(cur, _ASYM_COLUMNS, f"phase {index} Pref/Asy line")
+    # LINE 30 (manual p. 109): six values, and the two FCJ axial-divergence
+    # terms S_L/D_L only for the TCH-FCJ profile Npr = 7, which every corpus
+    # file uses. FullProf's own examples write six under Npr 0 and 5.
+    npr = int(phase.control["npr"])
+    if npr == 4 or npr > 7:
+        raise FullProfPcrError(
+            f"{where}: Npr = {npr} adds a shape-parameter line (LINE 33, manual "
+            f"p. 109) whose profile function rietx does not have")
+    columns = _ASYM_COLUMNS if npr == 7 else _ASYM_COLUMNS[:6]
+    asym, _ = _block(cur, columns, f"phase {index} Pref/Asy line")
     phase.profile = {**scale, **width, **asym}
 
     # Nvk propagation vectors, one value line and one codeword line each,
@@ -1860,6 +2103,125 @@ def _read_magnetic_atom(cur: _Cursor, where: str, i: int, nat: int) -> FullProfA
                         flags=tuple(numbers[:2]))
 
 
+#: LINE 25b (c) of a ``Jbt = ±10`` site carrying a moment, ``N_t = 1``
+#: (manual p. 105): ``Rx Ry Rz Ix Iy Iz MagPh`` (``Rm Rphi Rtheta Im Iphi
+#: Itheta MagPh`` in spherical form). Named as :data:`_MAGNETIC_COLUMNS`'s
+#: moment slots so :func:`magnetic_reading` reads either phase kind's moments.
+_COMBINED_MOMENT_COLUMNS = ("m1", "m2", "m3", "m4", "m5", "m6", "magph")
+
+#: A magnetic form-factor label: ``M`` (⟨j0⟩) or ``J`` (⟨j0⟩ + c2⟨j2⟩) + element
+#: + charge, ``MNI2``, ``JHO3`` (manual pp. 80-81). In a ``Jbt = ±10`` phase a
+#: site carrying a moment names its form factor this way and "the program
+#: extracts internally the Fermi length symbol from Typ" (p. 105).
+_FORM_FACTOR_LABEL = re.compile(r"([MJ])([A-Z]{1,2})(\d)")
+
+
+def _read_combined_symmetry(cur: _Cursor, phase: FullProfPhase, where: str,
+                            sg_line: _Line) -> None:
+    """A ``Jbt = ±10`` phase's magnetic symmetry, in whichever form it is given.
+
+    The manual allows two (pp. 90, 95-96). ``Isy = -1`` or ``-2`` lists the
+    operators (LINE 23b/24, the ``Jbt = ±1`` grammar, read by
+    :func:`_read_magnetic_symmetry`). ``Isy = 0`` with a LINE-22 comment
+    starting ``Mag`` instead reads LINE 23a, one ``TIME_REV`` flag per operator
+    of the space group. Both at once is refused: two statements of one
+    symmetry, and the file does not say which FullProf used.
+    """
+    isy = phase.isy
+    mag = phase.symbol_comment.startswith("Mag")
+    if isy not in (0, -1, -2):
+        raise FullProfPcrError(
+            f"{where}: a nuclear+magnetic phase (Jbt {phase.jbt}) with Isy = "
+            f"{isy}. Its symmetry is read as SYMM/MSYM pairs (Isy = -1), "
+            f"SYMM/BASR/BASI (Isy = -2) or a 'Mag' comment and time-reversal "
+            f"flags (Isy = 0); the numeric matrices of Isy = +1 are not "
+            f"evidenced by any file this reader was written against")
+    if mag and isy != 0:
+        raise FullProfPcrError(
+            f"{where}: line {sg_line.number}: the space-group line's comment "
+            f"{phase.symbol_comment!r} announces time-reversal flags and Isy = "
+            f"{isy} lists the operators too — two statements of one magnetic "
+            f"symmetry, and the file does not say which one FullProf used")
+    if mag:
+        line, flags = cur.floats("the LINE 23a time-reversal flags",
+                                 at_least=1)
+        if any(f not in (1.0, -1.0) for f in flags):
+            raise FullProfPcrError(
+                f"{where}: line {line.number}: {line.text!r} is read as LINE "
+                f"23a's time-reversal flags (manual p. 96), each 1 or -1")
+        phase.time_reversal = tuple(int(f) for f in flags)
+    elif isy != 0:
+        phase.magnetic = _read_magnetic_symmetry(cur, where, isy)
+
+
+def _read_combined_atom(cur: _Cursor, where: str, i: int, nat: int) -> FullProfAtom:
+    """One LINE-25b site of a ``Jbt = ±10`` phase (manual p. 105).
+
+    ``Atom Typ Mag Vek X Y Z Biso Occ N_t Spc`` and its five codewords, then —
+    for ``N_t = 1`` only — the moment line ``Rx Ry Rz Ix Iy Iz MagPh`` (the
+    spherical ``M phi theta`` under ``Jbt = -10``) and its seven codewords.
+    ``N_t`` decides the line count, so it is read as the positional walk's
+    selector: 0 is a nuclear site, 1 a site with a moment. ``-1`` is refused:
+    the manual gives it the spherical form, and FullProf 8.20 does not read it
+    (measured). The β and form-factor forms (2, ±3, 4) are refused, the manual
+    stating the β lines' condition as "N_t=2,3,-3, and Isy=-2", which is not a
+    rule a reader can apply without guessing at the ``and``.
+
+    ``flags`` is ``(Mag, Vek, N_t, Spc)``, so :attr:`FullProfAtom.n_t` reads it
+    where it reads a nuclear site's ``(In, Fin, N_t, Spc)``.
+    """
+    line = cur.take(f"atom {i} of {nat}")
+    tokens = line.text.split()
+    names = ("Mag", "Vek") + _ATOM_COLUMNS + ("N_t",)
+    if len(tokens) < 2 + len(names):
+        raise FullProfPcrError(
+            f"{where}: line {line.number}: a Jbt ±10 atom line needs a label, "
+            f"a species, Mag, Vek, {len(_ATOM_COLUMNS)} numbers and N_t "
+            f"(LINE 25b); found {len(tokens)} tokens in {line.text!r}")
+    numbers = _atom_floats(tokens[2:], names, where, line)
+    for j, name in ((0, "Mag"), (1, "Vek"), (7, "N_t")):
+        if not float(numbers[j]).is_integer():
+            raise FullProfPcrError(
+                f"{where}: line {line.number}: {name} = {numbers[j]!r} is a "
+                f"selector, not a quantity, in {line.text!r}")
+    _, codewords = cur.floats(f"atom {i} codewords", at_least=1)
+    values = _row(_ATOM_COLUMNS, numbers[2:7], codewords)
+    flags = tuple(numbers[:2]) + tuple(numbers[7:])
+    n_t = int(numbers[7])
+    if n_t == -1:
+        # The manual (p. 105) reads the spherical form "if N_t=-1,-3", and
+        # FullProf 8.20 itself does not: given that line under N_t = -1 it
+        # stops with "FindFMT: separator missing" (fp2k, measured 2026-10-28),
+        # and reads the spherical form under Jbt = -10 with N_t = 1.
+        raise FullProfPcrError(
+            f"{where}: atom {tokens[0]!r} of a Jbt ±10 phase declares N_t = -1. "
+            f"FullProf 8.20 does not read a moment line under it (measured: "
+            f"'separator missing'), though the manual's p. 105 says it states "
+            f"the spherical form; FullProf's spherical form is Jbt = -10 with "
+            f"N_t = 1, which reads")
+    if n_t == 1:
+        # FullProf writes `<-MagPar` after the seven numbers with no comment
+        # marker (example file 1 of FullProf's set), so the leading numeric run is read.
+        _, moment = cur.floats(f"atom {i} moment line",
+                               at_least=len(_COMBINED_MOMENT_COLUMNS),
+                               leading=True)
+        _, moment_codes = cur.floats(f"atom {i} moment codewords", at_least=1)
+        values.update(_row(_COMBINED_MOMENT_COLUMNS, moment, moment_codes))
+    elif n_t != 0:
+        raise FullProfPcrError(
+            f"{where}: atom {tokens[0]!r} of a Jbt ±10 phase declares N_t = "
+            f"{n_t}. N_t 0 (a nuclear site) and ±1 (a site with a moment) are "
+            f"read; 2 and ±3 add anisotropic beta lines whose condition the "
+            f"manual states as 'N_t=2,3,-3, and Isy=-2' (p. 105), and 4 a "
+            f"special form factor, so how many lines follow is not settled")
+    species = normalize_species(tokens[1])
+    label = _FORM_FACTOR_LABEL.fullmatch(tokens[1].upper())
+    if label and (n_t or numbers[0]):
+        species = label.group(2).capitalize()
+    return FullProfAtom(label=tokens[0], species_raw=tokens[1], species=species,
+                        values=values, flags=flags)
+
+
 def _read_trailing(cur: _Cursor, path: Path, model: FullProfModel) -> None:
     """The lines after the last phase: soft moment constraints and the 2θ range.
 
@@ -1878,8 +2240,23 @@ def _read_trailing(cur: _Cursor, path: Path, model: FullProfModel) -> None:
     """
     last = model.phases[-1]
     ranges: list[tuple] = []
+    nre = model.control["nre"]
     for line in cur.remaining():
         tokens = line.text.split()
+        # LINE 47 (p. 126) follows the phase loop, so the soft moment
+        # constraints (LINE 46, inside it) come first and the fitted range last:
+        # the first `Nre` numeric lines are the limits. A line that is not one
+        # — the range line read early because `Nre` overstates the count — is
+        # refused by `_parameter_limit`, and a count the file falls short of
+        # below.
+        if len(model.parameter_limits) < nre and not ranges:
+            try:
+                float(tokens[0])
+            except ValueError:
+                pass
+            else:
+                model.parameter_limits.append(_parameter_limit(path, line, nre))
+                continue
         try:
             float(tokens[0])
         except ValueError:
@@ -1918,11 +2295,58 @@ def _read_trailing(cur: _Cursor, path: Path, model: FullProfModel) -> None:
                 f"phase and states fewer than two numbers, so it is neither a "
                 f"fitted 2theta range nor anything else this reader knows")
         ranges.append(tuple(numbers[:3]))
+    if len(model.parameter_limits) != nre:
+        raise FullProfPcrError(
+            f"{path}: Nre = {nre} declares {nre} parameter-limit lines after "
+            f"the last phase, and the file has {len(model.parameter_limits)}")
     if len(ranges) > 1:
         raise FullProfPcrError(
             f"{path}: {len(ranges)} fitted-range lines follow the last phase, "
             f"and a single-pattern .pcr states one")
     model.fitted_range = ranges[0] if ranges else None
+
+
+def _parameter_limit(path: Path, line: _Line, nre: int) -> ParameterLimit:
+    """One LINE-47 limit, or a refusal naming why the line is not one.
+
+    Two of its own gates, because a wrong ``Nre`` puts some *other* numeric
+    line here (the fitted range ``9.000 157.000 1`` is the likeliest): the
+    parameter number must be a positive integer and the interval must not be
+    inverted. The third — that the number is one a codeword of this file
+    refines — is checked by :func:`read_fullprof_pcr` once every codeword is
+    decoded.
+    """
+    tokens = line.text.split()
+    numbers: list[float] = []
+    for token in tokens:
+        try:
+            numbers.append(float(token))
+        except ValueError:
+            break
+    name = " ".join(tokens[len(numbers):])
+    where = (f"{path}: line {line.number}: {line.text!r} is read as one of the "
+             f"Nre = {nre} parameter limits (NUMPAR LowLIMIT HighLIMIT Step "
+             f"IBOUND NAMPAR, manual p. 126)")
+    if len(numbers) < 3:
+        raise FullProfPcrError(f"{where}, and it states {len(numbers)} numbers "
+                               f"where a limit needs at least a parameter "
+                               f"number and two bounds")
+    number, low, high = numbers[:3]
+    if not float(number).is_integer() or number < 1:
+        raise FullProfPcrError(f"{where}, and NUMPAR = {number!r} is not a "
+                               f"parameter number")
+    if low > high:
+        raise FullProfPcrError(f"{where}, and its interval [{low!r}, {high!r}] "
+                               f"is inverted — Nre may overstate the count, "
+                               f"making this the fitted-range line")
+    ibound = numbers[4] if len(numbers) > 4 else None
+    if ibound is not None and not float(ibound).is_integer():
+        raise FullProfPcrError(f"{where}, and IBOUND = {ibound!r} is not an "
+                               f"integer")
+    return ParameterLimit(
+        number=int(number), low=low, high=high,
+        step=numbers[3] if len(numbers) > 3 else None,
+        ibound=None if ibound is None else int(ibound), name=name)
 
 
 # --------------------------------------------------- to_structure
@@ -2054,6 +2478,10 @@ class MagneticReading:
     partner: int
     operations: list
     moments: dict
+    #: The space group the built phase carries where it is not the file's
+    #: symbol: a ``Jbt = ±10`` phase's is the group its SYMM operators generate
+    #: (:func:`combined_reading`), its symbol only generating reflections.
+    space_group: str | None = None
 
 
 def _parse_msym(text: str) -> tuple[list[list[int]], float]:
@@ -2089,8 +2517,8 @@ def _orbit_size(ops, xyz) -> int:
     return len(images)
 
 
-def magnetic_reading(model: FullProfModel, phase: FullProfPhase
-                     ) -> MagneticReading | str:
+def magnetic_reading(model: FullProfModel, phase: FullProfPhase, *,
+                     partners: list | None = None) -> MagneticReading | str:
     """A ``Jbt = ±1`` phase as moments on a nuclear phase, or why it is not one.
 
     Returns a :class:`MagneticReading` or the **reason** it is refused, as one
@@ -2137,6 +2565,12 @@ def magnetic_reading(model: FullProfModel, phase: FullProfPhase
     * A soft moment constraint, a diagonal β, and a tie between moment
       columns are each something the built phase cannot carry, so each is a
       refusal naming it.
+
+    ``partners`` replaces :attr:`FullProfModel.nuclear_phases` as the phases
+    a counterpart is looked for in, and ``partner`` then indexes it. A
+    ``Jbt = ±10`` phase is read by passing its magnetic half (from
+    :func:`combined_reading`) with ``partners=[phase]``: its own nuclear half
+    is the only counterpart it has.
     """
     import gemmi
     import numpy as np
@@ -2164,7 +2598,8 @@ def magnetic_reading(model: FullProfModel, phase: FullProfPhase
         return (f"propagation vector {ks}: a moment stated per k is the "
                 f"Fourier-component form, which rietx's magnetic model (one "
                 f"real moment per site, in the magnetic cell) has no shape for "
-                f"— restate the structure in its magnetic cell with k = 0")
+                f"— restate the structure in its magnetic cell with k = 0 (a "
+                f"propagation vector is WP-1918's, issue #757)")
     operations: list[str] = []
     ops = []
     for symm, (msym,) in sym.operators:
@@ -2191,7 +2626,7 @@ def magnetic_reading(model: FullProfModel, phase: FullProfPhase
         operations.append(f"{op.triplet()},{eps}")
         ops.append(op)
 
-    nuclear = model.nuclear_phases
+    nuclear = model.nuclear_phases if partners is None else partners
     same_cell = [i for i, n in enumerate(nuclear)
                  if all(abs(n.cell[k].value - phase.cell[k].value)
                         <= _MAGNETIC_MATCH_ATOL for k in _CELL_COLUMNS)]
@@ -2295,6 +2730,189 @@ def magnetic_reading(model: FullProfModel, phase: FullProfPhase
                 f"come out scaled by {math.sqrt(s_m / s_n) if s_n else float('inf'):.4g}")
     return MagneticReading(partner=same_cell[0], operations=operations,
                            moments=moments)
+
+
+def _moment_sites(phase: FullProfPhase) -> list:
+    """The sites of a ``Jbt = ±10`` phase that state a moment (``N_t = ±1``)."""
+    return [atom for atom in phase.atoms if atom.n_t != 0]
+
+
+def combined_reading(model: FullProfModel, phase: FullProfPhase
+                     ) -> MagneticReading | str | None:
+    """A ``Jbt = ±10`` phase's moments on its own sites, or why they are not.
+
+    The manual's ``Jbt = ±10`` (Rodríguez-Carvajal 2001, p. 90) is a phase that "can contain nuclear
+    and magnetic contributions", its atoms in LINE 25b (p. 105): every site's
+    nuclear columns, and a moment line on the sites whose ``N_t`` is ±1. That
+    is exactly a ``Jbt = 0`` phase and the ``Jbt = ±1`` phase restating it
+    written as one block, so it is read by splitting it into those two halves
+    and handing the magnetic half to :func:`magnetic_reading` with the phase
+    itself as the only counterpart — one rule, so a ``Jbt 0`` + ``Jbt 1`` pair
+    and the same structure as one ``Jbt 10`` phase cannot read differently.
+
+    ``None`` where no site states a moment and no magnetic symmetry is given:
+    the manual's X-ray use of LINE 25b, a nuclear phase. A reason string where
+    the phase cannot be read, quoted by :func:`to_structure`, beyond those of
+    :func:`magnetic_reading`:
+
+    * ``Mag`` and ``N_t`` disagree on whether a site carries a moment
+      ("If N_t = 1 give the lines (a), (b), (c) and (d)"; ``Mag`` is the
+      ordinal of the moment matrix applied to it, 0 for none, p. 102);
+    * the symmetry is a ``Mag`` comment with LINE 23a's time-reversal flags,
+      which are keyed to "the same [order] as in CODFIL.out" (p. 96), an order
+      FullProf prints and the ``.pcr`` does not state;
+    * a site states a moment and no magnetic symmetry is given at all;
+    * a propagation vector is given, even k = 0: FullProf computes the
+      magnetic part on the fundamentals only when none is (p. 90), and fp2k
+      8.20's pattern did not move with the moment when k = 0 was stated;
+    * the symbol extinguishes a reflection its lattice allows, or the SYMM
+      list is not a tabulated group (:func:`_combined_group`).
+
+    Where it reads, the built phase's space group is the group of the SYMM
+    list (:attr:`MagneticReading.space_group`), the symbol having only
+    generated the reflections. ``Jbt = -10`` makes the moment line spherical
+    (``M``, φ, θ) under ``N_t = 1``. The positive arm is FullProf's own: the
+    same structure as a ``Jbt 0`` + ``Jbt 1`` pair, as one ``Jbt 10`` phase
+    (``P -1`` over the P 2₁/c operators) and as one ``Jbt -10`` phase gave the
+    same calculated pattern in fp2k 8.20, within 0.09 counts of ~5000.
+    """
+    sites = _moment_sites(phase)
+    for atom in phase.atoms:
+        mag = int(atom.flags[0])
+        if (mag != 0) != (atom.n_t != 0):
+            return (f"site {atom.label!r} states Mag = {mag} and N_t = "
+                    f"{atom.n_t}, which disagree on whether it carries a "
+                    f"moment")
+    if phase.time_reversal:
+        return ("its magnetic symmetry is a 'Mag' comment with LINE 23a's "
+                "time-reversal flags, which follow the order FullProf lists the "
+                "space group's operators in its own output file (manual p. 96) "
+                "— an order the .pcr does not state; restate the phase with "
+                "Isy = -1 SYMM/MSYM pairs")
+    if not sites and phase.magnetic is None:
+        return None
+    if phase.magnetic is None:
+        return (f"{len(sites)} site(s) state a moment and the phase gives no "
+                f"magnetic symmetry (Isy = 0 with no 'Mag' comment)")
+    sym = phase.magnetic
+    half = FullProfPhase(
+        index=phase.index, name=phase.name,
+        control={**phase.control, "jbt": 1 if phase.jbt > 0 else -1},
+        space_group=phase.space_group, space_group_raw=phase.space_group_raw,
+        atoms=[FullProfAtom(
+            label=atom.label, species_raw=atom.species_raw,
+            species=atom.species, flags=atom.flags[:2],
+            values={**atom.values, **{k: Value(value=0.0, codeword=0.0)
+                                      for k in ("m7", "m8", "m9")}})
+            for atom in sites],
+        magnetic=sym, profile=phase.profile, cell=phase.cell,
+        propagation_vectors=phase.propagation_vectors,
+        soft_moment_constraints=phase.soft_moment_constraints)
+    if any(any(abs(v) > 0 for v in k) for k, _ in phase.propagation_vectors):
+        # The propagation vector is the more basic refusal, and the one whose
+        # remedy is named, so it is given before the operator-list tests.
+        return magnetic_reading(model, half, partners=[phase])
+    if phase.propagation_vectors:
+        return (f"it declares Nvk = {phase.nvk} with k = 0. FullProf computes a "
+                f"Jbt ±10 phase's magnetic intensity on the fundamental "
+                f"reflections only when no propagation vector is given (manual "
+                f"p. 90), and fp2k 8.20 bears that out: with k = (0, 0, 0) "
+                f"stated, flipping a moment changes its calculated pattern by "
+                f"nothing (measured), so the refinement this file records had no "
+                f"magnetic scattering there. Give Nvk = 0")
+    if phase.isy != -1 or sym.cen != 1:
+        return magnetic_reading(model, half, partners=[phase])
+    group, why = _combined_group(phase)
+    if why is not None:
+        return why
+    built = dataclasses.replace(phase, space_group=group)
+    reading = magnetic_reading(model, dataclasses.replace(half, space_group=group),
+                               partners=[built])
+    if isinstance(reading, MagneticReading):
+        reading.space_group = group
+    return reading
+
+
+def _lattice_absent(hkl, centrings) -> bool:
+    """Whether the lattice centring alone extinguishes ``hkl`` (Σ e^{2πi h·t} = 0).
+
+    The structure factor of the centring translations t alone, F(h) = Σ e^{2πi
+    h·t}: it vanishes exactly where the lattice type is systematically absent
+    (the centred-lattice reflection conditions of *International Tables for
+    Crystallography* Vol. A, Hahn ed., 2005).
+    """
+    import cmath
+
+    import gemmi
+
+    total = sum(cmath.exp(2j * math.pi * sum(h * t / gemmi.Op.DEN
+                                              for h, t in zip(hkl, c, strict=True)))
+                for c in centrings)
+    return abs(total) < 1e-9
+
+
+def _combined_group(phase: FullProfPhase) -> tuple[str | None, str | None]:
+    """The space group a ``Jbt = ±10`` phase's SYMM list states, or why not.
+
+    FullProf builds the phase's structure factor from the listed operators and
+    generates its reflections from the symbol ("The reflections … will be
+    generated according to the space group symbol", Rodríguez-Carvajal 2001,
+    manual p. 95), so the two play different parts and FullProf's own examples
+    write an extinction-free symbol (``I -1``) over the full operator list. Two conditions make that
+    reading the one FullProf computed, both measured with fp2k 8.20:
+
+    * the **symbol extinguishes nothing its lattice does not**. A symbol with a
+      glide or screw drops those reflections for the magnetic part too: a
+      ``P 1 21/c 1`` symbol over a primed c-glide lost the magnetic (001) the
+      moments give, 2062 counts against the same structure as a ``Jbt 0`` +
+      ``Jbt 1`` pair, while ``P -1`` over the same operators matched the pair to
+      print precision;
+    * the listed operators with the symbol's lattice centring **are a group**
+      gemmi tabulates, which is then the built phase's space group.
+
+    Returns ``(symbol, None)``, the extended H-M symbol, or ``(None, reason)``.
+    """
+    import gemmi
+
+    try:
+        symbol = gemmi.SpaceGroup(phase.space_group).operations()
+        listed = [gemmi.Op(symm.strip()[4:].strip().lower().replace(" ", ""))
+                  for symm, _ in phase.magnetic.operators]
+    except (RuntimeError, ValueError) as exc:
+        return None, f"its symbol or a SYMM operator cannot be read: {exc}"
+    centrings = [list(c) for c in symbol.cen_ops]
+    # |h|, |k|, |l| <= 4 is enough, not a tuned bound: a glide or screw
+    # condition shows at an index of 1 or 2 along its axis, so every
+    # systematic absence the symbol adds to its lattice's has a member inside.
+    extinct = [hkl for hkl in itertools.product(range(-4, 5), repeat=3)
+               if any(hkl) and symbol.is_systematically_absent(list(hkl))
+               and not _lattice_absent(hkl, centrings)]
+    if extinct:
+        return None, (f"its symbol {phase.space_group!r} extinguishes reflections its "
+                f"lattice allows ({len(extinct)} with |h|,|k|,|l| <= 4, e.g. "
+                f"{extinct[0]}), and FullProf generates a Jbt ±10 phase's "
+                f"reflections from the symbol, magnetic ones included — so the "
+                f"refinement had no magnetic intensity there whatever the moments "
+                f"(measured with fp2k 8.20). The symbol FullProf's own examples "
+                f"write here is the lattice's extinction-free one (P -1, I -1) "
+                f"over the full SYMM list")
+    # The zero translation is the identity already listed; gemmi counts a
+    # second copy of it as a second centring.
+    seeds = listed + [gemmi.Op("x,y,z").translated(c) for c in centrings
+                      if any(c)]
+    group = gemmi.GroupOps(seeds)
+    stated = len(group.sym_ops)
+    group.add_missing_elements()
+    found = gemmi.find_spacegroup_by_ops(group)
+    if len(group.sym_ops) != stated or found is None:
+        return None, (f"its {len(listed)} SYMM operators with the lattice of "
+                f"{phase.space_group!r} "
+                + ("are not closed under composition, so they are not a space "
+                   "group" if len(group.sym_ops) != stated else
+                   "form no tabulated space-group setting")
+                + ", and the built phase needs the group the structure factor "
+                  "was computed under")
+    return normalize_space_group(found.xhm()), None
 
 
 #: The atom columns :func:`to_structure` puts on a :class:`~rietx.schemas.Atom`
@@ -2607,6 +3225,94 @@ def cell_parameter_ties(phase: FullProfPhase, where: str | None = None
     return carried, dropped
 
 
+def _preferred_orientation(model: FullProfModel, phase: FullProfPhase,
+                           where: str, parameter):
+    """``Pref1``/``Pref2`` under the file's ``Nor``, as rietx's March-Dollase.
+
+    The FullProf manual's two functions (Rodríguez-Carvajal, *An Introduction
+    to the Program FullProf 2000*, July 2001, pp. 54-55), with α the angle
+    between the scattering vector and the reciprocal-lattice direction
+    ``Pr1 Pr2 Pr3``:
+
+    * ``Nor = 1``, the modified March function (eq. 3.32),
+      P = G₂ + (1 − G₂)·[(G₁ cos α)² + sin²α/G₁]^(−3/2). With G₂ = 0 that is
+      the March-Dollase factor (Dollase 1986, *J. Appl. Cryst.* 19, 267) with
+      r = G₁, which is what :class:`~rietx.schemas.PreferredOrientation`
+      computes, so ``Pref1`` becomes ``r`` with its refine flag. A non-zero
+      G₂, the untextured fraction, has no rietx term: refused. The manual's
+      geometry note — G₁ < 1 is platy and G₁ > 1 needle-like in Bragg-Brentano,
+      the opposite in Debye-Scherrer — is the same reading rietx's model module
+      states for r, so nothing is flipped.
+    * ``Nor = 0``, the exponential function (eq. 3.31),
+      P = G₂ + (1 − G₂)·exp(−G₁α²). rietx has no such function, so a non-zero
+      G₁ is refused; at G₁ = 0 it is P ≡ 1 whatever G₂, and nothing is built —
+      unless G₁ carries a refine codeword, which is refused for the same
+      reason: the file refines a coefficient that nothing in the built model
+      can take.
+
+    The ``Nor = 1`` mapping is measured, not only read: fp2k 8.20 run on a
+    synthetic tetragonal file (March-Dollase G₁ = 0.6, axes 100, 001, 110, 101)
+    applies P as the mean over the reflection's symmetry equivalents, as rietx
+    does, and reads ``Pr1 Pr2 Pr3`` as reciprocal-lattice indices. Its 50
+    reflections above 100 counts agree with rietx's P to 1.1e-4, where the
+    representative-only P is off by up to 1.9 and the axis read as a
+    direct-space direction by 1.9
+    (``test_nor_1_reproduces_the_preferred_orientation_fullprof_applied``).
+
+    ``Nor = 1`` at G₁ = 1 with G₁ held is also P ≡ 1 and builds nothing, so a
+    file that differs from its ``Nor = 0`` twin only in that flag reads to the
+    same :class:`~rietx.schemas.Structure`.
+    """
+    import rietx as rx
+
+    g1, g2 = phase.profile.get("pref1"), phase.profile.get("pref2")
+    if g1 is None:
+        return None
+    nor = model.control.get("nor", 0)
+    if nor == 0:
+        if g1.value != 0.0:
+            raise FullProfPcrError(
+                f"{where}: Nor = 0 with Pref1 = {g1.value!r}, the exponential "
+                f"preferred-orientation function P = G2 + (1-G2)*exp(-G1*alpha^2) "
+                f"(FullProf manual eq. 3.31), which rietx does not have; its "
+                f"March-Dollase correction is FullProf's Nor = 1. Building "
+                f"without it would return intensities the refinement did not "
+                f"compute.")
+        if g1.codeword != 0.0:
+            raise FullProfPcrError(
+                f"{where}: Nor = 0 with Pref1 = 0 refined (codeword "
+                f"{g1.codeword!r}): the exponential function (FullProf manual "
+                f"eq. 3.31) is P = 1 at G1 = 0, but the file refines G1 under "
+                f"it, and rietx has no exponential function for that refine "
+                f"flag to reach. Building without it would drop a refined "
+                f"parameter in silence; its March-Dollase correction is "
+                f"FullProf's Nor = 1.")
+        return None
+    if g2 is not None and g2.value != 0.0:
+        raise FullProfPcrError(
+            f"{where}: Nor = 1 with Pref2 = {g2.value!r}, the untextured fraction "
+            f"G2 of the modified March function (FullProf manual eq. 3.32). "
+            f"rietx's March-Dollase correction is that function at G2 = 0 and has "
+            f"no untextured-fraction term.")
+    if g1.value == 1.0 and g1.codeword == 0.0:
+        return None
+    if not g1.value > 0.0:
+        # The schema would clamp it onto its pole guard in silence.
+        raise FullProfPcrError(
+            f"{where}: Nor = 1 with Pref1 = {g1.value!r}; the March coefficient "
+            f"G1 divides the function (eq. 3.32), so it is positive in any "
+            f"refinement FullProf completed")
+    axis =[phase.control[k] for k in ("pr1", "pr2", "pr3")]
+    if not all(float(h).is_integer() for h in axis):
+        raise FullProfPcrError(
+            f"{where}: the preferred-orientation direction Pr1 Pr2 Pr3 = "
+            f"{tuple(axis)} is not integral, and rietx's March-Dollase axis is "
+            f"a reciprocal-lattice direction given by integer indices")
+    return rx.PreferredOrientation(
+        axis=tuple(int(h) for h in axis),
+        r=parameter(g1, "Pref1, the March coefficient G1"))
+
+
 def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
                                 drop_parameter_ties: bool = False,
                                 diagnostics: list[Diagnostic] | None = None):
@@ -2695,8 +3401,20 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
     magnetic = model.magnetic_phases
     #: {index into model.nuclear_phases: (magnetic phase, MagneticReading)}
     merged: dict = {}
-    if magnetic and not nuclear_only:
+    #: Jbt ±10 phases whose moments `nuclear_only=True` leaves off.
+    combined = [(i, ph) for i, ph in enumerate(model.nuclear_phases)
+                if ph.is_combined]
+    if not nuclear_only:
         refused = []
+        # The combined phases first: each is its own counterpart, so a Jbt ±1
+        # phase restating one is then caught by the "already states" arm.
+        for i, ph in combined:
+            reading = combined_reading(model, ph)
+            if isinstance(reading, str):
+                refused.append((ph, reading))
+            elif reading is not None:
+                reading.partner = i
+                merged[i] = (ph, reading)
         for ph in magnetic:
             reading = magnetic_reading(model, ph)
             if isinstance(reading, str):
@@ -2712,10 +3430,13 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
             named = "; ".join(
                 f"{ph.index}:{ph.name!r} (Jbt {ph.jbt}, Isy {ph.isy}, "
                 f"{len(ph.atoms)} sites) — {why}" for ph, why in refused)
+            why = (f"{MAGNETIC_PHASE_REFUSAL} "
+                   if any(ph.is_magnetic for ph, _ in refused) else
+                   f"{COMBINED_PHASE_REFUSAL} ")
             raise FullProfPcrError(
                 f"{model.path or '<model>'}: {len(refused)} of "
                 f"{len(model.phases)} phases are magnetic and cannot be read: "
-                f"{named}. {MAGNETIC_PHASE_REFUSAL} Returning only the nuclear "
+                f"{named}. {why}Returning only the nuclear "
                 f"phases would hand back a structure that looks complete while "
                 f"those phases' contribution went unmentioned. Read "
                 f"`model.magnetic_phases` for what the file states about them, "
@@ -2748,6 +3469,14 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
     unchecked_occupancy: list[tuple[str, str]] = []
     for structure_index, ph in enumerate(model.nuclear_phases):
         where = f"{model.path or '<model>'}: phase {ph.index} ({ph.name!r})"
+        stated = merged.get(structure_index, (None, None))[1]
+        if stated is not None and stated.space_group is not None:
+            # A Jbt ±10 phase is built under the group its SYMM list states;
+            # its symbol only generated reflections (`_combined_group`). Raw
+            # set too, so no origin choice is reported for a group read off
+            # the operators rather than chosen.
+            ph = dataclasses.replace(ph, space_group=stated.space_group,
+                                     space_group_raw=stated.space_group)
         missing = [k for k in _CELL_COLUMNS if k not in ph.cell]
         if missing:
             raise FullProfPcrError(
@@ -2890,6 +3619,7 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
                 for atom_index, atom in enumerate(ph.atoms)]
             phases.append(rx.Phase(
                 name=ph.name, space_group=ph.space_group, cell=cell, atoms=atoms,
+                preferred_orientation=_preferred_orientation(model, ph, where, _p),
                 magnetic_symmetry=(None if reading is None else
                                    MagneticSymmetry_(
                                        operations=reading.operations)),
@@ -2933,9 +3663,9 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
             # its three moment columns comes in with the whole moment free
             # (the `any` in `magnetic_reading`); said here, since the model
             # has no narrower form to carry it in.
-            columns = ("M", "phi", "theta") if ph.jbt == -1 else ("Rx", "Ry", "Rz")
+            columns = ("M", "phi", "theta") if ph.jbt < 0 else ("Rx", "Ry", "Rz")
             partial = []
-            for atom in ph.atoms:
+            for atom in (_moment_sites(ph) if ph.is_combined else ph.atoms):
                 free = [c for c, k in zip(columns, ("m1", "m2", "m3"), strict=True)
                         if atom.values[k].vary]
                 if 0 < len(free) < 3:
@@ -2946,14 +3676,22 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
                     f"phases.{structure_index}.atoms.{j}.moment"
                     for j in sorted(reading.moments)],
                 value=ph.r_bragg,
-                message=(f"{named}: magnetic phase {ph.index} ({ph.name!r}, "
-                         f"Jbt {ph.jbt}) was read as the moments of nuclear "
-                         f"phase {built.name!r}. {len(reading.operations)} "
+                message=(f"{named}: "
+                         + (f"phase {ph.index} ({ph.name!r}, Jbt {ph.jbt}) "
+                            f"was read as one nuclear phase carrying its "
+                            f"own moments, in {built.space_group!r}, the "
+                            f"group of its SYMM operators (its symbol "
+                            f"{ph.space_group_raw!r} generated the "
+                            f"reflections). " if ph.is_combined else
+                            f"magnetic phase {ph.index} ({ph.name!r}, "
+                            f"Jbt {ph.jbt}) was read as the moments of "
+                            f"nuclear phase {built.name!r}. ")
+                         + f"{len(reading.operations)} "
                          f"SYMM/MSYM pairs became a magnetic group ({group}), "
                          f"with moments on {len(reading.moments)} of "
                          f"{len(built.atoms)} sites in crystal-axis mu_B"
                          + (" converted from (M, phi, theta)"
-                            if ph.jbt == -1 else "")
+                            if ph.jbt < 0 else "")
                          + "."
                          + (f" The file frees only part of the moment at "
                             f"{', '.join(partial)}. It is read with the whole "
@@ -2965,6 +3703,18 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
         # channel still says which phases went, what each stated, and its
         # R_Bragg, so a caller who asked for the nuclear subset can still see
         # the size of what they asked to drop.
+        for i, ph in (combined if nuclear_only else ()):
+            if not _moment_sites(ph):
+                continue
+            diagnostics.append(Diagnostic(
+                level="warning", code="FULLPROF_MAGNETIC_PHASE_OMITTED",
+                where=[f"phases.{i}"], value=ph.r_bragg,
+                message=(f"{named}: phase {ph.index} ({ph.name!r}) is nuclear "
+                         f"and magnetic (Jbt {ph.jbt}), and nuclear_only=True "
+                         f"built it without the moments its "
+                         f"{len(_moment_sites(ph))} magnetic site(s) state."),
+                suggestion="Leave nuclear_only off to read the magnetic "
+                           "phase, or to be told why it cannot be read."))
         for ph in (model.magnetic_phases if nuclear_only else ()):
             moment_columns = sorted(
                 {k for atom in ph.atoms for k in ("m1", "m2", "m3")
@@ -3040,6 +3790,23 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
                             "Use Refinement.tie(path, source, scale=multiplier) "
                             "for a signed group."),
                 where=[path]))
+        # The file's own hard limits are protocol the Structure does not carry:
+        # a limit names a FullProf parameter *number*, which can drive several
+        # values at once, and whether one becomes a bound is a reading the
+        # reader leaves to the caller. Said once, listing every limit.
+        if model.parameter_limits:
+            listed = "; ".join(
+                f"parameter {lim.number}"
+                + (f" ({lim.name})" if lim.name else "")
+                + f" in [{lim.low:g}, {lim.high:g}]"
+                for lim in model.parameter_limits)
+            diagnostics.append(Diagnostic(
+                level="info", code="FULLPROF_LIMITS_NOT_APPLIED",
+                where=[], value=float(len(model.parameter_limits)),
+                message=(f"{named} states {len(model.parameter_limits)} hard "
+                         f"parameter limit(s) (Nre): {listed}. They are read "
+                         f"onto model.parameter_limits and not applied as "
+                         f"bounds.")))
         for path, group in dropped_cell_ties:
             diagnostics.append(Diagnostic(
                 level="warning", code="FULLPROF_TIE_DROPPED",
@@ -3514,6 +4281,7 @@ def from_structure(structure: Structure, *,
     from ...crystallography.symmetry import (
         expand_positions,
         get_spacegroup,
+        refuse_distortion_modes,
         refuse_magnetic_phase,
         refuse_operation_list,
     )
@@ -3654,6 +4422,7 @@ def from_structure(structure: Structure, *,
     rhombohedral: list[str] = []
     for index, phase in enumerate(structure.phases):
         refuse_operation_list(phase, "a FullProf `.pcr`")
+        refuse_distortion_modes(phase, "a FullProf `.pcr`")
         refuse_magnetic_phase(phase, "a FullProf `.pcr`")
         phase, restated = restate_in_hexagonal_axes(phase, "a FullProf `.pcr`")
         if restated:

@@ -28,6 +28,7 @@ bcc
 beamline
 beamstop
 beamtime
+Bmmm
 Bravais
 brucite
 carbonyl
@@ -39,8 +40,10 @@ chiral
 chirality
 CIF
 CIFs
+Cmmm
 collinear
 collinearity
+conjugacy
 coset
 cryostat
 crystallite
@@ -59,6 +62,7 @@ enantiopure
 esd
 esds
 Ewald
+Fddd
 ferritic
 fluorapatite
 Friedel
@@ -66,6 +70,7 @@ goniometer
 hkl
 holohedry
 hydrogens
+Immm
 inequivalent
 interatomic
 intermetallic
@@ -74,6 +79,7 @@ irreps
 isostructural
 isotropy
 IUCr
+klassengleiche
 lanthanide
 ligand
 ligands
@@ -92,8 +98,10 @@ monochromator
 monoclinic
 multiplet
 nanocrystalline
+NiAsS
 Niggli
 nonbonding
+normaliser
 nuclide
 nuclides
 occupancies
@@ -101,6 +109,7 @@ octahedra
 octahedral
 octahedron
 operando
+orientational
 orthorhombic
 oxygens
 pdCIF
@@ -111,6 +120,7 @@ polycrystalline
 polyhedra
 polyimide
 pseudosymmetry
+PtGeSe
 pyroelectric
 rhombohedral
 rutile
@@ -123,6 +133,7 @@ spinel
 structureless
 subcell
 sublattice
+subspaces
 supercell
 superionic
 superlattice
@@ -132,6 +143,8 @@ tetragonal
 tetrahedra
 torsion
 torsions
+translational
+translationengleiche
 triclinic
 trigonal
 trirutile
@@ -177,7 +190,9 @@ Gaultois
 Gaussian
 Gaussians
 Guinier
+HCl
 Hofmann
+Hotelling
 Jacobian
 Jacobians
 Kass
@@ -185,6 +200,7 @@ Kessler
 Kirfel
 Kissel
 Kleeberg
+Klyne
 Kovalev
 Landé
 Langford
@@ -199,8 +215,10 @@ Maxwellian
 Olds
 Pawley
 Pitschke
+Prelog
 Rachinger
 Raftery
+Rez
 Rietveld
 Rodrigues
 Scherrer
@@ -386,3 +404,4 @@ Yue
 Dal
 Negro
 Ungaretti
+ZrBeSi

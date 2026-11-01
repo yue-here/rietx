@@ -26,6 +26,7 @@ Altomare
 [bB]intypes
 Biso
 [bB]kg
+Bmmm
 Borda
 [bB]ranchless
 Bravais
@@ -52,6 +53,7 @@ Chebyshev
 [cC]hirality
 CIF
 CIFs
+Cmmm
 [cC]odeword
 [cC]odewords
 Coelho
@@ -63,6 +65,7 @@ Colab
 [cC]omponentwise
 [cC]onfigurational
 [cC]ongruences
+[cC]onjugacy
 Conograph
 [cC]ontainments
 [cC]ontrapositive
@@ -116,6 +119,7 @@ Dreele
 Ewald
 [eE]xponentials
 Faddeeva
+Fddd
 [fF]erritic
 [fF]ilesystem
 [fF]luorapatite
@@ -134,11 +138,14 @@ Gaussians
 [gG]oniometer
 GSAS
 Guinier
+HCl
 [hH]kl
 Hofmann
 [hH]olohedry
+Hotelling
 [hH]ydrogens
 [iI]dentifiability
+Immm
 [iI]nequivalent
 [iI]njective
 [iI]nlier
@@ -163,7 +170,9 @@ Kass
 Kessler
 Kirfel
 Kissel
+[kK]lassengleiche
 Kleeberg
+Klyne
 Kovalev
 Landé
 Langford
@@ -212,9 +221,11 @@ Maxwellian
 [mM]ultiplets
 [nN]anocrystalline
 Negro
+NiAsS
 Niggli
 [nN]m
 [nN]onbonding
+[nN]ormaliser
 [nN]ormals
 [nN]uclide
 [nN]uclides
@@ -226,6 +237,7 @@ Niggli
 [oO]ctahedron
 Olds
 [oO]perando
+[oO]rientational
 [oO]rthonormal
 [oO]rthorhombic
 [oO]xygens
@@ -249,10 +261,12 @@ Pitschke
 [pP]ositivity
 [pP]recisions
 [pP]refactor
+Prelog
 [pP]rm
 [pP]rojective
 [pP]seudoreal
 [pP]seudosymmetry
+PtGeSe
 [pP]x
 [pP]ydantic
 [pP]yroelectric
@@ -277,6 +291,7 @@ Raftery
 [rR]esolvability
 [rR]eweighting
 Rexp
+Rez
 [rR]hombohedral
 Rietveld
 [rR]ietview
@@ -312,6 +327,7 @@ Stoe
 [sS]ubcommand
 [sS]ubcommands
 [sS]ublattice
+[sS]ubspaces
 [sS]ubtree
 Suortti
 [sS]upercell
@@ -331,6 +347,8 @@ TOPAS
 [tT]orsion
 [tT]orsions
 [tT]raceback
+[tT]ranslational
+[tT]ranslationengleiche
 [tT]riclinic
 [tT]rigonal
 [tT]rirutile
@@ -364,3 +382,4 @@ Whittaker
 Wyckoff
 Yue
 [zZ]incite
+ZrBeSi

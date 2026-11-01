@@ -134,7 +134,7 @@ So the algorithm will refine far more parameters than the data support without c
 |---|---|---|
 | `DataSupport.n_unique_reflections` | reflections this pattern measured, summed over phases | one symmetry orbit is one reflection, and a Kα doublet's second line is the same reflection measured again; a reflection counts when a fitted channel lies within half its own FWHM of its position on any emission line, so an excluded region removes what sits under it and a peak half-measured at a range end still counts |
 | `DataSupport.n_effective_observations` | the same count corrected for overlap | each reflection contributes the fraction of its own area on which no overlapping reflection stands higher, so an isolated line is worth 1 and an exactly coincident pair is worth 1 between the two of them; a float, because a partly resolved pair is worth more than one and less than two; `None` when no reflection was measured |
-| `DataSupport.n_structural_parameters` | the free parameters the ratio is about | the atomic ones: coordinate degrees of freedom, occupancies, Biso and ADP components; the cell, zero, profile, background, scale, preferred orientation and extinction are excluded, because peak positions and shape determine those rather than the intensities being counted |
+| `DataSupport.n_structural_parameters` | the free parameters the ratio is about | the ones that move an atom: coordinate degrees of freedom, occupancies, Biso and ADP components, and any free parameter that reaches one of those, such as a mode amplitude, a named variable tied to an atom entry, or a rigid body's origin, rotation and twists; the cell, zero, profile, background, scale, preferred orientation and extinction are excluded, because peak positions and shape determine those rather than the intensities being counted, and the cell stays out when a rigid body reads it to place its atoms |
 | `DataSupport.observations_per_parameter` | the raw count divided by the parameters | the upper bound on the ratio; `None` when no structural parameter is free, as in a profile-only stage, a Le Bail fit or a Pawley fit |
 | `DataSupport.effective_observations_per_parameter` | the effective count divided by the parameters | the number the guideline is about: at least {{ OBS_PER_PARAMETER_MIN }} and preferably {{ OBS_PER_PARAMETER_PREFERRED }} {cite}`mccusker1999`; `None` on the same terms as the row above |
 
@@ -267,6 +267,7 @@ On a restrained refinement it is the first thing to read, before Rwp.
 The deviations are always reported unscaled.
 "Is this restraint satisfied?" is a question about the geometry, and c<sub>w</sub> is a choice about how hard to insist on the answer.
 A row past three σ raises [`RESTRAINT_TENSION`](diagnostics-refinement.md#restraint_tension).
+A plane raises one between its rows, naming the atoms past three σ, worst first.
 The restraint and the data are then pulling against each other, and one of them is wrong.
 A joint fit reports the same object per histogram, on `HistogramResult.restraints`.
 

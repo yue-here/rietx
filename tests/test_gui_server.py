@@ -538,7 +538,7 @@ def test_an_upload_is_claimed_by_content_not_by_extension(
     # used to stand in for with a fake RAW4 header
     ("d8.raw", b"RAW4.00\x00" + bytes(range(256)) * 8, "truncated"),
     # …and one this build knows the version of but does not read is named
-    ("legacy.raw", b"RAW2" + bytes(4000), "RAW version 2"),
+    ("legacy.raw", b"RAW " + bytes(4000), "RAW version 1"),
 ])
 def test_a_file_this_build_cannot_honestly_read_is_refused_by_name(
         blank, name, body, expect):

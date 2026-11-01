@@ -317,6 +317,15 @@ def _magnetic() -> tuple[object, object]:
 from rietx.schemas.instrument import IncidentSpectrum  # noqa: E402
 
 
+def _distortion():
+    """A child on mode amplitudes (WP-1419), for the same reason as the two above:
+    ``phases.*.distortion_modes.modes.*.amplitude`` exists on no other table."""
+    from rietx.schemas.structure import Structure
+    from tests.test_help import _distortion_phase
+
+    return Structure(phases=[_distortion_phase()])
+
+
 def _parameter_paths() -> set[str]:
     """Every dot-path four representative models put on the table.
 
@@ -334,7 +343,8 @@ def _parameter_paths() -> set[str]:
     bank.source.incident_spectrum = IncidentSpectrum(
         itype=3, coefficients=[Parameter(value=1.0)] * 12)
     models = [(make_lab6(), plain), (make_rutile(vary_coords=True), plain),
-              _fully_declared(), _magnetic(), (make_lab6(), bank)]
+              _fully_declared(), _magnetic(), (make_lab6(), bank),
+              (_distortion(), plain)]
     paths: set[str] = set()
     for structure, instrument in models:
         paths.update(entry.path for entry in ParameterTable(structure, instrument).entries)
