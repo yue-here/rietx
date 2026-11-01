@@ -315,7 +315,8 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
   records it. **Support is a fact about the values and a stage moves them** → re-measured at the
   answer: a phase that appeared is *released*; one that **collapsed** while solving is restored to
   where the stage found it and held (one extra solve, never a third). **A value that is not a
-  measurement is the caller's**: held paths leave `RefinementResult.parameters`, a trajectory starts
+  measurement is the caller's**: held paths leave `RefinementResult.parameters` with every tie only
+  they move — its rows are `moving_paths`, never "varied or tied" (WP-1999) — and a trajectory starts
   at the onset. Which phases: a scale under 3σ of its counting-noise esd
   (`refine._answer_significance`, WP-1523), never the fitted curve an absent phase's cell fits to
   noise; zero limit `phase_line_counts`. Both feed `PHASE_UNCONSTRAINED`, which says what was done;

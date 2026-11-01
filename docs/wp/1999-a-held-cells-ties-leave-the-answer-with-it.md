@@ -63,7 +63,7 @@ so measure how many goldens and tests move before choosing.
 - [x] The fix at `refine.py:6953` (now `_build_result`, `refine.py:8428`), and
   a test that a held source's followers leave `parameters` and the trajectory
   (`tests/test_reported_rows_move.py`).
-- [ ] Find the siblings. Same leak, fixed: the joint fit's own row builder
+- [x] Find the siblings. Same leak, fixed: the joint fit's own row builder
   (`MultiHistogramRefinement._parameters`), and `stage_reports_`, which builds through
   `_build_result` and so inherits the fix. Not leaks: `Refinement.parameters()`
   and the GUI's parameter table read the whole table by design, each held row
