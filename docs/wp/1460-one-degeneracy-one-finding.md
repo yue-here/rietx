@@ -104,8 +104,9 @@ reader that keys on `where` without naming the code is the one it misses.
   reported. That set is the candidate this WP's grouping wants for its flat
   case, and it is recorded nowhere yet: a set-level finding naming it would
   also be the record WP-2050's generality review asked for. Two gaps it left
-  for this WP. A member with no ±1.000 partner has its pairs withheld with
-  no `FLAT_DIRECTION` clause to say so. Two unresolved directions leave ρ
+  for this WP. No message says which pairs were withheld (Yue's ruling of
+  2026-11-01: a correlation whose value is rounding is not shown to users;
+  the mask is a developer signal a nightly test asserts). Two unresolved directions leave ρ
   between members of different ones set by rounding (by construction; not
   measured).
 
