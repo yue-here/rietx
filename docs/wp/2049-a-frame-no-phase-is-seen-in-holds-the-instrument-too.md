@@ -44,6 +44,25 @@ is what the committed signals record. The probe is
 Which rung wins is rounding. That an instrument column is refined on a frame
 with no seen phase is not: it happens whenever the warm rung is accepted.
 
+**Superseded in part, 2026-11-01** (`62034506e`, macOS arm64, `[dev]`). The
+series no longer reaches outcome B: at k = −3, −2, −1, 0, +1, +2, +3 and +5
+the ladder accepted `warm_staged` on frame 87, with the scale at 0 and the
+instrument rows carrying no esd. So the nightly row this WP was filed for
+is not red here by that route. The class still stands. Frame 87 fitted
+alone from `cubic_model` under `mccusker_default` returns a zero shift of
+−0.0129 ± 0.0015° (8.7σ, truth 0.006°), U..Y refined beside it, and
+`HIGH_CORRELATION` on U and V at ρ −0.991. That direct fit is the test this
+WP pins (`tests/test_held_phase.py`, `blank_frame`). Probe:
+`~/.cache/ghostshift/rietx/wp-2049/direct87.py` (not committed).
+
+**What qualifies, as built.** An instrument entry is peak-only when
+`CompiledModel.scalar_chain_supported` claims it, or it is one of the two FCJ
+axial ratios. That predicate is the authority that already says which paths
+reach the pattern only through per-peak scalars. It already knows that a
+declared sharp peak (`extra_components`) reads the polarisation and the line
+weights, so with one compiled those stay free. The hold reads the column's
+reach off C and asks the predicate of each reached entry.
+
 The tier of the rule this WP adds: physics. A column whose every reach is an
 unseen phase is flat by the same argument WP-1301 made for a cell, so the
 action is of Rule 1's first kind (`docs/DESIGN.md` § Rules). Which columns
