@@ -20,7 +20,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1329](1329-moment-in-a-series.md) | The moment in a series: the onset, the hold, the trajectory | 2026-10-25 | P3 | [magnetic](#magnetic) |
 | [1339](1339-where-the-improvement-lives.md) | Where the improvement lives | 2026-10-12 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 2026-10-25 | P2 | [magnetic](#magnetic) |
-| [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 2026-10-30 | P2 | [magnetic](#magnetic) |
+| [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 2026-11-01 | P2 | [magnetic](#magnetic) |
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 2026-10-30 | P3 | [magnetic](#magnetic) |
 | [1468](1468-what-the-polyhedra-still-miss.md) | What the polyhedra still miss, and the controls a chemist would reach for | 2026-10-03 | P3 | [Unscheduled](#unscheduled-render-what-the-fit-already-knows) |
 | [1530](1530-the-topas-readers-last-silences.md) | The TOPAS reader's last silences: a macro-opened dataset, a line it does not know, a held background | 2026-10-03 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
@@ -31,11 +31,11 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1807](1807-a-body-on-a-special-position.md) | A body on a special position | 2026-10-29 | P2 | [rigid-bodies](#rigid-bodies) |
 | [1809](1809-tether-planarity-and-anti-bump-restraints.md) | Tether, planarity and anti-bump restraints, pairs frozen per plan | 2026-10-30 | P3 | [rigid-bodies](#rigid-bodies) |
 | [1909](1909-a-line-on-a-falling-flank.md) | A line on a falling flank, at a third of its own esd | 2026-10-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [1910](1910-the-extinction-screen-at-a-small-cell-error.md) | The extinction screen at a small cell error, and the other centring | 2026-10-26 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [1910](1910-the-extinction-screen-at-a-small-cell-error.md) | The extinction screen at a small cell error, and the other centring | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) | The foreign writers state what the other program reads: the setting, the scale, the free set | 2026-10-12 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [1913](1913-what-the-benchmark-agents-wrote-by-hand.md) | What the benchmark agents wrote by hand: a mixed site, a special-position retry loop, and `.esd` | 2026-10-08 | P3 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
-| [1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) | A magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out | 2026-10-29 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
-| [1919](1919-maximal-subgroups-generated-from-the-operators.md) | Maximal subgroups, their conjugacy classes, (P, p) and Wyckoff splittings, generated from the group's own operators | 2026-10-30 | P3 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
+| [1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) | A magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out | 2026-11-01 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
+| [1919](1919-maximal-subgroups-generated-from-the-operators.md) | Maximal subgroups, their conjugacy classes, (P, p) and Wyckoff splittings, generated from the group's own operators | 2026-11-01 | P3 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [1924](1924-a-monoclinic-search-inside-its-ceiling.md) | A monoclinic search stays inside its ceiling and its memory | 2026-10-31 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [1931](1931-the-background-order-scan-runs-to-its-cap.md) | The background order scan runs to its cap | 2026-10-12 | P3 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 2026-10-09 | P2 | [Unscheduled](#unscheduled-coming-from-another-code) |
@@ -52,16 +52,18 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 2026-10-31 | P3 | [generality](#generality-the-audits) |
 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) | A candidate is judged on a fit that converged | 2026-10-28 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | 2026-10-21 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
-| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-10-31 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 2026-10-30 | P2 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
+| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
+| [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 2026-11-01 | P2 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [2033](2033-a-declared-z-filters-the-extinction-class.md) | A declared Z or density filters an extinction class's members | 2026-10-31 | P3 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [2034](2034-the-satellite-window-is-compile-models-window.md) | The satellite arm generates over `compile_model`'s window, not a copy of it | 2026-10-27 | P3 | [magnetic](#magnetic) |
 | [2035](2035-a-reduced-cell-is-its-inputs-exact-image.md) | A reduced cell is its input's exact image, near a right angle too | 2026-10-26 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-10-25 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2041](2041-a-tutorial-shows-the-indexer-abstain.md) | A tutorial shows the indexer abstain | 2026-10-24 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 2026-10-25 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
+| [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 2026-11-01 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
 | [2059](2059-a-bruker-raw-v2-file-reads.md) | A Bruker RAW v2 file reads, checked against two descriptions and one real file | 2026-10-30 | P3 | [Unscheduled](#unscheduled-the-formats-a-lab-still-has) |
 | [2065](2065-a-hung-fast-job-names-its-test.md) | A hung fast job names its test, and the hang is fixed | 2026-10-31 | P1 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
+| [2067](2067-the-data-support-count-reads-what-drives-an-atom.md) | The data-support count reads what drives an atom, not its name | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## Next, by priority
 
@@ -92,7 +94,6 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2062](2062-pawley-is-the-structure-free-default.md) | Pawley is the structure-free default | P2 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2063](2063-the-panel-scored-after-the-clock-spends-the-validation-reserve.md) | The FoM panel scored after the clock spends the validation reserve | P2 | — | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) | A complete dichotomy search holds every centred lattice and polishes its truth leaf | P2 | — ([1924](1924-a-monoclinic-search-inside-its-ceiling.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2067](2067-the-data-support-count-reads-what-drives-an-atom.md) | The data-support count reads what drives an atom, not its name | P2 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md), [1805](1805-the-rigid-body.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2068](2068-the-stationary-angle-test-reads-the-curvature-s-sign.md) | The stationary-angle test reads the curvature's sign, analytically | P2 | — ([1327](1327-magnetic-structure.md) soft) | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 
 ## <a id="v0-3"></a>v0.3 — multi-phase workflows
@@ -409,7 +410,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1328](1328-magnetic-interchange.md) | Magnetic interchange: magCIF in and out, and the readers stop refusing | ✅ 2026-10-03 | — | [1327](1327-magnetic-structure.md) ([1118](1118-foreign-model-files.md) soft) |
 | [1329](1329-moment-in-a-series.md) | The moment in a series: the onset, the hold, the trajectory | 🔄 2026-10-25 | P3 | [1327](1327-magnetic-structure.md) ([1326](1326-satellites-without-a-moment.md) soft) |
 | [1343](1343-the-moment-pays-for-the-width.md) | The magnetic peaks are broader, and the moment pays for it | 🔄 2026-10-25 | P2 | [1327](1327-magnetic-structure.md) ([1326](1326-satellites-without-a-moment.md) soft) |
-| [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 🔄 2026-10-30 | P2 | #290, [1326](1326-satellites-without-a-moment.md), [1327](1327-magnetic-structure.md) |
+| [1418](1418-the-magnetic-structure-is-determined.md) | The magnetic structure is determined, not only stated | 🔄 2026-11-01 | P2 | #290, [1326](1326-satellites-without-a-moment.md), [1327](1327-magnetic-structure.md) |
 | [1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) | A child structure refined on its mode amplitudes | 🔄 2026-10-30 | P3 | [1418](1418-the-magnetic-structure-is-determined.md) ([1327](1327-magnetic-structure.md) soft) |
 | [2034](2034-the-satellite-window-is-compile-models-window.md) | The satellite arm generates over `compile_model`'s window, not a copy of it | 🔄 2026-10-27 | P3 | — |
 
@@ -505,13 +506,13 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1530](1530-the-topas-readers-last-silences.md) | The TOPAS reader's last silences: a macro-opened dataset, a line it does not know, a held background | 🔄 2026-10-03 | P2 | — ([1433](1433-the-inp-grammar-still-refused.md) soft) |
 | [1543](1543-a-gsas-gaussian-width-is-a-variance.md) | A GSAS Gaussian width is a variance | ✅ 2026-10-10 | — | — |
 | [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) | The foreign writers state what the other program reads: the setting, the scale, the free set | 🔄 2026-10-12 | P3 | — (#713 soft) |
-| [1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) | A magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out | 🔄 2026-10-29 | P2 | — ([1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) soft) |
+| [1918](1918-a-magcif-read-in-its-own-cell-and-validated.md) | A magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out | 🔄 2026-11-01 | P2 | — ([1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) soft) |
 | [1933](1933-the-cif-module-beyond-the-structure-block.md) | The CIF module beyond the structure block: the pattern block, the multi-block layout, and the validation hook | 🔄 2026-10-09 | P2 | [1319](1319-structure-interchange.md) |
 | [1942](1942-a-soft-restraint-on-a-sum-across-phases.md) | A soft restraint on a sum of parameters across phases | ⬜ | P3 | — |
 | [1943](1943-the-pbso4-round-robin-as-an-acceptance-case.md) | The PbSO₄ round robin as an acceptance case | ⬜ | P3 | — |
 | [1973](1973-a-topas-spherical-harmonics-texture-reads-in.md) | A TOPAS spherical-harmonics texture reads in | ⬜ | P3 | [1960](1960-spherical-harmonics-texture.md), #131 |
 | [2057](2057-the-o2-form-factor-names-its-source.md) | The O²⁻ form factor names the fit it came from | ✅ 2026-10-30 | — | — |
-| [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | ⬜ | P3 | — |
+| [2058](2058-the-pcr-reader-takes-npatt-and-jbt-10.md) | The FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT` | 🔄 2026-11-01 | P3 | — |
 
 ### <a id="unscheduled-the-fit-has-no-reference"></a>The fit has no reference
 
@@ -576,7 +577,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1542](1542-a-le-bail-background-left-at-its-seed.md) | A Le Bail background left at its seed | 🔄 2026-10-08 | P2 | — |
 | [1908](1908-a-tick-misses-the-displacement-shift.md) | A tick misses the displacement shift | ✅ 2026-10-15 | — | — |
 | [1909](1909-a-line-on-a-falling-flank.md) | A line on a falling flank, at a third of its own esd | 🔄 2026-10-12 | P2 | — |
-| [1910](1910-the-extinction-screen-at-a-small-cell-error.md) | The extinction screen at a small cell error, and the other centring | 🔄 2026-10-26 | P2 | — |
+| [1910](1910-the-extinction-screen-at-a-small-cell-error.md) | The extinction screen at a small cell error, and the other centring | 🔄 2026-11-01 | P2 | — |
 | [1912](1912-a-polar-axis-has-no-origin.md) | A polar axis has no origin, and the fit walks along it | ✅ 2026-10-23 | — | — |
 | [1914](1914-a-size-read-off-a-coefficient-at-its-floor.md) | A size read off a coefficient at its floor | ⬜ | P3 | — |
 | [1915](1915-an-unmeasured-direction-poisons-a-candidates-esds.md) | An unmeasured direction poisons every esd of an indexing candidate | ⬜ | P3 | — |
@@ -606,7 +607,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1998](1998-a-suggestion-past-its-bound.md) | A suggestion whose gain lies past its bound | ⬜ | P2 | — |
 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) | A candidate is judged on a fit that converged | 🔄 2026-10-28 | P2 | [1956](1956-a-cell-pays-for-the-lines-it-predicts-and-the-pattern-lacks.md) |
 | [2012](2012-the-axial-ratios-are-interchangeable.md) | The two axial-divergence ratios are interchangeable, and a fit reports one branch | ⬜ | P2 | — |
-| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 🔄 2026-10-31 | P2 | — ([1325](1325-parametric-series.md), [1421](1421-the-result-reproduces-its-own-number.md) soft) |
+| [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 🔄 2026-11-01 | P2 | — ([1325](1325-parametric-series.md), [1421](1421-the-result-reproduces-its-own-number.md) soft) |
 | [2029](2029-whether-the-centroid-fixes-a-polar-origin-by-default.md) | Whether the centroid fixes a polar origin by default | ⬜ | P3 | — ([1912](1912-a-polar-axis-has-no-origin.md) soft) |
 | [2035](2035-a-reduced-cell-is-its-inputs-exact-image.md) | A reduced cell is its input's exact image, near a right angle too | 🔄 2026-10-26 | P2 | — |
 | [2044](2044-the-sabine-laue-factor-is-continuous.md) | The Sabine Laue factor is continuous at x = 1 | ✅ 2026-10-24 | — | — |
@@ -623,7 +624,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2062](2062-pawley-is-the-structure-free-default.md) | Pawley is the structure-free default | ⬜ | P2 | [2011](2011-a-candidate-is-judged-on-a-fit-that-converged.md) ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) |
 | [2063](2063-the-panel-scored-after-the-clock-spends-the-validation-reserve.md) | The FoM panel scored after the clock spends the validation reserve | ⬜ | P2 | — |
 | [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) | A complete dichotomy search holds every centred lattice and polishes its truth leaf | ⬜ | P2 | — ([1924](1924-a-monoclinic-search-inside-its-ceiling.md) soft) |
-| [2067](2067-the-data-support-count-reads-what-drives-an-atom.md) | The data-support count reads what drives an atom, not its name | ⬜ | P2 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md), [1805](1805-the-rigid-body.md) soft) |
+| [2067](2067-the-data-support-count-reads-what-drives-an-atom.md) | The data-support count reads what drives an atom, not its name | 🔄 2026-11-01 | P2 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md), [1805](1805-the-rigid-body.md) soft) |
 | [2068](2068-the-stationary-angle-test-reads-the-curvature-s-sign.md) | The stationary-angle test reads the curvature's sign, analytically | ⬜ | P2 | — ([1327](1327-magnetic-structure.md) soft) |
 | [2071](2071-a-peak-list-refuses-a-q-esd-its-two-theta-esd-does-not-give.md) | A peak list refuses a q_esd that its two_theta_esd does not give | ✅ 2026-11-01 | — | — |
 | [2075](2075-the-result-records-its-fit-range-and-what-lies-outside-it.md) | The result records its fit range, and what lies outside it | ⬜ | P3 | — ([2005](2005-refine-py-codes-and-literals.md) soft) |
@@ -715,12 +716,12 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1516](1516-scoping-stacking-faults.md) | Scoping stacking faults: DIFFaX files first, a native model when it earns one | ⬜ | P3 | [1512](1512-a-simulated-diffuse-curve-is-a-component.md) ([1514](1514-scoping-rigid-bodies.md), [1515](1515-scoping-structure-solution.md) soft) |
 | [1517](1517-the-eight-steers-replayed.md) | The eight steers, replayed: does the package raise what the person caught? | ⬜ | P3 | — |
 | [1913](1913-what-the-benchmark-agents-wrote-by-hand.md) | What the benchmark agents wrote by hand: a mixed site, a special-position retry loop, and `.esd` | 🔄 2026-10-08 | P3 | — |
-| [1919](1919-maximal-subgroups-generated-from-the-operators.md) | Maximal subgroups, their conjugacy classes, (P, p) and Wyckoff splittings, generated from the group's own operators | 🔄 2026-10-30 | P3 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) |
+| [1919](1919-maximal-subgroups-generated-from-the-operators.md) | Maximal subgroups, their conjugacy classes, (P, p) and Wyckoff splittings, generated from the group's own operators | 🔄 2026-11-01 | P3 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) |
 | [1921](1921-the-users-own-structure-database-indexed.md) | The user's own structure database, indexed: is this phase or this cell already known? | ⬜ | P3 | — |
 | [1967](1967-what-the-chemist-declares-reaches-the-extinction-screen.md) | What the chemist declares reaches the extinction screen | ✅ 2026-10-23 | — | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) |
 | [1992](1992-nw2-magnetic-superspace-groups.md) | N-W2 (group half): magnetic superspace groups generated from the operators | ✅ 2026-11-01 | — | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) |
 | [1993](1993-nw3-satellites-at-a-real-q.md) | N-W3: satellites at a real q, to order m, with (h k l m) rows | ⬜ | P3 | — ([1992](1992-nw2-magnetic-superspace-groups.md) soft) |
-| [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 🔄 2026-10-30 | P2 | — ([1510](1510-what-the-chemist-knows-reaches-the-search.md) soft) |
+| [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 🔄 2026-11-01 | P2 | — ([1510](1510-what-the-chemist-knows-reaches-the-search.md) soft) |
 | [2033](2033-a-declared-z-filters-the-extinction-class.md) | A declared Z or density filters an extinction class's members | 🔄 2026-10-31 | P3 | — ([1967](1967-what-the-chemist-declares-reaches-the-extinction-screen.md), [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) soft) |
 | [2069](2069-every-displacive-child-of-a-parent-in-a-stated-cell.md) | Every displacive child of a parent in a stated cell, several irreps included | ⬜ | P3 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md), [1919](1919-maximal-subgroups-generated-from-the-operators.md) soft) |
 
