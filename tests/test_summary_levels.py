@@ -103,8 +103,9 @@ def test_a_path_that_moves_an_atom_bears_where_a_coordinate_does(state):
     twist, or a variable tied to an atom entry is about the coordinates it
     moves, so it keeps its level under every purpose a coordinate's does
     (WP-2067; under qpa and magnetic each read as info before).  The paths are
-    the data-support count's own reading of what a column reaches, so a new
-    family that drives atoms fails here until the purpose table lists it
+    the data-support count's own reading of what a column reaches.  A new
+    family that drives atoms is checked once its state joins the list above,
+    and then fails until the purpose table lists it
     (``rietx.purposes._ATOM_DRIVERS``)."""
     from rietx.optimize.statistics import structural_free_paths
     from tests import test_cross_backend as tcb
