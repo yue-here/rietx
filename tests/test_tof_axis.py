@@ -691,6 +691,109 @@ def test_a_stated_unit_that_is_neither_axis_is_refused_by_name(tmp_path, unit, w
     assert unit in str(exc.value) and what in str(exc.value)
 
 
+# ---------------------------------------------------------------------------
+# the axis reader option (#1064): the caller's declaration
+# ---------------------------------------------------------------------------
+
+def _headerless_bank(path):
+    """#1064's reproduction: a flight-time bank of 2000-18000 µs, three plain
+    columns and no unit line, so nothing in the file says what x is."""
+    path.write_text("\n".join(f"{2000.0 + 16.0 * i:.1f} {100.0 + i % 7:.1f} "
+                              f"{10.0 + 0.01 * i:.3f}" for i in range(1001))
+                    + "\n", encoding="utf-8")
+    return path
+
+
+def test_a_headerless_flight_time_bank_reads_when_the_caller_declares_tof(tmp_path):
+    """Main before this refused the bank as "2000° to 18000° … not 2θ", and
+    refused ``axis="tof"`` as an unknown option.  The declaration is recorded,
+    and the undeclared read keeps its refusal, now naming the option."""
+    p = _headerless_bank(tmp_path / "bank.dat")
+    with pytest.raises(ValueError, match="not 2θ in degrees") as exc:
+        rx.read_pattern(str(p))
+    assert "axis='tof'" in str(exc.value)
+
+    notes: list = []
+    data = rx.read_pattern(str(p), axis="tof", diagnostics=notes)
+    assert data.axis == "tof" and data.two_theta is None
+    assert data.tof[0] == 2000.0 and data.tof[-1] == 18000.0
+    assert len(data.tof) == 1001 and data.sigma[0] == 10.0
+    assert data.metadata["declared_axis"] == "tof"
+    assert notes == []
+
+
+def test_a_declared_two_theta_is_recorded_and_reads_the_same_pattern(tmp_path):
+    """Declaring what the reader would have assumed changes no number, and is
+    recorded, since a declaration is not a finding about the file."""
+    p = tmp_path / "plain.xye"
+    p.write_text("\n".join(f"{10.0 + 0.02 * i} {i} {1.0 + 0.1 * i}"
+                           for i in range(N)) + "\n", encoding="utf-8")
+    assumed = rx.read_pattern(str(p))
+    notes: list = []
+    declared = rx.read_pattern(str(p), axis="two_theta", diagnostics=notes)
+    assert declared.two_theta == assumed.two_theta
+    assert declared.intensity == assumed.intensity
+    assert declared.sigma == assumed.sigma
+    assert declared.metadata["declared_axis"] == "two_theta"
+    assert "declared_axis" not in assumed.metadata
+    assert notes == []
+
+
+@pytest.mark.parametrize(("unit", "declared", "found"), [
+    ("Time-of-flight", "two_theta", "a flight time in µs"),
+    ("Degrees", "tof", "2θ in degrees"),
+    ("dSpacing", "tof", "a d-spacing"),
+])
+def test_a_declaration_the_file_contradicts_is_refused_quoting_both(
+        tmp_path, unit, declared, found):
+    """Two declarations that disagree: the reader cannot tell which is wrong,
+    so it picks neither."""
+    p = tmp_path / "stated.xye"
+    p.write_text(f"' The X-axis unit is: {unit}\n"
+                 + "\n".join(f"{7000.0 + 3.0 * i} {i} 0.5" for i in range(N))
+                 + "\n", encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        rx.read_pattern(str(p), axis=declared)
+    message = str(exc.value)
+    assert f"axis={declared!r}" in message
+    assert repr(unit) in message and found in message
+
+
+def test_a_declaration_the_file_agrees_with_or_cannot_be_classified_against_reads(
+        tmp_path):
+    """The agreeing arm of the contradiction test, and a stated unit this
+    reader does not recognise: the declaration settles it, the unit stays
+    verbatim in ``x_label``, and nothing is assumed, so nothing is reported."""
+    rows = "\n".join(f"{7000.0 + 3.0 * i} {i} {0.5 + 0.1 * i}" for i in range(N))
+    for unit in ("Time-of-flight", "channel"):
+        p = tmp_path / f"{unit}.xye"
+        p.write_text(f"' The X-axis unit is: {unit}\n{rows}\n", encoding="utf-8")
+        notes: list = []
+        data = rx.read_pattern(str(p), axis="tof", diagnostics=notes)
+        assert data.axis == "tof" and data.tof[0] == 7000.0
+        assert data.metadata["x_label"] == unit
+        assert notes == []
+
+
+def test_an_axis_that_is_not_one_a_pattern_holds_is_refused_by_name(tmp_path):
+    p = _headerless_bank(tmp_path / "bank.dat")
+    with pytest.raises(ValueError, match="axis='d_spacing'"):
+        rx.read_pattern(str(p), axis="d_spacing")
+
+
+def test_an_axis_option_on_a_format_that_states_its_own_is_reported(tmp_path):
+    """A GSAS bintype is the format's declaration and ``axis`` is the ASCII
+    reader's: elsewhere it is dropped and reported, as ``bank`` is on ``xy``."""
+    p = tmp_path / "cons.gsa"
+    p.write_text("BANK 1 4 1 CONS 1000 20 STD\n"
+                 "    10.0    11.0    12.0    13.0\n", encoding="utf-8")
+    notes: list = []
+    data = rx.read_pattern(str(p), axis="tof", diagnostics=notes)
+    assert data.axis == "two_theta"
+    assert any(d.code == "READER_OPTION_IGNORED" and "axis='tof'" in d.message
+               for d in notes)
+
+
 def test_a_cons_bank_with_a_tof_comment_pasted_in_still_reads_as_an_angle(tmp_path):
     """Negative control (ii): the bintype wins over a comment.
 
