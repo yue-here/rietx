@@ -170,7 +170,7 @@ the transposed rotation set is a group too and passes any dimension count.
   warning on a strain parameter reads as a warning under `magnetic`, which does
   not list the cell. Then list the strain path under `cell` and `phase_id` too.
   Those purposes list the cell and no `distortion_modes` path, so a warning on
-  it reads as info there. `tests/test_summary_levels.py::test_a_path_that_moves_an_atom_bears_where_a_coordinate_does`
+  it reads as info there. `tests/test_data_support.py::test_the_count_reads_what_a_column_reaches`
   checks only the paths `structural_free_paths` counts, so it cannot catch
   either case.
 - **2026-10-16, from the issue triage (#1002): `IrrepModes.primary` compares

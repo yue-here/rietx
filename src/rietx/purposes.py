@@ -37,7 +37,7 @@ class Purpose:
 #: rigid body writes its atoms through a derived block, a mode amplitude
 #: through affine rows of C.  Every purpose that lists the coordinates lists
 #: these too, since a warning naming one is about the coordinates it moves
-#: (WP-2067; ``tests/test_summary_levels.py`` holds the list to
+#: (WP-2067; ``tests/test_data_support.py`` holds the list to
 #: ``optimize.statistics.structural_free_paths``).  A ``vars.`` name bears on
 #: every purpose already (``schemas.results._bears_on``).
 _ATOM_DRIVERS: tuple[str, ...] = ("phases.*.rigid_bodies.*", "phases.*.distortion_modes.*")
