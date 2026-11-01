@@ -1122,9 +1122,16 @@ class GuardFinding:
                    f"points; the Gaussian carries {share:.0%} of the width)")
 
     @classmethod
-    def flat_direction(cls, a: str, b: str, rho: float) -> "GuardFinding":
+    def flat_direction(cls, a: str, b: str, rho: float,
+                       unresolved: bool = False) -> "GuardFinding":
+        """``unresolved``: the pair lies in a direction the Jacobian cannot
+        resolve, so no ρ against either member was thresholded (WP-2050,
+        :func:`~rietx.optimize.statistics.resolved_correlation`)."""
+        note = ("; ρ against either is not determined and is not reported"
+                if unresolved else "")
         return cls("FLAT_DIRECTION", (a, b), float(rho),
-                   f"{a} ~ {b} (ρ={rho:+.3f}; the data does not separate them)")
+                   f"{a} ~ {b} (ρ={rho:+.3f}; the data does not separate them"
+                   f"{note})")
 
     @classmethod
     def discarded_direction(cls, paths: tuple[str, ...],
@@ -2202,8 +2209,29 @@ def check_guards(table, outcome, threshold: float,
 
     if outcome.correlation is not None and len(free) > 1:
         corr = np.asarray(outcome.correlation)
+        unresolved = np.zeros(len(free), dtype=bool)
+        if outcome.jac is not None and not outcome.n_aux:
+            # a ρ against a direction the Jacobian cannot resolve is rounding
+            # (WP-2050): such a pair is nan here and never crosses a threshold
+            from ..optimize.least_squares import covariance_jacobian
+            from ..optimize.statistics import resolved_correlation
+
+            try:
+                corr, unresolved = resolved_correlation(
+                    corr, covariance_jacobian(outcome, free))
+            except np.linalg.LinAlgError:
+                # ``soft_modes``' rule below: the stage already said so
+                if getattr(outcome, "covariance_error", None) is None:
+                    raise
         report.high_correlations, report.flat_directions = (
             _correlation_findings(corr, free, threshold))
+        if unresolved.any():
+            index = {p: i for i, p in enumerate(free)}
+            report.flat_directions = [
+                GuardFinding.flat_direction(
+                    *f.paths, f.value,
+                    unresolved=bool(unresolved[[index[p] for p in f.paths]].all()))
+                for f in report.flat_directions]
         # measured once (WP-1056): the same matrix the loop above thresholds
         report.measured_top_correlations = top_correlations(corr, free)
 

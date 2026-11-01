@@ -57,6 +57,31 @@ def test_the_differences_name_the_code_and_the_standard_it_moved_on():
 
 
 @pytest.mark.slow
+@pytest.mark.xdist_group("brucite-nudge")
+def test_brucites_correlation_findings_do_not_move_under_a_rounding_nudge():
+    """WP-2050: a 1e-14 nudge to the start scale moved brucite between 35 and
+    42 warnings, every extra one a ρ against its unresolved Gaussian-size,
+    Gaussian-strain and W direction.  The guard now reads those ρ as not
+    determined, so the findings are the same at every nudge."""
+    import rietx as rx
+    from rietx.viz import compare
+
+    standard = STANDARD_BY_KEY["brucite"]
+    if not standard.available(compare.default_data_dir()):
+        pytest.skip("brucite's files are not here")
+    seen = []
+    for k in (0, 4, -4):  # +4 gave 42 warnings before WP-2050, -4 gave 35
+        inputs = standard.build(compare.default_data_dir())
+        inputs.structure.phases[0].scale.value *= 1 + k * 1e-14
+        fit = rx.Refinement(inputs.structure, inputs.instrument, history=False).fit(
+            inputs.data, plan=inputs.plan, telemetry=False,
+            two_theta_limits=inputs.two_theta_limits)
+        seen.append(sorted((d.code, tuple(d.where)) for d in fit.diagnostics
+                           if d.level == "warning"))
+    assert seen[0] == seen[1] == seen[2]
+
+
+@pytest.mark.slow
 @pytest.mark.xdist_group("suite-alarms")
 def test_the_standards_fire_what_the_pin_says():
     missing = suite_alarms.unavailable()

@@ -294,14 +294,18 @@ def resolved_correlation(corr: np.ndarray, jac: np.ndarray
     **The cut is the Jacobian's own accuracy, not a tolerance.**  The forward
     differences of the peak chain carry a relative error of order
     :data:`~rietx.optimize.least_squares.FD_STEP` per column (5e-7 measured
-    against jax on lab brucite, :func:`~.least_squares._fd_typicals`).  An
-    equilibrated singular value below ``FD_STEP·σ_max`` lies inside that
-    error, so an eigenvalue of the unit-diagonal normal matrix at or below
-    ``FD_STEP²·|λ|max`` is a direction the data has not been shown to move.
-    The covariance still inverts it, and rounding then sets it: on brucite's
+    against jax on lab brucite, :func:`~.least_squares._fd_typicals`).  With
+    every column scaled to unit norm, an error of at most ``FD_STEP`` in each
+    of *n* columns has a spectral norm of at most ``√n·FD_STEP`` (it is bounded
+    by the Frobenius norm), and by Weyl's inequality a singular value moves by
+    no more.  So an eigenvalue of the unit-diagonal normal matrix at or below
+    ``n·FD_STEP²`` is a direction the data has not been shown to move.  The
+    covariance still inverts it, and rounding then sets it: on brucite's
     Gaussian-size, Gaussian-strain and W triple it sat between 2.7e-15 and
     4.9e-14 of |λ|max under 1e-14 nudges to one start value, while the next
-    direction stayed at 1.3-1.4e-10.  Every column carries a rounding-level
+    direction stayed at 1.3-1.4e-10.  On corundum the same triple reached
+    1.2-1.9e-12 of |λ|max in its later stages, above ``FD_STEP²·|λ|max`` and
+    still under ``n·FD_STEP²``.  Every column carries a rounding-level
     loading on such a direction, divided by that eigenvalue, so a ρ against
     one of its members, and between two columns that load on it weakly, is
     rounding too: ``lor_size ~ lor_strain`` read −0.995 or −0.9975 or fell
@@ -340,7 +344,7 @@ def resolved_correlation(corr: np.ndarray, jac: np.ndarray
         return corr, unresolved
     sub = JTJ[np.ix_(live, live)] / np.outer(d[live], d[live])
     lam, vec = lapack.eigh(sub)
-    cut = FD_STEP ** 2 * np.abs(lam).max()
+    cut = len(live) * FD_STEP ** 2
     gone = np.abs(lam) <= cut
     if not gone.any():
         return corr, unresolved

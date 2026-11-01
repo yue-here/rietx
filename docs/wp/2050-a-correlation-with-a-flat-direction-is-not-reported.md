@@ -95,8 +95,14 @@ none of their reported pairs involves it.
       would also project out the zero-shift/displacement direction at
       1.4e-10, whose pairs hold to 2e-5 under the nudges and which a refiner
       wants reported. Tier: derived (the cut is the Jacobian's accuracy).
-- [ ] Apply it in the guard loop. Say in the message what was left out and why,
-      rather than dropping it silently.
+- [x] Apply it in the guard loop. Say in the message what was left out and why,
+      rather than dropping it silently. `check_guards` reads the resolved
+      matrix for the findings and `measured_top_correlations` alike; a
+      `FLAT_DIRECTION` pair of unresolved members adds "ρ against either is
+      not determined and is not reported". The cut became absolute,
+      n·FD_STEP² on the unit-diagonal matrix (the Frobenius bound on n
+      columns' forward-difference error), after corundum's triple sat at
+      1.2-1.9e-12 of |λ|max, above the relative FD_STEP².
 - [ ] Tests: brucite's count is the same at the nudges in
       `docs/wp/2050-batch/`; re-pin `tests/data/suite_alarms.json`.
 - [ ] Skill: `HIGH_CORRELATION`'s row in `references/diagnostics.md`, if the

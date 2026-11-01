@@ -110,3 +110,13 @@ def test_top_correlations_quotes_no_undetermined_pair():
     assert all(np.isfinite(p.rho) for p in quoted)
     assert {(p.path_a, p.path_b) for p in quoted} == {
         ("a", "b"), ("a", "e"), ("b", "e"), ("c", "d")}
+
+
+def test_a_flat_pair_in_an_unresolved_direction_says_what_was_left_out():
+    from rietx.strategy.staged import GuardFinding
+
+    plain = GuardFinding.flat_direction("a", "b", -1.0)
+    noted = GuardFinding.flat_direction("a", "b", -1.0, unresolved=True)
+    assert str(plain) == "a ~ b (ρ=-1.000; the data does not separate them)"
+    assert str(noted) == ("a ~ b (ρ=-1.000; the data does not separate them; "
+                          "ρ against either is not determined and is not reported)")
