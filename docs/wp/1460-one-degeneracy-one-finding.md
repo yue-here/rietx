@@ -97,6 +97,17 @@ reader that keys on `where` without naming the code is the one it misses.
   01 and 02 use the Chebyshev, and 01's prose names the flood as the reason.
   When this WP lands, rewrite that paragraph in
   `examples/tutorials/01_quickstart.py` and rebuild the notebook.
+- **From WP-2050 (2026-11-01), the guard now knows the unresolved set.**
+  `check_guards` reads `statistics.resolved_correlation`, which names the
+  columns an unresolved eigen-direction dominates (eigenvalue ≤ n·FD_STEP²
+  on the unit-diagonal matrix). A ρ against one of them is `nan` and never
+  reported. That set is the candidate this WP's grouping wants for its flat
+  case, and it is recorded nowhere yet: a set-level finding naming it would
+  also be the record WP-2050's generality review asked for. Two gaps it left
+  for this WP. A member with no ±1.000 partner has its pairs withheld with
+  no `FLAT_DIRECTION` clause to say so. Two unresolved directions leave ρ
+  between members of different ones set by rounding (by construction; not
+  measured).
 
 ## Non-goals
 

@@ -1,6 +1,6 @@
 # WP-2050 — a correlation with a flat direction is not reported as one
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here
+Milestone: unscheduled · Status: 🔄 2026-11-01 — all four tasks landed (PR #1306); awaiting Yue's approval of the cut's tier-3 row and the FLAT_DIRECTION wording
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-25 — a warning whose count is rounding: brucite carries 35 to 42 by a 1e-14 start nudge, and the alarm pin cannot hold it on any platform
@@ -128,35 +128,91 @@ none of their reported pairs involves it.
 
 ## Handover log
 
-- **2026-11-01** — ghostshift runner, PR #1306 (draft), branch
-  `wp2050-flat-direction-correlation`. **Paused at task 2 on a file
-  boundary, not a design question.** Task 1 landed: the premise
-  re-measured (Context, "superseded in part"), the practice survey, and
-  `statistics.resolved_correlation` with 8 tests
-  (`tests/test_resolved_correlation.py`, 8 passed, `[dev]`, macOS arm64).
-  The shift lead had told this runner to stay out of `src/strategy/` and
-  `refine.py` while WP-2049's runner works there. Task 2 needs
-  `strategy/staged.py`, in two functions WP-2049's tasks do not reach.
-  In `check_guards`, before `_correlation_findings`, pass
-  `resolved_correlation(corr, covariance_jacobian(outcome, free))`'s
-  matrix when `outcome.jac is not None and not outcome.n_aux`, so the
-  findings and `measured_top_correlations` read one matrix (WP-1056's
-  rule). And in `_correlation_findings`, say what was left out:
-  `GuardFinding.flat_direction` gains a clause for a pair of unresolved
-  members, along the lines of "ρ against either is not determined and is
-  not reported". The joint twin in `multi.py` passes a `BlockJacobian`,
-  which the helper returns unchanged; leave it. After that: re-pin
-  `tests/data/suite_alarms.json` (brucite 36 → 35; 76/8 = 9.5 → 75/8 =
-  9.375 warnings per result), the `HIGH_CORRELATION` and `FLAT_DIRECTION`
-  rows of `references/diagnostics.md`, an `_audit` row for the cut, and
-  `python -m tests.reader_output` (the message changes, so it goes to Yue
-  before merge). Measured with `docs/wp/2050-batch/simulate.py`: brucite
-  35 at k = 0, ±1, ±4, +7, ±20; the other seven unchanged at k = 0, +4.
-  Not generalised: the esds. `lor_size`'s own esd moves 55 % across the
-  nudges (0.185 against 0.287) for the same reason, and the three members'
-  esds (≈ 6000) are rounding too. The correlation feeds
-  `stderr_physical`, so fixing that belongs to the esd authority
-  (`normal_covariance`) and to its own WP.
+- **2026-11-01** — ghostshift runner, PR #1306. All four tasks landed. Two
+  maintainer calls wait before merge (below).
+
+  Brucite's warning count no longer depends on rounding. Before, a 1e-14
+  change to one start value gave 35, 36, 39 or 42 warnings; now it gives 35
+  at all eight nudges tried. The cause was one direction in the fit that the
+  data does not determine: the Gaussian size, the Gaussian strain and W,
+  which are exactly degenerate. The correlation guard used to report ρ
+  against those three, and those ρ were set by rounding. It now drops them,
+  and the FLAT_DIRECTION message says so. The other seven alarm standards
+  report what they did before. Every purpose's warnings per result fell by
+  exactly 1/8: brucite lost one warning, `lor_size ~ lor_strain`, whose ρ
+  with the flat direction removed is −0.896.
+
+  *Done.* `statistics.resolved_correlation` removes from the correlation
+  every eigen-direction of the unit-diagonal normal matrix at or below
+  n·FD_STEP² (n = live columns). That is the Frobenius bound on n columns
+  that each carry a forward-difference error of FD_STEP. It names the columns
+  such a direction dominates, using `discarded_directions`' touched test at
+  this cut. `check_guards` hands the projected matrix to the
+  correlation/flat loop and to `measured_top_correlations` (one matrix, as
+  WP-1056 requires). A pair with one unresolved member is `nan`, and
+  `top_correlations` skips it. A FLAT_DIRECTION pair of two members gains
+  "; ρ against either is not determined and is not reported". There is a
+  practice survey in `docs/practice.md`. The skill's FLAT_DIRECTION row is
+  updated. `tests/data/suite_alarms.json` is re-pinned.
+
+  *Measured* (macOS arm64, `[dev]`). Brucite gives 35 warnings at scale
+  nudges k = 0, ±1, ±4, +7, ±20 (`row4_probe.py`). The other seven standards
+  are unchanged at k = 0 and +4. Per stage, the triple's eigenvalue against
+  the cut (`perstage.py` in this session's scratch, not committed): the
+  closing stage of brucite, corundum, zincite and fluorite reads 0.004-0.47×;
+  brucite's 1.4e-10 zero-shift/displacement direction reads ≥ 31×; SRM 660c,
+  FAP, NAC and the capillary have nothing within 1000× of it. The relative
+  cut FD_STEP²·|λ|max, tried first, misread corundum: its triple sat at
+  1.2-1.9e-12 of |λ|max in the later stages. The FLAT_DIRECTION clause is
+  the same in 19 of 20 standard-by-nudge cases. In the 20th, brucite at
+  k = −4, the seventh stage has the triple at 2.3× the cut. The dedup keeps
+  that stage's message for two of the three pairs, so those two lose the
+  clause; their count does not change. `python -m tests.reader_output` exit
+  0: its fit has no unresolved direction. Fast suite: 1 failed, 13195 passed, 310 skipped, 32 xfailed (`-m "not slow"`, `[dev]`, macOS arm64, alone on the machine through the suite lock). The one failure is `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`: this Mac's user Jupyter kernel spec points at a deleted venv, which is unrelated to this branch. Added
+  tests: 9 in `tests/test_resolved_correlation.py` (fast) and one slow
+  brucite row in `test_suite_alarms.py`. The nine fast tests cost 0.03 s in all (local junit). The slow row ran alone in 6.6 s.
+
+  *Review.* `/code-review high --fix` made 10 findings. Kept: the skill
+  wording and `top_correlations`' docstring. Reverted: its change to
+  `_correlation_findings` and its hoist of `covariance_jacobian`. The lead
+  allowed only `check_guards` and `flat_direction` in `staged.py`, and the
+  hoist moved the call out of its LinAlgError guard. Declined, stated as
+  limits in `resolved_correlation`'s docstring: the error premise
+  (`FD_STEP`'s row records some columns to 2.5e-4); n-scaling (at 60
+  columns the cut is 12× under the zero-shift direction); two unresolved
+  directions. Declined, out of scope: the joint fit in `multi.py` (the lead's
+  file boundary); Pawley (`n_aux`) fits, which skip the projection as
+  `check_discarded_directions` does; the shared-eigh refactor (it would touch
+  `discarded_directions`, whose bits are pinned).
+
+  *Generality.* The generality-review agent's report is pasted unedited
+  into `docs/wp/2050-batch/generality-review.md`, because at about 2 500
+  words it would bury this log. All four items came back **weak**. Author's
+  answers:
+  (1) The cut needs a tier-3 row, with the maintainer's approval, for its
+  free factor (the error per column, 1 × FD_STEP). Answer: agreed. A tier-3
+  row cannot be written without Yue's dated approval, so the cut stays inline
+  and the approval is asked in the PR. The judge's point that the eight-nudge
+  count ran under the earlier relative cut is answered by `row4_probe.py`,
+  re-run under the shipped cut: 35 at all eight nudges.
+  (2) A lone member is withheld silently. Answer: stated in the docstring,
+  and moved to WP-1460's Inherited; its set-level finding is the natural
+  record.
+  (3) No record field names the unresolved set (Rule 4). Answer: that is
+  WP-1460's finding too. Adding a result field here would be a second
+  reader-output change for Yue; the PR asks.
+  (4) The skill sentence was wrong for pairs inside the set. Answer: reworded
+  with the judge's wording. `CorrelationPair`'s stale docstring is fixed.
+
+  *Not generalised.* The esds. `lor_size`'s esd moves 55 % across the nudges
+  (0.185 against 0.287), and the triple's (≈ 6000) are rounding too. The raw
+  correlation feeds `stderr_physical` and QPA propagation, so that belongs to
+  the esd authority (`normal_covariance`). No open WP owns it.
+
+  *Next.* (1) Yue: approve or reverse the cut's tier-3 row (below). (2) Yue:
+  the FLAT_DIRECTION wording, a reader-output change. (3) Then add the
+  `_audit` row with the approval date. If the cut is reversed, the fallback
+  is GSAS-II's 1e-6 relative cut, which also drops the zero-shift pairs.
 - **2026-10-25** — filed by WP-2036's session after a measurement lane
   reproduced the nightly's alarm red on an arm64 Mac. No open WP owns the
   guard: WP-2037, which made the pin, is closed. Next: the first task.
