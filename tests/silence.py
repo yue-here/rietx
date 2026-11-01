@@ -714,6 +714,23 @@ def _stage_solve(*, nan_column: bool) -> list:
     return [] if found is None else [found]
 
 
+def _site_glob(*turn_ons: list[str]) -> list:
+    """``STAGE_PATH_NOT_FREE``'s site arm on LaB6 (``perturbed_models``), one
+    stage per ``turn_on``.  La on 1a has no ``dof`` rows, so its ``dof.*``
+    frees nothing (issue #896); B's ``dof.*`` frees its one row, a wildcard
+    index is WP-1414's healthy miss, and a ``biso`` answers the ``adp.*``
+    beside it."""
+    from rietx.params.vector import ParameterTable
+    from rietx.refine import _site_glob_diagnostics
+    from rietx.strategy.staged import Stage
+    from tests.test_refine_synthetic import perturbed_models
+
+    table = ParameterTable(*perturbed_models())
+    stages = [Stage(f"s{i}", ["phases.*.scale", *turn_on])
+              for i, turn_on in enumerate(turn_ons)]
+    return _site_glob_diagnostics(stages, table, {})
+
+
 SILENCE: dict[str, Pair] = {
     "CIF_SITE_LISTED_TWICE": Pair(
         _listed_twice_fires, _listed_twice_silent, "tests/test_cif_sites_coincide.py"),
@@ -766,6 +783,12 @@ SILENCE: dict[str, Pair] = {
         functools.partial(_stage_solve, nan_column=True),
         functools.partial(_stage_solve, nan_column=False),
         "tests/test_non_finite_stage.py"),
+    "STAGE_PATH_NOT_FREE": Pair(
+        functools.partial(_site_glob, ["phases.0.atoms.0.dof.*"]),
+        functools.partial(_site_glob, ["phases.0.atoms.1.dof.*"],
+                          ["phases.*.atoms.*.dof.*"],
+                          ["phases.0.atoms.0.biso", "phases.0.atoms.0.adp.*"]),
+        "tests/test_params_surface.py"),
     "STAGE_WINDOWS_STALE": Pair(
         functools.partial(_windows_stale, 0.3), functools.partial(_windows_stale, None),
         "tests/test_window_loss.py"),
