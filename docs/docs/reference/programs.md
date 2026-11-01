@@ -143,6 +143,17 @@ Six more strings version the data contracts, and each moves on its own:
 Store the contract versions beside any answer you store.
 A threshold compared across two `report_thresholds_version` values compares two different tests.
 
+### Events of a structure solution
+
+Event version 4 added three kinds, with the `data` keys below ([Events](refinement.md#events) has the rest of the ladder).
+A solve's units (a race round, a seed, a control seed, a per-group consensus) are `stage_start` and `stage_end` pairs, as indexing's are.
+
+| Kind | `data` keys in this version |
+|---|---|
+| `solve_start` | `engine`, `space_groups`, `n_assignments`, `seeds`, `control_seeds`, `replicas`, `sweeps`, `race_sweeps`, `span`, `step`, `swap_every`, `exchange`, `n_random`, `cluster_tol`, `polish_maxiter`, `heartbeat_sweeps`, `total_budget_seconds`, `n_reflections`, `chi2_floor`, `resumed`, `n_stages` |
+| `solve_step` | `unit`, `unit_kind`, `sweep`, `sweeps`, `moves`, `leader_j`, `leader_chi2_ratio`, `leader_changed`, `sweeps_since_improvement`, `replica_temperatures`, `replica_acceptance`, `swap_acceptance` |
+| `solve_end` | `status`, `partial`, `n_candidates`, `units_not_run` |
+
 ### Arms
 
 | Arm | Holds |

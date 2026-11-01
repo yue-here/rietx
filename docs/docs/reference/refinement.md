@@ -623,7 +623,7 @@ A `nonpositive_strain` finding means those coefficients are not quotable, and it
 ## Events
 
 `events=` streams every stage boundary and residual evaluation to a destination you choose, beside the run directory the fit writes for itself ([How to watch or stop a running fit](../guides/watch.md)).
-A path appends each event to that file as one line of JSON.
+A path appends each event to it as one line of JSON.
 A function is called with each event as a dictionary:
 
 <!-- api-doc: no-exec — it refines the reader's own pattern -->
@@ -634,10 +634,10 @@ def show(event):
 result = ref.fit(data, events=show)
 ```
 
-Each event carries `record` (always `"event"`), `v` (the event schema version), `t` (a Unix time), `kind` and an open `data` dictionary.
+Each event carries `record` (always `"event"`), `v` (the schema version), `t` (a Unix time), `kind` and an open `data` dictionary.
 A fit emits five kinds: `fit_start` and `fit_end` for the run, `stage_start` and `stage_end` for each stage, and `eval` for each residual evaluation.
-An indexing search adds `index_start` and `index_end`, a structure solution `solve_start`, `solve_step` and `solve_end`.
-A five-stage fit of the fluorapatite tutorial pattern emitted 1 `fit_start`, 5 `stage_start`, 102 `eval`, 5 `stage_end` and 1 `fit_end`.
+An indexing search adds `index_start` and `index_end`, a structure solution `solve_start`, `solve_step` and `solve_end` ([keys](programs.md#events-of-a-structure-solution)).
+A five-stage fluorapatite fit emitted 1 `fit_start`, 5 `stage_start`, 102 `eval`, 5 `stage_end` and 1 `fit_end`.
 
 | Kind | `data` keys in this version |
 |---|---|
@@ -646,16 +646,13 @@ A five-stage fit of the fluorapatite tutorial pattern emitted 1 `fit_start`, 5 `
 | `eval` | `stage`, `n_eval`, `cost`, `accepted`, `lam`, `step_norm`, `values` |
 | `stage_end` | `stage`, `status`, `termination`, `n_iterations`, `cost_initial`, `cost_final`, `rwp`, `held`, `released` |
 | `fit_end` | `status`, `rwp`, `gof`, `node_id` |
-| `solve_start` | `engine`, `space_groups`, `seeds`, `n_stages`, … |
-| `solve_step` | `unit`, `sweep`, `leader_j`, … |
-| `solve_end` | `status`, `partial`, `n_candidates` |
 
-Read `data` with `.get`, because a version may add keys to a kind without a version change.
+Read `data` with `.get`: a version may add keys to a kind.
 A cancelled run's `fit_end` has `status` `"cancelled"`, the abandoned `stage`, the `completed` stage names and `node_id`, and no `rwp` or `gof`, because there is no fitted result.
 Under `RefinementPlan.lebail_passes`, each pass's `fit_start` and `fit_end` also carry `lebail_pass` and `lebail_of`.
 A run's state is not an event: it is in the run's `status.json`, because a fit killed outright emits no `fit_end`.
 
-A path is opened for appending, so a second fit given the same path adds to the same file.
+A path is opened for appending, so a second fit adds to the same file.
 The first line each stream writes is a run header, `{"record": "run", "v": "4", "t": …, "run": <id>, "data": {"pid": …}}`, which is not an event and never reaches a function.
 `rietx.history.events.read_events` returns the events and skips the headers, and `rietx events` prints a log run by run ([`rietx events`](cli.md#rietx-events)).
 A reader that branches on `kind` checks first that `record` is `"event"`.
