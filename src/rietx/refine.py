@@ -374,6 +374,35 @@ def mode_fixed_path(path: str, mode: Mode) -> bool:
             or _MAGNETIC_WIDTH_PATH.match(path) is not None)
 
 
+def _parameter_row(e, *, tie: "TieSpec | None", esd: float | None, mode: Mode,
+                   blocked, reach, owned, origin, path: str | None = None,
+                   lo: float | None = None, hi: float | None = None) -> ParameterRow:
+    """The one place an ``Entry`` becomes a :class:`ParameterRow` (WP-2028).
+
+    ``Refinement.parameters`` and ``MultiHistogramRefinement.parameters`` both
+    call it, so the two listings cannot drift.  Every ``Entry`` field not named
+    in the keywords is copied by name from ``dataclasses.fields(Entry)``: a
+    field added to ``Entry`` and ``ParameterRow`` reaches both surfaces, and one
+    added to ``Entry`` alone fails ``ParameterRow`` (``extra="forbid"``) in the
+    first call rather than reading as an empty answer.  The keywords are what a
+    joint fit respells: ``path``, ``tie`` (its sources under the joint result's
+    paths), and ``lo``/``hi`` (a shared row's intersected window).
+    """
+    kw = {f.name: getattr(e, f.name) for f in dataclasses.fields(e)}
+    kw.update(
+        path=e.path if path is None else path,
+        lo=e.lo if lo is None else lo, hi=e.hi if hi is None else hi,
+        tie=tie, esd=esd,
+        mode_fixed=(mode_fixed_column(reach[e.path], mode)
+                    if e.path in reach else mode_fixed_path(e.path, mode)),
+        needs_held_cell=e.path in blocked,
+        body=owned.get(e.path),
+        origin_axis=origin[e.path][1] if e.path in origin else None,
+        help_key=help_key_for(e.path),
+    )
+    return ParameterRow(**kw)
+
+
 def mode_fixed_column(reached: list[str], mode: Mode) -> bool:
     """Whether ``mode`` force-fixes every model path this column moves.
 
@@ -3135,24 +3164,11 @@ class Refinement:
         reach = table.entry_reach()
         owned = table.body_rows()
         origin = table.origin_holds
-        rows = []
-        for e in table.entries:
-            rows.append(ParameterRow(
-                path=e.path, value=e.value, vary=e.vary, lo=e.lo, hi=e.hi,
-                tie=(TieSpec._from_tie(e.tie, user=e.path in self._applied_ties)
-                     if e.tie is not None else None),
-                locked=e.locked,
-                held=e.held,
-                esd=esd.get(e.path),
-                mode_fixed=(mode_fixed_column(reach[e.path], mode)
-                            if e.path in reach
-                            else mode_fixed_path(e.path, mode)),
-                needs_held_cell=e.path in blocked,
-                body=owned.get(e.path),
-                origin_axis=origin[e.path][1] if e.path in origin else None,
-                help_key=help_key_for(e.path),
-            ))
-        return rows
+        return [_parameter_row(
+            e, tie=(TieSpec._from_tie(e.tie, user=e.path in self._applied_ties)
+                    if e.tie is not None else None),
+            esd=esd.get(e.path), mode=mode, blocked=blocked, reach=reach,
+            owned=owned, origin=origin) for e in table.entries]
 
     def set_vary(self, path_globs: list[str] | str, vary: bool = True) -> list[str]:
         """Free (or hold) every parameter matching ``path_globs``.

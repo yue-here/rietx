@@ -28,7 +28,6 @@ import numpy as np
 from . import runs
 from .backend.api import backend_dtype_note
 from .crystallography.twins import merge_site_twins
-from .help import help_key_for
 from .history.events import _attach_progress, as_event_stream
 from .model.forward import (
     PHASE_SUPPORT_SIGMA,
@@ -110,6 +109,7 @@ from .refine import (
     _occupancy_flag_diagnostics,
     _onto_flat_meridian,
     _origin_diagnostics,
+    _parameter_row,
     _peak_only_instrument_path,
     _phase_agreement,
     _phase_support_diagnostics,
@@ -138,8 +138,6 @@ from .refine import (
     _width_census_diagnostics,
     _width_twin_flats,
     _window_loss_diagnostics,
-    mode_fixed_column,
-    mode_fixed_path,
 )
 from .report.magnetic import moment_angle_stationary_diagnostics
 from .report.schemas import THRESHOLDS_VERSION
@@ -1297,7 +1295,15 @@ class MultiHistogramRefinement:
         histogram, ``hist.<h>.``-scoped.  Histograms are walked in order and
         each table's entries in θ order.  A path read here is one a stage's
         ``turn_on`` accepts and one ``result_.parameters`` and the findings
-        print.  A tie's sources are spelled the same way.
+        print.  A tie's sources are spelled the same way, and its
+        :attr:`~rietx.schemas.params.TieSpec.user` is always ``False``: a
+        joint fit has no ``untie``, so every tie it lists is one the fit holds
+        for the caller, symmetry-derived or a parametric equation's target,
+        and none is a user tie the caller could release.  A shared row's
+        ``lo``/``hi`` are the **intersection** of its histograms' stored
+        bounds, in the shared column's units, which is the window the solver
+        enforces; a size cap is divided by each histogram's wavelength factor
+        first.
 
         Each row is read off its own histogram's table, by the single fit's
         rules: ``esd`` from the most recent fit's ``result_.parameters`` under
@@ -1310,6 +1316,23 @@ class MultiHistogramRefinement:
         mt = self.mtable
         esd = ({p.path: p.stderr for p in self.result_.parameters}
                if self.result_ is not None else {})
+        # a shared row's window is what the solver holds: the **intersection**
+        # of every histogram's own, each in the shared column's units (a size
+        # cap is divided by that histogram's value scale, ``params/multi.py``'s
+        # column build).  Histogram 0's scale is 1, so the row's value and
+        # window are in the same units.  Stored bounds only, as the single fit
+        # lists them: a stage's solver windows are not facts about the row.
+        window: dict[str, tuple[float, float]] = {}
+        for h, table in enumerate(mt.tables):
+            scales = mt.value_scales[h] if h < len(mt.value_scales) else {}
+            for e in table.entries:
+                if not row_shared(mt.sharing, e):
+                    continue
+                s = scales.get(e.path, 1.0)
+                lo, hi = e.lo / s, e.hi / s
+                old = window.get(e.path)
+                window[e.path] = (lo, hi) if old is None else (
+                    max(old[0], lo), min(old[1], hi))
         rows: list[ParameterRow] = []
         seen: set[str] = set()
         for h, table in enumerate(mt.tables):
@@ -1328,17 +1351,11 @@ class MultiHistogramRefinement:
                     terms=[(mt.row_path(h, by_path[src]), float(c))
                            for src, c in e.tie.terms],
                     const=float(e.tie.const)))
-                rows.append(ParameterRow(
-                    path=path, value=e.value, vary=e.vary, lo=e.lo, hi=e.hi,
-                    tie=tie, locked=e.locked, held=e.held, esd=esd.get(path),
-                    mode_fixed=(mode_fixed_column(reach[e.path], "rietveld")
-                                if e.path in reach
-                                else mode_fixed_path(e.path, "rietveld")),
-                    needs_held_cell=e.path in blocked,
-                    body=owned.get(e.path),
-                    origin_axis=origin[e.path][1] if e.path in origin else None,
-                    help_key=help_key_for(e.path),
-                ))
+                lo, hi = window.get(e.path, (e.lo, e.hi))
+                rows.append(_parameter_row(
+                    e, tie=tie, esd=esd.get(path), mode="rietveld",
+                    blocked=blocked, reach=reach, owned=owned, origin=origin,
+                    path=path, lo=lo, hi=hi))
         return rows
 
     # ------------------------------------------------------------------
