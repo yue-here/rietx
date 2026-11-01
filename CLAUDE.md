@@ -90,9 +90,7 @@ Structure/Instrument/PatternData (schemas/, pydantic, JSON round-trip)
 
 **Telemetry/cancel.** `fit`/`run_stage`/`refine` take `events=` and `cancel=` (an
 `optimize.cancel.CancelToken` another thread sets). Cancellation is **cooperative, read between
-residual evaluations** and, under LM, before each trial step and inside a projected-CG
-step's factorisations and products (one Pawley step ran 27 s, WP-2063; TRF reads at
-evaluations only), never an interrupt, so frozen-per-stage discreteness holds; the
+residual evaluations and LM factorisations** (WP-2063), never an interrupt, so frozen-per-stage discreteness holds; the
 in-flight stage is *abandoned* — no node, no commit, models restored to pre-stage values (a
 seeding stage writes before solving). `RefinementCancelled` carries `.completed_stages` and
 `.node_id`, the last completed node the working state stands at. Event `data` is an **open
