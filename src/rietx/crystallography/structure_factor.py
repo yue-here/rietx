@@ -213,13 +213,20 @@ def _multiplicity_kept_diagnostics(structure, split: list,
                     f"count. Later compiles decide from the coordinates and use "
                     f"the fresh count. They include predict() on a new grid, "
                     f"suggest(), a new Refinement and the next fit."),
+                # the one-atom reading only where it is one atom: above 1
+                # the fitted content does not fit on the position
                 suggestion=(
-                    f"if the site is one atom on the special position, state "
-                    f"it there at occupancy {on_position:g}, which keeps the "
-                    f"fitted content; if it is a split pair the data do not "
-                    f"resolve, state it more than {TWIN_COORD_TOL:g} "
-                    f"(fractional) from the special position, or the next fit "
-                    f"counts it at {m_now} positions.")))
+                    (f"if the site is one atom on the special position, state "
+                     f"it there at occupancy {on_position:g}, which keeps the "
+                     f"fitted content; if it is a split pair the data do not "
+                     f"resolve, state" if on_position <= 1.0 else
+                     f"the fitted content is {m_fit * occ:g} atoms per cell, "
+                     f"more than one atom on the special position holds, so "
+                     f"the site is a split pair or its occupancy is wrong; "
+                     f"to keep it split, state")
+                    + f" it more than {TWIN_COORD_TOL:g} (fractional) from the "
+                    f"special position, or the next fit counts it at {m_now} "
+                    f"positions.")))
     return out
 
 

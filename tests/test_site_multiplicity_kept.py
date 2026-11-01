@@ -213,3 +213,23 @@ def test_a_site_that_leaves_its_special_position_gets_its_full_orbit():
     model = compile_model(off, _instrument(), data, orbit_split=special)
     assert len(orbit_split_of(model)[0][O1][0]) == 8
     assert _multiplicity_kept_diagnostics(off, orbit_split_of(model)) == []
+
+
+def test_the_one_atom_reading_is_offered_only_where_it_fits():
+    """A full general atom stopped on a mirror is 2 atoms at one place.
+
+    Its fitted content is 8 × 1 = 8, and one atom on the 4c position holds 4,
+    so the suggestion names that and offers only the split reading.
+    """
+    split = [[*[(r, t) for r, t in
+                orbit_split_of(compile_model(
+                    rx.Structure(phases=[_toy(0.27)]), _instrument(),
+                    rx.PatternData(two_theta=GRID.tolist(),
+                                   intensity=[1.0] * len(GRID))))[0]]]]
+    phase = _toy(0.27)
+    phase.atoms[O1].y.value = 0.25 + 1e-6      # past the construction gate
+    found = _multiplicity_kept_diagnostics(rx.Structure.model_construct(
+        phases=[phase]), split)
+    assert [d.where for d in found] == [[f"phases.0.atoms.{O1}"]]
+    assert "occupancy 2" not in found[0].suggestion
+    assert "8 atoms per cell" in found[0].suggestion
