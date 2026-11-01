@@ -1,6 +1,6 @@
 # WP-1992 — N-W2 (group half): magnetic superspace groups generated from the operators
 
-Milestone: unscheduled · Status: ✅ 2026-11-01 — built and merged from outside as PR #1060 (`44de0f62`), with the `LINE_ATOL` second-λ control as PR #1227 (`c6c75653`); closed with the type-4 count (4651 against 4653) standing as a strict xfail, by Yue's ruling
+Milestone: unscheduled · Status: ✅ 2026-11-01 — built and merged from outside as PR #1060 (`44de0f62`), with the `LINE_ATOL` second-λ control as PR #1227 (`c6c75653`); closed with the type-4 count (4651 against 4653) standing as a strict xfail, by Yue's ruling (close PR #1278)
 Track: Data and metadata in, a structure out
 Depends on: — (N-W1 landed as PR #682; 1419 soft, the `representation/` package it extends)
 
@@ -82,7 +82,7 @@ redistribution, so rietx ships a generator and pins published counts.
 
 ## Handover log
 
-- **2026-11-01** (ghostshift close) — The group half of N-W2 is finished and closed. `crystallography/superspace/` now generates the magnetic superspace group of each irrep at a real propagation vector, and its counts and sign patterns match the published tables except one: the type-4 count is 4651 where the table prints 4653. That test stays a strict xfail (an expected failure that turns red if it ever starts to pass). **Yue ruled 2026-11-01: close with the 4651/4653 strict xfail standing.** Docs only, no source or test change. Done: Status set to done, the `Priority:` line and the empty `### Inherited` deleted (nothing was in it, so nothing was folded), the index regenerated, and the narrative moved to the v1.11 record (protocol step 5). No ROADMAP row changes: a close does not edit Current focus. WP-1993 lists this WP as a soft dependency and keeps its priority, since its need is unchanged. The package stays unexported, so no skill change. Next: the 4651/4653 gap reopens only if someone finds which two type-4 groups the generator misses or the table over-counts; the xfail reason names the count.
+- **2026-11-01** (ghostshift close, PR #1278) — The group half of N-W2 is finished and closed. `crystallography/superspace/` now generates the magnetic superspace group of each irrep at a real propagation vector, and its counts and sign patterns match the published tables except one: the type-4 count is 4651 where the table prints 4653. That test stays a strict xfail (an expected failure that turns red if it ever starts to pass). **Yue ruled 2026-11-01: close with the 4651/4653 strict xfail standing.** Docs only, no source or test change. Done: Status set to done, the `Priority:` line and the empty `### Inherited` deleted (nothing was in it, so nothing was folded), the index regenerated, and the narrative moved to the v1.11 record (protocol step 5). No ROADMAP row changes: a close does not edit Current focus. WP-1993 lists this WP as a soft dependency and keeps its priority, since its need is unchanged. The package stays unexported, so no skill change. Next: the 4651/4653 gap reopens only if someone finds which two type-4 groups the generator misses or the table over-counts; the xfail reason names the count.
 
 - **2026-10-16** — created, from the 2026-10-16 issue triage (issue #678).
   The maintainer decided to cut N-W2's group half and N-W3 now that T-1 has
