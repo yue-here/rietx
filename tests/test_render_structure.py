@@ -1243,3 +1243,29 @@ def test_an_axis_view_stacks_rather_than_hides(hkust, nac):
     assert 0.0 <= opening.report.stacked < opening.report.hidden
     for fig in (down_b, down_a, opening):
         assert 0.0 <= fig.report.stacked <= fig.report.hidden
+
+
+def test_an_ellipsoid_figure_counts_the_sites_it_drew_as_spheres():
+    """#1056: a CIF read with the default ``aniso=False`` draws spheres, and the
+    report says how many; the file's nine hydrogens stay spheres either way."""
+    path = str(DATA / "cod_2104364.cif")
+    default = render_structure(structure_from_cif(path), mode="ellipsoid", size=200)
+    kept = render_structure(structure_from_cif(path, aniso=True), mode="ellipsoid", size=200)
+    ball = render_structure(structure_from_cif(path), mode="ball", size=200)
+    assert [w[:25] for w in default.report.warnings] == [
+        "20 of 20 sites carry no a"]
+    assert [w[:24] for w in kept.report.warnings] == ["9 of 20 sites carry no a"]
+    assert ball.report.warnings == []
+
+
+def test_the_reader_counts_the_tensors_it_collapses():
+    path = str(DATA / "cod_2104364.cif")
+    said: list = []
+    collapsed = structure_from_cif(path, diagnostics=said)
+    (d,) = [d for d in said if d.code == "CIF_ANISO_COLLAPSED"]
+    assert d.level == "info" and "11 sites carry U_ij" in d.message and len(d.where) == 11
+    assert all(collapsed.phases[0].atoms[int(p.split(".")[3])].aniso is None
+               for p in d.where)
+    kept: list = []
+    structure_from_cif(path, aniso=True, diagnostics=kept)
+    assert not [d for d in kept if d.code == "CIF_ANISO_COLLAPSED"]

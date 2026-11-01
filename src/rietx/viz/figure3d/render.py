@@ -705,7 +705,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
 
     ``mode`` is ``"ball"`` or ``"ellipsoid"``; ``probability`` the ellipsoids'
     level (default 50 %) and ``exaggeration`` a drawing scale on top of it,
-    which is not a probability.  ``stick`` multiplies the mode's stick radius.
+    which is not a probability.  A site with no U_ij is a sphere in this mode,
+    and ``report.warnings`` counts them.  ``stick`` multiplies the mode's stick radius.
     That radius is 0.08 Å in ball mode.  In ellipsoid mode it is half the
     smallest drawn semi-axis, from 0.02 Å to 0.08 Å, and the 0.02 Å floor does
     not scale.  At ``stick ≤ 1`` every ball stays wider than its stick.  Every
@@ -850,9 +851,17 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     seen = rp.look(probe, R)
     warnings = []
     if mode == "ellipsoid":
-        flat = sorted({geometry["sites"][geometry["atoms"][a["index"]]["site"]]["label"]
-                       for a in scene["atoms"]
-                       if geometry["sites"][geometry["atoms"][a["index"]]["site"]]["npd"]})
+        drawn_sites = {geometry["atoms"][a["index"]]["site"] for a in scene["atoms"]}
+        flat = sorted({geometry["sites"][k]["label"] for k in drawn_sites
+                       if geometry["sites"][k]["npd"]})
+        # a site without U_ij is a sphere in this mode too; a count, since a
+        # file's hydrogens are isotropic and say so legitimately (#1056)
+        spheres = sum(1 for k in drawn_sites if not geometry["sites"][k]["aniso"])
+        if spheres:
+            warnings.append(
+                f"{spheres} of {len(drawn_sites)} sites carry no anisotropic displacement "
+                "and are drawn as spheres; a CIF's U_ij reaches a site only through "
+                "Structure.from_cif(..., aniso=True)")
         warnings += [f"{label}: its displacement tensor is not positive definite, so its "
                      "ellipsoid is drawn flat" for label in flat]
     if seen.unjudged:

@@ -697,7 +697,8 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     the schema field is: reading a file must not silently change which
     parameters a refinement plan will free.  Sites without an aniso loop keep
     their isotropic value either way, so a mixed file yields a mixed
-    structure.
+    structure.  Without it, ``diagnostics=`` receives one ``CIF_ANISO_COLLAPSED``
+    (info) counting the sites whose U_ij were read as U_eq.
 
     Species are passed through :func:`normalize_cif_species`, so the two wild
     type-symbol forms (``"O1"``, ``"O-2"``) arrive refinable instead of
@@ -875,8 +876,11 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     # the writer chooses its U against this very arithmetic (io/cif/blocks)
     from ..io.cif.blocks import b_from_u
 
+    collapsed: list[str] = []
     for site in small.sites:
         has_aniso = site.aniso.nonzero()
+        if has_aniso and not aniso:
+            collapsed.append(site.label)
         u_iso = site.u_iso
         said = site_statements.get(site.label, {})
         # a displacement parameter the file states is the file's, zero included:
@@ -1074,6 +1078,16 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
         diagnostics.extend(snap_diagnostics(
             sg, [(a.label, (a.x.value, a.y.value, a.z.value)) for a in atoms],
             source=path, prefix="phases.0"))
+        # the loop's tensors are dropped here, so the reader says how many
+        # (WP-1468, #1056): an ellipsoid figure of this structure is spheres
+        collapsed_labels = set(collapsed)
+        kept = [k for k, a in enumerate(atoms) if a.label in collapsed_labels]
+        if kept:
+            diagnostics.append(Diagnostic(
+                level="info", code="CIF_ANISO_COLLAPSED",
+                message=(f"{path}: {len(kept)} sites carry U_ij in the file and "
+                         f"were read as U_eq; pass aniso=True to keep them."),
+                where=[f"phases.0.atoms.{k}.biso" for k in kept]))
 
     phase = Phase(
         # gemmi names a bare `data_` block " ", which is no name
