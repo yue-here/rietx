@@ -1699,13 +1699,19 @@ def test_an_edit_that_removes_an_atom_moves_each_constraint_onto_its_own_atom(pb
                                         "phases.0.atoms.2": "phases.0.atoms.0"}),
     (["A", "B", "C"], ["A", "B2", "C"], {}),                           # renamed in place
     (["A", "B", "C"], ["A", "B", "C", "D"], {}),                       # appended
-    (["X", "A", "X"], ["A", "X", "X"], {"phases.0.atoms.0": None,      # an ambiguous label
-                                        "phases.0.atoms.1": "phases.0.atoms.0",
-                                        "phases.0.atoms.2": None}),
+    (["O", "O", "S"], ["O", "O"], {"phases.0.atoms.2": None}),          # repeated labels
+    (["X", "A", "X"], ["A", "X", "X"], {"phases.0.atoms.0": "phases.0.atoms.1",
+                                        "phases.0.atoms.1": "phases.0.atoms.0"}),
+    (["O", "O", "S"], ["O", "S"], {"phases.0.atoms.0": None,            # which O went?
+                                   "phases.0.atoms.1": None,
+                                   "phases.0.atoms.2": "phases.0.atoms.1"}),
+    (["A", "B", "C"], ["A", "C2"], {"phases.0.atoms.1": None,          # removed and renamed:
+                                    "phases.0.atoms.2": None}),        # which one went?
 ])
 def test_atom_moves_names_every_atom_whose_number_changes(old, new, expected):
-    """``twins.atom_moves``: label match where unique, rename in place by position,
-    and an atom it cannot tell apart maps to nothing rather than to an index."""
+    """``twins.atom_moves``: a label held equally often by both pairs in order, an atom
+    renamed in place pairs by position, and an atom it cannot place maps to nothing
+    rather than to an index (the generality review's two cases are the last two)."""
     from rietx.crystallography.twins import CoordinateSnapshot, atom_moves, renumber_path
 
     def snap(labels):

@@ -406,20 +406,28 @@ def _matched_atoms(lo: Sequence[str], ln: Sequence[str]) -> list[tuple[int, int]
 
     The same list in the same order matches by position.  Otherwise (an atom
     appended, one renamed, one removed: the GUI's add-atom path) an atom is
-    matched by its label where that label is unique in both phases (#1014
-    round 6, item 2).  An atom renamed where it stands is matched by position:
-    one whose label the new phase does not hold, at an index whose new label
-    the old phase does not hold.  Any other atom has no partner and is a
-    different atom (#1264): :func:`atom_moves` maps it to ``None``, where
-    passing its index through would name whichever atom now has that number.
+    matched by its label (#1014 round 6, item 2).  A label both phases hold
+    equally often pairs its occurrences in order, so a model built with
+    repeated labels keeps them.  Where no atom was added or removed, an atom
+    renamed where it stands is matched by position: one whose label the new
+    phase does not hold, at an index whose new label the old phase does not
+    hold.  Any other atom has no partner and is a different atom (#1264):
+    :func:`atom_moves` maps it to ``None``, where passing its index through
+    would name whichever atom now has that number.  A rename beside a removal
+    is one of those, since nothing in the labels says which atom went.
     """
     if list(lo) == list(ln):
         return [(j, j) for j in range(len(lo))]
-    pairs = [(lo.index(label), ln.index(label)) for label in lo
-             if lo.count(label) == 1 and ln.count(label) == 1]
-    renamed = [(j, j) for j in range(min(len(lo), len(ln)))
-               if lo[j] not in ln and ln[j] not in lo]
-    return sorted(pairs + renamed)
+    pairs = []
+    for label in dict.fromkeys(lo):
+        old = [j for j, x in enumerate(lo) if x == label]
+        new = [j for j, x in enumerate(ln) if x == label]
+        if len(old) == len(new):
+            pairs.extend(zip(old, new, strict=True))
+    if len(lo) == len(ln):
+        pairs.extend((j, j) for j in range(len(lo))
+                     if lo[j] not in ln and ln[j] not in lo)
+    return sorted(pairs)
 
 
 def _move(m) -> DofMove:
