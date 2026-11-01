@@ -1114,6 +1114,18 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     refuted at an absent-line position (SRM 676a corundum: ``R - c -`` at the
     certified cell, ``R - - -`` once the cell is scaled by 1.0012, #726).
 
+    **A class from the prefit is checked by a second screen** (WP-1910, ruled
+    on #1178): when ``refine_cell=True`` names a class, the screen runs again
+    at the prefit's cell, **held**, from the declared ``instrument``
+    (``ExtinctionScreen.held_screen``).  The two fail differently — the
+    prefit's widths, zero and seeded background against the declared ones — so
+    when both name a class and the classes differ, ``EXTINCTION_SCREENS_DISAGREE``
+    says so and :meth:`ExtinctionScreen.best_or_none` abstains, both rankings
+    kept.  A held screen naming no class changes nothing (the default is right
+    and the held screen names nothing on eleven offsets of the GSAS-II PbSO₄
+    X-ray pattern).  Where the prefit's own cell is off, both screens can name
+    the same wrong class and this check cannot see it (SRM 676a at ×0.985).
+
     **The reference fit is gated** (:data:`REFERENCE_NET_RWP_MAX`): when the
     absence-free class's own fit leaves more than half of the net signal's
     weighted power unexplained, every absence test would read that misfit, so
@@ -1147,7 +1159,8 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     Cost is one refinement per surviving class (~0.1 s each on a 3750-point
     pattern), after **two** profile Le Bail fits: the cell-free prefit and the
     shared one (the pair took about 1 s on SRM 676a's 7251 points, numpy, warm
-    Apple-silicon Mac; ``refine_cell=False`` skips the first).  ``max_classes`` caps it; the classes left
+    Apple-silicon Mac; ``refine_cell=False`` skips the first), plus the held
+    second screen whenever the first names a class.  ``max_classes`` caps it; the classes left
     unfitted are reported with ``screened=False`` and, because an unasked question
     must not read as a clean answer, :meth:`ExtinctionScreen.best_or_none` then
     abstains.
@@ -1421,6 +1434,21 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     screen.candidates = sorted(
         entries, key=lambda e: (e.refuted, not e.screened, e.delta_bic,
                                 e.n_absent))
+    if (refine_cell and screen.status == "converged"
+            and screen.best_or_none() is not None):
+        # The second screen (WP-1910, ruled on #1178): the prefit's cell, held,
+        # from the declared instrument.  It fails differently from this one —
+        # the prefit's widths, zero and seeded background against the declared
+        # ones — so two decisive answers that differ cannot both be right, and
+        # ``best_or_none`` then names neither.  ``candidate`` is already at the
+        # prefit's cell; ``instrument`` is the caller's.
+        screen.held_screen = determine_extinction_symbol(
+            data, candidate, instrument, peaks=peaks,
+            two_theta_limits=two_theta_limits, k_sigma=k_sigma,
+            max_classes=max_classes, refine_cell=False, restrict=prior,
+            cancel=cancel)
+        if screen.held_screen.status == "cancelled":
+            screen.status = "cancelled"
     screen.diagnostics = extinction_diagnostics(screen)
     return screen
 
