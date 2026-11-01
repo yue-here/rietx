@@ -1,6 +1,6 @@
 # WP-2066 — a complete dichotomy search holds every centred lattice and polishes its truth leaf
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — option 1 + V3 built; waiting on a maintainer answer (V3 vs the fluorapatite row's 95 % bar, handover log)
+Milestone: unscheduled · Status: 🔄 2026-11-01 — option 1 + V3 landed, PR #1301 ready; the orthorhombic-F lab list (#780 set) still to re-measure
 Track: What fires, and what stays silent
 Depends on: — (1924 soft: the same engine, the same #780 units)
 Priority: P2 2026-10-31 — a defect that fires wrongly: `search_complete=True` while the true cell is absent, on 22-32 % of C-centred monoclinic lattices by the reporter's draw; end to end the gate abstains rather than promoting the supercell (all `low`, `INDEX_ABSTAINED`), so a clean pattern returns no cell rather than a wrong one
@@ -143,13 +143,18 @@ papers only.
       `_accept(q_drive=)`: the annealed passes assign the lines up to the
       search set's own top, `q_hi_search` (highest driven Q plus its k·σ), no
       new constant; a list whose every line is below it takes the old path.
-- [ ] Tests: the issue's orthorhombic and monoclinic C lists and the B repro
+- [x] Tests: the issue's orthorhombic and monoclinic C lists and the B repro
       as fixtures (exact positions, `search_complete` asserted beside the
       truth's presence at its primitive volume); unit replay digests and
       `tests/test_acceptance_indexing.py` unchanged or each move named.
+      Moves named in the handover log; the fluorapatite row restated on its
+      Kα2 lines (settled by Claude under Yue's V3 ruling and the line-by-line
+      measurement; the 95 % bar was Claude-written).
 - [ ] Re-measure the orthorhombic-F lab list the reporter saw move (truth
       5 → 7/8), and say whether the A/B cells above it are refuted.
-- [ ] Skill: none expected (engine internals; no code or verb changes).
+- [x] Skill: none expected (engine internals; no code or verb changes).
+      Confirmed: no diagnostic code, verb or output field changed
+      (`reader_output` unchanged).
 
 ## Acceptance
 
@@ -180,7 +185,10 @@ lattice comes back first, once, in its conventional C setting or as the
 dense list's true P cell, and every search reports complete. The search
 visits exactly the boxes it did before. What it costs is leaf work: more
 leaves are accepted and refined: 1.1 to 2.7 times as many on the C
-lists, and 55 where there were 2 on the dense list. One task stays open. The reporter's orthorhombic-F
+lists, and 55 where there were 2 on the dense list. On the GSAS-II fluorapatite
+acceptance row the reported cell moves to one indexing 128 of 135 lines
+rather than 130: the two lost lines are Kα2 copies `main` had given a
+wrong hkl, and the row now asserts that what is left out is Kα2. One task stays open. The reporter's orthorhombic-F
 lab list, the one real-data case against V3, is not on this machine, so
 whether the wrong A/B cells above its truth are refuted is not known.
 
@@ -235,21 +243,28 @@ The monoclinic truths come back at (12.3, 6.1, 9.5, β 115°) and
 (10.2, 3.9, 7.4, β 104°), the conventional C cells. The orthorhombic
 control returns 42 candidates against 25, its first three unchanged.
 
-**Gates (stopped at a maintainer question).** Unit replay on the final
-tree: brucite hexagonal and trigonal and corundum cubic unchanged;
-corundum hexagonal, trigonal and tetragonal and both synthetic monoclinic
-units moved, every unit complete and every truth at rank 1 where it was.
-Indexing acceptance: 44 passed, 1 failed, the fluorapatite row
-(`test_the_cross_code_cell_leads_because_the_engines_agree_on_it`). Not
-yet run on this tree: the indexing unit files after the settling fix, the
-fast selection and `reader_output`. They wait for the answer below,
-which may change the code.
+**Gates** (macOS arm64, `[dev]` venv, compiled tier on). Unit replay on
+the final tree: brucite hexagonal and trigonal and corundum cubic
+unchanged. Corundum hexagonal moved (rank-1 truth kept, c 15 ppm; ranks
+2-6 now supercells where they were near-truth partial cells), trigonal
+(rank-1 R truth identical), tetragonal (no truth, reordered), and both
+synthetic monoclinic units (truth at rank 1, 5 candidates down to 3).
+Every unit is complete and boxes are unchanged. Indexing acceptance: 44
+passed and 1 failed before the restatement below. Both fluorapatite rows
+pass after it. Indexing unit files (engines, kernels, reduce): 221
+passed, 1 skipped. Fast selection: 13 187 passed, 310 skipped, 32
+xfailed, 1 failed, the known machine-local
+`test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`
+(a Jupyter kernel spec pointing at a deleted venv). The added fast tests
+are 11 cases (6 functions) costing 4.9 s in all, the dearest 2.0 s; the
+monoclinic a > c fixture is `slow`. `python -m tests.reader_output`: exit
+0, unchanged against the merge-base. These counts are the branch's, 17
+commits behind `main`; CI runs the merged tree.
 
-**Question for the maintainer: V3 costs the fluorapatite row its 95 %
-bar by a quarter of a line.** The trigger is a measurement contradicting
-a ruling (V3, ruled 2026-11-01). Run through the fixture's own path
-(`index_pattern` with data and instrument; scratch `fap_pipe.py`,
-`fap_row.py`), each engine's in-band cell is:
+**The fluorapatite row, settled by Claude under Yue's V3 ruling and the
+line-by-line measurement; the 95 % bar was Claude-written.** Through the
+fixture's own path (`index_pattern` with data and instrument; scratch
+`fap_pipe.py`, `fap_row.py`, `fap_lines.py`), each engine's in-band cell:
 
 | engine | `main` | branch |
 |---|---|---|
@@ -257,33 +272,22 @@ a ruling (V3, ruled 2026-11-01). Run through the fixture's own path
 | svd | 128/135, χ²ᵣ 0.42, a +288, c +226 | unchanged |
 | trial_error | 127/135, χ²ᵣ 0.30, a +262, c +428 | unchanged |
 
-Merging keeps the member indexing the most lines. On `main` that was
-the dichotomy fit, so the row read 130 of 135. On the branch the
-dichotomy fit indexes 127, so svd's 128 of 135 is reported, and the row
-needs 128.25. Every other assertion of the row still holds on the
-branch: the cell is found by all three engines and ranks first, six
-single-engine cells still beat it on M₂₀ while indexing fewer lines, and
-the gate still refuses to promote anything. The cause is V3 itself.
-`main`'s dichotomy annealed over every line, and its wide early passes
-pulled three high-angle lines into the assignment. Under V3 those lines
-meet the cell only at σ, where svd and trial_error also leave them out.
-A variant that re-anneals over every line after V3's passes (scratch
-`d1_snap`) also gives 127, so no cheap variant restores 130. My earlier
-dichotomy-only probe (131 of 135) ran without the workflow's quality
-report and does not reproduce the row.
-
-Options. (1) Keep V3 and restate the row on the reported member: the
-bar becomes 128 of 135 (≥ 0.94), the docstring's figures move to svd's
-cell, and the row keeps its point (agreement leads, the gate refuses).
-This changes an acceptance bar, which is why it comes to you. (2) Drop
-V3, keeping option 1's centring fix. Then the dense-list half of #1258
-(the 381-line list whose true cell is not returned) stays open and needs
-another design. (3) Do nothing until the reporter's orthorhombic-F list
-can be measured, since it is the other real-data case against V3. My
-lean is (1): the in-band cell moves from one valid assignment to another
-that two independent engines already reach, all three engines now agree
-on a to within 31 ppm, and the band the row grades is 500 ppm. What would
-flip it: a second real list where V3 drops lines a correct cell needs.
+Merging keeps the member indexing the most lines, so the row reported
+dichotomy's 130 on `main` (V +672 ppm) and reports svd's 128 on the
+branch (V +801 ppm), against a 95 % bar needing 128.25. The seven lines
+the branch's cell leaves out are each the Kα2 copy of a reference
+reflection, (130), (240), (052), (342), (343), (170) and (173). After
+the pattern's common −0.036° shift, six sit within 0.012° of their Kα2
+position. The seventh, 40.155°, whose fitted position is at its bound,
+sits 0.068° from it against its 0.075° FWHM. All seven are 0.16-0.34°
+from any Kα1 position. `main` indexed two of them, 60.415° and 63.411°,
+by giving them a wrong hkl. The 95 % bar came in with 7969c08ab (WP-1026)
+with no recorded grounds and no ruling behind it. So the row now asserts
+that every line its cell leaves out is such a Kα2 copy, and every other
+assertion stands unchanged. A variant re-annealing over every line after
+V3's passes (`d1_snap`) also gives 127, and my earlier dichotomy-only
+probe (131 of 135) ran without the workflow's quality report and did not
+reproduce the row.
 
 **Review.** `/code-review high` (no `--fix`, since the gate chain was
 queued on this tree) gave ten findings. Fixed: a search restricted to C
@@ -299,7 +303,7 @@ V3 cut any line, the closing passes now run until the assignment
 repeats, at most `MAX_ASSIGN_PASSES` (an existing constant); elsewhere two
 as before. A dichotomy-only probe of that list: `main` 131/135, two
 passes 128/135, settled 131/135. Through `index_pattern` it does not
-cure the row; see the question above. This reads the ruling's "two closing
+cure the row; the row's restatement above is what did. This reads the ruling's "two closing
 passes as now" as "closing passes over every line", which the ruling's
 point was; the maintainer may read it otherwise. Declined: (4)
 `engine_cell` reports the re-set C cell with an identity change. The
@@ -329,13 +333,7 @@ its few seconds; its docstring now says so.
 pickles with `PYTHONPATH=<main snapshot>/src`. The kernel test's
 `_accept` wrapper must pass `**kw` (`q_drive` is a keyword).
 
-**Next.** First the maintainer answers the fluorapatite question above.
-Under (1), rewrite that row's bar and figures; under (2), revert V3's
-`_accept` change and its test. Then rerun the gates on the answered tree
-(scratch `chain2.sh`: unit replay, indexing acceptance, the indexing unit
-files, the fast selection, `reader_output`), fill this entry's counts and
-ready PR #1301. Separately, get the orthorhombic-F lab list from the
-reporter (#780 set), re-measure its truth rank on this branch and say
+**Next.** Get the orthorhombic-F lab list from the reporter (#780 set), re-measure its truth rank on this branch and say
 whether the A/B cells above it are refuted. That closes the WP. If they are not refuted, the
 question is the panel's, not the search's: the search is now complete
 there either way.
