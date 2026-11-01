@@ -1621,3 +1621,176 @@ def test_the_packages_own_trials_run_under_the_callers_settings(monkeypatch):
         trial()
         assert seen, name
         assert set(seen) == {(0.9, None)}, (name, seen)
+
+
+# ----------------------------------------------------------------------
+# WP-2049: a frame no phase is seen in holds the instrument's peak terms too
+# ----------------------------------------------------------------------
+#: the instrument rows ``mccusker_default`` frees that reach the pattern only
+#: through phase peaks
+_PEAK_ONLY_FREED = {"instrument.zero_shift",
+                    *(f"instrument.profile.{n}" for n in "uvwxy")}
+
+
+@pytest.fixture(scope="module")
+def blank_frames():
+    """The planted series (``tests/planted_series.py``, seed 0), whose frame
+    87 is the blank one."""
+    from tests import planted_series as ps
+
+    assert ps.default_events(248)["bad"] == 87
+    return ps, ps.generate(248, seed=0)
+
+
+def _blank_frame_fit(ps, series, k: int):
+    """Frame 87 fitted alone from the fixture's start model under the
+    default plan, the start cell nudged by ``k`` × 1e-14 (the rounding that
+    picked the outcome in WP-2049's measurement), on the numpy path."""
+    @ps.numpy_path
+    def fit():
+        structure, ins = ps.cubic_model(series.temperature[87])
+        structure.phases[0].cell.a.value *= 1 + k * 1e-14
+        ref = Refinement(structure, ins, history=False)
+        return ref, ref.fit(series.patterns[87], plan="mccusker_default")
+    return fit()
+
+
+@pytest.mark.parametrize("k", [0, 1])
+def test_a_blank_frame_holds_the_instruments_peak_terms(blank_frames, k):
+    """With no phase seen, the zero shift and the widths are flat (WP-2049).
+
+    Measured on ``main`` before this: the zero shift came back
+    −0.0129 ± 0.0015° (8.7σ) against a truth of 0.006°, with U, V, W, X and
+    Y refined beside it and U and V correlated at ρ −0.991.  The zero shift
+    reaches the pattern only through the phase's peaks, so that value was
+    fitted to noise.  Held, it keeps the value handed in and leaves the
+    parameter list.  The background reaches the pattern without a phase,
+    and it refines.
+    """
+    ps, series = blank_frames
+    ref, result = _blank_frame_fit(ps, series, k)
+    last = result.stages[-1]
+    assert _PEAK_ONLY_FREED <= set(last.held)
+    rows = {p.path: p for p in result.parameters}
+    assert not _PEAK_ONLY_FREED & set(rows)
+    assert all(rows[f"instrument.background.c{i}"].stderr is not None
+               for i in range(4))
+    handed_in = ps.cubic_model(series.temperature[87])[1].zero_shift.value
+    assert ref.instrument.zero_shift.value == handed_in
+    fired = [d for d in result.diagnostics if d.code == "PHASE_UNCONSTRAINED"]
+    assert len(fired) == 1
+    assert "No phase was seen, so 6 instrument parameters" in fired[0].message
+    assert "instrument.zero_shift" in fired[0].message
+    # the record keeps its key: the phase's paths, never the instrument's
+    assert fired[0].where == ["phases.0.cell.a"]
+
+
+def test_one_seen_phase_leaves_the_instrument_free(held_fit):
+    """All, never any: a seen phase gives every peak term gradient, so the
+    absent-phase fixture holds the absent phase's cell and no instrument row."""
+    _, result = held_fit
+    for stage in result.stages:
+        assert not [p for p in stage.held if p.startswith("instrument.")], stage.name
+    assert not [d for d in result.diagnostics if "No phase was seen" in d.message]
+
+
+def test_the_clause_reports_what_the_answer_holds():
+    """A zero shift held in an early stage and released once a phase was seen
+    is a measurement at the answer, so no clause tells a reader to drop it
+    (WP-2049, review finding 4)."""
+    from rietx.refine import _instrument_held
+    from rietx.schemas.results import StageResult
+
+    def stage(name, held):
+        return StageResult(name=name, status="converged", n_iterations=1,
+                           cost_initial=1.0, cost_final=1.0, held=held)
+
+    zero = "instrument.zero_shift"
+    assert _instrument_held([stage("a", [zero]), stage("b", [])]) == ([], [])
+    assert _instrument_held([stage("a", [zero]), stage("b", ["phases.0.cell.a"]),
+                             stage("c", [zero])]) == ([zero], ["a", "c"])
+
+
+def test_what_reaches_the_pattern_without_a_phase_is_never_peak_only():
+    """The background and every extra component add to the pattern on their
+    own.  A declared sharp peak reads the polarisation and the line weights
+    too, so with one compiled those two are not peak-only (WP-2049)."""
+    from types import SimpleNamespace
+
+    from rietx.model.forward import CompiledModel
+    from rietx.refine import _peak_only_instrument_path
+
+    def model(peaks):
+        stub = SimpleNamespace(peak_components=peaks)
+        stub.scalar_chain_supported = (
+            lambda p: CompiledModel.scalar_chain_supported(stub, p))
+        return stub
+
+    bare, peaked = model(()), model((object(),))
+    for path in ("instrument.zero_shift", "instrument.profile.u",
+                 "instrument.geometry.sample_displacement",
+                 "instrument.geometry.axial_sl"):
+        assert _peak_only_instrument_path(bare, path), path
+        assert _peak_only_instrument_path(peaked, path), path
+    for path in ("instrument.polarization", "instrument.source.lines.1.weight"):
+        assert _peak_only_instrument_path(bare, path), path
+        assert not _peak_only_instrument_path(peaked, path), path
+    for path in ("instrument.background.c0", "instrument.extra_components.0.area",
+                 "phases.0.cell.a"):
+        assert not _peak_only_instrument_path(bare, path), path
+
+
+def test_a_series_carries_the_last_measured_zero_shift_across_a_blank_frame(
+        blank_frames):
+    """A series' carry (WP-2049).  The blank frame holds its zero shift at the
+    value carried in, so the frame after it starts from the last measured one
+    and lands near the truth, 0.006°, instead of from a value fitted to
+    noise.  The blank frame quotes no zero shift at all."""
+    import rietx as rx
+
+    ps, series = blank_frames
+
+    @ps.numpy_path
+    def fit():
+        structure, ins = ps.cubic_model(series.temperature[86])
+        return rx.refine_sequential(series.patterns[86:89], structure, ins,
+                                    x=series.temperature[86:89],
+                                    plan="mccusker_default")
+
+    entries = fit().entries
+    zero = [{p.path: p for p in e.parameters}.get("instrument.zero_shift")
+            for e in entries]
+    assert zero[1] is None
+    for row in (zero[0], zero[2]):
+        assert row is not None and row.stderr is not None
+        assert abs(row.value - ps.TRUE_ZERO) < 4 * row.stderr
+
+
+def test_a_joint_fit_holds_the_blank_patterns_own_zero_shift(blank_frames):
+    """The joint twin.  Each histogram's zero shift is its own, so the blank
+    frame's is held while the frame that sees the phase refines its own.  The
+    shared cell refines, because one histogram sees the phase."""
+    import rietx as rx
+
+    ps, series = blank_frames
+
+    @ps.numpy_path
+    def fit():
+        structure, ins = ps.cubic_model(series.temperature[86])
+        ref = rx.MultiHistogramRefinement(
+            [structure, structure.model_copy(deep=True)],
+            [ins, ins.model_copy(deep=True)])
+        return ref.fit([series.patterns[86], series.patterns[87]],
+                       plan=rx.RefinementPlan(stages=[
+                           rx.Stage("scale_bkg", ["phases.*.scale",
+                                                  "instrument.background.*"]),
+                           rx.Stage("zero", ["instrument.zero_shift",
+                                             "phases.*.cell.*"])]))
+
+    result = fit()
+    held = set(result.stages[-1].held)
+    assert "hist.1.instrument.zero_shift" in held
+    assert "hist.0.instrument.zero_shift" not in held
+    rows = {p.path: p for p in result.parameters}
+    assert rows["hist.0.instrument.zero_shift"].stderr is not None
+    assert rows["phases.0.cell.a"].stderr is not None
