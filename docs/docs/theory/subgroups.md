@@ -182,3 +182,45 @@ with 2c and in the Bmmm setting, and the series formulas for I4̄m2 with $p\math
 and P4₂/n with $\mathbf{a}, \mathbf{b}, p\mathbf{c}$ in both origin choices at p = 3, 5 and 7
 {cite}`muller2011guide`. Over the 230 types at index at most 4, every one of
 the 33 792 rows conserves multiplicity.
+
+## A phase in its standard setting
+
+The same (P, p) moves a whole phase, not only its group. A phase restated in
+new axes keeps every atom and every structure factor, and each quantity goes
+as its kind:
+
+```{math}
+:label: sub-basis
+
+G' = \mathsf{P}^{\mathsf{T}} G\, \mathsf{P}, \qquad
+\mathbf{x}' = \mathsf{P}^{-1}(\mathbf{x} - \mathbf{p}), \qquad
+\mathbf{h}' = \mathsf{P}^{\mathsf{T}} \mathbf{h}, \qquad
+U^{*\prime} = \mathsf{P}^{-1} U^{*} \mathsf{P}^{-\mathsf{T}},
+```
+
+{source}`rietx.crystallography.setting.change_basis`
+
+with G the direct metric, x an atom's fractions, h a reflection's indices and
+U* = U^ij a*ᵢa*ⱼ the fractional form of a displacement tensor
+{cite}`wondratschekaroyo2011` (equations 2.1.3.3–2.1.3.9). Every column of P must
+be a lattice translation of the group, so the new cell is a cell of the
+crystal; a supercell's extra translations become centrings, and the phase's
+scale is multiplied by (V/V′)² so that a pattern computed from it is unchanged.
+The tests hold |F(h′)|² = (det P)²·|F(h)|² reflection by reflection.
+
+`standard_setting` applies the setting and cell rules of Parthé and Gelato's
+standardization {cite}`parthe1984` (pp. 172–173). Rule 2 is ITA's standard
+setting: unique axis b with cell choice 1, the obverse hexagonal cell of an R
+lattice, origin choice 2 where ITA gives two, and of an enantiomorphic pair
+the member with the smaller screw index, the structure then its mirror image
+and the result saying so. The group step is the one standardiser above, given
+the Hall number of the target setting, because spglib's default for the
+two-origin types is origin choice 1. Rule 3 is the cell: the Niggli cell for a
+triclinic group; for a monoclinic P group without a glide, the shortest a and c
+normal to b with a ≤ c and β ≥ 90°; for an orthorhombic group, a ≤ b ≤ c over
+the relabellings its affine normaliser contains, computed from the operations
+(six for P2₁2₁2₁, two for Cmmm, three cyclic ones for Pbca, one for Pnma). The
+monoclinic centred and glide groups get β ≥ 90° only: their rule keeps the
+symbol with the shortest translations, and its details are in a later paper
+the package does not yet implement. The representative coordinates, the
+standardization parameter Γ and the atom order (rules 4–6) are not applied.

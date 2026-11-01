@@ -221,6 +221,7 @@ DEFAULT_SEATS: dict[str, int] = {
     "rietx.indexing.workflow.index_pattern": 2007,
     "rietx.indexing.engines.SearchSpec": 2007,
     "rietx.crystallography.representation.subgroups.maximal": 2006,
+    "rietx.crystallography.setting.standard_setting": 2006,
 }
 
 #: The record schemas whose fields the guard holds.
@@ -4302,6 +4303,25 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.representation.subgroups.maximal:supercell", "default", tier="caller",
         ambiguity=1, value=None,
         evidence="off by default; a caller names the cell whose translations every subgroup keeps"),
+    Row("rietx.crystallography.setting.standard_setting:origin_choice", "default", tier=2,
+        ambiguity=1, value=2,
+        evidence=("Parthé & Gelato (1984) Acta Cryst. A40, 169, p. 172 rule 2(c), page-verified: the "
+                  "origin at the centre of symmetry where ITA gives two; Stokes (2011) § 5.1(2) and "
+                  "WP-1452's decision (1) the same; a licensed database's standardized entries follow "
+                  "it on every origin-choice entry sampled (local oracle, aggregates only)")),
+    Row("rietx.crystallography.setting.standard_setting:smaller_screw", "default", tier=2,
+        ambiguity=1, value=True,
+        evidence=("Parthé & Gelato (1984) p. 172 rule 2(d) and p. 174: an enantiomorphic pair is "
+                  "standardized in the smaller-screw member (P4₁32, not P4₃32), the structure then "
+                  "its mirror image, reported (StandardSetting.inverted); powder |F|² is the same "
+                  "either way; False keeps the input's type")),
+    Row("rietx.crystallography.setting.standard_setting:reduce_cell", "default", tier=2,
+        ambiguity=1, value=True,
+        evidence=("Parthé & Gelato (1984) p. 173 rule 3 (Niggli triclinic cell; reset monoclinic "
+                  "cell; orthorhombic a ≤ b ≤ c over the affine normaliser, Burzlaff & Zimmermann "
+                  "1980); its ε is indexing.reduce.NIGGLI_EPS_RELATIVE, Grosse-Kunstleve et al. 2004; "
+                  "the monoclinic glide/centred case is owed to Parthé & Gelato 1985; False stops at "
+                  "rule 2")),
     # suggestion: 197
     Row("ABSORPTION_ESTIMATE_UNAVAILABLE.suggestion", "suggestion", value=1),
     Row("ABSORPTION_MU_R_OUT_OF_RANGE.suggestion", "suggestion", value=1),
