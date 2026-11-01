@@ -2172,15 +2172,32 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "new freed and compare. A plan's closing stage does this already."
         ),
     ),
+    "FULLPROF_BINDING_LIMIT_NOT_APPLIED": HelpEntry(
+        title="A FullProf limit the file's answer rests on was not applied",
+        description=(
+            "The FullProf file holds a hard limit on a refined parameter, and the "
+            "file's own value sits on that limit or past it. FullProf holds a limited "
+            "parameter inside its interval during least squares, so the refinement the "
+            "file records ended against the limit. The reader could not carry the limit "
+            "over, and the message says why: the value builds no parameter in "
+            "FullProf's units, or the limit reaches a value where the model is "
+            "undefined. The built parameter is free to leave the limit, so the two fits "
+            "can differ by it. Hold the parameter inside the limit, or compare the two "
+            "fits knowing they differ there."
+        ),
+    ),
     "FULLPROF_LIMITS_NOT_APPLIED": HelpEntry(
-        title="A FullProf file's parameter limits were not applied",
+        title="A FullProf parameter limit was not applied",
         description=(
             "The FullProf file holds hard limits on some refined parameters, one line "
-            "each after the phases, counted by its `Nre` flag. A limit names a FullProf "
-            "parameter number, which can drive several values at once. The reader keeps "
-            "every limit on the model it read and sets no bound from it, so the built "
-            "structure's parameters are free to leave those intervals. Set a "
-            "parameter's min and max where it should stay inside its limit."
+            "each after the phases, counted by its `Nre` flag. The reader sets a limit "
+            "as the built parameter's min and max where FullProf's own rule maps it "
+            "onto one: a cell length or angle, a Biso or the March coefficient r. "
+            "This limit did not map, and the message says why. A scale or an "
+            "occupancy is never in FullProf's units, a coordinate refines through its "
+            "site's free directions, and no instrument or background is built from the "
+            "file. The file's value is inside the limit. Set the parameter's min and "
+            "max yourself where it should stay inside the limit."
         ),
     ),
     "FULLPROF_MAGNETIC_PHASE_OMITTED": HelpEntry(

@@ -641,15 +641,30 @@ ROWS: tuple[Row, ...] = (
                   "check whatever trades against it before quoting an ADP, an occupancy or "
                   "a scale")),
     Row("FROZEN_COMPILE_STALE", "code"),
+    Row("FULLPROF_BINDING_LIMIT_NOT_APPLIED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: fires once per LINE-47 hard limit (FullProf manual p. 126) "
+                  "that limit_readings does not apply and whose value, the first from the "
+                  "top carrying its parameter number at multiplier +1, lies on or past an "
+                  "end of the interval as the file prints both; FullProf clamps such a "
+                  "parameter in least squares (fp2k 8.20 on its own ce1.pcr, "
+                  "docs/practice.md), so the recorded answer rested on the limit; the "
+                  "level is io/CLAUDE.md's for a flag the model cannot honour; acts on "
+                  "nothing"),
+        response="warning",
+        responds=("before comparing a refined cell, Biso, scale or coordinate with the "
+                  "file's, hold the named parameter inside the limit (its min and max) "
+                  "or say the two fits differ by it"),
+        scope=("all",)),
     Row("FULLPROF_LIMITS_NOT_APPLIED", "code", tier=1, ambiguity=1,
-        evidence=("info; a record of what a read did not carry: the file's Nre count "
-                  "declares LINE-47 hard limits (FullProf manual p. 126, NUMPAR "
-                  "LowLIMIT HighLIMIT), which the reader reads onto "
-                  "FullProfModel.parameter_limits and applies to no bound; fires "
-                  "exactly when Nre > 0 and diagnostics= is passed; acts on nothing"),
+        evidence=("info; a record of what a read did not carry: fires once per LINE-47 "
+                  "hard limit (FullProf manual p. 126, NUMPAR LowLIMIT HighLIMIT) that "
+                  "limit_readings does not apply, where the file's value is inside it, "
+                  "with the reason (no entry in FullProf's units, March r or W at 0, a "
+                  "multiplier other than +1, IBOUND 1, a symmetry-tied cell entry); "
+                  "acts on nothing"),
         response="info",
-        responds=("decide per limit whether the parameter it names should be held "
-                  "inside it, and set that Parameter's min and max if so"),
+        responds=("decide whether the parameter it names should be held inside the "
+                  "limit, and set that Parameter's min and max if so"),
         scope=("all",)),
     Row("FULLPROF_MAGNETIC_PHASE_OMITTED", "code"),
     Row("FULLPROF_MAGNETIC_PHASE_READ", "code"),

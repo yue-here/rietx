@@ -8,9 +8,9 @@ below is quoted in a comment from a real file at a real line so that the
 evidence for it is checkable. The corpus is the maintainer's own unpublished
 research data, so the files are cited as **corpus file 1** to **6** and the map
 from number to file is not public; the maintainer holds it in the private
-repository ``yue-here/rietx-corpus-map``. **Example file 1** and **2** are two
-files of FullProf's own distributed example set, cited by number for the same
-reason. Where a real file is the *only*
+repository ``yue-here/rietx-corpus-map``. ``hobk.pcr`` and ``lab.pcr`` are
+files of FullProf's own example set, which the ILL distributes publicly, so
+they keep their names. Where a real file is the *only*
 evidence for a block's position, that is said, and where there is no evidence at all the construct is **refused
 by name** rather than parsed on a guess.
 
@@ -50,8 +50,9 @@ nuclear half is the single most damaging thing it could do.
 **Read at every value the manual defines:** ``Nor`` (the preferred-orientation
 function, built as March-Dollase where it is one, :func:`_preferred_orientation`),
 ``Dum`` and ``Opt`` (recorded; no line, no model effect), ``Nre`` (its LINE-47
-limits read onto :attr:`FullProfModel.parameter_limits` and reported, never
-applied), and the analytic backgrounds ``Nba = 0, -1, -3, -4, -5`` (their
+limits read onto :attr:`FullProfModel.parameter_limits`, applied as the built
+entry's ``min``/``max`` where the manual's mapping holds and reported where it
+does not, :func:`limit_readings`), and the analytic backgrounds ``Nba = 0, -1, -3, -4, -5`` (their
 coefficients read onto :attr:`FullProfModel.background_coefficients`; no
 background is built from a ``.pcr`` of any kind).
 
@@ -451,8 +452,8 @@ _BETA_COLUMNS = ("beta11", "beta22", "beta33", "beta12", "beta13", "beta23")
 #: says 12 for ``-4`` — so a 12-term ``-4`` file is refused at its third group
 #: rather than read on a guess. The position, right after LINE 14 (and LINE 15,
 #: refused here), is the manual's "The right place to input this line is
-#: detailed in the LINE 14", and one of FullProf's own examples (example
-#: file 1) writes its ``Nba = 0`` pair exactly there. ``Nba = 1`` and ``-2`` also read LINE 17, but over a
+#: detailed in the LINE 14", and FullProf's ``hobk.pcr`` writes its ``Nba = 0``
+#: pair exactly there. ``Nba = 1`` and ``-2`` also read LINE 17, but over a
 #: background from a companion ``.bac`` file, and are refused at the control
 #: line.
 _BACKGROUND_LINES = {
@@ -657,9 +658,10 @@ class ParameterLimit:
 
     ``NUMPAR LowLIMIT HighLIMIT Step IBOUND NAMPAR``: the refined parameter's
     *number* (a codeword's ``INT(CODEWORD/10)``, so it names a parameter of
-    this file, never a value), the interval FullProf holds it in, and the
-    simulated-annealing step and boundary type, which a least-squares job
-    (``Cry = 0``) does not use. ``name`` is the file's own label for it.
+    this file, never a value), the interval FullProf holds it in, the step,
+    which only a simulated-annealing job uses (``Cry = 3``), and the boundary
+    type, hard (0) or periodic (1). ``name`` is the file's own label for it.
+    :func:`limit_readings` says where each lands on the built model.
     """
 
     number: int
@@ -781,8 +783,9 @@ class FullProfModel:
     #: the Debye-like ``"bc"`` and ``"d"`` (6 each), each a :class:`Value` with
     #: its codeword.
     background_coefficients: dict = field(default_factory=dict)
-    #: ``Nre``'s LINE-47 hard limits, one :class:`ParameterLimit` per line, read
-    #: and reported by :func:`to_structure`, never applied as bounds.
+    #: ``Nre``'s LINE-47 hard limits, one :class:`ParameterLimit` per line.
+    #: :func:`to_structure` applies each as a bound where FullProf's mapping
+    #: holds and reports the rest (:func:`limit_readings`).
     parameter_limits: list = field(default_factory=list)
     #: ``(low, high)`` per excluded region, in file order.
     excluded_regions: list = field(default_factory=list)
@@ -1865,7 +1868,7 @@ def _read_phase(cur: _Cursor, path: Path, index: int) -> FullProfPhase:
         cur, _SCALE_COLUMNS, f"phase {index} scale/shape line", trailing=1)
     if (phase.strain_model or 0) > 8:
         # FullProf's own writer labels the block that follows: "! 5 additional
-        # strain parameters (IstrainModel>8)" (example file 2 of FullProf's set).
+        # strain parameters (IstrainModel>8)" (its example lab.pcr).
         raise FullProfPcrError(
             f"{where}: Strain-Model = {phase.strain_model} adds a block of "
             f"strain parameters after the Pref/Asy line, a model rietx's "
@@ -2201,7 +2204,7 @@ def _read_combined_atom(cur: _Cursor, where: str, i: int, nat: int) -> FullProfA
             f"N_t = 1, which reads")
     if n_t == 1:
         # FullProf writes `<-MagPar` after the seven numbers with no comment
-        # marker (example file 1 of FullProf's set), so the leading numeric run is read.
+        # marker (its example hobk.pcr), so the leading numeric run is read.
         _, moment = cur.floats(f"atom {i} moment line",
                                at_least=len(_COMBINED_MOMENT_COLUMNS),
                                leading=True)
@@ -3225,6 +3228,287 @@ def cell_parameter_ties(phase: FullProfPhase, where: str | None = None
     return carried, dropped
 
 
+# ------------------------------------------------------------ LINE-47 limits
+
+
+@dataclass(frozen=True)
+class LimitReading:
+    """Where one ``Nre`` hard limit lands on the built model, or why it does not.
+
+    ``value`` is the value the limit belongs to: the first, from the top of
+    the file, whose codeword carries the limit's parameter number (FullProf
+    manual, Rodríguez-Carvajal 2001, p. 126). ``label`` says where that value
+    is, in the file's own words. ``path`` is the
+    :class:`~rietx.schemas.Structure` entry the value builds, or ``None`` where
+    it builds none. ``reason`` is ``None`` where the limit is applied as that
+    entry's ``min`` and ``max``, and otherwise says why it is not.
+    """
+
+    limit: ParameterLimit
+    value: Value
+    label: str
+    path: str | None
+    reason: str | None
+
+    @property
+    def applied(self) -> bool:
+        """The limit is the built entry's ``min`` and ``max``."""
+        return self.reason is None
+
+    @property
+    def binding(self) -> bool:
+        """The file's own value sits on its limit, or past it.
+
+        FullProf holds a limited parameter inside its interval in least squares
+        (``docs/practice.md`` § Limits a control file declares), so a value on
+        the limit is an answer that rested on it. Compared exactly, as the file
+        prints both, and read only where the value's multiplier is +1: under
+        any other the value is not the parameter the limit bounds.
+        """
+        code = self.value.code
+        if code is None or code.multiplier != 1.0:
+            return False
+        return not self.limit.low < self.value.value < self.limit.high
+
+
+def _column_label(key: str) -> str:
+    """A profile column as the file's comment line spells it: ``W``, ``Pref1``."""
+    return key.upper() if len(key) == 1 else key.capitalize()
+
+
+def _values_in_file_order(model: FullProfModel):
+    """Every value a codeword can sit on, from the top of the file down.
+
+    Yields ``(value, label, structure_index, entry)``: ``structure_index`` is
+    the phase's position among the built phases (``None`` for a magnetic phase,
+    which builds no phase of its own), and ``entry`` is ``(kind, …)``, which
+    :func:`limit_readings` maps to a Structure path. The order is the reader's
+    walk: background points, the zero-shift line, LINE 17, then each phase's
+    atoms (each site's values and then its β block), scale line, width line,
+    cell line, Pref/Asy line and propagation vectors.
+    """
+    for i, (position, value) in enumerate(model.background):
+        yield value, f"background point {i + 1} (2theta {position:g})", None, ("none",)
+    for name in _ZERO_FIELDS:
+        if name in model.zero_shift:
+            yield (model.zero_shift[name], f"{name} on the zero-shift line", None,
+                   ("none",))
+    for key, values in model.background_coefficients.items():
+        for j, value in enumerate(values):
+            yield value, f"background coefficient {key}{j + 1}", None, ("none",)
+    nuclear = {id(ph): i for i, ph in enumerate(model.nuclear_phases)}
+    for ph in model.phases:
+        si = nuclear.get(id(ph))
+        where = f"phase {ph.index}"
+        for j, atom in enumerate(ph.atoms):
+            for column, value in atom.values.items():
+                yield (value, f"{where} atom {atom.label!r} {column}", si,
+                       ("atom", j, column))
+            for column, value in atom.betas.items():
+                yield (value, f"{where} atom {atom.label!r} {column}", si,
+                       ("beta", j, column))
+        for key in _SCALE_COLUMNS + _WIDTH_COLUMNS:
+            if key in ph.profile:
+                yield (ph.profile[key], f"{where} {_column_label(key)}", si,
+                       ("profile", key))
+        for key in _CELL_COLUMNS:
+            if key in ph.cell:
+                yield ph.cell[key], f"{where} cell {key}", si, ("cell", key)
+        for key in _ASYM_COLUMNS:
+            if key in ph.profile:
+                yield (ph.profile[key], f"{where} {_column_label(key)}", si,
+                       ("profile", key))
+        for i, (_, codes) in enumerate(ph.propagation_vectors):
+            for value in codes:
+                yield (value, f"{where} propagation vector {i + 1}", si, ("none",))
+
+
+def _entry_reason(model: FullProfModel, si: int | None, entry: tuple,
+                  built) -> tuple[str | None, str | None]:
+    """``(path, reason)`` for one value's entry before the limit's own checks.
+
+    ``reason`` is ``None`` where the value builds an entry that refines in
+    FullProf's own units, which is where the manual's mapping can hold.
+    """
+    kind = entry[0]
+    if kind == "none" or si is None and kind != "atom":
+        return None, "it builds no entry of the Structure"
+    if kind == "atom":
+        _, j, column = entry
+        if column in ("m1", "m2", "m3"):
+            path = None if si is None else f"phases.{si}.atoms.{j}.moment"
+            return path, ("a moment refines through its modulus and angles "
+                          "(moment.dof), where a bound on a component binds "
+                          "nothing")
+        if si is None:
+            return None, ("it is a column of a magnetic phase, which builds no "
+                          "entry of its own")
+        path = f"phases.{si}.atoms.{j}.{column}"
+        if column in ("x", "y", "z"):
+            return path, ("a coordinate refines through its site's displacement "
+                          "DOFs, where a bound on x, y or z binds nothing")
+        if column == "occ":
+            return path, ("an occupancy never maps: the file's Occ is "
+                          "multiplicity-scaled, and the built occ is the site's "
+                          "fraction")
+        if column == "biso":
+            return path, None
+        return None, "it builds no entry of the Structure"
+    if kind == "beta":
+        return None, "it builds no entry of the Structure"
+    if kind == "cell":
+        return f"phases.{si}.cell.{entry[1]}", None
+    key = entry[1]
+    if key == "scale":
+        return f"phases.{si}.scale", (
+            "a phase scale never maps: rietx's scale is not in FullProf's units, "
+            "which fold ATZ and the profile normalisation into it")
+    if key == "pref1" and model.control.get("nor", 0) == 1 and (
+            built is None or built[si].preferred_orientation is not None):
+        return f"phases.{si}.preferred_orientation.r", None
+    return None, ("it builds no entry of the Structure: a .pcr builds no "
+                  "instrument, profile width or background")
+
+
+def _undefined_at(entry: tuple, model: FullProfModel,
+                  limit: ParameterLimit) -> str | None:
+    """A limit whose interval reaches a value where the model is undefined.
+
+    Root CLAUDE.md's bound rule: a bound must be a value where the model *and
+    its columns* are defined. March-Dollase r has a pole at 0
+    (:data:`~rietx.schemas.structure.MARCH_R_MIN`), and Caglioti W at 0 puts
+    Γ_G² under its clamp at every reflection, so the U, V, W columns are zero
+    there (``caglioti._MIN_GAMMA_G2``, W's floor, in deg² as FullProf's W).
+    """
+    from ...model.profiles.caglioti import _MIN_GAMMA_G2
+    from ...schemas.structure import MARCH_R_MIN
+
+    if entry[0] != "profile":
+        return None
+    if (entry[1] == "pref1" and model.control.get("nor", 0) == 1
+            and limit.low < MARCH_R_MIN):
+        return (f"its low end {limit.low:g} reaches March r's pole at 0, where "
+                f"the March-Dollase factor is undefined (rietx's floor is "
+                f"MARCH_R_MIN = {MARCH_R_MIN:g})")
+    if entry[1] == "w" and limit.low < _MIN_GAMMA_G2:
+        return (f"its low end {limit.low:g} reaches Caglioti W at 0, where the "
+                f"Gaussian width is clamped and the U, V, W columns are zero "
+                f"(rietx's floor is {_MIN_GAMMA_G2:g} deg^2)")
+    return None
+
+
+def limit_readings(model: FullProfModel, built=None) -> list[LimitReading]:
+    """Where each of the file's ``Nre`` hard limits lands, one per limit.
+
+    The FullProf manual (Rodríguez-Carvajal, *An Introduction to the Program
+    FullProf 2000*, July 2001, p. 126, LINE 47) gives the mapping: a limit
+    goes on the value "appearing for the first time" from the top of the file
+    with the parameter's codeword, and that value must carry a positive sign
+    and a unit multiplier. Other values tied to it follow through their own
+    multipliers, which on a Structure is the tie, carried or reported by
+    :func:`cell_parameter_ties` and :func:`nuclear_parameter_ties`. The units
+    are the file's own, so the limit is applied unchanged, and only to an
+    entry that refines in those units: a cell length or angle (Å, degrees),
+    ``biso`` (B in Å², no 8π²) and March r (``Pref1`` under ``Nor = 1``).
+    FullProf clamps such a parameter in least squares, not only in simulated
+    annealing: Yue Wu ran fp2k 8.20 on FullProf's own ``ce1.pcr`` with a cell-a
+    limit of [5.400, 5.405] Å below its converged 5.41222(3) Å, and a was held
+    at 5.40500(3) Å from the first cycle (``docs/practice.md`` § Limits a
+    control file declares). A file read without its limits would fit a
+    different model from the one its author ran.
+
+    A limit is **not applied**, with the reason, where:
+
+    * its interval reaches a value where the model or its columns are
+      undefined (March r or Caglioti W at 0; :func:`_undefined_at`);
+    * the value builds no entry that refines in FullProf's units: a scale or an
+      occupancy (never, since rietx refines neither in FullProf's units), a
+      coordinate or a moment component (they refine through DOFs, where a bound
+      binds nothing), a profile width, the zero shift or the background (no
+      instrument or background is built from a ``.pcr``), or a magnetic
+      phase's own column;
+    * the value's multiplier is not +1, where the manual's mapping does not hold;
+    * ``IBOUND = 1``, a periodic boundary, which a box bound is not, and which
+      no one has measured in FullProf's least squares;
+    * the file's own value lies outside the interval, so the file was not
+      refined under it, and a bound there would refuse the value;
+    * rietx's own cell constraints tie or fix the entry by the space group,
+      where a bound on it binds nothing.
+
+    ``built`` is the list of built :class:`~rietx.schemas.Phase` objects,
+    which :func:`to_structure` passes so the cell constraints and the March
+    block are those of the phases it built. Without it the file's own space
+    group is resolved, and ``Nor = 1`` is taken to build the March block.
+    """
+    readings: list[LimitReading] = []
+    nuclear = model.nuclear_phases
+    for limit in model.parameter_limits:
+        found = None
+        for value, label, si, entry in _values_in_file_order(model):
+            code = value.code
+            if code is not None and code.number == limit.number:
+                found = (value, label, si, entry)
+                break
+        if found is None:  # pragma: no cover - read_fullprof_pcr refuses it
+            raise FullProfPcrError(
+                f"{model.path or '<model>'}: Nre limit on parameter "
+                f"{limit.number}, which no codeword in the file refines")
+        value, label, si, entry = found
+        reason = _undefined_at(entry, model, limit)
+        path, why = _entry_reason(model, si, entry, built)
+        reason = reason or why
+        multiplier = value.code.multiplier
+        if reason is None and multiplier != 1.0:
+            reason = (f"the value it belongs to carries the multiplier "
+                      f"{multiplier:+g}, and the manual's mapping needs +1 "
+                      f"(p. 126)")
+        if reason is None and limit.ibound == 1:
+            reason = ("IBOUND = 1 asks for periodic boundaries, which a box "
+                      "bound is not, and FullProf's least squares under it is "
+                      "unmeasured")
+        if reason is None and not limit.low <= value.value <= limit.high:
+            reason = (f"the file's own value {value.value:g} lies outside it, "
+                      f"so the file was not refined under this limit")
+        if reason is None and entry[0] == "cell":
+            reason = _cell_entry_tied(nuclear[si], entry[1],
+                                      None if built is None else built[si])
+        readings.append(LimitReading(limit=limit, value=value, label=label,
+                                     path=path, reason=reason))
+    return readings
+
+
+def _cell_entry_tied(phase: FullProfPhase, key: str, built) -> str | None:
+    """Why a bound on cell ``key`` binds nothing under rietx's constraints."""
+    from ...crystallography.symmetry import cell_constraints
+
+    try:
+        if built is not None:
+            group = resolve_group(built.space_group, built.symmetry_operations)
+        else:
+            import gemmi
+            group = gemmi.SpaceGroup(phase.space_group)
+        cons = cell_constraints(group)
+    except Exception as exc:
+        return (f"the space group {phase.space_group!r} does not resolve "
+                f"({exc}), so which cell entries rietx refines is unknown")
+    if key in cons.ties:
+        return (f"rietx ties cell {key} to cell {cons.ties[key]} by the space "
+                f"group, so a bound on {key} binds nothing")
+    if key in cons.fixed_angles:
+        return (f"the space group fixes cell {key} at "
+                f"{cons.fixed_angles[key]:g} degrees")
+    return None
+
+
+def _set_bounds(phases: list, reading: LimitReading) -> None:
+    """Set an applied limit as the ``min`` and ``max`` of the entry it names."""
+    _, index, *rest = reading.path.split(".")
+    target = phases[int(index)]
+    for part in rest:
+        target = target[int(part)] if part.isdigit() else getattr(target, part)
+    target.min, target.max = reading.limit.low, reading.limit.high
+
+
 def _preferred_orientation(model: FullProfModel, phase: FullProfPhase,
                            where: str, parameter):
     """``Pref1``/``Pref2`` under the file's ``Nor``, as rietx's March-Dollase.
@@ -3346,6 +3630,13 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
     does for the same defect (``TOPAS_CELL_COUPLING_DROPPED``); it does not refuse
     and is not gated on ``drop_parameter_ties``, which the *atom*-tie refusal
     below is.
+
+    The file's ``Nre`` hard limits are applied where FullProf's manual maps
+    them onto a built entry: each becomes that entry's ``min`` and ``max``
+    (:func:`limit_readings`). Each limit not applied is reported with its
+    reason, once: ``FULLPROF_BINDING_LIMIT_NOT_APPLIED`` (warning) where the
+    file's own value sits on it, since FullProf's answer then rested on it,
+    and ``FULLPROF_LIMITS_NOT_APPLIED`` (info) otherwise.
 
     Five refusals, each naming what it would otherwise have dropped:
 
@@ -3645,6 +3936,13 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
             f"{model.path or '<model>'}: no nuclear phase to build. The file "
             f"states {len(model.phases)} phase(s), all magnetic — read "
             f"`model.magnetic_phases` for what it does say about them.")
+    # The file's own hard limits are protocol FullProf enforces in least
+    # squares, so each is applied where the manual's mapping holds and the
+    # rest are reported below (`limit_readings`).
+    readings = limit_readings(model, built=phases)
+    for reading in readings:
+        if reading.applied:
+            _set_bounds(phases, reading)
     if diagnostics is not None:
         named = model.path or "<model>"
         # A merged magnetic phase is a *derivation* — two phases of the file
@@ -3790,23 +4088,32 @@ def to_structure(model: FullProfModel, *, nuclear_only: bool = False,
                             "Use Refinement.tie(path, source, scale=multiplier) "
                             "for a signed group."),
                 where=[path]))
-        # The file's own hard limits are protocol the Structure does not carry:
-        # a limit names a FullProf parameter *number*, which can drive several
-        # values at once, and whether one becomes a bound is a reading the
-        # reader leaves to the caller. Said once, listing every limit.
-        if model.parameter_limits:
-            listed = "; ".join(
-                f"parameter {lim.number}"
-                + (f" ({lim.name})" if lim.name else "")
-                + f" in [{lim.low:g}, {lim.high:g}]"
-                for lim in model.parameter_limits)
-            diagnostics.append(Diagnostic(
-                level="info", code="FULLPROF_LIMITS_NOT_APPLIED",
-                where=[], value=float(len(model.parameter_limits)),
-                message=(f"{named} states {len(model.parameter_limits)} hard "
-                         f"parameter limit(s) (Nre): {listed}. They are read "
-                         f"onto model.parameter_limits and not applied as "
-                         f"bounds.")))
+        # A limit not applied is said once per limit. Where the file's own
+        # value sits on it, FullProf's answer rested on it, so the loss is a
+        # warning (io/CLAUDE.md: a flag the model cannot honour is dropped at
+        # warning); otherwise it is a record. Two consequences, two codes.
+        for reading in readings:
+            if reading.applied:
+                continue
+            lim = reading.limit
+            stated = (f"{named}: the hard limit [{lim.low:g}, {lim.high:g}] on "
+                      f"parameter {lim.number}"
+                      + (f" ({lim.name})" if lim.name else "")
+                      + f", which belongs to {reading.label} = "
+                      f"{reading.value.value:g}, is not applied: "
+                      f"{reading.reason}.")
+            where = [reading.path] if reading.path else []
+            if reading.binding:
+                diagnostics.append(Diagnostic(
+                    level="warning", code="FULLPROF_BINDING_LIMIT_NOT_APPLIED",
+                    where=where, value=reading.value.value,
+                    message=(stated + " The file's value sits on that limit, "
+                             "so the refinement it records rested on it, and "
+                             "the built parameter is free to leave it.")))
+            else:
+                diagnostics.append(Diagnostic(
+                    level="info", code="FULLPROF_LIMITS_NOT_APPLIED",
+                    where=where, value=reading.value.value, message=stated))
         for path, group in dropped_cell_ties:
             diagnostics.append(Diagnostic(
                 level="warning", code="FULLPROF_TIE_DROPPED",

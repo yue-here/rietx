@@ -136,6 +136,12 @@ LINE 47; checked). The periodic boundary type (`IBOUND = 1`) was not tested. MAU
 limits are not enforced by its least squares (§ Peak-width limits above). The other five
 programs were not surveyed for this.
 
+rietx's `.pcr` reader follows that mapping since 1.11.0. It sets a limit as the built entry's
+`min` and `max` where the value it belongs to builds an entry in FullProf's own units: a cell
+entry rietx refines, a `Biso`, or March r. It reports every other limit with its reason, at
+`warning` where the file's value sits on the limit
+(`rietx.io.projects.fullprof.limit_readings`, checked).
+
 ## Instrument and specimen widths refined together
 
 Read 2026-10-23 (WP-2002, 8th session), after removing rietx's U and Y floors exposed the

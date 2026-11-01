@@ -68,6 +68,7 @@
   "diagnostics:FLAT_DIRECTION_OMITTED",
   "diagnostics:FLOOR_HIT",
   "diagnostics:FROZEN_COMPILE_STALE",
+  "diagnostics:FULLPROF_BINDING_LIMIT_NOT_APPLIED",
   "diagnostics:FULLPROF_LIMITS_NOT_APPLIED",
   "diagnostics:FULLPROF_MAGNETIC_PHASE_OMITTED",
   "diagnostics:FULLPROF_MAGNETIC_PHASE_READ",
