@@ -1140,6 +1140,20 @@ ROWS: tuple[Row, ...] = (
                   "since one histogram can be the intent (issue #265, WP-1414)")),
     Row("STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT", "code"),
     Row("STAGE_MAX_ITER", "code"),
+    Row("STAGE_NOT_FINITE", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic: a NaN or an infinity in the residual at a solve's start, or "
+                  "in the Jacobian at a point the driver accepted, leaves neither driver a "
+                  "step (scipy's TRF raised ValueError from its SVD, and the LM driver's "
+                  "normal equations go NaN); fires exactly when run_least_squares or "
+                  "run_multi_least_squares returns LSQOutcome.non_finite; the stage ends "
+                  "at its start, the rule a cancelled stage and a collapsed phase already "
+                  "follow; reproduced on the 1e-14-nudged P 1 Le Bail fit under TRF "
+                  "(k = -1: Jacobian column cell.alpha; k = 1: the residual at the second "
+                  "solve's start), WP-2048"),
+        response="warning",
+        responds=("read the stage it names as not run, since its values are its start, and "
+                  "hold some of its free parameters or start it nearer its answer before "
+                  "quoting what the stage was meant to refine")),
     Row("STAGE_PATH_NOT_FREE", "code"),
     Row("STAGE_PATH_UNKNOWN", "code"),
     Row("STAGE_WINDOWS_STALE", "code", tier=3, ambiguity=3,
@@ -4476,6 +4490,13 @@ ROWS: tuple[Row, ...] = (
                   "histogram, and picks neither (multi.py:2579-2582)")),
     Row("STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT.suggestion", "suggestion", value=1),
     Row("STAGE_MAX_ITER.suggestion", "suggestion", value=1),
+    Row("STAGE_NOT_FINITE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
+        evidence=("arithmetic: names the two levers that change what a stage reaches, its "
+                  "free set and its start, and picks neither; under solver='trf' alone, "
+                  "states the one difference between the drivers that bears on it, the LM "
+                  "driver's Gaussian and Lorentzian width floors "
+                  "(gaussian_width_inequalities, lorentzian_width_inequalities) that TRF "
+                  "has no vocabulary for")),
     Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=1),
     Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=2),
     Row("STAGE_WINDOWS_STALE.suggestion", "suggestion", value=1, tier=3, ambiguity=3,
