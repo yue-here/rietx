@@ -2457,8 +2457,10 @@ class ExtinctionScreen(Base):
     reference_rwp_net: float | None = None
     #: what ``reference_rwp_net`` would read for a fit that left only the
     #: counting noise: √(N/(N + S)), N the fitted channels and S the weighted
-    #: net Bragg power.  Past the bound too, the data are too weak for the gate
-    #: (S < N); below it, the gap to ``reference_rwp_net`` is misfit.  ``None``
+    #: net Bragg power.  Past the bound too, either the data are too weak for the
+    #: gate (S < N) or the picker's envelope sits inside the lines over this range
+    #: (the pair cannot tell which); below it, the gap to ``reference_rwp_net`` is
+    #: misfit.  ``None``
     #: until the reference fit ran
     perfect_fit_rwp_net: float | None = None
     #: formula units per cell the member filter used: the declared ``z``, or

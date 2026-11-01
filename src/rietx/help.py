@@ -2065,7 +2065,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "first); below it, the reference misfits them. The bound, "
             "1/√2 (at most half of the net weighted power unexplained), was measured on "
             "synthetic Si and P 2₁/c, 11-BM NAC, the GSAS-II fluorapatite and PbSO₄ "
-            "patterns and SRM 676a corundum: every right cell reads 0.12-0.19 on the default path "
+            "patterns and SRM 676a corundum; every right cell of the four real patterns reads 0.12-0.19 on the default path "
             "(cell refined; ≤ 0.36 was measured with the cell held), "
             "and cells outside the refinable basin read 1.0-2.3 (corundum at ×1.02, "
             "fluorapatite at ×0.99, NAC at ×0.99 and ×1.02, PbSO₄ at ×1.02, Si at ×1.01) "

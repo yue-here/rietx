@@ -1029,9 +1029,11 @@ def _reference_net_rwp(result) -> tuple[float | None, float | None]:
     that leaves only the counting noise has Σw·(y_obs − y_calc)² ≈ N, and on a
     background channel the net is that noise too, so D ≈ N + S with S the
     weighted net Bragg power: a perfect fit reads √(N/(N + S)), which is above
-    :data:`REFERENCE_NET_RWP_MAX` exactly when S < N.  The pair says which of
-    the two failed: weak data (the second is past the bound too, so no model
-    could pass) or misfit (the ratio of the two is √(χ²/N)).  Both are
+    :data:`REFERENCE_NET_RWP_MAX` exactly when S < N.  The pair separates
+    misfit from the rest: below the bound the reference misfits (the ratio of
+    the two is √(χ²/N)); past it too, no model could pass, because the data
+    are weak or the envelope sits inside the lines (see below), and the pair
+    cannot tell which.  Both are
     ``None`` when the pattern carries no net signal at all.
 
     **The envelope's known weakness: a continuum of lines** (review of #939,
