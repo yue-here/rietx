@@ -221,6 +221,10 @@ from .structure import Cell
 #: than its parent's (``SupercellEvidence.child_seen_more``) is never
 #: ``refuted``, so a dense low-symmetry truth no longer sits below a wrong cell
 #: that p₀ near the truth's own seen fraction let refute it.
+#: Also 1.12 (WP-1910, ruled on #1178): with ``refine_cell=True`` a screen that
+#: names a class is checked by a second screen at the prefit's cell, held, from
+#: the declared instrument, and ``best_or_none()`` abstains when the two name
+#: different classes (``EXTINCTION_SCREENS_DISAGREE``); no threshold moved.
 INDEXING_THRESHOLDS_VERSION = "1.12"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is

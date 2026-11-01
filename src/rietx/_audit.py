@@ -629,7 +629,8 @@ ROWS: tuple[Row, ...] = (
                   "the six offsets where the default names a wrong class and the held screen "
                   "the true one, on none where the default is right; fails where the prefit's "
                   "own cell is off (corundum x0.985, P 2_1/c x0.9975: both screens name the "
-                  "same wrong class)"),
+                  "same wrong class) and where the held screen names nothing (PbSO4 x0.99, "
+                  "x1.0125: the default names P c - -)"),
         grounds=("Mechanical: four unrelated real families plus a synthetic, silent on every "
                  "row the default gets right. Judgement: two answers naming disjoint classes "
                  "cannot both be right, so no competent refiner quotes either; ruled for this "

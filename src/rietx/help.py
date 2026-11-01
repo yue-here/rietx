@@ -2076,9 +2076,11 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "GSAS-II fluorapatite tutorial pattern, a synthetic P 2₁/c, the GSAS-II "
             "PbSO₄ X-ray pattern and 11-BM NAC, with each cell scaled by ×0.97 to ×1.03: "
             "it fired on six offsets where the default named a wrong class (corundum, "
-            "fluorapatite, the P 2₁/c) and on none where the default was right. Where "
-            "the prefit's own cell is off, both screens can name the same wrong class "
-            "and this check cannot see it."
+            "fluorapatite, the P 2₁/c) and on none of the 51 where the default was right. "
+            "It cannot see a wrong class where the prefit's own cell is off, so both "
+            "screens name it (corundum ×0.985, P 2₁/c ×0.9975), nor where the held "
+            "screen names nothing (PbSO₄ at ×0.99 and ×1.0125, where the default "
+            "names `P c - -`)."
         ),
     ),
     "EXTINCTION_SCREEN_UNRELIABLE": HelpEntry(
