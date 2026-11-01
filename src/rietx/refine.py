@@ -1922,6 +1922,37 @@ def _cell_runaway_diagnostic(
     )
 
 
+def _non_finite_diagnostic(stage_name: str, outcome) -> Diagnostic | None:
+    """``STAGE_NOT_FINITE`` for a stage whose solve stopped on a model that is
+    not finite (WP-2048, :class:`~.optimize.least_squares.NonFiniteStop`), or
+    ``None``.  ``where`` is every path the stopped solve had free, because
+    the column that went non-finite is rarely the parameter that ran: on the
+    nudged P 1 Le Bail fit the NaN column was ``cell.alpha`` while the zero
+    shift stood at −8584°."""
+    stop = getattr(outcome, "non_finite", None)
+    if stop is None:
+        return None
+    if stop.kind == "jacobian":
+        cols = ", ".join(stop.columns)
+        what = (f"its Jacobian column{'s' if len(stop.columns) > 1 else ''} "
+                f"{cols}, at a point the solver had reached")
+    else:
+        what = "its residual, where a solve began"
+    return Diagnostic(
+        level="warning", code="STAGE_NOT_FINITE", where=list(stop.free),
+        value=float(len(stop.free)),
+        message=(f"Stage {stage_name!r} stopped where it started. Its model "
+                 f"held a NaN or an infinity in {what}. The stage had "
+                 f"{len(stop.free)} parameters free. Every value is back at "
+                 "the stage's start, so the stage changed nothing."),
+        suggestion=(
+            "Hold some of the parameters this stage frees, or start it nearer "
+            "its answer."
+            + (" solver='trf' keeps no floor under the peak widths, and the "
+               "default 'lm' driver does." if outcome.solver == "trf" else "")),
+    )
+
+
 def _released_phases(model: CompiledModel, table: ParameterTable,
                      held: list[str], support: np.ndarray | None = None,
                      reach: dict[str, list[str]] | None = None, *,
@@ -2150,6 +2181,10 @@ def _answer_significance(model: CompiledModel, table: ParameterTable,
                              dtype=np.float64)
         else:
             jac = np.asarray(outcome.jac, dtype=np.float64)
+        if not np.all(np.isfinite(jac)):
+            # a stage stopped on a non-finite model (WP-2048) can be measured
+            # where its Jacobian is not finite: no covariance, the screen stands
+            return out
         column_reach = table.column_reach()
         for ip in seen:
             columns = [c for c in _significance_columns(
@@ -4684,6 +4719,9 @@ class Refinement:
         stage_ftol = {} if ftol is None else {"ftol": ftol}
         # what the stage starts from, kept for the collapse case below
         start_values = table.decode(table.x0())
+        # and for a solve stopped on a non-finite model (WP-2048): the Pawley
+        # intensities, which live outside the table
+        pawley_start = model.pawley_x0() if model.pawley is not None else None
         # A "centroid" phase's origin restraint (WP-1912), built here and not
         # at the compile: its rows exist only where the *free* set can slide
         # the phase, and the holds above have just decided that set
@@ -4700,6 +4738,11 @@ class Refinement:
         signs = table.commit(outcome.theta)
         outcome = rechart_outcome(outcome, table.x0(), signs,
                                   table.free_paths)
+        # A solve stopped on a non-finite model handed back its own start,
+        # which is the stage's (WP-2048).  The stage ends there: nothing moved,
+        # so the answer the collapse and the release would re-measure is the
+        # start, and no second solve runs.
+        stopped = outcome.non_finite is not None
         # A phase can stay comfortably significant (phase_support_sigma) the
         # whole time and its cell still walk to nonsense — a joint
         # degeneracy with another free phase's cell, invisible to the
@@ -4769,7 +4812,7 @@ class Refinement:
         # the flat axis, which is #599's trap.
         late_axes: dict[str, np.ndarray] = {}
         still_flat: set[str] = set()
-        if moment_held:
+        if moment_held and not stopped:
             still, still_axes = _flat_moment_scan(model, table, moment_held)
             still_flat = set(still)
             released = released + [p for p in moment_held if p not in still_flat]
@@ -4793,7 +4836,10 @@ class Refinement:
             model, table, {b: a for b, a in late_axes.items()
                            if f"{b}.dof2" in still_flat})
         moment_turned.update(late_turned)
-        flat_now, collapse_axes = _flat_moment_scan(model, table)
+        # a stopped stage has no answer to scan, and an axis found at its
+        # start would join the record as though the stage had found it
+        flat_now, collapse_axes = (([], {}) if stopped
+                                   else _flat_moment_scan(model, table))
         collapsed_phase = _unsupported_phase_paths(model, table, support,
                                                    sigma=phase_support_sigma)
         collapsed = collapsed_phase + flat_now
@@ -4815,6 +4861,8 @@ class Refinement:
         # ``StageResult.cell_reset``: the held ones, and any the second solve
         # puts back below
         cell_reset = list(reset_hold)
+        if stopped:
+            released, collapsed, late_turned, reset_hold = [], [], [], []
         if released or collapsed or late_turned or reset_hold:
             if collapsed:
                 # Restore before holding.  A phase whose scale is not 3σ from
@@ -4918,9 +4966,28 @@ class Refinement:
                 stage=stage.name, backend=self._backend,
                 solver=self._solver, cancel=cancel,
                 phase_support_sigma=phase_support_sigma, **stage_ftol)
-            signs = table.commit(second.theta)
-            second = rechart_outcome(second, table.x0(), signs,
-                                     table.free_paths)
+            if second.non_finite is not None:
+                # The second solve starts from the first one's answer with
+                # what the reset and the collapse put back, and it is that
+                # mixture the model could not evaluate (WP-2048).  So every
+                # path goes back to where the stage found it, a moment turned
+                # between the solves included, and the stage ends at its
+                # start.  Nothing is committed first: the solve handed back
+                # the values the table holds, and a commit would replace the
+                # anchor a rigid body's restore reads.
+                by_path = {e.path: e for e in table.entries}
+                for path, value in start_values.items():
+                    by_path[path].value = value
+                table.restore_body_anchors(list(start_values))
+                table.refresh_ties()
+                if pawley_start is not None:
+                    model.set_pawley_intensities(pawley_start)
+                second = dataclasses.replace(second, theta=table.x0(),
+                                             cost_final=outcome.cost_initial)
+            else:
+                signs = table.commit(second.theta)
+                second = rechart_outcome(second, table.x0(), signs,
+                                         table.free_paths)
             # Asked again, because a column this solve freed (a release) can
             # walk too.  There is no third solve, so the cell goes back and
             # stays a free column of this answer: holding it now would leave
@@ -4978,7 +5045,8 @@ class Refinement:
             for ip in _phases_reached(support_held, held_reach):
                 support[ip] = decided[ip]
 
-        if mode == "lebail":
+        if mode == "lebail" and outcome.non_finite is None:
+            # a stopped stage changed nothing, its intensities included (WP-2048)
             model.lebail_update(table.decode(outcome.theta), n_cycles=stage.lebail_cycles)
 
         guard = check_guards(table, outcome, correlation_guard, model=model,
@@ -5646,6 +5714,12 @@ class Refinement:
             if runaway_diag is not None:
                 diagnostics.append(runaway_diag)
                 stage_diagnostics = stage_diagnostics + [runaway_diag]
+            # every stage's own: a later stage refines from the start this one
+            # kept, which says nothing about why this one stopped (WP-2048)
+            stop_diag = _non_finite_diagnostic(stage.name, outcome)
+            if stop_diag is not None:
+                diagnostics.append(stop_diag)
+                stage_diagnostics = stage_diagnostics + [stop_diag]
             stage_results.append(StageResult(
                 name=stage.name, status=outcome.status, n_iterations=outcome.n_iterations,
                 cost_initial=outcome.cost_initial, cost_final=outcome.cost_final,
@@ -5938,6 +6012,9 @@ class Refinement:
             runaway_diag = _cell_runaway_diagnostic(hold.cell_runaway, hold.cell_runaway_unresolved)
             if runaway_diag is not None:
                 diagnostics.append(runaway_diag)
+            stop_diag = _non_finite_diagnostic(stage.name, outcome)
+            if stop_diag is not None:
+                diagnostics.append(stop_diag)
 
             self._model = model
             self._write_back(table)

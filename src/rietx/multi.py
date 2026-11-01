@@ -103,6 +103,7 @@ from .refine import (
     _low_angle_diagnostics,
     _max_iter_diagnostics,
     _merge_unresolved,
+    _non_finite_diagnostic,
     _occupancy_flag_diagnostics,
     _onto_flat_meridian,
     _origin_diagnostics,
@@ -1028,6 +1029,20 @@ def _rehold_flat_moments_multi(models, mtable, moment_held: list[str],
     return released, collapsed, found, turned_now
 
 
+def _restore_stage_start(mtable, start_values: list[dict[str, float]]) -> None:
+    """Every histogram's table back at the values its stage started from
+    (WP-2048), the collapse's restore applied to every path: each table's own
+    entries, its body anchors and its ties, then the combined columns."""
+    for h, table in enumerate(mtable.tables):
+        by_path = {e.path: e for e in table.entries}
+        paths = [p for p in start_values[h] if p in by_path]
+        for path in paths:
+            by_path[path].value = start_values[h][path]
+        table.restore_body_anchors(paths)
+        table.refresh_ties()
+    mtable._rebuild_columns()
+
+
 def _reset_cell_runaway_multi(mtable, start_values: list[dict[str, float]]
                               ) -> list[tuple[str, float, float]]:
     """:func:`~rietx.refine.reset_cell_runaway`, extended to the joint runner
@@ -1655,41 +1670,47 @@ class MultiHistogramRefinement:
                 if cell_runaway:
                     self.mtable._rebuild_columns()
                     outcome = dataclasses.replace(outcome, theta=self.mtable.x0())
-                moment_set = set(moment_hold)
-                # the free columns as the solve left them, read before the
-                # collapse takes any out of θ, so a collapsed column's reach is
-                # on the record beside the stage-start hold's
-                reach = _joint_column_reach(self.mtable)
-                released, collapsed = _rehold_multi(
-                    models, self.mtable, list(support_hold), start_values,
-                    held_reach=held_reach, reach=reach, sigma=phase_support_sigma)
-                held_reach.update(_joint_reach_beyond_self(collapsed, reach))
-                # ``StageResult.collapsed``: the restored columns alone, taken
-                # before the late scale-B hold joins ``collapsed`` below, since
-                # that one holds a released phase's B where it stands
-                restored = list(collapsed)
-                if released:
-                    # a phase the support hold released is asked before its second
-                    # solve, or that solve runs on the ridge unflagged (the single
-                    # runner's ``late_hold``); read off what each released
-                    # column moves, since a parametric coefficient's own name
-                    # carries no phase (WP-1342)
-                    back = _joint_phases_reached(released, held_reach)
-                    late, late_sep = _hold_scale_b_ridges_multi(
-                        models, self.mtable, back, weights)
-                    if late:
-                        late_set = set(late)
-                        released = [p for p in released if p not in late_set]
-                        collapsed = collapsed + late
-                        scale_b_held.update(late_sep)
-                m_released, m_collapsed, m_axes, m_turned = _rehold_flat_moments_multi(
-                    models, self.mtable, [p for p in held if p in moment_set],
-                    start_values, moment_turned)
-                released, collapsed = released + m_released, collapsed + m_collapsed
-                restored = restored + m_collapsed
-                for site, axis in m_axes.items():
-                    flat_axes.setdefault(site, axis)
-                moment_turned = moment_turned + m_turned
+                # a solve stopped on a non-finite model handed back the
+                # stage's start (WP-2048): the stage ends there, so there is no
+                # answer to re-measure and no second solve
+                stopped = outcome.non_finite is not None
+                released, collapsed, restored, m_turned = [], [], [], []
+                if not stopped:
+                    moment_set = set(moment_hold)
+                    # the free columns as the solve left them, read before the
+                    # collapse takes any out of θ, so a collapsed column's reach is
+                    # on the record beside the stage-start hold's
+                    reach = _joint_column_reach(self.mtable)
+                    released, collapsed = _rehold_multi(
+                        models, self.mtable, list(support_hold), start_values,
+                        held_reach=held_reach, reach=reach, sigma=phase_support_sigma)
+                    held_reach.update(_joint_reach_beyond_self(collapsed, reach))
+                    # ``StageResult.collapsed``: the restored columns alone, taken
+                    # before the late scale-B hold joins ``collapsed`` below, since
+                    # that one holds a released phase's B where it stands
+                    restored = list(collapsed)
+                    if released:
+                        # a phase the support hold released is asked before its second
+                        # solve, or that solve runs on the ridge unflagged (the single
+                        # runner's ``late_hold``); read off what each released
+                        # column moves, since a parametric coefficient's own name
+                        # carries no phase (WP-1342)
+                        back = _joint_phases_reached(released, held_reach)
+                        late, late_sep = _hold_scale_b_ridges_multi(
+                            models, self.mtable, back, weights)
+                        if late:
+                            late_set = set(late)
+                            released = [p for p in released if p not in late_set]
+                            collapsed = collapsed + late
+                            scale_b_held.update(late_sep)
+                    m_released, m_collapsed, m_axes, m_turned = _rehold_flat_moments_multi(
+                        models, self.mtable, [p for p in held if p in moment_set],
+                        start_values, moment_turned)
+                    released, collapsed = released + m_released, collapsed + m_collapsed
+                    restored = restored + m_collapsed
+                    for site, axis in m_axes.items():
+                        flat_axes.setdefault(site, axis)
+                    moment_turned = moment_turned + m_turned
                 # the reset's hold takes what the collapse left, the single
                 # runner's rule: a path both reach is the collapse's, in ``held``
                 collapsed_set = set(collapsed)
@@ -1718,11 +1739,19 @@ class MultiHistogramRefinement:
                         solver=self._solver, events=stream, stage=stage.name,
                         cancel=cancel, phase_support_sigma=phase_support_sigma,
                         **stage_ftol)
-                    signs = self.mtable.commit(second.theta)
-                    if signs is not None:
-                        self.mtable._rebuild_columns()
-                        second = rechart_outcome(second, self.mtable.x0(), signs,
-                                                 self.mtable.free_paths)
+                    if second.non_finite is not None:
+                        # the single runner's rule (WP-2048): every value back
+                        # where the stage found it, with nothing committed
+                        _restore_stage_start(self.mtable, start_values)
+                        second = dataclasses.replace(
+                            second, theta=self.mtable.x0(),
+                            cost_final=outcome.cost_initial)
+                    else:
+                        signs = self.mtable.commit(second.theta)
+                        if signs is not None:
+                            self.mtable._rebuild_columns()
+                            second = rechart_outcome(second, self.mtable.x0(), signs,
+                                                     self.mtable.free_paths)
                     # asked again, and with no third solve the cell goes back and
                     # stays a free column of this answer, its esd withheld (the
                     # single runner's rule)
@@ -1754,6 +1783,11 @@ class MultiHistogramRefinement:
                 answer_runaway = [] if runaway_diag is None else [runaway_diag]
                 if runaway_diag is not None:
                     cell_runaway_diags.append(runaway_diag)
+                # per stage, like the reset's: the list is every stage's own
+                # finding the joint result carries (WP-2048)
+                stop_diag = _non_finite_diagnostic(stage.name, outcome)
+                if stop_diag is not None:
+                    cell_runaway_diags.append(stop_diag)
                 self.mtable.apply_to_models()
                 # the reset's hold is lifted by the next stage with the others
                 carried_hold = list(held) + reset_hold

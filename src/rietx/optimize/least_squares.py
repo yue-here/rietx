@@ -340,6 +340,109 @@ class LSQOutcome:
     #: ``None`` on the single-histogram path, which has one layout and no
     #: choice to report.
     jacobian_layout: str | None = None
+    #: why the solve stopped on a non-finite model, or ``None`` when it did
+    #: not (WP-2048).  Written by both solver entry points, at the two places
+    #: a driver would otherwise raise: a residual that is not finite at the
+    #: start, and a Jacobian that is not finite at a point the driver
+    #: accepted.  Such an outcome hands back the solve's **start**
+    #: (:attr:`theta`, :attr:`cost_final` equal to :attr:`cost_initial`), with
+    #: ``status="diverged"``, no Jacobian and no esds; ``refine`` and
+    #: ``multi`` end the stage there and say so in ``STAGE_NOT_FINITE``.
+    non_finite: NonFiniteStop | None = None
+
+
+@dataclass(frozen=True)
+class NonFiniteStop:
+    """Where a solve met a model that is not finite (WP-2048).
+
+    ``kind`` is ``"residual"`` when the residual at the solve's start holds a
+    NaN or an infinity, and ``"jacobian"`` when the Jacobian does at a point
+    the driver had accepted, whose residual was finite.  ``columns`` names
+    the Jacobian's non-finite columns, and is empty for a residual stop.
+    ``free`` is every free path of the solve, in column order.
+
+    A trial step into a non-finite residual is no stop: both drivers reject
+    it and shorten the step (scipy's TRF by its own test, the LM driver
+    because ``S = nan`` never compares lower).  The two kinds here are the
+    points at which neither driver has a step left to shorten.
+    """
+
+    kind: str
+    columns: tuple[str, ...]
+    free: tuple[str, ...]
+
+
+class _NonFiniteJacobian(Exception):
+    """Raised by :class:`_FiniteJacobianGuard` through a driver, and caught by
+    the solver entry point that installed the guard; never seen outside."""
+
+    def __init__(self, columns: np.ndarray):
+        super().__init__("the Jacobian is not finite")
+        self.columns = columns
+
+
+def _non_finite_columns(j) -> np.ndarray:
+    """The column indices of ``j`` holding a NaN or an infinity, dense or
+    :class:`~.blocked.BlockJacobian`.  A column sum is NaN or infinite
+    whenever the column holds one, so a finite sum clears the column without
+    the full-size boolean mask; only a non-finite sum (possibly a finite
+    column that overflowed) is checked entry by entry."""
+    def bad_of(m: np.ndarray) -> np.ndarray:
+        bad = ~np.isfinite(m.sum(axis=0))
+        if bad.any():
+            bad[bad] = ~np.isfinite(m[:, bad]).all(axis=0)
+        return bad
+
+    if isinstance(j, BlockJacobian):
+        bad = np.zeros(j.n_cols, dtype=bool)
+        for block, cols in zip(j.blocks, j.col_maps, strict=True):
+            bad[cols] |= bad_of(block)
+        return np.flatnonzero(bad)
+    return np.flatnonzero(bad_of(np.asarray(j)))
+
+
+class _FiniteJacobianGuard:
+    """Stops a solve at the first Jacobian that is not finite (WP-2048).
+
+    Both drivers ask for the Jacobian only at a point they have accepted, so
+    the residual there was finite and the trust region has no smaller step to
+    try.  scipy's TRF raised ``ValueError`` from its SVD on such a matrix, and
+    the LM driver would form NaN normal equations.  This guard raises
+    :class:`_NonFiniteJacobian` instead, which the entry point turns into an
+    outcome carrying :class:`NonFiniteStop`.  Outermost of the Jacobian
+    wrappers, so a degenerate-cell fallback is checked like any other matrix.
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
+        # ``inspect.unwrap`` reaches the guard below, as it reaches the
+        # residual guard under the TRF event wrapper
+        self.__wrapped__ = inner
+
+    def __call__(self, theta: np.ndarray):
+        j = self._inner(theta)
+        bad = _non_finite_columns(j)
+        if bad.size:
+            raise _NonFiniteJacobian(bad)
+        return j
+
+
+def _non_finite_outcome(kind: str, columns, free_paths, x0: np.ndarray,
+                        n_table: int, cost0: float, solver: str,
+                        cell_guard, lapack_start: int,
+                        jacobian_layout: str | None = None) -> LSQOutcome:
+    """The outcome of a solve stopped on a non-finite model: its own start,
+    named as such (:attr:`LSQOutcome.non_finite`)."""
+    free = tuple(free_paths)
+    names = tuple(free[c] if c < len(free) else f"aux.{c - len(free)}"
+                  for c in np.asarray(columns, dtype=int))
+    return LSQOutcome(np.array(x0[:n_table], dtype=np.float64), cost0, cost0,
+                      cell_guard.n_calls, "diverged", None, None, None, solver=solver,
+                      termination=f"non_finite_{kind}",
+                      n_degenerate_cell_probes=cell_guard.n_degenerate,
+                      n_lapack_fallbacks=lapack.retries() - lapack_start,
+                      jacobian_layout=jacobian_layout,
+                      non_finite=NonFiniteStop(kind, names, free))
 
 
 def stationary_columns(outcome: LSQOutcome, free_paths: list[str]) -> list[int]:
@@ -1003,8 +1106,13 @@ class _DegenerateCellGuard:
         self._inner = inner
         self._last: np.ndarray | None = None
         self.n_degenerate = 0
+        #: every call, refused or not: the evaluation count a solve stopped
+        #: on a non-finite Jacobian reports, having no driver result to read
+        #: one off (WP-2048)
+        self.n_calls = 0
 
     def __call__(self, theta: np.ndarray) -> np.ndarray:
+        self.n_calls += 1
         try:
             r = self._inner(theta)
         except DegenerateCellError:
@@ -2717,6 +2825,43 @@ def _check_magnetic_width_compiled(model: CompiledModel,
                 f"or seed the term off zero before compiling")
 
 
+def _drive_single(model: CompiledModel, table: ParameterTable, residual, jacobian,
+                  x0: np.ndarray, lo: np.ndarray, hi: np.ndarray, *, n_table: int,
+                  n_aux: int, max_nfev: int, ftol: float, events, stage: str,
+                  tracker, backend: str, solver: str, cancel=None):
+    """One driver run of :func:`run_least_squares`, either driver's result
+    shape; a function of its own so that one ``try`` covers both drivers
+    (WP-2048)."""
+    if solver == "lm":
+        # the strain cone and the Γ_G² and Γ_L floors (WP-1938 D7, WP-2002)
+        # are built against the *starting* point, because feasibility is
+        # maintained rather than restored (see the builders)
+        ineqs = _pad_inequalities(
+            strain_cone_inequalities(model, table, x0[:n_table])
+            + texture_positivity_inequalities(model, table, x0[:n_table])
+            + gaussian_width_inequalities(model, table, x0[:n_table])
+            + lorentzian_width_inequalities(model, table, x0[:n_table]), n_aux)
+        from . import lm as lm_mod
+
+        # a Pawley block past the BVLS cut takes its normal matrix sparse,
+        # where its windows are narrow enough (``PAWLEY_SPARSE_DENSITY``), so
+        # the projected CG can precondition (WP-2011).  numpy only: the
+        # pattern is read off the writer in ``_make_jacobian``, and the
+        # traced backends' columns were never checked against it
+        normal_equations = (_pawley_normal_equations(model, n_table)
+                            if model.pawley is not None and backend == "numpy"
+                            and len(x0) > lm_mod.BVLS_MAX_COLUMNS else None)
+        res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
+                          ftol=ftol, inequalities=ineqs, events=events, stage=stage,
+                          track=tracker, table=table,
+                          normal_equations=normal_equations, cancel=cancel)
+    else:
+        with lapack.scipy_trf():
+            res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",
+                                ftol=ftol, xtol=XTOL, gtol=GTOL, max_nfev=max_nfev)
+    return res
+
+
 def run_least_squares(model: CompiledModel, table: ParameterTable,
                       *, max_iter: int = 100, ftol: float = FTOL,
                       compute_uncertainties: bool = True,
@@ -2749,6 +2894,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
     residual = cell_guard
     jacobian = _jacobian_for(model, table, backend)
     jacobian = _DegenerateCellJacobianGuard(jacobian, cell_guard)
+    jacobian = _FiniteJacobianGuard(jacobian)
 
     if cancel is not None:
         # Both drivers, and *before* the event wrapper, so the check costs one
@@ -2800,37 +2946,31 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
                           solver=solver,
                           n_degenerate_cell_probes=cell_guard.n_degenerate)
 
+    def stopped(kind: str, columns=()) -> LSQOutcome:
+        if model.pawley is not None:
+            # the residual evaluations wrote their trial intensities into
+            # the per-phase buffers; the outcome is the start, so are they
+            model.set_pawley_intensities(x0[n_table:])
+        return _non_finite_outcome(kind, columns, table.free_paths, x0, n_table,
+                                   cost0, solver, cell_guard, lapack_start)
+
+    if not np.all(np.isfinite(r0)):
+        # both drivers refuse this start with a ValueError (WP-2048)
+        return stopped("residual")
+
     n_truncated, truncated_by = 0, {}
     # one budget, in residual evaluations, for both drivers (WP-1937)
     max_nfev = max_iter * NFEV_PER_ITERATION
+    try:
+        res = _drive_single(model, table, residual, jacobian, x0, lo, hi,
+                            n_table=n_table, n_aux=n_aux, max_nfev=max_nfev,
+                            ftol=ftol, events=events, stage=stage,
+                            tracker=tracker, backend=backend, solver=solver,
+                            cancel=cancel)
+    except _NonFiniteJacobian as stop:
+        return stopped("jacobian", stop.columns)
     if solver == "lm":
-        # the strain cone and the Γ_G² and Γ_L floors (WP-1938 D7, WP-2002)
-        # are built against the *starting* point, because feasibility is
-        # maintained rather than restored (see the builders)
-        ineqs = _pad_inequalities(
-            strain_cone_inequalities(model, table, x0[:n_table])
-            + texture_positivity_inequalities(model, table, x0[:n_table])
-            + gaussian_width_inequalities(model, table, x0[:n_table])
-            + lorentzian_width_inequalities(model, table, x0[:n_table]), n_aux)
-        from . import lm as lm_mod
-
-        # a Pawley block past the BVLS cut takes its normal matrix sparse,
-        # where its windows are narrow enough (``PAWLEY_SPARSE_DENSITY``), so
-        # the projected CG can precondition (WP-2011).  numpy only: the
-        # pattern is read off the writer in ``_make_jacobian``, and the
-        # traced backends' columns were never checked against it
-        normal_equations = (_pawley_normal_equations(model, n_table)
-                            if model.pawley is not None and backend == "numpy"
-                            and len(x0) > lm_mod.BVLS_MAX_COLUMNS else None)
-        res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
-                          ftol=ftol, inequalities=ineqs, events=events, stage=stage,
-                          track=tracker, table=table,
-                          normal_equations=normal_equations, cancel=cancel)
         n_truncated, truncated_by = res.n_truncated, res.truncated_by
-    else:
-        with lapack.scipy_trf():
-            res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",
-                                ftol=ftol, xtol=XTOL, gtol=GTOL, max_nfev=max_nfev)
     status = "converged" if res.status > 0 else ("max_iter" if res.status == 0 else "diverged")
     termination = (res.termination if solver == "lm"
                    else _TRF_TERMINATION.get(res.status, str(res.status)))
@@ -3044,6 +3184,7 @@ def run_multi_least_squares(models: list[CompiledModel],
     cell_guard = _DegenerateCellGuard(residual)
     residual = cell_guard
     jacobian = _DegenerateCellJacobianGuard(jacobian, cell_guard)
+    jacobian = _FiniteJacobianGuard(jacobian)
     n_cols = len(mtable.free_paths)
 
     if cancel is not None:
@@ -3081,17 +3222,30 @@ def run_multi_least_squares(models: list[CompiledModel],
                           n_degenerate_cell_probes=cell_guard.n_degenerate,
                           jacobian_layout=layout)
 
+    def stopped(kind: str, columns=()) -> LSQOutcome:
+        return _non_finite_outcome(kind, columns, mtable.free_paths, x0, n_cols,
+                                   cost0, solver, cell_guard, lapack_start,
+                                   jacobian_layout=layout)
+
+    if not np.all(np.isfinite(r0)):
+        # the single-histogram rule (WP-2048), on the stacked residual
+        return stopped("residual")
+
     max_nfev = max_iter * NFEV_PER_ITERATION
-    if solver == "lm":
-        res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
-                          ftol=ftol,
-                          inequalities=_joint_width_inequalities(models, mtable, x0),
-                          events=events, stage=stage, track=tracker, table=mtable,
-                          cancel=cancel)
-    else:
-        with lapack.scipy_trf():
-            res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi), method="trf",
-                                ftol=ftol, xtol=XTOL, gtol=GTOL, max_nfev=max_nfev)
+    try:
+        if solver == "lm":
+            res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
+                              ftol=ftol,
+                              inequalities=_joint_width_inequalities(models, mtable, x0),
+                              events=events, stage=stage, track=tracker, table=mtable,
+                              cancel=cancel)
+        else:
+            with lapack.scipy_trf():
+                res = least_squares(residual, x0, jac=jacobian, bounds=(lo, hi),
+                                    method="trf", ftol=ftol, xtol=XTOL, gtol=GTOL,
+                                    max_nfev=max_nfev)
+    except _NonFiniteJacobian as stop:
+        return stopped("jacobian", stop.columns)
     status = "converged" if res.status > 0 else ("max_iter" if res.status == 0 else "diverged")
     termination = (res.termination if solver == "lm"
                    else _TRF_TERMINATION.get(res.status, str(res.status)))
