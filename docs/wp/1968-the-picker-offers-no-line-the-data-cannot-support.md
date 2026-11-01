@@ -1,6 +1,6 @@
 # WP-1968 — the picker offers no line the data cannot support
 
-Milestone: unscheduled · Status: 🔄 2026-10-31 — every task landed (#947, #948, #1048, #993, #1179); the close waits on one inherited question from WP-2002: whether the flat-silicon control's evidence for the driven-set exclusion is an artefact of the synthetic draw's truncated tails
+Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by the ghostshift runner (measured-silicon check, then close)
 Track: What fires, and what stays silent
 Depends on: 1909 soft (the 1σ floor this bar succeeds, and its census)
 Priority: P2 2026-10-14 — a defect that fires wrongly: off-lattice components reach every engine as usable lines, and every benchmark harness filters them by hand
