@@ -1,6 +1,6 @@
 # WP-2066 — a complete dichotomy search holds every centred lattice and polishes its truth leaf
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-01 — options for A measured; waits on the maintainer's decision (first task)
 Track: What fires, and what stays silent
 Depends on: — (1924 soft: the same engine, the same #780 units)
 Priority: P2 2026-10-31 — a defect that fires wrongly: `search_complete=True` while the true cell is absent, on 22-32 % of C-centred monoclinic lattices by the reporter's draw; end to end the gate abstains rather than promoting the supercell (all `low`, `INDEX_ABSTAINED`), so a clean pattern returns no cell rather than a wrong one
@@ -162,6 +162,151 @@ with `search_complete=True`; acceptance rows keep their rankings.
   WP-1924, WP-1959 (the compiled box test).
 
 ## Handover log
+
+### 2026-11-01 — both fixes for A measured; the choice waits on the maintainer
+
+The tree still loses the issue's C-centred lattices. All five rows
+reproduce on `main` at `f4db77639`. This session measured the fix the
+reporter had not built. Dropping the axis-swap prune (option 2) finds both
+missing C lattices, but searches about twice the boxes in monoclinic and four
+times in orthorhombic. Replaying the swapped centring letters at each leaf
+(option 1) finds the same two lattices with the box count unchanged, and an
+argument below shows the two options reach exactly the same lattices. Neither
+touches B; only the reporter's V3 variant does. No code landed, because the
+WP's first task is the maintainer's decision. The brief is at the end of
+this entry. PR #1294 carries the entry.
+
+**Measured** (macOS arm64, this worktree's `[dev]` venv, compiled tier on,
+`main` at `f4db77639`). The machine ran concurrent shifts at load 50-77 on
+10 cores, so wall seconds are noise here and box counts are the cost. The
+script is the issue's reproduction with one monkeypatch per arm, kept outside
+the tree (`~/.cache/ghostshift/rietx/wp-2066/arms.py`): option 2 makes
+`axis_swaps` return nothing, and option 1 adds A, I to monoclinic and A, B to
+orthorhombic in `engines.CENTRINGS`, with no relabelling. "Truth rank" is the
+rank of the first candidate at the true primitive volume (within 1 %) that
+indexes at least 95 % of the lines. "Leaves" is the harvest of accepted
+leaves before dedup.
+
+| list | main: truth rank, boxes, leaves | option 2 | option 1 |
+|---|---|---|---|
+| C m m m 4.2 / 12.9 / 5.9 | absent, 43 599, 39 | 1, 177 285 (×4.07), 236 | 1, 43 599, 56 |
+| control C m m m 4.2 / 5.9 / 12.9 | 1, 49 007, 64 | 1, 211 480 (×4.32), 286 | 1, 49 007, 64 |
+| C 1 2/c 1, a > c | absent, 5 428 291, 646 | 1, 10 664 947 (×1.96), 1 600 | 1, 5 428 291, 1 118 |
+| control C 1 2/c 1 | 1, 14 328 646, 1 315 | 1, 28 328 799 (×1.98), 2 406 | 1, 14 328 646, 1 586 |
+| B repro, 381 lines | absent, 50 666, 2 | absent, 86 288, 4 | absent, 50 666, 2 |
+
+Every run reported `search_complete=True`.
+
+- Option 1 returns the letters it replayed, so one lattice comes back up to
+  three times. On the monoclinic control, ranks 1-3 are I, C and A
+  descriptions of the truth. This reproduces the reporter's duplicate
+  finding.
+- Option 2 returns C, but not in the conventional setting. Orthorhombic comes
+  back in a non-standard axis order, C (12.9, 4.2, 5.9). The monoclinic truth
+  comes back at β 141.07° on a 17.74 Å axis. So both options need a
+  relabelling step. `reduce.conventional_setting` today re-sets monoclinic P
+  and C only, and orthorhombic not at all.
+
+**Why the two options reach the same lattices** (a derivation, not a
+measurement). A setting change the prune quotients by also relabels the
+centring. In orthorhombic, P, I and F map to themselves and A, B and C map
+onto one another. In monoclinic, the one swap (a↔c) fixes P and I and
+exchanges A and C. So searching the pruned half for C asks the same question
+as searching the kept half for A (and B in orthorhombic). The leaf replay
+already answers "would that centring's own search reach this box" exactly,
+because every prune is monotone under bisection (WP-1509's argument). So
+option 1 with A (monoclinic) and A, B (orthorhombic) reaches what option 2
+reaches, with no extra boxes. The leaves differ, because the two halves are
+bisected differently. The monoclinic I replay is coverage beyond option 2:
+it would catch a C lattice whose every C and A setting lies past the 30°
+obliquity bound. Whether such a lattice exists inside the domain is not
+checked. The orthorhombic-F list whose truth moved 5 → 8 under the
+reporter's arm A is therefore not evidence between the options: option 2
+reaches the same wrong A/B lattices, labelled C.
+
+**Done.** Claimed the WP. Re-checked the findings: `dichotomy.py`'s
+commits since the triage sha `d87c8cc91` (WP-2030's volume window) touch
+neither the prune, `_accept` nor `CENTRINGS`, and every row reproduces.
+`### Inherited`: none to prune. The branch changes docs only. Its fast
+selection on the same venv and machine gave 13 161 passed, 310 skipped,
+32 xfailed and 1 failed. The failure is
+`test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`.
+It also fails alone, because this Mac's user Jupyter kernel spec points at a
+deleted interpreter (`FileNotFoundError`). That is machine-local, not this
+branch. `tests/test_docs_consistency.py`: 25 passed. `python -m
+tests.reader_output`: exit 0. The indexing acceptance suite was not run,
+because no engine code changed.
+
+**Not done.** No fixtures. The C m m m list (under 3 s) and the B repro
+(under 1 s) can be fast tests; the monoclinic C lists take 30-190 s here and
+belong under `slow`. The fixture asserts the truth's primitive volume, which
+is setting-free, but it waits on the ruling so that no test is written to
+fail on purpose.
+
+**Decision 1 (the maintainer's, by the WP's first task): fix A by option 1
+or option 2.**
+
+- *Why it matters.* Dichotomy is the one engine whose "searched and found
+  nothing" is evidence. Today it reports a monoclinic or orthorhombic search
+  complete while a C-centred lattice is missing. The reporter's draw puts
+  that at 22-32 % of random C-monoclinic cells. It hits every orthorhombic C
+  lattice whose centred face is not on its two shortest axes. A user gets no
+  cell, because the gate abstains, rather than a wrong one. Moderate.
+- *Aim.* An honest completeness claim for anyone indexing a centred
+  low-symmetry phase. Search cost comes second.
+- *Option 1.* At each leaf, replay A in monoclinic and A, B in orthorhombic,
+  optionally I in monoclinic. Re-set an accepted A, B or I leaf to its
+  conventional C through `engines.conventional_fit`, extending
+  `reduce.conventional_setting` to those letters, so one lattice gives one
+  candidate. Measured: boxes unchanged, leaves +0-73 % on these lists;
+  the reporter measured +2-11 % wall. Python only; the compiled kernel is
+  untouched. Reversible.
+- *Option 2.* Drop the swap prune for monoclinic and orthorhombic, in
+  `_test_box` and in `kernels/src/dichotomy.rs` together. Measured: boxes
+  ×1.96-1.98 monoclinic, ×4.07-4.32 orthorhombic; leaves ×2-6. It needs the
+  same relabelling for orthorhombic order. Inferred, not measured: on #780's
+  real monoclinic grids, which already stop at the 1 GiB frontier cap in 5
+  of 11 units (WP-1924), a doubled domain makes more units report
+  incomplete. Reversible, but it moves the kernel.
+- *Do nothing.* The false completeness stays.
+- *Dropped:* closing the prune per centring inside the box test (a new
+  mechanism neither the issue nor practice proposes).
+- *Practice.* DICVOL (Boultif & Louër 2004) searches primitive metric forms
+  and reads the centring off the reduced cell afterwards. That is recall:
+  the DICVOL papers are not in the local corpus, and TOPAS and GSAS-II were
+  not checked. Neither option departs from it in what is reported.
+- *Recommendation: option 1, clear call.* The crux is cost, because the two
+  options cover the same lattices. Option 2 pays 2-4× the boxes for nothing
+  option 1 lacks. A lattice that option 2 finds and option 1 does not would
+  flip it; the argument above says none exists, so one would refute the
+  argument.
+
+**Decision 2 (the maintainer's, same task): bound the annealed passes for B
+(the reporter's V3)?**
+
+- *Why it matters.* On dense lists the leaf holding the true cell is
+  polished onto a nearby wrong cell. On the B repro the true cell indexes
+  381 of 381 lines and is absent, while two cells indexing 288 and 273 are
+  returned, with `search_complete=True`. Neither A option touches it
+  (measured above). Moderate.
+- *V3.* The annealed passes assign only lines up to the highest driven Q
+  plus k·σ_max, with the existing k (no new constant); the two closing passes
+  assign every line, as now. The reporter measured: the B truth first at
+  381/381, the truth gained in 3 of the #780 units and lost in none, +37 %
+  accepted leaves, +7 % phase-2 time, +12 % wall on the synthetic lists. On
+  the orthorhombic C control 19 extra partial cells enter at ranks 9-42, and
+  one orthorhombic-F lab list's truth drops 5 → 7.
+- *Do nothing.* B stays.
+- *Practice.* Not checked: no program's annealing schedule is surveyed.
+- *Recommendation: V3, lean.* The crux is a truth found against extra
+  candidates ranked below it, which cost validation time and no rank on
+  these lists. A ranking move in `tests/test_acceptance_indexing.py` would
+  flip it.
+
+**Next.** On the ruling, record `Decided 2026-MM-DD:` in the first task and
+answer #1258. Then build A as decided, with the relabelling and the
+one-lattice-one-candidate merge. Then V3 if wanted. Then the fixtures, the
+unit replay digests and the indexing acceptance suite.
 
 - **2026-10-31** — filed from the issue triage of #1258. No open WP owns
   dichotomy's completeness: WP-1924 owns its ceiling and memory, WP-1520 its
