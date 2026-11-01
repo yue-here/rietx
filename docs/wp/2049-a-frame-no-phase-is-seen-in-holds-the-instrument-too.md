@@ -1,6 +1,6 @@
 # WP-2049 — a frame no phase is seen in holds the instrument's peak terms too
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-25 — a confident number fitted to noise (zero shift at 4.8σ on a blank frame) and a series step flagged from it; sub-onset frames of a ramp are where it lands
