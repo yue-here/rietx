@@ -221,6 +221,11 @@ from .structure import Cell
 #: than its parent's (``SupercellEvidence.child_seen_more``) is never
 #: ``refuted``, so a dense low-symmetry truth no longer sits below a wrong cell
 #: that p₀ near the truth's own seen fraction let refute it.
+#: Also 1.12 (WP-1977): the validation fit's Layer 0 no longer counts a lobe
+#: on the flank of a drawn peak (``report.layer0.on_drawn_flank``), so a
+#: candidate's ``unmatched_observed`` falls and ``INDEX_IMPURITY_LINES`` fires
+#: on fewer lines.  No rank or grade moves: neither reads the count, and 22
+#: replayed engine units keep their digests.
 INDEXING_THRESHOLDS_VERSION = "1.12"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is

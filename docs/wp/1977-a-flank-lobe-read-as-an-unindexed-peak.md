@@ -214,8 +214,11 @@ isolated peaks still read as `unmatched_obs`.
   replay to the same digests, candidate counts and completeness under this
   branch and under origin/main. No rank or grade moves, since consensus and
   the gate never read the count. Only the reported `unmatched_observed`
-  and `INDEX_IMPURITY_LINES` move. By 1.12's precedent (WP-2011 bumped for
-  a move of that same count) a bump to 1.13 looks owed. Declined: three
+  and `INDEX_IMPURITY_LINES` move. Settled by Claude under WP-2011's
+  precedent: WP-2011 moved this same count and recorded it as an "Also 1.12"
+  line under the release cycle's one bump (#991's rule), so this move is
+  recorded the same way and the number stays 1.12. A bump to 1.13 was the
+  alternative, and it would be a second bump in one cycle. Declined: three
   reader texts still say "match no reflection", which stays true of what is
   listed. Declined: three test and speed cleanups.
 
