@@ -37,6 +37,21 @@ The magnetic diagnostic family lives in this one file rather than in §7's table
 | `K_VECTOR_UNSEPARATED` | (info) Treat the winning propagation vector as settled. `k_trials` holds one row per k actually refined. The code tests the gap of the top two entries against `k_tie_width` ΔBIC (default 10.0) and nothing else, whatever the message says about the satellite step. |
 | `MAGNETIC_SUBGROUP_PREFERRED` | (**warning**) Trust the ranked list's top row without reading `MagneticSolution.subgroup_note`. `value` is the margin and the message names both groups. The code reports; it does not change `MagneticSolution.best`. Only a k = 0 winner is audited, and a k ≠ 0 winner's note says the audit was not attempted |
 
+## Mode-amplitude blocks
+
+A child stated on mode amplitudes (`Phase.distortion_modes`) reports per irrep block on `RefinementResult.distortion_totals`; `Refinement.distortion_block_tests` refits with blocks held at 0. Numbers only: no verdict field, no code. `distortion_totals` is `None` on a joint fit's result too (its builder writes none of the per-phase technique fields), so `None` there does not mean no modes.
+
+| reading | what you must not assume, and what to do |
+|---|---|
+| `DistortionTotal.t2` | Turn it into a p against χ²_m. χ² is even in a symmetry-breaking amplitude, so at a zero-truth block T² ≈ 4 × the likelihood ratio and that p is wrong exactly there (Measured: LaMnO₃ Γ null block, p < 0.05 on 0.465 of 400 seeds). Compare the block by a refit, `distortion_block_tests` |
+| `DistortionTotal.esd` | Quote A_τ ± esd as a measurement of zero, or read a missing esd as zero. The label says it: linearised, undefined at `a_tau` = 0, Rice-biased below about 2 esd. `None` means not measured |
+| `DistortionTotal` between modes of one block | Read a correlation inside one block as physics. It is the basis; `a_tau`, `esd`, `t2` and every `DistortionBlockTest` number are basis-invariant |
+| `DistortionBlockTest.lambda_p` small | Read it as "the block is present". Λ holds its size on white-noise nulls, but under model misfit it can call a block that absorbs the misfit (Hypothesis: from the design's misfit argument, no public counter-case measured) |
+| `DistortionBlockTest.delta_bic` | Hold several blocks one at a time and add the answers. A gain two blocks share is charged twice alone; pass them as one set in `hold` to measure it |
+| `DistortionBlockTest.a_det` | Read it as calibrated. On LaMnO₃ white noise it was +2 % (five-mode Γ block), +9 to +12 % (ten-mode zone-boundary block) and +48 % (one mode of a 57-mode P1 child) off the 50 % point at bar 6, and it is uncalibrated on misfit, and it needs your own positive `detectability_probe` (Å) beside the bar: the scaling is leading-order, so the figure depends on it (the three offsets were measured, WP-1419, LaMnO₃ synthetic arms; the dependence on the probe is the leading-order argument, not measured against a second probe) |
+| `DistortionTotal.driving` `None` | Read it as "not driving". The record's parent operations did not map its reference structure onto itself, so the answer could not be built; the other fields stand |
+| `DistortionBlockTests.restarts` non-empty | Read the rows against the fit you passed in. A restricted refit fell below it, so the full fit was refitted; the rows compare against `DistortionBlockTests.restarted_result` |
+
 ## Moment codes
 
 | code | what you must not assume, and what to do |

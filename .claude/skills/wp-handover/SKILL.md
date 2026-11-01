@@ -263,6 +263,14 @@ re-reading its own diff.
       per `tests/CLAUDE.md` § Quoting numbers), what it deliberately did not
       do, and any finding filed into another WP, named with its number. End
       with the repo's two-line Claude Code footer.
+    - **Say what a reader now receives** (ruled 2026-11-01: no junk passed
+      back to a reader, a person or an agent). Run `.venv/bin/python -m
+      tests.reader_output`. On exit 1, the body gains a section headed
+      `What a reader receives` with its diff, and step 12 shows the diff to
+      the person and asks whether each added line belongs. A field added to
+      a result or report type gets the same section, read off the generated
+      `docs/skill/rietx/references/api*.md`. On exit 0 with no such field,
+      the body says so in one line.
     - **A closing keyword is plain text, never a code span.** GitHub does not
       parse `` `Closes #148` `` inside backticks, so the issue stays open with
       its work merged and nothing says so. Measured 2026-09-16 over the last
@@ -289,6 +297,7 @@ re-reading its own diff.
 12. **Report**, to the person and not to the log: **first the same
     plain-language paragraph the entry opens with** — what this session's work
     means, in a few sentences someone can read without opening the diff — then
+    step 11's reader diff with its question, where there is one — then
     the next actions, then the PR URL, and that CI is the gate — the required checks run
     ruff plus the fast suite across the supported Pythons and a `[dev,jax]`
     job. Subscribed (step 11), say so; without the tool, offer to watch the

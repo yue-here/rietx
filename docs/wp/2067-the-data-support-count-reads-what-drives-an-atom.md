@@ -1,6 +1,6 @@
 # WP-2067 — The data-support count reads what drives an atom, not its name
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-01 — the count reads what each free column reaches, from outside as PR #1276 (`3c1e3ad7`, #1250); close owed once the maintainer has ticked the tasks
 Track: What fires, and what stays silent
 Depends on: — (1419 soft: the mode-amplitude family; 1805 soft: the rigid-body family)
 Priority: P2 2026-10-31 — a number on the reassuring side of McCusker's band that nothing flags, on paths few fits run yet (mode amplitudes, rigid bodies)
@@ -65,5 +65,7 @@ The three states above report 5, 11 and 5 structural parameters; every plain-ato
 - Issue #1250; PR #1107's review (round 1).
 
 ## Handover log
+
+- **2026-11-01** (`/pr-review`) — merged from outside as PR #1276 (`3c1e3ad7`), closing #1250. The data-support count (McCusker 1999 §9) reads what each free column reaches through `table.column_reach()`. A variable that drives an atom now counts as structural, and one that drives only a scale does not. `DerivedBlock.frame_inputs`, with `RigidBodyBlock` as its one writer, keeps a body's cell input from counting as structural. `DATA_SUPPORT_LOW` fires on more fits as a result. No audit row changed. The diff touches `optimize/statistics.py`, the `DataSupport` docstring, `reference/result.md`, `theory/estimation.md`, `tests/test_data_support.py` and the 1.11.0 release note. That covers tasks 1 to 3, and task 4 needed no row. The PR ticked nothing, so the boxes stay for the maintainer. Follow-up, not blocking: nothing asserts that `frame_inputs` is a subset of `inputs`. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
 
 - **2026-10-31** — created, from the issue triage (issue #1250). No open WP owns the count: WP-1071, which built it, is closed; WP-1419 and WP-1805 each own one family, and the fix belongs in the one statistics authority rather than per family; WP-2028 is about joint fits.

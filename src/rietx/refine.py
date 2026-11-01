@@ -130,6 +130,7 @@ from .params.vector import (
     is_variable_path,
     retired_spelling,
 )
+from .report.distortion import distortion_totals as _distortion_totals
 from .report.magnetic import (
     magnetic_width_findings,
     moment_angle_stationary_diagnostics,
@@ -154,6 +155,8 @@ from .schemas.plan import (
 from .schemas.results import (
     DELIVERABLES,
     AbsorptionCorrection,
+    GeometryRequest,
+    GeometryTable,
     Identifiability,
     PhaseAgreement,
     PhaseTexture,
@@ -1919,6 +1922,37 @@ def _cell_runaway_diagnostic(
     )
 
 
+def _non_finite_diagnostic(stage_name: str, outcome) -> Diagnostic | None:
+    """``STAGE_NOT_FINITE`` for a stage whose solve stopped on a model that is
+    not finite (WP-2048, :class:`~.optimize.least_squares.NonFiniteStop`), or
+    ``None``.  ``where`` is every path the stopped solve had free, because
+    the column that went non-finite is rarely the parameter that ran: on the
+    nudged P 1 Le Bail fit the NaN column was ``cell.alpha`` while the zero
+    shift stood at −8584°."""
+    stop = getattr(outcome, "non_finite", None)
+    if stop is None:
+        return None
+    if stop.kind == "jacobian":
+        cols = ", ".join(stop.columns)
+        what = (f"its Jacobian column{'s' if len(stop.columns) > 1 else ''} "
+                f"{cols}, at a point the solver had reached")
+    else:
+        what = "its residual, where a solve began"
+    return Diagnostic(
+        level="warning", code="STAGE_NOT_FINITE", where=list(stop.free),
+        value=float(len(stop.free)),
+        message=(f"Stage {stage_name!r} stopped where it started. Its model "
+                 f"held a NaN or an infinity in {what}. The stage had "
+                 f"{len(stop.free)} parameters free. Every value is back at "
+                 "the stage's start, so the stage changed nothing."),
+        suggestion=(
+            "Hold some of the parameters this stage frees, or start it nearer "
+            "its answer."
+            + (" solver='trf' keeps no floor under the peak widths, and the "
+               "default 'lm' driver does." if outcome.solver == "trf" else "")),
+    )
+
+
 def _released_phases(model: CompiledModel, table: ParameterTable,
                      held: list[str], support: np.ndarray | None = None,
                      reach: dict[str, list[str]] | None = None, *,
@@ -2147,6 +2181,10 @@ def _answer_significance(model: CompiledModel, table: ParameterTable,
                              dtype=np.float64)
         else:
             jac = np.asarray(outcome.jac, dtype=np.float64)
+        if not np.all(np.isfinite(jac)):
+            # a stage stopped on a non-finite model (WP-2048) can be measured
+            # where its Jacobian is not finite: no covariance, the screen stands
+            return out
         column_reach = table.column_reach()
         for ip in seen:
             columns = [c for c in _significance_columns(
@@ -2629,9 +2667,20 @@ class Refinement:
         a hold onto the coupled direction where the position couples
         coordinates), and what cannot follow is dropped and named in the
         site's ``SITE_TWINS_MERGED`` message.
+
+        An atom removed, inserted or reordered ahead of a site changes its
+        number whether or not its DOFs moved, so every register is first read
+        into the new structure's atom numbering
+        (:meth:`~.crystallography.twins.NumberingMoves.renumber`), and a
+        constraint on an atom the new structure no longer has is dropped and
+        named in a warning (#1264).  Without it a hold on the atom after a
+        removed one held its neighbour.
         """
         if "_user_holds" not in self.__dict__:
             return            # construction: no constraint has been declared yet
+        if isinstance(moves, NumberingMoves) and moves.atoms:
+            self._renumber_atoms(moves)
+            moves = moves.in_new_numbering()
         sites = sorted({path.rsplit(".dof.", 1)[0] for path in moves})
         for site in sites:
             site_moves = {p: m for p, m in moves.items()
@@ -2662,6 +2711,42 @@ class Refinement:
                              + "."),
                     suggestion="check the holds and ties on this site's "
                                "coordinates against parameters()."))
+
+    def _renumber_atoms(self, moves: NumberingMoves) -> None:
+        """Read every constraint register into ``moves``' new atom numbering.
+
+        A path on an atom that is gone, whose number another atom now has, is
+        dropped, and a tie with it when its target or any source is
+        (:func:`~.crystallography.twins.atom_moves`).  A dropped hold or tie is named in one
+        warning, the way ``_apply_ties`` names a tie that stopped applying; a
+        free path is the plan's to re-declare and goes without one.
+        """
+        dropped: list[str] = []
+        holds: list[str] = []
+        for p in sorted(self._user_holds):
+            new = moves.renumber(p)
+            if new is None:
+                dropped.append(f"the hold on {p}")
+            else:
+                holds.append(new)
+        self._user_holds = set(holds)
+        self._free_paths = list(dict.fromkeys(
+            new for p in self._free_paths if (new := moves.renumber(p))))
+        self._held = [new for p in self._held if (new := moves.renumber(p))]
+        ties: dict[str, TieSpec] = {}
+        for target, spec in self._ties.items():
+            new_target = moves.renumber(target)
+            terms = [(moves.renumber(p), c) for p, c in spec.terms]
+            if new_target is None or any(p is None for p, _ in terms):
+                dropped.append(f"the tie {target} = {spec.describe()}")
+                continue
+            ties[new_target] = spec.model_copy(update={"terms": terms})
+        self._ties = ties
+        if dropped:
+            warnings.warn(
+                f"{len(dropped)} constraint(s) named an atom this model no longer "
+                f"has and were dropped: {'; '.join(dropped)}.", UserWarning,
+                stacklevel=4)
 
     def _drain_twin_findings(self) -> list[Diagnostic]:
         """The merges no result has reported yet; each is reported once."""
@@ -2839,7 +2924,10 @@ class Refinement:
         # forbids rather than describes, so there is nothing in it to go
         # stale, and dropping it at an edit would be the one way a
         # declaration could lapse without anybody saying so.  The warning
-        # ``_apply_holds`` gives is the saying-so.
+        # ``_apply_holds`` gives is the saying-so.  A hold on an atom the edit
+        # removed is the one exception, and only where another atom took its
+        # number: kept, it would hold that atom, so the carry above drops it
+        # with its own warning (#1264).
         self._apply_holds(table)
         if structure is not None:
             self.structure = candidate.model_copy(deep=True)
@@ -3908,6 +3996,40 @@ class Refinement:
             state=self.snapshot())
         self._head_id = node.id
 
+    def distortion_block_tests(self, data: PatternData, *, hold=None,
+                               detectability_bar: float | None = None,
+                               detectability_probe: float | None = None):
+        """Refit with irrep blocks held at 0 and compare, for any blocks the caller names (WP-1419).
+
+        For a child stated on mode amplitudes and fitted on ``data`` with its
+        blocks free.  ``hold`` is a list whose items are a block, or a set of
+        blocks held at 0 together, each named by its ``(irrep, k,
+        isotropy_group)`` key or its
+        :class:`~rietx.schemas.results.DistortionTotal`; ``None`` holds every
+        block that is not parent-invariant and that the fit freed throughout,
+        each alone.  Every item gets one
+        restricted refit from this fit's optimum, freeing everything else this
+        fit freed, and one :class:`~rietx.report.DistortionBlockTest` row: ΔBIC
+        at N/f² (the restricted fit's f, as :func:`~rietx.report.compare_freed`),
+        Λ = Δχ²/(χ²_red·f²) with the full fit's χ²_red and f and its p against
+        χ²_m, both χ², and, when ``detectability_bar`` is given, A_det at that
+        bar (no default: without it none is computed) and
+        ``detectability_probe``, the amplitude in Å of its one predict per mode
+        (the caller's, required with a bar).  A restricted fit below
+        the full one restarts the full fit from there and tests every set
+        again; each restart is recorded.  No verdict is read and no warning
+        raised.  Opt-in because it refits (one refit per held set).
+
+        Runs on a private copy: this refinement, its history and its result
+        are left as they are, and a restarted full fit is returned on the
+        record (``restarted_result``).
+        """
+        from .report.distortion import distortion_block_tests
+
+        return distortion_block_tests(self, data, hold=hold,
+                                      detectability_bar=detectability_bar,
+                                      detectability_probe=detectability_probe)
+
     def suggest(self, data: PatternData, *, top_n: int = 5,
                 include: "str | list[str]" = "*",
                 exclude: "list[str] | tuple[str, ...]" = (),
@@ -4597,6 +4719,9 @@ class Refinement:
         stage_ftol = {} if ftol is None else {"ftol": ftol}
         # what the stage starts from, kept for the collapse case below
         start_values = table.decode(table.x0())
+        # and for a solve stopped on a non-finite model (WP-2048): the Pawley
+        # intensities, which live outside the table
+        pawley_start = model.pawley_x0() if model.pawley is not None else None
         # A "centroid" phase's origin restraint (WP-1912), built here and not
         # at the compile: its rows exist only where the *free* set can slide
         # the phase, and the holds above have just decided that set
@@ -4613,6 +4738,11 @@ class Refinement:
         signs = table.commit(outcome.theta)
         outcome = rechart_outcome(outcome, table.x0(), signs,
                                   table.free_paths)
+        # A solve stopped on a non-finite model handed back its own start,
+        # which is the stage's (WP-2048).  The stage ends there: nothing moved,
+        # so the answer the collapse and the release would re-measure is the
+        # start, and no second solve runs.
+        stopped = outcome.non_finite is not None
         # A phase can stay comfortably significant (phase_support_sigma) the
         # whole time and its cell still walk to nonsense — a joint
         # degeneracy with another free phase's cell, invisible to the
@@ -4682,7 +4812,7 @@ class Refinement:
         # the flat axis, which is #599's trap.
         late_axes: dict[str, np.ndarray] = {}
         still_flat: set[str] = set()
-        if moment_held:
+        if moment_held and not stopped:
             still, still_axes = _flat_moment_scan(model, table, moment_held)
             still_flat = set(still)
             released = released + [p for p in moment_held if p not in still_flat]
@@ -4706,7 +4836,10 @@ class Refinement:
             model, table, {b: a for b, a in late_axes.items()
                            if f"{b}.dof2" in still_flat})
         moment_turned.update(late_turned)
-        flat_now, collapse_axes = _flat_moment_scan(model, table)
+        # a stopped stage has no answer to scan, and an axis found at its
+        # start would join the record as though the stage had found it
+        flat_now, collapse_axes = (([], {}) if stopped
+                                   else _flat_moment_scan(model, table))
         collapsed_phase = _unsupported_phase_paths(model, table, support,
                                                    sigma=phase_support_sigma)
         collapsed = collapsed_phase + flat_now
@@ -4728,6 +4861,8 @@ class Refinement:
         # ``StageResult.cell_reset``: the held ones, and any the second solve
         # puts back below
         cell_reset = list(reset_hold)
+        if stopped:
+            released, collapsed, late_turned, reset_hold = [], [], [], []
         if released or collapsed or late_turned or reset_hold:
             if collapsed:
                 # Restore before holding.  A phase whose scale is not 3σ from
@@ -4831,9 +4966,28 @@ class Refinement:
                 stage=stage.name, backend=self._backend,
                 solver=self._solver, cancel=cancel,
                 phase_support_sigma=phase_support_sigma, **stage_ftol)
-            signs = table.commit(second.theta)
-            second = rechart_outcome(second, table.x0(), signs,
-                                     table.free_paths)
+            if second.non_finite is not None:
+                # The second solve starts from the first one's answer with
+                # what the reset and the collapse put back, and it is that
+                # mixture the model could not evaluate (WP-2048).  So every
+                # path goes back to where the stage found it, a moment turned
+                # between the solves included, and the stage ends at its
+                # start.  Nothing is committed first: the solve handed back
+                # the values the table holds, and a commit would replace the
+                # anchor a rigid body's restore reads.
+                by_path = {e.path: e for e in table.entries}
+                for path, value in start_values.items():
+                    by_path[path].value = value
+                table.restore_body_anchors(list(start_values))
+                table.refresh_ties()
+                if pawley_start is not None:
+                    model.set_pawley_intensities(pawley_start)
+                second = dataclasses.replace(second, theta=table.x0(),
+                                             cost_final=outcome.cost_initial)
+            else:
+                signs = table.commit(second.theta)
+                second = rechart_outcome(second, table.x0(), signs,
+                                         table.free_paths)
             # Asked again, because a column this solve freed (a release) can
             # walk too.  There is no third solve, so the cell goes back and
             # stays a free column of this answer: holding it now would leave
@@ -4891,7 +5045,8 @@ class Refinement:
             for ip in _phases_reached(support_held, held_reach):
                 support[ip] = decided[ip]
 
-        if mode == "lebail":
+        if mode == "lebail" and outcome.non_finite is None:
+            # a stopped stage changed nothing, its intensities included (WP-2048)
             model.lebail_update(table.decode(outcome.theta), n_cycles=stage.lebail_cycles)
 
         guard = check_guards(table, outcome, correlation_guard, model=model,
@@ -5559,6 +5714,12 @@ class Refinement:
             if runaway_diag is not None:
                 diagnostics.append(runaway_diag)
                 stage_diagnostics = stage_diagnostics + [runaway_diag]
+            # every stage's own: a later stage refines from the start this one
+            # kept, which says nothing about why this one stopped (WP-2048)
+            stop_diag = _non_finite_diagnostic(stage.name, outcome)
+            if stop_diag is not None:
+                diagnostics.append(stop_diag)
+                stage_diagnostics = stage_diagnostics + [stop_diag]
             stage_results.append(StageResult(
                 name=stage.name, status=outcome.status, n_iterations=outcome.n_iterations,
                 cost_initial=outcome.cost_initial, cost_final=outcome.cost_final,
@@ -5851,6 +6012,9 @@ class Refinement:
             runaway_diag = _cell_runaway_diagnostic(hold.cell_runaway, hold.cell_runaway_unresolved)
             if runaway_diag is not None:
                 diagnostics.append(runaway_diag)
+            stop_diag = _non_finite_diagnostic(stage.name, outcome)
+            if stop_diag is not None:
+                diagnostics.append(stop_diag)
 
             self._model = model
             self._write_back(table)
@@ -6405,6 +6569,55 @@ class Refinement:
     # ------------------------------------------------------------------
     # exporters (WP-0309): reflection table, refinement CIF, QPA table
     # ------------------------------------------------------------------
+    def geometry(self, request: GeometryRequest | dict | None = None
+                 ) -> GeometryTable | None:
+        """Distances, angles and torsions with esds, or the ones ``request`` names.
+
+        With no ``request``, the whole bonding table
+        (:func:`~rietx.model.geometry.geometry_table`): bonds, contacts, angles
+        and torsions over bonded chains, the one ``result_.geometry`` carries.
+        With a :class:`~rietx.schemas.results.GeometryRequest` (or a dict
+        validated as one), only the distances, angles and torsions it names,
+        each atom by label or by label and CIF symmetry code — so a chain the
+        table's caps left out, a contact past its radius or a torsion over
+        atoms that are not bonded is measured on demand (WP-1815).
+
+        **Answered while the last fit's covariance is live.**  After
+        :meth:`fit` or :meth:`run_stage`, the values are that answer's and the
+        esds are J·Cov·Jᵀ through its covariance — the one its parameter esds
+        were read off, the Bérar-Lelann factor already in it, so nothing here
+        multiplies again and a row the table lists carries the numbers
+        ``result_.geometry`` does.  The covariance is never serialized, so with
+        no live fit (before one, after an edit, a checkout or a replay) the
+        values are the current model's and every esd is ``None``.  ``None`` in
+        Le Bail and Pawley mode and with no phase, as for the table.
+        """
+        from .crystallography.structure_factor import compile_phase_sites
+        from .model.geometry import geometry_from_sites, request_table
+
+        live = self._answer_covariance
+        if (live is not None and self._model is not None
+                and live[0] is self.result_ and self._answer is not None):
+            if self._model.mode != "rietveld" or not self._model.phases:
+                return None
+            _result, table, theta, stderr_internal, correlation = live
+            structure = self._answer["structure"]
+            sites_of = [cp.sites for cp in self._model.phases]
+        else:
+            if self._mode != "rietveld" or not self.structure.phases:
+                return None
+            structure = self.structure
+            table = ParameterTable(structure, self.instrument)
+            theta, stderr_internal, correlation = table.x0(), None, None
+            sites_of = [compile_phase_sites(p) for p in structure.phases]
+        if request is None:
+            return geometry_from_sites(sites_of, table, theta, structure,
+                                       stderr_internal=stderr_internal,
+                                       correlation=correlation)
+        return request_table(request, sites_of, table, theta, structure,
+                             stderr_internal=stderr_internal,
+                             correlation=correlation)
+
     def reflection_table(self) -> list["ReflectionRow"]:
         """Every (emission line, reflection) of the last fit as typed rows.
 
@@ -8268,6 +8481,12 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     volumes = cell_volumes(table, theta, structure,
                            stderr_internal=stderr_internal, correlation=correlation)
 
+    # Each irrep block of a child on mode amplitudes (WP-1419): A_τ, its esd and
+    # T² off the same final covariance, for geometry's reason.  Quantities only.
+    distortion_totals = _distortion_totals(table, theta, structure, values,
+                                           stderr_internal=stderr_internal,
+                                           correlation=correlation)
+
     # The widths read as a coherent domain size and a Δd/d (WP-1131), built
     # here for geometry's reason — the esds come off the same final Jacobian —
     # and through the same λ selector the size bound and the size flag use, so
@@ -8454,6 +8673,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
         sigma=model.sigma.tolist(),
         ticks=ticks, tick_hkl=tick_hkl, radiation=_radiation(model, values),
         qpa=qpa, restraints=restraints_report, geometry=geometry,
+        distortion_totals=distortion_totals,
         cell_volumes=volumes,
         microstructure=microstructure,
         phase_agreement=_phase_agreement(model, values, structure),

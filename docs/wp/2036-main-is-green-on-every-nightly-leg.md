@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-10-25 — every task done (PR #1165); a green nightly waits on WP-2048, 2049 and 2050
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
-Priority: P3 2026-10-25 — was P2: the `full` job completes again (#1161) and every task here is done; what remains is a green nightly, waiting on WP-2048, 2049 and 2050
+Priority: P3 2026-11-01 — every task here is done; a green nightly waits on WP-2049 and 2050, and on WP-2048's PR #1292 merging
 
 ## Goal
 
@@ -133,6 +133,16 @@ and 2045 on 2026-10-25):
 - **An indexing answer's axis order moves with the platform** (WP-2043):
   notebook 03's orthorhombic P cell printed a and c swapped on Linux. No prose
   quotes the order, so nothing fails.
+
+### Inherited
+
+- **2026-11-01, from WP-2048** (PR #1292, open at this writing): the
+  triclinic Le Bail row no longer raises. A stage whose model goes non-finite
+  ends at its start with `STAGE_NOT_FINITE`, and all six nudged starts return
+  a finite Rwp on macOS arm64. The row is now parametrised `start`/`nudged`,
+  the second in its own xdist group, so the nightly's `full` job runs one more
+  slow case (233 s locally under load). Once #1292 merges, the green nightly
+  waits on 2049 and 2050 alone.
 
 ## Non-goals
 

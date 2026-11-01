@@ -4237,6 +4237,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "stage. More iterations do not find a different minimum."
         ),
     ),
+    "STAGE_NOT_FINITE": HelpEntry(
+        title="A stage stopped on a model that is not finite",
+        description=(
+            "The model held a NaN or an infinity at a point the solver reached, so the "
+            "solver had no step left to take. The stage ended at the values it started "
+            "from and changed nothing. The column that went non-finite is often not the "
+            "parameter that ran away. Hold some of the parameters the stage frees, or "
+            "start it nearer its answer."
+        ),
+    ),
     "STAGE_PATH_NOT_FREE": HelpEntry(
         title="A stage named a fixed parameter",
         description=(
@@ -5277,6 +5287,33 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "esd that cannot be measured is absent rather than zero. `None` outside "
             "Rietveld mode and when the result did not come from a fit."
         ),
+    ),
+    "RefinementResult.distortion_totals": HelpEntry(
+        title="Irrep blocks of a child on mode amplitudes",
+        description=(
+            "One `DistortionTotal` per irrep block, every mode sharing one irrep, k and "
+            "isotropy group, of each phase stated on mode amplitudes: A_τ, the norm of the "
+            "block's amplitudes in Å, with its esd from the block's own covariance, "
+            "labelled 'linearised; undefined at A_τ = 0 and Rice-biased below about 2 "
+            "esd'; Hotelling's T² with the mode count m and no p, because χ² is even in "
+            "an amplitude that breaks the parent's symmetry, so where the block's truth "
+            "may be zero T² is about 4 × the likelihood ratio and a χ²_m p is wrong "
+            "exactly there; whether the block alone has the child's group; the sign "
+            "convention; and the largest displacement. A correlation inside one irrep "
+            "block is a basis artefact; A_τ, its esd, T² and the block comparison are "
+            "basis-invariant. `Refinement.distortion_block_tests` refits with any blocks "
+            "held at 0 and reports ΔBIC at N/f² and Λ = Δχ²/(χ²_red·f²) with its p. Λ is "
+            "Hamilton's F form on rietx's esd scale; it holds its size on white-noise "
+            "nulls; under model misfit it can call a block that absorbs misfit, so it is "
+            "not a test of zero. With a bar it adds `A_det`, measured +2 % (five-mode Γ "
+            "block), +9 to +12 % (ten-mode zone-boundary block) and +48 % (one mode of a "
+            "57-mode P1 child) off the 50 % point at bar 6 on LaMnO₃ white noise, and "
+            "uncalibrated on misfit; a bar needs the caller's `detectability_probe` (Å), "
+            "which has no default. `None` when no phase carries `distortion_modes`, and on "
+            "a joint fit's result, whose builder writes none of the per-phase technique "
+            "fields (geometry, cell volumes and this one alike)."
+        ),
+        anchor="reference/parameter-table.html#what-the-fit-reports-about-the-blocks",
     ),
     "RefinementResult.cell_volumes": HelpEntry(
         title="Cell volumes",

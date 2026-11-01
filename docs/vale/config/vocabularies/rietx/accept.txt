@@ -142,6 +142,7 @@ HCl
 [hH]kl
 Hofmann
 [hH]olohedry
+Hotelling
 [hH]ydrogens
 [iI]dentifiability
 Immm
@@ -171,6 +172,7 @@ Kirfel
 Kissel
 [kK]lassengleiche
 Kleeberg
+Klyne
 Kovalev
 Landé
 Langford
@@ -259,6 +261,7 @@ Pitschke
 [pP]ositivity
 [pP]recisions
 [pP]refactor
+Prelog
 [pP]rm
 [pP]rojective
 [pP]seudoreal
