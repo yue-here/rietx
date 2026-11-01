@@ -96,6 +96,30 @@ def test_a_named_variable_bears_on_every_purpose():
     assert {level_under(driven, p) for p in PURPOSES} == {"warning"}
 
 
+@pytest.mark.parametrize("state", ["_state_distortion_modes", "_state_bodies",
+                                   "_state_bodies_site", "_state_families_variable"])
+def test_a_path_that_moves_an_atom_bears_where_a_coordinate_does(state):
+    """A warning naming a mode amplitude, a rigid body's origin, rotation or
+    twist, or a variable tied to an atom entry is about the coordinates it
+    moves, so it keeps its level under every purpose a coordinate's does
+    (WP-2067; under qpa and magnetic each read as info before).  The paths are
+    the data-support count's own reading of what a column reaches, so a new
+    family that drives atoms fails here until the purpose table lists it
+    (``rietx.purposes._ATOM_DRIVERS``)."""
+    from rietx.optimize.statistics import structural_free_paths
+    from tests import test_cross_backend as tcb
+
+    def warned(path):
+        return {p for p in PURPOSES
+                if level_under(_d("FLOOR_HIT", [path]), p) == "warning"}
+
+    coordinate = warned("phases.0.atoms.0.x")
+    _, table, _ = getattr(tcb, state)()
+    paths = [p for p in structural_free_paths(table) if ".atoms." not in p]
+    assert paths
+    assert {p: sorted(coordinate - warned(p)) for p in paths} == {p: [] for p in paths}
+
+
 def test_an_unknown_purpose_is_refused_by_name():
     with pytest.raises(ValueError, match="'phase_id'"):
         level_under(FAP["FLOOR_HIT"], "cells")
