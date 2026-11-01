@@ -1946,8 +1946,8 @@ def _non_finite_diagnostic(stage_name: str, outcome) -> Diagnostic | None:
                  f"{len(stop.free)} parameters free. Every value is back at "
                  "the stage's start, so the stage changed nothing."),
         suggestion=(
-            "Look for a free width or zero shift that ran far from its start, "
-            "then hold it or start the stage nearer its answer."
+            "Hold some of the parameters this stage frees, or start it nearer "
+            "its answer."
             + (" solver='trf' keeps no floor under the peak widths, and the "
                "default 'lm' driver does." if outcome.solver == "trf" else "")),
     )

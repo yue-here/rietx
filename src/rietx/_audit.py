@@ -1152,8 +1152,8 @@ ROWS: tuple[Row, ...] = (
                   "solve's start), WP-2048"),
         response="warning",
         responds=("read the stage it names as not run, since its values are its start, and "
-                  "hold the free width or zero shift that ran or start the stage nearer "
-                  "its answer before quoting what the stage was meant to refine")),
+                  "hold some of its free parameters or start it nearer its answer before "
+                  "quoting what the stage was meant to refine")),
     Row("STAGE_PATH_NOT_FREE", "code"),
     Row("STAGE_PATH_UNKNOWN", "code"),
     Row("STAGE_WINDOWS_STALE", "code", tier=3, ambiguity=3,
@@ -4492,10 +4492,11 @@ ROWS: tuple[Row, ...] = (
     Row("STAGE_MAX_ITER.suggestion", "suggestion", value=1),
     Row("STAGE_NOT_FINITE.suggestion", "suggestion", tier=1, ambiguity=3, value=1,
         evidence=("arithmetic: names the two levers that change what a stage reaches, its "
-                  "free set and its start, and picks neither; states the one difference "
-                  "between the drivers that bears on it, the LM driver's Gaussian and "
-                  "Lorentzian width floors (gaussian_width_inequalities, "
-                  "lorentzian_width_inequalities) that TRF has no vocabulary for")),
+                  "free set and its start, and picks neither; under solver='trf' alone, "
+                  "states the one difference between the drivers that bears on it, the LM "
+                  "driver's Gaussian and Lorentzian width floors "
+                  "(gaussian_width_inequalities, lorentzian_width_inequalities) that TRF "
+                  "has no vocabulary for")),
     Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=1),
     Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=2),
     Row("STAGE_WINDOWS_STALE.suggestion", "suggestion", value=1, tier=3, ambiguity=3,

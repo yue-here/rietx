@@ -4243,8 +4243,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "The model held a NaN or an infinity at a point the solver reached, so the "
             "solver had no step left to take. The stage ended at the values it started "
             "from and changed nothing. The column that went non-finite is often not the "
-            "parameter that ran away. Look for a free peak width or zero shift far from "
-            "its start, then hold it or start the stage nearer its answer."
+            "parameter that ran away. Hold some of the parameters the stage frees, or "
+            "start it nearer its answer."
         ),
     ),
     "STAGE_PATH_NOT_FREE": HelpEntry(
