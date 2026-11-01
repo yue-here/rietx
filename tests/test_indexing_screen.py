@@ -451,7 +451,7 @@ def test_the_seen_guard_keeps_every_refutation_of_941(si, tet):
 
 
 #: #1230's dense case, regenerated: a triclinic P -1 cell with six random
-#: atoms, Cu Kα1 Bragg-Brentano from 5 to 90°, 291 picked lines.
+#: atoms, Cu Kα1 Bragg-Brentano from 5 to 90°, 289 usable picked lines.
 _AP = ("data_aP\n_cell_length_a 8.90\n_cell_length_b 10.40\n_cell_length_c 12.60\n"
        "_cell_angle_alpha 97.3\n_cell_angle_beta 101.9\n_cell_angle_gamma 106.6\n"
        "_space_group_IT_number 2\n_symmetry_space_group_name_H-M 'P -1'\n"

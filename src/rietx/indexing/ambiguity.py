@@ -659,12 +659,13 @@ class SupercellEvidence:
 
     @property
     def p_floor(self) -> float:
-        """The p-value had **every** extra been seen, p₀ⁿ — the most this test
-        could have said for the child on these data.
+        """The power bound: p₀ⁿ, the p-value had **every** extra been seen.
+        It is the most this test could have said for the child on these data.
 
-        Read at :attr:`p0_power` where one is set: whether the test had the
-        power to refute is bounded by the assumed shift, which the seen
-        count's own windows do not carry (#951)."""
+        Read at :attr:`p0_power` where one is set, so it is then larger than
+        the p-value the seen count's own null gives for all n seen.  Whether
+        the test had the power to refute is bounded by the assumed shift,
+        which the seen count's own windows do not carry (#951)."""
         rate = self.p0 if self.p0_power is None else self.p0_power
         return float(rate ** self.n_extra)
 
