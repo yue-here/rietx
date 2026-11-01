@@ -277,7 +277,15 @@ from ..strategy.staged import BACKGROUND_ABSORPTION_GUARD
 #   z moves little there; where the width is the misfit, z grows by the ratio
 #   of the two scatters.  A consumer comparing z against a number sees the
 #   change, on 1.10 → 1.11's precedent.
-THRESHOLDS_VERSION = "1.13"
+# 1.13 → 1.14 (WP-1977, #1106, #1217): no number moved, but which residual
+#   peaks ``unmatched_obs`` lists did.  A peak the observed curve joins to a
+#   peak ``y_calc`` draws, with no valley of ``min_peak_sigma`` σ on the way,
+#   is explained (``layer0.on_drawn_flank``), where only a tick within
+#   ``LAYER0_MATCH_TOL_DEG`` explained one before.  It removed 66 rows across
+#   twelve QPA round-robin fits and SRM 660c, 65 of them flank lobes, and with them
+#   ``add_impurity_phase`` on two.  A consumer comparing the count against a
+#   number sees the change, on 1.12 → 1.13's precedent.
+THRESHOLDS_VERSION = "1.14"
 
 #: WP-1343.  How far the moment must move when a magnetic width is released
 #: before the release is called a *measurement of the correlation*, in units

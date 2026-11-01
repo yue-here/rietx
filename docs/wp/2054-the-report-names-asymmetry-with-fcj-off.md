@@ -79,6 +79,16 @@ nothing ported.
 
 ### Inherited
 
+- 2026-11-01, from WP-1977 (PR #1295): Layer 0 now explains a residual lobe
+  that the observed curve joins to a drawn peak. On #1106's script with the
+  apertures at 0, `unmatched_obs` falls from 11 to 0 and `add_impurity_phase`
+  0.50 is gone, measured on that branch (`[dev]`, darwin/arm64). The one
+  active action left is `increase_background_flexibility` 0.47. So the
+  failing test this WP plans must assert on the asymmetry action's absence;
+  its "suggests `add_impurity_phase`" half no longer reproduces once WP-1977
+  merges, and the Acceptance clause "`add_impurity_phase` is not the top
+  action" holds already.
+
 - 2026-10-31, from the issue triage (issue #1106): the reporter (2026-10-29)
   brings evidence for direction (a) and one new ask, with no code and no
   threshold. Per peak region they fit the residual on the model's own net line
