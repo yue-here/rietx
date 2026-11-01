@@ -1474,8 +1474,8 @@ def _accept(basis: np.ndarray, system: str, centring: str, spec: SearchSpec,
     # **the lines above the cut meet the cell first at σ, so the closing
     # passes run until the assignment repeats**, up to MAX_ASSIGN_PASSES.
     # Two passes were enough while the annealed ones had seen every line; on
-    # the GSAS-II fluorapatite list they stopped the true cell at 128 of 135
-    # lines where a settled assignment reaches 131 (WP-2066).
+    # the GSAS-II fluorapatite list searched alone they stopped the true cell
+    # at 128 of 135 lines where a settled assignment reaches 131 (WP-2066).
     closing = [0.0] * (2 if near is None else MAX_ASSIGN_PASSES)
     for extra, floor in enumerate(schedule + closing):
         if not reflection_ceiling_ok(cell, wavelength, tt_max):
