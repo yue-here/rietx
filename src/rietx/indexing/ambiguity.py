@@ -725,7 +725,7 @@ class SupercellEvidence:
         the expected count of #1230's three truths at 2.3–3.0× the seen
         test's own (aP1: 112 of 183 seen against 115 at p₀ 0.628, and 37.7 at
         the 0.206 a Monte Carlo of the seen test gives).  The floor still bounds
-        what the test could claim: #951's 0-of-2 pair has p₀² 1e-4 in the
+        what the test could claim: #951's 0-of-2 pair has p₀² 1.3e-4 in the
         seen test's windows and 0.030 in the floored ones, and stays
         undecided (:attr:`p_floor`).
         """
