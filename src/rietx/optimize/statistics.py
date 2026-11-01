@@ -322,6 +322,17 @@ def resolved_correlation(corr: np.ndarray, jac: np.ndarray
     column *i*'s equilibrated variance, and the column is unresolved when that
     is at least the variance the resolved directions give it.  A dead column
     and a joint fit's :class:`~.blocked.BlockJacobian` are left as they are.
+
+    **Limits, measured or by construction.**  The error premise holds for the
+    width columns it was measured on; ``FD_STEP``'s audit row records other
+    columns up to 2.5e-4 from a Richardson oracle, and a direction set by such
+    an error sits above this cut and is left alone, as it was before.  The cut
+    grows with *n*: at 60 free columns it is 6e-11, 12× under brucite's
+    zero-shift/displacement direction.  On brucite's seventh stage the triple
+    reached 2.3× the cut under one nudge, so that stage reads it as resolved.
+    Two unresolved directions leave a ρ between members of different ones set
+    by two rounding eigenvalues.  A member with no ±1.000 partner has its
+    pairs withheld without a ``FLAT_DIRECTION`` clause to say so.
     """
     from .least_squares import FD_STEP
 
