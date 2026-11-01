@@ -89,6 +89,11 @@ CI runs pins the case.
       (`python -m tests.unit_replay`) and `tests/test_acceptance_indexing.py`
       either stay unchanged or have each move named.
 - [x] Skill: none expected.
+- [x] Issue #1252 (2026-11-01): the near-90° property compared the reduced
+      cell with gemmi's ε-reduced G6 vector, which drifts from the image by up
+      to 2 ε. Judge the cell by the Niggli conditions at ε instead
+      (`_niggli_violation` in `tests/test_indexing_reduce.py`), and pin the
+      issue's cases with `@example`. A test-only change.
 
 ## Acceptance
 

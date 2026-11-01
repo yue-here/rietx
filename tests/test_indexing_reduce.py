@@ -421,8 +421,8 @@ def test_the_map_needs_no_sign_the_reduction_chose(cell):
 def test_the_reduced_cell_is_the_exact_image_of_its_input(centring, a, b, c,
                                                           al, be, ga):
     """WP-1923: M·G·Mᵀ of the input under the recorded change of basis *is*
-    the reduced metric, and it is gemmi's reduced vector to within the
-    reduction's own ε.  Not ``is_niggli``: that predicate tests signs without
+    the reduced metric, and it meets the Niggli conditions at the reduction's
+    own ε.  Not ``is_niggli``: that predicate tests the normalisation without
     ε, and it fails gemmi's own output on fp ties (``ReducedCell``'s note).
 
     WP-2035's cell (found by WP-1930) left gemmi's vector with every sign
@@ -446,15 +446,43 @@ def _assert_exact_image(cell, centring):
     image = m @ np.asarray(direct_metric_tensor(*cell)) @ m.T
     got = np.asarray(direct_metric_tensor(*r.cell))
     assert np.allclose(got, image, rtol=0.0, atol=1e-12 * np.max(np.abs(image)))
-    uc = gemmi.UnitCell(*cell)
-    eps = NIGGLI_EPS_RELATIVE * uc.volume ** (1.0 / 3.0)
-    gv = gemmi.GruberVector(uc, centring)
-    gv.niggli_reduce(epsilon=eps)
-    gv.normalize(epsilon=eps)
-    A, B, C, xi, eta, zeta = gv.parameters
-    theirs = np.array([[A, zeta / 2, eta / 2], [zeta / 2, B, xi / 2],
-                       [eta / 2, xi / 2, C]])
-    assert np.max(np.abs(got - theirs)) <= eps
+    eps = NIGGLI_EPS_RELATIVE * gemmi.UnitCell(*cell).volume ** (1.0 / 3.0)
+    assert _niggli_violation(got, eps) <= 0.0
+
+
+def _niggli_violation(g, eps):
+    """By how much the metric ``g`` breaks a Niggli condition at ``eps``; at
+    most 0 when it breaks none.
+
+    The conditions are Gruber (1973), *Acta Cryst.* A29, 433, eq. (3) (the
+    normalisation) and Křivý & Gruber (1976), *Acta Cryst.* A32, 297, steps
+    5-8, each with ε placed as gemmi places it (Grosse-Kunstleve, Sauter &
+    Adams 2004, *Acta Cryst.* A60, 1).  Issue #1252: the property once
+    compared the cell with gemmi's own reduced G6 vector to within ε, but that
+    vector is not the image of anything.  ``normalize`` sets the sign of a
+    parameter within ε of zero and records no change of basis for it, and the
+    later steps carry the error, so the vector drifts from the image under
+    its own recorded basis by up to 1.65 ε (P) and 1.99 ε (I) on cells one
+    angle within 1e-5° of 90°.  These conditions ask what the reference was
+    meant to ask, whether the cell is reduced, without that drift.
+    """
+    A, B, C = g[0, 0], g[1, 1], g[2, 2]
+    xi, eta, zeta = 2 * g[1, 2], 2 * g[0, 2], 2 * g[0, 1]
+    s = A + B + xi + eta + zeta
+    v = [A - B - eps, B - C - eps,
+         # every sign alike within ε: all ≥ −ε (type I) or all ≤ ε (type II)
+         min(max(-xi, -eta, -zeta), max(xi, eta, zeta)) - eps,
+         abs(xi) - B - eps, abs(eta) - A - eps, abs(zeta) - A - eps, -s - eps,
+         # a special condition breaks when both of its halves hold
+         min(xi - B + eps, zeta - 2 * eta - eps), min(-xi - B + eps, -zeta - eps),
+         min(eta - A + eps, zeta - 2 * xi - eps), min(-eta - A + eps, -zeta - eps),
+         min(zeta - A + eps, eta - 2 * xi - eps), min(-zeta - A + eps, -eta - eps),
+         min(eps - s, 2 * (A + eta) + zeta - eps)]
+    if abs(A - B) <= eps:
+        v.append(abs(xi) - abs(eta) - eps)
+    if abs(B - C) <= eps:
+        v.append(abs(eta) - abs(zeta) - eps)
+    return max(v)
 
 
 _NEAR_RIGHT = st.one_of(
@@ -469,13 +497,23 @@ _NEAR_RIGHT = st.one_of(
 @given(lengths, lengths, lengths, angles, angles, angles,
        st.integers(0, 2), _NEAR_RIGHT)
 @example(3.0, 4.0, 5.0, 90.0, 100.0, 90.0, 0, (0.0, 1.0))   # monoclinic: two exact 90°
+# issue #1252: gemmi's ε-vector sat 1.65 ε (P), 1.14 ε (P) and 1.05 ε (P, where
+# gemmi at ε = 1e-12 picks another setting) from the reduced cell
+@example(3.0, 3.0, 21.0, 65.0, 65.0, 65.0, 0, (1e-5, -1.0))
+@example(3.0, 3.0, 21.0, 65.0, 65.0, 65.0, 0, (6.90495131727726e-06, -1.0))
+@example(21.0, 3.0, 3.0, 65.0, 65.0, 111.0, 0, (1e-5, 1.0))
+@example(14.493029429286063, 12.642787865540104, 19.232480172270797,  # 1.99 ε (I)
+         102.37322057598564, 74.00551499794184, 65.0, 2, (1.54173736e-06, 1.0))
 def test_the_exact_image_holds_with_one_angle_within_epsilon_of_90(
         centring, a, b, c, al, be, ga, which, offset):
     """WP-2035's sweep: one angle 1e-7–1e-5° either side of 90° (or exactly
     90°, where a metric zero carries rounding noise of either sign) puts a
     Niggli parameter within the reduction's ε of zero, where gemmi's
     ``normalize`` and Křivý–Gruber steps disagree on a sign.  On ``main``'s
-    sign-gated path about 30 % of such P cells left the exact image."""
+    sign-gated path about 30 % of such P cells left the exact image.  Such a
+    cell is also where gemmi's own reduced vector leaves the image by more
+    than ε, which is why the reduction is judged by its conditions
+    (:func:`_niggli_violation`)."""
     angs = [al, be, ga]
     angs[which] = 90.0 + offset[1] * offset[0]
     cell = (a, b, c, *angs)
