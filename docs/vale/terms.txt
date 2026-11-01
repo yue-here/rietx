@@ -192,6 +192,7 @@ Gaussians
 Guinier
 HCl
 Hofmann
+Hotelling
 Jacobian
 Jacobians
 Kass

@@ -491,6 +491,26 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                  "rietx.crystallography.representation.distortion.DisplaciveStatement"),
             ),
             (
+                "What a fit on mode amplitudes reports",
+                "A fit of a phase carrying `Phase.distortion_modes` returns "
+                "`RefinementResult.distortion_totals`: one `DistortionTotal` per "
+                "irrep block (every mode of one irrep, k and isotropy group), "
+                "with A_τ in Å, its esd from the block's covariance (linearised; "
+                "undefined at A_τ = 0, Rice-biased below about 2 esd) and "
+                "Hotelling's T² with m and no p. "
+                "`ref.distortion_block_tests(data, hold=None, "
+                "detectability_bar=None, detectability_probe=None)` refits with each named block, or set of "
+                "blocks, held at 0 and returns ΔBIC at N/f², Λ and its p, both χ² "
+                "and, with a bar and your probe amplitude, A_det; a restricted fit below the full one "
+                "restarts the full fit and is recorded. Numbers only, no verdict; "
+                "readings in `references/magnetic.md`.",
+                ("rietx.schemas.results.DistortionTotal",
+                 "rietx.report.DistortionBlockTests",
+                 "rietx.report.DistortionBlockTest",
+                 "rietx.report.block_comparison",
+                 "rietx.report.detectability_amplitude"),
+            ),
+            (
                 "Displacive candidates of a parent",
                 "`distortion_candidates(parent, k, sites=None)` from "
                 "`rietx.crystallography.magnetic.isotropy` lists every child a "
@@ -523,6 +543,7 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
 #: raised cap).  ``tests/test_skill.py`` holds every name here to a real field.
 TECHNIQUE_FIELDS: dict[str, frozenset[str]] = {
     "rx.Phase": frozenset({"rigid_bodies", "distortion_modes"}),
+    "rx.RefinementResult": frozenset({"distortion_totals"}),
     "rx.ParameterRow": frozenset({"body"}),
 }
 
