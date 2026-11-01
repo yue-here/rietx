@@ -104,7 +104,7 @@ Every refinable quantity is a `rx.Parameter` (`value`, `vary`, bounds), addresse
   Fields: `stages: list[Stage]`, `correlation_guard: float = 0.98`, `intermediate_ftol: float | None = 1e-06`, `lebail_passes: int = 1`, `phase_support_sigma: float | None = 3.0`, `closing_window_tol: float | None = 0.001`
 - `rx.Stage` — One turn-on group of a staged plan.
   Fields: `name: str`, `turn_on: list[str]`, `max_iter: int = 100`, `ftol: float | None = None`, `lebail_cycles: int = 3`, `seed: float = 0.0`, `strain_seed: float = 0.0`, `restraint_weight_scale: float = 1.0`, `window_slack_deg: float | None = None`
-- `rx.PLAN_INFO` — keys: `mccusker_default`, `mccusker_structural`, `lab_bragg_brentano`, `lab_calibrate`, `lab_sample_refine`, `profile_only`, `pawley_default`, `magnetic_width`
+- `rx.PLAN_INFO` — keys: `mccusker_default`, `mccusker_structural`, `magnetic_structural`, `lab_bragg_brentano`, `lab_calibrate`, `lab_sample_refine`, `profile_only`, `pawley_default`, `magnetic_width`
 - `rx.ParameterRow` — One row of the parameter table, mirroring `params.vector.Entry`.
   Fields: `path: str`, `value: float`, `vary: bool = False`, `lo: float = -inf`, `hi: float = inf`, `tie: TieSpec | None = None`, `locked: bool = False`, `held: bool = False`, `esd: float | None = None`, `mode_fixed: bool = False`, `needs_held_cell: bool = False`, `origin_axis: tuple[int, int, int] | None = None`, `help_key: str | None = None`
 

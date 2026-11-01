@@ -472,3 +472,84 @@ $2G_s\mathbf{b}$, work on those. A shell where $G_s$ vanishes is one the
 family can never light: if the other family's intensity is zero there too
 the shell carries no information and is left out, and if it is not, the
 pair is distinguishable without a fit.
+
+## The irrep blocks of a child on mode amplitudes
+
+A child stated on its parent's symmetry-adapted modes refines one absolute
+amplitude $A_i$ per mode. The unit the fit reports on is the irrep block $B$,
+every mode sharing one irrep, wave vector and isotropy group. Its size is the
+norm {cite}`perezmato2010`
+
+```{math}
+:label: est-block-atau
+
+A_\tau \;=\; \lVert \mathbf{A}_B \rVert .
+```
+
+{source}`rietx.report.distortion.distortion_totals`
+
+Its esd is the linearised one of {eq}`est-derived` (Estimation), with the unit vector
+$\mathbf{c} = \mathbf{A}_B / A_\tau$ as the partials and $\mathrm{Cov}_B$ the
+block's covariance from the same $f^2$-inflated matrix as every other esd, so
+$\sigma(A_\tau) = \sqrt{\mathbf{c}^\top \mathrm{Cov}_B\, \mathbf{c}}$. It is
+undefined at $A_\tau = 0$ and biased upward below about two esd, where a norm
+of noisy components follows a Rice distribution, so every block carries that
+sentence beside it. The block's evidence that its amplitudes are not all zero is
+Hotelling's statistic
+
+```{math}
+:label: est-block-t2
+
+T^{2} \;=\; \mathbf{A}_B^{\top}\, \mathrm{Cov}_B^{-1}\, \mathbf{A}_B ,
+```
+
+{source}`rietx.report.distortion.hotelling_t2`
+
+reported with the mode count $m$ and with no $p$. Where a block breaks the
+parent's symmetry, χ² is even in its amplitudes, so at a true zero $T^2$ is
+about four times the likelihood ratio and an upper-tail $p$ against $\chi^2_m$
+is wrong exactly where the question is asked. Both quantities are unchanged by
+a rotation of the basis inside the block.
+
+Holding a block at zero and refitting gives the comparison. With $\chi^2_r$ and
+$\chi^2_f$ the raw sums Σw·Δ² (not divided by the degrees of freedom) of the restricted and full fits, $f$ the
+Bérar-Lelann factor of {eq}`est-berar-lelann` and $N_\mathrm{eff} = N/f^{2}$,
+
+```{math}
+:label: est-block-lambda
+
+\Lambda \;=\; \frac{\chi^2_r - \chi^2_f}{\chi^2_\mathrm{red}\, f^{2}} ,
+\qquad
+\Delta\mathrm{BIC} \;=\; N_\mathrm{eff}\,\ln\frac{\chi^2_r}{\chi^2_f}
+\;-\; m \ln N_\mathrm{eff} ,
+```
+
+{source}`rietx.report.distortion.block_comparison`
+
+where $\chi^2_\mathrm{red}$ and $f$ in $\Lambda$ are the full fit's. $\Lambda$ is
+Hamilton's $F$ form {cite}`hamilton1965` on rietx's esd scale, read against
+$\chi^2_m$ for its upper-tail $p$, and $\Delta\mathrm{BIC}$ is Schwarz's
+{cite}`schwarz1978` at the effective count. A restricted fit is the full model
+with $m$ parameters held, so its $\chi^2$ cannot lie below the full optimum; one
+that does, by more than the solver's own stopping tolerance, shows the full fit
+stopped short and is refitted from there.
+
+The amplitude a held set needs for $\Delta\mathrm{BIC}$ to reach a stated bar
+follows from the leading power of $\chi^2$ in the amplitude. For mode $j$ at a
+probe amplitude $A_0$ the data's own $\sigma$ gives $\lambda_j(A_0) =
+\sum_k \bigl(\Delta y_k / \sigma_k\bigr)^{2}$, one predict per mode, and
+$\lambda_j(A) \propto A^{p_j}$ with $p_j = 4$ where the pattern has no
+first-order term along the mode at that structure and $2$ otherwise:
+
+```{math}
+:label: est-block-adet
+
+A_\mathrm{det} \;=\; \min_{j}\; A_0
+\left[ \frac{\chi^2_\mathrm{red}\, f^{2}\,\bigl(m \ln N_\mathrm{eff} + \mathrm{bar}\bigr)}
+{\lambda_j(A_0)} \right]^{1/p_j} .
+```
+
+{source}`rietx.report.distortion.detectability_amplitude`
+
+The scaling holds to leading order only, so $A_0$ is an argument, as the bar
+is, and the figure is uncalibrated under model misfit.

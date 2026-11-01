@@ -563,6 +563,98 @@ def _locate(diagnostics, atoms, codes, *, start=0, repeats=None) -> None:
                 if k is not None]})
 
 
+#: The tag prefixes of the one category a data block may carry and still state
+#: nothing a structure is read from.  ``cif_core.dic`` 3.3.0 files AUDIT and
+#: its children (AUDIT_AUTHOR, AUDIT_CONFORM, AUDIT_LINK, ...) under
+#: PUBLICATION: "details about the creation and subsequent updating of the
+#: data block", never a cell, a site or a symmetry operation.  Both spellings,
+#: since CIF tags are case-blind and DDLm writes the dot.
+_AUDIT_PREFIXES = ("_audit_", "_audit.")
+
+#: The items whose presence makes a block one with atom sites, in both
+#: spellings: what gemmi's small-structure reader builds a site from.
+_SITE_TAGS = ("_atom_site_label", "_atom_site.label",
+              "_atom_site_fract_x", "_atom_site.fract_x")
+
+
+def _block_tags(block) -> list[str]:
+    """Every tag a block states, pairs and loop columns, in file order; a save
+    frame counts as a statement, under its name."""
+    tags: list[str] = []
+    for item in block:
+        if item.pair is not None:
+            tags.append(item.pair[0])
+        elif item.loop is not None:
+            tags.extend(item.loop.tags)
+        elif item.frame is not None:
+            tags.append(f"save_{item.frame.name}")
+    return tags
+
+
+def _block_name(block) -> str:
+    return f"data_{block.name.strip()}"
+
+
+def _structure_block(doc, path: str, diagnostics: list[Diagnostic] | None):
+    """The data block :func:`structure_from_cif` reads, or a refusal naming why
+    none can be chosen.
+
+    One block is that block.  Of several, one holding atom sites is read where
+    **every other block states nothing**: no tag at all, or only the AUDIT
+    category's (:data:`_AUDIT_PREFIXES`), which records how the file was made
+    and carries no structure: an empty ``data_global`` ahead of the
+    structure, as issue #1063 (item 1) reports of FullProf's magnetic CIF.
+    ``CIF_EMPTY_BLOCK_SKIPPED`` (info) names each block passed over.  Two
+    blocks with atom sites, or one beside a block that states anything else
+    (a pdCIF's pattern, a journal's publication block), are refused, naming
+    the blocks and saying what each states, because choosing among them is
+    not something this reader does yet.  No block at all keeps gemmi's own
+    refusal, which is the right one for an empty or truncated file.
+    """
+    if len(doc) <= 1:
+        return _gemmi_or_value_error(
+            doc.sole_block, path, "could not be read as a small-molecule CIF")
+    tags = [_block_tags(block) for block in doc]
+    with_sites = [k for k, own in enumerate(tags)
+                  if any(t.lower() in _SITE_TAGS for t in own)]
+    stating = [k for k, own in enumerate(tags)
+               if k not in with_sites
+               and not all(t.lower().startswith(_AUDIT_PREFIXES) for t in own)]
+    names = [_block_name(block) for block in doc]
+    if len(with_sites) == 1 and not stating:
+        (chosen,) = with_sites
+        skipped = [f"{names[k]} ({'only ' + ', '.join(tags[k]) if tags[k] else 'no tags'})"
+                   for k in range(len(doc)) if k != chosen]
+        if diagnostics is not None:
+            diagnostics.append(Diagnostic(
+                level="info", code="CIF_EMPTY_BLOCK_SKIPPED", where=["phases.0"],
+                message=(f"{path} holds {len(doc)} data blocks; the structure "
+                         f"was read from {names[chosen]}, the only one with "
+                         f"atom sites. Skipped, as stating nothing a structure "
+                         f"is read from: {'; '.join(skipped)}.")))
+        return doc[chosen]
+    if len(with_sites) > 1:
+        raise ValueError(
+            f"{path}: could not be read as a small-molecule CIF: single data "
+            f"block expected, got {len(doc)}, and {len(with_sites)} of them "
+            f"hold atom sites ({', '.join(names[k] for k in with_sites)}). "
+            f"This reader reads one structure, and choosing a block is not yet "
+            f"supported: write each structure to a file of its own.")
+    shown = "; ".join(
+        f"{names[k]} states {', '.join(tags[k][:3])}"
+        + (f" and {len(tags[k]) - 3} more" if len(tags[k]) > 3 else "")
+        for k in stating[:3])
+    where = (f"the atom sites are in {names[with_sites[0]]}, and"
+             if with_sites else "no block holds atom sites, and")
+    raise ValueError(
+        f"{path}: could not be read as a small-molecule CIF: single data block "
+        f"expected, got {len(doc)}: {where} {len(stating)} other block"
+        f"{'s' if len(stating) != 1 else ''} state{'' if len(stating) != 1 else 's'} "
+        f"more than _audit_ items ({shown}). Only a block with no tags or "
+        f"only _audit_ tags is skipped, and choosing a block is not yet "
+        f"supported: write the structure to a file of its own.")
+
+
 def _magnetic_content(text: str) -> bool:
     """Whether a CIF's text states a magnetic construct of any kind.
 
@@ -586,7 +678,14 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
                        moment_g: dict[str, float] | None = None,
                        nuclear_group: str = "auto",
                        diagnostics: list[Diagnostic] | None = None) -> Structure:
-    """Read the first data block of a CIF into a single-phase :class:`Structure`.
+    """Read the structure block of a CIF into a single-phase :class:`Structure`.
+
+    The block is the file's only one, or the one holding atom sites where
+    every other block states nothing (no tags, or only ``_audit_`` ones), which
+    ``CIF_EMPTY_BLOCK_SKIPPED`` reports; any other file of several blocks is
+    refused naming them (:func:`_structure_block`).  A file using the pre-2016
+    draft magnetic tags is refused by name
+    (:func:`~rietx.crystallography.magcif.refuse_draft_tags`).
 
     Uses gemmi's small-molecule reader, which resolves the space group from
     the recorded H-M (or Hall) symbol and carries fractional coordinates,
@@ -663,31 +762,39 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
             f"nuclear_group={nuclear_group!r}: expected one of "
             f"{', '.join(map(repr, magcif.NUCLEAR_GROUP_CHOICES))}")
     try:
-        small = _gemmi_or_value_error(
-            lambda: gemmi.read_small_structure(path), path,
+        doc = _gemmi_or_value_error(
+            lambda: gemmi.cif.read(path), path,
             "could not be read as a small-molecule CIF")
     except ValueError as exc:
         fault = _syntax_fault(path, str(exc))
         if fault is None:
             raise
         raise ValueError(f"{exc}. {fault}") from exc
+    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    # before the atom-site test: a file written wholly in the draft's tags has
+    # no atom sites under the dictionary's names, and "no atom sites found"
+    # would name the wrong cause (issue #1063, item 3)
+    magcif.refuse_draft_tags(text, path)
+    source = _structure_block(doc, path, diagnostics)
+    small = _gemmi_or_value_error(
+        lambda: gemmi.make_small_structure_from_block(source), path,
+        "could not be read as a small-molecule CIF")
     if not small.sites:
         raise ValueError(f"no atom sites found in {path}")
     cell_values = (small.cell.a, small.cell.b, small.cell.c,
                    small.cell.alpha, small.cell.beta, small.cell.gamma)
     if any(math.isnan(v) for v in cell_values):
-        _number_fault(path, gemmi.cif.read(path).sole_block(),
+        _number_fault(path, source,
                       [f"_cell_{n}" for n in ("length_a", "length_b",
                                               "length_c", "angle_alpha",
                                               "angle_beta", "angle_gamma")])
     for site in small.sites:
         if any(math.isnan(v) for v in (site.fract.x, site.fract.y,
                                        site.fract.z, site.occ)):
-            _number_fault(path, gemmi.cif.read(path).sole_block(),
+            _number_fault(path, source,
                           ["_atom_site_fract_x", "_atom_site_fract_y",
                            "_atom_site_fract_z", "_atom_site_occupancy"],
                           label=site.label)
-    text = Path(path).read_text(encoding="utf-8", errors="replace")
 
     # The magnetic arm's two refusals run **before** anything is built and
     # whether or not the file also states an ordinary space group: a magCIF
@@ -697,9 +804,7 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     block = None
     magnetic_symmetry = None
     if _magnetic_content(text):
-        block = _gemmi_or_value_error(
-            lambda: gemmi.cif.read(path).sole_block(), path,
-            "states a magnetic construct and has no single data block")
+        block = source
         magcif.refuse_modulation(text, path)
         magcif.refuse_a_magnetic_supercell(block, text, path)
         magnetic_symmetry = magcif.read_magnetic_symmetry(
@@ -718,12 +823,9 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
         # list cannot supply it: a type-III group is an index-2 subgroup of the
         # parent, so the nuclear symmetry is strictly higher than the
         # operators state.
-        doc_block = block if block is not None else _gemmi_or_value_error(
-            lambda: gemmi.cif.read(path).sole_block(), path,
-            "has no single data block to read a space group from")
-        hm = (doc_block.find_value("_symmetry_space_group_name_H-M")
-              or doc_block.find_value("_space_group_name_H-M_alt")
-              or (magcif.parent_space_group(doc_block, path,
+        hm = (source.find_value("_symmetry_space_group_name_H-M")
+              or source.find_value("_space_group_name_H-M_alt")
+              or (magcif.parent_space_group(source, path,
                                             diagnostics=diagnostics)
                   if block is not None else None))
         if hm is None and block is not None:
@@ -767,9 +869,9 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     rewrites: dict[str, tuple[str, str, list[str]]] = {}
     # CIF tags are case-insensitive, so the gate that spares an ordered file its
     # second parse is too
-    disorder = (_disorder_columns(path, small.name)
+    disorder = (_disorder_columns(source)
                 if re.search(r"(?i)_atom_site_disorder", text) else {})
-    site_statements = _site_statements(path, small.name)
+    site_statements = _site_statements(source)
     # the writer chooses its U against this very arithmetic (io/cif/blocks)
     from ..io.cif.blocks import b_from_u
 
@@ -974,7 +1076,8 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
             source=path, prefix="phases.0"))
 
     phase = Phase(
-        name=phase_name or (small.name or "phase_1"),
+        # gemmi names a bare `data_` block " ", which is no name
+        name=phase_name or (small.name.strip() or "phase_1"),
         space_group=sg.xhm(),
         symmetry_operations=listed,
         cell=Cell(
@@ -1044,7 +1147,7 @@ def format_su(value: float, esd: float | None, *, decimals: int = 6) -> str:
 CIF_STATED_MULTIPLICITY_SNAP_TOL = 1e-3
 
 
-def _site_statements(path: str, name: str) -> dict[str, dict]:
+def _site_statements(block) -> dict[str, dict]:
     """What each site label's row states, per column, where gemmi cannot say.
 
     ``small.sites`` holds ``u_iso = 0`` and ``occ = 1`` for a column the file
@@ -1058,8 +1161,6 @@ def _site_statements(path: str, name: str) -> dict[str, dict]:
     :func:`_within_printed_rounding` reads the file's precision from; ``None``
     where any of the three is not a plain decimal.
     """
-    doc = gemmi.cif.read(path)
-    block = doc.find_block(name) or doc[0]
     table = block.find("_atom_site_", [
         "label", "?U_iso_or_equiv", "?B_iso_or_equiv", "?occupancy",
         "?symmetry_multiplicity", "?Wyckoff_symbol",
@@ -1230,15 +1331,13 @@ def _snap_to_stated_multiplicity(sg, atoms: list[Atom], stated: dict[str, dict],
     return out
 
 
-def _disorder_columns(path: str, name: str) -> dict[str, tuple[str | None, str | None]]:
+def _disorder_columns(block) -> dict[str, tuple[str | None, str | None]]:
     """Each site label's ``(_atom_site_disorder_assembly, _atom_site_disorder_group)``.
 
     Read from the block itself, since gemmi's small-structure site keeps the
     group as an integer and the assembly not at all, and the dictionary types
     both as a ``Word``.  A null (``.`` or ``?``) is ``None``, an ordered site.
     """
-    doc = gemmi.cif.read(path)
-    block = doc.find_block(name) or doc[0]
     table = block.find("_atom_site_", ["label", "?disorder_assembly", "?disorder_group"])
     out: dict[str, tuple[str | None, str | None]] = {}
     for row in table:

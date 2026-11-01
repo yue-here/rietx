@@ -28,7 +28,6 @@ from typing import Any, get_args
 
 import numpy as np
 
-from ..crystallography.atomic_volume import VOLUME_SCATTER, formula_unit_volume
 from ..model.profiles.fcj import fcj_live
 from ..schemas.common import Diagnostic
 from ..schemas.indexing import (
@@ -707,45 +706,25 @@ BRAGG_BRENTANO_CELL_PPM = 85.0
 #: duplicating the text would let the two copies disagree.
 _PER_CANDIDATE_CODES = ("INDEX_GEOMETRIC_AMBIGUITY", "INDEX_BRAVAIS_AMBIGUOUS",
                         "INDEX_PREDICTED_BUT_ABSENT", "INDEX_IMPURITY_LINES",
-                        "INDEX_VOLUME_UNPHYSICAL", "INDEX_SUPERCELL_REFUTED",
-                        "INDEX_Z_NOT_INTEGER")
-
-#: How far a cell may sit from a whole number of formula units, as a fraction of
-#: its volume, before ``INDEX_Z_NOT_INTEGER`` fires (WP-1510).  Twice the 4.00 %
-#: scatter of one crystal about Hofmann's (2002) estimate
-#: (:data:`~rietx.crystallography.atomic_volume.VOLUME_SCATTER`).  That scatter
-#: is the method's uncertainty for one crystal.  The table's mean errors, about
-#: 0.5 % for an organic, describe the average and would flag correct cells.
-#: Three consequences.  Above Z = 6.25 every volume lies within 8 % of some
-#: whole number, so the check is silent there by arithmetic.  Z = 2.8 sits 6.7 %
-#: from 3 and does not fire, while Z = 8/3, a third of a Z = 8 cell, sits 11 %
-#: from 3 and does.  And a correct cell can fire, since only 6049 of the 9112
-#: structures in Hofmann's sample 1 lie within 5 % of his estimate (Table 1).
-#: So the code is a warning that reports the number, and never a caveat.
-Z_INTEGER_TOLERANCE = 2.0 * VOLUME_SCATTER
+                        "INDEX_VOLUME_UNPHYSICAL", "INDEX_SUPERCELL_REFUTED")
 
 
-def candidate_diagnostics(cand, *, formula: str | None = None,
-                          temperature: float = 298.0) -> list[Diagnostic]:
+def candidate_diagnostics(cand) -> list[Diagnostic]:
     """Everything to say about **one** candidate cell.
 
     Attached to the candidate rather than to the result, so a caller reading the
     third-ranked cell sees why it is third — and so a twelve-candidate answer does
     not bury its own abstention under thirty-six messages.
 
-    ``formula`` (with ``temperature`` in K) adds the chemistry's check: the
-    number of formula units the cell's volume implies, reported as
-    ``INDEX_Z_NOT_INTEGER`` when it is far from a whole number
-    (:data:`Z_INTEGER_TOLERANCE`).
+    A formula's check is no longer here (WP-2030): the number of formula units
+    a cell holds is recorded on the candidate
+    (:attr:`~rietx.schemas.indexing.CellCandidate.formula_units`), and no
+    diagnostic judges it, since against Hofmann's (2002) volumes a correct
+    inorganic cell looks like a wrong Z.
     """
     out: list[Diagnostic] = []
     where = [f"{cand.system} {cand.centring}, "
              f"V = {cand.volume:.1f} Å³, cell {_cell_str(cand.cell)}"]
-    if formula is not None:
-        z_check = _z_not_integer(cand, formula, temperature, where)
-        if z_check is not None:
-            out.append(z_check)
-
     if cand.ambiguity:
         tt = [t for p in cand.ambiguity for t in p.discriminating_two_theta]
         out.append(Diagnostic(
@@ -872,32 +851,6 @@ def candidate_diagnostics(cand, *, formula: str | None = None,
             suggestion=("Narrow max_volume to the envelope assess_peak_list "
                         "supplied, or measure more lines.")))
     return out
-
-
-def _z_not_integer(cand, formula: str, temperature: float,
-                   where: list[str]) -> Diagnostic | None:
-    """``INDEX_Z_NOT_INTEGER``: the cell holds a fractional number of formula
-    units, by Hofmann's (2002) volumes.  ``value`` is the implied Z."""
-    v_fu, _ = formula_unit_volume(formula, temperature)
-    z = cand.volume / v_fu
-    below = max(1, math.floor(z))
-    # the whole number nearest in *ratio*, since the tolerance is a fraction of
-    # the volume
-    n = min((below, below + 1), key=lambda k: abs(z / k - 1.0))
-    off = z / n - 1.0
-    if abs(off) <= Z_INTEGER_TOLERANCE:
-        return None
-    return Diagnostic(
-        level="warning", code="INDEX_Z_NOT_INTEGER", value=z,
-        message=(f"This cell holds {z:.2f} formula units of {formula} "
-                 f"({cand.volume:.1f} Å³ over {v_fu:.1f} Å³ per unit at "
-                 f"{temperature:g} K, Hofmann 2002). The nearest whole number, "
-                 f"{n}, needs a formula unit {abs(off) * 100:.0f} % "
-                 f"{'larger' if off > 0 else 'smaller'} than the estimate, "
-                 f"past the {Z_INTEGER_TOLERANCE * 100:.0f} % tolerance."),
-        where=where + [f"formula {formula}"],
-        suggestion=("Check the formula for a missing solvent or counter-ion, "
-                    "then weigh this beside the figures of merit."))
 
 
 def _refuting_caveat_names() -> str:
@@ -1086,9 +1039,29 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
         from .extinction import REFERENCE_NET_RWP_MAX
 
         net = screen.reference_rwp_net
+        perfect = screen.perfect_fit_rwp_net
         prefit = ("" if screen.prefit_rwp is None else
                   f" (after a cell-free Le Bail prefit at Rwp "
                   f"{screen.prefit_rwp:.3f})")
+        # which of the two failed, by arithmetic on the screen's own numbers:
+        # a fit leaving only the noise reads √(N/(N+S)), past the bound when
+        # S < N, so no model of these data could pass it
+        if net is None or perfect is None:
+            which = ""
+        elif perfect > REFERENCE_NET_RWP_MAX:
+            which = (f". A fit that left only the counting noise would read "
+                     f"{perfect:.3f} (√(N/(N+S)), N channels, S the weighted net "
+                     "Bragg power), past the bound too, so no cell or model passes it. "
+                     "Two causes give that, and these numbers cannot tell them "
+                     "apart: the data are weak (S < N), or the peak picker's "
+                     "envelope sits inside the lines over this range (a "
+                     "continuum, as at high angle in a low-symmetry pattern), "
+                     "which raises both readings with strong data")
+        else:
+            which = (f". A fit that left only the counting noise would read "
+                     f"{perfect:.3f} (√(N/(N+S)), N channels, S the weighted net "
+                     "Bragg power), so the data could pass and the reference "
+                     f"misfits them, by {net / perfect:.1f}× that (√(χ²/N))")
         out.append(Diagnostic(
             level="warning", code="EXTINCTION_SCREEN_UNRELIABLE",
             message=(f"the reference fit of the lattice group "
@@ -1099,7 +1072,7 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
                         "are modelled well enough to read an absence against")
                      + ", so every refutation and ΔBIC below may measure that "
                      "misfit; the classes are ranked but best_or_none() "
-                     "abstains"),
+                     "abstains" + which),
             where=[f"{screen.system} {screen.centring}, cell "
                    f"{_cell_str(screen.cell)}"],
             suggestion=("any of these, in no order: the cell (a few tenths of a "
@@ -1307,6 +1280,6 @@ def significant(values: np.ndarray, threshold: float) -> np.ndarray:
 
 
 __all__ = ["BRAGG_BRENTANO_CELL_PPM", "SHIFT_CAUSE", "WIDTH_MISMATCH_RATIO",
-           "Z_INTEGER_TOLERANCE", "candidate_diagnostics", "extinction_class_diagnostics",
+           "candidate_diagnostics", "extinction_class_diagnostics",
            "extinction_diagnostics", "index_diagnostics", "peak_diagnostics",
            "quality_diagnostics", "significant"]

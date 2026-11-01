@@ -1225,6 +1225,16 @@ The only externally *graded* feature in the package. Bergmann et al. (2004) publ
 
 **Diagnostics:** `INDEX_SEARCH_INCOMPLETE`, `INDEX_ABSTAINED`
 
+#### `test_the_formula_window_ranks_the_fluorapatite_cell_where_the_search_does`
+
+`own_result` · dataset `fap`
+
+**Claims:** SearchSpec.from_formula('Ca5P3O12F', z=2), a ceiling only since WP-2030 part 2, keeps the fluorapatite cell and ranks it where the same search under the row's hand-set 600 A^3 ceiling does; 1.10.0's window (738-1153 A^3) excluded it
+
+**Referenced to:** the same pattern, systems and budgets searched under fap_index's declared 600 A^3 ceiling, the in-band cell read at that row's 500 ppm band on GSAS's FAP.EXP cell
+
+**Measured:** ranked first in both (pearl, 2026-10-30, WP-2030 part 2)
+
 #### `test_the_cross_code_cell_leads_because_the_engines_agree_on_it`
 
 `cross_code` `characterisation` · dataset `fap`

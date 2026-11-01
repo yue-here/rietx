@@ -163,7 +163,7 @@ N_A_CM3_PER_A3 = 0.602214076
 #: How far a measured density may put Z from a whole number, as a fraction of
 #: Z (WP-2033, ruled by the maintainer on PR #1140).  The density is the
 #: error of a **measurement**, not the 8 % scatter of a volume estimated from
-#: atom counts (:data:`~rietx.indexing.diagnostics.Z_INTEGER_TOLERANCE`).  The
+#: atom counts, the 8 % the withdrawn ``INDEX_Z_NOT_INTEGER`` allowed (WP-2030).  The
 #: figure is the one *International Tables* Vol. C (2006), ch. 3.2, §3.2.1,
 #: p. 156 gives for assigning Z: measured and calculated density "should agree
 #: within at least 1.5%" (Richards & Lindley, doi:10.1107/97809553602060000586).
@@ -1008,8 +1008,10 @@ def _prefit(data: PatternData, candidate: CellCandidate, instrument: Instrument,
             float(result.statistics.rwp))
 
 
-def _reference_net_rwp(result) -> float | None:
-    """The gate's quantity: the reference fit's weighted misfit over the net
+def _reference_net_rwp(result) -> tuple[float | None, float | None]:
+    """The gate's quantity, and the value a perfect fit would give it.
+
+    The first is the reference fit's weighted misfit over the net
     signal, the net taken against the **picker's** envelope rather than the
     fit's own background.
 
@@ -1021,8 +1023,36 @@ def _reference_net_rwp(result) -> float | None:
     prefit walked the cell out of its basin; ``tests/test_extinction_gate.py``
     builds the mechanism).
     ``peaks._debiased_envelope`` (a rolling low quantile, debiased) is fixed
-    before any candidate exists, so no fit can move the denominator.  ``None``
-    when the pattern carries no net signal at all.
+    before any candidate exists, so no fit can move the denominator.
+
+    The second is √(N/D), N the fitted channels and D that denominator.  A fit
+    that leaves only the counting noise has Σw·(y_obs − y_calc)² ≈ N, and on a
+    background channel the net is that noise too, so D ≈ N + S with S the
+    weighted net Bragg power: a perfect fit reads √(N/(N + S)), which is above
+    :data:`REFERENCE_NET_RWP_MAX` exactly when S < N.  The pair separates
+    misfit from the rest: below the bound the reference misfits (the ratio of
+    the two is √(χ²/N)); past it too, no model could pass, because the data
+    are weak or the envelope sits inside the lines (see below), and the pair
+    cannot tell which.  Both are
+    ``None`` when the pattern carries no net signal at all.
+
+    **The envelope's known weakness: a continuum of lines** (review of #939,
+    round 1).  The envelope is a rolling low quantile, and where the lines run
+    together (low symmetry, high angle) no window holds a background channel:
+    the quantile lands in the tails, the debiasing median is pulled up with it,
+    the net shrinks and the ratio of a good fit rises.  GSAS-II's own Rietveld
+    fit of the PbSO₄ X-ray histogram (Hill 1992, ``tests/data/gsas2_pbso4.gpx``)
+    reads 0.136 against the envelope and 0.128 against its fitted background over
+    15-60°, but 0.436 and 0.245 over 110-160°
+    (``test_the_envelope_rides_up_where_the_lines_form_a_continuum``).  Over a
+    whole range the low-angle lines carry most of the weighted power, so the
+    two PbSO₄ readings differ by 12 % (0.155 and 0.138, 15-160°): the bias
+    matters when the fitted range is high angle or the lines are a continuum
+    everywhere.  The perfect-fit value reads the same denominator and rises
+    with it, so there a "weak data" reading may be the envelope's.  The
+    envelope is not changed here.  When a good reference fit of a low-symmetry
+    pattern reads above the bound, it is a cause to check beside those the
+    diagnostic lists.
     """
     from .peaks import _debiased_envelope
 
@@ -1032,9 +1062,10 @@ def _reference_net_rwp(result) -> float | None:
     net = y_obs - _debiased_envelope(tt, y_obs)
     denom = float(w @ (net * net))
     if not denom > 0.0:
-        return None
+        return None, None
     diff = y_obs - np.asarray(result.y_calc, dtype=np.float64)
-    return float(np.sqrt(float(w @ (diff * diff)) / denom))
+    return (float(np.sqrt(float(w @ (diff * diff)) / denom)),
+            float(np.sqrt(len(y_obs) / denom)))
 
 
 def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
@@ -1090,6 +1121,12 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     ``EXTINCTION_SCREEN_UNRELIABLE`` and :meth:`ExtinctionScreen.best_or_none`
     abstains.  A cell the prefit could not bring into its basin (0.4 % off at
     synchrotron resolution) lands here rather than on a confident wrong class.
+    ``perfect_fit_rwp_net`` beside it is what a fit leaving only the noise
+    would read, and the diagnostic says from the pair whether the data are too
+    weak for the bound or the reference misfits them.  The denominator is the
+    picker's envelope, which rides up into the lines where they form a
+    continuum (:func:`_reference_net_rwp`), so a good reference fit of a
+    low-symmetry pattern over a high-angle range can read above the bound.
 
     ``restrict`` declares facts about the specimen — chirality (Sohncke),
     centrosymmetry, polarity, and the content per cell as a ``z`` or a
@@ -1226,7 +1263,8 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
 
     screen.two_theta_range = (float(tt_data.min()), float(tt_data.max()))
     screen.reference_rwp = float(ref_result.statistics.rwp)
-    screen.reference_rwp_net = _reference_net_rwp(ref_result)
+    screen.reference_rwp_net, screen.perfect_fit_rwp_net = _reference_net_rwp(
+        ref_result)
     if (screen.reference_rwp_net is None
             or not screen.reference_rwp_net <= REFERENCE_NET_RWP_MAX):
         # the classes are still ranked, so the reader sees what the screen

@@ -204,10 +204,19 @@ from .structure import Cell
 #: Also 1.12 (WP-2030): ``INDEX_DATA_INSUFFICIENT`` names an undeclared
 #: instrument first only on a laboratory source, read off the declared source
 #: (``diagnostics.lab_source``), and reads it from the list's own record when
-#: no instrument is passed.  No search, rank or grade moves.
+#: no instrument is passed.  No search, rank or grade moves.  Part 2:
+#: ``SearchSpec.from_formula`` sets a ceiling only, for every formula, so a
+#: search declared through it no longer drops the cells below 0.8 of the
+#: formula's volume and can rank a smaller cell it used to exclude.  And
+#: ``INDEX_Z_NOT_INTEGER`` (``Z_INTEGER_TOLERANCE`` 0.08) is withdrawn: it fired
+#: on 12 of 16 true inorganic cells, and the number it judged is now recorded
+#: as ``CellCandidate.formula_units``.  No rank or grade moves without a formula.
 #: Also 1.12 (WP-2011): the whole-pattern validation fits by Pawley, so every
 #: candidate's ``lebail.rwp`` and ``unmatched_observed`` move, and a cell that
 #: predicts every reflection of another now reads that cell's Rwp or lower.
+#: Also 1.12 (#939's follow-ups): ``EXTINCTION_SCREEN_UNRELIABLE``'s message
+#: says whether weak data or misfit failed the gate, from
+#: ``ExtinctionScreen.perfect_fit_rwp_net``; no threshold or verdict moved.
 #: Also 1.12 (#1230): a containment child whose own lines are seen more often
 #: than its parent's (``SupercellEvidence.child_seen_more``) is never
 #: ``refuted``, so a dense low-symmetry truth no longer sits below a wrong cell
@@ -998,11 +1007,20 @@ class PeakList(Base):
 
     @model_validator(mode="after")
     def _q_matches_two_theta(self) -> "PeakList":
-        """Q is derived, so it cannot be allowed to drift from 2θ.
+        """Q and σ(Q) are derived, so neither may drift from 2θ and σ(2θ).
 
-        Cheap (one vectorised pass) and it makes the derived field
+        Cheap (one vectorised pass) and it makes the derived fields
         self-guarding: a caller that builds a peak by hand and forgets Q gets an
         error here rather than a silently mis-indexed pattern later.
+
+        ``q_esd`` is checked the same way (#1236): the engines weight lines by
+        :meth:`q_esd`, so an edit to ``two_theta_esd`` that left the stored
+        ``q_esd`` behind would never reach the search, and nothing would say
+        so.  The tolerance is relative only: σ(Q) is ~1e-5 Å⁻², so the position
+        check's floor of 1.0 would make it an absolute 1e-9 Å⁻², blind to an
+        edit of a line whose σ(2θ) is below ~1e-7°.  A pair where both
+        numbers are non-finite agrees: an infinite σ(2θ) gives an infinite or
+        undefined σ(Q), and both mean "unmeasured".
         """
         if not self.peaks:
             return self
@@ -1017,6 +1035,22 @@ class PeakList(Base):
                 f"but 1/d² at λ = {self.wavelength} Å is {float(want[k])!r}; "
                 "build peaks with PeakList.from_positions or "
                 "indexing.pick_peaks rather than setting q by hand")
+        esd = np.array([p.two_theta_esd for p in self.peaks])
+        with np.errstate(invalid="ignore"):
+            want_esd = q_esd_of_two_theta(tt, esd, self.wavelength)
+        got_esd = np.array([p.q_esd for p in self.peaks])
+        agree = (np.isclose(got_esd, want_esd, rtol=1e-9, atol=0.0)
+                 | (~np.isfinite(got_esd) & ~np.isfinite(want_esd)))
+        if not agree.all():
+            k = int(np.flatnonzero(~agree)[0])
+            raise ValueError(
+                f"peak {k} at 2θ = {tt[k]:.4f}° carries q_esd = "
+                f"{float(got_esd[k])!r} but two_theta_esd = {float(esd[k])!r}° gives "
+                f"σ(1/d²) = {float(want_esd[k])!r} at λ = {self.wavelength} Å; "
+                "set both fields together, deriving q_esd with "
+                "rietx.schemas.indexing.q_esd_of_two_theta, or rebuild the "
+                "list with indexing.pick_peaks or PeakList.from_positions "
+                "(which marks every σ assumed)")
         return self
 
     def usable(self) -> list[ObservedPeak]:
@@ -1407,6 +1441,19 @@ class CellCandidate(Base):
     #: :data:`IndexCaveat` vocabulary
     confidence_caveats: list[IndexCaveat] = Field(default_factory=list)
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+    #: formula units this cell's volume holds by Hofmann's (2002) average atomic
+    #: volumes (WP-2030): :attr:`volume` over one formula unit's volume at the
+    #: run's temperature (``IndexingResult.formula`` and ``.temperature``).
+    #: Written by :func:`rietx.index_pattern` when it is given ``formula=``;
+    #: ``None`` means no formula was given.  A number, judged by no diagnostic.
+    #: On an organic or metal-organic cell the true Z usually lies within a few
+    #: per cent of it (one crystal scatters about 4 %, Hofmann Fig. 1).  An
+    #: ionic or mainly inorganic cell reads low, often far low (his § 3 (iii)):
+    #: the 16 inorganic standards measured read 0.38-0.87 of their Z.  The one
+    #: bound that holds for any formula is the window's ceiling, so the true Z
+    #: is at least this number over 1.25, short of a porous framework whose
+    #: formula leaves its pore contents out.
+    formula_units: float | None = None
 
     @property
     def a(self) -> float:
@@ -2057,13 +2104,14 @@ class IndexingResult(Base):
     #: ``total_budget_seconds`` did, or ``None`` on a result recorded before
     #: presets existed.  The ceiling itself is in ``provenance.notes``.
     preset: str | None = None
-    #: the chemical formula each candidate's ``INDEX_Z_NOT_INTEGER`` check read
-    #: (WP-2030), written verbatim by :func:`rietx.index_pattern` from its
-    #: ``formula=``.  ``None`` means no formula was given, so no candidate was
-    #: checked against one; a result recorded before 0.60 also reads ``None``.
-    #: It checked the answer and never narrowed the search.
+    #: the chemical formula each candidate's
+    #: :attr:`~CellCandidate.formula_units` was read against (WP-2030), written
+    #: verbatim by :func:`rietx.index_pattern` from its ``formula=``.  ``None``
+    #: means no formula was given, so no candidate was read against one; a
+    #: result recorded before 0.60 also reads ``None``.  It never narrowed the
+    #: search.
     formula: str | None = None
-    #: the temperature in K that check read Hofmann's (2002) volumes at,
+    #: the temperature in K Hofmann's (2002) volumes were read at,
     #: written by :func:`rietx.index_pattern` beside :attr:`formula` and
     #: ``None`` whenever :attr:`formula` is, since without a formula no
     #: temperature was read.
@@ -2075,7 +2123,8 @@ class IndexingResult(Base):
     def _temperature_needs_a_formula(self):
         if self.formula is None and self.temperature is not None:
             raise ValueError("IndexingResult.temperature is the temperature "
-                             "the formula's Z check read, so it needs a formula")
+                             "the formula's volumes were read at, so it needs a "
+                             "formula")
         return self
 
     def __str__(self) -> str:
@@ -2452,6 +2501,14 @@ class ExtinctionScreen(Base):
     #: :data:`~rietx.indexing.extinction.REFERENCE_NET_RWP_MAX` the screen is
     #: ``"unreliable"``; ``None`` until the reference fit ran
     reference_rwp_net: float | None = None
+    #: what ``reference_rwp_net`` would read for a fit that left only the
+    #: counting noise: √(N/(N + S)), N the fitted channels and S the weighted
+    #: net Bragg power.  Past the bound too, either the data are too weak for the
+    #: gate (S < N) or the picker's envelope sits inside the lines over this range
+    #: (the pair cannot tell which); below it, the gap to ``reference_rwp_net`` is
+    #: misfit.  ``None``
+    #: until the reference fit ran
+    perfect_fit_rwp_net: float | None = None
     #: formula units per cell the member filter used: the declared ``z``, or
     #: the one whole number the declared density gives on :attr:`cell`.
     #: ``None`` with no Z declared, and when a declared density does not give
