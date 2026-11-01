@@ -26,6 +26,7 @@ Altomare
 [bB]intypes
 Biso
 [bB]kg
+Bmmm
 Borda
 [bB]ranchless
 Bravais
@@ -52,6 +53,7 @@ Chebyshev
 [cC]hirality
 CIF
 CIFs
+Cmmm
 [cC]odeword
 [cC]odewords
 Coelho
@@ -142,6 +144,7 @@ Hofmann
 [hH]olohedry
 [hH]ydrogens
 [iI]dentifiability
+Immm
 [iI]nequivalent
 [iI]njective
 [iI]nlier
@@ -216,6 +219,7 @@ Maxwellian
 [mM]ultiplets
 [nN]anocrystalline
 Negro
+NiAsS
 Niggli
 [nN]m
 [nN]onbonding
@@ -259,6 +263,7 @@ Pitschke
 [pP]rojective
 [pP]seudoreal
 [pP]seudosymmetry
+PtGeSe
 [pP]x
 [pP]ydantic
 [pP]yroelectric
@@ -374,3 +379,4 @@ Whittaker
 Wyckoff
 Yue
 [zZ]incite
+ZrBeSi
