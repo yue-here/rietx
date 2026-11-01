@@ -106,7 +106,7 @@ class ParameterRow(Base):
         "what is this worth, and how well is it known".
     ``mode_fixed``
         ``True`` when ``lebail``/``pawley`` mode force-fixes this path (every
-        ``.atoms.`` path, the phase scale, the emission-line weights — see
+        ``.atoms.`` path, the phase scale, a texture coefficient — see
         ``Refinement._run_stage``).  It is not ``locked``: nothing about the
         parameter is structurally fixed, and switching back to ``rietveld``
         frees it again.  The distinction matters most for a Le Bail-only phase,

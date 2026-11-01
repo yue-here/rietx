@@ -219,6 +219,7 @@ def _plan(*, asymmetric: bool) -> rx.RefinementPlan:
     # user's own run does.  ``None`` would converge every stage and move the
     # numbers in the module docstring.
     plan.intermediate_ftol = 1e-6
+    plan.closing_window_tol = 1e-3   # WP-2002: the shipped closing stage, named rather than inherited
     return plan
 
 
@@ -488,7 +489,7 @@ def test_the_fit_renders(full, symmetric, held):
 
 
 # ------------------------------------------- the background-peak worked example ---
-# The manual's ``Explicit background peaks`` section (docs/manual/using/data.md)
+# The manual's hump comparison (docs/docs/concepts/parameters.md § Humps)
 # rests its headline on this pattern, and this is where that headline is
 # executable.  Same data, same protocol, one thing changed: the background is a
 # low-order Chebyshev rather than the P-spline above, which is the point — the
@@ -503,8 +504,8 @@ def test_the_fit_renders(full, symmetric, held):
 #: The manual's table, to 6 dp.  Bands below are ±0.002 in Rwp — wide enough to
 #: survive a solver tolerance change, narrow enough that the *comparison*
 #: (a peak beats three more polynomial terms, by a lot) cannot silently invert.
-MANUAL_RWP = {"cheb3": 0.119977, "cheb3_peak": 0.082503, "cheb6": 0.088596,
-              "cheb6_peak": 0.077152}
+MANUAL_RWP = {"cheb3": 0.120051, "cheb3_peak": 0.082134, "cheb6": 0.088232,
+              "cheb6_peak": 0.076711}
 
 
 class _ChebFit(NamedTuple):
@@ -585,6 +586,7 @@ def _fit_chebyshev(nterm: int, *, with_peak: bool = False,
                                 "instrument.background.c*"]))
     plan = rx.RefinementPlan(stages=stages)
     plan.intermediate_ftol = 1e-6
+    plan.closing_window_tol = 1e-3   # WP-2002: the shipped closing stage, named rather than inherited
 
     data = rx.read_pattern(PATTERN)
     ref = rx.Refinement(_structure(), ins, history=False)
@@ -630,7 +632,7 @@ def cheb6():
 def cheb6_peak():
     """Chebyshev-6 + one background peak — the fourth table row.
 
-    Quoted in the manual (`using/data.md`), the ``HumpComponent`` docstring and
+    Quoted in the manual (`concepts/parameters.md` § Humps), the ``HumpComponent`` docstring and
     this module's `MANUAL_RWP`, and the arm the "relaxes to 5.245(41)°" caveat
     turns on; a fixture so all three are pinned to a refinement rather than to a
     number a solver change can silently move.
@@ -869,8 +871,9 @@ def test_the_refined_scale_rejects_the_only_value_the_code_could_express(
     absorbs what the container scatters, so the fraction of the blank that
     reached run 4918 is not 1.0 — and 1.0 was the only value this package could
     express before the ``scale`` field existed.  Freed, it comes back at
-    0.8374(113): issue #171's hand-set interior minimum of ≈ 0.85 sits 1.1
-    esd away, and unity is rejected at more than ten.
+    0.8413(107): issue #171's hand-set interior minimum of ≈ 0.85 sits 0.8
+    esd away, and unity is rejected at more than ten (0.8374(113) and 1.1 esd
+    on 1.9.0).
 
     The synthetic fixture in `test_background_measured.py` recovered 0.8315(58)
     against a truth of 0.85 and named the mechanism — a noisy blank biases its
@@ -895,7 +898,8 @@ def test_the_refined_scale_rejects_the_only_value_the_code_could_express(
     # It is here as a regression pin on the two recorded numbers, not as
     # evidence.  The common weight is the specimen's own σ, the same one every
     # other cross-arm comparison in this section uses, so the pair asserted
-    # here is the pair the validation matrix records (0.079311 → 0.077328).
+    # here is the pair the validation matrix records (0.078843 → 0.076946;
+    # 0.079311 → 0.077328 on 1.9.0).
     sigma_y = cheb3.result.sigma
     for label, (free, held) in (
             ("each arm's own σ", (blank_free.result.statistics.rwp,
@@ -947,10 +951,10 @@ def test_a_longer_polynomial_eats_the_measured_scale(
     polynomial is additive and the curve is a shape, so what the two share is
     the background's level, and the longer polynomial takes it.
 
-    Here, on run 4736: 0.8374(113) on three terms and 0.6935(196) on six — the
+    Here, on run 4736: 0.8413(107) on three terms and 0.6935(192) on six — the
     same walk, on data nobody constructed.  And the sting is which arm Rwp
     prefers.  Scored on one common weight the six-term arm is the *better* fit
-    (0.076382 against 0.077328) while its scale is the one that disagrees with
+    (0.075953 against 0.076946) while its scale is the one that disagrees with
     issue #171's hand-set minimum.  A lower Rwp does not make a scale more
     nearly measured, which is why the docs' rule is what it is: if the scale is
     a number you intend to quote, keep the polynomial as low-order as the fit
@@ -985,8 +989,8 @@ def test_the_blank_widens_the_weight_it_is_judged_by(cheb3, blank_held):
 
     The weight is *looser*: this blank's own σ inflates the specimen's by up to
     ~14 % at the low-angle end where the container dominates.  So the same
-    residual scores better — ``blank_held`` reads 0.074012 against its own σ and
-    0.079311 against the specimen's alone, and 7 % of that number is weighting
+    residual scores better — ``blank_held`` reads 0.073609 against its own σ and
+    0.078843 against the specimen's alone, and 7 % of that number is weighting
     rather than fit.
 
     And the weight depends on **s**, so an Rwp column down a scan of scales is

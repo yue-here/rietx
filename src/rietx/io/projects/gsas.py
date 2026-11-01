@@ -89,6 +89,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ...crystallography.symmetry import setting_diagnostics
+from ...crystallography.twins import merge_site_twins
 from ...model.profiles.caglioti import GAUSSIAN_VARIANCE_TO_FWHM_SQUARED
 from ...schemas.common import Diagnostic
 
@@ -1606,7 +1607,7 @@ def to_structure(model: GsasModel, *, phase: int | None = None,
                 x=rx.Parameter(value=site["xyz"][0], vary=site["vary_xyz"]),
                 y=rx.Parameter(value=site["xyz"][1], vary=site["vary_xyz"]),
                 z=rx.Parameter(value=site["xyz"][2], vary=site["vary_xyz"]),
-                occ=rx.Parameter(value=site["occupancy"], min=0.0, max=1.5,
+                occ=rx.Parameter(value=site["occupancy"], min=0.0,
                                  vary=site["vary_occupancy"]),
                 biso=rx.Parameter(value=site["biso"], vary=site["vary_biso"]))
                 for site in sites],
@@ -1617,6 +1618,10 @@ def to_structure(model: GsasModel, *, phase: int | None = None,
             f"({chosen.name!r}) states values this build's schema refuses "
             f"({exc}).  The file's own numbers are on `model.phases`") from exc
 
+    # a site whose own images coincide is one atom on its special position
+    # (#1007), said here because this is the channel the schema lacks
+    structure = merge_site_twins(structure, diagnostics=diagnostics,
+                                 source=model.path or "<model>")
     if diagnostics is not None:
         named = model.path or "<model>"
         for raw, (canonical, wheres) in rewrites.items():
@@ -1893,6 +1898,7 @@ def from_structure(structure: Structure, *, title: str = "",
     from ...crystallography.symmetry import (
         expand_positions,
         get_spacegroup,
+        refuse_distortion_modes,
         refuse_magnetic_phase,
         refuse_operation_list,
         refuse_propagation_vector,
@@ -1929,6 +1935,7 @@ def from_structure(structure: Structure, *, title: str = "",
                 f"ATmmmA record numbers a site in three columns — site "
                 f"{_WRITE_MAX_ATOMS + 1} has no key")
         refuse_operation_list(phase, "a GSAS `.EXP`")
+        refuse_distortion_modes(phase, "a GSAS `.EXP`")
         refuse_magnetic_phase(phase, "a GSAS `.EXP`")
         refuse_propagation_vector(
             phase, "a GSAS `.EXP`",

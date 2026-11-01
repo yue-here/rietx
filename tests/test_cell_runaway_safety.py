@@ -22,13 +22,16 @@ scales refined through softplus: since WP-1938 they are refined in their own
 units and the construction no longer walks, so the firing path is reached by
 an injected escape (:func:`_fit_with_injected_escape`).
 
-The fix (``refine.clamp_cell_runaway``) is a **post-solve** correction, not a
-second live bound: it inspects the committed cell values after a stage solves
-and pulls any free cell parameter back inside
+The fix (``refine.reset_cell_runaway``) is a **post-solve** correction, not a
+second live bound: it inspects the committed cell values after a stage solves,
+and a phase with a free cell parameter outside
 ``CELL_SAFETY_FRACTION``/``CELL_SAFETY_ANGLE_DEG`` of the value the stage
-*started* from, unconditionally — no phase_support test gates it, which is
+*started* from gets its whole free cell put back at those starting values,
+held, and the stage solved once more without it (WP-2002, B8).  It is
+unconditional — no phase_support test gates it, which is
 the whole point, since the escaping phase here is exactly the one
-phase_support calls fine.  Doing this on the outcome rather than as a bound
+phase_support calls fine.  Until WP-2002 the parameter was pulled back to the
+window's edge instead.  Doing this on the outcome rather than as a bound
 scipy's TRF sees is what keeps every other test in this suite bit-identical:
 a live bound changes TRF's own trust-region step scaling even where it is
 never hit (WP-1110's own measurement, on an honestly-converging phase), and
@@ -39,6 +42,7 @@ digit.
 from __future__ import annotations
 
 import math
+import sys
 
 import numpy as np
 import pytest
@@ -51,7 +55,7 @@ from rietx.params.vector import (
     CELL_WINDOW_FRACTION,
     cell_window,
 )
-from rietx.refine import _build_result, _cell_runaway_diagnostic, clamp_cell_runaway
+from rietx.refine import CellReset, _build_result, _cell_runaway_diagnostic, reset_cell_runaway
 from rietx.schemas.common import Parameter
 from rietx.schemas.instrument import BackgroundChebyshev
 from rietx.schemas.structure import Atom, Cell, Phase, Structure
@@ -112,10 +116,10 @@ def test_the_safety_window_is_three_times_wider_than_the_support_window():
 
 
 # ----------------------------------------------------------------------
-# clamp_cell_runaway as a unit
+# reset_cell_runaway as a unit
 # ----------------------------------------------------------------------
 def test_a_cell_inside_the_window_is_left_alone():
-    """The bit-identity property: nothing to clamp is nothing changed."""
+    """The bit-identity property: nothing escaped is nothing changed."""
     from rietx.params.vector import ParameterTable
 
     structure, ins = _degenerate_pair(5e-4)
@@ -125,12 +129,14 @@ def test_a_cell_inside_the_window_is_left_alone():
     # nudge phase 0's cell by far less than CELL_SAFETY_FRACTION
     entry = table.entries[table._paths["phases.0.cell.a"]]
     entry.value = TRUE_A * 1.001
-    clamped = clamp_cell_runaway(table, start_values)
-    assert clamped == []
-    assert entry.value == pytest.approx(TRUE_A * 1.001)
+    found = reset_cell_runaway(table, start_values)
+    assert found == []
+    assert entry.value == TRUE_A * 1.001
 
 
-def test_a_cell_outside_the_window_is_pulled_back_and_reported():
+def test_a_cell_outside_the_window_goes_back_to_its_start_and_is_reported():
+    """WP-2002, B8: the stage-start value, never the window edge the
+    parameter used to be pulled to, and only the phase that escaped."""
     from rietx.params.vector import ParameterTable
 
     structure, ins = _degenerate_pair(5e-4)
@@ -138,22 +144,25 @@ def test_a_cell_outside_the_window_is_pulled_back_and_reported():
     table.set_vary(["phases.*.cell.a"], True)
     start_values = table.decode(table.x0())
     escaped = TRUE_A * 50.0  # far outside +/-15%
-    # ``clamp_cell_runaway`` reads and writes ``table.entries`` — the table's
+    # ``reset_cell_runaway`` reads and writes ``table.entries`` — the table's
     # own committed state, exactly what a real stage leaves it in after
     # ``table.commit(outcome.theta)`` — not the pydantic ``structure`` a
     # caller happens to also hold a reference to.
     entry = table.entries[table._paths["phases.0.cell.a"]]
     entry.value = escaped
-    clamped = clamp_cell_runaway(table, start_values)
-    assert len(clamped) == 1
-    path, old, new = clamped[0]
-    assert path == "phases.0.cell.a"
-    assert old == pytest.approx(escaped)
-    lo, hi = cell_window("a", start_values[path], -math.inf, math.inf,
-                         fraction=CELL_SAFETY_FRACTION,
-                         angle_deg=CELL_SAFETY_ANGLE_DEG)
-    assert new == pytest.approx(hi)
-    assert entry.value == pytest.approx(hi)
+    other = table.entries[table._paths["phases.1.cell.a"]]
+    other.value = TRUE_A * 1.001            # moved, inside its window
+    found = reset_cell_runaway(table, start_values)
+    assert found == [("phases.0.cell.a", escaped, start_values["phases.0.cell.a"])]
+    assert found[0].escaped and found[0].held
+    assert entry.value == start_values["phases.0.cell.a"]
+    # the cubic b and c follow the restored a
+    for n in "bc":
+        assert table.entries[table._paths[f"phases.0.cell.{n}"]].value == entry.value
+    # the other phase's cell did not escape, and keeps its solved value
+    assert other.value == TRUE_A * 1.001
+    # never as a bound: the table's free set is the caller's to change
+    assert "phases.0.cell.a" in table.free_paths
 
 
 def test_a_held_cell_is_never_visited():
@@ -163,7 +172,7 @@ def test_a_held_cell_is_never_visited():
 
     Review of #385 finding 3.  The escape is staged on the table's own
     ``Entry`` — what a real stage's ``table.commit(outcome.theta)`` writes,
-    and what ``clamp_cell_runaway`` actually reads — never on the pydantic
+    and what ``reset_cell_runaway`` actually reads — never on the pydantic
     ``structure``: ``ParameterTable._add`` snapshots ``Entry.value`` from the
     model at construction and does not track it afterwards, so a write to
     ``structure.phases[0].cell.a.value`` after the table is built lands
@@ -174,11 +183,14 @@ def test_a_held_cell_is_never_visited():
     test's escape silently missed the entries this function reads on two
     counts, not one.
 
-    Made to fail on purpose once (``tests/CLAUDE.md``): commenting out
-    ``clamp_cell_runaway``'s ``if e.path not in free: continue`` line turned
-    this from green to red — ``clamped`` came back
-    ``[('phases.0.cell.a', 207.83, 4.830089999999999)]`` instead of ``[]``,
-    confirming the filter is what this pins rather than a vacuous write.
+    A cubic cell held at ``a`` has no other free cell parameter, so the
+    reset could not move anything even with the filter gone.  The monoclinic
+    half is the one the filter carries: ``a`` held and staged far outside its
+    window, ``beta`` free beside it, and a reset reading the held entry would
+    put ``beta`` back from its solved value.  Made to fail on purpose once
+    (``tests/CLAUDE.md``): commenting out ``_escaped_cell_paths``' ``if e.path
+    not in free: continue`` line turned that half red, the reset returning
+    ``phases.0.cell.beta`` at its solved 99.3° instead of nothing.
     """
     from rietx.params.vector import ParameterTable
 
@@ -189,24 +201,35 @@ def test_a_held_cell_is_never_visited():
     start_values = table.decode(table.x0())
     entry = table.entries[table._paths["phases.0.cell.a"]]
     entry.value = TRUE_A * 50.0  # staged on the Entry itself, not the pydantic model
-    clamped = clamp_cell_runaway(table, start_values)
-    assert clamped == []
+    found = reset_cell_runaway(table, start_values)
+    assert found == []
+
+    table = ParameterTable(_monoclinic_phase(98.3),
+                           Instrument.debye_scherrer(wavelength=1.5406))
+    table.set_vary(["phases.0.cell.beta"], True)
+    table.set_vary(["phases.0.cell.a"], False)
+    start_values = table.decode(table.x0())
+    table.entries[table._paths["phases.0.cell.a"]].value = 5.0 * 50.0
+    beta = table.entries[table._paths["phases.0.cell.beta"]]
+    beta.value = 99.3                       # solved, inside its window
+    assert reset_cell_runaway(table, start_values) == []
+    assert beta.value == 99.3
 
 
 # ----------------------------------------------------------------------
 # review of #385 (2026-09-22): a cell driven by a free ``vars.X`` is
-# invisible to ``clamp_cell_runaway``, which tests a free path's own name
-# -- and it must stay invisible to the clamp (a shared driver has no single
-# clamp target), but it must never pass through silently.
+# invisible to ``reset_cell_runaway``, which tests a free path's own name
+# -- and it must stay invisible to the reset (a shared driver has no single
+# start to go back to), but it must never pass through silently.
 # ----------------------------------------------------------------------
-def test_a_vars_driven_cell_escape_is_never_clamped_but_is_named():
+def test_a_vars_driven_cell_escape_is_never_reset_but_is_named():
     """``phases.0.cell.a`` tied to a free ``vars.A`` (Yue's own reproduction,
-    review of #385 finding 1): ``clamp_cell_runaway`` still does not touch
-    it -- that is correct, per its own docstring, since pulling the driver
+    review of #385 finding 1): ``reset_cell_runaway`` still does not touch
+    it -- that is correct, per its own docstring, since putting the driver
     back would move every other value it reaches -- but
     ``_vars_driven_cell_escapes`` must find it, and the ``CELL_RUNAWAY``
     diagnostic built from both must name ``vars.A`` and ``phases.0.cell.a``
-    together, saying it was not pulled back and why."""
+    together, saying it was not put back."""
     from rietx import Refinement
     from rietx.refine import _cell_runaway_diagnostic, _vars_driven_cell_escapes
 
@@ -233,9 +256,9 @@ def test_a_vars_driven_cell_escape_is_never_clamped_but_is_named():
     dependent = table.entries[table._paths["phases.0.cell.a"]]
     assert dependent.value == pytest.approx(TRUE_A * 50.0)
 
-    # clamp_cell_runaway does not, and must not, touch it
-    clamped = clamp_cell_runaway(table, start_values)
-    assert clamped == []
+    # reset_cell_runaway does not, and must not, touch it
+    found = reset_cell_runaway(table, start_values)
+    assert found == []
     assert dependent.value == pytest.approx(TRUE_A * 50.0)  # still escaped
 
     # LaB6 is cubic, so ``vars.A`` reaches ``b``/``c`` too, transitively
@@ -248,13 +271,14 @@ def test_a_vars_driven_cell_escape_is_never_clamped_but_is_named():
 
     # nothing is silently passed through: the diagnostic names the driver
     # and every escaped dependent
-    diag = _cell_runaway_diagnostic(clamped, unresolved)
+    diag = _cell_runaway_diagnostic(found, unresolved)
     assert diag is not None
     assert set(diag.where) == {"vars.A", "phases.0.cell.a",
                                "phases.0.cell.b", "phases.0.cell.c"}
     assert "vars.A" in diag.message
     assert "phases.0.cell.a" in diag.message
-    assert "not pulled back" in diag.message
+    assert "not put back" in diag.message
+    assert "restored" not in diag.message
 
 
 def test_a_vars_driver_with_no_escaped_dependent_is_not_reported():
@@ -309,7 +333,7 @@ def test_every_free_cell_ends_in_the_physical_range(degenerate_pair_fit):
 
 def test_the_trigger_construction_no_longer_walks_in_physical_units(
         degenerate_pair_fit):
-    """The walk was a softplus artefact, and the clamp has nothing to do now.
+    """The walk was a softplus artefact, and the reset has nothing to do now.
 
     Measured on this fixture (macOS arm64, ``[dev]``): with the scales
     refined through softplus, TRF drove the decoy's scale to 2.7e-25 and
@@ -383,25 +407,41 @@ def _cubic_pair_pattern(wavelength: float = 0.4139, seed: int = 7):
     return PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
 
 
-def _fit_with_injected_escape(stages, *, mode, escape_at, restore_at):
+def _fit_with_injected_escape(stages, *, mode, escape_at, restore_at,
+                              second_escape=None, log=None):
     """Fit :func:`_cubic_pair` under ``stages`` with the escape **injected**:
-    ``escape_at``'s solve answers ``ESCAPE`` times what it found for
+    ``escape_at``'s first solve answers ``ESCAPE`` times what it found for
     ``ESCAPED``, and ``restore_at``'s solve (if that stage runs) answers the
     value ``escape_at`` found, so a later stage refines the cell from inside
-    its window.  WP-1301's hold is patched off (``_unsupported_phase_paths``
-    reports nothing): a cell pulled back to a window edge 15 % from its data
-    is a phase the data cannot see, so the collapse-restore would otherwise
-    hold it deterministically, and the rule under test is the clamp's."""
+    its window.  ``second_escape`` names a path the escape stage's *second*
+    solve, the one the reset buys, answers ``ESCAPE`` times its own value
+    for, which reaches the reset that has no solve after it.  ``log``
+    collects ``(stage, free paths)`` per solve.
+
+    WP-1301's hold is patched off (``_unsupported_phase_paths`` reports
+    nothing): with it on, a phase measured at the escaped answer could be
+    called unseen and held by the collapse instead, and the rule under test
+    is the reset's."""
     import dataclasses
     import sys
 
     refine_module = sys.modules["rietx.refine"]
     real = refine_module.run_least_squares
     found: dict[str, float] = {}
+    solves: dict[str, int] = {}
 
     def solve(model, table, **kwargs):
-        outcome = real(model, table, **kwargs)
         stage = kwargs.get("stage")
+        if log is not None:
+            log.append((stage, list(table.free_paths)))
+        outcome = real(model, table, **kwargs)
+        solves[stage] = solves.get(stage, 0) + 1
+        if stage == escape_at and solves[stage] == 2 and second_escape:
+            table.commit(outcome.theta)
+            entry = table.entries[table._paths[second_escape]]
+            entry.value = ESCAPE * entry.value
+            table.refresh_ties()
+            return dataclasses.replace(outcome, theta=table.x0())
         if stage not in (escape_at, restore_at) or stage in found:
             return outcome
         table.commit(outcome.theta)
@@ -421,8 +461,9 @@ def _fit_with_injected_escape(stages, *, mode, escape_at, restore_at):
         mp.setattr(refine_module, "run_least_squares", solve)
         mp.setattr(refine_module, "_unsupported_phase_paths", lambda *a, **k: [])
         ref = Refinement(_cubic_pair(), ins, history=False)
+        # the declared stages' reset; the closing stage is tests/test_closing_stage.py's
         result = ref.fit(_cubic_pair_pattern(), mode=mode,
-                         plan=RefinementPlan(stages=list(stages)))
+                         plan=RefinementPlan(stages=list(stages), closing_window_tol=None))
     assert escape_at in found, "the injection never ran"
     return result
 
@@ -431,23 +472,25 @@ def _fit_with_injected_escape(stages, *, mode, escape_at, restore_at):
 def lebail_pair_fits():
     """The #374 Le Bail plan on ``_cubic_pair``, run twice, with the escape
     **injected** rather than found: the ``cell`` solve's answer for
-    ``phases.1.cell.a`` is replaced by ``ESCAPE`` times itself, so the clamp
+    ``phases.1.cell.a`` is replaced by ``ESCAPE`` times itself, so the reset
     fires on that one path in that one stage on every platform.
 
-    "end" cuts the plan after ``cell``, so the clamp fires in the stage that
+    "end" cuts the plan after ``cell``, so the reset fires in the stage that
     produces the answer.  "early" runs the whole plan and puts the value the
     ``cell`` solve found back as ``widths``' answer, so ``axial`` refines the
-    cell from a value inside its window and its clamp has nothing to do.
+    cell from a value inside its window and its reset has nothing to do.
 
     Why injected (review of #385 round 4): the fixture this replaces walked a
     free, jointly degenerate pair and recorded one machine's stopping point.
     On the Linux CI jobs the walk crossed WP-1301's hold instead, and the
-    clamped row left ``parameters`` altogether, which is why the helper
+    row left ``parameters`` through the collapse, which is why the helper
     patches the hold off."""
     out = {}
     for name, stages in (("end", _LEBAIL_STAGES[:2]), ("early", _LEBAIL_STAGES)):
-        out[name] = _fit_with_injected_escape(
-            stages, mode="lebail", escape_at="cell", restore_at="widths")
+        log: list = []
+        out[name] = (_fit_with_injected_escape(
+            stages, mode="lebail", escape_at="cell", restore_at="widths",
+            log=log), log)
     return out
 
 
@@ -456,32 +499,62 @@ def _cell_rows(result, phase: int) -> dict[str, object]:
     return {n: by_path.get(f"phases.{phase}.cell.{n}") for n in "abc"}
 
 
-def test_a_clamped_cells_stderr_is_withheld(lebail_pair_fits):
-    """Review of #385 round 3: the esd is withheld only where the clamp
+def test_a_reset_cell_is_held_for_its_stage_and_the_stage_solves_again(
+        lebail_pair_fits):
+    """WP-2002, B8, ruled 2026-10-19: on a runaway the cell goes back to its
+    stage-start value and is held for that stage, with a record entry.
+
+    "end": ``cell`` solved twice, the second time without ``ESCAPED``; the
+    record names it in ``cell_reset`` and not in ``freed``; the answer holds
+    it at exactly the value the stage started from, never the window edge
+    the parameter was pulled to before.  "early": the next stage lifts the
+    hold and refines the cell again."""
+    end, log = lebail_pair_fits["end"]
+    solves = [(s, free) for s, free in log if s == "cell"]
+    assert len(solves) == 2, [s for s, _ in log]
+    assert ESCAPED in solves[0][1] and ESCAPED not in solves[1][1]
+    assert "phases.0.cell.a" in solves[1][1]          # the other phase refines on
+    cell = end.stages[-1]
+    assert cell.name == "cell"
+    assert cell.cell_reset == [ESCAPED]
+    assert ESCAPED not in cell.freed and ESCAPED not in cell.held
+    [diag] = [d for d in end.diagnostics if d.code == "CELL_RUNAWAY"]
+    assert "held while the stage solved again" in diag.message
+    assert "window edge" not in diag.message
+    start = TRUE_A * CUBIC_TWIN
+    for n in "bc":   # the held a has left ``parameters``; its tied b, c report it
+        assert _cell_rows(end, 1)[n].value == pytest.approx(start, rel=1e-14)
+    # the earlier stage reset nothing, and says so rather than staying silent
+    assert end.stages[0].cell_reset == []
+
+    early, log = lebail_pair_fits["early"]
+    assert [s.cell_reset for s in early.stages] == [[], [ESCAPED], [], []]
+    later = [free for s, free in log if s in ("widths", "axial")]
+    assert later and all(ESCAPED in free for free in later)
+
+
+def test_a_reset_cells_stderr_is_withheld(lebail_pair_fits):
+    """Review of #385 round 3: the esd is withheld only where the reset
     happened in the stage that produced the answer, and on every path tied to
     a withheld one (a tie inherits its source's blindness).
 
-    "end": the answer stage clamped ``phases.1.cell.a`` to the window edge,
-    so ``a`` — still a free column, never dropped — and the cubic ``b``/``c``
-    tied to it all report ``stderr=None``, while phase 0, never clamped,
-    keeps its esd.  "early": the same clamp fired in ``cell``, and the later
-    stages refined the cell again from inside the window, so the value
-    reported is a fit result and every cell row carries the esd that last
-    stage measured.  Before round 3 "early" withheld ``a``'s esd off the run's
-    accumulated diagnostics and left ``b``/``c`` theirs."""
-    end, early = lebail_pair_fits["end"], lebail_pair_fits["early"]
+    "end": the answer stage put ``phases.1.cell.a`` back and held it, so the
+    row has left ``parameters`` (a held path does, as WP-1301's collapse
+    does), and the cubic ``b``/``c`` tied to it report ``stderr=None``, while
+    phase 0, never reset, keeps its esd.  "early": the same reset fired in
+    ``cell``, and the later stages refined the cell again from its start, so
+    the value reported is a fit result and every cell row carries the esd that
+    last stage measured.  Before round 3 "early" withheld ``a``'s esd off the
+    run's accumulated diagnostics and left ``b``/``c`` theirs."""
+    end, early = lebail_pair_fits["end"][0], lebail_pair_fits["early"][0]
 
     fired = [d for d in end.diagnostics if d.code == "CELL_RUNAWAY"]
     assert len(fired) == 1 and fired[0].where == [ESCAPED]
     assert [s.name for s in end.stages][-1] == "cell"
     rows = _cell_rows(end, 1)
-    assert rows["a"] is not None and rows["a"].vary is True
-    _, edge = cell_window("a", TRUE_A * CUBIC_TWIN, -math.inf, math.inf,
-                          fraction=CELL_SAFETY_FRACTION, angle_deg=CELL_SAFETY_ANGLE_DEG)
-    assert rows["a"].value == pytest.approx(edge)   # the window edge, not a fit
-    for n, row in rows.items():
-        assert row is not None and row.value == pytest.approx(edge), n
-        assert row.stderr is None, f"end: phases.1.cell.{n} {row}"
+    assert rows["a"] is None
+    for n in "bc":
+        assert rows[n] is not None and rows[n].stderr is None, f"end: phases.1.cell.{n}"
     for n, row in _cell_rows(end, 0).items():
         assert row is not None and row.stderr is not None, f"end: phases.0.cell.{n}"
 
@@ -509,7 +582,7 @@ _RIETVELD_STAGES = [
 
 
 def test_the_rietveld_trigger_reports_the_esd_its_last_stage_measured():
-    """Yue's round-3 probe, the Rietveld arm: the clamp fires in ``both``
+    """Yue's round-3 probe, the Rietveld arm: the reset fires in ``both``
     and a later stage refines the cell again, so every cell row of both
     phases reports the esd ``zero`` measured, the tied ``b``/``c`` equal to
     their ``a``.
@@ -526,6 +599,7 @@ def test_the_rietveld_trigger_reports_the_esd_its_last_stage_measured():
     assert fired[0].level == "warning"
     assert fired[0].value is not None and fired[0].value > 0.0
     assert [s.name for s in result.stages][-1] == "zero"
+    assert [s.cell_reset for s in result.stages] == [[ESCAPED], [], []]
     for phase in (0, 1):
         rows = _cell_rows(result, phase)
         for n, row in rows.items():
@@ -549,6 +623,7 @@ def test_a_well_behaved_fit_never_fires_it():
     ref = Refinement(structure, ins, history=False)
     result = ref.fit(synthesize())
     assert not any(d.code == "CELL_RUNAWAY" for d in result.diagnostics)
+    assert all(s.cell_reset == [] for s in result.stages)
     assert result.statistics.rwp < 0.05
 
 
@@ -567,43 +642,33 @@ def test_absent_phase_fixture_is_unaffected_by_the_new_safety_net():
 
 
 # ----------------------------------------------------------------------
-# review of #385 (2026-09-22): theta/Entry.value desync after a clamp
+# review of #385 (2026-09-22): theta/Entry.value desync after a reset
 # ----------------------------------------------------------------------
 #
-# ``clamp_cell_runaway`` mutates ``Entry.value`` directly and the caller
-# calls ``table.refresh_ties()`` when it fires, but neither touches the
-# ``LSQOutcome.theta`` the stage is carrying — and ``_build_result`` decodes
-# *that* ``theta`` (never the table) to build ``y_calc``/``statistics``/
-# ``ticks``, while ``RefinedParameter.value`` reads ``Entry.value`` straight
-# off the table.  A clamp that fires desynced the two: the reported
-# parameter was the clamped one, and the reported fit quality/pattern were
-# the pre-clamp (escaped) one's.
+# ``reset_cell_runaway`` mutates ``Entry.value`` directly, but it does not
+# touch the ``LSQOutcome.theta`` the stage is carrying — and
+# ``_build_result`` decodes *that* ``theta`` (never the table) to build
+# ``y_calc``/``statistics``/``ticks``, while ``RefinedParameter.value`` reads
+# ``Entry.value`` straight off the table.  A reset that fires desyncs the two
+# unless the caller re-derives ``theta``: the reported parameter would be the
+# restored one, and the reported fit quality/pattern the escaped one's.  (Found
+# on the window-edge clamp this replaced; the contract is the same.)
 #
-# On the two-phase construction above, reproducing this against a full
-# ``Refinement.fit()`` turned out to need more than the clamp itself: an
-# escaped cell generally also drops one phase's support (WP-1301), which
-# restores the pre-escape cell, holds it and re-solves — and that *second*
-# solve's ``theta`` is a fresh encoder output, never stale to begin with, so
-# the desync never reaches the stage's returned outcome on that route
-# regardless of whether the fix is present.  Tried and confirmed inert here:
-# (a) monkeypatching ``refine.CELL_SAFETY_FRACTION`` down to 0.02 so a modest
-# drift trips the clamp — still routed through the same collapse-restore,
-# because the joint degeneracy that drives the escape also drives one
-# phase's scale towards the other's; (b) a decoy scale two orders larger
-# (1e-2) than the fixture above, on the same reasoning.  So this asserts the
-# contract directly at ``clamp_cell_runaway``/``_build_result`` — the
-# review's own reproduction — which needs no solver at all: a stage's
-# ``table.commit(outcome.theta)`` is exactly ``table.commit(entry-set-by-
-# hand)`` from ``_build_result``'s point of view.
-def test_build_result_uses_the_theta_a_firing_clamp_left_stale():
-    """Demonstrates the *contract* directly: fed a stale (pre-clamp) theta,
+# Since WP-2002 a reset after the stage's first solve always buys a second
+# solve, whose ``theta`` is a fresh encoder output and never stale.  The one
+# branch that hands its outcome straight to ``_build_result`` is a reset after
+# that second solve, which ``second_escape`` reaches below.  The contract
+# itself needs no solver: a stage's ``table.commit(outcome.theta)`` is exactly
+# ``table.commit(entry-set-by-hand)`` from ``_build_result``'s point of view.
+def test_build_result_uses_the_theta_a_firing_reset_left_stale():
+    """Demonstrates the *contract* directly: fed a stale (pre-reset) theta,
     ``_build_result`` disagrees with the table it was handed; fed
-    ``table.x0()`` re-derived after the clamp, it agrees exactly. This is
+    ``table.x0()`` re-derived after the reset, it agrees exactly. This is
     unconditionally true of ``_build_result`` and does not by itself prove
     ``_run_stage``/``fit()`` honour it on a live solve (both thetas are
     supplied here by hand) -- see
-    ``test_fit_re_derives_theta_after_a_firing_clamp_with_no_collapse``
-    below for the integration check that fails on the pre-fix tree."""
+    ``test_fit_re_derives_theta_after_a_reset_with_no_solve_after_it``
+    below for the integration check."""
     structure = make_lab6()
     for n in "abc":
         getattr(structure.phases[0].cell, n).value = TRUE_A
@@ -620,19 +685,18 @@ def test_build_result_uses_the_theta_a_firing_clamp_left_stale():
 
     # what a runaway TRF step + ``table.commit(outcome.theta)`` leaves: an
     # escaped cell, freshly committed.  ``stale_theta`` is exactly what
-    # ``outcome.theta`` held before this fix re-derived it.
+    # ``outcome.theta`` holds until the caller re-derives it.
     entry = table.entries[table._paths["phases.0.cell.a"]]
     entry.value = TRUE_A * 1.30  # +30%, outside CELL_SAFETY_FRACTION
     stale_theta = table.x0()
 
-    clamped = clamp_cell_runaway(table, start_values)
-    assert len(clamped) == 1, clamped
-    table.refresh_ties()
-    fixed_theta = table.x0()  # the fix: re-derived after the clamp
+    found = reset_cell_runaway(table, start_values)
+    assert len(found) == 1, found
+    fixed_theta = table.x0()  # the fix: re-derived after the reset
 
     # entry.value is the ground truth either way — RefinedParameter.value
     # reads it directly and is not the thing under test here
-    assert entry.value != pytest.approx(TRUE_A * 1.30)  # the clamp moved it
+    assert entry.value == start_values["phases.0.cell.a"]  # the reset moved it
 
     import numpy as np
 
@@ -652,7 +716,7 @@ def test_build_result_uses_the_theta_a_firing_clamp_left_stale():
     y_calc_stale, rwp_stale = y_calc_and_rwp_at(stale_theta)
     y_calc_fixed, rwp_fixed = y_calc_and_rwp_at(fixed_theta)
 
-    # the clamp actually moved the cell, so the two thetas decode to
+    # the reset actually moved the cell, so the two thetas decode to
     # different y_calc/rwp -- otherwise this test would not be exercising
     # anything
     assert not np.allclose(y_calc_stale, y_calc_fixed)
@@ -680,33 +744,28 @@ def test_build_result_uses_the_theta_a_firing_clamp_left_stale():
     assert result_fixed.statistics.rwp == pytest.approx(rwp_fixed)
 
 
-def test_fit_re_derives_theta_after_a_firing_clamp_with_no_collapse(monkeypatch):
+def test_fit_re_derives_theta_after_a_reset_with_no_solve_after_it(monkeypatch):
     """End-to-end regression, through the public ``Refinement.fit()`` surface
     rather than a direct ``_build_result`` call.
 
-    The escape is injected (:func:`_fit_with_injected_escape`) into a plan
-    whose one stage produces the answer.  The degenerate pair walked only
-    while its scales were refined through softplus, so since WP-1938 nothing
-    found escapes on any platform.  WP-1301's collapse-restore would re-solve
-    and hand ``_build_result`` a fresh ``theta`` that was never stale, which
-    masks the bug whether or not the fix is present, so the helper patches
-    ``_unsupported_phase_paths`` to report no collapse.  That leaves exactly
-    the branch the fix touches: the stage's own outcome, clamped and returned
-    directly to ``_build_result``, with no second solve in between.  Made to
-    fail on purpose once: without ``_run_stage``'s
-    ``dataclasses.replace(outcome, theta=table.x0())`` the decoded cell is the
-    escaped 5.468 Å against the clamped entry's 4.887 Å.
+    One stage, two injected escapes (:func:`_fit_with_injected_escape`): the
+    first solve's ``ESCAPED``, which the reset holds and re-solves, and the
+    second solve's ``phases.0.cell.a``, which goes back to its start with no
+    solve after it and stays a free column with its esd withheld.  That second
+    one is the branch whose outcome reaches ``_build_result`` directly, so
+    this spies on the real ``_build_result`` call ``fit()`` makes and checks
+    its ``theta`` decodes to exactly what the SAME table's ``Entry.value``\\ s
+    hold at that moment, the literal postcondition, with no independent model
+    build to disagree about.  Made to fail on purpose once: without the
+    second reset's ``dataclasses.replace(second, theta=table.x0())`` in
+    ``_run_stage``, ``phases.0.cell.a`` decodes to the escaped 5.4036 Å
+    against the restored entry's 4.1566 Å.
 
     Rather than recompiling a second model to compare ``y_calc`` against (a
     fresh ``compile_model`` call makes its own frozen-window/FCJ-node sizing
     decisions -- WP-1110's own "Frozen-per-stage discreteness" invariant --
     which need not agree with the live fit's compiled model and produced a
-    large, unrelated mismatch when tried), this spies on the real
-    ``_build_result`` call ``fit()`` makes internally and checks its
-    ``theta`` argument decodes to exactly what the SAME table's
-    ``Entry.value``\\ s hold at that moment -- the literal postcondition the
-    fix restores, on the real code path, with no independent model build to
-    disagree about.
+    large, unrelated mismatch when tried), the spy reads the theta.
     """
     import sys
 
@@ -723,10 +782,20 @@ def test_fit_re_derives_theta_after_a_firing_clamp_with_no_collapse(monkeypatch)
 
     monkeypatch.setattr(refine_module, "_build_result", spy)
 
+    late = "phases.0.cell.a"
     result = _fit_with_injected_escape(
-        _RIETVELD_STAGES[:1], mode="rietveld", escape_at="both", restore_at=None)
-    assert [d.where for d in result.diagnostics
-            if d.code == "CELL_RUNAWAY"] == [[ESCAPED]]
+        _RIETVELD_STAGES[:1], mode="rietveld", escape_at="both", restore_at=None,
+        second_escape=late)
+    [diag] = [d for d in result.diagnostics if d.code == "CELL_RUNAWAY"]
+    assert diag.where == [ESCAPED, late]
+    assert "held while the stage solved again" in diag.message
+    assert "after the stage's second solve" in diag.message
+    [stage] = result.stages
+    assert stage.cell_reset == [ESCAPED, late]
+    assert ESCAPED not in stage.freed and late not in stage.freed
+    row = result.parameter(late)
+    assert row.vary is True and row.stderr is None
+    assert row.value == pytest.approx(TRUE_A, rel=1e-14)
     assert captured, "the spy never ran -- fit() must call _build_result by name"
 
     for path, entry_value in captured["entry_values"].items():
@@ -750,7 +819,7 @@ def _monoclinic_phase(beta: float) -> Structure:
                     y=Parameter(value=0.0), z=Parameter(value=0.0))])])
 
 
-def test_a_free_beta_outside_the_angle_window_is_clamped_and_reported_in_degrees():
+def test_a_free_beta_outside_the_angle_window_is_reset_and_reported_in_degrees():
     """A monoclinic phase's free ``beta`` escaping the ±``CELL_SAFETY_ANGLE_DEG``
     window must be reported in degrees, at the angle window — never in Å at
     the length fraction, which is what every ``a/b/c`` path in this file's
@@ -766,16 +835,13 @@ def test_a_free_beta_outside_the_angle_window_is_clamped_and_reported_in_degrees
 
     entry = table.entries[table._paths["phases.0.cell.beta"]]
     entry.value = 98.3 + 10.0  # +10 deg, outside the +/-CELL_SAFETY_ANGLE_DEG window
-    clamped = clamp_cell_runaway(table, start_values)
-    assert len(clamped) == 1
-    path, old, new = clamped[0]
+    found = reset_cell_runaway(table, start_values)
+    assert len(found) == 1
+    path, old, new = found[0]
     assert path == "phases.0.cell.beta"
-    lo, hi = cell_window("beta", 98.3, -math.inf, math.inf,
-                         fraction=CELL_SAFETY_FRACTION,
-                         angle_deg=CELL_SAFETY_ANGLE_DEG)
-    assert new == pytest.approx(hi)
+    assert old == 108.3 and new == 98.3 and entry.value == 98.3
 
-    diag = _cell_runaway_diagnostic(clamped)
+    diag = _cell_runaway_diagnostic(found)
     assert diag is not None
     assert "Å" not in diag.message
     assert "15%" not in diag.message
@@ -783,8 +849,8 @@ def test_a_free_beta_outside_the_angle_window_is_clamped_and_reported_in_degrees
     assert f"±{CELL_SAFETY_ANGLE_DEG:.0f}°" in diag.message
 
 
-def test_a_mixed_length_and_angle_clamp_names_both_windows():
-    """A stage that clamps both a length and an angle in the same firing
+def test_a_mixed_length_and_angle_reset_names_both_windows():
+    """A stage that resets both a length and an angle in the same firing
     must not collapse to either unit alone."""
     diag = _cell_runaway_diagnostic([
         ("phases.0.cell.a", 5.403580000000001, 4.83009),
@@ -837,20 +903,22 @@ def _ortho_pattern():
     return PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
 
 
-def test_a_negative_cell_length_in_lebail_is_caught_by_the_same_clamp(monkeypatch):
+def test_a_negative_cell_length_in_lebail_is_caught_by_the_same_reset(monkeypatch):
     """Two orthorhombic phases of one structure type with cells 0.8 % apart,
     Le Bail, the plan freeing background → cell → widths → an axial term.
     The ``cell`` solve's answer is replaced by the issue's shape — a ≈ −1.0e4,
     b ≈ −5.9e4, c ≈ 1.9e5 Å, a *positive* volume, so no degenerate-metric
     refusal can see it — and the stage still reports ``converged``.
 
-    No positivity guard is needed beside the clamp: its window is a band
+    No positivity guard is needed beside the reset: its window is a band
     around the stage's positive starting length (±15 %, and ±6° inside
     (0°, 180°) for an angle), so a length ≤ 0 is outside it by construction
-    and is pulled back like any other escape, in Le Bail mode as in Rietveld.
-    Measured without the clamp: the ``widths`` compile refuses to enumerate
-    reflections for the escaped cell (``ValueError``); a run whose last stage
-    escaped would have returned it."""
+    and goes back like any other escape, in Le Bail mode as in Rietveld.
+    Measured without the clamp the reset replaced: the ``widths`` compile
+    refuses to enumerate reflections for the escaped cell (``ValueError``); a
+    run whose last stage escaped would have returned it.  Injected on the
+    stage's first solve alone, since the reset's second solve runs with the
+    cell held."""
     import dataclasses
     import sys
 
@@ -858,10 +926,13 @@ def test_a_negative_cell_length_in_lebail_is_caught_by_the_same_clamp(monkeypatc
     real = refine_module.run_least_squares
     issue_shape = dict(zip("abc", (-1.0e4, -5.9e4, 1.9e5), strict=True))
 
+    injected = []
+
     def solve(model, table, **kwargs):
         outcome = real(model, table, **kwargs)
-        if kwargs.get("stage") != "cell":
+        if kwargs.get("stage") != "cell" or injected:
             return outcome
+        injected.append(True)
         table.commit(outcome.theta)
         by_path = {e.path: e for e in table.entries}
         for n, v in issue_shape.items():
@@ -886,17 +957,19 @@ def test_a_negative_cell_length_in_lebail_is_caught_by_the_same_clamp(monkeypatc
     fired = [d for d in result.diagnostics if d.code == "CELL_RUNAWAY"]
     assert len(fired) == 1
     assert fired[0].where == [f"phases.1.cell.{n}" for n in "abc"]
-    for n in "abc":
-        assert f"phases.1.cell.{n} {issue_shape[n]:.6g} -> " in fired[0].message
+    for n, start in zip("abc", _ORTHO, strict=True):
+        assert (f"phases.1.cell.{n} {issue_shape[n]:.6g} -> {1.008 * start:.6g} Å"
+                in fired[0].message)
+    assert result.stages[1].cell_reset == [f"phases.1.cell.{n}" for n in "abc"]
     for phase in ref.structure.phases:
         assert all(v > 1.0 for v in phase.cell.lengths_angles()[:3]), phase.name
 
 
 @pytest.mark.parametrize("beta", [-3.0, 0.0, 180.0, 185.0])
-def test_an_angle_outside_zero_to_180_is_clamped(beta):
+def test_an_angle_outside_zero_to_180_is_reset(beta):
     """The angle half of the positivity question: a free β the solve left
-    at or past 0° or 180° is outside ±6° of a physical start, so the clamp
-    pulls it back to the window edge — no second test needed."""
+    at or past 0° or 180° is outside ±6° of a physical start, so the reset
+    puts it back at that start — no second test needed."""
     from rietx.params.vector import ParameterTable
 
     table = ParameterTable(_monoclinic_phase(95.0), Instrument.debye_scherrer(
@@ -904,13 +977,12 @@ def test_an_angle_outside_zero_to_180_is_clamped(beta):
     table.set_vary(["phases.0.cell.beta"], True)
     start_values = table.decode(table.x0())
     next(e for e in table.entries if e.path == "phases.0.cell.beta").value = beta
-    clamped = clamp_cell_runaway(table, start_values)
-    assert [(p, old) for p, old, _ in clamped] == [("phases.0.cell.beta", beta)]
-    assert 0.0 < clamped[0][2] < 180.0
+    found = reset_cell_runaway(table, start_values)
+    assert found == [("phases.0.cell.beta", beta, 95.0)]
 
 
 # ----------------------------------------------------------------------
-# The clamp must not hand back a cell with no volume (#283 / #289, one rank on)
+# The reset hands back the cell the stage evaluated (#283 / #289, one rank on)
 # ----------------------------------------------------------------------
 def _p1_table(cell):
     from rietx.params.vector import ParameterTable
@@ -927,60 +999,77 @@ TRICLINIC = [2.733385, 2.361025, 2.548007, 127.8106, 113.4292, 108.7994]
 CELL_NAMES = ("a", "b", "c", "alpha", "beta", "gamma")
 
 
-def test_a_clamp_that_lands_on_a_degenerate_corner_restores_the_start_cell():
-    """Each parameter is clamped to its own window, so three escaped angles
-    land on the window's corner, ``start + 6°`` each: here α, β, γ =
-    133.8°, 119.4°, 114.8°, a direct-metric determinant of −126.  The cell the
-    stage started with is the one a Le Bail stage can still evaluate."""
+def test_three_escaped_angles_put_the_whole_cell_back_at_its_start():
+    """The window-edge clamp this replaced moved each parameter to its own
+    window, so three escaped angles landed on the window's corner, ``start +
+    6°`` each: α, β, γ = 133.8°, 119.4°, 114.8°, a direct-metric determinant
+    of −126, which raised ``DegenerateCellError`` out of a Le Bail fit.  The
+    reset puts the cell back at the one the stage started with, whose volume
+    the stage's own residual evaluated."""
+    from rietx.crystallography.lattice import direct_metric_tensor
+
     table = _p1_table(TRICLINIC)
     start_values = table.decode(table.x0())
     for name in CELL_NAMES:
         entry = table.entries[table._paths[f"phases.0.cell.{name}"]]
         entry.value = start_values[f"phases.0.cell.{name}"] * (
             1.5 if name in "abc" else 1.4)             # far outside the window
-    clamped = clamp_cell_runaway(table, start_values)
-    assert len(clamped) == 6
-    for path, escaped, restored in clamped:
-        assert restored == pytest.approx(start_values[path]), path
-        assert table.entries[table._paths[path]].value == pytest.approx(
-            start_values[path])
+    found = reset_cell_runaway(table, start_values)
+    assert len(found) == 6 and all(c.escaped for c in found)
+    for path, escaped, restored in found:
+        assert restored == start_values[path], path
+        assert table.entries[table._paths[path]].value == start_values[path]
         assert escaped != pytest.approx(start_values[path])
+    cell = [table.entries[table._paths[f"phases.0.cell.{n}"]].value for n in CELL_NAMES]
+    assert float(np.linalg.det(np.asarray(direct_metric_tensor(*cell)))) > 0.0
 
 
-def test_a_reverted_phase_is_told_apart_from_a_clamped_one_in_the_record():
-    """The diagnostic must not say a restored cell was "pulled back to the
-    window edge": its right-hand value is the start, not an edge."""
+def test_a_parameter_inside_its_window_goes_back_with_its_cell():
+    """Three angles escape while ``a`` drifts inside its window.  The cell
+    goes back whole, since ``a`` beside its partners' start values would be
+    another cell no fit produced; ``a`` is reported with the solved value it
+    went back from, and the message names only the three that left."""
     table = _p1_table(TRICLINIC)
     start_values = table.decode(table.x0())
-    for name in CELL_NAMES:
-        entry = table.entries[table._paths[f"phases.0.cell.{name}"]]
-        entry.value = start_values[f"phases.0.cell.{name}"] * (
-            1.5 if name in "abc" else 1.4)
-    reverted = clamp_cell_runaway(table, start_values)
-    assert all(c.reverted for c in reverted)
-    message = _cell_runaway_diagnostic(reverted).message
-    assert "restored to this stage's starting values" in message
-    assert "no volume" in message
+    by_path = {e.path: e for e in table.entries}
+    for name in ("alpha", "beta", "gamma"):
+        by_path[f"phases.0.cell.{name}"].value = start_values[
+            f"phases.0.cell.{name}"] * 1.4
+    drifted = start_values["phases.0.cell.a"] * 1.01        # inside ±15 %
+    by_path["phases.0.cell.a"].value = drifted
+    found = reset_cell_runaway(table, start_values)
+    assert len(found) == 6
+    assert {c[0] for c in found if c.escaped} == {
+        f"phases.0.cell.{n}" for n in ("alpha", "beta", "gamma")}
+    for path in start_values:
+        if ".cell." in path:
+            assert by_path[path].value == start_values[path], path
+    [a_row] = [c for c in found if c[0] == "phases.0.cell.a"]
+    assert a_row[1] == drifted and not a_row.escaped
+    assert a_row[2] == start_values["phases.0.cell.a"]
+    message = _cell_runaway_diagnostic(found).message
+    assert message.startswith(
+        "3 free cell parameters left ±6° of this stage's starting cell during "
+        "solving: phases.0.cell.alpha, phases.0.cell.beta, phases.0.cell.gamma.")
+    assert "phases.0.cell.a " in message           # in the restored detail
+    assert "held while the stage solved again" in message
+    assert "window edge" not in message
 
-    # positive arm for the old sentence: an ordinary clamp says nothing of it
-    table = _p1_table(TRICLINIC)
-    start_values = table.decode(table.x0())
-    entry = table.entries[table._paths["phases.0.cell.alpha"]]
-    entry.value = start_values["phases.0.cell.alpha"] + 20.0
-    clamped = clamp_cell_runaway(table, start_values)
-    assert not any(c.reverted for c in clamped)
-    message = _cell_runaway_diagnostic(clamped).message
-    assert "pulled back to the window edge" in message
-    assert "restored" not in message
+
+def test_a_reset_after_the_last_solve_says_so():
+    """A row the stage could not hold, found after its second solve
+    (``CellReset.held`` False), is worded apart from a held one."""
+    message = _cell_runaway_diagnostic([
+        CellReset("phases.1.cell.a", 5.40358, 4.20648, held=False)]).message
+    assert "after the stage's second solve, with no solve after it" in message
+    assert "held while the stage solved again" not in message
 
 
-def test_the_determinant_is_taken_on_the_cell_the_table_would_hold():
+def test_tied_angles_follow_a_restored_alpha():
     """Rhombohedral axes, α free with β, γ ← α: start 100°, solved 140°.  The
-    clamp rewrites α alone (to 106°) and the ties are refreshed afterwards by
-    the caller, so a determinant read straight off the entries sees
-    (106°, 140°, 140°), a cell with no volume, though the cell the table holds
-    once ``β = γ = α`` follows is (106°, 106°, 106°) and is fine (review of
-    #736, round 2).  Positive arm: the phase is not reverted."""
+    reset puts the phase's free cell (``a`` and α) back at the start, and the
+    ties refreshed off it put β and γ back at 100° too, so the cell the table
+    holds is the stage's own (review of #736, round 2, on the clamp)."""
     from rietx.params.vector import ParameterTable
     from rietx.schemas.structure import lebail_scaffold
 
@@ -994,61 +1083,40 @@ def test_the_determinant_is_taken_on_the_cell_the_table_would_hold():
     by_path["phases.0.cell.alpha"].value = 140.0
     for tied in ("beta", "gamma"):
         by_path[f"phases.0.cell.{tied}"].value = 140.0     # what commit leaves
-    clamped = clamp_cell_runaway(table, start_values)
-    assert [c[0] for c in clamped] == ["phases.0.cell.alpha"]
-    assert not any(c.reverted for c in clamped)
-    assert by_path["phases.0.cell.alpha"].value == pytest.approx(106.0)
-    for tied in ("beta", "gamma"):
-        assert by_path[f"phases.0.cell.{tied}"].value == pytest.approx(106.0)
-
-
-def test_a_reverted_phase_restores_every_free_cell_parameter():
-    """Three angles escape to the degenerate corner while ``a`` drifts inside
-    its window.  The record's claim is that the phase is back at the stage's
-    starting cell, so ``a`` is restored too and is reported as reverted, with
-    the solved value it was restored from."""
-    table = _p1_table(TRICLINIC)
-    start_values = table.decode(table.x0())
-    by_path = {e.path: e for e in table.entries}
+    found = reset_cell_runaway(table, start_values)
+    assert [(c[0], c.escaped) for c in found] == [
+        ("phases.0.cell.a", False), ("phases.0.cell.alpha", True)]
     for name in ("alpha", "beta", "gamma"):
-        by_path[f"phases.0.cell.{name}"].value = start_values[
-            f"phases.0.cell.{name}"] * 1.4
-    drifted = start_values["phases.0.cell.a"] * 1.01        # inside ±15 %
-    by_path["phases.0.cell.a"].value = drifted
-    found = clamp_cell_runaway(table, start_values)
-    assert len(found) == 6 and all(c.reverted for c in found)
-    for path in start_values:
-        if ".cell." in path:
-            assert by_path[path].value == pytest.approx(start_values[path]), path
-    [a_row] = [c for c in found if c[0] == "phases.0.cell.a"]
-    assert a_row[1] == pytest.approx(drifted)
-    assert a_row[2] == pytest.approx(start_values["phases.0.cell.a"])
-    message = _cell_runaway_diagnostic(found).message
-    assert "pulled back to the window edge" not in message
-    assert "restored to this stage's starting values" in message
+        assert by_path[f"phases.0.cell.{name}"].value == 100.0
 
 
-def test_a_clamp_that_stays_a_valid_cell_is_unchanged():
-    """The negative arm: one angle escaped, the cell clamped to its window edge
-    still has a positive determinant, and the clamp is what it always was."""
-    table = _p1_table(TRICLINIC)
-    start_values = table.decode(table.x0())
-    entry = table.entries[table._paths["phases.0.cell.alpha"]]
-    entry.value = start_values["phases.0.cell.alpha"] + 20.0
-    clamped = clamp_cell_runaway(table, start_values)
-    [(path, escaped, target)] = clamped
-    lo, hi = cell_window("alpha", start_values[path], -math.inf, math.inf,
-                         fraction=CELL_SAFETY_FRACTION,
-                         angle_deg=CELL_SAFETY_ANGLE_DEG)
-    assert path == "phases.0.cell.alpha" and target == pytest.approx(hi)
-    assert entry.value == pytest.approx(hi)
-
-
-def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path):
+@pytest.mark.slow
+@pytest.mark.parametrize("nudge", [
+    pytest.param(0, id="start"),
+    # its own group, so the two rows run on two workers (WP-2048)
+    pytest.param(-1, id="nudged", marks=pytest.mark.xdist_group("cell-runaway-nudged")),
+])
+def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path, nudge):
     """The public path: a P 1 Le Bail fit of a valid but wrong ~7 Å^3 cell on
     synthetic silicon (``tests/_synthetic_silicon.py``), two
-    stages.  The second ended on the clamp's degenerate corner and raised
-    ``DegenerateCellError`` out of ``fit`` from ``phase_support``."""
+    stages.  The second ended on the window-edge clamp's degenerate corner
+    and raised ``DegenerateCellError`` out of ``fit`` from ``phase_support``;
+    the reset that replaced the clamp puts the cell back at its stage start.
+
+    ``slow`` since WP-2019: it was the fast tier's longest case, 217 s of two
+    TRF plans.  Each part of its claim is asserted per push elsewhere: the
+    reset of this very cell by
+    ``test_three_escaped_angles_put_the_whole_cell_back_at_its_start``, and
+    the reset inside ``fit`` by the injected escape (``lebail_pair_fits``).
+    What this row alone shows is a fit walking into the guard unaided, and
+    that is kept in the nightly's full suite.
+
+    ``nudged`` multiplies cell ``a`` by 1 - 1e-14 (WP-1930's nudge).  On
+    macOS arm64 that start's second plan met a Jacobian that was not finite
+    and raised ``ValueError`` out of ``fit``, as the Linux nightly did on the
+    unnudged start once (WP-2048).  It now ends the stage with
+    ``STAGE_NOT_FINITE``, asserted where the trajectory was measured, since
+    elsewhere rounding picks another one."""
     import rietx as rx
     from rietx.schemas.structure import lebail_scaffold
     from tests._synthetic_silicon import silicon_pattern
@@ -1060,9 +1128,11 @@ def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path)
     np.savetxt(path, np.c_[pattern.two_theta, pattern.intensity], fmt="%.4f %.0f")
     data = rx.read_pattern(path)
     ins = rx.Instrument.bragg_brentano(radiation="CuKa")
-    ins.background = rx.background.auto_background(data)
-    structure = lebail_scaffold("P 1", TRICLINIC)
-    findings = []
+    ins.background = rx.background.auto_background(data).background
+    cell = list(TRICLINIC)
+    cell[0] *= 1 + nudge * 1e-14
+    structure = lebail_scaffold("P 1", cell)
+    findings, stops = [], []
     for plan in ("profile_only", "lab_bragg_brentano"):
         # TRF, because its trajectory is the one that reaches the guard, on
         # every start tried.  Under LM, the default since WP-1938, the wrong
@@ -1080,20 +1150,44 @@ def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path)
         assert math.isfinite(float(result.statistics.rwp))
         assert float(result.statistics.rwp) > 0.0
         findings += [d for d in result.diagnostics if d.code == "CELL_RUNAWAY"]
+        stops += [d for d in result.diagnostics if d.code == "STAGE_NOT_FINITE"]
         # fit plot for visual inspection (tests/output/, gitignored)
         from pathlib import Path
 
         from rietx.viz.plots import plot_result
         out = Path(__file__).parent / "output"
         out.mkdir(exist_ok=True)
-        plot_result(result, path=str(out / f"cell_runaway_p1_lebail_{plan}.png"))
+        plot_result(result, path=str(out / f"cell_runaway_p1_lebail_{plan}_{nudge}.png"))
         structure, ins = ref.fitted_structure, ref.fitted_instrument
-    # pin that the runaway guard was exercised.  Which of its two outcomes (a
-    # clamp, or a restore of a degenerate cell) this trajectory reaches depends
-    # on the platform's Python and BLAS: py3.13 CI clamps all six parameters and
-    # never reaches the degenerate corner.  The restore is pinned
-    # deterministically by the unit tests above, so here either message will do.
+    # pin that the runaway guard was exercised, and that it put the cell back
     assert findings, "no CELL_RUNAWAY fired: the fit no longer reaches the guard"
     assert all("restored to this stage's starting values" in d.message
-               or "pulled back to the window edge" in d.message
                for d in findings), [d.message for d in findings]
+    import platform
+    if nudge and (sys.platform, platform.machine()) == ("darwin", "arm64"):
+        assert stops, "the nudged start no longer reaches a non-finite model"
+
+
+def test_two_solves_driven_escapes_merge_by_driver_once():
+    """A stage that solves twice names each driving coefficient once.
+
+    ``refine._merge_unresolved`` is the one rule both runners call after the
+    second solve (WP-2028 task 7): a driver that escapes in both solves is one
+    entry, its dependents the sorted union; a driver from one solve alone is
+    kept, in first-seen order.  No fit in the suite reaches a second-solve
+    escape on either runner, so the rule is pinned here directly.
+    """
+    import sys
+
+    refine = sys.modules["rietx.refine"]
+    multi = sys.modules["rietx.multi"]
+    assert multi._merge_unresolved is refine._merge_unresolved
+    first = [("vars.a_0", ["phases.0.cell.a"]), ("vars.c_1", ["phases.0.cell.c"])]
+    second = [("vars.a_0", ["hist.1.phases.0.cell.a"]),
+              ("vars.b_0", ["phases.0.cell.b"])]
+    assert refine._merge_unresolved(first, second) == [
+        ("vars.a_0", ["hist.1.phases.0.cell.a", "phases.0.cell.a"]),
+        ("vars.c_1", ["phases.0.cell.c"]),
+        ("vars.b_0", ["phases.0.cell.b"])]
+    assert refine._merge_unresolved(first, []) == first
+    assert refine._merge_unresolved([], second) == second

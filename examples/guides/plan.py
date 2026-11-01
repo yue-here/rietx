@@ -30,4 +30,4 @@ for stage in result.stages:
 assert result.status == "converged"
 assert [(s.name, len(s.freed)) for s in result.stages] == [
     ("scale_bkg", 7), ("zero", 1), ("cell", 2), ("profile_w", 1), ("profile", 4),
-    ("biso", 7)]
+    ("biso", 7), ("closing", 22)]

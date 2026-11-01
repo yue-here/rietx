@@ -50,7 +50,7 @@ With more terms the polynomial imitates part of the blank, and the scale walks a
 
 <!-- output of examples/guides/blank.py -->
 ```text
-with 6 terms: blank scale 0.70 ± 0.03
+with 6 terms: blank scale 0.69 ± 0.03
 ```
 
 On this pair a scan of fixed scales, scored under one σ, puts the best scale near 0.85, which the three-term fit agrees with.

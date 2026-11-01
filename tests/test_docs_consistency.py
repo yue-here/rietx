@@ -150,6 +150,7 @@ PRIORITIES = wp_index.PRIORITIES
 #   2026-10-13  src/rietx/indexing/CLAUDE.md  328 -> 332  for WP-1932
 #   2026-10-13  src/rietx/indexing/CLAUDE.md  332 -> 338  for indexing C4 (#933)
 #   2026-10-13  src/rietx/indexing/CLAUDE.md  338 -> 340  for indexing C6
+#   2026-10-13  src/rietx/indexing/CLAUDE.md  340 -> 361  for C3 (issue #916)
 #   2026-09-01  tests/CLAUDE.md               253 -> 275  for the placement pass
 #   2026-09-01  docs/ROADMAP.md               589 -> 597  for the roadmap reorder: landed 573, cap landed + 24
 #   2026-09-02  docs/ROADMAP.md               597 -> 621  for the magnetic scattering track (1326-1329, out of
@@ -246,6 +247,14 @@ PRIORITIES = wp_index.PRIORITIES
 #                                                          tab, and three rules keep it running
 #                                                          there, where no CI job looks. Landed 982,
 #                                                          +1 headroom
+#   2026-10-19  CLAUDE.md                     983 -> 993  for WP-2001: a new decision answers by
+#                                                          its kind (DESIGN.md Rule 1), and every
+#                                                          heuristic has a row in rietx._audit.
+#                                                          Landed 992, +1 headroom
+#   2026-10-24  CLAUDE.md                     993 -> 994  for #1103: the absent-phase clause rewrapped at
+#                                                          100 columns, one line longer (Yue's round 2)
+#   2026-10-31  CLAUDE.md                     994 -> 995  for WP-2010: the answer-by-kind bullet says a ranking
+#                                                          picks only in Rule 1's two cases, one line longer
 #   2026-09-27  docs/ROADMAP.md               880 -> 571  for WP-1507: the WP tables left for the
 #                                                          generated docs/wp/README.md; prose only now
 #   2026-09-28  docs/ROADMAP.md               571 -> 579  for the structure track (1510-1517): one new
@@ -255,10 +264,18 @@ PRIORITIES = wp_index.PRIORITIES
 #                                                          and blurbs; landed 588
 #   2026-10-14  docs/ROADMAP.md               588 -> 589  for v1.10 (WP-1961): one table row, the cut's
 #                                                          Current focus already two lines; landed 589
+#   2026-10-18  docs/ROADMAP.md               589 -> 614  for the generality milestone (WP-2001): one table
+#                                                          row, a section with three tracks, one Current focus
+#                                                          line; landed 614, no headroom
 #   2026-10-06  src/rietx/io/CLAUDE.md        501 -> 561  for the time-of-flight readers and axis (issue
 #                                                          #193): the flight-time axis row, and the two
 #                                                          new reader kinds (a calibration reader and the
 #                                                          opt-in legacy layer); landed 560
+#   2026-10-30  src/rietx/io/CLAUDE.md        561 -> 563  for the total-scattering refusal (issue #1240):
+#                                                          its per-format row; landed 562
+#   2026-10-31  src/rietx/io/CLAUDE.md        563 -> 565  for Yue's review of #1241: § Refusals' fourth
+#                                                          case (a name-only refusal) and the table
+#                                                          row's no-fixture sentence; landed LANDED
 SIZE_CAPS: dict[str, int | None] = {
     # 739 -> 755 (WP-1102): two standing rules for the component seam — that an
     # additive non-Bragg term is a union *member* and not a new field, and that
@@ -455,7 +472,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # 978 -> 983 (WP-1966, 2026-10-14): the browser bullet, the three rules
     # that keep rietx running under wasm32 Pyodide, where no CI job looks.
     # Landed 982, +1 headroom.
-    "CLAUDE.md": 983,
+    "CLAUDE.md": 995,
     # 672 -> 676 (WP-1102): the Current focus rewrite at 1102's close names the
     # milestone's one break and what makes 1103 the seam's proving case.
     # 676 -> 682 (WP-1407): a new Unscheduled group, "The formats a lab still
@@ -582,7 +599,7 @@ SIZE_CAPS: dict[str, int | None] = {
     # its WP-level paragraphs moved to the v1.6 record.  From here the cap is
     # a budget on prose alone, and the per-row bump above ends.  Landed 570,
     # +1 headroom.
-    "docs/ROADMAP.md": 589,
+    "docs/ROADMAP.md": 614,
     # 1036 -> 1053 (WP-1429): where the GUI's colour values live, now that
     # they are Python and this workspace's `tokens.css` is generated from
     # them. It governs work outside the WP that measured it — an edit to a
@@ -647,7 +664,13 @@ SIZE_CAPS: dict[str, int | None] = {
     # χ² of one's own on two reduced vectors.  The counts stayed in the WP.
     # Landed at 332, no headroom.
     # 332 -> 340 (indexing C4, C6): the inlier retry and the width-set window.
-    "src/rietx/indexing/CLAUDE.md": 340,
+    # 340 -> 361 (C3, issue #916): the reversed questions moved to a
+    # candidate-independent line screen at the resolution, so three clauses
+    # changed where they stood — the pipeline's whole-profile rule, the
+    # search-window section (a shift is estimated, never a window) and the
+    # ``predicted_but_absent`` bullet (caps; the superset check refutes).
+    # The measurements stayed in #941's Acceptance table.  Landed at 361, no headroom.
+    "src/rietx/indexing/CLAUDE.md": 361,
     # 300 -> 350 (WP-1407): four per-format rows, and three standing rules the
     # Philips √ encoding taught — that a format may encode its counts rather
     # than store them, that the *permissive* description can be the defective
@@ -732,7 +755,14 @@ SIZE_CAPS: dict[str, int | None] = {
     # is a reader accepting a named deviation only when asked.  The long form
     # is in the module docstrings (`io/instrument_tof.py`, `io/formats/gsas.py`,
     # `io/legacy/__init__.py`).  Landed at 560; the +1 is headroom.
-    "src/rietx/io/CLAUDE.md": 561,
+    # 561 -> 563 (issue #1240): the `total_scattering` row of § Per format, the
+    # table every reader is listed in, so a refusal missing from it would read
+    # as a format nobody claims.  The row carries two rules the next refusal
+    # needs: that header evidence can sit past the 4 kB window and be matched
+    # on a banner rather than by escalating, and that a Windows-written header
+    # ends in `\r`, which `$` under `re.M` does not match.  Landed at 562; the
+    # +1 is headroom.
+    "src/rietx/io/CLAUDE.md": 565,
 }
 CURRENT_FOCUS_CAP: int | None = 60  # lines within ROADMAP's Current focus (WP-1031 landed at 33; the 1060 rewrite at 44)
 # Words, because a line cap alone was met by nine 1000-character paragraphs
@@ -982,7 +1012,7 @@ def _planning_docs() -> list[Path]:
     # directory's README under the same two checks (WP-1412).
     docs += _kept_by_git(sorted((ROOT / "docs" / "wp").rglob("*.md")))
     docs += sorted((ROOT / "docs" / "milestones").glob("*.md"))
-    return docs  # docs/manual/ is excluded: MyST links are sphinx's to check (-W)
+    return docs  # docs/docs/ is excluded: MyST links are sphinx's to check (-W)
 
 
 def _kept_by_git(paths: list[Path]) -> list[Path]:
@@ -1030,8 +1060,8 @@ def test_no_planning_doc_links_something_gitignored():
 
     `.gitignore` carries a blanket `*.png`, un-ignored directory by directory,
     and it has swallowed a committed image five times.  The guard written after
-    the third (`tests/test_gui_manual.py`) names two directories under
-    `docs/manual/`, so WP-1412's eighteen sheets under `docs/wp/` went past it:
+    the third (`tests/test_gui_manual.py`) named two directories under
+    the old manual tree, so WP-1412's eighteen sheets under `docs/wp/` went past it:
     the local build was right, the commit took the README alone, and nothing
     was red.
 
@@ -1177,7 +1207,7 @@ def test_current_focus_stays_a_focus_not_a_diary():
 
 SKILL_TREE = ROOT / "docs" / "skill" / "rietx"
 SRC = ROOT / "src" / "rietx"
-REFERENCES_BIB = ROOT / "docs" / "manual" / "references.bib"
+REFERENCES_BIB = ROOT / "docs" / "docs" / "references.bib"
 
 #: Diagnostic codes the AST walk below cannot see statically, each mapped to a
 #: comment naming its emitter.  Empty today: every engine code is a
@@ -1311,6 +1341,6 @@ def test_every_wp_and_citation_the_protocol_names_resolves():
         if not (in_bib or inline):
             unresolved.append(f"{chain}, {year}")
     assert not unresolved, (
-        "author-year citations resolving neither in docs/manual/references.bib "
+        "author-year citations resolving neither in docs/docs/references.bib "
         f"nor inline: {sorted(set(unresolved))}"
     )

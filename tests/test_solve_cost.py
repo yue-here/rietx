@@ -30,7 +30,7 @@ import numpy as np
 import pytest
 
 import rietx as rx
-from rietx.model.forward import compile_model, d_spacings
+from rietx.model.forward import WINDOW_AREA_TOL, compile_model, d_spacings
 from rietx.params.vector import ParameterTable
 from rietx.schemas.pattern import PatternData
 from rietx.solve import cost as solve_cost
@@ -129,7 +129,9 @@ def test_identity_from_a_lebail_extraction(nac_lebail, background):
     ref, data = nac_lebail
     cost = SolveCost.from_pawley(ref, data, background=background)
     S, inst = ref.fitted_structure, ref.fitted_instrument
-    model = compile_model(S, inst, data, mode="rietveld", two_theta_limits=LIMITS)
+    # the windows from_pawley compiles at (its docstring), named
+    model = compile_model(S, inst, data, mode="rietveld", two_theta_limits=LIMITS,
+                          window_area_tol=WINDOW_AREA_TOL)
     v = _values(S, inst)
     assert np.array_equal(cost.hkl, model.phases[0].reflections.index)
     chi, s = cost.chi2(_f2(model, v))
@@ -149,7 +151,7 @@ def test_floor_is_the_cost_s_own_unconstrained_solve(nac_lebail):
     cost = SolveCost.from_pawley(ref, data)
     S = solve_cost.blind_structure(ref.fitted_structure, 0, "pawley")
     model = compile_model(S, ref.fitted_instrument, data, mode="rietveld",
-                          two_theta_limits=LIMITS)
+                          two_theta_limits=LIMITS, window_area_tol=WINDOW_AREA_TOL)
     y, w, om, X = solve_cost._design(model, _values(S, ref.fitted_instrument), 0,
                                      "projected", "pawley")
     A = np.hstack([om.toarray(), X]) * np.sqrt(w)[:, None]
@@ -166,7 +168,13 @@ def test_a_pawley_fit_sits_on_or_above_its_own_floor(nac):
     restraint rows and the ridge the floor does not."""
     data, st, ins = nac
     ref = rx.Refinement(st, ins, history=False)
-    result = ref.fit(data, mode="pawley", two_theta_limits=(2.0, 12.0), telemetry=False)
+    plan = rx.PLAN_PRESETS["pawley_default"]()
+    # the declared stages alone (WP-2002): the cost compiles at their windows,
+    # and a fit closed at 1e-3 is a different model from it (floor 1.0029 of the
+    # fit's χ² there)
+    plan.closing_window_tol = None
+    result = ref.fit(data, mode="pawley", plan=plan, two_theta_limits=(2.0, 12.0),
+                     telemetry=False)
     cost = SolveCost.from_pawley(ref, data)
     assert cost.records["extraction"]["mode"] == "pawley"
     r = (np.asarray(result.y_obs) - np.asarray(result.y_calc)) / np.asarray(result.sigma)
@@ -188,7 +196,7 @@ def test_sparse_low_rank_equals_the_dense_projection(nac_lebail):
     assert cost.M0.nnz < 0.25 * len(cost.b) ** 2     # banded, not dense
     S = solve_cost.blind_structure(ref.fitted_structure, 0, "pawley")
     model = compile_model(S, ref.fitted_instrument, data, mode="rietveld",
-                          two_theta_limits=LIMITS)
+                          two_theta_limits=LIMITS, window_area_tol=WINDOW_AREA_TOL)
     y, w, om, X = solve_cost._design(model, _values(S, ref.fitted_instrument), 0,
                                      "projected", "pawley")
     Om = om.toarray()
@@ -481,7 +489,8 @@ def test_scale_nuisance_is_the_profile_chi2_with_one_free_impurity_scale(two_pha
     ref, data = two_phase
     cost = SolveCost.from_pawley(ref, data, nuisance="scale")
     S, inst = ref.fitted_structure, ref.fitted_instrument
-    model = compile_model(S, inst, data, mode="rietveld")
+    # the windows from_pawley compiles at (its docstring), named
+    model = compile_model(S, inst, data, mode="rietveld", window_area_tol=WINDOW_AREA_TOL)
     v = _values(S, inst)
     assert sum(k.startswith("instrument.source.lines.") and k.endswith(".weight")
                for k in v) == 2    # Kα₁,₂: the per-line factors are exercised
@@ -652,7 +661,7 @@ def test_refuses_a_nuisance_phase_s_satellites(nuisance):
 def harmonic():
     """λ = 2.4 Å with its λ/2 harmonic over 10–150°: every reflection with
     d < 1.2 Å is beyond line 0's sphere and reached by line 1 alone."""
-    ins = rx.Instrument.constant_wavelength_neutron(2.4, fwhm_deg=0.3, harmonics=True)
+    ins = rx.Instrument.constant_wavelength_neutron(2.4, fwhm_deg=0.3, harmonics=[2])
     assert [ln.wavelength.value for ln in ins.source.lines] == [2.4, 1.2]
     return ins, _flat(10, 150)
 

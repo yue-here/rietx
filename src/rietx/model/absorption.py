@@ -150,6 +150,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..backend import get_backend
+from ..optimize import lapack
 
 #: Upper limit of the Rouse et al. (1970) fit.  Above this the expression is an
 #: extrapolation, not a fit, so :mod:`rietx.refine` warns rather than
@@ -329,7 +330,7 @@ def equivalent_delta_biso_from_transmission(
     if s.size < 2:
         return 0.0, 0.0
     design = np.column_stack([np.ones_like(s), s])
-    coeffs, *_ = np.linalg.lstsq(design, ln_a, rcond=None)
+    coeffs, *_ = lapack.lstsq(design, ln_a, rcond=None)
     resid = ln_a - design @ coeffs
     spread = float(np.linalg.norm(ln_a - ln_a.mean()))
     unabsorbed = float(np.linalg.norm(resid) / spread) if spread > 0.0 else 0.0
@@ -404,6 +405,6 @@ def mu_t_identifiable_fraction(two_theta_deg: np.ndarray, mu_t: float,
 def _identifiable_fraction(s: np.ndarray, g: np.ndarray) -> float:
     """‖g − proj_{span{1, s}} g‖ / ‖g‖, the shared core of the two above."""
     design = np.column_stack([np.ones_like(s), s])
-    resid = g - design @ np.linalg.lstsq(design, g, rcond=None)[0]
+    resid = g - design @ lapack.lstsq(design, g, rcond=None)[0]
     scale = np.linalg.norm(g)
     return float(np.linalg.norm(resid) / scale) if scale > 0.0 else 0.0

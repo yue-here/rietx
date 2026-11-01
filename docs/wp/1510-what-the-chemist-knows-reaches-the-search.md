@@ -1,9 +1,8 @@
 # WP-1510 — What the chemist knows reaches the indexing search
 
-Milestone: unscheduled · Status: 🔄 2026-10-03 — every task landed; full suite green on main merged after the 1.6 cut, PR #690 ready
+Milestone: unscheduled · Status: ✅ 2026-10-23 — a peak list offers each line once, a refused prior or quality gate names its fix, a cell reads by name, and a formula gives a volume window and a Z check (PR #690, in 1.7)
 Track: Data and metadata in, a structure out
 Depends on: — (1449 soft, the ranking this feeds; 1508 soft, the search that ran out of time)
-Priority: P2 2026-09-28 — a defect that fires wrongly: sixty false impurity lines and a refused gate cost a collaborator's agent one whole earlier session, and each fix is small
 
 ## Goal
 
@@ -98,20 +97,10 @@ rule.
 (`schemas/indexing.py` `max_d_axis` now :1204 and `CellCandidate` :932,
 `diagnostics.py` `INDEX_DATA_INSUFFICIENT` :327, `priors.py` refusal :237).
 
-### Inherited
-
-- **2026-10-18, from WP-1986 (writing the indexing guide): the formula's volume
-  window excludes the true cell of most inorganic solids.** Hofmann's (2002)
-  volumes come from organic and organometallic structures. Measured with
-  `SearchSpec.from_formula(formula, z=…)` against each known cell (window
-  midpoint over true V): NaCl 1.18 (inside), CaF₂ 1.69, Al₂O₃ (z 6) 2.74,
-  ZnO 2.17, fluorapatite Ca5P3O12F (z 2) 1.81, LaB₆ 1.96, Si (z 8) 1.91,
-  NAC Na2Ca3Al2F14 (z 8) 3.22, all **outside**; paracetamol C8H9NO2 (z 4)
-  1.05, inside. On the shipped fluorapatite pattern the windowed search took
-  127 s, ranked only cells of 1000-1050 Å³ and abstained, while the same
-  search unwindowed put the true 523.6 Å³ cell first. `INDEX_Z_NOT_INTEGER`
-  rests on the same volume, so on the true cell it would imply Z = 1.14.
-  The skill's §7d recommends `from_formula` before the first search.
+**The window built here has a known limit.** Hofmann's volumes come from
+organic and metal-organic crystals, and the window excluded 7 of the 9 known
+cells WP-1986 measured on 2026-10-18; only NaCl and paracetamol fell inside.
+WP-2030 owns that, with the review findings left open below.
 
 ## Non-goals
 
@@ -170,6 +159,35 @@ given the skill asks for or infers the range before its first search.
   volumes. Read before citing.
 
 ## Handover log
+
+### 2026-10-23 — closed: what the chemist knows reaches the search
+
+What this WP built has stood since 1.7. A peak list offers each physical line
+once, a refused prior and a refused quality gate each name their fix, a
+candidate's cell reads by name, and a formula gives a volume window and a Z
+check. What stays open is the window's reach. Hofmann's volumes come from
+organic crystals, so on most inorganic solids the window misses the true cell,
+and the skill tells an agent to build it before the first search. That and the
+review findings left open below are now
+[WP-2030](2030-a-formulas-volume-window-fits-inorganic-cells.md).
+
+*Closed by* the maintainer's decision today, which discharges the merge and
+close that waited on them. PR #690 merged 2026-10-03 with every task ticked,
+the full suite at 8418 passed, 0 failed on the merged tree (entry below). The
+replay of `solution case 1` never ran: its pattern is a collaborator's
+unpublished data, not in this tree (PR #690's body). The close discharges that
+acceptance item for that reason, and with no data to come it is not forwarded.
+
+*Inherited:* the one bullet (WP-1986, 2026-10-18: the window misses 7 of 9
+known cells) is open work. It became WP-2030's Context and first tasks, plus
+one sentence in Context here. *Forwarded* to WP-2030, filed now because no open
+WP owns `from_formula`, Hofmann, a hydrate or `formula=`: the inorganic window
+and its Z check; the five open review findings, the hydrate parse first; the
+two-step flow; `formula` in the CLI and GUI; whether the supported-supercell
+promotion earns an `indexing/CLAUDE.md` rule; and the Z ≈ 2.8 trade-off, as
+Context. 1511 and 1517 name 1510 soft, and neither priority moves.
+
+*Next.* Nothing owed here.
 
 - **2026-10-03** — The four red acceptance rows are fixed, and one of the
   fixes is a ranking rule. Corundum had started indexing at half its true c,

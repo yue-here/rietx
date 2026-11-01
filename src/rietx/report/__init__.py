@@ -11,9 +11,16 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..schemas.pattern import PatternData
 from ..schemas.results import RefinementResult
 from .apply import RECIPES, Recipe, describe_action, recipe, stage_for
 from .background import assess_background
+from .distortion import (
+    block_comparison,
+    detectability_amplitude,
+    detectability_target,
+    distortion_blocks,
+)
 from .identifiability import (
     assess_identifiability,
     identifiability_clause,
@@ -68,6 +75,9 @@ from .schemas import (
     BasisCoefficient,
     DeltaChi2Profile,
     DeltaChi2Quantile,
+    DistortionBlockTest,
+    DistortionBlockTests,
+    DistortionRestart,
     ExchangeFinding,
     FitReport,
     FreedComparison,
@@ -104,6 +114,9 @@ __all__ = [
     "BasisCoefficient",
     "DeltaChi2Profile",
     "DeltaChi2Quantile",
+    "DistortionBlockTest",
+    "DistortionBlockTests",
+    "DistortionRestart",
     "ExchangeFinding",
     "FitReport",
     "FreedComparison",
@@ -140,6 +153,7 @@ __all__ = [
     "attribute_regions",
     "background_actions",
     "background_clause",
+    "block_comparison",
     "build_layer0",
     "build_report",
     "cap_texture_crosstalk",
@@ -150,6 +164,9 @@ __all__ = [
     "cumulative_delta_chi2",
     "delta_bic",
     "describe_action",
+    "detectability_amplitude",
+    "detectability_target",
+    "distortion_blocks",
     "estimate_delta_chi2",
     "hamilton_justified",
     "identifiability_clause",
@@ -218,9 +235,73 @@ def _resid_norm(result: RefinementResult) -> np.ndarray:
             / result.sig())
 
 
+def _reading_models(model, structure, instrument):
+    """The two models Layer 1 and the texture screen read (WP-2002, the eighth
+    round's item 1): ``(misfit, shapes)``.
+
+    The misfit comes from a model at the closing stage's precision
+    (``CLOSING_WINDOW_TOL`` and the closing FCJ rule), and the shapes it is
+    fitted with (the derivative bases, and the windows the texture screen
+    shares a point's misfit over) from one at the declared stages'
+    (``WINDOW_AREA_TOL``).  Whichever ``model`` is not is compiled here on
+    its grid, once per report, about 2 % of a report's time.
+
+    Both halves were measured.  Shapes at the closing precision misread two
+    ways: windows ±20° wide on a lab Lorentzian share an impurity line's
+    misfit with distant reflections, which the texture screen read as
+    preferred orientation (0.35 on ``tests/test_fitreport_layers.py``'s doped
+    pattern); and the closing rule computes an asymmetry shape for every
+    reflection over 3e-4 of its width, which near 90° runs within |cos|
+    0.9986 of the position shape and, scaled to unit length, fails the
+    Gram gate, so a zero shift and a displacement could no longer be told
+    apart.  A misfit at the declared precision misreads too: that FCJ rule
+    leaves up to 5.6e-3 of a peak's maximum against data with exact
+    asymmetry, and on a displaced specimen the report ranked axial asymmetry
+    first.  Read this way the displaced specimen ranks the displacement first
+    at 0.995.
+
+    The texture screen takes ``shapes`` alone, so its misfit is read at the
+    declared precision too: it shares a point's misfit over that model's
+    windows, and the two must come from one compile.
+
+    For a Pawley model (whose intensity block is the solve's), or one built by
+    hand that records no window fraction, both are ``model``.
+    :func:`build_report` refuses a non-Pawley ``model`` without ``structure``
+    and ``instrument``, so both are always given here.
+    """
+    if model.mode == "pawley" or model.window_area_tol is None:
+        return model, model
+    from ..model.forward import CLOSING_WINDOW_TOL, WINDOW_AREA_TOL
+    misfit = (model if model.window_area_tol <= CLOSING_WINDOW_TOL
+              else _twin(model, structure, instrument, CLOSING_WINDOW_TOL))
+    shapes = (model if model.window_area_tol >= WINDOW_AREA_TOL
+              else _twin(model, structure, instrument, WINDOW_AREA_TOL))
+    return misfit, shapes
+
+
+def _twin(model, structure, instrument, window_area_tol):
+    """``model`` compiled again at ``window_area_tol`` on its own grid: the
+    same channels, σ and moment frames, and its Le Bail intensities."""
+    from ..model.forward import compile_model
+    from ..refine import _carry_lebail
+
+    grid = PatternData(two_theta=model.tt.tolist(), intensity=model.y_obs.tolist(),
+                       sigma=model.sigma.tolist())
+    twin = compile_model(structure, instrument, grid, mode=model.mode,
+                         window_area_tol=window_area_tol)
+    # the model's σ, which a measured background widened once already
+    twin.sigma = model.sigma
+    for cp, twin_cp in zip(model.phases, twin.phases, strict=True):
+        if cp.magnetic is not None and twin_cp.magnetic is not None:
+            twin_cp.magnetic.frames = list(cp.magnetic.frames)
+    if model.mode == "lebail":
+        _carry_lebail(model, twin)
+    return twin
+
+
 def build_report(result: RefinementResult, *, model=None, values=None,
                  plan=None, free_paths: list[str] | None = None,
-                 structure=None, held: list[str] | None = None,
+                 structure=None, instrument=None, held: list[str] | None = None,
                  top_n: int = 15, match_tol_deg: float = 0.08,
                  min_peak_sigma: float = 5.0) -> FitReport:
     """Build the report, going as deep as the inputs allow.
@@ -243,11 +324,32 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         carry: the moment arm (WP-1327) labels each row with the atom's own
         label rather than its index, and the satellite arm (WP-1326) reports
         which propagation vector each phase already *declares*.
+    instrument:
+        The :class:`~rietx.schemas.instrument.Instrument` the model was
+        compiled from.  With ``structure`` it lets Layer 1 and the texture
+        screen read the misfit at the closing stage's precision and fit it
+        with shapes at the declared stages' (:func:`_reading_models`).
     held:
         The last stage's hold list (``StageResult.held``), so the moment arm's
         "unmeasured" directions are the refinement's answer rather than a
         second opinion about it.
+
+    ``model`` without ``structure`` and ``instrument`` is refused, except for a
+    Pawley model, whose intensity block is the solve's and is read as it is.
+    Read from one model, Layer 1 takes both its misfit and its shapes at one
+    precision, and each precision alone misreads a measured case
+    (:func:`_reading_models`), so the report would be wrong without saying so.
     """
+    if (model is not None and model.mode != "pawley"
+            and (structure is None or instrument is None)):
+        missing = " and ".join(name for name, arg in (("structure=", structure),
+                                                      ("instrument=", instrument))
+                               if arg is None)
+        raise TypeError(
+            f"build_report(model=...) needs {missing}: the Structure and "
+            f"Instrument the model was compiled from, because Layer 1 reads its "
+            f"misfit and its shapes from two compiles of them.  "
+            f"Refinement.report() passes all three")
     report = build_layer0(result, top_n=top_n, match_tol_deg=match_tol_deg,
                           min_peak_sigma=min_peak_sigma)
     # Soft-restraint deviations are model-free (carried from the result), so they
@@ -320,13 +422,14 @@ def build_report(result: RefinementResult, *, model=None, values=None,
         flat_axes=(result.stages[-1].moment_flat_axes if result.stages
                    else None),
         turned=(result.stages[-1].moment_turned if result.stages else None))
-    attributions = attribute_regions(model, values, report.regions)
+    misfit, shapes = _reading_models(model, structure, instrument)
+    attributions = attribute_regions(misfit, values, report.regions, shapes=shapes)
     report.attribution = attributions
     # March-Dollase texture and Stephens anisotropic strain are computed before
     # the maturity gate: an uncorrected intensity or width *direction* is a
     # common *cause* of an immature fit, so these must still speak when the rest
     # of Layer 1 abstains.
-    report.texture = analyse_texture(model, values)
+    report.texture = analyse_texture(shapes, values)
     # phases carrying the spherical-harmonics texture (WP-1960), whose
     # remedy for a leftover single-axis signature is the order, never a
     # March-Dollase block the schema would refuse beside it
@@ -345,11 +448,11 @@ def build_report(result: RefinementResult, *, model=None, values=None,
     # arm sorts them itself so one radius decides both the tick test and the
     # satellite test (``report/satellites.py``'s docstring has the measurement)
     tt_res = np.asarray(result.two_theta)
-    residual_peaks = tt_res[residual_peak_indices(
-        _resid_norm(result), min_peak_sigma=min_peak_sigma)]
+    resid = _resid_norm(result)
+    peak_idx = residual_peak_indices(resid, min_peak_sigma=min_peak_sigma)
     report.satellites = analyse_satellites(
-        model, values, residual_two_theta=residual_peaks, ticks=sat_ticks,
-        structure=structure)
+        model, values, residual_two_theta=tt_res[peak_idx], ticks=sat_ticks,
+        structure=structure, residual_height_over_sigma=resid[peak_idx])
     # The Le Bail gap is measured, never linearised, so it too speaks on both
     # branches (None outside Rietveld mode — absent for cause).  The summary
     # quotes it only when notable: a converged fit reads ratio ≲ 1 and saying

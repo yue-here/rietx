@@ -690,7 +690,8 @@ def test_the_count_falls_with_the_point_group_and_not_with_centring():
     reduce the count is the **star** — arms of one star generate the identical
     satellite list, so keeping all of them would put exact ties in a ranking
     meant to be read.  Recorded as a test because it is a correction to the
-    WP's own text.
+    WP's own text.  What centring *does* change is which points are in the set
+    (the k ≡ −k points of the lattice, the tests below), never more than seven.
     """
     from rietx.crystallography.representation.irreps import equivalent_kvectors
 
@@ -704,10 +705,153 @@ def test_the_count_falls_with_the_point_group_and_not_with_centring():
     # the reduction is the point group's: seven on P-1, three on P m -3 m
     assert len(zone_boundary_candidates("P -1")) == 7
     assert len(zone_boundary_candidates("P m -3 m")) == 3
-    # and centring alone does not reduce it — C 2/m has the same point group as
-    # P 2/m and the same count
-    assert len(zone_boundary_candidates("C 2/m")) == \
-        len(zone_boundary_candidates("P 2/m"))
+    # on a centred lattice the set is the lattice's own, so the count is the
+    # number of its stars of k ≡ −k points: five on C 2/m against seven on
+    # P 2/m, the same point group
+    assert len(zone_boundary_candidates("P 2/m")) == 7
+    assert len(zone_boundary_candidates("C 2/m")) == 5
+
+
+# ------------------------------------------- the set is the lattice's k ≡ −k points
+
+def _literal_candidates(symbol):
+    """The generator as it was before it was derived from the lattice.
+
+    {0, ½}³ minus the origin in conventional axes, plus the two third-order
+    points on a hexagonal or trigonal lattice, one per star in that order —
+    kept here as the reference the P-lattice identity is measured against.
+    """
+    from rietx.crystallography.satellites import _TRIGONAL_POINTS
+
+    sg = get_spacegroup(symbol)
+    half = (Fraction(0), Fraction(1, 2))
+    raw = [(h, k, ll) for h in half for k in half for ll in half
+           if (h, k, ll) != (0, 0, 0)]
+    if sg.crystal_system_str() in ("hexagonal", "trigonal"):
+        raw.extend(_TRIGONAL_POINTS)
+    out, seen = [], set()
+    for kk in raw:
+        arms = frozenset(star(sg, kk))
+        if arms not in seen:
+            seen.add(arms)
+            out.append(kk)
+    return out
+
+
+def _two_k_in_lattice(symbol, k) -> bool:
+    twice = [2 * c for c in k]
+    if any(c.denominator != 1 for c in twice):
+        return False
+    return bool(reciprocal_lattice_mask(
+        symbol, np.array([[int(c) for c in twice]]))[0])
+
+
+def test_on_every_primitive_setting_the_set_is_bit_identical_to_the_literal():
+    """Every P (and rhombohedral-axes) setting gemmi tabulates: same k, same order.
+
+    On a P lattice the primitive reciprocal basis is the conventional one, so
+    the k ≡ −k points are {0, ½}³ minus the origin and the derived set must be
+    the literal one exactly — the candidates, their spelling and their order,
+    hence every ranking a primitive fixture (Cr₂WO₆, LaMnO₃, Ba₆Co₆ClO₁₆) pins.
+    """
+    import gemmi
+
+    # On a P lattice both sets depend only on the rotations (the star) and the
+    # crystal system (the third-order points), so one setting per distinct
+    # rotation set covers every case the table holds, axis orders included.
+    distinct: dict[tuple, str] = {}
+    for entry in gemmi.spacegroup_table():
+        symbol = entry.xhm()
+        if symbol[0] != "P" and not symbol.endswith(":R"):
+            continue
+        sg = get_spacegroup(symbol)
+        rot = np.rint(rotation_matrices(sg)).astype(int).reshape(-1, 9)
+        key = (sg.crystal_system_str(), tuple(sorted(map(tuple, rot.tolist()))))
+        distinct.setdefault(key, symbol)
+    for symbol in distinct.values():
+        assert [c.k for c in zone_boundary_candidates(symbol)] == \
+            _literal_candidates(symbol), symbol
+    assert len(distinct) > 40, len(distinct)
+
+
+#: Hand-derived from the centring condition on the reciprocal lattice L*
+#: (``reciprocal_lattice_mask``'s docstring): k ≡ −k when 2k is in L*, one
+#: shortest spelling per class, one representative per star under the point
+#: group, listed in order.
+#:
+#: * F (h, k, l all of one parity): the three X points (1, 0, 0), (0, 1, 0),
+#:   (0, 0, 1) — 2k = (2, 0, 0) is all even — and the four L points
+#:   (±½, ±½, ±½), one star under m m m and under m -3 m, where the X points
+#:   join into one star too.
+#: * I (h + k + l even): (1, 0, 0) ≡ (0, 1, 0) ≡ (0, 0, 1), since their
+#:   differences have an even sum; (½, ½, 0) and (½, -½, 0) are two classes
+#:   (they differ by (0, 1, 0)) and one star; likewise for the other two faces.
+#: * C (h + k even): (1, 0, 0) ≡ (0, 1, 0); (0, 0, ½); (0, 1, ½); (½, ±½, 0)
+#:   and (½, ±½, ½), one star each.  A (k + l even) is the same with the
+#:   axes permuted.
+#: * R in hexagonal axes (-h + k + l = 3n): (0, 0, 3/2), the three L points
+#:   (½, 0, ½), (0, -½, ½), (-½, ½, ½) and the three F points (½, ½, 0),
+#:   (0, ½, 1), (3/2, 0, 0) — one star each under -3 m — and the two
+#:   third-order points the WP adds on a trigonal lattice.
+CENTRED_SETS = {
+    "F m m m": ["(0, 0, 1)", "(0, 1, 0)", "(1/2, 1/2, 1/2)", "(1, 0, 0)"],
+    "F m -3 m": ["(0, 0, 1)", "(1/2, 1/2, 1/2)"],
+    "I m m m": ["(0, 0, 1)", "(0, 1/2, 1/2)", "(1/2, 0, 1/2)", "(1/2, 1/2, 0)"],
+    "I m -3 m": ["(0, 0, 1)", "(0, 1/2, 1/2)"],
+    "C m m m": ["(0, 0, 1/2)", "(0, 1, 0)", "(0, 1, 1/2)", "(1/2, 1/2, 0)",
+                "(1/2, 1/2, 1/2)"],
+    "A m m 2": ["(0, 0, 1)", "(0, 1/2, 1/2)", "(1/2, 0, 0)", "(1/2, 0, 1)",
+                "(1/2, 1/2, 1/2)"],
+    "R -3 m:H": ["(0, 0, 3/2)", "(1/2, 0, 1/2)", "(1/2, 1/2, 0)",
+                 "(1/3, 1/3, 0)", "(1/3, 1/3, 1/2)"],
+}
+
+
+@pytest.mark.parametrize("symbol", sorted(CENTRED_SETS))
+def test_a_centred_lattice_gets_its_own_k_equals_minus_k_points(symbol):
+    """The hand-derived set, and the property that defines it, on F, I, C, A, R.
+
+    The literal {0, ½}³ on an F lattice holds one such point of seven (only
+    (½, ½, ½) has 2k in L*) and misses X, where the Pr₀.₅Sr₀.₅MnO₃ structure of
+    the GSAS-II tutorial "Magnetic-IV" orders; this test fails on the literal.
+    """
+    got = [c.vector for c in zone_boundary_candidates(symbol)]
+    assert got == CENTRED_SETS[symbol]
+    for c in zone_boundary_candidates(symbol):
+        if c.k in ((Fraction(1, 3), Fraction(1, 3), Fraction(0)),
+                   (Fraction(1, 3), Fraction(1, 3), Fraction(1, 2))):
+            continue
+        assert _two_k_in_lattice(symbol, c.k), (symbol, c.vector)
+        assert minus_k_is_k(symbol, c.k), (symbol, c.vector)
+
+
+@pytest.mark.parametrize("symbol", ["P -1", "C 1 2/m 1", "A m m 2", "B b c b",
+                                    "I 4/m m m", "I -4 3 d", "F d d d:1",
+                                    "F m -3 m", "R -3 c:H", "R 3:H",
+                                    "R -3 m:R"])
+def test_the_seven_classes_and_their_stars_cover_the_lattice(symbol):
+    """L*/2L* minus the origin: seven classes, each k ≡ −k, none ≡ 0, all distinct.
+
+    And completeness: the stars of the published candidates cover all seven,
+    so the star merge dropped no point, only repeats of one.
+    """
+    from rietx.crystallography.representation.irreps import (
+        canonical_kvector,
+        equivalent_kvectors,
+    )
+    from rietx.crystallography.satellites import _order_two_kvectors
+
+    classes = _order_two_kvectors(symbol)
+    assert len(classes) == 7
+    for i, k in enumerate(classes):
+        assert minus_k_is_k(symbol, k), (symbol, k)
+        assert not equivalent_kvectors(symbol, k, (0, 0, 0)), (symbol, k)
+        for other in classes[i + 1:]:
+            assert not equivalent_kvectors(symbol, k, other), (symbol, k, other)
+    covered = {canonical_kvector(symbol, arm)
+               for c in zone_boundary_candidates(symbol)
+               for arm in star(symbol, c.k)}
+    assert {canonical_kvector(symbol, k) for k in classes} <= covered
 
 
 def test_arms_of_one_star_generate_the_same_satellite_list():
@@ -1002,6 +1146,14 @@ def test_the_arm_says_an_x_ray_satellite_is_a_superstructure_reflection():
 
 
 def test_the_arm_reports_the_pm_k_rule_and_the_star_beside_each_candidate():
+    """The ±k flag rides beside each candidate, true where −k is a second vector.
+
+    On a centred lattice every zone-boundary candidate is a k ≡ −k point of
+    that lattice, so the flag is false on all of them — (½, 0, 0) on C 2/m,
+    whose −k is distinct, is no longer a candidate, being a line point inside
+    the zone.  The third-order points of a hexagonal lattice are where the
+    default set carries a distinct −k.
+    """
     instrument = _neutron()
     structure = rx.Structure(phases=[_phase(None, symbol="C 2/m",
                                             cell=(5.0, 6.0, 7.0, 90, 92, 90))])
@@ -1010,10 +1162,21 @@ def test_the_arm_reports_the_pm_k_rule_and_the_star_beside_each_candidate():
     arm = analyse_satellites(model, values, residual_two_theta=[25.0],
                              ticks=[])[0]
     by_vector = {c.vector: c for c in arm.candidates}
-    assert by_vector["(1/2, 0, 0)"].minus_k_distinct is True
+    assert "(1/2, 0, 0)" not in by_vector
     assert by_vector["(0, 0, 1/2)"].minus_k_distinct is False
+    assert by_vector["(0, 1, 0)"].minus_k_distinct is False
+    assert not any(c.minus_k_distinct for c in arm.candidates)
     assert all(c.n_satellites > 0 for c in arm.candidates)
     assert all(c.star_size >= 1 for c in arm.candidates)
+
+    hexagonal = rx.Structure(phases=[_phase(None, symbol="P 6/m m m",
+                                            cell=(5.0, 5.0, 6.0, 90, 90, 120))])
+    model = compile_model(hexagonal, instrument, _pattern())
+    arm = analyse_satellites(model, _values(hexagonal, instrument),
+                             residual_two_theta=[25.0], ticks=[])[0]
+    by_vector = {c.vector: c for c in arm.candidates}
+    assert by_vector["(1/3, 1/3, 0)"].minus_k_distinct is True
+    assert by_vector["(0, 0, 1/2)"].minus_k_distinct is False
 
 
 def test_a_k_zero_signature_is_not_handed_to_the_candidate_ranking():
@@ -1237,3 +1400,134 @@ def test_the_shared_grid_gives_every_candidate_its_own_list_bit_for_bit():
                                         two_theta_min=8.0).d
             assert d.dtype == one.dtype and d.tobytes() == one.tobytes(), \
                 (symbol, k)
+
+
+# ===================================== the arm's generation window (WP-2034)
+
+
+def _doublet(displacement: float = 0.0, zero: float = 0.0) -> rx.Instrument:
+    """A Cu Kα1/Kα2 flat plate: the doublet whose two frames the window spans."""
+    ins = rx.Instrument.bragg_brentano(radiation="CuKa")
+    ins.source.dispersion = None      # declined, not inherited (CLAUDE.md)
+    ins.geometry.sample_displacement.value = displacement
+    ins.zero_shift.value = zero
+    return ins
+
+
+def _drawn(model, values, d: np.ndarray) -> list[np.ndarray]:
+    """Each emission line's drawn 2θ for the d-spacings ``d``, unfiltered."""
+    from rietx.crystallography.lattice import two_theta_deg
+
+    return [np.asarray(model.apparent_two_theta(
+                np.asarray(two_theta_deg(d, lam), dtype=np.float64), values))
+            for lam in model.line_lambdas(values)]
+
+
+def _straddling(model_values, d: float) -> float:
+    """A range start just below the drawn Kα2 image of spacing ``d``.
+
+    Just below Kα2 rather than midway, so the Kα1 image sits the whole doublet
+    splitting outside: the old window widened by the spread of the geometry's
+    shift over the range, and that slack must not cover the case.
+    """
+    model, values = model_values
+    k1, k2 = (float(t[0]) for t in _drawn(model, values, np.array([d])))
+    assert k1 + 0.01 < k2, "the doublet must put Kα2 above Kα1"
+    return float(np.floor((k2 - 0.002) * 1e4) / 1e4)
+
+
+def _doublet_model(structure, instrument, start: float, span: float = 15.0):
+    tt = np.arange(start, start + span, 0.01)
+    data = rx.PatternData(two_theta=tt.tolist(),
+                          intensity=np.ones_like(tt).tolist())
+    model = compile_model(structure, instrument, data)
+    return model, _values(structure, instrument)
+
+
+def _in_range(model, values, d: np.ndarray) -> np.ndarray:
+    """The held-out oracle: every drawn image of ``d`` inside the fitted range.
+
+    Unique to 1e-6°, so it is blind to how the generator merges orbits and
+    tests only *which positions* the arm can reach.
+    """
+    out = np.concatenate(_drawn(model, values, d))
+    out = out[np.isfinite(out) & (out >= model.tt_min) & (out <= model.tt_max)]
+    return np.unique(np.round(out, 6))
+
+
+#: (1 0 3/2) of k = (0 0 1/2) on ``CELL``: d = 2.8284 Å, drawn by Cu Kα1 at
+#: 31.607° and by Kα2 at 31.688°, 0.6° from any nuclear line
+_STRIP_D = 2.0 * np.sqrt(2.0)
+
+
+@pytest.mark.parametrize("displacement,zero", [(0.0, 0.0), (0.3, -0.02)])
+def test_the_arm_enumerates_a_satellite_whose_kalpha2_image_alone_is_in_range(
+        displacement, zero):
+    """A satellite whose Kα1 image lies below ``tt_min`` and whose Kα2 image inside.
+
+    ``compile_model`` generates in the shortest line's frame and translates the
+    low cutoff from the longest line's, so it keeps that reflection; the arm's
+    own copy of the window applied the cutoff in the shortest line's frame, so
+    the (1 0 3/2) satellite of k = (0 0 1/2) was never enumerated and a residual
+    peak sitting exactly on its Kα2 image was indexed by nothing (WP-2034).
+    """
+    instrument = _doublet(displacement, zero)
+    structure = rx.Structure(phases=[_phase(None)])
+    probe = _doublet_model(structure, instrument, 20.0, 50.0)
+    start = _straddling(probe, _STRIP_D)
+    model, values = _doublet_model(structure, instrument, start)
+    k1, k2 = (float(t[0]) for t in _drawn(model, values, np.array([_STRIP_D])))
+    # the case is the strip, or it proves nothing
+    assert k1 < model.tt_min <= k2 <= model.tt_max
+
+    pos, _ = model.reflection_positions(0, values)
+    ticks = pos[np.isfinite(pos)]
+    arm = analyse_satellites(model, values, residual_two_theta=[k2],
+                             ticks=ticks, structure=structure)[0]
+    # the peak needs a k: it is on no tick and on no lattice point
+    assert arm.n_unexplained == 1, arm.note
+    half = {c.vector: c for c in arm.candidates}["(0, 0, 1/2)"]
+    assert half.matched == 1, arm.note
+    assert half.worst_offset_deg == pytest.approx(0.0, abs=1e-9)
+
+
+@pytest.mark.parametrize("d_strip", [_STRIP_D, 1.0 / np.sqrt(1 / 16 + 1 / 25)],
+                         ids=["satellite_103/2", "lattice_110"])
+def test_the_arms_lists_are_every_image_in_range_at_a_doublet_edge(d_strip):
+    """Each list the arm builds holds every drawn image in range, and no other.
+
+    The oracle enumerates the reciprocal lattice of ``P m m m`` and every
+    zone-boundary candidate's H ± k by brute force over integer H, and places
+    each line's image with the model's own ``apparent_two_theta``; it shares
+    no window with either copy.  The range starts between the Kα1 and Kα2
+    images of (1 0 3/2) of k = (0 0 1/2), or of the nuclear (1 1 0), so the
+    old window's frame error drops a position from the satellite list or the
+    lattice list.
+    """
+    from rietx.crystallography.lattice import d_spacings
+    from rietx.report.satellites import _lattice_positions, _satellite_positions
+
+    instrument = _doublet(0.2, 0.01)
+    structure = rx.Structure(phases=[_phase(None)])
+    start = _straddling(_doublet_model(structure, instrument, 20.0, 50.0),
+                        d_strip)
+    model, values = _doublet_model(structure, instrument, start)
+
+    r = np.arange(-8, 9)
+    hkl = np.stack(np.meshgrid(r, r, r, indexing="ij"), -1).reshape(-1, 3)
+    hkl = hkl[np.any(hkl != 0, axis=1)].astype(np.float64)
+
+    lattice = np.unique(np.round(_lattice_positions(model, values, 0), 6))
+    expected = _in_range(model, values, d_spacings(hkl, *CELL))
+    assert np.array_equal(lattice, expected), (
+        np.setdiff1d(expected, lattice), np.setdiff1d(lattice, expected))
+
+    candidates = zone_boundary_candidates("P m m m")
+    listed = _satellite_positions(model, values, 0, [c.k for c in candidates])
+    for c, got in zip(candidates, listed, strict=True):
+        k = np.array([float(Fraction(v)) for v in c.k])
+        sat = np.vstack([hkl + k, hkl - k, k[None, :]])
+        want = _in_range(model, values, d_spacings(sat, *CELL))
+        got = np.unique(np.round(got, 6))
+        assert np.array_equal(got, want), (
+            c.vector, np.setdiff1d(want, got), np.setdiff1d(got, want))

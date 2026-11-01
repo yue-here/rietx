@@ -1,6 +1,6 @@
 # WP-1317 — scrub the series along its own trace
 
-Milestone: unscheduled · Status: 🔄 2026-10-12 — #218's `forward_` and `moved_paths` merged from outside as #903; the scrubber is unstarted
+Milestone: unscheduled · Status: 🔄 2026-10-21 — #218's `forward_` and `moved_paths` merged from outside as #903, and the planted-events series fixture as #1011; the scrubber is unstarted
 Track: Render what the fit already knows
 Depends on: —
 Priority: P3 2026-09-23 — a view over what the series already knows
@@ -53,6 +53,14 @@ screenshots come from `docs/manual/make_screenshots.py`.
 
 ### Inherited
 
+- **2026-10-26, from WP-2003 (fourth session): the series panel's "discontinuous" mark has no writer left; plot `SeriesResult.steps` instead.** WP-2003 removed `SEQUENTIAL_DISCONTINUITY` (no threshold survives) and added `SeriesResult.steps`: every refined path's step between consecutive patterns, in esds of the later fit, largest first, with `cold_ratio` set only on steps a caller re-measured with `fit(verify_steps=k)`. `src/rietx/gui/series.py` keeps the route's `discontinuous` key, now true only for such a verified step, and the GUI never passes `verify_steps`, so it is always false there. The client still reads it and still captions it "a step far larger than this parameter's own scatter" (`gui/src/lib/series.ts:65`, `:151`, `:196`; `gui/src/panels/Series.svelte:613`). WP-2037's mock-up (`docs/wp/2037-attention/examples.md` § 5) has the panel plot `series.steps` beside the trajectory. That change and its dist rebuild are owed, and the scrubber is where the series panel is being rebuilt.
+- **2026-10-24, from WP-2003 (PR #1150): the planted fixture's `signals.json` is stale in its one unpinned list.** WP-2003 reran the planted-events series on the current tree (`docs/wp/2003-batch/measure_reseed.py --family planted`, all 248 patterns, default arm) and found 49 reseeds where `tests/data/planted_series/signals.json` lists 20. Nothing fails, because `tests/test_planted_series.py` pins every signal but that list. The other lists were not compared. The reseed fence's ruling (WP-2003's batch) may change the count again, so regenerate it after that lands, or pin it now and let the ruling move it on purpose.
+- **2026-10-19, from WP-1986.** The GUI chapters moved to the new manual tree:
+  `docs/docs/start/gui-quickstart.md`, `docs/docs/reference/gui-guide.md` and
+  `docs/docs/reference/gui-power.md`, with the screenshots in `docs/docs/screenshots/` and
+  the script at `docs/docs/make_screenshots.py`. `tests/test_gui_manual.py` partitions routes
+  and tabs over the new pages, so the scrubber's tab or route is documented there. The old
+  `docs/manual/using/gui-*.md` copies stay up, unguarded, until that tree retires.
 - **Decided 2026-10-16 (maintainer, from the issue triage, #141): the
   planted-events fixture goes ahead now.** The reporter opens it as a
   tests-only PR against this WP, WP-1965 named as the second user: the seeded
@@ -232,6 +240,38 @@ still open, since its surviving residual lands here.
 - `gui/CLAUDE.md` — the panel, route and manual-partition rules.
 
 ## Handover log
+
+- **2026-10-21** — the planted-events series this WP's acceptance asks for
+  merged from outside. PR #1011 (head `82cf9600`) merged as `58ccce44` by
+  `/pr-review` after two rounds. Tests and test data only; no source change.
+  *Done.* `tests/planted_series.py` forward-models a 3-20° capillary cooling
+  ramp of a cubic perovskite with Poisson noise. It plants four events at known
+  indices: a background step, one blank frame, an unmodelled rock-salt phase
+  growing, and a cubic → tetragonal transition. It also has a null twin with
+  none. One fixed cubic model is fitted along the chain, and `surfaced` reads
+  each event off `SeriesResult` alone (`EVENT_CODES`). The fast tier regenerates
+  a 24-pattern series, and `tests/data/planted_series/` holds the 248-pattern
+  run's `table.csv`, `signals.json` and `null_signals.json`, not the patterns.
+  Both generator and refit run under `compiled.set_enabled(False)` (the
+  `numpy_path` decorator), and the Mac-generated `signals.json` reproduces
+  byte for byte on Linux.
+  *What it makes possible.* The acceptance's "series fixture with a known
+  transition" exists, and `surfaced` is a first enumeration of task 1's marker
+  vocabulary, though not yet one written once and quoted by view and docs.
+  Three findings for the scrubber's design. **The blank frame** is a step in the
+  phase scale and a `PHASE_UNCONSTRAINED` hold, not an Rwp outlier. **The
+  transition is masked when it falls inside the second phase's run above the
+  Rwp fence**: the discontinuity scan skips every step into or out of a pattern
+  above the fence, so nothing marks it. That is a strict xfail; planted alone, the
+  transition does start a run. **On the 248-pattern null**,
+  `SEQUENTIAL_DISCONTINUITY` flags 1 to 4 noise steps on four of five seeds,
+  also a strict xfail. Those two xfails go red the day something makes the event
+  visible or the null clean.
+  *Not done.* None of the five tasks is ticked. The scrubber is unstarted.
+  *Gate:* stacked with #1069 on `main` `3437d52d` as `abe6d9e2`, Linux x86_64,
+  4 cores, `[dev,jax]`, `-n 3`, nothing else running: fast 10 986 passed,
+  132 skipped, 3 xfailed; `-m slow` 319 passed, 16 skipped, 1 xfailed. `main` after both merges
+  (`c93b974b`) is content-identical to that tree.
 
 - **2026-10-12** — #218's two asks merged from outside. PR #903 (head
   `0afe61b6`) merged as `75b9ee88` after four rounds, and #218 is closed.

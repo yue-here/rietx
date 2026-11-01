@@ -92,6 +92,8 @@ run directory unless asked, because an evaluation is not a fit.
 
 ### Inherited
 
+- **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: two `lebail_cycles` slips.** A node's `api_call` drops `lebail_cycles` (`schemas/history.py:126-135`), so a stage run with a non-default value renders a call that runs a different stage; this WP's replay already reads `lebail_cycles or 3`. And `rietx.help`'s `lebail_cycles` text, shown on `docs/docs/reference/settings.md`, says Pawley mode ignores it, where `refine.py:3916-3920` uses it to seed the Pawley intensities.
+
 - **2026-10-11, from WP-1938 (PR #883): LM refuses `max_iter=0` now, in
   scipy's words.** `lm.minimize` raises "`max_nfev` must be None or positive
   integer." for a budget under one evaluation, on the single and the joint

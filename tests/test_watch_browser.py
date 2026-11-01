@@ -3,7 +3,7 @@
 A python test cannot see layout (WP-1402 and WP-1405 each found a page defect
 no substring assertion could have), and ``node --check`` sees only syntax.
 This file drives the page in chromium through playwright, which is not a
-dependency (``docs/manual/make_screenshots.py`` says why), so every test here
+dependency (``docs/docs/make_screenshots.py`` says why), so every test here
 skips where the package or a cached chromium is missing. That includes CI:
 the guard is this machine's, and the handover names the skip.
 
@@ -35,7 +35,7 @@ playwright = pytest.importorskip("playwright")
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-MAKE_SHOTS = REPO_ROOT / "docs" / "manual" / "make_screenshots.py"
+MAKE_SHOTS = REPO_ROOT / "docs" / "docs" / "make_screenshots.py"
 
 #: One poll of the page, in seconds (``schedule`` in
 #: ``watch/static/watch.mjs``); a wait of two of them is what "the page has

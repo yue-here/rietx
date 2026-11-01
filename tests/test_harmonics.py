@@ -41,12 +41,10 @@ from rietx.crystallography.structure_factor import (
     structure_factors_squared,
 )
 from rietx.crystallography.symmetry import generate_reflections
-from rietx.model.forward import compile_model
+from rietx.model.forward import WINDOW_AREA_TOL, compile_model
 from rietx.params.vector import ParameterTable
 from rietx.refine import HARMONIC_ABSENT_FRAC
 from rietx.schemas.instrument import (
-    DEFAULT_HARMONIC_ORDER,
-    HARMONIC_WEIGHT_MAX,
     BackgroundChebyshev,
     EmissionLine,
     Harmonic,
@@ -152,9 +150,14 @@ def clean_neutron_pattern(seed: int = 11):
 
 
 # -------------------------------------------------------------- the schema ---
-def test_default_order_is_two_and_the_block_is_general_in_n():
-    assert DEFAULT_HARMONIC_ORDER == 2
-    assert Harmonic().order == 2
+def test_the_order_is_the_callers_and_the_block_is_general_in_n():
+    """Which orders pass is a fact about the monochromator's crystal (a Ge(733)
+    beam carries no λ/2), so the package picks none (WP-2002, the eighth
+    round's item 4)."""
+    with pytest.raises(ValueError, match="order"):
+        Harmonic()
+    with pytest.raises(ValueError, match=r"harmonics=\[3\] for Si\(111\)"):
+        rx.Instrument.constant_wavelength_neutron(1.5, harmonics=True)
     # general in n: nothing about the block is specific to the second order
     for n in (2, 3, 4, 7):
         h = Harmonic(order=n)
@@ -189,7 +192,7 @@ def test_harmonic_weight_is_the_stored_parameter_by_reference():
     and on a neutron source those lines are *derived*.  A copied Parameter would
     make every refinement silently discard the fitted harmonic weight.
     """
-    src = NeutronSource(wavelength=1.5, harmonics=[Harmonic()])
+    src = NeutronSource(wavelength=1.5, harmonics=[Harmonic(order=2)])
     assert src.lines[1].weight is src.harmonics[0].weight
     src.lines[1].weight.value = 0.0731
     assert src.harmonics[0].weight.value == pytest.approx(0.0731)
@@ -197,7 +200,7 @@ def test_harmonic_weight_is_the_stored_parameter_by_reference():
 
 def test_the_fundamental_stays_structurally_locked():
     """Line 0's weight is degenerate with the phase scales, harmonic or not."""
-    inst = rx.Instrument.constant_wavelength_neutron(1.5, harmonics=True)
+    inst = rx.Instrument.constant_wavelength_neutron(1.5, harmonics=[2])
     table = ParameterTable(rx.Structure(phases=nd2ru2o7().phases), inst)
     freed = table.set_vary(["instrument.source.lines.*.weight"], True)
     assert "instrument.source.lines.0.weight" not in freed
@@ -206,10 +209,10 @@ def test_the_fundamental_stays_structurally_locked():
 
 def test_harmonic_weight_seeds_fixed_and_low():
     """A correction must not open at the answer it is meant to measure."""
-    h = Harmonic()
+    h = Harmonic(order=2)
     assert not h.weight.vary          # freed by a stage, never by declaration
     assert h.weight.min == 0.0        # zero is the off state and is reachable
-    assert h.weight.max == HARMONIC_WEIGHT_MAX
+    assert h.weight.max == math.inf   # no ceiling since WP-2002's B9 ruling
     # far below every reported value, so the fit has to travel to reach one
     assert h.weight.value < 0.02
 
@@ -231,7 +234,7 @@ def test_duplicate_orders_are_refused_naming_the_flat_direction():
 def test_xray_harmonics_are_refused_naming_dispersion_and_the_way_round():
     """The refusal has to say *why*, or it is pydantic's 'extra inputs'."""
     with pytest.raises(ValueError) as exc:
-        Source(lines=[EmissionLine(wavelength=1.5406)], harmonics=[Harmonic()])
+        Source(lines=[EmissionLine(wavelength=1.5406)], harmonics=[Harmonic(order=2)])
     msg = str(exc.value)
     assert "f'" in msg                       # names the shared quantity
     assert "1 % of Z" in msg                 # names the guard that would fire
@@ -319,8 +322,12 @@ def test_the_reflection_list_is_generated_for_the_shortest_wavelength():
     pattern = rx.read_pattern(str(DATA / CU311[0]))
     struct = nd2ru2o7()
     inst = rx.Instrument.constant_wavelength_neutron(
-        CU311[1], fwhm_deg=0.30, harmonics=True)
-    model = compile_model(struct, inst, pattern, two_theta_limits=LIMITS)
+        CU311[1], fwhm_deg=0.30, harmonics=[2])
+    # the declared stages' windows, which generate over the limits alone; a
+    # compile at the closing windows reaches past them by its widest window
+    # (WP-2002)
+    model = compile_model(struct, inst, pattern, two_theta_limits=LIMITS,
+                          window_area_tol=WINDOW_AREA_TOL)
     # the compiled list is the λ/2 list, not the fundamental's
     assert len(model.phases[0].reflections) == n_harm
     assert model.harmonic_orders == {1: 2}
@@ -423,7 +430,7 @@ class TestPublishedCu311Histogram:
     @pytest.fixture(scope="class")
     def fits():
         return {"off": fit(*CU311, harmonics=False),
-                "on": fit(*CU311, harmonics=True)}
+                "on": fit(*CU311, harmonics=[2])}
 
     def test_the_uncorrected_fit_has_the_gof_of_a_missing_component(self, fits):
         """GoF well above 1 while Rwp looks respectable — the signature."""
@@ -506,7 +513,7 @@ class TestSyntheticNegativeControl:
         pattern, lam = clean_neutron_pattern()
         return {"pattern": pattern, "lam": lam,
                 "off": fit_pattern(pattern, lam, harmonics=False),
-                "on": fit_pattern(pattern, lam, harmonics=True)}
+                "on": fit_pattern(pattern, lam, harmonics=[2])}
 
     def test_the_harmonic_refines_to_nothing(self, clean):
         ref, res = clean["on"]
@@ -525,7 +532,7 @@ class TestSyntheticNegativeControl:
     def test_a_held_weight_is_reported_as_an_assumption(self, clean):
         """Declared but never freed: the value is the caller's, not measured."""
         inst = rx.Instrument.constant_wavelength_neutron(
-            clean["lam"], fwhm_deg=0.30, harmonics=True)
+            clean["lam"], fwhm_deg=0.30, harmonics=[2])
         ref = rx.Refinement(structure=nd2ru2o7(), instrument=inst, history=False)
         res = ref.fit(clean["pattern"], plan="mccusker_structural",
                       two_theta_limits=LIMITS)
@@ -556,7 +563,7 @@ def test_a_derived_harmonic_follows_a_refining_fundamental():
     lam = 1.5404
     structure = nd2ru2o7()
     ins = rx.Instrument.constant_wavelength_neutron(
-        lam, fwhm_deg=0.30, harmonics=True)
+        lam, fwhm_deg=0.30, harmonics=[2])
     tt = np.arange(*LIMITS, 0.05)
     pattern = PatternData(two_theta=tt.tolist(),
                           intensity=np.ones_like(tt).tolist())

@@ -13,7 +13,8 @@
 #   docs/index.html, which sends /docs/ to stable/ (to dev/ before any
 #   release carries a tree);
 # - copies that tree's llms.txt to the site root;
-# - writes a redirect stub at each old-tree page in RETIRED.
+# - writes a redirect stub at each page the retired old tree (`docs/manual/`)
+#   published, from RETIRED, so its URLs keep working.
 #
 # Pruning is the same step: a minor outside the newest KEEP_MINORS is simply
 # not fetched.  One version of the new tree measured 7.4 MB on 2026-10-16, and
@@ -33,14 +34,19 @@ import urllib.request as _request
 from html import escape as _escape
 from pathlib import Path as _Path
 
-from rietx._about import DIST_NAME, DOCS_URL, REPO_URL
+# `docs_version`, the version -> directory mapping, is the package's (WP-1986),
+# because the GUI builds the manual's address from it too; `sphinx_shared` and
+# the tests read it through here.
+from rietx._about import DIST_NAME, DOCS_URL, REPO_URL, docs_version  # noqa: F401
 
 #: How many minor releases stay reachable beside dev (WP-1979).
 KEEP_MINORS = 6
 
-#: Every page the old tree (`docs/manual/`) published on 2026-10-16, as a path
-#: from the site root.  Each must stay built by the old tree or be in RETIRED,
-#: so a retired chapter cannot lose its URL (tests/test_docs_versions.py).
+#: Every page the old tree (`docs/manual/`, retired by WP-1986) published on
+#: 2026-10-16, as a path from the site root, and the one it gained after
+#: (`02b_steering_a_refinement`, 2026-10-19), which the landing page links.
+#: Each has a row in RETIRED, so none of those URLs 404s
+#: (tests/test_docs_versions.py).
 OLD_PAGES = """
 background corrections engines estimation forward-model indexing intensities
 manual method microstructure parameterisation peak-positions profiles
@@ -52,28 +58,72 @@ using/indexing using/install using/model using/qpa using/quickstart
 using/recipe using/refining using/report using/results using/series
 using/skill
 using/tutorials/01_quickstart using/tutorials/02_simple_rietveld
+using/tutorials/02b_steering_a_refinement
 using/tutorials/03_peaks_indexing_lebail
 using/tutorials/04_peak_shape_and_microstructure
 using/tutorials/05_sequential_fits using/tutorials/06_your_own_data
 """.split()
 
 #: A retired old-tree page and the new-tree page that replaces it, both
-#: without `.html`; the new one may carry a `#heading`.  WP-1986 fills it.
-RETIRED: dict[str, str] = {}
+#: without `.html`; the new one may carry a `#heading`.  WP-1986 retired the
+#: whole old tree at once (2026-10-22): its Part 2 pages were already the new
+#: tree's Theory chapters, its front page goes to the new one, Part 1 maps
+#: chapter by chapter, and the tutorials render under Start.
+RETIRED: dict[str, str] = {
+    "manual": "index",
+    "background": "theory/background",
+    "corrections": "theory/corrections",
+    "engines": "theory/engines",
+    "estimation": "theory/estimation",
+    "forward-model": "theory/forward-model",
+    "indexing": "theory/indexing",
+    "intensities": "theory/intensities",
+    "method": "theory/method",
+    "microstructure": "theory/microstructure",
+    "parameterisation": "theory/parameterisation",
+    "peak-positions": "theory/peak-positions",
+    "profiles": "theory/profiles",
+    "representation-analysis": "theory/representation-analysis",
+    "superspace": "theory/superspace",
+    "using/agents": "reference/programs",
+    "using/cli": "reference/cli",
+    "using/compatibility": "reference/compatibility",
+    "using/concepts": "concepts/fit",
+    "using/constraints": "reference/parameter-table#ties",
+    "using/data": "reference/data",
+    "using/exports": "reference/exports",
+    "using/files": "reference/pattern-files",
+    "using/first-refinement": "start/first-fit",
+    "using/glossary": "reference/parameters",
+    "using/gui-guide": "reference/gui-guide",
+    "using/gui-power": "reference/gui-power",
+    "using/gui-quickstart": "start/gui-quickstart",
+    "using/history": "reference/history",
+    "using/indexing": "reference/indexing",
+    "using/install": "start/install",
+    "using/model": "reference/parameter-table",
+    "using/qpa": "reference/qpa",
+    "using/quickstart": "start/tutorials",
+    "using/recipe": "reference/recipe",
+    "using/refining": "reference/refinement",
+    "using/report": "reference/report",
+    "using/results": "reference/result",
+    "using/series": "reference/series",
+    "using/skill": "reference/agents",
+    # The notebooks are copied in at build (`sphinx_shared.copy_tutorials`).
+    "using/tutorials/01_quickstart": "start/tutorials/01_quickstart",
+    "using/tutorials/02_simple_rietveld": "start/tutorials/02_simple_rietveld",
+    "using/tutorials/02b_steering_a_refinement": "start/tutorials/02b_steering_a_refinement",
+    "using/tutorials/03_peaks_indexing_lebail": "start/tutorials/03_peaks_indexing_lebail",
+    "using/tutorials/04_peak_shape_and_microstructure":
+        "start/tutorials/04_peak_shape_and_microstructure",
+    "using/tutorials/05_sequential_fits": "start/tutorials/05_sequential_fits",
+    "using/tutorials/06_your_own_data": "start/tutorials/06_your_own_data",
+}
 
 _TAG = _re.compile(r"v(\d+)\.(\d+)\.(\d+)")
 #: The start of a markdown link target that is relative to its file.
 _RELATIVE_LINK = _re.compile(r"\]\((?![a-z][a-z0-9+.-]*:|/|#)")
-
-
-def docs_version(version: str) -> str:
-    """The directory under docs/ holding a version's manual.
-
-    A release's manual is kept per minor, so `1.10.2` reads `1.10`.  Anything
-    else, a `.dev0` build included, reads `dev`, the tree built from `main`.
-    """
-    match = _TAG.fullmatch(f"v{version}")
-    return f"{match[1]}.{match[2]}" if match else "dev"
 
 
 def asset_name(version: str) -> str:
@@ -120,8 +170,21 @@ def switcher_entries(minors: list[str]) -> list[dict]:
 
 
 def redirect_page(url: str, canonical: str) -> str:
-    """An HTML stub that sends a reader on, for a host with no redirects."""
+    """An HTML stub that sends a reader on, for a host with no redirects.
+
+    A meta refresh drops the `#fragment` the reader arrived with, so where the
+    target names no heading of its own a script carries it over first.  That is
+    what keeps an installed release's help links landing on their section:
+    their anchors are `<theory chapter>.html#<heading>` at the site root, and
+    each Theory chapter kept its heading ids when it moved under /docs/.  The
+    refresh stays as the fallback for a reader without scripts.
+    """
+    forward = ""
+    if "#" not in url:
+        target = _json.dumps(url).replace("<", "\\u003c")
+        forward = f"<script>location.replace({target} + location.hash)</script>\n"
     return ('<!doctype html>\n<meta charset="utf-8">\n'
+            + forward +
             f'<meta http-equiv="refresh" content="0; url={_escape(url)}">\n'
             f'<link rel="canonical" href="{_escape(canonical)}">\n'
             f'<title>Moved</title>\n<p>This page has moved to <a href="{_escape(url)}">'

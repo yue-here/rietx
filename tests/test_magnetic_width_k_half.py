@@ -26,8 +26,8 @@ A1'        broad        same run                         releasing the width did
 A2 bias    broad        stage 1 only                     the moment is not biased low by a
                                                          missing width
 A2 diag    broad        stage 1 only                     ``MAGNETIC_WIDTH_UNMODELLED`` misses
-                                                         the case it exists for (**xfail,
-                                                         non-strict**: see below)
+                                                         the case it exists for (was
+                                                         ``xfail``: see below)
 A2-4x      broad, 4x    stage 1 only                     the diagnostic does not fire at 4x
                         counts                           counts either
 C1 (a)     sharp        stage 1 only                     the diagnostic false-fires, or the
@@ -54,18 +54,20 @@ term (PR #524: ~1.2 % low) is ~0.8 esd; at 1e5 counts it would be 6 esd and the
 bar would test the floor.  The sigma is rietx's quoted esd (Berar-Lelann already
 applied), read from the untied dof0 of the Cr pair.
 
-**A2 diagnostic: a recorded finding, not a weakened assertion.**  On seed 1343
-the moment held-width fit lands 25 % low (2.317 against 3.09) but
-``MAGNETIC_WIDTH_UNMODELLED`` stays silent at z = 2.99 against its 3.0 bar: the
-misfit inflates the pooled-scatter noise the statistic is divided by.  On seeds
-1346-1350 it fires on 4 of 5; at 2x counts on 5 of 6, at 4x on 6 of 6.  So
-``test_a2_the_diagnostic_fires_at_5000_counts`` is ``xfail(strict=False)``: the
-statistic sits 0.3 % under its bar, so a change in the fit's last digits can
-cross it on some platform, and an XPASS reports without failing (the #820
-shape); ``A2-4x`` is the same arm at 4x
-counts (seed 1343, z = 4.10) and must pass.  **4x gives up the truncation-floor
-argument above for this arm only**: it is a diagnostic test, and it asserts no
-width or moment recovery.
+**A2 diagnostic: a recorded finding, then a fix.**  On seed 1343 the moment
+held-width fit lands 25 % low (2.317 against 3.09), and
+``MAGNETIC_WIDTH_UNMODELLED`` stayed silent at z = 2.99 against its 3.0 bar,
+because the misfit inflated the pooled-scatter noise the statistic was divided
+by (s = 2.57).  On seeds 1346-1350 it fired on 4 of 5; at 2x counts on 5 of 6,
+at 4x on 6 of 6.  ``test_a2_the_diagnostic_fires_at_5000_counts`` was
+``xfail(strict=False)`` for that.  The noise is now the scatter of the
+nuclear-only channels alone (s = 0.99), which the magnetic misfit does not
+enter, and the same fit reads z = 7.76 (6.9-8.2 on seeds 1343 and 1346-1352,
+measured 2026-10-20), so the arm is an ordinary pass with its margin.
+``A2-4x`` is the same arm at 4x counts (seed 1343; z = 4.10 under the pooled
+scatter, 17.0 now) and stays.  **4x gives up the truncation-floor argument
+above for this arm only**: it is a diagnostic test, and it asserts no width
+or moment recovery.
 
 What each negative arm can catch: C1 holds the same moment and counts as A2 and
 only the width differs, so it is the arm that can fail for ``UNMODELLED``.  C2's
@@ -276,17 +278,19 @@ def test_a2_without_the_width_the_moment_is_biased_low(arms):
     assert bias > 0.10
 
 
-@pytest.mark.xfail(strict=False, reason=(
-    "the misfit inflates the pooled-scatter noise MAGNETIC_WIDTH_UNMODELLED is "
-    "divided by, so it stays at z = 2.99 (< 3.0) on seed 1343 while the moment "
-    "is 25 % low; fires on 4 of 5 other seeds (WP-1343 finding, #277)"))
 def test_a2_the_diagnostic_fires_at_5000_counts(arms):
+    """Was ``xfail``: z = 2.99 under the pooled scatter.  Its noise is now the
+    nuclear-only channels' scatter, and z = 7.76 here."""
     _ref, res = arms["a2"]
-    assert UNMODELLED in _codes(res), sorted(_codes(res))
+    hits = [d for d in res.diagnostics if d.code == UNMODELLED]
+    assert len(hits) == 1, sorted(_codes(res))
+    print(f"A2 UNMODELLED z = {hits[0].value:.2f}")
+    assert "biased low" in hits[0].message
+    assert "(0 0 1)" in hits[0].message
 
 
 def test_a2_4x_the_diagnostic_fires_at_four_times_the_counts(arms):
-    """Same arm, 4x counts, seed 1343 (z = 4.10).  Gives up the truncation-floor
+    """Same arm, 4x counts, seed 1343 (z = 17.0).  Gives up the truncation-floor
     argument for this arm only; no recovery is asserted here."""
     _ref, res = arms["a2_4x"]
     m = _rows(res)["phases.0.atoms.0.moment.dof0"]

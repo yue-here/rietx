@@ -26,7 +26,7 @@ from rietx.model.preferred_orientation import (
     orbit_layout,
 )
 from rietx.params.vector import ParameterTable
-from rietx.schemas.structure import MARCH_R_MAX, MARCH_R_MIN, PreferredOrientation
+from rietx.schemas.structure import MARCH_R_MIN, PreferredOrientation
 from tests.test_coordinates import make_rutile
 
 OUT = Path(__file__).parent / "output"
@@ -49,9 +49,9 @@ def test_po_defaults_off_and_round_trips():
     phase.preferred_orientation = _po((0, 0, 1), 1.0)
     r = phase.preferred_orientation.r
     # min is MARCH_R_MIN, not 0.0: the March factor divides by r
-    # (WP-1028 §(e))
+    # (WP-1028 §(e)); no ceiling since WP-2002
     assert r.value == 1.0 and r.vary is False
-    assert (r.min, r.max) == (MARCH_R_MIN, MARCH_R_MAX)
+    assert (r.min, r.max) == (MARCH_R_MIN, np.inf)
 
     phase.preferred_orientation.r.value = 0.8
     phase.preferred_orientation.r.vary = True
@@ -351,6 +351,33 @@ def test_injected_po_is_recovered_within_esds():
 
     OUT.mkdir(exist_ok=True)
     plot_result(result, path=str(OUT / "po_rutile_fit.png"))
+
+
+def test_a_texture_below_the_old_floor_is_accepted_and_refines():
+    """WP-2002, the B9 ruling: March r keeps only its pole floor.
+
+    Before 1.10 the floor was 0.15, so a stated r of 0.1 was clipped to 0.15 on
+    construction and a refinement could not go below it.  A pressed clay or
+    mica plate can need less.  Measured 2026-10-20 (darwin/arm64, ``[dev]``):
+    from the identity, r = 0.1 comes back as 0.10012 ± 0.00018, off its bound.
+    """
+    from rietx import Refinement
+
+    stated = PreferredOrientation(axis=(0, 0, 1), r=Parameter(value=0.1, vary=True))
+    assert stated.r.value == 0.1 and stated.r.min == MARCH_R_MIN < 0.15
+
+    axis, r_true = (0, 0, 1), 0.1
+    pattern = _synthesize_textured_rutile(axis, r_true)
+    s = make_rutile()
+    s.phases[0].scale.value = 3e-2
+    s.phases[0].preferred_orientation = _po(axis, 1.0, vary=False)
+    ins = Instrument.debye_scherrer(wavelength=1.5406)
+    ins.profile.w.value = 8e-3
+    result = Refinement(s, ins, history=False).fit(pattern, plan=_po_plan(with_po=True))
+    assert result.status == "converged"
+    r = result.parameter("phases.0.preferred_orientation.r")
+    assert r.value < 0.15 and r.at_bound is not True
+    assert r.value == pytest.approx(r_true, abs=max(4 * r.stderr, 0.02 * r_true))
 
 
 def test_po_is_identifiable_from_scale_and_biso():

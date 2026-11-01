@@ -120,7 +120,7 @@ paper's eqs (10)-(12) (`optimize.statistics.berar_lelann_factor`; quadrature,
 checked by simulation). It is one scalar applied to every esd, so it says how
 correlated the residual is, not how wrong any one parameter's esd is.
 
-`report.identifiability` quotes raw χ²_red, the inflation (already in every quoted esd, dividable back out) and Durbin-Watson side by side, plus the δR line (`delta_r_slope` / `delta_r_intercept`: sorted Δ/σ against
+`report.identifiability` quotes raw χ²_red, the inflation (already in every quoted esd; `stderr_uncorrected` omits it) and Durbin-Watson side by side, plus the δR line (`delta_r_slope` / `delta_r_intercept`: sorted Δ/σ against
 normal quantiles; slope ≈ 1 and intercept ≈ 0 on honest σ, slope > 1 when σ is
 underestimated).
 
@@ -262,7 +262,7 @@ nothing and most of the residual the detector looks for goes with it. What
 survives is a noise excursion near a tick. Measured on a synthetic LaB₆ pattern
 (WP-1024): 19 of the certified cell's own 28 reflections
 and 84 of a doubled cell's 153, 68 % against 55 %, so it does not separate them. The count that does is `LeBailValidation.predicted_but_absent`, which
-integrates net intensity above the fitted background over each predicted
+integrates net intensity above the picker's envelope over each predicted
 position. The blind direction is the one de Wolff's M₂₀ has, and it is why
 Oishi-Tomiyasu (2013, *J. Appl. Cryst.* **46**, 1277) reversed the figure.
 
@@ -381,7 +381,7 @@ The cut, `profile.delta_chi2_cut`, is the 95 % Δχ² for one parameter (3.84)
 scaled by the same χ²_red and Bérar-Lelann factor every esd already carries,
 so on a single quadratic basin it reproduces W ± 1.96 esd. `excess` is the
 farthest admissible fraction from the fit's in units of that half-width, and
-`QPA_FRACTION_UNDETERMINED` fires past 2. The axis is the width, never the
+`QPA_FRACTION_RANGE` (info) states it. The axis is the width, never the
 scale: at a pinned scale the refit reaches the hump basin only by broadening
 the phase below `PHASE_SUPPORT_SIGMA`, where WP-1301 holds its structure, so the scan stops short.
 The grid stops at half the range because on the full range the frozen peak
@@ -390,10 +390,10 @@ windows no longer cover the profile and `FROZEN_COMPILE_STALE` fires.
 so the fit is not in the lowest basin along the ridge.
 
 A synthetic trace of CaF₂ in LaB₆ (lab Cu Kα, a 10-count amorphous hump under a
-six-term Chebyshev) reproduces the shape. The fit gives 1.19 ± 0.39 wt%. The
-profile admits 0.86 % to 77 % in two basins separated by a barrier the data sees
-(Δχ² 15 against a cut of 5.2), `excess` 99, and fires. Without the hump and with
-five times the CaF₂, one basin at 3.8-3.9 % and `excess` 0.22: silent. By hand
+six-term Chebyshev) reproduces the shape. The fit gives 0.93 ± 0.33 wt%. The
+profile admits 0.93 % to 77.1 % in two basins separated by a barrier the data sees
+(Δχ² 15.8 against a cut of 5.2), `excess` 118, and fires. Without the hump and with
+five times the CaF₂, one basin at 3.29-3.94 % and `excess` 0.47: silent. By hand
 the same scan is `ref.branch()`, `trial.set_vary([axis], False)`, then per value
 `set_values` and `run_stage(data, rx.Stage("width_pin", []))`, with χ² = `chi2 · (n_points − n_free_parameters)`.
 
@@ -418,8 +418,8 @@ Four codes on `SeriesResult.summary(deliverable="series")` carry the chain's
 own rows. `SEQUENTIAL_PATH_DEPENDENT` is an ordering artefact — only a
 `direction="both"` chain can produce one, so a one-way chain has not looked.
 `SEQUENTIAL_PERSISTENT_FINDING` states a persistent count no per-pattern code
-can, measured at **42 of 68** patterns on this ramp (`BOUND_HIT` on one cell, original run). `SEQUENTIAL_DISCONTINUITY`
-flags either the science or a chain failure, and `verify_discontinuities=True`
+can, measured at **42 of 68** patterns on this ramp (`BOUND_HIT` on one cell, original run). A large entry in
+`series.steps` is either the science or a chain failure, and `verify_steps=k`
 tells them apart (below). `PHASE_UNCONSTRAINED` says the value is held, so its trajectory is the one you handed in. Apply the QPA background check **at every point** too: an absent phase took **40–96 wt %** at equal Rwp.
 
 The row exists because an agent needed it and wrote it itself. Given 68 patterns
@@ -436,8 +436,8 @@ into those checks. None of them is a fit statistic, and §4b named none of them.
 
 Two are now the package's:
 
-- **The cold-refit check is `verify_discontinuities=True`.** Each flagged step's
-  two patterns are refitted cold and independently, and the diagnostic's `value`
+- **The cold-refit check is `verify_steps=k`.** Each of the *k* largest steps'
+  two patterns are refitted cold and independently, and the step's `cold_ratio`
   becomes the cold step over the chain's (1.0 a real step, 0 the chain's).
   Measured on that ramp, reproducing the run's own protocol: the chain takes
   11.6–12.0 s and the check adds 1–5 % (12.1–12.2 s) for four flagged steps over

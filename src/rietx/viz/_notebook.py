@@ -10,7 +10,7 @@ The dark image is hidden by an inline style, and a ``<style>`` keyed on
 an output keeps inline styles, so it shows the light figure: GitHub, and
 JupyterLab on a notebook opened with its outputs.  The classes take an
 ``rx-`` prefix because in a Sphinx page the ``<style>`` applies to the whole
-page.  furo's ``only-light`` and ``only-dark`` classes switch the manual with
+page.  pydata-sphinx-theme's ``only-light`` and ``only-dark`` classes switch the manual with
 no ``<style>`` at all.
 """
 

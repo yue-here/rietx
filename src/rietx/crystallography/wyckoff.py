@@ -21,6 +21,9 @@ Two independent jobs, deliberately split between two libraries:
     subspace of that action on symmetric 3×3 matrices (Peterse & Palm, 1966,
     Acta Cryst. 20, 147; cross-check tables in Grosse-Kunstleve & Adams,
     2002, J. Appl. Cryst. 35, 477 — the cctbx implementation).
+  - Axial vectors (a rigid body's rotation increment, WP-1807): R acts as
+    det(R)·R, so the basis spans ∩ ker(det(R)·R − I) (Gallego et al., 2012,
+    J. Appl. Cryst. 45, 1236, eq. 3); :func:`axial_basis`.
 
 Both bases are returned as smallest-integer row vectors in a deterministic
 (RREF-derived) form, e.g. an ``x,x,z`` site gives ``[[1, 1, 0], [0, 0, 1]]``
@@ -157,6 +160,31 @@ def coordinate_basis(rotations: list[np.ndarray]) -> np.ndarray:
     return _nullspace_int(rows, 3)
 
 
+def axial_basis(rotations: list[np.ndarray]) -> np.ndarray:
+    """Integer basis of site-symmetry-invariant axial vectors, shape (k, 3).
+
+    An axial vector — a rotation increment, a magnetic moment without time
+    reversal — transforms as det(R)·R (Gallego et al., 2012, *J. Appl.
+    Cryst.* **45**, 1236, eq. (3), p. 1239), so the invariant directions span
+    ∩ ker(det(R)·R − I): :func:`coordinate_basis`'s algebra with the
+    determinant folded in.  Rows are fractional (direct-lattice) components;
+    the Cartesian directions are M·v.
+
+    **k is 0, 1 or 3**, never 2: det(R)·R is a proper rotation, a proper
+    rotation other than the identity fixes exactly one line, so the
+    intersection is all of ℝ³ only when every det(R)·R is the identity (site
+    symmetry 1 or −1) and at most a line otherwise.  A rigid body on a site
+    turns about exactly these directions (WP-1807), which is why its rotation
+    DOFs never number two.  With no rotations it is the identity basis.
+    """
+    rows = [[Fraction(round(np.linalg.det(r)) * int(r[i][j]) - (i == j))
+             for j in range(3)]
+            for r in rotations for i in range(3)]
+    if not rows:
+        return np.eye(3, dtype=np.int64)
+    return _nullspace_int(rows, 3)
+
+
 def floating_origin_basis(space_group) -> np.ndarray:
     """Integer basis of the origin shifts no intensity depends on, shape (k, 3).
 
@@ -235,9 +263,11 @@ def site_constraints(space_group, xyz, *, tol: float = SITE_TOL) -> SiteConstrai
     position count as on it).  Raises ``RuntimeError`` if spglib does not
     recover the requested group from the probe cell — that indicates
     coordinates given in a setting inconsistent with the operators, not a
-    tolerance issue.  **The Wyckoff letter and the oriented site-symmetry
-    symbol are both spglib's**, so they are available only for a group spglib
-    names; an :class:`~rietx.crystallography.symmetry.OperatorGroup` gets the
+    tolerance issue.  **The oriented site-symmetry symbol is spglib's; the
+    Wyckoff letter is the one**
+    :func:`~rietx.crystallography.representation.subgroups.wyckoff_positions`
+    **gives** (spglib's own only where that table cannot place the point), and
+    both are available only for a group spglib names; an :class:`~rietx.crystallography.symmetry.OperatorGroup` gets the
     constraint bases and the multiplicity — read off its own operations — with
     ``wyckoff`` and ``site_symmetry`` both empty, rather than a plausible wrong
     symbol for the type spglib would identify from the probe cell (the comment
@@ -291,8 +321,16 @@ def site_constraints(space_group, xyz, *, tol: float = SITE_TOL) -> SiteConstrai
             f"({sg.xhm()}): the coordinates are not consistent with this "
             "group's setting")
 
+    # spglib names the atom in its own standardised frame, which in some
+    # settings differs from the input's by a normaliser element that permutes
+    # letters; the table in representation.subgroups maps it back, so this
+    # letter and wyckoff_positions(group)'s agree.  Where the snapped point
+    # does not identify cleanly the table says nothing and spglib's letter stays.
+    from .representation.subgroups import _letter_at
+    letter = _letter_at(sg, xyz, len(rots), tol) or str(dataset.wyckoffs[0])
+
     return SiteConstraints(
-        wyckoff=f"{orbit.multiplicity}{dataset.wyckoffs[0]}",
+        wyckoff=f"{orbit.multiplicity}{letter}",
         site_symmetry=dataset.site_symmetry_symbols[0],
         multiplicity=orbit.multiplicity,
         coord_basis=coord,

@@ -1,9 +1,8 @@
 # WP-1912 — a polar axis has no origin, and the fit walks along it
 
-Milestone: unscheduled · Status: 🔄 2026-10-13 — hold and centroid both built, default off; the default (centroid proposed) is the maintainer's call on #727
+Milestone: unscheduled · Status: ✅ 2026-10-23 — a polar group's floating origin can be fixed on request, by holding one atom or by restraining a weighted centroid of all of them; both stay off by default, and whether the centroid becomes the default is WP-2029
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-05 — the default structural preset reaches it on every polar space group with a free coordinate, and the CIF it writes carries an absolute coordinate hundreds of cells out with an esd; flagged only by `FLAT_DIRECTION` on the result, so not P1
 
 ## Goal
 
@@ -109,16 +108,8 @@ a row block of its own (task below; it needs nothing from WP-1942's unbuilt
 user-declared restraint), is measured against the hold on ZnO, Cc and P1, and becomes the candidate
 default. A default change moves the reported origin and the spread of esds,
 never the structure, Rwp or any interatomic distance, and goes in the release
-notes.
-
-### Inherited
-
-- From WP-1986 (2026-10-17): the new manual's Guides tab has no page on fixing the
-  origin of a polar space group, deliberately, because this WP still owns the default.
-  The old `using/concepts.md` § Holding a parameter against the plan carries the text
-  (zincite numbers, both values of `Phase.floating_origin`). When the default settles,
-  say so in WP-1986's Guides notes, so a guide `docs/docs/guides/<page>.md` with its
-  script in `examples/guides/` can be written against the settled behaviour.
+notes. *Decided 2026-10-23 by the maintainer:* both modes stay opt-in and off
+by default, and whether the centroid becomes the default is WP-2029.
 
 ## Non-goals
 
@@ -276,7 +267,7 @@ notes.
       `par-origin-centroid` and `par-origin-weights`, Part 1 `concepts.md`,
       `help.py`, `numbers.md`, the 1.9.0 note. `replay` is evaluate-only
       and quotes no esd, so it needs no rows. Untested: a rigid body's
-      origin as a site.*
+      origin as a site (moved to WP-2029).*
 - [x] Measure hold against centroid on the ZnO, Cc and P1 fixtures and the
       round-robin zincite (origin, esds, Rwp, free count), then propose the
       default with a read-time pin for documents older than the schema that
@@ -301,6 +292,8 @@ notes.
       is not one), either one origin row per joint structure or a fallback
       to `"hold"` there. Cost: 2·N·P extra forward evaluations per stage
       that slides a phase. The maintainer's call on #727.*
+      *Decided 2026-10-23: the default stays off. The proposal, its
+      conditions and the pin moved to WP-2029.*
 
 ## Acceptance
 
@@ -330,6 +323,39 @@ with each moved number named.
   WP-0302, WP-1432, WP-1435; `schemas/params.py` (`needs_held_cell`).
 
 ## Handover log
+
+### 2026-10-23 — closed: the origin is fixed on request, and the default moves on
+
+A fit in a polar space group can now fix the origin the data cannot see, in
+one of two ways the caller picks. It can hold one atom
+(`Refinement.hold_floating_origin()`, `Phase.floating_origin = "hold"`), or
+restrain a weighted centroid of all of them (`"centroid"`, Flack &
+Schwarzenbach 1988). Either keeps the coordinates in the cell with esds that
+measure what the data measures. A caller who sets neither gets what every
+earlier version gave: `FLAT_DIRECTION` on the result, and a walk under TRF.
+The maintainer decided today that both stay off by default and that this WP
+closes, which discharges the call on #727 it waited on. So the Goal's "fixes
+the origin itself" holds on request only. The default is WP-2029.
+
+*Closed.* Every task box was already ticked; the last two now point at
+WP-2029. The acceptance holds with a mode declared:
+`tests/test_floating_origin.py`, 73 passed today (`[dev]`, Linux, `2ff746f`).
+*Inherited.* WP-1986's bullet (no Guides page on fixing the origin until the
+default settles) went back to WP-1986 as a forward note: the behaviour is
+settled as opt-in, and a flip in 2029 carries the guide with it. Its pointer
+to `using/concepts.md` was stale, as that tree retired; the text now lives in
+`docs/docs/reference/data.md` and `theory/parameterisation.md`.
+*Re-measured today* (same venv): two review findings still hold.
+`hold_floating_origin()` on a `"centroid"` phase returns `[]` and leaves the
+field. After `unhold` of the origin DOF, Zn's row reads `vary=False`; after
+`edit(floating_origin=None)` it reads `vary=True`. The others were not checked.
+*Next.* Nothing owed here. WP-2029 holds the joint-fit seam, the open
+findings, the read-time pin, the rigid-body test and the default; WP-1986
+holds the guide.
+
+*For the issue thread* (to batch, none posted): #727 gets a line saying both modes
+stay opt-in and off, and that the default, the joint-fit seam and the analytic
+weights are WP-2029's. #727 stays open, cited by 2029.
 
 ### 2026-10-13 (2nd session) — the centroid, built from the paper
 

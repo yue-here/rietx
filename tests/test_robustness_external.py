@@ -694,12 +694,13 @@ def test_a_zero_bound_is_repaired_even_when_it_comes_from_a_stored_document():
     # the broken bound outlives the default: a project or history node written
     # before the fix carries min=0.0 explicitly
     from rietx import Parameter
-    from rietx.schemas.structure import MARCH_R_MAX, MARCH_R_MIN, PreferredOrientation
+    from rietx.schemas.structure import MARCH_R_MIN, PreferredOrientation
 
     po = PreferredOrientation(
         axis=(0, 0, 1),
         r=Parameter(value=0.8, vary=True, min=0.0, transform="softplus"))
-    assert (po.r.min, po.r.max) == (MARCH_R_MIN, MARCH_R_MAX)
+    # the pole floor, and no ceiling (WP-2002)
+    assert (po.r.min, po.r.max) == (MARCH_R_MIN, np.inf)
     assert po.r.value == pytest.approx(0.8)      # the value is not disturbed
 
     back = PreferredOrientation.model_validate_json(po.model_dump_json())
@@ -729,12 +730,28 @@ def test_the_march_bound_holds_through_the_parameter_table():
 
     lo, hi = table.bounds()
     k = table.free_paths.index("phases.0.preferred_orientation.r")
-    # the solver sees a finite lower bound, so it can no longer reach a zero r
-    assert np.isfinite(lo[k]) and np.isfinite(hi[k])
+    # the solver sees a finite lower bound, so it can no longer reach a zero r;
+    # nothing bounds it above (WP-2002)
+    assert np.isfinite(lo[k]) and hi[k] == np.inf
     x = table.x0().copy()
     x[k] = lo[k]
     assert table.decode(x)["phases.0.preferred_orientation.r"] == \
         pytest.approx(MARCH_R_MIN)
+
+
+def test_the_march_factor_and_its_column_are_finite_on_the_floor():
+    """The floor is a pole guard: at ``MARCH_R_MIN`` the factor and its
+    r-derivative are finite at every angle, so LM landing exactly on the bound
+    (WP-1938) meets a defined model and a live column."""
+    from rietx.model.preferred_orientation import march_term_and_dr
+    from rietx.schemas.structure import MARCH_R_MIN
+
+    cos2 = np.linspace(0.0, 1.0, 10001)
+    term, dterm = march_term_and_dr(cos2, MARCH_R_MIN)
+    assert np.all(np.isfinite(term)) and np.all(np.isfinite(dterm))
+    assert np.all(term > 0.0) and np.all(dterm != 0.0)
+    # with a margin of more than a hundred decades below fp64's overflow
+    assert np.abs(dterm).max() < 1e30
 
 
 # ----------------------------------------------------------------------
@@ -872,7 +889,7 @@ def test_an_unseeded_background_hands_the_pedestal_to_the_reflections():
     y = peaks + 5.0 * peaks.max()          # background 5× the strongest peak
     pattern = PatternData(two_theta=tt.tolist(), intensity=y.tolist())
 
-    ins.background = auto_background(pattern)
+    ins.background = auto_background(pattern).background
     assert all(c.value == 0.0 for c in ins.background.coefficients)
 
     model = compile_model(s, ins, pattern, mode="lebail")

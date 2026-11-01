@@ -94,6 +94,12 @@ Everything a fresh session needs and cannot get from CLAUDE.md alone:
 - Relevant invariants (link `../DESIGN.md#...` sections; restate the short ones).
 - Prior measured findings that constrain the design.
 - Licensing fences (what may be ported, what is concepts-only).
+- The tier of each rule this WP adds ([generality § The rule](../milestones/generality.md#the-rule)):
+  physics, named practice, or new judgement. For new judgement, name the dataset families
+  it was measured on and the reference for each. A default or automatic action also names
+  its kind of ambiguity ([DESIGN § Rules](../DESIGN.md#rules), 1). A new topic names its
+  reference (dataset, published number, tolerance) before any code is written, or says
+  none exists and that it ships not yet validated.
 
 ### Inherited
 

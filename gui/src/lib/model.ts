@@ -586,15 +586,19 @@ export function positionEdits(structure: any, phase: number,
  *
  * Everything but the position is a default the schema would have supplied; the
  * position is asked for because it is the one thing that *decides* something —
- * the site symmetry, and with it how many DOFs the atom will have.
+ * the site symmetry, and with it how many DOFs the atom will have.  So `occ`
+ * and `biso` carry a value only, and the schema fills in the range and unit it
+ * declares (`_InheritsDeclaredDefaults`).  Spelled out here, the range was a
+ * second copy that outlived the schema's: `occ ≤ 1.5` after WP-2002 removed it,
+ * and `biso` in [0, 25] after WP-1534 did.
  */
 export function newAtom(label: string, species: string,
                         xyz: readonly number[] = [0, 0, 0]): any {
   return {
     label, species,
     x: { value: xyz[0] }, y: { value: xyz[1] }, z: { value: xyz[2] },
-    occ: { value: 1.0, min: 0.0, max: 1.5 },
-    biso: { value: 0.5, min: 0.0, max: 25.0, unit: "A^2" },
+    occ: { value: 1.0 },
+    biso: { value: 0.5 },
   };
 }
 

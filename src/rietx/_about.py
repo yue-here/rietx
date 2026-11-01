@@ -3,7 +3,10 @@
 Every string in this package that spells the *distribution*, the on-disk
 *format tokens* or the *state directory* lives here and nowhere else.  The
 module imports nothing — not even from this package — so anything may import
-it: the forward model, the GUI server, ``docs/manual/conf.py``, the tests.
+it: the forward model, the GUI server, ``docs/docs/conf.py``, the tests.
+Its two functions, :func:`docs_version` and :func:`docs_base`, keep that rule:
+they finish the hosted manual's address from a version string the caller
+passes, since a URL's spelling belongs here and nowhere else.
 
 Two rules the values below follow, and they point in opposite directions:
 
@@ -127,6 +130,34 @@ SERVER_TOKEN = "rietx"
 #: with ``rietx.agent`` in WP-1303.  A brand token: a rename or a hosting move
 #: changes it here and nowhere else.
 DOCS_URL = "https://rietx.org"
+
+
+def docs_version(version: str) -> str:
+    """The directory under ``<DOCS_URL>/docs/`` holding a version's manual (WP-1979).
+
+    A release's manual is kept per minor, so ``1.10.2`` reads ``1.10``.
+    Anything else, a ``.dev0`` build or a release candidate included, reads
+    ``dev``, the tree built from ``main``.  Written here, beside the URL it
+    completes, without the ``re`` it was first written with, because this
+    module imports nothing; ``docs/docs_versions.py`` and the docs build
+    import it rather than keeping a copy.
+    """
+    parts = version.split(".")
+    if len(parts) == 3 and all(part.isascii() and part.isdecimal() for part in parts):
+        return f"{parts[0]}.{parts[1]}"
+    return "dev"
+
+
+def docs_base(version: str) -> str:
+    """Root of the manual this version documents, no trailing slash (WP-1986).
+
+    ``<DOCS_URL>/docs/<docs_version(version)>``: the tree a ``help.py``
+    ``anchor`` is relative to, and what the GUI serves as ``docs_url``.  The
+    version is an argument because this module imports nothing, not even
+    ``rietx.__version__``; a caller passes the installed one.
+    """
+    return f"{DOCS_URL}/docs/{docs_version(version)}"
+
 
 #: Root of the source repository, no trailing slash.  A brand token like
 #: :data:`DOCS_URL`, and the base the theory manual builds a per-equation

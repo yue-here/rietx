@@ -19,7 +19,9 @@ the added parameters — Hamilton's R-ratio test at α = 0.05 and ΔBIC, +22.4 a
 N/f² on the 1.7.0 tree (+592 at raw N).  In physical units (WP-1938) the same
 TRF fit stops at max_iter at 18.09 %, and ΔBIC reads +9.2 (+392 at raw N).
 Since WP-1953 the axial stage refines S/L with H/L held at 0, and on 1.9.0 the
-TRF fit converges at 17.88 % from 18.64 %, ΔBIC +21.0 (+578 at raw N).
+TRF fit converges at 17.88 % from 18.64 %, ΔBIC +21.0 (+578 at raw N).  On
+1.10.0, after WP-2002's width twin hold and floor removal, it converges at
+18.04 %, ΔBIC +12.5 (+448 at raw N).
 It is nonetheless **physically inadmissible**: the refinement drives σ²(M)
 negative on 12 of the 43 fitted reflections, and the v0.5 fit stopped at
 max_iter rather than converging.  σ² is a variance; a negative one is not a large
@@ -70,7 +72,9 @@ Measured before 1.6.0. Re-run on the 1.7.0 tree, the TRF column reads 14, 7,
 units (WP-1938) it reads 13, 7, 26 and 24, seeds 400 and 1600 stop at
 max_iter, and seed 800 gives LM 0.17942 against TRF 0.18092.  On 1.9.0, after
 WP-1953, it reads 15, 7, 19 and 24, every fit converges, LM holds the cone at
-all four, and seed 800 gives LM 0.17995 against TRF 0.17877.
+all four, and seed 800 gives LM 0.17995 against TRF 0.17877.  On 1.10.0 it
+reads 19, 19, 19 and 17, every fit converges, and seed 800 gives LM 0.18147
+against TRF 0.18042.
 
 So: the constraint holds from **every** start, which is what it promised, and
 the unconstrained driver leaves the cone from the low seeds only.  But the
@@ -96,7 +100,7 @@ separates them (+578 against −8.8; +592 against −15 on 1.7.0).  That read as
 ΔBIC being the statistic to trust until #270 showed raw-N ΔBIC blessing a 1σ
 occupancy the same way.  Both are now read at N/f², f the restricted fit's
 ``esd_inflation``.  There Hamilton refuses corundum too, and ΔBIC reads +21.0
-for brucite against −18.0 on 1.9.0.  Brucite's block still pays for its three
+for brucite against −18.0 on 1.9.0 (+12.5 against −18.1 on 1.10.0).  Brucite's block still pays for its three
 parameters jointly, while three of its four S_HKL coefficients lie within 1.3σ
 of zero (value/esd 0.37, −1.22, 0.40, 2.29): the ~100 % spread across starts
 above, seen in one fit's esds.
@@ -165,6 +169,12 @@ def _plan(*, texture: bool, stephens: bool) -> rx.RefinementPlan:
     # ones the package actually produces.  None here would converge every
     # stage; measured cost of the schedule on this protocol is <= 0.02 esd.
     plan.intermediate_ftol = 1e-6
+    # No closing stage here (WP-2002), declared rather than inherited.  The
+    # suite pins TRF's unconstrained answer, and under TRF the closing stage
+    # stops brucite where one S_HKL's esd collapses (t = -268 against -1.22),
+    # while LM is unaffected; the iso/aniso comparison needs both fits on one
+    # window setting, so the whole module declines it.
+    plan.closing_window_tol = None
     return plan
 
 
@@ -283,8 +293,8 @@ def test_brucite_improvement_is_justified_but_leaves_the_physical_cone(
         == pytest.approx(0.65, abs=0.05)
 
     # 1. the improvement is real and passes both tests for the added
-    #    parameters at N/f² (measured ΔBIC +21.0 at N_eff 473, +578 at raw N
-    #    on 1.9.0; +9.2 and +392 on 1.8.0, before WP-1953's axial limit;
+    #    parameters at N/f² (measured ΔBIC +12.5 at N_eff 473, +448 at raw N
+    #    on 1.10.0; +21.0 and +578 on 1.9.0; +9.2 and +392 on 1.8.0, before WP-1953's axial limit;
     #    +22.4 and +592 on 1.7.0, before WP-1938's physical units)
     assert iso.statistics.rwp == pytest.approx(0.1855, abs=0.01)
     assert ani.statistics.rwp == pytest.approx(0.1790, abs=0.01)
@@ -324,14 +334,13 @@ def test_corundum_is_reported_isotropic(corundum_plain):
     strain = ref.report().strain[0]
     assert not strain.detected
     assert strain.r2 < 0.5              # nothing directional beyond isotropic
-    # the ratio of an *insignificant* diagnostic fit (r² here is 0.11 on 1.9.0) is
-    # noise, and it drifted from ~1.9 to ~2.02 when WP-1112 resized the
-    # evaluation windows — the isotropic verdict is carried by ``detected``
-    # and ``r2`` above; this bar only keeps the quoted magnitude honest.
-    # WP-1930's floor seed moved it to 4.51 at the same χ²_red (2.65601 in
-    # both arms): the Lorentzian split is a flat direction here (lor_strain
-    # 1e-4 against 1.4e-3), and the ratio rides it
-    assert strain.anisotropy < 6.0
+    # No bar on ``strain.anisotropy``: the ratio of an *insignificant*
+    # diagnostic fit (r² 0.079) is noise, and it rode the instrument/specimen
+    # split of the Lorentzian width (~1.9, 2.02 after WP-1112, 4.51 after
+    # WP-1930).  WP-2002's width twin hold fixed that split at the instrument's
+    # stage-start Y, a reflection's specimen width then clips to zero, and the
+    # ratio is infinite (quoted as 1e6, forwarded to WP-2004).  The isotropic
+    # verdict is carried by ``detected`` and ``r2`` above.
     assert strain.n_patterns == 4       # R-3c → Laue -3m
     assert strain.n_reflections_used > 40
 
@@ -416,6 +425,9 @@ def test_constrained_solver_keeps_brucite_inside_the_cone():
     LM, cone enforced   17.95        17.94        18.00        0 of 43
     ==================  ===========  ===========  ===========  ===================
 
+    On 1.10.0 TRF reads 18.04 with 19 of 43 reflections out of the cone, and LM
+    18.15 with none.
+
     On 1.7.0 a fit inadmissible on 7 of its 43 reflections had the lower Rwp,
     and it was still not the better fit: its S_HKL cannot be quoted.  Same
     shape as the v0.5 method result — a correction that is right can move Rwp
@@ -467,7 +479,7 @@ def test_unconstrained_solver_leaves_the_cone_on_the_same_data(brucite_aniso_trf
     ref, result = brucite_aniso_trf
     sigma2 = _sigma2_of(ref)
     # ≥ 10 before WP-1112; the area-criterion windows moved the converged
-    # block and 7 reflections now leave the cone — the claim is that the
+    # block and 7 reflections left the cone on 1.9.0, 19 on 1.10.0 — the claim is that the
     # unconstrained optimum genuinely wants negative σ², and it still does
     assert (sigma2 < 0.0).sum() >= 5
     assert [d for d in result.diagnostics

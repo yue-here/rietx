@@ -23,21 +23,30 @@ address a consumer can act on.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping, Sequence
+from typing import Any, get_args
 
 import numpy as np
 
-from ..crystallography.atomic_volume import VOLUME_SCATTER, formula_unit_volume
 from ..model.profiles.fcj import fcj_live
 from ..schemas.common import Diagnostic
 from ..schemas.indexing import (
+    _MODE_NAMES,
+    INDEX_REFUTING_CAVEATS,
     MAX_RELATIVE_SIGMA_Q,
     PEAK_MIN_USABLE_LINES,
+    PEAK_NO_INTENSITY_SIGMA,
+    PEAK_POSITION_BOUND_FWHM,
+    PEAK_WIDTH_BOUND_FACTORS,
     PEAK_WIDTH_CENSUS_N,
     DataQualityReport,
+    IndexCaveat,
+    ObservedPeak,
     PeakList,
 )
 from ..schemas.instrument import Instrument, ProfileTCHZ
-from .peaks import Detection, fdr_screen
+from ..strategy.staged import BOUND_HIT_RTOL
+from .peaks import Detection, PeakGroup, fdr_screen
 
 #: Physical cause of each shift template, for the messages.  The template names
 #: themselves come from ``report/layer2.py``'s ``_POSITION_ACTIONS`` — one
@@ -60,6 +69,8 @@ WIDTH_MISMATCH_RATIO = 3.0
 
 
 def peak_diagnostics(peaks: PeakList, detection: Detection | None = None,
+                     *,
+                     windows: Sequence[PeakGroup] | Mapping[int, Any] | None = None,
                      ) -> list[Diagnostic]:
     """Translate a peak list's flags and a detection's width census.
 
@@ -67,7 +78,18 @@ def peak_diagnostics(peaks: PeakList, detection: Detection | None = None,
     that arrives from outside — ``PeakList.from_positions``, i.e. the form the
     bethanechol benchmark comes in — needs the same translation without any
     detection to go with it.
+
+    ``windows`` are the fitting windows ``ObservedPeak.group`` indexes, read
+    for the bounds the fit ran into (each a multiple of its window's seed
+    FWHM).  Detection's own groups by default, which is what
+    :func:`~rietx.indexing.pick_peaks` fitted; a caller that fitted other
+    windows passes those (:func:`~rietx.indexing.fit_peaks` does).  A mapping
+    keyed by group number serves a caller whose numbers are not a
+    ``0..n-1`` sequence, each value anything with a ``seed_fwhm`` (the peak
+    editor passes its own ``GroupMeta`` windows).
     """
+    if windows is None and detection is not None:
+        windows = detection.groups
     out: list[Diagnostic] = []
     usable = peaks.usable()
 
@@ -132,16 +154,23 @@ def peak_diagnostics(peaks: PeakList, detection: Detection | None = None,
 
     capped = [p for p in peaks.peaks if "width_capped" in p.flags]
     if capped:
+        f_hi = PEAK_WIDTH_BOUND_FACTORS[1]
         out.append(Diagnostic(
             level="info", code="PEAK_WIDTH_CAPPED",
             message=(f"{len(capped)} component(s) ran into the width bound of "
-                     "five times the pattern's own width law at their angle, "
-                     "and are excluded from usable()."),
-            where=[f"{p.two_theta:.4f}°" for p in capped],
+                     f"{f_hi:g} times the pattern's own width law at their "
+                     "angle (PEAK_WIDTH_BOUND_FACTORS), and are excluded from "
+                     "usable()."),
+            where=[_at(p, f"FWHM {p.fwhm:.4f}°"
+                       + (f", Γ_G/Γ_L bound {f_hi * s:.4f}° each"
+                          if (s := _seed_fwhm(p, windows)) else ""))
+                   for p in capped],
             suggestion=("On a steep or structured background, check whether "
                         "the background envelope followed it. For a broad "
                         "second phase, pick it separately at its own "
                         "width.")))
+
+    out.extend(_bound_diagnostics(peaks, windows))
 
     tails = [p for p in peaks.peaks if "axial_tail" in p.flags]
     if tails:
@@ -217,11 +246,137 @@ def _false_line_diagnostic(peaks: PeakList, det: Detection) -> Diagnostic:
                     "weak_line.")
     return Diagnostic(
         level="info", code="PEAK_EXPECTED_FALSE_LINES", message=message,
-        where=[f"{p.two_theta:.4f}°" for p in weak],
+        where=[_at(p, f"I/σ_I {_significance(p):.2f}, bar "
+                      f"{screen.z_threshold:.2f}") for p in weak],
         suggestion=("Keep weak_line components unless the list is known to "
                     "carry flank or tail junk. Count longer to tell weak "
                     "lines from noise."),
         value=screen.expected_false)
+
+
+def _at(p: ObservedPeak, detail: str) -> str:
+    """A ``where`` entry: the line's 2θ, then the number the statement is
+    about in brackets, so a reader acting on one line reads its value
+    without re-deriving it from the list."""
+    return f"{p.two_theta:.4f}° ({detail})"
+
+
+def _significance(p: ObservedPeak) -> float:
+    """I/σ_I, or NaN where the esd is not a finite positive number."""
+    esd = float(p.intensity_esd)
+    return (float(p.intensity) / esd if math.isfinite(esd) and esd > 0.0
+            else float("nan"))
+
+
+def _seed_fwhm(p: ObservedPeak,
+               windows: Sequence[PeakGroup] | Mapping[int, Any] | None
+               ) -> float | None:
+    """The seed FWHM of the window ``p`` was fitted in, which every bound of
+    the group's fit is a multiple of (``peakfit._GroupModel.bounds``).
+
+    ``None`` where no windows stand behind the list, or where ``p.group`` is
+    not one of them (the peak editor numbers a window a person opened past
+    detection's): the bound is then named by its rule, without a number.  Not
+    a test of ``p`` lying inside the window: a component on its position
+    bound may have left it.
+    """
+    if windows is None:
+        return None
+    if isinstance(windows, Mapping):
+        window = windows.get(p.group)
+    else:
+        window = windows[p.group] if 0 <= p.group < len(windows) else None
+    if window is None:
+        return None
+    s = float(window.seed_fwhm)
+    return s if math.isfinite(s) and s > 0.0 else None
+
+
+def _bound_diagnostics(peaks: PeakList,
+                       windows: Sequence[PeakGroup] | Mapping[int, Any] | None) -> list[Diagnostic]:
+    """One diagnostic per bound of the picker's group fit that a component
+    ended on, each ``where`` entry naming the bound and the value (#934 (c)).
+
+    The fit has three kinds of bound (``peakfit._GroupModel.bounds``): each
+    position within :data:`~rietx.schemas.indexing.PEAK_POSITION_BOUND_FWHM`
+    of the group's seed FWHM from its seed (``position_at_bound``); each
+    intensity ≥ 0 (``no_intensity``, which also carries the
+    :data:`~rietx.schemas.indexing.PEAK_NO_INTENSITY_SIGMA` floor, so the
+    entry says which of the two put it there); and the two widths between
+    :data:`~rietx.schemas.indexing.PEAK_WIDTH_BOUND_FACTORS` × the seed FWHM,
+    whose upper end is ``width_capped`` (``PEAK_WIDTH_CAPPED``).  The lower
+    end is a positivity floor and gets no flag: one width there is a pure
+    Gaussian or Lorentzian line, which is a shape, not a failure, and both
+    there at once never happened on the public corpus or the reproducers.
+    """
+    out: list[Diagnostic] = []
+    moved = [p for p in peaks.peaks if "position_at_bound" in p.flags]
+    if moved:
+        # the hazard is a line still offered at full weight: one under the
+        # false-discovery bar is already marked as evidence a consumer weighs
+        offered = [p for p in moved
+                   if p.usable and "weak_line" not in p.flags]
+        out.append(Diagnostic(
+            level="info",
+            code="PEAK_POSITION_AT_BOUND",
+            message=(f"{len(moved)} component(s) ended on their position "
+                     f"bound, {PEAK_POSITION_BOUND_FWHM:g} of the group's "
+                     "seed FWHM from where they were seeded "
+                     "(PEAK_POSITION_BOUND_FWHM): the fit stopped on its "
+                     "bound, so the reported 2θ is the bound's; "
+                     f"{len(offered)} of them usable and above the "
+                     "false-discovery bar"),
+            where=[_at(p, (f"bound ±{PEAK_POSITION_BOUND_FWHM * s:.4f}°"
+                           if (s := _seed_fwhm(p, windows)) else "at the bound")
+                       + f", I/σ_I {_significance(p):.1f}")
+                   for p in moved],
+            suggestion=("the reported 2θ is the bound's: the fit stopped on "
+                        "its bound, and its σ(2θ) is the curvature there, "
+                        "which leaves out how far past the bound the fit "
+                        "would have moved"),
+            value=float(len(offered))))
+
+    empty = [p for p in peaks.peaks if "no_intensity" in p.flags]
+    if empty:
+        n_zero = sum(_at_zero(p) for p in empty)
+        # the fit's own cause is the zero bound or the floor; a component the
+        # editor's ``set_flags`` marked by hand on a line the data can tell
+        # from zero is neither, and its entry must not print a comparison
+        # that is false
+        by_hand = [p for p in empty
+                   if not _at_zero(p)
+                   and not _significance(p) < PEAK_NO_INTENSITY_SIGMA
+                   and not math.isnan(_significance(p))]
+        out.append(Diagnostic(
+            level="info", code="PEAK_NO_INTENSITY",
+            message=(f"{len(empty)} component(s) excluded from usable() and "
+                     "kept in peaks so a report can say why: "
+                     f"{n_zero} on the fit's zero-intensity bound, "
+                     f"{len(empty) - n_zero - len(by_hand)} under "
+                     f"PEAK_NO_INTENSITY_SIGMA ({PEAK_NO_INTENSITY_SIGMA:g}) "
+                     f"of their own esd and {len(by_hand)} marked by hand"),
+            where=[_at(p, f"I = {float(p.intensity):.3g}, at the zero bound"
+                       if _at_zero(p) else
+                       f"I/σ_I {_significance(p):.2f}, marked by hand"
+                       if p in by_hand else
+                       f"I/σ_I {_significance(p):.2f} < "
+                       f"{PEAK_NO_INTENSITY_SIGMA:g}")
+                   for p in empty],
+            suggestion=("these components are excluded from usable() and "
+                        "kept in peaks so a report can say why; a component "
+                        "on the zero bound has a 2θ and σ(2θ) that are not "
+                        "measurements, one under its esd has a weak "
+                        "gradient and a large σ(2θ), and one marked by hand "
+                        "was withheld by the caller, whatever its "
+                        "intensity"),
+            value=float(n_zero)))
+    return out
+
+
+def _at_zero(p: ObservedPeak) -> bool:
+    """On the zero-intensity bound, by the refinement's own bound test
+    (``no_intensity``'s first half, ``pick._flags_for``)."""
+    return float(p.intensity) <= BOUND_HIT_RTOL
 
 
 def _width_diagnostics(det: Detection) -> list[Diagnostic]:
@@ -335,9 +490,53 @@ def refinement_width_diagnostics(measured: float,
         suggestion=suggestion, value=ratio)]
 
 
+#: How far a single line may sit from one of an anode's three declared
+#: wavelengths (:func:`lab_lines`) and still be that anode, Å.  Four decimals
+#: typed by hand (``1.5405``, 9e-5 off) and the weighted mean quoted to four
+#: (``1.5418`` for Cu, 7e-5 off) are within it.  The six anodes' lines are at
+#: least 0.14 Å apart (Fe Kα1 to Co Kα2 is the nearest, 0.143 Å), so it names
+#: one anode at most.
+LAB_LINE_TOLERANCE_ANGSTROM = 5e-4
+
+
+def lab_lines() -> dict[str, tuple[float, float, float]]:
+    """Per anode, the three wavelengths a source may declare as one line: Kα1,
+    Kα2, and the intensity-weighted mean (2λ₁ + λ₂)/3, which is what ``.uxd``
+    files and older exports write (1.5418 for Cu).  The GUI's metadata reader
+    asks the same three of a file's wavelength."""
+    from ..schemas.instrument import _KA_DOUBLETS
+
+    return {name: (a1, a2, (2.0 * a1 + a2) / 3.0)
+            for name, (a1, a2) in _KA_DOUBLETS.items()}
+
+
+def lab_source(instrument: Instrument) -> bool:
+    """Does ``instrument`` declare a laboratory X-ray tube?
+
+    Read off the declared source, never guessed from the pattern (WP-2030): a
+    constant-wavelength X-ray source carrying a Kα doublet, or whose one line is
+    an anode's Kα1, Kα2 or weighted mean (:func:`lab_lines`) to within
+    :data:`LAB_LINE_TOLERANCE_ANGSTROM`, so the value
+    :meth:`~rietx.schemas.instrument.Instrument.bragg_brentano`'s ``radiation=``
+    writes, GSAS-II's six-decimal ``1.540593``, a hand-typed ``1.5406`` and the
+    ``1.5418`` of a vendor header all read alike.  A synchrotron or neutron
+    source is not one, and nor is a single line more than the tolerance from
+    every anode's three: it states none, so this answers ``False`` and nothing
+    is said that the declaration does not support.
+    """
+    source = instrument.source
+    if source.kind != "xray_cw":
+        return False
+    if len(source.lines) >= 2:
+        return True
+    wavelength = source.lines[0].wavelength.value
+    return any(abs(wavelength - line) <= LAB_LINE_TOLERANCE_ANGSTROM
+               for lines in lab_lines().values() for line in lines)
+
+
 def undeclared_instrument(instrument: Instrument) -> dict[str, str]:
     """What the instrument a peak list was picked with still leaves at default,
-    keyed by the block that holds it.
+    keyed by the block that holds it, on a laboratory source (:func:`lab_source`).
 
     The picker holds both and applies them (:func:`~rietx.indexing.pick_peaks`),
     so a default stands in for a measurement.  Axial divergence at S/L = H/L = 0
@@ -346,8 +545,15 @@ def undeclared_instrument(instrument: Instrument) -> dict[str, str]:
     and the separation floor are a lab pattern's several times over.  Measured
     on one lab capillary pattern (WP-1510, ``solution case 1``): declaring both
     took median σ(Q)/Q from 1.05e-3 to 6.9e-4 and the gate passed.
+
+    On any other source it is empty (:func:`picked_undeclared` records ``None``
+    there, "not checked", on the list): a correctly declared synchrotron
+    instrument has zero axial apertures and a narrow profile too, so the same
+    two tests would name a correct declaration as missing (WP-2030).
     """
     out: dict[str, str] = {}
+    if not lab_source(instrument):
+        return out
     geo = instrument.geometry
     if not fcj_live(geo.axial_sl.value, geo.axial_hl.value):
         out["instrument.geometry"] = (
@@ -360,6 +566,14 @@ def undeclared_instrument(instrument: Instrument) -> dict[str, str]:
             "instrument.profile is the default ProfileTCHZ, a synchrotron line "
             f"(W = {default.w.value:g} deg²)")
     return out
+
+
+def picked_undeclared(instrument: Instrument) -> dict[str, str] | None:
+    """What a picker records in ``PeakList.instrument_undeclared``:
+    :func:`undeclared_instrument` on a laboratory source, ``None`` on any other,
+    where the check does not apply.  ``{}`` therefore only ever says "checked,
+    and everything was declared"."""
+    return undeclared_instrument(instrument) if lab_source(instrument) else None
 
 
 def quality_diagnostics(report: DataQualityReport, peaks: PeakList,
@@ -382,9 +596,16 @@ def quality_diagnostics(report: DataQualityReport, peaks: PeakList,
         # the instrument is named first because it is the cheapest of the
         # remedies: a re-pick, where the others are a new measurement
         # only a fitted list was picked with an instrument; a position list
-        # has no picker to re-run
-        missing = ({} if instrument is None or peaks.source != "fitted"
-                   else undeclared_instrument(instrument))
+        # has no picker to re-run.  What the list recorded at its pick is the
+        # instrument it was picked with, so it outranks one handed in beside
+        # it; a list from before the record falls back to that one (WP-2030)
+        if peaks.source != "fitted":
+            missing = {}
+        elif peaks.instrument_undeclared is not None:
+            missing = dict(peaks.instrument_undeclared)
+        else:
+            missing = ({} if instrument is None
+                       else undeclared_instrument(instrument))
         if missing:
             suggestion = ("Declare the instrument before re-picking, because "
                           "a default widens each position's esd: "
@@ -485,45 +706,25 @@ BRAGG_BRENTANO_CELL_PPM = 85.0
 #: duplicating the text would let the two copies disagree.
 _PER_CANDIDATE_CODES = ("INDEX_GEOMETRIC_AMBIGUITY", "INDEX_BRAVAIS_AMBIGUOUS",
                         "INDEX_PREDICTED_BUT_ABSENT", "INDEX_IMPURITY_LINES",
-                        "INDEX_VOLUME_UNPHYSICAL", "INDEX_SUPERCELL_REFUTED",
-                        "INDEX_Z_NOT_INTEGER")
-
-#: How far a cell may sit from a whole number of formula units, as a fraction of
-#: its volume, before ``INDEX_Z_NOT_INTEGER`` fires (WP-1510).  Twice the 4.00 %
-#: scatter of one crystal about Hofmann's (2002) estimate
-#: (:data:`~rietx.crystallography.atomic_volume.VOLUME_SCATTER`).  That scatter
-#: is the method's uncertainty for one crystal.  The table's mean errors, about
-#: 0.5 % for an organic, describe the average and would flag correct cells.
-#: Three consequences.  Above Z = 6.25 every volume lies within 8 % of some
-#: whole number, so the check is silent there by arithmetic.  Z = 2.8 sits 6.7 %
-#: from 3 and does not fire, while Z = 8/3, a third of a Z = 8 cell, sits 11 %
-#: from 3 and does.  And a correct cell can fire, since only 6049 of the 9112
-#: structures in Hofmann's sample 1 lie within 5 % of his estimate (Table 1).
-#: So the code is a warning that reports the number, and never a caveat.
-Z_INTEGER_TOLERANCE = 2.0 * VOLUME_SCATTER
+                        "INDEX_VOLUME_UNPHYSICAL", "INDEX_SUPERCELL_REFUTED")
 
 
-def candidate_diagnostics(cand, *, formula: str | None = None,
-                          temperature: float = 298.0) -> list[Diagnostic]:
+def candidate_diagnostics(cand) -> list[Diagnostic]:
     """Everything to say about **one** candidate cell.
 
     Attached to the candidate rather than to the result, so a caller reading the
     third-ranked cell sees why it is third — and so a twelve-candidate answer does
     not bury its own abstention under thirty-six messages.
 
-    ``formula`` (with ``temperature`` in K) adds the chemistry's check: the
-    number of formula units the cell's volume implies, reported as
-    ``INDEX_Z_NOT_INTEGER`` when it is far from a whole number
-    (:data:`Z_INTEGER_TOLERANCE`).
+    A formula's check is no longer here (WP-2030): the number of formula units
+    a cell holds is recorded on the candidate
+    (:attr:`~rietx.schemas.indexing.CellCandidate.formula_units`), and no
+    diagnostic judges it, since against Hofmann's (2002) volumes a correct
+    inorganic cell looks like a wrong Z.
     """
     out: list[Diagnostic] = []
     where = [f"{cand.system} {cand.centring}, "
              f"V = {cand.volume:.1f} Å³, cell {_cell_str(cand.cell)}"]
-    if formula is not None:
-        z_check = _z_not_integer(cand, formula, temperature, where)
-        if z_check is not None:
-            out.append(z_check)
-
     if cand.ambiguity:
         tt = [t for p in cand.ambiguity for t in p.discriminating_two_theta]
         out.append(Diagnostic(
@@ -554,19 +755,53 @@ def candidate_diagnostics(cand, *, formula: str | None = None,
             suggestion=("Refine in the lower symmetry and test the higher "
                         "one.")))
 
+    # keyed on the validation's own counts, not on the caveat (#941 round 1):
+    # the code then reads the same on a candidate validated directly, before
+    # the gate has run, and on a validation the gate reads as failed; and a
+    # count outside de Wolff's window is said, at ``info``, rather than lost
     lebail = cand.lebail
-    if lebail is not None and lebail.predicted_but_absent:
+    in_window = outside = 0
+    # a diverged fit is as unread as a failed one: consensus.caveats_for
+    # reports both as validation_failed, and this block must not say otherwise
+    if lebail is not None and lebail.status not in ("failed", "diverged"):
+        if lebail.absent_source == "line_screen":
+            in_window = lebail.predicted_but_absent_uncancellable_in_window or 0
+            outside = (lebail.predicted_but_absent_uncancellable or 0) - in_window
+        else:
+            in_window = lebail.predicted_but_absent
+    if in_window > 0 or outside > 0:
         tt = lebail.predicted_but_absent_two_theta
+        if lebail.absent_source == "line_screen":
+            message = (
+                f"{in_window} of the "
+                "lines this lattice predicts inside the first twenty observed "
+                "lines, that no extinction could remove, have nothing above the "
+                "picker's background envelope at the measured width "
+                f"({lebail.predicted_but_absent} absent over the whole range, "
+                f"{lebail.predicted_but_absent_uncancellable} uncancellable)."
+                + ("" if in_window else " None of them is in the window, so "
+                   "the count caps nothing: above it a correct cell's weak "
+                   "general reflections go undetected too."))
+        else:
+            message = (
+                f"{lebail.predicted_but_absent} of {lebail.n_reflections} "
+                "reflections this lattice predicts have no net intensity "
+                "above the fitted background.")
         out.append(Diagnostic(
-            level="warning", code="INDEX_PREDICTED_BUT_ABSENT",
-            message=(f"{lebail.predicted_but_absent} of {lebail.n_reflections} "
-                     "reflections this lattice predicts have no net intensity "
-                     "above the fitted background."),
+            level="warning" if in_window else "info",
+            code="INDEX_PREDICTED_BUT_ABSENT",
+            message=message,
             where=where + ([f"first at {tt[0]:.3f}°"] if tt else []),
-            suggestion=("Compare the smaller cell that indexes the same lines, "
-                        "and read this count beside lebail.rwp. Rwp moves "
-                        "little on an oversized cell (0.379 against 0.216 for "
-                        "the correct one).")))
+            suggestion=("Compare the smaller cell that indexes the same lines: "
+                        "the pairwise supercell check against it is what "
+                        "refutes, this count only caps. lebail.rwp cannot "
+                        "separate them: a converged fit of a cell that "
+                        "predicts every reflection of another fits at least "
+                        "as well (0.164 against 0.164 for a doubled cell on "
+                        "rietx's synthetic LaB6 pattern)."
+                        if in_window else
+                        "Look at the pattern at these positions if the cell "
+                        "is in doubt; the grade does not read them.")))
 
     refuting = [c for c in cand.supercell_checks or [] if c.verdict == "refuted"]
     if refuting:
@@ -598,7 +833,8 @@ def candidate_diagnostics(cand, *, formula: str | None = None,
         out.append(Diagnostic(
             level="warning", code="INDEX_IMPURITY_LINES",
             message=(f"{lebail.unmatched_observed} observed peak(s) have no "
-                     "calculated reflection nearby after a whole-pattern Le Bail "
+                     "calculated reflection nearby after a whole-pattern "
+                     f"{_MODE_NAMES[lebail.mode]} "
                      "fit of this cell."),
             where=where + ([f"strongest region near {tt[0]:.3f}°" ] if tt else []),
             suggestion=("If a handful of lines remain, subtract the solved "
@@ -617,30 +853,11 @@ def candidate_diagnostics(cand, *, formula: str | None = None,
     return out
 
 
-def _z_not_integer(cand, formula: str, temperature: float,
-                   where: list[str]) -> Diagnostic | None:
-    """``INDEX_Z_NOT_INTEGER``: the cell holds a fractional number of formula
-    units, by Hofmann's (2002) volumes.  ``value`` is the implied Z."""
-    v_fu, _ = formula_unit_volume(formula, temperature)
-    z = cand.volume / v_fu
-    below = max(1, math.floor(z))
-    # the whole number nearest in *ratio*, since the tolerance is a fraction of
-    # the volume
-    n = min((below, below + 1), key=lambda k: abs(z / k - 1.0))
-    off = z / n - 1.0
-    if abs(off) <= Z_INTEGER_TOLERANCE:
-        return None
-    return Diagnostic(
-        level="warning", code="INDEX_Z_NOT_INTEGER", value=z,
-        message=(f"This cell holds {z:.2f} formula units of {formula} "
-                 f"({cand.volume:.1f} Å³ over {v_fu:.1f} Å³ per unit at "
-                 f"{temperature:g} K, Hofmann 2002). The nearest whole number, "
-                 f"{n}, needs a formula unit {abs(off) * 100:.0f} % "
-                 f"{'larger' if off > 0 else 'smaller'} than the estimate, "
-                 f"past the {Z_INTEGER_TOLERANCE * 100:.0f} % tolerance."),
-        where=where + [f"formula {formula}"],
-        suggestion=("Check the formula for a missing solvent or counter-ion, "
-                    "then weigh this beside the figures of merit."))
+def _refuting_caveat_names() -> str:
+    """The refuting caveats, read off :data:`INDEX_REFUTING_CAVEATS` in the
+    vocabulary's own order, so the text cannot name a set the gate no longer
+    uses."""
+    return ", ".join(c for c in get_args(IndexCaveat) if c in INDEX_REFUTING_CAVEATS)
 
 
 def index_diagnostics(result, instrument=None) -> list[Diagnostic]:
@@ -667,9 +884,11 @@ def index_diagnostics(result, instrument=None) -> list[Diagnostic]:
                      "confidence gate, so best_or_none() returns None."),
             where=[f"{c.system} {c.centring}, V = {c.volume:.1f} Å³"
                    for c in high],
-            suggestion=("Compare their figure-of-merit panels and their "
-                        "lebail.rwp, and extend the 2θ range to reach a "
-                        "high-angle reflection that separates them.")))
+            suggestion=("Compare their figure-of-merit panels, and their "
+                        "lebail.rwp where neither cell predicts every "
+                        "reflection of the other (supercell_checks says), "
+                        "and extend the 2θ range to reach a high-angle "
+                        "reflection that separates them.")))
 
     if result.best_or_none() is None:
         top = result.candidates[0] if result.candidates else None
@@ -684,11 +903,9 @@ def index_diagnostics(result, instrument=None) -> list[Diagnostic]:
                      "No candidate cell was found in the systems searched."),
             where=[f"searched: {', '.join(result.systems_searched) or 'nothing'}"],
             suggestion=(("Read each candidate's confidence_caveats and act on "
-                         "the refuting ones first (geometric_ambiguity, "
-                         "predicted_but_absent, fom_panel_disagrees, "
-                         "indexed_fraction_low, volume_unphysical, "
-                         "validation_failed, supercell_refuted). The others "
-                         "cap confidence, and better data closes most of them.")
+                         "the refuting ones first "
+                         f"({_refuting_caveat_names()}). The others cap "
+                         "confidence, and better data closes most of them.")
                         if top else
                         "Read search_complete before you treat the absence as "
                         "evidence.")))
@@ -818,12 +1035,66 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
     from .extinction import DECISIVE_DELTA_BIC
 
     out: list[Diagnostic] = []
+    if screen.status == "unreliable":
+        from .extinction import REFERENCE_NET_RWP_MAX
+
+        net = screen.reference_rwp_net
+        perfect = screen.perfect_fit_rwp_net
+        prefit = ("" if screen.prefit_rwp is None else
+                  f" (after a cell-free Le Bail prefit at Rwp "
+                  f"{screen.prefit_rwp:.3f})")
+        # which of the two failed, by arithmetic on the screen's own numbers:
+        # a fit leaving only the noise reads √(N/(N+S)), past the bound when
+        # S < N, so no model of these data could pass it
+        if net is None or perfect is None:
+            which = ""
+        elif perfect > REFERENCE_NET_RWP_MAX:
+            which = (f". A fit that left only the counting noise would read "
+                     f"{perfect:.3f} (√(N/(N+S)), N channels, S the weighted net "
+                     "Bragg power), past the bound too, so no cell or model passes it. "
+                     "Two causes give that, and these numbers cannot tell them "
+                     "apart: the data are weak (S < N), or the peak picker's "
+                     "envelope sits inside the lines over this range (a "
+                     "continuum, as at high angle in a low-symmetry pattern), "
+                     "which raises both readings with strong data")
+        else:
+            which = (f". A fit that left only the counting noise would read "
+                     f"{perfect:.3f} (√(N/(N+S)), N channels, S the weighted net "
+                     "Bragg power), so the data could pass and the reference "
+                     f"misfits them, by {net / perfect:.1f}× that (√(χ²/N))")
+        out.append(Diagnostic(
+            level="warning", code="EXTINCTION_SCREEN_UNRELIABLE",
+            message=(f"the reference fit of the lattice group "
+                     f"{screen.lattice_group}{prefit} leaves "
+                     + ("its net signal unmeasured" if net is None else
+                        f"a background-subtracted Rwp of {net:.3f}, above the "
+                        f"{REFERENCE_NET_RWP_MAX:g} at which the allowed lines "
+                        "are modelled well enough to read an absence against")
+                     + ", so every refutation and ΔBIC below may measure that "
+                     "misfit; the classes are ranked but best_or_none() "
+                     "abstains" + which),
+            where=[f"{screen.system} {screen.centring}, cell "
+                   f"{_cell_str(screen.cell)}"],
+            suggestion=("any of these, in no order: the cell (a few tenths of a "
+                        "per cent off at synchrotron resolution is outside the "
+                        "basin a Le Bail can refine it from; re-index it from a "
+                        "better start), a phase the reference does not model, "
+                        "weak data (counting longer helps; re-indexing does "
+                        "not), the range, the wavelength, the width law")))
     alive = [c for c in screen.candidates if not c.refuted and c.screened]
     # the classes a declared prior leaves a member in; every class without one
     admissible = [c for c in alive if c.space_groups]
     unscreened = [c for c in screen.candidates if not c.refuted and not c.screened]
+    if not screen.candidates and screen.status == "cancelled":
+        return out + [Diagnostic(
+            level="warning", code="EXTINCTION_SYMBOL_AMBIGUOUS",
+            message=("the screen was stopped before any extinction class was "
+                     f"screened (lattice {screen.lattice_group}); nothing here "
+                     "says anything about the cell"),
+            where=[f"{screen.system} {screen.centring}"],
+            suggestion="run the screen again to completion")]
     if not screen.candidates:
-        return [Diagnostic(
+        return out + [Diagnostic(
             level="warning", code="EXTINCTION_SYMBOL_AMBIGUOUS",
             message=("No extinction class could be screened: the lattice "
                      f"{screen.lattice_group} produced no fittable reflections in "
@@ -876,6 +1147,11 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
     if alive and not admissible:
         reasons.append("the declared prior leaves no member in any surviving "
                        "class")
+    if screen.density_contradicts_z():
+        reasons.append("the declared density does not give "
+                       + (f"the declared Z = {screen.prior.z}"
+                          if screen.prior.z is not None else "a whole Z")
+                       + " on this cell")
     if top.n_absent and top.n_testable == 0:
         reasons.append("none of its absences is testable in this range")
     if unscreened:
@@ -905,15 +1181,36 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
     ``info`` when the declaration only narrowed the classes the data rank;
     ``warning`` when it emptied the class the data rank first, since that is
     either the declaration doing work the data could not, or the data
-    contradicting it — and the reader must see which before acting.
+    contradicting it — and the reader must see which before acting.  Also a
+    ``warning`` when a declared density does not give the Z on this cell.
+    Each removed group is named with the facts it fails, each member of the
+    answer's class kept at a Z′ that is not whole with the special positions it
+    needs, and each kept member whose orbits cannot hold the declared count with
+    that statement.  A density that fits several whole Z is said to, and only
+    declares nothing.
     """
-    declared = ", ".join(f"{k}={v}" for k, v in screen.prior.declared().items())
+    prior = screen.prior
+    declared = ", ".join(f"{k}={v}" for k, v in prior.declared().items())
     removed = [c for c in screen.candidates if c.excluded_groups]
     emptied = [c.symbol for c in removed if not c.space_groups]
     first_emptied = bool(alive) and not alive[0].space_groups
+    contradicted = screen.density_contradicts_z()
     n_removed = sum(len(c.excluded_groups) for c in removed)
     message = (f"the declared prior ({declared}) removed {n_removed} space "
                f"group(s) from {len(removed)} class(es)")
+    if contradicted:
+        message = (f"the declared density and formula put "
+                   f"{screen.z_from_density:.2f} formula units in this cell, "
+                   + (f"not the declared z = {prior.z}"
+                      if prior.z is not None else "not one whole number")
+                   + ", so no group was filtered by Z and best_or_none() "
+                     "abstains; " + message)
+    elif prior.density is not None and screen.z is None and screen.z_candidates:
+        message = (f"the declared density and formula put "
+                   f"{screen.z_from_density:.2f} formula units in this cell, "
+                   f"which fits Z = {', '.join(map(str, screen.z_candidates))} "
+                   "within the density's tolerance, so no group was filtered "
+                   "by Z (declare z to filter); " + message)
     if emptied:
         message += f", emptying {', '.join(emptied)}"
     if first_emptied and top.space_groups:
@@ -924,19 +1221,47 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
         message += (f"; the data's leading class {alive[0].symbol} is among "
                     "them and the declaration admits no member of any "
                     "surviving class, so there is no admissible answer")
+
+    def _named(c) -> str:
+        return ", ".join(f"{g} ({c.exclusion_reasons[g]})"
+                         if g in c.exclusion_reasons else g
+                         for g in c.excluded_groups)
+
     return Diagnostic(
-        level="warning" if first_emptied else "info",
+        level="warning" if (first_emptied or contradicted) else "info",
         code="EXTINCTION_PRIOR_APPLIED",
         message=message + ".  A filter on the members, never evidence: no ΔBIC "
                           "moved and every class was fitted",
-        where=[f"{c.symbol}: excluded {', '.join(c.excluded_groups)}"
-               for c in removed],
+        where=[f"{c.symbol}: excluded {_named(c)}" for c in removed]
+        + _special_lines(top, screen.z) + _count_lines(top),
         suggestion=("check the declaration before the answer: a class it "
                     "emptied that leads on the data is either chemistry doing "
                     "what a powder cannot, or a wrong declaration (a racemate "
                     "declared enantiopure, a polar sample measured as a "
-                    "centrosymmetric twin).  best_or_none() abstains when the "
-                    "data prefer an excluded class by the decisive margin"))
+                    "centrosymmetric twin, a Z read off the wrong cell).  "
+                    "best_or_none() abstains when the data prefer an excluded "
+                    "class by the decisive margin"))
+
+
+def _special_lines(top, z) -> list[str]:
+    """The Z′ statements of the answer's class, one per member — or one line
+    when every member needs special positions, as an ionic solid's do, since
+    the statement then tells no member from another."""
+    notes = top.special_positions
+    if not notes:
+        return []
+    if len(top.space_groups) > 1 and len(notes) == len(top.space_groups):
+        return [f"{top.symbol}: every member holds Z = {z} only with formula "
+                "units on special positions (special_positions names them)"]
+    return [f"{top.symbol}: {note}" for note in notes.values()]
+
+
+def _count_lines(top) -> list[str]:
+    """What the declared Z says of the answer's class members whose orbits
+    cannot hold some element's count: kept, a disordered model may share a site."""
+    return [f"{top.symbol}: {g} kept though {why} (a disordered model shares "
+            "a site; ExtinctionPrior(ordered=True) removes it)"
+            for g, why in top.count_notes.items()]
 
 
 def _cell_str(cell) -> str:
@@ -955,6 +1280,6 @@ def significant(values: np.ndarray, threshold: float) -> np.ndarray:
 
 
 __all__ = ["BRAGG_BRENTANO_CELL_PPM", "SHIFT_CAUSE", "WIDTH_MISMATCH_RATIO",
-           "Z_INTEGER_TOLERANCE", "candidate_diagnostics", "extinction_class_diagnostics",
+           "candidate_diagnostics", "extinction_class_diagnostics",
            "extinction_diagnostics", "index_diagnostics", "peak_diagnostics",
            "quality_diagnostics", "significant"]

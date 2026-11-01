@@ -407,6 +407,15 @@ def refine_candidate(q: np.ndarray, q_esd: np.ndarray, hkl: np.ndarray, *,
     cell = cell_from_af(af)
     cov, chi2_red = _covariance(jac, resid_w)
     n_free = basis.shape[0]
+    # "at zero" is not exact: the solve can leave such a term at ±1e-17, and
+    # when the sign is + the metric is positive definite and passes the check
+    # above (measured on h0l-only assignments of a monoclinic cell).  The
+    # infinite variance is the direct test, so it is asked here as well; let
+    # through, it gave the candidate NaN esds, which reached spglib as symprec.
+    if not np.all(np.isfinite(np.diag(cov)[:n_free])):
+        raise ValueError(
+            f"no assigned line constrains every metric direction of this "
+            f"{system} fit (A..F = {af.tolist()}), so it is not a lattice")
     cov_af = basis.T @ cov[:n_free, :n_free] @ basis
     return CandidateFit(
         af=af, cov_af=cov_af, cell=cell,

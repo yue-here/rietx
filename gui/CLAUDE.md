@@ -1034,7 +1034,7 @@ say it. And **only the Rwp badge may be green**: `.better` was on every compare
 row with a non-zero delta, and a parameter difference has no good direction.
 
 **The manual is held to this app, and two of its vocabularies by test**
-(WP-1017, `docs/manual/using/gui-*.md`, `tests/test_gui_manual.py`). The GUI is
+(WP-1017, `docs/docs/**/gui-*.md`, `tests/test_gui_manual.py`). The GUI is
 documented and no longer beta; its **routes stay provisional by declaration**,
 which is the half of that status the chapters did not retire. Four rules.
 **Routes and panel names are partitioned** the way `tests/api_surface.py`
@@ -1045,7 +1045,7 @@ WP-1037's bug pointed at the reader. **Where no python object knows the fact,
 the authorities swap**: nothing here knows the panels exist, so the strip is
 data in `lib/tabs.ts`, `tabs.test.ts` writes `tests/data/gui/panels.json` and
 pytest reads it — the fnmatch mechanism run backwards, and it keeps the python
-suite node-free. **A screenshot is generated**, by `docs/manual/
+suite node-free. **A screenshot is generated**, by `docs/docs/
 make_screenshots.py` driving this server in-process over a shipped example;
 that script is the one authority for how each was taken, its `SHOTS` table is
 what a chapter may reference, and a picture is judged by **looking at it** —

@@ -335,6 +335,130 @@ def test_min_image_refreezes_when_coordinates_move():
     assert d_near < d_far  # different min-image frozen at each compile-time position
 
 
+# --------------------------- (d2) MIN_IMAGE_SHELL over its domain (WP-2002, B10)
+#: the longest pair a restraint names: bonds and anti-bump contacts, in Å
+_PAIR_MAX_ANG = 4.0
+
+
+def _reduced(cell):
+    """The Niggli-reduced cell of ``cell`` (gemmi's Gruber reduction)."""
+    import gemmi
+
+    gv = gemmi.GruberVector(gemmi.UnitCell(*cell), None)
+    gv.niggli_reduce()
+    c = gv.get_cell()
+    return (c.a, c.b, c.c, c.alpha, c.beta, c.gamma)
+
+
+def _domain_cells(kind, rng, n):
+    lengths = lambda: rng.uniform(2.4, 30.0, 3)  # noqa: E731
+    if kind == "hexagonal":
+        return [(a, a, c, 90.0, 90.0, 120.0)
+                for a, c in zip(rng.uniform(2.4, 30.0, n), rng.uniform(2.4, 60.0, n),
+                                strict=True)]
+    if kind == "rhombohedral":
+        return [(a, a, a, al, al, al)
+                for a, al in zip(rng.uniform(3.0, 15.0, n), rng.uniform(30.0, 115.0, n),
+                                 strict=True)]
+    if kind == "reduced_triclinic":
+        cells = []
+        while len(cells) < n:
+            cell = (*lengths(), *rng.uniform(40.0, 140.0, 3))
+            try:
+                ok = _metric_g(cell)
+            except ValueError:
+                continue
+            if np.linalg.eigvalsh(ok).min() > 0:
+                cells.append(_reduced(cell))
+        return cells
+    if kind == "reduced_monoclinic":
+        return [_reduced((*lengths(), 90.0, beta, 90.0))
+                for beta in rng.uniform(90.0, 160.0, n)]
+    assert kind == "monoclinic_beta_135_150"
+    return [(*lengths(), 90.0, beta, 90.0) for beta in rng.uniform(135.0, 150.0, n)]
+
+
+def _image_misses(cells, rng, pairs_per_cell):
+    """``(misses at any distance, misses within _PAIR_MAX_ANG, pairs within it)``.
+
+    The reference is the shell :func:`rietx.model.geometry._shell` sizes to
+    reach the centred image's distance, which no nearest image exceeds.  It
+    spans ceil(d·√G*ₖₖ) + 1 cells along each axis, so by the plane-spacing
+    bound it holds every image closer than that distance, in any cell.  It is
+    sized from the pair alone, never from what the search found, so the
+    search's first pass is checked rather than repeated.  That is the
+    geometry table's neighbour search, whose completeness
+    ``tests/test_geometry_table.py`` proves against a plain enumeration.
+    Orbit counting cannot do it here: in P 1 the search from i and the search
+    from j share their rounded centre up to a sign, so a miss from one end is
+    the same miss from the other.
+    """
+    from types import SimpleNamespace
+
+    from rietx.model.geometry import _shell
+
+    sites = SimpleNamespace(ops={0: (np.eye(3)[None], np.zeros((1, 3)))})
+    missed = missed_short = short = 0
+    for cell in cells:
+        g = _metric_g(cell)
+        for _ in range(pairs_per_cell):
+            ref = rng.uniform(-0.5, 0.5, 3) + rng.integers(-2, 3, 3)
+            x = rng.uniform(-0.5, 0.5, 3) + rng.integers(-2, 3, 3)
+            _r, _t, n = _resolve_image(sites, 0, ref, x, None, None, g)
+            dx = x + n - ref
+            found = float(np.sqrt(dx @ g @ dx))
+            f = x - ref
+            centred = f + np.round(-f)
+            reach = float(np.sqrt(centred @ g @ centred))
+            if reach < 1e-3:   # coincident: the nearest is a lattice vector away
+                reach = float(np.sqrt(np.diag(g).min()))
+            cand = centred[None, :] + _shell(g, reach + 1e-9)
+            d2 = np.einsum("sa,ab,sb->s", cand, g, cand)
+            best = float(np.sqrt(d2[d2 > 1e-6].min()))
+            short += best <= _PAIR_MAX_ANG
+            if found > best * (1.0 + 1e-12):
+                missed += 1
+                missed_short += best <= _PAIR_MAX_ANG
+    return missed, missed_short, short
+
+
+@pytest.mark.parametrize("kind", [
+    "reduced_triclinic", "reduced_monoclinic", "hexagonal", "rhombohedral",
+    "monoclinic_beta_135_150"])
+# slow: a domain sweep, 7.2 s for its four passing cells in the fast tier locally
+# (WP-2002 handover), which would join the fast tier's tail on CI
+@pytest.mark.slow
+def test_one_image_shell_finds_the_nearest_image_over_its_domain(kind):
+    """The minimum-image search against a complete one, in any cell (B10,
+    ruled 2026-10-19).  The bar is exactness, since a missed image restrains
+    the wrong pair.
+
+    ``MIN_IMAGE_SHELL`` = 1 alone was exact on every **Niggli-reduced** cell
+    (400 000 random pairs over 1000 of them, lengths 2.4-30 Å), on hexagonal
+    cells and on rhombohedral axes from α = 30° to 115°.  A cell stored
+    unreduced was outside it: monoclinic β past about 110° missed images
+    beyond the restraint range, past 129° within 4 Å, past 136° within 3 Å,
+    and at β 135-150° 72 of 2518 pairs within 4 Å (595 of 10 000 at any
+    distance; a shell of 2 still missed 10 of 14 105).  The search now sizes
+    a second pass from the first pass's distance, as ``geometry._shell``
+    sizes the neighbour search, so the stored setting no longer matters.
+
+    Made to fail on 2026-10-21 with the module constant patched to 0 and no
+    second pass: the four reduced rows missed 1742, 766, 1651 and 2031 of
+    their 10 000 pairs.  With the second pass removed, the monoclinic row
+    misses again.
+    """
+    rng = np.random.default_rng({"reduced_triclinic": 1, "reduced_monoclinic": 2,
+                                 "hexagonal": 3, "rhombohedral": 4,
+                                 "monoclinic_beta_135_150": 5}[kind])
+    cells = _domain_cells(kind, rng, 100)
+    missed, missed_short, short = _image_misses(cells, rng, 100)
+    assert short > 500, f"{kind}: only {short} pairs within {_PAIR_MAX_ANG} A"
+    assert missed == missed_short == 0, (
+        f"{kind}: {missed} of 10000 pairs missed their nearest image, "
+        f"{missed_short} of {short} within {_PAIR_MAX_ANG} A")
+
+
 # ------------------------------------------------- (e) the c_w schedule (1074)
 def _scaled_triclinic(c_w: float):
     """The (b) fixture compiled at a given stage c_w; returns (model, table)."""
@@ -529,7 +653,7 @@ def _sched_instrument() -> Instrument:
 def schedule_inputs():
     """(pattern, [true Zr-O1, true Zr-O2]) for the under-determined P-1 case.
 
-    A plain function beside the fixture so `docs/manual/make_figures.py` draws
+    A plain function beside the fixture so `docs/docs/make_figures.py` draws
     the manual's c_w figure from *this* case rather than from a second copy of
     it: the picture in the manual and the assertions below then cannot disagree
     about what the schedule did.

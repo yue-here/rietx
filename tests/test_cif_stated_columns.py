@@ -15,6 +15,9 @@ made up to reproduce the mechanism, not a database record.
 
 from __future__ import annotations
 
+from decimal import Decimal
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -142,3 +145,64 @@ def test_a_null_b_is_not_a_statement(tmp_path):
     phase, _ = _read(tmp_path, _cif([FE, O_EXACT], cols))
     assert phase.atoms[0].biso.value == pytest.approx(0.5)
     assert phase.atoms[1].biso.value == pytest.approx(0.4)
+
+
+# ------------------------------------------- a snap inside the file's own rounding
+# WP-2037: a coordinate printed to d decimals is any value within half its last
+# digit (cif.CIF_PRINTED_ROUNDING), so a snap that moves no coordinate further
+# is the file's rounding and not a statement of the file's.
+
+FAP = "tests/data/fluorapatite.cif"
+
+
+def _fap_with_ca1(tmp_path, x: str, y: str):
+    text = Path(FAP).read_text(encoding="utf-8").replace(
+        "Ca1 Ca 0.3333333333 0.6666666667", f"Ca1 Ca {x} {y}")
+    return _read(tmp_path, text)
+
+
+def test_a_snap_inside_the_files_printed_rounding_is_read_on_the_position(tmp_path):
+    """The bundled fluorapatite prints Ca1 as 0.3333333333, 0.6666666667:
+    3.3e-11 from 1/3 against a half-digit of 5e-11, and the same site printed
+    to five decimals is 3.3e-6 against 5e-6.  Either way the site is stored on
+    its special position, and neither the reader nor the fit's own check
+    reports a snap the file did not make."""
+    from rietx.refine import _symmetry_silence_diagnostics
+
+    found: list = []
+    structure = rx.Structure.from_cif(FAP, diagnostics=found)
+    assert not [d for d in found if d.code == "SITE_SNAPPED_TO_SPECIAL_POSITION"]
+    assert not [d for d in _symmetry_silence_diagnostics(structure, "rietveld")
+                if d.code == "SITE_SNAPPED_TO_SPECIAL_POSITION"]
+    ca1 = structure.phases[0].atoms[0]
+    assert (ca1.x.value, ca1.y.value) == pytest.approx((1 / 3, 2 / 3), abs=1e-15)
+    assert ca1.z.value == 0.001913                    # a free coordinate is untouched
+    assert _multiplicity(structure.phases[0], "Ca1") == 4
+    phase, found = _fap_with_ca1(tmp_path, "0.33333", "0.66667")
+    assert not [d for d in found if d.code == "SITE_SNAPPED_TO_SPECIAL_POSITION"]
+    assert _multiplicity(phase, "Ca1") == 4
+
+
+def test_a_snap_past_the_files_printed_rounding_is_still_reported(tmp_path):
+    """Ca1 printed 0.33334: 6.7e-6 from 1/3, inside the orbit tolerance and
+    past the half-digit of 5e-6, so the snap is the reader's and it says so.
+    (Further out, at 6.7e-5, the twin merge reaches the site first and reports
+    it as ``CIF_SITE_TWINS_MERGED``.)"""
+    phase, found = _fap_with_ca1(tmp_path, "0.33334", "0.66667")
+    [snap] = [d for d in found if d.code == "SITE_SNAPPED_TO_SPECIAL_POSITION"]
+    assert snap.where == ["phases.0.atoms.0"] and "Ca1" in snap.message
+    assert _multiplicity(phase, "Ca1") == 4
+
+
+def test_the_rounding_test_is_exact_decimal_arithmetic():
+    """1/8 printed 0.12 is exactly half a digit away, a tie, and within; one
+    part in 10⁴ further is not.  In floats the tie is 4.4e-18 outside."""
+    from rietx.crystallography.cif import _printed_decimal, _within_printed_rounding
+
+    printed = tuple(_printed_decimal(t) for t in ("0.12", "0.25(3)", "0"))
+    assert printed[1] == Decimal("0.25")
+    assert _within_printed_rounding((0.125, 0.25, 0.0), printed)
+    assert not _within_printed_rounding((0.1251, 0.25, 0.0), printed)
+    assert _within_printed_rounding((1.125, 0.25, 0.0), printed)  # a lattice translation
+    assert _printed_decimal("?") is None and _printed_decimal("1/3") is None
+    assert not _within_printed_rounding((0.125, 0.25, 0.0), None)

@@ -374,6 +374,34 @@ def test_set_tie_refuses_a_derived_or_locked_source():
                       AffineTie(terms=(("phases.0.cell.alpha", 0.01),)))
 
 
+def test_set_tie_refuses_a_source_tied_onto_a_derived_or_locked_row():
+    """A tied source is read through its chain (the #773 round-2 gap).
+
+    No writer builds a tie resting on a locked or derived row today (symmetry
+    never does, and the verbs refuse it), so the middle link is planted on the
+    entry.  Read only directly, the source passed and the target's C row came
+    out empty: frozen, with no error.
+    """
+    table, _ = _with_block()
+    table.entries[table._paths["phases.0.atoms.7.y"]].tie = AffineTie(
+        terms=(("phases.0.atoms.2.x", 1.0),))
+    with pytest.raises(ValueError, match=r"phases\.0\.atoms\.7\.y.*derived row "
+                                         r"'phases\.0\.atoms\.2\.x'"):
+        table.set_tie("phases.0.atoms.7.z",
+                      AffineTie(terms=(("phases.0.atoms.7.y", 1.0),)))
+    s = Structure(phases=[Phase(
+        name="cub", space_group="F m -3 m", cell=Cell.cubic(5.43),
+        atoms=[Atom(label="Li", species="Li", x=Parameter(value=0.1),
+                    y=Parameter(value=0.2), z=Parameter(value=0.3))])])
+    plain = ParameterTable(s, LAB)
+    plain.entries[plain._paths["phases.0.atoms.0.occ"]].tie = AffineTie(
+        terms=(("phases.0.cell.alpha", 0.01),))
+    with pytest.raises(ValueError, match=r"phases\.0\.atoms\.0\.occ.*locked row "
+                                         r"'phases\.0\.cell\.alpha'"):
+        plain.set_tie("phases.0.atoms.0.biso",
+                      AffineTie(terms=(("phases.0.atoms.0.occ", 1.0),)))
+
+
 def test_add_derived_refuses_an_unlocked_output():
     s = _structure(2)
     table = ParameterTable(s, LAB)

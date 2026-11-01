@@ -67,7 +67,7 @@ class Write:
 def _git(root: Path, *args: str) -> Optional[str]:
     try:
         proc = subprocess.run(
-            ["git", *args], cwd=root, capture_output=True, text=True, timeout=30
+            ["git", *args], cwd=root, capture_output=True, encoding="utf-8", errors="replace", timeout=30
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -169,6 +169,10 @@ def main(argv: Optional[list[str]] = None) -> int:
                                        "(default: origin/main); the diff is "
                                        "against the merge-base with it")
     args = parser.parse_args(argv)
+    # The report prints a WP's ✅, which cp1252 cannot encode, so on Windows a
+    # piped stdout would raise UnicodeEncodeError at the first closed WP found.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     tip = args.base or target_ref(ROOT)
     base = _git(ROOT, "merge-base", "HEAD", tip)
     if not base:

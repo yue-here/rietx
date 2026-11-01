@@ -44,11 +44,12 @@ from ..schemas.suggest import (
     ParameterCandidate,
     SuggestionResult,
 )
+from .staged import ROUGHNESS_SEED, STRAIN_SEED_PPM
 
 #: Probe seeds, per family.  Two kinds of floor candidate are scored at the
 #: seed the corresponding stage would start its solve from (the
-#: ``strategy/staged.py`` literals: roughness ``0.3``,
-#: ``strain_seed=1000.0``), and report ``seeded=True``.  A Stephens block at
+#: ``strategy/staged.py`` constants: :data:`~.staged.ROUGHNESS_SEED` and
+#: :data:`~.staged.STRAIN_SEED_PPM`), and report ``seeded=True``.  A Stephens block at
 #: S ≡ 0 sits on √Σ's unbounded slope (an FD there returns an h-dependent
 #: value, not a derivative).  Suortti roughness at b = 0 is the *identity*,
 #: and 0.3 is ``_ROUGHNESS_STAGE``'s measured start.
@@ -72,8 +73,8 @@ from ..schemas.suggest import (
 #: peak, moves probe χ²_red from 1.01 to 7.1, and hands every width
 #: parameter a spurious gain ≈ 3×10⁴ at a *converged* fit
 #: (``Refinement.suggest`` implements the split and tells the same story).
-SUGGEST_SEED_ROUGHNESS = 0.3
-SUGGEST_SEED_STEPHENS = 1000.0
+SUGGEST_SEED_ROUGHNESS = ROUGHNESS_SEED
+SUGGEST_SEED_STEPHENS = STRAIN_SEED_PPM
 
 
 @dataclass(frozen=True)
@@ -238,6 +239,14 @@ def _summary(groups: list[CandidateGroup], floor: float, n_evaluated: int,
     The sentence carries both numbers because they answer different questions
     and can disagree: ``Δχ²`` is the leverage that ranks, ΔBIC is whether the
     leverage pays for the parameter at this ``N`` (WP-1305).
+
+    Both are printed no finer than a rerun reproduces them (WP-2002): three
+    significant figures of Δχ² and one decimal of ΔBIC, as ``Refinement``'s
+    next-step line prints it.  Both move with where the fit stopped.  On the
+    fluorapatite guide, starts 1e-14 apart put Δχ² at 96.109 to 96.114 and
+    ΔBIC at −1.29940 to −1.29971, and four figures printed that ΔBIC as
+    −1.299 or −1.3 by the start.  The noise floor is the data's and did not
+    move, so it keeps four.
     """
     tail = (f"{n_evaluated} candidate(s) evaluated, {n_non_separable} "
             f"non-separable from the free set, {n_skipped} without leverage; "
@@ -248,13 +257,13 @@ def _summary(groups: list[CandidateGroup], floor: float, n_evaluated: int,
     top = groups[0]
     if top.resolved:
         head = (f"free {top.members[0].path} next: predicted "
-                f"Δχ² {top.gain:.4g}, ΔBIC {top.delta_bic:+.4g}")
+                f"Δχ² {top.gain:.3g}, ΔBIC {top.delta_bic:+.1f}")
         if top.members[0].action_kind:
             head += f" (Layer 2 agrees: {top.members[0].action_kind})"
     else:
         paths = ", ".join(pc.path for pc in top.members)
         head = (f"the data cannot separate {paths}: joint predicted "
-                f"Δχ² {top.gain:.4g}, ΔBIC {top.delta_bic:+.4g} — free one, "
+                f"Δχ² {top.gain:.3g}, ΔBIC {top.delta_bic:+.1f} — free one, "
                 "not on this evidence alone")
     if top.delta_bic <= 0.0:
         head += (f"; ΔBIC refuses it — the predicted gain does not pay for "

@@ -1,7 +1,7 @@
 (guide-path)=
 # How to check a series for path dependence
 
-Fit the series with `direction="both"` and look for `SEQUENTIAL_PATH_DEPENDENT`, and pass `verify_discontinuities=True` so that each step the series flags is refitted from cold on its two patterns alone.
+Fit the series with `direction="both"` and look for `SEQUENTIAL_PATH_DEPENDENT`, and pass `verify_steps=k` so that the k largest steps in `series.steps` are refitted from cold on their two patterns alone.
 
 Each fit in a series starts from its neighbour's answer.
 An error in one pattern can therefore pass to every pattern after it and still draw a smooth curve.
@@ -36,10 +36,11 @@ The downward chain repeats the work of the upward one, so `direction="both"` tak
 
 ## Check a step against two independent fits
 
-`SEQUENTIAL_DISCONTINUITY` flags a step much larger than the series' typical step.
-Such a step is either in the data or made by the chain, and the diagnostic cannot tell which.
-`verify_discontinuities=True` refits the step's two patterns from your starting model, each on its own, and reports the step they give.
-This replaces the 700 K pattern with one whose cell is 2 % larger:
+`series.steps` lists every parameter's step between consecutive patterns, in esds of the later fit, largest first.
+It calls no step a jump, because a large one may be a transition, a sample shift, a beam dump or a wrong model, and only the sample's history can say which.
+A step is either in the data or made by the chain, and the size cannot tell which.
+`verify_steps=k` refits the two patterns of each of the k largest steps from your starting model, each on its own, and reports the step they give.
+This replaces the 700 K pattern with one whose cell is 1.5 % larger:
 
 ```{literalinclude} ../../../examples/guides/path.py
 :language: python
@@ -49,34 +50,37 @@ This replaces the 700 K pattern with one whose cell is 2 % larger:
 
 <!-- output of examples/guides/path.py -->
 ```text
-phases.0.cell.a steps by 0.08536 between p003 and p004 (T (K) 600 → 700), 41× its median step over the series. Refitted cold and independently, the two patterns step by 0.08536, 1.00× the chain's.
+phases.0.cell.a p003->p004  +0.06454  15,790 esd  cold pair 1.00x
+phases.0.cell.b p003->p004  +0.06454  15,790 esd  cold pair 1.00x
+phases.0.cell.c p003->p004  +0.06454  15,790 esd  cold pair 1.00x
+phases.0.cell.a p004->p005  -0.06040  -14,110 esd  not refitted
 p000  cold
 p001  warm
 p002  warm
 p003  warm
 p004  warm_staged
-p005  warm_staged
+p005  cold
 p006  warm
 ```
 
-The diagnostic's `value` is the cold step over the chain's.
+`SeriesStep.cold_ratio` is the cold step over the chain's.
 Near 1 the step is in the data, as here.
 Near 0 the chain made it, because the two patterns agree when nothing passes an error between them.
 Near −1 the cold pair stepped the other way.
-`series.discontinuities` holds the flagged pairs, with `SeriesStep.indices` and `SeriesStep.step`.
+A step the check did not reach keeps `cold_ratio` at `None`, as the step back down at 800 K does here.
+Every step of this synthetic ramp is hundreds of esds, because its esds are tiny, so read the order of the list rather than a size.
 
-The check costs up to two full fits per flagged step, and nothing else in the result changes.
-Here `cell.b` and `cell.c` are flagged at the same step as `cell.a`, because the cubic cell ties them to it, and the three flags share one pair of refits.
+The check costs up to two full fits per step, and nothing else in the result changes.
+Here `cell.b` and `cell.c` step with `cell.a`, because the cubic cell ties them to it, so the three largest steps share one pair of refits.
 
 ## Read where each fit started
 
-The jump also broke the warm start.
-Started from the 600 K answer, the 700 K fit reached an Rwp of 0.96, far above the rest of the series.
-The series fitted it again with the whole plan, still from the 600 K answer, and reached 0.039.
-The 800 K pattern started from the jumped cell and needed the same rescue.
+The jump also broke two warm starts, one on each side of the step.
+The 700 K fit, started from the 600 K answer, was rejected and fitted again with the whole plan, still from the 600 K answer, and reached 0.04.
+The 800 K fit, started from the 700 K answer, met the step back down and reached an Rwp over 0.9 on both warm attempts.
 `entry.rwp_warm` keeps the Rwp the first attempt reached.
 
-A `cold` entry after the first pattern means no warm start could be rescued, and the pattern was fitted from your starting model.
+The 800 K entry is `cold`: no warm start could be rescued, so the pattern was fitted from your starting model, and it reached 0.04 too.
 Its values do not continue the chain, so read them as a separate measurement.
 
 The full script is `examples/guides/path.py`.

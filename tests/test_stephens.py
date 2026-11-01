@@ -361,14 +361,18 @@ def test_widths_become_direction_dependent():
     # 00l picks up the extra strain; hk0 does not (l = 0 kills every monomial
     # carrying l, and s004 is the pure l⁴ pattern).  The strain law is ∝ tanθ,
     # so the *ratio* grows with angle — assert the sense everywhere and the
-    # magnitude where the law has room to act.
+    # magnitude where the law has room to act.  At the closing windows a
+    # compile generates reflections out to its widest window past the range's
+    # end (WP-2002), so the broader one carries more; both carry the iso set.
+    assert widths["iso"].keys() <= widths["aniso"].keys()
     ratios = []
-    for h, w in widths["aniso"].items():
+    for h, w_iso in widths["iso"].items():
+        w = widths["aniso"][h]
         if h[0] == 0 and h[1] == 0:
-            assert w > widths["iso"][h], h
-            ratios.append(w / widths["iso"][h])
+            assert w > w_iso, h
+            ratios.append(w / w_iso)
         elif h[2] == 0:
-            assert w == pytest.approx(widths["iso"][h], rel=1e-12), h
+            assert w == pytest.approx(w_iso, rel=1e-12), h
     assert max(ratios) > 1.5
 
 
@@ -426,6 +430,31 @@ def test_seed_puts_a_freed_zero_block_on_the_isotropic_ray():
     values = t.decode(t.x0())
     got = np.array([values[f"phases.0.microstrain.{n}"] for n in S_NAMES])
     assert np.allclose(got, isotropic_coefficients(CELLS[1], 1200.0), rtol=1e-9)
+
+
+def test_the_strain_seed_is_recorded_in_the_stage_result():
+    """``Stage.strain_seed`` is ``StageResult.seeded``'s second writer
+    (WP-2002, B14): every DOF of the block, at the value the seed wrote,
+    which is the isotropic ray at that microstrain."""
+    truth, inst = _injection_state(_brucite_coef(600.0))
+    data = _synthetic(truth, inst)
+    start, start_inst = _injection_state(_brucite_coef(600.0))
+    start.phases[0].microstrain = StephensStrain.from_values([0.0] * 15)
+    dofs = [f"phases.0.microstrain.dof.{k}" for k in range(4)]
+    expected = table_for(start.phases[0].model_copy(deep=True))
+    expected.set_vary(dofs, True)
+    assert expected.seed_stephens(dofs, 1000.0) == dofs
+    want = {p: expected.entries[expected._paths[p]].value for p in dofs}
+
+    result = Refinement(start, start_inst, history=False).fit(
+        data, plan=RefinementPlan(stages=[
+            Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
+            Stage("microstrain", ["phases.*.microstrain.dof.*"],
+                  strain_seed=1000.0),
+        ], closing_window_tol=None))
+    assert result.stages[0].seeded == {}
+    assert result.stages[1].seeded == want
+    assert any(v != 0.0 for v in want.values())
 
 
 def test_seed_never_overwrites_a_deliberate_starting_model():

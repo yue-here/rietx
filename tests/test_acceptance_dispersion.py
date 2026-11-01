@@ -139,8 +139,9 @@ def test_the_microabsorption_shape_was_mostly_dispersion(sample1_anomalous):
     What is left over is small enough that microabsorption — which is real, and
     which the round robin designed sample 1 to be mild in — is no longer the
     leading term.  The convergence schedule is ``qpa_plan``'s own
-    (``intermediate_ftol``, WP-1123), which is what keeps this arm comparable
-    to the dispersion-off arm stage for stage.
+    (``intermediate_ftol``, WP-1123, and ``closing_window_tol``, WP-2002),
+    which is what keeps this arm comparable to the dispersion-off arm stage
+    for stage.
     Note that ``qpa_plan`` frees Biso, so the refinement can and
     does re-absorb part of the correction; the improvement below is what
     survives that.
@@ -195,11 +196,19 @@ def test_zincite_cell_does_not_move(zincite_pair):
     ZnO ``P 63 m c`` is the case where the Friedel average genuinely differs
     from the representative |F|², so if the new structure-factor path leaked
     into the peak positions this is where it would show.
+
+    The bar is 0.1 of the cell's esd, the suite's start-invariance bar.  It was
+    1e-5 Å (0.03 esd) until WP-2002's width twin hold (2026-10-23): the QPA
+    plan fits X and Y on the specimen before its widths, the hold keeps that
+    stage's split, and dispersion moves the split (X 0.027 against 0.032) and
+    the cell with it by 0.04 esd (c 1.5e-5 Å against an esd of 3.7e-4).
     """
-    (ref_off, _), (ref_on, _) = zincite_pair
+    (ref_off, res_off), (ref_on, _) = zincite_pair
     off, on = ref_off.fitted_structure.phases[0], ref_on.fitted_structure.phases[0]
-    assert on.cell.a.value == pytest.approx(off.cell.a.value, abs=1e-5)
-    assert on.cell.c.value == pytest.approx(off.cell.c.value, abs=1e-5)
+    esd = {p.path: p.stderr for p in res_off.parameters}
+    for k in ("a", "c"):
+        assert abs(getattr(on.cell, k).value - getattr(off.cell, k).value) \
+            <= 0.1 * esd[f"phases.0.cell.{k}"], k
 
 
 @pytest.mark.xdist_group("zincite-pair")

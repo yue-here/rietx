@@ -3,8 +3,8 @@
     .venv/bin/python docs/skill/make_api_index.py
     .venv/bin/rietx skill --install . --copy      # then re-sync the committed copies
 
-The index is **generated and committed**, the way Part 1's figures are
-(``docs/manual/make_figures.py``): committed so that it ships in the wheel and
+The index is **generated and committed**, the way the manual's figures are
+(``docs/docs/make_figures.py``): committed so that it ships in the wheel and
 in the two committed copies with no build step, generated so that no signature
 in it was typed by hand.  WP-1304's brief for this file is the document three
 "explore the library" runs (114 calls) wrote from source during the 2026-08
@@ -204,6 +204,26 @@ SECTIONS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
 #: A technique's own index, ``api-<name>.md``: its title, the load
 #: condition the body's routing row names, and its sections, as above.
 TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ...]]] = {
+    "batch": (
+        "The batch index",
+        "Load it when you hold many results fitted as separate jobs and want "
+        "their diagnostics read as one table rather than one fit at a time.",
+        (
+            (
+                "Diagnostics over a batch",
+                "`rx.diagnostics_summary(results)` counts a batch's "
+                "diagnostics: each code's count of results fired on, the "
+                "warning rows a result carries per purpose, and the codes "
+                "ranked by their share of the warnings. Every level is taken "
+                "from the view `summary()` prints, so `deliverable=` and "
+                "`levels=` mean what they mean there. A code that fires on "
+                "most of a batch is a statement about the model or plan the "
+                "batch shares (`references/batch.md`, 9c.18).",
+                ("rx.diagnostics_summary", "rx.DiagnosticsSummary",
+                 "rietx.report.batch.CodeTally", "rietx.report.batch.ParetoRow"),
+            ),
+        ),
+    ),
     "figure": (
         "The figure index",
         "Load it when you want a picture of a structure: a refined model to "
@@ -250,7 +270,7 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "at `size=400` and render the final size once. A look costs "
                 "about width × height / 750 tokens, 213 at 400 px and 1333 at "
                 "1000 px, and a turn besides (Hypothesis: WP-1503, the usual "
-                "image-token rule; WP-1504 measures it with agents). "
+                "image-token rule; WP-1504 logged each look's size but priced none). "
                 "`stacked` is the part of `hidden` behind a copy of the same "
                 "site, which a view down an axis does by construction; "
                 "`hidden - stacked` is what the view occludes. Keep a view the "
@@ -425,11 +445,11 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "converged **neutron** fit and proposes a propagation vector, "
                 "candidate models per k, one trial refinement per class the "
                 "powder cannot separate, and a ranked list with a stated "
-                "criterion: ΔBIC against a nuclear reference, then a "
-                "magnetic-only R, then parsimony, and never Rwp, since more "
-                "amplitudes always fit better. Classes inside the tie width that "
-                "neither the magnetic-only R nor parsimony separates "
-                "abstain together rather than name a winner, and a class with no "
+                "criterion: ΔBIC against a nuclear reference, which charges "
+                "each extra amplitude, and never Rwp, since more "
+                "amplitudes always fit better. Classes inside the tie width "
+                "abstain together rather than name a winner, listed fewest "
+                "moment parameters first, and a class with no "
                 "supported moment cannot win. A non-neutron histogram is refused "
                 "by name; everything else, \"nothing to solve\" included, is "
                 "reported. Read `MagneticSolution.verdict` before `.best`, and "
@@ -453,11 +473,60 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "Σ `n_modes` its free coordinates. `irrep` is this package's "
                 "small-irrep label: compare a published table on "
                 "`isotropy_group`. `distortion_basis` returns the modes alone, "
-                "per irrep. Provisional: refining them is a later WP-1419 chunk.",
+                "per irrep. To **refine** on them, `displacive_statement(parent, "
+                "child, (P, p))` returns the child with `Phase.distortion_modes`: "
+                "one absolute amplitude per mode (Å, "
+                "`phases.*.distortion_modes.modes.*.amplitude`), its atoms' "
+                "coordinates derived as base + Σ A·v, freed by "
+                "`mccusker_structural`'s coordinates stage. A child at its parent "
+                "is seeded (`DISTORTION_SEED`), since the gradient there is "
+                "exactly zero; the driving mode's sign is a domain label. Apply "
+                "its `biso_ties` with `Refinement.tie`. Provisional: the record "
+                "and the reported A_τ may still move.",
                 ("rietx.crystallography.representation.distortion.mode_amplitudes",
                  "rietx.crystallography.representation.distortion.ModeDecomposition",
                  "rietx.crystallography.representation.distortion.ModeAmplitude",
-                 "rietx.crystallography.representation.distortion.distortion_basis"),
+                 "rietx.crystallography.representation.distortion.distortion_basis",
+                 "rietx.crystallography.representation.distortion.displacive_statement",
+                 "rietx.crystallography.representation.distortion.DisplaciveStatement"),
+            ),
+            (
+                "What a fit on mode amplitudes reports",
+                "A fit of a phase carrying `Phase.distortion_modes` returns "
+                "`RefinementResult.distortion_totals`: one `DistortionTotal` per "
+                "irrep block (every mode of one irrep, k and isotropy group), "
+                "with A_τ in Å, its esd from the block's covariance (linearised; "
+                "undefined at A_τ = 0, Rice-biased below about 2 esd) and "
+                "Hotelling's T² with m and no p. "
+                "`ref.distortion_block_tests(data, hold=None, "
+                "detectability_bar=None, detectability_probe=None)` refits with each named block, or set of "
+                "blocks, held at 0 and returns ΔBIC at N/f², Λ and its p, both χ² "
+                "and, with a bar and your probe amplitude, A_det; a restricted fit below the full one "
+                "restarts the full fit and is recorded. Numbers only, no verdict; "
+                "readings in `references/magnetic.md`.",
+                ("rietx.schemas.results.DistortionTotal",
+                 "rietx.report.DistortionBlockTests",
+                 "rietx.report.DistortionBlockTest",
+                 "rietx.report.block_comparison",
+                 "rietx.report.detectability_amplitude"),
+            ),
+            (
+                "Displacive candidates of a parent",
+                "`distortion_candidates(parent, k, sites=None)` from "
+                "`rietx.crystallography.magnetic.isotropy` lists every child a "
+                "displacement at `k` can give: one per (irrep, direction) of "
+                "`candidates(kind=\"displacive\")` over the named sites (all "
+                "by default), the child `Phase` in a standard setting with "
+                "(P, p), and its `distortion_basis`, every irrep the child "
+                "admits, in Å. `driving` is the candidate's own irrep, "
+                "`rest` the others. The k fence (2k in the reciprocal "
+                "lattice) is `candidates`'. A candidate whose child the probe "
+                "refuses still comes back, with `child` `None` and `refusal` "
+                "set (its `code`, `message` and each draw's operation count): "
+                "`DISTORTION_CHILD_LARGER` (the atoms cannot realise the "
+                "group), `_SMALLER` (a tolerance miss) or `_UNIDENTIFIED`.",
+                ("rietx.crystallography.magnetic.isotropy.distortion_candidates",
+                 "rietx.crystallography.magnetic.isotropy.DistortionCandidate"),
             ),
         ),
     ),
@@ -473,16 +542,19 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
 #: ``tests/api_surface_deferred.txt`` defers them from the manual (WP-1805: no
 #: raised cap).  ``tests/test_skill.py`` holds every name here to a real field.
 TECHNIQUE_FIELDS: dict[str, frozenset[str]] = {
-    "rx.Phase": frozenset({"rigid_bodies"}),
+    "rx.Phase": frozenset({"rigid_bodies", "distortion_modes"}),
+    "rx.RefinementResult": frozenset({"distortion_totals"}),
     "rx.ParameterRow": frozenset({"body"}),
 }
 
 #: Union members a technique owns, elided from a field's rendered annotation
 #: for the same reason: ``Phase.restraints`` is an everyday field, but the
-#: tether and anti-bump kinds are the rigid-body track's, and their verbs get
-#: their own index in WP-1812 (WP-1809: no raised cap).  Deferred from the
-#: manual in ``tests/api_surface_deferred.txt`` meanwhile.
-TECHNIQUE_MEMBERS: frozenset[str] = frozenset({"TetherRestraint", "AntiBumpRestraint"})
+#: tether, anti-bump, planarity and torsion kinds are the rigid-body track's,
+#: and their verbs get their own index in WP-1812 (WP-1809, WP-1815: no raised
+#: cap).  The manual documents them in the restraints guide.
+TECHNIQUE_MEMBERS: frozenset[str] = frozenset({"TetherRestraint", "AntiBumpRestraint",
+                                               "PlanarityRestraint",
+                                               "TorsionRestraint"})
 
 HEADER = """# The API index
 
@@ -661,7 +733,9 @@ def _doc_line(obj) -> str:
     return text
 
 
-def _model_fields(cls, skip: frozenset[str] = frozenset()) -> list[str]:
+def model_field_parts(cls, skip: frozenset[str] = frozenset()) -> list[tuple[str, str, str | None]]:
+    """(name, annotation, default or None) per field: what `_model_fields`
+    prints, and what the manual's API reference renders as attributes."""
     from pydantic_core import PydanticUndefined
 
     out = []
@@ -671,28 +745,44 @@ def _model_fields(cls, skip: frozenset[str] = frozenset()) -> list[str]:
         ann = _ann(info.annotation)
         for member in TECHNIQUE_MEMBERS:
             ann = ann.replace(f" | {member}", "")
-        text = f"{name}: {ann}"
         if info.default_factory is not None:
-            text += f" = {_default(info.default_factory())}"
+            default = _default(info.default_factory())
         elif info.default is not PydanticUndefined:
-            text += f" = {_default(info.default)}"
-        out.append(f"`{text}`")
+            default = _default(info.default)
+        else:
+            default = None
+        out.append((name, ann, default))
     return out
 
 
-def _dataclass_fields(cls) -> list[str]:
+def dataclass_field_parts(cls) -> list[tuple[str, str, str | None]]:
+    """`model_field_parts` for a dataclass."""
     out = []
     for f in dataclasses.fields(cls):
         if f.name.startswith("_"):
             # private, as a pydantic private attribute is, which model_fields omits
             continue
-        text = f"{f.name}: {_ann(f.type)}"
         if f.default_factory is not dataclasses.MISSING:
-            text += f" = {_default(f.default_factory())}"
+            default = _default(f.default_factory())
         elif f.default is not dataclasses.MISSING:
-            text += f" = {_default(f.default)}"
-        out.append(f"`{text}`")
+            default = _default(f.default)
+        else:
+            default = None
+        out.append((f.name, _ann(f.type), default))
     return out
+
+
+def _field_spans(parts) -> list[str]:
+    return [f"`{name}: {ann}" + (f" = {default}`" if default is not None else "`")
+            for name, ann, default in parts]
+
+
+def _model_fields(cls, skip: frozenset[str] = frozenset()) -> list[str]:
+    return _field_spans(model_field_parts(cls, skip))
+
+
+def _dataclass_fields(cls) -> list[str]:
+    return _field_spans(dataclass_field_parts(cls))
 
 
 def _entry(dotted: str, technique: str | None = None) -> str:

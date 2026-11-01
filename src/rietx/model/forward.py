@@ -35,8 +35,9 @@ Differentiability invariants honoured here (see docs/DESIGN.md):
 
 from __future__ import annotations
 
+import functools
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -69,6 +70,7 @@ from ..crystallography.magnetic.scattering import (
     NON_MAGNETIC_SOURCE_KINDS,
     MagneticSites,
     compile_magnetic_sites,
+    d_magnetic_f2_d_dofs,
     magnetic_f2,
     magnetic_reflections,
     merge_magnetic,
@@ -110,6 +112,14 @@ from ..schemas.instrument import (
     Instrument,
 )
 from ..schemas.pattern import PatternData, require_two_theta
+
+# PHASE_SUPPORT_SIGMA is re-exported beside the screen it is read against
+# (``phase_support``); the plan carries the number since WP-2002 B1, so it is
+# defined beside the mirror
+from ..schemas.plan import (
+    CLOSING_WINDOW_TOL,
+    PHASE_SUPPORT_SIGMA,  # noqa: F401
+)
 from ..schemas.project import check_interval
 from ..schemas.structure import Structure
 from . import compiled
@@ -135,6 +145,7 @@ from .preferred_orientation import (
     march_dollase_and_dr,
     march_dollase_factors,
     orbit_layout,
+    sphere_minimum,
     texture_factors,
     texture_index,
     texture_term_weights,
@@ -144,6 +155,7 @@ from .profiles.fcj import (
     fcj_extent_deg,
     fcj_live,
     fcj_node_count,
+    fcj_node_counts,
     fcj_offsets_weights,
     fcj_offsets_weights_batch,
 )
@@ -189,6 +201,13 @@ from .restraints import (
 #: was ≈ 0.64 % at η = 0.6, unstated).  Rwp rises in the third digit as the
 #: truncated tail residue becomes visible — Rwp is an identity check here,
 #: not the metric.
+#:
+#: Since WP-2002 it is the **declared stages'** fraction only.  The answer is
+#: measured in the closing stage at ``schemas.plan.CLOSING_WINDOW_TOL``, and
+#: every compile that does not say otherwise uses that fraction too: a
+#: ``predict`` on a grid, a synthetic pattern, a stage run by hand (the
+#: seventh round's Q1).  The plan runner asks for this one by name, through
+#: :func:`recorded_window_tol`.
 WINDOW_AREA_TOL = 2e-2
 #: Absolute slack added to every half-width: windows are frozen per stage,
 #: so a peak must stay inside its window while zero-shift, displacement and
@@ -196,13 +215,30 @@ WINDOW_AREA_TOL = 2e-2
 #: coverage (a cold fit's zero error is instrument-scale, ~0.1°).
 WINDOW_MIN_DEG = 0.3
 
+def recorded_window_tol(tol: float | None) -> float:
+    """A stage's window fraction as a record or a plan states it, for a compile.
+
+    ``None`` in ``StageResult.window_area_tol``, ``NodeAction.window_area_tol``
+    and ``RefinementPlan.stage_window_tols()`` is a declared stage, which ran
+    at :data:`WINDOW_AREA_TOL`.  Every history written before WP-2002 says
+    ``None`` and ran there.  :func:`compile_model`'s own ``None`` is the
+    closing stage's fraction instead, so a caller rebuilding a stage from its
+    record passes the value through here first.  Read at call time, so a
+    patched ``WINDOW_AREA_TOL`` reaches every declared stage.
+    """
+    return WINDOW_AREA_TOL if tol is None else tol
+
+
 #: 2·√(ln 2) — the Gaussian tail argument: a unit-area Gaussian of FWHM Γ
 #: has σ = Γ/(2√(2 ln 2)), so the area outside ±k·Γ is erfc(2√(ln 2)·k)
 _GAUSS_TAIL_C = 2.0 * np.sqrt(np.log(2.0))
 
 
-def window_fwhm_mult(eta: np.ndarray) -> np.ndarray:
-    """k(η): FWHM multiples holding all but ``WINDOW_AREA_TOL`` of the area.
+def window_fwhm_mult(eta: np.ndarray, tol: float | None = None) -> np.ndarray:
+    """k(η): FWHM multiples holding all but ``tol`` of the area.
+
+    ``tol`` defaults to ``WINDOW_AREA_TOL``; a plan's closing stage passes its
+    own (``RefinementPlan.closing_window_tol``).
 
     The two-sided discarded area of the unit pseudo-Voigt outside ±k·Γ is
 
@@ -217,7 +253,7 @@ def window_fwhm_mult(eta: np.ndarray) -> np.ndarray:
     from scipy.special import erfc
 
     eta = np.clip(np.asarray(eta, dtype=np.float64), 0.0, 1.0)
-    tol = WINDOW_AREA_TOL
+    tol = WINDOW_AREA_TOL if tol is None else tol
 
     def discard(k):
         with np.errstate(divide="ignore"):
@@ -233,6 +269,36 @@ def window_fwhm_mult(eta: np.ndarray) -> np.ndarray:
         hi = np.where(too_wide, mid, hi)
         lo = np.where(too_wide, lo, mid)
     return hi
+
+
+@functools.lru_cache(maxsize=16)
+def _fwhm_mult_table(tol: float) -> tuple[np.ndarray, np.ndarray]:
+    # a uniform grid for η near 1, a geometric one for the knee at η ~ tol,
+    # where k turns from the Gaussian value to η/(π·tol) (WP-2051)
+    eta = np.unique(np.concatenate([np.linspace(0.0, 1.0, 4097),
+                                    np.geomspace(1e-9, 1.0, 4096)]))
+    k = window_fwhm_mult(eta, tol)
+    eta.flags.writeable = k.flags.writeable = False
+    return eta, k
+
+
+def window_fwhm_mult_interp(eta: np.ndarray, tol: float | None = None) -> np.ndarray:
+    """:func:`window_fwhm_mult` read off a table built once per ``tol``.
+
+    For :func:`window_sizing` (:func:`rewindow`), which sizes at every call it
+    gets and spent 70-88 % of its time in the bisection: 60 steps of a few
+    numpy calls each, so ~0.36 ms per phase and emission line whatever the
+    reflection count (WP-2051).  Linear interpolation on the table's 8192
+    nodes is within 1.2e-5 of the bisection's k, relative, at tolerances
+    0.02, 1e-3 and 5e-5 (40 000 η, measured 2026-10-25).  ``compile_model``
+    keeps the bisection, so no compiled window moves.  ``np.interp`` holds
+    the end values outside [0, 1], which is the bisection's clip.
+    """
+    tol = WINDOW_AREA_TOL if tol is None else tol
+    grid, k = _fwhm_mult_table(float(tol))
+    return np.interp(np.asarray(eta, dtype=np.float64), grid, k)
+
+
 #: quadrature nodes are sized as if the axial S/L, H/L were at least this
 #: large.  Applied **by value** whenever either is positive, so that
 #: ``predict()`` at given values does not depend on which parameters are free
@@ -242,12 +308,22 @@ def window_fwhm_mult(eta: np.ndarray) -> np.ndarray:
 AXIAL_SIZING_FLOOR = 0.02
 
 #: How far outside the fitted range, in °2θ, a reflection is still generated
-#: (``compile_model``).  A peak centred just outside the range still puts its
+#: (``compile_model``, and the satellite report arm, through
+#: :func:`generation_window`).  A peak centred just outside the range still puts its
 #: tail inside it, and the reflection list is frozen for the stage while the
 #: zero and the geometry move.  The margin is on top of the geometry's own
 #: shift at the values the stage compiles from, which the window follows
 #: (WP-1908).  A stage that frees the zero or a geometry shift from those
 #: values still has only this margin for what it moves during the stage.
+#:
+#: At the closing stage's windows this margin leaves 0.186σ and 0.124σ at the
+#: last points of FAP and cpd-1a against a bar of 0.1σ, the answers moving 0.026
+#: and 0.043 esd (``tests/test_window_domain.py``).  Generating out to the widest
+#: edge window removed that, at 1.3× the FAP fit's time, and let tail-only
+#: reflections lift the scale-B separation (``refine._scale_b_separation``) over
+#: its floor on a narrow scan, so a closing stage freed a ridge its declared
+#: stages held: tried and reverted in WP-2002's seventh round, and the eighth
+#: round kept 0.5° for WP-2017's second pass.
 REFLECTION_MARGIN_DEG = 0.5
 
 #: WP-1343.  When a magnetic broadening term is about to be *refined* from
@@ -328,20 +404,6 @@ def _cached_fcj_nodes(cp: "CompiledPhase", il: int, k: int, variant: int,
     cache[key] = (tt, s, h, phi, omega)
     return phi, omega
 
-
-#: The significance a phase must reach to count as one the data can see, in σ.
-#: It is a significance, not a height: the phase's scale must sit this many of
-#: its own esds from zero, the esd taken against the counting noise
-#: (WP-1523).  Three is :data:`~rietx.indexing.workflow.ABSENT_SIGMA`'s value
-#: and meaning, the multiple of its propagated σ a line's net intensity must
-#: reach to count as present, so a phase and a line are judged present on one
-#: footing.  :meth:`CompiledModel.phase_support` is the cheap screen against
-#: it, and ``refine._answer_significance`` the full test where the screen
-#: passes.  Until
-#: WP-1523 this was 1.0 against one point's height, and a scale fitted to pure
-#: noise lifted that point past it.  Lives here, beside the screen, because the
-#: bound and the diagnostic must read one number.
-PHASE_SUPPORT_SIGMA = 3.0
 
 @dataclass
 class BatchLayout:
@@ -445,6 +507,22 @@ def accumulate_planes(n_points: int, parts) -> np.ndarray:
     return np.bincount(idx, weights=w, minlength=n_points)
 
 
+def _window_bounds(tt: np.ndarray, pos: np.ndarray, half: np.ndarray,
+                   valid: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Each peak's window ``[i0, i1)`` on the grid ``tt``, empty where not ``valid``.
+
+    The one rule ``compile_model`` and :func:`rewindow` both size by, so the
+    two cannot drift apart.
+    """
+    pos_v = np.where(valid, pos, 0.0)
+    half_v = np.where(valid, half, 0.0)
+    i0 = np.searchsorted(tt, pos_v - half_v, side="left")
+    i1 = np.searchsorted(tt, pos_v + half_v, side="right")
+    i0[~valid] = 0
+    i1[~valid] = 0
+    return i0, i1
+
+
 def _batch_layout(win: np.ndarray, fcj_n: np.ndarray, tt: np.ndarray
                   ) -> BatchLayout:
     """Build the frozen planes off the just-computed windows (compile time)."""
@@ -474,6 +552,11 @@ PAWLEY_OVERLAP_FWHM_FRAC = 0.5
 #: reported with an esd of order its own value (≈100 % at λ=1) rather than the
 #: spuriously tight one a bare pseudo-inverse of a singular JᵀJ would give.
 PAWLEY_OVERLAP_LAMBDA = 1.0
+#: floor on the scale of the off-data ridge in ``build_pawley_restraint``, in
+#: the Pawley block's intensity units: the ridge is as wide as the phase's
+#: largest on-data intensity, and never narrower than this, which a phase
+#: with no on-data reflection falls back to (WP-1459, outside PR #453)
+PAWLEY_OFF_DATA_SCALE_FLOOR = 1.0
 
 
 
@@ -595,9 +678,10 @@ class CompiledPhase:
     # Primary extinction, frozen *out* of this stage: True when the phase's
     # ``extinction`` is exactly 0 — where Sabine's E is identically 1 — and no
     # path this stage can move reaches it.  Then E is a multiply by ones, and
-    # the six-term Laue series that builds it is pure cost: measured 1.2 s of
+    # the Laue factor that builds it is pure cost: measured 1.2 s of
     # ``sabine_extinction`` plus 0.79 s of ``_laue_and_deriv`` in a 17.5 s fit
-    # where extinction was never freed (WP-1109).
+    # where extinction was never freed (WP-1109, on GSAS-II's six-term series;
+    # the closed form of WP-2044 is 1.3x faster on 10^4 reflections).
     #
     # This is the frozen-per-stage invariant, not a branch on θ: the decision
     # is taken at compile from a value that provably cannot change before the
@@ -841,6 +925,15 @@ class CompiledModel:
     # esd is built from them.  Scaled there, all of them would come back ×√c_w
     # with no test failing that a reader would connect to the change.
     restraint_weight_scale: float = 1.0
+    # The area fraction this compile's windows drop, as ``compile_model``
+    # resolved it, and so also which FCJ node rule ran (WP-2002).  The
+    # FitReport reads it to know which precision it was handed
+    # (``report._reading_models``).
+    window_area_tol: float | None = None
+    # The absolute capture slack every window half-width carries, as
+    # ``compile_model`` resolved it (``WINDOW_MIN_DEG`` unless a stage set
+    # ``window_slack_deg``), so ``rewindow`` sizes by the compile's rule.
+    window_slack_deg: float = WINDOW_MIN_DEG
     # The origin restraint of a ``Phase.floating_origin = "centroid"`` phase
     # (WP-1912, Flack & Schwarzenbach 1988; ``model.origin``): one row per
     # direction this solve's free set can slide the phase along.  ``None``
@@ -900,7 +993,8 @@ class CompiledModel:
 
         The tick half of the member contract's clause 2, written once because
         **two** result builders owe it: ``refine._build_result`` and
-        ``multi.MultiHistogramRefinement._ticks``.  A copy in each is how a
+        ``multi.MultiHistogramRefinement._build_result``, through their one
+        tick builder ``refine._tick_rows`` (WP-2028).  A copy in each is how a
         joint fit ends up reporting a declared peak as an unindexed impurity
         while a single-histogram fit does not — the ``ticks`` failure this
         exists to prevent, one surface over.
@@ -1039,6 +1133,21 @@ class CompiledModel:
                 self.radius_mm)
         return shift
 
+    def generation_window(self, values: dict[str, float]) -> tuple[float, float]:
+        """:func:`generation_window` at ``values``: the Bragg 2θ to enumerate over.
+
+        The window :func:`compile_model` froze this model's reflection list
+        over, re-taken at ``values`` (zero, geometry shift and line
+        wavelengths), for a builder that enumerates its own list at the
+        current state: the satellite report arm's lattice, satellite and
+        centring-forbidden positions.  Returned at ``min(line_lambdas)``.
+        """
+        return generation_window(
+            self.tt_min, self.tt_max, values["instrument.zero_shift"],
+            self.line_lambdas(values),
+            lambda theta, tt_bragg: self._position_shift_deg(theta, tt_bragg,
+                                                             values))
+
     def apparent_two_theta(self, tt_bragg: np.ndarray,
                            values: dict[str, float]) -> np.ndarray:
         """Where a reflection at Bragg angle ``tt_bragg`` is drawn, in °2θ.
@@ -1072,8 +1181,9 @@ class CompiledModel:
 
         This is the one place that walks a phase's cell, lines and positions
         for a tick.  ``refine._build_result``, ``multi.MultiHistogramRefinement
-        ._ticks`` and ``viz.snapshot.stage_ticks`` each carried their own copy
-        until WP-1908's review, and a copy is how a builder forgets the shift.
+        ._build_result`` and ``viz.snapshot.stage_ticks`` each carried their
+        own copy until WP-1908's review, and a copy is how a builder forgets
+        the shift.  The first two now share ``refine._tick_rows`` (WP-2028).
         A time-of-flight axis owes a twin here, not a fifth walk.  Positions come
         from :meth:`apparent_two_theta`, so they are where the model draws each
         peak.  The satellite report's lattice enumerates differently and calls
@@ -1530,8 +1640,10 @@ class CompiledModel:
         Numpy only, at ``values``: a record and a guard read it, never the
         residual.  The sphere's minimum samples
         :data:`~rietx.model.preferred_orientation.TEXTURE_SPHERE_SAMPLES`
-        directions, because the driver holds P ≥ 0 only at the reflections and
-        the series can dip between them.  None when the phase has no texture.
+        directions and polishes the lowest locally
+        (:func:`~rietx.model.preferred_orientation.sphere_minimum`), because
+        the driver holds P ≥ 0 only at the reflections and the series can dip
+        between them.  None when the phase has no texture.
         """
         cp = self.phases[ip]
         if cp.tex_basis is None:
@@ -1540,11 +1652,12 @@ class CompiledModel:
                      for k in ("a", "b", "c", "alpha", "beta", "gamma"))
         c = np.array([values[p] for p in cp.tex_paths], dtype=np.float64)
         on_reflections = np.asarray(self._texture_factors(ip, values, cell))
-        sphere = 1.0 + np.asarray(cp.tex_basis.evaluate(
-            sphere_points(TEXTURE_SPHERE_SAMPLES))) @ (cp.tex_weights * c)
+        weighted = cp.tex_weights * c
+        sphere = sphere_minimum(
+            lambda u: 1.0 + np.asarray(cp.tex_basis.evaluate(u)) @ weighted,
+            sphere_points(TEXTURE_SPHERE_SAMPLES))
         j = texture_index([t.degree for t in cp.tex_basis.terms], c)
-        return j, float(on_reflections.min()), float(min(sphere.min(),
-                                                         on_reflections.min()))
+        return j, float(on_reflections.min()), float(min(sphere, on_reflections.min()))
 
     def strain_width(self, ip: int, values: dict[str, float], d: np.ndarray):
         """Λ(hkl) (N,) — the Stephens tanθ coefficient — or 0.0 when off.
@@ -1617,11 +1730,23 @@ class CompiledModel:
         Evaluate-only, and never in the hot loop — nothing in the residual
         needs a combined width.
         """
+        return self.peak_gamma_eta(w1, w2)[0]
+
+    def peak_gamma_eta(self, w1: np.ndarray, w2: np.ndarray
+                       ) -> tuple[np.ndarray, np.ndarray]:
+        """TCHZ (Γ, η) from a :meth:`phase_peaks` width pair, under either shape.
+
+        :meth:`peak_fwhm`'s reading with the mixing parameter beside it, for a
+        consumer that sizes a window by ``compile_model``'s rule
+        (:func:`rewindow`).  Evaluate-only, like :meth:`peak_fwhm`.
+        """
         if self.shape == "voigt":
             gam_g = np.asarray(w1, dtype=np.float64) * GAUSS_FWHM_TO_SIGMA
             gam_l = 2.0 * np.asarray(w2, dtype=np.float64)
-            return np.asarray(tch_gamma_eta(gam_g, gam_l)[0], dtype=np.float64)
-        return np.asarray(w1, dtype=np.float64)
+            gamma, eta = tch_gamma_eta(gam_g, gam_l)
+            return (np.asarray(gamma, dtype=np.float64),
+                    np.asarray(eta, dtype=np.float64))
+        return np.asarray(w1, dtype=np.float64), np.asarray(w2, dtype=np.float64)
 
     def _profile(self, x: np.ndarray, w1: np.ndarray, w2: np.ndarray) -> np.ndarray:
         """Unit-area profile of the active shape at offsets ``x``."""
@@ -2324,10 +2449,23 @@ class CompiledModel:
         a margin) has an empty window and contributes exactly as much as one
         that does not exist.  Frozen at stage compile like everything else the
         windows carry, so this is a fact about the stage, not about θ.
+
+        A window is the reflection's profile reach, not its centre: a
+        reflection whose centre lies outside the fitted range while its tail
+        reaches into it **counts as a line**, since its column is not zero
+        there (stated on #1103's follow-up).
+
+        A phase drawing its magnetic component on its own, wider windows
+        (``win_mag``, WP-1343) counts a reflection either window brings into
+        range, since either one gives the scale a column; zero then means
+        what the hold and the QPA read it as (WP-1958).
         """
         out = np.zeros(len(self.phases), dtype=np.int64)
         for ip, cp in enumerate(self.phases):
-            out[ip] = int(np.count_nonzero(cp.win[:, :, 1] > cp.win[:, :, 0]))
+            inside = cp.win[:, :, 1] > cp.win[:, :, 0]
+            if cp.win_mag is not None:
+                inside = inside | (cp.win_mag[:, :, 1] > cp.win_mag[:, :, 0])
+            out[ip] = int(np.count_nonzero(inside))
         return out
 
     # ------------------------------------------------------------------
@@ -2378,6 +2516,68 @@ class CompiledModel:
         """
         return self.phases[ip].magnetic is None
 
+    def moment_grad_supported(self, ip: int) -> bool:
+        """Whether the analytic moment columns are exact for phase ip (WP-1327).
+
+        True for a Rietveld phase carrying a moment, with one declared
+        exclusion: a phase drawing its magnetic component on its own family
+        (:meth:`mag_split`) **while extinction is evaluated**.  There the
+        attenuation reads the total |F|², so a moment also moves the nuclear
+        component through E and the magnetic one through f2_m·dE/d|F|², a
+        cross-component term :meth:`moment_intensity_grad` does not write.
+        Such a phase keeps the peak-chain column, which re-runs
+        :meth:`phase_peaks` per component and is exact for it.  The split
+        draw with extinction skipped — the WP-1343 default — is covered: the
+        moment then moves the magnetic component alone.
+        """
+        cp = self.phases[ip]
+        if self.mode != "rietveld" or cp.magnetic is None:
+            return False
+        return not (self.mag_split(ip) and not cp.skip_extinction)
+
+    def moment_f2_grads(self, ip: int, values: dict[str, float]
+                        ) -> dict[tuple[int, int], np.ndarray]:
+        """``{(j, k): (N,)}`` ∂(p²⟨|F_⊥|²⟩)/∂ moment DOF k of atom j (WP-1327).
+
+        Every DOF of the phase at once, because the projected total F_⊥ they
+        all need is the expensive half
+        (``crystallography.magnetic.scattering.d_magnetic_f2_d_dofs``).  The
+        caller caches it for one Jacobian evaluation.
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        xyz, occ, biso, _u, _a = self._site_values(ip, values, cell)
+        stol = 1.0 / (2.0 * np.asarray(d, dtype=np.float64))
+        return d_magnetic_f2_d_dofs(cp.mag_members, cp.mag_seg, cp.mag_counts,
+                                    stol, cp.magnetic, cell, xyz, occ, biso,
+                                    self._moment_dofs(ip, values))
+
+    def moment_intensity_grad(self, ip: int, df2: np.ndarray,
+                              values: dict[str, float]
+                              ) -> list[list[np.ndarray]]:
+        """Per component, per line, ∂intensity for a moment column (WP-1327).
+
+        ``df2`` is the column's ∂(p²⟨|F_⊥|²⟩), already summed through C over
+        the DOFs it moves.  One entry per drawn component, in
+        ``DerivativeBases.components`` order.  On the ordinary draw the
+        magnetic term is part of the one total |F|², so the chain is the
+        coordinate columns' (:meth:`_f2_derivative_chain`).  On a split draw
+        with extinction skipped (the only split case
+        :meth:`moment_grad_supported` admits) the nuclear component does not
+        move and the magnetic one carries the same chain, its E factor being
+        exactly 1.
+        """
+        cp = self.phases[ip]
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        moved = self._f2_derivative_chain(ip, values, cell, d, df2)
+        if not self.mag_split(ip):
+            return [moved]
+        return [[np.zeros_like(col) for col in moved], moved]
+
     def _structural_intensity_grad(self, ip: int, j: int, coeffs: np.ndarray,
                                    values: dict[str, float], kernel
                                    ) -> list[np.ndarray] | None:
@@ -2398,6 +2598,27 @@ class CompiledModel:
         nuc = self._nuclear_mask(ip)
         if nuc is not None:
             df2 = df2 * nuc
+        return self._f2_derivative_chain(ip, values, cell, d, df2)
+
+    def _f2_derivative_chain(self, ip: int, values: dict[str, float],
+                             cell: tuple, d: np.ndarray, df2: np.ndarray,
+                             f2_total: np.ndarray | None = None
+                             ) -> list[np.ndarray]:
+        """Per-line ∂intensity from a ∂|F|² that moves the phase's whole term.
+
+        Everything :meth:`phase_peaks` applies after the structure factor, for
+        a parameter that moves only |F|²: scale · multiplicity · P · w · Lp ·
+        G · absorption · roughness, with G = E + x·dE/dx where extinction is
+        evaluated.  The coordinate and ADP columns reach it with ∂|F_N|², the
+        moment columns (WP-1327) with ∂(p²⟨|F_⊥|²⟩) — both are terms of the
+        one total |F|² that the non-split draw scales and attenuates.
+
+        ``f2_total`` is that total, when the caller already holds it; it is
+        read only where extinction is evaluated, and built here only then —
+        a stage that cannot move extinction off zero pays no structure-factor
+        evaluation per column for a factor it multiplies by exactly 1.
+        """
+        cp = self.phases[ip]
         d_base = values[f"phases.{ip}.scale"] * cp.reflections.multiplicity * df2
         # March-Dollase P multiplies the intensity and does not depend on the
         # coordinates/ADPs, so a structural move chains through it unchanged —
@@ -2421,7 +2642,10 @@ class CompiledModel:
         ext = values[f"phases.{ip}.extinction"]
         # the extinction variable x is built from the whole reflection, so the
         # magnetic term belongs in it exactly as it does in ``phase_peaks``
-        f2 = self._total_f2(ip, d, values, cell)
+        f2 = None
+        if not cp.skip_extinction:
+            f2 = (self._total_f2(ip, d, values, cell) if f2_total is None
+                  else f2_total)
         vol = cell_volume(*cell)
         out = []
         # λ read through ``line_lambdas``, never off the frozen tuple: a joint
@@ -3190,7 +3414,7 @@ class CompiledModel:
         off[pb.off_data] = True
         for a, b in pb.phase_slices:
             on = intens[a:b][~off[a:b]]
-            s = max(float(on.max()) if len(on) else 0.0, 1.0)
+            s = max(float(on.max()) if len(on) else 0.0, PAWLEY_OFF_DATA_SCALE_FLOOR)
             for k in np.flatnonzero(off[a:b]):
                 row = np.zeros(pb.n, dtype=np.float64)
                 row[a + k] = np.sqrt(lam) / s
@@ -3365,7 +3589,7 @@ def _reraise_species_fault(phase, disp, lams, exc, *, neutron=False):
     """Name the phase, atom and label behind a species lookup that failed.
 
     ``species`` is validated when the model *compiles*, not when the object is
-    built (``docs/manual/using/data.md`` § Atom): the scattering lookups are the
+    built (``docs/docs/reference/data.md`` § Atom): the scattering lookups are the
     authority on what they can read, and duplicating their grammar in a schema
     would put a periodic table in ``pydantic`` and, worse, refuse for one
     radiation's sake a spelling the other reads — a neutron nuclide (``2H``) has
@@ -3538,7 +3762,8 @@ def magnetic_wanted(phase, source) -> bool:
 
 
 
-def _compile_extra_peaks(instrument, tt: np.ndarray, lams: list[float]
+def _compile_extra_peaks(instrument, tt: np.ndarray, lams: list[float],
+                         window_area_tol: float | None = None
                          ) -> tuple[CompiledExtraPeak, ...]:
     """Freeze one window per (emission line, declared sharp peak).
 
@@ -3566,7 +3791,7 @@ def _compile_extra_peaks(instrument, tt: np.ndarray, lams: list[float]
     for i, comp in enumerate(instrument.extra_components):
         if COMPONENT_AGGREGATE[comp.kind] != "ticks":
             continue
-        half = (float(window_fwhm_mult(np.float64(comp.eta.max)))
+        half = (float(window_fwhm_mult(np.float64(comp.eta.max), window_area_tol))
                 * comp.fwhm.max + WINDOW_MIN_DEG)
         n_lines = len(lams)
         win = np.zeros((n_lines, 2), dtype=np.int64)
@@ -3609,12 +3834,58 @@ def _compile_extra_peaks(instrument, tt: np.ndarray, lams: list[float]
 SCALE_PATH = "instrument.background.scale"
 
 
+def generation_window(tt_min: float, tt_max: float, zero: float, lambdas,
+                      shift) -> tuple[float, float]:
+    """The Bragg 2θ window to enumerate reflections over, at ``min(lambdas)``.
+
+    Returns ``(two_theta_min, two_theta_max)`` for a generator called at the
+    shortest wavelength.  A reflection is wanted if **any** line draws it
+    inside ``[tt_min, tt_max]``.  The shortest line sits lowest, so the
+    enumeration runs at λ_min, and the low cutoff is set in the *longest*
+    line's frame and translated (same d, so sin θ ∝ λ): a Kα1 image below the
+    range whose Kα2 partner lies inside is kept.
+
+    The window is in Bragg angle and a peak is drawn at the Bragg angle plus
+    the zero and the geometry's own shift, so it is widened by the geometry's
+    shift beyond the zero over the fitted range: by the largest one at the low
+    edge and by the smallest one at the high edge, and never narrowed, so a
+    geometry with no shift keeps the window it always had, bit for bit.  A
+    fixed margin alone left a reflection whose drawn peak sits inside the range
+    ungenerated once the shift passed it (WP-1908).  On top of that it adds
+    :data:`REFLECTION_MARGIN_DEG`, and it caps at backscatter, since
+    d_min = λ/(2·sin θ_max) folds back past 180° and a window widened beyond it
+    would generate *fewer* reflections, not more.
+
+    ``shift(theta, tt_bragg)`` is the zero plus the geometry's shift at Bragg
+    angle ``tt_bragg``, in °2θ.  :func:`compile_model` passes its compile-time
+    estimate, and :meth:`CompiledModel.generation_window` the model's own
+    :meth:`~CompiledModel.apparent_two_theta` shift at given values, so the
+    satellite report arm (``report/satellites``) enumerates over the same
+    window as the model it reports on.  The arm kept its own copy until
+    WP-2034: no margin, a 179° cap and the low cutoff in the shortest line's
+    frame, so on a Cu Kα doublet a satellite whose Kα2 image alone lies in
+    range was never enumerated.  Every caller filters on the drawn position
+    afterwards, so a superset is harmless and a subset is the defect.
+    """
+    grid = np.linspace(tt_min, tt_max, 33)
+    extra = np.asarray(shift(0.5 * grid, grid), dtype=np.float64) - zero
+    extra = extra[np.isfinite(extra)]
+    widen_lo = max(float(extra.max()), 0.0) if extra.size else 0.0
+    widen_hi = max(-float(extra.min()), 0.0) if extra.size else 0.0
+    lo_eff = max(tt_min - zero - REFLECTION_MARGIN_DEG - widen_lo, 0.1)
+    hi_eff = min(tt_max - zero + REFLECTION_MARGIN_DEG + widen_hi, 180.0)
+    sin_lo = np.sin(np.radians(lo_eff / 2.0)) * min(lambdas) / max(lambdas)
+    gen_min = max(2.0 * np.degrees(np.arcsin(min(sin_lo, 1.0))), 0.05)
+    return gen_min, hi_eff
+
+
 def compile_model(structure: Structure, instrument: Instrument, pattern: PatternData,
                   *, mode: Mode = "rietveld",
                   two_theta_limits: tuple[float, float] | None = None,
                   moving_paths: set[str] | None = None,
                   restraint_weight_scale: float = 1.0,
-                  window_slack_deg: float | None = None) -> CompiledModel:
+                  window_slack_deg: float | None = None,
+                  window_area_tol: float | None = None) -> CompiledModel:
     """Freeze reflection lists, orbits, windows and FCJ nodes for one stage.
 
     ``moving_paths`` is every parameter the coming stage can move, or ``None``
@@ -3640,6 +3911,23 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     slack added to every window half-width (``Stage.window_slack_deg`` has
     the two-jobs story); ``None`` — every ordinary caller — is the default.
 
+    ``window_area_tol`` is the area each window may drop from its peak, for the
+    phase windows and the declared sharp peaks alike.  ``None`` is
+    ``schemas.plan.CLOSING_WINDOW_TOL``, the fraction an answer is measured
+    at, so a model evaluated outside a fit is the model a default fit's answer
+    came from (WP-2002, the seventh round's Q1).  The plan runner passes
+    ``WINDOW_AREA_TOL`` for a declared stage and the plan's
+    ``closing_window_tol`` for its closing stage; a caller rebuilding a stage
+    from its record passes :func:`recorded_window_tol` of the recorded value.
+    Below ``WINDOW_AREA_TOL`` the axial-divergence quadrature takes the closing
+    node rule (``profiles.fcj.CLOSING_NODES_PER_FWHM``), so the recorded window
+    fraction also says which rule a stage ran, and a declared stage compiles as
+    it did before.  The line is the declared stages' fraction rather than
+    ``CLOSING_WINDOW_TOL``, so a closing stage loosened past 1e-3 for speed
+    keeps the asymmetry its rule was measured to (WP-2002, 2026-10-22): at the
+    declared rule it would leave up to 5.6e-3 of a peak's maximum, 7.8x the
+    lab bar, whatever its windows.
+
     The pattern must be in 2θ and the instrument a constant-wavelength one:
     this is the backstop for :func:`rietx.schemas.pattern.require_two_theta`,
     below every public entry that calls it, so a caller who assembled a compile
@@ -3650,6 +3938,20 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
     if restraint_weight_scale < 0.0:
         raise ValueError(
             f"restraint_weight_scale must be >= 0 (got {restraint_weight_scale})")
+    if window_area_tol is None:
+        window_area_tol = CLOSING_WINDOW_TOL
+    if not 0.0 < window_area_tol < 1.0:
+        raise ValueError(
+            f"window_area_tol is a fraction of a peak's area, strictly between 0 "
+            f"and 1 (got {window_area_tol})")
+    # the closing stage's FCJ node rule, for every compile at its windows or
+    # tighter (the seventh round's Q2) and for every compile finer than the
+    # declared stages (2026-10-22).  The first clause keeps a converged
+    # reference accurate where a caller lowers WINDOW_AREA_TOL itself.  A
+    # declared stage keeps the rule it had, so a plan with
+    # closing_window_tol=None is the fit it was
+    closing_precision = (window_area_tol <= CLOSING_WINDOW_TOL
+                         or window_area_tol < WINDOW_AREA_TOL)
     mask = pattern.in_range_mask()
     tt_all, y_all, s_all = pattern.tt(), pattern.y(), pattern.sig()
     if two_theta_limits is not None:
@@ -3723,27 +4025,10 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     tt_bragg, a, b, geom.goniometer_radius_mm)
         return shift
 
-    # a reflection is kept if *any* line lands in range: the min-λ line sits
-    # lowest, so generate with λ_min and translate the low-2θ cutoff from the
-    # max-λ line's frame (same d ⇒ sinθ ∝ λ).  The window is in Bragg angle and
-    # a peak is drawn at the Bragg angle plus the zero and the geometry's shift,
-    # so it is widened by the geometry's shift beyond the zero over the fitted
-    # range: by the largest one at the low edge and by the smallest one at the
-    # high edge, and never narrowed, so a geometry with no shift keeps the
-    # window it always had, bit for bit.  A fixed margin alone left a
-    # reflection whose drawn peak sits inside the range ungenerated once the
-    # shift passed it (WP-1908).
-    _grid = np.linspace(tt_min, tt_max, 33)
-    _extra = np.asarray(_shift_est(0.5 * _grid, _grid), dtype=np.float64) - zero
-    _extra = _extra[np.isfinite(_extra)]
-    widen_lo = max(float(_extra.max()), 0.0) if _extra.size else 0.0
-    widen_hi = max(-float(_extra.min()), 0.0) if _extra.size else 0.0
-    # capped at backscatter: d_min = λ/(2·sin θ_max) folds back past 180°, so
-    # a window widened beyond it would generate *fewer* reflections, not more
-    lo_eff = max(tt_min - zero - REFLECTION_MARGIN_DEG - widen_lo, 0.1)
-    hi_eff = min(tt_max - zero + REFLECTION_MARGIN_DEG + widen_hi, 180.0)
-    sin_lo = np.sin(np.radians(lo_eff / 2.0)) * lam_gen / max(lams)
-    gen_min = max(2.0 * np.degrees(np.arcsin(min(sin_lo, 1.0))), 0.05)
+    # a reflection is kept if *any* line draws it in range, over the window
+    # the satellite report arm shares (``generation_window``, WP-2034), here at
+    # the geometry's shift at the values the stage compiles from (WP-1908)
+    gen_min, hi_eff = generation_window(tt_min, tt_max, zero, lams, _shift_est)
 
     # Anomalous scattering: f′ + i·f″ per species, frozen for the stage.  The
     # source owns it (it is a property of the wavelength, not the structure),
@@ -3889,22 +4174,17 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                     on_data[:] |= (pos >= tt_min) & (pos <= tt_max)
                 slack = (WINDOW_MIN_DEG if window_slack_deg is None
                          else window_slack_deg)
-                half = window_fwhm_mult(eta_est) * gamma_est + slack
+                half = window_fwhm_mult(eta_est, window_area_tol) * gamma_est + slack
                 if fcj_on:
                     half = half + fcj_extent_deg(pos, sl_eff, hl_eff)
                 valid = np.isfinite(pos)
-                pos_v = np.where(valid, pos, 0.0)
-                half_v = np.where(valid, half, 0.0)
-                i0 = np.searchsorted(tt, pos_v - half_v, side="left")
-                i1 = np.searchsorted(tt, pos_v + half_v, side="right")
-                i0[~valid] = 0
-                i1[~valid] = 0
+                i0, i1 = _window_bounds(tt, pos, half, valid)
                 win[il, :, 0], win[il, :, 1] = i0, i1
                 if fcj_on:
                     for k in range(n):
                         if valid[k] and i1[k] > i0[k]:
                             fcj_n[il, k] = fcj_node_count(float(pos[k]), float(gamma_est[k]),
-                                                          sl_eff, hl_eff)
+                                                          sl_eff, hl_eff, closing=closing_precision)
 
         _size_family(win, fcj_n, 0.0, 0.0, primary=True)
         if mag_split:
@@ -4080,7 +4360,7 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
               for name in HUMP_FIELDS)
         for i, comp in enumerate(instrument.extra_components)
         if COMPONENT_AGGREGATE[comp.kind] == "background")
-    peak_components = _compile_extra_peaks(instrument, tt, lams)
+    peak_components = _compile_extra_peaks(instrument, tt, lams, window_area_tol)
     if peak_components:
         # `RefinementResult.ticks` is keyed by name, so a phase actually called
         # "(extra)" and the declared-peak row would be one entry and one of the
@@ -4128,7 +4408,95 @@ def compile_model(structure: Structure, instrument: Instrument, pattern: Pattern
                    else None),
         pawley=pawley, restraints=restraints,
         restraint_weight_scale=float(restraint_weight_scale),
+        window_area_tol=float(window_area_tol),
+        window_slack_deg=float(WINDOW_MIN_DEG if window_slack_deg is None
+                               else window_slack_deg),
     )
+
+
+def window_sizing(model: CompiledModel, values: dict[str, float]
+                  ) -> list[tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """Each phase's (windows, FCJ node counts, half-widths) sized at ``values``.
+
+    ``compile_model``'s rule: a half-width of k(η)·Γ plus the slack, plus the
+    FCJ extent while the aberration acts.  It reads the peaks the forward
+    model draws at ``values`` (``phase_peaks``) where the compile reads its
+    own width estimate, so the two agree to that estimate's ~1 % and not to
+    the bit; k(η) comes off :func:`window_fwhm_mult_interp`'s table.  The
+    arrays have the compile's shapes, so a caller can compare them with
+    ``CompiledPhase.win`` and ``.fcj_n`` before building anything.  The
+    half-widths, (lines, reflections) in degrees and NaN where a peak is not
+    finite, are the continuous edges the windows round to points.
+    """
+    tol = model.window_area_tol
+    sl = float(values.get("instrument.geometry.axial_sl", 0.0))
+    hl = float(values.get("instrument.geometry.axial_hl", 0.0))
+    # the compile's floor (#774), read off the model where the compile read
+    # the plan: a model holding nodes was sized with the axial term live
+    if sl > 0.0 or hl > 0.0 or any(cp.fcj_n.any() for cp in model.phases):
+        sl, hl = max(sl, AXIAL_SIZING_FLOOR), max(hl, AXIAL_SIZING_FLOOR)
+    fcj_on = fcj_live(sl, hl)
+    closing = tol <= CLOSING_WINDOW_TOL or tol < WINDOW_AREA_TOL
+    tt = np.asarray(model.tt, dtype=np.float64)
+    out = []
+    for ip, cp in enumerate(model.phases):
+        win = np.zeros_like(cp.win)
+        fcj_n = np.zeros_like(cp.fcj_n)
+        halves = np.full(cp.win.shape[:2], np.nan)
+        for il, (pos, w1, w2, _) in enumerate(model.phase_peaks(ip, values)):
+            pos = np.asarray(pos, dtype=np.float64)
+            gamma, eta = model.peak_gamma_eta(w1, w2)
+            half = window_fwhm_mult_interp(eta, tol) * gamma + model.window_slack_deg
+            if fcj_on:
+                half = half + fcj_extent_deg(pos, sl, hl)
+            valid = np.isfinite(pos) & np.isfinite(half)
+            i0, i1 = _window_bounds(tt, pos, half, valid)
+            win[il, :, 0], win[il, :, 1] = i0, i1
+            halves[il] = np.where(valid, half, np.nan)
+            if fcj_on:
+                live = valid & (i1 > i0)
+                fcj_n[il, live] = fcj_node_counts(pos[live], gamma[live], sl, hl,
+                                                  closing=closing)
+        out.append((win, fcj_n, halves))
+    return out
+
+
+def rewindow(model: CompiledModel, values: dict[str, float]) -> CompiledModel:
+    """``model`` with its windows and FCJ node counts sized at ``values``
+    (:func:`window_sizing`).
+
+    Everything else is the compile's: the reflection list, the sites and
+    every frozen correction.  The magnetic family and the extra peaks keep
+    their windows.
+
+    The copy is a new frozen model.  A solve running on ``model`` never sees
+    it, so frozen-per-stage discreteness holds (WP-2047, where a stage asks
+    what its frozen windows drop at its answer: ``window_loss``).
+    """
+    tt = np.asarray(model.tt, dtype=np.float64)
+    phases = [replace(cp, win=win, fcj_n=fcj_n, batch=_batch_layout(win, fcj_n, tt),
+                      fcj_cache={} if (fcj_n.any() or cp.fcj_cache is not None) else None,
+                      scalar_cache={})
+              for cp, (win, fcj_n, _) in zip(model.phases, window_sizing(model, values))]
+    return replace(model, phases=phases)
+
+
+def window_loss(model: CompiledModel, values: dict[str, float]) -> float | None:
+    """The share of the Bragg intensity ``model``'s frozen windows drop at
+    ``values``, against windows sized there (``rewindow``).
+
+    Negative where the peaks narrowed, and ``None`` with no Bragg intensity
+    to compare.  A stage whose loss passes its own ``window_area_tol`` ends
+    on frozen windows dropping more than the compile allows each peak
+    (WP-2047: 1.73 % at most on the four acceptance protocols' stages at the
+    2 % tolerance, 73-99 % on the hostile series' runaway).
+    """
+    fresh = np.asarray(rewindow(model, values).bragg_component(values),
+                       dtype=np.float64).sum()
+    if not fresh > 0.0:
+        return None
+    frozen = np.asarray(model.bragg_component(values), dtype=np.float64).sum()
+    return float(1.0 - frozen / fresh)
 
 
 def _overlap_groups(tt: np.ndarray, fwhm: np.ndarray) -> list[list[int]]:

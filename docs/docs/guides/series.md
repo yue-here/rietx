@@ -20,20 +20,19 @@ The starting model has the cell 0.1 % too large and the peaks about 20 % too wid
 <!-- output of examples/guides/series.py -->
 ```text
 SeriesResult: 7 pattern(s), rietveld, direction=forward
-  diagnostics: 2 unresolved
-    info[SEQUENTIAL_PERSISTENT_FINDING]: CAPILLARY_OFFSET_UNAVAILABLE fired on instrument.geometry.goniometer_radius_mm in 7 of 7 patterns (100% of the series).
-      at: instrument.geometry.goniometer_radius_mm
-      help: Change the model or the plan.
-    warning[SEQUENTIAL_PERSISTENT_FINDING]: PATTERN_UNDERSAMPLED fired on the fit in 7 of 7 patterns (100% of the series).
-      help: Change the model or the plan.
+  diagnostics: 2 rows, 0 errors; no deliverable given, so none is printed in full
+    SEQUENTIAL_PERSISTENT_FINDING: warning under every purpose
+    SEQUENTIAL_PERSISTENT_FINDING at instrument.geometry.goniometer_radius_mm: info
+    pass deliverable= to summary() for the rows that decide your purpose; every row is in result.diagnostics
   trajectory (T (K)):
-    [1/7] p000 x=300 converged Rwp=0.0408
-    [2/7] p001 x=400 converged Rwp=0.0411
-    [3/7] p002 x=500 converged Rwp=0.0401
-    [4/7] p003 x=600 converged Rwp=0.0408
-    [5/7] p004 x=700 converged Rwp=0.0408
-    [6/7] p005 x=800 converged Rwp=0.0401
-    [7/7] p006 x=900 converged Rwp=0.0405
+    largest step phases.0.cell.a 504.8σ at p001→p002 (series.steps)
+    [1/7] p000 x=300 converged Rwp=0.0409
+    [2/7] p001 x=400 converged Rwp=0.0409
+    [3/7] p002 x=500 converged Rwp=0.0399
+    [4/7] p003 x=600 converged Rwp=0.0405
+    [5/7] p004 x=700 converged Rwp=0.0406
+    [6/7] p005 x=800 converged Rwp=0.0402
+    [7/7] p006 x=900 converged Rwp=0.0404
 ```
 
 `labels=` names the patterns, and without it they are `p000` to `p006`.
@@ -43,6 +42,7 @@ SeriesResult: 7 pattern(s), rietveld, direction=forward
 
 `SEQUENTIAL_PERSISTENT_FINDING` reports a per-pattern diagnostic that fired on more than half the patterns, in a series of five patterns or more.
 Such a finding describes the model, so fix it once for the series.
+Given no deliverable, the summary prints each finding on one line; `SeriesResult.summary(deliverable="series")` prints the warning in full, and its message names the code it counts.
 Both findings here come from the synthetic setup:
 
 - `CAPILLARY_OFFSET_UNAVAILABLE` says the capillary offsets are held at zero, because the instrument declares no goniometer radius.
@@ -65,13 +65,15 @@ Each pattern's own diagnostics are in `series[k].diagnostics`.
 
 <!-- output of examples/guides/series.py -->
 ```text
-300 K  a = 4.156602(4) Å
-400 K  a = 4.158681(4) Å
-500 K  a = 4.160757(4) Å
-600 K  a = 4.162841(4) Å
-700 K  a = 4.164909(4) Å
-800 K  a = 4.166991(4) Å
-900 K  a = 4.169068(4) Å
+Trajectory: phases.0.cell.a, 7 point(s)
+  label  T (K)  value
+  p000   300    4.1565938(43)
+  p001   400    4.1586732(43)
+  p002   500    4.1607616(41)
+  p003   600    4.1628387(42)
+  p004   700    4.1649106(43)
+  p005   800    4.1669853(43)
+  p006   900    4.1690659(42)
 ```
 
 Each value lies within 2 esd of the cell edge its pattern was made from.
@@ -89,17 +91,17 @@ A pattern that did not refine the parameter has no point in the trajectory, so `
 
 <!-- output of examples/guides/series.py -->
 ```text
-p000  cold   35 evaluations
-p001  warm   12 evaluations
-p002  warm   12 evaluations
-p003  warm   12 evaluations
-p004  warm   12 evaluations
-p005  warm   12 evaluations
-p006  warm   12 evaluations
+p000  cold   38 evaluations
+p001  warm   15 evaluations
+p002  warm   15 evaluations
+p003  warm   15 evaluations
+p004  warm   15 evaluations
+p005  warm   15 evaluations
+p006  warm   15 evaluations
 ```
 
 The first pattern runs the whole plan from your starting model.
-Every later one starts from its neighbour's answer and runs the plan as a single stage, about a third of the work here.
+Every later one starts from its neighbour's answer and runs the plan as a single stage, then the closing stage, about two-fifths of the work here.
 When a warm fit diverges or its Rwp rises well above the series median, the pattern is fitted again from the neighbour's answer with the whole plan, and then from your starting model.
 `entry.rung` says which of the three attempts gave its values: `warm`, `warm_staged` or `cold`.
 

@@ -55,14 +55,14 @@ It refines the GSAS-II tutorial pattern that ships with rietx.
 <!-- output of examples/guides/restrain.py -->
 ```text
 bond [2, 4] 1.552 +1.2
-bond [2, 5] 1.573 +3.3
+bond [2, 5] 1.574 +3.4
 bond [2, 6] 1.526 -1.4
-angle [4, 2, 5] 110.833 +1.4
-['fluorapatite P3', 'fluorapatite O6'] The bond restraint deviates +3.3σ from its target (1.573 vs 1.54).
+angle [4, 2, 5] 110.796 +1.3
+['fluorapatite P3', 'fluorapatite O6'] The bond restraint deviates +3.4σ from its target (1.574 vs 1.54).
 ```
 
 `RefinementResult.restraints` holds one row per restraint, with the computed value and its deviation from the target in units of sigma.
-The P3–O6 bond ends 3.3 sigma from its target, and the fit reports [`RESTRAINT_TENSION`](../reference/diagnostics-refinement.md#restraint_tension).
+The P3–O6 bond ends 3.4 sigma from its target, and the fit reports [`RESTRAINT_TENSION`](../reference/diagnostics-refinement.md#restraint_tension).
 The diagnostic's `where` names the two atoms.
 
 Here the pattern's 5 751 points outweigh four restraints.
@@ -76,6 +76,25 @@ bond shifts: 0.0004, 0.0011, 0.0004
 So the data place the bonds, and the restraints add little.
 When a restraint is in tension, either correct its target, loosen its sigma, or accept that the data overrule it.
 The full script is `examples/guides/restrain.py`.
+
+## Hold a ring or a group planar
+
+A fourth kind, `PlanarityRestraint`, holds four or more atoms to their least-squares plane.
+`PlanarityRestraint.atoms` lists their positional indices, `PlanarityRestraint.sigma` is the uncertainty in ångströms and `PlanarityRestraint.weight` multiplies the rows.
+It adds one row per atom, √weight × d / σ, where d is that atom's signed distance from the plane, so it is order-free and has no target {eq}`par-planarity`.
+`PlanarityRestraint.op_indices` and `PlanarityRestraint.translations` give each listed atom's symmetry image, one entry per atom or none, for a ring that crosses a symmetry element.
+Leave them out and each atom takes the image nearest the centroid of the atoms listed before it, so a large plane stays inside one molecule.
+
+## Hold a torsion angle
+
+A fifth kind, `TorsionRestraint`, holds the torsion angle of a chain of four atoms near a target.
+`TorsionRestraint.atoms` lists the four positional indices in chain order, `TorsionRestraint.target_deg` is the target in degrees, `TorsionRestraint.sigma` the uncertainty in degrees and `TorsionRestraint.weight` multiplies the row.
+The row is √weight × Δ / σ, where Δ is the angle's circular difference from the target, wrapped into (−180°, 180°] {eq}`par-torsion-restraint`.
+So a target of 180° is as smooth as any other, and an angle of −179.9° is 0.1° from it.
+The sign is Klyne and Prelog's, the one `GeometryTorsion` reports, so a value read off the geometry table is a valid target.
+`TorsionRestraint.op_indices` and `TorsionRestraint.translations` give each atom's symmetry image, one entry per atom or none.
+Leave them out and each atom takes the image nearest the atom before it, so the chain follows its bonds.
+A chain with a straight bond angle has no torsion, and a restraint on one is refused when the stage compiles.
 
 ## Choose the symmetry image
 

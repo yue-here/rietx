@@ -1,0 +1,40 @@
+{
+ "length": 248,
+ "seed": 0,
+ "events": {},
+ "surfaced": {},
+ "signals": {
+  "above_fence": [],
+  "steps": [
+   [
+    "phases.0.cell.a",
+    51,
+    52
+   ],
+   [
+    "phases.0.scale",
+    201,
+    202
+   ],
+   [
+    "instrument.zero_shift",
+    209,
+    210
+   ],
+   [
+    "instrument.profile.w",
+    161,
+    162
+   ],
+   [
+    "instrument.background.c0",
+    216,
+    217
+   ]
+  ],
+  "reseeded": [],
+  "unrecovered": [],
+  "phase_unconstrained": [],
+  "codes": []
+ }
+}

@@ -16,6 +16,19 @@ pinned.
 
 ### Inherited
 
+- **2026-10-23, from [1322](1322-events-aggregator.md) (closed): a job of many
+  fits is many run directories, and nothing summarises them as one job.** This
+  comes from a 2026-09-25 transcript review of an agent session on `in-situ
+  series 1`. Asked to report its own metrics, the agent counted fits by hand
+  while 887 run directories sat in `.rietx/runs` (843 `done`, 44 `failed`), each
+  with its `meta.json`, `status.json` and log. It put its first screen at
+  "about 15 min", where the transcript's timeline says 89. `rietx events` (PR
+  #902) reads one log or one run directory. `runs.discover` lists the runs
+  under a root, `runs.read_run` reads each, and `label=`
+  ([1431](1431-a-caller-names-its-run.md)) can give a job's runs one name.
+  Still open: decide whether a job's count, failures, wall and slowest run
+  are a second mode of `rietx events` or another verb, and name the answer in
+  `batch-operating.md` either way.
 - **2026-10-11, from the issue triage (#898 (b)): a second user hit lesson
   2, and asks for `OMP_NUM_THREADS` too.** An application runs rietx beside
   other parallel work and sets `RIETX_COMPILED_THREADS=1`, because the

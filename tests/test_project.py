@@ -99,8 +99,9 @@ def test_a_hold_survives_reopening_the_project(tmp_path, pattern_file):
 
     # and it is still enforced, not merely remembered
     result = reopened.fit(plan=SHORT)
-    assert [s.blocked_by_hold for s in result.stages if s.blocked_by_hold] == \
-        [["phases.0.cell.a"]]
+    blocked = {s.name: s.blocked_by_hold for s in result.stages if s.blocked_by_hold}
+    # the closing stage frees every glob the plan freed, the cell's too
+    assert blocked == {"cell": ["phases.0.cell.a"], "closing": ["phases.0.cell.a"]}
     assert reopened.refinement.structure.phases[0].cell.a.value == \
         project.refinement.structure.phases[0].cell.a.value
 
@@ -146,7 +147,7 @@ def test_document_round_trip_including_infinite_bounds(tmp_path, pattern_file):
     project.save()
 
     raw = json.loads((project.path / PROJECT_JSON).read_text(encoding="utf-8"))
-    assert raw["format_version"] == "1.4"   # WP-1323: the plan's lebail_passes
+    assert raw["format_version"] == "1.5"   # WP-2002 B1: the plan's phase_support_sigma
     assert raw["patterns"][0]["reader"] == "xy"
 
     reopened = rx.Project.open(project.path)
@@ -331,8 +332,9 @@ def _bare_biso(value: float | None = None):
 
 
 def _bare_occ(value: float | None = None):
-    """``_bare_biso`` on the occupancy, whose declared [0, 1.5] is what these
-    repairs restore since WP-1534 left ``Atom.biso`` with a unit only."""
+    """``_bare_biso`` on the occupancy, whose declared floor of 0 is what these
+    repairs restore since WP-1534 left ``Atom.biso`` with a unit only (and
+    WP-2002 left ``occ`` with no ceiling)."""
     def edit(state):
         occ = state["structure"]["phases"][0]["atoms"][1]["occ"]
         occ.update(_BARE)
@@ -358,17 +360,17 @@ def test_a_log_written_before_206_opens_with_its_declared_bounds_back(
 
     reopened = rx.Project.open(project.path)
     occ = reopened.refinement.structure.phases[0].atoms[1].occ
-    assert (occ.value, occ.min, occ.max) == (0.7, 0.0, 1.5)
+    assert (occ.value, occ.min, occ.max) == (0.7, 0.0, float("inf"))
     for node in reopened.history.nodes.values():
         stored = node.state.structure.phases[0].atoms[1].occ
-        assert (stored.min, stored.max) == (0.0, 1.5)
+        assert (stored.min, stored.max) == (0.0, float("inf"))
 
     [note] = reopened.history_diagnostics
     assert (note.code, note.level, note.where) == (
         "DECLARED_RANGE_RESTORED", "warning", ["phases.0.atoms.1.occ"])
     assert "(atom B)" in note.message
     assert "[-inf, inf]" in note.message
-    assert "[0.0, 1.5]" in note.message
+    assert "[0.0, inf]" in note.message
     assert "this history (2: n0000, n0001)" in note.message and "schema 0.17" in note.message
     assert reopened.data_diagnostics == []   # the pattern's channel stays the pattern's
 
@@ -508,14 +510,15 @@ def test_a_stored_value_outside_the_declared_range_is_left_and_reported(
     far outside the X-ray one).  So the parameter is left as stored, still
     unbounded, and the note says so, naming the node and the value."""
     project = _create(tmp_path / "s.rex", pattern_file)
-    _age_log(project, "0.16", _bare_occ(2.0))
+    # below the floor of 0 (an occupancy has had no ceiling since WP-2002)
+    _age_log(project, "0.16", _bare_occ(-2.0))
     reopened = rx.Project.open(project.path)
     occ = reopened.refinement.structure.phases[0].atoms[1].occ
-    assert (occ.value, occ.min, occ.max) == (2.0, float("-inf"), float("inf"))
+    assert (occ.value, occ.min, occ.max) == (-2.0, float("-inf"), float("inf"))
     [note] = reopened.history_diagnostics
     assert (note.code, note.level, note.where, note.value) == (
-        "DECLARED_RANGE_NOT_RESTORED", "warning", ["phases.0.atoms.1.occ"], 2.0)
-    assert "2.0 in n0000" in note.message and "[0.0, 1.5]" in note.message
+        "DECLARED_RANGE_NOT_RESTORED", "warning", ["phases.0.atoms.1.occ"], -2.0)
+    assert "-2.0 in n0000" in note.message and "[0.0, inf]" in note.message
 
 
 def test_a_parameter_is_restored_in_every_node_or_in_none(tmp_path, pattern_file):
@@ -558,8 +561,10 @@ def test_a_node_this_release_appends_to_an_old_log_is_read_at_its_own_version(
     old, new = (again.history.nodes[n] for n in again.history.order)
     assert new.schema_version == rx.schemas.common.SCHEMA_VERSION
     assert old.schema_version is None
-    assert old.state.structure.phases[0].atoms[1].occ.max == 1.5
-    assert new.state.structure.phases[0].atoms[1].occ.max == float("inf")
+    # the declared range is [0, inf) since WP-2002, so the floor is what tells
+    # the repaired node from the chosen one
+    assert old.state.structure.phases[0].atoms[1].occ.min == 0.0
+    assert new.state.structure.phases[0].atoms[1].occ.min == float("-inf")
     [note] = again.history_diagnostics
     assert "this history (n0000)" in note.message
 
@@ -577,17 +582,20 @@ def test_an_instrument_profile_is_the_other_read_point(tmp_path):
 
     doc = json.loads(path.read_text(encoding="utf-8"))
     doc.pop("schema_version")
-    doc["instrument"]["zero_shift"].update(_BARE)
-    doc["instrument"]["profile"]["u"].update({**_BARE, "value": 1.576})
+    # V, whose declared box is the 2θ axis's mirror pair since WP-2002
+    # (2026-10-23); zero_shift's box went (2026-10-20) and U, V and Y lost
+    # their chosen floors, so the X left unrestored is one under its floor
+    doc["instrument"]["profile"]["v"].update(_BARE)
+    doc["instrument"]["profile"]["x"].update({**_BARE, "value": -0.1})
     path.write_text(json.dumps(doc), encoding="utf-8")
     loaded = rx.load_instrument_profile(path, diagnostics=notes)
-    assert (loaded.zero_shift.min, loaded.zero_shift.max, loaded.zero_shift.unit) == (
-        -0.5, 0.5, "deg")
-    assert loaded.profile.u.max == float("inf") and loaded.profile.u.value == 1.576
+    assert (loaded.profile.v.min, loaded.profile.v.max, loaded.profile.v.unit) == (
+        -180.0 ** 2, 180.0 ** 2, "deg^2")
+    assert loaded.profile.x.min == -float("inf") and loaded.profile.x.value == -0.1
     by_code = {n.code: n for n in notes}
-    assert by_code["DECLARED_RANGE_RESTORED"].where == ["instrument.zero_shift"]
+    assert by_code["DECLARED_RANGE_RESTORED"].where == ["instrument.profile.v"]
     left = by_code["DECLARED_RANGE_NOT_RESTORED"]
-    assert (left.where, left.value) == (["instrument.profile.u"], 1.576)
+    assert (left.where, left.value) == (["instrument.profile.x"], -0.1)
     assert "the profile cal.json" in left.message
 
 
@@ -722,7 +730,7 @@ def test_settings_drive_the_convenience_verbs(tmp_path, pattern_file):
                       two_theta_limits=(4.0, 20.0))
     result = project.fit()
 
-    assert [s.name for s in result.stages] == ["scale_bkg"]
+    assert [s.name for s in result.stages] == ["scale_bkg", "closing"]
     assert project.refinement._two_theta_limits == (4.0, 20.0)
 
 
@@ -739,6 +747,32 @@ def test_run_stage_uses_the_documents_mode_before_any_fit(tmp_path, pattern_file
                  max_iter=5))
     assert result.mode == "lebail"
     assert project.history[project.history.head].state.mode == "lebail"
+
+
+def test_run_stage_takes_the_stored_plans_hold_threshold(tmp_path, pattern_file,
+                                                        monkeypatch):
+    """A stage driven by hand (the GUI's stage verb) reads the threshold the
+    project's plan stores, or a hold the caller switched off comes back at the
+    default for every stage run one at a time (WP-2002, B1).  A caller's own
+    keyword still wins."""
+    project = _create(tmp_path / "s.rex", pattern_file, plan="mccusker_default")
+    seen = []
+    monkeypatch.setattr(project.refinement, "run_stage",
+                        lambda data, stage, **kw: seen.append(kw))
+    stage = rx.Stage("scale_bkg", ["phases.*.scale"])
+
+    project.run_stage(stage)
+    assert seen[-1]["phase_support_sigma"] == 3.0
+    project.doc.plan = project.doc.plan.model_copy(update={"phase_support_sigma": None})
+    project.run_stage(stage)
+    assert seen[-1]["phase_support_sigma"] is None
+    project.run_stage(stage, phase_support_sigma=5.0)
+    assert seen[-1]["phase_support_sigma"] == 5.0
+    # and the correlation guard, the plan's other setting a stage reads
+    assert seen[-1]["correlation_guard"] == 0.98
+    project.doc.plan = project.doc.plan.model_copy(update={"correlation_guard": 0.9})
+    project.run_stage(stage)
+    assert seen[-1]["correlation_guard"] == 0.9
 
 
 def test_set_excluded_regions_updates_document_and_data(tmp_path, pattern_file):
@@ -800,7 +834,7 @@ def test_reopen_mid_history_resumes_at_head(fitted_project, pattern):
     assert result.node_id == project.history.head
 
     reopened = rx.Project.open(project.path)
-    assert len(reopened.history) == 1 + len(SHORT.stages)
+    assert len(reopened.history) == 1 + len(SHORT.run_stages())
     assert reopened.refinement._head_id == project.history.head
     # the working state is the fitted one, not the as-created one
     fitted_a = project.refinement.fitted_structure.phases[0].cell.a.value

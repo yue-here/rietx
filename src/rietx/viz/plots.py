@@ -238,16 +238,21 @@ def _spread(ys: list[float], min_gap: float) -> list[float]:
     return out
 
 
-def _x_values(two_theta, x_axis: str, wavelength: float | None):
+def _x_values(two_theta, x_axis: str, wavelength: float | None,
+              radiation: str | None = None):
     """The abscissa the panel is drawn against, and its axis label.
 
     Q = 4π sinθ/λ and d = λ/(2 sinθ) are the same measurement in a coordinate
     that does not depend on the wavelength, which is why neither label repeats
-    it and why the 2θ label must.
+    it and why the 2θ label must.  ``radiation`` (``"Cu Kα"``) goes on the 2θ
+    label before λ, in one form whichever of the two is known:
+    ``2θ (degrees), Cu Kα, λ = 1.54059 Å``.
     """
     tt = np.asarray(two_theta, dtype=float)
     if x_axis == "two_theta":
         label = r"$2\theta$ (degrees)"
+        if radiation is not None:
+            label += f", {radiation}"
         if wavelength is not None:
             label += f", $\\lambda$ = {wavelength:g} Å"
         return tt, label
@@ -812,12 +817,14 @@ def plot_result(result: RefinementResult, *, path: str | None = None,
     It is in 2θ whatever ``x_axis`` is, because it selects channels rather than
     describing the drawing.
 
-    ``wavelength`` puts λ on the 2θ axis, which is meaningless without it.  It
-    is a parameter rather than a lookup because a :class:`RefinementResult`
-    does not carry the emission line — pass
-    ``instrument.source.lines[0].wavelength.value`` (a ``Parameter`` since
-    WP-1134, so ``.value`` is required here), or leave it off and say the
-    source in the caption.
+    The 2θ axis names the radiation the fit used, which
+    :attr:`RefinementResult.radiation` records (WP-2042):
+    ``2θ (degrees), Cu Kα, λ = 1.54059 Å``.  The anode is named by
+    :meth:`PatternData.plot`'s rule (:func:`_stated_radiation`), so a refined
+    wavelength, a synchrotron or a neutron source shows λ alone, and a result
+    written before the field existed shows ``2θ (degrees)``.  An explicit
+    ``wavelength`` replaces both, and Q and d need it, because the label
+    converts nothing.
 
     ``figsize``/``font_size`` are the exposure surface: build the figure at the
     width it will be read at rather than scaling it afterwards.  The defaults
@@ -855,7 +862,9 @@ def plot_result(result: RefinementResult, *, path: str | None = None,
     hue = PALETTES[style]
     has_bkg = bool(show_background and y_bkg.size == tt.size and np.any(y_bkg))
 
-    x, x_label = _x_values(tt, x_axis, wavelength)
+    lam, radiation = ((wavelength, None) if wavelength is not None
+                      else _stated_radiation(None, None, result.radiation))
+    x, x_label = _x_values(tt, x_axis, lam, radiation)
     if x.size > 1 and x[0] > x[-1]:
         # d ascends as 2θ descends.  Mirror the pattern rather than reversing
         # the axis: an axis that counts down is read wrong at a glance, and
@@ -1071,19 +1080,85 @@ def plot_result(result: RefinementResult, *, path: str | None = None,
     return _handed_back(fig, style)
 
 
-def _model_ticks(ref, data) -> dict[str, list[float]]:
-    """Each phase's reflection positions over ``data``'s range, at ``ref``'s
-    parameters as they stand: compiled as :meth:`Refinement.predict` compiles,
-    placed by :func:`~rietx.viz.snapshot.stage_ticks`, keyed by phase name."""
-    from ..model.forward import compile_model
+def _starting_model(ref, data):
+    """What ``ref`` draws over ``data`` at its parameters as they stand, from
+    one compile: each phase's reflection positions keyed by phase name, and
+    the background with the 2θ of the channels it was evaluated on.
+
+    Compiled as :meth:`Refinement.predict` compiles, so the background is
+    :meth:`CompiledModel.background` over the channels a fit would use: the
+    curve a fit over the pattern's whole range starts from.  A fit given
+    ``two_theta_limits`` maps its Chebyshev terms onto that narrower range
+    instead, so its starting curve differs.  The ticks are placed by
+    :func:`~rietx.viz.snapshot.stage_ticks`.  Neither depends on the windows,
+    so this compiles the declared stages' narrow ones rather than
+    ``compile_model``'s closing default."""
+    from ..model.forward import WINDOW_AREA_TOL, compile_model
     from ..params.vector import ParameterTable
     from .snapshot import stage_ticks
     table = ParameterTable(ref.structure, ref.instrument)
     compiled = compile_model(ref.structure, ref.instrument, data, mode="rietveld",
-                             moving_paths=set(table.moving_paths))
-    rows = stage_ticks(compiled, table.decode(table.x0()), max_per_phase=10**9)
+                             moving_paths=set(table.moving_paths),
+                             window_area_tol=WINDOW_AREA_TOL)
+    values = table.decode(table.x0())
+    rows = stage_ticks(compiled, values, max_per_phase=10**9)
     names = [p.name for p in ref.structure.phases]
-    return {names[int(key.split()[-1])]: row["two_theta"] for key, row in rows.items()}
+    ticks = {names[int(key.split()[-1])]: row["two_theta"]
+             for key, row in rows.items()}
+    return (ticks, np.asarray(compiled.tt, dtype=float),
+            np.asarray(compiled.background(values), dtype=float))
+
+
+def _stated_radiation(model, data, recorded=None) -> tuple[float | None, str | None]:
+    """The primary λ and the anode a figure can name, read and never inferred:
+    from ``model``'s source when there is a model, else from a result's
+    ``recorded`` :class:`~rietx.schemas.results.Radiation` (WP-2042), else from
+    what the file stated (``data.metadata``), else nothing.
+
+    A source carries no anode name, so an X-ray source is named only where its
+    lines are one entry of the radiation table to the last digit, which is
+    what a preset such as ``bragg_brentano(radiation="CuKa")`` builds.  A
+    wavelength near a Kα1 names nothing, because a synchrotron beam can sit
+    within any tolerance of one, and a neutron source is never named.  A
+    recorded radiation is the source's kind and lines, so it is named by the
+    same test.  A file's own ``anode`` is named when it is an element the
+    table carries, as Kα1 where the file records a Kα2 wavelength of zero (the
+    doublet was not used) and as Kα otherwise.
+    """
+    from ..schemas.instrument import _KA_DOUBLETS, _RADIATIONS
+
+    def spelt(key: str) -> str:            # "CuKa1" -> "Cu Kα1"
+        element, line = key.split("Ka")
+        return f"{element} Kα{line}"
+
+    if model is not None or recorded is not None:
+        if model is not None:
+            source = model.instrument.source
+            kind, lam = source.kind, getattr(source, "primary_wavelength", None)
+            lines = tuple(line.wavelength.value for line in getattr(source, "lines", ()))
+        else:
+            kind, lines = recorded.kind, tuple(recorded.wavelengths)
+            lam = lines[0] if lines else None
+        name = next((key for key, table in _RADIATIONS.items()
+                     if kind == "xray_cw" and lines == table), None)
+        return lam, spelt(name) if name is not None else None
+    if data is None:
+        return None, None
+
+    def stated(key: str) -> float | None:
+        try:
+            return float(data.metadata[key])
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    lam = stated("wavelength")
+    element = str(data.metadata.get("anode", "")).strip().capitalize()
+    name = None
+    if f"{element}Ka" in _KA_DOUBLETS:
+        name = spelt(f"{element}Ka1" if stated("wavelength_alpha2") == 0.0
+                     else f"{element}Ka")
+    return (lam if lam is not None and np.isfinite(lam) and lam > 0.0 else None,
+            name)
 
 
 def plot_pattern(data, *, path: str | None = None,
@@ -1113,15 +1188,33 @@ def plot_pattern(data, *, path: str | None = None,
     ``two_theta_range``, ``x_axis``/``wavelength``, ``y_scale``, ``style``,
     ``figsize``/``font_size``/``dpi`` and ``title`` mean exactly what they
     mean on :func:`plot_result`; the default size is the result panel's own,
-    so a before-and-after pair lines up.  A :class:`PatternData` carries no
-    wavelength either, so λ on the 2θ axis, and Q or d, need ``wavelength=``.
+    so a before-and-after pair lines up.
 
-    ``model``, a :class:`~rietx.Refinement`, adds one row of reflection ticks
-    per phase under the data, where the result panel puts them, at the
-    parameters as they stand and before any fit (WP-1544): the check that the
-    cell is close and λ is right before a fit is asked to find either. The
-    positions are :func:`rietx.viz.snapshot.stage_ticks`', every emission line
-    included. A row sits below the data floor, so it needs the linear axis.
+    A notebook output has no caption, so the 2θ label names the radiation
+    whenever something states it (WP-2039): ``2θ (degrees), Cu Kα, λ =
+    1.54059 Å``.  A :class:`PatternData` carries no wavelength of its own, so
+    the label reads ``model``'s source, else the anode and wavelength the file
+    recorded in ``data.metadata``, else stays ``2θ (degrees)``.  The anode is
+    named only where a preset built the source's lines from the radiation
+    table or the file names one, never from a wavelength's nearness
+    (:func:`_stated_radiation`), so a neutron or synchrotron source shows λ
+    alone.  An explicit ``wavelength=`` replaces both.  Q and d still need
+    ``wavelength=``, because the stated λ names the axis and converts nothing.
+
+    ``model``, a :class:`~rietx.Refinement`, draws what it already holds over
+    the data, at the parameters as they stand and before any fit (WP-1544,
+    WP-2039), so each part can be checked against the data before a fit uses
+    it.  One row of reflection ticks per phase goes under the data, where the
+    result panel puts them: the check that the cell is close and λ is right
+    before a fit is asked to find either.  The positions are
+    :func:`rietx.viz.snapshot.stage_ticks`', every emission line included.  The
+    background is drawn as the result panel draws it, dashed in the
+    background colour with its name in the gutter, over the channels a fit
+    would use: the check that it runs through the counts between the peaks.  A
+    background that is zero everywhere, the default instrument's, is not
+    drawn.  The intensity axis reaches the background where it leaves the
+    data's range, so a starting value far off is in the picture.  A row sits
+    below the data floor, so ``model=`` needs the linear axis.
 
     2θ only: every axis this draws (2θ, Q, d) is reached through an angle, and
     a time-of-flight pattern is refused by name rather than drawn as degrees.
@@ -1145,14 +1238,21 @@ def plot_pattern(data, *, path: str | None = None,
         tt, y_obs = tt[keep], y_obs[keep]
     hue = PALETTES[style]
 
-    x, x_label = _x_values(tt, x_axis, wavelength)
+    lam, radiation = ((wavelength, None) if wavelength is not None
+                      else _stated_radiation(model, data))
+    x, x_label = _x_values(tt, x_axis, lam, radiation)
     if x.size > 1 and x[0] > x[-1]:
         # mirrored rather than reversed, as the result panel does it
         x, y_obs = x[::-1], y_obs[::-1]
-    rows = ([(name, _x_values(np.asarray(pos, dtype=float), x_axis, wavelength)[0])
-             for name, pos in _model_ticks(model, data).items()]
-            if model is not None else [])
+    ticks, bkg_tt, y_bkg = (_starting_model(model, data) if model is not None
+                            else ({}, np.empty(0), np.empty(0)))
+    rows = [(name, _x_values(np.asarray(pos, dtype=float), x_axis, wavelength)[0])
+            for name, pos in ticks.items()]
     n_rows = len(rows)
+    inside = (bkg_tt >= tt.min()) & (bkg_tt <= tt.max())
+    bkg_tt, y_bkg = bkg_tt[inside], y_bkg[inside]
+    # zero everywhere is the default instrument's background: nothing to check
+    has_bkg = bool(y_bkg.size and np.any(y_bkg))
 
     with _style_context(plt, style, font_size):
         if figsize is None:
@@ -1175,6 +1275,19 @@ def plot_pattern(data, *, path: str | None = None,
             ax.axvspan(a, b, color=hue["zero"], alpha=0.5, lw=0, zorder=0)
         ax.plot(x, y_obs, marker="x", ms=0.24 * font_size, mew=0.6,
                 color=hue["obs"], ls="none", zorder=2)
+        if has_bkg:
+            # modelled, so dashed, in the result panel's background ink.  Over
+            # the markers, where the result panel draws its calculated curve:
+            # it is the model being checked, and under a full range's markers
+            # (5753 on FAP.XRA) it was hidden wherever it ran through the counts.
+            # Broken where the fit's channels skip an excluded region, found on
+            # the 2θ grid so a Q or d axis's uneven steps break nothing
+            steps = np.diff(bkg_tt)
+            cut = (np.flatnonzero(steps > 1.5 * np.median(steps)) + 1
+                   if steps.size else np.empty(0, dtype=int))
+            ax.plot(np.insert(_x_values(bkg_tt, x_axis, wavelength)[0], cut, np.nan),
+                    np.insert(y_bkg, cut, np.nan), "--",
+                    lw=0.8, color=hue["bkg"], zorder=3)
 
         top = float(y_obs.max())
         if y_scale == "log":
@@ -1184,6 +1297,10 @@ def plot_pattern(data, *, path: str | None = None,
             floor = float(y_obs[y_obs > 0.0].min())
         else:
             floor = min(float(y_obs.min()), 0.0)
+        if has_bkg:
+            # model= is linear-only, so a background below zero is drawable
+            top = max(top, float(y_bkg.max()))
+            floor = min(floor, float(y_bkg.min()))
         forward, inverse, setter, floor = _y_scale(y_scale, floor, top)
         if setter is not None:
             ax.set_yscale(setter[0], **setter[1])
@@ -1223,14 +1340,18 @@ def plot_pattern(data, *, path: str | None = None,
                                    u_top, u_head)
         ax.set_xlabel(x_label)
 
-        # the gutter convention, with one name in it: at the foot of the data,
-        # where the result panel's block starts
+        # the gutter convention: the curve names as one block at the foot of
+        # the data, as the result panel's default block, background lowest
         fig_h = fig.get_size_inches()[1]
         ax_h_in = ax.get_position().height * fig_h
         min_gap = 1.15 * font_size * (u_head - u_bottom) / (ax_h_in * 72.0)
-        _gutter_label(ax,
-                      float(inverse(max(u_bottom, float(forward(floor))) + 0.55 * min_gap)),
-                      "observed", hue["obs"])
+        anchor = max(u_bottom, float(forward(floor))) + 0.55 * min_gap
+        names = [("observed", hue["obs"])]
+        if has_bkg:
+            names.append(("background", hue["bkg"]))
+        for i, (text, colour) in enumerate(names):
+            _gutter_label(ax, float(inverse(anchor + (len(names) - 1 - i) * min_gap)),
+                          text, colour)
         for i, ((name, _), y) in enumerate(zip(rows, row_y, strict=True)):
             colour = (hue["tick"] if n_rows == 1
                       else hue["phase"][i % len(hue["phase"])])
@@ -1354,9 +1475,12 @@ def plot_trajectory(series, paths, *, path: str | None = None,
     ``stderr`` column is ``None`` throughout, and a zero-height bar would read
     as an infinitely precise residual), so those panels draw the curve alone.
     Patterns the reseed guard refitted cold are ringed rather than dropped, and
-    a discontinuity the series flagged is marked between its two points — the
-    plot shows the same fences the diagnostics carry, so a trajectory is never
-    read as smoother than it was measured to be.
+    a step re-measured cold (``fit(verify_steps=k)``, a ``SeriesStep`` carrying
+    a ``cold_ratio``) is shaded between its two points — the plot shows what
+    the series measured, so a trajectory is never read as smoother than it
+    was.  An unverified step is not shaded: ``SeriesResult.steps`` lists every
+    step and calls none a jump (WP-2003), so shading by size would draw a
+    threshold the package does not hold.
 
     A pattern the escalation ladder could not rescue (``SEQUENTIAL_UNRECOVERED``,
     WP-1051) is crossed out instead of ringed, and that difference is the whole
@@ -1384,12 +1508,12 @@ def plot_trajectory(series, paths, *, path: str | None = None,
     if not paths:
         raise ValueError("plot_trajectory needs at least one parameter path")
 
-    jumps = {d.where[0] for d in series.diagnostics
-             if d.code == "SEQUENTIAL_DISCONTINUITY" and d.where}
-    # the pair each flag names, read off its record (WP-1469) — re-deriving it
-    # here as the largest step shaded a different step whenever the scan had
-    # left a pattern out, or the largest step failed the σ leg
-    flagged = {s.path: s.labels for s in (series.discontinuities or [])}
+    # the pairs re-measured cold, read off their records (WP-2003): one path
+    # may carry several, the caller's k taking the largest wherever they are
+    verified: dict[str, list[tuple[str, str]]] = {}
+    for s in series.steps or []:
+        if s.cold_ratio is not None:
+            verified.setdefault(s.path, []).append(s.labels)
     unstable = {d.where[0] for d in series.diagnostics
                 if d.code == "SEQUENTIAL_PATH_DEPENDENT" and d.where}
     reseeded = {e.label for e in series.entries if e.reseeded}
@@ -1453,16 +1577,11 @@ def plot_trajectory(series, paths, *, path: str | None = None,
                     if label in outliers:
                         ax.plot(x[i], value[i], "s", ms=11, mfc="none",
                                 mec=hue["outlier"], mew=1.4)
-                if name in flagged:
-                    first, last = flagged[name]
+                for first, last in verified.get(name, []):
                     if first in traj.labels and last in traj.labels:
                         ax.axvspan(x[traj.labels.index(first)],
                                    x[traj.labels.index(last)],
                                    color=hue["reseeded"], alpha=0.10, lw=0)
-                elif name in jumps and len(x) > 1 and series.discontinuities is None:
-                    # a document written before the record: what older versions drew
-                    k = int(np.argmax(np.abs(np.diff(value))))
-                    ax.axvspan(x[k], x[k + 1], color=hue["reseeded"], alpha=0.10, lw=0)
             flag = "  [path-dependent]" if name in unstable else ""
             ax.set_ylabel(name.split(".")[-1] if len(name) > 24 else name, fontsize=8)
             ax.set_title(f"{name}{flag}", fontsize=9, loc="left")

@@ -257,12 +257,15 @@ class GuiSession:
 
         ``docs_url`` rides beside the arms rather than inside one because it is
         not a name anything is looking up: an entry's ``anchor`` is a manual
-        page and heading (``corrections.html#surface-roughness``), so the one
-        thing a client needs to turn it into a link is where the manual lives —
-        and a frontend that spelled that out would be the second authority on
-        it (root CLAUDE.md's ``_about`` rule).
+        page and heading (``theory/corrections.html#surface-roughness``), so
+        the one thing a client needs to turn it into a link is where the manual
+        lives — and a frontend that spelled that out would be the second
+        authority on it (root CLAUDE.md's ``_about`` rule).  It is the manual
+        of *this* build, ``<DOCS_URL>/docs/<version>`` (WP-1986): ``dev`` for a
+        ``.dev0`` build, ``X.Y`` for a release, so a popover explains the
+        version that is running.
         """
-        return {**_help_registry(), "docs_url": _about.DOCS_URL}
+        return {**_help_registry(), "docs_url": _about.docs_base(_VERSION)}
 
     def spacegroup(self, symbol: str) -> dict:
         """What one space-group symbol *is*, and what it costs the cell.
@@ -1059,14 +1062,23 @@ class GuiSession:
                 "n_matched": len(matched), "n_free": len(after),
             })
 
-        for entry, rwp in zip(stages, self._stage_rwp(p, plan), strict=True):
+        rwps = self._stage_rwp(p, plan)
+        for entry, rwp in zip(stages, rwps, strict=False):
             entry["rwp"] = rwp
+        # the stage the plan appends (WP-2002, the sixth round's Q1 and Q2):
+        # every glob again at tight windows, read-only here, and its Rwp is
+        # the answer's, which the last declared rung's is not
+        closing = plan.closing_stage()
+        closing_entry = None if closing is None else {
+            "name": closing.name, "window_area_tol": plan.closing_window_tol,
+            "rwp": rwps[-1]}
         reached = {path for entry in stages for path in entry["frees"]}
         set_aside = [row.path for row in rows.values()
                      if row.vary and row.refinable and row.path not in reached]
         return {"mode": mode, "n_parameters": len(rows),
                 "n_free_final": stages[-1]["n_free"] if stages else 0,
                 "set_aside": set_aside, "stages": stages,
+                "closing": closing_entry,
                 "head": p.refinement._head_id,
                 "live": self._state != "idle"}
 
@@ -1083,23 +1095,37 @@ class GuiSession:
 
     @classmethod
     def _stage_rwp(cls, p: Project, plan) -> list[float | None]:
-        """One Rwp per plan stage, off the history nodes the run recorded.
+        """One Rwp per stage the plan runs, off the history nodes the run recorded.
 
-        The alignment rule is in :meth:`plan_resolve`'s docstring; this is it
-        applied.  ``None`` everywhere is the ordinary answer before the first
-        run, and the honest one whenever the plan on screen is not the plan
-        that ran.
+        Parallel to ``plan.run_stages()``: the declared stages, then the
+        closing stage when the plan has one (WP-2002), whose Rwp is the
+        answer's.  The alignment rule is in :meth:`plan_resolve`'s docstring;
+        this is it applied.  ``None`` everywhere is the ordinary answer before
+        the first run, and the honest one whenever the plan on screen is not
+        the plan that ran.
         """
-        blank: list[float | None] = [None] * len(plan.stages)
+        stages = plan.run_stages()
+        blank: list[float | None] = [None] * len(stages)
         tree = p.refinement.history
         head = p.refinement._head_id
         if tree is None or head is None or head not in tree:
             return blank
+        out = cls._aligned_rwp(tree, head, stages)
+        if any(r is not None for r in out) or len(stages) == len(plan.stages):
+            return out
+        # a run recorded before every plan closed (WP-2002) has the declared
+        # stages alone; its numbers still describe the rungs it ran
+        return cls._aligned_rwp(tree, head, list(plan.stages)) + [None]
+
+    @classmethod
+    def _aligned_rwp(cls, tree, head, stages) -> list[float | None]:
+        """The last run of ``len(stages)`` stage nodes, aligned to ``stages``."""
+        blank: list[float | None] = [None] * len(stages)
         run: list = []
         for node in reversed(tree.lineage(head)):
             if node.action.kind == "stage":
                 run.append(node)
-                if len(run) == len(plan.stages):
+                if len(run) == len(stages):
                     break   # the *last* run: back-to-back runs of one plan
                             # leave 2N contiguous stage nodes, and aligning
                             # from the far end of them would read the first
@@ -1108,7 +1134,7 @@ class GuiSession:
                 break   # the run has ended, or something ended it before it
         run.reverse()
         out = list(blank)
-        for k, stage in enumerate(plan.stages):
+        for k, stage in enumerate(stages):
             if k >= len(run):
                 break
             node = run[k]
@@ -1659,7 +1685,7 @@ class GuiSession:
                 raise GuiError(
                     f"a series needs at least two patterns; {len(setup.members)} "
                     "staged. One pattern is a fit — use Run — and the fences a "
-                    "series exists for (reseed, discontinuity, path dependence) "
+                    "series exists for (reseed, path dependence) and its steps "
                     "all compare a pattern with its neighbours.",
                     code="NO_SERIES", status=409, where=["patterns"])
             plan = self._effective_plan(body.get("plan"))
@@ -1719,7 +1745,7 @@ class GuiSession:
                 return p.fit(plan=plan, events=stream, cancel=token)
 
             label = ""
-            n_stages = len(plan.stages)
+            n_stages = len(plan.run_stages())   # the closing stage counts
 
         p.live_dir.mkdir(exist_ok=True)  # a project copied without empty dirs
         with self._cond:
@@ -2622,13 +2648,24 @@ class GuiSession:
         state still reports ``converged``, which is WP-1028's to fix and not
         this route's).  Served here rather than derived in the client for the
         reason ``held_because`` travels on a parameter row: a threshold the
-        package owns must not have a second copy in TypeScript.
+        package owns must not have a second copy in TypeScript.  Each
+        diagnostic carries ``full`` and ``warning_under`` for the same reason:
+        how a row prints is :func:`~rietx.schemas.results.diagnostic_view`'s
+        answer, with no deliverable, as ``str(result)`` prints it (WP-2037).
         """
         from ..report.schemas import MATURITY_MAX_RWP
+        from ..schemas.results import diagnostic_view
 
         res = self._need_result()
         payload = res.model_dump(mode="json", exclude={
             "two_theta", "y_obs", "y_calc", "y_background", "sigma"})
+        # How each diagnostic prints (WP-2037): whether in full, and the
+        # purposes it is a warning under, from the one filter every renderer
+        # calls, so the panel lays the rows out and never derives either
+        view = {id(row.diagnostic): row for row in diagnostic_view(res.diagnostics)}
+        for d, item in zip(res.diagnostics, payload["diagnostics"], strict=True):
+            item["full"] = view[id(d)].full
+            item["warning_under"] = list(view[id(d)].warning_under)
         payload["curves"] = {
             "n_points": len(res.two_theta),
             "two_theta_range": ([res.two_theta[0], res.two_theta[-1]]
@@ -2703,8 +2740,11 @@ class GuiSession:
         # both hoisted: ``_held`` rebuilds a ParameterTable and ``_indexing`` probes
         # every optional dependency's import, and a report carries a dozen actions
         held, indexing = self._held(), _indexing()
+        # the stored plan, whose two settings an applied stage runs at
+        stored = self._need_project().doc.plan
         return {"report": report.model_dump(mode="json"),
-                "apply": [describe_action(a, held=held, indexing=indexing)
+                "apply": [describe_action(a, held=held, indexing=indexing,
+                                          plan=stored)
                           for a in report.suggested_actions]}
 
     def _held(self) -> dict[str, str]:
@@ -2761,7 +2801,9 @@ class GuiSession:
                             "rationale": action.rationale,
                             "expected_delta_chi2": action.expected_delta_chi2,
                             "stage": stage.model_dump(mode="json")},
-                "api_call": api_call(stage), "undo": undo,
+                # at the stored plan's settings, which ``Project.run_stage``
+                # ran the stage at and its node records (WP-2002, B1)
+                "api_call": api_call(stage, plan=p.doc.plan), "undo": undo,
                 "chi2_before": before, **frame}
 
     # ------------------------------------------------------------------

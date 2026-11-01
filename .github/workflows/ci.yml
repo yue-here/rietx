@@ -9,8 +9,8 @@ name: CI
 #
 # What runs per push, and per PR once it is out of draft:
 #
-#   lint                          ruff over src/tests/examples, Vale over the
-#                                 new manual, and on a PR the skill size
+#   lint                          ruff over src/tests/examples, the tutorials'
+#                                 format, Vale over the manual, and on a PR the skill size
 #                                 limits against its base; the one job a
 #                                 draft PR runs (~40 s)
 #   changes                       `scope`: docs when a PR changes only the
@@ -20,8 +20,9 @@ name: CI
 #   fast py3.11, py3.14  K/2      scope code: the "not slow" suite at both
 #                                 ends of the support window, each leg in
 #                                 two shards (below)
-#   fast jax  K/2                 scope code: the same selection with
-#                                 [dev,jax], in two shards
+#   fast jax                      scope code: the "not slow" cases that reach
+#                                 jax (tests/jax_cases.py), with [dev,jax]
+#                                 on 3.13, as one job (below)
 #   ci-ok                         whether the chosen suite passed; with lint,
 #                                 the one check branch protection requires
 #
@@ -68,14 +69,30 @@ name: CI
 # xdist counts physical cores once psutil imports.  `-n logical` was measured
 # to buy nothing: four workers each ran at about half speed (WP-1547).
 #
-# Each leg runs as two shards.  `--shard K/2` (tests/shards.py) deals whole
-# files and whole xdist groups by the seconds in tests/shard_times.json.  On
-# main's six runs after WP-1547's tail cut, a leg's fast suite took 15.5-31.2
-# min and a run waited 24-31 min for the slowest of its five legs.  The middle
-# Pythons left the per-push matrix: the nightly runs the fast suite on 3.12
-# and 3.13.  So a break on a middle version alone shows the next morning.
-# Six fast jobs a run leave room for three runs at once under the free plan's
-# 20 concurrent jobs.
+# Each Python leg runs as two shards.  `--shard K/2` (tests/shards.py) deals
+# whole files and whole xdist groups by the seconds in
+# tests/shard_times.json.  On main's six runs after WP-1547's tail cut, a
+# leg's fast suite took 15.5-31.2 min and a run waited 24-31 min for the
+# slowest of its five legs.  The middle Pythons left the per-push matrix: the
+# nightly runs the fast suite on 3.12 and 3.13.  So a break on a middle
+# version alone shows the next morning.
+#
+# The jax job runs only the cases that reach jax (WP-2019): a jax parameter,
+# jax named in the test or in a fixture of it, or a module that skips without
+# jax, all read off the code by tests/jax_cases.py.  Until then it ran the
+# whole fast tier in two shards for the few files jax changes, and was a
+# run's slowest job (19.6 min on 2026-10-21).  What it no longer covers per
+# push is the rest of the fast tier on Python 3.13 and the [dev,jax]
+# dependency resolution.  Both run in nightly.yml: `full` installs [dev,jax]
+# on 3.13 and runs the whole suite, and `middle` runs the fast suite on 3.12
+# and 3.13.  So a break visible only there shows the next morning, as a middle
+# version's does.  The selection is derived, so the conftest guards it:
+# wherever jax does not import, a case that skips for want of jax outside the
+# selection fails, since no per-push leg would run it.
+#
+# Five fast jobs a run, four Python shards and the jax job, so four runs' fast
+# jobs fill the free plan's 20 concurrent jobs exactly, with nothing left for
+# their lint and changes jobs; three runs at once leave room to spare.
 
 on:
   push:
@@ -106,8 +123,12 @@ jobs:
       - run: uv venv --python 3.13
       - run: uv pip install -e ".[dev]"
       - run: .venv/bin/python -m ruff check src tests examples
-      - name: Vale over the new manual
-        # The prose linter over docs/docs/ (WP-1982; rules and layers in
+      # the tutorials' layout, one argument a line at 79 columns (WP-2039,
+      # examples/tutorials/ruff.toml); the rest of the tree is not formatted
+      - run: .venv/bin/python -m ruff format --check examples/tutorials
+      - name: Vale over the manual and the tutorials
+        # The prose linter over docs/docs/ and the tutorials' markdown cells
+        # (WP-2039, extracted by `build.py --prose`) (WP-1982; rules and layers in
         # .vale.ini).  An error-level alert fails the job, and a warning is
         # printed for whoever edits the page; suggestions are left to a local
         # run.  Here rather than in the suite because Vale is a Go binary, not
@@ -122,7 +143,8 @@ jobs:
           tar -xzf "$RUNNER_TEMP/$VALE" -C "$RUNNER_TEMP" vale
           "$RUNNER_TEMP/vale" sync
           .venv/bin/python -c "import sys; sys.path.insert(0, 'docs'); import reference_pages; reference_pages.write_bodies()"
-          "$RUNNER_TEMP/vale" --minAlertLevel=warning docs/docs
+          .venv/bin/python examples/tutorials/build.py --prose
+          "$RUNNER_TEMP/vale" --minAlertLevel=warning docs/docs examples/tutorials/_prose
       - name: Skill size limits
         # Here rather than in the suite because a draft runs this job alone,
         # and a WP branch lives as a draft: the author sees each capped file's
@@ -138,6 +160,16 @@ jobs:
         # (WP-1907).  Same base as the step above.
         if: github.event_name == 'pull_request'
         run: .venv/bin/python -m tests.skill_surface
+      - name: Audit table rows to judge
+        # Every row this change adds, renames, changes or deletes in the
+        # generality audit table, with its tier, in the run summary.  It is the
+        # item list `/pr-review` hands the `generality-review` judge.  It fails
+        # only on a name new to the table arriving at 'unaudited' (WP-2014).
+        # Same base as the steps above.  It runs after an earlier step fails
+        # too, since a ruff or skill-cap failure is no reason to withhold the
+        # judge's item list.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: .venv/bin/python -m tests.audit_delta
 
   changes:
     # Which suite this run needs, as `scope`: `docs` when every file the PR
@@ -161,7 +193,7 @@ jobs:
       - id: scope
         env:
           EVENT: ${{ github.event_name }}
-          PLANNING: '^(docs/(wp|milestones|releases)/|docs/(ROADMAP|DESIGN)\.md$|tests/test_docs_consistency\.py$|\.claude/(commands|agents|skills/issue-review)/|\.claude/settings\.json$|\.claude/hooks/(handover_owed|no_top_level_cd|session_start|worktree_create|worktree_only|worktree_remove|wp_claim)\.py$)'
+          PLANNING: '^(docs/(wp|milestones|releases)/|docs/(ROADMAP|DESIGN)\.md$|tests/test_docs_consistency\.py$|\.claude/(agents|skills/(issue-review|pr-review|steward|wp-handover|wp-start))/|\.claude/settings\.json$|\.claude/hooks/(handover_owed|no_top_level_cd|session_start|worktree_create|worktree_only|worktree_remove|wp_claim)\.py$)'
         run: |
           scope=code
           if [ "$EVENT" = pull_request ]; then
@@ -187,7 +219,7 @@ jobs:
     #
     # The session machinery under .claude/ joined the planning set on
     # 2026-10-06, measured the same way over one fast run on main 443c0c1a.
-    # Nothing opens the commands, the agent definition, the issue-review skill
+    # Nothing opens the slash-command skills, the agent definition
     # or settings.json except test_no_stale_name's `git grep`.  The hooks
     # listed by name are imported or run only by test_workflow_hooks.  Three
     # paths stay code.  test_session_usage imports session_usage.py.
@@ -203,7 +235,7 @@ jobs:
     # (docs/reference_pages.py), so test_reference_pages reads it, and so does
     # test_manual's page-contract check, which renders the generated bodies.
     #
-    # test_closed_wp_writes reads .claude/commands/wp-handover.md, to check that
+    # test_closed_wp_writes reads .claude/skills/wp-handover/SKILL.md, to check that
     # the handover step that runs closed_wp_writes.py is still there (WP-1994).
     needs: changes
     if: needs.changes.outputs.scope == 'docs'
@@ -238,13 +270,13 @@ jobs:
         # runs the fast suite on 3.12 and 3.13.
         python: ["3.11", "3.14"]
         shard: [1, 2]
-        # the newest leg executes the tutorials, in whichever shard holds
-        # them.  Dropping its version from the list above makes this a job of
-        # its own with no shard, and `--shard /2` then fails it: move the
-        # entry to the new newest version instead.
+        # the newest leg executes the documentation, in whichever shard holds
+        # each part.  Dropping its version from the list above makes this a
+        # job of its own with no shard, and `--shard /2` then fails it: move
+        # the entry to the new newest version instead.
         include:
           - python: "3.14"
-            tutorials: run
+            docs: run
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -262,14 +294,22 @@ jobs:
         # whole xdist groups by tests/shard_times.json.  The junit file carries
         # each test's setup, call and teardown time, uploaded below: the
         # numbers the next cut to this job's time is chosen from, and the
-        # record's refresh (tests/CLAUDE.md § Budgets in tests).  The tutorial
-        # notebooks execute on the newest Python alone (tests/test_tutorials.py
-        # says what that trades).
+        # record's refresh (tests/CLAUDE.md § Budgets in tests).  The
+        # documentation (tutorial notebooks, guide scripts, manual builds)
+        # executes on the newest Python alone (tests/documentation.py says
+        # what that trades).  faulthandler_timeout makes a case still running
+        # after 10 min print every thread's stack, its own file and line
+        # included, and leaves it running: the cap above stays the runaway
+        # guard.  Without it a case that never ends shows as `[ 99%]` and then
+        # silence until the cap kills the workers, which names nothing (#1249,
+        # WP-2065).  600 s is 4-10x the slowest passing case of each leg,
+        # 63-152 s on main run 41045940948 once the two P -1 rows of
+        # tests/test_subgroups.py left the fast tier.
         env:
-          RIETX_TUTORIALS: ${{ matrix.tutorials || 'skip' }}
+          RIETX_DOCS: ${{ matrix.docs || 'skip' }}
         run: >-
           .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
-          --shard ${{ matrix.shard }}/2
+          --shard ${{ matrix.shard }}/2 -o faulthandler_timeout=600
           --junitxml=junit.xml -o junit_duration_report=total
       - name: Upload per-test timings
         if: always()
@@ -281,15 +321,11 @@ jobs:
           retention-days: 30
 
   fast-jax:
-    name: fast jax ${{ matrix.shard }}/2
+    name: fast jax
     needs: changes
     if: needs.changes.outputs.scope == 'code'
     runs-on: ubuntu-latest
     timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2]
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
@@ -300,21 +336,24 @@ jobs:
       - run: uv pip install -e ".[dev,jax]"
       - name: Record the environment
         run: .venv/bin/python -m tests.record_environment
-      - name: Fast suite with jax installed
+      - name: The fast cases that reach jax
+        # --jax-cases keeps them (tests/jax_cases.py; the header says what the
+        # rest of the tier runs on instead).  Unsharded, being a few minutes of
+        # cases, so tests/shard_times.json keeps no jax profile.  None of them
+        # executes the documentation, so the job sets no RIETX_DOCS.
         # jit-compile bound; an actions/cache of tests/.jax_cache was measured
         # not to help (8:18 warm against 8:12 cold — weekly.yml's note, kept
         # with the job it explains), so there is no cache step.
-        env:
-          RIETX_TUTORIALS: skip
+        # faulthandler_timeout as in the fast job.
         run: >-
           .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
-          --shard ${{ matrix.shard }}/2
+          --jax-cases -o faulthandler_timeout=600
           --junitxml=junit.xml -o junit_duration_report=total
       - name: Upload per-test timings
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: junit-jax-${{ matrix.shard }}
+          name: junit-jax
           path: junit.xml
           if-no-files-found: warn
           retention-days: 30

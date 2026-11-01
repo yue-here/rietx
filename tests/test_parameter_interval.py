@@ -213,7 +213,9 @@ def test_a_fit_short_of_its_minimum_says_so(fitted):
     _, _, data = fitted
     ref = rx.Refinement(*_models(W_FITTED))
     ref.set_values({INTERIOR: 4.159, "phases.0.lor_strain": 0.09})
-    short = RefinementPlan(stages=[PLAN.stages[0], Stage("all", FREE, max_iter=1)])
+    # the declared last stage's cut; the closing stage is tests/test_closing_stage.py's
+    short = RefinementPlan(stages=[PLAN.stages[0], Stage("all", FREE, max_iter=1)],
+                           closing_window_tol=None)
     result = ref.fit(data, plan=short, telemetry=False)
     interval = ref.profile_interval(data, INTERIOR, max_refits=1)
     assert interval.chi2_fit == pytest.approx(

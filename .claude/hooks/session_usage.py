@@ -259,7 +259,7 @@ def replay(t: Transcript, lane_if, u: float, mo: int = 5, d: int = 8_000,
 def _repo_dirs() -> list[Path]:
     """This repository's project directories: the main checkout's and its worktrees'."""
     common = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--path-format=absolute",
-                             "--git-common-dir"], capture_output=True, text=True).stdout.strip()
+                             "--git-common-dir"], capture_output=True, encoding="utf-8", errors="replace").stdout.strip()
     slug = re.sub(r"[/.]", "-", str(Path(common).parent))
     return [p for p in PROJECTS.glob(slug + "*")
             if p.name == slug or p.name.startswith(slug + "--claude-worktrees-")]

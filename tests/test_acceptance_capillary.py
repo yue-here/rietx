@@ -110,6 +110,7 @@ def _plan() -> rx.RefinementPlan:
     # ones the package actually produces.  None here would converge every
     # stage; measured cost of the schedule on this protocol is <= 0.02 esd.
     plan.intermediate_ftol = 1e-6
+    plan.closing_window_tol = 1e-3   # WP-2002: the shipped closing stage, named rather than inherited
     return plan
 
 

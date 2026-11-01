@@ -43,6 +43,25 @@ here (2026-10-03, at the maintainer's request).
 
 ### Inherited
 
+- **2026-10-27, from WP-2011 and WP-2062: every surveyed program re-extracts
+  Le Bail intensities inside the refinement, and rietx does not.** GSAS-II
+  re-extracts once per least-squares iteration (`GSASIIstrMath.py:4808`,
+  checked), FullProf once per cycle (ran), and TOPAS, RIETAN-FP and MAUD
+  likewise (`docs/practice.md` § Structure-free fitting). rietx partitions
+  `lebail_cycles` times before each solve and never inside one. That is a
+  candidate cause beside the background for issue #740's plateau. WP-2062's
+  decision 0 (repair Le Bail by re-extracting per iteration, or use Pawley
+  where rietx picks the method) and its decision 4 may move this WP's
+  priority. The indexer's validation is Pawley since WP-2011, so a Le Bail
+  background no longer reaches `index_pattern`.
+
+- **2026-10-24, from WP-2039: a model's starting background is now drawn before a fit.**
+  `data.plot(model=ref)` draws the background at its starting values, dashed, over the
+  channels a fit would use (`viz.plots._starting_model`). An `auto_background()` model
+  starts its P-spline at zero and its air-scatter term at 0.001, so the figure shows a
+  dashed line along zero: a seed left unset is visible before any fit runs. Usable as the
+  picture this WP's report points to.
+
 - **2026-10-16, from the issue triage (#726): a second case where the seeded
   `profile_only` prefit was not enough.** The 2026-10-11 PbSO₄ neutron entry
   below now has a companion: #726's comment of 2026-10-15, on a lab
@@ -164,6 +183,8 @@ here (2026-10-03, at the maintainer's request).
   subject, and `validate_by_lebail` is its unmeasured path. Since WP-1938 a
   width's floor is an ordinary bound of 0 with its physical column, which
   ended the LaB₆ + cBN split, so this one may be gone too; unmeasured.
+
+- **From WP-2002 (2026-10-19, PR #1050).** Batch class B11. GSAS-II's stand-alone `DoLeBail` runs 10 cycles by default (`GSASIIstrMain.py:761`), and FullProf's manual says "a few cycles (say 10)". On #740's pattern the Le Bail fit plateaus at Rwp 1.62 % from 100 to 400 cycles, against 1.09 % for the true structure (`2002-batch/i740.json`). More cycles close the 4.56 % to 1.62 % gap and not the rest. The batch proposes a converge-with-cap cycle rule inside this WP, pending the ruling.
 
 ## Non-goals
 

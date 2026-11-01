@@ -490,3 +490,16 @@ def test_an_unidentified_probe_leaves_primary_unanswered(monkeypatch):
     blind = D.distortion_basis(parent, child, transform)
     assert [c.primary for c in blind.components] == [None] * len(blind.components)
     assert {c.isotropy_group for c in blind.components} == {"unidentified"}
+
+
+def test_a_supergroup_with_the_childs_operation_count_is_not_primary():
+    """#1002: spglib lists only the operations that preserve the input cell, so the
+    I4/mmm child of the cubic perovskite (32 of them) reads a component whose group is
+    Fm-3m as the child's own when the two are compared by count."""
+    parent, child, transform = _i4mcm(0.01)
+    child = child.model_copy(update={"space_group": "I 4/m m m"})
+    by_irrep = {c.irrep: c for c in D.distortion_basis(parent, child, transform).components}
+    assert by_irrep["S4"].isotropy_group == "Fm-3m (225)"
+    assert by_irrep["S4"].primary is False
+    assert by_irrep["S6"].isotropy_group == "I4/mmm (139)"  # positive arm: the child's own
+    assert by_irrep["S6"].primary is True

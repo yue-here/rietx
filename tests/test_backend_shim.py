@@ -57,6 +57,13 @@ magnitude below the tightest physical bar in the tree.  So the gate is asserted
 where it was captured and skipped, loudly, everywhere else: relaxing
 ``array_equal`` to a tolerance instead would delete the only check that says no
 refactor changed a single computed number.
+
+**Every compile declares its windows** (WP-2002).  The goldens were captured
+when ``compile_model``'s default was the declared stages' 2 % windows; the
+default is now the closing stage's ``CLOSING_WINDOW_TOL``, which also takes
+the closing FCJ node rule and the Rietveld edge margin.  So each builder asks
+for ``WINDOW_AREA_TOL`` by name, the setting the files were captured at, for
+the reason dispersion is declined in ``_toy_base``.
 """
 
 from __future__ import annotations
@@ -70,7 +77,7 @@ import pytest
 
 import rietx as rx
 from rietx.model import compiled
-from rietx.model.forward import compile_model
+from rietx.model.forward import WINDOW_AREA_TOL, compile_model
 from rietx.optimize.least_squares import _make_jacobian, _make_residual
 from rietx.params.vector import ParameterTable
 from rietx.schemas.instrument import (
@@ -135,7 +142,8 @@ def _state_srm660c():
         "phases.0.atoms.*.biso", "phases.0.extinction",
     ])
     model = compile_model(structure, instrument, data, mode="rietveld",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
     return model, table, {}
 
 
@@ -177,7 +185,8 @@ def _state_nac():
     ])
     model = compile_model(structure, instrument, data, mode="rietveld",
                           two_theta_limits=(2.0, 24.0),
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
     return model, table, {}
 
 
@@ -211,7 +220,8 @@ def _toy_base(*, c_near_a: bool = False) -> tuple[rx.Structure, Instrument, Patt
     sim_structure.phases[0].cell.a.value += 0.005
     sim_structure.phases[0].cell.c.value -= 0.004
     sim_structure.phases[0].scale.value = 9.2e-3
-    sim = compile_model(sim_structure, instrument, empty, mode="rietveld")
+    sim = compile_model(sim_structure, instrument, empty, mode="rietveld",
+                    window_area_tol=WINDOW_AREA_TOL)
     sim_table = ParameterTable(sim_structure, instrument)
     y = sim.evaluate(sim_table.decode(sim_table.x0())) + 30.0
     pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
@@ -237,7 +247,8 @@ def _state_toy_lebail():
     table = ParameterTable(structure, instrument)
     _free(table, _TOY_WHOLE_PATTERN_FREE)
     model = compile_model(structure, instrument, pattern, mode="lebail",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
     model.lebail_update(table.decode(table.x0()), n_cycles=3)
     intens = np.concatenate([cp.hkl_intensity for cp in model.phases])
     return model, table, {"lebail_intensity": intens}
@@ -249,7 +260,8 @@ def _state_toy_pawley():
     table = ParameterTable(structure, instrument)
     _free(table, _TOY_WHOLE_PATTERN_FREE)
     model = compile_model(structure, instrument, pattern, mode="pawley",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
     # mirror the staged runner's seeding: one Le Bail partition, then the
     # equal-split restraint on the seeded scale
     model.lebail_update(table.decode(table.x0()), n_cycles=3)
@@ -283,7 +295,8 @@ def _state_toy_rich():
     sim_structure = structure.model_copy(deep=True)
     sim_structure.phases[0].cell.a.value = 4.5987
     sim_structure.phases[0].preferred_orientation.r.value = 0.9
-    sim = compile_model(sim_structure, instrument, empty, mode="rietveld")
+    sim = compile_model(sim_structure, instrument, empty, mode="rietveld",
+                    window_area_tol=WINDOW_AREA_TOL)
     sim_table = ParameterTable(sim_structure, instrument)
     y = sim.evaluate(sim_table.decode(sim_table.x0())) + 20.0
     pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
@@ -302,7 +315,8 @@ def _state_toy_rich():
         "instrument.source.lines.1.weight", "instrument.background.*",
     ])
     model = compile_model(structure, instrument, pattern, mode="rietveld",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
     return model, table, {}
 
 
@@ -337,7 +351,8 @@ def _state_toy_restraints():
         "instrument.zero_shift", "instrument.background.*",
     ])
     model = compile_model(structure, instrument, pattern, mode="rietveld",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
     return model, table, {}
 
 
@@ -370,7 +385,8 @@ def _state_toy_capillary():
                         intensity=np.zeros_like(grid).tolist())
     sim_structure = structure.model_copy(deep=True)
     sim_structure.phases[0].cell.a.value = 4.5987
-    sim = compile_model(sim_structure, instrument, empty, mode="rietveld")
+    sim = compile_model(sim_structure, instrument, empty, mode="rietveld",
+                    window_area_tol=WINDOW_AREA_TOL)
     sim_table = ParameterTable(sim_structure, instrument)
     y = sim.evaluate(sim_table.decode(sim_table.x0())) + 20.0
     pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
@@ -383,7 +399,8 @@ def _state_toy_capillary():
         "instrument.background.*",
     ])
     model = compile_model(structure, instrument, pattern, mode="rietveld",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
     assert model.mu_r == 0.8, "absorption must actually be live in this state"
     return model, table, {}
 
@@ -417,7 +434,8 @@ def _state_toy_stephens():
         "instrument.zero_shift", "instrument.background.*",
     ])
     model = compile_model(structure, instrument, pattern, mode="rietveld",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
     return model, table, {}
 
 
@@ -468,7 +486,8 @@ def _state_toy_anomalous():
         "instrument.background.*",
     ])
     model = compile_model(structure, instrument, pattern, mode="rietveld",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
     return model, table, {}
 
 
@@ -499,7 +518,8 @@ def _state_toy_roughness():
     grid = np.arange(12.0, 80.0, 0.02)
     empty = PatternData(two_theta=grid.tolist(),
                         intensity=np.zeros_like(grid).tolist())
-    sim = compile_model(structure, instrument, empty, mode="rietveld")
+    sim = compile_model(structure, instrument, empty, mode="rietveld",
+                    window_area_tol=WINDOW_AREA_TOL)
     sim_table = ParameterTable(structure, instrument)
     y = sim.evaluate(sim_table.decode(sim_table.x0())) + 30.0
     pattern = PatternData(two_theta=sim.tt.tolist(), intensity=y.tolist())
@@ -512,7 +532,8 @@ def _state_toy_roughness():
         "instrument.zero_shift", "instrument.background.*",
     ])
     model = compile_model(structure, instrument, pattern, mode="rietveld",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
     return model, table, {}
 
 

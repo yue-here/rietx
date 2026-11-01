@@ -132,7 +132,10 @@ from .structure import Cell
 #: **reported, not refused**, so ``usable()`` is unchanged; bumped because a
 #: list's flags are part of what this string stamps.  On #728's synthetic
 #: silicon with a steep background it marks 24 of the 26 off-lattice usable
-#: components and no silicon line.
+#: components and no silicon line.  Since #934 (c), inside 1.11's one bump, a
+#: ``weak_line`` line no longer drives a search (``PEAK_UNDRIVEN_FLAGS``), so
+#: a list whose driven set, or the low-Q pool it is drawn from, held one can
+#: answer differently; no indexing-acceptance list's did.
 #: 1.11: ``PeakFlag`` gains ``unresolved_split`` and ``width_capped`` and
 #: ``PEAK_UNUSABLE_FLAGS`` gains both — the component count by resolvability
 #: (#934): comparable components of one group closer than Sparrow's limit for
@@ -156,7 +159,69 @@ from .structure import Cell
 #: where it was the constant, so a high-resolution list now matches within its
 #: own widths.  A run whose first pass finds an agreed lattice, and a lab list
 #: with lines 0.05 degrees or wider, answer as at 1.9.
-INDEXING_THRESHOLDS_VERSION = "1.11"
+#: Also in 1.11 (WP-1969, #933): ``indexed_fraction_low`` reads the share of the
+#: usable lines' *intensity* a cell indexes, where it read their count, so a
+#: cell leaving weak foreign lines unindexed can grade above ``low`` and one
+#: missing a strong line cannot.  On SRM 660c with three or six weak impurity
+#: lines the certified cell goes from ``low`` to ``medium``: a line count under
+#: the bar adds the capping caveat ``indexed_lines_low`` (a vocabulary member
+#: of ``IndexCaveat``, no new field); no other indexing acceptance row changes
+#: grade by the intensity reading.
+#: 1.12, C3 (issue #916): the reversed questions are asked at the measured
+#: **resolution** (``indexing.fom.RESOLUTION_FWHM``) by a candidate-independent
+#: line screen (``indexing/screen.py``), never in the search window or of the
+#: candidate's own fit.  ``predicted_seen_fraction`` is the screen's seen
+#: fraction after the candidate's common shift; ``supercell_checks`` asks child
+#: against parent by containment of the indexed observed set with the denser
+#: line set as the child, so cubic I √2·a₀ over cubic F a₀ and a trigonal
+#: description of a cubic truth are now asked and refuted; ``verdict`` gains
+#: a middle band (refuted needs the extras seen no more often than chance,
+#: ``n_seen ≤ n_extra·p0``); ``LeBailValidation.predicted_but_absent`` is the
+#: screen's count against the picker's envelope, with the uncancellable and
+#: windowed-uncancellable counts beside it, and the ``predicted_but_absent``
+#: caveat fires on the windowed count and **caps** rather than refutes.
+#: Also 1.12 (#934 (c)): the picker names every bound its group fit ends on:
+#: ``PEAK_POSITION_AT_BOUND`` and ``PEAK_NO_INTENSITY`` are new, and the
+#: ``where`` entries of those two, ``PEAK_WIDTH_CAPPED`` and
+#: ``PEAK_EXPECTED_FALSE_LINES`` carry each line's bound and value.  No flag,
+#: threshold or ``usable()`` moved; it shares C3's 1.12, the release cycle's
+#: one bump, because a list's diagnostics are part of what this string stamps,
+#: as its flags were at 1.10.
+#: Also 1.12 (#939): ``determine_extinction_symbol`` refines the cell by default
+#: (``refine_cell=True``: a cell-free ``profile_only`` Le Bail of the lattice
+#: group, from a seeded background when the instrument's is all zero) and
+#: abstains when its reference fit fails the ``REFERENCE_NET_RWP_MAX`` gate
+#: (``status="unreliable"``, ``EXTINCTION_SCREEN_UNRELIABLE``);
+#: ``ExtinctionScreen`` gains ``prefit_rwp`` and ``reference_rwp_net``.
+#: Every pinned class held (synthetic P 2₁/c, FAP, NAC, certified corundum),
+#: with their ΔBIC moved (corundum −3434 → −1301, FAP −16 → −83); the PbSO₄
+#: X-ray histogram at a 0.1-0.2 % cell went from an abstention to ``P c - n``.
+#: Also 1.12 (WP-2033, #935's other half): ``ExtinctionPrior`` gains ``z``,
+#: ``density`` and ``formula`` (and ``ordered``), which name the members whose
+#: orbits cannot hold the declared content (removing them only under
+#: ``ordered=True``) and the special positions a Z′ below one needs.  Only a screen that declares one of them can answer differently;
+#: with none declared every screen answers as before.
+#: Also 1.12 (WP-2030): ``INDEX_DATA_INSUFFICIENT`` names an undeclared
+#: instrument first only on a laboratory source, read off the declared source
+#: (``diagnostics.lab_source``), and reads it from the list's own record when
+#: no instrument is passed.  No search, rank or grade moves.  Part 2:
+#: ``SearchSpec.from_formula`` sets a ceiling only, for every formula, so a
+#: search declared through it no longer drops the cells below 0.8 of the
+#: formula's volume and can rank a smaller cell it used to exclude.  And
+#: ``INDEX_Z_NOT_INTEGER`` (``Z_INTEGER_TOLERANCE`` 0.08) is withdrawn: it fired
+#: on 12 of 16 true inorganic cells, and the number it judged is now recorded
+#: as ``CellCandidate.formula_units``.  No rank or grade moves without a formula.
+#: Also 1.12 (WP-2011): the whole-pattern validation fits by Pawley, so every
+#: candidate's ``lebail.rwp`` and ``unmatched_observed`` move, and a cell that
+#: predicts every reflection of another now reads that cell's Rwp or lower.
+#: Also 1.12 (#939's follow-ups): ``EXTINCTION_SCREEN_UNRELIABLE``'s message
+#: says whether weak data or misfit failed the gate, from
+#: ``ExtinctionScreen.perfect_fit_rwp_net``; no threshold or verdict moved.
+#: Also 1.12 (#1230): a containment child whose own lines are seen more often
+#: than its parent's (``SupercellEvidence.child_seen_more``) is never
+#: ``refuted``, so a dense low-symmetry truth no longer sits below a wrong cell
+#: that p₀ near the truth's own seen fraction let refute it.
+INDEXING_THRESHOLDS_VERSION = "1.12"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
 #: flagged ``position_unmeasured``.
@@ -505,7 +570,11 @@ SMITH_VOLUME_C1, SMITH_VOLUME_C2 = 0.6, 0.0052
 # Consensus and the confidence gate (WP-1024)
 # ----------------------------------------------------------------------
 #: Share of the **whole usable line list** a candidate must index before it can
-#: be called ``"high"`` confidence.  Note the denominator: the search is driven
+#: be called ``"high"`` confidence, read in two roles against the one bar: the
+#: share of the lines' *intensity* gates the refuting ``indexed_fraction_low``
+#: caveat, and the share of their *count* below it caps the grade at
+#: ``"medium"`` through ``indexed_lines_low`` (see the last paragraph).  Note the
+#: denominator: the search is driven
 #: by the first :data:`~rietx.indexing.engines.DEFAULT_SEARCH_LINES` lines and
 #: may leave ``n_unindexed`` of *those* unexplained, so a cell can pass the
 #: search having said nothing at all about lines 21 onwards — the first of the
@@ -518,6 +587,27 @@ SMITH_VOLUME_C1, SMITH_VOLUME_C2 = 0.6, 0.0052
 #: 20-line list it would demand only 90 % anyway.  A fixed fraction lets a couple
 #: of foreign lines through on a long list and still refuses a cell that explains
 #: only the low-angle half.
+#:
+#: **Read on the intensity the cell explains, not the line count** (WP-1969,
+#: issue #933; ``indexed_intensity_fraction``, falling back to
+#: ``indexed_fraction`` only for a panel built without it).  A count charges a
+#: cell for its own impurities twice, once in the search's acceptance and again
+#: here: on SRM 660c with k weak impurity lines (drawn from the weaker half of
+#: the observed intensities) the certified cell indexes exactly its own 25
+#: lines, so the count put it at 25/(25 + k) and refuted it from k = 3, while it
+#: explains 0.93-1.00 of the intensity through k = 6.  The weighted reading also
+#: refutes what the count passes: a cell missing one strong line.  The same six
+#: impurity lines drawn from the *stronger* half take the share to 0.73-0.74,
+#: and the caveat fires.  The bar is unchanged; on a position-only list every
+#: line weighs 1 and the two readings are one number.
+#:
+#: **The count still acts, as a cap** (yue-here's ruling on #1042).  From the
+#: line list alone a superlattice line and an impurity line look the same, and a
+#: sub-cell missing a superstructure explains every strong line, so on intensity
+#: alone it could reach ``"high"`` with nothing else refuting a smaller cell.  A
+#: line count under this bar therefore adds ``indexed_lines_low``, which caps
+#: and does not refute (GSAS-II scores cells by count only, M20 and X20).  The
+#: weak-impurity LaB6 cell grades ``"medium"`` rather than ``"low"``.
 INDEX_MIN_INDEXED_FRACTION = 0.9
 #: Confidence in one candidate cell.  Three levels, and the top one is
 #: **agreement between independent engines** rather than any statistic: the same
@@ -539,10 +629,22 @@ Confidence = Literal["high", "medium", "low"]
 #: supplied at all (``IndexingResult.validated`` is then False) or because the
 #: run's ceiling expired part-way down the shortlist, which
 #: ``INDEX_BUDGET_EXHAUSTED`` counts: the run-level flag and this caveat are
-#: therefore not each other's negation.  ``predicted_but_absent`` — the Le Bail fit found reflections where
-#: the pattern has no intensity, the classic oversized-cell false positive M₂₀
-#: cannot see.  ``indexed_fraction_low`` — below
-#: :data:`INDEX_MIN_INDEXED_FRACTION` of the usable lines.  ``search_incomplete``
+#: therefore not each other's negation.  ``predicted_but_absent`` — the line
+#: screen found reflections this lattice predicts, that no extinction could
+#: remove, inside de Wolff's window (the first twenty lines), where the
+#: pattern has nothing above the picker's background envelope
+#: (``LeBailValidation.predicted_but_absent_uncancellable_in_window``).
+#: **Capping** since thresholds 1.12: a true cell's weak general reflections
+#: below detection read absent too (corundum 5 over the full range, 0 in the
+#: window), so the count keeps ``high`` out of reach and the pairwise
+#: ``supercell_refuted`` is what refutes.  ``indexed_fraction_low`` — below
+#: :data:`INDEX_MIN_INDEXED_FRACTION` of the usable lines' intensity.
+#: ``indexed_lines_low`` — the intensity passes that bar but the cell indexes
+#: fewer than :data:`INDEX_MIN_INDEXED_FRACTION` of the usable lines by count
+#: (both numbers are on the panel as ``indexed_intensity_fraction`` and
+#: ``indexed_fraction``); capping, because from the line list alone a sub-cell
+#: missing a superstructure and a cell beside an impurity look the same.
+#: ``search_incomplete``
 #: — a budget expired, so a *negative* result elsewhere in the domain means
 #: nothing.  ``shift_allowance_assumed`` — the matching window was widened by an
 #: *assumed* systematic (``INDEX_SHIFT_ALLOWANCE``), and a cell found inside a
@@ -571,6 +673,7 @@ IndexCaveat = Literal[
     "validation_failed",
     "predicted_but_absent",
     "indexed_fraction_low",
+    "indexed_lines_low",
     "search_incomplete",
     "shift_allowance_assumed",
     "bravais_ambiguous",
@@ -584,7 +687,7 @@ IndexCaveat = Literal[
 #: constant read by :func:`rietx.indexing.consensus.confidence_for` rather than
 #: a chain of conditions.
 INDEX_REFUTING_CAVEATS: frozenset[str] = frozenset({
-    "geometric_ambiguity", "fom_panel_disagrees", "predicted_but_absent",
+    "geometric_ambiguity", "fom_panel_disagrees",
     "indexed_fraction_low", "volume_unphysical", "validation_failed",
     "supercell_refuted"})
 
@@ -731,6 +834,29 @@ PEAK_UNUSABLE_FLAGS: frozenset[str] = frozenset(
      "no_intensity", "position_unmeasured", "duplicate_line",
      "unresolved_split", "width_capped"})
 
+#: Flags that keep a line in :meth:`PeakList.usable` (scored, reported) and out
+#: of the set a search is **driven** by
+#: (:func:`rietx.indexing.engines.search_line_order`).  The middle ground
+#: between ``usable()`` and the reported list (#934 (c)): a line the list cannot
+#: tell from noise is still evidence a candidate may explain, and cheap to keep
+#: in the scoring, but every driven line is one an accepted cell must index, so
+#: a noise line there is a line the truth is charged for missing.
+#:
+#: ``weak_line`` only.  On #916's flat synthetic silicon (12.1–60°, seed 1)
+#: the usable list carries 6 ``weak_line`` components (7 under the tuned
+#: profile), all off the silicon lines (0.014–0.147° away, I/σ_I 1.3–2.7), and
+#: with fewer than 20 usable lines every one of them was driven.  A cubic search
+#: with a declared count of 2 then returned no cell on the tuned list, and an
+#: all-systems search ranked the truth sixth on the untuned one and lost it on
+#: the tuned one.  Driven by the 11 silicon lines, the cubic search ranks it
+#: first and the all-systems searches fourth and fifth, behind trigonal and
+#: tetragonal descriptions that an 11-line list cannot refute.  No
+#: indexing-acceptance list drives a ``weak_line`` line, so none moves.
+#: ``position_at_bound`` is not here: on the silicon every component carrying
+#: it carries ``weak_line`` too, while on the real acceptance lists 2–10
+#: usable components carry it alone at I/σ_I up to 29.
+PEAK_UNDRIVEN_FLAGS: frozenset[str] = frozenset({"weak_line"})
+
 #: Standard deviations above χ²_red = 1 at which a group's fit is **refuted**, and
 #: therefore above which a ΔBIC verdict on adding one more component to it cannot
 #: be read as evidence of a line.
@@ -867,16 +993,34 @@ class PeakList(Base):
     two_theta_min: float
     two_theta_max: float
     source: Literal["fitted", "positions"] = "fitted"
+    #: The instrument blocks the picker found at their defaults on a
+    #: laboratory source, keyed by block, written by
+    #: :func:`~rietx.indexing.pick_peaks` and :func:`~rietx.indexing.fit_peaks`
+    #: from :func:`~rietx.indexing.diagnostics.picked_undeclared` (WP-2030).
+    #: Empty when the source is a lab tube and nothing was left at default;
+    #: ``None`` when nothing was checked: the source is not a lab tube, no picker
+    #: recorded it (a position list), or the list was picked before 0.60.  It is how ``index_pattern(peaks)`` with no instrument
+    #: can still name the instrument first in ``INDEX_DATA_INSUFFICIENT``.
+    instrument_undeclared: dict[str, str] | None = None
     thresholds_version: str = INDEXING_THRESHOLDS_VERSION
     diagnostics: list[Diagnostic] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _q_matches_two_theta(self) -> "PeakList":
-        """Q is derived, so it cannot be allowed to drift from 2θ.
+        """Q and σ(Q) are derived, so neither may drift from 2θ and σ(2θ).
 
-        Cheap (one vectorised pass) and it makes the derived field
+        Cheap (one vectorised pass) and it makes the derived fields
         self-guarding: a caller that builds a peak by hand and forgets Q gets an
         error here rather than a silently mis-indexed pattern later.
+
+        ``q_esd`` is checked the same way (#1236): the engines weight lines by
+        :meth:`q_esd`, so an edit to ``two_theta_esd`` that left the stored
+        ``q_esd`` behind would never reach the search, and nothing would say
+        so.  The tolerance is relative only: σ(Q) is ~1e-5 Å⁻², so the position
+        check's floor of 1.0 would make it an absolute 1e-9 Å⁻², blind to an
+        edit of a line whose σ(2θ) is below ~1e-7°.  A pair where both
+        numbers are non-finite agrees: an infinite σ(2θ) gives an infinite or
+        undefined σ(Q), and both mean "unmeasured".
         """
         if not self.peaks:
             return self
@@ -891,6 +1035,22 @@ class PeakList(Base):
                 f"but 1/d² at λ = {self.wavelength} Å is {float(want[k])!r}; "
                 "build peaks with PeakList.from_positions or "
                 "indexing.pick_peaks rather than setting q by hand")
+        esd = np.array([p.two_theta_esd for p in self.peaks])
+        with np.errstate(invalid="ignore"):
+            want_esd = q_esd_of_two_theta(tt, esd, self.wavelength)
+        got_esd = np.array([p.q_esd for p in self.peaks])
+        agree = (np.isclose(got_esd, want_esd, rtol=1e-9, atol=0.0)
+                 | (~np.isfinite(got_esd) & ~np.isfinite(want_esd)))
+        if not agree.all():
+            k = int(np.flatnonzero(~agree)[0])
+            raise ValueError(
+                f"peak {k} at 2θ = {tt[k]:.4f}° carries q_esd = "
+                f"{float(got_esd[k])!r} but two_theta_esd = {float(esd[k])!r}° gives "
+                f"σ(1/d²) = {float(want_esd[k])!r} at λ = {self.wavelength} Å; "
+                "set both fields together, deriving q_esd with "
+                "rietx.schemas.indexing.q_esd_of_two_theta, or rebuild the "
+                "list with indexing.pick_peaks or PeakList.from_positions "
+                "(which marks every σ assumed)")
         return self
 
     def usable(self) -> list[ObservedPeak]:
@@ -925,10 +1085,10 @@ class PeakList(Base):
         each peak's flags, as :meth:`IndexingResult.best_or_none` is over the
         candidates.
         """
-        head, rows, tail = self._text_sections()
-        return "\n".join(head + rows + tail)
+        return "\n".join(self._text_lines())
 
-    def _text_sections(self) -> tuple[list[str], list[str], list[str]]:
+    def _text_lines(self, notebook: bool = False) -> list[str]:
+        from .._display import diagnostic_lines
         head = [f"PeakList: {len(self.peaks)} peaks, {len(self.usable())} usable, "
                 f"{self.two_theta_min:g}–{self.two_theta_max:g}° 2θ, "
                 f"λ = {self.wavelength:g} Å, source {self.source}",
@@ -941,19 +1101,14 @@ class PeakList(Base):
         # before the list was built, so it prints as IndexingResult's does
         tail = []
         for d in self.diagnostics:
-            tail += [f"  {line}" for line in str(d).splitlines()]
-        return head, rows, tail
+            tail += diagnostic_lines(d, "  ", notebook=notebook)
+        return head + rows + tail
 
     def _repr_html_(self) -> str:
-        """The peaks as a table between the count line and the diagnostics."""
-        from .._display import diagnostics_html, pre_html, table_html
-        head, _, _ = self._text_sections()
-        rows = [(str(i), f"{p.two_theta:.4f}", f"{p.two_theta_esd:.4f}",
-                 f"{p.intensity:.1f}", f"{p.fwhm:.3f}", p.origin, ", ".join(p.flags))
-                for i, p in enumerate(self.peaks)]
-        table = table_html(("#", "two_theta", "two_theta_esd", "intensity", "fwhm",
-                            "origin", "flags"), rows) if rows else ""
-        return pre_html(head[0]) + table + diagnostics_html(self.diagnostics)
+        """The notebook form: the text in one ``<pre>``, each diagnostic's
+        explanation under its ``help:`` line (WP-2039)."""
+        from .._display import pre_html
+        return pre_html("\n".join(self._text_lines(notebook=True)))
 
     @classmethod
     def from_positions(cls, two_theta: np.ndarray, wavelength: float, *,
@@ -1065,8 +1220,16 @@ class SupercellCheck(Base):
     parent_cell: tuple[float, float, float, float, float, float]
     parent_system: str
     parent_centring: str
-    #: how many of the parent's primitive cells one of this lattice's holds
+    #: how many of the parent's primitive cells one of this lattice's holds;
+    #: 0 when the parent is not a sublattice (``relation="containment"``)
     index: int
+    #: ``"sublattice"``: the parent is an index-2-to-4 sublattice of this
+    #: lattice.  ``"containment"`` (thresholds 1.12): every observed line the
+    #: parent indexes, this lattice indexes, and this one's line set is the
+    #: denser — the relation ``indexing.screen.contains`` asks, which reaches
+    #: cubic I √2·a₀ over cubic F a₀ and a trigonal description of a cubic
+    #: truth, neither a sublattice pair
+    relation: Literal["sublattice", "containment"] = "sublattice"
     n_extra: int
     n_seen: int
     p0: float
@@ -1106,8 +1269,15 @@ class BravaisOpinion(Base):
     reduced_cell: tuple[float, float, float, float, float, float] = (0.0,) * 6
 
 
+#: how a summary line names :attr:`LeBailValidation.mode`
+_MODE_NAMES = {"lebail": "Le Bail", "pawley": "Pawley"}
+
+
 class LeBailValidation(Base):
-    """A candidate cell tested against the **whole pattern** by a Le Bail fit.
+    """A candidate cell tested against the **whole pattern** by a structure-free fit.
+
+    The fit is Pawley since WP-2011 and was Le Bail before it; :attr:`mode`
+    says which, and the class keeps its name.
 
     Why this is mandatory rather than optional: the figure-of-merit panel is
     computed on ≤20 lines and is structurally blind to three things the whole
@@ -1122,15 +1292,10 @@ class LeBailValidation(Base):
     deliberately *not* a member of the ranking panel: the panel ranks every
     candidate and this costs a refinement, so it is computed for the shortlist
     only and used to *validate* rather than to order.  Reading it as a rank would
-    also reintroduce the blind spot it exists to close — a bigger cell fits
-    better.
+    also reintroduce the blind spot it exists to close: a converged fit of a
+    bigger cell fits at least as well.
 
-    The fit is **single-phase**, and that is a measured constraint rather than a
-    simplification (WP-1028): ``CompiledModel.lebail_update`` partitions
-    ``max(y_obs − y_bkg, 0)`` per phase with nothing to arbitrate two phases
-    claiming the same channel, so two phases inflate one another without bound
-    (measured Rwp 742–9 281 % against 7.5–24.8 % for one).  A candidate is
-    therefore never validated against a multi-phase hypothesis.
+    The fit is **single-phase**, since a candidate is one lattice.
     """
 
     rwp: float
@@ -1140,21 +1305,60 @@ class LeBailValidation(Base):
     #: the reflections whose absence is not yet established.
     space_group: str
     n_reflections: int
-    #: reflections the lattice predicts where the pattern has no intensity, from
-    #: Layer 0's ``unmatched_calc``
+    #: lines the lattice predicts where the pattern has no intensity.  Since
+    #: thresholds 1.12 the line screen's count (``indexing/screen.py``): merged
+    #: predicted lines, testable (resolved from every picked component and
+    #: quiet in the peak-list model) and with nothing above the picker's
+    #: background envelope at the measured width — inputs the candidate
+    #: cannot buy.  With no peak list supplied it is the older count against
+    #: the fit's own background (``absent_source``).
     predicted_but_absent: int = 0
+    #: of those, the lines no space group of this lattice could extinguish
+    #: (``ambiguity.uncancellable``); ``None`` before C3 (thresholds 1.12) or without a screen
+    predicted_but_absent_uncancellable: int | None = None
+    #: of *those*, the lines inside de Wolff's window — positions up to the
+    #: Q of the 20th usable line, where a true cell's lines are strong enough
+    #: to be detected.  The ``predicted_but_absent`` caveat fires on this one.
+    predicted_but_absent_uncancellable_in_window: int | None = None
+    #: which detector produced the count
+    absent_source: Literal["line_screen", "fitted_background"] = "fitted_background"
+    #: the screen's denominator: predicted lines merged at the resolution in
+    #: the peak list's range.  ``n_reflections`` is the fit's and counts every
+    #: reflection, so ``predicted_but_absent`` is a share of *this* number
+    n_lines_screened: int | None = None
+    #: of those, the lines inside de Wolff's window: the denominator of the
+    #: absence density below
+    n_lines_screened_in_window: int | None = None
+    #: ``predicted_but_absent_uncancellable_in_window`` over
+    #: ``n_lines_screened_in_window``: the share of the lines this cell
+    #: asserts inside the window that read absent where no extinction could
+    #: explain it.  The density form of the count, as Smith & Snyder's (1979)
+    #: F_N weighs its lines by N/N_poss.  Reported only; the caveat fires on
+    #: the count
+    predicted_but_absent_density_in_window: float | None = None
+    #: the windowed uncancellable absences above what the lowest density
+    #: among the run's screened candidates implies for this cell's window
+    #: lines, A − N_w·d_min: the density compared across candidates, as
+    #: WRIP20 (Altomare et al. 2009) is read against the best candidate.
+    #: 0 for the cleanest candidate and for a lone one, so it cannot stand in
+    #: for the count.  Written by ``index_pattern``; reported only
+    predicted_but_absent_excess_in_window: float | None = None
     #: observed peaks with no calculated reflection nearby — impurity content, or
     #: a wrong cell.  Layer 0's ``unmatched_obs``
     unmatched_observed: int = 0
     #: ° 2θ of each, so the report is actionable rather than a count
     predicted_but_absent_two_theta: list[float] = Field(default_factory=list)
     unmatched_observed_two_theta: list[float] = Field(default_factory=list)
-    #: the underlying refinement's status; ``"failed"`` when the Le Bail fit
+    #: the underlying refinement's status; ``"failed"`` when the fit
     #: raised, which is itself evidence against the candidate but is reported as
     #: a failure rather than converted into a score
     status: str = "converged"
     n_stages: int = 0
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+    #: the decomposition the fit ran.  ``validate_by_lebail`` writes
+    #: ``"pawley"`` since WP-2011 (schema 0.60).  A record written before then
+    #: carries no key and was a Le Bail fit, which is what the default reads.
+    mode: Literal["lebail", "pawley"] = "lebail"
 
 
 class CellCandidate(Base):
@@ -1237,6 +1441,19 @@ class CellCandidate(Base):
     #: :data:`IndexCaveat` vocabulary
     confidence_caveats: list[IndexCaveat] = Field(default_factory=list)
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+    #: formula units this cell's volume holds by Hofmann's (2002) average atomic
+    #: volumes (WP-2030): :attr:`volume` over one formula unit's volume at the
+    #: run's temperature (``IndexingResult.formula`` and ``.temperature``).
+    #: Written by :func:`rietx.index_pattern` when it is given ``formula=``;
+    #: ``None`` means no formula was given.  A number, judged by no diagnostic.
+    #: On an organic or metal-organic cell the true Z usually lies within a few
+    #: per cent of it (one crystal scatters about 4 %, Hofmann Fig. 1).  An
+    #: ionic or mainly inorganic cell reads low, often far low (his § 3 (iii)):
+    #: the 16 inorganic standards measured read 0.38-0.87 of their Z.  The one
+    #: bound that holds for any formula is the window's ceiling, so the true Z
+    #: is at least this number over 1.25, short of a porous framework whose
+    #: formula leaves its pore contents out.
+    formula_units: float | None = None
 
     @property
     def a(self) -> float:
@@ -1757,7 +1974,7 @@ class CandidateEvidence(Base):
     #: members exist is a property of the peak list, not of the candidate —
     #: ``IndexingEvidence.fom_undefined`` names the absent ones with reasons
     fom: dict[str, float] = Field(default_factory=dict)
-    #: ``True`` when a Le Bail fit ran on *this* candidate — distinct from
+    #: ``True`` when a validation fit ran on *this* candidate — distinct from
     #: ``IndexingResult.validated`` (a pattern was supplied at all): under a
     #: budget the shortlist can be validated only partway down
     validated: bool = False
@@ -1828,7 +2045,7 @@ class IndexingEvidence(Base):
 
 
 def _candidate_label(c: CellCandidate) -> str:
-    """Which candidate a finding is about, as the text and HTML views say it."""
+    """Which candidate a finding is about, as its ``on:`` line says it."""
     return f"candidate {c.system} {c.centring} V={c.volume:.1f}"
 
 
@@ -1887,8 +2104,28 @@ class IndexingResult(Base):
     #: ``total_budget_seconds`` did, or ``None`` on a result recorded before
     #: presets existed.  The ceiling itself is in ``provenance.notes``.
     preset: str | None = None
+    #: the chemical formula each candidate's
+    #: :attr:`~CellCandidate.formula_units` was read against (WP-2030), written
+    #: verbatim by :func:`rietx.index_pattern` from its ``formula=``.  ``None``
+    #: means no formula was given, so no candidate was read against one; a
+    #: result recorded before 0.60 also reads ``None``.  It never narrowed the
+    #: search.
+    formula: str | None = None
+    #: the temperature in K Hofmann's (2002) volumes were read at,
+    #: written by :func:`rietx.index_pattern` beside :attr:`formula` and
+    #: ``None`` whenever :attr:`formula` is, since without a formula no
+    #: temperature was read.
+    temperature: float | None = None
     thresholds_version: str = INDEXING_THRESHOLDS_VERSION
     diagnostics: list[Diagnostic] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _temperature_needs_a_formula(self):
+        if self.formula is None and self.temperature is not None:
+            raise ValueError("IndexingResult.temperature is the temperature "
+                             "the formula's volumes were read at, so it needs a "
+                             "formula")
+        return self
 
     def __str__(self) -> str:
         """The candidate table, the verdict and every diagnostic (WP-1544).
@@ -1898,13 +2135,13 @@ class IndexingResult(Base):
         :meth:`best_or_none` is the one rule it calls, a filter over the
         candidates.
         """
-        head, candidates, tail = self._text_sections()
-        return "\n".join(head + candidates + tail)
+        return "\n".join(self._text_lines())
 
-    def _text_sections(self) -> tuple[list[str], list[str], list[str]]:
-        """The run line, the candidate lines, and the verdict with every
-        diagnostic: :meth:`__str__` joins them, ``_repr_html_`` swaps the middle
-        one for a table."""
+    def _text_lines(self, notebook: bool = False) -> list[str]:
+        """The run line, the candidate lines, the verdict and every
+        diagnostic; ``notebook`` adds each code's explanation
+        (:func:`rietx._display.diagnostic_lines`)."""
+        from .._display import diagnostic_lines
         result = self
         lines: list[str] = []
         lines.append(f"engines: {', '.join(result.engines_run) or 'none'}   "
@@ -1916,7 +2153,6 @@ class IndexingResult(Base):
             lines.append(f"search INCOMPLETE in: {', '.join(incomplete)} — a negative "
                          "result there is not evidence")
         lines.append("")
-        head, lines = lines, []
         if not result.candidates:
             lines.append("no candidate cell in the systems searched.")
         for i, c in enumerate(result.candidates, start=1):
@@ -1926,25 +2162,24 @@ class IndexingResult(Base):
                          f"   V = {c.volume:.2f} Å³")
             lines.append(f"      found by {', '.join(c.found_by)};  indexed "
                          f"{c.n_indexed}/{c.n_lines} lines;  chi2_red {c.chi2_red:.2f}"
-                         + (f";  Le Bail Rwp {c.lebail.rwp:.4f}, "
+                         + (f";  {_MODE_NAMES[c.lebail.mode]} Rwp {c.lebail.rwp:.4f}, "
                             f"{c.lebail.predicted_but_absent} of "
-                            f"{c.lebail.n_reflections} reflections absent"
+                            + (f"{c.lebail.n_lines_screened} lines absent"
+                               if c.lebail.n_lines_screened is not None else
+                               f"{c.lebail.n_reflections} reflections absent")
                             if c.lebail is not None else ""))
             if c.confidence_caveats:
                 lines.append(f"      not higher because: {', '.join(c.confidence_caveats)}")
-        candidates, lines = lines, self._verdict_lines()
+        lines += self._verdict_lines()
         # ``where`` is load-bearing for the run-level codes: it names which
         # systems INDEX_BUDGET_EXHAUSTED left truncated or unreached, which no
         # message restates, and ``str(diag)`` prints it as ``at:``
         for diag in result.diagnostics:
-            lines += [f"  {line}" for line in str(diag).splitlines()]
+            lines += diagnostic_lines(diag, "  ", notebook=notebook)
         for c in result.candidates:
             for diag in c.diagnostics:
-                # ``on:`` straight under the headline, where the HTML fold has it
-                first, *rest = str(diag).splitlines()
-                lines += [f"  {first}", f"    on: {_candidate_label(c)}",
-                          *(f"  {line}" for line in rest)]
-        return head, candidates, lines
+                lines += diagnostic_lines(diag, "  ", on=_candidate_label(c), notebook=notebook)
+        return lines
 
     def _verdict_lines(self) -> list[str]:
         best = self.best_or_none()
@@ -1955,26 +2190,10 @@ class IndexingResult(Base):
                 f"{best.cell[3]:.3f} {best.cell[4]:.3f} {best.cell[5]:.3f}°"]
 
     def _repr_html_(self) -> str:
-        """The candidates as a table between the run line and the verdict,
-        then the diagnostics with their detail folded."""
-        from .._display import diagnostics_html, pre_html, table_html
-        head, _, _ = self._text_sections()
-        rows = []
-        for i, c in enumerate(self.candidates, start=1):
-            a, b, cc, al, be, ga = c.cell
-            rows.append((str(i), c.confidence, f"{c.system} {c.centring}",
-                         f"{a:.5f} {b:.5f} {cc:.5f}", f"{al:.3f} {be:.3f} {ga:.3f}",
-                         f"{c.volume:.2f}", f"{c.n_indexed}/{c.n_lines}",
-                         f"{c.chi2_red:.2f}",
-                         f"{c.lebail.rwp:.4f}" if c.lebail is not None else "",
-                         ", ".join(c.confidence_caveats)))
-        table = table_html(("#", "confidence", "lattice", "a b c (Å)", "α β γ (°)",
-                            "V (Å³)", "indexed", "chi2_red", "Le Bail Rwp",
-                            "confidence_caveats"), rows) if rows else ""
-        folds = diagnostics_html(self.diagnostics) + "".join(
-            diagnostics_html(c.diagnostics, context=_candidate_label(c)) for c in self.candidates)
-        return (pre_html("\n".join(head)) + table
-                + pre_html("\n".join(self._verdict_lines()).lstrip("\n")) + folds)
+        """The notebook form: the text in one ``<pre>``, each diagnostic's
+        explanation under its ``help:`` line (WP-2039)."""
+        from .._display import pre_html
+        return pre_html("\n".join(self._text_lines(notebook=True)))
 
     def best_or_none(self) -> CellCandidate | None:
         """The single candidate, or None.
@@ -2036,11 +2255,33 @@ class ExtinctionPrior(Base):
     or a glide; a second-harmonic signal says ``centrosymmetric=False``; a
     pyroelectric response says ``polar=True``.  ``None`` declares nothing.
 
+    **The content per cell** (WP-2033): ``z`` formula units of ``formula``, or
+    a measured ``density`` that fixes Z through the formula weight and the
+    screened cell.  A group whose orbits cannot hold some element's atoms per
+    cell is named in ``count_notes`` and kept; only under ``ordered=True`` is
+    it removed, the count being the test of an ordered model; a
+    fractional formula count declares a shared site and is not counted
+    (:func:`rietx.indexing.extinction.content_exclusion`).  Where Z is not a
+    whole multiple of a member's general multiplicity (Z′ < 1, as for #935's
+    P 2₁ salt against P 2₁/m) the member is kept and the special positions a
+    formula unit then needs are named, since a molecule's own symmetry is not
+    declared (:func:`rietx.indexing.extinction.special_site_note`).
+
     **A filter, never evidence.**  It decides which members of each class are
     admissible and is reported as ``EXTINCTION_PRIOR_APPLIED`` with every group
     it removed; it never enters a ΔBIC, every class is still fitted, and a class
     it empties stays in the ranking, so a declaration the data contradict is
-    visible rather than silently obeyed.
+    visible rather than silently obeyed.  A density that does not give the
+    declared ``z`` (or, alone, any whole number) on the screened cell
+    filters nothing and makes the screen abstain; one that fits several whole
+    numbers (above Z ≈ 33) only filters nothing.
+
+    **A count its orbits cannot hold is a statement, not a removal, unless the
+    model is declared ordered.**  A disordered alloy written with whole counts
+    (CuAu, Cu₃Au) puts its atoms on a shared site and its true group fails the
+    count, which a competent refiner would not remove.  So by default the
+    screen keeps the group and names the failure
+    (``ExtinctionCandidate.count_notes``); ``ordered=True`` removes it.
     """
 
     #: only Sohncke groups (proper rotations, screws and translations): an
@@ -2051,6 +2292,21 @@ class ExtinctionPrior(Base):
     #: only groups whose point group leaves a direction fixed (``True``: the
     #: ten polar classes) or none (``False``)
     polar: bool | None = None
+    #: formula units per cell.  With :attr:`formula` and :attr:`ordered` it
+    #: removes the groups whose orbits cannot hold that content (without
+    #: ``ordered`` it only names the failure); alone it names only what a
+    #: Z′ below one needs
+    z: int | None = Field(default=None, ge=1)
+    #: measured density in g/cm³, which fixes Z through :attr:`formula`'s
+    #: weight and the screened cell's volume
+    density: float | None = Field(default=None, gt=0.0)
+    #: the formula unit as a chemist writes it (``"Cu12Sb4S13"``, brackets and
+    #: ``·`` adducts allowed); a fractional count declares a shared site
+    formula: str | None = None
+    #: every site is one element at full occupancy (no mixed or partial
+    #: sites): only then does a group whose orbits cannot hold the declared
+    #: content get **removed**, instead of named in ``count_notes``
+    ordered: bool | None = None
 
     @model_validator(mode="after")
     def _consistent(self) -> "ExtinctionPrior":
@@ -2060,13 +2316,29 @@ class ExtinctionPrior(Base):
         if self.polar is True and self.centrosymmetric is True:
             raise ValueError("polar=True and centrosymmetric=True cannot both "
                              "hold: an inversion centre reverses every direction")
+        if self.density is not None and self.formula is None:
+            raise ValueError("a density gives Z only through the formula "
+                             "weight: declare the formula with it")
+        if self.formula is not None:
+            if self.z is None and self.density is None:
+                raise ValueError("a formula alone filters nothing: declare "
+                                 "it with a z or a density")
+            from ..crystallography.atomic_volume import formula_counts
+
+            formula_counts(self.formula)       # a symbol that is no element raises
+        if self.ordered and self.formula is None:
+            raise ValueError("ordered=True removes groups by the declared "
+                             "content: declare the formula with a z or a density")
         return self
 
-    def declared(self) -> dict[str, bool]:
+    def declared(self) -> dict[str, bool | int | float | str]:
         """The facts actually declared, by name."""
         return {k: v for k, v in (("sohncke", self.sohncke),
                                   ("centrosymmetric", self.centrosymmetric),
-                                  ("polar", self.polar)) if v is not None}
+                                  ("polar", self.polar), ("z", self.z),
+                                  ("density", self.density),
+                                  ("formula", self.formula),
+                                  ("ordered", self.ordered)) if v is not None}
 
 
 class ExtinctionCandidate(Base):
@@ -2106,6 +2378,21 @@ class ExtinctionCandidate(Base):
     space_groups: list[str] = Field(default_factory=list)
     #: members the declared :class:`ExtinctionPrior` removed (empty without one)
     excluded_groups: list[str] = Field(default_factory=list)
+    #: for each of :attr:`excluded_groups`, the declared facts it fails
+    #: (``"sohncke=True"``, ``"z=2: S 26 per cell is no sum of its orbits …"``)
+    exclusion_reasons: dict[str, str] = Field(default_factory=dict)
+    #: for each admitted member at which the declared Z is not a whole multiple
+    #: of its general multiplicity (Z′ not whole): the special positions a
+    #: formula unit then sits on.  A statement, never an exclusion — a molecule
+    #: there must carry the site's symmetry, which nothing declared says.
+    #: Filled for the classes the data leave standing, never for a refuted one
+    special_positions: dict[str, str] = Field(default_factory=dict)
+    #: for each admitted member whose orbits cannot hold some element's atoms
+    #: per cell at the declared Z (``"Cu 2 per cell is no sum of its orbits
+    #: …"``): kept, since a disordered model can share a site, and removed only
+    #: under ``ExtinctionPrior.ordered`` (then in :attr:`exclusion_reasons`).
+    #: Filled for the classes the data leave standing
+    count_notes: dict[str, str] = Field(default_factory=dict)
     #: :attr:`space_groups` grouped by Laue class (gemmi's symbol).  More than
     #: one key means the members differ in which reflections are *equivalent*
     #: — the intensity partition inside an overlapped multiplet — and not in any
@@ -2127,7 +2414,8 @@ class ExtinctionCandidate(Base):
     #: forbidden line coinciding with an allowed one never was an independently
     #: determined intensity, so removing it costs no parameter.
     #:
-    #: ``None`` until :attr:`screened`, and that is not bookkeeping.  The third
+    #: ``None`` until :attr:`screened` (and after a fit that raised, which
+    #: leaves no pattern to ask), and that is not bookkeeping.  The third
     #: clause is a question about the class's *fit* — a window filled by a
     #: neighbour's tail measures the profile model rather than the absence
     #: (WP-1077) — so before the fit the count is unknown rather than zero, and
@@ -2140,8 +2428,8 @@ class ExtinctionCandidate(Base):
     #: the refuting reflections, so the refutation can be checked in the pattern
     forbidden_hkl: list[tuple[int, int, int]] = Field(default_factory=list)
     forbidden_two_theta: list[float] = Field(default_factory=list)
-    #: whole-pattern Le Bail fit of this class; ``rwp`` is ``inf`` when the class
-    #: was refuted before it was fitted (:attr:`screened`)
+    #: whole-pattern Le Bail fit of this class; ``inf`` when the class was never
+    #: fitted (:attr:`screened` False) or its fit raised
     rwp: float = float("inf")
     gof: float = float("inf")
     chi2: float = float("inf")
@@ -2154,9 +2442,9 @@ class ExtinctionCandidate(Base):
     #: restoring the forbidden reflections is *justified*, i.e. the class's
     #: absences are contradicted by the fit
     absences_rejected: bool = False
-    #: was the Le Bail screen actually run for this class?  False when direct
-    #: absence evidence already refuted it (no fit can rescue a forbidden
-    #: position that carries intensity) or when ``max_classes`` truncated
+    #: was the Le Bail screen actually run for this class?  False only when
+    #: ``max_classes`` truncated the screen or ``cancel`` stopped it first; the
+    #: absence test reads this class's own fit, so it never runs before one
     screened: bool = False
     #: **One-sided by construction.** A class asserts *absences*, so intensity at
     #: a position it forbids contradicts it — while a class claiming too *few*
@@ -2205,25 +2493,76 @@ class ExtinctionScreen(Base):
     profile_rwp: float = float("inf")
     #: the declared facts the members were filtered by (``restrict=``)
     prior: ExtinctionPrior | None = None
+    #: Rwp of the cell-free ``profile_only`` Le Bail the screen ran first
+    #: (``refine_cell=True``, the default); ``None`` when the cell was held
+    prefit_rwp: float | None = None
+    #: the reference fit's background-subtracted Rwp (Toby 2006): the weighted
+    #: misfit as a fraction of the net signal.  Above
+    #: :data:`~rietx.indexing.extinction.REFERENCE_NET_RWP_MAX` the screen is
+    #: ``"unreliable"``; ``None`` until the reference fit ran
+    reference_rwp_net: float | None = None
+    #: what ``reference_rwp_net`` would read for a fit that left only the
+    #: counting noise: √(N/(N + S)), N the fitted channels and S the weighted
+    #: net Bragg power.  Past the bound too, either the data are too weak for the
+    #: gate (S < N) or the picker's envelope sits inside the lines over this range
+    #: (the pair cannot tell which); below it, the gap to ``reference_rwp_net`` is
+    #: misfit.  ``None``
+    #: until the reference fit ran
+    perfect_fit_rwp_net: float | None = None
+    #: formula units per cell the member filter used: the declared ``z``, or
+    #: the one whole number the declared density gives on :attr:`cell`.
+    #: ``None`` with no Z declared, and when a declared density does not give
+    #: one — then nothing is filtered by Z and :meth:`best_or_none` abstains
+    z: int | None = None
+    #: Z the declared density and formula give on :attr:`cell`, not rounded;
+    #: ``None`` without a declared density
+    z_from_density: float | None = None
+    #: every whole Z within the density's tolerance of :attr:`z_from_density`,
+    #: when no ``z`` is declared; more than one is an ambiguity (a measured
+    #: density at Z ≳ 50), none a contradiction
+    z_candidates: list[int] = Field(default_factory=list)
+    #: ``"converged"``; ``"failed"`` (no reference fit, nothing ranked);
+    #: ``"unreliable"`` (ranked, but the reference fit left more of the net
+    #: signal unexplained than any absence test can be read against, so
+    #: :meth:`best_or_none` abstains); ``"cancelled"``
     status: str = "converged"
     thresholds_version: str = INDEXING_THRESHOLDS_VERSION
     diagnostics: list[Diagnostic] = Field(default_factory=list)
 
+    def density_contradicts_z(self) -> bool:
+        """Did a declared density fail to give the Z on the screened cell?
+
+        True when :attr:`prior` declares a density, one was computed
+        (:attr:`z_from_density`), and it names no Z: it is outside the
+        tolerance of the declared ``z``, or, with none declared, of every
+        whole number.  A density that fits *several* whole numbers is an
+        ambiguity, not a contradiction, and is False; so is a screen that never
+        computed one (cancelled, failed, or no reflections).
+        """
+        return (self.prior is not None and self.prior.density is not None
+                and self.z_from_density is not None and self.z is None
+                and (self.prior.z is not None or not self.z_candidates))
+
     def best_or_none(self) -> ExtinctionCandidate | None:
         """The one extinction class, or None.
 
-        Returns a class only when it was fitted, is not refuted, rests on at
-        least one absence the data could **test** (or is the absence-free class
-        itself, whose claim is that there is nothing to see), is separated from
-        the next surviving class by a decisive ΔBIC margin, and **no unrefuted
-        class was left unfitted** — a ``max_classes`` cap or a cancelled run
-        leaves an unasked question, which must not read as a clean answer.  Every
-        other situation returns None with the reason in :attr:`diagnostics`.
+        Returns a class only when the reference fit passed its gate (``status``
+        is not ``"unreliable"``), the class was fitted, is not refuted, rests on
+        at least one absence the data could **test** (or is the absence-free
+        class itself, whose claim is that there is nothing to see), is separated
+        from the next surviving class by a decisive ΔBIC margin, and **no
+        unrefuted class was left unfitted** — a ``max_classes`` cap or a
+        cancelled run leaves an unasked question, which must not read as a clean
+        answer.  Every other situation returns None with the reason in
+        :attr:`diagnostics`.
 
         With a declared :attr:`prior`, only classes it leaves a member in can be
         returned and the margin is taken to the next such class — that is the
         declaration used — but a class it emptied that the data prefer by the
         decisive margin makes this abstain: the data contradict the declaration.
+        So does a declared density that gives another Z than the one declared,
+        or no whole Z, on the screened cell (:meth:`density_contradicts_z`); a
+        density that fits several whole Z does not.
 
         A returned class still lists every space group it admits.  There is no
         accessor anywhere in this module that yields one space group from the
@@ -2231,8 +2570,12 @@ class ExtinctionScreen(Base):
         """
         from ..indexing.extinction import DECISIVE_DELTA_BIC
 
+        if self.status == "unreliable":
+            return None                 # the absence tests read the misfit
         if any(not c.refuted and not c.screened for c in self.candidates):
             return None                 # an unasked question, not a clean answer
+        if self.density_contradicts_z():
+            return None                 # the declaration disagrees with the cell
         alive = [c for c in self.candidates if not c.refuted]
         admissible = [c for c in alive if c.space_groups]
         if not admissible:

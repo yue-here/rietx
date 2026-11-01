@@ -382,6 +382,16 @@
     {/each}
   </ol>
 
+  <!-- the stage every plan ends with (WP-2002): not editable here, and its Rwp
+       is the answer's, which the last declared rung's is not -->
+  {#if ladder && resolved?.closing}
+    <p class="muted blurb">
+      Then <span class="mono">{resolved.closing.name}</span>: every stage's globs once
+      more, with windows that drop {pct(resolved.closing.window_area_tol)} of each peak{#if
+        resolved.closing.rwp !== null} · Rwp {pct(resolved.closing.rwp)}{/if}
+    </p>
+  {/if}
+
   {#if setAside.length}
     <details class="aside">
       <summary>

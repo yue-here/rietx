@@ -708,6 +708,32 @@ def test_unconstrained_roughness_is_flagged_rather_than_reported_as_measured():
     assert ROUGHNESS_MIN_DEPRESSION == pytest.approx(0.01)
 
 
+def test_a_switched_off_suortti_block_says_its_esds_depend_on_the_off_state():
+    """Suortti's form is the identity at b = 0 and at a = 1, and the scale's
+    and Biso's esds differ ×1.1 to ×4.4 between the two on the CPD round
+    robin (WP-2002, fifth round's Q4).  The warning says so at both, and only
+    where the correction is exactly off: b = 1e-6 is nearly off, not off.
+
+    Made to fail on 2026-10-21 with the ``off`` test removed: the b = 0 and
+    a = 1 warnings lost the sentence."""
+    from rietx.refine import _roughness_regime_diagnostics
+
+    def warning(a, b):
+        model, values = _lab6_bb(RoughnessSuortti(
+            a=Parameter(value=a, min=0.0, max=1.0),
+            b=Parameter(value=b, min=0.0, max=5.0)))
+        (d,) = [d for d in _roughness_regime_diagnostics(model, values)
+                if d.code == "ROUGHNESS_UNCONSTRAINED"]
+        return d
+
+    for a, b, at in ((0.5, 0.0, "b = 0"), (1.0, 0.5, "a = 1")):
+        d = warning(a, b)
+        assert f"switched off at {at}," in d.message, (a, b)
+        assert "Without the block" in d.suggestion, (a, b)
+    d = warning(0.5, 1e-6)
+    assert "switched off" not in d.message and "Without the block" not in d.suggestion
+
+
 def test_pitschke_outside_its_regime_is_flagged_not_clamped():
     """The paper's Eq (18) fence: past sin(theta) = tau the model amplifies."""
     from rietx.refine import _roughness_regime_diagnostics

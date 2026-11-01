@@ -1,12 +1,12 @@
 # %% [markdown]
 # # Peaks, indexing and a Le Bail check
 #
-# *Written by Claude Code, Anthropic's coding agent, for the rietx project.*
-#
 # When the phase is unknown there is no CIF to start from, and the cell has to come from the peak positions alone.
-# We pick the peaks of a synthetic pattern whose answer we know, index them, and read why rietx declines to name a single cell.
+# We pick the peaks of a synthetic pattern whose answer we know, index them, and read how rietx decides whether to name a single cell.
 # Then we check the best candidate with a Le Bail fit.
 # By the end you can pick and fit peaks, run an indexing search, and test a candidate cell against the whole pattern.
+#
+# *Written by Claude Code, Anthropic's coding agent, for the rietx project.*
 #
 # **You need** rietx 1.10 or later, which the next cell installs.
 # Notebook 01 introduces Le Bail fitting.
@@ -45,11 +45,12 @@ cif.write_text(
     "C1  C  0.25 0.7627 0.0850 0.80\n"
     "O1  O  0.25 0.9231 0.0952 1.25\n"
     "O2  O  0.4729 0.6801 0.0870 1.19\n",
-    encoding="utf-8")
+    encoding="utf-8",
+)
 truth = rx.Structure.from_cif(cif)
 
 # %% [markdown]
-# `predict` computes a pattern from a structure and an instrument without fitting anything.
+# [`predict`](https://rietx.org/docs/stable/reference/refinement.html#entry-points) computes a pattern from a structure and an instrument without fitting anything.
 # This instrument sets its own peak widths and a flat background of 200 counts.
 # We scale the phase so the strongest peak reaches about 20 000 counts above the background, then draw Poisson counts.
 
@@ -64,8 +65,10 @@ two_theta = np.arange(10, 80, 0.02)
 y = rx.Refinement(truth, true_instrument).predict(two_theta) - 200.0
 truth.phases[0].scale.value *= 20000 / y.max()
 y = rx.Refinement(truth, true_instrument).predict(two_theta)
-data = rx.PatternData(two_theta=two_theta,
-                      intensity=np.random.default_rng(0).poisson(y).astype(float))
+data = rx.PatternData(
+    two_theta=two_theta,
+    intensity=np.random.default_rng(0).poisson(y).astype(float),
+)
 data.plot()
 
 # %% [markdown]
@@ -74,7 +77,7 @@ data.plot()
 #
 # ## Find the peaks
 #
-# `pick_peaks` finds every resolvable peak and fits each one for its position, with an esd.
+# [`pick_peaks`](https://rietx.org/docs/stable/reference/peaks.html#picking-the-peaks) finds every resolvable peak and fits each one for its position, with an esd.
 # It needs an instrument for the wavelength and a first guess at the peak width.
 # Give it a default copper instrument, as you would for an unknown sample.
 # Its widths do not match these peaks, so expect the picker to say so.
@@ -86,19 +89,19 @@ peaks
 
 # %% [markdown]
 # Each row is one peak: its position, the esd of that position, its area and its width.
-# `flags` records anything the fit noticed.
+# [`flags`](https://rietx.org/docs/stable/reference/peaks.html#the-flags) records anything the fit noticed.
 # Some flags, such as `duplicate_line` and `fit_failed`, take a row out of indexing.
 # The header line counts the rows left usable.
 #
 # The diagnostics under the table explain the list.
-# `PEAK_WIDTH_LAW_MISMATCH` says the default instrument predicts narrower peaks than these, so the picker scaled its windows to the data.
-# `PEAK_KALPHA2_ALIAS` lists candidates dropped as the Kα2 partner of a stronger line, so each reported position is a Kα1 position.
+# [`PEAK_WIDTH_LAW_MISMATCH`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#peak-width-law-mismatch) says the default instrument predicts narrower peaks than these, so the picker scaled its windows to the data.
+# [`PEAK_KALPHA2_ALIAS`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#peak-kalpha2-alias) lists candidates dropped as the Kα2 partner of a stronger line, so each reported position is a Kα1 position.
 # Open a diagnostic to read what its code means.
 # [Diagnostics: peaks and indexing](https://rietx.org/docs/stable/reference/diagnostics-indexing.html) lists every code.
 #
 # ## Measure lines you name
 #
-# `fit_peaks` fits exactly the positions you give it, and nothing else.
+# [`fit_peaks`](https://rietx.org/docs/stable/reference/peaks.html#fitting-peaks-you-name) fits exactly the positions you give it, and nothing else.
 # Use it to measure lines you have chosen: a few reflections for a size analysis, or one line as a quick check.
 
 # %%
@@ -107,13 +110,13 @@ chosen
 
 # %% [markdown]
 # Each line is marked `manual`, because its position came from you.
-# A line flagged `unnamed_neighbour` shares its fitting window with a line you did not name, and that line's intensity had nowhere to go but into it.
+# A line flagged [`unnamed_neighbour`](https://rietx.org/docs/stable/reference/peaks.html#the-neighbour-you-did-not-name) shares its fitting window with a line you did not name, and that line's intensity had nowhere to go but into it.
 # A whole peak list rebuilt from edited positions in code meets this at every line it leaves out.
 #
 # ## The same work in the GUI
 #
 # Editing a peak list is easier by hand, and rietx has a graphical mode for it.
-# Run `rietx gui` in a terminal, open or create a project with your pattern, and choose the Peaks tab.
+# Run [`rietx gui`](https://rietx.org/docs/stable/reference/cli.html#rietx-gui) in a terminal, open or create a project with your pattern, and choose the Peaks tab.
 # The plot then becomes an editing surface:
 #
 # | Gesture | Does |
@@ -125,48 +128,63 @@ chosen
 #
 # The same tab runs the indexing search, draws a candidate's predicted lines over the pattern, and adopts a candidate as the starting point of a Le Bail fit.
 # Every gesture also has a typed equivalent in the panel.
-# The [GUI guide](https://rietx.org/using/gui-guide.html#peaks) covers the tab in full.
+# [The GUI panel by panel](https://rietx.org/docs/stable/reference/gui-guide.html#peaks) covers the tab in full.
 #
 # ## Index
 #
-# `index_pattern` searches for cells that index the usable peaks.
+# [`index_pattern`](https://rietx.org/docs/stable/reference/indexing.html#running-the-search) searches for cells that index the usable peaks.
 # A search over every crystal system can take minutes, so we narrow it.
-# `SearchSpec` limits it to orthorhombic cells, with a volume between 200 and 250 Å³ and no axis longer than 8.5 Å.
+# [`SearchSpec`](https://rietx.org/docs/stable/reference/indexing.html#the-search-specification) limits it to orthorhombic cells, with a volume between 200 and 250 Å³ and no axis longer than 8.5 Å.
 # Those limits come from knowing the answer.
 # With a real unknown, start from the formula and a wide window, and let the search run longer.
+#
+# [`budget_seconds`](https://rietx.org/docs/stable/reference/indexing.html#presets-budgets-and-the-three-states-of-a-system) caps each engine's search of each crystal system, and its default is 30 s.
+# This search finishes inside that on a quiet laptop.
+# On a laptop running other work, one engine ran past 30 s and the whole call took 58 s.
+# A search stopped by its cap cannot rule anything out, so we allow 120 s.
 
 # %%
-spec = SearchSpec(systems=("orthorhombic",), min_volume=200, max_volume=250, max_d_axis=8.5)
+spec = SearchSpec(
+    systems=("orthorhombic",),
+    min_volume=200,
+    max_volume=250,
+    max_d_axis=8.5,
+    budget_seconds=120,
+)
 indexing = rx.index_pattern(peaks, data=data, instrument=lab, spec=spec)
 indexing
 
 # %% [markdown]
 # The top candidate is the true cell, with its axes in a different order.
-# All three search engines found it.
+# All three [search engines](https://rietx.org/docs/stable/reference/indexing.html#three-engines-and-why-the-default-is-all-of-them) found it.
 #
-# Yet the verdict line says NO CELL.
-# rietx names a single cell only when exactly one candidate reaches high confidence, and this one is low for the reasons in its row.
+# The verdict line names it.
+# rietx names a single cell only when exactly one candidate reaches [high confidence](https://rietx.org/docs/stable/reference/indexing.html#the-confidence-gate), and this one does.
+# Its row indexes 51 of the 54 usable lines, and the indexer's own [whole-pattern fit](https://rietx.org/docs/stable/reference/indexing.html#the-whole-profile-test), a Pawley fit, reaches Rwp 0.044.
+# The row also counts 24 of the 87 lines it predicts as absent from the pattern.
+# The gate reads only the absent lines that no space group could remove, inside the first twenty lines, and here there are none.
+# The three lines it leaves are the candidate's [`unindexed_two_theta`](https://rietx.org/docs/stable/reference/indexing.html#one-candidate), printed below.
+# The one near 36° is two reflections 0.05° apart, fitted as one line between them.
 #
-# - `predicted_but_absent`: the indexer tests a candidate in the lattice's highest-symmetry space group, and that group has no systematic absences. Aragonite's real space group, Pmcn, has glide planes that remove some reflections. Those reflections are predicted but absent.
-# - `indexed_fraction_low`: some usable lines sit at no reflection of this lattice. Most are weak false lines the picker found near strong peaks. The line near 36° is two reflections 0.05° apart, fitted as one line between them.
+# The verdict depends on every search finishing.
+# An engine stopped by `budget_seconds` makes the row say [`search_incomplete`](https://rietx.org/docs/stable/reference/indexing.html#presets-budgets-and-the-three-states-of-a-system), and the verdict line then says NO CELL.
 #
-# The candidate's `INDEX_IMPURITY_LINES` warning comes from the indexer's own quick Le Bail fit, whose Rwp in the candidate's row is poor.
-# A poor fit leaves many peaks unmatched, so that count is not evidence of a second phase.
-# Our own Le Bail fit below settles it.
+# That fit leaves no observed peak unmatched, so the row raises no [`INDEX_IMPURITY_LINES`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-impurity-lines) warning and gives no sign of a second phase.
 #
-# `best_or_none()` returns a cell only when the gate passes.
-# Here it returns `None`.
+# [`best_or_none()`](https://rietx.org/docs/stable/reference/indexing.html#the-result-object) returns a cell only when the gate passes.
+# Here it returns the candidate.
 
 # %%
 print(indexing.best_or_none())
 
 # %% [markdown]
-# [`INDEX_ABSTAINED`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-abstained) says what the abstention means.
+# The candidate prints every field, its figures of merit included.
+# When no candidate reaches high confidence, `best_or_none()` returns `None` and the result carries [`INDEX_ABSTAINED`](https://rietx.org/docs/stable/reference/diagnostics-indexing.html#index-abstained).
 # [Indexing](https://rietx.org/docs/stable/theory/indexing.html#figures-of-merit-in-both-directions) explains the figures of merit behind the ranking.
 #
 # ## Check the candidate with Le Bail
 #
-# `structure_from_candidate` turns a candidate into a structure for Le Bail fitting.
+# [`structure_from_candidate`](https://rietx.org/docs/stable/reference/indexing-evidence.html#from-a-candidate-to-a-phase) turns a candidate into a structure for Le Bail fitting.
 # It uses the lattice's highest-symmetry space group, so the fit tests the lattice and nothing else.
 # We test the first candidate because it is the true cell.
 # With a real unknown, test each candidate whose caveats you cannot rule out.
@@ -177,12 +195,13 @@ structure = structure_from_candidate(candidate)
 structure.phases[0].space_group
 
 # %% [markdown]
-# As in notebook 01, start the background at the data's floor and run the plan twice.
+# As in notebook 01, start the background's constant term at the 5th percentile of the counts, and run the plan [twice](https://rietx.org/docs/stable/reference/refinement.html#le-bail-passes).
 
 # %%
 instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 instrument.background = rx.BackgroundChebyshev.with_terms(4)
-instrument.background.coefficients[0].value = float(np.percentile(data.intensity, 5))
+c0 = float(np.percentile(data.intensity, 5))
+instrument.background.coefficients[0].value = c0
 
 ref = rx.Refinement(structure, instrument)
 first = ref.fit(data, mode="lebail", plan="profile_only")
@@ -201,10 +220,11 @@ ref.checkout(best.node_id)
 best
 
 # %% [markdown]
-# `FLOOR_HIT` says the profile's Y term, the Lorentzian width that grows as tan θ, refined to its lower limit.
-# The pattern was made with no such term, so here the limit is the right answer.
+# The fit raises no diagnostic.
+# The profile's Y term, the Lorentzian width that grows as tan θ, refined to zero within its esd.
+# The pattern was made with no such term, so zero is the right answer.
 #
-# The table under the summary starts with the refined cell edges.
+# The table under the summary starts with the refined lattice parameters.
 # They match the CIF's cell, in the candidate's order of axes.
 # Now look at the fit.
 
@@ -215,7 +235,7 @@ best.plot()
 # The fit puts a reflection under every peak and leaves only small residuals, so the lattice is right.
 #
 # Some ticks stand over no peak, such as those near 11° and 15.5°.
-# They are reflections P m m m allows and aragonite's glide planes remove.
+# They are reflections `P m m m` allows and aragonite's glide planes remove.
 #
 # What this does not settle is the space group.
-# That is a question about which reflections are absent, and it comes after the cell is refined.
+# That is a question about [which reflections are absent](https://rietx.org/docs/stable/reference/indexing-evidence.html#the-extinction-symbol), and it comes after the cell is refined.

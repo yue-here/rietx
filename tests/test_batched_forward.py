@@ -41,7 +41,7 @@ import pytest
 from rietx import Instrument, PatternData, Refinement, RefinementPlan, Stage
 from rietx.model import compiled
 from rietx.model.compiled import SPELL_FORWARD
-from rietx.model.forward import CompiledModel, compile_model
+from rietx.model.forward import WINDOW_AREA_TOL, CompiledModel, compile_model
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
 from rietx.schemas.structure import Atom, Cell, Phase, Structure
@@ -195,12 +195,20 @@ def test_a_fit_on_fcj_data_lands_on_the_same_parameters_and_esds():
     Both fits see identical data; only the forward differs.  Values and esds
     must agree far inside the esds themselves — the ulp is allowed to move the
     solver's path, never its answer.
+
+    The esd bar reads where each fit stopped, so it declares the setting it
+    was measured at (WP-1120): the pattern drawn at, and fitted on, the
+    declared stages' windows, with no closing stage.  There the esds agree to
+    1.1e-7.  Under the default plan the two closing stages stop 3e-5 esd
+    apart and their esds differ by 1.5e-6, from 4e-7 before the closing
+    stage took the closing FCJ rule (WP-2002, macOS arm64).
     """
     structure, ins = _toy_structure(), _instrument(axial=True)
     grid = np.arange(10.0, 90.0, 0.02)
     blank = PatternData(two_theta=grid.tolist(),
                         intensity=np.zeros_like(grid).tolist())
-    model = compile_model(structure, ins, blank, mode="rietveld")
+    model = compile_model(structure, ins, blank, mode="rietveld",
+                          window_area_tol=WINDOW_AREA_TOL)
     table = ParameterTable(structure, ins)
     y = np.asarray(model.evaluate(table.decode(table.x0())), dtype=np.float64)
     assert _has_fcj(model) and y.max() > 0.0
@@ -213,7 +221,7 @@ def test_a_fit_on_fcj_data_lands_on_the_same_parameters_and_esds():
               max_iter=30),
         Stage("cell", ["phases.*.scale", "instrument.background.*",
                        "phases.*.cell.*"], max_iter=30),
-    ])
+    ], closing_window_tol=None)
 
     def _fit():
         return Refinement(structure.model_copy(deep=True),

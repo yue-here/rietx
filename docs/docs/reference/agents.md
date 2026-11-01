@@ -5,6 +5,7 @@ An agent that drives rietx reads the rietx skill, a protocol and a set of refere
 The protocol says what to free in what order, what to check before believing a number, and which numbers may be quoted.
 An agent reads it whole before its first fit.
 The reference files are lookups it loads when a task needs one, such as the API index, the diagnostic codes or a series of patterns.
+[Calling rietx from a program](programs.md) gives the Python surface the skill drives: the exceptions, the answer types, an answer's JSON form and `capabilities()`.
 
 ## Installing the skill
 

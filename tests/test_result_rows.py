@@ -237,3 +237,99 @@ def test_a_widely_bounded_scale_is_clean_on_a_real_fit():
     assert scale.at_bound is False
     assert 1e-6 < scale.value < 1e6, scale.value
     assert "phases.0.scale" not in _bound_hit_paths(result)
+
+
+# ----------------------------------------- the esd other programs print (B4) --
+def _without_the_factor(monkeypatch) -> None:
+    """Switch the Bérar-Lelann factor off where the covariance applies it.
+
+    ``covariance_estimates`` imports it from ``optimize.statistics`` at call
+    time, so a fit run under this reports χ²_red·(JᵀJ)⁻¹ esds, the ones
+    GSAS-II prints.  Nothing the solver steps on reads the factor, so the
+    values do not move, and each test checks that before comparing esds.
+    """
+    from rietx.optimize import statistics
+
+    monkeypatch.setattr(statistics, "berar_lelann_factor", lambda delta: 1.0)
+
+
+def _assert_uncorrected_is_the_plain_esd(result, plain) -> float:
+    """Every row's ``stderr_uncorrected`` is the esd a fit without the factor
+    reports, and one fit's rows share one factor.  Returns that factor."""
+    assert [p.path for p in plain.parameters] == [p.path for p in result.parameters]
+    assert [p.value for p in plain.parameters] == [p.value for p in result.parameters]
+    ratios = []
+    for row, bare in zip(result.parameters, plain.parameters, strict=True):
+        if row.stderr is None:
+            assert row.stderr_uncorrected is None, row.path
+            continue
+        assert row.stderr_uncorrected == pytest.approx(
+            bare.stderr, rel=1e-12, abs=0.0), row.path
+        if row.stderr_uncorrected > 0.0:
+            ratios.append(row.stderr / row.stderr_uncorrected)
+    assert ratios
+    assert max(ratios) / min(ratios) - 1.0 < 1e-12
+    return ratios[0]
+
+
+def test_the_uncorrected_esd_is_the_one_a_fit_without_the_factor_reports(
+        lebail, monkeypatch):
+    """``stderr_uncorrected`` is ``stderr`` without the Bérar-Lelann factor
+    (WP-2002, B4), checked against a fit with the factor switched off.
+
+    The factor divided out is the solve's own, measured on its last
+    residual.  ``Statistics.esd_inflation`` is re-measured at the result's
+    compile, and on this Le Bail fit the two differed by 0.75 % (measured
+    2026-10-20), so dividing by the statistic would miss the 1e-12 bar here.
+    """
+    _, _, result = lebail
+    _without_the_factor(monkeypatch)
+    data, structure, instrument = _nac()
+    plain = rx.Refinement(structure, instrument).fit(
+        data, mode="lebail", two_theta_limits=LIMITS)
+    factor = _assert_uncorrected_is_the_plain_esd(result, plain)
+    # NAC's residuals are strongly correlated: the factor is far from 1.13
+    assert factor > 2.0
+    assert factor == pytest.approx(result.statistics.esd_inflation, rel=0.02)
+
+
+def test_a_result_without_esds_has_no_uncorrected_esd(lebail):
+    """``None`` wherever ``stderr`` is: on every row of an evaluate-only
+    ``replay``, and on a hand-built row."""
+    data, ref, result = lebail
+    replayed = rx.replay(ref.history, result.node_id, data)
+    assert all(p.stderr is None and p.stderr_uncorrected is None
+               for p in replayed.parameters)
+    assert RefinedParameter(path="phases.0.scale", value=1.0,
+                            stderr=0.1).stderr_uncorrected is None
+
+
+def test_a_joint_fit_divides_by_the_factor_of_its_weighted_residual(monkeypatch):
+    """The joint writer (``MultiHistogramRefinement._parameters``), shared
+    and per-histogram rows alike.
+
+    Weighted 1:4, the joint solve's factor reads the weighted residual and
+    ``Statistics.esd_inflation`` the unweighted one: 1.173 against 1.129
+    (measured 2026-10-20), so this fixture separates the two divisors.
+    """
+    from rietx import MultiHistogramRefinement
+    from tests.test_multi_histogram import perturbed_inputs, synthesize
+
+    patterns = [
+        synthesize(0.41390, 3.0, 24.0, scale=5e-4, zero=0.006,
+                   bkg=[40.0, -6.0, 1.5], seed=1),
+        synthesize(0.71070, 6.0, 46.0, scale=9e-4, zero=-0.010,
+                   bkg=[70.0, 5.0, -2.0], seed=2),
+    ]
+
+    def joint():
+        structure, instruments = perturbed_inputs()
+        return MultiHistogramRefinement(structure, instruments).fit(
+            patterns, plan="mccusker_default", weights=[1.0, 4.0])
+
+    result = joint()
+    assert result.status == "converged"
+    assert any(p.path.startswith("hist.") and p.stderr is not None
+               for p in result.parameters)
+    _without_the_factor(monkeypatch)
+    _assert_uncorrected_is_the_plain_esd(result, joint())

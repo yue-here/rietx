@@ -41,14 +41,14 @@ This fit refines the GSAS-II tutorial fluorapatite pattern twice under one plan,
 
 <!-- output of examples/guides/tie.py -->
 ```text
-35 0.0893
-  phases.0.atoms.4.biso  0.264 ± 0.149
-  phases.0.atoms.5.biso  0.467 ± 0.158
-  phases.0.atoms.6.biso  0.385 ± 0.113
-33 0.0894
-  phases.0.atoms.4.biso  0.377 ± 0.078
-  phases.0.atoms.5.biso  0.377 ± 0.078
-  phases.0.atoms.6.biso  0.377 ± 0.078
+35 0.0898
+  phases.0.atoms.4.biso  0.242 ± 0.150
+  phases.0.atoms.5.biso  0.467 ± 0.160
+  phases.0.atoms.6.biso  0.363 ± 0.114
+33 0.0898
+  phases.0.atoms.4.biso  0.360 ± 0.079
+  phases.0.atoms.5.biso  0.360 ± 0.079
+  phases.0.atoms.6.biso  0.360 ± 0.079
 ```
 
 For each pair of free values, divide their difference by their combined esd, the square root of the sum of the two squared esds.
@@ -56,14 +56,14 @@ The script prints the three ratios:
 
 <!-- output of examples/guides/tie.py -->
 ```text
-pair gaps: 0.94, 0.65, 0.42
+pair gaps: 1.02, 0.64, 0.53
 ```
 
 All three are under 2, so the free fit does not contradict the claim that the three oxygens share one displacement parameter.
 Where a ratio is larger, the atoms are probably not in the same environment, and a tie would replace a measurement with an assumption.
 
-The tie gives one Biso with an esd of 0.078 Å², smaller than any of the three free esds.
-Rwp moved in its fourth figure, which says only that the tie does not make the fit worse.
+The tie gives one Biso with an esd of 0.079 Å², smaller than any of the three free esds.
+Rwp is the same to four figures, which says only that the tie does not make the fit worse.
 The full script is `examples/guides/tie.py`.
 
 ## Tie with a scale and an offset
@@ -80,7 +80,7 @@ ref.tie("phases.0.atoms.1.occ", "phases.0.atoms.0.occ", scale=-1.0, offset=1.0)
 The dependent takes its new value at once, and every later fit keeps the relation.
 
 The dependent's own limits carry over to its source, and you don't have to work them out.
-If each occupancy is limited to between 0 and 1.5, then `occ₁ = 1 − occ₀` keeps `occ₀` between 0 and 1, and the fit uses that range for `occ₀`.
+Each occupancy has a lower limit of 0, so `occ₁ = 1 − occ₀` keeps `occ₀` between 0 and 1, and the fit uses that range for `occ₀`.
 When a fit stops at such a limit, it reports [`BOUND_HIT`](../reference/diagnostics-refinement.md#bound_hit) on the source.
 Widen the dependent's limit if the source needs more room.
 

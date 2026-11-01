@@ -257,6 +257,43 @@ def test_the_spglib_fallbacks_survive_a_process_that_imported_spgrep():
     assert done.stdout.strip().endswith("OK")
 
 
+#: A candidate whose cell esd is NaN reached ``bravais_screen`` from the
+#: consensus on a synthetic hR pattern with three impurity lines, and the floor
+#: ``max(esd, 1e-6)`` let the NaN through, since ``max(nan, x)`` is nan.
+#: spglib 2.8 answers ``symprec=nan`` with a segmentation fault, so the probe
+#: runs in its own process: a regression fails this test instead of killing the
+#: worker that runs it.
+_NAN_ESD_PROBE = """
+import numpy as np
+from rietx.indexing.consensus import bravais_opinion
+from rietx.indexing.reduce import bravais_screen
+
+cell = (4.0, 4.0, 4.0, 90.0, 90.0, 90.0)
+for esd in (np.array([np.nan, 1e-3, 1e-3, 0.0, 0.0, 0.0]), float("inf")):
+    try:
+        bravais_screen(cell, cell_esd=esd)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(f"no refusal for cell_esd={esd!r}")
+    assert bravais_opinion(cell, "P", cell_esd=esd) is None
+print("OK")
+"""
+
+
+def test_a_non_finite_cell_esd_is_refused_before_spglib():
+    """A NaN or infinite esd is refused before it becomes spglib's ``symprec``.
+
+    ``bravais_opinion`` already declines a screen that raises, so the refusal
+    turns a crash of the whole indexing run into a candidate with no Bravais
+    opinion.
+    """
+    done = subprocess.run([sys.executable, "-c", _NAN_ESD_PROBE],
+                          capture_output=True, text=True, timeout=300)
+    assert done.returncode == 0, (done.returncode, done.stderr[-2000:])
+    assert done.stdout.strip().endswith("OK")
+
+
 # ----------------------------------------------------------------------
 # Dedup
 # ----------------------------------------------------------------------
@@ -266,6 +303,38 @@ def test_same_lattice_sees_through_a_setting_change():
     equal, chi2 = same_lattice(af_from_cell(cell), af_from_cell(other))
     assert equal
     assert np.isnan(chi2)          # the covariance-free fallback ran
+
+
+def test_symmetry_zero_components_at_rounding_level_do_not_split_a_lattice():
+    """A monoclinic reduced D, E is zero; M·G·Mᵀ returns it as ~1e-18 noise of
+    either sign (WP-2035), which a purely relative test calls a difference —
+    the two settings of one prior lattice then dedup apart on some platforms
+    (CI, Linux, py3.11 and 3.14: ``test_two_settings_of_one_prior_lattice``)."""
+    red = np.array([1.9720631506620304e-02, 1.2753091867002138e-02,
+                    3.7144002961060477e-03, -9.0e-19, -1.12e-18,
+                    2.1241323203985479e-03])
+    noisy = red.copy()
+    noisy[3], noisy[4] = 4e-19, 2e-19
+    assert equal_reduced(red, noisy)[0]
+    # a real difference in the same slots still separates
+    real = red.copy()
+    real[3] = 1e-4
+    assert not equal_reduced(red, real)[0]
+
+
+def test_boundary_path_floors_symmetry_zero_noise_like_the_as_given_path():
+    """`_equal_across_boundaries` compares a monoclinic image's D, F against
+    each other too: noise of either sign at rounding level, with no floor,
+    splits the pair there as it did in `_equal_as_given` (WP-2035, Yue's
+    round 2 on #1136)."""
+    from rietx.indexing.reduce import _equal_across_boundaries
+    red = np.array(reduced_af(af_from_cell((6.0, 9.0, 5.5, 90.0, 91.0, 90.0))))
+    a, b = red.copy(), red.copy()
+    a[[3, 5]] = [3.0e-17, 1.1e-19]
+    b[[3, 5]] = [-4.0e-17, 7.4e-17 / 3]
+    assert _equal_across_boundaries(a, b, None, None) is not None
+    b[3] = 1e-4                      # a real difference in the slot still separates
+    assert _equal_across_boundaries(a, b, None, None) is None
 
 
 def test_same_lattice_separates_genuinely_different_cells():
@@ -347,19 +416,31 @@ def test_the_map_needs_no_sign_the_reduction_chose(cell):
 @given(lengths, lengths, lengths, angles, angles, angles)
 @example(3.0, 11.0, 14.197202585325392, 65.0, 65.0, 65.0)           # #797
 @example(3.4481, 3.4481, 7.9668, 90.0, 89.9999997, 90.0)
+@example(3.2, 16.0, 23.602486327493914, 81.0, 66.0, 65.0)           # WP-2035
+@example(3.0, 4.0, 5.0, 89.99999, 70.0, 80.0)                       # WP-2035
 def test_the_reduced_cell_is_the_exact_image_of_its_input(centring, a, b, c,
                                                           al, be, ga):
     """WP-1923: M·G·Mᵀ of the input under the recorded change of basis *is*
     the reduced metric, and it is gemmi's reduced vector to within the
     reduction's own ε.  Not ``is_niggli``: that predicate tests signs without
-    ε, and it fails gemmi's own output on fp ties (``ReducedCell``'s note)."""
+    ε, and it fails gemmi's own output on fp ties (``ReducedCell``'s note).
+
+    WP-2035's cell (found by WP-1930) left gemmi's vector with every sign
+    agreeing and ξ 2|η| off the image, G₂₃ at 1.1e-7 of max|G| on F and
+    5.4e-8 on C, so a check of the signs alone kept it.  The primitive cell
+    one angle 1e-5° from a right angle does the same through ξ (2.9e-7 on
+    P): hypothesis's angles almost never land within ε of 90°."""
+    cell = (a, b, c, al, be, ga)
+    assume(_valid(cell))
+    _assert_exact_image(cell, centring)
+
+
+def _assert_exact_image(cell, centring):
     import gemmi
 
     from rietx.crystallography.lattice import direct_metric_tensor
     from rietx.indexing.reduce import NIGGLI_EPS_RELATIVE, _basis_change
 
-    cell = (a, b, c, al, be, ga)
-    assume(_valid(cell))
     r = reduce_cell(cell, centring)
     m = _basis_change(r.change_of_basis)
     image = m @ np.asarray(direct_metric_tensor(*cell)) @ m.T
@@ -374,6 +455,32 @@ def test_the_reduced_cell_is_the_exact_image_of_its_input(centring, a, b, c,
     theirs = np.array([[A, zeta / 2, eta / 2], [zeta / 2, B, xi / 2],
                        [eta / 2, xi / 2, C]])
     assert np.max(np.abs(got - theirs)) <= eps
+
+
+_NEAR_RIGHT = st.one_of(
+    st.just((0.0, 1.0)),                     # exactly 90°: the metric's zero entries
+    st.tuples(st.floats(min_value=1e-7, max_value=1e-5),
+              st.sampled_from([-1.0, 1.0])))
+
+
+@pytest.mark.parametrize("centring", ["P", "C", "I", "F", "R"])
+@settings(max_examples=40, deadline=None,
+          suppress_health_check=[HealthCheck.filter_too_much])
+@given(lengths, lengths, lengths, angles, angles, angles,
+       st.integers(0, 2), _NEAR_RIGHT)
+@example(3.0, 4.0, 5.0, 90.0, 100.0, 90.0, 0, (0.0, 1.0))   # monoclinic: two exact 90°
+def test_the_exact_image_holds_with_one_angle_within_epsilon_of_90(
+        centring, a, b, c, al, be, ga, which, offset):
+    """WP-2035's sweep: one angle 1e-7–1e-5° either side of 90° (or exactly
+    90°, where a metric zero carries rounding noise of either sign) puts a
+    Niggli parameter within the reduction's ε of zero, where gemmi's
+    ``normalize`` and Křivý–Gruber steps disagree on a sign.  On ``main``'s
+    sign-gated path about 30 % of such P cells left the exact image."""
+    angs = [al, be, ga]
+    angs[which] = 90.0 + offset[1] * offset[0]
+    cell = (a, b, c, *angs)
+    assume(_valid(cell))
+    _assert_exact_image(cell, centring)
 
 
 _SETTING_STEPS = st.sampled_from([(1, 0, 0, 1), (1, 0, 1, 1), (1, 0, -2, 1),
@@ -825,10 +932,23 @@ def test_a_monoclinic_truths_phantom_supercells_are_never_supported():
             verdicts[verdict] += 1
             assert verdict != "supported", (name, child, ev.n_seen, ev.n_extra)
             if verdict == "undecided":
-                # power runs out only where chance fills most windows, and
-                # only for the smallest supercells, which add the fewest extras
-                assert ev.p0 > 0.5 and index == 2, (name, child, ev.p0)
-    assert verdicts["refuted"] >= 0.95 * sum(verdicts.values()), verdicts
+                # two ways in (thresholds 1.12, three bands): power runs out
+                # where chance fills most windows, only for the smallest
+                # supercells, which add the fewest extras; or the extras are
+                # seen above chance but not significantly, which a two-band
+                # rule called refuted and a non-significant test cannot
+                if ev.p_floor >= 0.01:
+                    assert ev.p0 > 0.5 and index == 2, (name, child, ev.p0)
+                else:
+                    assert ev.n_seen > ev.n_extra * ev.p0 and ev.p_value >= 0.01, \
+                        (name, child, ev.n_seen, ev.n_extra, ev.p0)
+    # these four sets x 55 cells, under the three bands (thresholds 1.12), measured
+    # 2026-10-14: 142 refuted, 78 undecided, 0 supported (Aa 21/34, Ba 40/15, E 46/9,
+    # F 35/20 refuted/undecided).  The two-band rule's 544 of 550 was all ten sets.
+    # The bar sits two under the count, so a fall toward half (110) is caught.
+    assert verdicts["refuted"] >= 140, verdicts
+    assert sum(verdicts.values()) == 220
+    assert verdicts["supported"] == 0
 
 
 def test_a_true_superstructures_extras_are_present():
@@ -915,7 +1035,13 @@ def test_the_uncancellable_extras_answer_without_the_class():
     assert by_default.n_seen == by_class.n_seen == 9
     assert all(h and k for h, k, _l in by_default.extra_hkl)   # off every zone
     assert by_default.verdict() == "supported"
-    assert by_lattice.verdict() == "refuted"
+    # asked of the whole lattice the true cell is not supported: it read
+    # *refuted* under the two-band rule and reads *undecided* under 1.12's
+    # three (its 9 seen of the lattice's extras sit above chance, not
+    # significantly), which is the right reading of a truth asked the wrong
+    # question
+    assert by_lattice.verdict() != "supported"
+    assert by_lattice.n_seen > by_lattice.n_extra * by_lattice.p0
 
 
 @pytest.mark.parametrize("cell, centring, index", [

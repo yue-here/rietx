@@ -1,6 +1,6 @@
 # WP-1343 — the magnetic peaks are broader, and the moment pays for it
 
-Milestone: magnetic · Status: 🔄 2026-10-15 — 9 of 12 tasks done; PR #943 merged (acceptance 4's synthetic k ≠ 0 fallback); open: a synthetic k = 0 no-esd case with its PNGs, and the width diagnostic's self-inflated noise
+Milestone: magnetic · Status: 🔄 2026-10-25 — 12 of 12 tasks done; PR #1111 merged (the synthetic k = 0 case, a wide esd and the path named); open: the maintainer's choice of fix for `MAGNETIC_WIDTH_UNMODELLED`'s silence where every magnetic reflection is also nuclear (a strict xfail holds the case)
 Depends on: 1327 (the moment, the magnetic |F_⊥|², the shared scale);
 1326 soft (the satellites that make the term identifiable)
 Priority: P2 2026-10-05 — was P3: `STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT` fires on a warm refit under `fit` (#729), a flag firing wrongly whose workaround is `run_stage`
@@ -315,6 +315,46 @@ the cheaper of the two at the time; the skill row is required either way.
   model, and the acceptance should say so. Asked of them: build the child
   from a published structure and name it in the test.
 
+- **2026-10-26 issue triage (#1082's reproduction): `MAGNETIC_WIDTH_UNMODELLED`
+  fires on a moment no stage refined.** Checked against the tree at c0e32ab29:
+  on #1081's synthetic k = (0,0,½) child, simulated with no magnetic
+  broadening, a moment held 20 % high (3.6 against 3.0 μ_B) under
+  `mccusker_default` and `mccusker_structural` makes the magnetic peaks too
+  tall at their centres, and the diagnostic reads it as the width signature:
+  "fitted by peaks that are too narrow, so the refined moment is biased low".
+  The moment was not refined and is biased high. The centre-versus-tails test
+  assumes the moment was free; where it was held, the same residual shape is
+  the moment's error. #1089's reporter measured the same while writing #1087:
+  with the moment held 10-20 % high it fires on 7 of 8 sharp arms.
+
+- **2026-10-26 issue triage: #1089, when the magnetic width is freed; the
+  reporter's final answer keeps the tree's behaviour and changes one text.**
+  Checked against the tree at c0e32ab29: no default plan frees
+  `magnetic_lor_*` (only `plan="magnetic_width"` does) and nothing consults
+  `MAGNETIC_WIDTH_UNMODELLED`. The reporter measured three real families
+  (Ba₂FeSbSe₅ G4.1, Cr₂WO₆ HB-2A, LaMnO₃ BT-1): the trigger is silent on all six
+  patterns before and after #1087; on Ba₂FeSbSe₅ freeing the width moved the
+  moment by about 3 esd while ΔBIC was weak or against, and after tying the
+  child Biso and refitting the background (#1073) the width is rejected at every
+  temperature (ΔBIC −5.8 to −9.0 at N/f²). The moved moment came from Lorentzian
+  tails the 9.35° line does not have; the line's misfit is a low-angle centroid
+  shift, now WP-2056's (#1090). Their revised ask: no default frees the width,
+  no default reads the trigger, and the three texts that say to quote the
+  freed-width moment change (`help.py:3026-3034`,
+  `report/magnetic.py:637-640`, `references/magnetic.md:60`). The issue's
+  first-pass trigger-first rule is withdrawn by its author. Also measured: the
+  trigger fires on a moment held too large (the reporter's 7 of 8 sharp arms at
+  10-20 % high; this round's #1082 reproduction at 20 % high under
+  `mccusker_default`, "biased low" on data with no magnetic broadening), so it is
+  read only after a stage that freed the moment. The four width codes are
+  `unaudited` (`_audit.py:720-722`); the reporter's proposed tiers (the ΔBIC
+  test tier 2 statistic, tier 3 action; width after moment tier 2, from
+  FullProf's manual order and Rodríguez-Carvajal 1993) go to whichever of this
+  WP and WP-2004 tiers `report/magnetic.py` first. Question B (cell free in the
+  moment stages): no change to `SOLVE_STAGE_PATHS`, since freeing the cell there
+  moved no moment by more than 0.1 esd on three families, a ramp and two
+  above-T_N starts.
+
 ## Non-goals
 
 - **Neutron TOF**, and with it the whole POWGEN/Mn₃O₄ case the issue leads
@@ -351,7 +391,7 @@ the cheaper of the two at the time; the skill row is required either way.
       size term (λ¹, as `lor_size`), or the joint fit shares a coefficient
       that is not one number across wavelengths (WP-1131's invariant), with
       the two-histogram test that catches it.
-- [ ] Identifiability: the unmeasured path named rather than quoted, on all
+- [x] Identifiability: the unmeasured path named rather than quoted, on all
       three regimes above; a synthetic k = 0 case asserted to come back with
       no esd rather than a small one.
 - [x] `MAGNETIC_WIDTH_UNMODELLED`: the differential centre-versus-tails
@@ -369,9 +409,9 @@ the cheaper of the two at the time; the skill row is required either way.
 - [x] Skill: rows in the magnetic `references/` file 1327 opens — the
       turn-on order, what the diagnostic means, and when the width is not
       measurable. Paid for by a named cut if the body moves at all.
-- [ ] Tests + obs/calc/diff PNGs to `tests/output/`, magnetic-only
+- [x] Tests + obs/calc/diff PNGs to `tests/output/`, magnetic-only
       reflections zoomed.
-- [ ] `MAGNETIC_WIDTH_UNMODELLED` divides its statistic by a pooled scatter
+- [x] `MAGNETIC_WIDTH_UNMODELLED` divides its statistic by a pooled scatter
       that the misfit itself inflates, so its evidence shrinks as the problem
       grows. *Decided 2026-10-15 (from PR #943): a task here, with no change
       in #943.* On #943's synthetic CrSBr (k = (0, 0, ½), 5 000 counts on the
@@ -452,6 +492,70 @@ the cheaper of the two at the time; the skill row is required either way.
 
 ## Handover log
 
+- **2026-10-25** — PR #1111 (outside contributor) merged as `942f8db4`. It
+  adds `tests/test_magnetic_width_k_zero.py` and lands the last two Tasks rows:
+  the identifiability row and the k = 0 half of the Tests + PNGs row. The k = 0
+  case is CrSBr's ferromagnet along c (BNS 59.409, on the parent cell), on
+  #943's specimen, instrument and counts. Along c, no reflection carrying at
+  least 0.1 % of the strongest magnetic line is over 95 % magnetic, so it is
+  the WP's second regime. The b-axis child is not, because its (0 0 1) is 97 %
+  magnetic, and MnF₂ is the first regime. The identifiability row is met in
+  #524's accepted form: a wide esd that covers the truth, with the path named,
+  never a small esd. On the test draw the width came back 0.2030 ± 0.0729°
+  against 0.1969 ± 0.0046° at k = ½, 15.8× wider. Over 30 scratch draws the
+  esd was 0.062-0.081° and the pulls had s.d. 0.67. Each of five arms names
+  exactly the widths under 3σ, both ways. New PNGs `crsbr_k000_{free,held}`
+  with (1 0 1) and (0 2 1) zooms, since this regime has no magnetic-only line.
+  *What the merge does not do*: it fixes nothing in the source. It records one
+  defect as a strict xfail, `test_k0_held_the_report_names_the_missing_width`.
+  With the width held at zero the k = 0 moment comes back 28.5 % low on the
+  test draw (25 % mean, at least 8.1 esd over 30 draws), and
+  `MAGNETIC_WIDTH_UNMODELLED` fires on 0 of 30. Its statistic differences
+  magnetic-only against nuclear-only reflections, and this regime has no
+  magnetic-only reflection. `_classified_reflections` keeps a row on
+  `f_mag > 0.0`, so its magnetic-only set is five rows extinct to rounding
+  (f_mag ~1e-30) and (1 1 2) at 0.03 % of the strongest line. Nothing in the
+  report says the check could not be made. The PR ranks three fixes: report
+  that the check had nothing to read; floor the classifier relative to the
+  strongest magnetic line (a precondition, silent on its own); or a regime-2
+  statistic on the most magnetic mixed reflections (new design). Which fix,
+  if any, is the maintainer's call, asked on 2026-10-25.
+  *Gate*: stacked with #1073 on tree `1923c693` (main `f9a983d7` + both PRs;
+  macOS arm64, Python 3.12.10, `[dev,jax]`, nothing else running): the whole
+  suite, slow tests included, 12 255 passed, 206 skipped, 43 xfailed in
+  35 min. Main after the last merge (`4cfd4598`) is content-identical to that
+  tree.
+  *Cross-reference*: #1073, merged in the same stack, vendors the real
+  Ba₂FeSbSe₅ G4.1 ramp, which acceptance 4 names as the better k ≠ 0 row. Its
+  description reports that freeing both magnetic widths there costs BIC at 1.5,
+  20, 40 and 50 K (ΔBIC −5.8 to −9.0), with the Biso tied per parent site. Its
+  test does not free the widths. *Next*: the choice among the three fixes, then
+  a Tasks row for it.
+- **2026-10-21** — PR #1087 (outside contributor) merged as `f0c7285b`. It
+  lands the last Tasks row. `MAGNETIC_WIDTH_UNMODELLED` now divides its
+  statistic by the weighted residual's s.d. over the nuclear-only channels it
+  read, where it used the s.d. over the magnetic-only channels too. The
+  docstring grounds this in the F test's rule (Hamilton 1965, eq. 20): the
+  error variance comes from residuals the tested effect does not enter. On
+  #943's CrSBr arm (seed 1343) the scatter is 0.99 against 2.57 before, and
+  z reads 7.76 against 2.99 (6.9-8.2 on seeds 1343 and 1346-1352, the
+  contributor's measurement). The A2 arm is an ordinary pass, and the 4x arm
+  reads 17.0. `THRESHOLDS_VERSION` moves 1.12 → 1.13, because z's meaning
+  changed although no number did. A new planted-residual test pins z as linear
+  in the planted misfit with the noise unchanged.
+  The review established one thing the
+  merge does not do: a non-width misfit on the magnetic channels no longer
+  damps z through the noise, so the false-fire guard is now only the
+  differencing against the nuclear-only split. The tests that the nuclear-only
+  control and the C1 sharp-width arm stay silent still pass. Gated on the merged tree
+  `51b94dae` (main `37d087a5` + the PR; macOS arm64, `[dev,jax]`, nothing
+  else running): fast suite 11 053 passed, 120 skipped, 2 xfailed; whole
+  `-m slow` 323 passed, 12 skipped, 1 xfailed; main after the merge is
+  content-identical to that tree. Two follow-ups left on the PR: the skill
+  row in `references/magnetic.md` still says "its own noise", and no
+  release note says the diagnostic now fires where it was silent. *Next:* the
+  Tests row's synthetic k = 0 no-esd case with its PNGs, and the
+  identifiability row.
 - **2026-10-15** — PR #943 (outside contributor) merged as `2e5b5eb8`.
   It adds `tests/test_magnetic_width_k_half.py`, acceptance 4's synthetic
   fallback: CrSBr at k = (0, 0, ½), from a published structure, with a

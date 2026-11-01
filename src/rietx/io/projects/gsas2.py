@@ -86,6 +86,7 @@ from typing import Any
 
 import numpy as np
 
+from ...crystallography.twins import merge_site_twins
 from ...model.profiles.caglioti import GAUSSIAN_VARIANCE_TO_FWHM_SQUARED
 from ...schemas.common import Diagnostic
 from .coverage import Stance
@@ -1815,7 +1816,7 @@ def to_structure(model: Gsas2Model, *, phase: str | int | None = None,
                 x=rx.Parameter(value=site["xyz"][0], vary=site["vary_xyz"]),
                 y=rx.Parameter(value=site["xyz"][1], vary=site["vary_xyz"]),
                 z=rx.Parameter(value=site["xyz"][2], vary=site["vary_xyz"]),
-                occ=rx.Parameter(value=site["occupancy"], min=0.0, max=1.5,
+                occ=rx.Parameter(value=site["occupancy"], min=0.0,
                                  vary=site["vary_occupancy"]),
                 biso=rx.Parameter(value=site["biso"], vary=site["vary_biso"]))
                 for site in sites],
@@ -1830,6 +1831,10 @@ def to_structure(model: Gsas2Model, *, phase: str | int | None = None,
             f"schema refuses ({exc}).  The file's own numbers are on "
             f"`model.phases`") from exc
 
+    # a site whose own images coincide is one atom on its special position
+    # (#1007), said here because this is the channel the schema lacks
+    structure = merge_site_twins(structure, diagnostics=diagnostics,
+                                 source=named)
     if diagnostics is not None:
         for raw, (canonical, wheres) in rewrites.items():
             choice = chosen.isotope.get(raw, _NATURAL)
@@ -1920,6 +1925,7 @@ def from_structure(structure, *,
 
     from ...crystallography.symmetry import (
         get_spacegroup,
+        refuse_distortion_modes,
         refuse_magnetic_phase,
         refuse_operation_list,
         refuse_propagation_vector,
@@ -1944,6 +1950,7 @@ def from_structure(structure, *,
                 "to a magCIF, whose magnetic loops GSAS-II's CIF import drops "
                 "without a warning (measured on GSAS-II 5.6.3)")
         refuse_operation_list(phase, "a GSAS-II phase CIF")
+        refuse_distortion_modes(phase, "a GSAS-II phase CIF")
         phase, restated = restate_in_hexagonal_axes(
             phase, "a GSAS-II phase CIF")
         if restated:

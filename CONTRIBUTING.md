@@ -59,7 +59,7 @@ fails before review reads it.
   bibliography entry is cited, and every displayed equation carries a
   source symbol that imports. A new public name fails the coverage
   partition until it is documented, excluded with a reason, or deferred.
-- The new manual (`docs/docs/`) is also read by Vale, in CI's lint job:
+- The manual (`docs/docs/`) is also read by Vale, in CI's lint job:
   British spelling, Microsoft's style guide as the base, and the house rules
   in `docs/vale/rietx/`. An error fails the job. Run it locally with
   `vale sync && vale docs/docs` (Vale 3.24, installed separately, e.g.
@@ -70,6 +70,42 @@ fails before review reads it.
   and executed by the suite. Never write a second copy of a walkthrough.
 - A new correction ships with a record field or a diagnostic stating what
   it changed — never an Rwp comparison as its evidence.
+
+## A heuristic needs its tier
+
+Every decision rietx makes on its own has a row in `src/rietx/_audit.py`,
+with a tier and the evidence for it. A new diagnostic code needs a row. So
+does a new field on a result record, a module-level number in a directory
+the table walks (`_audit.WALKED`), a default at a seat it declares
+(`_audit.DEFAULT_SEATS`), and a new `suggestion=` text.
+`tests/test_audit_table.py` fails until the row exists, and prints it with
+the tier and evidence left for you to fill in.
+
+The tiers are defined in `docs/milestones/generality.md` § The rule. Tier 1
+is physics or arithmetic. Tier 2 is established practice: a citation that
+validated it, or the same action taken by default in one of the seven
+programs the rule names (GSAS-II, FullProf, TOPAS, RIETAN-FP, BGMN, MAUD and
+EasyDiffraction). Tier 3 is rietx's own choice. `invariant` is an efficiency setting
+that cannot change an answer, and it names the test asserting its margin.
+`caller` is an action that runs only when the caller turns it on. A code,
+an action or a default also states its kind of ambiguity, from
+`docs/DESIGN.md` § Rules, 1.
+
+A name new to the table may not enter at `unaudited`. CI's lint job fails a
+pull request that adds one, and prints every row the pull request adds,
+changes or deletes. At review the `generality-review` agent drafts the case
+against each of those rows, and the case for any action the change removes
+or leaves to the caller. A tier-3 row, and a tier-2 automatic action, waits
+for the maintainer's dated ruling in its `approved` field. The maintainer
+may write that field into your branch.
+
+**Land the machinery first.** Machinery is what a caller operates: a model,
+a fit, a reported quantity. A heuristic is a choice rietx makes for the
+caller. A pull request that adds a tier-3 row waits on the maintainer's
+ruling, so a machinery pull request adds none. A number the machinery needs
+is physics or arithmetic (tier 1), established practice (tier 2), or a
+required argument on a verb no default path calls (`caller`). The tier-3
+default follows in its own pull request. Adopted 2026-10-30 from #1224.
 
 ## The agent skill
 
@@ -189,10 +225,12 @@ Two of those files are the maintainer's to write:
 
 Adding to the handover log of a WP whose work you did is welcome. That log
 is the record of what you measured and where you stopped, and it belongs in
-the same change as the code.
+the same change as the code. In the same file you may tick the tasks your PR
+completes, move its `Status:` line, and record the decisions your work made.
+Those stand as you wrote them. Closing the WP stays the maintainer's, in the
+handover after your PR merges.
 
-**Claiming one is welcome too, and is the one other edit to those files that
-is yours to make.** Before starting scheduled work, open a draft pull request
+**Claiming one is welcome too.** Before starting scheduled work, open a draft pull request
 that sets that WP's `Status:` line to `🔄 <date> — claimed by @you` and
 regenerates the index with `python3 .claude/hooks/wp_index.py`. It
 stops two people spending a week on the same work: nobody can see a claim that

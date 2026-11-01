@@ -292,6 +292,27 @@ def gaussian_fwhm(theta_deg: np.ndarray, u: float, v: float, w: float,
     return xp.sqrt(xp.maximum(g2, _MIN_GAMMA_G2))
 
 
+def lorentzian_negative_above(x_size: float, y_strain: float) -> float:
+    """The 2θ (degrees) above which Γ_L = X/cosθ + Y·tanθ is negative.
+
+    ``inf`` where it stays at or above zero below 2θ = 180°, and 0 where it is
+    negative from the start.  X < 0 with Y > 0 also returns 0, although the
+    width there is negative only *below* sinθ = −X/Y: a caller reads 0 as
+    "refuse", which is right for a width negative anywhere on the axis.
+    Γ_L·cosθ = X + Y·sinθ, and cosθ > 0 there, so
+    with Y < 0 the width crosses zero at sinθ = −X/Y (Thompson, Cox &
+    Hastings, 1987, J. Appl. Cryst. 20, 79, for the law).  For a reader
+    checking a stated (X, Y) against the range it will be fitted on, since
+    neither coefficient has to be non-negative on its own (WP-2002).
+    """
+    if y_strain >= 0.0:
+        return math.inf if x_size >= 0.0 else 0.0
+    if x_size <= 0.0:
+        return 0.0
+    s = -x_size / y_strain
+    return math.inf if s >= 1.0 else 2.0 * math.degrees(math.asin(s))
+
+
 def lorentzian_fwhm(theta_deg: np.ndarray, x_size: float, y_strain: float,
                     aniso_strain=0.0) -> np.ndarray:
     """Γ_L(θ) = x_size/cosθ + (y_strain + aniso_strain)·tanθ; θ in degrees.

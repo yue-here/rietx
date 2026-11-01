@@ -45,20 +45,20 @@ def pedestal_pattern() -> rx.PatternData:
 
 @pytest.mark.parametrize("kind", ["pspline", "chebyshev"])
 def test_the_default_still_starts_every_coefficient_at_zero(pedestal_pattern, kind):
-    bkg = rx.auto_background(pedestal_pattern, kind=kind)
+    bkg = rx.auto_background(pedestal_pattern, kind=kind).background
     assert all(c.value == 0.0 for c in bkg.coefficients)
 
 
 def test_a_seeded_pspline_starts_every_coefficient_at_the_percentile(pedestal_pattern):
     bkg = rx.auto_background(pedestal_pattern, seed=True,
-                             two_theta_limits=(10.0, 150.0))
+                             two_theta_limits=(10.0, 150.0)).background
     want = np.percentile(pedestal_pattern.intensity, AUTO_BACKGROUND_SEED_PERCENTILE)
     assert bkg.coefficients and all(c.value == pytest.approx(want)
                                     for c in bkg.coefficients)
 
 
 def test_a_seeded_chebyshev_seeds_only_its_constant_term(pedestal_pattern):
-    bkg = rx.auto_background(pedestal_pattern, kind="chebyshev", seed=True)
+    bkg = rx.auto_background(pedestal_pattern, kind="chebyshev", seed=True).background
     want = np.percentile(pedestal_pattern.intensity, AUTO_BACKGROUND_SEED_PERCENTILE)
     assert bkg.coefficients[0].value == pytest.approx(want)
     assert all(c.value == 0.0 for c in bkg.coefficients[1:])
@@ -66,7 +66,7 @@ def test_a_seeded_chebyshev_seeds_only_its_constant_term(pedestal_pattern):
 
 def test_the_seed_is_taken_over_the_fitted_range_only(pedestal_pattern):
     narrow = rx.auto_background(pedestal_pattern, seed=True,
-                                two_theta_limits=(100.0, 150.0))
+                                two_theta_limits=(100.0, 150.0)).background
     tt = np.asarray(pedestal_pattern.two_theta)
     y = np.asarray(pedestal_pattern.intensity)[(tt >= 100.0) & (tt <= 150.0)]
     assert narrow.coefficients[0].value == pytest.approx(
@@ -83,7 +83,7 @@ def test_a_seeded_start_gives_the_first_le_bail_pass_a_better_answer(pedestal_pa
     def first_pass(seed: bool):
         ins = _neutron()
         ins.background = rx.auto_background(
-            pedestal_pattern, two_theta_limits=(10.0, 150.0), seed=seed)
+            pedestal_pattern, two_theta_limits=(10.0, 150.0), seed=seed).background
         ref = rx.Refinement(rx.Structure(phases=[_phase(0.02)]), ins)
         result = ref.fit(pedestal_pattern, mode="lebail", plan="profile_only")
         return result.statistics.rwp

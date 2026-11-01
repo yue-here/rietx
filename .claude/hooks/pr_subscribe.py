@@ -179,7 +179,7 @@ def target(payload: dict) -> Optional[tuple[str, str, int]]:
 
 def main() -> int:
     try:
-        payload = json.load(sys.stdin)
+        payload = json.loads(sys.stdin.buffer.read())
         found = target(payload)
     except Exception as exc:  # fail open, visibly
         print(f"pr_subscribe hook failed open: {exc!r}", file=sys.stderr)

@@ -40,12 +40,13 @@ def _short_plan() -> RefinementPlan:
 def test_one_line_per_stage_boundary_and_the_numbers_match_the_events():
     events = []
     buf = io.StringIO()
+    plan = _short_plan()
     ref = rx.Refinement(make_lab6(), _instrument(), history=False)
-    ref.fit(synthesize(), plan=_short_plan(), progress=buf, events=events.append)
+    ref.fit(synthesize(), plan=plan, progress=buf, events=events.append)
 
     stage_ends = [e for e in events if e["kind"] == "stage_end"]
     lines = buf.getvalue().splitlines()
-    assert len(lines) == len(stage_ends) == 2
+    assert len(lines) == len(stage_ends) == len(plan.run_stages())
 
     stage_starts = {e["data"]["stage"]: e["t"] for e in events if e["kind"] == "stage_start"}
     for line, event in zip(lines, stage_ends, strict=True):
@@ -62,7 +63,7 @@ def test_progress_alone_needs_no_events_argument():
     buf = io.StringIO()
     ref = rx.Refinement(make_lab6(), _instrument(), history=False)
     ref.fit(synthesize(), plan=_short_plan(), progress=buf)
-    assert buf.getvalue().count("\n") == 2
+    assert buf.getvalue().count("\n") == len(_short_plan().run_stages())
 
 
 def test_progress_to_a_path_writes_and_is_closed(tmp_path):
@@ -70,7 +71,7 @@ def test_progress_to_a_path_writes_and_is_closed(tmp_path):
     ref = rx.Refinement(make_lab6(), _instrument(), history=False)
     ref.fit(synthesize(), plan=_short_plan(), progress=str(path))
     text = path.read_text(encoding="utf-8")
-    assert text.count("\n") == 2
+    assert text.count("\n") == len(_short_plan().run_stages())
     assert "stage scale_bkg" in text and "stage zero" in text
 
 
@@ -78,12 +79,12 @@ def test_a_series_line_carries_the_series_stamp_and_the_numbers_still_match():
     events = []
     buf = io.StringIO()
     patterns = [synthesize(noise_seed=1), synthesize(noise_seed=2)]
+    plan = RefinementPlan(stages=[
+        Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"], max_iter=5),
+    ])
     result = rx.refine_sequential(
         patterns, make_lab6(), _instrument(), labels=["250C", "300C"],
-        plan=RefinementPlan(stages=[
-            Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"], max_iter=5),
-        ]),
-        progress=buf, events=events.append)
+        plan=plan, progress=buf, events=events.append)
     assert result.entries  # the fit ran, not just the plumbing
 
     stage_ends = [e for e in events if e["kind"] == "stage_end"]
@@ -97,7 +98,8 @@ def test_a_series_line_carries_the_series_stamp_and_the_numbers_still_match():
         assert m["idx"] == str(data["series_index"] + 1)
         assert m["n"] == str(data["series_n"])
         assert m["label"] == data["series_label"]
-        assert m["label"] == ["250C", "300C"][i]
+        # each pattern's stages, the closing stage included, carry its label
+        assert m["label"] == ["250C", "300C"][i // len(plan.run_stages())]
         assert float(m["rwp"]) == round(data["rwp"], 4)
 
 

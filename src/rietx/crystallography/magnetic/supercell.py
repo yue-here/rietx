@@ -945,9 +945,9 @@ def _seed_moments(group: MagneticGroup, positions, ions, magnitude: float,
     tilted_seed` (WP-1418 stage (b)) rather than the whole magnitude on the
     allowed basis's first row alone: a rank ≥ 2 basis (a multi-copy irrep or a
     general/kernel direction) used to leave every other DOF starting at a
-    stationary point of χ², the same shape ``Stage.distortion_seed`` exists
-    to fix for a whole amplitude vector at A = 0 — see that function's
-    docstring.
+    stationary point of χ², the same shape ``displacive_statement``'s seed
+    (``representation.distortion.DISTORTION_SEED``) fixes for a whole
+    amplitude vector at A = 0 — see that function's docstring.
 
     cell is the **child** cell, and it is not optional: crystal-axis
     components are on unit vectors along the cell axes, so their modulus is
@@ -1183,7 +1183,9 @@ def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
     factor: every atom of the child cell is listed explicitly, so |F_N|² is the
     parent's to the last bit (``tests/test_magnetic_supercell.py``).
 
-    ``magnetic_species`` is the species (or atom labels) that carry a moment;
+    ``magnetic_species`` is the species (or atom labels) that carry a moment,
+    and it is required for a magnetic statement: left ``None`` the call is
+    refused (a displacive candidate carries no moment and needs none);
     ``ion`` the magnetic form-factor key, either one string for all of them or
     a mapping from species to key.  ``g`` is that ion's Landé factor, mirroring
     ``ion``'s shape — one float for every moment, or a mapping keyed by the
@@ -1195,7 +1197,13 @@ def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
     Every number in the returned phase is derived; nothing is copied from a
     published structure.  The parent's cell, coordinates, occupancies and
     displacement parameters come through unchanged, and the cell parameters are
-    the parent's carried through P.
+    the parent's carried through P.  The **scale** is the parent's divided by
+    |det P|²: the child cell holds the parent's atoms |det P| times, so every
+    parent reflection's F is |det P| times larger in it (the first control in
+    ``tests/test_magnetic_supercell.py``), and a scale carried unchanged would
+    restate a converged nuclear fit |det P|² times too strong.  Divided, the
+    restated phase with its moments at zero computes the parent's pattern, and
+    its weight fraction is unchanged, since Z·M·V grows by the same |det P|².
     """
     if (candidate is None) == (group is None):
         raise ValueError(
@@ -1216,6 +1224,21 @@ def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
             "operator list alone does not say which cell it is written in, and "
             "guessing would put the parent's atoms in the wrong cell with no "
             "sign that anything was wrong.")
+    if magnetic_species is None and getattr(candidate, "kind",
+                                            "magnetic") != "displacive":
+        # A magnetic group over a structure with no moment anywhere is not the
+        # statement any caller asked for, and nothing downstream says so: the
+        # phase compiles, its magnetic term is zero, and a fit has no moment
+        # to free.  The package cannot pick the magnetic species itself — the
+        # same element can be magnetic in one compound and not in another —
+        # so the call is refused here, where the missing argument is named.
+        # A displacive candidate carries no moment by design and is not refused.
+        raise ValueError(
+            "magnetic_supercell(): no magnetic_species was given, so no site "
+            "of the child phase would carry a moment and the magnetic group "
+            "would decorate a structure with none. Name the species or atom "
+            "labels that carry the moment and their form-factor ion, e.g. "
+            "magnetic_species='Fe', ion='Fe3+'.")
     if any(a.aniso is not None for a in parent.atoms):
         raise ValueError(
             "magnetic_supercell(): an anisotropic displacement block is "
@@ -1436,7 +1459,10 @@ def magnetic_supercell(parent: Phase, candidate=None, *, group=None,
             setting=None,
             propagation_vector_parent=(None if k is None
                                        else tuple(str(c) for c in k))),
-        scale=Parameter(value=parent.scale.value),
+        # |det P|² is |F_child / F_parent|² on every parent reflection (the
+        # docstring's scale sentence), so this is the parent's intensity scale
+        # restated, not a seed
+        scale=Parameter(value=parent.scale.value / len(cosets) ** 2),
         # the declaration, not a hold: the child's table derives which DOF
         # fixes the child group's origin (WP-1912)
         floating_origin=parent.floating_origin,

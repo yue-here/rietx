@@ -1,0 +1,16 @@
+{#- The brand at the header's left: the mark beside the wordmark, linked to the site's
+    home page, the landing page at `rietx_home` (WP-2021).  The top-left logo of a site's
+    subsite goes to the site's home; the way back to this manual's own front page is the
+    breadcrumb's first item, "Manual", on every page but that one (`breadcrumbs.html`).
+
+    The mark is inline SVG filled from `--accent`, never an `<img>`: an embedded SVG is
+    its own document, cannot see `html[data-theme]`, and so would follow the system theme
+    and ignore the toggle (the old manual's `sidebar/brand.html` had the measurement,
+    mask-image included).  Its shapes are a copy of the site's favicon,
+    `docs/landing/src/favicon.svg`, which `tests/test_manual.py` pins.
+
+    `rietx_name` is `_about.DIST_NAME`, handed over through `html_context`. -#}
+<a class="navbar-brand logo rietx-brand" href="{{ rietx_home }}" aria-label="{{ rietx_name }} home">
+  <svg class="rietx-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M2 26 C7 26 9 23 11.5 3.5 C14 23 16 26 21 26 Z"/><path d="M17 26 C20 26 21.5 24 23 13 C24.5 24 26 26 29 26 Z"/><rect x="1.5" y="25.5" width="29" height="3" rx="1.5"/></svg>
+  <p class="title logo__title rietx-wordmark">{{ rietx_name }}</p>
+</a>

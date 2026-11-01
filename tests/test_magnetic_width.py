@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -103,7 +104,7 @@ def _mnf2(*, size=0.0, strain=0.0, moment=(0.0, 0.0, 4.6), magnetic=True):
     return ph
 
 
-def _state(ph, *, moving=None, step=0.02, lo=8.0, hi=140.0):
+def _state(ph, *, moving=None, step=0.02, lo=8.0, hi=140.0, window_area_tol=None):
     st = rx.Structure(phases=[ph])
     ins = rx.Instrument.constant_wavelength_neutron(LAMBDA_CW)
     ins.profile.u.value, ins.profile.w.value = 0.05, 0.02
@@ -112,7 +113,8 @@ def _state(ph, *, moving=None, step=0.02, lo=8.0, hi=140.0):
     pat = rx.PatternData(two_theta=tt.tolist(),
                          intensity=np.ones_like(tt).tolist())
     model = compile_model(st, ins, pat, mode="rietveld",
-                          moving_paths=None if moving is None else set(moving))
+                          moving_paths=None if moving is None else set(moving),
+                          window_area_tol=window_area_tol)
     table = ParameterTable(st, ins)
     return model, table, table.decode(table.x0())
 
@@ -848,6 +850,62 @@ def test_the_diagnostic_fires_on_a_planted_width_and_not_without_one():
                 if d.code == "MAGNETIC_WIDTH_UNMODELLED"]
 
 
+def test_the_width_noise_is_the_nuclear_only_scatter(monkeypatch):
+    """The statistic's noise is the weighted residual's s.d. over the
+    nuclear-only channels read, so a misfit on the magnetic channels cannot
+    inflate it (#943: pooled over every channel read it was 2.57 against
+    0.99, and z sat at 2.99 with the moment 25 % low).
+
+    Pinned on a planted residual, with σ = 1 so r is what is planted: unit
+    noise everywhere, plus A times a centre-negative, tails-positive shape on
+    the magnetic-only channels alone.  z is then (split_m − split_n) over the
+    nuclear-only s.d. times √(Σ 1/n), written out below from the package's
+    own split, and it is **linear in A** with the noise unchanged.  Under the
+    pooled scatter it was neither: the shape entered the denominator too.
+    """
+    import rietx.report.magnetic as rm
+    from rietx.report.schemas import MAGNETIC_WIDTH_TAIL_FWHM, VALIDITY_RADIUS_FWHM
+
+    monkeypatch.setattr(rm, "MAGNETIC_WIDTH_SIGMA", -np.inf)   # read every z
+    model, _t, v = _state(_mnf2(), moving=None)
+    tt = np.asarray(model.tt, dtype=np.float64)
+    y0 = np.asarray(model.evaluate(v), dtype=np.float64)
+    (_ip, mag, nuc, pos, fwhm), = _classified_reflections(model, v)
+    *_, used_m = rm._sign_split(np.zeros_like(tt), tt, mag, pos, fwhm, pos[nuc])
+    *_, used_n = rm._sign_split(np.zeros_like(tt), tt, nuc, pos, fwhm, pos[mag])
+    assert len(used_m) >= 2 and used_n
+    nuc_chan = np.zeros(len(tt), dtype=bool)
+    for k in used_n:
+        nuc_chan |= np.abs(tt - pos[k]) <= MAGNETIC_WIDTH_TAIL_FWHM * fwhm[k]
+    shape = np.zeros(len(tt))
+    for k in used_m:
+        off = np.abs(tt - pos[k])
+        shape[off <= MAGNETIC_WIDTH_TAIL_FWHM * fwhm[k]] = 1.0
+        shape[off <= VALIDITY_RADIUS_FWHM * fwhm[k]] = -1.0
+    shape[nuc_chan] = 0.0
+    noise = np.random.default_rng(943).normal(0.0, 1.0, len(tt))
+    model.sigma[:] = 1.0
+
+    def z_at(a):
+        model.y_obs[:] = y0 + noise + a * shape
+        r = np.asarray(model.y_obs, dtype=np.float64) - y0   # as rounded there
+        hit, = [d for d in magnetic_width_findings(model, v)
+                if d.code == "MAGNETIC_WIDTH_UNMODELLED"]
+        c_m, t_m, n_cm, n_tm, _ = rm._sign_split(r, tt, mag, pos, fwhm, pos[nuc])
+        c_n, t_n, n_cn, n_tn, _ = rm._sign_split(r, tt, nuc, pos, fwhm, pos[mag])
+        expected = ((t_m / n_tm - c_m / n_cm) - (t_n / n_tn - c_n / n_cn)) / (
+            np.std(r[nuc_chan], ddof=1)
+            * np.sqrt(1 / n_tm + 1 / n_cm + 1 / n_tn + 1 / n_cn))
+        assert hit.value == pytest.approx(expected, rel=1e-12)
+        return hit.value
+
+    z0, z1, z2 = z_at(0.0), z_at(1.0), z_at(2.0)
+    print(f"z at A = 0, 1, 2: {z0:.3f}, {z1:.3f}, {z2:.3f}")
+    assert abs(z0) < MAGNETIC_WIDTH_SIGMA        # unit noise alone: silent
+    assert z1 > MAGNETIC_WIDTH_SIGMA
+    assert z2 - z0 == pytest.approx(2.0 * (z1 - z0), rel=1e-9)
+
+
 def test_an_unmeasured_width_is_named_rather_than_quoted():
     """``MAGNETIC_WIDTH_UNMEASURED`` on the same ratio WP-1327 uses for a
     moment — no threshold of its own, so the report cannot call a width
@@ -1251,3 +1309,132 @@ def test_a_fit_with_no_magnetic_component_pays_no_forward_evaluation():
 
     model.evaluate = _refuse
     assert magnetic_width_findings(model, v, esds={"x": 1.0}) == []
+
+
+# ================================== MAGNETIC_SIZING_FLOOR over its domain (B10)
+#
+# WP-2002, batch item B10: a numerical setting is tier 1 once a test bounds its
+# error over the domain it claims.  A stage freeing a magnetic width from zero
+# draws the magnetic component on windows sized as if the width were
+# MAGNETIC_SIZING_FLOOR (0.1 deg) and solves on them however far the width
+# walks.  The widths in the domain are the ones this file plants, 0.22 and
+# 0.30 deg.  Two readings, measured on 2026-10-21 (macOS arm64, worktree venv
+# [dev], compiled tier on):
+#
+# * the window: at the end of the preset's ``magnetic_width`` stage of the
+#   planted round trip below, the frozen magnetic windows lose 3.0 % (0.22
+#   deg), 4.0 % (0.30) and 7.6 % (0.60) of a magnetic peak's area against the
+#   2 % every window claims, and the frozen model differs from one compiled at
+#   the stage's end by 0.94, 1.20 and 2.04 sigma;
+# * the answer: the preset's last stage recompiles at the reached width, so
+#   the shipped floor and a floor at the planted width give one answer to
+#   0.017, 0.031 and 0.081 esd.  A plan that ends on the stage freeing the
+#   width keeps the clipping: 0.07, 0.17 and 0.57 esd on the moment.  Since
+#   the closing stage, every plan ends recompiled at the reached width, and
+#   the preset's two floors agree to 0.000 esd at 0.30 deg (the seventh
+#   round's Q2).  The package's magnetic default solve runs no closing stage.
+#
+# The whole effect is the window's: with WINDOW_AREA_TOL at 5e-5 every window
+# spans the pattern and the two floors give the same answer to the bit.
+
+def _window_loss(model, values, cp_win):
+    """The largest area a magnetic peak in range loses to its frozen window."""
+    from scipy.special import erf
+    k = 2.0 * np.sqrt(np.log(2.0))
+    tt = np.asarray(model.tt)
+    worst = (0.0, None)
+    for il, (pos, gam, eta, inten) in enumerate(model.phase_peaks(0, values, component=1)):
+        for j in np.flatnonzero(np.asarray(inten) > 0.0):
+            c = float(pos[j])
+            if not (tt[0] <= c <= tt[-1]):
+                continue
+            i0, i1 = int(cp_win[il, j, 0]), int(cp_win[il, j, 1])
+            if i1 <= i0:
+                lost = 1.0
+            else:
+                a = -np.inf if i0 == 0 else tt[i0] - 0.5 * (tt[i0] - tt[i0 - 1])
+                b = np.inf if i1 >= len(tt) else tt[i1 - 1] + 0.5 * (tt[i1] - tt[i1 - 1])
+                ua, ub = (a - c) / gam[j], (b - c) / gam[j]
+                lor = (np.arctan(2.0 * ub) - np.arctan(2.0 * ua)) / np.pi
+                gau = 0.5 * (erf(k * ub) - erf(k * ua))
+                lost = 1.0 - (eta[j] * lor + (1.0 - eta[j]) * gau)
+            worst = max(worst, (float(lost), c), key=lambda t: t[0])
+    return worst
+
+
+@pytest.mark.parametrize("width", [
+    pytest.param(0.1, id="at-floor"),
+    pytest.param(0.22, id="planted", marks=pytest.mark.xfail(strict=True, reason=(
+        "MAGNETIC_SIZING_FLOOR 0.1: a width reaching 0.22 deg loses 3.2 % of a magnetic "
+        "peak's area to windows sized at the floor (bound 2 %)"))),
+    pytest.param(SIZE, id="SIZE", marks=pytest.mark.xfail(strict=True, reason=(
+        "MAGNETIC_SIZING_FLOOR 0.1: a width reaching 0.30 deg loses 4.1 % (bound 2 %)")))])
+def test_the_magnetic_floor_holds_the_area_bound_at_the_widths_a_stage_reaches(width):
+    """Windows frozen at the floor, for a width freed from zero, against the
+    area bound every window claims, at the width the stage ends on.  Made to
+    fail once (2026-10-21) by patching MAGNETIC_SIZING_FLOOR to 0.3 before the
+    compile: both xfail cells turned XPASS(strict)."""
+    from rietx.model.forward import WINDOW_AREA_TOL
+    # a declared stage's windows, where the floor sizes a width freed from
+    # zero: the closing stage recompiles at the width reached
+    model, _t, v = _state(_mnf2(), moving=["phases.0.magnetic_lor_size"], step=0.05,
+                          window_area_tol=WINDOW_AREA_TOL)
+    assert model.mag_split(0)
+    lost, at = _window_loss(model, {**v, "phases.0.magnetic_lor_size": width},
+                            model.phases[0].win_mag)
+    assert lost <= WINDOW_AREA_TOL, (
+        f"a width at {width} deg loses {lost:.4f} of the magnetic peak at {at:.2f} deg to "
+        f"windows sized at the {MAGNETIC_SIZING_FLOOR} deg floor")
+
+
+@pytest.mark.slow
+def test_the_preset_answer_does_not_depend_on_the_magnetic_floor(monkeypatch):
+    """The planted round trip at SIZE under the shipped three-step preset,
+    with the floor shipped and at the planted width: one answer to 0.1 plain
+    esd (the larger of the two) on every row but the background.  Measured
+    0.000 behind the closing stage the preset now ends in, and 0.031 (the width
+    itself) before it, when its last declared stage recompiled at the reached
+    width (WP-2002, 2026-10-21).  Made to fail once (2026-10-21) by running the
+    preset without its last stage, which left 0.17 esd on the moment."""
+    import rietx.model.forward as fwd
+    ph = _mnf2(size=SIZE)
+    ins = rx.Instrument.constant_wavelength_neutron(LAMBDA_CW)
+    ins.profile.u.value, ins.profile.w.value = 0.05, 0.03
+    ins.background = rx.BackgroundChebyshev.with_terms(2)
+    ins.background.coefficients[0].value = 20.0
+    ph.scale.value = 0.02
+    tt = np.arange(8.0, 140.0, 0.05)
+    blank = rx.PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    was = compiled.set_enabled(True)
+    try:
+        y = np.asarray(rx.Refinement(rx.Structure(phases=[ph]),
+                                     ins.model_copy(deep=True)).predict(blank))
+        rng = np.random.default_rng(1343)
+        data = rx.PatternData(two_theta=tt.tolist(), intensity=(
+            y + rng.normal(0.0, np.sqrt(np.maximum(y, 1.0)))).tolist())
+        rows = []
+        for floor in (MAGNETIC_SIZING_FLOOR, SIZE):
+            monkeypatch.setattr(fwd, "MAGNETIC_SIZING_FLOOR", floor)
+            start = _mnf2()
+            start.scale.value = 0.02
+            res = rx.Refinement(rx.Structure(phases=[start]), ins.model_copy(deep=True),
+                                history=False).fit(data, plan=PLAN_PRESETS["magnetic_width"]())
+            out = Path(__file__).parent / "output"
+            out.mkdir(exist_ok=True)
+            res.plot(path=str(out / f"magnetic_floor_{floor}.png"))
+            rows.append({p.path: (p.value, p.stderr_uncorrected) for p in res.parameters})
+        monkeypatch.undo()
+    finally:
+        compiled.set_enabled(was)
+    import matplotlib.pyplot as plt
+    plt.close("all")
+    worst = (0.0, None)
+    for path, (a, ea) in rows[0].items():
+        if path.startswith("instrument.background."):
+            continue
+        b, eb = rows[1][path]
+        esds = [e for e in (ea, eb) if e]
+        if esds:
+            worst = max(worst, (abs(a - b) / max(esds), path), key=lambda t: t[0])
+    print(f"the floor moves {worst[1]} by {worst[0]:.3f} esd")
+    assert worst[0] <= 0.1, f"the floor moves {worst[1]} by {worst[0]:.3f} esd"

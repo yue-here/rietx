@@ -826,7 +826,7 @@ the untied fit 1.21-1.44×. The chain itself took 20-83 s. One linear law took
     window never met it: no phase falls below support in any pattern here.
   - The chain held the fading LT phase in two patterns (938 K and 956 K) by
     WP-1523's answer significance. The joint path reads the support screen
-    alone, by design, because its report is WP-1341's. So the chain and the
+    alone, by design, because its report is WP-2028's (WP-1341's until it closed 2026-10-23). So the chain and the
     joint free different sets, 14 columns here. That is why the nested test
     takes the untied joint fit as its reference.
 
@@ -1083,7 +1083,7 @@ private bundle with the harness, drafts and data goes to the maintainer
 separately. The points for this WP are below. The subset boundary and the
 detectors went to [1965](1965-a-law-declared-by-formula-condition-and-glob.md),
 the scanned nonlinear laws to [1964](1964-a-nonlinear-law-through-the-derived-block.md),
-and the telemetry and event pairing to [1322](1322-events-aggregator.md).
+and the telemetry and event pairing to [1322](1322-events-aggregator.md) (closed 2026-10-23; it returned the per-equation line here, see § Inherited).
 Their numbers are as reported and were not re-measured here.
 
 - **The joint fit inherits the chain's start, and the chain can be wrong at
@@ -1116,6 +1116,47 @@ Their numbers are as reported and were not re-measured here.
 - Not carried: their test that a tie survives the chain's carry step (#376,
   closed). A parametric equation exists only in the joint fit, which has no
   carry step.
+
+### Inherited
+
+- **2026-10-23, from [1341](1341-a-joint-fit-has-no-report.md) (closed): joint-report items now go
+  to [2028](2028-a-joint-fits-guards-see-every-histogram.md).** The four joint items and the
+  three `PARAMETRIC_*` rendering notes this WP sent 1341 on 2026-10-14 are 2028's Context items
+  1-4 and 6, under today's names (`parametric_equations`, `RefinedParameter.equations`).
+- **2026-10-23, from [1322](1322-events-aggregator.md) (closed): `rietx events`
+  could print one line per parametric equation of a joint fit.** This is
+  @mustachefeeling's point from the PR #977 comments, which this WP sent to
+  1322 on 2026-10-15. 1322 closed without it. A joint fit keeps no history
+  (`multi.py`), but it has emitted events since #926, and `rietx events`
+  (`history.aggregate.summarize_events`) shipped in PR #902. The line would
+  carry the subset size, the form verdict, and whether a detector fired inside
+  the subset (the subset boundary and the detectors are
+  [1965](1965-a-law-declared-by-formula-condition-and-glob.md)'s). Two rules
+  for whoever builds it:
+  - Pair events in file order, never by `(series_index, series_pass)`, since
+    indices recur on reseeds and restarted segments. The aggregator already
+    clears its open stages at each `fit_start` (`aggregate.py:185`).
+  - A segmented chain's summed fit time is not its wall time: 700 s against
+    148 s on one chain, as reported and not re-measured.
+
+- 2026-10-31, from the issue triage (issue #1218, row S2): a pure-error
+  lack-of-fit beside the declared-form test. For every group of patterns that
+  share every declared coordinate, the χ² of the free-fit targets about their
+  inverse-variance mean on n_g − 1 dof, per group and pooled, with esds
+  uncorrected (the choice the form test already makes), and "no replicate
+  groups: not measured" when no coordinate repeats. It would sit on
+  `ParametricFormTest` as `replicates`, or on the series summary. Measured by
+  the reporter on one synthetic series (16 patterns, cubic perovskite
+  capillary, a = a₀(1 + αΔT) + 0.02·x, a ramp to 700 K then a hold): when x
+  drifts during the hold the 9 held patterns differ in `phases.0.cell.a` by χ²
+  = 24 054 on 8 dof; when x stays put, χ² = 12.0 on 8 dof (p ≈ 0.15). The
+  score test cannot see a misfit that varies at a repeated coordinate, which
+  is what replicates measure (Draper & Smith 1998, pure error). Checked
+  against the tree at d87c8cc91: `ParametricFormTest`
+  (`schemas/parametric.py:320`) carries `n_patterns`, `n_subset`, `tied`,
+  `others_freed`, `rejected` and no replicate reading; this WP's ticked
+  lack-of-fit task built the score test only. Not re-run here. The reporter
+  proposes landing S2 before S1.
 
 ## Non-goals
 

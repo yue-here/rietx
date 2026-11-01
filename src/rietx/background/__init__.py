@@ -1,4 +1,4 @@
-from .auto import auto_background
+from .auto import BackgroundChoice, auto_background
 from .diagnostics import (
     ContaminationFlag,
     CoverageRegion,
@@ -29,6 +29,7 @@ from .select import (
 )
 
 __all__ = [
+    "BackgroundChoice",
     "BackgroundSelection",
     "ContaminationFlag",
     "CoverageRegion",

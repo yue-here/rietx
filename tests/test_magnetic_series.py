@@ -427,7 +427,10 @@ def test_the_ascent_out_of_the_floor_terminates_at_once(solver, max_iter):
     data = simulate(4.5, 4400, scale=6.0, background=300.0)
     ref = rx.Refinement(Structure(phases=[mnf2(MOMENT_FLOOR_MU_B)]), neutron(),
                         solver=solver)
-    result = ref.fit(data, plan=moment_plan(max_iter=max_iter))
+    plan = moment_plan(max_iter=max_iter)
+    # the declared stages' iteration budget; the closing stage is tests/test_closing_stage.py's
+    plan.closing_window_tol = None
+    result = ref.fit(data, plan=plan)
     table = ParameterTable(ref.structure, ref.instrument)
     row = analyse_moments(
         ref._model, table.decode(table.x0()), ref.structure,
@@ -759,7 +762,7 @@ def _verdicts(flags) -> SeriesResult:
 
 def _agreement(forward_flags, backward_flags):
     forward, back = _verdicts(forward_flags), _verdicts(backward_flags)
-    rows = _with_onset_agreement(_moment_diagnostics(forward, {}), forward,
+    rows = _with_onset_agreement(_moment_diagnostics(forward), forward,
                                  back)
     return [d for d in rows if d.code == "SEQUENTIAL_MOMENT_ONSET"]
 
@@ -900,7 +903,7 @@ def _early(flags) -> SeriesResult:
 
 
 def _fold(forward: SeriesResult, back: SeriesResult):
-    rows = _with_onset_agreement(_moment_diagnostics(forward, {}), forward,
+    rows = _with_onset_agreement(_moment_diagnostics(forward), forward,
                                  back)
     return [d for d in rows if d.code == "SEQUENTIAL_MOMENT_ONSET"]
 
@@ -955,7 +958,7 @@ def test_an_interleaved_forward_row_keeps_its_own_advice(backward_flags):
     the fold has nothing to replace there: with the same interleaved verdicts
     on both chains, "the pattern one chain supports and the other holds" does
     not exist (review round 3, item 3)."""
-    (forward_row,) = [d for d in _moment_diagnostics(_verdicts(_INTERLEAVED), {})
+    (forward_row,) = [d for d in _moment_diagnostics(_verdicts(_INTERLEAVED))
                       if d.code == "SEQUENTIAL_MOMENT_ONSET"]
     assert forward_row.suggestion.startswith(_OPEN_THE_SWITCHES)
     (row,) = _agreement(_INTERLEAVED, backward_flags)
@@ -1081,6 +1084,14 @@ def test_an_unsupported_pattern_reseeds_its_successor_to_the_floor():
                 if d.code == "SEQUENTIAL_MOMENT_HOLD")
     assert "reseeded to its floor" in hold.message
     assert "successor pattern(s)" in hold.message
+    # the record the message is read from (WP-2003): each floored entry names
+    # the modulus it received at the floor, and every warm start its source
+    floored = [e for e in series.entries if e.floored]
+    assert floored
+    assert all(e.rung != "cold" for e in floored)
+    assert all(e.label in hold.message for e in floored)
+    assert all(hold.where[0] in e.floored for e in floored)
+    assert [e.seeded_from for e in series.entries] == [None, 0, 1, 2]
     # the unsupported values are the fit's own, above the floor, with their esds
     # still on the evidence row even though the trajectory withholds them
     for entry, ok in zip(series.entries, traj.supported, strict=True):
@@ -1325,3 +1336,282 @@ def test_solve_magnetic_on_the_first_pattern_gives_the_model_the_series_refines(
     assert traj.value[0] == pytest.approx(4.5, abs=0.4)
     assert traj.stderr[1] is None
     assert tuple(traj.onset.bracket) == (10.0, 90.0)
+
+
+# ============================ a real ramp through an onset: Ba₂FeSbSe₅ on G4.1
+#
+# Row H of the magnetic milestone (WP-1329 task 5): the moment's trajectory
+# measured on real data, ``direction="both"``.  Everything above is synthetic
+# or a two-pattern pair; this is twelve patterns of one specimen, 1.5-200 K,
+# through T_N = 58 K, and the first *k != 0* series in the tree.
+#
+# **Data.**  LLB G4.1 (Saclay) constant-wavelength neutron, lambda = 2.426 A,
+# 2theta 2-81.9 deg at 0.1 deg, two columns (2theta, counts), the corrected
+# patterns of S. Maier, M. W. Gaultois, N. Matsubara, W. Surta, F. Damay,
+# S. Hebert, V. Hardy, D. Berthebaud and F. Gascoin, Phys. Rev. B 103, 054115
+# (2021), doi:10.1103/PhysRevB.103.054115 (arXiv:2102.06484).  M. W. Gaultois, a
+# co-author, released the twelve patterns under CC BY 4.0 for this repository
+# (https://github.com/yue-here/rietx/pull/1073#issuecomment-6316397776; terms and
+# reference values in ``tests/data/README.md``).  We acknowledge the Laboratoire
+# Leon Brillouin for the provision of neutron beam time.  The paper reports
+# T_N = 58 K from chi(T) and c_p(T), k = (1/2, 0, 1/2), the Shubnikov group
+# P_a 2_1/m (BNS 11.55, irreps Gamma4/Gamma8) with the moment along b, and
+# m_y = 4.13(4) mu_B per Fe at 1.5 K with the two Fe moments constrained equal
+# (p. 9; "5.8 mu_B" without the constraint, which is 4.13 * sqrt(2): the powder
+# measures only the quadrature sum of the two orbits, so the tie is the paper's
+# assumption and not a measurement).
+#
+# **Nothing here is tuned to this ramp.**  The plan is the one ``solve_magnetic``
+# ships (``SOLVE_STAGE_PATHS``: moduli, moment, then the fuller stage) and the
+# model is the one ``solve_magnetic`` selects on the 1.5 K pattern from the
+# nuclear fit alone (class 11.55 S2(a,b); run 2026-10-20, recorded in the PR),
+# built here directly so the test does not repeat that ten-minute search.  The
+# ties are the statement's own (``anti_translation_ties``), the paper's
+# equal-moment tie, and one Biso per parent site.  The starting nuclear model is
+# the published 293 K single-crystal Pnma structure of Wang, Greenfield and
+# Kovnir, J. Solid State Chem. 242, 22 (2016), refined here against the 1.5 K
+# pattern.
+#
+# **Protocol** (revised 2026-10-21, measured on these patterns): the fit starts
+# at 5.2 deg, above the direct-beam tail; the background is the P-spline
+# ``auto_background`` sizes to the fitted range (it replaced a 4-term Chebyshev
+# that bent the wrong way under the lowest magnetic line); the 28 child Biso are
+# tied to their 7 parent sites (freed one by one, the Fe children alone ran to
+# -8..+24 A^2).  Asymmetry stays at 0: one tied axial-divergence parameter
+# fitted on the 100 K pattern lowers chi^2 but draws a low-angle tail the data
+# do not have.  The unmodelled low-angle centroid shift that remains (about
+# -50 mdeg at the 9.35 deg magnetic line, cot 2theta-shaped) is a named
+# systematic worth +0.03 to +0.06 mu_B on the 1.5 K moment.  No magnetic width:
+# with the Biso tied it costs BIC (-5.8 to -9) at every temperature measured.
+# The parent Biso are not determined by these data (esds 2.6-5.8 A^2 in the
+# nuclear fit; Ba1 comes out at -1.2(3.8) A^2 there and its child at
+# -0.3(1.2) A^2 at 1.5 K, so BISO_NEGATIVE stays on); one overall B, free or
+# held at 0.8 A^2, moves the 1.5 K moment by -0.04 and +0.004 mu_B, inside
+# 0.3 esd, so per-site B is kept.
+#
+# **Tier: characterisation, never validation.**  The published 4.13(4) mu_B is a
+# same-pattern result under another code and another protocol (FullProf,
+# Gamma4/Gamma8; its profile, background and form-factor settings are not
+# published), so it bounds the answer and verifies nothing about the physics.
+# The onset has an independent reference (T_N from bulk probes), but a powder
+# verdict can only see an order parameter once it is above its own esd, so the
+# bracket is asserted to lie at or below T_N, within one grid step of it, and
+# never above.  The assertions below were written after the first run, which is
+# stated here and in the PR; none was widened afterwards, and the 2026-10-21
+# protocol revision left every one of them unchanged.
+
+BA_DATA = Path(__file__).resolve().parent / "data"
+BA_TEMPS = [1.5, 10.0, 20.0, 30.0, 40.0, 45.0, 50.0, 55.0, 65.0, 100.0,
+            150.0, 200.0]
+BA_T_N = 58.0
+BA_PUBLISHED_MU_B = 4.13
+BA_LAMBDA = 2.426
+#: Wang, Greenfield & Kovnir (2016) at 293 K, Pnma, a, b, c = 12.650, 9.140,
+#: 9.170 A: label, species, x, y, z, U_iso (A^2)
+BA_ATOMS = [
+    ("Ba1", "Ba", 0.17567, -0.00762, 0.37692, 0.0127),
+    ("Sb1", "Sb", 0.02806, 0.25, 0.01240, 0.0133),
+    ("Se1", "Se", -0.05782, -0.03987, 0.18326, 0.0133),
+    ("Se2", "Se", 0.00716, -0.25, 0.54270, 0.0131),
+    ("Se3", "Se", 0.21724, 0.25, 0.11656, 0.0129),
+    ("Se4", "Se", 0.27926, 0.25, 0.60793, 0.0129),
+    ("Fe1", "Fe", 0.09763, 0.25, 0.66698, 0.0107),
+]
+
+
+def _ba_tag(t: float) -> str:
+    return "001p5" if t == 1.5 else f"{int(t):03d}"
+
+
+#: below 5.2 deg 2theta is the direct-beam tail of the corrected patterns: the
+#: fit starts above it rather than asking the background to follow it
+BA_LOW = 5.2
+
+
+def _ba_pattern(t: float):
+    return rx.read_pattern(
+        BA_DATA / f"llb_g41_ba2fesbse5_{_ba_tag(t)}K.xy"
+    ).model_copy(update={"excluded_regions": [(0.0, BA_LOW)]})
+
+
+@pytest.fixture(scope="module")
+def ba2fesbse5_ramp():
+    """The nuclear fit at 1.5 K, the magnetic statement, and the ramp both ways."""
+    # the fixture's numbers declare their kernel path rather than inheriting
+    # whatever an earlier test on this worker, or RIETX_COMPILED, left behind
+    # (tests/CLAUDE.md § Quoting numbers); numpy is the tier's own oracle
+    from rietx.model import compiled
+
+    was = compiled.set_enabled(False)
+    try:
+        return _ba2fesbse5_ramp_fits()
+    finally:
+        compiled.set_enabled(was)
+
+
+def _ba2fesbse5_ramp_fits():
+    from rietx.crystallography.magnetic.isotropy import candidates
+    from rietx.crystallography.magnetic.supercell import (
+        anti_translation_ties,
+        magnetic_supercell,
+    )
+    from rietx.strategy.magnetic import (
+        SOLVE_SEED_MU_B,
+        SOLVE_STAGE_NAMES,
+        SOLVE_STAGE_PATHS,
+    )
+
+    def par(v, **kw):
+        return Parameter(value=v, **kw)
+
+    parent = rx.Phase(
+        name="Ba2FeSbSe5", space_group="P n m a",
+        cell=rx.Cell(a=par(12.650), b=par(9.140), c=par(9.170),
+                     alpha=par(90.0), beta=par(90.0), gamma=par(90.0)),
+        atoms=[rx.Atom(label=lab, species=sp, x=par(x), y=par(y), z=par(z),
+                       occ=par(1.0), biso=par(u * 8.0 * np.pi ** 2, unit="A^2"))
+               for lab, sp, x, y, z, u in BA_ATOMS])
+    first = _ba_pattern(1.5)
+    inst = rx.Instrument.constant_wavelength_neutron(BA_LAMBDA)
+    inst.profile.w.value = 0.0025
+    inst.profile.x.value = 0.0
+    # the background rietx sizes to the data over the fitted range (a P-spline,
+    # 3 deg knots), seeded; asymmetry stays at its default 0 (see the PR)
+    inst.background = rx.auto_background(
+        first, two_theta_limits=(BA_LOW, float(first.two_theta[-1])),
+        wavelength=BA_LAMBDA, seed=True).background
+
+    bkg = ["phases.0.scale", "instrument.background.c*"]
+    width = [f"instrument.profile.{k}" for k in "uvwx"]
+    cell = ["instrument.zero_shift", "phases.0.cell.*"]
+    stages = [("scale_bkg", bkg), ("zero", bkg + cell[:1]), ("cell", bkg + cell),
+              ("widths", bkg + cell + width),
+              ("coords", bkg + cell + width + ["phases.0.atoms.*.dof.*"]),
+              ("biso", bkg + cell + width + ["phases.0.atoms.*.dof.*",
+                                             "phases.0.atoms.*.biso"])]
+    nuclear_plan = rx.RefinementPlan(
+        stages=[rx.Stage(n, list(p), max_iter=200) for n, p in stages],
+        intermediate_ftol=1e-6)
+    ref = rx.Refinement(rx.Structure(phases=[parent]), inst, history=False)
+    nuclear = ref.fit(first, plan=nuclear_plan)
+
+    fitted = ref.fitted_structure.phases[0]
+    fe = next(a for a in fitted.atoms if a.label == "Fe1")
+    cand = next(c for c in candidates(
+        fitted.space_group, (fe.x.value, fe.y.value, fe.z.value),
+        ("1/2", "0", "1/2")) if c.bns_number == "11.55" and c.label.startswith("S2"))
+    statement = magnetic_supercell(
+        fitted, candidate=cand, magnetic_species="Fe", ion="Fe3+",
+        magnitude=SOLVE_SEED_MU_B, nuclear_group="magnetic")
+    child = rx.Structure(phases=[statement.phase])
+    moment_atoms = [j for j, a in enumerate(statement.phase.atoms)
+                    if a.moment is not None]
+    first_child: dict[int, int] = {}
+    biso_ties = []
+    for j, (parent_atom, _coset) in enumerate(statement.site_map):
+        if parent_atom in first_child:
+            biso_ties.append((f"phases.0.atoms.{j}.biso",
+                              f"phases.0.atoms.{first_child[parent_atom]}.biso"))
+        else:
+            first_child[parent_atom] = j
+
+    def constrain(_i, r):
+        # the statement's own ties, then the paper's equal-moment tie
+        ties = anti_translation_ties(r.structure.phases[0], 0)
+        for target, source, scale, offset in ties:
+            r.tie(target, source, scale=scale, offset=offset)
+        followers = {t for t, *_ in ties}
+        free = [j for j in moment_atoms
+                if f"phases.0.atoms.{j}.moment.dof0" not in followers]
+        for j in free[1:]:
+            r.tie(f"phases.0.atoms.{j}.moment.dof0",
+                  f"phases.0.atoms.{free[0]}.moment.dof0", scale=1.0)
+        # one Biso per parent site: every child of a parent atom follows the
+        # first (``site_map``), as tie_to_parent does; freed one by one, the 28
+        # child Biso ran to -8..+24 A^2 on the Fe children alone
+        for target, source in biso_ties:
+            r.tie(target, source, scale=1.0)
+
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage(n, list(p)) for n, p in zip(SOLVE_STAGE_NAMES,
+                                              SOLVE_STAGE_PATHS, strict=True)])
+    series = rx.refine_sequential(
+        [_ba_pattern(t) for t in BA_TEMPS], child, ref.fitted_instrument,
+        plan=plan, x=BA_TEMPS, x_label="T (K)",
+        labels=[f"{t:g}K" for t in BA_TEMPS], direction="both",
+        constrain=constrain)
+    return {"nuclear": nuclear, "series": series}
+
+
+@pytest.mark.slow
+@pytest.mark.xdist_group("magnetic-ba2fesbse5")
+def test_ba2fesbse5_ramp_the_moment_grows_below_the_onset_both_ways(
+        ba2fesbse5_ramp):
+    """Real ramp, k = (1/2, 0, 1/2): supported below ~T_N, held above, both chains.
+
+    What a competent refiner asserts of twelve patterns through an ordering
+    transition: the ordered moment is supported at every temperature up to
+    50 K and not at any from 55 K; it grows monotonically on cooling; the
+    onset is a bracket that lies at or below the bulk T_N (a bracket above it
+    would be a moment carried through the transition by the warm start) and
+    within one grid step of it; the forward and backward chains return the same
+    verdicts, the same bracket and moduli that differ by less than their esds;
+    the moment lies along b; and the 1.5 K modulus sits within about 12 % of
+    the published 4.13(4) mu_B (an envelope: a different protocol, not agreement).
+    """
+    series = ba2fesbse5_ramp["series"]
+    assert ba2fesbse5_ramp["nuclear"].status == "converged"
+    # the fits the verdicts rest on converged, in both chains (all 24 do under
+    # this protocol); the assertion covers the ordered side and 55 K, because a
+    # moment held in the paramagnetic valley is not a fit result and its fit
+    # may stop on its budget without moving a verdict
+    for chain in (series, series.backward):
+        assert [e.status for e, t in zip(chain.entries, BA_TEMPS, strict=True)
+                if t <= 55.0] == ["converged"] * 8
+
+    site = series.magnetic_sites()[0]
+    fwd = series.magnetic_trajectory(site)
+    assert series.backward is not None
+    bwd = series.backward.magnetic_trajectory(site)
+    assert fwd.x == BA_TEMPS
+
+    # supported up to 50 K, never from 55 K; the paramagnetic side is not
+    # merely unsupported on one pattern, it is on every one that gives a verdict
+    for traj in (fwd, bwd):
+        for t, sup in zip(traj.x, traj.supported, strict=True):
+            assert sup is (t <= 50.0), (t, sup)
+    ordered = [i for i, t in enumerate(BA_TEMPS) if t <= 50.0]
+    assert all(fwd.stderr[i] is not None for i in ordered)
+
+    # grows on cooling: strictly through 20-55 K, and by many sigma overall
+    values = fwd.value
+    assert all(values[i + 1] < values[i] for i in range(2, BA_TEMPS.index(55.0))), values
+    i50 = BA_TEMPS.index(50.0)
+    sigma = float(np.hypot(fwd.stderr[0], fwd.stderr[i50]))
+    assert values[0] - values[i50] > 5.0 * sigma
+
+    # the onset: a falling, monotone bracket, at or below T_N and within a step
+    for traj in (fwd, bwd):
+        onset = traj.onset
+        assert onset.sense == "falls" and onset.monotone
+        assert onset.bracket_verdicts_final is True
+        lo, hi = onset.bracket
+        assert 45.0 <= lo < hi <= BA_T_N, onset.bracket
+        assert BA_T_N - hi <= 5.0, onset.bracket
+    assert fwd.onset.bracket == bwd.onset.bracket
+
+    # the two chains agree, per pattern, within their combined esd
+    for i in ordered:
+        d = abs(fwd.value[i] - bwd.value[i])
+        assert d < 3.0 * float(np.hypot(fwd.stderr[i], bwd.stderr[i])), (BA_TEMPS[i], d)
+    onset_rows = [d for d in series.diagnostics
+                  if d.code == "SEQUENTIAL_MOMENT_ONSET"]
+    assert onset_rows and all(d.level != "warning" for d in onset_rows)
+
+    # along b, whatever the two Fe orbits' split (tied equal, as published)
+    row = series.entries[0].moment(site)
+    assert abs(row.crystalaxis[1]) / row.magnitude > 0.99, row.crystalaxis
+
+    # the published value bounds the 1.5 K modulus; it does not validate it
+    assert row.supported is True and row.magnitude_esd < 0.15
+    assert abs(row.magnitude - BA_PUBLISHED_MU_B) <= 0.5, row.magnitude

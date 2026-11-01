@@ -108,9 +108,9 @@ def _models(scales, *, unbounded=True):
     return rx.Structure(phases=phases), instrument
 
 
-def _fit(data, stages, *, unbounded=True, ref=None):
+def _fit(data, stages, *, unbounded=True, ref=None, **plan):
     ref = ref or rx.Refinement(*_models(START_SCALES, unbounded=unbounded))
-    res = ref.fit(data, plan=RefinementPlan(stages=stages), telemetry=False)
+    res = ref.fit(data, plan=RefinementPlan(stages=stages, **plan), telemetry=False)
     return ref, res
 
 
@@ -288,7 +288,9 @@ def test_a_plan_that_never_frees_b_holds_nothing(pattern):
 def test_a_held_scale_leaves_b_to_measure_the_intensity(pattern):
     """The ridge is a *pair* of columns: with the scale fixed, B is what the
     one intensity determines, and holding it would freeze a measured value."""
-    _, res = _fit(pattern, [Stage("b", ["instrument.background.*"] + BISO)])
+    # the declared stage's probe; the closing stage is tests/test_closing_stage.py's
+    _, res = _fit(pattern, [Stage("b", ["instrument.background.*"] + BISO)],
+                  closing_window_tol=None)
     (sr,) = res.stages
     assert sr.scale_b_held == {} and FE_B in sr.freed
     assert _findings(res) == []
@@ -300,7 +302,8 @@ def test_a_phase_released_inside_the_stage_is_asked_before_its_second_solve(
     probe can see it; the solve raises its scale and the release frees B.  The
     probe is asked then, or the second solve runs on the ridge unflagged."""
     ref = rx.Refinement(*_models(START_SCALES[:FE] + [1e-9]))
-    _, res = _fit(pattern, [Stage("b", BIG + BISO)], ref=ref)
+    # the declared stage's probe; the closing stage is tests/test_closing_stage.py's
+    _, res = _fit(pattern, [Stage("b", BIG + BISO)], ref=ref, closing_window_tol=None)
     (sr,) = res.stages
     assert FE_B in sr.held and FE_B not in sr.released + sr.freed
     assert list(sr.scale_b_held) == [FE]
@@ -344,9 +347,8 @@ def test_a_variable_shared_with_a_separable_phase_is_not_held(pattern):
 # ----------------------------------------------------------------------
 #: 25–33° Cu Kα: fluorite keeps (111) and (200), two reflections for its
 #: scale, B(Ca) and B(F).  The uniform B is separable there, the block is not.
-#: Iron is left out: it has no reflection there, and its free scale walks a
-#: flat direction to 126 in a second scale-only stage at an unchanged Rwp,
-#: which predates this probe and is WP-1523's (its 2026-10-04 Inherited).
+#: Iron is left out of the block tests: it has no reflection there, and its
+#: scale is WP-1958's, tested below.
 TT_NARROW = np.arange(25.0, 33.0, 0.01)
 ADP = ["phases.*.atoms.*.adp.*"]
 
@@ -439,6 +441,162 @@ def test_an_anisotropic_site_is_probed(pattern):
 
 
 # ----------------------------------------------------------------------
+# WP-1958 (#954): a phase with no reflection in the fitted range
+# ----------------------------------------------------------------------
+SCALES_ONLY = [Stage("s", BIG), Stage("s2", BIG)]
+FE_SCALE = f"phases.{FE}.scale"
+
+
+@pytest.fixture(scope="module")
+def four_phase_narrow_pattern() -> PatternData:
+    """All four phases over 25–33°, where bcc Fe has no reflection."""
+    structure, instrument = _models(TRUE_SCALES, unbounded=False)
+    blank = PatternData(two_theta=TT_NARROW.tolist(),
+                        intensity=np.zeros_like(TT_NARROW).tolist())
+    model = compile_model(structure, instrument, blank, mode="rietveld")
+    assert int(model.phase_line_counts()[FE]) == 0
+    assert all(int(n) > 0 for n in model.phase_line_counts()[:FE])
+    table = ParameterTable(structure, instrument)
+    y = model.evaluate(table.decode(table.x0()))
+    y = np.random.default_rng(3).poisson(np.maximum(y, 1.0)).astype(float)
+    return PatternData(two_theta=np.asarray(model.tt).tolist(), intensity=y.tolist())
+
+
+@pytest.mark.parametrize("solver", ["lm", "trf"])
+def test_a_phase_with_no_reflection_keeps_its_scale_and_has_no_fraction(
+        four_phase_narrow_pattern, solver):
+    """The acceptance of WP-1958, as decided on #954: under both solvers the
+    scale is unchanged and the QPA carries no fraction for the phase.
+
+    Measured on ``main`` before it (the WP's repro, this fit): LM left the
+    scale at 1e-4 and read iron at 0.61 wt%, the start value; TRF walked it to
+    164.7 and read iron at 99.99 wt%.  Both now hold the scale at the 1e-4
+    handed in, and iron has no fraction.
+    """
+    ref = rx.Refinement(*_models(START_SCALES), solver=solver)
+    res = ref.fit(four_phase_narrow_pattern,
+                  plan=RefinementPlan(stages=SCALES_ONLY), telemetry=False)
+    # on the Refinement's own copy, the one the fit could move
+    assert ref.structure.phases[FE].scale.value == START_SCALES[FE]
+    assert all(FE_SCALE in sr.held and FE_SCALE not in sr.freed
+               for sr in res.stages)
+    assert FE_SCALE not in {p.path for p in res.parameters}
+    (iron,) = [q for q in res.qpa.phases if q.name == "iron"]
+    assert iron.weight_fraction is None and iron.weight_fraction_stderr is None
+    assert res.qpa.unmeasured_phases == ["iron"]
+    (finding,) = _findings(res, "PHASE_UNCONSTRAINED")
+    assert finding.where == [FE_SCALE]
+    assert "relative to the phases seen in range" in finding.message
+    # the unmeasured scale withholds no other esd: it left the sum
+    assert _findings(res, "QPA_ESD_UNAVAILABLE") == []
+
+
+@pytest.mark.parametrize("solver", ["lm", "trf"])
+def test_the_phases_seen_in_range_still_refine_and_are_quantified(
+        four_phase_narrow_pattern, solver):
+    """The positive arm: the three phases with reflections in range refine
+    their scales off the 1e-4 start towards the 2e-4 truth and carry fractions
+    with esds, which sum to 1 over the phases seen and match the three-phase
+    truth, the fixture's fluorite tolerance applied to each."""
+    ref = rx.Refinement(*_models(START_SCALES), solver=solver)
+    res = ref.fit(four_phase_narrow_pattern,
+                  plan=RefinementPlan(stages=SCALES_ONLY), telemetry=False)
+    truth = _narrow_models(TRUE_SCALES)
+    table = ParameterTable(*truth)
+    w = {p.name: p.weight_fraction
+         for p in compute_qpa(truth[0], table.decode(table.x0())).phases}
+    rows = {p.path: p for p in res.parameters}
+    seen = [q for q in res.qpa.phases if q.name != "iron"]
+    assert math.isclose(sum(q.weight_fraction for q in seen), 1.0, rel_tol=1e-12)
+    for ip, q in enumerate(seen):
+        scale = rows[f"phases.{ip}.scale"]
+        assert abs(scale.value - TRUE_SCALES[ip]) < 0.1 * TRUE_SCALES[ip]
+        assert all(f"phases.{ip}.scale" in sr.freed for sr in res.stages)
+        assert q.weight_fraction_stderr is not None
+        tol = 3.0 * scale.stderr / scale.value
+        assert abs(q.weight_fraction - w[q.name]) < tol * w[q.name]
+
+
+def test_iron_with_a_reflection_in_range_refines_its_scale_under_trf(pattern):
+    """The same phase and solver on 25–50°, where (110) is in range: nothing
+    of WP-1958's hold applies, iron's scale refines and it has a fraction."""
+    ref = rx.Refinement(*_models(START_SCALES), solver="trf")
+    res = ref.fit(pattern, plan=RefinementPlan(stages=SCALES_ONLY), telemetry=False)
+    assert all(FE_SCALE in sr.freed and FE_SCALE not in sr.held
+               for sr in res.stages)
+    assert ref.structure.phases[FE].scale.value != START_SCALES[FE]
+    (iron,) = [q for q in res.qpa.phases if q.name == "iron"]
+    assert iron.weight_fraction is not None and iron.weight_fraction > 0.0
+    assert res.qpa.unmeasured_phases == []
+
+
+def test_the_lineless_hold_does_not_wait_on_the_support_threshold(
+        four_phase_narrow_pattern):
+    """``phase_support_sigma=None`` switches the significance hold off, and a
+    phase with no line in range is held all the same: "no line" is a count."""
+    ref = rx.Refinement(*_models(START_SCALES), solver="trf")
+    res = ref.fit(four_phase_narrow_pattern,
+                  plan=RefinementPlan(stages=SCALES_ONLY, phase_support_sigma=None),
+                  telemetry=False)
+    assert all(FE_SCALE in sr.held for sr in res.stages)
+    assert ref.structure.phases[FE].scale.value == START_SCALES[FE]
+    assert [q.weight_fraction for q in res.qpa.phases if q.name == "iron"] == [None]
+
+
+def test_a_restrained_lineless_scale_is_left_to_its_restraint(
+        four_phase_narrow_pattern):
+    """A ``ValueRestraint`` on the scale gives it a column the data do not, so
+    the hold leaves it free and it goes to the target; its fraction stays
+    absent, the value being the caller's and not the data's."""
+    structure, instrument = _models(START_SCALES)
+    structure.phases[FE].restraints = [
+        rx.ValueRestraint(path=FE_SCALE, target=3.0e-4, sigma=1.0e-6)]
+    ref = rx.Refinement(structure, instrument, solver="trf")
+    res = ref.fit(four_phase_narrow_pattern,
+                  plan=RefinementPlan(stages=SCALES_ONLY), telemetry=False)
+    assert all(FE_SCALE not in sr.held for sr in res.stages)
+    assert math.isclose(ref.structure.phases[FE].scale.value, 3.0e-4, rel_tol=1e-3)
+    assert res.qpa.unmeasured_phases == ["iron"]
+
+
+def test_a_magnetic_window_in_range_counts_as_a_line(four_phase_narrow_pattern):
+    """A phase drawing its magnetic component on its own wider windows has a
+    column wherever either window reaches the range (WP-1343's ``win_mag``)."""
+    structure, instrument = _models(START_SCALES)
+    model = compile_model(structure, instrument, four_phase_narrow_pattern,
+                          mode="rietveld")
+    cp = model.phases[FE]
+    assert int(model.phase_line_counts()[FE]) == 0
+    # one reflection whose nuclear window is empty and whose wider magnetic
+    # one covers five points, in the frozen layout (n_lines, N, 2)
+    cp.win = np.zeros((cp.win.shape[0], 1, 2), dtype=np.int64)
+    cp.win_mag = cp.win.copy()
+    assert int(model.phase_line_counts()[FE]) == 0
+    cp.win_mag[0, 0] = (0, 5)
+    assert int(model.phase_line_counts()[FE]) == 1
+
+
+@pytest.mark.parametrize("solver", ["lm", "trf"])
+def test_a_joint_fit_holds_each_histograms_unseen_scale(
+        four_phase_narrow_pattern, solver):
+    """The joint runner's half: each histogram's own Fe scale is held where
+    that histogram has no line of it.  Measured before the hold, TRF walked
+    the two to 214.1 and 2.3 on two copies of the 25–33° scan."""
+    from rietx.multi import MultiHistogramRefinement
+
+    structure, instrument = _models(START_SCALES)
+    multi = MultiHistogramRefinement(
+        structure, [instrument.model_copy(deep=True) for _ in range(2)],
+        solver=solver)
+    res = multi.fit([four_phase_narrow_pattern] * 2,
+                    plan=RefinementPlan(stages=SCALES_ONLY))
+    held = {f"hist.{h}.{FE_SCALE}" for h in range(2)}
+    assert all(held <= set(sr.held) for sr in res.stages)
+    assert [s.phases[FE].scale.value for s in multi.fitted_structures] == [
+        START_SCALES[FE]] * 2
+
+
+# ----------------------------------------------------------------------
 # a joint fit: scales per histogram, displacement parameters shared
 # ----------------------------------------------------------------------
 def _joint_fit(patterns, stages):
@@ -519,3 +677,389 @@ def test_the_held_fit_is_drawn_for_inspection(ridge_fit):
 
     plt.close("all")
     assert path.exists()
+
+
+# ----------------------------------------------------------------------
+# #1103's review: what the answer quotes, and what a restraint exempts
+# ----------------------------------------------------------------------
+def _restraint_fit(pattern, *, weight=1.0, via_variable=False, solver="trf"):
+    """The narrow fit with a restraint of ``weight`` on iron's scale, named
+    directly or through a variable driving it."""
+    structure, instrument = _models(START_SCALES)
+    path = "vars.S_fe" if via_variable else FE_SCALE
+    structure.phases[FE].restraints = [
+        rx.ValueRestraint(path=path, target=3.0e-4, sigma=1.0e-6, weight=weight)]
+    ref = rx.Refinement(structure, instrument, solver=solver)
+    stages = SCALES_ONLY
+    if via_variable:
+        ref.add_variable("S_fe", START_SCALES[FE])
+        ref.tie(FE_SCALE, "vars.S_fe")
+        stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
+    res = ref.fit(pattern, plan=RefinementPlan(stages=stages), telemetry=False)
+    return ref, res
+
+
+def test_a_weightless_restraint_does_not_exempt_the_scale(
+        four_phase_narrow_pattern):
+    """A restraint of weight 0 gives the column nothing, so the hold stays on
+    and the scale keeps the value handed in (TRF walked it to 64.9 when the
+    restraint's mere presence exempted it)."""
+    ref, res = _restraint_fit(four_phase_narrow_pattern, weight=0.0)
+    assert all(FE_SCALE in sr.held for sr in res.stages)
+    assert ref.structure.phases[FE].scale.value == START_SCALES[FE]
+    assert res.qpa.unmeasured_phases == ["iron"]
+
+
+def test_a_restraint_through_a_variable_exempts_the_scale_it_drives(
+        four_phase_narrow_pattern):
+    """The positive arm: a weighted restraint on ``vars.S_fe``, which drives
+    iron's scale, gives that scale a column, so the hold leaves it to the
+    restraint instead of overriding it (and ``RESTRAINT_TENSION`` firing at
+    -200σ)."""
+    ref, res = _restraint_fit(four_phase_narrow_pattern, via_variable=True)
+    assert all(FE_SCALE not in sr.held and "vars.S_fe" not in sr.held
+               for sr in res.stages)
+    assert math.isclose(ref.structure.phases[FE].scale.value, 3.0e-4, rel_tol=1e-3)
+    assert _findings(res, "RESTRAINT_TENSION") == []
+    assert res.qpa.unmeasured_phases == ["iron"]
+
+
+def test_the_unmeasured_set_is_what_the_last_stage_held(pattern):
+    """A scale the last stage held is unmeasured though the answer's count
+    finds a line (a refined zero shift moved one over the range edge): the
+    wide pattern has iron's (110), and the record says it was held."""
+    from rietx.refine import _unmeasured_phases
+
+    structure, instrument = _models(START_SCALES)
+    model = compile_model(structure, instrument, pattern, mode="rietveld")
+    assert int(model.phase_line_counts()[FE]) > 0
+
+    def stage(held, reach=None):
+        return StageResult(name="z", status="converged", n_iterations=1, cost_initial=1.0, cost_final=1.0, held=held,
+                           held_reach=reach or {})
+
+    assert _unmeasured_phases(model, [stage([FE_SCALE])]) == {FE}
+    assert _unmeasured_phases(model, [stage([FE_SCALE]), stage([])]) == set()
+    assert _unmeasured_phases(model, [stage(["vars.S"])]) == set()
+    assert _unmeasured_phases(
+        model, [stage(["vars.S"], {"vars.S": [FE_SCALE]})]) == {FE}
+    assert _unmeasured_phases(model, None) == set()
+
+
+def test_a_shared_scale_another_histogram_measures_is_quoted_everywhere():
+    """A scale shared by a histogram without a line of iron and one with
+    several: its value is the wide scan's measurement, so the narrow
+    histogram's QPA counts iron too (it left iron out before)."""
+    from rietx.multi import MultiHistogramRefinement
+    from rietx.params.multi import SharingMap
+
+    structure, instrument = _models(START_SCALES)
+    narrow = _wide_pattern(np.arange(25.0, 33.0, 0.01))
+    wide = _wide_pattern(np.arange(25.0, 90.0, 0.02))
+    plan = RefinementPlan(stages=SCALES_ONLY)
+    multi = MultiHistogramRefinement(
+        structure, [instrument.model_copy(deep=True) for _ in range(2)],
+        sharing=SharingMap(shared=["phases.*.scale"]))
+    res = multi.fit([narrow, wide], plan=plan)
+    assert all(FE_SCALE not in sr.held for sr in res.stages)
+    for hist in res.histograms:
+        assert hist.qpa.unmeasured_phases == []
+        (iron,) = [q for q in hist.qpa.phases if q.name == "iron"]
+        assert iron.weight_fraction is not None
+    # per-histogram scales stay as before: the narrow scan has no iron fraction
+    own = MultiHistogramRefinement(
+        structure, [instrument.model_copy(deep=True) for _ in range(2)]
+    ).fit([narrow, wide], plan=plan)
+    assert own.histograms[0].qpa.unmeasured_phases == ["iron"]
+    assert own.histograms[1].qpa.unmeasured_phases == []
+
+
+def test_the_message_says_where_the_closing_stage_refined_the_scale():
+    """The scale held in an early stage and refined in the last: the message
+    names the stages that held it and says the answer is a measurement."""
+    from rietx.refine import _phase_support_diagnostics
+
+    structure, _ = _models(START_SCALES)
+    held = StageResult(name="s", status="converged", n_iterations=1, cost_initial=1.0, cost_final=1.0, held=[FE_SCALE])
+    closing = StageResult(name="close", status="converged", n_iterations=1, cost_initial=1.0, cost_final=1.0, held=[])
+    args = (np.full(4, 0.5), np.array([5, 5, 5, 1]), (25.0, 44.0), [FE_SCALE],
+            structure)
+    (finding,) = _phase_support_diagnostics(*args, [held, closing])
+    assert "held at the value handed in for stage s" in finding.message
+    assert "refined in the last stage (close)" in finding.message
+    (finding,) = _phase_support_diagnostics(*args, [held, held])
+    assert "refined in the last stage" not in finding.message
+
+
+def test_the_answer_quotes_no_fraction_for_a_scale_the_last_stage_held(
+        four_phase_narrow_pattern, monkeypatch):
+    """#1103's item 1 end to end: the stages held iron's scale, and the
+    answer's own recount then finds a line (a zero shift moved one over the
+    edge, simulated by emptying the recount once the result is being built).
+    The scale is still the value handed in, so no fraction is quoted."""
+    import importlib
+
+    refine = importlib.import_module("rietx.refine")
+
+    building = {"on": False}
+    real_lineless, real_build = refine._lineless_phases, refine._build_result
+
+    def lineless(model):
+        return set() if building["on"] else real_lineless(model)
+
+    def build(*args, **kw):
+        building["on"] = True
+        try:
+            return real_build(*args, **kw)
+        finally:
+            building["on"] = False
+
+    monkeypatch.setattr(refine, "_lineless_phases", lineless)
+    monkeypatch.setattr(refine, "_build_result", build)
+    ref = rx.Refinement(*_models(START_SCALES), solver="trf")
+    res = ref.fit(four_phase_narrow_pattern,
+                  plan=RefinementPlan(stages=SCALES_ONLY), telemetry=False)
+    assert all(FE_SCALE in sr.held for sr in res.stages)
+    assert res.qpa.unmeasured_phases == ["iron"]
+    (iron,) = [q for q in res.qpa.phases if q.name == "iron"]
+    assert iron.weight_fraction is None and iron.weight_fraction_stderr is None
+
+
+def _simulate_a_line_entering_after_the_stages(monkeypatch):
+    """Empty the line recount whenever a result is being built, so the stages
+    hold iron's scale and the answer's own count then finds it a line (the
+    crossing a refined zero shift makes, #1103)."""
+    import importlib
+
+    refine = importlib.import_module("rietx.refine")
+    building = {"on": False}
+    real_lineless, real_build = refine._lineless_phases, refine._build_result
+
+    def lineless(model):
+        return set() if building["on"] else real_lineless(model)
+
+    def build(*args, **kw):
+        building["on"] = True
+        try:
+            return real_build(*args, **kw)
+        finally:
+            building["on"] = False
+
+    monkeypatch.setattr(refine, "_lineless_phases", lineless)
+    monkeypatch.setattr(refine, "_build_result", build)
+
+
+@pytest.fixture
+def crossed_fit(four_phase_narrow_pattern, monkeypatch):
+    _simulate_a_line_entering_after_the_stages(monkeypatch)
+    structure, instrument = _models(START_SCALES)
+    for phase in structure.phases:
+        phase.particle_radius_um = 0.4
+    ref = rx.Refinement(structure, instrument, solver="trf")
+    res = ref.fit(four_phase_narrow_pattern,
+                  plan=RefinementPlan(stages=SCALES_ONLY), telemetry=False)
+    return ref, res, four_phase_narrow_pattern
+
+
+def test_replay_quotes_no_fraction_for_a_scale_every_stage_held(crossed_fit):
+    """#1103 round 2, item 1: a node records the scales its stage held, so a
+    replay (which has no stage record) quotes iron no fraction either."""
+    ref, res, pattern = crossed_fit
+    assert res.qpa.unmeasured_phases == ["iron"]
+    assert ref.history[res.node_id].metrics.held_scale_phases == [FE]
+    replayed = rx.replay(ref.history, res.node_id, pattern)
+    assert replayed.qpa.unmeasured_phases == ["iron"]
+    assert replayed.qpa.unmeasured_held == ["iron"]
+    (iron,) = [q for q in replayed.qpa.phases if q.name == "iron"]
+    assert iron.weight_fraction is None
+
+
+def test_every_text_gives_a_held_scales_cause_not_a_missing_line(crossed_fit):
+    """Item 2: iron has a reflection at the answer, so no text says it has
+    none; each says the scale was held, and the advice is not to widen."""
+    from rietx.io.exporters import _qpa_caveats
+
+    ref, res, _ = crossed_fit
+    assert res.qpa.unmeasured_held == ["iron"]
+    texts = {
+        "caveat": " ".join(_qpa_caveats(res.qpa)),
+        "skipped": res.qpa.microabsorption_skipped or "",
+        "summary": ref.summary(deliverable="qpa"),
+    }
+    for name, text in texts.items():
+        assert "no reflection in the fitted range" not in text, name
+    assert "scale was held" in texts["caveat"]
+    assert "scale was held" in texts["skipped"]
+    (skipped,) = [d for d in res.diagnostics
+                  if d.code == "MICROABSORPTION_SKIPPED"]
+    assert "Widen the fitted range" not in skipped.suggestion
+    assert "scale was held" in skipped.suggestion
+    (finding,) = [d for d in res.diagnostics if d.code == "PHASE_UNCONSTRAINED"]
+    assert "no weight fraction" in finding.message
+    assert "scale was held" in finding.message
+    assert "seed its scale" not in finding.suggestion
+
+
+def test_a_restraint_freed_scale_is_not_called_a_measurement():
+    """Item 3: no line in range, held in s0 and left free in the last stage
+    by a weighted restraint: the message says so, never that a reflection
+    reached the range."""
+    from rietx.refine import _phase_support_diagnostics
+
+    structure, _ = _models(START_SCALES)
+    held = StageResult(name="s0", status="converged", n_iterations=1,
+                       cost_initial=1.0, cost_final=1.0, held=[FE_SCALE])
+    free = StageResult(name="s1", status="converged", n_iterations=1,
+                       cost_initial=1.0, cost_final=1.0, held=[])
+    args = (np.full(4, 0.0), np.array([5, 5, 5, 0]), (25.0, 44.0), [FE_SCALE],
+            structure, [held, free])
+    (finding,) = _phase_support_diagnostics(*args)
+    assert "where a reflection reached the range" not in finding.message
+    assert "weighted restraint" in finding.message
+    assert "is a measurement" not in finding.message
+
+
+def test_a_joint_message_names_the_histograms_that_held_the_scale():
+    """Item 4: only histogram 0's iron scale was held."""
+    from rietx.refine import _phase_support_diagnostics
+
+    structure, _ = _models(START_SCALES)
+    held = StageResult(name="s", status="converged", n_iterations=1,
+                       cost_initial=1.0, cost_final=1.0,
+                       held=[f"hist.0.{FE_SCALE}"])
+    (finding,) = _phase_support_diagnostics(
+        np.full(4, 0.5), np.array([5, 5, 5, 0]), (25.0, 44.0), [FE_SCALE],
+        structure, [held, held])
+    assert "in histogram 0" in finding.message
+
+
+# ----------------------------------------------------------------------
+# #1103's follow-ups: the trajectory flag (round 1, answer 5) and round 2's
+# read-only observations
+# ----------------------------------------------------------------------
+def test_a_qpa_trajectory_marks_the_points_whose_basis_left_a_phase_out(
+        pattern, four_phase_narrow_pattern):
+    """Iron's lines leave the range in the middle two patterns, so corundum's
+    fraction there is of the three phases seen and steps by 1.4 points with no
+    change in the specimen.  Each point names the phases its basis left out."""
+    from rietx.sequential import SequentialRefinement
+
+    series = SequentialRefinement(*_models(START_SCALES)).fit(
+        [pattern, four_phase_narrow_pattern, four_phase_narrow_pattern, pattern],
+        plan=RefinementPlan(stages=SCALES_ONLY), labels=["w0", "n1", "n2", "w3"])
+    corundum = series.qpa_trajectory("corundum")
+    assert corundum.positions == [0, 1, 2, 3]
+    assert corundum.unmeasured == [[], ["iron"], ["iron"], []]
+    assert corundum.basis_changes
+    assert "n1: relative to the phases seen; iron not measured" in str(corundum)
+    assert series.resolve_trajectory("qpa.corundum").unmeasured == corundum.unmeasured
+    iron = series.qpa_trajectory("iron")
+    assert iron.positions == [0, 3] and not iron.basis_changes
+    # the positive arm: every phase in range at every point, one basis
+    whole = SequentialRefinement(*_models(START_SCALES)).fit(
+        [pattern, pattern], plan=RefinementPlan(stages=SCALES_ONLY))
+    corundum = whole.qpa_trajectory("corundum")
+    assert corundum.unmeasured == [[], []] and not corundum.basis_changes
+    assert "not measured" not in str(corundum)
+
+
+def test_a_scale_held_through_a_variable_is_named_as_the_scale(
+        four_phase_narrow_pattern):
+    """The message sorted held columns by name, so a held ``vars.S_fe``
+    driving iron's scale read "Its 1 structural parameter was held" and the
+    scale clause never fired.  It is the scale, by what the column moves."""
+    ref = rx.Refinement(*_models(START_SCALES), solver="trf")
+    ref.add_variable("S_fe", START_SCALES[FE])
+    ref.tie(FE_SCALE, "vars.S_fe")
+    stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
+    res = ref.fit(four_phase_narrow_pattern, plan=RefinementPlan(stages=stages),
+                  telemetry=False)
+    assert all(sr.held == ["vars.S_fe"] for sr in res.stages)
+    (finding,) = _findings(res, "PHASE_UNCONSTRAINED")
+    assert finding.where == ["vars.S_fe"]
+    assert "Its scale was held at the value handed in" in finding.message
+    assert "structural" not in finding.message
+
+
+def test_a_held_variable_driving_a_cell_is_still_structural():
+    """The positive arm: a held ``vars.a`` driving iron's cell edge is a
+    structural parameter, and the scale clause stays silent."""
+    from rietx.refine import _phase_support_diagnostics
+
+    structure, _ = _models(START_SCALES)
+    held = StageResult(name="s", status="converged", n_iterations=1,
+                       cost_initial=1.0, cost_final=1.0, held=["vars.a"],
+                       held_reach={"vars.a": [f"phases.{FE}.cell.a"]})
+    (finding,) = _phase_support_diagnostics(
+        np.full(4, 0.5), np.array([5, 5, 5, 0]), (25.0, 33.0), [],
+        structure, [held])
+    assert "Its 1 structural parameter was held for stage s." in finding.message
+    assert "Its scale was held" not in finding.message
+
+
+def test_per_histogram_scales_tied_to_one_variable_are_quoted_everywhere():
+    """A constant ``ParametricEquation`` on iron's scale ties each pattern's
+    own scale to ``vars.S_fe_0``, which the wide scan measures, so the narrow
+    histogram's scale is the wide scan's measurement as a shared one is.  It
+    left iron out under the tie and quoted it under ``SharingMap.shared``."""
+    from rietx.multi import MultiHistogramRefinement
+    from rietx.schemas.parametric import ParametricEquation
+
+    structure, instrument = _models(START_SCALES)
+    narrow = _wide_pattern(TT_NARROW)
+    wide = _wide_pattern(np.arange(25.0, 90.0, 0.02))
+    stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
+    multi = MultiHistogramRefinement(
+        structure, [instrument.model_copy(deep=True) for _ in range(2)],
+        parametric=[ParametricEquation(name="S_fe", target=FE_SCALE,
+                                       basis="constant")])
+    res = multi.fit([narrow, wide], plan=RefinementPlan(stages=stages))
+    assert all("vars.S_fe_0" in sr.freed and sr.held == [] for sr in res.stages)
+    for hist in res.histograms:
+        assert hist.qpa.unmeasured_phases == []
+        (iron,) = [q for q in hist.qpa.phases if q.name == "iron"]
+        assert iron.weight_fraction is not None
+
+
+def test_a_variable_no_histogram_with_a_line_reaches_measures_nothing():
+    """The negative arm: the same tie over two narrow scans, neither with a
+    line of iron.  The stages hold the variable, and neither histogram
+    quotes iron."""
+    from rietx.multi import MultiHistogramRefinement
+    from rietx.schemas.parametric import ParametricEquation
+
+    structure, instrument = _models(START_SCALES)
+    narrow = _wide_pattern(TT_NARROW)
+    stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
+    multi = MultiHistogramRefinement(
+        structure, [instrument.model_copy(deep=True) for _ in range(2)],
+        parametric=[ParametricEquation(name="S_fe", target=FE_SCALE,
+                                       basis="constant")])
+    res = multi.fit([narrow, narrow], plan=RefinementPlan(stages=stages))
+    assert all("vars.S_fe_0" in sr.held for sr in res.stages)
+    assert [h.qpa.unmeasured_phases for h in res.histograms] == [["iron"]] * 2
+
+
+def test_a_polynomial_link_on_a_scale_leaves_the_narrow_scan_unmeasured():
+    """The a + b·T arm of the tie above (#1176 round 1, question 2).  One wide
+    scan sees iron and one narrow scan has no iron line; iron's scale is
+    linked by a + b·T.  Two columns face one measured scale, so one direction
+    of the pair is flat and the narrow scan's fraction would be the start
+    value wearing an esd.  Only a constant link counts as measured, so the
+    narrow histogram quotes no iron and the wide one does."""
+    from rietx.multi import MultiHistogramRefinement
+    from rietx.schemas.parametric import CoordinateTable, ParametricEquation
+
+    structure, instrument = _models(START_SCALES)
+    narrow = _wide_pattern(TT_NARROW)
+    wide = _wide_pattern(np.arange(25.0, 90.0, 0.02))
+    stages = [Stage(s.name, [*s.turn_on, "vars.*"]) for s in SCALES_ONLY]
+    multi = MultiHistogramRefinement(
+        structure, [instrument.model_copy(deep=True) for _ in range(2)],
+        coordinates=CoordinateTable(columns={"T": [300.0, 500.0]}, units={"T": "K"}),
+        parametric=[ParametricEquation(name="S_fe", target=FE_SCALE,
+                                       basis="polynomial", terms=[[], ["T"]])])
+    res = multi.fit([narrow, wide], plan=RefinementPlan(stages=stages))
+    narrow_res, wide_res = res.histograms
+    assert narrow_res.qpa.unmeasured_phases == ["iron"]
+    assert wide_res.qpa.unmeasured_phases == []

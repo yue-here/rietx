@@ -1,4 +1,4 @@
-# rietx
+# The rietx manual
 
 rietx is a Python package for Rietveld, Le Bail and Pawley refinement of powder diffraction data.
 

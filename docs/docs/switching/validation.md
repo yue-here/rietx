@@ -9,9 +9,9 @@ The texture and calculated-pattern rows compare calculated data, and their tests
 
 | Comparison | Other code | Data | Agreement |
 | --- | --- | --- | --- |
-| [Fluorapatite](#fluorapatite-against-gsas) | GSAS | Cu Kα, laboratory | cell +83 and +82 ppm; Rwp 9.25 % against 10.05 % |
-| [LaB<sub>6</sub> and cBN](#lab6-and-cbn-against-topas) | TOPAS | synchrotron, APS 11-BM | cBN cell +16 ppm; LaB<sub>6</sub> fraction 0.36 esd outside TOPAS's interval |
-| [Two cathode phases](#two-phases-against-topas-and-gsas-ii) | TOPAS and GSAS-II | synchrotron, NSLS-II 28-ID-1 | within 98 ppm of TOPAS, where the two codes differ by 2668 ppm |
+| [Fluorapatite](#fluorapatite-against-gsas) | GSAS | Cu Kα, laboratory | cell +84 and +84 ppm; Rwp 9.28 % against 10.05 % |
+| [LaB<sub>6</sub> and cBN](#lab6-and-cbn-against-topas) | TOPAS | synchrotron, APS 11-BM | cBN cell +17 ppm; LaB<sub>6</sub> fraction 0.38 esd outside TOPAS's interval |
+| [Two cathode phases](#two-phases-against-topas-and-gsas-ii) | TOPAS and GSAS-II | synchrotron, NSLS-II 28-ID-1 | within 96 ppm of TOPAS, where the two codes differ by 2668 ppm |
 | [Silicon](#silicon-against-xnd) | XND | synchrotron, APS 11-BM | wavelength −11 ppm from XND |
 | [One specimen, two radiations](#one-specimen-two-radiations) | published refinement | synchrotron X-ray and neutron | cell +57 ppm |
 | [Spherical-harmonic texture](#spherical-harmonic-texture-against-gsas-ii) | GSAS-II 5.8.4 | calculated | 16 settings, within 2×10<sup>−6</sup> |
@@ -43,17 +43,20 @@ The Gaussian terms GU, GV and GW are held, and read as the variances GSAS states
 
 | Quantity | rietx | GSAS |
 | --- | --- | --- |
-| Rwp | 0.0925 | 0.1005 |
-| Rp | 0.0712 | 0.0766 |
-| Cell *a* | +83 ppm from GSAS | 9.371724(36) Å |
-| Cell *c* | +82 ppm from GSAS | 6.885867(37) Å |
-| Lorentzian size term | 0.0326° | LX 0.0335° |
+| Rwp | 0.0928 | 0.1005 |
+| Rp | 0.0714 | 0.0766 |
+| Cell *a* | +84 ppm from GSAS | 9.371724(36) Å |
+| Cell *c* | +84 ppm from GSAS | 6.885867(37) Å |
+| Lorentzian size term | 0.0323° | LX 0.0335° |
 
-The offsets on the two axes differ by 2.7×10<sup>−7</sup> in relative terms, against a bar of 10<sup>−4</sup>.
+The offsets on the two axes differ by 6.3×10<sup>−7</sup> in relative terms, against a bar of 10<sup>−4</sup>.
 An offset equal on both axes is a difference in the d-scale convention, and a structural difference would not be equal.
 The test allows 300 ppm on the cell and 10 % on the R-factors.
 
-rietx's esds carry the Bérar–Lelann inflation and GSAS's do not, so the esds are not compared.
+rietx's `stderr` carries the Bérar–Lelann factor, 2.16 on this fit, and GSAS's esds do not.
+`stderr_uncorrected` leaves the factor out.
+It is 4.1×10<sup>−5</sup> Å on *a* and 3.8×10<sup>−5</sup> Å on *c*, against GSAS's 3.6×10<sup>−5</sup> and 3.7×10<sup>−5</sup> Å, measured on the 1.10.0 tree.
+No test compares the esds.
 
 GSAS's file frees 28 parameters, and the plan used here frees 20.
 The plan leaves out the 12 coordinate parameters.
@@ -75,21 +78,24 @@ Both codes fitted 44 895 of the file's 49 496 channels, with the weights from th
 | Quantity | rietx | TOPAS |
 | --- | --- | --- |
 | cBN cell *a* | 3.616521(17) Å | 3.616463 and 3.616466 Å |
-| LaB<sub>6</sub> boron *x* | 0.19839 | 0.19890 |
-| LaB<sub>6</sub> weight fraction | 17.791 ± 0.319 wt % | 17.907 and 17.950 wt % |
-| Rwp | 0.1687 | 0.0810 |
+| LaB<sub>6</sub> boron *x* | 0.19836 | 0.19890 |
+| LaB<sub>6</sub> weight fraction | 17.787 ± 0.319 wt % | 17.907 and 17.950 wt % |
+| Rwp | 0.1686 | 0.0810 |
 
-The cBN cell is 16 ppm from TOPAS.
+The cBN cell is 17 ppm from TOPAS.
 The two TOPAS models are 0.8 ppm apart, and the test allows 50 ppm.
-The boron coordinate is 5.1×10<sup>−4</sup> from TOPAS, inside the fit's own esd of 2.3×10<sup>−3</sup>.
-The LaB<sub>6</sub> fraction is 0.116 wt % outside the interval TOPAS's two models span, which is 0.36 of its own esd.
+The boron coordinate is 5.4×10<sup>−4</sup> from TOPAS, inside the fit's own esd of 2.3×10<sup>−3</sup>.
+The LaB<sub>6</sub> fraction is 0.120 wt % outside the interval TOPAS's two models span, which is 0.38 of its own esd.
 
 The Rwp gap is a profile-shape difference.
 TOPAS fits a Pearson VII peak with six free shape parameters, and rietx has no Pearson VII.
 88 % of χ² sits in the 11 % of channels where the calculated Bragg part is more than half the total, so the gap is at the peak tops.
 A lower Rwp is not a better answer on this specimen.
-Freeing the Lorentzian terms of the instrument and of each phase together reaches Rwp 0.1289 and moves the LaB<sub>6</sub> fraction to 16.850 wt %, 5.5 esd outside TOPAS's interval.
-The instrument and the phases then split one broadening three ways, and the data cannot tell the split apart (correlation −1.000 between a phase's Lorentzian strain and the instrument's Y).
+Freeing each phase's Lorentzian terms beside the instrument's reaches Rwp 0.1377 and moves the LaB<sub>6</sub> fraction to 16.779 wt %, 5.8 esd outside TOPAS's interval.
+The instrument and the phases then split one broadening three ways, and the data cannot tell the split apart.
+In 1.9.0 the correlation between a phase's Lorentzian strain and the instrument's Y read −1.000.
+rietx now holds the instrument's X and Y while a phase's matching Lorentzian term is free, so what stays free is each phase's width relative to the other's.
+That freedom alone still lowers Rwp and moves the fraction.
 
 ## Two phases against TOPAS and GSAS-II
 
@@ -100,11 +106,11 @@ GSAS-II reports its own fit singular and returns a negative crystallite size for
 
 The bar is the span the two codes leave, widened by 300 ppm at each end.
 rietx lands inside the span for every free cell parameter.
-Its worst deviation from TOPAS is 98 ppm, against 2668 ppm between the two codes.
+Its worst deviation from TOPAS is 96 ppm, against 2668 ppm between the two codes.
 
 | | rietx | TOPAS | GSAS-II |
 | --- | --- | --- | --- |
-| Rwp | 7.328 % | 7.326 % | 10.83 % |
+| Rwp | 7.322 % | 7.326 % | 10.83 % |
 
 The phase-scale ratio agrees with TOPAS's within 20 %.
 That bar is the ratio's own dependence on the size and strain valley both codes reported singular.
@@ -112,13 +118,13 @@ The absolute scales are not compared, because each code normalises its own.
 
 A second recipe holds the cell of SRM 660c LaB<sub>6</sub> at its certificate value and fits only the instrument profile.
 The held cell comes back exactly as stated, as it does in both codes.
-rietx's peak widths match the width of GSAS-II's own calculated profile within 5 %, with a median of 1.2 % and a worst case of 2.3 % on the first ten reflections.
+rietx's peak widths match the width of GSAS-II's own calculated profile within 5 %, with a median of 0.5 % and a worst case of 1.0 % on the first ten reflections.
 The test compares widths.
 The coefficients cannot agree, because GSAS-II's model carries a constant Lorentzian term that rietx has not, and a negative Y that GSAS-II clamps on 26 of its 49 reflections.
 
 | | rietx | TOPAS | GSAS-II |
 | --- | --- | --- | --- |
-| Rwp | 8.801 % | 8.519 % | 6.53 % |
+| Rwp | 8.410 % | 8.519 % | 6.53 % |
 
 rietx names three differences from the recipe when it reads it: `RECIPE_FLAG_DROPPED`, `RECIPE_ENGINE_DEFAULT_DECLINED` and `RECIPE_BACKGROUND_PEAK_DEGENERATE`.
 The recipe also declares a background peak wider than its fitted range.
@@ -132,9 +138,9 @@ The reference is XND 1.42.
 
 | Quantity | rietx | XND |
 | --- | --- | --- |
-| Wavelength, 2–50° | 0.412371535 Å | 0.412376076(379) Å |
+| Wavelength, 2–50° | 0.412371546 Å | 0.412376076(379) Å |
 | Wavelength, symmetric peaks only | −0.4 ppm from XND | |
-| B<sub>iso</sub>(Si) | 0.42198(1880) Å<sup>2</sup> | 0.438984(1711) Å<sup>2</sup> |
+| B<sub>iso</sub>(Si) | 0.42188(1897) Å<sup>2</sup> | 0.438984(1711) Å<sup>2</sup> |
 
 Over the full range the wavelengths differ by 11 ppm.
 The two codes model the low-angle asymmetry differently, and rietx uses the Finger–Cox–Jephcoat model.
@@ -150,13 +156,13 @@ rietx runs the same protocol as a joint fit of the two histograms.
 
 | Quantity | rietx | Published |
 | --- | --- | --- |
-| Cell *a* | 10.342904(51) Å | 10.342312(8) Å |
-| O 48*f* *x* | 0.32994(43) | 0.33012(7) |
-| Neutron wavelength | 1.5407968(843) Å | |
+| Cell *a* | 10.342904(48) Å | 10.342312(8) Å |
+| O 48*f* *x* | 0.33001(41) | 0.33012(7) |
+| Neutron wavelength | 1.5407972(795) Å | |
 
 The cell is 57 ppm above the published value, and the oxygen coordinate is inside its own esd.
 The published refinement also carries 0.5(1) % by mole of RuO<sub>2</sub> and a λ/2 contribution, which rietx does not model.
-The neutron wavelength moves 257.6 ppm from its nominal value, which is the same cell disagreement the two histograms show when each is fitted on its own.
+The neutron wavelength moves 257.9 ppm from its nominal value, which is the same cell disagreement the two histograms show when each is fitted on its own.
 
 ## Spherical-harmonic texture against GSAS-II
 
@@ -184,9 +190,9 @@ These tests compare rietx with a known answer and with no other code.
 
 | Comparison | Reference | Agreement |
 | --- | --- | --- |
-| LaB<sub>6</sub>, NIST SRM 660c, laboratory Cu Kα | the certified cell, recomputed for the measurement's temperature | +25 ppm, inside the test's ±2×10<sup>−4</sup> Å |
-| Corundum, NIST SRM 676a, laboratory Cu Kα | the certified a and c | c/a +30 ppm; a and c −312 and −282 ppm |
-| Quantitative phase analysis, IUCr CPD round robin, sample 1 | the weighed composition of eight mixtures | worst 4.92 wt %, RMS 2.19 wt %, against the participants' spread of 6.0 wt % on a major phase |
+| LaB<sub>6</sub>, NIST SRM 660c, laboratory Cu Kα | the certified cell, recomputed for the measurement's temperature | +24 ppm, inside the test's ±2×10<sup>−4</sup> Å |
+| Corundum, NIST SRM 676a, laboratory Cu Kα | the certified a and c | c/a +29 ppm; a and c −314 and −284 ppm |
+| Quantitative phase analysis, IUCr CPD round robin, sample 1 | the weighed composition of eight mixtures | worst 5.10 wt %, RMS 2.30 wt %, against the participants' spread of 6.0 wt % on a major phase |
 
 The certificate's own uncertainty on SRM 660c is ±8×10<sup>−6</sup> Å, and rietx does not reach it.
 The remaining offset varies as cot θ and sin 2θ, which is the shape of instrument aberrations a fundamental-parameters peak would model.

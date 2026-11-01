@@ -34,7 +34,7 @@ def test_events_written_and_readable(tmp_path, synthetic_pattern):
     assert kinds[0] == "fit_start"
     assert kinds[-1] == "fit_end"
     stages = [e.data["stage"] for e in events if e.kind == "stage_start"]
-    assert stages == ["scale_bkg", "zero", "cell", "profile_w", "profile"]
+    assert stages == ["scale_bkg", "zero", "cell", "profile_w", "profile", "closing"]
     # per-iteration heartbeat really came from inside the solver
     evals = [e for e in events if e.kind == "eval"]
     assert len(evals) > 10
@@ -543,12 +543,12 @@ def test_live_session_and_watch_server(tmp_path, synthetic_pattern):
     assert not (live / "fit.html").exists()
     assert (live / "events.jsonl").exists()
     snapshot = json.loads((live / "snapshot.json").read_text(encoding="utf-8"))
-    assert snapshot["stage"] == "profile"        # last stage of the plan
+    assert snapshot["stage"] == "closing"        # the last stage a fit runs
     assert len(snapshot["two_theta"]) == snapshot["n_drawn"]
     assert snapshot["ticks"]["phase 0"]["n_total"] > 0
 
     status = json.loads((live / "status.json").read_text(encoding="utf-8"))
-    assert status["stage"] == "profile"
+    assert status["stage"] == "closing"
     assert status["rwp"] < 0.2
     # status.json is written from the snapshot payload, so the two cannot
     # disagree about what the stage achieved
@@ -673,10 +673,11 @@ def test_merge_conflict_takes_preferred_side(synthetic_pattern):
 def test_cherry_pick_replays_a_stage_action(synthetic_pattern):
     structure, ins = perturbed_models()
     ref = rx.Refinement(structure, ins)
+    # the declared stages' replay; the closing stage is tests/test_closing_stage.py's
     ref.fit(synthetic_pattern, plan=rx.RefinementPlan(stages=[
         Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
         Stage("zero", ["instrument.zero_shift"]),
-    ]))
+    ], closing_window_tol=None))
     zero_node = ref.result_.node_id             # last stage = zero
     root_children = ref.history.children(ref.history.root.id)
     base_id = root_children[0].id               # after scale_bkg
@@ -706,7 +707,7 @@ def _one_stage_fit(*, peak: bool, two_theta_limits=None):
     and windows and ``fit_end.rwp`` is evaluated on the same model at the same
     values: the two Rwps may then be compared to the bit.
     """
-    from rietx.model.forward import compile_model
+    from rietx.model.forward import WINDOW_AREA_TOL, compile_model
     from rietx.params.vector import ParameterTable
     from rietx.schemas.common import Parameter
     from rietx.schemas.instrument import BackgroundChebyshev, PeakComponent
@@ -744,8 +745,10 @@ def _one_stage_fit(*, peak: bool, two_theta_limits=None):
     grid = rx.PatternData(two_theta=tt.tolist(),
                           intensity=np.zeros_like(tt).tolist())
     table = ParameterTable(structure, ins)
-    y = compile_model(structure, ins, grid, mode="rietveld").evaluate(
-        table.decode(table.x0()))
+    # drawn at the declared stage's windows, the stage this fit runs alone and
+    # the setting PRE_FIX_NO_PEAK_RWP was measured at (WP-2002 moved the default)
+    y = compile_model(structure, ins, grid, mode="rietveld",
+                      window_area_tol=WINDOW_AREA_TOL).evaluate(table.decode(table.x0()))
     y = np.random.default_rng(7).poisson(np.maximum(y, 1.0)).astype(float)
     data = rx.PatternData(two_theta=tt.tolist(), intensity=y.tolist())
 
@@ -756,8 +759,9 @@ def _one_stage_fit(*, peak: bool, two_theta_limits=None):
     if peak:
         free.append("instrument.extra_components.0.area")
     seen: list[dict] = []
+    # the declared stage's stage_end; the closing stage is tests/test_closing_stage.py's
     result = rx.Refinement(structure, ins, history=False).fit(
-        data, plan=rx.RefinementPlan(stages=[Stage("all", free)]),
+        data, plan=rx.RefinementPlan(stages=[Stage("all", free)], closing_window_tol=None),
         two_theta_limits=two_theta_limits, events=seen.append, telemetry=False)
 
     def of(kind):

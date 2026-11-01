@@ -448,6 +448,8 @@ export const PLACES: Readonly<Record<string, Format>> = {
   "phases.*.cell.beta": 5,
   "phases.*.cell.c": 5,
   "phases.*.cell.gamma": 5,
+  // WP-1419: a mode amplitude is in Å, the scale of a bond-length shift
+  "phases.*.distortion_modes.modes.*.amplitude": 4,
   "phases.*.extinction": "exp",
   "phases.*.gauss_size": 6,
   "phases.*.gauss_strain": 6,

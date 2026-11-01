@@ -1,0 +1,1963 @@
+[
+ {
+  "name": "SEQUENTIAL_RESEED",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2010-2045 (raise 2039); trigger src/rietx/sequential.py:1674",
+  "decides": "Tells the caller that a pattern's warm start was rejected and the pattern was refitted cold from the initial models, quoting the warm rung's Rwp (or what it raised) against the cold one.",
+  "without": "The caller would see only SeriesEntry.reseeded and rwp_warm, with nothing in the diagnostics saying the chain was broken at that pattern.",
+  "record": "SeriesEntry.reseeded; SeriesEntry.rwp_warm; SeriesEntry.rung; SeriesEntry.rungs_tried",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-0505 (src/rietx/sequential.py:22-26); WP-1051 the ladder; WP-1333 the raised-rung text (src/rietx/sequential.py:2017-2020); WP-1469 the diverged/above-fence variants (src/rietx/sequential.py:2021-2033)",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:795, reseed_factor=1.0 forced)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:943)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1202)",
+   "IUCr CPD round-robin sample-1 1a-1h, real (tests/test_acceptance_sequential.py:258)",
+   "synthetic LaB6 with an injected raise (tests/test_series_error_policy.py:302)"
+  ],
+  "note": "Fires only when the kept rung is cold; a warm_staged rescue sets rwp_warm and rungs_tried but no code. Its trigger is _reseed_needed (RESEED_FACTOR's fence or divergence), so its tier follows those rows. One literal level (warning)."
+ },
+ {
+  "name": "SEQUENTIAL_RESEED.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:2044 (texts chosen at src/rietx/sequential.py:2026-2036)",
+  "decides": "Points the reader at SEQUENTIAL_UNRECOVERED or SEQUENTIAL_RWP_OUTLIER when the cold rung diverged or is still above the fence, else at a specimen or model change at that point.",
+  "without": "A reseeded pattern would carry no next step, and a reseed beside an outlier would read as a good fit (the contradiction WP-1469 removed).",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1469, issue #481 (src/rietx/sequential.py:2021-2025)",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1326)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1202)"
+  ],
+  "note": "One site, three texts; the walk counts the site, not the branches."
+ },
+ {
+  "name": "SEQUENTIAL_RWP_OUTLIER",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2068-2124 (raise 2106); verdict src/rietx/schemas/sequential.py:193-209 (SeriesEntry.above_fence)",
+  "decides": "Names a pattern whose best rung is still above its rwp_fence, quoting GoF and Rexp against the last pattern inside the fence, and says its steps are left out of the discontinuity scan.",
+  "without": "A blank or bad frame's kept fit would read as an ordinary trajectory point (issue #481), visible only by comparing each entry's Rwp with its rwp_fence.",
+  "record": "SeriesEntry.rwp_fence; SeriesEntry.above_fence (a property, not a stored field); SeriesEntry.rungs_tried",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1469, issue #481; three measured causes in the docstring (src/rietx/sequential.py:2076-2085): blank frame GoF 1.00 vs 1.06 and Rexp 0.159 vs 0.040, counts fallen 4x GoF 1.08 vs 1.04, unmodelled phase GoF 16.7",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp with a blank frame (tests/test_sequential.py:1247)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1202)",
+   "planted perovskite cooling ramp, synthetic, second phase and transition (tests/test_planted_series.py:130, tests/test_planted_series.py:146)",
+   "IUCr CPD round-robin sample-1 1a-1h, real, never fires (tests/test_acceptance_sequential.py:286-289)"
+  ],
+  "note": "Reports and does not judge (docstring). Its threshold is the RESEED_FACTOR fence; the same verdict gates the WP-1469 carve-out and the discontinuity scan's rejected set (src/rietx/sequential.py:2389-2390)."
+ },
+ {
+  "name": "SEQUENTIAL_RWP_OUTLIER.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:2120-2123",
+  "decides": "Tells the reader to open the pattern's own fit before reading its values, and to refit with reseed on first when the ladder stopped short of its cold rung.",
+  "without": "The reader would not know whether a cold start was ever tried on the outlier.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1469",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1202)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1287)"
+  ],
+  "note": "Two texts at one site, keyed on whether 'cold' is in rungs_tried."
+ },
+ {
+  "name": "SEQUENTIAL_UNRECOVERED",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2127-2148 (raise 2141)",
+  "decides": "Names a pattern whose kept attempt is still diverged after every rung the chain tried, and states that it seeded no successor and was left out of the series median.",
+  "without": "The caller would have SeriesEntry.status == 'diverged' but no statement that the chain stepped over the pattern.",
+  "record": "SeriesEntry.status; SeriesEntry.rung; SeriesEntry.rungs_tried",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1051 (src/rietx/sequential.py:73-85)",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp, dictated divergence (tests/test_sequential.py:1158)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1326)",
+   "synthetic LaB6 7-pattern thermal ramp, a quarantined pattern's variable (tests/test_sequential.py:637)",
+   "IUCr CPD round-robin sample-1 1a-1h, real, never fires (tests/test_acceptance_sequential.py:284-285)",
+   "LaB6 tutorial ramp (examples/tutorials/05_sequential_fits.py:358)"
+  ],
+  "note": "The report of quarantine, one of Rule 1's protections. It names neither the successor that warm-started from the last accepted pattern instead nor that pattern (README § Quarantine's record)."
+ },
+ {
+  "name": "SEQUENTIAL_UNRECOVERED.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:2147",
+  "decides": "Tells the reader to fit the diverged pattern on its own to find out why.",
+  "without": "A quarantined pattern would carry no next step.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1051",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1158)"
+  ],
+  "note": ""
+ },
+ {
+  "name": "SEQUENTIAL_CANCELLED",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2151-2165 (raise 2160; called src/rietx/sequential.py:1329, 1412-1414)",
+  "decides": "Says how many of how many patterns the chain reached before a cancel, the pattern in flight abandoned and the rest never started.",
+  "without": "A cancelled series' short entries list would read as a shorter series that ran to completion.",
+  "record": null,
+  "opt_in": "cancel=None (default); fires only on the caller's own token or a stop written by rietx watch (runs.CANCEL_FILE)",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "WP-1016 (src/rietx/sequential.py:2151-2157); WP-1006's rule one rank up (src/rietx/sequential.py:112-118)",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:2377)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1400)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_telemetry.py:943)"
+  ],
+  "note": "Reports the requested act and moves nothing. No field holds the series length, so the n of N lives only in the message. A recorded fit always carries a token (runs.attach_cancel, src/rietx/sequential.py:1273), but only a person or the caller sets it."
+ },
+ {
+  "name": "SEQUENTIAL_CANCELLED.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:2164",
+  "decides": "Tells the reader to re-run the series to extend the trajectory.",
+  "without": "A cancelled series would carry no next step.",
+  "record": null,
+  "opt_in": "cancel=None (default)",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "WP-1016",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:2377)"
+  ],
+  "note": ""
+ },
+ {
+  "name": "SEQUENTIAL_PATH_CHECK_INCOMPLETE",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2168-2189 (warning, raise 2182); src/rietx/sequential.py:2191-2240 (info, raises 2218, 2227); called src/rietx/sequential.py:1369-1372, 1395-1396, 1418-1423, 3057",
+  "decides": "Says the forward/backward comparison did not run (warning: a chain cancelled, or the backward chain raised) or ran on less than the series (info: patterns one chain has no entry for, paths no pattern could judge in both chains).",
+  "without": "Zero SEQUENTIAL_PATH_DEPENDENT findings would read the same whether the comparison ran clean or never ran (issue #224's series C).",
+  "record": null,
+  "opt_in": "direction='forward' (default); fires only under direction='both'",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "WP-1333, issues #224 and #269 (src/rietx/sequential.py:2169-2180, 2194-2213)",
+  "families": [
+   "synthetic LaB6 with an injected raise (tests/test_series_error_policy.py:375, tests/test_series_error_policy.py:402, tests/test_series_error_policy.py:427, tests/test_series_error_policy.py:453)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:2406)"
+  ],
+  "note": "Two literal levels at its raise sites (warning 2182; info 2218, 2227): two consequences in one code, which the record's 'two codes, never a threshold between levels' clause reaches. The info half names only paths some chain measured (a package choice that moves no value). The warning half's record is the diagnostic alone."
+ },
+ {
+  "name": "SEQUENTIAL_PATH_CHECK_INCOMPLETE.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:2185; src/rietx/sequential.py:2223; src/rietx/sequential.py:2234",
+  "decides": "Tells the reader to re-run direction='both' to completion, to treat named patterns as unchecked, or to read both trajectories of an unjudged path before quoting it.",
+  "without": "A partial comparison would carry no next step.",
+  "record": null,
+  "opt_in": "direction='forward' (default)",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "WP-1333",
+  "families": [
+   "synthetic LaB6 with an injected raise (tests/test_series_error_policy.py:402)"
+  ],
+  "note": ""
+ },
+ {
+  "name": "SERIES_PATTERN_FAILED",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2242-2276 (raise 2270; called src/rietx/sequential.py:1326, 1408-1409)",
+  "decides": "Names a pattern on which every rung raised, so it has no entry, and on the backward pass that the path-dependence comparison cannot judge it.",
+  "without": "A gap left by on_error='carry' or 'skip' would read as a pattern nobody asked to fit, held only in SeriesResult.failures.",
+  "record": "SeriesResult.failures; SeriesResult.n_failed (SeriesResult is not in _audit.RECORD_SCHEMAS)",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1333 (default on_error='carry'; 'raise' was, PR #386) (src/rietx/sequential.py:327-354)",
+  "families": [
+   "synthetic LaB6 with an injected LinAlgError (tests/test_series_error_policy.py:188, tests/test_series_error_policy.py:329, tests/test_series_error_policy.py:402)"
+  ],
+  "note": "Not in the brief's list; raised only in sequential.py, so 2003 owns it. Its injected error copies the private trigger series' LinAlgError, nothing else of it (tests/test_series_error_policy.py:1-22)."
+ },
+ {
+  "name": "SERIES_PATTERN_FAILED.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:2275",
+  "decides": "Tells the reader to fit the failed pattern on its own and read the exception.",
+  "without": "A failed pattern would carry no next step.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1333",
+  "families": [
+   "synthetic LaB6 with an injected raise (tests/test_series_error_policy.py:188)"
+  ],
+  "note": ""
+ },
+ {
+  "name": "SEQUENTIAL_DISCONTINUITY",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2348-2440 (raise 2431); record src/rietx/schemas/sequential.py:327-346 and src/rietx/schemas/sequential.py:715",
+  "decides": "Flags, per path, the single largest step that exceeds DISCONTINUITY_FACTOR x the median absolute step and DISCONTINUITY_SIGMA combined esds, skipping relative paths and steps into or out of rejected patterns.",
+  "without": "The trajectory would carry no named jump; a step would be found only by differencing trajectory(path) by hand.",
+  "record": "SeriesResult.discontinuities (SeriesStep: path, labels, indices, signed step)",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-0505 thresholds, rationale only (src/rietx/sequential.py:219-225); WP-1469 the rejected-step drop (src/rietx/sequential.py:2375-2386, issue #481); WP-1305 verification; WP-1333 relative paths; #604 angles modulo a turn",
+  "families": [
+   "synthetic LaB6 jump series (tests/test_sequential.py:1430)",
+   "synthetic LaB6 7-pattern thermal ramp, silent on a uniform ramp (tests/test_sequential.py:2015)",
+   "planted perovskite cooling ramp, synthetic and its null (tests/test_planted_series.py:112, tests/test_planted_series.py:208)",
+   "LaB6 tutorial ramp (examples/tutorials/05_sequential_fits.py:296)"
+  ],
+  "note": "The maintainer's example (WP Context): to become SeriesResult.steps with no threshold and no diagnostic. Readers of the flagged pairs today: SeriesResult.discontinuities, the trajectory plot's shading (tests/test_sequential.py:1739), _verify_discontinuities (src/rietx/sequential.py:1350), the series deliverable (tests/test_termination_view.py:439). Level info. The verification pass appends to its message and suggestion with += (src/rietx/sequential.py:1880-1900), which the suggestion walk does not count."
+ },
+ {
+  "name": "SEQUENTIAL_DISCONTINUITY.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:2437-2438; appended at src/rietx/sequential.py:1896-1900 by the verification pass",
+  "decides": "Tells the reader to check the pattern's own fit before reading the jump as physics; after verification it adds how to read the cold/chain ratio.",
+  "without": "A flagged jump would carry no next step.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-0505; WP-1305 the appended reading",
+  "families": [
+   "synthetic LaB6 jump series (tests/test_sequential.py:1457, tests/test_sequential.py:1473)"
+  ],
+  "note": "The appended reading is outside the walk's count (an AugAssign, not a suggestion= keyword). The skill's references/series.md carried the symmetry-mode reading (WP Context)."
+ },
+ {
+  "name": "SEQUENTIAL_PATH_DEPENDENT",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2940-3058 (raise 3050)",
+  "decides": "Under direction='both', names a path whose forward and backward values at the same pattern differ by more than PATH_DEPENDENCE_SIGMA combined esds and above the noise floor, judged only where both chains measured an esd.",
+  "without": "The caller would hold SeriesResult.backward and both trajectories with no statement of where they disagree.",
+  "record": "SeriesResult.backward (the reverse chain)",
+  "opt_in": "direction='forward' (default); the GUI series panel defaults to 'forward' too (src/rietx/gui/series.py:80)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-0505; WP-1076 SeriesResult.backward; WP-1333 relative paths and label pairing (src/rietx/sequential.py:2988-2999); #604 angles",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp, silent on a clean series (tests/test_sequential.py:2026)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1804, tests/test_sequential.py:1884)",
+   "moment-angle chart fixtures (tests/test_moment_angle_chart.py:319, :329)",
+   "synthetic magnetic ramp (tests/test_magnetic_series.py:799)",
+   "GUI serves the n_sigma (tests/test_gui_server.py:3692)"
+  ],
+  "note": "The switch is opt-in but PATH_DEPENDENCE_SIGMA (3.0) and NOISE_FLOOR_REL are package numbers used once it is on, and they decide whether the verdict exists, so caller condition 2 fails for this code. Root CLAUDE.md calls it the only check separating a measured trajectory from an ordering artefact; no measurement of the 3 sigma is stated."
+ },
+ {
+  "name": "SEQUENTIAL_PATH_DEPENDENT.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:3054-3055",
+  "decides": "Tells the reader to hold the parameter fixed, restrain it, or report the spread between the two directions as its uncertainty.",
+  "without": "A path-dependent parameter would carry no next step.",
+  "record": null,
+  "opt_in": "direction='forward' (default)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-0505",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1884)"
+  ],
+  "note": "Three alternatives offered, none picked."
+ },
+ {
+  "name": "SEQUENTIAL_PERSISTENT_FINDING",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2443-2509 (raise 2503; half-cut src/rietx/sequential.py:2498; MIN_POINTS_FOR_PERSISTENCE src/rietx/sequential.py:2467; exclusions src/rietx/sequential.py:2482)",
+  "decides": "States, per (code, path), a per-pattern finding that fired on more than half of at least five patterns, at the worst level any occurrence carried, with count/n as its value.",
+  "without": "The caller would see the finding once per entry (425 BOUND_HIT in the WP-1110 trigger) and never the sentence '42 of 68'.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1110 item 8, the 68-pattern in-situ series (src/rietx/sequential.py:2446-2454; tests/test_absent_phase.py:376-380)",
+  "families": [
+   "synthetic SeriesResult with the 68-pattern episode's counts (tests/test_absent_phase.py:376)",
+   "tests/test_absent_phase.py:772",
+   "held-phase ramp (tests/test_held_phase.py:1280)",
+   "tests/test_walking_bounds.py:367",
+   "LaB6 tutorial ramp (examples/tutorials/05_sequential_fits.py:197)"
+  ],
+  "note": "Tier 1 as a statistic per the WP; the open question is whether it carries a verdict. Every raise passes level=levels[(code, path)] (2503), never a literal, so the response test (literal level= at each raise site) cannot read it. The 'more than half' cut is an inline literal the walk cannot see (row-less entry below). Under no deliverable its row prints one line that does not say which per-pattern code persisted (WP Context; tutorial 05, cells 19 and 34)."
+ },
+ {
+  "name": "SEQUENTIAL_PERSISTENT_FINDING.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:2507",
+  "decides": "Tells the reader to change the model or the plan.",
+  "without": "A persistent finding would carry no next step.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1110",
+  "families": [
+   "tests/test_absent_phase.py:376"
+  ],
+  "note": "An instruction to act on every aggregated code alike, including an info one such as DISPERSION_NEGLECTED that the code calls a declared choice (2470-2475)."
+ },
+ {
+  "name": "SEQUENTIAL_WIDTH_GROWTH",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2512-2622 (raise 2608)",
+  "decides": "Names, once per trajectory at its onset, a phase width that reached WIDTH_GROWTH_FACTOR x the first well-measured width, grown by more than WIDTH_GROWTH_SIGMA combined esds, while GoF reached WIDTH_GROWTH_GOF_FACTOR x its own at that reference.",
+  "without": "A width soaking up a missing component would show only as a rising width and a rising GoF that the caller has to put together.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1465, issue #451 (src/rietx/sequential.py:2513-2524)",
+  "families": [
+   "synthetic two-phase soak (tests/test_sequential.py:2899)",
+   "synthetic real strain growth, silent (tests/test_sequential.py:2931)",
+   "synthetic SeriesResult fixtures (tests/test_sequential.py:2724-2813)",
+   "IUCr CPD round-robin sample-1 1a-1h, real, silent (src/rietx/sequential.py:274-278)",
+   "issue #451's operando chain (the reporter's; not on disk)"
+  ],
+  "note": "Its three thresholds sit under THRESHOLDS_VERSION, owned by WP-2004: hand the rulings over, bump nothing here. It reads entries above the Rwp fence (2543-2548) that the discontinuity scan drops."
+ },
+ {
+  "name": "SEQUENTIAL_WIDTH_GROWTH.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:2617-2619",
+  "decides": "Tells the reader to fit the onset pattern with the missing component before reading this width, or the phase's scale and cell, as physics.",
+  "without": "A soaked width would carry no next step.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1465",
+  "families": [
+   "synthetic two-phase soak (tests/test_sequential.py:2899)"
+  ],
+  "note": "Assumes the cause is a missing component, one of the two readings the docstring names (2516-2519)."
+ },
+ {
+  "name": "SEQUENTIAL_MOMENT_HOLD",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2625-2680 (raise 2675)",
+  "decides": "Counts the patterns on which a site's moment came back unsupported (|m| at or below MOMENT_SUPPORT_SIGMA x its esd), names those with no verdict, and lists up to four successors whose modulus was reseeded to MOMENT_FLOOR_MU_B.",
+  "without": "The caller would see each entry's magnetic row and no chain-level count, and nothing at all about the floored warm starts.",
+  "record": "SeriesEntry.magnetic (per-pattern verdicts); the floor carry itself has none",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1329; WP-1327's ratio (src/rietx/sequential.py:50-57)",
+  "families": [
+   "synthetic magnetic ramp (tests/test_magnetic_series.py:678, tests/test_magnetic_series.py:1065, tests/test_magnetic_series.py:993)",
+   "real Cr2WO6 4 K/150 K pair, slow (tests/data/gsas2_hb2a_cr2wo6_*; tests/test_magnetic_series.py:1-8)"
+  ],
+  "note": "The only report of _floor_unsupported_moments, and it truncates the successor list at four labels (src/rietx/sequential.py:2666-2673). MOMENT_SUPPORT_SIGMA is 2004's (unaudited); MOMENT_FLOOR_MU_B is a tier-3 row."
+ },
+ {
+  "name": "SEQUENTIAL_MOMENT_HOLD.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:2677-2679",
+  "decides": "Tells the reader to plot the trajectory from magnetic_trajectory() and quote these points as held.",
+  "without": "Held points would carry no next step.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1329",
+  "families": [
+   "synthetic magnetic ramp (tests/test_magnetic_series.py:678)"
+  ],
+  "note": ""
+ },
+ {
+  "name": "SEQUENTIAL_MOMENT_ONSET",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/sequential.py:2681-2710 (raises 2700, 2705); src/rietx/sequential.py:2742-2938 (folded under direction='both': 2892, 2904, 2921, 2930)",
+  "decides": "Brackets where the moment stops being supported between the last released and first held pattern, read off the verdicts; warns when the bracket's supported side did not converge or verdicts interleave; under direction='both' folds in the reverse chain's bracket and warns on disagreement.",
+  "without": "The onset would be readable only from magnetic_trajectory(site).onset, with no agreement check between chain directions anywhere in the diagnostics.",
+  "record": "MagneticTrajectory.onset (MagneticOnset, computed from SeriesEntry.magnetic; src/rietx/schemas/sequential.py:374-475)",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1329 (src/rietx/sequential.py:58-66)",
+  "families": [
+   "synthetic magnetic ramp (tests/test_magnetic_series.py:678, tests/test_magnetic_series.py:716, tests/test_magnetic_series.py:956, tests/test_magnetic_series.py:1018, tests/test_magnetic_series.py:1145)"
+  ],
+  "note": "Level info or warning at one site (2699, on bracket_verdicts_final), and raised to warning through model_copy in _with_onset_agreement (2784, 2793, 2801, 2810, 2858), which the literal-level response test cannot see: two consequences in one code."
+ },
+ {
+  "name": "SEQUENTIAL_MOMENT_ONSET.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/sequential.py:2702; src/rietx/sequential.py:2707; src/rietx/sequential.py:2900; src/rietx/sequential.py:2913; src/rietx/sequential.py:2927; src/rietx/sequential.py:2936",
+  "decides": "Tells the reader to raise the moment stage's max_iter, to run direction='both', to open the patterns either side of a switch, or to compare the two chains' magnetic rows.",
+  "without": "An onset would carry no next step.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1329",
+  "families": [
+   "synthetic magnetic ramp (tests/test_magnetic_series.py:716, tests/test_magnetic_series.py:956)"
+  ],
+  "note": "advise() (src/rietx/sequential.py:2779-2781) replaces _RUN_BOTH through model_copy(update=...), a seventh rewrite path the suggestion walk does not count."
+ },
+ {
+  "name": "SIZE_NORMALISED_ACROSS_WAVELENGTHS",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/multi.py:2246-2297 (raise 2280; called src/rietx/multi.py:2214)",
+  "decides": "States (info) that a shared size column is the coefficient at histogram 0's wavelength and that each histogram's copy carries (lambda_h/lambda_0)^p of it, with the factors and values.",
+  "without": "A reader would take phases.i.lor_size for the number their own histogram shows.",
+  "record": null,
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1131, WP-1343 (root CLAUDE.md: unfixed, 363.3 A against 623.9 A for one specimen)",
+  "families": [
+   "synthetic two-wavelength LaB6 pair (tests/test_multi_histogram.py:482, tests/test_multi_histogram.py:531, tests/test_multi_histogram.py:634)"
+  ],
+  "note": "Reports the size normalisation (row-less entry rietx.params.multi.size_value_scales), which the package applies inside the opt-in verb without being asked; silent when no scaled term moved off zero."
+ },
+ {
+  "name": "SIZE_NORMALISED_ACROSS_WAVELENGTHS.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/multi.py:2290-2296",
+  "decides": "Tells the reader to read the size with apparent_size_from_size_coefficient at each histogram's own wavelength, or to declare a per-histogram size with SharingMap.",
+  "without": "The reader would not know how to convert the shared column or opt out of sharing it.",
+  "record": null,
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1131",
+  "families": [
+   "tests/test_multi_histogram.py:482"
+  ],
+  "note": ""
+ },
+ {
+  "name": "PARAMETRIC_OUT_OF_RANGE",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/multi.py:2300-2334 (raise 2326)",
+  "decides": "Names every subset pattern where a parametric equation's coefficients put the dependent outside its own declared bounds, at the value it took.",
+  "without": "The dependent's escape would show only by reading each histogram's row against its bounds, since the solve never saw the target's box.",
+  "record": null,
+  "opt_in": "parametric=None (default) on MultiHistogramRefinement/refine_multi; the joint verb itself no default path calls",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "WP-1325; the WP-1119 hazard one rank up",
+  "families": [
+   "synthetic LaB6 parametric ramp (tests/test_parametric_series.py:442)"
+  ],
+  "note": "Reports a fact about the caller's own declaration and bounds; no package threshold."
+ },
+ {
+  "name": "PARAMETRIC_OUT_OF_RANGE.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/multi.py:2331-2333",
+  "decides": "Tells the reader to narrow the subset, lower the polynomial's order, or declare a basis that stays in range.",
+  "without": "An out-of-range equation would carry no next step.",
+  "record": null,
+  "opt_in": "parametric=None (default)",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "WP-1325",
+  "families": [
+   "tests/test_parametric_series.py:442"
+  ],
+  "note": ""
+ },
+ {
+  "name": "PARAMETRIC_TARGET_UNSEEN",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/multi.py:2382-2419 (raise 2410); predicate src/rietx/multi.py:2364-2379",
+  "decides": "Names the subset patterns that cannot see a parametric target's phase, where the target's value and esd are the equation's alone and the form test leaves the pattern out.",
+  "without": "Those patterns' target values would read as measurements.",
+  "record": "ParametricFormTest.n_patterns against n_subset (src/rietx/schemas/parametric.py:320-363)",
+  "opt_in": "parametric=None (default)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1325 (docs/wp/1325-parametric-series.md § Measured: the interval covered a bent truth in the gaps 0.03 of the time)",
+  "families": [
+   "synthetic LaB6 parametric ramp with a faded phase (tests/test_parametric_series.py:617, tests/test_parametric_series.py:541)"
+  ],
+  "note": "Rests on the reported support sigma (PHASE_SUPPORT_SIGMA, a tier-3 row) through refine._reported_support_sigma, a package number inside the opt-in switch."
+ },
+ {
+  "name": "PARAMETRIC_TARGET_UNSEEN.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/multi.py:2416-2418",
+  "decides": "Tells the reader to quote the equation's coefficients, or narrow the subset to the patterns that see the phase.",
+  "without": "An unseen target would carry no next step.",
+  "record": null,
+  "opt_in": "parametric=None (default)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1325",
+  "families": [
+   "tests/test_parametric_series.py:617"
+  ],
+  "note": ""
+ },
+ {
+  "name": "PARAMETRIC_FORM_REJECTED",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/multi.py:2447-2533 (raises 2489, 2522); test src/rietx/multi.py:2422-2444",
+  "decides": "Warns that a parametric equation's form is refused by its data (freeing each pattern's target removes more chi2 than the FORM_TEST_LEVEL point), or that the joint reading rejects all tested equations together without naming one.",
+  "without": "The coefficients' esds, which assume the form, would be quoted with no test of it.",
+  "record": "RefinementResult.parametric_form; RefinementResult.parametric_form_joint (ParametricFormTest.rejected)",
+  "opt_in": "parametric=None (default)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1325; FORM_TEST_LEVEL 0.95 is a tier-2 row (Venzon & Moolgavkar 1988)",
+  "families": [
+   "synthetic LaB6 ramp that bends (tests/test_parametric_series.py:716)",
+   "tests/test_parametric_series.py:1288",
+   "Durham ZrP2O7 and WO3, out of sample (src/rietx/schemas/parametric.py:349-352; docs/wp/1325-parametric-series.md § Measured)"
+  ],
+  "note": "FORM_TEST_LEVEL and the at-bound hold inside the test (row-less entry rietx.multi._parametric_form_tests:at_bound_hold) are package choices inside the opt-in switch; clash candidate B16 from 2002-batch/clashes.md."
+ },
+ {
+  "name": "PARAMETRIC_FORM_REJECTED.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/multi.py:2496-2498; src/rietx/multi.py:2530-2532",
+  "decides": "Tells the reader to add the next term or narrow the subset, one equation at a time when the joint reading alone rejects.",
+  "without": "A rejected form would carry no next step.",
+  "record": null,
+  "opt_in": "parametric=None (default)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1325",
+  "families": [
+   "tests/test_parametric_series.py:716",
+   "tests/test_parametric_series.py:1288"
+  ],
+  "note": ""
+ },
+ {
+  "name": "STAGE_FREED_NOTHING",
+  "kind": "code",
+  "row": true,
+  "where": "src/rietx/multi.py:2536-2581 (raise 2570; called src/rietx/multi.py:1992)",
+  "decides": "States (info), per histogram, the stages whose globs reached rows of another histogram and none of this one.",
+  "without": "A plan whose globs missed a bank would read 'converged' with that histogram's rows never freed (issue #265: Rwp 0.115 against 0.066 with the banks' own globs).",
+  "record": "StageResult.unreached_histograms",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "issue #265, WP-1414",
+  "families": [
+   "synthetic two-histogram LaB6 (tests/test_multi_histogram.py:351)",
+   "tests/test_joint_report.py:405",
+   "TOF bank beside a CW histogram (tests/test_tof_axis.py:1345)",
+   "tests/test_params_surface.py:935"
+  ],
+  "note": "Raised only in multi.py. Reports what the stage did, no threshold."
+ },
+ {
+  "name": "STAGE_FREED_NOTHING.suggestion",
+  "kind": "suggestion",
+  "row": true,
+  "where": "src/rietx/multi.py:2576-2580",
+  "decides": "Tells the reader to list the histogram's parameters and add a glob that reaches them, or scope the stage with hist.<k>.",
+  "without": "A missed histogram would carry no next step.",
+  "record": null,
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "issue #265",
+  "families": [
+   "tests/test_multi_histogram.py:351"
+  ],
+  "note": ""
+ },
+ {
+  "name": "rietx.schemas.sequential.SeriesEntry.rung",
+  "kind": "action",
+  "row": true,
+  "where": "src/rietx/schemas/sequential.py:147-155; written src/rietx/sequential.py:1667",
+  "decides": "Records which attempt produced the entry's values: the collapsed warm refit, the staged plan from the warm state, or the staged plan cold.",
+  "without": "The caller could not tell whether a value came from a warm start or a cold restart.",
+  "record": "SeriesEntry.rung",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1051",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:915, tests/test_sequential.py:943, tests/test_sequential.py:2082)",
+   "IUCr CPD round-robin sample-1 1a-1h, real (tests/test_acceptance_sequential.py:270-273)"
+  ],
+  "note": "The first pattern of every chain is 'cold' without a restart, which is why reseeded is a separate field. Default 'warm' only on a document older than WP-1051."
+ },
+ {
+  "name": "rietx.schemas.sequential.SeriesEntry.reseeded",
+  "kind": "action",
+  "row": true,
+  "where": "src/rietx/schemas/sequential.py:130-137; written src/rietx/sequential.py:1674",
+  "decides": "Records that the kept attempt is the cold rung on a warm-startable pattern, so the chain is broken there.",
+  "without": "The caller could not tell a continuous trajectory point from one with no neighbour behind it.",
+  "record": "SeriesEntry.reseeded",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-0505; WP-1051 (a warm_staged rescue does not set it)",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:795, tests/test_sequential.py:816)",
+   "IUCr CPD round-robin sample-1 1a-1h, real (tests/test_acceptance_sequential.py:275-278)"
+  ],
+  "note": "Set only when the ladder ran (len(tried) > 1, 1670)."
+ },
+ {
+  "name": "rietx.schemas.sequential.SeriesEntry.rwp_fence",
+  "kind": "action",
+  "row": true,
+  "where": "src/rietx/schemas/sequential.py:175-186; written src/rietx/sequential.py:1677 via _rwp_fence src/rietx/sequential.py:1990-1999",
+  "decides": "Records the Rwp limit the fence set at this pattern: reseed_factor x the median Rwp of the patterns accepted before it.",
+  "without": "The verdict above_fence and SEQUENTIAL_RWP_OUTLIER could not be re-derived from a reloaded SeriesResult.",
+  "record": "SeriesEntry.rwp_fence",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1469",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1202, tests/test_sequential.py:1287)",
+   "IUCr CPD round-robin sample-1 1a-1h, real (tests/test_acceptance_sequential.py:290)"
+  ],
+  "note": "Written whatever reseed says; None on the first pattern walked or after only quarantined ones."
+ },
+ {
+  "name": "rietx.schemas.sequential.SeriesEntry.rungs_tried",
+  "kind": "action",
+  "row": true,
+  "where": "src/rietx/schemas/sequential.py:156-162; written src/rietx/sequential.py:1668",
+  "decides": "Records every rung attempted on the pattern, in ladder order.",
+  "without": "rung alone could not say whether the winning attempt was the only one, nor what the iteration count was charged for.",
+  "record": "SeriesEntry.rungs_tried",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1051",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:835, tests/test_sequential.py:915)",
+   "IUCr CPD round-robin sample-1 1a-1h, real, prefix assertion (tests/test_acceptance_sequential.py:270)"
+  ],
+  "note": "Under reseed=False it is ['warm'] except when a bounded first rung forced an escalation (src/rietx/sequential.py:1561-1571)."
+ },
+ {
+  "name": "rietx.schemas.sequential.SeriesEntry.rungs_raised",
+  "kind": "action",
+  "row": true,
+  "where": "src/rietx/schemas/sequential.py:163-174; written src/rietx/sequential.py:1669",
+  "decides": "Records the rungs whose fit raised rather than returned, each with repr(exc), on a pattern a later rung rescued.",
+  "without": "A raised rung would be indistinguishable from one that returned a worse fit.",
+  "record": "SeriesEntry.rungs_raised",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1333, issue #224 (a neighbour's runaway cell refused at compile by every warm rung)",
+  "families": [
+   "synthetic LaB6 with an injected raise (tests/test_series_error_policy.py:302, tests/test_series_error_policy.py:329)"
+  ],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.RESEED_FACTOR",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:167-171; read src/rietx/sequential.py:1990-2007",
+  "decides": "Sets the fence at 1.25 x the median Rwp of the accepted patterns; a warm fit above it climbs the ladder, and a kept fit above it is an outlier.",
+  "without": "Only divergence would escalate the ladder, so a warm fit converged into a wrong minimum would be kept and seed its successor.",
+  "record": "SeriesEntry.rwp_fence; SeriesEntry.reseeded; SeriesEntry.rungs_tried",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "none stated for 1.25: the comment (src/rietx/sequential.py:167-170) argues for a median over the previous value, not for the factor; WP-1469 carved the outlier case out of it",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests force reseed_factor=1.0: tests/test_sequential.py:663, :802, :929, :954, :977, :1176)",
+   "IUCr CPD round-robin sample-1 1a-1h, real, exercised at its default (tests/test_acceptance_sequential.py:258)",
+   "planted perovskite cooling ramp, synthetic (tests/test_planted_series.py:130)"
+  ],
+  "note": "The WP's open measurement: fence on, off and status-only (diverged or non-finite) on three chain families. Also the default of fit:reseed_factor. Its fence feeds three consumers: the ladder, SEQUENTIAL_RWP_OUTLIER and the discontinuity scan's rejected set."
+ },
+ {
+  "name": "rietx.sequential.FIRST_RUNG_SAMPLES",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:173-180; read src/rietx/sequential.py:599",
+  "decides": "Requires three converged first rungs before the first-rung budget exists.",
+  "without": "The budget would arm on one or two samples, whose maximum is set by the cheapest pattern.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "inherits FIRST_RUNG_FACTOR's claim (src/rietx/sequential.py:196-216); no test of its own",
+  "provenance": "WP-1127: at one sample the bound was 2 x 8 = 16 evaluations on the thermal-ramp chain and its third pattern wanted 17, failing on Linux (src/rietx/sequential.py:176-179)",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:986, tests/test_sequential.py:1120)"
+  ],
+  "note": "Part of the answer-invariant class with FIRST_RUNG_FACTOR: the bound only exists once it is satisfied."
+ },
+ {
+  "name": "rietx.sequential.FIRST_RUNG_FACTOR",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:182-218; read src/rietx/sequential.py:601",
+  "decides": "Caps the collapsed first rung at 3.0 x the dearest converged first rung of the chain, after which a truncated rung escalates.",
+  "without": "A losing first rung would spend the plan's largest budget (~400 evaluations on both harness chains) before the ladder moved on.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "claimed bit-identical, 0 of 1030 and 0 of 392 accepted values (src/rietx/sequential.py:196-216; fit docstring src/rietx/sequential.py:1084-1107); measured by examples/bench_ladder_bound.py, asserted by no test",
+  "provenance": "WP-1127: legitimate first rung / running max reaches 1.29 over three chains once three samples are in, so 3.0 is 2.3x margin (src/rietx/sequential.py:193-198)",
+  "families": [
+   "trigger-series, simulated 10-pattern 4-phase ramp (examples/bench_refinement.py:804)",
+   "cpd-series = IUCr CPD sample-1 chain (examples/bench_refinement.py:584)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1035, tests/test_sequential.py:1099, tests/test_sequential.py:1120)"
+  ],
+  "note": "Where it binds it is worth 1.36x the chain's evaluations (src/rietx/sequential.py:1099-1100). WP task 4 writes the invariance test (values bit-identical bound on/off on two chain families, plus the margin). tests/test_sequential.py:1035 shows on a dictated chain that where the bound bites the kept rung and status do change (max_iter kept unbounded, escalated to converged bounded), so the invariance is a measured margin, not a construction. The comment block repeats one paragraph twice (199-216)."
+ },
+ {
+  "name": "rietx.sequential.DISCONTINUITY_FACTOR",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:219-226; read src/rietx/sequential.py:2416",
+  "decides": "Calls a step a discontinuity when it exceeds 5.0 x the median absolute step of the same path.",
+  "without": "The significance leg alone would flag every step of a real ramp with small esds.",
+  "record": "SeriesResult.discontinuities",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "none stated for 5.0: the comment (src/rietx/sequential.py:219-225) justifies needing both legs",
+  "families": [
+   "synthetic LaB6 jump series (tests/test_sequential.py:1430)",
+   "planted perovskite cooling ramp, synthetic (tests/test_planted_series.py:112)"
+  ],
+  "note": "Keyed to the code the WP removes: goes with it, or is re-tiered as SeriesResult.steps' own (the step size needs no threshold)."
+ },
+ {
+  "name": "rietx.sequential.DISCONTINUITY_SIGMA",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:219-227; read src/rietx/sequential.py:2416-2417",
+  "decides": "Requires a flagged step to exceed 3.0 combined esds of its two points.",
+  "without": "The ratio leg alone would flag noise in a flat series whose median step is near zero.",
+  "record": "SeriesResult.discontinuities",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "none stated for 3.0 (src/rietx/sequential.py:219-225)",
+  "families": [
+   "synthetic LaB6 jump series (tests/test_sequential.py:1430)",
+   "planted perovskite cooling ramp, synthetic null (tests/test_planted_series.py:208)"
+  ],
+  "note": "As DISCONTINUITY_FACTOR. A missing esd counts as infinite here (2410-2415, WP-1929)."
+ },
+ {
+  "name": "rietx.sequential.MIN_POINTS_FOR_DISCONTINUITY",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:245-247; read src/rietx/sequential.py:2387, 2399",
+  "decides": "Scans for discontinuities only on series, and paths, with at least five judged points.",
+  "without": "A median step over two or three points would set the scale the ratio is taken against.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "none stated beyond 'means anything' (src/rietx/sequential.py:245-246)",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1635)"
+  ],
+  "note": "Goes or is re-tiered with the discontinuity code. Also the reason cited for FIRST_RUNG_SAMPLES and MIN_POINTS_FOR_PERSISTENCE."
+ },
+ {
+  "name": "rietx.sequential.MIN_POINTS_FOR_PERSISTENCE",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:249-254; read src/rietx/sequential.py:2467",
+  "decides": "Emits SEQUENTIAL_PERSISTENT_FINDING only on series of at least five patterns.",
+  "without": "A series of two or three fits would get a 'summary' that repeats its per-entry findings.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "by analogy with MIN_POINTS_FOR_DISCONTINUITY (src/rietx/sequential.py:249-253), no measurement",
+  "families": [
+   "tests/test_absent_phase.py:408",
+   "tests/test_held_phase.py:1301"
+  ],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.NOISE_FLOOR_REL",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:229-240; read src/rietx/sequential.py:2279-2288",
+  "decides": "Ignores a step or a between-chain gap smaller than 1e-9 of the parameter's own magnitude (never below 1e-9 absolute).",
+  "without": "An unconstrained parameter's floating-point noise would read as a 29 000x jump and as 1e16 sigma of path dependence.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "measured on the synthetic ramp before WP-1938: an unrefinable profile.y with median step 4e-16, one step 1.3e-11, sigma ~4e-55 (src/rietx/sequential.py:229-239)",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:1635, tests/test_sequential.py:1804)"
+  ],
+  "note": "Its absolute floor is the inline max(1.0, magnitude) at src/rietx/sequential.py:2288. A numerical floor (tier-1 candidate); used by both fences."
+ },
+ {
+  "name": "rietx.sequential.PATH_DEPENDENCE_SIGMA",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:242-243; read src/rietx/sequential.py:3046",
+  "decides": "Calls the forward and backward chains in disagreement at more than 3.0 combined esds.",
+  "without": "SEQUENTIAL_PATH_DEPENDENT would have no cut; every nonzero gap would be a finding or none would.",
+  "record": "SeriesResult.backward",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "none stated",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:2026)",
+   "GUI payload reads it (tests/test_gui_server.py:3702)"
+  ],
+  "note": "A number defaulted inside the opt-in direction='both' switch, so it is tiered on its own (the record's caller class, condition 2). The GUI serves it as path_dependence_sigma."
+ },
+ {
+  "name": "rietx.sequential.WIDTH_GROWTH_FACTOR",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:267-279; read src/rietx/sequential.py:2587",
+  "decides": "Calls a phase width a soak at 3.0 x the first well-measured width.",
+  "without": "The GoF leg alone would name every misfit that coincides with any width change.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1465, issue #451: 3 is the reporter's; operando chain 3.4x at onset, synthetic 3.65x on its second soaked pattern; growth alone fires on 11 of 24 round-robin trajectories against the first value, none against the first measured one (src/rietx/sequential.py:268-278)",
+  "families": [
+   "synthetic soak (tests/test_sequential.py:2899)",
+   "IUCr CPD round-robin sample-1 1a-1h, real (src/rietx/sequential.py:274-278)",
+   "issue #451 operando chain (not on disk)"
+  ],
+  "note": "Under THRESHOLDS_VERSION: ruling handed to WP-2004."
+ },
+ {
+  "name": "rietx.sequential.WIDTH_GROWTH_GOF_FACTOR",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:281-297; read src/rietx/sequential.py:2589-2590",
+  "decides": "Requires GoF at the flagged pattern to reach 2.0 x GoF at the reference.",
+  "without": "A width that grows for real under a right model would be named a soak.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1465: clean bound 1.52 over the 75 multi-pattern series the suite runs (thermal ramp's bounded-first-rung fixtures), 1.14 on the round-robin chain; the synthetic soak reads 3.05 (src/rietx/sequential.py:287-296)",
+  "families": [
+   "synthetic real strain growth, GoF flat within 2 % (tests/test_sequential.py:2931)",
+   "synthetic soak (tests/test_sequential.py:2899)",
+   "IUCr CPD round-robin sample-1 1a-1h, real"
+  ],
+  "note": "GoF rather than the issue's Rwp (Rwp tracks Rexp). Under THRESHOLDS_VERSION: WP-2004."
+ },
+ {
+  "name": "rietx.sequential.WIDTH_GROWTH_SIGMA",
+  "kind": "constant",
+  "row": true,
+  "where": "src/rietx/sequential.py:299-303; read src/rietx/sequential.py:2568, 2588",
+  "decides": "Requires the reference width to be 3.0 of its own esds and the growth 3.0 combined esds.",
+  "without": "A poorly determined first width (round-robin lor_strain 5.85e-5 with esd 3e3) would make any later value '946x'.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1465 (src/rietx/sequential.py:299-302)",
+  "families": [
+   "tests/test_sequential.py:2747",
+   "tests/test_sequential.py:2757",
+   "IUCr CPD round-robin sample-1 1a-1h, real"
+  ],
+  "note": "Under THRESHOLDS_VERSION: WP-2004."
+ },
+ {
+  "name": "rietx.sequential.refine_sequential:carry",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:3062; src/rietx/sequential.py:972",
+  "decides": "Carries every parameter across the pattern boundary (glob '*').",
+  "without": "Each pattern would start from the initial models (2863 iterations unchained on round-robin sample 1, against 838 carried).",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-0505: 838 iterations carrying everything against 904 excluding scales, Rwp 0.1278 both (src/rietx/sequential.py:668-677); acceptance header (tests/test_acceptance_sequential.py:9-20)",
+  "families": [
+   "IUCr CPD round-robin sample-1 1a-1h, real (tests/test_acceptance_sequential.py:230)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:270)"
+  ],
+  "note": "WP-2002's width twin hold made the policy matter: carry='*' Rwp 0.1256 against restricted 0.1282 and independent 0.1258, a strict xfail at tests/test_acceptance_sequential.py:224-229. The GUI passes its own carry (src/rietx/gui/session.py:1699)."
+ },
+ {
+  "name": "rietx.sequential.refine_sequential:carry_hkl_intensities",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:3063; src/rietx/sequential.py:973; acts src/rietx/sequential.py:1782-1790",
+  "decides": "Seeds each warm Le Bail or Pawley pattern's per-hkl intensities from the last accepted pattern, matched by hkl.",
+  "without": "Every pattern's extraction would restart from scratch.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1459, issue #440",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp Pawley chain (tests/test_sequential.py:2673)",
+   "synthetic LaB6 7-pattern thermal ramp Le Bail chain (tests/test_sequential.py:2245)"
+  ],
+  "note": "No effect in Rietveld mode."
+ },
+ {
+  "name": "rietx.sequential.refine_sequential:backend",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:3064",
+  "decides": "Runs every pattern on the numpy backend.",
+  "without": "The caller would have to pick a backend.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "precedent: rietx.refine.refine:backend is tier caller (opt-in extras)",
+  "families": [],
+  "note": "Same value and reasoning as the single-fit seat."
+ },
+ {
+  "name": "rietx.sequential.refine_sequential:solver",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:3064",
+  "decides": "Runs every pattern on the bounded LM driver (DEFAULT_SOLVER).",
+  "without": "The caller would have to pick a solver.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "precedent: rietx.refine.refine:solver is tier 2 (GSAS-II's Marquardt-damped solve)",
+  "families": [],
+  "note": "Same value as the single-fit seat."
+ },
+ {
+  "name": "rietx.sequential.refine_sequential:history",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:3065; src/rietx/sequential.py:974",
+  "decides": "Keeps no history tree per pattern.",
+  "without": "A long series would make one tree per pattern and rung.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "precedent: rietx.refine.refine:history is invariant via tests/test_answer_invariant_defaults.py, which does not cover the series seat",
+  "provenance": "none stated",
+  "families": [],
+  "note": "With history off, entries carry no node_id/tree_id and _link_history writes no warm-start note (src/rietx/sequential.py:1937-1955), so a series' warm-start sources are recorded nowhere (README § Quarantine's record). The GUI passes history=True (src/rietx/gui/session.py:1703)."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:x",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1019; src/rietx/sequential.py:1241",
+  "decides": "Uses the pattern index as the series axis.",
+  "without": "The caller would have to supply a coordinate.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "presentation: no fitted value reads x (src/rietx/sequential.py:1241-1243); no test asserts it",
+  "provenance": "none stated",
+  "families": [],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:x_label",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1020; promoted src/rietx/sequential.py:1242-1243",
+  "decides": "Names the axis 'index', promoted to 'x' when an x is given.",
+  "without": "The axis would have no name.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "presentation only; no test asserts it",
+  "provenance": "none stated",
+  "families": [],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:labels",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1021; src/rietx/sequential.py:452-467",
+  "decides": "Names each pattern after its source file's stem, else p000.., made unique by position.",
+  "without": "Patterns would have no names, which become history file names and the key both chains are paired by.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "presentation and pairing only; no fitted value reads it (src/rietx/sequential.py:452-467)",
+  "provenance": "none stated",
+  "families": [
+   "tests/test_sequential.py:259",
+   "tests/test_sequential.py:2307"
+  ],
+  "note": "Labels are the key path dependence pairs the two chains on (src/rietx/sequential.py:2988-2999)."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:mode",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1022",
+  "decides": "Refines every pattern in Rietveld mode.",
+  "without": "The caller would have to name a mode.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "precedent: rietx.refine.Refinement.fit:mode is tier 2 (GSAS-II LeBail False)",
+  "families": [],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:plan",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1023",
+  "decides": "Runs the mccusker_default plan on the first pattern, on every cold rung, and collapsed on every warm one.",
+  "without": "The caller would have to name a plan.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "precedent: rietx.refine.Refinement.fit:plan is tier 3 (McCusker 1999, the order only)",
+  "families": [],
+  "note": "In a series the plan also sets the collapsed first rung's max_iter (the plan's maximum)."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:refit",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1024; src/rietx/sequential.py:1245-1247",
+  "decides": "Makes the collapsed one-stage warm refit the ladder's first rung, rather than the staged plan from the warm state.",
+  "without": "Every warm pattern would re-walk the staged plan.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-0505: 904 iterations against 1623 staged and 2863 unchained, QPA identical to three decimals (src/rietx/sequential.py:1056-1059)",
+  "families": [
+   "IUCr CPD round-robin sample-1 1a-1h, real (WP-0505 acceptance)",
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:758)",
+   "trigger-series: staged 1253 nfev against collapsed 1603 (examples/bench_refinement.py:584-593, 804-823)"
+  ],
+  "note": "The trigger-series is the counterexample: which rung is cheaper is a property of the model (WP-1127). The GUI keeps a second copy of this default (src/rietx/gui/series.py:75-80)."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:two_theta_limits",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1025",
+  "decides": "Fits every pattern's whole range.",
+  "without": "The caller would have to state a range.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "precedent: rietx.refine.Refinement.fit:two_theta_limits is tier 2",
+  "families": [],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:direction",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1026; src/rietx/sequential.py:1249-1251, 1363-1442",
+  "decides": "Walks the chain forward only, with no backward chain and no path-dependence comparison.",
+  "without": "The caller would pay a second complete chain (33.7 s against 83.7 s on the round robin, src/rietx/schemas/sequential.py:776-777) on every series.",
+  "record": null,
+  "opt_in": "direction='forward' is the switch's own off default; 'both' is asked by name, and the GUI series panel defaults to 'forward' (src/rietx/gui/series.py:80)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-0505",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:2026)",
+   "synthetic magnetic ramp (tests/test_magnetic_series.py:716)"
+  ],
+  "note": "Once 'both' is on, PATH_DEPENDENCE_SIGMA and NOISE_FLOOR_REL decide the verdict and the onset agreement raises SEQUENTIAL_MOMENT_ONSET's level, so condition 2 fails for what the switch turns on; the default itself decides nothing. A row at tier caller per the WP is the off default only."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:reseed",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1027; read src/rietx/sequential.py:1567-1571",
+  "decides": "Escalates the ladder when a warm fit diverges or lands above the Rwp fence, keeping the best attempt.",
+  "without": "Each pattern would keep its first rung; the quarantine still holds (fit docstring src/rietx/sequential.py:1077-1083).",
+  "record": "SeriesEntry.rungs_tried; SeriesEntry.rung; SeriesEntry.reseeded",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-0505; WP-1051",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests/test_sequential.py:915)",
+   "IUCr CPD round-robin sample-1 1a-1h, real (tests/test_acceptance_sequential.py:258)"
+  ],
+  "note": "With reseed=False a bounded first rung that came back max_iter still escalates (forced, src/rietx/sequential.py:1561-1571)."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:reseed_factor",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1028",
+  "decides": "Sets the fence factor to RESEED_FACTOR (1.25).",
+  "without": "The caller would have to state a factor.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "see rietx.sequential.RESEED_FACTOR",
+  "families": [
+   "synthetic LaB6 7-pattern thermal ramp (tests pass 1.0)"
+  ],
+  "note": "Same value as the constant; one audit covers both."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:first_rung_factor",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1029",
+  "decides": "Bounds the collapsed first rung at FIRST_RUNG_FACTOR (3.0) x the dearest converged one; None is no bound.",
+  "without": "Every first rung would run to the plan's own cap.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "see rietx.sequential.FIRST_RUNG_FACTOR",
+  "provenance": "none stated",
+  "families": [
+   "tests/test_sequential.py:1035"
+  ],
+  "note": "None reproduces every pre-WP-1127 fit bit for bit, the way back a golden declares."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:verify_discontinuities",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1030; acts src/rietx/sequential.py:1350-1353",
+  "decides": "Leaves every flagged step unverified by default.",
+  "without": "Every series flagging s steps would pay up to 2s cold fits (~5 % on the 68-pattern ramp).",
+  "record": null,
+  "opt_in": "verify_discontinuities=False (default); the GUI series route does not pass it (src/rietx/gui/session.py:1706-1716)",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "WP-1305",
+  "families": [
+   "tests/test_sequential.py:1444"
+  ],
+  "note": "Its input is the discontinuity code's flagged pairs, which the WP replaces."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:prepare",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1031-1032; called src/rietx/sequential.py:1762-1763",
+  "decides": "Calls no per-pattern hook on the warmed models.",
+  "without": "Nothing: the hook is the caller's code.",
+  "record": null,
+  "opt_in": "prepare=None (default); a caller's callable",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "none stated",
+  "families": [
+   "IUCr CPD round-robin sample-1 1a-1h, real chained arm's seed_scales (tests/test_acceptance_sequential.py:105-113, 136)"
+  ],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:constrain",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1033; called src/rietx/sequential.py:1791-1794",
+  "decides": "Declares no per-pattern tie, variable or hold.",
+  "without": "Nothing: the hook is the caller's code.",
+  "record": null,
+  "opt_in": "constrain=None (default); a caller's callable",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "none stated",
+  "families": [
+   "tests/test_sequential.py:474",
+   "tests/test_sequential.py:508",
+   "tests/test_sequential.py:563"
+  ],
+  "note": "Without it, a tie, variable or hold reaches pattern 1 only (WP-1441)."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:on_result",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1034; called src/rietx/sequential.py:1723-1724",
+  "decides": "Calls no per-pattern result callback.",
+  "without": "Nothing: the callback is the caller's code.",
+  "record": null,
+  "opt_in": "on_result=None (default)",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "none stated",
+  "families": [],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:on_error",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1035; acts src/rietx/sequential.py:1615-1657; doc src/rietx/sequential.py:327-354",
+  "decides": "Records a pattern on which every rung raised as a SeriesFailure and warm-starts its successor from the last accepted pattern.",
+  "without": "One pattern's exception would end the chain ('raise', the pre-WP-1333 default).",
+  "record": "SeriesResult.failures; SeriesResult.n_failed",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1333, PR #386, issue #224",
+  "families": [
+   "synthetic LaB6 with an injected raise (tests/test_series_error_policy.py:201, tests/test_series_error_policy.py:210)"
+  ],
+  "note": "The action it selects is the row-less entry rietx.sequential.SequentialRefinement._chain.on_error_carry."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:events",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1036",
+  "decides": "Attaches no event callback.",
+  "without": "Nothing: an observation channel.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "precedent: rietx.refine.Refinement.fit:events is invariant via tests/test_answer_invariant_defaults.py, which does not cover the series seat",
+  "provenance": "none stated",
+  "families": [],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:cancel",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1036; composed src/rietx/sequential.py:1273",
+  "decides": "Passes no cancel token (a recorded run still composes one for rietx watch).",
+  "without": "Nothing: an observation channel.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "precedent: rietx.refine.Refinement.fit:cancel is invariant; no series test",
+  "provenance": "none stated",
+  "families": [],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:progress",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1036",
+  "decides": "Writes no progress lines.",
+  "without": "Nothing: an observation channel.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "precedent: rietx.refine.Refinement.fit:progress is invariant; no series test",
+  "provenance": "none stated",
+  "families": [],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:telemetry",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1036; src/rietx/sequential.py:1261",
+  "decides": "Records the series as one run directory.",
+  "without": "Nothing about the answer: the recorder sits beside the stream.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "precedent: rietx.refine.Refinement.fit:telemetry is invariant; no series test",
+  "provenance": "none stated",
+  "families": [
+   "tests/test_telemetry.py:943"
+  ],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement.fit:label",
+  "kind": "default",
+  "row": true,
+  "where": "src/rietx/sequential.py:1037",
+  "decides": "Leaves the series' run directory unnamed, so rietx watch shows the pattern labels alone.",
+  "without": "Nothing about the answer: a run's name.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "precedent: rietx.refine.Refinement.fit:label is invariant; no series test",
+  "provenance": "none stated",
+  "families": [],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential._prefer",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:1958-1987; called src/rietx/sequential.py:1610",
+  "decides": "Chooses which attempt of a pattern's ladder is kept: an untruncated attempt over a truncated one, then a non-diverged over a diverged one, then the lower Rwp (_better).",
+  "without": "The last rung tried would be kept whatever it reached.",
+  "record": "SeriesEntry.rung; SeriesEntry.rungs_tried; SeriesEntry.rwp_warm (first rung only)",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1051 (_better); WP-1127 (_prefer: measured that _better alone keeps a truncated rung at equal Rwp, src/rietx/sequential.py:1977-1980)",
+  "families": [
+   "tests/test_sequential.py:788",
+   "tests/test_sequential.py:1077",
+   "tests/test_sequential.py:964",
+   "IUCr CPD round-robin sample-1 1a-1h, real (tests/test_acceptance_sequential.py:276-278: kept Rwp <= rwp_warm)"
+  ],
+  "note": "Keeping the best attempt is one of Rule 1's protections; the criterion (Rwp, with 'max_iter' ranked equal to 'converged' in _better at 1960-1962) is what is on trial. No field records a middle rung's Rwp (rwp_of is local, 1543)."
+ },
+ {
+  "name": "rietx.sequential._reseed_needed",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:2002-2007; called src/rietx/sequential.py:1569-1570",
+  "decides": "Rejects an attempt that diverged or whose Rwp is above the fence; 'max_iter' is not tested.",
+  "without": "No rung after the first would ever run.",
+  "record": "SeriesEntry.rwp_fence; SeriesEntry.rungs_tried",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-0505; the narrowness argued in the module docstring (src/rietx/sequential.py:87-104): guard findings and discontinuities were rejected as triggers",
+  "families": [
+   "tests/test_sequential.py:775",
+   "tests/test_sequential.py:943"
+  ],
+  "note": "The second review's status-only alternative (diverged or non-finite) changes this function; the WP's three-family measurement compares on, off and status-only."
+ },
+ {
+  "name": "rietx.sequential._ladder",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:539-566; RUNGS src/rietx/sequential.py:356-360; stop test src/rietx/sequential.py:1559-1571",
+  "decides": "Sets the escalation order (collapsed warm, staged from warm, staged cold under refit='single'; staged warm then cold under 'stages'), runs a rung only while the fence rejects the best attempt so far, and gives up after the cold rung.",
+  "without": "A rejected warm fit would go straight to the cold fit, paying ~3x to discard a warm start not shown to be the problem (pre-WP-1051).",
+  "record": "SeriesEntry.rungs_tried; SeriesEntry.rung; SeriesEntry.rungs_raised",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1051: 838-904 iterations warm-collapsed, 1623 warm-staged, 2863 cold on round-robin sample 1 (src/rietx/sequential.py:550-555)",
+  "families": [
+   "tests/test_sequential.py:835",
+   "tests/test_sequential.py:915",
+   "tests/test_sequential.py:943",
+   "IUCr CPD round-robin sample-1 1a-1h, real, prefix assertion (tests/test_acceptance_sequential.py:258)",
+   "raised rung escalates (tests/test_series_error_policy.py:302)"
+  ],
+  "note": "Rungs, order and give-up point are the choices to tier. A raised rung escalates like a diverged one (WP-1333). The cold rung starts from the initial models, so a quarantined pattern has no fourth option."
+ },
+ {
+  "name": "rietx.sequential._first_rung_budget",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:569-601; _bounded_plan src/rietx/sequential.py:604-620; armed src/rietx/sequential.py:1537-1539; forced escalation src/rietx/sequential.py:1561; sample src/rietx/sequential.py:1720-1722",
+  "decides": "Caps the collapsed first rung's evaluations at first_rung_factor x the dearest converged first rung once FIRST_RUNG_SAMPLES are in hand, and forces an escalation when the capped rung returns max_iter.",
+  "without": "A losing first rung would spend the plan's whole budget before the ladder moved on.",
+  "record": "none: no field says a rung was truncated or what the budget was; only rungs_tried shows the escalation",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": "claimed at src/rietx/sequential.py:196-216 and src/rietx/sequential.py:1084-1107; bench examples/bench_ladder_bound.py; no test",
+  "provenance": "WP-1127",
+  "families": [
+   "trigger-series and cpd-series (examples/bench_refinement.py:584, 804)",
+   "tests/test_sequential.py:986-1157"
+  ],
+  "note": "Inert under refit='stages' (1535-1539). The cold fit is deliberately not evidence (src/rietx/sequential.py:585-597: cold 9 evaluations, warm 14 on the suite's cheap plan)."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement._chain.quarantine",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:1678-1722 (the status != 'diverged' branch at 1697)",
+  "decides": "A pattern whose kept attempt diverged seeds no successor, joins no median and supplies no first-rung sample; its successor warm-starts from the last accepted pattern.",
+  "without": "One failed pattern would seed its neighbour with garbage and drag the median that sets every later fence (pre-WP-1051).",
+  "record": "SeriesEntry.status ('diverged'); SeriesEntry.rung; SeriesEntry.rungs_tried; no field names the successors seeded from an earlier pattern instead",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1051 (src/rietx/sequential.py:73-85)",
+  "families": [
+   "tests/test_sequential.py:1158",
+   "tests/test_sequential.py:637",
+   "IUCr CPD round-robin sample-1 1a-1h, real, never fires (tests/test_acceptance_sequential.py:284-285)"
+  ],
+  "note": "One of Rule 1's four protections; kept unless a competent caller wants a diverged fit to seed its successors (WP Context). Holds under reseed=False. Missing record: README § Quarantine's record."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement._chain.rwp_outlier_carve_out",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:1688-1697; scan exclusion src/rietx/sequential.py:2387-2390; verdict src/rietx/schemas/sequential.py:193-209",
+  "decides": "Keeps a pattern whose best rung is still above the fence in the chain (it seeds its successor and joins the median), while dropping its steps from the discontinuity scan.",
+  "without": "Quarantined, the median would never follow a lasting change and every later pattern would climb the ladder (+55 % iterations, 18 of 18 flagged against 7, on a 24-pattern ramp whose counts fall 4x).",
+  "record": "SeriesEntry.rwp_fence with SeriesEntry.above_fence (property); SEQUENTIAL_RWP_OUTLIER",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1469, issue #481: on #481's blank quarantine buys 2-8 % of the chain, values identical to the digit (src/rietx/sequential.py:1688-1696)",
+  "families": [
+   "tests/test_sequential.py:1202",
+   "tests/test_sequential.py:1247",
+   "planted perovskite cooling ramp, synthetic (tests/test_planted_series.py:130, tests/test_planted_series.py:146)"
+  ],
+  "note": "The exception WP-1469 carved out of the reseed fence. The scan exclusion is what let the planted step behind a blank frame be seen (src/rietx/sequential.py:2375-2386)."
+ },
+ {
+  "name": "rietx.sequential._floor_unsupported_moments",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:857-922; called src/rietx/sequential.py:1704-1706; carried src/rietx/sequential.py:1529-1530; reported src/rietx/sequential.py:1361, 2654, 2666-2673",
+  "decides": "Before an accepted pattern's state seeds its successor, scales every modulus its fit called unsupported down to MOMENT_FLOOR_MU_B, keeping its direction and leaving the entry's own value untouched.",
+  "without": "A stale modulus would seed the next pattern, where |F_m|^2 ~ m^2 gives no gradient to leave it, and the chain would print a smooth |m| through the transition.",
+  "record": "none: only SEQUENTIAL_MOMENT_HOLD's message, which names at most four successors; the floored dict _chain returns (1745) reaches no field",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1329 (WP-1301's rule along the series); MOMENT_FLOOR_MU_B is a tier-3 row (WP-1327); MOMENT_SUPPORT_SIGMA is 2004's, unaudited",
+  "families": [
+   "synthetic magnetic ramp (tests/test_magnetic_series.py:587, tests/test_magnetic_series.py:609, tests/test_magnetic_series.py:618, tests/test_magnetic_series.py:1065, tests/test_magnetic_series.py:1194)"
+  ],
+  "note": "Not in the first plan; the review found it. Acts whatever reseed says; a None verdict is never floored (892-894); on_error='skip' clears the pending floor (1647). A protection that records only in prose."
+ },
+ {
+  "name": "rietx.sequential._carry_into",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:646-709; called src/rietx/sequential.py:1760-1761",
+  "decides": "Copies every fitted value matching the carry globs into the next pattern's initial models, carrying a refined coordinate as its site's displacement and a rigid body's orientation and torsions, then re-derives every tie from its carried sources.",
+  "without": "Each pattern would start from the initial models.",
+  "record": "none on the SeriesResult; with history on, the root annotation series_warm_start_tree/_node (src/rietx/sequential.py:1937-1955)",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-0505 (src/rietx/sequential.py:668-677); WP-1333 coordinate displacement; WP-1805/1808 rigid bodies",
+  "families": [
+   "tests/test_sequential.py:270",
+   "tests/test_sequential.py:299",
+   "tests/test_sequential.py:339",
+   "IUCr CPD round-robin sample-1 1a-1h, real (tests/test_acceptance_sequential.py:230)"
+  ],
+  "note": "The carry policy x the width twin hold is a WP clash item (strict xfail tests/test_acceptance_sequential.py:224-229)."
+ },
+ {
+  "name": "rietx.sequential._reanchor_carried",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:712-745; called src/rietx/sequential.py:1793-1794",
+  "decides": "Rebases a carried displacement DOF's anchor against its source when the constrain hook ties it to a named variable, so the variable's warm start is not added twice.",
+  "without": "A tied coordinate would gain the previous displacement again on every pattern.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1432, WP-1333",
+  "families": [
+   "tests/test_sequential.py:365",
+   "tests/test_sequential.py:411"
+  ],
+  "note": "Arithmetic correctness of the carry (a tier-1 candidate)."
+ },
+ {
+  "name": "rietx.sequential._carry_variables",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:748-798; called src/rietx/sequential.py:1795",
+  "decides": "Warms each named variable the constrain hook declared from the last accepted pattern's value under the carry globs, skipping a variable tied to others.",
+  "without": "A vars.X would restart from its declaration on every pattern though carry=['*'] claims it is carried.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1441, issue #376",
+  "families": [
+   "tests/test_sequential.py:563",
+   "tests/test_sequential.py:602",
+   "tests/test_sequential.py:637"
+  ],
+  "note": ""
+ },
+ {
+  "name": "rietx.sequential._collapse",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:468-522; _unseeded src/rietx/sequential.py:525-536; built src/rietx/sequential.py:1245-1246",
+  "decides": "Builds the default warm rung: one stage freeing the union of the plan's globs at the plan's largest max_iter and lebail_cycles, no stage seed, the largest strain_seed, and the plan's intermediate_ftol, closing_window_tol, lebail_passes and phase_support_sigma.",
+  "without": "Every warm pattern would re-walk the staged plan.",
+  "record": "StageResult.name 'warm_refit' on the per-pattern RefinementResult (SequentialRefinement.results_), not on SeriesEntry",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-0505; WP-1123; WP-1323; WP-2002 B1 and sixth round Q1/Q2; the dropped seed measured on the LaB6 ramp, chi2_red 1.05828 seeded against 1.05145 (src/rietx/sequential.py:478-488)",
+  "families": [
+   "tests/test_sequential.py:705",
+   "tests/test_sequential.py:714",
+   "tests/test_sequential.py:729",
+   "tests/test_sequential.py:758",
+   "trigger-series counterexample (examples/bench_refinement.py:804)"
+  ],
+  "note": "Carries the closing stage (closing_window_tol), 1.05-2.05x a single fit's time a pattern; its cost along a chain and its effect on path dependence are unmeasured (WP Context; closing stage x path dependence is a clash item)."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement._verify_discontinuities",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:1811-1900; called src/rietx/sequential.py:1350-1353",
+  "decides": "Refits each flagged step's two patterns cold and independently and records the signed cold step over the chain's as the discontinuity diagnostic's value.",
+  "without": "The step would carry no reproduction ratio; the reader would run the cold pair by hand.",
+  "record": "Diagnostic.value on SEQUENTIAL_DISCONTINUITY (not a SeriesStep field)",
+  "opt_in": "verify_discontinuities=False (default); no default path passes it",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "WP-1305: ~5 % on the 68-pattern thermal ramp, four steps over four patterns (src/rietx/sequential.py:1117-1124)",
+  "families": [
+   "synthetic LaB6 jump series (tests/test_sequential.py:1457, tests/test_sequential.py:1497)",
+   "stubbed cold fits (tests/test_sequential.py:1551-1600)",
+   "68-pattern in-situ ramp (not on disk)"
+  ],
+  "note": "Moves no fitted value, entry, rung or median (fit docstring 1126-1130). Which pairs it refits is the tier-3 discontinuity pick, so its input moves with that ruling. Each cold refit pays the automatic moment-angle profile interval (no _auto_intervals gate in sequential.py, WP task 3)."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement._chain.on_error_carry",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:1615-1657; policy doc src/rietx/sequential.py:327-354",
+  "decides": "When every rung of a pattern raised, records a SeriesFailure and warm-starts the successor from the last accepted pattern ('carry'), cold ('skip'), or ends the chain ('raise'); a series that fitted nothing raises under every policy.",
+  "without": "One pattern's exception would lose every converged pattern of the chain.",
+  "record": "SeriesResult.failures; SeriesResult.n_failed; SeriesEntry.rungs_raised on a rescued pattern",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1333, PR #386, issue #224",
+  "families": [
+   "tests/test_series_error_policy.py:158",
+   "tests/test_series_error_policy.py:178",
+   "tests/test_series_error_policy.py:210",
+   "tests/test_series_error_policy.py:254"
+  ],
+  "note": "Its default is the fit:on_error row; 'carry' is quarantine's own treatment of a diverged fit (1648-1652)."
+ },
+ {
+  "name": "rietx.sequential._persistent_diagnostics.half",
+  "kind": "constant",
+  "row": false,
+  "where": "src/rietx/sequential.py:2498",
+  "decides": "Promotes a per-pattern finding to the series only when it fired on more than half the patterns.",
+  "without": "Every per-pattern finding, or none, would be restated for the series.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "docstring: 'a change of subject, not a sensitivity' (src/rietx/sequential.py:2456-2462); no measurement",
+  "families": [
+   "tests/test_absent_phase.py:376"
+  ],
+  "note": "An inline literal (count * 2 <= n) the constant walk cannot see."
+ },
+ {
+  "name": "rietx.sequential.NOT_A_SERIES_FINDING",
+  "kind": "constant",
+  "row": false,
+  "where": "src/rietx/sequential.py:255-265; read src/rietx/sequential.py:2482",
+  "decides": "Excludes FROZEN_COMPILE_STALE from SEQUENTIAL_PERSISTENT_FINDING's aggregation.",
+  "without": "A chain whose last stages move the zero and widths would carry a series warning about compile sizing on every pattern (round-robin sample 1: 1.3-2.1e-2).",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "#272 (src/rietx/sequential.py:255-264)",
+  "families": [
+   "tests/test_absent_phase.py:451"
+  ],
+  "note": "A frozenset of codes, which the walk cannot see."
+ },
+ {
+  "name": "rietx.sequential._WIDTH_SUFFIXES",
+  "kind": "constant",
+  "row": false,
+  "where": "src/rietx/sequential.py:305-312; read src/rietx/sequential.py:2556-2559",
+  "decides": "Sets which phase widths the soak test reads (lor_strain, lor_size, gauss_strain, gauss_size) and judges the Gaussian pair on their square root.",
+  "without": "A Stephens block or another width would be screened, or none would.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1465",
+  "families": [
+   "tests/test_sequential.py:2763",
+   "tests/test_sequential.py:2813"
+  ],
+  "note": "A dict, which the walk cannot see. A series refining a Stephens block is not screened."
+ },
+ {
+  "name": "rietx.sequential._relative_paths",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:2309-2346; skipped src/rietx/sequential.py:2393, 2985; angles src/rietx/sequential.py:2401-2402, 3032",
+  "decides": "Leaves coordinate and rigid-body rotation DOFs (steps, not positions) out of both fences and compares moment angles modulo a turn.",
+  "without": "A chained coordinate DOF's first step would read as a jump on every clean series, and its opposite signs in the two chains as path dependence.",
+  "record": "SeriesResult.relative_paths; SeriesResult.angle_paths",
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1333, WP-1317, #604",
+  "families": [
+   "tests/test_sequential.py:1763",
+   "tests/test_sequential.py:1786",
+   "tests/test_moment_angle_chart.py:319"
+  ],
+  "note": "Arithmetic (tier-1 candidate); the coordinate rows they drive are judged instead."
+ },
+ {
+  "name": "rietx.sequential.SequentialRefinement._fit_one.declared_wavelengths",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/sequential.py:1768-1781",
+  "decides": "Threads the series root's declared wavelength into each pattern's WAVELENGTH_CALIBRATION reference, though the carried refined wavelength stays the warm start.",
+  "without": "Each pattern would report the pattern-to-pattern drift (~0 ppm) instead of the move from what the beamline stated.",
+  "record": null,
+  "opt_in": null,
+  "caller_condition_2": null,
+  "invariant": null,
+  "provenance": "WP-1134",
+  "families": [],
+  "note": "Moves no fitted value, only a diagnostic's reference; skipped when a prepare hook changes the line count."
+ },
+ {
+  "name": "rietx.multi._hold_unsupported_phases_multi",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/multi.py:396-427, 467-500, 543-589; called src/rietx/multi.py:1484-1486",
+  "decides": "Holds for the stage every joint column whose every reached entry is structure of a phase below phase_support_sigma wherever it lives (a shared cell only when no histogram sees the phase), and a phase's scale only where no histogram's range has a line of it.",
+  "without": "An unseen phase's shared cell would walk at unchanged Rwp (14.9 A from truth in the single-fit v1.3 measurement).",
+  "record": "StageResult.held; StageResult.held_reach",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1301, WP-1325, WP-1342, WP-1958, WP-2002 B1",
+  "families": [
+   "tests/test_held_phase.py:907",
+   "tests/test_held_phase.py:997",
+   "tests/test_held_phase.py:1536",
+   "tests/test_absent_phase.py:717"
+  ],
+  "note": "The joint runner reads CompiledModel.phase_support at stage start and answer alike, never the single fit's scale significance (refine._answer_significance, WP-1523), so the two runners call a phase unseen by different statistics (src/rietx/multi.py:413-417). No Le Bail/Pawley force-fix exists here: the joint fit refuses those modes (src/rietx/multi.py:1180-1184; src/rietx/params/multi.py:234). The 2002 row StageResult.held covers the single runner's hold."
+ },
+ {
+  "name": "rietx.multi._rehold_multi",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/multi.py:707-761; called src/rietx/multi.py:1545-1547; second solve src/rietx/multi.py:1583-1631",
+  "decides": "At the answer, releases a held phase that is seen again and restores to its stage start and holds a column whose phase collapsed while solving, then solves once more.",
+  "without": "A phase that appeared mid-stage would stay held, and one that vanished would keep the cell it walked to.",
+  "record": "StageResult.released; StageResult.collapsed",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1301, WP-1342",
+  "families": [
+   "tests/test_held_phase.py:699"
+  ],
+  "note": ""
+ },
+ {
+  "name": "rietx.multi._hold_scale_b_ridges_multi",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/multi.py:613-704; called src/rietx/multi.py:1491-1492 and late src/rietx/multi.py:1555-1565",
+  "decides": "Holds a phase's displacement columns when its scales across every histogram and its shared displacement columns are inseparable under SCALE_B_SEPARATION_FLOOR, also for a phase released mid-stage.",
+  "without": "Scale and B would ride a ridge the covariance cannot see as two directions.",
+  "record": "StageResult.scale_b_held",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1534; SCALE_B_SEPARATION_FLOOR is a tier-1 row",
+  "families": [
+   "two narrow scans (tests/test_scale_b_ridge.py:621)"
+  ],
+  "note": ""
+ },
+ {
+  "name": "rietx.multi._hold_flat_moments_multi",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/multi.py:764-952 (with _rehold_flat_moments_multi, _turn_flat_axes_multi, _sees_moment); called src/rietx/multi.py:1496-1497, 1567-1574",
+  "decides": "Holds a moment direction flat in every histogram that carries it, turns a flat combination onto its meridian only when the turn reproduces every histogram that sees the moment, and re-asks both at the answer.",
+  "without": "A cubic collinear moment's angles would walk to 1e9-1e10 rad with nothing held (#600).",
+  "record": "StageResult.moment_flat_axes; StageResult.moment_turned; StageResult.held",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1327, #599, #600, #624",
+  "families": [
+   "tests/test_joint_flat_moments.py:87",
+   "tests/test_joint_flat_moments.py:109",
+   "tests/test_joint_flat_moments.py:144"
+  ],
+  "note": "Inline tolerances the walk cannot see: axis agreement 1e-6 (src/rietx/multi.py:796), a 10 % modulus step (src/rietx/multi.py:822), turn agreement atol 1e-9 (src/rietx/multi.py:856). The order differs from the single runner on purpose (src/rietx/multi.py:922-928): a just-released phase's flat directions are restored and held."
+ },
+ {
+  "name": "rietx.multi._hold_width_twins_multi",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/multi.py:592-607; called src/rietx/multi.py:1500-1501",
+  "decides": "Holds an instrument width whose specimen twin is free in every histogram's sums, so one histogram's held width pins the rest.",
+  "without": "The twin pair would walk along a flat direction across the stack.",
+  "record": "StageResult.width_twins_held",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-2002",
+  "families": [
+   "tests/test_width_twin_hold.py:149",
+   "tests/test_width_twin_hold.py:159"
+  ],
+  "note": ""
+ },
+ {
+  "name": "rietx.multi._reset_cell_runaway_multi",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/multi.py:955-988; called src/rietx/multi.py:1536-1539, 1611-1620; diagnostic src/rietx/multi.py:1632",
+  "decides": "Puts a phase's cell back where the stage found it, in every histogram's table, when any table saw it leave the safety window, and holds it for the stage's second solve.",
+  "without": "A shared cell could run to nonsense while every histogram's support stayed above threshold.",
+  "record": "StageResult.cell_reset",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "review of #385 finding 2; WP-2002 B8; CELL_SAFETY_FRACTION/ANGLE are tier-3 rows",
+  "families": [
+   "tests/test_multi_histogram.py:858",
+   "tests/test_multi_histogram.py:897",
+   "tests/test_multi_histogram.py:968",
+   "tests/test_multi_histogram.py:1004"
+  ],
+  "note": "_cell_runaway_diagnostic(cell_runaway) at src/rietx/multi.py:1632 never passes refine._vars_driven_cell_escapes (src/rietx/refine.py:1704; the single runner folds it at refine.py:4480 and 4710), so a vars.X-driven escape in a joint fit is neither reset nor named (WP-2002, PR #1050). The injected case for the single runner is tests/test_cell_runaway_safety.py."
+ },
+ {
+  "name": "rietx.multi.MultiHistogramRefinement._run_plan.seed",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/multi.py:1454-1457; src/rietx/params/multi.py:791-819",
+  "decides": "Lifts every freed row sitting on its floor to the stage's seed, in each histogram's table.",
+  "without": "A row on its floor (U, V, Y at 0) would start where its column may be zero.",
+  "record": "StageResult.seeded",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-2002 (the seed rows); the plan's Stage.seed",
+  "families": [
+   "tests/test_floor_seed.py:113"
+  ],
+  "note": "The joint runner seeds no Stephens block (WP Context)."
+ },
+ {
+  "name": "rietx.multi._parametric_form_tests.at_bound_hold",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/multi.py:2422-2444 (hold at 2442-2444); bound test src/rietx/multi.py:1941-1944",
+  "decides": "Keeps the columns bound_findings names on their bounds on both sides of the parametric form test.",
+  "without": "An at-bound column would enter the alternative free and inflate or absorb the lack-of-fit statistic.",
+  "record": "RefinedParameter.at_bound (the same bound test); the form test records no list of what it held",
+  "opt_in": "parametric=None (default)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1325; staged.bound_findings (WP-1076, WP-1434, WP-1929)",
+  "families": [
+   "tests/test_parametric_series.py:716"
+  ],
+  "note": "Clash candidate B16 (2002-batch/clashes.md): its margin falls to 13/f if class B4 lands."
+ },
+ {
+  "name": "rietx.multi._joint_unmeasured_phases",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/multi.py:443-464; read src/rietx/multi.py:1767, 1793",
+  "decides": "Counts a shared scale that another histogram measures as measured in every histogram it is shared with, so its fraction is reported there.",
+  "without": "A shared scale out of one histogram's range would withhold that histogram's fraction though the data measured it.",
+  "record": "HistogramResult.qpa",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "#1103; refine._unmeasured_phases (WP-1958)",
+  "families": [
+   "tests/test_absent_phase.py:717",
+   "tests/test_absent_phase.py:738"
+  ],
+  "note": ""
+ },
+ {
+  "name": "rietx.optimize.least_squares._freeze_strain_cap_multi",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/optimize/least_squares.py:2373-2388 and _freeze_size_cap_multi src/rietx/optimize/least_squares.py:2426-2445; called src/rietx/optimize/least_squares.py:2853-2854",
+  "decides": "Gives a shared strain or size column the widest histogram's cap, so a line need only fit inside some histogram's range.",
+  "without": "The last histogram's cap would win, letting a short scan bound a width a long one measures.",
+  "record": null,
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1131 (size intersection)",
+  "families": [],
+  "note": "In optimize/, whose constants are 2002's, but the rule is the joint fit's own; no test names either function."
+ },
+ {
+  "name": "rietx.optimize.least_squares._freeze_cell_windows_multi",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/optimize/least_squares.py:2448-2470; called src/rietx/optimize/least_squares.py:2855",
+  "decides": "Windows a phase's cell only when the phase is below support in every histogram, freezing the same set on every sub-table.",
+  "without": "A phase invisible in one histogram and plain in another would have its shared cell windowed by the blind one.",
+  "record": null,
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1301; PHASE_SUPPORT_SIGMA is a tier-3 row",
+  "families": [
+   "tests/test_held_phase.py:907"
+  ],
+  "note": "In optimize/, 2002's directory; a joint-only rule."
+ },
+ {
+  "name": "rietx.params.multi.size_value_scales",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/params/multi.py:61-76 (SIZE_LAMBDA_POWER), src/rietx/params/multi.py:111-153",
+  "decides": "Shares a size column at histogram 0's wavelength and scales each histogram's copy by (lambda_h/lambda_0)^p, p = 1 for lor_size and magnetic_lor_size, 2 for gauss_size.",
+  "without": "One specimen would wear one crystallite size per wavelength (363.3 A against 623.9 A, Rwp x1.8 on the long-lambda histogram).",
+  "record": "none on the result; SIZE_NORMALISED_ACROSS_WAVELENGTHS (info) reports it",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1131, WP-1343; Scherrer (the docstring's physics, 118-127)",
+  "families": [
+   "tests/test_multi_histogram.py:482",
+   "tests/test_multi_histogram.py:531",
+   "tests/test_multi_histogram.py:634"
+  ],
+  "note": "Physics (tier-1 candidate). SIZE_LAMBDA_POWER is a dict, which the walk cannot see."
+ },
+ {
+  "name": "rietx.params.multi.MultiParameterTable._rebuild_columns.bound_intersection",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/params/multi.py:880-894; refresh_bounds src/rietx/params/multi.py:928-944",
+  "decides": "Intersects every histogram's bound onto a shared column, and writes its start value from each histogram in turn.",
+  "without": "The last histogram's bound would silently win.",
+  "record": null,
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "WP-1131",
+  "families": [],
+  "note": "Identity wherever the histograms agree; the start values agree by _check_starts_agree (src/rietx/params/multi.py:389)."
+ },
+ {
+  "name": "rietx.params.multi.SharingMap.is_shared",
+  "kind": "default",
+  "row": false,
+  "where": "src/rietx/params/multi.py:156-177",
+  "decides": "Makes a path per-histogram iff it starts with instrument. or ends with .scale, and shares every other (cell, coordinates, ADPs, size, strain, texture).",
+  "without": "The caller would have to declare the sharing of every path.",
+  "record": "RefinedParameter.path scoping (hist.<h>. on a per-histogram row)",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "Von Dreele (1997) J. Appl. Cryst. 30, 517 (multi.py:6)",
+  "families": [
+   "tests/test_multi_histogram.py:482"
+  ],
+  "note": "SharingMap, MultiHistogramRefinement.__init__/fit and refine_multi are not DEFAULT_SEATS seats, so their defaults (sharing=None, plan='mccusker_default', weights=None, solver, backend) have no rows."
+ },
+ {
+  "name": "rietx.multi.MultiHistogramRefinement.fit:weights",
+  "kind": "default",
+  "row": false,
+  "where": "src/rietx/multi.py:1127-1129; src/rietx/multi.py:1199",
+  "decides": "Weights every histogram 1.0 in the stacked residual.",
+  "without": "The caller would have to weight each histogram.",
+  "record": "HistogramResult.weight",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": false,
+  "invariant": null,
+  "provenance": "none stated",
+  "families": [],
+  "note": "A default outside DEFAULT_SEATS (the walk does not hold it)."
+ },
+ {
+  "name": "rietx.multi.MultiHistogramRefinement._ticks.extra_components",
+  "kind": "action",
+  "row": false,
+  "where": "src/rietx/multi.py:1699-1744 (extra-peak ticks src/rietx/multi.py:1736-1743)",
+  "decides": "Writes declared sharp peaks into each histogram's ticks under EXTRA_TICK_KEY, the joint fit's second builder beside refine._build_result's.",
+  "without": "Every declared peak would read as an unindexed impurity on every histogram's Layer 0.",
+  "record": "HistogramResult.ticks[EXTRA_TICK_KEY]",
+  "opt_in": "refine_multi / MultiHistogramRefinement.fit: a verb no default path calls (grep of src/rietx 2026-10-24: no caller outside multi.py; refine.py only names it in docstrings at 7701 and 7886)",
+  "caller_condition_2": true,
+  "invariant": null,
+  "provenance": "WP-1103 (the member contract's clause 2), WP-1438",
+  "families": [
+   "tests/test_extra_components.py:1583"
+  ],
+  "note": "Root CLAUDE.md names multi.py's own builder as the miss; positions come from CompiledModel.extra_peak_tick_positions, shared with the single runner, and support from refine._extra_peak_tick_support. A third extra_components member audits this reader."
+ }
+]

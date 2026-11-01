@@ -23,7 +23,7 @@ The Jacobian is assembled column by column, taking exact work wherever it
 exists: linear background columns, analytic peak-chain columns (everything
 flowing through per-peak position, width, mixing and intensity), analytic
 site-DOF columns for coordinates and anisotropic ADPs over the frozen operator
-subsets, analytic axial columns for the FCJ apertures, and plain forward
+subsets, analytic columns for magnetic-moment moduli, analytic axial columns for the FCJ apertures, and plain forward
 differences as the fallback.
 Under a differentiable backend the same residual is traced and columns
 come from forward-mode autodiff, whose cost scales with the parameter
@@ -113,9 +113,11 @@ which some overlapping reflection stands higher. An isolated line contributes 1
 and the weaker of an exactly coincident pair contributes 0, so the pair is one
 observation. The guideline built on it asks for at least
 {{ OBS_PER_PARAMETER_MIN }} and preferably {{ OBS_PER_PARAMETER_PREFERRED }}
-effective observations per structural parameter. Those are the atomic ones,
-since peak positions rather than intensities pay for the cell, profile and
-background terms.
+effective observations per structural parameter. Those are the ones that
+move an atom, whatever their names: an atom's own coordinates, occupancy and
+displacement, and a mode amplitude, a named variable or a rigid body's pose
+that drives them. Peak positions rather than intensities pay for the cell,
+profile and background terms.
 
 The estimate is not a theorem, and both papers say so: the approach "may not
 have a rigorous basis". Its own $\alpha$ is a case in point. The paper's check
@@ -125,20 +127,55 @@ generous.
 
 ## Esds and the Bérar-Lelann inflation
 
+rietx reports two esds for each refined parameter.
+`RefinedParameter.stderr` is the least-squares esd multiplied by the
+Bérar-Lelann factor $f$ {cite}`berar1991`, which corrects for neighbouring
+residuals that share a sign. `RefinedParameter.stderr_uncorrected` is the same
+esd without $f$. It is the number GSAS-II and FullProf print, so compare theirs
+with it. `Statistics.esd_inflation` reports $f$, to within 1 % on a
+single-pattern fit.
+
 ```{math}
 :label: est-cov
 
+\begin{gathered}
 \mathrm{Cov} \;=\; \chi^2_{\mathrm{red}} \cdot (J^\top J)^{-1},
-\qquad \mathrm{esd}_i = \sqrt{\mathrm{Cov}_{ii}} \cdot
-\sqrt{S'' / S},
+\qquad \mathrm{esd}^{\mathrm{uncorr}}_i = \sqrt{\mathrm{Cov}_{ii}},
+\\
+\mathrm{esd}_i = f \cdot \mathrm{esd}^{\mathrm{uncorr}}_i,
+\qquad f = \sqrt{S'' / S},
+\end{gathered}
 ```
 
 {source}`rietx.optimize.least_squares.covariance_estimates`
 
-where the second factor is the Bérar-Lelann serial-correlation inflation, the
-homogeneous correction of their § IV {cite}`berar1991`. On the weighted
+where $J$ is the Jacobian of the weighted residuals, $\mathrm{esd}_i$ is
+`stderr` and $\mathrm{esd}^{\mathrm{uncorr}}_i$ is `stderr_uncorrected`.
+{eq}`est-berar-lelann` defines $S$ and $S''$.
+
+### Why the uncorrected esd is too small
+
+The uncorrected esd treats the residual at each channel as independent of its
+neighbours. A Rietveld residual rarely is. Where the model misses a peak's
+shape, the misfit keeps one sign across many consecutive channels. Those
+channels repeat one piece of information, and the uncorrected esd counts each
+of them as new. So it comes out too small.
+
+It also depends on the step width. Take a scan whose misfit is systematic, so
+that $\chi^2_{\mathrm{red}}$ is well above 1. Measure the same specimen again
+with the same total counts in steps half as wide. Each channel then holds half
+the counts and half the misfit. The weighted misfit summed over a peak is
+unchanged, and the number of channels doubles. So $\chi^2_{\mathrm{red}}$
+halves, $J^\top J$ is unchanged, and every uncorrected esd shrinks by
+$\sqrt 2$. The specimen and the information in the scan are the same. Where the
+residual is counting noise alone, $\chi^2_{\mathrm{red}} \approx 1$ at either
+step width and the uncorrected esd does not move.
+
+### The factor
+
+$f$ is the homogeneous correction of Bérar and Lelann's § IV. On the weighted
 residuals $a_i$, with $S = \sum a_i^2$, each point carries the probability
-$z_i$ that it is correlated with its predecessor, and enters the sum
+$z_i$ that it is correlated with its predecessor. It enters the sum
 quadratically with weight $1 - z_i^2$ and linearly with weight $z_i$:
 
 ```{math}
@@ -156,26 +193,92 @@ x_i = a_i^2 + a_{i-1}^2 \quad (a_i a_{i-1} > 0),
 {source}`rietx.optimize.statistics.berar_lelann_factor`
 
 and $z_i = 0$ where the sign changes. A run is a stretch of consecutive
-$z_i > 0$. Correlated neighbours do not carry independent information, so
-they are added coherently in proportion to how likely they are to be
-correlated. The $z_i$ is the paper's stated derivation, the ratio of the
-$\chi^2$ densities for two degrees of freedom to the sum of those for one and
-two, $f_2/(f_1 + f_2)$ at $x_i$. That is the $2\pi$ of the paper's own Fortran
-and of Andreev's restatement {cite}`andreev1994`; the typeset equation (12) prints
-2 instead. Two properties follow. White residuals do not give 1: independent unit
-normals give $E[S'']/E[S] = 1.269$, a factor of ≈1.13, so a value near that is
-no evidence of correlation. And $z_i$ reads $a_i^2$ itself, so the factor is
-not invariant to the residuals' scale: it grows with $\chi^2_{\mathrm{red}}$
-at a fixed correlation, which the paper intends, since normalised differences
-grow with counting time. Before 1.6 the package summed every same-sign run
-with weight 1 instead, the paper's rejected § III product test at level zero,
-which reads ≈1.51 on white residuals.
+$z_i > 0$. Correlated neighbours do not carry independent information, so they
+are added coherently, in proportion to how likely they are to be correlated.
+The $z_i$ is the paper's stated derivation: the $\chi^2$ density for two
+degrees of freedom over the sum of the densities for one and two,
+$f_2/(f_1 + f_2)$ at $x_i$. That is the $2\pi$ of the paper's own Fortran and
+of Andreev's restatement {cite}`andreev1994`. The typeset equation (12) prints
+2 instead.
 
-Reported esds carry the inflation. The correlation matrix does not. It is the
-true Pearson matrix, so a genuinely degenerate pair reports $|\rho| \approx 1$
-and the 0.98 high-correlation guard means what it says. Values are quoted with
-two-significant-figure su's per the IUCr convention
-{cite}`schwarzenbach1989`.
+Two properties follow. White residuals do not give 1. Independent unit normals
+give $E[S'']/E[S] = 1.269$, a factor of 1.13, so a value near 1.13 is no
+evidence of correlation. And $z_i$ reads $a_i^2$ itself, so the factor is not
+invariant to the residuals' scale. It grows with $\chi^2_{\mathrm{red}}$ at a
+fixed correlation. The paper intends this, since normalised differences grow
+with counting time. Before 1.6 the package summed every same-sign run with
+weight 1 instead. That is the paper's rejected § III product test at level
+zero, and it reads 1.51 on white residuals.
+
+Two fits shipped with the package, measured on 2026-10-21, with the esd of
+the lattice parameter $a$:
+
+| Fit | $f$ | `stderr` of $a$ | `stderr_uncorrected` of $a$ |
+|---|---|---|---|
+| Fluorapatite, lab Cu Kα (`examples/guides/cell.py`) | 2.17 | 8.3×10<sup>−5</sup> Å | 3.8×10<sup>−5</sup> Å |
+| NAC, APS 11-BM synchrotron (`examples/nac_11bm.py`) | 8.02 | 3.9×10<sup>−5</sup> Å | 4.9×10<sup>−6</sup> Å |
+
+So on a fit with nothing left to model, `stderr` is 13 % above
+`stderr_uncorrected`. On lab data it is about twice as large, and on a
+fine-stepped synchrotron scan about eight times.
+
+Neither esd includes systematic error. On NIST SRM 660c, a LaB<sub>6</sub>
+standard measured on a lab instrument, the refined $a$ is 4.156882(21) Å
+against 4.156780 Å recomputed from the certificate. That is 4.9 `stderr`
+away, with $f$ applied.
+
+The correlation matrix does not carry $f$. It is the true Pearson matrix, so a
+genuinely degenerate pair reports $|\rho| \approx 1$ and the 0.98
+high-correlation guard means what it says. The esd of a derived quantity, such
+as a bond length or a weight fraction, carries $f$ through {eq}`est-derived`.
+Divide it by $f$ for the uncorrected number. The exact $f$ is `stderr` over
+`stderr_uncorrected` on any row of the same fit. `Statistics.esd_inflation`
+measures $f$ again at the values the result reports, while the esds carry the
+$f$ of the solve's last residual. The two agreed to 0.75 % or better on the
+single-pattern fits measured, and differed by 4 % on a joint fit with
+histogram weights 1:4. Values are quoted with two-significant-figure su's per
+the IUCr convention {cite}`schwarzenbach1989`.
+
+### What other programs report
+
+| Program | Its esd | The rietx number to compare with |
+|---|---|---|
+| GSAS-II 5.8.4 | $\chi^2_{\mathrm{red}} \cdot (J^\top J)^{-1}$, with no correlation factor | `stderr_uncorrected` |
+| FullProf 8.20 | the least-squares esd, with $f$ printed beside it as SCOR | `stderr_uncorrected`, or its esd × SCOR against `stderr` |
+| TOPAS (Technical Reference, Version 9) | from the least-squares matrix, or by bootstrap, with no correlation factor described | `stderr_uncorrected` |
+| XND 1.42 | multiplied by Bérar's factor | `stderr` |
+
+GSAS-II multiplies the inverse normal matrix by GOF² (`GSASIIstrMain.py`,
+line 397, in 5.8.4, read on 2026-10-20), and GOF² is $\chi^2_{\mathrm{red}}$.
+It computes the Durbin-Watson statistic and applies no correlation factor.
+
+FullProf computes Bérar and Lelann's correction and leaves its own esds as they
+are. Its `.sum` file says why, and gives the factor beside two others. From
+FullProf 8.20's refinement of the PbSO<sub>4</sub> round-robin pattern:
+
+```text
+ => Standard deviations concern the PRECISION of parameters and
+    represent ACCURACY only if there is no systematic errors
+    A better estimate of the accuracy of structural parameters
+    is obtained multiplying sigmas by the parameter SCOR
+ -> SCOR =   2.2790 { Berar'S FORMULA}
+ -> SCOR =   2.6633 {Pawley'S FORMULA}
+```
+
+The `.out` file repeats it as "Standard deviations have to be multiplied by:
+2.2790". A FullProf esd times SCOR is the counterpart of rietx's `stderr`, as
+far as the two factors agree. rietx's {eq}`est-berar-lelann` applied to the
+final residuals of that FullProf fit gives 2.37, 4 % above FullProf's 2.28.
+The cause of that difference has not been traced.
+
+The TOPAS Technical Reference, Version 9 (October 2026), computes esds
+at the end of a refinement when `do_errors` is set (§ 5.9), by singular value
+decomposition, and offers `bootstrap_errors` as the alternative (§ 5.10). It
+lists the Durbin-Watson statistic among its criteria of fit (§ 5.19). It does
+not mention Bérar and Lelann or any correction for serial correlation.
+
+XND 1.42 applies Bérar's correction, so its esds compare with `stderr`. The
+silicon comparison on the validation page relies on that.
 
 ## Esds of derived quantities
 
@@ -214,7 +317,10 @@ honestly. Four cases qualify:
   variance below {{ VARIANCE_CANCELLATION_FLOOR }} of its own form's absolute
   terms. A symmetry-fixed 90° angle has exactly zero variance while its partials
   against $x$, $y$ and $z$ do not vanish, so the quadratic form lands on
-  roundoff;
+  roundoff. A torsion held at 180° by an inversion centre cancels one step
+  earlier, between the two images of one atom, so every net partial is
+  roundoff; its absolute terms are therefore taken from the partials before
+  they are summed;
 * an angle within {{ ANGLE_LINEARISATION_LIMIT_DEG }}° of 0° or 180°, where the
   angle is a stationary point of the coordinates and the linearisation the
   propagation rests on does not hold at all.
@@ -258,9 +364,9 @@ factors put the cut on the
 scale of the esds themselves, so on a single quadratic basin the admissible
 fractions reproduce $W \pm 1.96\,\sigma_W$. Every admissible point's fraction
 lies inside the 95 % profile interval for $W$, so the range the profile reports
-is an inner bound, and a finer grid can only widen it. The profile is reported
-as undetermined when an admissible fraction lies more than
-{{ FRACTION_PROFILE_EXCESS }} times $1.96\,\sigma_W$ from the fit's.
+is an inner bound, and a finer grid can only widen it. The profile reports how
+far its farthest admissible fraction lies from the fit's, in units of
+$1.96\,\sigma_W$, and no threshold turns that distance into a verdict.
 
 The pinned parameter is the width rather than the scale. At a pinned scale the
 refit can reach the hump basin only by broadening the phase below the noise,
@@ -372,6 +478,15 @@ tilted 0.05 rad from $\mathbf{a}$ scores about 2500 with the four angles
 together, so its polar angle keeps its column. The two azimuths beside it pass
 on their own, and leaving them out gives the moduli 0.0015 and 0.0011 μ_B
 again.
+
+An angle left out has no esd, but the data still determine it through the
+curvature. So a single fit gives each such angle the two-sided interval of
+{eq}`est-interval` and stores it on the angle's row. Its steps start from the
+distance either side at which $\chi^2$, with every other parameter held, rises
+by $\chi^2_{\mathrm{red}} \cdot S''/S$. On the one-site set both angles'
+intervals include the direction, after 24 refits each.
+
+{source}`rietx.strategy.parameter_interval.attach_stationary_intervals`
 
 ## A scale and a B the range cannot separate
 
@@ -490,6 +605,17 @@ separating a measured trajectory from an ordering artefact. Parametric
 refinement {cite}`stinton2007` is the other route: every pattern in one joint
 residual, with a parameter held to a declared function of each pattern's
 coordinates ({ref}`par-parametric-section`).
+
+A plan's last declared stage converges at the solver's tolerance even though
+the closing stage polishes its answer. A stage computes on peak windows frozen
+at its start. A stage stopped at 1e-6 can stop where a parameter has widened
+the peaks past those windows, and the intensity outside them drops out of the
+model. On the hostile series' cpd-1b, the warm stage stopped that way with the
+axial ratio S/L at 555, where real instruments sit near 0.01-0.05. At 1e-9 the
+same stage reached 0.014. The closing stage at 555 recompiled about 1 600 times
+the work and ran for tens of minutes. Converging the last declared stage costs
+1.04-1.07 times the evaluations on the four acceptance protocols, and moves no
+answer by 0.001 esd.
 
 ## Solvers
 
@@ -658,10 +784,11 @@ The FitReport reads the converged state in three layers. Layer 0 is model-free:
 cumulative-χ² breakpoints localise where misfit lives {cite}`david2004`, and
 unindexed peaks are flagged against the tick positions of every emission line
 (an impurity must clear {{ IMPURITY_SIGMA }}σ). Layer 1 attributes per-region
-misfit to profile shape derivatives, under four gates (resolvability on the
-scale-normalised Gram, a validity radius, local-χ² significance, global
-maturity), so a collinear pair is declared non-separable rather than resolved
-into a confident wrong singleton. Layer 2 turns attributions into actions. The
+misfit to profile shape derivatives. Each region passes four gates: local-χ²
+significance, a local R² showing the shape basis explains the region's misfit,
+resolvability on the scale-normalised Gram, and a validity radius. A global
+maturity gate stands above them, so a collinear pair is declared non-separable
+rather than resolved into a confident wrong singleton. Layer 2 turns attributions into actions. The
 actions are advisory and carry no statistical test of their own. Whether a
 freed parameter pays for itself is ΔBIC {cite}`schwarz1978`, predicted before
 the fit by `Refinement.suggest` and measured after it by

@@ -52,7 +52,7 @@ const HELP = {
     { paths: ["phases.*.cell.a", "phases.*.cell.b", "phases.*.cell.c"],
       title: "Cell edge", description: "A unit-cell edge length.",
       unit: "Å", default: null, typical: "3-40 Å for an inorganic phase",
-      anchor: "peak-positions.html#lattice-metric-and-bragg-s-law" },
+      anchor: "theory/peak-positions.html#lattice-metric-and-bragg-s-law" },
   ],
   // a flag and an origin with the label a chip carries (WP-1209): the chip says
   // the label and the popover restores the name behind it
@@ -75,7 +75,8 @@ const HELP = {
   instrument_fields: {},
   search_fields: {},
   plans: {},
-  docs_url: "https://rietx.org",
+  result_fields: {},
+  docs_url: "https://rietx.org/docs/dev",
 };
 
 const PROJECT = {
@@ -1428,17 +1429,30 @@ describe("the report panel", () => {
       "/api/result": () => ({ body: { result: {
         ...RESULT, statistics: { rwp: 0.216, gof: 1.41, chi2: 16.96 },
         diagnostics: [
-          diag("info", "LEBAIL_ALTERNATION_STOPPED", { suggestion: "raise lebail_passes" }),
-          diag("warning", "BOUND_HIT", { where: ["phases.0.cell.a"] }),
-          diag("error", "SOME_ERROR"),
+          diag("info", "LEBAIL_ALTERNATION_STOPPED",
+               { suggestion: "raise lebail_passes", full: false, warning_under: [] }),
+          diag("warning", "BOUND_HIT", { where: ["phases.0.cell.a"], full: false,
+                                         warning_under: ["phase_id", "cell"] }),
+          diag("error", "SOME_ERROR", { full: true, warning_under: [] }),
         ] } } }),
     });
-    const rows = [...host.querySelectorAll<HTMLElement>(".fitdiag")];
+    const rows = [...host.querySelectorAll<HTMLDetailsElement>(".fitdiag")];
     expect(rows.map((r) => r.querySelector(".kind")?.textContent?.trim()))
       .toEqual(["SOME_ERROR", "BOUND_HIT", "LEBAIL_ALTERNATION_STOPPED"]);
     expect(rows[1].textContent).toContain("phases.0.cell.a");
     expect(rows[2].textContent).toContain("raise lebail_passes");
     expect(rows[0].querySelector(".chip")?.classList.contains("bad")).toBe(true);
+    // the server says which rows open (WP-2037): the error, and nothing else
+    expect(rows.map((r) => r.open)).toEqual([true, false, false]);
+    // a folded warning keeps its code, its paths and the purposes it bears on
+    // in its summary, the server's list joined and never re-derived
+    const summary = rows[1].querySelector("summary")!;
+    expect(summary.textContent).toContain("phases.0.cell.a");
+    expect(summary.querySelector(".under")?.textContent).toBe("warning under phase_id, cell");
+    expect(rows[2].querySelector(".under")).toBeNull();
+    // and the code's explanation one click away beside it, folded or not
+    expect(rows.map((r) => r.querySelector("summary .help")?.textContent))
+      .toEqual(["SOME_ERROR", "BOUND_HIT", "LEBAIL_ALTERNATION_STOPPED"]);
   });
 
   it("says the predicted Δχ² is the report's, once, not per suggestion", async () => {
@@ -5321,7 +5335,7 @@ describe("the help popover", () => {
     // the anchor is a page and a heading, joined to the base the same payload
     // carries — nothing in the frontend knows where the manual lives
     expect(link.href).toBe(
-      "https://rietx.org/peak-positions.html#lattice-metric-and-bragg-s-law");
+      "https://rietx.org/docs/dev/theory/peak-positions.html#lattice-metric-and-bragg-s-law");
   });
 
   it("says so rather than inventing one when the key names nothing", async () => {

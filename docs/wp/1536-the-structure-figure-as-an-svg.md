@@ -112,6 +112,13 @@ rectangle closed by two half-ellipses.
 - `docs/skill/rietx/references/api-figure.md`: the paragraph naming what
   `path=` writes.
 
+### Inherited
+
+- **2026-10-23, from [1504](1504-the-figure-surface-measured-with-real-agents.md) (closed): the
+  agent task an SVG answers.** 1504's tasks are in `docs/wp/1504-eval/`. Task 6, fluorapatite
+  for print, is the one an agent could answer with an SVG once this lands. A later round that
+  re-runs it measures this WP's surface. 1504 runs no further round itself.
+
 ## Non-goals
 
 - Ray-tracer and 3D formats: WP-1537.

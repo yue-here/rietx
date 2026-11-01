@@ -44,6 +44,7 @@ import fnmatch
 import numpy as np
 
 from ..schemas.results import CorrelationPair, ExchangeRow, SoftMode
+from . import lapack
 from .statistics import block_projection_r2, column_norms
 
 #: how many worst-|ρ| pairs the carrier keeps — a size cap, not a judgment
@@ -151,7 +152,7 @@ def soft_modes(jac: np.ndarray, free_paths: list[str],
     Jn = J[:, keep] / norms[keep]
     gram = Jn.T @ Jn
     gram = 0.5 * (gram + gram.T)
-    eigvals, eigvecs = np.linalg.eigh(gram)
+    eigvals, eigvecs = lapack.eigh(gram)
     out = []
     for m in range(min(k, len(keep))):
         vec = eigvecs[:, m]
@@ -225,7 +226,7 @@ def exchangeability_scan(model, table) -> list[ExchangeRow]:
             if c not in r2:      # zero-norm column: no information either way
                 continue
             jc = J[:, paths.index(c)]
-            beta, *_ = np.linalg.lstsq(Jf, jc, rcond=None)
+            beta, *_ = lapack.lstsq(Jf, jc, rcond=None)
             c_norm = float(column_norms(jc[:, None])[0])
             loading = beta * f_norms / c_norm
             partners = {free_before[i]: float(loading[i])

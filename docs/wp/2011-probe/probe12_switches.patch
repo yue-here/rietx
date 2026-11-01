@@ -1,0 +1,291 @@
+--- base/src/rietx/optimize/lm.py	2026-10-28 11:33:01
++++ snap/src/rietx/optimize/lm.py	2026-10-28 11:20:50
+@@ -112,6 +112,7 @@
+ from typing import Callable
+ 
+ import numpy as np
++from scipy import sparse
+ from scipy.optimize import lsq_linear, nnls
+ 
+ from ..backend.linalg64 import require_fp64, to_host_fp64
+@@ -208,6 +209,16 @@
+ #: in the acceptance fits is far below the cut, so only a Pawley block
+ #: crosses it.
+ BVLS_MAX_COLUMNS = 128
++
++#: PROBE switch: form A = JᵀJ sparse above the BVLS cut when J is sparse enough
++SPARSE_NORMAL = False
++SPARSE_MAX_DENSITY = 0.25
++SPARSE_CACHE = False
++_PATTERN = {}
++
++
++def _diagonal(A):
++    return A.diagonal() if sparse.issparse(A) else np.diag(A)
+ 
+ 
+ @dataclass(frozen=True)
+@@ -463,6 +474,7 @@
+         raise ValueError("`max_nfev` must be None or positive integer.")
+     x = _clip_to_bounds(np.asarray(x0, dtype=np.float64).copy(), lo, hi)
+     ineqs = list(inequalities or [])
++    _PATTERN.clear()
+ 
+     r = residual(x)
+     require_fp64(r, "least-squares residual")
+@@ -502,10 +514,13 @@
+         # taking the largest step and dragging λ up for every parameter.  A
+         # curvature measured this stage stays its column's diagonal where it
+         # is the larger.
+-        col = np.sqrt(np.maximum(np.diag(A), 0.0))
++        col = np.sqrt(np.maximum(_diagonal(A), 0.0))
+         col_max = col if col_max is None else np.maximum(col_max, col)
+         if np.any(curvature > 0.0):
+-            A[np.diag_indices(len(x))] = np.maximum(np.diag(A), curvature)
++            if sparse.issparse(A):
++                A.setdiag(np.maximum(A.diagonal(), curvature))
++            else:
++                A[np.diag_indices(len(x))] = np.maximum(np.diag(A), curvature)
+         scale = np.maximum(col_max, np.sqrt(curvature))
+         lam_start = lam
+ 
+@@ -666,6 +681,20 @@
+     # invariant 2: cond(JᵀJ) = cond(J)², so the normal equations are the one
+     # step that can never run below fp64 whatever built the columns
+     Jh = to_host_fp64(J)
++    if SPARSE_NORMAL and Jh.shape[1] > BVLS_MAX_COLUMNS:
++        if SPARSE_CACHE:
++            pat = _PATTERN.get(Jh.shape)
++            if pat is None:
++                rows, cols = np.nonzero(Jh.T)      # column-major order
++                Js0 = sparse.csc_matrix((np.ones(len(rows)), (cols, rows)), shape=Jh.shape)
++                pat = _PATTERN[Jh.shape] = (Js0.indices, Js0.indptr,
++                                             np.repeat(np.arange(Jh.shape[1]), np.diff(Js0.indptr)))
++            idx, ptr, colof = pat
++            Js = sparse.csc_matrix((Jh[idx, colof], idx, ptr), shape=Jh.shape)
++            return (Js.T @ Js).tocsr(), -(Js.T @ r)
++        Js = sparse.csc_matrix(Jh)
++        if Js.nnz <= SPARSE_MAX_DENSITY * Jh.size:
++            return (Js.T @ Js).tocsr(), -(Js.T @ r)
+     return Jh.T @ Jh, -(Jh.T @ r)
+ 
+ 
+@@ -759,11 +788,15 @@
+     the bound the solve chose.
+     """
+     n = len(b)
+-    d = np.sqrt(np.maximum(np.diag(A), 0.0)) if scale is None else scale
++    d = np.sqrt(np.maximum(_diagonal(A), 0.0)) if scale is None else scale
+     d = np.where(d > 0.0, d, 1.0)
+     inv_d = 1.0 / d
+-    A_s = A * np.outer(inv_d, inv_d)
+-    A_s[np.diag_indices(n)] += lam
++    if sparse.issparse(A):
++        D = sparse.diags(inv_d)
++        A_s = (D @ A @ D + lam * sparse.identity(n)).tocsr()
++    else:
++        A_s = A * np.outer(inv_d, inv_d)
++        A_s[np.diag_indices(n)] += lam
+     b_s = b * inv_d
+     if n > BVLS_MAX_COLUMNS:
+         y, side = bccg.projected_cg(A_s, b_s, (lo - x) * d, (hi - x) * d)
+@@ -829,6 +862,8 @@
+     :func:`_solve_step` does: −1 for an active lower box row, +1 for an
+     active upper one.  The caller lands those variables exactly on the bound.
+     """
++    if sparse.issparse(A):
++        A = A.toarray()
+     n = len(b)
+     eps = float(np.finfo(np.float64).eps)
+     d = np.sqrt(np.maximum(np.diag(A), 0.0)) if scale is None else scale
+--- base/src/rietx/optimize/bccg.py	2026-10-28 11:33:01
++++ snap/src/rietx/optimize/bccg.py	2026-10-28 11:25:01
+@@ -304,6 +304,15 @@
+             return y
+         t *= 0.5
+     return np.zeros_like(g)
++
++
++#: PROBE switches: incomplete-LU preconditioning of the free block
++PRECONDITION = False
++EXACT_LU = False
++REFACTOR_ON_HIT = True
++ILU_DROP = 1e-4
++ILU_FILL = 10.0
++PC_STATS = {"factorisations": 0}
+ 
+ 
+ def projected_cg(H: np.ndarray, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
+@@ -340,6 +349,9 @@
+     floor = _PCG_TOL * _PCG_TOL * max(float(g @ g), np.finfo(np.float64).tiny)
+     fixed = (y <= lo) | (y >= hi)
+     spent = 0
++    from scipy import sparse as _sp
++    precondition = PRECONDITION and _sp.issparse(getattr(H, "H", H))
++    cached = None
+     while spent < budget:
+         grad = H @ y - g
+         spent += 1
+@@ -351,7 +363,42 @@
+                 break
+             fixed &= ~release
+             continue
+-        p = r
++        if precondition and not REFACTOR_ON_HIT and cached is not None \
++                and not np.any(~fixed & ~cached[0]):
++            pass        # the solve's one factor still covers every free variable
++        elif precondition:
++            from scipy.sparse.linalg import spilu
++            free = np.flatnonzero(~fixed)
++            Hm = getattr(H, "H", H)
++            Hff = Hm[free][:, free].tocsc()
++            try:
++                if EXACT_LU:
++                    from scipy.sparse.linalg import splu
++                    ilu = splu(Hff)
++                else:
++                    ilu = spilu(Hff, drop_tol=ILU_DROP, fill_factor=ILU_FILL)
++            except RuntimeError:
++                ilu = None
++            PC_STATS["factorisations"] += 1
++
++            cached = (~fixed.copy(), ilu, free)
++        if precondition:
++            _covered, _ilu, _free = cached
++
++            def msolve(v, _ilu=_ilu, _free=_free):
++                if _ilu is None:
++                    return v
++                out = np.zeros_like(v)
++                out[_free] = _ilu.solve(v[_free])
++                return np.where(fixed, 0.0, out)
++        else:
++            def msolve(v):
++                return v
++        z = msolve(r)
++        rz = float(r @ z)
++        if rz <= 0.0:
++            z, rz = r, rr
++        p = z
+         stalled = False
+         while spent < budget:
+             q = H @ p
+@@ -360,7 +407,7 @@
+             if pq <= 0.0:
+                 stalled = True      # flat along p: no CG step left to take
+                 break
+-            alpha = rr / pq
++            alpha = rz / pq
+             with np.errstate(divide="ignore", invalid="ignore"):
+                 reach = np.where(p > 0.0, (hi - y) / p,
+                                  np.where(p < 0.0, (lo - y) / p, np.inf))
+@@ -377,8 +424,12 @@
+             rr_next = float(r @ r)
+             if rr_next <= floor:
+                 break
+-            p = r + (rr_next / rr) * p
+-            rr = rr_next
++            z = msolve(r)
++            rz_next = float(r @ z)
++            if rz_next <= 0.0:
++                z, rz_next = r, rr_next
++            p = z + (rz_next / rz) * p
++            rz = rz_next
+         if stalled:
+             break
+     side = np.zeros(n, dtype=np.int8)
+--- base/src/rietx/optimize/least_squares.py	2026-10-28 11:33:01
++++ snap/src/rietx/optimize/least_squares.py	2026-10-28 11:14:33
+@@ -2511,6 +2511,49 @@
+                 f"— compile_model(..., moving_paths=set(table.moving_paths)) "
+                 f"— which is what fit() and every staged plan already pass, "
+                 f"or seed the term off zero before compiling")
++
++
++#: PROBE switches (WP-2011 probe 12): one intensity per overlap group, no esds
++MERGE_PAWLEY = False
++NO_COV = False
++#: the merge's own overlap fraction (of the mean FWHM); 0 → the restraint groups
++MERGE_FRAC = 0.0
++
++
++def _merge_groups(model):
++    if MERGE_FRAC <= 0.0:
++        return model.pawley.groups
++    from ..model import forward as F
++    old = F.PAWLEY_OVERLAP_FWHM_FRAC
++    F.PAWLEY_OVERLAP_FWHM_FRAC = MERGE_FRAC
++    try:
++        out = []
++        for (a, _b), cp in zip(model.pawley.phase_slices, model.phases):
++            if cp.tt_primary is not None:
++                out += [[a + k for k in g] for g in F._overlap_groups(cp.tt_primary,
++                                                                     cp.fwhm_primary)]
++        return out
++    finally:
++        F.PAWLEY_OVERLAP_FWHM_FRAC = old
++
++
++def _merge_map(n_table, pb, groups):
++    """Sparse expansion E with θ_full = E·θ_merged: table identity, then one
++    column per overlap group (equal split of the group total) and one per
++    singleton."""
++    from scipy import sparse
++    rows, cols, vals = list(range(n_table)), list(range(n_table)), [1.0] * n_table
++    grouped = np.zeros(pb.n, dtype=bool)
++    j = n_table
++    for g in groups:
++        for k in g:
++            rows.append(n_table + k); cols.append(j); vals.append(1.0 / len(g))
++        grouped[g] = True
++        j += 1
++    for k in np.flatnonzero(~grouped):
++        rows.append(n_table + int(k)); cols.append(j); vals.append(1.0)
++        j += 1
++    return sparse.csr_matrix((vals, (rows, cols)), shape=(n_table + pb.n, j))
+ 
+ 
+ def run_least_squares(model: CompiledModel, table: ParameterTable,
+@@ -2608,9 +2651,29 @@
+             + texture_positivity_inequalities(model, table, x0[:n_table])
+             + gaussian_width_inequalities(model, table, x0[:n_table])
+             + lorentzian_width_inequalities(model, table, x0[:n_table]), n_aux)
+-        res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
+-                          ftol=ftol, inequalities=ineqs, events=events, stage=stage,
+-                          track=tracker, table=table)
++        if MERGE_PAWLEY and model.pawley is not None and model.pawley.groups:
++            import dataclasses
++            E = _merge_map(n_table, model.pawley, _merge_groups(model))
++            # the merged start is each group's total: Eᵀ sums, and E's 1/n
++            # weights split it back equally
++            ones = (E != 0).astype(np.float64)
++            x0r = np.asarray(ones.T @ x0).ravel()
++            x0r[:n_table] = x0[:n_table]
++            n_r = E.shape[1]
++            lor = np.concatenate([lo[:n_table], np.zeros(n_r - n_table)])
++            hir = np.concatenate([hi[:n_table], np.full(n_r - n_table, np.inf)])
++            ineqs_r = [dataclasses.replace(iq, T=np.asarray((E.T @ iq.T.T).T))
++                       for iq in ineqs]
++            res = _lm_outcome(lambda t: residual(E @ t),
++                              lambda t: np.asarray((E.T @ np.asarray(jacobian(E @ t)).T).T),
++                              x0r, lor, hir, max_nfev=max_nfev,
++                              ftol=ftol, inequalities=ineqs_r, events=events, stage=stage,
++                              track=None, table=table)
++            res = dataclasses.replace(res, x=E @ res.x, jac=None)
++        else:
++            res = _lm_outcome(residual, jacobian, x0, lo, hi, max_nfev=max_nfev,
++                              ftol=ftol, inequalities=ineqs, events=events, stage=stage,
++                              track=tracker, table=table)
+         n_truncated, truncated_by = res.n_truncated, res.truncated_by
+     else:
+         with lapack.scipy_trf():
+@@ -2626,7 +2689,8 @@
+     stderr = corr = stderr_full = None
+     covariance_error = esd_inflation = None
+     moment_angle_tests = None
+-    if compute_uncertainties and res.jac is not None and len(res.fun) > len(res.x):
++    if compute_uncertainties and not NO_COV and res.jac is not None \
++            and len(res.fun) > len(res.x):
+         # a moment angle at a direction the symmetry fixes leaves the
+         # covariance, and only the covariance (WP-1929)
+         moment_angle_tests, stationary = stationary_angle_test(

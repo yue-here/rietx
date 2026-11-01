@@ -53,13 +53,16 @@ from ..crystallography.symmetry import (
     check_cell_angles,
     resolve_group,
     rotation_matrices,
+    site_orbit,
 )
 from ..crystallography.wyckoff import (
     adp_basis,
+    axial_basis,
     coordinate_basis,
     floating_origin_basis,
     stabilizer_rotations,
 )
+from ..optimize import lapack
 from ..schemas.common import Parameter
 from ..schemas.instrument import (
     CAPILLARY_OFFSETS,
@@ -90,6 +93,35 @@ _SIGMA_MAX = float(np.sqrt(np.finfo(np.float64).max))
 #: Above roundoff and far below anything a fit could see: a frame moved by
 #: 1e-12 moves the moment by 1e-12 of its modulus.
 _MOMENT_REFRAME_TOL = 1e-12
+
+#: The exact invariance test of :meth:`ParameterTable._refuse_body_off_its_sites`,
+#: in units of ``symmetry.SITE_TOL``.  For an operation fixing both a body atom
+#: and its origin (mod the lattice), R(p − o) − (p − o) is a lattice vector
+#: plus the two positions' residuals from their sites, each at most SITE_TOL
+#: per component for an operation ``site_orbit``'s step 1 admitted and at most
+#: 3 × SITE_TOL for one the snap added.  Taking the larger, the two positions
+#: miss by at most 6 × SITE_TOL on the atom's own element (the step-1 case is
+#: 2 ×, attained and never exceeded on 25 site pairs in 17 groups); on an
+#: element a lattice vector away the miss is at least 1 − 6 × SITE_TOL.  Any
+#: factor from 6 to 1/SITE_TOL − 6 refuses the same inputs; 8 keeps a
+#: factor-of-two margin over 6, so float rounding there cannot decide.
+_BODY_SITE_MISS_FACTOR = 8.0
+
+#: How far (child fractions) a stored coordinate of an atom a distortion mode
+#: moves may sit from ``base + Σ A·v`` before it counts as edited by hand
+#: (WP-1419).  The write-back stores exactly what the rows compute, so a fitted
+#: model differs by round-off only (the affine row's own sum against a numpy
+#: sum, 1e-16 here); anything past this bound was edited, and silently moving
+#: it back would undo the edit without a word, so the table refuses it naming
+#: the coordinate (``RIGID_BODY_DRIFT_TOL``'s rule for a body atom).
+DISTORTION_DRIFT_TOL = 1e-9
+
+#: How far (relative to the vector's own size) a mode vector may leave its
+#: atom's site-symmetry subspace, R·v = v for every rotation of the site's
+#: stabiliser, before the mode is refused (WP-1419).  Linear-algebra round-off:
+#: the vectors are averages of permutation-times-rotation matrices, so a true
+#: zero sits at 1e-15 and a vector the site forbids is O(1) off.
+DISTORTION_SITE_TOL = 1e-8
 
 
 def _is_wavelength(path: str) -> bool:
@@ -484,13 +516,18 @@ CELL_WINDOW_ANGLE_DEG = 2.0
 #: refinement bound.
 CELL_MIN_LENGTH_A = 1.5
 
-#: Unconditional post-solve safety window (fraction, degrees) — see
-#: ``refine.clamp_cell_runaway``, which applies this to every cell parameter
-#: that is itself a free *column* regardless of ``phase_support``, after a
-#: stage has solved and committed.  **"Free" is narrower than "moving" here**
+#: Unconditional post-solve safety window (fraction, degrees): the
+#: **trigger** for a runaway, never a value anything is moved to.  See
+#: ``refine.reset_cell_runaway``, which tests every cell parameter that is
+#: itself a free *column* against it, regardless of ``phase_support``, after a
+#: stage has solved and committed.  A phase with one parameter outside it gets
+#: its whole free cell put back at the stage's starting values and held while
+#: the stage solves again (WP-2002, B8, ruled 2026-10-19); until then the
+#: parameter was pulled back to this window's edge, a value no fit produced.
+#: **"Free" is narrower than "moving" here**
 #: (the ``moving_paths``-vs-``free_paths`` rule, root CLAUDE.md), and the gap
 #: is not closed: a cell tied to a caller's free ``vars.X`` is a *moving*
-#: path, not a *free* one, so it is never clamped directly — clamping the
+#: path, not a *free* one, so it is never reset directly — resetting the
 #: driver would move every other value it also reaches, which is not this
 #: function's decision to make.  Such an escape is named instead, never
 #: silently passed through: see ``refine._vars_driven_cell_escapes`` and the
@@ -526,7 +563,8 @@ CELL_MIN_LENGTH_A = 1.5
 #: ±15 % is three times :data:`CELL_WINDOW_FRACTION` — wide enough that no
 #: real measurement needs it (thermal expansion and a composition swing are
 #: each a few percent at most) and narrow enough that an escaping cell is
-#: pulled back in Å rather than left to reach the thousands.
+#: caught in Å rather than left to reach the thousands.  It fired in none of
+#: WP-1523's 104 fits.
 CELL_SAFETY_FRACTION = 0.15
 CELL_SAFETY_ANGLE_DEG = 3.0 * CELL_WINDOW_ANGLE_DEG
 
@@ -540,7 +578,7 @@ def _cell_parameter_name(path: str, *, phases: set[int] | None) -> str | None:
     """``"phases.0.cell.a"`` → ``"a"`` when phase 0 is in ``phases``, else None.
 
     ``phases=None`` means *any* phase — asked only by ``refine``'s
-    unconditional post-solve safety net (``clamp_cell_runaway`` and the
+    unconditional post-solve safety net (``reset_cell_runaway`` and the
     helpers that name, word and withhold around it), which reads every cell
     path regardless of which phase it belongs to.
     (:meth:`ParameterTable.bounds` never passes ``None`` here: it calls this
@@ -571,9 +609,9 @@ def cell_window(name: str, value: float, lo: float, hi: float,
     """The default bounds on one cell parameter, anchored at ``value``.
 
     ``fraction``/``angle_deg`` default to the per-phase-support window's own
-    constants; ``refine.clamp_cell_runaway`` passes
+    constants; ``refine.reset_cell_runaway`` passes
     :data:`CELL_SAFETY_FRACTION`/:data:`CELL_SAFETY_ANGLE_DEG` instead, three
-    times as wide, to pull an escaped cell back after a stage regardless of
+    times as wide, to find a cell that escaped during a stage regardless of
     which phase it belonged to — see that constant's docstring.  Every
     existing caller of this function keeps the old numbers.
 
@@ -883,26 +921,12 @@ def strain_cap_hi(name: str, value: float, hi: float, cap: float) -> float:
 #: strain pair above.
 _SIZE_NAMES = ("lor_size", "gauss_size")
 
-#: The smallest crystallite (Å) the size cap will let a fit *reach* — a floor
-#: on size, hence a ceiling on the 1/cosθ coefficient.  **2 nm, deliberately
-#: permissive.**  This is not a physics claim about how small a crystallite may
-#: be (genuinely nanocrystalline specimens reach a few nm and must refine
-#: freely); it is a runaway fence a couple of unit cells below anything the
-#: archive contains — the smallest well-determined refined size in 606 solved
-#: TOPAS refinements is ≈ 33 nm, and every refined size below ~2 nm in that
-#: corpus is an exploratory or placeholder fit (a phase named ``pixie_dust``, a
-#: 0.69 nm "crystallite" of Si — smaller than 1.3 unit cells — in a folder
-#: literally named *To Rietveld or not to Rietveld*).  The surprising-but-
-#: possible band above it is the :data:`~rietx.refine.SIZE_FLAG_SIZE_A` flag,
-#: which bounds nothing.  See :func:`size_cap`.
-SIZE_CAP_MIN_SIZE_A = 20.0
-
 #: The range backstop's fraction, the strain rule reused: a size term whose own
 #: FWHM at the highest θ exceeds this fraction of the fitted range is a line
-#: wider than the interval it was measured over.  On any real scan this is far
-#: looser than the 2 nm floor (≈ 54 deg on a 10–80° Cu scan against ≈ 4 deg), so
-#: it binds only in degenerate high-angle windows where 1/cosθ blows up — the
-#: floor is what governs everywhere else.
+#: wider than the interval it was measured over.  It is the whole size bound.
+#: The 2 nm crystallite floor that once sat beside it was removed in 1.10
+#: (WP-2002, B8 ruling); :func:`size_cap` says why.  On a Cu Kα 10–80° scan
+#: the backstop is ≈ 54 deg, a crystallite of ≈ 0.15 nm.
 SIZE_CAP_RANGE_FRACTION = 1.0
 
 #: Hysteresis, for the reason :data:`STRAIN_CAP_ARM_RTOL` is: TRF leaves a
@@ -928,72 +952,53 @@ def _size_parameter_name(path: str) -> str | None:
     return None
 
 
-#: Scherrer K for the size cap's physics floor — a **deliberate second spelling**
-#: of :data:`~rietx.model.profiles.caglioti.SCHERRER_K`, not an independent
-#: choice.  Spelled twice because :func:`size_cap` inlines caglioti eq. (4) to
-#: keep this module free of a ``params`` → ``model`` import (the formula's
-#: authority is there, and the inline is one expression); the two spellings are
-#: held together by an equality pin rather than by this comment —
-#: ``tests/test_strain_cap.py::test_the_size_caps_scherrer_k_is_the_one_in_caglioti``,
-#: which fails if either number moves.
-_SIZE_CAP_SCHERRER_K = 0.9
+def size_cap(tt_min: float, tt_max: float) -> float:
+    """The widest ``lor_size`` (deg 2θ) the *fitted range* can express.
 
+    **Why size needs a bound at all.**  The sample size terms enter the profile
+    as Γ_L = ``lor_size``/cosθ and Γ_G² = ``gauss_size``/cos²θ
+    (:mod:`rietx.model.profiles.caglioti`).  Nothing in that arithmetic stops at
+    a physical crystallite.  This is the runaway geometry the strain terms have:
+    a phase's lines widen until they behave like background.
 
-def size_cap(tt_min: float, tt_max: float, wavelength_a: float,
-             *, k: float = _SIZE_CAP_SCHERRER_K,
-             min_size_a: float = SIZE_CAP_MIN_SIZE_A) -> float:
-    """The widest ``lor_size`` (deg 2θ) allowed: the *tighter* of a 2 nm floor
-    and the fitted-range backstop.
+    **The bound is the strain rule with 1/cosθ in place of tanθ.**  A line whose
+    size contribution alone is wider than the interval it was measured over
+    carries no information the fit could have got from the data.  So at the
+    highest θ the scan reaches, where 1/cosθ is largest,
 
-    **Why size needs a bound at all, and why a gentle one.**  The sample size
-    terms enter the profile as Γ_L = ``lor_size``/cosθ and Γ_G² =
-    ``gauss_size``/cos²θ (:mod:`rietx.model.profiles.caglioti`), and nothing in
-    that arithmetic stops at a physical crystallite — the same runaway geometry
-    the strain terms have.  But unlike strain the intent here is only to catch a
-    runaway, never to legislate a size: real specimens are genuinely
-    nanocrystalline, so the floor is set two unit cells *below* the archive
-    (:data:`SIZE_CAP_MIN_SIZE_A`), where a "crystallite" has stopped being one.
+        ``lor_size``/cos θ_max ≤ f·(2θ_max − 2θ_min),   f = :data:`SIZE_CAP_RANGE_FRACTION`
 
-    **The two bounds, and which binds.**  A 1/cosθ coefficient maps to a
-    Scherrer size with no reference angle (caglioti eq. 4,
-    :func:`~rietx.model.profiles.caglioti.size_coefficient_for_size`): a floor
-    ``L ≥ min_size_a`` is therefore a ceiling
+    and the Gaussian variance takes the square of the same width.  On a Cu Kα
+    10–80° scan the cap is ≈ 54 deg, which Scherrer reads as a crystallite of
+    ≈ 0.15 nm.  The shared θ clip (:func:`_backstop_span_theta`) keeps 1/cosθ
+    off its pole at 2θ = 180°.  Returns ``inf`` for an empty or inverted range,
+    since "no claim" is the honest output there.
 
-        ``lor_size`` ≤ (180/π)·k·λ / min_size_a          [the physics floor]
+    **There is no size floor** (WP-2002, the B8 ruling of 2026-10-19).  Until
+    1.10 a second term held every crystallite at 2 nm or more.  A small size is
+    still a physical quantity, and a chosen limit on one is the caller's to
+    state with a finite ``max``.  Below about 2 nm a crystallite is a few unit
+    cells, and broadened Bragg peaks may not describe its pattern; the Debye
+    scattering equation does.  ``SIZE_UNUSUALLY_SMALL`` says so below
+    :data:`~rietx.refine.SIZE_FLAG_SIZE_A`, and it bounds nothing.
 
-    on the coefficient directly, per wavelength — ≈ 3.97 deg at Cu Kα for 2 nm,
-    i.e. Michael's "≈ 4°/cosθ".  The range backstop is the strain rule with
-    1/cosθ in place of tanθ, evaluated where 1/cosθ is largest (the highest θ):
+    **Practice.**  Two of the three codes floor size and one does not.  TOPAS's
+    ``CS_L`` macro limits the size to 0.3-10 000 nm (Technical Reference
+    Version 9, § 2.17).  GSAS-II 5.8.4 clamps the stored size to 0.001-10 µm
+    after each refinement (``GSASIIstrIO.py:3531-3540``).  FullProf sets no
+    limit.  The backstop here sits below both floors on an ordinary scan.
 
-        ``lor_size``/cos θ_max ≤ f·(2θ_max − 2θ_min)     [the range backstop]
-
-    The Gaussian variance takes the square of whichever width binds.  On every
-    normal scan the physics floor is far the tighter (Cu 10–80°: ≈ 4 deg against
-    ≈ 54 deg), so the floor governs and the backstop only catches the arithmetic
-    pathology of 1/cosθ near 2θ = 180°.  Returns ``inf`` when neither can state
-    a bound (no wavelength *and* a degenerate range) — "no claim" is honest.
-
-    Enforced at stage granularity, armed only on a term that has already reached
-    the cap, and outranked by any finite stored ``max`` — all exactly as
-    :func:`strain_cap`/:func:`strain_cap_hi`, and for the same measured
-    identity reason: a finite bound is never free.
+    Enforced at stage granularity, armed only on a term that has already
+    reached the cap, and outranked by any finite stored ``max``, all exactly as
+    :func:`strain_cap`/:func:`strain_cap_hi` and for the same measured identity
+    reason: a finite bound is never free.
     """
-    # physics floor: L ≥ min_size_a  ⇔  lor_size ≤ (180/π)·k·λ/min_size_a.
-    # This is caglioti.size_coefficient_for_size(min_size_a, λ, k) inlined to
-    # keep this hot module free of a model import; the formula's authority is
-    # there.
-    physics = math.inf
-    if wavelength_a > 0.0 and min_size_a > 0.0 and k > 0.0:
-        physics = math.degrees(k * wavelength_a / min_size_a)
-    # range backstop: 1/cosθ is largest at θ_max, and the shared θ clip
-    # (:func:`_backstop_span_theta`) keeps it off the cosθ → 0 pole at 2θ = 180°.
-    rng = math.inf
     backstop = _backstop_span_theta(tt_min, tt_max)
-    if backstop is not None:
-        span, theta = backstop
-        cos_theta = math.cos(math.radians(theta)) if theta > 0.0 else 1.0
-        rng = SIZE_CAP_RANGE_FRACTION * span * cos_theta
-    return min(physics, rng)
+    if backstop is None:
+        return math.inf
+    span, theta = backstop
+    cos_theta = math.cos(math.radians(theta)) if theta > 0.0 else 1.0
+    return SIZE_CAP_RANGE_FRACTION * span * cos_theta
 
 
 def size_cap_hi(name: str, value: float, hi: float, cap: float) -> float:
@@ -1002,9 +1007,9 @@ def size_cap_hi(name: str, value: float, hi: float, cap: float) -> float:
     The mirror of :func:`strain_cap_hi`: ``cap`` is :func:`size_cap`'s width,
     ``gauss_size`` is a variance and takes its square, a finite stored ``hi`` is
     the caller's claim and is kept (the off switch), and the cap is armed only
-    where the coefficient has already reached it.  Because the cap is a ceiling
-    on the coefficient — a *floor* on the crystallite — reaching it means the
-    fit has driven the size down to 2 nm, which is where a runaway lives.
+    where the coefficient has already reached it.  Reaching it means the size
+    term alone has made a line wider than the fitted range, which is where a
+    runaway lives.
     """
     if not math.isinf(hi):
         return hi
@@ -1029,8 +1034,8 @@ def tie_window(lo: float, hi: float, coeff: float,
     """Where a source must stay for its dependent to honour *its own* bounds.
 
     A tie says ``dependent = coeff·source + offset``, and the dependent carries
-    the schema's declared physical limits ``[lo, hi]`` — ``Biso`` in [0, 25],
-    ``occ`` in [0, 1.5], March-Dollase ``r`` in its floored range.  The solver's
+    the schema's declared physical limits ``[lo, hi]``: ``occ`` at or above 0,
+    March-Dollase ``r`` above its pole floor, or a caller's own.  The solver's
     box, though, covers the **free** column, and a tied entry is not one, so
     nothing stops a coefficient other than 1 carrying the dependent straight
     past a limit that is physics.  This is the interval that stops it:
@@ -1274,6 +1279,12 @@ class ParameterTable:
         #: (:meth:`set_vary`).  Restored when the fix moves off the entry, so a
         #: take-back leaves the row as the caller left it, never silently fixed.
         self._origin_wanted: dict[str, bool] = {}
+        #: phase base path → (its amplitude paths, which of them are invariant
+        #: under the whole parent group), for every phase with
+        #: ``Phase.distortion_modes`` (WP-1419).  Built by
+        #: :meth:`_collect_distortion_modes`; read by
+        #: :meth:`_refuse_unseeded_distortion`.  Empty for every other table.
+        self._distortion: dict[str, tuple[tuple[str, ...], tuple[bool, ...]]] = {}
         self._collect(structure, instrument)
         self._rebuild()
         if self._origin:
@@ -1286,6 +1297,8 @@ class ParameterTable:
             self._check_body_drift()
             for _, _, block in self._bodies:
                 self.add_derived(block)
+        if self._distortion:
+            self._refuse_unseeded_distortion()
 
     # -- collection ----------------------------------------------------
     def _add(self, path: str, p: Parameter, *, force_fixed: bool = False,
@@ -1358,10 +1371,13 @@ class ParameterTable:
             self._collect_microstrain(base, sg, phase)
             owner = {label: body.name for body in phase.rigid_bodies
                      for label in body.atoms}
+            moved = self._collect_distortion_modes(base, phase)
             for j, atom in enumerate(phase.atoms):
                 if atom.label in owner:
                     self._collect_body_atom_coords(f"{base}.atoms.{j}", atom,
                                                    owner[atom.label])
+                elif j in moved:
+                    self._collect_mode_atom_coords(f"{base}.atoms.{j}", sg, phase, j)
                 else:
                     self._collect_atom_coords(f"{base}.atoms.{j}", sg, atom)
                 self._add(f"{base}.atoms.{j}.occ", atom.occ)
@@ -1431,7 +1447,7 @@ class ParameterTable:
             return
         basis = strain_basis(rotation_matrices(sg))  # (n_free, 15)
         s0 = np.array(block.values(), dtype=np.float64)
-        coef, *_ = np.linalg.lstsq(basis.T.astype(np.float64), s0, rcond=None)
+        coef, *_ = lapack.lstsq(basis.T.astype(np.float64), s0, rcond=None)
         residual = basis.T @ coef - s0
         scale = max(float(np.abs(s0).max()), 1.0)
         if float(np.abs(residual).max()) > 1e-6 * scale:
@@ -1469,7 +1485,7 @@ class ParameterTable:
             self.entries.append(Entry(path=path, value=float(coef[k]), vary=want_vary,
                                       lo=-np.inf, hi=np.inf))
         # S scales as microstrain², so one unit-ppm projection serves any seed
-        unit, *_ = np.linalg.lstsq(
+        unit, *_ = lapack.lstsq(
             basis.T.astype(np.float64),
             isotropic_coefficients(phase.cell.lengths_angles(), 1.0), rcond=None)
         self._strain_unit[base] = unit
@@ -1511,6 +1527,140 @@ class ParameterTable:
             self._anchored_dofs[path] = tuple(
                 (f"{base}.{c}", float(basis[k][c_idx]))
                 for c_idx, c in enumerate(("x", "y", "z")) if basis[k][c_idx] != 0)
+
+    def _collect_distortion_modes(self, base: str, phase) -> set[int]:
+        """One absolute amplitude per mode of ``Phase.distortion_modes`` (WP-1419).
+
+        Each mode contributes ``phases.i.distortion_modes.modes.m.amplitude``
+        (Å), built in one pass here rather than through ``Refinement.tie``
+        (480 tie calls took 202 s on #286's kickoff; the block takes
+        milliseconds).  Returns the indices of the atoms some mode moves, whose
+        coordinates :meth:`_collect_mode_atom_coords` then derives from these
+        entries.  The amplitudes are unbounded, like the ADP and Stephens DOFs:
+        a sign is a domain label, so no box is physical.
+        """
+        modes = phase.distortion_modes
+        if modes is None:
+            return set()
+        paths = []
+        for m, mode in enumerate(modes.modes):
+            path = f"{base}.distortion_modes.modes.{m}.amplitude"
+            self._add(path, mode.amplitude)
+            paths.append(path)
+        self._distortion[base] = (tuple(paths),
+                                  tuple(mode.parent_invariant for mode in modes.modes))
+        return {j for j in range(len(phase.atoms))
+                if any(any(v != 0.0 for v in mode.vectors[j]) for mode in modes.modes)}
+
+    def _collect_mode_atom_coords(self, base: str, sg, phase, j: int) -> None:
+        """An atom a distortion mode moves: x, y, z derived from the amplitudes.
+
+        The rows are x = base + Σ_ν A_ν·v_ν (child fractions), one per
+        coordinate, with the record's ``base`` as the constant, **never the
+        stored coordinate** (WP-1419).  That is what makes the amplitude
+        absolute: no anchored displacement DOF exists for the atom, so
+        :attr:`anchored_dof_paths` does not list it and no re-basing
+        (WP-1432) can reach it, and a rebuild reproduces the coordinate from
+        the amplitudes alone.  The mode basis is complete (Σ n_modes equals the
+        child's free coordinates, asserted by ``distortion_basis``), so freeing
+        no coordinate DOF here loses no freedom.  A coordinate no mode moves is
+        held at the stored value, as a fixed special position's is.
+
+        Three refusals, each naming what to do.  A coordinate declared
+        ``vary=True``: the amplitudes are its one writer.  A stored coordinate
+        further than :data:`DISTORTION_DRIFT_TOL` from ``base + Σ A·v``: an
+        edit of a derived coordinate, which a silent rewrite would undo.  A
+        mode vector outside the atom's site-symmetry subspace (R·v ≠ v for a
+        rotation of the base position's stabiliser, past
+        :data:`DISTORTION_SITE_TOL`): the
+        orbit expansion would then carry the field onto the atom's own images
+        with the wrong sign, which is the case where the phase's group and the
+        mode field's stabiliser differ (milestone row D).
+        """
+        atom = phase.atoms[j]
+        modes = phase.distortion_modes
+        label = f"{base} ({atom.label!r})"
+        if any(getattr(atom, c).vary for c in ("x", "y", "z")):
+            raise ValueError(
+                f"{label} is moved by distortion modes; its coordinates are derived "
+                "from the mode amplitudes — refine "
+                "phases.*.distortion_modes.modes.*.amplitude and set vary=False here")
+        xyz = np.array([atom.x.value, atom.y.value, atom.z.value], dtype=np.float64)
+        origin = np.array(modes.base[j], dtype=np.float64)
+        vectors = np.array([mode.vectors[j] for mode in modes.modes], dtype=np.float64)
+        amps = np.array([mode.amplitude.value for mode in modes.modes], dtype=np.float64)
+        # the site symmetry at the base: a vector the site forbids moves the
+        # stored atom off its special position, where the stored coordinate's
+        # own stabiliser no longer sees the operation it breaks
+        rotations = stabilizer_rotations(sg, origin)
+        for mode, v in zip(modes.modes, vectors, strict=True):
+            size = float(np.abs(v).max())
+            if size == 0.0:
+                continue
+            off = max(float(np.abs(np.asarray(r, dtype=np.float64) @ v - v).max())
+                      for r in rotations)
+            if off > DISTORTION_SITE_TOL * size:
+                raise ValueError(
+                    f"{label}: distortion mode {mode.irrep} #{mode.index} ({mode.site}) "
+                    f"moves it by {v.tolist()} per Å, which its site symmetry does not "
+                    f"allow (R·v − v up to {off:.3g}); the phase's group carries an "
+                    "operation the mode field is not invariant under.  Restate the "
+                    "child with displacive_statement, whose group is the field's own")
+        placed = origin + amps @ vectors
+        drift = np.abs(xyz - placed)
+        if float(drift.max()) > DISTORTION_DRIFT_TOL:
+            c = "xyz"[int(np.argmax(drift))]
+            raise ValueError(
+                f"{label}.{c} = {xyz['xyz'.index(c)]!r} but its distortion modes place it "
+                f"at {placed['xyz'.index(c)]!r} (base + Σ amplitude·vector).  The "
+                "coordinates of a mode-moved atom are derived: move it with "
+                "set_values on phases.*.distortion_modes.modes.*.amplitude, or restate "
+                "the child with displacive_statement")
+        paths = self._distortion[base.split(".atoms.")[0]][0]
+        for c_idx, c in enumerate(("x", "y", "z")):
+            p: Parameter = getattr(atom, c)
+            terms = tuple((paths[m], float(vectors[m, c_idx]))
+                          for m in range(len(paths)) if vectors[m, c_idx] != 0.0)
+            if terms:
+                self._add(f"{base}.{c}", p,
+                          tie=AffineTie(terms=terms, const=float(origin[c_idx])))
+            else:
+                self._add(f"{base}.{c}", p, force_fixed=True)
+
+    def _refuse_unseeded_distortion(self) -> None:
+        """Refuse a free distortion block sitting exactly at the parent (WP-1419).
+
+        χ²(D(g)·A) = χ²(A) for every lost parent operation g, D(g) its action on
+        the amplitude vector (it maps the child to a domain-related structure
+        with the same powder pattern), so at A = 0 the gradient lies in the fixed subspace of the
+        parent group's action: every amplitude outside the identity irrep has
+        an **exactly** zero column there, the whole block at once (#286,
+        2026-09-16: dχ²/du −2.9e-8 at 0 against −1.57e7 at 0.005; Perez-Mato,
+        Orobengoa & Aroyo 2010, *Acta Cryst.* A66, 558, § 7).  A stage that
+        frees such a block can move only through the finite difference's own
+        step, which is not a measurement.  ``_collect_microstrain``'s all-zero
+        refusal is the precedent.  A block whose free amplitudes are all
+        identity-irrep (``parent_invariant``) is accepted: its column at the
+        parent is not forced to zero.  Asked of what moves (C's rows), so a
+        variable driving an amplitude counts as freeing it.
+        """
+        reach = np.asarray(abs(self._reach).sum(axis=1)).ravel()
+        for base, (paths, invariant) in self._distortion.items():
+            broken = [p for p, inv in zip(paths, invariant, strict=True) if not inv]
+            if not broken:
+                continue
+            idx = [self._paths[p] for p in broken]
+            if not any(reach[i] > 0.0 for i in idx):
+                continue
+            if all(self.entries[i].value == 0.0 for i in idx):
+                raise ValueError(
+                    f"{base}.distortion_modes: every amplitude outside the identity "
+                    "irrep is exactly zero, where the pattern is invariant under every "
+                    "lost parent operation's action on the block, so its gradient there "
+                    "is exactly zero and the stage "
+                    "cannot move off the parent.  State the child with "
+                    "displacive_statement, which seeds it, or set_values a small "
+                    "non-zero amplitude before freeing the block")
 
     def _declare_origin(self, ip: int, sg, phase) -> None:
         """Record where phase ``ip``'s origin floats and what could hold it (WP-1912).
@@ -1558,7 +1708,7 @@ class ParameterTable:
                 for k, d in enumerate(site_dofs):
                     for coord, coeff in self._anchored_dofs[d]:
                         basis[k, "xyz".index(coord[-1])] = coeff
-                a, *_ = np.linalg.lstsq(basis.T, np.asarray(f, float), rcond=None)
+                a, *_ = lapack.lstsq(basis.T, np.asarray(f, float), rcond=None)
                 if np.abs(basis.T @ a - f).max() > 1e-9:
                     continue  # this site cannot move along f at all
                 hits.extend(d for d, ak in zip(site_dofs, a, strict=True)
@@ -1599,53 +1749,45 @@ class ParameterTable:
             self._add(f"{base}.{c}", getattr(atom, c), force_fixed=True)
 
     def _collect_body(self, base: str, sg, phase, b: int, body) -> None:
-        """A rigid body: origin DOFs, three rotation DOFs, and its block.
+        """A rigid body: origin DOFs, its rotation DOFs, and its block.
 
         The origin is collected exactly as an atom's coordinates are
         (:meth:`_collect_atom_coords`): anchored displacement DOFs on its
-        site-symmetry basis.  A body whose origin, or any of whose atoms, sits
-        on a special position is refused for now (``RIGID_BODY_NOT_INVARIANT``;
-        WP-1807 takes the stabiliser's axial subspace for the rotation).  The rotation is an
-        **anchored increment** δω = E·θ about the record's R₀, zero at every
-        build and every commit, bounded per component by
-        ``RIGID_BODY_ROTATION_BOUND``; it has as many DOFs as the template's
-        inertia rank (two for a linear body, ``params.bodies``), and it is
-        never in ``_anchored_dofs`` (:attr:`_anchored_rotations` says why).
-        The block is declared after collection, through :meth:`add_derived`.
+        site-symmetry basis.  The rotation is an **anchored increment**
+        δω = E·θ about the record's R₀, zero at every build and every commit,
+        bounded per component by ``RIGID_BODY_ROTATION_BOUND``; it has as many
+        DOFs as E has columns (``params.bodies``): the template's inertia rank
+        at a general origin, and on a special position the axial directions
+        the origin's site symmetry fixes (WP-1807: 0, 1 or 3).  It is never in
+        ``_anchored_dofs`` (:attr:`_anchored_rotations` says why).  The block
+        is declared after collection, through :meth:`add_derived`.
+
+        Refused at build, each naming the body and the atom
+        (:meth:`_refuse_body_off_its_sites`, :meth:`_refuse_body_image_overlap`):
+        ``RIGID_BODY_NOT_INVARIANT`` for an atom whose site symmetry its origin
+        does not share, a torsion that moves an atom on a special position, or
+        a site body in rhombohedral axes; ``RIGID_BODY_IMAGE_OVERLAP`` for a
+        body that straddles a symmetry element.
         """
         from ..schemas.structure import RIGID_BODY_ROTATION_BOUND
         from .bodies import RigidBodyBlock
+        from .derived import cartesian_frame
 
         bbase = f"{base}.rigid_bodies.{b}"
-        xyz = np.array(body.origin.values())
-        if len(coordinate_basis(stabilizer_rotations(sg, xyz))) < 3:
-            raise ValueError(
-                f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has its "
-                f"origin {tuple(xyz)} on a special position of "
-                f"{phase.space_group!r}; a body on a special position is not "
-                "supported yet (WP-1807) — move the origin to a general "
-                "position")
+        xyz = np.array(body.origin.values(), dtype=np.float64)
+        origin = site_orbit(sg, xyz)
         index = {a.label: j for j, a in enumerate(phase.atoms)}
-        # the origin is not the only point a site can fix: a member atom on a
-        # special position keeps its coset split for the stage while the body
-        # turns it off the site, and the next compile counts |G_x| times as
-        # many images (S, O1, O2 of PbSO4 on the Pnma mirror: 8 S and 24 O in
-        # a cell of 4 and 16).  Keyed on the stabiliser the forward model's
-        # multiplicity is read from (``wyckoff.stabilizer_rotations``)
-        for label in body.atoms:
-            atom = phase.atoms[index[label]]
-            at = np.array([atom.x.value, atom.y.value, atom.z.value])
-            order = len(stabilizer_rotations(sg, at))
-            if order > 1:
-                raise ValueError(
-                    f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has its "
-                    f"atom {label!r} at {tuple(float(v) for v in at)} on a "
-                    f"special position of {phase.space_group!r} (site symmetry "
-                    f"of order {order}); a turn of the body moves it off the "
-                    f"site and the next stage counts {order}× its images, and a "
-                    "body on a special position is not supported yet (WP-1807) "
-                    "— refine that atom outside the body, or state the "
-                    "structure in a subgroup where its site is general")
+        self._refuse_body_off_its_sites(sg, phase, body, index, origin)
+        self._refuse_body_image_overlap(sg, phase, body, index)
+        # W, the axial directions the origin's site fixes, carried into the
+        # Cartesian frame at the stored cell: cell-independent in every
+        # setting the check above lets through, so fixed for the table's life
+        axial = axial_basis(list(origin.stabilizer))
+        site_axes = None
+        if len(axial) < 3:
+            m = np.asarray(cartesian_frame(phase.cell.lengths_angles()), dtype=np.float64)
+            w = (m @ axial.T.astype(np.float64)).reshape(3, len(axial))
+            site_axes = w / np.linalg.norm(w, axis=0) if len(axial) else w
         member = {label: i for i, label in enumerate(body.atoms)}
         try:
             block = RigidBodyBlock(
@@ -1656,8 +1798,11 @@ class ParameterTable:
                 torsions=[(member[t.axis[0]], member[t.axis[1]],
                            [member[m] for m in t.moves]) for t in body.torsions],
                 angles=[t.angle for t in body.torsions],
-                names=[t.name for t in body.torsions])
+                names=[t.name for t in body.torsions], site_axes=site_axes)
         except ValueError as exc:
+            code, sep, rest = str(exc).partition(": ")
+            if sep and code.startswith("RIGID_BODY_"):
+                raise ValueError(f"{code}: rigid body {body.name!r}: {rest}") from None
             raise ValueError(f"rigid body {body.name!r}: {exc}") from None
         before = set(self._anchored_dofs)
         self._collect_atom_coords(f"{bbase}.origin", sg, body.origin)
@@ -1681,6 +1826,170 @@ class ParameterTable:
                                       lo=-np.inf, hi=np.inf))
         self._anchored_torsions[bbase] = twists
         self._bodies.append((bbase, body.name, block))
+
+    def _refuse_body_off_its_sites(self, sg, phase, body, index, origin) -> None:
+        """``RIGID_BODY_NOT_INVARIANT``: the invariance rule (WP-1807, D4a, D7, D8).
+
+        Every member atom's site symmetry G_i must lie inside its origin's
+        G_o, as operations of the group (mod lattice), **and** fix the atom's
+        offset from the origin exactly, R(p − o) = p − o in unwrapped body
+        coordinates (-1 at (0,0,0) and (½,0,0) is one operation mod the
+        lattice and two elements to a turn): a turn about an axis
+        G_o allows commutes with G_o, so it carries an atom on an element of
+        G_o along that element, but an atom on an element G_o lacks is pushed
+        off it, and the next stage counts |G_i|× its images (#840: 8 S and
+        24 O in a PbSO₄ cell of 4 and 16).  With G_o = {1} this is #841's
+        check exactly.  A torsion moving an on-site atom takes it off the site
+        the same way.  In rhombohedral axes the 3-fold and 2-fold directions
+        turn with α, so a body held to them inside a stage would leave its
+        own site as the cell refines.
+        """
+        from ..crystallography.symmetry import SITE_TOL, _group_arrays, group_key
+
+        ops, rots, _ = _group_arrays(group_key(sg))
+        g_o = {int(i) for i in origin.stabilizer_ops}
+        where = tuple(float(v) for v in body.origin.values())
+        sites = {}
+        for label in body.atoms:
+            atom = phase.atoms[index[label]]
+            at = np.array([atom.x.value, atom.y.value, atom.z.value], dtype=np.float64)
+            orbit = site_orbit(sg, at)
+            sites[label] = orbit
+            extra = [int(i) for i in orbit.stabilizer_ops if int(i) not in g_o]
+            if not extra:
+                # membership mod the lattice is not enough: a turn about the
+                # origin keeps the atom on its element only if R(p − o) = p − o
+                # in the unwrapped body coordinates, else the atom's element is
+                # a lattice vector from the origin's (-1 at (0,0,0) and at
+                # (½,0,0); 2-folds at x = 0 and ½).  Both positions are known
+                # to SITE_TOL, and a true miss is a lattice vector, so
+                # _BODY_SITE_MISS_FACTOR × it is a rounding bound
+                d = at - np.array(where, dtype=np.float64)
+                for g in orbit.stabilizer_ops:
+                    miss = rots[int(g)] @ d - d
+                    if float(np.abs(miss).max()) > _BODY_SITE_MISS_FACTOR * SITE_TOL:
+                        raise ValueError(
+                            f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has "
+                            f"its atom {label!r} at {tuple(float(v) for v in at)} on "
+                            f"an element of operation {ops[int(g)].triplet()} that "
+                            f"is a lattice translation away from the one the body's "
+                            f"origin {where} is on: the operation holds the atom "
+                            "only modulo the lattice, and a turn about the origin "
+                            "takes it off — put the body's origin on that element "
+                            f"(body_from_atoms(..., origin={label!r})), or refine the "
+                            "atom outside the body")
+            if extra:
+                order = len(orbit.stabilizer_ops)
+                raise ValueError(
+                    f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has its "
+                    f"atom {label!r} at {tuple(float(v) for v in at)} on a "
+                    f"special position of {phase.space_group!r} (site symmetry "
+                    f"of order {order}), on the element of operation "
+                    f"{ops[extra[0]].triplet()} that the body's origin {where} "
+                    "is not on; a turn of the body moves it off the site and "
+                    f"the next stage counts {order}× its images — put the "
+                    "body's origin on that site (body_from_atoms(..., "
+                    f"origin={label!r})), refine the atom outside the body, or "
+                    "state the structure in a subgroup where its site is general")
+        for torsion in body.torsions:
+            for label in torsion.moves:
+                order = len(sites[label].stabilizer_ops)
+                if order > 1:
+                    raise ValueError(
+                        f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has "
+                        f"its torsion {torsion.name!r} move atom {label!r}, which "
+                        f"sits on a special position (site symmetry of order "
+                        f"{order}); the twist takes it off the site — a torsion "
+                        "on a site body may move only atoms in general positions")
+        if (len(g_o) > 1 and sg.ext == "R"
+                and any(abs(r).sum() != 3 or abs(np.trace(r)) != 3
+                        for r in origin.stabilizer)):
+            raise ValueError(
+                f"RIGID_BODY_NOT_INVARIANT: rigid body {body.name!r} has its "
+                f"origin {where} on a site of {phase.space_group!r} in "
+                "rhombohedral axes, where the site's symmetry directions turn "
+                "with the refined α and the body would leave its site inside a "
+                "stage — state the phase in hexagonal axes (:H)")
+
+    def _refuse_body_image_overlap(self, sg, phase, body, index) -> None:
+        """``RIGID_BODY_IMAGE_OVERLAP``: a body that straddles a symmetry element.
+
+        Any space-group image of a body atom, other than the atom's own
+        position on its own site, nearer than
+        ``RIGID_BODY_OVERLAP_FACTOR`` × the covalent-radius sum to an atom of
+        the same body means the listed atoms and their images double part of
+        the molecule: #876's SO₄ moved 0.03 off the Pnma mirror built with its
+        S 0.32 Å from its own image and 8 S, 32 O in a cell of 4 and 16.
+        Exempt when either atom has a ``disorder_group``, which declares the
+        overlap, or when the occupancies of everything in one place (the atom
+        and every distinct image within the limit of it) sum to 1 or less: two
+        half atoms on a mirror, or three thirds on a 3-fold axis, are a
+        disorder model, while a sum over 1 is #876's double count.  Minimum image over the 27 neighbouring cells.
+        """
+        import gemmi
+
+        from ..crystallography.species import element_symbol
+        from ..crystallography.symmetry import _group_arrays, group_key
+        from ..schemas.structure import RIGID_BODY_OVERLAP_FACTOR
+        from .derived import cartesian_frame
+
+        ops, rot, tran = _group_arrays(group_key(sg))
+        m = np.asarray(cartesian_frame(phase.cell.lengths_angles()), dtype=np.float64)
+        atoms = [phase.atoms[index[label]] for label in body.atoms]
+        live = [i for i, a in enumerate(atoms) if a.disorder_group is None]
+        if not live:
+            return
+        xyz = np.array([[a.x.value, a.y.value, a.z.value] for a in atoms],
+                       dtype=np.float64)
+        occ = [float(a.occ.value) for a in atoms]
+        elements = [element_symbol(a.species) for a in atoms]
+        radius = np.array([float(gemmi.Element(e).covalent_r) for e in elements])
+        shifts = np.array([(i, j, k) for i in (-1, 0, 1) for j in (-1, 0, 1)
+                           for k in (-1, 0, 1)], dtype=np.float64)
+        # a place is a body atom j's position: j itself plus every distinct
+        # image of a body atom landing within the limit of it; its occupancy
+        # is their sum, which is what the cell counts there (a pair would let
+        # three images of a 3-fold site through at 1/2 each)
+        owns = {i: {int(g) for g in site_orbit(sg, xyz[i]).stabilizer_ops} for i in live}
+        hits = []
+        for j in live:
+            members, found = {}, []
+            for i in live:
+                for g in range(len(ops)):
+                    if g in owns[i]:
+                        continue
+                    image = rot[g] @ xyz[i] + tran[g]
+                    d = image - xyz[j]
+                    d = d - np.round(d) + shifts
+                    dist = float(np.sqrt(((d @ m.T) ** 2).sum(axis=1)).min())
+                    limit = RIGID_BODY_OVERLAP_FACTOR * (radius[i] + radius[j])
+                    if dist < limit:
+                        key = (i, *np.round(image - np.floor(image), 3) % 1.0)
+                        members[key] = occ[i]
+                        found.append((dist, i, j, g, limit))
+            if found and occ[j] + sum(members.values()) > 1.0 + 1e-9:
+                hits.extend(found)
+        if not hits:
+            return
+        dist, i, j, g, limit = min(hits)
+        involved = sorted({elements[h[1]] for h in hits} | {elements[h[2]] for h in hits})
+        counts = {e: 0.0 for e in involved}
+        for a in phase.atoms:
+            e = element_symbol(a.species)
+            if e in counts:
+                counts[e] += float(a.occ.value) * site_orbit(
+                    sg, np.array([a.x.value, a.y.value, a.z.value])).multiplicity
+        tally = ", ".join(f"{e} {counts[e]:g}" for e in involved)
+        raise ValueError(
+            f"RIGID_BODY_IMAGE_OVERLAP: rigid body {body.name!r} has the image of "
+            f"its atom {body.atoms[i]!r} under {ops[g].triplet()} {dist:.3g} Å "
+            f"from its atom {body.atoms[j]!r} (under {limit:.3g} Å, "
+            f"{RIGID_BODY_OVERLAP_FACTOR:g} × their covalent radii), so the body "
+            "straddles a symmetry element and the cell counts the overlap twice: "
+            f"it holds {tally} per cell — put the body's origin on that element "
+            "and list one atom per image (body_from_atoms(..., origin=...)), or "
+            "give the atoms a disorder_group and an occupancy of 1/|G_s| "
+            "(1/2 across a mirror or a centre) if the body is disordered across it")
 
     def _check_body_drift(self) -> None:
         """Refuse a body whose stored atoms sit off its map (WP-1805).
@@ -1782,7 +2091,7 @@ class ParameterTable:
         xyz = np.array([atom.x.value, atom.y.value, atom.z.value])
         basis = adp_basis(stabilizer_rotations(sg, xyz))  # (n_free, 6)
         u0 = np.array(atom.aniso.values(), dtype=np.float64)
-        coef, *_ = np.linalg.lstsq(basis.T.astype(np.float64), u0, rcond=None)
+        coef, *_ = lapack.lstsq(basis.T.astype(np.float64), u0, rcond=None)
         residual = basis.T @ coef - u0
         scale = max(float(np.abs(u0).max()), 1e-6)
         if float(np.abs(residual).max()) > 1e-6 * scale:
@@ -2595,15 +2904,27 @@ class ParameterTable:
         derived row is written after the matmul.  Measured before this refusal
         (WP-1803): the dependent's C row emptied and it left ``moving_paths``
         with no error.  The mirror of ``apply_value_scale``'s refusal of a
-        scaled source.  Returns ``(path, "derived" | "locked")``; one authority
-        for :meth:`set_tie`, which raises, and ``Refinement._apply_ties``,
-        which drops the tie and says so (a model edit never stops a build).
+        scaled source.  A tied source is read through its chain, as
+        :meth:`_flatten` will read it, so one resting on a locked or derived
+        row is refused too (the #773 round-2 gap).  Returns ``(path, what)``,
+        ``what`` naming the row — ``"derived row"``, ``"locked row"``, or the
+        chain; one authority for :meth:`set_tie`, which raises, and
+        ``Refinement._apply_ties``, which drops the tie and says so (a model
+        edit never stops a build).
         """
         derived = self.derived_paths()
         for src, _ in tie.terms:
-            j = self._paths.get(src)
-            if j is not None and (src in derived or self.entries[j].locked):
-                return src, "derived" if src in derived else "locked"
+            if src not in self._paths:
+                continue
+            # an untied source is its own one leaf
+            leaves, _ = self._flatten(AffineTie.identity(src))
+            for i, _ in leaves:
+                e = self.entries[i]
+                k = ("derived" if e.path in derived
+                     else "locked" if e.locked else None)
+                if k is not None:
+                    return src, (f"{k} row" if e.path == src
+                                 else f"row tied to the {k} row {e.path!r}")
         return None
 
     def set_tie(self, path: str, tie: AffineTie | None) -> None:
@@ -2621,10 +2942,10 @@ class ParameterTable:
         if tie is not None:
             reason = self.tie_source_refusal(tie)
             if reason is not None:
-                src, kind = reason
+                src, what = reason
                 raise ValueError(
                     f"cannot tie {path!r} to {src!r}: the source is a "
-                    f"{kind} row, which the affine block cannot carry, so "
+                    f"{what}, which the affine block cannot carry, so "
                     f"{path!r} would be frozen at its present value")
         if tie is not None:
             self._refuse_body_increment_tie(path, tie)
@@ -2869,7 +3190,7 @@ class ParameterTable:
             if cs.size == 0:
                 return False
             block = a[rows][:, cs].toarray()
-            step, *_ = np.linalg.lstsq(block, b[rows], rcond=None)
+            step, *_ = lapack.lstsq(block, b[rows], rcond=None)
             if float(np.abs(block @ step - b[rows]).max()) > 1e-9:
                 return False
         return True
@@ -3152,7 +3473,7 @@ class ParameterTable:
                 gap -= basis[:, held] @ np.array(
                     [self.entries[self._paths[dofs[k]]].value for k in held],
                     dtype=np.float64)
-            theta, *_ = np.linalg.lstsq(basis[:, cols], gap, rcond=None)
+            theta, *_ = lapack.lstsq(basis[:, cols], gap, rcond=None)
             for k, value in zip(cols, theta):
                 self.entries[self._paths[dofs[k]]].value = float(value)
                 moved.append(dofs[k])
@@ -3171,9 +3492,10 @@ class ParameterTable:
                                  named: Callable[[str], bool]) -> list[str]:
         """The rotation half of :meth:`displace_anchored_dofs` (its docstring)."""
         from ..crystallography import rotation
+        from ..crystallography.symmetry import SITE_TOL
 
         moved: list[str] = []
-        for bbase, _, block in self._bodies:
+        for bbase, name, block in self._bodies:
             target = orientations.get(bbase)
             paths = self._anchored_rotations[bbase]
             if target is None or not (any(named(p) for p in paths)
@@ -3181,7 +3503,26 @@ class ParameterTable:
                 continue
             r_t = np.asarray(rotation.matrix_from_quaternion(
                 np.asarray(tuple(target), dtype=np.float64)), dtype=np.float64)
-            if block.n_rot == 3:
+            if block.site_axes is not None:
+                # a site body turns only about W (WP-1807): a target off it
+                # would leave the site, and θ cannot reach it anyway
+                omega = np.asarray(rotation.vector_from_matrix(r_t @ block.r0.T),
+                                   dtype=np.float64)
+                w = block.site_axes
+                off = float(np.linalg.norm(omega - w @ (w.T @ omega)))
+                if off > SITE_TOL:
+                    allowed = ("no turn at all" if not w.shape[1] else
+                               "turns about "
+                               f"{tuple(round(float(v), 6) for v in w[:, 0])} only")
+                    raise ValueError(
+                        f"RIGID_BODY_NOT_INVARIANT: the target orientation of rigid "
+                        f"body {name!r} turns it {math.degrees(off):.3g}° about a "
+                        "direction its origin's site symmetry does not allow, which "
+                        f"would take it off its site; on this site it {allowed} "
+                        "(Cartesian)")
+                if not paths:
+                    continue
+            elif block.n_rot == 3:
                 omega = np.asarray(rotation.vector_from_matrix(r_t @ block.r0.T),
                                    dtype=np.float64)
             else:
@@ -3204,7 +3545,7 @@ class ParameterTable:
                     # to the body's, and E's first column is one (#801)
                     e0 = block.axes[:, 0]
                     omega = math.pi * e0 / np.linalg.norm(e0)
-            theta, *_ = np.linalg.lstsq(block.axes, omega, rcond=None)
+            theta, *_ = lapack.lstsq(block.axes, omega, rcond=None)
             for path, value in zip(paths, theta, strict=True):
                 e = self.entries[self._paths[path]]
                 if e.tie is None:
@@ -3358,6 +3699,8 @@ class ParameterTable:
                 e.vary = vary
                 hits.append(e.path)
         self._rebuild()
+        if vary and self._distortion:
+            self._refuse_unseeded_distortion()
         return hits
 
     @staticmethod
@@ -3672,8 +4015,8 @@ class ParameterTable:
 
         ``None`` means **no claim made** and caps nothing — the
         ``freeze_cell_windows``/``freeze_strain_cap`` convention.  The width
-        comes from :func:`size_cap` (the fitted 2θ range and the pattern's
-        wavelength, both properties of the *data*), and is held on the table
+        comes from :func:`size_cap` (the fitted 2θ range, a property of the
+        *data*), and is held on the table
         for the same reason the strain cap is: the solver used it and
         ``staged.check_guards`` must see the same bound to report ``BOUND_HIT``.
         """
@@ -4021,7 +4364,7 @@ class ParameterTable:
             if not len(cols):
                 continue
             a = a[:, cols]
-            out[np.ix_(cols, cols)] = np.linalg.pinv(a) @ chart @ a
+            out[np.ix_(cols, cols)] = lapack.pinv(a) @ chart @ a
         return out
 
     def restore_body_anchors(self, paths: Iterable[str]) -> list[str]:
@@ -4295,6 +4638,11 @@ class ParameterTable:
             for b, body in enumerate(phase.rigid_bodies):
                 for c in ("x", "y", "z"):
                     put(getattr(body.origin, c), f"{base}.rigid_bodies.{b}.origin.{c}")
+            if phase.distortion_modes is not None:
+                # the amplitudes; the coordinates they derive are written with
+                # the atoms below, from their rows
+                for m, mode in enumerate(phase.distortion_modes.modes):
+                    put(mode.amplitude, f"{base}.distortion_modes.modes.{m}.amplitude")
             for j, atom in enumerate(phase.atoms):
                 # coordinates too — without this, refined positions vanish at
                 # the next stage's recompile (models feed compile_phase_sites)

@@ -137,8 +137,20 @@ def test_an_edited_body_atom_is_refused_as_drift_and_place_body_atoms_repairs():
 
 
 def test_a_body_on_a_special_position_is_refused_for_now():
-    s = body_structure(Q_TRUE, origin=(0.0, 0.0, 0.0))
-    with pytest.raises(ValueError, match="RIGID_BODY_NOT_INVARIANT"):
+    """C₆Br moved onto the P-1 centre.  Its origin's site is no longer refused
+    as such (WP-1807); the body is not centrosymmetric, so its inverted image
+    lands 0.45 Å from it (C1′ on C5) and the cell would hold two C₆Br where it
+    has one.  ``add_body`` refuses the same placement up front (its template
+    check, ``test_rigid_body_special``); this is the table's backstop for a
+    body moved there by hand."""
+    s = body_structure(Q_TRUE)
+    d = s.phases[0].model_dump()
+    for c in "xyz":
+        d["rigid_bodies"][0]["origin"][c]["value"] = 0.0
+    s = Structure(phases=[place_body_atoms(Phase.model_validate(d))])
+    with pytest.raises(ValueError, match=(
+            r"RIGID_BODY_IMAGE_OVERLAP: rigid body 'c6br' has the image of its atom "
+            r"'C1' under -x,-y,-z 0.45 Å from its atom 'C5' .* Br 2, C 12 per cell")):
         ParameterTable(s, INS)
 
 

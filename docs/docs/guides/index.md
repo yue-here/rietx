@@ -1,6 +1,6 @@
 # Guides
 
-Each guide does one task from start to finish, and its title names the task as "How to …".
+Each guide does one task from start to finish. Its title names the task as "How to …", and the menu names the task alone, since the tab already says it is a guide.
 
 Each guide's fits are a script in `examples/guides/`, run by the test suite, and the output a guide shows is what its script printed.
 
@@ -9,10 +9,15 @@ Each guide's fits are a script in `examples/guides/`, run by the test suite, and
 - [How to check a pattern before fitting](check.md) reads `rietx.diagnose` and draws the reflection ticks.
 - [How to limit the fit range or leave out a region](range.md) sets `two_theta_limits` and `PatternData.excluded_regions`.
 
-## Background
+## Instrument
+
+- [How to calibrate an instrument on a standard and reuse it](calibrate.md) saves the widths a standard measured and loads them for each sample.
+
+## Background and extra peaks
 
 - [How to use a measured blank as the background](blank.md) holds an empty-container scan under the pattern with `BackgroundFixedPlusChebyshev`.
 - [How to add a hump to the background](hump.md) declares a broad Gaussian for amorphous or container scattering.
+- [How to fit a peak from the sample holder](holder.md) declares a sharp line no phase explains with a `PeakComponent`.
 
 ## Constraints and plans
 
@@ -45,27 +50,39 @@ Each guide's fits are a script in `examples/guides/`, run by the test suite, and
 - [How to check a series for path dependence](path.md) runs the chain both ways and refits a flagged step from cold.
 - [How to refine a cell edge as a function of temperature](equation.md) refines an equation's coefficients against every pattern at once.
 
+## Magnetic structures
+
+- [How to refit the nuclear model with the moment present](moment.md) takes the nuclear model from a pattern above the ordering temperature, or refits it with the moment in, and reads the moment after.
+
+## Several radiations
+
+- [How to fit an X-ray and a neutron pattern together](joint.md) refines one structure against both with `MultiHistogramRefinement`, and refines the neutron wavelength.
+
 ```{toctree}
 :hidden:
 
-check
-range
-blank
-hump
-hold
-tie
-restrain
-plan
-stage
-next
-branch
-watch
-qpa
-cell
-interval
-export
-foreign
-series
-path
-equation
+Check a pattern before fitting <check>
+Limit the fit range or leave out a region <range>
+Calibrate an instrument on a standard and reuse it <calibrate>
+Use a measured blank as the background <blank>
+Add a hump to the background <hump>
+Fit a peak from the sample holder <holder>
+Keep a parameter fixed whatever the plan frees <hold>
+Tie parameters together <tie>
+Restrain a bond length or an angle <restrain>
+Add a stage to a refinement plan <plan>
+Run a plan one stage at a time <stage>
+Choose the next parameter to free <next>
+Branch a refinement, compare the branches and roll back <branch>
+Watch or stop a running fit <watch>
+Find the weight fraction of each phase in a mixture <qpa>
+Quote lattice parameters with their esds <cell>
+Quote a parameter that ended on its bound <interval>
+Export the refined structure as a CIF and the reflection list as a table <export>
+Open a GSAS, TOPAS or FullProf refinement and write one back <foreign>
+Fit a temperature series <series>
+Check a series for path dependence <path>
+Refine a cell edge as a function of temperature <equation>
+Fit an X-ray and a neutron pattern together <joint>
+Refit the nuclear model with the moment present <moment>
 ```

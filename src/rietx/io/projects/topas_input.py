@@ -57,9 +57,26 @@ _MOMENT_KEYS = ("mlx", "mly", "mlz")
 #: TCH (1987) and rietx have 0.11116.
 _TCH_GAMMA = (2.69269, 2.42843, 4.47163, 0.07842)
 _TCH_ETA = (1.36603, -0.47719, 0.11116)
-#: rietx's Sabine extinction constants (``model.extinction``).
-_SABINE_LAUE = (-0.5, 0.25, -0.10416667, 0.036458333, -0.0109375, 2.8497409e-3)
+#: rietx's Sabine extinction prefactor (``model.extinction``).
 _SABINE_XPOL = 0.079411
+#: rietx's Laue factor is e^(−x)·[I₀(x) + I₁(x)], and TOPAS's expression
+#: language has no Bessel function (Technical Reference, Table 3-1). So the file
+#: spells Abramowitz & Stegun (1964), *Handbook of Mathematical Functions*, NBS
+#: AMS 55, eqs 9.8.1-9.8.4. Below the switch, I₀ and I₁/x are polynomials in
+#: (x/3.75)²; above it, √x·e^(−x)·I₀ and √x·e^(−x)·I₁ are polynomials in 3.75/x.
+#: Against scipy's ``i0e + i1e`` the spelled E_L is within 3.6e-8 relative for
+#: x in (0, 10⁴], the range tested, and it steps by 6e-9 at the switch (WP-2044).
+_BESSEL_SWITCH = 3.75
+_I0_SMALL = (1.0, 3.5156229, 3.0899424, 1.2067492, 0.2659732, 0.0360768, 0.0045813)
+_I1_SMALL = (0.5, 0.87890594, 0.51498869, 0.15084934, 0.02658733, 0.00301532,
+             0.00032411)
+_I0_LARGE = (0.39894228, 0.01328592, 0.00225319, -0.00157565, 0.00916281,
+             -0.02057706, 0.02635537, -0.01647633, 0.00392377)
+_I1_LARGE = (0.39894228, -0.03988024, -0.00362018, 0.00163801, -0.01031555,
+             0.02282967, -0.02895312, 0.01787654, -0.00420059)
+#: The largest relative difference between the spelled and rietx's E_L,
+#: measured on x in (0, 10⁴]; the note at write quotes it.
+_LAUE_SPELLING_REL = 3.6e-8
 #: The goniometer radius written when the instrument states none. Only the
 #: axial lengths and a displacement read it, and both are written against the
 #: same number, so its value is a convention of the file, not a measurement.
@@ -400,8 +417,10 @@ def _extinction_items(instrument, ip, phase, refined: RefinedSet) -> list:
     (1988), *Acta Cryst.* A44, 374 (the references ``model.extinction`` lists).
 
     E = E_B sin²θ + E_L cos²θ with x = ext·|F|²·(λ/V)²·Xpol, E_B = (1 + x)^-½,
-    and E_L the six-term series for x ≤ 1 and √(2/πx)(1 − 1/(8x)) above
-    (``model.extinction``). TOPAS states |F|² per reflection as
+    and E_L = e^(−x)·[I₀(x) + I₁(x)] (``model.extinction``). TOPAS has no
+    Bessel function, so E_L is written as Abramowitz & Stegun's polynomials
+    (1964, eqs 9.8.1-9.8.4), within ``_LAUE_SPELLING_REL`` of rietx's, and the
+    caller is told so (``_extinction_note``). TOPAS states |F|² per reflection as
     ``A01^2 + B01^2 + A11^2 + B11^2`` (Technical Reference § 10.2.2, p. 71,
     eqs. 10-10 and 10-12) and the cell volume as ``Get(cell_volume)``. Its unit
     is measured against TOPAS 6, never assumed: a neutron |F|² there is in barn,
@@ -423,12 +442,29 @@ def _extinction_items(instrument, ip, phase, refined: RefinedSet) -> list:
         f2 = "100*" + f2          # barn -> fm²
     xv = (f"({{0}}*{f2}*({number(lam)}/Get(cell_volume))^2*{number(_SABINE_XPOL)}"
           f"*(1 + Cos(2*Th)^2)/2)")
-    c = _SABINE_LAUE
-    series = " + ".join(f"({number(ci)})*{xv}^{i + 1}" for i, ci in enumerate(c))
-    el = (f"If({xv} <= 0, 1, If({xv} <= 1, 1 + {series}, "
-          f"Sqrt(2/(Pi*{xv}))*(1 - 0.125/{xv})))")
+    sw = number(_BESSEL_SWITCH)
+    small = (f"Exp(-{xv})*({_horner(_I0_SMALL, f'({xv}/{sw})^2')}"
+             f" + {xv}*{_horner(_I1_SMALL, f'({xv}/{sw})^2')})")
+    large_coef = tuple(round(a + b, 8) for a, b in zip(_I0_LARGE, _I1_LARGE))
+    large = f"{_horner(large_coef, f'({sw}/{xv})')}/Sqrt({xv})"
+    el = f"If({xv} <= 0, 1, If({xv} <= {sw}, {small}, {large}))"
     e = f"(1/Sqrt(1 + {xv}))*Sin(Th)^2 + {el}*Cos(Th)^2"
     return ["  scale_pks = ", Expr(e, [ext]), ";\n"]
+
+
+def _horner(coef: tuple, t: str) -> str:
+    """c₀ + t·(c₁ + t·(c₂ + …)) as a TOPAS expression, each power of ``t`` once."""
+    out = f"({number(coef[-1])})"   # no operator meets a bare minus
+    for c in reversed(coef[:-1]):
+        out = f"({number(c)} + {t}*{out})"
+    return out
+
+
+def _extinction_note(phase_name: str) -> str:
+    """What the written Laue factor is, for the file's head (WP-2044)."""
+    return (f"phase {phase_name!r}: extinction's Laue factor e^(-x)(I0 + I1) is "
+            f"written as Abramowitz & Stegun 9.8.1-9.8.4, since TOPAS has no Bessel "
+            f"function; it is within {_LAUE_SPELLING_REL:g} of rietx's, relative")
 
 
 # --------------------------------------------------------------- instrument
@@ -780,6 +816,8 @@ def whole_input(structure, *, refined: RefinedSet, scale: str, instrument=None,
                     if instrument is not None else None)
             ext = (_extinction_items(instrument, ip, phase, refined)
                    if instrument is not None and part != "magnetic" else None)
+            if ext:
+                notes.append(_extinction_note(phase.name))
             if instrument is None and phase.extinction.value != 0.0:
                 notes.append(f"phase {phase.name!r}: extinction "
                              f"{number(phase.extinction.value)} not written "
@@ -847,6 +885,7 @@ def from_structure_refined(structure, *, free: Any = None, scale: str | None = N
         _GroupIdentityRefusal,
         _magnetic_group_line,
         _sign_first,
+        refuse_distortion_modes,
         refuse_operation_list,
         topas_species,
     )
@@ -863,6 +902,7 @@ def from_structure_refined(structure, *, free: Any = None, scale: str | None = N
             raise ValueError(f"phase name {phase.name!r} cannot be written to a TOPAS "
                              f"`.inp`: it carries a double quote or a line break")
         refuse_operation_list(phase, "a TOPAS `.inp`")
+        refuse_distortion_modes(phase, "a TOPAS `.inp`")
         for atom in phase.atoms:
             if any(ch.isspace() or ch == "'" for ch in atom.label + atom.species):
                 raise ValueError(

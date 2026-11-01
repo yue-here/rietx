@@ -54,7 +54,7 @@ exists precisely because a *derived* flag rots in silence, ``features``
 process's contract, which is the argument for giving it one. Against it:
 nothing negotiates over it, and WP-1006's own precedent is that a contract
 nothing has exercised is an untested guess. So it waits until the layout has
-survived a release. ``using/compatibility.md`` says the same thing to a reader,
+survived a release. ``reference/compatibility.md`` says the same thing to a reader,
 which is the promise that has to be kept if this is ever revisited.
 """
 

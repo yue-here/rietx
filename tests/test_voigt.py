@@ -17,7 +17,7 @@ import numpy as np
 import pytest
 
 import rietx as rx
-from rietx.model.forward import compile_model
+from rietx.model.forward import WINDOW_AREA_TOL, compile_model
 from rietx.model.profiles.faddeeva import WEIDEMAN_N, faddeeva_w
 from rietx.model.profiles.pseudovoigt import pseudo_voigt
 from rietx.model.profiles.voigt import (
@@ -227,8 +227,10 @@ def test_voigt_cross_backend_forward_residual():
     table.set_vary(["*"], False)
     for path in ANALYTIC_FAMILIES:
         table.set_vary([path], True)
+    # the cross-backend matrix's windows, declared as tests/test_cross_backend.py says
     model = compile_model(structure, ins, pattern, mode="rietveld",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
     theta = table.x0()
     r_np = _make_residual(model, table)(theta)
     set_backend("jax")

@@ -18,17 +18,21 @@ htmlcov/
 *.png
 *.html
 !docs/**/*.html
-# Part 1's figures are COMMITTED, not built (docs/manual/make_figures.py says
+# The manual's figures are COMMITTED, not built (docs/docs/make_figures.py says
 # why): the sphinx build stays seconds and stays offline, at the cost of a
 # figure that can go stale.  `*.png` above would have dropped them silently,
 # leaving a manual whose images are broken everywhere except this machine.
-!docs/manual/using/figures/*.png
+# They moved here from the old tree's `using/figures/` (WP-1986), and
+# `tests/test_manual_api.py` asks `git check-ignore` about every image a page
+# shows.
+!docs/docs/figures/*.png
 # The GUI chapters' screenshots are committed for the same reason and were
 # dropped by the same rule (WP-1017) — the third time `*.png` above has
 # swallowed a committed image. `tests/test_gui_manual.py` now asks
 # `git check-ignore` about them, so a fourth directory fails a test instead of
-# reaching a fresh clone with its pictures missing.
-!docs/manual/using/screenshots/*.png
+# reaching a fresh clone with its pictures missing.  They moved into the new
+# tree with the GUI pages (WP-1986).
+!docs/docs/screenshots/*.png
 # A WP that decides something from rendered pages commits the pictures beside
 # its own file, and `*.png` above swallowed all eighteen of WP-1412's — the
 # fifth time, and the first outside `docs/manual/`, which is why the guard added
@@ -82,13 +86,12 @@ eval-runs/
 # backend suites are compile-bound, and the cache is keyed by a content hash
 # of the computation, so it is safe to share between runs and xdist workers.
 tests/.jax_cache/
-# sphinx output for the theory manual (docs/manual/); note the !docs/**/*.html
+# sphinx output for the manual (docs/docs/); note the !docs/**/*.html
 # un-ignore above would otherwise commit every built page.
-docs/manual/_build/
 docs/docs/_build/
 .DS_Store
 
-# .claude/ is committed selectively: commands/ is shared tooling, while
+# .claude/ is committed selectively: skills/ and hooks/ are shared tooling, while
 # worktrees/ holds live checkouts and settings.local.json is per-machine.
 .claude/worktrees/
 .claude/settings.local.json
@@ -99,15 +102,16 @@ docs/docs/_build/
 # no test saw it and CI was green with it.
 /pr_body.md
 
-# Generated at Sphinx build time from rietx.help (docs/manual/conf.py).
-docs/manual/_generated/
 # Generated at Sphinx build time by docs/reference_pages.py (WP-1981).
 docs/docs/_generated/
 # The Microsoft style package, fetched by `vale sync` at the version .vale.ini
 # pins (WP-1982).
 docs/vale/Microsoft/
-# Copied at Sphinx build time from examples/tutorials/ (docs/manual/conf.py).
-docs/manual/using/tutorials/
+# Copied at Sphinx build time from examples/tutorials/ (docs/sphinx_shared.py's
+# copy_tutorials, called by docs/docs/conf.py).
+docs/docs/start/tutorials/
+# The tutorials' markdown cells, extracted for Vale (`build.py --prose`).
+examples/tutorials/_prose/
 
 # The landing page (docs/landing/, WP-1331).  Three rules, and they are here
 # rather than beside the rules they answer because ORDER decides: the last

@@ -24,7 +24,7 @@ sometimes with a phase index in them (texture), and a second copy here could
 disagree with the rationale printed beside it.
 
 **Not every kind is a button, and each non-button says why in its own terms.**
-Four of the sixteen are advice, and none of them for want of effort:
+Four of the eighteen are advice, and none of them for want of effort:
 
 * ``add_impurity_phase`` — nothing is named yet, so there is nothing to free.
   Identifying the phase is the work, and adding it is an ``edit_model``.
@@ -177,18 +177,28 @@ def stage_for(action: SuggestedAction, *, prefix: str = "apply",
                      turn_on=list(action.parameter_paths), max_iter=max_iter)
 
 
-def api_call(stage: StageSpec) -> str:
+def api_call(stage: StageSpec, *, plan=None) -> str:
     """The public-API line ``stage`` corresponds to.
 
     Rendered by :meth:`NodeAction.api_call`, which is what the history panel
     already prints for a stage node — so the line an Apply button shows as its
     tooltip and the line that node prints afterwards come from one function rather
-    than from two spellings that can drift.
+    than from two spellings that can drift.  ``plan`` is the plan whose two
+    settings the stage will run at (a project's stored one, which
+    ``Project.run_stage`` passes on), since the node records them and its line
+    then names any that differ from the default (WP-2002, B1).
     """
     from ..schemas.history import NodeAction
+    from ..schemas.plan import CLOSING_WINDOW_TOL
 
+    settings = ({} if plan is None else
+                {"correlation_guard": plan.correlation_guard,
+                 "phase_support_sigma": plan.phase_support_sigma})
+    # the fraction run_stage records when given none (WP-2002, the seventh
+    # round's Q1), so the tooltip and the node's line agree
     return NodeAction(kind="stage", name=stage.name, turn_on=list(stage.turn_on),
-                      max_iter=stage.max_iter).api_call()
+                      max_iter=stage.max_iter, window_area_tol=CLOSING_WINDOW_TOL,
+                      **settings).api_call()
 
 
 def unreachable(action: SuggestedAction, held: Mapping[str, str]) -> dict[str, str]:
@@ -256,13 +266,14 @@ def refusal(action: SuggestedAction, *, held: Mapping[str, str],
 
 
 def describe_action(action: SuggestedAction, *, held: Mapping[str, str],
-                    indexing: bool = False) -> dict:
+                    indexing: bool = False, plan=None) -> dict:
     """One suggestion's applicability, as the arm a client renders from.
 
     Served beside the report (``GET /api/report``) rather than computed by the
     panel, so the enabled-ness of a button and the route's willingness to act
     cannot disagree — the same reason ``refinable``/``held_because`` travel on a
-    parameter row instead of being re-derived per client.
+    parameter row instead of being re-derived per client.  ``plan`` is
+    :func:`api_call`'s.
     """
     rule = recipe(action.kind)
     why = refusal(action, held=held, indexing=indexing)
@@ -275,7 +286,7 @@ def describe_action(action: SuggestedAction, *, held: Mapping[str, str],
         "refusal": why,
         "paths": list(action.parameter_paths),
         "stage": None if stage is None else stage.model_dump(mode="json"),
-        "api_call": None if stage is None else api_call(stage),
+        "api_call": None if stage is None else api_call(stage, plan=plan),
     }
 
 

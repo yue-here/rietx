@@ -1,8 +1,7 @@
 # WP-1810 — hydrogens riding on a body, CIF flags
 
-Milestone: rigid-bodies · Status: 🔄 2026-10-15 — all four tasks landed from outside (PR #955); closing is the maintainer's
+Milestone: rigid-bodies · Status: ✅ 2026-10-23 — a body's riding H at SHELXL's X-ray or ITC's neutron lengths, and the CIF flags on write (PR #955)
 Depends on: 1805; 1806 soft (a real case to show it on)
-Priority: P4 2026-10-06 — a body refines without its hydrogens; this is completeness
 
 ## Goal
 
@@ -50,6 +49,13 @@ CIF write records which atoms were constrained. This is chunk R9 of issue #561, 
 
 ## Handover log
 
+- **2026-10-23** — closed by the maintainer's word. A rigid body now carries its
+  riding hydrogens at a length set by bond class and radiation, and a CIF written
+  from a phase with a body says which atoms the group or a riding rule placed.
+  Nothing was left open. All four tasks and every acceptance line were met at
+  `719a0a74`, and there was no `### Inherited`. *Next:* nothing owed here. The
+  user-facing call (`set_riding_lengths` reached from `src/`) is WP-1812's,
+  which already parks the body fields in `api_surface_deferred.txt`.
 - **2026-10-15** — PR #955 (outside contributor) merged as `719a0a74`.
   All four tasks landed. `RigidBody.riding` carries the riding H at SHELXL's
   X-ray lengths or ITC Vol. C Table 9.5.1.1's neutron means, and a joint fit

@@ -22,11 +22,13 @@ anisotropy
 antiparallel
 antiphase
 antisite
+aragonite
 attenuator
 bcc
 beamline
 beamstop
 beamtime
+Bmmm
 Bravais
 brucite
 carbonyl
@@ -34,11 +36,14 @@ centring
 centrings
 centrosymmetric
 centrosymmetry
+chiral
 chirality
 CIF
 CIFs
+Cmmm
 collinear
 collinearity
+conjugacy
 coset
 cryostat
 crystallite
@@ -52,15 +57,20 @@ displacive
 DOF
 DOFs
 electronegative
+enantiomorphic
+enantiopure
 esd
 esds
 Ewald
+Fddd
+ferritic
 fluorapatite
 Friedel
 goniometer
 hkl
 holohedry
 hydrogens
+Immm
 inequivalent
 interatomic
 intermetallic
@@ -69,6 +79,7 @@ irreps
 isostructural
 isotropy
 IUCr
+klassengleiche
 lanthanide
 ligand
 ligands
@@ -85,9 +96,12 @@ monatomic
 monochromated
 monochromator
 monoclinic
+multiplet
 nanocrystalline
+NiAsS
 Niggli
 nonbonding
+normaliser
 nuclide
 nuclides
 occupancies
@@ -95,6 +109,7 @@ octahedra
 octahedral
 octahedron
 operando
+orientational
 orthorhombic
 oxygens
 pdCIF
@@ -105,16 +120,20 @@ polycrystalline
 polyhedra
 polyimide
 pseudosymmetry
+PtGeSe
+pyroelectric
 rhombohedral
 rutile
 scatterer
 scatterers
 Shubnikov
+Sohncke
 spallation
 spinel
 structureless
 subcell
 sublattice
+subspaces
 supercell
 superionic
 superlattice
@@ -124,6 +143,8 @@ tetragonal
 tetrahedra
 torsion
 torsions
+translational
+translationengleiche
 triclinic
 trigonal
 trirutile
@@ -151,14 +172,17 @@ Altomare
 Borda
 Brentano
 Brindley
+Brunner
 Bunge
 Caglioti
 Chebyshev
 Coelho
 Cracknell
+Daams
 de
 Debye
 Deslattes
+Doebelin
 Dollase
 Dreele
 Faddeeva
@@ -166,24 +190,35 @@ Gaultois
 Gaussian
 Gaussians
 Guinier
+HCl
 Hofmann
+Hotelling
 Jacobian
 Jacobians
+Kass
 Kessler
 Kirfel
 Kissel
+Kleeberg
+Klyne
 Kovalev
 Landé
 Langford
+Lelann
 Levenberg
 Lindemann
 Lorentzian
 Madsen
+Maier
 Marquardt
 Maxwellian
+Olds
 Pawley
 Pitschke
+Prelog
 Rachinger
+Raftery
+Rez
 Rietveld
 Rodrigues
 Scherrer
@@ -191,6 +226,7 @@ Schwarzenbach
 Shirane
 Suortti
 Thomlinson
+Villars
 Voigt
 Von
 Waasmaier
@@ -255,6 +291,7 @@ parameterisation
 parameterisations
 parameterises
 pentadiagonal
+planarity
 pointwise
 positivity
 precisions
@@ -291,10 +328,13 @@ unscaled
 untransposed
 
 # Programs, libraries and formats.
+bintype
+bintypes
 Bruker
 cctbx
 codeword
 codewords
+Colab
 Conograph
 Fortran
 FullProf
@@ -307,6 +347,7 @@ Kapton
 Mantid
 matplotlib
 numpy
+PANalytical
 pydantic
 pytest
 rietx
@@ -314,6 +355,7 @@ Rigaku
 SARAh
 scipy
 spglib
+Stoe
 TOPAS
 
 # Words a reader of software documentation meets.
@@ -327,8 +369,10 @@ docstrings
 filesystem
 frontend
 lookups
+quickstart
 recurses
 refinable
+renderer
 rietview
 roadmap
 selectable
@@ -352,3 +396,12 @@ magnetons
 nm
 px
 ulp
+
+# People the manual names (start/this-manual.md).
+Yue
+
+# Authors the tutorials cite (examples/tutorials).
+Dal
+Negro
+Ungaretti
+ZrBeSi

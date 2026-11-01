@@ -4,6 +4,10 @@
 0 or above at the seed (``ParameterTable.seed_floored``), and
 ``StageResult.seeded`` records each such row with its start in column units.
 
+The row these tests lift is ``instrument.profile.y`` with a floor of 0 the
+caller states (:func:`_models`): Y has no floor of its own since 2026-10-23
+(WP-2002), so its zero is not a floor and no seed lifts it.
+
 WP-1930's floor seed lived here too: it started a freed softplus row sitting
 on its floor at a size per unit, because its column there was twelve orders
 below its neighbours and rounding chose whether it ever left (issue #832).
@@ -35,9 +39,16 @@ def pattern():
     return synthesize()
 
 
+def _models():
+    """The synthetic models with Y floored at 0 by the caller."""
+    structure, ins = perturbed_models()
+    ins.profile.y.min = 0.0
+    return structure, ins
+
+
 def test_the_stage_seed_selects_rows_by_their_bounds():
     """WP-1938: a row qualifies by its lower bound, never a transform word."""
-    structure, ins = perturbed_models()
+    structure, ins = _models()
     table = ParameterTable(structure, ins)
     table.set_vary(["*"], False)
     freed = table.set_vary(["instrument.profile.x", "instrument.profile.y",
@@ -52,6 +63,12 @@ def test_the_stage_seed_selects_rows_by_their_bounds():
     assert values["instrument.zero_shift"] == 0.0
     # a row the stage did not free keeps the value a caller gave it
     assert table.seed_floored(["phases.0.extinction"], 1e-3) == []
+    # Y's own box has no floor at 0, so its zero is not lifted
+    structure, ins = perturbed_models()
+    table = ParameterTable(structure, ins)
+    table.set_vary(["*"], False)
+    freed = table.set_vary(["instrument.profile.y"], True)
+    assert table.seed_floored(freed, 1e-4) == []
 
 
 def test_a_fit_records_what_each_stage_seeded(pattern):
@@ -61,8 +78,9 @@ def test_a_fit_records_what_each_stage_seeded(pattern):
     floor; what it may not do is leave its box."""
     structure, ins = perturbed_models()
     result = rx.Refinement(structure, ins, history=False).fit(pattern, plan=PROFILE)
-    assert [s.seeded for s in result.stages] == [{}, {}]
-    assert 0.0 <= result.parameter("instrument.profile.y").value <= ins.profile.y.max
+    assert [s.seeded for s in result.stages] == [{}] * len(PROFILE.run_stages())
+    assert ins.profile.y.min <= result.parameter("instrument.profile.y").value \
+        <= ins.profile.y.max
     OUT.mkdir(exist_ok=True)
     result.plot(path=str(OUT / "floor_seed_profile.png"))
     import matplotlib.pyplot as plt
@@ -74,7 +92,7 @@ def test_a_stage_seed_is_recorded_too(pattern):
     """``Stage.seed`` lifts a freed row on its floor and nothing else: ``x``
     starts above 0 and below the seed, and keeps the start it was given
     (#499)."""
-    structure, ins = perturbed_models()
+    structure, ins = _models()
     plan = rx.RefinementPlan(stages=[
         PROFILE.stages[0],
         rx.Stage("profile", ["instrument.profile.x", "instrument.profile.y"],
@@ -85,7 +103,7 @@ def test_a_stage_seed_is_recorded_too(pattern):
 
 def test_run_stage_records_its_seed_too(pattern):
     """``run_stage`` builds its own ``StageResult``: the second call site."""
-    structure, ins = perturbed_models()
+    structure, ins = _models()
     ref = rx.Refinement(structure, ins, history=False)
     result = ref.run_stage(pattern, rx.Stage(
         "y", ["instrument.profile.y"], max_iter=5, seed=1e-3))
@@ -100,6 +118,8 @@ def test_a_joint_fit_seeds_each_histograms_row():
         tm.synthesize(0.71070, 6.0, 46.0, scale=9e-4, zero=-0.010,
                       bkg=[70.0, 5.0, -2.0], seed=2)]
     structure, instruments = tm.perturbed_inputs()
+    for ins in instruments:
+        ins.profile.y.min = 0.0
     plan = rx.RefinementPlan(stages=[
         PROFILE.stages[0],
         rx.Stage("profile", ["instrument.profile.x", "instrument.profile.y"],

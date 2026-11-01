@@ -90,6 +90,14 @@ What an operator must know, all measured:
   the median that decides every later trigger.  So a single failure cannot
   propagate down the chain or quietly raise the bar for the patterns after it —
   but it is still *reported*, and reading its parameters is on you.
+- **A closing `stage_start` with no `stage_end` for minutes is a runaway
+  being polished.**  The closing stage rebuilds the model at the answer it is
+  handed, so a runaway axial ratio or width gives it windows as wide as the
+  pattern.  Refit with `closing_window_tol=None` and say the numbers came
+  without the closing stage (up to 0.97 esd on lab answers).  *(Hypothesis:
+  the one measured trigger, cpd-1b at `axial_sl` 557.8 on 1.10.0, is gone
+  since the last declared stage converges (WP-2045); a runaway the stage
+  converges to would still do it.)*
 - **A tie or a named variable reaches a chain only through `constrain=`.**  The
   chain builds its own `Refinement` per pattern, so a constraint you declare on
   one you built yourself fits one pattern and nothing after it — there is no
@@ -97,7 +105,7 @@ What an operator must know, all measured:
   `constrain=lambda index, ref: ...` to `fit`/`refine_sequential` and call
   `ref.add_variable(...)` / `ref.tie_equal(...)` inside it, against that
   pattern's own table.  It fires once per **fit** and not once per pattern —
-  every escalation rung and the `verify_discontinuities` refit get it — so a
+  every escalation rung and the `verify_steps` refit get it — so a
   hook that counts its own calls counts fits.  The variable's *value* then
   rides the `carry` globs like any other path (`vars.<name>`) and warm-starts
   from the last **accepted** pattern, a quarantined one seeding no successor
@@ -174,7 +182,7 @@ What an operator must know, all measured:
   one lists.  *(Measured: issue #224's series C before WP-1333; the codes are
   WP-1333's.)*  Both safety checks are also worth pricing up front: on one
   series the backward pass was **43.9 %** of wall clock and the
-  `verify_discontinuities` refits **15.1 %**, so **59 % of the run bought
+  `verify_steps` refits **15.1 %**, so **59 % of the run bought
   assurance rather than answers** — the right trade for a trajectory you will
   publish, the wrong one for a screen.
 - **One pattern that cannot be fitted costs that pattern, not the chain.**  A
@@ -192,9 +200,9 @@ What an operator must know, all measured:
   resumed chain has a cold seam an uninterrupted one does not.  *(Measured:
   issue #224, 20 of 24 patterns lost to one raise before WP-1333; the ladder
   rescue is WP-1333's fixture test, not a re-run of that series.)*
-- **A flagged step can check itself.**  `verify_discontinuities=True` refits
-  each `SEQUENTIAL_DISCONTINUITY`'s two patterns **cold and independently** and
-  writes the cold step over the chain's step to the diagnostic's `value`, signed:
+- **A step can check itself.**  `verify_steps=k` refits the two patterns of
+  each of the *k* largest `series.steps` **cold and independently** and
+  writes the cold step over the chain's step to that step's `cold_ratio`, signed:
   near 1.0 the step is in the data, near 0 the chain made it, negative a cold
   pair that moved the other way.  Off by default because
   a cold fit is the full staged plan from the initial models; measured on a
@@ -245,6 +253,15 @@ What an operator must know, all measured:
   form, whose `results_` holds them.  `sr = rx.SequentialRefinement(structure,
   instrument)`, `series = sr.fit(patterns, ...)`, then
   `rx.build_report(sr.results_[i]).background.worst_absorption`.
+- **A step in a `qpa_trajectory` curve may be a change of basis, not of the
+  specimen: check `basis_changes` before reading it.**  A phase with no line in
+  a pattern's range quotes no fraction there, so the other phases' points in
+  that pattern are fractions of fewer phases.  `qpa_trajectory(phase).unmeasured`
+  lists, per point, the phases left out, and `basis_changes` says whether the
+  points differ in that set.  *(Measured: WP-1958, synthetic four-phase series
+  of 25-50°, 25-33°, 25-33° and 25-50° scans with iron out of range in the
+  middle two: corundum read 71.55, 72.94, 72.94, 71.55 % with no change in the
+  specimen.)*
 
 Driving one: **`fit()` is all-or-nothing, so wire `on_result=` before starting
 anything long.**  The per-pattern loop catches `RefinementCancelled` and nothing
@@ -403,22 +420,20 @@ gives no verdict (`MagneticTrajectory.measured` False), outside the bracket.
 
 ## The series codes: what each one means you must not do
 
-These eleven arrive on a `SeriesResult` — the series' own `diagnostics`, or a
+These nine arrive on a `SeriesResult` — the series' own `diagnostics`, or a
 pattern's entry — and a single `fit()` never emits one, so their rows live
 here rather than in §7's table, which carries what a fit is likely to say.
 Branch on the code, as §7 says; the manual's *Refining many patterns* chapter explains each.
-The twelfth series code, `SEQUENTIAL_PERSISTENT_FINDING`, is an abstention, so its row is in §6, [`abstention.md`](abstention.md).
+The twelfth series code, `SEQUENTIAL_PERSISTENT_FINDING`, is an abstention, so its row is in §6, [`abstention.md`](abstention.md). The two moment codes, `SEQUENTIAL_MOMENT_HOLD` and `SEQUENTIAL_MOMENT_ONSET`, are the magnetic family's, so their rows are in §7j, [magnetic](magnetic.md) (maintainer ruling, issue #286: one order-parameter question, one file).
 
 | Code | What it means you must not do |
 |---|---|
 | `SEQUENTIAL_RESEED` | Read this point of a series as evidence that the trajectory is continuous. With `SEQUENTIAL_RWP_OUTLIER` on the same pattern the cold rung was only the best of the rejected rungs, not a good fit |
 | `SEQUENTIAL_RWP_OUTLIER` | Read that point as a measurement before opening its fit. `value` = Rwp over `entry.rwp_fence`; every rung the chain tried left it above the fence (with `reseed=False` only the first, and the message says so). The message quotes GoF and Rexp against the last pattern inside the fence: GoF up is a model the pattern outgrew, GoF level with Rexp up is fewer counts. (Measured: #481, a blank frame fitted perfectly with its scales at their esds, GoF 1.00 against 1.06, Rexp 0.159 against 0.040.) It is not quarantined, so a run that stops is the median catching up with a lasting change (WP-1469) |
-| `SEQUENTIAL_DISCONTINUITY` | Report the jump as physics without opening that pattern's own fit; it is equally the signature of a chain failure. `fit(verify_discontinuities=True)` opens it for you: both patterns refitted cold and independently, and `value` is what that pair reproduces (1.0 in the data, 0 the chain's own); measured cost 5 % of a 68-pattern chain. The pair is `series.discontinuities` (a `SeriesStep` per flag, key `path`), not the prose. Steps into or out of an outlier or unrecovered pattern are not scanned |
+| `series.steps` | Report a large step as physics without opening that pattern's own fit; it is equally the signature of a chain failure, and no threshold says which. `fit(verify_steps=k)` opens the *k* largest for you: both patterns refitted cold and independently, and `cold_ratio` is what that pair reproduces (1.0 in the data, 0 the chain's own); measured cost 5 % of a 68-pattern chain. Each `SeriesStep` carries `path`, `indices` and `size_esd`. Steps into or out of an outlier or unrecovered pattern are not listed |
 | `SEQUENTIAL_PATH_DEPENDENT` | Quote that parameter's per-pattern esd as its uncertainty; the between-chain spread is larger and is the honest one |
 | `SEQUENTIAL_CANCELLED` | Read the shortened `entries` list as the series |
 | `SEQUENTIAL_UNRECOVERED` | Read that point's values as a measurement, or its failure as evidence about its neighbours: nothing was chained through it. A pattern that *converged* above the Rwp fence on every rung is `SEQUENTIAL_RWP_OUTLIER` instead, and is chained through |
 | `SEQUENTIAL_WIDTH_GROWTH` | Read that phase's width, or its scale, cell or weight fraction, as a measurement from the pattern the message names onward. It fires where the width reached 3× the first value the series measured **and** GoF 2× its own; `value` is the width ratio there. No per-pattern code says so until `STRAIN_UNUSUALLY_LARGE` at 1.5° (Measured: a 0.4 %-split second phase, width 3.65×, GoF 3.1×, nothing else fired). A Stephens block is not screened (WP-1465) |
 | `SERIES_PATTERN_FAILED` | Read a missing index in `SeriesResult.entries` as a pattern nobody asked to fit: it is one on which **every** rung of the ladder raised rather than returned (`SeriesResult.failures`/`.n_failed` name it, `SeriesFailure.exception` carries the last rung's `repr(exc)`), not a converged-but-rejected `"diverged"` entry. A rung that raises is a rung that lost and the ladder escalates past it. A pattern a later rung rescued has an entry whose `rungs_raised` says what the earlier rungs raised. With `direction="both"` a failure in the backward chain costs only the comparison (`SEQUENTIAL_PATH_CHECK_INCOMPLETE`); the forward entry stands. The default `on_error="carry"` warm-starts the successor from the last accepted pattern; `"skip"` starts it cold; under `"raise"` the chain ends in the exception instead, so read `SequentialRefinement.results_`/`.failures_`, or the exception's own `series_results`/`series_failures` (and `series_result`, the forward `SeriesResult`, when the backward pass is what raised) for what completed. A chain that fitted **no** pattern raises under every policy, so an empty `SeriesResult` never comes back as an answer |
 | `SEQUENTIAL_PATH_CHECK_INCOMPLETE` | Read zero `SEQUENTIAL_PATH_DEPENDENT` findings as a clean bill while this is present. At `warning` the comparison **did not run** at all (the forward chain was cancelled, so the backward one never started; the backward chain was cancelled; or it raised under `on_error="raise"`) and the message names the chain and the pattern it stopped on. At `info` it ran on less than the series: `where` lists **patterns** one chain has no entry for (every rung raised there; `value` is the number compared), or **paths** some chain measured that no pattern could judge because no pattern has an esd for them in both chains (issue #269, a path held throughout one direction). A finding that did fire still stands; silence says nothing about what these name, so read `result.trajectory(path)` against `result.backward.trajectory(path)` yourself |
-| `SEQUENTIAL_MOMENT_HOLD` | Read the held patterns as small moments, or plot them as zero with an error bar. A held point's `value` is its fit's modulus, judged against its *own* esd, so the trajectory withholds the esd there. The message names the successors reseeded to the floor instead of warm-started |
-| `SEQUENTIAL_MOMENT_ONSET` | Quote the midpoint as a critical temperature with that ± as its uncertainty: it is a **bracket** between the last released and the first held pattern, the ± half *your pattern spacing*, and nothing fits `m ∝ (1 − T/T_N)^β`. Nor quote it when `MagneticOnset.bracket_verdicts_final` is False (the early-stopped modulus had not finished falling), nor from one pass: `direction="both"` carries both chains' brackets and says whether they overlap, and one chain's warm start can carry a moment across the transition |

@@ -68,9 +68,24 @@ SKIP_EXTENT_FWHM_RATIO = 0.02
 NODES_PER_FWHM = 6.0
 MIN_NODES = 8
 MAX_NODES = 64
+#: The same rule for a compile finer than the declared stages' windows: the
+#: closing stage, and every evaluation outside a fit (WP-2002, the seventh
+#: round's Q2).  The declared stages' rule above leaves up to 5.6e-3 of the
+#: peak maximum on a lab Lorentzian against a bar of 7.2e-4, a tenth of σ at
+#: the fluorapatite's strongest peak (``tests/test_lab_instrument.py``, the
+#: FCJ section).  This set meets both families' bars over that domain: worst
+#: 1.6e-4 lab and 9.9e-5 synchrotron (0.25 and 0.81 of the bars over 8 500
+#: cases).  A cheaper set (11, 8, 768, 3.5e-4) sat at 0.95 of the bar; the
+#: margin is bought on one stage only.
+CLOSING_NODES_PER_FWHM = 12.0
+CLOSING_MIN_NODES = 10
+CLOSING_MAX_NODES = 1024
+CLOSING_SKIP_EXTENT_FWHM_RATIO = 3e-4
 
 
-@lru_cache(maxsize=32)
+#: sized for every node count the closing rule can freeze (half its cap per
+#: segment), so a fit's buckets never evict each other's quadrature
+@lru_cache(maxsize=CLOSING_MAX_NODES // 2 + 1)
 def _gauss_legendre_01(n: int) -> tuple[np.ndarray, np.ndarray]:
     """Gauss-Legendre nodes/weights mapped from [-1, 1] to [0, 1]."""
     x, w = np.polynomial.legendre.leggauss(n)
@@ -111,20 +126,56 @@ def fcj_extent_deg(two_theta_deg: np.ndarray, sl: float, hl: float) -> np.ndarra
     return np.abs(np.degrees(np.arccos(cphi)) - np.degrees(tt))
 
 
-def fcj_node_count(two_theta_deg: float, fwhm_deg: float, sl: float, hl: float) -> int:
+def _node_rule(closing: bool) -> tuple[float, int, int, float]:
+    """(nodes per FWHM, min, max, skip ratio): the closing rule or the declared one.
+
+    The one selection :func:`fcj_node_count` and :func:`fcj_node_counts` share.
+    """
+    if closing:
+        return (CLOSING_NODES_PER_FWHM, CLOSING_MIN_NODES, CLOSING_MAX_NODES,
+                CLOSING_SKIP_EXTENT_FWHM_RATIO)
+    return NODES_PER_FWHM, MIN_NODES, MAX_NODES, SKIP_EXTENT_FWHM_RATIO
+
+
+def fcj_node_count(two_theta_deg: float, fwhm_deg: float, sl: float, hl: float,
+                   *, closing: bool = False) -> int:
     """Frozen per-reflection quadrature size; 0 → treat peak as symmetric.
 
     The aberration acts unless both apertures are zero (:func:`fcj_live`).  A
     point slit beside a sample of half-length S still smears the peak, over
-    the uniform weight the module docstring derives.
+    the uniform weight the module docstring derives.  ``closing`` takes the
+    closing rule (``CLOSING_NODES_PER_FWHM`` and its three siblings), which
+    ``compile_model`` asks for at any window fraction under the declared stages'.
     """
     if not fcj_live(sl, hl):
         return 0
+    per_fwhm, n_min, n_max, skip = _node_rule(closing)
     extent = float(fcj_extent_deg(np.array(two_theta_deg), sl, hl))
-    if extent < SKIP_EXTENT_FWHM_RATIO * fwhm_deg:
+    if extent < skip * fwhm_deg:
         return 0
-    n = int(np.ceil(4.0 + NODES_PER_FWHM * extent / max(fwhm_deg, 1e-6)))
-    return int(np.clip(n, MIN_NODES, MAX_NODES))
+    n = int(np.ceil(4.0 + per_fwhm * extent / max(fwhm_deg, 1e-6)))
+    return int(np.clip(n, n_min, n_max))
+
+
+def fcj_node_counts(two_theta_deg: np.ndarray, fwhm_deg: np.ndarray, sl: float,
+                    hl: float, *, closing: bool = False) -> np.ndarray:
+    """:func:`fcj_node_count` over arrays, by the same rule.
+
+    For ``forward.rewindow`` (WP-2047), which sizes every reflection at once
+    and was 80 % of its time in the per-reflection call.  ``compile_model``
+    keeps the scalar one: a vectorised transcendental may land an ulp from the
+    scalar, and a count sitting on a ceiling would then move every converged
+    fit for nothing.
+    """
+    tt = np.asarray(two_theta_deg, dtype=np.float64)
+    if not fcj_live(sl, hl):
+        return np.zeros(tt.shape, dtype=np.int64)
+    per_fwhm, n_min, n_max, skip = _node_rule(closing)
+    fwhm = np.asarray(fwhm_deg, dtype=np.float64)
+    extent = np.asarray(fcj_extent_deg(tt, sl, hl), dtype=np.float64)
+    n = np.clip(np.ceil(4.0 + per_fwhm * extent / np.maximum(fwhm, 1e-6)),
+                n_min, n_max).astype(np.int64)
+    return np.where(extent < skip * fwhm, 0, n)
 
 
 def fcj_offsets_weights(two_theta_deg: float, sl: float, hl: float,

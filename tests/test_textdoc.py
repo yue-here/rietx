@@ -27,7 +27,7 @@ import rietx as rx
 from rietx.gui import GuiSession
 from rietx.gui import textdoc as td
 from rietx.schemas.plan import StageSpec
-from rietx.schemas.structure import PreferredOrientation
+from rietx.schemas.structure import MARCH_R_MIN, PreferredOrientation
 from tests.test_project import _write_xye
 from tests.test_refine_synthetic import perturbed_models, synthesize
 
@@ -162,7 +162,7 @@ def test_a_document_written_before_a_floor_applies_nothing(tmp_path, pattern_fil
     text = td.render(project)
     rows = {row.path: row for row in td.parse(text).rows}
     assert rows["instrument.profile.w"].annotations["min"] == 1e-8
-    assert rows["phases.0.preferred_orientation.r"].annotations["min"] == 0.15
+    assert rows["phases.0.preferred_orientation.r"].annotations["min"] == MARCH_R_MIN
 
     def written_before(doc, local, lo, value=None):
         line = next(ln for ln in doc.splitlines() if ln.split()[:1] == [local])
@@ -554,6 +554,41 @@ def test_the_passes_line_carries_the_le_bail_cap_and_refuses_nonsense(project):
         assert delta.plan is None, bad
 
 
+def test_the_support_line_carries_the_hold_threshold_and_refuses_nonsense(project):
+    """``phase_support_sigma`` (WP-2002, B1) has a line, or a save through the
+    document would reset a caller's threshold, or a hold switched off, to 3σ.
+    Absent at its default, as ``guard`` and ``passes`` are, so every stored
+    document renders byte for byte as before.  ``none`` is a value here, the
+    hold off, as it is for ``tolerance``."""
+    text = td.render(project)
+    assert not any(ln.startswith("support ") for ln in text.splitlines())
+
+    delta, errors = _changes(_edit(text, "tolerance", "tolerance 1e-06\nsupport none"),
+                             project)
+    assert errors == []
+    assert delta.plan["plan"]["phase_support_sigma"] is None
+
+    delta, errors = _changes(_edit(text, "tolerance", "tolerance 1e-06\nsupport 5"),
+                             project)
+    assert errors == []
+    assert delta.plan["plan"]["phase_support_sigma"] == 5.0
+
+    # rendered once away from the default, naming the field, so a save keeps it
+    for value, shown in ((None, "none"), (5.0, "5")):
+        project.doc.plan = project.doc.plan.model_copy(
+            update={"phase_support_sigma": value})
+        line = next(ln for ln in td.render(project).splitlines()
+                    if ln.startswith("support "))
+        assert line.split()[1] == shown and "phase_support_sigma" in line
+
+    for bad in ("support 0", "support -3", "support inf", "support nan",
+                "support many", "support", "support 3 4"):
+        delta, errors = _changes(
+            _edit(text, "tolerance", f"tolerance 1e-06\n{bad}"), project)
+        assert errors and errors[0].where == "support", bad
+        assert delta.plan is None, bad
+
+
 def test_a_stage_line_round_trips_every_key_stage_spec_has(project):
     """The keys are derived from ``StageSpec``, so this is the whole set at once.
 
@@ -721,8 +756,9 @@ def test_a_refusal_raised_by_the_verb_still_gets_a_line_number(session, project)
     most likely to hit came back with ``line: 0``.
     """
     doc = session.textdoc()
-    # an occupancy, whose [0, 1.5] the schema declares (B has had none since WP-1534)
-    bad = _edit(doc["text"], "atoms.0.occ", "  atoms.0.occ   @ 999")
+    # an occupancy below the floor of 0 the schema declares (B has had no bound
+    # since WP-1534, and occ no ceiling since WP-2002)
+    bad = _edit(doc["text"], "atoms.0.occ", "  atoms.0.occ   @ -1")
     with pytest.raises(rx.gui.GuiError) as excinfo:
         session.textdoc_put({"text": bad})
     detail = excinfo.value.details[0]

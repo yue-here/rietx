@@ -26,7 +26,7 @@ import numpy as np
 import pytest
 
 from rietx import Instrument, PatternData, Refinement
-from rietx.model.forward import compile_model
+from rietx.model.forward import WINDOW_AREA_TOL, compile_model
 from rietx.optimize.statistics import structure_r_factors
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
@@ -76,19 +76,23 @@ def _lab6_at(a: float = TRUE_A, *, scale: float = TRUE_SCALE,
     return s, ins
 
 
-def _noiseless(structure, instrument, tt: np.ndarray) -> PatternData:
+def _noiseless(structure, instrument, tt: np.ndarray, *,
+               window_area_tol: float | None = None) -> PatternData:
     """The model's own pattern, evaluated exactly — no noise, no rounding."""
     blank = PatternData(two_theta=tt.tolist(),
                         intensity=np.zeros_like(tt).tolist())
-    model = compile_model(structure, instrument, blank, mode="rietveld")
+    model = compile_model(structure, instrument, blank, mode="rietveld",
+                          window_area_tol=window_area_tol)
     table = ParameterTable(structure, instrument)
     y = model.evaluate(table.decode(table.x0()))
     return PatternData(two_theta=model.tt.tolist(), intensity=y.tolist())
 
 
-def _partition_r(structure, instrument, pattern):
+def _partition_r(structure, instrument, pattern, *,
+                 window_area_tol: float | None = None):
     """(R_B, R_F, n, I_obs, I_calc) for phase 0 at the models' stored values."""
-    model = compile_model(structure, instrument, pattern, mode="rietveld")
+    model = compile_model(structure, instrument, pattern, mode="rietveld",
+                          window_area_tol=window_area_tol)
     table = ParameterTable(structure, instrument)
     values = table.decode(table.x0())
     i_obs, i_calc = model.structure_intensity_partition(values)[0]
@@ -98,8 +102,11 @@ def _partition_r(structure, instrument, pattern):
 
 
 # ---------------------------------------------------------------- fixed point
+@pytest.mark.parametrize(("window_area_tol", "n_visible"),
+                         [(WINDOW_AREA_TOL, 17), (None, 19)])
 @pytest.mark.parametrize("march_r", [None, 0.7])
-def test_partition_of_its_own_pattern_is_the_identity(march_r):
+def test_partition_of_its_own_pattern_is_the_identity(march_r, window_area_tol,
+                                                      n_visible):
     """I(obs) = I(calc) to fp precision when the data *is* the model.
 
     The strongest available pin, because it constrains every factor at once:
@@ -112,21 +119,28 @@ def test_partition_of_its_own_pattern_is_the_identity(march_r):
     multiplies P into ``base``) and it is strongly hkl-dependent: a P that
     reached the observed share but not the calculated one would show as a
     per-reflection ratio, not a uniform offset, so only the r ≠ 1 row sees it.
+
+    Run at both window fractions, because they differ in what is visible.  Two
+    of the 19 generated reflections sit at 24.40°, just above the 24° cut.  At
+    the declared stages' windows (2e-2) the WP-1112 area-criterion windows stop
+    short of the cut, so the two carry the documented empty-window NaN in both
+    arrays instead of entering the sums, and this row is where that path is
+    pinned.  At the closing windows a compile takes by default (1e-3) their
+    windows reach below the cut and their tails enter the sums (WP-2002).
     """
     s, ins = _lab6_at(march_r=march_r)
     tt = np.arange(3.0, 24.0, 0.005)
-    r_b, r_f, n, i_obs, i_calc = _partition_r(s, ins, _noiseless(s, ins, tt))
+    pattern = _noiseless(s, ins, tt, window_area_tol=window_area_tol)
+    r_b, r_f, n, i_obs, i_calc = _partition_r(s, ins, pattern,
+                                              window_area_tol=window_area_tol)
 
-    # 17 of the 19 generated reflections are visible: the last two sit just
-    # above the 24° cut and the WP-1112 area-criterion windows no longer
-    # spill below it, so they carry the documented empty-window NaN in both
-    # arrays instead of entering the sums (the pre-1112 count here was 19
-    # only because ±30·FWHM margins gave them sliver windows in range)
-    assert n == 17
+    assert len(i_calc) == 19
+    assert n == n_visible
     assert r_b == pytest.approx(0.0, abs=1e-12)
     assert r_f == pytest.approx(0.0, abs=1e-12)
     visible = np.isfinite(i_calc)
-    assert visible.sum() == 17 and np.array_equal(visible, np.isfinite(i_obs))
+    assert visible.sum() == n_visible
+    assert np.array_equal(visible, np.isfinite(i_obs))
     assert np.allclose(i_obs[visible], i_calc[visible], rtol=1e-12)
 
 
@@ -176,9 +190,10 @@ def test_i_calc_is_multiplicity_times_f_squared_and_nothing_else():
     rows = [r for r in reflection_table(model, values, s) if r.line == 0]
     assert len(rows) == len(i_calc)
     expected = np.array([r.multiplicity * r.f_squared for r in rows])
-    # the two reflections above the 24° cut have empty windows and carry the
-    # documented NaN (no observable → no ratio); every visible row must be
-    # exactly m·|F|²
+    # a reflection whose window holds no channel carries the documented NaN
+    # (no observable → no ratio); every visible row must be exactly m·|F|².
+    # At the closing windows this compile takes by default every window here
+    # holds a channel, so the identity test's declared row pins the NaN half
     visible = np.isfinite(i_calc)
     empty = [k for k in range(len(rows))
              if not (model.phases[0].win[:, k, 1]
@@ -383,6 +398,11 @@ def test_cif_carries_the_tags_and_the_esd_method():
     assert "(J^T J)^-1" in details
     assert "chi^2_red" in details
     assert "Berar-Lelann" in details
+    # the factor quoted is the one the written su carry (WP-2002, B4)
+    carried = next(p.stderr / p.stderr_uncorrected for p in result.parameters
+                   if p.stderr is not None and p.stderr_uncorrected)
+    assert f"serial-correlation factor {carried:.3g} " in details
+    assert "Divided by it" in details
 
     # ...and a result carrying no esds must not describe how they were made.
     # An evaluate-only or replayed result has none, and a method statement

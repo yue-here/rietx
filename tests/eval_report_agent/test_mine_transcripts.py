@@ -242,6 +242,14 @@ def test_projection_condition_cell_names_parse():
         "report_noexec", "haiku", "C1")
 
 
+def test_a_windows_workspace_path_names_its_cell():
+    """The launcher formats its prompt from the platform's own path, so on
+    Windows the separator is ``\\``, and a transcript holds it JSON-escaped."""
+    path = r"C:\Temp\RUNS\python__sonnet\N1"
+    assert mt.cell_of(path) == ("python", "sonnet", "N1")
+    assert mt.cell_of(json.dumps({"text": path})) == ("python", "sonnet", "N1")
+
+
 def test_license_phrase_quotes_the_live_clause():
     """The 2.2 in-context anchor must match the sentence the round's package
     delivers (PROTOCOL.md 2.2 read-out (a)).  A later WP that rewords the

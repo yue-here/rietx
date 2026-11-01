@@ -130,7 +130,7 @@ def wp_from_name(name: str) -> Optional[str]:
 def _git(root: Path, *args: str) -> Optional[str]:
     try:
         proc = subprocess.run(
-            ["git", *args], cwd=root, capture_output=True, text=True, timeout=10
+            ["git", *args], cwd=root, capture_output=True, encoding="utf-8", errors="replace", timeout=10
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -431,7 +431,7 @@ def _gh(root: Path, *args: str, timeout: int = 20) -> Optional[str]:
     """
     try:
         proc = subprocess.run(
-            ["gh", *args], cwd=root, capture_output=True, text=True, timeout=timeout
+            ["gh", *args], cwd=root, capture_output=True, encoding="utf-8", errors="replace", timeout=timeout
         )
     except (OSError, subprocess.TimeoutExpired):
         return None

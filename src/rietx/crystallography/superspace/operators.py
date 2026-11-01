@@ -60,11 +60,23 @@ directions f_j (de Wolff 1981 eqs (3.5)-(3.6)).  An operation must map every
 member of the family to ±itself modulo the reciprocal lattice, which holds
 exactly when f_jR = εf_j for every free direction and M = q_rR − εq_r.
 
+Time reversal (magnetic superspace groups)
+------------------------------------------
+An operation carries θ = ±1, −1 for time reversal (1′), as the fifth field of
+the magCIF form ``x1,x2,x3,x4,-1`` (Perez-Mato, Ribeiro, Petříček & Aroyo
+2012 eq. (3); Petříček et al. 2010 eq. (1)).  θ composes as θ₁θ₂ (Perez-Mato
+2012 eq. (9)) and acts on nothing in superspace: it is a sign on time-odd
+quantities, so a moment transforms as θ det(R) R and a displacement as R
+(Petříček et al. 2010 eq. (2); Perez-Mato 2012 eqs (6)-(7)).  Every nuclear
+operation has θ = +1, which is the default, so a non-magnetic group is the
+θ = +1 case of the same object.  Pure time reversal and the anti-translations
+{1′|v} (Stokes & Campbell 2022 types 2 and 4) have the identity rotation and
+are carried among a group's *centrings*, as the magCIF centring loop carries
+them; {1′|0000} and {1′|000½} are distinct operations (Perez-Mato 2012 p. 17).
+
 Not built here, refused by name
 -------------------------------
 * **d > 1** (two or more modulation vectors): a fifth coordinate is refused.
-* **Time reversal** (magnetic superspace groups, Perez-Mato et al. 2012 eq. (20)):
-  an operation string with a trailing ±1 is refused; that is N-W2.
 * Atoms, waves, the structure factor and the satellite list (N-W3 onward).
 """
 
@@ -92,10 +104,8 @@ _TERM = re.compile(
 _REFUSE_D = (
     "superspace operations are built here for one modulation vector (d = 1) "
     "only; a fifth coordinate means d > 1, which is not implemented")
-_REFUSE_THETA = (
-    "a trailing time-reversal sign makes this a magnetic superspace "
-    "operation; magnetic superspace groups (the 1' rule, Perez-Mato et al. "
-    "2012 eq. (20)) are work package N-W2 and are not built here")
+_THETA_FIELD = re.compile(r"^[+-]?\d+$")
+_PRIMES = ("'", "′")
 
 
 def as_fraction(value) -> Fraction:
@@ -178,6 +188,14 @@ class SuperspaceOperator:
 
     The string form is the msCIF/magCIF one, ``"-x1,x2,-x3+1/2,x1-x4+1/2"``:
     four components, the fourth carrying M as x1..x3 terms, ε as ±x4 and δ.
+
+    ``theta`` is the time-reversal sign θ = ±1 (Perez-Mato et al. 2012
+    eq. (3)), −1 for a primed operation; the magCIF string then carries it as
+    a fifth field, ``"x1,x2,x3,x4+1/2,-1"``.  Its default +1 is the nuclear
+    case, and every N-W1 caller leaves it there.  θ = −1 is set by three
+    writers only: the string parser (:meth:`from_xyz`), :meth:`prime`, and
+    the magnetic-group builders (:meth:`SuperspaceGroup.with_anti_translation`
+    and :mod:`.magnetic`'s enumerator).
     """
 
     rotation: tuple[tuple[int, int, int], ...]
@@ -185,15 +203,19 @@ class SuperspaceOperator:
     epsilon: int
     m: tuple[int, int, int]
     delta: Fraction
+    theta: int = 1
 
     def __post_init__(self) -> None:
         if self.epsilon not in (1, -1):
             raise ValueError(f"epsilon is +1 or -1, not {self.epsilon!r}")
+        if self.theta not in (1, -1):
+            raise ValueError(
+                f"theta (the time-reversal sign) is +1 or -1, not {self.theta!r}")
 
     # -- construction ----------------------------------------------------
     @classmethod
     def build(cls, rotation, translation, epsilon: int = 1, m=(0, 0, 0),
-              delta=0) -> SuperspaceOperator:
+              delta=0, theta: int = 1) -> SuperspaceOperator:
         """From anything array-like; translations reduced mod 1."""
         r = np.asarray(rotation)
         rot = tuple(tuple(int(round(float(r[i][j]))) for j in range(3))
@@ -205,18 +227,37 @@ class SuperspaceOperator:
                            np.asarray(m, dtype=float)):
             raise ValueError(f"the M row {m!r} is not integral (Stokes 2011 eq. (2))")
         tran = tuple(as_fraction(x) % 1 for x in translation)
-        return cls(rot, tran, int(epsilon), mm, as_fraction(delta) % 1)
+        return cls(rot, tran, int(epsilon), mm, as_fraction(delta) % 1, int(theta))
 
     @classmethod
     def from_xyz(cls, text: str) -> SuperspaceOperator:
         """Parse ``"x1,x2,x3,x4"``-style text (or ``x,y,z,t``).
 
-        Refuses, by name, a fifth coordinate (d > 1) and a trailing
-        time-reversal field (a magnetic operation, N-W2).
+        A fifth field that is an integer is the time-reversal sign θ, the
+        magCIF ``_space_group_symop_magn_ssg_operation.algebraic`` form
+        (``"x1,x2,x3,x4+1/2,-1"``); a trailing prime is the same thing in
+        the notation of Stokes & Campbell (2022), *Acta Cryst.* A**78**, 364,
+        Fig. 4 (``"(x+1/2,-y,-z,-t)'"``).  Refused by name: a θ other than
+        ±1, and a fifth *coordinate* (d > 1).
         """
-        parts = [p.strip() for p in str(text).split(",")]
-        if len(parts) == 5 and parts[4] in ("+1", "1", "-1"):
-            raise ValueError(f"{text!r}: {_REFUSE_THETA}")
+        s = str(text).strip()
+        primed = s.endswith(_PRIMES)
+        if primed:
+            s = s[:-1].strip()
+        if s.startswith("(") and s.endswith(")"):
+            s = s[1:-1]
+        parts = [p.strip() for p in s.split(",")]
+        theta = -1 if primed else 1
+        if len(parts) == 5 and _THETA_FIELD.match(parts[4].replace(" ", "")):
+            value = int(parts[4])
+            if value not in (1, -1):
+                raise ValueError(
+                    f"{text!r}: the time-reversal field is +1 or -1, not {value}")
+            if primed:
+                raise ValueError(f"{text!r} gives time reversal twice (a prime "
+                                 f"and a fifth field)")
+            theta = value
+            parts = parts[:4]
         if len(parts) > 4:
             raise ValueError(f"{text!r} has {len(parts)} components: {_REFUSE_D}")
         if len(parts) != 4:
@@ -243,15 +284,26 @@ class SuperspaceOperator:
                 f"{text!r}: the x4 component must carry x4 with coefficient "
                 f"+1 or -1 (that is epsilon), found {coeff[3]}")
         return cls(tuple(rows), tuple(tran), int(coeff[3]),
-                   tuple(int(c) for c in coeff[:3]), const % 1)
+                   tuple(int(c) for c in coeff[:3]), const % 1, theta)
 
     # -- rendering -------------------------------------------------------
-    def xyz(self) -> str:
-        """The canonical string; ``from_xyz(op.xyz()) == op``."""
+    def xyz(self, magnetic: bool | None = None) -> str:
+        """The canonical string; ``from_xyz(op.xyz()) == op``.
+
+        The time-reversal field ``,+1``/``,-1`` is printed when ``magnetic``
+        is true (every operation of a magnetic group, the magCIF form), never
+        when it is false, and when it is ``None`` only for θ = −1, so a
+        nuclear operation prints as N-W1 printed it.
+        """
+        if magnetic is False and self.theta == -1:
+            raise ValueError("a primed operation has no non-magnetic string form")
         ext = [_format_affine(list(self.rotation[i]) + [0], self.translation[i])
                for i in range(3)]
         internal = _format_affine(list(self.m) + [self.epsilon], self.delta)
-        return ",".join(ext + [internal])
+        out = ",".join(ext + [internal])
+        if magnetic or (magnetic is None and self.theta == -1):
+            out += ",+1" if self.theta == 1 else ",-1"
+        return out
 
     def __str__(self) -> str:  # pragma: no cover - convenience
         return self.xyz()
@@ -271,8 +323,29 @@ class SuperspaceOperator:
 
     @property
     def is_translation(self) -> bool:
+        """A lattice or centring translation: identity point part, θ = +1."""
         return (self.rotation == _IDENTITY_R and self.epsilon == 1
-                and self.m == (0, 0, 0))
+                and self.m == (0, 0, 0) and self.theta == 1)
+
+    @property
+    def is_anti_translation(self) -> bool:
+        """{1′|v}: identity point part with time reversal (Stokes & Campbell
+        2022 p. 366), {1′|0000} itself included."""
+        return (self.rotation == _IDENTITY_R and self.epsilon == 1
+                and self.m == (0, 0, 0) and self.theta == -1)
+
+    def prime(self) -> SuperspaceOperator:
+        """The same operation combined with time reversal: θ → −θ."""
+        return SuperspaceOperator(self.rotation, self.translation, self.epsilon,
+                                  self.m, self.delta, -self.theta)
+
+    def unprimed(self) -> SuperspaceOperator:
+        """The operation with θ = +1: Stokes & Campbell (2022)'s family
+        function F applied to one operation (p. 365)."""
+        if self.theta == 1:
+            return self
+        return SuperspaceOperator(self.rotation, self.translation, self.epsilon,
+                                  self.m, self.delta, 1)
 
     @property
     def determinant(self) -> int:
@@ -286,7 +359,8 @@ class SuperspaceOperator:
 
         Stokes 2011 eqs (4)-(8), reduced mod 1.  δ_c = M_a·v_b + ε_aδ_b + δ_a is
         the product's internal translation; de Wolff 1981 § 6 writes the same
-        rule in the intrinsic form τ₃ = τ₁ + ε₁τ₂.
+        rule in the intrinsic form τ₃ = τ₁ + ε₁τ₂.  θ_c = θ_aθ_b (Perez-Mato et
+        al. 2012 eq. (9)).
         """
         a, b = self.rotation, other.rotation
         rot = tuple(tuple(a[i][0] * b[0][j] + a[i][1] * b[1][j] + a[i][2] * b[2][j]
@@ -299,11 +373,17 @@ class SuperspaceOperator:
                   + self.epsilon * other.m[j] for j in range(3))
         delta = (ma[0] * v[0] + ma[1] * v[1] + ma[2] * v[2]
                  + self.epsilon * other.delta + self.delta) % 1
-        return SuperspaceOperator(rot, tran, self.epsilon * other.epsilon, m, delta)
+        return SuperspaceOperator(rot, tran, self.epsilon * other.epsilon, m, delta,
+                                  self.theta * other.theta)
 
     def inverse(self) -> SuperspaceOperator:
         """The inverse operation: R⁻¹, ε, M′ = −εMR⁻¹, v′ = −R⁻¹v,
-        δ′ = −M′·v − εδ (the identity block of A(g)⁻¹A(g))."""
+        δ′ = −M′·v − εδ (the identity block of A(g)⁻¹A(g)), and the same θ.
+
+        A(g) is the augmented matrix of Stokes, Campbell & van Smaalen
+        (2011), *Acta Cryst.* A**67**, 45, eq. (1); the inverse is its matrix
+        inverse, written out in the blocks of their eqs (3)-(8).
+        """
         r = [[Fraction(x) for x in row] for row in self.rotation]
         inv = _inverse3(r)
         rinv = tuple(tuple(int(inv[i][j]) for j in range(3)) for i in range(3))
@@ -314,10 +394,15 @@ class SuperspaceOperator:
         v2 = tuple(-sum(rinv[i][k] * self.translation[k] for k in range(3))
                    for i in range(3))
         d2 = -sum(m2[k] * self.translation[k] for k in range(3)) - e * self.delta
-        return SuperspaceOperator(rinv, tuple(x % 1 for x in v2), e, m2, d2 % 1)
+        return SuperspaceOperator(rinv, tuple(x % 1 for x in v2), e, m2, d2 % 1,
+                                  self.theta)
 
     def act(self, x, x4):
-        """Image of the superspace point (x, x₄): (Rx + v, M·x + εx₄ + δ)."""
+        """Image of the superspace point (x, x₄): (Rx + v, M·x + εx₄ + δ).
+
+        The augmented matrix of Stokes, Campbell & van Smaalen (2011),
+        *Acta Cryst.* A**67**, 45, eq. (1) applied to (x, x₄, 1).
+        """
         xv = np.asarray(x, dtype=float)
         r = np.asarray(self.rotation, dtype=float)
         x_new = r @ xv + np.array([float(t) for t in self.translation])
@@ -333,10 +418,12 @@ class SuperspaceOperator:
         return self.delta - sum(qq[i] * self.translation[i] for i in range(3))
 
     def order(self) -> int:
-        """Order of the point part (R, ε): the smallest n with R^n = 1."""
+        """Order of the point part (R, ε, θ): the smallest n with R^n = 1
+        and θ^n = 1."""
         p = self
         for n in range(1, 13):
-            if p.rotation == _IDENTITY_R and p.epsilon == 1 and p.m == (0, 0, 0):
+            if (p.rotation == _IDENTITY_R and p.epsilon == 1 and p.m == (0, 0, 0)
+                    and p.theta == 1):
                 return n
             p = p * self
         raise ValueError("point part has no finite order <= 12")
@@ -345,8 +432,48 @@ class SuperspaceOperator:
         """The basic-space-group operation (R, v): the external block."""
         return self.rotation, self.translation
 
+    def harmonic_factor(self, n: int, *, kind: str) -> complex:
+        """The factor this operation puts on the n-th harmonic of a
+        modulation function at a site it leaves in place.
+
+        Defined for an operation whose external part is the identity modulo
+        the lattice (R = E, ε = +1, M = 0, v ∈ ℤ³): an internal translation
+        or time reversal combined with one, such as {1′|000½}.  Such an
+        operation maps the modulation function A(x₄) of every site onto
+        Transf·A(x₄ − δ) (Perez-Mato et al. 2012 eqs (5)-(7)), so the
+        coefficient T_n of exp(−2πi n x₄) is multiplied by
+        Transf·exp(2πi n δ), and an invariant structure has T_n = 0 unless the
+        factor is 1.  ``kind`` names Transf, with the vocabulary of
+        :data:`rietx.crystallography.representation.order_parameter.ORDER_PARAMETER_KINDS`:
+        ``"magnetic"`` (a moment, time-odd, θ det(R) R = θ) or
+        ``"displacive"`` (a displacement, time-even, R = 1).  For {1′|000½}
+        the factor is θ·e^{iπn} = −(−1)ⁿ on a moment and (−1)ⁿ on a
+        displacement: only odd moment harmonics and even displacive ones
+        survive (Perez-Mato 2012 p. 17; Petříček et al. 2010 § 4.2).
+        """
+        if kind not in ("magnetic", "displacive"):
+            raise ValueError(f"kind is 'magnetic' or 'displacive', not {kind!r}")
+        if not (self.rotation == _IDENTITY_R and self.epsilon == 1
+                and self.m == (0, 0, 0) and all(t == 0 for t in self.translation)):
+            raise ValueError(
+                f"{self.xyz()!r} moves the site; the harmonic factor of a single "
+                f"site is defined for an internal translation (R = E, ε = +1, "
+                f"v ∈ ℤ³) only")
+        sign = self.theta if kind == "magnetic" else 1
+        phase = (int(n) * self.delta) % 1
+        exact = {Fraction(0): 1 + 0j, Fraction(1, 2): -1 + 0j,
+                 Fraction(1, 4): 1j, Fraction(3, 4): -1j}
+        value = exact.get(phase)
+        if value is None:
+            value = complex(np.exp(2j * np.pi * float(phase)))
+        return sign * value
+
 
 IDENTITY = SuperspaceOperator(_IDENTITY_R, _ZERO3, 1, (0, 0, 0), Fraction(0))
+
+#: {1′|0000}: pure time reversal, the operation that makes a group grey
+#: (Stokes & Campbell 2022 type 2).
+IDENTITY_PRIME = SuperspaceOperator(_IDENTITY_R, _ZERO3, 1, (0, 0, 0), Fraction(0), -1)
 
 
 def _inverse3(m):
@@ -500,6 +627,39 @@ class ModulationVector:
         return None if sol is None else tuple(sol)
 
 
+def line_rule(rotation, q: ModulationVector) -> tuple[int, tuple[Fraction, Fraction, Fraction]] | None:
+    """The exact line rule: (ε, M) for a point operation R on the family q,
+    or ``None`` when R does not map the family to ±itself.
+
+    R keeps the line iff f R = ε f for every free direction f with one sign
+    ε = ±1 (the λ_j are rationally independent, so each direction must map
+    alone), and then **M = q_r R − ε q_r** exactly (row vectors, i.e. Rᵀ on
+    a column k; Stokes, Campbell & van Smaalen 2011 eq. (2); de Wolff,
+    Janssen & Janner 1981 eq. (3.4)).  Whether M is a reciprocal-lattice
+    vector is the caller's test, because the lattice is: a superspace
+    operation carries M as its integer row (:meth:`SuperspaceGroup._check_q`),
+    the little group of a line point asks M ∈ L* with the centrings
+    (:func:`rietx.crystallography.representation.irreps.little_group_on_line`).
+    One criterion read by both, never restated.
+    """
+    r = rotation
+    eps = None
+    for f in q.free:
+        fr = tuple(sum(f[i] * r[i][j] for i in range(3)) for j in range(3))
+        if fr == tuple(f):
+            e = 1
+        elif fr == tuple(-x for x in f):
+            e = -1
+        else:
+            return None
+        if eps is not None and e != eps:
+            return None
+        eps = e
+    qr = q.rational
+    m = tuple(sum(qr[i] * int(r[i][j]) for i in range(3)) - eps * qr[j] for j in range(3))
+    return eps, m
+
+
 def _parse_q_component(part: str, whole: str) -> tuple[Fraction, list[tuple[int, int]]]:
     s = part.replace(" ", "").replace("−", "-")
     if not s:
@@ -570,6 +730,23 @@ class SuperspaceGroup:
     set closes under composition modulo the lattice.
 
     ``symbol`` and ``number`` are labels only; nothing reads them back.
+    ``number`` has one writer, the caller: :meth:`from_operations` (or the
+    constructor) stores a four-part number (the numbering of Stokes, Campbell
+    & van Smaalen (2011), *Acta Cryst.* A**67**, 45, p. 47) verbatim and
+    unchecked.  Nothing in this package sets it — the generator does not
+    reproduce that numbering (:func:`~.generation.superspace_groups`), and
+    :func:`~.symbols.parse_symbol` and :meth:`transformed` leave it ``None`` —
+    so ``None`` means "not given", never "not numbered".
+
+    **Magnetic groups are the same class** (decision of WP-1992 commit A):
+    an operation's θ is part of the operation, so a magnetic superspace group
+    is a superspace group whose operator list carries θ = −1 somewhere, and
+    :attr:`is_magnetic` and :attr:`magnetic_type` are *derived* from that list
+    rather than declared beside it.  ``operations`` stays one per point
+    operation R; the anti-translations {1′|v} — pure time reversal {1′|0000}
+    included — have R = E and sit in ``centerings`` beside the translations,
+    as magCIF's centring loop holds them, so (g, θ = +1) and (g, θ = −1)
+    differ by a centring and the closure test compares θ.
     """
 
     q: ModulationVector
@@ -586,13 +763,17 @@ class SuperspaceGroup:
         if IDENTITY not in cen:
             cen = (IDENTITY,) + cen
         for c in cen:
-            if not c.is_translation:
-                raise ValueError(f"centering {c.xyz()!r} is not a pure translation")
+            if not (c.is_translation or c.is_anti_translation):
+                raise ValueError(f"centering {c.xyz()!r} is not a pure translation "
+                                 f"or an anti-translation {{1'|v}}")
         object.__setattr__(self, "centerings", cen)
         keys = [(_rkey(o.rotation), o.epsilon) for o in ops]
         if len(set(_rkey(o.rotation) for o in ops)) != len(ops):
             raise ValueError("operations must be one per point operation R "
-                             "(coset representatives modulo the lattice)")
+                             "(coset representatives modulo the lattice); an "
+                             "operation present both with and without time "
+                             "reversal means the group holds 1', which goes "
+                             "in centerings")
         if keys[0] != (_rkey(_IDENTITY_R), 1):
             # identity first, so equality and printing are deterministic
             idx = next((i for i, k in enumerate(keys)
@@ -601,6 +782,10 @@ class SuperspaceGroup:
                 raise ValueError("the identity is missing from the operations")
             ops = (ops[idx],) + ops[:idx] + ops[idx + 1:]
             object.__setattr__(self, "operations", ops)
+        if ops[0].theta != 1:
+            raise ValueError("the identity's representative carries time "
+                             "reversal; 1' and the anti-translations {1'|v} "
+                             "go in centerings")
         self._check_q()
         gap = self.closure_gap()
         if gap is not None:
@@ -611,19 +796,15 @@ class SuperspaceGroup:
 
     # -- validation ------------------------------------------------------
     def _check_q(self) -> None:
-        qr = self.q.rational
         for op in self.operations + self.centerings:
-            r = op.rotation
-            for f in self.q.free:
-                fr = tuple(sum(f[i] * r[i][j] for i in range(3)) for j in range(3))
-                if fr != tuple(op.epsilon * x for x in f):
-                    raise ValueError(
-                        f"{op.xyz()!r} does not map the free direction {f} of "
-                        f"q = {self.q.label()} to epsilon times itself; an "
-                        f"incommensurate q must satisfy qR = εq + M "
-                        f"(Stokes 2011 eq. (2))")
-            mexp = tuple(sum(qr[i] * r[i][j] for i in range(3)) - op.epsilon * qr[j]
-                         for j in range(3))
+            rule = line_rule(op.rotation, self.q)
+            if rule is None or rule[0] != op.epsilon:
+                raise ValueError(
+                    f"{op.xyz()!r} does not map the free directions "
+                    f"{self.q.free} of q = {self.q.label()} to epsilon times "
+                    f"themselves; an incommensurate q must satisfy qR = εq + M "
+                    f"(Stokes 2011 eq. (2))")
+            mexp = rule[1]
             if tuple(Fraction(x) for x in op.m) != mexp:
                 raise ValueError(
                     f"{op.xyz()!r} carries M = {op.m}, but q = {self.q.label()} "
@@ -631,7 +812,12 @@ class SuperspaceGroup:
                     f"({', '.join(str(x) for x in mexp)})")
 
     def _reduce(self, op: SuperspaceOperator) -> SuperspaceOperator | None:
-        """The coset representative for ``op``'s R, if ``op`` is in the group."""
+        """The coset representative for ``op``'s R, if ``op`` is in the group.
+
+        ``op`` = c · rep for a centring c, θ included: θ_op = θ_c θ_rep, so a
+        primed and an unprimed operation with the same (R, v, δ) are never
+        merged (a centring with the right translation but the wrong θ does
+        not reduce)."""
         rep = self._by_rotation.get(_rkey(op.rotation))
         if rep is None or rep.epsilon != op.epsilon or rep.m != op.m:
             return None
@@ -641,8 +827,10 @@ class SuperspaceGroup:
                 op.delta - rep.delta)
         # op = c * rep for a centering c iff (v_op - v_rep, δ_op - δ_rep) ≡ c
         # (the centring is a pure translation, so the product is additive)
+        want = op.theta * rep.theta
         for c in self.centerings:
-            if all((diff[i] - c.translation[i]) % 1 == 0 for i in range(3)) \
+            if c.theta == want \
+                    and all((diff[i] - c.translation[i]) % 1 == 0 for i in range(3)) \
                     and (diff[3] - c.delta) % 1 == 0:
                 return rep
         return None
@@ -673,12 +861,42 @@ class SuperspaceGroup:
     def __len__(self) -> int:
         return len(self.operations) * len(self.centerings)
 
+    @property
+    def is_magnetic(self) -> bool:
+        """Whether any operation carries time reversal (θ = −1)."""
+        return any(o.theta == -1 for o in self.operations + self.centerings)
+
+    @property
+    def magnetic_type(self) -> int | None:
+        """The construct type 1-4 of Stokes & Campbell (2022), *Acta Cryst.*
+        A**78**, 364, p. 366 (Campbell et al. 2022 § 2.4 for the 3D case), or
+        ``None`` for a non-magnetic group.
+
+        Read off the operator list: 2 when {1′|0000} is an operation (grey),
+        4 when an anti-translation {1′|v} with v ≢ 0 is (so every operation
+        occurs with both signs and none is grey), 3 when some point
+        operation is primed and no anti-translation exists, 1 for a group
+        of θ = +1 operations declared magnetic, which this class cannot tell
+        from a non-magnetic one — so ``None`` here; :mod:`.magnetic` writes
+        type 1 explicitly.
+        """
+        anti = [c for c in self.centerings if c.is_anti_translation]
+        if anti:
+            zero = any(all(x == 0 for x in c.translation) and c.delta == 0 for c in anti)
+            return 2 if zero else 4
+        if any(o.theta == -1 for o in self.operations):
+            return 3
+        return None
+
     def epsilon_of(self, rotation) -> int:
         return self._by_rotation[_rkey(rotation)].epsilon
 
     def basic_operations(self) -> tuple[tuple[tuple, tuple], ...]:
-        """The basic space group's operations (R, v), centrings included."""
-        return tuple(o.basic() for o in self.all_operations())
+        """The basic space group's operations (R, v), centrings included.
+
+        θ is dropped, so for a magnetic group these are the operations of the
+        basic group of its family (Stokes & Campbell 2022's B∘F), each once."""
+        return tuple(dict.fromkeys(o.basic() for o in self.all_operations()))
 
     def basic_xyz(self) -> tuple[str, ...]:
         """The basic space group as ``x,y,z`` strings (e.g. for
@@ -690,8 +908,10 @@ class SuperspaceGroup:
             for r, v in self.basic_operations())
 
     def xyz(self) -> tuple[str, ...]:
-        """Every operation as an ``x1,x2,x3,x4`` string."""
-        return tuple(op.xyz() for op in self.all_operations())
+        """Every operation as an ``x1,x2,x3,x4`` string; for a magnetic group
+        every one carries its time-reversal field (``x1,x2,x3,x4,+1``)."""
+        mag = self.is_magnetic
+        return tuple(op.xyz(magnetic=mag) for op in self.all_operations())
 
     def label(self) -> str:
         return self.symbol or f"<superspace group, q = {self.q.label()}>"
@@ -718,7 +938,9 @@ class SuperspaceGroup:
                     f"(epsilon or M nontrivial); q = {qv.label()} is not "
                     f"compatible with these operations")
         by_r: dict = {}
-        for o in found:
+        # an unprimed representative where the group has one (it has one for
+        # every R exactly when it holds an anti-translation)
+        for o in sorted(found, key=lambda o: o.theta != 1):
             by_r.setdefault(_rkey(o.rotation), o)
         reps = sorted(by_r.values(), key=lambda o: (o.rotation != _IDENTITY_R,
                                                      _rkey(o.rotation)))
@@ -728,6 +950,64 @@ class SuperspaceGroup:
         return cls(qv, tuple(reps), tuple(sorted(cen, key=_op_key)),
                    symbol=symbol, number=number)
 
+    # -- time reversal ------------------------------------------------------
+    def with_anti_translation(self, v, *, symbol=None) -> SuperspaceGroup:
+        """D + D{1′|v}: this group with the anti-translation {1′|v} added.
+
+        ``v`` has four components (v₁, v₂, v₃, v₄), the last internal, exact
+        rationals in this group's coordinates.  This is the type-2/4
+        construction of Stokes & Campbell (2022), *Acta Cryst.* A**78**, 364,
+        § 3 p. 367 (v = 0 gives the grey group, type 2).  Refused, by name:
+        a v with 2v outside the superspace lattice ({1′|v}² = {1|2v}, their
+        p. 367), and a v the operations do not map onto itself modulo the
+        lattice — both would add translations this group does not have (the
+        "none" rows of their Table 3).  This group must carry no time reversal
+        already.
+        """
+        if self.is_magnetic:
+            raise ValueError("this group already carries time reversal; add the "
+                             "anti-translation to its maximal non-magnetic subgroup")
+        vv = tuple(as_fraction(x) for x in v)
+        if len(vv) != 4:
+            raise ValueError("an anti-translation in (3+1)D has four components")
+        anti = SuperspaceOperator(_IDENTITY_R, tuple(x % 1 for x in vv[:3]), 1,
+                                  (0, 0, 0), vv[3] % 1, -1)
+        lattice = {(c.translation, c.delta) for c in self.centerings}
+        sq = anti * anti
+        if (sq.translation, sq.delta) not in lattice:
+            raise ValueError(
+                f"{{1'|{', '.join(str(x) for x in vv)}}}² = {{1|2v}} with 2v = "
+                f"({', '.join(str(2 * x) for x in vv)}) not a lattice vector of "
+                f"this group: not an anti-translation of it (Stokes & Campbell "
+                f"2022 p. 367)")
+        for op in self.operations:
+            img = op * anti * op.inverse()
+            if (img.translation, img.delta) not in {
+                    ((c * anti).translation, (c * anti).delta) for c in self.centerings}:
+                raise ValueError(
+                    f"{op.xyz()!r} maps the anti-translation {anti.xyz()!r} to "
+                    f"{img.xyz()!r}, which differs from it by a translation this "
+                    f"group lacks; adding it would change the lattice (Stokes & "
+                    f"Campbell 2022 Table 3, 'none')")
+        cen = tuple(self.centerings) + tuple(c * anti for c in self.centerings)
+        return SuperspaceGroup(self.q, self.operations, tuple(sorted(cen, key=_op_key)),
+                               symbol=symbol)
+
+    def grey(self) -> SuperspaceGroup:
+        """G + {1′|0000}G, the grey (type-2) group (Perez-Mato et al. 2012
+        eq. (12) in superspace; Stokes & Campbell 2022 p. 366)."""
+        return self.with_anti_translation((0, 0, 0, 0))
+
+    def with_time_reversal_shift(self) -> SuperspaceGroup:
+        """Ω = G + {1′|000½}G, the magnetic superspace group of a single-k
+        incommensurate magnetic phase (Perez-Mato, Ribeiro, Petříček & Aroyo
+        2012, *J. Phys.: Condens. Matter* **24**, 163201, eq. (20)).
+
+        {1′|000½} is carried in the operator list as a centring, never as a
+        flag, and is distinct from both {1′|0000} and {1|000½}.
+        """
+        return self.with_anti_translation((0, 0, 0, Fraction(1, 2)))
+
     # -- transformation ----------------------------------------------------
     def transformed(self, transform: SuperspaceTransform) -> SuperspaceGroup:
         """The group S g S⁻¹ for every g, and q in the new coordinates.
@@ -735,6 +1015,7 @@ class SuperspaceGroup:
         See :class:`SuperspaceTransform` for what S does to q.
         """
         qn = transform.apply_to_q(self.q)
+        self._require_superlattice(transform)
         det = _det_rational(transform.p_matrix)
         if abs(det) == 1:
             # a unimodular basis change maps coset representatives to coset
@@ -744,7 +1025,36 @@ class SuperspaceGroup:
             if len({_rkey(o.rotation) for o in reps}) == len(reps):
                 return SuperspaceGroup(qn, reps, cen)
         ops = [transform.conjugate(o) for o in self.all_operations()]
+        # a cell change of |det| ≠ 1 turns lattice translations of the old
+        # cell into centrings of the new one; they are group elements the
+        # coset list does not hold, so their images join the closure
+        for i in range(3):
+            unit = tuple(Fraction(int(i == j)) for j in range(3))
+            ops.append(transform.conjugate(
+                SuperspaceOperator(_IDENTITY_R, unit, 1, (0, 0, 0), Fraction(0))))
         return SuperspaceGroup.from_operations(qn, ops, symbol=None)
+
+    def _require_superlattice(self, transform: SuperspaceTransform) -> None:
+        """Refuse a transformation whose new cell the group does not fill.
+
+        The new unit translations must be translations of this group:
+        u = P⁻¹e_i has to be a lattice vector or a centring, with the internal
+        part the map x₄′ = s_m·x + s_eps·x₄ sends to zero.  Otherwise the image
+        group would assert a translation (P = diag(2,1,1) over P222(0,0,γ)000
+        would assert a/2) that the input does not have."""
+        pinv = _inverse3([list(r) for r in transform.p_matrix])
+        for i in range(3):
+            u = tuple(pinv[k][i] for k in range(3))
+            delta = (-transform.s_eps * sum(transform.s_m[k] * u[k] for k in range(3))) % 1
+            if not any(c.theta == 1 and c.delta % 1 == delta
+                       and all((c.translation[k] - u[k]) % 1 == 0 for k in range(3))
+                       for c in self.centerings):
+                raise ValueError(
+                    f"the new cell's translation {tuple(str(x) for x in u)} (in this "
+                    f"group's cell) is not a translation of this group: the "
+                    f"transformation does not map its lattice onto a lattice "
+                    f"containing the new cell's, so the image would assert "
+                    f"translations the group lacks")
 
     # -- the commensurate section ----------------------------------------
     def section(self, q, t0) -> Section:
@@ -766,6 +1076,11 @@ class SuperspaceGroup:
         spglib (Togo, Shinohara & Tanaka 2024) and keeps the operations in the
         supercell basis diag(N₁, N₂, N₃) of Orlov eq. (2).
         """
+        if self.is_magnetic:
+            raise ValueError(
+                "the section of a magnetic superspace group is a magnetic space "
+                "group, which this method does not build (it would drop θ); "
+                "take the section of the non-magnetic family or maximal subgroup")
         qq = tuple(as_fraction(c) for c in q)
         if self.q.contains(qq) is None:
             raise ValueError(
@@ -803,7 +1118,7 @@ def _det_rational(m) -> Fraction:
 
 
 def _op_key(o: SuperspaceOperator) -> tuple:
-    return (_rkey(o.rotation), o.epsilon, o.m, o.translation, o.delta)
+    return (_rkey(o.rotation), o.epsilon, o.m, o.translation, o.delta, -o.theta)
 
 
 def _close(gens, *, limit: int = 4096) -> list[SuperspaceOperator]:
@@ -883,7 +1198,13 @@ class SuperspaceTransform:
         return ModulationVector(rat, tuple(free))
 
     def conjugate(self, op: SuperspaceOperator) -> SuperspaceOperator:
-        """S · A(op) · S⁻¹, reduced mod ℤ⁴."""
+        """S · A(op) · S⁻¹, reduced mod ℤ⁴.
+
+        The equivalence map of Stokes, Campbell & van Smaalen (2011),
+        *Acta Cryst.* A**67**, 45, eq. (13), applied to one operator; van
+        Smaalen, Campbell & Stokes (2013), *Acta Cryst.* A**69**, 75, § 2.1
+        state equivalence as the same map on the (3+d+1) augmented matrices.
+        """
         s = self.augmented()
         sinv = _inverse_n(s)
         g = _op_augmented(op)
@@ -898,7 +1219,7 @@ class SuperspaceTransform:
         return SuperspaceOperator(
             tuple(tuple(int(x) for x in row) for row in rot),
             tuple(out[i][4] % 1 for i in range(3)),
-            int(out[3][3]), tuple(int(x) for x in mrow), out[3][4] % 1)
+            int(out[3][3]), tuple(int(x) for x in mrow), out[3][4] % 1, op.theta)
 
 
 def _op_augmented(op: SuperspaceOperator) -> list[list[Fraction]]:

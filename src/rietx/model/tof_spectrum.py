@@ -57,6 +57,22 @@ COEFFICIENT_COUNTS: dict[int, int] = {0: 0, 1: 11, 2: 11, 3: 12, 4: 12, 5: 12}
 POINT_BY_POINT_ITYP = 10
 
 
+def _coefficient_count(itype: int) -> int:
+    """How many coefficients ITYP ``itype`` uses, or a refusal by number.
+
+    The one place a type is validated, and both validators call it — the
+    schema's (:class:`rietx.schemas.instrument.IncidentSpectrum`) and the
+    ``.iparm`` reader's.  :data:`SPECTRUM_TYPES` decides whether the manual
+    defines the function at all; :data:`COEFFICIENT_COUNTS` answers only how
+    many numbers a defined one takes.  Asking the count table whether a type
+    exists left ``SPECTRUM_TYPES`` read by nothing, the two tables free to
+    drift apart with no test going red (WP-2032).
+    """
+    if itype not in SPECTRUM_TYPES:
+        raise ValueError(_unknown_type_message(itype))
+    return COEFFICIENT_COUNTS[itype]
+
+
 def _unknown_type_message(itype: int) -> str:
     if itype == POINT_BY_POINT_ITYP:
         return (f"ITYP {POINT_BY_POINT_ITYP} is a point-by-point measured "
@@ -64,10 +80,11 @@ def _unknown_type_message(itype: int) -> str:
                 f"(GSAS Technical Manual p. 129, 222): it has no coefficients, "
                 f"and a point-by-point spectrum must be supplied as data on the "
                 f"pattern's own channels, not as coefficients")
+    defined = ", ".join(str(t) for t in sorted(SPECTRUM_TYPES))
     return (f"ITYP {itype} is not an incident-spectrum function the GSAS "
-            f"Technical Manual defines (p. 128-129 define 0-5, and 10 for a "
-            f"point-by-point file); refused by number rather than read as "
-            f"'no spectrum'")
+            f"Technical Manual defines (p. 128-129 define {defined}, and "
+            f"{POINT_BY_POINT_ITYP} for a point-by-point file); refused by "
+            f"number rather than read as 'no spectrum'")
 
 
 def _type_zero_message(n: int) -> str:

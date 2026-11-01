@@ -6,21 +6,28 @@ specifications records which fact came from which; the rule is that a byte
 offset is an interface fact, so it may be read from a source whose licence would
 bar a port.
 
-Four magic numbers, one reader, **two of them refused**::
+Four magic numbers, one reader, **one of them refused**::
 
     RAW      v1 — refused: no description of it exists
-    RAW2     v2 — refused: exactly one uncorroborated description exists
+    RAW2     v2   single-range only (WP-2059)
     RAW1.01  v3   (the version numbering is the vendor's, not a typo)
     RAW4.00  v4
 
-**v2 is refused on evidence rather than on effort.**  GSAS-II describes it and
-nothing else found does: the two permissive readers implement v3 and v4 only,
-and the one v2 attempt located carries no licence *and* is visibly heuristic
-("try v3 as a fallback"; "if n_ranges > 100, n_ranges = 1") and disagrees with
-GSAS-II about where the first block starts.  One uncorroborated description and
-no fixture is how a reader comes to return a plausible wrong pattern, which is
-the failure this whole seam exists to prevent — so the file is named, its
-version is named, and something convertible is suggested.
+**v2 is read from two descriptions and one real file that agree** (WP-2059,
+issue #1164).  It was refused while GSAS-II's was the only description and no
+file existed to check it against.  A hand decode of a public v2 file (the PbSO₄
+round-robin X-ray pattern of Hill 1992, as converted to v2 in 1997 for the
+Durham TOPAS tutorials) matches GSAS-II's description field for field, and
+TOPAS, run as a black box on the same file, returns the same 6001 counts.  The
+layout is a table of offsets: a block count at 4, then one block whose header
+starts at 0x100 and declares its own length, then ``n`` float32 counts.  The
+data offset is read from that length, never assumed, and the one gate a
+mis-parse cannot pass is arithmetic: ``0x100 + header length + 4n`` must be
+the file's size.  A block count other than 1 is refused by name until a
+multi-range v2 file is seen.  No count is altered: GSAS-II raises every count
+below 1 to 1, and this reader does not.  The header's other fields
+(wavelengths, anode, date) are not read, because no second description
+corroborates them.
 
 **v4 is a walk, not a table of offsets.**  After a fixed 61-byte preamble the
 file is a chain of ``(uint32 type, uint32 length)`` segments; a type of 0 or 160
@@ -462,6 +469,65 @@ def _version(p: Path) -> int:
                      f"{raw[:8]!r}")
 
 
+#: v2 (``RAW2``), WP-2059.  The block count is a file-level uint32; the block
+#: header starts at a fixed 0x100 and the offsets after it are relative to it.
+#: Its first field is the header's own length, which is what places the data.
+_V2_BLOCK_COUNT = 4
+_V2_BLOCK = 0x100
+_V2_POINTS = 2
+_V2_STEP = 12
+_V2_START = 16
+
+
+def _read_v2(buf: bytes, *, path: Path) -> _File:
+    """v2's one block: a header that states its own length, then ``n`` float32s.
+
+    Every gate is one the file can fail.  The block count must be 1, ``n`` must
+    be positive, and the header length and ``n`` together must account for the
+    file to the byte: a header length or a point count read from the wrong
+    offset lands the data's end anywhere but on the file's.
+    """
+    blocks, = _unpack("<I", buf, _V2_BLOCK_COUNT, path=path,
+                      what="the block count")
+    if blocks != 1:
+        what = (f"{blocks} blocks, a multi-range v2 file, which this reader "
+                "refuses until one has been seen to check the layout against"
+                if blocks > 1 else
+                f"{blocks} blocks, so it holds no measurement")
+        raise ValueError(f"{path.name}: the Bruker RAW version 2 header "
+                         f"declares {what}")
+    header_len, = _unpack("<H", buf, _V2_BLOCK, path=path,
+                          what="the block header's length")
+    n_points, = _unpack("<H", buf, _V2_BLOCK + _V2_POINTS, path=path,
+                        what="the block's point count")
+    step, = _unpack("<f", buf, _V2_BLOCK + _V2_STEP, path=path,
+                    what="the block's step")
+    start, = _unpack("<f", buf, _V2_BLOCK + _V2_START, path=path,
+                     what="the block's start angle")
+    if n_points < 1:
+        raise ValueError(f"{path.name}: the Bruker RAW version 2 block declares "
+                         f"{n_points} points")
+    if step == 0.0 or not np.isfinite(step) or not np.isfinite(start):
+        raise ValueError(f"{path.name}: the block steps by {step!r} from "
+                         f"{start!r}, which is not a scan this reader can put "
+                         "on an axis")
+    data_at = _V2_BLOCK + header_len
+    end = data_at + 4 * n_points
+    if end != len(buf):
+        raise ValueError(
+            f"{path.name}: the Bruker RAW version 2 block header declares a "
+            f"length of {header_len} bytes and {n_points} points, so its counts "
+            f"would end at offset {end}, and the file is {len(buf)} bytes. The "
+            "header was not read at the offsets this reader knows, or the file "
+            "is not a single-range v2 file")
+    # the description names these two fields as 2θ, so the axis is stated by the
+    # layout rather than assumed; there is no scan-type field to classify
+    return _File(version=2, ranges=(_Range(
+        axis=_Axis(stated="", field="the scan axis", two_theta=True),
+        label="2θ", start=start, step=step, n_points=n_points,
+        count_time_s=None, datum_size=4, data_at=data_at, end=end),))
+
+
 #: The v3 file header, before the first range header.
 _V3_HEADER = 712
 
@@ -600,15 +666,15 @@ def _read_v3(buf: bytes, *, path: Path) -> _File:
 def _parse(p: Path) -> tuple[bytes, _File]:
     """The file's bytes and its ranges, or a refusal naming the version."""
     version = _version(p)
-    if version not in (3, 4):
+    if version == 1:
         raise ValueError(
-            f"{p.name} is Bruker RAW version {version}, which this build does "
-            "not read: only one description of it exists and no file to check "
-            "it against, so a reader would be guessing at your intensities. "
-            "Re-export it from DIFFRAC as RAW4, or convert it to .uxd, .xy or "
-            "GSAS .fxye, all of which this build reads")
+            f"{p.name} is Bruker RAW version 1, which this build does not read: "
+            "no description of it exists, so a reader would be guessing at your "
+            "intensities. Re-export it from DIFFRAC as RAW4, or convert it to "
+            ".uxd, .xy or GSAS .fxye, all of which this build reads")
     buf = p.read_bytes()
-    return buf, (_read_v4(buf, path=p) if version == 4 else _read_v3(buf, path=p))
+    read = {2: _read_v2, 3: _read_v3, 4: _read_v4}[version]
+    return buf, read(buf, path=p)
 
 
 def _decode(buf: bytes, found: _Range, *, path: Path) -> tuple[np.ndarray,
@@ -723,15 +789,16 @@ def looks_bruker_raw(p: Path) -> bool:
 
 BRUKER_RAW = PatternFormat(
     name="bruker_raw",
-    title="Bruker/Siemens DIFFRAC binary (.raw, v3/v4)",
+    title="Bruker/Siemens DIFFRAC binary (.raw, v2/v3/v4)",
     extensions=(".raw",),
-    sniff="the file begins RAW4.00 or RAW1.01 (or RAW2/'RAW ', which are "
-          "named and refused as the versions no corroborated description of "
-          "exists)",
+    sniff="the file begins RAW4.00, RAW1.01 or RAW2 (or 'RAW ', which is "
+          "named and refused as the version no description of exists; so is a "
+          "v2 file holding more than one range)",
     sigma=("measured per file: integral intensities are counts and take the "
            "Poisson fallback, an integral y·t is a rate whose σ is derived from "
-           "the header's step time, and anything else withholds σ — neither "
-           "version declares an intensity unit anywhere"),
+           "the header's step time, and anything else withholds σ — no "
+           "version declares an intensity unit anywhere, and v2's step time "
+           "is not read"),
     matches=looks_bruker_raw,
     read=read_bruker_raw,
     options=("scan",),

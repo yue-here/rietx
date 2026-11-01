@@ -23,6 +23,14 @@ generated skill reference and manual section. This is chunk R10 of issue #561, s
 
 ### Inherited
 
+- **2026-10-23, from [1810](1810-hydrogens-riding-on-a-body.md) (closed): the
+  riding hydrogens have no user-facing call yet.** `RigidBody.riding` and
+  `crystallography/riding.py` landed in PR #955, and a CIF write carries
+  `_atom_site_refinement_flags_posn` and `_atom_site_calc_flag`. But nothing
+  under `src/` calls `set_riding_lengths`, so a user reaches riding H only by
+  building the body by hand. The verb, its `.rxt`/GUI surface and its skill row
+  belong with this WP's body fields, which `api_surface_deferred.txt` already
+  parks.
 - **2026-10-11, from WP-1920 (closed, PR #906): `api-bodies.md` need not wait
   for this WP.** The maintainer ruled that the first pull request documenting
   the rigid-body classes creates their index, one `TECHNIQUES` entry in

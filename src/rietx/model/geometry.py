@@ -58,12 +58,18 @@ import gemmi
 import numpy as np
 
 from ..crystallography.symmetry import as_group, resolve_group
+from ..params.derived import cartesian_frame
 from .restraints import (
     _COS_CLAMP,
+    _TORSION_SIN2_FLOOR,
     CompiledRestraints,
     _Angle,
     _Bond,
     _metric_g,
+    _resolve_image,
+    _Torsion,
+    _torsion_defined,
+    _torsion_geometry_np,
     _xyz_np,
     restraint_partials,
 )
@@ -90,13 +96,16 @@ BOND_SLACK_ANG = 0.40
 #: distances are still reported; only the loop they land in changes.
 DEMOTE_METAL_METAL = True
 
-#: Non-bonded contacts are searched out to this distance, in Å.  McCusker §11
+#: Non-bonded contacts are listed out to this distance, in Å.  McCusker §11
 #: asks for "both bonding and nonbonding" distances without naming a range.
-#: This is a **search radius**, not a physical constant: 3.5 Å reaches the
+#: This is a **listing radius**, not a physical constant: 3.5 Å reaches the
 #: second coordination sphere of the oxides and framework solids powder
 #: Rietveld is usually about (ZnO's nearest Zn···Zn and O···O are both the
 #: 3.25 Å a axis), and is short enough that the row count stays readable.  It
-#: is recorded on the table, so a row can be read without guessing it.
+#: is recorded on the table, so a row can be read without guessing it.  It
+#: bounds contacts only: the search reaches the longest pair the radii could
+#: call a bond, so CsCl's 3.57 Å Cs–Cl is listed (WP-2002; a search stopping
+#: here once dropped it with no note).
 CONTACT_MAX_ANG = 3.5
 
 #: Contacts kept per asymmetric-unit atom, nearest first.  Bonds and angles are
@@ -113,6 +122,20 @@ MAX_CONTACTS_PER_ATOM = 24
 #: runs at fit close, where a minute spent on a table is a minute stolen from
 #: the refinement.
 MAX_ASYM_ATOMS = 200
+
+#: Torsions kept per asymmetric-unit atom B (the central bond's first atom),
+#: in the table's chain order: B's bonds B–C nearest first, then A and D
+#: nearest first.  Like :data:`MAX_CONTACTS_PER_ATOM` this bounds a
+#: **listing**, not a measurement: a torsion's esd is its own row's J·Cov·Jᵀ
+#: and does not depend on which other rows are listed, so the cap only decides
+#: how many rows a reader is handed.  Whatever it drops is counted in
+#: ``GeometryTable.notes``, and :meth:`~rietx.Refinement.geometry` answers any
+#: chain by name, capped or not.  36 is the most a tetravalent chain can give,
+#: (4 − 1)·(4 − 1) chains about each of B's four bonds, so every chain of a
+#: molecule built from atoms of up to four bonds is listed whole; a densely
+#: bonded inorganic phase reaches it (LaB₆'s La has 24 B neighbours and 4 374
+#: chains), where a torsion is rarely the quantity anyone reads.
+MAX_TORSIONS_PER_ATOM = 36
 
 #: A CIF symmetry code ``n_klm`` encodes each lattice translation as one digit
 #: offset by 5, so it can express shifts in −4…+4 only.  An image needing more
@@ -227,6 +250,21 @@ def _symmetry_code(index: int | None, shift: np.ndarray) -> str | None:
     return f"{index + 1}_{5 + n[0]}{5 + n[1]}{5 + n[2]}"
 
 
+def _code_of(symops, rot: np.ndarray, tran: np.ndarray) -> str | None:
+    """CIF code of the image ``rot·x + tran``, ``tran`` holding any shift.
+
+    For a composed image (the far end of a torsion, the image of an image):
+    the rotation is matched exactly (integer entries), and the translation is
+    split into the listed operation's part, in [0, 1), and a lattice shift.
+    """
+    shift = np.floor(tran + 1e-9)
+    frac = tran - shift
+    for idx, (r, t) in enumerate(symops):
+        if np.array_equal(r, rot) and np.allclose(t, frac, atol=1e-9):
+            return _symmetry_code(idx, shift)
+    return None
+
+
 def _neighbours(sites, values, ip: int, i: int, g: np.ndarray,
                 shifts: np.ndarray, cutoff: float) -> list[tuple]:
     """``(j, R, t, n, d)`` for every image within ``cutoff`` of atom ``i``.
@@ -306,30 +344,37 @@ def _phase_items(phase, sites, values, ip: int, notes: list[str]):
     """
     cell = tuple(values[f"phases.{ip}.cell.{k}"] for k in _CELL_NAMES)
     g = _metric_g(cell)
-    shifts = _shell(g, CONTACT_MAX_ANG)
     symops = _symop_table(resolve_group(phase.space_group,
                                         phase.symmetry_operations))
     elements = [_element(a.species) for a in phase.atoms]
     radii = [float(e.covalent_r) for e in elements]
     metal = [bool(e.is_metal) for e in elements]
     labels = [a.label for a in phase.atoms]
+    # the longest pair the radii could call a bond, past the contact radius
+    # for heavy atoms (Cs: 2.44 Å)
+    longest = max(radii, default=0.0)
 
     bonds, contacts, angles = [], [], []
+    bonded_of: list[list] = []
     dropped = 0
     for i in range(sites.n_asym):
         bonded, near = [], []
+        # sized per atom, so a light atom beside a heavy one searches the
+        # contact radius's shell rather than the heavy atom's
+        reach = max(CONTACT_MAX_ANG, radii[i] + longest + BOND_SLACK_ANG)
         for j, rot, tran, shift, d in _neighbours(sites, values, ip, i, g,
-                                                  shifts, CONTACT_MAX_ANG):
+                                                  _shell(g, reach), reach):
             entry = (j, rot, tran, shift, d,
                      _symmetry_code(_symop_index(symops, rot, tran), shift))
             if (d <= radii[i] + radii[j] + BOND_SLACK_ANG
                     and not (DEMOTE_METAL_METAL and metal[i] and metal[j])):
                 bonded.append(entry)
-            else:
+            elif d <= CONTACT_MAX_ANG:
                 near.append(entry)
         if len(near) > MAX_CONTACTS_PER_ATOM:
             dropped += len(near) - MAX_CONTACTS_PER_ATOM
             near = near[:MAX_CONTACTS_PER_ATOM]
+        bonded_of.append(bonded)
         bonds.extend((i, e) for e in bonded)
         contacts.extend((i, e) for e in near)
         for a in range(len(bonded)):
@@ -338,7 +383,147 @@ def _phase_items(phase, sites, values, ip: int, notes: list[str]):
     if dropped:
         notes.append(f"{phase.name}: {dropped} contact(s) beyond the nearest "
                      f"{MAX_CONTACTS_PER_ATOM} per atom are not listed")
-    return labels, bonds, contacts, angles
+    torsions = _torsion_chains(phase, ip, values, bonded_of, symops, notes)
+    return labels, bonds, contacts, angles, torsions
+
+
+def _image(entry) -> tuple[np.ndarray, np.ndarray]:
+    """(R, t + n) of a neighbour entry, the image as one affine map."""
+    _j, rot, tran, shift, _d, _code = entry
+    return rot, tran + shift
+
+
+#: where :func:`_keys` puts its cell boundaries, as a fraction of a cell:
+#: irrational, so no coordinate a CIF prints (a decimal) and none of its
+#: images under a symmetry operation sits on one.  Rounding to the nearest
+#: 1e-4 instead put 0.48775 (LaMnO₃'s O3 x) on a tie, two arithmetic paths to
+#: one point fell either side of it, and four chains were counted twice.
+_KEY_OFFSET = math.sqrt(2.0) - 1.0
+
+
+def _keys(j, pos: np.ndarray) -> list[tuple]:
+    """A position key per row of ``pos`` (fractional, 1e-4 cells) with its atom.
+
+    Two images of one atom share a key exactly when they are the same point,
+    so keys compare chains by where their atoms are rather than by which
+    operation reached them.
+    """
+    js = [j] * len(pos) if np.isscalar(j) else list(j)
+    cells = np.floor(np.asarray(pos) * 1e4 + _KEY_OFFSET).astype(np.int64)
+    return [(jj, *row) for jj, row in zip(js, cells.tolist(), strict=True)]
+
+
+def _cross_rows(u: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """Row-wise u × v for (n, 3) arrays (``np.cross`` without its overhead)."""
+    return np.stack([u[..., 1] * v[..., 2] - u[..., 2] * v[..., 1],
+                     u[..., 2] * v[..., 0] - u[..., 0] * v[..., 2],
+                     u[..., 0] * v[..., 1] - u[..., 1] * v[..., 0]], axis=-1)
+
+
+def _bent_arms(arm: np.ndarray, axis: np.ndarray) -> np.ndarray:
+    """Per row of ``arm``: whether the angle it makes with ``axis`` is bent.
+
+    The test ``restraints._torsion_defined`` makes, |arm × axis|² against
+    |arm|²·|axis|² at the clamp's sin² (and no zero arm), on Cartesian rows.
+    """
+    la = np.einsum("ka,ka->k", arm, arm)
+    lx = float(axis @ axis)
+    n = _cross_rows(arm, np.broadcast_to(axis, arm.shape))
+    return (la > 0.0) & (lx > 0.0) & (np.einsum("ka,ka->k", n, n)
+                                     > _TORSION_SIN2_FLOOR * la * lx)
+
+
+def _torsion_chains(phase, ip: int, values, bonded_of, symops,
+                    notes: list[str]) -> list[tuple]:
+    """``(item, codes)`` for every torsion over bonded chains of one phase.
+
+    B is an asymmetric-unit atom at its published position, C one of its
+    bonded images, A another of B's, and D one of C's bonded neighbours
+    carried to C's image (the composed map C∘D).  A torsion is not listed
+    again from its other end: a chain whose reversal, carried by the inverse
+    of C's map back to C's published position, was already listed is
+    skipped.  Images related by an atom's own site symmetry are each listed,
+    as the distances are.  A chain with a straight bond angle has no torsion,
+    and a chain whose two ends coincide (a three-membered ring) none either;
+    the first are counted in ``notes`` rather than listed, as is every torsion
+    past :data:`MAX_TORSIONS_PER_ATOM` about one atom.
+
+    Vectorised over A × D per central bond, since a densely bonded phase has
+    thousands of chains (LaB₆: 4 566) and this runs at fit close.
+    """
+    eye, zero = np.eye(3), np.zeros(3)
+    x = [_xyz_np(values, ip, j) for j in range(len(bonded_of))]
+    amat = np.asarray(cartesian_frame(tuple(values[f"phases.{ip}.cell.{k}"]
+                                            for k in _CELL_NAMES)), dtype=np.float64)
+    # per atom: its bonded images' atoms, maps and positions, in table order
+    nb_j = [[e[0] for e in around] for around in bonded_of]
+    nb_map = [[_image(e) for e in around] for around in bonded_of]
+    nb_pos = [np.array([r @ x[j] + t for j, (r, t) in zip(js, maps, strict=True)])
+              .reshape(-1, 3) for js, maps in zip(nb_j, nb_map, strict=True)]
+    seen: set[tuple] = set()
+    out: list[tuple] = []
+    over = straight = 0
+    for b, around_b in enumerate(bonded_of):
+        kept = 0
+        if not around_b:
+            continue
+        key_b = _keys(b, x[b][None, :])[0]
+        pos_a = nb_pos[b]
+        keys_a = _keys(nb_j[b], pos_a)
+        cart_b = amat @ x[b]
+        arm_a = cart_b - pos_a @ amat.T                       # b₁ = B − A
+        for ic, ec in enumerate(around_b):
+            c = ec[0]
+            if not bonded_of[c]:
+                continue
+            rc, tc = nb_map[b][ic]
+            pos_c = pos_a[ic]
+            key_c = keys_a[ic]
+            rc_inv = np.linalg.inv(rc)
+            pos_d = nb_pos[c] @ rc.T + tc                      # C's map on D
+            keys_d = _keys(nb_j[c], pos_d)
+            axis = amat @ pos_c - cart_b                       # b₂ = C − B
+            arm_d = pos_d @ amat.T - amat @ pos_c              # b₃ = D − C
+            bent_a = _bent_arms(arm_a, axis)
+            bent_d = _bent_arms(arm_d, axis)
+            # the reversal D–C–B–A carried back by C's inverse map
+            back_d = _keys(nb_j[c], (pos_d - tc) @ rc_inv.T)
+            back_c = _keys(c, x[c][None, :])[0]
+            back_b = _keys(b, ((x[b] - tc) @ rc_inv.T)[None, :])[0]
+            back_a = _keys(nb_j[b], (pos_a - tc) @ rc_inv.T)
+            for ia, ea in enumerate(around_b):
+                if ia == ic or keys_a[ia] == key_c:
+                    continue
+                for id_, ed in enumerate(bonded_of[c]):
+                    if keys_d[id_] == key_b or keys_d[id_] == keys_a[ia]:
+                        continue
+                    key = (keys_a[ia], key_b, key_c, keys_d[id_])
+                    if key in seen or (back_d[id_], back_c, back_b,
+                                       back_a[ia]) in seen:
+                        continue
+                    seen.add(key)
+                    if not (bent_a[ia] and bent_d[id_]):
+                        straight += 1
+                        continue
+                    if kept >= MAX_TORSIONS_PER_ATOM:
+                        over += 1
+                        continue
+                    kept += 1
+                    ra, ta = nb_map[b][ia]
+                    rd, td = nb_map[c][id_]
+                    r_cd, t_cd = rc @ rd, rc @ td + tc
+                    item = _Torsion(ip, [ea[0], b, c, ed[0]],
+                                    [ra, eye, rc, r_cd], [ta, zero, tc, t_cd],
+                                    [zero, zero, zero, zero], 0.0, 1.0, 1.0)
+                    out.append((item, (ea[5], ".", ec[5],
+                                       _code_of(symops, r_cd, t_cd))))
+    if straight:
+        notes.append(f"{phase.name}: {straight} bonded chain(s) with a straight "
+                     "bond angle have no torsion and are not listed")
+    if over:
+        notes.append(f"{phase.name}: {over} torsion(s) beyond the first "
+                     f"{MAX_TORSIONS_PER_ATOM} per atom are not listed")
+    return out
 
 
 def _bond_item(ip: int, i: int, entry) -> _Bond:
@@ -403,12 +588,19 @@ def _sigmas(items, values, table, ip: int, n_atoms: int, cov) -> list[tuple]:
     if cov is None:
         return [(None, None)] * len(items)
     cov_full, cov_diag, blind = cov
-    rows = restraint_partials(CompiledRestraints(items=items), values, table)
+    compiled = CompiledRestraints(items=items)
+    gross_rows = np.zeros((compiled.n_rows, len(table.entries)), dtype=np.float64)
+    rows = restraint_partials(compiled, values, table, gross=gross_rows)
     cols = [table._paths[p] for p in _phase_paths(ip, n_atoms)]
     g = rows[:, cols]
     var_full = np.einsum("ra,ab,rb->r", g, cov_full, g)
     var_diag = np.einsum("ra,ab,rb->r", g, cov_diag, g)
-    scale = np.einsum("ra,ab,rb->r", np.abs(g), np.abs(cov_full), np.abs(g))
+    # the quadratic form's absolute terms, with a row's partials taken gross
+    # (before two images of one atom cancel): a torsion fixed by symmetry has
+    # roundoff for every net partial, and a floor scaled by those is roundoff
+    # too.  Every other kind's gross row is |g|, the scale this always had.
+    gross = gross_rows[:, cols]
+    scale = np.einsum("ra,ab,rb->r", gross, np.abs(cov_full), gross)
     floor = VARIANCE_CANCELLATION_FLOOR * scale
     touches_blind = (np.abs(g[:, blind]) > 0.0).any(axis=1) if blind.any() \
         else np.zeros(len(items), dtype=bool)
@@ -418,9 +610,35 @@ def _sigmas(items, values, table, ip: int, n_atoms: int, cov) -> list[tuple]:
                                    strict=True)]
 
 
+def _covariance(table, theta, ip: int, n_atoms: int, stderr_internal,
+                correlation):
+    """``(full, diagonal-only, blind)`` over phase ``ip``'s entries, or None."""
+    if stderr_internal is None:
+        return None
+    paths = _phase_paths(ip, n_atoms)
+    return (table.physical_covariance(theta, stderr_internal, correlation, paths),
+            table.physical_covariance(theta, stderr_internal, None, paths),
+            table.unmeasured_rows(theta, stderr_internal,
+                                  [table._paths[q] for q in paths]))
+
+
+def _torsion_row(ip: int, labels, item: _Torsion, codes, values, sigma):
+    from ..schemas.results import GeometryTorsion
+
+    angle, _ = _torsion_geometry_np(item, values)
+    a, b, c, d = item.atoms
+    sig, sig_d = sigma
+    return GeometryTorsion(
+        phase_index=ip, atom_1=labels[a], atom_2=labels[b], atom_3=labels[c],
+        atom_4=labels[d], atom_index_1=a, atom_index_2=b, atom_index_3=c,
+        atom_index_4=d, angle=angle, stderr=sig, stderr_diagonal=sig_d,
+        symmetry_1=codes[0], symmetry_2=codes[1], symmetry_3=codes[2],
+        symmetry_4=codes[3])
+
+
 def geometry_table(model, table, theta: np.ndarray, structure, *,
                    stderr_internal=None, correlation=None):
-    """The converged model's distances and angles, or ``None``.
+    """The converged model's distances, angles and torsions, or ``None``.
 
     ``None`` outside Rietveld mode, where the mandatory dummy atom of a Le Bail
     or Pawley phase is not a structure to measure — and ``None`` with no phase
@@ -431,33 +649,40 @@ def geometry_table(model, table, theta: np.ndarray, structure, *,
     esd is ``None`` — the values are recomputable from the model, the
     covariance is not.
     """
-    from ..schemas.results import GeometryAngle, GeometryDistance, GeometryTable
-
     if model.mode != "rietveld" or not model.phases:
         return None
+    return geometry_from_sites([cp.sites for cp in model.phases], table, theta,
+                               structure, stderr_internal=stderr_internal,
+                               correlation=correlation)
+
+
+def geometry_from_sites(sites_of, table, theta: np.ndarray, structure, *,
+                        stderr_internal=None, correlation=None):
+    """:func:`geometry_table` over each phase's frozen orbit subsets.
+
+    ``sites_of[ip]`` is phase ``ip``'s :class:`~rietx.crystallography.
+    structure_factor.PhaseSites`; a compiled model's when there is one, and
+    ``compile_phase_sites`` of the phase where there is not
+    (:meth:`~rietx.Refinement.geometry` with no live fit).
+    """
+    from ..schemas.results import GeometryAngle, GeometryDistance, GeometryTable
+
     values = table.decode(theta)
     notes: list[str] = []
     distances: list[GeometryDistance] = []
     angles: list[GeometryAngle] = []
-    for ip, cp in enumerate(model.phases):
+    torsions: list = []
+    for ip, sites in enumerate(sites_of):
         phase = structure.phases[ip]
-        if cp.sites.n_asym > MAX_ASYM_ATOMS:
-            notes.append(f"{phase.name}: {cp.sites.n_asym} asymmetric-unit atoms "
+        if sites.n_asym > MAX_ASYM_ATOMS:
+            notes.append(f"{phase.name}: {sites.n_asym} asymmetric-unit atoms "
                          f"exceeds the {MAX_ASYM_ATOMS}-atom search limit; no "
                          "geometry listed for this phase")
             continue
-        labels, bonds, contacts, angle_rows = _phase_items(
-            phase, cp.sites, values, ip, notes)
+        labels, bonds, contacts, angle_rows, torsion_rows = _phase_items(
+            phase, sites, values, ip, notes)
         n_atoms = len(phase.atoms)
-        cov = None
-        if stderr_internal is not None:
-            paths = _phase_paths(ip, n_atoms)
-            cov = (table.physical_covariance(theta, stderr_internal,
-                                             correlation, paths),
-                   table.physical_covariance(theta, stderr_internal,
-                                             None, paths),
-                   table.unmeasured_rows(theta, stderr_internal,
-                                         [table._paths[q] for q in paths]))
+        cov = _covariance(table, theta, ip, n_atoms, stderr_internal, correlation)
         pairs = ([(i, e, True) for i, e in bonds]
                  + [(i, e, False) for i, e in contacts])
         pair_items = [_bond_item(ip, i, e) for i, e, _ in pairs]
@@ -483,7 +708,11 @@ def geometry_table(model, table, theta: np.ndarray, structure, *,
                 atom_index_3=b[0], angle=degrees,
                 stderr=sig, stderr_diagonal=sig_d,
                 symmetry_1=a[5], symmetry_3=b[5]))
-    return GeometryTable(distances=distances, angles=angles,
+        torsion_sigma = _sigmas([it for it, _ in torsion_rows], values, table,
+                                ip, n_atoms, cov)
+        for (item, codes), sigma in zip(torsion_rows, torsion_sigma, strict=True):
+            torsions.append(_torsion_row(ip, labels, item, codes, values, sigma))
+    return GeometryTable(distances=distances, angles=angles, torsions=torsions,
                          bond_slack=BOND_SLACK_ANG, contact_max=CONTACT_MAX_ANG,
                          notes=notes)
 
@@ -543,3 +772,175 @@ def cell_volumes(table, theta: np.ndarray, structure, *,
         out.append(CellVolume(phase_index=ip, volume=v, stderr=sig,
                               stderr_diagonal=sig_d))
     return out
+
+
+# ----------------------------------------------------------------------
+# a request: particular distances, angles and torsions (WP-1815)
+# ----------------------------------------------------------------------
+def _parse_code(code: str, symops, what: str) -> tuple[np.ndarray, np.ndarray]:
+    """(R, t + n) of a CIF ``n_klm`` code (``.`` the identity), or raise."""
+    if code == ".":
+        return np.eye(3), np.zeros(3)
+    parts = code.split("_")
+    if (len(parts) != 2 or not parts[0].isdigit() or len(parts[1]) != 3
+            or not parts[1].isdigit()):
+        raise ValueError(f"{what}: symmetry code {code!r} is not of the CIF form "
+                         "'n_klm' (operation n, lattice shift k-5, l-5, m-5)")
+    n = int(parts[0])
+    if not 1 <= n <= len(symops):
+        raise ValueError(f"{what}: symmetry code {code!r} names operation {n}, "
+                         f"but the space group lists {len(symops)}")
+    rot, tran = symops[n - 1]
+    return rot, tran + np.array([int(ch) - 5 for ch in parts[1]], dtype=np.float64)
+
+
+def request_table(request, sites_of, table, theta: np.ndarray, structure, *,
+                  stderr_internal=None, correlation=None):
+    """The rows ``request`` names, as a :class:`GeometryTable`.
+
+    Each atom is placed by its CIF code where one is given, and otherwise at
+    the image nearest the atom it is measured from (``restraints.
+    _resolve_image``, the minimum image a restraint takes): a distance's
+    second atom from its first, an angle's two arms from the vertex, a
+    torsion's B, C and D each from the atom before it.  The first atom of a
+    distance or a torsion and an angle's vertex sit where they are stored
+    unless coded.  esds are :func:`geometry_table`'s, through the same
+    partials and the same floor, so a requested row the table also lists
+    carries the same numbers.  A torsion whose chain has a straight bond
+    angle has none, and is named in ``notes`` rather than listed.
+    """
+    from ..schemas.results import (
+        GeometryAngle,
+        GeometryDistance,
+        GeometryRequest,
+        GeometryTable,
+    )
+
+    if not isinstance(request, GeometryRequest):
+        request = GeometryRequest.model_validate(request)
+    ip = request.phase_index
+    if not 0 <= ip < len(structure.phases):
+        raise ValueError(f"geometry request names phase {ip}, but the structure "
+                         f"has {len(structure.phases)} phase(s)")
+    phase, sites = structure.phases[ip], sites_of[ip]
+    values = table.decode(theta)
+    cell = tuple(values[f"phases.{ip}.cell.{k}"] for k in _CELL_NAMES)
+    g = _metric_g(cell)
+    symops = _symop_table(resolve_group(phase.space_group,
+                                        phase.symmetry_operations))
+    labels = [a.label for a in phase.atoms]
+    index = {}
+    for j, lab in enumerate(labels):
+        index.setdefault(lab, []).append(j)
+    elements = [_element(a.species) for a in phase.atoms]
+    radii = [float(e.covalent_r) for e in elements]
+    metal = [bool(e.is_metal) for e in elements]
+    x = [_xyz_np(values, ip, j) for j in range(len(labels))]
+
+    def atom_of(ref, what: str) -> tuple[int, str | None]:
+        lab, code = (ref, None) if isinstance(ref, str) else ref
+        hits = index.get(lab, [])
+        if len(hits) != 1:
+            raise ValueError(
+                f"{what}: phase {phase.name!r} has "
+                f"{'no atom' if not hits else f'{len(hits)} atoms'} labelled {lab!r}")
+        return hits[0], code
+
+    def place(ref, reference, what: str):
+        """(j, R, t + n, code) for one atom, relative to ``reference`` (a
+        position) or at its stored site when ``reference`` is None."""
+        j, code = atom_of(ref, what)
+        if code is not None:
+            rot, tran = _parse_code(code, symops, what)
+            return j, rot, tran, code
+        if reference is None:
+            return j, np.eye(3), np.zeros(3), "."
+        rot, tran, shift = _resolve_image(sites, j, reference, x[j], None,
+                                          (0, 0, 0), g)
+        return j, rot, tran + shift, _symmetry_code(_symop_index(symops, rot, tran),
+                                                    shift)
+
+    def relative(anchor, other):
+        """``other``'s map seen from ``anchor``'s frame: anchor⁻¹ ∘ other."""
+        _ja, ra, ta, _ca = anchor
+        _jo, ro, to, _co = other
+        inv = np.linalg.inv(ra)
+        return inv @ ro, inv @ (to - ta)
+
+    def pos(p):
+        return p[1] @ x[p[0]] + p[2]
+
+    n_atoms = len(phase.atoms)
+    cov = _covariance(table, theta, ip, n_atoms, stderr_internal, correlation)
+    notes: list[str] = []
+    zero = np.zeros(3)
+
+    pairs, pair_items = [], []
+    for k, (r1, r2) in enumerate(request.distances):
+        what = f"distance {k}"
+        p1 = place(r1, None, what)
+        p2 = place(r2, pos(p1), what)
+        rot, tran = relative(p1, p2)
+        pairs.append((p1, p2))
+        pair_items.append(_Bond(ip, p1[0], p2[0], rot, tran, zero,
+                                target=0.0, sigma=1.0, weight=1.0))
+    distances = []
+    for (p1, p2), item, (sig, sig_d) in zip(
+            pairs, pair_items, _sigmas(pair_items, values, table, ip, n_atoms, cov),
+            strict=True):
+        i, j = p1[0], p2[0]
+        d = math.sqrt(max(float((pos(p2) - pos(p1)) @ g @ (pos(p2) - pos(p1))), 0.0))
+        distances.append(GeometryDistance(
+            phase_index=ip, atom_1=labels[i], atom_2=labels[j], atom_index_1=i,
+            atom_index_2=j, distance=d, stderr=sig, stderr_diagonal=sig_d,
+            symmetry_1=p1[3] or "?", symmetry_2=p2[3],
+            bonded=(d <= radii[i] + radii[j] + BOND_SLACK_ANG
+                    and not (DEMOTE_METAL_METAL and metal[i] and metal[j]))))
+
+    triples, angle_items = [], []
+    for k, (r1, rv, r3) in enumerate(request.angles):
+        what = f"angle {k}"
+        pv = place(rv, None, what)
+        p1 = place(r1, pos(pv), what)
+        p3 = place(r3, pos(pv), what)
+        (r_1, t_1), (r_3, t_3) = relative(pv, p1), relative(pv, p3)
+        triples.append((p1, pv, p3))
+        angle_items.append(_Angle(ip, p1[0], pv[0], p3[0], r_1, t_1, zero,
+                                  r_3, t_3, zero, target_deg=0.0, sigma=1.0,
+                                  weight=1.0))
+    angles = []
+    for (p1, pv, p3), item, (sig, sig_d) in zip(
+            triples, angle_items,
+            _sigmas(angle_items, values, table, ip, n_atoms, cov), strict=True):
+        degrees = _angle_degrees(item, values)
+        if min(degrees, 180.0 - degrees) < ANGLE_LINEARISATION_LIMIT_DEG:
+            sig = sig_d = None
+        angles.append(GeometryAngle(
+            phase_index=ip, atom_1=labels[p1[0]], atom_2=labels[pv[0]],
+            atom_3=labels[p3[0]], atom_index_1=p1[0], atom_index_2=pv[0],
+            atom_index_3=p3[0], angle=degrees, stderr=sig, stderr_diagonal=sig_d,
+            symmetry_1=p1[3], symmetry_2=pv[3] or "?", symmetry_3=p3[3]))
+
+    torsion_rows = []
+    for k, refs in enumerate(request.torsions):
+        what = f"torsion {k}"
+        placed = [place(refs[0], None, what)]
+        for ref in refs[1:]:
+            placed.append(place(ref, pos(placed[-1]), what))
+        item = _Torsion(ip, [p[0] for p in placed], [p[1] for p in placed],
+                        [p[2] for p in placed], [zero] * 4, 0.0, 1.0, 1.0)
+        if not _torsion_defined(item, values):
+            notes.append(f"{what} ({'-'.join(labels[p[0]] for p in placed)}): a "
+                         "bond angle of the chain is straight, so it has no "
+                         "torsion and is not listed")
+            continue
+        torsion_rows.append((item, tuple(p[3] for p in placed)))
+    torsions = [
+        _torsion_row(ip, labels, item, codes, values, sigma)
+        for (item, codes), sigma in zip(
+            torsion_rows,
+            _sigmas([it for it, _ in torsion_rows], values, table, ip, n_atoms, cov),
+            strict=True)]
+    return GeometryTable(distances=distances, angles=angles, torsions=torsions,
+                         bond_slack=BOND_SLACK_ANG, contact_max=CONTACT_MAX_ANG,
+                         notes=notes)

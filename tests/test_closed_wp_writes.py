@@ -140,7 +140,7 @@ def test_net_added_counts_only_the_growth_of_a_hunk():
 
 def test_the_handover_command_runs_it():
     """The script is only as good as the step that runs it."""
-    text = (ROOT / ".claude" / "commands" / "wp-handover.md").read_text(encoding="utf-8")
+    text = (ROOT / ".claude" / "skills" / "wp-handover" / "SKILL.md").read_text(encoding="utf-8")
     runs = re.findall(r"`python3 (\S+closed_wp_writes\.py)`", text)
     assert runs, "no step in /wp-handover runs closed_wp_writes.py"
     assert all((ROOT / run).resolve() == Path(hook.__file__).resolve() for run in runs)

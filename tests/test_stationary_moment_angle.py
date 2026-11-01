@@ -14,7 +14,9 @@ Gauss-Newton step to where their columns vanish, Δχ² there with the other
 columns refitted by one linear step, against the χ̄² cut for that many
 one-sided directions.  A set that passes leaves the covariance.  The fixtures
 are ``test_magnetic_solve``'s two-site set simulated with Poisson noise, about
-half a second a fit.
+3.4 s a fit, and about 15× that with the automatic profile interval of each
+angle left out (52.1 s for ``_fit(0.0, seed=4)``; Linux x86-64, WP-2019).  So
+``_fit`` computes the interval only for the rows that read it.
 """
 from __future__ import annotations
 
@@ -58,8 +60,14 @@ def _plan() -> rx.RefinementPlan:
 
 
 def _fit(tilt: float, *, two: bool = True, start_tilt: float | None = None,
-         seed: int | None = None):
-    """Mn1 at 3.5 μ_B tilted ``tilt`` from **a**, Mn2 at 0.7 along **a**."""
+         seed: int | None = None, intervals: bool = False):
+    """Mn1 at 3.5 μ_B tilted ``tilt`` from **a**, Mn2 at 0.7 along **a**.
+
+    ``intervals=True`` keeps the profile interval the fit computes for each
+    angle it leaves out (WP-2002).  Off by default, as on a package trial,
+    because it is most of a fit's cost here and only the rows that read it
+    pay for it (WP-2019).
+    """
     T = _solve()
     mag = _magnetic()
     instrument = T.neutron()
@@ -74,6 +82,7 @@ def _fit(tilt: float, *, two: bool = True, start_tilt: float | None = None,
             if two else None),
         magnetic=mag)
     ref = rx.Refinement(rx.Structure(phases=[start]), instrument)
+    ref._auto_intervals = intervals
     return ref, data, ref.fit(data, plan=_plan(), telemetry=False)
 
 
@@ -120,7 +129,7 @@ def test_a_stop_beside_the_symmetry_direction_leaves_the_angles_out():
     cut makes at 5 % (WP-1929 measured 3 of 48), so the seed is chosen for a
     low statistic and only the verdict is pinned.
     """
-    ref, _data, result = _fit(0.0, seed=4)
+    ref, _data, result = _fit(0.0, seed=4, intervals=True)
     stage = result.stages[-1]
     (only,) = stage.moment_angle_tests
     assert only.paths == ANGLES and only.reached and only.zeroed
@@ -138,7 +147,11 @@ def test_a_stop_beside_the_symmetry_direction_leaves_the_angles_out():
     (finding,) = [d for d in result.diagnostics
                   if d.code == "MOMENT_ANGLE_STATIONARY"]
     assert finding.where == ANGLES and finding.value == only.statistic
-    assert "profile_interval" in finding.suggestion
+    assert "RefinedParameter.interval" in finding.suggestion
+    # each angle's interval, computed by the fit, includes the direction
+    assert all(rows[p].interval.lower <= only.stationary_at[p] <= rows[p].interval.upper
+               for p in ANGLES)
+    assert finding.message.count("includes the direction") == len(ANGLES)
 
 
 @pytest.fixture(scope="module")
@@ -266,7 +279,7 @@ def test_an_angle_without_an_esd_still_has_a_profile_interval(nudge):
     macOS runners unnudged.
     """
     ref, data, result = _fit(0.0, two=False, seed=2,
-                             start_tilt=0.04 * (1.0 + nudge))
+                             start_tilt=0.04 * (1.0 + nudge), intervals=True)
     azimuth = f"{MN1}.dof2"
     (passed,) = [t for t in result.stages[-1].moment_angle_tests if t.zeroed]
     assert azimuth in passed.paths and _rows(result)[azimuth].stderr is None
@@ -276,6 +289,56 @@ def test_an_angle_without_an_esd_still_has_a_profile_interval(nudge):
     width = interval.upper - interval.lower
     assert abs(interval.upper + interval.lower) < 0.05 * width
     assert interval.lower < interval.value < interval.upper
+    # the fit's own interval (WP-2002) is this one: the same refits, on a copy
+    auto = _rows(result)[azimuth].interval
+    assert (auto.lower, auto.upper) == (interval.lower, interval.upper)
+
+
+def test_a_left_out_angle_carries_its_interval_and_the_history_gains_no_node():
+    """WP-2002, B2 option 2: the angle's profile interval in place of its esd.
+
+    The one-site set leaves both of Mn1's angles out of the covariance.  The
+    fit computes each one's profile interval and stores it on the row, whose
+    ``stderr`` stays ``None``.  Each interval includes the direction where its
+    column vanishes, and the finding says so.  Measured: 24 refits an angle,
+    2.6 s beside a 0.18 s fit (macOS arm64).
+
+    The refits run on a copy of the models, so the caller's tree holds exactly
+    the nodes the same fit holds with the intervals off, HEAD on the result's
+    own node.  Every other row, and every row of the fit with them off, has
+    ``interval`` ``None``.
+    """
+    ref, _data, result = _fit(0.0, two=False, seed=2, start_tilt=0.04, intervals=True)
+    off_ref, _data, off = _fit(0.0, two=False, seed=2, start_tilt=0.04,
+                               intervals=False)
+    (passed,) = [t for t in result.stages[-1].moment_angle_tests if t.zeroed]
+    assert passed.paths == [f"{MN1}.dof1", f"{MN1}.dof2"]
+    rows = _rows(result)
+    for path in passed.paths:
+        row = rows[path]
+        assert row.stderr is None and row.interval is not None
+        iv = row.interval
+        assert iv.path == path and iv.stderr is None and not iv.one_sided
+        assert iv.lower_stop == iv.upper_stop == "threshold"
+        assert iv.lower <= passed.stationary_at[path] <= iv.upper
+        assert all(p.node_id is None for p in iv.points)
+    assert all(r.interval is None for r in result.parameters
+               if r.path not in passed.paths)
+    assert all(r.interval is None for r in off.parameters)
+    # nothing else the fit returns moved
+    assert [(r.path, r.value, r.stderr) for r in result.parameters] == [
+        (r.path, r.value, r.stderr) for r in off.parameters]
+    (finding,) = [d for d in result.diagnostics
+                  if d.code == "MOMENT_ANGLE_STATIONARY"]
+    assert finding.message.count("includes the direction") == 2
+    (plain,) = [d for d in off.diagnostics if d.code == "MOMENT_ANGLE_STATIONARY"]
+    assert "No profile interval was computed" in plain.message
+    # the history a plain fit leaves, node for node
+    tree, off_tree = ref.history, off_ref.history
+    assert len(tree) == len(off_tree)
+    assert tree.head == result.node_id
+    assert [(n.action.kind, n.action.name) for n in tree.lineage(tree.head)] == [
+        (n.action.kind, n.action.name) for n in off_tree.lineage(off_tree.head)]
 
 
 def test_the_joint_path_runs_the_same_test():
@@ -348,6 +411,7 @@ def test_an_angle_a_named_variable_drives_leaves_the_covariance():
         m1=Moment.from_values(_vec(3.3, 0.04, 0.03), "Mn3+", vary=True),
         m2=Moment.from_values(_vec(0.75, 0.03, 0.03), "Mn3+", vary=True),
         magnetic=mag)]), instrument)
+    ref._auto_intervals = False   # no row here reads one (_fit's docstring)
     start = {r.path: r.value for r in ref.parameters()}
     ref.add_variable("phi", start[f"{MN1}.dof2"])
     ref.tie_equal([f"{MN1}.dof2", f"{MN2}.dof2"], source="vars.phi")
@@ -366,3 +430,49 @@ def test_an_angle_a_named_variable_drives_leaves_the_covariance():
     assert rows[f"{MN1}.dof0"].stderr == pytest.approx(0.00152, rel=0.05)
     assert rows[f"{MN2}.dof0"].stderr == pytest.approx(0.00112, rel=0.05)
     assert rows["vars.m1"].stderr == rows[f"{MN1}.dof0"].stderr
+
+
+def test_a_chain_pays_the_interval_once_a_pattern_on_the_attempt_it_keeps(
+        monkeypatch):
+    """A rung the ladder discards pays no profile interval (WP-2003, X10).
+
+    Every rung and every verify refit was a plain ``Refinement``, so each paid
+    the moment angles' interval, 20-32 refits an angle, on a result the chain
+    then threw away.  ``_fit_one`` now declines it and the chain hands the
+    attempt it keeps to the same ``attach_stationary_intervals`` a plain fit
+    calls.  A fence of 1e-6 sends pattern 1 up all three rungs, and the
+    interval is still asked for twice, once a pattern, each time of the fit
+    the entry reports.  Stubbed: the interval itself is
+    ``test_a_left_out_angle_carries_its_interval_and_the_history_gains_no_node``'s,
+    and run for real it is 60 s of this test's 70.
+    """
+    import rietx.sequential as seq
+
+    T = _solve()
+    mag = _magnetic()
+    instrument = T.neutron()
+
+    def pattern(seed):
+        return T.simulate(T.two_site(
+            m1=Moment.from_values(_vec(3.5, 0.0), "Mn3+"), m2=None, magnetic=mag),
+            instrument, seed=seed)
+
+    start = rx.Structure(phases=[T.two_site(
+        m1=Moment.from_values(_vec(3.3, 0.04, 0.03), "Mn3+", vary=True),
+        m2=None, magnetic=mag)])
+    import rietx.strategy.parameter_interval as pi
+
+    asked: list = []
+    by_a_fit: list = []
+    monkeypatch.setattr(seq, "attach_stationary_intervals",
+                        lambda ref, data, *, cancel=None: asked.append(ref.result_))
+    # where Refinement.fit looks it up, so a rung that paid would show here
+    monkeypatch.setattr(pi, "attach_stationary_intervals",
+                        lambda ref, data, *, cancel=None: by_a_fit.append(ref))
+    series = rx.SequentialRefinement(start, instrument).fit(
+        [pattern(2), pattern(3)], plan=_plan(), reseed_factor=1e-6)
+    assert series[1].rungs_tried == ["warm", "warm_staged", "cold"]
+    assert by_a_fit == []
+    assert [r.statistics.rwp for r in asked] == [e.statistics.rwp for e in series]
+    # and each kept attempt has angles left out for the interval to be about
+    assert all(any(t.zeroed for t in r.stages[-1].moment_angle_tests) for r in asked)

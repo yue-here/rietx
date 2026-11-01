@@ -1,9 +1,8 @@
 # WP-1322 — the run is instrumentable, and nothing says so
 
-Milestone: unscheduled · Status: 🔄 2026-10-12 — every task landed from outside (PR #902); closing waits on the maintainer
+Milestone: unscheduled · Status: ✅ 2026-10-23 — `rietx events` reads an event log run by run, every opened log starts with a run header, and the skill says how to keep a run record (PR #902)
 Track: Render what the fit already knows
 Depends on: —
-Priority: P3 2026-09-23 — a view over events already written
 
 ## Goal
 
@@ -77,137 +76,13 @@ consumer" — #207's own framing): the aggregator's `termination` histogram
 and held-path counts summarise exactly the marker vocabulary 1317 reads
 from `SeriesResult`, so neither surface invents a second set of names.
 
-### Inherited
-
-- **2026-10-15, from [1325](1325-parametric-series.md), from @mustachefeeling's comments on PR #977: the joint fit and long chains.** A joint fit
-  keeps no history (`multi.py:1051`), though it now emits events (#926).
-  With those, `rietx events` could print one line per parametric equation:
-  subset size, form verdict, and whether a detector fired inside the
-  subset. On long chains, pair events in order, never by
-  `(series_index, series_pass)`, since indices recur on reseeds and
-  restarted segments. One segmented chain summed 700 s of fit time against
-  148 s of wall time. On #207, 3 of 3 independent agents turned history off.
-
-- **2026-10-11, from the issue triage (#207, #223, in PR #902): Tasks 1 and 3
-  are open as the reporter's PR.** PR #902 (opened 2026-10-11, fork) writes a
-  `record: "run"` header line on every opened `EventStream` (#223) and adds
-  `rietx events <log | run dir> [--json]` over
-  `history.aggregate.summarize_events` (#207), which splits a log on that
-  header. It answers this WP's open question as a record rather than a kind,
-  and still moves `EVENT_SCHEMA_VERSION` from 2 to 3, because a version-2
-  reader that validates every line refuses the header either way. The PR's
-  claims match both issues. The 2026-09-25 entry below (a job's many run
-  directories) is not in it. Checked against the tree at d80ca5f4: no
-  `history/aggregate.py`, no `events` subcommand in `cli.py`.
-
-- **2026-09-25, from a transcript review of an agent session on `in-situ
-  series 1`: the records were there and the report was still wrong.** The user
-  asked the agent to report its own metrics. The session left 887 run
-  directories in `.rietx/runs` (843 `done`, 44 `failed`), each with its
-  `meta.json`, `status.json` and log. The agent counted fits by hand instead,
-  in a file of its own plus "about 60 in early unlogged probes". It put its
-  first screen at "about 15 min", where the transcript's timeline says 89.
-  Every `fit` outside a series writes its own directory, so a job of many
-  fits is many directories. The question this session needed answered is
-  therefore across the runs of one job (count, failures, wall, slowest run),
-  not within one log. Decide whether that is Task 1's second mode or another
-  verb, and name it in `batch-operating.md` either way (WP-1464 edits that
-  file too).
-- **2026-09-24, from the issue triage: #237 closed as a duplicate of #223.**
-  This file keeps citing both. The 9c.13 row the 2026-09-03 entry below
-  places in `references/batch.md` merged with PR #233 and now lives in
-  `references/batch-operating.md` § 9c.13, still cross-referenced from
-  `references/series.md`; revise it there.
-
-From **WP-1403** (2026-09-15), which removed this WP's Task 2 premise:
-
-- **Task 2 is discharged, not deferred.** The `history` defaults asymmetry was
-  a decision about which knob to flip so that an agent would have a log; every
-  fit now writes one whether or not `history` or `events=` was passed, so there
-  is no longer an asymmetry to decide. Strike the task rather than answering it,
-  and say in the handover that 1403 is why.
-- **Task 1 is untouched and still wanted.** The terminal-shaped post-hoc
-  aggregator now has a reliable input rather than a hoped-for one: a run
-  directory per fit, discoverable by `runs.discover`, with `meta.json` and
-  `status.json` beside the log. An aggregator can read what a run *says about
-  itself* instead of inferring it from the stream.
-- The measurement this WP made is what carried 1403: three agents, three routes
-  to the skill, five occurrences of `history=False`, and 2.7-16.6 % coverage
-  recovered from transcripts afterwards. It is quoted in 1403's own Context and
-  in the new `tests/test_telemetry.py` docstring, so it is no longer only here.
-
-- **2026-09-13, from WP-1401 (the live-watcher track): Task 2 is on its way to
-  being answered by removing its own premise — do not decide it standing
-  alone.** WP-1403 makes every `fit()` record itself, with an env switch and
-  nothing for a caller to remember, on this WP's own evidence: an agent cannot
-  switch off by accident what it never had to switch on. If 1403 ships, the
-  `history` defaults asymmetry stops being the thing that decided coverage and
-  Task 2 becomes a note in the skill rather than a defaults flip. If 1403 is
-  reprioritised or fails WP-1404's cost gate, Task 2 is live again exactly as
-  written. Either way WP-1406 is scheduled to record the outcome here, dated.
-  **Task 1 is untouched by all of it**: the post-hoc aggregator over an event
-  log is a terminal-shaped surface for a moment the watcher does not serve, and
-  it is a contributor's offered PR. Also relevant to it: WP-1401 lands
-  incremental tailing of an `events.jsonl` by byte offset, tolerant of a torn
-  last line — import that rather than writing a second reader.
-
-  Related, and the reason this entry is not stronger: WP-1403 gives each run its
-  own directory, which answers the segmentation problem below for *recorded*
-  runs without touching `EventStream`'s append mode. A log a caller opened by
-  hand still has no run marker.
-
-- **2026-09-03, from the issue triage (issues #223 and #237, the same defect
-  reported twice): an aggregator cannot segment the log it is given, because
-  `EventStream` appends with no run marker.** `EventStream.__init__` opens
-  unconditionally in append mode (`history/events.py:139`):
-
-  ```python
-  self._fh = open(self.path, "a", encoding="utf-8") if self.path else None
-  ```
-
-  So re-running anything into the same `events=` path silently merges the new
-  run into the previous one, with nothing in the file saying two runs are
-  present, and `read_events` returns both as one stream. **The failure is
-  silent, the corrupted quantity is plausible, and the only signal is an
-  external check most callers will not have.** Measured twice during a timing
-  study over a 638-pattern series: in the worst case a **10.3 s fit reported as
-  459.0 s** (44.67x). It was caught only by asserting event-log-summed
-  durations against an independently measured wall clock (3472.73 s against
-  3409.27 s, ratio 1.0186 once fixed). It is worse for a long series, where
-  re-running one leg after a crash is the normal recovery and the merged log is
-  then the *expected* workflow rather than an accident.
-
-  **Append is nonetheless the right default and must stay one.** It is
-  load-bearing in two places: `SequentialRefinement` forwards every pattern's
-  events through one stream so a series run appends to exactly one log (the
-  module comment at `sequential.py` ~248 says so explicitly), and `rietx watch`
-  tails the file, so truncating under a reader would be worse. The fix is not
-  to change the mode.
-
-  Three directions, cheapest first, and the reporters agree on which: **(1) a
-  run header record written on open** — a `record: "run"` line carrying the
-  fingerprint and created timestamp the header already computes, so a reader
-  can partition a file into runs and a consumer summing durations can refuse or
-  warn when it sees more than one; one line per file, and it protects the
-  *reader* rather than relying on the writer remembering, which is the case
-  that actually bites. **(2)** an explicit `EventStream(path,
-  mode="append"|"truncate")` with the default unchanged. **(3)** at minimum,
-  document it where `events=` is documented. A contributor has offered a PR
-  for (1).
-
-  **The design constraint to settle first**: `EventKind` is closed and the run
-  state is deliberately not an event (root CLAUDE.md), so a new *kind* is an
-  `EVENT_SCHEMA_VERSION` bump while a header *record* on a different key may
-  not be. Decide which shape (1) takes before writing it — this WP's aggregator
-  is its first consumer either way.
-
-  Skill rows that may need revising **in the same change** (all three copies,
-  via `rietx skill --install . --copy`): on this tree `references/batch.md`
-  holds rows 9c.1–9c.4 only, but **PR #233 (open, unmerged on 2026-09-03)**
-  adds a 9c.13 telling an operator to rotate or re-path the log before every
-  run, cross-referenced from `references/series.md` for ramps. If #233 has
-  merged by then, both become descriptions of a package that no longer needs
-  the workaround.
+**How a log splits, and how its events pair.** `EventStream` still opens its
+file in append mode, because a series writes every pattern into one log and
+`rietx watch` tails the file. So PR #902 starts each opened stream with a
+`record: "run"` header line and the reader splits on it. A header is not an
+event kind, but a version-2 reader refuses the line, so `EVENT_SCHEMA_VERSION`
+went to 3. Within a run, events pair in file order, never by
+`(series_index, series_pass)`, which recur on reseeds and restarted segments.
 
 ## Non-goals
 
@@ -257,6 +132,35 @@ The shipping PR carries `Closes #207`.
   consumer.
 
 ## Handover log
+
+### 2026-10-23 — closed: an event log reads run by run
+
+An agent or a CI job can now ask what a run did after the fact, from its event
+log alone, and a log that several runs appended to no longer mixes their times.
+Everything this WP asked for landed from outside in PR #902 on 2026-10-12. The
+maintainer closed it today, which discharges "closing waits on the maintainer".
+
+- *Closed by* PR #902 (`daca33e5`): tasks 1, 3 and 4, as the 2026-10-12 entry
+  checked them. WP-1403 discharged task 2 on 2026-09-15. No box was open.
+- *Inherited, deleted as discharged:* 2026-10-11 (#902 was that open PR, now
+  merged); 2026-09-24 (`batch-operating.md` § 9c.13 already reads a re-used log
+  per run); the WP-1403 and WP-1401 entries (task 2's premise is gone, task 1
+  shipped, and the aggregator reads through `runs.tail_events` as 1401 asked);
+  2026-09-03 (the run header is #902's fix; why append stays is now in Context).
+- *Inherited, forwarded:* 2026-09-25 (one job's many run directories) → 1464,
+  which edits `batch-operating.md`; 2026-10-15's per-equation line for a joint
+  fit → 1325, its pairing rule kept in Context.
+- *Inherited, filed:* 2026-10-20's reused `history=` path → new
+  [2031](2031-a-history-log-holds-one-tree.md). Still true at `3e0dc6f`:
+  `RefinementTree.for_data` appends a header to any path, and `load` adds every
+  node record to `order`.
+- *The 2026-10-12 "Not done":* `docs/releases/1.8.0.md` now has both lines. The
+  stage-timing rule still lives twice, and `progress_writer` still keeps a
+  stage's first start across a `fit_start` (`events.py:326-350`), with one
+  writer for a whole series (`sequential.py:1252`). → 2031, beside the
+  history log.
+
+*Next.* Nothing owed here. 1464, 1325 and 2031 hold what this WP leaves.
 
 - **2026-10-12** — PR #902 merged from outside as `daca33e5` and closed #207
   and #223. An `events.jsonl` can now be read per run without a GUI:

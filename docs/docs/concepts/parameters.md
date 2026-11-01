@@ -110,14 +110,14 @@ The cell is held at the certificate value.
 
 | Background | Free background terms | Rwp | B<sub>iso</sub>(Si) / Å² |
 |---|---|---|---|
-| Chebyshev, 3 terms | 3 | 0.119977 | 0.414(65) |
-| Chebyshev, 3 terms, and one hump | 3 + 3 | 0.082503 | 0.421(10) |
-| Chebyshev, 6 terms | 6 | 0.088596 | 0.422(25) |
-| Chebyshev, 6 terms, and one hump | 6 + 3 | 0.077152 | 0.4235(66) |
+| Chebyshev, 3 terms | 3 | 0.120051 | 0.413(64) |
+| Chebyshev, 3 terms, and one hump | 3 + 3 | 0.082134 | 0.421(10) |
+| Chebyshev, 6 terms | 6 | 0.088232 | 0.422(25) |
+| Chebyshev, 6 terms, and one hump | 6 + 3 | 0.076711 | 0.4234(64) |
 
 Three hump parameters lower Rwp more than three extra Chebyshev terms do.
 That shows only that the hump describes the curve more economically, and the empty capillary is the evidence for what it is.
-The refined hump sits at 4.18°, below the capillary's 4.24°, because it also takes up the rise below 3° that a 3-term polynomial cannot follow.
+The refined hump sits at 4.16°, below the capillary's 4.24°, because it also takes up the rise below 3° that a 3-term polynomial cannot follow.
 Do not read a hump's position as a d-spacing.
 :::
 

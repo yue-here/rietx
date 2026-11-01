@@ -42,11 +42,11 @@ def fitted(pattern):
 def test_records_a_node_per_stage(fitted):
     ref, result = fitted
     tree = ref.history
-    # root + one node per stage
-    assert len(tree) == 1 + len(SHORT.stages)
+    # root + one node per stage the fit ran, the closing stage included
+    assert len(tree) == 1 + len(SHORT.run_stages())
     assert tree.root.action.kind == "root"
     assert [n.action.name for n in tree.nodes.values() if n.action.kind == "stage"] \
-        == ["scale_bkg", "cell"]
+        == ["scale_bkg", "cell", "closing"]
     assert result.node_id == tree.order[-1]
     assert result.tree_id == tree.header.tree_id
     # every fitted node carries its own agreement indices
@@ -191,7 +191,7 @@ def test_branching_creates_independent_leaves(pattern):
 
     leaves = tree.leaves()
     assert len(leaves) == 2, [n.id for n in leaves]
-    assert {n.action.name for n in leaves} == {"cell", "profile_w"}
+    assert {n.action.name for n in leaves} == {"closing", "profile_w"}
     assert tree.children(mid.id).__len__() == 2
     # recording a sibling must not disturb the node it branched from
     assert mid.model_dump_json() == frozen
@@ -433,9 +433,9 @@ def test_branch_overlay_plot(tmp_path, pattern):
 
     structure, ins = perturbed_models()
     ref = rx.Refinement(structure, ins)
-    ref.fit(pattern, plan=SHORT)
+    result = ref.fit(pattern, plan=SHORT)
     tree = ref.history
-    fork = [n for n in tree.nodes.values() if n.action.name == "cell"][0]
+    fork = tree[result.node_id]                  # the fit's answer, its closing stage
 
     # two plausible continuations of the same checkpoint: widen only W, or
     # free the whole TCHZ profile
@@ -504,12 +504,146 @@ def test_stage_node_carries_its_seeds(pattern):
     assert (reloaded.seed, reloaded.strain_seed) == (1e-3, 1000.0)
 
 
-def test_stage_node_without_seeds_renders_unchanged(fitted):
-    """An unseeded stage's api_call keeps its pre-WP-1004 text exactly."""
-    ref, _ = fitted
+def test_a_cherry_pick_replays_zero_le_bail_cycles_as_zero(pattern):
+    """``lebail_cycles=0`` holds the extracted intensities, and a replay that
+    read it as the default 3 would re-extract them: a rule the node never ran
+    (WP-2002, from the second read of its batch on PR #1050, B11.4)."""
+    structure, ins = perturbed_models()
+    ref = rx.Refinement(structure, ins)
+    ref.fit(pattern, mode="lebail", plan=rx.RefinementPlan(stages=[
+        rx.Stage("held", ["instrument.background.*"], max_iter=10,
+                 lebail_cycles=0)]))
+    picked = ref.history.order[-1]
+    assert ref.history[picked].action.lebail_cycles == 0
+    ref.cherry_pick(picked, pattern)
+    assert ref.history[ref.history.order[-1]].action.lebail_cycles == 0
+
+
+def test_stage_node_without_seeds_renders_unchanged(pattern):
+    """An unseeded stage's api_call keeps its pre-WP-1004 Stage text exactly.
+
+    A declared stage names its windows after it: run_stage's own default is
+    the closing stage's fraction since WP-2002's seventh round, so a line
+    without the keyword would replay a different stage from the one that ran."""
+    structure, ins = perturbed_models()
+    ref = rx.Refinement(structure, ins)
+    # the declared stages' rendered call; the closing stage is tests/test_closing_stage.py's
+    ref.fit(pattern, plan=_with_settings(SHORT, closing_window_tol=None))
     node = ref.history[ref.history.order[-1]]
     assert node.action.api_call() == (
-        "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], max_iter=40))")
+        "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], max_iter=40), "
+        "window_area_tol=0.02)")
+
+
+# ------------------------------- the plan settings a stage ran at (WP-2002, B1)
+def _with_settings(plan, **settings):
+    import dataclasses
+
+    return dataclasses.replace(plan, **settings)
+
+
+def test_a_cherry_pick_replays_the_plan_settings_the_stage_ran_at(pattern):
+    """The absent-phase threshold and the correlation guard are ``run_stage``
+    keywords, not ``Stage`` fields, so a node that kept only the ``Stage``
+    replayed a stage run at 5σ, or with the hold off, at the default 3σ."""
+    structure, ins = perturbed_models()
+    ref = rx.Refinement(structure, ins)
+    # the declared stages' recorded settings; the closing stage is tests/test_closing_stage.py's
+    ref.fit(pattern, plan=_with_settings(SHORT, phase_support_sigma=5.0,
+                                         correlation_guard=0.9, closing_window_tol=None),
+            telemetry=False)
+    picked = ref.history.order[-1]
+    action = ref.history[picked].action
+    assert (action.phase_support_sigma, action.correlation_guard) == (5.0, 0.9)
+    assert action.api_call().endswith(
+        "max_iter=40), correlation_guard=0.9, phase_support_sigma=5.0, "
+        "window_area_tol=0.02)")
+    reloaded = rx.NodeAction.model_validate_json(action.model_dump_json())
+    assert (reloaded.phase_support_sigma, reloaded.correlation_guard) == (5.0, 0.9)
+
+    # from a working tree whose last run was at the defaults, so the replay
+    # can only have read its settings off the node
+    ref.run_stage(pattern, rx.Stage("bkg", ["instrument.background.*"],
+                                    max_iter=5), telemetry=False)
+    ref.cherry_pick(picked, pattern)
+    again = ref.history[ref.history.order[-1]].action
+    assert (again.phase_support_sigma, again.correlation_guard) == (5.0, 0.9)
+
+
+def test_the_hold_switched_off_is_recorded_and_rendered():
+    """``None`` is a setting, not an absence: the node says the hold was off
+    and the rendered call switches it off again."""
+    action = rx.NodeAction(kind="stage", name="cell", turn_on=["phases.*.cell.*"],
+                           phase_support_sigma=None)
+    assert action.api_call() == (
+        "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], "
+        "max_iter=100), phase_support_sigma=None, window_area_tol=0.02)")
+    reloaded = rx.NodeAction.model_validate_json(action.model_dump_json())
+    assert reloaded.phase_support_sigma is None
+
+
+def test_a_node_written_before_the_plan_settings_replays_at_the_defaults(
+        tmp_path, pattern):
+    """A history file from before the fields loads, renders its call as it
+    always did, and cherry-picks at the 3σ and 0.98 it ran under."""
+    import json
+
+    from rietx.history.tree import RefinementTree
+
+    path = tmp_path / "old.jsonl"
+    structure, ins = perturbed_models()
+    ref = rx.Refinement(structure, ins, history=path)
+    # the declared stages' recorded settings; the closing stage is tests/test_closing_stage.py's
+    ref.fit(pattern, plan=_with_settings(SHORT, phase_support_sigma=5.0,
+                                         correlation_guard=0.9, closing_window_tol=None),
+            telemetry=False)
+    lines = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        record = json.loads(line)
+        if record.get("record") == "node":
+            record["node"]["action"].pop("phase_support_sigma")
+            record["node"]["action"].pop("correlation_guard")
+        lines.append(json.dumps(record))
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    tree = RefinementTree.load(path)
+    picked = tree.order[-1]
+    action = tree[picked].action
+    assert (action.phase_support_sigma, action.correlation_guard) == (3.0, 0.98)
+    # a node written before the window field ran at the declared 2 %
+    assert action.api_call() == (
+        "ref.run_stage(data, rx.Stage('cell', ['phases.*.cell.*'], max_iter=40), "
+        "window_area_tol=0.02)")
+
+    old = rx.Refinement.from_node(tree, picked)
+    old.cherry_pick(picked, pattern)
+    again = tree[tree.order[-1]].action
+    assert (again.phase_support_sigma, again.correlation_guard) == (3.0, 0.98)
+
+
+def test_replay_reads_the_report_threshold_off_the_node(pattern, monkeypatch):
+    """``replay`` builds a result whose ``PHASE_UNCONSTRAINED`` is read
+    against a threshold: the one the stage ran at, never the default."""
+    import importlib
+
+    # the module, which ``rietx.refine`` is not: the package exports the
+    # function of that name over it
+    refine_module = importlib.import_module("rietx.refine")
+
+    structure, ins = perturbed_models()
+    ref = rx.Refinement(structure, ins)
+    ref.fit(pattern, plan=_with_settings(SHORT, phase_support_sigma=5.0),
+            telemetry=False)
+    seen = []
+    build = refine_module._build_result
+
+    def spy(*args, **kw):
+        seen.append(kw.get("phase_support_sigma"))
+        return build(*args, **kw)
+
+    monkeypatch.setattr(refine_module, "_build_result", spy)
+    replay(ref.history, ref.history.order[-1], pattern)
+    assert seen == [5.0]
 
 
 # ------------------------------------------------- user constraints (WP-1070)

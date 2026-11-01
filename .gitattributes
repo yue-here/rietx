@@ -38,5 +38,5 @@ src/rietx/gui/static/** -merge -diff
 # .claude/hooks/wp_index.py` resolves the markers.  GitHub's web merge runs no
 # custom driver, so a PR it cannot merge is synced locally.  The /pr-review
 # bench swaps the driver for git's text merge, so its merges conflict where
-# GitHub's do (.claude/commands/pr-review.md § Where this command runs).
+# GitHub's do (.claude/skills/pr-review/SKILL.md § Where this command runs).
 docs/wp/README.md merge=wpindex

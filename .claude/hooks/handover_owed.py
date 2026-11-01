@@ -55,9 +55,14 @@ _WP_BRANCH_RE = re.compile(r"wp-?(\d{4})", re.IGNORECASE)
 # session that reads, greps or edits this hook or its tests, which silences the
 # nudge for the rest of that session — measured on the session that wrote it
 # (2026-09-02), whose own transcript matched before this line was split.
+#
+# A Skill call in a worktree session may carry the tree as a prefix,
+# ``.claude/worktrees/<tree>:<name>``.  While the ritual was a command that call
+# failed and the session retried bare; since it became a skill (PR #1209) the
+# prefixed call succeeds and is the only one in the transcript.
 _NAME = "wp-" + "handover"
 _HANDOVER_RAN_RE = re.compile(
-    r'"skill"\s*:\s*"' + _NAME + r'"|<command-' + "name>/" + _NAME
+    r'"skill"\s*:\s*"(?:[^"]*:)?' + _NAME + r'"|<command-' + "name>/" + _NAME
 )
 
 REASON = """Stop paused: WP-{wp} has {n} commit(s) on `{branch}`, the branch is clean and \
@@ -80,7 +85,7 @@ def _git(root: Path, *args: str) -> Optional[str]:
         # own 15 s budget (.claude/settings.json), and a git call slow enough
         # to matter is one more reason to let the stop through.
         proc = subprocess.run(
-            ["git", *args], cwd=root, capture_output=True, text=True, timeout=5
+            ["git", *args], cwd=root, capture_output=True, encoding="utf-8", errors="replace", timeout=5
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -192,7 +197,7 @@ def nudge(payload: dict) -> Optional[str]:
 
 
 def main() -> int:
-    payload = json.load(sys.stdin)
+    payload = json.loads(sys.stdin.buffer.read())
     reason = nudge(payload)
     if reason is None:
         return 0

@@ -1,9 +1,8 @@
 # WP-1968 — the picker offers no line the data cannot support
 
-Milestone: unscheduled · Status: 🔄 2026-10-15 — both PRs merged (#947 part b, #948 part a); open: the driven-set follow-up after WP-1969
+Milestone: unscheduled · Status: ✅ 2026-11-01 — every task landed; measured silicon (11-BM SRM 640c) flags no weak line, so the flat-silicon control stays synthetic as a documented limit
 Track: What fires, and what stays silent
 Depends on: 1909 soft (the 1σ floor this bar succeeds, and its census)
-Priority: P2 2026-10-14 — a defect that fires wrongly: off-lattice components reach every engine as usable lines, and every benchmark harness filters them by hand
 
 ## Goal
 
@@ -73,39 +72,6 @@ listed for `duplicate_line`: `help.py`, `tests/data/gui/help_keys.json`,
 regenerated skill `api.md`. `tests/test_acceptance_indexing.py` runs before
 close, since the peak list feeds every engine.
 
-### Inherited
-
-- **2026-10-16, from the issue triage (#934): PR #993 (theirs, head
-  `d34597c9`, opened 2026-10-15 13:32) is part (c)'s diagnostics, and WP-1968
-  does not name it.** Part (c) asked for three filters as flags with a
-  diagnostic each. The flags already landed with #947 (`weak_line`) and #948
-  (`width_capped`, `unresolved_split`). #993 adds `PEAK_POSITION_AT_BOUND` and
-  `PEAK_NO_INTENSITY`, and puts each component's value and bound in
-  `PEAK_WIDTH_CAPPED` and `PEAK_EXPECTED_FALSE_LINES`; no flag, threshold or
-  `usable()` moves (census identical on the flat Si and the 16 round-robin
-  patterns). It takes `INDEXING_THRESHOLDS_VERSION` 1.11 to 1.12, so it
-  renumbers against #951 and #940. It leaves out the driven-set exclusion,
-  which matches the task already in this WP. It asks one thing of the
-  maintainer: `PEAK_POSITION_AT_BOUND` as a warning when an offered line sits
-  on its bound (10 of 16 round-robin patterns). It also reports 24 usable
-  components on the position bound whose reported position is the bound's, and
-  offers a re-seeded second solve as a separate PR. Checked against the PR
-  body, code not reviewed.
-
-- **2026-10-14, from the issue triage: issue #934 is in PRs #947 and #948
-  (theirs).** #947 (part b, head `d4b78965`) tests each component's I/σ_I by
-  Benjamini–Hochberg at q = 0.01 (`PEAK_FDR_Q`) over the pattern's resolution
-  elements, flags a component under the bar `weak_line`, and reports the
-  info code `PEAK_EXPECTED_FALSE_LINES`. It carries the null-pattern test.
-  Made unusable, the flag moved five acceptance rows, which is why it is
-  reported only. #948 (part a, head `87b90e43`) adds
-  `peakfit.unresolved_mates`. Two adjacent components of comparable area
-  showing no dip under Sparrow's criterion become one line, and the merged
-  one is flagged `unresolved_split` (unusable). It also flags `width_capped`,
-  a group whose width ends on its bound (5 × the width law). On the 16
-  round-robin lists usable components go from 789 to 782. Both take
-  `INDEXING_THRESHOLDS_VERSION` 1.10, and the second to merge renumbers.
-
 ## Non-goals
 
 - The steep-flank envelope, and the 1σ floor's census (WP-1909).
@@ -120,12 +86,13 @@ close, since the peak list feeds every engine.
       a free hand beyond (Context).*
 - [x] Review and merge PR #947 (part b).
 - [x] Review and merge PR #948 (part a).
-- [ ] Follow-up, after WP-1969: keep `weak_line` and the other reported
+- [x] Follow-up, after WP-1969: keep `weak_line` and the other reported
       flags in the list, and leave them out of the search's driven set, as
-      the issue's (c) asks.
-- [ ] Tests, with obs/calc/diff PNGs to `tests/output/`, and
-      `tests/test_acceptance_indexing.py` green.
-- [ ] Skill: the new flags' and code's `help.py` entries (both PRs add
+      the issue's (c) asks. *PR #1048, `weak_line` only; why
+      `position_at_bound` stays driven is in the 2026-10-21 entry.*
+- [x] Tests, with obs/calc/diff PNGs to `tests/output/`, and
+      `tests/test_acceptance_indexing.py` green. *PR #1179.*
+- [x] Skill: the new flags' and code's `help.py` entries (both PRs add
       them), which is where an agent reads a flag; a `references/` row only
       where a flag needs a judgement the entry cannot carry.
 
@@ -154,6 +121,85 @@ name.
 
 ## Handover log
 
+- **2026-11-01** (ghostshift runner, PR #1303, closed) — The question WP-2002 left here is answered, and the answer is a limit rather than a second test. The only measured silicon in the tree, APS 11-BM's SRM 640c scan, gives the picker nothing to flag: no component falls under the false-discovery bar, every usable component sits on a silicon line, and the list indexes to the true cell with or without the driven-set exclusion. So the evidence that the exclusion is needed on flat silicon stays synthetic, and the test now says so with the numbers. The measured scan cannot settle the question either way, because its peaks stand about 15 times higher above the background than the synthetic draw's. The maintainer's go of 2026-11-01 (ghostshift record) chose this branch for that outcome.
+  *Measured* (macOS arm64, `[dev]`, Python 3.12, compiled tier on; scripts and JSON in the runner's scratch, not committed). Cubic search, `n_unindexed=2`, `preset="full"`, as the test runs it.
+
+  | pattern | components | usable | `weak_line` | usable > 1.5 FWHM off a line | driven, flagged / stripped | truth rank, flagged / stripped |
+  |---|---|---|---|---|---|---|
+  | #916 synthetic, 2 % windows | 23 | 18 | 7 | 3 | 11 / 18 | 1 / no cell |
+  | #916 synthetic, closing windows | 20 | 15 | 4 | 1 | 11 / 15 | 1 / 1 |
+  | `11BM_Si640c.xy`, #916's d-range (6.03-28.92° at 0.412359 Å) | 19 | 11 | 0 | 0 | 11 / 11 | 1 / 1 |
+  | `11BM_Si640c.xy`, whole scan (2-50°, 30 lines) | 45 | 30 | 0 | 0 | 20 / 20 | 1 / 1 |
+
+  The synthetic rows reproduce WP-2002's finding (7 against 4 weak components, the stripped control indexing only at the closing windows). The synthetic weak re-seeds sit 2.1-2.6 FWHM from a line at I/σ_I 1.3-2.3. On the measured d-range the 8 unusable components are axial-tail shoulders 0.9-1.2 FWHM from a line (`not_separable`) and two `unresolved_split` halves. The usable ones sit at I/σ_I 22 or more. Peak-to-background is about 2600 measured (251 500 counts on ~95) against about 170 synthetic (1.3e6 on 7700). The pick PNGs (`tests/output/peaks_wp1968_si640c*.png`, whole range and zooms at 7.5° and 21.4°) were read by eye: every true line carries one unflagged usable tick, and the flagged ticks sit on the lines' tails.
+  *Done*: `tests/test_indexing_driven_set.py` records the limit in the flat-silicon test's comment and in the module docstring. No assertion and no source file changed, so the picker's output does not move. Inherited pruned: its one open entry (WP-2002's question) is answered above; the #993 and #947/#948 entries were already consumed by their merges. Priority was P2, so no release is owed.
+  *Gates* (macOS arm64, `[dev]`, Python 3.12, branch level with `main` `b0e0e4b71`, beside other runners' targeted pytest): fast suite 13187 passed, 310 skipped, 32 xfailed (no test added, so no count moves); `test_docs_consistency.py` 25 passed; ruff clean; `python -m tests.reader_output` exit 0, printed output unchanged. No `/code-review` pass: the only `.py` change is comments. No full suite: a test-comment and docs change moves no measured number.
+  *Next*: none in this WP. A measured silicon pattern at a lab diffractometer's counting level (peak-to-background near 170) would decide whether the exclusion is needed on measured data; the tree has none, and the local-only data root holds no silicon either. #934 is the maintainer's to close.
+
+- **2026-10-31** (ghostshift close-batch, PR #1287, not closed) — all six tasks are ticked and landed (#947, #948, #993, #1048, #1179 and the help entries). One inherited question is still open, and it says it is this WP's to decide. The WP-2002 session found that the flat-silicon control in `test_916s_flat_silicon_is_driven_by_its_own_lines` only shows the driven-set exclusion is needed when the silicon pattern is drawn at the 2 % windows. Drawn at the closing stage's windows (full peak tails), the picker flags 3 fewer `weak_line` components, and the stripped control then indexes. So the evidence that the `weak_line` exclusion is needed on #916's flat silicon rests on the truncated tails of a synthetic draw. The test already says so in a comment and draws at `WINDOW_AREA_TOL`.
+  *Checked against main `1314c69ea`*: the test still draws at `WINDOW_AREA_TOL` (`tests/test_indexing_driven_set.py`, line 145) and no entry in this log answers the question. Not measured here: whether a real flat-silicon pattern (the #916 data) flags extra weak components, which is what would show the exclusion is needed on a measured pattern.
+  *Next*: decide, with that measurement, whether the exclusion's control is kept on the synthetic draw as a documented limit, or rebuilt on measured silicon. Then close: ✅, delete `Priority:` and `### Inherited`, narrative to the v1.11 record. #934 is the maintainer's to close.
+
+- **2026-10-26** — PR #1179 (the PNG task, by @mustachefeeling) merged as
+  `6ecf7fa3`. `tests/peak_pictures.draw_pick` draws what `pick_peaks` fitted:
+  each group's fitted profile over the frozen envelope, through
+  `peakfit.group_profile`, never a refit. Under it go (obs − calc)/σ and one
+  tick row per flag (`weak_line`, `unresolved_split`, `width_capped`,
+  `position_at_bound`). Five arms of `test_peak_fdr.py`,
+  `test_peak_resolvability.py` and `test_peak_bounds.py` switch to
+  `pick_peaks_with_state` and leave `tests/output/peaks_*.png`. No assertion
+  moves. Read by eye at review: on #728's steep arm the flank components sit
+  in the capped, split and at-bound rows, and every silicon line keeps one
+  unflagged component. Two nits went to the review as follow-ups: `zoom` has
+  no caller, and a usable peak with a flag outside the four rows is counted
+  as both "unflagged" and "other". Gated in a stack with #1178 on `main`
+  `c0e32ab2` (tree `1b644447`, which `main` equals after both merges). The
+  fast suite gave 11 937 passed, 199 skipped, 32 xfailed, and the whole
+  `-m slow` suite gave 417 passed, 14 skipped, 15 xfailed,
+  `test_acceptance_indexing.py` among them (macOS arm64, `[dev,jax]`,
+  Python 3.12.10, alone). *Next:* the close (the milestone record's line
+  and ✅); #934 is the maintainer's to close.
+
+- **2026-10-25** — PR #993 (#934 (c), by @mustachefeeling) merged at round 6,
+  landing in `fe4cbcc3` through #939's head. `pick_peaks` names every bound
+  its group fit ends on: `PEAK_POSITION_AT_BOUND` and `PEAK_NO_INTENSITY`
+  are new (info, tier 1), and the `where` entries of those two,
+  `PEAK_WIDTH_CAPPED` and `PEAK_EXPECTED_FALSE_LINES` carry each line's bound
+  and value. No flag, threshold or `usable()` moves. Both codes have help
+  entries and their `response` rows. The review's sync commit `72d9884c` put
+  the picker's thresholds note under C3's 1.12 (#941) and moved the release
+  bullet to `docs/releases/1.11.0.md`. Gate: as WP-1956's 2026-10-25 entry.
+  *Next:* the PNG task.
+
+- **2026-10-21** — PR #1048 (outside contributor, #934 part (c)) merged as
+  `7c177d01`. A line flagged `weak_line` stays in `usable()` and is still
+  scored, but `engines.search_line_order` no longer draws it into the lines
+  a search is driven by, which are the lines an accepted cell must index.
+  The set of such flags is `schemas.indexing.PEAK_UNDRIVEN_FLAGS`. Below
+  `engines.DRIVEN_MIN_LINES` (6, the triclinic metric's parameter count)
+  unflagged lines, the strongest flagged ones are driven again. On #916's
+  flat synthetic silicon the driven set falls from 17-18 lines to the 11
+  silicon lines. A cubic search with a declared `n_unindexed=2` goes from no
+  cell to the truth first, and an all-systems search moves the truth from
+  sixth (or absent) to fourth or fifth. No indexing-acceptance list drives a
+  `weak_line` line, so none moved. It rides the 1.11
+  `INDEXING_THRESHOLDS_VERSION` already staged. `position_at_bound` stays
+  driven: on the real acceptance lists 2-10 usable components carry it alone,
+  at I/σ_I up to 29, so leaving them out would be a guess.
+  **Known limit, ruled 2026-10-21 (no opt-out for now).** A superstructure
+  whose extra lines are all flagged `weak_line` now indexes as its subcell,
+  with those lines listed in the candidate's `unindexed_two_theta`. No trial
+  cell is generated from them. The ruling rests on practice: indexers are fed
+  the most reliable lines, and a superstructure is indexed by its subcell
+  first. A real list that loses its supercell this way reopens it.
+  Follow-up from the review: `search_line_order` casts its index array to
+  `int64` where the wasm32 rule asks for `intp`; harmless today.
+  Gated on `main` `5a99ba92` with the PR merged (`a513c4f0`, content-identical
+  to `main` after the merge): fast suite 11051 passed, 120 skipped,
+  3 xfailed. A superset tree with #1086's test files gave 324 passed,
+  12 skipped, 1 xfailed on the whole `-m slow` suite, `test_acceptance_indexing.py`
+  included (macOS arm64, `[dev,jax]`, Python 3.12.10). *Next:* the PNG and
+  skill tasks, then close; #934 is the maintainer's to close.
 - **2026-10-15** — PR #948 (part a) merged as `54526f82`. Both parts of #934
   are now in. `pick_peaks` merges two comparable components closer than
   Sparrow's limit (`unresolved_split`), and flags a group whose width runs into

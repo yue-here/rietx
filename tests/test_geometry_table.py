@@ -490,6 +490,91 @@ def test_the_contact_cap_is_recorded_not_silent(monkeypatch):
                for i in (0, 1))
 
 
+# ----------------------------------------------------------------------
+# the three report caps (WP-2002, B10)
+# ----------------------------------------------------------------------
+# ``CONTACT_MAX_ANG``, ``MAX_CONTACTS_PER_ATOM`` and ``MAX_ASYM_ATOMS`` bound
+# what the table lists, never a number in it, so there is no error to bound
+# over a domain.  What each claims is a contract on the output: everything
+# inside the stated scope is listed, and whatever a cap leaves out is counted
+# in ``GeometryTable.notes``.  The tests below hold that contract.  On the
+# eight structure CIFs in tests/data the largest asymmetric unit is 32 atoms
+# and the most contacts any atom has within 3.5 Å is 20 (cod_2104364,
+# P 1 21/n 1), so neither count cap fires on them (measured 2026-10-21).
+
+
+def _p1_phase(cell, atoms):
+    from rietx.schemas.common import Parameter
+    from rietx.schemas.structure import Atom, Cell, Phase
+
+    p = Parameter
+    return Phase(name="p1", space_group="P 1",
+                 cell=Cell(**{k: p(value=v) for k, v in zip(
+                     ("a", "b", "c", "alpha", "beta", "gamma"), cell, strict=True)}),
+                 atoms=[Atom(label=label, species=species, x=p(value=x), y=p(value=y),
+                             z=p(value=z)) for label, species, x, y, z in atoms])
+
+
+def test_the_contact_search_is_complete_in_an_unreduced_cell():
+    """``CONTACT_MAX_ANG``: every pair within the radius is listed, in a cell
+    where a fixed shell of lattice shifts is not enough.
+
+    β = 150° on a 3 Å edge, stored unreduced.  The Si···O contact at 3.04 Å
+    needs a shift outside {−1, 0, 1}³ around the centred image, so a search
+    with that shell lists only the 1.92 Å bond.  Orbit counting cannot see
+    this miss: in P 1 the search from either end loses the same image.  The
+    reference is a plain enumeration over every shift in −8…8 along each axis,
+    past any image within the radius here.
+
+    Made to fail on 2026-10-21: ``geometry._shell`` patched to return the
+    fixed {−1, 0, 1}³ shell dropped the 3.04 Å contact.
+    """
+    import itertools
+
+    cell = (3.0, 6.0, 16.0, 90.0, 150.0, 90.0)
+    phase = _p1_phase(cell, [("Si", "Si", 0.857, 0.034, 0.73),
+                             ("O", "O", 0.176, 0.863, 0.541)])
+    g, structure, _table, _theta = _table_for(phase)
+    listed: dict[tuple[int, int], list[float]] = {}
+    for d in g.distances:
+        listed.setdefault((d.atom_index_1, d.atom_index_2), []).append(round(d.distance, 6))
+    metric = _metric_g(cell)
+    shifts = np.array(list(itertools.product(range(-8, 9), repeat=3)), dtype=np.float64)
+    xyz = [np.array([a.x.value, a.y.value, a.z.value]) for a in structure.phases[0].atoms]
+    for i, j in itertools.product(range(2), repeat=2):
+        dx = (xyz[j] - xyz[i])[None, :] + shifts
+        d = np.sqrt(np.einsum("sa,ab,sb->s", dx, metric, dx))
+        expected = sorted(np.round(d[(d > 1e-3) & (d <= g.contact_max)], 6).tolist())
+        assert sorted(listed.get((i, j), [])) == expected, (i, j)
+    assert 3.035666 in listed[(0, 1)]
+
+
+def test_the_contact_cap_note_counts_exactly_what_it_dropped(monkeypatch):
+    """``MAX_CONTACTS_PER_ATOM``: the note's count is the capped table's
+    shortfall against an uncapped one, and what is kept is the nearest.
+
+    Made to fail on 2026-10-21, on a copy of the package whose note counted
+    one extra contact for each capped atom: 33 against a shortfall of 31.
+    """
+    import re
+
+    # the torsion cap's own note is test_the_torsion_cap_... (WP-1815)'s
+    monkeypatch.setattr(geom, "MAX_TORSIONS_PER_ATOM", 10 ** 6)
+    monkeypatch.setattr(geom, "MAX_CONTACTS_PER_ATOM", 10 ** 6)
+    full, *_ = _table_for(corundum_phase())
+    assert not full.notes
+    monkeypatch.setattr(geom, "MAX_CONTACTS_PER_ATOM", 2)
+    capped, *_ = _table_for(corundum_phase())
+    (note,) = capped.notes
+    dropped = int(re.search(r": (\d+) contact\(s\) beyond", note).group(1))
+    assert dropped == len(full.contacts) - len(capped.contacts) > 0
+    for i in {d.atom_index_1 for d in full.contacts}:
+        nearest = sorted(d.distance for d in full.contacts if d.atom_index_1 == i)[:2]
+        kept = sorted(d.distance for d in capped.contacts if d.atom_index_1 == i)
+        assert kept == pytest.approx(nearest, abs=1e-12)
+    assert len(capped.bonds) == len(full.bonds)
+
+
 def test_a_phase_too_large_to_search_says_so(monkeypatch):
     monkeypatch.setattr(geom, "MAX_ASYM_ATOMS", 1)
     g, *_ = _table_for(corundum_phase())
@@ -497,11 +582,32 @@ def test_a_phase_too_large_to_search_says_so(monkeypatch):
     assert g.notes and "search limit" in g.notes[0]
 
 
+def test_a_bond_past_the_contact_radius_is_found():
+    """``CONTACT_MAX_ANG`` bounds contacts, never bonds.  CsCl's Cs–Cl at
+    a√3/2 = 3.571 Å is inside the radii's 2.44 + 1.02 + 0.4 = 3.86 Å and past
+    the 3.5 Å contact radius, so each ion lists its eight counter-ions and
+    nothing else: Cs···Cs and Cl···Cl sit at a = 4.123 Å.
+
+    Made to fail on 2026-10-21: with the search stopped at the contact radius
+    the table listed no distance at all.
+    """
+    phase = _p1_phase((4.123,) * 3 + (90.0,) * 3,
+                      [("Cs", "Cs", 0.0, 0.0, 0.0), ("Cl", "Cl", 0.5, 0.5, 0.5)])
+    phase = phase.model_copy(update={"space_group": "P m -3 m"})
+    g, *_ = _table_for(phase)
+    assert _distances(g, "Cs", "Cl") == [3.5706] * 8
+    assert _distances(g, "Cl", "Cs") == [3.5706] * 8
+    # no contact note; the eight-fold Cs–Cl chains are over the torsion cap
+    # (WP-1815), which notes say in their own words
+    assert g.contacts == [] and not [n for n in g.notes if "contact" in n]
+    assert len([a for a in g.angles if a.atom_2 == "Cs"]) == 28
+
+
 def test_the_criteria_travel_with_the_table():
     g, *_ = _table_for(corundum_phase())
     assert g.bond_slack == geom.BOND_SLACK_ANG
     assert g.contact_max == geom.CONTACT_MAX_ANG
-    assert all(d.distance <= g.contact_max + 1e-9 for d in g.distances)
+    assert all(d.distance <= g.contact_max + 1e-9 for d in g.contacts)
     assert len(g.bonds) + len(g.contacts) == len(g.distances)
 
 

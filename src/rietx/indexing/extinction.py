@@ -109,11 +109,12 @@ is the v1.0 form of the same logic; the posterior is a v2 fence.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import gemmi
 import numpy as np
 
+from ..optimize.cancel import RefinementCancelled
 from ..optimize.statistics import _chi2_absolute
 from ..schemas.common import Diagnostic
 from ..schemas.indexing import (
@@ -138,6 +139,39 @@ from .workflow import (
 #: evidence; anything less is reported as an ambiguity rather than resolved,
 #: which is the same posture ``ShiftScreen.separable`` takes one module over.
 DECISIVE_DELTA_BIC = 10.0
+
+#: Background-subtracted Rwp of the **reference** fit (the absence-free class
+#: under the frozen shared profile) above which the screen abstains, reported
+#: as ``EXTINCTION_SCREEN_UNRELIABLE``.  The quantity is Toby's (2006, *Powder
+#: Diffr.* **21**, 67) background-subtracted R_wp: the weighted misfit as a
+#: fraction of the pattern's own *net* signal, so the bound is a statement about
+#: the data rather than a count of anything.  Its square is the share of the net
+#: signal's weighted power the lattice leaves unexplained, so this bound admits
+#: a reference that leaves at most half of it.  A reference past it has not
+#: modelled the *allowed* lines, and every absence test downstream reads that
+#: misfit — measured on a synthetic Si pattern at 11-BM-like resolution with
+#: the cell 0.4 % off: reference Rwp 0.75, ``F d - -`` "untestable" and
+#: ``F - - -`` returned by ``best_or_none`` as a confident answer.
+REFERENCE_NET_RWP_MAX = 0.7071
+
+#: Avogadro's number times 10⁻²⁴ cm³ per Å³, so that a density in g/cm³, a
+#: cell volume in Å³ and a formula weight in g/mol give the formula units per
+#: cell as Z = ρ·V·N_A_CM3_PER_A3 / M.  N_A = 6.022 140 76 × 10²³ mol⁻¹ is exact
+#: in the SI since 2019 (CODATA 2018).
+N_A_CM3_PER_A3 = 0.602214076
+
+#: How far a measured density may put Z from a whole number, as a fraction of
+#: Z (WP-2033, ruled by the maintainer on PR #1140).  The density is the
+#: error of a **measurement**, not the 8 % scatter of a volume estimated from
+#: atom counts, the 8 % the withdrawn ``INDEX_Z_NOT_INTEGER`` allowed (WP-2030).  The
+#: figure is the one *International Tables* Vol. C (2006), ch. 3.2, §3.2.1,
+#: p. 156 gives for assigning Z: measured and calculated density "should agree
+#: within at least 1.5%" (Richards & Lindley, doi:10.1107/97809553602060000586).
+#: Z ∝ ρ·V, so the fraction carries over, the cell's own volume being far
+#: better known.  At Z ≳ 33 two whole numbers fit that window and the density
+#: no longer names one, which :func:`declared_z` reports as ambiguity, never as
+#: contradiction.
+DENSITY_Z_TOLERANCE = 0.015
 
 #: Crystal systems that share one *lattice*, keyed by the candidate's system.
 #: The powder determines a lattice, not a crystal system: a hexagonal metric
@@ -286,16 +320,172 @@ def admits(prior: ExtinctionPrior | None, sg: gemmi.SpaceGroup) -> bool:
     Each fact is read off the group's own operators: Sohncke (proper motions
     only, the groups an enantiopure compound can occupy; Flack 2003, *Helv.
     Chim. Acta* **86**, 905) and centrosymmetric from gemmi, polar from
-    :func:`is_polar`.
+    :func:`is_polar`.  A declared Z needs the cell for a density, so the
+    screen asks :func:`exclusion_reasons` with the Z it settled; this asks
+    the three facts that need no cell.
+    """
+    return not exclusion_reasons(prior, sg)
+
+
+def exclusion_reasons(prior: ExtinctionPrior | None, sg: gemmi.SpaceGroup,
+                      z: int | None = None,
+                      counts: dict[str, float] | None = None) -> list[str]:
+    """The declared facts this space group fails, each named; empty admits it.
+
+    The three facts that need no cell come first.  A declared model
+    (``prior.ordered``) adds the content test, with ``z`` the formula units
+    per cell the screen settled (:func:`declared_z`) and ``counts`` the
+    declared formula's element counts (:func:`content_exclusion`); it runs
+    only on a group the cheap facts left, since it derives the group's orbits.
+    Without ``ordered`` a group that fails the count is kept and the screen
+    says so (``ExtinctionCandidate.count_notes``).
     """
     if prior is None:
-        return True
+        return []
+    out = []
     if prior.sohncke is not None and sg.is_sohncke() != prior.sohncke:
-        return False
+        out.append(f"sohncke={prior.sohncke}")
     if (prior.centrosymmetric is not None
             and sg.is_centrosymmetric() != prior.centrosymmetric):
-        return False
-    return not (prior.polar is not None and is_polar(sg) != prior.polar)
+        out.append(f"centrosymmetric={prior.centrosymmetric}")
+    if prior.polar is not None and is_polar(sg) != prior.polar:
+        out.append(f"polar={prior.polar}")
+    if not out and prior.ordered and z is not None and counts:
+        why = content_exclusion(sg, z, counts)
+        if why is not None:
+            out.append(f"z={z}, ordered: {why}")
+    return out
+
+
+def content_exclusion(sg: gemmi.SpaceGroup, z: int,
+                      counts: dict[str, float]) -> str | None:
+    """Why ``z`` formula units of ``counts`` cannot occupy this group, or None.
+
+    Each element's atoms per cell, Z times its count in the formula, must sit
+    on whole orbits of the group: a sum of Wyckoff multiplicities in which a
+    position with no free parameter counts at most once, since it is one
+    orbit, and one with free parameters any number of times
+    (:func:`~rietx.crystallography.site_classes.holds`).  The orbits are
+    derived from the group's operators
+    (:func:`~rietx.crystallography.site_classes.site_classes`, *International
+    Tables for Crystallography*, Vol. A, 5th ed., ed. Hahn, 2002, sect.
+    8.3.2), never read from a table.
+
+    That is exact for an **ordered** model, where every site is one element
+    at full occupancy, and it is the only reading this makes.  A disordered
+    one (CuAu, Cu₃Au written with whole counts) can place its atoms on a
+    shared site this test cannot see, so it **removes** a group only when
+    the caller declares the model ordered (``ExtinctionPrior.ordered``);
+    otherwise the screen only states the failure.  A formula count that is
+    not a whole number (``Cu0.5Au0.5``) declares a site the element shares,
+    and that element is not counted.  The test is per element, so two
+    elements competing for one fixed position are not caught: it never
+    removes a group an ordered structure can occupy.
+    """
+    from ..crystallography.site_classes import holds, site_classes
+
+    classes = site_classes(sg)
+    for element, n in counts.items():
+        if n != int(n):
+            continue                     # a shared site, declared as such
+        count = int(n) * int(z)
+        if not holds(classes, count):
+            sizes = ", ".join(str(m) for m in sorted({c.multiplicity
+                                                      for c in classes}))
+            return f"{element} {count} per cell is no sum of its orbits ({sizes})"
+    return None
+
+
+def special_site_note(sg: gemmi.SpaceGroup, z: int) -> str | None:
+    """What ``z`` formula units need in this group when Z′ is not whole, or None.
+
+    Z′ = Z / (the general multiplicity).  Where it is not a whole number,
+    some formula units sit on special positions, and a molecule sitting on one
+    must itself carry that site's symmetry.  Whether the formula unit is one
+    molecule is not declared, and the atom count of :func:`content_exclusion`
+    cannot see a molecule's symmetry, so this is a statement and never an
+    exclusion (#935: a P 2₁ salt at Z = 2 against P 2₁/m, Z′ = 1/2, which
+    needs each cation on an inversion centre or a mirror).
+
+    The remainder is what the general positions leave: the smallest
+    ``Z − k·(general multiplicity)`` the special positions can make, so as many
+    general orbits as fit
+    (:func:`~rietx.crystallography.site_classes.holds`, a fixed position once,
+    a free one any number of times).  When none can, no placement of whole
+    formula units exists, and the note says so instead of listing positions
+    that cannot add up to it (P 2₁/m at Z = 3: the remainder 3 is no sum of 2s).
+    """
+    from fractions import Fraction
+
+    from ..crystallography.site_classes import holds, site_classes
+
+    classes = site_classes(sg)
+    general = max(c.multiplicity for c in classes)
+    if int(z) % general == 0:
+        return None
+    head = f"{sg.xhm()} holds Z = {z} with Z′ = {Fraction(int(z), general)}"
+    special = [c for c in classes if c.multiplicity < general]
+    rest = next((int(z) - k * general
+                 for k in range(int(z) // general, -1, -1)
+                 if holds(special, int(z) - k * general)), None)
+    if rest is None:
+        sizes = ", ".join(str(m) for m in sorted({c.multiplicity for c in classes}))
+        return (f"{head}, and Z = {z} is no sum of this group's orbit "
+                f"multiplicities ({sizes}): no placement of whole formula "
+                "units exists, so the formula unit is not one molecule")
+    on = [c for c in special if c.multiplicity <= rest]
+    by_symmetry: dict[str, list[str]] = {}
+    for c in on:
+        by_symmetry.setdefault(c.site_symmetry or "?", []).append(c.wyckoff)
+    sites = " or ".join(f"{sym} ({', '.join(w)})" for sym, w in by_symmetry.items())
+    return (f"{head}: {rest} formula unit(s) per cell sit on special positions, "
+            f"of site symmetry {sites}; a molecule there must carry that "
+            "symmetry itself")
+
+
+def density_zs(z_rho: float) -> list[int]:
+    """Every whole Z within :data:`DENSITY_Z_TOLERANCE` of the density's Z."""
+    import math
+
+    tol = DENSITY_Z_TOLERANCE
+    return [k for k in range(max(1, math.floor(z_rho / (1.0 + tol))),
+                             math.ceil(z_rho / (1.0 - tol)) + 1)
+            if abs(z_rho / k - 1.0) <= tol]
+
+
+def declared_z(prior: ExtinctionPrior | None,
+               volume: float) -> tuple[int | None, float | None]:
+    """The Z the member filter uses, and the Z a declared density implies.
+
+    ``volume`` is the screen's cell, in Å³.  A declared density gives
+    Z = ρ·V·N_A / M through the formula weight (gemmi's standard atomic
+    weights).  The definition ρ = Z·M / (N_A·V), N_A exact in the SI
+    (BIPM, *The International System of Units*, 9th ed., 2019), is the manual's
+    Theory tab, "Volume from a formula".  It must sit within
+    :data:`DENSITY_Z_TOLERANCE`, the error of a measured density, of the
+    declared ``z``, or, with no ``z``, of exactly one whole number, which is
+    then the Z.  Otherwise the first value is None and
+    nothing is filtered by Z.  Which of two ways that happens is
+    :func:`density_zs`: none within the window is a **contradiction**
+    (:meth:`~rietx.schemas.indexing.ExtinctionScreen.density_contradicts_z`,
+    and the screen abstains); several is an **ambiguity**, which a measured
+    density meets above Z ≈ 33 and which is no statement about the cell.
+    """
+    if prior is None:
+        return None, None
+    if prior.density is None:
+        return prior.z, None
+    from ..crystallography.atomic_volume import formula_counts
+    from ..optimize.qpa import atomic_weight
+
+    weight = sum(n * atomic_weight(el)
+                 for el, n in formula_counts(prior.formula).items())
+    z_rho = float(prior.density) * float(volume) * N_A_CM3_PER_A3 / weight
+    if prior.z is not None:
+        return (prior.z if abs(z_rho / prior.z - 1.0) <= DENSITY_Z_TOLERANCE
+                else None), z_rho
+    near = density_zs(z_rho)
+    return (near[0] if len(near) == 1 else None), z_rho
 
 
 def laue_classes(space_groups: list[str]) -> dict[str, list[str]]:
@@ -711,7 +901,9 @@ def _screen_plan(instrument: Instrument | None = None):
         paths += [f"instrument.extra_components.{i}.*"
                   for i, c in enumerate(instrument.extra_components or ())
                   if COMPONENT_AGGREGATE.get(c.kind) == "background"]
-    return RefinementPlan(stages=[Stage("bkg", paths)])
+    # one class's screen fit among several fitted alike: no closing stage
+    # (WP-2002, the sixth round's Q1 and Q2)
+    return RefinementPlan(stages=[Stage("bkg", paths)], closing_window_tol=None)
 
 
 def _with_background_width_humps(instrument: Instrument) -> Instrument:
@@ -758,13 +950,131 @@ def _fit_class(candidate: CellCandidate, data: PatternData, instrument: Instrume
     return ref, result
 
 
+def _background_unseeded(background) -> bool:
+    """Is this the preset's all-zero start, which a Le Bail extraction hands to
+    the reflections (``auto_background``'s ``seed`` docstring, WP-1542)?
+
+    Only the two coefficient-only kinds can be unseeded; a fixed or measured
+    curve is the caller's declaration and is never replaced.
+    """
+    if getattr(background, "kind", None) not in ("chebyshev", "pspline"):
+        return False
+    return all(float(c.value) == 0.0 for c in background.coefficients)
+
+
+def _prefit(data: PatternData, candidate: CellCandidate, instrument: Instrument,
+            symbol: str, two_theta_limits, cancel=None):
+    """The screen's own cell-free Le Bail of the lattice group (``refine_cell``).
+
+    ``profile_only`` — background, zero, **cell**, then the widths — from a
+    seeded background when the caller's is the preset's all-zero start.  This is
+    the route the extinction-screen harness measured on PbSO₄ (#726): the true
+    ``P c - n`` at ΔBIC −560 where a cell stage inside the shared fit alone gave
+    −296, and where that stage plus a seeded background gave a confident wrong
+    ``P c - -``.  Returns the fitted instrument, the candidate at the refined
+    cell, and the prefit's Rwp.
+
+    The replacement is a seeded **P-spline whatever the kind it replaces**: the
+    all-zero start is the preset's own Chebyshev, which a caller who declared one
+    cannot be told from, and a seeded Chebyshev of the preset's order returned
+    ``R - - -`` on the certified corundum cell and at every offset up to ×1.005
+    where the seeded P-spline returns ``R - c -`` (WP-1910's fixture).  A
+    Chebyshev with any non-zero coefficient is a declaration and is kept.
+    ``cancel`` reaches the fit, which raises
+    :class:`~rietx.optimize.cancel.RefinementCancelled` out of it.
+    """
+    from ..background.auto import auto_background
+    from ..refine import Refinement
+    from ..strategy.staged import resolve_plan
+
+    ins = instrument
+    if _background_unseeded(ins.background):
+        ins = ins.model_copy(deep=True)
+        ins.background = auto_background(data, two_theta_limits=two_theta_limits,
+                                         source=ins.source, seed=True).background
+    ref = Refinement(structure_from_candidate(candidate, space_group=symbol),
+                     ins, history=False)
+    # the prefit's answer is the cell and widths every class is then compared
+    # at, so it pays for no closing stage either (WP-2002, the sixth round's
+    # Q1 and Q2; the screen's own fits and the validation's run without one)
+    plan = replace(resolve_plan("profile_only", "lebail"),
+                               closing_window_tol=None)
+    result = ref.fit(data, mode="lebail", plan=plan,
+                     two_theta_limits=two_theta_limits, telemetry=False,
+                     cancel=cancel if hasattr(cancel, "is_set") else None)
+    cell = tuple(float(v) for v in
+                 ref.fitted_structure.phases[0].cell.lengths_angles())
+    return (ref.fitted_instrument, candidate.model_copy(update={"cell": cell}),
+            float(result.statistics.rwp))
+
+
+def _reference_net_rwp(result) -> tuple[float | None, float | None]:
+    """The gate's quantity, and the value a perfect fit would give it.
+
+    The first is the reference fit's weighted misfit over the net
+    signal, the net taken against the **picker's** envelope rather than the
+    fit's own background.
+
+    Toby (2006)'s background-subtracted R_wp, with one change that is the whole
+    point: the fit's background is a parameter of the very fit being judged,
+    and a fit that has lost the peaks can buy a small ratio by moving it — sink
+    the background and let the Le Bail intensities carry the pedestal, and the
+    ratio divides by the pedestal (seen on a real synchrotron pattern whose
+    prefit walked the cell out of its basin; ``tests/test_extinction_gate.py``
+    builds the mechanism).
+    ``peaks._debiased_envelope`` (a rolling low quantile, debiased) is fixed
+    before any candidate exists, so no fit can move the denominator.
+
+    The second is √(N/D), N the fitted channels and D that denominator.  A fit
+    that leaves only the counting noise has Σw·(y_obs − y_calc)² ≈ N, and on a
+    background channel the net is that noise too, so D ≈ N + S with S the
+    weighted net Bragg power: a perfect fit reads √(N/(N + S)), which is above
+    :data:`REFERENCE_NET_RWP_MAX` exactly when S < N.  The pair separates
+    misfit from the rest: below the bound the reference misfits (the ratio of
+    the two is √(χ²/N)); past it too, no model could pass, because the data
+    are weak or the envelope sits inside the lines (see below), and the pair
+    cannot tell which.  Both are
+    ``None`` when the pattern carries no net signal at all.
+
+    **The envelope's known weakness: a continuum of lines** (review of #939,
+    round 1).  The envelope is a rolling low quantile, and where the lines run
+    together (low symmetry, high angle) no window holds a background channel:
+    the quantile lands in the tails, the debiasing median is pulled up with it,
+    the net shrinks and the ratio of a good fit rises.  GSAS-II's own Rietveld
+    fit of the PbSO₄ X-ray histogram (Hill 1992, ``tests/data/gsas2_pbso4.gpx``)
+    reads 0.136 against the envelope and 0.128 against its fitted background over
+    15-60°, but 0.436 and 0.245 over 110-160°
+    (``test_the_envelope_rides_up_where_the_lines_form_a_continuum``).  Over a
+    whole range the low-angle lines carry most of the weighted power, so the
+    two PbSO₄ readings differ by 12 % (0.155 and 0.138, 15-160°): the bias
+    matters when the fitted range is high angle or the lines are a continuum
+    everywhere.  The perfect-fit value reads the same denominator and rises
+    with it, so there a "weak data" reading may be the envelope's.  The
+    envelope is not changed here.  When a good reference fit of a low-symmetry
+    pattern reads above the bound, it is a cause to check beside those the
+    diagnostic lists.
+    """
+    from .peaks import _debiased_envelope
+
+    tt = np.asarray(result.two_theta, dtype=np.float64)
+    y_obs = np.asarray(result.y_obs, dtype=np.float64)
+    w = 1.0 / np.asarray(result.sigma, dtype=np.float64) ** 2
+    net = y_obs - _debiased_envelope(tt, y_obs)
+    denom = float(w @ (net * net))
+    if not denom > 0.0:
+        return None, None
+    diff = y_obs - np.asarray(result.y_calc, dtype=np.float64)
+    return (float(np.sqrt(float(w @ (diff * diff)) / denom)),
+            float(np.sqrt(len(y_obs) / denom)))
+
+
 def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                                 instrument: Instrument, *,
                                 peaks: PeakList | None = None,
                                 two_theta_limits: tuple[float, float] | None = None,
                                 k_sigma: float = ABSENT_SIGMA,
                                 max_classes: int | None = None,
-                                refine_cell: bool = False,
+                                refine_cell: bool = True,
                                 restrict: ExtinctionPrior | dict | None = None,
                                 cancel=None) -> ExtinctionScreen:
     """Rank the extinction classes of a lattice.
@@ -792,18 +1102,40 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     reading, and a screen run in the higher symmetry would enumerate classes the
     lattice may not have.
 
-    ``refine_cell=False`` (default) holds the cell at ``candidate.cell``, so the
-    screen takes it as certified quality: a cell off by more than a few parts
-    in 10⁴ leaves a tan θ position error the shared fit's one shift cannot
-    absorb, and the true class can be refuted at an absent-line position (SRM
-    676a corundum: ``R - c -`` at the certified cell, ``R - - -`` once the cell
-    is scaled by 1.0012, the factor the test measures, #726).  ``refine_cell=True`` frees the cell in the
-    shared profile fit, after the shift and before the widths, and every class
-    is then screened at the refined cell (``ExtinctionScreen.cell`` is that
-    cell); the classes still differ only in their reflection sets.
+    ``refine_cell=True`` (default) runs a cell-free ``profile_only`` Le Bail of
+    the lattice group first (:func:`_prefit`, from a seeded background when the
+    caller's is the preset's all-zero start), and screens every class at its
+    refined cell with its fitted instrument as the shared fit's start
+    (``ExtinctionScreen.cell`` is that cell, ``prefit_rwp`` its Rwp); the
+    classes still differ only in their reflection sets.  ``refine_cell=False``
+    holds the cell at ``candidate.cell``, so the screen takes it as certified
+    quality: a cell off by more than a few parts in 10⁴ leaves a tan θ position
+    error the shared fit's one shift cannot absorb, and the true class can be
+    refuted at an absent-line position (SRM 676a corundum: ``R - c -`` at the
+    certified cell, ``R - - -`` once the cell is scaled by 1.0012, #726).
+
+    **The reference fit is gated** (:data:`REFERENCE_NET_RWP_MAX`): when the
+    absence-free class's own fit leaves more than half of the net signal's
+    weighted power unexplained, every absence test would read that misfit, so
+    the screen still ranks the classes but sets ``status="unreliable"``, says
+    ``EXTINCTION_SCREEN_UNRELIABLE`` and :meth:`ExtinctionScreen.best_or_none`
+    abstains.  A cell the prefit could not bring into its basin (0.4 % off at
+    synchrotron resolution) lands here rather than on a confident wrong class.
+    ``perfect_fit_rwp_net`` beside it is what a fit leaving only the noise
+    would read, and the diagnostic says from the pair whether the data are too
+    weak for the bound or the reference misfits them.  The denominator is the
+    picker's envelope, which rides up into the lines where they form a
+    continuum (:func:`_reference_net_rwp`), so a good reference fit of a
+    low-symmetry pattern over a high-angle range can read above the bound.
 
     ``restrict`` declares facts about the specimen — chirality (Sohncke),
-    centrosymmetry, polarity — as an :class:`ExtinctionPrior` (or its dict).
+    centrosymmetry, polarity, and the content per cell as a ``z`` or a
+    ``density`` with its ``formula`` — as an :class:`ExtinctionPrior` (or its
+    dict).  The content is settled on the screened cell (:func:`declared_z`)
+    and tested by :func:`content_exclusion`, which removes a group only under
+    ``ordered=True`` and otherwise states the failure
+    (``ExtinctionCandidate.count_notes``); :func:`special_site_note` names
+    what a kept member at a Z′ that is not whole needs.
     It filters each class's members (``space_groups`` keeps the admitted ones,
     ``excluded_groups`` the rest) and changes nothing else: every class is
     fitted and ranked on the data exactly as without it, and
@@ -813,7 +1145,9 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     one it emptied.
 
     Cost is one refinement per surviving class (~0.1 s each on a 3750-point
-    pattern, after a ~2 s profile fit).  ``max_classes`` caps it; the classes left
+    pattern), after **two** profile Le Bail fits: the cell-free prefit and the
+    shared one (the pair took about 1 s on SRM 676a's 7251 points, numpy, warm
+    Apple-silicon Mac; ``refine_cell=False`` skips the first).  ``max_classes`` caps it; the classes left
     unfitted are reported with ``screened=False`` and, because an unasked question
     must not read as a clean answer, :meth:`ExtinctionScreen.best_or_none` then
     abstains.
@@ -850,36 +1184,37 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     # class would inherit it — so it comes back as a failed screen with a reason
     # rather than as a traceback, the same way ``validate_by_lebail`` reports a
     # candidate the physics refuses.
+    which = "reference"
     try:
+        if refine_cell:
+            which = "cell-free prefit"
+            ins, candidate, screen.prefit_rwp = _prefit(
+                data, candidate, ins, symbol, two_theta_limits, cancel)
+            screen.cell = candidate.cell
+            which = "reference"
         pre = Refinement(structure_from_candidate(candidate, space_group=symbol),
                          ins, history=False)
         tt_max = float(np.max(data.tt()))
         if two_theta_limits is not None:
             tt_max = min(tt_max, float(two_theta_limits[1]))
         plan = validation_plan(candidate, ins, two_theta_max=tt_max)
-        if refine_cell:
-            from ..strategy.staged import Stage
-
-            plan.stages.insert(2, Stage(
-                "cell", ["phases.*.cell.*"],
-                window_slack_deg=plan.stages[1].window_slack_deg))
         profile = pre.fit(data, mode="lebail", plan=plan,
                           two_theta_limits=two_theta_limits,
                           telemetry=False)      # the screen's own, not a run
         screen.profile_rwp = float(profile.statistics.rwp)
         frozen = pre.fitted_instrument
-        if refine_cell:
-            refined = tuple(float(v) for v in
-                            pre.fitted_structure.phases[0].cell.lengths_angles())
-            candidate = candidate.model_copy(update={"cell": refined})
-            screen.cell = refined
         ref_fit, ref_result = _fit_class(candidate, data, frozen, symbol,
                                          two_theta_limits)
+    except RefinementCancelled:
+        # a stop pressed during the prefit: no class was asked, so the screen
+        # is an unasked question rather than a failure with a reason
+        screen.status = "cancelled"
+        return screen
     except Exception as exc:                          # noqa: BLE001
         screen.status = "failed"
         screen.diagnostics = [Diagnostic(
             level="error", code="EXTINCTION_SCREEN_FAILED",
-            message=(f"The reference Le Bail fit of the lattice group {symbol} "
+            message=(f"The {which} Le Bail fit of the lattice group {symbol} "
                      f"raised {type(exc).__name__}: {str(exc).rstrip('.')}, so no class could be "
                      "screened against it."),
             where=[f"{candidate.system} {candidate.centring}, cell "
@@ -928,6 +1263,13 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
 
     screen.two_theta_range = (float(tt_data.min()), float(tt_data.max()))
     screen.reference_rwp = float(ref_result.statistics.rwp)
+    screen.reference_rwp_net, screen.perfect_fit_rwp_net = _reference_net_rwp(
+        ref_result)
+    if (screen.reference_rwp_net is None
+            or not screen.reference_rwp_net <= REFERENCE_NET_RWP_MAX):
+        # the classes are still ranked, so the reader sees what the screen
+        # would have said; ``best_or_none`` reads the status and abstains
+        screen.status = "unreliable"
     screen.reference_chi2 = _chi2_absolute(ref_result.statistics)
     screen.reference_lines = int(n_lines)
     screen.n_points = int(ref_result.statistics.n_points)
@@ -935,6 +1277,17 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
     classes = absence_classes(candidate, wavelength, screen.two_theta_range[1],
                               screen.two_theta_range[0])
     screen.n_classes = len(classes)
+
+    # the declared Z, settled on the cell the classes are screened at
+    from ..crystallography.atomic_volume import formula_counts
+    from ..crystallography.lattice import cell_volume
+
+    screen.z, screen.z_from_density = declared_z(
+        prior, float(cell_volume(*candidate.cell)))
+    if screen.z_from_density is not None and prior.z is None:
+        screen.z_candidates = density_zs(screen.z_from_density)
+    counts = (formula_counts(prior.formula)
+              if prior is not None and prior.formula else None)
 
     # 3a — what each class forbids, and which of those the data can test.  No
     # fit yet: this is what orders the screen and what ``n_added`` counts.
@@ -945,12 +1298,19 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
         orbit_absent = _orbit_absences(sg, orbits)
         absent_line = np.logical_and.reduceat(orbit_absent[by_line], starts)
         forbidden = np.flatnonzero(absent_line)
-        admitted = [g for g in cls.space_groups
-                    if admits(prior, gemmi.find_spacegroup_by_name(g))]
+        admitted, reasons = [], {}
+        for g in cls.space_groups:
+            why = exclusion_reasons(prior, gemmi.find_spacegroup_by_name(g),
+                                    screen.z, counts)
+            if why:
+                reasons[g] = "; ".join(why)
+            else:
+                admitted.append(g)
         entry = ExtinctionCandidate(
             symbol=cls.symbol, representative=cls.representative,
             space_groups=admitted,
             excluded_groups=[g for g in cls.space_groups if g not in admitted],
+            exclusion_reasons=reasons,
             laue_classes=laue_classes(admitted), conditions=list(cls.conditions),
             conditions_complete=cls.conditions_complete,
             n_lines=int(n_lines - len(forbidden)), n_absent=int(len(forbidden)))
@@ -1044,8 +1404,18 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                 f"{entry.forbidden_two_theta[0]:.3f}°")
 
     screen.n_screened = sum(1 for e in entries if e.screened)
-    if cancel is not None and bool(cancel):
+    if cancel is not None and bool(cancel) and screen.status != "unreliable":
+        # the gate's verdict outranks the stop: ``best_or_none`` abstains on
+        # "unreliable" and not on "cancelled", so overwriting it would hand
+        # back the class the gate withheld
         screen.status = "cancelled"
+    if screen.z is not None:
+        # what the declared Z says of each kept member, on the classes the data
+        # leave standing: it derives each group's orbits, seconds for a cubic
+        # F class, and a refuted class's answer is never read
+        for entry in entries:
+            if not entry.refuted:
+                _content_notes(entry, screen.z, counts, prior)
     for entry in entries:
         entry.diagnostics = extinction_class_diagnostics(entry)
     screen.candidates = sorted(
@@ -1053,6 +1423,26 @@ def determine_extinction_symbol(data: PatternData, candidate: CellCandidate,
                                 e.n_absent))
     screen.diagnostics = extinction_diagnostics(screen)
     return screen
+
+
+def _content_notes(entry: ExtinctionCandidate, z: int,
+                   counts: dict[str, float] | None,
+                   prior: ExtinctionPrior) -> None:
+    """Fill the statements the declared Z makes about each kept member.
+
+    The count a group's orbits cannot hold is a statement here, and the
+    group's removal only under ``prior.ordered`` (:func:`exclusion_reasons`),
+    which has then already run it.
+    """
+    for g in entry.space_groups:
+        member = gemmi.find_spacegroup_by_name(g)
+        why = (content_exclusion(member, z, counts)
+               if counts and not prior.ordered else None)
+        if why is not None:
+            entry.count_notes[g] = why
+        note = special_site_note(member, z)
+        if note is not None:
+            entry.special_positions[g] = note
 
 
 def _row_line_labels(rows, primary, labels) -> np.ndarray:
@@ -1068,7 +1458,8 @@ def _row_line_labels(rows, primary, labels) -> np.ndarray:
                     dtype=np.int64)
 
 
-__all__ = ["DECISIVE_DELTA_BIC", "AbsenceClass", "absence_classes", "admits",
-           "compatible_groups", "determine_extinction_symbol",
+__all__ = ["DECISIVE_DELTA_BIC", "DENSITY_Z_TOLERANCE", "N_A_CM3_PER_A3", "REFERENCE_NET_RWP_MAX", "AbsenceClass",
+           "absence_classes", "admits", "compatible_groups", "content_exclusion",
+           "declared_z", "density_zs", "determine_extinction_symbol", "exclusion_reasons",
            "extinction_symbol", "is_polar", "laue_classes", "line_index",
-           "reflection_conditions", "testable_mask"]
+           "reflection_conditions", "special_site_note", "testable_mask"]

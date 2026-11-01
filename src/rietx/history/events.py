@@ -28,6 +28,9 @@ Event kinds (closed set, versioned with the schema):
   vocabulary), where ``status`` says only whether it converged.  Since WP-1301
   both carry ``held`` — the paths the stage held because the data could not see
   their phase — and ``stage_end`` also ``released``, the ones it let go again.
+  Since WP-2047 ``stage_end`` carries ``window_loss``,
+  ``StageResult.window_loss`` as soon as the stage ends, so a stream sees a
+  stale stage before the fit does.
   A stage that releases **emits a second** ``stage_start`` before it re-solves,
   with the same ``stage``/``index`` and the longer ``free_paths``: ``values``
   aligns with the *most recent* ``stage_start``, the way an indexing run's

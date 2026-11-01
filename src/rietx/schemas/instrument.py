@@ -86,8 +86,14 @@ class EmissionLine(_InheritsDeclaredDefaults):
     """
 
     wavelength: Parameter
+    #: Bounded at 0 and nowhere above (WP-2002, the B9 ruling of 2026-10-19):
+    #: an intensity ratio cannot be negative, and how strong a second line is
+    #: relative to the first is the data's to say.  The ceiling of 2 it carried
+    #: before 1.10 had no stated source.  TOPAS's default for an emission line's
+    #: ``la`` is 1e-5 to 2·Val + 0.1, recomputed every iteration, so it limits
+    #: a step and never the answer (Tech Ref Version 9 § 2.17, Table 2-1).
     weight: Parameter = Field(
-        default_factory=lambda: Parameter(value=1.0, min=0.0, max=2.0)
+        default_factory=lambda: Parameter(value=1.0, min=0.0)
     )
 
     @field_validator("wavelength", mode="before")
@@ -103,28 +109,12 @@ class EmissionLine(_InheritsDeclaredDefaults):
         return self
 
 
-#: The harmonic order a bare ``Harmonic()`` declares.  A monochromator set for
-#: λ reflects *every* order its planes admit, but the second is the only one
-#: that normally carries measurable intensity: the higher orders' structure
-#: factors and their Bragg-reflectivity widths both fall away, and the λ/3
-#: component of a Ge or Cu monochromator is typically an order below the λ/2
-#: one.  So this is a **default, not a limit** — :class:`Harmonic` is general
-#: in ``order`` and a beamline that knows it has a third order declares it.
-DEFAULT_HARMONIC_ORDER = 2
-
 #: Seed for a harmonic's relative weight.  Deliberately small and deliberately
 #: *not* any of the numbers the literature reports for a real beamline (see
 #: :class:`Harmonic`): a seed at the expected answer is how a correction comes
 #: back confirming its own prior.  1 % is far enough below every reported value
 #: that the refinement has to travel to reach one.
 HARMONIC_WEIGHT_SEED = 0.01
-
-#: Ceiling on a harmonic's relative weight.  Not a tuning: a component that is
-#: more than half the fundamental is not a contaminant of it, and a refinement
-#: that pushes the weight here is telling you the peaks it is filling are not
-#: harmonic peaks.  The bound is therefore *informative* — ``BOUND_HIT`` on
-#: this path is the finding, not a nuisance.
-HARMONIC_WEIGHT_MAX = 0.5
 
 
 class Harmonic(_InheritsDeclaredDefaults):
@@ -191,17 +181,28 @@ class Harmonic(_InheritsDeclaredDefaults):
 
     #: n in λ/n.  ``ge=2`` because n = 1 *is* the fundamental (declaring it
     #: would be a second copy of line 0, degenerate with the phase scales) and
-    #: n ≤ 0 is not a diffraction order at all.
-    order: int = Field(default=DEFAULT_HARMONIC_ORDER, ge=2)
-    # Every attribute stated, ``unit`` included: the derived
-    # emission line takes this object by reference (:attr:`NeutronSource.lines`)
-    # so a refined weight writes back here, and a Parameter leaving any
-    # attribute unset is copied on the way into a class that inherits declared
-    # ranges (``_InheritsDeclaredDefaults``), which would cut that link.
+    #: n ≤ 0 is not a diffraction order at all.  No default (WP-2002, the
+    #: eighth round's item 4): which orders pass is a fact about the
+    #: monochromator's crystal (the extinction route above), so a default of 2
+    #: was the package choosing for a Ge(733) or Si(111) beam, which passes no
+    #: λ/2.  Every saved harmonic carries its order, so old files still read.
+    order: int = Field(ge=2)
+    # Every attribute stated, ``unit`` and the infinite ``max`` included: the
+    # derived emission line takes this object by reference
+    # (:attr:`NeutronSource.lines`) so a refined weight writes back here, and a
+    # Parameter leaving any attribute unset is copied on the way into a class
+    # that inherits declared ranges (``_InheritsDeclaredDefaults``), which
+    # would cut that link.
+    #
+    # **No ceiling** (WP-2002, the B9 ruling of 2026-10-19).  The 0.5 it
+    # carried before 1.10 was a chosen limit on a quantity that stays physical:
+    # a weight is an intensity ratio, and only below 0 is it not one.  A large
+    # value is still the finding the old ceiling was meant to make, and
+    # ``HARMONIC_FRACTION`` says so at ``warning`` past
+    # :data:`~rietx.refine.HARMONIC_IMPLAUSIBLE_FRAC`.
     weight: Parameter = Field(
         default_factory=lambda: Parameter(
-            value=HARMONIC_WEIGHT_SEED, min=0.0, max=HARMONIC_WEIGHT_MAX,
-            unit=None)
+            value=HARMONIC_WEIGHT_SEED, min=0.0, max=math.inf, unit=None)
     )
 
     @property
@@ -605,19 +606,18 @@ class IncidentSpectrum(_InheritsDeclaredDefaults):
         # imports ``crystallography.neutron``, and the schemas are what the
         # model layer imports, not the other way round.
         from ..model.tof_spectrum import (
-            COEFFICIENT_COUNTS,
+            SPECTRUM_TYPES,
+            _coefficient_count,
             _type_zero_message,
-            _unknown_type_message,
         )
 
-        want = COEFFICIENT_COUNTS.get(self.itype)
-        if want is None:
-            raise ValueError(_unknown_type_message(self.itype))
+        want = _coefficient_count(self.itype)
         if want == 0 and self.coefficients:
             raise ValueError(_type_zero_message(len(self.coefficients)))
         if len(self.coefficients) != want:
             raise ValueError(
-                f"IncidentSpectrum: ITYP {self.itype} uses {want} coefficients "
+                f"IncidentSpectrum: ITYP {self.itype} "
+                f"({SPECTRUM_TYPES[self.itype]}) uses {want} coefficients "
                 f"and {len(self.coefficients)} were given. GSAS writes ICOFF as "
                 f"three records of four numbers whatever the type, so a file "
                 f"using fewer writes zeros into the rest; a list of the wrong "
@@ -844,7 +844,7 @@ class Dispersion(Base):
     model.  Neglecting it is not a neutral simplification: it mis-scales every
     reflection of a species by ((Z + f′)² + f″²)/Z² − 1, which is −16 % for
     ZnO at Cu Kα and +7 % for CaF₂, and unequal effects across phases bias QPA
-    weight fractions directly (measured: RMS error 2.26 → 0.62 wt % on the
+    weight fractions directly (measured: RMS error 2.26 → 0.69 wt % on the
     IUCr round robin).
 
     Set ``source.dispersion = None`` to decline it and reproduce the ≤ v0.6
@@ -1073,6 +1073,12 @@ class RoughnessPitschke(_InheritsDeclaredDefaults):
 
 SurfaceRoughness = RoughnessSuortti | RoughnessPitschke
 
+#: The fraction of a capillary bore or a flat slab occupied by solid, read only
+#: to estimate µR or µt from the composition: 0.3-0.6 is typical for a tapped
+#: powder and 0.64 is random close packing of spheres.  An assumption about the
+#: caller's specimen; GSAS-II's absorption calculator starts at 0.50.
+PACKING_FRACTION = 0.6
+
 
 class Geometry(_InheritsDeclaredDefaults):
     """Diffraction geometry.
@@ -1210,41 +1216,47 @@ class Geometry(_InheritsDeclaredDefaults):
     surface_roughness: SurfaceRoughness | None = None
     #: How far the specimen sits off the goniometer axis (mm).
     #:
-    #: **The ±1 mm is a runaway guard, not a physical limit** (WP-1311,
-    #: measured 2026-09-18), and two things follow that a caller should know.
-    #: It is *loose*: ``help.py`` gives a carefully packed flat plate as
-    #: |s| < 0.05 mm, so the bound sits a factor of 20 above ordinary practice,
-    #: and at the bound itself a line moves 0.19-1.13° depending on the
-    #: goniometer, which is 0.9-14.0× a typical laboratory FWHM.  And its
-    #: *angular* licence is not constant, because eq (3)'s shift goes as s/R:
-    #: one bound in mm spreads 3.0× across ordinary goniometer radii (100 to
-    #: 300 mm).  Scaling it by ``goniometer_radius_mm`` would fix the spread
-    #: and not the magnitude, and that field is optional, so a scaled bound
-    #: would still need this flat one as its fallback.  Kept as it is because
-    #: it has stood since v0.2 and narrowing it is a user-facing break; a
-    #: caller who wants the tighter, instrument-aware limit declares it, and
-    #: an explicit bound always beats a declared one.
+    #: **No position correction carries a default bound; the axial ratios and
+    #: the transparency keep their floor of 0.**  WP-2002's B9 ruling
+    #: (2026-10-19) removed chosen limits on quantities that stay physical.
+    #: The FCJ quadrature is defined for any S/L, H/L ≥ 0 (``fcj._xi_max``
+    #: clips at |tan 2θ|; ``fcj.fcj_live`` reads a negative ratio as the
+    #: aberration off), and a transparency is 1/(2µR) ≥ 0.  The displacement,
+    #: the two capillary offsets and ``Instrument.zero_shift`` lost their
+    #: ±1 mm and ±0.5° on 2026-10-20.  The fit reports the degeneracy with or
+    #: without them: on 11-BM NAC over 2-24° 2θ with zero and both offsets
+    #: free, bounded, the cell lands 1097 ppm from its reference with an esd
+    #: of 2610 ppm; unbounded, the offsets slide to +4.86 and +2.12 mm and
+    #: the cell to 5111 ppm with an esd of 2544 ppm, and both fits carry the
+    #: same two ``FLAT_DIRECTION`` findings naming the cell and an offset
+    #: (``tests/test_capillary_displacement.py``).  The bound acted as a
+    #: prior that the mount is aligned, true on 11-BM and so nearer the
+    #: reference there, without narrowing the esd.  A prior about the mount
+    #: is the caller's: the bounds had one family behind them and a named
+    #: dissenter (a recessed holder), and neither GSAS-II nor FullProf sets
+    #: one.  A caller who knows the mount states a bound; ``BOUND_HIT``
+    #: reports one that carries load.
     sample_displacement: Parameter = Field(
-        default_factory=lambda: Parameter(value=0.0, min=-1.0, max=1.0, unit="mm")
+        default_factory=lambda: Parameter(value=0.0, unit="mm")
     )
     sample_transparency: Parameter = Field(
-        default_factory=lambda: Parameter(value=0.0, min=0.0, max=0.05)
+        default_factory=lambda: Parameter(value=0.0, min=0.0)
     )
     #: capillary displacement along the incident beam (mm, positive
     #: downstream) — the sin 2θ half of eq (4).  ``debye_scherrer`` only.
     capillary_offset_along_beam: Parameter = Field(
-        default_factory=lambda: Parameter(value=0.0, min=-1.0, max=1.0, unit="mm")
+        default_factory=lambda: Parameter(value=0.0, unit="mm")
     )
     #: capillary displacement perpendicular to the beam in the diffraction
     #: plane (mm, positive toward increasing 2θ) — the cos 2θ half of eq (4).
     capillary_offset_across_beam: Parameter = Field(
-        default_factory=lambda: Parameter(value=0.0, min=-1.0, max=1.0, unit="mm")
+        default_factory=lambda: Parameter(value=0.0, unit="mm")
     )
     axial_sl: Parameter = Field(
-        default_factory=lambda: Parameter(value=0.0, min=0.0, max=0.2)
+        default_factory=lambda: Parameter(value=0.0, min=0.0)
     )
     axial_hl: Parameter = Field(
-        default_factory=lambda: Parameter(value=0.0, min=0.0, max=0.2)
+        default_factory=lambda: Parameter(value=0.0, min=0.0)
     )
     #: dimensionless µ·R of the packed specimen; ``None`` → estimate it from the
     #: composition and ``capillary_radius_mm``.  Never a ``Parameter`` — see the
@@ -1263,7 +1275,7 @@ class Geometry(_InheritsDeclaredDefaults):
     #: fraction of the bore (or the specimen slab) occupied by solid.  0.3-0.6 is
     #: typical for a tapped powder; 0.64 is random close packing of spheres.
     #: Estimator input only.
-    packing_fraction: float = Field(default=0.6, gt=0.0, le=1.0)
+    packing_fraction: float = Field(default=PACKING_FRACTION, gt=0.0, le=1.0)
 
     @model_validator(mode="after")
     def _bb_needs_radius(self) -> "Geometry":
@@ -1365,16 +1377,41 @@ class ProfileTCHZ(_InheritsDeclaredDefaults):
     not a refinable parameter and not per-reflection — and consumes the *same*
     U,V,W,X,Y widths, so switching shapes never touches the parameter table.
 
-    **Every width is bounded, and which box depends on how the instrument was
-    built.**  The X-ray presets take :data:`TCHZ_BOUNDS` (U ≥ −0.05,
-    V ∈ [−0.5, 0.5]); :meth:`Instrument.constant_wavelength_neutron` takes
-    :data:`TCHZ_BOUNDS_COARSE` through :meth:`coarse` (U ≥ −0.5, V ∈ [−4, 4]);
-    an explicit ``Parameter(value, min, max)`` carries the caller's own.  X
-    and Y have a floor of zero in both boxes, because Γ_L is a width.  Some
-    programs hold these coefficients unbounded, so a solution read from
-    another program can sit outside the box: one with W < 0 lies outside both
-    boxes, so a comparison against it starts from W's floor rather than from
-    its value.
+    **The widths have a floor, and U, V and Y have none of their own.**  What
+    must stay non-negative is a width: Γ_G² above and Γ_L, each with every
+    phase's own terms added.  A coefficient can be negative while both
+    widths stay positive.  So U and V are bounded at −180² deg² and Y at
+    −180°, the ceilings' mirror images, which no width reaches (the
+    maintainer's ruling of 2026-10-23, WP-2002).  GSAS-II and FullProf bound
+    none of the five.  The default LM driver holds Γ_G² ≥ ε and Γ_L ≥ 0 at
+    every reflection inside the step
+    (:func:`~rietx.optimize.least_squares.gaussian_width_inequalities`,
+    :func:`~rietx.optimize.least_squares.lorentzian_width_inequalities`).
+    ``solver="trf"`` holds no inequality, and ``RESOLUTION_NOT_POSITIVE``
+    reports an instrument width that goes negative in the fitted range.
+    Two floors stay.  W's is the Γ_G² clamp (below).  X's is 0: at θ → 0
+    the tanθ term vanishes, so the instrument's Γ_L is X itself there.
+    Every preset builds this one box (:data:`TCHZ_BOUNDS`), and an explicit
+    ``Parameter(value, min, max)`` carries the caller's own.  The chosen
+    floors went on 2026-10-23: U ≥ −0.05 and V ≥ −0.5 on the X-ray presets,
+    U ≥ −0.5 and V ≥ −4 on the neutron one, Y ≥ 0 on both.  A solution
+    read from another program can still sit under a floor: one with W < 0
+    starts from W's floor rather than from its value.
+
+    **The ceiling is the width of the 2θ axis** (:data:`TCHZ_CEILING_DEG`),
+    which no peak can reach.  The chosen ceilings (1 for U, W, X and Y, 0.5
+    for V) went on 2026-10-21 (WP-2002, the fifth round's Q5): X ≤ 1° capped
+    the Lorentzian size near 8 nm at Cu Kα, and none of GSAS-II, FullProf,
+    TOPAS, RIETAN-FP, MAUD or EasyDiffraction bounds these coefficients by
+    default (BGMN has none to bound).  A finite ceiling stays because
+    ``solver="trf"`` scales each step by the distance to a finite bound and
+    by 1 for an infinite one, so an infinite ceiling changes TRF's path where
+    no width comes near it.  Without one, TRF stopped the CPD brucite
+    Stephens fit at Rwp 0.17891 with one S_HKL esd collapsing to 66 (t = −203).
+    With these ceilings it stops at 0.17878 with the pre-removal t values, as
+    it did with every ceiling at 10 or at 1000 (the sixth round's Q7).  LM,
+    the default driver, gives the same answer either way.  The floors at
+    −180² and −180 are finite for the same reason.
 
     **W's floor is the Γ_G² clamp, not zero** (WP-1938 D7).
     :func:`~rietx.model.profiles.caglioti.gaussian_fwhm` takes
@@ -1390,11 +1427,6 @@ class ProfileTCHZ(_InheritsDeclaredDefaults):
     (:meth:`_w_floor_is_reachable`).
     """
 
-    #: WP-1312's escape for a coarser instrument, which a ``Parameter`` leaving
-    #: its bounds unset (it inherits :data:`TCHZ_BOUNDS`) is offered too.
-    _declared_escape: ClassVar[str] = (
-        "build ProfileTCHZ.coarse(...), every width in TCHZ_BOUNDS_COARSE")
-
     shape: Literal["tchz_pv", "voigt"] = "tchz_pv"
     u: Parameter = Field(default_factory=lambda: _tchz_width("u"))
     v: Parameter = Field(default_factory=lambda: _tchz_width("v"))
@@ -1405,22 +1437,20 @@ class ProfileTCHZ(_InheritsDeclaredDefaults):
     @model_validator(mode="before")
     @classmethod
     def _refuse_bare_widths(cls, data):
-        """A bare number is refused by name, inside the default box or not.
+        """A bare number is refused by name.
 
         A width is a :class:`Parameter` carrying its own box; a bare number
         never was one, and pydantic's type error said so without saying what
-        to do.  The default box (:data:`TCHZ_BOUNDS`) is sized for a lab or
-        synchrotron X-ray line and stays the default (WP-1312's 2026-09-11
-        ruling: the bound stays, the constructor refuses by name).  So a bare
-        width — a long-wavelength neutron instrument's Caglioti ``U = 1.576``
-        (issue #276), or ``u=0.5`` — is refused naming the width, the value,
-        the box and the two escapes: :meth:`ProfileTCHZ.coarse`, which builds
-        *all five* widths in :data:`TCHZ_BOUNDS_COARSE` from bare values, or
-        an explicit ``Parameter(value, min, max)`` carrying the caller's own
-        bound.  A :class:`Parameter` or a dict passes through untouched *here*;
-        one leaving its bounds unset inherits the default box from
+        to do (WP-1312's 2026-09-11 ruling: the constructor refuses by name).
+        So a bare width, such as a neutron instrument's Caglioti ``U = 1.576``
+        (issue #276), is refused naming the width, the value, the box and the
+        two ways to build it: :meth:`ProfileTCHZ.coarse`, which builds all
+        five widths from bare values, or an explicit
+        ``Parameter(value, min, max)``.  A :class:`Parameter` or a dict passes
+        through untouched *here*; one leaving its bounds unset inherits
+        :data:`TCHZ_BOUNDS` from
         :class:`~rietx.schemas.common._InheritsDeclaredDefaults` (WP-1321), and
-        a value outside it is refused there, naming :meth:`coarse` the same way.
+        a value outside it is refused there.
         """
         if not isinstance(data, dict):
             return data
@@ -1428,15 +1458,13 @@ class ProfileTCHZ(_InheritsDeclaredDefaults):
                 if name in TCHZ_DEFAULTS and isinstance(v, (int, float))
                 and not isinstance(v, bool)}
         if bare:
-            said = ", ".join(f"{n}={float(v)!r} (default box [{TCHZ_BOUNDS[n][0]}, "
+            said = ", ".join(f"{n}={float(v)!r} (box [{TCHZ_BOUNDS[n][0]}, "
                              f"{TCHZ_BOUNDS[n][1]}])"
                              for n, v in bare.items())
             raise ValueError(
                 f"ProfileTCHZ: {said} is a bare number, and a width is a "
-                f"Parameter carrying its box; the default box is sized for an "
-                f"X-ray line and is not widened on your behalf. For a coarser "
-                f"instrument (a CW neutron line) build ProfileTCHZ.coarse(...), "
-                f"every width in TCHZ_BOUNDS_COARSE; or state the width as an "
+                f"Parameter carrying its box. Build all five widths from values "
+                f"with ProfileTCHZ.coarse(...), or state the width as an "
                 f"explicit Parameter(value, min, max) with its own bounds")
         return data
 
@@ -1465,12 +1493,12 @@ class ProfileTCHZ(_InheritsDeclaredDefaults):
     @classmethod
     def coarse(cls, *, shape: Literal["tchz_pv", "voigt"] = "tchz_pv",
                **widths: float) -> "ProfileTCHZ":
-        """Widths in the coarse-instrument box, :data:`TCHZ_BOUNDS_COARSE`.
+        """The five widths built from bare values, in :data:`TCHZ_BOUNDS`.
 
-        What :meth:`Instrument.constant_wavelength_neutron` builds: a CW
-        neutron diffractometer's lines are 0.2-2.5°, where the default box
-        is sized for a ~0.03° synchrotron line and caps ``w`` at 1 deg².
-        ``widths`` are values (``u=1.576``), each kept in this box.
+        What :meth:`Instrument.constant_wavelength_neutron` builds.  The name
+        survives from WP-1312, when a CW neutron line needed a wider box than
+        the X-ray presets; since 2026-10-23 every preset builds the same box.
+        ``widths`` are values (``u=1.576``), each kept in that box.
         """
         unknown = set(widths) - set(TCHZ_DEFAULTS)
         if unknown:
@@ -1478,7 +1506,7 @@ class ProfileTCHZ(_InheritsDeclaredDefaults):
                             f"{sorted(unknown)}; the widths are "
                             f"{sorted(TCHZ_DEFAULTS)}")
         return cls(shape=shape, **{
-            name: _tchz_width(name, widths.get(name), box="coarse")
+            name: _tchz_width(name, widths.get(name))
             for name in TCHZ_DEFAULTS})
 
 
@@ -1486,29 +1514,36 @@ class ProfileTCHZ(_InheritsDeclaredDefaults):
 TCHZ_DEFAULTS: dict[str, float] = {"u": 0.0, "v": 0.0, "w": 1e-3, "x": 1e-3,
                                    "y": 0.0}
 
-#: The default refinement box per width coefficient, sized for a lab or
-#: synchrotron X-ray line.  Every X-ray preset builds these, so they are the
-#: numbers every X-ray fit's search box has always been, but for W's floor:
-#: the Γ_G² clamp since WP-1938 (:class:`ProfileTCHZ`), 0 before it.
-TCHZ_BOUNDS: dict[str, tuple[float, float]] = {
-    "u": (-0.05, 1.0), "v": (-0.5, 0.5), "w": (_MIN_GAMMA_G2, 1.0),
-    "x": (0.0, 1.0), "y": (0.0, 1.0)}
+#: The ceiling on every TCHZ width: the whole 2θ axis, 180° for X and Y and
+#: 180² deg² for U, V and W.  It bounds nothing a peak can reach and gives
+#: ``solver="trf"`` a finite bound to scale its steps by (:class:`ProfileTCHZ`
+#: says why; WP-2002, the sixth round's Q7).
+TCHZ_CEILING_DEG = 180.0
+_TCHZ_CEILING = {"u": TCHZ_CEILING_DEG ** 2, "v": TCHZ_CEILING_DEG ** 2,
+                 "w": TCHZ_CEILING_DEG ** 2, "x": TCHZ_CEILING_DEG,
+                 "y": TCHZ_CEILING_DEG}
 
-#: The coarse-instrument box: what a constant-wavelength neutron line needs.
-#: Measured on the public APDW Co3O4 set (ILL D1B, λ = 2.52 Å; issue #276):
-#: its FullProf model has U = 1.576, V = -0.501, W = 0.475, outside the
-#: default box on two coefficients, and with these bounds it converges to
-#: U = 1.654 ± 0.051, within 5 % of that model.
-TCHZ_BOUNDS_COARSE: dict[str, tuple[float, float]] = {
-    "u": (-0.5, 8.0), "v": (-4.0, 4.0), "w": (_MIN_GAMMA_G2, 8.0),
-    "x": (0.0, 8.0), "y": (0.0, 8.0)}
+#: The refinement box per width coefficient, which every preset builds.  U, V
+#: and Y have no floor of their own: each stops at the ceiling's mirror image,
+#: which no width reaches and which stays finite for ``solver="trf"``'s step
+#: scaling (:class:`ProfileTCHZ`; the maintainer's ruling of 2026-10-23,
+#: WP-2002).  W's floor is the Γ_G² clamp since WP-1938, and X's is 0.  The
+#: chosen ceilings (1 for U, W, X and Y, 0.5 for V) were removed on 2026-10-21
+#: (the fifth round's Q5).  The chosen floors went on 2026-10-23, and with them
+#: the neutron preset's own box, ``TCHZ_BOUNDS_COARSE`` (U ≥ −0.5, V ≥ −4).
+#: That box was measured on the public APDW Co3O4 set (ILL D1B, λ = 2.52 Å;
+#: issue #276), whose FullProf model has V = −0.501, under the X-ray floor.
+TCHZ_BOUNDS: dict[str, tuple[float, float]] = {
+    "u": (-_TCHZ_CEILING["u"], _TCHZ_CEILING["u"]),
+    "v": (-_TCHZ_CEILING["v"], _TCHZ_CEILING["v"]),
+    "w": (_MIN_GAMMA_G2, _TCHZ_CEILING["w"]), "x": (0.0, _TCHZ_CEILING["x"]),
+    "y": (-_TCHZ_CEILING["y"], _TCHZ_CEILING["y"])}
 
 _TCHZ_UNITS = {"u": "deg^2", "v": "deg^2", "w": "deg^2", "x": "deg", "y": "deg"}
 
 
-def _tchz_width(name: str, value: float | None = None, *,
-                box: Literal["default", "coarse"] = "default") -> Parameter:
-    lo, hi = (TCHZ_BOUNDS if box == "default" else TCHZ_BOUNDS_COARSE)[name]
+def _tchz_width(name: str, value: float | None = None) -> Parameter:
+    lo, hi = TCHZ_BOUNDS[name]
     return Parameter(value=TCHZ_DEFAULTS[name] if value is None else value,
                      min=lo, max=hi, unit=_TCHZ_UNITS[name])
 
@@ -1529,6 +1564,13 @@ class BackgroundChebyshev(Base):
     @classmethod
     def with_terms(cls, n: int, *, vary: bool = True) -> "BackgroundChebyshev":
         return cls(coefficients=[Parameter(value=0.0, vary=vary) for _ in range(n)])
+
+
+#: The P-spline's default stiffness, in :attr:`BackgroundPSpline.lambda_units`'
+#: dimensionless units: λ = 1 suppresses features narrower than a knot spacing,
+#: and Rwp and Biso stay flat from 0.1 to 100 on IUCr CPD sample 2 and 11-BM
+#: NAC (WP-1454).  ``auto_background`` builds every P-spline at it.
+PSPLINE_LAMBDA_SMOOTH = 1.0
 
 
 class BackgroundPSpline(Base):
@@ -1562,7 +1604,7 @@ class BackgroundPSpline(Base):
     kind: Literal["pspline"] = "pspline"
     breakpoints: list[float]
     coefficients: list[Parameter]
-    lambda_smooth: float = Field(default=1.0, ge=0.0)
+    lambda_smooth: float = Field(default=PSPLINE_LAMBDA_SMOOTH, ge=0.0)
     #: What ``lambda_smooth`` is measured against.  ``"dimensionless"``: the
     #: rows are √(λ·m)·D₂c/σ̄, with σ̄ the median σ over the fitted channels
     #: and m the fitted channels per coefficient, both frozen at compile
@@ -1590,7 +1632,8 @@ class BackgroundPSpline(Base):
 
     @classmethod
     def for_range(cls, lo: float, hi: float, *, knot_step_deg: float = 5.0,
-                  lambda_smooth: float = 1.0, vary: bool = True) -> "BackgroundPSpline":
+                  lambda_smooth: float = PSPLINE_LAMBDA_SMOOTH,
+                  vary: bool = True) -> "BackgroundPSpline":
         """Uniform knots covering [lo, hi] at ~``knot_step_deg`` spacing."""
         n = max(int(round((hi - lo) / knot_step_deg)) + 1, 2)
         breaks = [lo + (hi - lo) * i / (n - 1) for i in range(n)]
@@ -1863,22 +1906,22 @@ class HumpComponent(_InheritsDeclaredDefaults):
     ==============================  ======  ========  ============  ================
     background                       terms  Rwp       Biso(Si)/Å²   HIGH_CORRELATION
     ==============================  ======  ========  ============  ================
-    Chebyshev, 3 terms                   3  0.119977  0.414(65)                    0
-    that **+ one peak**              3 + 3  0.082503  0.421(10)                    0
-    Chebyshev, 6 terms                   6  0.088596  0.422(25)                    0
-    that **+ one peak**              6 + 3  0.077152  0.4235(66)                   0
+    Chebyshev, 3 terms                   3  0.120051  0.413(64)                    0
+    that **+ one peak**              3 + 3  0.082134  0.421(10)                    0
+    Chebyshev, 6 terms                   6  0.088232  0.422(25)                    0
+    that **+ one peak**              6 + 3  0.076711  0.4234(64)                   0
     ==============================  ======  ========  ============  ================
 
     **Three parameters beat three polynomial terms.**  Rows one and two differ by
-    three numbers and so do rows one and three — the peak takes Rwp down 31 %
-    relative, three more Chebyshev coefficients only 26 %.  Biso(Si) barely moves
-    (well inside one esd) but its **esd falls 6.5×**, and so do those of λ, the
+    three numbers and so do rows one and three — the peak takes Rwp down 32 %
+    relative, three more Chebyshev coefficients only 27 %.  Biso(Si) barely moves
+    (well inside one esd) but its **esd falls 6.4×**, and so do those of λ, the
     scale and the zero shift: an undescribed background blurs this fit rather
     than biasing it.
 
     **The feature is identified from outside the fit.**  The refined peak is
-    5.57(22)° wide against an instrumental Gaussian FWHM of 0.00346° at that
-    angle — 1 608×.  11-BM's published blank (run 4736, ``empty Kapton
+    5.61(22)° wide against an instrumental Gaussian FWHM of 0.00347° at that
+    angle — 1 618×.  11-BM's published blank (run 4736, ``empty Kapton
     capillary``, same February 2010 beamtime), fitted independently of this
     package, puts the same feature at 4.2417(111)° with FWHM 6.153(23)°, and the
     beamline's published air-scatter scan shows no localised feature anywhere.
@@ -1886,8 +1929,8 @@ class HumpComponent(_InheritsDeclaredDefaults):
     halo.  That — not the Rwp — is what makes the term quotable.
 
     **A peak needs a low-order background to mean anything.**  Between the
-    3-term and 6-term arms the peak moves 1.07° and narrows from 5.57(22)° to
-    1.94(8)° while Rwp moves by 0.005: the peak and the polynomial describe
+    3-term and 6-term arms the peak moves 1.08° and narrows from 5.61(22)° to
+    1.92(8)° while Rwp moves by 0.005: the peak and the polynomial describe
     overlapping freedom, so the more flexible the polynomial the less the peak's
     own parameters mean.  Declare a peak *instead of* extra polynomial terms,
     never on top of them.
@@ -1897,7 +1940,7 @@ class HumpComponent(_InheritsDeclaredDefaults):
     cannot reach, which pulls the fitted centre to 4.18(9)° below the envelope's
     4.98°; at six terms it relaxes onto the envelope at 5.245(32)°.  Quote the
     envelope for where the halo is and the fit for the model that describes it.
-    ``docs/manual/using/data.md`` carries the long form and
+    ``docs/docs/concepts/parameters.md`` § Humps carries the long form and
     ``tests/data/README.md`` the provenance of every file named here.
 
     Fields, and the reason each bound is the bound it is:
@@ -2228,6 +2271,19 @@ class PeakComponent(_InheritsDeclaredDefaults):
 #: this seam admits *any* evaluator shape is an intention.
 ExtraComponent = HumpComponent | PeakComponent
 
+#: :meth:`Instrument.debye_scherrer`'s polarisation K, in the GSAS POLA
+#: convention: 0.99, as APS 11-BM's instrument-parameter files state it.  An
+#: assumption about the caller's beam, which a lab capillary does not share.
+DEBYE_SCHERRER_POLARIZATION = 0.99
+#: :meth:`Instrument.bragg_brentano`'s goniometer radius, mm: the radius a lab
+#: diffractometer commonly has, there because the geometry refuses a missing one.
+BRAGG_BRENTANO_RADIUS_MM = 217.5
+#: The Kα2/Kα1 intensity ratio the lab presets seed: 0.5 is the 2j+1 degeneracy
+#: ratio (4:2).  Measured integrated ratios run a few percent above it and a
+#: diffracted-beam monochromator clips it (Hölzer et al. 1997, Phys. Rev. A 56,
+#: 4554); ``lab_bragg_brentano`` refines it and ``mccusker_default`` holds it.
+KA2_RATIO = 0.5
+
 
 class Instrument(_InheritsDeclaredDefaults):
     """Everything about the measurement except the sample.
@@ -2246,8 +2302,10 @@ class Instrument(_InheritsDeclaredDefaults):
     #: :func:`rietx.schemas.pattern.require_two_theta`.
     source: Source | NeutronSource | TOFSource = Field(discriminator="kind")
     geometry: Geometry = Field(default_factory=Geometry)
+    #: unbounded with the other position corrections since 2026-10-20: see
+    #: ``Geometry``'s comment above ``sample_displacement`` for why (WP-2002)
     zero_shift: Parameter = Field(
-        default_factory=lambda: Parameter(value=0.0, min=-0.5, max=0.5, unit="deg")
+        default_factory=lambda: Parameter(value=0.0, unit="deg")
     )
     profile: ProfileTCHZ = Field(default_factory=ProfileTCHZ)
     background: Background = Field(
@@ -2332,7 +2390,7 @@ class Instrument(_InheritsDeclaredDefaults):
             capillary_radius_mm: float | None = None,
             mu_r: float | None = None,
             fwhm_deg: float | None = None,
-            harmonics: bool | list[int] = False) -> "Instrument":
+            harmonics: list[int] | bool = False) -> "Instrument":
         """Constant-wavelength neutron powder diffractometer.
 
         Debye-Scherrer geometry, because that is what a CW neutron
@@ -2351,21 +2409,14 @@ class Instrument(_InheritsDeclaredDefaults):
         with ``x`` left at its negligible default: the width you observed is
         the width you get.
 
-        The profile is built in the coarse-instrument box
-        (:meth:`ProfileTCHZ.coarse`, :data:`TCHZ_BOUNDS_COARSE`): this is
-        WP-1312's escape, built for you.  The default box is sized for a
-        ~0.03° synchrotron line and caps ``w`` at 1 deg², a 1.0° FWHM, where
-        a long-wavelength CW neutron line is wider (issue #276: 1.10° on D1B
-        at λ = 2.52 Å); the ruling keeps that default and has the constructor
-        refuse past it, so the preset takes the escape on the caller's behalf,
-        all five bounds at once.  The cost, said out loud: a *bare* wide width
-        still refuses — ``ProfileTCHZ(u=1.576)`` raises, naming
+        The profile is built by :meth:`ProfileTCHZ.coarse`, in the box every
+        preset builds (:data:`TCHZ_BOUNDS`).  U and V have no floor of their
+        own, so a long-wavelength CW neutron model fits in it (issue #276:
+        V = −0.501 on D1B at λ = 2.52 Å).  Every width's ceiling is the 2θ
+        axis (:data:`TCHZ_CEILING_DEG`), so any ``fwhm_deg`` up to 180° seeds
+        ``w`` at its square.  A *bare* width still
+        refuses: ``ProfileTCHZ(u=1.576)`` raises, naming
         ``ProfileTCHZ.coarse`` and an explicit ``Parameter`` as the ways out.
-        ``fwhm_deg`` may not exceed the square root of ``w``'s upper bound,
-        √8 ≈ 2.83° in the coarse box: above it raises ``ValueError`` naming
-        the value passed and the bound.  To declare a coarser instrument
-        still, set ``instrument.profile.w``
-        explicitly, with its own bounds, instead of ``fwhm_deg``.
 
         Note the profile itself needs no neutron-specific code: the Caglioti
         law U·tan²θ + V·tanθ + W *is* the neutron resolution function (Caglioti,
@@ -2373,20 +2424,23 @@ class Instrument(_InheritsDeclaredDefaults):
         is the borrower.
 
         ``harmonics`` declares the λ/n components a monochromator that does not
-        filter its own orders lets through (:class:`Harmonic`).  ``True`` is the
-        second order alone, which is the one that normally carries measurable
-        intensity; a list of orders is the general form (``harmonics=[2, 3]``).
-        ``False``, the default, leaves the source with the single line it has
-        always had, so every number measured before this argument existed is
-        reproduced bit for bit.  The declared weights arrive **fixed** — free
+        filter its own orders lets through (:class:`Harmonic`), as the list of
+        orders n it passes: ``[2]`` for Cu(311) or pyrolytic graphite,
+        ``[3]`` for Si(111) or Ge(311), whose second order is extinct,
+        ``[2, 3]`` for both.  ``True`` is refused, since which orders pass
+        depends on the crystal.  ``False``, the default, leaves the source with
+        the single line it has always had, so every number measured before this
+        argument existed is reproduced bit for bit.  The declared weights arrive **fixed** — free
         them with the ``instrument.source.lines.*.weight`` glob once the profile
         and the scale are settled, never in the opening stage.
         """
-        orders: list[int] = []
         if harmonics is True:
-            orders = [DEFAULT_HARMONIC_ORDER]
-        elif harmonics is not False:
-            orders = list(harmonics)
+            raise ValueError(
+                "harmonics=True does not say which orders the monochromator passes, "
+                "and that depends on its crystal: name them, e.g. harmonics=[2] for "
+                "Cu(311) or pyrolytic graphite, harmonics=[3] for Si(111) or Ge(311), "
+                "whose second order is extinct")
+        orders = [] if harmonics is False else list(harmonics)
         inst = cls(source=NeutronSource(
                        wavelength=wavelength,
                        harmonics=[Harmonic(order=n) for n in orders]),
@@ -2409,17 +2463,7 @@ class Instrument(_InheritsDeclaredDefaults):
             # Paoletti & Ricci 1958), so a monotonically climbing seed is not
             # a coarse version of that curve; a flat one is the honest
             # zeroth-order stand-in, and U/V/X/Y refine away from it.
-            w_seed = fwhm_deg ** 2
-            w_bound = inst.profile.w.max
-            if w_seed > w_bound:
-                raise ValueError(
-                    f"fwhm_deg={fwhm_deg} seeds w={w_seed} (fwhm_deg ** 2), "
-                    f"which exceeds w's upper bound of {w_bound}; to declare "
-                    f"a genuinely coarser instrument, set "
-                    f"instrument.profile.w explicitly, with its own bounds, "
-                    f"instead of fwhm_deg."
-                )
-            inst.profile.w.value = w_seed
+            inst.profile.w.value = fwhm_deg ** 2
         return inst
 
     @classmethod
@@ -2459,10 +2503,11 @@ class Instrument(_InheritsDeclaredDefaults):
                                      mu_r=mu_r))
 
     @classmethod
-    def debye_scherrer(cls, wavelength: float, *, polarization: float = 0.99,
+    def debye_scherrer(cls, wavelength: float, *,
+                       polarization: float = DEBYE_SCHERRER_POLARIZATION,
                        goniometer_radius_mm: float | None = None,
                        capillary_radius_mm: float | None = None,
-                       packing_fraction: float = 0.6,
+                       packing_fraction: float = PACKING_FRACTION,
                        mu_r: float | None = None) -> "Instrument":
         """Synchrotron/capillary preset with a single wavelength.
 
@@ -2490,9 +2535,9 @@ class Instrument(_InheritsDeclaredDefaults):
 
     @classmethod
     def bragg_brentano(cls, *, radiation: str = "CuKa",
-                       goniometer_radius_mm: float = 217.5,
+                       goniometer_radius_mm: float = BRAGG_BRENTANO_RADIUS_MM,
                        monochromator_two_theta: float | None = None,
-                       ka2_ratio: float = 0.5,
+                       ka2_ratio: float = KA2_RATIO,
                        mu_t: float | None = None,
                        thickness_mm: float | None = None) -> "Instrument":
         """Lab flat-plate diffractometer preset with a Kα1/Kα2 doublet.
@@ -2542,11 +2587,11 @@ class Instrument(_InheritsDeclaredDefaults):
             k = 1.0 / (1.0 + c2)
             kbeta = "monochromator"
         emission = [EmissionLine(wavelength=lines[0],
-                                 weight=Parameter(value=1.0, min=0.0, max=2.0))]
+                                 weight=Parameter(value=1.0, min=0.0))]
         for wl in lines[1:]:
             emission.append(EmissionLine(
                 wavelength=wl,
-                weight=Parameter(value=ka2_ratio, min=0.0, max=1.0)))
+                weight=Parameter(value=ka2_ratio, min=0.0)))
         return cls(
             source=Source(
                 lines=emission,
@@ -2563,8 +2608,8 @@ class Instrument(_InheritsDeclaredDefaults):
     def flat_plate_transmission(cls, *, radiation: str = "CuKa1",
                                 mu_t: float | None = None,
                                 thickness_mm: float | None = None,
-                                packing_fraction: float = 0.6,
-                                ka2_ratio: float = 0.5) -> "Instrument":
+                                packing_fraction: float = PACKING_FRACTION,
+                                ka2_ratio: float = KA2_RATIO) -> "Instrument":
         """Flat-specimen **transmission** preset (WP-0508).
 
         The powder sits between two foils and the beam passes through it —
@@ -2593,10 +2638,10 @@ class Instrument(_InheritsDeclaredDefaults):
                 f"unknown radiation {radiation!r}; available: {sorted(_RADIATIONS)}"
             ) from None
         emission = [EmissionLine(wavelength=lines[0],
-                                 weight=Parameter(value=1.0, min=0.0, max=2.0))]
+                                 weight=Parameter(value=1.0, min=0.0))]
         for wl in lines[1:]:
             emission.append(EmissionLine(
-                wavelength=wl, weight=Parameter(value=ka2_ratio, min=0.0, max=1.0)))
+                wavelength=wl, weight=Parameter(value=ka2_ratio, min=0.0)))
         return cls(
             source=Source(lines=emission,
                           polarization=Parameter(value=0.5, min=0.0, max=1.0)),

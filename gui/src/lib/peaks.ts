@@ -267,6 +267,9 @@ export interface Candidate {
     predicted_but_absent: number;
     n_reflections: number;
     status: string;
+    absent_source?: "line_screen" | "fitted_background";
+    n_lines_screened?: number | null;
+    predicted_but_absent_uncancellable_in_window?: number | null;
   } | null;
   diagnostics: Array<{ level: string; code: string; message: string }>;
 }
@@ -301,6 +304,22 @@ export function fomOf(candidate: Candidate, name: string): number | null {
 /** Red for a caveat that refutes, amber for one that merely caps. */
 export function caveatTone(caveat: string, refuting: readonly string[]): Tone {
   return refuting.includes(caveat) ? "bad" : "warn";
+}
+
+/**
+ * The absent column: a share of the lines the count was taken over.  Since
+ * indexing thresholds 1.12 the count is the line screen's, over merged lines
+ * (`n_lines_screened`), not the Le Bail fit's reflections; the windowed
+ * uncancellable count, the one the caveat caps on, rides beside it.  A
+ * validation without a peak list keeps the fitted background's share.
+ */
+export function absentText(lebail: NonNullable<Candidate["lebail"]>): string {
+  if (lebail.absent_source === "line_screen" && lebail.n_lines_screened != null) {
+    const w = lebail.predicted_but_absent_uncancellable_in_window;
+    return `${lebail.predicted_but_absent}/${lebail.n_lines_screened} lines`
+      + (w == null ? "" : ` · ${w} in window`);
+  }
+  return `${lebail.predicted_but_absent}/${lebail.n_reflections}`;
 }
 
 /** `4.7594(3) 4.7594(3) 12.992(1)` style cell summary — lengths only. */

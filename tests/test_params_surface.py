@@ -462,7 +462,7 @@ def test_a_tie_refuses_and_names_the_holder(ref):
     with pytest.raises(ValueError, match="that is set_values"):
         ref.tie(*BISOS, scale=0.0)
     with pytest.raises(ValueError, match="outside its bounds"):
-        # Atom.occ declares [0, 1.5]; B had [0, 25] until WP-1534
+        # Atom.occ declares a floor of 0; B had [0, 25] until WP-1534
         ref.tie("phases.0.atoms.1.occ", "phases.0.atoms.0.occ", scale=-1.0)
     # a refused call changes nothing — not the table, not the models
     assert {r.path: r for r in ref.parameters()}["phases.0.atoms.0.biso"].refinable
@@ -710,7 +710,8 @@ def test_a_blocked_stage_says_which_declaration_won(ref, pattern):
     result = ref.fit(pattern, plan=SHORT)
 
     blocked = {s.name: s.blocked_by_hold for s in result.stages if s.blocked_by_hold}
-    assert blocked == {"cell": [CELL]}
+    # the closing stage frees every glob the plan freed, the cell's too
+    assert blocked == {"cell": [CELL], "closing": [CELL]}
     assert all(CELL not in s.freed for s in result.stages)
 
     hit = [d for d in result.diagnostics if d.code == "HOLD_BLOCKED_PLAN"]
@@ -986,8 +987,10 @@ def test_a_literal_repeated_across_stages_is_one_finding_naming_both(pattern):
     assert set(unknown) == {WAVELENGTH_TYPO, "phases.0.cell.aa"}
     assert "Stages 'first', 'second'" in unknown[WAVELENGTH_TYPO].message
     assert "Did you mean 'phases.0.cell.a'" in unknown["phases.0.cell.aa"].message
+    # the closing stage asks for every glob the plan freed, the typos too
     assert [s.unknown_paths for s in result.stages] == [
-        [WAVELENGTH_TYPO], [WAVELENGTH_TYPO, "phases.0.cell.aa"]]
+        [WAVELENGTH_TYPO], [WAVELENGTH_TYPO, "phases.0.cell.aa"],
+        [WAVELENGTH_TYPO, "phases.0.cell.aa"]]
 
 
 def test_a_single_stage_run_says_it_too(ref, pattern):
@@ -1161,7 +1164,7 @@ def test_the_shipped_presets_name_no_path_a_shipped_instrument_lacks():
                    rx.Instrument.bragg_brentano(),
                    rx.Instrument.flat_plate_transmission(),
                    rx.Instrument.constant_wavelength_neutron(1.5),
-                   rx.Instrument.constant_wavelength_neutron(1.5, harmonics=True)]
+                   rx.Instrument.constant_wavelength_neutron(1.5, harmonics=[2])]
     structure, _ = perturbed_models()
     for ins in instruments:
         table = rx.Refinement(structure, ins, history=False)._working_table()

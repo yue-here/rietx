@@ -72,6 +72,8 @@ def test_backend_implements_the_whole_vocabulary(name):
         assert getattr(xp, attr, None) is not None, f"{name}: missing {attr}"
     assert callable(getattr(xp.linalg, "inv", None))
     assert callable(getattr(xp.linalg, "det", None))
+    # a planarity restraint's normal (WP-1809) is traced through ``eigh``
+    assert callable(getattr(xp.linalg, "eigh", None))
 
 
 @pytest.mark.parametrize("state", list(STATES))

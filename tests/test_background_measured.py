@@ -405,7 +405,9 @@ def test_the_result_divides_by_the_weight_the_model_used():
     without any of them knowing about it."""
     data, blank, structure, ins = synthetic_blank_case()
     ins = _with_blank(ins, blank, vary_scale=False)
-    result = rx.refine(data, structure, ins, plan=_bkg_only_plan(), telemetry=False)
+    # the declared stage's weights; the closing stage is tests/test_closing_stage.py's
+    result = rx.refine(data, structure, ins, plan=_bkg_only_plan(closing_window_tol=None),
+                       telemetry=False)
     model = compile_model(structure, ins, data, mode="rietveld")
     assert np.allclose(np.asarray(result.sigma), model.sigma)
 
@@ -419,7 +421,8 @@ def test_a_last_stage_that_moved_the_scale_reports_the_solves_weights():
     data, blank, structure, ins = synthetic_blank_case()
     ins = _with_blank(ins, blank, vary_scale=True)
     ref = rx.Refinement(structure, ins)
-    result = ref.fit(data, plan=_bkg_only_plan(), telemetry=False)
+    # the declared last stage's weights; the closing stage is tests/test_closing_stage.py's
+    result = ref.fit(data, plan=_bkg_only_plan(closing_window_tol=None), telemetry=False)
     assert abs(ref.fitted_instrument.background.scale.value - 1.0) > 0.05, \
         "the last stage must move the scale, or this pins nothing"
 
@@ -498,7 +501,7 @@ def test_the_refusal_names_both_ranges():
 # ----------------------------------------------------------------------
 # the fit
 # ----------------------------------------------------------------------
-def _bkg_only_plan(*, with_scale: bool = True) -> RefinementPlan:
+def _bkg_only_plan(*, with_scale: bool = True, **plan) -> RefinementPlan:
     """One stage over the background block, with or without the curve's scale.
 
     ``instrument.background.*`` reaches the scale and ``…c*`` does not, which is
@@ -508,7 +511,7 @@ def _bkg_only_plan(*, with_scale: bool = True) -> RefinementPlan:
     """
     free = ["phases.*.scale",
             "instrument.background.*" if with_scale else "instrument.background.c*"]
-    return RefinementPlan(stages=[Stage("scale_bkg", free)])
+    return RefinementPlan(stages=[Stage("scale_bkg", free)], **plan)
 
 
 @pytest.mark.xdist_group("measured-background")

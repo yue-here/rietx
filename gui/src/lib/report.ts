@@ -228,6 +228,23 @@ export interface FitDiagnostic {
   message: string;
   where?: string[];
   suggestion?: string | null;
+  /** printed in full rather than as one line: the server's view (WP-2037) */
+  full?: boolean;
+  /** the purposes it is a warning under, `series` never among them */
+  warning_under?: string[];
+}
+
+/**
+ * The purposes a warning is a warning under, as a collapsed row says them;
+ * `null` for any other level, whose chip already says all there is.  The list
+ * is the server's (`diagnostic_view`) and this only joins it.  An empty one is
+ * a warning only a series reads: the list leaves `series` out, and a warning
+ * naming a path is always one under it.
+ */
+export function underNote(d: FitDiagnostic): string | null {
+  if (d.level !== "warning") return null;
+  const under = d.warning_under ?? [];
+  return under.length ? `warning under ${under.join(", ")}` : "warning under series only";
 }
 
 const LEVEL_RANK: Record<string, number> = { error: 0, warning: 1, info: 2 };

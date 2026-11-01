@@ -80,6 +80,11 @@ restraint rows on the penalty side of it.
   It is the same once-per-structure problem; lift it here only if it falls
   out for free.
 
+### Inherited
+
+- **2026-10-23, from [1912](1912-a-polar-axis-has-no-origin.md) (closed): lifting the centroid's joint-fit refusal now belongs to WP-2029.** This WP's Non-goals and References name `multi._refuse_centroid_origin` as "WP-1912's refusal". 1912 closed with the refusal still in place. [WP-2029](2029-whether-the-centroid-fixes-a-polar-origin-by-default.md) task 1 lifts it, either with one origin row block per shared structure or with a fallback to `"hold"`. It reuses this WP's once-per-structure placement if that lands first. Nothing in this WP's scope changes.
+- **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: `HistogramResult.restraints` has no writer.** It is always `None`: `multi.py:1740` never sets it (`schemas/results.py:1178`). `docs/docs/reference/joint.md` documents it so. This WP's restraint reporting for a joint fit is its natural writer.
+
 ## Tasks
 
 - [ ] `_multi_closures`: read each model's below-data blocks from

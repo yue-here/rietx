@@ -132,6 +132,11 @@ def _system(sg: gemmi.SpaceGroup) -> str:
 
 def _positions(sg: gemmi.SpaceGroup) -> list[_Position]:
     """The symbol's generators in order, from the setting's H-M symbol."""
+    if sg.hm[0] == "R" and sg.ext == "R":
+        raise ValueError(
+            f"{sg.xhm()} is an R lattice on rhombohedral axes; superspace symbols "
+            f"are written in hexagonal axes (Stokes 2011 § 5.1(2)), and no change "
+            f"of axes is made here: take the group to hexagonal axes first")
     system = _system(sg)
     toks = _tokens(sg)
     rots = {tuple(tuple(x // gemmi.Op.DEN for x in row) for row in op.rot)
@@ -444,14 +449,16 @@ def _letters_key(text: str) -> tuple:
 
 
 def _origin_shift(mine: dict, theirs: dict, den: int):
-    """p (in 1/den) with v + (E − R)p ∈ their translations for every op."""
+    """p (in 1/den) with {v + (E − R)p} equal to their translations of R, as
+    whole sets, for every R.  The identity's set is the centring vectors, so
+    I2₁2₁2₁ shifted by (¼,0,0) is not read as C222₁ (the same number of
+    centrings, a different one)."""
     for p in product(range(den), repeat=3):
         ok = True
         for r, ts in mine.items():
-            t0 = next(iter(ts))
             rp = tuple(sum(r[i][k] * p[k] for k in range(3)) for i in range(3))
-            moved = tuple((t0[i] + p[i] - rp[i]) % den for i in range(3))
-            if moved not in theirs[r]:
+            moved = {tuple((t[i] + p[i] - rp[i]) % den for i in range(3)) for t in ts}
+            if moved != theirs[r]:
                 ok = False
                 break
         if ok:
@@ -565,7 +572,14 @@ def _entry_of(group: SuperspaceGroup):
 def symbol(group: SuperspaceGroup) -> str:
     """The one-line symbol, under Stokes 2011 § 5.2 steps 1-4 (step 3 against
     the other groups over the same basic group and q), with ITC-C's spelling
-    where Stokes 2011 Table 9 says it differs from the conventions."""
+    where Stokes 2011 Table 9 says it differs from the conventions.
+
+    A magnetic group gets its magnetic superspace symbol
+    (:func:`.magnetic.magnetic_symbol`; Stokes & Campbell 2022 p. 366)."""
+    if group.is_magnetic:
+        from .magnetic import magnetic_symbol
+
+        return magnetic_symbol(group)
     e = _entry_of(group)
     printed = e.assigned if e is not None else symbol_candidates(group)[0]
     return ITC_C_EXCEPTIONS.get(printed, (printed,))[0]
@@ -606,10 +620,11 @@ def parse_symbol(text: str) -> SuperspaceGroup:
     The basic group is read in the setting the symbol names (origin choice 2
     where ITA offers two, hexagonal axes); the group is found among those
     :func:`~rietx.crystallography.superspace.generation.generate` derives for
-    that basic group and q (module docstring).  Refused by name: a second
-    modulation vector (d > 1), a magnetic symbol (a 1′, N-W2), a symbol with
-    no q (ambiguous, Yamamoto et al. 1985), and a symbol matching no group or
-    several.
+    that basic group and q (module docstring).  A magnetic symbol — primes, a
+    ``.1``, or a ``.1'`` with its extra phase letter — is read by
+    :func:`.magnetic.parse_magnetic_symbol`.  Refused by name: a second
+    modulation vector (d > 1), a symbol with no q (ambiguous, Yamamoto et
+    al. 1985), and a symbol matching no group or several.
     """
 
     m = _SYMBOL.match(str(text))
@@ -623,9 +638,10 @@ def parse_symbol(text: str) -> SuperspaceGroup:
         raise ValueError(f"{text!r} gives a second modulation vector: superspace "
                          f"groups are built here for d = 1 only")
     hm = m.group("hm")
-    if "'" in hm or "′" in hm or ".1" in hm:
-        raise ValueError(f"{text!r} is a magnetic superspace symbol (it carries "
-                         f"1'); magnetic superspace groups are N-W2, not built here")
+    if "'" in hm or "′" in hm or hm.rstrip().endswith(".1"):
+        from .magnetic import parse_magnetic_symbol
+
+        return parse_magnetic_symbol(text)
     q = ModulationVector.parse(m.group("q"))
     want = _letters(tail)
     settings = _settings_named(hm)

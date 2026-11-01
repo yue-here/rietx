@@ -78,13 +78,14 @@ for row in corrected.qpa.phases:
 
 # The page quotes every printed line; these pin the claims its prose makes.
 assert result.qpa.crystalline_only
-assert f"{100 * result.qpa.phases[1].weight_fraction:.1f}" == "3.1"
+assert f"{100 * result.qpa.phases[1].weight_fraction:.1f}" == "3.6"
 assert "HIGH_CORRELATION" in {d.code for d in result.diagnostics}
 assert result.statistics.rwp < held_result.statistics.rwp
 assert f"{result.statistics.rwp:.3f}, {held_result.statistics.rwp:.3f}" == "0.082, 0.089"
 assert "HOLD_BLOCKED_PLAN" in {d.code for d in held_result.diagnostics}
 assert f"{100 * held_result.qpa.phases[1].weight_fraction:.2f}" == "1.37"
-assert profile.fit_admissible and not profile.diagnostics
+assert profile.fit_admissible and profile.excess < 1.0
+assert [d.code for d in profile.diagnostics] == ["QPA_FRACTION_RANGE"]
 default = nac_and_fluorite().fit(data, plan="mccusker_default", two_theta_limits=(2, 24))
 assert f"{100 * default.qpa.phases[1].weight_fraction:.2f}" == "1.38"
 assert abs(sum(row.weight_fraction for row in held_result.qpa.phases) - 1.0) < 1e-12

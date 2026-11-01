@@ -1,19 +1,24 @@
 name: Docs site
 
-# Builds the Sphinx manual under -W and publishes it to GitHub Pages
-# (WP-1003), with the agent skill copied verbatim into the site root beside it
-# — _about.DOCS_URL is the one authority for the resulting URLs, and the skill
-# is fetchable file by file at /skill/rietx/… so a harness with network and no
-# wheel can pull the body without pulling the reference files it does not need
-# (WP-1304).  The pointer this replaced, published at /AGENT_PROTOCOL.md from
-# v1.0 to v1.3, was deleted in v1.4 and that URL now 404s.
+# Builds the site and publishes it to GitHub Pages (WP-1003).  The layout, with
+# _about.DOCS_URL the one authority for the resulting URLs:
 #
-# Since WP-1331 the site root is the landing page, not the manual: sphinx's
-# root document is manual.md, and docs/landing/build.py --site writes the page
-# into docs/landing/site, which conf.py copies in through html_extra_path.  So
-# / is the landing page and /manual.html the manual; no other URL moved.
+# - / is the landing page (WP-1331): docs/landing/build.py --site writes it into
+#   docs/landing/site, and a step below copies that into the site root.
+# - /docs/ is the manual (WP-1978, WP-1979): main's tree built under -W at
+#   /docs/dev/, each kept release's tree beside it, and the version switcher,
+#   all laid out by docs/docs_versions.py.
+# - The pages the retired old manual (docs/manual/, WP-1986) published keep
+#   their URLs as redirect stubs into /docs/, which docs_versions.py writes
+#   from its RETIRED table after the landing page is in place.
+# - /skill/rietx/... is the agent skill, copied verbatim, so a harness with
+#   network and no wheel can pull the body without pulling the reference files
+#   it does not need (WP-1304).  The pointer this replaced, published at
+#   /AGENT_PROTOCOL.md from v1.0 to v1.3, was deleted in v1.4 and that URL now
+#   404s.
+# - /lite/ is the tutorials in the browser (WP-1966).
 #
-# The package itself is installed before the build because docs/manual/conf.py
+# The package itself is installed before the build because the manual's conf.py
 # injects fenced constants from the live package; a source-only checkout
 # builds a manual that quotes nothing.
 #
@@ -52,18 +57,20 @@ jobs:
           cache-dependency-glob: pyproject.toml
       - run: uv venv --python 3.13
       - run: uv pip install -e ".[docs]"
-      # Before sphinx: docs/manual/conf.py adds docs/landing/site to
-      # html_extra_path only if it exists, and it reads that at conf load.
-      - name: Build the landing page
-        run: .venv/bin/python docs/landing/build.py --site
-      - name: Build the manual (-W, as the test suite does)
-        run: .venv/bin/python -m sphinx -W -b html docs/manual site
-      # The new manual (WP-1978) at /docs/dev/, then each kept release's tree beside it
+      # The landing page at the site root.  It goes in before docs_versions.py
+      # writes the redirect stubs, none of which shares a path with it
+      # (tests/test_docs_versions.py).
+      - name: Build the landing page into the site root
+        run: |
+          .venv/bin/python docs/landing/build.py --site
+          mkdir -p site
+          cp -R docs/landing/site/. site/
+      # The manual (WP-1978) at /docs/dev/, then each kept release's tree beside it
       # (WP-1979; docs/docs_versions.py says how they are chosen and laid out).  release.yml
       # dispatches this workflow once a new release's tree is attached.
-      - name: Build main's new manual as /docs/dev/ (-W)
+      - name: Build main's manual as /docs/dev/ (-W, as the test suite does)
         run: .venv/bin/python -m sphinx -W -b html -d "$RUNNER_TEMP/doctrees" docs/docs site/docs/dev
-      - name: Add the kept releases, the version switcher and /docs/
+      - name: Add the kept releases, the version switcher, /docs/ and the old URLs' stubs
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: .venv/bin/python docs/docs_versions.py site

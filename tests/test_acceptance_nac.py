@@ -98,6 +98,7 @@ def nac_rietveld(nac_inputs, nac_lebail):
     # ones the package actually produces.  None here would converge every
     # stage; measured cost of the schedule on this protocol is <= 0.02 esd.
     plan.intermediate_ftol = 1e-6
+    plan.closing_window_tol = 1e-3   # WP-2002: the shipped closing stage, named rather than inherited
     ref = rx.Refinement(structure2, instrument2)
     return ref, ref.fit(data, plan=plan, two_theta_limits=LIMITS)
 

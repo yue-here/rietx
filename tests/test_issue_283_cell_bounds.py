@@ -437,7 +437,8 @@ def test_run_multi_least_squares_guards_both_closures_and_reports_the_count(
     swap is the same trick the two guard unit tests above use.  Under TRF the
     driver gets the step tracker's closure over the guard, as
     ``run_least_squares`` hands it (WP-1341), so the guard is found by
-    ``inspect.unwrap``."""
+    ``inspect.unwrap``; the Jacobian's guard sits under the finite check
+    (WP-2048) and is found the same way."""
     structure = _rhombohedral_boundary_cell()
     structure.phases[0].cell.alpha.value = 120.0
     models, mtable = _joint_alpha_only(structure)
@@ -452,7 +453,7 @@ def test_run_multi_least_squares_guards_both_closures_and_reports_the_count(
         r = fun(np.asarray(x0))      # seeds both fallbacks from a good point
         J = jac(np.asarray(x0))
         inspect.unwrap(fun)._inner = boom
-        jac._inner = boom
+        inspect.unwrap(jac)._inner = boom
         assert np.array_equal(fun(np.asarray(x0)), r * 10.0)  # penalised
         assert np.array_equal(jac(np.asarray(x0)), J)         # last good one
         return SimpleNamespace(x=np.asarray(x0), cost=0.5 * float(r @ r),
@@ -471,8 +472,8 @@ def test_run_multi_least_squares_guards_both_closures_and_reports_the_count(
 
     guard = inspect.unwrap(seen["fun"])
     assert isinstance(guard, _DegenerateCellGuard)
-    assert isinstance(seen["jac"], _DegenerateCellJacobianGuard)
-    assert seen["jac"]._residual_guard is guard  # one counter, not two
+    assert isinstance(inspect.unwrap(seen["jac"]), _DegenerateCellJacobianGuard)
+    assert inspect.unwrap(seen["jac"])._residual_guard is guard  # one counter, not two
     assert outcome.n_degenerate_cell_probes == 2  # one off each path
 
 
@@ -501,8 +502,10 @@ def test_a_joint_fit_reaches_the_boundary_survives_it_and_says_so():
         patterns.append(PatternData(two_theta=tt.tolist(),
                                     intensity=np.ones_like(tt).tolist()))
 
+    # the declared stage's probes; the closing stage is tests/test_closing_stage.py's
     plan = RefinementPlan(stages=[
-        Stage(name="cell", turn_on=["phases.0.cell.alpha"], max_iter=3)])
+        Stage(name="cell", turn_on=["phases.0.cell.alpha"], max_iter=3)],
+        closing_window_tol=None)
     result = MultiHistogramRefinement(structure, instruments).fit(
         patterns, plan=plan)
 

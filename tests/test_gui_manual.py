@@ -1,6 +1,10 @@
 """The GUI chapters' anti-divergence guards (WP-1017).
 
-Part 2 is guarded by injected constants, Part 1 by name resolution
+The chapters are `start/gui-quickstart.md`, `reference/gui-guide.md` and
+`reference/gui-power.md`, under `docs/docs/` since WP-1986, with their
+screenshots and the script that takes them beside the tree's pages.
+
+The Theory tab is guarded by injected constants, every page by name resolution
 (`test_manual.py`, `test_manual_api.py`).  A GUI chapter is guarded by neither,
 because its subject is routes and panels rather than importable names — and the
 prose-drift problem is worse here than anywhere else in the manual: this WP's
@@ -35,13 +39,41 @@ from rietx.gui.server import ROUTES, UPLOAD_ROUTES
 from rietx.gui.session import RESERVED_ROUTES
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-USING_DIR = REPO_ROOT / "docs" / "manual" / "using"
-GUI_PAGES = sorted(USING_DIR.glob("gui-*.md"))
+DOCS_TREE = REPO_ROOT / "docs" / "docs"
+#: Globbed rather than listed, so a fourth GUI page fails the name check below
+#: instead of sitting outside the partition.  `_build/` is sphinx output.
+GUI_PAGES = sorted(p for p in DOCS_TREE.rglob("gui-*.md")
+                   if not {"_build", "_generated"} & set(p.relative_to(DOCS_TREE).parts))
+#: Where a new route is documented, named in the failure that asks for it.
+ROUTES_PAGE = DOCS_TREE / "reference" / "gui-power.md"
 PANELS_CORPUS = REPO_ROOT / "tests" / "data" / "gui" / "panels.json"
-SHOTS_DIR = USING_DIR / "screenshots"
-MAKE_SHOTS = REPO_ROOT / "docs" / "manual" / "make_screenshots.py"
+SHOTS_DIR = DOCS_TREE / "screenshots"
+MAKE_SHOTS = DOCS_TREE / "make_screenshots.py"
 
 IMAGE_REF = re.compile(r"^```\{image\}\s+(\S+)\s*$", re.M)
+
+
+def _rel(path: Path) -> str:
+    """A path as a failure message names it: from the repo root where it can be."""
+    try:
+        return path.relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def _screenshot_refs() -> list[tuple[Path, str, Path]]:
+    """(page, target as written, the file it resolves to) per screenshot shown.
+
+    A screenshot is an image whose directory is named `screenshots`, however
+    the page reaches it: the pages sit in two tabs, so the relative path
+    differs by page, and a prefix match on the target would miss one.
+    """
+    refs = []
+    for page in GUI_PAGES:
+        for target in IMAGE_REF.findall(page.read_text(encoding="utf-8")):
+            if Path(target).parent.name == "screenshots":
+                refs.append((page, target, (page.parent / target).resolve()))
+    return refs
 
 
 def _declared_shots():
@@ -92,8 +124,9 @@ def _live_routes() -> set[tuple[str, str]]:
 
 def test_the_gui_chapters_exist():
     """The partition below is vacuous if the pages moved or were renamed."""
-    names = {page.name for page in GUI_PAGES}
-    assert names == {"gui-quickstart.md", "gui-guide.md", "gui-power.md"}, (
+    names = {page.relative_to(DOCS_TREE).as_posix() for page in GUI_PAGES}
+    assert names == {"start/gui-quickstart.md", "reference/gui-guide.md",
+                     "reference/gui-power.md"}, (
         f"GUI chapters are not the three this suite guards: {sorted(names)}"
     )
 
@@ -112,7 +145,7 @@ def test_every_route_is_documented_or_excluded():
     assert not missing, (
         f"{len(missing)} route(s) no GUI chapter names and no exclusion covers:\n"
         + "\n".join(f"  {m} {p}" for m, p in missing)
-        + "\n\nDocument them in docs/manual/using/gui-power.md, or add an entry "
+        + f"\n\nDocument them in {_rel(ROUTES_PAGE)}, or add an entry "
         "to ROUTE_EXCLUSIONS with a written reason."
     )
     both = sorted(documented & excluded)
@@ -152,19 +185,21 @@ def test_every_screenshot_a_chapter_shows_is_one_the_script_takes():
     """
     shots, themes = _declared_shots()
     declared = {f"{shot.name}-{theme}.png" for shot in shots for theme in themes}
-    for page in GUI_PAGES:
-        for target in IMAGE_REF.findall(page.read_text(encoding="utf-8")):
-            if not target.startswith("screenshots/"):
-                continue
-            name = target.split("/", 1)[1]
-            assert name in declared, (
-                f"{page.name}: `{target}` is not a shot make_screenshots.py "
-                f"produces — add it to SHOTS, or reference a declared one"
-            )
-            assert (SHOTS_DIR / name).exists(), (
-                f"{page.name}: `{target}` is declared but not committed — run "
-                "docs/manual/make_screenshots.py"
-            )
+    refs = _screenshot_refs()
+    assert refs, "no GUI chapter shows a screenshot — has the image syntax moved?"
+    for page, target, resolved in refs:
+        assert resolved.parent == SHOTS_DIR.resolve(), (
+            f"{_rel(page)}: `{target}` resolves to {resolved}, outside "
+            f"{_rel(SHOTS_DIR)} where make_screenshots.py writes"
+        )
+        assert resolved.name in declared, (
+            f"{_rel(page)}: `{target}` is not a shot make_screenshots.py "
+            f"produces — add it to SHOTS, or reference a declared one"
+        )
+        assert resolved.exists(), (
+            f"{_rel(page)}: `{target}` is declared but not committed — run "
+            f"{_rel(MAKE_SHOTS)}"
+        )
 
 
 def test_no_committed_screenshot_is_undeclared():
@@ -208,18 +243,18 @@ def test_every_declared_shot_is_committed_and_used():
     one that is declared but missing from the tree is a broken image waiting
     for the next build."""
     shots, themes = _declared_shots()
-    prose = "\n".join(page.read_text(encoding="utf-8") for page in GUI_PAGES)
+    shown = {resolved.name for _, _, resolved in _screenshot_refs()
+             if resolved.parent == SHOTS_DIR.resolve()}
     for shot in shots:
         for theme in themes:
             name = f"{shot.name}-{theme}.png"
             assert (SHOTS_DIR / name).exists(), (
-                f"{name} is declared but not committed — run "
-                "docs/manual/make_screenshots.py"
+                f"{name} is declared but not committed — run {_rel(MAKE_SHOTS)}"
             )
         # The whole filename, not the `<name>-` prefix: `first` would have been
         # covered by a chapter showing `first-fit`, so a shot whose name is
         # another's prefix could go unshown and still pass.
-        assert any(f"screenshots/{shot.name}-{theme}.png" in prose for theme in themes), (
+        assert any(f"{shot.name}-{theme}.png" in shown for theme in themes), (
             f"{shot.name} is taken by make_screenshots.py but no chapter shows it"
         )
         assert len(shot.caption.split()) >= 5, f"{shot.name}: caption says nothing"
@@ -240,7 +275,7 @@ def test_nothing_gitignores_the_screenshots():
     import subprocess
 
     files = sorted(SHOTS_DIR.glob("*.png"))
-    assert files, "no screenshots committed — run docs/manual/make_screenshots.py"
+    assert files, f"no screenshots committed — run {_rel(MAKE_SHOTS)}"
     result = subprocess.run(
         # --no-index: check-ignore answers for a *tracked* file from the index
         # without reading the rules at all, and every file here is committed.

@@ -252,16 +252,45 @@ class _Stated:
     value: float
 
 
+def _through(expr: str, symbols, chain: tuple[str, ...] = ()) -> str:
+    """``expr`` with every **dependent** parameter written out as its equation.
+
+    ``u11 = uA;`` under ``prm uA = 0.006*k;`` is ``u11 = 0.006*k``: ``uA`` is a
+    dependent parameter (Technical Reference §2.6), so the name that carries a
+    refine state, and that a tie has to be written over, is ``k``. Left as
+    ``uA``, the tie would be over a name nothing refines, and a ``beq = k;``
+    elsewhere would come back as a second independent parameter. A declaration
+    whose equation names nothing (``prm third = 1/3;``) is an *independent*
+    parameter by the same section and stays a name. A name already being
+    written out is left standing, so a cycle of tail-evaluated declarations
+    ends rather than recursing. The names are found with the reader's own
+    pattern (``topas._EQUATION_NAME``), so the two cannot disagree about what
+    in an equation is a name.
+    """
+    from .topas import _EQUATION_NAME
+
+    def sub(m):
+        name = m.group(0)
+        read = symbols.get(name)
+        if read is None or read.expr is None or not read.refs or name in chain:
+            return name
+        return f"({_through(read.expr, symbols, chain + (name,))})"
+    return _EQUATION_NAME.sub(sub, expr)
+
+
 def _stated_value(read, path, symbols, skipped) -> _Stated | None:
-    """A value's affine form over declared names, from how the file stated it."""
+    """A value's affine form over declared names, from how the file stated it,
+    with every dependent parameter it names written out (:func:`_through`)."""
     if read is None:
         return None
     if read.expr is not None:
+        expr = _through(read.expr, symbols)
         try:
-            terms, const = affine_of(read.expr)
+            terms, const = affine_of(expr)
         except _NotAffine:
-            skipped.append(f"{path}: '= {read.expr};' is not affine in parameter "
-                           f"names; read as its value {read.value!r}")
+            through = "" if expr == read.expr else f", which is '= {expr};',"
+            skipped.append(f"{path}: '= {read.expr};'{through} is not affine in "
+                           f"parameter names; read as its value {read.value!r}")
             return None
         terms = {n: c for n, c in terms.items() if n in symbols}
         if not terms:

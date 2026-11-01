@@ -12,7 +12,7 @@ pages ship inside the wheel and the GUI workspace does not — ``gui/`` is a
 build input, and what reaches an installed copy is the committed ``dist/``.  A
 value the wheel has to serve therefore cannot live in ``gui/src``.  The
 reverse direction is a build step, which this repo already does twice:
-``help.py`` generates ``docs/manual/using/glossary.md`` in ``conf.py``, and
+``help.py`` generates the manual's vocabulary pages (``docs/reference_pages.py``), and
 ``gui/dist`` is committed and pinned stale-or-current by a test.  So this
 module owns the values and emits the stylesheet, ``gui/src/tokens.css`` is
 generated and committed, and ``tests/test_gui_palette.py`` holds the two equal

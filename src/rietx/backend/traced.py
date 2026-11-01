@@ -124,8 +124,9 @@ def make_traced_residual(model, table, xp):
     # and freezing them against a cell that is still refining would be an
     # approximation nobody asked for.  So the twin **declines by name** rather
     # than tracing a model whose magnetic term it would silently drop; the
-    # numpy path is exact, and a moment's Jacobian column comes from the peak
-    # chain, which re-runs the forward model and needs no tracing.
+    # numpy path is exact, and so is a moment modulus's Jacobian column there
+    # (analytic, ``least_squares._moment_column``), which needs no tracing;
+    # an angle column is the peak chain's forward difference.
     if any(getattr(cp, "magnetic", None) is not None for cp in model.phases):
         raise NotImplementedError(
             "the magnetic structure factor (WP-1327) has no traced twin, so a "

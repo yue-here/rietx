@@ -48,8 +48,10 @@ import tempfile
 from pathlib import Path
 
 TREE = Path(__file__).resolve().parent
-# `make_screenshots.py` stays in the old tree until the GUI chapters move.
-sys.path.insert(0, str(TREE.parent / "manual"))
+# `make_screenshots.py` sits beside this script since the GUI pages moved
+# (WP-1986).  The insert keeps the import working when this file is loaded by
+# path rather than run as a script.
+sys.path.insert(0, str(TREE))
 
 from make_screenshots import chromium_path  # noqa: E402  (after the path insert)
 
@@ -108,7 +110,7 @@ def build(out: Path) -> None:
 def pages(out: Path) -> list[Path]:
     """Built pages that carry at least one numbered equation.
 
-    Derived from the output rather than listed: a chapter added to Part 2 is
+    Derived from the output rather than listed: a chapter added to the Theory tab is
     measured without anyone editing this file, and a page with no equation
     costs nothing to skip.
     """

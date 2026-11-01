@@ -1,0 +1,1975 @@
+{
+ "codes": {
+  "CIF_CELL_ANGLE_CORRECTED": {
+   "class": "act",
+   "condition": "A cell angle stored within CIF_ANGLE_CORRECT_MAX_DEG of the value its space group fixes is read as that value. A larger disagreement is not this code: it is refused (ValueError), a judgement under the act.",
+   "note": "gated by CIF_ANGLE_CORRECT_MAX_DEG (the WP's named tier-3 threshold)"
+  },
+  "CIF_SITE_TWINS_MERGED": {
+   "class": "act",
+   "condition": "Two atoms of one site closer than TWIN_DISTANCE are read as one, on the special position.",
+   "note": "gated by TWIN_DISTANCE"
+  },
+  "CIF_SITE_LISTED_TWICE": {
+   "class": "act",
+   "condition": "A site whose orbit another listed site repeats, with the same occupancy (and moment) to OCCUPANCY_TOLERANCE and DUPLICATE_U_TOLERANCE, is dropped.",
+   "note": "gated by OCCUPANCY_TOLERANCE, DUPLICATE_U_TOLERANCE, TWIN_DISTANCE"
+  },
+  "CIF_MAGNETIC_MOMENT_ON_ALLOWED": {
+   "class": "act",
+   "condition": "A site moment off the subspace its site symmetry allows, by less than the file's printed precision, is moved onto it.",
+   "note": "gated by magcif.moment_within_print (half a unit in the last printed place, computed per row, no module constant)"
+  },
+  "CIF_SPECIES_NORMALISED": {
+   "class": "act",
+   "condition": "An atom-type symbol is respelled to the canonical species (case, charge placement, isotope spelling).",
+   "note": ""
+  },
+  "SITE_SNAPPED_TO_SPECIAL_POSITION": {
+   "class": "act",
+   "condition": "A site within SITE_TOL (symmetry.py) of a special position is expanded there; cif.py's second site also snaps a site to reach the multiplicity the file states, within CIF_STATED_MULTIPLICITY_SNAP_TOL.",
+   "note": "gated by SITE_TOL, CIF_STATED_MULTIPLICITY_SNAP_TOL"
+  },
+  "CIF_SITE_MULTIPLICITY_DISAGREES": {
+   "class": "judgement",
+   "condition": "A stated site multiplicity differs from the one the coordinates give, and no move within CIF_STATED_MULTIPLICITY_SNAP_TOL reconciles them. Nothing is moved; the record says the file disagrees with itself.",
+   "note": "threshold CIF_STATED_MULTIPLICITY_SNAP_TOL decides snapped (act) versus this"
+  },
+  "CIF_MAGNETIC_CENTERING_ASSUMED": {
+   "class": "act",
+   "condition": "A magCIF with no centring loop is read with the trivial centring x,y,z,+1 alone.",
+   "note": ""
+  },
+  "CIF_MAGNETIC_NUMBER_MISMATCH": {
+   "class": "act",
+   "condition": "The BNS/UNI numbers a file states disagree with those of its own operators; the operators' numbers are stored and the stated ones dropped. The disagreement is also an assertion that the file is wrong.",
+   "note": "act with a judgement inside: which of two statements is right is decided for the operators"
+  },
+  "CIF_MAGNETIC_NUCLEAR_GROUP": {
+   "class": "act",
+   "condition": "Positions are refined under the nuclear group the file's operators contain, and moments under the magnetic one; recorded which relation held.",
+   "note": ""
+  },
+  "CIF_MAGNETIC_NUCLEAR_SETTING": {
+   "class": "act",
+   "condition": "Positions are refined under the file's own group (or its operator list) instead of the parent it names, because the parent's setting does not contain the operators.",
+   "note": ""
+  },
+  "MAGNETIC_ION_ASSUMED": {
+   "class": "act",
+   "condition": "A magnetic site states no oxidation state and the neutral table lacks the element: its form factor is taken from an assumed ion (form_factor's assumed-ion table, 2002's B15).",
+   "note": "the table is the judgement under the act; ruled by 2002 (B15), tiered here after it"
+  },
+  "LANDE_G_ASSUMED": {
+   "class": "act",
+   "condition": "A site with an assumed ion that needs a g states none: the ion's Hund's-rule g_J is used.",
+   "note": "as MAGNETIC_ION_ASSUMED; both raise sites also in strategy/magnetic.py (2002 tiers them there)"
+  },
+  "CIF_MAGNETIC_ION_UNCHARGED": {
+   "class": "act",
+   "condition": "A magnetic site states no oxidation state and its label is a bare element: the neutral-atom form factor is used.",
+   "note": ""
+  },
+  "CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED": {
+   "class": "act",
+   "condition": "A site states moment.magnitude_su; Structure has no field for it, so it is dropped.",
+   "note": ""
+  },
+  "CIF_MAGNETIC_SPHERICAL_ESD_NOT_STORED": {
+   "class": "act",
+   "condition": "A moment stated in spherical form carries su values; they are not propagated to the crystal-axis components.",
+   "note": ""
+  },
+  "CIF_MAGNETIC_SYMMFORM": {
+   "class": "judgement",
+   "condition": "A site states symmform; its free-parameter count is compared with the subspace the file's operators give. Level is info when they agree (or the string is unreadable), warning when they differ. No value is changed: the derived subspace is used either way.",
+   "note": "level depends on a comparison the reader makes"
+  },
+  "CIF_MAGNETIC_UNIDENTIFIED": {
+   "class": "unclear",
+   "condition": "The operator list does not match one of the 1651 magnetic space groups in spglib's database, so no UNI number is recorded. Reports that a lookup found nothing; no value was changed or chosen.",
+   "note": "unclear: an absence, neither an act nor an assertion about the file"
+  },
+  "CHILD_GROUP_UNNAMED": {
+   "class": "unclear",
+   "condition": "magnetic_supercell() found a child group with no tabulated name. States a fact about the result; the group is still carried as operators.",
+   "note": "unclear: an observation about a derived group, not a repair of a file"
+  },
+  "SPACE_GROUP_SETTING_ASSUMED": {
+   "class": "act",
+   "condition": "A symbol the tables hold in more than one setting is resolved to one of them (the evidence is the composition each setting implies; WP-1118).",
+   "note": "act with a judgement inside: which setting is chosen"
+  },
+  "READER_OPTION_IGNORED": {
+   "class": "act",
+   "condition": "A reader option the chosen format does not take is not applied.",
+   "note": ""
+  },
+  "PATTERN_MULTISCAN_DEFAULTED": {
+   "class": "act",
+   "condition": "A file holds several scans and none was named by scan=: scan 0 is read.",
+   "note": ""
+  },
+  "PATTERN_SCAN_REVERSED": {
+   "class": "act",
+   "condition": "Points stored from high to low are reversed to ascending.",
+   "note": ""
+  },
+  "PATTERN_DUPLICATE_POINTS": {
+   "class": "act",
+   "condition": "Repeated x values carrying the same intensity are dropped.",
+   "note": ""
+  },
+  "PATTERN_X_AXIS_ASSUMED": {
+   "class": "act",
+   "condition": "A format whose axis label is absent or unrecognised: the x column is read as 2θ in degrees.",
+   "note": "the alternative is the refusal in the same function for an axis known not to be 2θ"
+  },
+  "PATTERN_INTENSITY_SCALED": {
+   "class": "act",
+   "condition": "Intensity or σ is not the file's number: the unit is cps with no usable counting time, an unrecognised unit, or values not integral within INTEGRAL_TOL; no σ is supplied (Poisson fallback). Five sites in four readers (base, brml, uxd, xrdml).",
+   "note": "gated by INTEGRAL_TOL (base.py site)"
+  },
+  "BRML_ABSORBER_ENGAGED": {
+   "class": "act",
+   "condition": "A Bruker .brml used an automatic absorber over some points; the stored intensities already include the correction, and this records it.",
+   "note": ""
+  },
+  "RAS_ATTENUATOR_PRESENT": {
+   "class": "act",
+   "condition": "A Rigaku .ras carries an attenuator factor other than 1: it is applied (or not) by the measured vendor convention and said so.",
+   "note": "the per-format convention is the judgement under the act"
+  },
+  "XRDML_ATTENUATOR_APPLIED": {
+   "class": "act",
+   "condition": "A PANalytical .xrdml carries a beam attenuation factor over some points: it is applied to the intensities.",
+   "note": "as RAS_ATTENUATOR_PRESENT"
+  },
+  "GSAS_BANK_COMMENTED": {
+   "class": "act",
+   "condition": "A GSAS file has no live BANK record but a commented one: that one is read.",
+   "note": ""
+  },
+  "PATTERN_ROWS_DROPPED": {
+   "class": "act",
+   "condition": "Numeric rows whose column count differs from the file's are not read as data.",
+   "note": "the file's arity is taken from the rows themselves"
+  },
+  "PATTERN_SIGMA_CONSTANT": {
+   "class": "judgement",
+   "condition": "The σ column holds one value on every point. Raised after the read, no change made: the reader asserts that such a σ is not a measurement.",
+   "note": "asserts a judgement about the file"
+  },
+  "PATTERN_X_AXIS_IMPLAUSIBLE": {
+   "class": "judgement",
+   "condition": "The x axis starts at or below 0° with some points at or below 0°, in a format read as 2θ: the reader asserts the axis is not what it was read as. Nothing is changed.",
+   "note": "asserts a judgement; TWO_THETA_MAX_DEG is the upper-end refusal elsewhere in readers.py"
+  },
+  "PATTERN_DEAD_CHANNELS": {
+   "class": "judgement",
+   "condition": "A run of channels carries a small fraction of the local background with an esd that fell with it: the reader asserts they are dead. Nothing is dropped. The run and window lengths and the fraction are in background.diagnostics.dead_channels, outside io/.",
+   "note": "thresholds live in background/diagnostics.py (2004's walk)"
+  },
+  "GSAS_FIELD_OVERFLOW": {
+   "class": "act",
+   "condition": "A GSAS record field holds only asterisks (a Fortran overflow): the field is read as absent.",
+   "note": ""
+  },
+  "GSAS_PRM_FIELD_DROPPED": {
+   "class": "act",
+   "condition": "A .prm record or field has no slot in the Instrument and is not carried.",
+   "note": ""
+  },
+  "GSAS_PRM_PROFILE_SET_DEFAULTED": {
+   "class": "act",
+   "condition": "Bank 1 offers several profile sets and none was named: one is read.",
+   "note": ""
+  },
+  "GSAS_PRM_GEOMETRY_ASSUMED": {
+   "class": "act",
+   "condition": "A .prm states no geometry, so none is read from it.",
+   "note": ""
+  },
+  "GSAS_PRM_VALUE_NARROWED": {
+   "class": "act",
+   "condition": "A written value needs more characters than a .prm's fixed columns hold and is written to what fits.",
+   "note": ""
+  },
+  "GSAS_PRM_FIELD_NOT_WRITTEN": {
+   "class": "act",
+   "condition": "The Instrument holds parts the .prm cannot state; they are not written.",
+   "note": ""
+  },
+  "GSAS2_INSTPRM_VALUE_DEFAULTED": {
+   "class": "act",
+   "condition": "An .instprm states no value for some fields: they come back at this package's default.",
+   "note": ""
+  },
+  "GSAS2_INSTPRM_CONVENTION_ASSUMED": {
+   "class": "act",
+   "condition": "SH/L (GSAS-II's combined (S+H)/L) is split evenly into axial_sl and axial_hl.",
+   "note": "an assumption (the even split) under the act"
+  },
+  "GSAS2_INSTPRM_GEOMETRY_ASSUMED": {
+   "class": "act",
+   "condition": "An .instprm states no Diff-type: the geometry is GSAS-II's own fallback.",
+   "note": ""
+  },
+  "GSAS2_INSTPRM_FIELD_NOT_READ": {
+   "class": "act",
+   "condition": "An .instprm states items the Instrument has no place for; they are not read.",
+   "note": ""
+  },
+  "GSAS2_INSTPRM_VALUE_MERGED": {
+   "class": "act",
+   "condition": "On writing, axial_sl and axial_hl differ and are written as one SH/L.",
+   "note": ""
+  },
+  "GSAS2_INSTPRM_VALUE_FLOORED": {
+   "class": "act",
+   "condition": "On writing, SH/L is below INSTPRM_SHL_FLOOR: it is written as it stands, and GSAS-II floors it when it evaluates.",
+   "note": "notes the floor INSTPRM_SHL_FLOOR a target program applies"
+  },
+  "GSAS2_INSTPRM_FIELD_NOT_WRITTEN": {
+   "class": "act",
+   "condition": "On writing, parts of the instrument the .instprm cannot state are omitted.",
+   "note": ""
+  },
+  "GSAS_IPARM_PROFILE_DECLINED": {
+   "class": "act",
+   "condition": "A TOF .iparm bank has no PRCF set 1, or states a set other than 1: the profile coefficients are left at zero or the set is not read (set 1 is GSAS's default whatever its function). Two sites.",
+   "note": ""
+  },
+  "GSAS_IPARM_PROFILE_READ": {
+   "class": "act",
+   "condition": "A TOF .iparm's PRCF set 1 is read in the order the Technical Manual lists the coefficients; the order is an assumption and the record says so.",
+   "note": "the ordering is an assumption under the act"
+  },
+  "GSAS_IPARM_FIELD_DROPPED": {
+   "class": "act",
+   "condition": "Records and fields with no slot in the schema are not carried.",
+   "note": ""
+  },
+  "GSAS2_INSTPRM_FIELD_DROPPED": {
+   "class": "act",
+   "condition": "TOF .instprm items were read and not carried.",
+   "note": ""
+  },
+  "GSAS_IPARM_LEGACY_LAYOUT": {
+   "class": "act",
+   "condition": "A LANSCE legacy .iparm: a value running across a BNKPAR boundary is re-read by whitespace tokens (GSAS-II reads it the same way); PRCF set 1 of legacy banks is read as slots 1-8; a non-zero fifth ICOFF pair is carried as written. Three sites.",
+   "note": ""
+  },
+  "FULLPROF_MAGNETIC_PHASE_READ": {
+   "class": "act",
+   "condition": "A magnetic phase of a .pcr is read as the moments of its nuclear phase, its SYMM/MSYM pairs becoming a magnetic group.",
+   "note": ""
+  },
+  "FULLPROF_MAGNETIC_PHASE_OMITTED": {
+   "class": "act",
+   "condition": "A magnetic phase of a .pcr is not built (not read as moments).",
+   "note": ""
+  },
+  "FULLPROF_SPECIES_NORMALISED": {
+   "class": "act",
+   "condition": "A FullProf species is respelled to the canonical species.",
+   "note": ""
+  },
+  "FULLPROF_ORIGIN_CHOICE": {
+   "class": "act",
+   "condition": "A space-group symbol with an origin choice is resolved to one; the occupancy-ratio check (_OCCUPANCY_RTOL) accepted it.",
+   "note": "gated by _OCCUPANCY_RTOL; the setting choice is the judgement under the act"
+  },
+  "FULLPROF_OCCUPANCY_UNCHECKED": {
+   "class": "judgement",
+   "condition": "The occupancy-ratio check compared a single site with itself, so it passed for a setting without testing it. States that a check that would have decided did not test.",
+   "note": "asserts that a gate was vacuous"
+  },
+  "FULLPROF_TIE_DROPPED": {
+   "class": "act",
+   "condition": "A codeword tie in a .pcr is not carried onto the Structure (three sites: the caller asked drop_parameter_ties, a general tie, a cell tie the space group does not make).",
+   "note": ""
+  },
+  "FULLPROF_RHOMBOHEDRAL_RESTATED": {
+   "class": "act",
+   "condition": "On writing, a rhombohedral-axes phase is written in hexagonal axes with the scale divided by 9. Raised by crystallography/symmetry.py:rhombohedral_restated_diagnostic.",
+   "note": "gated by symmetry.restate_in_hexagonal_axes' own test"
+  },
+  "FULLPROF_SPECIES_WRITTEN_NEUTRAL": {
+   "class": "act",
+   "condition": "On writing X-ray, an ion the X-ray table lacks is written as its neutral atom. Raised by crystallography/scattering.py:written_neutral_diagnostics.",
+   "note": ""
+  },
+  "GSAS_EXP_HISTOGRAM_NOT_READ": {
+   "class": "act",
+   "condition": "A histogram of a GSAS .EXP is not read; the text names why.",
+   "note": ""
+  },
+  "GSAS_EXP_BACKGROUND_NOT_CARRIED": {
+   "class": "act",
+   "condition": "A fitted GSAS background function's coefficients are on the model, not carried into a Background.",
+   "note": ""
+  },
+  "GSAS_EXP_PHASE_MAGNETIC": {
+   "class": "act",
+   "condition": "A magnetic phase of a .EXP: its cell and sites are on the model, no magnetism is built.",
+   "note": ""
+  },
+  "GSAS_EXP_SPECIES_NORMALISED": {
+   "class": "act",
+   "condition": "A GSAS species is respelled to the canonical species.",
+   "note": ""
+  },
+  "GSAS_EXP_COORDINATES_SYMMETRY_FIXED": {
+   "class": "act",
+   "condition": "Sites carry GSAS's X refine flag but sit on fully fixed special positions: the flag is not honoured.",
+   "note": ""
+  },
+  "GSAS_EXP_SCALE_NOT_COMPARABLE": {
+   "class": "act",
+   "condition": "The phase scale is seeded at 1e-3, not the file's histogram scale.",
+   "note": "a convention (the seed) under the act"
+  },
+  "GSAS_EXP_VALUE_NARROWED": {
+   "class": "act",
+   "condition": "On writing, values needing more than the fixed columns are narrowed.",
+   "note": ""
+  },
+  "GSAS_EXP_REFINE_FLAG_MERGED": {
+   "class": "act",
+   "condition": "On writing, a group with some members held and some free is written free.",
+   "note": ""
+  },
+  "GSAS_EXP_SPECIES_WRITTEN_NEUTRAL": {
+   "class": "act",
+   "condition": "On writing, an ion the X-ray table lacks is written as its neutral atom (helper in scattering.py).",
+   "note": ""
+  },
+  "GSAS2_GPX_SETTING_FROM_OPERATORS": {
+   "class": "act",
+   "condition": "A .gpx names a space group whose setting the project's operators settle differently: the operators' setting is used.",
+   "note": ""
+  },
+  "GSAS2_GPX_ITEM_NOT_READ": {
+   "class": "act",
+   "condition": "A .gpx item is not read; the text names it.",
+   "note": ""
+  },
+  "GSAS2_GPX_BACKGROUND_NOT_CARRIED": {
+   "class": "act",
+   "condition": "A fitted GSAS-II background's coefficients are on the model, not carried.",
+   "note": ""
+  },
+  "GSAS2_GPX_PHASE_MAGNETIC": {
+   "class": "act",
+   "condition": "A magnetic phase of a .gpx is not built, or a nuclear phase carries a magPhases partner; level is warning when magnetic phases exist, info otherwise. Two sites.",
+   "note": "level depends on whether magnetic phases exist"
+  },
+  "GSAS2_GPX_CONSTRAINT_NOT_CARRIED": {
+   "class": "act",
+   "condition": "A .gpx's constraints are none applied; they are on model.constraints.",
+   "note": ""
+  },
+  "GSAS2_GPX_TEXTURE_NOT_CARRIED": {
+   "class": "act",
+   "condition": "A spherical-harmonics texture is not carried, for the reason named; level is a parameter of the helper.",
+   "note": ""
+  },
+  "GSAS2_GPX_TEXTURE_CONVERTED": {
+   "class": "act",
+   "condition": "A spherical-harmonics texture is carried with each coefficient multiplied by P_l(0) (and by √2 on n≠0 terms).",
+   "note": "a convention conversion under the act"
+  },
+  "GSAS2_GPX_SPECIES_NORMALISED": {
+   "class": "act",
+   "condition": "A GSAS-II species is respelled to the canonical species.",
+   "note": ""
+  },
+  "GSAS2_GPX_COORDINATES_SYMMETRY_FIXED": {
+   "class": "act",
+   "condition": "As GSAS_EXP_COORDINATES_SYMMETRY_FIXED, for a .gpx.",
+   "note": ""
+  },
+  "GSAS2_GPX_SCALE_NOT_COMPARABLE": {
+   "class": "act",
+   "condition": "As GSAS_EXP_SCALE_NOT_COMPARABLE, for a .gpx.",
+   "note": ""
+  },
+  "GSAS2_CIF_RHOMBOHEDRAL_RESTATED": {
+   "class": "act",
+   "condition": "On writing a GSAS-II CIF, a rhombohedral-axes phase is restated in hexagonal axes (helper in symmetry.py).",
+   "note": ""
+  },
+  "GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL": {
+   "class": "act",
+   "condition": "On writing a GSAS-II CIF, an ion the X-ray table lacks is written neutral (helper in scattering.py).",
+   "note": ""
+  },
+  "GSAS2_CIF_DEUTERIUM_AS_D": {
+   "class": "act",
+   "condition": "Deuterium sites are written as D; GSAS-II scatters D at 6.681 fm and rietx at 6.671 fm.",
+   "note": "records a disagreement between two programs' constants"
+  },
+  "GSAS2_CIF_SETTING_IN_OPERATORS": {
+   "class": "act",
+   "condition": "The setting is stated in the operators and not in the bare symbol, for an ambiguous group.",
+   "note": ""
+  },
+  "GSAS2_CIF_FIELD_NOT_WRITTEN": {
+   "class": "act",
+   "condition": "The phase CIF does not state some fields.",
+   "note": ""
+  },
+  "TOPAS_FIRST_RUN_READ": {
+   "class": "act",
+   "condition": "An .inp has #if/#elseif on Run_Number and states more than one run: branches are read as the first run reads them.",
+   "note": ""
+  },
+  "TOPAS_SPECIES_NORMALISED": {
+   "class": "act",
+   "condition": "A TOPAS species is respelled to the canonical species.",
+   "note": ""
+  },
+  "TOPAS_CELL_COUPLING_DROPPED": {
+   "class": "act",
+   "condition": "A cell tie in a .inp is not carried and the space group does not tie it: the value is copied.",
+   "note": ""
+  },
+  "TOPAS_FEATURES_NOT_IMPORTED": {
+   "class": "act",
+   "condition": "Features the file states (or calls without a definition) do not reach the Structure. Two sites.",
+   "note": ""
+  },
+  "TOPAS_FEATURE_REFUSED": {
+   "class": "act",
+   "condition": "The file states something to_structure refuses to build without, or is time of flight (issue #193). Two sites.",
+   "note": ""
+  },
+  "TOPAS_ORIGIN_TRANSLATED": {
+   "class": "act",
+   "condition": "A space-group symbol with an origin choice is read as the canonical one.",
+   "note": ""
+  },
+  "TOPAS_BLOCK_SKIPPED": {
+   "class": "act",
+   "condition": "A block of the .inp is skipped and listed on model.skipped_blocks.",
+   "note": ""
+  },
+  "TOPAS_MAGNETIC_GROUP_READ": {
+   "class": "act",
+   "condition": "A magnetic phase's group is read from the file or derived; the text says which.",
+   "note": ""
+  },
+  "TOPAS_MOMENT_CONVENTION": {
+   "class": "act",
+   "condition": "mlx, mly, mlz are read as fractional-basis components and stored as crystal-axis μ_B (mlx·|a|, …).",
+   "note": "a convention under the act (topas-mlx-is-fractional)"
+  },
+  "TOPAS_MOMENT_G_HELD": {
+   "class": "act",
+   "condition": "A file that refines the Landé g (mg) is read as holding it.",
+   "note": ""
+  },
+  "TOPAS_MOMENT_ION_UNCHARGED": {
+   "class": "act",
+   "condition": "A moment and an uncharged species: the species is read neutral.",
+   "note": ""
+  },
+  "TOPAS_MAGNETIC_PART_MERGED": {
+   "class": "act",
+   "condition": "A TOPAS str read as the magnetic half of another is merged into it.",
+   "note": ""
+  },
+  "TOPAS_PHASE_TERM_READ": {
+   "class": "act",
+   "condition": "A prm p<n>_<term> is read as phase n's term.",
+   "note": ""
+  },
+  "TOPAS_SPECIES_WRITTEN_NEUTRAL": {
+   "class": "act",
+   "condition": "On writing, an ion the X-ray table lacks is written neutral (helper in scattering.py; two call sites).",
+   "note": ""
+  },
+  "TOPAS_FIELD_NOT_WRITTEN": {
+   "class": "act",
+   "condition": "On writing, TOPAS computes each phase without a texture, magnetic-only width or extinction the Structure carries.",
+   "note": ""
+  },
+  "TOPAS_PHASE_RESTATED_IN_P1": {
+   "class": "act",
+   "condition": "A phase with no mag_space_group in TOPAS is written in P1 with every copy tied.",
+   "note": ""
+  },
+  "RECIPE_BOUND_HONOURED": {
+   "class": "act",
+   "condition": "A recipe declares min/max and the refinement applies them.",
+   "note": ""
+  },
+  "RECIPE_SCHEMA_UNTESTED": {
+   "class": "judgement",
+   "condition": "The recipe's schema_version is not one this reader was checked against; asserts the reading is unverified. Nothing is changed.",
+   "note": "asserts a judgement about verification"
+  },
+  "RECIPE_ZERO_WEIGHT_EXCLUDED": {
+   "class": "act",
+   "condition": "Channels carrying weight 0 become excluded regions (the pdCIF dictionary: weight 0 means not used; #1006's row).",
+   "note": "the pdCIF weight rule is the row #1006 enters"
+  },
+  "RECIPE_FIT_RANGE_CHANNELS": {
+   "class": "act",
+   "condition": "The fit_range selects some channels on an inclusive mask at both ends.",
+   "note": ""
+  },
+  "RECIPE_FIELD_DROPPED": {
+   "class": "act",
+   "condition": "A recipe field has no counterpart or no effect here and is dropped (polarization on a neutron instrument; a constant Lorentzian term at zero; a sub-step background-peak width; refinement_cycles; refinement_algorithm). Five sites.",
+   "note": ""
+  },
+  "RECIPE_CONVENTION_ASSUMED": {
+   "class": "act",
+   "condition": "SH/L is split evenly into axial_sl and axial_hl.",
+   "note": ""
+  },
+  "RECIPE_DISPERSION_DECLINED": {
+   "class": "act",
+   "condition": "Anomalous scattering is declined and f = f0 is used, for the stated reason.",
+   "note": ""
+  },
+  "RECIPE_FLAG_DROPPED": {
+   "class": "act",
+   "condition": "A refine flag is not honoured (Z has no place; a background-peak gamma has no counterpart; LG_eta at its off state holds a coefficient). Three sites.",
+   "note": ""
+  },
+  "RECIPE_BACKGROUND_RESEEDED": {
+   "class": "act",
+   "condition": "A recipe's Chebyshev background arrives as a count and a flag, so its values start at zero.",
+   "note": ""
+  },
+  "RECIPE_BACKGROUND_PEAK_DEGENERATE": {
+   "class": "judgement",
+   "condition": "A background peak starts at a FWHM that is broad against the fitted range, so it is a polynomial (asserts degeneracy; no change).",
+   "note": "asserts a judgement"
+  },
+  "RECIPE_FLAG_TRANSLATED": {
+   "class": "act",
+   "condition": "A (magnitude, eta) pair with the eta flag is translated to two free coefficients.",
+   "note": ""
+  },
+  "RECIPE_SCALE_RESEEDED": {
+   "class": "act",
+   "condition": "The recipe's phase scales are re-seeded to match the summed calculated intensity to the data.",
+   "note": ""
+  },
+  "RECIPE_ENGINE_DEFAULT_DECLINED": {
+   "class": "act",
+   "condition": "A null magnitude that GSAS-II fills with its own default is not filled: the sample broadening is zero here.",
+   "note": ""
+  },
+  "RECIPE_NOTHING_REFINED": {
+   "class": "judgement",
+   "condition": "No parameter is flagged for refinement; the plan has one stage that frees nothing (asserts the recipe frees nothing).",
+   "note": ""
+  },
+  "RECIPE_PLAN_STAGED": {
+   "class": "act",
+   "condition": "The flagged parameters are freed over several stages in the McCusker (1999) turn-on order.",
+   "note": "McCusker's order is a citation behind the act"
+  }
+ },
+ "constants": {
+  "rietx.io.cif.blocks.SCAT_SOURCE_MAX": {
+   "role": "format layout",
+   "decides": "The longest ``_atom_type_scat_source`` value written, held by test.",
+   "file": "src/rietx/io/cif/blocks.py",
+   "line": 99
+  },
+  "rietx.io.cif.numbers.LINE_MAX": {
+   "role": "format layout",
+   "decides": "The longest record checkCIF reads without its PLAT802 note.",
+   "file": "src/rietx/io/cif/numbers.py",
+   "line": 47
+  },
+  "rietx.io.formats.base.HEAD_BYTES": {
+   "role": "sniff bound",
+   "decides": "How much of a file a *sniff* may look at.",
+   "file": "src/rietx/io/formats/base.py",
+   "line": 296
+  },
+  "rietx.io.formats.base.INTEGRAL_TOL": {
+   "role": "tolerance (decides a branch)",
+   "decides": "How close to an integer a value must be to count as one.",
+   "file": "src/rietx/io/formats/base.py",
+   "line": 551
+  },
+  "rietx.io.formats.bruker_raw._MAGIC": {
+   "role": "format layout (magic strings)",
+   "decides": "The four magic strings, longest first so ``RAW1.01`` is not read as ``RAW `` would be if the test were four bytes for every version.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 107
+  },
+  "rietx.io.formats.bruker_raw._V4_SEGMENTS": {
+   "role": "format layout",
+   "decides": "Where the v4 segment chain begins — the only fixed offset in the format past the preamble's date and time strings.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 116
+  },
+  "rietx.io.formats.bruker_raw._RANGE_MARKERS": {
+   "role": "format layout",
+   "decides": "Segment \"types\" that are not segments: each marks the start of a range.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 119
+  },
+  "rietx.io.formats.bruker_raw._SEG_KEYVALUE": {
+   "role": "format layout",
+   "decides": "Segment payload layouts, as offsets from the segment's own start.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 122
+  },
+  "rietx.io.formats.bruker_raw._SEG_SOURCE": {
+   "role": "format layout",
+   "decides": "64 skip, then Kα-mean/Kα1/Kα2/Kβ/ratio, then anode.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 123
+  },
+  "rietx.io.formats.bruker_raw._SEG_DRIVE": {
+   "role": "format layout",
+   "decides": "uint32 flag, char[24] name, 20 skip, float64 position.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 124
+  },
+  "rietx.io.formats.bruker_raw._MIN_DATUM": {
+   "role": "runaway guard",
+   "decides": "A datum is at least one float32 (4 bytes); anything smaller cannot hold an intensity.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 127
+  },
+  "rietx.io.formats.bruker_raw._MAX_RANGES": {
+   "role": "runaway guard",
+   "decides": "Runaway guards on numbers a corrupt or misread header can make enormous.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 132
+  },
+  "rietx.io.formats.bruker_raw._MAX_HEADER": {
+   "role": "runaway guard",
+   "decides": "Runaway guard on a v4 header's size, with _MAX_RANGES.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 133
+  },
+  "rietx.io.formats.bruker_raw._V3_SCAN_CODES": {
+   "role": "format layout",
+   "decides": "v3's numeric spelling of the names above.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 181
+  },
+  "rietx.io.formats.bruker_raw._V3_HEADER": {
+   "role": "format layout",
+   "decides": "The v3 file header, before the first range header.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 466
+  },
+  "rietx.io.formats.bruker_raw._V3_POINTS": {
+   "role": "format layout",
+   "decides": "v3 range-header field offsets that this reader reads, relative to its start.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 469
+  },
+  "rietx.io.formats.bruker_raw._V3_TWO_THETA_START": {
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 470
+  },
+  "rietx.io.formats.bruker_raw._V3_STEP": {
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 471
+  },
+  "rietx.io.formats.bruker_raw._V3_STEP_TIME": {
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 472
+  },
+  "rietx.io.formats.bruker_raw._V3_SCAN_TYPE": {
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 473
+  },
+  "rietx.io.formats.bruker_raw._V3_TEMPERATURE": {
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 474
+  },
+  "rietx.io.formats.bruker_raw._V3_WAVELENGTH": {
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 475
+  },
+  "rietx.io.formats.bruker_raw._V3_VARYING": {
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 476
+  },
+  "rietx.io.formats.bruker_raw._V3_RECORD_LENGTH": {
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 477
+  },
+  "rietx.io.formats.bruker_raw._V3_EXTRA_RECORDS": {
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 478
+  },
+  "rietx.io.formats.bruker_raw._V3_MIN_HEADER": {
+   "role": "format layout",
+   "decides": "the last field read above ends here, so a header shorter than this is not one.",
+   "file": "src/rietx/io/formats/bruker_raw.py",
+   "line": 480
+  },
+  "rietx.io.formats.dif._MIN_ROWS": {
+   "role": "dispatch gate",
+   "decides": "How many reflection rows before it is a peak list rather than a coincidence.",
+   "file": "src/rietx/io/formats/dif.py",
+   "line": 43
+  },
+  "rietx.io.formats.gsas._GSAS_TIME_MAP_SCAN_BYTES": {
+   "role": "sniff bound",
+   "decides": "A ``TIME_MAP`` step table is written *before* the bank it feeds, and a long one pushes the first ``BANK`` record past the 4 kB ``head`` window the sniff reads — a real HIPD@LANSCE file (``vnb5053.dat`` from the GSAS distribution's own examples) carries a 71-row ``(10I8)`` table and its first bank sits at byte 6068, so the sniff missed it and the file fell to the ``xy`` catch-all and was refused for the wrong cause; ``TIME_MAP`` in the first 4 kB now triggers one more read up to this bound, and a larger table stays unsniffed.",
+   "file": "src/rietx/io/formats/gsas.py",
+   "line": 251
+  },
+  "rietx.io.formats.gsas.TIME_MAP_FIELD_CHARS": {
+   "role": "format layout",
+   "decides": "Width of one field of a ``TIME_MAP`` table record, in characters.",
+   "file": "src/rietx/io/formats/gsas.py",
+   "line": 643
+  },
+  "rietx.io.formats.gsas.ESD_FIELD_CHARS": {
+   "role": "format layout",
+   "decides": "Width of one field of an **ESD** bank's data record, in characters.",
+   "file": "src/rietx/io/formats/gsas.py",
+   "line": 926
+  },
+  "rietx.io.formats.peaklist._MIN_ROWS": {
+   "role": "dispatch gate",
+   "decides": "How many such rows before the head is a profile rather than a coincidence.",
+   "file": "src/rietx/io/formats/peaklist.py",
+   "line": 62
+  },
+  "rietx.io.formats.philips_rd._DATA_START": {
+   "role": "format layout",
+   "decides": "The magic at offset 0, and where that version's intensities begin.",
+   "file": "src/rietx/io/formats/philips_rd.py",
+   "line": 72
+  },
+  "rietx.io.formats.philips_rd._ANODE_AT": {
+   "role": "format layout",
+   "decides": "Offsets of the header fields this reader uses.",
+   "file": "src/rietx/io/formats/philips_rd.py",
+   "line": 77
+  },
+  "rietx.io.formats.philips_rd._WAVELENGTHS_AT": {
+   "role": "format layout",
+   "decides": "3 × float64: λα1, λα2, α2/α1 ratio.",
+   "file": "src/rietx/io/formats/philips_rd.py",
+   "line": 78
+  },
+  "rietx.io.formats.philips_rd._MAX_VALUE_AT": {
+   "role": "format layout",
+   "decides": "uint16, equal to max(v) in all 28 real files.",
+   "file": "src/rietx/io/formats/philips_rd.py",
+   "line": 79
+  },
+  "rietx.io.formats.philips_rd._FILE_NAME_AT": {
+   "role": "format layout",
+   "decides": "8 bytes.",
+   "file": "src/rietx/io/formats/philips_rd.py",
+   "line": 80
+  },
+  "rietx.io.formats.philips_rd._SAMPLE_AT": {
+   "role": "format layout",
+   "decides": "20 bytes.",
+   "file": "src/rietx/io/formats/philips_rd.py",
+   "line": 81
+  },
+  "rietx.io.formats.philips_rd._SCAN_AT": {
+   "role": "format layout",
+   "decides": "3 × float64: step, start 2θ, end 2θ.",
+   "file": "src/rietx/io/formats/philips_rd.py",
+   "line": 82
+  },
+  "rietx.io.formats.philips_rd._ANODES": {
+   "role": "vocabulary / lookup",
+   "decides": "The anode code table, from the two descriptions and confirmed on the real files: all 28 read 0, and the kit's own prose independently says a Cu tube.",
+   "file": "src/rietx/io/formats/philips_rd.py",
+   "line": 95
+  },
+  "rietx.io.formats.ras._SPEED_UNIT_SECONDS": {
+   "role": "vocabulary / lookup",
+   "decides": "``*MEAS_SCAN_SPEED_UNIT`` → seconds per unit of the speed's denominator.",
+   "file": "src/rietx/io/formats/ras.py",
+   "line": 103
+  },
+  "rietx.io.formats.rasx.MAX_MEMBER_BYTES": {
+   "role": "runaway guard",
+   "decides": "How much of any one member may be read.",
+   "file": "src/rietx/io/formats/rasx.py",
+   "line": 78
+  },
+  "rietx.io.formats.rasx._SPEED_UNIT_SECONDS": {
+   "role": "vocabulary / lookup",
+   "decides": "``SpeedUnit`` → seconds per unit of the speed's denominator, the same reading ``.ras`` needs: real files say ``deg/min``, and assuming seconds would make every derived counting time 60× short and every σ wrong by √60.",
+   "file": "src/rietx/io/formats/rasx.py",
+   "line": 83
+  },
+  "rietx.io.formats.xy._XYDATA_HEADING_LINES": {
+   "role": "format layout",
+   "decides": "How many lines an ``XYDATA`` file's heading takes, the keyword line included (the keyword, then five heading lines); the reader skips them before the numbers.",
+   "file": "src/rietx/io/formats/xy.py",
+   "line": 141
+  },
+  "rietx.io.instrument_profile._PRCF_TYPE_3": {
+   "role": "format layout",
+   "decides": "``INS n PRCF1 <type> <ncoef> <cutoff>`` — the profile-function type this reader reads.",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 262
+  },
+  "rietx.io.instrument_profile._PRCF_TYPE_REFUSALS": {
+   "role": "vocabulary / lookup",
+   "decides": "Names of the PRCF profile types a .prm reader refuses, for its refusal message.",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 263
+  },
+  "rietx.io.instrument_profile._PRCF_MAPPED": {
+   "role": "vocabulary / lookup",
+   "decides": "The type-3 coefficients this reader maps, **named from the one table that holds them** (``CW_PROFILE_COEFFICIENTS``, ``io/projects/gsas.py``) rather than restated here: ``GU GV GW`` and ``LX LY`` onto ``ProfileTCHZ``, ``S/L`` and ``H/L`` onto ``Geometry``, ``GP`` refused unless it is zero. Two readers unpacking one coefficient order from two lists is how they come to disagree, so this one is a slice of the other's.",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 275
+  },
+  "rietx.io.instrument_profile._BANK_COLUMNS": {
+   "role": "format layout",
+   "decides": "A ``.prm`` record's 12-byte key, by column: ``INS``, a three-column bank number, then the record's own name from column 6. The bank columns are blank on the file-wide records (``BANK``, ``HTYPE``) and carry the bank number on the rest.",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 302
+  },
+  "rietx.io.instrument_profile._NAME_COLUMNS": {
+   "role": "format layout",
+   "decides": "Same group as _BANK_COLUMNS: A ``.prm`` record's 12-byte key, by column: ``INS``, a three-column bank number, then the record's own name from column 6. The bank columns are blank on the file-wide records (``BANK``, ``HTYPE``) and carry the bank number on the rest.",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 303
+  },
+  "rietx.io.instrument_profile._PRM_COEFFICIENT_COLUMNS": {
+   "role": "format layout",
+   "decides": "The ``PRCF`` continuation records are ``4E15.6``, so a coefficient gets fifteen columns where a ``.EXP``'s cell edge gets ten.",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 994
+  },
+  "rietx.io.instrument_profile._PRM_PER_RECORD": {
+   "role": "format layout",
+   "decides": "Same group as _PRM_COEFFICIENT_COLUMNS: The ``PRCF`` continuation records are ``4E15.6``, so a coefficient gets fifteen columns where a ``.EXP``'s cell edge gets ten.",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 995
+  },
+  "rietx.io.instrument_profile._PRM_COEFFICIENT_DIGITS": {
+   "role": "format layout",
+   "decides": "One of those fifteen columns is **reserved as a separator**, so a value is written into fourteen and right-justified into fifteen.",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 1009
+  },
+  "rietx.io.instrument_profile._PRM_BANK": {
+   "role": "format layout",
+   "decides": "What this writer states on the two file-wide records.",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 1014
+  },
+  "rietx.io.instrument_profile._PRM_CUTOFF": {
+   "role": "format layout",
+   "decides": "The cutoff a .prm writer states on PRCF1.",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 1015
+  },
+  "rietx.io.instrument_profile._PRM_CENTIDEG_SQUARED": {
+   "role": "unit conversion",
+   "decides": "``S/L`` and ``H/L`` are dimensionless and cross unconverted; the rest are the inverse of ``read_gsas_prm``'s own centidegree division, written here as the multiplication it is so the two cannot drift apart. ``GU GV GW`` are the coefficients of a Gaussian *variance* in centidegrees², the squared factor; ``profile.u/v/w`` are those of the Gaussian FWHM² in degrees² (Γ² = 8 ln 2 · σ²).",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 1020
+  },
+  "rietx.io.instrument_profile._PRM_CENTIDEG": {
+   "role": "unit conversion",
+   "decides": "Same group as _PRM_CENTIDEG_SQUARED: ``S/L`` and ``H/L`` are dimensionless and cross unconverted; the rest are the inverse of ``read_gsas_prm``'s own centidegree division, written here as the multiplication it is so the two cannot drift apart. ``GU GV GW`` are the coefficients of a Gaussian *variance* in centidegrees², the squared factor; ``profile.u/v/w`` are those of the Gaussian FWHM² in degrees² (Γ² = 8 ln 2 · σ²).",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 1021
+  },
+  "rietx.io.instrument_profile.INSTPRM_SHL_FLOOR": {
+   "role": "foreign program's floor",
+   "decides": "GSAS-II floors the axial-divergence sum at this when it evaluates a profile (``GSASIIpwd.SetInstParms``: ``max(instDict['SH/L'], 0.002)``), so a smaller one is written faithfully and still read as 0.002 by the program the file is for.",
+   "file": "src/rietx/io/instrument_profile.py",
+   "line": 1275
+  },
+  "rietx.io.instrument_tof.PRCF_COEFFICIENT_NAMES": {
+   "role": "vocabulary / lookup",
+   "decides": "Documented coefficient names, in the manual's \"respectively\" order (p. 144, 147, 148) — the only ordering the documentation offers.",
+   "file": "src/rietx/io/instrument_tof.py",
+   "line": 151
+  },
+  "rietx.io.instrument_tof._PRCF_TO_PROFILE": {
+   "role": "vocabulary / lookup",
+   "decides": "Which documented names land on which :class:`ProfileTOF` field.",
+   "file": "src/rietx/io/instrument_tof.py",
+   "line": 162
+  },
+  "rietx.io.instrument_tof._PRCF_NOT_EVALUATED": {
+   "role": "vocabulary / lookup",
+   "decides": "Documented profile functions this package does not evaluate, and why.",
+   "file": "src/rietx/io/instrument_tof.py",
+   "line": 171
+  },
+  "rietx.io.instrument_tof._BANK_FIELDS": {
+   "role": "format layout",
+   "decides": "Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary.",
+   "file": "src/rietx/io/instrument_tof.py",
+   "line": 182
+  },
+  "rietx.io.instrument_tof._ICONS_FIELDS": {
+   "role": "format layout",
+   "decides": "Same group as _BANK_FIELDS: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary.",
+   "file": "src/rietx/io/instrument_tof.py",
+   "line": 183
+  },
+  "rietx.io.instrument_tof._BNKPAR_FIELDS": {
+   "role": "format layout",
+   "decides": "Same group as _BANK_FIELDS: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary.",
+   "file": "src/rietx/io/instrument_tof.py",
+   "line": 186
+  },
+  "rietx.io.instrument_tof._ITYP_FIELDS": {
+   "role": "format layout",
+   "decides": "Same group as _BANK_FIELDS: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary.",
+   "file": "src/rietx/io/instrument_tof.py",
+   "line": 189
+  },
+  "rietx.io.instrument_tof._PRCF_FIELDS": {
+   "role": "format layout",
+   "decides": "Same group as _BANK_FIELDS: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary.",
+   "file": "src/rietx/io/instrument_tof.py",
+   "line": 191
+  },
+  "rietx.io.instrument_tof._E15_FIELDS": {
+   "role": "format layout",
+   "decides": "Same group as _BANK_FIELDS: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary.",
+   "file": "src/rietx/io/instrument_tof.py",
+   "line": 192
+  },
+  "rietx.io.legacy.lansce_iparm.LEGACY_PRCF1_NCOF": {
+   "role": "format layout",
+   "decides": "The legacy block's declared coefficient count for profile function 1.",
+   "file": "src/rietx/io/legacy/lansce_iparm.py",
+   "line": 74
+  },
+  "rietx.io.legacy.lansce_iparm.LEGACY_PRCF1_SLOT_NAMES": {
+   "role": "vocabulary / lookup",
+   "decides": "The eight slots, named as slots 1-8 of the documented twelve (GSAS Technical Manual p. 144) — confirmed by GSAS-II v5.8.2 reading an 8-slot and a 12-slot block slot for slot alike.",
+   "file": "src/rietx/io/legacy/lansce_iparm.py",
+   "line": 79
+  },
+  "rietx.io.legacy.lansce_iparm._BNKPAR_REALS": {
+   "role": "format layout",
+   "decides": "How many of ``BNKPAR``'s fields are reals (DIST TTHETA TILT SEPN HGHT); the rest (NTUBE ITUBE) are integers, in its documented layout of 5F10 then 2I5.",
+   "file": "src/rietx/io/legacy/lansce_iparm.py",
+   "line": 88
+  },
+  "rietx.io.legacy.lansce_iparm._ZERO_E15": {
+   "role": "format layout",
+   "decides": "A zero written in E15.6 for padded coefficient slots.",
+   "file": "src/rietx/io/legacy/lansce_iparm.py",
+   "line": 90
+  },
+  "rietx.io.projects.fullprof._N_T_EXTRA_LINES": {
+   "role": "format layout",
+   "decides": "What a nuclear phase's ``N_t`` adds to each atom.",
+   "file": "src/rietx/io/projects/fullprof.py",
+   "line": 378
+  },
+  "rietx.io.projects.fullprof._NAM_WIDTH": {
+   "role": "format layout",
+   "decides": "LINE 12's ``NAM`` field width (manual: \"Character A4\").",
+   "file": "src/rietx/io/projects/fullprof.py",
+   "line": 770
+  },
+  "rietx.io.projects.fullprof._USER_B_ATOL_FM": {
+   "role": "tolerance (decides a branch)",
+   "decides": "How far a LINE-12 ``DFP`` may sit from the Sears b of the isotope its ``NAM`` names and still be read as that isotope, in fm.",
+   "file": "src/rietx/io/projects/fullprof.py",
+   "line": 776
+  },
+  "rietx.io.projects.fullprof._DISPERSION_ATOL_E": {
+   "role": "tolerance (decides a branch)",
+   "decides": "How far a stated f′ or f″ may sit from rietx's Cromer-Liberman value at the file's wavelength and still be read as the same model, in electrons.",
+   "file": "src/rietx/io/projects/fullprof.py",
+   "line": 870
+  },
+  "rietx.io.projects.fullprof._RHOMBOHEDRAL_LENGTH_RTOL": {
+   "role": "tolerance (decides a branch)",
+   "decides": "How far a cell may stray from ``a = b = c``/``α = β = γ`` and still be called rhombohedral axes.",
+   "file": "src/rietx/io/projects/fullprof.py",
+   "line": 1012
+  },
+  "rietx.io.projects.fullprof._RHOMBOHEDRAL_ANGLE_ATOL": {
+   "role": "tolerance (decides a branch)",
+   "decides": "Same group as _RHOMBOHEDRAL_LENGTH_RTOL: How far a cell may stray from ``a = b = c``/``α = β = γ`` and still be called rhombohedral axes.",
+   "file": "src/rietx/io/projects/fullprof.py",
+   "line": 1013
+  },
+  "rietx.io.projects.fullprof._OCCUPANCY_RTOL": {
+   "role": "tolerance (decides a branch)",
+   "decides": "How far the per-site occupancy ratios may spread and still be called constant.",
+   "file": "src/rietx/io/projects/fullprof.py",
+   "line": 1934
+  },
+  "rietx.io.projects.fullprof._MAGNETIC_MATCH_ATOL": {
+   "role": "tolerance (decides a branch)",
+   "decides": "How close two numbers the stance below compares must be, and why each is what it is.",
+   "file": "src/rietx/io/projects/fullprof.py",
+   "line": 2003
+  },
+  "rietx.io.projects.fullprof._CELL_TIE_MULTIPLIER_TOL": {
+   "role": "float-equality tolerance",
+   "decides": "Two decoded multipliers count as the same coefficient within this tolerance.",
+   "file": "src/rietx/io/projects/fullprof.py",
+   "line": 2468
+  },
+  "rietx.io.projects.gsas.RECORD_BYTES": {
+   "role": "format layout",
+   "decides": "One record: 80 characters, of which the first 12 are the fetch key.",
+   "file": "src/rietx/io/projects/gsas.py",
+   "line": 99
+  },
+  "rietx.io.projects.gsas.KEY_BYTES": {
+   "role": "format layout",
+   "decides": "Same group as RECORD_BYTES: One record: 80 characters, of which the first 12 are the fetch key.",
+   "file": "src/rietx/io/projects/gsas.py",
+   "line": 100
+  },
+  "rietx.io.projects.gsas.CW_PROFILE_COEFFICIENTS": {
+   "role": "vocabulary / lookup",
+   "decides": "Coefficient names per constant-wavelength profile function, from the manual's own naming sentences.",
+   "file": "src/rietx/io/projects/gsas.py",
+   "line": 122
+  },
+  "rietx.io.projects.gsas.CW_CENTIDEG_POWER": {
+   "role": "vocabulary / lookup",
+   "decides": "Power of centidegrees each named coefficient carries, for the conversion to degrees.",
+   "file": "src/rietx/io/projects/gsas.py",
+   "line": 135
+  },
+  "rietx.io.projects.gsas.BACKGROUND_FUNCTIONS": {
+   "role": "vocabulary / lookup",
+   "decides": "What each GSAS background function is, in this package's words.",
+   "file": "src/rietx/io/projects/gsas.py",
+   "line": 301
+  },
+  "rietx.io.projects.gsas.EIGHT_PI_SQUARED": {
+   "role": "unit conversion",
+   "decides": "Uiso (Å²) → Biso (Å²).",
+   "file": "src/rietx/io/projects/gsas.py",
+   "line": 1367
+  },
+  "rietx.io.projects.gsas._WRITE_NUMBER": {
+   "role": "format layout",
+   "decides": "The column widths the writer fills, each quoted from the read above rather than restated.",
+   "file": "src/rietx/io/projects/gsas.py",
+   "line": 1668
+  },
+  "rietx.io.projects.gsas._WRITE_LABEL": {
+   "role": "format layout",
+   "decides": "Same group as _WRITE_NUMBER: The column widths the writer fills, each quoted from the read above rather than restated.",
+   "file": "src/rietx/io/projects/gsas.py",
+   "line": 1669
+  },
+  "rietx.io.projects.gsas._WRITE_MAX_PHASES": {
+   "role": "format layout",
+   "decides": "The two counts the *format* cannot exceed, as opposed to this build: ``EXPR NPHAS`` states nine phase types in nine ``I5`` fields, and the ``ATmmmA`` key numbers a site in three columns.",
+   "file": "src/rietx/io/projects/gsas.py",
+   "line": 1675
+  },
+  "rietx.io.projects.gsas._WRITE_MAX_ATOMS": {
+   "role": "format layout",
+   "decides": "Same group as _WRITE_MAX_PHASES: The two counts the *format* cannot exceed, as opposed to this build: ``EXPR NPHAS`` states nine phase types in nine ``I5`` fields, and the ``ATmmmA`` key numbers a site in three columns.",
+   "file": "src/rietx/io/projects/gsas.py",
+   "line": 1676
+  },
+  "rietx.io.projects.gsas._WRITE_VERSION": {
+   "role": "format layout",
+   "decides": "The ``VERSION`` this writer stamps — the edition :data:`SPEC` names, which is the one ``FAP.EXP`` states.",
+   "file": "src/rietx/io/projects/gsas.py",
+   "line": 1681
+  },
+  "rietx.io.projects.gsas2.CW_CENTIDEGREE_POWER": {
+   "role": "vocabulary / lookup",
+   "decides": "Power of centidegrees each CW coefficient carries, for the conversion to degrees.",
+   "file": "src/rietx/io/projects/gsas2.py",
+   "line": 353
+  },
+  "rietx.io.projects.gsas2.EIGHT_PI_SQUARED": {
+   "role": "unit conversion",
+   "decides": "Uiso (Å²) → Biso (Å²).",
+   "file": "src/rietx/io/projects/gsas2.py",
+   "line": 1473
+  },
+  "rietx.io.projects.registry.INP_SNIFF_BYTES": {
+   "role": "sniff bound",
+   "decides": "How much of a ``.inp`` a sniff may read.",
+   "file": "src/rietx/io/projects/registry.py",
+   "line": 72
+  },
+  "rietx.io.projects.topas._MOMENT_COMPONENT_KEYS": {
+   "role": "vocabulary / lookup",
+   "decides": "The three components of :data:`_MOMENT_KEYS`, without the g.",
+   "file": "src/rietx/io/projects/topas.py",
+   "line": 1923
+  },
+  "rietx.io.projects.topas._CELL_MACROS": {
+   "role": "vocabulary / lookup",
+   "decides": "The cell macros this reader implements, each enumerated and cited individually.",
+   "file": "src/rietx/io/projects/topas.py",
+   "line": 2242
+  },
+  "rietx.io.projects.topas._CELL_MACRO_LIST": {
+   "role": "vocabulary / lookup",
+   "decides": "The macro names a refusal message may offer, derived from :data:`_CELL_MACROS` so the two cannot drift.",
+   "file": "src/rietx/io/projects/topas.py",
+   "line": 2262
+  },
+  "rietx.io.projects.topas._TOPAS_NO_S_SUFFIX": {
+   "role": "foreign program behaviour (measured)",
+   "decides": "Origin-choice-1 groups of these space-group numbers are the ones TOPAS 6 stops on when written with its ``S`` suffix: they are axis permutations of #50 and #68, and only their bare symbols generate (checked over all 33 groups with an origin choice).",
+   "file": "src/rietx/io/projects/topas.py",
+   "line": 4574
+  },
+  "rietx.io.projects.topas._STEPHENS_K": {
+   "role": "unit conversion",
+   "decides": "The degrees-per-radian × 10⁻⁶ of Stephens' equation (2), spelled once, so the written constant is the double ``stephens.strain_width_deg`` multiplies by.",
+   "file": "src/rietx/io/projects/topas.py",
+   "line": 4891
+  },
+  "rietx.io.projects.topas_input._TCH_GAMMA": {
+   "role": "published constants (cited)",
+   "decides": "The Thompson-Cox-Hastings constants rietx uses (``model.profiles.pseudovoigt`` ``_TCH_GAMMA``/``_TCH_ETA``; Thompson, Cox & Hastings 1987). Written into the file rather than left to a TOPAS macro, so the profile TOPAS computes is rietx's: the Technical Reference prints 0.1116 for the cubic η term where TCH (1987) and rietx have 0.11116.",
+   "file": "src/rietx/io/projects/topas_input.py",
+   "line": 58
+  },
+  "rietx.io.projects.topas_input._TCH_ETA": {
+   "role": "published constants (cited)",
+   "decides": "Same group as _TCH_GAMMA: The Thompson-Cox-Hastings constants rietx uses (``model.profiles.pseudovoigt`` ``_TCH_GAMMA``/``_TCH_ETA``; Thompson, Cox & Hastings 1987). Written into the file rather than left to a TOPAS macro, so the profile TOPAS computes is rietx's: the Technical Reference prints 0.1116 for the cubic η term where TCH (1987) and rietx have 0.11116.",
+   "file": "src/rietx/io/projects/topas_input.py",
+   "line": 59
+  },
+  "rietx.io.projects.topas_input._SABINE_LAUE": {
+   "role": "published constants (cited)",
+   "decides": "rietx's Sabine extinction constants (``model.extinction``).",
+   "file": "src/rietx/io/projects/topas_input.py",
+   "line": 61
+  },
+  "rietx.io.projects.topas_input._SABINE_XPOL": {
+   "role": "published constants (cited)",
+   "decides": "Same group as _SABINE_LAUE: rietx's Sabine extinction constants (``model.extinction``).",
+   "file": "src/rietx/io/projects/topas_input.py",
+   "line": 62
+  },
+  "rietx.io.projects.topas_input.DEFAULT_RADIUS_MM": {
+   "role": "written-file convention",
+   "decides": "The goniometer radius written when the instrument states none.",
+   "file": "src/rietx/io/projects/topas_input.py",
+   "line": 66
+  },
+  "rietx.io.projects.topas_input.CALC_POINTS_PER_FWHM": {
+   "role": "written-file convention",
+   "decides": "Calculation points per narrowest FWHM asked of TOPAS (``convolution_step``).",
+   "file": "src/rietx/io/projects/topas_input.py",
+   "line": 555
+  },
+  "rietx.io.projects.topas_refined.NEUTRON_SCALE_FACTOR": {
+   "role": "unit conversion",
+   "decides": "TOPAS's scale over rietx's for a constant-wavelength neutron pattern: TOPAS states |F|² in barn (10² fm²) where rietx states it in fm² (module docstring).",
+   "file": "src/rietx/io/projects/topas_refined.py",
+   "line": 58
+  },
+  "rietx.io.readers.TWO_THETA_MAX_DEG": {
+   "role": "physical limit (gates a refusal)",
+   "decides": "No scattering angle exceeds this, so an axis running past it is not 2θ.",
+   "file": "src/rietx/io/readers.py",
+   "line": 143
+  },
+  "rietx.io.recipe.GAUSS_CENTIDEG2_TO_DEG2": {
+   "role": "unit conversion",
+   "decides": "GSAS-II Gaussian variance (centideg²) → a Caglioti FWHM² term (deg²).",
+   "file": "src/rietx/io/recipe.py",
+   "line": 150
+  },
+  "rietx.io.recipe.CENTIDEG_TO_DEG": {
+   "role": "unit conversion",
+   "decides": "GSAS-II Lorentzian FWHM (centideg) → deg.",
+   "file": "src/rietx/io/recipe.py",
+   "line": 153
+  },
+  "rietx.io.recipe.SIZE_COEF_DEG": {
+   "role": "convention (measured against GSAS-II)",
+   "decides": "Coefficient of λ[Å]/(D[µm]·cosθ) in the GSAS-II isotropic size FWHM, in degrees.",
+   "file": "src/rietx/io/recipe.py",
+   "line": 158
+  },
+  "rietx.io.recipe.STRAIN_COEF_DEG": {
+   "role": "convention (measured against GSAS-II)",
+   "decides": "Coefficient of µ[1e-6 Δd/d]·tanθ in the GSAS-II isotropic strain FWHM, deg.",
+   "file": "src/rietx/io/recipe.py",
+   "line": 161
+  },
+  "rietx.io.recipe.EIGHT_PI_SQ": {
+   "role": "unit conversion",
+   "decides": "Uiso (Å²) → Biso (Å²).",
+   "file": "src/rietx/io/recipe.py",
+   "line": 164
+  },
+  "rietx.io.recipe.GSASII_DEFAULT_SIZE_UM": {
+   "role": "foreign program's default (measured)",
+   "decides": "What GSAS-II puts in a size/strain block whose magnitude the recipe leaves null, **measured** off the committed LaB6 reference rather than read from a manual: the peak list's ``gamma`` exceeds the instrument-only ``X/cosθ + Y·tanθ + Z`` by exactly ``1.8·λ/(π·D·cosθ) + 0.018·µ·tanθ/π`` centidegrees at these two values, on every reflection. Two free constants landing on round numbers across 49 reflections is not a coincidence.",
+   "file": "src/rietx/io/recipe.py",
+   "line": 1247
+  },
+  "rietx.io.recipe.GSASII_DEFAULT_MICROSTRAIN": {
+   "role": "foreign program's default (measured)",
+   "decides": "Same group as GSASII_DEFAULT_SIZE_UM: What GSAS-II puts in a size/strain block whose magnitude the recipe leaves null, **measured** off the committed LaB6 reference rather than read from a manual: the peak list's ``gamma`` exceeds the instrument-only ``X/cosθ + Y·tanθ + Z`` by exactly ``1.8·λ/(π·D·cosθ) + 0.018·µ·tanθ/π`` centidegrees at these two values, on every reflection. Two free constants landing on round numbers across 49 reflections is not a coincidence.",
+   "file": "src/rietx/io/recipe.py",
+   "line": 1248
+  },
+  "rietx.crystallography.adp.VOIGT": {
+   "role": "vocabulary / lookup",
+   "decides": "Index pairs matching :data:`U_NAMES`.",
+   "file": "src/rietx/crystallography/adp.py",
+   "line": 52
+  },
+  "rietx.crystallography.atomic_volume.HOFMANN_VOLUMES": {
+   "role": "tabulated data (cited)",
+   "decides": "Hofmann (2002), Table 2: element → (v̄, Δv), Å³ at 298 K.",
+   "file": "src/rietx/crystallography/atomic_volume.py",
+   "line": 63
+  },
+  "rietx.crystallography.atomic_volume.THERMAL_EXPANSION": {
+   "role": "tabulated datum (cited)",
+   "decides": "ᾱ and its mean error, K⁻¹ (Hofmann 2002, § 3).",
+   "file": "src/rietx/crystallography/atomic_volume.py",
+   "line": 97
+  },
+  "rietx.crystallography.atomic_volume.THERMAL_EXPANSION_ESD": {
+   "role": "tabulated datum (cited)",
+   "decides": "Same group as THERMAL_EXPANSION: ᾱ and its mean error, K⁻¹ (Hofmann 2002, § 3).",
+   "file": "src/rietx/crystallography/atomic_volume.py",
+   "line": 98
+  },
+  "rietx.crystallography.atomic_volume.TABLE_TEMPERATURE": {
+   "role": "tabulated datum (cited)",
+   "decides": "The temperature Table 2 is quoted at, K.",
+   "file": "src/rietx/crystallography/atomic_volume.py",
+   "line": 100
+  },
+  "rietx.crystallography.atomic_volume.VOLUME_SCATTER": {
+   "role": "tabulated datum (cited)",
+   "decides": "Standard deviation of V_obs/V_est for one crystal (Hofmann 2002, § 3).",
+   "file": "src/rietx/crystallography/atomic_volume.py",
+   "line": 102
+  },
+  "rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS": {
+   "role": "threshold (statistical bound)",
+   "decides": "V_obs/V_est at the 25 % boundary of Hofmann (2002), § 3.",
+   "file": "src/rietx/crystallography/atomic_volume.py",
+   "line": 104
+  },
+  "rietx.crystallography.attenuation._HC_EV_ANGSTROM": {
+   "role": "physical constant",
+   "decides": "hc in eV·Å (CODATA), the conversion E[eV] = _HC_EV_ANGSTROM / wavelength[Å].",
+   "file": "src/rietx/crystallography/attenuation.py",
+   "line": 41
+  },
+  "rietx.crystallography.attenuation._NA_BARN": {
+   "role": "physical constant",
+   "decides": "Avogadro constant scaled for barn/atom -> cm^2/g conversion: mu/rho = sigma[barn] * 1e-24 * N_A / A = sigma * _NA_BARN / A.",
+   "file": "src/rietx/crystallography/attenuation.py",
+   "line": 45
+  },
+  "rietx.crystallography.cif.CIF_ANGLE_CORRECT_MAX_DEG": {
+   "role": "tolerance (decides a branch)",
+   "decides": "Largest disagreement between a stored cell angle and the value its space group fixes that :func:`structure_from_cif` will **correct and record** rather than leave for ``ParameterTable`` to refuse (WP-1028 §(j)).",
+   "file": "src/rietx/crystallography/cif.py",
+   "line": 52
+  },
+  "rietx.crystallography.cif.TWIN_DISTANCE": {
+   "role": "tolerance (decides a branch)",
+   "decides": "Two atoms of a structure closer than this are one atom stated twice (Å).",
+   "file": "src/rietx/crystallography/cif.py",
+   "line": 317
+  },
+  "rietx.crystallography.cif.OCCUPANCY_TOLERANCE": {
+   "role": "tolerance (decides a branch)",
+   "decides": "Two occupancies agree, and two sites fill a position without overfilling it, to within this (absolute).",
+   "file": "src/rietx/crystallography/cif.py",
+   "line": 324
+  },
+  "rietx.crystallography.cif.DUPLICATE_U_TOLERANCE": {
+   "role": "tolerance (decides a branch)",
+   "decides": "Two statements of one site agree on their displacement to within this (U, Å²).",
+   "file": "src/rietx/crystallography/cif.py",
+   "line": 330
+  },
+  "rietx.crystallography.cif.CIF_STATED_MULTIPLICITY_SNAP_TOL": {
+   "role": "tolerance (decides a branch)",
+   "decides": "How far :func:`structure_from_cif` will move a site to reach the special position the file's own ``_atom_site_symmetry_multiplicity`` states.",
+   "file": "src/rietx/crystallography/cif.py",
+   "line": 1016
+  },
+  "rietx.crystallography.dispersion.NEAR_EDGE_EV": {
+   "role": "threshold (decides a warning)",
+   "decides": "Within this distance of an absorption edge the *tabulation* is wrong in principle, not merely coarsely sampled: f″ there is the near-edge structure of the compound, which depends on coordination and oxidation state.",
+   "file": "src/rietx/crystallography/dispersion.py",
+   "line": 82
+  },
+  "rietx.crystallography.dispersion.LINE_DISPERSION_TOL": {
+   "role": "threshold (decides a refusal)",
+   "decides": "A single |F|² is shared across the source's emission lines, so f′/f″ are evaluated at the primary line only.",
+   "file": "src/rietx/crystallography/dispersion.py",
+   "line": 243
+  },
+  "rietx.crystallography.fragments.COLLINEAR_TOL": {
+   "role": "tolerance (numerical)",
+   "decides": "Below this sine of the angle at C between C→B and C→D, a Z-matrix line's reference triple B, C, D is collinear.",
+   "file": "src/rietx/crystallography/fragments.py",
+   "line": 83
+  },
+  "rietx.crystallography.fragments.INERTIA_RANK_TOL": {
+   "role": "tolerance (numerical)",
+   "decides": "An eigenvalue of the inertia tensor below this fraction of the largest is a null rotation.",
+   "file": "src/rietx/crystallography/fragments.py",
+   "line": 90
+  },
+  "rietx.crystallography.fragments._COINCIDENT_A2": {
+   "role": "tolerance (numerical)",
+   "decides": "The largest eigenvalue (Å²) below which the atoms coincide: no rotation DOF.",
+   "file": "src/rietx/crystallography/fragments.py",
+   "line": 93
+  },
+  "rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B": {
+   "role": "tolerance (decides a branch)",
+   "decides": "How far two statements of the same moment may differ before the file is refused as self-contradictory (μ_B per crystal-axis component).",
+   "file": "src/rietx/crystallography/magcif.py",
+   "line": 1334
+  },
+  "rietx.crystallography.magnetic.form_factor._G_REQUIRED_Z": {
+   "role": "element list (decides when g is required)",
+   "decides": "Atomic numbers whose ions need an explicit ``g``: the lanthanides (Ce-Lu) and the actinides (Th-Cm).",
+   "file": "src/rietx/crystallography/magnetic/form_factor.py",
+   "line": 168
+  },
+  "rietx.crystallography.magnetic.form_factor._J0": {
+   "role": "tabulated data (cited)",
+   "decides": "⟨j₀⟩ coefficients, keyed by ion (``\"Cr\"``, ``\"Cr3+\"``).",
+   "file": "src/rietx/crystallography/magnetic/form_factor.py",
+   "line": 175
+  },
+  "rietx.crystallography.magnetic.form_factor._J2": {
+   "role": "tabulated data (cited)",
+   "decides": "⟨j₂⟩ coefficients, same keys: every ion of :data:`_J0`.",
+   "file": "src/rietx/crystallography/magnetic/form_factor.py",
+   "line": 274
+  },
+  "rietx.crystallography.magnetic.form_factor._J0_LISHER": {
+   "role": "tabulated data (cited)",
+   "decides": "Lisher & Forsyth (1971) ⟨j₀⟩, Table 1 p. 545, and ⟨j₂⟩, Table 2 p. 546, in their 5-parameter form.",
+   "file": "src/rietx/crystallography/magnetic/form_factor.py",
+   "line": 376
+  },
+  "rietx.crystallography.magnetic.form_factor._J2_LISHER": {
+   "role": "tabulated data (cited)",
+   "decides": "Same group as _J0_LISHER: Lisher & Forsyth (1971) ⟨j₀⟩, Table 1 p. 545, and ⟨j₂⟩, Table 2 p. 546, in their 5-parameter form.",
+   "file": "src/rietx/crystallography/magnetic/form_factor.py",
+   "line": 379
+  },
+  "rietx.crystallography.magnetic.form_factor._ASSUMED_ION_SLJ": {
+   "role": "tabulated data (Hund's rule)",
+   "decides": "(S, L, J) Hund's-rule ground-term quantum numbers for every ion :data:`_ASSUMED_ION` can produce, keyed by the *assumed ion* (not the bare element) so a caller need not re-derive the term itself.",
+   "file": "src/rietx/crystallography/magnetic/form_factor.py",
+   "line": 528
+  },
+  "rietx.crystallography.magnetic.isotropy.INTENSITY_RTOL": {
+   "role": "tolerance (decides a branch)",
+   "decides": "Relative tolerance on |M⊥|² below which a reflection counts as absent, and on a singular value below which an amplitude counts as undeterminable.",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 220
+  },
+  "rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS": {
+   "role": "sampling count (sets a verdict's confidence)",
+   "decides": "Draws per direction on a pair no certificate settles, when the caller names none (issue #565, decision 3): 12 between two irreps, where 8 % of the cubic pairs that 3 draws called equivalent were refuted by a draw within 12 (0.2 % at 12), and 3 inside one irrep. On the cubic ``P n -3 m:1`` at (0, 0, ½) the raise is what gives the four classes of the known answer rather than two. The 3 within an irrep is not measured the same way (the 8 % was counted on cross-irrep pairs only) and applies only to two *different* directions of one irrep, since the isometry certificate settles the rank-1 copies without a draw; 12 there would cost about 4 min more on the known answer (an estimate, not a measurement).",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 235
+  },
+  "rietx.crystallography.magnetic.isotropy.WITHIN_IRREP_DRAWS": {
+   "role": "sampling count (sets a verdict's confidence)",
+   "decides": "Same group as CROSS_IRREP_DRAWS: Draws per direction on a pair no certificate settles, when the caller names none (issue #565, decision 3): 12 between two irreps, where 8 % of the cubic pairs that 3 draws called equivalent were refuted by a draw within 12 (0.2 % at 12), and 3 inside one irrep. On the cubic ``P n -3 m:1`` at (0, 0, ½) the raise is what gives the four classes of the known answer rather than two. The 3 within an irrep is not measured the same way (the 8 % was counted on cross-irrep pairs only) and applies only to two *different* directions of one irrep, since the isometry certificate settles the rank-1 copies without a draw; 12 there would cost about 4 min more on the known answer (an estimate, not a measurement).",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 236
+  },
+  "rietx.crystallography.magnetic.isotropy.ISOMETRY_RESIDUAL": {
+   "role": "tolerance (accept bound of a certificate)",
+   "decides": "The isometry certificate's accept bound (issue #565, part 3): the relative congruence residual max_s ‖QᵀG^B_sQ − G^A_s‖_max / max|G^A| and the orthogonality deviation ‖QᵀQ − I‖₂ of the quoted Q must both be at most this.",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 250
+  },
+  "rietx.crystallography.magnetic.isotropy.KERNEL_AMPLITUDE_RATIO": {
+   "role": "guard (certificate)",
+   "decides": "The full-stack guard of a Farkas certificate (issue #565, part 3, the promise made on #772).",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 267
+  },
+  "rietx.crystallography.magnetic.isotropy.FARKAS_FLOOR": {
+   "role": "tolerance (accept bound of a certificate)",
+   "decides": "The Farkas certificate's accept floor (issue #565, decision 2): a draw is certified only when the projected dual's optimum, λ_min/|λ|_max of Σ_s y_s G_s on the kernel-projected stack, is at least this.",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 278
+  },
+  "rietx.crystallography.magnetic.isotropy.FARKAS_QUOTE": {
+   "role": "tolerance (certificate)",
+   "decides": "The projected ratio the quoted certificate is moved inside to: the min-norm point sits on the PSD boundary to rounding (ratios −4e-16 to 2e-16 on the 49 draws), where an exact check can go either way between machines, so the certificate stored and checked is the nearest point toward the interior with at least this ratio (or half the interior anchor's, when that is lower). Two decades above ``FARKAS_FLOOR``; the per-certificate rounding bound (≤ 3.4e-14 measured) is more than three decades below it.",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 288
+  },
+  "rietx.crystallography.magnetic.isotropy.TRANSFER_FLOAT_STACK": {
+   "role": "threshold (decides a label)",
+   "decides": "A fit transfer (issue #565, item 6) whose margin μ = λ′/Γ on the target's projected live stack is below this is printed as \"proved on the float Gram stack\": the cone bound cos(ŷ, I) ≥ μ then sits within a few decades of the rounding allowance ρ, and the step from the float G_s to the exact ones (which no certificate here covers) can be a real share of it. A label, not a gate: the verdict rests on cos < μ − ρ either way. Measured on the 246 fit transfers of the six cubic sets (2026-09-30, both machines): μ 1.7e-9 to 3.5e-4, 14 below this, the largest ρ/μ 0.22.",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 298
+  },
+  "rietx.crystallography.magnetic.isotropy.DUAL_AFTER_RESTART": {
+   "role": "cost schedule",
+   "decides": "The restart after which a failed fit is handed to the Farkas dual.",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 305
+  },
+  "rietx.crystallography.magnetic.isotropy.DEFAULT_CELL_SCALE": {
+   "role": "internal scale (sets nothing)",
+   "decides": "Shortest axis of the default compatible cell, Å.",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 310
+  },
+  "rietx.crystallography.magnetic.isotropy._CLOSURE_LIMIT": {
+   "role": "runaway guard",
+   "decides": "Guard for :func:`_close_operations`: every crystallographic (little group x lattice index) case this module builds is far under this, so reaching it is a bug in the seed list, not a tolerance to raise.",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 821
+  },
+  "rietx.crystallography.magnetic.isotropy._SPAN_GAP": {
+   "role": "numerical-method constant",
+   "decides": "The relative singular values :func:`_intensity_span` must have none of.",
+   "file": "src/rietx/crystallography/magnetic/isotropy.py",
+   "line": 2509
+  },
+  "rietx.crystallography.magnetic.moments.MOMENT_DIRECTION_SUPPORT": {
+   "role": "threshold (decides a hold)",
+   "decides": "A moment direction whose calculated-pattern response is this far below the modulus's measures nothing (WP-1327).",
+   "file": "src/rietx/crystallography/magnetic/moments.py",
+   "line": 144
+  },
+  "rietx.crystallography.magnetic.moments.DOF_NAMES": {
+   "role": "vocabulary / lookup",
+   "decides": "Parameter names of the moment DOFs, by subspace dimension.",
+   "file": "src/rietx/crystallography/magnetic/moments.py",
+   "line": 149
+  },
+  "rietx.crystallography.magnetic.moments.DOF_UNITS": {
+   "role": "vocabulary / lookup",
+   "decides": "Units of those DOFs, in the same order.",
+   "file": "src/rietx/crystallography/magnetic/moments.py",
+   "line": 157
+  },
+  "rietx.crystallography.magnetic.moments.SEED_TILT": {
+   "role": "seed (changes a starting value)",
+   "decides": "Fraction of the modulus placed on every :func:`moment_frame` row *beyond the first* by :func:`tilted_seed`.",
+   "file": "src/rietx/crystallography/magnetic/moments.py",
+   "line": 236
+  },
+  "rietx.crystallography.magnetic.operators.N_MAGNETIC_SPACE_GROUPS": {
+   "role": "count (classification fact)",
+   "decides": "Number of magnetic space groups (Litvin 2013), in UNI numbering 1-1651.",
+   "file": "src/rietx/crystallography/magnetic/operators.py",
+   "line": 98
+  },
+  "rietx.crystallography.magnetic.operators.IDENTITY": {
+   "role": "numerical-method constant",
+   "decides": "The identity operator, the seed of operator closures.",
+   "file": "src/rietx/crystallography/magnetic/operators.py",
+   "line": 327
+  },
+  "rietx.crystallography.magnetic.operators.TIME_REVERSAL": {
+   "role": "numerical-method constant",
+   "decides": "The pure time reversal 1'.",
+   "file": "src/rietx/crystallography/magnetic/operators.py",
+   "line": 331
+  },
+  "rietx.crystallography.magnetic.operators._MAX_CODE": {
+   "role": "runaway guard",
+   "decides": "Largest code an int64 mixed-radix key may reach before :func:`_closure_gap` gives up on the vectorised form.",
+   "file": "src/rietx/crystallography/magnetic/operators.py",
+   "line": 1397
+  },
+  "rietx.crystallography.magnetic.p1._WRAP_TOL": {
+   "role": "tolerance (numerical)",
+   "decides": "A coordinate this close to the next lattice point after wrapping is that point: ``-1e-17 % 1.0`` is ``1.0`` in floating point, which is outside [0, 1).",
+   "file": "src/rietx/crystallography/magnetic/p1.py",
+   "line": 70
+  },
+  "rietx.crystallography.magnetic.scattering.P_MAGNETIC_FM": {
+   "role": "physical constant",
+   "decides": "p = γ·r₀/2, the magnetic scattering length of one Bohr magneton, in **fm** — the unit ``crystallography.neutron``'s Sears table gives b in, which is what lets |F_m|² and |F_N|² share one scale (issue #257 A6 iv).",
+   "file": "src/rietx/crystallography/magnetic/scattering.py",
+   "line": 76
+  },
+  "rietx.crystallography.magnetic.scattering.METRIC_TOL": {
+   "role": "tolerance (numerical)",
+   "decides": "|RᵀGR − G| / max|G| above which a magnetic operation is not a symmetry of the cell.",
+   "file": "src/rietx/crystallography/magnetic/scattering.py",
+   "line": 198
+  },
+  "rietx.crystallography.magnetic.scattering.INVARIANCE_POS_TOL": {
+   "role": "tolerance (numerical)",
+   "decides": "fractional-coordinate tolerance for matching an image to an atom of the compiled structure.",
+   "file": "src/rietx/crystallography/magnetic/scattering.py",
+   "line": 202
+  },
+  "rietx.crystallography.magnetic.scattering.INVARIANCE_MOMENT_TOL": {
+   "role": "tolerance (numerical)",
+   "decides": "moment tolerance for the same match, μ_B, relative to max(1, |m|)",
+   "file": "src/rietx/crystallography/magnetic/scattering.py",
+   "line": 204
+  },
+  "rietx.crystallography.neutron.RESONANCE_ENERGY_EV": {
+   "role": "tabulated data (cited)",
+   "decides": "Energy (eV) of the **lowest positive-energy resonance** of each nuclide that makes it a resonant absorber, from the resolved-resonance parameters of ENDF/B-VIII.0 (Brown et al. 2018, *Nucl. Data Sheets* **148**, 1); the lowest one sets how far a thermal wavelength sits from the resonance; bound (negative-energy) levels are left out.",
+   "file": "src/rietx/crystallography/neutron.py",
+   "line": 80
+  },
+  "rietx.crystallography.neutron.NEUTRON_LAMBDA_EV_ANGSTROM": {
+   "role": "physical constant",
+   "decides": "λ(Å) = NEUTRON_LAMBDA_EV_ANGSTROM / sqrt(E / eV): h / sqrt(2 m_n E) with CODATA 2018 h, m_n and e.",
+   "file": "src/rietx/crystallography/neutron.py",
+   "line": 93
+  },
+  "rietx.crystallography.neutron.SIGMA_ABS_REFERENCE_WAVELENGTH": {
+   "role": "physical constant",
+   "decides": "Wavelength (Å) at which the table's ``xs_abs_barn`` is quoted: neutrons at the conventional thermal velocity of 2200 m/s, the velocity Sears (1992) quotes absorption cross-sections for.",
+   "file": "src/rietx/crystallography/neutron.py",
+   "line": 223
+  },
+  "rietx.crystallography.representation.distortion._RANK_TOL": {
+   "role": "tolerance (numerical)",
+   "decides": "Rank and residual tolerance on the projected subspaces.",
+   "file": "src/rietx/crystallography/representation/distortion.py",
+   "line": 119
+  },
+  "rietx.crystallography.representation.distortion._POSITION_TOL": {
+   "role": "tolerance (numerical)",
+   "decides": "How close (in parent or child fractions) two positions must be to count as the same atom.",
+   "file": "src/rietx/crystallography/representation/distortion.py",
+   "line": 123
+  },
+  "rietx.crystallography.representation.distortion._PROBE_AMPLITUDE": {
+   "role": "numerical-method constant",
+   "decides": "The order-of-magnitude scale (Å) of the generic displacement used to read a component's isotropy subgroup with spglib, and spglib's tolerance on it.",
+   "file": "src/rietx/crystallography/representation/distortion.py",
+   "line": 127
+  },
+  "rietx.crystallography.representation.distortion._PROBE_SYMPREC": {
+   "role": "numerical-method constant",
+   "decides": "spglib's tolerance on the generic displacement probe, with _PROBE_AMPLITUDE.",
+   "file": "src/rietx/crystallography/representation/distortion.py",
+   "line": 128
+  },
+  "rietx.crystallography.representation.irreps.K_MAX_DENOMINATOR": {
+   "role": "threshold (decides a reading)",
+   "decides": "Largest denominator :func:`as_kvector` will read out of a float.",
+   "file": "src/rietx/crystallography/representation/irreps.py",
+   "line": 160
+  },
+  "rietx.crystallography.representation.irreps.K_FLOAT_TOL": {
+   "role": "tolerance (numerical)",
+   "decides": "How far a float k-component may sit from the rational :data:`K_MAX_DENOMINATOR` reads out of it.",
+   "file": "src/rietx/crystallography/representation/irreps.py",
+   "line": 166
+  },
+  "rietx.crystallography.representation.irreps.IRREP_ATOL": {
+   "role": "tolerance (numerical)",
+   "decides": "Tolerance on the irrep matrices, which come from an eigendecomposition of a matrix of order |P_k| ≤ 48 built from unit-modulus entries.",
+   "file": "src/rietx/crystallography/representation/irreps.py",
+   "line": 173
+  },
+  "rietx.crystallography.representation.irreps._SEEDS": {
+   "role": "vocabulary / lookup",
+   "decides": "Seeds tried, in order, for the random Hermitian matrix whose commutant average splits the twisted regular representation.",
+   "file": "src/rietx/crystallography/representation/irreps.py",
+   "line": 180
+  },
+  "rietx.crystallography.representation.irreps._ZERO": {
+   "role": "numerical-method constant",
+   "decides": "Exact 0 for the same tables.",
+   "file": "src/rietx/crystallography/representation/irreps.py",
+   "line": 182
+  },
+  "rietx.crystallography.representation.irreps._EYE3": {
+   "role": "numerical-method constant",
+   "decides": "Integer identity matrix for the irreps code.",
+   "file": "src/rietx/crystallography/representation/irreps.py",
+   "line": 183
+  },
+  "rietx.crystallography.representation.irreps._H": {
+   "role": "numerical-method constant",
+   "decides": "Exact 1/2 used to write the primitive-basis tables.",
+   "file": "src/rietx/crystallography/representation/irreps.py",
+   "line": 308
+  },
+  "rietx.crystallography.representation.irreps._T": {
+   "role": "numerical-method constant",
+   "decides": "Exact 1/3, same use.",
+   "file": "src/rietx/crystallography/representation/irreps.py",
+   "line": 309
+  },
+  "rietx.crystallography.representation.irreps._TT": {
+   "role": "numerical-method constant",
+   "decides": "Exact 2/3, same use.",
+   "file": "src/rietx/crystallography/representation/irreps.py",
+   "line": 310
+  },
+  "rietx.crystallography.representation.irreps._STANDARD_PRIMITIVE_BASIS": {
+   "role": "numerical-method constant",
+   "decides": "The conventional primitive bases, as rows in conventional fractional coordinates: the transposes of the transformation matrices of *International Tables* A Table 1.5.1.1, the same primitive cells spglib and every other code names for these centrings. Used in preference to the Hermite normal form so that ``primitive_operations`` returns the operations in the setting a reader (and spgrep's tabulated point groups) expects; a centring not among these, or a setting whose centring vectors these rows do not span, falls back to the HNF, which is correct for any lattice.",
+   "file": "src/rietx/crystallography/representation/irreps.py",
+   "line": 320
+  },
+  "rietx.crystallography.representation.modes.MODE_ATOL": {
+   "role": "tolerance (numerical)",
+   "decides": "Tolerance on the projected quantities.",
+   "file": "src/rietx/crystallography/representation/modes.py",
+   "line": 273
+  },
+  "rietx.crystallography.representation.modes.POSITION_ATOL": {
+   "role": "tolerance (numerical)",
+   "decides": "How far an orbit image may sit from the lattice translate of another before the two are refused as unmatched.",
+   "file": "src/rietx/crystallography/representation/modes.py",
+   "line": 280
+  },
+  "rietx.crystallography.representation.order_parameter.ISOTROPY_ATOL": {
+   "role": "tolerance (numerical)",
+   "decides": "Tolerance on the numerical linear algebra of the order-parameter space — subspace comparisons, fixed-subspace ranks, \"this matrix is real\".",
+   "file": "src/rietx/crystallography/representation/order_parameter.py",
+   "line": 70
+  },
+  "rietx.crystallography.representation.order_parameter._SIMPLE": {
+   "role": "numerical-method constant",
+   "decides": "The rational grid (denominators 1,2,3,4,6) of directions the order-parameter search tries.",
+   "file": "src/rietx/crystallography/representation/order_parameter.py",
+   "line": 297
+  },
+  "rietx.crystallography.riding.RIDING_LENGTHS": {
+   "role": "tabulated data (cited)",
+   "decides": "X–H lengths (Å) by bond class and radiation, the source of each column given in the module docstring. ``None`` would mean no tabulated value and is refused; no entry is ``None`` today.",
+   "file": "src/rietx/crystallography/riding.py",
+   "line": 38
+  },
+  "rietx.crystallography.riding.RIDING_MIN_SEPARATION": {
+   "role": "degenerate-geometry guard",
+   "decides": "Å: an H closer than this to its parent gives no parent→H direction.",
+   "file": "src/rietx/crystallography/riding.py",
+   "line": 47
+  },
+  "rietx.crystallography.rotation.SERIES_THRESHOLD": {
+   "role": "numerical-method coefficients",
+   "decides": "|ω| (rad) below which A, B and C are evaluated by their series (module docstring, \"The small-angle branch\").",
+   "file": "src/rietx/crystallography/rotation.py",
+   "line": 86
+  },
+  "rietx.crystallography.rotation.UNIT_TOLERANCE": {
+   "role": "tolerance (numerical)",
+   "decides": "How far ‖q‖ may sit from 1, or RᵀR from I, before an input is refused rather than read as a rotation.",
+   "file": "src/rietx/crystallography/rotation.py",
+   "line": 91
+  },
+  "rietx.crystallography.rotation._A_SERIES": {
+   "role": "numerical-method coefficients",
+   "decides": "Maclaurin coefficients through θ¹⁰ (in powers of θ²), lowest first: A = Σ (−1)ᵏ θ²ᵏ/(2k+1)!,  B = Σ (−1)ᵏ θ²ᵏ/(2k+2)!,  C = Σ (−1)ᵏ θ²ᵏ/(2k+3)!.",
+   "file": "src/rietx/crystallography/rotation.py",
+   "line": 95
+  },
+  "rietx.crystallography.rotation._B_SERIES": {
+   "role": "numerical-method coefficients",
+   "decides": "Same group as _A_SERIES: Maclaurin coefficients through θ¹⁰ (in powers of θ²), lowest first: A = Σ (−1)ᵏ θ²ᵏ/(2k+1)!,  B = Σ (−1)ᵏ θ²ᵏ/(2k+2)!,  C = Σ (−1)ᵏ θ²ᵏ/(2k+3)!.",
+   "file": "src/rietx/crystallography/rotation.py",
+   "line": 96
+  },
+  "rietx.crystallography.rotation._C_SERIES": {
+   "role": "numerical-method coefficients",
+   "decides": "Same group as _A_SERIES: Maclaurin coefficients through θ¹⁰ (in powers of θ²), lowest first: A = Σ (−1)ᵏ θ²ᵏ/(2k+1)!,  B = Σ (−1)ᵏ θ²ᵏ/(2k+2)!,  C = Σ (−1)ᵏ θ²ᵏ/(2k+3)!.",
+   "file": "src/rietx/crystallography/rotation.py",
+   "line": 98
+  },
+  "rietx.crystallography.rotation._LOG_SERIES_NORM": {
+   "role": "numerical-method coefficients",
+   "decides": "a quaternion's vector norm below which atan2(n, w)/n is taken by its series.",
+   "file": "src/rietx/crystallography/rotation.py",
+   "line": 102
+  },
+  "rietx.crystallography.satellites._ORDERS": {
+   "role": "vocabulary / lookup",
+   "decides": "the two satellite orders this rung enumerates, in the order they are tried when a representative is split back into (H, m)",
+   "file": "src/rietx/crystallography/satellites.py",
+   "line": 367
+  },
+  "rietx.crystallography.satellites._TRIGONAL_POINTS": {
+   "role": "numerical-method constant",
+   "decides": "The third-order points WP-1326 adds on a hexagonal or trigonal lattice, in conventional reciprocal coordinates.",
+   "file": "src/rietx/crystallography/satellites.py",
+   "line": 608
+  },
+  "rietx.crystallography.scattering._ITC_IONS": {
+   "role": "tabulated data (cited)",
+   "decides": "Ions *International Tables* Vol. C carries and ``f0_WaasKirf.dat`` does not: the nine fit numbers of ITC eq. 6.1.1.15 for Y³⁺ (Maslen, Fox & O'Keefe 2004, Table 6.1.1.4), valid for 0 < s < 2.0 Å⁻¹, from which ``f0`` hands over to the neutral atom where the curves meet.",
+   "file": "src/rietx/crystallography/scattering.py",
+   "line": 66
+  },
+  "rietx.crystallography.species._HYDROGEN_NUCLIDE_MASS_NUMBER": {
+   "role": "vocabulary / lookup",
+   "decides": "The two hydrogen nuclides with symbols of their own, D (mass number 2) and T (3); every other nuclide is written mass-number-first.",
+   "file": "src/rietx/crystallography/species.py",
+   "line": 22
+  },
+  "rietx.crystallography.spherical_harmonics._TOL": {
+   "role": "tolerance (numerical)",
+   "decides": "Tolerance on a projector check.",
+   "file": "src/rietx/crystallography/spherical_harmonics.py",
+   "line": 73
+  },
+  "rietx.crystallography.spherical_harmonics._C4Z": {
+   "role": "numerical-method constant",
+   "decides": "The 4-fold about z that turns m-3 into m-3m, in the cubic texture frame.",
+   "file": "src/rietx/crystallography/spherical_harmonics.py",
+   "line": 386
+  },
+  "rietx.crystallography.stephens.S_EXPONENTS": {
+   "role": "numerical-method constant",
+   "decides": "Exponent triples (H, K, L) of the fifteen quartic monomials h^H k^K l^L, in descending lexicographic order — the storage order everywhere.",
+   "file": "src/rietx/crystallography/stephens.py",
+   "line": 89
+  },
+  "rietx.crystallography.stephens._DEG_PER_RAD": {
+   "role": "unit conversion",
+   "decides": "Radian to degree conversion (Stephens strain width).",
+   "file": "src/rietx/crystallography/stephens.py",
+   "line": 98
+  },
+  "rietx.crystallography.superspace.generation.N_SUPERSPACE_GROUPS_D1": {
+   "role": "count (classification fact)",
+   "decides": "(3+1)D superspace-group types (Yamamoto et al. 1985 p. 529; Stokes 2011 p. 47; Stokes & Campbell 2022 Table 6, type-1 row): 775.",
+   "file": "src/rietx/crystallography/superspace/generation.py",
+   "line": 69
+  },
+  "rietx.crystallography.superspace.generation.N_BRAVAIS_CLASSES_D1": {
+   "role": "count (classification fact)",
+   "decides": "(3+1)D Bravais classes (de Wolff et al. 1981 § 4; Stokes 2011 p. 49): 24.",
+   "file": "src/rietx/crystallography/superspace/generation.py",
+   "line": 72
+  },
+  "rietx.crystallography.superspace.generation._E": {
+   "role": "numerical-method constant",
+   "decides": "Integer identity rotation for the superspace generator.",
+   "file": "src/rietx/crystallography/superspace/generation.py",
+   "line": 74
+  },
+  "rietx.crystallography.superspace.generation._GRID": {
+   "role": "numerical-method constant",
+   "decides": "origin-shift grid of the normaliser search, 1/24.",
+   "file": "src/rietx/crystallography/superspace/generation.py",
+   "line": 75
+  },
+  "rietx.crystallography.superspace.generation._F0": {
+   "role": "numerical-method constant",
+   "decides": "Exact 0 for the superspace generator.",
+   "file": "src/rietx/crystallography/superspace/generation.py",
+   "line": 76
+  },
+  "rietx.crystallography.superspace.generation._QR_COMPONENTS": {
+   "role": "numerical-method constant",
+   "decides": "The rational components a modulation vector is searched over in the superspace generator.",
+   "file": "src/rietx/crystallography/superspace/generation.py",
+   "line": 270
+  },
+  "rietx.crystallography.superspace.operators._IDENTITY_R": {
+   "role": "numerical-method constant",
+   "decides": "Integer identity rotation part of a superspace operator.",
+   "file": "src/rietx/crystallography/superspace/operators.py",
+   "line": 82
+  },
+  "rietx.crystallography.superspace.operators._ZERO3": {
+   "role": "numerical-method constant",
+   "decides": "Zero translation of a superspace operator.",
+   "file": "src/rietx/crystallography/superspace/operators.py",
+   "line": 83
+  },
+  "rietx.crystallography.superspace.operators._LETTERS": {
+   "role": "vocabulary / lookup",
+   "decides": "Coordinate letters accepted in an operation string: the msCIF/magCIF ``x1,x2,x3,x4`` form and the Stokes ``x,y,z,t`` form.",
+   "file": "src/rietx/crystallography/superspace/operators.py",
+   "line": 87
+  },
+  "rietx.crystallography.superspace.operators.IDENTITY": {
+   "role": "numerical-method constant",
+   "decides": "The identity operator, the seed of operator closures.",
+   "file": "src/rietx/crystallography/superspace/operators.py",
+   "line": 349
+  },
+  "rietx.crystallography.superspace.operators._PARAM_ALIASES": {
+   "role": "vocabulary / lookup",
+   "decides": "Spellings of the three free parameters a superspace operator string accepts.",
+   "file": "src/rietx/crystallography/superspace/operators.py",
+   "line": 373
+  },
+  "rietx.crystallography.superspace.symbols._LETTERS": {
+   "role": "vocabulary / lookup",
+   "decides": "Same group as _LETTERS: Coordinate letters accepted in an operation string: the msCIF/magCIF ``x1,x2,x3,x4`` form and the Stokes ``x,y,z,t`` form.",
+   "file": "src/rietx/crystallography/superspace/symbols.py",
+   "line": 79
+  },
+  "rietx.crystallography.superspace.symbols._TETRA": {
+   "role": "vocabulary / lookup",
+   "decides": "Stokes 2011 Table 2 orientations, keyed by (system, position, kind); the third tetragonal and hexagonal position takes the [110] two-fold and the mirror normal to [1-10] (Table 2's 422 / 4mm rows).",
+   "file": "src/rietx/crystallography/superspace/symbols.py",
+   "line": 86
+  },
+  "rietx.crystallography.superspace.symbols._HEXA": {
+   "role": "vocabulary / lookup",
+   "decides": "Same group as _TETRA: Stokes 2011 Table 2 orientations, keyed by (system, position, kind); the third tetragonal and hexagonal position takes the [110] two-fold and the mirror normal to [1-10] (Table 2's 422 / 4mm rows).",
+   "file": "src/rietx/crystallography/superspace/symbols.py",
+   "line": 91
+  },
+  "rietx.crystallography.symmetry.MAX_HKL_GRID_POINTS": {
+   "role": "runaway guard",
+   "decides": "Ceiling on the (2h+1)(2k+1)(2l+1) enumeration grid ``generate_reflections`` may allocate: ~30M points is ≈ 1 GB of transient int64, far above any physical powder problem (a 100 Å cell at d_min = 1 Å needs 8.1e6) and far below the PiB-scale grids a collapsed cell implies.",
+   "file": "src/rietx/crystallography/symmetry.py",
+   "line": 36
+  },
+  "rietx.crystallography.symmetry._ORBIT_CHUNK_ELEMENTS": {
+   "role": "memory budget",
+   "decides": "transient element budget for the orbit-image stack in ``generate_reflections`` — the hkl loop it replaced was O(1) in memory, so the vectorised form chunks to stay bounded.",
+   "file": "src/rietx/crystallography/symmetry.py",
+   "line": 43
+  },
+  "rietx.crystallography.symmetry._TRANSLATION_DEN": {
+   "role": "numerical-method constant",
+   "decides": "Denominator every space-group translation is an exact multiple of, which is what lets a stated operator be compared with a tabulated one by integers rather than by tolerance.",
+   "file": "src/rietx/crystallography/symmetry.py",
+   "line": 503
+  },
+  "rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG": {
+   "role": "tolerance (decides a branch)",
+   "decides": "Largest deviation of a symmetry-fixed cell angle from its exact value that :func:`cell_constraints` accepts, in degrees.",
+   "file": "src/rietx/crystallography/symmetry.py",
+   "line": 567
+  },
+  "rietx.crystallography.symmetry._GAMMA_HEX": {
+   "role": "physical constant (exact angle)",
+   "decides": "The exact angle a hexagonal/trigonal γ takes on hexagonal axes.",
+   "file": "src/rietx/crystallography/symmetry.py",
+   "line": 570
+  },
+  "rietx.crystallography.symmetry.SITE_TOL": {
+   "role": "tolerance (decides a branch)",
+   "decides": "Default tolerance, in fractional coordinates, for \"this operation fixes this site\".",
+   "file": "src/rietx/crystallography/symmetry.py",
+   "line": 764
+  },
+  "rietx.crystallography.symmetry._SITE_TOL_SLACK": {
+   "role": "tolerance (numerical)",
+   "decides": "Relative slack making the :data:`SITE_TOL` comparison **inclusive**.",
+   "file": "src/rietx/crystallography/symmetry.py",
+   "line": 773
+  },
+  "rietx.crystallography.symmetry._COINCIDENCE_TOL": {
+   "role": "tolerance (numerical)",
+   "decides": "Tolerance at which two images of an *already snapped* position count as the same orbit member.",
+   "file": "src/rietx/crystallography/symmetry.py",
+   "line": 779
+  },
+  "rietx.crystallography.symmetry._SNAP_NOISE": {
+   "role": "tolerance (numerical)",
+   "decides": "Below this the snap did nothing and ``SiteOrbit.shift`` reports 0.0.",
+   "file": "src/rietx/crystallography/symmetry.py",
+   "line": 787
+  },
+  "rietx.crystallography.symmetry._SNAP_MESSAGE_SITES": {
+   "role": "message cosmetic",
+   "decides": "How many snapped sites a ``SITE_SNAPPED_TO_SPECIAL_POSITION`` message names before it says \"and N more\".",
+   "file": "src/rietx/crystallography/symmetry.py",
+   "line": 1011
+  },
+  "rietx.crystallography.wyckoff._VOIGT": {
+   "role": "vocabulary / lookup",
+   "decides": "Index pairs of the symmetric-tensor components in storage order.",
+   "file": "src/rietx/crystallography/wyckoff.py",
+   "line": 69
+  }
+ },
+ "reader_decisions": [
+  {
+   "name": "io.formats.dif._MIN_ROWS",
+   "where": "src/rietx/io/formats/dif.py:43",
+   "decides": "Three hkl rows or more make a file a peak list; fewer is refused as a coincidence.",
+   "walked_by_audit": true,
+   "also_covered": "module constant, listed in constants"
+  },
+  {
+   "name": "io.formats.peaklist._MIN_ROWS",
+   "where": "src/rietx/io/formats/peaklist.py:62",
+   "decides": "Eight rows or more before a head is read as a profile rather than a peak list.",
+   "walked_by_audit": true,
+   "also_covered": "module constant, listed in constants"
+  },
+  {
+   "name": "io.formats.gsas._GSAS_TIME_MAP_SCAN_BYTES",
+   "where": "src/rietx/io/formats/gsas.py:251",
+   "decides": "The sniff reads 64 kB, not 4 kB, so a long TIME_MAP table before the first BANK record is still recognised; a larger table falls to the xy reader, refused for the wrong cause.",
+   "walked_by_audit": true,
+   "also_covered": "module constant, listed in constants"
+  },
+  {
+   "name": "bruker_raw drive pick (atol=1e-6)",
+   "where": "src/rietx/io/formats/bruker_raw.py:339",
+   "decides": "Which drive record is the scan axis: a flagged drive whose position matches the range start within np.isclose atol 1e-6 deg. A function-level literal, not a module constant, so no walk sees it.",
+   "walked_by_audit": false,
+   "also_covered": "literal inside a function"
+  },
+  {
+   "name": "bruker_raw counting-time windows",
+   "where": "src/rietx/io/formats/bruker_raw.py:398 (v4: 0 < step_time_ms < 1e9, ms to s) and :572 (v3: 0 < step_time < 1e6)",
+   "decides": "Whether a counting time is usable, so whether sigma can be derived by arithmetic or is withheld (Poisson fallback). Two function-level windows.",
+   "walked_by_audit": false,
+   "also_covered": "literals inside functions"
+  },
+  {
+   "name": "pdcif weight column",
+   "where": "src/rietx/io/formats/pdcif.py:80-82",
+   "decides": "_pd_proc_ls_weight becomes sigma = 1/sqrt(w) only if every weight is positive; one zero weight drops the whole column and the Poisson fallback applies, with no diagnostic. xy.py:183 and chi.py:90 adopt a third column as sigma when any value is positive.",
+   "walked_by_audit": false,
+   "also_covered": "behaviour, no constant"
+  }
+ ]
+}

@@ -63,6 +63,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 import rietx as rx
@@ -162,6 +163,8 @@ def _inputs():
 #: that a future change to ``INTERMEDIATE_FTOL_DEFAULT`` shows up here as a
 #: decision rather than as a silent shift in the numbers above.
 INTERMEDIATE_FTOL = None   # i.e. plan.intermediate_ftol left at the shipped default
+#: and the shipped closing stage (WP-2002), for the same reason:
+#: ``plan.closing_window_tol`` is left at its default, 1e-3.
 
 _BASE = [
     rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.*"]),
@@ -222,8 +225,11 @@ PLAN_SHARED = rx.RefinementPlan(stages=[
     *_TAIL,
 ])
 
-#: The same fit with the phases' Lorentzian terms freed *as well*.  Kept as a
-#: fixture rather than deleted because it is the control for the finding below.
+#: The same fit with the phases' Lorentzian terms freed *as well*: X and Y
+#: each have a twin in both phases, so until WP-2002 the fit had two exactly
+#: flat directions and the tests below asserted that they were flagged.  Since
+#: the width twin hold the stage holds X and Y instead, and the tests assert
+#: that, on the one real two-phase family the hold has.
 PLAN_DEGENERATE = rx.RefinementPlan(stages=[
     *_BASE,
     rx.Stage("profile", ["instrument.profile.x", "instrument.profile.y"]),
@@ -298,7 +304,7 @@ def test_the_file_esds_are_used_rather_than_poisson():
 
 # ------------------------------------------------------- measured answers ---
 def test_the_qpa_agrees_with_topas_within_its_own_esd(shared):
-    """Cross-code QPA — there is no weighing, so TOPAS is the only referent.
+    """Cross-code QPA — there is no weighing, so TOPAS is the only reference value.
 
     The bar is **this fit's own esd**, and the comparison is against TOPAS's
     two-model interval rather than a single number, because that interval is
@@ -343,8 +349,12 @@ def test_the_lowest_rwp_is_the_worst_answer(shared, degenerate):
 
     Lorentzian FWHMs **add** (CLAUDE.md § Conventions), so instrument ``X,Y``
     and per-phase ``lor_size``/``lor_strain`` are one quantity split three
-    ways.  Measured here: ρ = −1.000 between ``phases.0.lor_strain`` and
-    ``instrument.profile.y``, and +1.000 between the two phases' strains.
+    ways.  Measured before WP-2002: ρ = −1.000 between ``phases.0.lor_strain``
+    and ``instrument.profile.y``, and +1.000 between the two phases' strains.
+    Since then the width twin hold holds X and Y, which removes those two
+    flat directions and not the finding: what is left free is each phase's
+    width relative to the other's, and that alone still lowers Rwp (0.1377
+    against 0.1686) and moves LaB6 to 16.78(19) wt %.
 
     The consequence is the point.  The degenerate fit reaches a **lower Rwp**
     — the extra freedom lets the profile take intensity that belongs to the
@@ -367,12 +377,16 @@ def test_the_lowest_rwp_is_the_worst_answer(shared, degenerate):
 
 
 def test_the_correlation_diagnostic_separates_the_two(shared, degenerate):
-    """And it separates them *without* being told which is which.
+    """Silent on the identifiable fit, and on the degenerate one since WP-2002.
 
-    ``HIGH_CORRELATION`` is silent on the identifiable fit and fires on the
-    degenerate one at ρ → 1.  A user who never compared the two would still be
-    told which numbers are not quotable, which is the whole purpose of the
-    diagnostic channel.
+    Until WP-2002 the degenerate fit's half of this test was the finding: the
+    broadening split spans two exactly flat directions, and either
+    ``HIGH_CORRELATION`` or ``COVARIANCE_DIRECTION_DISCARDED`` had to say so,
+    rounding deciding which.  The width twin hold now holds X and Y for the
+    stage, so the half asserts the hold's record and that nothing left free is
+    flat.  Measured on the merged tree (macOS arm64): LaB6's widths end on
+    their 0 floor (``FLOOR_HIT``), cBN's ``lor_strain`` is 0.0354(35), and every
+    width carries a finite esd; the identifiable fit is unchanged.
 
     **Silence is the bar again since WP-1930.**  Until then this plan freed
     the Gaussian triple ``u, v, w``, which is flat on this histogram, and the
@@ -386,13 +400,6 @@ def test_the_correlation_diagnostic_separates_the_two(shared, degenerate):
     protocol change this docstring once declined to smuggle into a bounds fix,
     is now the protocol, and nothing on the shared fit is flagged.
 
-    **The degenerate fit's half is told by either of two codes**, as in the
-    test below this one: the broadening split spans two exactly flat
-    directions, and rounding decides whether they are kept and inverted
-    (``HIGH_CORRELATION``) or fall under the cut
-    (``COVARIANCE_DIRECTION_DISCARDED``).  At this start on Linux x86-64,
-    after WP-1953's #923, both fall under the cut and ``HIGH_CORRELATION`` is
-    silent, so asserting it alone was a bar on rounding.
     """
     def flat(result):
         return [d for d in result.diagnostics if d.code in FLAT_CODES]
@@ -405,15 +412,23 @@ def test_the_correlation_diagnostic_separates_the_two(shared, degenerate):
         "a flat-direction finding on the identifiable fit: "
         f"{[(d.code, d.where, d.message) for d in flat(shared)]}")
 
-    finding = ("phases.0.lor_size", "phases.0.lor_strain",
-               "phases.1.lor_size", "phases.1.lor_strain",
-               "instrument.profile.y")
-    flagged = flat(degenerate)
-    assert flagged, ("the degenerate fit raised neither HIGH_CORRELATION nor "
-                     "COVARIANCE_DIRECTION_DISCARDED")
-    assert any(set(d.where or []) & set(finding) for d in flagged), (
-        "the degenerate fit's broadening split is not flagged: "
-        f"{[(d.code, d.where) for d in flagged]}")
+    # the degenerate plan is no longer degenerate: the width twin hold takes X
+    # and Y (WP-2002), so its half is now the hold's record, and nothing left
+    # free is flat
+    _assert_twins_held(degenerate)
+    assert flat(degenerate) == [], (
+        "a flat-direction finding after the twin hold: "
+        f"{[(d.code, d.where) for d in flat(degenerate)]}")
+
+
+def _assert_twins_held(result):
+    """X and Y held against both phases' twins from ``size_strain`` on."""
+    names = [s.name for s in result.stages]
+    for stage in result.stages[names.index("size_strain"):]:
+        assert stage.width_twins_held == {
+            "instrument.profile.x": ["phases.0.lor_size", "phases.1.lor_size"],
+            "instrument.profile.y": ["phases.0.lor_strain", "phases.1.lor_strain"],
+        }, stage.name
 
 
 #: Relative nudges to ``w``'s start, (1 + k·1e-14).  On macOS arm64, k = 1
@@ -424,21 +439,18 @@ FLAT_NUDGES = (0, 1, 7)
 
 
 @pytest.mark.parametrize("k", FLAT_NUDGES)
-def test_the_flat_widths_are_flagged_whatever_rounding_does(k, request):
-    """The degenerate fit's six Lorentzian widths span two exactly flat
-    directions, and rounding must not decide whether anyone is told.
+def test_the_twin_hold_leaves_no_flat_width_whatever_rounding_does(k, request):
+    """The degenerate plan's six Lorentzian widths once spanned two exactly
+    flat directions, and rounding decided whether anyone was told: such a
+    direction reaches the covariance at a rounding-level eigenvalue of either
+    sign (1e-16 to 4e-15 of the largest against ``statistics.PINV_RCOND``),
+    and before WP-1930 a kept negative one returned an esd of exactly 0.
+    Since WP-2002 the width twin hold holds X and Y, so at every nudge the
+    hold is recorded, no specimen width is flat, and each has a finite,
+    nonzero esd.  The nudges stay because they are where rounding used to
+    decide.
 
-    Such a direction reaches the covariance at a rounding-level eigenvalue of
-    either sign, measured between 1e-16 and 4e-15 of the largest against a
-    cut of ``statistics.PINV_RCOND``.  Which side of the cut it lands on, and
-    with which sign, is rounding's choice, and it differs by platform.  So the
-    assertion is on the mechanism.  Each width is named either by
-    ``COVARIANCE_DIRECTION_DISCARDED`` (its direction fell under the cut) or
-    by ``HIGH_CORRELATION`` (it was kept and inverted).  And no width reports
-    an esd of exactly 0, which is what a kept negative eigenvalue inverted
-    with its sign gave before WP-1930: the Linux nightlies from 0f30d584 on,
-    and these nudges on macOS.
-
+    The record before the hold:
     Measured on macOS arm64 over k in {0, ±1, ±3, ±7, ±20, 50}, with WP-1953's
     #923 merged: HIGH_CORRELATION fired in all ten, and at nine the widths'
     esds ran 8.9-3420.  At k = 0 both flat directions fell under the cut, the
@@ -457,19 +469,18 @@ def test_the_flat_widths_are_flagged_whatever_rounding_does(k, request):
     import matplotlib.pyplot as plt
     plt.close("all")
 
+    _assert_twins_held(result)
     widths = ("phases.0.lor_size", "phases.0.lor_strain",
-              "phases.1.lor_size", "phases.1.lor_strain",
-              "instrument.profile.x", "instrument.profile.y")
+              "phases.1.lor_size", "phases.1.lor_strain")
     named = set()
     for d in result.diagnostics:
         if d.code in FLAT_CODES:
             named |= set(d.where or [])
-    unnamed = [p for p in widths if p not in named]
-    assert not unnamed, (
-        f"k = {k}: flat widths named by neither HIGH_CORRELATION nor "
-        f"COVARIANCE_DIRECTION_DISCARDED: {unnamed}")
-    zero = [p for p in widths if result.parameter(p).stderr == 0.0]
-    assert not zero, f"k = {k}: undetermined widths report an esd of 0: {zero}"
+    assert not named & set(widths), (
+        f"k = {k}: widths still flat after the twin hold: {sorted(named & set(widths))}")
+    esds = {p: result.parameter(p).stderr for p in widths}
+    bad = [p for p, e in esds.items() if not (e is not None and 0.0 < e < np.inf)]
+    assert not bad, f"k = {k}: widths without a finite, nonzero esd: {bad} ({esds})"
 
 
 def test_rwp_is_worse_than_topas_and_the_reason_is_the_peak_shape(shared):
@@ -478,8 +489,8 @@ def test_rwp_is_worse_than_topas_and_the_reason_is_the_peak_shape(shared):
     TOPAS fitted ``PVII_Peak_Type`` with six free shape parameters; rietx
     offers TCHZ pseudo-Voigt and a true Voigt.  On this instrument that costs
     roughly a factor two in Rwp, and the misfit is concentrated at the peak
-    **tops** (84.5 % of χ² in the 9 % of channels that are more than half
-    Bragg, mean Δ/σ = +0.49) rather than in the background or the flanks —
+    **tops** (88 % of χ² in the 11 % of channels that are more than half
+    Bragg, mean Δ/σ = +1.10, on 1.9.0 and on 1.10.0) rather than in the background or the flanks —
     a shape deficit, not a scale or background one.
 
     The band is deliberately loose and one-sided.  It exists to catch a
@@ -492,7 +503,8 @@ def test_rwp_is_worse_than_topas_and_the_reason_is_the_peak_shape(shared):
 
 #: The shared fit's Rwp, measured on macOS arm64 and Linux x86-64 (issue #832,
 #: 2026-10-08) and again here (WP-1930): 0.168656, χ²_red 10.15182, the two
-#: platforms agreeing to 1e-12 relative.
+#: platforms agreeing to 1e-12 relative.  WP-2002's closing stage moved it to
+#: 0.168625, χ²_red 10.14803 (macOS arm64), inside the band below.
 SHARED_RWP = 0.168656
 
 
@@ -506,7 +518,8 @@ def test_the_shared_fit_reaches_one_minimum_on_every_platform(shared):
     minimum single by starting ``instrument.profile.y`` off its softplus
     floor.  WP-1938 refines it in deg, where its column at 0 is the physical
     one, so the ``profile`` stage seeds nothing and ``y`` leaves 0 on its own
-    (0.0369 at Rwp 0.168656, macOS arm64, ``[dev]``).
+    (0.0369 at Rwp 0.168656 on 1.9.0, and 0.0368 at 0.168625 on 1.10.0, macOS
+    arm64, ``[dev]``).
     """
     assert shared.statistics.rwp == pytest.approx(SHARED_RWP, rel=0.02)
     profile = next(s for s in shared.stages if s.name == "profile")

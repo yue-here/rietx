@@ -19,7 +19,7 @@ Its extinction stage frees the Sabine extinction coefficient, in µm²:
 
 <!-- output of examples/guides/interval.py -->
 ```text
-phases.0.extinction  0.000 ± 1.945  at_bound True
+phases.0.extinction  0.000 ± 1.973  at_bound True
 ```
 
 `RefinedParameter.at_bound` is `True` for a row the fit stopped against a bound with the data still pushing outward.
@@ -36,12 +36,12 @@ The same rows appear in the `FLOOR_HIT` diagnostic for a floor at 0, and in `BOU
 
 <!-- output of examples/guides/interval.py -->
 ```text
-one-sided True: 0.000 to 0.742
+one-sided True: 0.000 to 0.749
 ```
 
 A row on its bound gets a one-sided interval: the bound is one end, and the other is where χ² has risen by 2.71 × χ²<sub>red</sub> × f², with f the fit's `Statistics.esd_inflation`.
-At 95 %, read this one as "extinction is below 0.742 µm²", mosaic blocks no larger than about 0.9 µm.
-A one-sided bound read from the esd would reach 1.645 × 1.945 = 3.2 µm², more than four times as far.
+At 95 %, read this one as "extinction is below 0.749 µm²", mosaic blocks no larger than about 0.9 µm.
+A one-sided bound read from the esd would reach 1.645 × 1.973 = 3.2 µm², more than four times as far.
 The data push extinction below 0, so χ² rises from the floor faster than the esd assumes.
 
 `interval.lower_stop` and `interval.upper_stop` say why each end is where it is: `"bound"` for the parameter's own limit, `"threshold"` for the χ² rise.
@@ -60,10 +60,10 @@ Here it is on the Biso of Ca1:
 
 <!-- output of examples/guides/interval.py -->
 ```text
-0.479 ± 0.060  one-sided False: 0.368 to 0.593
+0.471 ± 0.061  one-sided False: 0.359 to 0.586
 ```
 
-The ends are 1.85 esd below the value and 1.91 above.
+The ends are 1.84 esd below the value and 1.90 above.
 Where χ² is a parabola in the parameter they would both be 1.96 esd, so here the esd is a fair summary and the interval adds little.
 Profile a row away from its bounds when it is strongly correlated with a row that is on one: the bound can stop it on one side.
 

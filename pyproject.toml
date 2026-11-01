@@ -17,7 +17,7 @@ name = "rietx"
 # shipped.  The value itself is stamped into every RefinementResult's Provenance
 # and every history node, so a stale one mislabels the provenance of real
 # results, and the release workflow refuses a tag that disagrees with it.
-version = "1.10.0.dev0"
+version = "1.11.0.dev0"
 description = "Python-API-first analysis and Rietveld refinement of powder diffraction data"
 readme = "README.md"
 license = "MIT"
@@ -117,16 +117,15 @@ docs = [
     # The tutorial notebooks as manual pages (WP-1916), with execution off.
     "myst-nb>=1.1",
     "sphinxcontrib-bibtex>=2.6",
-    # Part 1's diagrams.  >=2.1 because that is where the extension's own
-    # theme detection reads `body[data-theme]` and re-renders on a
-    # MutationObserver — which is exactly how furo signals its light/dark
-    # toggle, so the diagrams follow the toggle with no custom JS here.
+    # The manual's diagrams.  >=2.1 because that is where the extension's own
+    # theme detection reads `data-theme` and re-renders on a MutationObserver,
+    # which is how the theme signals its light/dark toggle, so the diagrams
+    # follow the toggle with no custom JS here.
     "sphinxcontrib-mermaid>=2.1",
-    # Part 1's installation tabs (WP-1126): one chapter, three operating
+    # The install page's tabs (WP-1126): one chapter, three operating
     # systems, two installers.
     "sphinx-design>=0.6",
-    "furo>=2024.1",
-    # The new manual's theme (docs/docs/, WP-1978), chosen over furo in the
+    # The manual's theme (docs/docs/, WP-1978), chosen over furo in the
     # WP-1975 spike for its six-tab header, version switcher and dev banner.
     # The floor is the release the spike was measured on.
     "pydata-sphinx-theme>=0.23",
@@ -147,7 +146,10 @@ dev = [
     # instead of importorskip-ing out, and notebooks so the display tests and
     # the tutorials meet a real kernel.
     "rietx[docs,notebooks]",
-    "pytest>=8",
+    # <9.2 until a pytest-xdist release carries the fix for pytest-xdist#1386:
+    # 9.2.0 moved the node id xdist rewrites to group a case, so every
+    # xdist_group mark is ignored (tests/conftest.py, `_refuse_ungrouped`)
+    "pytest>=8,<9.2",
     # `-n auto --dist loadgroup` is how the suite is meant to be run; the
     # expensive shared fixtures are pinned to a worker by xdist_group marks
     # (tests/conftest.py), so this is not an optional accelerator
@@ -166,7 +168,7 @@ dev = [
 
 [project.urls]
 Homepage = "https://github.com/yue-here/rietx"
-Documentation = "https://rietx.org/manual.html"
+Documentation = "https://rietx.org/docs/"
 
 [project.scripts]
 rietx = "rietx.cli:main"

@@ -11,9 +11,11 @@ import {
   confidenceTone,
   headline,
   predictionNote,
+  underNote,
   worstRegions,
   zoomWindow,
   type ApplyArm,
+  type FitDiagnostic,
   type Suggestion,
 } from "./report";
 
@@ -159,5 +161,26 @@ describe("the worst-region list", () => {
     expect(zoomWindow(9, 10)).toEqual([8.65, 10.35]);
     const [lo, hi] = zoomWindow(9.5, 9.5);
     expect(hi).toBeGreaterThan(lo);
+  });
+});
+
+describe("a folded diagnostic's note", () => {
+  const diag = (level: string, warning_under?: string[]): FitDiagnostic =>
+    ({ level, code: "FLOOR_HIT", message: "m", warning_under });
+
+  it("joins the server's purposes in the order they came", () => {
+    expect(underNote(diag("warning", ["qpa", "structure"])))
+      .toBe("warning under qpa, structure");
+  });
+
+  it("names series alone where the server's list is empty", () => {
+    // `warning_under` leaves `series` out, and a warning naming a path is
+    // always one under it, so an empty list is a warning only a series reads
+    expect(underNote(diag("warning", []))).toBe("warning under series only");
+  });
+
+  it("says nothing on an error or an info, whose chip says it all", () => {
+    expect(underNote(diag("error", []))).toBeNull();
+    expect(underNote(diag("info"))).toBeNull();
   });
 });

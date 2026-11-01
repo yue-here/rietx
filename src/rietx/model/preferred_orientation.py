@@ -228,8 +228,53 @@ TEXTURE_POSITIVITY_TOL = 1e-9
 
 #: Directions sampled over the sphere for the minimum of P between
 #: reflections.  The terms run to l = 8 or so, whose features span about
-#: 180°/l; 2000 points sit about 4.5° apart.
+#: 180°/l; 2000 points sit about 4.5° apart.  The samples only find the dips:
+#: the minimum is polished locally from the lowest of them
+#: (:data:`TEXTURE_POLISH_STARTS`), because a sampled minimum sits 2.0e-3 to
+#: 7.9e-3 of the random powder above the true one at orders 2-8 against a bar
+#: of 1e-3 (``tests/test_texture.py``; WP-2002, the seventh round's Q2).
 TEXTURE_SPHERE_SAMPLES = 2000
+#: How many of the lowest sampled directions the minimum is polished from, as
+#: the domain test's reference does.
+TEXTURE_POLISH_STARTS = 5
+#: The polish: this many patches of 11 × 11 directions in the tangent plane
+#: of each start, each patch 0.3 of the last across and centred on the last
+#: one's lowest point.  The first spans one sample spacing either side, the
+#: last a step of about 1e-5 rad.
+TEXTURE_POLISH_LEVELS = 6
+
+
+def sphere_minimum(p_of, directions: np.ndarray, starts: int = TEXTURE_POLISH_STARTS,
+                   levels: int = TEXTURE_POLISH_LEVELS) -> float:
+    """The lowest value of ``p_of`` over the unit sphere.
+
+    ``p_of`` maps (M, 3) unit vectors to (M,) values, numpy only.  It is
+    sampled at ``directions``, then refined around the ``starts`` lowest
+    samples by ``levels`` shrinking patches, every start's patch in one call.
+    Each patch is a grid in the plane tangent to its centre, projected back
+    onto the sphere, so no start sits at a coordinate pole.  The result never
+    lies above the sampled minimum.
+    """
+    values = np.asarray(p_of(directions), dtype=np.float64)
+    lowest = float(values.min())
+    centres = directions[np.argsort(values)[:starts]]
+    half = float(np.sqrt(4.0 * np.pi / len(directions)))
+    offsets = np.linspace(-1.0, 1.0, 11)
+    a, b = (g.ravel() for g in np.meshgrid(offsets, offsets))
+    for _ in range(levels if len(centres) else 0):
+        seed = np.where(np.abs(centres[:, :1]) < 0.9, [[1.0, 0.0, 0.0]], [[0.0, 1.0, 0.0]])
+        e1 = np.cross(centres, seed)
+        e1 /= np.linalg.norm(e1, axis=1, keepdims=True)
+        e2 = np.cross(centres, e1)
+        u = (centres[:, None, :] + half * (a[None, :, None] * e1[:, None, :]
+                                           + b[None, :, None] * e2[:, None, :]))
+        u /= np.linalg.norm(u, axis=2, keepdims=True)
+        v = np.asarray(p_of(u.reshape(-1, 3)), dtype=np.float64).reshape(len(centres), -1)
+        best = np.argmin(v, axis=1)
+        centres = u[np.arange(len(centres)), best]
+        lowest = min(lowest, float(v.min()))
+        half *= 0.3
+    return lowest
 
 
 def texture_index(degrees, coefficients) -> float:

@@ -40,8 +40,9 @@ from pydantic import Field
 from scipy.ndimage import median_filter
 from scipy.signal import find_peaks, peak_prominences, peak_widths
 
+from ..optimize import lapack
 from ..schemas.common import Base
-from ..schemas.pattern import PatternData, require_two_theta
+from ..schemas.pattern import POISSON_FLOOR_COUNTS, PatternData, require_two_theta
 from .models import chebyshev_design_matrix
 
 #: Kβ1,3 wavelengths (Å) per anode, for contamination checks only — Kβ is never
@@ -395,6 +396,18 @@ DEAD_LEVEL_FRACTION = 0.10
 #: one *is* a floor rather than a tuning.
 DEAD_WEIGHT_RATIO_MIN = 100.0
 
+#: Width, in ° 2θ, of :func:`background_envelope`'s rolling window: wider than
+#: any Bragg FWHM, so the low quantile inside it lands on background channels
+#: (v0.2; WP-1018 reused it for peak picking, WP-1028 repaired its edges).
+ENVELOPE_WINDOW_DEG = 3.0
+#: The percentile of each window :func:`background_envelope` takes: low enough
+#: to land under the peaks.  It sits 1.28σ under the mean of pure noise, a bias
+#: ``indexing.peaks._debiased_envelope`` removes.
+ENVELOPE_QUANTILE = 10.0
+#: Chebyshev terms of the smooth envelope fit the air-scatter gain is measured
+#: against: a cubic, then the cubic plus a 1/(2θ) column (v0.2's nested test).
+AIR_GAIN_CHEBYSHEV_TERMS = 4
+
 #: Width, in ° 2θ, of the median window that turns the background envelope into
 #: the *local level* a dead channel is judged against.  It is
 #: :func:`background_envelope`'s own window for the reason that function gives
@@ -404,7 +417,7 @@ DEAD_WEIGHT_RATIO_MIN = 100.0
 #: the longest run this function will report (:data:`CUTOFF_MIN_DEG`), which is
 #: what stops a dropout from dragging down the level that is meant to expose
 #: it: at 0.1° steps that is 10 channels inside a 30-channel median.
-DEAD_LEVEL_WINDOW_DEG = 3.0
+DEAD_LEVEL_WINDOW_DEG = ENVELOPE_WINDOW_DEG
 
 #: How many times :func:`dead_channels` re-derives which channels to withhold
 #: from its level estimate before taking the mask as settled.  Each pass walks
@@ -631,6 +644,15 @@ class PatternDiagnostics(Base):
       and an *empty list means nothing was flagged or nothing was checked*:
       the Kβ position is anode-specific, so a wavelength that matches no
       tabulated Kα1 (:func:`identify_anode`) is silently skipped.
+      ``contamination_searches`` tells the two apart.
+    * ``contamination_searches`` — the ghost searches that could have raised
+      a flag, ``"kbeta"`` and ``"tungsten_la"``: each ran with at least
+      :data:`GHOST_MIN_PARENTS` parents whose ghost falls in range.  ``[]``
+      means none could, so an empty ``contamination`` is *not checked*: no
+      ``wavelength``, one matching no tabulated Kα1, a source whose beam
+      carries neither line (:func:`ghost_searches`), or too few strong lines
+      in range.  ``None`` is an object written before the field existed
+      (WP-2039), which cannot say.
     * ``baseline_lambda`` — the arPLS stiffness the whiteness rule selects
       for this pattern (:func:`rietx.background.select_arpls_lambda`).
     * ``steps_per_fwhm`` / ``n_peaks_measured`` — how finely the peaks were
@@ -677,32 +699,61 @@ class PatternDiagnostics(Base):
     steps_per_fwhm: float | None = None
     n_peaks_measured: int = 0
     contamination: list[ContaminationFlag] = Field(default_factory=list)
+    contamination_searches: list[str] | None = None
     coverage_plateau: float | None = None
     coverage_regions: list[CoverageRegion] = Field(default_factory=list)
     signal_cutoffs: list[SignalCutoff] = Field(default_factory=list)
     dead_channels: list[DeadChannelRun] = Field(default_factory=list)
 
-    #: The order ``print`` shows the fields in (WP-1544): what bounds the range
-    #: first, then the sampling, then what a background is built from, and the
-    #: σ-relative census last. Every field appears once (``tests/test_display.py``).
-    _READING_ORDER: ClassVar[tuple[str, ...]] = (
-        "signal_cutoffs", "dead_channels", "coverage_plateau", "coverage_regions",
-        "steps_per_fwhm", "n_peaks_measured", "contamination",
-        "air_scatter_gain", "amorphous_hump_score", "baseline_lambda",
-        "signal_to_background", "noise_sigma_median",
-        "peak_fraction", "n_peaks", "peak_density_per_deg")
+    #: The headings ``print`` shows the fields under, in reading order
+    #: (WP-2039, the maintainer's choice of 2026-10-23): what anyone refining
+    #: checks, what matters on some instruments, and the numbers rietx
+    #: measures for its own use.  Every field appears once, the range in the
+    #: head and ``contamination_searches`` inside the ``contamination`` row
+    #: (``tests/test_display.py``).
+    _READING_ORDER: ClassVar[tuple[tuple[str, tuple[str, ...]], ...]] = (
+        ("checked on every pattern",
+         ("signal_cutoffs", "steps_per_fwhm", "n_peaks_measured", "contamination",
+          "signal_to_background")),
+        ("matters on some instruments",
+         ("dead_channels", "coverage_plateau", "coverage_regions", "air_scatter_gain",
+          "amorphous_hump_score")),
+        ("rietx's own measurements",
+         ("baseline_lambda", "noise_sigma_median", "peak_fraction", "n_peaks",
+          "peak_density_per_deg")),
+    )
 
     def __str__(self) -> str:
-        """Every field in :attr:`_READING_ORDER`, an empty list printed as
-        ``none`` because here "checked, and nothing" is the finding."""
-        from .._display import tree
+        """Every field under its heading in :attr:`_READING_ORDER`, each bare
+        number to three significant figures.  An empty field says whether its
+        check ran: ``none`` where it ran and found nothing, ``not checked``
+        where it could not run.  Which it was is read off fields:
+        ``coverage_plateau`` is ``None`` without a measured σ, and
+        ``contamination_searches`` lists the searches that ran."""
+        from .._display import significant, tree
         head = (f"PatternDiagnostics of {self.n_points} points, "
                 f"{self.two_theta_min:g}–{self.two_theta_max:g}° 2θ")
-        return tree(self, order=self._READING_ORDER, show_empty=True, head=head)
+        values = {name: significant(value) for name in type(self).model_fields
+                  if isinstance(value := getattr(self, name), float)}
+        if self.coverage_plateau is None:
+            unmeasured = "not checked (no measured σ)"
+            values["coverage_plateau"] = unmeasured
+            for name in ("dead_channels", "coverage_regions"):
+                if not getattr(self, name):
+                    values[name] = unmeasured
+        if self.steps_per_fwhm is None:
+            values["steps_per_fwhm"] = "not measured (no peak measurable)"
+        if not self.contamination and self.contamination_searches == []:
+            values["contamination"] = "not checked"
+        elif not self.contamination and self.contamination_searches is None:
+            values["contamination"] = "none, or not checked (not recorded)"
+        return tree(self, groups=self._READING_ORDER, show_empty=True, head=head,
+                    values=values)
 
 
 def background_envelope(two_theta: np.ndarray, y: np.ndarray, *,
-                        window_deg: float = 3.0, quantile: float = 10.0
+                        window_deg: float = ENVELOPE_WINDOW_DEG,
+                        quantile: float = ENVELOPE_QUANTILE
                         ) -> np.ndarray:
     """Rolling low-quantile envelope of the pattern — a peak-robust,
     λ-free stand-in for the background level.
@@ -743,7 +794,8 @@ def background_envelope(two_theta: np.ndarray, y: np.ndarray, *,
 
 
 def envelope_measured_span(two_theta: np.ndarray, *,
-                           window_deg: float = 3.0) -> tuple[float, float]:
+                           window_deg: float = ENVELOPE_WINDOW_DEG
+                           ) -> tuple[float, float]:
     """The 2θ range over which :func:`background_envelope` *interpolates*.
 
     Outside it the envelope is extrapolated from the two nearest knots, so a
@@ -871,7 +923,7 @@ def sampling_steps_per_fwhm(two_theta: np.ndarray, y: np.ndarray,
     counts = np.asarray(y, dtype=np.float64)
     if len(tt) < 3:
         return None, 0
-    sig = (np.sqrt(np.maximum(counts, 1.0)) if sigma is None
+    sig = (np.sqrt(np.maximum(counts, POISSON_FLOOR_COUNTS)) if sigma is None
            else np.asarray(sigma, dtype=np.float64))
     return _median_steps_per_fwhm(counts - background_envelope(tt, counts), sig)
 
@@ -1459,6 +1511,8 @@ def diagnose(data: PatternData, *, wavelength: float | None = None,
     net = y - env
     med_env = float(np.median(env))
 
+    # its own 3σ over the envelope: the order scan's mask is another rule
+    # (``select.PEAK_MASK_SIGMA``, over an arPLS baseline)
     peak_channels = net > 3.0 * sigma
     # The census wants every line the pattern shows, so it keeps no prominence
     # bar — but its height bar takes the same dynamic-range floor the width
@@ -1515,20 +1569,25 @@ def diagnose(data: PatternData, *, wavelength: float | None = None,
         prominence >= SAMPLING_PROMINENCE_SIGMA * sigma[candidates]]
 
     # nested envelope fits: cubic, then cubic + 1/(2θ) air-scatter column
-    design = chebyshev_design_matrix(tt, 4, float(tt[0]), float(tt[-1]))
-    coef, *_ = np.linalg.lstsq(design.T, env, rcond=None)
+    design = chebyshev_design_matrix(tt, AIR_GAIN_CHEBYSHEV_TERMS, float(tt[0]),
+                                     float(tt[-1]))
+    coef, *_ = lapack.lstsq(design.T, env, rcond=None)
     r_cubic = env - coef @ design
     design_air = np.vstack([design, 1.0 / np.maximum(tt, 1e-3)])
-    coef_air, *_ = np.linalg.lstsq(design_air.T, env, rcond=None)
+    coef_air, *_ = lapack.lstsq(design_air.T, env, rcond=None)
     r_air = env - coef_air @ design_air
     rss_cubic = float(r_cubic @ r_cubic)
     air_gain = float(1.0 - (r_air @ r_air) / rss_cubic) if rss_cubic > 0 else 0.0
     hump = float(np.sqrt(np.mean(r_air ** 2)) / max(med_env, 1e-12))
 
+    # Which searches could have flagged something is recorded beside the flags,
+    # because an empty list of flags reads the same for "looked, and clean" and
+    # "never looked" (or looked with too few parents to decide).
+    searches: list[str] = []
     flags: list[ContaminationFlag] = []
     if wavelength is not None and len(ghost_idx):
-        flags = _contamination_flags(tt, net, sigma, ghost_idx, wavelength,
-                                     source=source)
+        flags, searches = _contamination_flags(tt, net, sigma, ghost_idx, wavelength,
+                                               source=source)
 
     lam = (select_arpls_lambda(data).selected if baseline_lambda is None
            else baseline_lambda)
@@ -1558,6 +1617,7 @@ def diagnose(data: PatternData, *, wavelength: float | None = None,
         steps_per_fwhm=steps,
         n_peaks_measured=n_measured,
         contamination=flags,
+        contamination_searches=searches,
         coverage_plateau=plateau,
         coverage_regions=coverage,
         signal_cutoffs=cutoffs,
@@ -1648,23 +1708,43 @@ def contamination_flags_from_peaks(
     than :data:`GHOST_MIN_PARENTS` parents in range is a silence rather than a
     clean bill, exactly as an unrecognised wavelength is.
     """
+    return _ghost_screen(two_theta, intensity, two_theta_esd, wavelength,
+                         intensity_esd=intensity_esd, tt_range=tt_range,
+                         tol_deg=tol_deg, k_sigma=k_sigma, source=source)[0]
+
+
+def _ghost_screen(
+    two_theta: np.ndarray, intensity: np.ndarray,
+    two_theta_esd: np.ndarray | None, wavelength: float, *,
+    intensity_esd: np.ndarray | None = None,
+    tt_range: tuple[float, float] | None = None,
+    tol_deg: float = GHOST_TOL_DEG, k_sigma: float = GHOST_MATCH_K,
+    source: object | None = None,
+) -> tuple[list[ContaminationFlag], list[str]]:
+    """:func:`contamination_flags_from_peaks`' flags, and the searches that
+    could have raised one (WP-2039): those run with at least
+    :data:`GHOST_MIN_PARENTS` parents whose ghost falls in range.  A search
+    with fewer is a silence, so :func:`diagnose` records it as not run."""
     searches = ghost_searches(source)
     anode = identify_anode(wavelength)
     if anode is None or not searches:
-        return []
+        return [], []
     tt = np.asarray(two_theta, dtype=np.float64)
     inten = np.asarray(intensity, dtype=np.float64)
     if not len(tt):
-        return []
+        return [], []
     lo, hi = (float(tt.min()), float(tt.max())) if tt_range is None else tt_range
     esd = None if two_theta_esd is None else np.asarray(two_theta_esd, dtype=np.float64)
     flags: list[ContaminationFlag] = []
+    searched: list[str] = []
     for kind, lam_ghost in (("kbeta", _KBETA[anode]), ("tungsten_la", _W_LA1)):
         if kind not in searches:
             continue
         cands, n_searched = _ghost_candidates(
             tt, inten, esd, intensity_esd, lam_ghost / wavelength, lo, hi,
             tol_deg=tol_deg, k_sigma=k_sigma)
+        if n_searched >= GHOST_MIN_PARENTS:
+            searched.append(kind)
         support, leak, chosen = _ghost_consensus(cands)
         if support < GHOST_MIN_PARENTS:
             continue
@@ -1689,7 +1769,7 @@ def contamination_flags_from_peaks(
                 parent_two_theta=float(tt[ip]), intensity_ratio=r,
                 leak_ratio=leak, n_parents=support,
                 n_parents_searched=n_searched))
-    return flags
+    return flags, searched
 
 
 def _ghost_candidates(
@@ -1784,15 +1864,16 @@ def _contamination_flags(tt: np.ndarray, net: np.ndarray, sigma: np.ndarray,
                          peak_idx: np.ndarray, wavelength: float,
                          *, tol_deg: float = GHOST_TOL_DEG,
                          source: object | None = None
-                         ) -> list[ContaminationFlag]:
-    """Channel-index view of :func:`contamination_flags_from_peaks`.
+                         ) -> tuple[list[ContaminationFlag], list[str]]:
+    """Channel-index view of :func:`contamination_flags_from_peaks`, with the
+    searches that could have raised a flag (:func:`_ghost_screen`).
 
     This is the pre-WP-1018 surface, kept because :func:`diagnose` works from
     ``find_peaks`` channel indices and has neither a fitted position esd nor an
     integrated intensity: it passes net height for both the ranking and the
     ratio test, and no σ(2θ), so the window is the flat ``tol_deg``.
     """
-    return contamination_flags_from_peaks(
+    return _ghost_screen(
         tt[peak_idx], net[peak_idx], None, wavelength,
         intensity_esd=sigma[peak_idx], tt_range=(float(tt[0]), float(tt[-1])),
         tol_deg=tol_deg, source=source)

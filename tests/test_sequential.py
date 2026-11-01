@@ -8,9 +8,9 @@ Two synthetic series carry these tests, both built from the LaB6 model that
     is known, so it is where the trajectory machinery is actually validated.
 ``jump_series``
     a nearly flat series with one step far larger than its own scatter, which
-    is what the discontinuity fence exists to find.
+    ``SeriesResult.steps`` ranks first.
 
-The chain's fences (reseed, discontinuity, path dependence) never alter a
+The chain's fences (reseed, path dependence) never alter a
 fitted value, so every test here asserts on the reported diagnostics and on
 values that were fitted independently of them.
 """
@@ -36,11 +36,11 @@ from rietx.sequential import (
     _better,
     _carry_into,
     _collapse,
-    _discontinuity_steps,
     _entry_from_result,
     _labels_for,
     _path_dependence_diagnostics,
     _reseed_needed,
+    _series_steps,
     _width_growth_diagnostics,
     refine_sequential,
 )
@@ -114,11 +114,7 @@ def thermal_patterns():
 
 @pytest.fixture(scope="module")
 def thermal_series(thermal_patterns):
-    structure, ins = _start_models()
-    return refine_sequential(thermal_patterns, structure, ins,
-                             x=TEMPERATURES, x_label="T (K)",
-                             labels=[f"{int(t)}K" for t in TEMPERATURES],
-                             plan="mccusker_default")
+    return _thermal_series(thermal_patterns)
 
 
 @pytest.fixture(scope="module")
@@ -126,8 +122,8 @@ def jump_patterns():
     """Six patterns at one cell, then a step 20× the series' own scatter.
 
     The step (2e-3 Å) is far below the peak capture range, so *both* the warm
-    and the cold fit find it easily — the discontinuity fence is about the
-    trajectory, not about whether an individual fit succeeded.
+    and the cold fit find it easily — the steps are about the trajectory,
+    not about whether an individual fit succeeded.
     """
     flat = [_simulate(A0, seed=31 + k) for k in range(3)]
     stepped = [_simulate(A0 + 2e-3, seed=41 + k) for k in range(3)]
@@ -711,6 +707,21 @@ def test_collapse_unions_the_plans_turn_on_globs():
             assert glob in single.stages[0].turn_on
 
 
+def test_collapse_keeps_every_plan_level_setting():
+    """The collapsed warm refit is the plan compressed, not another protocol,
+    so every plan-level field crosses it: one dropped here runs a series at
+    its default, as the absent-phase hold's threshold would (WP-2002, B1)."""
+    import dataclasses
+
+    plan = dataclasses.replace(
+        rx.RefinementPlan.mccusker_structural(), correlation_guard=0.9,
+        intermediate_ftol=1e-4, lebail_passes=3, phase_support_sigma=None)
+    single = _collapse(plan)
+    for f in dataclasses.fields(plan):
+        if f.name != "stages":
+            assert getattr(single, f.name) == getattr(plan, f.name), f.name
+
+
 def test_a_warm_refit_lifts_no_carried_floor_value():
     """WP-1938: the collapsed warm refit carries no ``Stage.seed``.
 
@@ -803,12 +814,13 @@ def test_a_well_behaved_series_reseeds_nothing(thermal_series):
     codes = [d.code for d in thermal_series.diagnostics]
     assert "SEQUENTIAL_RESEED" not in codes
     # WP-1469's new half fires nothing on it: every fence recorded, none left
-    # a pattern above it, and the record of flagged steps is empty, not absent
+    # a pattern above it, and the steps are written, none re-measured cold
     assert "SEQUENTIAL_RWP_OUTLIER" not in codes
     assert thermal_series[0].rwp_fence is None
     assert all(e.rwp_fence is not None and not e.above_fence
                for e in thermal_series.entries[1:])
-    assert thermal_series.discontinuities == []
+    assert thermal_series.steps
+    assert all(s.cold_ratio is None for s in thermal_series.steps)
     # ... and no pattern climbed past its first rung: the first is cold because
     # it has no predecessor, every other one is the collapsed warm refit
     assert [e.rung for e in thermal_series] == ["cold"] + ["warm"] * 6
@@ -1140,6 +1152,74 @@ def test_only_a_converged_first_rung_becomes_evidence(thermal_patterns):
     assert none[4].rungs_tried == ["warm"] and none[4].status == "max_iter"
 
 
+def chain_answer(series):
+    """Every number a chain reports, and which rung each pattern kept: per
+    pattern its values, esds, rungs, fence and codes, then the series' own
+    codes and steps.  The tree and node ids a history writes are names, not
+    answers, and are left out."""
+    entries = [(e.label, e.status, e.rung, tuple(e.rungs_tried), e.reseeded,
+                e.rwp_warm, e.rwp_fence, e.statistics.rwp,
+                [(p.path, p.value, p.stderr) for p in e.parameters],
+                [d.code for d in e.diagnostics])
+               for e in series.entries]
+    return entries, [d.code for d in series.diagnostics], series.steps
+
+
+def first_rung_ratios(series):
+    """Each kept first rung's cost over the most expensive one before it.
+
+    Replays :func:`~rietx.sequential._first_rung_budget`'s sample from the
+    record: a warm pattern that kept its first rung reports that rung's
+    evaluations as ``n_iterations``, and only a *converged* one joins the
+    sample.  Once the sample holds :data:`~rietx.sequential.FIRST_RUNG_SAMPLES`
+    (the point the bound arms) every kept first rung gets a ratio, a
+    ``max_iter`` one included: that is the rung a bound would cut.
+    """
+    from rietx.sequential import FIRST_RUNG_SAMPLES
+
+    sample, ratios = [], []
+    for e in series.entries[1:]:
+        if e.rungs_tried == ["warm"]:
+            if len(sample) >= FIRST_RUNG_SAMPLES:
+                ratios.append(e.n_iterations / max(sample))
+            if e.status == "converged":
+                sample.append(e.n_iterations)
+    return ratios
+
+
+def _thermal_series(patterns, **kw):
+    structure, ins = _start_models()
+    return refine_sequential(patterns, structure, ins,
+                             x=TEMPERATURES, x_label="T (K)",
+                             labels=[f"{int(t)}K" for t in TEMPERATURES],
+                             plan="mccusker_default", **kw)
+
+
+@pytest.fixture(scope="module")
+def thermal_series_unbounded(thermal_patterns):
+    return _thermal_series(thermal_patterns, first_rung_factor=None)
+
+
+def test_the_first_rung_bound_moves_no_accepted_value(thermal_series,
+                                                      thermal_series_unbounded):
+    """`FIRST_RUNG_FACTOR` is answer-invariant here, and by how much (WP-2003).
+
+    Invariance is a measured margin, not a construction: a bound that cut a
+    *winning* first rung would keep the next rung's answer instead.  So two
+    things are asserted on the default plan's chain, the bound on and off:
+    every accepted value, esd, rung and code is equal, and every first rung
+    the unbounded chain kept cost less than the budget the bound would have
+    set at that point.  Measured 2026-10-24: three armed patterns, each at
+    1.0× the running maximum (15 evaluations against 15), so the bound sits
+    3× above every rung it could have cut.  The CPD chain's twin is in
+    `test_acceptance_sequential.py`.
+    """
+    assert chain_answer(thermal_series) == chain_answer(thermal_series_unbounded)
+    ratios = first_rung_ratios(thermal_series_unbounded)
+    assert ratios, "the bound armed on no pattern, so nothing was tested"
+    assert max(ratios) < FIRST_RUNG_FACTOR
+
+
 def test_an_unrecovered_pattern_seeds_nothing_and_joins_no_median(
         thermal_patterns, tmp_path):
     """The hygiene criterion: a doubly-failed pattern is stepped over.
@@ -1169,6 +1249,10 @@ def test_an_unrecovered_pattern_seeds_nothing_and_joins_no_median(
     assert unrecovered[0].level == "warning"
     assert unrecovered[0].where == ["p001"]
     assert "seeded no successor" in unrecovered[0].message
+    # the re-routing is on the record, with history off as with it (WP-2003)
+    assert [e.seeded_from for e in series] == [None, 0, 0]
+    assert ("Pattern 2 (p002) warm-started from pattern 0 (p000) instead."
+            in unrecovered[0].message)
 
     # the median never saw it: pattern 2 fitted once, against a median of 0.10
     assert series[2].rungs_tried == ["warm"]
@@ -1249,7 +1333,7 @@ def test_a_blank_frame_no_longer_reads_as_a_point_or_hides_a_step():
                                   first.fitted_instrument).fit(
         patterns, labels=[f"ramp_{k:03d}" for k in range(24)],
         plan="mccusker_default", refit="stages", on_error="carry",
-        verify_discontinuities=True)
+        verify_steps=3)
 
     # gap 1: the blank carries a warning that does not call it a good fit,
     # and it is the only pattern that does
@@ -1259,14 +1343,13 @@ def test_a_blank_frame_no_longer_reads_as_a_point_or_hides_a_step():
     assert outliers[0].level == "warning"
     assert all("good fit" not in d.suggestion for d in series.diagnostics
                if d.where == ["ramp_007"])
-    # gap 2: the planted step is flagged, verified, and nothing touches the blank
-    jumps = {d.where[0]: d for d in series.diagnostics
-             if d.code == "SEQUENTIAL_DISCONTINUITY"}
-    assert jumps["phases.0.cell.a"].value == pytest.approx(1.0, abs=0.05)
+    # gap 2: the planted step is the cell's largest, re-measured cold, and no
+    # step touches the blank (WP-2003: a row of SeriesResult.steps, no flag)
+    cell = [s for s in series.steps if s.path == "phases.0.cell.a"]
+    assert cell[0].labels == ("ramp_011", "ramp_012")
+    assert cell[0].cold_ratio == pytest.approx(1.0, abs=0.05)
     # gap 3: …and the pair is read from a field
-    pairs = {s.path: s.labels for s in series.discontinuities}
-    assert pairs["phases.0.cell.a"] == ("ramp_011", "ramp_012")
-    assert not [p for p in pairs.values() if "ramp_007" in p]
+    assert not [s for s in series.steps if "ramp_007" in s.labels]
 
 
 def test_the_outlier_verdict_is_read_off_the_entry():
@@ -1410,48 +1493,38 @@ def test_a_cancel_mid_ladder_keeps_the_best_complete_attempt(thermal_patterns):
     assert "SEQUENTIAL_CANCELLED" in [d.code for d in series.diagnostics]
 
 
-# -- the discontinuity fence ---------------------------------------------
+# -- the steps between patterns (WP-2003) ------------------------------
 
-def test_discontinuity_is_flagged_and_the_value_is_left_alone(jump_patterns):
+def test_the_step_ranks_first_and_the_value_is_left_alone(jump_patterns):
+    """The planted step is the cell's largest row, no diagnostic names it,
+    and no row is re-measured unless the caller asks: ``cold_ratio`` stays
+    ``None`` (WP-1003's absent-for-cause rule)."""
     structure, ins = _start_models()
     series = refine_sequential(jump_patterns, structure, ins)
-    jumps = [d for d in series.diagnostics
-             if d.code == "SEQUENTIAL_DISCONTINUITY"
-             and d.where == ["phases.0.cell.a"]]
-    assert len(jumps) == 1
-    assert "Check this pattern's own fit" in jumps[0].suggestion
+    assert "SEQUENTIAL_DISCONTINUITY" not in [d.code for d in series.diagnostics]
+    cell = [s for s in series.steps if s.path == "phases.0.cell.a"]
+    assert len(cell) == 5                       # every consecutive pair
+    assert cell[0].indices == (2, 3)
+    assert cell[0].step == pytest.approx(2e-3, abs=3e-4)
+    assert abs(cell[0].size_esd) > 3 * max(abs(s.size_esd) for s in cell[1:])
+    assert all(s.cold_ratio is None for s in series.steps)
 
     # nothing was smoothed: the fitted step is still the injected one
     value = np.asarray(series.trajectory("phases.0.cell.a").value)
     assert value[3] - value[2] == pytest.approx(2e-3, abs=3e-4)
 
 
-def test_discontinuity_verification_is_off_by_default(jump_patterns):
-    """The flag is the caller's decision, and its absence must not look like a
-    measured answer: ``value`` stays ``None`` (WP-1003's absent-for-cause rule,
-    the one ``Diagnostic.value`` is documented under)."""
-    structure, ins = _start_models()
-    series = refine_sequential(jump_patterns, structure, ins)
-    jump = next(d for d in series.diagnostics
-                if d.code == "SEQUENTIAL_DISCONTINUITY")
-    assert jump.value is None
-    assert "Refitted cold" not in jump.message
-
-
 @pytest.mark.slow
-def test_verified_discontinuity_reproduces_a_real_step(jump_patterns):
+def test_verified_step_reproduces_a_real_step(jump_patterns):
     """WP-1305 (c): a step that is in the data survives two fits that never
     saw each other.  The fixture's step is injected into the *specimen*, so
     the honest answer is a ratio of 1."""
     structure, ins = _start_models()
-    series = refine_sequential(jump_patterns, structure, ins,
-                               verify_discontinuities=True)
-    jump = next(d for d in series.diagnostics
-                if d.code == "SEQUENTIAL_DISCONTINUITY"
-                and d.where == ["phases.0.cell.a"])
-    assert jump.value == pytest.approx(1.0, abs=0.1)
-    assert "Refitted cold and independently" in jump.message
-    assert "A ratio near 1.0" in jump.suggestion
+    series = refine_sequential(jump_patterns, structure, ins, verify_steps=3)
+    step = next(s for s in series.steps
+                if s.path == "phases.0.cell.a" and s.indices == (2, 3))
+    assert step.cold_ratio == pytest.approx(1.0, abs=0.1)
+    assert sum(s.cold_ratio is not None for s in series.steps) <= 3
 
 
 @pytest.mark.slow
@@ -1467,12 +1540,12 @@ def test_verified_step_renders_for_inspection(jump_patterns):
     structure, ins = _start_models()
     runner = SequentialRefinement(structure, ins)
     series = runner.fit(jump_patterns, labels=[f"p{k}" for k in range(6)],
-                        verify_discontinuities=True)
+                        verify_steps=1)
     out = Path(__file__).parent / "output"
     out.mkdir(exist_ok=True)
-    plot_trajectory(series, ["phases.0.cell.a"],
+    plot_trajectory(series, [series.steps[0].path],
                     path=str(out / "sequential_verified_step.png"))
-    for k in (2, 3):                       # the pair the verification refitted
+    for k in series.steps[0].indices:      # the pair the verification refitted
         plot_result(runner.results_[k],
                     path=str(out / f"sequential_verified_step_p{k}.png"))
     assert (out / "sequential_verified_step.png").exists()
@@ -1484,13 +1557,50 @@ def test_verification_moves_no_fitted_value(jump_patterns):
     ladder rung, and the module docstring says why this cannot be one."""
     structure, ins = _start_models()
     plain = refine_sequential(jump_patterns, structure, ins)
-    checked = refine_sequential(jump_patterns, structure, ins,
-                                verify_discontinuities=True)
+    checked = refine_sequential(jump_patterns, structure, ins, verify_steps=3)
     for a, b in zip(plain.entries, checked.entries, strict=True):
         assert a.rung == b.rung and a.status == b.status
         assert a.n_iterations == b.n_iterations
         assert [(p.path, p.value) for p in a.parameters] == \
                [(p.path, p.value) for p in b.parameters]
+    assert [(s.path, s.indices, s.step) for s in plain.steps] == \
+           [(s.path, s.indices, s.step) for s in checked.steps]
+
+
+class _RecordedVerify(SequentialRefinement):
+    """A runner that records which rows the walk hands its verification."""
+
+    def _verify_steps(self, steps, *args, **kw):
+        self.handed = list(steps)
+
+
+def test_verify_steps_hands_the_k_largest_rows_to_the_check(thermal_patterns):
+    """``verify_steps=k`` is the caller's k over the sorted list, and 0 runs
+    no check at all (WP-2003, the ruling's option (ii))."""
+    runner = _RecordedVerify(*_start_models())
+    series = runner.fit(thermal_patterns[:3], plan=_CHEAP, verify_steps=2)
+    assert runner.handed == series.steps[:2]
+    assert all(a is b for a, b in zip(runner.handed, series.steps[:2], strict=True))
+
+    runner = _RecordedVerify(*_start_models())
+    runner.fit(thermal_patterns[:3], plan=_CHEAP)
+    assert not hasattr(runner, "handed")
+
+
+@pytest.mark.parametrize("bad, error, match", [
+    (True, TypeError, "verify_discontinuities"),
+    (False, TypeError, "count"),
+    (-1, ValueError, "0 or more"),
+    (2.0, TypeError, "int count"),
+])
+def test_verify_steps_refuses_a_flag_or_a_negative_count(thermal_patterns, bad,
+                                                         error, match):
+    """``True`` meant "the flagged pairs" under the old keyword; read as 1 it
+    would refit a pair nobody chose, so a bool is refused by name."""
+    runner = SequentialRefinement(*_start_models())
+    with pytest.raises(error, match=match):
+        runner.fit(thermal_patterns[:2], plan=_CHEAP, verify_steps=bad)
+    assert runner.results_ == []
 
 
 class _StubColdFits(SequentialRefinement):
@@ -1523,14 +1633,9 @@ class _StubColdFits(SequentialRefinement):
             for p, v in self._values[label].items()])
 
 
-def _flagged(path: str, step: float, labels=("p2", "p3")):
-    from rietx.sequential import _FlaggedStep
-
-    return _FlaggedStep(
-        record=SeriesStep(path=path, labels=labels, step=step,
-                          indices=tuple(int(label[1:]) for label in labels)),
-        diagnostic=rx.Diagnostic(level="info", code="SEQUENTIAL_DISCONTINUITY",
-                                 where=[path], message="m", suggestion="s"))
+def _flagged(path: str, step: float, labels=("p2", "p3")) -> SeriesStep:
+    return SeriesStep(path=path, labels=labels, step=step,
+                      indices=tuple(int(label[1:]) for label in labels))
 
 
 def test_verification_reports_a_chain_made_step_as_a_small_ratio():
@@ -1539,23 +1644,24 @@ def test_verification_reports_a_chain_made_step_as_a_small_ratio():
     runner = _StubColdFits({"p2": {"phases.0.cell.a": 4.1566},
                             "p3": {"phases.0.cell.a": 4.1567}})
     steps = [_flagged("phases.0.cell.a", 2e-3)]
-    runner._verify_discontinuities(steps, [None] * 6, [f"p{i}" for i in range(6)],
-                                   "rietveld", _CHEAP, None, None, None)
-    d = steps[0].diagnostic
-    assert d.value == pytest.approx(0.05, rel=1e-6)
-    assert "0.05× the chain's" in d.message
+    runner._verify_steps(steps, [None] * 6, [f"p{i}" for i in range(6)],
+                         "rietveld", _CHEAP, None, None, None)
+    assert steps[0].cold_ratio == pytest.approx(0.05, rel=1e-6)
     assert runner.refits == ["p2", "p3"]
 
 
-def test_verification_refits_each_pattern_once_for_all_its_flagged_paths():
-    """Two paths flagged at the same step is one pair of refits, not two."""
+def test_verification_refits_each_pattern_once_for_all_its_paths():
+    """Two paths stepping between the same pair is one pair of refits, and a
+    third step sharing one of its patterns adds one refit, not two."""
     runner = _StubColdFits({"p2": {"phases.0.cell.a": 4.0, "phases.0.cell.b": 4.0},
                             "p3": {"phases.0.cell.a": 4.002, "phases.0.cell.b": 4.002}})
-    steps = [_flagged("phases.0.cell.a", 2e-3), _flagged("phases.0.cell.b", 2e-3)]
-    runner._verify_discontinuities(steps, [None] * 6, [f"p{i}" for i in range(6)],
-                                   "rietveld", _CHEAP, None, None, None)
-    assert runner.refits == ["p2", "p3"]
-    assert all(s.diagnostic.value == pytest.approx(1.0, rel=1e-6) for s in steps)
+    runner._values["p4"] = {"phases.0.cell.a": 4.004}
+    steps = [_flagged("phases.0.cell.a", 2e-3), _flagged("phases.0.cell.b", 2e-3),
+             _flagged("phases.0.cell.a", 2e-3, labels=("p3", "p4"))]
+    runner._verify_steps(steps, [None] * 6, [f"p{i}" for i in range(6)],
+                         "rietveld", _CHEAP, None, None, None)
+    assert runner.refits == ["p2", "p3", "p4"]
+    assert all(s.cold_ratio == pytest.approx(1.0, rel=1e-6) for s in steps)
 
 
 def test_verification_ratio_is_signed_so_the_other_way_is_not_a_reproduction():
@@ -1565,21 +1671,19 @@ def test_verification_ratio_is_signed_so_the_other_way_is_not_a_reproduction():
     runner = _StubColdFits({"p2": {"phases.0.cell.a": 4.002},
                             "p3": {"phases.0.cell.a": 4.0}})
     steps = [_flagged("phases.0.cell.a", 2e-3)]
-    runner._verify_discontinuities(steps, [None] * 6, [f"p{i}" for i in range(6)],
-                                   "rietveld", _CHEAP, None, None, None)
-    assert steps[0].diagnostic.value == pytest.approx(-1.0, rel=1e-6)
-    assert "-1.00× the chain's" in steps[0].diagnostic.message
+    runner._verify_steps(steps, [None] * 6, [f"p{i}" for i in range(6)],
+                         "rietveld", _CHEAP, None, None, None)
+    assert steps[0].cold_ratio == pytest.approx(-1.0, rel=1e-6)
 
 
 def test_verification_says_so_when_a_cold_fit_determines_nothing():
     """A ratio needs both ends; a path a cold fit did not measure is not a
-    zero, so no ``value`` is written at all."""
+    zero, so no ``cold_ratio`` is written at all."""
     runner = _StubColdFits({"p2": {"phases.0.cell.a": 4.0}, "p3": {}})
     steps = [_flagged("phases.0.cell.a", 2e-3)]
-    runner._verify_discontinuities(steps, [None] * 6, [f"p{i}" for i in range(6)],
-                                   "rietveld", _CHEAP, None, None, None)
-    assert steps[0].diagnostic.value is None
-    assert "could not be re-measured" in steps[0].diagnostic.message
+    runner._verify_steps(steps, [None] * 6, [f"p{i}" for i in range(6)],
+                         "rietveld", _CHEAP, None, None, None)
+    assert steps[0].cold_ratio is None
 
 
 def test_verification_refits_carry_the_callers_constraints():
@@ -1592,9 +1696,8 @@ def test_verification_refits_carry_the_callers_constraints():
     runner = _StubColdFits({"p2": {"phases.0.cell.a": 4.0},
                             "p3": {"phases.0.cell.a": 4.002}})
     steps = [_flagged("phases.0.cell.a", 2e-3)]
-    runner._verify_discontinuities(steps, [None] * 6, [f"p{i}" for i in range(6)],
-                                   "rietveld", _CHEAP, None, None,
-                                   _tie_the_two_biso)
+    runner._verify_steps(steps, [None] * 6, [f"p{i}" for i in range(6)],
+                         "rietveld", _CHEAP, None, None, _tie_the_two_biso)
     assert runner.hooks == [_tie_the_two_biso, _tie_the_two_biso]
 
 
@@ -1617,30 +1720,47 @@ def _series_missing(path: str, values, stderr, absent) -> SeriesResult:
         for k, (v, e) in enumerate(zip(values, stderr, strict=True))])
 
 
-def test_an_inert_parameter_cannot_carry_a_discontinuity():
-    """Regression for a measured false positive, and for why the σ test alone
-    cannot catch it: a softplus coefficient dying on its floor has dp/du → 0,
-    so its esd collapses *with* its value and every step is formally
-    astronomically significant.  ``instrument.profile.y`` on the synthetic ramp
-    came back with a median step of 4e-16, one step of 1.3e-11 and σ ≈ 4e-55."""
+def test_an_inert_parameter_steps_by_zero_esds():
+    """Regression for a measured false positive: a softplus coefficient dying
+    on its floor has dp/du → 0, so its esd collapses *with* its value and
+    every step is formally astronomically many σ.  ``instrument.profile.y`` on
+    the synthetic ramp came back with a median step of 4e-16, one step of
+    1.3e-11 and σ ≈ 4e-55; under the noise floor its steps have size 0."""
     inert = _synthetic_series(
         "instrument.profile.y",
         [1e-16, 2e-16, 1.3e-11, 1.4e-11, 1.5e-11, 1.6e-11],
         [4e-55] * 6)
-    assert _discontinuity_steps(inert) == []
+    assert [s.size_esd for s in _series_steps(inert)] == [0.0] * 5
 
-    # the same shape at a physical magnitude is still reported
+    # the same shape at a physical magnitude is measured
     real = _synthetic_series(
         "phases.0.cell.a",
         [4.1566, 4.15661, 4.15962, 4.15963, 4.15964, 4.15965],
         [1e-5] * 6)
-    flagged = _discontinuity_steps(real)
-    assert [s.diagnostic.code for s in flagged] == ["SEQUENTIAL_DISCONTINUITY"]
+    steps = _series_steps(real)
     # the signed step the verification ratio divides by (WP-1305)
-    assert flagged[0].record.step == pytest.approx(4.15962 - 4.15661)
+    assert steps[0].step == pytest.approx(4.15962 - 4.15661)
+    assert steps[0].size_esd == pytest.approx((4.15962 - 4.15661) / 1e-5)
     # …and the pair it is between, as fields (WP-1469, issue #481)
-    assert flagged[0].record.labels == ("p1", "p2")
-    assert flagged[0].record.indices == (1, 2)
+    assert steps[0].labels == ("p1", "p2")
+    assert steps[0].indices == (1, 2)
+
+
+def test_steps_sort_largest_first_and_an_unmeasured_size_last():
+    """Every consecutive pair is a row, sized by the *later* fit's esd, in
+    descending magnitude whatever its sign, and a step against no esd has no
+    size rather than an infinite one."""
+    series = _synthetic_series("phases.0.cell.a",
+                               [4.0, 4.001, 4.0, 4.0005, 4.0035],
+                               [1e-4, 1e-4, 2e-4, None, 1e-3])
+    steps = _series_steps(series)
+    assert [s.indices for s in steps] == [(0, 1), (1, 2), (3, 4), (2, 3)]
+    assert steps[0].size_esd == pytest.approx(0.001 / 1e-4)
+    assert steps[1].size_esd == pytest.approx(-0.001 / 2e-4)
+    assert steps[2].size_esd == pytest.approx(0.003 / 1e-3)
+    assert steps[3].size_esd is None and steps[3].step == pytest.approx(5e-4)
+    # one pattern is no step at all
+    assert _series_steps(_synthetic_series("phases.0.cell.a", [4.0], [1e-4])) == []
 
 
 def _fenced_series(path: str, values, stderr, *, above=(), diverged=()):
@@ -1667,72 +1787,93 @@ _RAMP_SD = [6.6e-6] * 10
 _RAMP_SD[3] = 1.6e-3
 
 
-def test_a_rejected_frame_no_longer_takes_the_paths_one_flag():
-    """Gap 2: the blank's step was the largest passing both legs, so the
-    argmax kept it and the planted step behind it went unreported."""
+def test_a_rejected_frame_has_no_step():
+    """Gap 2: the blank's steps were the largest, so the argmax kept them and
+    the planted step behind it went unreported.  Above the fence or diverged,
+    its two steps are not rows, and the planted one ranks first."""
     path = "phases.0.cell.a"
-    # as a measurement (the pre-WP-1469 reading), the blank takes the flag
-    (s,) = _discontinuity_steps(_fenced_series(path, _RAMP_A, _RAMP_SD))
-    assert set(s.record.labels) & {"p3"}
-    # above the fence, its two steps are left out and the planted one is found
+    # as a measurement (the pre-WP-1469 reading), the blank's steps lead
+    assert "p3" in _series_steps(_fenced_series(path, _RAMP_A, _RAMP_SD))[0].labels
     for rejected in ({"above": {3}}, {"diverged": {3}}):
-        (s,) = _discontinuity_steps(_fenced_series(path, _RAMP_A, _RAMP_SD,
-                                                   **rejected))
-        assert s.record.labels == ("p5", "p6")
-        assert s.record.indices == (5, 6)
-        assert s.record.step == pytest.approx(2.27e-3)
-        assert "between p5 and p6" in s.diagnostic.message
+        steps = _series_steps(_fenced_series(path, _RAMP_A, _RAMP_SD, **rejected))
+        assert not [s for s in steps if "p3" in s.labels]
+        assert len(steps) == 7
+        assert steps[0].labels == ("p5", "p6")
+        assert steps[0].indices == (5, 6)
+        assert steps[0].step == pytest.approx(2.27e-3)
 
 
-def test_a_non_finite_rejected_value_does_not_take_the_flag():
-    """A diverged pattern whose value is NaN: its steps are dropped, and the
-    argmax must not pick them back up (NaN × False is NaN, not 0)."""
+def test_a_non_finite_rejected_value_has_no_step():
+    """A diverged pattern whose value is NaN: its steps are dropped, and no
+    row carries the NaN."""
     values = list(_RAMP_A)
     values[3] = float("nan")
-    (s,) = _discontinuity_steps(_fenced_series("phases.0.cell.a", values,
-                                               _RAMP_SD, diverged={3}))
-    assert s.record.labels == ("p5", "p6")
-    assert np.isfinite(s.record.step)
+    steps = _series_steps(_fenced_series("phases.0.cell.a", values, _RAMP_SD,
+                                         diverged={3}))
+    assert steps[0].labels == ("p5", "p6")
+    assert all(np.isfinite(s.step) for s in steps)
 
 
 def test_a_run_of_rejected_patterns_is_never_bridged():
     """A clean ramp whose counts fell for four patterns: those four sit over
     the fence with good values.  Bridged, the step from p1 to p6 spans five of
-    the ramp's steps and read as a 5× discontinuity; dropped, nothing fires."""
+    the ramp's steps; dropped, only the pairs either side remain."""
     ramp = [4.1566 + 2.7e-4 * k for k in range(10)]
-    assert _discontinuity_steps(_fenced_series(
-        "phases.0.cell.a", ramp, [6.6e-6] * 10, above={2, 3, 4, 5})) == []
+    steps = _series_steps(_fenced_series(
+        "phases.0.cell.a", ramp, [6.6e-6] * 10, above={2, 3, 4, 5}))
+    assert sorted(s.indices for s in steps) == [(0, 1), (6, 7), (7, 8), (8, 9)]
 
 
-def test_the_flagged_pair_is_a_field_beside_the_diagnostic():
-    """Gap 3: one record per SEQUENTIAL_DISCONTINUITY, in the same order, the
-    path its key, and it survives JSON."""
+@pytest.mark.parametrize("above", [{3}, set()])
+def test_a_pattern_the_path_is_absent_from_is_not_bridged(above):
+    """A pattern whose phase was held carries no row for its cell, so the
+    trajectory skips it; the pair either side of it is two steps apart and is
+    not a row, whether the pattern sits above the fence (tutorial 05's 5 %
+    jump read 600 K → 800 K before) or inside it (the planted blank frame)."""
+    series = _fenced_series("phases.0.cell.a", _RAMP_A, _RAMP_SD, above=above)
+    series.entries[3].parameters = []
+    steps = _series_steps(series)
+    assert sorted(s.indices for s in steps) == [
+        (0, 1), (1, 2), (4, 5), (5, 6), (6, 7), (7, 8), (8, 9)]
+
+
+def test_the_steps_are_a_field_that_survives_json():
+    """Gap 3: the pair is fields, not prose, and survives JSON; a document
+    written before WP-2003 carries ``discontinuities`` and still opens."""
     series = _fenced_series("phases.0.cell.a", _RAMP_A, _RAMP_SD, above={3})
-    steps = _discontinuity_steps(series)
-    series.diagnostics = [s.diagnostic for s in steps]
-    series.discontinuities = [s.record for s in steps]
+    series.steps = _series_steps(series)
+    series.steps[0].cold_ratio = 0.98
     reloaded = SeriesResult.model_validate_json(series.model_dump_json())
-    flagged = [d for d in reloaded.diagnostics
-               if d.code == "SEQUENTIAL_DISCONTINUITY"]
-    assert [s.path for s in reloaded.discontinuities] == \
-        [d.where[0] for d in flagged]
-    assert reloaded.discontinuities[0].labels == ("p5", "p6")
+    assert reloaded.steps == series.steps
+    assert reloaded.steps[0].labels == ("p5", "p6")
     # a document written before the record says "not recorded", not "none"
-    assert SeriesResult().discontinuities is None
+    assert SeriesResult().steps is None
+
+    old = json.loads(series.model_dump_json())
+    del old["steps"]
+    old["discontinuities"] = [{"path": "phases.0.cell.a", "labels": ["p5", "p6"],
+                               "indices": [5, 6], "step": 2.27e-3}]
+    opened = SeriesResult.model_validate(old)
+    assert opened.steps is None
+    assert "discontinuities" not in opened.model_dump()
 
 
-def test_the_plot_shades_the_step_the_record_names():
-    """The trajectory plot re-derived the flagged step as the largest one,
-    which is the blank's here: it shaded a step no diagnostic named."""
+def test_the_plot_shades_only_a_step_re_measured_cold():
+    """No step is called a jump, so an unverified one is not shaded; the one
+    ``verify_steps`` re-measured is, between the pair its record names."""
     import matplotlib.pyplot as plt
 
     from rietx.viz.plots import plot_trajectory
 
     path = "phases.0.cell.a"
     series = _fenced_series(path, _RAMP_A, _RAMP_SD, above={3})
-    steps = _discontinuity_steps(series)
-    series.diagnostics = [s.diagnostic for s in steps]
-    series.discontinuities = [s.record for s in steps]
+    series.steps = _series_steps(series)
+    fig = plot_trajectory(series, [path])
+    (ax,) = fig.get_axes()
+    assert not ax.patches
+    plt.close(fig)
+
+    series.steps[0].cold_ratio = 1.0
     fig = plot_trajectory(series, [path])
     (ax,) = fig.get_axes()
     (span,) = ax.patches
@@ -1745,7 +1886,7 @@ def test_the_plot_shades_the_step_the_record_names():
     plt.close(fig)
 
 
-def test_a_relative_dof_is_judged_by_neither_fence():
+def test_a_relative_dof_is_judged_by_neither_fence_nor_stepped():
     """A coordinate DOF's value is the step its fit took, not a position.
 
     Since WP-1333 each pattern starts where its predecessor ended, so a DOF's
@@ -1753,18 +1894,18 @@ def test_a_relative_dof_is_judged_by_neither_fence():
     either way: a jump by construction.  The backward chain takes the same
     steps from the other side, so the two differ in sign by construction too.
     Both fences fired on exactly that, on a clean seven-pattern ramp whose
-    coordinate agreed between the chains to 1e-9.
+    coordinate agreed between the chains to 1e-9, and its first step leads
+    ``SeriesResult.steps`` unless the path is named relative.
     """
     steps = [0.0096, -0.0005, 0.0003, -0.0002, 0.0003, -0.0001]
     forward = _synthetic_series(B_DOF, steps, [4e-4] * 6)
     backward = _synthetic_series(B_DOF, [-s for s in steps], [4e-4] * 6)
-    assert [s.diagnostic.code for s in _discontinuity_steps(forward)] == [
-        "SEQUENTIAL_DISCONTINUITY"]
+    assert _series_steps(forward)[0].indices == (0, 1)
     assert [d.code for d in _path_dependence_diagnostics(forward, backward)] == [
         "SEQUENTIAL_PATH_DEPENDENT"]
 
     relative = frozenset({B_DOF})
-    assert _discontinuity_steps(forward, relative) == []
+    assert _series_steps(forward, relative) == []
     assert _path_dependence_diagnostics(forward, backward, relative) == []
 
 
@@ -1782,8 +1923,11 @@ def test_a_chained_coordinate_is_judged_on_its_coordinate(thermal_patterns):
         thermal_patterns[:5], structure, instrument, direction="both",
         plan=_coordinate_plan("phases.*.atoms.*.dof.*"))
     assert {B_X, B_DOF} <= set(series.paths(varied_only=False))
-    judged = {"SEQUENTIAL_DISCONTINUITY", "SEQUENTIAL_PATH_DEPENDENT"}
-    assert [d.where for d in series.diagnostics if d.code in judged] == []
+    assert [d.where for d in series.diagnostics
+            if d.code == "SEQUENTIAL_PATH_DEPENDENT"] == []
+    stepped = {s.path for s in series.steps}
+    assert B_X in stepped and B_DOF not in stepped
+    assert {s.path for s in series.backward.steps} == stepped
 
 
 def test_path_dependence_ignores_numerically_identical_chains():
@@ -1997,12 +2141,14 @@ def test_the_abstention_row_recipe_counts_the_patterns_actually_judged():
     assert patterns_judged(partial, path) == 5      # p2..p6, neither length
 
 
-def test_a_uniform_ramp_is_not_a_discontinuity(thermal_series):
-    """A steady trend has every step at the median step, so the robust test
-    passes it — which is the point of measuring against the series' own scatter
-    rather than against the esds (in a real ramp every step is many σ)."""
+def test_a_uniform_ramp_steps_one_way(thermal_series):
+    """A steady trend: every cell step is the same sign, and nothing in the
+    series reads any of them as a finding (WP-2003)."""
     assert "SEQUENTIAL_DISCONTINUITY" not in [d.code
                                               for d in thermal_series.diagnostics]
+    cell = [s for s in thermal_series.steps if s.path == "phases.0.cell.a"]
+    assert len(cell) == len(thermal_series) - 1
+    assert all(s.step > 0 and s.size_esd > 0 for s in cell)
 
 
 # -- the path-dependence fence -------------------------------------------

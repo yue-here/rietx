@@ -1,10 +1,13 @@
 """Primary extinction (WP-0506, Sabine model).
 
-The golden is a faithful scalar transcription of GSAS-II ``GetPwdrExt`` /
-``GetPwdrExtDerv`` (behavioral reference only — no code is ported; see
-ATTRIBUTION.md), used to pin our vectorised/branchless implementation and the
-exact numeric constants (Xpol = 0.079411, the six Laue coefficients, the two
-Laue branches) to ~1e-10.
+The reference is a faithful scalar transcription of GSAS-II ``GetPwdrExt`` /
+``GetPwdrExtDerv`` (behavioural reference only; no code is ported, see
+ATTRIBUTION.md).  Since WP-2044 rietx evaluates the Laue factor in closed form,
+e^(−x)·[I₀(x) + I₁(x)], where GSAS-II truncates a series below x = 1 and an
+asymptote above it.  So the transcription pins the Bragg half, the Xpol
+constant and the blend to ~1e-10, and the Laue half to the measured band
+between the two forms.  The closed form itself is pinned to a quadrature of
+the Laue integral it is derived from.
 """
 
 from __future__ import annotations
@@ -33,6 +36,44 @@ F2 = np.array([9.0e4, 4.2e4, 2.1e4, 8.0e3, 3.0e3, 1.1e3, 4.0e2, 1.2e2])
 # -- an independent GSAS-II GetPwdrExt / GetPwdrExtDerv reference -------
 
 _COEF = [-0.5, 0.25, -0.10416667, 0.036458333, -0.0109375, 2.8497409e-3]
+
+
+def _gsas_laue(x: float) -> tuple[float, float]:
+    """GSAS-II's Laue factor and its slope: the six-term series on 0 < x ≤ 1,
+    the two-term asymptote above, 1 and 0 at x ≤ 0."""
+    if x <= 0.0:
+        return 1.0, 0.0
+    if x <= 1.0:
+        return (1.0 + sum(_COEF[i] * x ** (i + 1) for i in range(6)),
+                sum((i + 1) * _COEF[i] * x ** i for i in range(6)))
+    pi2 = math.sqrt(2.0 / math.pi)
+    return (pi2 * (1.0 - 0.125 / x) / math.sqrt(x),
+            pi2 / math.sqrt(x) * (-0.5 / x + 0.1875 / x ** 2))
+
+
+#: the band between the closed-form Laue factor and GSAS-II's two branches,
+#: measured on a dense grid (WP-2044).  Each row is (lo, hi, value, slope):
+#: on the interval, |ΔE_L|/E_L stays under ``value`` and |ΔdE_L/dx| under
+#: ``slope``.  The difference grows towards x = 1 from both sides, so each bar
+#: is the difference at the end of its interval nearer 1, rounded up.
+_GSAS_BAND = (
+    (0.0, 0.1, 5.0e-11, 3.6e-9),
+    (0.1, 0.25, 4.0e-8, 1.0e-6),
+    (0.25, 0.5, 5.6e-6, 6.3e-5),
+    (0.5, 1.0, 8.0e-4, 3.7e-3),
+    (1.0, 2.0, 3.7e-2, 4.2e-2),
+    (2.0, 5.0, 9.9e-3, 7.0e-3),
+    (5.0, np.inf, 1.2e-3, 2.2e-4),
+)
+
+
+def _band(x: float) -> tuple[float, float]:
+    """The (value, slope) bar at x: intervals are (lo, hi] up to x = 1, where
+    GSAS-II's series holds, and (lo, hi] above it too, x = 1 itself excluded."""
+    for lo, hi, value, slope in _GSAS_BAND:
+        if lo < x <= hi:
+            return value, slope
+    raise AssertionError(f"x = {x} outside the band table")
 
 
 def _gsas_ext(f2: float, tt_deg: float, ext: float) -> float:
@@ -260,8 +301,10 @@ def test_jacobian_dof_adp_extinction_columns_match_fd_with_extinction_on():
                           moving_paths=set(table.moving_paths))
     values = table.decode(table.x0())
 
-    # G must genuinely differ from 1 (so the test discriminates) but no
-    # reflection may cross the x=1 branch discontinuity (FD breaks there)
+    # G must genuinely differ from 1 (so the test discriminates).  Before
+    # WP-2044 no reflection could cross x = 1 either, where GSAS-II's two
+    # branches stepped and FD broke.  The closed form is smooth there, and
+    # tests/test_cross_backend.py's ``extinction_strong`` row crosses it.
     cp = model.phases[0]
     cell = tuple(values[f"phases.0.cell.{k}"] for k in ("a", "b", "c", "alpha", "beta", "gamma"))
     d = d_spacings(cp.reflections.hkl, *cell)
@@ -269,9 +312,8 @@ def test_jacobian_dof_adp_extinction_columns_match_fd_with_extinction_on():
     f2 = structure_factors_squared(cp.reflections.hkl, d, cp.sites, xyz, occ, biso, uaniso, astar)
     lam0 = model.line_wavelengths[0]
     tt0 = cp.reflections.two_theta(cell, lam0)
-    E, _, x = sabine_extinction_and_dx(f2, lam0, cell_volume(*cell), tt0,
+    E, _, _ = sabine_extinction_and_dx(f2, lam0, cell_volume(*cell), tt0,
                                        values["phases.0.extinction"])
-    assert x.max() < 0.9, "extinction too strong — a reflection crosses x=1"
     assert (1.0 - E).max() > 0.02, "extinction too weak — test would not discriminate"
 
     theta = table.x0()
@@ -302,27 +344,102 @@ def test_extinction_is_identity_at_zero():
     assert np.array_equal(x, np.zeros_like(F2))
 
 
-# -- GSAS-II golden ----------------------------------------------------
+# -- GSAS-II reference, within the measured band -----------------------
 
 
-def test_golden_matches_gsas_getpwdrext_both_branches():
+def test_extinction_matches_gsas_getpwdrext_within_the_band():
+    """E per reflection against GSAS-II, both Laue branches.
+
+    The Bragg half and the blend are GSAS-II's to 1e-10.  The Laue half differs
+    by the band, scaled by the cos²θ weight it enters E with.
+    """
     ext = 0.03  # large enough that the strong low-angle reflections cross x = 1
     x = _x_of(ext)
     assert (x <= 1.0).any() and (x > 1.0).any(), "test must span both Laue branches"
 
     E = sabine_extinction(F2, WAVE, VOL, TT, ext)
     ref = np.array([_gsas_ext(f, t, ext) for f, t in zip(F2, TT, strict=True)])
-    assert E == pytest.approx(ref, abs=1e-10, rel=1e-10)
+    cos2 = np.cos(np.radians(TT / 2.0)) ** 2
+    el, _ = _laue_and_deriv(x)
+    bar = np.array([_band(v)[0] for v in x]) * el * cos2 + 1e-10
+    assert np.all(np.abs(E - ref) <= bar), np.abs(E - ref) / bar
+
+    # dE/d(ext) = dE/dx · ∂x/∂ext = dEdx · (x/ext); the Laue slope's band is
+    # absolute in dE_L/dx, so it scales by the same two factors
+    _, dEdx, _ = sabine_extinction_and_dx(F2, WAVE, VOL, TT, ext)
+    ref_d = np.array([_gsas_ext_derv(f, t, ext) for f, t in zip(F2, TT, strict=True)])
+    bar_d = np.array([_band(v)[1] for v in x]) * cos2 * (x / ext) + 1e-8
+    assert np.all(np.abs(dEdx * (x / ext) - ref_d) <= bar_d)
 
 
-def test_golden_matches_gsas_derivative_both_branches():
-    ext = 0.03
-    _, dEdx, x = sabine_extinction_and_dx(F2, WAVE, VOL, TT, ext)
-    assert (x <= 1.0).any() and (x > 1.0).any()
-    # dE/d(ext) = dE/dx · ∂x/∂ext = dEdx · (x/ext)
-    dE_dext = dEdx * (x / ext)
-    ref = np.array([_gsas_ext_derv(f, t, ext) for f, t in zip(F2, TT, strict=True)])
-    assert dE_dext == pytest.approx(ref, abs=1e-10, rel=1e-8)
+def test_laue_factor_stays_within_the_band_of_gsas_branches():
+    """The closed form against GSAS-II's series and asymptote, value and slope,
+    on a grid crossing x = 1, and at the recorded points to two digits."""
+    x = np.concatenate([np.linspace(1e-4, 1.0, 2001),
+                        np.linspace(1.0 + 1e-9, 60.0, 4001)])
+    el, dl = _laue_and_deriv(x)
+    for v, e, d in zip(x, el, dl, strict=True):
+        ref_e, ref_d = _gsas_laue(v)
+        bar_e, bar_d = _band(v)
+        assert abs(e - ref_e) / e <= bar_e, f"value at x = {v}"
+        assert abs(d - ref_d) <= bar_d, f"slope at x = {v}"
+    # the recorded differences (relative to E_L), so the band cannot loosen
+    # into a bar that would hide a change of form
+    recorded = {0.25: 3.9e-8, 0.5: 5.6e-6, 1.0: 7.9e-4, 1.0 + 1e-12: 3.6e-2,
+                2.0: 9.8e-3, 5.0: 1.13e-3}
+    for v, want in recorded.items():
+        e = float(_laue_and_deriv(np.array([v]))[0][0])
+        got = abs(e - _gsas_laue(v)[0]) / e
+        assert got == pytest.approx(want, rel=0.02), f"x = {v}: {got:.3e}"
+
+
+# -- the closed form: the Laue integral, continuous at x = 1 -----------
+
+
+def _laue_integral(x: float) -> float:
+    """(1/πx)·∫ ½[1 − exp(−2x/(1 + u²))] du over the real line, by quadrature.
+
+    ITC Vol. C (2006) §6.4.5's construction of Sabine's Laue factor: the
+    Laue-case fraction of eq. 6.4.4.3 with a Lorentzian coupling, divided by
+    the kinematic intensity.  ``expm1`` keeps small x free of cancellation.
+    """
+    from scipy.integrate import quad
+
+    half, _ = quad(lambda u: -0.5 * math.expm1(-2.0 * x / (1.0 + u * u)),
+                   0.0, np.inf, epsabs=0.0, epsrel=1e-13, limit=500)
+    return 2.0 * half / (math.pi * x)
+
+
+@pytest.mark.parametrize("x", [1e-3, 0.01, 0.3, 1.0, 2.5, 6.49, 40.0])
+def test_laue_factor_is_the_laue_integral(x):
+    """E_L = e^(−x)·[I₀ + I₁] is the integral Sabine's expansions truncate.
+
+    Measured 1e-16 to 4e-16 relative.  6.49 is the largest x of CaF₂ on the QPA
+    guide's fit (WP-2044).
+    """
+    el, _ = _laue_and_deriv(np.array([x]))
+    assert el[0] == pytest.approx(_laue_integral(x), rel=1e-12)
+
+
+def test_laue_factor_is_continuous_at_x_equals_one():
+    """No step at x = 1, in value or slope (GSAS-II's pair stepped 3.6 %)."""
+    el, dl = _laue_and_deriv(np.array([1.0 - 1e-9, 1.0, 1.0 + 1e-9]))
+    assert el[1] == pytest.approx(0.673670022943349, rel=1e-15)
+    # the value moves by its slope times the 2e-9 gap, and no more
+    assert abs(el[2] - el[0]) < 1e-9
+    assert abs(el[2] - el[0] - 2e-9 * dl[1]) < 1e-15
+    assert abs(dl[2] - dl[0]) < 1e-9
+
+
+def test_laue_slope_matches_a_central_difference():
+    """dE_L/dx = −i1e(x)/x against a central difference of E_L, across x = 1
+    and down to the floor, where the slope is −1/2."""
+    x = np.array([1e-6, 0.05, 0.4, 0.999, 1.0, 1.001, 1.7, 6.49, 30.0])
+    h = 1e-5 * np.maximum(x, 0.1)
+    _, dl = _laue_and_deriv(x)
+    fd = (_laue_and_deriv(x + h)[0] - _laue_and_deriv(x - h)[0]) / (2.0 * h)
+    assert dl == pytest.approx(fd, rel=1e-8, abs=1e-9)
+    assert _laue_and_deriv(np.array([0.0]))[1][0] == pytest.approx(-0.5, rel=1e-15)
 
 
 def test_dEdx_matches_finite_difference():
@@ -341,15 +458,8 @@ def test_dEdx_matches_finite_difference():
 
 
 def test_extinction_never_amplifies_and_slope_is_non_positive():
-    """E ≤ 1 for all ext, and the within-branch slope dE/dx ≤ 0 everywhere.
-
-    The reported slope is ≤ 0 on both Laue branches, so extinction only ever
-    attenuates.  (E is *not* globally monotone in ext: GSAS-II's two-term x>1
-    asymptote does not join the six-term x≤1 series continuously — see
-    ``test_series_and_asymptote_jump_at_x_equals_one`` — so a reflection whose
-    x sweeps through 1 sees a ~2% step.  That is the model as GSAS-II ships it,
-    and it is out of reach for lab data where x ≪ 1.)
-    """
+    """E ≤ 1 for all ext, and the slope dE/dx ≤ 0 everywhere, so extinction
+    only ever attenuates."""
     for ext in np.linspace(0.0, 0.4, 30):
         E = sabine_extinction(F2, WAVE, VOL, TT, ext)
         assert np.all(E <= 1.0 + 1e-12)
@@ -357,14 +467,13 @@ def test_extinction_never_amplifies_and_slope_is_non_positive():
         assert np.all(dEdx <= 0.0), f"positive slope at ext={ext}"
 
 
-def test_extinction_is_monotone_in_the_lab_regime():
-    """Where x stays ≤ 1 (the six-term series branch), E decreases with ext.
-
-    This is the only regime lab or synchrotron powder data reach; the
-    discontinuity above lives at x > 1 (E_L ≈ 0.6, a 40% intensity loss).
-    """
-    ext_grid = np.linspace(0.0, 0.02, 20)  # x_max stays < 1 here
-    assert _x_of(ext_grid[-1]).max() < 1.0
+def test_extinction_is_monotone_in_ext_across_x_equals_one():
+    """E decreases with ext on every reflection, including the ones whose x
+    sweeps through 1.  GSAS-II's branches stepped up by 3.6 % there, and real
+    powder data reach it: CaF₂ on the QPA guide's fit has five of 11
+    reflections above x = 1 (WP-2044)."""
+    ext_grid = np.linspace(0.0, 0.1, 400)
+    assert _x_of(ext_grid[-1]).max() > 1.0, "the grid must carry x through 1"
     prev = np.ones_like(F2)
     for ext in ext_grid:
         E = sabine_extinction(F2, WAVE, VOL, TT, ext)
@@ -372,21 +481,14 @@ def test_extinction_is_monotone_in_the_lab_regime():
         prev = E
 
 
-def test_series_and_asymptote_jump_at_x_equals_one():
-    """Pin the known GSAS-II discontinuity so a future 'fix' is a deliberate one."""
-    el_below, _ = _laue_and_deriv(np.array([1.0]))       # six-term series at x=1
-    el_above, _ = _laue_and_deriv(np.array([1.0 + 1e-9]))  # asymptote just above
-    assert el_below[0] == pytest.approx(0.6742039, abs=1e-6)
-    assert el_above[0] == pytest.approx(0.6981490, abs=1e-6)
-
-
-# -- the branchless select computes both arms, so both must stay finite ---
+# -- the branchless select computes every arm, so each must stay finite ---
 #
-# ``_laue_and_deriv`` evaluates the series *and* the asymptote at every x and
-# throws one away.  Neither arm is finite over the whole line, so each is
-# clamped to its own domain (both boundaries are x = 1, the value the Sabine
-# expression itself splits on).  Without that, the discarded arm raises numpy
-# RuntimeWarnings out of a converged refinement — the bug these three pin.
+# ``_laue_and_deriv`` evaluates the Bessel arm at every x and throws it away on
+# x < 0.  Before WP-2044 it evaluated GSAS-II's series *and* asymptote, neither
+# finite over the whole line, and the discarded arm raised numpy
+# RuntimeWarnings out of a converged refinement: the bug these tests pin.  The
+# Bessel arm is finite for every x ≥ 0, and its argument is clamped at 0 and
+# shifted by 2⁻¹²⁶, so i1e(x)/x never divides 0 by 0.
 
 
 #: numpy's default error state.  ``under='ignore'`` is deliberate and is
@@ -411,62 +513,98 @@ def _warnings_from(fn, *args):
 def test_laue_branches_are_warning_free_across_the_reachable_domain():
     """No RuntimeWarning for any x a refinement can produce.
 
-    x = ext·|F|²·(λ/V)²·Xpol is ≥ 0 (softplus ext ≥ 0, |F|² ≥ 0, Xpol > 0), so
-    the domain is [0, ∞).  The regression lives in the denormal window: the
-    asymptote's 1/x² term underflows to *exactly zero* below x ≈ 1.5e-162 and
-    then divides by it, and its x^{-3/2} prefactor overflows below x ≈ 1e-206.
-    Both are reached while ``ext`` — softplus with ``min=0.0``, so unbounded
-    below internally — is driven to the exact zero that switches the
-    correction off.
+    x = ext·|F|²·(λ/V)²·Xpol is ≥ 0 (ext ≥ 0, |F|² ≥ 0, Xpol > 0), so the
+    domain is [0, ∞).  The regression lived in the denormal window: GSAS-II's
+    asymptote's 1/x² term underflowed to *exactly zero* below x ≈ 1.5e-162 and
+    then divided by it.  The window is reached while ``ext`` is driven to the
+    exact zero that switches the correction off.  The negative values are the
+    clamp's: x < 0 selects 1, and the discarded arm must not warn either.
     """
     rng = np.random.default_rng(0)
     x = np.concatenate([
         # exact zero, the subnormal floor, and both warning thresholds
         np.array([0.0, 5e-324, 1e-320, 1e-300, 1e-206, 1e-162, 1e-100,
-                  1e-20, 1e-6, 0.5, 1.0, np.nextafter(1.0, 2.0), 2.0, 1e6]),
+                  1e-20, 1e-6, 0.5, 1.0, np.nextafter(1.0, 2.0), 2.0, 1e6,
+                  -0.0, -5e-324, -2.0 ** -126, -1.0]),
         10.0 ** rng.uniform(-323.0, 12.0, 20000),
     ])
     assert _warnings_from(_laue_and_deriv, x) == []
 
 
-def test_laue_clamp_never_moves_a_value_that_is_actually_selected():
-    """The clamp is the identity wherever its arm is the one chosen.
+def test_laue_shift_never_moves_a_value_that_is_actually_selected():
+    """The clamp and the 2⁻¹²⁶ shift are the identity on every fp64 value.
 
-    Guards the fix against being replaced by a *tuned* floor: an epsilon-based
-    clamp would silently move converged numbers, because it would bite inside
-    the region the value is read from.  Here the clamp sits exactly on the
-    branch boundary, so it can only ever alter a discarded value.
+    Guards the shift against being replaced by a *tuned* floor: one large
+    enough to bite would silently move converged numbers.  E_L is compared bit
+    for bit with the unshifted closed form on x > 0, the subnormals included.
+    The slope is compared where −i1e(x)/x is itself accurate, x ≥ 1e-300.
+    Below that i1e(x) ≈ x/2 is subnormal, and the unshifted quotient loses
+    digits the shifted one keeps.
     """
+    from scipy.special import i0e, i1e
+
     rng = np.random.default_rng(7)
-    x = np.concatenate([rng.uniform(0.0, 1.0, 5000),    # series arm
-                        rng.uniform(1.0, 50.0, 5000)])  # asymptote arm
+    x = np.concatenate([np.array([5e-324, 1e-320, 2.0 ** -126, 2.0 ** -73,
+                                  2.0 ** -72, 1e-17, 1.0]),
+                        10.0 ** rng.uniform(-323.0, -10.0, 5000),
+                        rng.uniform(0.0, 1.0, 5000),
+                        rng.uniform(1.0, 50.0, 5000)])
+    x = x[x > 0.0]
     el, dl = _laue_and_deriv(x)
 
-    # recompute each arm unclamped, at the x it is selected for
-    ser = x[x <= 1.0]
-    one = np.ones_like(ser)
-    series, dseries = one.copy(), np.zeros_like(ser)
-    for i in range(6):
-        series = series + _COEF[i] * ser ** (i + 1)
-        dseries = dseries + (i + 1) * _COEF[i] * ser ** i
-    asy = x[x > 1.0]
-    pi2 = math.sqrt(2.0 / math.pi)
-    inv = 1.0 / np.sqrt(asy)
-    asym = pi2 * (1.0 - 0.125 / asy) * inv
-    dasym = pi2 * inv * (-0.5 / asy + 0.1875 / asy ** 2)
-
     # bit-identical, not approx: a moved bit here moves every converged fit
-    assert np.array_equal(el[x <= 1.0], np.where(ser <= 0.0, 1.0, series))
-    assert np.array_equal(dl[x <= 1.0], np.where(ser <= 0.0, 0.0, dseries))
-    assert np.array_equal(el[x > 1.0], asym)
-    assert np.array_equal(dl[x > 1.0], dasym)
+    assert np.array_equal(el, i0e(x) + i1e(x))
+    accurate = x >= 1e-300
+    assert dl[accurate] == pytest.approx(-i1e(x[accurate]) / x[accurate], rel=1e-15)
+    exact = x >= 2.0 ** -72
+    assert np.array_equal(dl[exact], -i1e(x[exact]) / x[exact])
+    # and the floor: E_L is exactly 1 with the one-sided slope
+    el0, dl0 = _laue_and_deriv(np.array([0.0, -0.0, -1.0]))
+    assert el0.tolist() == [1.0, 1.0, 1.0]
+    assert dl0 == pytest.approx([-0.5, -0.5, 0.0], rel=1e-15, abs=0.0)
+
+
+@pytest.mark.parametrize("name", ["jax", "torch"])
+def test_autodiff_takes_the_one_sided_laue_slope_at_the_floor(name):
+    """A traced backend differentiates E_L to −i1e(x)/x, and to −1/2 at x = 0.
+
+    The scaled Bessel functions carry e^(−|x|), and jax and torch differentiate
+    them through sign(x), with sign(0) = 0.  Unshifted, both return +1/2 at
+    x = 0 exactly: an extinction column at its floor of 0 with the wrong sign
+    (measured, WP-2044).  The 2⁻¹²⁶ shift in ``_laue_and_deriv`` is the fix.
+    """
+    from rietx.backend import traced
+    from rietx.backend.api import BACKEND_REQUIRES, resolve_backend
+    from rietx.backend.linalg64 import to_host_fp64
+
+    pytest.importorskip(BACKEND_REQUIRES[name])
+    xp = resolve_backend(name)
+    x = np.array([0.0, 1e-300, 0.3, 1.0, 1.0 + 1e-9, 6.49])
+    want = _laue_and_deriv(x)[1]
+    with traced.active(xp):
+        primal, tangent = xp.asarray(x), xp.asarray(np.ones_like(x))
+        if name == "jax":
+            import jax
+
+            _, out = jax.jvp(lambda v: _laue_and_deriv(v)[0], (primal,), (tangent,))
+        else:
+            import torch
+
+            _, out = torch.func.jvp(lambda v: _laue_and_deriv(v)[0],
+                                    (primal,), (tangent,))
+    got = to_host_fp64(out)
+    assert got[0] == pytest.approx(-0.5, rel=1e-12)
+    assert got == pytest.approx(want, rel=1e-12)
 
 
 def test_a_negligible_structure_factor_is_not_what_triggers_the_warning():
     """Records a *refuted* diagnosis, so it is not re-derived.
 
-    The obvious reading — "reflections with zero or negligible |F|² overflow
-    the asymptote" — is wrong, in the one detail that decides the fix.  An
+    The diagnosis concerned GSAS-II's asymptote, which rietx evaluated until
+    WP-2044.  The closed form has no such term, and the test keeps its point
+    about where x can collapse.  The obvious reading — "reflections with zero
+    or negligible |F|² overflow the asymptote" — is wrong, in the one detail
+    that decides the fix.  An
     exactly-zero |F|² gives x = 0, which the branch guard already catches, and
     a |F|² that is merely negligible floors at the fp64 cancellation limit of a
     systematic absence (~1e-29 for a real structure), some 130 orders of
@@ -483,8 +621,8 @@ def test_a_negligible_structure_factor_is_not_what_triggers_the_warning():
     smallest = x[f2 > 0.0].min()
     assert smallest > 1.0e-162, "a negligible |F|² does not reach the window"
 
-    # and the whole list is quiet on the *unclamped* asymptote, which is what
-    # makes the zero-|F|² framing vacuous as a regression test
+    # and the whole list is quiet, which is what made the zero-|F|² framing
+    # vacuous as a regression test
     assert _warnings_from(sabine_extinction_and_dx,
                           f2, WAVE, VOL, tt, 1.0e-3) == []
 
@@ -783,3 +921,90 @@ def test_gating_leaves_the_structural_and_po_columns_bit_identical():
     theta = table.x0()
     assert np.array_equal(_make_jacobian(gated, table)(theta),
                           _make_jacobian(ungated, table)(theta))
+
+
+# -- the column on a real fit whose reflections cross x = 1 (WP-2044) --------
+
+
+def _nac_and_fluorite():
+    """The QPA guide's first model (``examples/guides/qpa.py``), restated: the
+    guide runs on import, so it cannot be imported."""
+    import rietx as rx
+    from rietx.examples import examples_dir
+
+    def site(label, species, xyz, biso):
+        x, y, z = (rx.Parameter(value=v) for v in xyz)
+        return rx.Atom(label=label, species=species, x=x, y=y, z=z,
+                       biso=rx.Parameter(value=biso, min=0.0, max=25.0))
+
+    structure = rx.Structure.from_cif(examples_dir() / "cod_1000236.cif")
+    structure.phases.append(rx.Phase(
+        name="CaF2", space_group="F m -3 m", cell=rx.Cell.cubic(5.4631),
+        atoms=[site("Ca", "Ca2+", (0, 0, 0), 0.6),
+               site("F", "F1-", (0.25, 0.25, 0.25), 0.9)]))
+    instrument = rx.Instrument.debye_scherrer(wavelength=0.4139090)
+    instrument.profile.w.value = 2e-5
+    instrument.profile.x.value = 2e-3
+    instrument.background = rx.BackgroundChebyshev.with_terms(6)
+    return rx.Refinement(structure, instrument)
+
+
+@pytest.mark.slow
+def test_the_extinction_column_agrees_with_central_differences_on_the_qpa_fit():
+    """At the QPA guide's answer CaF₂'s reflections run past x = 1, where
+    GSAS-II's two Laue branches stepped by 3.6 %. A central difference at a
+    1e-4 relative step then straddled the step (column norm 22.47 against
+    0.1957, cosine −0.19, WP-2043), and the esd depended on whether the
+    solver's last Jacobian did. With the closed form the solver's
+    forward-difference column agrees with a central difference at every step
+    to its own truncation error (measured 6.7e-7 of the norm at 1e-4 and 1e-6),
+    so it needs no analytic replacement."""
+    import rietx as rx
+    from rietx import PatternData
+    from rietx.crystallography.lattice import cell_volume, d_spacings
+    from rietx.crystallography.structure_factor import structure_factors_squared
+    from rietx.examples import examples_dir
+    from rietx.model.forward import compile_model
+    from rietx.optimize.least_squares import _make_jacobian, _make_residual
+    from rietx.params.vector import ParameterTable
+
+    data = rx.read_pattern(examples_dir() / "11BM_NAC.fxye")
+    ref = _nac_and_fluorite()
+    ref.fit(data, plan="mccusker_structural", two_theta_limits=(2, 24))
+
+    tt = np.asarray(data.two_theta)
+    keep = (tt >= 2) & (tt <= 24)
+    pattern = PatternData(two_theta=tt[keep].tolist(),
+                          intensity=np.asarray(data.intensity)[keep].tolist(),
+                          sigma=np.asarray(data.sigma)[keep].tolist())
+    table = ParameterTable(ref.structure, ref.instrument)
+    table.set_vary(["*"], False)
+    assert table.set_vary(["phases.1.extinction"], True)
+    model = compile_model(ref.structure, ref.instrument, pattern, mode="rietveld",
+                          moving_paths=set(table.moving_paths))
+    values = table.decode(table.x0())
+
+    # the answer is only worth testing while CaF₂'s reflections cross x = 1
+    cp = model.phases[1]
+    cell = tuple(values[f"phases.1.cell.{k}"]
+                 for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+    d = d_spacings(cp.reflections.hkl, *cell)
+    f2 = structure_factors_squared(cp.reflections.hkl, d, cp.sites,
+                                   *model._site_values(1, values, cell))
+    lam = model.line_wavelengths[0]
+    _, _, x = sabine_extinction_and_dx(f2, lam, cell_volume(*cell),
+                                       cp.reflections.two_theta(cell, lam),
+                                       values["phases.1.extinction"])
+    assert (x > 1.0).sum() >= 3, np.sort(x)[-6:]     # measured five of 11
+
+    theta = table.x0()
+    column = _make_jacobian(model, table)(theta)[:, 0]
+    residual = _make_residual(model, table)
+    for rel in (1e-4, 1e-6):
+        h = rel * abs(theta[0])
+        up, down = theta.copy(), theta.copy()
+        up[0] += h
+        down[0] -= h
+        central = (residual(up) - residual(down)) / (2.0 * h)
+        miss = np.linalg.norm(column - central) / np.linalg.norm(central)
+        assert miss < 1e-5, (rel, miss)              # measured 6.7e-7 at both

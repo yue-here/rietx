@@ -603,3 +603,71 @@ def test_the_finding_reaches_the_diagnostics_naming_the_remedy():
     # the remedy the paper prescribes, named as the workflow that implements it
     assert "lab_calibrate" in diags[0].suggestion
     assert "load_instrument_profile" in diags[0].suggestion
+
+
+# ----------------------------------------------------------------------
+# WP-2002: the occupancy has no ceiling, and a flag meets a value above 1
+# ----------------------------------------------------------------------
+def _lab6_with_occupancy(occ_true: float):
+    """A synthetic LaB6 pattern whose La site scatters as ``occ_true`` La."""
+    import rietx as rx
+
+    structure = make_lab6()
+    structure.phases[0].scale.value = 3e-4
+    structure.phases[0].atoms[0].occ.value = occ_true
+    ins = Instrument.debye_scherrer(wavelength=WAVELENGTH)
+    ins.source.dispersion = None      # declared, never inherited
+    tt = np.arange(15.0, 110.0, 0.02)
+    blank = PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+    model = compile_model(structure, ins, blank, mode="rietveld")
+    table = ParameterTable(structure, ins)
+    y = model.evaluate(table.decode(table.x0())) + 20.0
+    rng = np.random.default_rng(3)
+    data = PatternData(two_theta=model.tt.tolist(),
+                       intensity=rng.poisson(np.maximum(y, 1.0)).astype(float).tolist())
+    start = make_lab6()
+    start.phases[0].scale.value = 3e-4
+    ins = Instrument.debye_scherrer(wavelength=WAVELENGTH)
+    ins.source.dispersion = None
+    return rx.Refinement(start, ins, history=False), data
+
+
+def test_an_occupancy_above_one_refines_and_is_reported():
+    """The B9 ruling end to end: "Unlimited occupancy is fine.  We can give a
+    warning."  A La site scattering as 2.2 La, the mineralogist's Fe-on-Mg
+    number, refines past the old 1.5 ceiling to its value, and the result says
+    so, naming the path and the value.  Measured 2026-10-20, darwin/arm64
+    ``[dev]``: 2.251 ± 0.055."""
+    import rietx as rx
+
+    ref, data = _lab6_with_occupancy(2.2)
+    plan = rx.RefinementPlan(stages=[
+        rx.Stage("scale", ["phases.*.scale", "instrument.background.*"]),
+        rx.Stage("occ", ["phases.0.atoms.0.occ"])])
+    result = ref.fit(data, plan=plan)
+    occ = result.parameter("phases.0.atoms.0.occ")
+    assert occ.value > 1.5 and occ.at_bound is not True
+    assert occ.value == pytest.approx(2.2, abs=4 * occ.stderr)
+    [flag] = [d for d in result.diagnostics if d.code == "OCCUPANCY_ABOVE_ONE"]
+    # an info record: noise alone puts a free full site above 1 half the time
+    assert (flag.level, flag.where, flag.value) == (
+        "info", ["phases.0.atoms.0.occ"], occ.value)
+    assert "esd above a full site" in flag.message
+    assert "site scattering" in flag.suggestion
+
+
+def test_the_occupancy_flag_is_silent_at_one_and_on_a_held_value():
+    """Strictly above 1, and only an occupancy the fit moved: a held value is
+    the caller's own statement."""
+    from rietx.refine import _occupancy_flag_diagnostics
+
+    structure = make_lab6()
+    path = "phases.0.atoms.0.occ"
+    assert _occupancy_flag_diagnostics({path: 1.0}, {path}, structure) == []
+    assert _occupancy_flag_diagnostics({path: 1.2}, set(), structure) == []
+    [above] = _occupancy_flag_diagnostics({path: 1.2}, {path}, structure,
+                                          {path: 0.05})
+    assert above.value == 1.2 and "4.0 esd above a full site" in above.message
+    # no esd to quote: the plain statement
+    [plain] = _occupancy_flag_diagnostics({path: 1.2}, {path}, structure)
+    assert "more than a full site" in plain.message

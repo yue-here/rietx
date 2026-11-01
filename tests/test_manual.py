@@ -19,30 +19,37 @@ from pathlib import Path
 import pytest
 
 from rietx._about import DOCS_URL
+from tests import documentation
 
 pytest.importorskip("sphinx")
 
-MANUAL_DIR = Path(__file__).resolve().parent.parent / "docs" / "manual"
-# rglob, not glob: Part 1 lives in docs/manual/using/ (WP-1067).  A doc tree's
-# shape should not be set by a test's glob, and the guards below are what a
-# future Part 1 page inherits by being collected here.  _build/ is a local
-# sphinx output directory, not source — an rglob that walks it collects a stale
-# copy of every chapter.
-CHAPTERS = sorted(
-    p for p in MANUAL_DIR.rglob("*.md") if "_build" not in p.relative_to(MANUAL_DIR).parts
-)
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
-#: The new manual (WP-1978), built beside the old one until WP-1986 retires it.
-#: Its pages share the old tree's register and trail guards below, and carry the
-#: page contract of their own (§ The new tree).
-DOCS_TREE = MANUAL_DIR.parent / "docs"
-#: Build outputs, never pages.  `_generated/` holds the Reference tab's bodies,
-#: which a committed page includes (`docs/reference_pages.py`).
+#: The manual (WP-1978), the one tree since WP-1986 retired the old one in
+#: `docs/manual/`.  rglob, not glob: a doc tree's shape should not be set by a
+#: test's glob, and the guards below are what a new page inherits by being
+#: collected here.
+DOCS_TREE = REPO_ROOT / "docs" / "docs"
+#: The bibliography every page cites from (`docs/sphinx_shared.py`'s `BIBFILE`).
+BIBFILE = DOCS_TREE / "references.bib"
+#: Build outputs, never pages.  `_build/` is a local sphinx output directory,
+#: and an rglob that walks it collects a stale copy of every page.
+#: `_generated/` holds the Reference tab's bodies, which a committed page
+#: includes (`docs/reference_pages.py`).
 NOT_PAGES = {"_build", "_generated"}
+#: Markdown only, so the tutorial notebooks under `start/tutorials/` are not
+#: here, though each is a page of the tree.  A build copies them in from
+#: `examples/tutorials/`, so a source checkout may have none, and each guard
+#: reading these files reads markdown, where a notebook is JSON.  Their
+#: markdown cells are the tutorial scripts' (WP-1545): their code runs in
+#: `tests/test_tutorials.py`, and their names and register go unchecked here,
+#: as `start/tutorials.md`'s guard note says.  Their built twins are held to
+#: the page contract with every other page's
+#: (`test_every_page_has_a_twin_that_keeps_the_contract`).
 DOCS_PAGES = sorted(
     p for p in DOCS_TREE.rglob("*.md") if not NOT_PAGES & set(p.relative_to(DOCS_TREE).parts)
 )
-#: Part 2, moved here by WP-1986.
+#: Part 2, the Theory tab since WP-1986.
 THEORY_DIR = DOCS_TREE / "theory"
 
 # Everything on a built page that is *not* prose: a `$` inside a code block or
@@ -50,24 +57,6 @@ THEORY_DIR = DOCS_TREE / "theory"
 MARKUP_WITHOUT_PROSE = re.compile(
     r"<(script|style|pre)\b[^>]*>.*?</\1\s*>|<code\b[^>]*>.*?</code\s*>", re.S | re.I
 )
-
-# The landing page is copied into the build verbatim through `html_extra_path`
-# (WP-1331), so the output tree holds pages Sphinx never rendered and whose
-# markup is nobody's MyST.  They are not this suite's to police, and one of them
-# writes a shell prompt as `<span class="ps">$</span>pip install rietx` — prose
-# by MARKUP_WITHOUT_PROSE's definition, and a false positive for the TeX guard.
-# Derived from the directory conf.py actually copies, so the exclusion is exactly
-# what was added and a new manual page stays covered.  Read when the guard runs,
-# never at import: `tests/test_landing.py` *creates* `docs/landing/site` during
-# the session, so a set frozen at collection time is empty on the checkout that
-# had none — and the landing page's `$` is then scanned as the manual's prose.
-_LANDING_SITE = MANUAL_DIR.parent / "landing" / "site"
-
-
-def _copied_in() -> set[str]:
-    if not _LANDING_SITE.is_dir():
-        return set()
-    return {p.relative_to(_LANDING_SITE).as_posix() for p in _LANDING_SITE.rglob("*.html")}
 
 CITE_ROLE = re.compile(r"\{cite\}`([^`]+)`")
 #: Each displayed equation's source line, as `{source}` spells it (WP-1408).
@@ -83,30 +72,26 @@ BIB_KEY = re.compile(r"^@\w+\{([^,\s]+)\s*,", re.MULTILINE)
 
 
 def _cited_keys() -> set[str]:
-    """Both trees cite from the one `references.bib` (`docs/sphinx_shared.py`)."""
+    """Every key a page cites from `references.bib` (`docs/sphinx_shared.py`)."""
     keys: set[str] = set()
-    for page in CHAPTERS + DOCS_PAGES:
+    for page in DOCS_PAGES:
         for role in CITE_ROLE.findall(page.read_text(encoding="utf-8")):
             keys.update(k.strip() for k in role.split(","))
     return keys
 
 
 @pytest.fixture(scope="session")
-def built_manual(tmp_path_factory):
-    """One `-W` build, shared by every test that reads its output.
+def built_docs_tree(tmp_path_factory):
+    """One `-W` build of the manual, shared by every test that reads its output.
 
     Session-scoped, and its consumers carry the matching `xdist_group` mark:
     without it a second worker rebuilds the whole tree and the sharing costs
     more than it saved (tests/CLAUDE.md).  Returns the output directory and the
     completed process, so the build's own failure is reported by the test named
-    for it rather than as a fixture error.
+    for it rather than as a fixture error.  It skips where
+    `tests/documentation.py` says the documentation does not execute.
     """
-    return _build(MANUAL_DIR, tmp_path_factory.mktemp("manual") / "html")
-
-
-@pytest.fixture(scope="session")
-def built_docs_tree(tmp_path_factory):
-    """The new tree's `-W` build, on the old tree's worker: a few seconds."""
+    documentation.skip_here()
     return _build(DOCS_TREE, tmp_path_factory.mktemp("docs-tree") / "html")
 
 
@@ -119,26 +104,19 @@ def _build(source: Path, out: Path):
     return out, result
 
 
-#: Each built-HTML guard below reads both trees.
-BOTH_BUILDS = pytest.mark.parametrize("build", ["built_manual", "built_docs_tree"])
+def _stray_in_prose(built, pattern: str) -> list[str]:
+    """Each match of `pattern` in the rendered prose of the build's pages.
 
-
-def _stray_in_prose(build: str, request, pattern: str) -> list[str]:
-    """Each match of `pattern` in the rendered prose of a build's own pages.
-
-    The old tree's landing page is copied in and skipped (`_copied_in`); the new
-    tree copies nothing in, and its own `index.html` shares the landing page's
-    name.  `_static/` is skipped in both, being the theme's assets:
-    pydata-sphinx-theme ships a Jinja template there, `webpack-macros.html`,
-    that no page renders.
+    The build copies no page in from elsewhere, so every page is Sphinx's.
+    `_static/` is skipped, being the theme's assets: pydata-sphinx-theme ships
+    a Jinja template there, `webpack-macros.html`, that no page renders.
     """
-    out, result = request.getfixturevalue(build)
+    out, result = built
     assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
-    copied_in = _copied_in() if build == "built_manual" else set()
     stray: list[str] = []
     for page in sorted(out.rglob("*.html")):
         rel = page.relative_to(out)
-        if rel.as_posix() in copied_in or rel.parts[0] == "_static":
+        if rel.parts[0] == "_static":
             continue
         text = MARKUP_WITHOUT_PROSE.sub("", page.read_text(encoding="utf-8"))
         for match in re.finditer(pattern, text, re.S):
@@ -147,17 +125,15 @@ def _stray_in_prose(build: str, request, pattern: str) -> list[str]:
 
 
 @pytest.mark.xdist_group("manual-build")
-@BOTH_BUILDS
-def test_manual_builds_warning_free(build, request):
+def test_manual_builds_warning_free(built_docs_tree):
     """sphinx-build -W: warnings (incl. undefined substitutions, missing
     citations, broken eq refs) are errors."""
-    _, result = request.getfixturevalue(build)
+    _, result = built_docs_tree
     assert result.returncode == 0, f"sphinx-build -W failed:\n{result.stdout}\n{result.stderr}"
 
 
 @pytest.mark.xdist_group("manual-build")
-@BOTH_BUILDS
-def test_no_unrendered_math_survives_the_build(build, request):
+def test_no_unrendered_math_survives_the_build(built_docs_tree):
     """No `$` reaches the rendered prose.  `-W` cannot see this class of bug:
     the page builds cleanly and prints the TeX.
 
@@ -170,13 +146,12 @@ def test_no_unrendered_math_survives_the_build(build, request):
     other spans in Part 2 render correctly — so the rule is about the delimiters
     surviving, not about reflowing every equation onto one line.
     """
-    stray = _stray_in_prose(build, request, r".{0,60}\$.{0,60}")
+    stray = _stray_in_prose(built_docs_tree, r".{0,60}\$.{0,60}")
     assert not stray, "unrendered TeX in the built prose:\n" + "\n".join(stray[:10])
 
 
 @pytest.mark.xdist_group("manual-build")
-@BOTH_BUILDS
-def test_no_unrendered_markup_survives_the_build(build, request):
+def test_no_unrendered_markup_survives_the_build(built_docs_tree):
     """No backtick reaches the rendered prose.  The `$` guard above, one
     delimiter over, and the same blind spot: the page builds clean and prints
     the markup.
@@ -195,7 +170,7 @@ def test_no_unrendered_markup_survives_the_build(build, request):
     table the pipes are escaped and the span dropped, which is what the manual's
     own tables already do (`\\|F\\|²`).
     """
-    stray = _stray_in_prose(build, request, r".{0,60}`.{0,60}")
+    stray = _stray_in_prose(built_docs_tree, r".{0,60}`.{0,60}")
     assert not stray, (
         "a code span or role did not close, and its backtick is in the built "
         "prose:\n" + "\n".join(stray[:10])
@@ -203,8 +178,7 @@ def test_no_unrendered_markup_survives_the_build(build, request):
 
 
 @pytest.mark.xdist_group("manual-build")
-@BOTH_BUILDS
-def test_no_unsubstituted_substitution_survives_the_build(build, request):
+def test_no_unsubstituted_substitution_survives_the_build(built_docs_tree):
     """No `{{ NAME }}` reaches the rendered page.  The guard above, one
     delimiter over, and the same blind spot: `-W` sees nothing.
 
@@ -220,121 +194,22 @@ def test_no_unsubstituted_substitution_survives_the_build(build, request):
     the symbol in the equation and state its value in the prose beside it,
     which is where `conf.py`'s injection works.
     """
-    stray = _stray_in_prose(build, request, r".{0,60}\{\{.{0,60}")
+    stray = _stray_in_prose(built_docs_tree, r".{0,60}\{\{.{0,60}")
     assert not stray, (
         "a MyST substitution reached the page unexpanded (a `{{ NAME }}` inside "
         "a {math} directive is the usual cause):\n" + "\n".join(stray[:10])
     )
 
 
-#: One `<a class="sidebar-brand" href="…">` on a built page.
-SIDEBAR_BRAND = re.compile(r'<a class="sidebar-brand"[^>]*\shref="([^"]*)"')
-
-#: The release line beneath it, which is the way back to the manual's own
-#: front page.  The href is relative, so it is `../manual.html` a directory
-#: down and `#` on the front page itself, which is sphinx's `pathto` answering
-#: for the current document.
-SIDEBAR_RELEASE = re.compile(r'<a class="sidebar-release"[^>]*\shref="([^"]*)"')
 #: Every drawn shape in an SVG: the `d` of a path, and a rect's four corners.
 SVG_SHAPES = re.compile(r'<(?:path\s+d|rect\s+x)="[^"]*"[^>]*>')
 
 
-@pytest.mark.xdist_group("manual-build")
-def test_the_brand_mark_is_the_favicon(built_manual):
-    """The inlined mark and `_static/favicon.svg` draw the same thing.
-
-    The mark in `_templates/sidebar/brand.html` is inline SVG, which is a copy
-    of the favicon's geometry, and a copy is exactly what this repository does
-    not leave unpinned.  It is inline for a measured reason: worn as a CSS
-    `mask-image` the same file renders over http and **silently disappears**
-    from a local `file://` build, because chromium treats a `file://` mask
-    source as cross-origin.  A reviewer opening `_build/html/` would have seen
-    no mark at all.
-
-    So the duplicate stays and the file stays its authority.  Compared on the
-    drawn shapes rather than on the bytes, because the two documents legitimately
-    differ everywhere else: the favicon carries a `<style>` with the two literal
-    hexes, which is the one place they have to be literal, and the template
-    takes its fill from `--color-rietx-ink`.
-    """
-    out, result = built_manual
-    assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
-    template = (MANUAL_DIR / "_templates" / "sidebar" / "brand.html").read_text(encoding="utf-8")
-    favicon = (MANUAL_DIR / "_static" / "favicon.svg").read_text(encoding="utf-8")
-    inlined = SVG_SHAPES.findall(template)
-    assert inlined, "no drawn shape in the brand template — has the mark moved?"
-    assert inlined == SVG_SHAPES.findall(favicon), (
-        "the brand's inline mark and _static/favicon.svg have drifted.  The "
-        "favicon is the authority: copy its shapes into "
-        "docs/manual/_templates/sidebar/brand.html.\n"
-        f"  template: {inlined}\n  favicon:  {SVG_SHAPES.findall(favicon)}"
-    )
-    # and the copy is what the page actually carries
-    page = (out / "manual.html").read_text(encoding="utf-8")
-    for shape in inlined:
-        assert shape in page, f"the built page does not draw {shape}"
-
-
-@pytest.mark.xdist_group("manual-build")
-def test_the_brand_links_to_the_landing_page(built_manual):
-    """Every page's brand goes to the site root and its release line to the manual.
-
-    Furo writes `href="{{ pathto(master_doc) }}"` in its own
-    `sidebar/brand.html` and offers no theme option that reaches it, so
-    `docs/manual/_templates/sidebar/brand.html` is a fork of that file
-    (WP-1411).  A fork is exactly the thing that rots quietly: furo reshapes
-    its template in some later release, sphinx renders the new one, the build
-    is green, and the manual silently becomes a dead end again — which is what
-    it was before this, with no page under `docs/manual/` linking to the site
-    root at all.
-
-    So the assertion is on the *built* page rather than on the template, and it
-    runs over all of them rather than over one: the brand is in the sidebar, so
-    a page that lost it lost it alone.  The mark and the wordmark come with it
-    because the same upgrade would drop those too, and a link with no brand on
-    it is not what this WP shipped.
-
-    The release line underneath is the other half of the same fork: `root_doc`
-    is in no toctree, so furo's sidebar never lists the manual's front page and
-    that line is the only link to it on any chapter.
-    """
-    from rietx._about import DIST_NAME, DOCS_URL
-
-    out, result = built_manual
-    assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
-    copied_in = _copied_in()
-    pages = [p for p in sorted(out.rglob("*.html"))
-             if p.relative_to(out).as_posix() not in copied_in]
-    assert pages, "the build wrote no pages of its own"
-
-    wrong: list[str] = []
-    for page in pages:
-        text = page.read_text(encoding="utf-8")
-        hrefs = SIDEBAR_BRAND.findall(text)
-        if hrefs != [DOCS_URL]:
-            wrong.append(f"{page.name}: brand href {hrefs} (want [{DOCS_URL!r}])")
-        elif 'class="rietx-mark"' not in text:
-            wrong.append(f"{page.name}: the brand carries no mark")
-        elif f'<span class="sidebar-brand-text">{DIST_NAME}</span>' not in text:
-            wrong.append(f"{page.name}: the brand carries no wordmark")
-        else:
-            depth = len(page.relative_to(out).parts) - 1
-            want = ["#"] if page == out / "manual.html" else ["../" * depth + "manual.html"]
-            if SIDEBAR_RELEASE.findall(text) != want:
-                wrong.append(
-                    f"{page.name}: release line {SIDEBAR_RELEASE.findall(text)} (want {want})")
-    assert not wrong, (
-        f"{len(wrong)} of {len(pages)} built pages have the wrong brand — has furo's "
-        f"sidebar/brand.html moved under the fork in docs/manual/_templates/?\n"
-        + "\n".join(wrong[:10])
-    )
-
-
 # The tutorial notebooks (WP-1916).  `conf.py` copies them in at build by
-# `build.py`'s own glob, so the set is read from there too: a sixth tutorial
-# reaches these tests with no edit, and fails the index test until
-# `using/quickstart.md` lists it.
-_TUTORIALS = MANUAL_DIR.parent.parent / "examples" / "tutorials"
+# `build.py`'s own glob (`docs/sphinx_shared.py`), so the set is read from
+# there too: a new tutorial reaches these tests with no edit, and fails the
+# index test until the index page lists it.
+_TUTORIALS = REPO_ROOT / "examples" / "tutorials"
 
 
 def _tutorial_notebooks() -> list[Path]:
@@ -344,26 +219,88 @@ def _tutorial_notebooks() -> list[Path]:
     return [s.with_suffix(".ipynb") for s in build.sources(_TUTORIALS)]
 
 
+#: Where `conf.py` copies the notebooks, which is also their index page.
+TUTORIAL_HOME = "start/tutorials"
+#: Where the index page's body opens.  The body only, because the theme's
+#: navigation links every toctree entry on every page, so a link test over the
+#: whole file passes with the table row gone.
+ARTICLE_BODY = '<article class="bd-article"'
+
+
 @pytest.mark.xdist_group("manual-build")
-def test_the_build_copies_exactly_the_committed_tutorials(built_manual):
-    """`using/tutorials/` holds each committed notebook byte for byte, and nothing else.
+def test_the_build_copies_exactly_the_committed_tutorials(built_docs_tree):
+    """The copy directory holds each committed notebook byte for byte, and nothing else.
 
     The directory is gitignored and rewritten by every build, so a copy left
     over from a renamed tutorial would render as a page nobody can edit.
     """
-    _, result = built_manual
+    _, result = built_docs_tree
     assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
     notebooks = _tutorial_notebooks()
     assert len(notebooks) >= 5, f"found {len(notebooks)} tutorials under {_TUTORIALS}"
-    copies = MANUAL_DIR / "using" / "tutorials"
+    copies = DOCS_TREE / TUTORIAL_HOME
     assert sorted(p.name for p in copies.glob("*.ipynb")) == [nb.name for nb in notebooks]
     for nb in notebooks:
         assert (copies / nb.name).read_bytes() == nb.read_bytes(), f"{nb.name} copy is stale"
 
 
 @pytest.mark.xdist_group("manual-build")
-def test_every_tutorial_renders_with_its_outputs_and_the_quickstart_links_it(built_manual):
-    """Each notebook is a page carrying its committed outputs, reached from the quickstart.
+def test_every_anchor_a_tutorial_links_is_on_its_page(built_docs_tree):
+    """A tutorial's `#anchor` into the manual names an id on that page of the build.
+
+    `test_tutorials.py` checks the page against the Markdown sources, and that
+    check cannot see an anchor: a heading's slug is generated, so only the
+    output says what a link will find.  A renamed heading would otherwise
+    leave the reader at the top of the page with every test green (WP-2040).
+    """
+    out, result = built_docs_tree
+    assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
+    texts = {nb.with_suffix(".py").name: nb.with_suffix(".py").read_text(encoding="utf-8")
+             for nb in _tutorial_notebooks()}
+    assert any(_ANCHOR_LINK.search(text) for text in texts.values()), \
+        "no tutorial links an anchor, so this test checks nothing"
+    broken = _broken_anchors(texts, out)
+    assert not broken, ("links whose anchor is no id on that page of the built manual:\n"
+                        + "\n".join(broken))
+
+
+#: A link into the published manual with an anchor, its page and anchor apart.
+_ANCHOR_LINK = re.compile(re.escape(DOCS_URL)
+                          + r"/docs/stable/([^\s#)>\]\"'`]+)#([^\s)>\]\"'`]+)")
+
+
+def _broken_anchors(texts: dict[str, str], out: Path) -> list[str]:
+    """Each `page#anchor` link in `texts` whose anchor is no id on that page under `out`."""
+    ids: dict[str, set[str]] = {}
+    broken = []
+    for name, text in texts.items():
+        for page, anchor in _ANCHOR_LINK.findall(text):
+            if page not in ids:
+                built = out / page
+                ids[page] = (set(re.findall(r'id="([^"]+)"', built.read_text(encoding="utf-8")))
+                             if built.is_file() else set())
+            if anchor not in ids[page]:
+                broken.append(f"{name}: {page}#{anchor}")
+    return broken
+
+
+def test_the_anchor_check_sees_a_missing_id_and_a_missing_page(tmp_path):
+    """The guard can fail: a renamed heading and a page the build lacks are both reported."""
+    (tmp_path / "reference").mkdir()
+    (tmp_path / "reference" / "result.html").write_text(
+        '<section id="diagnostics"><h2>Diagnostics</h2></section>', encoding="utf-8")
+    stable = f"{DOCS_URL}/docs/stable"
+    text = (f"[ok]({stable}/reference/result.html#diagnostics) "
+            f"[renamed]({stable}/reference/result.html#printing-a-result) "
+            f"[gone]({stable}/reference/nowhere.html#x)")
+    assert _broken_anchors({"t.py": text}, tmp_path) == [
+        "t.py: reference/result.html#printing-a-result",
+        "t.py: reference/nowhere.html#x"]
+
+
+@pytest.mark.xdist_group("manual-build")
+def test_every_tutorial_renders_with_its_outputs_and_the_index_links_it(built_docs_tree):
+    """Each notebook is a page carrying its committed outputs, reached from its index page.
 
     Execution is off at build, so a page shows exactly the outputs the
     notebook was committed with.  myst-nb draws each code cell that has
@@ -372,15 +309,13 @@ def test_every_tutorial_renders_with_its_outputs_and_the_quickstart_links_it(bui
     """
     import json
 
-    out, result = built_manual
+    out, result = built_docs_tree
     assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
-    # The page body only: furo's sidebar links every toctree entry on every
-    # page, so a link test over the whole file passes with the table row gone.
-    index = (out / "using" / "quickstart.html").read_text(encoding="utf-8")
-    index = index.split('<article role="main"', 1)[1].split("</article>", 1)[0]
+    index = (out / f"{TUTORIAL_HOME}.html").read_text(encoding="utf-8")
+    index = index.split(ARTICLE_BODY, 1)[1].split("</article>", 1)[0]
     problems: list[str] = []
     for nb in _tutorial_notebooks():
-        page = out / "using" / "tutorials" / f"{nb.stem}.html"
+        page = out / TUTORIAL_HOME / f"{nb.stem}.html"
         if not page.is_file():
             problems.append(f"{nb.stem}: no page")
             continue
@@ -390,9 +325,9 @@ def test_every_tutorial_renders_with_its_outputs_and_the_quickstart_links_it(bui
         if got != want:
             problems.append(f"{nb.stem}: {got} rendered outputs, notebook has {want}")
         if f'href="tutorials/{nb.stem}.html"' not in index:
-            problems.append(f"{nb.stem}: the quickstart does not link its page")
+            problems.append(f"{nb.stem}: {TUTORIAL_HOME}.html does not link its page")
         if not re.search(rf'href="\.\./_downloads/[0-9a-f]+/{re.escape(nb.name)}"', index):
-            problems.append(f"{nb.stem}: the quickstart offers no download")
+            problems.append(f"{nb.stem}: {TUTORIAL_HOME}.html offers no download")
     assert not problems, "\n".join(problems)
 
 
@@ -423,7 +358,7 @@ def test_the_tch_coefficients_in_print_are_the_ones_the_code_runs():
 def test_every_bib_entry_is_cited():
     """references.bib carries no dead weight: an uncited entry is either a
     chapter that lost its citation or an entry that should be pruned."""
-    bib_keys = set(BIB_KEY.findall((MANUAL_DIR / "references.bib").read_text(encoding="utf-8")))
+    bib_keys = set(BIB_KEY.findall(BIBFILE.read_text(encoding="utf-8")))
     assert bib_keys, "no bibliography entries parsed — regex or file moved?"
     uncited = bib_keys - _cited_keys()
     assert not uncited, f"bibliography entries never cited: {sorted(uncited)}"
@@ -431,7 +366,7 @@ def test_every_bib_entry_is_cited():
 
 def test_every_citation_has_a_bib_entry():
     """The -W build also catches this, but a direct diff names the key."""
-    bib_keys = set(BIB_KEY.findall((MANUAL_DIR / "references.bib").read_text(encoding="utf-8")))
+    bib_keys = set(BIB_KEY.findall(BIBFILE.read_text(encoding="utf-8")))
     missing = _cited_keys() - bib_keys
     assert not missing, f"citations with no bibliography entry: {sorted(missing)}"
 
@@ -452,7 +387,7 @@ NO_DOI = {"scherrer1918": "Göttinger Nachrichten 1918 predates the DOI register
 
 
 def _bib_entries() -> list[tuple[str, str, dict[str, str]]]:
-    text = (MANUAL_DIR / "references.bib").read_text(encoding="utf-8")
+    text = BIBFILE.read_text(encoding="utf-8")
     out = []
     for kind, key, body in BIB_ENTRY.findall(text):
         out.append((kind, key, dict(BIB_FIELD.findall(body))))
@@ -538,7 +473,8 @@ def test_every_article_carries_its_doi_in_the_one_case_the_file_uses():
 #: it normally takes.  `srd128`'s author is the braced corporate name `{NIST}`,
 #: which pybtex keeps whole because the braces make it non-alphabetic.  A list
 #: rather than a bound, so a second one has to say what it is.
-LONG_SINGLE_AUTHOR_LABELS = {"srd128": "{NIST}, a braced corporate author"}
+LONG_SINGLE_AUTHOR_LABELS = {"srd128": "{NIST}, a braced corporate author",
+                             "bipm2019": "{BIPM}, a braced corporate author"}
 
 LABEL_TAIL = re.compile(r"^(.*?)(\d{2})([a-z]?)$")
 
@@ -561,7 +497,7 @@ def test_every_citation_label_abbreviates_its_authors():
     from pybtex.database.input import bibtex
     from pybtex.plugin import find_plugin
 
-    data = bibtex.Parser().parse_file(str(MANUAL_DIR / "references.bib"))
+    data = bibtex.Parser().parse_file(str(BIBFILE))
     style = find_plugin("pybtex.style.formatting", "alpha")()
     offenders = []
     for formatted in style.format_entries(data.entries.values()):
@@ -598,8 +534,7 @@ BIBLIO_LABEL_RULE = 'div.citation[role="doc-biblioentry"] > span.label'
 
 
 @pytest.mark.xdist_group("manual-build")
-@BOTH_BUILDS
-def test_every_citation_reads_as_author_and_year(build, request):
+def test_every_citation_reads_as_author_and_year(built_docs_tree):
     """`conf.py` § bibtex: a citation names its author and year on the page.
 
     Three settings produce this and any one of them can be lost quietly, so
@@ -613,7 +548,7 @@ def test_every_citation_reads_as_author_and_year(build, request):
     naming more than one work rendered as a flat comma list of six fragments.
     A citation carrying N years must carry N-1 semicolons.
     """
-    out, result = request.getfixturevalue(build)
+    out, result = built_docs_tree
     assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
     not_author_year, bad_separator = [], []
     multi = 0
@@ -645,8 +580,7 @@ EQUATION_REF = re.compile(r'<a[^>]*href="[^"]*#equation-[^"]*"[^>]*>\((\d+\.\d+)
 
 
 @pytest.mark.xdist_group("manual-build")
-@BOTH_BUILDS
-def test_no_reference_is_doubly_bracketed(build, request):
+def test_no_reference_is_doubly_bracketed(built_docs_tree):
     """A reference brings its own brackets, so the prose must not add a second
     pair.
 
@@ -661,7 +595,7 @@ def test_no_reference_is_doubly_bracketed(build, request):
     Brackets of the *other* kind are left alone. `(via Scherrer, (6.3) in …)`
     is ordinary English and reads correctly.
     """
-    out, result = request.getfixturevalue(build)
+    out, result = built_docs_tree
     assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
     doubled, seen = [], 0
     for page in sorted(out.rglob("*.html")):
@@ -690,8 +624,7 @@ def test_no_reference_is_doubly_bracketed(build, request):
 
 
 @pytest.mark.xdist_group("manual-build")
-@BOTH_BUILDS
-def test_the_bibliography_label_is_hidden_and_the_rule_reaches_all_of_them(build, request):
+def test_the_bibliography_label_is_hidden_and_the_rule_reaches_all_of_them(built_docs_tree):
     """The other half of § G3, which no build warning can see.
 
     docutils gives every citation node a label and sphinxcontrib-bibtex
@@ -701,7 +634,7 @@ def test_the_bibliography_label_is_hidden_and_the_rule_reaches_all_of_them(build
     bibliography, so that is asserted rather than assumed: a label appearing
     anywhere else would be hidden too, silently.
     """
-    out, result = request.getfixturevalue(build)
+    out, result = built_docs_tree
     assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
     css = (out / "_static" / "custom.css").read_text(encoding="utf-8")
     assert BIBLIO_LABEL_RULE in css, (
@@ -720,28 +653,23 @@ def test_the_bibliography_label_is_hidden_and_the_rule_reaches_all_of_them(build
     )
 
 
-#: Part 2 — the theory chapters, the new tree's Theory tab since WP-1986, less
-#: its generated bibliography.  The old tree's copies are one-line includes of
-#: these.  Derived rather than listed, so a chapter added to Theory inherits
-#: the guards below.
+#: Part 2 — the theory chapters, the Theory tab since WP-1986, less its
+#: generated bibliography.  Derived rather than listed, so a chapter added to
+#: Theory inherits the guards below.
 def _part_two() -> list[Path]:
     pages = [p for p in DOCS_PAGES if p.parent == THEORY_DIR and p.name != "references.md"]
     assert len(pages) > 5, "Part 2 chapters not found — has the tree moved?"
     return pages
 
 
-#: Every chapter a person wrote, both parts.  ``_generated/`` is excluded
-#: because neither file in it is the manual's prose to hold: the glossary body
-#: is written from ``rietx.help`` by ``conf.py`` (and guarded by
-#: ``tests/test_help.py``), and the skill body is the agent skill rendered
-#: whole, which is a rulebook an agent cites and may compress
-#: (``tests/test_skill.py``).
+#: Every page a person wrote.  ``_generated/`` is already out of
+#: ``DOCS_PAGES``: its bodies are written from the package by
+#: ``docs/reference_pages.py``, so their prose is the package's strings, held
+#: by the tests of the code that owns each one (``tests/test_help.py`` for the
+#: vocabularies).
 def _authored_chapters() -> list[Path]:
-    pages = [p for p in CHAPTERS
-             if "_generated" not in p.relative_to(MANUAL_DIR).parts]
-    assert len(pages) > 20, "the manual's chapters are not where this expects"
-    assert DOCS_PAGES, "the new tree's pages are not where this expects"
-    return pages + DOCS_PAGES
+    assert len(DOCS_PAGES) > 20, "the manual's pages are not where this expects"
+    return DOCS_PAGES
 
 
 #: A directive option (``:class:``, ``:alt:``, ``:language:``) and an ``:::``
@@ -832,7 +760,7 @@ def test_the_manual_keeps_its_register():
         for number, line in _prose_lines(page):
             for mark, fix in REGISTER_MARKS:
                 if mark in line:
-                    rel = page.relative_to(MANUAL_DIR.parent).as_posix()
+                    rel = page.relative_to(DOCS_TREE.parent).as_posix()
                     offenders.append(f"{rel}:{number}: {fix}\n    {line.strip()[:70]}")
     assert not offenders, (
         "the manual carries the maintainer register:\n" + "\n".join(offenders)
@@ -864,7 +792,7 @@ def test_every_source_symbol_imports():
     """Each equation's *Source:* line names a live module or attribute; a
     rename breaks this test rather than the reader's trust."""
     symbols: set[str] = set()
-    for page in CHAPTERS + DOCS_PAGES:
+    for page in DOCS_PAGES:
         symbols.update(SOURCE_LINE.findall(page.read_text(encoding="utf-8")))
     assert symbols, "no {source} lines found — pattern or chapters moved?"
     for dotted in sorted(symbols):
@@ -892,10 +820,10 @@ def test_no_chapter_still_writes_a_source_line_by_hand():
     rather than silent on the page.
     """
     offenders = []
-    for page in CHAPTERS + DOCS_PAGES:
+    for page in DOCS_PAGES:
         for number, line in enumerate(page.read_text(encoding="utf-8").splitlines(), 1):
             if line.lstrip().startswith("*Source:*"):
-                offenders.append(f"{page.relative_to(MANUAL_DIR.parent).as_posix()}:{number}: "
+                offenders.append(f"{page.relative_to(DOCS_TREE.parent).as_posix()}:{number}: "
                                  f"{line.strip()[:60]}")
     assert not offenders, (
         "write the source line as the `{source}` role, which resolves the name "
@@ -908,17 +836,17 @@ def test_source_lines_cover_every_labelled_equation():
     at least one `{source}` line — an equation with no named source is a
     transcription with no audit trail.  Every page of the new tree is held to
     it, not only its Theory tab (WP-1978)."""
-    for page in CHAPTERS + DOCS_PAGES:
+    for page in DOCS_PAGES:
         text = page.read_text(encoding="utf-8")
         n_labels = len(re.findall(r"^:label:", text, re.MULTILINE))
         n_sources = len(SOURCE_LINE.findall(text))
         if n_labels:
-            assert n_sources > 0, (f"{page.relative_to(MANUAL_DIR.parent).as_posix()}: "
+            assert n_sources > 0, (f"{page.relative_to(DOCS_TREE.parent).as_posix()}: "
                                    f"{n_labels} labelled equations, no {{source}} lines")
 
 
 def test_the_hump_table_agrees_with_the_refinement_that_produced_it():
-    """`using/data.md`'s background-peak evidence table, against the fixture.
+    """`concepts/parameters.md`'s hump evidence table, against the fixture.
 
     That section's headline is a comparison of measured Rwp values — one
     background peak against three more Chebyshev terms, at equal parameter cost
@@ -934,31 +862,31 @@ def test_the_hump_table_agrees_with_the_refinement_that_produced_it():
     that needs four fits does not.
 
     **Both prose copies, not one.**  The same table is transcribed twice — the
-    Markdown table in `using/data.md` and the reST table in the
+    Markdown table in `concepts/parameters.md` and the reST table in the
     :class:`~rietx.schemas.instrument.HumpComponent` docstring — and the second
     is the one that drifted last time (7dbd27c fixed the manual's claim and left
     the docstring stating the old one).  Both are checked against `MANUAL_RWP`
     here, so neither copy can say a number no refinement produced.
     """
-    sys.path.insert(0, str(MANUAL_DIR.parent.parent / "tests"))
+    sys.path.insert(0, str(REPO_ROOT / "tests"))
     manual_rwp = importlib.import_module("test_acceptance_si640c").MANUAL_RWP
-    page = (MANUAL_DIR / "using" / "data.md").read_text(encoding="utf-8")
+    page = (DOCS_TREE / "concepts" / "parameters.md").read_text(encoding="utf-8")
 
-    # --- the Markdown table in using/data.md, keyed by row label ---
+    # --- the Markdown table in concepts/parameters.md, keyed by row label ---
     rows = {
         "cheb3": "| Chebyshev, 3 terms |",
-        "cheb3_peak": "| Chebyshev-3 + one hump |",
+        "cheb3_peak": "| Chebyshev, 3 terms, and one hump |",
         "cheb6": "| Chebyshev, 6 terms |",
-        "cheb6_peak": "| Chebyshev-6 + one hump |",
+        "cheb6_peak": "| Chebyshev, 6 terms, and one hump |",
     }
     for key, prefix in rows.items():
         line = next((ln for ln in page.splitlines() if ln.startswith(prefix)),
                     None)
-        assert line is not None, f"the {key} row is gone from data.md"
+        assert line is not None, f"the {key} row is gone from parameters.md"
         cells = [c.strip() for c in line.strip("|").split("|")]
-        # | background | terms | Rwp | GoF | Biso | HIGH_CORRELATION |
+        # | background | free background terms | Rwp | Biso |
         assert float(cells[2]) == manual_rwp[key], (
-            f"data.md's {key} row says Rwp {cells[2]}, the fixture that "
+            f"parameters.md's {key} row says Rwp {cells[2]}, the fixture that "
             f"produced it says {manual_rwp[key]}")
 
     # --- the reST table in the HumpComponent docstring, keyed by the `terms`
@@ -989,12 +917,11 @@ def test_the_hump_table_agrees_with_the_refinement_that_produced_it():
 
 
 # ----------------------------------------------------------------------
-# The new tree (WP-1978)
+# The page contract (WP-1978)
 #
-# The page contract holds on `docs/docs/` only.  The old chapters are exempt
-# until WP-1986 retires them, since most of them were written before it and
-# would fail it.  Each rule is a function of the text, so the tests that hold
-# the tree to it are paired with tests that make it fail on purpose.
+# Every page of `docs/docs/` keeps it.  Each rule is a function of the text,
+# so the tests that hold the tree to it are paired with tests that make it
+# fail on purpose.
 # ----------------------------------------------------------------------
 
 #: A page longer than this is two pages (WP-1975 § F8).
@@ -1087,7 +1014,7 @@ _GENERATED_INCLUDE = re.compile(r"^```\{include\} [./]*_generated/(\S+)\n```$", 
 
 def _reference_pages():
     spec = importlib.util.spec_from_file_location(
-        "_reference_pages", MANUAL_DIR.parent / "reference_pages.py")
+        "_reference_pages", DOCS_TREE.parent / "reference_pages.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -1137,7 +1064,10 @@ def test_every_page_of_the_new_tree_keeps_the_page_contract():
     ("# Title\n\nAn answer.\n\n## Part\n\nRecall that a plate is flat.\n", ["back-reference"]),
     ("# Title\n\nAn answer.\n\n## Part\n\nPeaks above 90° shift. As above, so below.\n", []),
     ("# Title\n\nAn answer.\n\n```text\n# not a heading\n```\n", []),
-    ("# Title\n\n" + "A sentence. " * 5000, ["over the 50000 cap"]),
+    # Its own id: pytest puts the id in PYTEST_CURRENT_TEST, and Windows refuses
+    # an environment variable over 32 767 characters (WP-2043).
+    pytest.param("# Title\n\n" + "A sentence. " * 5000, ["over the 50000 cap"],
+                 id="over-the-cap"),
 ])
 def test_the_page_contract_fails_what_it_should(text, expected):
     """Each rule, made to fail once, with the message that names it."""
@@ -1173,8 +1103,8 @@ def _heading_slugs(source: Path) -> set[str]:
 
 
 #: A Part 2 chapter's old address on the site.  Concepts linked these until
-#: WP-1986 moved Part 2 into the Theory tab, and the old pages stay up until
-#: Part 1 retires, so a link to one would land and go stale in silence.
+#: WP-1986 moved Part 2 into the Theory tab, and since the old tree retired
+#: each is a redirect stub, so a link to one costs the reader a hop.
 _OLD_THEORY_LINK = re.compile(re.escape(DOCS_URL) + r"/([\w-]+)\.html(?:#\S*)?$")
 
 #: The tabs whose pages link Theory to back a physics claim (WP-1975 § F8).
@@ -1285,6 +1215,218 @@ def test_the_front_page_offers_three_audiences_and_six_tabs(built_docs_tree):
     assert tuple(dict.fromkeys(tabs)) == TABS, tabs
 
 
+#: The manual's header brand, which goes to the site's home page (WP-2021).
+HEADER_BRAND = re.compile(r'<a class="navbar-brand logo rietx-brand" href="([^"]*)"')
+#: The site's source: the landing page's shell, its favicon and its colours.
+LANDING_SRC = REPO_ROOT / "docs" / "landing" / "src"
+
+
+#: The pages Sphinx writes for itself rather than from a source.
+SPHINX_PAGES = {"genindex.html", "search.html"}
+
+
+def _built_pages(out: Path) -> list[Path]:
+    """Every page the build wrote.  `_static/` holds the theme's assets, one of them
+    an HTML macro file no page renders."""
+    pages = [p for p in sorted(out.rglob("*.html")) if p.relative_to(out).parts[0] != "_static"]
+    assert pages, "the build wrote no pages"
+    return pages
+
+
+def test_the_site_draws_one_mark():
+    """The favicon, the manual's header and the landing page's header draw one mark.
+
+    `docs/landing/src/favicon.svg` is the site's one favicon and the mark's
+    authority (WP-2021).  The two headers copy its geometry inline, because an
+    `<img>` is its own document and cannot follow the theme toggle, so the copies
+    are held to it: one mark, never redrawn.  Compared on the drawn shapes rather
+    than the bytes, since the favicon carries a `<style>` and the headers take
+    their fill from the page.  An SVG loaded as an icon reads no CSS variable, so
+    the favicon spells its two fills, and they are `--accent` in `tokens.css`."""
+    from tests.test_landing import site_tokens
+
+    favicon = (LANDING_SRC / "favicon.svg").read_text(encoding="utf-8")
+    shapes = SVG_SHAPES.findall(favicon)
+    assert shapes, "no drawn shape in docs/landing/src/favicon.svg — has the mark moved?"
+    # The mark is the 32-unit drawing; the theme button beside it draws on 24.
+    def mark(path: Path) -> list[str]:
+        drawing = re.search(r'<svg[^>]*viewBox="0 0 32 32".*?</svg>',
+                            path.read_text(encoding="utf-8"), re.S)
+        return SVG_SHAPES.findall(drawing.group(0)) if drawing else []
+    for copy in (DOCS_TREE / "_templates" / "rietx-brand.html", LANDING_SRC / "shell.html"):
+        where, inlined = copy.relative_to(REPO_ROOT).as_posix(), mark(copy)
+        assert inlined == shapes, (
+            f"{where} has drifted from docs/landing/src/favicon.svg, which is the "
+            f"authority: copy its shapes.\n  copy:    {inlined}\n  favicon: {shapes}")
+    fills = re.findall(r"fill:\s*(#[0-9a-fA-F]{6})", favicon)
+    tokens = site_tokens()
+    accent = [tokens["light"]["accent"], tokens["dark (pinned)"]["accent"]]
+    assert fills == accent, f"the favicon's fills {fills} are not --accent {accent}"
+
+
+def test_the_manual_spells_no_colour():
+    """Only `tokens.css` spells a colour.  `custom.css` maps pydata's names onto the
+    tokens, and a hex or an `rgb()` anywhere in the manual's own styles, scripts or
+    templates is a second authority the dark theme and the landing page cannot see."""
+    literal = re.compile(r"(?<![\w-])#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})(?![\w-])"
+                         r"|\b(?:rgba?|hsla?)\(|\b(?:white|black)\b")
+    files = [DOCS_TREE / "_static" / "custom.css", DOCS_TREE / "_static" / "rietx-theme.js",
+             DOCS_TREE / "_static" / "fonts" / "fonts.css",
+             *sorted((DOCS_TREE / "_templates").glob("*.html"))]
+    found = [f"{f.relative_to(REPO_ROOT).as_posix()}:{n}: {line.strip()}"
+             for f in files
+             for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1)
+             if literal.search(line)]
+    assert not found, "a colour spelled outside docs/landing/src/tokens.css:\n" + "\n".join(found)
+
+
+def test_the_theme_control_is_the_landing_pages():
+    """The manual's theme button draws the landing page's two glyphs, so the control
+    a reader learned on one page is the control on the other."""
+    def glyphs(text: str) -> list[str]:
+        return re.findall(r'<svg class="only-(?:light|dark)".*?</svg>', text, re.S)
+    ours = glyphs((DOCS_TREE / "_templates" / "rietx-theme.html").read_text(encoding="utf-8"))
+    theirs = glyphs((LANDING_SRC / "shell.html").read_text(encoding="utf-8"))
+    assert len(ours) == 2 and ours == theirs, (ours, theirs)
+
+
+#: Each tab whose page titles share a prefix, and the prefix (WP-2021 decision 6).
+TITLE_PREFIXES = {"concepts": "About ", "guides": "How to "}
+#: One entry of a toctree with an explicit title: `Label <doc>`.
+TOCTREE_ENTRY = re.compile(r"^(?P<label>.+?) <(?P<doc>[^>]+)>$")
+
+
+@pytest.mark.parametrize("tab", sorted(TITLE_PREFIXES))
+def test_a_tabs_menu_names_each_page_without_the_prefix_its_tab_says(tab):
+    """In Concepts and Guides the sidebar drops "About" and "How to", which the tab
+    already says, and the page keeps them.
+
+    A toctree entry's explicit title changes the menu alone: the H1, the `<title>`,
+    the previous and next links and `llms.txt` keep the page's own.  The title keeps
+    its prefix because 66 links quote it as prose ("[About the report] describes
+    its three layers"), where the bare noun would read as the thing, not the page.
+    So the label is derived, never authored: the title less its prefix, capitalised."""
+    prefix = TITLE_PREFIXES[tab]
+    index = (DOCS_TREE / tab / "index.md").read_text(encoding="utf-8")
+    block = re.search(r"```\{toctree\}\n(?::[^\n]*\n)*\n(.*?)\n```", index, re.S)
+    assert block, f"{tab}/index.md has no toctree"
+    wrong: list[str] = []
+    for entry in block.group(1).splitlines():
+        match = TOCTREE_ENTRY.match(entry)
+        if not match:
+            wrong.append(f"{entry!r}: no explicit title, so the menu shows the prefix")
+            continue
+        page = (DOCS_TREE / tab / f"{match['doc']}.md").read_text(encoding="utf-8")
+        title = re.search(r"^# (.+)$", page, re.M).group(1)
+        if not title.startswith(prefix):
+            wrong.append(f"{match['doc']}: title {title!r} does not begin {prefix!r}")
+            continue
+        rest = title[len(prefix):]
+        if match["label"] != rest[0].upper() + rest[1:]:
+            wrong.append(f"{match['doc']}: menu says {match['label']!r} for the title {title!r}")
+    assert not wrong, f"{tab}/index.md:\n" + "\n".join(wrong)
+
+
+@pytest.mark.xdist_group("manual-build")
+def test_every_page_brands_its_header_with_the_sites_home(built_docs_tree):
+    """The brand goes to the site's home page, the landing page, from every page.
+
+    Asserted on every built page, because the brand is in the header and a pydata
+    upgrade renaming `navbar_start`'s slot would drop it with a green build.  The
+    wordmark is checked as the word itself, `_about.DIST_NAME`.  The way back to
+    this manual's own front page is the breadcrumb's, below."""
+    from rietx._about import DIST_NAME
+
+    out, result = built_docs_tree
+    assert result.returncode == 0, "the new tree did not build"
+    pages = _built_pages(out)
+    wrong: list[str] = []
+    for page in pages:
+        text = page.read_text(encoding="utf-8")
+        name = page.relative_to(out).as_posix()
+        if HEADER_BRAND.findall(text) != [DOCS_URL]:
+            wrong.append(f"{name}: brand href {HEADER_BRAND.findall(text)} (want {[DOCS_URL]})")
+        elif f'rietx-wordmark">{DIST_NAME}</p>' not in text:
+            wrong.append(f"{name}: the brand carries no wordmark")
+    assert not wrong, f"{len(wrong)} of {len(pages)} pages:\n" + "\n".join(wrong[:10])
+
+
+@pytest.mark.xdist_group("manual-build")
+def test_every_breadcrumb_starts_at_the_manual_and_stops_at_the_parent(built_docs_tree):
+    """The trail's first item is "Manual", linking the front page, and its last is the
+    page's parent, never the page, whose title is the H1 directly under it.  The front
+    page carries none, nor do Sphinx's own index and search pages, which have no
+    article header.  Read on the built pages, since the trail is a template."""
+    out, result = built_docs_tree
+    assert result.returncode == 0, "the new tree did not build"
+    pages = [p for p in _built_pages(out) if p.relative_to(out).as_posix() not in SPHINX_PAGES]
+    wrong: list[str] = []
+    for page in pages:
+        text = page.read_text(encoding="utf-8")
+        name = page.relative_to(out).as_posix()
+        trail = re.search(r'<nav aria-label="Breadcrumb".*?</nav>', text, re.S)
+        if page == out / "index.html":
+            if trail:
+                wrong.append(f"{name}: the front page carries a trail")
+            continue
+        if not trail:
+            wrong.append(f"{name}: no trail")
+            continue
+        items = re.findall(r'<li class="breadcrumb-item[^"]*">(.*?)</li>', trail.group(0), re.S)
+        links = [re.search(r'<a href="([^"]*)"[^>]*>(.*?)</a>', item, re.S) for item in items]
+        if not items or not all(links):
+            wrong.append(f"{name}: an item that is not a link, {items}")
+            continue
+        home = (page.parent / links[0][1]).resolve()
+        if (links[0][2], home) != ("Manual", (out / "index.html").resolve()):
+            wrong.append(f"{name}: first item {links[0][2]!r} -> {links[0][1]}")
+        if any((page.parent / link[1]).resolve() == page.resolve() for link in links):
+            wrong.append(f"{name}: the trail names the page itself")
+    assert not wrong, f"{len(wrong)} of {len(pages)} pages:\n" + "\n".join(wrong[:10])
+
+
+@pytest.mark.xdist_group("manual-build")
+def test_no_page_credits_its_tools_or_folds_its_sidebar(built_docs_tree):
+    """The footer is the site's line, with no credit to Sphinx or the theme, and the
+    sidebar has no collapse control: pydata 0.23 keeps no state for it, so every
+    click through to another page opened it again."""
+    out, result = built_docs_tree
+    assert result.returncode == 0, "the new tree did not build"
+    pages = _built_pages(out)
+    unwanted = ("Created using", "Built with the", "pst-collapse-sidebar-button")
+    wrong = [f"{p.relative_to(out).as_posix()}: {word!r}"
+             for p in pages for word in unwanted if word in p.read_text(encoding="utf-8")]
+    missing = [p.relative_to(out).as_posix() for p in pages
+               if 'class="rietx-footer"' not in p.read_text(encoding="utf-8")]
+    assert not wrong, "\n".join(wrong[:10])
+    assert not missing, f"no site footer on {missing[:10]}"
+
+
+@pytest.mark.xdist_group("manual-build")
+def test_every_page_links_its_markdown_twin(built_docs_tree):
+    """The right column's "This page as markdown" link, in place of "Show source",
+    names the twin the build wrote beside the page, and every page with a twin has it.
+    A page without a right column has nowhere to hold it: the front page (`conf.py`)
+    and a wide table's page that removes the column for room."""
+    out, result = built_docs_tree
+    assert result.returncode == 0, "the new tree did not build"
+    wrong: list[str] = []
+    for page in _built_pages(out):
+        text = page.read_text(encoding="utf-8")
+        if 'class="sidebar-secondary-items' not in text:
+            continue
+        name = page.relative_to(out).as_posix()
+        link = re.search(r'class="tocsection rietx-twin">\s*<a href="([^"]*)"', text)
+        twin = page.with_name(page.name + ".md")
+        if twin.is_file() and not link:
+            wrong.append(f"{name}: no link to its twin")
+        elif link and (page.parent / link[1]).resolve() != twin.resolve():
+            wrong.append(f"{name}: links {link[1]}, not its twin")
+        elif link and not twin.is_file():
+            wrong.append(f"{name}: links {link[1]}, which the build did not write")
+    assert not wrong, "\n".join(wrong[:10])
+
+
 # ----------------------------------------------------------------------
 # The markdown twin and llms.txt (WP-1980)
 #
@@ -1311,14 +1453,25 @@ def _twins(out: Path) -> dict[str, str]:
             for p in sorted(out.rglob("*.html.md"))}
 
 
+#: A tutorial notebook's twin, in `TUTORIAL_HOME`, where the notebooks are copied.
+def _notebook_twins() -> set[str]:
+    return {f"{TUTORIAL_HOME}/{nb.stem}.html.md" for nb in _tutorial_notebooks()}
+
+
 @pytest.mark.xdist_group("manual-build")
 def test_every_page_has_a_twin_that_keeps_the_contract(built_docs_tree):
-    """One twin per page, with no MyST left in it, its title and answer
-    sentence, and under the 50 000-character cap."""
+    """One twin per page and per tutorial notebook, with no MyST left in it,
+    its title and answer sentence, and under the 50 000-character cap.
+
+    A notebook is held to the same contract as a page: each tutorial's
+    authorship note sits below its opening paragraph, so the paragraph under
+    the title answers (the waiver that excused this went in WP-1986)."""
     out, result = built_docs_tree
     assert result.returncode == 0, "the new tree did not build"
     twins = _twins(out)
-    pages = {page.relative_to(DOCS_TREE).with_suffix(".html.md").as_posix() for page in DOCS_PAGES}
+    notebooks = _notebook_twins()
+    pages = {page.relative_to(DOCS_TREE).with_suffix(".html.md").as_posix()
+             for page in DOCS_PAGES} | notebooks
     assert set(twins) == pages, set(twins) ^ pages
     breaches = [f"{path}: {message}" for path, twin in twins.items()
                 for message in _contract_breaches(twin)
@@ -1358,8 +1511,8 @@ def test_llms_txt_links_every_twin_once(built_docs_tree):
     assert [path for path, twin in twins.items() if twin.splitlines()[0] not in full] == []
 
 
-#: One page holding each node type the old tree uses and the new one does not
-#: yet (WP-1986 brings them), so the twin is ready before they arrive.
+#: One page holding each node type the retired old tree used (WP-1986), so the
+#: twin handles each one whether or not a page carries it today.
 _COVERAGE_PAGE = """\
 # Coverage
 
@@ -1390,6 +1543,23 @@ Equation {eq}`eq-one` cites {cite}`%(key)s`.
 :alt: the dark figure
 ```
 
+<div><img class="rx-fig-light only-light" alt="the inline figure" src="data:image/png;base64,%(light)s"><img class="rx-fig-dark only-dark" alt="" src="data:image/png;base64,%(dark)s"><style>.rx-fig-dark {display:none}</style></div>
+
+Get {download}`the notes <notes.txt>` to read later.
+
+```{py:function} rx.call(a: int, *, b: str = 'x') -> int
+An API entry, whose bare `*` the HTML marks with a tooltip.
+```
+
+````{py:class} rx.Model
+A model, whose {py:attr}`rx.Model.size` is a field.
+
+```{py:fields}
+name: str
+size: float = 1.0
+```
+````
+
 ::::{tab-set}
 :::{tab-item} First tab
 First tab text.
@@ -1419,21 +1589,31 @@ flowchart LR
 
 def test_the_twin_writes_every_node_type_the_old_tree_uses(tmp_path):
     """A note and a titled admonition as labelled quotes, the math, the light
-    half of a figure pair, every tab, the dropdown, an escaped table cell, a
-    mermaid fence and the bibliography, with `-W` holding no node unknown."""
+    half of a figure pair (a notebook's inline one written out as a file),
+    a download, an API signature and a model's fields as a list (the HTML's
+    field anchored and found by `{py:attr}`), every tab, the dropdown, an
+    escaped table cell, a mermaid fence and the bibliography, with `-W`
+    holding no node unknown."""
+    import base64
+
     src = tmp_path / "src"
     src.mkdir()
-    (src / "index.md").write_text(_COVERAGE_PAGE % {"key": _bib_entries()[0][1]},
-                                  encoding="utf-8")
+    light, dark = b"\x89PNG\r\n\x1a\nlight", b"\x89PNG\r\n\x1a\ndark"
+    (src / "index.md").write_text(
+        _COVERAGE_PAGE % {"key": _bib_entries()[0][1],
+                          "light": base64.b64encode(light).decode(),
+                          "dark": base64.b64encode(dark).decode()},
+        encoding="utf-8")
     for name in ("pic-light.png", "pic-dark.png"):
         (src / name).write_bytes(b"\x89PNG\r\n\x1a\n")
+    (src / "notes.txt").write_text("notes\n", encoding="utf-8")
     (src / "conf.py").write_text(
         "import sys\n"
-        f"sys.path.insert(0, {str(MANUAL_DIR.parent)!r})\n"
+        f"sys.path.insert(0, {str(DOCS_TREE.parent)!r})\n"
         "extensions = ['myst_parser', 'sphinx_design', 'sphinxcontrib.bibtex',\n"
-        "              'sphinxcontrib.mermaid', 'markdown_twin']\n"
+        "              'sphinxcontrib.mermaid', 'markdown_twin', 'py_fields']\n"
         "myst_enable_extensions = ['colon_fence', 'dollarmath', 'amsmath']\n"
-        f"bibtex_bibfiles = [{str(MANUAL_DIR / 'references.bib')!r}]\n"
+        f"bibtex_bibfiles = [{str(BIBFILE)!r}]\n"
         "project = 'coverage'\n",
         encoding="utf-8")
     out = tmp_path / "html"
@@ -1445,6 +1625,8 @@ def test_the_twin_writes_every_node_type_the_old_tree_uses(tmp_path):
                      "> **A Title as Written**\n> \n> A titled admonition.",
                      "$$", "y = x^2",
                      "![the light figure](_images/pic-light.png)",
+                     "rx.call(a: int, \\*, b: str = 'x') → int",
+                     "* `name: str`\n* `size: float = 1.0`",
                      "**First tab**", "Second tab text.",
                      "**The folded part**\n\nFolded text.",
                      "| x \\| y | z |",
@@ -1452,7 +1634,197 @@ def test_the_twin_writes_every_node_type_the_old_tree_uses(tmp_path):
         assert fragment in twin, fragment
     assert "dark figure" not in twin
     assert _myst_residue(twin) == []
+    html = (out / "index.html").read_text(encoding="utf-8")
+    assert 'id="rx.Model.size"' in html and 'href="#rx.Model.size"' in html
+    # The inline pair's light half is a file the twin links; the base64, the
+    # dark half and its stylesheet are the browser's.
+    inline = re.search(r"!\[the inline figure\]\((_images/twin-[0-9a-f]+\.png)\)", twin)
+    assert inline and (out / inline[1]).read_bytes() == light, twin
+    assert "data:image" not in twin and "rx-fig-dark" not in twin
+    assert re.search(r"\[`?the notes`?\]\(_downloads/[0-9a-f]+/notes\.txt\)", twin), twin
     # The citation links its bibliography entry, which carries the label.
     anchor = re.search(r"\]\(#([\w-]+)\)", twin.split("cites", 1)[1])[1]
     entry = twin.split(f'<a id="{anchor}"></a>', 1)[1].lstrip()
     assert re.match(r"\*\*\[\w+\]\*\* \S.*1969", entry), entry
+
+
+# ----------------------------------------------------------------------
+# A signature in the code blocks' colours (WP-2023, docs/py_highlight.py)
+# ----------------------------------------------------------------------
+
+_SIGNATURE_PAGE = """\
+# Signatures
+
+```{py:function} rx.call(a: int, *, b: str | None = None, n: float = 1.5, k: int = 3, mode: Mode = 'x', lo=-inf, **kw: Any) -> rx.Model
+A call.
+```
+
+```{py:function} rx.unparsed(a: dict[str, int], b = (0 × 3))
+A list Sphinx can parse neither way, so its one parameter is bare text.
+```
+
+````{py:class} rx.Model
+A model.
+
+```{py:method} rx.Model.load(path: str) -> rx.Model
+:classmethod:
+A classmethod.
+```
+
+```{py:fields}
+name: str
+size: float = 1.0
+flag: bool = False
+```
+````
+"""
+
+#: `<span class="pre">` is the HTML writer's wrapper round every piece of text in
+#: a signature; dropped, a token reads as one span.
+_PRE = re.compile(r'<span class="pre">([^<]*)</span>')
+
+
+def _signature_build(tmp_path: Path, extensions: list[str]) -> tuple[str, str]:
+    src = tmp_path / "src"
+    src.mkdir(parents=True)
+    (src / "index.md").write_text(_SIGNATURE_PAGE, encoding="utf-8")
+    (src / "conf.py").write_text(
+        "import sys\n"
+        f"sys.path.insert(0, {str(DOCS_TREE.parent)!r})\n"
+        f"extensions = {['myst_parser', 'markdown_twin', 'py_fields', *extensions]!r}\n"
+        "project = 'signatures'\n",
+        encoding="utf-8")
+    out = tmp_path / "html"
+    result = subprocess.run([sys.executable, "-m", "sphinx", "-W", "-q", "-E", "-b", "html",
+                             str(src), str(out)], capture_output=True, text=True, timeout=300)
+    assert result.returncode == 0, result.stderr
+    return (_PRE.sub(r"\1", (out / "index.html").read_text(encoding="utf-8")),
+            (out / "index.html.md").read_text(encoding="utf-8"))
+
+
+def test_a_signature_is_coloured_token_by_token_and_its_twin_is_unchanged(tmp_path):
+    """Each piece of a signature carries the Pygments class a code block gives it,
+    a default by the kind of literal it is, and the markdown twin is the page built
+    without the extension byte for byte: the classes carry no text."""
+    html, twin = _signature_build(tmp_path / "with", ["py_highlight"])
+    _, plain = _signature_build(tmp_path / "without", [])
+    assert twin == plain
+    signatures = html.count('<dt class="sig sig-object py')
+    assert signatures == 7 and html.count('<dt class="sig sig-object py highlight"') == signatures
+    for fragment in (
+            '<span class="sig-name descname nf">call</span>',
+            '<span class="n">a</span><span class="p">:</span><span class="w"> </span>'
+            '<span class="n"><span class="nb">int</span></span>',
+            '<span class="nb">str</span><span class="w"> </span><span class="p">|</span>'
+            '<span class="w"> </span><span class="kc">None</span>',
+            '<span class="default_value kc">None</span>',
+            '<span class="default_value mf">1.5</span>',
+            '<span class="default_value mi">3</span>',
+            '<span class="n"><span class="nc">Mode</span></span>',
+            '<span class="default_value s">\'x\'</span>',
+            # Not one literal: `ast.literal_eval` reads no `-inf`, and it stays a name.
+            '<span class="default_value">-inf</span>',
+            '<span class="o">**</span><span class="n">kw</span><span class="p">:</span>'
+            '<span class="w"> </span><span class="n"><span class="nc">Any</span></span>',
+            '<span class="sig-return-typehint"><a class="nc reference internal" href="#rx.Model"',
+            '<span class="sig-name descname nc">Model</span>',
+            '<span class="k">classmethod</span>',
+            '<span class="sig-name descname nf">load</span>',
+            '<span class="sig-name descname">flag</span><span class="property">'
+            '<span class="p">:</span><span class="w"> </span><span class="nb">bool</span></span>'
+            '<span class="property"><span class="w"> </span><span class="p">=</span>'
+            '<span class="w"> </span><span class="default_value kc">False</span></span>',
+            '<span class="default_value mf">1.0</span>'):
+        assert fragment in html, fragment
+
+
+@pytest.mark.xdist_group("manual-build")
+def test_the_api_pages_signatures_carry_their_token_classes(built_docs_tree):
+    """On the built pages: every Python signature is coloured, and four pinned ones
+    carry the class each of their tokens takes — an instance method, a classmethod, a
+    `py:fields` line and a `**kw`."""
+    out, result = built_docs_tree
+    assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
+    pages = {name: _PRE.sub(r"\1", (out / "reference" / f"{name}.html").read_text(encoding="utf-8"))
+             for name in ("api", "api-techniques", "api-types")}
+    for name, html in pages.items():
+        signatures = html.count('<dt class="sig sig-object py')
+        assert signatures > 30, name
+        assert html.count('<dt class="sig sig-object py highlight"') == signatures, name
+
+    def signature(ident: str) -> str:
+        html = pages["api"]
+        start = html.index(f'id="{ident}"')
+        return html[start:html.index("</dt>", start)]
+
+    fit = signature("rx.Refinement.fit")
+    for fragment in ('<span class="sig-name descname nf">fit</span>',
+                     '<a class="nc reference internal" href="#rx.PatternData"',
+                     '<span class="default_value s">\'rietveld\'</span>',
+                     '<span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span>',
+                     '<span class="kc">None</span></span>',
+                     '<span class="default_value kc">None</span>'):
+        assert fragment in fit, fragment
+    from_cif = signature("rx.Structure.from_cif")
+    for fragment in ('<span class="k">classmethod</span>',
+                     '<span class="sig-name descname nf">from_cif</span>',
+                     '<span class="default_value kc">False</span>',
+                     '<span class="sig-return-typehint"><a class="nc reference internal" '
+                     'href="#rx.Structure"'):
+        assert fragment in from_cif, fragment
+    vary = signature("rx.Parameter.vary")
+    assert '<span class="nb">bool</span>' in vary
+    assert '<span class="default_value kc">False</span>' in vary
+    read = signature("rx.read_pattern")
+    assert ('<span class="o">**</span><span class="n">options</span><span class="p">:</span>'
+            '<span class="w"> </span><span class="n"><span class="nc">Any</span>') in read
+
+
+#: Every token class a coloured signature carries: Sphinx's own (its `desc_sig_*`
+#: nodes, `m`/`kt`/`sc` among them for a `Literal[1]`-style annotation), and the
+#: ones `docs/py_highlight.py` writes.
+SIGNATURE_TOKENS = ("n", "o", "p", "w", "k", "kt", "m", "s", "sc",
+                    "nf", "nc", "nb", "kc", "mi", "mf")
+
+
+def _pygments_styles() -> dict[str, str]:
+    """The light and dark Pygments styles the manual's `pygments.css` is built from:
+    pydata-sphinx-theme's defaults, since `conf.py` sets neither."""
+    import configparser
+
+    import pydata_sphinx_theme
+
+    conf = (DOCS_TREE / "conf.py").read_text(encoding="utf-8")
+    assert "pygments_light_style" not in conf and "pygments_dark_style" not in conf, (
+        "conf.py now names a Pygments style: read it here rather than the theme's default")
+    theme = configparser.ConfigParser()
+    theme.read(Path(pydata_sphinx_theme.__file__).parent / "theme" / "pydata_sphinx_theme"
+               / "theme.conf")
+    return {mode: theme["options"][f"pygments_{mode}_style"] for mode in ("light", "dark")}
+
+
+def test_every_signature_colour_is_legible_on_its_grounds():
+    """WCAG 2.2 AA on the site's own grounds, not the code block's: a signature sits
+    on `--bg`, and on `--accent-soft` when reached by its permalink.  The colours
+    are read from the stylesheet pydata writes, by its own function."""
+    from pydata_sphinx_theme.pygments import get_pygments_stylesheet
+
+    from tests.test_landing import contrast, site_tokens
+
+    styles = _pygments_styles()
+    css = get_pygments_stylesheet(styles["light"], styles["dark"])
+    tokens = {"light": site_tokens()["light"], "dark": site_tokens()["dark (pinned)"]}
+    low, measured = [], 0
+    for mode in ("light", "dark"):
+        prefix = re.escape(f'html[data-theme="{mode}"] .highlight')
+        base = re.search(prefix + r" \{[^}]*?color: (#[0-9a-fA-F]{6})", css)[1]
+        for token in SIGNATURE_TOKENS:
+            rule = re.search(prefix + rf" \.{token} \{{[^}}]*?color: (#[0-9a-fA-F]{{6}})", css)
+            colour = rule[1] if rule else base
+            for ground in ("bg", "accent-soft"):
+                ratio = contrast(colour, tokens[mode][ground])
+                measured += 1
+                if ratio < 4.5:
+                    low.append(f"{mode} .{token} {colour} on --{ground}: {ratio:.2f}")
+    assert measured == 2 * len(SIGNATURE_TOKENS) * 2
+    assert not low, "\n".join(low)

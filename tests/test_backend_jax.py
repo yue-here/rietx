@@ -35,7 +35,7 @@ from rietx.backend.jax_backend import (  # noqa: E402
     make_jax_jacobian,
     make_traced_residual,
 )
-from rietx.model.forward import compile_model  # noqa: E402
+from rietx.model.forward import WINDOW_AREA_TOL, compile_model  # noqa: E402
 from rietx.optimize.least_squares import (  # noqa: E402
     _make_jacobian,
     _make_residual,
@@ -174,8 +174,10 @@ def test_jacfwd_matches_analytic_and_fd_on_families():
     table.set_vary(["*"], False)
     for path in ANALYTIC_FAMILIES:
         assert table.set_vary([path], True), path
+    # the cross-backend matrix's windows, declared as tests/test_cross_backend.py says
     model = compile_model(structure, ins, pattern, mode="rietveld",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL)
 
     theta = table.x0()
     J_an = _make_jacobian(model, table)(theta)

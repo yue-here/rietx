@@ -12,41 +12,48 @@ lands here; it earns a clause at root only if it changes behavior outside
 The FitReport's rule one rank up: an indexer must never hand back one cell
 confidently — `IndexingResult` has **no** `.cell`/`.best`, only a gated
 `best_or_none()`; geometrical ambiguity (Mighell & Santoro 1975) is reported
-with the reflections that would break the tie, never silently resolved;
-coverage is scored in *both* directions (share-of-observed alone puts a
-390-line wrong phase above the truth); a restricted search reports
-`systems_searched` rather than concluding anything about the sample. Engines
-supply the confidence by **agreeing** (`direction="both"`'s device) — three
-of them (two until WP-1040), `high` meaning *every* engine that ran found
-the lattice, so adding one raises the bar. They must fail differently for
-that to mean anything, and they do: wide domain (dichotomy), poisoned base
-line (trial_error), bad starting basin (svd). One step further: the
-**extinction symbol**, not the space group, is what a powder measures —
-`determine_extinction_symbol` answers with ranked classes, each carrying a
-*list* of space groups; there the singleton is not unsupported but
-unmeasurable. Its absence test can only speak where its own null model is
+with the reflections that would break the tie, never silently resolved; coverage
+is scored in *both* directions (share-of-observed alone puts a 390-line wrong
+phase above the truth); a restricted search reports `systems_searched` rather
+than concluding anything about the sample. Engines supply the confidence by
+**agreeing** (`direction="both"`'s device) — three of them (two until WP-1040),
+`high` meaning *every* engine that ran found the lattice, so adding one raises
+the bar. They must fail differently for that to mean anything, and they do: wide
+domain (dichotomy), poisoned base line (trial_error), bad starting basin (svd).
+One step further: the **extinction symbol**, not the space group, is what a
+powder measures — `determine_extinction_symbol` answers with ranked classes,
+each carrying a *list* of space groups; there the singleton is not unsupported
+but unmeasurable. Its absence test can only speak where its own null model is
 silent — a σ threshold is counting noise, not model error, and a forbidden
 position inside a neighbour's tail measures the *profile*, which refuted
 certified corundum's own `R -3 c` (WP-1077; `_model_is_quiet` and the sham-probe
 measurement are in `extinction.py`'s docstring, and `n_testable` is `None` until
-`screened` because it needs that class's fit).
+`screened` because it needs that class's fit). Its reference fit is gated on the
+picker's envelope (`REFERENCE_NET_RWP_MAX`).
 
 ## The pipeline
 
 `index_pattern(peaks | data+instrument)` (`workflow.py`): quality gate →
 engines → `consensus.py` (merge on the reduced cell, `found_by` union, Borda
-over the panel, two-opinion Bravais, ambiguity) → Le Bail validation → the
+over the panel, two-opinion Bravais, ambiguity) → whole-profile validation → the
 gate. Three load-bearing rules. **`high` requires zero caveats**, and
 `IndexCaveat`/`INDEX_REFUTING_CAVEATS` (`schemas/indexing.py`) are the whole
 gate: any caveat in the refuting set drops a cell to `low`, the rest cap at `medium`, and
-*count* deliberately separates nothing. **Whole-profile validation is
-mandatory** — the FoM panel sees ≤20 lines, so `validate_by_lebail`'s
-`predicted_but_absent` is what catches an oversized cell (117 of 153 for a
-doubled cell against 0 of 28 for the truth, Rwp moving only 0.216 → 0.379);
-Layer 0's `unmatched_calc` **cannot** serve (Le Bail assigns ~nothing to a
-phantom, so it fires on 68 % of the truth's reflections against 55 % of a doubled cell's), nor `unmatched_observed` as a caveat
-(its level is the *specimen's* — 10-188 across 21 correct candidates —
-comparative only, WP-1041). **The validation fit holds the cell**, freeing
+*count* deliberately separates nothing. **Every reversed question is asked of
+inputs a candidate cannot buy, at the measured resolution** (C3, #916,
+`screen.py`: peak list + picker's envelope + the one overlap rule, after the
+common shift the forward matches imply) — never the candidate's own Le Bail
+fit (magnetite's wrong P description bought a negative background and read 0
+of 163 absent, WP-1043) and never the search window (±0.15° on a 0.023° FWHM
+read a resolved split as *supported*). The oversized cell is **capped** by the
+line screen (`predicted_but_absent`, the windowed uncancellable count) and
+**refuted** by the generalised supercell check; the whole-profile fit — **Pawley**, since one
+Le Bail pass stalls (WP-2011) — stays **mandatory for the forward direction**
+(`unmatched_observed`, Rwp for a reader; `freeze_profile` is off, measured in
+`validation_plan`). Layer 0's `unmatched_calc` **cannot** serve (a phantom gets ~nothing, so it
+fires on 68 % of the truth's reflections against 55 % of a doubled cell's), nor
+`unmatched_observed` as a caveat (its level is the *specimen's* — 10-188 across
+21 correct candidates — comparative only, WP-1041). **The validation fit holds the cell**, freeing
 exactly one peak-position parameter from the candidate's own shift template.
 On real data with no measured shift, `high` is *unreachable* by design
 (`shift_allowance_assumed`); the fix is evidence, not a bigger constant
@@ -67,8 +74,8 @@ On real data with no measured shift, `high` is *unreachable* by design
   would fire on every empty system of a run that found its cell elsewhere).
 - **`quick` is the default preset**: every engine, every requested system,
   a whole-run ceiling (`SEARCH_PRESETS`/`SEARCH_PRESET_INFO`, bijection by
-  meta-test, quoted live by `capabilities()` and the agent schema),
-  validation fits each drawing an equal **slice** of the remaining clock.
+  meta-test, quoted live), validation **cheapest first** in a reserve that
+  **anything run after the search's stop spends** (WP-2011: the FoM panel).
   Nothing is narrowed — a binding ceiling reports, and what it cuts is
   trailing low-symmetry systems, cheapest-first ordering's documented cost.
   A declared `total_budget_seconds` is never overridden and records
@@ -123,7 +130,8 @@ failing on a bad starting basin; the only *stochastic* engine
 (`SearchSpec.seed` is part of its answer, never `hash()` of a name — python
 salts per process) and the only one reading observed intensities. All three
 rank on the FoM **panel** via `rank_candidates`, never on a member —
-supercells index every observed line and lose only on the reversed members.
+supercells index every observed line and lose only on the reversed members,
+asked at the resolution (`fom_panel(..., fwhm_obs=)`, C3).
 Seven members: M₂₀, F_N, three coverage fractions, and Oishi-Tomiyasu
 (2013)'s `m_rev`/`m_sym` (the reversed direction as a *ratio* where ours is
 a windowed fraction — on a doubled axis `m_rev` separates truth from
@@ -184,6 +192,13 @@ wider than the shift manufactures a confident wrong singleton** (at 0.060° SRM
 660c returns a cell 293 000 ppm off at `high`), so headroom scales the
 amplitude's *standard error*, never the pair scatter; and **an allowance is not
 a correction** — it finds lines, only `shift_template` moves the cell.
+
+**The reversed questions are not asked in the search window** (C3): a common
+shift is estimated from the forward matches (`fom.common_shift`) and never
+applied as a window; the reversed one is `RESOLUTION_FWHM` (1 FWHM, floored by
+3σ; 0.5 refuted a true unresolved split). The capping count takes de Wolff's
+window (first twenty lines: truths 0–2, wrong cells 7–79), the pairwise test
+the full range, whose null p₀ already discounts unseen weak lines.
 
 **The tolerance an engine searches with is not the per-line σ.** A fitted σ(2θ)
 is the right *weight* and the wrong *matching window*: certified corundum's
@@ -256,17 +271,23 @@ roughly the shift (+1400 ppm).
   skipped that and put a pseudo-cubic trigonal R description of the certified LaB6
   lattice above the cubic truth with **115 fast indexing tests green** — so run
   `tests/test_acceptance_indexing.py` before closing anything that touches an engine.
-- Read a `predicted_but_absent` firing as "this cell predicts lines the pattern
-  lacks", **never** "this cell is too big": it counts against the *lattice* group,
-  so a space-group extinction (corundum's R-3c c-glide) refutes a correct cell, and
-  only the extinction screen separates the two. Choose acceptance datasets **by
-  space group** — SRM 660c (P m -3 m) is the control that proved it. **So the
-  reversed members cannot order two fitted candidates either**: asked pairwise the
-  question demotes SRM 676a's own cell as readily as brucite's supercell, the two
-  populations interleaving (WP-1446). Asked of the extras no extinction can
-  cancel and judged against **chance** it separates (`supercell_chance`; never
-  the screen's class, which moves with 2θ range), and a refuted child sits below
-  its parent **across corroboration tiers**, being refuted, not outscored (1449).
+- Read a `predicted_but_absent` firing as "this cell predicts lines the pattern lacks",
+  **never** "this cell is too big", and since C3 **it caps; the lattice statement that
+  refutes is the generalised superset check**. The full-range count shows a space-group
+  extinction (corundum's R-3c c-glide); the caveat reads only the uncancellable lines
+  inside de Wolff's window, so a glide never raises it and the extinction screen
+  separates glide from oversized cell. Choose acceptance datasets **by space group** —
+  SRM 660c (P m -3 m) is the control that proved it. **So the reversed members cannot
+  order two fitted candidates either**: asked pairwise the question demotes SRM 676a's
+  own cell as readily as brucite's supercell, the two populations interleaving
+  (WP-1446). Asked of the extras no extinction can cancel and judged against **chance**
+  it separates (`screen.containment_evidence`: indexed-set containment with the denser
+  line set as the child, generalising `supercell_chance`'s index 2–4; never the
+  screen's class, which moves with 2θ range), *refuted* meaning seen no more often than
+  chance (k ≤ n·p₀), and a refuted child sits below its parent **across corroboration
+  tiers**, being refuted, not outscored (1449). **Never refuted: a child seen more often
+  than its parent** (#1230: on dense patterns p₀ ≥ a truth's own seen fraction, and
+  density made the truth the child).
 - The known-cell scoreboard is *never wrong, and silent more often than right* —
   **never round it up**, and **keep the found-but-not-first bucket** (collapsing it
   into right-or-wrong is how the old board named nine datasets under a total of
@@ -286,8 +307,8 @@ roughly the shift (+1400 ppm).
   And **a χ² takes its difference and its covariance in one frame**: an engine's
   `cov_af` is in the setting it refined in, so it meets a reduced A..F only through
   `reduce.reduction`'s map. Unmapped, it moved groups in all 99 bethanechol dedups (1518).
-  Exact because **a reduced cell is the exact image of its input**: a sign gemmi picks
-  inside ε is not a change of basis, so M·G·Mᵀ's replaces it (#797, WP-1923).
+  Exact because **a reduced cell is the exact image of its input**: built from M·G·Mᵀ, never
+  gemmi's vector, whose ε-picked signs leak into values (#797, WP-1923, WP-2035).
 - **Two reduced cells are compared across the reduction's boundaries** (WP-1932): call
   `equal_reduced`, `equal_reduced_many` or `same_lattice`, never a ΔᵀΣ⁺Δ of your own on
   two reduced vectors, which split one lattice 4 784 times on bethanechol (#834). The
@@ -326,12 +347,12 @@ roughly the shift (+1400 ppm).
   needing neither references nor pairs — and still may not correct a cell, being the
   `constant` template *by construction*: **a shift measured without an attribution
   sizes windows, and only a declared template moves a cell.**
-- **A search is driven by the *strongest* N lines, and "enumerate liberally" is a
-  rule this package cannot have** (WP-1039, `engines.search_line_order`). *Which*
-  twenty beats *how many* (NAC: 6 of the truth's lines in 2θ order, 18 by intensity
-  over a `SEARCH_POOL_MULTIPLE` low-Q pool), and under a *declared* `n_unindexed`
-  raising N *loses* answers, that count being an **absolute** budget. Ties fall
-  back to Q, so position-only lists are untouched.
+- **A search is driven by the *strongest* N lines, and "enumerate liberally" is a rule this
+  package cannot have** (WP-1039, `engines.search_line_order`). *Which* twenty beats *how
+  many* (NAC: 6 of the truth's lines in 2θ order, 18 by intensity over a
+  `SEARCH_POOL_MULTIPLE` low-Q pool), and under a *declared* `n_unindexed` raising N *loses*
+  answers, that count being an **absolute** budget. Ties fall back to Q (position-only lists
+  untouched). **A reported flag is scored, never driven** (`PEAK_UNDRIVEN_FLAGS`, #934).
 - **No agreement → the whole run again on inliers** (C4, `INDEX_INLIER_RETRY`):
   `SearchSpec.miss_budget`/`engines.search_acceptance` is the one authority for
   acceptance, the dichotomy prunes (anchor included) and the panel trim. Never

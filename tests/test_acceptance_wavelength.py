@@ -184,6 +184,7 @@ def _plan(free_histogram: int | None) -> rx.RefinementPlan:
     # user's own run does.  ``None`` would converge every stage and move the
     # numbers in the module docstring.
     plan.intermediate_ftol = 1e-6
+    plan.closing_window_tol = 1e-3   # WP-2002: the shipped closing stage, named rather than inherited
     return plan
 
 
@@ -204,12 +205,16 @@ def _joint(free_histogram: int | None):
         two_theta_limits=[XRAY_LIMITS, NEUTRON_LIMITS])
 
 
-def _solo_refinement(which: int, nudge: int = 0) -> rx.Refinement:
+def _solo_refinement(which: int, nudge: int = 0, *,
+                     y_floor: bool = False) -> rx.Refinement:
     """One histogram alone, fitted; the result is its ``result_``.  ``nudge``
     multiplies every refinable nonzero start value by (1 + nudge·1e-14), the
-    size of the difference two platforms' arithmetic makes (WP-1929)."""
+    size of the difference two platforms' arithmetic makes (WP-1929).
+    ``y_floor`` declares Y ≥ 0, the floor WP-2002 removed from the default."""
     data = _patterns()[which]
     ins = _xray_instrument() if which == 0 else _neutron_instrument()
+    if y_floor:
+        ins.profile.y.min = 0.0
     lim = XRAY_LIMITS if which == 0 else NEUTRON_LIMITS
     ref = rx.Refinement(_structure(), ins, history=False)
     if nudge:
@@ -238,6 +243,12 @@ def solo_neutron_refinement():
 @pytest.fixture(scope="module")
 def solo_neutron(solo_neutron_refinement):
     return solo_neutron_refinement.result_
+
+
+@pytest.fixture(scope="module")
+def solo_neutron_floored_refinement():
+    """The neutron fit with Y ≥ 0 declared by the caller, where Y lands on it."""
+    return _solo_refinement(1, y_floor=True)
 
 
 @pytest.fixture(scope="module")
@@ -420,35 +431,42 @@ def test_swapping_which_wavelength_is_held_measures_the_same_ratio(
     assert x_free_n == pytest.approx(x_free_x, abs=1e-5)
 
 
-def test_a_width_on_its_floor_leaves_one_esd_at_every_start(solo_neutron):
-    """Issue #831: the neutron fit's Lorentzian ``y`` refines to 0, and while
-    widths refined in softplus coordinates its column was differenced below
-    rounding.  The noise then set ``x``'s esd: 0.00322 on Linux against
-    0.00664 on macOS, and 0.0032 to 0.0089 on one Mac with every start nudged
-    by 1e-14.  The column taken in physical space gives 0.0098437 at every
-    stopping point, and that is what refining in physical units reports
-    (WP-1938).  Measured on macOS arm64, eight nudges spread 4e-8 relative.
+def test_the_neutron_widths_leave_one_esd_at_every_start(solo_neutron):
+    """Issue #831: the neutron fit's Lorentzian ``y`` refined to its floor of
+    0, and while widths refined in softplus coordinates its column was
+    differenced below rounding.  The noise then set ``x``'s esd: 0.00322 on
+    Linux against 0.00664 on macOS, and 0.0032 to 0.0089 on one Mac with every
+    start nudged by 1e-14.  Refining in physical units (WP-1938) and behind the
+    closing stage (WP-2002) it was 0.0102720 at four starts, spread 1.5e-8.
+    Since WP-2002 removed Y's floor (2026-10-23), ``y`` refines to
+    −0.0210949(191), inside its own esd of 0, and ``x``'s esd is 0.0102922 at
+    the same four starts, spread 1.5e-9 (macOS arm64).  The floor's own case
+    is the next test's, with the floor declared.
     """
     fits = [solo_neutron, *(_solo(1, k) for k in (1, -1, 2))]
     rows = [{p.path: p for p in fit.parameters} for fit in fits]
     x = [r["instrument.profile.x"].stderr for r in rows]
-    assert x == [pytest.approx(0.0098437, rel=1e-4)] * len(x)
+    assert x == [pytest.approx(0.0102922, rel=1e-4)] * len(x)
     assert max(x) / min(x) - 1.0 < 1e-6
     for r in rows:
         y = r["instrument.profile.y"]
-        assert (y.value, y.at_bound) == (0.0, True)
-        assert y.stderr == pytest.approx(0.018101, rel=1e-4)
+        assert y.value == pytest.approx(-0.0210949, rel=1e-4)
+        assert y.at_bound is False
+        assert y.stderr == pytest.approx(0.0190970, rel=1e-4)
 
 
 def test_a_width_on_its_floor_has_a_one_sided_profile_interval(
-        solo_neutron_refinement, solo_neutron):
+        solo_neutron_floored_refinement):
     """WP-1929: ``y`` = 0 ± 0.018101 is no interval, so the profile gives one.
+    Y has no floor of its own since WP-2002, so the caller declares one here,
+    the case this test keeps: ``y`` = 0 ± 0.0189972 on it.
 
     The bound is the lower end.  The upper end is where the data's χ² has
     risen by χ²₁(0.90) × χ²_red × f² (Self & Liang's mixture), solved by
     pinned refits.  Measured on macOS arm64: 0.0166098, the same to 5e-10
     relative at six starts nudged by 1e-14, at Δχ² 0.0044 under a cut of
-    21.343, in 19 refits and 3 s.
+    21.343, in 19 refits and 3 s.  With U and V free to go negative since
+    WP-2002 the end is 0.0164535, at a cut of 21.048 (2026-10-23).
 
     The end is 0.558 of √2.706 × esd = 0.0298, the end a floor that is a
     stationary point would give.  This one is not.  ``at_bound`` reads LM's
@@ -459,8 +477,8 @@ def test_a_width_on_its_floor_has_a_one_sided_profile_interval(
     tolerance, a thousandth of an esd.
     """
     data = _patterns()[1]
-    interval = solo_neutron_refinement.profile_interval(data, "instrument.profile.y")
-    assert solo_neutron_refinement.result_ is solo_neutron
+    interval = solo_neutron_floored_refinement.profile_interval(
+        data, "instrument.profile.y")
     assert interval.one_sided and interval.at_bound is True
     assert (interval.lower, interval.lower_stop) == (0.0, "bound")
     assert interval.upper_stop == "threshold"
@@ -470,7 +488,7 @@ def test_a_width_on_its_floor_has_a_one_sided_profile_interval(
         PARAMETER_INTERVAL_CHI2_TOL * interval.delta_chi2_cut)
     assert interval.upper < math.sqrt(interval.quantile) * interval.stderr
     assert interval.upper == pytest.approx(
-        0.0166098, abs=10 * PARAMETER_INTERVAL_XTOL * interval.stderr)
+        0.0164535, abs=10 * PARAMETER_INTERVAL_XTOL * interval.stderr)
 
 
 def test_the_fits_render(joint_neutron_free):

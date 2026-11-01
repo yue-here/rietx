@@ -691,7 +691,8 @@ def test_a_scale_on_its_floor_is_at_its_bound_and_is_not_told_to_widen_it(
     assert "widen" not in hit.suggestion
 
 
-def _joint_inputs(*, empty: bool):
+def _joint_inputs(*, empty: bool, seed: int = 1):
+    """``seed`` draws histogram 0's noise; histogram 1 keeps seed 2."""
     from tests import test_multi_histogram as tmh
 
     structure, instruments = tmh.perturbed_inputs()
@@ -706,7 +707,7 @@ def _joint_inputs(*, empty: bool):
     structure = Structure(phases=[structure.phases[0], absent])
     patterns = [
         tmh.synthesize(0.41390, 3.0, 24.0, scale=5e-4, zero=0.006,
-                       bkg=[40.0, -6.0, 1.5], seed=1),
+                       bkg=[40.0, -6.0, 1.5], seed=seed),
         tmh.synthesize(0.71070, 6.0, 46.0, scale=9e-4, zero=-0.010,
                        bkg=[70.0, 5.0, -2.0], seed=2),
     ]
@@ -740,13 +741,18 @@ def test_a_joint_fit_tests_a_scale_on_its_floor_like_the_single_fit():
     Histogram 0's absent scale stops on 0.0 and reads ``at_bound=True`` with
     its marginal esd, and ``FLOOR_HIT`` names it by its joint row path
     (WP-1929).
-    Histogram 1's noise holds its own copy 0.8σ off the floor, so only the
+    Histogram 1's noise holds its own copy 0.1σ off the floor, so only the
     fractions are asserted there.
+
+    Whether the absent scale lands on its floor is the noise's call, so the
+    draw is chosen for it: drawn at the closing stage's windows (WP-2002),
+    seed 1 holds histogram 0's copy 0.53σ off the floor, and seed 2 is the
+    first that puts it on.
     """
     from rietx import MultiHistogramRefinement
     from rietx.refine import _ZERO_FLOOR_SUGGESTION
 
-    structure, instruments, patterns = _joint_inputs(empty=False)
+    structure, instruments, patterns = _joint_inputs(empty=False, seed=2)
     result = MultiHistogramRefinement(structure, instruments).fit(
         patterns, plan="mccusker_default")
     OUT.mkdir(exist_ok=True)

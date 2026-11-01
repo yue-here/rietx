@@ -256,7 +256,7 @@ def test_watch_and_the_recorder_read_a_headed_log(tmp_path, pattern):
     assert {e["record"] for e in tail.events[1:]} == {"event"}
     assert tail.events[-1]["kind"] == "fit_end"
     row = runs.read_run(live)
-    assert row.status is not None and row.status.stage == "cell"
+    assert row.status is not None and row.status.stage == "closing"
 
 
 def test_a_recorded_run_directory_starts_with_its_header(tmp_path, pattern):

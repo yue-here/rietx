@@ -1,9 +1,8 @@
 # WP-1326 — satellites at G ± k, with no moment model: is it magnetic?
 
-Milestone: magnetic · Status: 🔄 2026-09-26 — the satellites and their report arm landed from outside (PR #468); the public k ≠ 0 pattern and the Cr₂WO₆ PNG remain
+Milestone: magnetic · Status: ✅ 2026-10-23 — a declared k puts satellites at G ± k beside the nuclear list, and with no moment model the report ranks the k ≡ −k points of the phase's lattice against a nuclear fit's residual, on synthetic data and two public neutron patterns (PRs #468, #1069, #1071, #1102)
 Depends on: — (first rung of the magnetic scattering track; 1327 builds on
 its reflection list)
-Priority: P2 2026-09-23 — the open milestone's first rung, nothing blocks it
 
 ## Goal
 
@@ -91,67 +90,20 @@ its magnetic supercell instead, which is the shape WP-1327 adopts for the
 moment model; the k-vector form here is the hypothesis tool and the two must
 not both be declared on one phase.
 
-### Inherited
-
-- **2026-10-15, from [1908](1908-a-tick-misses-the-displacement-shift.md),
-  closed: the satellite arm's generation window is a second copy of
-  `compile_model`'s, and the two already differ.** `/code-review high` on PR
-  #942 found it and left it, being outside that diff. `satellites._generation_window`
-  scans the same 33-point shift grid as `compile_model` but applies its low 2θ
-  cutoff in the shortest line's frame without translating it from the longest
-  line's, so on a Cu Kα doublet a satellite whose Kα1 image falls just below
-  `tt_min` while its Kα2 image lies inside is never enumerated. It also caps at
-  179° where `compile_model` now caps at 180° and adds the 0.5°
-  `REFLECTION_MARGIN_DEG`. One helper both call would close the drift.
-  Unmeasured on a real pattern.
-- **2026-10-03, from [1328](1328-magnetic-interchange.md), closed: two
-  places a propagation vector still drops on the way out or in.** Both were
-  left as design choices by #567's review. `fullprof.to_structure` drops a
-  nuclear phase's `Nvk` k, since FullProf's nuclear k and rietx's k are not
-  the same model. `Structure.to_cif` writes no k, though magCIF has
-  `_parent_propagation_vector.kxkykz`; the writers' refusals point at the JSON
-  instead.
-
-- **2026-09-15, from the issue triage (issue #257 A1–A3, and PR #290):
-  three amendments to this WP, and a layer that landed under it.**
-  PR #290 (2026-09-10) added `crystallography.magnetic.operators`: operators
-  with ε, groups from spglib's database, `identify()`,
-  `allowed_moment_basis`. Nothing there generates satellites, so this WP's
-  generator is still unwritten, but the operations a star of k needs can
-  come from the spglib calls PR #290 already wraps. A1: make the candidate
-  set a **pluggable generator** returning labelled k's rather than the
-  literal {0, ½}³ plus the two trigonal/hexagonal points, so 1418's M-8
-  (every special point and line of the zone, then a general-k grid) drops
-  in without touching the arm. A2: label k where it has a CDML label (Aroyo
-  et al. 2014), since MAGNDATA, ISODISTORT and k-SUBGROUPSMAG speak those
-  labels and a user cross-checks against them. A3: the ±k multiplicity test
-  in § Tasks covers a C-centred cell only; add P, I, F and R against
-  |Laue orbit of H| × |star of k| minus coincidences, because the
-  coincidence rule is where the enumeration and a formula disagree.
-
-- **2026-09-17, from [1436](1436-k-is-the-wavevector-everywhere-else.md):
-  `k` is free for the propagation vector.** The earlier note here warned that
-  `scattering.py`, `structure_factor.py` and `dispersion.py` all spent `k` on
-  sinθ/λ, in the same subpackage `crystallography/magnetic/` lives in, and
-  asked this WP to spell the propagation vector out rather than add a second
-  bare `k`. 1436 has landed: that quantity is `stol` in python and `s` in
-  equations throughout, following Waasmaier & Kirfel and the IUCr core
-  dictionary, and a tree-wide sweep found no line left pairing a bare `k` with
-  sinθ/λ in `src/`, `tests/`, `examples/` or the manual. **So name the
-  propagation vector `k` and add no qualifier.** Root CLAUDE.md § Conventions
-  carries the rule that keeps it free. The same note is in 1327, 1328, 1329 and 1418.
-- **From WP-1541 (2026-10-03): the satellite types shipped in 1.6.0 without
-  a provisional declaration a test can see.** `SatelliteEvidence` and
-  `SatelliteCandidate` are defined in `rietx.report.schemas`, which also
-  defines 197 stable names, so no `PROVISIONAL_MODULES` prefix can cover them
-  (`tests/api_surface.py` resolves by defining module). The cut named them
-  provisional in prose instead, in `using/compatibility.md` and the 1.6.0
-  notes. The mechanised fix is to move both into `rietx.report.satellites`,
-  re-export them from `rietx.report.schemas`, and declare that prefix with a
-  reason such as: the candidate set is a fixed zone-boundary enumeration with
-  no chance baseline and no CDML label, and the generator still to come
-  changes what is ranked and what a candidate carries. Then drop their
-  sentence from the compatibility page.
+**What this WP inherited, and where it went at the close (2026-10-23).**
+The arm's generation window, a second copy of `compile_model`'s that already
+differs from it (from WP-1908), is now
+[WP-2034](2034-the-satellite-window-is-compile-models-window.md). The
+satellite types' missing provisional declaration (from WP-1541) moved to
+[WP-1418](1418-the-magnetic-structure-is-determined.md)'s Inherited, where
+M-8's schema decision changes them. A nuclear phase's k, which
+`Structure.to_cif` does not write (from WP-1328), moved to
+[WP-1911](1911-the-foreign-writers-state-what-the-other-program-reads.md)'s
+C-f. FullProf's dropped nuclear `Nvk` stays a standing design choice. #257's
+A1-A3 were met here: `generator=` makes the candidate set pluggable,
+`crystallography.satellites` gives each label as the plain vector with
+`cdml_label` as the hook, and the ±k count is tested on every centring. 1436's
+note on naming k was followed.
 
 ## Non-goals
 
@@ -184,7 +136,7 @@ not both be declared on one phase.
       tutorial repository (`Magnetic-II/data`, ORNL data distributed by
       Argonne; licence checked per file, a `tests/data/README.md` row each);
       they serve 1327's acceptance as well. (Vendored by WP-1327's PR #433.)
-- [ ] Source a public constant-wavelength neutron pattern with a published
+- [x] Source a public constant-wavelength neutron pattern with a published
       k ≠ 0 structure (search the maintainer's corpus first, then ask; the
       GSAS-II `Magnetic-III` … `-V` folders are the first place to look).
       *Two candidates confirmed 2026-10-03*, each a CW neutron pattern under
@@ -195,8 +147,14 @@ not both be declared on one phase.
       Pr₀.₅Sr₀.₅MnO₃ on LLB 3T2, k = (1, 0, 0) on the Fmmm cell (the
       A-centring made magnetic). The published structure each answers to is
       still to cite. WP-1343's acceptance 4 wants the same data.
-- [ ] Tests, including the acceptance below, with obs/calc/diff PNGs to
-      `tests/output/`.
+      (`Magnetic-III` vendored by PR #1069, 2026-10-21.)
+- [x] Tests, including the acceptance below, with obs/calc/diff PNGs to
+      `tests/output/`. **Every acceptance line has its test**, except
+      Cr₂WO₆'s "no candidate scores", which is recorded as a deviation
+      (2026-09-26 entry). Every real-pattern fit draws its PNG: the
+      synthetic k = (0, 0, ½) case, Cr₂WO₆ at 4 K and 150 K, Ba₆Co₆ and
+      (Pr,Sr)MnO₃. A k ≠ 0 moment refined on real data, and the published
+      structure each pattern answers to, are WP-1327's since the close.
 
 ## Acceptance
 
@@ -228,6 +186,141 @@ not both be declared on one phase.
   the fence this track opens.
 
 ## Handover log
+
+### 2026-10-23 — closed: the PNGs drawn, and what was left moved on
+
+A phase that declares k carries satellites at G ± k, and with no moment model
+the report ranks the candidate k's against a nuclear fit's residual. That
+holds on synthetic data, on two public neutron patterns at k ≠ 0, and on
+Cr₂WO₆'s k = 0 signature with its 150 K null. The last box asked for
+obs/calc/diff PNGs, and every real-pattern fit now draws one.
+
+*Done.* `tests/test_satellites_acceptance.py` gains `_draw`, the
+`tests/output/` writer `test_acceptance_magnetic.py` already uses, and the
+(Pr,Sr)MnO₃ test's inline copy now calls it. Ba₆Co₆ draws
+`satellites_ba6co6_d1b.png`, and Cr₂WO₆ draws its 4 K and 150 K nuclear fits.
+The synthetic k = (0, 0, ½) case already drew `satellites_k_00half.png`. The
+plots were checked by eye. Ba₆Co₆ (Rwp 0.121, GoF 1.09) shows its residual
+peaks at 31.8°, 37.3°, 116° and 158°, where the test's docstring puts them.
+Cr₂WO₆ at 4 K (Rwp 0.204) shows the forbidden 15.8° line and the 44.7°
+excess. At 150 K (Rwp 0.099) neither is there.
+
+*Closed by* the maintainer's decision today. Two things the last two entries
+kept the box open for were never in its text or in the Acceptance, and both
+moved to [WP-1327](1327-magnetic-structure.md)'s Inherited: a k ≠ 0 moment
+refined on real data, and the published structure each vendored pattern
+answers to. The Cr₂WO₆ "no candidate scores" line stays a recorded deviation
+(2026-09-26 entry). The `### Inherited` section is consumed, and § Context
+says where each bullet went: WP-2034 (new) for the generation window, 1418
+for the satellite types, 1911 for `to_cif`'s k.
+
+*Measured* (`[dev]`, Linux x86-64, 4 cores, nothing else running):
+`tests/test_satellites.py` with `tests/test_satellites_acceptance.py`, slow
+rows included, 82 passed in 18 s. Ruff clean.
+
+*Next:* nothing owed here.
+
+### 2026-10-23 — the note names peaks on centring-forbidden positions
+
+PR #1102 (head `ed1333f5`) merged as `d71a7583` by `/pr-review`, in one
+gate with #1015 and #1013.
+
+*Done.* An integer (h k l) that the lattice's centring forbids is not a
+reciprocal-lattice point, so a residual peak there was counted in neither
+of the arm's two lists. The note now says how many unexplained peaks sit on
+such positions, out of how many lie in range, and names the strongest by
+its height in σ with its (h k l). It lists the causes the positions cannot
+separate: a less centred lattice, λ/2 contamination, an impurity line, and
+on neutrons a magnetic k that is such an integer vector. The λ/2 cause
+appears only where the space group allows (2h 2k 2l). A primitive lattice
+has no such positions, so the sentence never appears for one. No count and
+no ranking changes.
+*What the review established.* Round 1 found the λ/2 cause tested with the
+centring-only mask, so on `F d -3 m` a peak at (1 0 0) was told it might be
+λ/2 from an extinct (2 0 0). It now uses gemmi's
+`is_systematically_absent`, which counts glides and screws as well, citing
+International Tables A §2.2.13. A test holds `F d -3 m` (no λ/2 cause)
+against `F m -3 m` and `F m m m` (λ/2 named). Issue #795 stays open: it
+carries the k-search proposal, chunks K0–K7, which nothing here starts.
+*Tasks.* Unchanged. The PNG task and the sourcing of each pattern's
+published structure remain open.
+*Gate:* main `3e0dc6f7` with #1102, #1015 and #1013 stacked (`35b9eff5`),
+macOS arm64, `[dev,jax]`, nothing else running. Fast suite: 11 322 passed,
+195 skipped, 27 xfailed and 2 failed. Whole `-m slow`: 404 passed, 12
+skipped, 14 xfailed and 4 failed. All six failures fail identically on main
+alone.
+
+### 2026-10-22 — the candidate set follows the phase's own lattice
+
+PR #1071 (head `97b417fe`) merged as `dbe8b38f` by `/pr-review`, after #1086
+in the same gate. It answers option (a) of issue #795.
+
+*Done.* The enumerated candidate set is now every k with k ≡ −k on the
+phase's own reciprocal lattice (2k a lattice vector), one per star, plus the
+two hexagonal and trigonal third-order points. It used to be the literal
+{0, ½}³ without the origin, which § Context above still describes. On a
+primitive lattice the two sets are identical, and a test holds them
+bit-identical on every primitive setting. A centred lattice gets its own
+points: F adds the X points (1 0 0), (0 1 0) and (0 0 1), and on C the
+set no longer holds (½ 0 0). The enumeration takes H/2 for H in [−N, N]³,
+where N is the centring's order, and checks that seven classes and their
+stars cover L*/2L*. `Magnetic-IV` is now vendored as
+`tests/data/gsas2_llb3t2_prsrmno_10K.gda` ((Pr,Sr)MnO₃, LLB 3T2, 10 K), with
+a `tests/data/README.md` row and the licence the other `gsas2_*` fixtures
+ship under. Its slow test ranks (1 0 0) first, matching every unexplained
+peak and more than twice the runner-up, and it draws the fit.
+*What the review established.* N·Z³ ⊆ L* holds for every centring, so the
+search box is complete. `magnetic_supercell` refuses the X point, because
+|det P| = ½ needs #612's child-cell route. That refusal is pinned as a strict
+xfail, so it shows when the route lands. The manual's `reference/magnetic.md`
+and the old tree's `using/refining.md` both state the new set.
+*Tasks.* The sourcing task now covers `Magnetic-IV` too. The tests task
+stays open: the published structure behind each pattern is still uncited,
+and no k ≠ 0 moment has been refined. #1102, which names unexplained peaks on
+centring-forbidden positions, is the other half of #795 and is in review.
+*Gate:* stacked with #1086 on `main` `1661895e` as `3b5e015a`, macOS arm64,
+`[dev,jax]`, nothing else running: fast 11 159 passed, 121 skipped,
+3 xfailed and 1 failed; `-m slow` 326 passed, 12 skipped, 1 xfailed. The
+failure is `test_examples.py`'s `next` guide row (ΔBIC printed -1.798
+against -1.799), and it fails identically on pristine `main` on this
+machine. `main` after both merges (`dbe8b38f`) is content-identical to the
+gated tree.
+*Next:* the moment refinement on `Magnetic-III` or `-IV` once the published
+structure is cited.
+
+### 2026-10-21 — the first real k ≠ 0 pattern landed from outside
+
+PR #1069 (head `03e76b44`) merged as `c93b974b` by `/pr-review`. Tests and
+test data only; `satellites.py` is untouched.
+
+*Done.* The `Magnetic-III` candidate named on 2026-10-03 is vendored:
+`tests/data/gsas2_d1b_ba6co6.xye` (Ba₆Co₆ClO₁₆, ILL D1B, 1.4 K, λ = 2.394 Å,
+3 120 points, no σ), `tests/data/gsas2_d1b.prm` (only its `ICONS` wavelength
+is read, since `read_gsas_prm` refuses profile function 2), and the GSAS-II
+tutorials licence beside them. Each has a `tests/data/README.md` row with the
+upstream commit and sha256, and there is one `ATTRIBUTION.md` row. The tutorial's
+`Ba6Co6.cif` is not vendored; its coordinates are typed into the test and
+cited. `test_ba6co6_d1b_returns_the_tutorials_k_first_with_every_other_candidate_behind`
+(slow, in `tests/test_satellites_acceptance.py`) runs six McCusker stages from
+those coordinates and reads `report().satellites`. (0, 0, ½) ranks first,
+matching 3 of 3 unexplained peaks, and the four other candidates match none.
+The fit runs under `compiled.set_enabled(False)`.
+*What the review established.* The tier is `characterisation`: the k is the
+tutorial's label, not checked against Mentré et al., *Solid State Sci.* **10**,
+471 (2008), which is closed access. The evidence is thin, three weak peaks with
+a random-placement null of P ≈ 0.004 measured outside rietx, and the test
+asserts the ranking only, never a peak position or a moment.
+*Tasks.* The sourcing task is ticked for `Magnetic-III`; `Magnetic-IV`
+(Pr₀.₅Sr₀.₅MnO₃) stays unvendored. The tests task stays open: no obs/calc/diff
+PNGs, and no k ≠ 0 structure refinement. WP-1343's acceptance 4 and WP-1329's
+row H want real k ≠ 0 data too; #1073's Ba₂FeSbSe₅ series is held on a written
+redistribution permission.
+*Gate:* stacked with #1011 on `main` `3437d52d` as `abe6d9e2`, Linux x86_64,
+4 cores, `[dev,jax]`, `-n 3`, nothing else running: fast 10 986 passed,
+132 skipped, 3 xfailed; `-m slow` 319 passed, 16 skipped, 1 xfailed. `main` after both merges
+(`c93b974b`) is content-identical to that tree.
+*Next:* the obs/calc/diff PNGs, and a moment refinement on this pattern if the
+published structure can be checked.
 
 ### 2026-10-03 — two public k ≠ 0 patterns found, by a cleanup session
 

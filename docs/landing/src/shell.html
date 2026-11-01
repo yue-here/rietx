@@ -4,49 +4,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
-:root{
-  --bg:#fbfaf8; --surface:#ffffff; --surface-2:#f4f1ec; --surface-3:#ece7e0;
-  --ink:#1c1917; --ink-2:#403a35; --muted:#6b6259; --faint:#9c938a;
-  --rule:#e6e0d8; --rule-strong:#d1c9bf;
-  --accent:#c65d0a; --accent-ink:#a34c06; --accent-soft:#fdf0e3; --on-accent:#ffffff;
-  --calc:#ff7f0e; --obs:#1c1917; --diff:#7a7a7a; --zero:#cfcfcf;
-  --p0:#1f77b4; --p1:#d62728; --p2:#2ca02c;
-  --support:#6f6559; --support-2:#c2b7a6; --support-3:#e0d9ce;
-  --atm-n2:#c9c2b8; --atm-h2:#7ea6d8; --atm-air:#e08a7a;
-  --ok:#2a7d2a; --warn:#b5561b;
-  --heat0:#ffffff; --heat1:#ffe2bd; --heat2:#ff7f0e; --heat3:#5a2106;
-  --shadow:0 1px 2px rgba(28,25,23,.06), 0 12px 32px -18px rgba(28,25,23,.25);
-  --sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
-  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-}
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]){
-    --bg:#15110d; --surface:#1d1813; --surface-2:#252019; --surface-3:#2e2820;
-    --ink:#f1ece5; --ink-2:#d2c9bd; --muted:#a0968a; --faint:#7c7368;
-    --rule:#312a22; --rule-strong:#463d32;
-    --accent:#ff9d4d; --accent-ink:#ffb679; --accent-soft:#2c1f12; --on-accent:#1c1917;
-    --calc:#ff9d4d; --obs:#ece7df; --diff:#8f8f8f; --zero:#4a4a4a;
-    --p0:#6fb1ff; --p1:#ff7b7b; --p2:#6ede8a;
-    --support:#d3c7b6; --support-2:#7a6d5c; --support-3:#443e36;
-    --atm-n2:#4a443c; --atm-h2:#3f6a9c; --atm-air:#a6533f;
-    --ok:#5fd45f; --warn:#ffa25c;
-    --heat0:#15110d; --heat1:#5a2c0c; --heat2:#ff9d4d; --heat3:#ffeacb;
-    --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 32px -18px rgba(0,0,0,.8);
-  }
-}
-:root[data-theme="dark"]{
-  --bg:#15110d; --surface:#1d1813; --surface-2:#252019; --surface-3:#2e2820;
-  --ink:#f1ece5; --ink-2:#d2c9bd; --muted:#a0968a; --faint:#7c7368;
-  --rule:#312a22; --rule-strong:#463d32;
-  --accent:#ff9d4d; --accent-ink:#ffb679; --accent-soft:#2c1f12; --on-accent:#1c1917;
-  --calc:#ff9d4d; --obs:#ece7df; --diff:#8f8f8f; --zero:#4a4a4a;
-  --p0:#6fb1ff; --p1:#ff7b7b; --p2:#6ede8a;
-  --support:#d3c7b6; --support-2:#7a6d5c; --support-3:#443e36;
-  --atm-n2:#4a443c; --atm-h2:#3f6a9c; --atm-air:#a6533f;
-  --ok:#5fd45f; --warn:#ffa25c;
-  --heat0:#15110d; --heat1:#5a2c0c; --heat2:#ff9d4d; --heat3:#ffeacb;
-  --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 32px -18px rgba(0,0,0,.8);
-}
+%%TOKENS%%
 /* theme-dependent images: light by default, dark under either dark state */
 .only-dark{display:none!important}
 @media (prefers-color-scheme: dark){
@@ -118,7 +76,7 @@ p{margin:0}
 .cmd{display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 5px 0 14px;border-radius:8px;
   background:var(--surface-2);font-family:var(--mono);font-size:.95rem;color:var(--ink)}
 .hero .cmd{display:flex;width:fit-content;margin-bottom:24px}
-.cmd .ps{color:var(--faint);user-select:none}
+.cmd .ps{color:var(--muted);user-select:none}
 .cmd code{font-size:1em;user-select:all}
 .icon-btn{appearance:none;border:0;background:none;width:30px;height:30px;padding:0;border-radius:6px;
   display:inline-grid;place-items:center;color:var(--muted);cursor:pointer}
@@ -158,7 +116,7 @@ p{margin:0}
 .qs-src .dot{color:var(--faint)}
 .qs-block{background:var(--surface-2);border-radius:8px;padding:6px 16px 14px}
 .qs-head{display:flex;align-items:baseline;justify-content:space-between;
-  font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .qs-copy{appearance:none;border:0;background:none;display:inline-flex;align-items:center;gap:6px;margin-right:-8px;padding:4px 8px;
   border-radius:6px;font:inherit;font-size:.84rem;letter-spacing:0;text-transform:none;color:var(--accent-ink);cursor:pointer}
 .qs-copy:hover{background:var(--surface-3)}
@@ -213,7 +171,7 @@ input[type=range]{flex:1;accent-color:var(--accent);min-width:120px}
    absolute in its cell, so neither ever sizes the row -- the panels do */
 .tx-cell{position:relative;border-right:1px solid var(--rule);min-height:320px}
 .tx{position:absolute;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr);background:var(--surface)}
-.tx .lbl{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:0 0 7px}
+.tx .lbl{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 7px}
 .tx code{font-size:.9em;background:var(--surface);border:1px solid var(--rule);border-radius:3px;padding:0 3px}
 .tx b{font-weight:600;color:var(--ink)}
 .tx .cut{color:var(--faint)}
@@ -261,12 +219,12 @@ input[type=range]{flex:1;accent-color:var(--accent);min-width:120px}
 .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
 .codebox{background:var(--surface);border:1px solid var(--rule);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
 .codebox .bar{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--rule);
-  font-size:.75rem;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+  font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
 .codebox pre{margin:0;padding:14px 16px;overflow-x:auto;font-size:.78rem;line-height:1.5;color:var(--ink)}
 .codebox pre.out{color:var(--ink-2)}
 .k{color:var(--accent-ink)}.s{color:var(--p2)}.c{color:var(--faint)}.w{color:var(--warn)}.g{color:var(--ok)}
 .fig{margin:22px auto 0;max-width:760px}
-.fig img{display:block;width:100%;height:auto;border:1px solid var(--rule);border-radius:10px;background:#fff}
+.fig img{display:block;width:100%;height:auto;border:1px solid var(--rule);border-radius:10px;background:var(--surface)}
 .fig .only-dark{background:var(--surface)}
 .fig figcaption{color:var(--muted);font-size:.9rem;line-height:1.5;margin-top:10px}
 @media (max-width:760px){.two{grid-template-columns:1fr}}
@@ -314,7 +272,7 @@ footer .note{flex-basis:100%;margin-top:8px;font-size:.82rem;color:var(--faint)}
     rietx
   </a>
   <nav>
-    <a href="https://rietx.org/manual.html">Manual</a>
+    <a href="https://rietx.org/docs/">Manual</a>
     <a href="https://github.com/yue-here/rietx">GitHub</a>
     <a href="https://pypi.org/project/rietx/">PyPI</a>
     <button class="tbtn" id="theme" type="button" aria-label="Switch to the dark theme" title="Switch to the dark theme">
@@ -327,18 +285,32 @@ footer .note{flex-basis:100%;margin-top:8px;font-size:.82rem;color:var(--faint)}
 <script>
 /* ---------- theme: the system's, until a click pins one ---------- */
 // There is no third state to choose: a first load follows the system because nothing is
-// stored, and a stored value is one of the two.  (A "system" left over from the older
+// stored, and a stored value is one of the two.  (An "auto" or "system" left over from a
 // three-way control reads as nothing stored, which is what it meant.)  The glyph is CSS
 // -- `only-light` / `only-dark` on the two svgs -- so only the label is set here.  It runs
 // straight after the bar, before any page's own script, so a page drawing in the theme's
 // colours reads the pinned one on its first frame; a later change reaches it as a
 // mutation of `data-theme`.
+// The choice is stored under the manual's keys, pydata-sphinx-theme's `mode` and `theme`,
+// so one click holds on both pages of the origin (WP-2021).  `rietx-theme`, this page's
+// own key before that, is read once where `mode` pins nothing -- the manual writes `auto`
+// there on every load, so `mode` being set is no sign of a choice -- carried over to the
+// two keys, and removed.
 (function(){
   "use strict";
   const root = document.documentElement, tb = document.getElementById("theme");
   const mqDark = window.matchMedia("(prefers-color-scheme: dark)");
+  const isTheme = s => s === "light" || s === "dark";
   let pinned = null;
-  try { const s = localStorage.getItem("rietx-theme"); if (s === "light" || s === "dark") pinned = s; } catch (e) {}
+  try {
+    const mode = localStorage.getItem("mode"), old = localStorage.getItem("rietx-theme");
+    if (isTheme(mode)) pinned = mode;
+    else if (isTheme(old)) {
+      pinned = old;
+      localStorage.setItem("mode", old); localStorage.setItem("theme", old);
+    }
+    localStorage.removeItem("rietx-theme");
+  } catch (e) {}
   const isDark = () => pinned ? pinned === "dark" : mqDark.matches;
   function applyTheme(){
     if (pinned) root.setAttribute("data-theme", pinned); else root.removeAttribute("data-theme");
@@ -349,7 +321,9 @@ footer .note{flex-basis:100%;margin-top:8px;font-size:.82rem;color:var(--faint)}
   applyTheme();
   tb.addEventListener("click", () => {
     pinned = isDark() ? "light" : "dark";
-    try { localStorage.setItem("rietx-theme", pinned); } catch (e) {}
+    try {
+      localStorage.setItem("mode", pinned); localStorage.setItem("theme", pinned);
+    } catch (e) {}
     applyTheme();
   });
   mqDark.addEventListener("change", applyTheme);   // the label, while nothing is pinned
@@ -361,7 +335,7 @@ footer .note{flex-basis:100%;margin-top:8px;font-size:.82rem;color:var(--faint)}
 <footer><div class="wrap">
   <span>MIT licence</span>
   <a href="https://github.com/yue-here/rietx">GitHub</a>
-  <a href="https://rietx.org/manual.html">Manual</a>
+  <a href="https://rietx.org/docs/">Manual</a>
   <a href="why.html">Why rietx?</a>
   <a href="https://github.com/yue-here/rietx/blob/main/CITATION.cff">Cite</a>
   <a href="https://github.com/yue-here/rietx/blob/main/ATTRIBUTION.md">Sources</a>

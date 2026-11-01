@@ -38,9 +38,20 @@ and 43.6205°:
 The esds are 1.5.0's. On the 1.6.0 tree clean is 2.08e-05 and ignore
 1.81e-04, 8.7x.
 
+Re-measured on the 1.10.0 tree (macOS arm64, `[dev]`): declare -0.1 ppm,
+ignore -0.4 ppm, exclude +0.3 ppm. The ignore arm still inflates the cell's
+esd 9.9x and Rwp 4.4x. WP-2002's width twin hold (#1113) moved the ignore arm
+from 1.9.0's +6.3 ppm. The two arms' cells are now 0.3 ppm apart against the
+ignore arm's esd of 51 ppm, a difference no platform can be trusted to order,
+so the test asserts the inflated esd instead (WP-2036, 2026-10-25). That esd
+reports the worse fit, since an esd scales with √χ²; it does not measure a
+bias (McCusker et al. 1999, §10; `docs/practice.md`).
+
 **The honest reading, and it is not the one this WP assumed.** Declaring
 recovers the clean cell (-1.0 ppm) and ignoring does not (+7.6 ppm, with the
-esd inflated 7.5x, 8.7x on the 1.6.0 tree, and Rwp 3.7x) — that part holds. But *excluding also
+esd inflated 7.5x, 8.7x on the 1.6.0 tree, and Rwp 3.7x) — on that tree. Since
+WP-2002 ignoring recovers it too (-0.4 ppm, above), and only the inflated esd
+separates the arms. But *excluding also
 recovers it*, to +0.6 ppm, for 256 channels (4.8 %). On this fixture the case
 for declaring is **not** cell accuracy over exclusion. It is that the channels
 stay in the fit, and that the intruder is measured rather than discarded:
@@ -135,6 +146,7 @@ def _plan(extra_stage: bool):
         stages.insert(2, rx.Stage("holder", ["instrument.extra_components.*"]))
         plan = rx.RefinementPlan(stages=stages)
         plan.intermediate_ftol = 1e-6
+        plan.closing_window_tol = 1e-3   # WP-2002: the shipped closing stage, named rather than inherited
     return plan
 
 
@@ -210,17 +222,20 @@ def test_declaring_the_intruder_recovers_the_clean_cell(arms):
     """The measurement this WP exists for.
 
     The cell from the contaminated pattern with the holder lines **declared**
-    must land on the cell from the clean pattern; the cell with them ignored
-    must not.  Both are compared in ppm of the clean cell, so the bar does not
-    depend on LaB6's own edge length.
+    must land on the cell from the clean pattern, in ppm of the clean cell so
+    the bar does not depend on LaB6's own edge length.  With them ignored the
+    cell's reported esd must be several times the clean one's: 9.9x measured
+    (2026-10-25, macOS arm64, `[dev]`), against a bar of 5.  Which arm lands
+    closer is not asserted, being 0.3 ppm against an esd of 51.
     """
     a_clean, sd_clean = _a(arms["clean"])
     a_declare, _ = _a(arms["declare"])
-    a_ignore, _ = _a(arms["ignore"])
+    a_ignore, sd_ignore = _a(arms["ignore"])
+    assert sd_clean is not None and sd_ignore is not None, (sd_clean, sd_ignore)
 
     ppm = lambda a: 1e6 * (a - a_clean) / a_clean          # noqa: E731
     assert abs(ppm(a_declare)) < 20.0, (a_declare, a_clean)
-    assert abs(ppm(a_declare)) < abs(ppm(a_ignore))
+    assert sd_ignore > 5.0 * sd_clean, (sd_ignore, sd_clean)
 
 
 def test_the_excluded_regions_alternative_is_quoted_and_never_gated(arms):

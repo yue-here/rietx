@@ -784,9 +784,9 @@ def test_a_gsas_i_tof_file_gives_one_instrument_per_bank(tmp_path):
     one = banks[1].source
     assert (one.difc.value, one.difa.value, one.tzero.value) == (5123.45, -1.23, -12.34)
     assert one.two_theta_bank_deg == 61.20
-    # DIST is carried as l2; FPATH1 is not a record the manual lists, so the
-    # primary flight path is not stated and stays unset
-    assert (one.l1_m, one.l2_m) == (None, 2.50)
+    # DIST is carried as l2 and the file-level FPATH1 as l1 (WP-2032: not a
+    # record the manual lists, and SNS files write it)
+    assert (one.l1_m, one.l2_m) == (32.00, 2.50)
     assert banks[2].source.difc.value == 10231.58
     # a calibration arrives frozen, exactly as load_instrument_profile's does
     assert not any(getattr(one, n).vary for n in ("difc", "difa", "tzero", "difb"))
@@ -1489,7 +1489,8 @@ def test_a_profile_holding_a_bank_is_refused_by_name_at_both_doors(tmp_path):
     (tmp_path / "old.json").write_text(json.dumps(doc), encoding="utf-8")
     with pytest.raises(ValueError) as exc:
         rx.load_instrument_profile(tmp_path / "old.json")
-    assert str(exc.value).startswith("load_instrument_profile()")
+    assert str(exc.value).startswith(
+        f"{tmp_path / 'old.json'}: load_instrument_profile()")
 
 
 def test_an_esd_time_map_bank_padded_to_ten_fields_is_checked_at_its_declared_count(
@@ -1579,3 +1580,234 @@ def test_the_descending_and_repeat_notes_name_the_flight_time_on_a_bank(tmp_path
     assert "2θ" not in by["PATTERN_SCAN_REVERSED"].message
     assert by["PATTERN_SCAN_REVERSED"].where == ["tof"]
     assert "flight-time value(s)" in by["PATTERN_DUPLICATE_POINTS"].message
+
+
+# ---------------------------------------------------------------------------
+# WP-2032: the T-1 readers' review follow-ups (yue-here/rietx#1120)
+# ---------------------------------------------------------------------------
+
+def time_map_after_the_rows(path, *, flag="ESD"):
+    """:func:`time_map_bank`'s file with its ``TIME_MAP`` record moved to
+    *after* the bank's rows — the same bytes in the other legal order.
+
+    The GSAS Technical Manual (Larson & Von Dreele 2004, LAUR 86-748, p. 219)
+    says a file's header-plus-records sets "may be repeated in any order", and
+    that a time map is only "usually" at the head of the file.  So the record
+    may follow the rows, and the rows must end where it starts.
+    """
+    lines = time_map_bank(path, flag=flag).read_text(encoding="utf-8").splitlines()
+    title, header, table, bank, *rows = lines
+    path.write_text("\n".join([title, bank, *rows, header, table]) + "\n",
+                    encoding="utf-8")
+    return path
+
+
+@pytest.mark.parametrize("flag", ["ESD", "STD"])
+def test_a_time_map_record_after_the_rows_ends_the_bank(tmp_path, flag):
+    """The record is a header, never data: the bank read is the one the
+    map-first file gives, channel for channel."""
+    before = rx.read_pattern(str(time_map_bank(tmp_path / "first.gsa", flag=flag)))
+    after = rx.read_pattern(str(time_map_after_the_rows(tmp_path / "last.gsa",
+                                                        flag=flag)))
+    assert after.axis == "tof" and len(after.tof) == N
+    assert after.tof == before.tof
+    assert after.intensity == before.intensity
+    assert after.sigma == before.sigma
+
+
+def test_a_time_map_record_between_two_banks_belongs_to_neither(tmp_path):
+    """Between banks, with a ``#`` comment before it as the manual (p. 217)
+    places one: bank 1's rows end at the comment's header, and bank 2 still
+    finds the map it names."""
+    lines = time_map_bank(tmp_path / "one.gsa").read_text(encoding="utf-8").splitlines()
+    title, header, table, bank, *rows = lines
+    p = tmp_path / "between.gsa"
+    p.write_text("\n".join([title, bank, *rows, "# the time map for both banks",
+                            header, table, bank.replace("BANK   1", "BANK   2"),
+                            *rows]) + "\n", encoding="utf-8")
+    one = rx.read_pattern(str(p), bank=1)
+    two = rx.read_pattern(str(p), bank=2)
+    assert len(one.tof) == len(two.tof) == N
+    assert one.intensity == two.intensity == [10.0 + j for j in range(N)]
+
+
+def test_a_line_after_the_rows_that_is_no_header_is_still_refused_by_name(tmp_path):
+    """The negative arm: only a ``BANK`` or ``TIME_MAP`` header ends a bank.  Any
+    other line where a record belongs is refused naming the file, not skipped."""
+    lines = time_map_bank(tmp_path / "x.gsa").read_text(encoding="utf-8").splitlines()
+    p = tmp_path / "stray.gsa"
+    p.write_text("\n".join(lines + ["TIMEMAP 1 4 1"]) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        rx.read_pattern(str(p))
+    assert p.name in str(exc.value)
+
+
+def _bank_profile_file(tmp_path):
+    """A profile file holding a bank, as a version before the writer refused
+    one could have saved it."""
+    import json
+
+    bank = rx.Instrument.tof_neutron_bank(difc=5123.45, two_theta_bank_deg=90.0)
+    cw = rx.Instrument.constant_wavelength_neutron(1.5)
+    rx.save_instrument_profile(cw, tmp_path / "cw.json")
+    doc = json.loads((tmp_path / "cw.json").read_text(encoding="utf-8"))
+    doc["instrument"] = bank.model_dump(
+        mode="json", exclude={"background", "extra_components"})
+    path = tmp_path / "old_bank_profile.json"
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    return path
+
+
+def test_load_instrument_profile_names_the_file_it_refuses(tmp_path):
+    """A reader raises naming the file (CLAUDE.md § Invariants, WP-1047): the
+    door alone says which function closed and not on what."""
+    path = _bank_profile_file(tmp_path)
+    with pytest.raises(ValueError) as exc:
+        rx.load_instrument_profile(path)
+    message = str(exc.value)
+    assert str(path) in message
+    assert "load_instrument_profile()" in message
+    assert "neutron_tof" in message
+
+
+def test_project_open_records_the_bank_it_read_and_a_reopen_reads_it_again(
+        tmp_path, cw_models):
+    """The reader call is part of the reference (CLAUDE.md § Project), so the
+    bank an old project's reopen chose is written into its ``DataRef``.
+
+    The positive arm: once recorded, the bank is asked for by number, so the
+    same file with its banks written in the other order still reads bank 1.
+    The control: the same swap with the record removed reads the file's
+    *first* bank, bank 2, and the fingerprint refuses it.
+    """
+    import hashlib
+    import json
+
+    structure, instrument = cw_models
+    bank1 = "BANK 1 4 1 CONS 1000 20 STD\n    10.0    11.0    12.0    13.0\n"
+    bank2 = "BANK 2 4 1 CONS 2000 20 STD\n    20.0    21.0    22.0    23.0\n"
+    one = tmp_path / "one.gsa"
+    one.write_text("one bank\n" + bank1, encoding="utf-8")
+    proj = tmp_path / "proj.rex"
+    rx.Project.create(proj, pattern=one, structure=structure,
+                      instrument=instrument)
+    doc_path = proj / "project.json"
+    doc = json.loads(doc_path.read_text(encoding="utf-8"))
+    assert "bank" not in doc["patterns"][0]["options"]
+    stored = proj / doc["patterns"][0]["filename"]
+
+    def rewrite(text: str, *, keep_bank: bool = True) -> None:
+        stored.write_text(text, encoding="utf-8")
+        d = json.loads(doc_path.read_text(encoding="utf-8"))
+        d["patterns"][0]["sha256"] = hashlib.sha256(stored.read_bytes()).hexdigest()
+        if not keep_bank:
+            d["patterns"][0]["options"].pop("bank", None)
+        doc_path.write_text(json.dumps(d), encoding="utf-8")
+
+    # an old project: no bank recorded, and the file now holds two
+    rewrite("two banks\n" + bank1 + bank2)
+    opened = rx.Project.open(proj)
+    assert opened.data_ref.options == {"bank": "1"}
+    opened.save()
+    saved = json.loads(doc_path.read_text(encoding="utf-8"))
+    assert saved["patterns"][0]["options"] == {"bank": "1"}
+
+    rewrite("two banks\n" + bank2 + bank1)
+    again = rx.Project.open(proj)
+    assert again.data.two_theta[0] == pytest.approx(10.0)
+    assert again.data_ref.options == {"bank": "1"}
+
+    rewrite("two banks\n" + bank2 + bank1, keep_bank=False)
+    with pytest.raises(ValueError, match="parses them differently"):
+        rx.Project.open(proj)
+
+
+def test_fpath1_is_read_as_every_banks_primary_flight_path(tmp_path):
+    """``FPATH1`` is not in the manual's record list (p. 221-223), and SNS
+    writes it: NOMAD's ``FPATH1 19.50`` beside ``BNKPAR`` DIST 2.010 is the
+    "Primary flight path 19.5m" and "Total flight path 21.510m" its own
+    data file states for that bank.  It is one number for the whole file."""
+    p = tmp_path / "synthetic.iparm"
+    p.write_text(IPARM, encoding="utf-8")
+    notes = []
+    banks = read_gsas_tof_iparm(str(p), diagnostics=notes)
+    assert [banks[b].source.l1_m for b in (1, 2)] == [32.0, 32.0]
+    where = [w for n in notes if n.code == "GSAS_IPARM_FIELD_DROPPED"
+             for w in n.where]
+    assert not any("FPATH" in w for w in where)
+
+
+def test_fpath1_written_past_ten_columns_is_still_one_number(tmp_path):
+    """POWGEN writes ``FPATH1     60.000000``, fourteen columns after the key;
+    the record has no documented layout, so it is read as one number."""
+    p = tmp_path / "powgen_width.iparm"
+    p.write_text(IPARM.replace("INS   FPATH1   32.00",
+                               "INS   FPATH1     60.000000"), encoding="utf-8")
+    banks = read_gsas_tof_iparm(str(p))
+    assert banks[1].source.l1_m == 60.0
+
+
+@pytest.mark.parametrize("payload, why", [
+    ("   thirty", "not a number"),
+    ("   32.00   2.50", "one number"),
+    ("   -32.00", "must be positive"),
+])
+def test_an_fpath1_that_is_not_one_flight_path_is_refused_naming_the_file(
+        tmp_path, payload, why):
+    p = tmp_path / "bad_fpath.iparm"
+    p.write_text(IPARM.replace("INS   FPATH1   32.00", "INS   FPATH1" + payload),
+                 encoding="utf-8")
+    with pytest.raises(ValueError) as exc:
+        read_gsas_tof_iparm(str(p))
+    assert str(p) in str(exc.value)
+    assert why in str(exc.value)
+
+
+def test_a_file_with_no_fpath1_leaves_the_primary_path_unstated(tmp_path):
+    p = tmp_path / "no_fpath.iparm"
+    p.write_text(IPARM.replace("INS   FPATH1   32.00\n", ""), encoding="utf-8")
+    assert read_gsas_tof_iparm(str(p))[1].source.l1_m is None
+
+
+def test_the_spectrum_type_is_validated_against_spectrum_types(monkeypatch, tmp_path):
+    """``SPECTRUM_TYPES`` is what decides whether an ITYP exists, at both
+    places a type is validated: the schema and the ``.iparm`` reader.  Shown
+    by removing a type from it and watching both refuse that type."""
+    from rietx.model import tof_spectrum
+    from rietx.schemas.common import Parameter
+    from rietx.schemas.instrument import IncidentSpectrum
+
+    twelve = [Parameter(value=1.0) for _ in range(12)]
+    p = tmp_path / "ityp3.iparm"
+    # type 3 reads all twelve ICOFF slots, so the type-1 block is a valid one
+    p.write_text(IPARM.replace("INS  1I ITYP    1", "INS  1I ITYP    3"),
+                 encoding="utf-8")
+    # the positive arm: with the table whole, type 3 is accepted at both
+    assert IncidentSpectrum(itype=3, coefficients=twelve).itype == 3
+    assert read_gsas_tof_iparm(str(p))[1].source.incident_spectrum.itype == 3
+    monkeypatch.setattr(tof_spectrum, "SPECTRUM_TYPES",
+                        {k: v for k, v in tof_spectrum.SPECTRUM_TYPES.items()
+                         if k != 3})
+    with pytest.raises(ValueError, match="ITYP 3 is not"):
+        IncidentSpectrum(itype=3, coefficients=twelve)
+    with pytest.raises(ValueError, match="ITYP 3 is not"):
+        read_gsas_tof_iparm(str(p))
+
+
+def test_a_coefficient_count_refusal_names_the_function():
+    """The refusal says which function the type is, from the same table."""
+    from rietx.model.tof_spectrum import SPECTRUM_TYPES
+    from rietx.schemas.common import Parameter
+    from rietx.schemas.instrument import IncidentSpectrum
+
+    with pytest.raises(ValueError) as exc:
+        IncidentSpectrum(itype=3, coefficients=[Parameter(value=1.0)] * 11)
+    assert SPECTRUM_TYPES[3] in str(exc.value)
+
+
+def test_the_two_spectrum_tables_name_the_same_types():
+    """``COEFFICIENT_COUNTS`` answers how many numbers a type takes only for a
+    type ``SPECTRUM_TYPES`` defines, so the two may not drift apart."""
+    from rietx.model.tof_spectrum import COEFFICIENT_COUNTS, SPECTRUM_TYPES
+
+    assert SPECTRUM_TYPES.keys() == COEFFICIENT_COUNTS.keys()

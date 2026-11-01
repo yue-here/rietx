@@ -273,28 +273,28 @@ CI leg by 3-4×**, so it reads CI's `junit-*` file when the branch has one (WP-1
 ## CI
 
 CI runs the same commands (`.github/`). Per push and per ready PR (`ci.yml`):
-ruff + the fast suite on 3.11 and 3.14 plus a `[dev,jax]` fast job, Linux, in
-two shards each that keep every file and `xdist_group` whole (`shards.py`). A
-stale `shard_times.json` costs balance, never a test. **A PR changing only the
-planning set runs the tests that read it instead** (the `docs` job, WP-1506),
-so a new test reading that set (`PLANNING` in `ci.yml`) joins its list, or a
-docs-only PR skips it until the nightly. Branch protection requires `lint` and
-`ci-ok`, the job that says whether the suite `changes` chose passed. **A draft
-PR runs ruff alone**, the matrix waiting for `gh pr ready` (`ci.yml`'s header).
-Nightly (`nightly.yml`): the full suite `[dev,jax]` on Linux (3.13, not a
-gate), the fast suite on 3.12 and 3.13 and on Windows (the release pre-upload
+ruff + the fast suite on 3.11 and 3.14, Linux, in two shards each that keep
+every file and `xdist_group` whole (`shards.py`), plus a `[dev,jax]` job of the
+cases reaching jax (`jax_cases.py`, whose guard names the fix for a case it
+misses). A stale `shard_times.json` costs balance, never a test. **A PR changing
+only the planning set runs the tests that read it instead** (the `docs` job,
+WP-1506), so a new test reading that set (`PLANNING` in `ci.yml`) joins its
+list, or a docs-only PR skips it until the nightly. Branch protection requires
+`lint` and `ci-ok`, the job that says whether the suite `changes` chose passed.
+**A draft PR runs ruff alone**, the matrix waiting for `gh pr ready` (`ci.yml`'s
+header). Nightly (`nightly.yml`): the full suite `[dev,jax]` on Linux (3.13, not
+a gate), the fast suite on 3.12 and 3.13 and on Windows (the release pre-upload
 gate, `docs/RELEASING.md` step 4), macOS fast plus the informational goldens
-step, and `[torch]`. **Read spend from the Actions usage page or `gh run
-list`, never from comments or this file**: a written total rots (303 vs ≈495).
+step, and `[torch]`. **Read spend from the Actions usage page or `gh run list`,
+never from comments or this file**: a written total rots (303 vs ≈495).
 
 Two consequences for local work:
 
-- **The bit-identity goldens are pinned to `darwin/arm64`**
-  (`GOLDEN_PLATFORM` in `tests/test_backend_shim.py`) and *skip* elsewhere:
-  measured, Linux x86-64 diverges by 1 ulp to 1.7e-13 relative — a libm and
-  summation-order difference — so the gate is asserted where it was captured
-  rather than loosened to a tolerance that could not distinguish it from a
-  real change.
+- **The bit-identity goldens are pinned to `darwin/arm64`** (`GOLDEN_PLATFORM`
+  in `tests/test_backend_shim.py`) and *skip* elsewhere: measured, Linux x86-64
+  diverges by 1 ulp to 1.7e-13 relative — a libm and summation-order difference
+  — so the gate is asserted where it was captured rather than loosened to a
+  tolerance that could not distinguish it from a real change.
 - **`tests/.jax_cache` is why the jax rows feel free locally** — deleting it
   takes the two jax files from ~12 s to 107 s — but caching it in CI was
   measured and does *not* help (8:18 warm against 8:12 cold): jax's

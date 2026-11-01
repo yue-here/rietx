@@ -1,4 +1,4 @@
-# A markdown twin of every page of the new manual, and the llms.txt that
+# A markdown twin of every page of the manual, and the llms.txt that
 # lists them (WP-1980).  An agent reads these, never the HTML: WP-1975 § F8
 # chose a clean markdown copy of each page beside the skill.
 #
@@ -10,14 +10,19 @@
 # link in a twin is the page's own link with `.md` appended.
 #
 # The translator is sphinx-markdown-builder's, which WP-1975's spike measured
-# closest to clean.  What it loses on this tree is mended in two places.
+# closest to clean.  What it loses on this tree is mended in three places.
 # `_normalise` rewrites the nodes it does not know into ones it does: a
 # sphinx-design card, dropdown or tab, a mermaid diagram, the dark half of a
-# figure pair and the comments and icons the HTML carries.  `TwinTranslator`
-# writes what needs its own markdown: an admonition as a labelled blockquote,
-# a bibliography entry, an image path the HTML build copied, and a table with
-# no column padding, which measured 9 % of the parameter map's twin.
+# figure pair and the comments and icons the HTML carries.
+# `_write_inline_figures` writes a notebook's inline figure out as a file.
+# `TwinTranslator` writes what needs its own markdown: an admonition as a
+# labelled blockquote, a bibliography entry, an image path the HTML build
+# copied, and a table with no column padding, which measured 9 % of the
+# parameter map's twin.
 
+import base64 as _base64
+import hashlib as _hashlib
+import html as _html
 import posixpath as _posixpath
 import re as _re
 from pathlib import Path as _Path
@@ -71,6 +76,17 @@ def _normalise(doctree: _nodes.document) -> None:
     for node in list(doctree.findall(_nodes.image)):
         if "only-dark" in node["classes"]:
             node.parent.remove(node)
+    # An API signature's bare `*` carries a tooltip (PEP 3102); the `*` stays.
+    for signature in list(doctree.findall(_addnodes.desc_signature)):
+        for node in list(signature.findall(_nodes.abbreviation)):
+            node.replace_self(_nodes.Text(node.astext()))
+    # A model's fields (`py:fields`, docs/py_fields.py) are a list, where the
+    # translator writes every signature as a heading of its own.
+    for node in list(doctree.findall(_addnodes.desc)):
+        if node.get("desctype") == "fields":
+            node.replace_self(_nodes.bullet_list("", *(
+                _nodes.list_item("", _nodes.paragraph("", "", _nodes.literal(text, text)))
+                for text in (sig.astext() for sig in node.findall(_addnodes.desc_signature)))))
     for node in list(doctree.findall(lambda n: type(n).__name__ == "mermaid")):
         code = node["code"].replace("\\*", "*")
         node.replace_self(_nodes.literal_block(code, code, language="mermaid"))
@@ -114,6 +130,48 @@ def _normalise(doctree: _nodes.document) -> None:
         node.replace_self([*(_nodes.target(refid=ref) for ref in node["ids"]),
                            _nodes.paragraph("", "", _nodes.strong("", f"[{label.astext()}]"),
                                             _nodes.Text(" "), *text)])
+
+
+#: One `<img>` tag, and the light half of a figure pair drawn inline.
+_IMG_TAG = _re.compile(r"<img\b[^>]*>")
+#: What a figure block holds besides its images: the `<div>` round them and
+#: the stylesheet that shows one half per theme.
+_FIGURE_WRAPPING = _re.compile(r"</?div\b[^>]*>|<style\b[^>]*>.*?</style\s*>", _re.S)
+_INLINE_LIGHT_PNG = _re.compile(
+    r'\bclass="[^"]*\bonly-light\b[^"]*"[^>]*\bsrc="data:image/png;base64,([^"]+)"')
+_ALT = _re.compile(r'\balt="([^"]*)"')
+
+
+def _write_inline_figures(doctree: _nodes.document, builder, docname: str) -> None:
+    """Each inline figure pair as a link to its light half, written as a file.
+
+    A notebook's figure reaches the HTML page as one raw block holding a light
+    and a dark PNG inline, as rietx's notebook display draws it.  Copied as it
+    is, the base64 was most of a tutorial's twin: six of the seven measured
+    62 752 to 551 259 characters, and 7 561 to 39 799 with each figure a link
+    (WP-1986).
+    So the light half is written into `_images/` under its content's hash and
+    linked, as a page's figure pair is, and the dark half and the stylesheet
+    that switches between them go.  A raw block holding anything else is left
+    as it is.
+    """
+    for node in list(doctree.findall(_nodes.raw)):
+        text = node.astext()
+        if "html" not in node.get("format", "").split():
+            continue
+        tags = _IMG_TAG.findall(text)
+        light = [m for m in map(_INLINE_LIGHT_PNG.search, tags) if m]
+        if len(light) != 1 or _FIGURE_WRAPPING.sub("", _IMG_TAG.sub("", text)).strip():
+            continue
+        data = _base64.b64decode(light[0][1])
+        name = f"twin-{_hashlib.sha256(data).hexdigest()[:16]}.png"
+        path = _Path(builder.outdir) / builder.imagedir / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        alt = _ALT.search(light[0].string)
+        node.replace_self(_nodes.image(
+            uri=_relative_uri(builder.get_target_uri(docname), f"{builder.imagedir}/{name}"),
+            alt=_html.unescape(alt[1]) if alt else ""))
 
 
 class _CompactTable(_TableContext):
@@ -302,6 +360,7 @@ def write_twin(app, doctree: _nodes.document, docname: str) -> str:
             toctree.parent.remove(toctree)
         else:
             toctree.replace_self(resolved)
+    _write_inline_figures(doctree, builder, docname)
     _normalise(doctree)
     visitor = TwinTranslator(doctree, builder, docname)
     doctree.walkabout(visitor)

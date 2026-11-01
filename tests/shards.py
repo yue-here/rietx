@@ -19,17 +19,26 @@ until the record is rewritten.
 rewrites the record from one CI run's junit files, fetched with ``gh run
 download RUN -p 'junit-*' -D DIR``.  Each subdirectory is one job, named
 ``junit-<leg>`` or ``junit-<leg>-<shard>``, and a leg's shards sum together.  A
-file's seconds sum its cases, leaving out skipped ones.  The record holds two
-profiles, because the jax leg's costs differ from the others' file by file
-(``test_cross_backend.py`` ~390 s there against ~15 s on numpy).  ``numpy`` is
-each file's median share of a Python leg times the median Python leg, since one
-run's legs differ by up to 1.6× on the same tree.  ``jax`` is the jax leg's
-seconds.  SOURCE names the run in the record.
+file's seconds sum its cases, leaving out skipped ones.  The record holds one
+profile, ``numpy``: each file's median seconds over the Python legs that ran
+the most of its cases, each leg's put on the median leg's clock, since one
+run's legs differ by up to 1.6× on the same tree.  A leg's clock is what it
+spent on the files every leg ran alike: the same number of cases, none of them
+free.  Over the legs that ran the *most* of a file, because part of one may run
+on a leg alone: the documentation executes on the newest
+(``tests/documentation.py``), and every file holding it also holds cases that
+run everywhere, so "ran it at all" cannot tell the legs apart.  A median over
+every leg would weigh the documentation at half there, on the leg that already
+runs the most, and the clock would count it as that leg's slowness (WP-2019).
+The jax
+job is read past.  It held a second profile while it ran the whole tier in
+shards, its costs differing file by file (``test_cross_backend.py`` ~390 s there
+against ~15 s on numpy), and since WP-2019 it runs ``--jax-cases`` as one job,
+which no record places.  SOURCE names the run in the record.
 """
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import math
 import re
@@ -57,15 +66,9 @@ def parse(spec: str) -> tuple[int, int]:
     return k, n
 
 
-def profile() -> str:
-    """The record's profile for this environment: does jax import here?"""
-    return "jax" if importlib.util.find_spec("jax") is not None else "numpy"
-
-
-def recorded_seconds(which: str | None = None, path: Path = RECORD) -> dict[str, float]:
-    """One profile of the record, keyed by repo-relative POSIX file path."""
-    record = json.loads(path.read_text(encoding="utf-8"))
-    return record[which or profile()]
+def recorded_seconds(path: Path = RECORD) -> dict[str, float]:
+    """The record's seconds, keyed by repo-relative POSIX file path."""
+    return json.loads(path.read_text(encoding="utf-8"))["numpy"]
 
 
 def units(pairs: Iterable[tuple[str, str | None]]) -> list[frozenset[str]]:
@@ -133,7 +136,13 @@ def leg_seconds(directory: Path) -> dict[str, dict[str, float]]:
     module skipped at import has no classname and no items, and is left out.
     A leg missing a shard that another leg has is refused: a shard that timed
     out uploads no file, and its files would read as costing nothing."""
+    return _legs(directory)[0]
+
+
+def _legs(directory: Path) -> tuple[dict[str, dict[str, float]], dict[str, dict[str, int]]]:
+    """``leg_seconds``, and beside it how many of each file's cases each leg ran."""
     legs: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    ran: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     shards_of: dict[str, set[int]] = defaultdict(set)
     for junit in sorted(directory.glob("junit-*/junit.xml")):
         m = _JOB.fullmatch(junit.parent.name)
@@ -141,32 +150,41 @@ def leg_seconds(directory: Path) -> dict[str, dict[str, float]]:
             continue
         if m[2] is not None:
             shards_of[m[1]].add(int(m[2]))
-        leg = legs[m[1]]
+        leg, count = legs[m[1]], ran[m[1]]
         for case in ET.parse(junit).iter("testcase"):
             file = _file_of(case.get("classname", ""))
             if file is None:
                 continue
-            leg[file] += 0.0 if case.find("skipped") is not None else float(case.get("time", "0"))
+            skipped = case.find("skipped") is not None
+            leg[file] += 0.0 if skipped else float(case.get("time", "0"))
+            count[file] += 0 if skipped else 1
     want = set(range(1, max(map(max, shards_of.values()), default=0) + 1))
     if short := {name: sorted(want - got) for name, got in shards_of.items() if got != want}:
         raise SystemExit(f"shards missing under {directory}: {short}")
-    return {name: dict(files) for name, files in legs.items()}
+    return ({name: dict(files) for name, files in legs.items()},
+            {name: dict(files) for name, files in ran.items()})
 
 
 def record(directory: Path, source: str) -> dict:
-    """The record's contents: both profiles from one run's junit files."""
-    legs = leg_seconds(directory)
-    python = {name: files for name, files in legs.items() if name.startswith("py")}
+    """The record's contents from one run's junit files, its Python legs alone."""
+    seconds, ran = _legs(directory)
+    python = [name for name in seconds if name.startswith("py")]
     if not python:
         raise SystemExit(f"no junit-py* leg under {directory}")
-    totals = {name: math.fsum(files.values()) for name, files in python.items()}
-    scale = statistics.median(totals.values())
-    numpy = {
-        f: round(statistics.median(files.get(f, 0.0) / totals[name]
-                                   for name, files in python.items()) * scale, 1)
-        for f in set().union(*python.values())}
-    jax = {f: round(s, 1) for f, s in legs.get("jax", {}).items()}
-    return {"source": source, "numpy": numpy, "jax": jax}
+    every = set().union(*(seconds[name] for name in python))
+    common = {f for f in every
+              if len({ran[name].get(f, 0) for name in python}) == 1
+              and all(seconds[name].get(f, 0.0) > 0.0 for name in python)}
+    speed = {name: math.fsum(seconds[name][f] for f in sorted(common)) for name in python}
+    median = statistics.median(speed.values())
+    factor = {name: (s / median if s and median else 1.0) for name, s in speed.items()}
+    numpy = {}
+    for f in every:
+        most = max(ran[name].get(f, 0) for name in python)
+        legs = [seconds[name][f] / factor[name] for name in python
+                if most and ran[name].get(f, 0) == most]
+        numpy[f] = round(statistics.median(legs), 1) if legs else 0.0
+    return {"source": source, "numpy": numpy}
 
 
 def main(argv: list[str]) -> int:
@@ -177,8 +195,7 @@ def main(argv: list[str]) -> int:
     source = argv[1] if len(argv) == 2 else directory.name
     out = record(directory, source)
     RECORD.write_text(json.dumps(out, indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    for which in ("numpy", "jax"):
-        print(f"{which}: {len(out[which])} files, {math.fsum(out[which].values()):.0f} s")
+    print(f"numpy: {len(out['numpy'])} files, {math.fsum(out['numpy'].values()):.0f} s")
     return 0
 
 

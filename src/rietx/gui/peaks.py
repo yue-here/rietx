@@ -310,7 +310,7 @@ class PeakEditor:
         g = peak.group
         comps = [(p, c) for p, c in self._components(doc, g) if p is not peak]
         if not comps:
-            doc.peaks = _spliced(doc.peaks, g, [], self.det)
+            doc.peaks = _spliced(doc.peaks, g, [], self.det, windows=doc.groups)
             doc.groups.pop(g, None)
             return doc
         return self._refit_with(doc, g, [p.two_theta for p, _ in comps],
@@ -365,7 +365,8 @@ class PeakEditor:
         the usable lines."""
         set_flags(doc, index, use_for_indexing=use_for_indexing, flags=flags)
         doc.peaks = doc.peaks.model_copy(update={
-            "diagnostics": peak_diagnostics(doc.peaks, self.det)})
+            "diagnostics": peak_diagnostics(doc.peaks, self.det,
+                                            windows=doc.groups)})
         return doc
 
     # -- drawing -------------------------------------------------------
@@ -516,16 +517,22 @@ class PeakEditor:
                 peak.flags = [*peak.flags, "excluded"]
         doc.peaks = _spliced(doc.peaks, g, fresh, self.det,
                              self.instrument.source.lines,
-                             source=self.instrument.source)
+                             source=self.instrument.source,
+                             windows=doc.groups)
         meta.gamma_g, meta.gamma_l = float(fit.gamma_g), float(fit.gamma_l)
         meta.from_reseed = [bool(b) for b in fit.reseeded()]
         return doc
 
 
 def _spliced(peaks: PeakList, g: int, fresh: list[ObservedPeak],
-             det: Detection, lines=(), source=None) -> PeakList:
+             det: Detection, lines=(), source=None,
+             windows: dict[int, GroupMeta] | None = None) -> PeakList:
     """The list with group ``g`` replaced by ``fresh``, marks and diagnostics
-    recomputed for exactly the spliced components."""
+    recomputed for exactly the spliced components.
+
+    ``windows`` are the editor's own (``PeakDoc.groups``): ``ObservedPeak.group``
+    numbers those, not detection's, so a bound is read from the window the
+    component was fitted in."""
     merged = [p for p in peaks.peaks if p.group != g] + list(fresh)
     merged.sort(key=lambda p: p.two_theta)
     if fresh:
@@ -543,4 +550,5 @@ def _spliced(peaks: PeakList, g: int, fresh: list[ObservedPeak],
     # the new bar no longer supports is cleared
     flag_weak_lines(merged, det)
     out = peaks.model_copy(update={"peaks": merged})
-    return out.model_copy(update={"diagnostics": peak_diagnostics(out, det)})
+    return out.model_copy(update={
+        "diagnostics": peak_diagnostics(out, det, windows=windows)})

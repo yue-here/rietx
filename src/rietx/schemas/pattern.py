@@ -25,6 +25,17 @@ AxisKind = Literal["two_theta", "tof"]
 AXIS_UNITS: dict[str, str] = {"two_theta": "degrees", "tof": "microseconds (µs)"}
 
 
+#: The floor :func:`_floor_sigma` raises a zero or negative esd to, as a
+#: fraction of the column's median positive esd (#650).  Such a channel then
+#: weighs about a million times its neighbours; WP-1952 replaces it with a
+#: dropped channel and a reader warning (WP-2002, B5).
+SIGMA_FLOOR_RELATIVE = 1e-3
+#: The count under which the Poisson fallback stops falling: σ = √max(y, 1),
+#: so a channel that counted zero is weighted as one count, as TOPAS weights
+#: a file without esds, 1/Max(Yobs, 1) (Technical Reference § 6.2).
+POISSON_FLOOR_COUNTS = 1.0
+
+
 def _floor_sigma(s: np.ndarray) -> np.ndarray:
     """``s`` with zero and negative esds raised to a floor, so no channel takes
     an infinite weight.
@@ -40,7 +51,8 @@ def _floor_sigma(s: np.ndarray) -> np.ndarray:
     :meth:`~rietx.schemas.results.RefinementResult.sig`, so the two cannot
     drift apart.
     """
-    floor = float(np.median(s[s > 0])) * 1e-3 if np.any(s > 0) else 1.0
+    floor = (float(np.median(s[s > 0])) * SIGMA_FLOOR_RELATIVE if np.any(s > 0)
+             else 1.0)
     return np.maximum(s, floor)
 
 
@@ -176,7 +188,7 @@ class PatternData(Base):
         if self.sigma is not None:
             return _floor_sigma(np.asarray(self.sigma, dtype=np.float64))
         y = self.y()
-        return np.sqrt(np.maximum(y, 1.0))
+        return np.sqrt(np.maximum(y, POISSON_FLOOR_COUNTS))
 
     def in_range_mask(self) -> np.ndarray:
         """True for points kept in the fit (excluded_regions removed).
@@ -215,7 +227,8 @@ class PatternData(Base):
     def plot(self, path: str | None = None, **kw):
         """Draw the pattern: :func:`rietx.viz.plots.plot_pattern`, the peer of
         :meth:`RefinementResult.plot`, forwarding ``**kw``; ``model=ref`` adds a
-        :class:`~rietx.Refinement`'s reflection ticks before any fit."""
+        :class:`~rietx.Refinement`'s reflection ticks and starting background
+        before any fit, and names its radiation on the 2θ label."""
         from ..viz.plots import plot_pattern
 
         return plot_pattern(self, path=path, **kw)

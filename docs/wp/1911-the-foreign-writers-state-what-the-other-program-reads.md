@@ -212,6 +212,30 @@ a `tests/data/README.md` row.
 
 ### Inherited
 
+- **2026-10-24, from [2044](2044-the-sabine-laue-factor-is-continuous.md):
+  two facts for C3 and the TOPAS writer.** FullProf's powder extinction is one
+  empirical parameter (`Extinc`, the SHELX-style form), with no Laue and Bragg
+  split. `Ext-Model` is single-crystal only. So a `.pcr` cannot carry rietx's
+  Sabine factor, and C3 decides between refusing a non-zero extinction and
+  writing the nearest empirical term with the difference reported
+  (`docs/practice.md` § Extinction, checked in the FullProf manual). The TOPAS
+  writer's `scale_pks` now spells rietx's e^(−x)·[I₀ + I₁] as Abramowitz &
+  Stegun's polynomials, within 3.6e-8, since TOPAS has no Bessel function. It
+  has not been run in TOPAS: the TOPAS 6 oracle at extinction 20 still
+  matches, but that case keeps x small.
+- **2026-10-23, from [1326](1326-satellites-without-a-moment.md)'s close
+  (originally WP-1328, 2026-10-03): `Structure.to_cif` writes no k for a
+  nuclear phase.** A phase with `Phase.propagation_vector` set carries
+  satellites, but the CIF written from it says nothing of k, although magCIF
+  has `_parent_propagation_vector.kxkykz`. #567's review left that as a design
+  choice, and the writers' refusals point at the JSON instead. C-f writes the
+  same tag from `MagneticSymmetry.propagation_vector_parent`, so the nuclear
+  phase's k is a second source for one tag, and C-f is where to decide
+  whether it writes. The other half of 1328's note stays a standing choice
+  and is not forwarded: `fullprof.to_structure` drops a nuclear phase's `Nvk`,
+  because FullProf's nuclear k and rietx's are not the same model.
+- **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: a tied TOPAS write its own reader refuses.** `write_topas_inp(structure, path, free=ref)` with a structure whose values break one of `ref`'s `tie_equal` groups writes one shared name at two values, and rietx's `.inp` reader then refuses the file (`TopasInpError ... is stated at two values`, `io/projects/topas_ties.py:345`; writer `topas_input.py` through `from_structure_refined`). Reproduced by a WP-1986 lane and not re-run by its parent. `src/rietx/io/CLAUDE.md` asks a writer to refuse what its reader refuses. `docs/docs/reference/foreign-writers.md`'s example sidesteps it by passing `ref.fitted_structure`.
+
 - **2026-10-17, from [1996](1996-the-switching-tab-says-only-what-its-tests-show.md):
   FullProf applies the Laue-class cell constraints itself, and it runs on this
   machine.** `~/Code/rietx-bench/tools/fullprof/files/fp2k` (FullProf.2k 8.20,

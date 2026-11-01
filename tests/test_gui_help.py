@@ -40,6 +40,7 @@ ARMS = (
     "reader_options",
     "instrument_fields",
     "search_fields",
+    "result_fields",
 )
 
 

@@ -273,6 +273,117 @@ def test_compute_qpa_no_radii_stays_silent():
     assert qpa.microabsorption is None and qpa.microabsorption_skipped is None
 
 
+# -- a phase with no reflection in the fitted range (WP-1958, #954) ---------
+
+def _three_phase_decoded(radii):
+    from rietx.optimize.qpa import compute_qpa
+
+    structure = make_lab6()
+    structure.phases.append(_caf2_phase())
+    extra = _caf2_phase()
+    extra.name = "CaF2_out"
+    structure.phases.append(extra)
+    for phase, r in zip(structure.phases, radii, strict=True):
+        phase.particle_radius_um = r
+    table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+    return structure, table.decode(table.x0()), compute_qpa
+
+
+def test_an_unmeasured_phase_has_no_fraction_and_leaves_the_sum():
+    """Absent rather than zero, and the others are fractions of the phases
+    seen: exactly the fractions the model without it gives."""
+    structure, values, compute_qpa = _three_phase_decoded([None] * 3)
+    qpa = compute_qpa(structure, values, unmeasured=[2])
+    seen, _, compute = _two_phase_decoded([None, None])
+    two = compute(seen, values)
+    assert qpa.phases[2].weight_fraction is None
+    assert qpa.phases[2].weight_fraction_stderr is None
+    assert qpa.phases[2].scale == values["phases.2.scale"]   # the row stays
+    assert [r.weight_fraction for r in qpa.phases[:2]] == \
+           [r.weight_fraction for r in two.phases]
+    assert qpa.unmeasured_phases == ["CaF2_out"]
+    # the positive arm: every phase counted, the same call gives three numbers
+    full = compute_qpa(structure, values)
+    assert all(r.weight_fraction is not None for r in full.phases)
+    assert full.unmeasured_phases == []
+    assert full.phases[0].weight_fraction < qpa.phases[0].weight_fraction
+
+
+def test_brindley_is_skipped_with_an_unmeasured_phase():
+    """τ compares each phase's µ with the mixture's volume-mean µ̄, which
+    needs every phase's fraction: with one absent the correction cannot run,
+    and says so rather than averaging over the phases seen."""
+    structure, values, compute_qpa = _three_phase_decoded([0.4, 0.4, 0.4])
+    qpa = compute_qpa(structure, values, wavelength=1.5406, unmeasured=[2])
+    assert qpa.microabsorption is None
+    assert "CaF2_out" in qpa.microabsorption_skipped
+    assert all(r.weight_fraction_corrected is None for r in qpa.phases)
+    # the positive arm: every phase measured, the same radii run it
+    full = compute_qpa(structure, values, wavelength=1.5406)
+    assert full.microabsorption is not None and full.microabsorption_skipped is None
+
+
+def test_the_skipped_brindley_advice_follows_its_reason():
+    """With radii supplied and a phase unmeasured, "supply particle_radius_um"
+    points the wrong way: the advice is the range or the phase (#1103).  The
+    positive arm, a phase missing its radius, keeps the old advice."""
+    from rietx.optimize.qpa import microabsorption_diagnostics
+
+    structure, values, compute_qpa = _three_phase_decoded([0.4, 0.4, 0.4])
+    qpa = compute_qpa(structure, values, wavelength=1.5406, unmeasured=[2])
+    (diag,) = microabsorption_diagnostics(qpa)
+    assert diag.code == "MICROABSORPTION_SKIPPED"
+    assert "Widen the fitted range" in diag.suggestion
+    assert "CaF2_out" in diag.suggestion
+    assert "particle_radius_um" not in diag.suggestion.replace(
+        "the radii were supplied", "")
+    structure, values, compute_qpa = _three_phase_decoded([0.4, None, 0.4])
+    qpa = compute_qpa(structure, values, wavelength=1.5406)
+    (diag,) = microabsorption_diagnostics(qpa)
+    assert diag.suggestion.startswith("Supply particle_radius_um")
+
+
+def test_the_skipped_brindley_advice_names_a_phase_still_missing_its_radius():
+    """One radius is enough to record the skip, so "the radii were supplied"
+    was said of a model with a phase still missing its radius (#1103, round
+    2).  The message and the advice name that phase; the positive arm, every
+    radius given, still says the radii were supplied."""
+    from rietx.optimize.qpa import microabsorption_diagnostics
+
+    structure, values, compute_qpa = _three_phase_decoded([0.4, None, 0.4])
+    qpa = compute_qpa(structure, values, wavelength=1.5406, unmeasured=[2])
+    (diag,) = microabsorption_diagnostics(qpa, structure)
+    assert "radii were supplied" not in diag.suggestion
+    assert diag.suggestion.endswith("Supply particle_radius_um on CaF2 too.")
+    assert diag.message.endswith("No particle_radius_um on phase(s) CaF2 either.")
+    structure, values, compute_qpa = _three_phase_decoded([0.4, 0.4, 0.4])
+    qpa = compute_qpa(structure, values, wavelength=1.5406, unmeasured=[2])
+    (diag,) = microabsorption_diagnostics(qpa, structure)
+    assert diag.suggestion.endswith("The radii were supplied.")
+    assert "either" not in diag.message
+
+
+def test_a_lone_phase_seen_is_whole_by_definition_with_no_esd():
+    structure, values, compute_qpa = _three_phase_decoded([None] * 3)
+    cov = np.diag([1e-10, 1e-10])
+    qpa = compute_qpa(structure, values, cov[:1, :1], unmeasured=[1, 2])
+    assert qpa.phases[0].weight_fraction == 1.0
+    assert qpa.phases[0].weight_fraction_stderr is None
+    assert qpa.unmeasured_phases == ["CaF2", "CaF2_out"]
+
+
+def test_an_unmeasured_row_round_trips_and_says_so_in_the_table():
+    from rietx.io.exporters import qpa_table_csv
+
+    structure, values, compute_qpa = _three_phase_decoded([None] * 3)
+    qpa = compute_qpa(structure, values, unmeasured=[2])
+    assert QuantitativePhaseAnalysis.model_validate_json(qpa.model_dump_json()) == qpa
+    text = qpa_table_csv(qpa)
+    assert "relative to the phases measured; CaF2_out not measured" in text
+    (row,) = [line for line in text.splitlines() if line.startswith("CaF2_out,")]
+    assert row.split(",")[1] == ""
+
+
 # -- µR fence diagnostics --------------------------------------------------
 
 def test_mu_r_fence_fires_exactly_when_it_should():

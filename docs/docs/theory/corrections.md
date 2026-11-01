@@ -277,8 +277,29 @@ x \;=\; \mathrm{ext} \cdot |F|^2 \cdot \left(\frac{\lambda}{V}\right)^2
 
 {source}`rietx.model.extinction.sabine_extinction`
 
-with $E_L$ a six-term series in $x$ for $0 < x \le 1$ and a two-term asymptote
-above, $E_L = 1$ at $x \le 0$, and $|F|^2$ entering without multiplicity or Lp.
+with $|F|^2$ entering without multiplicity or Lp. The Laue component is the
+Laue-case diffracted fraction $\tfrac12[1 - e^{-2\sigma D}]$ integrated over a
+Lorentzian coupling $\sigma(k)$ and divided by the kinematic intensity
+{cite}`itc-c`. That integral has a closed form:
+
+```{math}
+:label: corr-sabine-laue
+
+E_L \;=\; \frac{1}{\pi x}\int_{-\infty}^{\infty}
+\tfrac12\left[1 - e^{-2x/(1+u^2)}\right] du
+\;=\; e^{-x}\left[I_0(x) + I_1(x)\right],
+\qquad x \ge 0,
+```
+
+{source}`rietx.model.extinction._laue_and_deriv`
+
+with $I_0$ and $I_1$ the modified Bessel functions, and $E_L = 1$ at $x < 0$.
+The papers print two truncated expansions of $E_L$ instead
+{cite}`sabine1988b,itc-c`: the series $1 - x/2 + x^2/4 - 5x^3/48 + 7x^4/192$
+for $x \le 1$ and an asymptote above. The closed form is derived from their
+stated construction and is printed in neither. It is continuous, with
+$E_L(1) = 0.67367$, where the printed pair steps by 2.2 % at $x = 1$ and
+GSAS-II's six-term series and two-term asymptote step by 3.6 %.
 $\mathrm{ext}$ is the squared mosaic-block size $D^2$ in µm². The constant
 0.079411 is $r_e^2$ in Å² times $10^8$ Å² per µm², to four figures, so $x$ is dimensionless
 with λ in Å and V in Å³.
@@ -288,12 +309,14 @@ $\mathrm{ext} = 0$ gives $E \equiv \sin^2\theta + \cos^2\theta = 1$ exactly.
 Documented by physics rather than by letter: the Bragg component weights
 $\sin^2\theta$ and the Laue component $\cos^2\theta$. That is the opposite of
 the naive reading, because backscattering ($2\theta \to 180°$) is the Bragg-case
-limit and forward scattering the Laue-case limit. The two Laue branches
-deliberately do not join continuously at $x = 1$. The ~2 % step there is
-inherited verbatim from the cross-code reference and is out of reach for real
-powder data, where $x \ll 1$, and smoothing it would break the cross-code
-golden.
+limit and forward scattering the Laue-case limit.
 ```
+
+Real powder data reach $x > 1$. On the [QPA guide](../guides/qpa.md)'s first fit,
+CaF₂'s reflections run to $x = 6.5$ at the answer. Until 1.10, rietx used
+GSAS-II's stepped pair, and that fit stopped with one reflection on the step.
+CaF₂'s esd then depended on whether the solver's last Jacobian straddled it:
+0.21 wt % on one platform and 2.24 on another.
 
 ## Preferred orientation (March-Dollase)
 

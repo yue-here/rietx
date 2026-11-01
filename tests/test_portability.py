@@ -199,6 +199,89 @@ def test_every_text_io_call_names_its_encoding():
         + "\n  ".join(offenders))
 
 
+#: The workflow scripts: the hooks and the skills' helpers.  They sit outside
+#: the package, but their tests run on Windows.
+WORKFLOW_SCRIPTS = (ROOT / ".claude" / "hooks", ROOT / ".claude" / "skills")
+
+_SUBPROCESS = {"run", "Popen", "check_output", "check_call", "call"}
+
+
+def _workflow_scripts() -> list[Path]:
+    return [path for tree in WORKFLOW_SCRIPTS for path in sorted(tree.rglob("*.py"))]
+
+
+def _text_mode_subprocess_calls(tree: ast.AST) -> list[ast.Call]:
+    """`subprocess` calls that decode their output in the locale's encoding."""
+    found = []
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr in _SUBPROCESS
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "subprocess"):
+            text_mode = any(
+                kw.arg in ("text", "universal_newlines")
+                and not (isinstance(kw.value, ast.Constant) and kw.value.value is False)
+                for kw in node.keywords)
+            if text_mode and not any(kw.arg == "encoding" for kw in node.keywords):
+                found.append(node)
+    return found
+
+
+def _text_stdin_reads(tree: ast.AST, source: str) -> list[ast.Call]:
+    """Reads of `sys.stdin` as text, which Windows decodes as cp1252.
+
+    A hook payload is UTF-8 JSON, so it is read from `sys.stdin.buffer`.
+    """
+    found = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if (isinstance(func, ast.Attribute) and func.attr in ("read", "readline", "readlines")
+                and ast.get_source_segment(source, func.value) == "sys.stdin"):
+            found.append(node)
+        elif any(ast.get_source_segment(source, arg) == "sys.stdin" for arg in node.args) \
+                and isinstance(func, ast.Attribute) and func.attr == "load":
+            found.append(node)
+    return found
+
+
+def test_a_hook_decodes_what_git_and_gh_print_as_utf8():
+    """A hook's text I/O names its encoding, its subprocess output included (WP-2043).
+
+    The hooks read WP files and PR titles through git and gh, and those carry
+    a status ✅ and em dashes.  `text=True` alone decoded them as cp1252 on
+    Windows, where ✅ arrives as `âœ…`: `closed_wp_writes` read every closed
+    WP as open, and five tests were red on four Windows nightlies.  A hook's
+    payload on stdin is UTF-8 JSON too, and the skills' helpers read the same
+    git and gh output.  The test-side subprocess calls are not held to this,
+    because the ones that read non-ASCII output pin their own pipe
+    (`test_examples._run`).
+    """
+    offenders = []
+    for path in _workflow_scripts():
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        calls = _text_mode_subprocess_calls(tree) + _text_stdin_reads(tree, source)
+        calls += [call for call, _ in _text_io_calls(tree, source)
+                  if not any(kw.arg == "encoding" for kw in call.keywords)]
+        offenders += [f"{path.relative_to(ROOT)}:{call.lineno}" for call in calls]
+    assert not offenders, (
+        "a hook decodes text in the locale's encoding (cp1252 on Windows):\n  "
+        + "\n  ".join(offenders))
+
+
+def test_the_hook_guard_can_actually_fail():
+    """The subprocess and stdin halves of the guard above, made to fail once."""
+    source = ('import subprocess\nsubprocess.run(["git"], text=True)\n'
+              'subprocess.run(["git"], encoding="utf-8")\n'
+              'subprocess.run(["git"], text=False)\n')
+    assert [call.lineno for call in _text_mode_subprocess_calls(ast.parse(source))] == [2]
+    source = ('import json, sys\njson.load(sys.stdin)\nsys.stdin.read()\n'
+              'json.loads(sys.stdin.buffer.read())\n')
+    assert sorted(call.lineno for call in _text_stdin_reads(ast.parse(source), source)) == [2, 3]
+
+
 def test_csv_writers_open_with_newline_suppressed():
     """Anything handing csv.writer output to a file must pass newline="".
 

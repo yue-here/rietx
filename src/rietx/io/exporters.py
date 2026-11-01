@@ -38,6 +38,7 @@ from ..crystallography.cif import format_su  # noqa: F401
 from ..crystallography.lattice import d_spacings
 from ..model.components import COMPONENT_AGGREGATE
 from ..model.forward import CompiledModel
+from ..optimize.qpa import unmeasured_reason
 from ..schemas.instrument import (
     BackgroundChebyshev,
     BackgroundFixedPlusChebyshev,
@@ -248,6 +249,12 @@ def _qpa_caveats(qpa: QuantitativePhaseAnalysis) -> list[str]:
         "sum to 1.",
         f"method={qpa.method} crystalline_only={qpa.crystalline_only}",
     ]
+    if qpa.unmeasured_phases:
+        lines.append(
+            "Fractions are relative to the phases measured; "
+            + "; ".join(f"{n} not measured ({unmeasured_reason(qpa, n)}, so "
+                        "no weight_fraction)" for n in qpa.unmeasured_phases)
+            + ".")
     if qpa.microabsorption is not None:
         m = qpa.microabsorption
         lines.append(
@@ -281,7 +288,7 @@ def qpa_table_csv(qpa: QuantitativePhaseAnalysis, *, delimiter: str = ",") -> st
     w.writerow(QPA_COLUMNS)
     for q in qpa.phases:
         w.writerow([
-            q.name, _g(q.weight_fraction),
+            q.name, "" if q.weight_fraction is None else _g(q.weight_fraction),
             "" if q.weight_fraction_stderr is None else _g(q.weight_fraction_stderr),
             "" if q.weight_fraction_corrected is None else _g(q.weight_fraction_corrected),
             _g(q.scale), _g(q.cell_mass), _g(q.cell_volume), _g(q.zmv),
@@ -455,10 +462,27 @@ def _special_details(result: RefinementResult, structure: Structure) -> list[str
         esd = ("Standard uncertainties are the square roots of the diagonal of "
                "chi^2_red (J^T J)^-1, J the Jacobian of the weighted residual at "
                "convergence")
-        if st.esd_inflation is not None:
+        # the factor the written su carry, read off the rows: it can differ
+        # from ``Statistics.esd_inflation`` (0.07-4 %, WP-2002), and a reader
+        # dividing by the quoted factor must land on the uncorrected su
+        # (one solve's rows share one factor to an ulp, so compare unrounded:
+        # rounding first split a factor on a 3-digit boundary into a range)
+        carried = [p.stderr / p.stderr_uncorrected for p in result.parameters
+                   if p.stderr is not None and p.stderr_uncorrected]
+        if carried:
+            lo, hi = min(carried), max(carried)
+            factor = (f"{lo:.3g}" if hi - lo <= 1e-9 * hi
+                      or f"{lo:.3g}" == f"{hi:.3g}" else f"{lo:.3g} to {hi:.3g}")
+        else:
+            factor = (None if st.esd_inflation is None
+                      else f"{st.esd_inflation:.3g}")
+        if factor is not None:
             esd += (", multiplied by the Berar-Lelann serial-correlation factor "
-                    f"{st.esd_inflation:.3g} (Berar & Lelann 1991, J. Appl. Cryst. "
-                    "24, 1, eqs 10-12)")
+                    f"{factor} (Berar & Lelann 1991, J. Appl. Cryst. 24, 1, eqs "
+                    "10-12). Divided by it, they are the uncorrected su, as "
+                    "GSAS-II prints them and FullProf prints them beside its "
+                    "SCOR; the TOPAS Technical Reference describes no such "
+                    "factor")
         out.append(esd + ".")
     for phase in structure.phases:
         po = phase.preferred_orientation

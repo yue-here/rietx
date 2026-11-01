@@ -60,8 +60,9 @@ from tests.space_group_sample import TRAP_SAMPLE
 
 HALF = Fraction(1, 2)
 
-#: Γ plus every zone-boundary point with all coordinates in {0, 1/2} — the set
-#: the projective factor system lives on, in conventional coordinates.
+#: Γ plus every zone-boundary point with all coordinates in {0, 1/2}, in
+#: conventional coordinates.  Projective factor systems occur at some of these
+#: k, not at all of them, and also off this set (zone-boundary lines and faces).
 ZONE_BOUNDARY_SET = tuple(
     tuple(map(Fraction, c)) for c in itertools.product([0, HALF], repeat=3)
 )
@@ -476,8 +477,9 @@ def test_an_incommensurate_k_is_refused_by_name():
 def test_dropping_the_factor_system_changes_the_irreps_at_a_zone_boundary():
     """The projective and the ordinary (linear) answers must differ, measurably.
 
-    P n m a is non-symmorphic and k = (0, 0, 1/2) is on the zone boundary, so
-    the factor system is not a coboundary: the little co-group mmm has eight
+    P n m a is non-symmorphic, and at k = (0, 0, 1/2) on the zone boundary
+    its factor system is not a coboundary (that it is on the boundary allows
+    this but does not imply it): the little co-group mmm has eight
     one-dimensional *ordinary* irreps and exactly two two-dimensional
     *projective* ones.  This is the assertion that fails if someone
     "simplifies" ω away — and note the last two lines: Burnside's Σ dim² = 8

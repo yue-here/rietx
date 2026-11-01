@@ -579,13 +579,71 @@ def test_q_must_not_drift_from_two_theta():
               chi2_red=1.0)
     lam = 1.54
     q = float(q_of_two_theta(np.array(30.0), lam))
-    good = ObservedPeak(q=q, q_esd=1e-4, **ok)
+    q_esd = float(q_esd_of_two_theta(np.array(30.0), np.array(0.01), lam))
+    good = ObservedPeak(q=q, q_esd=q_esd, **ok)
     PeakList(peaks=[good], wavelength=lam, two_theta_min=20.0,
              two_theta_max=40.0)
-    bad = ObservedPeak(q=q * 1.01, q_esd=1e-4, **ok)
+    bad = ObservedPeak(q=q * 1.01, q_esd=q_esd, **ok)
     with pytest.raises(ValueError, match="carries q ="):
         PeakList(peaks=[bad], wavelength=lam, two_theta_min=20.0,
                  two_theta_max=40.0)
+
+
+def _reloaded_with(pl: PeakList, k: int, **update) -> PeakList:
+    """``pl`` with peak ``k``'s fields replaced, revalidated as a reload would."""
+    peaks = [p.model_copy(update=update) if i == k else p
+             for i, p in enumerate(pl.peaks)]
+    return PeakList.model_validate_json(
+        pl.model_copy(update={"peaks": peaks}).model_dump_json())
+
+
+def test_q_esd_must_not_drift_from_two_theta_esd():
+    """#1236's reproduction: an edit to one line's σ(2θ) that leaves its σ(Q)
+    behind is refused on reload, by name and with the remedy.  Before the
+    check the edit loaded clean and the engines, which weight lines by
+    ``q_esd()``, never saw it."""
+    pl = PeakList.from_positions([20.0, 28.0, 33.0, 40.0], wavelength=1.5406,
+                                 two_theta_esd=0.002)
+    with pytest.raises(ValueError, match=r"peak 1 at 2θ = 28\.0000° carries "
+                       r"q_esd = .*PeakList\.from_positions"):
+        _reloaded_with(pl, 1, two_theta_esd=3 * pl.peaks[1].two_theta_esd)
+    with pytest.raises(ValueError, match="carries q_esd ="):
+        _reloaded_with(pl, 2, q_esd=2 * pl.peaks[2].q_esd)
+    # the remedy the message names: rebuild, and both σ move together
+    tt = [p.two_theta for p in pl.peaks]
+    esd = np.array([0.002, 0.006, 0.002, 0.002])
+    again = PeakList.from_positions(tt, wavelength=1.5406, two_theta_esd=esd)
+    assert again.q_esd()[1] / pl.q_esd()[1] == pytest.approx(3.0)
+
+
+def test_a_non_finite_esd_pair_agrees_and_a_half_finite_one_does_not():
+    """An infinite σ(2θ) means "unmeasured", and σ(Q) is then infinite too;
+    a NaN pair is the same statement.  Only a pair where one side is finite
+    and the other is not is a drift."""
+    pl = PeakList.from_positions([20.0, 28.0, 33.0], wavelength=1.5406)
+    inf = float("inf")
+    assert _reloaded_with(pl, 0, two_theta_esd=inf, q_esd=inf).peaks[0].q_esd == inf
+    nan = float("nan")
+    assert np.isnan(_reloaded_with(pl, 0, two_theta_esd=nan, q_esd=nan).peaks[0].q_esd)
+    with pytest.raises(ValueError, match="carries q_esd ="):
+        _reloaded_with(pl, 0, two_theta_esd=inf)
+
+
+def test_a_picked_list_survives_its_own_json_round_trip():
+    """``pick_peaks``'s constructor (``peaks_of_group``) derives σ(Q) through
+    the same function the check uses, merged lines' widened σ(2θ) included,
+    so a picked list reloads exactly; this is the path a saved GUI peak
+    state takes back in."""
+    instrument = _instrument()
+    y_true, grid, _ = _forward(instrument, tt_lo=20.0, tt_hi=45.0)
+    peaks = pick_peaks(_noisy(y_true, grid, 21), instrument)
+    assert peaks.peaks
+    again = PeakList.model_validate_json(peaks.model_dump_json())
+    assert [p.q_esd for p in again.peaks] == [p.q_esd for p in peaks.peaks]
+    want = q_esd_of_two_theta(np.array([p.two_theta for p in peaks.peaks]),
+                              np.array([p.two_theta_esd for p in peaks.peaks]),
+                              peaks.wavelength)
+    assert [p.q_esd for p in peaks.peaks] == pytest.approx(want, rel=1e-12)
 
 
 def test_short_list_is_a_result_not_an_exception():
@@ -1050,8 +1108,16 @@ def test_a_named_position_with_no_peak_comes_back_flagged_not_dropped():
     position wearing an ordinary esd: the component has no gradient on its own
     position, so the number it comes back with means nothing and its esd says
     so in the only way it can.
+
+    The lines are Gaussian so that 35° holds nothing.  A prediction draws a
+    Lorentzian's whole tail at the closing windows (WP-2002), and the lab
+    profile's ``x`` left 0.8 counts of the 30.39° and 37.44° lines there on a
+    background of 209.7: the component then came back at I = 3.8e-3 ± 376,
+    off its zero bound and flagged by the 1σ rule alone, with a position esd
+    of 0.83°.
     """
     ins = _instrument()
+    ins.profile.x.value = 0.0
     y, grid, _truth = _forward(ins)
     data = _noisy(y, grid, seed=7)
 

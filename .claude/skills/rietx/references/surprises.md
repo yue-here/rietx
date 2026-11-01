@@ -28,7 +28,7 @@ settings side by side on the bundled standards, whose cumulative-Δχ² panel sh
 
 **8.2 The opposite also happens: an improvement that passes every statistical
 test and is still rejected.** On round-robin brucite, adding anisotropic strain
-improves Rwp 18.64 → 17.88 % with ΔBIC +21.0 at N/f² — and drives σ²(M) negative on 7
+improves Rwp 18.64 → 18.04 % with ΔBIC +12.5 at N/f² — and drives σ²(M) negative on 19
 of 43 reflections, so the coefficients are unphysical and unquotable. A
 statistical test cannot see a violated positivity cone.
 
@@ -124,8 +124,8 @@ Three things then follow from *which* anode, all measured:
   a `warning` at Co Kα (180 eV under the Fe K edge, f′ = −3.3 e) and an `info`
   at Mo Ka (f′ = +0.3 e). Same specimen, same code, different severity.
 * Contamination checks are per anode. `contamination == []` is *not checked*,
-  not clean, for an unrecognised wavelength (`identify_anode(λ)` is `None`), a
-  neutron source and `kbeta="monochromator"`. `kbeta=None` is undeclared, not
+  not clean, when `contamination_searches == []`: an unrecognised wavelength, a
+  neutron source, `kbeta="monochromator"`. `kbeta=None` is undeclared, not
   "no filter".
 
 **8.12 "Infinitely thick" is a modelling claim you make by saying nothing.**
@@ -223,8 +223,8 @@ further.**
 **8.17 "Is there intensity here?" is not one question — it depends on what else
 your hypothesis predicts nearby.** Two detectors in this package ask it with the
 same window (±½ FWHM) and the same threshold (3σ), and they must use different
-null models. WP-1024's `predicted_but_absent` asks it against the fitted
-**background**, which is right for an oversized cell's phantom reflection because
+null models. WP-1024's `predicted_but_absent` asks it against the picker's
+**envelope**, which is right for an oversized cell's phantom reflection because
 a phantom sits in a *gap*. WP-1025's extinction screen asks it at a **forbidden**
 position, which sits inside a dense predicted pattern — and measured on the FAP
 lab pattern, the 003 that P 6₃/m forbids is 0.89 FWHM from an allowed neighbour
@@ -512,6 +512,7 @@ neutron one. `result.diagnostics` holds the shared structure, solve and plan,
 plus each histogram's `BACKGROUND_ABSORPTION`, on both lists: count it once.
 `DATA_SUPPORT_LOW` never fires on a joint fit. Histogram h's radiation is
 `MultiHistogramRefinement.fitted_instruments[h].source.kind`.
-`ref.report(h)` is histogram h's report. If the last stage broadened peaks, its
+`ref.report(h)` is histogram h's report, `for_histogram(h).diagnostics` its
+findings. If the last stage broadened peaks, its
 curves cut their tails and Layer 0 lists the cuts as unmatched.
 (Measured: WP-1312, WP-1344, WP-1341.)

@@ -62,6 +62,11 @@ accepted cell is tested as the explanation of the leftovers.
 
 ### Inherited
 
+- **2026-10-23, from [1510](1510-what-the-chemist-knows-reaches-the-search.md) (closed): the
+  supported-supercell count this WP reads may change.** 1510's review found that the
+  supercell test judges the parent's lines with the child's shift correction
+  (`ambiguity.py:708`, `:814`). [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md)
+  holds that task, so read `SupercellCheck.n_seen_unexplained` after it lands.
 - **2026-10-16, from the issue triage (#728 item 1): the picker changed after
   the public repro was measured.** The 2026-10-12 repro (`869b6cf8`)
   attributes the ~100 lines to two picker effects: junk components on a steep

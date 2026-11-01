@@ -90,13 +90,13 @@ assert at_cell.best_or_none() is None
 assert [len(g.members) for g in at_cell.groups] == [2, 2, 1, 2, 2]
 assert [g.resolved for g in at_cell.groups] == [False, False, True, False, False]
 assert round(at_cell.noise_floor) == 693
-assert [round(g.gain) for g in at_cell.groups] == [320390, 187893, 156398, 129094, 39429]
-assert [round(g.delta_bic) for g in at_cell.groups] == [784, 329, 263, 201, 45]
+assert [round(g.gain) for g in at_cell.groups] == [322283, 189147, 156429, 129119, 39436]
+assert [round(g.delta_bic) for g in at_cell.groups] == [795, 333, 264, 201, 45]
 # After the widths: the Kα2 weight leads, then two occupancies.
 assert [g.members[0].path for g in at_profile.groups[:3]] == [
     "instrument.source.lines.1.weight", "phases.0.atoms.2.occ", "phases.0.atoms.6.occ"]
-assert [round(g.gain) for g in at_profile.groups[:3]] == [478, 215, 182]
-assert [f"{g.delta_bic:+.1f}" for g in at_profile.groups[:3]] == ["+15.7", "+3.3", "+1.7"]
+assert [round(g.gain) for g in at_profile.groups[:3]] == [474, 218, 201]
+assert [f"{g.delta_bic:+.1f}" for g in at_profile.groups[:3]] == ["+21.0", "+5.8", "+4.8"]
 assert {"instrument.geometry.axial_sl", "instrument.geometry.axial_hl"} <= {
     c.path for c in at_profile.non_separable}
 # Narrowed to the phase without occupancies, ΔBIC refuses what is left, and
@@ -104,27 +104,28 @@ assert {"instrument.geometry.axial_sl", "instrument.geometry.axial_hl"} <= {
 assert narrowed.best_or_none().path == "phases.0.extinction"
 assert narrowed.groups[0].delta_bic < 0
 assert "ΔBIC refuses it" in narrowed.summary
-assert f"{narrowed.groups[0].gain:.1f}" == "104.5"
-assert f"{narrowed.groups[0].delta_bic:.3f}" == "-1.799"
-assert round(narrowed.n_effective) == 915 and narrowed.n_evaluated == 24
-assert round(narrowed.noise_floor, 2) == 29.96
+assert f"{narrowed.groups[0].gain:.1f}" == "96.1"
+# −1.29940 to −1.29971 between starts 1e-14 apart, so one decimal, as the summary prints it
+assert f"{narrowed.groups[0].delta_bic:.1f}" == "-1.3"
+assert round(narrowed.n_effective) == 1001 and narrowed.n_evaluated == 24
+assert round(narrowed.noise_floor, 2) == 26.98
 assert sorted(c.path for c in narrowed.non_separable) == [
     "phases.0.gauss_size", "phases.0.gauss_strain", "phases.0.lor_size", "phases.0.lor_strain"]
 # The re-solve, and the comparison against it.
-assert f"{ref.result_.statistics.rwp:.4f}" == "0.1022"
-assert f"{again.statistics.rwp:.4f}" == "0.0940"
-assert f"{wide_profile.statistics.rwp:.4f}" == "0.0947"
+assert f"{ref.result_.statistics.rwp:.4f}" == "0.0970"
+assert f"{again.statistics.rwp:.4f}" == "0.0945"
+assert f"{wide_profile.statistics.rwp:.4f}" == "0.0952"
 assert round(100 * (1 - c.freed[0].value / 0.5)) == 7
 assert [p.path for p in c.freed] == ["instrument.source.lines.1.weight"]
 assert c.freed[0].held_at == 0.5
-assert f"{c.freed[0].value:.3f}" == "0.464" and round(c.freed[0].esd * 1000) == 6
-assert f"{c.freed[0].t_ratio:+.1f}" == "-6.0"
-assert f"{c.delta_bic:+.1f}" == "+31.0" and round(c.n_effective) == 1297
-assert round(c.delta_bic_raw_n) == 161
+assert f"{c.freed[0].value:.3f}" == "0.465" and round(c.freed[0].esd * 1000) == 6
+assert f"{c.freed[0].t_ratio:+.1f}" == "-5.8"
+assert f"{c.delta_bic:+.1f}" == "+29.2" and round(c.n_effective) == 1269
+assert round(c.delta_bic_raw_n) == 156
 # The warning's numbers: extinction does not move, yet the unpaired ΔBIC is large.
 assert c_direct.freed[0].value == 0.0 and c_paired.freed[0].value == 0.0
-assert round(c_direct.delta_bic) == 148 and round(c_paired.delta_bic) == -7
+assert round(c_direct.delta_bic) == 46 and round(c_paired.delta_bic) == -7
 assert narrowed_again.groups[0].members[0].path == "phases.0.extinction"
-assert f"{narrowed_again.groups[0].delta_bic:+.1f}" == "+1.4"
+assert f"{narrowed_again.groups[0].delta_bic:+.1f}" == "+0.4"
 assert narrowed_again.groups[0].members[0].gradient > 0  # χ² falls below the floor
 assert c_paired.freed[0].t_ratio == 0.0

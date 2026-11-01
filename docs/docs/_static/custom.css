@@ -1,12 +1,691 @@
-/* The styling pydata-sphinx-theme does not supply (WP-1986). */
+/* The manual's own styling (WP-1986, WP-2021).
+ *
+ * Every colour and face is a name from `tokens.css`, the site's one token file
+ * (`docs/landing/src/tokens.css`, loaded first), and this file spells no colour of its
+ * own: `tests/test_manual.py` fails on a hex here.  It maps pydata-sphinx-theme's names
+ * onto the tokens, then restyles the parts whose shape differs from the landing page's.
+ * `docs/landing/README.md` § House style is the rulebook both pages follow. */
 
-/* The bibliography under `bibtex_reference_style = "author_year"`.  docutils
- * gives every citation node a label, and sphinxcontrib-bibtex documents that
- * it cannot remove one, so the list would print [AS64] beside a citation
- * reading [Abramowitz and Stegun, 1964].  Hide it and the entry starts at the
- * author, which is the shape an author-year reference list has.  The selector
- * is exact: tests/test_manual.py asserts every `span.label` in the built site
- * sits inside a `doc-biblioentry`. */
+/* ---------------------------------------------------------------------------------------
+ * The map from pydata's names to the site's.
+ *
+ * On `html[data-theme]`, where pydata declares its own: a bare `:root` rule loses to that
+ * on specificity, and this one wins by loading later.  One block serves both themes, since
+ * the tokens it reads are per theme, and it covers `data-theme="auto"`, which pydata writes
+ * before its script resolves the system's choice.  The heading colour is
+ * `--pst-heading-color`: pydata reads `--pst-color-heading` only as a fallback.  Link hover
+ * stays the link colour, where pydata's default is its violet secondary. */
+html[data-theme] {
+  --pst-color-background: var(--bg);
+  --pst-color-on-background: var(--surface);
+  --pst-color-surface: var(--surface-2);
+  --pst-color-on-surface: var(--ink);
+  --pst-color-text-base: var(--ink);
+  --pst-color-text-muted: var(--muted);
+  --pst-heading-color: var(--ink);
+  --pst-color-heading: var(--ink);
+  --pst-color-border: var(--rule-strong);
+  --pst-color-border-muted: var(--rule);
+  --pst-color-shadow: color-mix(in srgb, var(--ink) 10%, transparent);
+  --pst-color-primary: var(--accent);
+  --pst-color-primary-bg: var(--accent-soft);
+  --pst-color-primary-text: var(--on-accent);
+  --pst-color-primary-highlight: var(--accent-ink);
+  --pst-color-secondary: var(--accent-ink);
+  --pst-color-secondary-bg: var(--accent-soft);
+  --pst-color-accent: var(--accent);
+  --pst-color-accent-bg: var(--accent-soft);
+  --pst-color-link: var(--accent-ink);
+  --pst-color-link-hover: var(--accent-ink);
+  --pst-color-link-higher-contrast: var(--accent-ink);
+  --pst-color-inline-code: var(--ink);
+  --pst-color-inline-code-links: var(--accent-ink);
+  --pst-color-target: var(--accent-soft);
+  --pst-color-blockquote-notch: var(--rule-strong);
+  --pst-color-table: var(--ink);
+  --pst-color-table-row-hover-bg: var(--surface-2);
+  --pst-color-table-inner-border: var(--rule);
+  --pst-color-info: var(--info);
+  --pst-color-info-bg: color-mix(in srgb, var(--info) 12%, var(--bg));
+  --pst-color-success: var(--ok);
+  --pst-color-success-bg: color-mix(in srgb, var(--ok) 12%, var(--bg));
+  --pst-color-warning: var(--warn);
+  --pst-color-warning-bg: color-mix(in srgb, var(--warn) 14%, var(--bg));
+  --pst-color-attention: var(--warn);
+  --pst-color-attention-bg: color-mix(in srgb, var(--warn) 14%, var(--bg));
+  --pst-color-danger: var(--danger);
+  --pst-color-danger-bg: color-mix(in srgb, var(--danger) 12%, var(--bg));
+  --pst-font-family-base: var(--sans);
+  --pst-font-family-heading: var(--sans);
+  --pst-font-family-monospace: var(--mono);
+  /* sphinx-design's tab sets and cards read their own names. */
+  --sd-color-tabs-label-active: var(--ink);
+  --sd-color-tabs-label-hover: var(--accent-ink);
+  --sd-color-tabs-label-inactive: var(--muted);
+  --sd-color-tabs-underline-active: var(--accent);
+  --sd-color-tabs-underline-hover: var(--rule-strong);
+  --sd-color-tabs-underline: var(--rule);
+  --sd-color-tabs-overline: transparent;
+  --sd-color-card-border: var(--rule);
+  --sd-color-card-border-hover: var(--accent);
+}
+
+/* The landing page's scales (README § House style): a 56 px bar, headings at weight 600
+ * a hair tight, and a sidebar of fixed width in the band other documentation sites use.
+ * pydata registers the sidebar's width as a non-inheriting property set on the sidebar
+ * itself from 960 px, so it is overridden there. */
+:root {
+  --pst-header-height: 3.5rem;
+  --pst-font-weight-heading: 600;
+  --pst-font-size-h1: 2.25rem;
+  --pst-font-size-h2: 1.5rem;
+  --pst-font-size-h3: 1.2rem;
+  --pst-font-size-h4: 1.05rem;
+  --pst-font-size-h5: 1rem;
+  --pst-font-size-h6: 1rem;
+}
+
+@media (min-width: 960px) {
+  .bd-sidebar-primary {
+    --pst-sidebar-primary-width: 18rem;
+  }
+}
+
+h1, h2, h3, h4 {
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* The small label, the landing page's table and box heads (README § House style): the two
+ * sidebars' headings here, and the previous and next links' "Previous" and "Next".
+ * Uppercase, tracked, `--faint` on the page ground.  The last selector is pydata's own
+ * plus the element, since pydata capitalises that label at four classes deep. */
+nav.bd-links p.bd-links__title,
+.onthispage,
+.prev-next-area a .prev-next-info p.prev-next-subtitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+nav.bd-links p.bd-links__title,
+.onthispage {
+  margin-bottom: 0.6rem;
+}
+
+.onthispage i,
+.onthispage svg {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------------------
+ * The header: the landing page's bar.  The ground shows through, the brand is the mark
+ * and the word, and every control is the same height and quiet until hovered. */
+.bd-header {
+  background-color: color-mix(in srgb, var(--bg) 88%, transparent) !important;
+  backdrop-filter: saturate(1.2) blur(8px);
+  box-shadow: none;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* pydata pads the bar and sizes the brand to the bar's height, which adds up to 16 px
+ * more than the height it declares and the sidebars stick under. */
+.bd-header .bd-header__inner {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.bd-header .navbar-brand {
+  padding: 0;
+}
+
+.rietx-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.rietx-brand .rietx-mark {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  fill: var(--accent);
+}
+
+.rietx-brand .rietx-wordmark {
+  font-family: var(--sans);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.bd-header ul.navbar-nav > li.nav-item > .nav-link {
+  color: var(--ink-2);
+}
+
+.bd-header ul.navbar-nav > li.nav-item > .nav-link:hover {
+  color: var(--accent-ink);
+}
+
+.bd-header ul.navbar-nav > li.nav-item.current > .nav-link {
+  color: var(--ink);
+}
+
+.bd-header ul.navbar-nav > li.nav-item.current > .nav-link::before {
+  border-bottom: 2px solid var(--accent);
+}
+
+.bd-header ul.navbar-nav > li.nav-item > .nav-link:hover::before {
+  border-bottom-color: var(--rule-strong);
+}
+
+/* The search field opens a dialog, so it is a control, and it keeps its border. */
+.search-button-field {
+  height: 32px;
+  padding: 0 0.6em;
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+  background-color: var(--surface);
+  color: var(--muted);
+}
+
+.search-button-field:hover {
+  box-shadow: none;
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.search-button-field .kbd-shortcut__modifier,
+.search-button-field kbd {
+  color: var(--faint);
+}
+
+/* The version is a word with a caret, not a box. */
+button.btn.version-switcher__button {
+  border: 0;
+  background: none;
+  padding: 0 0.25rem;
+  font-size: 0.9rem;
+  color: var(--ink-2);
+}
+
+button.btn.version-switcher__button:hover {
+  box-shadow: none;
+  color: var(--accent-ink);
+}
+
+.version-switcher__menu {
+  font-size: 0.9rem;
+  background-color: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: 8px;
+}
+
+.version-switcher__menu a.list-group-item {
+  background-color: var(--surface);
+  color: var(--ink-2);
+}
+
+.version-switcher__menu a.list-group-item:hover {
+  background-color: var(--surface-2);
+  color: var(--accent-ink);
+}
+
+html .pst-navbar-icon {
+  color: var(--ink-2);
+}
+
+html .pst-navbar-icon:hover {
+  color: var(--accent-ink);
+}
+
+html .pst-navbar-icon:hover::before {
+  border-bottom: 0;
+}
+
+/* The theme control is the landing page's `.tbtn`. */
+.rietx-theme {
+  appearance: none;
+  border: 1px solid var(--rule-strong);
+  background: var(--surface);
+  color: var(--ink-2);
+  border-radius: 999px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.rietx-theme svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (hover: hover) {
+  .rietx-theme:hover {
+    border-color: var(--accent);
+    color: var(--accent-ink);
+  }
+}
+
+.bd-header .navbar-header-items__end {
+  gap: 14px;
+}
+
+/* The narrow-screen drawer: the tabs, then a rule, then the controls on one row of their
+ * own, and the current tab carries the sidebar's mark.  The row wraps: at 390 px the
+ * controls are wider than the drawer, and the GitHub link went off its edge. */
+.bd-sidebar-primary .sidebar-header-items .sidebar-header-items__end {
+  flex-wrap: wrap;
+  gap: 0.5rem 14px;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+}
+
+.bd-sidebar-primary .sidebar-header-items .nav-item > .nav-link {
+  color: var(--ink-2);
+}
+
+.bd-sidebar-primary .sidebar-header-items .nav-item.current > .nav-link {
+  color: var(--ink);
+  box-shadow: inset 2px 0 0 var(--accent);
+  padding-left: 0.75rem;
+}
+
+/* ---------------------------------------------------------------------------------------
+ * The sidebars.  The current entry is marked by colour and a bar on the column's rule,
+ * never by weight: a bolder line re-wraps its text and shifts what is under it. */
+nav.bd-links .current > a,
+.toc-entry a.nav-link.active,
+.toc-entry a.nav-link[aria-current="true"] {
+  font-weight: inherit;
+  color: var(--ink);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+nav.bd-links li > a,
+.toc-entry a.nav-link {
+  color: var(--ink-2);
+}
+
+nav.bd-links li > a:hover,
+.toc-entry a.nav-link:hover {
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+
+/* The left column stands on a rule; the right column's sections sit on one, which the
+ * current entry's bar overlays.  The twin link under them is not a section, so its item
+ * has none. */
+.bd-sidebar-primary {
+  border-right-color: var(--rule);
+}
+
+.sidebar-secondary-item {
+  border-left-color: var(--rule);
+}
+
+.sidebar-secondary-item:has(> .rietx-twin) {
+  border-left: 0;
+}
+
+.rietx-twin {
+  margin-top: 1.25rem;
+  font-size: 0.84rem;
+}
+
+.rietx-twin a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.rietx-twin a:hover {
+  color: var(--accent-ink);
+}
+
+/* ---------------------------------------------------------------------------------------
+ * The breadcrumb (`_templates/breadcrumbs.html`): regular weight in `--muted`, so the H1
+ * under it is the only heavy thing at the top of the article. */
+ul.bd-breadcrumbs {
+  font-size: 0.84rem;
+}
+
+ul.bd-breadcrumbs li.breadcrumb-item {
+  font-weight: 400;
+  color: var(--muted);
+}
+
+ul.bd-breadcrumbs li.breadcrumb-item a {
+  color: var(--muted);
+}
+
+ul.bd-breadcrumbs li.breadcrumb-item a:hover {
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+
+ul.bd-breadcrumbs li.breadcrumb-item:not(.breadcrumb-home)::before {
+  color: var(--faint);
+  font-size: 0.65rem;
+}
+
+/* ---------------------------------------------------------------------------------------
+ * The article. */
+
+/* A link is the accent's ink over a tinted underline, which takes the full accent on
+ * hover: the landing page's links, as an underline rather than a border so a link that
+ * wraps keeps it on every line. */
+a {
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  text-decoration-thickness: 1px;
+}
+
+a:hover {
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 1px;
+}
+
+/* The answer sentence under every title is the page's lede (the page contract puts one
+ * there, WP-1975 § F8). */
+.bd-article > section > h1 + p {
+  font-size: 1.1rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+/* Inline code is ink on a tint with no border: the landing page draws code flat, so a
+ * bordered box is always a control. */
+code.literal {
+  border: 0;
+  border-radius: 4px;
+  background-color: var(--surface-2);
+  color: var(--ink);
+}
+
+a code.literal {
+  color: inherit;
+}
+
+/* A block of code: flat on the tint, as on the landing page. */
+div.highlight,
+div.highlight pre,
+.highlight .hll {
+  background-color: var(--surface-2);
+}
+
+div.highlight pre,
+pre {
+  border: 0;
+  border-radius: 8px;
+}
+
+/* A signature short enough to stay on one line can still be wider than a phone, and
+ * `rx.save_instrument_profile(instrument:` has no break in it: it scrolls on its own line
+ * where the column would otherwise cut it (WP-2022). */
+dt.sig {
+  overflow-x: auto;
+}
+
+/* A signature is coloured as a Python code block is (WP-2023): `docs/py_highlight.py`
+ * puts `highlight` on it and Pygments' token names on its pieces, so every colour is
+ * `pygments.css`'s.  It takes the token colours and not the block's ground, which would
+ * hide the tint of a signature reached by its permalink; and its parameter names are
+ * upright, where an italic would fight the colours. */
+html[data-theme] dt.sig.highlight {
+  background-color: transparent;
+}
+
+html[data-theme] dt.sig.highlight:target {
+  background-color: var(--pst-color-target);
+}
+
+dt.sig.highlight em.sig-param {
+  font-style: normal;
+}
+
+/* A model's fields (`py:fields`, WP-2022) are one object's signatures, a line each, and
+ * carry no body of their own. */
+dl.py.fields > dt {
+  padding-top: 0.1rem;
+  padding-bottom: 0.1rem;
+}
+
+dl.py.fields > dd:empty {
+  display: none;
+}
+
+/* A tab set (macOS, Linux, Windows) is a row of words over a rule, the current one
+ * underlined, and draws no box round the panel, which is not a control. */
+.bd-content .sd-tab-set > label {
+  background-color: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--muted);
+  font-weight: 500;
+  margin-inline-end: 0.75rem;
+  padding: 0 0.1em;
+}
+
+.bd-content .sd-tab-set > input:checked + label {
+  background-color: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--accent);
+  border-radius: 0;
+  color: var(--ink);
+  transform: none;
+}
+
+.bd-content .sd-tab-set > input:not(:checked, :focus-visible) + label:hover {
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+
+.bd-content .sd-tab-set .sd-tab-content {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  border-radius: 0;
+  background-color: transparent;
+  padding: 0.75rem 0 0;
+}
+
+/* Cards are links: a bordered box is a control. */
+.sd-card {
+  border-color: var(--rule-strong);
+  border-radius: 10px;
+  background-color: var(--surface);
+}
+
+@media (hover: hover) {
+  .sd-card:hover {
+    border-color: var(--accent);
+  }
+}
+
+.sd-card .sd-card-title {
+  font-weight: 600;
+}
+
+/* Previous and next: the title is a link without an underline, and the label above it
+ * is the small label. */
+.prev-next-area a p.prev-next-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--accent-ink);
+  text-decoration: none;
+}
+
+.prev-next-area a p.prev-next-title:hover {
+  text-decoration: none;
+}
+
+/* A diagram takes the site's colours in both themes.  mermaid writes its colours into a
+ * stylesheet inside each SVG under the SVG's own id, so these outrank it only with
+ * `!important`, and they hold through the re-render a theme change triggers.  pydata
+ * inverts a diagram under the dark theme, which would turn these tokens into others. */
+html[data-theme="dark"] pre.mermaid > svg {
+  filter: none;
+}
+
+.mermaid svg .node rect,
+.mermaid svg .node polygon,
+.mermaid svg .node circle,
+.mermaid svg .node path {
+  fill: var(--surface) !important;
+  stroke: var(--rule-strong) !important;
+}
+
+.mermaid svg .cluster rect {
+  fill: transparent !important;
+  stroke: var(--rule-strong) !important;
+}
+
+.mermaid svg .flowchart-link,
+.mermaid svg .edgePath path {
+  stroke: var(--muted) !important;
+}
+
+.mermaid svg marker path,
+.mermaid svg .arrowheadPath {
+  fill: var(--muted) !important;
+  stroke: var(--muted) !important;
+}
+
+.mermaid svg .nodeLabel,
+.mermaid svg .cluster-label,
+.mermaid svg .label text,
+.mermaid svg span {
+  color: var(--ink) !important;
+  fill: var(--ink) !important;
+  font-family: var(--sans) !important;
+}
+
+.mermaid svg .edgeLabel,
+.mermaid svg .edgeLabel p,
+.mermaid svg .edgeLabel rect {
+  background-color: var(--bg) !important;
+  fill: var(--bg) !important;
+  color: var(--ink-2) !important;
+}
+
+/* ---------------------------------------------------------------------------------------
+ * The footer (`_templates/rietx-footer.html`): the landing page's line. */
+.bd-footer {
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.bd-footer .bd-footer__inner {
+  padding: 32px 1rem 48px;
+}
+
+.rietx-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 28px;
+}
+
+.rietx-footer a {
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.rietx-footer a:hover {
+  color: var(--accent-ink);
+}
+
+.rietx-footer .rietx-footer__note {
+  flex-basis: 100%;
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: var(--faint);
+}
+
+/* ---------------------------------------------------------------------------------------
+ * The version banner, which pydata writes above the header of every page that is not the
+ * newest release.  On the development tree, which is every preview, it is one quiet line
+ * in the manner of GOV.UK's phase banner.  On an old release it keeps the warning colour,
+ * since a reader there may be following advice that has since changed.  Which tree this
+ * is reaches the stylesheet through the footer's `data-docs-version`. */
+#bd-header-version-warning {
+  min-height: 0;
+  padding: 0.4rem 1rem;
+  font-size: 0.84rem;
+  background-color: color-mix(in srgb, var(--warn) 14%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--warn) 45%, var(--bg));
+  color: var(--ink);
+}
+
+html:has(.rietx-footer[data-docs-version="dev"]) #bd-header-version-warning {
+  background-color: var(--surface-2);
+  border-bottom-color: var(--rule);
+  color: var(--ink-2);
+}
+
+#bd-header-version-warning .sidebar-message,
+#bd-header-version-warning strong {
+  font-weight: 400;
+}
+
+#bd-header-version-warning .pst-button-link-to-stable-version {
+  background: none;
+  border: 0;
+  box-shadow: none !important;
+  padding: 0;
+  margin: 0 0 0 0.75rem;
+  font-size: inherit;
+  line-height: inherit;
+  vertical-align: baseline;
+  font-weight: 500 !important;
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+#bd-header-version-warning .pst-button-link-to-stable-version:hover {
+  background: none;
+  color: var(--accent-ink);
+  text-decoration-color: var(--accent);
+}
+
+#bd-header-version-warning a:not(.pst-button-link-to-stable-version) {
+  color: var(--muted);
+}
+
+/* "Hide search matches", which Sphinx's search script puts into `#searchbox` above the
+ * article on a page opened from a search result.  pydata draws it as a filled button on the
+ * primary colour, which is words on `--accent`, and that is 4.2:1 in the light theme, short
+ * of AA.  So it is a plain link like the banner's, and no page sets words on the accent. */
+div#searchbox p.highlight-link a {
+  background: none;
+  padding: 0;
+  font-size: 0.84rem;
+  color: var(--accent-ink);
+  text-decoration: underline;
+}
+
+/* ---------------------------------------------------------------------------------------
+ * The bibliography under `bibtex_reference_style = "author_year"`.  docutils gives every
+ * citation node a label, and sphinxcontrib-bibtex documents that it cannot remove one, so
+ * the list would print [AS64] beside a citation reading [Abramowitz and Stegun, 1964].
+ * Hide it and the entry starts at the author, which is the shape an author-year reference
+ * list has.  The selector is exact: tests/test_manual.py asserts every `span.label` in the
+ * built site sits inside a `doc-biblioentry`. */
 div.citation[role="doc-biblioentry"] > span.label {
   display: none;
 }
@@ -19,13 +698,13 @@ div.citation[role="doc-biblioentry"] {
 
 /* A numbered equation gets a column of its own for the number (WP-1408).
  *
- * Sphinx's `basic.css` floats `span.eqno` right and reserves nothing for it,
- * so a wide equation is typeset under its own number.  A two-cell grid makes
- * that collision impossible: the typeset math has one cell and the number the
- * other.  `overflow-x` on the math cell turns an equation too wide for its
- * cell into a scrollbar, and `safe center` left-aligns it once it overflows,
- * so its left edge stays in reach.  `docs/docs/check_equations.py` measures
- * whether each equation fits.  `:has()` scopes this to numbered equations. */
+ * Sphinx's `basic.css` floats `span.eqno` right and reserves nothing for it, so a wide
+ * equation is typeset under its own number.  A two-cell grid makes that collision
+ * impossible: the typeset math has one cell and the number the other.  `overflow-x` on
+ * the math cell turns an equation too wide for its cell into a scrollbar, and `safe
+ * center` left-aligns it once it overflows, so its left edge stays in reach.
+ * `docs/docs/check_equations.py` measures whether each equation fits.  `:has()` scopes
+ * this to numbered equations. */
 div.math:has(> span.eqno) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

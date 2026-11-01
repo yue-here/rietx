@@ -5,7 +5,8 @@
   python build.py --ref HEAD                      the notebooks at a ref other than the newest release tag
 
 `src/shell.html` is what every page shares: the stylesheet, the top bar, the theme control
-and the footer.  Each page in PAGES is a `<main>` (and any script of its own) in `src/`,
+and the footer.  Its colours and faces are `src/tokens.css`, the manual's too, inlined at
+`%%TOKENS%%`.  Each page in PAGES is a `<main>` (and any script of its own) in `src/`,
 dropped into the shell at `%%MAIN%%`; the table gives its title, its description and the
 footer's line saying who wrote it.  `%%IMG:name%%` becomes a data URI (inline) or
 `img/<name>.png` (site); `%%DEMO%%` is data/demo.json inline, or empty for the site build,
@@ -29,6 +30,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 SHELL = HERE / "src" / "shell.html"
+#: The site's colours and faces, shared with the manual (WP-2021): inlined at `%%TOKENS%%`.
+TOKENS = HERE / "src" / "tokens.css"
 
 
 def _by_path(name: str, path: Path):
@@ -200,6 +203,7 @@ def assemble(site: bool, name: str = "index.html", ref: str | None = None) -> st
     """One page; `ref` is where its notebooks are read, the newest release tag when None."""
     page = PAGES[name]
     html = SHELL.read_text(encoding="utf-8")
+    html = html.replace("%%TOKENS%%", TOKENS.read_text(encoding="utf-8").strip())
     html = html.replace("%%MAIN%%", (HERE / "src" / name).read_text(encoding="utf-8").strip())
     html = (html.replace("%%TITLE%%", page.title).replace("%%DESCRIPTION%%", page.description)
             .replace("%%NOTE%%", page.note))

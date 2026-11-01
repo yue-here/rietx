@@ -40,9 +40,15 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from .._about import PROFILE_FORMAT_KEY
-from ..model.profiles.caglioti import _MIN_GAMMA_G2, GAUSSIAN_VARIANCE_TO_FWHM_SQUARED
+from ..model.profiles.caglioti import (
+    _MIN_GAMMA_G2,
+    GAUSSIAN_VARIANCE_TO_FWHM_SQUARED,
+    lorentzian_negative_above,
+)
 from ..schemas.common import SCHEMA_VERSION, Diagnostic
 from ..schemas.instrument import (
+    DEBYE_SCHERRER_POLARIZATION,
+    PACKING_FRACTION,
     TCHZ_BOUNDS,
     BackgroundChebyshev,
     EmissionLine,
@@ -185,9 +191,11 @@ def load_instrument_profile(path: str | Path, *,
     # A profile file holding a bank (written by a version that did not refuse
     # one) is refused by name: ``_iter_parameters`` lists constant-wavelength
     # parameters, and a bank's ``difc`` and ``profile_tof.*`` would stay free.
+    # The file leads the message, as every other refusal here does: a reader
+    # raises naming the file (CLAUDE.md § Invariants, WP-1047).
     from ..schemas.pattern import require_two_theta
 
-    require_two_theta(None, "load_instrument_profile()", instrument=ins)
+    require_two_theta(None, f"{path}: load_instrument_profile()", instrument=ins)
     for p in _iter_parameters(ins):
         p.vary = False
     return ins
@@ -692,7 +700,7 @@ def read_gsas_prm(path: str | Path, *, profile_set: int | None = None,
             "Instrument.constant_wavelength_neutron builds it."
             if neutron else
             "HTYPE PXCR spans Bragg-Brentano and Debye-Scherrer, so "
-            "debye_scherrer was chosen (packing_fraction=0.6, a capillary "
+            f"debye_scherrer was chosen (packing_fraction={PACKING_FRACTION:g}, a capillary "
             "offset pair).")
         diagnostics.append(Diagnostic(
             level="warning", code="GSAS_PRM_GEOMETRY_ASSUMED",
@@ -714,7 +722,7 @@ def _build_instrument(icons: GsasIcons,
     ``neutron`` (an ``HTYPE PNCR`` file) starts from
     :meth:`Instrument.constant_wavelength_neutron` at ``LAM1`` — a
     :class:`~rietx.schemas.instrument.NeutronSource`, one wavelength, the
-    polarisation term pinned at 1, the coarse-instrument profile box — and
+    polarisation term pinned at 1, the profile box every preset builds — and
     maps the same eight ``PRCF`` coefficients onto it as a ``PXCR`` file,
     because the type-3 record is the same record under either radiation.
 
@@ -751,7 +759,7 @@ def _build_instrument(icons: GsasIcons,
             # rather than guess (WP-1118).
             instrument.source.lines.append(EmissionLine(
                 wavelength=icons.lam2,
-                weight=Parameter(value=icons.ka2_ratio, min=0.0, max=2.0)))
+                weight=Parameter(value=icons.ka2_ratio, min=0.0)))
         prof = instrument.profile
         prof.u.value = gu * _PRM_GAUSS_TO_DEG2
         prof.v.value = gv * _PRM_GAUSS_TO_DEG2
@@ -762,6 +770,7 @@ def _build_instrument(icons: GsasIcons,
         prof.w.value = _MIN_GAMMA_G2 if 0.0 <= w < _MIN_GAMMA_G2 else w
         prof.x.value = lx / 1e2
         prof.y.value = ly / 1e2
+        _refuse_negative_lorentzian(prof.x.value, prof.y.value, p)
         instrument.geometry.axial_sl.value = sl
         instrument.geometry.axial_hl.value = hl
     except ValidationError as exc:
@@ -851,7 +860,7 @@ def _read_icons(records: list[tuple[str, str]], p: Path, *,
             f"{p.name}: bank 1's ICONS record states no polarization (POLA, "
             f"columns 52-62) — the field is blank.  Every "
             f"real file in the corpus states it, and falling back on "
-            f"Instrument.debye_scherrer's 0.99 would put this package's "
+            f"Instrument.debye_scherrer's {DEBYE_SCHERRER_POLARIZATION:g} would put this package's "
             f"number into an instrument the caller will read as the file's")
     if icons.zero:
         raise ValueError(
@@ -1345,12 +1354,13 @@ def _instprm_width(profile, letter: str, attr: str, value: float,
 
     Two rules, both :mod:`~rietx.io.recipe`'s and both earned there rather than
     here (``_refuse_negative_width``, ``_widen``).  A **negative** width (a
-    term :data:`TCHZ_BOUNDS` bounds at or above zero) is refused by name, so a
-    fit never answers from a model the file does not describe.  It is the
-    ordinary case rather than a corner —
+    term :data:`TCHZ_BOUNDS` bounds at or above zero, W and X) is refused by
+    name, so a fit never answers from a model the file does not describe.  It
+    is the ordinary case rather than a corner —
     GSAS-II bounds none of U V W X Y Z, and **two of the four**
     constant-wavelength files in its own tutorial corpus converged to a
-    negative ``X``.  And a value outside this package's default box **widens**
+    negative ``X``.  A negative U, V or Y is read, those three having no
+    floor of their own.  And a value outside this package's default box **widens**
     the box rather than being clipped, because the box is a lab-pattern seed
     and the file is the caller's claim.
 
@@ -1376,12 +1386,35 @@ def _instprm_width(profile, letter: str, attr: str, value: float,
         # raised to it, as the schema raises a stored one
         degrees = max(degrees, _MIN_GAMMA_G2)
     if degrees < param.min:
-        # Only u and v reach this: a width's lower bound is its own domain
-        # rather than a seeded guess, and a negative one was refused above.
+        # Unreachable while u, v and y are bounded at the ceiling's mirror
+        # image and w and x refuse a negative value above; kept for a file
+        # stating a value past the 2θ axis.
         param.min = degrees - abs(degrees) - 1.0
     if degrees > param.max:
         param.max = degrees + abs(degrees) + 1.0
     param.value = degrees
+
+
+def _refuse_negative_lorentzian(x: float, y: float, p: Path) -> None:
+    """A calibration whose Lorentzian width goes negative below 2θ = 180°.
+
+    Y has no floor of its own since 2026-10-23 (WP-2002), so a negative Y is
+    read where X carries the width X/cosθ + Y·tanθ over it.  A calibration is
+    applied to a pattern this reader has not seen, so the check runs to the
+    end of the 2θ axis.  Past the crossing GSAS-II clamps the width at a
+    floor, this package has no such clamp, and a negative Lorentzian width is
+    not a peak shape.  :mod:`~rietx.io.recipe` makes the same check against
+    its own fitted range.
+    """
+    edge = lorentzian_negative_above(x, y)
+    if edge >= 180.0:
+        return
+    raise ValueError(
+        f"{p.name}: converts to instrument.profile.x = {x:g} and "
+        f"instrument.profile.y = {y:g}, whose Lorentzian FWHM X/cosθ + Y·tanθ "
+        f"is negative above 2θ = {edge:.3f}°.  GSAS-II clamps that width at a "
+        f"floor and this package has no such clamp, so the calibration is "
+        f"refused: refine X and Y from this package's own start instead")
 
 
 def _instprm_instrument(items: dict[str, str], p: Path,
@@ -1483,11 +1516,12 @@ def _instprm_instrument(items: dict[str, str], p: Path,
             if lam2 is not None:
                 lines.append(EmissionLine(
                     wavelength=Parameter(value=lam2, unit="A"),
-                    weight=Parameter(value=ratio, min=0.0, max=2.0)))
+                    weight=Parameter(value=ratio, min=0.0)))
             source = Source(
                 lines=lines,
                 polarization=Parameter(
-                    value=0.99 if polarization is None else polarization,
+                    value=(DEBYE_SCHERRER_POLARIZATION if polarization is None
+                           else polarization),
                     min=0.0, max=1.0))
 
         profile = ProfileTCHZ()
@@ -1496,21 +1530,19 @@ def _instprm_instrument(items: dict[str, str], p: Path,
             value = number(letter)
             if value is not None:
                 _instprm_width(profile, letter, attr, value, p)
+        _refuse_negative_lorentzian(profile.x.value, profile.y.value, p)
 
         geometry = Geometry(kind=geometry_kind, goniometer_radius_mm=radius)
         shl = number("SH/L")
         if shl:
             half = 0.5 * shl
-            geometry.axial_sl = Parameter(value=half, min=0.0, max=0.2)
-            geometry.axial_hl = Parameter(value=half, min=0.0, max=0.2)
+            geometry.axial_sl = Parameter(value=half, min=0.0)
+            geometry.axial_hl = Parameter(value=half, min=0.0)
 
         instrument = Instrument(source=source, geometry=geometry,
                                 profile=profile)
         zero = number("Zero")
         if zero:
-            if abs(zero) > instrument.zero_shift.max:
-                instrument.zero_shift.min = -abs(zero) - 1.0
-                instrument.zero_shift.max = abs(zero) + 1.0
             instrument.zero_shift.value = zero
     except ValidationError as exc:
         raise ValueError(

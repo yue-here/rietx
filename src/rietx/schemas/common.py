@@ -501,7 +501,128 @@ from .._nearmiss import did_you_mean
 #: rule replaces the absolute ``n_unindexed`` cap, which a ``SearchSpecSpec``
 #: still accepts as a declared int, its default now ``None``).  Additive and
 #: defaulted to ``None``, "not computed", the 0.25 → 0.26 rule.
-SCHEMA_VERSION = "0.59"
+#: Also in 0.59 (WP-2002, B8): ``StageResult.cell_reset``, the free cell
+#: parameters a stage put back at its starting values after their phase's cell
+#: left the safety window.  Additive and defaulted to ``None``, the 0.25 → 0.26
+#: rule; all three runners write a list on every stage.
+#: Also in 0.59 (WP-2002, B14): ``StageResult.collapsed``, the free parameters
+#: a stage restored to its starting values and held after its first solve found
+#: them flat (WP-1301's collapse restore).  Additive and defaulted to ``None``,
+#: the 0.25 → 0.26 rule; all three runners write a list on every stage.  And
+#: ``StageResult.seeded`` gains a second writer, ``Stage.strain_seed``'s
+#: Stephens rows, with no change of type.
+#: Also in 0.59 (WP-2002, B2): ``RefinedParameter.interval``, the profile
+#: interval of a moment angle the stationary-angle test left out of the
+#: covariance.  Additive and defaulted to ``None``, "not computed", the
+#: 0.25 → 0.26 rule; a single fit writes it on exactly those rows.
+#: Also in 0.59 (WP-2002, B1): ``PlanSpec.phase_support_sigma``, the
+#: absent-phase hold's threshold, defaulting to the 3σ every fit used, so a
+#: stored plan loads and runs as before; ``None`` switches the hold off.  An
+#: older build refuses a plan carrying it.
+#: Also in 0.59 (WP-2002, B4): ``RefinedParameter.stderr_uncorrected``, the
+#: esd without the Bérar-Lelann factor, as GSAS-II and FullProf print it.
+#: Additive and defaulted to ``None``, the 0.25 → 0.26 rule; both fit
+#: builders write it on every row that has an esd.
+#: Also in 0.59 (WP-2002, B1): ``NodeAction.phase_support_sigma`` and
+#: ``.correlation_guard``, the two plan settings a stage ran at, so a
+#: cherry-pick replays them.  Additive and defaulted to the 3σ and 0.98 the
+#: package defaulted to before them (a plan's own guard went unrecorded), the
+#: 0.4 → 0.5 rule for ``NodeAction.ftol``; both stage runners write them on
+#: every stage node.
+#: Also in 0.59 (WP-2002, the sixth round's Q1 and Q2):
+#: ``PlanSpec.closing_window_tol``, the closing stage's window area fraction,
+#: defaulting to 1e-3, so a stored plan gains a closing stage on its next run;
+#: ``None`` runs as before.  And ``NodeAction.window_area_tol``, the fraction a
+#: stage ran at, defaulting to ``None`` (the compiler default every earlier
+#: node ran at), the same rule.  And ``StageResult.n_lapack_fallbacks``, the
+#: decompositions a stage repeated with LAPACK's second driver, defaulting to
+#: 0, which every earlier stage took.
+#: Also in 0.59 (WP-1958, #954): ``QuantitativePhaseAnalysis.unmeasured_phases``,
+#: the phases with no reflection in the fitted range, and
+#: ``PhaseQuantity.weight_fraction`` widened to ``None`` for them, the others
+#: normalised over the phases seen.  Additive and defaulted to the empty list,
+#: the 0.25 → 0.26 rule; an older build refuses a row whose fraction is ``None``.
+#: And ``QuantitativePhaseAnalysis.unmeasured_held`` (which of those a stage held
+#: rather than found lineless) and ``NodeMetrics.held_scale_phases`` (the held
+#: scales a node's replay reads), both defaulting to the empty list.
+#: 0.59 → 0.60 (WP-2042): ``RefinementResult.radiation`` and
+#: ``HistogramResult.radiation``, the source's kind and line wavelengths a
+#: fit used, which ``result.plot()`` names on its 2θ axis.  Additive and
+#: defaulted to ``None``, "not recorded", the 0.25 → 0.26 rule; both fit
+#: builders write it on every result and every histogram.
+#: 0.60, C3 (issue #916), same cycle as the 0.60 above: ``LeBailValidation.predicted_but_absent_uncancellable``,
+#: ``.predicted_but_absent_uncancellable_in_window``, ``.absent_source`` and
+#: ``.n_lines_screened``,
+#: the line screen's counts beside the one it replaces; ``SupercellCheck.relation``,
+#: whether the parent is a sublattice or only indexes a subset of the lines.
+#: Additive, every new field defaulted to the reading an earlier document had
+#: (``None`` = not counted, ``"fitted_background"``, ``"sublattice"``).
+#: Also in 0.60 (#939): ``ExtinctionScreen.prefit_rwp`` and
+#: ``ExtinctionScreen.reference_rwp_net``, the cell-free Le Bail's Rwp and the
+#: reference fit's background-subtracted Rwp, and ``"unreliable"`` as a
+#: ``status`` value.  Additive and defaulted to ``None``, the 0.25 → 0.26 rule.
+#: Also in 0.60 (WP-2033): ``ExtinctionPrior.z``, ``.density``, ``.formula`` and
+#: ``.ordered``, ``ExtinctionCandidate.exclusion_reasons``, ``.special_positions``
+#: and ``.count_notes``, and ``ExtinctionScreen.z``, ``.z_from_density`` and
+#: ``.z_candidates``: the content per cell a caller declares and what the screen
+#: says of it.  Additive, every one defaulted to ``None`` or empty, the 0.25 → 0.26
+#: rule.
+#: Also in 0.60 (WP-2047): ``StageResult.window_loss`` and
+#: ``NodeMetrics.window_loss``, the share of the Bragg intensity a stage's
+#: frozen windows dropped at its answer.  Additive and defaulted to ``None``,
+#: "nobody looked", the 0.25 → 0.26 rule; all three runners write it on every
+#: stage, and ``Refinement._record`` on every stage node.
+#: Also in 0.60, one number a release cycle (WP-1809): ``PlanarityRestraint`` joins the ``Restraint``
+#: union, and ``RestraintRow.kind`` gains ``"planarity"``.  Additive: no
+#: existing document carries either, and an older build refuses one that does.
+#: Also in 0.60 (WP-2003): ``SeriesEntry.seeded_from`` and ``SeriesEntry.floored``,
+#: where each warm start came from and which moments reached it at their floor,
+#: additive and defaulted to ``None`` and the empty list; and
+#: ``SeriesResult.discontinuities`` replaced by ``SeriesResult.steps``, with
+#: ``SeriesStep.size_esd`` and ``.cold_ratio``.  Not additive: the flagged pairs
+#: cannot be rebuilt as every step, so a document's ``discontinuities`` key is
+#: dropped at read (``SeriesResult``'s ``mode="before"`` validator) and its
+#: ``steps`` reads ``None``, "not recorded".
+#: Also in 0.60 (WP-2030): ``IndexingResult.formula`` and ``.temperature``, the
+#: formula and temperature read, and ``PeakList.instrument_undeclared``,
+#: the instrument blocks the picker found at default on a lab source.  Additive
+#: and defaulted to ``None``, "not recorded", the 0.25 → 0.26 rule;
+#: ``index_pattern`` writes the first two on every result, ``pick_peaks`` and
+#: ``fit_peaks`` the third on every list.  Part 2 added
+#: ``CellCandidate.formula_units``, the units a cell holds by Hofmann's
+#: volumes, written by ``index_pattern`` when a formula is given and ``None``
+#: otherwise (additive, the same rule); ``INDEX_Z_NOT_INTEGER``, which judged
+#: that number, is gone, so a document carrying one still reads.
+#: Also in 0.60 (WP-1419 C3a): ``Phase.distortion_modes``, a child stated as
+#: its parent plus absolute mode amplitudes (``DistortionModes``: the parent
+#: group, the transform, the reference metric, one base position per atom and
+#: a ``DistortionMode`` per mode with ``amplitude: Parameter``).  Additive and
+#: defaulted to ``None``, exactly off, the 0.25 → 0.26 rule; written by
+#: ``displacive_statement``.  An older build refuses a phase carrying it.
+#: Also in 0.60 (WP-2011): ``LeBailValidation.mode``, additive, its default
+#: ``"lebail"`` being what every record written before it ran.
+#: Also in 0.60 (#939's follow-ups): ``ExtinctionScreen.perfect_fit_rwp_net``,
+#: what that Rwp would read for a fit leaving only the noise, √(N/(N+S)).
+#: Additive and defaulted to ``None``, the same rule.
+#: Also in 0.60 (WP-1815): ``GeometryTable.torsions``, a ``GeometryTorsion``
+#: per torsion over bonded chains (four labels, indices and symmetry codes, the
+#: angle in (−180°, 180°] and its two esds), defaulted to ``None``, which an
+#: older table reads as "not listed" (``[]`` is "listed, none found"); and ``TorsionRestraint`` joins the
+#: ``Restraint`` union, ``RestraintRow.kind`` gaining ``"torsion"``.  Additive:
+#: no existing document carries either, and an older build refuses one that
+#: does.  ``GeometryRequest`` is an argument and is never stored.
+#: Also in 0.60 (WP-1419 C4a): ``RefinementResult.distortion_totals``, one
+#: ``DistortionTotal`` per irrep block of a phase on mode amplitudes (A_τ, its
+#: esd and label, T², ``driving`` (``None`` where the record's parent
+#: operations miss its reference structure), the sign convention, the largest
+#: displacement), additive and defaulted to ``None`` where no phase carries
+#: ``distortion_modes``.
+#: Also in 0.60 (#941's follow-ups): ``LeBailValidation.n_lines_screened_in_window``,
+#: ``.predicted_but_absent_density_in_window`` and
+#: ``.predicted_but_absent_excess_in_window``, the windowed count's density and
+#: its excess over the run's cleanest candidate.  Additive and defaulted to
+#: ``None``, the 0.25 → 0.26 rule.
+SCHEMA_VERSION = "0.60"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``
 #: partitions the observed intensity among reflections by an iterated
@@ -787,7 +908,7 @@ class _InheritsDeclaredDefaults(Base):
     ``Parameter`` inherits what it left out.
 
     A field declares its physical range and unit in its ``default_factory``
-    (``Atom.occ``: min 0, max 1.5; ``Phase.lor_size``: min 0, degrees) rather
+    (``Atom.occ``: min 0; ``Phase.lor_size``: min 0, degrees) rather
     than as a field constraint, so before this the range applied only when the
     field was omitted entirely.  A caller supplying
     ``Parameter(value=..., vary=...)`` — the natural way to set a start or hold
@@ -942,8 +1063,9 @@ class Diagnostic(Base):
 
         ``warning[CODE]: message`` heads it, then ``at:`` with the paths and
         ``help:`` with the suggestion, each indented on its own line.  The
-        explanation is left out because it is the same for every finding; a
-        notebook folds it under the headline.
+        explanation is left out because it is the same for every finding
+        (WP-1985).  A notebook form prints it as ``means:`` under ``help:``
+        (:func:`rietx._display.diagnostic_lines`).
         """
         lines = [f"{self.level}[{self.code}]: {self.message}"]
         if self.where:

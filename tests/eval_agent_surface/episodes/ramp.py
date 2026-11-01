@@ -40,6 +40,8 @@ from pathlib import Path
 import numpy as np
 
 import rietx as rx
+from rietx.model.forward import WINDOW_AREA_TOL, compile_model
+from rietx.params.vector import ParameterTable
 from rietx.schemas.instrument import BackgroundChebyshev
 
 # The host CIF ships with the package's test data; the episode hands the agent a
@@ -117,7 +119,15 @@ def simulate(n: int = N_PATTERNS) -> tuple[np.ndarray, list[np.ndarray]]:
     for T in temps:
         truth.phases[0].cell.a.value = a_of_T(T)
         truth.phases[1].scale.value = 4.0e-4 * w_of_T(T)
-        y = rx.Refinement(truth, ins).predict(GRID)
+        # at the declared stages' windows, the draw the registered baseline
+        # was captured from: predict's default became the closing stage's
+        # fraction in WP-2002's seventh round, and moved 149 935 of 153 068
+        # channels
+        table = ParameterTable(truth, ins)
+        grid = rx.PatternData(two_theta=GRID.tolist(), intensity=np.zeros_like(GRID).tolist())
+        y = compile_model(truth, ins, grid, mode="rietveld",
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=WINDOW_AREA_TOL).evaluate(table.decode(table.x0()))
         counts.append(rng.poisson(np.maximum(y, 0.0)).astype(float))
     return temps, counts
 

@@ -935,7 +935,7 @@ def test_auto_background_hands_the_cap_code_to_its_caller():
     import warnings
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        cheb = auto_background(humpy, kind="chebyshev")
+        cheb = auto_background(humpy, kind="chebyshev").background
     assert len(cheb.coefficients) == 15
 
 
@@ -947,16 +947,60 @@ def test_arpls_lambda_selection_returns_evidence():
 
 
 def test_auto_background_shapes_to_pattern():
-    flat = auto_background(_peaky_pattern(background=_flat_bkg), wavelength=WAVELENGTH)
+    flat = auto_background(_peaky_pattern(background=_flat_bkg), wavelength=WAVELENGTH).background
     assert isinstance(flat, BackgroundPSpline)
     assert flat.air_scatter is None, "a declined air term is absent, not zero (WP-1454)"
 
-    air = auto_background(_peaky_pattern(background=_air_scatter_bkg), wavelength=WAVELENGTH)
+    air = auto_background(_peaky_pattern(background=_air_scatter_bkg), wavelength=WAVELENGTH).background
     assert air.air_scatter.vary, "1/x term should switch on for air scatter"
 
-    cheb = auto_background(_peaky_pattern(background=_hump_bkg), kind="chebyshev")
+    cheb = auto_background(_peaky_pattern(background=_hump_bkg), kind="chebyshev").background
     assert isinstance(cheb, BackgroundChebyshev)
     assert len(cheb.coefficients) >= 4
+
+
+def test_auto_background_returns_the_scores_beside_its_pick():
+    """The pick travels with the scores it was made on (WP-2002, B12).
+
+    Each choice is the one its score and trigger name, and the model is the
+    one the verb built before it returned the scores: the knots
+    ``for_range`` lays at that step, and the air term only past its trigger.
+    """
+    from rietx.background.auto import (
+        _KNOT_STEP_HUMPY_DEG,
+        _KNOT_STEP_SMOOTH_DEG,
+        AIR_SCATTER_TRIGGER,
+        HUMP_TRIGGER,
+    )
+
+    for shape in (_flat_bkg, _air_scatter_bkg, _hump_bkg):
+        data = _peaky_pattern(background=shape)
+        diag = diagnose(data, wavelength=WAVELENGTH)
+        choice = auto_background(data, diagnostics=diag)
+        assert choice.kind == "pspline"
+        assert choice.amorphous_hump_score == diag.amorphous_hump_score
+        assert choice.hump_trigger == HUMP_TRIGGER
+        assert choice.air_scatter_gain == diag.air_scatter_gain
+        assert choice.air_scatter_trigger == AIR_SCATTER_TRIGGER
+        humpy = diag.amorphous_hump_score > HUMP_TRIGGER
+        assert choice.knot_step_deg == (_KNOT_STEP_HUMPY_DEG if humpy
+                                        else _KNOT_STEP_SMOOTH_DEG)
+        assert choice.air_scatter == (diag.air_scatter_gain > AIR_SCATTER_TRIGGER)
+        assert choice.air_scatter == (choice.background.air_scatter is not None)
+        built = BackgroundPSpline.for_range(diag.two_theta_min, diag.two_theta_max,
+                                            knot_step_deg=choice.knot_step_deg,
+                                            lambda_smooth=1.0)
+        assert choice.background.breakpoints == built.breakpoints
+        assert choice.selection is None and choice.seed_level is None
+
+    humpy = _peaky_pattern(background=_hump_bkg)
+    cheb = auto_background(humpy, kind="chebyshev")
+    scan = select_chebyshev_order(humpy)
+    assert cheb.kind == "chebyshev"
+    assert cheb.selection == scan
+    assert len(cheb.background.coefficients) == int(scan.selected)
+    assert cheb.amorphous_hump_score is None and cheb.knot_step_deg is None
+    assert cheb.air_scatter is None
 
 
 def test_auto_background_knots_span_the_fitted_range():
@@ -964,11 +1008,11 @@ def test_auto_background_knots_span_the_fitted_range():
     others (WP-1454): a coefficient past the fitted range has no data, only
     the penalty, and extends the curve wherever its slope points."""
     data = _peaky_pattern(background=_flat_bkg)
-    whole = auto_background(data, wavelength=WAVELENGTH)
+    whole = auto_background(data, wavelength=WAVELENGTH).background
     assert whole.breakpoints[0] == pytest.approx(data.two_theta[0])
     assert whole.breakpoints[-1] == pytest.approx(data.two_theta[-1])
 
-    limited = auto_background(data, wavelength=WAVELENGTH, two_theta_limits=(30.0, 70.0))
+    limited = auto_background(data, wavelength=WAVELENGTH, two_theta_limits=(30.0, 70.0)).background
     tt = np.asarray(data.two_theta)
     fitted = tt[(tt >= 30.0) & (tt <= 70.0)]
     assert limited.breakpoints[0] == pytest.approx(fitted[0])
@@ -976,7 +1020,7 @@ def test_auto_background_knots_span_the_fitted_range():
 
     # caller-supplied diagnostics over the whole file: the knots still stop at the limits
     kept = auto_background(data, diagnostics=diagnose(data, wavelength=WAVELENGTH),
-                           two_theta_limits=(30.0, 70.0))
+                           two_theta_limits=(30.0, 70.0)).background
     assert kept.breakpoints[0] >= 30.0 and kept.breakpoints[-1] <= 70.0
 
 
@@ -1167,7 +1211,7 @@ def test_pspline_refines_a_curved_background():
     ins = rx.Instrument.bragg_brentano(monochromator_two_theta=26.6)
     ins.profile.w.value = 2e-3
     ins.profile.x.value = 4e-3
-    ins.background = auto_background(data, wavelength=WAVELENGTH)
+    ins.background = auto_background(data, wavelength=WAVELENGTH).background
 
     ref = rx.Refinement(structure, ins, history=False)
     result = ref.fit(data, plan="lab_bragg_brentano")

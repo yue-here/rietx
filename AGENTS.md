@@ -14,7 +14,7 @@ agent — and any human — changing this code.
   read the agent skill [`docs/skill/rietx/SKILL.md`](docs/skill/rietx/SKILL.md)
   first (it is also installed at `.agents/skills/rietx/` and
   `.claude/skills/rietx/`, so your harness may have loaded it already), then the
-  manual's Part 1 (`docs/manual/using/`). Nothing in the rulebooks substitutes
+  manual (`docs/docs/`). Nothing in the rulebooks substitutes
   for either.
 - Learned something *running* it — a rule a batch, a series or a phase type
   needs and a single fit does not? It goes into the skill's reference file for

@@ -8,13 +8,15 @@ rietx leaves that esd empty because the arithmetic would otherwise print a small
 The esds come from the covariance matrix at the converged point, χ²<sub>red</sub> (JᵀJ)⁻¹, where J is the Jacobian of the weighted residuals.
 They are taken from the last stage of the plan, where every freed parameter refines together.
 Each esd is multiplied by the Bérar-Lelann factor, which accounts for neighbouring residuals that are correlated with each other and so carry less independent information.
-Not every program applies this factor, so divide it out before comparing esds with another program's: `FitReport.identifiability.esd_inflation` holds it.
+GSAS-II, FullProf and TOPAS do not apply it to their esds.
+`RefinedParameter.stderr_uncorrected` is each esd without the factor, so compare another program's esd with it.
 The correlation matrix is not inflated, so a degenerate pair reads |ρ| ≈ 1.
 The [esd section of the theory](../theory/estimation.md#esds-and-the-bérar-lelann-inflation) gives both formulas.
 
 An esd describes the minimum the fit stopped in.
 A trace phase whose scale trades against its peak width can have several minima at one χ², each with a tight esd.
-`Refinement.profile_interval` refits with one parameter pinned at a series of values, and reports the range over which χ² rises by less than the cut for the chosen confidence level.
+`Refinement.profile_fraction` pins that phase's width at a series of values and reports every weight fraction the pattern admits.
+For any one parameter, `Refinement.profile_interval` refits with one parameter pinned at a series of values, and reports the range over which χ² rises by less than the cut for the chosen confidence level.
 
 ## Why parameters correlate
 
@@ -73,7 +75,7 @@ Across 88 distances in a synchrotron structure refinement, the esd from the diag
 So the diagonal-only esd is not a safe upper bound, and rietx reports both.
 
 A derived esd is empty when linear propagation cannot give one.
-That happens with no covariance (a replayed node), with no free parameter behind the quantity, at an angle the symmetry fixes, and at an angle within a few degrees of 0° or 180°.
+That happens with no covariance (a replayed node), with no free parameter behind the quantity, at an angle the symmetry fixes, and at an angle within {{ ANGLE_LINEARISATION_LIMIT_DEG }}° of 0° or 180°.
 The [derived-quantities section](../theory/estimation.md#esds-of-derived-quantities) lists the four cases.
 
 ## Parameters on a bound

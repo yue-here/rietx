@@ -415,7 +415,7 @@ def test_the_writer_refuses_a_declared_harmonic():
     """A λ/n component changes the spectrum and a constant-wavelength bank has
     no term for one."""
     inst = rx.Instrument.constant_wavelength_neutron(wavelength=1.5,
-                                                    harmonics=True)
+                                                    harmonics=[2])
     with pytest.raises(ValueError, match="harmonic"):
         from_instrument_gsas2(inst)
 

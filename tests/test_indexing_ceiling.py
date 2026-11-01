@@ -174,7 +174,11 @@ def test_a_validation_stopped_mid_loop_caps_and_never_refutes(
         cubic_peaks, tiny_pattern, monkeypatch):
     """The loop half of trap 1: the token fires after the first validation, the
     run still returns, and the unreached candidates read ``not_validated``
-    (capping) — ``validation_failed`` (refuting) appears nowhere."""
+    (capping) — ``validation_failed`` (refuting) appears nowhere.
+
+    A claim about the validation loop, so one engine reporting two candidates
+    carries it: one validated, one the token stops.  The ambiguity sweep over a
+    full report, which nothing here reads, was most of this test (WP-2019)."""
     import rietx.indexing.workflow as workflow
 
     peaks, _cell = cubic_peaks
@@ -193,12 +197,64 @@ def test_a_validation_stopped_mid_loop_caps_and_never_refutes(
 
     monkeypatch.setattr(workflow, "validate_by_lebail", cancel_after_first)
     res = index_pattern(peaks, data=data, instrument=instrument,
-                        spec=SearchSpec(systems=("cubic",)), cancel=token)
+                        spec=SearchSpec(systems=("cubic",), max_candidates=2),
+                        engines=("dichotomy",), cancel=token)
+    assert len(calls) == 1 and len(res.candidates) == 2
     assert res.validated
     caveats = {c for cand in res.candidates for c in cand.confidence_caveats}
     assert "validation_failed" not in caveats
     assert any(cand.lebail is None and "not_validated" in
                cand.confidence_caveats for cand in res.candidates)
+
+
+@pytest.mark.parametrize("ceiling", [600.0, None])
+def test_under_a_ceiling_validation_runs_cheapest_first(
+        cubic_peaks, tiny_pattern, monkeypatch, ceiling):
+    """Under a declared ceiling the validation fits run in order of the
+    reflections each refines, the order that finishes the most fits by a
+    common deadline (WP-2011); with no ceiling they run in rank order, as
+    they always did.  Each fit runs on the run's clock, with no slice."""
+    import importlib
+
+    import rietx.indexing.workflow as workflow
+
+    consensus = importlib.import_module("rietx.indexing.consensus")
+    peaks, _cell = cubic_peaks
+    data, instrument, _a = tiny_pattern
+    real_fit, real_checked = workflow.validate_by_lebail, consensus.checked_indices
+    ranked, seen = [], []
+
+    def checked(candidates, *args, **kwargs):
+        out = real_checked(candidates, *args, **kwargs)
+        if not seen:    # the list validation visits; ambiguity asks again after
+            ranked[:] = [candidates[i] for i in out]
+        return out
+
+    def record(cand, *args, **kwargs):
+        seen.append((cand, kwargs["cancel"]))
+        return real_fit(cand, *args, **kwargs)
+
+    monkeypatch.setattr(consensus, "checked_indices", checked)
+    monkeypatch.setattr(workflow, "validate_by_lebail", record)
+    # no ceiling is preset "full": under the default "quick" a None is filled
+    index_pattern(peaks, data=data, instrument=instrument,
+                  spec=SearchSpec(systems=("cubic",), max_candidates=3,
+                                  total_budget_seconds=ceiling),
+                  engines=("dichotomy",),
+                  preset="full" if ceiling is None else None)
+    visited = [c for c, _ in seen]
+    assert len(visited) == len(ranked) >= 2
+    if ceiling is None:
+        assert visited == ranked
+        assert all(token is None for _, token in seen)
+    else:
+        size = {id(c): workflow.validation_size(c, peaks.wavelength, data)
+                for c in ranked}
+        assert visited == sorted(ranked, key=lambda c: size[id(c)])
+        # the order is not the rank order here, so the sort is what put it so
+        assert visited != ranked
+        # one token, the run's own: no fit draws a slice of it
+        assert len({id(token) for _, token in seen}) == 1
 
 
 @pytest.fixture(scope="module")
@@ -276,15 +332,21 @@ def test_a_binding_ceiling_returns_a_complete_and_consistent_result(
 def test_full_means_no_ceiling_and_quick_is_what_default_means(cubic_peaks):
     """Since WP-1042 the default **is** a ceiling (`quick`), so the no-ceiling
     state is a declaration: `preset="full"` writes no `total_budget_seconds`
-    note — the absence is the record — while a default run writes quick's."""
+    note — the absence is the record — while a default run writes quick's.
+
+    A claim about the record, so one engine reporting one candidate carries
+    it.  Each run's cost was the ambiguity sweep over the reported list (~19 s
+    a run over twelve candidates, which one engine alone makes larger, since
+    each of its candidates is then "found by every engine" and checked), and
+    nothing here reads it (WP-2019)."""
     peaks, _cell = cubic_peaks
-    res = index_pattern(peaks, spec=SearchSpec(systems=("cubic",)),
-                        preset="full")
+    spec = SearchSpec(systems=("cubic",), max_candidates=1)
+    res = index_pattern(peaks, spec=spec, preset="full", engines=("dichotomy",))
     assert res.preset == "full"
     assert "total_budget_seconds" not in res.provenance.notes
     assert "INDEX_BUDGET_EXHAUSTED" not in {d.code for d in res.diagnostics}
 
-    quick = index_pattern(peaks, spec=SearchSpec(systems=("cubic",)))
+    quick = index_pattern(peaks, spec=spec, engines=("dichotomy",))
     assert quick.preset == "quick"
     assert "total_budget_seconds" in quick.provenance.notes
 
@@ -298,12 +360,17 @@ def test_progress_is_one_flat_ladder_on_the_existing_kinds(cubic_peaks):
     progress bar jump), and — asserted, per the WP — no
     ``EVENT_SCHEMA_VERSION`` bump: the ladder adds fields and revises
     ``n_stages``, neither of which is a new kind.  The constant is "3" since
-    WP-1322's run header, a record and not a kind; the ladder never moved it."""
+    WP-1322's run header, a record and not a kind; the ladder never moved it.
+
+    Every engine runs, because the claim is that every engine feeds the ladder.
+    One candidate is reported: the ambiguity sweep over a full report runs after
+    the ladder, emits nothing on it, and was ~12 s of this test (WP-2019)."""
     assert EVENT_SCHEMA_VERSION == "3"
 
     peaks, _cell = cubic_peaks
     events = []
-    res = index_pattern(peaks, spec=SearchSpec(systems=("cubic", "tetragonal")),
+    res = index_pattern(peaks, spec=SearchSpec(systems=("cubic", "tetragonal"),
+                                               max_candidates=1),
                         events=events.append)
     assert res.systems_searched == ["cubic", "tetragonal"]
 

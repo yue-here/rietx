@@ -178,13 +178,17 @@ boundary. Stop when the next would carry it past **500 K tokens**. Ending means 
 resume line: `/issue-review new` after the user's `/clear`. The committed
 files carry the work across.
 
-**The batch**: one numbered message; per item the issue and what it reports
-in plain words, the act in one sentence, the file holding a comment's text,
-and the recommendation with its reason. Each item reads without this run's
-context, so a WP number or a name the run coined carries a gloss. A genuine
-judgement call adds why it matters, each option's consequence and the
-practice it rests on. A clear-cut item stays one line. Open with how many
-items need a judgement. Group:
+**The batch**: one numbered message. Every act is public, so every act joins
+it; the triage in the maintainer's instructions (§ "Before you bring me a
+decision") decides each one's content. Per item: the issue and what it
+reports in plain words, the act in one sentence, the file holding a
+comment's text, and the recommendation with its confidence (clear call,
+lean, close call). A clear call is one line: "I will do X because Y, unless
+you object." A lean or close call adds why it matters, ending in an
+importance word (minor, moderate, serious), the options a competent person
+would choose, the practice it rests on, and the crux. Each item reads
+without this run's context, so a WP number or a name the run coined carries
+a gloss. Open with how many items need a judgement. Group:
 the summary's issues and PRs by other authors first, then closes, then
 comments, then labels as one item, then scheduling.
 `AskUserQuestion` only for ≤ 4 genuine multi-way choices. Then apply in one

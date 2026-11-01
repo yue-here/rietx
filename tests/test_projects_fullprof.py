@@ -711,8 +711,10 @@ def test_soft_moment_constraints_read_in_both_spellings(
     pcr = _pcr(tmp_path, "soft.pcr", _phase(),
                magnetic(third_value=declared), trailing=block + _RANGE)
     phase = read_fullprof_pcr(pcr).phases[-1]
-    got = [(c.key, c.moment, c.sigma) for c in phase.soft_moment_constraints]
-    assert got == pytest.approx(expected)
+    got = phase.soft_moment_constraints
+    assert [c.key for c in got] == [key for key, _, _ in expected]
+    assert [v for c in got for v in (c.moment, c.sigma)] == pytest.approx(
+        [v for _, moment, sigma in expected for v in (moment, sigma)])
     labels = [phase.atoms[c.atom_index].label if c.atom_index is not None else None
               for c in phase.soft_moment_constraints]
     assert all(label is not None for label in labels)
@@ -790,12 +792,13 @@ def test_a_multi_pattern_file_is_refused_naming_the_pattern_count(tmp_path):
 
 
 @pytest.mark.parametrize("nba, why", [
-    # corpus file 5 has Nba 0 and writes six polynomial coefficients
-    # per pattern — but only in the multi-pattern layout, so where the
-    # coefficient line sits in a *single*-pattern file is unevidenced.
-    (0, "a polynomial background"),
-    (1, "one interpolated point"),
-    (-3, "a background model with no description here"),
+    # Both read LINE 17 over a background held in a companion CODFIL.bac
+    # (manual pp. 69-70); the analytic forms 0, -1, -3, -4 and -5 read
+    # (test_projects_fullprof_flags).
+    (1, "a background file refined by four coefficients"),
+    (-2, "a background file smoothed by a Fourier filter"),
+    # The manual's "cubic splines" and the 2011 notes' Chebyshev -5 disagree.
+    (-6, "a background form two sources describe two ways"),
 ])
 def test_a_background_this_reader_cannot_place_is_refused(tmp_path, nba, why):
     pcr = _pcr(tmp_path, "bkg.pcr", _phase())
@@ -809,8 +812,9 @@ def test_a_background_this_reader_cannot_place_is_refused(tmp_path, nba, why):
 @pytest.mark.parametrize("field, position", [
     # The control line's 19 fields, by position:
     # Job Npr Nph Nba Nex Nsc Nor Dum Iwg Ilo Ias Res Ste Nre Cry Uni Cor Opt Aut
-    ("Nsc", 5), ("Nor", 6), ("Dum", 7), ("Res", 11), ("Ste", 12), ("Nre", 13),
-    ("Cry", 14), ("Uni", 15), ("Cor", 16), ("Opt", 17),
+    # Nor, Dum, Nre and Opt read at every value the manual defines
+    # (test_projects_fullprof_flags), and refuse any other by name there.
+    ("Nsc", 5), ("Res", 11), ("Ste", 12), ("Cry", 14), ("Uni", 15), ("Cor", 16),
 ])
 def test_a_layout_changing_control_flag_is_refused_by_name(
         tmp_path, field, position):
@@ -852,11 +856,12 @@ def test_a_control_line_of_the_wrong_width_is_refused(tmp_path):
         read_fullprof_pcr(pcr)
 
 
-@pytest.mark.parametrize("jbt", [2, 10, -3])
+@pytest.mark.parametrize("jbt", [2, 4, -3])
 def test_an_unknown_jbt_is_refused_naming_it(tmp_path, jbt):
-    """Only ``Jbt`` 0 (nuclear) and ±1 (magnetic) are read. The others select
-    Le Bail intensity extraction, a combined nuclear+magnetic phase or a
-    form-factor phase, each of which changes the *atom block's* own layout.
+    """Only ``Jbt`` 0 (nuclear), ±1 (magnetic) and ±10 (both in one phase,
+    ``test_projects_fullprof_magnetic``) are read. The others select Le Bail
+    intensity extraction, a rigid-body or a form-factor phase, each of which
+    changes the *atom block's* own layout.
     ``Jbt = -1`` left this list with WP-1328: the manual states its atom block
     is Jbt = 1's with the moment as (M, phi, theta), same positions
     (``test_projects_fullprof_magnetic``)."""
@@ -2302,7 +2307,7 @@ def test_what_would_change_the_profile_fullprof_computes_is_refused(change, matc
     elif change == "axial":
         inst.geometry.axial_sl.value = 0.02
     elif change == "harmonics":
-        inst = rx.Instrument.constant_wavelength_neutron(2.41, harmonics=True)
+        inst = rx.Instrument.constant_wavelength_neutron(2.41, harmonics=[2])
     else:
         inst = _xray(1.5405929, 1.5444274, 1.39222)
     with pytest.raises(ValueError, match=match):

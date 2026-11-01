@@ -36,7 +36,7 @@ from rietx.model.forward import compile_model
 from rietx.model.profiles.caglioti import gaussian_fwhm, lorentzian_fwhm
 from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
-from rietx.schemas.fraction import FRACTION_PROFILE_EXCESS, FractionProfile
+from rietx.schemas.fraction import FractionProfile
 from rietx.schemas.instrument import BackgroundChebyshev
 from rietx.schemas.structure import Atom, Cell, Phase, Structure
 from rietx.strategy.fraction_profile import WIDTH_TERMS, width_value
@@ -162,9 +162,11 @@ def test_the_fit_reports_the_sharp_basin_with_a_tight_esd_and_no_finding(multimo
     """The premise: a confident point, and nothing that points at the phase."""
     _, result, _ = multimodal
     row = result.qpa.phases[1]
-    assert row.weight_fraction == pytest.approx(0.0119, abs=0.0005)
+    # 0.0119 ± 0.0039 on data drawn at the declared stages' windows; drawn at the
+    # closing stage's (WP-2002), nearer the 0.0069 the fixture holds
+    assert row.weight_fraction == pytest.approx(0.0093, abs=0.0005)
     # 0.0053 before #674: the esd carries eqs (10)-(12)'s factor, 0.74× the run-sum's here
-    assert row.weight_fraction_stderr == pytest.approx(0.0039, abs=0.0005)
+    assert row.weight_fraction_stderr == pytest.approx(0.0033, abs=0.0005)
     naming = [d.code for d in result.diagnostics
               if any("CaF2" in w or w.startswith("phases.1.") for w in d.where)]
     assert not naming, naming
@@ -173,7 +175,10 @@ def test_the_fit_reports_the_sharp_basin_with_a_tight_esd_and_no_finding(multimo
 def test_the_control_has_one_basin(control):
     """No hump and five times the trace: the hump-sized width is excluded."""
     ref, result, data = control
-    sharp, barrier, hump = _pinned(ref, data, [0.03, 10.0, 80.0])
+    # the sharp basin probed at the true width, 0.05: this trace's width is
+    # measured, 0.070(22), and 0.03 sits 1.8 esd below it, at Δχ² 5.18 against
+    # the cut's 5.12 (WP-2002)
+    sharp, barrier, hump = _pinned(ref, data, [0.05, 10.0, 80.0])
     best = min(sharp[2], barrier[2], hump[2], _data_chi2(result))
     cut = _cut(result)
     assert sharp[2] - best <= cut
@@ -210,25 +215,31 @@ def test_the_profile_spans_both_basins_and_says_so(multimodal_profile):
     assert profile.range_low < 0.02 and profile.range_high > 0.5
     assert profile.fit_admissible
     [finding] = profile.diagnostics
-    assert finding.code == "QPA_FRACTION_UNDETERMINED"
-    assert finding.level == "warning"
+    assert finding.code == "QPA_FRACTION_RANGE"
+    assert finding.level == "info"
     assert finding.where == ["phases.1.scale", AXIS]
-    assert finding.value == profile.excess > 10 * FRACTION_PROFILE_EXCESS
+    assert finding.value == profile.excess > 20
     assert f"{100 * profile.range_high:.3g} %" in finding.message
 
 
-def test_the_control_profile_confirms_the_esd_and_stays_silent(control):
+def test_the_control_profile_confirms_the_esd_and_states_it(control):
     """One basin, and every admissible fraction inside W ± 1.96 esd.
 
     The second half is the calibration claim: Δχ² scaled by χ²_red·f² is the
     esd's own scale, so a profile along a healthy minimum lands inside the
-    interval the esd already quotes (0.61 of its half-width here).
+    interval the esd already quotes (0.47 of its half-width here).  The
+    profile still states it, in the same info record the trace case gets:
+    no threshold decides whether the record exists (WP-2002, B12).
     """
     ref, _, data = control
     profile = ref.profile_fraction(data, "CaF2")
     assert _basins(profile) == 1
     assert profile.excess < 1.0
-    assert profile.diagnostics == []
+    [finding] = profile.diagnostics
+    assert finding.code == "QPA_FRACTION_RANGE"
+    assert finding.level == "info"
+    assert finding.value == profile.excess
+    assert f"{100 * profile.range_low:.3g} %" in finding.message
 
 
 def test_the_profile_moves_nothing(multimodal, multimodal_profile):

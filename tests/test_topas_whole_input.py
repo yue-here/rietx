@@ -20,13 +20,17 @@ import pytest
 import rietx as rx
 from rietx.background.models import pspline_penalty_scale, second_difference_matrix
 from rietx.io.projects.topas_input import _bspline_pieces
+from rietx.model.forward import WINDOW_AREA_TOL, compile_model
+from rietx.params.vector import ParameterTable
 from tests.topas_export_cases import case_nacl_neutron, case_nacl_pspline, case_nacl_xray
 
 DATA = Path(__file__).parent / "data"
 #: TOPAS against rietx at zero cycles, largest |ΔY| over the largest Y. Measured
-#: 2.2e-3 (neutron), 2.4e-3 (X-ray), 2.6e-3 (P-spline and FCJ axial): TOPAS
-#: integrates whole Lorentzian tails where rietx's windows hold 98 % of the area
-#: (model.forward.WINDOW_AREA_TOL), and averages Y_calc over the data step.
+#: 2.2e-3 (neutron), 2.4e-3 (X-ray), 3.3e-3 (P-spline and FCJ axial) at
+#: predict()'s closing windows, which hold 99.9 % of each peak's area
+#: (schemas.plan.CLOSING_WINDOW_TOL). At the declared stages' 98 % the three
+#: are within 1 % of those, so the window tails are not what is left. TOPAS
+#: also averages Y_calc over the data step.
 ORACLE_TOL = 1e-2
 
 
@@ -119,6 +123,41 @@ def test_an_xray_extinction_is_written_in_electrons_squared(tmp_path):
         assert arm > 4 * err         # measured 2.4e-1 and 3.7
 
 
+def test_the_written_laue_factor_is_within_its_stated_bound(tmp_path):
+    """TOPAS has no Bessel function, so the file spells e^(−x)·[I₀ + I₁] as
+    Abramowitz & Stegun 9.8.1-9.8.4 (WP-2044). The Laue factor is cut out of
+    the written ``scale_pks`` line, mapped to python and evaluated against
+    scipy over x in (0, 10⁴], and the file's head says what was written."""
+    from scipy.special import i0e, i1e
+
+    from rietx.io.projects.topas_input import _LAUE_SPELLING_REL
+
+    ref, pattern = _xray_extinction(20.0)
+    rx.write_topas_inp(ref.fitted_structure, tmp_path / "x.inp", free=ref,
+                       instrument=ref.fitted_instrument, pattern=pattern,
+                       scale="topas")
+    text = (tmp_path / "x.inp").read_text(encoding="utf-8")
+    assert "Abramowitz & Stegun" in text.split("scale_pks")[0]
+    (line,) = [ln for ln in text.splitlines() if "scale_pks" in ln]
+    rhs = line.split("=", 1)[1].rstrip(";").strip()
+    # the Laue arm sits between the x <= 0 guard and the closing '*Cos(Th)^2'
+    xv = rhs[rhs.index("If(") + 3:rhs.index(" <= 0, 1, ")]
+    laue = rhs[rhs.index("If("):rhs.rindex("*Cos(Th)^2")].replace(xv, "X")
+    expr = (laue.replace("^", "**").replace("Exp", "np.exp")
+            .replace("Sqrt", "np.sqrt"))
+    expr = re.sub(r"If\(", "_if(", expr)
+
+    def _if(c, a, b):
+        return np.where(c, a, b)
+
+    x = np.concatenate([np.geomspace(1e-6, 10, 20001), np.geomspace(10, 1e4, 2001)])
+    with np.errstate(all="ignore"):
+        got = eval(compile(expr, "<laue>", "eval"),  # noqa: S307 - our own file
+                   {"np": np, "_if": _if, "X": x})
+    exact = i0e(x) + i1e(x)
+    assert np.max(np.abs(got - exact) / exact) <= _LAUE_SPELLING_REL  # 3.59e-8
+
+
 @pytest.mark.parametrize("stem", ['a"b', "a\nb", "a\rb"])
 def test_a_data_file_name_the_xdd_line_cannot_hold_is_refused(tmp_path, stem):
     ref, pattern = case_nacl_neutron()
@@ -164,11 +203,21 @@ def test_the_pspline_case_is_what_topas_computes():
     inst.geometry.axial_hl.value = 0.0
     _, _, arm = _oracle("nacl_pspline", rx.Refinement(ref.fitted_structure, inst,
                                                       history=False))
-    assert arm > 3 * err          # measured 1.07e-2 against 2.6e-3
+    assert arm > 3 * err          # measured 1.07e-2 against 3.3e-3
+    # The penalty's σ̄ is the data file's.  TOPAS read the file written on
+    # 2026-10-06, when predict() drew the case at the declared stages'
+    # windows, so its σ is rebuilt at that setting by name: drawn at today's
+    # closing windows, σ̄ moves and Σr² misses TOPAS's in its fifth figure (WP-2002).
+    tt = pattern.tt()
+    table = ParameterTable(ref.structure, ref.instrument)
+    grid = rx.PatternData(two_theta=list(tt), intensity=[0.0] * len(tt))
+    y = compile_model(ref.structure, ref.instrument, grid, mode="rietveld",
+                      moving_paths=set(table.moving_paths),
+                      window_area_tol=WINDOW_AREA_TOL).evaluate(table.decode(table.x0()))
+    sig = np.sqrt(np.maximum(y, 1.0))[pattern.in_range_mask()]
     bkg = ref.fitted_instrument.background
     c = np.array([p.value for p in bkg.coefficients])
-    w = np.sqrt(bkg.lambda_smooth) * pspline_penalty_scale(
-        pattern.sig()[pattern.in_range_mask()], len(c))
+    w = np.sqrt(bkg.lambda_smooth) * pspline_penalty_scale(sig, len(c))
     r = w * (second_difference_matrix(len(c)) @ c)
     assert float(r @ r) == pytest.approx(32.039846, abs=5e-7)
 

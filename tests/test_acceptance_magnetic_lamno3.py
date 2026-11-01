@@ -49,7 +49,6 @@ import numpy as np
 import pytest
 
 import rietx as rx
-from rietx.crystallography.cif import structure_from_cif
 from rietx.io.recipe import GAUSS_CENTIDEG2_TO_DEG2
 from rietx.schemas.common import Parameter
 from tests.test_acceptance_magnetic import draw
@@ -114,7 +113,8 @@ MAGNETIC_STAGES = [
 def _plan(stages) -> rx.RefinementPlan:
     return rx.RefinementPlan(
         stages=[rx.Stage(name=n, turn_on=list(t), max_iter=200) for n, t in stages],
-        intermediate_ftol=1e-6)
+        intermediate_ftol=1e-6,
+        closing_window_tol=1e-3)   # WP-2002: the shipped closing stage, named rather than inherited
 
 
 def _instrument() -> rx.Instrument:
@@ -150,11 +150,8 @@ def _chi2(result, window) -> float:
 
 
 @pytest.fixture(scope="module")
-def lamno3():
-    data = rx.read_pattern(DATA / "gsas2_bt1_lamno3_50K.gsas")
-    data = data.model_copy(update={"excluded_regions": [CONTAMINANT]})
-    ref_nuc, nuc = _fit(structure_from_cif(DATA / "gsas2_bt1_lamno3.cif"),
-                        _instrument(), data, NUCLEAR_STAGES)
+def lamno3(lamno3_nuclear):
+    data, ref_nuc, nuc = (lamno3_nuclear[k] for k in ("data", "ref", "nuc"))
     draw(nuc, "lamno3_50K_nuclear", LOW_ANGLE)
     fits = {}
     for bns in (PN_MA, PNMA):

@@ -688,7 +688,10 @@ def test_a_parametric_slope_recovers_a_known_expansion_within_its_esd():
     intercept, slope = result.parametric
     assert (intercept.term, slope.term) == ("1", "T")
     assert slope.reference == {"T": 750.0}
-    assert abs(slope.value - truth) < slope.esd, (slope.value, slope.esd, truth)
+    # Two esds: one noise draw.  Over five sets of seeds the slope lands
+    # -1.04, +0.15, -0.44, +0.32 and -0.14 esd from the truth (WP-2002, the
+    # closing windows), so a one-esd bar fails a third of correct fits.
+    assert abs(slope.value - truth) < 2 * slope.esd, (slope.value, slope.esd, truth)
     a_ref = A0 * (1.0 + RAMP * (750.0 - 300.0) / 100.0)
     assert abs(intercept.value - a_ref) < 3 * intercept.esd
 
@@ -752,7 +755,8 @@ def test_a_line_equation_is_rejected_by_a_ramp_that_bends(bow, rejected):
         {"vars.a_0", "vars.a_1"}
         | {f"hist.{h}.phases.0.cell.{k}" for h in range(10) for k in "abc"})
     assert result.for_histogram(3).parameter("phases.0.cell.a").equations == ["a"]
-    assert "<th>equations</th>" in result._repr_html_()
+    assert ["path", "value", "at_bound", "equations"] in [
+        line.split() for line in result._repr_html_().splitlines()]
     # the equation's covariance: its diagonal is each esd squared, bit for bit, and
     # at each pattern's coordinate the equation is that pattern's row
     (equation,) = result.parametric_equations
@@ -781,7 +785,8 @@ def test_a_line_equation_is_rejected_by_a_ramp_that_bends(bow, rejected):
         # field reads unrecorded, never "no equation"
         single = rx.refine(patterns[0], *_start_models(), plan="mccusker_default")
         assert single.parameters and all(p.equations == [] for p in single.parameters)
-        assert "<th>equations</th>" not in single._repr_html_()
+        assert ["path", "value", "at_bound"] in [
+            line.split() for line in single._repr_html_().splitlines()]
         old = single.parameters[0].model_dump(mode="json", exclude={"equations"})
         assert type(single.parameters[0]).model_validate(old).equations is None
     if rejected:
@@ -1069,6 +1074,52 @@ def test_a_joint_covariance_at_a_real_point_is_the_dense_one():
     esd_d, corr_d = covariance_estimates(dense(x), r, len(x), n_data=n_data)
     np.testing.assert_allclose(esd_b, esd_d, rtol=1e-10)
     np.testing.assert_allclose(corr_b, corr_d, rtol=0, atol=1e-10)
+
+
+@pytest.mark.parametrize("case", ["random", "library"])
+def test_the_eigenvalue_switch_moves_only_the_cut(case, monkeypatch):
+    """``_DENSE_EIGEN_MAX`` (64 live columns) switches |λ|max of the
+    equilibrated arrow from a dense eigensolve to ARPACK Lanczos at 1e-6
+    relative (WP-2002, B10).  |λ|max does one thing, place the
+    pseudo-inverse cut at ``PINV_RCOND`` of it, so the switch is
+    answer-invariant wherever no eigenvalue lies within that tolerance of the
+    cut: the same directions are discarded, and the covariance does not read
+    |λ|max otherwise.  So the claim is a tolerance on |λ|max and bit-identity
+    on the esds, correlations and discarded directions.
+
+    Measured on 2026-10-21: the two agree to 4e-16-1.4e-14 relative on 83- and
+    84-column cases (3.7e-14 at 204 columns), and the nearest eigenvalue sits
+    2.4e10 times the cut away or more.  Made to fail once by scaling scipy's ``eigsh``
+    result by 1.01: the |λ|max assertion fired, and the covariance stayed
+    bit-identical, which is why the tolerance is asserted on its own.
+    """
+    if case == "random":
+        bj = _random_arrow(3, n_blocks=20, n_pen=((0, 2, 0, 1) * 5))
+        r = np.random.default_rng(4).standard_normal(bj.shape[0])
+        n_free, n_data = bj.n_cols, sum(bj.n_data)
+    else:
+        mt, models = _library_problem(8)
+        residual, _dense, n_data = _multi_closures(models, mt)
+        _, blocks, _ = _multi_closures(models, mt, layout="blocked")
+        x = mt.x0()
+        bj, r, n_free = blocks(x), residual(x), len(x)
+    arrow = blocked._Arrow(bj)
+    m = len(arrow.order())
+    assert m > blocked._DENSE_EIGEN_MAX, "the case does not cross the switch"
+    lanczos = arrow.largest_eigenvalue()
+    got = (covariance_estimates(bj, r, n_free, n_data=n_data), discarded_directions(bj))
+    monkeypatch.setattr(blocked, "_DENSE_EIGEN_MAX", m)
+    dense = arrow.largest_eigenvalue()
+    want = (covariance_estimates(bj, r, n_free, n_data=n_data), discarded_directions(bj))
+    assert abs(lanczos - dense) <= 1e-6 * dense
+    cut = blocked.PINV_RCOND * dense
+    lam = np.abs(np.linalg.eigvalsh(arrow.dense()))
+    assert np.min(np.abs(lam - cut)) > 1e-6 * cut, "an eigenvalue sits at the cut"
+    (esd_l, corr_l), (n_l, touched_l) = got
+    (esd_d, corr_d), (n_d, touched_d) = want
+    assert np.array_equal(esd_l, esd_d, equal_nan=True)
+    assert np.array_equal(corr_l, corr_d, equal_nan=True)
+    assert n_l == n_d and np.array_equal(touched_l, touched_d)
 
 
 @pytest.mark.parametrize("where", ["own", "shared"])

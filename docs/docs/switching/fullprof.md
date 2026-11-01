@@ -89,6 +89,14 @@ FullProf folds the unit-cell content, the occupancy normalisation and its own pr
 rietx carries the file's scale through as a starting value and a refine flag, and it does not equal a rietx scale.
 Reading a `.pcr` therefore gives a scale to refine from, and the value is no basis for a comparison.
 
+### rietx's esds already carry SCOR
+
+FullProf prints SCOR, the Bérar-Lelann factor for serially correlated residuals, and leaves its own esds without it.
+rietx multiplies every esd by the same correction, and `RefinedParameter.stderr_uncorrected` holds each esd without it.
+So compare a FullProf esd with `stderr_uncorrected`, or a FullProf esd times its SCOR with `stderr`.
+On FullProf's fit of the PbSO<sub>4</sub> round-robin pattern, rietx's formula gives a factor 4 % above FullProf's SCOR.
+[Estimation](../theory/estimation.md#esds-and-the-bérar-lelann-inflation) says why rietx applies the factor and what each program reports.
+
 ### The species follow the radiation
 
 FullProf looks X-ray form factors and neutron scattering lengths up differently, and the writer follows each.

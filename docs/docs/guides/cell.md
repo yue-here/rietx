@@ -18,9 +18,9 @@ This runs `mccusker_structural` on the fluorapatite pattern that ships with riet
 
 <!-- output of examples/guides/cell.py -->
 ```text
-phases.0.cell.a  9.370962(82)  free True
-phases.0.cell.b  9.370962(82)  free False
-phases.0.cell.c  6.885326(79)  free True
+phases.0.cell.a  9.370962(83)  free True
+phases.0.cell.b  9.370962(83)  free False
+phases.0.cell.c  6.885324(80)  free True
 V = 523.629(12) Å³
 ```
 
@@ -44,13 +44,13 @@ Quote `stderr`.
 
 <!-- output of examples/guides/cell.py -->
 ```text
-Bérar-Lelann factor 2.15
+Bérar-Lelann factor 2.17
 ```
 
 Neighbouring points of a step scan have correlated residuals, so they carry less independent information than their number suggests.
 The Bérar-Lelann factor widens the esds to account for it.
 The esds above already include it, so do not multiply them by it, or by the goodness of fit, again.
-GSAS's esds do not include it, so compare them with rietx's only after dividing rietx's by this factor.
+GSAS's esds do not include it, so compare them with `stderr_uncorrected`, the same esd without the factor.
 [Estimation](../theory/estimation.md#esds-and-the-bérar-lelann-inflation) gives the formula.
 
 ## Check what the esd leaves out
@@ -67,12 +67,12 @@ Refining again with only the tutorial's wavelengths:
 
 <!-- output of examples/guides/cell.py -->
 ```text
-a with rietx's Cu Ka      9.370962(82)
-a with the tutorial's     9.370341(82)
-difference 66 ppm, 7.6 esd
+a with rietx's Cu Ka      9.370962(83)
+a with the tutorial's     9.370341(84)
+difference 66 ppm, 7.5 esd
 ```
 
-A 60 ppm change in the declared wavelength moves a by 7.6 esd, and the esd itself does not change.
+A 60 ppm change in the declared wavelength moves a by 7.5 esd, and the esd itself does not change.
 GSAS's own refinement of this pattern, at the tutorial's wavelengths and with its own peak-position model, gives a = 9.371724(36) Å, 148 ppm above the second fit.
 
 To quote an accurate cell, state the wavelength you used.

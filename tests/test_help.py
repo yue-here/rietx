@@ -41,16 +41,19 @@ from rietx.help import (
     PEAK_FLAG_HELP,
     PEAK_ORIGIN_HELP,
     READER_OPTION_HELP,
+    RESULT_FIELD_HELP,
+    RESULT_FIELD_TYPES,
     SEARCH_FIELD_HELP,
     STAGE_FIELD_HELP,
     UNIT_DISPLAY,
     HelpEntry,
+    explain,
     help_key_for,
     help_registry,
     plan_help,
 )
 from rietx.io.formats.base import READER_OPTIONS
-from rietx.params.vector import SIZE_CAP_MIN_SIZE_A, ParameterTable
+from rietx.params.vector import ParameterTable
 from rietx.refine import SIZE_FLAG_SIZE_A, STRAIN_FLAG_WIDTH
 from rietx.schemas.common import Parameter
 from rietx.schemas.indexing import IndexingControls, ObservedPeak, PeakFlag
@@ -81,7 +84,7 @@ from rietx.schemas.structure import (
     Structure,
 )
 from rietx.strategy.staged import PLAN_INFO
-from tests.test_manual import built_manual  # noqa: F401  (fixture, shared build)
+from tests.test_manual import built_docs_tree  # noqa: F401  (fixture, shared build)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -232,6 +235,10 @@ def _variant_models() -> list[tuple[Structure, Instrument]]:
         # by ``body_from_atoms`` in a P1 cell, so the body decodes them back.
         (Structure(phases=[_body_phase()]),
          Instrument(source=Source(lines=[EmissionLine(wavelength=1.540598)]))),
+        # A child on mode amplitudes (WP-1419): its amplitudes are a family no
+        # other model declares
+        (Structure(phases=[_distortion_phase()]),
+         Instrument(source=Source(lines=[EmissionLine(wavelength=1.540598)]))),
         (structure, Instrument(
             source=TOFSource(
                 difc=5123.45, two_theta_bank_deg=90.0,
@@ -272,6 +279,23 @@ def _body_phase() -> Phase:
     body = body.model_copy(update={"torsions": [
         BodyTorsion(name="t", axis=("C1", "O1"), moves=["H1"])]})
     return phase.model_copy(update={"rigid_bodies": [body]})
+
+
+def _distortion_phase() -> Phase:
+    """#286's toy: a P 1 Sr pair at ¼ and ¾ of a c-doubled cell, on its modes."""
+    from rietx.crystallography.representation.distortion import displacive_statement
+
+    def phase(name, c, zs):
+        return Phase(name=name, space_group="P1",
+                     cell=Cell(a=Parameter(value=4.0), b=Parameter(value=4.0),
+                               c=Parameter(value=c), alpha=Parameter(value=90.0),
+                               beta=Parameter(value=90.0), gamma=Parameter(value=90.0)),
+                     atoms=[Atom(label=f"Sr{i}", species="Sr", x=Parameter(value=0.0),
+                                 y=Parameter(value=0.0), z=Parameter(value=z))
+                            for i, z in enumerate(zs)])
+
+    return displacive_statement(phase("parent", 4.0, [0.5]), phase("child", 8.0, [0.25, 0.75]),
+                                ([[1, 0, 0], [0, 1, 0], [0, 0, 2]], [0, 0, 0])).phase
 
 
 def _all_models() -> list[tuple[Structure, Instrument]]:
@@ -335,6 +359,7 @@ def _arms() -> dict[str, dict[str, HelpEntry]]:
         "instrument_fields": INSTRUMENT_FIELD_HELP,
         "search_fields": SEARCH_FIELD_HELP,
         "plans": plan_help(),
+        "result_fields": RESULT_FIELD_HELP,
     }
 
 
@@ -509,6 +534,62 @@ def test_search_control_defaults_are_the_schemas_own():
         "number in the popover and in the glossary")
 
 
+def _result_types() -> dict[str, type[BaseModel]]:
+    """Each name in ``RESULT_FIELD_TYPES``, resolved to its schema class.
+
+    Resolved here rather than imported by name, so a type added to the tuple
+    reaches the crossing below with no second list to edit, and a name that
+    resolves to nothing fails rather than dropping out of coverage.
+    """
+    from rietx.schemas import results, sequential
+
+    out = {}
+    for name in RESULT_FIELD_TYPES:
+        cls = getattr(sequential, name, None) or getattr(results, name, None)
+        assert isinstance(cls, type) and issubclass(cls, BaseModel), (
+            f"RESULT_FIELD_TYPES names {name!r}, which is no schema in "
+            "rietx.schemas.results or rietx.schemas.sequential")
+        out[name] = cls
+    return out
+
+
+def test_every_result_field_has_an_entry():
+    """A result field is explained once, keyed ``"<Type>.<field>"`` (WP-2037).
+
+    The seat a demoted statistic moves into: a number in a field costs nothing
+    until read, and its sentence lives here rather than in a diagnostic that
+    fires on every run.  Crossed against the live ``model_fields`` both ways,
+    so a field added to one of the four types fails until it is described, and
+    a renamed one cannot leave its old entry describing nothing.
+    """
+    fields = {f"{name}.{f}" for name, cls in _result_types().items()
+              for f in cls.model_fields}
+    assert len(fields) >= 80, f"the result types lost their fields: {sorted(fields)}"
+    assert set(RESULT_FIELD_HELP) == fields, (
+        f"missing: {sorted(fields - set(RESULT_FIELD_HELP))}; "
+        f"describing nothing: {sorted(set(RESULT_FIELD_HELP) - fields)}")
+
+
+def test_codes_and_result_field_keys_cannot_collide():
+    """``explain`` reads two arms with one key, so their key sets are disjoint.
+
+    By shape, not by luck: a diagnostic code is UPPER_SNAKE with no dot and a
+    field key is ``Type.field``, so neither arm can grow a key the other has.
+    """
+    assert not set(DIAGNOSTIC_HELP) & set(RESULT_FIELD_HELP)
+    assert all(re.fullmatch(r"[A-Z][A-Z0-9_]*", code) for code in DIAGNOSTIC_HELP)
+    assert all(key.count(".") == 1 for key in RESULT_FIELD_HELP)
+
+
+def test_explain_answers_a_code_and_a_result_field():
+    assert explain("RefinementResult.status") is RESULT_FIELD_HELP["RefinementResult.status"]
+    assert explain("StageResult.held") is RESULT_FIELD_HELP["StageResult.held"]
+    assert explain("BOUND_HIT") is DIAGNOSTIC_HELP["BOUND_HIT"]
+    # a stored file may name what this build does not have, and must still open
+    assert explain("RefinementResult.no_such_field") is None
+    assert explain("NO_SUCH_CODE") is None
+
+
 def test_the_plan_arm_is_plan_info_projected_not_restated():
     """``PLAN_INFO`` is the authority, so the arm must quote it byte for byte.
 
@@ -661,11 +742,9 @@ def test_defaults_are_the_schemas_own():
 #: ``help.py``'s module docstring instead, but a number can be and is.
 #:
 #: The converters are the units the sentence chose, not the code's: a crystallite
-#: floor is stored in Å and read by people in nm.  Retuning a constant therefore
+#: size is stored in Å and read by people in nm.  Retuning a constant therefore
 #: fails here until the sentence is rewritten, which is the whole point.
 _QUOTED_THRESHOLDS = (
-    ("phases.0.lor_size", "SIZE_CAP_MIN_SIZE_A", SIZE_CAP_MIN_SIZE_A / 10.0, "2 nm"),
-    ("phases.0.gauss_size", "SIZE_CAP_MIN_SIZE_A", SIZE_CAP_MIN_SIZE_A / 10.0, "2 nm"),
     ("phases.0.lor_size", "SIZE_FLAG_SIZE_A", SIZE_FLAG_SIZE_A / 10.0, "5 nm"),
     ("phases.0.lor_strain", "STRAIN_FLAG_WIDTH", STRAIN_FLAG_WIDTH, "1.5 deg"),
 )
@@ -682,7 +761,7 @@ def test_quoted_thresholds_are_the_codes_own():
     were, and nothing else would notice a retune.
 
     Two directions, as everywhere in this file.  The sentence must spell the
-    constant, so retuning ``SIZE_CAP_MIN_SIZE_A`` to 30 Å fails until the
+    constant, so retuning ``SIZE_FLAG_SIZE_A`` to 30 Å fails until the
     description says 3 nm.  And the spelling must be *derived* from the constant
     rather than asserted flat, so a row whose converter is wrong fails here
     rather than certifying its own arithmetic.
@@ -752,7 +831,8 @@ def test_the_registry_is_json_and_carries_every_arm():
     registry = help_registry()
     assert set(registry) == {"parameters", "peak_flags", "diagnostics",
                              "peak_origins", "stage_fields", "reader_options",
-                             "instrument_fields", "search_fields", "plans"}
+                             "instrument_fields", "search_fields", "plans",
+                             "result_fields"}
     payload = json.dumps(registry)  # raises on anything unserialisable
     assert len(payload) > 10_000
 
@@ -773,7 +853,9 @@ def test_the_help_route_serves_the_registry_and_the_manual_s_address():
     client can only build a link if it is also told where the manual lives.
     ``docs_url`` rides beside the arms rather than in one because it is not a
     name anything looks up, and it is served rather than spelled in TypeScript
-    for the reason ``_about`` exists at all.
+    for the reason ``_about`` exists at all.  It is the running version's manual
+    (WP-1986), the tree :func:`test_every_anchor_resolves_in_the_built_manual`
+    checks the anchors against.
     """
     from rietx.gui.server import ROUTES
     from rietx.gui.session import GuiSession
@@ -781,7 +863,8 @@ def test_the_help_route_serves_the_registry_and_the_manual_s_address():
     assert ("GET", "/api/help") in ROUTES
     served = GuiSession().help()
     assert {k: v for k, v in served.items() if k != "docs_url"} == help_registry()
-    assert served["docs_url"] == _about.DOCS_URL
+    assert served["docs_url"] == _about.docs_base(rx.__version__)
+    assert served["docs_url"].startswith(f"{_about.DOCS_URL}/docs/")
 
 
 # -------------------------------------------------------------------- the prose
@@ -813,7 +896,7 @@ def test_every_entry_has_a_title_and_a_description():
 
 
 @pytest.mark.xdist_group("manual-build")
-def test_every_anchor_resolves_in_the_built_manual(built_manual):  # noqa: F811
+def test_every_anchor_resolves_in_the_built_manual(built_docs_tree):  # noqa: F811
     """An ``anchor`` is the page and heading the popover links to, so both must exist.
 
     Checked against the **built** HTML rather than the Markdown sources, for
@@ -827,8 +910,11 @@ def test_every_anchor_resolves_in_the_built_manual(built_manual):  # noqa: F811
     a rendered link needs, so this checks the pair: an id found on some *other*
     page used to pass, and would now send a reader to a page that does not
     carry the heading.
+
+    The manual is the new tree's, `docs/docs/` (WP-1986): the GUI joins an
+    anchor to that tree's versioned base, so its build is the one asked.
     """
-    out, result = built_manual
+    out, result = built_docs_tree
     assert result.returncode == 0, "manual did not build — see test_manual.py"
     ids: dict[str, set[str]] = {}
     for page in out.rglob("*.html"):

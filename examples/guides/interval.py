@@ -36,18 +36,18 @@ print(f"{biso.value:.3f} ± {biso.stderr:.3f}  "
 
 # The page quotes the row, both intervals, and compares each with the esd.
 assert "FLOOR_HIT" in {d.code for d in result.diagnostics}
-assert f"{row.value:.3f} ± {row.stderr:.3f}" == "0.000 ± 1.945"
+assert f"{row.value:.3f} ± {row.stderr:.3f}" == "0.000 ± 1.973"
 assert interval.at_bound and interval.lower == 0.0
 assert interval.lower_stop == "bound" and interval.upper_stop == "threshold"
-assert f"{interval.upper:.3f}" == "0.742"
+assert f"{interval.upper:.3f}" == "0.749"
 # the 1.645-esd reach a symmetric reading would give is 3.2, "more than four times as far"
 assert f"{1.645 * row.stderr:.1f}" == "3.2"
 assert 0.2 < interval.upper / (1.645 * row.stderr) < 0.25
 assert structure.phases[0].atoms[0].label == "Ca1"
-assert f"{biso.lower:.3f} to {biso.upper:.3f}" == "0.368 to 0.593"
-# "1.85 esd below the value and 1.91 above"
-assert f"{(biso.value - biso.lower) / biso.stderr:.2f}" == "1.85"
-assert f"{(biso.upper - biso.value) / biso.stderr:.2f}" == "1.91"
+assert f"{biso.lower:.3f} to {biso.upper:.3f}" == "0.359 to 0.586"
+# "1.84 esd below the value and 1.90 above"
+assert f"{(biso.value - biso.lower) / biso.stderr:.2f}" == "1.84"
+assert f"{(biso.upper - biso.value) / biso.stderr:.2f}" == "1.90"
 assert interval.fit_is_minimum and biso.fit_is_minimum
 # The working state is left where the fit put it.
 assert ref.result_ is result

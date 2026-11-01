@@ -1,6 +1,6 @@
 """Suite-wide hygiene and the fixtures that share an expensive refinement.
 
-Five things live here, in the order they have to happen:
+Six things live here, in the order they have to happen:
 
 1. **Headless matplotlib.**  Every test refinement writes obs/calc/diff PNGs
    (CLAUDE.md's Tests convention), so ``MPLBACKEND=Agg`` is set before anything
@@ -27,14 +27,21 @@ Five things live here, in the order they have to happen:
    ``xdist_group`` marks refits the shared fixtures and mis-measures every
    wall-clock budget, both without failing, so ``pytest_configure`` refuses it
    rather than leaving it to be noticed in a ``--durations`` list.
-5. **The ``--shard K/N`` selection.**  A CI fast leg runs as N jobs, because
+5. **The ``--jax-cases`` selection, and its guard.**  CI's jax job runs only
+   the cases that reach jax, read off their code (``tests/jax_cases.py``,
+   WP-2019).  It runs after ``-m``'s own deselection and before the shard
+   split.  Wherever jax does not import, a case that skips for want of jax
+   while the selection does not hold it fails instead, and so does a module
+   skipped at import for it: every leg but the jax job lacks jax, so such a
+   case would run on no per-push leg, and a skip is how that would look.
+6. **The ``--shard K/N`` selection.**  A CI fast leg runs as N jobs, because
    its two-core runner gives no more workers to add (WP-1547).  Each job keeps
    shard K of the collected files, split by recorded seconds with every file
    and every ``xdist_group`` whole (``tests/shards.py``).  It runs after
    ``-m``'s own deselection, so the split is of the tier being run.
 
 Shared expensive results (``sample1_results``, ``srm660c_baseline``,
-``cr2wo6_nuclear``) are
+``cr2wo6_nuclear``, ``lamno3_nuclear``) are
 session-scoped: they exist because several acceptance modules were re-deriving
 the *identical* fit.  A consumer must carry the matching
 ``@pytest.mark.xdist_group`` or a second xdist worker silently recomputes the
@@ -153,17 +160,70 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--shard", metavar="K/N", default=None,
         help="run shard K of N: whole files, xdist groups kept together, "
              "split by tests/shard_times.json (tests/shards.py)")
+    parser.addoption(
+        "--jax-cases", action="store_true", default=False,
+        help="run only the cases that reach jax (tests/jax_cases.py)")
+
+
+#: Why a marked case on this worker did not join its group, set where it is found.
+_UNGROUPED = pytest.StashKey[str]()
+
+
+def _refuse_ungrouped(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Fail every case whose ``loadgroup`` did not take, the guard above one rank down.
+
+    ``pytest_configure`` checks the flag, and the flag is not the mechanism.
+    xdist groups a case by appending ``@<group>`` to its node id inside its own
+    ``pytest_collection_modifyitems``, through a private attribute, and pytest
+    9.2.0 moved the id to another (pytest-xdist#1386, fixed on xdist's main
+    after 3.8.0).  Under that pair every mark was ignored, the run stayed green
+    but for the tests sharing a module's server, and the shared fixtures
+    refitted per worker.  This hook runs after xdist's, so a marked case still
+    lacking the suffix is the mechanism failing.  The case fails at setup
+    (``pytest_runtest_setup`` below), because a ``UsageError`` raised on a
+    worker reaches the controller as an INTERNALERROR without its message.
+    """
+    if not (hasattr(config, "workerinput") and config.getvalue("loadgroup")):
+        return
+    import xdist
+
+    reason = (f"--dist {REQUIRED_DIST} did not group this case: pytest "
+              f"{pytest.__version__} with pytest-xdist {xdist.__version__} drops "
+              "the xdist_group marks (pytest-xdist#1386). Install a pair that "
+              "groups; pyproject's [dev] pin names one.")
+    for item in items:
+        if any(True for _ in item.iter_markers("xdist_group")) and "@" not in item.nodeid:
+            item.stash[_UNGROUPED] = reason
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    reason = item.stash.get(_UNGROUPED, None)
+    if reason is not None:
+        pytest.fail(reason, pytrace=False)
 
 
 @pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    """Keep the items of shard K's files, after every other selection has run.
+    """Keep the cases that reach jax, then shard K's files, after every other
+    selection has run.
 
     Under xdist the controller collects nothing: each worker collects, runs
     this hook and reports its list, and xdist refuses a run whose workers
-    disagree.  So the split is a function of the items alone.  ``shards.assign``
-    breaks every tie by name, never by collection order or a clock.
+    disagree.  So both selections are functions of the items alone.
+    ``jax_cases.reaches`` reads each case's code, and ``shards.assign`` breaks
+    every tie by name, never by collection order or a clock.
     """
+    _refuse_ungrouped(config, items)
+    if getattr(config.option, "jax_cases", False):
+        from tests import jax_cases
+
+        kept: list[pytest.Item] = []
+        dropped: list[pytest.Item] = []
+        for item in items:
+            (kept if jax_cases.reaches(item) else dropped).append(item)
+        if dropped:
+            config.hook.pytest_deselected(items=dropped)
+        items[:] = kept
     spec = getattr(config.option, "shard", None)
     if spec is None:
         return
@@ -198,19 +258,38 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 @pytest.hookimpl(wrapper=True)
 def pytest_make_collect_report(collector: pytest.Collector):
-    """Report a module skipped at import from shard 1 alone.
+    """Fail a module skipped at import for want of jax that the selection
+    cannot reach; leave out one ``--jax-cases`` does not select; and report
+    the rest from shard 1 alone.
 
     A module-level ``importorskip`` skips the file before it has an item, so
-    the selection above cannot place it, and every shard reported its skip.
-    On CI's first sharded run the py3.14 leg's two shards summed to eight
-    more than the unsharded count: jax, torch and six browser files (WP-1547).
-    A leg's passed+skipped must sum to the unsharded total, because that total
-    is how a module that never ran gets seen (tests/CLAUDE.md § Quoting
-    numbers).
+    neither selection above can place it.  Rule (c) of ``tests/jax_cases.py``
+    reads the module itself, which is how the guard and ``--jax-cases`` judge
+    it.  Under ``--shard``, every shard used to report its skip, and on CI's
+    first sharded run the py3.14 leg's two shards summed to eight more than
+    the unsharded count: jax, torch and six browser files (WP-1547).  A leg's
+    passed+skipped must sum to the unsharded total, because that total is how
+    a module that never ran gets seen (tests/CLAUDE.md § Quoting numbers).
     """
     report = yield
-    spec = getattr(collector.config.option, "shard", None)
-    if spec is not None and report.skipped and isinstance(collector, pytest.Module):
+    if not (report.skipped and isinstance(collector, pytest.Module)):
+        return report
+    from tests import jax_cases
+
+    config = collector.config
+    failure = jax_cases.guard(report.longrepr,
+                              lambda: jax_cases.module_reaches(collector.path), collector)
+    if failure is not None:
+        report.outcome = "failed"
+        report.longrepr = failure
+        return report
+    if getattr(config.option, "jax_cases", False) \
+            and not jax_cases.module_reaches(collector.path):
+        report.outcome = "passed"   # outside the selection, like a deselected case
+        report.longrepr = None
+        return report
+    spec = getattr(config.option, "shard", None)
+    if spec is not None:
         from tests import shards
 
         try:
@@ -220,6 +299,27 @@ def pytest_make_collect_report(collector: pytest.Collector):
         if k != 1:
             report.outcome = "passed"
             report.longrepr = None
+    return report
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo):
+    """Fail a case that skips for want of jax where the selection cannot reach it.
+
+    Only where jax does not import, since that is where such a case skips.
+    The jax job runs ``--jax-cases`` alone and every other leg lacks jax, so a
+    case ``tests/jax_cases.py`` cannot see would run on no per-push leg, and
+    its skip would say so to nobody.  An xfail is left alone.
+    """
+    report = yield
+    if not report.skipped or hasattr(report, "wasxfail"):
+        return report
+    from tests import jax_cases
+
+    failure = jax_cases.guard(report.longrepr, lambda: jax_cases.reaches(item), item)
+    if failure is not None:
+        report.outcome = "failed"
+        report.longrepr = failure
     return report
 
 
@@ -293,11 +393,48 @@ def cr2wo6_nuclear():
 
     d4 = rx.read_pattern(DATA / "gsas2_hb2a_cr2wo6_4K.dat")
     d150 = rx.read_pattern(DATA / "gsas2_hb2a_cr2wo6_150K.dat")
-    ref150, nuc150 = _fit(_trirutile(), _instrument(), d150, NUCLEAR_STAGES)
+    # the nuclear references the magnetic solve starts from, at the declared
+    # stages alone (WP-2002): ended in a closing stage, the 150 K reference moves
+    # enough that class 3's pair, which a correlation near its threshold folds,
+    # no longer folds (moduli 0.514 and 0.131 with esds 0.69 and 2.79)
+    ref150, nuc150 = _fit(_trirutile(), _instrument(), d150, NUCLEAR_STAGES,
+                          closing_window_tol=None)
     ref4, nuc4 = _fit(ref150.structure.model_copy(deep=True),
-                      ref150.instrument.model_copy(deep=True), d4, NUCLEAR_STAGES)
+                      ref150.instrument.model_copy(deep=True), d4, NUCLEAR_STAGES,
+                      closing_window_tol=None)
     return {"d4": d4, "d150": d150, "ref150": ref150, "nuc150": nuc150,
             "ref4": ref4, "nuc4": nuc4}
+
+
+@pytest.fixture(scope="session")
+def lamno3_nuclear():
+    """The LaMnO₃ 50 K nuclear-only fit, fitted once.
+
+    WP-1327's moment acceptance (``test_acceptance_magnetic_lamno3``) seeds
+    its two moment fits from it, and WP-1418's ``solve_magnetic`` acceptance
+    (``test_magnetic_solve_acceptance``) solves it.  ``data`` carries the
+    contaminant exclusion the fit was made with.
+
+    ``ref`` is live (``report()`` works); do not ``fit()`` it again, and copy
+    a model before editing it.
+
+    **Consumers must carry** ``@pytest.mark.xdist_group("magnetic-lamno3")``.
+    """
+    import rietx as rx
+    from rietx.crystallography.cif import structure_from_cif
+    from tests.test_acceptance_magnetic_lamno3 import (
+        CONTAMINANT,
+        DATA,
+        NUCLEAR_STAGES,
+        _fit,
+        _instrument,
+    )
+
+    data = rx.read_pattern(DATA / "gsas2_bt1_lamno3_50K.gsas")
+    data = data.model_copy(update={"excluded_regions": [CONTAMINANT]})
+    ref, nuc = _fit(structure_from_cif(DATA / "gsas2_bt1_lamno3.cif"),
+                    _instrument(), data, NUCLEAR_STAGES)
+    return {"data": data, "ref": ref, "nuc": nuc}
 
 
 @pytest.fixture(scope="session")

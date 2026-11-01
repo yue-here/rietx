@@ -1,8 +1,8 @@
 # WP-1806 — first public case: acridine form IX
 
-Milestone: rigid-bodies · Status: ⬜
+Milestone: rigid-bodies · Status: 🔄 2026-10-25 — the pdCIF reader merged (PR #1006); open: the data file, the authors' profile, the acceptance test
 Depends on: 1805
-Priority: P3 2026-10-06 — the first real-data proof of the body; nothing waits on it but WP-1810
+Priority: P3 2026-10-23 — the first real-data proof of the body; 1810 closed without it (PR #955), and 1989 waits on it soft for its public case and pdCIF reader
 
 ## Goal
 
@@ -70,13 +70,34 @@ of issue #561, sized M.
   and a 1000 ppm Stephens seed. Tree checked at 2c94d848: `body_from_atoms`
   exists (`crystallography/bodies.py:56`); #1005, #1006, #995 open.
 
+- 2026-10-31, from the issue triage (issue #561): the acceptance fit misses
+  the maintainer's option-(3) bar on three atoms (reporter, 2026-10-27, main
+  at feae4c75). The model is the 16 October one: 14 heavy atoms, 9 riding H,
+  Chebyshev 10 plus one hump, TCHZ, FCJ, Stephens 2/m at 1000 ppm,
+  March-Dollase (100). Rwp is 0.05839. Read per component, C5, C11 and C12
+  miss along c at 2.22, 1.32 and 1.32 of the bar. Every x and y component is
+  at most 0.30 of its bar, and the cell passes. The miss is one translation of
+  the body along c. The origin's z is 1.9 of rietx's own esd from the
+  deposited value. The background moves it. Chebyshev 12 takes C5 to 1.35 but
+  ends at a higher Rwp (0.0598). So it found another minimum along a
+  Chebyshev-hump degeneracy (ρ up to −1.000), not a better background. On
+  2026-10-30 the reporter proposed splitting the acceptance. Part 1 would
+  assert now what the body owns: a 10° / 0.3 Å perturbed start returns to the
+  same minimum (0.0001 Å); an intra-body distance reports `None`; a simulated
+  known answer is recovered while a regular-hexagon template fails. Part 2
+  would add the option-(3) assertion once the maintainer rules on the 27
+  October numbers. This WP does not say whether the bar is read per component
+  or as a 3-D distance. C5 fails both readings. Checked against the tree at
+  d87c8cc91: the acceptance task is unticked and no acridine acceptance test
+  exists. The reporter's figures were not re-run.
+
 ## Non-goals
 
 - Hydrogens (WP-1810), torsions (WP-1808).
 
 ## Tasks
 
-- [ ] pdCIF reader: accept the net-intensity and weight columns, with a diagnostic where it repairs
+- [x] pdCIF reader: accept the net-intensity and weight columns, with a diagnostic where it repairs
 - [ ] The data file and a provenance row in `tests/data/README.md`
 - [ ] The authors' profile; the template-superposition floor, measured and recorded
 - [ ] The acceptance test + obs/calc/diff PNGs to `tests/output/`
@@ -100,3 +121,19 @@ of issue #561, sized M.
 - **2026-10-06** — created by WP-1803's re-cut. The maintainer kept the
   published-esd bar, so the reader fix and the authors' profile are tasks here and the
   size grows from S to M.
+- **2026-10-25** — PR #1006 (by @mustachefeeling) merged at round 4 as
+  `f9a983d7`. `read_pattern` reads a pdCIF whose only intensity column is
+  `_pd_proc_intensity_net`, as the acridine deposit (COD 2242872) has, and
+  says so (`PATTERN_INTENSITY_NET`, `metadata["intensity_item"]`). A net
+  column that never comes within 5σ of zero fires `PATTERN_NET_HAS_BACKGROUND`
+  (warning, tier 3, ruled 2026-10-24), 14.1σ on this deposit; the message
+  names both readings, a background left in or no empty baseline in range,
+  and the suggestion prescribes neither. A `_pd_proc_ls_weight` of zero now
+  excludes its point only (`PATTERN_ZERO_WEIGHT_EXCLUDED`), where 1.10.0
+  dropped the whole weight column. The review's sync commit `4072cedb` moved
+  the notes to `docs/releases/1.11.0.md`. Gate: the stacked full suite of
+  WP-1956's 2026-10-25 entry. Merged by the maintainer over a red `fast py3.14
+  2/2`, whose one failure is `examples/guides/moment.py` (WP-2036): that
+  guide's code path is identical to #939's head, which passed it. Skill: the
+  three codes have rows in `references/diagnostics-reading.md`. *Next:* the
+  data file and its provenance row, then the authors' profile.

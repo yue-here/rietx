@@ -1,4 +1,4 @@
-# The new manual's Reference tab, generated from the code that owns each fact
+# The manual's Reference tab, generated from the code that owns each fact
 # (WP-1981).  Prose pages are written; tables of names are built (WP-1975
 # § F8), so none of these pages can drift from the package.
 #
@@ -82,7 +82,11 @@ PARAMETER_GROUPS = (
       ("Rigid bodies",
        "A rigid body moves a group of atoms as one unit. "
        "Its rotation and torsions refine as increments from the stored geometry.",
-       ("phases.*.rigid_bodies.*",)))),
+       ("phases.*.rigid_bodies.*",)),
+      ("Distortion modes",
+       "A child stated as its parent plus a distortion refines one absolute amplitude per "
+       "symmetry-adapted mode, and the coordinates of the atoms the modes move follow.",
+       ("phases.*.distortion_modes.*",)))),
     ("Phase amount and intensity corrections",
      "The phase scale carries how much of the phase the pattern shows. "
      "The others correct intensities for the specimen. "
@@ -225,6 +229,128 @@ def parameter_map() -> str:
 
 
 # ----------------------------------------------------------------------
+# The other vocabularies
+#
+# `rietx.help` holds ten.  Parameters, plans, diagnostic codes and result
+# fields have pages of their own, and the other six share
+# `reference/settings.md`, in the
+# order and under the lead sentences `_VOCABULARIES` gives (the old tree's
+# glossary, WP-1986).  That list is the one hand-written thing here, so an arm
+# added to the registry and missing from both raises rather than rendering
+# nowhere.
+# ----------------------------------------------------------------------
+
+#: The arms with a page of their own.
+_OWN_PAGE = {"parameters", "plans", "diagnostics", "result_fields"}
+
+#: Section heading and lead sentence per arm, in the order the page shows them.
+_VOCABULARIES = [
+    ("stage_fields", "Stage settings",
+     "One stage of a plan, as `StageSpec` serialises it. Staging is "
+     "cumulative: a parameter freed in one stage keeps refining in every "
+     "later one."),
+    ("peak_flags", "Peak flags",
+     "What is known about one fitted line. Whether a flag also makes the line "
+     "unusable as evidence of a lattice is served beside the vocabulary as "
+     "`unusable_flags`, so neither the GUI nor a script works it out again."),
+    ("peak_origins", "Peak origins",
+     "Where one line came from: detection, or a person. It records provenance "
+     "and makes no judgement, and no gate in the package branches on it."),
+    ("reader_options", "Reader options",
+     "Keyword arguments `read_pattern` accepts. A project records which ones "
+     "claimed its file, because the same file can hold more than one pattern."),
+    ("instrument_fields", "Instrument preset fields",
+     "Constructor arguments for building an instrument from a geometry and an "
+     "anode. They are not parameter names, and none of them is refined."),
+    ("search_fields", "Indexing search settings",
+     "The controls an indexing search takes, as `ProjectDoc.indexing` holds "
+     "them. Several bound the search rather than describing the specimen, and "
+     "each says what a negative result means once it has bitten."),
+]
+
+
+def _vocabulary_entry(name: str, entry: dict) -> list[str]:
+    """One name as a definition, then its chip, unit, default and typical range."""
+    bits = []
+    if entry.get("label") and entry["label"] != name:
+        bits.append(f"Chip `{entry['label']}`")
+    if entry.get("unit"):
+        bits.append(f"Unit {_notation(entry['unit'])}")
+    if entry.get("default") is not None:
+        bits.append(f"Default `{entry['default']}`")
+    if entry.get("typical"):
+        bits.append(f"Typical {_notation(entry['typical'])}")
+    lines = [f"`{name}`", f": {entry['title']}. {_notation(entry['description'])}"]
+    if bits:
+        lines += ["", "  " + " · ".join(bits)]
+    return lines + [""]
+
+
+def vocabularies() -> str:
+    """The body of `reference/settings.md`: every arm without a page of its own."""
+    registry = help_registry()
+    placed = _OWN_PAGE | {key for key, _, _ in _VOCABULARIES}
+    missing = sorted(set(registry) - placed)
+    if missing:
+        raise RuntimeError(
+            f"help_registry() arms on no reference page: {missing}. Add a heading "
+            "and lead sentence to _VOCABULARIES in docs/reference_pages.py")
+    out = [_BANNER.format(source="rietx.help"), ""]
+    for key, heading, lead in _VOCABULARIES:
+        out += [f"## {heading}", "", lead, ""]
+        for name, entry in registry[key].items():
+            out += _vocabulary_entry(name, entry)
+    return "\n".join(out)
+
+
+# ----------------------------------------------------------------------
+# The result fields
+#
+# A page of their own because the four result types' fields put
+# `settings.md` over the page cap (WP-2037).  One section per type, in
+# `RESULT_FIELD_TYPES` order, so a field is found under the type a reader
+# is holding; each entry keeps its full `Type.field` key, which is what
+# `rietx.help.explain` takes.
+# ----------------------------------------------------------------------
+
+#: The lead sentence under each type's heading, keyed as `RESULT_FIELD_TYPES`.
+_RESULT_TYPE_LEADS = {
+    "RefinementResult": (
+        "What a fit returns: the answer, its statistics, its curves and what the "
+        "engine found wrong with it."),
+    "StageResult": (
+        "One stage's record in `RefinementResult.stages`: what it freed, what it "
+        "held and why, and what it cost."),
+    "SeriesEntry": (
+        "One pattern's summary in `SeriesResult.entries`: what was fitted and how "
+        "the chain reached it."),
+    "SeriesResult": (
+        "What a sequential refinement returns: one entry per pattern, and what the "
+        "chain found about the series as a whole."),
+}
+
+
+def result_field_page() -> str:
+    """The body of `reference/result-fields.md`: every result field, by type."""
+    from rietx.help import RESULT_FIELD_TYPES
+
+    unled = sorted(set(RESULT_FIELD_TYPES) ^ set(_RESULT_TYPE_LEADS))
+    if unled:
+        raise RuntimeError(
+            f"result types with no lead sentence, or leads for no type: {unled}. "
+            "Keep _RESULT_TYPE_LEADS in docs/reference_pages.py equal to "
+            "rietx.help.RESULT_FIELD_TYPES")
+    registry = help_registry()["result_fields"]
+    out = [_BANNER.format(source="rietx.help.RESULT_FIELD_HELP"), ""]
+    for type_name in RESULT_FIELD_TYPES:
+        out += [f"## {type_name}", "", _RESULT_TYPE_LEADS[type_name], ""]
+        for key, entry in registry.items():
+            if key.startswith(f"{type_name}."):
+                out += _vocabulary_entry(key, entry)
+    return "\n".join(out)
+
+
+# ----------------------------------------------------------------------
 # The plan ladder
 #
 # Drawn from the plan objects, because the old tree's hand-drawn diagram
@@ -316,21 +442,38 @@ def _code_literals(node) -> set[str]:
             and isinstance(n.value, str) and _CODE_SHAPE.fullmatch(n.value)}
 
 
-def diagnostic_index(root: _Path = SOURCE_ROOT) -> dict[str, dict[str, set[str]]]:
-    """Code -> {"levels": the literal `level=` values beside it, "files": where}.
+def _passes_where(keywords: dict) -> bool | None:
+    """Whether a call's keywords give a `where`: a literal `[]`, `()` or `None`
+    names no path, and a `**` splat might hold one, so it is unknown (None)."""
+    if "where" not in keywords:
+        return None if None in keywords else False
+    given = keywords["where"]
+    return not ((isinstance(given, (_ast.List, _ast.Tuple)) and not given.elts)
+                or (isinstance(given, _ast.Constant) and given.value is None))
+
+
+def diagnostic_index(root: _Path = SOURCE_ROOT) -> dict[str, dict[str, set]]:
+    """Code -> {"levels": the literal `level=` values beside it, "files": where,
+    "where": whether each keyword raise site passes a `where=`}.
 
     A level computed at run time is recorded as "".  A `*_CODES` table often
     lists codes raised elsewhere, to filter or cap them, so a table names a
-    code's file only when nothing else in the tree does.
+    code's file only when nothing else in the tree does.  "where" holds True
+    for a `code=` site passing a `where=` and False for one passing none or
+    a literal empty one; a site splatting `**` keywords, or raising through a
+    helper, adds nothing, since the walk cannot tell (WP-2037, read by
+    `tests/test_audit_table.py`).
     """
-    out: dict[str, dict[str, set[str]]] = {}
+    out: dict[str, dict[str, set]] = {}
     tabled: dict[str, set[str]] = {}
 
-    def add(code: str, rel: str, level: str | None) -> None:
-        entry = out.setdefault(code, {"levels": set(), "files": set()})
+    def add(code: str, rel: str, level: str | None, where: bool | None = None) -> None:
+        entry = out.setdefault(code, {"levels": set(), "files": set(), "where": set()})
         entry["files"].add(rel)
         if level is not None:
             entry["levels"].add(level)
+        if where is not None:
+            entry["where"].add(where)
 
     for path in sorted(root.rglob("*.py")):
         rel = path.relative_to(root.parent).as_posix()
@@ -353,7 +496,7 @@ def diagnostic_index(root: _Path = SOURCE_ROOT) -> dict[str, dict[str, set[str]]
                     and _CODE_SHAPE.fullmatch(code.value)):
                 level = keywords.get("level")
                 add(code.value, rel, level.value if isinstance(level, _ast.Constant)
-                    else "" if level is not None else None)
+                    else "" if level is not None else None, _passes_where(keywords))
             callee = node.func
             name = callee.id if isinstance(callee, _ast.Name) else getattr(callee, "attr", "")
             if name in {"cls", "GuardFinding"} and node.args:
@@ -399,7 +542,7 @@ def diagnostic_group(files: set[str]) -> str:
                 if any(first.startswith(area) for area in areas))
 
 
-def _levels(entry: dict[str, set[str]]) -> str:
+def _levels(entry: dict[str, set]) -> str:
     levels = sorted(lv for lv in entry["levels"] if lv)
     if "" in entry["levels"]:
         levels.append("set at run time")
@@ -629,9 +772,16 @@ def roadmap_page() -> str:
 # authored here.  The skill's index generator (`docs/skill/make_api_index.py`)
 # already decides it: `SECTIONS` is what every session calling rietx needs,
 # `TECHNIQUES` what a session doing one technique needs, and every other name
-# in `rietx.__all__` is the third tier.  Each entry is rendered by that
-# script's own `_entry`, so a signature here and in the skill cannot differ.
-# The skill's section paragraphs are written to an agent and are left out.
+# in `rietx.__all__` is the third tier.  The skill's section paragraphs are
+# written to an agent and are left out.
+#
+# Each name is a Sphinx Python-domain object (WP-2022), so the theme draws its
+# signature a parameter a line with names, annotations and defaults told
+# apart, and the object gets a permalink, a contents entry and a search entry.
+# The text inside each directive comes from that script's own builders
+# (`_signature`, `_doc_line`, the field parts), so a signature here and in the
+# skill cannot differ.  Not autodoc, which would render whole docstrings,
+# written in the rulebook register (WP-1981).
 #
 # This page does not count as documenting a name: `tests/test_manual_api.py`
 # skips `_generated/`, so its coverage partition still asks for prose.
@@ -648,27 +798,97 @@ def _api_index():
     return module
 
 
-#: `make_api_index._entry`'s bullet: the code span, then " — " and the summary.
-_ENTRY = _re.compile(r"^- (`[^`]+`)(?: — (.*))?$", _re.S)
+def _directive(kind: str, argument: str, body: str, *, options: dict[str, str] | None = None,
+               children: list[str] = (), no_index: bool = False) -> str:
+    """One `py:<kind>` directive as a MyST fence, children nested inside it.
+
+    A name described twice fails a `-W` build ("duplicate object description"),
+    so a repeat carries `:no-index:`: it still renders, and links go to the first.
+    """
+    options = dict(options or {})
+    if no_index:
+        options["no-index"] = ""
+    fence = "````" if children else "```"
+    lines = [f"{fence}{{py:{kind}}} {argument}".rstrip()]
+    lines += [f":{key}: {value}".rstrip() for key, value in options.items()]
+    if body:
+        lines += [body]
+    for child in children:
+        lines += ["", child.rstrip("\n")]
+    lines.append(fence)
+    return "\n".join(lines) + "\n"
 
 
-def _api_entry(index, dotted: str, technique: str | None = None) -> str:
-    """One name as a definition: its signature as the term, then its summary
-    line and, for a model or a dataclass, its fields."""
+def _api_entry(index, dotted: str, technique: str | None = None, *,
+               no_index: bool = False) -> str:
+    """One name as a Python-domain object: its signature, its summary line
+    and, for a model or a dataclass, its fields in one `py:fields`."""
     import inspect
 
+    from pydantic import BaseModel
+
     obj = index._resolve(dotted)
+    module, name = _api_module(dotted)
+    # The module is the object's own, so a contents entry reads `Refinement.summary()`
+    # where the bare name would be one of several `summary()`s.
+    options = {"module": module}
     if inspect.isclass(obj) and issubclass(obj, BaseException):
-        doc = index._doc_line(obj)
-        return f"`{dotted}`\n: An exception. {doc}\n"
-    if not (inspect.isclass(obj) or callable(obj) or isinstance(obj, dict)):
-        return f"`{dotted}`\n: A constant, `{obj!r}`.\n"
-    head, _, fields = index._entry(dotted, technique).partition("\n  Fields: ")
-    term, summary = _ENTRY.match(head).groups()
-    lines = [term, f": {_notation(summary or '')}".rstrip()]
-    if fields:
-        lines += ["", f"  Fields: {fields}"]
-    return "\n".join(lines) + "\n"
+        doc = f"An exception. {_notation(index._doc_line(obj))}".rstrip()
+        return _directive("exception", name, doc, options=options, no_index=no_index)
+    if isinstance(obj, dict):
+        keys = ", ".join(f"`{k}`" for k in obj)
+        return _directive("data", name, f"A dict. Keys: {keys}.", options=options,
+                          no_index=no_index)
+    if not (inspect.isclass(obj) or callable(obj)):
+        return _directive("data", name, "A constant.", options={**options, "value": repr(obj)},
+                          no_index=no_index)
+    doc = _notation(index._doc_line(obj))
+    if inspect.isclass(obj) and (issubclass(obj, BaseModel) or _dataclasses.is_dataclass(obj)):
+        if issubclass(obj, BaseModel):
+            skip = (index.TECHNIQUE_FIELDS.get(dotted, frozenset()) if technique is None
+                    else frozenset())
+            parts = index.model_field_parts(obj, skip)
+        else:
+            parts = index.dataclass_field_parts(obj)
+        # `py:fields` (docs/py_fields.py): one signature line a field.
+        lines = [f"{field}: {ann}" + (f" = {default}" if default is not None else "")
+                 for field, ann, default in parts]
+        fields = [_directive("fields", "", "\n".join(lines), no_index=no_index)] if parts else []
+        return _directive("class", name, doc, options=options, children=fields,
+                          no_index=no_index)
+    if inspect.isclass(obj):
+        return _directive("class", name + index._signature(obj, drop_self=False), doc,
+                          options=options, no_index=no_index)
+    owner, _, attr = dotted.rpartition(".")
+    owner = index._resolve(owner) if "." in dotted[3:] else None
+    if not inspect.isclass(owner):
+        return _directive("function", name + index._signature(obj, drop_self=False), doc,
+                          options=options, no_index=no_index)
+    # Called on the class, so it says so: `Structure.from_cif`, `Project.open`.
+    kind = inspect.getattr_static(owner, attr)
+    if isinstance(kind, classmethod):
+        options["classmethod"] = ""
+    elif isinstance(kind, staticmethod):
+        options["staticmethod"] = ""
+    return _directive("method", name + index._signature(obj, drop_self=True), doc,
+                      options=options, no_index=no_index)
+
+
+def _api_module(dotted: str) -> tuple[str, str]:
+    """(module, name within it): `rx` for a name reached as `rx.`, else the
+    longest importable prefix, as `make_api_index._resolve` walks it."""
+    import importlib
+
+    if dotted.startswith("rx."):
+        return "rx", dotted[3:]
+    parts = dotted.split(".")
+    for n in range(len(parts) - 1, 0, -1):
+        try:
+            importlib.import_module(".".join(parts[:n]))
+        except ModuleNotFoundError:
+            continue
+        return ".".join(parts[:n]), ".".join(parts[n:])
+    raise ValueError(f"{dotted}: no importable module prefix")
 
 
 def api_tiers() -> list[tuple[str, list[tuple[str, list[str]]], str | None]]:
@@ -688,8 +908,13 @@ def api_tiers() -> list[tuple[str, list[tuple[str, list[str]]], str | None]]:
             + [("Everything else in rx", [("", [f"rx.{name}" for name in rest])], None)])
 
 
-def _api_body(tiers) -> str:
+def _api_body(start: int, stop: int | None) -> str:
+    """The tiers `api_tiers()[start:stop]`.  A name an earlier tier, or an
+    earlier section here, already described is a repeat (`_directive`)."""
     index = _api_index()
+    every = api_tiers()
+    seen = {name for _, sections, _ in every[:start] for _, names in sections for name in names}
+    tiers = every[start:stop]
     out = [_BANNER.format(source="docs/skill/make_api_index.py's selection and rietx.__all__"), ""]
     # One tier is the page itself, so its sections take the H2 level.
     level = "##" if len(tiers) == 1 else "###"
@@ -699,28 +924,33 @@ def _api_body(tiers) -> str:
         for title, names in sections:
             if title:
                 out += [f"{level} {title}", ""]
-            out += [_api_entry(index, name, technique) for name in names] + [""]
+            for name in names:
+                out += [_api_entry(index, name, technique, no_index=name in seen)]
+                seen.add(name)
+            out.append("")
     return "\n".join(out)
 
 
 def api_everyday() -> str:
     """The body of `reference/api.md`: the calls a session making a fit needs."""
-    return _api_body(api_tiers()[:1])
+    return _api_body(0, 1)
 
 
 def api_techniques() -> str:
     """The body of `reference/api-techniques.md`: one tier per technique."""
-    return _api_body(api_tiers()[1:-1])
+    return _api_body(1, -1)
 
 
 def api_everything_else() -> str:
     """The body of `reference/api-types.md`: the rest of `rietx.__all__`."""
-    return _api_body(api_tiers()[-1:])
+    return _api_body(-1, None)
 
 
 #: Generated body file name -> the function that writes it.
 BODIES = {
     "parameters.md": parameter_map,
+    "settings.md": vocabularies,
+    "result-fields.md": result_field_page,
     "plans.md": plan_ladder,
     "diagnostics.md": diagnostic_page,
     **{f"{stem}.md": _functools.partial(diagnostic_group_page, stem)

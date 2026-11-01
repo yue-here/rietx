@@ -42,9 +42,10 @@ cannot depend on a tolerance.  Only the d-spacings are floating point.
 
 **The candidate set is enumerated, not searched, and the enumeration is a
 pluggable generator** (issue #257 A1).  :func:`zone_boundary_candidates` is
-the default WP-1326 fixes — {0, ½}³ minus the origin, plus the two
-third-order points on a hexagonal or trigonal lattice — reduced to one
-representative per **star**, since every arm of a star generates the identical
+the default WP-1326 fixes — the points where k ≡ −k on the phase's own
+lattice ({0, ½}³ minus the origin on a P lattice, the classes of L*/2L* on a
+centred one), plus the two third-order points on a hexagonal or trigonal
+lattice — reduced to one representative per **star**, since every arm of a star generates the identical
 satellite list.  A successor that scans the special points and lines of the
 Brillouin zone (Wills, A. S. (2009). *Z. Kristallogr. Suppl.* **30**, 39;
 Hinuma, Y., Pizzi, G., Kumagai, Y., Oba, F. & Tanaka, I. (2017). *Comput.
@@ -626,27 +627,103 @@ def cdml_label(space_group, k) -> str | None:
     return None
 
 
+def _shortest_spelling_key(k: KVector) -> tuple:
+    """Order among equivalent spellings of one k: shortest, fewest minus signs.
+
+    |k|₁ in conventional fractional components, then the number of negative
+    components, then the plain tuple — a pure function of the numbers, so the
+    spelling a report prints does not depend on the cell's metric.  On a P
+    lattice it picks the member of {0, ½}³, which is the spelling the set had
+    before it was derived from the lattice.
+    """
+    return (sum(abs(c) for c in k), sum(c < 0 for c in k), k)
+
+
+def _order_two_kvectors(space_group) -> tuple[KVector, ...]:
+    """The seven k ≢ 0 with k ≡ −k, one shortest spelling each, sorted.
+
+    k ≡ −k exactly when 2k is a vector of the reciprocal lattice L* (the
+    FullProf rule :func:`minus_k_is_k` states), so these are the points
+    k = H/2 with H in L* and H not in 2L* — the classes of L*/2L* minus the
+    origin, seven for every three-dimensional lattice.  In the primitive
+    reciprocal basis they are ½(n₁b₁* + n₂b₂* + n₃b₃*), n ∈ {0, 1}³; on a P
+    lattice that is {0, ½}³ minus the origin.  On a centred lattice written
+    in conventional axes it is **not**: on F the three X points (1, 0, 0),
+    (0, 1, 0), (0, 0, 1) are among them and (½, 0, 0) is not, because
+    2·(½, 0, 0) = (1, 0, 0) violates the F condition (all indices of one
+    parity), so +(½, 0, 0) and −(½, 0, 0) are two vectors and that point lies
+    on a line inside the zone, halfway from Γ to X.
+
+    Enumerated rather than derived from a basis: with N lattice points per
+    conventional cell, N·Z³ lies in L*, so every class has a spelling with
+    |components| ≤ N/2, and H = 2k runs over the integer box [−N, N]³ kept by
+    :func:`reciprocal_lattice_mask`.  Two k are one class when their difference
+    is an integer vector the same mask keeps.  The count is checked, not
+    assumed.
+    """
+    sg = _resolve(space_group)
+    n = len(_centring_rows(sg))
+    span = np.arange(-n, n + 1)
+    box = np.array(np.meshgrid(span, span, span, indexing="ij")).reshape(3, -1).T
+    in_lattice = box[reciprocal_lattice_mask(sg, box)]
+
+    def same_class(a: KVector, b: KVector) -> bool:
+        diff = [x - y for x, y in zip(a, b)]
+        if any(c.denominator != 1 for c in diff):
+            return False
+        return bool(reciprocal_lattice_mask(
+            sg, np.array([[int(c) for c in diff]], dtype=np.int64))[0])
+
+    zero = (Fraction(0),) * 3
+    classes: list[KVector] = []
+    for h in in_lattice:
+        kk: KVector = tuple(Fraction(int(c), 2) for c in h)  # type: ignore[assignment]
+        if same_class(kk, zero):
+            continue
+        for i, rep in enumerate(classes):
+            if same_class(kk, rep):
+                if _shortest_spelling_key(kk) < _shortest_spelling_key(rep):
+                    classes[i] = kk
+                break
+        else:
+            classes.append(kk)
+    if len(classes) != 7:
+        raise RuntimeError(
+            f"{len(classes)} classes of k ≡ −k found on {sg.xhm()!r}; "
+            "L*/2L* has eight elements on every three-dimensional lattice")
+    return tuple(sorted(classes))
+
+
 def zone_boundary_candidates(space_group) -> tuple[KCandidate, ...]:
     """The enumerated candidate set WP-1326 fixes — the default generator.
 
-    {0, ½}³ minus the origin, plus (⅓, ⅓, 0) and (⅓, ⅓, ½) on a hexagonal or
-    trigonal lattice, reduced to **one representative per star**.  The star
+    The points where k ≡ −k on the phase's **own** lattice
+    (:func:`_order_two_kvectors`), plus (⅓, ⅓, 0) and (⅓, ⅓, ½) on a hexagonal
+    or trigonal lattice, reduced to **one representative per star**.  The star
     reduction is not a convenience: every arm of a star generates the
     identical satellite list (the enumeration merges over the whole Laue
     group), so keeping all of them would put exact ties in a ranking that is
-    supposed to be read.
+    supposed to be read.  The representative of a star is its shortest
+    spelling (:func:`_shortest_spelling_key`), and stars are listed in the
+    order of their representatives.
 
-    Seven on a triclinic P lattice; three on P m -3 m, where the six face and
-    edge points collapse onto two stars.  **Centring does not reduce the
-    count**: every difference of two members of {0, ½}³ has a half-integer
-    component and so is never a reciprocal-lattice vector, whatever the
-    centring — which is what the WP's "fewer distinct ones under centring"
-    would need.  What does reduce it is the point group, through the star.
+    On a P lattice this is {0, ½}³ minus the origin, as the WP writes it:
+    seven on P -1, three on P m -3 m, where the face and edge points collapse
+    onto two stars.  On a centred lattice the literal {0, ½}³ in conventional
+    axes is not that set — on F m m m only (½, ½, ½) of its seven members has
+    2k in the reciprocal lattice, and the X point (1, 0, 0), where the
+    Pr₀.₅Sr₀.₅MnO₃ structure of the GSAS-II tutorial "Magnetic-IV" orders, is
+    not among them — so the set is derived from the lattice.  It is never
+    longer than seven before the star merge, on any lattice.
     """
     sg = _resolve(space_group)
-    half = (Fraction(0), Fraction(1, 2))
-    raw: list[KVector] = [(h, kk, ll) for h in half for kk in half for ll in half
-                          if not (h == 0 and kk == 0 and ll == 0)]
+    stars: dict[frozenset[KVector], KVector] = {}
+    for kk in _order_two_kvectors(sg):
+        arms = frozenset(star(sg, kk))
+        held = stars.get(arms)
+        if held is None or _shortest_spelling_key(kk) < _shortest_spelling_key(held):
+            stars[arms] = kk
+    raw: list[KVector] = sorted(stars.values())
     if sg.crystal_system_str() in ("hexagonal", "trigonal"):
         raw.extend(_TRIGONAL_POINTS)
     out: list[KCandidate] = []

@@ -1,9 +1,8 @@
 # WP-1547 — the fast tier's tail is cut back, and its report reads CI's seconds
 
-Milestone: unscheduled · Status: 🔄 2026-10-11 — shards merged (#869); the ten-run acceptance reads main from here
+Milestone: unscheduled · Status: ✅ 2026-10-23 — the tail cut and two shards a leg brought a run's slowest fast job to a 14.75-min median over ten main runs
 Track: The repo's own process
 Depends on: —
-Priority: P2 2026-10-09 — a cost item with the maintainer at the wall: every code PR waits 32-37 min, and the median leg rose 43 % in one week
 
 ## Goal
 
@@ -153,6 +152,15 @@ edits, and a missed one drops that platform's answer silently. A YAML anchor
 or one script every leg calls would fix it. It is low stakes, and in scope
 only if the last task moves Python versions into the nightly.
 
+**After this WP (from WP-2019, 2026-10-21).** The tier grew again after these
+tasks: the guide scripts (WP-1986), the automatic profile interval (WP-2002)
+and 64 files the shard record lacked. Main run 39589774138 (3437d52) had a
+slowest job of 19.6 min, at this WP's bar. [2019](2019-each-fast-leg-runs-what-only-it-can-see.md)
+owns the next cut. Its #1095 (merged 2026-10-21) reshaped the per-push matrix:
+jax is one unsharded job of the cases that reach jax, and the documentation
+runs on the newest leg alone under `RIETX_DOCS`, which replaced this WP's
+`RIETX_TUTORIALS`.
+
 ## Non-goals
 
 - Why `isotropy.analyse` is slow: WP-1418.
@@ -226,6 +234,35 @@ gh run view <id> --json jobs   # each "fast …" job's startedAt to completedAt;
 - Runs 36362163974, 37100295315, 37966391017, 37978210348; PR #810.
 
 ## Handover log
+
+### 2026-10-23 — closed: a run's slowest fast job takes about 15 minutes
+
+When this WP opened, a code PR waited 32-37 minutes for CI. After the tail cut
+and the split of each leg into two shards, the first ten successful main runs
+waited a median 14.75 minutes for their slowest fast job, under the 20-minute
+bar. The maintainer decided on 2026-10-23 that the WP closes, which discharges
+the wait on the maintainer. The tier has grown since, and the next cut is WP-2019's.
+
+Read from GitHub's REST API (ci.yml, main, push; each job `started_at` to
+`completed_at`). #869 merged 2026-10-11T07:16:44Z. The next 24 completed runs,
+to 10-12 08:41, were 10 successes and 14 cancelled by a newer push. None failed.
+
+- Item 1 met. Slowest fast job per run, min: 38120969515 14.97,
+  38124338257 14.97, 38126808708 14.93, 38149031888 18.45, 38151965750 18.47,
+  38177046032 14.57, 38181705837 13.83, 38184006682 14.30, 38219845308 13.62,
+  38225077694 12.82. Median 14.75. A jax shard was slowest in 7 runs. All ten
+  had one shape, three legs of two shards, nine days before #1095.
+- Item 2 met by 38048650490 (10-11 entry), and again by the first nightly
+  after the merge, 38136632756 on 12db370b: `full` green, both `middle` jobs too.
+- Item 3 met by the 10-11 entry: run 38094285221's shard sums are the base
+  legs plus the 27 added, and the local count was 9219 (`[dev]`, macOS arm64).
+- Inherited: the grown-tier note is now in Context, its next cut already
+  WP-2019's. The two-shapes note is discharged: the window ends before #1095.
+- For WP-2019: the five latest main runs (10-22, 10-23) had slowest jobs of
+  17.5-22.2 min, three over 20; py3.14's shards took 9.1 and 21.7 min on
+  39937040834.
+
+*Next.* Nothing owed here. The shard record refresh and the next cut are WP-2019's.
 
 ### 2026-10-11 (2nd session) — the release gate reads 3.12 and 3.13 on their own, and the trim stays
 

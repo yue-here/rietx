@@ -126,14 +126,18 @@ def test_the_cap_is_never_applied_to_a_stored_diagnostics_list():
     # the stored list carries all 15 — nothing was dropped from the data
     assert sum(1 for d in result.diagnostics if d.code == "HIGH_CORRELATION") == 15
 
-    # only the rendered view is bounded
+    # only the rendered view is bounded; the header counts the stored list
+    # (WP-2037: no deliverable, so each warning prints as one line)
     text = str(result)
-    assert text.count("[HIGH_CORRELATION]:") == HIGH_CORRELATION_MAX
+    assert text.count("    HIGH_CORRELATION at ") == HIGH_CORRELATION_MAX
     assert "HIGH_CORRELATION_OMITTED" in text
-    assert "diagnostics: 15 unresolved" in text
+    assert "diagnostics: 15 rows, 0 errors;" in text
 
-    lines = _diagnostic_lines(result.diagnostics)
+    # under a deliverable each prints in full, and the count is still the stored one
+    lines = _diagnostic_lines(result.diagnostics, "structure")
+    assert lines[0] == "  diagnostics under structure: 15 warnings, 0 errors, 0 info"
     assert sum(1 for ln in lines if "[HIGH_CORRELATION]:" in ln) == HIGH_CORRELATION_MAX
+    assert "    info[HIGH_CORRELATION_OMITTED]: 5 more correlated pair(s)" in "\n".join(lines)
 
 
 # --- the routing (WP-1310) -----------------------------------------------

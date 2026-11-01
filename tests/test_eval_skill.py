@@ -393,7 +393,7 @@ def test_the_placement_episode_builds_and_fires_its_codes(tmp_path):
     B.build(TREE, tmp_path / "p", only=["fap-judge"])
     files = tmp_path / "p" / "evals" / "fap-judge" / "files"
     out = (files / "fit_output.txt").read_text(encoding="utf-8")
-    assert all(f" {c} " in out for c in placement.SCORED_CODES)
+    assert all(f" {c} " in out for c in placement.EPISODE_CODES)
 
 
 # --- readout.py: the read-outs and the decision rule, on documents built here --

@@ -1981,15 +1981,25 @@ def test_a_schema_refusal_from_the_cell_or_the_atoms_is_still_converted(tmp_path
 
     The truncation pin cannot catch this class: a ragged cut rarely leaves a
     well-formed line carrying an out-of-range number, so it is tested directly.
-    It was a beq of 26 Å² until `Atom.biso` lost its default bound (WP-1534);
-    an occupancy of 1.8 is outside the [0, 1.5] window `Atom.occ` declares.
+    It was a beq of 26 Å² until `Atom.biso` lost its default bound (WP-1534),
+    then an occupancy of 1.8 until `Atom.occ` lost its 1.5 ceiling (WP-2002);
+    a negative occupancy is outside the floor of 0 that `Atom.occ` keeps.
     """
     inp = _inp(tmp_path, "outofrange.inp",
                'str\nphase_name "hot"\nspace_group "P1"\na 5.0\n'
-               'site A1 x 0 y 0 z 0 occ Na+1 1.8 beq bA 0.5\n')
+               'site A1 x 0 y 0 z 0 occ Na+1 -0.5 beq bA 0.5\n')
     with pytest.raises(TopasInpError) as exc:
         to_structure(read_topas_inp(inp))
     assert "outofrange.inp" in str(exc.value) and "hot" in str(exc.value)
+
+
+def test_an_occupancy_above_the_old_ceiling_reads(tmp_path):
+    """A stated occupancy of 1.8 reads as stated, with no ceiling (WP-2002)."""
+    inp = _inp(tmp_path, "full.inp",
+               'str\nphase_name "full"\nspace_group "P1"\na 5.0\n'
+               'site A1 x 0 y 0 z 0 occ Na+1 1.8 beq bA 0.5\n')
+    occ = to_structure(read_topas_inp(inp)).phases[0].atoms[0].occ
+    assert (occ.value, occ.min, occ.max) == (pytest.approx(1.8), 0.0, math.inf)
 
 
 def test_a_beq_above_the_old_ceiling_reads(tmp_path):
@@ -4729,3 +4739,156 @@ def test_every_named_term_is_a_parameter_table_path(tmp_path):
                                    "phases.0.preferred_orientation.r"]
     table = ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
     assert set(named.where) <= {e.path for e in table.entries}
+
+
+# ---- a parameter defined by an equation, with no `: value` tail (Tech Ref 2.5-2.6)
+#
+# TOPAS writes an equation's value back only where the input asks for it with
+# `: 0` (Technical Reference v6, §2.5 p. 12), so `prm uA = 0.006*k;` is how such
+# a declaration usually reads. Every slot naming one refused: the symbol table
+# bound a `prm` only when it stated a number or the evaluated tail. Every number
+# below is invented, and chosen off every default (beq 0.5, occ 1, u 0, x 0), so
+# a value that fell back to a seed cannot pass.
+
+_EQ_PHASE = '''str
+  phase_name "ABO3"
+  space_group "P m -3 m"
+  {cell}
+  site A x 0 y 0 z 0 occ Sr+2 1 {a}
+  site B x 0.5 y 0.5 z 0.5 occ Ti+4 1 {b}
+  site O x {ox} y 0.5 z 0.5 occ O-2 {occ} beq 0.6
+'''
+
+
+def _eq_model(tmp_path, prms, *, cell="a 3.9", a="beq 0.45", b="beq 0.4",
+              ox="0", occ="1"):
+    text = prms + "\n" + _EQ_PHASE.format(cell=cell, a=a, b=b, ox=ox, occ=occ)
+    return read_topas_inp(_inp(tmp_path, "eq.inp", text))
+
+
+_U = "u11 {0} u22 {0} u33 {0}"
+
+#: ``(the declarations, the site/cell slot, where the value lands, the value)``
+#: — the brief's table, one row per spelling.
+EQUATION_ROWS = [
+    ("", dict(a=_U.format("0.0102")), "A.u11", 0.0102),
+    ("", dict(a=_U.format("uA 0.0102")), "A.u11", 0.0102),
+    ("", dict(a="beq !bA 0.45 min 0 max 3"), "A.beq", 0.45),
+    ("prm uA 0.0102", dict(a=_U.format("=uA;")), "A.u11", 0.0102),
+    ("prm k 1.7", dict(a=_U.format("=0.006*k;")), "A.u11", 0.006 * 1.7),
+    ("prm d 0.17", dict(occ="=(3-d)/3;"), "O.occ", (3 - 0.17) / 3),
+    ("prm k 1.7\nprm uA = 0.006*k; : 0.0102", dict(a=_U.format("=uA;")),
+     "A.u11", 0.0102),
+    # -- the four that refused: an equation `prm` with no tail
+    ("prm k 1.7\nprm uA = 0.006*k;", dict(a=_U.format("=uA;")), "A.u11",
+     0.006 * 1.7),
+    ("prm k 1.7\nprm bB = 0.25*k;", dict(b="beq =bB;"), "B.beq", 0.25 * 1.7),
+    ("prm k 1.7\nprm d = 0.1*k;", dict(occ="=(3-d)/3;"), "O.occ",
+     (3 - 0.17) / 3),
+    ("prm k 1.7\nprm xx = 0.01*k;", dict(ox="=xx;"), "O.x", 0.017),
+]
+
+
+def _landed(model, where):
+    label, key = where.split(".")
+    site = next(s for s in model.phases[0].sites if s.label == label)
+    return {"u11": (site.adps or {}).get("u11"), "beq": site.beq,
+            "occ": site.occupancy, "x": site.x}[key]
+
+
+@pytest.mark.parametrize("prms, slots, where, value", EQUATION_ROWS)
+def test_a_slot_naming_an_equation_prm_reads_its_value(tmp_path, prms, slots,
+                                                        where, value):
+    model = _eq_model(tmp_path, prms, **slots)
+    assert _landed(model, where) == pytest.approx(value, rel=1e-12)
+
+
+def test_a_chain_two_deep_reads_to_the_arithmetic_value(tmp_path):
+    prms = ("prm T 300\nprm k 1.1\n"
+            "prm f = 4.8e-5*(T+273.15) - 1.5e-2;\nprm u = f*k;")
+    model = _eq_model(tmp_path, prms, a=_U.format("=u;"))
+    expected = (4.8e-5 * (300 + 273.15) - 1.5e-2) * 1.1
+    assert model.phases[0].sites[0].adps == pytest.approx(
+        {"u11": expected, "u22": expected, "u33": expected}, rel=1e-12)
+    # `u` reaches every parameter its chain does, which is what a refine flag
+    # is inherited through.
+    assert model.symbols["u"].refs == ("T", "f", "k")
+    assert model.symbols["u"].vary is None       # a dependent parameter (§2.6)
+
+
+def test_equations_are_not_evaluated_in_file_order(tmp_path):
+    """§2.6: ``prm a2 = 2 a1;`` above ``prm a1 = 3;`` is legal and gives 6."""
+    model = _eq_model(tmp_path, "prm a2 = 2*a1;\nprm a1 = 0.35;",
+                      b="beq =a2;")
+    assert model.phases[0].sites[1].beq == pytest.approx(0.7)
+    assert symbol_table(strip_comments("prm a2 = 2*a1;\nprm a1 = 0.35;"))[
+        "a2"] == pytest.approx(0.7)
+
+
+def test_the_evaluated_tail_outranks_the_equation(tmp_path):
+    """The ``: value`` is what the converged refinement used, so it is kept even
+    where re-evaluating the equation against the file's other numbers differs."""
+    model = _eq_model(tmp_path, "prm k 1.7\nprm uA = 0.006*k; : 0.0111",
+                      a=_U.format("=uA;"))
+    assert model.phases[0].sites[0].adps["u11"] == 0.0111
+    assert model.symbols["uA"].refs == ("k",)
+
+
+@pytest.mark.parametrize("prms, slot, names", [
+    ("prm pa = pb;\nprm pb = pa;", "=pa;", ["pa -> pb -> pa", "cycle"]),
+    ("", "=nope;", ["nope", "does not declare"]),
+    ("prm k 1.7\nprm bA = bQ*k;", "=bA;", ["bQ", "does not declare"]),
+    ("prm k 1.7\nprm bA = k^2;", "=bA;", ["bA", "k^2", "does not evaluate"]),
+    ("prm k 1.7\nprm bA = 2 k;", "=bA;", ["bA", "2 k", "does not evaluate"]),
+])
+def test_an_equation_that_does_not_resolve_still_refuses_naming_why(
+        tmp_path, prms, slot, names):
+    with pytest.raises(TopasInpError, match="cannot read beq") as err:
+        _eq_model(tmp_path, prms, a=f"beq {slot}")
+    for name in names:
+        assert name in str(err.value)
+
+
+@pytest.mark.parametrize("held, expected", [("", True), ("!", None)])
+def test_a_cell_edge_through_a_chain_inherits_its_refine_flag(tmp_path, held,
+                                                             expected):
+    """``a = edge;`` is a dependent cell edge, so it is refined where anything
+    its chain reaches is: ``edge = 1.95*k`` with ``k`` free is a refined cell,
+    and reading it as held is a protocol the file did not record."""
+    model = _eq_model(tmp_path, f"prm {held}k 1.7\nprm edge = 1.95*k;",
+                      cell="a =edge;")
+    assert model.phases[0].cell["a"] == pytest.approx(3.315)
+    assert model.phases[0].vary.get("a") is expected
+
+
+@pytest.mark.parametrize("held, expected", [("", True), ("!", None)])
+def test_a_cell_macro_argument_through_a_chain_reads_and_inherits(
+        tmp_path, held, expected):
+    model = _eq_model(tmp_path, f"prm {held}k 1.7\nprm edge = 1.95*k;",
+                      cell="Cubic(=edge;)")
+    assert model.phases[0].cell["a"] == pytest.approx(3.315)
+    assert model.phases[0].cell["c"] == pytest.approx(3.315)
+    assert model.phases[0].vary.get("a") is expected
+
+
+def test_scale_moment_wavelength_and_weight_percent_read_through_a_chain(
+        tmp_path):
+    """The scope of the fix: every keyword read through the symbol table."""
+    prms = ("prm k 1.7\nprm s_eq = 3e-5*k;\nprm m_eq = 1.5*k;\n"
+            "prm lam = 0.77*k;\nprm wp = 25*k;\n"
+            "lam ymin_on_ymax 0.001 la 1 lo =lam; lh 0.5")
+    model = _eq_model(tmp_path, prms,
+                      cell="a 3.9\n  scale =s_eq;\n  weight_percent =wp;",
+                      a="beq 0.45 mlx 0 mly 0 mlz =m_eq;")
+    phase = model.phases[0]
+    assert phase.scale == pytest.approx(5.1e-5)
+    assert phase.weight_percent == pytest.approx(42.5)
+    assert phase.sites[0].moment["mlz"] == pytest.approx(2.55)
+    assert model.wavelength == pytest.approx(1.309)
+
+
+def test_a_stated_scale_that_does_not_resolve_refuses(tmp_path):
+    """It arrived None and was seeded 1e-4 at build: a stated number replaced
+    by a default, the one outcome every other slot already refuses."""
+    with pytest.raises(TopasInpError, match="cannot read scale.*nope"):
+        _eq_model(tmp_path, "", cell="a 3.9\n  scale =nope;")

@@ -541,12 +541,14 @@ def test_a_symbol_this_build_cannot_resolve_is_refused(tmp_path):
 def test_a_schema_refusal_is_converted_rather_than_leaked(tmp_path):
     """The class, not a third instance: no pydantic error reaches a caller.
 
-    An occupancy of 40 is nothing the corpus contains and nothing the reader
+    A negative occupancy is nothing the corpus contains and nothing the reader
     checks for by name.  It must still come back naming the file, because a
     message about a ``Parameter`` tells a caller nothing about which file they
     handed in (``io/CLAUDE.md`` § Refusals — the rule ``read_gsas_prm`` paid for).
+    It was an occupancy of 40 until ``Atom.occ`` lost its ceiling (WP-2002);
+    the floor of 0 is the bound that stays.
     """
-    atoms = [["Na1", "Na", "XU", 0.0, 0.0, 0.0, 40.0, "m3m", 1, "I",
+    atoms = [["Na1", "Na", "XU", 0.0, 0.0, 0.0, -0.5, "m3m", 1, "I",
               0.01, 0, 0, 0, 0, 0, 0, 12345]]
     path = _write_gpx(tmp_path / "occ.gpx", _minimal_project(atoms=atoms))
     with pytest.raises(Gsas2GpxError, match="occ.gpx"):

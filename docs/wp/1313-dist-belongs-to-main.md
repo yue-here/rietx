@@ -57,6 +57,11 @@ instruction for the by-hand half, not an automation of it.
 
 ### Inherited
 
+**From WP-1986 (2026-10-19).** The GUI screenshots and their script moved: they are now
+`docs/docs/screenshots/*.png` and `docs/docs/make_screenshots.py`, with `.gitignore`'s
+negation following them. The churn noted below (sixteen of eighteen files move on any
+regeneration) moved with them.
+
 **From [1506](1506-a-planning-doc-pr-runs-what-reads-it.md) (2026-09-27).**
 Measured over the PRs merged 2026-08-27 to 2026-09-27: 91 changes to files
 under `src/rietx/gui/static/` (32 to `build-info.json`, 27 to

@@ -1,6 +1,6 @@
 # WP-1918 — a magCIF the reader refuses today is read in its own cell, and one validator checks it on the way in and out
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-01 — FullProf's `_parent_space_group.name_H-M` spelling read, from outside as PR #1193 (`cd1c39ff`); an empty second block skipped and the draft magnetic tags refused, as PR #1257 (`1c55eda6`, #1063 items 1 and 3); the six maintainer decisions and I-a onwards open
 Track: Coming from another code
 Depends on: — (1911 soft: the structure-level setting transform the BNS restatement uses)
 Priority: P2 2026-10-08 — a refusal that fires on readable files: 615 of the 900 supercell refusals name a double count the file does not have
@@ -134,6 +134,8 @@ transcriptions were deliberately not copied. TOPAS is a black box.
   `CIF_MAGNETIC_SUPERCELL_READ`, `CIF_TEXT_REPAIRED`,
   `CIF_MAGNETIC_RESTATED_BNS` is under `src/`.
 
+- 2026-10-26 issue triage: #1063 (mustachefeeling, 2026-10-20), three FullProf-mCIF refusals on k = 0 files, independent of I-c. Checked against the tree at c0e32ab29, from `tests/test_magcif.py`'s Cr₂WO₆ fixture: (1) an empty `data_global` block ahead of the structure block, or one holding only `_audit_*` tags, raises "single data block expected, got 2 — this file does not read as a CIF (an empty, truncated or non-CIF file reaches here)" (`crystallography/cif.py:206-209`); (2) `_parent_space_group.name_H-M` without `_alt` raises `MagCifError` naming only the `_alt` tag (`magcif.py:683-690`); `cif_mag.dic` 0.9.9 defines only `name_h-m_alt` (`tests/data/cif_dictionaries/cif_mag.dic:3320`); (3) pre-2016 `_magnetic_atom_site_*`/`_magnetic_cell_*` tags raise "no atom sites found". Two real mCIFs from FullProf's example distribution (held locally, never to be committed) write `_parent_space_group.name_H-M` and both raise (2); with the tag renamed to `_alt`, both read. GSAS-II 5.8.4 falls back to `name_H-M` when `_alt` is absent (`imports/G2phase_CIF.py:242-244`, read 2026-10-26). Proposed: read `name_H-M` where `_alt` is absent, with an info diagnostic naming the non-dictionary tag, and refuse when both are present and disagree; read the one block holding an `_atom_site_` loop when every other block is empty or `_audit_*` only, with an info diagnostic naming the skipped blocks, while two structure blocks stay refused with a message that counts them and names `block=`; refuse the pre-2016 tag set by name. Item (1) edits the same reader lines as WP-1933's C-e (`structure_from_cif(block=)`), whose Inherited already records the wrong-cause message; build them together or land this rule first and let C-e generalise it. Each new code needs its `_audit` row (tier 1: the format's definition) and its `help.py`/skill row.
+
 ## Non-goals
 
 - Modulated files and an irrational k (164 files): #678 and the v2+ fence.
@@ -235,6 +237,10 @@ transcriptions were deliberately not copied. TOPAS is a black box.
   the CIF writer.
 
 ## Handover log
+
+- **2026-11-01** (`/pr-review`) — #1063's items 1 and 3 merged from outside as PR #1257 (`1c55eda6`). A CIF whose other data blocks state nothing, or only `_audit_` tags, now reads its one structure block. It records the skip as the info code `CIF_EMPTY_BLOCK_SKIPPED` (tier 1). The pre-2016 draft magnetic tags are refused by name. That refusal is the maintainer's call on file "B" in #1063: refuse. No task of this WP is ticked by it. Follow-ups, not blocking: `refuse_a_magnetic_supercell` does not consult `_magnetic_propagation_vector_kxkykz`. `refuse_draft_tags` matches `^\s*<tag>` over the raw text, so it would fire inside a semicolon text field. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
+
+- **2026-10-29** (`/pr-review`) — merged from outside as PR #1193 (`cd1c39ff`): where `_parent_space_group.name_H-M_alt` is absent, the reader takes FullProf's `_parent_space_group.name_H-M`, which `cif_mag.dic` does not define, and says so with `CIF_MAGNETIC_PARENT_TAG_UNDEFINED` (info, tier 1). Two tags naming different groups raise `MagCifError` quoting both. Review noted one gap for this WP: `magcif.py` promises the known tags as lists (`READ_TAGS`, `IGNORED_TAGS`, `PRIVATE_TAGS`), and this tag is in none of them, so the completeness oracle cannot see it. None of this WP's tasks is ticked by it; the six decisions stand.
 
 - **2026-10-08** — created, from the 2026-10-08 issue triage (issues #757
   and #758). Checked against the tree at `5d1f5f67`:

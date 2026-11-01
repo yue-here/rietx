@@ -1,9 +1,8 @@
 # WP-1967 — what the chemist declares reaches the extinction screen
 
-Milestone: unscheduled · Status: 🔄 2026-10-17 — PR #940 merged from outside (`c93c4213`); the Z and density filter remains
+Milestone: unscheduled · Status: ✅ 2026-10-23 — a declared chirality, centre of symmetry or polarity filters each extinction class and names what it removed (PR #940); Z and density are WP-2033's
 Track: Data and metadata in, a structure out
 Depends on: 1910 soft (the screen's default, PR #939, shares this work's functions)
-Priority: P2 2026-10-14 — was P3 (a workaround covers it: the user drops the groups by hand after the screen); up a rung because PR #940 builds it and what remains is its review
 
 ## Goal
 
@@ -53,24 +52,12 @@ answer can move. Each fact is read off the group's operators, never a table:
 gemmi's `is_sohncke` and `is_centrosymmetric`, and polarity as an invariant
 vector shared by every rotation. A new diagnostic code needs its skill row.
 
-### Inherited
-
-- **2026-10-14, from the issue triage: issue #935 is in PR #940 (theirs,
-  head `edb3b74b`).** It adds `restrict=` on `determine_extinction_symbol`
-  (`rx.ExtinctionPrior(sohncke, centrosymmetric, polar)`, each `None`, `True`
-  or `False`), `ExtinctionCandidate.excluded_groups` and `.laue_classes`, and
-  the codes `EXTINCTION_PRIOR_APPLIED` and `LAUE_CLASS_NOT_SEPARABLE`. With
-  nothing declared no ranking and no `best_or_none` moves, and the Laue
-  diagnostic is the one change a caller sees. It shares
-  `determine_extinction_symbol`, `extinction_diagnostics`, `best_or_none` and
-  the thresholds version with PR #939 (WP-1910). Whichever merges second
-  renumbers 1.10 to 1.11.
-
 ## Non-goals
 
 - The screen at a small cell error, and its default prefit (WP-1910, PR #939).
-- The blind search's use of what the chemist knows (WP-1510).
-- Z and density inside #940 (decided as a follow-up, a task below).
+- The blind search's use of what the chemist knows (WP-1510, shipped in 1.7; its open window
+  and Z-check work is WP-2030).
+- Z and density inside #940 (decided as a follow-up; WP-2033 since the close).
 
 ## Tasks
 
@@ -80,8 +67,10 @@ vector shared by every rotation. A new diagnostic code needs its skill row.
 - [x] Review and merge PR #940 against the two conditions: answers with
       nothing declared stay as on `main`, and `restrict` stays optional on
       every surface.
-- [ ] Follow-up: Z and density as a member filter, from Wyckoff
-      multiplicities derived off the operators.
+- [x] ~~Follow-up: Z and density as a member filter, from Wyckoff
+      multiplicities derived off the operators.~~ Moved at the close to
+      [WP-2033](2033-a-declared-z-filters-the-extinction-class.md), by the
+      maintainer's decision of 2026-10-23.
 - [x] Tests (#940 carries `tests/test_extinction_prior.py`), and
       `tests/test_acceptance_indexing.py` green.
 - [x] Skill: the two new codes' rows (#940 puts them in
@@ -111,6 +100,18 @@ on `main`.
 
 ## Handover log
 
+- **2026-10-23** — closed by the maintainer's decision. A caller can now
+  declare that a compound is enantiopure, centrosymmetric or polar. The
+  extinction screen drops the members that contradict the declaration and
+  names each one, and with nothing declared it answers as before. PR #940 met
+  the Goal and every acceptance line on 2026-10-17 (entry below). The one box
+  left open was the follow-up the maintainer split off on 2026-10-14: a
+  declared Z or density, which needs each group's Wyckoff orbit sizes. That box
+  is now [WP-2033](2033-a-declared-z-filters-the-extinction-class.md). It was
+  filed at this close because no open WP owns a declared Z for the screen.
+  2030 holds Z in the search, and 1910 holds the screen at a small cell error.
+  Issue #935 stays open for that half. The one `### Inherited` bullet was
+  #940 itself, and its merge discharged it. *Next:* nothing owed here.
 - **2026-10-14** — created, from the 2026-10-14 issue triage (issue #935).
   Checked against the tree at `ee589bab`: both symbols the issue names exist
   where cited, and nothing lets a caller declare chemistry to the screen. No

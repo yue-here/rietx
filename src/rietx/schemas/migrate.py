@@ -249,8 +249,9 @@ def restore_declared_ranges(found: dict[str, list[tuple[str, dict]]],
     stored value lies outside the declared range, restoring the others would
     hand a checkout of them a range that value refutes, and restoring that one
     would refuse the record.  The default box is not physics for every
-    instrument — a coarse neutron line's Caglioti ``u`` sits well outside the
-    X-ray one — so the parameter is left as stored everywhere and reported.
+    stored value (a neutron line's Caglioti ``u`` sat outside the X-ray one
+    until 2026-10-23), so the parameter is left as stored everywhere and
+    reported.
     **No value ever moves.**  One ``DECLARED_RANGE_RESTORED`` or
     ``DECLARED_RANGE_NOT_RESTORED`` per dot-path.
     """
@@ -328,5 +329,4 @@ def _not_restored_note(candidate: dict, document: str, ids: list[str],
         value=float(value),
         suggestion=(
             "If the value is right, give the Parameter a range that holds it "
-            "before the next fit (for a coarse instrument's widths, the box "
-            "ProfileTCHZ.coarse builds)."))
+            "before the next fit."))

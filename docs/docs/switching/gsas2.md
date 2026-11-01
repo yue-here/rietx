@@ -60,9 +60,9 @@ result = ref.fit(data, plan=plan, two_theta_limits=(15, 130))
 
 ```text
 >>> result.status, round(result.statistics.rwp, 4)
-('converged', 0.0893)
+('converged', 0.0898)
 >>> [(s.name, len(s.freed)) for s in result.stages]
-[('background', 7), ('cell', 3), ('profile', 5), ('atoms', 19)]
+[('background', 7), ('cell', 3), ('profile', 5), ('atoms', 19), ('closing', 34)]
 ```
 
 The two axial-divergence terms are set by hand, where an `.instprm` would supply `SH/L`.
@@ -71,6 +71,7 @@ This plan frees U, V and W, which the [validation protocol](validation.md#fluora
 A name in `turn_on` is a parameter path, and `*` stands for any text at that place.
 `phases.*.cell.*` is every lattice parameter of every phase.
 Staging is cumulative, so the cell stays free in the profile and atom stages.
+The fit ends with a closing stage, which frees all 34 parameters again with wider peak windows ([The closing stage](../reference/refinement.md#the-closing-stage)).
 [About a fit](../concepts/fit.md#the-plan) describes the stages, and the [plan presets](../reference/plans.md) draw the ones rietx ships.
 
 ### A project is a directory
@@ -103,17 +104,17 @@ rx.write_gsas2_instprm(ref.fitted_instrument, "refined.instprm")
 Type:PXC
 Lam1:1.54059
 Lam2:1.54443
-Zero:-0.0365483
+Zero:-0.0365586
 I(L2)/I(L1):0.5
 Polariz.:0.5
-U:-1.57858
-V:2.93235
-W:2.29048
-X:2.74538
-Y:3.9936
+U:-1.57826
+V:2.76475
+W:2.37759
+X:2.68762
+Y:4.11637
 ```
 
-The `.instprm` states U = −1.57858 centidegrees², and rietx's own value is −0.000875351 degrees².
+The `.instprm` states U = −1.57826 centidegrees², and rietx's own value is −0.000875173 degrees².
 `rx.read_gsas2_instprm` reads the file back and converts.
 
 GSAS-II states one axial divergence, `SH/L`, as the sum of the specimen and detector terms.
@@ -133,6 +134,13 @@ It never adds one on its own.
 GSAS-II's `LeBail` flag on a phase and rietx's `fit(mode="lebail")` do the same job.
 `mode="pawley"` refines each reflection's intensity as a parameter and fixes the atoms.
 The atoms and the phase scale are fixed in both modes, and no other code was compared with these two.
+
+### An esd carries a correlation factor
+
+rietx multiplies every esd by the Bérar-Lelann factor for serially correlated residuals, and GSAS-II does not.
+`RefinedParameter.stderr_uncorrected` is rietx's esd without the factor, so compare a GSAS-II esd with it.
+On the fluorapatite pattern of the `LabData` tutorial the factor is 2.17, so `stderr` is about twice `stderr_uncorrected` there.
+[Estimation](../theory/estimation.md#esds-and-the-bérar-lelann-inflation) says why rietx applies the factor and what each program reports.
 
 ## Moving files across
 

@@ -61,6 +61,7 @@ import warnings
 import numpy as np
 
 from ..backend.linalg64 import require_fp64, to_host_fp64
+from . import lapack
 from .statistics import COLUMN_SAFE_EXPONENT, PINV_RCOND
 
 #: Size of the dense joint Jacobian, in bytes (8 per entry), above which
@@ -416,7 +417,7 @@ class _Arrow:
         if m == 0:
             return 0.0
         if m <= _DENSE_EIGEN_MAX:
-            return float(np.abs(np.linalg.eigvalsh(self.dense())).max())
+            return float(np.abs(lapack.eigvalsh(self.dense())).max())
         from scipy.sparse.linalg import ArpackNoConvergence, LinearOperator, eigsh
 
         op = LinearOperator((m, m), matvec=self.matvec, dtype=np.float64)
@@ -426,7 +427,7 @@ class _Arrow:
         except ArpackNoConvergence:
             # the dense eigensolve this method exists to avoid, rather than a
             # cut placed on a guess
-            return float(np.abs(np.linalg.eigvalsh(self.dense())).max())
+            return float(np.abs(lapack.eigvalsh(self.dense())).max())
         return float(np.abs(lam).max())
 
 
@@ -497,7 +498,7 @@ def _cut_pinv(a: np.ndarray, cut: float) -> tuple[np.ndarray, np.ndarray]:
     and the eigenvectors it discarded (columns)."""
     if a.size == 0:
         return np.zeros_like(a), np.zeros((a.shape[0], 0))
-    lam, u = np.linalg.eigh(a)
+    lam, u = lapack.eigh(a)
     mag = np.abs(lam)
     keep = mag > cut
     inv = (u[:, keep] / mag[keep]) @ u[:, keep].T
@@ -603,7 +604,7 @@ def refitted_increase(bj: BlockJacobian, angles: list[int], r_stop: np.ndarray,
                 g[:, pos_b[cm[on_b]]] = jb[:, on_b] / d[cm[on_b]]
             if len(own) and jb.shape[0]:
                 p = jb[:, own] / d[cm[own]]
-                u, sv, _ = np.linalg.svd(p, full_matrices=False)
+                u, sv, _ = lapack.svd(p, full_matrices=False)
                 u = u[:, sv > eps * max(p.shape) * sv[0]]
                 g = g - u @ (u.T @ g)
                 rh = rh - u @ (u.T @ rh)
@@ -612,7 +613,7 @@ def refitted_increase(bj: BlockJacobian, angles: list[int], r_stop: np.ndarray,
         rhs = np.vstack(r_parts) if r_parts else rhs
         if len(b_idx):
             gs = np.vstack(g_parts)
-            rhs = rhs - gs @ np.linalg.lstsq(gs, rhs, rcond=None)[0]
+            rhs = rhs - gs @ lapack.lstsq(gs, rhs, rcond=None)[0]
     return float(rhs[:, 1] @ rhs[:, 1] - rhs[:, 0] @ rhs[:, 0])
 
 

@@ -283,3 +283,15 @@ processes do not each start a kernel pool sized for the whole machine.
 CPUs. Hypothesis: whole fits behave the same on threads, not timed; and the
 one-thread pool per process, the use `RIETX_COMPILED_THREADS`'s docstring names
 for it, which no batch has measured.)*
+
+**9c.34 Switch the closing stage off for a screening batch with
+`plan.closing_window_tol = None`, and keep it on for the fits you report.**
+Every plan ends in a closing stage that refines everything again on windows
+dropping 1e-3 of each peak, and it costs **1.2-2.3×** a fit on the four
+acceptance patterns. Off, each answer lands 0.15-0.96 esd from the closing
+one and depends on the start values (0.75 esd apart on cpd-1a from two Biso
+starts, 0.07 with it on). Refit with it on the units a screen keeps and those
+near its cut, which a shift that size can carry across it, and say which
+setting each number came from: `result.stages[-1].name == "closing"`
+when it ran. *(Measured: WP-2002 on SRM 660c LaB6, the GSAS-II
+fluorapatite, CPD cpd-1a and 11-BM NAC, one fit each; no batch has timed it.)*

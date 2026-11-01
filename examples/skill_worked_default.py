@@ -15,8 +15,7 @@ Provenance and licence for both: `tests/data/README.md`.
 **Two copies, held equal by a test.** The skill body cannot
 `{literalinclude}` this file, because an agent reads `SKILL.md` raw, so
 `tests/test_skill.py` asserts the two blocks agree line for line. The manual
-needs no include of its own either: it renders the whole body, this code
-included, through its skill chapter (`docs/manual/conf.py`, `_write_skill`).
+does not render the body; `docs/docs/reference/agents.md` points at it.
 It writes no output file, so it runs from any cwd.
 """
 
@@ -32,7 +31,7 @@ data = rx.read_pattern(PATTERN)
 structure = rx.Structure.from_cif(CIF)
 instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 limits = (float(np.min(data.two_theta)), float(np.max(data.two_theta)))  # narrow to what you trust
-instrument.background = rx.auto_background(data, kind="chebyshev", two_theta_limits=limits)
+instrument.background = rx.auto_background(data, kind="chebyshev", two_theta_limits=limits).background
 
 strong = sorted(rx.pick_peaks(data, instrument).peaks, key=lambda p: -p.intensity)[:12]
 h = float(np.median([p.fwhm for p in strong]))                           # §1 width seed

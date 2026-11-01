@@ -32,25 +32,37 @@ The chain, and who owns each link:
    a candidate with more free amplitudes always reaches a lower Rwp, so an Rwp
    ordering is a freedom ordering wearing a fit's clothes.
 
-**What the ranking is.**  ΔBIC first (:func:`rietx.report.layer2.delta_bic`,
+**What the ranking is.**  ΔBIC (:func:`rietx.report.layer2.delta_bic`,
 Schwarz 1978 — the package's one BIC form), computed against a nuclear
 reference refined *under the same stage list minus the moment paths*, so the
 only difference between the two models is the moment block and ``n_added`` is
-exactly the moment DOFs that stayed free.  BIC is where parsimony enters:
-``−n_added·ln N`` charges every extra amplitude, which is why a nested triple
-of groups reaching the same profile comes out in the order the smallest group
-first.  Then the **magnetic-only R** (:attr:`MagneticTrial.r_magnetic`), a
-profile R over exactly the channels the nuclear model puts nothing on — WP-1326's
-buckets 2 and 3 — where 1.0 is "explains none of it" and 0 is "explains all of
-it".  Then parsimony as a literal tiebreak, for the case where two classes have
-the same amplitude count and the same χ².  A gap under
-:data:`SOLVE_TIE_DELTA_BIC` is **not** a ΔBIC ranking: the classes inside it
-are tied *on ΔBIC*, and the next two keys decide among them — the
-magnetic-only R when it separates them by more than
-:data:`SOLVE_TIE_R_MAGNETIC` (relative), then the smaller moment-parameter
-count.  The verdict is ``"solved"`` with the reason naming which key decided,
-and :attr:`MagneticSolution.margin` can then be negative.  Only when neither
-key separates them is the verdict an abstention naming all of them.
+exactly the moment DOFs that stayed free.  The observation count is the
+reference's effective one, as :func:`rietx.report.compare_freed` charges it
+(issue #270; WP-2002, B12):
+
+    ΔBIC = N_eff·ln(χ²_nuclear / χ²_trial) − n_added·ln N_eff,
+    N_eff = N / f²,
+
+N the fitted channels and f the Bérar-Lelann factor (Bérar & Lelann, 1991,
+J. Appl. Cryst. 24, 1) the reference's solve multiplied its esds by.
+Neighbouring channels of one peak share their residual's sign, so N counts
+the same misfit several times, and at raw N any χ² gain outvotes the penalty
+(:func:`~rietx.optimize.statistics.effective_sample_size`).  BIC is where
+parsimony enters: ``−n_added·ln N_eff`` charges every extra amplitude, which
+is why a nested triple of groups reaching the same profile comes out in the
+order the smallest group first.  The **magnetic-only R**
+(:attr:`MagneticTrial.r_magnetic`) is reported beside it, a profile R over
+exactly the channels the nuclear model puts nothing on — WP-1326's buckets 2
+and 3 — where 1.0 is "explains none of it" and 0 is "explains all of it".  It
+ranks nothing.  A gap under :data:`SOLVE_TIE_DELTA_BIC` is **not** a ΔBIC
+ranking: the classes inside it are tied *on ΔBIC*, and the verdict is an
+abstention naming every tied class with its R_mag.  The tied classes come
+first in the published list with the fewest moment parameters first, the
+order of the highest-symmetry convention, and the reason says so.  Until 1.10
+two keys broke a tie: an R_mag gap of more than 2 %, a margin chosen and never
+measured, and a smaller moment-parameter count, which counted a cost the ΔBIC
+already charges and declared a winner the data had not chosen.  Both are gone
+(WP-2002, B12 and the ruling of 2026-10-20).
 
 **The null test is a gate, not a column.**  A trial whose every moment comes
 back unsupported (WP-1327 D4: below the floor *or* below
@@ -80,6 +92,9 @@ determines of a moment direction; the degeneracies that make a class.
 
 Schwarz, G. (1978). *Ann. Stat.* **6**, 461 — the Bayesian information
 criterion the ranking is ordered by.
+
+Bérar, J.-F. & Lelann, P. (1991). *J. Appl. Cryst.* **24**, 1 — the
+serial-correlation factor f behind the effective count N/f².
 
 Kass, R. E. & Raftery, A. E. (1995). *J. Am. Stat. Assoc.* **90**, 773 — the
 evidence scale :data:`SOLVE_TIE_DELTA_BIC` is read off.
@@ -123,6 +138,7 @@ from ..crystallography.magnetic.supercell import (
 )
 from ..crystallography.symmetry import resolve_group
 from ..schemas.common import Diagnostic
+from ..schemas.plan import CLOSING_WINDOW_TOL
 from ..schemas.structure import MagneticSymmetry, Moment, Structure
 from .staged import RefinementPlan, Stage
 
@@ -132,16 +148,10 @@ from .staged import RefinementPlan, Stage
 #: over: a determination that names a winner on weaker evidence than that is
 #: the confident wrong singleton the indexing rule (WP-1043) exists to stop.
 #: It is the *width of the tie*, quoted in the result, never a threshold a
-#: caller is invited to tune down until an answer appears.
+#: caller is invited to tune down until an answer appears.  The band is Kass
+#: and Raftery's; the ΔBIC it is applied to charges N/f² observations, which is
+#: rietx's own count (WP-2002, B12).
 SOLVE_TIE_DELTA_BIC = 6.0
-
-#: Relative separation in the magnetic-only R below which two ΔBIC-tied classes
-#: are still tied.  A profile R over a few hundred channels of a weak magnetic
-#: signal is not a three-figure quantity, so a small relative gap is not
-#: ordering.  **2 % is a chosen margin, not a measured one**: no run here
-#: establishes where two fits of the same data stop agreeing in R, and it is
-#: open to a measurement that does.
-SOLVE_TIE_R_MAGNETIC = 0.02
 
 #: How many candidate propagation vectors the ranked list is carried down to
 #: when the excess indexes as satellites.  A list, never a singleton: the top
@@ -214,6 +224,17 @@ SOLVE_SEED_TILT = _moments.SEED_TILT
 #: TRF reached 2555.8.  Freed modulus-only first, the same start reached
 #: 2556.06 under LM.
 #:
+#: **The widths are the instrument's alone.**  The stage frees U and X and not
+#: the specimen's ``gauss_strain`` and ``lor_size``, which share their angular
+#: shapes, so a pattern sees only each pair's sum.  Freed together they are
+#: what WP-2002's width twin hold holds U and X against, leaving the ranking's
+#: widths on the instrument the caller handed in plus a specimen term floored
+#: at 0; freed alone, the instrument carries the whole width.  GSAS-II leaves
+#: its sample size and microstrain flags off by default (``docs/practice.md``),
+#: so its fits read their widths this way too.  A calibrated instrument is
+#: moved off its calibration here; whether that changes a ranking is
+#: unmeasured (the generality judge, WP-2002 9th session).
+#:
 #: **Coordinates are deliberately absent.**  Freeing them lets each candidate's
 #: *nuclear* model absorb a different amount of the magnetic intensity, which
 #: is precisely the confound a ranking must not have; and for a supercell
@@ -227,8 +248,7 @@ SOLVE_STAGE_PATHS: tuple[tuple[str, ...], ...] = (
      "instrument.background.c*"),
     ("phases.*.atoms.*.moment.dof*", "phases.*.scale",
      "instrument.background.c*", "phases.*.cell.*", "instrument.zero_shift",
-     "phases.*.atoms.*.biso", "phases.*.gauss_strain", "phases.*.lor_size",
-     "instrument.profile.u", "instrument.profile.x"),
+     "phases.*.atoms.*.biso", "instrument.profile.u", "instrument.profile.x"),
 )
 
 #: The names of :data:`SOLVE_STAGE_PATHS`' stages, in order.
@@ -361,8 +381,7 @@ class MagneticTrial:
     #: amplitudes the **representative site's** family has before any data is
     #: looked at.  On a parent with several magnetic sites this is per site and
     #: is not the model's parameter count — that is
-    #: :attr:`n_moment_parameters`, and it is what the ranking's parsimony key
-    #: reads
+    #: :attr:`n_moment_parameters`, and it is what orders a tie
     free_amplitudes: int
     #: ``None`` on a refused trial: the powder determines nothing about a model
     #: that was never stated, which is not the same as "determines none"
@@ -406,6 +425,10 @@ class MagneticTrial:
     reference_status: str | None = None
     _structure: Structure | None = field(default=None, repr=False, compare=False)
     _result: object | None = field(default=None, repr=False, compare=False)
+    #: the winning start's refinement and the plan it ran, which
+    #: :func:`_close` continues from
+    _refinement: object | None = field(default=None, repr=False, compare=False)
+    _plan: RefinementPlan | None = field(default=None, repr=False, compare=False)
 
     @property
     def supported(self) -> bool:
@@ -491,14 +514,13 @@ class MagneticSolution:
     ``verdict`` is one of:
 
     ``"solved"``
-        one class is ahead of every other by more than :attr:`tie_width`, or
-        the classes inside it are separated by the magnetic-only R or by
-        parsimony (``reason`` says which key decided).
+        one class is ahead of every other by more than :attr:`tie_width`.
     ``"abstained"``
-        the top classes are inside the tie width and neither the magnetic-only
-        R nor parsimony separates them, or the k step could not choose, or a
-        fit that would have mattered stopped on its budget; ``tied`` names the
-        classes and ``reason`` says which it is.
+        the top classes are inside the tie width, or the k step could not
+        choose, or a fit that would have mattered stopped on its budget;
+        ``tied`` names the classes and ``reason`` says which it is, with each
+        tied class's R_mag.  A ΔBIC tie lists the fewest moment parameters
+        first, the highest-symmetry convention's order.
     ``"nothing to solve"``
         the pattern carries no unexplained intensity a magnetic model would
         explain, or no candidate's moment survived the null test.  This is an
@@ -572,12 +594,9 @@ class MagneticSolution:
         """The winner's ΔBIC over the best *other eligible* class, or ``None``.
 
         ``None`` when there is no winner (an abstention) or no second
-        eligible class to compare against.  The winner is ``trials[0]``, which
-        is the top-ΔBIC class unless :func:`_rank`'s second or third key
-        (the magnetic-only R, parsimony) chose among classes inside the tie
-        width; then another eligible class can carry a **higher** ΔBIC than
-        the winner and this is **negative**, by at most :attr:`tie_width`.
-        That is the tiebreak made visible, not a ranking failure.
+        eligible class to compare against.  The winner is ``trials[0]``, the
+        top-ΔBIC class, so the margin is positive and above
+        :attr:`tie_width`.
 
         **Why this exists** (issue #390, measured on two entries of its
         MAGNDATA sweep): a caller diffing
@@ -1168,6 +1187,8 @@ def _descend(parent, winner_trial: "MagneticTrial",
     owners = [label for _j, label, _i in magnetic]
     chi2_winner = _chi2_absolute(winner_trial._result.statistics)
     n_points = int(winner_trial._result.statistics.n_points)
+    # the winner is the restricted model here, so its count is charged
+    n_effective = _effective_count(winner_trial._result)
     audits: list[SubgroupAudit] = []
     beat: list[tuple[float, MagneticCandidate]] = []
     #: subgroups whose refit stopped short of a minimum: their χ² is an upper
@@ -1198,7 +1219,8 @@ def _descend(parent, winner_trial: "MagneticTrial",
         _moments, n_moment, _pair = _moment_rows(ref, result, ref.fitted_structure)
         chi2_sub = _chi2_absolute(result.statistics)
         margin = delta_bic(chi2_winner, chi2_sub, n_points,
-                           n_moment - winner_trial.n_moment_parameters)
+                           n_moment - winner_trial.n_moment_parameters,
+                           n_effective=n_effective)
         audits.append(SubgroupAudit(
             bns_number=candidate.bns_number, label=candidate.label,
             n_moment_parameters=n_moment, delta_bic_over_winner=margin,
@@ -1339,6 +1361,10 @@ def _fit(structure, instrument, data, plan, ties=None, limits=None, hold=()):
     from ..refine import Refinement
 
     ref = Refinement(structure, instrument.model_copy(deep=True))
+    # a trial, so no automatic profile interval either (WP-2002): ``_fit``
+    # cannot tell the winner's fit from the rest, and each interval costs
+    # 20-32 refits an angle left out of the covariance
+    ref._auto_intervals = False
     if hold:
         ref.hold(list(hold))
     for target, source, scale, offset in (ties or ()):
@@ -1359,10 +1385,51 @@ def _fit(structure, instrument, data, plan, ties=None, limits=None, hold=()):
     for _n in range(SOLVE_MAX_CONTINUATIONS):
         if result.status != "max_iter":
             break
+        # the plan's absent-phase hold and correlation guard carry into the
+        # continuation, or a trial run with the hold off would be continued
+        # under the default (WP-2002)
         result = ref.fit(data, plan=RefinementPlan(stages=[Stage(
             f"{last.name} (continued)", freed, max_iter=last.max_iter,
-            ftol=last.ftol)]), two_theta_limits=limits, telemetry=False)
+            ftol=last.ftol)], phase_support_sigma=plan.phase_support_sigma,
+            correlation_guard=plan.correlation_guard,
+            # and its closing stage, so a continued trial ends on the windows
+            # every other trial's χ² was measured on (WP-2002)
+            closing_window_tol=plan.closing_window_tol),
+            two_theta_limits=limits, telemetry=False)
     return ref, result
+
+
+def _close(trial: MagneticTrial, data, limits, mask) -> MagneticTrial:
+    """The winner, its fit ended in a closing stage (WP-2002, ruled 2026-10-22).
+
+    The trials a package-chosen plan ranks run at the declared stages'
+    windows and stop there, because ΔBIC compares their χ² with a reference's
+    at one precision.  The winner's moments are the answer, and at those
+    windows their esds carry the misfit of the peak tails the windows drop:
+    1.61× the closing stage's on the two-site Pnma test, 0.00242 against
+    0.00151 μ_B.  So the winner continues from its own fit with the closing
+    stage its plan would have run (``RefinementPlan.closing_stage``, every
+    glob the plan freed, at ``CLOSING_WINDOW_TOL``), and its Rwp, GoF, R_mag,
+    moments, held list and status are that fit's.  Its ΔBIC stays the
+    ranking's.
+    """
+    plan = replace(trial._plan, closing_window_tol=CLOSING_WINDOW_TOL)
+    ref = trial._refinement
+    result = ref.run_stage(data, plan.closing_stage(), two_theta_limits=limits,
+                           correlation_guard=plan.correlation_guard,
+                           phase_support_sigma=plan.phase_support_sigma,
+                           telemetry=False)
+    moments, _n, _pairs = _moment_rows(ref, result, ref.fitted_structure)
+    # measured on the moments it is reported beside, where the trial took one
+    drift = (None if trial.anti_translation_drift is None
+             else anti_translation_residual(ref.fitted_structure.phases[0]))
+    return replace(trial, rwp=float(result.statistics.rwp),
+                   gof=float(result.statistics.gof),
+                   r_magnetic=r_magnetic(result, mask), moments=moments,
+                   held=tuple(result.stages[-1].held) if result.stages else (),
+                   anti_translation_drift=drift,
+                   fit_status=result.status, _structure=ref.fitted_structure,
+                   _result=result)
 
 
 def _moment_owner(label: str, owners: Sequence[str]) -> str | None:
@@ -1425,16 +1492,14 @@ def _release(fitted, seeded):
 
 def _parent_site_ties(statement) -> tuple[tuple[str, str, float, float], ...]:
     """Ties that make every child Biso the Biso of the first child atom of the
-    same parent atom (``SupercellStatement.site_map``), as ``_fit`` takes them."""
-    first: dict[int, int] = {}
-    ties = []
-    for i, (parent_atom, _coset) in enumerate(statement.site_map):
-        if parent_atom not in first:
-            first[parent_atom] = i
-            continue
-        ties.append((f"phases.0.atoms.{i}.biso",
-                     f"phases.0.atoms.{first[parent_atom]}.biso", 1.0, 0.0))
-    return tuple(ties)
+    same parent atom (``SupercellStatement.site_map``), as ``_fit`` takes them.
+
+    The one derivation is ``representation.distortion.parent_site_ties``,
+    which ``displacive_statement`` calls too (Yue, #724: "the derivation should
+    be written once")."""
+    from ..crystallography.representation.distortion import parent_site_ties
+
+    return parent_site_ties([parent_atom for parent_atom, _coset in statement.site_map])
 
 
 def _without_cell(plan: RefinementPlan) -> RefinementPlan:
@@ -1657,6 +1722,36 @@ def _chi2_absolute(stats) -> float:
     return absolute(stats)
 
 
+def _solve_inflation(result) -> float | None:
+    """The Bérar-Lelann factor ``result``'s solve multiplied its esds by.
+
+    Read off a row, because the result carries the solve's factor nowhere
+    else: ``RefinedParameter.stderr_uncorrected`` is ``stderr`` divided by
+    ``LSQOutcome.esd_inflation``, so their ratio on any row is that factor to
+    rounding.  ``Statistics.esd_inflation`` is not it: it is measured again on
+    the result's own compile, and differs by up to 4 % (WP-2002, B4).
+    ``None`` where no row carries both esds, as on a fit with no covariance.
+    """
+    for row in result.parameters:
+        if row.stderr is not None and row.stderr_uncorrected:
+            return row.stderr / row.stderr_uncorrected
+    return None
+
+
+def _effective_count(result) -> float:
+    """N/f², the observation count a ΔBIC against ``result`` charges.
+
+    N is the fitted channel count and f is :func:`_solve_inflation`, the
+    restricted fit's factor, as :func:`rietx.report.compare_freed` takes it.
+    Every trial measured against one nuclear reference therefore charges one
+    count, so their ΔBICs rank on one scale (issue #270; WP-2002, B12).
+    """
+    from ..optimize.statistics import effective_sample_size
+
+    return effective_sample_size(int(result.statistics.n_points),
+                                 _solve_inflation(result))
+
+
 def _within_k_offset_margin(satellite_score: dict, reference_k, candidate_k,
                             margin: float = SOLVE_K_OFFSET_MARGIN_DEG) -> bool:
     """Whether ``candidate_k`` is close enough to ``reference_k`` on the
@@ -1794,18 +1889,25 @@ def _n_k_tried(k_runs) -> int:
                if any(t.status == "refined" for t in ts))
 
 
-def _reported_reference(reference_of, references, kk, ordered):
+def _reported_reference(reference_of, references, kk, ordered, tied=()):
     """The nuclear reference the reported ``nuclear_*`` numbers come from.
 
     The one the **leading trial** was measured against: ``kk`` is the winning
-    k and ``ordered[0]`` the winner (on an abstention, the class ranked
-    first).  Taking the first child cell's reference that was built instead
+    k and ``ordered[0]`` the winner.  On a ΔBIC tie the tied classes lead the
+    list fewest moment parameters first (WP-2002, 2026-10-20), so the lead is
+    the tied class with the highest ΔBIC, the one ``ordered[0]`` was before
+    that order.  Taking the first child cell's reference that was built instead
     reports the losing k's numbers whenever two k's have different child cells
     and the second wins.  Falls back to any reference built at ``kk``, then to
     any at all, and is ``None`` only when none was.
     """
-    reference = (reference_of.get((kk, ordered[0].class_index))
-                 if ordered else None)
+    lead = ordered[0] if ordered else None
+    if len(tied) > 1:
+        lead = max((t for t in ordered if t.class_index in tied
+                    and t.delta_bic is not None),
+                   key=lambda t: t.delta_bic, default=lead)
+    reference = (reference_of.get((kk, lead.class_index))
+                 if lead is not None else None)
     if reference is None:
         reference = next((v for (k_i, _i), v in reference_of.items()
                           if k_i == kk), None)
@@ -1814,10 +1916,15 @@ def _reported_reference(reference_of, references, kk, ordered):
     return reference
 
 
-def _rank(trials: list[MagneticTrial], tie_width: float, tie_r: float):
-    """ΔBIC, then the magnetic-only R, then parsimony — and abstain on a tie.
+def _rank(trials: list[MagneticTrial], tie_width: float):
+    """ΔBIC, and abstain on a tie, the tie listed fewest parameters first.
 
-    Returns ``(ordered trials, tied class indices, verdict, reason)``.  Every
+    Nothing breaks a ΔBIC tie (WP-2002).  The magnetic-only R is reported in
+    an abstention's reason and decides nothing: the 2 % R gap that once broke
+    a tie was chosen, never measured (B12).  Nor does the moment-parameter
+    count, which the ΔBIC already charges at ln N_eff a parameter; it orders
+    the tied classes, the order of the highest-symmetry convention, and the
+    reason names it (ruled 2026-10-20).  Returns ``(ordered trials, tied class indices, verdict, reason)``.  Every
     trial is in the returned order, refusals and unsupported models included,
     because a ranked list is published whole; only the *eligible* ones — a
     refined fit that converged, a supported moment and evidence in favour of
@@ -1840,7 +1947,6 @@ def _rank(trials: list[MagneticTrial], tie_width: float, tie_r: float):
 
     def key(t: MagneticTrial):
         return (-(t.delta_bic if t.delta_bic is not None else -math.inf),
-                t.r_magnetic if t.r_magnetic is not None else math.inf,
                 parsimony(t), t.bns_number)
 
     eligible = _eligible_trials(trials)
@@ -1918,37 +2024,27 @@ def _rank(trials: list[MagneticTrial], tie_width: float, tie_r: float):
                 f"class {best.class_index} ({best.label}) is the only class "
                 f"with a supported moment and evidence in its favour "
                 f"(ΔBIC {best.delta_bic:.1f})")
-    scored = [t for t in tie if t.r_magnetic is not None]
-    if len(scored) == len(tie) and len(tie) > 1:
-        by_r = sorted(scored, key=lambda t: t.r_magnetic)
-        first, second = by_r[0], by_r[1]
-        if second.r_magnetic - first.r_magnetic > tie_r * max(first.r_magnetic,
-                                                             1e-12):
-            ordered = [first] + [t for t in ordered if t is not first]
-            return (tuple(ordered), (first.class_index,), "solved",
-                    f"{len(tie)} classes are inside the ΔBIC tie width of "
-                    f"{tie_width:.1f}; class {first.class_index} "
-                    f"({first.label}) leads them on the magnetic-only R "
-                    f"({first.r_magnetic:.3f} against {second.r_magnetic:.3f})")
-    simplest = sorted(tie, key=parsimony)
-    if len(simplest) > 1 and parsimony(simplest[0]) < parsimony(simplest[1]):
-        first = simplest[0]
-        ordered = [first] + [t for t in ordered if t is not first]
-        return (tuple(ordered), (first.class_index,), "solved",
-                f"{len(tie)} classes are inside the ΔBIC tie width of "
-                f"{tie_width:.1f} and the magnetic-only R does not separate "
-                f"them; class {first.class_index} ({first.label}) is the "
-                f"parsimonious one — {parsimony(first)} free moment "
-                f"parameter(s) against {parsimony(simplest[1])}")
+    spread = best.delta_bic - tie[-1].delta_bic
+    # the convention's order, fewest moment parameters first, ΔBIC after
+    tie = sorted(tie, key=lambda t: (parsimony(t), -t.delta_bic, t.bns_number))
+    in_tie = {id(t) for t in tie}
+    ordered = tie + [t for t in ordered if id(t) not in in_tie]
+
+    def r_mag(t: MagneticTrial) -> str:
+        return "-" if t.r_magnetic is None else f"{t.r_magnetic:.3f}"
+
     names = ", ".join(f"class {t.class_index} ({t.label}, ΔBIC "
-                      f"{t.delta_bic:.1f})" for t in tie)
+                      f"{t.delta_bic:.1f}, {parsimony(t)} moment parameter(s), "
+                      f"R_mag {r_mag(t)})" for t in tie)
     return (tuple(ordered), tuple(t.class_index for t in tie), "abstained",
             f"{len(tie)} classes are tied: {names}. Their ΔBIC spread of "
-            f"{best.delta_bic - tie[-1].delta_bic:.1f} is inside the tie width "
-            f"of {tie_width:.1f}, the magnetic-only R does not separate them "
-            f"and neither is more parsimonious than the others. This powder "
-            f"pattern does not choose between them; a pattern to a smaller d, "
-            f"a single crystal, or a temperature series (WP-1329) would")
+            f"{spread:.1f} is inside the tie width of {tie_width:.1f}, and the "
+            f"ΔBIC already charges each moment parameter, so neither the count "
+            f"nor R_mag ranks them. This powder pattern does not choose between "
+            f"them; a pattern to a smaller d, a single crystal, or a temperature "
+            f"series (WP-1329) would. They are listed fewest moment parameters "
+            f"first, the order of the convention that reports the highest "
+            f"symmetry the data allow")
 
 
 # ---------------------------------------------------------------------------
@@ -1966,7 +2062,6 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
                    nuclear_group: str = "parent",
                    generator=None,
                    tie_width: float = SOLVE_TIE_DELTA_BIC,
-                   tie_r: float = SOLVE_TIE_R_MAGNETIC,
                    k_trials: int = SOLVE_K_TRIALS,
                    k_tie_width: float = SOLVE_K_TIE_DELTA_BIC,
                    cif_dir=None,
@@ -2009,7 +2104,11 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
 
     ``plan`` overrides :data:`SOLVE_STAGE_PATHS` for both the trials and the
     nuclear reference; pass one whose stages differ only by the moment paths,
-    or ΔBIC stops meaning what it says.
+    or ΔBIC stops meaning what it says.  Without one, the trials and the
+    reference run no closing stage, and the winner then runs one
+    (:func:`_close`), so its moments and their esds are measured on peaks with
+    their tails; a caller's plan keeps its own ``closing_window_tol`` for every
+    fit, the winner's included.
 
     ``tie_to_parent=True`` (default ``False``, which is the behaviour above
     unchanged) takes a k ≠ 0 trial's nuclear freedom from the parent: the child
@@ -2149,12 +2248,14 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
             ticks = np.asarray([t for positions in
                                 refinement.result_.ticks.values()
                                 for t in positions], dtype=np.float64)
+            resid = _resid_norm(refinement.result_)
+            peak_idx = residual_peak_indices(resid, min_peak_sigma=5.0)
             evidence = analyse_satellites(
                 refinement._model, values,
-                residual_two_theta=tt[residual_peak_indices(
-                    _resid_norm(refinement.result_), min_peak_sigma=5.0)],
+                residual_two_theta=tt[peak_idx],
                 ticks=ticks, structure=structure,
                 generator=generator or zone_boundary_candidates,
+                residual_height_over_sigma=resid[peak_idx],
             )[phase]
         ks, route, reason = _k_from_the_report(evidence, top_k)
     else:
@@ -2201,9 +2302,14 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
     skipped: list[str] = []
 
     # --- the candidates, per site, merged into classes -----------------------
+    # the trials the package fits and ranks by ΔBIC pay for no closing stage
+    # when it chose the plan, and the winner then runs one (_close); a
+    # caller's plan keeps its own (WP-2002)
+    package_plan = plan is None
     plan = plan or RefinementPlan(stages=[
         Stage(name, list(paths))
-        for name, paths in zip(SOLVE_STAGE_NAMES, SOLVE_STAGE_PATHS, strict=True)])
+        for name, paths in zip(SOLVE_STAGE_NAMES, SOLVE_STAGE_PATHS, strict=True)],
+        closing_window_tol=None)
     # A stage that differed from its predecessor only by moment paths repeats
     # it here, and is dropped: the default's moduli and moment stages would
     # otherwise refit the reference twice under one free set, and move it.
@@ -2213,7 +2319,12 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
         if nuclear_stages and turn_on == nuclear_stages[-1].turn_on:
             continue
         nuclear_stages.append(Stage(stage.name, turn_on))
-    nuclear_plan = RefinementPlan(stages=nuclear_stages)
+    # the trials' absent-phase hold and correlation guard, so the reference a
+    # ΔBIC compares them with is fitted under the same rule (WP-2002, B1)
+    nuclear_plan = RefinementPlan(stages=nuclear_stages,
+                                  phase_support_sigma=plan.phase_support_sigma,
+                                  correlation_guard=plan.correlation_guard,
+                                  closing_window_tol=plan.closing_window_tol)
 
     def enumerate_for(k_try):
         """Candidate classes for one k, or a sentence saying why there are none."""
@@ -2298,7 +2409,9 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
                                float(res.statistics.rwp),
                                float(res.statistics.gof),
                                r_magnetic(res, mask),
-                               res.status)
+                               res.status,
+                               _effective_count(res),
+                               int(res.statistics.n_points))
         return references[key]
 
     def run_k(kk, sets, classes):
@@ -2417,7 +2530,8 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
                 rwp=float(result.statistics.rwp),
                 gof=float(result.statistics.gof),
                 delta_bic=delta_bic(chi2_ref, _chi2_absolute(result.statistics),
-                                    int(result.statistics.n_points), n_moment),
+                                    int(result.statistics.n_points), n_moment,
+                                    n_effective=reference_of[(kk, index)][6]),
                 r_magnetic=r_magnetic(result, mask),
                 n_moment_parameters=n_moment, n_free_parameters=n_free,
                 moments=moments,
@@ -2426,7 +2540,8 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
                 n_starts=n_starts, n_minima=n_minima, start=start,
                 fit_status=result.status,
                 reference_status=reference_of[(kk, index)][5],
-                _structure=ref.fitted_structure, _result=result))
+                _structure=ref.fitted_structure, _result=result,
+                _refinement=ref, _plan=trial_plan))
             if result.status != "converged":
                 caveats.append(
                     f"class {index}: the trial fit stopped at "
@@ -2489,7 +2604,7 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
         k_runs, satellite_score, k_tie_width, parent.name)
     caveats.extend(k_caveats)
 
-    ordered, tied, verdict, why = _rank(trials, tie_width, tie_r)
+    ordered, tied, verdict, why = _rank(trials, tie_width)
 
     # Issue #390's descent audit: after the winner is chosen, look one step down its
     # own group-subgroup lattice among the classes already enumerated at its
@@ -2511,14 +2626,52 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
                 parent, winner_trial, winner_candidate, winner_classes,
                 magnetic, g_map, plan, instrument, data, limits, tie_width,
                 zero)
+    if package_plan and verdict == "solved" and ordered:
+        try:
+            closed = _close(ordered[0], data, limits, mask)
+        except Exception as exc:      # noqa: BLE001 - reported, never swallowed
+            caveats.append(
+                f"class {ordered[0].class_index}, the winner: its closing stage "
+                f"raised {type(exc).__name__}: {exc}, so its Rwp, GoF, R_mag and "
+                f"moments are the ranked fit's, at the declared stages' windows")
+        else:
+            ordered = (closed, *ordered[1:])
+            caveats.append(
+                f"class {closed.class_index}, the winner: its Rwp, GoF, R_mag "
+                f"and moments are from a closing stage at windows dropping "
+                f"{CLOSING_WINDOW_TOL:g} of each peak, run after the ranking; its "
+                f"ΔBIC, the other rows and the nuclear reference are at the "
+                f"declared stages' windows, where every trial was ranked")
+            if closed.fit_status != "converged":
+                caveats.append(
+                    f"class {closed.class_index}, the winner: its closing stage "
+                    f"stopped at {closed.fit_status!r}, so its moments and their "
+                    f"esds measure where the solver stopped rather than a "
+                    f"minimum")
+    # the refinements only the close continues from: a solution that kept
+    # them would hold every trial's compiled model alive
+    ordered = tuple(replace(t, _refinement=None, _plan=None) for t in ordered)
 
-    reference = _reported_reference(reference_of, references, kk, ordered)
-    caveats.append(
-        "ΔBIC's N is the raw channel count, not an effective number of "
-        "independent observations (issue #270): channels inside one peak are "
-        "correlated, so the penalty term is charged against a larger N than "
-        "the data carries and the criterion is generous to the fuller model. "
-        "It is the package's one BIC form and is used unchanged")
+    reference = _reported_reference(reference_of, references, kk, ordered, tied)
+    if reference is not None:
+        n_eff, n_raw = reference[6], reference[7]
+        if n_eff >= n_raw:
+            # f is floored at 1, and ``_effective_count`` reads N unchanged
+            # where the reference carried no row with both esds (issue #270)
+            caveats.append(
+                f"ΔBIC charges the raw {n_raw} fitted channels: the nuclear "
+                f"reference's fit gave no Bérar-Lelann factor above 1, or no "
+                f"esd to measure one on, so the count is not corrected for "
+                f"neighbouring channels sharing their misfit")
+        else:
+            caveats.append(
+                f"ΔBIC charges {n_eff:.0f} observations, not the {n_raw} "
+                f"fitted channels: N/f², with f = "
+                f"{math.sqrt(n_raw / n_eff):.2f} the Bérar-Lelann factor of "
+                f"the nuclear reference's fit (issue #270). Neighbouring "
+                f"channels of one peak share the sign of their misfit, so the "
+                f"raw count would charge the same misfit several times and let "
+                f"any χ² gain outvote the parameter penalty")
     solution = MagneticSolution(
         verdict=verdict, reason=why, criterion=_CRITERION, phase=parent.name,
         space_group=parent.space_group,
@@ -2545,11 +2698,12 @@ def solve_magnetic(refinement, data, *, phase: int = 0,
 
 _CRITERION = (
     "ΔBIC against a nuclear reference refined under the same stages minus the "
-    "moment paths (n_added = the moment DOFs left free), then the magnetic-only "
-    "R over the channels the nuclear model puts nothing on, then parsimony; "
-    "a supported moment (WP-1327's null test) is a precondition and classes "
-    "inside the tie width that neither of those two separates are an "
-    "abstention, never a winner. Never Rwp alone")
+    "moment paths (n_added = the moment DOFs left free), charged at the "
+    "reference's N/f² observations; a supported moment (WP-1327's null test) "
+    "is a precondition, and classes inside the tie width are an abstention, "
+    "never a winner, listed fewest moment parameters first. The "
+    "magnetic-only R, over the channels the nuclear model puts nothing on, is "
+    "reported and ranks nothing. Never Rwp alone")
 
 
 def _determinable(sets, site_label, candidate) -> int:

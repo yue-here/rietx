@@ -75,7 +75,7 @@ from ..schemas.structure import (
     StephensStrain,
     Structure,
 )
-from ..strategy.staged import RefinementPlan, Stage
+from ..strategy.staged import ROUGHNESS_SEED, STRAIN_SEED_PPM, RefinementPlan, Stage
 from .packed import CURVES_CEILING, Packed
 
 
@@ -469,7 +469,7 @@ STANDARDS: tuple[Standard, ...] = (
         key="srm660c", title="NIST SRM 660c — LaB₆ (lab CuKα)",
         description=("Certified line-profile standard on the NIST divergent-beam "
                      "diffractometer. The package's **absolute** cell anchor "
-                     "(a = 4.156882(21) Å, +25 ppm). Zero held at 0, displacement "
+                     "(a = 4.156882(21) Å, +24 ppm). Zero held at 0, displacement "
                      "refined — the NIST protocol."),
         files=("nist_srm660c_100a.cif",), pattern="nist_srm660c_100a.cif",
         reader_options=(("block", "_meas"),), build=_build_srm660c,
@@ -664,13 +664,15 @@ def _with_hump(inputs: StandardInputs) -> None:
 def _with_roughness_suortti(inputs: StandardInputs) -> None:
     inputs.instrument.geometry.surface_roughness = RoughnessSuortti()
     inputs.plan.stages.append(
-        Stage("roughness", ["instrument.geometry.surface_roughness.*"], seed=0.3))
+        Stage("roughness", ["instrument.geometry.surface_roughness.*"],
+              seed=ROUGHNESS_SEED))
 
 
 def _with_roughness_pitschke(inputs: StandardInputs) -> None:
     inputs.instrument.geometry.surface_roughness = RoughnessPitschke()
     inputs.plan.stages.append(
-        Stage("roughness", ["instrument.geometry.surface_roughness.*"], seed=0.3))
+        Stage("roughness", ["instrument.geometry.surface_roughness.*"],
+              seed=ROUGHNESS_SEED))
 
 
 def _with_extinction(inputs: StandardInputs) -> None:
@@ -730,9 +732,9 @@ def _with_stephens(inputs: StandardInputs) -> None:
     """
     for phase in inputs.structure.phases:
         if phase.microstrain is None:
-            phase.microstrain = StephensStrain.isotropic(1000.0, phase.cell)
+            phase.microstrain = StephensStrain.isotropic(STRAIN_SEED_PPM, phase.cell)
     _extend_broadening_stage(inputs.plan, ["phases.*.microstrain.dof.*"],
-                             strain_seed=1000.0)
+                             strain_seed=STRAIN_SEED_PPM)
 
 
 def _extend_broadening_stage(plan: RefinementPlan, globs: list[str],
@@ -816,7 +818,7 @@ VARIANTS: tuple[Variant, ...] = (
     Variant("dispersion", "+ anomalous f′, f″",
             "Cromer-Liberman dispersion on every species. Watch the displacement "
             "parameters and (multi-phase) the QPA fractions, not Rwp — measured "
-            "on the round robin this took QPA RMS error 2.26 → 0.62 wt %.",
+            "on the round robin this took QPA RMS error 2.26 → 0.69 wt %.",
             _with_dispersion),
     Variant("voigt", "+ true Voigt peak shape",
             "Exact Gaussian⊗Lorentzian instead of the TCHZ pseudo-Voigt "

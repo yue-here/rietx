@@ -24,6 +24,21 @@ every number in the file *means* on the strength of a coincidence.  A file that
 carries a TOF-looking token without stating a unit is therefore read as 2θ —
 and **says so** (``PATTERN_X_AXIS_ASSUMED``), which is the third row of the axis
 policy (``io/CLAUDE.md`` § The axis is never trusted) rather than a silence.
+
+**FullProf's** ``XYDATA`` **header is read where the file opens with it.**  The
+FullProf manual (J. Rodríguez-Carvajal, *An Introduction to the Program
+FullProf 2000*, Laboratoire Léon Brillouin, version July 2001, PDF p. 74,
+``Ins = 10``) defines it: ``XYDATA`` left-adjusted on line 1 makes the next
+five lines a heading, in which ``TEMP tsamp`` is the sample temperature and
+``INTER fac_x fac_y Interpol Stepin`` holds the internal multipliers of the x
+values and of y and σ, and whether FullProf interpolates to a constant step.
+ILL instruments write this layout.  ``tsamp`` becomes
+``metadata["temperature_k"]`` — the series coordinate of a variable-temperature
+run (``io/CLAUDE.md`` § Metadata) — and only the first value is read, being the
+one the manual names; a file writing a second value says nothing the manual
+defines about it.  A multiplier other than 1, or ``Interpol = 1``, changes
+what the numbers *are* and is **refused by name** rather than read as written,
+which before this was what happened, silently.
 """
 
 from __future__ import annotations
@@ -121,6 +136,61 @@ def _stated_axis(comments: list[str]
     return None, None, None
 
 
+#: How many lines an ``XYDATA`` file's heading takes, the keyword line included
+#: (the FullProf manual, PDF p. 74: the keyword, then five heading lines).
+_XYDATA_HEADING_LINES = 6
+
+
+def _xydata_heading(lines: list[str], path: Path) -> float | None:
+    """The sample temperature an ``XYDATA`` heading states, refusing what changes the numbers.
+
+    ``lines`` are the five heading lines after the keyword.  ``INTER fac_x
+    fac_y Interpol`` with a multiplier other than 1 means FullProf scales the
+    x values, or y and σ, before it uses them; ``Interpol = 1`` means it
+    interpolates them to a constant step.  Neither is applied here, so either
+    is refused, naming the file and the value, rather than read as written.
+    Returns ``tsamp`` from ``TEMP tsamp``, or ``None`` where the heading has
+    no ``TEMP`` line, a value that is not a number, or one that is not
+    positive (a file recording zero records nothing).
+    """
+    temperature = None
+    for line in lines:
+        parts = line.split()
+        if not parts:
+            continue
+        key, values = parts[0].upper(), parts[1:]
+        if key == "INTER":
+            try:
+                fac_x, fac_y = (float(v) for v in values[:2])
+            except ValueError:
+                raise ValueError(
+                    f"{path}: the XYDATA heading's INTER line {line.strip()!r} "
+                    f"does not start with two numbers (fac_x, fac_y)") from None
+            interpol = values[2] if len(values) > 2 else "0"
+            if fac_x != 1.0 or fac_y != 1.0:
+                raise ValueError(
+                    f"{path}: the XYDATA heading states INTER multipliers "
+                    f"fac_x = {fac_x:g}, fac_y = {fac_y:g}. FullProf multiplies "
+                    f"the x values by fac_x and y and σ by fac_y before using "
+                    f"them, and this reader does not, so the file is refused "
+                    f"rather than read with every value off by that factor. "
+                    f"Re-export it with the factors applied and INTER 1 1.")
+            if interpol.strip() == "1":
+                raise ValueError(
+                    f"{path}: the XYDATA heading states Interpol = 1, which "
+                    f"tells FullProf to interpolate the data to a constant "
+                    f"step. This reader reads the points as measured and does "
+                    f"not interpolate, so the file is refused rather than read "
+                    f"as a different pattern from FullProf's.")
+        elif key == "TEMP" and values:
+            try:
+                value = float(values[0])
+            except ValueError:
+                continue
+            temperature = value if value > 0.0 else None
+    return temperature
+
+
 def read_xy(path: str | Path, *,
             diagnostics: list[Diagnostic] | None = None) -> PatternData:
     """Rows of ``x y [σ]``, read by position; x is 2θ unless the file states a flight time.
@@ -141,7 +211,15 @@ def read_xy(path: str | Path, *,
     # the mark decides the codec, so a UTF-16 export from Windows vendor
     # software reads instead of dying on "no numeric data found"
     text = p.read_text(encoding=head(p).encoding, errors="replace")
-    for n, line in enumerate(text.splitlines(), 1):
+    lines = text.splitlines()
+    heading = 0
+    temperature = None
+    if lines and lines[0].lstrip("\ufeff").startswith("XYDATA"):
+        heading = _XYDATA_HEADING_LINES
+        temperature = _xydata_heading(lines[1:heading], p)
+    for n, line in enumerate(lines, 1):
+        if n <= heading:
+            continue
         s = line.strip()
         if not s:
             continue
@@ -204,7 +282,7 @@ def read_xy(path: str | Path, *,
     x, y, sig = ascending(arr[:, 0], arr[:, 1], sigma, path=p, fmt=XY,
                           axis=axis, diagnostics=diagnostics)
     return pattern_data(p, x, y, sig, axis=axis, source_file=p.name, format="xy",
-                        x_label=stated)
+                        x_label=stated, temperature_k=temperature)
 
 
 XY = PatternFormat(

@@ -56,13 +56,13 @@ This runs APS 11-BM's scan of NIST SRM 640c silicon in a Kapton capillary, which
 
 <!-- output of examples/guides/hump.py -->
 ```text
-3 terms         Biso 0.444 ± 0.100 Å²
-3 terms + hump  Biso 0.446 ± 0.019 Å²
-6 terms         Biso 0.448 ± 0.040 Å²
+3 terms         Biso 0.443 ± 0.100 Å²
+3 terms + hump  Biso 0.446 ± 0.018 Å²
+6 terms         Biso 0.448 ± 0.039 Å²
 ```
 
 Silicon's Biso is the only structural parameter in this fit.
-Its value barely moves, and its esd falls by a factor of five with the hump, against 2.5 with three more polynomial terms.
+Its value barely moves, and its esd falls by a factor of 5.6 with the hump, against 2.5 with three more polynomial terms.
 A background that cannot describe the halo trades against the Bragg intensities, and the hump ends that trade.
 
 ## Check what the hump is
@@ -87,8 +87,8 @@ The refined position and width describe the background model, not the halo on it
 
 <!-- output of examples/guides/hump.py -->
 ```text
-3 terms: hump at 4.19 ± 0.11°, FWHM 5.57 ± 0.26°
-6 terms: hump at 5.25 ± 0.05°, FWHM 1.96 ± 0.13°
+3 terms: hump at 4.16 ± 0.10°, FWHM 5.59 ± 0.25°
+6 terms: hump at 5.24 ± 0.04°, FWHM 1.91 ± 0.11°
 ```
 
 Against three polynomial terms, the hump also absorbs the rise of the direct beam below 3°, which pulls its centre low and widens it.

@@ -41,14 +41,14 @@ assert result.status == "converged"
 assert [(r.kind, r.atoms, f"{r.computed:.3f}", f"{r.deviation_over_sigma:+.1f}")
         for r in result.restraints.rows] == [
     ("bond", [2, 4], "1.552", "+1.2"),
-    ("bond", [2, 5], "1.573", "+3.3"),
+    ("bond", [2, 5], "1.574", "+3.4"),
     ("bond", [2, 6], "1.526", "-1.4"),
-    ("angle", [4, 2, 5], "110.833", "+1.4"),
+    ("angle", [4, 2, 5], "110.796", "+1.3"),
 ]
 assert result.restraints.weight_scale == 1.0
 tension = [d for d in result.diagnostics if d.code == "RESTRAINT_TENSION"]
 assert [d.message for d in tension] == [
-    "The bond restraint deviates +3.3σ from its target (1.573 vs 1.54)."]
+    "The bond restraint deviates +3.4σ from its target (1.574 vs 1.54)."]
 
 # The page's claim that the data outweighs the restraints: the same fit with
 # each σ a thousand times larger, where the rows pull on nothing, puts every

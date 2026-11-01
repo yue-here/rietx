@@ -192,7 +192,7 @@ def test_a_guard_on_both_lists_is_named_as_the_exception_in_the_prose():
             and set(scopes) & {multi.SPECIMEN, multi.FIT}}
     assert both == set(_ON_BOTH_LISTS)
     root = Path(__file__).resolve().parents[1]
-    manual = (root / "docs/manual/using/series.md").read_text(encoding="utf-8")
+    manual = (root / "docs/docs/reference/joint.md").read_text(encoding="utf-8")
     skill = (root / "docs/skill/rietx/references/surprises.md").read_text(
         encoding="utf-8")
     s830 = skill[skill.index("**8.30 "):].split("\n**8.", 1)[0]

@@ -1888,7 +1888,9 @@ def test_a_flat_combination_found_at_the_answer_is_turned_too(eps, released,
     start = tuple(eps * np.array([3.0, 0.2, 0.2]))
     ref, result = _fit(_rhombohedral(truth), _rhombohedral(start),
                        solver=solver)
-    stage = result.stages[-1]
+    # both checks run in the stage that starts at the vanishing modulus; the
+    # closing stage starts at the answer, where nothing is left to release
+    stage = next(s for s in result.stages if s.name == "moment")
     base = "phases.0.atoms.0.moment"
     assert stage.held == [f"{base}.dof2"], stage.held
     assert (f"{base}.dof1" in stage.released) is released, stage.released
@@ -1954,6 +1956,32 @@ def test_the_flat_rotation_probe_holds_nothing_a_powder_can_see():
     assert ref.report().magnetic[0].unmeasured_directions == []
     assert ref.fitted_structure.phases[0].atoms[0].moment.values() == (
         pytest.approx(truth, abs=1e-3))
+
+
+def test_an_azimuth_the_caller_holds_is_never_turned():
+    """#599's turn moves only a direction the fit was asked to find.
+
+    A refiner who knows the in-plane direction from another probe holds the
+    azimuth, and the turn must leave it where it was stated: the combination
+    needs both angles live (``refine._flat_moment_scan``).  The fixture is the
+    turn's own, on rhombohedral axes, with the azimuth left out of the stage
+    (WP-2002, from the second read of its batch on PR #1050, B2.1).
+    """
+    import rietx as rx
+
+    base = "phases.0.atoms.0.moment"
+    start = _rhombohedral((3.0, 0.2, 0.2))
+    stated = rx.Refinement(rx.Structure(phases=[start.model_copy(deep=True)]),
+                           rx.Instrument.constant_wavelength_neutron(LAMBDA_CW),
+                           history=False)
+    azimuth = next(r.value for r in stated.parameters() if r.path == f"{base}.dof2")
+    ref, result = _fit(_rhombohedral((1.5, 2.0, 3.0)), start, stages=[
+        rx.Stage("scale", ["phases.*.scale", "instrument.background.c*"]),
+        rx.Stage("moment", [f"{base}.dof0", f"{base}.dof1"]),
+    ])
+    assert result.stages[-1].moment_turned == []
+    assert next(r.value for r in ref.parameters()
+                if r.path == f"{base}.dof2") == pytest.approx(azimuth, abs=1e-12)
 
 
 def test_the_null_test_reports_the_moment_unsupported_rather_than_small():
@@ -2141,8 +2169,10 @@ def test_the_capability_flag_is_derived_from_the_fields():
     # ``RefinementResult.parametric`` 0.55 and ``.parametric_form`` 0.56, and
     # WP-1960's ``Phase.texture`` 0.57, WP-1810's ``RigidBody.riding``
     # 0.58, and WP-1325's ``RefinedParameter.equations`` 0.59, which indexing C4's
-    # ``CellCandidate.n_search_unindexed`` and ``.unindexed_two_theta`` share.
-    assert caps.schema_version == "0.59"
+    # ``CellCandidate.n_search_unindexed`` and ``.unindexed_two_theta`` share,
+    # WP-2042's ``RefinementResult.radiation`` 0.60, and WP-1419's
+    # ``Phase.distortion_modes``, in the same number.
+    assert caps.schema_version == "0.60"
 
 
 def test_every_moment_dof_has_a_help_entry():

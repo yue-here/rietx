@@ -26,15 +26,6 @@ from .common import Base, Diagnostic
 #: ``tests/test_qpa_multimodal.py`` land at 0.46-0.79 of that half-width).
 FRACTION_PROFILE_DCHI2 = 3.84
 
-#: How far outside the esd's own 95 % half-width an admissible fraction must
-#: lie before ``QPA_FRACTION_UNDETERMINED`` fires, in units of that half-width.
-#: **Chosen, not measured**: 2 sits between the controls (≤ 0.79, a single
-#: minimum) and the synthetic trace fixture (≈ 75, two basins), a factor of
-#: 2.5 above the one and ~37 below the other.  Its job is to ignore a profile
-#: that merely confirms the esd, never to grade how undetermined a fraction is:
-#: the range itself says that.
-FRACTION_PROFILE_EXCESS = 2.0
-
 #: The default grid, as the phase's own FWHM contribution in degrees 2θ at the
 #: middle of the fitted range: 0 (instrument only), then this many values
 #: spaced logarithmically from :data:`FRACTION_PROFILE_FWHM_MIN` to half the
@@ -48,6 +39,11 @@ FRACTION_PROFILE_N_FWHM = 11
 #: instrument's own width and near a synchrotron's, so the grid starts where
 #: sample broadening stops being visible at all.
 FRACTION_PROFILE_FWHM_MIN = 0.01
+
+#: The largest FWHM on the default grid, as a fraction of the fitted span in
+#: degrees 2θ.  Half, because on the whole span a pinned width outruns the peak
+#: windows frozen at stage compile (WP-1320; the reason above).
+FRACTION_PROFILE_FWHM_MAX_SPAN = 0.5
 
 
 class FractionProfilePoint(Base):
@@ -91,9 +87,11 @@ class FractionProfile(Base):
     fit's by more than the cut, which says the fit did not reach the lowest
     basin along this ridge.  ``excess`` is the farthest admissible fraction
     from the fit's, in units of the esd's 95 % half-width (1.96 esd), ``None``
-    where the fit carries no esd.  ``diagnostics`` holds
-    ``QPA_FRACTION_UNDETERMINED`` when ``excess`` exceeds
-    :data:`FRACTION_PROFILE_EXCESS`, and nothing otherwise.
+    where the fit carries no esd.  ``diagnostics`` holds one
+    ``QPA_FRACTION_RANGE`` info record stating the range and ``excess``
+    wherever ``excess`` is defined, and nothing otherwise.  Until 1.10 it held
+    ``QPA_FRACTION_UNDETERMINED``, a warning only past an excess of 2, a
+    number chosen rather than measured (WP-2002, B12).
     """
 
     phase: str

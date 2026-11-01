@@ -68,6 +68,16 @@ DATASETS: dict[str, dict[str, tuple[str, str]]] = {
             "6d653b9d53fc7636eea103b181b54b3aa02afa9b6487fbb8b35f1f684de9d647",
         ),
     },
+    # Durham TOPAS tutorial "Structure solution - inorganics": the PbSO4
+    # round-robin X-ray pattern (Hill 1992, J. Appl. Cryst. 25, 589) as a
+    # Bruker RAW version 2 file, the v2 reader's one real file (WP-2059). The
+    # page states no licence. Hash checked again on 2026-10-28.
+    "durham-topas/pbso4": {
+        "Pbso4.raw": (
+            _DURHAM + "2021/08/Pbso4.raw",
+            "80e990bc360a3628dca6b0efca3ce03278b00136c4183c2088c0d52041a018d7",
+        ),
+    },
     # Durham TOPAS tutorial 9.5: ZrP2O7, parametric over temperature (Stinton &
     # Evans 2007, J. Appl. Cryst. 40, 87).
     "durham-topas/zrp2o7": {

@@ -15,7 +15,7 @@ WAVELENGTH = 0.4139090  # from 11bm_gsas.prm (INS 1 ICONS)
 
 def run() -> tuple[rx.PatternData, rx.Refinement, rx.RefinementResult, rx.RefinementResult]:
     """The refinement itself, so that anything else needing these results —
-    `docs/manual/make_figures.py` draws the manual's figures from them — reuses
+    `docs/docs/make_figures.py` draws the manual's figures from them — reuses
     this script rather than keeping a second copy of the walkthrough."""
     data = rx.read_pattern(DATA / "11BM_NAC.fxye")
     print(f"pattern: {len(data.two_theta)} points, "

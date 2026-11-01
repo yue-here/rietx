@@ -1,6 +1,6 @@
 # WP-1997 — the direct-space solver on main: site classes, kernels, chemistry, engine and entry point
 
-Milestone: structure-solution · Status: ⬜
+Milestone: structure-solution · Status: 🔄 2026-10-24 — the site classes (PR #1013), the solve kernels' crate source (PR #1015) and the chemistry terms (PR #1016) landed from outside; the `kernels-v1.4.0` tag, the engine and the entry point remain
 Depends on: 1902 (shipped, the cost); 1901 soft (the map, needed only by completion); 1940 (shipped, the kernel crate)
 Priority: P2 2026-10-17 — a feature the open milestone was opened for, and three outside PRs (#1013, #1015, #1016) wait on this number
 
@@ -102,6 +102,13 @@ entries at the time):
   N_clump, `space_group_confidence`, an extraction retry, a four-outcome
   acceptance table) is not part of this WP. The radii half of #677 lands in
   #1016.
+- **2026-11-01, from WP-1991 (PR #1274): a site-assignment test's wall-clock
+  budget is a load sensor.** `tests/test_site_classes.py::
+  test_an_unplaceable_species_does_not_enumerate_the_others` asserts the call
+  returns within 15 s. It took 12.2 s alone and 18.0 s in the fast suite under
+  `-n auto` (macOS arm64, `[dev]`), where it failed once on a branch that does
+  not touch site classes. `tests/CLAUDE.md` § Budgets in tests asks for a
+  budget several times the serial cost, or a count-based assertion.
 
 ## Non-goals
 
@@ -125,13 +132,13 @@ entries at the time):
 
 Each item is one PR off `main`. Check off as they land.
 
-- [ ] Site classes (#1013): `crystallography/site_classes.py`, `site_classes()`,
+- [x] Site classes (#1013): `crystallography/site_classes.py`, `site_classes()`,
       `site_assignments()`, an exact count and a named refusal past
       `MAX_SITE_ASSIGNMENTS`, checked across all 564 gemmi settings
 - [ ] Solve kernels (#1015): `kernels/src/solve.rs`, rietx-kernels 1.4.0, three
       entry points in `model/compiled.py`, `tests/test_solve_kernels.py`; after
       merge, the `kernels-v1.4.0` tag
-- [ ] Chemistry terms (#1016): `solve/chemistry.py`, `Composition`, the
+- [x] Chemistry terms (#1016): `solve/chemistry.py`, `Composition`, the
       minimum-image contact term, the coordination prior and `CandidateCost`;
       #675's radii tables; #675 closes as merged
 - [ ] Engine: sites from the site classes, moves, and the planned parallel
@@ -145,6 +152,12 @@ Each item is one PR off `main`. Check off as they land.
 - [ ] Entry point: `solve_seed`, the answer type with no `.structure`, the
       provisional grades and their versioned thresholds contract, the events,
       and the #998 checkpoint, resume and progress
+- [ ] Racing replaces the halving race's fixed drop (Yue, 2026-10-31, on
+      #1262): several independent seeds per site assignment in round 0, and an
+      assignment dropped only when its best J is worse than the leader's beyond
+      the seed-to-seed spread, measured on a composition where round 0 is close.
+      The first task of the solver PR after the entry point. `solve_structure`
+      stays unexported from `rietx` until it lands
 - [ ] Tests (unit; the acceptance rows above) + the ladder's measurement on a
       public synthetic set
 - [ ] Skill: none until the entry point is public, then its routing row (root
@@ -186,4 +199,35 @@ cancelled run returns what it has.
 
 ## Handover log
 
+- **2026-10-31** (`/pr-review`, a ruling on #1262, S2b) — **the assignment race ships as successive halving, approved at tier 2, and racing follows.** #1262's `race_assignments` runs every site assignment one unit at `race_sweeps`, keeps the better half by best J, and doubles the sweeps each round, warm-starting each survivor (successive halving; Karnin et al. 2013, Jamieson & Talwalkar 2016). `_assemble` builds candidates only for the winner, so a dropped true assignment makes every structure in the answer wrong. Measured on NAC by the PR: round 0 decisive, J 1.2-1.4 against ≥ 8.4. Not measured: a composition where round 0 is close. Halving drops half every round whatever the margin, and the race runs one seed per assignment, so no run-to-run spread exists to judge a margin against. Yue approved the action row `RaceRecord.winner` at tier 2 with that risk named in its `grounds`, and made racing the next solver PR's first task (§ Tasks) rather than holding #1262 for it; `solve_structure` stays unexported until then. Asked whether hyperparameter-tuning libraries such as TPE apply: no, since TPE chooses which configuration to try next and every assignment is tried; the survey is `docs/practice.md` § Dropping candidates in a search race. Also ruled on #1262: a checkpoint resume is refused across any package-version difference.
+
+- **2026-10-31** (`/pr-review`) — S2a, the engine's moves, tempering and clustering, merged from outside as PR #1153 (`6a92826e`) after two rounds, split under #1224 ("a machinery PR adds no tier-3 row") at head `1519537e5`. `solve/moves.py` holds `FreeSite` on a Wyckoff class from `site_classes`, `FragmentUnit` placed by the map `crystallography.bodies` uses, a site exchange between two same-class sites of different species, and |F|² held to `CompiledModel._total_f2` at ≤ 1e-13 relative for X-ray, X-ray with dispersion and neutron. `solve/tempering.py` holds the planned geometric ladder, swaps counted per neighbour pair, and `polish`. `solve/cluster.py` holds `equivalences` (the Euclidean normaliser derived from the group's own operations, matching International Tables A Part 15 indices), `align`, `cluster` and `rank`. Nothing is exported from `rietx`. Bar 1 (a rigid 14-atom acridine-shaped fragment in P2₁/n) recovers 4 of 4 seeds within 0.10 Å (0.005 Å), and bar 2 (NAC from its own Pawley intensities) 4 of 4 (0.017 Å), on the compiled and numpy paths alike. Both bars also ask at least 2 seeds within 0.10 Å before the polish, since an accept-every-move walk followed by the polish recovered the rigid fragment 11 to 14 times in 16. The site exchange was not in the cut. NAC reached 11 of 16 seeds at 20 000 sweeps without it and 16 of 16 at an exchange probability of 0.1. The split removed nine tier-3 rows. The engine now chooses no search setting, so `span`, `step`, `exchange`, `swap_every`, `n`, `tol` and `maxiter` are required arguments (a missing one is a `TypeError`, an impossible one a `ValueError`), and the provisional grade with its four thresholds is gone. They return with S2b, each as a tier-3 row for its own ruling. `SWAP_EVERY`, `N_RANDOM`, the clustering RMSD and the three grade thresholds were never varied, so S2b owes a measurement for each. The PR adds three tier-1 rows (`_ISOMETRY_RTOL`, `_TAU`, `REFRESH_EVERY`), and `tests.audit_delta` reports 0 new at `unaudited`. `rank` returns the evidence with no grade and no `.structure`. Given `control=`, each entry carries `control_rmsd_ang` and `control_chi2_data`, the numbers amendment (c)'s rule reads. The review kept bars 1 and 2 as asserting tests and this PR's acceptance. They are `slow`, and each docstring now gives the measured rate (16 of 16) beside the bar (at least 2 of 4). Round 1 items, all fixed: `Solution.control` had no writer and was dropped; the f2 test and bar 2 declare their dispersion and run over the compiled and numpy paths; counts handed to numpy are `intp` for wasm32; three citations were added; `polish(maxiter=)` is required; `Ladder.planned` refuses a non-positive `step` by name. The compiled parametrisations of the f2 test and bar 2 have not run since `bb0c25e46`, because the published rietx-kernels is 1.3.0 and both benches skip them. Bar 1 on the compiled path passed under a local 1.4.0 build before round 2. Left open in the Engine task: orchestration (running seeds and control seeds, racing assignments, merging seed results) is S2b's; `SOLVE_NAMES` into `KERNEL_NAMES`, `KERNEL_FLOOR` to 1.4 and the release note (the PR carries none); the `ATTRIBUTION.md` rows (none is in the PR); the coordination prior is reported per candidate and not steered in the move loop. The `kernels-v1.4.0` tag is still the maintainer's. #998's checkpoint half waits on S2b. No task is ticked. Gate (the six PRs of this round merged together onto main `766c3505d`; macOS arm64, `[dev,jax]`, Python 3.12): fast 12 884 passed, 223 skipped, 32 xfailed; slow 435 passed, 18 skipped, 16 xfailed, with one GUI-boot socket timeout under load that passed alone in 5 s; ruff and the `-W` manual build clean.
+
+- **2026-10-24** — PR #1016 merged (`d71b8127`, review round 5), by `/pr-review`;
+  #675 closed as folded into it (its files are on main byte for byte).
+  *Done*: the chemistry terms. `solve/chemistry.py` (`Composition`, the
+  minimum-image contact term, the coordination prior, `CandidateCost`) and #675's
+  radii tables (`crystallography/radii.py`, three `.dat` files, attributed). The
+  composition gate reads a part occupancy as written, or as the nearest p/q with
+  q ≤ 12 inside its printed rounding (`occupancy_fraction`), so 0.33 is ⅓ and
+  0.5 is ½ and nothing else. That rule was the round-4 review's suggestion.
+  *Ruled* (2026-10-24): `OCCUPANCY_MAX_DENOMINATOR` stays at tier 3, approved on
+  the judgement ground while only tests call `require`. The mechanical ground
+  (three published part-occupied structures from unrelated laboratories and
+  materials, each accepted at its composition and refused when mis-stated) is
+  owed before a default path calls `require`. The maintainer's commit
+  `25772efd` on the branch wrote the ruling into the row.
+  *Gotchas*: the S2 engine writes occupancy 1.0 on every site it places, so only
+  a caller's model meets the fraction reading; nothing in S2a or S2b calls
+  `Composition.check` or `require` yet.
+  *Measured*: the whole suite on a stack including it, and the fast selection on
+  the final stack `bb654fd0` (11 655 passed, macOS arm64).
+  Next: the `kernels-v1.4.0` tag, then the engine.
+
 - **2026-10-17** — created at the maintainer's request for the #562 chain; #1013, #1015 and #1016 are open against it, reviews in progress. Next: review each PR against this file.
+- **2026-10-23** — PR #1013 (head `019a0adc`) merged as `a1a1aa7d` and PR #1015 (head `0542346c`) as `bcdf80e0`, by `/pr-review`, in one gate with #1102.
+  *Done.* The site-classes task is checked. `site_classes()` and `site_assignments()` are on main, refusing past `MAX_SITE_ASSIGNMENTS` with the exact count. The solve kernels' source is in the crate as rietx-kernels 1.4.0, with its three entry points in `model/compiled.py`.
+  *Not done.* The solve-kernels task stays open until the `kernels-v1.4.0` tag is pushed and the wheel published. That is the maintainer's release step (`docs/RELEASING.md` § The kernel wheel), and this review did not take it. Until then every `@needs_solve` test skips against the published 1.3 wheel. Nothing in rietx calls the kernels yet.
+  *What the review established.* For #1013: an operator list whose special positions leave the 1/24 grid is refused (`SITE_CLASSES_GRID`) by two checks. (a) `_has_fixed_point` decides exactly, by integer row reduction of R − I, whether an operation fixes any point, and refuses one whose fixed points miss the grid. That covers an inversion at x = t/2 and a 3-fold at (2t/3, t/3). (b) A 1/48 scan looks for a point several operations share. Check (b) has no test of its own, because every current case trips (a) first. `MAX_SITE_ASSIGNMENTS` is tier 3, approved 2026-10-21, with grounds rewritten to what the evidence supports. For #1015: `check_cells` refuses a `g` that is not symmetric or not positive definite. The names sit in `SOLVE_NAMES` beside `KERNEL_NAMES`, and `KERNEL_FLOOR` stays 1.3. A 1.3 wheel still loads, and the three wrappers decline. The engine PR moves the names into `KERNEL_NAMES`, raises the floor, and carries round 1's notes: the N = 0 early return before the argument checks, `sig3` above 1000, references on the wrappers, a test that `SOLVE_NAMES` empties, and the numba spike's provenance line.
+  *Held.* #1016 (chemistry) waits on the maintainer's ruling on its composition tolerance. Its tolerance reads an occupancy's precision from its shortest decimal form, so a one-decimal value forgives 0.05 per atom. On a 192-fold site, 0.3 then passes 6.4 atoms short of Z = 64, while 0.32 is refused, and a plain 0.5 lets Z = 88 and Z = 104 both match 96 atoms. A float cannot say whether its file printed 0.5 or 0.500.
+  *Gate.* Main `3e0dc6f7` with #1102, #1015 and #1013 stacked (`35b9eff5`), macOS arm64, `[dev,jax]` with the published rietx-kernels 1.3.0, nothing else running. Fast suite: 11 322 passed, 195 skipped, 27 xfailed and 2 failed. Whole `-m slow`: 404 passed, 12 skipped, 14 xfailed and 4 failed. All six failures fail identically on main alone. CI's Kernels workflow built and tested the 1.4.0 wheel on #1015's head on five platforms. After the last merge, `git diff 35b9eff5 origin/main` was empty.

@@ -96,8 +96,8 @@ def _longest_wavelength(instrument: Instrument) -> float | None:
     one a schema object, and the sharing map has to answer before anything is
     compiled.  The two are held together by
     ``tests/test_multi_histogram.py::test_the_two_wavelength_selectors_agree``
-    rather than by this comment — the same idiom
-    ``params.vector._SIZE_CAP_SCHERRER_K`` uses against ``caglioti.SCHERRER_K``.
+    rather than by this comment — the same idiom the two ``_ZERO_BOUND``
+    copies in ``schemas.structure`` and ``schemas.instrument`` use.
 
     **Longest** for the reason that function gives: every size surface in the
     package attributes a coefficient to the longest line, so a Kα2 offset can

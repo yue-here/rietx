@@ -29,24 +29,24 @@ LIMITS = (15, 130)
 
 # The lines each page quotes, as the page prints them.
 TOPAS_SITES = [
-    "site O5 x O5_x 0.324667 y O5_y 0.484845 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382724",
-    "site O6 x O6_x 0.591017 y O6_y 0.468992 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382724",
-    "site O7 x O7_x 0.339851 y O7_y 0.257709 z O7_z 0.0704395 occ O ! 1.0 beq O5_biso 0.382724",
+    "site O5 x O5_x 0.32467 y O5_y 0.484898 z ! 0.25 occ O ! 1.0 beq O5_biso 0.366488",
+    "site O6 x O6_x 0.591092 y O6_y 0.469105 z ! 0.25 occ O ! 1.0 beq O5_biso 0.366488",
+    "site O7 x O7_x 0.339828 y O7_y 0.257684 z O7_z 0.0705402 occ O ! 1.0 beq O5_biso 0.366488",
 ]
 TOPAS_EXCERPT = [
     'xdd "refined.xye" xye_format',
     "  weighting = 1 / SigmaYobs^2;",
-    "  bkg @ 154.768 -172.225 123.706 -71.9946 35.2465 -15.3096",
+    "  bkg @ 152.446 -171.263 124.821 -73.5215 36.6909 -16.1333",
     "  th2_offset ! 0",
-    "  th2_offset = -2*Rad*(0.0631871)*Cos(Th)/217.5;",
+    "  th2_offset = -2*Rad*(0.0629551)*Cos(Th)/217.5;",
     "str",
-    "  scale p0_scale 0.00047007 min 0",
-    "  a p0_cell_a 9.37331",
-    "  b p0_cell_a 9.37331",
+    "  scale p0_scale 0.000469265 min 0",
+    "  a p0_cell_a 9.37332",
+    "  b p0_cell_a 9.37332",
 ]
 INSTPRM = [
-    "Type:PXC", "Lam1:1.54059", "Lam2:1.54443", "Zero:-0.0365483", "I(L2)/I(L1):0.5",
-    "Polariz.:0.5", "U:-1.57858", "V:2.93235", "W:2.29048", "X:2.74538", "Y:3.9936",
+    "Type:PXC", "Lam1:1.54059", "Lam2:1.54443", "Zero:-0.0365586", "I(L2)/I(L1):0.5",
+    "Polariz.:0.5", "U:-1.57826", "V:2.76475", "W:2.37759", "X:2.68762", "Y:4.11637",
 ]
 # fullprof.md prints these runs with `...` between them; each run is
 # consecutive in the file, so an atom's codeword line is the one under it.
@@ -131,9 +131,9 @@ def gsas2_page(out: Path) -> None:
     ])
     result = ref.fit(data, plan=plan, two_theta_limits=LIMITS)
     assert result.status == "converged"
-    assert round(result.statistics.rwp, 4) == 0.0893
+    assert round(result.statistics.rwp, 4) == 0.0898
     assert [(s.name, len(s.freed)) for s in result.stages] == [
-        ("background", 7), ("cell", 3), ("profile", 5), ("atoms", 19)]
+        ("background", 7), ("cell", 3), ("profile", 5), ("atoms", 19), ("closing", 34)]
 
     path = out / "refined.instprm"
     rx.write_gsas2_instprm(ref.fitted_instrument, path)
@@ -144,7 +144,7 @@ def gsas2_page(out: Path) -> None:
                      for line in path.read_text(encoding="utf-8").splitlines()
                      if line.startswith("U:"))
     u_rietx = rx.read_gsas2_instprm(path).profile.u.value
-    assert same("-0.000875351", cut(repr(u_rietx)))
+    assert same("-0.000875173", cut(repr(u_rietx)))
     assert math.isclose(u_instprm * 8 * math.log(2) * 1e-4, u_rietx, rel_tol=1e-6)
 
 
@@ -152,7 +152,7 @@ def topas_page(out: Path) -> None:
     """A tie, a hold, and the file rietx writes for TOPAS from the held state."""
     data, ref = build()
     first = ref.fit(data, plan="mccusker_structural", two_theta_limits=LIMITS)
-    assert round(first.statistics.rwp, 4) == 0.0893
+    assert round(first.statistics.rwp, 4) == 0.0898
     a_free = ref.fitted_structure.phases[0].cell.a.value
     ref.tie_equal(OXYGENS)
     ref.set_values({"instrument.zero_shift": 0.0})
@@ -160,11 +160,11 @@ def topas_page(out: Path) -> None:
     held = ref.fit(data, plan="lab_bragg_brentano", two_theta_limits=LIMITS)
     assert "HOLD_BLOCKED_PLAN" in [d.code for d in held.diagnostics]
     final = ref.fit(data, plan="mccusker_structural", two_theta_limits=LIMITS)
-    assert round(final.statistics.rwp, 4) == 0.0890
-    # topas.md: the held zero moves the cell 110 ppm from the fit with it free.
+    assert round(final.statistics.rwp, 4) == 0.0894
+    # topas.md: the held zero moves the cell 111 ppm from the fit with it free.
     a_held = ref.fitted_structure.phases[0].cell.a.value
     assert cut(repr(a_free)) == "9.37228"
-    assert round(1e6 * (a_held - a_free) / a_free) == 110
+    assert round(1e6 * (a_held - a_free) / a_free) == 111
 
     path = out / "refined.inp"
     rx.write_topas_inp(ref.fitted_structure, path, free=ref, scale="topas",

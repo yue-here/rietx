@@ -106,13 +106,17 @@ jobs:
         # what ci.yml's py3.12 and py3.13 legs ran until WP-1547, unsharded:
         # the nightly has no one waiting on it
         env:
-          RIETX_TUTORIALS: skip
+          RIETX_DOCS: skip
         run: .venv/bin/python -m pytest -n auto --dist loadgroup -m "not slow"
 
   windows:
     name: fast suite (Windows)
     runs-on: windows-latest
-    timeout-minutes: 45
+    # raised from 45 (WP-2036): the same suite ran 17-25 min and 40-45 min on
+    # runners a few hours apart, 2.2x slower at every point of the timeline
+    # rather than in one test, so 45 fired on runner speed; 120 is 2.7x the
+    # slowest pass measured and stays a runaway guard
+    timeout-minutes: 120
     defaults:
       run:
         # git-bash, so the python -c quoting below matches the other jobs;

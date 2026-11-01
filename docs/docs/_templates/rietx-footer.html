@@ -1,0 +1,16 @@
+{#- The footer (WP-2021): the landing page's line, item for item, so the site ends the
+    same way on every page (`docs/landing/src/shell.html`), then the release this tree
+    documents.  It replaces pydata's credits for Sphinx and for the theme.
+
+    `data-docs-version` is the version this build is (`sphinx_shared.DOCS_VERSION`).  The
+    stylesheet reads it to tell a development tree's banner from an old release's
+    (`custom.css` § The version banner). -#}
+<div class="rietx-footer" data-docs-version="{{ rietx_docs_version }}">
+  <span>MIT licence</span>
+  <a href="{{ rietx_repo }}">GitHub</a>
+  <a href="{{ pathto(root_doc) }}">Manual</a>
+  <a href="{{ rietx_home }}/why.html">Why {{ rietx_name }}?</a>
+  <a href="{{ rietx_repo }}/blob/main/CITATION.cff">Cite</a>
+  <a href="{{ rietx_repo }}/blob/main/ATTRIBUTION.md">Sources</a>
+  <span class="rietx-footer__note">This manual documents {{ rietx_name }} {{ release }}.</span>
+</div>

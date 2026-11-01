@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from scipy import linalg
 
+from ..optimize import lapack
 from ..optimize.blocked import added_columns_gain, held_projection
 from ..optimize.statistics import PINV_RCOND
 from ..schemas.interval import PARAMETER_INTERVAL_LEVEL
@@ -296,7 +297,7 @@ def _refuse_rank_deficient(name: str, phi: np.ndarray, labels: list[str],
     if rank == phi.shape[1]:
         return
     keep, dep = list(piv[:rank]), list(piv[rank:])
-    coef, *_ = np.linalg.lstsq(q[:, keep], q[:, dep], rcond=None)
+    coef, *_ = lapack.lstsq(q[:, keep], q[:, dep], rcond=None)
     parts = []
     for i, j in enumerate(dep):
         with_ = [labels[keep[k]] for k in np.flatnonzero(np.abs(coef[:, i]) > 1e-8)]
@@ -337,7 +338,7 @@ def least_squares_start(resolved: ResolvedParametric, values: np.ndarray) -> np.
         c = np.zeros(m, dtype=np.float64)
         c[resolved.labels.index("1")] = values[0]
         return c
-    c, *_ = np.linalg.lstsq(resolved.phi, values, rcond=None)
+    c, *_ = lapack.lstsq(resolved.phi, values, rcond=None)
     return c
 
 

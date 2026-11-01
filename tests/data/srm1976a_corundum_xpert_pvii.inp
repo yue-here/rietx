@@ -1,0 +1,152 @@
+'--------------------------------------------------------------
+'Refinement quality statistics
+'--------------------------------------------------------------
+
+
+	r_wp  12.4815943 r_exp  5.24587644 r_p  8.98815639
+	gof  2.37931535										'gof = chi^2 = r_wp/r_exp
+	
+	
+'background subtracted indicators (_dash); ignore these for the most part
+	r_wp_dash  18.7534379 r_p_dash  14.5405277 r_exp_dash  7.88186312 weighted_Durbin_Watson  0.468198628
+	
+	
+'--------------------------------------------------------------
+'Plotting multiple phases
+'--------------------------------------------------------------
+
+'#define all_contributions_							' Comment out for individual components
+#define individual_contributions_					' Comment out for sum of all components
+
+#ifdef all_contributions_								'this block enabled if "all_contributions_" is active
+        #define background_               
+        #define phase_1_               
+        #define phase_2_           
+		  #define phase_3_								' add further phases as appropriate
+    #else #ifdef individual_contributions_
+                        #define background_		' Comment out components individually
+                        #define phase_1_			' Only allow one contribution at a time
+                        #define phase_2_
+								#define phase_3_
+            #endif
+#endif
+
+'--------------------------------------------------------------
+'Refinement flags
+'--------------------------------------------------------------
+
+'continue_after_convergence                                                             
+'do_errors
+iters 100
+
+'--------------------------------------------------------------
+'Export and results
+'--------------------------------------------------------------
+
+'out "quant_results.txt"	
+'Out_String(weight_fractions)
+
+'Create_2Th_Ip_file(peaklist.dat) 						'export peaklist
+'Out_Yobs_Ycalc_and_Difference(phases.dat)				'export ascii data to plot
+'do_errors
+
+'--------------------------------------------------------------
+'Datafile
+'--------------------------------------------------------------
+
+xdd "srm1976a_corundum_xpert.xy"
+	start_X 20					'starting point
+	'finish_X 37					'end point
+	'extra_X_right 0.1
+	'exclude 52 55				'exclude a region of data
+   x_calculation_step = Yobs_dx_at(Xo); convolution_step 4		'calculate the x step at each peak
+   'Zero_Error(0.0)
+	Specimen_Displacement(displacement,-0.08930` min -1 max = 1;)			'do not refine the ZE and SD simultaneously, as they are highly correlated (also correlated w/ ADPs)
+	
+	/*'for capillary geometry only. Also takes care of absorption.
+	capillary_diameter_mm 0.8
+		capillary_u_cm_inv @, 63.7097096
+		capillary_parallel_beam
+	*/'end capillary absorption correction
+	
+	Absorption(absorb, 32.46463` min 0 max = 200;)	 ' linear absorption coefficient in cm^-1                                                          
+
+	#ifdef background_	
+	bkg bkg_cheb  163.921335` -97.763961`  76.572122` -8.13838671`  7.46126027`  8.07053027` -7.64854174`  2.95285503` -6.54576525` -3.55379405` -10.0696405` -3.94082987` -6.27658698` -8.99142602`  0.181460491` -7.52402065` -3.64510576`
+	#endif	
+	One_on_X(air_bkg, 5510.80986`)		' 1/x background to model air scattering at low angles
+
+	
+'--------------------------------------------------------------
+'Instrument parameters and emission profile
+'--------------------------------------------------------------
+			
+lam
+   	ymin_on_ymax 1e-5
+      'CuKa2(0.001)
+   	CuKa5(0.001)
+'   	la  0.6605 lo  1.540598 lh  0.5 'Cu-Ka1
+'      la  0.3395 lo  1.544426 lh  0.5 'Cu-Ka2
+		LP_Factor(90) 					'2th angle of monochromator. 90 for no mono.
+		Radius(240)
+		Simple_Axial_Model(axial_div, 10.82952`)
+		'Radius(240,240)			'primary and secondary goniometer radii (mm)
+'		axial_conv
+		'filament_length filament_length_xpert  1.83402	sample_length sample_length_xpert  19.59119_LIMIT_MIN_0.0001	receiving_slit_length slit_length_xpert  0.12527
+		'primary_soller_angle 2.3
+		'secondary_soller_angle 2.3
+		'Slit_Width(@, 0.20443)
+				'Full_Axial_Model(12, 15, 12, 2.3, 2.3)
+		'lpsd_th2_angular_range_degrees 2.122
+		'	lpsd_equitorial_divergence_degrees @  4.52143113
+		'	lpsd_equitorial_sample_length_mm @  32.1409574
+		
+		/*'peak profile for full Voigt peak				
+			prm pr1 0.00676 min 0
+			prm pr2 0.00682 min 0
+			prm pr3 0.00731 min 0
+			prm pr4 0.00809 min 0
+		*/'peak profile for full Voigt peak
+
+		
+#ifdef phase_1_
+	str
+		phase_name "Al2O3"
+		space_group "R-3c"
+		scale ph1_sc  0.00345000484`
+		'Choose a peak shape (spvii, PVII, TCHZ, or full Voigt)
+		'peak_type spvii h1 @, 0.00127983275 h2 @, 0.00188762389 m1 @, 0.993273481 m2 @, 1.16094396
+		PVII_Peak_Type(ph1_ha, 0.00736`,ph1_hb, 0.00555`,ph1_hc, 0.00025`_LIMIT_MIN_0.0001,ph1_ma, 0.41642`,ph1_mb, 0.00012`_LIMIT_MIN_0.0001,ph1_mc, 0.00014`_LIMIT_MIN_0.0001)
+		'TCHZ_Peak_Type(pku,-0.00623,pkv,  0.00208,pkw, -0.00013,!pkz, 0.00000,pky, 0.00148,!pkx, 0.000)
+		/* 'begin Voigt peak shape
+			lor_fwhm = pr1 Tan(Th) + pr2/Cos(Th) ;					'Lorentz component of the Voigt peak shape
+			gauss_fwhm = pr3 Tan(Th) + pr4/Cos(Th) ;					'Gaussian component of the Voigt peak shape
+		*/ 'end Voigt peak shape
+		'Preferred_Orientation(orien, 0.48751, po_ang, 1)
+			PO_Spherical_Harmonics(sh, 4 load sh_Cij_prm {
+			y00   !sh_c00  1.00000
+			y20   sh_c20   2.08901`
+			y40   sh_c40   0.87393`
+			y43m  sh_c43m  0.00178`
+			} )
+		
+		volume  254.827		
+		a 4.758877 
+		b 4.758877 
+		c 12.992880
+		al 90       
+		be 90       
+		ga 120      
+
+		site Al1    x = 0;      y  = 0;      z  0.35301     occ Al+3   1.0        beq @  1.21023`   
+		site O1     x   0.30263     y = 0;      z = 1/4;      occ O-2    1.0        beq @  1.06494`   
+ 
+		
+	'Microstrain(ph1_strain, 0.04058`) 		'Strain_L (Lorentz) microstrain (ppm)                                
+	'Crystallite_Size(ph1_csize, 367.35735`)						'CS_L (Lorentz) crystallite size (nm)
+		'Strain_G(@, 0.00010`)
+		 'CS_G(@, 7073.33198`)
+
+#endif
+     
+

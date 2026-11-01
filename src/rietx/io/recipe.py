@@ -112,6 +112,7 @@ from ..model.profiles.caglioti import (
     GAUSSIAN_VARIANCE_TO_FWHM_SQUARED,
     gaussian_fwhm,
     lorentzian_fwhm,
+    lorentzian_negative_above,
 )
 from ..params.vector import background_parameters, extra_component_parameters
 from ..schemas.common import Diagnostic, Parameter
@@ -128,6 +129,7 @@ from ..schemas.instrument import (
 )
 from ..schemas.pattern import PatternData
 from ..schemas.structure import (
+    BISO_SEED,
     Atom,
     Cell,
     Phase,
@@ -630,6 +632,8 @@ def _read_instrument(payload: dict, pattern: PatternData,
                width=TCHZ_BOUNDS[attr][0] >= 0.0)
 
     _refuse_constant_lorentzian(iparm, broadening, diags)
+    top = limits[1] if limits is not None else float(np.max(pattern.two_theta))
+    _refuse_negative_lorentzian(profile.x.value, profile.y.value, top)
     # validated again for W's floor (ProfileTCHZ._w_floor_is_reachable): a W
     # or a declared min under the Γ_G² clamp is raised to it, as the schema
     # raises a stored one, and the writes above do not re-run that validator
@@ -639,8 +643,8 @@ def _read_instrument(payload: dict, pattern: PatternData,
     shl = _iparm(iparm, "SH/L")
     if shl:
         half = 0.5 * float(shl)
-        geometry.axial_sl = Parameter(value=half, min=0.0, max=0.2)
-        geometry.axial_hl = Parameter(value=half, min=0.0, max=0.2)
+        geometry.axial_sl = Parameter(value=half, min=0.0)
+        geometry.axial_hl = Parameter(value=half, min=0.0)
         diags.append(Diagnostic(
             level="info", code="RECIPE_CONVENTION_ASSUMED",
             message=(
@@ -722,14 +726,14 @@ def _refuse_negative_width(letter: str, attr: str, declared: float,
                            scale: float) -> None:
     """A width this package bounds at zero cannot start negative.
 
-    ``ProfileTCHZ``'s W, X and Y are bounded below at zero (W at the Γ_G²
-    clamp) because a Lorentzian or Gaussian FWHM contribution is a width, and
-    a negative one is not a shape.  Which terms those are is read off
-    :data:`TCHZ_BOUNDS`.  GSAS-II bounds none of them, and it matters here
-    rather than hypothetically: **both** committed LaB6 reference outputs
-    converge to a negative Y (GSAS-II −15.81 centideg, TOPAS −8.97), so a
-    recipe seeded from a previous fit will carry one.  Refused by name, so the
-    fit never answers from a model the recipe did not describe.
+    ``ProfileTCHZ``'s W and X are bounded below at zero (W at the Γ_G²
+    clamp), because at θ → 0 each is the whole of its width.  Which terms
+    those are is read off :data:`TCHZ_BOUNDS`.  GSAS-II bounds none of them.
+    U, V and Y have no floor of their own since 2026-10-23, so a negative one
+    is read: **both** committed LaB6 reference outputs converge to a negative
+    Y (GSAS-II −15.81 centideg, TOPAS −8.97).  A negative W or X is refused
+    by name, so the fit never answers from a model the recipe did not
+    describe.
     """
     if TCHZ_BOUNDS[attr][0] < 0.0 or declared >= 0.0:
         return
@@ -739,10 +743,31 @@ def _refuse_negative_width(letter: str, attr: str, declared: float,
         f"{'Gaussian variance' if attr == 'w' else 'Lorentzian FWHM'} term is "
         f"bounded below at zero — a width is not a shape when it is "
         f"negative. GSAS-II bounds none of U V W X Y Z, so a recipe seeded "
-        f"from a converged GSAS-II or TOPAS fit can carry a negative one (both "
-        f"committed LaB6 references converge to a negative Y), so it is "
-        f"refused: start from a non-negative width, or refine X and Y from "
-        f"this package's own zero")
+        f"from a converged GSAS-II or TOPAS fit can carry a negative one, so "
+        f"it is refused: start from a non-negative width, or refine {letter} "
+        f"from this package's own zero")
+
+
+def _refuse_negative_lorentzian(x: float, y: float, top: float) -> None:
+    """A stated X and Y whose Lorentzian width goes negative in the fitted range.
+
+    Y has no floor of its own since 2026-10-23 (WP-2002), so a recipe seeded
+    from a GSAS-II or TOPAS fit with a negative Y is read.  What cannot be
+    read is the width X/cosθ + Y·tanθ going below zero under the fitted range:
+    GSAS-II clamps it at a floor there, this package has no such clamp, and a
+    negative Lorentzian width is not a peak shape.  So the width is checked,
+    not the sign of Y.
+    """
+    edge = lorentzian_negative_above(x, y)
+    if edge >= top:
+        return
+    raise RecipeError(
+        f"instrument X and Y convert to instrument.profile.x = {x:g} and "
+        f"instrument.profile.y = {y:g}, whose Lorentzian FWHM X/cosθ + Y·tanθ "
+        f"is negative above 2θ = {edge:.3f}°, inside the fitted range up to "
+        f"{top:g}°. GSAS-II clamps that width at a floor and this package has "
+        f"no such clamp, so the recipe is refused: start from an X and Y whose "
+        f"width stays at or above zero over the range")
 
 
 def _widen(param: Parameter, path: str, *, width: bool) -> None:
@@ -1070,13 +1095,13 @@ def _read_atoms(key: str, st: dict, par: dict,
                 f"{base}.ADP = {adp!r}: PowderLine's vocabulary is 'Uiso' or "
                 f"'Uaniso'")
         uiso = site.get("Uiso")
-        b_iso = 0.5 if uiso is None else EIGHT_PI_SQ * float(uiso)
+        b_iso = BISO_SEED if uiso is None else EIGHT_PI_SQ * float(uiso)
         atom = Atom(label=str(label), species=str(element),
                     x=Parameter(value=float(site.get("x", 0.0))),
                     y=Parameter(value=float(site.get("y", 0.0))),
                     z=Parameter(value=float(site.get("z", 0.0))),
                     occ=Parameter(value=float(site.get("occupancy", 1.0)),
-                                  min=0.0, max=1.5),
+                                  min=0.0),
                     biso=Parameter(value=b_iso, unit="A^2"))
         spec = atom_par.get(label) or {}
         pbase = f"payload.phases.{key}.parameterization.atoms.{label}"
@@ -1285,9 +1310,9 @@ def _read_plan(payload: dict, structure: Structure, instrument: Instrument,
     """One stage freeing every flagged path — the recipe's own semantics.
 
     PowderLine runs a single refinement pass over everything flagged, so the
-    faithful translation is a one-stage plan, and a one-stage plan is all
-    endpoint: :meth:`RefinementPlan.stage_ftols` loosens nothing, which is the
-    right reading of a recipe that declares no order.
+    faithful translation is a one-stage plan.  It carries the package's
+    closing stage like any plan a caller runs (WP-2002), which recompiles at
+    the answer and solves once more with the same globs.
 
     ``refinement_cycles`` is **not** translated.  It is GSAS-II's cycle count,
     and this package's :attr:`Stage.max_iter` is a runaway guard rather than a

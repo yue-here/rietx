@@ -1,6 +1,6 @@
 # WP-1969 — an exhaustive search that ends in no cell
 
-Milestone: unscheduled · Status: 🔄 2026-10-17 — PR #951 merged from outside (`ed1c1958`); three measured follow-ups remain
+Milestone: unscheduled · Status: 🔄 2026-10-24 — PR #951 (`ed1c1958`) and PR #1042 (`377c5724`) merged from outside; two measured follow-ups remain
 Track: What fires, and what stays silent
 Depends on: 1956 soft (the line screen, PR #941, may let the inlier rule become the default)
 Priority: P2 2026-10-14 — a defect that fires wrongly: a completed search abstains on a list with three or more stray lines, and raising the count returns oversized cells; declaring the count by hand is the workaround
@@ -73,6 +73,32 @@ second pass on the residue. Both are tasks below.
   branch, and passes because it declares 3. It takes
   `INDEXING_THRESHOLDS_VERSION` 1.10, as five other open PRs do.
 
+- 2026-10-31, from the issue triage (issue #1198, about draft PR #1043): the
+  second pass on the residue (this WP's open follow-up, `index_residue` in PR
+  #1043) was measured on 26 real runs, the IUCr CPD round robin sample 1
+  (cpd-1a … 1h, Madsen et al. 2001) and the 11-BM LaB₆ + cBN mixture, each
+  phase subtracted in turn with its true cell passed as `candidate=`. With the
+  residue fit in Le Bail, its free widths ran away on balanced mixtures
+  (fitted/measured FWHM 6.4-2692×) and the width guard refused 17 of 26 runs.
+  Since PR #1043 runs that fit in `VALIDATION_MODE` (Pawley, after #1191;
+  pushed `c82d9b23`), 1 of 26 is refused (cpd-1b with a 1.4 wt % trace
+  subtracted, correctly) and widths sit at 0.87-1.7× on 25. So the runaway is
+  gone from what `index_residue` runs. Checked against the tree at d87c8cc91:
+  `index_residue` is not on `main`; `validate_by_lebail` takes no mode
+  argument there and fits in `VALIDATION_MODE = "pawley"` (`workflow.py:119`,
+  `:529`), so no public call on `main` reaches the Le Bail runaway. What still
+  stands: with the largest phase subtracted, the second search finds the true
+  minor phase in 0 of 8 CPD lab mixtures, so the miss is in the second search,
+  not in the fit. With widths held, `residue_misfit` flags 0 of 103 true
+  minor-phase lines, and SRM 660c alone returns LaB₆ itself as a "second
+  phase" because a declared width law at 0.63× the measured one passes
+  `WIDTH_MISMATCH_RATIO`. The measurement behind #1043's
+  `RESIDUE_MISFIT_RATIO` is the same run (tables at PR #1043,
+  issuecomment-6515145543). Whether `index_residue` may claim real-mixture use
+  before the second search finds lab-Cu minor phases is the maintainer's
+  decision. Decided 2026-10-31: Yue closed #1198 in favour of PR #1043's
+  thread, so the real-mixture question is answered there, not on the issue.
+
 ## Non-goals
 
 - The absent-line side of acceptance (WP-1956, PR #941).
@@ -89,7 +115,7 @@ second pass on the residue. Both are tasks below.
 - [ ] Follow-up, after WP-1956 lands: widen the retry's trigger or make the
       inlier rule the default, measured, with LaB6's certified cell kept at
       rank 1.
-- [ ] Follow-up: `indexed_fraction_low` on the intensity-weighted fraction
+- [x] Follow-up: `indexed_fraction_low` on the intensity-weighted fraction
       of the driven set, so a truth explaining most of the intensity is not
       capped by its own impurities.
 - [ ] Follow-up: a second pass on the residue, picked at the first cell's
@@ -118,6 +144,27 @@ rank 1. Every indexing acceptance row ranks as on `main`.
   the correct cell generally ranks first.
 
 ## Handover log
+
+- **2026-10-24** — PR #1042 merged (`377c5724`, review round 3), by `/pr-review`.
+  *Done*: the second follow-up. `indexed_fraction_low` now reads the share of the
+  usable lines' *intensity* a cell indexes (`indexed_intensity_fraction`, falling
+  back to the line count where there is none). A line count under the bar adds
+  the capping caveat `indexed_lines_low` (an `IndexCaveat` member, no new
+  field). On SRM 660c with three or six weak impurity lines the certified cell
+  goes from `low` to `medium`; no other indexing acceptance row changes grade.
+  `INDEXING_THRESHOLDS_VERSION` stays 1.11.
+  *Measured*: round 2 ran the slow rows of `test_acceptance_indexing.py`,
+  `test_peak_bounds.py` and `test_indexing_consensus.py` (20 passed); this round
+  the whole suite on a stack including it, and the fast selection on the final
+  stack `bb654fd0` (11 655 passed, macOS arm64).
+  *Gotchas*: `INDEX_MIN_INDEXED_FRACTION` now gates two verdicts, the refuting
+  caveat on intensity and the cap on count; its row is on
+  `UNAUDITED_BASELINE` and WP-2007 should see both roles. #993 (open) adds a
+  1.11 note at the same place in `schemas/indexing.py`; keeping both resolves it.
+  The rebase dropped the PR's tutorial 03 edits, since main had rewritten that
+  text and names neither caveat.
+  Next: the residue pass is #1043 (open, rebase requested 2026-10-24); the retry
+  follow-up waits on WP-1956.
 
 - **2026-10-14** — created, from the 2026-10-14 issue triage (issue #933).
   Checked against the tree at `ee589bab`: every symbol the issue names exists

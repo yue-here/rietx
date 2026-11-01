@@ -38,6 +38,7 @@ REAL_FIXTURES = [
     ("FAP.XRA", "gsas"),                  # GSAS STD, fixed-format, Poisson
     ("mg090.Cu311.gsas", "gsas"),         # GSAS ESD, 8-char positional fields
     ("nist_srm660c_100a.cif", "pdcif"),   # pdCIF through gemmi, two blocks
+    ("cod_2242872.cif", "pdcif"),         # pdCIF, a net column + weights, 173 kB
     ("qarr/corundum.prn", "xy"),          # two-column ASCII
     ("rigaku_nims.ras", "ras"),           # Rigaku text, marked sections
     ("panalytical_powder.xrdml", "xrdml"),      # XRDML 1.6, one scan, counts
@@ -77,8 +78,8 @@ REAL_FIXTURES = [
 #: vendored and truncated above, but **no V5 file exists anywhere**, and V5's
 #: header is 810 bytes against V3's 250 — so a cut lands at depths the V3 file
 #: cannot reach, and this arm is the only truncation coverage that version has.
-SYNTHETIC_FIXTURES = ["uxd", "rasx", "brml", "raw4", "raw3", "gsas_esd", "udf",
-                      "philips_v5"]
+SYNTHETIC_FIXTURES = ["uxd", "rasx", "brml", "raw4", "raw3", "raw2", "gsas_esd",
+                      "udf", "philips_v5"]
 
 
 def _synthesize(kind: str, path: Path) -> Path:
@@ -92,6 +93,7 @@ def _synthesize(kind: str, path: Path) -> Path:
     from tests.writers_xrd import (
         CORUNDUM_HEAD,
         write_philips_rd,
+        write_raw2,
         write_raw3,
         write_raw4,
     )
@@ -118,6 +120,9 @@ def _synthesize(kind: str, path: Path) -> Path:
                  intensity=[500.0 + i % 7 for i in range(200)]),
             dict(start=40.0, step=0.02, extras=[(100, 40), (110, 32)],
                  intensity=[300.0 + i % 5 for i in range(200)])])
+    if kind == "raw2":
+        # the real file is local-only, so this arm is v2's truncation coverage
+        return write_raw2(path, [500.0 + i % 7 for i in range(200)])
     if kind == "raw4":
         return write_raw4(path, [
             dict(start=10.0, step=0.02,
@@ -434,12 +439,12 @@ def test_a_comment_that_mentions_a_bank_does_not_claim_an_ascii_file(tmp_path):
 _PAST_180 = {
     "xy": "5000.0 1000.0\n6000.0 1010.0\n7000.0 990.0\n8000.0 1005.0\n",
     "gsas": "past\nBANK 1 8 1 CONST 17000.0 200.0 0 0 STD\n"
-            "  100  110  120  130  140  150  160  170\n",
+            "     100     110     120     130     140     150     160     170\n",
 }
 _AT_OR_BELOW_0 = {
     "xy": "-2.0 100.0\n-1.0 110.0\n0.0 120.0\n1.0 130.0\n",
     "gsas": "through zero\nBANK 1 4 1 CONST -200.0 100.0 0 0 STD\n"
-            "  100  110  120  130\n",
+            "     100     110     120     130\n",
 }
 _SUFFIX = {"xy": ".xy", "gsas": ".gsas"}
 

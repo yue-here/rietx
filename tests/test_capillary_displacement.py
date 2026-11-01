@@ -25,12 +25,14 @@ measurement.  It expected a *null* test — the paper says a crystal analyser
 eliminates displacement error, so 11-BM should recover x, y ≈ 0.  It does not.
 Over NAC's certified 2-24° range the three positional shapes are degenerate
 (unit-column Gram eigenvalue 1.6e-5), so the fit slides along the null
-direction to a bound and returns +1.00 and +0.72 mm with esds of 2.8 and
-1.0 mm — while Rwp *improves* and the cell leaves its acceptance band by
-1117 ppm.  What the last two tests assert is therefore the sharper claim: on
+direction to +4.86 and +2.12 mm with esds of 2.5 and 0.9 mm — while Rwp
+*improves* and the cell leaves its acceptance band by 5111 ppm, with an esd
+of 2544 ppm that says so (1.10.0).  Until WP-2002 (2026-10-20) a ±1 mm default bound
+stopped the walk at 1097 ppm, a prior that the mount is aligned which held
+here, with the same esd.  What the last two tests assert is therefore the sharper claim: on
 this instrument the correction must not be refined, and the package says so
-in the channel that can (esds, HIGH_CORRELATION, BOUND_HIT) rather than in
-the one that cannot (Rwp).
+in the channels that can (the cell's esd, HIGH_CORRELATION, FLAT_DIRECTION)
+rather than in the one that cannot (Rwp).
 
 Those two are **not** marked ``slow`` even though they read a real dataset.
 The mark exists for the acceptance suites, whose fits cost minutes; both NAC
@@ -434,28 +436,27 @@ def test_11bm_is_where_this_correction_must_not_be_refined(nac_pair):
     **degeneracy** test, and the answer is sharper.  11-BM NAC's certified
     protocol runs 2-24° 2θ, where {1, sin2θ, cos2θ} has a unit-column Gram
     eigenvalue of 1.6e-5, so the fit does not return zero: it slides along the
-    null direction until a bound stops it, at a = +1.000 mm (its max) and
-    b = +0.72 mm, with esds of 2.8 and 1.0 mm — every one of them larger than
-    the number it qualifies.
+    null direction to a = +4.86 mm and b = +2.12 mm, two and a half esds out,
+    numbers that read as measured and are not.
 
     Asserted here as the *machinery reporting it*, because that is the part a
-    consumer relies on: the offsets come back unquotable against their own
-    esds, ``HIGH_CORRELATION`` names one of them, and ``BOUND_HIT`` fires.
-    Both flavours of "not measured" are allowed — which of the two the solver
-    reaches is a path property, and pinning it would make this a test of the
-    trust region.
+    consumer relies on, and since WP-2002 removed the ±1 mm default bound
+    (2026-10-20) no bound is there to stop the walk or to report it:
+    ``FLAT_DIRECTION`` names the cell with an offset, ``HIGH_CORRELATION``
+    names an offset, and the cell's esd is wide enough to cover how far it
+    walked from the fit that held the offsets.
     """
-    (_held, r_held), (_free, r_free) = nac_pair
-    fitted = {p.path: p for p in r_free.parameters}
-    a, b = fitted[ALONG_PATH], fitted[ACROSS_PATH]
-
-    unquotable = [p for p in (a, b)
-                  if p.stderr is None or p.stderr >= abs(p.value)]
+    (held, r_held), (free, r_free) = nac_pair
     codes = {d.code for d in r_free.diagnostics}
-    assert unquotable or "BOUND_HIT" in codes, (
-        f"the offsets came back quotable on 2-24° 2θ: "
-        f"a={a.value:+.4f}±{a.stderr}, b={b.value:+.4f}±{b.stderr}")
+    flat = [set(d.where) for d in r_free.diagnostics if d.code == "FLAT_DIRECTION"]
+    assert any("phases.0.cell.a" in w and (ALONG_PATH in w or ACROSS_PATH in w)
+               for w in flat), flat
     assert "HIGH_CORRELATION" in codes
+    # the cell's own esd carries the degeneracy: the walk from the held fit is
+    # inside three of it (measured 2.0 esd, 2026-10-20)
+    a_held = held.fitted_structure.phases[0].cell.a.value
+    cell = r_free.parameter("phases.0.cell.a")
+    assert abs(cell.value - a_held) < 3 * cell.stderr, (cell.value, cell.stderr, a_held)
     pairs = {(c.path_a, c.path_b) for c in r_free.identifiability.top_correlations
              if abs(c.rho) > 0.99}
     assert any(ALONG_PATH in p or ACROSS_PATH in p for p in pairs), pairs
@@ -465,11 +466,12 @@ def test_11bm_is_where_this_correction_must_not_be_refined(nac_pair):
 def test_on_11bm_rwp_improves_and_the_cell_leaves_its_band(nac_pair):
     """The invariant, on the correction that ships with this WP.
 
-    Freeing eq (4) over 2-24° takes Rwp *down* — 0.14025 → 0.13843, a 1.3 %
+    Freeing eq (4) over 2-24° takes Rwp *down* — 0.14010 → 0.13784, a 1.6 %
     improvement — while the cell walks out of the acceptance band, 10.2512 to
-    10.2398 Å, which is 1117 ppm and 5.6× the ±2e-3 Å the NAC acceptance
-    allows.  A session judging this correction by Δ Rwp would have accepted it
-    here and shipped a cell wrong in the fourth digit.
+    10.1986 Å, which is 5111 ppm and 26× the ±2e-3 Å the NAC acceptance
+    allows (1097 ppm while a ±1 mm default bound stopped the offsets, until
+    WP-2002).  A session judging this correction by Δ Rwp would have accepted
+    it here and shipped a cell wrong in the third digit.
 
     So the assertion is *both directions at once*: it is the improvement
     together with the damage that makes the point, and either alone would be

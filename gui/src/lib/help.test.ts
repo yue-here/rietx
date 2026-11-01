@@ -47,7 +47,7 @@ function corpus(): HelpCorpus {
   return {
     parameters: [
       { paths: ["phases.*.cell.a", "phases.*.cell.b", "phases.*.cell.c"],
-        ...entry("Cell edge", { unit: "Å", anchor: "peak-positions.html#lattice" }) },
+        ...entry("Cell edge", { unit: "Å", anchor: "theory/peak-positions.html#lattice" }) },
       { paths: ["instrument.zero_shift"], ...entry("Zero-point shift") },
     ],
     peak_flags: { excluded: entry("Excluded") },
@@ -58,7 +58,8 @@ function corpus(): HelpCorpus {
     instrument_fields: { radiation: entry("Anode") },
     search_fields: { seed: entry("Random seed"), preset: entry("Search preset") },
     plans: { profile_only: entry("Profile only", { modes: ["rietveld"] }) },
-    docs_url: "https://rietx.org",
+    result_fields: { "RefinementResult.status": entry("Solver exit") },
+    docs_url: "https://rietx.org/docs/dev",
   };
 }
 
@@ -104,6 +105,12 @@ describe("a key names its arm", () => {
     expect(resolve(c, "parameters:phases.0.cell.b")).toBeNull();
   });
 
+  it("resolves a result field by its `Type.field` name, dot and all", () => {
+    const c = corpus();
+    expect(resolve(c, "result_fields:RefinementResult.status")!.title).toBe("Solver exit");
+    expect(resolve(c, "result_fields:RefinementResult")).toBeNull();
+  });
+
   it("returns null for an unknown name, an unknown arm and no corpus", () => {
     const c = corpus();
     expect(resolve(c, "stage_fields:no_such_field")).toBeNull();
@@ -122,7 +129,7 @@ describe("the manual link", () => {
   it("joins the served base to the entry's page and heading", () => {
     const c = corpus();
     expect(manualUrl(c, resolve(c, "parameters:phases.*.cell.a")))
-      .toBe("https://rietx.org/peak-positions.html#lattice");
+      .toBe("https://rietx.org/docs/dev/theory/peak-positions.html#lattice");
   });
 
   it("is null where the entry names no chapter", () => {
@@ -132,9 +139,9 @@ describe("the manual link", () => {
   });
 
   it("does not double the slash when the base carries one", () => {
-    const c = { ...corpus(), docs_url: "https://rietx.org/" };
+    const c = { ...corpus(), docs_url: "https://rietx.org/docs/dev/" };
     expect(manualUrl(c, resolve(c, "parameters:phases.*.cell.a")))
-      .toBe("https://rietx.org/peak-positions.html#lattice");
+      .toBe("https://rietx.org/docs/dev/theory/peak-positions.html#lattice");
   });
 });
 
@@ -239,6 +246,9 @@ describe("every key the app writes down names something", () => {
       // words, which are pinned to `StageSpec` from python (WP-1208), so a new
       // schema field arrives in the form already keyed to its corpus entry
       "panels/Plan.svelte: stage_fields:{key}",
+      // the fit's own diagnostics (WP-2037): a folded row keeps its code's
+      // explanation beside it, so collapsing hides nothing
+      "panels/Report.svelte: diagnostics:{d.code}",
     ]);
   });
 });
@@ -255,7 +265,7 @@ describe("`title=` is no longer how this app explains a name", () => {
    * What is left is prose typed into the markup, and it is owed a corpus entry
    * — but the corpus describes *names the package has* (parameters, peak
    * flags, stage fields, reader options, instrument fields, plans, search
-   * controls), and several panels' vocabularies are not among them: a report
+   * controls, result fields), and several panels' vocabularies are not among them: a report
    * statistic, a series setting, an indexing result column, a drawing
    * threshold.  Those arrive with the WPs that own those panels.
    *
@@ -280,7 +290,8 @@ describe("`title=` is no longer how this app explains a name", () => {
     // field names, so an arm over those two `model_fields` is a real live
     // vocabulary — a `peak_origins`-sized commit (help.py, test_help.py
     // `_arms`, test_gui_help.py `ARMS`, lib/help.ts `ARMS` + `HelpCorpus`,
-    // conf.py `_ARMS`, the regenerated help_keys.json), and a WP of its own.
+    // docs/reference_pages.py `_VOCABULARIES`, the regenerated help_keys.json),
+    // and a WP of its own.
     "panels/Peaks.svelte": 10,
     "panels/Plan.svelte": 2,         // the reorder grip, correlation_guard
     "panels/Plot.svelte": 3,         // fit-range fields — WP-1212

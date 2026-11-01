@@ -1,6 +1,6 @@
 # WP-1956 — a cell pays for the lines it predicts and the pattern lacks
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-10-31 — C3 merged (PR #941) and #941's follow-ups (PR #1177, `8260c78b`); open: the `fom_panel_disagrees` revisit, and tutorial 03's absence count (WP-2041)
 Track: What fires, and what stays silent
 Depends on: 1449 soft (the index 2–4 refutation it widens); 1511 soft (one Le Bail protocol per cell)
 Priority: P2 2026-10-13 — the absent-line detector fires on the truth and is blind on every wrong cell, and a distorted cell ranks first; no grade is confident today only because the run-level `fom_panel_disagrees` fires, which the reporter measured quiet on arms where a wrong cell reached `medium`
@@ -100,6 +100,174 @@ singleton; a new indexing rule lands in that file; run
 engine or the ranking. Indexing is provisional by declaration
 (`PROVISIONAL_MODULES`).
 
+### Inherited
+
+- **2026-10-28, from WP-2011: the line screen raises on a peak list with no
+  usable peak.** `validate_by_lebail` with such a list fails inside
+  `screen.fwhm_at` with numpy's `ValueError: array of sample points is
+  empty`, where it should decline. The list arises from `pick_peaks` on a
+  pattern divided by its maximum with no σ column: the Poisson fallback
+  √max(y, 1) puts every point under the noise. `index_pattern` stops before
+  validating on such a list, so only a direct call reaches it (WP-2011
+  § Re-measured 2026-10-28, "Found on the way").
+- **2026-10-27, from WP-2011: on the no-peak-list path the fitted-background
+  count moved with the fit's mode.** The Pawley background no longer sinks
+  under a wrong cell, so the count reads more absences there (LaB6 with its
+  cell 1 % long 0 → 14 of 28, a×√5 59 → 167, magnetite's P rival 0 → 3), and
+  NAC's true cell reads 20, its weak real reflections, where Le Bail read 0
+  (WP-2011 § Re-measured 2026-10-27). With a peak list the line screen's count
+  is unchanged in every row. Tutorial 03's candidate now validates at Rwp
+  0.044 with 0 unmatched; the 125-against-200 background in the entry below
+  was the Le Bail fit's and was not re-measured under Pawley.
+
+- **2026-10-24, from WP-2041: the detector also goes blind on the *correct* cell, and
+  that grade is `high`.** Tutorial 03's synthetic aragonite (P m c n, flat 200-count
+  background, `examples/tutorials/03_peaks_indexing_lebail.py`) indexes at `high` over
+  10-80° with `predicted_but_absent` 0 of 105. The validation fit's background sits at
+  125 counts over 10-11° and 46 over 75-78° against the true 200, and 10-19° holds no
+  allowed reflection, so every forbidden position reads as net intensity. Cut the same
+  pattern at 35-60° and the background holds (192 at 10-11° on the 60° cut). The count
+  then returns 4-6 absences, every one a P m c n extinction: (010) 11.09°, (001) 15.43°,
+  (101) 23.68°, (120) 28.71° and (201) 39.54°. The cell grades `low`, found by all three
+  engines. 10-60° alone holds 15 such extinctions. So aragonite is a ready fixture for
+  this WP's glide guard: a correct cell with glides, synthetic, no impurity.
+- **Its outcome decides two things outside `indexing/`.** Tutorial 03's prose reads the
+  "0 of 105" as evidence for the `high` grade ("none of the reflections it predicts is
+  missing"), and WP-2041 is held on this WP to add the notebook's abstention example
+  (a 45° cut, maintainer's choice 2026-10-24). After the repair, say in WP-2041's
+  `### Inherited` what the full range and the 45° cut grade, and with which caveats.
+  Under decision (c) an honest count caps, so the full range may drop to `medium` and
+  print NO CELL unless the extinction screen clears the glide. Rebuild the notebook with
+  `examples/tutorials/build.py`, which lists every cell whose output moved.
+- **2026-10-24, from PR #941's round-5 review: the aragonite case, measured on #941.** On
+  `main` `0070d696` with #941 merged (`b4190354`), the 45° cut still prints NO CELL. Its
+  true cell is now `medium`, capped by `fom_panel_reduced` and `shift_allowance_assumed`,
+  with 6 of 23 lines absent and none uncancellable. The full range stays CELL at `high`,
+  with 24 of 87 lines absent, 5 uncancellable and 0 in de Wolff's window. So the entry
+  above is answered for #941 as it stood. Re-measure at the merge before writing WP-2041's
+  `### Inherited`, since round 5 asked for changes.
+- **2026-10-24, from the same review: a pair with few extras is refuted on half the
+  draws.** `screen.containment_evidence` calls a pair refuted only when k ≤ n·p₀. When
+  n·p₀ < 1 that means no extra seen at all, so one chance pick blocks the refutation. On
+  the tetragonal fixture of `tests/test_indexing_screen.py`, the b × 1.003 orthorhombic
+  split has 7 extras at p₀ 0.055–0.066. It reads `refuted` on Poisson seeds 2, 4, 5 and 6,
+  and `undecided` on 1, 3 and 7 (1 seen) and 8 (2 seen). Its seen fraction is 0.52–0.57
+  against the truth's 1.000 on every seed, so nothing is promoted. What is lost is the
+  refutation. The maintainer ruled the same day that #941's test asserts what holds on all
+  eight seeds and that the rule stays as built. A rule that tolerates a chance hit when
+  n·p₀ < 1 is this follow-up, for example refuting when k is consistent with chance at a
+  stated level and the test has the power to tell. It moves a ruled verdict and acceptance
+  rows, so it goes to the maintainer before code.
+- **2026-10-24, from the same review: #941's release-note bullets are parked.** 1.10.0 was
+  tagged at `ac1ee1e1` without #941, so the sync merge `0f3fce6b` moved #941 to the next
+  cycle (schema 0.60, indexing thresholds 1.12). It also took the bullets out of
+  `docs/releases/1.10.0.md`. Their text is at `83cae9e9:docs/releases/1.10.0.md`. At the
+  merge they go to the 1.11 notes, with "schema 0.59, indexing thresholds 1.11" read as
+  0.60 and 1.12. WP-2043's `### Inherited` holds #1152's line the same way.
+
+- 2026-10-31, from the issue triage (issue #916): task 5 measured (reporter,
+  2026-10-30, addendum 2026-10-31, main at e016f187d, 19 runs from 4 sources).
+  Removing `fom_panel_disagrees` is still unsafe after the repair. Without it,
+  6 runs promote a wrong cell, and on LaB₆ as picked three reach `high`. The
+  reporter measured a lattice-aware form ("TL"). It fires only when the
+  members' co-winners share no lattice, comparing lattices by line set at 1e-3
+  relative in Q. TL promotes no wrong cell. It lifts three truths: #916 arm b
+  and brucite to `medium`, and zincite to `high`. Its tolerance has under a
+  factor of 3 of margin on LaB₆'s 0.12 % tetragonal descent, so the tolerance
+  needs its own measurement before code. The addendum looks at one commit
+  under `preset="quick"`. There the flag on the tP c/a 1.01 negative arm flips
+  with machine load. It fired on 3 of 3 runs with six busy loops and was quiet
+  unloaded, because load changes which cells get validated inside the ~120 s
+  ceiling. A flag that fires by wall clock at fixed inputs is a
+  reproducibility cost of its own. The reporter asks the maintainer to choose:
+  make the flag lattice-aware (a rule change), or close task 5 as "kept".
+  Checked against the tree at d87c8cc91: `fom_panel_disagrees` is unchanged
+  and task 5 is unticked. The figures were not re-run.
+
+- 2026-10-31, from the issue triage (issue #1230, in PR #1251): since #941's
+  merge (`fe4cbcc32`) the containment refuter demotes the true cell of three
+  clean synthetic low-symmetry patterns under `preset="full"`: aP1 #1 → #2,
+  aP2 and big_mP1 #1 → #12, each truth carrying `supercell_refuted` against a
+  wrong "parent" of M₂₀ 4-9 that leaves 1-49 observed lines unindexed. The
+  reporter names three causes: `screen.contains` asks only that the child
+  index what the parent indexes; the denser line set is the child even when
+  the "parent" is 4-6× its volume; and on a dense list p₀ (0.63-0.82 with the
+  0.15° floor) sits at the truth's own seen fraction. Checked against the tree
+  at d87c8cc91: `containment_evidence` (`screen.py:475`) still compares
+  `n_seen ≤ n_extra·p₀` with `p₀` from `PatternScreen.from_peaks`, floored by
+  `p0_floor_deg` (`workflow.py:878`, k_sigma × the effective shift allowance),
+  and nothing in it reads either cell's seen fraction. PR #1251 (contributor,
+  head `195c38e8`, mergeable) builds neither of the issue's recommended
+  options. It measured option 1 (equal indexed sets) failing NAC's acceptance
+  row and option 3 (primitive-volume guard) leaving big_mP1 at #11, and builds
+  arm g instead: a child seen more often than its parent
+  (`child_seen_fraction` > `parent_seen_fraction`, new `SupercellEvidence`
+  fields) reads `undecided`, never `refuted`. It reports all three truths back
+  at #1, #941's Acceptance pairs still refuted, 211 acceptance tests passed
+  and no no-answer control promoted. It touches `_audit.py` and asks whether
+  the approved `INDEX_SUPERCELL_REFUTED` row's evidence text should say the
+  condition is now narrower; that is the maintainer's. Issue #1263 is the
+  sibling mechanism (the floored p₀ in the null) with an alternative rule,
+  `split`, measured against g; weigh the two in one review.
+
+- 2026-10-31, from the issue triage (issue #1263): the containment refuter
+  counts its chance rate p₀ in windows floored at k_sigma × the assumed shift
+  (0.15° 2θ when no shift is declared or measured, `bd38ca4af`), while the
+  seen count it is compared with (`fom.seen_at_resolution`) uses the
+  resolution window after the candidate's common shift, with no floor. So
+  `n_seen ≤ n_extra·p₀`, both binomial p-values and
+  `INDEX_SUPERCELL_REFUTED`'s "against {n_extra·p₀} expected by chance"
+  compare a count with the chance rate of a different, wider window.
+  `SupercellEvidence.p0`'s docstring ("over the same range and windows") and
+  `containment_evidence`'s ("the pattern's chance rate at the resolution")
+  claim the windows match; they match only when the floor does not bind.
+  Checked against the tree at d87c8cc91: `PatternScreen.from_peaks` floors the
+  half-width at `p0_floor_deg` (`screen.py:194-197`), `index_pattern` passes
+  `spec.k_sigma × effective_shift_allowance` (`workflow.py:878`) and
+  `validate_by_lebail` passes `MATCH_SIGMA × DEFAULT_UNKNOWN_SHIFT_DEG`
+  (`workflow.py:519`), and `seen_at_resolution` (`fom.py:561`) has no floor.
+  Reproduced on a synthetic P -1 list (`lane-A/r1263.py`, FWHM 0.032°, 5-90°):
+  478 lines give p₀ 0.788 floored against 0.356 unfloored, and a 10⁵-point
+  Monte Carlo of `seen_at_resolution` gives 0.359, so the reported chance rate
+  is 2.2× the seen test's own. The reporter measured 2.3-3.0× on #1230's three
+  truths. The floor exists for #951's row
+  (`test_a_narrow_window_does_not_refute_a_superstructure_the_list_cannot_see`),
+  where it keeps the **power** check p₀ⁿ < α from refuting at n = 2. The
+  proposal, `split`, keeps the floored p₀ for the power check and reads the
+  null at the unfloored one; it adds no constant, returns aP1, aP2 and big_mP1
+  to #1, keeps #951's row and passes 217 acceptance-file tests. PR #1251's
+  rule (g) does the same on those three, and split + g also passes. Every arm,
+  g included, frees some wrong children whose only refuters were other wrong
+  cells, the truth staying first. Which rule lands (g, split or both) is the
+  maintainer's: it narrows the approved tier-3 `INDEX_SUPERCELL_REFUTED`
+  action, and it turns on a reading of #951 (the assumed shift bounds what the
+  test may claim, not its null). Split alone also corrects the message's
+  number, which g leaves as it is.
+
+- 2026-10-31, from the issue triage (issue #1267): under `preset="quick"`, at
+  one commit (`e016f187d`) with fixed seeds and synthetic inputs,
+  `fom_panel_disagrees` (and the truth's grade it lowers, medium → low) on the
+  tP c/a 1.01 negative arm fired in 3 of 3 runs with six busy loops on the
+  machine and stayed quiet unloaded. Every run took 108-115 s and returned 12
+  candidates, so the 120 s ceiling bound each time; the distinct-class count
+  among the candidates moved 9 (quiet) → 11-12 (loaded). Under a 4× ceiling
+  (`total_budget_seconds=480`) all three runs were quiet. This is the
+  measurement behind the reporter's addendum on #916, which withdrew their
+  earlier "the flag moves with the commit". Checked against the tree at
+  d87c8cc91: `quick` fills `QUICK_TOTAL_BUDGET_SECONDS` = 120 s (`engines.py`)
+  when the caller leaves the ceiling `None`, the search stops
+  `VALIDATION_RESERVE_FRACTION` (0.15) early, validation runs cheapest first
+  and stops at the first cancelled fit (`workflow.py:1083-1114`), and
+  `fom_panel_disagrees` is computed from the panel winners of whatever was
+  ranked (`consensus.py`). So the mechanism the reporter proposes (the clock
+  reaches different units and fits under load) is consistent with the code; it
+  was not instrumented, and not re-run here. Consequence for this WP's open
+  task "Revisit `fom_panel_disagrees` only on the same arms": run that revisit
+  under `preset="full"` or a declared ceiling long enough that no arm binds,
+  or its readings move with machine load. Whether `quick` should become
+  reproducible for a given input (budget by work units, or a deterministic
+  cut) is a change to WP-1042's ruled design and is the maintainer's.
+
 ## Non-goals
 
 - The blind search and enumeration ceilings (WP-1924), dedup across a reduction
@@ -114,17 +282,17 @@ engine or the ranking. Indexing is provisional by declaration
       part, recorded as `Decided YYYY-MM-DD:` here and answered on #916.
       *Decided 2026-10-14: (a)-(c) whole, as PR #941 builds them; answered
       in PR #941's review.*
-- [ ] Rebuild the issue's synthetic Si arms as a test fixture: the truth, cI
+- [x] Rebuild the issue's synthetic Si arms as a test fixture: the truth, cI
       √2·a₀, cF +0.6 %, cP a₀, cP 2a₀, the steeper-background arm, and a
       tetragonal descent of the true lattice; exact and picked lines.
-- [ ] Candidate-independent inputs for `absent_reflections`: the shared or
+- [x] Candidate-independent inputs for `absent_reflections`: the shared or
       pattern-owned background and the measured width (WP-1043's design).
-- [ ] Charge absences at the grade beyond index 2–4, with the glide and
+- [x] Charge absences at the grade beyond index 2–4, with the glide and
       unresolved-split guards; re-measure every `predicted_but_absent` count in
       the tree and record the moves.
 - [ ] Revisit `fom_panel_disagrees` only on the same arms, after the repair.
-- [ ] Tests, and `tests/test_acceptance_indexing.py` green.
-- [ ] Skill: the indexing reference row for any changed caveat or grade rule.
+- [x] Tests, and `tests/test_acceptance_indexing.py` green.
+- [x] Skill: the indexing reference row for any changed caveat or grade rule.
 
 ## Acceptance
 
@@ -166,3 +334,24 @@ absences; Si, corundum and magnetite keep their correct cells.
   containment at equal volume, `to_cell_candidate` scoring on the old seen
   fraction, and a direct `validate_by_lebail` screening on the peak list's
   range and per-line σ. *Next:* #941's round 2.
+- **2026-10-25** — PR #941 (C3, by @mustachefeeling) merged at round 6, landing
+  in `fe4cbcc3` through #939's head, which carried #941's and #993's synced
+  heads. The indexer now asks its reversed questions of inputs a candidate
+  cannot buy: a line screen over the peak list and the picker's background
+  envelope, at the measured resolution (`RESOLUTION_FWHM`, 1 FWHM). A wrong
+  cell can no longer read zero absences by refitting its own background.
+  `predicted_but_absent` caps rather than refutes, and fires on the
+  uncancellable absences inside de Wolff's first twenty lines (true cells 0–2,
+  wrong cells 7–79). The generalised containment check refutes the
+  oversized cell. Indexing thresholds go to 1.12, the 1.11 cycle's one bump,
+  which #993's and #939's notes share. The review's sync commit `ed62646d`
+  parked the release bullets in `docs/releases/1.11.0.md`. Gate: the five
+  PRs of the 2026-10-25 batch stacked on `deff4c30` (tree `8273948f`), whole
+  suite 12 243 passed, 206 skipped, 42 xfailed, 0 failed in 35 min (macOS
+  arm64, `[dev,jax]`, Python 3.12.10). #941's own CI head failed only
+  `guides/moment.py` on Linux 3.14, twice; #939's head, which contains it,
+  passed (WP-2036's guide-precision cause). Task 5 stays open: nothing
+  revisited `fom_panel_disagrees` on the #916 arms. *Next:* task 5, and
+  WP-2041 re-measures tutorial 03's absence count on this tree.
+
+- **2026-10-31** (`/pr-review`) — PR #1177 (by @mustachefeeling) merged as `8260c78b` after two rounds: the four things #941 left open. `RESOLUTION_FWHM` stays 1.0: swept 0.5-1.0 on 15 real runs, one rank moves (PbSO₄ X-ray at 0.7, the truth second behind a cell within 0.5 % of its metric), and nothing above 1.0 ran on real data. The windowed cap gains a density form and an excess over the run's cleanest candidate, reported and never gated (`LeBailValidation.*_in_window`). `INDEX_PREDICTED_BUT_ABSENT` reads the validation's counts and fires at `info` when every uncancellable absence lies above de Wolff's window. The screen pairs absences with merged lines by index, and `screen_for` is memoised per run. Re-measured under the Pawley validation (#1191): identical cell for cell. Gated in a stack of seven on `main` `d87c8cc9` (tree `21beeca9`, Mac arm64, Python 3.12, `[dev,jax]`): full suite 13 427 passed, 230 skipped, 48 xfailed, 0 failed; GUI, ruff and the `-W` manual build clean. #1257 stayed out on a hung CI job, and `main` after the six merges equals the checked six-PR tree `86997f50`. Gap, not blocking: the `RESOLUTION_FWHM` row's source list counts 12 sources and omits SRM 676a, which the sweep ran.

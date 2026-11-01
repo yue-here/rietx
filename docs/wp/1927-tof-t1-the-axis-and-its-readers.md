@@ -1,9 +1,8 @@
 # WP-1927 — TOF T-1: the time-of-flight axis and its readers
 
-Milestone: unscheduled · Status: 🔄 2026-10-13 — T-1 landed from outside (PR #911, through #961); every task is met and the close is the maintainer's
+Milestone: unscheduled · Status: ✅ 2026-10-23 — rietx reads a neutron time-of-flight bank with its axis and refuses it by name wherever a pattern would be computed (PR #911, through #961)
 Track: The specimen is not an angle, and the neutron follow-through
 Depends on: —
-Priority: P2 2026-10-11 — a fence decision with a named user and a branch ready to rebase, no longer held by the index cap (WP-1920); the forward-model cuts wait on it
 
 ## Goal
 
@@ -42,59 +41,34 @@ root CLAUDE.md reader invariant (a repair the reader can say it made, the
 axis never trusted). #618 (Mantid instrument values: with provenance, never
 the files) sits beside the fence and is not part of T-1.
 
-### Inherited
+### What T-1 leaves for T-2
 
-- **2026-10-11, from WP-1920 (closed, PR #906): the API index has room, and
-  where T-1's names go is decided.** `api.md` is 33 292 B under one 39 000 B
-  ceiling for every `api*.md`. The maintainer placed T-1's names by shape.
-  `read_gsas_tof_iparm` leaves `SKILL_EXCLUDED_VERBS` for a row in
-  `api-io.md`, beside the other readers of another program's file.
-  `TOFSource`, `ProfileTOF` and `IncidentSpectrum` go to a new `api-tof.md`,
-  one `TECHNIQUES` entry in `docs/skill/make_api_index.py`, which this WP's PR
-  creates. `PatternData.tof` goes through `TECHNIQUE_FIELDS`, as
-  `Phase.rigid_bodies` does. `Instrument.source` accepting a `TOFSource`
-  renders in `api.md` as before. This differs from the reporter's default on
-  #808, which kept the classes in `api.md`.
-
-- **2026-10-11, from the issue triage (#193): the `read_gsas2_instprm` ruling
-  of 2026-09-18 is recorded only in WP-1419.** WP-1419's Inherited (about line
-  360) rules one reader dispatching on the file's own `Type`, never a `_tof`
-  sibling. `io/instrument_profile.py` already reads `Type`, keys
-  `CW_TYPES`/`HISTOGRAM_TYPES`, and refuses a flight-time bank by name, and
-  that refusal is the branch. If the two halves return different types,
-  dispatch moves up a level and discriminates on `kind`. The reporter's branch
-  keeps two readers and offered on 2026-09-18 to make it one, "one commit" if
-  asked. This WP's tasks carry the readers and not this spelling. Checked
-  against the tree at 7d9be3cb: `read_gsas2_instprm` is at
-  `io/instrument_profile.py:1610`, and this file had no "instprm" line.
-
-- **2026-10-11, from the issue triage (#678): the 2026-10-08 thread decisions
-  on the superspace cuts are in no WP file.** This WP only orders N-W2 and N-W3
-  after T-1. Decided on the thread: N-W2 opens with a check of spgrep's little
-  group and small irreps at an irrational k (a rational k reproduced at its
-  float value, a near-rational k that must not snap), and #682's three
-  follow-ups (the `number` field, function-level references, the hand-typed
-  775/24 counts) fold into N-W2's PR. Not decided: the reporter's amendments
-  A1-A6 (q-determination through M-8, an N-W3a/b split, one `Modulation.q`,
-  Laue-invariant classes, k₂ on the residue, satellite widths). They are
-  taken when N-W2's and N-W3's WPs are cut, and the cutter reads the thread.
-  A1's answer lands in WP-1418's #795 entry. Checked against the tree at
-  7d9be3cb: `crystallography/superspace/` holds `generation.py`,
-  `operators.py` and `symbols.py` only.
-
-- **2026-10-13, from WP-1908 (PR #927): a tick's drawn angle is one function,
-  and a time-of-flight axis owes it a twin.** `CompiledModel.apparent_two_theta`
-  is where the forward model reads the angle at which a peak is drawn.
-  `CompiledModel.reflection_positions` (WP-1908's post-merge review round)
-  is the walk over a phase's cell and emission lines that
-  `refine._build_result`, `multi._ticks` and `viz.snapshot.stage_ticks` all
-  call, and `report.satellites` calls `apparent_two_theta` itself. A
-  flight-time axis draws a peak at a time, so neither can serve it. The TOF
-  position map needs its own twin of that pair, with the three builders
-  choosing between them in one place, or ticks drift from the peaks they label
-  again. WP-1908's edits sit at `forward.py` near the position memo in
-  `phase_peaks`, the tick loops in `refine.py` and `multi.py`, and
-  `viz/snapshot.py`. Checked against #911's hunks: none touches those lines.
+No open WP owns T-2/T-3 yet; ROADMAP § v2+ holds the cut. Four things wait
+for it here.
+- **The API index placement** (WP-1920, decided 2026-10-11 by the maintainer,
+  overriding #808's default of keeping the classes in `api.md`). `TOFSource`,
+  `ProfileTOF` and `IncidentSpectrum` go to a new `api-tof.md`, one
+  `TECHNIQUES` entry in `docs/skill/make_api_index.py`, and `PatternData.tof`
+  goes through `TECHNIQUE_FIELDS`. #911 exported none of the three classes at
+  top level, so only `read_gsas_tof_iparm`'s row in `api-io.md` has landed,
+  and `PatternData.tof` still renders in `api.md`.
+- **A twin for a tick's drawn angle** (WP-1908).
+  `CompiledModel.apparent_two_theta` is where the forward model reads the
+  angle a peak is drawn at, and `reflection_positions` is the walk that
+  `refine._build_result`, `multi._ticks` and `viz.snapshot.stage_ticks` call;
+  `report.satellites` calls the first itself. A flight-time axis draws a peak
+  at a time, so the TOF position map needs its own twin of that pair, with the
+  builders choosing between them in one place, or ticks drift from their peaks
+  again.
+- **The two T-2 review follow-ups** under the 2026-10-13 entry's *Not done*:
+  `TOFSource` exposing `lines`, `primary_wavelength` and `wavelength_parameters`
+  as properties that refuse by name, and the hand-written `capabilities()` note
+  for `neutron_tof` (`capabilities.py:429`). The other five are defects in
+  shipped T-1 code and went to [2032](2032-the-tof-readers-t1-follow-ups.md)
+  on 2026-10-23.
+- **WP-1419's Context** (the #286 triage, around its lines 323-335 and
+  378-384): the reporter's items (7), TOPAS v6 corroboration, and (8), a staged
+  `TOF_WINDOW_AREA_TOL`, plus the Δd/d, PRCF1 and GEM evidence kept on the fork.
 
 ## Non-goals
 
@@ -130,6 +104,33 @@ by name, and the joint case of #442 is silent because no CW row exists.
 - WP-1414 ("matched, not freed"), WP-1134 (CW neutron).
 
 ## Handover log
+
+### 2026-10-23 — closed: T-1, the time-of-flight axis and its readers
+
+rietx can read a neutron time-of-flight bank with its axis, and it refuses
+that bank by name wherever a pattern would be computed. Nothing refines a bank
+yet. That is T-2/T-3, which stay behind the fence until the magnetic milestone
+closes. The contributor's cut landed as PR #911, through #961, on 2026-10-13,
+and it met every task.
+
+*Closed* by the maintainer's decision of 2026-10-23, which discharges the last
+entry's "the maintainer closes this WP".
+
+*Inherited, disposed.*
+- From WP-1920 (the API index): half landed. The rest is in Context § What T-1
+  leaves for T-2, since #911 exported none of the three TOF classes.
+- From the #193 triage: deleted, because it is met. `read_gsas2_instprm` is one
+  public reader that hands a `Type: PNT` file to `read_tof_instprm`
+  (`io/instrument_profile.py:1652`), as the 2026-09-18 ruling asked.
+- From the #678 triage: deleted. WP-1992 (N-W2) and WP-1993 (N-W3) were cut on
+  2026-10-16 and carry the thread's decisions and the amendments' homes.
+- From WP-1908: moved to Context § What T-1 leaves for T-2. Both functions are
+  where it says (`model/forward.py:1075` and `:1095`).
+
+*Next.* No open WP owns T-2/T-3. The five review follow-ups that are T-1
+defects went to WP-2032 (the chain audit, same day). The T-2 cut inherits
+Context § What T-1 leaves for T-2. The review follow-ups still hold:
+`SPECTRUM_TYPES` is read by nothing, and no reader writes `TOFSource.l1_m`.
 
 ### 2026-10-13 — T-1 landed from outside: PR #911
 

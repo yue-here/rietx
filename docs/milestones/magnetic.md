@@ -7,7 +7,7 @@ so this one ships in whichever release is cut after its acceptance is met.
 index lists the rows. Issue threads #286 and #426 quote it as v1.6.
 
 Narrative about the WPs below goes to the record of the release in flight,
-[v1.6](v1.6.md) today, as for every other WP (protocol rule 5).
+[v1.11](v1.11.md) today, as for every other WP (protocol rule 5).
 
 ## Scope
 

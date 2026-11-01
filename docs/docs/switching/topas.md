@@ -11,7 +11,7 @@ The weights are the same too.
 rietx uses the esd column of the pattern file when it has one, as `weighting = 1 / SigmaYobs^2;` does, and counting statistics (√y) when it does not.
 
 The comparisons on [LaB6 and cBN](validation.md#lab6-and-cbn-against-topas) and on [two cathode phases](validation.md#two-phases-against-topas-and-gsas-ii) are against TOPAS.
-The cBN cell agrees to 16 ppm, and the cathode's cells to within 98 ppm.
+The cBN cell agrees to 17 ppm, and the cathode's cells to within 96 ppm.
 [Calculated patterns](validation.md#calculated-patterns-against-topas-6) compares rietx with the pattern TOPAS 6 calculated for seven inputs.
 
 ## Differences in concepts
@@ -61,9 +61,9 @@ rietx has three calls for the same jobs:
 The three oxygen sites of fluorapatite share one displacement parameter in TOPAS like this (lines from a file rietx wrote, with each number cut to six significant figures):
 
 ```text
-site O5 x O5_x 0.324667 y O5_y 0.484845 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382724
-site O6 x O6_x 0.591017 y O6_y 0.468992 z ! 0.25 occ O ! 1.0 beq O5_biso 0.382724
-site O7 x O7_x 0.339851 y O7_y 0.257709 z O7_z 0.0704395 occ O ! 1.0 beq O5_biso 0.382724
+site O5 x O5_x 0.32467 y O5_y 0.484898 z ! 0.25 occ O ! 1.0 beq O5_biso 0.366488
+site O6 x O6_x 0.591092 y O6_y 0.469105 z ! 0.25 occ O ! 1.0 beq O5_biso 0.366488
+site O7 x O7_x 0.339828 y O7_y 0.257684 z O7_z 0.0705402 occ O ! 1.0 beq O5_biso 0.366488
 ```
 
 In rietx it is one call:
@@ -110,6 +110,13 @@ For X-rays TOPAS's value is rietx's times K, the polarisation constant, because 
 For constant-wavelength neutrons it is 100 times rietx's, because TOPAS states |F|² in barn and rietx in fm².
 The neutron constant was measured against TOPAS 6.
 `write_topas_inp(..., scale="topas")` and `to_structure(scale="rietx")` convert, and a file that states neither radiation is refused rather than guessed.
+
+### An esd carries a correlation factor
+
+rietx multiplies every esd by the Bérar-Lelann factor for serially correlated residuals.
+The TOPAS Technical Reference (Version 9) describes no such factor for `do_errors` or `bootstrap_errors`.
+So compare a TOPAS esd with `RefinedParameter.stderr_uncorrected`, which is rietx's esd without the factor.
+[Estimation](../theory/estimation.md#esds-and-the-bérar-lelann-inflation) says why rietx applies it and how large it gets.
 
 ### Rwp is for looking, and the report is for judging
 
@@ -175,19 +182,19 @@ rx.write_topas_inp(ref.fitted_structure, "refined.inp", free=ref, scale="topas",
 The file names each free parameter after its path, which in TOPAS is also its refine flag.
 This file comes from the refinement above that held the zero shift at 0.
 It holds the zero shift with `!`, and states the specimen displacement that took its place as an equation in `th2_offset`.
-The held zero also moves the cell: the same fit with the zero free gives a = 9.37228 Å, 110 ppm lower.
+The held zero also moves the cell: the same fit with the zero free gives a = 9.37228 Å, 111 ppm lower.
 These lines are an excerpt, with each number cut to six significant figures:
 
 ```text
 xdd "refined.xye" xye_format
   weighting = 1 / SigmaYobs^2;
-  bkg @ 154.768 -172.225 123.706 -71.9946 35.2465 -15.3096
+  bkg @ 152.446 -171.263 124.821 -73.5215 36.6909 -16.1333
   th2_offset ! 0
-  th2_offset = -2*Rad*(0.0631871)*Cos(Th)/217.5;
+  th2_offset = -2*Rad*(0.0629551)*Cos(Th)/217.5;
 str
-  scale p0_scale 0.00047007 min 0
-  a p0_cell_a 9.37331
-  b p0_cell_a 9.37331
+  scale p0_scale 0.000469265 min 0
+  a p0_cell_a 9.37332
+  b p0_cell_a 9.37332
 ```
 
 The data go beside it as `refined.xye`, with the esd rietx weights by.

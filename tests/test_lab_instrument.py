@@ -4,12 +4,15 @@ Fast unit/property tests; the SRM 660c real-data acceptance lives in
 ``test_acceptance_srm660c.py`` (marked slow).
 """
 
+from functools import lru_cache
+
 import numpy as np
 import pytest
 
 import rietx as rx
 from rietx.model.corrections import displacement_shift_deg, transparency_shift_deg
 from rietx.model.forward import compile_model
+from rietx.model.profiles import fcj as fcj_module
 from rietx.model.profiles.fcj import (
     fcj_extent_deg,
     fcj_node_count,
@@ -468,6 +471,375 @@ def test_axial_free_at_zero_nodes_do_not_change_the_pattern(monkeypatch):
     y_fixed = _rutile_axial(0.0, False).predict(tt)
     y_free = _rutile_axial(0.0, True).predict(tt)
     assert np.max(np.abs(y_free - y_fixed)) <= 1e-14 * np.max(y_fixed)
+
+
+# ---------------------------------------------------------------------------
+# FCJ quadrature error over the claimed domain (WP-2002, B10)
+# ---------------------------------------------------------------------------
+#
+# B10 (ruled 2026-10-19): a numerical setting is tier 1 once a test bounds its
+# error over the domain it claims.  One test per constant of
+# ``fcj_node_count``, each over the cases that constant decides.  A case's
+# error is max |y_n - y_ref| / max y_ref.  n is the count the rule picks, and
+# y_ref is the same quadrature at max(512, 4n) nodes.  Below extent/FWHM 10,
+# 512 nodes sit within 2e-7 of the peak of a reference doubled until it moved
+# by under 1e-8 (measured, WP-2002).
+# The arithmetic is numpy's ``fcj_offsets_weights`` and ``pseudo_voigt``.  The
+# compiled kernels draw the same images through ``fcj_offsets_weights_batch``,
+# so the error is theirs too.  No fit runs and no compiled tier is reached.
+
+#: σ/peak at the strongest peak of each family's most precise pattern in
+#: tests/data, from the file's own σ (WP-2002): ``FAP.XRA`` at 31.86°
+#: (19 693 counts) for lab Bragg-Brentano, ``11BM_NAC.fxye`` at 11.82° for a
+#: synchrotron.
+_SIGMA_OVER_PEAK = {"lab": 7.2e-3, "synchrotron": 1.75e-3}
+#: The bar, in units of the peak maximum, is a tenth of that noise.  At the
+#: maximum it adds 1 % to the point's expected χ².  SRM 660c's (100) is the
+#: anchor: its 39 shipped nodes leave 6.3e-4 of the peak (0.046 σ of that file),
+#: and a refit with every reflection at 512 nodes moved no parameter by more
+#: than 0.04 esd.
+_FCJ_BAR = {family: 0.1 * v for family, v in _SIGMA_OVER_PEAK.items()}
+#: The claimed domain.  Lab apertures span help.py's typical 0.01-0.05 for
+#: each ratio: equal (the trapezoid's kink at s = h), unequal, and one at zero
+#: (the uniform limit; the profile is symmetric in S/L and H/L).  Synchrotron
+#: apertures stay under 0.005.  FWHM runs 0.03-0.3° on a lab instrument and
+#: 0.003-0.03° on a synchrotron.  2θ runs from 2°, where |tan 2θ| caps ξ, to
+#: 160°, across the flip at 90°.
+_FCJ_DOMAIN = {
+    "lab": (((0.025, 0.025), (0.05, 0.05), (0.037, 0.025), (0.05, 0.01), (0.05, 0.0)),
+            (0.03, 0.07, 0.15, 0.3)),
+    "synchrotron": (((0.003, 0.003), (0.005, 0.002), (0.005, 0.0)), (0.003, 0.01, 0.03)),
+}
+_FCJ_TT = (2.0, 3.0, 5.0, 6.5, 8.0, 10.0, 15.0, 22.0, 30.0, 45.0, 60.0, 75.0, 85.0, 89.0,
+           91.0, 105.0, 120.0, 140.0, 160.0)
+_FCJ_ETA = (0.0, 0.5, 1.0)
+
+
+def _fcj_ratio(two_theta, fwhm, sl, hl):
+    return float(fcj_extent_deg(np.array(two_theta), sl, hl)) / fwhm
+
+
+def _fcj_tt_at_ratio(target, fwhm, sl, hl, above_90):
+    """The 2θ on one side of 90° where extent/FWHM falls just under ``target``.
+
+    The extent falls monotonically to zero at 90° from either side, so this
+    bisects between 90° and that side's end of the claimed domain
+    (``_FCJ_TT``).  Where the ratio stays under ``target`` all the way, it
+    returns the domain's end, a point the grid already holds."""
+    near, far = (90.0, _FCJ_TT[-1]) if above_90 else (90.0, _FCJ_TT[0])
+    for _ in range(60):
+        mid = 0.5 * (near + far)
+        if _fcj_ratio(mid, fwhm, sl, hl) < target:
+            near = mid
+        else:
+            far = mid
+    return near
+
+
+def _fcj_mix(x, two_theta, fwhm, sl, hl, n):
+    """The Lorentzian and Gaussian composites at n nodes.  pV is linear in η,
+    so every η is a mix of these two."""
+    if n == 0:
+        d = x - two_theta
+        return pseudo_voigt(d, fwhm, 1.0), pseudo_voigt(d, fwhm, 0.0)
+    phi, omega = fcj_offsets_weights(two_theta, sl, hl, n)
+    d = x[None, :] - phi[:, None]
+    return omega @ pseudo_voigt(d, fwhm, 1.0), omega @ pseudo_voigt(d, fwhm, 0.0)
+
+
+def _fcj_constants(closing=False):
+    m = fcj_module
+    if closing:
+        return (m.CLOSING_NODES_PER_FWHM, m.CLOSING_MIN_NODES, m.CLOSING_MAX_NODES,
+                m.CLOSING_SKIP_EXTENT_FWHM_RATIO)
+    return (m.NODES_PER_FWHM, m.MIN_NODES, m.MAX_NODES, m.SKIP_EXTENT_FWHM_RATIO)
+
+
+@lru_cache(maxsize=4)
+def _fcj_domain_cases(constants, closing=False):
+    """Every case as (family, region, 2θ, S/L, H/L, FWHM, extent/FWHM, n,
+    {η: error}).  The region names the constant that decides n.
+
+    Each (apertures, FWHM) also gets the 2θ on either side of 90° where
+    ``SKIP_EXTENT_FWHM_RATIO`` and ``MIN_NODES`` each stop deciding, because
+    each one's error is largest there.  ``constants`` keys the cache, so a
+    patched constant builds its own table."""
+    per_fwhm, n_min, n_max, skip = constants
+    rows = []
+    for family, (apertures, fwhms) in _FCJ_DOMAIN.items():
+        for (sl, hl), fwhm in ((a, f) for a in apertures for f in fwhms):
+            tts = set(_FCJ_TT)
+            for above in (False, True):
+                tts.add(_fcj_tt_at_ratio(0.999 * skip, fwhm, sl, hl, above))
+                tts.add(_fcj_tt_at_ratio((n_min - 4) / per_fwhm, fwhm, sl, hl, above))
+            for tt in sorted(tts):
+                ratio = _fcj_ratio(tt, fwhm, sl, hl)
+                n = fcj_node_count(tt, fwhm, sl, hl, closing=closing)
+                uncapped = int(np.ceil(4.0 + per_fwhm * ratio))
+                region = ("skip" if n == 0 else "min" if uncapped <= n_min
+                          else "cap" if uncapped > n_max else "rule")
+                ext = ratio * fwhm
+                x = np.arange(tt - ext - 6 * fwhm, tt + ext + 6 * fwhm, fwhm / 20)
+                ref = _fcj_mix(x, tt, fwhm, sl, hl, max(512, 4 * n))
+                got = _fcj_mix(x, tt, fwhm, sl, hl, n)
+                err = {}
+                for eta in _FCJ_ETA:
+                    r = eta * ref[0] + (1 - eta) * ref[1]
+                    y = eta * got[0] + (1 - eta) * got[1]
+                    err[eta] = float(np.max(np.abs(y - r)) / r.max())
+                rows.append((family, region, tt, sl, hl, fwhm, ratio, n, err))
+    return rows
+
+
+def _assert_fcj_bar(family, region, eta, closing=False):
+    rows = [r for r in _fcj_domain_cases(_fcj_constants(closing), closing)
+            if r[0] == family and r[1] == region]
+    if not rows:
+        # the constant decides no case of this family's domain, so it meets
+        # the bar there; a strict xfail cell then turns red, its cue to go
+        return
+    _, _, tt, sl, hl, fwhm, ratio, n, err = max(rows, key=lambda r: r[8][eta])
+    bar = _FCJ_BAR[family]
+    assert err[eta] <= bar, (
+        f"{family}, eta {eta}: {n} nodes leave {err[eta]:.2e} of the peak maximum at "
+        f"2theta {tt:.2f}, S/L {sl}, H/L {hl}, FWHM {fwhm} (extent/FWHM {ratio:.3g}); "
+        f"the bar is {bar:.2e}, a tenth of sigma/peak {_SIGMA_OVER_PEAK[family]:.2e}")
+
+
+def _fcj_cells(failing):
+    """(family, η) cells.  A measured failure is a strict xfail carrying its
+    numbers, so a constant that comes to pass turns it red."""
+    return [pytest.param(family, eta, id=f"{family}-eta{eta}",
+                         marks=([pytest.mark.xfail(strict=True, reason=failing[family, eta])]
+                                if (family, eta) in failing else []))
+            for family in _FCJ_DOMAIN for eta in _FCJ_ETA]
+
+
+#: Measured worst errors where the shipped constants fail (WP-2002).  The set
+#: NODES_PER_FWHM 12, MIN_NODES 10, MAX_NODES 1024, SKIP_EXTENT_FWHM_RATIO 3e-4
+#: meets both bars over a finer grid of this domain (8 500 cases): worst 1.6e-4
+#: lab, 9.9e-5 synchrotron.
+_SKIP_FAILS = {
+    (family, eta): (f"SKIP_EXTENT_FWHM_RATIO 0.02: a peak drawn symmetric just under it is "
+                    f"off by {e} of its maximum (bar {_FCJ_BAR[family]:.2e}); the error "
+                    f"is about 0.48 x extent/FWHM, so the ratio must sit under "
+                    f"{_FCJ_BAR[family] / 0.48:.1e}")
+    for family in _FCJ_DOMAIN for eta, e in ((0.0, 9.5e-3), (0.5, 8.9e-3), (1.0, 8.7e-3))}
+_MIN_FAILS = {
+    ("lab", 1.0): "MIN_NODES 8: 7.9e-4 at extent/FWHM 0.667, one aperture at zero (bar 7.2e-4)",
+    ("synchrotron", 0.5): "MIN_NODES 8: 3.9e-4 at extent/FWHM 0.667 (bar 1.75e-4)",
+    ("synchrotron", 1.0): "MIN_NODES 8: 7.9e-4 at extent/FWHM 0.667 (bar 1.75e-4)",
+}
+_RULE_FAILS = {
+    ("lab", 0.5): "NODES_PER_FWHM 6: 2.4e-3 at 30 deg, extent/FWHM 4.1, 29 nodes (bar 7.2e-4)",
+    ("lab", 1.0): "NODES_PER_FWHM 6: 5.6e-3 at 30 deg, extent/FWHM 4.1, 29 nodes (bar 7.2e-4)",
+    ("synchrotron", 0.0): "NODES_PER_FWHM 6: 3.2e-4 at extent/FWHM 0.82, 9 nodes (bar 1.75e-4)",
+    ("synchrotron", 0.5): "NODES_PER_FWHM 6: 2.0e-3 at 2 deg, extent/FWHM 6.9 (bar 1.75e-4)",
+    ("synchrotron", 1.0): "NODES_PER_FWHM 6: 4.7e-3 at 2 deg, extent/FWHM 6.9 (bar 1.75e-4)",
+}
+_CAP_FAILS = {
+    **{("lab", eta): (f"MAX_NODES 64 binds past extent/FWHM 10 (below about 6.2 deg at "
+                      f"S/L = H/L = 0.025, FWHM 0.07): {e} at 3 deg, extent/FWHM 70 "
+                      f"(bar 7.2e-4)")
+       for eta, e in ((0.0, 0.26), (0.5, 0.24), (1.0, 0.21))},
+    ("synchrotron", 0.5): "MAX_NODES 64: 4.2e-4 at 2 deg, extent/FWHM 13.5 (bar 1.75e-4)",
+    ("synchrotron", 1.0): "MAX_NODES 64: 9.9e-4 at 2 deg, extent/FWHM 13.5 (bar 1.75e-4)",
+}
+
+
+@pytest.mark.xdist_group("fcj-domain")
+@pytest.mark.parametrize("family, eta", _fcj_cells(_SKIP_FAILS))
+def test_fcj_skip_ratio_meets_the_bar(family, eta):
+    """``SKIP_EXTENT_FWHM_RATIO``: a peak drawn symmetric below the ratio."""
+    _assert_fcj_bar(family, "skip", eta)
+
+
+@pytest.mark.xdist_group("fcj-domain")
+@pytest.mark.parametrize("family, eta", _fcj_cells(_MIN_FAILS))
+def test_fcj_min_nodes_meets_the_bar(family, eta):
+    """``MIN_NODES``: the floor, where the extent is under (MIN_NODES − 4)
+    / NODES_PER_FWHM FWHM."""
+    _assert_fcj_bar(family, "min", eta)
+
+
+@pytest.mark.xdist_group("fcj-domain")
+@pytest.mark.parametrize("family, eta", _fcj_cells(_RULE_FAILS))
+def test_fcj_nodes_per_fwhm_meets_the_bar(family, eta):
+    """``NODES_PER_FWHM``: n = ⌈4 + NODES_PER_FWHM · extent/FWHM⌉ between the
+    floor and the cap."""
+    _assert_fcj_bar(family, "rule", eta)
+
+
+@pytest.mark.xdist_group("fcj-domain")
+@pytest.mark.parametrize("family, eta", _fcj_cells(_CAP_FAILS))
+def test_fcj_max_nodes_meets_the_bar(family, eta):
+    """``MAX_NODES``: the cap, which binds on large extents at low angle."""
+    _assert_fcj_bar(family, "cap", eta)
+
+
+@pytest.mark.slow  # 18-20 s serial for the 24 cells, on the fcj-domain worker
+@pytest.mark.xdist_group("fcj-domain")
+@pytest.mark.parametrize("region", ["skip", "min", "rule", "cap"])
+@pytest.mark.parametrize("family, eta", _fcj_cells({}))
+def test_the_closing_node_rule_meets_the_bar(family, eta, region):
+    """The closing rule (``CLOSING_NODES_PER_FWHM`` 12, ``CLOSING_MIN_NODES`` 10,
+    ``CLOSING_MAX_NODES`` 1024, ``CLOSING_SKIP_EXTENT_FWHM_RATIO`` 3e-4), which
+    ``compile_model`` takes at windows finer than the declared stages', over the
+    domain the four tests above fail on (WP-2002, the seventh round's Q2).
+    The declared stages keep the rule above, since the closing stage computes
+    the answer.  Measured 2026-10-21 over a finer grid of this domain (8 500
+    cases): worst 1.6e-4 lab and 9.9e-5 synchrotron, 0.25 and 0.81 of the
+    bars.  Made to fail on 2026-10-21 with ``CLOSING_NODES_PER_FWHM`` patched
+    to 6."""
+    _assert_fcj_bar(family, region, eta, closing=True)
+
+
+def test_the_closing_node_rule_serves_every_compile_finer_than_the_declared_stages():
+    """A ``closing_window_tol`` loosened past 1e-3 for speed keeps the closing
+    node rule, and the declared stages' 2 % keeps its own (WP-2002,
+    2026-10-22).  The line sat at ``CLOSING_WINDOW_TOL`` before, so 1.5e-3
+    sampled the asymmetry at the declared rule, 7.8x the lab bar."""
+    from rietx.model.forward import CLOSING_WINDOW_TOL, WINDOW_AREA_TOL
+    from tests.test_acceptance_qpa_roundrobin import corundum_phase, qarr_instrument
+
+    structure = rx.Structure(phases=[corundum_phase()])
+    ins = qarr_instrument()
+    ins.geometry.axial_sl.value = 0.03
+    tt = np.arange(20.0, 140.0, 0.02)
+    grid = rx.PatternData(two_theta=tt.tolist(), intensity=np.zeros_like(tt).tolist())
+
+    def nodes(tol):
+        return compile_model(structure, ins, grid, window_area_tol=tol).phases[0].fcj_n
+
+    # a reflection past the scan's end whose narrower window holds no point has
+    # no nodes at either rule, so only reflections with points in both compare
+    closing = nodes(CLOSING_WINDOW_TOL)
+    for tol in (5e-3, 0.0199):
+        looser = nodes(tol)
+        both = (looser > 0) & (closing > 0)
+        assert both.sum() > 0.9 * (closing > 0).sum()
+        assert np.array_equal(looser[both], closing[both]), tol
+    declared = nodes(WINDOW_AREA_TOL)
+    both = (declared > 0) & (closing > 0)
+    assert np.all(declared[both] <= closing[both]) and declared[both].sum() < closing[both].sum()
+
+
+# ---------------------------------------------------------------------------
+# AXIAL_SIZING_FLOOR over the claimed domain (WP-2002, B10)
+# ---------------------------------------------------------------------------
+#
+# A stage that frees S/L or H/L from zero compiles its quadrature nodes and its
+# windows as if both were AXIAL_SIZING_FLOOR, then solves on that model however
+# far the ratios walk.  The claimed domain is where they may walk to in one
+# stage: help.py's typical 0.01-0.05 for each ratio, equal, unequal and one at
+# zero.  cpd-1a's QPA protocol frees S/L alone from zero and ends its
+# ``lines_axial`` stage at 0.041.  On that stage the frozen model and one
+# compiled at the stage's end differ by up to 0.31 σ at 87.3° (converged
+# windows, WINDOW_AREA_TOL 5e-5; measured WP-2002), against 0.000 σ with the
+# floor at 0.06.  The next stage recompiles, so the floor reaches the answer
+# only through the path: the two floors' fixed points differ by 0.16 esd at a
+# χ² 0.008 apart, and one floor at 0.05 makes the protocol fits 1.25-1.8×
+# slower (LaB6, FAP, cpd-1a), since the floor also applies by value to every
+# positive ratio under it.
+#
+# Two errors, each held only where the node rule at the reached ratios meets
+# its own bar, so that the rule's failures (the tests above) are not counted
+# against the floor:
+#
+# 1. quadrature: the profile at the reached ratios on the floor's node count,
+#    against 512 nodes, in units of the peak maximum, against the lab bar;
+# 2. window: the area the reached profile loses outside a window sized at the
+#    floor, against WINDOW_AREA_TOL, the bound every window claims.
+#
+# Made to fail once each (2026-10-21) by patching AXIAL_SIZING_FLOOR to 0.05 in
+# the module before the cases were built: both tests turned XPASS(strict).
+
+_AXIAL_REACHED = ((0.01, 0.01), (0.02, 0.02), (0.03, 0.03), (0.05, 0.05), (0.04, 0.0),
+                  (0.05, 0.0), (0.04, 0.02), (0.05, 0.01))
+_AXIAL_FWHM = (0.03, 0.07, 0.15, 0.3)
+_AXIAL_TT = (3.0, 8.0, 15.0, 22.0, 30.0, 45.0, 60.0, 75.0, 85.0, 95.0, 120.0, 140.0, 160.0)
+
+
+def _kept_pv(c, fwhm, eta, a, b):
+    """Area of the unit pseudo-Voigt centred at ``c`` on [a, b]."""
+    from scipy.special import erf
+    k = 2.0 * np.sqrt(np.log(2.0))
+    ua, ub = (a - c) / fwhm, (b - c) / fwhm
+    lor = (np.arctan(2.0 * ub) - np.arctan(2.0 * ua)) / np.pi
+    return eta * lor + (1.0 - eta) * 0.5 * (erf(k * ub) - erf(k * ua))
+
+
+@lru_cache(maxsize=4)
+def _axial_floor_cases(floor, slack, tol):
+    """Every case as (S/L, H/L, FWHM, 2θ, η, n floor, n reached, quadrature
+    error at each, area lost to each window).  The arguments key the cache,
+    so a patched constant builds its own table."""
+    from rietx.model.forward import window_fwhm_mult
+    rows = []
+    for (sl, hl) in _AXIAL_REACHED:
+        for fwhm in _AXIAL_FWHM:
+            for tt in _AXIAL_TT:
+                n_floor = fcj_node_count(tt, fwhm, floor, floor)
+                # compiled where the stage ended, the floor still applies by value
+                n_reach = fcj_node_count(tt, fwhm, max(sl, floor), max(hl, floor))
+                ext = float(fcj_extent_deg(np.array(tt), sl, hl))
+                x = np.arange(tt - ext - 6 * fwhm, tt + ext + 6 * fwhm, fwhm / 20)
+                n_ref = max(512, 4 * n_reach)
+                ref = _fcj_mix(x, tt, fwhm, sl, hl, n_ref)
+                at_floor = _fcj_mix(x, tt, fwhm, sl, hl, n_floor)
+                at_reach = _fcj_mix(x, tt, fwhm, sl, hl, n_reach)
+                phi, om = fcj_offsets_weights(tt, sl, hl, n_ref)
+                halves = [float(fcj_extent_deg(np.array(tt), a, b))
+                          for a, b in ((floor, floor), (max(sl, floor), max(hl, floor)))]
+                for eta in _FCJ_ETA:
+                    r = eta * ref[0] + (1 - eta) * ref[1]
+                    err = [float(np.max(np.abs(eta * g[0] + (1 - eta) * g[1] - r)) / r.max())
+                           for g in (at_floor, at_reach)]
+                    k = float(window_fwhm_mult(np.float64(eta)))
+                    lost = [1.0 - float(om @ _kept_pv(phi, fwhm, eta, tt - h, tt + h))
+                            for h in (k * fwhm + slack + e for e in halves)]
+                    rows.append((sl, hl, fwhm, tt, eta, n_floor, n_reach, *err, *lost))
+    return rows
+
+
+def _axial_rows():
+    from rietx.model import forward
+    return _axial_floor_cases(forward.AXIAL_SIZING_FLOOR, forward.WINDOW_MIN_DEG,
+                              forward.WINDOW_AREA_TOL)
+
+
+@pytest.mark.xdist_group("axial-floor-domain")
+@pytest.mark.xfail(strict=True, reason=(
+    "AXIAL_SIZING_FLOOR 0.02: refined from zero to S/L = H/L = 0.05, 15 nodes leave 0.27 of "
+    "the peak maximum at 140 deg, FWHM 0.03 (64 nodes at the reached ratios: 1.8e-4; bar "
+    "7.2e-4); 313 of the 1019 cases the reached count passes fail, from S/L = H/L = 0.03 "
+    "(2.8e-2) and S/L 0.04 beside H/L 0 (6.4e-3) up"))
+def test_axial_floor_quadrature_meets_the_bar_over_the_reached_ratios():
+    """The floor's node count serves the ratios a stage may reach from zero
+    wherever the count at the reached ratios does."""
+    bar = _FCJ_BAR["lab"]
+    held = [r for r in _axial_rows() if r[8] <= bar]
+    sl, hl, fwhm, tt, eta, n_f, n_r, err, err_r, *_ = max(held, key=lambda r: r[7])
+    assert err <= bar, (
+        f"{n_f} nodes sized at the floor leave {err:.2e} of the peak maximum at S/L {sl}, "
+        f"H/L {hl}, FWHM {fwhm}, 2theta {tt}, eta {eta} ({n_r} at the reached ratios: "
+        f"{err_r:.1e}); the bar is {bar:.2e}")
+
+
+@pytest.mark.xdist_group("axial-floor-domain")
+@pytest.mark.xfail(strict=True, reason=(
+    "AXIAL_SIZING_FLOOR 0.02: a window sized at the floor loses 0.195 of a peak refined from "
+    "zero to S/L = H/L = 0.05 (8 deg, FWHM 0.03, eta 0), 0.054 at 0.03 each; 55 of 1248 "
+    "cases over the bound WINDOW_AREA_TOL 0.02"))
+def test_axial_floor_window_holds_the_area_bound_over_the_reached_ratios():
+    """A window sized at the floor keeps all but ``WINDOW_AREA_TOL`` of the
+    reached profile wherever a window sized at the reached ratios does."""
+    from rietx.model.forward import WINDOW_AREA_TOL
+    held = [r for r in _axial_rows() if r[10] <= WINDOW_AREA_TOL]
+    sl, hl, fwhm, tt, eta, *_, lost, lost_r = max(held, key=lambda r: r[9])
+    assert lost <= WINDOW_AREA_TOL, (
+        f"a window sized at the floor loses {lost:.3f} of the area at S/L {sl}, H/L {hl}, "
+        f"FWHM {fwhm}, 2theta {tt}, eta {eta} ({lost_r:.4f} sized at the reached ratios)")
 
 
 # ---------------------------------------------------------------------------

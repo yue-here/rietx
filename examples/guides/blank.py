@@ -60,10 +60,10 @@ held_ref, _ = fit_with(fixed, hold=["instrument.background.scale"])
 print("held scale", held_ref.fitted_instrument.background.scale.value)
 # guide: hold end
 
-# compiled path 0.8356 ± 0.0185, 0.6952 ± 0.0322 (2026-10-17, darwin/arm64)
+# compiled path 0.8418 ± 0.0175, 0.6914 ± 0.0301 (2026-10-21, darwin/arm64)
 assert result.status == result6.status == "converged"
 assert round(scale.value, 2) == 0.84 and round(scale.stderr, 2) == 0.02
-assert round(scale6.value, 2) == 0.70 and round(scale6.stderr, 2) == 0.03
+assert round(scale6.value, 2) == 0.69 and round(scale6.stderr, 2) == 0.03
 assert held_ref.fitted_instrument.background.scale.value == 1.0
 assert background.fixed_sigma is not None
 assert ref.fitted_instrument.background.fixed_source == "APS 11-BM run 4736, empty Kapton capillary"

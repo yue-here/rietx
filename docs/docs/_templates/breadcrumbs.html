@@ -1,0 +1,26 @@
+{#- The trail over each page's title, in place of pydata's (WP-2021).  Two changes.
+
+    It ends at the page's parent, never the page itself, whose title is the H1 directly
+    under it: pydata's ended "Concepts" over an H1 "Concepts".  GOV.UK ends a trail this
+    way; NN/g puts the current page in, unlinked; WCAG technique G65 accepts both.
+
+    Its root is the word "Manual" rather than a house icon.  The header's logo goes to the
+    site's home page, so this is the link back to the manual's front page, on every page
+    but that one, as NN/g asks of a subsite.  Hidden on the front page, as pydata's is.
+    `breadcrumb-home` keeps pydata's separator off the first item. -#}
+{%- block breadcrumbs %}
+{% if title and pagename != root_doc %}
+<nav aria-label="{{ _('Breadcrumb') }}" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    <li class="breadcrumb-item breadcrumb-home"><a href="{{ pathto(root_doc) }}" class="nav-link">Manual</a></li>
+    {%- for doc in parents %}
+    {% if doc.link %}
+    <li class="breadcrumb-item"><a href="{{ doc.link|e }}" class="nav-link">{{ doc.title }}</a></li>
+    {% else %}
+    <li class="breadcrumb-item">{{ doc.title }}</li>
+    {% endif %}
+    {%- endfor %}
+  </ul>
+</nav>
+{% endif %}
+{%- endblock %}

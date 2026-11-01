@@ -23,8 +23,8 @@ export type Token = (typeof TOKENS)[number];
 
 /** Line-opening words. Mirrors `textdoc._KEYWORDS` (reserved blocks included). */
 export const KEYWORDS = ["rxt", "project", "pattern", "mode", "limits", "excluded",
-                         "plan", "guard", "tolerance", "passes", "stage", "phase",
-                         "instrument", "peaks"];
+                         "plan", "guard", "tolerance", "passes", "support", "closing",
+                         "stage", "phase", "instrument", "peaks"];
 
 /** Words that describe a parameter rather than annotate it. `textdoc._FLAG_WORDS`. */
 export const FLAGS = ["locked", "mode-fixed", "held"];

@@ -2,7 +2,7 @@
 
 The package already tells a user that the intensity its model puts nowhere
 *might* be magnetic — it is one of the causes ``HARMONIC_FRACTION`` names, and
-the manual repeats it in ``using/refining.md``.  Until this arm there was no
+the manual repeats it in ``reference/refinement.md``.  Until this arm there was no
 way to test that.  Here it is, and it costs the user nothing they do not
 already have: **a satellite is a position**, so the test needs a cell, a
 symmetry and a wavelength, and no moment, no magnetic form factor and no
@@ -57,6 +57,18 @@ unexplained and then "indexed" by a candidate whose satellite sits 0.14° away.
 3. **Neither.**  Only these are scored against the candidate k, because only
    these need one.
 
+**One position inside the third is named, and not removed.**  A residual
+peak on an integer (h k l) that the lattice's *centring* forbids — mixed
+parity on F, h + k + l odd on I — is in neither of the first two lists:
+``lattice_two_theta`` applies the centring, so the point is not a
+reciprocal-lattice vector at all.  It stays in the third list and is scored
+like any other peak, but the note says how many sit there, from how many
+such positions in range, and names the strongest with its (h k l) and its
+height in σ, because a model of that lattice with no propagation vector
+cannot put intensity there.  Measured on the GSAS-II *Magnetic-IV*
+(Pr,Sr)MnO₃ pattern (F m m m, issue #795): the strongest residual peak sits
+on the forbidden (1 0 0), and the note said nothing about it.
+
 And one sentence about the radiation, which is read off the compiled phase's
 own amplitude — a bound coherent scattering length means neutrons — rather than
 assumed: **on an X-ray histogram** the positions of a superstructure reflection
@@ -70,15 +82,18 @@ generation from a propagation vector, and the ±k rule the enumeration obeys.
 
 from __future__ import annotations
 
+from typing import NamedTuple
+
 import numpy as np
 
-from ..crystallography.lattice import two_theta_deg
+from ..crystallography.lattice import d_spacings, two_theta_deg
 from ..crystallography.representation.irreps import star
 from ..crystallography.satellites import (
     KCandidate,
     check_candidate_denominators,
     lattice_two_theta,
     minus_k_is_k,
+    reciprocal_lattice_mask,
     satellite_d_spacings,
     zone_boundary_candidates,
 )
@@ -124,27 +139,12 @@ def _radius(tt: np.ndarray, pos: np.ndarray, fwhm: np.ndarray) -> np.ndarray:
     return VALIDITY_RADIUS_FWHM * local
 
 
-def _generation_window(model, values) -> tuple[float, float]:
-    """The Bragg-angle range whose apparent 2θ can land in the fitted range.
-
-    ``model.apparent_two_theta`` adds the zero and the geometry's own shift
-    (WP-1908), and the geometry's varies with angle, so the range is widened by
-    the largest and smallest shift the fitted range sees.  Generation over a
-    superset is harmless, since each caller filters on the apparent position.
-    """
-    grid = np.linspace(model.tt_min, model.tt_max, 33)
-    shift = np.asarray(model.apparent_two_theta(grid, values)) - grid
-    shift = shift[np.isfinite(shift)]
-    lo_shift = float(shift.min()) if shift.size else 0.0
-    hi_shift = float(shift.max()) if shift.size else 0.0
-    return (max(model.tt_min - hi_shift, 0.05),
-            min(model.tt_max - lo_shift, 179.0))
-
-
 def _satellite_positions(model, values, ip: int, ks) -> list[np.ndarray]:
     """Every emission line's apparent 2θ for the satellites of each k in ``ks``.
 
-    Generated at the *current* cell, over the fitted range, and placed by the
+    Generated at the *current* cell, over the window ``compile_model``
+    generates over (:meth:`~rietx.model.forward.CompiledModel.generation_window`,
+    WP-2034), and placed by the
     same ``CompiledModel.apparent_two_theta`` the tick list uses (zero and the
     geometry's own shift, WP-1908), so a position here is comparable with a
     peak found in the residual.  One parent grid serves every candidate
@@ -157,7 +157,7 @@ def _satellite_positions(model, values, ip: int, ks) -> list[np.ndarray]:
     cell = tuple(values[f"phases.{ip}.cell.{key}"]
                  for key in ("a", "b", "c", "alpha", "beta", "gamma"))
     lams = [float(v) for v in model.line_lambdas(values)]
-    lo, hi = _generation_window(model, values)
+    lo, hi = model.generation_window(values)
     if hi <= lo:
         return [np.zeros(0) for _ in ks]
     ds = satellite_d_spacings(
@@ -201,7 +201,44 @@ def _num(n: int) -> str:
     return {3: "three", 4: "four"}.get(n, str(n))
 
 
-def _note(evidence: SatelliteEvidence) -> str:
+class _CentringForbidden(NamedTuple):
+    """Unexplained peaks on centring-forbidden integer (h k l), for the note."""
+
+    count: int            # unexplained peaks within the radius of one
+    n_positions: int      # such positions in the fitted range
+    centring: str         # the lattice letter, "F", "I", "C", …
+    two_theta: float      # the named peak
+    hkl: tuple[int, int, int]
+    height: float | None  # its Δ/σ; None when the caller passed no heights
+    half_order: bool      # 2·hkl is allowed by the group (λ/2 can put a line there)
+
+
+def _centring_sentence(f: _CentringForbidden, radiation: str) -> str:
+    h, k, l = f.hkl  # noqa: E741 — Miller indices
+    which = (f"the strongest, {f.height:.1f}σ at {f.two_theta:.3f}°"
+             if f.height is not None
+             else f"the lowest-angle, at {f.two_theta:.3f}°")
+    causes = [f"a true lattice less centred than {f.centring} (a "
+              "superstructure the centring forbids)"]
+    if f.half_order:
+        causes.append(f"λ/2 contamination from the ({2 * h} {2 * k} {2 * l}) "
+                      "line")
+    causes.append("an impurity line that lands on the position")
+    if radiation == "neutron":
+        causes.append(f"a magnetic structure whose propagation vector is a "
+                      f"centring-forbidden integer vector, such as "
+                      f"({h} {k} {l}) itself")
+    return (f"{f.count} of them sit within the validity radius of an integer "
+            f"(h k l) that the {f.centring} centring forbids, from "
+            f"{f.n_positions} such position(s) in range; {which}, is at "
+            f"({h} {k} {l}), where a model of this lattice with no "
+            "propagation vector cannot put intensity, and the arm cannot "
+            f"separate {_num(len(causes))} causes that can — "
+            + ", ".join(causes[:-1]) + ", or " + causes[-1])
+
+
+def _note(evidence: SatelliteEvidence,
+          forbidden: _CentringForbidden | None = None) -> str:
     parts: list[str] = []
     if evidence.excess_on_absent_lattice_lines:
         causes = [
@@ -268,6 +305,8 @@ def _note(evidence: SatelliteEvidence) -> str:
                     f"(from {runner.n_satellites}); the count has no chance "
                     "baseline, so a k with more positions matches more by "
                     "being everywhere")
+        if forbidden is not None:
+            parts.append(_centring_sentence(forbidden, evidence.radiation))
         if evidence.excess_on_nuclear_lines:
             parts.append(
                 f"a further {evidence.excess_on_nuclear_lines} residual "
@@ -290,7 +329,7 @@ def _lattice_positions(model, values, ip: int) -> np.ndarray:
     cell = tuple(values[f"phases.{ip}.cell.{key}"]
                  for key in ("a", "b", "c", "alpha", "beta", "gamma"))
     lams = [float(v) for v in model.line_lambdas(values)]
-    lo, hi = _generation_window(model, values)
+    lo, hi = model.generation_window(values)
     if hi <= lo:
         return np.zeros(0)
     ref = lattice_two_theta(
@@ -310,9 +349,92 @@ def _lattice_positions(model, values, ip: int) -> np.ndarray:
     return np.concatenate(out) if out else np.zeros(0)
 
 
+def _centring_forbidden_positions(model, values, ip: int, sg
+                                  ) -> tuple[np.ndarray, np.ndarray]:
+    """(apparent 2θ, hkl) of every integer hkl in range the centring forbids.
+
+    The complement, on the integer grid, of what :func:`_lattice_positions`
+    generates: an hkl failing
+    :func:`~rietx.crystallography.satellites.reciprocal_lattice_mask`.  Empty
+    on a primitive lattice, where every integer hkl is a lattice vector.  The
+    grid has :func:`~rietx.crystallography.satellites.lattice_two_theta`'s
+    bounds, which that call has already held to its size limit; each row of
+    the hkl array pairs with the position at the same index, one row per
+    emission line.
+    """
+    if len(sg.operations().cen_ops) == 1:
+        return np.zeros(0), np.zeros((0, 3), dtype=np.int64)
+    cell = tuple(values[f"phases.{ip}.cell.{key}"]
+                 for key in ("a", "b", "c", "alpha", "beta", "gamma"))
+    lams = [float(v) for v in model.line_lambdas(values)]
+    lo, hi = model.generation_window(values)
+    if hi <= lo:
+        return np.zeros(0), np.zeros((0, 3), dtype=np.int64)
+    # both bounds in the λ_min frame the window is returned in
+    d_min = min(lams) / (2.0 * np.sin(np.radians(hi / 2.0)))
+    d_max = min(lams) / (2.0 * np.sin(np.radians(lo / 2.0)))
+    bounds = [int(np.floor(cell[i] / d_min)) + 1 for i in range(3)]
+    grids = np.meshgrid(*[np.arange(-b, b + 1) for b in bounds], indexing="ij")
+    hkl = np.column_stack([g.ravel() for g in grids]).astype(np.int64)
+    hkl = hkl[~reciprocal_lattice_mask(sg, hkl)]
+    d = d_spacings(hkl, *cell)
+    keep = (d >= d_min * 0.999) & (d <= d_max * 1.001)
+    hkl, d = hkl[keep], d[keep]
+    tts: list[np.ndarray] = []
+    rows: list[np.ndarray] = []
+    for lam in lams:
+        tt = np.asarray(model.apparent_two_theta(
+            np.asarray(two_theta_deg(d, lam), dtype=np.float64), values))
+        good = np.isfinite(tt) & (tt >= model.tt_min) & (tt <= model.tt_max)
+        tts.append(tt[good])
+        rows.append(hkl[good])
+    return np.concatenate(tts), np.concatenate(rows)
+
+
+def _centring_finding(model, values, ip: int, sg, peaks: np.ndarray,
+                      radius: np.ndarray, heights: np.ndarray | None
+                      ) -> _CentringForbidden | None:
+    """The unexplained peaks on centring-forbidden positions, or ``None``.
+
+    ``peaks`` and ``radius`` are the arm's own third list and validity radius,
+    so the test is the satellite test's: a peak within the radius of one.
+    """
+    if len(peaks) == 0:
+        return None
+    tt, hkl = _centring_forbidden_positions(model, values, ip, sg)
+    if len(tt) == 0:
+        return None
+    delta = np.abs(peaks[:, None] - tt[None, :])
+    on = np.min(delta, axis=1) <= radius
+    if not on.any():
+        return None
+    idx = np.flatnonzero(on)
+    pick = (int(idx[np.argmax(heights[idx])]) if heights is not None
+            else int(idx[np.argmin(peaks[idx])]))
+    # the nearest position names it; of several at one d (±h, a cubic
+    # permutation), the largest tuple, so (1 0 0) rather than (0 0 -1)
+    row = delta[pick]
+    near = np.flatnonzero(row <= row.min() + 1e-9)
+    label = max(tuple(int(v) for v in hkl[j]) for j in near)
+    # λ/2 contamination is a nuclear reflection, so the group's whole
+    # reflection condition applies (centring, glides, screws), not the
+    # centring alone: (2 0 0) is extinct on F d -3 m (International Tables
+    # for Crystallography, Vol. A, §2.2.13)
+    half = not sg.operations().is_systematically_absent(
+        [2 * v for v in label])
+    return _CentringForbidden(
+        count=int(on.sum()),
+        n_positions=int(len(np.unique(np.round(tt, 6)))),
+        centring=sg.centring_type(),
+        two_theta=float(peaks[pick]), hkl=label,
+        height=float(heights[pick]) if heights is not None else None,
+        half_order=half)
+
+
 def analyse_satellites(model, values, *, residual_two_theta, ticks,
                        structure=None,
-                       generator=zone_boundary_candidates
+                       generator=zone_boundary_candidates,
+                       residual_height_over_sigma=None,
                        ) -> list[SatelliteEvidence]:
     """Sort the positive residual peaks, then rank the candidate k on the rest.
 
@@ -328,8 +450,22 @@ def analyse_satellites(model, values, *, residual_two_theta, ticks,
     :class:`~rietx.crystallography.satellites.KCandidate`\\ s.  It is validated
     (:func:`~rietx.crystallography.satellites.check_candidate_denominators`)
     rather than trusted, because a caller wrote it.
+
+    ``residual_height_over_sigma``, when given, is Δ/σ at each of
+    ``residual_two_theta`` (same order and length).  It changes no count and no
+    ranking: it only lets the note name the *strongest* unexplained peak on a
+    centring-forbidden position (module docstring) rather than the
+    lowest-angle one.
     """
     all_peaks = np.asarray(residual_two_theta, dtype=np.float64)
+    all_heights = (None if residual_height_over_sigma is None
+                   else np.asarray(residual_height_over_sigma,
+                                   dtype=np.float64))
+    if all_heights is not None and all_heights.shape != all_peaks.shape:
+        raise ValueError(
+            f"residual_height_over_sigma has {all_heights.size} value(s) for "
+            f"{all_peaks.size} residual peak(s); pass one per peak, in the "
+            "same order")
     tick = np.asarray(ticks, dtype=np.float64)
     pos, fwhm = _peak_widths(model, values)
     all_radius = (_radius(all_peaks, pos, fwhm) if len(all_peaks)
@@ -384,6 +520,8 @@ def analyse_satellites(model, values, *, residual_two_theta, ticks,
             generator=getattr(generator, "__name__", str(generator)),
             candidates=scored,
         )
-        evidence.note = _note(evidence)
+        evidence.note = _note(evidence, _centring_finding(
+            model, values, ip, sg, peaks, radius,
+            None if all_heights is None else all_heights[left]))
         out.append(evidence)
     return out

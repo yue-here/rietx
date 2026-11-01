@@ -19,12 +19,24 @@ bank number ``bb`` in columns 5-6.
   (manual p. 182, 222); anything else is refused by name.
 * ``INS bb ICONS`` (3F10.0,10X,F10.0,I5,F10.0) holds DIFC, DIFA, ZERO in µs
   units for a TOF bank and **nothing else**: POLA, IPOLA and KRATIO "are absent
-  for neutron data" (p. 222), so non-blank columns 53-77 are refused.  There is
-  no DIFB field in GSAS-I; ``difb`` is 0.
+  for neutron data" (p. 222).  Absent means blank or zero, which the record's
+  FORTRAN format reads identically: "A field of all blanks is considered to be
+  zero" (ANSI X3.9-1978, FORTRAN 77, §13.5.9 item (1)).  So each of the three
+  is read in its own columns (53-62, 63-67, 68-77) and refused only when it is
+  non-zero or not a number.  A field with blanks between its characters is
+  read as the standard reads it under the default ``BLANK='NULL'`` (blanks
+  ignored, §12.10.1); ``BLANK='ZERO'`` would make those blanks zero digits,
+  which changes a value but never whether it is zero, so the verdict does not
+  depend on a mode the file does not state.  There is no DIFB field in GSAS-I;
+  ``difb`` is 0.
 * ``INS bbBNKPAR`` (5F10.0,2I5) gives DIST and TTHETA; TTHETA is the bank's
   scattering angle 2Θ in degrees and is required (DIFC alone cannot give it
   back), DIST is carried as ``l2_m`` — the field's name is its only
   definition, so that mapping is an inference and is metadata only.
+* ``INS   FPATH1`` — not in the manual's list, written by SNS files — is the
+  primary flight path L₁ in metres, carried as ``l1_m`` on every bank; read
+  as one number, its layout being only observed (:func:`_primary_flight_path`
+  holds the evidence that it is L₁).
 * ``INS bbI ITYP`` (I5,2F10.4,I10) — ITYP, TMIN, TMAX, CHKSUM.  TMIN/TMAX are
   in **milliseconds** (p. 223) and are carried in µs.  CHKSUM's algorithm is
   not published: it is read and never recomputed or checked, and since the
@@ -134,14 +146,12 @@ Every refusal names the file.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from pydantic import ValidationError
 
-from ..model.tof_spectrum import (
-    COEFFICIENT_COUNTS,
-    _unknown_type_message,
-)
+from ..model.tof_spectrum import _coefficient_count
 from ..schemas.common import Diagnostic, Parameter
 from ..schemas.instrument import IncidentSpectrum, Instrument, ProfileTOF, TOFSource
 from .projects.gsas import split_records
@@ -340,6 +350,46 @@ def _htype_refusal(path: Path, htype: str) -> ValueError:
                       f"Manual p. 182, 222)")
 
 
+#: The ICONS fields a neutron bank leaves absent (manual p. 222): POLA and
+#: KRATIO are F10.0, IPOLA is I5.
+_ICONS_ABSENT = tuple(f[:3] for f in _ICONS_FIELDS if f[2] in ("POLA", "IPOLA", "KRATIO"))
+#: FORTRAN 77 input forms, blanks already removed: I editing an optionally
+#: signed integer constant (§13.5.9.1); F editing an optional sign, digits
+#: optionally containing a decimal point, then an optional exponent written
+#: as E or D and an optionally signed integer, or as a signed integer alone
+#: (§13.5.9.2.1).  ``mant`` is the part whose digits decide zero.
+_FORTRAN_I = re.compile(r"[+-]?(?P<mant>\d+)")
+_FORTRAN_F = re.compile(r"[+-]?(?P<mant>\d+\.?\d*|\.\d+)(?:[EeDd][+-]?\d+|[+-]\d+)?")
+
+
+def _require_absent(rec: _Record, a: int, b: int, field: str) -> None:
+    """Refuse an ICONS field a neutron bank must leave absent, unless it is
+    blank or zero (module docstring, ``ICONS``).
+
+    Zero is decided on the mantissa's digits, never on ``float()``, which
+    reads ``1.0E-999`` as 0.0.
+    """
+    raw = rec.cols(a, b)
+    if not raw.strip():
+        return
+    integer = field == "IPOLA"
+    m = (_FORTRAN_I if integer else _FORTRAN_F).fullmatch(raw.replace(" ", ""))
+    if m is None:
+        raise rec.fail(
+            f"{field} in columns {a}-{b} is {raw.strip()!r}, which is not "
+            f"{'an integer' if integer else 'a number'}; POLA, IPOLA and KRATIO "
+            f"are absent for neutron data (GSAS Technical Manual p. 222), and "
+            f"only a blank or zero field says so")
+    if m["mant"].strip("0."):
+        raise rec.fail(
+            f"{field} in columns {a}-{b} is {raw.strip()!r}, which is not zero. "
+            f"POLA, IPOLA and KRATIO are absent for neutron data (GSAS "
+            f"Technical Manual p. 222), so an ICONS record carrying a non-zero "
+            f"one is not the neutron time-of-flight record this reader was "
+            f"told it is. A blank or zero field, which the record's FORTRAN "
+            f"format reads identically, is accepted")
+
+
 def _sequence(path: Path, bank: int, name: str, recs: dict[int, _Record],
               want: int) -> list[str]:
     """The raw E15 fields of records ``name1 … name<want>``, strictly in order."""
@@ -388,9 +438,10 @@ def _spectrum(path: Path, bank: int, ityp_rec: _Record | None,
     tmax = ityp_rec.number(28, 37, "TMAX")
     ityp_rec.integer(38, 47, "CHKSUM")       # read, carried nowhere, never checked
     dropped.append("CHKSUM")
-    if itype not in COEFFICIENT_COUNTS:
-        raise ValueError(f"{path}: bank {bank}: {_unknown_type_message(itype)}")
-    want = COEFFICIENT_COUNTS[itype]
+    try:
+        want = _coefficient_count(itype)
+    except ValueError as exc:
+        raise ValueError(f"{path}: bank {bank}: {exc}") from None
     lo = tmin * 1000.0 if tmin > 0.0 else None
     hi = tmax * 1000.0 if tmax > 0.0 else None
     if want == 0:
@@ -561,6 +612,7 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
     """
     nbank: int | None = None
     htype: str | None = None
+    l1_m: float | None = None
     whole_dropped: list[str] = []
     banks: dict[int, dict] = {}
 
@@ -578,6 +630,11 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
                 nbank = rec.integer(13, 17, "NBANK")
             elif key == "HTYPE":
                 htype = rec.cols(15, 18).strip()
+            elif key == "FPATH1":
+                if l1_m is not None:
+                    raise rec.fail("a second FPATH1 record; the primary flight "
+                                   "path is one number for the whole file")
+                l1_m = _primary_flight_path(rec)
             elif key not in whole_dropped:
                 whole_dropped.append(key)
             continue
@@ -642,12 +699,8 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
         difc = icons.number(13, 22, "DIFC")
         difa = icons.number(23, 32, "DIFA")
         zero = icons.number(33, 42, "ZERO")
-        if icons.cols(53, 77).strip():
-            raise icons.fail(
-                f"columns 53-77 hold {icons.cols(53, 77).strip()!r}; POLA, IPOLA "
-                f"and KRATIO are absent for neutron data (GSAS Technical Manual "
-                f"p. 222), so a neutron-TOF ICONS record carrying them is not "
-                f"the record this reader was told it is")
+        for a, b_, field in _ICONS_ABSENT:
+            _require_absent(icons, a, b_, field)
         if bank["bnkpar"] is None:
             raise ValueError(f"{path}: bank {b} has no BNKPAR record, so its "
                              f"scattering angle is unknown — DIFC alone is one "
@@ -664,7 +717,7 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
         profile = _profile(path, b, bank["prcf"], bank["prcf_c"], diagnostics)
         try:
             source = TOFSource(difc=difc, difa=difa, tzero=zero,
-                               two_theta_bank_deg=ttheta,
+                               two_theta_bank_deg=ttheta, l1_m=l1_m,
                                l2_m=dist if dist > 0.0 else None,
                                profile_tof=profile, incident_spectrum=spectrum)
         except ValidationError as exc:
@@ -678,6 +731,39 @@ def _banks_from_records(path: Path, records: list[tuple[str, str]],
               f"{path.name}: {', '.join(dropped_all)} have no slot in the "
               f"schema and were not carried.", where=dropped_all)
     return out
+
+
+def _primary_flight_path(rec: _Record) -> float:
+    """``INS   FPATH1``: the primary flight path L₁ in metres, for every bank.
+
+    **Not a record the manual lists** (GSAS Technical Manual p. 221-223), so
+    there is no FORTRAN layout to read it at: the layout is the one observed,
+    a single number after the key, and real files place it differently —
+    NOMAD writes ``     19.50`` in columns 13-22, POWGEN ``     60.000000``
+    across 13-26.  So it is read as one token, and anything else on the
+    record is refused rather than guessed between.
+
+    That it is L₁ is established by the files, not by its name alone: SNS
+    NOMAD's own data file states "Primary flight path 19.5m" beside an
+    ``.prm`` writing ``FPATH1 19.50``, and per bank a "Total flight path"
+    equal to 19.5 m plus that bank's ``BNKPAR`` DIST (21.510 m against DIST
+    2.010 on bank 1; five of six banks to the written digit, the sixth to
+    0.02 m).  Metadata, as :attr:`TOFSource.l1_m` says: DIFC is the refined
+    authority on the geometry.
+    """
+    payload = rec.cols(13, 80).split()
+    if len(payload) != 1:
+        raise rec.fail(
+            f"columns 13-80 hold {rec.cols(13, 80).strip()!r}; FPATH1 is one "
+            f"number, the primary flight path in metres")
+    try:
+        value = float(payload[0].replace("D", "E").replace("d", "e"))
+    except ValueError:
+        raise rec.fail(f"FPATH1 is {payload[0]!r}, which is not a number") from None
+    if not value > 0.0:
+        raise rec.fail(f"FPATH1 is {value!r}; a flight path in metres must be "
+                       f"positive")
+    return value
 
 
 # ---------------------------------------------------------------------------

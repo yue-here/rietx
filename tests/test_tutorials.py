@@ -11,27 +11,23 @@ notebook is sized to fit the fast tier.  The executed notebook is never written:
 outputs move with the machine that drew them, and the committed ones are the
 builder's to refresh.
 
-**CI executes them on its newest Python leg alone** (WP-1547).  The other legs
-set `RIETX_TUTORIALS=skip` and skip rather than deselect, so passed+skipped
-agrees across the matrix.  What only the newest Python can break is a
-notebook's own: a cell printing a new DeprecationWarning to stderr, or a kernel
-release lagging the interpreter.  The rietx calls behind each cell run on every
-leg through the rest of the suite.  Syntax newer than the 3.11 floor fails ruff,
-whose target is py311.  A stdlib name newer than 3.11 in a tutorial's own cells
-passes every check, and that is the trade.  The nightly executes them on 3.13,
-on Linux, Windows and macOS.
+**CI executes them on its newest Python leg alone** (WP-1547), with the guide
+scripts and the manual builds: `tests/documentation.py` holds the switch and
+says what that trades.  The nightly executes them on 3.13, on Linux, Windows
+and macOS.
 """
 
 from __future__ import annotations
 
 import html
 import importlib.util
-import os
 import re
 import shutil
 from pathlib import Path
 
 import pytest
+
+from tests import documentation
 
 nbformat = pytest.importorskip("nbformat")
 pytest.importorskip("nbclient")
@@ -80,8 +76,7 @@ def test_there_are_tutorials():
     assert SOURCES, f"no {build.SOURCES} under {TUTORIALS}"
 
 
-@pytest.mark.skipif(os.environ.get("RIETX_TUTORIALS") == "skip",
-                    reason="CI executes the notebooks on its newest Python leg (WP-1547)")
+@documentation.elsewhere
 @pytest.mark.parametrize("path", SOURCES, ids=lambda p: p.stem)
 def test_tutorial_executes_clean(path):
     """No error, no stderr, no home path, and a figure where a cell plots.
@@ -101,8 +96,14 @@ def test_tutorial_executes_clean(path):
     if path.stem == LANDING_TUTORIAL:
         printed = _flat(_printed(nb.cells))
         out = _landing_box()[1]
-        # a diagnostic prints as `warning[CODE]: message` (WP-1985)
-        codes = re.findall(r"\[([A-Z_]+)\]:", out)
+        # a diagnostic printed in full reads `warning[CODE]: message` (WP-1985);
+        # one printed short names the purposes it is a warning under (WP-2037):
+        # `CODE at <paths>: warning under …`, `CODE: warning under …` with no
+        # paths, and `info: CODE at <paths> (warning under …)` under a deliverable.
+        # The panel wraps its lines, so read the codes off the flattened text.
+        codes = [full or short for full, short in re.findall(
+            r"\[([A-Z_]+)\]:|\b([A-Z][A-Z_]+)(?: at [^:()]+)?(?:: | \()warning under",
+            _flat(out))]
         assert codes, "found no diagnostic code in the landing page's output panel"
         quoted = [_flat(out.splitlines()[0]), *codes]  # the status line, then each code
         missing = [code for code in quoted if code not in printed]
@@ -239,6 +240,39 @@ def test_check_sees_a_template_with_outputs(tmp_path):
     cell.outputs = [nbformat.v4.new_output("stream", name="stdout", text="from the example\n")]
     (tmp_path / f"{stem}.ipynb").write_text(nbformat.writes(nb), encoding="utf-8")
     assert build.check(tmp_path) == [f"{stem}.ipynb: a template is committed without outputs"]
+
+
+def test_a_rebuild_names_the_markdown_under_a_changed_output():
+    """A cell whose text output moved is listed with the markdown that
+    describes it; an inserted cell and an unchanged one are not (WP-2039)."""
+    v4 = nbformat.v4
+
+    def nb(*cells):
+        return v4.new_notebook(cells=list(cells))
+
+    def code(source, text, n):
+        out = v4.new_output("execute_result", data={"text/plain": text}, execution_count=n)
+        return v4.new_code_cell(source, outputs=[out], execution_count=n)
+
+    old = nb(code("a", "1", 1), v4.new_markdown_cell("A is one."),
+             code("b", "2", 2), v4.new_markdown_cell("B is two.\nMore."))
+    new = nb(code("z", "0", 1), v4.new_markdown_cell("Z is new."),
+             code("a", "1", 2), v4.new_markdown_cell("A is one."),
+             code("b", "3", 3), v4.new_markdown_cell("B is two.\nMore."))
+    assert build.changed_outputs(old, new) == [
+        "Out[1] 'z': reread 'Z is new.'",
+        "Out[3] 'b': reread 'B is two.'"]
+    assert build.changed_outputs(new, new) == []
+
+
+def test_prose_writes_only_the_markdown(tmp_path):
+    """``--prose`` hands Vale the markdown cells and none of the code."""
+    (tmp_path / "01_x.py").write_text(
+        "# %% [markdown]\n# # Title\n#\n# Some words.\n# %%\nx = 1\n# %% [markdown]\n# More.\n",
+        encoding="utf-8", newline="\n")
+    (written,) = build.prose(tmp_path, tmp_path / "out")
+    assert written.read_text(encoding="utf-8") == "# Title\n\nSome words.\n\nMore.\n"
+
 
 def test_problems_sees_stderr_and_a_home_path():
     v4 = nbformat.v4

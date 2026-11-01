@@ -368,9 +368,10 @@ def test_stage_ftol_reaches_the_solver_and_only_its_own_stage(pattern, monkeypat
 
     ``Stage.ftol`` (WP-1113) is per-stage and beats everything; every other
     intermediate stage takes the plan's schedule
-    (``RefinementPlan.intermediate_ftol``, WP-1123); the last stage takes the
-    runner's default, because it is the one producing the answer.  Quoted from
-    the plan rather than restated, so the assertion survives the number moving.
+    (``RefinementPlan.intermediate_ftol``, WP-1123); the last declared stage
+    and the closing stage take the runner's default, because they produce the
+    answer (WP-2045).  Quoted from the plan rather than restated, so the
+    assertion survives the number moving.
     """
     import rietx as rx
 
@@ -381,10 +382,13 @@ def test_stage_ftol_reaches_the_solver_and_only_its_own_stage(pattern, monkeypat
     refine(pattern, structure, instrument, plan=plan, solver=solver)
 
     assert {c["driver"] for c in calls} == {solver}
-    assert len(calls) == len(plan.stages)
+    assert len(calls) == len(plan.run_stages())     # the closing stage is the last
+    assert len(plan.stages) > 2, "stage 1 must be an intermediate stage"
     assert calls[1]["ftol"] == 1e-4
-    middle = {c["ftol"] for c in calls[:-1] if c["ftol"] != 1e-4}
+    middle = {c["ftol"] for c in calls[:-2] if c["ftol"] != 1e-4}
     assert middle == {plan.intermediate_ftol}
+    # the last declared stage and the closing stage, at the runner's default
+    assert calls[-2]["ftol"] == calls[-1]["ftol"]
     assert calls[-1]["ftol"] not in (1e-4, plan.intermediate_ftol)
 
 
@@ -403,7 +407,7 @@ def test_the_exact_schedule_is_one_field_and_reaches_every_stage(
     refine(pattern, structure, instrument, plan=plan, solver=solver)
 
     assert {c["driver"] for c in calls} == {solver}
-    assert len(calls) == len(plan.stages)
+    assert len(calls) == len(plan.run_stages())     # the closing stage is the last
     assert len({c["ftol"] for c in calls}) == 1
 
 

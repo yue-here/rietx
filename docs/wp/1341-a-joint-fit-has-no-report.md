@@ -1,12 +1,11 @@
 # WP-1341 — a joint fit has no report
 
-Milestone: unscheduled · Status: 🔄 2026-10-13 — every task landed (PR #926, PR-review fixes on `wp1341-review-fixes`); three inherited questions stay open in Context, and the joint fresh compile went to WP-1421
+Milestone: unscheduled · Status: ✅ 2026-10-23 — a joint fit writes events, can be stopped, carries a convergence figure and gets a three-layer report per histogram (PRs #926, #937); what its guards still cannot see went to WP-2028, the fresh compile to WP-1421
 Track: Render what the fit already knows
 Depends on: — (1312 soft: it exercises and audits the joint fit; 1335 soft: the
 report path this one gains should already be cheap; 1344 soft: it sorts each
 diagnostic into per specimen, per histogram or per fit, and decides where a
 per-histogram finding lives, and this report renders that)
-Priority: P2 2026-09-23 — a joint fit cannot be inspected; refining the histograms apart is the workaround
 
 ## Goal
 
@@ -103,84 +102,45 @@ against the tree at e1d19359 on arrival.
   `_unreached_histogram_diagnostics` about what a literal matches. Done when
   a locked or tied literal reports once per path naming its stages, and
   #789's silence cases stay silent. Still true on arrival
-  (`multi.py:255`). It is the task added below.
+  (`multi.py:255`). It is the task added below, landed 2026-10-12.
 - **The joint fit judges support on the screen alone** (from WP-1523,
   2026-10-04). A single fit calls a phase seen when its scale is 3σ from zero
   (`refine._answer_significance`). A joint fit reads only `phase_support`,
   which on issue #481's blank frame reached 3.1-4.4σ once a released cell
   chased the noise. Whether the joint report takes the marginal test, and
   whether histograms combine in quadrature, is open. Still true on arrival
-  (`multi.py:1297`). Not taken this session.
+  (`multi.py:1297`). Not taken here; it went to WP-2028 at the close.
 - **The joint runner runs the scale-B probe** (from WP-1534, 2026-10-04).
   `SCALE_B_INSEPARABLE` fires at top level and `DIAGNOSTIC_SCOPES` lists it
-  as FIT. Nothing is left here but to render it.
+  as FIT. Nothing is left here but to render it, and `report(h)` reads only
+  histogram h's own diagnostics, so that went to WP-2028.
 - **The census of what `multi.py` re-derives is wider than its diagnostics**
   (from WP-1344, 2026-10-01). WP-1344 did not audit the other members that
   re-derive something `Refinement` derives. `_ticks` is the known case. The
   rule WP-1103 settled holds: a declared peak belongs to every histogram that
   sees it. WP-1908 is editing the tick builders in parallel, so the audit is
-  left to a later pass.
+  left to a later pass. WP-1908 closed 2026-10-15; the audit went to
+  WP-2028.
 - **`STAGE_FREED_NOTHING` sits on the top-level diagnostics, one per
   histogram** (from WP-1414, 2026-09-22), `value` the histogram index. A
   report for a joint fit should put it beside the histogram it names.
   `STAGE_PATH_UNKNOWN` also fires on joint fits, with its suggestion naming
   the `mtable` listing, because `MultiHistogramRefinement` has no
-  `parameters()`.
+  `parameters()`. Both went to WP-2028.
 - **`worst_absorption` has an honest empty state** (from WP-1465,
   2026-09-27). `BackgroundEvidence.worst_absorption` is `float | None`, and a
   per-histogram background section built here carries `None` for a histogram
   whose screen found no target. `report/background.py`'s `assess_background`
-  is the builder to reuse.
+  is the builder to reuse, and `report(h)` reaches it through the view's own
+  screen (task 4).
 - **Deleted on arrival:** WP-1434's note that `bound_findings` grew `cos=` and
   `esd=`, which `multi.py` already passes. It is folded into the Context
   bullet above.
-
-### Inherited
-
-- **2026-10-14, from [1325](1325-parametric-series.md): the joint path now
-  carries `vars.` coefficients that drive per-histogram cells, and three
-  joint guards do not see them.**
-  - **What changed underneath.** The joint support hold and its release now
-    read column reach, not a name prefix (WP-1342's rule), and
-    `StageResult.held_reach` is written on joint stages; it was always `{}`
-    before.
-  - **Still open:**
-    1. **The joint `CELL_RUNAWAY`** (`multi._clamp_cell_runaway_multi`) has
-       no twin of the single fit's `_vars_driven_cell_escapes`, so a cell a
-       coefficient drives out of its window is not named.
-    2. **The specimen-level guards read histogram 0's table only**
-       (`_top_diagnostics`). A per-histogram structural path, whether a
-       parametric target or a `SharingMap(per_histogram=["phases.*"])`
-       override, is checked in histogram 0 alone. This predates 1325.
-    3. **A per-pattern hold is in no diagnostic.** 1325 fixed the hold
-       itself on 2026-10-14 (`multi._unseen`): each entry a column reaches
-       is judged in its own histogram, so a per-histogram cell is held where
-       its own pattern cannot see the phase. The hold is on
-       `StageResult.held`. `PHASE_UNCONSTRAINED` still names only a phase
-       that no histogram sees, so nothing says "held in 12 of 33 patterns".
-    4. **The joint path does not read WP-1523's answer significance**, by
-       design (the comment in `multi._joint_unsupported_phases` leaves it to
-       this WP). On 1325's ZrMo₂O₈ ramp the chain held a fading phase in two
-       of 33 patterns by that test, and the joint fit left the same 14
-       columns free. Whether a joint report adopts it is this WP's decision.
-  - **A new joint diagnostic is in.** `PARAMETRIC_OUT_OF_RANGE`, in
-    `DIAGNOSTIC_SCOPES` as FIT, warns when unbounded coefficients put a
-    target outside its own window. A joint report should render it beside
-    `RefinementResult.parametric`.
-  - **And a second, later on 2026-10-14.** `PARAMETRIC_FORM_REJECTED` (FIT)
-    and `RefinementResult.parametric_form` carry a score test of each
-    declared form. It leaves out the patterns `multi._unseen` holds, so
-    item 4's decision also changes which patterns the form test can see.
-  - **And three more on 2026-10-14 (1325's seventh session, PR #977).**
-    `PARAMETRIC_TARGET_UNSEEN` (FIT) names, per law, the patterns whose
-    phase is unseen where the law sets the target: item 3's per-pattern
-    statement, for parametric targets only. It is top-level, so
-    `for_histogram(h)` does not carry it; the view's rows do carry
-    `RefinedParameter.laws`. Each `ParametricFormTest` now has two
-    readings (`tied`, `others_freed`), and `RefinementResult.parametric_laws`
-    with `parametric_value` evaluates a law anywhere. A joint report placing
-    the warning per pattern, or quoting the law's value beside a row, reads
-    these.
+- **After the work landed (2026-10-14 to -20).** WP-1325 made the joint
+  support hold judge each entry a column reaches in its own histogram, and
+  joint stages now write `StageResult.held_reach`. WP-1986 found that
+  `for_histogram(h)` drops `tick_hkl` and `phase_agreement`. What either
+  leaves open is WP-2028's.
 
 ## Non-goals
 
@@ -258,6 +218,38 @@ stated reason it cannot, and reports what the WP decided it reports.
 - WP-1016 (per-member events in a series), WP-1131 (what a joint fit shares).
 
 ## Handover log
+
+### 2026-10-23 — closed: a joint fit can be watched, stopped and reported
+
+A joint refinement is no longer silent about itself. It writes an event log
+and a run directory, a cancel stops it between evaluations, its result carries
+`max_shift_over_esd`, each histogram gets the Layer 0-2 report a single fit
+gets, and a joint plan naming a fixed literal says so. What it still cannot do
+is let every guard see every histogram, and that is now WP-2028's. The
+maintainer decided the close today, which discharges "closing waits on the
+maintainer".
+
+**Closed on.** All seven tasks landed by 2026-10-13: PR #926 (merged at
+`a3987d6a`) and its review fixes, PR #937. Issues #252 and #803 closed that
+day and #245 has its line. The acceptance files re-run on this tree
+(`test_multi_histogram.py`, `test_events_viz_history.py`,
+`test_joint_report.py`; worktree venv, Linux x86_64): 75 passed.
+
+**Inherited, each placed.** 1986's view gap is still true (`for_histogram`
+copies `ticks` but not `tick_hkl` or `phase_agreement`,
+`schemas/results.py:1821`) and is a 2028 task. 2001/2004's rule for a gate
+added here goes to 2028's Context, since this WP added none; 2004's fence and
+1335's Non-goals line get notes naming 2028. 1325's four open items and its notes on the three
+`PARAMETRIC_*` codes go to 2028, spelled as the tree now spells them
+(`parametric_equations`, `RefinedParameter.equations`); its "what changed
+underneath" is one Context sentence. § What later work changed stays, each
+bullet saying where it went.
+
+*Next.* Nothing owed here. The three open questions and 1325's items are
+WP-2028's. The fresh compile went to WP-1421 on 2026-10-12 (open; its
+Inherited carries it). WP-1908 closed 2026-10-15, so the census is unblocked.
+`Refinement.report`'s live-table read (PR-review item 9 below) went to WP-1421's Inherited.
+The four `multi.py` comments naming WP-1341 as owner are a 2028 task. 1325 is told.
 
 ### 2026-10-13 — six tasks landed: events, a convergence figure, a report per histogram, and #803
 

@@ -146,7 +146,7 @@ def test_the_citation_records_quote_the_current_name():
     cff = (ROOT / "CITATION.cff").read_text(encoding="utf-8")
     assert re.search(rf"^title: {re.escape(DIST_NAME)}\s*$", cff, re.MULTILINE), (
         "CITATION.cff's title is not the distribution name")
-    bib = (ROOT / "docs" / "manual" / "references.bib").read_text(encoding="utf-8")
+    bib = (ROOT / "docs" / "docs" / "references.bib").read_text(encoding="utf-8")
     entry = re.search(r"@software\{.*?\n\}", bib, re.DOTALL)
     assert entry is not None, "references.bib has no @software entry"
     assert DIST_NAME in entry.group(0), (

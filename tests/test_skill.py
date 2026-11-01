@@ -665,7 +665,11 @@ def test_every_technique_field_is_a_field_and_deferred():
     """`make_api_index.TECHNIQUE_FIELDS` keeps a technique's fields out of
     `api.md` (WP-1805).  Each name must be a live field of its model, or a
     rename leaves a dead skip behind, and each must be deferred from the
-    manual too, since nothing documents it until its technique index lands."""
+    manual too, since nothing documents it until its technique index lands,
+    unless the manual already names it (`Phase.distortion_modes`, which the
+    reference documents while `api-magnetic.md` carries its verb): the
+    partition test then holds it, and deferring it as well would grow the
+    bucket past its ceiling for a name that is documented."""
     import rietx as rx
 
     deferred = set((ROOT / "tests" / "api_surface_deferred.txt")
@@ -676,7 +680,11 @@ def test_every_technique_field_is_a_field_and_deferred():
         cls = getattr(rx, dotted[len("rx."):])
         for name in names:
             assert name in cls.model_fields, (dotted, name)
-            assert f"{cls.__name__}.{name}" in deferred, (dotted, name)
+            dotted_name = f"{cls.__name__}.{name}"
+            assert dotted_name in deferred or any(
+                dotted_name in md.read_text(encoding="utf-8")
+                for md in (ROOT / "docs" / "docs" / "reference").glob("*.md")
+            ), (dotted, name)
             assert f"`{name}:" not in API_INDEX.read_text(encoding="utf-8").split(
                 f"- `{dotted}`")[1].split("\n- ")[0], (dotted, name)
 
@@ -684,17 +692,20 @@ def test_every_technique_field_is_a_field_and_deferred():
 def test_every_technique_member_is_a_deferred_name():
     """`make_api_index.TECHNIQUE_MEMBERS` elides a technique's union members
     from `api.md` (WP-1809); each must be a live export and deferred from the
-    manual, and absent from the rendered index."""
+    manual (deferred, or documented in a Part 1 chapter once the deferred
+    ceiling is full), and absent from the rendered index."""
     import rietx as rx
+    from tests.test_manual_api import documented_names
 
     deferred = set((ROOT / "tests" / "api_surface_deferred.txt")
                    .read_text(encoding="utf-8").split())
+    documented = documented_names()
     members = _generator().TECHNIQUE_MEMBERS
     assert members
     text = API_INDEX.read_text(encoding="utf-8")
     for name in members:
         assert hasattr(rx, name), name
-        assert name in deferred, name
+        assert name in deferred or name in documented, name
         assert name not in text, name
 
 
@@ -932,8 +943,8 @@ def test_the_dotted_walk_visits_the_tree_and_fails_a_broken_name():
 # GFM splits a table row on every unescaped `|`, code spans included, so
 # `scale × |F|² × profile` in a cell opens a span the cell never closes and
 # the backticks print literally.  The manual's HTML scan caught that one only
-# because `using/skill.md` includes the body whole; no reference file reaches
-# that build.  So the check runs on the Markdown: split each table row where
+# because the old tree's `using/skill.md` included the body whole; the manual
+# renders neither the body nor a reference file now.  So the check runs on the Markdown: split each table row where
 # GFM does, and require every code span to close inside its own cell.
 
 _UNESCAPED_PIPE = re.compile(r"(?<!\\)\|")

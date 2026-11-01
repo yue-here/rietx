@@ -587,10 +587,9 @@ def permutation_representation(space_group, site_xyz, k) -> PermutationRepresent
 def _phases(numerators: np.ndarray, denominator: int) -> np.ndarray:
     """exp(2πi·n/d) elementwise, exact where the quarter turns make it so.
 
-    Every zone-boundary k — the whole set where the factor system is
-    projective — gives n/d in {0, ¼, ½, ¾}, and those four are written down
-    rather than evaluated so that a phase which must be ±1 or ±i is, bit for
-    bit.  Everything else goes through ``exp``.
+    Every k with components in {0, ½} gives n/d in {0, ¼, ½, ¾}, and those
+    four are written down rather than evaluated so that a phase which must be
+    ±1 or ±i is, bit for bit.  Everything else goes through ``exp``.
     """
     out = np.exp(2j * np.pi * numerators / denominator)
     for turn, value in ((Fraction(0), 1 + 0j), (Fraction(1, 4), 1j),

@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+import functools
+from dataclasses import dataclass
 from typing import Any, ClassVar, Literal
 
 import numpy as np
 from pydantic import Field, model_validator
 
 from .._about import DIST_NAME
+from ..purposes import PURPOSES
 from .common import Base, Diagnostic, Mode, Provenance
+from .interval import ParameterInterval
 from .parametric import (
     ParametricCoefficient,
     ParametricFormReading,
@@ -16,7 +20,7 @@ from .parametric import (
     ParametricValue,
     RefinedParametricEquation,
 )
-from .pattern import _floor_sigma
+from .pattern import POISSON_FLOOR_COUNTS, _floor_sigma
 
 
 class RefinedParameter(Base):
@@ -78,14 +82,45 @@ class RefinedParameter(Base):
     recorded it: a hand-built row, or a result written before schema 0.57,
     when 1.9.0's parametric fits already carried equation-set rows that an empty
     list would have called measured.
+
+    **``interval`` is the profile interval of a moment angle the fit left out
+    of its covariance** (WP-2002, B2).  The stationary-angle test
+    (``StageResult.moment_angle_tests``, WP-1929) takes such an angle's column
+    out, so its ``stderr`` stays ``None``.  The data still determine the angle
+    through curvature, so the fit computes its 95 % profile interval
+    (:class:`~rietx.schemas.interval.ParameterInterval`, the answer
+    ``Refinement.profile_interval`` returns) and stores it here.  One writer:
+    ``parameter_interval.attach_stationary_intervals``, which ``fit`` and
+    ``run_stage`` call for every angle the answer-producing stage left out.
+    ``None`` says no interval was computed: any other row, a joint fit (which
+    has no profile verb), a package-internal trial, a fit cancelled while its
+    intervals ran, or a result stored before the field.
+
+    **``stderr_uncorrected`` is the esd other programs print** (WP-2002, B4).
+    ``stderr`` carries the Bérar-Lelann factor f for serially correlated
+    residuals (``optimize.statistics.berar_lelann_factor``); this is the same
+    esd without it, √(χ²_red·(JᵀJ)⁻¹) carried to the row, which is what
+    GSAS-II and FullProf report.  It is ``stderr`` divided by the f the solve
+    multiplied it by (``LSQOutcome.esd_inflation``), so one fit's rows share
+    one ratio and the identity is exact to rounding.  That f is measured on
+    the solve's own last residual, and :attr:`Statistics.esd_inflation`
+    re-measures it at the result's compile: on 11-BM NAC the two differ by
+    0.07 % (Rietveld) and 0.75 % (Le Bail), and by 4 % on a joint fit
+    weighted 1:4.  So ``stderr / Statistics.esd_inflation`` is close to this
+    and not equal to it.  Two writers, each beside ``stderr``:
+    ``refine._build_result`` and ``MultiHistogramRefinement._parameters``; a
+    series copies its fits' rows.  ``None`` wherever ``stderr`` is, and on a
+    result stored before the field.
     """
 
     path: str
     value: float
     stderr: float | None = None
+    stderr_uncorrected: float | None = None
     vary: bool = True
     at_bound: bool | None = None
     equations: list[str] | None = None
+    interval: ParameterInterval | None = None
 
     def __str__(self) -> str:
         """``path  value(esd)  state`` on one line, so a list of rows reads as
@@ -113,7 +148,12 @@ class Statistics(Base):
     neighbours (``optimize.statistics.berar_lelann_factor``), so a value near
     that is no evidence of correlation; lab data with unmodelled profile
     detail lands near 2-3 (1.93 on the FAP tutorial fit, 2.82 on SRM 660c).
-    Divide it out for raw χ²·(JᵀJ)⁻¹ esds.
+    It is measured on the residual at the values this result reports, while
+    the esds carry the factor the solve measured on its own last residual,
+    so the two can differ slightly (WP-2002, B4, measured on 11-BM NAC:
+    0.07 % on a Rietveld fit, 0.75 % on a Le Bail fit, 4 % on a joint fit
+    weighted 1:4).  The raw χ²·(JᵀJ)⁻¹ esd of a row is
+    :attr:`RefinedParameter.stderr_uncorrected`.
 
     ``max_shift_over_esd`` is McCusker et al. (1999) §7's convergence
     quantity: the largest |Δθᵢ|/esd(θᵢ) over the final accepted step of the
@@ -199,11 +239,15 @@ class DataSupport(Base):
     reflections at one 2θ are one observation.
 
     ``n_structural_parameters`` counts the free parameters §9 is about — the
-    atomic ones (coordinate DOFs, occupancies, Biso, ADP DOFs), matched as
-    ``phases.*.atoms.*``.  Cell, zero, profile, background, scale, preferred
-    orientation and extinction are excluded: they are determined by peak
-    positions and shape rather than by the integrated intensities being
-    counted here.  The complement is
+    ones that move an atom (coordinate DOFs, occupancies, Biso, ADP DOFs).
+    A free parameter counts when it is an atom entry (``phases.*.atoms.*``)
+    or reaches one: a mode amplitude, a named variable ``vars.X`` tied to an
+    atom entry, a rigid body's origin, rotation and twists (WP-2067,
+    :func:`~rietx.optimize.statistics.structural_free_paths`).  Cell, zero,
+    profile, background, scale, preferred orientation and extinction are
+    excluded: they are determined by peak positions and shape rather than by
+    the integrated intensities being counted here, and the cell stays out
+    when a rigid body reads it to place its atoms.  The complement is
     ``Statistics.n_free_parameters − n_structural_parameters`` — not repeated
     as a field, because that count already has an authority.
 
@@ -397,10 +441,16 @@ class PhaseQuantity(Base):
     fine/medium powder regime µ·D ≤ 0.1 (D = 2R), i.e. µ·R ≤ 0.05 — beyond
     that the number travels with the answer so the fence diagnostic can point
     at it.
+
+    ``weight_fraction`` is ``None`` for a phase with no reflection in the
+    fitted range (WP-1958): its scale is the value handed in, so a number read
+    off it would be the caller's start.  Absent rather than zero, the rule its
+    esd already followed; :attr:`QuantitativePhaseAnalysis.unmeasured_phases`
+    names it.
     """
 
     name: str                                       # matches Phase.name / ticks key
-    weight_fraction: float                          # W, renormalised to sum to 1
+    weight_fraction: float | None                   # W over the measured phases; None: unmeasured (WP-1958)
     weight_fraction_stderr: float | None = None     # σ(W); None if scale esds absent
     scale: float                                    # S (refined phases.{i}.scale)
     z: int | None = None                            # formula units per cell (display)
@@ -507,11 +557,25 @@ class QuantitativePhaseAnalysis(Base):
     **crystalline** content.  An unmodelled amorphous fraction or a missing
     phase still makes them sum to 1.  Internal-standard / amorphous
     quantification is fenced to v2.
+
+    ``unmeasured_phases`` (WP-1958): the phases with no reflection in the
+    fitted range.  Each has no fraction, and the others sum to 1 over the
+    phases seen in range, so they are relative to those, not to the modelled
+    content; a specimen known to hold the unmeasured phase has no absolute
+    fractions from this range.  Empty when every phase was seen.
+    ``unmeasured_held`` says which of them a stage held with a line now in range.
     """
 
     phases: list[PhaseQuantity]
     method: Literal["zmv"] = "zmv"
     crystalline_only: bool = True
+    unmeasured_phases: list[str] = Field(default_factory=list)
+    #: the subset of ``unmeasured_phases`` left out because a stage **held**
+    #: the scale (a refined zero shift can bring a line into range after the
+    #: stage's compile), not because the answer has no line; the rest have
+    #: none.  The two read differently to a caller: widening the range helps
+    #: only the second (#1103).
+    unmeasured_held: list[str] = Field(default_factory=list)
 
     # Brindley microabsorption: the mixture-level record when the correction
     # ran, or the reason it was skipped when radii were supplied but the
@@ -585,12 +649,15 @@ class RestraintRow(Base):
     ``deviation_over_sigma`` is the headline: a restraint fighting the data
     shows up as |deviation/σ| ≫ 1 (and, past a threshold, a ``RESTRAINT_TENSION``
     diagnostic).  ``atoms`` (bond/angle) or ``path`` (value) names the target;
-    exactly one is set.
+    exactly one is set.  A planarity restraint gives one row per atom: its
+    signed distance to the plane (target 0), ``atoms`` listing that atom first
+    and then the rest of the plane in restraint order.
     """
 
     phase_index: int | None = None
-    kind: Literal["bond", "angle", "value", "tether", "anti_bump"]
-    atoms: list[int] | None = None                  # bond (2) / angle (3) indices
+    kind: Literal["bond", "angle", "value", "tether", "anti_bump", "planarity",
+                  "torsion"]
+    atoms: list[int] | None = None                  # bond (2) / angle (3) / torsion (4) indices
     path: str | None = None                         # value-restraint dot-path
     computed: float                                 # Å (bond), deg (angle), or value
     target: float
@@ -619,6 +686,11 @@ class RestraintReport(Base):
     restraint_chi2: float
     n_restraints: int
     weight_scale: float = 1.0
+
+
+#: An atom named in a :class:`GeometryRequest` entry: its label, or its label
+#: and the CIF ``n_klm`` code of the image wanted (WP-1815).
+AtomRef = str | tuple[str, str]
 
 
 class GeometryDistance(Base):
@@ -696,6 +768,67 @@ class GeometryAngle(Base):
     symmetry_3: str | None = "."
 
 
+class GeometryTorsion(Base):
+    """One torsion angle A–B–C–D, in degrees (WP-1815).
+
+    Klyne and Prelog's sign (1960, *Experientia* 16, 521), as cif_core's
+    ``_geom_torsion.angle`` states it: looking along B → C, the angle is
+    positive when the bond B–A turns clockwise, by less than 180°, to eclipse
+    C–D.  The range is (−180°, 180°], so an anti chain reads 180, never −180.
+    Each atom carries the CIF ``n_klm`` code of its image (``None`` past
+    :data:`~rietx.model.geometry.SYMMETRY_CODE_MAX_SHIFT`), and indices into
+    ``structure.phases[phase_index].atoms`` as :class:`GeometryDistance`
+    does.
+
+    esd conventions are :class:`GeometryDistance`'s exactly: ``stderr`` is
+    J·Cov·Jᵀ through the whole covariance with ∂φ/∂p analytic through atan2,
+    exact at 0° and 180°; ``stderr_diagonal`` drops the refined parameters'
+    correlations; both are ``None`` where nothing the angle depends on was
+    refined, where symmetry or a rigid body's template holds it fixed (its
+    variance cancels to roundoff), where a source measured nothing, or where
+    no covariance was estimated.
+    """
+
+    phase_index: int
+    atom_1: str
+    atom_2: str
+    atom_3: str
+    atom_4: str
+    atom_index_1: int
+    atom_index_2: int
+    atom_index_3: int
+    atom_index_4: int
+    angle: float                      # degrees, (−180, 180]
+    stderr: float | None = None
+    stderr_diagonal: float | None = None
+    symmetry_1: str | None = "."
+    symmetry_2: str | None = "."
+    symmetry_3: str | None = "."
+    symmetry_4: str | None = "."
+
+
+class GeometryRequest(Base):
+    """Particular distances, angles and torsions to measure (WP-1815).
+
+    The input of :meth:`~rietx.Refinement.geometry`.  Each entry names its
+    atoms in chain order, by label (``"C1"``) or by label and CIF symmetry
+    code (``("C1", "2_655")``, an operation of the space group's listed order
+    and a lattice shift, as :class:`GeometryDistance` codes its images).  An
+    atom given by label alone sits at the image nearest the atom it is
+    measured from, which is the chain's previous atom for a distance or a
+    torsion and the vertex for an angle's two arms.  The first atom of a
+    distance or a torsion and the vertex of an angle sit where they are
+    stored unless a code is given.  ``phase_index`` says which phase the
+    labels belong to.
+    """
+
+    phase_index: int = 0
+    distances: list[tuple[AtomRef, AtomRef]] = Field(default_factory=list)
+    angles: list[tuple[AtomRef, AtomRef, AtomRef]] = Field(default_factory=list)
+    torsions: list[tuple[AtomRef, AtomRef, AtomRef, AtomRef]] = Field(
+        default_factory=list)
+
+
 class CellVolume(Base):
     """One phase's unit-cell volume in Å³, with its esd (WP-1933).
 
@@ -714,6 +847,59 @@ class CellVolume(Base):
     stderr_diagonal: float | None = None
 
 
+class DistortionTotal(Base):
+    """One irrep block of a child refined on its mode amplitudes, at fit close (WP-1419).
+
+    A block is every mode of ``Phase.distortion_modes`` sharing one ``(irrep,
+    k, isotropy_group)``, over all parent sites: fixed by symmetry before the
+    fit, never found from the data (#286, 2026-09-16).  ``modes`` are the
+    block's indices in ``Phase.distortion_modes.modes`` and ``n_modes`` their
+    count, m.  ``a_tau`` is the block's amplitude, the norm √(Σ A_ν²) of its
+    mode amplitudes in Å, the AMPLIMODES unit the record is normalised in, so
+    it does not depend on the basis inside the block (Perez-Mato, Orobengoa &
+    Aroyo 2010, *Acta Cryst.* A**66**, 558, eqs. 5–7).
+
+    ``esd`` is a_tau's esd from the block's own covariance, √(c·Cov·cᵀ) with
+    c = A/a_tau, through the same covariance every reported esd comes from
+    (Bérar–Lelann factor included, applied once).  ``esd_label`` says what it
+    is, on every block whatever its size: a linearised esd of a norm is
+    undefined at a_tau = 0 and biased up (the Rice distribution's) below about
+    2 esd.  ``t2`` is Hotelling's T² = Aᵀ·Cov⁻¹·A over the block's amplitudes,
+    with m beside it and no p: χ² is even in a symmetry-breaking amplitude, so
+    where the block's truth may be zero T² ≈ 4 × the likelihood ratio and a
+    χ²_m p is wrong exactly there (``rietx.help``).  ``esd`` and ``t2`` are
+    ``None`` where the fit measured no covariance (no free amplitude in the
+    block, a column the data cannot see, a singular block, or ``esd`` at
+    a_tau = 0).
+
+    ``driving`` says a generic displacement inside this block alone has
+    exactly the child's group (``None`` where the record's parent operations
+    do not map its reference structure onto itself, so the action the answer
+    is read from cannot be built), the block's isotropy group being the child's
+    own (Perez-Mato 2010 p. 561, primary and secondary); LaMnO₃'s Pnma has no
+    such block, its R4+ and M3+ being needed together.  ``sign_convention``
+    states which sign the amplitudes carry, and ``largest_displacement`` is the
+    largest atomic displacement this block's amplitudes put on any atom of
+    the child, in Å in the record's reference metric (ISODISPLACE's figure).
+    No verdict, threshold or correlation field: the block's comparison is
+    ``Refinement.distortion_block_tests``.
+    """
+
+    phase: int
+    irrep: str
+    k: tuple[str, str, str]
+    isotropy_group: str
+    modes: list[int]
+    n_modes: int
+    a_tau: float
+    esd: float | None = None
+    esd_label: str
+    t2: float | None = None
+    driving: bool | None
+    sign_convention: str
+    largest_displacement: float
+
+
 class GeometryTable(Base):
     """Bonding geometry of the converged model, with propagated esds (WP-1072).
 
@@ -728,16 +914,26 @@ class GeometryTable(Base):
     Present for Rietveld fits with atoms; ``None`` in Le Bail and Pawley mode,
     where the dummy atom the mode requires is not a structure.  ``notes``
     records every place coverage was bounded — a per-atom contact cap, a phase
-    too large to search — because a table that silently stopped early reads
+    too large to search, a torsion cap, a chain with a straight bond angle
+    and so no torsion — because a table that silently stopped early reads
     exactly like one that found nothing more.
+
+    ``torsions`` (WP-1815) lists every torsion A–B–C–D over bonded chains
+    (A–B, B–C and C–D each a bond of this table), once per chain and not
+    again reversed, up to :data:`~rietx.model.geometry.MAX_TORSIONS_PER_ATOM`
+    about each asymmetric-unit atom.  The central bond's first atom B sits at its published
+    position.  ``None`` means the listing never ran (an older document carries
+    no ``torsions`` key); ``[]`` means it ran and found no torsion, as for a
+    structure with no chain of three bonds.
     """
 
     distances: list[GeometryDistance] = Field(default_factory=list)
     angles: list[GeometryAngle] = Field(default_factory=list)
+    torsions: list[GeometryTorsion] | None = None
     #: the listing criteria actually used, so a row can be read without
     #: knowing which version of the module produced it
     bond_slack: float = 0.0           # Å, added to the covalent-radius sum
-    contact_max: float = 0.0          # Å, the nonbonding search radius
+    contact_max: float = 0.0          # Å, the nonbonding listing radius; bonds are not bounded by it
     notes: list[str] = Field(default_factory=list)
 
     @property
@@ -859,18 +1055,6 @@ class PhaseMicrostructure(Base):
         body = table_text(MICROSTRUCTURE_HEADER, rows, "  ") if rows else []
         return "\n".join([head, *body, *("  " + line for line in tail)])
 
-    def _repr_html_(self) -> str:
-        """The terms as a table between the head line and the verdict lines."""
-        from .._display import (
-            MICROSTRUCTURE_HEADER,
-            microstructure_sections,
-            pre_html,
-            table_html,
-        )
-        head, rows, tail = microstructure_sections(self)
-        table = table_html(MICROSTRUCTURE_HEADER, rows) if rows else ""
-        return pre_html(head) + table + pre_html("\n".join(tail))
-
 
 class MomentAngleTest(Base):
     """One round of the stationary-angle test on a stage's covariance (WP-1929).
@@ -887,7 +1071,9 @@ class MomentAngleTest(Base):
     χ²_red·f².  The angles pass when it is at most ``cut``, the 95 % point of
     the χ̄² mixture for ``len(paths)`` one-sided directions (Self & Liang,
     1987; Shapiro, 1985).  Their columns then leave the covariance, so each
-    has no esd, and their values stand.
+    has no esd, and their values stand.  On a single fit each such angle's
+    row carries its profile interval instead (``RefinedParameter.interval``,
+    WP-2002).
 
     ``paths`` are free columns.  A caller's ``vars.X`` driving only moment
     angles is one of them.  The angles it drives share its verdict.
@@ -926,7 +1112,9 @@ class StageResult(Base):
     an exhaustive match handled a branch that could not occur and a reader of
     the type inferred a skip mechanism the package does not have.  A stage a
     plan does not run produces no ``StageResult`` at all, which is the honest
-    way to say the same thing.
+    way to say the same thing.  A solve stopped on a model that is not finite
+    is one more way to reach ``"diverged"``, never a fourth word: its stage
+    ends at its start and ``STAGE_NOT_FINITE`` says so (WP-2048).
     """
 
     name: str
@@ -939,14 +1127,43 @@ class StageResult(Base):
     cost_final: float
     freed: list[str] = Field(default_factory=list)
     #: the relative cost-decrease tolerance this stage actually stopped at, or
-    #: ``None`` for the solver default (1e-9) — which is what the answer-
-    #: producing last stage takes, and what every stage of every fit before
+    #: ``None`` for the solver default (1e-9) — which is what the last
+    #: declared stage and the closing stage take, and what every stage of every fit before
     #: WP-1123 took.  Recorded because it is otherwise unrecoverable from a
     #: result: the plan's schedule (``RefinementPlan.intermediate_ftol``) and a
     #: stage's own ``Stage.ftol`` both land here, and a consumer comparing two
     #: fits' parameter shifts needs to know whether they were converged the
     #: same way.
     ftol: float | None = None
+    #: the fraction of each peak's area this stage's windows dropped, or
+    #: ``None`` for ``forward.WINDOW_AREA_TOL`` — what every declared stage
+    #: takes.  A plan's closing stage runs at ``closing_window_tol`` (WP-2002,
+    #: the sixth round's Q1 and Q2), a stage run by hand at the fraction it
+    #: ran at, and the result's curves and statistics are measured at the last
+    #: stage's.  So a reader rebuilding the model from
+    #: ``RefinementResult.parameters`` passes
+    #: ``forward.recorded_window_tol(this)`` to ``compile_model`` to reproduce
+    #: them, ``compile_model``'s own default being the closing stage's
+    #: fraction: the 2 % and 0.1 % windows of one answer differ by up to 0.6 %
+    #: in χ².
+    window_area_tol: float | None = None
+    #: the share of the Bragg intensity this stage's frozen windows dropped at
+    #: its answer, against windows sized there (``forward.window_loss``,
+    #: WP-2047).  Windows are sized when a stage compiles, so a peak that moves
+    #: or broadens during the solve spills past them, and the stage may have
+    #: fitted that loss rather than the data.  Negative where the peaks
+    #: narrowed.  Past ``recorded_window_tol(window_area_tol)`` the frozen
+    #: windows drop more than the compile allows each peak, and
+    #: ``STAGE_WINDOWS_STALE`` reports the stage when its answer reaches the
+    #: result (the last stage, and the one before a closing stage); an
+    #: earlier stage is refitted by every later one.  At most 1.73 % at the 2 %
+    #: tolerance on the four acceptance protocols, and 73 % on the QPA
+    #: round-robin chain's runaway before WP-2045.
+    #:
+    #: ``None`` means nobody looked: a result stored before the field, or a
+    #: stage with no Bragg intensity to compare.  Writers: the three runners
+    #: that build a ``StageResult``.
+    window_loss: float | None = None
     #: steps the bounded-LM driver held on a linear-inequality constraint (the
     #: Stephens strain cone, or the Γ_G² floor of WP-1938 D7) during this
     #: stage: the step for the box alone crossed a row, and the step solved
@@ -969,6 +1186,14 @@ class StageResult(Base):
     #: bumped with this change, ``SCHEMA_VERSION`` 0.19 → 0.20 (see the
     #: changelog entry in ``schemas/common.py``).
     n_degenerate_cell_probes: int = 0
+    #: decompositions this stage's solve and esds repeated with LAPACK's
+    #: QR-iteration driver because the divide-and-conquer driver stopped
+    #: without converging (``optimize.lapack``): the same decomposition by
+    #: another route, so the answer is the one a converging build computes.
+    #: Met on macOS's system LAPACK, whose ``gesdd`` failed on a TRF step on
+    #: CPD brucite that OpenBLAS's decomposed (WP-2002).  0 means no
+    #: decomposition needed it.
+    n_lapack_fallbacks: int = 0
     #: paths this stage **held** although the plan had freed them: the
     #: structural parameters of a phase the data could not see at stage start
     #: (the screen ``CompiledModel.phase_support`` below
@@ -979,8 +1204,11 @@ class StageResult(Base):
     #: (WP-1301).  Disjoint from :attr:`freed` by construction — a held path is
     #: dropped from it — so the two together say exactly what refined.  Empty
     #: on every fit with no unsupported phase, which is every fit that is
-    #: working; the phase's own ``scale`` is never held, because that is how a
-    #: phase legitimately climbs out of the noise.
+    #: working; the phase's own ``scale`` is never held on its significance,
+    #: because that is how a phase legitimately climbs out of the noise — except
+    #: a phase with no reflection in the fitted range, whose scale column is
+    #: zero at every value and is held too (WP-1958), at any
+    #: ``phase_support_sigma``.
     #: Since WP-1342 these are **columns**, not names: a caller's ``vars.X``
     #: driving that cell is what stopped moving, and a path under
     #: ``phases.{ip}.`` need not appear here at all.  What each held column
@@ -1021,6 +1249,34 @@ class StageResult(Base):
     #: Both single-histogram runners write a mapping on every stage, so an
     #: empty one is a stage that looked and held nothing on this test.
     scale_b_held: dict[int, float] | None = None
+    #: per instrument width column this stage **held** because free specimen
+    #: widths have its angular dependence (WP-2002), the specimen columns it
+    #: pairs with: U with ``gauss_strain`` and ``gauss_size`` (tan²θ in Γ_G²;
+    #: the size's 1/cos²θ is 1 + tan²θ, so it is flat with U and W together,
+    #: and W, the constant width, is never held), X with ``lor_size`` (1/cosθ in
+    #: Γ_L), Y with ``lor_strain`` (tanθ in Γ_L).  The data see each
+    #: angular term only as a total, so with both sides free it walks along a
+    #: flat direction.  The instrument side is held at the value the stage
+    #: started from, which is how every program that separates the two does
+    #: it, by fixing the instrument from a standard (``docs/practice.md``), and
+    #: the specimen value is then the width the instrument does not account
+    #: for.  Where the instrument value was fitted on this specimen instead,
+    #: it carries that stage's split.  The held columns are in :attr:`held` too.
+    #:
+    #: Held where the null space of the totals is not empty
+    #: (``refine._width_twin_flats``): one seen phase whose specimen width is
+    #: held pins the instrument term for every phase, and nothing is held.
+    #: One pair is held by rule instead: a free Stephens block locks
+    #: ``lor_strain`` and takes its place as Y's twin, flat exactly at its
+    #: isotropic seed and near it after, so Y is listed here with the block's
+    #: columns; a held block pins Y like a held ``lor_strain``.  The test reads
+    #: no bound, so a specimen width that ends on its floor of 0 stays paired
+    #: with a held instrument term.  Asked at stage start and again before a
+    #: second solve, never released inside the stage.
+    #:
+    #: ``None`` means a result stored before the field.  Every runner writes a
+    #: mapping, and an empty one is a stage that held nothing on this test.
+    width_twins_held: dict[str, list[str]] | None = None
     #: paths held at stage start and **released within the same stage**: the
     #: phase rose above support while the stage solved, so the hold was lifted
     #: and the stage solved a second time (once — never a third) with them
@@ -1093,15 +1349,23 @@ class StageResult(Base):
     #: reason.  It feeds ``STAGE_FREED_NOTHING``.
     unreached_histograms: dict[int, list[str]] | None = None
     #: each row this stage lifted before solving, and the value it started at
-    #: in column units (WP-1930).  One writer puts a row here: the stage's own
+    #: in column units (WP-1930).  Two writers put a row here.  The stage's own
     #: :attr:`~rietx.strategy.staged.Stage.seed`, through
-    #: :meth:`~rietx.params.vector.ParameterTable.seed_floored`, which starts a
-    #: freed row sitting exactly on a floor of 0 or above at the seed.
-    #: WP-1930's second writer, a floor seed sized by unit, went with WP-1938:
-    #: it existed because a softplus column at its floor was twelve orders below
-    #: its neighbours, and a row refined in its own units has its physical
-    #: column there.  ``None`` means a result stored before the field; all three
-    #: runners write a mapping, and an empty one is a stage that lifted nothing.
+    #: :meth:`~rietx.params.vector.ParameterTable.seed_floored`, starts a
+    #: freed row sitting exactly on a floor of 0 or above at the seed.  Its
+    #: :attr:`~rietx.strategy.staged.Stage.strain_seed`, through
+    #: :meth:`~rietx.params.vector.ParameterTable.seed_stephens`, puts a freed
+    #: all-zero Stephens block on the isotropic ray, and every DOF of that block
+    #: is here at the value the seed wrote, a zero coefficient of the ray
+    #: included (WP-2002, B14).  Those rows sit at zero rather than on a floor,
+    #: since a Stephens DOF is unbounded below.  The joint fit's runner seeds
+    #: no Stephens block, so its stages carry the first writer's rows alone.
+    #: WP-1930's floor seed sized by unit went with WP-1938: it existed because
+    #: a softplus column at its floor was twelve orders below its neighbours,
+    #: and a row refined in its own units has its physical column there.
+    #: ``None`` means a result stored before the field; all three runners write
+    #: a mapping, and an empty one is a stage that lifted nothing.  A result
+    #: stored before B14 lacks the Stephens rows of a stage that seeded them.
     seeded: dict[str, float] | None = None
     #: the stationary-angle test the stage's covariance ran (WP-1929), one
     #: :class:`MomentAngleTest` per round in the order they ran.  A round with
@@ -1112,6 +1376,46 @@ class StageResult(Base):
     #: beside its free modulus, the stage computed no covariance, or the result
     #: was stored before the field.  It feeds ``MOMENT_ANGLE_STATIONARY``.
     moment_angle_tests: list[MomentAngleTest] | None = None
+    #: the free cell parameters this stage **put back** at the values it
+    #: started from, because a cell parameter of their phase left the safety
+    #: window while the stage solved (±15 % on a length, ±6° on an angle:
+    #: ``params.vector.CELL_SAFETY_FRACTION``; WP-2002, B8).  The phase's whole
+    #: free cell goes back, a parameter that stayed inside the window included.
+    #: Found after the stage's first solve, the cell is held and the stage
+    #: solves once more without it, the collapse's path (WP-1301), and the next
+    #: stage frees it again.  Found after that second solve, there is no third:
+    #: the value goes back, the column stays free in the answer, and its esd is
+    #: withheld.  ``CELL_RUNAWAY`` names the paths and says which happened.
+    #:
+    #: Disjoint from :attr:`freed` and from :attr:`held`: a path the collapse
+    #: also holds is in ``held``.  Writers: the three runners that build a
+    #: ``StageResult``, ``Refinement.fit`` and ``Refinement.run_stage`` from
+    #: ``Refinement._run_stage``'s record, and ``MultiHistogramRefinement.fit``
+    #: from its own stage loop.  ``None`` means a result stored before the
+    #: field; every runner writes a list, and an empty one is a stage that put
+    #: nothing back, which is every stage of an ordinary fit.
+    cell_reset: list[str] | None = None
+    #: the free parameters this stage **restored** to the values it started
+    #: from and held, because the answer of its first solve found them flat
+    #: (WP-1301, B1; recorded since WP-2002, B14).  Two readings of the answer
+    #: put a column here, and both take the same restore, hold and one second
+    #: solve.  A column moving only phases whose scale is under the plan's
+    #: ``phase_support_sigma`` there collapsed with its phase.  A moment
+    #: direction whose turn no longer moves the pattern went flat while the
+    #: stage ran.  The first solve's values for them were the walk, not a
+    #: measurement, and are gone.
+    #:
+    #: A subset of :attr:`held`, which also carries the columns held at stage
+    #: start, so a column in ``held`` and not here was held before anything
+    #: solved.  Disjoint from :attr:`released`, from :attr:`freed` and from
+    #: :attr:`cell_reset`: a cell the runaway reset and the collapse both reach
+    #: is here.  Writers: the three runners that build a ``StageResult``,
+    #: ``Refinement.fit`` and ``Refinement.run_stage`` from
+    #: ``Refinement._run_stage``'s record, and ``MultiHistogramRefinement.fit``
+    #: from its own stage loop.  ``None`` means a result stored before the
+    #: field; every runner writes a list, and an empty one is a stage whose
+    #: answer restored nothing, which is every stage of an ordinary fit.
+    collapsed: list[str] | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -1128,6 +1432,27 @@ class StageResult(Base):
             value = dict(value)
             value.pop("floor_unseeded")
         return value
+
+
+class Radiation(Base):
+    """The radiation a pattern was fitted with, as the compiled model held it
+    at the answer (WP-2042).
+
+    Recorded so a figure of the result can name its source the way a figure
+    of the pattern does: ``result.plot()`` labels its 2θ axis ``2θ (degrees),
+    Cu Kα, λ = 1.54059 Å`` through the rule ``PatternData.plot()`` uses.  The
+    record is the source's facts and never the label, so the rule stays one
+    piece of code and decides at read time.
+
+    ``wavelengths`` are the refined values when a wavelength was freed, which
+    is why a calibrated λ names no anode: only lines equal to a radiation
+    table entry to the last digit do.
+    """
+
+    #: ``Source.kind`` of the histogram: ``"xray_cw"`` or ``"neutron_cw"``.
+    kind: str
+    #: Each emission line's wavelength in Å, in line order, primary first.
+    wavelengths: list[float]
 
 
 class HistogramResult(Base):
@@ -1174,6 +1499,10 @@ class HistogramResult(Base):
     #: A satellite (WP-1326) is ``[h, k, l, m]`` — its parent H and its order —
     #: because H alone does not identify it; a nuclear row keeps three.
     tick_hkl: dict[str, list[list[int]]] = Field(default_factory=dict)
+    #: This histogram's own radiation, which a joint fit's other histograms
+    #: need not share (WP-2042); :meth:`RefinementResult.for_histogram` swaps
+    #: it in.  ``None`` on a result written before schema 0.60.
+    radiation: Radiation | None = None
     qpa: "QuantitativePhaseAnalysis | None" = None
     restraints: "RestraintReport | None" = None
     #: this histogram's own R_Bragg/R_F — the partition is of *these* counts
@@ -1230,6 +1559,9 @@ _CAPPED_PAIR_CODES = (
     ("FLAT_DIRECTION", "FLAT_DIRECTION_OMITTED", "flat direction"),
 )
 
+#: The rows :func:`_cap_high_correlation` writes about what it left out.
+_OMITTED_CODES = frozenset(omitted for _, omitted, _ in _CAPPED_PAIR_CODES)
+
 
 def _cap_one_code(diagnostics: list[Diagnostic], code: str, omitted_code: str,
                   noun: str) -> list[Diagnostic]:
@@ -1271,30 +1603,336 @@ def _cap_high_correlation(diagnostics: list[Diagnostic]) -> list[Diagnostic]:
 
 
 #: What ``summary(deliverable=…)`` accepts, on a result and on a series alike
-#: (the agent skill §4b's four purposes).  Data rather than two literal lists:
-#: :meth:`rietx.refine.Refinement.summary` implements the first three and
-#: :meth:`rietx.schemas.sequential.SeriesResult.summary` the fourth, and each
-#: refuses the other's by naming where it lives — a vocabulary neither owns.
-DELIVERABLES = ("phase_id", "qpa", "structure", "series")
+#: (the agent skill §4b's purposes).  Derived, never listed: the purpose table
+#: :data:`rietx.purposes.PURPOSES` is the one authority for which purposes
+#: exist (WP-2037), so a purpose added there is a deliverable here.
+#: :meth:`rietx.refine.Refinement.summary` implements every one but
+#: ``series`` and :meth:`rietx.schemas.sequential.SeriesResult.summary` that
+#: one, and each refuses the other's by naming where it lives — a vocabulary
+#: neither owns.
+DELIVERABLES = tuple(PURPOSES)
+
+#: The first segment of a parameter dot-path, a joint fit's ``hist.{h}.``
+#: scope included.  A ``where`` entry starting with none of them names
+#: something other than a parameter, and :func:`level_under` reads it as no
+#: path at all.
+_PATH_ROOTS = ("phases.", "instrument.", "vars.", "hist.")
 
 
-def _diagnostic_lines(diagnostics: list[Diagnostic]) -> list[str]:
-    """Section 2a: the first stop condition — every diagnostic, resolved or not.
+def _bears_on(path: str, globs: tuple[str, ...]) -> bool:
+    """Whether a ``where`` path names a parameter one of ``globs`` matches, or
+    an object holding one: ``phases.0.atoms.0`` is the whole site, so a glob
+    over its coordinates matches it once cut to the path's own depth.  A
+    ``vars.`` name bears on every purpose, because which paths it drives is
+    a fact of the table, not of the record (WP-1342's blind spot)."""
+    from fnmatch import fnmatchcase
+
+    if path.startswith("hist."):
+        path = path.split(".", 2)[2] if path.count(".") >= 2 else path
+    if path.startswith("vars."):
+        return True
+    depth = path.count(".") + 1
+    return any(fnmatchcase(path, g) or fnmatchcase(path, ".".join(g.split(".")[:depth]))
+               for g in globs)
+
+
+@functools.cache
+def _code_scopes() -> dict[str, tuple[str, ...]]:
+    """Each code with a declared ``response`` in the audit table, mapped to its
+    ``scope`` (``()`` where it declares none), read once a process (importing
+    the table costs about 25 ms).  A code absent here has not had its
+    pairings checked."""
+    from .. import _audit
+
+    return {row.name: row.scope for row in _audit.ROWS
+            if row.kind == "code" and row.response is not None}
+
+
+def level_under(diagnostic: Diagnostic, purpose: str) -> str:
+    """The level ``diagnostic`` carries for a caller whose purpose is ``purpose``
+    (WP-2037, clause 2 of ``docs/milestones/generality.md`` § The rule).
+
+    A level is the response a reader owes, and whether it is owed depends on
+    what the reader will quote.  So it is **derived**, never authored per code
+    per purpose: the diagnostic's own level where any of its ``where`` paths
+    is one the purpose's result numbers depend on
+    (:data:`rietx.purposes.PURPOSES`), ``info`` elsewhere.  A diagnostic
+    naming no parameter path falls back on its code's ``scope`` in the audit
+    table (the purposes it bears on, or ``("all",)``).  With neither it keeps
+    its own level under every purpose: a pairing nobody checked must not read
+    as "not your concern" (WP-1076).  Nor has any pairing of a code still on
+    ``rietx._audit.RESPONSE_BASELINE`` been checked, so such a code keeps
+    its level everywhere too, and the view grows quieter as the audits give
+    each code its response.  An ``error`` is an error for every
+    purpose, since an unusable fit is unusable for all of them, and an
+    ``info`` stays one.
+    """
+    if purpose not in PURPOSES:
+        raise ValueError(f"unknown purpose {purpose!r}; one of "
+                         f"{', '.join(repr(p) for p in PURPOSES)}")
+    if diagnostic.level != "warning":
+        return diagnostic.level
+    scope = _code_scopes().get(diagnostic.code)
+    globs = PURPOSES[purpose].depends
+    # a code still on the audit's response baseline has had no pairing
+    # checked, and a purpose following every path ("series") reads every
+    # code: both keep the warning
+    if scope is None or globs == ("*",):
+        return "warning"
+    paths = [w for w in diagnostic.where if w.startswith(_PATH_ROOTS)]
+    if paths:
+        return "warning" if any(_bears_on(w, globs) for w in paths) else "info"
+    if not scope or scope == ("all",) or purpose in scope:
+        return "warning"
+    return "info"
+
+
+def _check_deliverable(deliverable: str) -> None:
+    """Refuse a deliverable outside :data:`DELIVERABLES`, naming every one."""
+    if deliverable not in DELIVERABLES:
+        raise ValueError(f"unknown deliverable {deliverable!r}; one of "
+                         f"{', '.join(repr(d) for d in DELIVERABLES)}")
+
+
+@dataclass(frozen=True)
+class DiagnosticRow:
+    """One diagnostic as a renderer shows it (WP-2037, clause 3): a view of a
+    stored record, never stored itself.
+
+    ``level`` is the diagnostic's level under the deliverable the view was
+    asked for (:func:`level_under`), or its own level with none.  ``full``
+    says whether it prints in full (message, paths, suggestion) or as one
+    line (code and paths).  ``warning_under`` names the purposes it is a
+    warning under, in the purpose table's order and never ``series``: that
+    purpose follows every path (``"*"``), so on a single result it would be
+    listed wherever any other is and says nothing a reader can act on.
+    ``override`` is the word of the caller's ``levels=`` map that set
+    ``level`` (clause 4), or ``None`` where the audited level stands.
+    """
+
+    diagnostic: Diagnostic
+    level: str
+    full: bool
+    warning_under: tuple[str, ...]
+    override: str | None = None
+
+
+#: The words a caller's ``levels=`` map takes (WP-2037, clause 4), in the
+#: compiler's allow-warn-deny form (Clang's ``-W``/``-Wno-``/``-Werror=``,
+#: Rust's lint levels), and the level each sets: ``allow`` quiets a code to
+#: ``info``, ``warn`` makes it a warning under every purpose, ``deny`` an
+#: error.
+LEVEL_OVERRIDES: dict[str, str] = {"allow": "info", "warn": "warning", "deny": "error"}
+
+
+def _check_levels(levels: dict[str, str] | None) -> dict[str, str]:
+    """A caller's ``levels=`` map, refused where a code or a word is unknown:
+    a misspelt code would otherwise override nothing and say nothing
+    (WP-1076).  The codes are :data:`rietx.help.DIAGNOSTIC_HELP`'s, which its
+    test holds equal to the raise sites."""
+    if not levels:
+        return {}
+    from ..help import DIAGNOSTIC_HELP
+
+    unknown = sorted(code for code in levels if code not in DIAGNOSTIC_HELP)
+    if unknown:
+        raise ValueError(f"levels=: unknown diagnostic code(s) {', '.join(unknown)}; "
+                         "the codes are rietx.help.DIAGNOSTIC_HELP's")
+    words = sorted({w for w in levels.values() if w not in LEVEL_OVERRIDES})
+    if words:
+        raise ValueError(f"levels=: unknown level(s) {', '.join(map(repr, words))}; one of "
+                         f"{', '.join(repr(w) for w in LEVEL_OVERRIDES)}")
+    return dict(levels)
+
+
+#: The purposes a row's ``warning_under`` can name: every one but ``series``
+#: (:class:`DiagnosticRow` says why).
+_NAMED_PURPOSES = tuple(p for p in PURPOSES if p != "series")
+
+#: The order a view lists its rows in: errors, then warnings, then the rest.
+_VIEW_RANK = {"error": 0, "warning": 1}
+
+
+def diagnostic_view(diagnostics: list[Diagnostic],
+                    deliverable: str | None = None,
+                    levels: dict[str, str] | None = None) -> list[DiagnosticRow]:
+    """The rows every renderer of a diagnostics list prints (WP-2037, clause 3):
+    the text summary, ``str(result)``, the notebook HTML and the GUI panel.
+
+    Under a deliverable, a row at ``error`` and one at ``warning`` *for that
+    purpose* (:func:`level_under`) print in full and the rest as one line
+    each.  With none, only the errors print in full: every other row is one
+    line naming the purposes it is a warning under, since which of them
+    decides the caller's numbers is the caller's to say, and the summary does
+    not infer it.  Rows come errors first, then warnings, then the rest, each
+    in stored order.  An unknown deliverable is refused, naming every one.
+
+    ``levels`` maps a code to ``"allow"``, ``"warn"`` or ``"deny"``
+    (:data:`LEVEL_OVERRIDES`; clause 4): the caller's word replaces the
+    audited level under every purpose, so the expert who disagrees with a
+    response and the pipeline that treats a code as blocking get what they
+    want without touching the default.  It never lowers a diagnostic raised
+    at ``error``, since an unusable fit is unusable for every purpose
+    (clause 1).  An unknown code or word is refused.
+
+    Every row of ``diagnostics`` comes back, uncapped: a renderer that prints
+    bounds the pair-keyed codes first (:func:`_cap_high_correlation`), and
+    the stored list stays the one its counts are taken from.
+    """
+    if deliverable is not None:
+        _check_deliverable(deliverable)
+    levels = _check_levels(levels)
+    rows = []
+    for d in diagnostics:
+        override = levels.get(d.code) if d.level != "error" else None
+        if override is not None:
+            level = LEVEL_OVERRIDES[override]
+            under = _NAMED_PURPOSES if level == "warning" else ()
+        else:
+            under = (tuple(p for p in _NAMED_PURPOSES if level_under(d, p) == "warning")
+                     if d.level == "warning" else ())
+            level = d.level if deliverable is None else level_under(d, deliverable)
+        full = level == "error" or (deliverable is not None and level == "warning")
+        rows.append(DiagnosticRow(d, level, full, under, override))
+    return sorted(rows, key=lambda r: _VIEW_RANK.get(r.level, 2))
+
+
+#: The reading rule, closing a summary that was given no deliverable: the
+#: output says how to see more, so the skill need only name the field
+#: (WP-2037 clause 3; WP-1338's cheapest place, the package's own output).
+#: It names ``summary()`` because every object that prints it has one taking
+#: ``deliverable=``: :meth:`rietx.refine.Refinement.summary`,
+#: :meth:`RefinementResult.summary` and
+#: :meth:`rietx.schemas.sequential.SeriesResult.summary`.
+DIAGNOSTICS_READING_RULE = ("pass deliverable= to summary() for the rows that decide "
+                            "your purpose; every row is in result.diagnostics")
+
+#: Closing a bare result's view under a deliverable: the rows that decide the
+#: purpose need the compiled model, so they are named rather than left out
+#: in silence.
+RESULT_DELIVERABLE_NOTE = ("the deliverable's deciding rows need the compiled model: "
+                           "Refinement.summary(deliverable=...)")
+
+
+def _count(n: int, noun: str) -> str:
+    return f"{n} {noun}{'' if n == 1 else 's'}"
+
+
+def _compress_paths(paths: list[str]) -> str:
+    """``where`` as one line: a sibling of the last path printed in full (the
+    same prefix up to its last dot) prints as its ``.leaf``, so
+    ``instrument.profile.u, .v, .w``.  Only a parameter path is a stem: a
+    ``where`` naming a region (``12.300-12.550``) or a peak (``12.3400°``)
+    has decimal points, not path segments, and always prints whole."""
+    out: list[str] = []
+    stem = ""
+    for path in paths:
+        leaf = path[len(stem):]
+        if stem and path.startswith(stem) and leaf and "." not in leaf:
+            out.append(f".{leaf}")
+        else:
+            out.append(path)
+            stem = path[:path.rfind(".") + 1] if path.startswith(_PATH_ROOTS) else ""
+    return ", ".join(out)
+
+
+def _warning_under_text(names: tuple[str, ...]) -> str:
+    if not names:
+        # level_under puts a warning with a path under ``series`` always, so a
+        # warning no named purpose reads is one only a trajectory does
+        return "warning under series only"
+    if names == _NAMED_PURPOSES:
+        return "warning under every purpose"
+    return f"warning under {', '.join(names)}"
+
+
+def _one_line(row: DiagnosticRow, deliverable: str | None) -> str:
+    """A row printed short: its code and paths, and what it is a warning under."""
+    d = row.diagnostic
+    head = d.code + (f" at {_compress_paths(d.where)}" if d.where else "")
+    if deliverable is None:
+        return f"{head}: {_warning_under_text(row.warning_under)}" \
+            if row.level == "warning" else f"{head}: {row.level}"
+    # under a deliverable a short row is one at ``info`` for it
+    if d.level == "warning" and row.override is None:
+        return f"info: {head} ({_warning_under_text(row.warning_under)})"
+    return f"info: {head}"
+
+
+def _diagnostic_header(rows: list[DiagnosticRow], deliverable: str | None) -> str:
+    n_errors = sum(r.level == "error" for r in rows)
+    n_set = sum(r.override is not None for r in rows)
+    # the rows whose level the caller's map set, so a level the package did
+    # not raise is never read as the package's
+    by_caller = f"; {n_set} set by levels=" if n_set else ""
+    if deliverable is None:
+        shown = ("none is printed in full" if not n_errors else
+                 "only the error is printed in full" if n_errors == 1 else
+                 "only the errors are printed in full")
+        return (f"  diagnostics: {_count(len(rows), 'row')}, {_count(n_errors, 'error')}"
+                f"{by_caller}; no deliverable given, so {shown}")
+    n_warnings = sum(r.level == "warning" for r in rows)
+    n_info = len(rows) - n_errors - n_warnings
+    return (f"  diagnostics under {deliverable}: {_count(n_warnings, 'warning')}, "
+            f"{_count(n_errors, 'error')}, {n_info} info{by_caller}")
+
+
+def _diagnostic_parts(diagnostics: list[Diagnostic], deliverable: str | None = None,
+                      levels: dict[str, str] | None = None
+                      ) -> tuple[str, list[tuple[DiagnosticRow, str | None]], str | None]:
+    """The diagnostics section as its header, its printed rows each with its
+    one-line form (``None`` for a row printed in full), and the reading rule
+    that closes it (``None`` under a deliverable, or with nothing to print).
+
+    The counts in the header are the *stored* list's, accurate and uncapped;
+    only the rows printed are bounded (:func:`_cap_high_correlation`), so a
+    header counting 23 rows can be followed by fewer lines without lying.
+    The rows printed in full and the rows printed short are bounded apart, so
+    a pair that is a warning under the deliverable is never cut to make room
+    for stronger pairs that are ``info`` for it.
+    """
+    stored = diagnostic_view(diagnostics, deliverable, levels)
+    if not stored:
+        return "  diagnostics: none", [], None
+    rows = []
+    for full in (True, False):
+        pool = [r for r in stored if r.full is full]
+        found = [r.diagnostic for r in pool]
+        capped = _cap_high_correlation(found)
+        rows += pool if capped is found else diagnostic_view(capped, deliverable, levels)
+    # the cap's own row says how many it left out, which its code alone does not
+    printed = [(r, None if r.full or r.diagnostic.code in _OMITTED_CODES
+                else _one_line(r, deliverable)) for r in rows]
+    return (_diagnostic_header(stored, deliverable), printed,
+            DIAGNOSTICS_READING_RULE if deliverable is None else None)
+
+
+def _diagnostic_lines(diagnostics: list[Diagnostic], deliverable: str | None = None,
+                      *, notebook: bool = False,
+                      levels: dict[str, str] | None = None) -> list[str]:
+    """Section 2a: the first stop condition, as :func:`diagnostic_view` prints it.
 
     Present even at zero (WP-1302's acceptance: the stop-condition lines are
     on *every* fit, including one with nothing to report), so a caller never
     has to distinguish "no diagnostics" from "this section did not run".
-
-    The header count is the *stored* list's — accurate, uncapped; only the
-    rows actually printed below are bounded (:func:`_cap_high_correlation`),
-    so "23 unresolved" can be followed by fewer than 23 lines without lying
-    about how many there are.
+    ``notebook`` wraps every row at the notebook's width and adds each code's
+    explanation as ``means:``, under ``help:`` on a full row and under the one
+    line on a short one (:mod:`rietx._display`), so a notebook still says what
+    each row means while ``print`` stays one line a row (WP-2039, WP-2037).
     """
-    if not diagnostics:
-        return ["  diagnostics: none"]
-    lines = [f"  diagnostics: {len(diagnostics)} unresolved"]
-    for d in _cap_high_correlation(diagnostics):
-        lines += [f"    {line}" for line in str(d).splitlines()]
+    from .._display import diagnostic_lines, short_lines, wrapped_note
+    header, printed, rule = _diagnostic_parts(diagnostics, deliverable, levels)
+    lines = [header]
+    for row, short in printed:
+        # a full row prints the level the view gave it, which the caller's
+        # map can have moved off the one the package raised
+        d = (row.diagnostic if row.level == row.diagnostic.level
+             else row.diagnostic.model_copy(update={"level": row.level}))
+        lines += (diagnostic_lines(d, "    ", notebook=notebook)
+                  if short is None else
+                  short_lines(row.diagnostic, short, "    ", notebook=notebook))
+    if rule:
+        lines += wrapped_note(rule, "    ", notebook=notebook)
     return lines
 
 
@@ -1405,6 +2043,25 @@ def _agreement_line(stats: Statistics) -> str:
 _LEGACY_COUNT_FIELD = "n_background_peaks"
 
 
+#: The joint result's top-level codes every histogram view carries
+#: (WP-2028): fit-wide statements about the shared model or the plan that a
+#: reader of any one pattern must see.  ``for_histogram`` copies each once.
+FINDINGS_IN_EVERY_VIEW = frozenset({
+    "SCALE_B_INSEPARABLE", "PARAMETRIC_OUT_OF_RANGE",
+    "PARAMETRIC_FORM_REJECTED", "STAGE_PATH_UNKNOWN"})
+
+
+def _names_histogram(d: Diagnostic, h: int) -> bool:
+    """Whether a joint result's top-level finding belongs in histogram
+    ``h``'s view (:meth:`RefinementResult.for_histogram`, WP-2028)."""
+    if d.code == "STAGE_FREED_NOTHING":
+        return d.value is not None and int(d.value) == h
+    if d.code in FINDINGS_IN_EVERY_VIEW:
+        return True
+    prefix = f"hist.{h}."
+    return any(p.startswith(prefix) for p in d.where)
+
+
 class RefinementResult(Base):
     """What a fit returns: the answer, its statistics, and what the engine
     found wrong with it.
@@ -1477,6 +2134,14 @@ class RefinementResult(Base):
     #: because H alone does not identify it; a nuclear row keeps three.
     tick_hkl: dict[str, list[list[int]]] = Field(default_factory=dict)
 
+    #: The source the curves above were fitted with (WP-2042), which
+    #: :meth:`plot` names on its 2θ axis.  Two writers: ``refine``'s result
+    #: builder, from the compiled model, for every single fit and ``replay``;
+    #: and the joint fit's, which mirrors histogram 0 as the curves do.
+    #: ``None`` means not recorded, a result written before schema 0.60, and
+    #: never "no radiation".
+    radiation: Radiation | None = None
+
     # Quantitative phase analysis (weight fractions); computed for Rietveld
     # fits, None for Le Bail (its scales are degenerate).
     qpa: QuantitativePhaseAnalysis | None = None
@@ -1512,6 +2177,11 @@ class RefinementResult(Base):
     # (WP-1072) — see :class:`GeometryTable`.  Rietveld-only, and None when the
     # result did not come from a fit that had a compiled model to search.
     geometry: GeometryTable | None = None
+    # One row per irrep block of every phase stated on mode amplitudes
+    # (WP-1419), its A_τ, esd and T² read off the final covariance, which is
+    # never serialized: the ``geometry`` carrier argument.  ``None`` when no
+    # phase carries ``distortion_modes``.
+    distortion_totals: list[DistortionTotal] | None = None
 
     # Each phase's cell volume with its esd through the cell covariance
     # (WP-1933), in every mode, since a Le Bail cell is a measurement too —
@@ -1657,9 +2327,30 @@ class RefinementResult(Base):
         counted the day it is written, with nothing here to edit.  ``False``
         means do not read the values; ``True`` is not a pass — the warnings
         still name what each number may not be quoted as (class docstring).
+
+        It reads nothing but the result, so a stored result answers the same
+        on every machine, and the package's own readers (the structure
+        solver's trial cost) never depend on a caller's preferences.  A caller
+        who treats a code as blocking asks :meth:`usable_under` instead.
         """
         return (self.status == "converged"
                 and not any(d.level == "error" for d in self.diagnostics))
+
+    def usable_under(self, levels: dict[str, str]) -> bool:
+        """:attr:`usable` with the caller's per-code override applied
+        (WP-2037 clause 4): ``levels`` maps a code to ``"allow"``, ``"warn"``
+        or ``"deny"``, as ``summary(levels=…)`` takes it, and a code the
+        caller denies makes the fit unusable to them.  The override never
+        lowers an error, so ``usable_under`` is never ``True`` where
+        :attr:`usable` is ``False``.  An unknown code or word is refused.
+
+        A method rather than a setting the property reads (ruled 2026-10-24):
+        :attr:`usable` stays a function of the stored result alone, and the
+        map is the caller's to keep, beside the code that applies it.
+        """
+        return (self.status == "converged"
+                and not any(row.level == "error"
+                            for row in diagnostic_view(self.diagnostics, None, levels)))
 
     # -- numpy views -------------------------------------------------------
     def sig(self) -> np.ndarray:
@@ -1696,7 +2387,8 @@ class RefinementResult(Base):
         if self.sigma:
             s = np.asarray(self.sigma, dtype=np.float64)
         else:
-            s = np.sqrt(np.maximum(np.asarray(self.y_obs, dtype=np.float64), 1.0))
+            s = np.sqrt(np.maximum(np.asarray(self.y_obs, dtype=np.float64),
+                                   POISSON_FLOOR_COUNTS))
         return _floor_sigma(s)
 
     def for_histogram(self, h: int) -> "RefinementResult":
@@ -1714,6 +2406,13 @@ class RefinementResult(Base):
         keeps the joint result's value, which for a WP-1131 size term is the
         coefficient at histogram 0's wavelength.  A negative ``h`` counts from
         the end, as list indexing does.
+
+        The view's ``diagnostics`` are histogram ``h``'s own, then the
+        joint result's top-level findings that a reader of this pattern must
+        see, each once (WP-2028): a finding whose ``where`` names a
+        ``hist.<h>.`` row, ``STAGE_FREED_NOTHING`` whose ``value`` is ``h``,
+        and the fit-wide :data:`FINDINGS_IN_EVERY_VIEW`.  Their ``where``
+        keeps the joint spelling.  The rest stay on the joint result.
         """
         if not self.histograms:
             if h == 0:
@@ -1741,10 +2440,23 @@ class RefinementResult(Base):
         view.y_background = list(hr.y_background)
         view.sigma = list(hr.sigma)
         view.ticks = dict(hr.ticks)
+        view.radiation = (hr.radiation.model_copy(deep=True)
+                          if hr.radiation is not None else None)
+        # the reflections the ticks label and this pattern's structure
+        # R-factors, which the view used to drop (WP-1986, WP-2028)
+        view.tick_hkl = {k: [list(r) for r in v] for k, v in hr.tick_hkl.items()}
+        view.phase_agreement = [a.model_copy(deep=True)
+                                for a in hr.phase_agreement]
         view.qpa = hr.qpa.model_copy(deep=True) if hr.qpa is not None else None
         view.restraints = (hr.restraints.model_copy(deep=True)
                            if hr.restraints is not None else None)
+        # this pattern's own findings, then the fit-level ones a reader of
+        # this pattern must see (WP-2028): those naming it, and the FIT ones
+        # every pattern shares, each once
         view.diagnostics = list(hr.diagnostics)
+        for d in self.diagnostics:
+            if _names_histogram(d, h) and d not in view.diagnostics:
+                view.diagnostics.append(d.model_copy(deep=True))
         if view.identifiability is not None:
             # this histogram's background screen, as a single fit spells it
             # (WP-1341): the joint result scopes every row ``hist.<h>.``
@@ -1794,10 +2506,12 @@ class RefinementResult(Base):
                                            joint=self.parametric_form_joint)
 
     def _repr_html_(self) -> str:
-        """The termination view, then the refined parameters as a table
-        (WP-1544). The text is what ``print`` gives; the table is the same
-        numbers as ``parameters``."""
-        from .._display import _number, diagnostics_html, pre_html, table_html
+        """The notebook form, in one ``<pre>`` (WP-1544, WP-2039): the
+        termination view ``print`` gives, with each diagnostic's explanation
+        under its ``help:`` line, then the refined parameters as a table of
+        the same numbers as ``parameters``."""
+        from .._display import _number, pre_html, table_text
+        lines = self._text_lines(notebook=True)
         rows = [(p.path, _number(p.value, p.stderr),
                  "" if p.at_bound is None else str(p.at_bound).lower())
                 for p in self.parameters]
@@ -1808,16 +2522,16 @@ class RefinementResult(Base):
             header += ("equations",)
             rows = [(*row, ", ".join(p.equations or ()))
                     for row, p in zip(rows, self.parameters, strict=True)]
-        table = table_html(header, rows) if rows else ""
-        before, after = self._text_parts()
-        before.append(_diagnostic_lines(self.diagnostics)[0])
-        return (pre_html("\n".join(before))
-                + diagnostics_html(_cap_high_correlation(self.diagnostics))
-                + pre_html("\n".join(after)) + table)
+        if rows:
+            lines += [f"  parameters: {len(rows)}", *table_text(header, rows, "    ")]
+        return pre_html("\n".join(lines))
 
     def __str__(self) -> str:
         """The termination view a bare result can answer (WP-1302): per-stage
-        status, every diagnostic, provenance, agreement indices last.
+        status, every diagnostic, provenance, agreement indices last.  It takes
+        no deliverable, so the diagnostics print as :func:`diagnostic_view`
+        gives them without one: the errors in full, every other row on one
+        line (WP-2037).
 
         Not the full view — ``Refinement.summary()`` adds the rows that need
         the compiled model (Layer 1's summary sentence, the next suggestion,
@@ -1826,16 +2540,40 @@ class RefinementResult(Base):
         is what a caller holding only the result — the return value of
         ``fit()``, or one read back from a project — can print without it.
         """
-        before, after = self._text_parts()
-        return "\n".join(before + _diagnostic_lines(self.diagnostics) + after)
+        return self.summary()
 
-    def _text_parts(self) -> tuple[list[str], list[str]]:
-        """The lines before the diagnostics and the lines after them, so the
-        HTML view can fold each diagnostic between the two."""
-        before = [f"RefinementResult: {self.status} ({self.mode})"]
-        before += _stage_lines(self.stages, self.statistics.max_shift_over_esd)
-        after = _parametric_lines(self.parametric, self.parametric_form,
-                                  self.parametric_form_joint)
-        after.append(_provenance_line(self.provenance))
-        after.append(_agreement_line(self.statistics))
-        return before, after
+    def summary(self, *, deliverable: str | None = None,
+                levels: dict[str, str] | None = None) -> str:
+        """``str(result)`` with its diagnostics read under ``deliverable``
+        (WP-2037): the errors and the warnings for that purpose in full, the
+        rest one line each, as :func:`diagnostic_view` gives them.  So the
+        reading rule ``str(result)`` closes on can be followed by a caller
+        holding only the result.  ``levels`` is the caller's per-code
+        override, ``{code: "allow" | "warn" | "deny"}``
+        (:func:`diagnostic_view`).
+
+        It filters the diagnostics and adds nothing else: the rows that decide
+        a purpose need the compiled model, and a closing line names
+        :meth:`rietx.refine.Refinement.summary`, which prints them.  An
+        unknown deliverable, code or level is refused.
+        """
+        if deliverable is not None:
+            _check_deliverable(deliverable)
+        _check_levels(levels)
+        return "\n".join(self._text_lines(deliverable=deliverable, levels=levels))
+
+    def _text_lines(self, notebook: bool = False, deliverable: str | None = None,
+                    levels: dict[str, str] | None = None) -> list[str]:
+        """The termination view's lines; ``notebook`` adds each diagnostic's
+        explanation (:func:`_diagnostic_lines`)."""
+        lines = [f"RefinementResult: {self.status} ({self.mode})"]
+        lines += _stage_lines(self.stages, self.statistics.max_shift_over_esd)
+        lines += _diagnostic_lines(self.diagnostics, deliverable, notebook=notebook,
+                                   levels=levels)
+        if deliverable is not None:
+            lines.append(f"    {RESULT_DELIVERABLE_NOTE}")
+        lines += _parametric_lines(self.parametric, self.parametric_form,
+                                   self.parametric_form_joint)
+        lines.append(_provenance_line(self.provenance))
+        lines.append(_agreement_line(self.statistics))
+        return lines

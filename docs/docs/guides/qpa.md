@@ -19,8 +19,8 @@ This refines both phases with `mccusker_structural`:
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-NAC    96.91 ± 2.32 wt%
-CaF2    3.09 ± 2.32 wt%
+NAC    96.42 ± 3.53 wt%
+CaF2    3.58 ± 3.53 wt%
 ```
 
 Each row is a `PhaseQuantity`, with the fraction, its esd, the refined scale and the Z·M and V it was computed from.
@@ -30,10 +30,11 @@ With two phases the fractions sum to 1, so their esds are equal.
 The fractions are of the crystalline phases in the model, and `result.qpa.crystalline_only` says so.
 An amorphous component or a crystalline phase you did not model is shared out among the phases you did, so the fractions still sum to 1.
 Report them as "wt % of the crystalline content".
+A phase with no reflection in the fitted range has no fraction (`None`), and the others are relative to the phases seen in range ([QPA reference](../reference/qpa.md#a-phase-with-no-reflection-in-the-fitted-range)).
 
 ## Check the minor phase
 
-An esd of 2.32 wt % on a 3.09 wt % phase, measured at a synchrotron, says something is trading against the scale.
+An esd of 3.53 wt % on a 3.58 wt % phase, measured at a synchrotron, says something is trading against the scale.
 The diagnostics name it:
 
 ```{literalinclude} ../../../examples/guides/qpa.py
@@ -44,9 +45,9 @@ The diagnostics name it:
 
 <!-- output of examples/guides/qpa.py -->
 ```text
-FLOOR_HIT | phases.1.atoms.0.biso refined to its floor (ρ=+0.040).
-FLOOR_HIT | phases.1.atoms.1.biso refined to its floor (ρ=+0.084).
-HIGH_CORRELATION | Correlated pair: phases.1.scale ~ phases.1.extinction (ρ=+0.996). Flagged in stages: extinction, roughness.
+FLOOR_HIT | phases.1.atoms.0.biso refined to its floor (ρ=+0.021).
+FLOOR_HIT | phases.1.atoms.1.biso refined to its floor (ρ=+0.091).
+HIGH_CORRELATION | Correlated pair: phases.1.scale ~ phases.1.extinction (ρ=+0.998). Flagged in stages: extinction, roughness, closing.
 ```
 
 The plan freed CaF₂'s extinction, and with a few weak peaks the extinction and the scale can scale the same intensities.
@@ -65,7 +66,7 @@ NAC    98.63 ± 0.07 wt%
 CaF2    1.37 ± 0.07 wt%
 ```
 
-The esd falls from 2.32 to 0.07 wt %, and `mccusker_default`, which frees no structural parameter, gives 1.38 wt % for CaF₂.
+The esd falls from 3.53 to 0.07 wt %, and `mccusker_default`, which frees no structural parameter, gives 1.38 wt % for CaF₂.
 Rwp rose from 0.082 to 0.089 when the three parameters were held.
 The free extinction lowered Rwp while it moved the fraction, so Rwp cannot choose between the two fits.
 The fit reports the holds as `HOLD_BLOCKED_PLAN`, because the plan tried to free paths you held.
@@ -89,7 +90,9 @@ admissible 1.37 to 1.37 wt%, 12 refits
 
 Here only the fit's own fraction is admissible, so the fraction is determined.
 A point is admissible when its χ² is within {{ FRACTION_PROFILE_DCHI2 }} × χ²<sub>red</sub> × f² of the lowest χ² found, f being the Bérar-Lelann factor.
-When an admissible fraction lies more than {{ FRACTION_PROFILE_EXCESS }} times the esd's 95 % half-width from the fit's, the profile reports `QPA_FRACTION_UNDETERMINED`, and you should quote the range rather than the value.
+Every profile of a fit with an esd carries a `QPA_FRACTION_RANGE` info record, whose value is the farthest admissible fraction's distance from the fit's, in the esd's 95 % half-widths.
+Below 1 the profile confirms the esd.
+Well above 1 the esd describes only the basin the fit stopped in, and you should quote the range rather than the value.
 Without `axes=`, it uses the phase's width terms that were free in the last fit, and refuses if none was.
 
 ## Correct for microabsorption

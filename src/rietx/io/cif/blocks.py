@@ -87,12 +87,15 @@ BLOCK_KINDS = ("structure", "refinement")
 #: ``_atom_type_scat_source``: Waasmaier & Kirfel (1995), *Acta Cryst.* A51,
 #: 416 for :mod:`rietx.crystallography.scattering`'s X-ray f0; ITC Vol. C
 #: (2004) Table 6.1.1.4 for its tabulated ions; Sears (1992), *Neutron News*
-#: 3(3), 26 for :mod:`rietx.crystallography.neutron`'s b.  Author and year
+#: 3(3), 26 for :mod:`rietx.crystallography.neutron`'s b; Waasmaier & Kirfel's
+#: own fit to Rez, Rez & Grant (1994), *Acta Cryst.* A50, 481, Table 2 for the
+#: ``O2-`` row, which their 1995 paper does not print (#1039).  Author and year
 #: only, because checkCIF's PLATON stops reading the whole block at a long
 #: one: a 113-character value left every computed-against-reported row empty
 #: on 2026-10-09, and 40 characters did not (``SCAT_SOURCE_MAX``).
 _XRAY_SOURCE = "Waasmaier & Kirfel (1995)"
 _XRAY_ITC_SOURCE = "ITC C (2004) 6.1.1.4"
+_XRAY_O2_SOURCE = "W&K, Rez et al. (1994)"
 _NEUTRON_SOURCE = "Sears (1992)"
 
 #: The longest ``_atom_type_scat_source`` value written, held by test.
@@ -263,10 +266,15 @@ def _scat_source(symbol: str, probe: str | None) -> str:
     from ...crystallography.scattering import _ITC_IONS, normalize_species
 
     try:
-        itc = normalize_species(symbol) in _ITC_IONS
+        key = normalize_species(symbol)
     except KeyError:
-        itc = False
-    xray = _XRAY_ITC_SOURCE if itc else _XRAY_SOURCE
+        key = None
+    if key in _ITC_IONS:
+        xray = _XRAY_ITC_SOURCE
+    elif key == "O2-":
+        xray = _XRAY_O2_SOURCE
+    else:
+        xray = _XRAY_SOURCE
     if probe == "xray":
         return xray
     if probe == "neutron":

@@ -57,8 +57,8 @@ assert abs(tied_result.statistics.rwp - free_result.statistics.rwp) < 5e-4
 assert max(gaps) < 2.0
 # The printed block, as the page quotes it.
 assert [free_result.statistics.n_free_parameters, tied_result.statistics.n_free_parameters] == [35, 33]
-assert [f"{r.statistics.rwp:.4f}" for r in (free_result, tied_result)] == ["0.0893", "0.0894"]
+assert [f"{r.statistics.rwp:.4f}" for r in (free_result, tied_result)] == ["0.0898", "0.0898"]
 assert [f"{p.value:.3f} ± {p.stderr:.3f}" for p in free_b] == [
-    "0.264 ± 0.149", "0.467 ± 0.158", "0.385 ± 0.113"]
-assert f"{tied_b[0].value:.3f} ± {tied_b[0].stderr:.3f}" == "0.377 ± 0.078"
-assert [f"{g:.2f}" for g in gaps] == ["0.94", "0.65", "0.42"]
+    "0.242 ± 0.150", "0.467 ± 0.160", "0.363 ± 0.114"]
+assert f"{tied_b[0].value:.3f} ± {tied_b[0].stderr:.3f}" == "0.360 ± 0.079"
+assert [f"{g:.2f}" for g in gaps] == ["1.02", "0.64", "0.53"]

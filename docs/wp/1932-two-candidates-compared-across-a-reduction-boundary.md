@@ -1,9 +1,8 @@
 # WP-1932 — two candidates compared across a reduction boundary
 
-Milestone: unscheduled · Status: 🔄 2026-10-15 — PR #949 merged; open: the bethanechol benchmark run alone
+Milestone: unscheduled · Status: ✅ 2026-10-23 — dedup and `same_lattice` join one lattice's descriptions across every Niggli boundary through Selling's form, and the bethanechol benchmark's grades did not move (PR #949)
 Track: What fires, and what stays silent
 Depends on: — (1923 soft: the same `reduce.py` seam and the #797 cell; 1915 soft: the covariance the distance's esd reads)
-Priority: P2 2026-10-11 — the first task's count (#834, the reporter's, on 9219e886) finds dedup splitting one lattice 4 784 times on the bethanechol benchmark and 8 times on the acceptance file, changing groups in 157 of 429 bethanechol calls; no truth rank moved at the merge, so the cost is duplicate candidates and finder counts, not a wrong answer
 
 ## Goal
 
@@ -58,80 +57,13 @@ pairwise (`engines.py:1543`) and stacked (`:1601`) paths; `same_lattice` in
 a prior cell; and WP-1921's planned `find(cell=)`, whose acceptance holds it
 equal to `equal_reduced_many` on every pair.
 
-### Inherited
-
-- **2026-10-11, from WP-1923 (closed): the reduction is now an exact change of
-  basis, so the sign boundary moved under the count below.** `reduce_cell`
-  builds the cell from M·G·Mᵀ wherever an entry's sign disagrees with it,
-  where gemmi had given a near-zero ξ, η or ζ the sign of a value it treats as
-  zero. Two descriptions straddling a right angle now reduce to the sign of
-  their own metric, and Δ is their true difference rather than zero or 2ε.
-  Over 27 300 reductions of `test_acceptance_indexing.py`'s searches, 792 had
-  a sign to correct, 440 of the 447 distinct cells by under 1e-14 of the
-  metric's scale and none near #797's 1.7e-7. So the 1 670 bethanechol splits
-  "at g4/g5/g6 = 0" were counted on a reduction this tree no longer runs:
-  recount before building on them. Also new: candidates are *reported* in the
-  conventional monoclinic setting (`CellCandidate.engine_cell`,
-  `.change_of_basis`), but dedup still runs on engine candidates before that
-  re-set, so the grouping key is untouched.
-
-- **2026-10-11, from the issue triage (#834): the first task's count is in,
-  and it finds splits.** The reporter measured it on `9219e886` (comment of
-  2026-10-09). They wrapped `equal_reduced`, `equal_reduced_many` and
-  `same_lattice` in the harness and logged every comparison on the indexing
-  acceptance file and the full bethanechol benchmark. An oracle that never
-  reduces searched integer matrices (det ±1, |m_ij| ≤ 3) and judged with
-  the unpatched `equal_reduced`. Results:
-  - Acceptance: 1 092 479 dedup comparisons, 8 splits, all LaB₆ (a
-    three-way tie among tetragonal candidates of the cubic cell).
-  - Bethanechol: 28 911 281 comparisons, 4 784 splits. By boundary: a sign
-    at g4/g5/g6 = 0, 1 670; a reduction step, 1 311; g2 = g3, 973;
-    g1 = g2, 830. rietx's χ² on the splits runs 18 to 81 000 against the
-    oracle's ≤ 16.8.
-  - `same_lattice` from `ambiguity` and `priors`: 0 splits in 6 270 calls.
-  - Replayed with "rietx's verdict, or the oracle maps them": groups change
-    in 157 of 429 bethanechol calls (574 fewer groups), 3 lattices gain a
-    second finder and cross `MIN_AGREEMENT` (none in a reported top 12),
-    and no truth rank or `found_by` moves at the merge. In acceptance,
-    LaB₆'s rank-3 tetragonal cell absorbs its rank-6 duplicate.
-  - The exposure is the search system. With all six A..F free (a triclinic
-    search), hexagonal and monoclinic lattices split in 41-50 % of
-    synthetic pairs at every relative esd from 2e-5 to 1e-2. With each
-    system's symmetry kept, nothing splits.
-
-  By this WP's own rule that re-rates it P2. Not reproduced here, since the
-  benchmark runs about an hour alone. Checked against the tree at 7d9be3cb:
-  `git log 9219e886..` touches none of `reduce.py`, `engines.py`,
-  `ambiguity.py` or `priors.py`, so the count stands for this tree. The
-  task's box stays open for the session that builds on it.
-
-- **2026-10-12, from WP-1930: `equal_reduced`'s χ² can go negative on a
-  rank-deficient Σ.** It takes `pinv(sigma, hermitian=True)` of the summed
-  covariance (`indexing/reduce.py:578` and `:600`). numpy inverts a kept
-  eigenvalue with its sign, and an exactly flat direction comes back at a
-  rounding-level eigenvalue of either sign. On the refinement side that gave
-  six widths an esd of 0 on LaB₆ + cBN, above a cut of 1e-15
-  (`statistics._psd_pinv` now inverts by magnitude). Here a kept negative
-  eigenvalue would make χ² negative and pass `CELL_EQUALITY_CHI2`, merging
-  two cells. A high-symmetry cell's `cov_af` is rank-deficient, so the case
-  is reachable. **Update 2026-10-13: the sign half is done in WP-1930**
-  (`reduce.CELL_PINV_RCOND`, `statistics._psd_pinv`, bit-identical to
-  `pinv` wherever no kept eigenvalue is negative; 0 of 20 000 witness pairs
-  had a negative χ² under the old call). The NCDIST/S6 redesign stays here,
-  and `python -m tests.unit_replay` was not run on the change. **Update
-  later on 2026-10-13 (WP-1930's second session, `[dev]`, Linux x86-64):** it
-  has run now. Twenty-two units were captured and replayed under the signed
-  `pinv` and under `_psd_pinv`. All 22 digests are identical, and every unit
-  completes. `tests/test_acceptance_indexing.py` gives 44 passed, run alone.
-- **2026-10-13, from WP-1930: hypothesis found a counterexample to
-  `test_the_reduced_cell_is_the_exact_image_of_its_input[F]`.** Centring F,
-  a = 3.2, b = 16.0, c = 23.602486327493914 Å, α = 81°, β = 66°, γ = 65°.
-  The reduced metric's (1, 2) entry is −1.45957512 against −1.45956250 for
-  M·G·Mᵀ, outside the test's 1e-12·max|G| bar. It surfaced in a local full
-  suite (`[dev]`, macOS arm64, at aea419b6) and fails identically on c4607fa0,
-  which lacks WP-1930's change; `reduce.py` calls nothing WP-1930 touched. The
-  example now replays from the local `.hypothesis` database only, so CI will
-  not see it until its own search finds it.
+**What this WP inherited, and where it went at the close (2026-10-23).**
+WP-1923's moved sign boundary and #834's count were the first task's input,
+and the recount on 2026-10-13 replaced both. WP-1930's negative χ² was fixed
+there for the pair test, and here for the image test (`_psd_pinv`, PR #949).
+WP-1930's F-centred hypothesis counterexample to
+`test_the_reduced_cell_is_the_exact_image_of_its_input` still fails on
+`12f459e`, and is [WP-2035](2035-a-reduced-cell-is-its-inputs-exact-image.md).
 
 ## Non-goals
 
@@ -152,9 +84,10 @@ equal to `equal_reduced_many` on every pair.
       propagation from `cov_af`.
 - [x] Replace the test in `equal_reduced`, `equal_reduced_many` and
       `same_lattice` from one implementation.
-- [ ] Run `tests/test_acceptance_indexing.py` and the bethanechol benchmark
+- [x] Run `tests/test_acceptance_indexing.py` and the bethanechol benchmark
       alone (root CLAUDE.md: engine budgets are wall-clock), listing every
-      group and grade that moves.
+      group and grade that moves. **No grade moved**: global −7 on #949's
+      merge and on its first parent, set for set (2026-10-23 entry).
 - [x] Tests: the #797 `red` and `t @ af` at distance 0; a pair either side of
       each Niggli boundary type.
 - [x] Skill: none expected, since a candidate list's shape does not change;
@@ -186,6 +119,44 @@ moves is listed in the handover with its cause.
 
 ## Handover log
 
+- **2026-10-23** — closed. The graded bethanechol benchmark ran alone on
+  #949's merge (`65fc6fe`) and on its first parent (`2e5b5eb`), and no grade
+  moved. Both trees score global −7 over 20 runs (default −4, manual −3).
+  Every set has the same truth rank, score, `truth_found_by` and candidate
+  count on both. Bb and E are at rank 1 in both modes, Db at rank 1 in
+  default and rank 2 in manual, F at rank 1 in manual, and the rest are
+  unfound.
+  *Groups that moved.* In 5 of 20 runs the 12 listed candidates regrouped,
+  and none of the five finds the truth on either tree. Aa manual: the nearest
+  cell went from rank 1, 123 333 ppm to rank 5, 116 253 ppm. Ba manual: rank
+  11, 197 522 ppm to rank 12, 181 468 ppm. Da manual: rank 9 to 10 (183 705
+  to 183 596 ppm), and a different `low` monoclinic cell on top (V 1077.6 to
+  1042.3 Å³). Cb default: the same nearest cell went from rank 9 to 10. F
+  default: the same nearest cell went from rank 9 to 10, and the top went
+  from a `low` monoclinic cell (V 1129.2 Å³) to a `low` triclinic one
+  (V 614.8 Å³). Every listed top is `low` on both trees.
+  *Acceptance file.* It was not re-run here. It ran inside the full `-m slow`
+  suite on trees carrying #949: 2268e525 (WP-1343's 2026-10-15 entry) and
+  `main` `1661895e` stacked with #1071 (WP-1326's 2026-10-22 entry, 326
+  passed, 12 skipped, 1 xfailed, macOS arm64).
+  *Measured* (`[dev]` with `rietx_kernels` 1.3.0, Linux x86-64, 4 cores,
+  Intel Xeon, a cloud container with nothing else running, load ~1). Each
+  tree was imported from its own extracted source. Per-run wall: default
+  244.6-383.0 s on the parent and 250.9-402.5 s on the merge (merge/parent
+  1.02-1.12 run by run), manual 83.8-103.3 s against 83.6-113.9 s
+  (0.99-1.13). The container restarted between the two runs (parent 12:39-13:48
+  UTC, merge 14:26-15:39 UTC). Same core count and CPU model, but whether it
+  was the same host is unknown, so the wall ratio is not quoted as #949's
+  cost. The grades need no such caveat, since they agree set for set.
+  *Gotcha, for WP-1924's open question.* `indexing/qspace.py:410`
+  (`cov_af = basis.T @ cov… @ basis`) printed `RuntimeWarning: invalid value
+  encountered in matmul` on Aa default on **both** trees. So it predates #949,
+  and it is on `main`'s lineage, not WP-1924's branch alone.
+  *Inherited:* four bullets, consumed. Three were discharged here or in WP-1930.
+  The fourth, the F-centred counterexample, still fails at `12f459e` (G₃₂ off
+  by 1.1e-7 of max|G|) and is now WP-2035. *Next:* nothing owed here. Issue
+  #834 stays open, since this WP built only its matching half (2026-10-15
+  entry).
 - **2026-10-15** — PR #949 (outside contributor) merged as `65fc6fe0`.
   @yue-here answered the PR's three questions in round 1 (2026-10-14). A joined
   pair reports the χ² of the description that joined it. The 1.35-1.63× dedup

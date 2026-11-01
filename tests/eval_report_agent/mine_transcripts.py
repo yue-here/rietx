@@ -132,10 +132,13 @@ WP1059_POSITION_EPISODES = ("E2", "R1")
 #: ``J1S``); ``python`` is a condition like any other here — the arm's cells
 #: are named the same way.  A condition name admits single underscores since
 #: 2.2 (``report_stat``, ``report_noexec``) — the cell separator stays the
-#: double underscore, which no condition name may contain
+#: double underscore, which no condition name may contain.  A path separator
+#: is ``/`` or a run of backslashes: a Windows launcher writes ``\``, and a
+#: transcript is read as raw JSONL, where that arrives escaped as ``\\``
+_SEP = r"(?:/|\\+)"
 _CELL_RE = re.compile(
-    r"RUNS/(?P<condition>[a-z]+(?:_[a-z]+)*)__(?P<model>[A-Za-z0-9.\-]+)"
-    r"/(?P<episode>[A-Z]\d+[A-Za-z]?)")
+    rf"RUNS{_SEP}(?P<condition>[a-z]+(?:_[a-z]+)*)__(?P<model>[A-Za-z0-9.\-]+)"
+    rf"{_SEP}(?P<episode>[A-Z]\d+[A-Za-z]?)")
 
 #: an agent asking for the trajectory, or a rung's text arriving: the response
 #: key itself, plus the word a prompt and an agent would use for one rung

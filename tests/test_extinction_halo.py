@@ -66,6 +66,23 @@ def _pyrochlore() -> Structure:
                     z=p(0.375), biso=p(0.6))])])
 
 
+def _reflections_near(ins, tt, centre, tol):
+    """The pyrochlore's reflections carrying intensity within ``tol`` of
+    ``centre``, every emission line, as the forward model compiles them."""
+    from rietx.model.forward import compile_model
+    from rietx.params.vector import ParameterTable
+
+    structure = _pyrochlore()
+    grid = PatternData(two_theta=list(tt), intensity=[0.0] * len(tt))
+    model = compile_model(structure, ins, grid, mode="rietveld")
+    table = ParameterTable(structure, ins)
+    out = []
+    for pos, _w1, _w2, intensity in model.phase_peaks(0, table.decode(table.x0())):
+        pos, intensity = np.asarray(pos), np.asarray(intensity)
+        out += pos[(np.abs(pos - centre) < tol) & (intensity > 0.0)].tolist()
+    return out
+
+
 def _gauss(tt, centre, fwhm, height):
     sig = fwhm / (2.0 * np.sqrt(2.0 * np.log(2.0)))
     return height * np.exp(-0.5 * ((tt - centre) / sig) ** 2)
@@ -83,7 +100,11 @@ def bragg():
         y = np.asarray(Refinement(_pyrochlore(), ins, history=False)
                        .predict(two_theta=tt), dtype=float)
         y = y / y.max() * TOP
-        assert y[np.abs(tt - TT200) < 0.02].max() < 1e-6 * TOP, \
+        # the d-glide is a statement about the reflection list, so it is asked
+        # there.  The pattern at (200) is the neighbours' tails: a prediction
+        # draws them at the closing windows, 1.4e-6 (sync) and 4.2e-6 (lab) of
+        # TOP there with no reflection within 0.5° (WP-2002)
+        assert not _reflections_near(ins, tt, TT200, 0.02), \
             "the model puts intensity on (200): the d-glide is not in force"
         out[name] = y
     return tt, out
@@ -106,7 +127,7 @@ def _screen(data, *, hump=None, free_hump=True):
     of the lattice group (with the declared hump freed in a last stage), then the
     screen on the fitted instrument and the refined cell."""
     ins = Instrument.debye_scherrer(wavelength=LAM)
-    ins.background = auto_background(data, two_theta_limits=RANGE, seed=True)
+    ins.background = auto_background(data, two_theta_limits=RANGE, seed=True).background
     plan = "profile_only"
     if hump is not None:
         position, height, fwhm = hump

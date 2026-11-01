@@ -334,13 +334,15 @@ def test_a_negative_uiso_is_read_as_stated(tmp_path):
 def test_a_schema_refusal_is_converted_rather_than_leaked(tmp_path):
     """The class, not a third instance: no pydantic error reaches a caller.
 
-    An occupancy of 40 is in no real file and is checked for by name nowhere.
-    It must still come back naming the file (``io/CLAUDE.md`` § Refusals).
+    A negative occupancy is in no real file and is checked for by name
+    nowhere.  It must still come back naming the file (``io/CLAUDE.md``
+    § Refusals).  It was an occupancy of 40 until ``Atom.occ`` lost its
+    ceiling (WP-2002); the floor of 0 is the bound that stays.
     """
     cards = list(_MINIMAL)
     cards[-2] = _card(
         "CRS1  AT  1A",
-        "  NA        0.000000  0.000000  0.000000 40.000000NA1        1 000")
+        "  NA        0.000000  0.000000  0.000000 -0.500000NA1        1 000")
     path = _exp(tmp_path, "occupancy.EXP", *cards)
     with pytest.raises(GsasExpError, match="occupancy.EXP"):
         to_structure(read_gsas_exp(path))

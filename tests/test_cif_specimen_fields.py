@@ -1,6 +1,6 @@
 """``Structure.to_cif`` states the crystal, not the specimen: what that drops, pinned.
 
-The manual (``using/data.md``) and ``Structure.to_cif``'s docstring say a CIF
+The manual (``reference/data.md``) and ``Structure.to_cif``'s docstring say a CIF
 carries the cell, positions, occupancies and displacement parameters, and that
 the phase scale and the sample-broadening, extinction and preferred-orientation
 fields come back at their defaults.  A magnetic width was dropped the same way

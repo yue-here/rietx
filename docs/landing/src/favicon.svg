@@ -5,9 +5,14 @@
        Authored as SVG rather than .ico so it is text (reviewable in a diff,
        like every other committed asset here) and so it can answer the
        browser's theme; a browser without SVG-favicon support falls back to the
-       light fill, which is why the light colour is the declared one. -->
+       light fill, which is why the light colour is the declared one.
+       The site's one favicon, the landing page's and the manual's (WP-2021), and
+       the mark's authority: the manual's header copies its shapes inline, and
+       `tests/test_manual.py` holds them equal.  The two fills are `--accent` in
+       `tokens.css`; an SVG loaded as an icon reads no CSS variable, so they are
+       literal here, and the same test holds the two equal. -->
   <style>
-    .ink { fill: #d8660c }
+    .ink { fill: #c65d0a }
     @media (prefers-color-scheme: dark) { .ink { fill: #ff9d4d } }
   </style>
   <g class="ink">

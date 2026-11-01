@@ -588,11 +588,13 @@ def test_nudge_is_silent_once_the_command_has_run(
     cmd = "wp-" + "handover"
     for name, body in (
         ("skill.jsonl", '{"name":"Skill","input":{"skill": "%s"}}\n' % cmd),
+        ("scoped.jsonl",
+         '{"name":"Skill","input":{"skill":".claude/worktrees/t:%s"}}\n' % cmd),
         ("typed.jsonl", f"<command-{'name'}>/{cmd}</command-name>\n"),
     ):
         assert owed.nudge(_stop(wt, _transcript(tmp_path, name, body))) is None
     # merely reading or naming the command is not running it
-    named = '{"name":"Bash","input":{"command":"cat .claude/commands/wp-handover.md"}}\n'
+    named = '{"name":"Bash","input":{"command":"cat .claude/skills/wp-handover/SKILL.md"}}\n'
     assert owed.nudge(_stop(wt, _transcript(tmp_path, "named.jsonl", named))) is not None
 
 
@@ -1227,9 +1229,9 @@ def test_a_citation_is_the_number_with_a_boundary() -> None:
     "paths,placement",
     [
         (["docs/wp/1416-x.md", "docs/ROADMAP.md", "tests/test_docs_consistency.py"], True),
-        (["gui/CLAUDE.md", ".claude/commands/pr-review.md"], True),
+        (["gui/CLAUDE.md", ".claude/skills/pr-review/SKILL.md"], True),
         (["docs/wp/1416-x.md", "src/rietx/io/formats/xy.py"], False),
-        (["docs/manual/using/parameters.md"], False),  # for a docs issue, the fix
+        (["docs/docs/reference/parameters.md"], False),  # for a docs issue, the fix
         ([], False),  # a merge commit lists no files and is no evidence
     ],
 )

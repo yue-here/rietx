@@ -20,9 +20,10 @@
    * route's own willingness to act rather than a rule this file re-derives.
    */
   import { ApiError, api } from "../api";
+  import Help from "../Help.svelte";
   import {
     actionRows, diagnosticTone, headline, orderDiagnostics, predictionNote,
-    worstRegions, zoomWindow, type FitDiagnostic,
+    underNote, worstRegions, zoomWindow, type FitDiagnostic,
   } from "../lib/report";
   import { num } from "../lib/table";
 
@@ -191,19 +192,28 @@ mispositioned or absent phase, not an impurity">
 
       <!-- the answer's own diagnostics: produced by the package, shown by no
            other panel (a node holds only those committed with it).  All of
-           them, errors first; a level is a chip tone, never a filter -->
+           them, errors first; a level is a chip tone, never a filter.  Which
+           rows open is the server's (`full`, WP-2037): the errors, as
+           `str(result)` prints them in full.  Every other row is folded to
+           its code, its paths and what it is a warning under, the code's
+           explanation one click away beside it -->
       {#if fitDiagnostics.length}
         <h3>Fit diagnostics</h3>
         {#each fitDiagnostics as d (d.code + d.message)}
-          <div class="fitdiag" data-level={d.level}>
-            <div class="line">
-              <span class="chip {diagnosticTone(d.level)}">{d.level}</span>
-              <strong class="kind mono">{d.code}</strong>
-            </div>
+          {@const under = underNote(d)}
+          <details class="fitdiag" data-level={d.level} open={d.full === true}>
+            <summary>
+              <span class="line">
+                <span class="chip {diagnosticTone(d.level)}">{d.level}</span>
+                <strong class="kind mono"
+                  ><Help for="diagnostics:{d.code}">{d.code}</Help></strong>
+              </span>
+              {#if under}<span class="under muted">{under}</span>{/if}
+              {#if d.where?.length}<span class="paths mono muted">{d.where.join("  ")}</span>{/if}
+            </summary>
             <p class="why">{d.message}</p>
             {#if d.suggestion}<p class="muted">{d.suggestion}</p>{/if}
-            {#if d.where?.length}<p class="paths mono muted">{d.where.join("  ")}</p>{/if}
-          </div>
+          </details>
         {/each}
       {/if}
 
@@ -437,6 +447,19 @@ mispositioned or absent phase, not an impurity">
 
   .fitdiag[data-level="warning"] {
     border-left-color: var(--warn);
+  }
+
+  .fitdiag > summary {
+    cursor: pointer;
+  }
+
+  .fitdiag > summary > .line {
+    display: inline-flex;
+  }
+
+  .fitdiag .under,
+  .fitdiag .paths {
+    display: block;
   }
 
   .action.off {

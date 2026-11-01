@@ -167,11 +167,14 @@ import numpy as np
 from ...crystallography.symmetry import (
     OperatorGroup,
     get_spacegroup,
+    refuse_distortion_modes,
     refuse_operation_list,
     setting_diagnostics,
     site_orbit,
 )
+from ...crystallography.twins import merge_site_twins
 from ...schemas.common import Diagnostic, Parameter
+from ...schemas.structure import BISO_SEED
 from ..formats.base import decode
 from . import coverage as _coverage
 
@@ -527,7 +530,10 @@ class TopasModel:
     time_of_flight: dict = field(default_factory=dict)
     #: Every parameter the file declares (``prm``, a named value), by name,
     #: each with its value and refine flag: what a name in an equation refers
-    #: to.
+    #: to. One declared by an equation (``prm u = f*k;``) is here with the value
+    #: this reader evaluated where TOPAS wrote no ``: value`` tail, its equation
+    #: as ``expr``, and in ``refs`` every declared parameter that equation
+    #: reaches, transitively — the ones whose refine flags it depends on.
     symbols: dict = field(default_factory=dict)
     #: Whether the file states ``neutron_data``, and the ``LP_Factor`` angle it
     #: states (``None`` where none): the two facts TOPAS's scale convention
@@ -2164,7 +2170,40 @@ def _symbol_reads(text: str) -> dict[str, _Read]:
     to prevent, so the whole :class:`_Read` is kept and the callers take the
     half they need.
     """
+    return _declarations(text)[0]
+
+
+def _declarations(text: str) -> tuple[dict[str, _Read], dict[str, _Read]]:
+    """Every declaration in ``text``: ``(resolved, unresolved)``, by name.
+
+    Three forms bind a value, in decreasing order of authority. A stated number
+    (``prm k 2.0``). TOPAS's evaluated tail (``prm uA = 0.006*k; : 0.012``),
+    which is what the converged refinement used and so is kept over anything
+    this reader could compute. And an **equation with no tail**
+    (``prm uA = 0.006*k;``), evaluated here against the other two — repeatedly,
+    because the Technical Reference (v6, §2.6 p. 12) says "Equations are not
+    evaluated sequentially", so ``prm a2 = 2*a1;`` above ``prm a1 = 3;`` is a
+    legal file. The tail is written only where the input asks for it with
+    ``: 0`` (§2.5 p. 12), so a file that never asked has none, and every slot
+    naming such a parameter used to refuse although its value lies in the file.
+
+    An equation over names is a *dependent* parameter (§2.6), so its read keeps
+    the equation as ``expr`` and the flag its own spelling states — none, for
+    ``prm uA = …;`` — and ``refs`` holds **every** declared parameter the
+    equation reaches, transitively: ``u = f*k`` over ``f = 4.8e-5*(T + 273.15)``
+    reaches ``f``, ``k`` and ``T``. Those are what carry a refine state, and a
+    value resolved through ``u`` inherits the state of the chain, not of ``u``.
+    A tail-evaluated declaration keeps its equation and ``refs`` too, for the
+    same reason; only its value is TOPAS's.
+
+    ``unresolved`` holds the equation declarations that never resolve — over a
+    name nothing declares, in a cycle (``prm a = b; prm b = a;``), or in
+    arithmetic :func:`_arith` does not evaluate. They bind nothing, so a slot
+    naming one still refuses; they are kept so the refusal can say why
+    (:func:`_why_unresolved`).
+    """
     out: dict[str, _Read] = {}
+    pending: dict[str, _Read] = {}
     for m in _DECLARATION.finditer(text):
         tail = text[m.end():]
         if m["kw"] == "occ":
@@ -2175,17 +2214,139 @@ def _symbol_reads(text: str) -> dict[str, _Read]:
                 continue
             tail = tail[species.end():]
         read = _read_tail(tail, {})
-        # `prm Fe1_1_x = 1/4 + Fe1_1_dx;: 0.25000` binds the evaluated value,
-        # which is the whole reason the deeper chain never has to be walked.
-        if read is not None and read.name and read.value is not None:
+        if read is None or not read.name:
+            continue
+        if read.expr is None and _TAIL_EVALUATED.match(tail) \
+                and (eq := _TAIL_EQUATION.match(tail)):
+            # `prm Fe1_1_x = 1/4 + Fe1_1_dx;: 0.25000` binds the evaluated
+            # value; the equation rides beside it for what it depends on.
+            read = _Read(read.value, read.vary, read.name, read.rest,
+                         expr=eq["expr"].strip())
+        if read.value is not None:
             out.setdefault(read.name, read)
+        elif read.expr is not None and read.name not in pending:
+            pending[read.name] = read
     for m in _DECLARED_ARG.finditer(text):
         # A macro's named argument states a value and may carry a flag with it,
         # which `_DECLARED_ARG` captures as part of the same match rather than
         # by a second look at the text.
         out.setdefault(m["name"], _Read(float(m["value"]),
                                         _flag(named=m["name"]), m["name"]))
-    return out
+    pending = {name: read for name, read in pending.items() if name not in out}
+    # The equations without a tail, to a fixed point. Each sweep sees what the
+    # last one bound; a sweep that binds nothing ends it, so a cycle or an
+    # undeclared name cannot loop.
+    while pending:
+        values = {name: read.value for name, read in out.items()}
+        bound = {}
+        for name, read in pending.items():
+            if (value := _resolve(read.expr, values)) is not None:
+                bound[name] = _Read(value, read.vary, name, read.rest,
+                                    expr=read.expr)
+        if not bound:
+            break
+        out.update(bound)
+        pending = {n: r for n, r in pending.items() if n not in bound}
+    # What each equation reaches, once every value is known. Direct first,
+    # then closed over the table, so a chain of any depth names its roots.
+    values = {name: read.value for name, read in out.items()}
+    direct: dict[str, set[str]] = {}
+    for name, read in out.items():
+        if read.expr is not None:
+            refs: set[str] = set()
+            _resolve(read.expr, values, refs=refs)
+            direct[name] = refs - {name}
+    for name, refs in direct.items():
+        if not refs:
+            continue
+        reach, stack = set(), list(refs)
+        while stack:
+            if (r := stack.pop()) in reach or r == name:
+                continue
+            reach.add(r)
+            stack.extend(direct.get(r, ()))
+        read = out[name]
+        out[name] = _Read(read.value, read.vary, read.name, read.rest,
+                          read.expr, tuple(sorted(reach)))
+    return out, pending
+
+
+def _reach(read: _Read, symbol_reads: dict[str, _Read]) -> set[str]:
+    """Every declared parameter ``read``'s equation reached: the ones it named,
+    and every one *their* equations reach (:func:`_declarations`), so a value
+    resolved through ``u = f*k`` reaches ``k`` as surely as ``= 0.006*k;`` does."""
+    out = set(read.refs)
+    for ref in read.refs:
+        if ref in symbol_reads:
+            out.update(symbol_reads[ref].refs)
+    return {ref for ref in out if ref in symbol_reads}
+
+
+#: A name in an equation that is not a function call: ``Get(a)`` reaches ``a``
+#: and not ``Get``, and ``4.8e-5`` holds no name because ``e`` follows a digit.
+_EQUATION_NAME = re.compile(rf"\b{_NAME}\b(?!\s*\()")
+
+
+def _why_unresolved(read: _Read | None, symbols: dict[str, float],
+                    unresolved: dict[str, _Read]) -> str:
+    """The sentence a refusal adds when a stated equation did not resolve:
+    which names it could not reach, and why each, or ``""`` where ``read`` is
+    not an equation.
+
+    Three causes, each named, because the remedy differs: a name the file does
+    not declare (a typo, or a parameter defined in a file this one includes);
+    names whose equations reach each other, which TOPAS refuses too (§2.6); and
+    an equation this reader does not evaluate (:func:`_arith` takes ``+ - * /``
+    and parentheses, not ``^``, a function, or TOPAS's whitespace
+    multiplication).
+    """
+    if read is None or read.expr is None:
+        return ""
+    undeclared: set[str] = set()
+    cycles: list[list[str]] = []
+    unevaluated: set[str] = set()
+
+    def walk(expr: str, chain: list[str]) -> bool:
+        """Whether ``expr`` reaches a missing name or a cycle."""
+        found = False
+        for name in _EQUATION_NAME.findall(expr):
+            if name in symbols:
+                continue
+            if name in chain:
+                cycle = chain[chain.index(name):] + [name]
+                if sorted(cycle[:-1]) not in [sorted(c[:-1]) for c in cycles]:
+                    cycles.append(cycle)
+                found = True
+            elif name in unresolved:
+                if not walk(unresolved[name].expr, chain + [name]):
+                    unevaluated.add(name)
+                found = True
+            else:
+                undeclared.add(name)
+                found = True
+        return found
+
+    parts = []
+    # A `Get(key)` names a keyword in a local scope, not a parameter, and the
+    # caller that offers one says so itself; only the parameters are walked.
+    if not walk(_GET.sub("0", read.expr), []):
+        if _GET.search(read.expr):
+            return ""
+        return (f" Its equation '= {read.expr};' names only parameters that "
+                f"resolve, so it is the arithmetic this reader does not "
+                f"evaluate (it takes + - * / and parentheses).")
+    if undeclared:
+        parts.append(f"it names {', '.join(sorted(undeclared))}, which the "
+                     f"file does not declare")
+    for cycle in cycles:
+        parts.append(f"{' -> '.join(cycle)} is a cycle of equations, so none "
+                     f"of them has a value")
+    for name in sorted(unevaluated):
+        parts.append(f"{name} is declared as '= {unresolved[name].expr};', "
+                     f"which this reader does not evaluate (it takes + - * / "
+                     f"and parentheses)")
+    return " Its equation '= " + read.expr + ";' does not resolve: " \
+        + "; ".join(parts) + "."
 
 
 # ------------------------------------------------------------ lattice macros
@@ -2554,7 +2715,9 @@ def _reference_wavelength(lines: list) -> float | None:
                                        else -math.inf)).wavelength
 
 
-def _cell_macro(chunk: str, symbols: dict[str, float]) -> tuple[dict, dict] | None:
+def _cell_macro(chunk: str, symbols: dict[str, float],
+                symbol_reads: dict[str, _Read] | None = None,
+                ) -> tuple[dict, dict] | None:
     """The cell and refine flags a cell macro states, or None if it states no
     complete one.
 
@@ -2570,6 +2733,11 @@ def _cell_macro(chunk: str, symbols: dict[str, float]) -> tuple[dict, dict] | No
     An angle the macro's symmetry fixes takes no flag at all, because the file
     states no parameter for it — the one exception being ``Rhombohedral``, where
     the angle *is* an argument and so carries its own.
+
+    An argument written as an equation (``Cubic(=lp;)``) has no flag of its
+    own, so it takes the one the cell lines take in that case: refined where
+    any declared parameter the equation reaches is (``symbol_reads``,
+    :func:`_reach`).
     """
     for name, macro in _CELL_MACROS.items():
         if not (m := re.search(rf"\b{name}_?\(([^)\n]*)\)", chunk)):
@@ -2587,6 +2755,10 @@ def _cell_macro(chunk: str, symbols: dict[str, float]) -> tuple[dict, dict] | No
                 cell[key] = read.value
                 if read.vary is not None:
                     vary[key] = read.vary
+                elif symbol_reads and any(
+                        symbol_reads[r].vary
+                        for r in _reach(read, symbol_reads)):
+                    vary[key] = True
         # Emitted in `_CELL_KEYS` order, so a macro-stated cell iterates the
         # same way a line-stated one does whatever order the table filled it in.
         return {k: cell[k] for k in _CELL_KEYS if k in cell}, vary
@@ -2892,9 +3064,14 @@ def read_topas_inp(path: str | Path, *,
     model = TopasModel(path=str(path))
     # The declarations, whole: the values every resolver takes, and the refine
     # flag a value resolved *through* one of them has to inherit (`_symbol_reads`).
-    symbol_reads = _symbol_reads(active)
+    symbol_reads, unresolved = _declarations(active)
     symbols = {name: read.value for name, read in symbol_reads.items()}
     model.symbols = dict(symbol_reads)
+
+    def why(read: _Read | None) -> str:
+        """What a refusal adds about an equation that did not resolve."""
+        return _why_unresolved(read, symbols, unresolved)
+
     _unq = _unquoted(active)
     model.neutron = re.search(r"\bneutron_data\b", _unq) is not None
     if lp := re.search(r"\bLP_Factor\(\s*(" + _NUM + r")\s*\)", _unq):
@@ -3090,7 +3267,7 @@ def read_topas_inp(path: str | Path, *,
         for key in _CELL_KEYS:
             stated = [(orig, gmask) for orig, mask, gmask in masked_lines
                       if re.search(rf"\b{key}\b", mask)]
-            read = None
+            read = unread = None
             for _orig, gmask in stated:
                 # `phase.cell` is this key's *local* scope: the keys already
                 # read for this phase, which is what a `Get(a)` on a coupled
@@ -3102,6 +3279,7 @@ def read_topas_inp(path: str | Path, *,
                                   getters=phase.cell)) is not None \
                         and read.value is not None:
                     break
+                unread = read if read is not None else unread
                 read = None
             if read is None:
                 # A **stated** key that could not be read refuses, naming the
@@ -3121,13 +3299,12 @@ def read_topas_inp(path: str | Path, *,
                         f"{'90 deg' if key in ('al', 'be', 'ga') else 'a'} for "
                         f"a number the file states. A phase that states no "
                         f"{key} at all is a different fact and keeps its "
-                        f"default.")
+                        f"default.{why(unread)}")
                 continue
             phase.cell[key] = read.value
             if read.vary is not None:
                 phase.vary[key] = read.vary
-            elif any(symbol_reads[r].vary for r in read.refs
-                     if r in symbol_reads):
+            elif any(symbol_reads[r].vary for r in _reach(read, symbol_reads)):
                 # **A cell edge resolved through a declared parameter inherits
                 # that parameter's refine flag.** `prm edge @ 5.0` with
                 # `a = edge;` is a refined cell edge, and reading the number
@@ -3169,7 +3346,7 @@ def read_topas_inp(path: str | Path, *,
                 phase.cell_limits[key] = (float(lo.group(1)) if lo else None,
                                           float(hi.group(1)) if hi else None)
         if "a" not in phase.cell:
-            if macro := _cell_macro(chunk, symbols):
+            if macro := _cell_macro(chunk, symbols, symbol_reads):
                 phase.cell.update(macro[0])
                 phase.vary.update(macro[1])
             elif bad := [n for n in _UNDEFINED_CELL_MACROS
@@ -3205,6 +3382,16 @@ def read_topas_inp(path: str | Path, *,
                     f"a different fact about the file. Write the a/b/c/al/be/ga "
                     f"lines out instead.")
         read = _read("scale", chunk, symbols)
+        if read is not None and read.value is None:
+            # A stated scale that does not resolve refuses, as a stated `beq`
+            # or `a` does: arriving None, it was seeded 1e-4 at build, and a
+            # phase's scale is its weight fraction's numerator.
+            raise TopasInpError(
+                f"{path}: {phase.name}: cannot read scale — the phase states "
+                f"'scale = {read.expr};' and this reader could not resolve its "
+                f"value, so building it would seed 1e-4 for a number the file "
+                f"states. A phase that states no scale at all is a different "
+                f"fact and keeps that seed.{why(read)}")
         phase.scale = read.value if read else None
         if read is not None and read.vary is not None:
             phase.vary["scale"] = read.vary
@@ -3242,7 +3429,7 @@ def read_topas_inp(path: str | Path, *,
                 if read is None or read.value is None:
                     raise TopasInpError(
                         f"{path}: {phase.name}: cannot read {axis} from "
-                        f"site line: {text.strip()!r}")
+                        f"site line: {text.strip()!r}{why(read)}")
                 reads[axis] = read
             # A **stated** `beq` the reader cannot resolve refuses, naming the
             # line, exactly as `x` on the same line already does — defaulting it
@@ -3259,7 +3446,7 @@ def read_topas_inp(path: str | Path, *,
                     f"{text.strip()!r} — the site states beq and this reader "
                     f"could not resolve its value, so building it would seed 0.5 "
                     f"for a number the file states. A site that states no beq at "
-                    f"all is a different fact and keeps that seed.")
+                    f"all is a different fact and keeps that seed.{why(beq_read)}")
             if beq_read is not None:
                 reads["beq"] = beq_read
             beq = beq_read.value if beq_read is not None else None
@@ -3284,9 +3471,11 @@ def read_topas_inp(path: str | Path, *,
                         f"six-slot anisotropic tensor and this reader could not "
                         f"resolve every slot (a `Get(...)` reference, or a slot "
                         f"that is not a value of the grammar), so building it "
-                        f"would substitute a number the file does not state.")
+                        f"would substitute a number the file does not state."
+                        f"{why(next((r for r in slots or () if r.value is None), None))}")
                 adps = dict(zip(_ADP_KEYS, (r.value for r in slots)))
                 for u, r in zip(_ADP_KEYS, slots):
+                    stated[u] = r
                     if r.vary is not None:
                         reads[u] = r
             elif _ADP_TOKEN.search(named_scan):
@@ -3301,8 +3490,9 @@ def read_topas_inp(path: str | Path, *,
                             f"line: {text.strip()!r} — the site states an "
                             f"anisotropic tensor and this reader could not "
                             f"resolve {u}, so building it would substitute 0 for "
-                            f"a number the file states.")
+                            f"a number the file states.{why(uread)}")
                     adps[u] = uread.value
+                    stated[u] = uread
                     if uread.vary is not None:
                         reads[u] = uread
             elif _ADPS_KW.search(text):
@@ -3331,7 +3521,7 @@ def read_topas_inp(path: str | Path, *,
                         f"line: {text.strip()!r} — the site states a magnetic "
                         f"moment and this reader could not resolve {key}, so "
                         f"building it would substitute 0 for a number the file "
-                        f"states.")
+                        f"states.{why(mread)}")
                 moment = {} if moment is None else moment
                 moment[key] = mread.value
                 stated[key] = mread
@@ -3357,7 +3547,7 @@ def read_topas_inp(path: str | Path, *,
                         f"resolve its value, so building it would substitute the "
                         f"format's 1.0 default for a number the file states. An "
                         f"occupancy the file omits is a different fact and keeps "
-                        f"1.0.")
+                        f"1.0.{why(occ_read)}")
                 occupancy = occ_read.value if occ_read is not None else None
                 vary = dict(base_vary)
                 if occ_read is not None and occ_read.vary is not None:
@@ -4220,8 +4410,8 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
             else:
                 # The file's own number, not `max(beq, 0.0)`: a negative one is
                 # kept rather than moved. A site that stated none is
-                # seeded 0.5 here, at build time — the model keeps it as None.
-                b_iso = 0.5 if s.beq is None else s.beq
+                # seeded BISO_SEED here, at build time — the model keeps it as None.
+                b_iso = BISO_SEED if s.beq is None else s.beq
                 displacement = {"biso": _sp(s, "beq", b_iso)}
             magnetic = {}
             if s.moment is not None and ph.name in magnetic_specs:
@@ -4344,6 +4534,10 @@ def to_structure(model: TopasModel, *, cell_limits: bool = True,
     except Exception as exc:
         # e.g. a phase whose site lines were all inside a disabled #ifdef branch
         raise TopasInpError(f"{model.path or '<model>'}: {exc}") from exc
+    # a site whose own images coincide is one atom on its special position
+    # (#1007), said here because this is the channel the schema lacks
+    structure = merge_site_twins(structure, diagnostics=diagnostics,
+                                 source=model.path or "<model>")
     if diagnostics is not None:
         for ip, ph in enumerate(phases_in):
             part = magnetic_parts.get(ph.name)
@@ -4810,6 +5004,7 @@ def from_structure(structure: Structure, *,
                 f"a keyword line of its own.  The same accident the `.EXP` "
                 f"writer's `write_record` refuses one format over")
         refuse_operation_list(phase, "a TOPAS `.inp`")
+        refuse_distortion_modes(phase, "a TOPAS `.inp`")
         magnetic_number = _magnetic_group_line(phase)
         lines.append("str")
         lines.append(f'  phase_name "{phase.name}"')

@@ -579,7 +579,7 @@ def test_an_unclaimed_binary_raw_names_six_vendors_and_picks_none(tmp_path):
                    "Shimadzu", "Stoe"):
         assert vendor in message
     # it says which this build reads, and offers a way out
-    assert "v3 and v4" in message and "PC-APD" in message
+    assert "v2 (single-range), v3 and v4" in message and "PC-APD" in message
     assert "ASCII" in message
     # and it names no vendor as *this* file's
     assert "is a Stoe" not in message
@@ -655,6 +655,129 @@ def test_the_pks_escape_survives_a_comment_header_and_a_short_scan(tmp_path):
                      "  20.00    567   2 0 0\n", encoding="utf-8")
     with pytest.raises(ValueError, match="declined on its name"):
         rx.read_pattern(peaks)
+
+
+# ---------------------------------------------------------- total scattering
+#: Synthetic files in the header shapes of the three writers (issue #1240).
+#: Numbers are made up; the shapes are the writers' own output layouts, and
+#: PDFgetX2's lines end in CRLF because the real files were written on Windows.
+_R = [0.5 + 0.1 * i for i in range(40)]
+_Q = [1.0 + 0.2 * i for i in range(40)]
+
+
+def _rows(x, n_extra=0):
+    pad = "    1.000000e+000" * n_extra
+    return "".join(f"  {a:.6e}    {(-1) ** i * 0.3 * a:.6e}{pad}\n"
+                   for i, a in enumerate(x))
+
+
+def _pdfgetx2(fname, s_label, columns, x, n_extra=0, pad_lines=0):
+    head_lines = [
+        "History written:  Mon Jan  1 00:00:00 2024", "Produced by someone",
+        "####### Get_XPDF #######", "", "##### General_Setting",
+        "title=X-ray PDF",
+        "iqfilesurfix=.iq    sqfilesurfix=.sq    fqfilesurfix=.fq    grfilesurfix=.gr",
+        "##### Sample_Setup information    num_atoms=2",
+        "#L symbol valence fractions z user_f1 user_f2 user_macoef",
+        "Ce   0   1.000000   58   0.000000   0.000000   0.000000",
+        *[f"padkey{i}=0    other{i}=1.000000" for i in range(pad_lines)],
+        f"#F {fname}", "#D Mon Jan  1 00:00:01 2024", "#C ", f"#S 1    {s_label}",
+        "#D ", f"#L {columns}"]
+    text = "\n".join(head_lines) + "\n" + _rows(x, n_extra)
+    return text.replace("\n", "\r\n")
+
+
+def _pdfgetx3(outputtype, columns, x):
+    return ("[DEFAULT]\n\nversion = diffpy.pdfgetx-2.1.0\n\n"
+            "# input and output specifications\ndataformat = twotheta\n"
+            f"inputfile = sample.xy\noutputtype = {outputtype}\n\n"
+            "# PDF calculation setup\nmode = xray\nwavelength = 0.1617\n"
+            "composition = Ce 1.0 O 2.0\nrpoly = 0.9\nqmaxinst = 25\nqmin = 0.5\n"
+            "qmax = 25\n\n# End of config ------------------------------\n\n"
+            f"#### start data\n#S 1\n#L {columns}\n" + _rows(x))
+
+
+_TOTAL_SCATTERING_SHAPES = {
+    # issue #192's case: a small file whose one header line labels r against G(r)
+    "small.dat": ("#L r(A) G(r)\n" + _rows(_R), "G(r)", "#L line"),
+    "x2.gr": (_pdfgetx2("x2.gr", "G(r)", "r(A)    G(r)    d_r    d_Gr", _R, 2),
+              "G(r)", "PDFgetX2"),
+    # a real PDFgetX2 header runs to about 6 kB, past the 4 kB sniff window, so
+    # its #L line is out of reach and the banner is what is matched
+    "x2_long.gr": (_pdfgetx2("x2_long.gr", "G(r)", "r(A)    G(r)    d_r    d_Gr",
+                             _R, 2, pad_lines=150), "G(r)", "PDFgetX2"),
+    "x2.sq": (_pdfgetx2("x2.sq", "S(Q)", "Q(/A)    S(Q)    d_Q    d_S(Q)    Ce-Ce",
+                        _Q, 3), "S(Q)", "PDFgetX2"),
+    "x2.fq": (_pdfgetx2("x2.fq", "F(Q)", "Q(/A)    F(Q)    d_Q    d_F(Q)", _Q, 2),
+              "F(Q)", "PDFgetX2"),
+    "x3.gr": (_pdfgetx3("gr", "r(Å)  G(Å$^{-2}$)", _R), "G(r)", "PDFgetX3"),
+    "x3.sq": (_pdfgetx3("sq", "Q(Å$^{-1}$)  S(a.u.)", _Q), "S(Q)", "PDFgetX3"),
+    "x3.fq": (_pdfgetx3("fq", "Q(Å$^{-1}$)  F(Å$^{-1}$)", _Q), "F(Q)", "PDFgetX3"),
+    # PDFgetX3 1.0 writes its configuration block behind "#", with CRLF ends;
+    # the #L line is cut so only the header can claim it
+    "x3v1.gr": ("".join("#" + line + "\r\n" for line in _pdfgetx3(
+        "gr", "x", []).replace("version = diffpy.pdfgetx-2.1.0",
+                                "version = pdfgetx3-1.0-r2152-20130314")
+        .split("#### start data")[0].splitlines())
+        + "#### start data\r\n#S 1\r\n" + _rows(_R).replace("\n", "\r\n"),
+        "G(r)", "PDFgetX3"),
+    "bare.gr": ("".join(f"{a:.4f} {0.3 * a:.4f}\n" for a in _R), "G(r)",
+                "matched on the name and not the columns"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(_TOTAL_SCATTERING_SHAPES))
+def test_a_total_scattering_file_is_refused_by_name_not_read_as_2theta(tmp_path, name):
+    """Issue #1240: every one of these fell to ``xy`` and came back as a 2θ
+    pattern with nothing a reader would act on.  Each is now claimed, refused
+    with ``PATTERN_TOTAL_SCATTERING`` at ``error``, and the message names the
+    function, the evidence that matched and #192."""
+    from rietx.io.formats import TotalScatteringRefused
+
+    text, function, evidence = _TOTAL_SCATTERING_SHAPES[name]
+    p = tmp_path / name
+    p.write_bytes(text.encode("utf-8"))
+
+    fmt = identify_format(p)
+    assert fmt.name == "total_scattering" and fmt.refuses
+    diags = []
+    with pytest.raises(TotalScatteringRefused) as refusal:
+        rx.read_pattern(p, diagnostics=diags)
+    assert isinstance(refusal.value, ValueError)   # every refusal's class
+    message = str(refusal.value)
+    assert name in message and function in message and evidence in message
+    assert "#192" in message
+    assert [(d.level, d.code) for d in diags] == [("error", "PATTERN_TOTAL_SCATTERING")]
+    assert refusal.value.diagnostic is diags[0]
+    # the escape is offered exactly where only the name was evidence
+    assert ("opens under any other name" in message) == (name == "bare.gr")
+
+
+def test_a_2theta_xy_and_a_q_axis_chi_are_not_claimed_as_total_scattering(tmp_path):
+    """The converse arm.  Only an #L label line, a writer's header or the
+    suffix claims a file: a 2θ ``.xy`` whose comment mentions G(r) still reads,
+    a SPEC-style ``#L`` labelling 2θ still reads, an ``#L`` labelling an
+    intensity on Q is a diffraction pattern and is not this code's, and a
+    Q-axis ``.chi`` keeps the answer its own reader gives."""
+    rows = "".join(f"{10.0 + 0.02 * i:.2f} {500 + i % 7}\n" for i in range(60))
+    mentions = tmp_path / "scan.xy"
+    mentions.write_text("# compare with the G(r) from PDFgetX3 later\n" + rows,
+                        encoding="utf-8")
+    spec = tmp_path / "spec.dat"
+    spec.write_text("#S 1 ascan\n#L 2Theta  Detector\n" + rows, encoding="utf-8")
+    iq = tmp_path / "iq.dat"
+    iq.write_text("#L Q(1/A)  I(Q)\n" + rows, encoding="utf-8")
+
+    for p in (mentions, spec):
+        assert identify_format(p).name == "xy"
+        assert len(rx.read_pattern(p).two_theta) == 60
+    assert identify_format(iq).name == "xy"
+
+    chi = tmp_path / "qaxis.chi"
+    chi.write_text("qaxis.chi\nQ (A-1)\nIntensity\n    60\n" + rows, encoding="utf-8")
+    assert identify_format(chi).name == "chi"
+    with pytest.raises(ValueError, match="scattering vector"):
+        rx.read_pattern(chi)
 
 
 def test_a_byte_order_mark_means_text_even_though_utf16_is_full_of_nuls(tmp_path):
@@ -884,12 +1007,93 @@ def test_a_bank_stating_no_type_flag_is_still_read_as_std(tmp_path, coeffs):
     ``gsas-0``.
     """
     p = write_gsas(tmp_path / "noflag.gsa", bintype="CONST", flag=None,
-                   body="  10 20 30 40\n", nchan=4, coeffs=coeffs)
+                   body="      10      20      30      40\n", nchan=4,
+                   coeffs=coeffs)
     d = rx.read_pattern(p)
     assert d.intensity == [10.0, 20.0, 30.0, 40.0]
     assert d.two_theta == [pytest.approx(10.0 + 0.2 * i) for i in range(4)]
     assert d.sigma is None                       # counts only, Poisson fallback
     assert d.metadata["format"] == "gsas-std"
+
+
+# -------------------------------------------------- gsas STD: (I2, F6.0) fields
+
+def gsas_std_rows(pairs):
+    """(counter number, value) pairs as STD records, packed **literally**.
+
+    Larson & Von Dreele (2004), LAUR 86-748, "GSAS raw powder file", p. 217:
+    ``(10(I2,F6.0))`` as ``(NCTR(I), YO(I))``, ten 8-character fields to a
+    record.  ``None`` as a counter number writes the field blank.  Nothing is
+    imported from ``rietx.io.formats.gsas``.
+    """
+    fields = [("  " if n is None else f"{n:2d}") + f"{v:6.0f}" for n, v in pairs]
+    assert all(len(f) == 8 for f in fields)
+    return "".join("".join(fields[i:i + 10]) + "\n"
+                   for i in range(0, len(fields), 10))
+
+
+#: Counts that do not track the counter numbers: the counter number steps
+#: 3 → 20 → 1 partway through while the counts run on smoothly, which is the
+#: shape of the GSAS-II tutorial pattern the misread was found on (#1061).
+_STD_COUNTS = [29.0, 24.0, 27.0, 21.0, 22.0, 32.0, 29.0, 24.0, 22.0, 25.0,
+               31.0, 28.0, 1684.0, 999999.0, 30.0]
+_STD_COUNTERS = [3] * 6 + [20] * 6 + [1] * 3
+
+
+def test_an_std_bank_that_writes_its_counter_numbers_reads_the_counts(tmp_path):
+    """The counter number is a field of its own and never enters the intensity.
+
+    Split on whitespace, these 15 fields came back as 30 numbers, the counter
+    numbers alternating with the counts and cut at the channel count, so the
+    first half of the counts lay on the whole axis.  999 999 fills its six
+    characters, as the manual allows.
+    """
+    p = write_gsas(tmp_path / "counters.gda", bintype="CONST", flag=None,
+                   body=gsas_std_rows(zip(_STD_COUNTERS, _STD_COUNTS)),
+                   nchan=len(_STD_COUNTS), nrec=2, coeffs=(600, 5, 0, 0))
+    notes: list = []
+    d = rx.read_pattern(p, diagnostics=notes)
+    assert d.intensity == _STD_COUNTS
+    assert len(d.two_theta) == len(_STD_COUNTS)
+    assert d.two_theta[0] == pytest.approx(6.0)
+    assert d.two_theta[-1] == pytest.approx(6.0 + 0.05 * 14)
+    # the esd stays the Poisson fallback on the value as written: the manual
+    # states σ = √I only, and not how it follows for NCTR > 1 (#1061)
+    assert d.sigma is None
+    assert d.metadata["format"] == "gsas-std"
+    # ... and the report says so: file, code and the NCTR range found
+    scaled = [n for n in notes if n.code == "PATTERN_INTENSITY_SCALED"]
+    assert len(scaled) == 1
+    assert "counters.gda" in scaled[0].message
+    assert "run 1 to 20" in scaled[0].message
+    assert scaled[0].where == ["sigma"]
+
+
+@pytest.mark.parametrize("counter", [None, 0, 1])
+def test_a_blank_zero_or_unit_counter_number_reads_the_same(tmp_path, counter):
+    """"If NCTR is zero or missing it is taken as one" — and the counts are equal."""
+    p = write_gsas(tmp_path / "unit.gda", bintype="CONST", flag="STD",
+                   body=gsas_std_rows((counter, v) for v in _STD_COUNTS),
+                   nchan=len(_STD_COUNTS), nrec=2, coeffs=(600, 5, 0, 0))
+    notes: list = []
+    assert rx.read_pattern(p, diagnostics=notes).intensity == _STD_COUNTS
+    assert not [n for n in notes if n.code == "PATTERN_INTENSITY_SCALED"]
+
+
+@pytest.mark.parametrize("bad, where", [
+    (" x    29", "first two characters"),        # a counter number that is not one
+    (" 3  ab12", "last six characters"),          # a value that is not a number
+    (" 3      ", "last six characters"),          # a counter number and no value
+])
+def test_an_std_field_out_of_layout_is_refused_by_name(tmp_path, bad, where):
+    body = gsas_std_rows([(1, 10.0)]).rstrip("\n") + bad[:8] + "\n"
+    p = write_gsas(tmp_path / "bad.gda", bintype="CONST", flag="STD",
+                   body=body, nchan=2, coeffs=(600, 5, 0, 0))
+    with pytest.raises(ValueError) as e:
+        rx.read_pattern(p)
+    msg = str(e.value)
+    assert p.name in msg and "STD" in msg and where in msg
+    assert "characters 9-16 of data record 1" in msg
 
 
 def _gsas_behind_long_time_map(path, *, table_rows, data_rows=40):
@@ -2623,18 +2827,17 @@ def test_a_range_declaring_more_points_than_the_file_holds_is_refused(tmp_path):
         rx.read_pattern(p)
 
 
-@pytest.mark.parametrize("magic,version", [(b"RAW ", 1), (b"RAW2", 2)])
 def test_an_undescribed_raw_version_is_refused_by_its_version_not_a_traceback(
-        magic, version, tmp_path):
-    """v1 has no description at all and v2 exactly one, uncorroborated — so
-    both are named rather than guessed at.  A parser written from a single
-    description with no file to check it against is how a reader comes to return
-    a plausible wrong pattern, which is what this whole seam exists to stop."""
-    p = tmp_path / f"v{version}.raw"
-    p.write_bytes(magic + b"\x00" * 4000)
+        tmp_path):
+    """v1 has no description at all, so it is named rather than guessed at.  A
+    parser written with nothing to check it against is how a reader comes to
+    return a plausible wrong pattern, which is what this whole seam exists to
+    stop."""
+    p = tmp_path / "v1.raw"
+    p.write_bytes(b"RAW " + b"\x00" * 4000)
 
     assert identify_format(p).name == "bruker_raw"
-    with pytest.raises(ValueError, match=f"RAW version {version}"):
+    with pytest.raises(ValueError, match="RAW version 1.*no description"):
         rx.read_pattern(p)
 
 
@@ -2679,6 +2882,163 @@ def test_the_alternate_range_marker_is_read_the_same_way(tmp_path):
                    marker=160)
 
     assert len(rx.read_pattern(p).two_theta) == 60
+
+
+# --------------------------------------------------------------------------- #
+# .raw v2 (RAW2) — two agreeing descriptions and one real file (WP-2059)
+#
+# The real file, Durham's `Pbso4.raw`, carries no licence and is never vendored:
+# `tests/local_data.py` registers it, and the last test here reads it only where
+# it has been fetched.  Every other v2 file is packed by `write_raw2` from its
+# own literal offsets, with the counts of the same pattern as GSAS-II's tutorial
+# holds it in `gsas2_pbso4.gpx` (in the tree under the GSAS-II licence).
+# --------------------------------------------------------------------------- #
+
+
+def _pbso4_xray_from_the_gpx():
+    """The X-ray histogram of ``gsas2_pbso4.gpx``: 6000 points, 10-159.975°."""
+    import numpy as np
+
+    from rietx.io.projects.gsas2 import _read_tree
+
+    tree = _read_tree(DATA / "gsas2_pbso4.gpx")
+    hist = next(item[0] for item in tree if isinstance(item[0], list)
+                and str(item[0][0]).startswith("PWDR PBSO4.XRA"))
+    x, y = (np.asarray(a, dtype=float) for a in hist[1][1][:2])
+    return x, y
+
+
+def test_a_v2_file_reads_to_the_counts_it_was_packed_with(tmp_path):
+    from tests.writers_xrd import write_raw2
+
+    x, y = _pbso4_xray_from_the_gpx()
+    p = write_raw2(tmp_path / "pbso4.raw", y, start=10.0, step=0.025)
+
+    assert identify_format(p).name == "bruker_raw"
+    notes: list = []
+    d = rx.read_pattern(p, diagnostics=notes)
+    assert d.intensity == y.tolist()
+    assert len(d.two_theta) == 6000
+    # float32 start and step, as the file holds them: 0.025 is not exact in
+    # float32, so the last point is 159.975 to within that rounding
+    assert d.two_theta == pytest.approx(x.tolist(), abs=1e-5)
+    assert d.sigma is None                       # whole counts: Poisson is right
+    assert d.metadata["format"] == "bruker_raw"
+    assert d.metadata["scan_count"] == "1"
+    assert notes == []
+    assert [s.n_points for s in list_scans(p)] == [6000]
+
+
+def test_the_v2_data_offset_is_the_header_length_the_file_declares(tmp_path):
+    """The real file's block header is 68 bytes; another length moves the data,
+    and a reader holding 0x144 as a constant reads the counts from inside it."""
+    from tests.writers_xrd import write_raw2
+
+    y = [500.0 + i % 13 for i in range(300)]
+    p = write_raw2(tmp_path / "long_header.raw", y, header_length=100)
+
+    assert p.stat().st_size == 0x100 + 100 + 4 * 300
+    assert rx.read_pattern(p).intensity == y
+
+
+def test_v2_counts_are_the_files_with_none_raised_to_one(tmp_path):
+    """GSAS-II raises every count below 1 to 1; the counts here are the file's.
+
+    A zero count is a measurement, and a value the arithmetic cannot call a
+    count is withheld a σ and reported, as for the other two versions."""
+    from tests.writers_xrd import write_raw2
+
+    whole = write_raw2(tmp_path / "zeros.raw", [0.0, 3.0, 0.0, 7.0] * 20)
+    assert rx.read_pattern(whole).intensity[:4] == [0.0, 3.0, 0.0, 7.0]
+
+    notes: list = []
+    scaled = write_raw2(tmp_path / "scaled.raw", [0.25, -2.0, 4.5, 9.0] * 20)
+    d = rx.read_pattern(scaled, diagnostics=notes)
+    assert d.intensity[:4] == [0.25, -2.0, 4.5, 9.0]
+    assert [n.code for n in notes] == ["PATTERN_INTENSITY_SCALED"]
+
+
+def _set_header_length(p, value):
+    raw = bytearray(p.read_bytes())
+    raw[0x100:0x102] = value.to_bytes(2, "little")
+    p.write_bytes(bytes(raw))
+
+
+#: Each gate's broken twin: the writer's keywords, then a byte edit after it,
+#: then the words the refusal must contain.  The intact twin of every case is
+#: the same call without the break, and it has to read first.
+_V2_BROKEN = {
+    "two blocks": (dict(blocks=2), None, "declares 2 blocks, a multi-range v2"),
+    "no blocks": (dict(blocks=0), None, "declares 0 blocks"),
+    "no points": (dict(points=0, counts=[]), None, "declares 0 points"),
+    "a byte past the counts": (dict(trailing=b"\x00"), None,
+                               "would end at offset 484, and the file is 485"),
+    "a point count one too many": (dict(points=41), None,
+                                   "and 41 points, so its counts would end"),
+    "a header length that moves the data": (
+        {}, lambda p: _set_header_length(p, 72),
+        "declares a length of 72 bytes"),
+    "the last count cut short": (
+        {}, lambda p: p.write_bytes(p.read_bytes()[:-2]),
+        "would end at offset 484, and the file is 482 bytes"),
+}
+
+
+@pytest.mark.parametrize("case", sorted(_V2_BROKEN))
+def test_each_v2_gate_refuses_its_broken_twin_by_name(case, tmp_path):
+    """Every gate is one a real file can fail, and each is shown failable: the
+    twin without the break reads to its counts first, so a refusal here is the
+    gate's and not the writer's."""
+    from tests.writers_xrd import write_raw2
+
+    options, edit, refusal = _V2_BROKEN[case]
+    counts = options.pop("counts", [100.0 + i for i in range(40)])
+    intact = write_raw2(tmp_path / "intact.raw", [100.0 + i for i in range(40)])
+    assert rx.read_pattern(intact).intensity == [100.0 + i for i in range(40)]
+
+    broken = write_raw2(tmp_path / "broken.raw", counts, **options)
+    if edit is not None:
+        edit(broken)
+    assert identify_format(broken).name == "bruker_raw"
+    with pytest.raises(ValueError, match=refusal) as caught:
+        rx.read_pattern(broken)
+    assert "broken.raw" in str(caught.value)
+
+
+def test_the_real_v2_file_reads_to_its_6001_pinned_counts():
+    """Durham's ``Pbso4.raw``, where it has been fetched (local-only, WP-2059).
+
+    The pin is this published file's own numbers, stated against the gpx
+    histogram of the same pattern so no count is retyped: the two agree at 5998
+    of their 6000 common points, the RAW file reads 278 and 276 where the gpx
+    has 275 at 143.375° and 153.725°, and it has one more point, 368 counts at
+    160°.  TOPAS, run as a black box on the file, returned the same 6001
+    (issue #1164)."""
+    import numpy as np
+
+    from tests import local_data
+
+    where = local_data.dataset("durham-topas/pbso4")
+    if where is None:
+        pytest.skip("Pbso4.raw is not fetched: python -m tests.local_data "
+                    "durham-topas/pbso4")
+
+    x, y = _pbso4_xray_from_the_gpx()
+    expected = y.copy()
+    for angle, raw_count in ((143.375, 278.0), (153.725, 276.0)):
+        at = int(np.argmin(abs(x - angle)))
+        assert abs(x[at] - angle) < 1e-6 and expected[at] == 275.0
+        expected[at] = raw_count
+    expected = np.append(expected, 368.0)
+
+    notes: list = []
+    d = rx.read_pattern(where / "Pbso4.raw", diagnostics=notes)
+    assert len(d.intensity) == 6001
+    assert d.intensity == expected.tolist()
+    assert d.two_theta[0] == 10.0
+    assert d.two_theta[-1] == pytest.approx(160.0, abs=1e-5)
+    assert d.sigma is None
+    assert notes == []
 
 
 # --------------------------------------------------------------------------- #
@@ -2896,3 +3256,416 @@ def test_a_v3_range_count_that_is_not_a_count_is_refused(tmp_path):
 
     with pytest.raises(ValueError, match="not a number of measurements"):
         rx.read_pattern(p)
+
+
+# ----------------------------------------------- FullProf's XYDATA heading
+def _xydata(path: Path, *, temp: str | None = "4.25", inter: str = "1.0 1.0 0",
+            heading_number: bool = False) -> Path:
+    """A synthetic FullProf ``Ins = 10`` file: the keyword, five heading lines
+    (the manual's, PDF p. 74), then x y σ rows of a small peak on 100 counts."""
+    heading = ["TITLE synthetic", "COND: neutrons",
+               "12.5 7.0 1.0" if heading_number else "FILE: synthetic.xys",
+               f"TEMP {temp}" if temp is not None else "! no temperature",
+               f"INTER {inter} 0.05"]
+    rows = [f"{10 + 0.1 * i:.3f} {100.0 + 50.0 * (i == 50):.3f} 10.0"
+            for i in range(120)]
+    path.write_text("\n".join(["XYDATA", *heading, *rows]) + "\n",
+                    encoding="utf-8")
+    return path
+
+
+def test_an_xydata_heading_carries_its_temperature(tmp_path):
+    """``TEMP tsamp`` becomes the series coordinate; main before this dropped it.
+
+    The positive arm is the same file with no ``TEMP``, which says nothing,
+    and a plain two-column file, which never had a heading to read.
+    """
+    read = rx.read_pattern(_xydata(tmp_path / "t.xys", temp="4.25  4.31"))
+    assert read.metadata["temperature_k"] == "4.25"
+    assert read.intensity[0] == 100.0 and read.sigma[0] == 10.0
+    assert len(read.intensity) == 120
+    silent = rx.read_pattern(_xydata(tmp_path / "n.xys", temp=None))
+    assert "temperature_k" not in silent.metadata
+    plain = write_xy(tmp_path / "plain.xy", [10.0, 10.1, 10.2], [1.0, 2.0, 3.0])
+    assert "temperature_k" not in rx.read_pattern(plain).metadata
+
+
+def test_an_xydata_heading_line_is_never_read_as_a_point(tmp_path):
+    """The manual makes the five lines after the keyword a heading, numeric or not."""
+    read = rx.read_pattern(_xydata(tmp_path / "h.xys", heading_number=True))
+    assert len(read.intensity) == 120
+    assert min(read.two_theta) == pytest.approx(10.0)
+
+
+@pytest.mark.parametrize(("inter", "named"), [
+    ("1.0 2.0 0", "fac_y = 2"), ("0.5 1.0 0", "fac_x = 0.5"),
+    ("1.0 1.0 1", "Interpol = 1")])
+def test_an_xydata_multiplier_or_interpolation_is_refused_by_name(
+        tmp_path, inter, named):
+    """FullProf scales or interpolates these numbers before using them, and
+    this reader does not; main before this read them as written, silently."""
+    with pytest.raises(ValueError, match=named):
+        rx.read_pattern(_xydata(tmp_path / "f.xys", inter=inter))
+    assert rx.read_pattern(_xydata(tmp_path / "u.xys",
+                                   inter="1.0000 1.0000 2")).intensity[0] == 100.0
+
+
+# ----------------------------------------------- pdCIF: the net intensity column
+# ``_pd_proc_intensity_net`` is the item a TOPAS deposit writes (WP-1806, #561).
+# It is read last of the intensity items, reported every time it is the one
+# read, and a column labelled net that never comes near zero is reported as
+# still carrying its background.  Nothing is repaired: y is the file's.
+
+def _write_pdcif(path, columns: dict[str, list[float]]):
+    """A one-block pdCIF holding ``columns`` as one loop, 2θ first; a ``str``
+    cell is written as it is (``?`` and ``.`` are the CIF nulls)."""
+    tags = list(columns)
+    rows = zip(*(columns[t] for t in tags))
+    text = ("data_synthetic\nloop_\n" + "".join(f"{t}\n" for t in tags)
+            + "".join(" ".join(v if isinstance(v, str) else repr(float(v)) for v in r)
+                      + "\n" for r in rows))
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+_TT = [10.0, 10.01, 10.02, 10.03, 10.04, 10.05]
+_Y = [400.0, 410.0, 900.0, 1200.0, 420.0, 405.0]
+#: weights with a variable counting time folded in, so σ = 1/√w is not √y
+_W = [0.0050, 0.0049, 0.0011, 0.0016, 0.0048, 0.0049]
+
+
+def test_a_net_column_reads_with_its_weights_and_is_reported(tmp_path):
+    """T1: the item TOPAS deposits, refused before it was in ``_PDCIF_Y``."""
+    p = _write_pdcif(tmp_path / "net.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": _W,
+        "_pd_proc_intensity_net": _Y})
+    found: list = []
+    pat = rx.read_pattern(p, diagnostics=found)
+    assert pat.intensity == _Y
+    assert pat.sigma == pytest.approx([1 / w ** 0.5 for w in _W], rel=1e-12)
+    assert "PATTERN_INTENSITY_NET" in [d.code for d in found]
+    assert pat.metadata["intensity_item"] == "_pd_proc_intensity_net"
+
+
+def test_the_same_values_as_a_total_column_read_identically_and_say_nothing(tmp_path):
+    """T2, the control: only the item's name differs, so only the report may."""
+    net = _write_pdcif(tmp_path / "net.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": _W,
+        "_pd_proc_intensity_net": _Y})
+    total = _write_pdcif(tmp_path / "total.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": _W,
+        "_pd_proc_intensity_total": _Y})
+    found: list = []
+    a, b = rx.read_pattern(net), rx.read_pattern(total, diagnostics=found)
+    assert (a.two_theta, a.intensity, a.sigma) == (b.two_theta, b.intensity, b.sigma)
+    assert found == []
+    assert "intensity_item" not in b.metadata
+
+
+def test_a_total_column_beside_a_net_one_wins(tmp_path):
+    """T3: net is last, so a file stating both reads as it did before."""
+    p = _write_pdcif(tmp_path / "both.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": _W,
+        "_pd_proc_intensity_net": [v - 300.0 for v in _Y],
+        "_pd_proc_intensity_total": _Y})
+    found: list = []
+    pat = rx.read_pattern(p, diagnostics=found)
+    assert pat.intensity == _Y
+    assert found == []
+
+
+def test_a_net_columns_own_su_wins_over_the_weights(tmp_path):
+    """T4: the su suffix rule reaches the net item with no code of its own."""
+    su = [21.0, 22.0, 33.0, 37.0, 22.5, 21.5]
+    p = _write_pdcif(tmp_path / "su.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": _W,
+        "_pd_proc_intensity_net": _Y, "_pd_proc_intensity_net_su": su})
+    assert rx.read_pattern(p).sigma == su
+
+
+def test_the_acridine_deposit_reads_its_weights_and_its_net_column_disagrees():
+    """T5, the real file (COD 2242872, ``tests/data/README.md``).
+
+    Its weights carry a variable counting time, so w·y is about 1 at low angle
+    and about 5 from 26 to 30°: a σ taken as √y instead would weigh the high
+    half wrongly by up to √5.  Its net column never comes within 14σ of zero,
+    so the contradiction fires.
+    """
+    import numpy as np
+
+    found: list = []
+    pat = rx.read_pattern(DATA / "cod_2242872.cif", diagnostics=found)
+    tt, y = np.array(pat.two_theta), np.array(pat.intensity)
+    s = np.array(pat.sigma)
+    assert len(tt) == 6601
+    assert (tt[0], tt[-1]) == (2.002, 35.002)
+    wy = y / s ** 2
+    assert np.median(wy[tt < 18.0]) == pytest.approx(1.05, abs=0.02)
+    assert np.median(wy[(tt >= 26.0) & (tt < 30.0)]) == pytest.approx(5.1, abs=0.1)
+    codes = [d.code for d in found]
+    assert codes == ["PATTERN_INTENSITY_NET", "PATTERN_NET_HAS_BACKGROUND"]
+    assert found[1].level == "warning"
+    assert found[1].value == pytest.approx(14.12, abs=0.01)
+
+
+def test_a_net_column_with_a_true_zero_baseline_is_only_reported(tmp_path):
+    """T6, the contradiction's negative arm: a subtracted pattern returns to
+    within noise of zero between its peaks, so only the info code fires."""
+    import numpy as np
+
+    rng = np.random.default_rng(1806)
+    tt = np.round(np.arange(10.0, 12.0, 0.01), 4)
+    peak = 2000.0 * np.exp(-0.5 * ((tt - 11.0) / 0.03) ** 2)
+    sig = np.sqrt(peak + 100.0)      # a background of 100 was subtracted
+    y = peak + rng.normal(0.0, 1.0, tt.size) * sig
+    p = _write_pdcif(tmp_path / "zero.cif", {
+        "_pd_proc_2theta_corrected": tt.tolist(),
+        "_pd_proc_ls_weight": (1.0 / sig ** 2).tolist(),
+        "_pd_proc_intensity_net": y.tolist()})
+    found: list = []
+    rx.read_pattern(p, diagnostics=found)
+    assert [d.code for d in found] == ["PATTERN_INTENSITY_NET"]
+
+
+def _offset_net(tmp_path, name, extra=None):
+    """A net column riding 300 counts above zero everywhere, with its weights."""
+    cols = {"_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": _W,
+            "_pd_proc_intensity_net": [v + 300.0 for v in _Y]}
+    cols.update(extra or {})
+    found: list = []
+    rx.read_pattern(_write_pdcif(tmp_path / name, cols), diagnostics=found)
+    return [d for d in found if d.code == "PATTERN_NET_HAS_BACKGROUND"]
+
+
+def test_the_suggestion_tells_the_two_readings_apart_and_prescribes_neither(tmp_path):
+    """T6c: whether a column still carries a background is a fact about the
+    file's history.  The warning gives the minimum and its 2θ and names both
+    readings; the suggestion says how to tell them apart (y against
+    y - bkg_calc where the file states one, an empty baseline otherwise) and
+    names each reading's fix, so it never says to hold the curve outright."""
+    plain, = _offset_net(tmp_path, "plain.cif")
+    assert "so the background was not subtracted" not in plain.message
+    assert "a background was left in" in plain.message
+    assert "no empty baseline" in plain.message
+    assert "2θ = " in plain.message
+    assert plain.suggestion.startswith("tell the two readings apart")
+    assert "look for an empty stretch of baseline" in plain.suggestion
+    assert "y - _pd_proc_intensity_bkg_calc" not in plain.suggestion
+    held, = _offset_net(tmp_path, "held.cif", {
+        "_pd_proc_intensity_bkg_calc": [300.0] * len(_TT)})
+    assert held.suggestion.startswith("tell the two readings apart")
+    assert "compare y with y - _pd_proc_intensity_bkg_calc" in held.suggestion
+    assert "BackgroundFixedPlusChebyshev" in held.suggestion
+    assert "already be subtracted" in held.suggestion
+
+
+def test_a_column_already_subtracted_by_the_files_curve_is_not_told_to_hold_it(
+        tmp_path):
+    """T6e: the depositor subtracted ``_pd_proc_intensity_bkg_calc`` and the
+    pattern is windowed onto a peak cluster, so the warning fires on a column
+    that is already net.  Holding the curve would count the background twice,
+    so the suggestion must not prescribe that, and must say how to see it."""
+    import numpy as np
+
+    rng = np.random.default_rng(1806)
+    tt = np.round(np.arange(10.95, 11.05, 0.01), 4)
+    peak = 2000.0 * np.exp(-0.5 * ((tt - 11.0) / 0.03) ** 2)
+    sig = np.sqrt(peak + 100.0)
+    y = peak + rng.normal(0.0, 1.0, tt.size) * sig      # already net
+    p = _write_pdcif(tmp_path / "sub.cif", {
+        "_pd_proc_2theta_corrected": tt.tolist(),
+        "_pd_proc_ls_weight": (1.0 / sig ** 2).tolist(),
+        "_pd_proc_intensity_net": y.tolist(),
+        "_pd_proc_intensity_bkg_calc": [100.0] * tt.size})
+    found: list = []
+    rx.read_pattern(p, diagnostics=found)
+    warn, = [d for d in found if d.code == "PATTERN_NET_HAS_BACKGROUND"]
+    assert not warn.suggestion.startswith("hold")
+    assert "compare y with y - _pd_proc_intensity_bkg_calc" in warn.suggestion
+    assert "when y - it reaches zero" in warn.suggestion
+    assert "may already be subtracted" in warn.suggestion
+
+
+def test_a_subtracted_pattern_windowed_onto_a_peak_cluster_misfires(tmp_path):
+    """T6d, the threshold's stated failure case: with no empty baseline in range
+    a truly subtracted column never nears zero, and the warning fires.  Pinned
+    so the limit stays written down in ``help.py`` and the skill row."""
+    import numpy as np
+
+    rng = np.random.default_rng(1806)
+    tt = np.round(np.arange(10.95, 11.05, 0.01), 4)
+    peak = 2000.0 * np.exp(-0.5 * ((tt - 11.0) / 0.03) ** 2)
+    sig = np.sqrt(peak + 100.0)
+    y = peak + rng.normal(0.0, 1.0, tt.size) * sig
+    p = _write_pdcif(tmp_path / "window.cif", {
+        "_pd_proc_2theta_corrected": tt.tolist(),
+        "_pd_proc_ls_weight": (1.0 / sig ** 2).tolist(),
+        "_pd_proc_intensity_net": y.tolist()})
+    found: list = []
+    rx.read_pattern(p, diagnostics=found)
+    assert [d.code for d in found] == ["PATTERN_INTENSITY_NET",
+                                       "PATTERN_NET_HAS_BACKGROUND"]
+
+
+def test_a_calculated_net_column_alone_is_still_refused(tmp_path):
+    """T7: ``_pd_calc_intensity_net`` is a model, never a measurement."""
+    p = _write_pdcif(tmp_path / "calc.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_calc_intensity_net": _Y})
+    with pytest.raises(ValueError, match="no pdCIF pattern block found"):
+        rx.read_pattern(p)
+
+
+def test_a_single_zero_weight_excludes_that_point_and_keeps_the_column(tmp_path):
+    """T8: the pdCIF dictionary defines a zero ``_pd_proc_ls_weight`` as "a data
+    point not used for refinement" (``_pd_proc.ls_weight``).  One zero used to
+    drop the whole column to the Poisson fallback with no diagnostic, so every
+    other point lost its weight; now that point alone is excluded."""
+    import numpy as np
+
+    w = list(_W)
+    w[2] = 0.0
+    p = _write_pdcif(tmp_path / "zero_w.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": w,
+        "_pd_proc_intensity_total": _Y})
+    found: list = []
+    pat = rx.read_pattern(p, diagnostics=found)
+    kept = [i for i in range(len(_TT)) if i != 2]
+    assert [pat.sigma[i] for i in kept] == pytest.approx(
+        [1 / w[i] ** 0.5 for i in kept], rel=1e-12)
+    assert pat.excluded_regions == [pytest.approx((10.015, 10.025))]
+    mask = pat.in_range_mask()
+    assert mask.tolist() == [True, True, False, True, True, True]
+    assert [d.code for d in found] == ["PATTERN_ZERO_WEIGHT_EXCLUDED"]
+    assert found[0].value == 1.0
+    assert np.isfinite(pat.sigma).all()
+
+
+def _zero_weight_pdcif(path):
+    w = list(_W)
+    w[2] = 0.0
+    return _write_pdcif(path, {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": w,
+        "_pd_proc_intensity_total": _Y})
+
+
+def test_a_callers_excluded_region_joins_the_readers_zero_weight_one(tmp_path):
+    """T8b: ``Project.create(excluded_regions=...)`` used to assign over the
+    reader's exclusions, so a zero-weight point re-entered the fit at the
+    Poisson placeholder sigma.  Both must be excluded, and survive a reopen."""
+    from tests.test_refine_synthetic import perturbed_models
+
+    p = _zero_weight_pdcif(tmp_path / "zero_w.cif")
+    structure, ins = perturbed_models()
+    project = rx.Project.create(tmp_path / "zw.rex", pattern=p,
+                                structure=structure, instrument=ins,
+                                excluded_regions=[(10.035, 10.045)])
+    for proj in (project, rx.Project.open(project.path)):
+        assert proj.data.in_range_mask().tolist() == [
+            True, True, False, True, False, True]
+        assert len(proj.doc.excluded_regions) == 2
+
+
+def test_a_series_members_own_exclusions_survive_the_projects_regions(tmp_path):
+    """T8c: the same replacement at ``gui/series.py``'s ``read_members``, where a
+    series of zero-weight pdCIFs lost them even with no region set by the user."""
+    from types import SimpleNamespace
+
+    from rietx.gui import series as series_mod
+
+    p = _zero_weight_pdcif(tmp_path / "zero_w.cif")
+    setup = SimpleNamespace(members=[SimpleNamespace(path=p, options={})])
+    bare, = series_mod.read_members(setup, [])
+    assert bare.in_range_mask().tolist() == [True, True, False, True, True, True]
+    both, = series_mod.read_members(setup, [(10.035, 10.045)])
+    assert both.in_range_mask().tolist() == [
+        True, True, False, True, False, True]
+
+
+def test_zero_weight_runs_at_the_ends_and_a_descending_scan(tmp_path):
+    """T9: runs at either end are closed intervals of their own points only,
+    and a scan stored high to low keeps each zero on its own point."""
+    w = [0.0, 0.0, 0.0011, 0.0016, 0.0048, 0.0]
+    p = _write_pdcif(tmp_path / "ends.cif", {
+        "_pd_proc_2theta_corrected": _TT[::-1], "_pd_proc_ls_weight": w[::-1],
+        "_pd_proc_intensity_total": _Y[::-1]})
+    found: list = []
+    pat = rx.read_pattern(p, diagnostics=found)
+    assert pat.two_theta == _TT
+    assert pat.in_range_mask().tolist() == [False, False, True, True, True, False]
+    assert len(pat.excluded_regions) == 2
+    assert [d.code for d in found] == ["PATTERN_SCAN_REVERSED",
+                                       "PATTERN_ZERO_WEIGHT_EXCLUDED"]
+    assert found[1].value == 3.0
+
+
+def test_a_weight_column_with_no_positive_weight_is_not_read(tmp_path):
+    """T10: all zeros would exclude every point; the column is read as no
+    weights, the Poisson fallback, and ``PATTERN_WEIGHT_UNUSABLE`` says so."""
+    p = _write_pdcif(tmp_path / "zeros.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": [0.0] * len(_TT),
+        "_pd_proc_intensity_total": _Y})
+    found: list = []
+    pat = rx.read_pattern(p, diagnostics=found)
+    assert pat.sigma is None and pat.excluded_regions == []
+    assert [d.code for d in found] == ["PATTERN_WEIGHT_UNUSABLE"]
+    assert found[0].value == 0.0
+    assert "no positive weight" in found[0].message
+    assert "Poisson" in found[0].message
+
+
+def test_a_negative_weight_falls_back_to_poisson_and_says_so(tmp_path):
+    """T10b: a negative weight has no σ; the column is not read, and the
+    diagnostic counts the negative entries."""
+    w = list(_W)
+    w[1], w[4] = -w[1], -w[4]
+    p = _write_pdcif(tmp_path / "neg.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": w,
+        "_pd_proc_intensity_total": _Y})
+    found: list = []
+    pat = rx.read_pattern(p, diagnostics=found)
+    assert pat.sigma is None and pat.excluded_regions == []
+    assert [d.code for d in found] == ["PATTERN_WEIGHT_UNUSABLE"]
+    assert found[0].value == 2.0
+    assert "2 negative weight(s)" in found[0].message
+
+
+@pytest.mark.parametrize("null", ["?", "."])
+def test_a_cif_null_among_positive_weights_is_counted_as_missing(tmp_path, null):
+    """T10d (Yue, round 1): ``?`` and ``.`` read as NaN. Five of the six
+    weights are positive, so the message must not say "no positive weight";
+    the column is still dropped, as in 1.10.0, and the null is counted on its
+    own beside any negative entries."""
+    w = list(_W)
+    w[2] = null
+    p = _write_pdcif(tmp_path / "null.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": w,
+        "_pd_proc_intensity_total": _Y})
+    found: list = []
+    pat = rx.read_pattern(p, diagnostics=found)
+    assert pat.sigma is None and pat.excluded_regions == []
+    assert [d.code for d in found] == ["PATTERN_WEIGHT_UNUSABLE"]
+    assert found[0].value == 1.0
+    assert "1 missing weight(s)" in found[0].message
+    assert "no positive weight" not in found[0].message
+    assert "negative" not in found[0].message
+    # a negative and two nulls in the same column: each counted on its own
+    w[0], w[4] = -w[0], "?"
+    p = _write_pdcif(tmp_path / "both.cif", {
+        "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": w,
+        "_pd_proc_intensity_total": _Y})
+    found = []
+    rx.read_pattern(p, diagnostics=found)
+    assert found[0].value == 3.0
+    assert "1 negative weight(s) and 2 missing weight(s)" in found[0].message
+
+
+def test_a_usable_weight_column_does_not_fire_the_fallback_code(tmp_path):
+    """T10c: positive weights, and weights with zeros among positives, read."""
+    for name, w in (("pos", list(_W)), ("zero", [0.0] + list(_W[1:]))):
+        p = _write_pdcif(tmp_path / f"{name}.cif", {
+            "_pd_proc_2theta_corrected": _TT, "_pd_proc_ls_weight": w,
+            "_pd_proc_intensity_total": _Y})
+        found: list = []
+        pat = rx.read_pattern(p, diagnostics=found)
+        assert pat.sigma is not None
+        assert "PATTERN_WEIGHT_UNUSABLE" not in [d.code for d in found]

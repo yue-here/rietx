@@ -1,0 +1,56 @@
+/* The site's colours and faces: the landing page at / and the manual at /docs/ (WP-2021).
+   This file is their one authority.  `build.py` inlines it at the top of the landing page's
+   stylesheet; the manual's `conf.py` copies it into `_static/` and loads it before
+   `custom.css`, which maps pydata-sphinx-theme's `--pst-*` names onto these and spells no
+   colour of its own.  `docs/landing/README.md` § House style says which colour does which
+   job, and `tests/test_landing.py` measures every text colour against every ground it is
+   drawn on (WCAG 2.2 AA, 4.5:1).
+
+   Written three times: light on `:root`; dark when the system asks for it and no light theme
+   is pinned; dark when pinned.  The two dark blocks are one set of values, held equal by the
+   same test.  Both pages pin a theme through `data-theme` on `<html>`, and pydata also
+   writes `auto` there before its script resolves it, which the second block reads as the
+   system's choice. */
+:root{
+  --bg:#fbfaf8; --surface:#ffffff; --surface-2:#f4f1ec; --surface-3:#ece7e0;
+  --ink:#1c1917; --ink-2:#403a35; --muted:#6b6259; --faint:#7a7167;
+  --rule:#e6e0d8; --rule-strong:#d1c9bf;
+  --accent:#c65d0a; --accent-ink:#a34c06; --accent-soft:#fdf0e3; --on-accent:#ffffff;
+  --ok:#2a7d2a; --warn:#7d5f00; --info:#2b6596; --danger:#b4271f;
+  --calc:#ff7f0e; --obs:#1c1917; --diff:#7a7a7a; --zero:#cfcfcf;
+  --p0:#1f77b4; --p1:#d62728; --p2:#2ca02c;
+  --support:#6f6559; --support-2:#c2b7a6; --support-3:#e0d9ce;
+  --atm-n2:#c9c2b8; --atm-h2:#7ea6d8; --atm-air:#e08a7a;
+  --heat0:#ffffff; --heat1:#ffe2bd; --heat2:#ff7f0e; --heat3:#5a2106;
+  --shadow:0 1px 2px rgba(28,25,23,.06), 0 12px 32px -18px rgba(28,25,23,.25);
+  --sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15110d; --surface:#1d1813; --surface-2:#252019; --surface-3:#2e2820;
+    --ink:#f1ece5; --ink-2:#d2c9bd; --muted:#a0968a; --faint:#8c8277;
+    --rule:#312a22; --rule-strong:#463d32;
+    --accent:#ff9d4d; --accent-ink:#ffb679; --accent-soft:#2c1f12; --on-accent:#1c1917;
+    --ok:#5fd45f; --warn:#e3c25b; --info:#86b7ea; --danger:#ff8f86;
+    --calc:#ff9d4d; --obs:#ece7df; --diff:#8f8f8f; --zero:#4a4a4a;
+    --p0:#6fb1ff; --p1:#ff7b7b; --p2:#6ede8a;
+    --support:#d3c7b6; --support-2:#7a6d5c; --support-3:#443e36;
+    --atm-n2:#4a443c; --atm-h2:#3f6a9c; --atm-air:#a6533f;
+    --heat0:#15110d; --heat1:#5a2c0c; --heat2:#ff9d4d; --heat3:#ffeacb;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 32px -18px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15110d; --surface:#1d1813; --surface-2:#252019; --surface-3:#2e2820;
+  --ink:#f1ece5; --ink-2:#d2c9bd; --muted:#a0968a; --faint:#8c8277;
+  --rule:#312a22; --rule-strong:#463d32;
+  --accent:#ff9d4d; --accent-ink:#ffb679; --accent-soft:#2c1f12; --on-accent:#1c1917;
+  --ok:#5fd45f; --warn:#e3c25b; --info:#86b7ea; --danger:#ff8f86;
+  --calc:#ff9d4d; --obs:#ece7df; --diff:#8f8f8f; --zero:#4a4a4a;
+  --p0:#6fb1ff; --p1:#ff7b7b; --p2:#6ede8a;
+  --support:#d3c7b6; --support-2:#7a6d5c; --support-3:#443e36;
+  --atm-n2:#4a443c; --atm-h2:#3f6a9c; --atm-air:#a6533f;
+  --heat0:#15110d; --heat1:#5a2c0c; --heat2:#ff9d4d; --heat3:#ffeacb;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 12px 32px -18px rgba(0,0,0,.8);
+}

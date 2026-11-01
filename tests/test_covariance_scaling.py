@@ -216,14 +216,24 @@ def _eigh_fails(*args, **kwargs):
 
 
 def test_a_failed_eigensolve_leaves_the_esds_absent_not_raised(monkeypatch):
-    from rietx.optimize import least_squares, statistics
+    """Since WP-2002 the eigensolve is repeated with LAPACK's ``syev`` where
+    numpy's ``syevd`` fails (``optimize.lapack``), so the esds are absent only
+    when both drivers fail."""
+    from rietx.optimize import lapack, least_squares, statistics
 
     jac, resid = _problem()
-    assert least_squares._guarded_covariance(jac, resid, 4, 400)[2] is None
+    ref = least_squares._guarded_covariance(jac, resid, 4, 400)
+    assert ref[3] is None
 
     monkeypatch.setattr(statistics.np.linalg, "eigh", _eigh_fails)
-    stderr, corr, error = least_squares._guarded_covariance(jac, resid, 4, 400)
-    assert stderr is None and corr is None
+    stderr, _, _, error = least_squares._guarded_covariance(jac, resid, 4, 400)
+    assert error is None
+    np.testing.assert_allclose(stderr, ref[0], rtol=1e-10)
+
+    monkeypatch.setattr(lapack.scipy.linalg, "eigh", _eigh_fails)
+    stderr, corr, factor, error = least_squares._guarded_covariance(
+        jac, resid, 4, 400)
+    assert stderr is None and corr is None and factor is None
     assert "Eigenvalues did not converge" in error
 
 

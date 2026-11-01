@@ -490,15 +490,16 @@ def test_suggest_is_read_only(truth, monkeypatch):
 
 
 def test_lebail_mode_fixed_paths_never_enumerate(truth):
-    """In Le Bail mode no .atoms./.scale/.source.lines. path is a candidate,
-    and everything refinable-but-held was either scored or skipped."""
+    """In Le Bail mode no .atoms./.scale path is a candidate, and everything
+    refinable-but-held was either scored or skipped.  An emission line's
+    weight is a candidate since WP-2002 lifted its force-fix (2026-10-20)."""
     r, data = _refinement(truth, free=("instrument.background.*",))
     res = r.suggest(data, mode="lebail")
     reported = (_member_paths(res) + [p.path for p in res.non_separable]
                 + res.skipped)
     assert reported and not any(
-        ".atoms." in p or p.endswith(".scale") or ".source.lines." in p
-        for p in reported)
+        ".atoms." in p or p.endswith(".scale") for p in reported)
+    assert "instrument.source.lines.1.weight" in reported
     held = [row for row in r.parameters(mode="lebail")
             if row.refinable and not row.vary]
     assert res.n_evaluated + len(res.skipped) == len(held)

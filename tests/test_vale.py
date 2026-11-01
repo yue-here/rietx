@@ -1,6 +1,6 @@
 """The term list Vale reads (WP-1982).
 
-Vale itself runs in CI's lint job, over the new manual; these tests hold the
+Vale itself runs in CI's lint job, over the manual; these tests hold the
 inputs it reads to their authorities.  The accept list is generated from
 `rietx.help` and a hand-kept file, so it is committed and held equal to its
 generator, the `tokens.css` pattern (WP-1429).

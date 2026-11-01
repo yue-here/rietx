@@ -88,6 +88,7 @@ from scipy.sparse import csr_matrix
 
 from ..crystallography.symmetry import reflection_label
 from ..model.forward import d_spacings
+from ..optimize import lapack
 from ..optimize.statistics import column_rescale
 
 _CELL_KEYS = ("a", "b", "c", "alpha", "beta", "gamma")
@@ -326,7 +327,7 @@ def _low_rank_pinv(X: np.ndarray, w: np.ndarray) -> np.ndarray:
     d = np.sqrt(np.diag(G))
     live = d > 0.0
     inv_d = np.where(live, 1.0 / np.where(live, d, 1.0), 0.0)
-    lam, Q = np.linalg.eigh(G * np.outer(inv_d, inv_d))
+    lam, Q = lapack.eigh(G * np.outer(inv_d, inv_d))
     keep = lam > NUISANCE_RCOND * max(float(lam[-1]), 0.0)
     if e is not None:
         inv_d = inv_d * e
@@ -451,14 +452,15 @@ class SolveCost:
         non-extraction; it is not a quality bar, and a tighter one needs a
         measurement on public data.
         """
-        from ..model.forward import compile_model
+        from ..model.forward import WINDOW_AREA_TOL, compile_model
         from ..params.vector import ParameterTable
 
         instrument = refinement.fitted_instrument
         # the dummy-atom compile drops every moment, so ask the fitted one
         _refuse_magnetic_model(compile_model(
             refinement.fitted_structure, instrument, data, mode="rietveld",
-            two_theta_limits=refinement._two_theta_limits))
+            two_theta_limits=refinement._two_theta_limits,
+            window_area_tol=WINDOW_AREA_TOL))
         result = getattr(refinement, "result_", None)
         if result is None:
             raise ExtractionRefused(
@@ -482,8 +484,12 @@ class SolveCost:
                 "the package calls it unusable (RefinementResult.usable): it is "
                 "not a fit of this pattern")
         structure = blind_structure(refinement.fitted_structure, phase, nuisance)
+        # at the declared stages' windows, never a closing stage's (WP-2002):
+        # those keep M0 banded, and at 1e-3 NAC's grew a third denser, so the
+        # floor is this model's and can sit above the extraction's own χ²
         model = compile_model(structure, instrument, data, mode="rietveld",
-                              two_theta_limits=refinement._two_theta_limits)
+                              two_theta_limits=refinement._two_theta_limits,
+                              window_area_tol=WINDOW_AREA_TOL)
         if len(model.tt) != result.statistics.n_points:
             raise ValueError(
                 f"data gives {len(model.tt)} fitted points where the extraction "
@@ -536,7 +542,7 @@ class SolveCost:
             b = b - V @ yx
             c = c - float(yx @ yx)
         M = M0.toarray() - V @ V.T                            # once, for the floor
-        ip_sol, *_ = np.linalg.lstsq(M, b, rcond=None)
+        ip_sol, *_ = lapack.lstsq(M, b, rcond=None)
         cp = model.phases[phase]
         cell = _cell(values, phase)
         return cls(

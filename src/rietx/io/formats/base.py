@@ -19,7 +19,7 @@ import numpy as np
 from pydantic import ValidationError as PydanticValidationError
 
 from ...schemas.common import Diagnostic
-from ...schemas.pattern import AxisKind, PatternData
+from ...schemas.pattern import POISSON_FLOOR_COUNTS, AxisKind, PatternData
 
 
 @dataclass(frozen=True)
@@ -188,6 +188,11 @@ METADATA_KEYS: dict[str, str] = {
                          "**zero included**, because a file recording a zero is "
                          "saying the doublet was not used, and a format that "
                          "records nothing here is saying nothing",
+    "intensity_item": "the pdCIF intensity item read, where it is one whose "
+                      "definition says more than a count: "
+                      "`_pd_proc_intensity_net`, defined as background-"
+                      "subtracted. A label, not a measurement — the reader "
+                      "says when the numbers disagree with it",
     "intensity_unit": "the intensity unit the file *declares*. A claim, not a "
                       "measurement — see the σ note in the .ras reader",
     "count_time_s": "seconds per step, where the file gives enough to derive it",
@@ -530,7 +535,7 @@ def sigma_from_scaled(intensity: Any, scale: Any) -> np.ndarray:
     s = np.asarray(scale, dtype=np.float64)
     if not np.all(s > 0):
         raise ValueError(f"an intensity scale must be positive, got {scale!r}")
-    return np.sqrt(np.maximum(y / s, 1.0)) * s
+    return np.sqrt(np.maximum(y / s, POISSON_FLOOR_COUNTS)) * s
 
 
 def sigma_from_cps(intensity: Any, count_time_s: float) -> np.ndarray:

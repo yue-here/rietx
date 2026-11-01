@@ -270,14 +270,18 @@ def read_members(setup: SeriesSetup,
     one protocol over N specimens, and a region excluded because the sample
     holder scatters there is excluded in all of them.  The 2θ limits are the
     other half and travel as ``fit``'s own argument, since that is where the
-    library takes them.
+    library takes them.  A member's own exclusions (a pdCIF's zero-weight
+    points) stay: the project's regions are added to them, never put in place
+    of them.
     """
     from ..io.readers import read_pattern
 
     out = []
     for member in setup.members:
         data = read_pattern(member.path, **member.options)
-        data.excluded_regions = [tuple(r) for r in excluded_regions]
+        data.excluded_regions = list(data.excluded_regions) + [
+            tuple(r) for r in excluded_regions
+            if tuple(r) not in data.excluded_regions]
         out.append(data)
     return out
 
@@ -321,10 +325,13 @@ def trajectories(series: SeriesResult,
     """Every parameter's path across the series, plus the QPA fractions.
 
     One entry per dot-path in first-seen order, then one ``qpa.<phase>`` per
-    phase a Rietveld fit weighed.  ``path_dependent`` and ``discontinuous`` are
-    read off the series' **own** diagnostics rather than recomputed — the fences
-    are the library's judgement — while ``n_sigma`` is computed here because no
-    diagnostic carries a magnitude (see the module docstring).
+    phase a Rietveld fit weighed.  ``path_dependent`` is read off the series'
+    **own** diagnostics rather than recomputed — the fence is the library's
+    judgement — and ``discontinuous`` off its ``steps``: true where a step of
+    that path was re-measured cold (``fit(verify_steps=k)``), the plot's
+    shading rule, since ``steps`` calls no step a jump (WP-2003).  ``n_sigma``
+    is computed here because no diagnostic carries a magnitude (see the module
+    docstring).
 
     ``relative`` paths keep their backward values and get no ``n_sigma``,
     because the fence abstains on them (``sequential._relative_paths``): a
@@ -337,8 +344,7 @@ def trajectories(series: SeriesResult,
     """
     unstable = {d.where[0] for d in series.diagnostics
                 if d.code == "SEQUENTIAL_PATH_DEPENDENT" and d.where}
-    jumps = {d.where[0] for d in series.diagnostics
-             if d.code == "SEQUENTIAL_DISCONTINUITY" and d.where}
+    jumps = {s.path for s in series.steps or [] if s.cold_ratio is not None}
     names = list(series.paths(varied_only=False))
     phases = []
     for entry in series.entries:

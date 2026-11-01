@@ -1,22 +1,30 @@
 """One-call background automation: diagnose → select → build the model.
 
-``auto_background(pattern)`` is the v0.2 default entry: it returns a
+``auto_background(pattern)`` is the v0.2 default entry.  It builds a
 configured, refinable :class:`~rietx.schemas.instrument.BackgroundPSpline`
 (or Chebyshev on request) whose complexity was chosen by the BIC +
 Durbin-Watson machinery in :mod:`.select`, with the 1/x air-scatter term
-enabled when the diagnostics flag a low-angle rise.
+enabled when the diagnostics flag a low-angle rise.  It returns a
+:class:`BackgroundChoice`: the background, and beside it the scores each
+choice was made on (WP-2002, B12).
 """
 
 from __future__ import annotations
 
 import warnings
+from typing import Literal
 
-from ..schemas.common import Parameter
-from ..schemas.instrument import Background, BackgroundChebyshev, BackgroundPSpline
+from ..schemas.common import Base, Parameter
+from ..schemas.instrument import (
+    PSPLINE_LAMBDA_SMOOTH,
+    Background,
+    BackgroundChebyshev,
+    BackgroundPSpline,
+)
 from ..schemas.pattern import PatternData, require_two_theta
 from ..schemas.project import check_interval
 from .diagnostics import PatternDiagnostics, diagnose
-from .select import select_chebyshev_order
+from .select import BackgroundSelection, select_chebyshev_order
 
 #: nested-fit gain from the 1/(2θ) column that turns the air term on
 AIR_SCATTER_TRIGGER = 0.3
@@ -34,13 +42,64 @@ _MIN_FIT_CHANNELS = 10
 AUTO_BACKGROUND_SEED_PERCENTILE = 10.0
 
 
+class BackgroundChoice(Base):
+    """What :func:`auto_background` chose, and the scores it chose on (WP-2002, B12).
+
+    ``background`` is the pick, ready for ``Instrument.background``.  The other
+    fields are the evidence for it.  A pick verb on the default path must return
+    its whole ranking with the pick (``docs/milestones/generality.md``, "A pick
+    on top of a ranking"), and the skill tells every agent to call this one.
+
+    A P-spline makes two choices, each on one score against one trigger.  The
+    knot step is ``_KNOT_STEP_HUMPY_DEG`` (3°) when ``amorphous_hump_score``
+    exceeds ``hump_trigger``, and ``_KNOT_STEP_SMOOTH_DEG`` (8°) otherwise.  The
+    1/(2θ) air term is declared when ``air_scatter_gain`` exceeds
+    ``air_scatter_trigger``.  Both scores are
+    :class:`~rietx.background.diagnostics.PatternDiagnostics` fields, taken over
+    the fitted range.  A Chebyshev's order is the minimum-BIC order of the scan
+    in ``selection``, whose ``scores`` hold every order tried with its BIC and
+    Durbin-Watson d, and whose ``stopped_by_whiteness`` says whether d reached
+    the scan's stop.
+
+    A field is ``None`` where the kind made no choice on it: the P-spline fields
+    on a Chebyshev, ``selection`` on a P-spline, and ``seed_level`` unless
+    ``seed=True``.
+    """
+
+    background: Background
+    kind: Literal["pspline", "chebyshev"]
+    #: the envelope's residual after a cubic and a 1/x term, over its median
+    #: level (``PatternDiagnostics.amorphous_hump_score``)
+    amorphous_hump_score: float | None = None
+    #: :data:`HUMP_TRIGGER`, the score above which the knots are 3° apart
+    hump_trigger: float | None = None
+    #: the P-spline's knot spacing, degrees 2θ
+    knot_step_deg: float | None = None
+    #: the share of the cubic fit's residual variance a 1/(2θ) column removes
+    #: (``PatternDiagnostics.air_scatter_gain``)
+    air_scatter_gain: float | None = None
+    #: :data:`AIR_SCATTER_TRIGGER`, the gain above which the air term is declared
+    air_scatter_trigger: float | None = None
+    #: whether the P-spline carries the 1/(2θ) air term
+    air_scatter: bool | None = None
+    #: the Chebyshev order scan, every order with its scores
+    selection: BackgroundSelection | None = None
+    #: the count every coefficient starts at under ``seed=True``
+    #: (:data:`AUTO_BACKGROUND_SEED_PERCENTILE` of the fitted counts)
+    seed_level: float | None = None
+
+
 def auto_background(data: PatternData, *, kind: str = "pspline",
                     diagnostics: PatternDiagnostics | None = None,
                     wavelength: float | None = None,
                     two_theta_limits: tuple[float, float] | None = None,
                     source: object | None = None,
-                    seed: bool = False) -> Background:
-    """Background sized to the data.
+                    seed: bool = False) -> BackgroundChoice:
+    """Background sized to the data, with the scores it was sized on.
+
+    Returns a :class:`BackgroundChoice`.  Its ``background`` is the model to
+    put on ``Instrument.background``, and its other fields are the scores and
+    triggers each choice was made on (WP-2002, B12).
 
     ``kind="pspline"`` (default): penalized co-refined spline — knot spacing
     from the amorphous-hump score, moderate fixed λ (the second-difference
@@ -70,11 +129,11 @@ def auto_background(data: PatternData, *, kind: str = "pspline",
     where one is switched on, stays at its own start.  Whether this should be
     the default is #725's question; the default is unchanged here.
 
-    ``kind="chebyshev"`` returns a background, not the selection, so what the
-    selection reports arrives as a ``UserWarning`` whose text starts with its
-    code: ``BACKGROUND_ORDER_AT_CAP`` when the order is the scan's cap of 16
-    rather than a choice (issue #833).  ``select_chebyshev_order`` carries the
-    same ``Diagnostic`` on its ``diagnostics``, beside the scan.
+    ``kind="chebyshev"`` carries the whole order scan on ``selection``.  What
+    the scan reports about its own answer is on ``selection.diagnostics``, and
+    it also arrives as a ``UserWarning`` whose text starts with its code:
+    ``BACKGROUND_ORDER_AT_CAP`` when the order is the scan's cap of 16 rather
+    than a choice (issue #833).
     """
     require_two_theta(data, "auto_background()")
     if two_theta_limits is not None:
@@ -98,9 +157,12 @@ def auto_background(data: PatternData, *, kind: str = "pspline",
             warnings.warn(str(d),
                           UserWarning, stacklevel=2)
         cheb = BackgroundChebyshev.with_terms(int(sel.selected))
+        level = None
         if seed and cheb.coefficients:
-            cheb.coefficients[0].value = _seed_level(data)
-        return cheb
+            level = _seed_level(data)
+            cheb.coefficients[0].value = level
+        return BackgroundChoice(background=cheb, kind="chebyshev",
+                                selection=sel, seed_level=level)
     if kind != "pspline":
         raise ValueError(f"unknown background kind {kind!r}")
 
@@ -115,16 +177,24 @@ def auto_background(data: PatternData, *, kind: str = "pspline",
                 f"{diag.two_theta_max:g}°, which does not overlap "
                 f"two_theta_limits ({lo}, {hi})")
     bkg = BackgroundPSpline.for_range(k_lo, k_hi, knot_step_deg=step,
-                                      lambda_smooth=1.0)
+                                      lambda_smooth=PSPLINE_LAMBDA_SMOOTH)
     # Declined means absent, never a zero one: a plan's ``instrument.background.*``
     # frees whatever path exists (WP-1454).
-    if diag.air_scatter_gain > AIR_SCATTER_TRIGGER:
+    air = bool(diag.air_scatter_gain > AIR_SCATTER_TRIGGER)
+    if air:
         bkg.air_scatter = Parameter(value=1e-3, vary=True, min=0.0)
+    level = None
     if seed:
         level = _seed_level(data)
         for c in bkg.coefficients:
             c.value = level
-    return bkg
+    return BackgroundChoice(
+        background=bkg, kind="pspline",
+        amorphous_hump_score=float(diag.amorphous_hump_score),
+        hump_trigger=HUMP_TRIGGER, knot_step_deg=step,
+        air_scatter_gain=float(diag.air_scatter_gain),
+        air_scatter_trigger=AIR_SCATTER_TRIGGER, air_scatter=air,
+        seed_level=level)
 
 
 def _seed_level(data: PatternData) -> float:

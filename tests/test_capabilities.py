@@ -223,8 +223,8 @@ def test_every_reader_format_appears_in_dispatch_order(caps):
     # and it names the reader keyword a caller has to supply *and* record
     assert by_name["pdcif"].options == ["block"]
     assert by_name["xy"].options == []
-    # a binary format's sniff has to say what it *refuses* too, since two of the
-    # four Bruker RAW versions are recognised in order to be declined and a
+    # a binary format's sniff has to say what it *refuses* too, since one of the
+    # four Bruker RAW versions is recognised in order to be declined and a
     # client choosing what to offer an upload dialog reads this arm (WP-1047)
     assert "RAW4.00" in by_name["bruker_raw"].sniff
     assert by_name["bruker_raw"].options == ["scan"]
@@ -591,7 +591,7 @@ def test_the_pre_fit_calls_are_reachable_from_the_top_level():
     data = rx.PatternData(two_theta=tt.tolist(), intensity=y.tolist())
     diag = rx.diagnose(data, wavelength=1.5405929)
     assert diag.n_points == len(tt)
-    bkg = rx.auto_background(data, diagnostics=diag)
+    bkg = rx.auto_background(data, diagnostics=diag).background
     # held additively or co-refined under a penalty — never subtracted
     assert bkg.kind in {"pspline", "chebyshev", "fixed+chebyshev"}
 

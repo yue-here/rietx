@@ -6,7 +6,7 @@
   <h1>Rietveld refinement for humans and machines</h1>
   <p class="lede"><code>rietx</code> is an open-source Python package for analysing powder diffraction data. It's easy to install and the streamlined API can be used by most common AI coding agents.</p>
   <div class="cta">
-    <a class="btn" href="https://rietx.org/manual.html">Read the manual</a>
+    <a class="btn" href="https://rietx.org/docs/">Read the manual</a>
     <a class="btn" href="https://github.com/yue-here/rietx">GitHub</a>
     <a class="btn" href="why.html">Why rietx?</a>
   </div>
@@ -107,25 +107,25 @@ instrument.geometry.axial_hl.value = 0.02
 instrument.background = rx.BackgroundChebyshev.with_terms(6)
 
 ref = rx.Refinement(structure, instrument)
-result = ref.fit(data, plan=<span class="s">"mccusker_structural"</span>,
-                 two_theta_limits=(15, 130))
+result = ref.fit(data, plan=<span class="s">"mccusker_structural"</span>, two_theta_limits=(15, 130))
 <span class="k">print</span>(result)</pre></div>
     <div class="codebox"><div class="bar"><span>output</span></div>
 <pre class="out">RefinementResult: <span class="g">converged</span> (rietveld)
   stage scale_bkg: converged (2 evals, ftol=1e-06)
   …
-  diagnostics: 4 unresolved
-    warning[<span class="w">SITE_SNAPPED_TO_SPECIAL_POSITION</span>]: 1 site(s)
-      in phase 'fluorapatite' lie within 0.0001 of a …
-    warning[<span class="w">FLOOR_HIT</span>]: phases.0.extinction refined to
-      its floor (ρ=+0.064). …
-    warning[<span class="w">RESOLUTION_UNCONSTRAINED</span>]: U, V, W refined
-      on a predominantly Lorentzian pattern …
-    warning[<span class="w">PATTERN_UNDERSAMPLED</span>]: The median fitted
-      peak spans 4.6 steps across its FWHM (76 peaks) …
+  diagnostics: 3 rows, 0 errors; no deliverable given,
+    so none is printed in full
+    <span class="w">FLOOR_HIT</span> at phases.0.extinction:
+      warning under qpa, structure, magnetic
+    <span class="w">RESOLUTION_UNCONSTRAINED</span> at instrument.profile.u,
+      .v, .w: warning under microstructure, calibration
+    <span class="w">PATTERN_UNDERSAMPLED</span>: warning under qpa,
+      structure, microstructure, calibration, magnetic
+    pass deliverable= to summary() for the rows that
+      decide your purpose; every row is in result.diagnostics
   …
-  Rwp 0.0893 / Rexp 0.0559 (GoF 1.60), Rp 0.0696,
-  χ² 2.6, DW 1.03</pre></div>
+  Rwp 0.0898 / Rexp 0.0559 (GoF 1.60), Rp 0.0699,
+  χ² 2.6, DW 1.02</pre></div>
   </div>
   <figure class="fig">
     <img class="only-light" src="%%IMG:fap-light%%" alt="Observed, calculated and difference curves for the fluorapatite refinement, 15 to 130 degrees two-theta, with the reflection tick row" width="2069" height="1307">
@@ -137,7 +137,7 @@ result = ref.fit(data, plan=<span class="s">"mccusker_structural"</span>,
 <section class="block" id="gui"><div class="wrap">
   <div class="sec-head">
     <h2>The GUI</h2>
-    <p><code>rietx</code> ships with a comprehensive <a href="https://rietx.org/using/gui-quickstart.html">GUI</a> for interactive refinement. There are several quality-of-life features not found in other Rietveld interfaces, including pre-rolled <a href="https://rietx.org/using/gui-guide.html#plan">automatic refinement plans</a> that sequentially release parameters, and the <a href="https://rietx.org/using/history.html">refinement history</a> panel shown below: a <code>git</code>-style tree of refinement checkpoints can be easily loaded and compared.</p>
+    <p><code>rietx</code> ships with a comprehensive <a href="https://rietx.org/using/gui-quickstart.html">GUI</a> for interactive refinement. There are several quality-of-life features not found in other Rietveld interfaces, including pre-rolled <a href="https://rietx.org/using/gui-guide.html">automatic refinement plans</a> that sequentially release parameters, and the <a href="https://rietx.org/using/history.html">refinement history</a> panel shown below: a <code>git</code>-style tree of refinement checkpoints can be easily loaded and compared.</p>
   </div>
   <figure class="shot">
     <img class="only-light" src="%%IMG:gui-light%%" alt="The rietx GUI with the fluorapatite fit on the left and the history panel on the right, reading 24 nodes in 3 lanes" width="2880" height="1800">
@@ -149,16 +149,16 @@ result = ref.fit(data, plan=<span class="s">"mccusker_structural"</span>,
   <div class="sec-head"><h2>Features</h2></div>
   <ul class="feat">
     <li><strong>Rietveld, Le Bail and Pawley</strong><span>Multi-phase, X-ray and constant-wavelength neutron. <a href="https://rietx.org/using/concepts.html">Concepts</a></span></li>
-    <li><strong>Magnetic structures</strong><span>Moments refined on constant-wavelength neutron data, read and written as magCIF. In progress. <a href="https://rietx.org/using/refining.html#a-moment-stated-and-refined">Magnetic</a></span></li>
+    <li><strong>Magnetic structures</strong><span>Moments refined on constant-wavelength neutron data, read and written as magCIF. In progress. <a href="https://rietx.org/using/refining.html">Magnetic</a></span></li>
     <li><strong>Reads common file formats</strong><span>.xy/.xye, GSAS, pdCIF, .chi, Rigaku .ras/.rasx, Bruker .uxd/.brml/.raw, PANalytical .xrdml/.udf, Philips .rd/.sd. <a href="https://rietx.org/using/files.html">Files</a></span></li>
-    <li><strong>Speaks other languages</strong><span>Reads and writes TOPAS, FullProf, GSAS and PowderLine formats. (Rietica, XND, etc. in progress) <a href="https://rietx.org/using/files.html#refinement-files-another-program-wrote">Formats</a> · <a href="https://rietx.org/using/recipe.html">PowderLine</a></span></li>
+    <li><strong>Speaks other languages</strong><span>Reads and writes TOPAS, FullProf, GSAS and PowderLine formats. (Rietica, XND, etc. in progress) <a href="https://rietx.org/using/files.html">Formats</a> · <a href="https://rietx.org/using/recipe.html">PowderLine</a></span></li>
     <li><strong>Phase quantification</strong><span>Weight fractions with esds propagated through the full covariance, and a flag when a phase is not determined by the data. <a href="https://rietx.org/using/qpa.html">QPA</a></span></li>
     <li><strong>Series</strong><span>Designed from the ground up for robust sequential refinement. <a href="https://rietx.org/using/series.html">Series</a></span></li>
-    <li><strong>Joint refinement</strong><span>Several patterns in one fit with shared parameters, including X-ray and neutron together. <a href="https://rietx.org/using/series.html#a-joint-fit-shares-parameters-instead">Joint fits</a></span></li>
+    <li><strong>Joint refinement</strong><span>Several patterns in one fit with shared parameters, including X-ray and neutron together. <a href="https://rietx.org/using/series.html">Joint fits</a></span></li>
     <li><strong>Reporting beyond Rwp</strong><span>Common refinement heuristics reported in words alongside numbers. This helps both humans and agents interpret refinement results. <a href="https://rietx.org/using/report.html">FitReport</a></span></li>
     <li><strong>History tree</strong><span>Every refinement stage is a restorable checkpoint. You can fork, compare, merge. <a href="https://rietx.org/using/history.html">History</a></span></li>
-    <li><strong>Live run viewer</strong><span>Every fit records itself. <code>rietx watch</code> shows a running fit in the browser and can stop it. <a href="https://rietx.org/using/refining.html#watching-a-run">Watching a run</a></span></li>
-    <li><strong>Structure figures</strong><span>Draw a structure to a PNG from Python, with polyhedra and any view direction. <a href="https://rietx.org/using/exports.html#a-figure-of-the-structure">Figures</a></span></li>
+    <li><strong>Live run viewer</strong><span>Every fit records itself. <code>rietx watch</code> shows a running fit in the browser and can stop it. <a href="https://rietx.org/using/refining.html">Watching a run</a></span></li>
+    <li><strong>Structure figures</strong><span>Draw a structure to a PNG from Python, with polyhedra and any view direction. <a href="https://rietx.org/using/exports.html">Figures</a></span></li>
     <li><strong>Indexing</strong><span>Robust automatic peak picking and three available indexing engines. <a href="https://rietx.org/using/indexing.html">Indexing</a></span></li>
     <li><strong>Corrections</strong><span>Axial divergence, displacement and transparency, absorption, preferred orientation, anisotropic displacement and strain, anomalous dispersion. <a href="https://rietx.org/using/model.html">Model</a></span></li>
     <li><strong>Constraints and restraints</strong><span>Ties, holds, named variables, and restraints on bond lengths and angles. <a href="https://rietx.org/using/constraints.html">Constraints</a></span></li>
@@ -175,12 +175,12 @@ result = ref.fit(data, plan=<span class="s">"mccusker_structural"</span>,
   <div class="tablewrap"><table class="vt">
     <thead><tr><th>Data</th><th>What is checked</th><th>Result</th><th>Referenced to</th></tr></thead>
     <tbody>
-      <tr><td>NIST SRM 660c LaB₆, lab Cu Kα (the certification measurement)</td><td>Lattice parameter</td><td>a = 4.156882(21) Å<br>+25 ppm</td><td><a href="https://tsapps.nist.gov/srmext/certificates/660c.pdf">NIST certificate</a>, cell recomputed for the measurement's 20.85 °C: 4.156780 Å</td></tr>
-      <tr><td>NIST SRM 676a corundum, lab Cu Kα</td><td>Axial ratio c/a</td><td>+30 ppm</td><td><a href="https://tsapps.nist.gov/srmext/certificates/676a.pdf">NIST certificate</a>: a = 4.759355(80), c = 12.99231(15) Å (k = 2)</td></tr>
-      <tr><td>IUCr CPD QPA round robin, sample 1: eight corundum, zincite and fluorite mixtures</td><td>Weight fractions</td><td>worst error 1.20 wt %</td><td>The weighed compositions. The participants' spread was 6 wt % on major phases (<a href="https://doi.org/10.1107/S0021889801007476">Madsen et al. 2001</a>)</td></tr>
-      <tr><td>Fluorapatite, GSAS-II tutorial data, lab Cu Kα</td><td>Cross-code, same protocol</td><td>Rwp 0.0925 vs 0.1005<br>cell +83 / +82 ppm</td><td>GSAS's converged fit of the same file (<a href="https://github.com/AdvancedPhotonSource/GSAS-II-tutorials">FAP.EXP</a>); the uniform cell offset is a d-scale convention</td></tr>
-      <tr><td>APS 11-BM, SRM 660b LaB₆ with cubic BN</td><td>Two-phase QPA</td><td>LaB₆ 17.791 ± 0.319 wt %</td><td>TOPAS: 17.907 and 17.950 wt % from its two models of the pattern (no weighed composition exists)</td></tr>
-      <tr><td>NIST SRM 676a corundum, peak list only</td><td>Indexing</td><td>correct cell first<br>a +110, c +57 ppm</td><td>The certificate cell; 45 of 47 lines indexed, graded low on its own caveats rather than accepted</td></tr>
+      <tr><td>NIST SRM 660c LaB₆, lab Cu Kα (the certification measurement)</td><td>Lattice parameter</td><td>a = 4.156882(21) Å<br>+24 ppm</td><td><a href="https://tsapps.nist.gov/srmext/certificates/660c.pdf">NIST certificate</a>, cell recomputed for the measurement's 20.85 °C: 4.156780 Å</td></tr>
+      <tr><td>NIST SRM 676a corundum, lab Cu Kα</td><td>Axial ratio c/a</td><td>+29 ppm</td><td><a href="https://tsapps.nist.gov/srmext/certificates/676a.pdf">NIST certificate</a>: a = 4.759355(80), c = 12.99231(15) Å (k = 2)</td></tr>
+      <tr><td>IUCr CPD QPA round robin, sample 1: eight corundum, zincite and fluorite mixtures</td><td>Weight fractions</td><td>worst error 1.37 wt %</td><td>The weighed compositions. The participants' spread was 6 wt % on major phases (<a href="https://doi.org/10.1107/S0021889801007476">Madsen et al. 2001</a>)</td></tr>
+      <tr><td>Fluorapatite, GSAS-II tutorial data, lab Cu Kα</td><td>Cross-code, same protocol</td><td>Rwp 0.0928 vs 0.1005<br>cell +84 / +84 ppm</td><td>GSAS's converged fit of the same file (<a href="https://github.com/AdvancedPhotonSource/GSAS-II-tutorials">FAP.EXP</a>); the uniform cell offset is a d-scale convention</td></tr>
+      <tr><td>APS 11-BM, SRM 660b LaB₆ with cubic BN</td><td>Two-phase QPA</td><td>LaB₆ 17.787 ± 0.319 wt %</td><td>TOPAS: 17.907 and 17.950 wt % from its two models of the pattern (no weighed composition exists)</td></tr>
+      <tr><td>NIST SRM 676a corundum, peak list only</td><td>Indexing</td><td>correct cell first<br>a +89, c +60 ppm</td><td>The certificate cell; 44 of 46 lines indexed, graded low on its own caveats rather than accepted</td></tr>
     </tbody>
   </table></div>
   <p class="caption">Test-data provenance and licences: <a href="https://github.com/yue-here/rietx/blob/main/tests/data/README.md">tests/data/README.md</a>.</p>

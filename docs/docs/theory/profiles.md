@@ -104,6 +104,29 @@ guard above stays the check for those.
 
 {source}`rietx.model.profiles.caglioti.lorentzian_fwhm`
 
+$\Gamma_L$ is a width, so it must not go below zero. $X$ has a floor of 0,
+because as $\theta \to 0$ the $\tan\theta$ term vanishes and the
+instrument's $\Gamma_L$ is $X$ itself. $Y$ has no floor of its own. A
+negative $Y$ is legitimate wherever $X$ carries the width. The default driver
+holds the sum on a single-histogram fit, one more row per reflection on the
+data:
+
+```{math}
+:label: prof-lorentzian-floor
+
+\Gamma_L(\theta_{hkl}) \;\ge\; 0
+\qquad \text{for every reflection } hkl \text{ on the data}
+```
+
+{source}`rietx.optimize.least_squares.lorentzian_width_inequalities`
+
+$\Gamma_L$ here includes the phase's Lorentzian size and strain terms. An
+anisotropic strain block adds a term its own cone keeps at or above zero, so
+the row leaves it out. TRF builds no rows. Below zero the pseudo-Voigt mixing
+parameter turns negative and the line is no longer a peak shape, so
+`RESOLUTION_NOT_POSITIVE` reports where the instrument's $\Gamma_L$ falls below
+zero in the fitted range.
+
 ```{warning}
 Conventions here are documented by physics and not by letters. The
 $1/\cos\theta$ terms (and the $1/\cos^2\theta$ variance term) carry Scherrer
@@ -205,52 +228,43 @@ on the path (`RefinedParameter.at_bound` carries the same finding on the row).
 ## The size coefficient bound
 
 The size terms $X_s/\cos\theta$ and $P/\cos^2\theta$ have the same runaway
-geometry as the strain terms and take the same fix. The intent differs, and so
-does the number. A large $X_s$ is a small crystallite (via Scherrer,
-{eq}`ms-size-coefficient` in {ref}`sec-width-as-size`), and real specimens are
-genuinely nanocrystalline, so this bound is set to catch a runaway and not to
-legislate a size:
+geometry as the strain terms and take the same fix. A line whose size
+contribution alone is wider than the interval it was measured over carries no
+information the fit could have got from the data. So the strain rule applies
+with $1/\cos\theta$ in place of $\tan\theta$, evaluated where $1/\cos\theta$ is
+largest:
 
 ```{math}
 :label: prof-size-cap
 
-X_s \;\le\; \min\!\left(
-\frac{(180/\pi)\,K\lambda}{L_{\min}},\;\;
-f\,(2\theta_{\max}-2\theta_{\min})\cos\theta_{\max}
-\right)
+X_s \;\le\; f\,(2\theta_{\max}-2\theta_{\min})\cos\theta_{\max}
 \quad [\deg 2\theta]
 ```
 
 {source}`rietx.params.vector.size_cap`
 
-with $L_{\min}$ the smallest crystallite the bound admits,
-{{ SIZE_CAP_MIN_SIZE_NM }} nm, and $f$ the range fraction of
-{eq}`prof-strain-cap`.
-
-The first term is a floor on the crystallite ($L \ge L_{\min}$), read as a
-ceiling on the coefficient with no reference angle, {eq}`ms-size-coefficient`
-in {ref}`sec-width-as-size`, per wavelength: ≈ 4°/cos θ at Cu Kα for 2 nm. The
-second is the strain rule's range backstop, with $1/\cos\theta$ in place of
-$\tan\theta$, evaluated where $1/\cos\theta$ is largest. On any real scan the
-floor is far the tighter (Cu 10–80°: ≈ 4 deg against ≈ 54 deg), so the floor
-governs, and the backstop catches only the $1/\cos\theta$ pathology near
-2θ = 180°. $P$ is a variance and takes the square of whichever width binds.
+with $f$ = {{ SIZE_CAP_RANGE_FRACTION }} the range fraction. $P$ is a variance
+and takes the square of the same width. On a Cu Kα 10–80° scan the bound is
+≈ 54 deg. Scherrer's relation, {eq}`ms-size-coefficient` in
+{ref}`sec-width-as-size`, reads that coefficient as a crystallite of
+≈ 0.15 nm, so the bound limits a runaway and not a size.
 
 ```{warning}
-$L_{\min}$ makes no claim about how small a crystallite may be. It is a runaway
-fence two unit cells below the archive. The smallest well-determined size in a
-corpus of 606 solved refinements is ≈ 33 nm, and every refined size below ~2 nm
-there is an exploratory or placeholder fit. A genuinely nano specimen refines
-freely above the fence. For one truly smaller than 2 nm, declare the bound you
-mean: a finite `Parameter.max` outranks the default. The
-surprising-but-possible band is the `SIZE_UNUSUALLY_SMALL` diagnostic, which
-fires below {{ SIZE_FLAG_SIZE_NM }} nm and bounds nothing.
+No default bound limits the crystallite size itself. A floor of 2 nm sat
+beside this bound until 1.10. It was removed because a small crystallite is
+still a physical quantity, and a limit on one is yours to state with a finite
+`Parameter.max`. Below about 2 nm a crystallite is a few unit cells, and
+broadened Bragg peaks may not describe its pattern. The Debye scattering
+equation does. The `SIZE_UNUSUALLY_SMALL` diagnostic fires below
+{{ SIZE_FLAG_SIZE_NM }} nm, says so, and bounds nothing. TOPAS's `CS_L` macro
+limits size to 0.3-10 000 nm, and GSAS-II clamps it to 0.001-10 µm after each
+refinement. FullProf sets no limit.
 ```
 
 The bound behaves as the {ref}`strain cap <sec-strain-cap>` does. It is armed only on a term that
 has already reached it, a finite stored `max` outranks it, and it reports
-`BOUND_HIT` when the next stage pulls a crossing back. Any fit that stays off
-the floor is bit-identical to an unbounded build.
+`BOUND_HIT` when the next stage pulls a crossing back. Any fit that stays below
+the bound is bit-identical to an unbounded build.
 
 ## Thompson-Cox-Hastings pseudo-Voigt
 
@@ -515,11 +529,18 @@ The integrand is smooth, and fixed-node Gauss-Legendre quadrature in
 $\tau = \xi/\xi_{\max}$ evaluates it. The $|\tan 2\theta|$ cap removes the
 unphysical $\cos 2\varphi > 1$ branch at very low angle. The weights are
 renormalised to $\sum\omega = 1$, so the composite peak keeps unit area and
-reflection intensities stay areas. Node counts are frozen per stage
-({{ NODES_PER_FWHM }} nodes per FWHM of smear where the map moves fastest,
-clamped to [8, 64]), and node positions follow $s$, $h$ and $2\theta$ smoothly.
-When the asymmetric extent falls below {{ SKIP_EXTENT_FWHM_RATIO }} of the peak
-FWHM the aberration is invisible, and the peak is treated as symmetric.
+reflection intensities stay areas. Node counts are frozen per stage, and node
+positions follow $s$, $h$ and $2\theta$ smoothly. A declared stage takes
+{{ NODES_PER_FWHM }} nodes per FWHM of smear where the map moves fastest,
+clamped to [8, 64]. When the asymmetric extent falls below
+{{ SKIP_EXTENT_FWHM_RATIO }} of the peak FWHM, it treats the peak as symmetric.
+A compile at windows finer than the declared stages' takes
+{{ CLOSING_NODES_PER_FWHM }} nodes per FWHM, clamped to [10, 1024], and treats
+a peak as symmetric below {{ CLOSING_SKIP_EXTENT_FWHM_RATIO }}. The closing
+stage and any model evaluated outside a fit are such compiles. That rule keeps
+the composite peak within a tenth of the counting noise of a 512-node
+reference on lab and synchrotron peaks. The declared stages' rule misses it by
+up to eight times on a lab Lorentzian, and those stages only steer.
 
 With one aperture at zero the trapezoid {eq}`prof-fcj-weight` has no height,
 and {eq}`prof-fcj-integral` is a ratio of two zeros. Its limit as $h \to 0^+$

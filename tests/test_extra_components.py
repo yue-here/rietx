@@ -28,6 +28,7 @@ then frees nothing.
 from __future__ import annotations
 
 import json
+import sys
 import typing
 
 import numpy as np
@@ -713,7 +714,7 @@ def test_no_plan_and_no_estimator_ever_adds_a_peak():
                        intensity=(200.0 + 400.0 * np.exp(
                            -0.5 * ((tt - 25.0) / 6.0) ** 2)).tolist())
     for kind in ("chebyshev", "pspline"):
-        bkg = rx.auto_background(data, kind=kind, wavelength=WAVELENGTH)
+        bkg = rx.auto_background(data, kind=kind, wavelength=WAVELENGTH).background
         assert not hasattr(bkg, "extra_components")
 
 
@@ -739,7 +740,7 @@ HUMP_BISO = 0.35
 def synthetic_hump_case():
     """``(data, structure, instrument_without_peak, truth)`` for the hump case.
 
-    A **generator** as well as a fixture: ``docs/manual/make_figures.py``
+    A **generator** as well as a fixture: ``docs/docs/make_figures.py``
     imports this so the committed figure and the assertion below draw the same
     case.  A figure with its own copy of a case can disagree with the test that
     proves the claim, and nobody would find out (that script's own rule).
@@ -791,7 +792,7 @@ def test_a_known_hump_comes_back_within_its_esds():
     actually makes.  It deliberately does **not** assert that the structural
     parameters improve: on this fixture they are not determined well enough to
     carry such a claim (scale esd 209 on a value of 0.046), and the real-data
-    measurement in `docs/manual/using/data.md` reports what happened there,
+    measurement in `docs/docs/concepts/parameters.md` § Humps reports what happened there,
     including where it did not go the expected way.
     """
     result, truth = fit_hump_case(with_peak=True)
@@ -1259,7 +1260,7 @@ def test_the_intensity_field_is_not_called_scale():
 
 
 def _peak_state(peak, *, lo=30.0, hi=50.0, step=0.005, radiation="CuKa",
-                one_line=False):
+                one_line=False, window_area_tol=None):
     """A compiled model over a flat pattern with the phases switched off.
 
     The phases are off (`scale = 0`) so that every count in `evaluate` belongs
@@ -1283,7 +1284,8 @@ def _peak_state(peak, *, lo=30.0, hi=50.0, step=0.005, radiation="CuKa",
                        intensity=np.zeros_like(tt).tolist())
     table = ParameterTable(structure, ins)
     model = compile_model(structure, ins, data, mode="rietveld",
-                          moving_paths=set(table.moving_paths))
+                          moving_paths=set(table.moving_paths),
+                          window_area_tol=window_area_tol)
     return structure, ins, data, table, model
 
 
@@ -1434,14 +1436,22 @@ def test_a_window_holding_no_fitted_channel_is_refused_and_names_the_peak():
     range is never questioned however implausible, which is the whole stance of
     this WP.  The message names the component and quotes both ranges, in the
     `check_interval` sentence shape.
+
+    A fit meets the refusal in its first declared stage, so the compile asks
+    for the declared stages' windows by name.  At the closing windows the
+    window is sized at η's upper bound of 1 to drop 1e-3 of the area, which
+    widens it by 159.45° either side, against 8.26° here: it reaches the
+    30-50° range and the column is a Lorentzian tail, not zero (WP-2002).
     """
+    tol = WINDOW_AREA_TOL
     peak = make_peak(center=95.0, span=1.0, label="holder 110")
     with pytest.raises(ValueError, match=r"holder 110.*covers no fitted channel"):
-        _peak_state(peak, lo=30.0, hi=50.0)
+        _peak_state(peak, lo=30.0, hi=50.0, window_area_tol=tol)
 
     # unlabelled, the dot-path is the name
     with pytest.raises(ValueError, match=r"extra_components\[0\]"):
-        _peak_state(make_peak(center=95.0, span=1.0), lo=30.0, hi=50.0)
+        _peak_state(make_peak(center=95.0, span=1.0), lo=30.0, hi=50.0,
+                    window_area_tol=tol)
 
 
 def test_a_model_declaring_no_peak_is_bit_identical_to_the_pre_member_one():
@@ -1572,16 +1582,17 @@ def test_declared_peaks_reach_the_tick_list_under_one_reserved_key():
 
 
 def test_a_joint_fit_writes_the_same_reserved_key_as_a_single_one():
-    """The tick list has two builders, and both owe clause 2's destination.
+    """The tick list has two result builders, and both owe clause 2's
+    destination.
 
-    `multi.MultiHistogramRefinement._ticks` is the joint fit's own tick
-    builder, so a declared peak missing from it is reported as an unindexed
-    impurity by every histogram's Layer 0 — the identical failure the test
-    above pins for a single histogram, on the surface that does not share its
-    code path.  Both now read `CompiledModel.extra_peak_tick_positions`, which
-    is why they cannot disagree about where the images fall.
+    A declared peak missing from a joint fit's ticks is reported as an
+    unindexed impurity by every histogram's Layer 0 — the identical failure
+    the test above pins for a single histogram.  `multi.MultiHistogramRefinement`
+    had its own tick builder until WP-2028 task 7; both paths now call
+    `refine._tick_rows`, which reads `CompiledModel.extra_peak_tick_positions`,
+    so they cannot disagree about where the images fall.
     """
-    from rietx.multi import MultiHistogramRefinement
+    _tick_rows = sys.modules["rietx.refine"]._tick_rows
 
     structure = make_lab6()
     ins = _instrument(peaks=[make_peak(center=40.0)])
@@ -1594,8 +1605,7 @@ def test_a_joint_fit_writes_the_same_reserved_key_as_a_single_one():
                           moving_paths=set(table.moving_paths))
     values = table.decode(table.x0())
 
-    ticks, tick_hkl, tick_support = MultiHistogramRefinement._ticks(
-        None, model, structure, values)
+    ticks, tick_hkl, tick_support = _tick_rows(model, structure, values)
     assert EXTRA_TICK_KEY in ticks
     assert ticks[EXTRA_TICK_KEY] == model.extra_peak_tick_positions(values)
     assert "LaB6" in ticks
@@ -1614,8 +1624,8 @@ def test_a_joint_fit_writes_the_same_reserved_key_as_a_single_one():
     plain_table = ParameterTable(structure, plain)
     plain_model = compile_model(structure, plain, data, mode="rietveld",
                                 moving_paths=set(plain_table.moving_paths))
-    assert EXTRA_TICK_KEY not in MultiHistogramRefinement._ticks(
-        None, plain_model, structure, plain_table.decode(plain_table.x0()))[0]
+    assert EXTRA_TICK_KEY not in _tick_rows(
+        plain_model, structure, plain_table.decode(plain_table.x0()))[0]
 
 
 def test_a_phase_named_like_the_reserved_key_is_refused():
@@ -1705,14 +1715,22 @@ def test_a_declared_peak_leaves_extracted_intensities_unbiased():
     So the test compares against the extraction from a pattern that never had
     the intruder: declaring the peak must recover *that* answer, not merely
     change the answer.
+
+    The pattern's flat 40 counts are the model's background, so the net is
+    Bragg counts alone.  Left out of the model, the pedestal joined the net
+    and every reflection's extraction took the 40 counts its window spans:
+    the clean extraction then scaled with the window, 160.9 for the strongest
+    reflection at the declared windows against 327.3 at the closing ones,
+    where the pedestal-free value is 128.7 at both (WP-2002).
     """
     structure, ins, tt, blank = _lebail_extraction()
+    ins.background = BackgroundChebyshev(coefficients=[Parameter(value=40.0)])
 
     # clean truth
     table_c = ParameterTable(structure, ins)
     m_c = compile_model(structure, ins, blank, mode="rietveld",
                         moving_paths=set(table_c.moving_paths))
-    y_clean = np.asarray(m_c.evaluate(table_c.decode(table_c.x0()))) + 40.0
+    y_clean = np.asarray(m_c.evaluate(table_c.decode(table_c.x0())))
 
     # the same pattern with a holder line dropped **onto a strong reflection**,
     # which is the only placement that tests anything: an intruder in empty
@@ -1725,7 +1743,7 @@ def test_a_declared_peak_leaves_extracted_intensities_unbiased():
     tab_t = ParameterTable(structure, ins_t)
     m_t = compile_model(structure, ins_t, blank, mode="rietveld",
                         moving_paths=set(tab_t.moving_paths))
-    y_dirty = np.asarray(m_t.evaluate(tab_t.decode(tab_t.x0()))) + 40.0
+    y_dirty = np.asarray(m_t.evaluate(tab_t.decode(tab_t.x0())))
 
     def extract(y, instrument):
         data = PatternData(two_theta=tt.tolist(), intensity=y.tolist())
@@ -1747,7 +1765,7 @@ def test_a_declared_peak_leaves_extracted_intensities_unbiased():
     # Declaring it recovers the clean extraction to machine precision — the
     # injected curve *is* the model's own, so subtracting it from the net
     # restores the clean net bit for bit, which is the strongest form this
-    # claim can take.  Ignoring it inflates the worst reflection 160.9 -> 547.2
+    # claim can take.  Ignoring it inflates the worst reflection 128.7 -> 526.5
     # (measured, this fixture): the phase is handed the holder's counts and
     # nothing says so, because an extracted intensity has no independent truth
     # to be checked against.

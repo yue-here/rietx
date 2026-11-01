@@ -566,8 +566,9 @@ def test_a_width_is_stepped_by_its_unit_and_everything_else_by_one():
     """WP-1936: a width takes FLOOR_SEEDS' size for its unit.
 
     ``u``, ``v`` and ``w`` are deg² terms of a variance, so they are widths
-    although ``u`` and ``v`` may go negative.  ``x`` and ``y`` are deg rows
-    bounded at 0, so they are widths.  Since WP-1938 every row is refined in
+    although ``u`` and ``v`` may go negative.  ``x`` is a deg row bounded at
+    0, so it is a width, and so is ``y``, which has no floor of its own since
+    2026-10-23 (WP-2002) and is named in ``_SIGNED_WIDTHS``.  Since WP-1938 every row is refined in
     its own units, so ``w`` and ``y`` take their unit's size too, where under
     softplus their θ was already logarithmic and kept 1.  The zero shift is
     in degrees, but it is an offset that may go negative, so it keeps 1.  So

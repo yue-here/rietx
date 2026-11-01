@@ -33,7 +33,6 @@ from rietx.params.vector import ParameterTable
 from rietx.schemas.common import Parameter
 from rietx.schemas.instrument import (
     TCHZ_BOUNDS,
-    TCHZ_BOUNDS_COARSE,
     BackgroundChebyshev,
     ProfileTCHZ,
 )
@@ -159,7 +158,7 @@ def test_on_the_floor_lm_reaches_trfs_minimum(pattern, trf, monkeypatch, rows):
 
 
 def test_the_declared_boxes_start_at_the_clamp():
-    assert TCHZ_BOUNDS["w"][0] == TCHZ_BOUNDS_COARSE["w"][0] == _MIN_GAMMA_G2
+    assert TCHZ_BOUNDS["w"][0] == _MIN_GAMMA_G2
     assert ProfileTCHZ().w.min == _MIN_GAMMA_G2
     assert ProfileTCHZ.coarse().w.min == _MIN_GAMMA_G2
 
@@ -173,7 +172,7 @@ def test_a_stored_min_of_zero_opens_with_the_floor():
     doc = Instrument.debye_scherrer(wavelength=WAVELENGTH).model_dump(mode="json")
     doc["profile"]["w"].update(value=0.0, min=0.0)
     w = Instrument.model_validate(doc).profile.w
-    assert (w.value, w.min, w.max) == (_MIN_GAMMA_G2, _MIN_GAMMA_G2, 1.0)
+    assert (w.value, w.min, w.max) == (_MIN_GAMMA_G2, _MIN_GAMMA_G2, TCHZ_BOUNDS["w"][1])
 
     # a value above the floor is kept, and only the bound moves
     doc["profile"]["w"].update(value=2.5e-5, min=0.0)
@@ -306,6 +305,116 @@ def test_no_row_without_a_free_width_and_none_the_start_violates(pattern):
     # row is violated at the start and none is built (feasibility is kept,
     # never restored)
     assert rows_at(-1e-4)[0] == []
+
+
+# ------------------------------------------------ _MIN_GAMMA_G2 over its domain (B10)
+#: a tenth of σ/peak at the strongest peak: what a profile error may reach and
+#: add at most 1 % to that point's expected χ² (lab FAP.XRA, 11-BM NAC)
+NOISE_BAR = {"lab": 0.1 * 7.2e-3, "synchrotron": 0.1 * 1.75e-3}
+
+
+def _floor_profile_change(gamma_l: float) -> float:
+    """The largest change, in units of the peak height, that clamping Γ_G at
+    √``_MIN_GAMMA_G2`` makes to a TCHZ peak whose true Γ_G lies under it."""
+    from rietx.model.profiles.pseudovoigt import pseudo_voigt, tch_gamma_eta
+
+    floor = np.sqrt(_MIN_GAMMA_G2)
+    x = np.linspace(-20.0 * gamma_l, 20.0 * gamma_l, 40001)
+    g1, e1 = tch_gamma_eta(np.array(floor), np.array(gamma_l))
+    clamped = pseudo_voigt(x, g1, e1)
+    worst = 0.0
+    for true in (0.0, 0.5 * floor, 0.9 * floor):
+        g0, e0 = tch_gamma_eta(np.array(max(true, 1e-300)), np.array(gamma_l))
+        exact = pseudo_voigt(x, g0, e0)
+        worst = max(worst, float(np.max(np.abs(clamped - exact)) / np.max(exact)))
+    return worst
+
+
+@pytest.mark.parametrize("noise, gamma_l", [
+    ("lab", 5e-3),
+    ("synchrotron", 1e-2),
+    pytest.param("synchrotron", 3e-3, marks=pytest.mark.xfail(strict=True, reason=(
+        "a peak whose Gaussian part is under the floor and whose Lorentzian FWHM "
+        "is 0.003 deg moves by 9.9e-4 of its height, 0.56 sigma/peak at 11-BM "
+        "(measured 2026-10-21); NAC's narrowest Lorentzian is 0.0026 deg, but its "
+        "Gaussian part there is 1180x the floor, so the clamp does not act")))])
+def test_where_the_floor_binds_it_moves_a_peak_less_than_the_noise(noise, gamma_l):
+    """``_MIN_GAMMA_G2`` = 1e-8 deg² (Γ_G ≥ 1e-4°), at fixed parameters.
+
+    The floor changes the model only at a reflection whose Caglioti Γ_G²
+    falls under it.  There the peak is a TCHZ with Γ_G = 1e-4° in place of
+    something narrower, and the change is largest when the Lorentzian is
+    narrow.  Measured as a fraction of the peak height: 6.9e-3 at
+    Γ_L = 0.001°, 9.9e-4 at 0.003°, 4.4e-4 at 0.005°, 1.6e-4 at 0.01°,
+    1.1e-5 at 0.1° and 6.4e-6 at 0.164° (SRM 660c's high-angle Γ_L).  So the
+    floor meets the lab bar wherever Γ_L ≥ 0.005° and the 11-BM bar wherever
+    Γ_L ≥ 0.01°.
+
+    Made to fail on 2026-10-21: ``_MIN_GAMMA_G2`` patched to 1e-6 deg²
+    (Γ_G ≥ 1e-3°) moved the two passing rows by 2.6e-2 and 6.9e-3.
+    """
+    change = _floor_profile_change(gamma_l)
+    assert change <= NOISE_BAR[noise], (
+        f"Gamma_L {gamma_l} deg: the floor moves the peak by {change:.2e} of its "
+        f"height (bar {NOISE_BAR[noise]:.2e}, {noise})")
+
+
+def _families():
+    from tests.test_window_domain import FAMILIES
+
+    return FAMILIES
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("family", _families())
+def test_the_floor_leaves_every_protocol_answer_under_the_noise(family, monkeypatch):
+    """The real-data half: at each family's protocol answer, y_calc with the
+    shipped floor against y_calc with none, point by point in units of the
+    file's σ, bar 0.1 (1 % of that point's expected χ²).
+
+    Raw Γ_G² at the reflections inside the fitted range sits far above the
+    floor on three families: 1180× at its lowest on 11-BM NAC (Γ_G 0.0034°
+    at 13.5°), 10 252× on cpd-1a and 2.5e5× on FAP.  SRM 660c's answer has
+    the instrument's Caglioti quadratic negative at its highest-angle points
+    (``RESOLUTION_NOT_POSITIVE``: 75 of 5332, worst at 150.9°), where the
+    floor binds.  The Lorentzian there is 0.164°, which bounds the floor's
+    effect at about 6e-6 of the peak.  Measured
+    max |Δy|/σ on 2026-10-21 (macOS arm64, ``[dev]``, compiled tier on): 0
+    on SRM 660c, FAP and NAC, 4.8e-9 on cpd-1a.  SRM 660c reads 0 because
+    its answer keeps every reflection at or above the face Γ_G² = 1e-8
+    (``CONSTRAINT_ACTIVE``), one of them within 1e-6 deg² of it at 149.7°,
+    so the clamp and no clamp agree; a floor of 1e-6 moves that point by
+    0.002 σ.
+
+    This bar is at fixed parameters.  The answer is another matter: polished
+    under a floor of 1e-10, SRM 660c's and cpd-1a's answers stop 1.2 plain
+    esd away on ``profile.u`` (FAP and NAC do not move), and so does a polish
+    under an ``FD_STEP`` of 5e-7.  ``tests/test_cross_backend.py``'s
+    ``test_fd_columns_hold_at_every_protocol_answer`` records that face.
+
+    Made to fail on 2026-10-21: ``_MIN_GAMMA_G2`` patched to 1e-3 deg²
+    (Γ_G ≥ 0.032°) failed NAC at 163 σ.
+    """
+    import rietx.model.profiles.caglioti as caglioti
+    from rietx.model.forward import compile_model
+    from tests.test_window_domain import _answer
+
+    f = _answer(family, ())
+    st, ins = f["structure"], f["instrument"]
+    # two compiles, so the windows are the shipped ones in both and the
+    # second model's width memo has never seen the shipped floor
+    model, fresh = (compile_model(st, ins, f["data"],
+                                  two_theta_limits=f["kw"].get("two_theta_limits"))
+                    for _ in range(2))
+    table = ParameterTable(st, ins)
+    values = table.decode(table.x0())
+    shipped = np.asarray(model.evaluate(values), dtype=float)
+    monkeypatch.setattr(caglioti, "_MIN_GAMMA_G2", 1e-300)
+    unfloored = np.asarray(fresh.evaluate(values), dtype=float)
+    d = np.abs(shipped - unfloored) / np.asarray(model.sigma, dtype=float)
+    k = int(np.argmax(d))
+    assert d[k] <= 0.1, (f"{family}: the floor moves y_calc by {d[k]:.3g} sigma at "
+                         f"{np.asarray(model.tt)[k]:.2f} deg")
 
 
 def test_constraint_active_names_the_block_that_bound():

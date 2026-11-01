@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from pydantic import Field
 
+from ..optimize import lapack
 from ..schemas.common import Base, Diagnostic
 from ..schemas.pattern import PatternData
 from .estimators import arpls
@@ -41,6 +42,21 @@ from .models import chebyshev_design_matrix, interpolate_fixed
 
 if TYPE_CHECKING:  # a declared curve the chosen order sits on top of
     from ..schemas.instrument import BackgroundFixedPlusChebyshev
+
+#: net counts above the masking baseline, in σ, past which a channel is a peak
+#: channel and leaves the BIC score; a conventional 3σ, no source cited
+PEAK_MASK_SIGMA = 3.0
+#: arPLS stiffness of the masking baseline (Baek et al. 2015); inside the
+#: 1e6-1e9 that :func:`~.estimators.arpls` calls typical for ~10⁴ points
+PEAK_MASK_BASELINE_LAMBDA = 1e7
+#: the highest Chebyshev order :func:`select_chebyshev_order` scans; a scan that
+#: returns it without the whiteness stop says ``BACKGROUND_ORDER_AT_CAP`` (#833)
+CHEBYSHEV_MAX_ORDER = 16
+#: Durbin-Watson d at which the order scan stops (d → 2 for white residuals)
+DW_STOP = 1.8
+#: the d an arPLS baseline's masked residuals must reach for
+#: :func:`select_arpls_lambda` to take its λ
+ARPLS_DW_FLOOR = 1.2
 
 
 class CandidateScore(Base):
@@ -63,10 +79,10 @@ class BackgroundSelection(Base):
 
 
 def peak_mask(tt: np.ndarray, y: np.ndarray, sigma: np.ndarray,
-              *, baseline_lambda: float = 1e7) -> np.ndarray:
+              *, baseline_lambda: float = PEAK_MASK_BASELINE_LAMBDA) -> np.ndarray:
     """True on background channels (net ≤ 3σ above a robust arPLS baseline)."""
     base = arpls(y, baseline_lambda)
-    return (y - base) <= 3.0 * sigma
+    return (y - base) <= PEAK_MASK_SIGMA * sigma
 
 
 def _bic(rss: float, m: int, k: int) -> float:
@@ -77,9 +93,9 @@ def _durbin_watson(r: np.ndarray) -> float:
     return float(np.sum(np.diff(r) ** 2) / max(np.sum(r * r), 1e-300))
 
 
-def select_chebyshev_order(data: PatternData, *, max_order: int = 16,
-                           dw_stop: float = 1.8,
-                           baseline_lambda: float = 1e7,
+def select_chebyshev_order(data: PatternData, *, max_order: int = CHEBYSHEV_MAX_ORDER,
+                           dw_stop: float = DW_STOP,
+                           baseline_lambda: float = PEAK_MASK_BASELINE_LAMBDA,
                            fixed: "BackgroundFixedPlusChebyshev | None" = None
                            ) -> BackgroundSelection:
     """Pick the Chebyshev background order by masked-channel BIC + DW stop.
@@ -150,7 +166,7 @@ def select_chebyshev_order(data: PatternData, *, max_order: int = 16,
         if free_scale:
             rows = np.vstack([rows, curve[None, :]])
         A = (rows * w).T
-        coef, *_ = np.linalg.lstsq(A, y_m * w, rcond=None)
+        coef, *_ = lapack.lstsq(A, y_m * w, rcond=None)
         r = y_m * w - A @ coef
         scores.append(CandidateScore(
             complexity=float(n), bic=_bic(float(r @ r), m, len(rows)),
@@ -179,7 +195,7 @@ def select_chebyshev_order(data: PatternData, *, max_order: int = 16,
 
 def select_arpls_lambda(data: PatternData, *,
                         candidates: tuple[float, ...] = tuple(10.0 ** e for e in range(4, 11)),
-                        dw_floor: float = 1.2) -> BackgroundSelection:
+                        dw_floor: float = ARPLS_DW_FLOOR) -> BackgroundSelection:
     """Pick the arPLS λ: the **stiffest** baseline whose masked-channel
     residuals still look white.
 

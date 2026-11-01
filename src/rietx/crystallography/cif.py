@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import os
 import re
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from pathlib import Path
 
 import gemmi
@@ -12,6 +13,7 @@ import numpy as np
 
 from ..schemas.common import Diagnostic, Parameter
 from ..schemas.structure import (
+    BISO_SEED,
     AnisoU,
     Atom,
     Cell,
@@ -21,6 +23,7 @@ from ..schemas.structure import (
 from . import magcif
 from .magnetic.scattering import check_group_is_structure_symmetry
 from .symmetry import (
+    TWIN_DISTANCE,  # noqa: F401  (re-export; the constant and its audit row live in .symmetry)
     OperatorGroup,
     site_orbit,
     snap_diagnostics,
@@ -50,6 +53,17 @@ def _strip_su(value: str) -> float:
 #: did, because choosing between "the angle is wrong" and "the symbol is wrong"
 #: is the caller's to make.
 CIF_ANGLE_CORRECT_MAX_DEG = 0.1
+
+#: How far, in units of a coordinate's last printed digit, the value a file
+#: rounded can lie from the number it printed (WP-2037).  A coordinate printed
+#: to d decimals is any value within 0.5·10⁻ᵈ of the print, so a snap onto a
+#: special position that moves every coordinate of a site by no more than that
+#: is the file's own rounding: Ca1 of the bundled fluorapatite is printed
+#: ``0.3333333333`` and snaps 3.3e-11 onto 1/3, which is no statement of the
+#: file's and is not reported.  A snap past it still is, whatever its size.
+#: Arithmetic, not a choice: the half is what rounding to the nearest digit
+#: means, ties included.
+CIF_PRINTED_ROUNDING = 0.5
 
 #: the grammar both form-factor lookups parse: an element symbol plus an
 #: optional *trailing* charge (``Cl1-``) — see ``scattering.normalize_species``
@@ -308,14 +322,6 @@ def _number_fault(path: str, block, tags, label: str | None = None) -> None:
                     f"standard uncertainty in parentheses, as in '5.4307(2)')")
 
 
-#: Two atoms of a structure closer than this are one atom stated twice (Å).
-#: Far below any split-site separation a refined structure states — the
-#: closest pair of images of one partially occupied site in the 2026-10-06
-#: MAGNDATA sweep is 0.20 Å apart, at occupancies summing to at most 1 — and
-#: far above the 1e-3 Å twins rounding leaves when a special position is
-#: printed off by 1e-3.
-TWIN_DISTANCE = 0.02
-
 #: Two occupancies agree, and two sites fill a position without overfilling it,
 #: to within this (absolute).  Occupancies are quoted to two or three decimals
 #: with su up to a few 1e-3, so two refined values summing to 1.004
@@ -338,55 +344,70 @@ def _cartesian_gap(cell, d) -> float:
 
 
 def _merge_twins(path: str, sg, cell, atoms, diagnostics) -> list:
-    """A site whose own images sit closer than :data:`TWIN_DISTANCE`, put on its special position.
+    """A site within :data:`TWIN_COORD_TOL` of a special position, put on it where the gate says.
 
     ``site_orbit`` snaps a site within ``SITE_TOL`` (1e-4, fractional) of a
     special position.  A file stating the 6h site (x, 2x, ¼) of P6₃/mmc as
     (0.828, 0.657, ¼) is 1e-3 off it, so every image counts as a distinct atom
     0.005 Å from its twin and the site scatters as two atoms per position.
-    Where the twins are closer than :data:`TWIN_DISTANCE` — at any
-    occupancy, since no split site is that tight, and a co-occupant of a
-    doubled site is doubled with it — the site is taken at the special
-    position its orbit collapses to, and ``CIF_SITE_TWINS_MERGED`` says so.
-    A split site, whose images stay apart, is untouched.
+    Where the special position is within :data:`TWIN_COORD_TOL` of every
+    coordinate (fractional) and the occupancy summed over the atoms at that
+    position, each × (images before / images after), is above 1
+    (:func:`.twins.applied_twin_merges`, the one gate at every boundary), the
+    unmerged model puts more than one atom at one place: the site is taken at
+    the special position its orbit collapses to, and ``CIF_SITE_TWINS_MERGED``
+    says so, with the site's atoms per cell before and after.  At most 1 the
+    stated numbers read both as one atom off its position and as a split pair
+    of part-atoms (#1088); the site is kept as stated and ``SITE_TWINS_KEPT``
+    gives both readings.  A split site, whose images stay apart, is untouched.
 
-    The orbit of a site and its collapse onto a special position are those of
-    :func:`.symmetry.site_orbit`: International Tables for Crystallography
+    The rule is :func:`.symmetry.site_twin_merge`'s, which
+    :func:`.twins.merge_site_twins` applies at every other boundary that builds
+    or changes a structure (issue #1007, reported there as
+    ``SITE_TWINS_MERGED``); this reader says the move on its own channel and
+    leaves nothing for them to move.  The orbit
+    and its collapse are those of International Tables for Crystallography
     vol. A (Wyckoff positions), with the tolerance-based site-symmetry search
     of Grosse-Kunstleve & Adams (2002), Acta Cryst. A58, 60.
     """
-    from .symmetry import site_orbit
+    from .twins import _content_change, _kept_message, applied_twin_merges
 
-    reach = TWIN_DISTANCE / min(cell.a, cell.b, cell.c)
+    xyzs = [np.array([a.x.value, a.y.value, a.z.value]) for a in atoms]
+    applied, kept = applied_twin_merges(sg, cell, xyzs,
+                                        [a.occ.value for a in atoms])
     out = []
-    for atom in atoms:
-        xyz = np.array([atom.x.value, atom.y.value, atom.z.value])
-        tight = site_orbit(sg, xyz)
-        loose = site_orbit(sg, xyz, tol=reach)
-        if loose.multiplicity >= tight.multiplicity:
+    for j, atom in enumerate(atoms):
+        xyz = xyzs[j]
+        if j in kept and diagnostics is not None:
+            merge = kept[j]
+            message, suggestion = _kept_message(
+                atom, None, path, xyz, merge,
+                [float(v) for v in merge.position])
+            diagnostics.append(Diagnostic(
+                level="warning", code="SITE_TWINS_KEPT", where=[atom.label],
+                value=merge.gap, message=message, suggestion=suggestion))
+        merge = applied.get(j)
+        if merge is None:
             out.append(atom)
             continue
-        images = np.asarray(tight.images, dtype=np.float64)
-        gap = min(_cartesian_gap(cell, images[a] - images[b])
-                  for a in range(len(images)) for b in range(a))
-        if gap > TWIN_DISTANCE:
-            out.append(atom)
-            continue
-        snapped = [float(v) for v in loose.position]
+        gap = merge.gap
+        snapped = [float(v) for v in merge.position % 1.0]
         out.append(atom.model_copy(update={
             n: getattr(atom, n).model_copy(update={"value": v})
             for n, v in zip("xyz", snapped)}))
         if diagnostics is not None:
+            content = _content_change(atom.occ.value, merge)
             diagnostics.append(Diagnostic(
                 level="warning", code="CIF_SITE_TWINS_MERGED",
                 where=[atom.label], value=gap,
                 message=(
                     f"{path}: site {atom.label!r} at "
-                    f"{[round(float(v), 6) for v in xyz]} puts {tight.multiplicity} "
-                    f"atoms in the cell in pairs {gap:.2g} Å apart. It was read "
-                    f"on the special position "
+                    f"{[round(float(v), 6) for v in xyz]} puts {merge.before} "
+                    f"positions in the cell in pairs {gap:.2g} Å apart. It was "
+                    f"read on the special position "
                     f"{[round(v, 6) for v in snapped]} "
-                    f"({loose.multiplicity} atoms)."),
+                    f"({merge.after} positions), with its occupancy unchanged. "
+                    f"{content}"),
                 suggestion="Check the coordinates against the source."))
     return out
 
@@ -542,6 +563,98 @@ def _locate(diagnostics, atoms, codes, *, start=0, repeats=None) -> None:
                 if k is not None]})
 
 
+#: The tag prefixes of the one category a data block may carry and still state
+#: nothing a structure is read from.  ``cif_core.dic`` 3.3.0 files AUDIT and
+#: its children (AUDIT_AUTHOR, AUDIT_CONFORM, AUDIT_LINK, ...) under
+#: PUBLICATION: "details about the creation and subsequent updating of the
+#: data block", never a cell, a site or a symmetry operation.  Both spellings,
+#: since CIF tags are case-blind and DDLm writes the dot.
+_AUDIT_PREFIXES = ("_audit_", "_audit.")
+
+#: The items whose presence makes a block one with atom sites, in both
+#: spellings: what gemmi's small-structure reader builds a site from.
+_SITE_TAGS = ("_atom_site_label", "_atom_site.label",
+              "_atom_site_fract_x", "_atom_site.fract_x")
+
+
+def _block_tags(block) -> list[str]:
+    """Every tag a block states, pairs and loop columns, in file order; a save
+    frame counts as a statement, under its name."""
+    tags: list[str] = []
+    for item in block:
+        if item.pair is not None:
+            tags.append(item.pair[0])
+        elif item.loop is not None:
+            tags.extend(item.loop.tags)
+        elif item.frame is not None:
+            tags.append(f"save_{item.frame.name}")
+    return tags
+
+
+def _block_name(block) -> str:
+    return f"data_{block.name.strip()}"
+
+
+def _structure_block(doc, path: str, diagnostics: list[Diagnostic] | None):
+    """The data block :func:`structure_from_cif` reads, or a refusal naming why
+    none can be chosen.
+
+    One block is that block.  Of several, one holding atom sites is read where
+    **every other block states nothing**: no tag at all, or only the AUDIT
+    category's (:data:`_AUDIT_PREFIXES`), which records how the file was made
+    and carries no structure: an empty ``data_global`` ahead of the
+    structure, as issue #1063 (item 1) reports of FullProf's magnetic CIF.
+    ``CIF_EMPTY_BLOCK_SKIPPED`` (info) names each block passed over.  Two
+    blocks with atom sites, or one beside a block that states anything else
+    (a pdCIF's pattern, a journal's publication block), are refused, naming
+    the blocks and saying what each states, because choosing among them is
+    not something this reader does yet.  No block at all keeps gemmi's own
+    refusal, which is the right one for an empty or truncated file.
+    """
+    if len(doc) <= 1:
+        return _gemmi_or_value_error(
+            doc.sole_block, path, "could not be read as a small-molecule CIF")
+    tags = [_block_tags(block) for block in doc]
+    with_sites = [k for k, own in enumerate(tags)
+                  if any(t.lower() in _SITE_TAGS for t in own)]
+    stating = [k for k, own in enumerate(tags)
+               if k not in with_sites
+               and not all(t.lower().startswith(_AUDIT_PREFIXES) for t in own)]
+    names = [_block_name(block) for block in doc]
+    if len(with_sites) == 1 and not stating:
+        (chosen,) = with_sites
+        skipped = [f"{names[k]} ({'only ' + ', '.join(tags[k]) if tags[k] else 'no tags'})"
+                   for k in range(len(doc)) if k != chosen]
+        if diagnostics is not None:
+            diagnostics.append(Diagnostic(
+                level="info", code="CIF_EMPTY_BLOCK_SKIPPED", where=["phases.0"],
+                message=(f"{path} holds {len(doc)} data blocks; the structure "
+                         f"was read from {names[chosen]}, the only one with "
+                         f"atom sites. Skipped, as stating nothing a structure "
+                         f"is read from: {'; '.join(skipped)}.")))
+        return doc[chosen]
+    if len(with_sites) > 1:
+        raise ValueError(
+            f"{path}: could not be read as a small-molecule CIF: single data "
+            f"block expected, got {len(doc)}, and {len(with_sites)} of them "
+            f"hold atom sites ({', '.join(names[k] for k in with_sites)}). "
+            f"This reader reads one structure, and choosing a block is not yet "
+            f"supported: write each structure to a file of its own.")
+    shown = "; ".join(
+        f"{names[k]} states {', '.join(tags[k][:3])}"
+        + (f" and {len(tags[k]) - 3} more" if len(tags[k]) > 3 else "")
+        for k in stating[:3])
+    where = (f"the atom sites are in {names[with_sites[0]]}, and"
+             if with_sites else "no block holds atom sites, and")
+    raise ValueError(
+        f"{path}: could not be read as a small-molecule CIF: single data block "
+        f"expected, got {len(doc)}: {where} {len(stating)} other block"
+        f"{'s' if len(stating) != 1 else ''} state{'' if len(stating) != 1 else 's'} "
+        f"more than _audit_ items ({shown}). Only a block with no tags or "
+        f"only _audit_ tags is skipped, and choosing a block is not yet "
+        f"supported: write the structure to a file of its own.")
+
+
 def _magnetic_content(text: str) -> bool:
     """Whether a CIF's text states a magnetic construct of any kind.
 
@@ -565,7 +678,14 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
                        moment_g: dict[str, float] | None = None,
                        nuclear_group: str = "auto",
                        diagnostics: list[Diagnostic] | None = None) -> Structure:
-    """Read the first data block of a CIF into a single-phase :class:`Structure`.
+    """Read the structure block of a CIF into a single-phase :class:`Structure`.
+
+    The block is the file's only one, or the one holding atom sites where
+    every other block states nothing (no tags, or only ``_audit_`` ones), which
+    ``CIF_EMPTY_BLOCK_SKIPPED`` reports; any other file of several blocks is
+    refused naming them (:func:`_structure_block`).  A file using the pre-2016
+    draft magnetic tags is refused by name
+    (:func:`~rietx.crystallography.magcif.refuse_draft_tags`).
 
     Uses gemmi's small-molecule reader, which resolves the space group from
     the recorded H-M (or Hall) symbol and carries fractional coordinates,
@@ -600,7 +720,9 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     metadata.  The nuclear space group's type comes from
     ``_parent_space_group.name_H-M_alt``, because a magCIF has no ordinary
     ``_space_group_name_H-M_alt`` at all and gemmi therefore resolves no space
-    group for one; its setting is checked against the file's own operators
+    group for one (FullProf's undefined ``_parent_space_group.name_H-M`` is
+    read where ``_alt`` is absent, and named:
+    :func:`~rietx.crystallography.magcif.parent_space_group`); its setting is checked against the file's own operators
     (:func:`~rietx.crystallography.magcif.resolve_nuclear_symmetry`).  Two magnetic constructs are **refused by name** rather than
     half-read: a modulated structure (any ``_atom_site_moment_Fourier`` or
     special-function loop) and a structure stated in a *supercell* of its
@@ -640,31 +762,39 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
             f"nuclear_group={nuclear_group!r}: expected one of "
             f"{', '.join(map(repr, magcif.NUCLEAR_GROUP_CHOICES))}")
     try:
-        small = _gemmi_or_value_error(
-            lambda: gemmi.read_small_structure(path), path,
+        doc = _gemmi_or_value_error(
+            lambda: gemmi.cif.read(path), path,
             "could not be read as a small-molecule CIF")
     except ValueError as exc:
         fault = _syntax_fault(path, str(exc))
         if fault is None:
             raise
         raise ValueError(f"{exc}. {fault}") from exc
+    text = Path(path).read_text(encoding="utf-8", errors="replace")
+    # before the atom-site test: a file written wholly in the draft's tags has
+    # no atom sites under the dictionary's names, and "no atom sites found"
+    # would name the wrong cause (issue #1063, item 3)
+    magcif.refuse_draft_tags(text, path)
+    source = _structure_block(doc, path, diagnostics)
+    small = _gemmi_or_value_error(
+        lambda: gemmi.make_small_structure_from_block(source), path,
+        "could not be read as a small-molecule CIF")
     if not small.sites:
         raise ValueError(f"no atom sites found in {path}")
     cell_values = (small.cell.a, small.cell.b, small.cell.c,
                    small.cell.alpha, small.cell.beta, small.cell.gamma)
     if any(math.isnan(v) for v in cell_values):
-        _number_fault(path, gemmi.cif.read(path).sole_block(),
+        _number_fault(path, source,
                       [f"_cell_{n}" for n in ("length_a", "length_b",
                                               "length_c", "angle_alpha",
                                               "angle_beta", "angle_gamma")])
     for site in small.sites:
         if any(math.isnan(v) for v in (site.fract.x, site.fract.y,
                                        site.fract.z, site.occ)):
-            _number_fault(path, gemmi.cif.read(path).sole_block(),
+            _number_fault(path, source,
                           ["_atom_site_fract_x", "_atom_site_fract_y",
                            "_atom_site_fract_z", "_atom_site_occupancy"],
                           label=site.label)
-    text = Path(path).read_text(encoding="utf-8", errors="replace")
 
     # The magnetic arm's two refusals run **before** anything is built and
     # whether or not the file also states an ordinary space group: a magCIF
@@ -674,9 +804,7 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     block = None
     magnetic_symmetry = None
     if _magnetic_content(text):
-        block = _gemmi_or_value_error(
-            lambda: gemmi.cif.read(path).sole_block(), path,
-            "states a magnetic construct and has no single data block")
+        block = source
         magcif.refuse_modulation(text, path)
         magcif.refuse_a_magnetic_supercell(block, text, path)
         magnetic_symmetry = magcif.read_magnetic_symmetry(
@@ -695,19 +823,18 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
         # list cannot supply it: a type-III group is an index-2 subgroup of the
         # parent, so the nuclear symmetry is strictly higher than the
         # operators state.
-        doc_block = block if block is not None else _gemmi_or_value_error(
-            lambda: gemmi.cif.read(path).sole_block(), path,
-            "has no single data block to read a space group from")
-        hm = (doc_block.find_value("_symmetry_space_group_name_H-M")
-              or doc_block.find_value("_space_group_name_H-M_alt")
-              or (magcif.parent_space_group(doc_block) if block is not None
-                  else None))
+        hm = (source.find_value("_symmetry_space_group_name_H-M")
+              or source.find_value("_space_group_name_H-M_alt")
+              or (magcif.parent_space_group(source, path,
+                                            diagnostics=diagnostics)
+                  if block is not None else None))
         if hm is None and block is not None:
             raise magcif.MagCifError(
                 f"{path} states a magnetic structure and no space group this "
                 f"reader can resolve: neither an ordinary "
                 f"_space_group_name_H-M_alt nor the magCIF "
-                f"_parent_space_group.name_H-M_alt. The magnetic operator list "
+                f"_parent_space_group.name_H-M_alt (or its undefined spelling "
+                f"{magcif.PARENT_HM_UNDEFINED}). The magnetic operator list "
                 f"alone cannot supply it — a type-III magnetic group is an "
                 f"index-2 subgroup of the parent, so the nuclear symmetry is "
                 f"strictly *higher* than the operators state, and a phase "
@@ -742,9 +869,9 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     rewrites: dict[str, tuple[str, str, list[str]]] = {}
     # CIF tags are case-insensitive, so the gate that spares an ordered file its
     # second parse is too
-    disorder = (_disorder_columns(path, small.name)
+    disorder = (_disorder_columns(source)
                 if re.search(r"(?i)_atom_site_disorder", text) else {})
-    site_statements = _site_statements(path, small.name)
+    site_statements = _site_statements(source)
     # the writer chooses its U against this very arithmetic (io/cif/blocks)
     from ..io.cif.blocks import b_from_u
 
@@ -759,7 +886,7 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
             # by the metric — adp.u_equivalent); it only feeds the isotropic
             # fallback, where the tensor is being discarded anyway
             u_eq = (site.aniso.u11 + site.aniso.u22 + site.aniso.u33) / 3.0
-            u_iso = u_eq if u_eq > 0 else 0.5 / (8.0 * math.pi ** 2)
+            u_iso = u_eq if u_eq > 0 else BISO_SEED / (8.0 * math.pi ** 2)
         b_iso = b_from_u(u_iso)
         raw = site.type_symbol or site.element.name
         species, note = normalize_cif_species(raw)
@@ -772,7 +899,7 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
             y=Parameter(value=site.fract.y),
             z=Parameter(value=site.fract.z),
             occ=Parameter(value=(site.occ if site.occ or said.get("occ")
-                                 else 1.0), min=0.0, max=1.5),
+                                 else 1.0), min=0.0),
             biso=Parameter(value=b_iso, unit="A^2"),
             aniso=(AnisoU.from_values([site.aniso.u11, site.aniso.u22, site.aniso.u33,
                                        site.aniso.u12, site.aniso.u13, site.aniso.u23])
@@ -786,6 +913,9 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     # the file's own statement first: a site it says is on a special position is
     # moved there under its own diagnostic, before the twin merge below can
     # collapse it unannounced.  The rows carry labels until the list is final.
+    # Before either, a site the file printed to its own rounding of a special
+    # position is read on it (CIF_PRINTED_ROUNDING), which reports nothing.
+    _read_rounded_sites_on_position(sg, atoms, site_statements)
     stated_diagnostics = _snap_to_stated_multiplicity(sg, atoms, site_statements, path=path)
     if diagnostics is not None:
         diagnostics.extend(stated_diagnostics)
@@ -929,7 +1059,7 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     if diagnostics is not None:
         # after the last site is merged or dropped, so every path below names
         # the site it is about
-        _locate(diagnostics, atoms, {"CIF_SITE_TWINS_MERGED", "CIF_SITE_LISTED_TWICE",
+        _locate(diagnostics, atoms, {"CIF_SITE_TWINS_MERGED", "SITE_TWINS_KEPT", "CIF_SITE_LISTED_TWICE",
                                       "SITE_SNAPPED_TO_SPECIAL_POSITION",
                                       "CIF_SITE_MULTIPLICITY_DISAGREES"},
                 start=first_own, repeats=repeats)
@@ -946,7 +1076,8 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
             source=path, prefix="phases.0"))
 
     phase = Phase(
-        name=phase_name or (small.name or "phase_1"),
+        # gemmi names a bare `data_` block " ", which is no name
+        name=phase_name or (small.name.strip() or "phase_1"),
         space_group=sg.xhm(),
         symmetry_operations=listed,
         cell=Cell(
@@ -1016,22 +1147,24 @@ def format_su(value: float, esd: float | None, *, decimals: int = 6) -> str:
 CIF_STATED_MULTIPLICITY_SNAP_TOL = 1e-3
 
 
-def _site_statements(path: str, name: str) -> dict[str, dict]:
+def _site_statements(block) -> dict[str, dict]:
     """What each site label's row states, per column, where gemmi cannot say.
 
     ``small.sites`` holds ``u_iso = 0`` and ``occ = 1`` for a column the file
     does not carry and for one that states them, so "stated zero" and "absent"
     are not told apart there.  Returns ``{label: {"iso": bool, "occ": bool,
-    "multiplicity": int | None}}`` read from the block itself; a null (``.``
-    or ``?``) is not a statement.  The multiplicity comes from
-    ``_atom_site_symmetry_multiplicity``, else the number leading a
-    ``_atom_site_Wyckoff_symbol`` (``6e``).
+    "multiplicity": int | None, "printed": tuple | None}}`` read from the block
+    itself; a null (``.`` or ``?``) is not a statement.  The multiplicity comes
+    from ``_atom_site_symmetry_multiplicity``, else the number leading a
+    ``_atom_site_Wyckoff_symbol`` (``6e``).  ``printed`` is the three fractional
+    coordinates as the file prints them, esd dropped, which is what
+    :func:`_within_printed_rounding` reads the file's precision from; ``None``
+    where any of the three is not a plain decimal.
     """
-    doc = gemmi.cif.read(path)
-    block = doc.find_block(name) or doc[0]
     table = block.find("_atom_site_", [
         "label", "?U_iso_or_equiv", "?B_iso_or_equiv", "?occupancy",
-        "?symmetry_multiplicity", "?Wyckoff_symbol"])
+        "?symmetry_multiplicity", "?Wyckoff_symbol",
+        "?fract_x", "?fract_y", "?fract_z"])
     out: dict[str, dict] = {}
     for row in table:
         def stated(k):
@@ -1043,10 +1176,74 @@ def _site_statements(path: str, name: str) -> dict[str, dict]:
         if multiplicity is None and stated(5):
             digits = re.match(r"\d+", gemmi.cif.as_string(row[5]).strip())
             multiplicity = int(digits.group()) if digits else None
+        printed = tuple(_printed_decimal(gemmi.cif.as_string(row[k]))
+                        if stated(k) else None for k in (6, 7, 8))
         out.setdefault(gemmi.cif.as_string(row[0]), {
             "iso": stated(1) or stated(2), "occ": stated(3),
-            "multiplicity": multiplicity})
+            "multiplicity": multiplicity,
+            "printed": None if None in printed else printed})
     return out
+
+
+def _printed_decimal(token: str) -> Decimal | None:
+    """A CIF number as the decimal it prints, its esd dropped: ``0.24198(3)`` →
+    ``Decimal('0.24198')``, which keeps the printed digit count.  ``None`` for
+    anything that is not a plain number."""
+    try:
+        value = Decimal(re.sub(r"\(\d+\)$", "", token.strip()))
+    except InvalidOperation:
+        return None
+    return value if value.is_finite() else None
+
+
+def _within_printed_rounding(position, printed) -> bool:
+    """Whether moving a site to ``position`` changes no coordinate by more than
+    the file's own rounding of it (:data:`CIF_PRINTED_ROUNDING` of its last
+    printed digit).  Exact in decimal, so a special value that falls on a
+    rounding tie (1/8 printed ``0.12``) is within it rather than a float's
+    width outside.  The difference is taken modulo a lattice translation, the
+    snap's own convention."""
+    if printed is None:
+        return False
+    for value, token in zip(position, printed, strict=True):
+        diff = Decimal(float(value)) - token
+        diff -= diff.to_integral_value(rounding=ROUND_HALF_EVEN)
+        half = Decimal(repr(CIF_PRINTED_ROUNDING)).scaleb(token.as_tuple().exponent)
+        if abs(diff) > half:
+            return False
+    return True
+
+
+def _read_rounded_sites_on_position(sg, atoms: list[Atom], stated: dict[str, dict]) -> None:
+    """Store a site on its special position where the file printed its rounding.
+
+    A site whose snap moves no coordinate by more than
+    :data:`CIF_PRINTED_ROUNDING` of the digit it is printed to is a site the
+    file *placed* there: ``0.3333333333`` is 1/3 to the ten decimals the file
+    gives, and the 3.3e-11 between them is not a number of the file's.  So the
+    value stored is the position itself, and neither this reader nor the fit's
+    own check (``refine._symmetry_silence_diagnostics``) reports a snap the
+    file did not make.  A site moved by more is left as printed, for
+    ``SITE_SNAPPED_TO_SPECIAL_POSITION`` to report, since there the deviation
+    is the file's number and may be real.  A site whose orbit cannot be built
+    is left alone, so the snap report raises its refusal naming the file.
+    """
+    for atom in atoms:
+        printed = stated.get(atom.label, {}).get("printed")
+        if printed is None:
+            continue
+        xyz = np.array([atom.x.value, atom.y.value, atom.z.value])
+        try:
+            orbit = site_orbit(sg, xyz)
+        except ValueError:
+            continue
+        if not orbit.shift or not _within_printed_rounding(orbit.position, printed):
+            continue
+        delta = orbit.position - xyz
+        delta -= np.rint(delta)
+        for axis, value in zip(("x", "y", "z"), xyz + delta, strict=True):
+            setattr(atom, axis, getattr(atom, axis).model_copy(
+                update={"value": float(value)}))
 
 
 def _snap_to_stated_multiplicity(sg, atoms: list[Atom], stated: dict[str, dict],
@@ -1093,8 +1290,12 @@ def _snap_to_stated_multiplicity(sg, atoms: list[Atom], stated: dict[str, dict],
                 for axis, value in zip(("x", "y", "z"), new, strict=True):
                     setattr(atom, axis, getattr(atom, axis).model_copy(
                         update={"value": float(value)}))
-                moved.append((atom.label, float(np.max(np.abs(delta))), want,
-                              where))
+                # moved either way; reported only where the move is more than
+                # the file's rounding of what it printed (CIF_PRINTED_ROUNDING)
+                if not _within_printed_rounding(
+                        near.position, stated[atom.label].get("printed")):
+                    moved.append((atom.label, float(np.max(np.abs(delta))), want,
+                                  where))
                 continue
         disagree.append((atom.label, want, have, where))
     out: list[Diagnostic] = []
@@ -1130,15 +1331,13 @@ def _snap_to_stated_multiplicity(sg, atoms: list[Atom], stated: dict[str, dict],
     return out
 
 
-def _disorder_columns(path: str, name: str) -> dict[str, tuple[str | None, str | None]]:
+def _disorder_columns(block) -> dict[str, tuple[str | None, str | None]]:
     """Each site label's ``(_atom_site_disorder_assembly, _atom_site_disorder_group)``.
 
     Read from the block itself, since gemmi's small-structure site keeps the
     group as an integer and the assembly not at all, and the dictionary types
     both as a ``Word``.  A null (``.`` or ``?``) is ``None``, an ordered site.
     """
-    doc = gemmi.cif.read(path)
-    block = doc.find_block(name) or doc[0]
     table = block.find("_atom_site_", ["label", "?disorder_assembly", "?disorder_group"])
     out: dict[str, tuple[str | None, str | None]] = {}
     for row in table:

@@ -59,13 +59,18 @@ A6_RTOL = 1e-3
 #: the relative step at which the (A6) iteration stops
 A6_STEP_RTOL = 1e-12
 #: the cap on (A6) passes.  Measured: 10-14 on random positive sets, 65 at a
-#: (Σb − 2b_r)/b_r margin of 0.03, 239 at the clip's 1e-3 below.
+#: (Σb − 2b_r)/b_r margin of 0.03.  On the 1200 realisable (A5) failures of
+#: ``tests/test_floating_origin.py`` it is reached by 389 at a clip of 1e-3 and
+#: 498 at the shipped 1e-4 (2026-10-21), and the sum solve meets eq 21 on all.
 A6_MAX_ITER = 2000
 
 #: how far below Σ_{n≠r} bₙ a dominant curvature is clipped when (A5) has no
 #: solution, relatively: the restraint is then the near-limit of a hold on that
-#: site, which is what a structure with one overwhelming scatterer wants anyway
-A5_CLIP = 1e-3
+#: site, which is what a structure with one overwhelming scatterer wants anyway.
+#: The light sites' z esds sit up to ε·14 from the hold's: 1.40 % at 1e-3
+#: against the 1 % bar, 0.14 % here, over 1200 realisable failures, at about
+#: 1 ms more per solve (WP-2002, the seventh round's Q2).
+A5_CLIP = 1e-4
 
 
 @dataclass(frozen=True)

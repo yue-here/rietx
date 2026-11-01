@@ -225,3 +225,14 @@ difference above. Opus under the user-level configuration (settings,
 `CLAUDE.md`, skills) read every row in every cell and cost about four times as
 much per cell ($1.26-2.07 against $0.30-0.47). Which part of that
 configuration did it was not measured.
+
+## Amendment, 2026-10-24, made after round 1.1 and before any later round
+
+A build from the tree at or after WP-2037 prints five of the six codes, not six.
+`SITE_SNAPPED_TO_SPECIAL_POSITION` no longer fires on `fluorapatite.cif`: its
+sites sit off their special positions by no more than the file's own printed
+rounding, and the CIF reader now snaps such a site without a warning. No rubric
+item concerns that code. Round 1.1's scoring list is unchanged, so its results
+above read the same, and a re-run of it builds from `db4a8582`, where the code
+fires. `runner.RETIRED_CODES` names the code and why; `build_episode` requires
+the other five (`runner.EPISODE_CODES`). A later round registers its own codes.

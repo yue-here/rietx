@@ -284,12 +284,28 @@ def test_a_non_zero_z_is_refused_and_a_zero_one_is_dropped(lab6, lab6_doc):
 
 
 def test_a_negative_width_is_refused_rather_than_silently_zeroed(lab6_doc):
-    """Both reference engines converge to a negative Y; reading one is a trap."""
-    doc = _edit(lab6_doc)
-    doc["payload"]["instrument"]["initialization"][0]["Y"] = [-15.8, -15.8, False]
-    with pytest.raises(RecipeError) as exc:
-        read_recipe(doc)
-    assert "bounded below at zero" in str(exc.value)
+    """A negative X is refused: at θ → 0 it is the whole Lorentzian width.
+
+    Both reference engines converge to a negative Y, and Y has no floor of
+    its own since 2026-10-23 (WP-2002).  So the width X/cosθ + Y·tanθ is
+    checked over the fitted range: with this recipe's X it crosses zero at
+    2θ = 2.04°, under the range's top of 15°, and is refused there; with an
+    X that carries it, the same Y is read as stated."""
+    init = ["payload", "instrument", "initialization"]
+
+    def edited(**letters):
+        doc = _edit(lab6_doc)
+        row = doc[init[0]][init[1]][init[2]][0]
+        for letter, value in letters.items():
+            row[letter] = [value, value, False]
+        return doc
+
+    with pytest.raises(RecipeError, match="bounded below at zero"):
+        read_recipe(edited(X=-1.5))
+    with pytest.raises(RecipeError, match=r"negative above 2θ = 2\.041°"):
+        read_recipe(edited(Y=-15.8))
+    recipe = read_recipe(edited(X=30.0, Y=-15.8))
+    assert recipe.instrument.profile.y.value == pytest.approx(-0.158)
 
 
 def test_the_spf_schema_is_refused_by_name(lab6_doc):
@@ -601,7 +617,11 @@ def test_a_recipe_that_flags_nothing_is_a_simulation(drx_doc):
 
 @pytest.fixture(scope="module")
 def written(tmp_path_factory, drx):
-    """A short DRX_33 fit, only so the writer has something real to write."""
+    """A short DRX_33 fit, only so the writer has something real to write.
+
+    About 8 s, so every consumer carries ``xdist_group("recipe-tables")``:
+    unmarked, xdist dealt them to four workers and each refitted it (WP-2019).
+    """
     ref = rx.Refinement(drx.structure, drx.instrument, history=False)
     ref.fit(drx.pattern, plan=drx.plan, two_theta_limits=drx.limits)
     out = tmp_path_factory.mktemp("recipe_tables")
@@ -610,6 +630,7 @@ def written(tmp_path_factory, drx):
             [p.name for p in ref.fitted_structure.phases], drx.phase_names)))
 
 
+@pytest.mark.xdist_group("recipe-tables")
 @pytest.mark.parametrize("engine", ["output", "output/topas"])
 @pytest.mark.parametrize(
     "key,name",
@@ -623,6 +644,7 @@ def test_the_contracted_headers_match_both_engines_byte_for_byte(
     assert ours == theirs
 
 
+@pytest.mark.xdist_group("recipe-tables")
 def test_the_fit_profile_header_matches_byte_for_byte(written):
     _, _, paths = written
     theirs = (DRX / "output/fit_profile.txt").read_text(encoding="utf-8").splitlines()[0]
@@ -649,6 +671,7 @@ def test_the_peak_list_header_is_not_a_contract_and_says_so():
     assert "F_obs_squared" not in PEAK_LIST_HEADER
 
 
+@pytest.mark.xdist_group("recipe-tables")
 def test_refined_parameters_carries_only_refined_rows_with_esds(written):
     ref, _, paths = written
     rows = list(csv.DictReader(
@@ -665,6 +688,7 @@ def test_refined_parameters_carries_only_refined_rows_with_esds(written):
     assert set(by_path) == varied
 
 
+@pytest.mark.xdist_group("recipe-tables")
 def test_the_unit_cell_report_writes_a_volume_with_no_esd(written):
     _, _, paths = written
     rows = list(csv.reader(
@@ -681,6 +705,7 @@ def test_the_unit_cell_report_writes_a_volume_with_no_esd(written):
     assert float([r for r in rows if r[0] == "cell_a"][0][2]) > 0.0
 
 
+@pytest.mark.xdist_group("recipe-tables")
 def test_the_peak_list_widths_round_trip_through_the_read_conversion(written):
     """Written sigma_squared/gamma, converted back, are this fit's own widths."""
     ref, _, paths = written
@@ -708,6 +733,7 @@ def test_the_peak_list_widths_round_trip_through_the_read_conversion(written):
         assert fwhm_l == pytest.approx(expect_l, rel=1e-8)
 
 
+@pytest.mark.xdist_group("recipe-tables")
 def test_the_fit_profile_columns_are_what_the_header_names(written):
     ref, _, paths = written
     lines = paths["fit_profile"].read_text(encoding="utf-8").splitlines()
@@ -729,6 +755,7 @@ def test_the_writer_refuses_a_refinement_that_has_not_run(drx):
         write_recipe_tables(ref, "/tmp/never-written")
 
 
+@pytest.mark.xdist_group("recipe-tables")
 def test_every_written_header_constant_is_the_one_the_file_carries(written):
     _, _, paths = written
     assert (paths["refined_parameters"].read_text(encoding="utf-8").splitlines()[0]

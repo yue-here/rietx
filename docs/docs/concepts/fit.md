@@ -88,6 +88,7 @@ The [forward model](../theory/forward-model.md#discreteness-frozen-per-stage) st
 
 Before it solves, the stage compares each phase's scale with its esd.
 A phase whose scale is under {{ PHASE_SUPPORT_SIGMA }} esds is too weak for the data to fix its cell and atoms, so the stage fixes them and tests the phase again at its answer.
+The plan sets that number (`RefinementPlan.phase_support_sigma`), and `None` turns off the significance test only: a phase with no reflection in the fitted range is still held, scale included, because its column is zero whatever the value.
 A magnetic moment direction the powder average cannot determine is fixed the same way.
 So is a phase's displacement parameter when its reflections in range cannot separate it from the scale.
 `StageResult.held` lists what was fixed.
@@ -113,7 +114,7 @@ The refined values are written back into the structure and instrument, and the s
 ## Outputs
 
 `fit` returns a `RefinementResult`.
-It holds the status (`converged`, `max_iter` or `diverged`), the agreement statistics, every refined parameter with its esd, a record of each stage, the diagnostics, and the observed, calculated and background curves.
+It holds the status (`converged`, or `max_iter` when the last stage ran out of iterations), the agreement statistics, every refined parameter with its esd, a record of each stage, the diagnostics, and the observed, calculated and background curves.
 The esds come from the last stage, where every freed parameter refines together.
 [About correlations and esds](correlations.md) explains what an esd here does and does not measure.
 

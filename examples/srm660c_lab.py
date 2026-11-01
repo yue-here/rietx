@@ -76,7 +76,7 @@ def main() -> None:
               f"({flag.intensity_ratio:.1%} of its {flag.parent_two_theta:.3f} parent)")
 
     structure, instrument = build_model()
-    instrument.background = auto_background(data, kind="chebyshev")
+    instrument.background = auto_background(data, kind="chebyshev").background
     print(f"background: auto-selected Chebyshev order "
           f"{len(instrument.background.coefficients)}")
 

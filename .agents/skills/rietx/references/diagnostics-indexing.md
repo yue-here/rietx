@@ -24,7 +24,8 @@ are read on the peak list, not on a `RefinementResult`.
 | `PEAK_AXIAL_TAIL` | (info) Read the flagged components as lattice lines, or exclude them unseen. They stay *usable*. On a well-aligned Bragg-Brentano pattern excluding them before indexing is usually right; the diagnostic's suggestion carries the SRM 660c numbers (Measured: WP-1043). |
 | `PEAK_KALPHA2_RESIDUAL` | (info) Treat it as a line of anything. Exclude it before indexing unless you believe a genuine reflection sits there. |
 | `PEAK_UNRESOLVED_SHOULDER`, `PEAK_UNRESOLVED_SPLIT` | Quote one of a pair as an independent line. |
-| `PEAK_WIDTH_CAPPED` | (info) Index on it. |
+| `PEAK_WIDTH_CAPPED`, `PEAK_NO_INTENSITY` | (info) Index on them: a width at 5× the width law is a hump, and a component with no intensity has no position; `PEAK_NO_INTENSITY` is excluded from `usable()` for one of three causes (on the zero bound, under 1σ of its esd, or marked by hand) and kept in peaks so a report can say why |
+| `PEAK_POSITION_AT_BOUND` | (info) Trust the flagged 2θ or its σ(2θ) as a measurement: the fit stopped on its bound, so the 2θ is the bound's, and σ(2θ) is the curvature there, which leaves out how far past the bound the fit would have moved. `value` counts those still usable above the false-discovery bar |
 | `PEAK_CONTAMINATION_LINE` | Subtract it, or read one flag as the evidence. The finding is joint: five of the eight strongest reflections at one common ratio. An unfiltered tube leaks 0.14 of Kα, so a reported 0.3 is a reflection and not a ghost. Flagged lines leave `usable()` and are never stripped (Measured: WP-1442) |
 | `PEAK_ASYMMETRY_UNMODELLED` | Trust the *positions* of the flagged lines. σ cannot see the bias, and the low-angle lines are the ones indexing depends on most. |
 | `PEAK_WIDTH_LAW_MISMATCH` | Leave `instrument.profile` as declared. A factor near 13 is the `ProfileTCHZ` synchrotron default (W = 1e-3 deg², FWHM ≈ 0.03°) on lab data. |
@@ -93,14 +94,13 @@ result.
 
 | Code | What it means you must not do |
 |---|---|
-| `INDEX_PREDICTED_BUT_ABSENT` | Keep or reject this candidate on this code alone. Prefer a smaller cell only if its own Le Bail fit indexes the same lines, and run the extinction screen (§7e) first (Measured: WP-1545, aragonite in P m c n is correct with 4 of 105 absent). **Do not check this with Rwp**: (Measured: an oversized cell scores 0.379 against a correct 0.216, a gap smaller than the spread between specimens) |
-| `INDEX_IMPURITY_LINES` | Read it as one thing. The count says which (Measured: 95 unmatched lines on LaB6 with the metric 1 % off, the table in `indexing/workflow.py`). A multi-phase pattern is not indexed: a second phase means subtracting the solved one first. |
+| `INDEX_PREDICTED_BUT_ABSENT` | Keep this candidate; it caps, never refutes, and at `info` (every such line above the first twenty) it caps nothing. Inside the first twenty lines the lattice predicts lines no extinction could remove where the picker's envelope shows nothing: an oversized cell, which M₂₀ cannot see. `supercell_refuted` is what refutes. **Do not check this with Rwp**; the explanation gives the counts and the case |
+| `INDEX_IMPURITY_LINES` | Read it as one thing. The count says which (Measured: 23 unmatched lines on LaB6 with the metric 1 % off, the table in `indexing/workflow.py`). A multi-phase pattern is not indexed: a second phase means subtracting the solved one first. |
 | `INDEX_BRAVAIS_AMBIGUOUS` | Refine in the higher symmetry because it was reported. Refine in the stated system and *test* the higher one, never the reverse. A disagreement between gemmi and spglib is information, not a bug. |
 | `INDEX_VOLUME_UNPHYSICAL` | Quote the cell. |
-| `INDEX_SUPERCELL_REFUTED` | Quote the larger cell, or read its old rank as evidence for it. The counts are on `supercell_checks`. If the chemistry predicts a superstructure, look at the pattern at `absent_two_theta`. (Measured: on the finished acceptance searches it put brucite's and 11-BM NAC's truths first, and it kept every truth tested as a child, the lowest at p = 0.0072) |
-| `INDEX_Z_NOT_INTEGER` | (warning, with `formula=`) Drop the candidate for it: a correct cell can fire. `value` is that Z. It is silent above Z = 6.25 by arithmetic, so silence there checks nothing. Check the formula (solvent, a counter-ion), then suspect a sub- or supercell. |
+| `INDEX_SUPERCELL_REFUTED` | Quote the larger cell, or read its old rank as evidence for it. A sparser reported cell indexes the same lines (`relation`: a sublattice, or containment only), and the extra lines this one needs that no extinction could remove are seen no more often than chance at the resolution **and** the child's own lines are seen no more often than its parent's, so it sits below that cell (`supercell_refuted`, refuting). A child seen more often than its parent cannot be refuted by containment (the verdict is `undecided`, #1230) The counts are on `supercell_checks`. Only a real superstructure too weak to pick escapes, so look at `absent_two_theta` if the chemistry predicts one |
 | `INDEX_NOT_VALIDATED` | Read a `medium` as a near-`high`. Pass `data=` and `instrument=`. |
-| `INDEX_VALIDATION_FAILED` | (warning — on the candidate's `lebail.diagnostics`) Read this candidate's Le Bail numbers as a judgement, in either direction: `lebail.rwp` is inf and its `status` is `failed`. A run whose validations all fail this way is telling you about the setup, not the cells. |
+| `INDEX_VALIDATION_FAILED` | (warning — on the candidate's `lebail.diagnostics`) Read this candidate's validation numbers as a judgement, in either direction: `lebail.rwp` is inf and its `status` is `failed`. A run whose validations all fail this way is telling you about the setup, not the cells. |
 | `INDEX_BUDGET_EXHAUSTED` | Read the answer as covering the requested search. `systems_searched` + `search_complete` distinguish three states: searched (present, `True`), truncated (present, `False`) and not reached (absent; the diagnostic's `where` names them). Candidates whose validation never ran read `not_validated` (capping), never `validation_failed` (refuting). Units run system-major (WP-1042), so a binding ceiling cuts trailing low-symmetry *systems* for every engine equally, and a candidate from a completed system keeps all its finders. A user cancellation never writes this code |
 | `INDEX_SINGLE_ENGINE` | (info) Read `low` as "refuted". Re-run with the default engine set for a gradeable answer. |
 | `INDEX_CELL_SYSTEMATIC_UNQUANTIFIED` | Quote a Bragg-Brentano cell to its esd. (Measured: the goniometer radius alone carries **≈ ±85 ppm** that no esd reports, because the data cannot identify it; Rwp moves 0.029 points across 180–320 mm) |
@@ -114,15 +114,21 @@ This section closes the loop between `index_pattern` and `refine`.
 **Before the first search, ask for the cell or infer it** (Measured: solution
 case 1: the blind search never found the person's cell).
 Ask for a cell range or candidate cells. When the person has given
-the chemistry (formula, Z or density, solvent), infer a volume window with
-`SearchSpec.from_formula(formula, z=…)`, say so, and pass `formula=` too. Declare a candidate cell in
+the chemistry (formula, Z or density, solvent), infer a volume ceiling with
+`SearchSpec.from_formula(formula, z=…)` and say so; it has no floor, and
+`z=None` narrows nothing. `formula=` records `formula_units` per candidate;
+an inorganic true cell reads 0.4-0.9 of its Z, so never drop a cell for it
+(Measured: WP-2030, 16 inorganic standards at 0.38-0.87).
+A framework written without its pore contents sits above the ceiling
+(Measured: HKUST-1 2.28; `SiO2` meets it at FAU's framework density, 13.3 T/1000 Å³,
+IZA database, and a less dense one lies above). Declare a candidate cell in
 `prior_cells` with `max_d_axis` above its longest axis.
 
 **These names are provisional, and the answers they return are versioned.**
 Indexing is under active development, so everything under `rietx.indexing` and
 every answer type in `rietx.schemas.indexing` may change in any release — the
-[compatibility promise](https://rietx.org/using/compatibility.html#provisional-by-declaration)
-has the detail. Two things do not move with them:
+[compatibility promise](https://rietx.org/using/compatibility.html)
+has the detail, § Provisional by declaration. Two things do not move with them:
 `capabilities().indexing_thresholds_version`, which is what the gates below are
 versioned by, and the serialized shape of an `IndexingResult`. So a tool loop
 that *reads* an answer sees any observable change as a version bump; one that
@@ -131,8 +137,8 @@ imports these types should pin an exact version.
 **How long will this take?** The default answers this itself:
 `index_pattern` resolves the **`quick` preset** — every engine, every requested
 system, and a whole-run ceiling (`SEARCH_PRESETS["quick"]`) covering search,
-probe and validation, with each validation fit drawing an equal slice of the
-remaining clock. A run that hits the ceiling says so
+probe and validation, with the validation fits run cheapest first on whatever
+clock remains. A run that hits the ceiling says so
 (`INDEX_BUDGET_EXHAUSTED`, §7c). Progress and a graded shortlist for every *completed* system
 stream on the event ladder as the run goes (`events=`), so a useful answer
 usually arrives seconds in. `preset="full"` is the
@@ -257,7 +263,7 @@ shows. Same split as §7c: a refutation lives on the class it refutes.
 |---|---|
 | `EXTINCTION_GROUPS_NOT_SEPARABLE` | (info) Pick one of the listed space groups and call it the answer. Carry the list; `structure_from_candidate(cand, space_group=…)` accepts any member. |
 | `EXTINCTION_SYMBOL_AMBIGUOUS` | Read the ranked first class as the answer. The message says which reason applies. Only a runner-up inside the decisive ΔBIC margin is fixed by better data at the same setting. |
-| `EXTINCTION_FORBIDDEN_INTENSITY` | Keep this class. hkl and 2θ are named. A held cell off by ~10⁻³ refutes the *true* class: pass `refine_cell=True` or Le Bail-refine the cell first. It is not a position under a neighbour's tail (untestable, WP-1077), and not necessarily a violated absence: check the indexing result's `unmatched_observed` for an impurity line. A good ΔBIC does not excuse it: a testable position carrying intensity refutes the class however well it scores. |
+| `EXTINCTION_FORBIDDEN_INTENSITY` | Keep this class. A position it forbids carries intensity its own Le Bail fit cannot account for (hkl and 2θ named). A held cell (`refine_cell=False`) off by ~10⁻³ refutes the *true* class; the default refines it first. Two things it is not: a position under a neighbour's tail (untestable, WP-1077), and necessarily a violated absence — it can be an impurity line, so check the indexing result's `unmatched_observed`. A good ΔBIC does not excuse it: a testable position carrying intensity refutes the class however well it scores |
 | `EXTINCTION_CONDITIONS_PARTIAL` | (info) Read `conditions` as the complete condition list for this class. Read `space_groups`. |
 | `EXTINCTION_SCREEN_FAILED` | (error) Read the empty ranking, or any class's absence from it, as evidence about the symmetry. `screen.status` is `failed`. Validate the cell first (`index_pattern` with `data=`, §7d's sequence). |
 
@@ -282,11 +288,10 @@ Three things about the screen that change how you use its answer:
 3. **The absence-free class winning is a result, not a failure.** On NAC (I 2₁3)
    it is the *correct* answer: I-centring already extinguishes the very
    reflections the 2₁ screws would, so those screws are invisible in principle.
-   It is a *wrong* answer when the shared profile fit is bad, and
-   `ExtinctionScreen.profile_rwp` reports how good that fit was: on certified
-   corundum 0.259 over 20–90° (`R - c -`) and 0.262 over 5–150° with declared
-   widths (`R - - -` wins). It bounds trust and does not choose. Give it a range
-   and a width law its profile fit can match before reading a refutation.
+   It is a *wrong* answer when the shared profile fit is bad, which
+   `ExtinctionScreen.profile_rwp` reports; a local misfit can stay under the
+   `EXTINCTION_SCREEN_UNRELIABLE` gate (its explanation gives a case). Give it a
+   range and a width law its profile fit can match before reading a refutation.
 
 **`where` names the paths on every guard code, `HIGH_CORRELATION` included**
 (WP-1007). Read `d.where`; never split a message like `"a ~ b (ρ=+0.994)"`.
@@ -337,12 +342,13 @@ the panel members that ranked, with values, beside `fom_undefined` — the
 figures that could not be computed, each *absent with its reason*, never
 silently zero; and the whole-profile numbers together — `lebail_rwp` and both
 detector counts, surfaced so a reader can see when a detector has failed (as
-it measurably does on magnetite's rival, whose fit buys a negative background
-— §7c's row), and never a thing to score on. Result-wide: what the search
+it measurably did on magnetite's rival, whose Le Bail fit bought a negative
+background before the validation became Pawley — §7c's row), and never a
+thing to score on. Result-wide: what the search
 covered (`systems_searched` + `search_complete`) against what the list
 supports (`systems_supported`). The visual check is part of the answer, not
 documentation of it: `rietx.viz.plot_indexing(result, peaks, data=...,
-instrument=...)` draws the ranked tick rows and the Le Bail panel from the
+instrument=...)` draws the ranked tick rows and the validation-fit panel from the
 result alone.
 
 **Worked example — fluorite, why the two reads differ.** Seventeen usable
@@ -350,7 +356,7 @@ lines on certified CaF₂ (Fm-3m, a = 5.4631 Å). The unattended read:
 `best_or_none()` is `None` — correct, and exactly as strict as ever, because
 the `fom_panel_reduced` caveat (capping) holds every below-twenty-line
 candidate at `medium`. The reasoning read: the certified cell at rank 1 at
-−18 ppm, found by every engine that ran, Le Bail-validated `converged`, four
+−18 ppm, found by every engine that ran, validated `converged`, four
 systems searched to completion, and the *only* caveat on it is the reduced
 panel — M₂₀/F_N absent for cause, the coverage and reversed members all
 ranked. A consumer that can weigh that is entitled to adopt the cell with its

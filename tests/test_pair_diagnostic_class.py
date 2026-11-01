@@ -88,6 +88,9 @@ def test_the_two_site_winner_finds_each_site_its_own_moment(monkeypatch):
     instrument = T.neutron()
     truth = T.candidate_named("P n m a", T.MN_SITE, (0, 0, 0), T.A_TYPE_BNS)
     ops, cent = truth.group.xyz_strings()
+    # Drawn by ``predict`` at the closing windows, where the winner's closing
+    # stage measures it (WP-2002).  Without that stage the window misfit
+    # inflated both esds by the same 1.61 (0.00242 and 0.00179).
     data = T.simulate(T.two_site(
         m1=Moment.from_values((3.5, 0.0, 0.0), "Mn3+"),
         m2=Moment.from_values((0.7, 0.0, 0.0), "Mn3+"),

@@ -1,8 +1,7 @@
 # WP-1804 — the derived block: a nonlinear map applied after the affine one
 
-Milestone: rigid-bodies · Status: 🔄 2026-10-07 — built in PR #773 (merged `f5f35593`); the stage-boundary regeneration with a block remains
+Milestone: rigid-bodies · Status: ✅ 2026-10-23 — built in PR #773 (`f5f35593`); closed with the chained tie-source refusal
 Depends on: 1801, 1803 (the record)
-Priority: P2 2026-10-06 — every later body WP reads it; built in PR #773, merged 2026-10-07
 
 ## Goal
 
@@ -61,7 +60,7 @@ v1.6 has shipped (2026-10), so WP-1514's "waits for v1.6" no longer holds.
 - [x] `set_tie` refuses a locked or derived source, naming both paths
 - [x] `optimize/least_squares.py`: `_column_extras` and the restraint block on the declared reach and the local Jacobian
 - [x] `backend/traced.py`: the map after the matmul
-- [ ] Tests: the acceptance below, including a toy-block row in `tests/test_cross_backend.py` and a stage-boundary regeneration with a block
+- [x] Tests: the acceptance below, including a toy-block row in `tests/test_cross_backend.py` and a stage-boundary regeneration with a block
 - [x] Skill: none. No public verb and no diagnostic code; the block is internal until WP-1805.
 
 ## Acceptance
@@ -95,6 +94,45 @@ Each is a check that can fail.
 - Issue #561; PR #596 (the record and the proposal this WP was cut from); WP-1803.
 
 ## Handover log
+
+- **2026-10-23** — closed. The derived block was finished before this session.
+  The last unticked task, a stage-boundary regeneration with a block declared,
+  had landed in PR #773's first review round. The 2026-10-07 entry called it
+  open. One gap from that PR's second round remained. A tie onto a row that is
+  itself tied onto a locked or derived row passed the refusal and froze its
+  target with no error. That is now refused. No writer builds that shape today,
+  so no fit moves.
+  - **Done.** `tie_source_refusal` resolves each source through its chain, as
+    `_flatten` does, and refuses when any resolved row is locked or derived
+    (`c8f97968..988a5fa1`). The error names the source and the row under it.
+    `_apply_ties` and `replay` word a dropped tie's warning the same way
+    (`refine._tie_refusal_text`). A directly locked or derived source keeps the
+    old text, which `tests/test_params_surface.py` pins.
+    `test_set_tie_refuses_a_source_tied_onto_a_derived_or_locked_row` plants the
+    middle link by hand, because no verb can build it. With the chain check
+    disabled it fails ("DID NOT RAISE").
+  - **Measured.** A probe over five space-group settings (cubic, rhombohedral,
+    hexagonal, tetragonal, monoclinic) and WP-1805's `bodies` fixture found no
+    tie resting on a locked or derived row. User chains heal themselves:
+    `_apply_ties` drops the middle link first. Acceptance on macOS arm64,
+    Python 3.12, `[dev,jax]`: `test_derived_block.py`, `test_cross_backend.py`
+    and `test_params_surface.py` gave 234 passed, 70 skipped, 2 xfailed. Six
+    `toy_body` and derived-block rows ran on jax, the stage-boundary row among
+    them. The torch rows skip here and run in the nightly `torch` job. The fast
+    selection, same venv, before the review's fix: 11243 passed, 120 skipped,
+    27 xfailed, 2 failed. The added test costs 0.10 s locally.
+  - **Two fast-suite failures predate this branch.** `test_examples.py`'s
+    `[moment]` guide row also failed in the 2026-10-22 nightly's macOS job.
+    `[qpa]` prints ±0.21 wt% where `guides/qpa.md` quotes ±2.24 (re-measured on
+    2026-10-21 by `e5976784`, WP-2002). An `origin/main` snapshot run in this
+    venv prints ±0.21 too. Linux CI on `main` passes. Not chased here.
+  - **Review** (`/code-review high --fix`): four findings. Fixed: the drop
+    warning said "structurally fixed" of a chained source; the refusal's two
+    branches became one loop. Declined: the error's "would be frozen" is loose
+    when some resolved rows are free, but the any-locked policy carries over
+    from direct terms; `derived_paths()` rebuilt per call costs nothing at
+    today's sizes.
+  - **Next:** none in this WP. WP-1805 carries the body work.
 
 - **2026-10-07** — PR #773 merged from outside as `f5f35593`, built by
   @mustachefeeling. Gated together on a nine-PR stack replayed onto `main` at

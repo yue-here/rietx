@@ -110,7 +110,7 @@ def _background_zero():
     data = _pattern()
     assert inspect.signature(rx.auto_background).parameters["kind"].default == "pspline"
     for kind in ("chebyshev", "pspline"):
-        bg = rx.auto_background(data, kind=kind)
+        bg = rx.auto_background(data, kind=kind).background
         assert [c.value for c in bg.coefficients] == [0.0] * len(bg.coefficients), kind
 
 
@@ -172,8 +172,8 @@ CLAIMS: dict[str, Callable[[], None]] = {
     "Seed `W ≈ (0.6·H)²`, `X ≈ 0.6·H`": _width_seed,
     "Gaussian and Lorentzian halves of 0.6·H combine to about H": _width_seed,
     "| size · strain | 1/cosθ · tanθ |": _size_strain_signatures,
-    "or the default penalised P-spline": _background_zero,
-    "starts every coefficient at 0.0": _background_zero,
+    "or the default P-spline": _background_zero,
+    "Unseeded, every coefficient is 0.0": _background_zero,
     "Above a correlation of 0.98 (`HIGH_CORRELATION`)": _correlation_guard,
     "(`occ₁ = 1 − occ₀` is `scale=-1, offset=1`)": _complementary_occupancy,
     "Above 0.1 under `converged`": _shift_band,

@@ -1,4 +1,5 @@
-"""`solve_magnetic` on real data: Cr₂WO₆ at 4 K and 150 K (WP-1418, M-9).
+"""`solve_magnetic` on real data: Cr₂WO₆ at 4 K and 150 K, LaMnO₃ at 50 K
+(WP-1418, M-9).
 
 The GSAS-II Magnetic-II tutorial patterns (HFIR HB-2A, λ 2.4067 Å, P4₂/mnm;
 provenance in ``tests/data/README.md``), refined from the ideal trirutile start
@@ -17,7 +18,15 @@ Two arms, one per temperature, and each is the other's control:
   chance, and no class refined there improves on the nuclear model, so the
   answer is that there is nothing to solve rather than a winner.
 
-obs/calc/diff PNGs of the 4 K winner go to ``tests/output/``.
+LaMnO₃ at 50 K is the GSAS-II Magnetic-I tutorial pattern (NIST BT-1, λ
+1.5403 Å, P n m a; provenance in ``tests/data/README.md``), fitted by the
+session fixture ``conftest.lamno3_nuclear`` that WP-1327's LaMnO₃ acceptance
+seeds its moment fits from.  It is the case where a winner *is* named: every
+line indexes on the nuclear cell, and the four Γ classes of P n m a are four
+models the powder separates.
+
+obs/calc/diff PNGs of the 4 K winner and of the LaMnO₃ winner go to
+``tests/output/``.
 """
 
 from __future__ import annotations
@@ -27,8 +36,15 @@ from pathlib import Path
 import pytest
 
 import rietx as rx
+from rietx.strategy.magnetic import SOLVE_TIE_DELTA_BIC
+from tests.test_acceptance_magnetic_lamno3 import PN_MA, PNMA, SPIN_ONLY_MN3
 
-pytestmark = [pytest.mark.slow, pytest.mark.xdist_group("magnetic-cr2wo6")]
+# Each test carries its own fixture's group: xdist joins every xdist_group
+# mark an item has into one name, so a module-level mark beside a test's own
+# would put that test in neither group.
+pytestmark = pytest.mark.slow
+CR2WO6 = pytest.mark.xdist_group("magnetic-cr2wo6")
+LAMNO3 = pytest.mark.xdist_group("magnetic-lamno3")
 
 OUT = Path(__file__).parent / "output"
 
@@ -45,6 +61,13 @@ def solved_150k(cr2wo6_nuclear):
                              sites=["Cr1"], ion="Cr3+")
 
 
+@pytest.fixture(scope="module")
+def solved_lamno3(lamno3_nuclear):
+    return rx.solve_magnetic(lamno3_nuclear["ref"], lamno3_nuclear["data"],
+                             sites=["Mn2"], ion="Mn3+")
+
+
+@CR2WO6
 def test_the_4k_pattern_takes_the_k_zero_route_and_ranks_58_395_first(solved_4k):
     s = solved_4k
     assert s.k_route == "forbidden lattice points", s.k_reason
@@ -67,6 +90,7 @@ def test_the_4k_pattern_takes_the_k_zero_route_and_ranks_58_395_first(solved_4k)
     plot_result(s.best._result, path=str(OUT / "magnetic_solve_cr2wo6_4K.png"))
 
 
+@CR2WO6
 def test_the_150k_pattern_has_nothing_to_solve(solved_150k):
     """No class wins, none improves on the nuclear model, and the verdict says so.
 
@@ -159,3 +183,62 @@ def test_the_150k_pattern_has_nothing_to_solve(solved_150k):
     unpaired = {t.class_index for t in s.trials
                 if not any(r.paired_with for r in t.moments)}
     assert not classes & unpaired
+
+
+@LAMNO3
+def test_lamno3_at_50k_ranks_a_type_first_of_four(solved_lamno3):
+    """Pn′ma′ (62.448, A-type) is named the winner, far outside the tie.
+
+    Measured on ``05ac4bac`` (macOS arm64): k = 0 by the forbidden-point
+    route, four singleton classes all converged against a converged nuclear
+    reference, ranked 62.448 (ΔBIC +423.9, 3.60 ± 0.045 μ_B), 62.441 (+260.0),
+    62.447 (+47.4), 62.446 (−17.0), with ΔBIC charged at the reference's
+    N/f² = 287 observations.  The lead over 62.441 is 163.9, 27 tie widths.
+
+    **What is asserted.**  The ranks and a lead floor, never the ΔBIC digits,
+    which move with the solver and the observation count (the lead was 1704.2
+    while the count was the raw 2984 channels).  The floor is ten tie widths,
+    the existing ``SOLVE_TIE_DELTA_BIC``, and today's lead is 2.7 times it,
+    and the next gap down (62.441 over 62.447, 212.5) is wider still.  The
+    second place is the tutorial's rejected group, as
+    ``test_acceptance_magnetic_lamno3`` finds by hand.  The moment is held to
+    that file's band, not to a digit.
+
+    **The negative control** is 62.446, in the same call: its symmetry leaves
+    the Mn moment nothing the pattern shows, so the modulus goes to zero with
+    an esd in the thousands, Rwp stays at the nuclear value, and ΔBIC is
+    the moment's parameter penalty alone.
+    """
+    s = solved_lamno3
+    assert s.k_route == "forbidden lattice points", s.k_reason
+    assert tuple(str(c) for c in s.k) == ("0", "0", "0")
+    assert s.verdict == "solved", s.reason
+    assert all(t.status == "refined" and t.fit_status == "converged"
+               and t.reference_status == "converged" for t in s.trials), [
+        (t.bns_number, t.status, t.fit_status, t.reference_status)
+        for t in s.trials]
+    # four classes, and the powder separates every one: each lists only itself
+    assert len(s.trials) == 4
+    assert all(len(t.members) == 1 and t.members[0].split()[0] == t.bns_number
+               for t in s.trials), [t.members for t in s.trials]
+    # A-type first, the tutorial's rival second, the control last
+    assert [t.bns_number for t in s.trials] == [PN_MA, PNMA, "62.447", "62.446"]
+    assert s.best.bns_number == PN_MA and s.best.supported
+    assert s.tied == (0,)
+    assert s.tie_width == SOLVE_TIE_DELTA_BIC
+    assert s.margin is not None and s.margin > 10.0 * s.tie_width, (
+        s.margin, s.tie_width)
+    (m,) = s.best.moments
+    assert m.supported and 3.3 <= m.magnitude < SPIN_ONLY_MN3 - 3.0 * m.esd, (
+        m.magnitude, m.esd)
+    # the negative control: no supported moment, no gain over the nuclear fit
+    control = s.trials[-1]
+    assert not control.supported, control.moments
+    assert control.delta_bic <= 0.0, control.delta_bic
+    assert abs(control.rwp - s.nuclear_rwp) < 1e-3 * s.nuclear_rwp, (
+        control.rwp, s.nuclear_rwp)
+
+    OUT.mkdir(exist_ok=True)
+    from rietx.viz.plots import plot_result
+
+    plot_result(s.best._result, path=str(OUT / "magnetic_solve_lamno3_50K.png"))

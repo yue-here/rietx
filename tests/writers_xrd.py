@@ -22,7 +22,10 @@ that from being what these writers are:
    GSAS-II, ``bracerino/xrd-file-converter`` (MIT) and ``reductus/reductus``
    (Unlicense), the last a field-by-field transcription of Bruker's own header
    definition — and **no** file at all, which is why v3's gates in the reader
-   are the strict ones.
+   are the strict ones.  For **v2** the two are a hand decode of a real public
+   file (Durham's ``Pbso4.raw``, never vendored: ``tests/local_data.py``) and
+   GSAS-II's description, with TOPAS's reading of the same file as a black-box
+   third (issue #1164, WP-2059).
 3. **The reader carries a self-consistency gate**, so a wrong parse raises
    rather than returning plausible garbage: a range header's nested segment
    chain must end *exactly* on the declared ``hdrSize``, and
@@ -198,6 +201,42 @@ def write_raw3(path: Path, ranges, *, sample="Synthesized", anode="Cu",
             if measured is not None:
                 out += struct.pack("<d", measured[i])
 
+    out += trailing
+    path.write_bytes(bytes(out))
+    return path
+
+
+#: Bruker RAW v2 (`RAW2`), packed from its own literal field table (WP-2059).
+_V2_MAGIC = b"RAW2"
+#: the real file's block-header length.  The reader reads the declared value,
+#: so a test that moves it moves the data with it.
+_V2_HEADER = 68
+#: what the bytes this table does not name are filled with: not zero, so a
+#: reader that took a field from one of them reads nonsense and fails a gate
+_V2_FILL = 0xA5
+
+
+def write_raw2(path: Path, counts, *, start=10.0, step=0.025, blocks=1,
+               header_length=_V2_HEADER, points=None, trailing=b"") -> Path:
+    """A single-block Bruker RAW v2 file holding `counts` as float32.
+
+    `blocks` is the uint32 at 4, `header_length` the uint16 at 0x100 (the
+    block header is padded to it, so the counts start at 0x100 + it), and
+    `points` overrides the uint16 point count at 0x102.  `trailing` appends
+    bytes past the counts, which the reader's size gate is for.
+    """
+    y = list(counts)
+    if header_length < 20:
+        raise ValueError("a v2 block header holds its start angle at +16")
+    out = bytearray([_V2_FILL]) * (0x100 + header_length)
+    out[0:4] = _V2_MAGIC
+    out[4:8] = struct.pack("<I", blocks)
+    out[0x100:0x102] = struct.pack("<H", header_length)
+    out[0x102:0x104] = struct.pack("<H", len(y) if points is None else points)
+    out[0x10C:0x110] = struct.pack("<f", step)
+    out[0x110:0x114] = struct.pack("<f", start)
+    for value in y:
+        out += struct.pack("<f", value)
     out += trailing
     path.write_bytes(bytes(out))
     return path

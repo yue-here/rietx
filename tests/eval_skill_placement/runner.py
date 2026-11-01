@@ -64,6 +64,16 @@ SCORED_CODES = (
     "PATTERN_UNDERSAMPLED",
     "SITE_SNAPPED_TO_SPECIAL_POSITION",
 )
+#: Scored codes a build from today's tree no longer fires, each with why
+#: (PROTOCOL.md § Amendment, 2026-10-24).  Round 1.1 scored them, and a re-run
+#: of it builds from its own checkout, where they fire.
+RETIRED_CODES = {
+    "SITE_SNAPPED_TO_SPECIAL_POSITION": (
+        "WP-2037: a site off its special position by no more than the CIF's own "
+        "printed rounding is snapped without a warning"),
+}
+#: What `build_episode` requires `fit_output.txt` to fire.
+EPISODE_CODES = tuple(c for c in SCORED_CODES if c not in RETIRED_CODES)
 
 #: The routing rows the `grep` body drops: the two keyed by something the agent
 #: already holds when it needs the row, a code or a field.
@@ -187,15 +197,16 @@ def build(root: Path) -> None:
 def build_episode(episode: Path, python: Path) -> str:
     """The episode every cell is handed, written into ``episode``: the two data
     files, the colleague's script as `fit.py`, and what it printed under
-    ``python`` as `fit_output.txt`.  Refuses an output missing a scored code.
-    WP-1905's skill eval stages its `fap-judge` case through this too."""
+    ``python`` as `fit_output.txt`.  Refuses an output missing one of
+    `EPISODE_CODES`.  WP-1905's skill eval stages its `fap-judge` case through
+    this too."""
     episode.mkdir(parents=True, exist_ok=True)
     for name in DATA_FILES:
         shutil.copyfile(REPO / "tests" / "data" / name, episode / name)
     shutil.copyfile(HARNESS / "colleague_fit.py", episode / "fit.py")
     out = _run(str(python), "fit.py", cwd=episode,
                env={**os.environ, "RIETX_TELEMETRY": "0"}).stdout
-    missing = [c for c in SCORED_CODES if f" {c} " not in out]
+    missing = [c for c in EPISODE_CODES if f" {c} " not in out]
     if missing:
         raise SystemExit(f"fit_output.txt does not fire {missing}:\n{out}")
     (episode / "fit_output.txt").write_text(out, encoding="utf-8")

@@ -65,19 +65,26 @@ for name in ("together", "w_first"):
 # guide: replay end
 
 # The page quotes both branch ends, the winner, four widths, the tree and the replay.
-assert f"{tree['together'].rwp:.4f}" == "0.1031"
-assert f"{tree['w_first'].rwp:.4f}" == "0.0988"
+# `run_stage` runs at the closing windows, and there the two orders find one fit:
+# "lower by 0.00002", and every differing value within 0.05 % of the other branch's.
+assert f"{tree['together'].rwp:.4f}" == f"{tree['w_first'].rwp:.4f}" == "0.0947"
+assert f"{tree['together'].rwp - tree['w_first'].rwp:.5f}" == "0.00002"
+assert all(abs(a - b) < 5e-4 * max(abs(a), abs(b))
+           for a, b in tree.diff("together", "w_first").values())
 assert tree.best("rwp").id == "n0006"  # the biso stage on top of w_first
 assert tree.head == "n0006" and tree["n0006"].parent == w_first.node_id
 assert {n.id for n in tree.leaves()} == {together.node_id, "n0006"}
 assert tree.common_ancestor("together", "w_first") == cell.node_id
-assert f"{replayed.statistics.rwp:.4f}" == "0.0992"
-# A stage's result is computed as a replay is, and strategy A's gap fires the code.
-assert f"{together.statistics.rwp:.4f}" == "0.1022"
-assert "FROZEN_COMPILE_STALE" in {d.code for d in together.diagnostics}
-assert "FROZEN_COMPILE_STALE" not in {d.code for d in w_first.diagnostics}
-# "at 1.7 %": the gap between the result's χ² and its node's
-gap = 1 - together.statistics.chi2 / tree["together"].metrics.statistics.chi2
-assert f"{gap:.3f}" == "0.017"
+assert f"{replayed.statistics.rwp:.4f}" == "0.0970"
+# A stage's result is computed as a replay is, and both strategies' gaps fire the code.
+assert f"{together.statistics.rwp:.4f}" == "0.0970"
+for name, result in (("together", together), ("w_first", w_first)):
+    assert "FROZEN_COMPILE_STALE" in {d.code for d in result.diagnostics}
+    # "at 5.0 %": the result's χ² above its node's
+    gap = result.statistics.chi2 / tree[name].metrics.statistics.chi2 - 1
+    assert f"{gap:.3f}" == "0.050"
+    assert result.stages[-1].window_area_tol == 1e-3
+# "within 0.0001 of each other on either measure"
+assert abs(together.statistics.rwp - w_first.statistics.rwp) < 1e-4
 # `ref` and `alt` hold their own positions; the shared head follows `ref`.
 assert alt._head_id == w_first.node_id

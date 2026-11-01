@@ -174,7 +174,11 @@ class Project:
         # ``two_theta_range``, which is a 2θ by its name.
         require_two_theta(data, "Project.create()")
         if excluded_regions:
-            data.excluded_regions = [tuple(r) for r in excluded_regions]
+            # The union, never a replacement: the reader's own exclusions (a
+            # pdCIF's zero-weight points) are not the caller's to overwrite.
+            data.excluded_regions = list(data.excluded_regions) + [
+                tuple(r) for r in excluded_regions
+                if tuple(r) not in data.excluded_regions]
 
         plan_spec = _as_plan_spec(plan)
         doc = ProjectDoc(
@@ -263,13 +267,14 @@ class Project:
 
         notes: list[Diagnostic] = []
         options = _reader_options(ref_doc)
+        chosen_bank: str | None = None
         if ref_doc.reader == "gsas" and "bank" not in options:
             # A project written before read_gsas refused a multi-bank file
             # recorded no bank, and that reader answered with the first one.
             # The recorded fingerprint still vouches for the choice.
             first = _first_bank_number(pattern_path)
             if first is not None:
-                options["bank"] = str(first)
+                chosen_bank = options["bank"] = str(first)
         data = read_pattern(pattern_path, diagnostics=notes, **options)
         # ``Project.create`` refuses a TOF pattern, so a project on disk should
         # never point at one — but the file it points at is on disk beside it
@@ -284,6 +289,13 @@ class Project:
                 f"{ref_doc.fingerprint[:8]}) — a reader change, not a corrupt "
                 "project; the recorded reader was "
                 f"{ref_doc.reader!r} with options {ref_doc.options}")
+        if chosen_bank is not None:
+            # The fingerprint has vouched for the bank, so it joins the
+            # reference: the reader call is part of it (CLAUDE.md § Project),
+            # and the next save records the **effective** options, as
+            # ``_data_ref`` does at create.  From then on the bank is asked
+            # for by its number, never found by its place in the file.
+            ref_doc.options["bank"] = chosen_bank
         data.excluded_regions = [tuple(r) for r in doc.excluded_regions]
 
         history_path = root / doc.history_file
@@ -412,6 +424,12 @@ class Project:
         kw.setdefault("mode", self.doc.mode)
         kw.setdefault("two_theta_limits", self.doc.two_theta_limits)
         kw.setdefault("telemetry", self.live_dir)
+        if self.doc.plan is not None:
+            # the stored plan's absent-phase hold and correlation guard, which
+            # a stage driven by hand would otherwise take at the defaults
+            # (WP-2002, B1)
+            kw.setdefault("phase_support_sigma", self.doc.plan.phase_support_sigma)
+            kw.setdefault("correlation_guard", self.doc.plan.correlation_guard)
         return self.refinement.run_stage(self.data, stage, **kw)
 
     def __repr__(self) -> str:  # pragma: no cover - convenience

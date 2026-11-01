@@ -1,0 +1,9 @@
+{#- A link to this page's markdown twin (WP-1980), where pydata puts "Show Source"
+    (WP-2021).  The twin is the copy an agent reads, so a person checking what an agent
+    was given opens the same file.  It sits beside the page as `<page>.html.md`
+    (`docs/markdown_twin.py`); a page with no source, such as search, has none. -#}
+{% if sourcename %}
+<div class="tocsection rietx-twin">
+  <a href="{{ pagename.split('/')[-1] }}{{ file_suffix }}.md">This page as markdown</a>
+</div>
+{% endif %}

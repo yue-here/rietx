@@ -23,6 +23,20 @@ splits, since a box is tens of microseconds of work.  The indexer reaches it
 through :func:`dichotomy_kernels`, and a wheel without it is declined whole,
 like one lacking any other kernel.
 
+From 1.4.0 it carries the structure-solution engine's two kernels as well
+(``solve_orbit_sums`` with its one-site twin ``solve_orbit_sums_one``, and
+``solve_clash``; #562, WP number pending): the replica-batched per-atom orbit
+sums of the structure factor and the minimum-image contact term.  Their oracle
+is a numpy expression written in ``tests/test_solve_kernels.py``, held to
+1e-13 relative for the orbit sums (they call ``cos`` and ``sin``); the
+engine's own numpy fallback, which a declined call runs, lands with its first
+caller (the numpy contact term is #1016's ``site_clash``).  Nothing in rietx
+calls them yet, so they are
+looked up beside :data:`KERNEL_NAMES` rather than in it: a 1.3 wheel lacks
+them, still loads, and :func:`solve_orbit_sums` and its two siblings decline.
+The engine's first caller moves them into :data:`KERNEL_NAMES` and raises
+:data:`KERNEL_FLOOR` to 1.4 in the same change.
+
 Why a compiled tier at all
 --------------------------
 WP-1112 and WP-1120 removed the two costs a numpy-level loop is usually blamed
@@ -158,6 +172,12 @@ KERNEL_NAMES = ("accum", "omega_sym", "omega_fcj", "bases_sym", "bases_fcj",
                 "render_rows", "id_plane",
                 "dichotomy_box_test", "dichotomy_child_key")
 
+#: The structure-solution engine's kernels, from 1.4.0 (#562).  Looked up
+#: beside :data:`KERNEL_NAMES` until a caller in rietx exists, so a 1.3 wheel
+#: still serves the model, the figure and the indexer, and the three entry
+#: points below decline on it.
+SOLVE_NAMES = ("solve_orbit_sums", "solve_orbit_sums_one", "solve_clash")
+
 #: Ω spelled as :func:`~rietx.model.profiles.pseudovoigt.pseudo_voigt` — the
 #: forward model's own arithmetic.
 SPELL_FORWARD = 0
@@ -250,7 +270,8 @@ def _load() -> tuple[dict | None, str | None]:
     if missing:
         return None, (f"rietx_kernels {version} lacks the kernel"
                       f"{'s' if len(missing) > 1 else ''} {', '.join(missing)}")
-    return {n: getattr(wheel, n) for n in KERNEL_NAMES}, None
+    return {n: getattr(wheel, n) for n in KERNEL_NAMES + SOLVE_NAMES
+            if callable(getattr(wheel, n, None))}, None
 
 
 def _kernels() -> dict | None:
@@ -572,3 +593,124 @@ def bases_fcj(omega: np.ndarray, d_pos: np.ndarray, d_gamma: np.ndarray,
     _spread(lambda lo, hi: k["bases_fcj"](*args, lo, hi), len(rows),
             _splits("bases_fcj", rows, width, phi.shape[1], x.shape[1]))
     return True
+
+
+# --- the structure-solution engine's kernels (1.4.0, #562) ----------------
+#
+# Nothing in rietx calls these yet.  Each returns ``None`` where the compiled
+# path is off or the wheel predates 1.4.0; the numpy fallback its caller runs
+# lands with the engine's first caller, and the oracle the kernels are held to
+# is the expression in ``tests/test_solve_kernels.py``.
+
+#: Serial nanoseconds per orbit image of the orbit sums (one ``cos`` and one
+#: ``sin``) and per image pair of the contact term.  Measured on darwin/arm64
+#: with the engine spike's numba kernels, whose arithmetic the crate
+#: transcribes, on a 36-atom P2₁/c cell, 2 000 reflections and 8 replicas:
+#: 7.5 ns and 1.0 ns.
+_NS_PER_IMAGE = 7.5
+_NS_PER_CONTACT = 1.0
+
+
+def _solve_kernel(name: str):
+    """The named solve kernel when the compiled path is on and the wheel has
+    it; ``None`` otherwise.  Fixed for the process, like :func:`enabled`."""
+    if not enabled():
+        return None
+    kernels = _kernels()
+    return None if kernels is None else kernels.get(name)
+
+
+def _mean_images(q: np.ndarray, xyz: np.ndarray) -> float:
+    """Orbit images per site on average, the table's M over the sites.
+
+    An estimate and never an index, so a malformed argument reaches the
+    kernel's refusal by name rather than numpy's ``IndexError`` here.
+    """
+    return q.shape[1] / max(xyz.shape[1], 1) if q.ndim == 3 and xyz.ndim == 3 else 0.0
+
+
+def solve_orbit_sums(q: np.ndarray, ht: np.ndarray, xyz: np.ndarray,
+                     img_lo: np.ndarray, img_hi: np.ndarray,
+                     atoms: np.ndarray) -> tuple[np.ndarray, np.ndarray] | None:
+    """Per-site orbit sums ``(S_re, S_im)``, each (R, len(atoms), N).
+
+    S_j(h_n) = Σ_m exp(2πi (Q[n,m]·x_j + HT[n,m])) over site j's images
+    ``img_lo[j]..img_hi[j]``, for ``xyz`` (R, n_sites, 3), ``q`` (N, M, 3)
+    and ``ht`` (N, M).  Split over reflections, so the pool cannot change a
+    bit.  ``None`` = declined.
+    """
+    k = _solve_kernel("solve_orbit_sums")
+    if k is None:
+        return None
+    q, ht, xyz = _c(q), _c(ht), _c(xyz)
+    img_lo, img_hi = _c(img_lo, np.int64), _c(img_hi, np.int64)
+    atoms = _c(atoms, np.int64)
+    n, r = q.shape[0], xyz.shape[0]
+    s_re = np.empty((r, len(atoms), n))
+    s_im = np.empty_like(s_re)
+    if not n or not len(atoms) or not r:
+        return s_re, s_im
+    work = n * r * len(atoms) * _mean_images(q, xyz) * _NS_PER_IMAGE
+    _spread(lambda lo, hi: k(s_re, s_im, q, ht, xyz, img_lo, img_hi, atoms, lo, hi),
+            n, work >= _THREAD_MIN_NS)
+    return s_re, s_im
+
+
+def solve_orbit_sums_one(q: np.ndarray, ht: np.ndarray, xyz: np.ndarray,
+                         img_lo: np.ndarray, img_hi: np.ndarray,
+                         atom_of_rep: np.ndarray
+                         ) -> tuple[np.ndarray, np.ndarray] | None:
+    """One site per replica, ``(S_re, S_im)`` each (R, N): site
+    ``atom_of_rep[r]`` of replica r, the batched one-site move.
+    ``None`` = declined."""
+    k = _solve_kernel("solve_orbit_sums_one")
+    if k is None:
+        return None
+    q, ht, xyz = _c(q), _c(ht), _c(xyz)
+    img_lo, img_hi = _c(img_lo, np.int64), _c(img_hi, np.int64)
+    atom_of_rep = _c(atom_of_rep, np.int64)
+    n, r = q.shape[0], xyz.shape[0]
+    s_re = np.empty((r, n))
+    s_im = np.empty_like(s_re)
+    if not n or not r:
+        return s_re, s_im
+    work = n * r * _mean_images(q, xyz) * _NS_PER_IMAGE
+    _spread(lambda lo, hi: k(s_re, s_im, q, ht, xyz, img_lo, img_hi, atom_of_rep,
+                             lo, hi), n, work >= _THREAD_MIN_NS)
+    return s_re, s_im
+
+
+def solve_clash(pos: np.ndarray, site_of: np.ndarray, moved: np.ndarray,
+                g: np.ndarray, r0: np.ndarray, sigma: float,
+                w_same: float) -> np.ndarray | None:
+    """The contact energy of site ``moved[r]`` in replica r, (R,).
+
+    Its images against every atom of ``pos`` (R, n_atoms, 3), an atom's own
+    images included and itself in its own cell excluded, over the 27 cells
+    around the minimum image ``d − floor(d + ½)``: Σ w·((r0 − d)/σ)² over
+    contacts closer than r0, w = ``w_same`` inside the moved site and 1
+    elsewhere.  Split over replicas.  ``None`` = declined.
+
+    Raises ``ValueError`` where the 27 cells cannot hold every contact: the
+    minimum image ``d − floor(d + ½)`` lies in [−½, ½), so the shifts needed
+    along axis k are |n_k| ≤ ⌊r0·√(G*_kk) + ½⌋, G* = G⁻¹, and the kernel
+    refuses a cell where that exceeds 1 (r0 over 1.5 plane spacings) rather
+    than return a sum missing contacts.  It also refuses a ``g`` that is not
+    a symmetric positive-definite metric and a non-finite ``r0``.
+    """
+    k = _solve_kernel("solve_clash")
+    if k is None:
+        return None
+    pos, g, r0 = _c(pos), _c(g), _c(r0)
+    site_of, moved = _c(site_of, np.int64), _c(moved, np.int64)
+    r = pos.shape[0]
+    out = np.zeros(r)
+    if not r:
+        return out
+    # the moved site's atoms estimated as the cell's mean per site, never
+    # counted off ``site_of``, so a bad index reaches the kernel's refusal
+    n_at = pos.shape[1] if pos.ndim == 3 else 0
+    work = r * n_at * n_at / max(r0.shape[0], 1) * 27 * _NS_PER_CONTACT
+    _spread(lambda lo, hi: k(out, pos, site_of, moved, g, r0, float(sigma),
+                             float(w_same), lo, hi), r, work >= _THREAD_MIN_NS)
+    return out

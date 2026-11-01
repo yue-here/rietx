@@ -40,6 +40,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..model.forward import CompiledModel, DerivativeBases
+from ..optimize import lapack
 from .schemas import (
     CONTENTS_MAX_TEMPLATE_R2,
     CONTENTS_MIN_INTENSITY_SHARE,
@@ -151,8 +152,8 @@ def attribute_region(model: CompiledModel, bases: DerivativeBases,
     # number sat at 7×10³ … 1×10⁶ regardless of separability.
     scale = np.linalg.norm(a, axis=0)
     normed = a / scale
-    cond = float(np.linalg.cond(normed.T @ normed))
-    coef, *_ = np.linalg.lstsq(a, b, rcond=None)
+    cond = float(lapack.cond(normed.T @ normed))
+    coef, *_ = lapack.lstsq(a, b, rcond=None)
     resid = b - a @ coef
     ss_tot = float(b @ b)
     r2 = float(1.0 - (resid @ resid) / ss_tot) if ss_tot > 0 else 0.0
@@ -160,7 +161,7 @@ def attribute_region(model: CompiledModel, bases: DerivativeBases,
     # Gram covariance, scaled by the region's own residual variance
     dof = max(len(idx) - len(live), 1)
     sigma2 = float(resid @ resid) / dof
-    cov = np.linalg.pinv(gram) * sigma2
+    cov = lapack.pinv(gram) * sigma2
     err = np.sqrt(np.maximum(np.diag(cov), 0.0))
 
     # relative importance of each term: how much signal its fitted amplitude
@@ -215,12 +216,19 @@ def attribute_region(model: CompiledModel, bases: DerivativeBases,
 
 
 def attribute_regions(model: CompiledModel, values: dict[str, float],
-                      regions: list[Region]) -> list[RegionAttribution]:
-    """Layer-1 attribution for every region (gates evaluated per region)."""
+                      regions: list[Region], *,
+                      shapes: CompiledModel | None = None) -> list[RegionAttribution]:
+    """Layer-1 attribution for every region (gates evaluated per region).
+
+    The misfit is read off ``model`` and the shape basis off ``shapes``
+    (``model`` when not given), which must share its grid: the report hands in
+    a model at the closing precision and one at the declared stages' precision
+    (``report._reading_models``).
+    """
     y_calc = model.evaluate(values)
     delta = model.y_obs - y_calc
     sqrt_w = 1.0 / model.sigma
-    bases = model.derivative_bases(values)
+    bases = (model if shapes is None else shapes).derivative_bases(values)
     out = []
     for region in regions:
         att = attribute_region(model, bases, region, delta, sqrt_w)
@@ -484,7 +492,7 @@ def analyse_trends(attributions: list[RegionAttribution], wavelength: float,
         fitted: list[TrendTemplate] = []
         for name in names:
             col = (templates[name] * w)[:, None]
-            coef, *_ = np.linalg.lstsq(col, b, rcond=None)
+            coef, *_ = lapack.lstsq(col, b, rcond=None)
             resid = b - col @ coef
             r2 = float(1.0 - (resid @ resid) / ss_tot) if ss_tot > 0 else 0.0
             dof = max(len(pts) - 1, 1)

@@ -1,8 +1,7 @@
 # WP-1504 — the figure surface measured with real agents
 
-Milestone: rietview · Status: 🔄 2026-10-04 — option E run at N = 3: fixed 40/42 done against before 25/42; the maintainer's spot-check remains, then close
+Milestone: rietview · Status: ✅ 2026-10-23 — agents given the skill drew 40 of 42 structure figures on the fixed surface, against 25 of 42 before it (two models, three runs a cell)
 Depends on: 1501, 1502, 1503; 1529 soft (the next round)
-Priority: P3 2026-10-04 — option E ran and found no new defect; the maintainer's spot-check of the fixed figures is all that remains
 
 ## Goal
 
@@ -47,6 +46,11 @@ Stated as a chemist would, from the 21 phases in
 - Sonnet and Opus, at the default effort, three repeats each.
 - The agent gets the skill and a shell, and nothing staged in its folder.
 
+WP-1531 and WP-1533 landed after the fixed commit. They added `cell=`,
+`stick=`, `max_atoms=`, `fig.to_px`, the label overlap counts, `cut["atoms"]`
+and `FigureReport.stacked`, so rounds C and E measured the surface without
+them.
+
 ### The scores
 
 - Done or not. An Opus judge reads the final picture against a rubric per
@@ -60,44 +64,6 @@ Stated as a chemist would, from the 21 phases in
 
 `docs/wp/1504-eval/` holds the harness, the rubric and the run log. A
 condition is enforced in a shim, never in the prompt.
-
-### Inherited
-
-From **WP-1533** (2026-10-02). `FigureReport.stacked` is the part of
-`hidden` that sits behind an atom of the same site, within a quarter of its
-drawn radius. One cell down a cell axis reads 0.53 hidden and 0.53 stacked
-on HKUST-1, 0.52 and 0.50 on ZSM-5, and 1.00 and 1.00 on YBa₂Cu₃O₇. NAC's
-opening view reads 0.18 and 0.00. The skill's rule now reads
-`hidden - stacked` and keeps a view the task named. `view="auto"` still
-ranks by `hidden`, stacking included, so it prefers an oblique view to an
-axis projection. Whether it should rank by occlusion is an agent question,
-because the change moves every default `auto` pick. WP-1531 and WP-1533
-also added `cell=`, `stick=`, `max_atoms=`, `fig.to_px`, the label overlap
-counts and `cut["atoms"]`. A round run after their merge measures a
-different surface from the fixed round.
-
-From **WP-1957** (2026-10-13), evidence for the `auto` question above. Three
-blind reviewers (a crystallographer, a newcomer and a figure designer) ranked
-15 renderings of refined fluorapatite for a notebook. The view down c,
-`hidden` 0.45 and nearly all of it stacking, was first for two and second for
-the third. `auto` picked about [2 0 1] (`hidden` 0.024), and all three called
-it "a tangle". They also agreed on four readings, none of which `FigureReport`
-counts:
-- the darker shade on images outside the cell (`scene.DIM_BOUNDARY`) makes one
-  element read as two species, and all three reviewers took it for a depth
-  cue;
-- `atom_labels=True` prints a stacked pair twice (`F4 F4` at one corner);
-- the a and b letters sit under atoms or bonds down c;
-- at the default probability, `mode="ellipsoid"` draws the atoms as
-  pinpricks, which is physically right at Biso ≈ 1 Å² but reads as a wire
-  model.
-WP-1957's Context 4 records the rankings.
-
-From **WP-1536, 1537 and 1538** (filed 2026-10-02, queued). They add `.svg`,
-`.pov` and `.glb` to `render_structure`'s `path=`, and an
-`ambient_occlusion=` option. None has landed. A round run after any of them
-measures a larger surface. Task 6 (fluorapatite for print) is the one an
-agent could then answer with an SVG.
 
 ## Non-goals
 
@@ -145,6 +111,36 @@ agent could then answer with an SVG.
 - The agent skill's `references/api-figure.md`.
 
 ## Handover log
+
+### 2026-10-23 — closed: the figure surface measured, before against fixed
+
+This WP asked whether an agent given only the skill can draw the structure
+figures a chemist asks for. On the fixed surface it can. Agents finished 40 of
+42 tasks on two models at three runs a cell, against 25 of 42 on the surface
+before WP-1501-1503 (round E). What is left is what blind reviewers saw wrong in
+the picture. A done-rate cannot count that, so it moves to the WP that owns the
+figure's defects.
+
+*Closed* by the maintainer's decision of 2026-10-23, which also settles the
+spot-check of the fixed figures as done or waived. That discharges the last
+entry's two *Next* items. Every task was already ticked. Round B's result for
+1501-1503 went to WP-1529 (✅ 2026-10-01), since those WPs had closed; E
+changes none of it.
+
+*Inherited, disposed.*
+- From WP-1533: the `view="auto"` question (it ranks by `hidden`, stacking
+  included) is forwarded to WP-1468. The surface 1531 and 1533 added after the
+  fixed commit is now a sentence in Context § The conditions.
+- From WP-1957: the four readings `FigureReport` does not count are forwarded to
+  WP-1468, one bullet each, with the reviewers' ranking as evidence for `auto`.
+  None is fixed in the tree: `scene.DIM_BOUNDARY` is still 0.62, and nothing in
+  `viz/figure3d/` merges a stacked pair's label.
+- From WP-1536 to 1538: deleted. All three are still ⬜, this WP runs no further
+  round, and WP-1505's Inherited carries the same note.
+
+*Next.* WP-1468 takes five forwarded bullets: the `auto` ranking and the four
+readings. WP-1505's `Depends on: 1504` is now met. Its P3 rests on the trigger,
+which this close does not move. Nothing else is owed here.
 
 ### 2026-10-04 (round E) — before against fixed at N = 3
 

@@ -103,12 +103,12 @@ _ZERO = Stage("zero", [ZERO])
 _CELL = Stage("cell", ["phases.*.cell.*"])
 
 
-def _fit(data, *stages, solver=None):
+def _fit(data, *stages, solver=None, **plan):
     from rietx.optimize.least_squares import DEFAULT_SOLVER
 
     return rx.Refinement(_seeded(), _instrument(), history=False,
                          solver=solver or DEFAULT_SOLVER).fit(
-        data, plan=RefinementPlan(stages=list(stages)))
+        data, plan=RefinementPlan(stages=list(stages), **plan))
 
 
 def _codes(result, code):
@@ -194,7 +194,7 @@ FTOLS = [1e-9, 1e-6, 1e-4, 1e-3]
 FTOL_STOPS_EARLY = 1e-2
 
 
-def _fit_at(data, ftol, *stages, solver=None):
+def _fit_at(data, ftol, *stages, solver=None, **plan):
     """``stages`` with the **last** one stopped at ``ftol``.
 
     ``RefinementPlan.stage_ftols`` is the one authority applying the schedule
@@ -204,10 +204,10 @@ def _fit_at(data, ftol, *stages, solver=None):
     """
     stages = [dataclasses.replace(s) for s in stages]
     stages[-1].ftol = ftol
-    return _fit(data, *stages, solver=solver)
+    return _fit(data, *stages, solver=solver, **plan)
 
 
-def _answering_stage(data, ftol, *stages, solver=None):
+def _answering_stage(data, ftol, *stages, solver=None, **plan):
     """``(table, outcome)`` of the stage whose θ becomes the result.
 
     ``check_guards`` is the one place both are in hand, and it is where the
@@ -224,7 +224,7 @@ def _answering_stage(data, ftol, *stages, solver=None):
 
     refine_mod.check_guards = spy
     try:
-        _fit_at(data, ftol, *stages, solver=solver)
+        _fit_at(data, ftol, *stages, solver=solver, **plan)
     finally:
         refine_mod.check_guards = real
     return captured[-1]
@@ -274,15 +274,17 @@ def test_a_stage_that_stopped_early_is_not_a_bound_hit(data):
     driver's step lands the shift exactly on its limit, where it is a bound
     hit, and its ``ftol`` needs three small decreases in a row (WP-1938).
     """
-    result = _fit_at(data, FTOL_STOPS_EARLY, _SCALE_BKG, _ZERO, solver="trf")
+    # the declared stage's stopping point; the closing stage is tests/test_closing_stage.py's
+    result = _fit_at(data, FTOL_STOPS_EARLY, _SCALE_BKG, _ZERO, solver="trf",
+                     closing_window_tol=None)
     zero = {p.path: p for p in result.parameters}[ZERO]
 
     # nowhere near the limit …
     assert 0.0 < zero.value < 0.9 * ZERO_BOUND
     # … while the residual keeps a large angle with that column, i.e. the
     # gradient half alone would have fired
-    table, outcome = _answering_stage(data, FTOL_STOPS_EARLY,
-                                      _SCALE_BKG, _ZERO, solver="trf")
+    table, outcome = _answering_stage(data, FTOL_STOPS_EARLY, _SCALE_BKG, _ZERO,
+                                      solver="trf", closing_window_tol=None)
     cos = float(outcome.residual_cosine[list(table.free_paths).index(ZERO)])
     assert cos < -BOUND_HIT_COS_MIN
 

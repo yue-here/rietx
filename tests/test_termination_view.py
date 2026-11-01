@@ -84,12 +84,19 @@ def test_str_result_diagnostics_line_present_even_at_zero():
 
 
 def test_str_result_names_every_diagnostic_by_substring():
+    """No deliverable, so an error prints in full and every other row as one
+    line naming its code (WP-2037); the reading rule closes the section."""
+    from rietx.schemas.results import DIAGNOSTICS_READING_RULE
+
     _ref, result = _fit()
     assert result.diagnostics, "fixture stopped producing any — pick another"
     text = str(result)
     for d in result.diagnostics:
-        assert f"{d.level}[{d.code}]: " in text
-        assert d.message in text
+        if d.level == "error":
+            assert f"{d.level}[{d.code}]: {d.message}" in text
+        else:
+            assert f"\n    {d.code}" in text and d.message not in text
+    assert f"    {DIAGNOSTICS_READING_RULE}\n" in text
 
 
 def test_str_result_ends_with_provenance_then_agreement():
@@ -223,6 +230,44 @@ def test_summary_refuses_a_plan_beside_a_report():
     report = ref.report()
     with pytest.raises(ValueError, match="not both"):
         ref.summary(plan=rx.RefinementPlan.mccusker_default(), report=report)
+
+
+def test_summary_leaves_the_result_as_it_found_it(tmp_path):
+    """The evidence behind the ``Refinement.summary`` seat's answer-invariant
+    rows in ``rietx._audit``: every option of the view reads a finished fit
+    and moves nothing in it.  The one field it writes is the report's
+    declared cross-document write, ``Statistics.identifiability_clause``
+    (WP-1108), a sentence and no fitted number."""
+    def answer(res):
+        return res.model_dump(mode="json", exclude={"statistics": {"identifiability_clause"}})
+
+    ref, result = _fit()
+    before = answer(result)
+    # any code will do for the override; the fit need raise no warning
+    first = next((d.code for d in result.diagnostics), "FLOOR_HIT")
+    ref.summary(deliverable="qpa", plot=str(tmp_path / "fit.png"),
+                plan=rx.RefinementPlan.mccusker_default(), levels={first: "deny"})
+    ref.summary(report=ref.report())
+    assert answer(ref.result_) == before
+
+
+def test_summary_levels_denies_a_warning_and_says_who_set_it():
+    """WP-2037 clause 4: a caller's ``deny`` prints a warning in full as an
+    error, and the header says the caller set it."""
+    ref, result = _fit()
+    warned = [d.code for d in result.diagnostics if d.level == "warning"]
+    assert warned, "the fixture fit must raise a warning for deny to act on"
+    first = warned[0]
+    text = ref.summary(levels={first: "deny"})
+    assert f"error[{first}]" in text
+    assert "1 set by levels=" in text
+
+
+def test_summary_levels_refuses_an_unknown_code_before_building_the_report(monkeypatch):
+    ref, _result = _fit()
+    monkeypatch.setattr(ref, "report", lambda **_: pytest.fail("the report was built"))
+    with pytest.raises(ValueError, match="unknown diagnostic code"):
+        ref.summary(levels={"FLOOR_HITT": "allow"})
 
 
 def test_summary_protocol_names_the_plan_and_held_reasons():
@@ -392,15 +437,39 @@ def test_series_deliverable_reads_the_comparisons_own_record():
 
 
 def test_series_deliverable_reads_a_steps_verification_state():
-    unverified = _series_result(diagnostics=[rx.Diagnostic(
-        level="info", code="SEQUENTIAL_DISCONTINUITY",
-        where=["phases.0.cell.a"], message="m")])
-    assert "not verified" in unverified.summary(deliverable="series")
+    """The row reads ``SeriesResult.steps`` (WP-2003): a step's
+    ``cold_ratio`` is the verification, and no step is called a jump."""
+    from rietx.schemas.sequential import SeriesStep
 
-    verified = _series_result(diagnostics=[rx.Diagnostic(
-        level="info", code="SEQUENTIAL_DISCONTINUITY",
-        where=["phases.0.cell.a"], message="m", value=0.05)])
-    assert "reproduces 0.05×" in verified.summary(deliverable="series")
+    def step(cold_ratio=None):
+        return SeriesStep(path="phases.0.cell.a", labels=("p1", "p2"),
+                          indices=(1, 2), step=1e-4, size_esd=10.0,
+                          cold_ratio=cold_ratio)
+
+    assert "steps: NOT recorded" in _series_result().summary(deliverable="series")
+    unverified = _series_result(steps=[step()])
+    assert "none re-measured cold" in unverified.summary(deliverable="series")
+    verified = _series_result(steps=[step(0.05)])
+    text = verified.summary(deliverable="series")
+    assert "phases.0.cell.a p1→p2: an independent cold pair reproduces 0.05×" in text
+
+
+def test_series_summary_names_the_largest_step_in_its_trajectory_block():
+    """One line, read off the field's first numbered row, and no diagnostic
+    (WP-2037's mock-up, § 5); a series with no numbered step prints none."""
+    from rietx.schemas.sequential import SeriesStep
+
+    steps = [SeriesStep(path="phases.0.cell.a", labels=("p1", "p2"),
+                        indices=(1, 2), step=1e-4, size_esd=-4.1),
+             SeriesStep(path="phases.0.cell.b", labels=("p0", "p1"),
+                        indices=(0, 1), step=1e-4, size_esd=None)]
+    lines = _series_result(steps=steps).summary().splitlines()
+    k = next(i for i, line in enumerate(lines) if line.startswith("  trajectory"))
+    assert lines[k + 1] == ("    largest step phases.0.cell.a -4.1σ at p1→p2 "
+                            "(series.steps)")
+    assert not any("SEQUENTIAL_" in line for line in lines)
+    bare = _series_result(steps=steps[1:]).summary()
+    assert "largest step" not in bare
 
 
 def test_series_deliverable_refuses_a_per_pattern_purpose_by_name():

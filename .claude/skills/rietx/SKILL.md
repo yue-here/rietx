@@ -13,7 +13,7 @@ description: >-
 license: MIT
 compatibility: Requires the rietx Python package (pip install rietx) and Python 3.11+. Works offline — this file and its references ship in the wheel; the user manual it names is hosted at https://rietx.org.
 metadata:
-  version: "1.10.0.dev0"
+  version: "1.11.0.dev0"
   homepage: "https://rietx.org"
 ---
 
@@ -38,7 +38,7 @@ How to drive `rietx` on real data: the order of work, and the checks before you 
 | §8 a result that makes no sense | [surprises](references/surprises.md) |
 | §9 the trajectory, and the history DAG | [history](references/history.md) |
 | §9b a ramp, a sweep or a tray of patterns | [series](references/series.md) |
-| §9c a batch: deciding; operating | [batch](references/batch.md), [batch-operating](references/batch-operating.md) |
+| §9c a batch: deciding; operating | [batch](references/batch.md), [operating](references/batch-operating.md), [api-batch](references/api-batch.md) |
 | §9d a human watching, or a finished run on disk | [watching](references/watching.md) |
 
 Read signatures from the package, never from memory: `rx.capabilities()`, `rx.help_for(path)`, `inspect.signature(obj)`. A failure raises. Dump an answer with `model_dump(mode="json")`.
@@ -59,7 +59,7 @@ Rietveld refinement locally fits a model you already believe. Check each row bef
 | The starting width is within ×2 | `W` is the squared Gaussian FWHM at low angle (Γ_G² = U·tan²θ + V·tanθ + W; `rx.help_for("instrument.profile.w")`). Its default, 1e-3 deg², is a 0.03° synchrotron line. Seed `W ≈ (0.6·H)²`, `X ≈ 0.6·H`, with H the median `fwhm` of the strongest `rx.pick_peaks` peaks (§10): Gaussian and Lorentzian halves of 0.6·H combine to about H |
 | The fitted range is yours | `fit(two_theta_limits=(lo, hi))`, and the same tuple to `rx.auto_background`. `PatternData.excluded_regions` drops intervals |
 
-Never subtract a background, because that breaks the weights. Hold an estimated one additively (`rx.BackgroundFixedPlusChebyshev`), or co-refine one: `rx.auto_background(data, kind="chebyshev")`, or the default penalised P-spline. A measured blank is `BackgroundFixedPlusChebyshev.from_pattern(blank)` (§8.29).
+Never subtract a background, because that breaks the weights. Hold an estimated one additively (`rx.BackgroundFixedPlusChebyshev`), or co-refine one: `rx.auto_background(data, kind="chebyshev").background`, or the default P-spline. A measured blank is `BackgroundFixedPlusChebyshev.from_pattern(blank)` (§8.29).
 
 ---
 
@@ -83,8 +83,8 @@ Free parameters in groups, cumulatively, each group converged before the next (M
 
 **Le Bail** (`mode="lebail"`, plan `profile_only`) is for a cell without a trusted structure: an indexing check, intensities for structure solution, a cell independent of any model. With a CIF, run the Rietveld plan directly (judging.md § rules 4-5). Where reflections crowd, check a Le Bail cell against a structural model before you quote it.
 
-4. **Set `lebail_passes` (say 8) on a plan object**: `plan = rx.RefinementPlan.profile_only(); plan.lebail_passes = 8`. The run stops at the first pass that does not lower Rwp, keeps the best, and names the stop (`LEBAIL_ALTERNATION_STOPPED`).
-5. **Seed the background before a Le Bail run: `rx.auto_background(data, seed=True)`.** The default starts every coefficient at 0.0, so the first partition gives the whole pedestal to the reflections; `seed=True` starts them at a low percentile of the counts.
+4. **Set `lebail_passes` (say 8) on a plan object**: `plan = rx.RefinementPlan.profile_only(); plan.lebail_passes = 8`.
+5. **Seed the background before a Le Bail run: `rx.auto_background(data, seed=True).background`.** Unseeded, every coefficient is 0.0 and the first partition gives the pedestal to the reflections; `seed=True` starts them at a low count percentile.
 
 ---
 
@@ -102,7 +102,7 @@ Free parameters in groups, cumulatively, each group converged before the next (M
 | overlapped intensities (Le Bail, Pawley) | identical | quote the sum; the split is undetermined |
 | extra peak · the reflection under it | identical | `EXTRA_PEAK_ON_REFLECTION`; declare one only for a real intruder (§8.23) |
 
-6. **Free a group's second member only when something outside the fit pins the first.** `lab_calibrate` does this by holding the certified cell.
+6. **Free a group's second member only when something outside the fit pins the first.**
 7. **Above a correlation of 0.98 (`HIGH_CORRELATION`), fix one member or extend the range.** Widening bounds does not help.
 8. **Constrain what chemistry makes one quantity**: `ref.tie_equal([paths])`, `ref.tie(path, source, scale=, offset=)` (`occ₁ = 1 − occ₀` is `scale=-1, offset=1`), `ref.untie`. Tie only values within their combined esds in the free fit, never judged by Rwp (judging.md § rule 8).
 
@@ -112,7 +112,7 @@ To keep a parameter fixed through a plan, call `ref.hold(globs)`: a plan replace
 
 ## 4. Judging a fit
 
-Judge in this order. `print(result)` shows per-stage status, the diagnostics, provenance, and the agreement indices last. Act on each `d.suggestion`, then grep its code. Evidence: [judging](references/judging.md).
+Judge in this order. Declare your purpose with `ref.summary(deliverable=…)`; act on each warning it prints in full, then grep its code. Evidence: [judging](references/judging.md).
 
 9. **Status and guards first.** `result.usable` is false when the fit did not converge or carries an `"error"` diagnostic: read no value from it. Then `result.diagnostics`, then `result.statistics.max_shift_over_esd`. Above 0.1 under `converged`, a direction is still walking: bound it, or find its correlated partner (rule 7).
 10. **Read the difference curve by region**: `report.regions` (local Rwp, χ² share) and `cumulative_chi2_breakpoints`.
@@ -136,17 +136,20 @@ Non-ideal data moves no bar. It changes which rows decide. Declare the deliverab
 |---|---|---|
 | Phase ID | `report.unmatched` (`unmatched_obs`); `report.lebail_gap.ratio`, Rietveld Rwp over Le Bail Rwp: ≫ 1 means every line is indexed and the intensity model is what misfits | no strong unmatched observed peak, at any Rwp. `abstained_kind="resolution_limited"` does not block it |
 | QPA | `result.qpa.phases` (`weight_fraction`, `zmv`); `report.background` absorption first, then absorption geometry, then impossible values. A large gap ratio means wrong fractions | fractions stable under a change of background flexibility, `worst_absorption` under its threshold, no unresolved scale or ZMV code, no trace-phase `ref.profile_fraction` finding. Never "Rwp stopped falling" |
-| Trajectory | `SEQUENTIAL_PATH_DEPENDENT`, `SEQUENTIAL_PERSISTENT_FINDING`, `SEQUENTIAL_DISCONTINUITY`, `PHASE_UNCONSTRAINED`; 2θ anchor, precision/accuracy split, QPA check at every point (§9b) | each quoted number names the one thing that would make it wrong, and that thing is checked |
+| Trajectory | `SEQUENTIAL_PATH_DEPENDENT`, `SEQUENTIAL_PERSISTENT_FINDING`, `series.steps`, `PHASE_UNCONSTRAINED`; 2θ anchor, precision/accuracy split, QPA check at every point (§9b) | each quoted number names the one thing that would make it wrong, and that thing is checked |
 | Microstructure | `result.microstructure`: size (Å), Δd/d, `size_agreement`; the report's `separable`; `SIZE_UNUSUALLY_SMALL`, `STRAIN_UNUSUALLY_LARGE`, `BOUND_HIT` | `separable` is not `False` and the readings agree. Quote the size as an order of magnitude with its `scherrer_k`. `False` asks for a wider 2θ range |
 | Structure | all of §4, plus `report.texture`, `report.strain`, restraint tension, ADP positive-definiteness, `report.identifiability.exchanges` | the three stop conditions (§10), with every `exchangeable` row swapped (rule 14) |
+| Cell | `report.identifiability.exchanges` with zero, displacement | exchanges settled (rule 14); an absolute only against a standard |
+| Calibration | instrument terms; the certified cell held | the cell never freed (`lab_calibrate`, rule 6) |
+| Magnetic | modulus `moment.dof0`; `StageResult.held`, `moment_turned` | no direction quoted that a stage held or turned |
 
-`resolution_limited` ends phase-ID work; for a structure, collect better data. Before you execute one of `report.suggested_actions`, verify it with `rx.report.predict_then_verify(ref, data, action)` or on a history branch (§9). Treat a capped confidence as an open question, and never run a vetoed action.
+Before you execute one of `report.suggested_actions`, verify it with `rx.report.predict_then_verify(ref, data, action)` or on a history branch (§9). Treat a capped confidence as an open question, and never run a vetoed action.
 
 ---
 
 ## 6. Abstention
 
-The package declines rather than return a confident wrong singleton, and the refusal is the answer. Every signal and its response: [abstention](references/abstention.md).
+The package declines rather than return a confident wrong singleton, and the refusal is the answer.
 
 18. **Propagate an abstention.** With `report.abstained_reason` set, branch on `report.abstained_kind` and do not read `report.attribution`. `INDEX_ABSTAINED` lists candidates for inspection.
 19. **Adopt a cell from `IndexingResult.best_or_none()`, not from a rank.** `None` is the usual first outcome: act on each candidate's refuting `confidence_caveats` first (§7c). Adopting an ungated cell is your stated decision, and a refinement checks it (§7d).
@@ -169,7 +172,7 @@ data = rx.read_pattern(PATTERN)
 structure = rx.Structure.from_cif(CIF)
 instrument = rx.Instrument.bragg_brentano(radiation="CuKa")
 limits = (float(np.min(data.two_theta)), float(np.max(data.two_theta)))  # narrow to what you trust
-instrument.background = rx.auto_background(data, kind="chebyshev", two_theta_limits=limits)
+instrument.background = rx.auto_background(data, kind="chebyshev", two_theta_limits=limits).background
 
 strong = sorted(rx.pick_peaks(data, instrument).peaks, key=lambda p: -p.intensity)[:12]
 h = float(np.median([p.fwhm for p in strong]))                           # §1 width seed
@@ -196,6 +199,6 @@ print(ref.summary(deliverable="structure", report=report))               # §4b
 
 Whether Rwp is still falling decides neither way. These are the structure-grade conditions; §4b's last column gives the other deliverables' stops.
 
-**Report** the refined values with their esds, the unresolved diagnostics as systematics, the protocol you ran (plan, held parameters, excluded ranges, channel count) and `result.provenance` (version, backend, solver). Write files with `rx.write_refinement_cif` and `rx.write_qpa_table`.
+**Report** the refined values with their esds, the unresolved diagnostics as systematics, the protocol you ran (plan, held parameters, excluded ranges, channel count) and `result.provenance`. Write files with `rx.write_refinement_cif` and `rx.write_qpa_table`.
 
-Theory: <https://rietx.org/manual.html>. Manual pages as markdown: <https://rietx.org/llms.txt>.
+Manual: <https://rietx.org/docs/>; its pages as markdown: <https://rietx.org/llms.txt>.

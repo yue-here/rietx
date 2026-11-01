@@ -55,9 +55,9 @@ assert f"{(lam_rietx / gsas.histogram().wavelengths[0] - 1) * 1e6:.0f}" == "60"
 assert result.parameter("phases.0.cell.b").vary is False
 assert result.parameter("phases.0.cell.b").stderr == result.parameter("phases.0.cell.a").stderr
 assert f"{volume.stderr_diagonal:.3f}" == "0.011"
-assert rx.format_su(a.value, a.stderr) == "9.370962(82)"
+assert rx.format_su(a.value, a.stderr) == "9.370962(83)"
 assert rx.format_su(volume.volume, volume.stderr) == "523.629(12)"
-assert f"{result.statistics.esd_inflation:.2f}" == "2.15"
+assert f"{result.statistics.esd_inflation:.2f}" == "2.17"
 assert f"{(a.value / b.value - 1) * 1e6:.0f}" == "66"
 cell = gsas.phases[0].cell
 assert rx.format_su(cell.a, cell.esd_a) == "9.371724(36)"

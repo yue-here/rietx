@@ -18,15 +18,15 @@ This fits a straight line a(T) = a₀ + a₁(T − T<sub>ref</sub>) to the seven
 
 <!-- output of examples/guides/equation.py -->
 ```text
-[1] 4.1628356113 +/- 1.6e-06 Å
-[T] 0.0000207744 +/- 8.0e-09 Å/K
-form rejected: False (statistic 3.8, cut 11.1)
+[1] 4.1628327119 +/- 1.6e-06 Å
+[T] 0.0000207819 +/- 8.0e-09 Å/K
+form rejected: False (statistic 9.3, cut 11.1)
 ```
 
 Each term in `terms` is a list of coordinate names: `[]` is the intercept, `["T"]` is linear in T, and `["T", "T"]` would add T².
 rietx centres each coordinate on the middle of its range, here 600 K.
 So `[1]` is a at 600 K, and the correlation between the intercept and the slope is 0.001.
-The true slope is 2.0783 × 10⁻⁵ Å/K, about 1 esd from the fitted one.
+The true slope is 2.0783 × 10⁻⁵ Å/K, 0.1 esd from the fitted one.
 
 Read the coefficients from `result.parametric`.
 The coefficient rows in `result.parameters` are per unit of the centred and scaled temperature, so their numbers differ.
@@ -53,7 +53,7 @@ To show a rejection, the script fits a second ramp whose true cell edge bows 9.4
 
 <!-- output of examples/guides/equation.py -->
 ```text
-form rejected: True (statistic 591.0, cut 11.1)
+form rejected: True (statistic 501.5, cut 11.1)
 ['PARAMETRIC_FORM_REJECTED']
 ```
 
@@ -76,7 +76,7 @@ A pattern that cannot see the phase adds nothing to the statistic, and `PARAMETR
 
 <!-- output of examples/guides/equation.py -->
 ```text
-a: phases.0.cell.a at T=293 = 4.1564579(29) Å (extrapolating in T; form not rejected)
+a: phases.0.cell.a at T=293 = 4.1564527(29) Å (extrapolating in T; form not rejected)
 ```
 
 293 K lies below the fitted range of 300-900 K, so the line says it is extrapolating.

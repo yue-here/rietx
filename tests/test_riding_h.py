@@ -83,6 +83,15 @@ def test_n_h_has_a_neutron_length_from_the_h_n3_row():
     assert riding_length("NH", "xray") == 0.86
 
 
+def test_every_class_has_a_length_for_both_radiations():
+    """The table's comment says no entry is ``None`` today; this keeps it true
+    when a row is added to one column and not the other."""
+    assert set(RIDING_LENGTHS["xray"]) == set(RIDING_LENGTHS["neutron"])
+    for radiation, column in RIDING_LENGTHS.items():
+        missing = sorted(k for k, v in column.items() if v is None)
+        assert not missing, (radiation, missing)
+
+
 def test_a_class_with_no_tabulated_length_is_refused(monkeypatch):
     monkeypatch.setitem(RIDING_LENGTHS["neutron"], "NH", None)
     with pytest.raises(ValueError, match="no tabulated neutron length"):

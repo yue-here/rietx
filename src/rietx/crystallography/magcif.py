@@ -191,6 +191,24 @@ REFUSED_TAGS: tuple[tuple[str, str], ...] = (
 )
 
 
+#: Tag families of the magnetic-CIF draft that ``cif_mag.dic`` replaced (issue
+#: #1063, item 3), each refused **by name** when a file states it.  The
+#: dictionary defines none of them under any name or alias (0.9.9, whose
+#: revision history opens at 0.1.0, 2016-05-24, "Initial automatic conversion
+#: from draft magCIF format"), and no source this package holds maps them onto
+#: its items, so a file written in them is not read: as an ordinary CIF it
+#: finds no atom sites, or reads its nuclear half and drops the moments in
+#: silence.  Matched as case-blind tag **prefixes**.  Other ``_magnetic_``
+#: spellings (``_magnetic_space_group_standard_setting``,
+#: ``_magnetic_propagation_vector_``) are not in this list and refuse nothing:
+#: they are written beside the dictionary's own items in files that read.
+DRAFT_TAGS: tuple[tuple[str, str], ...] = (
+    ("_magnetic_atom_site_", "the sites or their moments"),
+    ("_magnetic_cell_", "the cell"),
+    ("_magnetic_space_group_symop_operation_", "the magnetic operators"),
+)
+
+
 class MagCifError(ValueError):
     """Raised naming the file, the construct and what would make it readable.
 
@@ -481,6 +499,34 @@ def refuse_modulation(text: str, path: str) -> None:
         f"chapter.")
 
 
+def refuse_draft_tags(text: str, path: str) -> None:
+    """Raise naming every :data:`DRAFT_TAGS` tag the file states.
+
+    A refusal and not a read: mapping the draft's items onto the dictionary's
+    needs a source for what each meant, and this package has none.  Run before
+    the reader decides whether the file has atom sites at all, because a file
+    written wholly in these tags has none under the dictionary's names and was
+    refused as "no atom sites found", which names the wrong cause.
+    """
+    found = sorted({match.group(1) for tag, _what in DRAFT_TAGS
+                    for match in re.finditer(
+                        rf"(?mi)^\s*({re.escape(tag)}[A-Za-z0-9_.\-]*)", text)})
+    if not found:
+        return
+    families = "; ".join(f"{tag}* ({what})" for tag, what in DRAFT_TAGS
+                         if any(t.lower().startswith(tag) for t in found))
+    shown = ", ".join(found[:4]) + (f" and {len(found) - 4} more"
+                                    if len(found) > 4 else "")
+    raise MagCifError(
+        f"{path} uses the pre-2016 draft magnetic-CIF tags: {shown}. "
+        f"cif_mag.dic, which replaced that draft in 2016, defines none of "
+        f"{families} under any name or alias, and this reader has no source "
+        f"mapping them onto its items, so the file is refused rather than read "
+        f"without its magnetic structure. Re-export it with the dictionary's "
+        f"tags: _space_group_symop_magn_operation.xyz, the _atom_site_moment "
+        f"loop, and the ordinary _cell_ and _atom_site_ items.")
+
+
 def read_magnetic_symmetry(block, text: str, path: str, *,
                            diagnostics: list[Diagnostic] | None = None):
     """The magnetic space group a magCIF block states, or ``None``.
@@ -677,7 +723,29 @@ def refuse_a_magnetic_supercell(block, text: str, path: str) -> None:
         f"named here.")
 
 
-def parent_space_group(block) -> str | None:
+#: The parent symbol's tag as FullProf writes it (issue #1063, item 2).
+#: ``cif_mag.dic`` 0.9.9 defines ``_parent_space_group.name_H-M_alt`` and no
+#: alias of it, so this spelling is read only where that item is absent, and
+#: named when it is.
+PARENT_HM_UNDEFINED = "_parent_space_group.name_H-M"
+
+
+def _same_symbol(one: str, two: str) -> bool:
+    """Whether two H-M symbols name one setting: the same text up to spacing,
+    or one gemmi entry, looked up as :func:`resolve_nuclear_symmetry` does."""
+    from .symmetry import get_spacegroup
+
+    if "".join(one.split()) == "".join(two.split()):
+        return True
+    try:
+        return (get_spacegroup(one.replace("_", "")).hall
+                == get_spacegroup(two.replace("_", "")).hall)
+    except ValueError:
+        return False
+
+
+def parent_space_group(block, path: str, *,
+                       diagnostics: list[Diagnostic] | None = None) -> str | None:
     """The nuclear space-group symbol a magCIF states, or ``None``.
 
     ``_parent_space_group.name_H-M_alt`` is where a magCIF puts it: the
@@ -686,8 +754,40 @@ def parent_space_group(block) -> str | None:
     and the ordinary reader's fallback finds nothing.  Only meaningful once
     :func:`refuse_a_magnetic_supercell` has established that the file's cell
     *is* the parent cell.
+
+    FullProf writes the item as :data:`PARENT_HM_UNDEFINED`, which no
+    dictionary defines and which can mean nothing else.  Where ``_alt`` is
+    absent that tag is read and ``CIF_MAGNETIC_PARENT_TAG_UNDEFINED`` (info)
+    names it.  Where both are present and name different settings the file
+    contradicts itself, and the reader cannot tell which is wrong, so it
+    raises :class:`MagCifError` quoting both.
     """
-    return _value(block, "_parent_space_group.name_H-M_alt")
+    stated = _value(block, "_parent_space_group.name_H-M_alt")
+    other = _value(block, PARENT_HM_UNDEFINED)
+    if other is None:
+        return stated
+    if stated is None:
+        # the tag as the file spells it: gemmi matches tags case-blind
+        pairs = (block.find_pair(name)
+                 for name in (PARENT_HM_UNDEFINED, _flat(PARENT_HM_UNDEFINED)))
+        tag = next(pair[0] for pair in pairs if pair is not None)
+        if diagnostics is not None:
+            diagnostics.append(Diagnostic(
+                level="info", code="CIF_MAGNETIC_PARENT_TAG_UNDEFINED",
+                where=["phases.0.space_group"],
+                message=(f"{path} names its parent space group {other!r} "
+                         f"under {tag}, which cif_mag.dic does not define; "
+                         f"it was read as _parent_space_group.name_H-M_alt, "
+                         f"the item that tag can only mean.")))
+        return other
+    if not _same_symbol(stated, other):
+        raise MagCifError(
+            f"{path} names two parent space groups: "
+            f"_parent_space_group.name_H-M_alt {stated!r} and "
+            f"{PARENT_HM_UNDEFINED} {other!r}. The file contradicts itself and "
+            f"the reader cannot tell which is wrong; remove the one that does "
+            f"not describe the structure.")
+    return stated
 
 
 def nuclear_operations(magnetic_symmetry) -> tuple[str, ...]:
@@ -868,8 +968,9 @@ def resolve_nuclear_symmetry(hm_symbol: str | None, magnetic_symmetry,
     way ``.xhm()`` is what ``Phase.space_group`` takes, and an
     ``OperatorGroup``'s ``.xyz`` is ``Phase.symmetry_operations``.
 
-    ``hm_symbol`` — ``_parent_space_group.name_H-M_alt`` — names the parent
-    type; the **setting** is checked against the file's own operators, never
+    ``hm_symbol`` — ``_parent_space_group.name_H-M_alt``, or the undefined
+    spelling :func:`parent_space_group` reads where it is absent — names the
+    parent type; the **setting** is checked against the file's own operators, never
     taken on trust from the symbol: see :func:`nuclear_operations` for why a
     symbol lookup can silently disagree with the setting the file's
     coordinates and moments are stated in.  ``sites`` is ``[(label, xyz)]``

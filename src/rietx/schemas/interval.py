@@ -56,6 +56,13 @@ PARAMETER_INTERVAL_SETTLE_RUNS = 4
 #: Δχ² at the end by about 0.1 % of the threshold.
 PARAMETER_INTERVAL_XTOL = 1e-3
 
+#: The factor each probe's distance from the fit grows by while one side looks
+#: for a value past the Δχ² threshold, starting one esd out.  Doubling brackets
+#: an end within log₂ of its distance in esds, then the end is solved inside
+#: the bracket.  Where window recompiles give the profile several crossings,
+#: the growth can decide which one the bracket holds.  No stated source.
+PARAMETER_INTERVAL_BRACKET_GROWTH = 2.0
+
 #: A χ² difference the interval treats as nothing, as a fraction of the Δχ²
 #: threshold.  It decides two things: whether a probe has settled
 #: (:data:`PARAMETER_INTERVAL_SETTLE_RUNS`), and whether a probe that landed
@@ -71,8 +78,12 @@ PARAMETER_INTERVAL_CHI2_TOL = 0.01
 #: the parameter's own limit first, so the end is the limit; a one-sided
 #: interval's bounded end always reads this.  ``"refits"``: the side spent
 #: its refit budget before it could say either, and has no end.
-#: ``"error"``: a refit raised, and the side has no end.
-IntervalStop = Literal["threshold", "bound", "refits", "error"]
+#: ``"error"``: a refit raised, and the side has no end.  ``"period"``: a
+#: moment angle's side reached half a turn from the value with the χ² still
+#: under the threshold, and has no end: an angle repeats every 2π, so past
+#: half a turn the side only revisits directions the other side covers
+#: (WP-2002; a flat azimuth, or a moment the data no longer see).
+IntervalStop = Literal["threshold", "bound", "refits", "error", "period"]
 
 
 class ParameterIntervalPoint(Base):
@@ -84,7 +95,9 @@ class ParameterIntervalPoint(Base):
     many refits the value took to settle
     (:data:`PARAMETER_INTERVAL_SETTLE_RUNS`), and ``status`` and ``node_id``
     belong to the one that reached ``chi2``; ``node_id`` is ``None`` where the
-    caller disabled history.  A refit that raised records ``error``, and the
+    refits recorded no node: the caller disabled history, or the interval is
+    one a fit computed unasked (``RefinedParameter.interval``, WP-2002).  A
+    refit that raised records ``error``, and the
     numbers stay ``None`` when it was the first.
     """
 
@@ -113,7 +126,7 @@ class ParameterInterval(Base):
 
     ``lower`` and ``upper`` are the ends, and ``lower_stop`` and
     ``upper_stop`` say why each side stopped (:data:`IntervalStop`).  An end
-    is ``None`` when its side stopped on ``"refits"`` or ``"error"``.
+    is ``None`` when its side stopped on ``"refits"``, ``"error"`` or ``"period"``.
 
     ``chi2_lowest`` is the lowest data χ² found, the fit's included.
     ``fit_is_minimum`` is ``False`` when a probe found χ² below the fit's by

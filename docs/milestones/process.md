@@ -410,6 +410,15 @@ runs the browser, so a session changing `src/` meets the rules only where it
 already reads.  The README in `docs/lite/` keeps the rules with their causes,
 and the WP keeps the measurements.  Landed 982, +1 headroom.
 
+983 -> 993 for WP-2001 (2026-10-19): two rules from the generality milestone.
+The old rule "a new correction ships with a record field or a diagnostic" rewarded
+adding a firing code, so it now states DESIGN.md Rule 1's three outcomes: act
+and record, rank with evidence, or report the number.  Its Rwp and R_Bragg
+clauses stay.  The second rule names the audit table, its meta-test and the
+judge the handover dispatches, because DESIGN.md Rule 4 places the mechanisms
+that enforce its tests in § Invariants.  The rows, the counts and the probes
+that showed the guard failing stayed in the WP.  Landed 992, +1 headroom.
+
 ### `docs/ROADMAP.md`
 
 400 -> 416 for the agentic-report planning session (2026-08-18): four
@@ -624,6 +633,14 @@ one-line blurb, prose as the rule counts it.  The first draft's sections
 (31 lines) were cut to these before the cap was touched; the sequencing
 constraint lives in WP-1803 and WP-1514's `### Inherited`.  Landed 588, no
 headroom.
+
+588 -> 589 for v1.10 (2026-10-14, WP-1961): one table row.  Landed 589.
+
+589 -> 614 for the generality milestone (2026-10-18, WP-2001): one table
+row, a `###` section with three track headings the WP index links to, and
+one line in Current focus.  Prose, so the WP-1507 rule applies; the rule,
+the measurements and the decisions are in `generality.md`, and the section
+here carries one paragraph.  Landed 614, no headroom.
 
 ### `gui/CLAUDE.md`
 
@@ -1213,6 +1230,30 @@ lanes, the ten trial sessions first:
 | 2026-10-14 | 2aa6e19e | 4 | 0 | 4K | 8 | 18K | 2.13 | 0 / 0 | +35.62 | +35% |
 | 2026-10-14 | 8f4b0657 | 1 | 1 | 5K | 11 | 16K | 5.80 | 0 / 0 | +8.77 | +20% |
 | 2026-10-17 | cb4e52b3 | 6 | 0 | 0K | 5 | 15K | 1.65 | 1 / 0 | +16.33 | +38% |
+| 2026-10-19 | e31b95c0 | 1 | 0 | 7K | 16 | 28K | 2.15 | 1 / 0 | +3.71 | +16% |
+| 2026-10-19 | dee45bf6 | 2 | 0 | 8K | 12 | 29K | 2.88 | 2 / 0 | +5.95 | +27% |
+| 2026-10-19 | 49b424f3 | 7 | 0 | 0K | 8 | 10K | 5.17 | 2 / 0 | +75.77 | +37% |
+| 2026-10-19 | 34f7249c | 10 | 0 | 0K | 10 | 15K | 3.54 | 4 / 0 | +78.42 | +39% |
+| 2026-10-20 | 9245229d | 1 | 0 | 39K | 5 | 16K | 1.84 | 1 / 0 | +1.78 | +16% |
+| 2026-10-20 | 559fe6da | 7 | 0 | 0K | 12 | 20K | 2.77 | 6 / 0 | +29.49 | +37% |
+| 2026-10-21 | 34134d52 | 2 | 1 | 0K | 28 | 52K | 3.67 | 2 / 0 | +3.13 | +9% |
+| 2026-10-22 | ef260d4e | 4 | 0 | 0K | 11 | 13K | 2.38 | 1 / 0 | +14.92 | +32% |
+| 2026-10-22 | c6e9e0e6 | 2 | 0 | 0K | 10 | 19K | 2.67 | 1 / 0 | +3.17 | +15% |
+| 2026-10-22 | caaa4f5e | 3 | 0 | 0K | 12 | 30K | 3.58 | 2 / 0 | +15.96 | +25% |
+| 2026-10-23 | 0f7afe56 | 6 | 2 | 0K | 0 | 0K | 3.12 | 1 / 0 | +9.73 | +29% |
+| 2026-10-23 | 5fdf54e6 | 3 | 5 | 17K | 8 | 17K | 2.60 | 2 / 0 | +20.21 | +35% |
+| 2026-10-23 | e7b20750 | 4 | 2 | 0K | 22 | 44K | 2.77 | 4 / 0 | +6.74 | +11% |
+| 2026-10-24 | abdc9d50 | 1 | 0 | 0K | 34 | 73K | 4.30 | 1 / 0 | +6.43 | +17% |
+| 2026-10-24 | 930575e1 | 1 | 0 | 5K | 8 | 20K | 1.70 | 1 / 0 | +1.69 | +9% |
+| 2026-10-24 | ed354112 | 2 | 2 | 8K | 25 | 45K | 2.27 | 2 / 0 | +4.03 | +12% |
+| 2026-10-24 | 0014e706 | 2 | 1 | 0K | 17 | 36K | 3.05 | 1 / 0 | -0.48 | -1% |
+| 2026-10-24 | de49de8e | 1 | 2 | 0K | 2 | 6K | 0.80 | 1 / 0 | +3.29 | +10% |
+| 2026-10-24 | 2e162871 | 4 | 0 | 0K | 5 | 17K | 2.19 | 0 / 0 | +16.05 | +29% |
+| 2026-10-25 | 000445b0 | 2 | 0 | 45K | 4 | 8K | 3.48 | 1 / 0 | +12.00 | +28% |
+| 2026-10-25 | 21c429f1 | 1 | 0 | 9K | 9 | 27K | 2.68 | 1 / 0 | +3.57 | +10% |
+| 2026-10-26 | 5442497d | 1 | 0 | 1K | 17 | 25K | 4.12 | 1 / 0 | +8.03 | +17% |
+| 2026-10-28 | 91a42bee | 2 | 2 | 0K | 10 | 19K | 4.31 | 1 / 0 | +15.17 | +26% |
+| 2026-10-30 | 43767e25 | 1 | 0 | 0K | 3 | 12K | 1.92 | 0 / 0 | +1.52 | +13% |
 
 Session 38257a74 (WP-1523) resumed its one lane by `SendMessage` with a
 revised design after the first report. The tool counts that as no redo, and the

@@ -65,12 +65,12 @@ for n_terms in (3, 6):
           f"FWHM {fwhm.value:.2f} ± {fwhm.stderr:.2f}°")
 # guide: hump end
 
-# compiled path, 2026-10-17, darwin/arm64: Biso 0.4441(1001), 0.4460(185),
-# 0.4484(396); hump 4.190(108)° FWHM 5.567(264)°, 5.251(48)° FWHM 1.963(126)°
+# compiled path, 2026-10-21, darwin/arm64: Biso 0.4434(999), 0.4456(177),
+# 0.4482(394); hump 4.161(104)° FWHM 5.586(252)°, 5.238(40)° FWHM 1.912(105)°
 def rounded(p, digits):
     return round(p.value, digits), round(p.stderr, digits)
 
 
-assert [rounded(b, 3) for b in bisos.values()] == [(0.444, 0.100), (0.446, 0.019), (0.448, 0.040)]
-assert [rounded(p, 2) for p in humps[3]] == [(4.19, 0.11), (5.57, 0.26)]
-assert [rounded(p, 2) for p in humps[6]] == [(5.25, 0.05), (1.96, 0.13)]
+assert [rounded(b, 3) for b in bisos.values()] == [(0.443, 0.100), (0.446, 0.018), (0.448, 0.039)]
+assert [rounded(p, 2) for p in humps[3]] == [(4.16, 0.10), (5.59, 0.25)]
+assert [rounded(p, 2) for p in humps[6]] == [(5.24, 0.04), (1.91, 0.11)]

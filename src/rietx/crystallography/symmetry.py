@@ -20,6 +20,7 @@ approximate — thing to enumerate here.
 from __future__ import annotations
 
 import functools
+import itertools
 import re
 from dataclasses import dataclass, field
 
@@ -98,6 +99,24 @@ def refuse_operation_list(phase, fmt: str) -> None:
             f"{phase.space_group!r}, which says no Hermann-Mauguin symbol "
             f"generates it, and {fmt} states a group only as a symbol. A CIF "
             f"(Structure.to_cif) carries the list")
+
+
+def refuse_distortion_modes(phase, fmt: str) -> None:
+    """Refuse, by name, a phase refined on mode amplitudes (WP-1419).
+
+    For a writer whose format refines atom coordinates and has no mode
+    parameterisation: written anyway, the amplitudes and the base they are
+    absolute against would be dropped, and a refinement there would free the
+    coordinates the amplitudes were deriving.  The coordinates themselves are
+    a plain structure, and saying how to write them is the way out.
+    """
+    if getattr(phase, "distortion_modes", None) is not None:
+        raise ValueError(
+            f"phase {phase.name!r} cannot be written to {fmt}: its coordinates "
+            f"are derived from {len(phase.distortion_modes.modes)} distortion-mode "
+            f"amplitudes (Phase.distortion_modes), which {fmt} cannot state. To "
+            f"write the structure as it stands, as plain coordinates, drop the "
+            f"record: phase.model_copy(update={{'distortion_modes': None}})")
 
 
 def restate_in_hexagonal_axes(phase, fmt: str):
@@ -760,7 +779,10 @@ def rotation_matrices(sg) -> np.ndarray:
 #: Default tolerance, in fractional coordinates, for "this operation fixes this
 #: site".  A structure whose coordinates are quoted to five decimals — the
 #: ICSD's usual precision — can miss an exact relation such as y = 2x by 1e-4,
-#: which is why the boundary sits here rather than at roundoff.
+#: which is why the boundary sits here rather than at roundoff.  It bounds each
+#: operation's displacement R·x + t − x, so on a mirror, which moves a site by
+#: twice its offset, the effective reach is ``SITE_TOL``/2 (issue #1007); a
+#: site further off whose images still coincide is :func:`site_twin_merge`'s.
 SITE_TOL = 1e-4
 
 #: Relative slack making the :data:`SITE_TOL` comparison **inclusive**.  A
@@ -851,6 +873,12 @@ class SiteOrbit:
         the stabiliser, in gemmi's own order, so each generates a *distinct*
         orbit image.
     images : (m,3) float — those images of ``position``, wrapped into [0,1).
+    stabilizer_ops : (h,) int — the indices, in the group's own operation
+        list, of the operations fixing the site (mod lattice), in the order of
+        ``stabilizer``.  Two sites of one group compare their site symmetries
+        as a subset test on these (a rigid body's atoms against its origin,
+        WP-1807), which the rotation parts alone cannot do: a 2₁ screw and a
+        2-fold share a rotation and fix different points.
     """
 
     position: np.ndarray
@@ -860,6 +888,43 @@ class SiteOrbit:
     rot: np.ndarray
     tran: np.ndarray
     images: np.ndarray
+    stabilizer_ops: np.ndarray
+
+
+def _snapped_stabilizer(all_rot: np.ndarray, all_tran: np.ndarray, x: np.ndarray,
+                        tol: float) -> tuple[np.ndarray, float, list[int]]:
+    """Steps 1-3 of :func:`site_orbit`: the snapped position, its shift and its stabiliser.
+
+    Split out so a caller that needs only *which operations fix a site*
+    (``twins.numbering_moves``, asking whether two coordinates have the same
+    site symmetry) does not pay for step 4's walk over the whole group.
+    """
+    def fixing(p: np.ndarray, bound: float) -> list[int]:
+        d = all_rot @ p + all_tran - p
+        d -= np.round(d)
+        return list(np.flatnonzero(np.all(np.abs(d) <= bound, axis=1)))
+
+    candidates = fixing(x, tol * (1.0 + _SITE_TOL_SLACK))
+    if len(candidates) == 1:
+        snapped, shift = x, 0.0          # general position: no arithmetic at all
+    else:
+        p = all_rot[candidates] @ x + all_tran[candidates]
+        p -= np.round(p - x)             # each image on the branch nearest x
+        snapped = p.mean(axis=0)
+        delta = snapped - x
+        shift = float(np.max(np.abs(delta - np.round(delta))))
+        if shift <= _SNAP_NOISE:
+            snapped, shift = x, 0.0      # already on it; the average is noise
+
+    stab_ops = fixing(snapped, _COINCIDENCE_TOL)
+    if len(stab_ops) == 1 and shift:
+        # the projection landed nowhere special: keep the caller's numbers, and
+        # re-measure the stabiliser *there*, since x can be fixed exactly by an
+        # operation the projected point is not — leaving the stabiliser stale
+        # would report the wrong site symmetry and trip the guard below
+        snapped, shift = x, 0.0
+        stab_ops = fixing(snapped, _COINCIDENCE_TOL)
+    return snapped, shift, stab_ops
 
 
 def site_orbit(sg: gemmi.SpaceGroup, xyz: np.ndarray, *,
@@ -913,31 +978,7 @@ def site_orbit(sg: gemmi.SpaceGroup, xyz: np.ndarray, *,
     order = len(ops)
     x = np.asarray(xyz, dtype=np.float64).reshape(3)
 
-    def fixing(p: np.ndarray, bound: float) -> list[int]:
-        d = all_rot @ p + all_tran - p
-        d -= np.round(d)
-        return list(np.flatnonzero(np.all(np.abs(d) <= bound, axis=1)))
-
-    candidates = fixing(x, tol * (1.0 + _SITE_TOL_SLACK))
-    if len(candidates) == 1:
-        snapped, shift = x, 0.0          # general position: no arithmetic at all
-    else:
-        p = all_rot[candidates] @ x + all_tran[candidates]
-        p -= np.round(p - x)             # each image on the branch nearest x
-        snapped = p.mean(axis=0)
-        delta = snapped - x
-        shift = float(np.max(np.abs(delta - np.round(delta))))
-        if shift <= _SNAP_NOISE:
-            snapped, shift = x, 0.0      # already on it; the average is noise
-
-    stab_ops = fixing(snapped, _COINCIDENCE_TOL)
-    if len(stab_ops) == 1 and shift:
-        # the projection landed nowhere special: keep the caller's numbers, and
-        # re-measure the stabiliser *there*, since x can be fixed exactly by an
-        # operation the projected point is not — leaving the stabiliser stale
-        # would report the wrong site symmetry and trip the guard below
-        snapped, shift = x, 0.0
-        stab_ops = fixing(snapped, _COINCIDENCE_TOL)
+    snapped, shift, stab_ops = _snapped_stabilizer(all_rot, all_tran, x, tol)
     coincide = min(tol, _COINCIDENCE_TOL)
     images: list[np.ndarray] = []
     keep: list[int] = []
@@ -970,7 +1011,21 @@ def site_orbit(sg: gemmi.SpaceGroup, xyz: np.ndarray, *,
         rot=np.array(all_rot[keep]),
         tran=np.array(all_tran[keep]),
         images=np.asarray(images),
+        stabilizer_ops=np.asarray(stab_ops, dtype=np.intp),
     )
+
+
+def site_stabilizer_indices(sg: gemmi.SpaceGroup, xyz, *, tol: float = SITE_TOL
+                            ) -> tuple[int, ...]:
+    """Indices (into the group's operation list) of the operations fixing ``xyz``.
+
+    Exactly the stabiliser :func:`site_orbit` reports, without its orbit: two
+    positions with the same indices have the same site symmetry, which is all
+    ``twins.numbering_moves`` asks of an atom a stage moved.
+    """
+    _, all_rot, all_tran = _group_arrays(group_key(sg))
+    x = np.asarray(xyz, dtype=np.float64).reshape(3)
+    return tuple(int(i) for i in _snapped_stabilizer(all_rot, all_tran, x, tol)[2])
 
 
 def expand_orbit(sg: gemmi.SpaceGroup, xyz: np.ndarray, *, tol: float = SITE_TOL
@@ -1006,6 +1061,225 @@ def expand_positions(sg: gemmi.SpaceGroup, xyz: np.ndarray, *, tol: float = SITE
     return [p for p, _ in expand_orbit(sg, xyz, tol=tol)]
 
 
+#: Two images of one site closer than this are one atom stated twice (Å).  It
+#: now decides only whether a *listed* site is another site's image
+#: (``cif._sites_listed_twice``); a site's own twin is :data:`TWIN_COORD_TOL`'s.
+TWIN_DISTANCE = 0.02
+
+#: How far a coordinate may sit from a special position and still be taken as
+#: *on* it, per coordinate, fractional (#1014, rounds 4-5).  Under the gate in
+#: :func:`.twins.applied_twin_merges` the reach decides one thing: whether
+#: atoms that would overfill one place are the same place.  It is a distance
+#: bar on a site's *offset* from the position: 5e-4 of a cell edge is 0.002 Å
+#: in a 4 Å axis and 0.02 Å in a 40 Å one, and the pair of images on a mirror
+#: is twice that apart (0.004 Å, 0.04 Å), small against the ~1 Å at which two
+#: different atoms can share a cell; being fractional it follows the cell.
+TWIN_COORD_TOL = 5e-4
+
+#: A rotation of the site group turns an offset δ into a displacement R·x+t−x of
+#: up to 3δ per coordinate (a mirror 2δ, a hexagonal axis up to 3δ), so the
+#: operation search runs at this multiple of :data:`TWIN_COORD_TOL` and the
+#: snapped position is then held to :data:`TWIN_COORD_TOL` itself.
+_TWIN_SEARCH_FACTOR = 3.0
+
+
+@dataclass(frozen=True)
+class TwinMerge:
+    """A site whose own images coincide, and the special position they collapse to.
+
+    Attributes
+    ----------
+    position : (3,) float — the special position, on the lattice branch
+        nearest the given coordinates (so a caller's -0.1 stays near -0.1).
+        No coordinate is moved by more than :data:`TWIN_COORD_TOL`.
+    gap : float — the largest distance between two images of the given
+        coordinates that the merge collapses onto one, Å.
+    before, after : int — the multiplicity at the given coordinates and at
+        ``position``.
+    """
+
+    position: np.ndarray
+    gap: float
+    before: int
+    after: int
+
+
+def _orthogonalizer(cell) -> np.ndarray:
+    """Fractional → Cartesian (Å) matrix of a ``gemmi.UnitCell`` or a six-tuple."""
+    if not isinstance(cell, gemmi.UnitCell):
+        cell = gemmi.UnitCell(*(float(v) for v in cell))
+    return np.array(cell.orth.mat.tolist(), dtype=np.float64)
+
+
+def site_twin_merge(sg, cell, xyz, *, tol: float = SITE_TOL,
+                    reach: float = TWIN_COORD_TOL) -> TwinMerge | None:
+    """The special position a site's coinciding images collapse to, or ``None``.
+
+    :func:`site_orbit` snaps a site within ``tol`` (fractional) of a special
+    position.  Its test compares |R·x + t − x|, which on a mirror is twice the
+    offset, so the effective reach there is ``tol``/2: PbSO₄'s S2 moved 6e-5
+    off the Pnma mirror is a general position, and its two images sit
+    2·6e-5·b = 0.0004 Å apart — one atom counted twice (issue #1007).  A site
+    whose special position lies within ``reach`` (:data:`TWIN_COORD_TOL`,
+    fractional, **per coordinate**) of every coordinate belongs on it, at any
+    occupancy; the occupancy is kept, so a part-occupied split pair that a fit
+    leaves this tight loses content, which the merge's message states both
+    ways (#1088).  Because every coordinate moves by at most ``reach``, every
+    pair of images the merge collapses is as close as that allows: the test is
+    on the move, not on the nearest pair, which is how a site 0.0024 off a
+    mirror in a long cell was merged for the sake of a tight pair in another
+    axis.  A site that would have to move further, a split site (whose images
+    stay apart), a site already on its position and one far from any give
+    ``None``.
+
+    ``cell`` is a ``gemmi.UnitCell`` or (a, b, c, α, β, γ); it only measures
+    ``gap``.  The orbit and its collapse are those of :func:`site_orbit`:
+    International Tables for Crystallography vol. A (Wyckoff positions), with
+    the tolerance-based site-symmetry search of Grosse-Kunstleve & Adams
+    (2002), Acta Cryst. A58, 60.  Moved here from the CIF reader (#765), which
+    applied it to files only.
+    """
+    m = _orthogonalizer(cell)
+    search = reach * _TWIN_SEARCH_FACTOR
+    if search <= tol:
+        return None
+    x = np.asarray(xyz, dtype=np.float64).reshape(3)
+    _, all_rot, all_tran = _group_arrays(group_key(sg))
+    # the cheap screen: an operation within ``search`` of fixing x that
+    # ``tol`` does not admit is the only way a looser orbit can be smaller
+    d = all_rot @ x + all_tran - x
+    d = np.abs(d - np.round(d))
+    bound = 1.0 + _SITE_TOL_SLACK
+    admitted = np.all(d <= search * bound, axis=1)
+    if not np.any(admitted & ~np.all(d <= tol * bound, axis=1)):
+        return None
+    tight = site_orbit(sg, x, tol=tol)
+    # Each admitted operation is kept or dropped on its own move: the distance
+    # from x to the nearest fixed point of the cyclic group it generates.
+    # Keeping an operation whose own move exceeds ``reach`` would refuse the
+    # whole site for the sake of one coordinate (#1014 round 5, item 1), so
+    # that operation is dropped and the rest are kept.
+    kept = [i for i in np.flatnonzero(admitted)
+            if _operation_move(all_rot[i], all_tran[i], x) <= reach * bound]
+    # The kept operations need not close into a group (a threefold axis and
+    # one of its three mirrors, the other two dropped for a longer own move),
+    # and the average over a set that is not a group is not a fixed point
+    # (#1014 round 6, item 1).  The subgroup they generate has the same fixed
+    # points, so the position is the mean over its elements.  That group can
+    # in turn have a fixed point beyond ``reach`` although every operation
+    # passed on its own (four operations about a fourfold axis each pass, the
+    # axis does not, one mirror does: #1014 round 7, item 1), so the largest
+    # subgroup whose own fixed point is within reach is the one that merges.
+    def attempt(rots, trans):
+        p = rots @ x + trans
+        p -= np.round(p - x)                 # each image on the branch nearest x
+        delta = p.mean(axis=0) - x
+        delta -= np.round(delta)
+        if float(np.max(np.abs(delta))) > reach * bound:
+            return None
+        pos = x + delta
+        # the average is a fixed point only when the operations close into a
+        # group, so the stabiliser is measured at the point itself, as
+        # ``site_orbit`` does
+        orbit = site_orbit(sg, pos, tol=_COINCIDENCE_TOL)
+        if orbit.multiplicity >= tight.multiplicity:
+            return None
+        return pos, orbit, float(np.max(np.abs(delta)))
+
+    found = attempt(*_generated_group(all_rot[kept], all_tran[kept]))
+    if found is None and len(kept) > 1:
+        # site-symmetry groups are generated by at most three elements, so
+        # every subgroup is reached by the groups of up to three operations
+        seen: dict[frozenset, tuple[np.ndarray, np.ndarray]] = {}
+        for r in range(1, min(3, len(kept)) + 1):
+            for combo in itertools.combinations(kept, r):
+                rots, trans = _generated_group(all_rot[list(combo)], all_tran[list(combo)])
+                seen.setdefault(frozenset(_op_key(a, b) for a, b in zip(rots, trans)),
+                                (rots, trans))
+        # equal-order subgroups (the three mirrors of 4mm) are ranked by how
+        # far their fixed point is from x, the nearest being the reading the
+        # stated coordinates are closest to (#1014 round 8, item 1)
+        order = None
+        for rots, trans in sorted(seen.values(), key=lambda g: -len(g[0])):
+            if found is not None and len(rots) < order:
+                break
+            cand = attempt(rots, trans)
+            if cand is not None and (found is None or cand[2] < found[2]):
+                found, order = cand, len(rots)
+    if found is None:
+        return None
+    position, loose, _ = found
+    # the pairs the merge collapses: each stated image goes to the nearest
+    # image of the merged position, and images sharing one are the pairs
+    images = np.asarray(tight.images, dtype=np.float64)
+    target = np.asarray(loose.images, dtype=np.float64)
+    to_target = images[:, None, :] - target[None, :, :]
+    to_target -= np.round(to_target)
+    owner = np.argmin(np.linalg.norm(to_target @ m.T, axis=-1), axis=1)
+    diff = images[:, None, :] - images[None, :, :]
+    diff -= np.round(diff)
+    norms = np.linalg.norm(diff @ m.T, axis=-1)
+    same = owner[:, None] == owner[None, :]
+    gap = float(norms[same].max())
+    return TwinMerge(position=position, gap=gap,
+                     before=tight.multiplicity, after=loose.multiplicity)
+
+
+def _op_key(r, t):
+    """A hashable (rotation, translation mod 1) identity for one symmetry operation."""
+    return (tuple(np.rint(r).astype(int).ravel()), tuple(np.rint((t % 1.0) * 1e5).astype(int) % 100000))
+
+
+def _generated_group(rots: np.ndarray, trans: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The operations (rotation, translation mod 1) the given ones generate, as two arrays.
+
+    Closure under (R1, t1)(R2, t2) = (R1 R2, R1 t2 + t1), translations taken
+    mod 1; the group of a site is finite, so the loop ends, and the cap only
+    guards a malformed input.  The identity is always among the result.
+    """
+    key = _op_key
+
+    elements = {key(np.eye(3), np.zeros(3)): (np.eye(3), np.zeros(3))}
+    gens = []
+    for r, t in zip(rots, trans):
+        gens.append((np.asarray(r, dtype=np.float64), np.asarray(t, dtype=np.float64)))
+        elements.setdefault(key(r, t), gens[-1])
+    frontier = list(elements.values())
+    while frontier and len(elements) < 192:
+        grown = []
+        for r1, t1 in frontier:
+            for r2, t2 in gens:
+                r, t = r1 @ r2, r1 @ t2 + t1
+                k = key(r, t)
+                if k not in elements:
+                    elements[k] = (r, t)
+                    grown.append((r, t))
+        frontier = grown
+    vals = list(elements.values())
+    return np.array([v[0] for v in vals]), np.array([v[1] for v in vals])
+
+
+def _operation_move(rot: np.ndarray, tran: np.ndarray, x: np.ndarray) -> float:
+    """How far ``x`` moves onto the fixed point of the cyclic group one operation generates.
+
+    The mean of ``x, g·x, g²·x, …`` over the operation's order, each image on
+    the lattice branch nearest ``x``, is that fixed point, and a mirror gives
+    half its displacement.  The largest per-coordinate move is returned.
+    """
+    r = np.rint(rot)
+    n, power = 1, r.copy()
+    while not np.array_equal(power, np.eye(3)) and n < 12:
+        power = power @ r
+        n += 1
+    images, p = [x], x
+    for _ in range(n - 1):
+        p = rot @ p + tran
+        p = p - np.round(p - x)
+        images.append(p)
+    mean = np.mean(images, axis=0)
+    return float(np.max(np.abs(mean - x)))
+
+
 #: How many snapped sites a ``SITE_SNAPPED_TO_SPECIAL_POSITION`` message names
 #: before it says "and N more".  ``where`` still carries every one of them.
 _SNAP_MESSAGE_SITES = 4
@@ -1028,7 +1302,9 @@ def snap_diagnostics(sg: gemmi.SpaceGroup, sites, *, source: str,
     weight fraction, so it cannot be decided in silence (issue #215).
 
     Empty when nothing moved, which is every structure whose sites sit on their
-    special positions exactly.
+    special positions exactly.  The CIF reader stores a site on its position
+    where the file's printed digits cannot tell the two apart
+    (``cif.CIF_PRINTED_ROUNDING``), so such a file reaches here exact.
     """
     moved: list[tuple[str, float, int, str]] = []
     for j, (label, xyz) in enumerate(sites):

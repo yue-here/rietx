@@ -67,6 +67,7 @@ from ..crystallography.lattice import d_spacings
 from ..crystallography.stephens import monomial_matrix, stephens_basis
 from ..crystallography.symmetry import resolve_group
 from ..model.forward import CompiledModel
+from ..optimize import lapack
 from .schemas import (
     STRAIN_MAX_GRAM_CONDITION,
     STRAIN_MIN_ANISOTROPY,
@@ -233,7 +234,7 @@ def _strain_errors(model: CompiledModel, values: dict[str, float], ip: int,
     amp_factor = np.ones(n_group)   # multiplicative: each step scales the current
     weight = np.zeros(n_group)
     h_lambda = 1e-6
-    for _ in range(max(n_iter, 1)):
+    for done in range(max(n_iter, 1)):
         y = y_other.copy()
         col_a = np.zeros((npts, n_group))
         col_w = np.zeros((npts, n_group))
@@ -268,7 +269,18 @@ def _strain_errors(model: CompiledModel, values: dict[str, float], ip: int,
         # strongly leave near-collinear columns whose split the data does not
         # determine; truncating those singular values spreads the correction
         # over the group instead of letting the iteration walk along them
-        step, *_ = np.linalg.lstsq(design, delta, rcond=1e-6)
+        try:
+            step, *_ = lapack.lstsq(design, delta, rcond=1e-6)
+        except np.linalg.LinAlgError:
+            # ``least_squares._guarded_covariance``'s rule (#225): a solve that
+            # does not converge must not take the fit down.  The rounds that
+            # completed are the answer, and with none the phase has no reading.
+            # Met in a stage report on 11-BM NAC (WP-2002): a rank-deficient
+            # 22003 x 102 design that macOS's system LAPACK gelsd did not
+            # converge on and SciPy's gelsd, gelss and gelsy all solved
+            if not done:
+                return np.zeros(n), np.zeros(n)
+            break
         n_live = int(live.sum())
         amp_factor[live] *= 1.0 + np.clip(step[:n_live], -0.5, 0.5)
         d_lambda[live] += step[n_live:]
@@ -279,7 +291,7 @@ def _strain_errors(model: CompiledModel, values: dict[str, float], ip: int,
 def _fit(templates: np.ndarray, y: np.ndarray, w: np.ndarray) -> tuple[np.ndarray, float]:
     """Weighted least squares of ``y`` on ``templates``; returns (θ, residual SS)."""
     sw = np.sqrt(w)[:, None]
-    coef, *_ = np.linalg.lstsq(templates * sw, y * np.sqrt(w), rcond=None)
+    coef, *_ = lapack.lstsq(templates * sw, y * np.sqrt(w), rcond=None)
     resid = (templates @ coef - y) * np.sqrt(w)
     return coef, float(resid @ resid)
 
@@ -379,7 +391,7 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
         hkl_live = cp.reflections.hkl[live]
 
         norm = templates / np.maximum(np.linalg.norm(templates, axis=0), 1e-300)
-        cond = float(np.linalg.cond(norm.T @ norm)) if len(basis) > 1 else 1.0
+        cond = float(lapack.cond(norm.T @ norm)) if len(basis) > 1 else 1.0
         detected = (r2 >= STRAIN_MIN_R2 and anisotropy >= STRAIN_MIN_ANISOTROPY
                     and n_used >= STRAIN_MIN_REFLECTIONS)
         out.append(StrainAnalysis(

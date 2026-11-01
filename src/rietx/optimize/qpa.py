@@ -41,7 +41,12 @@ from ..crystallography.attenuation import (
 from ..crystallography.lattice import cell_volume
 from ..crystallography.neutron import linear_attenuation_neutron
 from ..crystallography.species import _parse_species, element_symbol
-from ..crystallography.symmetry import as_group, expand_positions, resolve_group
+from ..crystallography.symmetry import (
+    as_group,
+    expand_positions,
+    resolve_group,
+)
+from ..crystallography.twins import applied_twin_merges
 from ..schemas.common import Diagnostic
 from ..schemas.results import (
     MicroabsorptionCorrection,
@@ -143,9 +148,19 @@ def phase_zmv(space_group, cell: tuple[float, float, float, float, float, float]
     :func:`crystallography.symmetry.expand_positions`; that path must only be
     fed coordinates that are genuinely on their site, because an atom refined
     to within the dedup tolerance of a special position would otherwise
-    collapse its orbit and mis-weigh the cell.
+    collapse its orbit and mis-weigh the cell.  A site whose own images sit
+    within :data:`~rietx.crystallography.symmetry.TWIN_COORD_TOL` of a special position counts
+    at the special position they collapse to, as ``Phase`` construction
+    moves it there (issue #1007).
     """
     sg = as_group(space_group) if multiplicities is None else None
+    atoms = list(atoms)
+    applied: dict = {}
+    if sg is not None:
+        applied, _ = applied_twin_merges(
+            sg, cell, [np.array([x, y, z], dtype=np.float64)
+                       for _, x, y, z, _ in atoms],
+            [float(occ) for *_, occ in atoms])
     volume = cell_volume(*cell)
     cell_mass = 0.0
     element_counts: dict[str, float] = {}
@@ -154,7 +169,13 @@ def phase_zmv(space_group, cell: tuple[float, float, float, float, float, float]
         if multiplicities is not None:
             multiplicity = int(multiplicities[idx])
         else:
-            multiplicity = len(expand_positions(sg, np.array([x, y, z], dtype=np.float64)))
+            # a site whose own images coincide counts once, on the special
+            # position its orbit collapses to — what a ``Phase`` holding
+            # these coordinates would be moved to at construction (#1007)
+            merge = applied.get(idx)
+            multiplicity = (merge.after if merge is not None
+                            else len(expand_positions(
+                                sg, np.array([x, y, z], dtype=np.float64))))
         count = float(occ) * multiplicity
         cell_mass += count * atomic_weight(species)
         sym = element_symbol(species)
@@ -287,7 +308,9 @@ def brindley_correction(w_measured, densities, mus, radii_um, *,
 BRINDLEY_MU_R_FENCE = 0.05
 
 
-def microabsorption_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnostic]:
+def microabsorption_diagnostics(qpa: QuantitativePhaseAnalysis,
+                                structure: Structure | None = None,
+                                ) -> list[Diagnostic]:
     """Structured diagnostics for the Brindley correction's applicability.
 
     Two things are worth saying loudly (Taylor & Matulis 1991, J. Appl.
@@ -297,6 +320,13 @@ def microabsorption_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnost
     fractions can be *worse* than the uncorrected ones while looking more
     authoritative — and a correction the user asked for (radii supplied) that
     could not run must not stay quiet.
+
+    ``structure`` is the model the QPA was computed from.  A skipped
+    correction leaves every row's radius empty (:class:`PhaseQuantity` fills
+    its microabsorption fields only when the correction ran), so the
+    structure is what says, for a skip with a phase unmeasured, whether the
+    radii were all supplied or which phases still lack one.  ``None`` makes
+    neither claim.
     """
     out: list[Diagnostic] = []
     if qpa.microabsorption_skipped is not None:
@@ -304,8 +334,11 @@ def microabsorption_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnost
             level="warning", code="MICROABSORPTION_SKIPPED",
             where=[r.name for r in qpa.phases],
             message=qpa.microabsorption_skipped,
-            suggestion="Supply particle_radius_um on every phase, and use a "
-                       "wavelength inside the attenuation tables.",
+            suggestion=(
+                unmeasured_advice(qpa) + _radius_advice(structure)
+                if qpa.unmeasured_phases else
+                "Supply particle_radius_um on every phase, and use a "
+                "wavelength inside the attenuation tables."),
         ))
         return out
     offenders = [r for r in qpa.phases
@@ -324,16 +357,77 @@ def microabsorption_diagnostics(qpa: QuantitativePhaseAnalysis) -> list[Diagnost
     return out
 
 
+def _radius_advice(structure: Structure | None) -> str:
+    """The radius half of a skip's advice when a phase is unmeasured: "the
+    radii were supplied" only when every phase carries one (#1103's review:
+    one radius is enough to record the skip, so the sentence was said of a
+    model with a phase still missing its radius)."""
+    if structure is None:
+        return ""
+    bare = _phases_without_radius(structure)
+    if bare:
+        return f" Supply particle_radius_um on {', '.join(bare)} too."
+    return " The radii were supplied."
+
+
+def _phases_without_radius(structure: Structure) -> list[str]:
+    return [p.name for p in structure.phases if p.particle_radius_um is None]
+
+
+def unmeasured_causes(qpa: QuantitativePhaseAnalysis) -> tuple[list[str], list[str]]:
+    """``qpa.unmeasured_phases`` split by cause: ``(no reflection in the
+    fitted range, scale held by a stage)`` (#1103).  Every text saying why a
+    phase has no fraction reads this, so none claims a cause the record
+    does not hold."""
+    held = [n for n in qpa.unmeasured_phases if n in qpa.unmeasured_held]
+    return [n for n in qpa.unmeasured_phases if n not in held], held
+
+
+def unmeasured_reason(qpa: QuantitativePhaseAnalysis, name: str) -> str:
+    """Why phase ``name`` has no weight fraction, as one clause."""
+    return ("its scale was held at the value handed in"
+            if name in qpa.unmeasured_held
+            else "no reflection in the fitted range")
+
+
+def unmeasured_advice(qpa: QuantitativePhaseAnalysis) -> str:
+    """What helps, per cause: only a phase with no line wants a wider range."""
+    lineless, held = unmeasured_causes(qpa)
+    parts = []
+    if lineless:
+        parts.append("Widen the fitted range to reach a reflection of "
+                     f"{', '.join(lineless)}, or remove the phase.")
+    if held:
+        parts.append(f"{', '.join(held)} already has a reflection in range "
+                     "but its scale was held; start where a reflection is in "
+                     "range (or free the zero shift first) so the scale "
+                     "refines, or remove the phase.")
+    return " ".join(parts)
+
+
 def compute_qpa(structure: Structure, values: dict[str, float],
                 scale_cov=None, multiplicities=None,
                 wavelength: float | None = None, *,
                 source_kind: str = "xray_cw",
+                unmeasured=(), held=(),
                 ) -> QuantitativePhaseAnalysis | None:
     """Assemble the per-phase QPA rows from a decoded parameter dict.
 
     ``values`` is the physical value dict from ``ParameterTable.decode`` (refined
     cell, occupancies and scales); ``scale_cov`` is the physical covariance of
-    the phase scales in phase order (``None`` when no esds were estimated).
+    the measured phases' scales in phase order (``None`` when no esds were
+    estimated).
+
+    ``unmeasured`` are the indices of phases with no reflection in the fitted
+    range, or whose scale a stage held (WP-1958); ``held`` is the subset held
+    rather than lineless, recorded as ``unmeasured_held`` (#1103).  Each keeps its row, with ``weight_fraction`` ``None``
+    rather than a number read off a scale the data never touched; the other
+    fractions are normalised over the measured phases alone, and
+    ``unmeasured_phases`` names the ones left out, so a reader knows the
+    fractions are relative to the phases seen in range.  A lone phase seen
+    is 100 % of them by definition and carries no esd, and the Brindley
+    correction is skipped with its reason, since its mixture-average µ̄
+    needs the unmeasured phase's fraction too.
     ``multiplicities`` (one list per phase, one entry per atom) should be the
     site multiplicities frozen on the compiled model, so QPA counts the same
     orbits the forward model did rather than re-deriving them from refined
@@ -383,20 +477,34 @@ def compute_qpa(structure: Structure, values: dict[str, float],
             cell, atoms, multiplicities=mult))
         scales.append(values[f"{base}.scale"])
 
-    if sum(z.zmv * s for z, s in zip(zmvs, scales)) <= 0.0:
-        if len(structure.phases) > 1:
+    skip = {int(ip) for ip in unmeasured}
+    measured = [ip for ip in range(len(structure.phases)) if ip not in skip]
+    w_of: dict[int, float] = {}
+    sigma_of: dict[int, float] = {}
+    if not measured:
+        pass   # no phase seen in range: every fraction is absent
+    elif skip and len(measured) == 1:
+        # the one phase seen is 100 % of the phases seen by definition, so
+        # it carries no esd (a zero one would read as a measurement)
+        w_of = {measured[0]: 1.0}
+    elif sum(zmvs[ip].zmv * scales[ip] for ip in measured) <= 0.0:
+        if len(measured) > 1:
             return None
         # one phase is 100 % whatever its scale did; σ(W) is meaningless here
         # (the fraction is a definition, not a measurement), so it stays None
-        w, sigma_corr = np.array([1.0]), None
+        w_of = {measured[0]: 1.0}
     else:
-        w, sigma_corr, _ = weight_fractions([z.zmv for z in zmvs], scales, scale_cov)
+        w, sigma_corr, _ = weight_fractions([zmvs[ip].zmv for ip in measured],
+                                            [scales[ip] for ip in measured],
+                                            scale_cov)
+        w_of = {ip: float(w[k]) for k, ip in enumerate(measured)}
+        if sigma_corr is not None:
+            sigma_of = {ip: float(sigma_corr[k]) for k, ip in enumerate(measured)}
     rows = [
         PhaseQuantity(
             name=phase.name,
-            weight_fraction=float(w[ip]),
-            weight_fraction_stderr=(float(sigma_corr[ip]) if sigma_corr is not None
-                                    else None),
+            weight_fraction=w_of.get(ip),
+            weight_fraction_stderr=sigma_of.get(ip),
             scale=float(scales[ip]),
             z=zmvs[ip].z, molar_mass=zmvs[ip].molar_mass,
             cell_mass=zmvs[ip].cell_mass, cell_volume=zmvs[ip].cell_volume,
@@ -404,8 +512,28 @@ def compute_qpa(structure: Structure, values: dict[str, float],
         )
         for ip, phase in enumerate(structure.phases)
     ]
-    qpa = QuantitativePhaseAnalysis(phases=rows)
-    _apply_microabsorption(qpa, structure, zmvs, w, wavelength, source_kind)
+    qpa = QuantitativePhaseAnalysis(
+        phases=rows,
+        unmeasured_phases=[structure.phases[ip].name for ip in sorted(skip)
+                           if 0 <= ip < len(structure.phases)],
+        unmeasured_held=[structure.phases[ip].name for ip in sorted(skip)
+                         if ip in {int(h) for h in held}
+                         and 0 <= ip < len(structure.phases)])
+    if skip:
+        # Brindley's τ compares each phase's µ with the mixture's volume-mean
+        # µ̄, which needs every phase's fraction, the unmeasured one's too
+        if any(p.particle_radius_um is not None for p in structure.phases):
+            qpa.microabsorption_skipped = (
+                "Brindley correction skipped: the mixture's mean attenuation "
+                "needs every phase's fraction, and "
+                + "; ".join(f"{n} has none ({unmeasured_reason(qpa, n)})"
+                            for n in qpa.unmeasured_phases) + "."
+                + (f" No particle_radius_um on phase(s) {', '.join(bare)} "
+                   "either." if (bare := _phases_without_radius(structure))
+                   else ""))
+    else:
+        _apply_microabsorption(qpa, structure, zmvs, [w_of[ip] for ip in measured],
+                               wavelength, source_kind)
     return qpa
 
 

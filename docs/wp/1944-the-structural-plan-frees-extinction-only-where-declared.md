@@ -55,6 +55,20 @@ it for a sample-broadening coefficient at its softplus floor. This WP fixes
 the plan and its texts. A general "esd exceeds value" diagnostic is not in
 it.
 
+### Inherited
+
+- **2026-10-24, from [2044](2044-the-sabine-laue-factor-is-continuous.md):
+  the QPA guide's free fit moved.** With Sabine's Laue factor continuous, the
+  guide's first fit (11-BM NAC + CaF₂, `mccusker_structural`) gives CaF₂
+  3.58 ± 3.53 wt% and extinction 1919 ± 4066 µm², the same on macOS and Linux,
+  where 1.9.0 gave 3.09 ± 2.32. `HIGH_CORRELATION` reads scale ~ extinction at
+  ρ = +0.998. That fit is this WP's worked case: an extinction the data cannot
+  see, freed by the plan on a weak phase. The held fit is unchanged at
+  1.37 ± 0.07 wt%. Re-pin `examples/guides/qpa.py` and its page if this WP
+  changes what the plan frees.
+  The fit moves a quoted weight fraction by more than the fraction itself,
+  which may move this WP's priority row (noted by WP-2043).
+
 ## Non-goals
 
 - A general significance diagnostic for every freed parameter (above).

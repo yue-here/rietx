@@ -1,0 +1,5587 @@
+{
+ "counts": {
+  "codes_total": 115,
+  "codes_io": 95,
+  "codes_crystallography": 20,
+  "codes_by_class": {
+   "act": 104,
+   "unclear": 2,
+   "judgement": 9
+  },
+  "code_sites": 137,
+  "constants_total": 225,
+  "constants_io": 112,
+  "constants_crystallography": 113,
+  "constants_seen_by_audit_walk": 114,
+  "constants_by_shape": {
+   "scalar": 132,
+   "tuple": 23,
+   "call": 16,
+   "expr": 16,
+   "dict": 33,
+   "Subscript": 3,
+   "JoinedStr": 1,
+   "comp": 1
+  },
+  "constants_by_role": {
+   "format layout": 56,
+   "sniff bound": 3,
+   "tolerance (decides a branch)": 16,
+   "format layout (magic strings)": 1,
+   "runaway guard": 7,
+   "dispatch gate": 2,
+   "vocabulary / lookup": 28,
+   "unit conversion": 10,
+   "foreign program's floor": 1,
+   "float-equality tolerance": 1,
+   "foreign program behaviour (measured)": 1,
+   "published constants (cited)": 4,
+   "written-file convention": 2,
+   "physical limit (gates a refusal)": 1,
+   "convention (measured against GSAS-II)": 2,
+   "foreign program's default (measured)": 2,
+   "tabulated data (cited)": 8,
+   "tabulated datum (cited)": 4,
+   "threshold (statistical bound)": 1,
+   "physical constant": 5,
+   "threshold (decides a warning)": 1,
+   "threshold (decides a refusal)": 1,
+   "tolerance (numerical)": 19,
+   "element list (decides when g is required)": 1,
+   "tabulated data (Hund's rule)": 1,
+   "sampling count (sets a verdict's confidence)": 2,
+   "tolerance (accept bound of a certificate)": 2,
+   "guard (certificate)": 1,
+   "tolerance (certificate)": 1,
+   "threshold (decides a label)": 1,
+   "cost schedule": 1,
+   "internal scale (sets nothing)": 1,
+   "numerical-method constant": 23,
+   "threshold (decides a hold)": 1,
+   "seed (changes a starting value)": 1,
+   "count (classification fact)": 3,
+   "threshold (decides a reading)": 1,
+   "degenerate-geometry guard": 1,
+   "numerical-method coefficients": 5,
+   "memory budget": 1,
+   "physical constant (exact angle)": 1,
+   "message cosmetic": 1
+  },
+  "gui_names": 32
+ },
+ "codes": [
+  {
+   "name": "BRML_ABSORBER_ENGAGED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/formats/brml.py:347"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A Bruker .brml used an automatic absorber over some points; the stored intensities already include the correction, and this records it.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "CHILD_GROUP_UNNAMED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magnetic/supercell.py:1391"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "magnetic_supercell() found a child group with no tabulated name. States a fact about the result; the group is still carried as operators.",
+   "site_guards": [
+    [
+     "not child_group.named"
+    ]
+   ],
+   "records": "unclear",
+   "note": "unclear: an observation about a derived group, not a repair of a file",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_CELL_ANGLE_CORRECTED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/cif.py:90"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A cell angle stored within CIF_ANGLE_CORRECT_MAX_DEG of the value its space group fixes is read as that value. A larger disagreement is not this code: it is refused (ValueError), a judgement under the act.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "gated by CIF_ANGLE_CORRECT_MAX_DEG (the WP's named tier-3 threshold)",
+   "module_constants_named_in_function": [
+    "CIF_ANGLE_CORRECT_MAX_DEG",
+    "SYMMETRY_ANGLE_TOL_DEG"
+   ],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_MAGNETIC_CENTERING_ASSUMED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magcif.py:524"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A magCIF with no centring loop is read with the trivial centring x,y,z,+1 alone.",
+   "site_guards": [
+    [
+     "not centerings",
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_MAGNETIC_ION_UNCHARGED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magcif.py:1824"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A magnetic site states no oxidation state and its label is a bare element: the neutral-atom form factor is used.",
+   "site_guards": [
+    [
+     "not (label in assumed_ions)",
+     "re.fullmatch('[A-Za-z]{1,2}', moment.ion)"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magcif.py:1836"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A site states moment.magnitude_su; Structure has no field for it, so it is dropped.",
+   "site_guards": [
+    [
+     "row.get('magnitude_su') is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_MAGNETIC_MOMENT_ON_ALLOWED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/cif.py:879"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A site moment off the subspace its site symmetry allows, by less than the file's printed precision, is moved onto it.",
+   "site_guards": [
+    [
+     "block is not None",
+     "moved is not None",
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "gated by magcif.moment_within_print (half a unit in the last printed place, computed per row, no module constant)",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_MAGNETIC_NUCLEAR_GROUP",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magcif.py:996"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "Positions are refined under the nuclear group the file's operators contain, and moments under the magnetic one; recorded which relation held.",
+   "site_guards": [
+    [
+     "contained and mismatch is None and (nuclear_group != 'file' or derived == parent_keys)",
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_MAGNETIC_NUCLEAR_SETTING",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magcif.py:1042",
+    "src/rietx/crystallography/magcif.py:1030"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "Positions are refined under the file's own group (or its operator list) instead of the parent it names, because the parent's setting does not contain the operators.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ],
+    [
+     "taken is not None",
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_MAGNETIC_NUMBER_MISMATCH",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magcif.py:592"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "The BNS/UNI numbers a file states disagree with those of its own operators; the operators' numbers are stored and the stated ones dropped. The disagreement is also an assertion that the file is wrong.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "act with a judgement inside: which of two statements is right is decided for the operators",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_MAGNETIC_SPHERICAL_ESD_NOT_STORED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magcif.py:1848"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A moment stated in spherical form carries su values; they are not propagated to the crystal-axis components.",
+   "site_guards": [
+    [
+     "dropped"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_MAGNETIC_SYMMFORM",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magcif.py:1864"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "computed"
+   ],
+   "condition": "A site states symmform; its free-parameter count is compared with the subspace the file's operators give. Level is info when they agree (or the string is unreadable), warning when they differ. No value is changed: the derived subspace is used either way.",
+   "site_guards": [
+    [
+     "symmform"
+    ]
+   ],
+   "records": "judgement",
+   "note": "level depends on a comparison the reader makes",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_MAGNETIC_UNIDENTIFIED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magcif.py:1877"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "The operator list does not match one of the 1651 magnetic space groups in spglib's database, so no UNI number is recorded. Reports that a lookup found nothing; no value was changed or chosen.",
+   "site_guards": [
+    [
+     "magnetic.uni_number is None"
+    ]
+   ],
+   "records": "unclear",
+   "note": "unclear: an absence, neither an act nor an assertion about the file",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_SITE_LISTED_TWICE",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/cif.py:505"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A site whose orbit another listed site repeats, with the same occupancy (and moment) to OCCUPANCY_TOLERANCE and DUPLICATE_U_TOLERANCE, is dropped.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "gated by OCCUPANCY_TOLERANCE, DUPLICATE_U_TOLERANCE, TWIN_DISTANCE",
+   "module_constants_named_in_function": [
+    "OCCUPANCY_TOLERANCE",
+    "TWIN_DISTANCE"
+   ],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_SITE_MULTIPLICITY_DISAGREES",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/cif.py:1120"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A stated site multiplicity differs from the one the coordinates give, and no move within CIF_STATED_MULTIPLICITY_SNAP_TOL reconciles them. Nothing is moved; the record says the file disagrees with itself.",
+   "site_guards": [
+    [
+     "disagree"
+    ]
+   ],
+   "records": "judgement",
+   "note": "threshold CIF_STATED_MULTIPLICITY_SNAP_TOL decides snapped (act) versus this",
+   "module_constants_named_in_function": [
+    "CIF_STATED_MULTIPLICITY_SNAP_TOL"
+   ],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_SITE_TWINS_MERGED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/cif.py:380"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "Two atoms of one site closer than TWIN_DISTANCE are read as one, on the special position.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "gated by TWIN_DISTANCE",
+   "module_constants_named_in_function": [
+    "TWIN_DISTANCE"
+   ],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "CIF_SPECIES_NORMALISED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/cif.py:938"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "An atom-type symbol is respelled to the canonical species (case, charge placement, isotope spelling).",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "FULLPROF_MAGNETIC_PHASE_OMITTED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/fullprof.py:2934"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A magnetic phase of a .pcr is not built (not read as moments).",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "FULLPROF_MAGNETIC_PHASE_READ",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/fullprof.py:2905"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A magnetic phase of a .pcr is read as the moments of its nuclear phase, its SYMM/MSYM pairs becoming a magnetic group.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "FULLPROF_OCCUPANCY_UNCHECKED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/fullprof.py:2972"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "The occupancy-ratio check compared a single site with itself, so it passed for a setting without testing it. States that a check that would have decided did not test.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "judgement",
+   "note": "asserts that a gate was vacuous",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "FULLPROF_ORIGIN_CHOICE",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/fullprof.py:2965"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A space-group symbol with an origin choice is resolved to one; the occupancy-ratio check (_OCCUPANCY_RTOL) accepted it.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "gated by _OCCUPANCY_RTOL; the setting choice is the judgement under the act",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "FULLPROF_RHOMBOHEDRAL_RESTATED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/fullprof.py:3688"
+   ],
+   "raised_through_helper": [
+    "src/rietx/io/projects/fullprof.py:3688"
+   ],
+   "level": [
+    "computed"
+   ],
+   "condition": "On writing, a rhombohedral-axes phase is written in hexagonal axes with the scale divided by 9. Raised by crystallography/symmetry.py:rhombohedral_restated_diagnostic.",
+   "site_guards": [
+    [
+     "diagnostics is not None and rhombohedral"
+    ]
+   ],
+   "records": "act",
+   "note": "gated by symmetry.restate_in_hexagonal_axes' own test",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "FULLPROF_SPECIES_NORMALISED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/fullprof.py:2955"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A FullProf species is respelled to the canonical species.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "FULLPROF_SPECIES_WRITTEN_NEUTRAL",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/fullprof.py:3694"
+   ],
+   "raised_through_helper": [
+    "src/rietx/io/projects/fullprof.py:3694"
+   ],
+   "level": [
+    "computed"
+   ],
+   "condition": "On writing X-ray, an ion the X-ray table lacks is written as its neutral atom. Raised by crystallography/scattering.py:written_neutral_diagnostics.",
+   "site_guards": [
+    [
+     "diagnostics is not None and (not neutron)"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "FULLPROF_TIE_DROPPED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/fullprof.py:2981",
+    "src/rietx/io/projects/fullprof.py:2994",
+    "src/rietx/io/projects/fullprof.py:3006"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A codeword tie in a .pcr is not carried onto the Structure (three sites: the caller asked drop_parameter_ties, a general tie, a cell tie the space group does not make).",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ],
+    [
+     "diagnostics is not None"
+    ],
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_CIF_DEUTERIUM_AS_D",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:2118"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "Deuterium sites are written as D; GSAS-II scatters D at 6.681 fm and rietx at 6.671 fm.",
+   "site_guards": [
+    [
+     "deuterium"
+    ]
+   ],
+   "records": "act",
+   "note": "records a disagreement between two programs' constants",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_CIF_FIELD_NOT_WRITTEN",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:2151"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "The phase CIF does not state some fields.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_CIF_RHOMBOHEDRAL_RESTATED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:2009"
+   ],
+   "raised_through_helper": [
+    "src/rietx/io/projects/gsas2.py:2009"
+   ],
+   "level": [
+    "computed"
+   ],
+   "condition": "On writing a GSAS-II CIF, a rhombohedral-axes phase is restated in hexagonal axes (helper in symmetry.py).",
+   "site_guards": [
+    [
+     "diagnostics is not None",
+     "rhombohedral"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_CIF_SETTING_IN_OPERATORS",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:2128"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "The setting is stated in the operators and not in the bare symbol, for an ambiguous group.",
+   "site_guards": [
+    [
+     "ambiguous"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_CIF_SPECIES_WRITTEN_NEUTRAL",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:2012"
+   ],
+   "raised_through_helper": [
+    "src/rietx/io/projects/gsas2.py:2012"
+   ],
+   "level": [
+    "computed"
+   ],
+   "condition": "On writing a GSAS-II CIF, an ion the X-ray table lacks is written neutral (helper in scattering.py).",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_GPX_BACKGROUND_NOT_CARRIED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:1402"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A fitted GSAS-II background's coefficients are on the model, not carried.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_GPX_CONSTRAINT_NOT_CARRIED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:1460"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A .gpx's constraints are none applied; they are on model.constraints.",
+   "site_guards": [
+    [
+     "model.constraints"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_GPX_COORDINATES_SYMMETRY_FIXED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:1846"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "As GSAS_EXP_COORDINATES_SYMMETRY_FIXED, for a .gpx.",
+   "site_guards": [
+    [
+     "diagnostics is not None",
+     "frozen"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "EIGHT_PI_SQUARED"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_GPX_ITEM_NOT_READ",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:1396"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A .gpx item is not read; the text names it.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_GPX_PHASE_MAGNETIC",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:1421",
+    "src/rietx/io/projects/gsas2.py:1446"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "computed",
+    "warning"
+   ],
+   "condition": "A magnetic phase of a .gpx is not built, or a nuclear phase carries a magPhases partner; level is warning when magnetic phases exist, info otherwise. Two sites.",
+   "site_guards": [
+    [
+     "phase.magnetic"
+    ],
+    [
+     "not (phase.magnetic)",
+     "phase.magnetic_partner"
+    ]
+   ],
+   "records": "act",
+   "note": "level depends on whether magnetic phases exist",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_GPX_SCALE_NOT_COMPARABLE",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:1855"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "As GSAS_EXP_SCALE_NOT_COMPARABLE, for a .gpx.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "EIGHT_PI_SQUARED"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_GPX_SETTING_FROM_OPERATORS",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:1372"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A .gpx names a space group whose setting the project's operators settle differently: the operators' setting is used.",
+   "site_guards": [
+    [
+     "phase.space_group_from_operators"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_GPX_SPECIES_NORMALISED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:1840"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A GSAS-II species is respelled to the canonical species.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "EIGHT_PI_SQUARED"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_GPX_TEXTURE_CONVERTED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:1641"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A spherical-harmonics texture is carried with each coefficient multiplied by P_l(0) (and by √2 on n≠0 terms).",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "a convention conversion under the act",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_GPX_TEXTURE_NOT_CARRIED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas2.py:1576"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "computed"
+   ],
+   "condition": "A spherical-harmonics texture is not carried, for the reason named; level is a parameter of the helper.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_INSTPRM_CONVENTION_ASSUMED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:1559"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "SH/L (GSAS-II's combined (S+H)/L) is split evenly into axial_sl and axial_hl.",
+   "site_guards": [
+    [
+     "geometry.axial_sl.value"
+    ]
+   ],
+   "records": "act",
+   "note": "an assumption (the even split) under the act",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_INSTPRM_FIELD_DROPPED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_tof.py:783"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "TOF .instprm items were read and not carried.",
+   "site_guards": [
+    [
+     "dropped"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_INSTPRM_FIELD_NOT_READ",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:1589"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "An .instprm states items the Instrument has no place for; they are not read.",
+   "site_guards": [
+    [
+     "not_read"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_INSTPRM_FIELD_NOT_WRITTEN",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:1837"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "On writing, parts of the instrument the .instprm cannot state are omitted.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "INSTPRM_SHL_FLOOR"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_INSTPRM_GEOMETRY_ASSUMED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:1568"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "An .instprm states no Diff-type: the geometry is GSAS-II's own fallback.",
+   "site_guards": [
+    [
+     "not stated"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_INSTPRM_VALUE_DEFAULTED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:1550"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "An .instprm states no value for some fields: they come back at this package's default.",
+   "site_guards": [
+    [
+     "absent"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_INSTPRM_VALUE_FLOORED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:1814"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "On writing, SH/L is below INSTPRM_SHL_FLOOR: it is written as it stands, and GSAS-II floors it when it evaluates.",
+   "site_guards": [
+    [
+     "shl < INSTPRM_SHL_FLOOR"
+    ]
+   ],
+   "records": "act",
+   "note": "notes the floor INSTPRM_SHL_FLOOR a target program applies",
+   "module_constants_named_in_function": [
+    "INSTPRM_SHL_FLOOR"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS2_INSTPRM_VALUE_MERGED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:1803"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "On writing, axial_sl and axial_hl differ and are written as one SH/L.",
+   "site_guards": [
+    [
+     "geometry.axial_sl.value != geometry.axial_hl.value"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "INSTPRM_SHL_FLOOR"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_BANK_COMMENTED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/formats/gsas.py:448"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A GSAS file has no live BANK record but a commented one: that one is read.",
+   "site_guards": [
+    [
+     "commented and diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_EXP_BACKGROUND_NOT_CARRIED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas.py:1322"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A fitted GSAS background function's coefficients are on the model, not carried into a Background.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "BACKGROUND_FUNCTIONS"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_EXP_COORDINATES_SYMMETRY_FIXED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas.py:1632"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "Sites carry GSAS's X refine flag but sit on fully fixed special positions: the flag is not honoured.",
+   "site_guards": [
+    [
+     "diagnostics is not None",
+     "frozen"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "EIGHT_PI_SQUARED"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_EXP_HISTOGRAM_NOT_READ",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas.py:1314"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A histogram of a GSAS .EXP is not read; the text names why.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "BACKGROUND_FUNCTIONS"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_EXP_PHASE_MAGNETIC",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas.py:1335"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A magnetic phase of a .EXP: its cell and sites are on the model, no magnetism is built.",
+   "site_guards": [
+    [
+     "phase.magnetic"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "BACKGROUND_FUNCTIONS"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_EXP_REFINE_FLAG_MERGED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas.py:2026"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "On writing, a group with some members held and some free is written free.",
+   "site_guards": [
+    [
+     "diagnostics is not None",
+     "merged"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "EIGHT_PI_SQUARED",
+    "_WRITE_MAX_ATOMS",
+    "_WRITE_MAX_PHASES",
+    "_WRITE_NUMBER",
+    "_WRITE_VERSION"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_EXP_SCALE_NOT_COMPARABLE",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas.py:1641"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "The phase scale is seeded at 1e-3, not the file's histogram scale.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "a convention (the seed) under the act",
+   "module_constants_named_in_function": [
+    "EIGHT_PI_SQUARED"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_EXP_SPECIES_NORMALISED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas.py:1626"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A GSAS species is respelled to the canonical species.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "EIGHT_PI_SQUARED"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_EXP_SPECIES_WRITTEN_NEUTRAL",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas.py:2035"
+   ],
+   "raised_through_helper": [
+    "src/rietx/io/projects/gsas.py:2035"
+   ],
+   "level": [
+    "computed"
+   ],
+   "condition": "On writing, an ion the X-ray table lacks is written as its neutral atom (helper in scattering.py).",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "EIGHT_PI_SQUARED",
+    "_WRITE_MAX_ATOMS",
+    "_WRITE_MAX_PHASES",
+    "_WRITE_NUMBER",
+    "_WRITE_VERSION"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_EXP_VALUE_NARROWED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas.py:2017"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "On writing, values needing more than the fixed columns are narrowed.",
+   "site_guards": [
+    [
+     "diagnostics is not None",
+     "narrowed"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "EIGHT_PI_SQUARED",
+    "_WRITE_MAX_ATOMS",
+    "_WRITE_MAX_PHASES",
+    "_WRITE_NUMBER",
+    "_WRITE_VERSION"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_FIELD_OVERFLOW",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/gsas.py:216"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A GSAS record field holds only asterisks (a Fortran overflow): the field is read as absent.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_IPARM_FIELD_DROPPED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_tof.py:677"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "Records and fields with no slot in the schema are not carried.",
+   "site_guards": [
+    [
+     "dropped_all"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_BANK_FIELDS",
+    "_BNKPAR_FIELDS",
+    "_ICONS_FIELDS"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_IPARM_LEGACY_LAYOUT",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/legacy/lansce_iparm.py:227",
+    "src/rietx/io/legacy/lansce_iparm.py:235",
+    "src/rietx/io/legacy/lansce_iparm.py:249"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A LANSCE legacy .iparm: a value running across a BNKPAR boundary is re-read by whitespace tokens (GSAS-II reads it the same way); PRCF set 1 of legacy banks is read as slots 1-8; a non-zero fifth ICOFF pair is carried as written. Three sites.",
+   "site_guards": [
+    [],
+    [
+     "legacy_banks"
+    ],
+    [
+     "fifth"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "LEGACY_PRCF1_NCOF",
+    "LEGACY_PRCF1_SLOT_NAMES",
+    "_BNKPAR_FIELDS",
+    "_ZERO_E15"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_IPARM_PROFILE_DECLINED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_tof.py:446",
+    "src/rietx/io/instrument_tof.py:482"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info",
+    "warning"
+   ],
+   "condition": "A TOF .iparm bank has no PRCF set 1, or states a set other than 1: the profile coefficients are left at zero or the set is not read (set 1 is GSAS's default whatever its function). Two sites.",
+   "site_guards": [
+    [
+     "not headers"
+    ],
+    [
+     "n != 1"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "PRCF_COEFFICIENT_NAMES",
+    "_PRCF_FIELDS",
+    "_PRCF_NOT_EVALUATED",
+    "_PRCF_TO_PROFILE"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_IPARM_PROFILE_READ",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_tof.py:522"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A TOF .iparm's PRCF set 1 is read in the order the Technical Manual lists the coefficients; the order is an assumption and the record says so.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "the ordering is an assumption under the act",
+   "module_constants_named_in_function": [
+    "PRCF_COEFFICIENT_NAMES",
+    "_PRCF_FIELDS",
+    "_PRCF_NOT_EVALUATED",
+    "_PRCF_TO_PROFILE"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_PRM_FIELD_DROPPED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:673"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A .prm record or field has no slot in the Instrument and is not carried.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_PRCF_MAPPED",
+    "_PRCF_TYPE_3",
+    "_PRCF_TYPE_REFUSALS"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_PRM_FIELD_NOT_WRITTEN",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:1234"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "The Instrument holds parts the .prm cannot state; they are not written.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "CW_PROFILE_COEFFICIENTS",
+    "_PRCF_TYPE_3",
+    "_PRM_BANK",
+    "_PRM_CENTIDEG",
+    "_PRM_COEFFICIENT_COLUMNS",
+    "_PRM_COEFFICIENT_DIGITS",
+    "_PRM_CUTOFF",
+    "_PRM_PER_RECORD"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_PRM_GEOMETRY_ASSUMED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:697"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A .prm states no geometry, so none is read from it.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_PRCF_MAPPED",
+    "_PRCF_TYPE_3",
+    "_PRCF_TYPE_REFUSALS"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_PRM_PROFILE_SET_DEFAULTED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:680"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "Bank 1 offers several profile sets and none was named: one is read.",
+   "site_guards": [
+    [
+     "diagnostics is not None",
+     "profile_set is None and len(sets) > 1"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_PRCF_MAPPED",
+    "_PRCF_TYPE_3",
+    "_PRCF_TYPE_REFUSALS"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "GSAS_PRM_VALUE_NARROWED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/instrument_profile.py:1209"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A written value needs more characters than a .prm's fixed columns hold and is written to what fits.",
+   "site_guards": [
+    [
+     "diagnostics is not None",
+     "narrowed"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "CW_PROFILE_COEFFICIENTS",
+    "_PRCF_TYPE_3",
+    "_PRM_BANK",
+    "_PRM_CENTIDEG",
+    "_PRM_COEFFICIENT_COLUMNS",
+    "_PRM_COEFFICIENT_DIGITS",
+    "_PRM_CUTOFF",
+    "_PRM_PER_RECORD"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "LANDE_G_ASSUMED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magcif.py:1809"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A site with an assumed ion that needs a g states none: the ion's Hund's-rule g_J is used.",
+   "site_guards": [
+    [
+     "label in assumed_ions",
+     "label in assumed_g"
+    ]
+   ],
+   "records": "act",
+   "note": "as MAGNETIC_ION_ASSUMED; both raise sites also in strategy/magnetic.py (2002 tiers them there)",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "MAGNETIC_ION_ASSUMED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/magcif.py:1798"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A magnetic site states no oxidation state and the neutral table lacks the element: its form factor is taken from an assumed ion (form_factor's assumed-ion table, 2002's B15).",
+   "site_guards": [
+    [
+     "label in assumed_ions"
+    ]
+   ],
+   "records": "act",
+   "note": "the table is the judgement under the act; ruled by 2002 (B15), tiered here after it",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "PATTERN_DEAD_CHANNELS",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/readers.py:211"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A run of channels carries a small fraction of the local background with an esd that fell with it: the reader asserts they are dead. Nothing is dropped. The run and window lengths and the fraction are in background.diagnostics.dead_channels, outside io/.",
+   "site_guards": [
+    []
+   ],
+   "records": "judgement",
+   "note": "thresholds live in background/diagnostics.py (2004's walk)",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "PATTERN_DUPLICATE_POINTS",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/formats/base.py:409"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "Repeated x values carrying the same intensity are dropped.",
+   "site_guards": [
+    [
+     "tt.size > 1 and (not np.all(step > 0))",
+     "repeat.size and np.all(step >= 0)",
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "PATTERN_INTENSITY_SCALED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/formats/base.py:596",
+    "src/rietx/io/formats/brml.py:328",
+    "src/rietx/io/formats/gsas.py:1027",
+    "src/rietx/io/formats/uxd.py:212",
+    "src/rietx/io/formats/xrdml.py:306",
+    "src/rietx/io/formats/xrdml.py:319"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "Intensity or σ is not the file's number: the unit is cps with no usable counting time, an unrecognised unit, or values not integral within INTEGRAL_TOL; no σ is supplied (Poisson fallback). Five sites in four readers (base, brml, uxd, xrdml).",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ],
+    [
+     "diagnostics is not None"
+    ],
+    [],
+    [
+     "diagnostics is not None"
+    ],
+    [
+     "unit == _CPS",
+     "count_time is None or not np.all(np.asarray(count_time) > 0)",
+     "diagnostics is not None"
+    ],
+    [
+     "not (unit == _CPS)",
+     "unit != _COUNTS",
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "gated by INTEGRAL_TOL (base.py site)",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "PATTERN_MULTISCAN_DEFAULTED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/formats/base.py:284"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A file holds several scans and none was named by scan=: scan 0 is read.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "PATTERN_ROWS_DROPPED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/formats/xy.py:245"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "Numeric rows whose column count differs from the file's are not read as data.",
+   "site_guards": [
+    [
+     "dropped and diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "the file's arity is taken from the rows themselves",
+   "module_constants_named_in_function": [
+    "_XYDATA_HEADING_LINES"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "PATTERN_SCAN_REVERSED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/formats/base.py:386"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "Points stored from high to low are reversed to ascending.",
+   "site_guards": [
+    [
+     "tt.size > 1 and np.all(step <= 0) and np.any(step < 0)",
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "PATTERN_SIGMA_CONSTANT",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/readers.py:129"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "The σ column holds one value on every point. Raised after the read, no change made: the reader asserts that such a σ is not a measurement.",
+   "site_guards": [
+    []
+   ],
+   "records": "judgement",
+   "note": "asserts a judgement about the file",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "PATTERN_X_AXIS_ASSUMED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/formats/base.py:464"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A format whose axis label is absent or unrecognised: the x column is read as 2θ in degrees.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "the alternative is the refusal in the same function for an axis known not to be 2θ",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "PATTERN_X_AXIS_IMPLAUSIBLE",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/readers.py:185"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "The x axis starts at or below 0° with some points at or below 0°, in a format read as 2θ: the reader asserts the axis is not what it was read as. Nothing is changed.",
+   "site_guards": [
+    []
+   ],
+   "records": "judgement",
+   "note": "asserts a judgement; TWO_THETA_MAX_DEG is the upper-end refusal elsewhere in readers.py",
+   "module_constants_named_in_function": [
+    "TWO_THETA_MAX_DEG"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RAS_ATTENUATOR_PRESENT",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/formats/ras.py:205"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A Rigaku .ras carries an attenuator factor other than 1: it is applied (or not) by the measured vendor convention and said so.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "the per-format convention is the judgement under the act",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "READER_OPTION_IGNORED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/formats/base.py:260"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A reader option the chosen format does not take is not applied.",
+   "site_guards": [
+    [
+     "name not in fmt.options",
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_BACKGROUND_PEAK_DEGENERATE",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:979"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A background peak starts at a FWHM that is broad against the fitted range, so it is a polynomial (asserts degeneracy; no change).",
+   "site_guards": [
+    []
+   ],
+   "records": "judgement",
+   "note": "asserts a judgement",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_BACKGROUND_RESEEDED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:861"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A recipe's Chebyshev background arrives as a count and a flag, so its values start at zero.",
+   "site_guards": [
+    [
+     "cheb is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_BOUND_HONOURED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:263"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A recipe declares min/max and the refinement applies them.",
+   "site_guards": [
+    [
+     "allow_bounds and (lo is not None or hi is not None)"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_CONVENTION_ASSUMED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:644"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "SH/L is split evenly into axial_sl and axial_hl.",
+   "site_guards": [
+    [
+     "shl"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "CENTIDEG_TO_DEG",
+    "GAUSS_CENTIDEG2_TO_DEG2"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_DISPERSION_DECLINED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:692"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "Anomalous scattering is declined and f = f0 is used, for the stated reason.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_ENGINE_DEFAULT_DECLINED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:1271"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A null magnitude that GSAS-II fills with its own default is not filled: the sample broadening is zero here.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "GSASII_DEFAULT_MICROSTRAIN",
+    "GSASII_DEFAULT_SIZE_UM"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_FIELD_DROPPED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:543",
+    "src/rietx/io/recipe.py:814",
+    "src/rietx/io/recipe.py:1300",
+    "src/rietx/io/recipe.py:1310",
+    "src/rietx/io/recipe.py:923"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info",
+    "warning"
+   ],
+   "condition": "A recipe field has no counterpart or no effect here and is dropped (polarization on a neutron instrument; a constant Lorentzian term at zero; a sub-step background-peak width; refinement_cycles; refinement_algorithm). Five sites.",
+   "site_guards": [
+    [
+     "_iparm(iparm, 'Polariz.') is not None or not _is_off(entry)"
+    ],
+    [
+     "not (flag)"
+    ],
+    [
+     "cycles is not None"
+    ],
+    [
+     "algorithm"
+    ],
+    [
+     "gam_fwhm > 0.0"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "CENTIDEG_TO_DEG"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_FIT_RANGE_CHANNELS",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:461"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "The fit_range selects some channels on an inclusive mask at both ends.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_FLAG_DROPPED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:806",
+    "src/rietx/io/recipe.py:931",
+    "src/rietx/io/recipe.py:1191"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A refine flag is not honoured (Z has no place; a background-peak gamma has no counterpart; LG_eta at its off state holds a coefficient). Three sites.",
+   "site_guards": [
+    [
+     "flag"
+    ],
+    [
+     "g_vary"
+    ],
+    [
+     "free and (not param.vary)"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "CENTIDEG_TO_DEG"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_FLAG_TRANSLATED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:1199"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A (magnitude, eta) pair with the eta flag is translated to two free coefficients.",
+   "site_guards": [
+    [
+     "eta_vary and lor.vary and gauss.vary"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_NOTHING_REFINED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:1322"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "No parameter is flagged for refinement; the plan has one stage that frees nothing (asserts the recipe frees nothing).",
+   "site_guards": [
+    [
+     "not flagged"
+    ]
+   ],
+   "records": "judgement",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_PLAN_STAGED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:1340"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "The flagged parameters are freed over several stages in the McCusker (1999) turn-on order.",
+   "site_guards": [
+    [
+     "len(stages) > 1"
+    ]
+   ],
+   "records": "act",
+   "note": "McCusker's order is a citation behind the act",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_SCALE_RESEEDED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:1232"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "The recipe's phase scales are re-seeded to match the summed calculated intensity to the data.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_SCHEMA_UNTESTED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:317"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "The recipe's schema_version is not one this reader was checked against; asserts the reading is unverified. Nothing is changed.",
+   "site_guards": [
+    [
+     "version not in KNOWN_SCHEMA_VERSIONS"
+    ]
+   ],
+   "records": "judgement",
+   "note": "asserts a judgement about verification",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "RECIPE_ZERO_WEIGHT_EXCLUDED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/recipe.py:400"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "Channels carrying weight 0 become excluded regions (the pdCIF dictionary: weight 0 means not used; #1006's row).",
+   "site_guards": [
+    [
+     "zero.any()"
+    ]
+   ],
+   "records": "act",
+   "note": "the pdCIF weight rule is the row #1006 enters",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "SITE_SNAPPED_TO_SPECIAL_POSITION",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/cif.py:1106",
+    "src/rietx/crystallography/symmetry.py:1052"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A site within SITE_TOL (symmetry.py) of a special position is expanded there; cif.py's second site also snaps a site to reach the multiplicity the file states, within CIF_STATED_MULTIPLICITY_SNAP_TOL.",
+   "site_guards": [
+    [
+     "moved"
+    ],
+    []
+   ],
+   "records": "act",
+   "note": "gated by SITE_TOL, CIF_STATED_MULTIPLICITY_SNAP_TOL",
+   "module_constants_named_in_function": [
+    "CIF_STATED_MULTIPLICITY_SNAP_TOL",
+    "SITE_TOL",
+    "_SNAP_MESSAGE_SITES"
+   ],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "SPACE_GROUP_SETTING_ASSUMED",
+   "kind": "code",
+   "where": [
+    "src/rietx/crystallography/symmetry.py:1155"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A symbol the tables hold in more than one setting is resolved to one of them (the evidence is the composition each setting implies; WP-1118).",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "act with a judgement inside: which setting is chosen",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "crystallography"
+   ]
+  },
+  {
+   "name": "TOPAS_BLOCK_SKIPPED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:3567"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A block of the .inp is skipped and listed on model.skipped_blocks.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_CELL_MACROS",
+    "_CELL_MACRO_LIST"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_CELL_COUPLING_DROPPED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:3470"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A cell tie in a .inp is not carried and the space group does not tie it: the value is copied.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_CELL_MACROS",
+    "_CELL_MACRO_LIST"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_FEATURES_NOT_IMPORTED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:3485",
+    "src/rietx/io/projects/topas.py:3496"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "Features the file states (or calls without a definition) do not reach the Structure. Two sites.",
+   "site_guards": [
+    [
+     "diagnostics is not None",
+     "model.coverage.reported"
+    ],
+    [
+     "diagnostics is not None",
+     "model.coverage.unread_calls"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_CELL_MACROS",
+    "_CELL_MACRO_LIST"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_FEATURE_REFUSED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:3505",
+    "src/rietx/io/projects/topas.py:3514"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "The file states something to_structure refuses to build without, or is time of flight (issue #193). Two sites.",
+   "site_guards": [
+    [
+     "diagnostics is not None",
+     "model.coverage.refused"
+    ],
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_CELL_MACROS",
+    "_CELL_MACRO_LIST"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_FIELD_NOT_WRITTEN",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:5039"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "On writing, TOPAS computes each phase without a texture, magnetic-only width or extinction the Structure carries.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_FIRST_RUN_READ",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:3446"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "An .inp has #if/#elseif on Run_Number and states more than one run: branches are read as the first run reads them.",
+   "site_guards": [
+    [
+     "diagnostics is not None",
+     "conditionals.run_dependent and runs != 1"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_CELL_MACROS",
+    "_CELL_MACRO_LIST"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_MAGNETIC_GROUP_READ",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:3855"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A magnetic phase's group is read from the file or derived; the text says which.",
+   "site_guards": [
+    [
+     "ph.name in group_from_file or derived is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_MAGNETIC_PART_MERGED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:4353"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A TOPAS str read as the magnetic half of another is merged into it.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_MOMENT_COMPONENT_KEYS"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_MOMENT_CONVENTION",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:3866"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "mlx, mly, mlz are read as fractional-basis components and stored as crystal-axis μ_B (mlx·|a|, …).",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "a convention under the act (topas-mlx-is-fractional)",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_MOMENT_G_HELD",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:3885"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "warning"
+   ],
+   "condition": "A file that refines the Landé g (mg) is read as holding it.",
+   "site_guards": [
+    [
+     "g_free"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_MOMENT_ION_UNCHARGED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:3898"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A moment and an uncharged species: the species is read neutral.",
+   "site_guards": [
+    [
+     "bare"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_ORIGIN_TRANSLATED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:3525"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A space-group symbol with an origin choice is read as the canonical one.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_CELL_MACROS",
+    "_CELL_MACRO_LIST"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_PHASE_RESTATED_IN_P1",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas_input.py:884"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A phase with no mag_space_group in TOPAS is written in P1 with every copy tied.",
+   "site_guards": [
+    [
+     "not want_p1",
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_PHASE_TERM_READ",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:4367"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A prm p<n>_<term> is read as phase n's term.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_MOMENT_COMPONENT_KEYS"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_SPECIES_NORMALISED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:3453"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A TOPAS species is respelled to the canonical species.",
+   "site_guards": [
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [
+    "_CELL_MACROS",
+    "_CELL_MACRO_LIST"
+   ],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "TOPAS_SPECIES_WRITTEN_NEUTRAL",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/projects/topas.py:5055",
+    "src/rietx/io/projects/topas.py:4883"
+   ],
+   "raised_through_helper": [
+    "src/rietx/io/projects/topas.py:5055",
+    "src/rietx/io/projects/topas.py:4883"
+   ],
+   "level": [
+    "computed"
+   ],
+   "condition": "On writing, an ion the X-ray table lacks is written neutral (helper in scattering.py; two call sites).",
+   "site_guards": [
+    [],
+    [
+     "diagnostics is not None"
+    ]
+   ],
+   "records": "act",
+   "note": "",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  },
+  {
+   "name": "XRDML_ATTENUATOR_APPLIED",
+   "kind": "code",
+   "where": [
+    "src/rietx/io/formats/xrdml.py:337"
+   ],
+   "raised_through_helper": [],
+   "level": [
+    "info"
+   ],
+   "condition": "A PANalytical .xrdml carries a beam attenuation factor over some points: it is applied to the intensities.",
+   "site_guards": [
+    []
+   ],
+   "records": "act",
+   "note": "as RAS_ATTENUATOR_PRESENT",
+   "module_constants_named_in_function": [],
+   "directory": [
+    "io"
+   ]
+  }
+ ],
+ "constants": [
+  {
+   "name": "rietx.io.cif.blocks.SCAT_SOURCE_MAX",
+   "kind": "constant",
+   "where": "src/rietx/io/cif/blocks.py:99",
+   "shape": "scalar",
+   "value": "40",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "The longest ``_atom_type_scat_source`` value written, held by test."
+  },
+  {
+   "name": "rietx.io.cif.numbers.LINE_MAX",
+   "kind": "constant",
+   "where": "src/rietx/io/cif/numbers.py:47",
+   "shape": "scalar",
+   "value": "80",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "The longest record checkCIF reads without its PLAT802 note."
+  },
+  {
+   "name": "rietx.io.formats.base.HEAD_BYTES",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/base.py:296",
+   "shape": "scalar",
+   "value": "4096",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "sniff bound",
+   "decides": "How much of a file a *sniff* may look at."
+  },
+  {
+   "name": "rietx.io.formats.base.INTEGRAL_TOL",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/base.py:551",
+   "shape": "scalar",
+   "value": "0.001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "How close to an integer a value must be to count as one."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._MAGIC",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:107",
+   "shape": "tuple",
+   "value": "((b'RAW1.01', 3), (b'RAW4.00', 4), (b'RAW2', 2), (b'RAW ', 1))",
+   "n_numbers": 4,
+   "walked_by_audit": false,
+   "role": "format layout (magic strings)",
+   "decides": "The four magic strings, longest first so ``RAW1.01`` is not read as ``RAW `` would be if the test were four bytes for every version."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V4_SEGMENTS",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:116",
+   "shape": "scalar",
+   "value": "61",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Where the v4 segment chain begins — the only fixed offset in the format past the preamble's date and time strings."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._RANGE_MARKERS",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:119",
+   "shape": "call:frozenset",
+   "value": "frozenset({0, 160})",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Segment \"types\" that are not segments: each marks the start of a range."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._SEG_KEYVALUE",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:122",
+   "shape": "scalar",
+   "value": "10",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Segment payload layouts, as offsets from the segment's own start."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._SEG_SOURCE",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:123",
+   "shape": "scalar",
+   "value": "30",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "64 skip, then Kα-mean/Kα1/Kα2/Kβ/ratio, then anode."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._SEG_DRIVE",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:124",
+   "shape": "scalar",
+   "value": "50",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "uint32 flag, char[24] name, 20 skip, float64 position."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._MIN_DATUM",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:127",
+   "shape": "scalar",
+   "value": "4",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "runaway guard",
+   "decides": "A datum is at least one float32 (4 bytes); anything smaller cannot hold an intensity."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._MAX_RANGES",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:132",
+   "shape": "scalar",
+   "value": "4096",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "runaway guard",
+   "decides": "Runaway guards on numbers a corrupt or misread header can make enormous."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._MAX_HEADER",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:133",
+   "shape": "expr",
+   "value": "1 << 20",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "runaway guard",
+   "decides": "Runaway guard on a v4 header's size, with _MAX_RANGES."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_SCAN_CODES",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:181",
+   "shape": "dict",
+   "value": "{0: 'locked coupled', 1: 'unlocked coupled', 2: 'detector scan', 3: 'rocking curve', 4: 'chi scan', 5: 'phi scan', 6: 'x scan', 7: 'y scan',",
+   "n_numbers": 13,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "v3's numeric spelling of the names above."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_HEADER",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:466",
+   "shape": "scalar",
+   "value": "712",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "The v3 file header, before the first range header."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_POINTS",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:469",
+   "shape": "scalar",
+   "value": "4",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "v3 range-header field offsets that this reader reads, relative to its start."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_TWO_THETA_START",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:470",
+   "shape": "scalar",
+   "value": "16",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_STEP",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:471",
+   "shape": "scalar",
+   "value": "176",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_STEP_TIME",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:472",
+   "shape": "scalar",
+   "value": "192",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_SCAN_TYPE",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:473",
+   "shape": "scalar",
+   "value": "196",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_TEMPERATURE",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:474",
+   "shape": "scalar",
+   "value": "212",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_WAVELENGTH",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:475",
+   "shape": "scalar",
+   "value": "240",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_VARYING",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:476",
+   "shape": "scalar",
+   "value": "248",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_RECORD_LENGTH",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:477",
+   "shape": "scalar",
+   "value": "252",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_EXTRA_RECORDS",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:478",
+   "shape": "scalar",
+   "value": "256",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _V3_POINTS: v3 range-header field offsets that this reader reads, relative to its start."
+  },
+  {
+   "name": "rietx.io.formats.bruker_raw._V3_MIN_HEADER",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/bruker_raw.py:480",
+   "shape": "expr",
+   "value": "_V3_EXTRA_RECORDS + 4",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "the last field read above ends here, so a header shorter than this is not one."
+  },
+  {
+   "name": "rietx.io.formats.dif._MIN_ROWS",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/dif.py:43",
+   "shape": "scalar",
+   "value": "3",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "dispatch gate",
+   "decides": "How many reflection rows before it is a peak list rather than a coincidence."
+  },
+  {
+   "name": "rietx.io.formats.gsas._GSAS_TIME_MAP_SCAN_BYTES",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/gsas.py:251",
+   "shape": "expr",
+   "value": "64 * 1024",
+   "n_numbers": 2,
+   "walked_by_audit": true,
+   "role": "sniff bound",
+   "decides": "A ``TIME_MAP`` step table is written *before* the bank it feeds, and a long one pushes the first ``BANK`` record past the 4 kB ``head`` window the sniff reads — a real HIPD@LANSCE file (``vnb5053.dat`` from the GSAS distribution's own examples) carries a 71-row ``(10I8)`` table and its first bank sits at byte 6068, so the sniff missed it and the file fell to the ``xy`` catch-all and was refused for the wrong cause; ``TIME_MAP`` in the first 4 kB now triggers one more read up to this bound, and a larger table stays unsniffed."
+  },
+  {
+   "name": "rietx.io.formats.gsas.TIME_MAP_FIELD_CHARS",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/gsas.py:643",
+   "shape": "scalar",
+   "value": "8",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "format layout",
+   "decides": "Width of one field of a ``TIME_MAP`` table record, in characters."
+  },
+  {
+   "name": "rietx.io.formats.gsas.ESD_FIELD_CHARS",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/gsas.py:926",
+   "shape": "scalar",
+   "value": "8",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "format layout",
+   "decides": "Width of one field of an **ESD** bank's data record, in characters."
+  },
+  {
+   "name": "rietx.io.formats.peaklist._MIN_ROWS",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/peaklist.py:62",
+   "shape": "scalar",
+   "value": "8",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "dispatch gate",
+   "decides": "How many such rows before the head is a profile rather than a coincidence."
+  },
+  {
+   "name": "rietx.io.formats.philips_rd._DATA_START",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/philips_rd.py:72",
+   "shape": "dict",
+   "value": "{b'V3RD': 250, b'V5RD': 810}",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "The magic at offset 0, and where that version's intensities begin."
+  },
+  {
+   "name": "rietx.io.formats.philips_rd._ANODE_AT",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/philips_rd.py:77",
+   "shape": "scalar",
+   "value": "85",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Offsets of the header fields this reader uses."
+  },
+  {
+   "name": "rietx.io.formats.philips_rd._WAVELENGTHS_AT",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/philips_rd.py:78",
+   "shape": "scalar",
+   "value": "94",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "3 × float64: λα1, λα2, α2/α1 ratio."
+  },
+  {
+   "name": "rietx.io.formats.philips_rd._MAX_VALUE_AT",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/philips_rd.py:79",
+   "shape": "scalar",
+   "value": "136",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "uint16, equal to max(v) in all 28 real files."
+  },
+  {
+   "name": "rietx.io.formats.philips_rd._FILE_NAME_AT",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/philips_rd.py:80",
+   "shape": "scalar",
+   "value": "138",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "8 bytes."
+  },
+  {
+   "name": "rietx.io.formats.philips_rd._SAMPLE_AT",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/philips_rd.py:81",
+   "shape": "scalar",
+   "value": "146",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "20 bytes."
+  },
+  {
+   "name": "rietx.io.formats.philips_rd._SCAN_AT",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/philips_rd.py:82",
+   "shape": "scalar",
+   "value": "214",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "3 × float64: step, start 2θ, end 2θ."
+  },
+  {
+   "name": "rietx.io.formats.philips_rd._ANODES",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/philips_rd.py:95",
+   "shape": "dict",
+   "value": "{0: 'Cu', 1: 'Mo', 2: 'Fe', 3: 'Cr'}",
+   "n_numbers": 4,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "The anode code table, from the two descriptions and confirmed on the real files: all 28 read 0, and the kit's own prose independently says a Cu tube."
+  },
+  {
+   "name": "rietx.io.formats.ras._SPEED_UNIT_SECONDS",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/ras.py:103",
+   "shape": "dict",
+   "value": "{'deg/min': 60.0, 'degree/min': 60.0, 'deg/sec': 1.0, 'deg/s': 1.0, 'degree/sec': 1.0}",
+   "n_numbers": 5,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "``*MEAS_SCAN_SPEED_UNIT`` → seconds per unit of the speed's denominator."
+  },
+  {
+   "name": "rietx.io.formats.rasx.MAX_MEMBER_BYTES",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/rasx.py:78",
+   "shape": "expr",
+   "value": "128 * 1024 * 1024",
+   "n_numbers": 3,
+   "walked_by_audit": false,
+   "role": "runaway guard",
+   "decides": "How much of any one member may be read."
+  },
+  {
+   "name": "rietx.io.formats.rasx._SPEED_UNIT_SECONDS",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/rasx.py:83",
+   "shape": "dict",
+   "value": "{'deg/min': 60.0, 'degree/min': 60.0, 'deg/sec': 1.0, 'deg/s': 1.0, 'degree/sec': 1.0}",
+   "n_numbers": 5,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "``SpeedUnit`` → seconds per unit of the speed's denominator, the same reading ``.ras`` needs: real files say ``deg/min``, and assuming seconds would make every derived counting time 60× short and every σ wrong by √60."
+  },
+  {
+   "name": "rietx.io.formats.xy._XYDATA_HEADING_LINES",
+   "kind": "constant",
+   "where": "src/rietx/io/formats/xy.py:141",
+   "shape": "scalar",
+   "value": "6",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "How many lines an ``XYDATA`` file's heading takes, the keyword line included (the keyword, then five heading lines); the reader skips them before the numbers."
+  },
+  {
+   "name": "rietx.io.instrument_profile._PRCF_TYPE_3",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:262",
+   "shape": "scalar",
+   "value": "3",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "format layout",
+   "decides": "``INS n PRCF1 <type> <ncoef> <cutoff>`` — the profile-function type this reader reads."
+  },
+  {
+   "name": "rietx.io.instrument_profile._PRCF_TYPE_REFUSALS",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:263",
+   "shape": "dict",
+   "value": "{1: 'GSAS profile function 1 (simple Gaussian, no Lorentzian term)', 2: 'GSAS profile function 2', 4: 'GSAS profile function 4'}",
+   "n_numbers": 3,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Names of the PRCF profile types a .prm reader refuses, for its refusal message."
+  },
+  {
+   "name": "rietx.io.instrument_profile._PRCF_MAPPED",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:275",
+   "shape": "Subscript",
+   "value": "CW_PROFILE_COEFFICIENTS[_PRCF_TYPE_3][:8]",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "The type-3 coefficients this reader maps, **named from the one table that holds them** (``CW_PROFILE_COEFFICIENTS``, ``io/projects/gsas.py``) rather than restated here: ``GU GV GW`` and ``LX LY`` onto ``ProfileTCHZ``, ``S/L`` and ``H/L`` onto ``Geometry``, ``GP`` refused unless it is zero. Two readers unpacking one coefficient order from two lists is how they come to disagree, so this one is a slice of the other's."
+  },
+  {
+   "name": "rietx.io.instrument_profile._BANK_COLUMNS",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:302",
+   "shape": "call:slice",
+   "value": "slice(3, 6)",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "A ``.prm`` record's 12-byte key, by column: ``INS``, a three-column bank number, then the record's own name from column 6. The bank columns are blank on the file-wide records (``BANK``, ``HTYPE``) and carry the bank number on the rest."
+  },
+  {
+   "name": "rietx.io.instrument_profile._NAME_COLUMNS",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:303",
+   "shape": "call:slice",
+   "value": "slice(6, KEY_BYTES)",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _BANK_COLUMNS: A ``.prm`` record's 12-byte key, by column: ``INS``, a three-column bank number, then the record's own name from column 6. The bank columns are blank on the file-wide records (``BANK``, ``HTYPE``) and carry the bank number on the rest."
+  },
+  {
+   "name": "rietx.io.instrument_profile._PRM_COEFFICIENT_COLUMNS",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:994",
+   "shape": "scalar",
+   "value": "15",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "format layout",
+   "decides": "The ``PRCF`` continuation records are ``4E15.6``, so a coefficient gets fifteen columns where a ``.EXP``'s cell edge gets ten."
+  },
+  {
+   "name": "rietx.io.instrument_profile._PRM_PER_RECORD",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:995",
+   "shape": "scalar",
+   "value": "4",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "format layout",
+   "decides": "Same group as _PRM_COEFFICIENT_COLUMNS: The ``PRCF`` continuation records are ``4E15.6``, so a coefficient gets fifteen columns where a ``.EXP``'s cell edge gets ten."
+  },
+  {
+   "name": "rietx.io.instrument_profile._PRM_COEFFICIENT_DIGITS",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:1009",
+   "shape": "expr",
+   "value": "_PRM_COEFFICIENT_COLUMNS - 1",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "format layout",
+   "decides": "One of those fifteen columns is **reserved as a separator**, so a value is written into fourteen and right-justified into fifteen."
+  },
+  {
+   "name": "rietx.io.instrument_profile._PRM_BANK",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:1014",
+   "shape": "scalar",
+   "value": "1",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "format layout",
+   "decides": "What this writer states on the two file-wide records."
+  },
+  {
+   "name": "rietx.io.instrument_profile._PRM_CUTOFF",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:1015",
+   "shape": "scalar",
+   "value": "0.001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "format layout",
+   "decides": "The cutoff a .prm writer states on PRCF1."
+  },
+  {
+   "name": "rietx.io.instrument_profile._PRM_CENTIDEG_SQUARED",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:1020",
+   "shape": "scalar",
+   "value": "10000.0",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "unit conversion",
+   "decides": "``S/L`` and ``H/L`` are dimensionless and cross unconverted; the rest are the inverse of ``read_gsas_prm``'s own centidegree division, written here as the multiplication it is so the two cannot drift apart. ``GU GV GW`` are the coefficients of a Gaussian *variance* in centidegrees², the squared factor; ``profile.u/v/w`` are those of the Gaussian FWHM² in degrees² (Γ² = 8 ln 2 · σ²)."
+  },
+  {
+   "name": "rietx.io.instrument_profile._PRM_CENTIDEG",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:1021",
+   "shape": "scalar",
+   "value": "100.0",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "unit conversion",
+   "decides": "Same group as _PRM_CENTIDEG_SQUARED: ``S/L`` and ``H/L`` are dimensionless and cross unconverted; the rest are the inverse of ``read_gsas_prm``'s own centidegree division, written here as the multiplication it is so the two cannot drift apart. ``GU GV GW`` are the coefficients of a Gaussian *variance* in centidegrees², the squared factor; ``profile.u/v/w`` are those of the Gaussian FWHM² in degrees² (Γ² = 8 ln 2 · σ²)."
+  },
+  {
+   "name": "rietx.io.instrument_profile.INSTPRM_SHL_FLOOR",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_profile.py:1275",
+   "shape": "scalar",
+   "value": "0.002",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "foreign program's floor",
+   "decides": "GSAS-II floors the axial-divergence sum at this when it evaluates a profile (``GSASIIpwd.SetInstParms``: ``max(instDict['SH/L'], 0.002)``), so a smaller one is written faithfully and still read as 0.002 by the program the file is for."
+  },
+  {
+   "name": "rietx.io.instrument_tof.PRCF_COEFFICIENT_NAMES",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_tof.py:151",
+   "shape": "dict",
+   "value": "{1: ('alp-0', 'alp-1', 'bet-0', 'bet-1', 'sig-0', 'sig-1', 'sig-2', 's1ec', 's2ec', 'rstr', 'rsta', 'rsca'), 2: ('alp-0', 'alp-1', 'beta', '",
+   "n_numbers": 3,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Documented coefficient names, in the manual's \"respectively\" order (p. 144, 147, 148) — the only ordering the documentation offers."
+  },
+  {
+   "name": "rietx.io.instrument_tof._PRCF_TO_PROFILE",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_tof.py:162",
+   "shape": "dict",
+   "value": "{1: {'alp-0': 'alpha0', 'alp-1': 'alpha1', 'bet-0': 'beta0', 'bet-1': 'beta1', 'sig-0': 'sig0', 'sig-1': 'sig1', 'sig-2': 'sig2'}, 3: {'alp'",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Which documented names land on which :class:`ProfileTOF` field."
+  },
+  {
+   "name": "rietx.io.instrument_tof._PRCF_NOT_EVALUATED",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_tof.py:171",
+   "shape": "dict",
+   "value": "{2: 'the Ikeda-Carpenter function (manual p. 145-147), a causal shape with a different peak origin from the back-to-back pair', 4: 'profile ",
+   "n_numbers": 3,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Documented profile functions this package does not evaluate, and why."
+  },
+  {
+   "name": "rietx.io.instrument_tof._BANK_FIELDS",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_tof.py:182",
+   "shape": "tuple",
+   "value": "((13, 17, 'NBANK'),)",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary."
+  },
+  {
+   "name": "rietx.io.instrument_tof._ICONS_FIELDS",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_tof.py:183",
+   "shape": "tuple",
+   "value": "((13, 22, 'DIFC'), (23, 32, 'DIFA'), (33, 42, 'ZERO'), (43, 52, 'the 10X skip'), (53, 62, 'POLA'), (63, 67, 'IPOLA'), (68, 77, 'KRATIO'))",
+   "n_numbers": 14,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _BANK_FIELDS: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary."
+  },
+  {
+   "name": "rietx.io.instrument_tof._BNKPAR_FIELDS",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_tof.py:186",
+   "shape": "tuple",
+   "value": "((13, 22, 'DIST'), (23, 32, 'TTHETA'), (33, 42, 'TILT'), (43, 52, 'SEPN'), (53, 62, 'HGHT'), (63, 67, 'NTUBE'), (68, 72, 'ITUBE'))",
+   "n_numbers": 14,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _BANK_FIELDS: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary."
+  },
+  {
+   "name": "rietx.io.instrument_tof._ITYP_FIELDS",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_tof.py:189",
+   "shape": "tuple",
+   "value": "((13, 17, 'ITYP'), (18, 27, 'TMIN'), (28, 37, 'TMAX'), (38, 47, 'CHKSUM'))",
+   "n_numbers": 8,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _BANK_FIELDS: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary."
+  },
+  {
+   "name": "rietx.io.instrument_tof._PRCF_FIELDS",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_tof.py:191",
+   "shape": "tuple",
+   "value": "((13, 17, 'PTYP'), (18, 22, 'NCOF'), (23, 32, 'CTOF'))",
+   "n_numbers": 6,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _BANK_FIELDS: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary."
+  },
+  {
+   "name": "rietx.io.instrument_tof._E15_FIELDS",
+   "kind": "constant",
+   "where": "src/rietx/io/instrument_tof.py:192",
+   "shape": "call:tuple",
+   "value": "tuple(((13 + 15 * k, 27 + 15 * k, f'coefficient field {k + 1}') for k in range(4)))",
+   "n_numbers": 6,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _BANK_FIELDS: Each parsed record's FORTRAN layout as contiguous ``(first, last, name)`` column spans (GSAS Technical Manual p. 221-223) — what `_Record.check_columns` tests for a number crossing a boundary."
+  },
+  {
+   "name": "rietx.io.legacy.lansce_iparm.LEGACY_PRCF1_NCOF",
+   "kind": "constant",
+   "where": "src/rietx/io/legacy/lansce_iparm.py:74",
+   "shape": "scalar",
+   "value": "8",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "The legacy block's declared coefficient count for profile function 1."
+  },
+  {
+   "name": "rietx.io.legacy.lansce_iparm.LEGACY_PRCF1_SLOT_NAMES",
+   "kind": "constant",
+   "where": "src/rietx/io/legacy/lansce_iparm.py:79",
+   "shape": "Subscript",
+   "value": "PRCF_COEFFICIENT_NAMES[1][:LEGACY_PRCF1_NCOF]",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "The eight slots, named as slots 1-8 of the documented twelve (GSAS Technical Manual p. 144) — confirmed by GSAS-II v5.8.2 reading an 8-slot and a 12-slot block slot for slot alike."
+  },
+  {
+   "name": "rietx.io.legacy.lansce_iparm._BNKPAR_REALS",
+   "kind": "constant",
+   "where": "src/rietx/io/legacy/lansce_iparm.py:88",
+   "shape": "scalar",
+   "value": "5",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "How many of ``BNKPAR``'s fields are reals (DIST TTHETA TILT SEPN HGHT); the rest (NTUBE ITUBE) are integers, in its documented layout of 5F10 then 2I5."
+  },
+  {
+   "name": "rietx.io.legacy.lansce_iparm._ZERO_E15",
+   "kind": "constant",
+   "where": "src/rietx/io/legacy/lansce_iparm.py:90",
+   "shape": "JoinedStr",
+   "value": "f'{0.0:15.6E}'",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "A zero written in E15.6 for padded coefficient slots."
+  },
+  {
+   "name": "rietx.io.projects.fullprof._N_T_EXTRA_LINES",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/fullprof.py:378",
+   "shape": "dict",
+   "value": "{0: 0, 2: 2}",
+   "n_numbers": 4,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "What a nuclear phase's ``N_t`` adds to each atom."
+  },
+  {
+   "name": "rietx.io.projects.fullprof._NAM_WIDTH",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/fullprof.py:770",
+   "shape": "scalar",
+   "value": "4",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "format layout",
+   "decides": "LINE 12's ``NAM`` field width (manual: \"Character A4\")."
+  },
+  {
+   "name": "rietx.io.projects.fullprof._USER_B_ATOL_FM",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/fullprof.py:776",
+   "shape": "scalar",
+   "value": "0.001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "How far a LINE-12 ``DFP`` may sit from the Sears b of the isotope its ``NAM`` names and still be read as that isotope, in fm."
+  },
+  {
+   "name": "rietx.io.projects.fullprof._DISPERSION_ATOL_E",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/fullprof.py:870",
+   "shape": "scalar",
+   "value": "0.01",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "How far a stated f′ or f″ may sit from rietx's Cromer-Liberman value at the file's wavelength and still be read as the same model, in electrons."
+  },
+  {
+   "name": "rietx.io.projects.fullprof._RHOMBOHEDRAL_LENGTH_RTOL",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/fullprof.py:1012",
+   "shape": "scalar",
+   "value": "0.001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "How far a cell may stray from ``a = b = c``/``α = β = γ`` and still be called rhombohedral axes."
+  },
+  {
+   "name": "rietx.io.projects.fullprof._RHOMBOHEDRAL_ANGLE_ATOL",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/fullprof.py:1013",
+   "shape": "scalar",
+   "value": "0.01",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "Same group as _RHOMBOHEDRAL_LENGTH_RTOL: How far a cell may stray from ``a = b = c``/``α = β = γ`` and still be called rhombohedral axes."
+  },
+  {
+   "name": "rietx.io.projects.fullprof._OCCUPANCY_RTOL",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/fullprof.py:1934",
+   "shape": "scalar",
+   "value": "0.005",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "How far the per-site occupancy ratios may spread and still be called constant."
+  },
+  {
+   "name": "rietx.io.projects.fullprof._MAGNETIC_MATCH_ATOL",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/fullprof.py:2003",
+   "shape": "scalar",
+   "value": "0.0001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "How close two numbers the stance below compares must be, and why each is what it is."
+  },
+  {
+   "name": "rietx.io.projects.fullprof._CELL_TIE_MULTIPLIER_TOL",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/fullprof.py:2468",
+   "shape": "scalar",
+   "value": "1e-06",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "float-equality tolerance",
+   "decides": "Two decoded multipliers count as the same coefficient within this tolerance."
+  },
+  {
+   "name": "rietx.io.projects.gsas.RECORD_BYTES",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas.py:99",
+   "shape": "scalar",
+   "value": "80",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "One record: 80 characters, of which the first 12 are the fetch key."
+  },
+  {
+   "name": "rietx.io.projects.gsas.KEY_BYTES",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas.py:100",
+   "shape": "scalar",
+   "value": "12",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as RECORD_BYTES: One record: 80 characters, of which the first 12 are the fetch key."
+  },
+  {
+   "name": "rietx.io.projects.gsas.CW_PROFILE_COEFFICIENTS",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas.py:122",
+   "shape": "dict",
+   "value": "{1: ('U', 'V', 'W', 'asym', 'F1', 'F2'), 2: ('GU', 'GV', 'GW', 'LX', 'LY', 'trns', 'asym', 'shft', 'GP', 'stec', 'ptec', 'sfec', 'L11', 'L22",
+   "n_numbers": 3,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Coefficient names per constant-wavelength profile function, from the manual's own naming sentences."
+  },
+  {
+   "name": "rietx.io.projects.gsas.CW_CENTIDEG_POWER",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas.py:135",
+   "shape": "dict",
+   "value": "{'U': 2, 'V': 2, 'W': 2, 'F2': 2, 'GU': 2, 'GV': 2, 'GW': 2, 'GP': 2, 'LX': 1, 'LY': 1, 'trns': 1, 'shft': 1, 'asym': 1, 'F1': 1, 'stec': 1,",
+   "n_numbers": 20,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Power of centidegrees each named coefficient carries, for the conversion to degrees."
+  },
+  {
+   "name": "rietx.io.projects.gsas.BACKGROUND_FUNCTIONS",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas.py:301",
+   "shape": "dict",
+   "value": "{1: 'shifted Chebyshev polynomial of the first kind', 2: 'cosine Fourier series with a leading constant', 4: 'exponential expansion in Q², f",
+   "n_numbers": 7,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "What each GSAS background function is, in this package's words."
+  },
+  {
+   "name": "rietx.io.projects.gsas.EIGHT_PI_SQUARED",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas.py:1367",
+   "shape": "expr",
+   "value": "8.0 * 3.141592653589793 ** 2",
+   "n_numbers": 3,
+   "walked_by_audit": false,
+   "role": "unit conversion",
+   "decides": "Uiso (Å²) → Biso (Å²)."
+  },
+  {
+   "name": "rietx.io.projects.gsas._WRITE_NUMBER",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas.py:1668",
+   "shape": "scalar",
+   "value": "10",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "The column widths the writer fills, each quoted from the read above rather than restated."
+  },
+  {
+   "name": "rietx.io.projects.gsas._WRITE_LABEL",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas.py:1669",
+   "shape": "scalar",
+   "value": "8",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _WRITE_NUMBER: The column widths the writer fills, each quoted from the read above rather than restated."
+  },
+  {
+   "name": "rietx.io.projects.gsas._WRITE_MAX_PHASES",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas.py:1675",
+   "shape": "scalar",
+   "value": "9",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "The two counts the *format* cannot exceed, as opposed to this build: ``EXPR NPHAS`` states nine phase types in nine ``I5`` fields, and the ``ATmmmA`` key numbers a site in three columns."
+  },
+  {
+   "name": "rietx.io.projects.gsas._WRITE_MAX_ATOMS",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas.py:1676",
+   "shape": "scalar",
+   "value": "999",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "Same group as _WRITE_MAX_PHASES: The two counts the *format* cannot exceed, as opposed to this build: ``EXPR NPHAS`` states nine phase types in nine ``I5`` fields, and the ``ATmmmA`` key numbers a site in three columns."
+  },
+  {
+   "name": "rietx.io.projects.gsas._WRITE_VERSION",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas.py:1681",
+   "shape": "scalar",
+   "value": "6",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "format layout",
+   "decides": "The ``VERSION`` this writer stamps — the edition :data:`SPEC` names, which is the one ``FAP.EXP`` states."
+  },
+  {
+   "name": "rietx.io.projects.gsas2.CW_CENTIDEGREE_POWER",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas2.py:353",
+   "shape": "dict",
+   "value": "{'U': 2, 'V': 2, 'W': 2, 'X': 1, 'Y': 1, 'Z': 1}",
+   "n_numbers": 6,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Power of centidegrees each CW coefficient carries, for the conversion to degrees."
+  },
+  {
+   "name": "rietx.io.projects.gsas2.EIGHT_PI_SQUARED",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/gsas2.py:1473",
+   "shape": "expr",
+   "value": "8.0 * 3.141592653589793 ** 2",
+   "n_numbers": 3,
+   "walked_by_audit": false,
+   "role": "unit conversion",
+   "decides": "Uiso (Å²) → Biso (Å²)."
+  },
+  {
+   "name": "rietx.io.projects.registry.INP_SNIFF_BYTES",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/registry.py:72",
+   "shape": "scalar",
+   "value": "65536",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "sniff bound",
+   "decides": "How much of a ``.inp`` a sniff may read."
+  },
+  {
+   "name": "rietx.io.projects.topas._MOMENT_COMPONENT_KEYS",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas.py:1923",
+   "shape": "Subscript",
+   "value": "_MOMENT_KEYS[:3]",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "The three components of :data:`_MOMENT_KEYS`, without the g."
+  },
+  {
+   "name": "rietx.io.projects.topas._CELL_MACROS",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas.py:2242",
+   "shape": "dict",
+   "value": "{'Cubic': _CellMacro((('a', 'b', 'c'),), {'al': 90.0, 'be': 90.0, 'ga': 90.0}), 'Tetragonal': _CellMacro((('a', 'b'), ('c',)), {'al': 90.0, ",
+   "n_numbers": 12,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "The cell macros this reader implements, each enumerated and cited individually."
+  },
+  {
+   "name": "rietx.io.projects.topas._CELL_MACRO_LIST",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas.py:2262",
+   "shape": "expr",
+   "value": "', '.join(list(_CELL_MACROS)[:-1]) + f' and {list(_CELL_MACROS)[-1]}'",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "The macro names a refusal message may offer, derived from :data:`_CELL_MACROS` so the two cannot drift."
+  },
+  {
+   "name": "rietx.io.projects.topas._TOPAS_NO_S_SUFFIX",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas.py:4574",
+   "shape": "call:frozenset",
+   "value": "frozenset({50, 68})",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "foreign program behaviour (measured)",
+   "decides": "Origin-choice-1 groups of these space-group numbers are the ones TOPAS 6 stops on when written with its ``S`` suffix: they are axis permutations of #50 and #68, and only their bare symbols generate (checked over all 33 groups with an origin choice)."
+  },
+  {
+   "name": "rietx.io.projects.topas._STEPHENS_K",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas.py:4891",
+   "shape": "expr",
+   "value": "180.0 / math.pi * 1e-06",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "unit conversion",
+   "decides": "The degrees-per-radian × 10⁻⁶ of Stephens' equation (2), spelled once, so the written constant is the double ``stephens.strain_width_deg`` multiplies by."
+  },
+  {
+   "name": "rietx.io.projects.topas_input._TCH_GAMMA",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas_input.py:58",
+   "shape": "tuple",
+   "value": "(2.69269, 2.42843, 4.47163, 0.07842)",
+   "n_numbers": 4,
+   "walked_by_audit": true,
+   "role": "published constants (cited)",
+   "decides": "The Thompson-Cox-Hastings constants rietx uses (``model.profiles.pseudovoigt`` ``_TCH_GAMMA``/``_TCH_ETA``; Thompson, Cox & Hastings 1987). Written into the file rather than left to a TOPAS macro, so the profile TOPAS computes is rietx's: the Technical Reference prints 0.1116 for the cubic η term where TCH (1987) and rietx have 0.11116."
+  },
+  {
+   "name": "rietx.io.projects.topas_input._TCH_ETA",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas_input.py:59",
+   "shape": "tuple",
+   "value": "(1.36603, -0.47719, 0.11116)",
+   "n_numbers": 3,
+   "walked_by_audit": true,
+   "role": "published constants (cited)",
+   "decides": "Same group as _TCH_GAMMA: The Thompson-Cox-Hastings constants rietx uses (``model.profiles.pseudovoigt`` ``_TCH_GAMMA``/``_TCH_ETA``; Thompson, Cox & Hastings 1987). Written into the file rather than left to a TOPAS macro, so the profile TOPAS computes is rietx's: the Technical Reference prints 0.1116 for the cubic η term where TCH (1987) and rietx have 0.11116."
+  },
+  {
+   "name": "rietx.io.projects.topas_input._SABINE_LAUE",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas_input.py:61",
+   "shape": "tuple",
+   "value": "(-0.5, 0.25, -0.10416667, 0.036458333, -0.0109375, 0.0028497409)",
+   "n_numbers": 6,
+   "walked_by_audit": true,
+   "role": "published constants (cited)",
+   "decides": "rietx's Sabine extinction constants (``model.extinction``)."
+  },
+  {
+   "name": "rietx.io.projects.topas_input._SABINE_XPOL",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas_input.py:62",
+   "shape": "scalar",
+   "value": "0.079411",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "published constants (cited)",
+   "decides": "Same group as _SABINE_LAUE: rietx's Sabine extinction constants (``model.extinction``)."
+  },
+  {
+   "name": "rietx.io.projects.topas_input.DEFAULT_RADIUS_MM",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas_input.py:66",
+   "shape": "scalar",
+   "value": "217.5",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "written-file convention",
+   "decides": "The goniometer radius written when the instrument states none."
+  },
+  {
+   "name": "rietx.io.projects.topas_input.CALC_POINTS_PER_FWHM",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas_input.py:555",
+   "shape": "scalar",
+   "value": "16",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "written-file convention",
+   "decides": "Calculation points per narrowest FWHM asked of TOPAS (``convolution_step``)."
+  },
+  {
+   "name": "rietx.io.projects.topas_refined.NEUTRON_SCALE_FACTOR",
+   "kind": "constant",
+   "where": "src/rietx/io/projects/topas_refined.py:58",
+   "shape": "scalar",
+   "value": "100.0",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "unit conversion",
+   "decides": "TOPAS's scale over rietx's for a constant-wavelength neutron pattern: TOPAS states |F|² in barn (10² fm²) where rietx states it in fm² (module docstring)."
+  },
+  {
+   "name": "rietx.io.readers.TWO_THETA_MAX_DEG",
+   "kind": "constant",
+   "where": "src/rietx/io/readers.py:143",
+   "shape": "scalar",
+   "value": "180.0",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "physical limit (gates a refusal)",
+   "decides": "No scattering angle exceeds this, so an axis running past it is not 2θ."
+  },
+  {
+   "name": "rietx.io.recipe.GAUSS_CENTIDEG2_TO_DEG2",
+   "kind": "constant",
+   "where": "src/rietx/io/recipe.py:150",
+   "shape": "expr",
+   "value": "GAUSSIAN_VARIANCE_TO_FWHM_SQUARED * 0.0001",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "unit conversion",
+   "decides": "GSAS-II Gaussian variance (centideg²) → a Caglioti FWHM² term (deg²)."
+  },
+  {
+   "name": "rietx.io.recipe.CENTIDEG_TO_DEG",
+   "kind": "constant",
+   "where": "src/rietx/io/recipe.py:153",
+   "shape": "scalar",
+   "value": "0.01",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "unit conversion",
+   "decides": "GSAS-II Lorentzian FWHM (centideg) → deg."
+  },
+  {
+   "name": "rietx.io.recipe.SIZE_COEF_DEG",
+   "kind": "constant",
+   "where": "src/rietx/io/recipe.py:158",
+   "shape": "expr",
+   "value": "1.8 / 100.0",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "convention (measured against GSAS-II)",
+   "decides": "Coefficient of λ[Å]/(D[µm]·cosθ) in the GSAS-II isotropic size FWHM, in degrees."
+  },
+  {
+   "name": "rietx.io.recipe.STRAIN_COEF_DEG",
+   "kind": "constant",
+   "where": "src/rietx/io/recipe.py:161",
+   "shape": "expr",
+   "value": "SIZE_COEF_DEG / 100.0",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "convention (measured against GSAS-II)",
+   "decides": "Coefficient of µ[1e-6 Δd/d]·tanθ in the GSAS-II isotropic strain FWHM, deg."
+  },
+  {
+   "name": "rietx.io.recipe.EIGHT_PI_SQ",
+   "kind": "constant",
+   "where": "src/rietx/io/recipe.py:164",
+   "shape": "expr",
+   "value": "8.0 * math.pi ** 2",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "unit conversion",
+   "decides": "Uiso (Å²) → Biso (Å²)."
+  },
+  {
+   "name": "rietx.io.recipe.GSASII_DEFAULT_SIZE_UM",
+   "kind": "constant",
+   "where": "src/rietx/io/recipe.py:1247",
+   "shape": "scalar",
+   "value": "1.0",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "foreign program's default (measured)",
+   "decides": "What GSAS-II puts in a size/strain block whose magnitude the recipe leaves null, **measured** off the committed LaB6 reference rather than read from a manual: the peak list's ``gamma`` exceeds the instrument-only ``X/cosθ + Y·tanθ + Z`` by exactly ``1.8·λ/(π·D·cosθ) + 0.018·µ·tanθ/π`` centidegrees at these two values, on every reflection. Two free constants landing on round numbers across 49 reflections is not a coincidence."
+  },
+  {
+   "name": "rietx.io.recipe.GSASII_DEFAULT_MICROSTRAIN",
+   "kind": "constant",
+   "where": "src/rietx/io/recipe.py:1248",
+   "shape": "scalar",
+   "value": "1000.0",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "foreign program's default (measured)",
+   "decides": "Same group as GSASII_DEFAULT_SIZE_UM: What GSAS-II puts in a size/strain block whose magnitude the recipe leaves null, **measured** off the committed LaB6 reference rather than read from a manual: the peak list's ``gamma`` exceeds the instrument-only ``X/cosθ + Y·tanθ + Z`` by exactly ``1.8·λ/(π·D·cosθ) + 0.018·µ·tanθ/π`` centidegrees at these two values, on every reflection. Two free constants landing on round numbers across 49 reflections is not a coincidence."
+  },
+  {
+   "name": "rietx.crystallography.adp.VOIGT",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/adp.py:52",
+   "shape": "tuple",
+   "value": "((0, 0), (1, 1), (2, 2), (0, 1), (0, 2), (1, 2))",
+   "n_numbers": 12,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Index pairs matching :data:`U_NAMES`."
+  },
+  {
+   "name": "rietx.crystallography.atomic_volume.HOFMANN_VOLUMES",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/atomic_volume.py:63",
+   "shape": "dict",
+   "value": "{'H': (5.08, 0.04), 'Li': (22.6, 0.9), 'Be': (36.0, 4.0), 'B': (13.24, 0.17), 'C': (13.87, 0.05), 'N': (11.8, 0.3), 'O': (11.39, 0.17), 'F':",
+   "n_numbers": 166,
+   "walked_by_audit": false,
+   "role": "tabulated data (cited)",
+   "decides": "Hofmann (2002), Table 2: element → (v̄, Δv), Å³ at 298 K."
+  },
+  {
+   "name": "rietx.crystallography.atomic_volume.THERMAL_EXPANSION",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/atomic_volume.py:97",
+   "shape": "scalar",
+   "value": "9.5e-05",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tabulated datum (cited)",
+   "decides": "ᾱ and its mean error, K⁻¹ (Hofmann 2002, § 3)."
+  },
+  {
+   "name": "rietx.crystallography.atomic_volume.THERMAL_EXPANSION_ESD",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/atomic_volume.py:98",
+   "shape": "scalar",
+   "value": "3e-06",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tabulated datum (cited)",
+   "decides": "Same group as THERMAL_EXPANSION: ᾱ and its mean error, K⁻¹ (Hofmann 2002, § 3)."
+  },
+  {
+   "name": "rietx.crystallography.atomic_volume.TABLE_TEMPERATURE",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/atomic_volume.py:100",
+   "shape": "scalar",
+   "value": "298.0",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tabulated datum (cited)",
+   "decides": "The temperature Table 2 is quoted at, K."
+  },
+  {
+   "name": "rietx.crystallography.atomic_volume.VOLUME_SCATTER",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/atomic_volume.py:102",
+   "shape": "scalar",
+   "value": "0.04",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tabulated datum (cited)",
+   "decides": "Standard deviation of V_obs/V_est for one crystal (Hofmann 2002, § 3)."
+  },
+  {
+   "name": "rietx.crystallography.atomic_volume.VOLUME_RATIO_BOUNDS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/atomic_volume.py:104",
+   "shape": "tuple",
+   "value": "(0.8, 1.25)",
+   "n_numbers": 2,
+   "walked_by_audit": true,
+   "role": "threshold (statistical bound)",
+   "decides": "V_obs/V_est at the 25 % boundary of Hofmann (2002), § 3."
+  },
+  {
+   "name": "rietx.crystallography.attenuation._HC_EV_ANGSTROM",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/attenuation.py:41",
+   "shape": "scalar",
+   "value": "12398.4198",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "physical constant",
+   "decides": "hc in eV·Å (CODATA), the conversion E[eV] = _HC_EV_ANGSTROM / wavelength[Å]."
+  },
+  {
+   "name": "rietx.crystallography.attenuation._NA_BARN",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/attenuation.py:45",
+   "shape": "scalar",
+   "value": "0.602214076",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "physical constant",
+   "decides": "Avogadro constant scaled for barn/atom -> cm^2/g conversion: mu/rho = sigma[barn] * 1e-24 * N_A / A = sigma * _NA_BARN / A."
+  },
+  {
+   "name": "rietx.crystallography.cif.CIF_ANGLE_CORRECT_MAX_DEG",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/cif.py:52",
+   "shape": "scalar",
+   "value": "0.1",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "Largest disagreement between a stored cell angle and the value its space group fixes that :func:`structure_from_cif` will **correct and record** rather than leave for ``ParameterTable`` to refuse (WP-1028 §(j))."
+  },
+  {
+   "name": "rietx.crystallography.cif.TWIN_DISTANCE",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/cif.py:317",
+   "shape": "scalar",
+   "value": "0.02",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "Two atoms of a structure closer than this are one atom stated twice (Å)."
+  },
+  {
+   "name": "rietx.crystallography.cif.OCCUPANCY_TOLERANCE",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/cif.py:324",
+   "shape": "scalar",
+   "value": "0.01",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "Two occupancies agree, and two sites fill a position without overfilling it, to within this (absolute)."
+  },
+  {
+   "name": "rietx.crystallography.cif.DUPLICATE_U_TOLERANCE",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/cif.py:330",
+   "shape": "scalar",
+   "value": "0.0002",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "Two statements of one site agree on their displacement to within this (U, Å²)."
+  },
+  {
+   "name": "rietx.crystallography.cif.CIF_STATED_MULTIPLICITY_SNAP_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/cif.py:1016",
+   "shape": "scalar",
+   "value": "0.001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "How far :func:`structure_from_cif` will move a site to reach the special position the file's own ``_atom_site_symmetry_multiplicity`` states."
+  },
+  {
+   "name": "rietx.crystallography.dispersion.NEAR_EDGE_EV",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/dispersion.py:82",
+   "shape": "scalar",
+   "value": "50.0",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "threshold (decides a warning)",
+   "decides": "Within this distance of an absorption edge the *tabulation* is wrong in principle, not merely coarsely sampled: f″ there is the near-edge structure of the compound, which depends on coordination and oxidation state."
+  },
+  {
+   "name": "rietx.crystallography.dispersion.LINE_DISPERSION_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/dispersion.py:243",
+   "shape": "scalar",
+   "value": "0.01",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "threshold (decides a refusal)",
+   "decides": "A single |F|² is shared across the source's emission lines, so f′/f″ are evaluated at the primary line only."
+  },
+  {
+   "name": "rietx.crystallography.fragments.COLLINEAR_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/fragments.py:83",
+   "shape": "scalar",
+   "value": "1e-06",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "Below this sine of the angle at C between C→B and C→D, a Z-matrix line's reference triple B, C, D is collinear."
+  },
+  {
+   "name": "rietx.crystallography.fragments.INERTIA_RANK_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/fragments.py:90",
+   "shape": "scalar",
+   "value": "1e-06",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "An eigenvalue of the inertia tensor below this fraction of the largest is a null rotation."
+  },
+  {
+   "name": "rietx.crystallography.fragments._COINCIDENT_A2",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/fragments.py:93",
+   "shape": "scalar",
+   "value": "1e-20",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "The largest eigenvalue (Å²) below which the atoms coincide: no rotation DOF."
+  },
+  {
+   "name": "rietx.crystallography.magcif.MOMENT_FORM_AGREEMENT_MU_B",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magcif.py:1334",
+   "shape": "scalar",
+   "value": "0.02",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "How far two statements of the same moment may differ before the file is refused as self-contradictory (μ_B per crystal-axis component)."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.form_factor._G_REQUIRED_Z",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/form_factor.py:168",
+   "shape": "expr",
+   "value": "frozenset(range(58, 72)) | frozenset(range(90, 97))",
+   "n_numbers": 4,
+   "walked_by_audit": false,
+   "role": "element list (decides when g is required)",
+   "decides": "Atomic numbers whose ions need an explicit ``g``: the lanthanides (Ce-Lu) and the actinides (Th-Cm)."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.form_factor._J0",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/form_factor.py:175",
+   "shape": "dict",
+   "value": "{'Sc': (0.2512, 90.0296, 0.329, 39.4021, 0.4235, 14.3222, -0.0043), 'Sc1+': (0.4889, 51.1603, 0.5203, 14.0764, -0.0286, 0.1792, 0.0185), 'Sc",
+   "n_numbers": 665,
+   "walked_by_audit": false,
+   "role": "tabulated data (cited)",
+   "decides": "⟨j₀⟩ coefficients, keyed by ion (``\"Cr\"``, ``\"Cr3+\"``)."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.form_factor._J2",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/form_factor.py:274",
+   "shape": "dict",
+   "value": "{'Sc': (10.8172, 54.327, 4.7353, 14.847, 0.6071, 4.218, 0.0011), 'Sc1+': (8.5021, 34.285, 3.2116, 10.994, 0.4244, 3.605, 0.0009), 'Sc2+': (4",
+   "n_numbers": 665,
+   "walked_by_audit": false,
+   "role": "tabulated data (cited)",
+   "decides": "⟨j₂⟩ coefficients, same keys: every ion of :data:`_J0`."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.form_factor._J0_LISHER",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/form_factor.py:376",
+   "shape": "dict",
+   "value": "{'Pr3+': (0.2277, 16.11, 0.7923, 5.277, -0.0204)}",
+   "n_numbers": 5,
+   "walked_by_audit": false,
+   "role": "tabulated data (cited)",
+   "decides": "Lisher & Forsyth (1971) ⟨j₀⟩, Table 1 p. 545, and ⟨j₂⟩, Table 2 p. 546, in their 5-parameter form."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.form_factor._J2_LISHER",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/form_factor.py:379",
+   "shape": "dict",
+   "value": "{'Pr3+': (1.8655, 8.1948, 1.0779, 2.6641, 0.01199)}",
+   "n_numbers": 5,
+   "walked_by_audit": false,
+   "role": "tabulated data (cited)",
+   "decides": "Same group as _J0_LISHER: Lisher & Forsyth (1971) ⟨j₀⟩, Table 1 p. 545, and ⟨j₂⟩, Table 2 p. 546, in their 5-parameter form."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.form_factor._ASSUMED_ION_SLJ",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/form_factor.py:528",
+   "shape": "dict",
+   "value": "{'Ce3+': (0.5, 3.0, 2.5), 'Pr3+': (1.0, 5.0, 4.0), 'Nd3+': (1.5, 6.0, 4.5), 'Sm3+': (2.5, 5.0, 2.5), 'Eu2+': (3.5, 0.0, 3.5), 'Gd3+': (3.5, ",
+   "n_numbers": 45,
+   "walked_by_audit": false,
+   "role": "tabulated data (Hund's rule)",
+   "decides": "(S, L, J) Hund's-rule ground-term quantum numbers for every ion :data:`_ASSUMED_ION` can produce, keyed by the *assumed ion* (not the bare element) so a caller need not re-derive the term itself."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy.INTENSITY_RTOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:220",
+   "shape": "scalar",
+   "value": "1e-09",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "Relative tolerance on |M⊥|² below which a reflection counts as absent, and on a singular value below which an amplitude counts as undeterminable."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy.CROSS_IRREP_DRAWS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:235",
+   "shape": "scalar",
+   "value": "12",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "sampling count (sets a verdict's confidence)",
+   "decides": "Draws per direction on a pair no certificate settles, when the caller names none (issue #565, decision 3): 12 between two irreps, where 8 % of the cubic pairs that 3 draws called equivalent were refuted by a draw within 12 (0.2 % at 12), and 3 inside one irrep. On the cubic ``P n -3 m:1`` at (0, 0, ½) the raise is what gives the four classes of the known answer rather than two. The 3 within an irrep is not measured the same way (the 8 % was counted on cross-irrep pairs only) and applies only to two *different* directions of one irrep, since the isometry certificate settles the rank-1 copies without a draw; 12 there would cost about 4 min more on the known answer (an estimate, not a measurement)."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy.WITHIN_IRREP_DRAWS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:236",
+   "shape": "scalar",
+   "value": "3",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "sampling count (sets a verdict's confidence)",
+   "decides": "Same group as CROSS_IRREP_DRAWS: Draws per direction on a pair no certificate settles, when the caller names none (issue #565, decision 3): 12 between two irreps, where 8 % of the cubic pairs that 3 draws called equivalent were refuted by a draw within 12 (0.2 % at 12), and 3 inside one irrep. On the cubic ``P n -3 m:1`` at (0, 0, ½) the raise is what gives the four classes of the known answer rather than two. The 3 within an irrep is not measured the same way (the 8 % was counted on cross-irrep pairs only) and applies only to two *different* directions of one irrep, since the isometry certificate settles the rank-1 copies without a draw; 12 there would cost about 4 min more on the known answer (an estimate, not a measurement)."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy.ISOMETRY_RESIDUAL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:250",
+   "shape": "scalar",
+   "value": "1e-12",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (accept bound of a certificate)",
+   "decides": "The isometry certificate's accept bound (issue #565, part 3): the relative congruence residual max_s ‖QᵀG^B_sQ − G^A_s‖_max / max|G^A| and the orthogonality deviation ‖QᵀQ − I‖₂ of the quoted Q must both be at most this."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy.KERNEL_AMPLITUDE_RATIO",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:267",
+   "shape": "scalar",
+   "value": "1.0",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "guard (certificate)",
+   "decides": "The full-stack guard of a Farkas certificate (issue #565, part 3, the promise made on #772)."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy.FARKAS_FLOOR",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:278",
+   "shape": "scalar",
+   "value": "1e-12",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (accept bound of a certificate)",
+   "decides": "The Farkas certificate's accept floor (issue #565, decision 2): a draw is certified only when the projected dual's optimum, λ_min/|λ|_max of Σ_s y_s G_s on the kernel-projected stack, is at least this."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy.FARKAS_QUOTE",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:288",
+   "shape": "scalar",
+   "value": "1e-10",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (certificate)",
+   "decides": "The projected ratio the quoted certificate is moved inside to: the min-norm point sits on the PSD boundary to rounding (ratios −4e-16 to 2e-16 on the 49 draws), where an exact check can go either way between machines, so the certificate stored and checked is the nearest point toward the interior with at least this ratio (or half the interior anchor's, when that is lower). Two decades above ``FARKAS_FLOOR``; the per-certificate rounding bound (≤ 3.4e-14 measured) is more than three decades below it."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy.TRANSFER_FLOAT_STACK",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:298",
+   "shape": "scalar",
+   "value": "1e-08",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "threshold (decides a label)",
+   "decides": "A fit transfer (issue #565, item 6) whose margin μ = λ′/Γ on the target's projected live stack is below this is printed as \"proved on the float Gram stack\": the cone bound cos(ŷ, I) ≥ μ then sits within a few decades of the rounding allowance ρ, and the step from the float G_s to the exact ones (which no certificate here covers) can be a real share of it. A label, not a gate: the verdict rests on cos < μ − ρ either way. Measured on the 246 fit transfers of the six cubic sets (2026-09-30, both machines): μ 1.7e-9 to 3.5e-4, 14 below this, the largest ρ/μ 0.22."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy.DUAL_AFTER_RESTART",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:305",
+   "shape": "scalar",
+   "value": "1",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "cost schedule",
+   "decides": "The restart after which a failed fit is handed to the Farkas dual."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy.DEFAULT_CELL_SCALE",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:310",
+   "shape": "scalar",
+   "value": "5.0",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "internal scale (sets nothing)",
+   "decides": "Shortest axis of the default compatible cell, Å."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy._CLOSURE_LIMIT",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:821",
+   "shape": "scalar",
+   "value": "4096",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "runaway guard",
+   "decides": "Guard for :func:`_close_operations`: every crystallographic (little group x lattice index) case this module builds is far under this, so reaching it is a bug in the seed list, not a tolerance to raise."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.isotropy._SPAN_GAP",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/isotropy.py:2509",
+   "shape": "tuple",
+   "value": "(1e-12, 1e-06)",
+   "n_numbers": 2,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "The relative singular values :func:`_intensity_span` must have none of."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.moments.MOMENT_DIRECTION_SUPPORT",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/moments.py:144",
+   "shape": "scalar",
+   "value": "1e-06",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "threshold (decides a hold)",
+   "decides": "A moment direction whose calculated-pattern response is this far below the modulus's measures nothing (WP-1327)."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.moments.DOF_NAMES",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/moments.py:149",
+   "shape": "dict",
+   "value": "{0: (), 1: ('modulus',), 2: ('modulus', 'azimuth'), 3: ('modulus', 'polar', 'azimuth')}",
+   "n_numbers": 4,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Parameter names of the moment DOFs, by subspace dimension."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.moments.DOF_UNITS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/moments.py:157",
+   "shape": "dict",
+   "value": "{0: (), 1: ('mu_B',), 2: ('mu_B', 'rad'), 3: ('mu_B', 'rad', 'rad')}",
+   "n_numbers": 4,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Units of those DOFs, in the same order."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.moments.SEED_TILT",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/moments.py:236",
+   "shape": "scalar",
+   "value": "0.02",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "seed (changes a starting value)",
+   "decides": "Fraction of the modulus placed on every :func:`moment_frame` row *beyond the first* by :func:`tilted_seed`."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.operators.N_MAGNETIC_SPACE_GROUPS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/operators.py:98",
+   "shape": "scalar",
+   "value": "1651",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "count (classification fact)",
+   "decides": "Number of magnetic space groups (Litvin 2013), in UNI numbering 1-1651."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.operators.IDENTITY",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/operators.py:327",
+   "shape": "call:MagneticOperator",
+   "value": "MagneticOperator(((1, 0, 0), (0, 1, 0), (0, 0, 1)), (Fraction(0), Fraction(0), Fraction(0)), 1)",
+   "n_numbers": 13,
+   "walked_by_audit": false,
+   "role": "numerical-method constant",
+   "decides": "The identity operator, the seed of operator closures."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.operators.TIME_REVERSAL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/operators.py:331",
+   "shape": "call:MagneticOperator",
+   "value": "MagneticOperator(((1, 0, 0), (0, 1, 0), (0, 0, 1)), (Fraction(0), Fraction(0), Fraction(0)), -1)",
+   "n_numbers": 13,
+   "walked_by_audit": false,
+   "role": "numerical-method constant",
+   "decides": "The pure time reversal 1'."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.operators._MAX_CODE",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/operators.py:1397",
+   "shape": "expr",
+   "value": "1 << 62",
+   "n_numbers": 2,
+   "walked_by_audit": true,
+   "role": "runaway guard",
+   "decides": "Largest code an int64 mixed-radix key may reach before :func:`_closure_gap` gives up on the vectorised form."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.p1._WRAP_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/p1.py:70",
+   "shape": "scalar",
+   "value": "1e-12",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "A coordinate this close to the next lattice point after wrapping is that point: ``-1e-17 % 1.0`` is ``1.0`` in floating point, which is outside [0, 1)."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.scattering.P_MAGNETIC_FM",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/scattering.py:76",
+   "shape": "scalar",
+   "value": "2.695",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "physical constant",
+   "decides": "p = γ·r₀/2, the magnetic scattering length of one Bohr magneton, in **fm** — the unit ``crystallography.neutron``'s Sears table gives b in, which is what lets |F_m|² and |F_N|² share one scale (issue #257 A6 iv)."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.scattering.METRIC_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/scattering.py:198",
+   "shape": "scalar",
+   "value": "0.001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "|RᵀGR − G| / max|G| above which a magnetic operation is not a symmetry of the cell."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.scattering.INVARIANCE_POS_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/scattering.py:202",
+   "shape": "scalar",
+   "value": "0.001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "fractional-coordinate tolerance for matching an image to an atom of the compiled structure."
+  },
+  {
+   "name": "rietx.crystallography.magnetic.scattering.INVARIANCE_MOMENT_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/magnetic/scattering.py:204",
+   "shape": "scalar",
+   "value": "0.001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "moment tolerance for the same match, μ_B, relative to max(1, |m|)"
+  },
+  {
+   "name": "rietx.crystallography.neutron.RESONANCE_ENERGY_EV",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/neutron.py:80",
+   "shape": "dict",
+   "value": "{'113Cd': 0.1787, '149Sm': 0.0973, '151Eu': 0.321, '155Gd': 0.0268, '157Gd': 0.0314, '168Yb': 0.597}",
+   "n_numbers": 6,
+   "walked_by_audit": false,
+   "role": "tabulated data (cited)",
+   "decides": "Energy (eV) of the **lowest positive-energy resonance** of each nuclide that makes it a resonant absorber, from the resolved-resonance parameters of ENDF/B-VIII.0 (Brown et al. 2018, *Nucl. Data Sheets* **148**, 1); the lowest one sets how far a thermal wavelength sits from the resonance; bound (negative-energy) levels are left out."
+  },
+  {
+   "name": "rietx.crystallography.neutron.NEUTRON_LAMBDA_EV_ANGSTROM",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/neutron.py:93",
+   "shape": "scalar",
+   "value": "0.286014",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "physical constant",
+   "decides": "λ(Å) = NEUTRON_LAMBDA_EV_ANGSTROM / sqrt(E / eV): h / sqrt(2 m_n E) with CODATA 2018 h, m_n and e."
+  },
+  {
+   "name": "rietx.crystallography.neutron.SIGMA_ABS_REFERENCE_WAVELENGTH",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/neutron.py:223",
+   "shape": "scalar",
+   "value": "1.798",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "physical constant",
+   "decides": "Wavelength (Å) at which the table's ``xs_abs_barn`` is quoted: neutrons at the conventional thermal velocity of 2200 m/s, the velocity Sears (1992) quotes absorption cross-sections for."
+  },
+  {
+   "name": "rietx.crystallography.representation.distortion._RANK_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/distortion.py:119",
+   "shape": "scalar",
+   "value": "1e-08",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "Rank and residual tolerance on the projected subspaces."
+  },
+  {
+   "name": "rietx.crystallography.representation.distortion._POSITION_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/distortion.py:123",
+   "shape": "scalar",
+   "value": "1e-06",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "How close (in parent or child fractions) two positions must be to count as the same atom."
+  },
+  {
+   "name": "rietx.crystallography.representation.distortion._PROBE_AMPLITUDE",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/distortion.py:127",
+   "shape": "scalar",
+   "value": "0.05",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "The order-of-magnitude scale (Å) of the generic displacement used to read a component's isotropy subgroup with spglib, and spglib's tolerance on it."
+  },
+  {
+   "name": "rietx.crystallography.representation.distortion._PROBE_SYMPREC",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/distortion.py:128",
+   "shape": "scalar",
+   "value": "0.001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "spglib's tolerance on the generic displacement probe, with _PROBE_AMPLITUDE."
+  },
+  {
+   "name": "rietx.crystallography.representation.irreps.K_MAX_DENOMINATOR",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/irreps.py:160",
+   "shape": "scalar",
+   "value": "64",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "threshold (decides a reading)",
+   "decides": "Largest denominator :func:`as_kvector` will read out of a float."
+  },
+  {
+   "name": "rietx.crystallography.representation.irreps.K_FLOAT_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/irreps.py:166",
+   "shape": "scalar",
+   "value": "1e-09",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "How far a float k-component may sit from the rational :data:`K_MAX_DENOMINATOR` reads out of it."
+  },
+  {
+   "name": "rietx.crystallography.representation.irreps.IRREP_ATOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/irreps.py:173",
+   "shape": "scalar",
+   "value": "1e-08",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "Tolerance on the irrep matrices, which come from an eigendecomposition of a matrix of order |P_k| ≤ 48 built from unit-modulus entries."
+  },
+  {
+   "name": "rietx.crystallography.representation.irreps._SEEDS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/irreps.py:180",
+   "shape": "tuple",
+   "value": "(0, 1, 2, 3, 4, 5, 6, 7)",
+   "n_numbers": 8,
+   "walked_by_audit": true,
+   "role": "vocabulary / lookup",
+   "decides": "Seeds tried, in order, for the random Hermitian matrix whose commutant average splits the twisted regular representation."
+  },
+  {
+   "name": "rietx.crystallography.representation.irreps._ZERO",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/irreps.py:182",
+   "shape": "call:Fraction",
+   "value": "Fraction(0)",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "Exact 0 for the same tables."
+  },
+  {
+   "name": "rietx.crystallography.representation.irreps._EYE3",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/irreps.py:183",
+   "shape": "call:np.eye",
+   "value": "np.eye(3, dtype=np.int64)",
+   "n_numbers": 1,
+   "walked_by_audit": false,
+   "role": "numerical-method constant",
+   "decides": "Integer identity matrix for the irreps code."
+  },
+  {
+   "name": "rietx.crystallography.representation.irreps._H",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/irreps.py:308",
+   "shape": "call:Fraction",
+   "value": "Fraction(1, 2)",
+   "n_numbers": 2,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "Exact 1/2 used to write the primitive-basis tables."
+  },
+  {
+   "name": "rietx.crystallography.representation.irreps._T",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/irreps.py:309",
+   "shape": "call:Fraction",
+   "value": "Fraction(1, 3)",
+   "n_numbers": 2,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "Exact 1/3, same use."
+  },
+  {
+   "name": "rietx.crystallography.representation.irreps._TT",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/irreps.py:310",
+   "shape": "call:Fraction",
+   "value": "Fraction(2, 3)",
+   "n_numbers": 2,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "Exact 2/3, same use."
+  },
+  {
+   "name": "rietx.crystallography.representation.irreps._STANDARD_PRIMITIVE_BASIS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/irreps.py:320",
+   "shape": "dict",
+   "value": "{'A': ((Fraction(1), _ZERO, _ZERO), (_ZERO, _H, _H), (_ZERO, -_H, _H)), 'B': ((_H, _ZERO, _H), (_ZERO, Fraction(1), _ZERO), (-_H, _ZERO, _H)",
+   "n_numbers": 3,
+   "walked_by_audit": false,
+   "role": "numerical-method constant",
+   "decides": "The conventional primitive bases, as rows in conventional fractional coordinates: the transposes of the transformation matrices of *International Tables* A Table 1.5.1.1, the same primitive cells spglib and every other code names for these centrings. Used in preference to the Hermite normal form so that ``primitive_operations`` returns the operations in the setting a reader (and spgrep's tabulated point groups) expects; a centring not among these, or a setting whose centring vectors these rows do not span, falls back to the HNF, which is correct for any lattice."
+  },
+  {
+   "name": "rietx.crystallography.representation.modes.MODE_ATOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/modes.py:273",
+   "shape": "scalar",
+   "value": "1e-09",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "Tolerance on the projected quantities."
+  },
+  {
+   "name": "rietx.crystallography.representation.modes.POSITION_ATOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/modes.py:280",
+   "shape": "scalar",
+   "value": "1e-06",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "How far an orbit image may sit from the lattice translate of another before the two are refused as unmatched."
+  },
+  {
+   "name": "rietx.crystallography.representation.order_parameter.ISOTROPY_ATOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/order_parameter.py:70",
+   "shape": "scalar",
+   "value": "1e-08",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "Tolerance on the numerical linear algebra of the order-parameter space — subspace comparisons, fixed-subspace ranks, \"this matrix is real\"."
+  },
+  {
+   "name": "rietx.crystallography.representation.order_parameter._SIMPLE",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/representation/order_parameter.py:297",
+   "shape": "comp",
+   "value": "[Fraction(n, d) for d in (1, 2, 3, 4, 6) for n in range(-4 * d, 4 * d + 1)]",
+   "n_numbers": 8,
+   "walked_by_audit": false,
+   "role": "numerical-method constant",
+   "decides": "The rational grid (denominators 1,2,3,4,6) of directions the order-parameter search tries."
+  },
+  {
+   "name": "rietx.crystallography.riding.RIDING_LENGTHS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/riding.py:38",
+   "shape": "dict",
+   "value": "{'xray': {'aromatic_CH': 0.93, 'sp2_CH': 0.93, 'CH': 0.98, 'CH2': 0.97, 'CH3': 0.96, 'OH': 0.82, 'acid_OH': 0.82, 'NH': 0.86}, 'neutron': {'",
+   "n_numbers": 16,
+   "walked_by_audit": false,
+   "role": "tabulated data (cited)",
+   "decides": "X–H lengths (Å) by bond class and radiation, the source of each column given in the module docstring. ``None`` would mean no tabulated value and is refused; no entry is ``None`` today."
+  },
+  {
+   "name": "rietx.crystallography.riding.RIDING_MIN_SEPARATION",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/riding.py:47",
+   "shape": "scalar",
+   "value": "1e-06",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "degenerate-geometry guard",
+   "decides": "Å: an H closer than this to its parent gives no parent→H direction."
+  },
+  {
+   "name": "rietx.crystallography.rotation.SERIES_THRESHOLD",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/rotation.py:86",
+   "shape": "scalar",
+   "value": "0.25",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "numerical-method coefficients",
+   "decides": "|ω| (rad) below which A, B and C are evaluated by their series (module docstring, \"The small-angle branch\")."
+  },
+  {
+   "name": "rietx.crystallography.rotation.UNIT_TOLERANCE",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/rotation.py:91",
+   "shape": "scalar",
+   "value": "1e-09",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "How far ‖q‖ may sit from 1, or RᵀR from I, before an input is refused rather than read as a rotation."
+  },
+  {
+   "name": "rietx.crystallography.rotation._A_SERIES",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/rotation.py:95",
+   "shape": "tuple",
+   "value": "(1.0, -1.0 / 6, 1.0 / 120, -1.0 / 5040, 1.0 / 362880, -1.0 / 39916800)",
+   "n_numbers": 11,
+   "walked_by_audit": true,
+   "role": "numerical-method coefficients",
+   "decides": "Maclaurin coefficients through θ¹⁰ (in powers of θ²), lowest first: A = Σ (−1)ᵏ θ²ᵏ/(2k+1)!,  B = Σ (−1)ᵏ θ²ᵏ/(2k+2)!,  C = Σ (−1)ᵏ θ²ᵏ/(2k+3)!."
+  },
+  {
+   "name": "rietx.crystallography.rotation._B_SERIES",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/rotation.py:96",
+   "shape": "tuple",
+   "value": "(1.0 / 2, -1.0 / 24, 1.0 / 720, -1.0 / 40320, 1.0 / 3628800, -1.0 / 479001600)",
+   "n_numbers": 12,
+   "walked_by_audit": true,
+   "role": "numerical-method coefficients",
+   "decides": "Same group as _A_SERIES: Maclaurin coefficients through θ¹⁰ (in powers of θ²), lowest first: A = Σ (−1)ᵏ θ²ᵏ/(2k+1)!,  B = Σ (−1)ᵏ θ²ᵏ/(2k+2)!,  C = Σ (−1)ᵏ θ²ᵏ/(2k+3)!."
+  },
+  {
+   "name": "rietx.crystallography.rotation._C_SERIES",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/rotation.py:98",
+   "shape": "tuple",
+   "value": "(1.0 / 6, -1.0 / 120, 1.0 / 5040, -1.0 / 362880, 1.0 / 39916800, -1.0 / 6227020800)",
+   "n_numbers": 12,
+   "walked_by_audit": true,
+   "role": "numerical-method coefficients",
+   "decides": "Same group as _A_SERIES: Maclaurin coefficients through θ¹⁰ (in powers of θ²), lowest first: A = Σ (−1)ᵏ θ²ᵏ/(2k+1)!,  B = Σ (−1)ᵏ θ²ᵏ/(2k+2)!,  C = Σ (−1)ᵏ θ²ᵏ/(2k+3)!."
+  },
+  {
+   "name": "rietx.crystallography.rotation._LOG_SERIES_NORM",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/rotation.py:102",
+   "shape": "scalar",
+   "value": "1e-08",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "numerical-method coefficients",
+   "decides": "a quaternion's vector norm below which atan2(n, w)/n is taken by its series."
+  },
+  {
+   "name": "rietx.crystallography.satellites._ORDERS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/satellites.py:367",
+   "shape": "tuple",
+   "value": "(1, -1)",
+   "n_numbers": 2,
+   "walked_by_audit": true,
+   "role": "vocabulary / lookup",
+   "decides": "the two satellite orders this rung enumerates, in the order they are tried when a representative is split back into (H, m)"
+  },
+  {
+   "name": "rietx.crystallography.satellites._TRIGONAL_POINTS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/satellites.py:608",
+   "shape": "tuple",
+   "value": "((Fraction(1, 3), Fraction(1, 3), Fraction(0)), (Fraction(1, 3), Fraction(1, 3), Fraction(1, 2)))",
+   "n_numbers": 11,
+   "walked_by_audit": false,
+   "role": "numerical-method constant",
+   "decides": "The third-order points WP-1326 adds on a hexagonal or trigonal lattice, in conventional reciprocal coordinates."
+  },
+  {
+   "name": "rietx.crystallography.scattering._ITC_IONS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/scattering.py:66",
+   "shape": "dict",
+   "value": "{'Y3+': ((17.9268, 9.1531, 1.76795, -33.108), (1.35417, 11.2145, 22.6599, -0.01319), 40.2602)}",
+   "n_numbers": 9,
+   "walked_by_audit": false,
+   "role": "tabulated data (cited)",
+   "decides": "Ions *International Tables* Vol. C carries and ``f0_WaasKirf.dat`` does not: the nine fit numbers of ITC eq. 6.1.1.15 for Y³⁺ (Maslen, Fox & O'Keefe 2004, Table 6.1.1.4), valid for 0 < s < 2.0 Å⁻¹, from which ``f0`` hands over to the neutral atom where the curves meet."
+  },
+  {
+   "name": "rietx.crystallography.species._HYDROGEN_NUCLIDE_MASS_NUMBER",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/species.py:22",
+   "shape": "dict",
+   "value": "{'D': 2, 'T': 3}",
+   "n_numbers": 2,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "The two hydrogen nuclides with symbols of their own, D (mass number 2) and T (3); every other nuclide is written mass-number-first."
+  },
+  {
+   "name": "rietx.crystallography.spherical_harmonics._TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/spherical_harmonics.py:73",
+   "shape": "scalar",
+   "value": "1e-09",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "Tolerance on a projector check."
+  },
+  {
+   "name": "rietx.crystallography.spherical_harmonics._C4Z",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/spherical_harmonics.py:386",
+   "shape": "call:np.array",
+   "value": "np.array([[0.0, -1.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]])",
+   "n_numbers": 9,
+   "walked_by_audit": false,
+   "role": "numerical-method constant",
+   "decides": "The 4-fold about z that turns m-3 into m-3m, in the cubic texture frame."
+  },
+  {
+   "name": "rietx.crystallography.stephens.S_EXPONENTS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/stephens.py:89",
+   "shape": "call:tuple",
+   "value": "tuple(((h, k, 4 - h - k) for h in range(4, -1, -1) for k in range(4 - h, -1, -1)))",
+   "n_numbers": 7,
+   "walked_by_audit": false,
+   "role": "numerical-method constant",
+   "decides": "Exponent triples (H, K, L) of the fifteen quartic monomials h^H k^K l^L, in descending lexicographic order — the storage order everywhere."
+  },
+  {
+   "name": "rietx.crystallography.stephens._DEG_PER_RAD",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/stephens.py:98",
+   "shape": "expr",
+   "value": "180.0 / np.pi",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "unit conversion",
+   "decides": "Radian to degree conversion (Stephens strain width)."
+  },
+  {
+   "name": "rietx.crystallography.superspace.generation.N_SUPERSPACE_GROUPS_D1",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/generation.py:69",
+   "shape": "scalar",
+   "value": "775",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "count (classification fact)",
+   "decides": "(3+1)D superspace-group types (Yamamoto et al. 1985 p. 529; Stokes 2011 p. 47; Stokes & Campbell 2022 Table 6, type-1 row): 775."
+  },
+  {
+   "name": "rietx.crystallography.superspace.generation.N_BRAVAIS_CLASSES_D1",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/generation.py:72",
+   "shape": "scalar",
+   "value": "24",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "count (classification fact)",
+   "decides": "(3+1)D Bravais classes (de Wolff et al. 1981 § 4; Stokes 2011 p. 49): 24."
+  },
+  {
+   "name": "rietx.crystallography.superspace.generation._E",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/generation.py:74",
+   "shape": "tuple",
+   "value": "((1, 0, 0), (0, 1, 0), (0, 0, 1))",
+   "n_numbers": 9,
+   "walked_by_audit": false,
+   "role": "numerical-method constant",
+   "decides": "Integer identity rotation for the superspace generator."
+  },
+  {
+   "name": "rietx.crystallography.superspace.generation._GRID",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/generation.py:75",
+   "shape": "scalar",
+   "value": "24",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "origin-shift grid of the normaliser search, 1/24."
+  },
+  {
+   "name": "rietx.crystallography.superspace.generation._F0",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/generation.py:76",
+   "shape": "call:Fraction",
+   "value": "Fraction(0)",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "Exact 0 for the superspace generator."
+  },
+  {
+   "name": "rietx.crystallography.superspace.generation._QR_COMPONENTS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/generation.py:270",
+   "shape": "tuple",
+   "value": "(Fraction(0), Fraction(1, 2), Fraction(1), Fraction(1, 3), Fraction(2, 3))",
+   "n_numbers": 8,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "The rational components a modulation vector is searched over in the superspace generator."
+  },
+  {
+   "name": "rietx.crystallography.superspace.operators._IDENTITY_R",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/operators.py:82",
+   "shape": "tuple",
+   "value": "((1, 0, 0), (0, 1, 0), (0, 0, 1))",
+   "n_numbers": 9,
+   "walked_by_audit": false,
+   "role": "numerical-method constant",
+   "decides": "Integer identity rotation part of a superspace operator."
+  },
+  {
+   "name": "rietx.crystallography.superspace.operators._ZERO3",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/operators.py:83",
+   "shape": "tuple",
+   "value": "(Fraction(0), Fraction(0), Fraction(0))",
+   "n_numbers": 3,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "Zero translation of a superspace operator."
+  },
+  {
+   "name": "rietx.crystallography.superspace.operators._LETTERS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/operators.py:87",
+   "shape": "dict",
+   "value": "{'x1': 0, 'x2': 1, 'x3': 2, 'x4': 3, 'x': 0, 'y': 1, 'z': 2, 't': 3}",
+   "n_numbers": 8,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Coordinate letters accepted in an operation string: the msCIF/magCIF ``x1,x2,x3,x4`` form and the Stokes ``x,y,z,t`` form."
+  },
+  {
+   "name": "rietx.crystallography.superspace.operators.IDENTITY",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/operators.py:349",
+   "shape": "call:SuperspaceOperator",
+   "value": "SuperspaceOperator(_IDENTITY_R, _ZERO3, 1, (0, 0, 0), Fraction(0))",
+   "n_numbers": 5,
+   "walked_by_audit": false,
+   "role": "numerical-method constant",
+   "decides": "The identity operator, the seed of operator closures."
+  },
+  {
+   "name": "rietx.crystallography.superspace.operators._PARAM_ALIASES",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/operators.py:373",
+   "shape": "dict",
+   "value": "{'α': 0, 'a': 0, 'alpha': 0, 'β': 1, 'b': 1, 'beta': 1, 'γ': 2, 'g': 2, 'gamma': 2}",
+   "n_numbers": 9,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Spellings of the three free parameters a superspace operator string accepts."
+  },
+  {
+   "name": "rietx.crystallography.superspace.symbols._LETTERS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/symbols.py:79",
+   "shape": "dict",
+   "value": "{Fraction(0): '0', Fraction(1, 2): 's', Fraction(1, 3): 't', Fraction(1, 4): 'q', Fraction(1, 6): 'h'}",
+   "n_numbers": 9,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Same group as _LETTERS: Coordinate letters accepted in an operation string: the msCIF/magCIF ``x1,x2,x3,x4`` form and the Stokes ``x,y,z,t`` form."
+  },
+  {
+   "name": "rietx.crystallography.superspace.symbols._TETRA",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/symbols.py:86",
+   "shape": "dict",
+   "value": "{(0, 'rot', 4): '-y,x,z', (0, 'rot', -4): 'y,-x,-z', (0, 'mir', 0): 'x,y,-z', (1, 'rot', 2): 'x,-y,-z', (1, 'mir', 0): '-x,y,z', (2, 'rot', ",
+   "n_numbers": 14,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Stokes 2011 Table 2 orientations, keyed by (system, position, kind); the third tetragonal and hexagonal position takes the [110] two-fold and the mirror normal to [1-10] (Table 2's 422 / 4mm rows)."
+  },
+  {
+   "name": "rietx.crystallography.superspace.symbols._HEXA",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/superspace/symbols.py:91",
+   "shape": "dict",
+   "value": "{(0, 'rot', 3): '-y,x-y,z', (0, 'rot', -3): 'y,-x+y,-z', (0, 'rot', 6): 'x-y,x,z', (0, 'rot', -6): '-x+y,-x,-z', (0, 'mir', 0): 'x,y,-z', (1",
+   "n_numbers": 18,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Same group as _TETRA: Stokes 2011 Table 2 orientations, keyed by (system, position, kind); the third tetragonal and hexagonal position takes the [110] two-fold and the mirror normal to [1-10] (Table 2's 422 / 4mm rows)."
+  },
+  {
+   "name": "rietx.crystallography.symmetry.MAX_HKL_GRID_POINTS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/symmetry.py:36",
+   "shape": "scalar",
+   "value": "30000000",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "runaway guard",
+   "decides": "Ceiling on the (2h+1)(2k+1)(2l+1) enumeration grid ``generate_reflections`` may allocate: ~30M points is ≈ 1 GB of transient int64, far above any physical powder problem (a 100 Å cell at d_min = 1 Å needs 8.1e6) and far below the PiB-scale grids a collapsed cell implies."
+  },
+  {
+   "name": "rietx.crystallography.symmetry._ORBIT_CHUNK_ELEMENTS",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/symmetry.py:43",
+   "shape": "scalar",
+   "value": "24000000",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "memory budget",
+   "decides": "transient element budget for the orbit-image stack in ``generate_reflections`` — the hkl loop it replaced was O(1) in memory, so the vectorised form chunks to stay bounded."
+  },
+  {
+   "name": "rietx.crystallography.symmetry._TRANSLATION_DEN",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/symmetry.py:503",
+   "shape": "scalar",
+   "value": "12",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "numerical-method constant",
+   "decides": "Denominator every space-group translation is an exact multiple of, which is what lets a stated operator be compared with a tabulated one by integers rather than by tolerance."
+  },
+  {
+   "name": "rietx.crystallography.symmetry.SYMMETRY_ANGLE_TOL_DEG",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/symmetry.py:567",
+   "shape": "scalar",
+   "value": "0.001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "Largest deviation of a symmetry-fixed cell angle from its exact value that :func:`cell_constraints` accepts, in degrees."
+  },
+  {
+   "name": "rietx.crystallography.symmetry._GAMMA_HEX",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/symmetry.py:570",
+   "shape": "scalar",
+   "value": "120.0",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "physical constant (exact angle)",
+   "decides": "The exact angle a hexagonal/trigonal γ takes on hexagonal axes."
+  },
+  {
+   "name": "rietx.crystallography.symmetry.SITE_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/symmetry.py:764",
+   "shape": "scalar",
+   "value": "0.0001",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (decides a branch)",
+   "decides": "Default tolerance, in fractional coordinates, for \"this operation fixes this site\"."
+  },
+  {
+   "name": "rietx.crystallography.symmetry._SITE_TOL_SLACK",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/symmetry.py:773",
+   "shape": "scalar",
+   "value": "1e-09",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "Relative slack making the :data:`SITE_TOL` comparison **inclusive**."
+  },
+  {
+   "name": "rietx.crystallography.symmetry._COINCIDENCE_TOL",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/symmetry.py:779",
+   "shape": "scalar",
+   "value": "1e-09",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "Tolerance at which two images of an *already snapped* position count as the same orbit member."
+  },
+  {
+   "name": "rietx.crystallography.symmetry._SNAP_NOISE",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/symmetry.py:787",
+   "shape": "scalar",
+   "value": "1e-12",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "tolerance (numerical)",
+   "decides": "Below this the snap did nothing and ``SiteOrbit.shift`` reports 0.0."
+  },
+  {
+   "name": "rietx.crystallography.symmetry._SNAP_MESSAGE_SITES",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/symmetry.py:1011",
+   "shape": "scalar",
+   "value": "4",
+   "n_numbers": 1,
+   "walked_by_audit": true,
+   "role": "message cosmetic",
+   "decides": "How many snapped sites a ``SITE_SNAPPED_TO_SPECIAL_POSITION`` message names before it says \"and N more\"."
+  },
+  {
+   "name": "rietx.crystallography.wyckoff._VOIGT",
+   "kind": "constant",
+   "where": "src/rietx/crystallography/wyckoff.py:69",
+   "shape": "tuple",
+   "value": "((0, 0), (1, 1), (2, 2), (0, 1), (0, 2), (1, 2))",
+   "n_numbers": 12,
+   "walked_by_audit": false,
+   "role": "vocabulary / lookup",
+   "decides": "Index pairs of the symmetric-tensor components in storage order."
+  }
+ ],
+ "reader_decisions": [
+  {
+   "name": "io.formats.dif._MIN_ROWS",
+   "where": "src/rietx/io/formats/dif.py:43",
+   "decides": "Three hkl rows or more make a file a peak list; fewer is refused as a coincidence.",
+   "walked_by_audit": true,
+   "also_covered": "module constant, listed in constants"
+  },
+  {
+   "name": "io.formats.peaklist._MIN_ROWS",
+   "where": "src/rietx/io/formats/peaklist.py:62",
+   "decides": "Eight rows or more before a head is read as a profile rather than a peak list.",
+   "walked_by_audit": true,
+   "also_covered": "module constant, listed in constants"
+  },
+  {
+   "name": "io.formats.gsas._GSAS_TIME_MAP_SCAN_BYTES",
+   "where": "src/rietx/io/formats/gsas.py:251",
+   "decides": "The sniff reads 64 kB, not 4 kB, so a long TIME_MAP table before the first BANK record is still recognised; a larger table falls to the xy reader, refused for the wrong cause.",
+   "walked_by_audit": true,
+   "also_covered": "module constant, listed in constants"
+  },
+  {
+   "name": "bruker_raw drive pick (atol=1e-6)",
+   "where": "src/rietx/io/formats/bruker_raw.py:339",
+   "decides": "Which drive record is the scan axis: a flagged drive whose position matches the range start within np.isclose atol 1e-6 deg. A function-level literal, not a module constant, so no walk sees it.",
+   "walked_by_audit": false,
+   "also_covered": "literal inside a function"
+  },
+  {
+   "name": "bruker_raw counting-time windows",
+   "where": "src/rietx/io/formats/bruker_raw.py:398 (v4: 0 < step_time_ms < 1e9, ms to s) and :572 (v3: 0 < step_time < 1e6)",
+   "decides": "Whether a counting time is usable, so whether sigma can be derived by arithmetic or is withheld (Poisson fallback). Two function-level windows.",
+   "walked_by_audit": false,
+   "also_covered": "literals inside functions"
+  },
+  {
+   "name": "pdcif weight column",
+   "where": "src/rietx/io/formats/pdcif.py:80-82",
+   "decides": "_pd_proc_ls_weight becomes sigma = 1/sqrt(w) only if every weight is positive; one zero weight drops the whole column and the Poisson fallback applies, with no diagnostic. xy.py:183 and chi.py:90 adopt a third column as sigma when any value is positive.",
+   "walked_by_audit": false,
+   "also_covered": "behaviour, no constant"
+  }
+ ],
+ "gui_not_heuristics": {
+  "ACTION_NOT_APPLICABLE": [
+   "src/rietx/gui/session.py:2759"
+  ],
+  "ADOPT_GATED": [
+   "src/rietx/gui/session.py:2423"
+  ],
+  "AMBIGUOUS_ACTION": [
+   "src/rietx/gui/session.py:3209"
+  ],
+  "EXAMPLE_BUILD_FAILED": [
+   "src/rietx/gui/session.py:754"
+  ],
+  "EXPORT_UNAVAILABLE": [
+   "src/rietx/gui/session.py:2897"
+  ],
+  "FORBIDDEN_HOST": [
+   "src/rietx/gui/server.py:454"
+  ],
+  "INDEX_CELL_TOO_LARGE": [
+   "src/rietx/gui/session.py:2307"
+  ],
+  "INTERNAL_ERROR": [
+   "src/rietx/gui/server.py:506"
+  ],
+  "MODEL_REFUSED": [
+   "src/rietx/gui/session.py:1441",
+   "src/rietx/gui/session.py:1527"
+  ],
+  "NOT_FOUND": [
+   "src/rietx/gui/server.py:497",
+   "src/rietx/gui/server.py:524",
+   "src/rietx/gui/session.py:3195",
+   "src/rietx/gui/session.py:792",
+   "src/rietx/gui/session.py:2205",
+   "src/rietx/gui/session.py:2537",
+   "src/rietx/gui/session.py:2588",
+   "src/rietx/gui/session.py:2871",
+   "src/rietx/gui/session.py:3203",
+   "src/rietx/gui/session.py:295",
+   "src/rietx/gui/session.py:1240",
+   "src/rietx/gui/session.py:1317",
+   "src/rietx/gui/session.py:1360",
+   "src/rietx/gui/session.py:1438",
+   "src/rietx/gui/session.py:1487",
+   "src/rietx/gui/session.py:2030",
+   "src/rietx/gui/session.py:2794",
+   "src/rietx/gui/session.py:2803",
+   "src/rietx/gui/session.py:2813",
+   "src/rietx/gui/session.py:2840",
+   "src/rietx/gui/session.py:2850"
+  ],
+  "NOT_IMPLEMENTED": [
+   "src/rietx/gui/server.py:489"
+  ],
+  "NOT_RUNNING": [
+   "src/rietx/gui/session.py:1769"
+  ],
+  "NO_EXTINCTION_RESULT": [
+   "src/rietx/gui/session.py:2386"
+  ],
+  "NO_HISTORY": [
+   "src/rietx/gui/session.py:2593"
+  ],
+  "NO_INDEX_RESULT": [
+   "src/rietx/gui/session.py:2180",
+   "src/rietx/gui/session.py:2276",
+   "src/rietx/gui/session.py:2360",
+   "src/rietx/gui/session.py:2413"
+  ],
+  "NO_PEAKS": [
+   "src/rietx/gui/session.py:2135"
+  ],
+  "NO_PROJECT": [
+   "src/rietx/gui/session.py:2945"
+  ],
+  "NO_RESULT": [
+   "src/rietx/gui/session.py:2542",
+   "src/rietx/gui/session.py:2955",
+   "src/rietx/gui/session.py:2733"
+  ],
+  "NO_SERIES": [
+   "src/rietx/gui/session.py:1667"
+  ],
+  "NO_SERIES_RESULT": [
+   "src/rietx/gui/session.py:2523",
+   "src/rietx/gui/session.py:2603"
+  ],
+  "PEAKS_WRONG_PATTERN": [
+   "src/rietx/gui/session.py:2128"
+  ],
+  "PROJECT_ERROR": [
+   "src/rietx/gui/session.py:439",
+   "src/rietx/gui/session.py:475"
+  ],
+  "RESULT_NOT_ON_PATTERN": [
+   "src/rietx/gui/session.py:2992"
+  ],
+  "RUN_FAILED": [
+   "src/rietx/gui/session.py:1867"
+  ],
+  "RUN_IN_FLIGHT": [
+   "src/rietx/gui/session.py:2965"
+  ],
+  "STALE_REVISION": [
+   "src/rietx/gui/session.py:1161"
+  ],
+  "SYMMETRY_REFUSED": [
+   "src/rietx/gui/session.py:1290"
+  ],
+  "TEXTDOC_INVALID": [
+   "src/rietx/gui/session.py:1167",
+   "src/rietx/gui/session.py:1181"
+  ],
+  "UNKNOWN_EXAMPLE": [
+   "src/rietx/gui/session.py:697"
+  ],
+  "UNKNOWN_SPECIES": [
+   "src/rietx/gui/session.py:3395"
+  ],
+  "UPLOAD_TOO_LARGE": [
+   "src/rietx/gui/server.py:413"
+  ],
+  "upload_refused": [
+   "src/rietx/gui/session.py:373"
+  ]
+ }
+}

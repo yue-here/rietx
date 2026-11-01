@@ -304,3 +304,67 @@ def test_a_mergeable_part_is_not_warned_about_as_refused(tmp_path):
     assert topas.read_topas_inp(path).coverage.refused
     path.write_text(_magnetic(PART.replace(" mag_only\n", "\n", 1)), encoding="utf-8")
     assert topas.read_topas_inp(path).coverage.refused
+
+
+# ---- a dependent parameter is written out to the names it depends on
+
+#: Two Bs over one refined ``k`` through equation ``prm``s with no ``: value``
+#: tail — the form TOPAS leaves where the input did not ask for one (Technical
+#: Reference §2.5). Invented numbers.
+CHAIN = f'''prm {{held}}k 1.7
+prm bA = 0.5*k;
+prm bB = 0.25*k;
+str
+  phase_name "t"
+  space_group "P 1"
+  scale ! 0.5
+{CELL}  site A1 x ! 0.1 y ! 0.2 z ! 0.3 occ Ba ! 1 beq =bA;
+  site A2 x ! 0.6 y ! 0.7 z ! 0.8 occ Ba ! 1 beq =bB;
+'''
+
+
+@pytest.mark.parametrize("held, free", [("", True), ("!", False)])
+def test_a_chain_affine_in_one_name_is_a_tie_over_that_name(tmp_path, held, free):
+    """``bA`` and ``bB`` are dependent parameters (§2.6): the name that is
+    refined, and that both Bs move with, is ``k``. So A1's B carries ``k`` with
+    ``k``'s own flag and A2's is tied to it at 0.25/0.5 — not two unrelated
+    names, each one nothing refines."""
+    s, cons = _read(tmp_path, CHAIN.format(held=held))
+    assert s.phases[0].atoms[0].biso.value == pytest.approx(0.85)
+    assert s.phases[0].atoms[1].biso.value == pytest.approx(0.425)
+    assert cons.free == {"phases.0.atoms.0.biso": free}
+    [tie] = cons.ties
+    assert tie.path == "phases.0.atoms.1.biso"
+    assert tie.terms == [("phases.0.atoms.0.biso", pytest.approx(0.5))]
+    assert tie.const == pytest.approx(0.0) and tie.names == ("k",)
+    assert cons.skipped == []
+
+
+def test_a_chain_that_is_not_affine_is_reported_written_out(tmp_path):
+    """``u = f*k`` over ``f = c*(T + 273.15) - d`` is a product of two names, so
+    its value is read and the record says so, in the form that shows why."""
+    text = ("prm T 300\nprm k 1.1\nprm f = 4.8e-5*(T+273.15) - 1.5e-2;\n"
+            "prm u = f*k;\nprm bQ 1.2\n" + NUCLEAR.replace("beq bA 0.7\n", "beq =u;\n", 1))
+    s, cons = _read(tmp_path, text)
+    assert s.phases[0].atoms[0].biso.value == pytest.approx(
+        (4.8e-5 * 573.15 - 1.5e-2) * 1.1)
+    [msg] = [m for m in cons.skipped if m.startswith("phases.0.atoms.0.biso")]
+    assert "'= u;'" in msg and "(4.8e-5*(T+273.15) - 1.5e-2)*k" in msg
+    assert "not affine" in msg
+
+
+def test_an_anisotropic_component_stated_as_an_equation_is_a_statement(tmp_path):
+    """``u11 = 0.006*k;`` names ``k`` as surely as ``beq = 0.5*k;`` does; it was
+    left off the site's record, so no tie or free flag ever reached it."""
+    text = CHAIN.format(held="").replace(
+        "beq =bA;", "u11 =0.006*k; u22 =0.006*k; u33 =0.006*k;")
+    path = tmp_path / "t.inp"
+    path.write_text(text, encoding="utf-8")
+    cons = TopasConstraints()
+    topas.to_structure(topas.read_topas_inp(path), constraints=cons, aniso=True)
+    assert cons.free["phases.0.atoms.0.u11"] is True
+    ties = {t.path: t for t in cons.ties}
+    assert ties["phases.0.atoms.0.u22"].terms == [("phases.0.atoms.0.u11", 1.0)]
+    # A2's B is over the same `k`, so it is tied to the carrier too.
+    assert ties["phases.0.atoms.1.biso"].terms == [
+        ("phases.0.atoms.0.u11", pytest.approx(0.25 / 0.006))]

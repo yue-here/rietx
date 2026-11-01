@@ -49,13 +49,22 @@ threshold, and that sets how precise an end is there whatever ``xtol`` says.
 **Read-only by construction**, as ``fraction_profile`` is: every refit runs on
 a branch (or on a copy of the models where the caller disabled history), with
 ``telemetry=False``, and the history's HEAD is put back.
+
+**A moment angle the stationary-angle test left out gets its interval
+unasked** (WP-2002, B2).  Such an angle has no esd, and the interval is the
+number it carries instead (:func:`attach_stationary_intervals`).  That run is
+the package's, never the caller's, so its refits go on a copy of the models
+and leave the caller's history exactly as a plain fit leaves it.
 """
 
 from __future__ import annotations
 
 import math
+import re
 
+from ..optimize.cancel import RefinementCancelled
 from ..schemas.interval import (
+    PARAMETER_INTERVAL_BRACKET_GROWTH,
     PARAMETER_INTERVAL_CHI2_TOL,
     PARAMETER_INTERVAL_LEVEL,
     PARAMETER_INTERVAL_MAX_REFITS,
@@ -67,6 +76,11 @@ from ..schemas.interval import (
 )
 from .fraction_profile import data_chi2, head_restored
 from .staged import BOUND_HIT_ESD_FRAC, Stage
+
+#: A moment's two angle DOFs (polar, azimuth): the paths whose interval walk
+#: stops at half a turn (:data:`~rietx.schemas.interval.IntervalStop`'s
+#: ``"period"``).  The modulus, ``dof0``, is not periodic.
+_MOMENT_ANGLE = re.compile(r"\.moment\.dof[12]$")
 
 
 def interval_quantile(level: float, one_sided: bool) -> float:
@@ -175,13 +189,24 @@ def _bounded_end(result, row, lo: float, hi: float) -> tuple[int, float]:
 
 def _walk(refinement, data, path: str, start: float, sign: int, limit: float,
           step: float, cut: float, chi2_fit: float, budget: int,
-          points: list[ParameterIntervalPoint]) -> tuple[float | None, IntervalStop]:
-    """One side: bracket the root by doubling steps, then solve it with Brent."""
+          points: list[ParameterIntervalPoint], *, record: bool = True,
+          cancel=None, limit_stop: IntervalStop = "bound"
+          ) -> tuple[float | None, IntervalStop]:
+    """One side: bracket the root by doubling steps, then solve it with Brent.
+
+    ``record`` is :meth:`~rietx.refine.Refinement._trial`'s: ``False`` refits
+    on a copy of the models, so the caller's history gains no node.
+    ``cancel`` reaches every refit, and a cancelled one raises
+    :class:`~rietx.optimize.cancel.RefinementCancelled` out of the walk
+    rather than ending the side as an error.  ``limit_stop`` is what reaching
+    ``limit`` means: ``"bound"``, the parameter's own limit and so the end, or
+    ``"period"``, half a turn of a moment angle and so no end.
+    """
     from scipy.optimize import brentq
 
     if start == limit:
         return limit, "bound"            # already on this side's limit
-    trial = refinement._trial()
+    trial = refinement._trial(record=record)
     trial.set_vary([path], False)
     measured = {start: 0.0}             # the fit itself, by definition
     settled = PARAMETER_INTERVAL_CHI2_TOL * cut
@@ -205,8 +230,13 @@ def _walk(refinement, data, path: str, start: float, sign: int, limit: float,
             spent += 1
             runs += 1
             try:
+                # under the plan settings the caller's fit ran with
+                # (``Refinement._plan_settings``, WP-2002 B1)
                 r = trial.run_stage(data, Stage(f"interval:{path}", []),
-                                    telemetry=False)
+                                    telemetry=False, cancel=cancel,
+                                    **trial._plan_settings)
+            except RefinementCancelled:
+                raise                 # the caller's stop, not this point's
             except Exception as exc:  # an unmeasurable point ends the side
                 error = str(exc)
                 break
@@ -232,14 +262,14 @@ def _walk(refinement, data, path: str, start: float, sign: int, limit: float,
     try:
         inner, k = start, 0
         while True:
-            v = start + sign * 2.0 ** k * step
+            v = start + sign * PARAMETER_INTERVAL_BRACKET_GROWTH ** k * step
             reached = v <= limit if sign < 0 else v >= limit
             if reached:
                 v = limit
             if delta(v) >= cut:
                 break
             if reached:
-                return limit, "bound"
+                return (limit, "bound") if limit_stop == "bound" else (None, limit_stop)
             inner, k = v, k + 1
         a, b = sorted((inner, v))
         root = float(brentq(lambda x: delta(x) - cut, a, b,
@@ -254,11 +284,13 @@ def _walk(refinement, data, path: str, start: float, sign: int, limit: float,
 
 def profile_interval(refinement, data, path: str, *,
                      level: float = PARAMETER_INTERVAL_LEVEL,
-                     max_refits: int = PARAMETER_INTERVAL_MAX_REFITS
-                     ) -> ParameterInterval:
+                     max_refits: int = PARAMETER_INTERVAL_MAX_REFITS,
+                     record: bool = True, cancel=None) -> ParameterInterval:
     """Pin ``path`` outward from the fit on each open side, refit, solve for the ends.
 
-    See :meth:`rietx.refine.Refinement.profile_interval`, which is this.
+    See :meth:`rietx.refine.Refinement.profile_interval`, which is this with
+    ``record`` and ``cancel`` at their defaults.  ``record=False`` and a token
+    are :func:`attach_stationary_intervals`' (:func:`_walk` says what each does).
     """
     result = refinement.result_
     if result is None:
@@ -284,6 +316,18 @@ def profile_interval(refinement, data, path: str, *,
         raise ValueError(f"{path!r} was in the last fit and is not in the model "
                          "now; fit again before profiling it")
     lo, hi = float(entry.lo), float(entry.hi)
+    # A moment angle repeats every 2π, so half a turn either side covers every
+    # direction it can point in.  A side still under the threshold there has
+    # no end, and walking on only doubles out to absurd angles (measured: a
+    # moment the data no longer saw walked to ±1e12 rad, 120 refits an angle).
+    half_turn: set[int] = set()
+    if _MOMENT_ANGLE.search(path):
+        if row.value - math.pi > lo:
+            lo = row.value - math.pi
+            half_turn.add(-1)
+        if row.value + math.pi < hi:
+            hi = row.value + math.pi
+            half_turn.add(1)
 
     one_sided = row.at_bound is True
     quantile = interval_quantile(level, one_sided)
@@ -302,7 +346,9 @@ def profile_interval(refinement, data, path: str, *,
             if sign in ends:
                 continue
             ends[sign] = _walk(refinement, data, path, row.value, sign, limit,
-                               step, cut, chi2_fit, max_refits, points)
+                               step, cut, chi2_fit, max_refits, points,
+                               record=record, cancel=cancel,
+                               limit_stop="period" if sign in half_turn else "bound")
 
     lowest = min([chi2_fit, *(p.chi2 for p in points if p.chi2 is not None)])
     (lower, lower_stop), (upper, upper_stop) = ends[-1], ends[1]
@@ -314,3 +360,60 @@ def profile_interval(refinement, data, path: str, *,
         chi2_fit=chi2_fit, chi2_lowest=lowest,
         fit_is_minimum=chi2_fit - lowest <= PARAMETER_INTERVAL_CHI2_TOL * cut,
         points=points, n_refits=sum(p.runs for p in points))
+
+
+def attach_stationary_intervals(refinement, data, *, cancel=None) -> None:
+    """Each moment angle the answer stage left out, its interval onto its row.
+
+    The stationary-angle test (WP-1929) leaves an angle at a direction the
+    symmetry fixes out of the answer stage's covariance, so the angle has no
+    esd.  Under WP-2002's B2 ruling (2026-10-19) it carries its profile
+    interval instead.  :func:`profile_interval` runs for each angle of the
+    passing round that has a half-width to step from, at the default level,
+    and the answer lands on ``RefinedParameter.interval``.  The
+    ``MOMENT_ANGLE_STATIONARY`` finding is then rebuilt from the rows in
+    place, so it quotes the intervals.
+
+    The refits are the package's own, so they run on a copy of the models
+    (``record=False``): the caller's history gains no node and its HEAD does
+    not move.  Only a fit whose test passed pays.  Measured on the two-site
+    Pnma fixtures (``tests/test_stationary_moment_angle.py``, macOS arm64),
+    two to four angles cost 2.6-16.7 s on fits of 0.2-1.2 s, 20-32 refits an
+    angle.  ``cancel`` is the fit's token: a stop ends the run between
+    refits, and an angle it had not finished keeps ``None``.
+    """
+    from ..report.magnetic import moment_angle_stationary_diagnostics
+
+    result = refinement.result_
+    stage = result.stages[-1] if result is not None and result.stages else None
+    tests = getattr(stage, "moment_angle_tests", None) or []
+    passed = next((t for t in tests if t.zeroed), None)
+    if passed is None:
+        return
+    rows = {r.path: r for r in result.parameters}
+    for path in passed.paths:
+        row = rows.get(path)
+        # no half-width means no curvature either (``_half_widths``), and so
+        # no scale to step the profile in
+        if row is None or path not in passed.half_widths:
+            continue
+        try:
+            row.interval = profile_interval(refinement, data, path,
+                                            record=False, cancel=cancel)
+        except RefinementCancelled:
+            break
+        except ValueError:
+            # a precondition :func:`profile_interval` refuses (a row no longer
+            # free, no step to walk in): the fit already returned its answer,
+            # so this angle keeps ``None`` and the finding says none was
+            # computed, rather than the finished fit raising
+            continue
+    (rebuilt,) = moment_angle_stationary_diagnostics(stage, result.parameters)
+    diagnostics = list(result.diagnostics)
+    at = next((i for i, d in enumerate(diagnostics)
+               if d.code == "MOMENT_ANGLE_STATIONARY"), None)
+    if at is None:
+        diagnostics.append(rebuilt)
+    else:
+        diagnostics[at] = rebuilt
+    result.diagnostics = diagnostics

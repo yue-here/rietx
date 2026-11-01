@@ -1088,14 +1088,21 @@ def predict_then_verify(refinement, data, action: SuggestedAction, *,
     # values the restricted fit held are then gone
     restricted = refinement.result_
     held = {row.path: row.value for row in refinement.parameters()}
-    trial = refinement.branch() if refinement.history is not None else refinement
+    # ``_trial`` is ``branch()`` here, and marks the branch as the package's,
+    # so its stage computes no automatic profile interval (WP-2002).  In place,
+    # the stage is the caller's working state afterwards, and computes one.
+    trial = refinement._trial() if refinement.history is not None else refinement
     stage = Stage(f"verify:{action.kind}", list(action.parameter_paths))
     try:
         # ``telemetry=False``: this is a trial the *package* runs, one per
         # candidate action, and a recorder here writes a run directory for each
         # — the same "sixty directories for one job" a series declines
         # (WP-1403).  The run the caller asked about is the fit they started.
-        result = trial.run_stage(data, stage, telemetry=False)
+        # and under the plan settings the caller's fit ran with, so the
+        # verdict is about the action and not about a hold the caller had
+        # switched off (``Refinement._plan_settings``, WP-2002 B1)
+        result = trial.run_stage(data, stage, telemetry=False,
+                                 **trial._plan_settings)
     except Exception as exc:  # a failed trial is a rejection, not a crash
         return VerificationOutcome(
             kind=action.kind, predicted_delta_chi2=action.expected_delta_chi2,
@@ -1213,7 +1220,9 @@ def compare_rivals(refinement, data, finding: "ExchangeFinding | tuple[str, str]
         trial.set_values({other: NULL_IDENTITY[other]})
         trial.set_vary([freed], True)
         result = trial.run_stage(data, Stage(f"rival:{freed}", [freed]),
-                                 telemetry=False)   # a trial, not a run
+                                 telemetry=False,   # a trial, not a run
+                                 # the caller's fit's plan settings (WP-2002)
+                                 **trial._plan_settings)
         row = next((p for p in result.parameters if p.path == freed), None)
         fits.append(RivalFit(
             freed_path=freed, held_path=other, held_at=NULL_IDENTITY[other],

@@ -133,7 +133,7 @@ PLAN = rx.RefinementPlan(stages=[
 def test_a_hold_leaves_one_z_and_the_other_is_quoted_against_it():
     data = _pattern()
     ins = rx.Instrument.bragg_brentano(radiation="CuKa")
-    ins.background = rx.auto_background(data)
+    ins.background = rx.auto_background(data).background
     # a start displaced along c: the pair's common shift changes no intensity
     free = rx.Refinement(rx.Structure(phases=[_zno(0.05, 0.432)]), ins,
                          history=False)
@@ -393,7 +393,7 @@ def zincite_fits(zincite_data):
     for solver, origin in (("lm", None), ("lm", "hold"), ("trf", "hold"),
                            ("lm", "centroid"), ("trf", "centroid")):
         ins = _zincite_instrument()
-        ins.background = rx.auto_background(data)
+        ins.background = rx.auto_background(data).background
         ref = rx.Refinement(rx.Structure(phases=[_zincite(Z_O + 0.02, origin)]),
                             ins, history=False, solver=solver)
         fits[solver, origin] = (ref, ref.fit(data, plan="mccusker_structural",
@@ -477,7 +477,7 @@ def test_zincite_fit_pictures(zincite_fits):
 
 def _zincite_refinement(data, origin="hold"):
     ins = _zincite_instrument()
-    ins.background = rx.auto_background(data)
+    ins.background = rx.auto_background(data).background
     return rx.Refinement(rx.Structure(phases=[_zincite(Z_O, origin)]), ins,
                          history=False)
 
@@ -544,7 +544,7 @@ def test_a_joint_fit_says_once_which_atom_holds_the_origin(zincite_data):
     instruments = []
     for _ in range(2):
         ins = _zincite_instrument()
-        ins.background = rx.auto_background(zincite_data)
+        ins.background = rx.auto_background(zincite_data).background
         instruments.append(ins)
     result = rx.refine_multi(
         [zincite_data, zincite_data],
@@ -554,8 +554,9 @@ def test_a_joint_fit_says_once_which_atom_holds_the_origin(zincite_data):
               if d.code == "ORIGIN_FIXED_ON_POLAR_AXIS"]
     assert len(origin) == 1 and origin[0].where == ["phases.0.atoms.0.dof.0"]
     assert "(Zn)" in origin[0].message
-    assert [sr.blocked_by_hold for sr in result.stages] == [
-        [], ["phases.0.atoms.0.dof.0"]]
+    # every stage that frees the DOFs, the closing one included, is blocked
+    assert [sr.blocked_by_hold for sr in result.stages] == [[]] + [
+        ["phases.0.atoms.0.dof.0"]] * (len(PLAN.run_stages()) - 1)
     codes = {d.code for d in result.diagnostics}
     assert not codes & {"HOLD_BLOCKED_PLAN", "ORIGIN_NOT_FIXED"}
     for h in result.histograms:
@@ -686,6 +687,152 @@ def test_an_a5_failure_clips_the_dominant_site_toward_a_hold():
     # lopsided below the dominant site too: the clip stays inside every row
     lop = centroid_coefficients([100.0, 50.0, 1e-3])
     assert lop.clipped == 0 and np.all(np.isfinite(lop.a)) and lop.a.min() > 0
+
+
+#: an esd's own sampling error is 1/√(2(N − P)): 1 % at N − P = 5000, the
+#: smallest a lab pattern in the families reaches.  A clipped coefficient set
+#: that keeps every light site's esd within it of the hold's is the hold, as
+#: far as the data can say.
+A5_HOLD_BAR = 0.01
+
+
+def _pto(origin="centroid"):
+    """PbTiO₃ in P 4 m m: Pb's curvature exceeds the other three together,
+    so (A5) fails and the clip acts."""
+    return rx.Phase(
+        name="pto", space_group="P 4 m m", cell=_cell(3.90, 3.90, 4.15),
+        scale=rx.Parameter(value=0.01), floating_origin=origin,
+        atoms=[_atom("Pb", "Pb", 0.0, 0.0, 0.0), _atom("Ti", "Ti", 0.5, 0.5, 0.54),
+               _atom("O1", "O", 0.5, 0.5, 0.11), _atom("O2", "O", 0.5, 0.0, 0.62)])
+
+
+def _equilibrated_inverse(m):
+    d = 1.0 / np.sqrt(np.diag(m))
+    return d[:, None] * np.linalg.inv(d[:, None] * m * d[None, :]) * d[None, :]
+
+
+def test_the_a5_clip_moves_only_the_origin_convention(monkeypatch):
+    """``A5_CLIP`` on a real (A5) failure, through the package's Jacobian.
+
+    Eq 9 fixes only the null direction of the data rows, so the covariance of
+    every contrast cᵀz with Σc = 0 is the same under any weights
+    (Flack & Schwarzenbach 1988, eq 11 and after).  A bond along the polar
+    axis, and every parameter that is not a polar coordinate, therefore
+    cannot see the clip; only each coordinate's own esd and where the origin
+    sits can.  Measured on PbTiO₃: identical to 4e-16 between clips of 1e-2,
+    1e-3 and 1e-6, while the light sites' z esds sit 0.092 % from the hold
+    on Pb at 1e-3 (0.92 % at 1e-2, 9.2e-5 % at 1e-6).
+
+    Made to fail on 2026-10-21: with ``A5_CLIP`` patched to 1e-1 the light
+    sites' esds sat 8.95 % from the hold.
+    """
+    import rietx.model.origin as origin_mod
+    from rietx.model import rows as row_layout
+    from rietx.model.forward import compile_model
+    from rietx.optimize.least_squares import _jacobian_for
+
+    ins = rx.Instrument.bragg_brentano(radiation="CuKa")
+    ins.source.dispersion = None
+    structure = rx.Structure(phases=[_pto()])
+    grid = np.arange(15.0, 120.0, 0.02)
+    y = np.asarray(rx.Refinement(structure, ins, history=False).predict(grid)) + 40.0
+    data = rx.PatternData(two_theta=grid.tolist(), intensity=y.tolist())
+    table = rx.Refinement(structure, ins, history=False)._working_table()
+    table.set_vary(["phases.0.scale", "phases.*.atoms.*.dof.*",
+                    "phases.*.atoms.*.biso"], True)
+    model = compile_model(structure, ins, data, moving_paths=set(table.moving_paths))
+    free = list(table.free_paths)
+    z = [free.index(f"phases.0.atoms.{j}.dof.0") for j in range(4)]
+    for j in range(4):   # each z DOF is +z itself in P 4 m m
+        tie = table.entries[table._paths[f"phases.0.atoms.{j}.z"]].tie
+        assert tie.terms == ((f"phases.0.atoms.{j}.dof.0", 1.0),)
+
+    covs = {}
+    shipped_clip = origin_mod.A5_CLIP
+    for clip in (1e-2, shipped_clip, 1e-6):
+        monkeypatch.setattr(origin_mod, "A5_CLIP", clip)
+        model.origin = origin_mod.compile_origin(model, table)
+        assert model.origin.phases[0].clipped == "Pb"
+        jac = _jacobian_for(model, table, "numpy")(table.x0())
+        covs[clip] = _equilibrated_inverse(jac.T @ jac)
+    model.origin = None
+    data_rows = _jacobian_for(model, table, "numpy")(table.x0())[
+        row_layout.block(model, "data").rows]
+    keep = [c for c in range(len(free)) if c != z[0]]
+    hold = _equilibrated_inverse((data_rows.T @ data_rows)[np.ix_(keep, keep)])
+
+    contrasts = []
+    for j in z[1:]:
+        e = np.zeros(len(free))
+        e[j], e[z[0]] = 1.0, -1.0
+        contrasts.append(e)
+    others = [np.eye(len(free))[c] for c in range(len(free)) if c not in z]
+    ref = covs[1e-6]
+    for clip, cov in covs.items():
+        for v in contrasts + others:
+            assert v @ cov @ v == pytest.approx(v @ ref @ v, rel=1e-12), clip
+    shipped = covs[shipped_clip]
+    light = max(abs(np.sqrt(shipped[c, c] / hold[keep.index(c), keep.index(c)]) - 1.0)
+                for c in z[1:])
+    assert light <= A5_HOLD_BAR, f"PbTiO3 light-site z esds {light:.2%} from the hold"
+
+
+def _realisable_a5_failures(n_per_seed=400):
+    """Data normal matrices A = JᵀJ with J·1 = 0 (eq 8), columns spread from
+    light to heavy and coupled through a shared component, kept where (A5)
+    fails.  Random curvature vectors b are not enough: [1, 3e-4, 0.5] fails
+    (A5), and the clip then demotes the dominant site below the second, but
+    no positive semi-definite A with zero row sums has that diagonal."""
+    mats = []
+    for seed in range(3):
+        rng = np.random.default_rng(seed)
+        found = 0
+        while found < n_per_seed:
+            n = int(rng.integers(3, 9))
+            f = rng.lognormal(0.0, rng.uniform(0.5, 2.5), n)
+            j = rng.normal(size=(60, n)) * f[None, :]
+            j += rng.uniform(0, 3) * np.outer(rng.normal(size=60),
+                                              f * rng.choice([-1, 1], n))
+            j -= j.mean(axis=1, keepdims=True)
+            a = j.T @ j
+            b = np.diag(a)
+            if b.sum() - 2.0 * b.max() <= 0.0:
+                mats.append(a)
+                found += 1
+    return mats
+
+
+@pytest.mark.slow  # 15 s serial: the 1200-matrix domain test, run nightly like the other B10 domain tests
+def test_the_clipped_centroid_stays_within_an_esds_own_error_of_the_hold():
+    """``A5_CLIP`` over its domain: every (A5) failure a data matrix can have.
+
+    The comment claims the clipped restraint is "the near-limit of a hold on
+    that site".  The hold is the clip's ε → 0 limit, so the error is how far
+    each light site's z esd sits from the hold's, and the bar is an esd's
+    own sampling error at the smallest N − P in the families
+    (:data:`A5_HOLD_BAR`, 1 %).  Over 1200 matrices the median is 0.033 %
+    and the 95th percentile 0.2 %.  The deviation scales as ε, and (A6)
+    converges at every clip from 1e-3 to 1e-5 on all 1200, the sum solve
+    taking over where it stalls.  So a smaller clip costs nothing measured.
+
+    At the clip of 1e-3 shipped until the seventh round, two of the 1200 kept
+    a light site's z esd 1.2 % and 1.4 % from the hold; 3e-4 left at most
+    0.42 % and the shipped 1e-4 leaves 0.14 % (measured 2026-10-21).  Made to
+    fail on 2026-10-21 by patching ``A5_CLIP`` back to 1e-3.
+    """
+    from rietx.model.origin import centroid_coefficients
+
+    worst = 0.0
+    for a in _realisable_a5_failures():
+        b = np.diag(a).copy()
+        r = int(np.argmax(b))
+        keep = [c for c in range(len(b)) if c != r]
+        hold = np.sqrt(np.diag(np.linalg.pinv(a[np.ix_(keep, keep)])))
+        solve = centroid_coefficients(b)
+        assert solve.clipped == r and solve.converged
+        clipped = np.sqrt(np.diag(np.linalg.pinv(a + np.outer(solve.a, solve.a))))[keep]
+        worst = max(worst, float(np.max(np.abs(clipped / hold - 1.0))))
+    assert worst <= A5_HOLD_BAR, f"a light site's z esd sits {worst:.2%} from the hold"
 
 
 @pytest.mark.parametrize("b", [[5.0, 5.0, 1e-3], [6724.0, 6724.0, 1.0],
@@ -839,7 +986,7 @@ def test_the_origin_rows_are_exact_at_any_step(zincite_data):
 def test_a_restraint_weight_of_zero_leaves_the_origin_fixed(zincite_data):
     """c_w scales the caller's restraints, never the origin's own block."""
     ins = _zincite_instrument()
-    ins.background = rx.auto_background(zincite_data)
+    ins.background = rx.auto_background(zincite_data).background
     ref = rx.Refinement(rx.Structure(phases=[_zincite(Z_O + 0.02, "centroid")]),
                         ins, history=False)
     plan = rx.RefinementPlan(stages=[
@@ -892,7 +1039,7 @@ def _fit_centroid(phase, data, shift: float):
     origin shift), fitted under :data:`PLAN`."""
     start = _centroid(phase.model_copy(deep=True))
     ins = rx.Instrument.bragg_brentano(radiation="CuKa")
-    ins.background = rx.auto_background(data)
+    ins.background = rx.auto_background(data).background
     ref = rx.Refinement(rx.Structure(phases=[start]), ins, history=False)
     paths = {e.path for e in ref._working_table().entries}
     ref.set_values({f"phases.0.atoms.{j}.dof.{k}": shift * (j + 1) * (-1) ** (j + k)

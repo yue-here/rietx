@@ -120,3 +120,32 @@ synthetic Cu, tetragonal against cubic. A truly tetragonal specimen gave ΔBIC
 a {hhh}/{h00} peak shift gave ΔBIC +25 and −30 % on 4.9 %. Issue #219 is the
 laboratory case.) Both fits must share channels, intensities and σ, or it
 raises.
+
+**A size read against another setup's profile is about 9 esd off, and nothing
+says so.** `load_instrument_profile` describes the slits, optics and
+wavelength its standard was measured with. Used on a sample from a setup with
+twice the W and X, or the reverse, the crystallite size came back 325.3(27) and
+281.5(21) Å against 300, with Rwp within 0.001 of the matched fit. Only the
+narrower profile left a trace: a Gaussian size of 1530(230) Å the sample did not
+have. Ask which setup a profile came from before quoting a size from it.
+(Measured: WP-1986, synthetic LaB₆ and CeO₂, `examples/guides/calibrate.py`.)
+
+**Before a joint fit, fit each pattern alone and compare the cells.** A neutron
+wavelength declared 300 ppm short left that pattern's cell 293 ppm short. Held
+in the joint fit, it moved the shared a 2.6 esd and widened both corundum
+coordinates' esds past the X-ray pattern's own, with no finding. Hold the best
+calibrated pattern's wavelength, free the other's
+(`hist.1.instrument.source.lines.0.wavelength`), and read
+`WAVELENGTH_CALIBRATION` on `result.histograms[1].diagnostics`. (Measured:
+WP-1986, synthetic corundum, `examples/guides/joint.py`: +297.3 ppm recovered,
+5.1 ppm a esd.)
+
+**Ask for a torsion before you change the model.** `result.geometry.torsions`
+holds the torsion angles over bonded chains, Klyne-Prelog's sign in
+(−180°, 180°], at most 36 about each atom (`notes` counts the rest). For a row
+the table left out, call `ref.geometry({"torsions": [["C1", "C2", "C3",
+"C4"]], "distances": [["O1", ("N2", "2_555")]]})`: a label alone takes the
+image nearest the atom before it, and `(label, "n_klm")` names one. Its esds
+come from the last fit's covariance, which an edit or a checkout drops, after
+which every esd is `None`. (Measured: WP-1815, the published torsion loops of a
+TOPAS-6 and a SHELXL refinement reproduced to their printed digits.)

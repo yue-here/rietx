@@ -197,9 +197,11 @@ def test_the_result_type_has_no_singleton_accessor():
     ({}, "high"),
     ({"found_by": ["dichotomy"]}, "low"),
     ({"lebail": None}, "medium"),
+    # capping since thresholds 1.12 (C3): a count a truth's undetected weak
+    # lines can raise keeps ``high`` out of reach; the pairwise check refutes
     ({"lebail": LeBailValidation(rwp=0.4, gof=2.4, space_group="P m -3 m",
                                  n_reflections=153, predicted_but_absent=117)},
-     "low"),
+     "medium"),
     ({"lebail": LeBailValidation(rwp=float("inf"), gof=float("inf"),
                                  space_group="P m -3 m", n_reflections=0,
                                  status="failed")}, "low"),
@@ -226,6 +228,58 @@ def test_best_or_none_is_none_under_every_gate_failure(break_it, expect):
     assert (result.best_or_none() is not None) is (expect == "high")
 
 
+def _fractions(by_line: float, by_intensity: float) -> list[FigureOfMerit]:
+    return [FigureOfMerit(name="indexed_fraction", value=by_line, n_lines=53,
+                          n_possible=40, k_sigma=3.0),
+            FigureOfMerit(name="indexed_intensity_fraction", value=by_intensity,
+                          n_lines=53, n_possible=40, k_sigma=3.0)]
+
+
+@pytest.mark.parametrize("by_line,by_intensity,caveat,grade", [
+    # #933's shape: weak foreign lines take the line count under the bar and
+    # leave the intensity the cell explains above it — not refuted, but the
+    # count under the bar caps the grade (yue-here's ruling on #1042)
+    (0.68, 0.95, "indexed_lines_low", "medium"),
+    # the reverse: every line but a strong one indexed — refuted, where the
+    # line count alone would have passed it
+    (0.95, 0.80, "indexed_fraction_low", "low"),
+    (0.95, 0.95, None, "high"),
+    # both under the bar: the refuting caveat says it, the cap is not stacked
+    (0.68, 0.80, "indexed_fraction_low", "low"),
+])
+def test_indexed_fraction_low_reads_the_intensity_the_cell_explains(
+        by_line, by_intensity, caveat, grade):
+    """``indexed_fraction_low`` is read on the intensity-weighted fraction
+    (WP-1969, issue #933), so a cell's own impurities do not refute it by
+    their count, and a missed strong line refutes it whatever the count.  A
+    line count under the same bar caps the grade at ``medium`` through
+    ``indexed_lines_low``, which names the shortfall the panel holds."""
+    caveats, verdict = _gate(_candidate(TRUE_A,
+                                        fom=_fractions(by_line, by_intensity)))
+    assert [c for c in caveats if c.startswith("indexed_")] == (
+        [caveat] if caveat else []), caveats
+    assert verdict == grade, caveats
+
+
+def test_indexed_lines_low_caps_and_does_not_refute():
+    from typing import get_args
+
+    from rietx.schemas.indexing import INDEX_REFUTING_CAVEATS, IndexCaveat
+
+    assert "indexed_lines_low" in get_args(IndexCaveat)
+    assert "indexed_lines_low" not in INDEX_REFUTING_CAVEATS
+
+
+def test_indexed_fraction_low_falls_back_to_the_line_fraction():
+    """A panel without the weighted member (a hand-built candidate) is read on
+    the line fraction, and a candidate with no panel at all is still refuted:
+    the reflection ceiling it hit is what the caveat reports."""
+    one = [FigureOfMerit(name="indexed_fraction", value=0.85, n_lines=23,
+                         n_possible=28, k_sigma=3.0)]
+    assert "indexed_fraction_low" in _gate(_candidate(TRUE_A, fom=one))[0]
+    assert "indexed_fraction_low" in _gate(_candidate(TRUE_A, fom=[]))[0]
+
+
 def _result(candidates) -> IndexingResult:
     from rietx.schemas.common import Provenance
 
@@ -247,6 +301,24 @@ def test_two_high_candidates_are_not_a_singleton():
     codes = {d.code for d in index_diagnostics(result)}
     assert "INDEX_MULTIPLE_SOLUTIONS" in codes
     assert "INDEX_ABSTAINED" in codes
+
+
+def test_the_abstention_names_the_refuting_caveats_the_gate_uses():
+    """The suggestion's list of caveats to act on first is read off the gate's
+    own set, so it cannot keep naming one the gate moved to a cap (C3 moved
+    ``predicted_but_absent``)."""
+    from rietx.indexing.diagnostics import index_diagnostics
+    from rietx.schemas.indexing import INDEX_REFUTING_CAVEATS
+
+    a, b = _candidate(TRUE_A), _candidate(2 * TRUE_A)
+    for cand in (a, b):
+        cand.confidence = "high"
+    text = next(d.suggestion for d in index_diagnostics(_result([a, b]))
+                if d.code == "INDEX_ABSTAINED")
+    refuting_part = text.split("(")[1].split(")")[0]
+    named = {w.strip() for w in refuting_part.split(",")}
+    assert named == INDEX_REFUTING_CAVEATS
+    assert "predicted_but_absent" not in refuting_part
 
 
 def test_an_ambiguous_winner_is_not_a_singleton():
@@ -640,6 +712,41 @@ def test_a_supercell_the_pattern_shows_rises_above_its_parent_and_a_phantom_does
         assert ordered[0] is (child if first == "child" else parent)
 
 
+def test_the_check_screens_each_cell_on_its_own_corrected_lines(cubic_peaks,
+                                                                monkeypatch):
+    """WP-2030, on #941's containment check: which lines a parent indexes is
+    read on the parent's own shift correction, never the child's.
+
+    ``screen_for`` hands each candidate its own ``scored_positions``; a parent
+    read on the child's lines indexes none of them and every extra the child
+    sees reads unexplained, which is "supported" for the wrong reason.
+    """
+    from rietx.indexing import screen
+    from rietx.indexing.engines import scored_positions
+
+    double = (TRUE_A, TRUE_A, 2 * TRUE_A, 90.0, 90.0, 90.0)
+    parent = _candidate(TRUE_A).model_copy(update={
+        "shift_template": "constant", "shift_coefficient": 0.03})
+    child = _candidate(TRUE_A, cell=double, system="tetragonal",
+                       lattice_group="P 4/m m m", volume=2 * TRUE_A ** 3)
+    seen = []
+    real = screen.screen_candidate
+
+    def spy(pattern, cell, system, centring, **kwargs):
+        seen.append((tuple(cell), kwargs["q_obs"]))
+        return real(pattern, cell, system, centring, **kwargs)
+
+    monkeypatch.setattr(screen, "screen_candidate", spy)
+    supercell_checks([parent, child], cubic_peaks, q_match=cubic_peaks.q_esd(),
+                     k_sigma=3.0)
+    by_cell = dict(seen)
+    assert np.array_equal(by_cell[tuple(float(v) for v in parent.cell)],
+                          scored_positions(cubic_peaks, parent)[0])
+    assert np.array_equal(by_cell[tuple(float(v) for v in child.cell)],
+                          scored_positions(cubic_peaks, child)[0])
+    assert not np.array_equal(*by_cell.values())
+
+
 def test_a_phantom_supercell_is_refuted_graded_down_and_told_where_to_look(
         cubic_peaks):
     """The check on a list, the caveat it raises, and the message that names it.
@@ -736,7 +843,7 @@ def test_absent_reflections_reads_the_fitted_background():
 @pytest.mark.parametrize("factor,expect_absent,expect_unmatched", [
     (1.0, 0, 0),                     # the truth
     (2.0, "most", 0),                # doubled cell: the oversized signature
-    (1.01, 0, "many"),               # wrong metric: caught from the other side
+    (1.01, "some", "many"),          # wrong metric: caught from both sides
 ])
 def test_le_bail_validation_separates_the_failure_modes(lab6_pattern, factor,
                                                         expect_absent,
@@ -744,19 +851,25 @@ def test_le_bail_validation_separates_the_failure_modes(lab6_pattern, factor,
     """The measurement the module's reasoning rests on, pinned.
 
     Read it by column rather than by row: Rwp is decisive on a wrong *metric* and
-    nearly silent on an *oversized* cell, where only ``predicted_but_absent``
-    sees it; the wrong metric is caught instead by ``unmatched_observed``.  That
-    is why all three travel together and why none of them is the score.
+    silent on an *oversized* cell, where only ``predicted_but_absent`` sees it;
+    the wrong metric is caught instead by ``unmatched_observed``.  That is why
+    all three travel together and why none of them is the score.  Under the
+    Pawley fit (WP-2011) the wrong metric's background stays near the truth, so
+    the fitted-background count sees its displaced lines too (14 of 28); the Le
+    Bail fit's sank, and that count read 0.
 
-    The bars are qualitative on purpose (``most``, ``many``) — the exact counts
-    are noise-seed-dependent and quoted in the module docstring, whereas what must
-    not regress is the *separation*.
+    The bars are qualitative on purpose (``most``, ``some``, ``many``) — the
+    exact counts are noise-seed-dependent and quoted in the module docstring,
+    whereas what must not regress is the *separation*.
     """
     validation = validate_by_lebail(_candidate(TRUE_A * factor), lab6_pattern,
                                    _instrument())
     assert validation.status == "converged"
+    assert validation.mode == "pawley"
     if expect_absent == 0:
         assert validation.predicted_but_absent == 0
+    elif expect_absent == "some":
+        assert validation.predicted_but_absent > 0
     else:
         assert validation.predicted_but_absent > 0.5 * validation.n_reflections
     if expect_unmatched == 0:
@@ -765,6 +878,44 @@ def test_le_bail_validation_separates_the_failure_modes(lab6_pattern, factor,
         assert validation.unmatched_observed > 20
     assert len(validation.predicted_but_absent_two_theta) == \
         validation.predicted_but_absent
+
+
+def test_the_validation_fits_a_supercell_as_well_as_its_parent(lab6_pattern):
+    """Why ``rwp`` is silent on an oversized cell, pinned (WP-2011).
+
+    The doubled cell predicts a line at every position the truth does, so a
+    converged decomposition gives it the truth's fit and more freedom besides.
+    One Le Bail pass read 0.354 against 0.234 here: a gap its stall made, which
+    the diagnostics quoted as if the lattice had.
+    """
+    truth = validate_by_lebail(_candidate(TRUE_A), lab6_pattern, _instrument())
+    doubled = validate_by_lebail(_candidate(2.0 * TRUE_A), lab6_pattern,
+                                 _instrument())
+    assert doubled.rwp == pytest.approx(truth.rwp, rel=0.01), (
+        doubled.rwp, truth.rwp)
+
+
+def test_the_validation_record_names_its_fit_on_every_path(lab6_pattern,
+                                                            monkeypatch):
+    """``LeBailValidation.mode``'s two writers and its default (WP-2011).
+
+    A record from before schema 0.60 has no key and was a Le Bail fit, so the
+    default reads ``"lebail"``; both writers in ``validate_by_lebail`` name
+    the fit that ran, the failed path included.
+    """
+    from rietx.refine import Refinement
+    from rietx.schemas.indexing import LeBailValidation
+
+    old = LeBailValidation.model_validate(
+        {"rwp": 0.2, "gof": 1.5, "space_group": "P m -3 m", "n_reflections": 28})
+    assert old.mode == "lebail"
+
+    def raises(self, *a, **kw):
+        raise ValueError("a fit the physics refuses")
+
+    monkeypatch.setattr(Refinement, "fit", raises)
+    failed = validate_by_lebail(_candidate(TRUE_A), lab6_pattern, _instrument())
+    assert failed.status == "failed" and failed.mode == "pawley"
 
 
 def test_layer0_unmatched_calc_cannot_serve_as_the_absent_detector(lab6_pattern):
@@ -816,23 +967,56 @@ def test_index_pattern_recovers_the_cell_and_refutes_its_supercells(lab6_pattern
     assert result.validated and result.search_complete == {"cubic": True}
     assert result.provenance.notes["engines"] == ", ".join(engine_names())
 
-    # the supercells that index every observed line are refuted by the pattern,
-    # not by the panel — this is the blind spot validation exists to close.
-    # Only the checked subset carries a verdict: validation costs a refinement
-    # each, so the rest must say **not_validated** rather than look clean, and
-    # that half of the claim is the one a widening candidate list can break.
+    # the supercells that index every observed line are refuted by the
+    # pattern, not by the panel — this is the blind spot validation exists to
+    # close.  Since C3 (thresholds 1.12) the refutation is the pairwise check
+    # (``supercell_refuted``: the lines a superlattice adds over the truth,
+    # that no extinction could remove, are seen no more often than chance)
+    # and the line screen's absent count **caps**.  Only the checked subset
+    # carries a verdict: validation costs a refinement each, so the rest must
+    # say **not_validated** rather than look clean, and that half of the
+    # claim is the one a widening candidate list can break.
     supercells = [c for c in result.candidates if c.volume > 2 * best.volume]
     assert supercells, "the F/I supercells should be proposed and then refuted"
     tested = [c for c in supercells if c.lebail is not None]
     assert tested, "no supercell reached validation at all"
     for cand in supercells:
-        assert cand.confidence == "low"
+        assert cand.confidence != "high"
         if cand.lebail is None:
             assert "not_validated" in cand.confidence_caveats
             continue
+        assert cand.lebail.absent_source == "line_screen"
         assert "predicted_but_absent" in cand.confidence_caveats
         assert any(d.code == "INDEX_PREDICTED_BUT_ABSENT"
                    for d in cand.diagnostics)
+    # the true superlattices — the 2a cells and the P description of the
+    # a√2 I lattice — are refuted against their parents and grade low
+    doubled = [c for c in supercells if c.cell[0] == pytest.approx(2 * TRUE_A, rel=1e-3)]
+    assert len(doubled) >= 2
+    for cand in doubled + [c for c in supercells if c.centring == "P"
+                           and c.cell[0] == pytest.approx(np.sqrt(2) * TRUE_A, rel=1e-3)]:
+        assert cand.confidence == "low"
+        assert any(k.verdict == "refuted" for k in cand.supercell_checks or []), cand.cell
+        assert "supercell_refuted" in cand.confidence_caveats
+    # the a√2 I cell is no superlattice (primitive volume 2.83× the truth's):
+    # it misses the 321 line and predicts three lines P has none at (M = 7,
+    # 15, 23), so neither direction of the containment check is asked and
+    # the screen's two windowed absences cap it at medium — what a true
+    # cell reads on lab data (C3: magnetite 2) and so never a
+    # refutation.  It ranks below the truth and cannot reach ``high``.
+    (root2,) = [c for c in supercells if c.centring == "I"
+                and c.cell[0] == pytest.approx(np.sqrt(2) * TRUE_A, rel=1e-3)]
+    assert root2.confidence == "medium"
+    assert root2.confidence_caveats == ["predicted_but_absent"]
+    assert root2.lebail.predicted_but_absent_uncancellable_in_window >= 1
+    assert result.candidates.index(root2) > result.candidates.index(best)
+    # the density compared across candidates (#941's follow-up), written by
+    # the run: the truth is the cleanest (excess 0), the a√2 I cell carries
+    # its windowed absences over and above it, which the raw count shares
+    # with magnetite's and PbSO₄'s true cells
+    assert best.lebail.predicted_but_absent_excess_in_window == 0.0
+    assert root2.lebail.predicted_but_absent_excess_in_window == pytest.approx(
+        root2.lebail.predicted_but_absent_uncancellable_in_window)
 
 
 def test_a_peaks_only_run_abstains_by_declaration(cubic_peaks):
@@ -931,9 +1115,10 @@ def test_the_evidence_view_is_a_projection_with_caveat_kinds():
 
     The refuting/capping split lived only in ``INDEX_REFUTING_CAVEATS``, a
     package constant no JSON consumer can see, so the serialized answer could
-    name ``predicted_but_absent`` and ``not_validated`` in the same list
+    name ``supercell_refuted`` and ``not_validated`` in the same list
     without saying that one argues against the cell and the other only says a
-    question was never asked.  ``evidence()`` computes the view from the live
+    question was never asked (``predicted_but_absent`` was the refuting
+    example until thresholds 1.12 made it capping).  ``evidence()`` computes the view from the live
     fields on each call, so the two representations cannot disagree."""
     from typing import get_args
 
@@ -942,7 +1127,7 @@ def test_the_evidence_view_is_a_projection_with_caveat_kinds():
     from rietx.schemas.indexing import IndexingEvidence
 
     refuted = _candidate(
-        TRUE_A, confidence="low",
+        TRUE_A, confidence="medium",
         confidence_caveats=["predicted_but_absent", "not_validated"],
         lebail=LeBailValidation(rwp=0.379, gof=2.1, space_group="P m -3 m",
                                 n_reflections=153, predicted_but_absent=117,
@@ -960,7 +1145,7 @@ def test_the_evidence_view_is_a_projection_with_caveat_kinds():
     ev = result.evidence()
     assert [c.index for c in ev.candidates] == [0, 1]
     kinds = {c.name: c.kind for c in ev.candidates[0].caveats}
-    assert kinds == {"predicted_but_absent": "refuting",
+    assert kinds == {"predicted_but_absent": "capping",     # 1.12: caps (C3)
                      "not_validated": "capping"}
     assert ev.candidates[1].caveats[0].kind == "capping"
 
@@ -1105,3 +1290,24 @@ def test_a_monoclinic_candidate_is_reported_in_its_conventional_setting():
     out = to_cell_candidate(cand, peaks)
     assert out.change_of_basis == ((1, 0, 0), (0, 1, 0), (0, 0, 1))
     assert out.engine_cell == out.cell
+
+
+def test_the_fallback_panel_is_scored_at_the_resolution_like_the_search_panel(
+        monkeypatch):
+    """``to_cell_candidate`` builds its own panel when the engine brought none
+    (a prior, or a ``_panel_for`` that raised); it must ask the reversed member
+    the way ``_panel_for`` does, with the peak list's widths.  Spied, because on
+    a clean list the two members' values can coincide."""
+    from rietx.indexing import engines
+
+    cand, peaks = _monoclinic_engine_candidate(
+        (4.541, 4.884, 10.198, 90.0, 98.22, 90.0))
+    assert not cand.fom
+    calls = []
+    real = engines.fom_panel
+    monkeypatch.setattr(engines, "fom_panel",
+                        lambda *a, **kw: calls.append(kw.get("fwhm_obs")) or real(*a, **kw))
+    engines.to_cell_candidate(cand, peaks)
+    engines._panel_for(cand, peaks, 3.0)
+    assert len(calls) == 2 and all(w is not None for w in calls)
+    assert np.array_equal(calls[0], calls[1])

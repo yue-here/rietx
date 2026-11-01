@@ -7,6 +7,8 @@ columns its format gives, so a test reads as the record layout it pins.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from rietx import read_gsas2_instprm
@@ -108,12 +110,126 @@ def test_icons_gives_difc_difa_zero_for_a_pntr_bank(tmp_path):
 
 
 def test_icons_with_polarisation_columns_is_refused_on_a_neutron_bank(tmp_path):
-    """POLA, IPOLA, KRATIO are absent for neutron data, so
-    non-blank columns 53-77 are refused."""
+    """POLA, IPOLA, KRATIO are absent for neutron data, so a non-zero POLA
+    is refused, naming its columns."""
     b = bank(1)
     b[0] = icons(1, 5123.45, -1.23, -12.34, tail=f"{0.99:10.4f}")
-    with pytest.raises(ValueError, match="columns 53-77"):
+    with pytest.raises(ValueError, match=r"POLA in columns 53-62 is '0\.9900'"):
         read_gsas_tof_iparm(write(tmp_path, iparm(b)))
+
+
+# The ICONS tail a writer that fills every field puts on a neutron bank:
+# POLA (F10.0, columns 53-62), IPOLA (I5, 63-67) and KRATIO (F10.0, 68-77)
+# each written as an explicit zero, right-aligned, the record padded to 80.
+ZERO_TAIL = f"{0.0:10.3f}{0:5d}{0.0:10.3f}"
+
+
+def _icons_tail(tail: str) -> str:
+    """Bank 1's ICONS record with ``tail`` from column 53."""
+    return icons(1, 5123.45, -1.23, -12.34, tail=tail)
+
+
+def _read_tail(tmp_path, tail: str, pad: bool = False):
+    b = bank(1)
+    b[0] = _icons_tail(tail).ljust(80 if pad else 0)
+    return read_gsas_tof_iparm(write(tmp_path, iparm(b)))[1].source
+
+
+def test_explicit_zeros_in_the_absent_icons_fields_read_as_blanks(tmp_path):
+    """A blank FORTRAN numeric field reads as zero (ANSI X3.9-1978 §13.5.9
+    item (1)), so a writer cannot say "absent" any other way than blank or
+    zero, and the two are one record.  Files from a spallation source write
+    the zeros; the bank they describe reads exactly as its blank twin."""
+    assert ZERO_TAIL == "     0.000    0     0.000"
+    assert len(_icons_tail(ZERO_TAIL).ljust(80)) == 80
+    blank = _read_tail(tmp_path, "")
+    zeros = _read_tail(tmp_path, ZERO_TAIL, pad=True)
+    assert (zeros.difc.value, zeros.difa.value, zeros.tzero.value) == (
+        blank.difc.value, blank.difa.value, blank.tzero.value) == (
+        5123.45, -1.23, -12.34)
+    assert zeros.model_dump() == blank.model_dump()
+
+
+@pytest.mark.parametrize("tail, field, cols, shown", [
+    (f"{0.99:10.3f}{0:5d}{0.0:10.3f}", "POLA", "53-62", "0.990"),
+    (f"{0.0:10.3f}{1:5d}{0.0:10.3f}", "IPOLA", "63-67", "1"),
+    (f"{0.0:10.3f}{0:5d}{0.5:10.3f}", "KRATIO", "68-77", "0.500"),
+    # a value float() would underflow to 0.0 is still a non-zero field
+    (f"{'1.0E-999':>10}{0:5d}{0.0:10.3f}", "POLA", "53-62", "1.0E-999"),
+])
+def test_a_non_zero_absent_field_is_still_refused_by_its_columns(
+        tmp_path, tail, field, cols, shown):
+    """The positive arm: a non-zero POLA, IPOLA or KRATIO is an X-ray
+    record's, and each is refused naming its own columns and value."""
+    with pytest.raises(ValueError, match=rf"'INS  1 ICONS'.*{field} in columns "
+                                         rf"{cols} is '{re.escape(shown)}'.*"
+                                         rf"p\. 222"):
+        _read_tail(tmp_path, tail)
+
+
+@pytest.mark.parametrize("tail, field, cols, what", [
+    (f"{'zero':>10}", "POLA", "53-62", "a number"),
+    (f"{0.0:10.3f}{'n/a':>5}", "IPOLA", "63-67", "an integer"),
+    (f"{0.0:10.3f}{'0.0':>5}", "IPOLA", "63-67", "an integer"),  # I5 has no point
+    (f"{0.0:10.3f}{0:5d}{'0.0E':>10}", "KRATIO", "68-77", "a number"),
+    (f"{0.0:10.3f}{0:5d}{'.':>10}", "KRATIO", "68-77", "a number"),
+])
+def test_a_non_number_in_an_absent_field_is_refused_by_its_columns(
+        tmp_path, tail, field, cols, what):
+    with pytest.raises(ValueError, match=rf"{field} in columns {cols} is .*which "
+                                         rf"is not {what}"):
+        _read_tail(tmp_path, tail)
+
+
+@pytest.mark.parametrize("pola, ipola, kratio", [
+    ("0", "0", "0"),
+    ("0.", "-0", "0."),
+    ("-0.000", "+0", "-0.000"),
+    ("0.0E+00", "00000", "0.0E+00"),
+    ("0.0D+00", "0", "+.0"),
+    ("0.0+05", "0", "0.0E-3"),      # F input's exponent may be a bare signed integer
+])
+def test_every_fortran_spelling_of_zero_reads_as_absent(tmp_path, pola, ipola, kratio):
+    """``0``, ``0.``, ``-0.000`` and ``0.0E+00`` are all a zero under F and
+    I input (§13.5.9.1, §13.5.9.2.1), right-aligned in their own columns."""
+    ref = _read_tail(tmp_path, "")
+    src = _read_tail(tmp_path, f"{pola:>10}{ipola:>5}{kratio:>10}")
+    assert src.model_dump() == ref.model_dump()
+
+
+def test_a_left_aligned_zero_reads_as_absent(tmp_path):
+    """Leading blanks are not significant and, under the default
+    ``BLANK='NULL'``, trailing ones are ignored, so a zero written at the
+    left of its field is still a zero."""
+    ref = _read_tail(tmp_path, "")
+    src = _read_tail(tmp_path, f"{'0.000':<10}{'0':<5}{'0.0':<10}")
+    assert src.model_dump() == ref.model_dump()
+
+
+@pytest.mark.parametrize("tail", [
+    f"{'0. 0':>10}{0:5d}{0.0:10.3f}",        # POLA: 0.0 or 0.00
+    f"{0.0:10.3f}{'0 0':>5}{0.0:10.3f}",     # IPOLA: 00 or 000
+    f"{0.0:10.3f}{0:5d}{'0 .0 0':>10}",      # KRATIO: 0.00 or 00.000
+])
+def test_a_zero_with_embedded_blanks_reads_as_absent(tmp_path, tail):
+    """Embedded blanks are ignored under ``BLANK='NULL'`` and are zeros under
+    ``BLANK='ZERO'`` (§12.10.1, §13.5.8).  Which mode GSAS opens its file in
+    is not stated, but the choice changes a value, never whether it is zero:
+    a zero digit inserted into a zero is a zero.  So the field is a zero under
+    either reading, and is accepted."""
+    ref = _read_tail(tmp_path, "")
+    assert _read_tail(tmp_path, tail).model_dump() == ref.model_dump()
+
+
+@pytest.mark.parametrize("tail, field, cols", [
+    (f"{0.0:10.3f}{'1 0':>5}{0.0:10.3f}", "IPOLA", "63-67"),      # 10 or 100
+    (f"{0.0:10.3f}{0:5d}{'0.0 5':>10}", "KRATIO", "68-77"),       # 0.05 or 0.005
+])
+def test_a_non_zero_with_embedded_blanks_is_refused(tmp_path, tail, field, cols):
+    """The other half of the embedded-blank rule: a field that is non-zero
+    under either blank mode is refused, whichever value it would take."""
+    with pytest.raises(ValueError, match=rf"{field} in columns {cols} is"):
+        _read_tail(tmp_path, tail)
 
 
 def test_the_default_type_three_block_is_read_in_the_manuals_order(tmp_path):

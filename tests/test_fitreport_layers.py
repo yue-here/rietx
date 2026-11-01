@@ -119,7 +119,8 @@ def _result_for(structure, ins, data):
 def _report_for(structure, ins, data, **kw):
     """Build the full report for a *given* (unrefined) model state."""
     result, model, values = _result_for(structure, ins, data)
-    return build_report(result, model=model, values=values, **kw)
+    kw.setdefault("structure", structure)
+    return build_report(result, model=model, values=values, instrument=ins, **kw)
 
 
 def _coefficients(report, kind):
@@ -1448,6 +1449,21 @@ def test_license_rides_statistics_and_summary_from_one_render(truth):
     assert report2.summary.endswith("\n" + clause)
 
 
+@pytest.mark.parametrize("missing", ["structure", "instrument", "both"])
+def test_a_model_without_what_it_was_compiled_from_is_refused(truth, missing):
+    """Read from one model, Layer 1 takes its misfit and its shapes at one
+    precision, and each alone misreads a measured case (WP-2002), so the call
+    names what is missing rather than reporting from one model."""
+    structure, ins, data = truth
+    result, model, values = _result_for(structure, ins, data)
+    given = {"structure": None if missing in ("structure", "both") else structure,
+             "instrument": None if missing in ("instrument", "both") else ins}
+    with pytest.raises(TypeError, match="needs .*Refinement.report"):
+        build_report(result, model=model, values=values, **given)
+    # Layer 0 alone needs neither
+    assert build_report(result).layer1_available is False
+
+
 def test_license_field_stays_none_when_nothing_fires(truth):
     """``None`` is the honest empty state (WP-1076) and covers both causes —
     no report built, and nothing crossed a comment threshold — never a
@@ -1455,7 +1471,7 @@ def test_license_field_stays_none_when_nothing_fires(truth):
     structure, ins, data = truth
     result, model, values = _result_for(structure, ins, data)
     assert result.statistics.identifiability_clause is None
-    build_report(result, model=model, values=values)
+    build_report(result, model=model, values=values, structure=structure, instrument=ins)
     assert result.statistics.identifiability_clause is None
     dumped = result.model_dump(mode="json")
     assert dumped["statistics"]["identifiability_clause"] is None

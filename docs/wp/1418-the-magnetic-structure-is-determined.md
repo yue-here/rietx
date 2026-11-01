@@ -1,6 +1,6 @@
 # WP-1418 — the magnetic structure is determined, not only stated
 
-Milestone: magnetic · Status: 🔄 2026-10-14 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853), #820's option (a) (PR #953), #565's certificates part 5 (PR #936); M-8, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
+Milestone: magnetic · Status: 🔄 2026-11-01 — M-6 and M-7 landed (PR #389), the #439 row (PR #449), M-7's frame fix (PR #536), #455's Gram path (PR #535) and basis fix (PR #532), #563's sign text (PR #564), M-9's verb `solve_magnetic` with its Part 1 section and skill rows (PR #592), #565's certificates part 1 (PR #582), #679's displacive group (PR #680), #607's operator-list check (PR #785), #608's domain count (PR #786), #565's certificates part 2 (PR #772), #724's `tie_to_parent` opt-in (PR #746), #565's certificates part 3 (PR #809), #820's first test made machine-independent (PR #829), #565's certificates part 4 (PR #853) and its follow-ups (PR #1228), #820's option (a) (PR #953), #565's certificates part 5 (PR #936), #458's recipe as a guide (PR #1074), the LaMnO₃ acceptance on real data (PR #1086), the `magnetic_structural` preset with `PLAN_FREES_NO_MOMENT` (PR #1204, `502316ac`, #1082); M-8, M-9's `help.py` entries, Part 2 and the M-9 PNGs remain
 Depends on: PR #290's `crystallography.magnetic` (landed 2026-09-10);
 1326 (the k candidates) for the k-search rung; 1327 (the moment, the hold)
 for the determination verb. The irrep and isotropy rungs depend on nothing
@@ -82,11 +82,11 @@ tree depends on, plus tests.
   the published group of ≥ 10 MAGNDATA parents is in the list with its
   label; Pnma at Γ gives four maximal candidates; Shirane's cubic collinear
   degeneracy comes out as one class.
-- **M-8 — the k-search beyond {0, ½}³.** 1326's arm with a pluggable
-  candidate generator (issue #257 A1): every special point and line of the
-  zone, labelled, then a general-k grid, an incommensurate k admitted as a
-  *position* hypothesis and reported as such. Same files as 1326, so after
-  it lands.
+- **M-8 — the k-search beyond {0, ½}³.** 1326's arm takes a pluggable
+  candidate generator (`generator=`, issue #257 A1, landed with 1326's close).
+  M-8 adds a generator with every special point and line of the zone,
+  labelled, then a general-k grid, with an incommensurate k admitted as a
+  *position* hypothesis and reported as such.
 - **M-9 — the determination verb.** k candidates → M-7 candidates → one
   trial refinement per class under 1327's hold → ranking by ΔBIC at equal
   parameter count (with 1417's caveat on N) and a magnetic-only R over the
@@ -125,6 +125,28 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 ### Inherited
 
+- **2026-11-01, from [WP-1919](1919-maximal-subgroups-generated-from-the-operators.md)'s close: the maximal-subgroup list this WP wanted now exists.** `rietx.crystallography.representation.subgroups.maximal(group, kind, max_index)` returns every maximal t- and k-subgroup of a space group, each with its conjugacy class and its (P, p) checked exactly (PR #1189). `strategy/magnetic.py` `_maximal_subgroups` is still maximal only among the classes enumerated at the winner's k, so the descent audit can take its nuclear part from the new list. Wyckoff splittings come from `wyckoff_splitting(group, sub)` (PR #1239).
+
+- **2026-10-23, from [1326](1326-satellites-without-a-moment.md)'s close
+  (originally WP-1541, 2026-10-03): the satellite types have no provisional
+  declaration a test can see.** `SatelliteEvidence` and `SatelliteCandidate`
+  are still defined in `rietx.report.schemas` (`:610`, `:649` at `12f459e`).
+  That module defines stable names too, so no `PROVISIONAL_MODULES` prefix can
+  cover them, and only prose in the compatibility page and the 1.6.0 notes
+  calls them provisional. The proposed fix is to move both into
+  `rietx.report.satellites`, re-export them from `rietx.report.schemas`, and
+  declare that prefix with a reason. M-8's decision 3 (new fields on
+  `SatelliteCandidate`, or a `KSearchResult` beside `SatelliteEvidence`) is
+  where they change, so it moves here.
+- **2026-10-22, from WP-2002 (PR #1085): `solve_magnetic`'s winner ends in a closing stage.**
+  When the package chose the plan, the trials and the nuclear reference still
+  run no closing stage and are ranked there, and the winner then runs one from
+  its own refinement (`strategy.magnetic._close`). Its Rwp, GoF, R_mag, moments
+  and held list come from that stage; its ΔBIC stays the ranking's, and a caveat
+  says so. A caller's plan is untouched. Numbers quoted from an earlier solve
+  move: on the two-site Pnma set the moduli esds fall 1.61× (0.00242 → 0.00151
+  μ_B), and on Cr₂WO₆ at 4 K the blind moment reads 2.0383 ± 0.0467 μ_B (was
+  2.0353 ± 0.0459). The losing trials' rows stay at the declared windows.
 - **2026-10-15, from WP-1325: the moment-angle test divides by χ²_red·f².**
   `least_squares.stationary_angle_test` scales its Δχ² by χ²_red·f², the
   Bérar-Lelann factor squared. WP-1325's parametric form test dropped the f²
@@ -289,9 +311,9 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
      position half out of #678 for this.
   3. Schema: new fields on `SatelliteCandidate` with a schema and
      `REPORT_THRESHOLDS` bump, or a `KSearchResult` beside
-     `SatelliteEvidence`. 1326's Inherited entry from WP-1541 already
-     proposes moving both satellite types into `rietx.report.satellites` as
-     provisional.
+     `SatelliteEvidence`. WP-1541's proposal to move both satellite types
+     into `rietx.report.satellites` as provisional is in this WP's Inherited
+     (2026-10-23, from 1326's close).
   4. Which of K3, K4, K6 and K7 this WP takes, and which wait behind the
      fence or another WP. K4's complex S_k is M-11a's object.
 
@@ -749,6 +771,102 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
   docstring's "class 3 stops short" is stale on Linux. The bands for option
   (a) should be re-derived from the class-3 pair, whose sum sits 0.018 inside
   the 0.5 edge, before the PR is taken.
+- **2026-10-21, from [2019](2019-each-fast-leg-runs-what-only-it-can-see.md)
+  (PR #1095): `test_magnetic_isotropy.py` is now the fast tier's largest
+  file.** 968 of 5 487 worker-seconds over its 199 cases (`[dev]`, Linux
+  x86-64, Python 3.12, `-n 4`, the whole tier at 39de013), its top cases
+  77-98 s each. A CI shard takes a file whole (`tests/shards.py`), so this one
+  file is a floor under whichever shard holds it, and 2019's per-push target
+  (the slowest fast job at 15 min or less) depends on it. The
+  fixture-or-faster-`analyse` choice this section already holds is the lever;
+  2019 left the file alone as this WP's.
+
+- **2026-10-26 issue triage: #1083, the winner's structure is reachable only
+  privately or through a lossy magCIF round trip.** `MagneticTrial._structure`
+  (`strategy/magnetic.py:426`) is the only carrier; the guide's route 2 reads
+  the winner back. Checked against the tree at c0e32ab29 on the issue's
+  synthetic k = (0,0,½) set (124.360 winner, `tie_to_parent=True`): the
+  read-back has every moment `vary=False`, no modulus esd
+  (`CIF_MAGNETIC_MAGNITUDE_ESD_NOT_STORED`), scale 1.0 against the trial's
+  0.2507, and no anti-translation tie, so a next fit freeing `moment.dof*`
+  gives each modulus 3.0022 ± 14 930 μ_B (the forbidden ferromagnetic
+  combination is free and flat). The `vary=False` alone costs nothing to a plan
+  that names `moment.dof*` (a plan replaces vary flags, WP-1208). Proposed by
+  the reporter: a read-only `MagneticTrial.structure` returning a deep copy of
+  the fitted structure, moments' `vary` as fitted, with
+  `MagneticSolution.best.structure` the usual call; a `MagneticSolution.refinement(data)`
+  carrying the solve's ties is the alternative, and it is the one that would
+  also carry the ties (a `Structure` cannot; #1081's option 1 would make that
+  moot by deriving them in the table). This is the access half of the
+  § Tasks box the 2026-10-21 entry asks for (#458 in the package).
+
+- **2026-10-26 issue triage: #1082, no preset refines the moment with the
+  structure, and a fit under one never says the moment was held.** Checked
+  against the tree at c0e32ab29: of the eight `PLAN_PRESETS`, only
+  `magnetic_width` frees `moment.dof*`, and it frees no coordinate, Biso or
+  cell. On #1081's synthetic k = (0,0,½) child with the moment started 20 %
+  high (3.6 against 3.0 μ_B), `mccusker_default` and `mccusker_structural` both
+  return it at 3.6 with no esd, no row in `result.parameters`, and no
+  diagnostic about the moment; `mccusker_structural` fires `BISO_NEGATIVE`
+  instead. Under `refine_sequential`, `SEQUENTIAL_MOMENT_HOLD` says "no verdict
+  … because the modulus has no esd there", never that the plan freed none.
+  Proposed by the reporter: (1) a `magnetic_structural` preset,
+  `mccusker_structural`'s order with the moment staged as the solve stages it
+  (moduli, then all moment DOFs, then cell, zero and profile, coordinates,
+  Biso, the moments free throughout once released), with its `PLAN_INFO` row;
+  (2) one plan-level sentence, in a single fit and in a series, where a plan
+  frees no moment DOF on a structure that has one. The reporter recommends
+  both, (2) as wording in `SEQUENTIAL_MOMENT_HOLD`'s explanation. This is the
+  plan half of the #458 box above; a new preset is a new `_audit` default
+  seat for the generality judge.
+
+- **2026-10-26 issue triage: #1075 § 4, which site carries a cant is a χ² tie
+  the esds call decided.** Not re-run; the reporter's measurement on
+  `afce00a4`, on `test_stationary_moment_angle`'s two-site set: with Mn1 canted
+  δ toward c, a start exactly on a puts the cant on Mn2 in 225 of 225 fits with
+  δ ≥ 0.01, within Δχ² 0.07 of the tilted start's Mn1 answer, and in 206 of
+  them each fit's esds exclude the other assignment at 2σ. A determination
+  that reports one assignment with tight esds where the other fits as well is
+  the confident wrong singleton the package's report rule forbids; the
+  reporter reads it as an `exchanges` case for the identifiability report.
+
+- 2026-10-26 issue triage: #455 closed. The reporter's re-run of the cubic `P n -3 m:1` case on main at 7472e200 gave one partition in 9 of 9 seed × basis runs, the condition this WP's 2026-10-15 note set. Checked against the tree at c0e32ab29.
+
+- 2026-10-31, from the issue triage (issue #795): the reporter splits K1 under
+  #1224's machinery-before-heuristics rule (2026-10-29). K1a is the machinery,
+  and nothing in it ranks or chooses. It gives the candidate k's by stratum,
+  with denominator, radius, strata and exclusion windows as required
+  arguments. It scores any named k. It reports the shuffle null's full sample,
+  with its threshold as a number. It adds the equivalents and
+  `K_SEARCH_PARTNER`. K1b is the heuristic: `search_kvector` and its ranked
+  result, the default radius, `K_SEARCH_AT_CHANCE` and the few-peaks floor,
+  both nulls measured on one grid, and the validation arm. Decisions 1
+  (placement) and 2 (rational grid now, or real k after N-W3) of the
+  2026-10-08 entry gate K1a. Decision 3 (schema) concerns only K1b, and
+  decision 4 changes neither. All four are still the maintainer's and
+  unanswered. Checked against the tree at d87c8cc91: no `search_kvector`
+  exists, and M-8 is unticked.
+
+- 2026-10-31, from the issue triage (issue #1197): `isotropy.candidates`
+  labels a candidate's magnetic group in `MagneticCell`'s reduced basis, which
+  is left-handed (det < 0) at every k ≠ 0 tried. A change of basis with det <
+  0 swaps the two members of an enantiomorphic pair, so where the group type
+  has one, `bns_number` (and `identification`) names the mirror type. The
+  reporter's case: `P 42 c m`, k = (0, 0, 1/2), `S5(rank 1)#1` prints 78.22,
+  and the same operators carried to the right-handed cell a, b, 2c identify as
+  76.10 (the parent's 4₂ becomes a 4₁ in 2c). `magnetic_supercell` catches it
+  only because its own check runs in a right-handed cell, which is where the
+  48 refusals in PR #1108's 430-pair sweep come from (all P4₂ parents at k =
+  (0, 0, 1/2)). Checked against the tree at d87c8cc91: the issue's snippet
+  prints 78.22 and 76.10 as stated. A wider probe
+  (`scratchpad/lane-B/r1197_sweep.py`) found every candidate cell at k = (0,
+  0, 1/2) left-handed (4 of 4 for `P 42 c m`, 2/2 `P 41`, 2/2 `P 31`, 3/3 `P
+  61`, 6/6 `P 41 21 2`), none at k = 0 (`P n m a`, 0 of 4). The class reaches
+  beyond the reporter's P4₂ parents: `P 31` `S1(a)` and `P 61` `S3(a,b)` print
+  144.6 where the right-handed cell gives 145.9 (the 3₁/3₂ pair). Fix
+  direction from the reporter: identify in a right-handed cell (or flip the
+  reduced basis's handedness) before labelling, with a test over the
+  enantiomorphic pairs.
 
 ## Non-goals
 
@@ -764,8 +882,8 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
       only; the Pnma 4b/4c checks and the 230-group intertwiner test.
 - [x] M-7: isotropy subgroups → operator lists, absences, powder-equivalence
       classes; ≥ 10 MAGNDATA parents recover their published group.
-- [ ] M-8: 1326's candidate generator made pluggable and the zone's special
-      points and lines added, labelled.
+- [ ] M-8: the zone's special points and lines as a generator for 1326's
+      arm (`generator=`, already pluggable), labelled.
 - [ ] M-9: the verb, the ranking, the abstention, the magCIF per candidate;
       `capabilities()` feature flag; `help.py` entries.
 - [ ] Manual Part 2: the projection operator, the return-vector phase, the
@@ -814,6 +932,83 @@ no magnetic model declared.
 
 ## Handover log
 
+- **2026-11-01** (`/pr-review`) — #1082 merged from outside as PR #1204 (`502316ac`). It adds the `magnetic_structural` plan preset. It also adds `PLAN_FREES_NO_MOMENT` (warning, tier 1), which fires when no stage frees a moment degree of freedom that the caller did not hold. Its `where` holds each held site's modulus path, then the phase's `scale`. No task is ticked by it. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
+
+- **2026-10-30** (`/pr-review`) — #853's follow-ups merged from outside as PR #1228 (`fbc618e3`), four `WP-1418:` commits in `isotropy.py` and its tests. `powder_equivalent` now hands the caller's little group to the span certificate, and `_classify` shares one pattern cache with it. A spy test shows the caller's group arrives and none is rebuilt. `_verify_witness` recomputes `Witness.margin` and refuses a stored margin that differs by more than 4(n + S)ε (n amplitudes, S live shells). That is a rounding allowance with no module constant, so no audit row is owed. Six wrong margins (doubled, halved, zero, negated, NaN, ten allowances off) re-verified on main and are refused now. Two hand-written witnesses in the tests carried rounded margins and now carry the full value. `ISOMETRY_RESIDUAL`'s docstring covers both its uses, and both LAPACK citations give edition, publisher and DOI. The fit-cache item was already #936's. This closes the 2026-10-11 entry's "left open" list. One observation stays open: `_verify_transfer` compares μ to an absolute 1e-9 while transfer margins go down to 1.7e-9, so a transfer record with μ wrong by up to 1e-9 re-verifies. The review asked the contributor to file it as an issue. No checklist item is ticked. Gate (a stack of eleven PRs on main `b40bc994`, tree `307eff83`; macOS arm64, `[dev,jax]`, Python 3.12): 13 217 passed, 216 skipped, 48 xfailed, 0 failed, with ruff, the `-W` manual build and the GUI ladder green.
+
+- **2026-10-22** — PR #1086 (outside contributor, head `643430a0`), merged as
+  `6a135459` by `/pr-review`, puts the first clause of § Acceptance under a
+  real-data test, the magnetic milestone's row J. The slow
+  `test_lamno3_at_50k_ranks_a_type_first_of_four` runs `solve_magnetic` on the
+  `Magnetic-I` BT-1 pattern. It finds k = 0 by the forbidden-lattice-point
+  route and ranks 62.448 (Pn′ma′, A-type) first of four classes, each listing
+  only itself. Its lead is more than ten tie widths
+  (`SOLVE_TIE_DELTA_BIC`), and its moment lies between 3.3 μ_B and three esds
+  below spin-only 4 μ_B. The same call carries the negative control: 62.446
+  comes back unsupported, with Rwp within 1e-3 of the nuclear one. The
+  nuclear fit moved into a session fixture, `conftest.lamno3_nuclear`, which
+  WP-1327's LaMnO₃ acceptance now shares. Each test in the file carries its
+  own `xdist_group`, because xdist joins every group mark an item carries into
+  one name. The test draws the winner's obs/calc/diff PNG, so the 4 K and
+  LaMnO₃ winners both draw now. The PNG task stays open for the 150 K
+  abstention. It ticks no task: M-9's `help.py` entries, M-8 and Part 2
+  remain. Gate: stacked with #1071 on `main` `1661895e`, macOS arm64,
+  `[dev,jax]`: `-m slow` 326 passed, 12 skipped, 1 xfailed; `main` after both
+  merges is content-identical to that tree. The record of #1071 is in
+  WP-1326's log.
+- **2026-10-21** — #458's recipe landed from outside as a guide, with no
+  package code: PR #1074 (head `60a1822e`) merged as `1e876eaf` by
+  `/pr-review` after three rounds. `docs/docs/guides/moment.md` ("How to
+  refit the nuclear model with the moment present") runs
+  `examples/guides/moment.py`, with `examples/guides/_cr2wo6_pair.py` as its
+  data helper. One line was added to the guides index and one to the
+  `solve_magnetic` section of `reference/magnetic.md`.
+  *Done.* Two routes, both built from what is on `main`. **Route 1**, when a
+  pattern above T_N exists, is the 2026-09-27 decision (R, scale held). It
+  fits the paramagnetic pattern and hands its model to `solve_magnetic` with
+  a `plan=` that frees only the moment, background, zero and cell. **Route 2**
+  is (iv), the fallback. It solves blind, reads the winner back through
+  `write_magcifs` and `Structure.from_cif`, refits every nuclear term with
+  the moment free, and stops when the moment moves by less than its esd,
+  with a cap of five rounds. On the vendored Cr₂WO₆ HB-2A pair (4 K and
+  150 K, k = 0) the three answers are 2.03 ± 0.05 μ_B blind, 2.11 ± 0.03
+  with the reference, and about 2.11 ± 0.04 with the moment present. Cr1's
+  Biso goes from −1.4 Å² to about zero, and the nuclear scale moves 0.5 esd,
+  so on this specimen the displacement parameters carried the exchange,
+  not the scale. Holding the cell and zero at 150 K as well costs
+  Rwp 0.23 against 0.11, which is why route 1 frees them.
+  *What the review established.* **Route 2's answer is not
+  platform-stable at the second decimal**: py3.14 on CI gave |m| 2.10 and
+  Cr1 Biso −0.0 where py3.11 and the author's Mac gave 2.12 and 0.4, and
+  3.12 on Linux reproduced neither failure on either path. The guide now
+  prints |m| to one decimal and asserts ±0.03. That is half an esd on the
+  moment, and the Biso is one the data barely constrain, so the recipe
+  converges to a platform-dependent point inside its own error bars. A
+  stopping rule written into the package will need to say so.
+  *Not done.* No task box moves: § Tasks still has no box for #458's
+  recipe (the 2026-10-02 entry says so). The guide works around the API in
+  five places, all recorded as the author's notes on the PR: (1) there is
+  no `nuclear_reference=` seam, so route 1 reaches it by a `plan=` that
+  frees no nuclear term; (2) `MagneticTrial._structure` is private, and a
+  magCIF does not carry the scale, so route 2 copies it from the blind fit;
+  (3) the package has no alternation verb or stopping rule; (4) there is no
+  scale diagnostic (the script prints the shift in esds); (5) the (v)
+  opt-in plan is unmeasured on a real pattern and is not in the guide.
+  *Gate:* on `main` `f0c7285b` + this PR, Linux x86_64, `[dev,jax]`,
+  Python 3.12: the docs tests, the manual tests, the audit table and `tests/test_examples.py`
+  gave 199 passed, and the moment guide's script also passes under `RIETX_COMPILED=0`. Vale 3.24.0 at `--minAlertLevel=warning` reports
+  0 errors on the three touched pages; its three warnings are on lines that
+  predate the PR. `ruff check src tests examples` is clean. CI was green on
+  every leg at `60a1822e`.
+  *Next:* a § Tasks box for #458's recipe in the package: the seam, the
+  verb with its stopping rule, and the scale diagnostic.
+- **2026-10-21** — PR #1062 (outside contributor, `0669ea6e`), merged as
+  `e1cab2ee` by `/pr-review`, carries this WP's number beside 1329's. It moves
+  WP-1329's two series codes into `references/magnetic.md`, applying this WP's
+  rule that every magnetic row in the agent skill goes in that file (one of
+  the two housekeeping clauses in § Inherited). It ticks no task here: the open skill task is
+  M-9's rows and the abstention row, which it does not touch. The record is in
+  WP-1329's log.
 - **2026-10-15** — PR #936 (outside contributor) merged as `50b21045`, and
   with it #565's certificates are complete (part 5 of 5), so #565 is closed. A
   class of magnetic candidates that union-find joined is now split where a proof

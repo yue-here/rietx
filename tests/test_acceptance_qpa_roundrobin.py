@@ -42,8 +42,8 @@ into a wider band.  **WP-0504 re-derived that shape**: it is mostly the
 purpose, so its numbers stay comparable to v0.3), not microabsorption as v0.3
 supposed — see the shape test's docstring and
 ``test_acceptance_dispersion.py``, where enabling it takes the overall RMS
-error from 2.26 to 0.62 wt %.  Sample 2:
-worst 2.9 wt % with brucite March-Dollase r ≈ 0.68 (< 1 = platy in
+error from 2.26 to 0.69 wt % (0.62 on 1.9.0).  Sample 2:
+worst 3.0 wt % with brucite March-Dollase r ≈ 0.67 (< 1 = platy in
 Bragg-Brentano reflection geometry, the expected habit).  Sample 4
 uncorrected: corundum +24, magnetite −15, zircon −9 wt %; Brindley with
 order-of-magnitude radii improves corundum and magnetite but not zircon, and
@@ -245,6 +245,7 @@ def qpa_plan(*, biso_globs: tuple[str, ...] = ("phases.*.atoms.*.biso",),
     # ones the package actually produces.  None here would converge every
     # stage; measured cost of the schedule on this protocol is <= 0.02 esd.
     plan.intermediate_ftol = 1e-6
+    plan.closing_window_tol = 1e-3   # WP-2002: the shipped closing stage, named rather than inherited
     return plan
 
 
@@ -342,11 +343,14 @@ def test_a_supported_trace_phase_is_never_held(sample1_results):
     cost that fit its iteration budget and 2.7 wt % of its corundum (WP-1110);
     a hold is stronger than a window, so the same restriction has to hold here,
     and it is asserted on the record rather than on the outcome: no stage held
-    anything at all.
+    any phase's parameter.  The plan frees the instrument widths and then the
+    specimen ones, so the instrument twins are held from ``sample_broadening``
+    on (WP-2002), and those are the only paths ``held`` may carry.
     """
     result = sample1_results["cpd-1c"]
     for stage in result.stages:
-        assert stage.held == [] and stage.released == [], stage.name
+        phase_held = [p for p in stage.held if p not in stage.width_twins_held]
+        assert phase_held == [] and stage.released == [], stage.name
     assert not [d for d in result.diagnostics if d.code == "PHASE_UNCONSTRAINED"]
 
 
@@ -368,8 +372,9 @@ def test_sample1_bias_has_the_dispersion_shape(sample1_results):
     different factor — 1.0542 corundum, 0.8441 zincite, 1.0728 fluorite — and
     QPA divides one phase's scale by another's.  That predicts all three signs
     with no free parameters.  Enabling the correction and refitting under this
-    identical protocol takes the overall RMS error from 2.26 to 0.62 wt % and
-    the worst |ΔW| from 5.13 to 1.20 (``test_acceptance_dispersion.py``).
+    identical protocol takes the overall RMS error from 2.26 to 0.69 wt % and
+    the worst |ΔW| from 5.13 to 1.37 (``test_acceptance_dispersion.py``; 0.62
+    and 1.20 on 1.9.0).
 
     Microabsorption is real and still present in the ~0.6 wt % that remains;
     it is no longer the leading term.  Asserting the shape pins the
@@ -424,7 +429,9 @@ def test_sample2_brucite_spherical_harmonics(order):
     spherical-harmonics texture (WP-1960).  The weighed composition is the
     evidence, never Rwp.  Measured 2026-10-14, darwin/arm64: the largest
     error is 3.41 wt % at order 4 and 2.71 at order 6, against
-    March-Dollase's 2.80 on the same protocol.  C2,0 must read platy, which
+    March-Dollase's 2.80 on the same protocol.  On the 1.10.0 tree, after
+    WP-2002's closing stage and width twin hold, they read 3.71, 2.91 and
+    3.01.  C2,0 must read platy, which
     in the frame of WP-1960 D2 (ψ = 0 on a reflection plate) is positive."""
     _require_data()
     biso = ("phases.0.atoms.*.biso", "phases.1.atoms.*.biso",

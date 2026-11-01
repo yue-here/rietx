@@ -25,7 +25,7 @@ from pathlib import Path
 
 
 def main() -> int:
-    payload = json.load(sys.stdin)
+    payload = json.loads(sys.stdin.buffer.read())
     path = payload.get("path") or payload.get("cwd")
     if not path:
         print("worktree_remove: no path in payload", file=sys.stderr)
@@ -33,7 +33,7 @@ def main() -> int:
     root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path.cwd())
     proc = subprocess.run(
         ["git", "-C", str(root), "worktree", "remove", "--force", str(path)],
-        capture_output=True, text=True,
+        capture_output=True, encoding="utf-8", errors="replace",
     )
     if proc.returncode != 0:
         print(f"worktree_remove: {proc.stderr.strip()}", file=sys.stderr)

@@ -85,7 +85,7 @@ from .quality import VOLUME_ENVELOPE_SLACK
 
 #: Candidates that get the **expensive** per-candidate checks — geometrical
 #: ambiguity (which enumerates 55 derivative lattices and predicts reflections for
-#: each) and Le Bail validation (a refinement, ~0.6 s measured).  Three, plus
+#: each) and whole-pattern validation (a refinement, ~0.6 s measured).  Three, plus
 #: every candidate an engine consensus could promote, so the cap never removes a
 #: candidate the gate might otherwise call ``high``: see :func:`checked_indices`,
 #: which is one rule read by both call sites so "which candidates were checked"
@@ -98,7 +98,7 @@ class ConsensusOutcome:
     """Ranked candidates and the result-level facts the gate needs.
 
     Separate from :class:`~rietx.schemas.indexing.IndexingResult` because this
-    is the *pre-validation* answer: :func:`consensus` stops before the Le Bail
+    is the *pre-validation* answer: :func:`consensus` stops before the validation
     fits so ``index_pattern`` can decide which candidates to spend a refinement
     on, and :func:`apply_gate` runs after.
     """
@@ -169,51 +169,46 @@ def bravais_opinion(cell: Sequence[float], centring: str,
         reduced_cell=tuple(float(v) for v in screen.reduced.cell))
 
 
-#: Lattice points per conventional cell, by centring — the volume a reduced
-#: primitive cell has is the conventional one over this.
-_LATTICE_POINTS = {"P": 1, "A": 2, "B": 2, "C": 2, "I": 2, "F": 4, "R": 3}
-
-
 def supercell_checks(candidates: Sequence[CellCandidate], peaks: PeakList, *,
-                     q_match: np.ndarray, k_sigma: float) -> None:
-    """Ask each candidate as a superlattice of every other, in place (WP-1449).
+                     q_match: np.ndarray, k_sigma: float,
+                     screen=None) -> None:
+    """Ask each candidate as a child of every other, in place (WP-1449; C3).
 
     Fills ``supercell_checks`` on every candidate, ``[]`` where no other is a
-    sublattice of it, one entry per parent in the parents' rank order
-    otherwise.  A pair is tried only when the primitive volumes stand in a
-    ratio of 2 to 4, which is what :func:`~.ambiguity.supercell_chance`
-    enumerates; it decides the rest.  The child is scored on
-    :func:`~.engines.scored_positions` — its own shift-corrected lines, the ones
-    the panel scored it on — and in the window the search matched with.
+    parent of it, one entry per parent in the parents' rank order otherwise.
+    The relation is **containment of the indexed observed set** with the
+    denser line set as the child (:func:`~rietx.indexing.screen.contains`),
+    which reaches every pair the primitive-volume ratio of 2 to 4 reached and
+    the ones it could not: cubic I √2·a₀ over cubic F a₀ (volume ratio 5.66),
+    a trigonal description of a cubic truth at equal volume, a resolved
+    orthorhombic split of a tetragonal cell.  The extras and the verdict are
+    :func:`~rietx.indexing.screen.containment_evidence`'s, asked at the
+    resolution rather than in the search window.  ``screen`` is the run's
+    :class:`~rietx.indexing.screen.PatternScreen`; built from the peak list
+    alone when the caller has none, which is all this check needs.
     """
-    from ..crystallography.lattice import cell_volume
     from ..schemas.indexing import SupercellCheck
-    from .ambiguity import (
-        _DERIVATIVE_VOLUME_RTOL,
-        MAX_AMBIGUITY_INDEX,
-        MAX_DISCRIMINATING,
-        supercell_chance,
-    )
-    from .engines import scored_positions
+    from .ambiguity import MAX_DISCRIMINATING
     from .quality import shift_template_basis
+    from .screen import PatternScreen, containment_evidence, screen_for
 
-    volume = [float(cell_volume(*c.cell)) / _LATTICE_POINTS.get(c.centring, 1)
-              for c in candidates]
+    if screen is None:
+        screen = PatternScreen.from_peaks(peaks, q_match=q_match, k_sigma=k_sigma)
+    screens = []
+    for cand in candidates:
+        try:
+            screens.append(screen_for(screen, cand, peaks, absence=False))
+        except (ValueError, RuntimeError, np.linalg.LinAlgError):
+            screens.append(None)
     for j, child in enumerate(candidates):
         child.supercell_checks = []
-        q_obs = None
+        if screens[j] is None:
+            continue
         for i, parent in enumerate(candidates):
-            ratio = volume[j] / volume[i] if i != j and volume[i] > 0 else 0.0
-            index = round(ratio)
-            if not 2 <= index <= MAX_AMBIGUITY_INDEX \
-                    or abs(ratio - index) > _DERIVATIVE_VOLUME_RTOL * index:
+            if i == j or screens[i] is None:
                 continue
-            if q_obs is None:
-                q_obs, _tt = scored_positions(peaks, child)
             try:
-                ev = supercell_chance(parent.cell, parent.centring, child.cell,
-                                      child.centring, q_obs, q_match,
-                                      k_sigma=k_sigma)
+                ev = containment_evidence(screen, screens[j], screens[i])
             except (ValueError, RuntimeError, np.linalg.LinAlgError):
                 # an unanswered pair orders nothing, as ``_partners`` declines
                 ev = None
@@ -223,7 +218,7 @@ def supercell_checks(candidates: Sequence[CellCandidate], peaks: PeakList, *,
                                 if not seen][:MAX_DISCRIMINATING])
             tt = np.degrees(2.0 * np.arcsin(np.clip(
                 peaks.wavelength * np.sqrt(missing) / 2.0, -1.0, 1.0)))
-            # the child was scored on its shift-corrected lines; say where to
+            # the child was screened on its shift-corrected lines; say where to
             # look on the pattern's own axis by undoing that correction
             template = child.shift_template
             if template is not None and child.shift_coefficient and len(tt):
@@ -233,10 +228,48 @@ def supercell_checks(candidates: Sequence[CellCandidate], peaks: PeakList, *,
             child.supercell_checks.append(SupercellCheck(
                 parent_cell=tuple(parent.cell), parent_system=parent.system,
                 parent_centring=parent.centring, index=ev.index,
+                relation=ev.relation,
                 n_extra=ev.n_extra, n_seen=ev.n_seen, p0=ev.p0,
                 p_value=ev.p_value, verdict=ev.verdict(),
                 n_seen_unexplained=ev.n_seen_unexplained,
                 absent_two_theta=[float(t) for t in tt]))
+
+
+def absence_excess(candidates: Sequence[CellCandidate]) -> None:
+    """Write ``lebail.predicted_but_absent_excess_in_window`` on every
+    candidate the line screen validated, in place (#941's follow-up).
+
+    The windowed uncancellable count read as a **density compared across
+    candidates**: A − N_w·d_min, where d_min is the lowest
+    ``predicted_but_absent_density_in_window`` among the run's screened
+    candidates.  The field's figures of merit are densities read
+    comparatively (de Wolff 1968's M₂₀ divides by the lines a cell predicts up
+    to the twentieth observed one; Smith & Snyder 1979's F_N by N_poss; EXPO's
+    WRIP20, Altomare *et al.* 2009, against the best candidate), and the raw
+    count is not: magnetite's and PbSO₄'s true cells read 2, as LaB₆'s wrong
+    a√2 I cell does on synthetic data.  Measured at ``RESOLUTION_FWHM`` 1.0
+    on the acceptance corpus's real families (SRM 676a corundum with and
+    without the cos θ shift declared, zincite, zircon, brucite, magnetite,
+    fluorite, fluorapatite, 11-BM NAC, SRM 660c LaB₆ as picked and
+    calibrated) and both PbSO₄ histograms (neutron and lab X-ray), every true
+    cell reads an excess of 0 to 0.06, magnetite's and PbSO₄ neutron's
+    included, and every oversized cell at least 1; two cells within 0.5 % of
+    PbSO₄'s metric, with the truth's line set, read what it reads.  The
+    excess comes from the line screen, so it is identical under the Le Bail
+    and the Pawley validation fit.  **Reported, not gated**: the
+    cleanest candidate of a list that missed the truth, and a lone candidate,
+    read 0 whatever their count, so it cannot replace the cap.
+    """
+    screened = [c for c in candidates
+                if c.lebail is not None
+                and c.lebail.predicted_but_absent_density_in_window is not None]
+    if not screened:
+        return
+    d_min = min(c.lebail.predicted_but_absent_density_in_window for c in screened)
+    for c in screened:
+        c.lebail.predicted_but_absent_excess_in_window = float(
+            c.lebail.predicted_but_absent_uncancellable_in_window
+            - c.lebail.n_lines_screened_in_window * d_min)
 
 
 def _parent_key(check) -> tuple:
@@ -377,7 +410,7 @@ def checked_indices(candidates: Sequence[CellCandidate],
     ``SearchSpec.max_candidates``.
 
     One function rather than two similar loops because ambiguity enumeration and
-    Le Bail validation must cover the *same* candidates: a candidate validated but
+    whole-pattern validation must cover the *same* candidates: a candidate validated but
     not checked for ambiguity could reach ``high`` with an unenumerated partner.
 
     Since WP-1046 the second set is *mostly* inside the first — agreement is the
@@ -399,7 +432,8 @@ def consensus(results: Sequence[EngineResult], peaks: PeakList, *,
               quality: DataQualityReport | None = None,
               top: int = CONSENSUS_CHECK_TOP,
               cancel=None, ambiguity: bool = True,
-              priors: Sequence[EngineCandidate] = ()) -> ConsensusOutcome:
+              priors: Sequence[EngineCandidate] = (),
+              screen=None) -> ConsensusOutcome:
     """Merge, rank, classify and enumerate ambiguity — everything but validation.
 
     Order matters and it is the WP's: reduce and merge (so ``found_by`` is
@@ -422,6 +456,10 @@ def consensus(results: Sequence[EngineResult], peaks: PeakList, *,
     gate reads every candidate as unchecked (a capping caveat), so a streamed
     grade is conservative: it can rise when the full consensus runs, never
     fall.
+
+    ``screen`` is the run's :class:`~rietx.indexing.screen.PatternScreen`
+    (C3), handed to :func:`supercell_checks`; built from the peak list when
+    ``None``.
 
     ``priors`` (WP-1045) are checked prior cells (finder ``"prior"``, from
     ``priors.build_prior_candidates``).  They join the *merge* — a prior that
@@ -521,7 +559,7 @@ def consensus(results: Sequence[EngineResult], peaks: PeakList, *,
     # narrow window gives it power the unmeasured shift does not (#951)
     supercell_checks(out.candidates, peaks,
                      q_match=absence_window(peaks, spec, quality),
-                     k_sigma=spec.k_sigma)
+                     k_sigma=spec.k_sigma, screen=screen)
     out.candidates = above_supported_parents(
         below_refuting_parents(out.candidates))
     if prior_only:
@@ -642,11 +680,36 @@ def caveats_for(cand: CellCandidate, *, engines_run: Sequence[str],
         out.append("not_validated")
     elif cand.lebail.status in ("failed", "diverged"):
         out.append("validation_failed")
+    elif cand.lebail.predicted_but_absent_uncancellable_in_window is not None:
+        # the line screen's count (C3): the uncancellable absences inside de
+        # Wolff's window, which every truth measured reads at 0-2 and every
+        # wrong cell at 7-79; capping, since a true cell's weak general
+        # reflections below detection are absent for a reason that is not
+        # the lattice's
+        if cand.lebail.predicted_but_absent_uncancellable_in_window:
+            out.append("predicted_but_absent")
     elif cand.lebail.predicted_but_absent:
+        # no peak list was supplied, so the fitted-background detector's count
         out.append("predicted_but_absent")
-    fraction = cand.fom_value("indexed_fraction")
+    # read on the intensity the cell explains (WP-1969, #933): a cell's own
+    # weak impurity lines are not evidence against it by their count, and a
+    # missed strong line is evidence whatever the count.  The line fraction
+    # stays the reading for a panel built without the weighted member
+    fraction = cand.fom_value("indexed_intensity_fraction")
+    if fraction is None:
+        fraction = cand.fom_value("indexed_fraction")
     if fraction is None or fraction < min_indexed_fraction:
         out.append("indexed_fraction_low")
+    else:
+        # the ruling on the superstructure dissenter (yue-here, #1042): a
+        # sub-cell missing a superlattice explains every strong line and leaves
+        # weak ones, so it can pass on intensity, and from the line list alone a
+        # superlattice line and an impurity line look the same.  A line count
+        # under the same bar therefore caps the grade at ``medium`` (GSAS-II
+        # scores cells by count only: M20, X20), without refuting the cell
+        lines = cand.fom_value("indexed_fraction")
+        if lines is not None and lines < min_indexed_fraction:
+            out.append("indexed_lines_low")
     if not search_complete.get(cand.system, True):
         out.append("search_incomplete")
     if shift_allowance_assumed:
@@ -733,7 +796,7 @@ def apply_gate(candidates: Sequence[CellCandidate], *,
 
 
 __all__ = ["CONSENSUS_CHECK_TOP", "VOLUME_ENVELOPE_SLACK", "ConsensusOutcome",
-           "above_supported_parents", "apply_gate", "below_refuting_parents",
+           "above_supported_parents", "absence_excess", "apply_gate", "below_refuting_parents",
            "bravais_opinion",
            "caveats_for", "checked_indices", "consensus", "grade",
            "merge_engine_candidates", "supercell_checks"]

@@ -25,10 +25,13 @@ cell          2 freed  converged
 profile_w     1 freed  converged
 profile       4 freed  converged
 biso          7 freed  converged
+closing      22 freed  converged
 ```
 
-`StageResult.freed` lists what each stage added to the free parameters.
+`StageResult.freed` lists the parameters each stage's names matched.
 The `cell` stage freed two, because the hexagonal space group leaves only `a` and `c` free.
+The fit ends with the closing stage, which every plan adds after its own stages ([The closing stage](../reference/refinement.md#the-closing-stage)).
+It names every parameter the other stages named, so it lists all 22.
 The full script is `examples/guides/plan.py`.
 
 ## Insert or remove a stage

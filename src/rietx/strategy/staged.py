@@ -15,14 +15,26 @@ import dataclasses
 import functools
 import re
 from dataclasses import dataclass, field
+from typing import Literal
 
 from .._nearmiss import did_you_mean
 from ..schemas.common import Mode
 
-# INTERMEDIATE_FTOL is defined beside the mirror because the pydantic field
-# needs it at class-definition time and this module is the *upper* layer; it is
-# re-exported here, where plan policy is read.
-from ..schemas.plan import INTERMEDIATE_FTOL, PlanSpec
+# INTERMEDIATE_FTOL, CORRELATION_GUARD, PHASE_SUPPORT_SIGMA and
+# CLOSING_WINDOW_TOL are defined beside the mirror because the pydantic fields
+# need them at class-definition time and this module is the *upper* layer;
+# they are re-exported here, where plan policy is read.
+from ..schemas.plan import (
+    CLOSING_WINDOW_TOL,
+    CORRELATION_GUARD,
+    INTERMEDIATE_FTOL,
+    PHASE_SUPPORT_SIGMA,
+    PlanSpec,
+    check_closing_window_tol,
+)
+
+#: The name of the stage :meth:`RefinementPlan.closing_stage` appends.
+CLOSING_STAGE_NAME = "closing"
 
 #: ``phases.i.atoms.j.u11`` … — the stored anisotropic components, grouped by
 #: site for the positive-definiteness guard.
@@ -118,8 +130,9 @@ class Stage:
     max_iter: int = 100
     #: this stage's own ftol (relative cost-decrease termination), overriding
     #: whatever schedule the plan sets.  ``None`` = take it from the plan
-    #: (:attr:`RefinementPlan.intermediate_ftol` for every stage but the last,
-    #: the solver's 1e-9 for the last) — which is why the two cannot be told
+    #: (:attr:`RefinementPlan.intermediate_ftol` for every declared stage but
+    #: the last, the solver's 1e-9 for the last declared stage and for the
+    #: closing stage when the plan has one) — which is why the two cannot be told
     #: apart here and a plan is where the schedule is declared.  Set it to say
     #: that *this* stage is different: an early stage whose seed the next one
     #: is unusually sensitive to, or a one-stage validation fit that must
@@ -141,7 +154,8 @@ class Stage:
     #: microstrain (ppm of ΔM/M) to put a freed but still all-zero Stephens
     #: block on before solving.  ``seed`` cannot serve: the S_HKL DOFs are
     #: unbounded below, and their pathology at zero is the *exploding*
-    #: gradient of √Σ.  0 = no seed.
+    #: gradient of √Σ.  0 = no seed.  ``ParameterTable.seed_stephens``;
+    #: recorded in ``StageResult.seeded``, every DOF of the block at its seed.
     strain_seed: float = 0.0
     #: c_w of McCusker eq (7), S = S_y + c_w·S_G: how heavily this stage weights
     #: the geometric 'observations' (every soft restraint the phases declare)
@@ -194,9 +208,26 @@ class Stage:
 #: every freed row sitting exactly on a floor of 0 or above
 #: (``ParameterTable.seed_floored``, WP-1938).  Pitschke's ``tau`` at its 0.05
 #: default is above its floor, so it starts where it is (issue #499).
+#:
+#: The one 0.3 starts both models' strength, and the two are recorded apart
+#: (WP-2002, the sixth round's Q3, ruled (c)).  Suortti's start does not change
+#: the answer (``tests/test_seed_invariance.py``, five patterns, three families).
+#: Pitschke's does: from c = 0 CPD zincite lands in the model's turned-over
+#: regime, which ``ROUGHNESS_OUTSIDE_REGIME`` flags, and from 0.3 it reaches the
+#: switched-off branch inside the valid range.  No program supplies a Pitschke
+#: start, so 0.3 stays, at tier 3.  A per-model value would need a per-path seed
+#: or a second stage, and an inert stage re-solves everything already freed.
+ROUGHNESS_SEED = 0.3
 _ROUGHNESS_STAGE = (
-    Stage("roughness", ["instrument.geometry.surface_roughness.*"], seed=0.3),
+    Stage("roughness", ["instrument.geometry.surface_roughness.*"],
+          seed=ROUGHNESS_SEED),
 )
+
+#: The microstrain, in ppm of ΔM/M, that ``lab_sample_refine`` puts an all-zero
+#: Stephens block at before solving (``Stage.strain_seed``): the width's square
+#: root has unbounded slope at zero, so some start is forced.  1000 ppm is
+#: GSAS-II's isotropic microstrain default, on the isotropic ray (WP-1467).
+STRAIN_SEED_PPM = 1000.0
 
 
 #: Additive background peaks (:class:`~rietx.schemas.instrument.HumpComponent`)
@@ -301,8 +332,8 @@ MAGNETIC_WIDTH_STAGE_PATHS: tuple[tuple[str, ...], ...] = (
 @dataclass
 class RefinementPlan:
     stages: list[Stage]
-    correlation_guard: float = 0.98
-    #: the tolerance every stage but the last runs at, unless that stage
+    correlation_guard: float = CORRELATION_GUARD
+    #: the tolerance every declared stage but the last runs at, unless that stage
     #: declares its own :attr:`Stage.ftol`.  ``None`` = the solver default
     #: (1e-9) everywhere, which is what every fit before WP-1123 did and what
     #: it still does, bit for bit.  See :meth:`stage_ftols` for the rule and
@@ -316,6 +347,73 @@ class RefinementPlan:
     #: it stopped (:data:`LEBAIL_ALTERNATION_STOPPED`).  Ignored in every
     #: other mode, where there is nothing to alternate.
     lebail_passes: int = 1
+    #: the absent-phase hold's threshold, in esds of the phase's scale against
+    #: the counting noise (WP-1301, WP-1523; a caller's option since WP-2002
+    #: B1, ruled 2026-10-19).  At each stage start a phase under it has every
+    #: free structural column held, its scale left free; at the answer a held
+    #: phase now above it is released and one that fell under it is put back
+    #: where the stage found it and held, with one more solve.  The default cell
+    #: window (``params.vector.cell_window``) is applied to the same phases.
+    #: Read by ``Refinement._run_stage`` through ``fit``,
+    #: ``MultiHistogramRefinement.fit`` and a series, each through
+    #: :func:`~rietx.schemas.plan.check_phase_support_sigma`.  ``None`` switches
+    #: all of that off: no stage holds, releases or restores a phase for
+    #: support, and no cell is windowed.  ``PHASE_UNCONSTRAINED`` still reports
+    #: a phase under :data:`PHASE_SUPPORT_SIGMA`, whose structural parameters
+    #: then refined without signal.  The default reproduces every fit before
+    #: the field, bit for bit.  A phase with no reflection in the fitted range
+    #: is held whole, scale included, at any value here, ``None`` too
+    #: (WP-1958): that is a count, not a significance call.
+    phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA
+    #: the area fraction the closing stage's peak windows may drop (WP-2002,
+    #: the sixth round's Q1 and Q2).  After the declared stages, one more
+    #: recompiles at the answer with these windows and solves with every glob
+    #: the plan freed (:meth:`closing_stage`); :data:`CLOSING_WINDOW_TOL` says
+    #: what it fixes, what it costs and what other programs do.  ``None``
+    #: runs the declared stages alone, which reproduces every fit before the
+    #: field, bit for bit.
+    closing_window_tol: float | None = CLOSING_WINDOW_TOL
+
+    def closing_stage(self) -> Stage | None:
+        """The stage a fit runs after the declared ones, or ``None``.
+
+        It frees every glob any declared stage freed, in first-seen order,
+        and takes the last declared stage's discrete settings (iterations, Le
+        Bail cycles, c_w, window slack, its own ``ftol``), so a schedule's end
+        state is what it re-solves.  It seeds nothing: a row back on its floor
+        at the answer is where the data put it.  Its window fraction is
+        :attr:`closing_window_tol`, which :meth:`stage_window_tols` carries.
+        ``None`` when that is ``None`` or the plan declares no stage.
+        """
+        if check_closing_window_tol(self.closing_window_tol) is None or not self.stages:
+            return None
+        last = self.stages[-1]
+        globs = list(dict.fromkeys(g for s in self.stages for g in s.turn_on))
+        return Stage(CLOSING_STAGE_NAME, globs, max_iter=last.max_iter, ftol=last.ftol,
+                     lebail_cycles=last.lebail_cycles,
+                     restraint_weight_scale=last.restraint_weight_scale,
+                     window_slack_deg=last.window_slack_deg)
+
+    def run_stages(self) -> list[Stage]:
+        """The stages a fit runs, in order: the declared ones, then :meth:`closing_stage`.
+
+        Every runner iterates this, never :attr:`stages`, together with
+        :meth:`stage_ftols` and :meth:`stage_window_tols`, which are parallel
+        to it.
+        """
+        closing = self.closing_stage()
+        return [*self.stages, closing] if closing is not None else list(self.stages)
+
+    def stage_window_tols(self) -> list[float | None]:
+        """The window area fraction each of :meth:`run_stages` compiles at.
+
+        ``None`` for a declared stage, which takes ``forward.WINDOW_AREA_TOL``,
+        and :attr:`closing_window_tol` for the closing stage.
+        """
+        tols: list[float | None] = [None] * len(self.stages)
+        if self.closing_stage() is not None:
+            tols.append(self.closing_window_tol)
+        return tols
 
     def stage_ftols(self) -> list[float | None]:
         """The tolerance each stage runs at, in order — the one authority.
@@ -327,19 +425,32 @@ class RefinementPlan:
         and is applied once per fit instead of restated per call site.
 
         Three inputs, in precedence order: a stage's own ``ftol`` wins; the
-        last stage takes the solver default, because it is the one that
-        produces the answer; everything else takes
-        :attr:`intermediate_ftol`.
+        last declared stage takes the solver default, because it produces the
+        answer, and so does the closing stage after it; everything else takes
+        :attr:`intermediate_ftol`.  The list is parallel to
+        :meth:`run_stages`.
 
-        A single-stage plan is therefore all endpoint and nothing is loosened
-        — which is the right reading of a warm series pattern collapsed to one
-        stage, and of the indexing validation fit, neither of which has a
-        successor to seed.
+        **The last declared stage converges even with a closing stage
+        following it** (WP-2045, ruled 2026-10-24).  The closing stage
+        recompiles at whatever it is handed, and a stage stopped at 1e-6 can
+        stop on a plateau of its own frozen windows: on the hostile series'
+        cpd-1b the warm stage ended at ``axial_sl`` 555 under 1e-6, with the
+        windows dropping 73 % of the Bragg intensity a fresh compile computes,
+        and at 0.0139 under 1e-9.  The closing compile at 555 held 1 608× the
+        warm stage's point-nodes and ran for tens of minutes.  On the four
+        acceptance protocols converging this stage costs 1.04-1.07× the
+        evaluations and moves no answer by 0.001 esd
+        (``docs/wp/2045-batch/probe6.py``).
+
+        A single-stage plan is therefore all endpoint and nothing is
+        loosened, with or without a closing stage: the indexing validation fit
+        and a series' collapsed warm refit both read it that way.
         """
-        last = len(self.stages) - 1
+        stages = self.run_stages()
+        endpoints = {len(self.stages) - 1, len(stages) - 1}
         return [s.ftol if s.ftol is not None
-                else (None if i == last else self.intermediate_ftol)
-                for i, s in enumerate(self.stages)]
+                else (None if i in endpoints else self.intermediate_ftol)
+                for i, s in enumerate(stages)]
 
     def __getattr__(self, name: str):
         if name in _PYDANTIC_SURFACE:
@@ -368,7 +479,9 @@ class RefinementPlan:
         position contributes only its allowed directions, a fully fixed one
         contributes none, so the glob is always safe).  The displacement
         stage frees ``biso`` on isotropic sites and the ``adp.*`` patterns on
-        anisotropic ones, whichever each site declares.  Kept separate from
+        anisotropic ones, whichever each site declares.  A child stated on
+        mode amplitudes (``Phase.distortion_modes``, WP-1419) frees its
+        amplitudes in the coordinates stage, since they are its coordinates.  Kept separate from
         :meth:`mccusker_default` so profile-only workflows never free
         structural parameters by accident."""
         return cls(stages=[
@@ -379,7 +492,10 @@ class RefinementPlan:
             Stage("profile", ["instrument.profile.u", "instrument.profile.v",
                               "instrument.profile.x", "instrument.profile.y"]),
             *_EXTRA_COMPONENT_STAGE,
-            Stage("coordinates", ["phases.*.atoms.*.dof.*"]),
+            # a child stated on mode amplitudes (WP-1419) refines them here:
+            # they reparametrise its coordinates, so this is the same stage
+            Stage("coordinates", ["phases.*.atoms.*.dof.*",
+                                  "phases.*.distortion_modes.modes.*.amplitude"]),
             Stage("biso", list(_DISPLACEMENT_GLOBS)),
             # March-Dollase preferred orientation (WP-0307) turns on *after* the
             # displacement stage: r, occupancies and ADPs all rescale intensity
@@ -405,6 +521,64 @@ class RefinementPlan:
             # every refined value by at most 3.4e-8 esd (WP-1938).
             Stage("extinction", ["phases.*.extinction"]),
             *_ROUGHNESS_STAGE,
+        ])
+
+    @classmethod
+    def magnetic_structural(cls) -> "RefinementPlan":
+        """:meth:`mccusker_structural` with the magnetic moments refined from
+        its second stage on (WP-1418, issue #1082).
+
+        After the scale and background, the moment **moduli** refine alone
+        (``…moment.dof0``), then every moment DOF, moduli and angles; the
+        zero, cell, widths, coordinates and displacement parameters follow in
+        :meth:`mccusker_structural`'s order.  Staging is cumulative, so the
+        moments stay free in every later stage and the closing stage.  The
+        precedent for each part:
+
+        - **the nuclear order** is McCusker, Von Dreele, Cox, Louër & Scardi
+          (1999), *J. Appl. Cryst.* **32**, 36, as in
+          :meth:`mccusker_structural` (no program ships it as a default);
+        - **the moduli before the angles** is the order
+          ``strategy.magnetic.SOLVE_STAGE_PATHS`` refines a trial in, for
+          WP-1938 D12's measurement there: an angle's column scales with its
+          modulus, and freed together from a small modulus LM stopped at χ²
+          454 660 against 2556.06.  Measured for this preset on that two-site
+          P n m a set (WP-1418, macOS arm64): from moduli 20 % high the stage
+          changes no value beyond 1e-6 μ_B; from 0.1 μ_B with the directions
+          0.4 rad off, this preset and the same plan without the
+          ``moment_moduli`` stage (every moment DOF freed together) both
+          converge.  That is start dependence, not an effect of the order:
+          from this cold start the fit can reach either of two minima tied in
+          χ² (planted 3.50 / 0.70 μ_B, or 3.34 / 1.25 at a χ² 0.07 lower),
+          and the moduli stage reached the planted one here.  Freeing every
+          moment DOF together reaches the planted values from another start
+          (``docs/skill/rietx/references/magnetic.md``, WP-1938 and WP-1953).
+          The tie itself is an identifiability finding about the model, not
+          the plan (WP-1418's follow-ups);
+        - **the moments before the coordinates** is the solve's order too
+          (moment, scale and background before anything nuclear).  The reason
+          is the confound the solve leaves coordinates out for: with the
+          moment held, a coordinate or a Biso freed later absorbs the
+          magnetic intensity the held moment misplaces.  Measured on a
+          synthetic k = (0, 0, ½) child, moment started 20 % high and every
+          Biso 0.3 Å² high: under :meth:`mccusker_structural` the moment
+          stays at 3.6 μ_B and the O Biso falls to 0.33 Å² (planted 0.6, esd
+          770); under this plan the moment returns 2.997 ± 0.005 μ_B
+          (planted 3.0) and each Biso is within 1.0 esd of its planted
+          value.
+
+        The last two are rietx's own order.  A refiner may dissent on it,
+        refining the structure first and the moments after; that sequence was
+        not measured, so nothing above is evidence for or against it.  This is
+        a preset a caller chooses and never a default.  The two moment stages
+        free nothing on a phase without a moment.
+        """
+        first, *rest = cls.mccusker_structural().stages
+        return cls(stages=[
+            first,
+            Stage("moment_moduli", ["phases.*.atoms.*.moment.dof0"]),
+            Stage("moments", ["phases.*.atoms.*.moment.dof*"]),
+            *rest,
         ])
 
     @classmethod
@@ -483,7 +657,7 @@ class RefinementPlan:
             Stage("sample_profile", ["phases.*.lor_size", "phases.*.lor_strain",
                                      "phases.*.gauss_size", "phases.*.gauss_strain",
                                      "phases.*.microstrain.dof.*"],
-                  strain_seed=1000.0),
+                  strain_seed=STRAIN_SEED_PPM),
             Stage("biso", list(_DISPLACEMENT_GLOBS)),
             *_ROUGHNESS_STAGE,
         ])
@@ -592,6 +766,7 @@ PLAN_PRESETS = {
     name: _PlanFactory(build) for name, build in {
         "mccusker_default": RefinementPlan.mccusker_default,
         "mccusker_structural": RefinementPlan.mccusker_structural,
+        "magnetic_structural": RefinementPlan.magnetic_structural,
         "lab_bragg_brentano": RefinementPlan.lab_bragg_brentano,
         "lab_calibrate": RefinementPlan.lab_calibrate,
         "lab_sample_refine": RefinementPlan.lab_sample_refine,
@@ -694,6 +869,26 @@ PLAN_INFO: dict[str, PlanInfo] = {
         when_to_use=(
             "A structure worth refining against data good enough to carry it. "
             "Run the profile-only plan first if the fit is not already close."),
+    ),
+    "magnetic_structural": PlanInfo(
+        title="Standard + structure + magnetic moments",
+        description=(
+            "The structural order with the magnetic moments refined from the "
+            "start. After the scale and background, the moment moduli refine "
+            "alone, then every moment degree of freedom, moduli and "
+            "directions. The zero shift, lattice parameters, widths, "
+            "coordinates and displacement parameters follow as in "
+            "`mccusker_structural`. The moments keep refining in every later "
+            "stage, because staging is cumulative."),
+        modes=("rietveld",),
+        when_to_use=(
+            "A magnetic phase refined together with its nuclear structure: "
+            "the final joint fit of a stated magnetic structure, or a nuclear "
+            "model that has not converged with the moment present. Freeing "
+            "the moments before the coordinates keeps a coordinate or a "
+            "displacement parameter from absorbing magnetic intensity a held "
+            "moment leaves unexplained. Declare the moments and their symmetry "
+            "first; a supercell statement needs its anti-translation ties."),
     ),
     "lab_bragg_brentano": PlanInfo(
         title="Lab diffractometer (one pass)",
@@ -952,7 +1147,18 @@ class GuardFinding:
 
     @classmethod
     def nonpositive_resolution(cls, n_bad: int, n_total: int, worst: float,
-                               two_theta: float) -> "GuardFinding":
+                               two_theta: float, *,
+                               width: Literal["gaussian", "lorentzian"] = "gaussian"
+                               ) -> "GuardFinding":
+        """``width="lorentzian"`` is Γ_L's finding: one code for both widths,
+        since the action is the same for either (WP-2002)."""
+        if width == "lorentzian":
+            return cls("RESOLUTION_NOT_POSITIVE",
+                       ("instrument.profile.x", "instrument.profile.y"),
+                       float(worst),
+                       f"the Lorentzian instrument width ({n_bad} of {n_total} "
+                       f"fitted points, worst Γ_L {worst:+.2e}° at "
+                       f"{two_theta:.3f}° 2θ)")
         return cls("RESOLUTION_NOT_POSITIVE",
                    ("instrument.profile.u", "instrument.profile.v",
                     "instrument.profile.w"),
@@ -1527,12 +1733,20 @@ def check_biso_plausible(table, model) -> list[GuardFinding]:
     those multiplicities feed is weighted by occupancy, since the bound is per
     atom rather than per site.
     """
+    return [GuardFinding.large_biso(p, b, bound)
+            for p, b, bound in biso_over_bound(table, model)]
+
+
+def biso_over_bound(table, model) -> list[tuple[str, float, float]]:
+    """``(path, B, bound)`` for each isotropic B past its cell's Lindemann
+    bound: the numbers :func:`check_biso_plausible` words, kept apart so a
+    joint fit can set one B against several cells' bounds (WP-2028)."""
     from ..crystallography.lattice import cell_volume
 
     if model is None:
         return []
     values = {e.path: e.value for e in table.entries}
-    out: list[GuardFinding] = []
+    out: list[tuple[str, float, float]] = []
     for ip, cp in enumerate(model.phases):
         base = f"phases.{ip}"
         try:
@@ -1557,7 +1771,7 @@ def check_biso_plausible(table, model) -> list[GuardFinding]:
             path = f"{base}.atoms.{j}.biso"
             biso = values.get(path)
             if biso is not None and biso > bound:
-                out.append(GuardFinding.large_biso(path, biso, bound))
+                out.append((path, float(biso), bound))
     return out
 
 
@@ -1597,7 +1811,15 @@ RESOLUTION_CONE_TOL = 1e-9
 
 
 def check_resolution_positive(table, model) -> list[GuardFinding]:
-    """The Caglioti resolution function dipping below zero in the fitted range.
+    """An instrument width going below zero in the fitted range.
+
+    Two widths, one finding each.  The Gaussian one is below.  The Lorentzian
+    one, Γ_L = X/cosθ + Y·tanθ, is a FWHM and must not go negative either.
+    Y has no floor of its own since 2026-10-23 (WP-2002), so a negative Y can
+    take Γ_L below zero at high angle once X is too small to carry it.  The
+    model refuses nothing there: the TCH mixing gives a negative η.  Tested
+    the same way as Γ_G², over the fitted axis, on the instrument alone, at
+    the same relative tolerance.
 
     Γ_G² = U·tan²θ + V·tanθ + W is a **variance**, so the physical constraint
     is on the quadratic as a whole and not on its three coefficients: U, V and
@@ -1637,7 +1859,8 @@ def check_resolution_positive(table, model) -> list[GuardFinding]:
     histogram also holds the **total** Γ_G², each phase's Gaussian size and
     strain included, at or above ``caglioti._MIN_GAMMA_G2`` at every
     reflection, as a linear inequality (WP-1938 D7,
-    ``optimize.least_squares.gaussian_width_inequalities``).  That keeps the
+    ``optimize.least_squares.gaussian_width_inequalities``), and the total
+    Γ_L at or above zero (``lorentzian_width_inequalities``).  That keeps the
     width columns alive, and it does not make this guard redundant.  A phase
     term can carry the total while the instrument quadratic is negative, the
     points between reflections are not held, and a stage that starts under
@@ -1658,15 +1881,27 @@ def check_resolution_positive(table, model) -> list[GuardFinding]:
     except KeyError:  # defensive: ParameterTable always adds the five profile
         return []     # entries, so nothing in-tree reaches this
 
-    tan = np.tan(np.radians(0.5 * tt))
+    th = np.radians(0.5 * tt)
+    tan = np.tan(th)
+    out: list[GuardFinding] = []
     g2 = u * tan * tan + v * tan + w
     scale = max(float(np.max(np.abs(g2))), 1.0)
     bad = g2 < -RESOLUTION_CONE_TOL * scale
-    if not bad.any():
-        return []
-    k = int(np.argmin(g2))
-    return [GuardFinding.nonpositive_resolution(
-        int(bad.sum()), int(g2.size), float(g2[k]), float(tt[k]))]
+    if bad.any():
+        k = int(np.argmin(g2))
+        out.append(GuardFinding.nonpositive_resolution(
+            int(bad.sum()), int(g2.size), float(g2[k]), float(tt[k])))
+    x, y = values.get("instrument.profile.x"), values.get("instrument.profile.y")
+    if x is not None and y is not None:
+        gl = x / np.cos(th) + y * tan
+        scale = max(float(np.max(np.abs(gl))), 1.0)
+        bad = gl < -RESOLUTION_CONE_TOL * scale
+        if bad.any():
+            k = int(np.argmin(gl))
+            out.append(GuardFinding.nonpositive_resolution(
+                int(bad.sum()), int(gl.size), float(gl[k]), float(tt[k]),
+                width="lorentzian"))
+    return out
 
 
 #: a free column counts as "on its bound" within this fraction of **the closest
@@ -1906,6 +2141,34 @@ def check_discarded_directions(jac, free: list[str],
     return [GuardFinding.discarded_direction(paths, n)]
 
 
+def _correlation_findings(corr, free: list[str], threshold: float
+                          ) -> tuple[list["GuardFinding"], list["GuardFinding"]]:
+    """``high_correlations`` and ``flat_directions`` off one correlation matrix.
+
+    One loop for both runners, :func:`check_guards` and the joint fit's
+    ``_top_diagnostics`` (WP-2028 task 7): every pair above ``threshold`` is a
+    correlation, and one at or above ``FLAT_DIRECTION_RHO`` is a flat
+    direction as well.
+    """
+    high: list[GuardFinding] = []
+    flat: list[GuardFinding] = []
+    for i in range(len(free)):
+        for j in range(i + 1, len(free)):
+            if abs(corr[i, j]) > threshold:
+                high.append(GuardFinding.correlation(free[i], free[j], corr[i, j]))
+                # |ρ| = 1.000 is a rank statement, not a strong
+                # correlation, and saying so in the same vocabulary as
+                # ρ = 0.96 undersells it.  Reported *beside* the
+                # correlation rather than instead of it: the
+                # SEQUENTIAL_PERSISTENT_FINDING precedent, where the
+                # sharper finding rides alongside the ones it sharpens,
+                # so no existing consumer loses a row it counts on.
+                if abs(corr[i, j]) >= FLAT_DIRECTION_RHO:
+                    flat.append(GuardFinding.flat_direction(
+                        free[i], free[j], corr[i, j]))
+    return high, flat
+
+
 def check_guards(table, outcome, threshold: float,
                  background_threshold: float = BACKGROUND_ABSORPTION_GUARD,
                  roughness_threshold: float = ROUGHNESS_ABSORPTION_GUARD,
@@ -1939,22 +2202,8 @@ def check_guards(table, outcome, threshold: float,
 
     if outcome.correlation is not None and len(free) > 1:
         corr = np.asarray(outcome.correlation)
-        for i in range(len(free)):
-            for j in range(i + 1, len(free)):
-                if abs(corr[i, j]) > threshold:
-                    report.high_correlations.append(
-                        GuardFinding.correlation(free[i], free[j], corr[i, j]))
-                    # |ρ| = 1.000 is a rank statement, not a strong
-                    # correlation, and saying so in the same vocabulary as
-                    # ρ = 0.96 undersells it.  Reported *beside* the
-                    # correlation rather than instead of it: the
-                    # SEQUENTIAL_PERSISTENT_FINDING precedent, where the
-                    # sharper finding rides alongside the ones it sharpens,
-                    # so no existing consumer loses a row it counts on.
-                    if abs(corr[i, j]) >= FLAT_DIRECTION_RHO:
-                        report.flat_directions.append(
-                            GuardFinding.flat_direction(
-                                free[i], free[j], corr[i, j]))
+        report.high_correlations, report.flat_directions = (
+            _correlation_findings(corr, free, threshold))
         # measured once (WP-1056): the same matrix the loop above thresholds
         report.measured_top_correlations = top_correlations(corr, free)
 
