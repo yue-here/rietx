@@ -35,37 +35,16 @@ fit is bounded, so the validation reserve reaches validation and
   tier 3, its row carrying the measurement). At 15 % NAC's true cell
   validated on both specs; the cost was NAC's default spec no longer reaching
   orthorhombic.
+- **Issue #1231** (folded from `### Inherited` 2026-11-01): since #1191 a
+  `preset="full"` run with `total_budget_seconds=900` overran its ceiling by
+  minutes on dense synthetic low-symmetry patterns (aP2 1038 s, big_mP1
+  953 s), every aP2 candidate `not_validated`. Two causes. (1) A Pawley
+  validation fit read its cancel only between residual evaluations, and one
+  step outlasted the deadline (a 3931-reflection rival stopped 125 s late
+  under `Deadline(30)`); fixed here. (2) trial_error read its budget once per
+  base combination; fixed by WP-1924.
 - **The tier of each rule this WP adds**: none planned. A cheaper panel moves
   no number if it is exact; a budgeted one would add a cap, tier 3.
-
-### Inherited
-
-- 2026-10-31, from the issue triage (issue #1231): since #1191 (`6c043e56b`) a
-  `preset="full"` run with `total_budget_seconds=900` overruns its ceiling by
-  minutes on dense synthetic low-symmetry patterns (aP2 1038 s, big_mP1 953 s;
-  656 s and 565 s the commit before), and on aP2 every one of the 12
-  candidates reads `not_validated` where the parent validated the top three.
-  Two causes. (1) A Pawley validation fit honours its cancel late: the token
-  is read between residual evaluations
-  (`optimize.least_squares._cancellable`), and one step on thousands of Pawley
-  intensities outlasts the deadline. The reporter measured a 3931-reflection
-  monoclinic rival cancelled at 155 s under `Deadline(30)`. Since WP-2011 the
-  fits run cheapest first on the run's own clock (`workflow.py:1083-1114`), so
-  the first heavy fit started before the ceiling runs past it and the run ends
-  wherever its step ends. Reproduced at d87c8cc91 (`lane-A/r1231.py`, macOS
-  arm64, 11-BM NAC): under `Deadline(15)` the true cI cell (827 reflections)
-  converged at 14.6 s, and a tP description of the same metric (4552
-  reflections) raised `RefinementCancelled` in stage `bkg` at 25.9 s, 10.9 s
-  late. `validation_size` already counts a fit's reflections before it runs
-  (it sets the order), so a fit could be skipped when its estimated cost
-  exceeds the time left, or the Pawley step could read the token inside its
-  solve. (2) trial_error read its budget once per base combination: fixed by
-  WP-1924 (`1f2e48e7a`, merged with #1244), which reads it before each
-  `_score`; a 60 s triclinic unit now stops at 60.17 s. That also does this
-  WP's second task ("Read the clock inside trial_error's per-base loop"),
-  which can be ticked citing WP-1924. Re-rate this WP P3 → P2: a declared
-  ceiling overrun by minutes with every candidate left unvalidated is a defect
-  that fires wrongly, as WP-1924's own priority line rates a ceiling overrun.
 
 ## Tasks
 
@@ -85,9 +64,21 @@ fit is bounded, so the validation reserve reaches validation and
       (`least_squares._cancel_check` → `lm.minimize(check=)` →
       `bccg.projected_cg`): 20.18 s late before, 0.01 s after. Unset, a fit
       is bit-identical (`test_a_bounded_step_reads_the_cancel_and_changes_nothing_while_unset`).
-- [ ] Re-measure `quick` on NAC (`docs/wp/2011-probe/probe16_schedule.py`,
-      `RESERVE=`) and, if the fits now see the reserve, lower
-      `VALIDATION_RESERVE_FRACTION` with its row's evidence.
+- [x] Re-measure `quick` on NAC and see whether the fits now see the
+      reserve. Counted, not clocked: the machine ran at load 50-145 on 10
+      cores, where probe 16's wall clock means nothing.
+      `docs/wp/2063-probe/probe1_panel_replay.py` captured one `quick`
+      run's ten `rank_candidates` calls and replayed each on both trees
+      (thread CPU, minimum of five, digests equal on all ten): consensus
+      over 37 panels 5.59 → 1.05 s, the three trial_error units 5.80 →
+      1.04 s. Scaled to WP-2011's quiet 80-panel merge, the post-stop
+      scoring falls from about 10.5 s to about 1-2 s, so at 15 % (18 s) the
+      fits get about 16 s where they had 7.3 s.
+- [ ] Lower `VALIDATION_RESERVE_FRACTION` from a repeated `quick` sweep on
+      an idle machine (probe 16, `RESERVE=0.08,0.10,0.15`, three runs each,
+      NAC both specs and the four lab sets), with its row's evidence. The
+      value trades validated fits for searched systems on the wall clock, so
+      no count can choose it.
 - [x] Unit replay digests (`python -m tests.unit_replay`) and
       `tests/test_acceptance_indexing.py` unchanged, or each move named.
       Replay: 22 of 22 digests unchanged. Acceptance: 44 passed (macOS
