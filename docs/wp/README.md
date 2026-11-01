@@ -56,7 +56,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2041](2041-a-tutorial-shows-the-indexer-abstain.md) | A tutorial shows the indexer abstain | 2026-10-24 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2045](2045-a-runaway-fit-ends-without-an-expensive-closing-stage.md) | A runaway fit ends without an expensive closing stage | 2026-10-25 | P2 | [Unscheduled](#unscheduled-a-long-run-is-not-one-fit) |
 | [2059](2059-a-bruker-raw-v2-file-reads.md) | A Bruker RAW v2 file reads, checked against two descriptions and one real file | 2026-10-30 | P3 | [Unscheduled](#unscheduled-the-formats-a-lab-still-has) |
-| [2065](2065-a-hung-fast-job-names-its-test.md) | A hung fast job names its test, and the hang is fixed | 2026-10-31 | P1 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 
 ## Next, by priority
 
@@ -781,7 +780,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2043](2043-cut-1-10-0.md) | Cut 1.10.0 from what main holds | ✅ 2026-10-24 | — | [1961](1961-cut-1-9-0.md), [2044](2044-the-sabine-laue-factor-is-continuous.md) |
 | [2046](2046-the-claim-check-sees-a-contributors-pr.md) | The claim check sees a contributor's PR on the WP it runs for | ⬜ | P3 | — |
 | [2064](2064-an-approval-belongs-to-the-value-it-approved.md) | An approval belongs to the value it approved | ⬜ | P4 | — |
-| [2065](2065-a-hung-fast-job-names-its-test.md) | A hung fast job names its test, and the hang is fixed | 🔄 2026-10-31 | P1 | — |
+| [2065](2065-a-hung-fast-job-names-its-test.md) | A hung fast job names its test, and the hang is fixed | ✅ 2026-11-01 | — | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
