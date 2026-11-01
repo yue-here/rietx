@@ -2904,6 +2904,29 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: 2^-400 = 3.9e-121 squares to 1.5e-241, a normal double; 1/d^2 stays "
                   "under 1e241 (docstring, WP-1463)")),
     Row("rietx.optimize.statistics.EFFECTIVE_OBS_ALPHA", "constant", value=2.0),
+    Row("rietx.optimize.statistics.FD_COLUMN_ERROR", "constant", tier=3, value=1.0,
+        evidence=("the free factor of resolved_correlation's cut, n*(FD_COLUMN_ERROR*FD_STEP)^2 "
+                  "on the unit-diagonal normal matrix (WP-2050, generality review 2026-11-01). "
+                  "Mechanism tier 2: GSAS-II takes correlations off a pseudo-inverse truncated "
+                  "on the unit-diagonal Hessian (SVDtol, GSASIImath.setHcorr; docs/practice.md). "
+                  "For: brucite's exactly degenerate Gaussian size, Gaussian strain and W triple "
+                  "sits at 2.7e-15 to 4.9e-14 of |lambda|max under 1e-14 nudges, corundum's at "
+                  "1.2-1.9e-12, and the next real direction (zero shift with sample "
+                  "displacement, 1.3-1.4e-10) is kept. Against: FD_STEP's row records FD columns "
+                  "up to 2.5e-4 from a Richardson oracle, so the 1 x FD_STEP premise is measured "
+                  "on width columns only (5e-7 against jax on lab brucite); brucite's seventh "
+                  "stage put the triple at 2.3x the cut under one nudge; the cut grows with n, "
+                  "and no fit with n >= 100 is measured; an exact Jacobian makes it loose. "
+                  "Firing side one family: the four round-robin standards (qarr, lab CuKa, "
+                  "development data), with the exact identity 1/cos^2 = 1 + tan^2 as the truth"),
+        grounds=("WP-2050's measured margins: at the closing stage of brucite, corundum, "
+                 "zincite and fluorite the flat triple reads 0.004-0.47x the cut, brucite's "
+                 "zero-shift/displacement direction >= 31x, and SRM 660c, FAP, NAC and the "
+                 "LaB6 capillary nothing within 1000x; a correlation whose value is rounding "
+                 "is not shown to a user, and tests/test_suite_alarms.py asserts the "
+                 "unresolved mask nightly; the cut n*FD_STEP^2 approved by Yue, 2026-11-01 "
+                 "(PR #1306)."),
+        approved="2026-11-01"),
     Row("rietx.optimize.statistics.MAX_SHIFT_CONVERGED", "constant", value=0.1),
     Row("rietx.optimize.statistics.OBS_PER_PARAMETER_MIN", "constant", value=3.0),
     Row("rietx.optimize.statistics.OBS_PER_PARAMETER_PREFERRED", "constant", value=5.0),

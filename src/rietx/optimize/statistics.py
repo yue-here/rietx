@@ -62,6 +62,14 @@ PINV_RCOND = 1e-15
 #: and 1/d² stays below 1e+241 (WP-1463).
 COLUMN_SAFE_EXPONENT = 400
 
+#: The forward-difference error :func:`resolved_correlation` assumes in each
+#: Jacobian column, relative to the column and in units of
+#: :data:`~rietx.optimize.least_squares.FD_STEP`.  It is the one free factor of
+#: that function's cut, n·(this × FD_STEP)² on the unit-diagonal normal matrix
+#: (WP-2050; the cut ruled 2026-11-01).  1 is what was measured on the width
+#: columns, 5e-7 against jax on lab brucite.
+FD_COLUMN_ERROR = 1.0
+
 
 def _is_blocked(jac) -> bool:
     """Whether ``jac`` is a joint fit's :class:`~.blocked.BlockJacobian`, read
@@ -299,8 +307,9 @@ def resolved_correlation(corr: np.ndarray, jac: np.ndarray
     of *n* columns has a spectral norm of at most ``√n·FD_STEP`` (it is bounded
     by the Frobenius norm), and by Weyl's inequality a singular value moves by
     no more.  So an eigenvalue of the unit-diagonal normal matrix at or below
-    ``n·FD_STEP²`` is a direction the data has not been shown to move.  The
-    covariance still inverts it, and rounding then sets it: on brucite's
+    ``n·FD_STEP²`` is a direction the data has not been shown to move (the
+    per-column error is :data:`FD_COLUMN_ERROR` × ``FD_STEP``, a tier-3 row
+    approved 2026-11-01).  The covariance still inverts it, and rounding then sets it: on brucite's
     Gaussian-size, Gaussian-strain and W triple it sat between 2.7e-15 and
     4.9e-14 of |λ|max under 1e-14 nudges to one start value, while the next
     direction stayed at 1.3-1.4e-10.  On corundum the same triple reached
@@ -331,8 +340,13 @@ def resolved_correlation(corr: np.ndarray, jac: np.ndarray
     zero-shift/displacement direction.  On brucite's seventh stage the triple
     reached 2.3× the cut under one nudge, so that stage reads it as resolved.
     Two unresolved directions leave a ρ between members of different ones set
-    by two rounding eigenvalues.  A member with no ±1.000 partner has its
-    pairs withheld without a ``FLAT_DIRECTION`` clause to say so.
+    by two rounding eigenvalues.
+
+    **No message says which pairs were withheld** (ruled 2026-11-01): a
+    correlation whose value is rounding is not shown to a user.  The signal
+    for a developer is this function's ``unresolved`` mask, which a nightly
+    test asserts on the round-robin standards
+    (``tests/test_suite_alarms.py``).
     """
     from .least_squares import FD_STEP
 
@@ -355,7 +369,7 @@ def resolved_correlation(corr: np.ndarray, jac: np.ndarray
         return corr, unresolved
     sub = JTJ[np.ix_(live, live)] / np.outer(d[live], d[live])
     lam, vec = lapack.eigh(sub)
-    cut = len(live) * FD_STEP ** 2
+    cut = len(live) * (FD_COLUMN_ERROR * FD_STEP) ** 2
     gone = np.abs(lam) <= cut
     if not gone.any():
         return corr, unresolved
