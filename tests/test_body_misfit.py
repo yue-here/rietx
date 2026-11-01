@@ -237,18 +237,20 @@ def acridine():
     ref.fit(pattern, plan=RefinementPlan(stages=[Stage("body", trb.BODY_GLOBS, max_iter=200)]))
     arms: list = []
     out = ref.check_rigid_bodies(pattern, free=RIDING_GLOBS,
-                                 on_arm=lambda b, a, r: arms.append((a, r)))
+                                 on_arm=_png(arms, "body_misfit_acridine"))
     return ref, pattern, out, dict(arms)
 
 
-def _by_hand(ref, pattern, arm, globs=RIDING_GLOBS):
-    """The arm fitted through the public verbs only, as the manual spells it."""
+def _by_hand(ref, pattern, arm, stem, globs=RIDING_GLOBS):
+    """The arm fitted through the public verbs only, as the manual spells it;
+    its obs/calc/diff goes to ``tests/output/{stem}.png``."""
     hand = Refinement(arm.structure, ref.instrument, history=False)
     for path, source in arm.ties.items():
         hand.tie(path, source)
     res = hand.fit(pattern, telemetry=False, plan=RefinementPlan(
         stages=[Stage("misfit_check", [*globs, *arm.free], max_iter=200)],
         closing_window_tol=None))
+    trb._save_fit_png(res, stem)
     return hand, res
 
 
@@ -279,7 +281,7 @@ def test_freeing_every_member_is_the_arm_issue_1008_measured(acridine):
     ref, pattern, out, _ = acridine
     arm = ref.released_arm("acridine", freed=ACRIDINE_HEAVY + ACRIDINE_H)
     assert arm.riders == {} and arm.ties == {}
-    _, res = _by_hand(ref, pattern, arm)
+    _, res = _by_hand(ref, pattern, arm, "body_misfit_acridine_all_freed")
     (row,) = out.rows
     assert res.statistics.n_free_parameters - row.n_free_body == 3 * 23 - 6 == 63
 
@@ -288,7 +290,7 @@ def test_the_check_fits_the_public_arm(acridine):
     """One code path: the check's released χ² is the hand-fitted public arm's."""
     from rietx.optimize.statistics import _chi2_absolute
     ref, pattern, out, arms = acridine
-    _, res = _by_hand(ref, pattern, ref.released_arm("acridine"))
+    _, res = _by_hand(ref, pattern, ref.released_arm("acridine"), "body_misfit_acridine_public_arm")
     (row,) = out.rows
     assert _chi2_absolute(res.statistics) == pytest.approx(row.chi2_released, rel=1e-10)
     assert res.statistics.n_free_parameters == arms["released"].statistics.n_free_parameters
@@ -299,7 +301,7 @@ def test_each_rider_keeps_its_parent_vector(acridine):
     the parents themselves moved."""
     ref, pattern, _, _ = acridine
     arm = ref.released_arm("acridine")
-    hand, _ = _by_hand(ref, pattern, arm)
+    hand, _ = _by_hand(ref, pattern, arm, "body_misfit_acridine_rider_vectors")
     before, after = arm.structure.phases[0], hand.fitted_structure.phases[0]
     moved = []
     for h, p in arm.riders.items():
@@ -317,7 +319,7 @@ def test_at_a_refined_cell_the_vector_follows_the_cell(acridine):
     from rietx.params.derived import cartesian_frame
     ref, pattern, _, _ = acridine
     arm = ref.released_arm("acridine")
-    hand, _ = _by_hand(ref, pattern, arm, (*RIDING_GLOBS, "phases.*.cell.*"))
+    hand, _ = _by_hand(ref, pattern, arm, "body_misfit_acridine_free_cell", (*RIDING_GLOBS, "phases.*.cell.*"))
     before, after = arm.structure.phases[0], hand.fitted_structure.phases[0]
     m0 = np.asarray(cartesian_frame(before.cell.lengths_angles()))
     m1 = np.asarray(cartesian_frame(after.cell.lengths_angles()))

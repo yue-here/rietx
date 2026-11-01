@@ -22,6 +22,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from .io.exporters import ReflectionRow
+    from .report.body_misfit import ReleasedArm
     from .schemas.fraction import FractionProfile
     from .schemas.interval import ParameterInterval
     from .schemas.results import QuantitativePhaseAnalysis
@@ -6098,7 +6099,7 @@ class Refinement:
 
     def released_arm(self, body: str, *, phase: int | None = None,
                      freed: Sequence[str] | None = None,
-                     bond_sigma: float = 0.02, angle_sigma: float = 2.0):
+                     bond_sigma: float = 0.02, angle_sigma: float = 2.0) -> ReleasedArm:
         """The released arm :meth:`check_rigid_bodies` compares ``body`` with.
 
         Built from this refinement's current structure (fit first for the
