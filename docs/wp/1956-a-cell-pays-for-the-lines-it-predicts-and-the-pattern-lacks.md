@@ -310,11 +310,74 @@ absences; Si, corundum and magnetite keep their correct cells.
   "N expected by chance" and `SupercellCheck.p0` drop by the ratios above
   wherever the floor binds.
 
+  *Added after review.* `SupercellCheck.p0_power` (new, additive, schema note
+  under 0.60; `None` without a floor and in a record from before #1263),
+  written by `consensus.supercell_checks`, so a record reproduces its own
+  verdict: #951's pair stores p₀ 0.0115 with 0 of 2 seen, which alone reads as
+  refuted, beside the 0.172 the power check read. The texts giving the old
+  reason for `undecided` are corrected (`SupercellCheck`, `verdict`, `p_floor`,
+  the reference page's band and table, the theory page's power paragraph, which
+  also gains the k ≤ n·p₀ refutation and #1230's condition it lacked). The
+  reference page's text twin sits within a few characters of its 50 000 cap
+  after this, so the next addition there splits the page.
+
+  */code-review high --fix.* Seven findings. Applied three, all text: the
+  `p_floor` docstring, the dense fixture's line count (289 usable), #951's
+  test docstring's inequality. Built one after the judge agreed: the
+  `p0_power` record field above. Declined three, each a behaviour change for
+  its own measurement: (1) p₀ is not conditioned on the extras being far from
+  every parent line; on the dense fixture the conditional rate is 0.206
+  against p₀ 0.228, so n·p₀ still overstates chance by about 1.1× there (the
+  floored rate overstated it 3×), next action below; (2) `p0_floor_deg`'s
+  default 0 leaves `supercell_checks(screen=None)` without a power floor, as
+  before this branch (both rates were unfloored there, so nothing regressed),
+  and the keyword's name now describes a rate it no longer sets; (3) p₀ is
+  counted about the raw observed positions while the seen test reads each
+  candidate's shift-corrected ones, a gap the Monte Carlo bounds at 0.015 on
+  one constant-shift pattern.
+
+  *Generality* (judge's sections, unedited):
+
+  INDEX_SUPERCELL_REFUTED (code row, tier 3, ambiguity 2, approved
+  2026-10-21). Verdict: **holds.** "The new null is arithmetic that a test
+  verifies. The cost of refuting less was measured at one flipped verdict, on
+  a wrong cell that four other parents still refute. I found no case for
+  keeping the old null." Q5 note: the `approved` date was not refreshed,
+  although this entry says the rule is the maintainer's call at merge; a batch
+  reader of the table will not see that request. Q6 note: the 244 pairs are
+  not broken down by family, and all of them are development data (C3's
+  thresholds were measured on them), which this entry did not say.
+
+  The split (a heuristic the table cannot see). Verdict: **weak**; Q7
+  **fails**: "No field carries `p0_power` … for #951's pair, a reader computes
+  0.0115² = 1.3e-4 < 0.01 with 0 of 2 seen, expects `refuted`, and reads
+  `undecided`. Four texts still give the old reason." Q3 against the power
+  half: "#951's lines were missing because a weak-line intensity filter removed
+  them, not because of a 2θ shift. The shift bound protects it only by the
+  arithmetic of n = 2: 0.172² = 0.030 > 0.01. The same filtered superstructure
+  with three extras gives 0.172³ = 0.0051 < 0.01 and would be refuted. … This
+  proxy predates the branch, but the floor now carries the guard's whole
+  weight." Q5: the null half is tier 1 (arithmetic, verified by the Monte Carlo
+  test); the power half is tier 3 at best, its two constants
+  (`fom.MATCH_SIGMA`, `engines.DEFAULT_UNKNOWN_SHIFT_DEG`) at `unaudited`.
+  Q6: no count of how many verdicts the power check alone keeps undecided.
+  "Evidence that would change the verdict: a `SupercellCheck` field carrying
+  the power rate …, with those four texts corrected … And a count of how many
+  acceptance pairs the power check alone keeps undecided."
+
+  *Author's answer under the fail:* the field and the four texts are done
+  (above). Not done: the count of pairs the power check alone keeps undecided.
+  The proxy the judge names (#951's guard rests on n = 2, not on the shift)
+  predates this branch and goes to the maintainer with the rule.
+
   *Not done.* The three #1230 truths under `preset="full"` were not re-run here;
   the reporter's runs read #1 for `split + g`, and `g` alone already holds them
   at #1 on main.
 
-  *Next.* The maintainer rules on `split` at PR #1302's merge. Then task 5
+  *Next.* The maintainer rules on `split` at PR #1302's merge. If it lands,
+  the next refinement of the null is the declined review finding (1): count p₀
+  only over the range farther than the resolution from every parent line, per
+  pair, and re-run the 244-pair log (`gs_split_log.py`'s method) on it. Then task 5
   (`fom_panel_disagrees`), under `preset="full"` or a ceiling no arm binds, per
   #1267's entry above.
 
