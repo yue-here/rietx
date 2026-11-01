@@ -617,6 +617,9 @@ from .._nearmiss import did_you_mean
 #: operations miss its reference structure), the sign convention, the largest
 #: displacement), additive and defaulted to ``None`` where no phase carries
 #: ``distortion_modes``.
+#: Also in 0.60 (WP-1910, ruled on #1178): ``ExtinctionScreen.held_screen``, the
+#: second screen at the prefit's cell, held, itself an ``ExtinctionScreen``.
+#: Additive and defaulted to ``None``, the same rule.
 #: Also in 0.60 (#941's follow-ups): ``LeBailValidation.n_lines_screened_in_window``,
 #: ``.predicted_but_absent_density_in_window`` and
 #: ``.predicted_but_absent_excess_in_window``, the windowed count's density and

@@ -21,18 +21,27 @@ P 2₁/c, ``P 1 21/c 1``  ×0.9998 to ×1.0002    ×0.9995 to ×1.001
 ======================  ====================  =================================
 
 Outside those ranges the screen mostly abstains (``EXTINCTION_SCREEN_UNRELIABLE``
-past about ±2 %, or the prefit fails).  But at some offsets it returns a **wrong
-class confidently** (eight of the 72 default rows); four are the strict ``xfail``
-rows below.  In each of those four the prefit's cell is good: screening that same
-cell held, from the declared instrument, returns the true class (corundum ×0.995 lands at −391 ppm
-and reads ``R - c -`` at ΔBIC −2794 held; FAP ×1.0075 lands at −305 ppm and reads
-``P 63 - -``; the monoclinic ×0.999 and ×1.002 land within 150 ppm and read
-``P 1 21/c 1``).  What crosses from the prefit besides the cell is what refutes
-the true class.  It is not cured by carrying the cell alone, because PbSO₄'s
-X-ray histogram needs the prefit's seeded background to get ``P c - n`` at all
-(``test_extinction_gate.py``).  So these rows are the open part of WP-1910's
-acceptance ("returns the class or reports a finding that names the cell"), not a
-tuning target.
+past about ±2 %, or the prefit fails).  But at some offsets the prefit's screen
+names a **wrong class** (eight of the 72 default rows): what crosses from the
+prefit besides the cell (its widths, zero and seeded background) refutes the
+true class.  Carrying the cell alone is no cure, because PbSO₄'s X-ray histogram
+needs the prefit's seeded background to get ``P c - n`` at all
+(``test_extinction_gate.py``).  So, as ruled on #1178 (2026-10-26), a second
+screen at the prefit's cell, held, from the declared instrument checks every
+class the default names, and two different classes make the screen name neither
+(``EXTINCTION_SCREENS_DISAGREE``).  Re-measured on ``main`` 3defa3b6 plus this
+check (pearl, ``ws_jobs/m1910i1``): it catches six of the eight (``CAUGHT``) and
+fires on none of the 51 rows where the default is right
+(these three patterns, PbSO₄ X-ray and 11-BM NAC, 121 rows).  The other two are
+strict ``xfail`` rows: the prefit's own cell is off there (corundum ×0.985 lands
+1611 ppm short, the monoclinic ×0.9975 586 ppm on a), and both screens name the
+same wrong class.
+
+Measured beside it and not built: (b), the prefit's cell held with the prefit's
+fitted background carried and the widths and zero re-fitted from the declared
+instrument.  It returns the true class on three of the six caught rows, keeps
+the wrong ``P 1 - 1`` on the other three, and names ``P c - -`` on PbSO₄ X-ray at
+×0.975 where the default abstains.
 """
 
 from __future__ import annotations
@@ -172,39 +181,58 @@ def test_the_default_returns_the_true_class_across_its_patterns_margin(
     _draw(name, factor, "default", screen, fits)
     best = screen.best_or_none()
     assert best is not None and TRUE[name][0] in best.space_groups, _says(screen)
+    # the silent side of the second screen: it ran, and nothing fired
+    assert screen.held_screen is not None and not screen.screens_disagree()
+    assert "EXTINCTION_SCREENS_DISAGREE" not in {d.code for d in screen.diagnostics}
 
 
-@pytest.mark.parametrize("name,factor", [
-    ("corundum", 0.995), ("fap", 1.0075), ("mono", 0.999), ("mono", 1.002),
-])
-@pytest.mark.xfail(strict=True, reason=(
-    "WP-1910: the default returns a wrong class confidently here, although the "
-    "prefit's cell is good — the same cell held reads the true class"))
+#: the default's confident misses the held second screen catches: the prefit
+#: lands within 400 ppm, and the same cell held, from the declared instrument,
+#: names the true class (WP-1910, ruled on #1178)
+CAUGHT = [("corundum", 0.995), ("fap", 1.0075), ("mono", 0.998), ("mono", 0.999),
+          ("mono", 1.002), ("mono", 1.0025)]
+
+
+@pytest.mark.parametrize("name,factor", CAUGHT)
 def test_the_default_never_returns_a_wrong_class_confidently(
         patterns, name, factor, monkeypatch):
     """The open half of WP-1910's acceptance: return the class, or abstain with
-    a finding.  ``R - - -``, ``P - - -`` and ``P 1 - 1`` come back instead, each
-    refuting the true class on one to four forbidden positions."""
+    a finding.  After the prefit ``R - - -``, ``P - - -`` or ``P 1 - 1`` leads,
+    refuting the true class on one to four forbidden positions; the second
+    screen, at the prefit's cell held from the declared instrument, names the
+    true class.  Two classes sharing no group cannot both be right, so the
+    screen names neither and keeps both rankings."""
     screen, fits = _screen(patterns, name, factor, monkeypatch)
     _draw(name, factor, "default", screen, fits)
+    assert screen.best_or_none() is None, _says(screen)
+    assert screen.screens_disagree()
+    own, held = screen._own_best(), screen.held_screen.best_or_none()
+    assert TRUE[name][0] not in own.space_groups, _says(screen)
+    assert TRUE[name][0] in held.space_groups, _says(screen.held_screen)
+    assert tuple(screen.held_screen.cell) == tuple(screen.cell)
+    found = [d for d in screen.diagnostics if d.code == "EXTINCTION_SCREENS_DISAGREE"]
+    assert len(found) == 1 and own.symbol in found[0].message
+    assert held.symbol in found[0].message
+
+
+@pytest.mark.parametrize("name,factor", [("corundum", 0.985), ("mono", 0.9975)])
+@pytest.mark.xfail(strict=True, reason=(
+    "WP-1910: prefit cell off — the prefit lands 1611 ppm (corundum) and 586 ppm "
+    "(mono, a) from the specimen's cell, and the held second screen at that cell "
+    "names the same wrong class, so there is no disagreement to report (ruled on "
+    "#1178, 2026-10-26)"))
+def test_a_prefit_cell_that_is_off_is_not_caught(patterns, name, factor):
+    """Both screens name one wrong class: ``R - - -`` at corundum ×0.985 and
+    ``P 1 - 1`` at the monoclinic ×0.9975.  Pinned strict, so a fix shows as a
+    pass."""
+    screen, _ = _screen(patterns, name, factor)
     best = screen.best_or_none()
     assert best is None or TRUE[name][0] in best.space_groups, _says(screen)
 
 
-@pytest.mark.parametrize("name,factor", [
-    ("corundum", 0.995), ("fap", 1.0075), ("mono", 0.999), ("mono", 1.002),
-])
-def test_the_cell_the_prefit_lands_on_is_not_what_refutes_the_class(
-        patterns, name, factor):
-    """The control for the row above: hold the default's own refined cell and
-    screen again from the declared instrument.  The true class returns, so the
-    wrong answer comes from what the prefit carries besides the cell."""
-    from tests.test_extinction_symbol import _candidate
-
-    data, _cell, system, centring, ins, limits = patterns[name]
-    default, _ = _screen(patterns, name, factor)
-    held = determine_extinction_symbol(
-        data, _candidate(tuple(default.cell), system, centring), ins,
-        two_theta_limits=limits, refine_cell=False)
-    best = held.best_or_none()
-    assert best is not None and TRUE[name][0] in best.space_groups, _says(held)
+def test_a_held_cell_runs_no_second_screen(patterns):
+    """``refine_cell=False`` has no prefit to check, so ``held_screen`` stays
+    None and the answer is the held screen's own."""
+    screen, _ = _screen(patterns, "corundum", 1.0, refine_cell=False)
+    assert screen.held_screen is None and not screen.screens_disagree()
+    assert screen.best_or_none() is not None

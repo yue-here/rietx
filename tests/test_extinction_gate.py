@@ -324,6 +324,13 @@ def test_pbso4_xray_gets_its_class_only_through_the_seeded_prefit():
     assert best.symbol == "P c - n"
     assert "P c m n" in best.space_groups
     assert screen.status == "converged"
+    # the second screen at the prefit's cell, held from the preset instrument,
+    # names no class (the all-zero background loses P c - n): recorded, never
+    # flagged (WP-1910, ruled on #1178)
+    assert screen.held_screen is not None
+    assert screen.held_screen.best_or_none() is None
+    assert not screen.screens_disagree()
+    assert "EXTINCTION_SCREENS_DISAGREE" not in {d.code for d in screen.diagnostics}
 
     held = determine_extinction_symbol(data, candidate, instrument, peaks=peaks,
                                        two_theta_limits=limits, refine_cell=False)
@@ -396,11 +403,10 @@ def test_the_gate_fires_on_a_real_family_outside_the_prefits_basin(inputs, facto
 @pytest.mark.xfail(strict=True, reason=(
     "known miss: PbSO4 X-ray at x0.99 of its index cell; the prefit stops about "
     "0.3 % short, the reference reads 0.45 (below 1/sqrt(2)) and the screen "
-    "returns P c - - confidently, where the specimen is P c - n; belongs to "
-    "WP-1910's open task (re-screen at the prefit's cell, held, flag a "
-    "disagreement between the two screens, ruled 2026-10-26), which may not "
-    "flag it either, since a held re-screen with no decisive class is "
-    "recorded, not flagged: strict until a run shows it does"))
+    "returns P c - - confidently, where the specimen is P c - n; WP-1910's "
+    "second screen at the prefit's cell, held, names no class here, and a held "
+    "screen with no decisive class is recorded, not flagged (ruled 2026-10-26), "
+    "so it does not catch this row either (measured 2026-11-01)"))
 def test_the_gate_misses_pbso4_at_one_percent_short():
     """The counter-example to "every cell outside the basin reads ≥ 1.6": an
     out-of-basin cell inside the 0.36-1.6 gap.  The prefit moves 6.895 Å to

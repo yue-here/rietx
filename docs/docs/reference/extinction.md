@@ -97,6 +97,18 @@ With `refine_cell=False` a cell off by a few parts in 10⁴ leaves a tan θ posi
 On the IUCr round-robin SRM 676a corundum (`tests/data/qarr/corundum.prn`), the certified cell gives `R - c -` and the same cell scaled by 1.0012 gives `R - - -`, whose members exclude `R -3 c`.
 On the X-ray histogram of `tests/data/gsas2_pbso4.gpx` at a cell 0.1-0.2 % long, the held screen abstains, the cell-free fit gives `P c - n`, and the same fit from an unseeded background returns `P - - n`, which is why it seeds one.
 
+### A second screen checks the first
+
+The cell-free fit hands every class its cell and also its widths, zero and seeded background, and those can refute the true class at a cell that is right.
+So when the default screen names a class, it screens again at the same cell, held, from the instrument you declared, and keeps that screen as `ExtinctionScreen.held_screen`.
+The two fail differently, through the prefit's profile or through the declared one.
+When both name a class and the classes differ, `ExtinctionScreen.screens_disagree` is true, [`EXTINCTION_SCREENS_DISAGREE`](diagnostics-indexing.md#extinction_screens_disagree) says so, and `ExtinctionScreen.best_or_none` returns `None`; both rankings are kept, `candidates` and `held_screen.candidates`.
+A held screen that names no class changes nothing.
+On SRM 676a corundum, the GSAS-II fluorapatite and the synthetic P 2₁/c, each cell scaled by ×0.97 to ×1.03, the default named a wrong class at eight offsets: the check caught six and fired at none where the default was right.
+At the other two (corundum ×0.985, P 2₁/c ×0.9975) the prefit's own cell is off, both screens name the same wrong class, and nothing here can see it.
+On the PbSO₄ X-ray histogram the held screen names no class at eleven offsets where the default names the true `P c - n`, and nothing fires; at ×0.99 and ×1.0125 the default names `P c - -` and the held screen nothing, so this check cannot see those two either.
+The second screen costs about a third to a half again of the screen's time.
+
 ### The reference fit is gated
 
 When the absence-free class's own fit leaves more than half of the net signal's weighted power unexplained, every absence test would read that misfit.
@@ -153,6 +165,7 @@ Even that returns a class, which lists its space groups, so the type cannot expr
 | `ExtinctionScreen.z` | the formula units per cell the member filter used, or `None` |
 | `ExtinctionScreen.z_from_density` | the Z the declared density gives on `cell`, not rounded, or `None` |
 | `ExtinctionScreen.z_candidates` | with a density and no `z`, every whole Z within the density's tolerance; several is an ambiguity, none a contradiction |
+| `ExtinctionScreen.held_screen` | the second screen, at `cell` held from the declared instrument, with its own ranking; `None` when the cell was held or the screen named no class |
 | `ExtinctionScreen.status` | `"converged"`, `"failed"` (no class could be screened), `"unreliable"` (ranked, but the reference fit failed its gate) or `"cancelled"` |
 | `ExtinctionScreen.thresholds_version` | the indexing thresholds version that produced the ranking |
 | `ExtinctionScreen.diagnostics` | findings about the answer |
@@ -172,6 +185,7 @@ The screen's diagnostics say what the answer is and why it may not be one.
 - the class was fitted and is not refuted;
 - it rests on at least one absence the data could test, or is the absence-free class itself, whose claim is that there is nothing to see;
 - it leads the next surviving class by at least the decisive ΔBIC margin, 10 (`rietx.indexing.extinction.DECISIVE_DELTA_BIC`).
+- the second screen, when one ran, was not stopped and names no other class (`ExtinctionScreen.screens_disagree`).
 
 Otherwise it returns `None`, with the reason in `ExtinctionScreen.diagnostics`.
 With a declared prior, only classes it leaves a member in can be returned and the margin is taken to the next such class; a class the prior emptied that the data prefer by the decisive margin makes it abstain.
