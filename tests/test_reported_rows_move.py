@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import gemmi
 import pytest
 
 from rietx import (
@@ -25,6 +26,8 @@ from rietx import (
     Stage,
     refine_sequential,
 )
+from rietx.refine import _build_result
+from rietx.schemas.common import Diagnostic
 from tests.test_absent_phase import _absent_phase_inputs
 from tests.test_multi_histogram import perturbed_inputs
 from tests.test_multi_histogram import synthesize as synth_hist
@@ -97,40 +100,127 @@ def test_a_held_phase_leaves_no_trajectory_point():
 # ----------------------------------------------------------------------
 # a source the caller fixed
 # ----------------------------------------------------------------------
-def test_a_held_certified_cell_reports_no_cell_row():
-    """``lab_calibrate`` on a standard whose cell is held: no cell row at all.
-
-    Before WP-1999 ``a`` was absent and ``b`` and ``c`` were present at the
-    certified value, which read as if the fit had measured two edges of a
-    cubic cell and not the third.
-    """
+@pytest.fixture(scope="module")
+def certified_fit():
+    """``lab_calibrate`` on LaB6 with its cell held, as a calibration runs."""
     structure, ins = perturbed_models()
     ref = Refinement(structure, ins, history=False)
     ref.hold("phases.0.cell.*")
     result = ref.fit(synthesize(), plan="lab_calibrate")
     OUT.mkdir(exist_ok=True)
     result.plot(OUT / "reported_rows_held_certified_cell.png")
+    return ref, result
+
+
+def test_a_held_certified_cell_reports_no_cell_row(certified_fit):
+    """``lab_calibrate`` on a standard whose cell is held: no cell row at all.
+
+    Before WP-1999 ``a`` was absent and ``b`` and ``c`` were present at the
+    certified value, which read as if the fit had measured two edges of a
+    cubic cell and not the third.
+    """
+    _ref, result = certified_fit
     assert not [p for p in _paths(result) if ".cell." in p]
     _every_fixed_row_follows_a_free_one(result)
 
 
-def test_a_coordinate_no_stage_freed_is_not_reported():
+def test_the_cif_still_states_every_row_the_answer_dropped(certified_fit, tmp_path):
+    """The CIF writer reads the model, never ``result.parameters``.
+
+    The rows WP-1999 drops are constants, so the refinement CIF must still
+    carry every cell length and every coordinate, at the model's value and
+    with no standard uncertainty, while a refined row keeps its su.
+    """
+    ref, result = certified_fit
+    reported = _paths(result)
+    out = tmp_path / "held_cell.cif"
+    ref.write_cif(out)
+    block = gemmi.cif.read(str(out)).sole_block()
+    phase = ref.fitted_structure.phases[0]
+    for n in "abc":
+        assert f"phases.0.cell.{n}" not in reported
+        text = block.find_value(f"_cell_length_{n}")
+        assert text is not None and "(" not in text, (n, text)
+        assert float(text) == pytest.approx(getattr(phase.cell, n).value, abs=1e-6)
+    sites = block.find("_atom_site_", ["label", "fract_x", "fract_y", "fract_z"])
+    by_label = {row[0]: row for row in sites}
+    assert set(by_label) == {a.label for a in phase.atoms}
+    dropped = 0
+    for j, atom in enumerate(phase.atoms):
+        for k, axis in enumerate("xyz", start=1):
+            text = by_label[atom.label][k]
+            assert float(text.split("(")[0]) == pytest.approx(
+                getattr(atom, axis).value, abs=1e-6), (atom.label, axis)
+            if f"phases.0.atoms.{j}.{axis}" not in reported:
+                dropped += 1
+                assert "(" not in text, (atom.label, axis, text)
+    assert dropped == 6    # no stage of lab_calibrate frees a site DOF
+    # a refined quantity still carries its su into the file
+    refined = [p for p in result.parameters if p.vary and p.stderr is not None]
+    assert refined, "the calibration refined nothing"
+
+
+@pytest.fixture(scope="module")
+def default_fit():
+    """LaB6 under ``mccusker_default``: the cell refines, no site DOF does."""
+    structure, ins = perturbed_models()
+    ref = Refinement(structure, ins, history=False)
+    result = ref.fit(synthesize(), plan="mccusker_default")
+    OUT.mkdir(exist_ok=True)
+    result.plot(OUT / "reported_rows_coordinate_default.png")
+    return ref, result
+
+
+def test_a_coordinate_no_stage_freed_is_not_reported(default_fit):
     """A coordinate is tied to its site DOFs, so it moves only when they do."""
     x = "phases.0.atoms.1.x"
-    structure, ins = perturbed_models()
-    default = Refinement(structure, ins, history=False).fit(
-        synthesize(), plan="mccusker_default")
-    OUT.mkdir(exist_ok=True)
-    default.plot(OUT / "reported_rows_coordinate_default.png")
+    _ref, default = default_fit
     assert x not in _paths(default)
     _every_fixed_row_follows_a_free_one(default)
 
     structure, ins = perturbed_models()
     structural = Refinement(structure, ins, history=False).fit(
         synthesize(), plan="mccusker_structural")
+    OUT.mkdir(exist_ok=True)
     structural.plot(OUT / "reported_rows_coordinate_structural.png")
     row = structural.parameter(x)
     assert row.vary is False and row.stderr is not None
+
+
+def test_a_tied_row_inherits_a_withheld_esd(default_fit):
+    """A ``CELL_RUNAWAY`` cell that stays a free column withholds its esd,
+    and a cubic ``b``/``c`` tied to it withhold theirs too.
+
+    A real fit no longer reaches this: a reset cell is held for its stage
+    (``test_cell_runaway_safety.py``), so since WP-1999 its followers leave
+    the answer with it.  The row build is still the one place the rule
+    lives, so the answer is rebuilt here from the fit's own covariance with
+    the finding handed in, rather than waiting for a fixture that keeps a
+    reset cell free.
+    """
+    ref, result = default_fit
+    kept, table, theta, stderr_internal, correlation = ref._answer_covariance
+    assert kept is result
+
+    def rebuild(cell_runaway):
+        return _build_result(
+            ref._model, table, theta, mode=result.mode, status=result.status,
+            stage_results=list(result.stages), diagnostics=[],
+            structure=ref.structure, stderr_internal=stderr_internal,
+            correlation=correlation, cell_runaway=cell_runaway)
+
+    finding = Diagnostic(level="warning", code="CELL_RUNAWAY",
+                         message="injected", where=["phases.0.cell.a"])
+    plain, flagged = rebuild([]), rebuild([finding])
+    for n in "abc":
+        path = f"phases.0.cell.{n}"
+        assert plain.parameter(path).stderr is not None, path
+        row = flagged.parameter(path)    # still listed: a is a free column
+        assert row.stderr is None, path
+        assert row.value == plain.parameter(path).value, path
+    # the finding names a cell, so nothing outside it loses its esd
+    assert flagged.parameter("instrument.zero_shift").stderr == \
+        plain.parameter("instrument.zero_shift").stderr
 
 
 # ----------------------------------------------------------------------
