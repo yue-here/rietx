@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import functools
 import json
+import re
 import struct
 import zlib
 from pathlib import Path
@@ -1252,9 +1253,9 @@ def test_an_ellipsoid_figure_counts_the_sites_it_drew_as_spheres():
     default = render_structure(structure_from_cif(path), mode="ellipsoid", size=200)
     kept = render_structure(structure_from_cif(path, aniso=True), mode="ellipsoid", size=200)
     ball = render_structure(structure_from_cif(path), mode="ball", size=200)
-    assert [w[:25] for w in default.report.warnings] == [
-        "20 of 20 sites carry no a"]
-    assert [w[:24] for w in kept.report.warnings] == ["9 of 20 sites carry no a"]
+    pattern = r"^Drawn as spheres for want of an anisotropic displacement: (\d+) of (\d+) sites"
+    counts = [re.match(pattern, w).groups() for r in (default, kept) for w in r.report.warnings]
+    assert counts == [("20", "20"), ("9", "20")]
     assert ball.report.warnings == []
 
 

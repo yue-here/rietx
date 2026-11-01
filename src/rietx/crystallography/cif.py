@@ -1085,8 +1085,9 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
         if kept:
             diagnostics.append(Diagnostic(
                 level="info", code="CIF_ANISO_COLLAPSED",
-                message=(f"{path}: {len(kept)} sites carry U_ij in the file and "
-                         f"were read as U_eq; pass aniso=True to keep them."),
+                message=(f"{path}: {_sites(len(kept))} in the file and "
+                         f"{'was' if len(kept) == 1 else 'were'} read as U_eq; "
+                         f"pass aniso=True to keep {'it' if len(kept) == 1 else 'them'}."),
                 where=[f"phases.0.atoms.{k}.biso" for k in kept]))
 
     phase = Phase(
@@ -1113,6 +1114,10 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
     check_group_is_structure_symmetry(phase)
     structure = Structure(phases=[phase])
     return structure
+
+
+def _sites(n: int) -> str:
+    return f"{n} site carries U_ij" if n == 1 else f"{n} sites carry U_ij"
 
 
 def format_su(value: float, esd: float | None, *, decimals: int = 6) -> str:

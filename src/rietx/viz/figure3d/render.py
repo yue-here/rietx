@@ -859,9 +859,9 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
         spheres = sum(1 for k in drawn_sites if not geometry["sites"][k]["aniso"])
         if spheres:
             warnings.append(
-                f"{spheres} of {len(drawn_sites)} sites carry no anisotropic displacement "
-                "and are drawn as spheres; a CIF's U_ij reaches a site only through "
-                "Structure.from_cif(..., aniso=True)")
+                f"Drawn as spheres for want of an anisotropic displacement: {spheres} of "
+                f"{len(drawn_sites)} sites (a CIF's U_ij is kept only by "
+                "Structure.from_cif(..., aniso=True))")
         warnings += [f"{label}: its displacement tensor is not positive definite, so its "
                      "ellipsoid is drawn flat" for label in flat]
     if seen.unjudged:
