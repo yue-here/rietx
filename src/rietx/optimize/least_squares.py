@@ -383,13 +383,22 @@ class _NonFiniteJacobian(Exception):
 
 def _non_finite_columns(j) -> np.ndarray:
     """The column indices of ``j`` holding a NaN or an infinity, dense or
-    :class:`~.blocked.BlockJacobian`."""
+    :class:`~.blocked.BlockJacobian`.  A column sum is NaN or infinite
+    whenever the column holds one, so a finite sum clears the column without
+    the full-size boolean mask; only a non-finite sum (possibly a finite
+    column that overflowed) is checked entry by entry."""
+    def bad_of(m: np.ndarray) -> np.ndarray:
+        bad = ~np.isfinite(m.sum(axis=0))
+        if bad.any():
+            bad[bad] = ~np.isfinite(m[:, bad]).all(axis=0)
+        return bad
+
     if isinstance(j, BlockJacobian):
         bad = np.zeros(j.n_cols, dtype=bool)
         for block, cols in zip(j.blocks, j.col_maps, strict=True):
-            bad[cols] |= ~np.isfinite(block).all(axis=0)
+            bad[cols] |= bad_of(block)
         return np.flatnonzero(bad)
-    return np.flatnonzero(~np.isfinite(np.asarray(j)).all(axis=0))
+    return np.flatnonzero(bad_of(np.asarray(j)))
 
 
 class _FiniteJacobianGuard:
@@ -419,7 +428,7 @@ class _FiniteJacobianGuard:
 
 
 def _non_finite_outcome(kind: str, columns, free_paths, x0: np.ndarray,
-                        n_table: int, cost0: float, n_fev: int, solver: str,
+                        n_table: int, cost0: float, solver: str,
                         cell_guard, lapack_start: int,
                         jacobian_layout: str | None = None) -> LSQOutcome:
     """The outcome of a solve stopped on a non-finite model: its own start,
@@ -428,12 +437,12 @@ def _non_finite_outcome(kind: str, columns, free_paths, x0: np.ndarray,
     names = tuple(free[c] if c < len(free) else f"aux.{c - len(free)}"
                   for c in np.asarray(columns, dtype=int))
     return LSQOutcome(np.array(x0[:n_table], dtype=np.float64), cost0, cost0,
-                      int(n_fev), "diverged", None, None, None, solver=solver,
+                      cell_guard.n_calls, "diverged", None, None, None, solver=solver,
                       termination=f"non_finite_{kind}",
                       n_degenerate_cell_probes=cell_guard.n_degenerate,
                       n_lapack_fallbacks=lapack.retries() - lapack_start,
                       jacobian_layout=jacobian_layout,
-                      non_finite=NonFiniteStop(kind, names, free[:n_table]))
+                      non_finite=NonFiniteStop(kind, names, free))
 
 
 def stationary_columns(outcome: LSQOutcome, free_paths: list[str]) -> list[int]:
@@ -2925,8 +2934,7 @@ def run_least_squares(model: CompiledModel, table: ParameterTable,
             # the per-phase buffers; the outcome is the start, so are they
             model.set_pawley_intensities(x0[n_table:])
         return _non_finite_outcome(kind, columns, table.free_paths, x0, n_table,
-                                   cost0, cell_guard.n_calls, solver, cell_guard,
-                                   lapack_start)
+                                   cost0, solver, cell_guard, lapack_start)
 
     if not np.all(np.isfinite(r0)):
         # both drivers refuse this start with a ValueError (WP-2048)
@@ -3197,8 +3205,8 @@ def run_multi_least_squares(models: list[CompiledModel],
 
     def stopped(kind: str, columns=()) -> LSQOutcome:
         return _non_finite_outcome(kind, columns, mtable.free_paths, x0, n_cols,
-                                   cost0, cell_guard.n_calls, solver, cell_guard,
-                                   lapack_start, jacobian_layout=layout)
+                                   cost0, solver, cell_guard, lapack_start,
+                                   jacobian_layout=layout)
 
     if not np.all(np.isfinite(r0)):
         # the single-histogram rule (WP-2048), on the stacked residual
