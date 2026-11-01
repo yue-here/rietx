@@ -435,6 +435,10 @@ def _reduce_basis(rows, lattice, *, span: int = 2) -> list[tuple[Fraction, ...]]
     [−``span``, ``span``], measured in the group's own compatible metric, and
     the replacement is required to be **unimodular** against the original, which
     is what makes it the same lattice rather than a sublattice of it.
+
+    The basis returned is **right-handed** in the coordinates ``rows`` are
+    written in (:func:`_right_handed`), so a group carried into it keeps its
+    handedness and every label read there is the one it had (#1197).
     """
     metric = np.asarray(lattice, dtype=np.float64) @ np.asarray(
         lattice, dtype=np.float64).T
@@ -463,8 +467,25 @@ def _reduce_basis(rows, lattice, *, span: int = 2) -> list[tuple[Fraction, ...]]
         chosen.append(coeffs)
         vectors.append(vector)
         if len(chosen) == 3:
-            return vectors
-    return [tuple(row) for row in base]  # pragma: no cover - span 2 always suffices
+            return _right_handed(vectors)
+    return _right_handed([tuple(row) for row in base])  # pragma: no cover - span 2 suffices
+
+
+def _right_handed(vectors: list[tuple[Fraction, ...]]) -> list[tuple[Fraction, ...]]:
+    """The same three basis vectors, the first two swapped when their determinant is negative.
+
+    spglib reads fractional operators on right-handed axes, and an
+    enantiomorphic pair is two space-group types related only by an
+    orientation-reversing affine map (Souvignier, B. (2016), *International
+    Tables for Crystallography* A, ch. 1.3), so a group written in a basis with
+    det < 0 is identified as the mirror type.  The reduced cell of P 4₂ c m at
+    k = (0, 0, ½) was (b, a, 2c) and printed BNS 78.22 (a 4₃) for operators
+    that are 76.10 (a 4₁), issue #1197.  Swapping the two shortest vectors
+    flips the sign and keeps the lattice and every length.
+    """
+    if _operators._rational_determinant(vectors) < 0:
+        return [vectors[1], vectors[0], vectors[2]]
+    return vectors
 
 
 def magnetic_cell(space_group, k) -> MagneticCell:

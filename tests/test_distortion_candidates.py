@@ -883,3 +883,25 @@ def test_a_centred_parents_children_hold_its_atoms(build, numbers):
     if numbers is not None:
         assert sorted(_number(c) for c in cands) == numbers
         assert len({c.irrep for c in cands}) == 1
+
+
+def _hexagonal_p31():
+    cell = rx.Cell(**{k: P_(value=v) for k, v in
+                      dict(a=4.0, b=4.0, c=6.0, alpha=90.0, beta=90.0, gamma=120.0).items()})
+    return rx.Phase(name="p31", space_group="P 31", cell=cell,
+                    atoms=[_atom("Fe", "Fe", 0.11, 0.23, 0.31)])
+
+
+def test_a_chiral_child_keeps_the_parents_handedness():
+    """P 3₁ at k = (0, 0, ½): the S1(a) child is P 3₂ in a right-handed (P, p) (#1197's sibling).
+
+    The threefold that survives is the parent's 3₁ composed with the lost
+    translation c, at 2/3 of the child's c' = 2c: a 3₂.  Until #1197 the
+    magnetic cell was left-handed, the child's (P, p) had det P = −2, and its
+    atoms, read as written, were the mirror crystal under the label P 3₁.
+    """
+    cands = I.distortion_candidates(_hexagonal_p31(), (0, 0, Fraction(1, 2)))
+    (chiral,) = [c for c in cands if c.label == "S1(a)"]
+    assert chiral.refusal is None
+    assert chiral.child.space_group == "P 32"
+    assert np.linalg.det(chiral.transform[0]) == pytest.approx(2.0)
