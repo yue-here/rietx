@@ -524,6 +524,64 @@ class RefinementPlan:
         ])
 
     @classmethod
+    def magnetic_structural(cls) -> "RefinementPlan":
+        """:meth:`mccusker_structural` with the magnetic moments refined from
+        its second stage on (WP-1418, issue #1082).
+
+        After the scale and background, the moment **moduli** refine alone
+        (``…moment.dof0``), then every moment DOF, moduli and angles; the
+        zero, cell, widths, coordinates and displacement parameters follow in
+        :meth:`mccusker_structural`'s order.  Staging is cumulative, so the
+        moments stay free in every later stage and the closing stage.  The
+        precedent for each part:
+
+        - **the nuclear order** is McCusker, Von Dreele, Cox, Louër & Scardi
+          (1999), *J. Appl. Cryst.* **32**, 36, as in
+          :meth:`mccusker_structural` (no program ships it as a default);
+        - **the moduli before the angles** is the order
+          ``strategy.magnetic.SOLVE_STAGE_PATHS`` refines a trial in, for
+          WP-1938 D12's measurement there: an angle's column scales with its
+          modulus, and freed together from a small modulus LM stopped at χ²
+          454 660 against 2556.06.  Measured for this preset on that two-site
+          P n m a set (WP-1418, macOS arm64): from moduli 20 % high the stage
+          changes no value beyond 1e-6 μ_B; from 0.1 μ_B with the directions
+          0.4 rad off, this preset and the same plan without the
+          ``moment_moduli`` stage (every moment DOF freed together) both
+          converge.  That is start dependence, not an effect of the order:
+          from this cold start the fit can reach either of two minima tied in
+          χ² (planted 3.50 / 0.70 μ_B, or 3.34 / 1.25 at a χ² 0.07 lower),
+          and the moduli stage reached the planted one here.  Freeing every
+          moment DOF together reaches the planted values from another start
+          (``docs/skill/rietx/references/magnetic.md``, WP-1938 and WP-1953).
+          The tie itself is an identifiability finding about the model, not
+          the plan (WP-1418's follow-ups);
+        - **the moments before the coordinates** is the solve's order too
+          (moment, scale and background before anything nuclear).  The reason
+          is the confound the solve leaves coordinates out for: with the
+          moment held, a coordinate or a Biso freed later absorbs the
+          magnetic intensity the held moment misplaces.  Measured on a
+          synthetic k = (0, 0, ½) child, moment started 20 % high and every
+          Biso 0.3 Å² high: under :meth:`mccusker_structural` the moment
+          stays at 3.6 μ_B and the O Biso falls to 0.33 Å² (planted 0.6, esd
+          770); under this plan the moment returns 2.997 ± 0.005 μ_B
+          (planted 3.0) and each Biso is within 1.0 esd of its planted
+          value.
+
+        The last two are rietx's own order.  A refiner may dissent on it,
+        refining the structure first and the moments after; that sequence was
+        not measured, so nothing above is evidence for or against it.  This is
+        a preset a caller chooses and never a default.  The two moment stages
+        free nothing on a phase without a moment.
+        """
+        first, *rest = cls.mccusker_structural().stages
+        return cls(stages=[
+            first,
+            Stage("moment_moduli", ["phases.*.atoms.*.moment.dof0"]),
+            Stage("moments", ["phases.*.atoms.*.moment.dof*"]),
+            *rest,
+        ])
+
+    @classmethod
     def lab_bragg_brentano(cls) -> "RefinementPlan":
         """Lab flat-plate plan: adds sample displacement (with zero), then the
         Kα2/Kα1 intensity ratio and FCJ axial-divergence parameters last —
@@ -708,6 +766,7 @@ PLAN_PRESETS = {
     name: _PlanFactory(build) for name, build in {
         "mccusker_default": RefinementPlan.mccusker_default,
         "mccusker_structural": RefinementPlan.mccusker_structural,
+        "magnetic_structural": RefinementPlan.magnetic_structural,
         "lab_bragg_brentano": RefinementPlan.lab_bragg_brentano,
         "lab_calibrate": RefinementPlan.lab_calibrate,
         "lab_sample_refine": RefinementPlan.lab_sample_refine,
@@ -810,6 +869,26 @@ PLAN_INFO: dict[str, PlanInfo] = {
         when_to_use=(
             "A structure worth refining against data good enough to carry it. "
             "Run the profile-only plan first if the fit is not already close."),
+    ),
+    "magnetic_structural": PlanInfo(
+        title="Standard + structure + magnetic moments",
+        description=(
+            "The structural order with the magnetic moments refined from the "
+            "start. After the scale and background, the moment moduli refine "
+            "alone, then every moment degree of freedom, moduli and "
+            "directions. The zero shift, lattice parameters, widths, "
+            "coordinates and displacement parameters follow as in "
+            "`mccusker_structural`. The moments keep refining in every later "
+            "stage, because staging is cumulative."),
+        modes=("rietveld",),
+        when_to_use=(
+            "A magnetic phase refined together with its nuclear structure: "
+            "the final joint fit of a stated magnetic structure, or a nuclear "
+            "model that has not converged with the moment present. Freeing "
+            "the moments before the coordinates keeps a coordinate or a "
+            "displacement parameter from absorbing magnetic intensity a held "
+            "moment leaves unexplained. Declare the moments and their symmetry "
+            "first; a supercell statement needs its anti-translation ties."),
     ),
     "lab_bragg_brentano": PlanInfo(
         title="Lab diffractometer (one pass)",

@@ -353,6 +353,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (ABSENT,), "not called from multi.py: the magnetic-width ordering rule "
                    "(WP-1343) is checked by Refinement.fit and run_stage, and "
                    "the joint path has no plan check for it"),
+    "_held_moment_diagnostics": (
+        (ABSENT,), "not called from multi.py: the plan read that names a moment no "
+                   "stage frees (WP-1418) is asked by Refinement.fit, and the joint "
+                   "path has no plan check for it"),
     "_moved_moment_diagnostics": (
         (ABSENT,), "not called from multi.py: the moment's shift between the "
                    "width preset's rungs (WP-1343) is read by "
