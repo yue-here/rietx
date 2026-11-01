@@ -130,7 +130,7 @@ maintainer under the reader-output rule before merge.
   `predict()` δ sweep pins both occupancies; a revert of the freeze fails it.
   `tests/test_site_multiplicity_kept.py`. At occupancy 1 the sweep reads 12 O at both
   offsets now, because WP-1991's construction gate merges that site onto the mirror.
-- [ ] Skill: the reference row for the new or changed finding code.
+- [x] Skill: the reference row for the new or changed finding code.
 
 ## Acceptance
 
