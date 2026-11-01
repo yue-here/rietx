@@ -22,6 +22,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from .io.exporters import ReflectionRow
+    from .report.body_misfit import ReleasedArm
     from .schemas.fraction import FractionProfile
     from .schemas.interval import ParameterInterval
     from .schemas.results import QuantitativePhaseAnalysis
@@ -6262,6 +6263,25 @@ class Refinement:
         require_two_theta(data, "Refinement.check_rigid_bodies()",
                           instrument=self.instrument)
         return rigid_body_misfit(self, data, **kw)
+
+    def released_arm(self, body: str, *, phase: int | None = None,
+                     freed: Sequence[str] | None = None,
+                     bond_sigma: float = 0.02, angle_sigma: float = 2.0) -> ReleasedArm:
+        """The released arm :meth:`check_rigid_bodies` compares ``body`` with.
+
+        Built from this refinement's current structure (fit first for the
+        arm the check builds): the body removed, its non-riding members freed
+        and held near the template by bond and angle restraints, each riding
+        H tied to its parent.  ``freed`` names the members to free instead.
+        Returns a :class:`~rietx.report.body_misfit.ReleasedArm`; fit it as a
+        ``Refinement`` over its ``structure``, with its ``ties`` declared
+        through :meth:`tie` and its ``free`` globs in a stage.  The rules:
+        :func:`rietx.report.body_misfit.released_arm`.
+        """
+        from .report.body_misfit import released_arm
+
+        return released_arm(self.structure, body, phase=phase, freed=freed,
+                            bond_sigma=bond_sigma, angle_sigma=angle_sigma)
 
     def summary(self, *, deliverable: str | None = None, plot: str | None = None,
                plan: RefinementPlan | str | None = None,

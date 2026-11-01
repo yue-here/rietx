@@ -78,6 +78,26 @@ def riding_length(bond_class: str, radiation: str) -> float:
     return float(value)
 
 
+def riding_parents(body) -> dict[str, str]:
+    """Each riding H of ``body`` and its parent atom, by label.
+
+    The parent is the nearest template atom that is not itself riding, the
+    rule :func:`set_riding_lengths` places the H by.  A body whose atoms all
+    ride has no parent for them and is refused.
+    """
+    labels = list(body.atoms)
+    pts = np.asarray(body.template, dtype=np.float64)
+    heavy = [i for i, lab in enumerate(labels) if lab not in body.riding]
+    if body.riding and not heavy:
+        raise ValueError(f"rigid body {body.name!r} has no parent atom for its H")
+    out = {}
+    for h in body.riding:
+        i = labels.index(h)
+        d = np.linalg.norm(pts[heavy] - pts[i], axis=1)
+        out[h] = labels[heavy[int(np.argmin(d))]]
+    return out
+
+
 def set_riding_lengths(body, classes: Mapping[str, str], radiation: str):
     """A copy of ``body`` with each riding H at its class's length from its parent.
 
