@@ -83,8 +83,11 @@ stage's starting values (WP-1528's log, PR #736).
       *Done:* both solver entry points check the start residual and guard the
       Jacobian (`least_squares.NonFiniteStop`, `_FiniteJacobianGuard`); the
       stage ends at its start and says `STAGE_NOT_FINITE`.
-- [ ] Tests: the nudged start that raised now returns a result with the
+- [x] Tests: the nudged start that raised now returns a result with the
       diagnostic; the test above stays green at all six starts.
+      *Done:* `tests/test_non_finite_stage.py` injects both kinds on both
+      solver entry points and through both runners; the slow row gains a
+      `nudged` case (k = −1). All six starts return a finite Rwp (handover).
 - [x] Skill: the new diagnostic code's row in `references/diagnostics.md`.
 
 ## Acceptance
