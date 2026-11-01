@@ -4237,6 +4237,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "stage. More iterations do not find a different minimum."
         ),
     ),
+    "STAGE_NOT_FINITE": HelpEntry(
+        title="A stage stopped on a model that is not finite",
+        description=(
+            "The model held a NaN or an infinity at a point the solver reached, so the "
+            "solver had no step left to take. The stage ended at the values it started "
+            "from and changed nothing. The column that went non-finite is often not the "
+            "parameter that ran away. Look for a free peak width or zero shift far from "
+            "its start, then hold it or start the stage nearer its answer."
+        ),
+    ),
     "STAGE_PATH_NOT_FREE": HelpEntry(
         title="A stage named a fixed parameter",
         description=(

@@ -68,10 +68,21 @@ stage's starting values (WP-1528's log, PR #736).
 
 ## Tasks
 
-- [ ] Find where the first non-finite value appears on a raising start (k = −1):
+- [x] Find where the first non-finite value appears on a raising start (k = −1):
       the residual, a Jacobian column, or a decoded parameter, and which path.
-- [ ] End the stage there with a diagnostic, at the solve sites in `_run_stage`
+      *Found 2026-11-01:* at k = −1 a **Jacobian column**, `phases.0.cell.alpha`,
+      at a point TRF had accepted, where the residual was finite. TRF had
+      already rejected 16 trial steps whose residual was NaN (the TCHZ
+      Γ⁵ going negative under Y < 0, `pseudovoigt.py:45`). The decoded values
+      there: zero shift −8584°, U −1.59, V −1.09, W 2412, Y −2.08. At k = 1 the
+      first solve ends finite; the cell reset puts the cell back while the
+      profile stays at its end (zero −9303°, U −91, V −1802, Y −97), and the
+      **residual** at that mixture is NaN where the second solve begins.
+- [x] End the stage there with a diagnostic, at the solve sites in `_run_stage`
       and in `multi.py`'s joint twin, never by catching `ValueError` around `fit`.
+      *Done:* both solver entry points check the start residual and guard the
+      Jacobian (`least_squares.NonFiniteStop`, `_FiniteJacobianGuard`); the
+      stage ends at its start and says `STAGE_NOT_FINITE`.
 - [ ] Tests: the nudged start that raised now returns a result with the
       diagnostic; the test above stays green at all six starts.
 - [ ] Skill: the new diagnostic code's row in `references/diagnostics.md`.
