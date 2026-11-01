@@ -90,6 +90,7 @@ On the NAC Rietveld fit 15 of 53 regions are kept, and they carry 74 % of χ².
 
 `FitReport.unmatched` holds `UnmatchedPeak` entries of two kinds.
 An `unmatched_obs` entry is a local maximum of Δ/σ at least {{ LAYER0_PEAK_SIGMA }} high, with no calculated tick within {{ LAYER0_MATCH_TOL_DEG }}°.
+A maximum that the observed curve joins to a peak the calculated curve draws, with no valley of {{ LAYER0_PEAK_SIGMA }} on the way, is not listed: it is a misfit of that peak's shape ([About the report](../concepts/report.md)).
 An `unmatched_calc` entry is a local minimum of Δ/σ at least {{ LAYER0_PEAK_SIGMA }} deep within {{ LAYER0_MATCH_TOL_DEG }}° of a tick: a predicted reflection with too little intensity under it.
 
 | Field | Is | Reads as |

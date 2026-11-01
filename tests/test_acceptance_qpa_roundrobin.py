@@ -336,7 +336,8 @@ def test_no_flank_lobe_reads_as_unindexed(sample1_results, sample):
     peaks (WP-1908) the 0.08° window put them outside.  They are part of the
     drawn peak, so Layer 0 lists none within 0.5° of a strong line (drawn
     height above a tenth of the pattern's tallest).  On the tree before the
-    rule, cpd-1c listed six, at up to 12σ."""
+    rule, cpd-1c listed six, at up to 12σ.  Nor does Layer 2 suggest an
+    impurity phase: the mixtures were weighed from three known phases."""
     result = sample1_results[sample]
     tt = np.asarray(result.two_theta)
     bragg = np.asarray(result.y_calc) - np.asarray(result.y_background)
@@ -348,6 +349,9 @@ def test_no_flank_lobe_reads_as_unindexed(sample1_results, sample):
             for u in report.unmatched if u.kind == "unmatched_obs"
             and np.min(np.abs(strong - u.two_theta)) < 0.5]
     assert near == [], f"{sample}: {near}"
+    impurity = [a.confidence for a in report.suggested_actions
+                if a.kind == "add_impurity_phase" and a.active]
+    assert impurity == [], f"{sample}: add_impurity_phase {impurity}"
 
 
 @pytest.mark.slow

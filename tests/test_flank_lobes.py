@@ -108,7 +108,8 @@ def test_asymmetry_lobes_with_the_apertures_at_zero_are_explained():
     the model declares none.  The lines leave lobes on their flanks outside
     the 0.08° window (here at 116-121°, up to 11.5σ), and before WP-1977 each
     read as an unindexed line.  Now none does, and no impurity phase is
-    suggested.  The real-data case is ``test_srm660c_apertures_at_zero``."""
+    suggested.  The real-data case, SRM 660c fitted with the apertures at 0,
+    is measured in WP-1977's Task 4 (11 rows to 0); WP-2054 owns its test."""
     from rietx.model.forward import compile_model
     from rietx.params.vector import ParameterTable
 
