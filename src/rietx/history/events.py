@@ -76,6 +76,20 @@ Event kinds (closed set, versioned with the schema):
   unit whose ``stage_end`` carries the graded shortlist in the WP-1043
   evidence shape — added fields and added *units*, no new kind;
 
+* ``solve_start`` / ``solve_step`` / ``solve_end`` — one **structure-solution**
+  run (#562 S2b, WP number pending; ``solve.workflow.solve_structure``).  The
+  pair is indexing's for the same reason: a search has no mode, no Rwp and no
+  history node.  Its units — a race round of a site-class assignment, a seed,
+  a prior-off control seed, and a ``consensus:<space group>`` unit after each
+  group — ride ``stage_start``/``stage_end`` with ``index``/``n_stages``
+  exactly as indexing's do, so ``rietx watch`` draws the ladder with no new
+  case.  ``solve_step`` is the heartbeat **inside** a unit, every
+  ``heartbeat_sweeps`` sweeps: the leader (its J and χ²/χ²_floor), whether it
+  changed since the previous heartbeat, the sweeps since it last improved,
+  and the ladder's move and swap acceptance.  A new kind rather than ``eval``,
+  because ``eval`` means one residual evaluation inside a least-squares
+  driver and a kind's meaning is what the version guards;
+
 **A joint fit** (``multi.MultiHistogramRefinement``, WP-1341) is one solve
 over several histograms, so it emits each kind once per fit, stage or
 evaluation, never once per histogram.  A series stamps its index on every
@@ -135,6 +149,13 @@ is additive and would not have bumped anything on its own.
 validates every line as an :class:`EventRecord` — this module's own
 ``read_events`` before 1322 — refuses the line, so it is a change a consumer
 can observe and the constant moves for it.
+
+**Version 4** (#562 S2b): ``solve_start``/``solve_step``/``solve_end``, new
+kinds.  Since then a line's ``v`` is checked against its kind
+(:data:`KIND_SINCE`): a kind is refused on a line claiming a version older
+than the one that introduced it, since no writer of that version could have
+written it, and a ``v`` that is not a whole number is refused outright.  A
+newer ``v`` with a known kind is read, the additivity rule's reader side.
 """
 
 from __future__ import annotations
@@ -146,7 +167,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ..schemas.common import Base
 
@@ -157,23 +178,46 @@ from ..schemas.common import Base
 #: "2" since WP-1024 added the ``index_start``/``index_end`` kinds.
 #: "3" since WP-1322 added the run header, a ``record: "run"`` line an
 #: ``EventRecord``-validating reader of version 2 refuses.
-EVENT_SCHEMA_VERSION = "3"
+#: "4" since #562 S2b added the ``solve_start``/``solve_step``/``solve_end``
+#: kinds.
+EVENT_SCHEMA_VERSION = "4"
 
 #: The ``record`` tag of the one line a stream writes when it opens a file.
 RUN_RECORD = "run"
 
 EventKind = Literal["fit_start", "stage_start", "eval", "stage_end", "fit_end",
-                    "index_start", "index_end"]
+                    "index_start", "index_end", "solve_start", "solve_step", "solve_end"]
+
+#: The version that introduced each kind (version 1 had the first five).  A
+#: meta-test holds it equal to ``EventKind``.
+KIND_SINCE: dict[str, int] = {
+    "fit_start": 1, "stage_start": 1, "eval": 1, "stage_end": 1, "fit_end": 1,
+    "index_start": 2, "index_end": 2,
+    "solve_start": 4, "solve_step": 4, "solve_end": 4,
+}
 
 
 class EventRecord(Base):
-    """A validated view of one event line — for readers, not the hot loop."""
+    """A validated view of one event line — for readers, not the hot loop.
+
+    ``v`` is checked against ``kind`` (:data:`KIND_SINCE`, version 4's rule in
+    the module docstring)."""
 
     record: Literal["event"] = "event"
     v: str = EVENT_SCHEMA_VERSION
     t: float
     kind: EventKind
     data: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _kind_exists_at_version(self) -> EventRecord:
+        if not self.v.isdigit():
+            raise ValueError(f"event version {self.v!r} is not a whole number")
+        if int(self.v) < KIND_SINCE[self.kind]:
+            raise ValueError(
+                f"a {self.kind!r} event cannot carry version {self.v}: the kind arrived in "
+                f"version {KIND_SINCE[self.kind]}")
+        return self
 
 
 class RunHeader(Base):

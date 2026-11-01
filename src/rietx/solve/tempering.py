@@ -54,6 +54,21 @@ a run it stops says so (:attr:`SeedRun.stopped`).  Each rung keeps the lowest-J
 state it held, and :func:`polish` takes each to its local minimum of J
 (L-BFGS-B), so a candidate's coordinates are a minimum, not a thermal sample.
 
+**Stopping and resuming** (#998, as accepted on the issue 2026-10-16).  The
+loop reads ``cancel`` (an :class:`~rietx.optimize.cancel.CancelToken`, or
+anything answering ``is_set()``) after every sweep, cooperatively, as a fit
+reads it between evaluations; a stopped seed says so (``stopped =
+"cancelled"``) and keeps its best-so-far.  Its **natural boundary** is a
+rebuild of the running sums (every ``refresh_every`` sweeps): there the whole
+state is the coordinates, the generator's state and the counters, since every
+running sum is recomputed from u, so :class:`TemperState` taken there and
+handed back as ``resume`` continues bit for bit — the same moves, the same
+swaps, the same rebuilds — and a resumed seed returns the uninterrupted
+seed's record.  ``on_boundary`` receives each such state; a sweep between two
+boundaries is never saved, so a resume replays at most ``refresh_every``
+sweeps.  ``heartbeat`` receives the leader and the ladder's acceptance every
+``heartbeat_sweeps`` sweeps.
+
 Nothing here is exported from :mod:`rietx`.
 """
 
@@ -171,6 +186,41 @@ class Visit:
 
 
 @dataclass
+class TemperState:
+    """One seed at a rebuild boundary: everything :func:`temper` needs to
+    continue bit for bit (module docstring).  JSON-able through
+    :meth:`to_json`; python floats round-trip exactly through ``repr``."""
+
+    done: int                       # sweeps completed
+    u: np.ndarray                   # (R, n_par)
+    rng: dict                       # the generator's bit_generator.state
+    acc: np.ndarray                 # (R,) accepted moves per rung
+    sw_try: np.ndarray              # (R−1,)
+    sw_ok: np.ndarray               # (R−1,)
+    best: list[Visit]               # (R,)
+    drift: float
+    improved: int                   # the sweep the lowest J last fell
+
+    def to_json(self) -> dict:
+        return {"done": int(self.done), "u": self.u.tolist(), "rng": self.rng,
+                "acc": self.acc.tolist(), "sw_try": self.sw_try.tolist(),
+                "sw_ok": self.sw_ok.tolist(), "drift": float(self.drift),
+                "improved": int(self.improved),
+                "best": [{"u": v.u.tolist(), "j": v.j, "chi2": v.chi2, "clash": v.clash}
+                         for v in self.best]}
+
+    @classmethod
+    def from_json(cls, d: dict) -> TemperState:
+        return cls(done=int(d["done"]), u=np.array(d["u"], dtype=np.float64), rng=d["rng"],
+                   acc=np.array(d["acc"], dtype=np.float64),
+                   sw_try=np.array(d["sw_try"], dtype=np.float64),
+                   sw_ok=np.array(d["sw_ok"], dtype=np.float64), drift=float(d["drift"]),
+                   improved=int(d["improved"]),
+                   best=[Visit(np.array(v["u"], dtype=np.float64), float(v["j"]),
+                               float(v["chi2"]), float(v["clash"])) for v in d["best"]])
+
+
+@dataclass
 class SeedRun:
     """What one seed did: the record a reader needs to trust or distrust it."""
 
@@ -184,7 +234,7 @@ class SeedRun:
     best: list[Visit]               # (R,) lowest J each rung held
     final: list[Visit]              # (R,) each rung's state at the end
     seconds: float
-    stopped: str | None             # "wall_seconds" when the guard stopped it
+    stopped: str | None             # "wall_seconds" or "cancelled" when the run did not finish
     compiled: dict                  # this seed's calls that took the compiled kernels
     drift: float                    # max |J_running − J_rebuilt| over the rebuilds, J units
 
@@ -198,8 +248,15 @@ class SeedRun:
 def temper(problem: SearchProblem, ladder: Ladder, *, seed: int, sweeps: int,
            swap_every: int, exchange: float, refresh_every: int = REFRESH_EVERY,
            wall_seconds: float | None = None,
-           start: np.ndarray | None = None) -> SeedRun:
-    """Run one seed of parallel tempering (module docstring)."""
+           start: np.ndarray | None = None, cancel=None, heartbeat=None,
+           heartbeat_sweeps: int | None = None, on_boundary=None,
+           resume: TemperState | None = None) -> SeedRun:
+    """Run one seed of parallel tempering (module docstring).
+
+    ``resume`` continues from a :class:`TemperState` that ``on_boundary``
+    handed out on an earlier call with the same problem, ladder and seed;
+    ``start`` is then not read.  ``sweeps`` is the seed's total, not what is
+    left."""
     if not (swap_every >= 1 and int(swap_every) == swap_every):
         raise ValueError(f"swap_every {swap_every!r} must be a whole number of sweeps, at least 1")
     if not 0.0 <= exchange <= 1.0:
@@ -207,13 +264,19 @@ def temper(problem: SearchProblem, ladder: Ladder, *, seed: int, sweeps: int,
     space, sc, cost, clash = problem.space, problem.scattering, problem.cost, problem.clash
     n_rep = len(ladder.temperatures)
     rng = np.random.default_rng(seed)
-    if start is None:
+    if not len(space.movable):
+        raise ValueError("no unit of this search has a free parameter")
+    if resume is not None:
+        if resume.u.shape != (n_rep, space.n_par):
+            raise ValueError(f"the state holds u of shape {resume.u.shape}, this search "
+                             f"{(n_rep, space.n_par)}")
+        u = resume.u.copy()
+        rng.bit_generator.state = resume.rng
+    elif start is None:
         u = space.random(rng, n_rep)
     else:
         u = space.wrap(np.array(np.broadcast_to(start, (n_rep, space.n_par)), dtype=np.float64))
         space.check_seed(u)
-    if not len(space.movable):
-        raise ValueError("no unit of this search has a free parameter")
     floor, w = problem.floor, clash.weight
     beta = 1.0 / ladder.temperatures
     used0 = (dict(sc.compiled_used), clash.compiled_used)
@@ -229,16 +292,24 @@ def temper(problem: SearchProblem, ladder: Ladder, *, seed: int, sweeps: int,
 
     xyz, s, a, b, chi2, e = rebuild(u)
     jj = (chi2 + w * e) / floor
-    best = [Visit(u[r].copy(), float(jj[r]), float(chi2[r]), float(e[r])) for r in range(n_rep)]
-    acc = np.zeros(n_rep)
-    sw_try = np.zeros(n_rep - 1)
-    sw_ok = np.zeros(n_rep - 1)
+    if resume is None:
+        best = [Visit(u[r].copy(), float(jj[r]), float(chi2[r]), float(e[r]))
+                for r in range(n_rep)]
+        acc = np.zeros(n_rep)
+        sw_try = np.zeros(n_rep - 1)
+        sw_ok = np.zeros(n_rep - 1)
+        done = 0
+        drift = 0.0
+        improved = 0
+    else:
+        best = list(resume.best)
+        acc, sw_try, sw_ok = resume.acc.copy(), resume.sw_try.copy(), resume.sw_ok.copy()
+        done, drift, improved = resume.done, resume.drift, resume.improved
+    lead = min(v.j for v in best)
     t0 = time.perf_counter()
     stopped = None
-    done = 0
-    drift = 0.0
     reps = np.arange(n_rep)
-    for sweep in range(sweeps):
+    for sweep in range(done, sweeps):
         units = space.movable[rng.integers(len(space.movable), size=n_rep)]
         u_new, moved = space.propose(u, units, steps, rng, exchange=exchange)
         xyz_new = xyz.copy()
@@ -298,6 +369,9 @@ def temper(problem: SearchProblem, ladder: Ladder, *, seed: int, sweeps: int,
             for r in np.flatnonzero(ok & (jj < np.array([v.j for v in best]))):
                 best[r] = Visit(u[r].copy(), float(jj[r]), float(chi2[r]), float(e[r]))
         done = sweep + 1
+        now_lead = min(v.j for v in best)
+        if now_lead < lead:
+            lead, improved = now_lead, done
         if done % swap_every == 0:
             for i in range((done // swap_every) % 2, n_rep - 1, 2):
                 sw_try[i] += 1
@@ -311,6 +385,22 @@ def temper(problem: SearchProblem, ladder: Ladder, *, seed: int, sweeps: int,
             xyz, s, a, b, chi2, e = rebuild(u)
             jj = (chi2 + w * e) / floor
             drift = max(drift, float(np.max(np.abs(j_running - jj))))
+            if on_boundary is not None:
+                on_boundary(TemperState(done, u.copy(), rng.bit_generator.state, acc.copy(),
+                                        sw_try.copy(), sw_ok.copy(), list(best), drift,
+                                        improved))
+        if heartbeat is not None and heartbeat_sweeps and done % heartbeat_sweeps == 0:
+            with np.errstate(invalid="ignore", divide="ignore"):
+                swaps = sw_ok / sw_try
+            heartbeat({"sweep": done, "sweeps": int(sweeps), "moves": done * n_rep,
+                       "leader_j": lead, "leader_chi2": min(best, key=lambda v: v.j).chi2,
+                       "leader_changed": done - improved < heartbeat_sweeps, "sweeps_since_improvement": done - improved,
+                       "replica_acceptance": (acc / done).tolist(),
+                       "swap_acceptance": [None if not np.isfinite(x) else float(x)
+                                           for x in swaps]})
+        if cancel is not None and cancel.is_set():
+            stopped = "cancelled"
+            break
         if wall_seconds is not None and time.perf_counter() - t0 > wall_seconds:
             stopped = "wall_seconds"
             break
@@ -345,5 +435,5 @@ def polish(problem: SearchProblem, visit: Visit, *, maxiter: int) -> Visit:
 
 
 __all__ = ["REFRESH_EVERY", "Ladder",
-           "SearchProblem", "SeedRun", "TemperingRefused", "Visit", "polish",
+           "SearchProblem", "SeedRun", "TemperState", "TemperingRefused", "Visit", "polish",
            "random_spread", "temper"]
