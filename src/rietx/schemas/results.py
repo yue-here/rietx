@@ -393,13 +393,15 @@ class Identifiability(Base):
     here", never as "no degeneracy".
 
     A joint multi-histogram fit (WP-1341) screens each histogram's own rows,
-    so its ``background_absorption`` keys are ``hist.<h>.``-scoped, shared
-    paths included, and :meth:`RefinementResult.for_histogram` hands one
-    histogram's view its own rows, unscoped.  The joint path runs neither
-    the declared-peak screen nor the parameter-space screens, so
-    ``extra_peak_absorption`` and the three tables below it stay empty there,
-    a declared and freed peak included: not measured, the same reading as
-    ``None``.
+    so its ``background_absorption`` and ``extra_peak_absorption`` keys are
+    ``hist.<h>.``-scoped, shared paths included, and
+    :meth:`RefinementResult.for_histogram` hands one histogram's view its own
+    rows, unscoped: a declared peak is one instrument's (WP-2028).
+    ``top_correlations`` and ``soft_modes`` are measured on the joint matrix,
+    the one that was solved, and named by the joint paths (shared bare, a
+    histogram's own ``hist.<h>.``); every view keeps them whole, its own rows
+    unscoped.  ``exchangeability`` stays empty on a joint fit: not measured,
+    the same reading as ``None``.
     """
 
     background_absorption: dict[str, float] = Field(default_factory=dict)
@@ -2458,13 +2460,32 @@ class RefinementResult(Base):
             if _names_histogram(d, h) and d not in view.diagnostics:
                 view.diagnostics.append(d.model_copy(deep=True))
         if view.identifiability is not None:
-            # this histogram's background screen, as a single fit spells it
-            # (WP-1341): the joint result scopes every row ``hist.<h>.``
-            mine = {k[len(prefix):]: v for k, v in
-                    view.identifiability.background_absorption.items()
-                    if k.startswith(prefix)}
-            view.identifiability = view.identifiability.model_copy(
-                update={"background_absorption": mine})
+            ident = view.identifiability
+
+            def mine(screen: dict[str, float]) -> dict[str, float]:
+                return {k[len(prefix):]: v for k, v in screen.items()
+                        if k.startswith(prefix)}
+
+            def spelt(path: str) -> str:
+                return path[len(prefix):] if path.startswith(prefix) else path
+
+            # this histogram's background and declared-peak screens, as a
+            # single fit spells them (WP-1341, WP-2028): the joint result
+            # scopes every row ``hist.<h>.``.  The joint matrix's tables are
+            # the fit's, one measurement of what was solved, so every view
+            # keeps all of them; its own rows lose their scope as in
+            # ``parameters``, another histogram's keep theirs.
+            view.identifiability = ident.model_copy(update={
+                "background_absorption": mine(ident.background_absorption),
+                "extra_peak_absorption": mine(ident.extra_peak_absorption),
+                "top_correlations": [
+                    c.model_copy(update={"path_a": spelt(c.path_a),
+                                         "path_b": spelt(c.path_b)})
+                    for c in ident.top_correlations],
+                "soft_modes": [
+                    m.model_copy(update={"loadings": {
+                        spelt(k): v for k, v in m.loadings.items()}})
+                    for m in ident.soft_modes]})
         view.histograms = []
         return view
 

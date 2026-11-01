@@ -38,6 +38,7 @@ from .model.forward import (
 from .model.microstructure import microstructure_table
 from .optimize.blocked import BlockJacobian
 from .optimize.cancel import RefinementCancelled
+from .optimize.identifiability import soft_modes, top_correlations
 from .optimize.least_squares import (
     DEFAULT_SOLVER,
     SOLVERS,
@@ -50,6 +51,7 @@ from .optimize.least_squares import (
 from .optimize.statistics import (
     background_absorption,
     compute_statistics,
+    extra_peak_absorption,
     roughness_absorption,
 )
 from .params.multi import (
@@ -1436,10 +1438,11 @@ class MultiHistogramRefinement:
         quotes the same size.  The separability caveat beside it is the
         report's own, from this histogram's 2θ range.
 
-        The background section reads this histogram's own absorption screen.
-        The identifiability section has no correlation, soft-mode or
-        exchangeability table, because the joint path does not run those
-        screens.
+        The background section reads this histogram's own absorption screen,
+        and its declared peaks are screened on its own rows.  The
+        identifiability section quotes the joint matrix's worst correlations
+        and softest modes, the fit's, in every histogram's report (WP-2028);
+        it has no exchangeability table, which the joint path does not run.
 
         The report reads the result's curves and models, which come from a
         compile at the answer (:meth:`_final_compiles`, WP-1421), as a single
@@ -1947,6 +1950,7 @@ class MultiHistogramRefinement:
         histograms: list[HistogramResult] = []
         top_bg: list[GuardFinding] = []
         absorption_table: dict[str, float] = {}
+        peak_table: dict[str, float] = {}
         joint_unmeasured = _joint_unmeasured_phases(models, mt, stage_results)
         for h in range(n):
             table = mt.tables[h]
@@ -1991,6 +1995,13 @@ class MultiHistogramRefinement:
                 # below (``Identifiability``'s rule), scoped like them
                 absorption_table.update(
                     {f"hist.{h}.{p}": r2 for p, r2 in screened.items()})
+                # the declared-peak screen on the same rows (WP-2028, #1205's
+                # ruling): a declared peak is one instrument's, so it is
+                # screened where it lives, scoped like the background's
+                peak_table.update(
+                    {f"hist.{h}.{p}": r2 for p, r2 in extra_peak_absorption(
+                        jh, table.free_paths,
+                        model.peak_component_prefixes()).items()})
                 for path, r2 in sorted(screened.items(), key=lambda kv: -kv[1]):
                     if r2 > BACKGROUND_ABSORPTION_GUARD:
                         # ``hist.h.<path>`` is this surface's own addressing —
@@ -2267,8 +2278,8 @@ class MultiHistogramRefinement:
             # each histogram's background screen, ``hist.<h>.``-scoped, so
             # ``for_histogram`` hands a report its own (WP-1341); ``None``
             # where nothing was screened, the single fit's empty state
-            identifiability=(Identifiability(background_absorption=absorption_table)
-                             if absorption_table else None),
+            identifiability=_joint_identifiability(
+                outcome, mt.free_paths, absorption_table, peak_table),
             # the declared coefficients in user units at the reference, read
             # off histogram 0's slice of the joint covariance (a coefficient
             # is shared, so its marginal is the joint one), and each equation with
@@ -2401,6 +2412,44 @@ class MultiHistogramRefinement:
                     raise
         report.at_bounds = at_bounds
         return _guard_diagnostics(report) + _size_sharing_diagnostics(mt)
+
+
+def _joint_identifiability(outcome, free: list[str],
+                           background: dict[str, float],
+                           peaks: dict[str, float]) -> Identifiability | None:
+    """The joint result's identifiability carrier (WP-1341, WP-2028).
+
+    The two screens each histogram runs on its own rows, ``background`` and
+    ``peaks``, keyed ``hist.<h>.``, beside the parameter-space tables
+    ``check_guards`` measures after its loop, asked here of the **joint**
+    matrix, since that is what was solved (#1205's ruling): the worst |ρ|
+    pairs of the joint correlation, which ``HIGH_CORRELATION`` thresholds,
+    and the softest modes of the joint unit-column normal matrix, named by
+    the joint paths (shared bare, a histogram's own ``hist.<h>.``).  A mode
+    can then mix a shared B with each pattern's scale, which no histogram's
+    own rows can show.  The single fit's held-parameter exchangeability scan
+    is not run: the ruling named the two tables, and the scan re-compiles a
+    model, which a joint fit has one of per histogram.
+
+    ``None`` where nothing was measured, the single fit's empty state.
+    """
+    top: list = []
+    modes: list = []
+    if outcome.correlation is not None and len(free) > 1:
+        top = top_correlations(np.asarray(outcome.correlation), free)
+    if outcome.jac is not None and len(free) > 1:
+        try:
+            modes = soft_modes(outcome.jac, free)
+        except np.linalg.LinAlgError:
+            # ``check_guards``' rule: the covariance already failed to form and
+            # said so (COVARIANCE_UNAVAILABLE); anywhere it formed, stay loud
+            if getattr(outcome, "covariance_error", None) is None:
+                raise
+    if not (background or peaks or top or modes):
+        return None
+    return Identifiability(background_absorption=background,
+                           extra_peak_absorption=peaks,
+                           top_correlations=top, soft_modes=modes)
 
 
 def _row_shared(mtable, entry) -> bool:
