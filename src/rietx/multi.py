@@ -249,7 +249,8 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                       "McCusker's observations-per-parameter has no agreed "
                       "joint definition — one histogram's reflections against "
                       "the shared columns would warn on a fit the other "
-                      "histograms support (WP-1341's territory)"),
+                      "histograms support (no agreed joint definition; WP-2028 task 8 "
+                      "measured three candidates on #1124)"),
     "_far_from_data_diagnostics": (
         (HISTOGRAM,), "Rwp against one pattern; a pooled Rwp can hide one "
                       "histogram the model does not describe"),
@@ -357,6 +358,10 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (ABSENT,), "not called from multi.py: the magnetic-width ordering rule "
                    "(WP-1343) is checked by Refinement.fit and run_stage, and "
                    "the joint path has no plan check for it"),
+    "_held_moment_diagnostics": (
+        (ABSENT,), "not called from multi.py: the plan read that names a moment no "
+                   "stage frees (WP-1418) is asked by Refinement.fit, and the joint "
+                   "path has no plan check for it"),
     "_moved_moment_diagnostics": (
         (ABSENT,), "not called from multi.py: the moment's shift between the "
                    "width preset's rungs (WP-1343) is read by "
@@ -451,7 +456,7 @@ def _joint_unsupported_phases(models, mtable,
     The screen ``CompiledModel.phase_support`` alone, at the stage start and
     at the answer alike.  The single fit's answer reads the scale's
     significance (``refine._answer_significance``, WP-1523); the joint path
-    deliberately does not, because its report is WP-1341's to define.
+    deliberately does not, because its joint report is WP-2028's to define.
 
     ``sigma`` is the plan's ``phase_support_sigma`` (WP-2002, B1).  ``None``
     calls no phase unseen anywhere, so nothing is held, released or restored.
@@ -2143,10 +2148,10 @@ class MultiHistogramRefinement:
         # healthy phase teaches a consumer to ignore the code.  Where its cell
         # is per-histogram, the patterns that cannot see it hold their own copy
         # (``_unseen``, WP-1325), and that hold is on ``StageResult.held``;
-        # naming it per pattern is the joint report's, WP-1341's.
+        # naming it per pattern is the joint report's, WP-2028's.
         #
         # The screen alone, never the single fit's significance (WP-1523): the
-        # joint report is WP-1341's, so the message names the screen's basis.
+        # joint report is WP-2028's, so the message names the screen's basis.
         per_support = np.array([m.phase_support(v)
                                 for m, v in zip(models, per_values, strict=True)])
         per_lines = np.array([m.phase_line_counts() for m in models])

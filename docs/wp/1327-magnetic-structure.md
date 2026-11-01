@@ -391,6 +391,34 @@ rule above applies to the form factors.
   must still validate") and `Refinement.__init__` calling it on a refined phase
   disagree; whichever option lands decides which one is right.
 
+- 2026-10-31, from the issue triage (issue #1260): the published LaMnO₃
+  references this WP's 2026-10-19 Inherited note said nobody had searched for.
+  Huang et al. (1997), *Phys. Rev. B* 55, 14987: magnetic group Pn′ma′ (p.
+  14988), spin along a, μ(Mn) = 3.65(3) μ_B at 14 K and 2.09(3) μ_B at 121 K
+  (Table IV, sample IIa, NIST BT-1). Moussa et al. (1996), *Phys. Rev. B* 54,
+  15149: μ(Mn) = 3.87(3) μ_B at 1.4 K (Table I, Orphée G4.2, λ = 2.59 Å, Pbnm,
+  moment along b, which is a in the Pnma setting). The proposed acceptance:
+  `solve_magnetic` ranks Pn′ma′ (BNS 62.448) first; the 50 K |m| lies within
+  the interval spanned by each paper's value scaled to 50 K by that paper's
+  own temperature curve (Huang Fig. 2, Moussa Fig. 5; reading them is part of
+  the work); the moment lies along a; the report says the c component has no
+  published value (Moussa p. 15154 calls the G_x component too weak to
+  measure). Tiering, under DESIGN.md § Rules 2: Huang verifies once the
+  tutorial pattern is confirmed to be Huang's (the tutorial credits Q. Huang;
+  whether it is sample IIa is not established). Moussa validates only if a
+  powder neutron refinement of a different specimen, laboratory and instrument
+  counts as an independent measurement. Rule 2's examples (a certified cell, a
+  weighed composition, a composition from another probe) do not settle it, and
+  WP-2010's wording for this WP names magnetometry or a single-crystal
+  experiment. That ruling is the maintainer's. Checked against the tree at
+  d87c8cc91: `tests/test_acceptance_magnetic_lamno3.py` pins `PN_MA =
+  "62.448"`; `docs/VALIDATION.md` records `lamno3_bt1` as `characterisation`
+  with |m| 3.560 ± 0.043 μ_B and m = (3.546, 0, 0.317) μ_B. The group-ranking
+  test is WP-1418's (`test_lamno3_at_50k_ranks_a_type_first_of_four`); only
+  its tier would change. Open PR #1266 (WP-2010) lists #1260 as a filed
+  follow-up and tags the LaMnO₃ claims `features=("magnetic_structure",)` at
+  `characterisation`, which agrees with the issue.
+
 ## Non-goals
 
 - Determining a magnetic structure: representation analysis, k-SUBGROUPSMAG,

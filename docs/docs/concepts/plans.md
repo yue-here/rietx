@@ -25,6 +25,7 @@ Each preset is a constructor on `RefinementPlan`, and `Refinement.fit` also take
 |---|---|
 | `RefinementPlan.mccusker_default` | scale and background, zero shift, cell, the constant width W, then U, V, X and Y; no structure |
 | `RefinementPlan.mccusker_structural` | the same, then declared extra components, coordinates, displacement parameters, preferred orientation, extinction and surface roughness |
+| `RefinementPlan.magnetic_structural` | scale and background, the magnetic moment moduli, every moment degree of freedom, then the `mccusker_structural` order with the moments still free |
 | `RefinementPlan.lab_bragg_brentano` | the `mccusker_default` order with the specimen displacement beside the zero shift, then the emission-line weights and axial divergence, then surface roughness |
 | `RefinementPlan.lab_calibrate` | the instrument on a standard: scale and background, zero shift and specimen displacement, the widths, line weights and axial divergence, then displacement parameters; never the cell, which stays at the standard's certified value |
 | `RefinementPlan.lab_sample_refine` | a specimen against a calibrated instrument: scale and background, specimen displacement, cell, the specimen's size and strain widths, displacement parameters and surface roughness |

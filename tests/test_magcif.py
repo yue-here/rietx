@@ -1840,6 +1840,178 @@ def test_the_dictionary_parent_tag_alone_reads_as_before(tmp_path):
     assert phase.space_group.startswith("P 42/m n m")
 
 
+def _beside(tmp_path, *, before: str = "", after: str = "",
+            bare: bool = False) -> Path:
+    """Cr2WO6 with other data blocks written before or after its own, and its
+    block renamed to a bare ``data_`` when ``bare``."""
+    magic, rest = _fixture(tmp_path, "Cr2WO6").read_text(
+        encoding="utf-8").split("\n", 1)
+    assert magic == "#\\#CIF_2.0" and rest.startswith("data_Cr2WO6\n")
+    if bare:
+        rest = rest.replace("data_Cr2WO6\n", "data_\n", 1)
+    path = tmp_path / "blocks.mcif"
+    path.write_text(f"{magic}\n{before}{rest}{after}", encoding="utf-8")
+    return path
+
+
+def _block_read(path):
+    diagnostics: list = []
+    read = structure_from_cif(str(path), moment_ions=_IONS["Cr2WO6"],
+                              diagnostics=diagnostics)
+    return read.phases[0], [d for d in diagnostics
+                            if d.code == "CIF_EMPTY_BLOCK_SKIPPED"]
+
+
+def _sites(phase):
+    return [(a.label, a.species, a.x.value, a.y.value, a.z.value, a.occ.value)
+            for a in phase.atoms]
+
+
+@pytest.mark.parametrize("before, bare, chosen, said", [
+    ("data_global\n\n", False, "data_Cr2WO6", "data_global (no tags)"),
+    ("data_global\n\n", True, "data_,", "data_global (no tags)"),
+    ("data_global\n_audit_creation_method  'synthetic'\n\n", False,
+     "data_Cr2WO6", "data_global (only _audit_creation_method)"),
+    ("data_global\n_audit.creation_method  'synthetic'\n\n", False,
+     "data_Cr2WO6", "data_global (only _audit.creation_method)"),
+], ids=["empty", "bare structure block", "audit only", "audit, DDLm spelling"])
+def test_a_block_that_states_nothing_is_skipped_and_named(
+        tmp_path, before, bare, chosen, said):
+    """Issue #1063, item 1: an empty ``data_global`` ahead of the structure
+    block, or one holding only ``_audit_`` items, made the reader refuse the
+    file as "not a CIF".  AUDIT records how the block was made and states no
+    cell, site or symmetry (``cif_core.dic``), so the one block with atom
+    sites is read, exactly as the file alone reads, and an info diagnostic
+    names each block skipped."""
+    reference, none = _block_read(_fixture(tmp_path, "Cr2WO6"))
+    assert none == []
+    phase, (skipped,) = _block_read(_beside(tmp_path, before=before, bare=bare))
+    assert phase.space_group == reference.space_group
+    assert _sites(phase) == _sites(reference)
+    assert _stored(phase) == _stored(reference)
+    assert phase.name == ("phase_1" if bare else reference.name)
+    assert skipped.level == "info"
+    assert skipped.where == ["phases.0"]
+    assert f"read from {chosen}" in skipped.message
+    assert said in skipped.message
+
+
+@pytest.mark.parametrize("before", ["", "data_global\n\n"],
+                         ids=["two blocks", "three blocks"])
+def test_two_blocks_with_atom_sites_are_refused_with_their_count(
+        tmp_path, before):
+    """The dissent the reading rule leaves standing: two structures in one
+    file are two answers, and nothing in the file says which is meant, so the
+    read is refused.  The message counts the blocks with atom sites (not every
+    block) and names them, and no longer says the file is not a CIF."""
+    second = _fixture(tmp_path, "Cr2WO6").read_text(
+        encoding="utf-8").split("\n", 1)[1].replace(
+            "data_Cr2WO6\n", "data_second\n", 1)
+    path = _beside(tmp_path, before=before, after=f"\n{second}")
+    with pytest.raises(ValueError) as refused:
+        structure_from_cif(str(path), moment_ions=_IONS["Cr2WO6"])
+    message = str(refused.value)
+    blocks = 3 if before else 2
+    assert f"got {blocks}, and 2 of them hold atom sites" in message
+    assert "data_Cr2WO6" in message and "data_second" in message
+    assert "not yet supported" in message
+    assert "does not read as a CIF" not in message
+
+
+_DRAFT_SITES = """\
+loop_
+_magnetic_atom_site_label
+_magnetic_atom_site_type_symbol
+_magnetic_atom_site_fract_x
+_magnetic_atom_site_fract_y
+_magnetic_atom_site_fract_z
+Cr1 Cr 0.00000 0.00000 0.33450
+W1 W 0.00000 0.00000 0.00000
+"""
+
+_DRAFT_CELL = "".join(f"_magnetic_cell_{tag}  {value}\n" for tag, value in (
+    ("length_a", 4.582), ("length_b", 4.582), ("length_c", 8.87),
+    ("angle_alpha", 90), ("angle_beta", 90), ("angle_gamma", 90)))
+
+_DRAFT_OPERATIONS = """\
+loop_
+_magnetic_space_group_symop_id
+_magnetic_space_group_symop_operation_xyz
+1 x,y,z,+1
+2 -x,-y,z,-1
+"""
+
+_DRAFT_MOMENTS = """\
+loop_
+_magnetic_atom_site_moment_label
+_magnetic_atom_site_moment_crystalaxis_mx
+_magnetic_atom_site_moment_crystalaxis_my
+_magnetic_atom_site_moment_crystalaxis_mz
+Cr1 0.0 2.35 0.0
+"""
+
+_ORDINARY_HALF = """\
+_space_group_name_H-M_alt  'P 42/m n m'
+_cell_length_a  4.582
+_cell_length_b  4.582
+_cell_length_c  8.87
+_cell_angle_alpha  90
+_cell_angle_beta   90
+_cell_angle_gamma  90
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+Cr1 Cr 0.00000 0.00000 0.33450
+W1 W 0.00000 0.00000 0.00000
+"""
+
+
+@pytest.mark.parametrize("body, families, tags", [
+    (_DRAFT_CELL + _DRAFT_OPERATIONS + _DRAFT_SITES + _DRAFT_MOMENTS,
+     ("_magnetic_atom_site_*", "_magnetic_cell_*",
+      "_magnetic_space_group_symop_operation_*"),
+     ("_magnetic_atom_site_fract_x", "_magnetic_atom_site_label")),
+    (_ORDINARY_HALF + _DRAFT_OPERATIONS + _DRAFT_MOMENTS,
+     ("_magnetic_atom_site_*", "_magnetic_space_group_symop_operation_*"),
+     ("_magnetic_atom_site_moment_crystalaxis_mx",
+      "_magnetic_atom_site_moment_label")),
+], ids=["all draft", "draft magnetic half"])
+def test_the_pre_2016_draft_tags_are_refused_by_name(tmp_path, body,
+                                                     families, tags):
+    """Issue #1063, item 3: ``cif_mag.dic`` defines none of the draft's
+    ``_magnetic_atom_site_``, ``_magnetic_cell_`` or
+    ``_magnetic_space_group_symop_operation_`` items, under any name or alias.
+    A file written wholly in them was refused as "no atom sites found", and
+    one whose sites were ordinary read as its nuclear half with the moments
+    dropped in silence.  Both are refused, naming the tags and the families."""
+    path = tmp_path / "draft.mcif"
+    path.write_text(f"data_draft\n{body}", encoding="utf-8")
+    with pytest.raises(magcif.MagCifError) as refused:
+        structure_from_cif(str(path))
+    message = str(refused.value)
+    assert "pre-2016 draft magnetic-CIF tags" in message
+    assert all(family in message for family in families)
+    assert all(tag in message for tag in tags)
+    assert "no atom sites found" not in message
+
+
+def test_other_magnetic_spellings_beside_the_dictionary_items_still_read(
+        tmp_path):
+    """The control on the refusal's reach: ``_magnetic_`` spellings outside
+    the three draft families, written beside the dictionary's own items, are
+    no reason to refuse, and the file reads as it does without them."""
+    reference, _ = _block_read(_fixture(tmp_path, "Cr2WO6"))
+    extra = ("\n_magnetic_space_group_standard_setting  'no'\n"
+             "loop_\n_magnetic_propagation_vector_seq_id\n"
+             "_magnetic_propagation_vector_kxkykz\n1 '0 0 0'\n")
+    phase, _ = _block_read(_fixture(tmp_path, "Cr2WO6", extra=extra))
+    assert _sites(phase) == _sites(reference)
+    assert _stored(phase) == _stored(reference)
+
+
 # ===========================================================================
 # 5. what the reader says it did
 # ===========================================================================
@@ -2632,6 +2804,7 @@ def _magnetic_vocabulary() -> set[str]:
     tags = set(magcif.READ_TAGS) | set(magcif.PRIVATE_TAGS)
     tags |= {tag for tag, _what in magcif.REFUSED_TAGS}
     tags |= {tag for tag, _why in magcif.IGNORED_TAGS}
+    tags |= {tag for tag, _what in magcif.DRAFT_TAGS}
     keywords = {kw for feat in coverage.FEATURES for kw in feat.keywords
                 if kw.startswith("mag") or kw in ("mlx", "mly", "mlz", "mg")}
     return tags | keywords

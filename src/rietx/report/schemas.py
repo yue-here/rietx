@@ -25,6 +25,7 @@ from ..schemas.results import (
     CorrelationPair,
     GeometryTable,
     PhaseMicrostructure,
+    RefinementResult,
     RestraintReport,
     SoftMode,
 )
@@ -1232,6 +1233,84 @@ class FreedComparison(Base):
     n_effective: float
     delta_bic: float
     delta_bic_raw_n: float
+
+
+class DistortionBlockTest(Base):
+    """One held set of irrep blocks, compared by a refit with it held at 0 (WP-1419).
+
+    Built by :meth:`~rietx.Refinement.distortion_block_tests`.  ``held`` names
+    the blocks, each ``(irrep, k, isotropy_group)`` of phase ``phase``, held at
+    0 together in one restricted refit that frees everything else the full fit
+    freed and starts from the full optimum, so the restricted model is the
+    profile at A_B = 0 (Kerman et al. 2012, *Acta Cryst.* A**68**, 222, p. 231).
+    ``m`` is the number of free amplitudes held.
+
+    ``delta_bic`` is :func:`~rietx.report.compare_freed`'s figure,
+    N_eff·ln(χ²_r/χ²_f) − m·ln N_eff at N_eff = N/f², with f the **restricted**
+    fit's ``esd_inflation`` (Schwarz 1978; Kass & Raftery 1995); positive
+    favours the blocks.  ``lambda_`` is Δχ²/(χ²_red·f²) with χ²_red and f both
+    of the **full** fit, Hamilton's (1965) F form on rietx's esd scale, and
+    ``lambda_p`` its upper tail against χ²_m.  ``chi2_restricted`` and
+    ``chi2_full`` are the unreduced Σw·Δ², as :class:`FreedComparison` carries
+    them.  ``a_det`` is the predicted smallest amplitude of the held set at
+    which its ``delta_bic`` reaches the caller's ``detectability_bar``, in Å,
+    when one was passed (``None`` otherwise, and where no held mode moves the
+    pattern).
+
+    **There is deliberately no verdict field**, on :class:`FreedComparison`'s
+    precedent: every field is a number, a key or a count.
+    """
+
+    phase: int
+    held: list[tuple[str, tuple[str, str, str], str]]
+    m: int
+    n_points: int
+    chi2_restricted: float
+    chi2_full: float
+    esd_inflation_restricted: float | None = None
+    esd_inflation_full: float | None = None
+    chi2_red_full: float
+    delta_bic: float
+    lambda_: float
+    lambda_p: float
+    a_det: float | None = None
+    #: wall time of this row's restricted refit, s
+    wall_s: float
+
+
+class DistortionRestart(Base):
+    """One restart of the full fit by :meth:`~rietx.Refinement.distortion_block_tests`.
+
+    A restricted refit landed below the full fit, which proves the full fit
+    had not reached its optimum: the full model was refitted from that
+    restricted optimum with the held blocks re-seeded.  ``held`` is the set
+    whose refit triggered it, ``chi2_restricted`` its χ², and ``lowered`` says
+    whether the refit took the full χ² below ``chi2_full_before``.
+    """
+
+    held: list[tuple[str, tuple[str, str, str], str]]
+    chi2_full_before: float
+    chi2_restricted: float
+    chi2_full_after: float
+    lowered: bool
+
+
+class DistortionBlockTests(Base):
+    """The block comparisons of one call to :meth:`~rietx.Refinement.distortion_block_tests`.
+
+    ``tests`` holds one :class:`DistortionBlockTest` per held set, each against
+    the final full fit.  ``restarts`` lists every restart of the full fit, in
+    order, so its length is the count.  ``restarted_result`` is the full fit
+    the rows compare against when a restart moved it, the caller's own result
+    otherwise being that fit (``None``).  ``detectability_bar`` is the bar and ``detectability_probe`` the probe
+    amplitude (Å) the ``a_det`` column was read at, the caller's arguments.
+    """
+
+    tests: list[DistortionBlockTest]
+    restarts: list[DistortionRestart] = Field(default_factory=list)
+    detectability_bar: float | None = None
+    detectability_probe: float | None = None
+    restarted_result: RefinementResult | None = None
 
 
 class DeltaChi2Quantile(Base):

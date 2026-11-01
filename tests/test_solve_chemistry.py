@@ -576,3 +576,19 @@ def test_an_occupancy_reads_as_the_fraction_inside_its_printed_rounding():
     assert f(0.34) is None and f(0.32) is None and f(0.3334) is None
     assert f(0.0769) is None                                      # 1/13 is past q ≤ 12
     assert f(1.0) is None and f(0.0) is None
+
+
+def test_in_volume_window_is_a_ceiling_only():
+    # WP-2030 (#1237 review): an inorganic cell lies under Hofmann's 0.8 floor,
+    # so the flag must not call a correct cell outside the window
+    rutile = _phase("TiO2", "P 42/m n m", (4.5937, 4.5937, 2.9587, 90, 90, 90),
+                    [_atom("Ti", "Ti4+", 0, 0, 0), _atom("O", "O2-", 0.3048, 0.3048, 0)])
+    true = ch.Composition("TiO2", z=2).check(rutile)
+    assert true.volume_ratio < 0.8
+    assert true.in_volume_window
+    # two formula units declared as one: larger than the formula holds
+    doubled = _phase("TiO2", "P 42/m n m", (4.5937, 4.5937, 5.9174, 90, 90, 90),
+                     [_atom("Ti", "Ti4+", 0, 0, 0), _atom("O", "O2-", 0.3048, 0.3048, 0)])
+    big = ch.Composition("TiO2", z=1).check(doubled)
+    assert big.volume_ratio > 1.25
+    assert not big.in_volume_window

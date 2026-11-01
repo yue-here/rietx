@@ -211,6 +211,22 @@ the whole surface with real agents.
   module takes the next free number when it is cut, and the thread is
   corrected in the same triage.
 
+- 2026-10-31, from the issue triage (issue #562): the reporter proposes
+  (2026-10-30) making March-Dollase r a parameter of the solve cost.
+  `SolveCost` folds each reflection's preferred-orientation factor into Ω at
+  extraction. So the cost is a function of |F|² at the extraction's texture
+  only. The reporter ran a body search outside the package on a strongly
+  textured molecular pattern. It reached the structure's basin only once r was
+  a search coordinate. The proposal evaluates the cost and ∂/∂r at a stated r
+  and axis, reusing `march_term`. It would be verified against Rietveld-mode
+  `evaluate`, with a wrong-factor arm. Whether a search moves r is left to the
+  engine. The reporter asks where it sits: in `SolveCost`, or as a factor the
+  engine applies to |F|². Checked against the tree at d87c8cc91:
+  `solve/cost.py`'s docstring confirms that preferred orientation is folded
+  into Ω's columns. `model/preferred_orientation.march_term` and
+  `march_term_and_dr` exist. WP-1997 lists preferred orientation (S9, #677) as
+  a non-goal, so this belongs with S9.
+
 ## What the scoping decides
 
 1. The routes and their order.

@@ -45,7 +45,6 @@ from rietx.examples import list_examples
 from rietx.gui.textdoc import FORMAT_VERSION as RXT_FORMAT_VERSION
 from rietx.gui.textdoc import VALUE_DIGITS as RXT_VALUE_DIGITS
 from rietx.indexing.ambiguity import MAX_AMBIGUITY_INDEX, SUPERCELL_CHANCE_ALPHA
-from rietx.indexing.diagnostics import Z_INTEGER_TOLERANCE
 from rietx.indexing.extinction import DENSITY_Z_TOLERANCE
 from rietx.indexing.dichotomy import ANGLE_STEP_DEG, AXIS_STEP
 from rietx.indexing.engines import (
@@ -238,17 +237,14 @@ MYST_SUBSTITUTIONS = {
     "MAX_AMBIGUITY_INDEX": MAX_AMBIGUITY_INDEX,
     "MAX_RELATIVE_SIGMA_Q": MAX_RELATIVE_SIGMA_Q,
     "MIN_LINES_PER_DOF": MIN_LINES_PER_DOF,
-    # the formula-volume window and the Z check (WP-1510): the scatter of one
-    # crystal, the ratio bounds the window takes, the tolerance at twice the
-    # scatter, and the Z above which every value is within it of a whole number
+    # the formula-volume window (WP-1510, a ceiling only since WP-2030): the
+    # scatter of one crystal, and Hofmann's band, whose upper edge is the ceiling
     "VOLUME_SCATTER_PCT": f"{VOLUME_SCATTER * 100:.2f}",
     "VOLUME_RATIO_LOW": f"{VOLUME_RATIO_BOUNDS[0]:g}",
     "VOLUME_RATIO_HIGH": f"{VOLUME_RATIO_BOUNDS[1]:g}",
-    "Z_INTEGER_TOLERANCE_PCT": f"{Z_INTEGER_TOLERANCE * 100:g}",
     "DENSITY_Z_TOLERANCE_PCT": f"{DENSITY_Z_TOLERANCE * 100:g}",
     # two whole numbers fit a window of ±DENSITY_Z_TOLERANCE·Z once Z passes this
     "DENSITY_Z_AMBIGUOUS_ABOVE": f"{0.5 / DENSITY_Z_TOLERANCE:g}",
-    "Z_CHECK_SILENT_ABOVE": f"{0.5 / Z_INTEGER_TOLERANCE:g}",
     # How many example projects the wheel carries.  A *count* in prose is the
     # same class of stale number as a retuned threshold, and it rots the same
     # silent way: `using/first-refinement.md` said "Three" while the page's own

@@ -830,6 +830,42 @@ MAGNDATA magCIF entries serve the round-trip and span tests with no pattern.
 
 - 2026-10-26 issue triage: #455 closed. The reporter's re-run of the cubic `P n -3 m:1` case on main at 7472e200 gave one partition in 9 of 9 seed × basis runs, the condition this WP's 2026-10-15 note set. Checked against the tree at c0e32ab29.
 
+- 2026-10-31, from the issue triage (issue #795): the reporter splits K1 under
+  #1224's machinery-before-heuristics rule (2026-10-29). K1a is the machinery,
+  and nothing in it ranks or chooses. It gives the candidate k's by stratum,
+  with denominator, radius, strata and exclusion windows as required
+  arguments. It scores any named k. It reports the shuffle null's full sample,
+  with its threshold as a number. It adds the equivalents and
+  `K_SEARCH_PARTNER`. K1b is the heuristic: `search_kvector` and its ranked
+  result, the default radius, `K_SEARCH_AT_CHANCE` and the few-peaks floor,
+  both nulls measured on one grid, and the validation arm. Decisions 1
+  (placement) and 2 (rational grid now, or real k after N-W3) of the
+  2026-10-08 entry gate K1a. Decision 3 (schema) concerns only K1b, and
+  decision 4 changes neither. All four are still the maintainer's and
+  unanswered. Checked against the tree at d87c8cc91: no `search_kvector`
+  exists, and M-8 is unticked.
+
+- 2026-10-31, from the issue triage (issue #1197): `isotropy.candidates`
+  labels a candidate's magnetic group in `MagneticCell`'s reduced basis, which
+  is left-handed (det < 0) at every k ≠ 0 tried. A change of basis with det <
+  0 swaps the two members of an enantiomorphic pair, so where the group type
+  has one, `bns_number` (and `identification`) names the mirror type. The
+  reporter's case: `P 42 c m`, k = (0, 0, 1/2), `S5(rank 1)#1` prints 78.22,
+  and the same operators carried to the right-handed cell a, b, 2c identify as
+  76.10 (the parent's 4₂ becomes a 4₁ in 2c). `magnetic_supercell` catches it
+  only because its own check runs in a right-handed cell, which is where the
+  48 refusals in PR #1108's 430-pair sweep come from (all P4₂ parents at k =
+  (0, 0, 1/2)). Checked against the tree at d87c8cc91: the issue's snippet
+  prints 78.22 and 76.10 as stated. A wider probe
+  (`scratchpad/lane-B/r1197_sweep.py`) found every candidate cell at k = (0,
+  0, 1/2) left-handed (4 of 4 for `P 42 c m`, 2/2 `P 41`, 2/2 `P 31`, 3/3 `P
+  61`, 6/6 `P 41 21 2`), none at k = 0 (`P n m a`, 0 of 4). The class reaches
+  beyond the reporter's P4₂ parents: `P 31` `S1(a)` and `P 61` `S3(a,b)` print
+  144.6 where the right-handed cell gives 145.9 (the 3₁/3₂ pair). Fix
+  direction from the reporter: identify in a right-handed cell (or flip the
+  reduced basis's handedness) before labelling, with a test over the
+  enantiomorphic pairs.
+
 ## Non-goals
 
 - Modulated and incommensurate structures (superspace): issue #258 holds the

@@ -112,6 +112,31 @@ and goes through the harness.
 - **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: `model_dump(mode="json")` is not JSON for an infinite bound.** `SKILL.md:44`, and `references/api.md:13` from `make_api_index.py:499`, say to dump an answer with `model_dump(mode="json")`. That returns a ±inf bound as a Python float, so `json.dumps` writes a bare `Infinity`, which a strict parser rejects; `model_dump_json()` writes the `"Infinity"` strings the schemas promise (measured, pydantic 2.14.1). It is harmless to an agent reading the dict in Python and wrong for one storing or sending JSON. `docs/docs/reference/programs.md` gives `model_dump_json()`. Root CLAUDE.md's integration-surface clause says the same and is the maintainer's to change.
 - **2026-10-20, from [2014](2014-a-heuristic-meets-the-judge-on-every-path.md)'s filing: outside PRs bring skill rows too.** Nine of the twelve open outside PRs that touch `_audit.py` also edit `docs/skill/`, and some add verdicts: #941's `diagnostics-indexing.md` rows say "Keep this candidate; it caps, never refutes" (`INDEX_PREDICTED_BUT_ABSENT`) and "Quote the larger cell" (`INDEX_SUPERCELL_REFUTED`). A source check on thresholds and verdicts does not catch WP-2002's B12 class: a row telling agents to call a verb whose rows are tier `caller` makes that verb a default path (`profile_fraction` was one). Check each row that names a verb against the verb's tier. 2014 adds the class to `/pr-review`'s list of what outsiders miss; this WP owns the sweep.
 
+- 2026-10-31, from the issue triage (issue #1201): proposes that, for data
+  from a facility instrument, an agent reads the instrument's own
+  documentation before the first fit (the beamline pages and parameter files,
+  Mantid's instrument definition and parameter XML with SHA and date, the
+  instrument paper), writes an instrument card (geometry and radius, detector
+  cell and height, monochromator and any second line, the calibrant's
+  certified cell and impurities), maps each fact to a declaration, and fits
+  the calibrant first. The evidence is one private CW neutron refinement where
+  four effects were found late: a flat-plate displacement inherited from a
+  TOPAS input on a cylindrical can, an unrecognised second wavelength
+  component (#1208 is its model side), FCJ axial terms freed from zero instead
+  of fixed from the detector geometry, and a calibrant taken on trust. Checked
+  against the tree at d87c8cc91: `SKILL.md` §1 has a "geometry is right" row
+  but nothing on reading an instrument's documentation, and no `references/`
+  file covers instruments. #618's ruling (2026-10-02) already allows Mantid
+  values as facts with provenance. The body is 17 930 B against
+  `SKILL_BUDGET_BYTES` = 17 000 B, so a §1 row must be paid for by a cut;
+  WP-1338's rule points at a `references/` shape file behind a routing row
+  ("beamline data"). Judge it here under this WP's rule: the calibrant-first
+  step is established practice (the package's own `lab_calibrate` workflow on
+  a standard with its certified cell held), so it is a sourced trap rather
+  than a row measured on rietx's own data. The issue's open question 1 (make
+  the card a recorded `Instrument` provenance field that `summary()` checks)
+  is a stored-format change and the maintainer's call.
+
 ## Non-goals
 
 - Rewriting the skill's voice (1330 and 1985 settled it). The structure is in scope.

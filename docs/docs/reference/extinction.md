@@ -103,6 +103,21 @@ When the absence-free class's own fit leaves more than half of the net signal's 
 `ExtinctionScreen.reference_rwp_net` is that quantity, the weighted misfit over the net signal, taken against the peak picker's background envelope so no fit can move it, and `rietx.indexing.extinction.REFERENCE_NET_RWP_MAX` is the bound (1/√2, after Toby {cite}`toby2006`).
 Above it the screen still ranks the classes, sets `ExtinctionScreen.status` to `"unreliable"`, says [`EXTINCTION_SCREEN_UNRELIABLE`](diagnostics-indexing.md#extinction_screen_unreliable), and `ExtinctionScreen.best_or_none` returns `None`.
 A cell outside the basin a Le Bail can refine it from (0.4 % off held, or 1 % off with the cell-free fit, on a synthetic Si pattern at synchrotron resolution) lands there rather than on a confident wrong class.
+So does a real one: SRM 676a corundum at 1.02 times its certified cell reads 1.00 where the certified cell reads 0.19, and the GSAS-II fluorapatite at 0.99 times its cell reads 1.00 where its own reads 0.12; in both the cell-free fit leaves the cell more than 0.5 % off.
+The gate does not catch every such cell.
+The PbSO₄ X-ray histogram at 0.99 times its index cell reads 0.45: the cell-free fit stops about 0.3 % short, and the screen returns `P c - -` where the specimen is `P c - n`.
+
+`ExtinctionScreen.perfect_fit_rwp_net` is what `reference_rwp_net` would read for a fit that left only the counting noise: √(N/(N+S)), with N the fitted channels and S the weighted net Bragg power, since a background channel's net is that noise.
+It is past the bound exactly when S < N.
+The diagnostic reads the pair: when the perfect-fit value is past the bound too, no cell or model passes it, and the message names two causes it cannot tell apart (weak data, where counting longer helps, or the envelope sitting inside the lines over the range, where it does not); otherwise the reference misfits the data, by the ratio of the two (√(χ²/N)).
+On the four real patterns above it is 0.03-0.09, so there S ≫ N and every reading past the bound is misfit.
+
+The envelope has a known weakness where the lines form a continuum, as at high angle in a low-symmetry pattern.
+It is a rolling low quantile, and when no window holds a background channel it lands in the tails of the lines, the net shrinks, and a good fit reads worse.
+GSAS-II's own Rietveld fit of the PbSO₄ X-ray histogram reads 0.136 against the envelope and 0.128 against its fitted background over 15-60°, but 0.436 and 0.245 over 110-160°.
+Over the whole 15-160° range the low-angle lines carry most of the weighted power and the two read 0.155 and 0.138, so the bias matters when the fitted range is high angle or the whole pattern is a continuum.
+The perfect-fit value divides by the same envelope and rises with it, so in a continuum a weak-data reading may be the envelope's.
+When a reference fit that looks good reads above the bound on a low-symmetry pattern, the envelope is a cause to check beside those the diagnostic lists.
 
 ### A container halo
 
@@ -133,6 +148,7 @@ Even that returns a class, which lists its space groups, so the type cannot expr
 | `ExtinctionScreen.profile_rwp` | the shared profile fit every class inherits its instrument from |
 | `ExtinctionScreen.prefit_rwp` | the cell-free Le Bail fit, `None` when the cell was held |
 | `ExtinctionScreen.reference_rwp_net` | the reference fit's misfit over the net signal, the gate's quantity |
+| `ExtinctionScreen.perfect_fit_rwp_net` | what `reference_rwp_net` would read for a fit leaving only the noise, √(N/(N+S)) |
 | `ExtinctionScreen.prior` | the declared `ExtinctionPrior`, or `None` |
 | `ExtinctionScreen.z` | the formula units per cell the member filter used, or `None` |
 | `ExtinctionScreen.z_from_density` | the Z the declared density gives on `cell`, not rounded, or `None` |

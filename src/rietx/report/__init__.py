@@ -15,6 +15,12 @@ from ..schemas.pattern import PatternData
 from ..schemas.results import RefinementResult
 from .apply import RECIPES, Recipe, describe_action, recipe, stage_for
 from .background import assess_background
+from .distortion import (
+    block_comparison,
+    detectability_amplitude,
+    detectability_target,
+    distortion_blocks,
+)
 from .identifiability import (
     assess_identifiability,
     identifiability_clause,
@@ -69,6 +75,9 @@ from .schemas import (
     BasisCoefficient,
     DeltaChi2Profile,
     DeltaChi2Quantile,
+    DistortionBlockTest,
+    DistortionBlockTests,
+    DistortionRestart,
     ExchangeFinding,
     FitReport,
     FreedComparison,
@@ -105,6 +114,9 @@ __all__ = [
     "BasisCoefficient",
     "DeltaChi2Profile",
     "DeltaChi2Quantile",
+    "DistortionBlockTest",
+    "DistortionBlockTests",
+    "DistortionRestart",
     "ExchangeFinding",
     "FitReport",
     "FreedComparison",
@@ -141,6 +153,7 @@ __all__ = [
     "attribute_regions",
     "background_actions",
     "background_clause",
+    "block_comparison",
     "build_layer0",
     "build_report",
     "cap_texture_crosstalk",
@@ -151,6 +164,9 @@ __all__ = [
     "cumulative_delta_chi2",
     "delta_bic",
     "describe_action",
+    "detectability_amplitude",
+    "detectability_target",
+    "distortion_blocks",
     "estimate_delta_chi2",
     "hamilton_justified",
     "identifiability_clause",

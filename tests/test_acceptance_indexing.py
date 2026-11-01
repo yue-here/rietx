@@ -1928,6 +1928,39 @@ def test_the_cross_code_cell_leads_because_the_engines_agree_on_it(fap_index):
 
 
 @pytest.mark.slow
+@pytest.mark.xdist_group("indexing-acceptance-fap")
+def test_the_formula_window_ranks_the_fluorapatite_cell_where_the_search_does(fap_index):
+    """WP-2030: ``SearchSpec.from_formula("Ca5P3O12F", z=2)`` on ``FAP.XRA``.
+
+    1.10.0's window (738-1153 Å³) excluded the 523.6 Å³ cell and the search
+    abstained over 1050 Å³ cells; the ceiling alone (15-1153 Å³) holds it.
+    Same systems, budgets and data as :func:`fap_index`, whose hand ceiling is
+    600 Å³; the in-band cell must take the same rank in both.
+    """
+    from rietx.indexing import index_pattern
+    from rietx.indexing.engines import SearchSpec
+    from rietx.indexing.pick import pick_peaks
+    from tests.test_acceptance_fap import build_fap_inputs
+    data, _structure, ins = build_fap_inputs()
+    peaks = pick_peaks(data, ins)
+    spec = SearchSpec.from_formula(
+        "Ca5P3O12F", z=2, systems=("hexagonal", "trigonal"),
+        budget_seconds=REAL_DATA_BUDGET_SECONDS, n_unindexed=REAL_DATA_N_UNINDEXED)
+    assert spec.min_volume < 523.6 < spec.max_volume
+    windowed = index_pattern(peaks, data=data, instrument=ins, spec=spec,
+                             preset="full")
+
+    def in_band(res):
+        return [i for i, c in enumerate(res.candidates)
+                if abs(c.cell[0] / A_FAP - 1.0) < FAP_INDEXING_PPM
+                and abs(c.cell[2] / C_FAP - 1.0) < FAP_INDEXING_PPM]
+
+    assert in_band(windowed), "the formula window lost the fluorapatite cell"
+    _skip_unless_finished(windowed, fap_index)
+    assert in_band(windowed)[0] == in_band(fap_index)[0]
+
+
+@pytest.mark.slow
 @pytest.mark.xdist_group("indexing-acceptance-hl2")
 def test_an_unidentified_pattern_stays_unidentified(hl2_index):
     """The other half of an indexer, and the half a benchmark cannot measure.
