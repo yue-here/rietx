@@ -1,9 +1,8 @@
 # WP-2067 — The data-support count reads what drives an atom, not its name
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here
+Milestone: unscheduled · Status: ✅ 2026-11-01 — the count reads what each free column reaches (#1276); the purpose table's sibling and the frame-input guard close it (#1289)
 Track: What fires, and what stays silent
 Depends on: — (1419 soft: the mode-amplitude family; 1805 soft: the rigid-body family)
-Priority: P2 2026-10-31 — a number on the reassuring side of McCusker's band that nothing flags, on paths few fits run yet (mode amplitudes, rigid bodies)
 
 ## Goal
 
@@ -49,7 +48,7 @@ Tier: physics (McCusker et al. 1999 §9 defines the count as structural paramete
 - [x] `_audit` row for the count if it has one (check `tests/audit_delta.py`). (None: `DATA_SUPPORT_LOW` has its row, and the count is not a heuristic.)
 - [x] Skill: none; the count is the package's own output.
 - [x] `add_derived` refuses a `frame_inputs` name that is not an input (the follow-up PR #1276's merge entry left).
-- [x] The purpose table's sibling: a warning naming a mode amplitude or a rigid body keeps its level wherever a coordinate's does (`purposes._ATOM_DRIVERS`), held to `structural_free_paths` by `tests/test_summary_levels.py`.
+- [x] The purpose table's sibling: a warning naming a mode amplitude or a rigid body keeps its level wherever a coordinate's does (`purposes._ATOM_DRIVERS`), held to `structural_free_paths` by `tests/test_data_support.py::test_the_count_reads_what_a_column_reaches`.
 
 ## Acceptance
 
