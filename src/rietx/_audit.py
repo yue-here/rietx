@@ -827,6 +827,17 @@ ROWS: tuple[Row, ...] = (
                   "default where the caller set none (multi.py:2316-2322), and applies no "
                   "threshold of its own (WP-1325)")),
     Row("PARAMETRIC_TARGET_UNSEEN", "code"),
+    Row("PARENT_STRAIN_HELD", "code", tier=3, ambiguity=1,
+        evidence=("info; fires when a stage frees a Phase.parent_cell phase's cell edges while a "
+                  "strain stays held: phases.*.cell.* reaches the edges and never a strain, since "
+                  "a strain at exactly zero has no gradient to leave it by (test_parent_cell.py)"),
+        grounds=("The glob's choice to leave a strain held is the package's own act, so it is said "
+                 "out loud with the held paths and the verbs that free them; Yue ruled the hold "
+                 "stays and is reported (PR #1108, 2026-10-27), naming a dissenting refiner who "
+                 "would free the strain."),
+        approved="2026-10-27", response="info",
+        responds=("read the child's cell as the parent's carried through the transform; seed the "
+                  "strain off zero with set_values and free it to test for a shear")),
     Row("PATTERN_DEAD_CHANNELS", "code"),
     Row("PATTERN_DUPLICATE_POINTS", "code"),
     Row("PATTERN_INTENSITY_NET", "code", tier=1, ambiguity=1,
@@ -1715,6 +1726,11 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.crystallography.magnetic.scattering.METRIC_TOL", "constant", value=0.001),
     Row("rietx.crystallography.magnetic.scattering.P_MAGNETIC_FM", "constant", value=2.695),
     Row("rietx.crystallography.magnetic.supercell.CHILD_SITE_TOL", "constant", value=0.0001),
+    Row("rietx.crystallography.metric.COSINE_SNAP", "constant", tier=1, value=1e-12,
+        evidence=("numerical floor: P^T.G.P puts a symmetry-forced cosine within ~2e-16 of 0 or +-1/2 "
+                  "(hexagonal gamma 119.99999999999999 unsnapped); 1e-12 on a cosine is 6e-11 deg at 90, "
+                  "far below any refined departure. The literal main's _child_cell_parameters already "
+                  "used. test_the_cosine_snap_removes_round_off_and_nothing_physical")),
     Row("rietx.crystallography.neutron.NEUTRON_LAMBDA_EV_ANGSTROM", "constant", value=0.286014),
     Row("rietx.crystallography.neutron.SIGMA_ABS_REFERENCE_WAVELENGTH", "constant", value=1.798),
     Row("rietx.crystallography.representation.distortion.DISTORTION_SEED", "constant",
@@ -2929,6 +2945,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.params.parametric.RANK_RTOL", "constant", tier=1, value=3.162277660168379e-08,
         evidence=("numerical floor: sqrt(PINV_RCOND) = 3.2e-8, the R diagonal at which the "
                   "covariance's pinv would discard the direction anyway (docstring derivation)")),
+    Row("rietx.params.parent_cell._DEG", "constant", tier=1, value=0.017453292519943295,
+        evidence="arithmetic: degrees to radians"),
     Row("rietx.params.vector.CELL_MIN_LENGTH_A", "constant", tier=2, value=1.5,
         evidence=("TOPAS Tech Ref Version 9 § 2.17 Table 2-1 (checked 2026-10-19): a, b, c floored "
                   "at Max(1.5, ...)"
@@ -2988,6 +3006,17 @@ ROWS: tuple[Row, ...] = (
         evidence=("linear-algebra round-off: R.v - v of an allowed mode vector is ~1e-15, a "
                   "forbidden one O(1) (docstring, WP-1419); tests/test_distortion_block.py::"
                   "test_a_mode_vector_its_site_does_not_allow_is_refused")),
+    Row("rietx.params.vector.PARENT_STRAIN_PD_MARGIN", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: the box sum 2|s_j|.|E_j|_2 < lambda_min(C) keeps the child metric "
+                  "positive definite (Weyl's inequality, Horn & Johnson, Matrix Analysis, 2nd ed., "
+                  "Thm 4.3.1), and its edge can be singular; the bound sits a relative 1e-9 inside it, "
+                  "so at the edge lambda_min(C + 2E) >= 1e-9 lambda_min(C), about six decades above "
+                  "eigvalsh round-off, as STEPHENS_CONE_TOL. A tighter strain bound is the caller's "
+                  "(Parameter.min/max, kept where tighter). test_parent_cell.py")),
+    Row("rietx.params.vector.PARENT_CELL_DRIFT_TOL", "constant", tier=1, value=1e-09,
+        evidence=("numerical floor: the builder and every write-back store the derived child cell itself, "
+                  "so a stored cell agrees to the bit; 1e-9 relative sits above a 1e-13 round-off and below "
+                  "a 1e-6 deg edit. test_the_drift_tolerance_refuses_any_edit_and_passes_round_off")),
     Row("rietx.params.vector.SIZE_CAP_ARM_RTOL", "constant", tier=1, value=1e-06,
         evidence=("numerical floor: as STRAIN_CAP_ARM_RTOL; hysteresis pinned by "
                   "test_strain_cap.py:414")),
@@ -4381,6 +4410,10 @@ ROWS: tuple[Row, ...] = (
         evidence=("opt-in, as its code: names three changes to the caller's own declaration "
                   "(subset, order, basis) and picks none (multi.py:2334-2336)")),
     Row("PARAMETRIC_TARGET_UNSEEN.suggestion", "suggestion", value=1),
+    Row("PARENT_STRAIN_HELD.suggestion", "suggestion", tier=3, ambiguity=1, value=1,
+        evidence="names the two verbs that free a held strain: set_values to seed it, turn_on to free it",
+        grounds="Says how to test for the strain the glob left held (PR #1108, ruled 2026-10-27).",
+        approved="2026-10-27"),
     Row("PATTERN_DEAD_CHANNELS.suggestion", "suggestion", value=2),
     Row("PATTERN_INTENSITY_SCALED.suggestion", "suggestion", value=6),
     Row("PATTERN_MULTISCAN_DEFAULTED.suggestion", "suggestion", value=1),

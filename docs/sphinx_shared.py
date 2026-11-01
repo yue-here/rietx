@@ -76,7 +76,11 @@ from rietx.optimize.statistics import (
     PINV_RCOND,
 )
 from rietx.params.parametric import FORM_TEST_LEVEL
-from rietx.params.vector import SIZE_CAP_RANGE_FRACTION, STRAIN_CAP_RANGE_FRACTION
+from rietx.params.vector import (
+    PARENT_STRAIN_PD_MARGIN,
+    SIZE_CAP_RANGE_FRACTION,
+    STRAIN_CAP_RANGE_FRACTION,
+)
 from rietx.refine import SCALE_B_SEPARATION_FLOOR, SIZE_FLAG_SIZE_A, STRAIN_FLAG_WIDTH
 from rietx.report.layer0 import LAYER0_MATCH_TOL_DEG, build_layer0
 from rietx.report.layer2 import IMPURITY_SIGMA
@@ -300,6 +304,7 @@ MYST_SUBSTITUTIONS = {
     "SUGGEST_MIN_GAIN": SUGGEST_MIN_GAIN,
     "SUPERCELL_CHANCE_ALPHA": SUPERCELL_CHANCE_ALPHA,
     "SYMMETRY_ANGLE_TOL_DEG": SYMMETRY_ANGLE_TOL_DEG,
+    "PARENT_STRAIN_PD_MARGIN": PARENT_STRAIN_PD_MARGIN,
     # a body atom's image this close (× the covalent-radius sum) to the body
     # refuses it, RIGID_BODY_IMAGE_OVERLAP (WP-1807)
     "RIGID_BODY_OVERLAP_FACTOR": RIGID_BODY_OVERLAP_FACTOR,

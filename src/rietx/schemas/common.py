@@ -601,6 +601,13 @@ from .._nearmiss import did_you_mean
 #: ``displacive_statement``.  An older build refuses a phase carrying it.
 #: Also in 0.60 (WP-2011): ``LeBailValidation.mode``, additive, its default
 #: ``"lebail"`` being what every record written before it ran.
+#: Also in 0.60 (WP-1419, C2): ``Phase.parent_cell``, a ``ParentCell`` (the
+#: parent's ``space_group``, the parent → child ``transform``, the parent's
+#: ``cell`` and one ``strain`` amplitude per Γ strain the child's group
+#: allows), which makes the child's six cell parameters derived and locked.
+#: Additive and defaulted to ``None``, the 0.25 → 0.26 rule, so every stored
+#: document loads and refines as before; an older build refuses a phase
+#: carrying it.
 #: Also in 0.60 (#939's follow-ups): ``ExtinctionScreen.perfect_fit_rwp_net``,
 #: what that Rwp would read for a fit leaving only the noise, √(N/(N+S)).
 #: Additive and defaulted to ``None``, the same rule.

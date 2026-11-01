@@ -502,6 +502,28 @@ def unknown_paths_among(path_globs: Iterable[str], known: set[str]) -> list[str]
 #: Cell parameter names in table order — lengths first, then angles.
 _CELL_NAMES = ("a", "b", "c", "alpha", "beta", "gamma")
 
+#: Relative disagreement (on a length or an angle, against max(|value|, 1))
+#: between a ``Phase.parent_cell`` child's stored cell and the one its parent
+#: and strains give, past which the table refuses rather than overwrite it
+#: (WP-1419).  The builder and every write-back store the derived value itself,
+#: so a stored cell agrees to the bit; this only has to sit above a JSON round
+#: trip's zero and far below any edit a person makes.
+PARENT_CELL_DRIFT_TOL = 1e-9
+
+#: How far inside the positive-definite box a freed ``Phase.parent_cell`` strain
+#: is bounded, relative to the box (WP-1419, review of #1108).  The box of
+#: :meth:`ParameterTable._guard_strain_domain` is the sufficient condition
+#: Σⱼ 2|sⱼ|·‖Eⱼ‖₂ < λ_min(C) (Weyl's inequality: λ_min(C + 2E) ≥ λ_min(C) − ‖2E‖₂),
+#: which is arithmetic.  Its edge itself can be a singular metric, and the
+#: default LM driver lands a value exactly on a bound, so the bound sits this
+#: fraction inside it: at the edge λ_min(C + 2E) ≥ PARENT_STRAIN_PD_MARGIN·λ_min(C),
+#: some six decades above the round-off of an ``eigvalsh`` of a matrix of order
+#: one.  A numerical floor, not a choice of how far a lattice may strain: the
+#: package bounds a strain where the model is defined, and a tighter, physical
+#: bound is the caller's (``Parameter.min``/``max`` on the strain, kept where
+#: tighter).  #1224 moved this from a tier-3 fraction of ½.
+PARENT_STRAIN_PD_MARGIN = 1e-9
+
 #: Fraction of the value a stage *starts from* that a cell length may travel
 #: within that stage, and an additive pad in Å so a small cell is not held
 #: tighter than a large one in absolute terms.
@@ -591,14 +613,20 @@ def _cell_parameter_name(path: str, *, phases: set[int] | None) -> str | None:
     but their paths to go on.
     """
     parts = path.split(".")
-    if len(parts) == 4 and parts[0] == "phases" and parts[2] == "cell":
-        if parts[3] not in _CELL_NAMES:
+    # a phase's own cell, or the parent's cell a ``Phase.parent_cell`` child
+    # refines in its place (WP-1419): the latter is the cell that moves, and
+    # the child's own six are locked outputs, so the safeguards must read it
+    if (len(parts) == 4 and parts[0] == "phases" and parts[2] == "cell") or (
+            len(parts) == 5 and parts[0] == "phases" and parts[2] == "parent_cell"
+            and parts[3] == "cell"):
+        name = parts[-1]
+        if name not in _CELL_NAMES:
             return None
         try:
             ip = int(parts[1])
         except ValueError:
             return None
-        return parts[3] if phases is None or ip in phases else None
+        return name if phases is None or ip in phases else None
     return None
 
 
@@ -1235,6 +1263,13 @@ class ParameterTable:
         #: (body base path, body name, its block), in collection order
         #: (WP-1805): the write-back and the rigidity check walk this
         self._bodies: list[tuple[str, str, DerivedBlock]] = []
+        #: the cell blocks of ``Phase.parent_cell`` phases (WP-1419), declared
+        #: before every body block, which reads a phase's cell
+        self._cell_blocks: list[DerivedBlock] = []
+        #: strain path → the amplitude at which the child's metric stops being
+        #: positive definite, however it is combined (WP-1419); applied in
+        #: :meth:`bounds` to a **free** strain, never stored on the entry
+        self._strain_domain: dict[str, float] = {}
         #: body base path → its rotation DOF paths: the **anchored-rotation**
         #: kind (WP-1805).  An increment δω = E·θ composed into the body's
         #: R₀ and zeroed at every :meth:`commit`, so its value is a step
@@ -1289,6 +1324,8 @@ class ParameterTable:
         self._rebuild()
         if self._origin:
             self._fix_origin()
+        for block in self._cell_blocks:
+            self.add_derived(block)
         if self._bodies:
             # the stored atoms are checked against their bodies before the
             # blocks write them, so an edit of a body atom is refused rather
@@ -1314,23 +1351,15 @@ class ParameterTable:
     def _collect(self, structure: Structure, instrument: Instrument) -> None:
         for ip, phase in enumerate(structure.phases):
             sg = resolve_group(phase.space_group, phase.symmetry_operations)
-            # The cell ties come from the *setting*, not from the crystal system
-            # alone: a c-unique monoclinic symbol fixes β, not γ, and an R group
-            # on rhombohedral axes ties c←a and α=β=γ rather than leaving c free
-            # (WP-1036, crystallography.symmetry.CellConstraints).
-            constraints = cell_constraints(sg)
-            check_cell_angles(sg, {name: getattr(phase.cell, name).value
-                                   for name in ("alpha", "beta", "gamma")})
             base = f"phases.{ip}"
-            for name in _CELL_NAMES:
-                p: Parameter = getattr(phase.cell, name)
-                if name in constraints.ties:
-                    self._add(f"{base}.cell.{name}", p, tie=AffineTie.identity(
-                        f"{base}.cell.{constraints.ties[name]}"))
-                elif name in constraints.fixed_angles:
-                    self._add(f"{base}.cell.{name}", p, force_fixed=True)
-                else:
-                    self._add(f"{base}.cell.{name}", p)
+            if phase.parent_cell is not None:
+                self._collect_parent_cell(base, sg, phase)
+            else:
+                # The cell ties come from the *setting*, not from the crystal
+                # system alone: a c-unique monoclinic symbol fixes β, not γ,
+                # and an R group on rhombohedral axes ties c←a and α=β=γ rather
+                # than leaving c free (WP-1036, symmetry.CellConstraints).
+                self._collect_cell(f"{base}.cell", sg, phase.cell)
             self._add(f"{base}.scale", phase.scale)
             self._add(f"{base}.extinction", phase.extinction)
             if phase.preferred_orientation is not None:
@@ -1391,6 +1420,161 @@ class ParameterTable:
         self._add_instrument_row(instrument, "instrument.zero_shift",
                                  instrument.zero_shift)
         self._collect_instrument(instrument)
+
+    def _collect_cell(self, prefix: str, sg, cell) -> None:
+        """Six cell entries under ``prefix``, tied and fixed as ``sg`` says."""
+        constraints = cell_constraints(sg)
+        check_cell_angles(sg, {name: getattr(cell, name).value
+                               for name in ("alpha", "beta", "gamma")})
+        for name in _CELL_NAMES:
+            p: Parameter = getattr(cell, name)
+            if name in constraints.ties:
+                self._add(f"{prefix}.{name}", p, tie=AffineTie.identity(
+                    f"{prefix}.{constraints.ties[name]}"))
+            elif name in constraints.fixed_angles:
+                self._add(f"{prefix}.{name}", p, force_fixed=True)
+            else:
+                self._add(f"{prefix}.{name}", p)
+
+    def _collect_parent_cell(self, base: str, sg, phase) -> None:
+        """The cell of a phase that states it through its parent (WP-1419).
+
+        The parent's six entries go in under ``{base}.parent_cell.cell``,
+        constrained by the **parent's** group, then one entry per Γ strain
+        the child's group allows (``{base}.parent_cell.strain.j``), then the
+        child's own six entries **locked**: a :class:`~rietx.params.
+        parent_cell.ParentCellBlock`, declared after collection, is their one
+        writer.  The child's own group is never asked for cell constraints,
+        which is the point: its axes need not be conventional for its point
+        group (a C-centred type in a primitive doubled cell), and the metric
+        it allows is the parent's plus the strains.
+
+        Refused by name: a child group that is not a subgroup of the parent's
+        under the transform, a strain list of the wrong length (the message
+        says the right one), and a stored child cell that is not the one the
+        parent and strains give, beyond :data:`PARENT_CELL_DRIFT_TOL` — an
+        edit of the child's cell would otherwise be overwritten silently, as a
+        body atom's would (``_check_body_drift``).
+        """
+        from ..crystallography import metric
+        from ..crystallography.magnetic.operators import parse_transform
+        from .parent_cell import ParentCellBlock
+
+        declared = phase.parent_cell
+        try:
+            parent_sg = resolve_group(declared.space_group)
+        except (RuntimeError, ValueError) as exc:
+            raise ValueError(
+                f"{base}.parent_cell.space_group {declared.space_group!r} is not "
+                f"a space group this package resolves ({exc})") from exc
+        self._collect_cell(f"{base}.parent_cell.cell", parent_sg, declared.cell)
+        p_matrix, _origin = parse_transform(declared.transform)
+        try:
+            basis = metric.strain_basis(
+                metric.rotations_of(parent_sg),
+                metric.in_parent_basis(p_matrix, metric.rotations_of(sg)),
+                cell_constraints(parent_sg).fixed_angles)
+        except ValueError as exc:
+            raise ValueError(
+                f"{base}.parent_cell: the phase's group under the transform "
+                f"{declared.transform!r} against the parent "
+                f"{declared.space_group!r}: {exc}") from exc
+        if len(declared.strain) != len(basis):
+            raise ValueError(
+                f"{base}.parent_cell.strain has {len(declared.strain)} "
+                f"amplitude(s); the phase's group allows {len(basis)} Γ "
+                f"strain(s) that the parent {declared.space_group!r} does not, "
+                f"so it needs exactly {len(basis)} (zero and held is the "
+                f"parent's metric carried through the transform)")
+        strains = [f"{base}.parent_cell.strain.{j}" for j in range(len(basis))]
+        for path, p in zip(strains, declared.strain, strict=True):
+            self._add(path, p)
+        for name in _CELL_NAMES:
+            self._add(f"{base}.cell.{name}", getattr(phase.cell, name),
+                      force_fixed=True)
+        self._guard_strain_domain(base, declared, parent_sg, strains, basis)
+        block = ParentCellBlock(f"{base}.parent_cell.cell", f"{base}.cell",
+                                strains, [[float(v) for v in row] for row in p_matrix],
+                                basis)
+        # the parent's tied entries hold their source's value only after the
+        # rebuild, so the drift test reads the sources through the constraints
+        cons = cell_constraints(parent_sg)
+        parent_values = {n: getattr(declared.cell, n).value for n in _CELL_NAMES}
+        for name, src in cons.ties.items():
+            parent_values[name] = parent_values[src]
+        x = np.array([parent_values[n] for n in _CELL_NAMES]
+                     + [p.value for p in declared.strain], dtype=np.float64)
+        derived = block.evaluate(x)
+        stored = np.array(phase.cell.lengths_angles(), dtype=np.float64)
+        drift = np.abs(derived - stored) / np.maximum(np.abs(stored), 1.0)
+        if float(drift.max()) > PARENT_CELL_DRIFT_TOL:
+            worst = int(np.argmax(drift))
+            raise ValueError(
+                f"{base}.cell.{_CELL_NAMES[worst]} is stored as "
+                f"{float(stored[worst])!r}, but the parent's cell and strains "
+                f"give {float(derived[worst])!r}: the child's cell is derived "
+                f"(Phase.parent_cell), so the two sides disagree and the table "
+                f"cannot tell which was edited.  An edit of the child's cell "
+                f"would be overwritten; an edit of the parent's cell or a "
+                f"strain in the model leaves the child's stored cell behind.  "
+                f"Move the parent through a verb that re-derives it "
+                f"(``Refinement.set_values`` on {base}.parent_cell.cell.* or "
+                f"{base}.parent_cell.strain.*), or drop parent_cell to refine "
+                f"the six parameters directly")
+        self._cell_blocks.append(block)
+
+    def _guard_strain_domain(self, base: str, declared, parent_sg, strains: list[str],
+                             basis: np.ndarray) -> None:
+        """Where the child's metric stays positive definite, by name (WP-1419).
+
+        G′ = Pᵀ·(G + 2·L·E·L)·P with G = L·C·L (L the parent's lengths, C its
+        cosine matrix) is positive definite exactly when C + 2E is, P being
+        invertible.  A stored amplitude outside that is a model to refuse here
+        (a negative diagonal under ``sqrt`` is a NaN mid-solve, and the
+        cosine clip in ``cell_from_metric`` would hide the off-diagonal case).
+        A **freed** strain is bounded in :meth:`bounds`, per amplitude, at
+        (1 − PARENT_STRAIN_PD_MARGIN)·λ_min(C)/(2·n·‖Eⱼ‖₂): the sum of the n
+        amplitudes' spectral norms then stays under λ_min(C), which keeps
+        C + 2E positive definite for any combination (Weyl's inequality).
+        A sufficient box, not the cone itself: the equal split binds first
+        when one amplitude carries the strain, stopping it at 1/n of the room
+        that amplitude would have alone while the metric is still far from
+        singular.  On a hexagonal parent (λ_min(C) = ½) with four strains that
+        is about 0.066 to 0.088 depending on ‖Eⱼ‖₂, roughly six times the real
+        strains the ½ fraction was weighed against; a fit reaching it is
+        reported as a bound hit.  The box is derived from the parent's
+        cell at this build (re-read each stage, like every bound) rather than
+        a tuned number.  A parent angle freed in the same
+        stage moves λ_min within the stage; the stage's next build re-reads it.
+        """
+        if len(basis) == 0:
+            return
+        from ..crystallography.lattice import direct_metric_tensor
+
+        cons = cell_constraints(parent_sg)
+        values = {n: getattr(declared.cell, n).value for n in _CELL_NAMES}
+        for name, src in cons.ties.items():
+            values[name] = values[src]
+        g = np.asarray(direct_metric_tensor(*(values[n] for n in _CELL_NAMES)),
+                       dtype=np.float64)
+        lengths = np.sqrt(np.diag(g))
+        cosines = g / np.outer(lengths, lengths)
+        lam_min = float(lapack.eigvalsh(cosines)[0])
+        amplitudes = np.array([p.value for p in declared.strain], dtype=np.float64)
+        strained = cosines + 2.0 * np.tensordot(amplitudes, basis, axes=1)
+        if not float(lapack.eigvalsh(strained)[0]) > 0.0:
+            raise ValueError(
+                f"{base}.parent_cell.strain {amplitudes.tolist()} makes the "
+                f"child's metric not positive definite (its smallest "
+                f"eigenvalue is {float(lapack.eigvalsh(strained)[0])!r} "
+                f"against {lam_min!r} unstrained): that is not a lattice. "
+                f"Use smaller amplitudes")
+        for path, e_j in zip(strains, basis, strict=True):
+            # E is symmetric, so its spectral norm is its largest |eigenvalue|
+            norm = float(np.max(np.abs(lapack.eigvalsh(e_j))))
+            if norm > 0.0:
+                self._strain_domain[path] = ((1.0 - PARENT_STRAIN_PD_MARGIN) * lam_min
+                                             / (2.0 * len(basis) * norm))
 
     def _collect_texture(self, base: str, sg, phase) -> None:
         """One ``phases.i.texture.<name>`` entry per term the Laue class allows.
@@ -4140,6 +4324,11 @@ class ParameterTable:
                 # narrows, so intersecting last is the tightest of all four and
                 # leaves each of their decisions reading the stored bounds.
                 e_lo, e_hi = max(e_lo, tied_window[0]), min(e_hi, tied_window[1])
+            domain = self._strain_domain.get(e.path)
+            if domain is not None:
+                # a freed Γ strain stays where the child's metric is positive
+                # definite (WP-1419, ``_guard_strain_domain``); only narrows
+                e_lo, e_hi = max(e_lo, -domain), min(e_hi, domain)
             scale = self._value_scale.get(e.path)
             if scale is not None:
                 # every bound above is a *physical* limit on this table's own
@@ -4612,6 +4801,12 @@ class ParameterTable:
             base = f"phases.{ip}"
             for name in ("a", "b", "c", "alpha", "beta", "gamma"):
                 put(getattr(phase.cell, name), f"{base}.cell.{name}")
+            if phase.parent_cell is not None:
+                for name in ("a", "b", "c", "alpha", "beta", "gamma"):
+                    put(getattr(phase.parent_cell.cell, name),
+                        f"{base}.parent_cell.cell.{name}")
+                for j, p in enumerate(phase.parent_cell.strain):
+                    put(p, f"{base}.parent_cell.strain.{j}")
             put(phase.scale, f"{base}.scale")
             put(phase.extinction, f"{base}.extinction")
             if phase.preferred_orientation is not None:
