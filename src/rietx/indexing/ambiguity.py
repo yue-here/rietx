@@ -678,8 +678,9 @@ class SupercellEvidence:
         more often than chance** — ``n_seen ≤ n_extra · p0``, counting every
         seen one — and the test had the power to say otherwise.  *undecided*:
         everything between, in two forms.  Even every extra seen could not
-        have reached ``alpha`` (:attr:`p_floor` ≥ ``alpha``) — no extra in
-        range, or too few against a high chance rate — which is not measured,
+        have reached ``alpha`` (:attr:`p_floor` ≥ ``alpha``, read at
+        :attr:`p0_power` where one is set) — no extra in range, or too few
+        against a high chance rate — which is not measured,
         so it is not a refutation: a child with no extra line in range is the
         geometrical ambiguity :func:`ambiguity_partners` reports, not a cell
         the data reject.  Or the extras are seen above chance but not

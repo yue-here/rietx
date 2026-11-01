@@ -1218,7 +1218,8 @@ class SupercellCheck(Base):
     is a lattice statement the data make, and the candidate then sits directly
     above this parent unless another check refutes it (WP-1510).
     ``"undecided"`` means not even every extra seen could have reached the
-    significance level, which includes a parent whose lines this one only
+    significance level at ``p0_power`` (``p0`` where that is ``None``), which
+    includes a parent whose lines this one only
     repeats, or that the extras are seen beyond chance only on lines the parent
     explains.  An undecided check moves nothing.
     """
@@ -1245,6 +1246,12 @@ class SupercellCheck(Base):
     #: this many falling below α at the same ``p0``.  ``None`` in a record
     #: written before thresholds version 1.7, which did not count them
     n_seen_unexplained: int | None = None
+    #: the chance rate the power check read, counted in windows floored at the
+    #: assumed shift bound: refuted needs ``p0_power ** n_extra`` below α.
+    #: ``None`` where no floor was declared (the check then reads ``p0``), and
+    #: in a record written before #1263, whose ``p0`` was itself the floored
+    #: rate
+    p0_power: float | None = None
     verdict: Literal["supported", "refuted", "undecided"]
     #: ° 2θ of the extras nothing was seen at, lowest first and at most six:
     #: where to look in the pattern for the lines the larger cell needs
