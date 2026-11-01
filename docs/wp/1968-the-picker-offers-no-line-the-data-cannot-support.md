@@ -1,9 +1,8 @@
 # WP-1968 — the picker offers no line the data cannot support
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by the ghostshift runner (measured-silicon check, then close)
+Milestone: unscheduled · Status: ✅ 2026-11-01 — every task landed; measured silicon (11-BM SRM 640c) flags no weak line, so the flat-silicon control stays synthetic as a documented limit
 Track: What fires, and what stays silent
 Depends on: 1909 soft (the 1σ floor this bar succeeds, and its census)
-Priority: P2 2026-10-14 — a defect that fires wrongly: off-lattice components reach every engine as usable lines, and every benchmark harness filters them by hand
 
 ## Goal
 
@@ -73,45 +72,6 @@ listed for `duplicate_line`: `help.py`, `tests/data/gui/help_keys.json`,
 regenerated skill `api.md`. `tests/test_acceptance_indexing.py` runs before
 close, since the peak list feeds every engine.
 
-### Inherited
-
-- **From WP-2002 (2026-10-22, 6th session, PR #1085): #934 (c)'s flat-silicon control rests on a 2 % draw.** `tests/test_indexing_driven_set.py::test_916s_flat_silicon_is_driven_by_its_own_lines` draws silicon with `predict`, which since WP-2002 evaluates at the closing stage's windows (1e-3 of each peak's area). Drawn there, the picker flags 4 `weak_line` components, the flagged driven set is still 11 and the truth still ranks first, but the stripped control drives 15 lines rather than 18 and indexes (4 candidates), so the control no longer shows the rule is needed. The test now draws at `WINDOW_AREA_TOL` (2 %) and says why. Whether the three extra weak components at 2 % come from the truncated tails rather than from anything a measured pattern has is this WP's to decide, since it is the evidence the driven-set exclusion was shown on.
-
-- **2026-10-16, from the issue triage (#934): PR #993 (theirs, head
-  `d34597c9`, opened 2026-10-15 13:32) is part (c)'s diagnostics, and WP-1968
-  does not name it.** Part (c) asked for three filters as flags with a
-  diagnostic each. The flags already landed with #947 (`weak_line`) and #948
-  (`width_capped`, `unresolved_split`). #993 adds `PEAK_POSITION_AT_BOUND` and
-  `PEAK_NO_INTENSITY`, and puts each component's value and bound in
-  `PEAK_WIDTH_CAPPED` and `PEAK_EXPECTED_FALSE_LINES`; no flag, threshold or
-  `usable()` moves (census identical on the flat Si and the 16 round-robin
-  patterns). It takes `INDEXING_THRESHOLDS_VERSION` 1.11 to 1.12, so it
-  renumbers against #951 and #940. It leaves out the driven-set exclusion,
-  which matches the task already in this WP. It asks one thing of the
-  maintainer: `PEAK_POSITION_AT_BOUND` as a warning when an offered line sits
-  on its bound (10 of 16 round-robin patterns). It also reports 24 usable
-  components on the position bound whose reported position is the bound's, and
-  offers a re-seeded second solve as a separate PR. Checked against the PR
-  body, code not reviewed.
-
-- **2026-10-14, from the issue triage: issue #934 is in PRs #947 and #948
-  (theirs).** #947 (part b, head `d4b78965`) tests each component's I/σ_I by
-  Benjamini–Hochberg at q = 0.01 (`PEAK_FDR_Q`) over the pattern's resolution
-  elements, flags a component under the bar `weak_line`, and reports the
-  info code `PEAK_EXPECTED_FALSE_LINES`. It carries the null-pattern test.
-  Made unusable, the flag moved five acceptance rows, which is why it is
-  reported only. #948 (part a, head `87b90e43`) adds
-  `peakfit.unresolved_mates`. Two adjacent components of comparable area
-  showing no dip under Sparrow's criterion become one line, and the merged
-  one is flagged `unresolved_split` (unusable). It also flags `width_capped`,
-  a group whose width ends on its bound (5 × the width law). On the 16
-  round-robin lists usable components go from 789 to 782. Both take
-  `INDEXING_THRESHOLDS_VERSION` 1.10, and the second to merge renumbers.
-
-- 2026-10-26 issue triage: #1166 (the 24 usable components on their position bound, from
-  #993's round-2 review) is filed as WP-2055, because its likely fix is the profile the
-  picker holds (Kα2 weight, axial), outside this WP's Goal. Nothing here waits on it.
-
 ## Non-goals
 
 - The steep-flank envelope, and the 1σ floor's census (WP-1909).
@@ -160,6 +120,21 @@ name.
   a survey (Sparrow's criterion).
 
 ## Handover log
+
+- **2026-11-01** (ghostshift runner, PR #1303, closed) — The question WP-2002 left here is answered, and the answer is a limit rather than a second test. The only measured silicon in the tree, APS 11-BM's SRM 640c scan, gives the picker nothing to flag: no component falls under the false-discovery bar, every usable component sits on a silicon line, and the list indexes to the true cell with or without the driven-set exclusion. So the evidence that the exclusion is needed on flat silicon stays synthetic, and the test now says so with the numbers. The measured scan cannot settle the question either way, because its peaks stand about 15 times higher above the background than the synthetic draw's. The maintainer's go of 2026-11-01 (ghostshift record) chose this branch for that outcome.
+  *Measured* (macOS arm64, `[dev]`, Python 3.12, compiled tier on; scripts and JSON in the runner's scratch, not committed). Cubic search, `n_unindexed=2`, `preset="full"`, as the test runs it.
+
+  | pattern | components | usable | `weak_line` | usable > 1.5 FWHM off a line | driven, flagged / stripped | truth rank, flagged / stripped |
+  |---|---|---|---|---|---|---|
+  | #916 synthetic, 2 % windows | 23 | 18 | 7 | 3 | 11 / 18 | 1 / no cell |
+  | #916 synthetic, closing windows | 20 | 15 | 4 | 1 | 11 / 15 | 1 / 1 |
+  | `11BM_Si640c.xy`, #916's d-range (6.03-28.92° at 0.412359 Å) | 19 | 11 | 0 | 0 | 11 / 11 | 1 / 1 |
+  | `11BM_Si640c.xy`, whole scan (2-50°, 30 lines) | 45 | 30 | 0 | 0 | 20 / 20 | 1 / 1 |
+
+  The synthetic rows reproduce WP-2002's finding (7 against 4 weak components, the stripped control indexing only at the closing windows). The synthetic weak re-seeds sit 2.1-2.6 FWHM from a line at I/σ_I 1.3-2.3. On the measured d-range the 8 unusable components are axial-tail shoulders 0.9-1.2 FWHM from a line (`not_separable`) and two `unresolved_split` halves. The usable ones sit at I/σ_I 22 or more. Peak-to-background is about 2600 measured (251 500 counts on ~95) against about 170 synthetic (1.3e6 on 7700). The pick PNGs (`tests/output/peaks_wp1968_si640c*.png`, whole range and zooms at 7.5° and 21.4°) were read by eye: every true line carries one unflagged usable tick, and the flagged ticks sit on the lines' tails.
+  *Done*: `tests/test_indexing_driven_set.py` records the limit in the flat-silicon test's comment and in the module docstring. No assertion and no source file changed, so the picker's output does not move. Inherited pruned: its one open entry (WP-2002's question) is answered above; the #993 and #947/#948 entries were already consumed by their merges. Priority was P2, so no release is owed.
+  *Gates*: see the PR body for the fast-suite counts and `python -m tests.reader_output`.
+  *Next*: none in this WP. A measured silicon pattern at a lab diffractometer's counting level (peak-to-background near 170) would decide whether the exclusion is needed on measured data; the tree has none, and the local-only data root holds no silicon either. #934 is the maintainer's to close.
 
 - **2026-10-31** (ghostshift close-batch, PR #1287, not closed) — all six tasks are ticked and landed (#947, #948, #993, #1048, #1179 and the help entries). One inherited question is still open, and it says it is this WP's to decide. The WP-2002 session found that the flat-silicon control in `test_916s_flat_silicon_is_driven_by_its_own_lines` only shows the driven-set exclusion is needed when the silicon pattern is drawn at the 2 % windows. Drawn at the closing stage's windows (full peak tails), the picker flags 3 fewer `weak_line` components, and the stripped control then indexes. So the evidence that the `weak_line` exclusion is needed on #916's flat silicon rests on the truncated tails of a synthetic draw. The test already says so in a comment and draws at `WINDOW_AREA_TOL`.
   *Checked against main `1314c69ea`*: the test still draws at `WINDOW_AREA_TOL` (`tests/test_indexing_driven_set.py`, line 145) and no entry in this log answers the question. Not measured here: whether a real flat-silicon pattern (the #916 data) flags extra weak components, which is what would show the exclusion is needed on a measured pattern.
