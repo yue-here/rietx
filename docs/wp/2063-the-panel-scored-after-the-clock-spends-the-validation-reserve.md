@@ -74,7 +74,9 @@ fit is bounded, so the validation reserve reaches validation and
       cached per reduced cell: consensus re-scores cells the units already
       scored) and bounding the post-search scoring by the clock. Done exactly: whole-merge scoring 3.5-6.5× cheaper in CPU, every panel bit-identical; no cap added.
 - [x] Read the clock inside trial_error's per-base loop as well, so a unit
-      stops within one assignment, not one base set.
+      stops within one assignment, not one base set. Done by WP-1924
+      (`1f2e48e7a`), which reads it before each `_score`; this branch's own
+      read one line above it was removed at the merge as a duplicate.
 - [ ] Re-measure `quick` on NAC (`docs/wp/2011-probe/probe16_schedule.py`,
       `RESERVE=`) and, if the fits now see the reserve, lower
       `VALIDATION_RESERVE_FRACTION` with its row's evidence.
