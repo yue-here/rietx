@@ -1723,6 +1723,32 @@ def test_what_reaches_the_pattern_without_a_phase_is_never_peak_only():
         assert not _peak_only_instrument_path(bare, path), path
 
 
+def test_a_series_carries_the_last_measured_zero_shift_across_a_blank_frame(
+        blank_frames):
+    """A series' carry (WP-2049).  The blank frame holds its zero shift at the
+    value carried in, so the frame after it starts from the last measured one
+    and lands near the truth, 0.006°, instead of from a value fitted to
+    noise.  The blank frame quotes no zero shift at all."""
+    import rietx as rx
+
+    ps, series = blank_frames
+
+    @ps.numpy_path
+    def fit():
+        structure, ins = ps.cubic_model(series.temperature[86])
+        return rx.refine_sequential(series.patterns[86:89], structure, ins,
+                                    x=series.temperature[86:89],
+                                    plan="mccusker_default")
+
+    entries = fit().entries
+    zero = [{p.path: p for p in e.parameters}.get("instrument.zero_shift")
+            for e in entries]
+    assert zero[1] is None
+    for row in (zero[0], zero[2]):
+        assert row is not None and row.stderr is not None
+        assert abs(row.value - ps.TRUE_ZERO) < 4 * row.stderr
+
+
 def test_a_joint_fit_holds_the_blank_patterns_own_zero_shift(blank_frames):
     """The joint twin.  Each histogram's zero shift is its own, so the blank
     frame's is held while the frame that sees the phase refines its own.  The

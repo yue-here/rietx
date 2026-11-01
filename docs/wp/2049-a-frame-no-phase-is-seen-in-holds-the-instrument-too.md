@@ -79,7 +79,7 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
       reach (`column_reach`) lies wholly in unseen phases, beside the phases'
       own paths; record it in `StageResult.held` and `PHASE_UNCONSTRAINED`'s
       message.
-- [ ] The joint twin in `multi.py`, and a series' carry: a held instrument
+- [x] The joint twin in `multi.py`, and a series' carry: a held instrument
       value carries from the last frame that measured it.
 - [ ] Tests: frame 87 at both nudges gives a held zero shift; the planted
       series' committed signals hold at k = 0 and k = +1.
