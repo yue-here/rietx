@@ -1,6 +1,6 @@
 # WP-1951 — a glob that names a site and frees nothing
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P3 2026-10-11 — a request to free one site's coordinates, or an unknown path on `set_vary`, frees nothing and says nothing; the caller can read `freed` or the return value
