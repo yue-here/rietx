@@ -82,6 +82,13 @@ the whole surface with real agents.
 
 ### Inherited
 
+- **2026-11-01, from WP-1809 (closed, PR #1287): a radii-backed default for the
+  anti-bump pair-list builder is a later convenience, and this WP is its home.** The
+  maintainer ruled on 2026-11-01 that `anti_bump_restraints` keeps the caller-stated
+  minimum as the settled design. Reading Shannon, Pyykkö and Pauling radii
+  (`crystallography/radii.py`) for an r₀, and saying which species pairs got no row,
+  stays open here beside the clash floor this WP already names them for (#677).
+
 - **2026-10-16, from the issue triage (#998): `solve_seed` checkpoint,
   resume and progress.** The reporter's blind kit (36 atoms, 4 species, lab
   X-ray) ran single seeds at `budget=3` past 1 h and then 8 h timeouts, and
