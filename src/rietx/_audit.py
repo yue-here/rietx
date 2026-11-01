@@ -752,8 +752,9 @@ ROWS: tuple[Row, ...] = (
                   "superlattice below its parent and leaves it in the list; the explanation "
                   "names the weak superstructure the radiation barely sees (PR #941 round 4)"),
         grounds=("Ranks below the parent and withholds nothing else; a superstructure is "
-                 "indexed by its subcell first, as ruled on WP-1968 (C3, ruled 2026-10-21)."),
-        approved="2026-10-21"),
+                 "indexed by its subcell first, as ruled on WP-1968 (C3, ruled 2026-10-21); "
+                 "#1263's narrower null approved at PR #1302 (ruled 2026-11-01)."),
+        approved="2026-11-01"),
     Row("INDEX_SYSTEMS_NOT_COVERED", "code"),
     Row("INDEX_VALIDATION_FAILED", "code"),
     Row("INDEX_VOLUME_UNPHYSICAL", "code"),
