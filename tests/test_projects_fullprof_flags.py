@@ -21,7 +21,7 @@ from rietx.io.projects.fullprof import (
     read_fullprof_pcr,
     to_structure,
 )
-from tests.test_projects_fullprof import _RANGE, _pcr, _phase
+from tests.test_projects_fullprof import _PHASE_SITES, _RANGE, _pcr, _phase
 
 _CONTROL = ("job npr nph nba nex nsc nor dum iwg ilo ias res ste nre cry uni "
             "cor opt aut").split()
@@ -226,6 +226,9 @@ _LIMITS = ("! Limits for selected parameters:\n"
 
 
 def test_nre_limits_are_read_and_reported_not_applied(tmp_path):
+    """Neither of the fixture's two limits maps, so the Structure is the
+    twin's and each limit is said once, with its reason: a scale is never in
+    FullProf's units, and U builds no entry (no instrument from a .pcr)."""
     twin = _dump(_structure(_file(tmp_path, "nre0.pcr")))
     model = read_fullprof_pcr(_file(tmp_path, nre=2, trailing=_LIMITS + _RANGE))
     assert [(lim.number, lim.low, lim.high, lim.ibound, lim.name)
@@ -234,10 +237,182 @@ def test_nre_limits_are_read_and_reported_not_applied(tmp_path):
     assert model.fitted_range == (9.0, 157.0, 1.0)
     diagnostics: list = []
     assert _dump(to_structure(model, diagnostics=diagnostics)) == twin
-    [limits] = [d for d in diagnostics if d.code == "FULLPROF_LIMITS_NOT_APPLIED"]
-    assert limits.level == "info" and limits.value == 2.0
-    assert "parameter 7 (Scale_ph1) in [1, 10]" in limits.message
-    assert "parameter 2 (U_ph1) in [-1, 1]" in limits.message
+    scale, u = [d for d in diagnostics if d.code == "FULLPROF_LIMITS_NOT_APPLIED"]
+    assert (scale.level, scale.where, scale.value) == ("info", ["phases.0.scale"], 5.0)
+    assert "[1, 10] on parameter 7 (Scale_ph1)" in scale.message
+    assert "phase 1 Scale = 5" in scale.message
+    assert "scale never maps" in scale.message
+    assert (u.level, u.where, u.value) == ("info", [], 0.4)
+    assert "[-1, 1] on parameter 2 (U_ph1)" in u.message
+    assert "builds no entry" in u.message
+
+
+def _limit(number: int, low: float, high: float, ibound: int = 0,
+           name: str = "P") -> str:
+    """One LINE-47 line under the comment FullProf writes above them."""
+    return ("! Limits for selected parameters:\n"
+            f"  {number:2d}  {low:10.4f}  {high:10.4f}      0.0000   {ibound}  {name}\n")
+
+
+def _sites(**codes) -> str:
+    """The fixture's four sites with the named sites' codeword lines
+    (``x y z Biso Occ``) replaced; every other site stays held."""
+    lines = _PHASE_SITES.split("\n")
+    for i in range(0, len(lines), 2):
+        label = lines[i].split()[0]
+        if label in codes:
+            lines[i + 1] = "        " + "".join(
+                f"{float(c):9.2f}" for c in codes[label].split())
+    return "\n".join(lines)
+
+
+def _with_and_without(tmp_path, limit: str, *, phase=None, **control):
+    """The file read with one limit, and the same file with none: its twin."""
+    twin = _dump(_structure(_file(tmp_path, "twin.pcr", phase=phase, **control)))
+    diagnostics: list = []
+    built = _structure(_file(tmp_path, nre=1, phase=phase, trailing=limit + _RANGE,
+                             **control), diagnostics=diagnostics)
+    found = [d for d in diagnostics if "LIMIT" in d.code]
+    return twin, built, found
+
+
+def _entry(dump: dict, path: str) -> dict:
+    for part in path.split("."):
+        dump = dump[int(part)] if part.isdigit() else dump[part]
+    return dump
+
+
+_CR_BISO = _sites(Cr="0 0 0 111 0")
+
+#: (the limit, the file's own changes, the entry it bounds). Each value is the
+#: first from the top carrying its parameter number, at multiplier +1, in
+#: FullProf's own units.
+_MAPPED = [
+    # cell a, parameter 5 (51.00 on a and b): b is rietx's tie under P 42/m n m.
+    (_limit(5, 4.9, 5.1), {}, "phases.0.cell.a"),
+    # c = 9.0 on its own upper limit: applied, and FullProf's answer rested on it.
+    (_limit(6, 8.5, 9.0), {}, "phases.0.cell.c"),
+    # Biso is B in both programs, no 8pi^2.
+    (_limit(11, 0.1, 0.5), {"phase": _phase(atoms=_CR_BISO)},
+     "phases.0.atoms.0.biso"),
+    # March r is Pref1 under Nor = 1.
+    (_limit(11, 0.5, 2.0), {"nor": 1, "phase": _pref("0.85000", code1="111.00")},
+     "phases.0.preferred_orientation.r"),
+]
+
+
+@pytest.mark.parametrize("limit, changes, path", _MAPPED,
+                         ids=["cell-a", "cell-c-on-limit", "biso", "march-r"])
+def test_a_limit_fullprof_maps_is_the_entry_s_bound(tmp_path, limit, changes, path):
+    """FullProf's manual, p. 126: the limit belongs to the first value from the
+    top with the parameter's codeword, at a positive unit multiplier. The
+    Structure is its twin's but for that one entry's min and max, and nothing
+    is reported. On main the limit set no bound."""
+    twin, built, found = _with_and_without(tmp_path, limit, **changes)
+    low, high = (float(x) for x in limit.split("\n")[1].split()[1:3])
+    dump = _dump(built)
+    entry = _entry(dump, path)
+    assert (entry["min"], entry["max"]) == (low, high)
+    # the twin with that one entry bounded, and nothing else moved
+    expected = _entry(twin, path)
+    expected["min"], expected["max"] = low, high
+    assert dump == twin
+    assert found == []
+
+
+def test_a_limit_goes_to_the_first_value_carrying_its_number(tmp_path):
+    """Cr and W share parameter 11 on Biso (a +1 tie rietx reports and does
+    not carry). Cr is first from the top, so its Biso takes the limit and W's
+    does not; and where the first carries multiplier 2, no value takes it,
+    though a later one carries +1."""
+    from rietx.io.projects.fullprof import limit_readings
+
+    limit = _limit(11, 0.1, 0.5)
+    _, built, found = _with_and_without(
+        tmp_path, limit, phase=_phase(atoms=_sites(Cr="0 0 0 111 0", W="0 0 0 111 0")))
+    cr, w = built.phases[0].atoms[0].biso, built.phases[0].atoms[1].biso
+    assert (cr.min, cr.max) == (0.1, 0.5)
+    assert (w.min, w.max) == (-float("inf"), float("inf"))
+    assert found == []
+
+    path = _file(tmp_path, "second.pcr", nre=1, trailing=limit + _RANGE,
+                 phase=_phase(atoms=_sites(Cr="0 0 0 112 0", W="0 0 0 111 0")))
+    [reading] = limit_readings(read_fullprof_pcr(path))
+    assert reading.label == "phase 1 atom 'Cr' biso"
+    assert not reading.applied and "multiplier +2" in reading.reason
+
+
+#: (the limit, the file's own changes, the reason's words, the where path).
+_NOT_MAPPED = [
+    # Root CLAUDE.md's bound rule: March r has a pole at 0 ...
+    (_limit(11, 0.0, 2.0), {"nor": 1, "phase": _pref("0.85000", code1="111.00")},
+     "March r's pole at 0", ["phases.0.preferred_orientation.r"]),
+    # ... and W at 0 puts Gamma_G^2 under its clamp, the U, V, W columns zero.
+    (_limit(4, 0.0, 1.0), {}, "Caglioti W at 0", []),
+    # The file's Occ is multiplicity-scaled; the built occ is a fraction.
+    (_limit(11, 0.4, 0.6), {"phase": _phase(atoms=_sites(Cr="0 0 0 0 111"))},
+     "occupancy never maps", ["phases.0.atoms.0.occ"]),
+    # A coordinate refines through its site's DOFs; a bound on x binds nothing.
+    (_limit(11, 0.3, 0.4), {"phase": _phase(atoms=_sites(O1="111 111 0 0 0"))},
+     "displacement DOFs", ["phases.0.atoms.2.x"]),
+    # The manual's mapping needs a unit multiplier.
+    (_limit(11, 0.1, 0.5), {"phase": _phase(atoms=_sites(Cr="0 0 0 112 0"))},
+     "multiplier +2", ["phases.0.atoms.0.biso"]),
+    # A periodic boundary is not a box, and FullProf's least squares under it
+    # is unmeasured.
+    (_limit(5, 4.9, 5.1, ibound=1), {}, "periodic", ["phases.0.cell.a"]),
+    # FullProf refines b on its own number; rietx ties b to a under P 42/m n m.
+    (_limit(12, 4.9, 5.1), {"phase": _phase(
+        cell_codes="   51.00000  121.00000   61.00000    0.00000    0.00000    0.00000")},
+     "ties cell b to cell a", ["phases.0.cell.b"]),
+    # A background point builds no entry.
+    (_limit(9, 900.0, 1000.0), {}, "builds no entry", []),
+]
+
+
+@pytest.mark.parametrize("limit, changes, why, where", _NOT_MAPPED, ids=[
+    "r-at-0", "w-at-0", "occ", "coordinate", "multiplier", "ibound-1",
+    "symmetry-tied-b", "background-point"])
+def test_a_limit_that_does_not_map_is_reported_with_its_reason(
+        tmp_path, limit, changes, why, where):
+    """Not applied, the Structure is its twin's, and the limit is said once at
+    info with the reason, since the file's own value is inside it. On main one
+    diagnostic listed every limit and gave no reason."""
+    twin, built, found = _with_and_without(tmp_path, limit, **changes)
+    assert _dump(built) == twin
+    [d] = found
+    assert (d.code, d.level, d.where) == ("FULLPROF_LIMITS_NOT_APPLIED", "info", where)
+    assert why in d.message
+
+
+#: (the limit, the file's own changes, the reason's words, the file's value).
+_BINDING = [
+    # The scale is 5.0, on the limit's upper end: never maps, and the file's
+    # answer rested on the limit.
+    (_limit(7, 1.0, 5.0), {}, "scale never maps", 5.0),
+    # W is 0.1, on its lower end; no instrument is built from a .pcr.
+    (_limit(4, 0.1, 1.0), {}, "builds no entry", 0.1),
+    # a = 5.0 below the limit: the file was not refined under it, and a bound
+    # there would refuse the value itself.
+    (_limit(5, 5.1, 5.2), {}, "lies outside it", 5.0),
+]
+
+
+@pytest.mark.parametrize("limit, changes, why, value", _BINDING,
+                         ids=["scale", "w", "outside"])
+def test_a_limit_the_file_s_value_sits_on_is_a_warning(
+        tmp_path, limit, changes, why, value):
+    """FullProf clamps in least squares (fp2k 8.20 on its own ce1.pcr held cell
+    a at 5.40500 A, its limit, against an unlimited 5.41222; docs/practice.md),
+    so a value on its limit is an answer that rested on it. Not carrying that
+    limit is a warning, under its own code, since one code has one level. On
+    main it was the one info diagnostic."""
+    twin, built, found = _with_and_without(tmp_path, limit, **changes)
+    assert _dump(built) == twin
+    [d] = found
+    assert (d.code, d.level, d.value) == (
+        "FULLPROF_BINDING_LIMIT_NOT_APPLIED", "warning", value)
+    assert why in d.message and "sits on that limit" in d.message
 
 
 @pytest.mark.parametrize("nre, trailing, match", [
