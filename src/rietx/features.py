@@ -516,6 +516,7 @@ FEATURES: dict[str, Feature] = {
         ),
         theory=(
             "parameterisation § Distortion-mode amplitudes",
+            "representation-analysis § The irrep blocks of a child on mode amplitudes",
         ),
     ),
     "subgroup_enumeration": Feature(
@@ -526,6 +527,8 @@ FEATURES: dict[str, Feature] = {
             "subgroups § Conjugacy classes",
             "subgroups § The transformation to a standard setting",
             "subgroups § What the generator is checked against",
+            "subgroups § Wyckoff positions from the operations",
+            "subgroups § Splitting a Wyckoff position",
         ),
     ),
 }
