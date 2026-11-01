@@ -1,9 +1,8 @@
 # WP-1977 — a flank lobe read as an unindexed peak
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here
+Milestone: unscheduled · Status: ✅ 2026-11-01 — PR #1295; a flank lobe is part of its drawn peak; record field asked of Yue
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-15 — a flag that fires wrongly: it drives `add_impurity_phase` on two round-robin fits
 
 ## Goal
 
@@ -87,13 +86,16 @@ asymmetry column, stay with WP-2054.
 observed curve rises into a peak `y_calc` draws, with no valley of
 `min_peak_sigma` σ on the way, is explained (`report/layer0.on_drawn_flank`).
 It is a peak-resolution test, the reader's eye made explicit (McCusker et al.
-1999). It adds no number: both its levels are the report's existing detection
-level, `min_peak_sigma` = 5σ, unaudited and owned by WP-2004. Kind of
-ambiguity: the data settle it, since no competent refiner reads a shoulder of
-a drawn peak as a separate phase. Measured on the IUCr CPD QPA round robin
-(twelve fits), SRM 660c and four synthetic LaB₆ cases (`tests/test_flank_lobes.py`).
-
-### Inherited
+1999). Tier 3: no program does it (`docs/practice.md`). Both its levels
+reuse the report's detection level, `min_peak_sigma` = 5σ, unaudited and
+owned by WP-2004; reusing it is a choice, and the valley depth sets how far
+the rule reaches. Kind of ambiguity: where the observed curve has a valley
+the data settle it, and the rule lists the peak. Where it has none they do
+not: a shape misfit and an unresolved foreign line look the same, and the
+rule reads it as the first, following this WP's Goal. Measured on the IUCr
+CPD QPA round robin (twelve fits, one laboratory), SRM 660c and four
+synthetic LaB₆ cases (`tests/test_flank_lobes.py`); the firing side on real
+data is 11-BM NAC's CaF₂ (`tests/eval_report_agent`'s W1 rows, which pass).
 
 ## Non-goals
 
@@ -153,6 +155,145 @@ isolated peaks still read as `unmatched_obs`.
 - PR #927 § Not done.
 
 ## Handover log
+
+- **2026-11-01** — closed, PR #1295. The fit report no longer calls a
+  misfit lobe on the side of a drawn peak an unindexed line. Such a lobe
+  is joined to the peak by the observed curve, with no dip between them,
+  and the report now checks for that dip instead of only measuring the
+  distance to the nearest tick. On the twelve round-robin fits and SRM 660c
+  that took 66 false "unindexed" rows out of the list, and two wrong
+  "add an impurity phase" suggestions with them. The cost is a blind zone.
+  A real foreign line that sits unresolved on the flank of a strong peak is
+  now explained away too, out to 2-6 FWHM depending on the peak's height.
+  Whether the report should record what it explained is a question for Yue,
+  at the end of this entry.
+
+  *Done.* `report.layer0.on_drawn_flank` and its call in `build_layer0`;
+  `build_report`'s `match_tol_deg` default quotes `LAYER0_MATCH_TOL_DEG`
+  instead of a second literal 0.08. `EXTRA_PEAK_ON_REFLECTION` keeps the
+  0.08° window, reason in the constant's comment. `THRESHOLDS_VERSION`
+  1.13 → 1.14. Tests: `tests/test_flank_lobes.py` (9), the rewritten
+  broad-peak test in `test_fitreport_layers.py`, and a slow acceptance row
+  per cpd-1a…1h in `test_acceptance_qpa_roundrobin.py` (no lobe listed
+  within 0.5° of a strong line, no active `add_impurity_phase`). Skill
+  `judging.md` §4b, manual `concepts/report.md` and
+  `reference/report.md`, release note, practice survey § "When a peak
+  counts as explained by a reflection". Notes to WP-2054 and WP-2004.
+
+  *Measured* (`[dev]` venv, darwin/arm64). Task 4's table is the
+  before/after. The acceptance rows fail on origin/main (8 of 8) and pass
+  here (8 of 8). 11-BM NAC's real CaF₂ (`eval_report_agent` W1, two rows)
+  and the Kα2 satellites (W2) still read as unmatched: 3 passed. The blind
+  zone, on a synthetic Lorentzian of FWHM 0.1° with a foreign line 8-12σ
+  tall, five noisy draws per cell: hidden out to 2 FWHM at 10³ counts, 3-4
+  at 10⁴, 6 at 10⁵, against 0.8 FWHM for the old 0.08° window. A 50 %
+  Gaussian mix halves the reach at 10³-10⁴. `python -m tests.reader_output`
+  exits 1 with one change: the SRM 660c standard fit's summary goes from
+  "12 observed peak(s) match no reflection." to "0 …". Fast
+  selection, `[dev]`, darwin/arm64, beside another runner's suite: 13168
+  passed, 310 skipped, 32 xfailed, 3 failed. Two failures were this
+  branch's and are fixed (no `validation_matrix` row for the new acceptance
+  test; the skill's `api.md` quoting thresholds 1.13); their files then
+  passed, 952. The third,
+  `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`,
+  is this Mac's Jupyter kernel spec pointing at a deleted venv. The added
+  fast tests cost 11.7 s in all, 7.2 s of it the two blank-line cases.
+
+  *Code review* (`/code-review high --fix`). Taken: scipy's prominence-0
+  warning silenced, the reach measured into the docstring. Tried and
+  reverted: a walk crossing flat steps, which would carry it along a flat
+  background to a far peak. Tried and dropped: a second condition that the
+  residual turns negative only inside the drawn peak's upper half; most
+  real lobes fail it (cpd-1c 0.23-0.50, SRM 660c 0.08-0.18 of the
+  prominence), so it would un-explain them. Declined: the indexing workflow
+  counts `unmatched_observed` through `build_layer0`, so its numbers move
+  with no `INDEXING_THRESHOLDS_VERSION` bump. Indexing is another runner's
+  this shift; the indexing acceptance suite was not run. Declined: three
+  reader texts still say "match no reflection", which stays true of what is
+  listed. Declined: three test and speed cleanups.
+
+  *Generality* (generality-review, verdicts and the first two tables
+  unedited, the last two tables summarised; the author's answer under
+  each `fails` or `weak`).
+
+  ## `report.layer0.on_drawn_flank` (no table row; a rule the table cannot see)
+
+  **Verdict: weak.** The case for acting is better measured: 65 flank lobes left the list on specimens known to carry no impurity. But the author's own docstring shows the kind-1 claim fails the unanimity gate. No tier is stated, and nothing records which peaks the rule explained.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | "a residual peak whose observed curve rises into a peak `y_calc` draws, with no valley of `min_peak_sigma` σ on the way, is explained" (WP file, Context, "The tier of each rule this WP adds") | It drops a peak of at least 5σ from `report.unmatched` when no tick lies within 0.08° and the flank test passes. That also withdraws `add_impurity_phase`, which "reads only `unmatched_obs`" (WP Context, #1106 paragraph). It runs on every `build_report` with no switch. `match_tol_deg` and `min_peak_sigma` are parameters, but this test has no parameter of its own. | Stated. That it is always on with no switch is not stated. |
+  | 2. Kind of ambiguity | "Kind of ambiguity: the data settle it, since no competent refiner reads a shoulder of a drawn peak as a separate phase" (WP Context). There is no row, so no `ambiguity` field. | The data settle only one branch. Where the observed curve has a valley, the peak is a line of its own, and the rule lists it. Where there is no valley, the docstring itself says: "A foreign line that the observed curve does not resolve from a stronger neighbour is explained too. No positions test can separate it from a shape misfit" (`layer0.py`, `on_drawn_flank`). So at that peak the data cannot decide. The hypotheses can be listed: a shape or asymmetry misfit, an unmodelled Kα2, a line split by lower symmetry, or a foreign line. Pattern-level evidence could rank them, for example whether the lobe recurs on every strong line at the same offset. The rule picks one hypothesis, silently. That is kind 2 handled as kind 1. | Disagrees. The author's own docstring contradicts the kind-1 claim. |
+  | 3. Case against acting | none named (WP Context) | Three competent refiners would act otherwise. (a) Someone screening for a minor phase, such as a trace impurity or a polymorph beside the main form, whose strongest line sits a few FWHM from a host line. The unresolved shoulder is the sign they look for. The docstring measures how far the rule hides such a line. A line 8-12σ tall beside a Lorentzian of FWHM 0.1° is hidden "out to 2 FWHM at 10³ counts, 3-4 at 10⁴ and 6 at 10⁵, where the 0.08° tick window alone hid it out to 0.8". At 10⁵ counts that is about ±0.6° around every strong line. How much of a dense pattern those zones cover was not measured. I found no script or test behind the reach numbers, in the WP file or in `tests/test_flank_lobes.py`. (b) A phase with lower symmetry modelled in a higher one: each split line reads as a shoulder. Before, such lobes reached Layer 2 with `reindex_or_recheck_cell` as the first alternative (`test_broad_peak_lobes_cap_impurity_without_reindex` asserts this). Now no entry is made, and this case was not measured. (c) An unmodelled Kα2 line, which sits unresolved on the Kα1 flank at low angle. `tests/eval_report_agent/test_landing_states.py::test_w2_satellites_vanish_when_the_source_is_fixed` asserts at least 10 `unmatched_obs` at Kα2 positions (31 measured before). The WP does not quote that test's result on this branch. Programs: `docs/practice.md` (new section) finds no program that flags a difference-curve peak after a fit. GSAS-II and FullProf were checked; TOPAS was inferred. | Dissenters can be named, so the rule fails unanimity. |
+  | 4. Case for acting | "66 rows left the list, and 65 of them sat 0.08-0.38° from a line drawn at 125-24175 counts … cpd-1b loses `add_impurity_phase` 0.50, and SRM 660c at zero apertures loses `add_impurity_phase` 0.50"; the synthetic silicon case: "every silicon line above 8σ that sits 0.3-2.0° from a LaB₆ line is still listed" (WP Task 4) | This case is real and measured. Sample 1 and SRM 660c are known to be impurity-free (a weighed composition, and certified single-phase LaB₆), so both withdrawn suggestions were wrong. The old behaviour was an accident: "The old, misplaced ticks put them inside the window by accident" (WP Context). A refiner reading the cpd-1c lobes, which recur on each strong zincite line on the same side, would plausibly call them a shape misfit. No number moved off a reference, because the change is report-only (Rwp agrees to four places). The cost to an agent of a false `add_impurity_phase` (extra calls, a phase refined to nothing) was not measured: none given. | Holds, on development data. |
+  | 5. Tier and source | No tier is stated. The paragraph headed "The tier of each rule this WP adds" gives the kind and the datasets. It cites "the reader's eye made explicit (McCusker et al. 1999)" and says "It adds no number" (WP Context). | This is tier 3. `practice.md` says "rietx's `unmatched_obs` has no direct precedent", and lists McCusker and Toby as "inferred (recall, no local copy) … Neither gives a numeric rule". The "no number" claim does not survive the record's rule: "a factor is a threshold of its own". Reusing the 5σ detection level for two other quantities, the apex prominence and the allowed valley depth, is a choice. The valley depth sets the blind-zone reach in row 3. Neither level is visible to the table, because `build_report` is not in `DEFAULT_SEATS`. They were handed to WP-2004 (the open audit of the report's thresholds) as one level (`docs/wp/2004-…md` § Inherited, 2026-11-01). The orderings (strictly uphill, the pattern edge never an apex, both directions tried) are invisible to the table too. | Tier missing. The "adds no number" claim is weak. |
+  | 6. Dataset families | "Measured on the IUCr CPD QPA round robin (twelve fits), SRM 660c and four synthetic LaB₆ cases" (WP Context) | The CPD patterns are one laboratory and one instrument, a Philips 3020 (`tests/data/README.md` § v0.3), so they count as one family across several materials. SRM 660c is a second, from NIST. The synthetic cases come from rietx's own forward model and count as none. That is two real families, below the three the record requires. The reference is the right kind, a known truth: weighed compositions and a certified single phase. Against it the rule stays silent where there is no fault. Whether it still fires where there is a fault was shown only on synthetic data. 11-BM NAC carries a real CaF₂ impurity (W1, `test_w1_landing_names_the_impurity_…`), and its result on this branch is not quoted. Both real families are development data: the rule was chosen after Task 1 measured the cpd-1c and SRM 660c lobes ("at most 2.2σ along the way"). The author does not say so. The real SRM 660c case has no test. `test_asymmetry_lobes_…`'s docstring names `test_srm660c_apertures_at_zero`, which does not exist in the tree. The new cpd acceptance test checks the list but not the WP's acceptance clause "Layer 1 does not suggest `add_impurity_phase`". | Fails the three-family count. The firing side is synthetic only. |
+  | 7. Field that says it fired | none given. The docstring says "the region list still carries its χ²". | None. A dropped peak leaves no entry. `UnmatchedPeak.kind` is an open string and gained no value. A region carries a χ² share and a maximum Δ/σ, but neither the peak nor the valley depth. The record requires that "a kept action leaves a record field". Separately, `docs/docs/reference/report.md:92` still defines `unmatched_obs` as "no calculated tick within {{ LAYER0_MATCH_TOL_DEG }}°". The concepts page was updated; this reference page was not. | Fails. |
+
+  What would change the verdict: a recorded entry for each explained peak (position, height, deepest valley in σ, the apex it joined), for Layer 2 to down-weight rather than drop; plus this branch's results on W1 (real CaF₂ in NAC), on W2 (Kα2) and on a third unrelated real family.
+
+  Author: the tier line now says tier 3, and kind 2 read as kind 1 under
+  this WP's Goal, with the dataset families as found. W1 and W2 pass on
+  this branch (3 rows), so the real CaF₂ still fires and the Kα2 satellites
+  still read as unmatched. The reference page, the dangling test name and
+  the acceptance clause are fixed. The reach numbers come from a scratch
+  probe of five noisy draws per cell, not a committed test. The record
+  field is the question for Yue below. Case (b), a lower-symmetry split,
+  was not measured.
+
+  ## `EXTRA_PEAK_ON_REFLECTION` kept on the 0.08° window
+
+  `EXTRA_PEAK_ON_REFLECTION` is a warning that a peak the caller declared sits on a position the model already predicts.
+
+  **Verdict: weak.** Neither side is measured. The comment's reason covers declared peaks the data resolve, which the flank test would not flag anyway. The unresolved case goes unargued.
+
+  | Question | Author's answer (where) | What I found | Verdict |
+  |---|---|---|---|
+  | 1. What it decides | "That test stays out of the second consumer on purpose" (`layer0.py`, the comment on `LAYER0_MATCH_TOL_DEG`) | Behaviour is unchanged: the warning fires within 0.08° (`refine.py:9546`). Now a declared peak 0.1-0.6° away, on an unresolved flank, draws no warning, although Layer 0 would call a residual peak there explained. The caller must judge alone whether their peak doubles a reflection. | Stated. |
+  | 2. Kind of ambiguity | none given. The row is unaudited, on `UNAUDITED_BASELINE`. | The message reports the gap, which is the shape of kind 3, but the code exists only on the 0.08° threshold. The old consistency claim no longer holds: "a component inside Layer 0's tolerance is one Layer 0 would have matched" (same comment, older text). | Cannot tell. |
+  | 3. Case against acting (keep the window) | "A declared peak that the data resolve from its neighbour is a legitimate one wherever it sits on that neighbour's flank" (same comment) | True, but beside the point: `on_drawn_flank` never explains a resolved peak. One unstated reason is real: run on `y_calc` whole, the declared peak is its own apex, so sharing the test would need `y_calc` without the component. The designers also call a holder line overlapping a reflection "the design case" (`refine.py`, `_extra_peak_diagnostics`), so firing more often has an attention cost. Nothing measured. | Weak. |
+  | 4. Case for acting (extend it) | none given | The warning exists for "two terms describing one peak, with nothing in Rwp to say which owns the counts" (`refine.py`, `_extra_peak_diagnostics`). A declared peak on an unresolved flank is that degeneracy. Nothing measured. | Unmeasured. |
+  | 5. Tier and source | none given (`LAYER0_MATCH_TOL_DEG` is unaudited, owned by WP-2004) | Unchanged. For WP-2004's audit: `practice.md`'s windows are indexing windows (DICVOL 0.03°, ITO 0.06°, TOPAS 0.05°, the last inferred). 0.08° lies above all of them, so a tier-2 claim would need a stated reason. | No change. |
+  | 6. Dataset families | none given | I found no test of a declared peak on a flank. | none given |
+  | 7. Field that says it fired | the code itself | It fires `EXTRA_PEAK_ON_REFLECTION` with the gap in its message and the centre and area paths in `where`. Unchanged. | Holds. |
+
+  What would change the verdict: a fit with a declared peak 1-3 FWHM from a strong, unresolved reflection, showing whether the peak's area trades against the phase scale (their correlation, or the area's esd).
+
+  Author: behaviour is unchanged by this WP, and the window is WP-2004's
+  to tier; the question goes there with the reviewer's proposed fit.
+
+  ## `build_report:match_tol_deg` default now quotes `LAYER0_MATCH_TOL_DEG`
+
+  **Verdict: holds.** The case for the change is clear, and there is no case against it.
+
+  (Table: no new decision; removes a duplicate literal; `min_peak_sigma=5.0` is still a literal in both `build_report` and `build_layer0` and now sets three levels, handed to WP-2004.)
+
+  ## Skill row, `docs/skill/rietx/references/judging.md` §4b
+
+  **Verdict: holds.** The row names fields and adds no heuristic of its own. It omits the trap an agent hunting a minor phase would need.
+
+  (Table: passes Rule 4's test for a skill row; "incomplete" because it does not say an unresolved foreign line is excluded too, which by WP-1338 belongs first in the package's help entry.) What would change the verdict: a record field naming each explained peak. The row should then point there rather than at `report.regions`.
+
+  Author: the trap sentence waits on the record field, since it would point
+  there; the skill file sits 1 B under its budget.
+
+  *Gotchas.* The full suite was not run: the change moves no fitted
+  number (Rwp agrees to four places on all twelve fits).
+
+  **Question for Yue.** Should the report record each peak the flank rule
+  explained, for example as a separate `kind` in `report.unmatched` with
+  its height and the deepest dip in σ? For: DESIGN.md Rule 1 asks a kept
+  action to leave a record field, and an agent hunting a trace phase could
+  then see the shoulders. Against: `report.unmatched` has about twelve
+  readers in `src/` and the GUI, and each needs auditing for a new kind;
+  Layer 2 would then have to decide whether a recorded shoulder weighs
+  toward `add_impurity_phase`. Doing nothing leaves the shoulder's χ² in
+  `report.regions` and nothing else. Lean: record it, as a follow-up WP,
+  because the blind zone reaches 6 FWHM at high counts.
+
+  Next: Yue answers the question; a yes becomes a WP under WP-2004's
+  track. Then WP-2054 (#1106 points 1-2) builds its asymmetry test on the
+  SRM 660c case this WP emptied.
 
 - **2026-10-15** — filed from WP-1908's open question (PR #927). No open WP
   owns Layer 0's matching window: a search of the open WPs for unindexed and
