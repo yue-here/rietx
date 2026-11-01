@@ -311,6 +311,44 @@ class Trajectory(Base):
                            dtype=float))
 
 
+class QPATrajectory(Trajectory):
+    """A phase's weight fraction across the series, with each point's basis.
+
+    A :class:`Trajectory`, so it plots and exports through the same code, with
+    the one column a fraction cannot do without: :attr:`unmeasured`, per
+    point.  A pattern quotes no fraction for a phase with no reflection in its
+    fitted range, or whose scale a stage held, and normalises the others over
+    the phases seen (WP-1958).  So when a reflection crosses the range edge
+    part-way through a series, the other phases' fractions change basis there:
+    on a four-phase series whose middle two patterns lose iron's lines,
+    corundum reads 71.55, 72.94, 72.94, 71.55 % with no change in the
+    specimen.  ``PHASE_UNCONSTRAINED`` fires on each such pattern; this says
+    it on the curve as well (#1103).
+    """
+
+    #: per point, the phases that pattern quoted no fraction for
+    #: (``QuantitativePhaseAnalysis.unmeasured_phases``), so the point is a
+    #: fraction of the other phases only.  Empty where every phase was seen.
+    unmeasured: list[list[str]] = Field(default_factory=list)
+
+    @property
+    def basis_changes(self) -> bool:
+        """Whether the points are fractions of different sets of phases."""
+        return len({tuple(u) for u in self.unmeasured}) > 1
+
+    def __str__(self) -> str:
+        text = super().__str__()
+        if not any(self.unmeasured):
+            return text
+        notes = []
+        for k, u in enumerate(self.unmeasured):
+            if u:
+                label = self.labels[k] if k < len(self.labels) else ""
+                notes.append(f"  {label or f'point {k}'}: relative to the phases "
+                             f"seen; {', '.join(u)} not measured")
+        return "\n".join([text, *notes])
+
+
 def _unservable(series: "SeriesResult", path: str) -> str:
     """Why ``path`` reaches no pattern, and what the caller could have meant.
 
@@ -880,9 +918,11 @@ class SeriesResult(Base):
                     out.append(p.path)
         return out
 
-    def qpa_trajectory(self, phase: str) -> Trajectory:
-        """A phase's weight fraction (as a percentage) across the series."""
-        traj = Trajectory(path=f"qpa.{phase}", x_label=self.x_label)
+    def qpa_trajectory(self, phase: str) -> QPATrajectory:
+        """A phase's weight fraction (as a percentage) across the series,
+        with the phases each point leaves out of its basis
+        (:attr:`QPATrajectory.unmeasured`)."""
+        traj = QPATrajectory(path=f"qpa.{phase}", x_label=self.x_label)
         for i, (e, xv) in enumerate(zip(self.entries, self.x, strict=True)):
             if e.qpa is None:
                 continue
@@ -896,6 +936,7 @@ class SeriesResult(Base):
                                else 100.0 * row.weight_fraction_stderr)
             traj.labels.append(e.label)
             traj.positions.append(i)
+            traj.unmeasured.append(list(e.qpa.unmeasured_phases))
         return traj
 
     def agreement_trajectory(self, phase: str, *,

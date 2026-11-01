@@ -524,6 +524,64 @@ class RefinementPlan:
         ])
 
     @classmethod
+    def magnetic_structural(cls) -> "RefinementPlan":
+        """:meth:`mccusker_structural` with the magnetic moments refined from
+        its second stage on (WP-1418, issue #1082).
+
+        After the scale and background, the moment **moduli** refine alone
+        (``…moment.dof0``), then every moment DOF, moduli and angles; the
+        zero, cell, widths, coordinates and displacement parameters follow in
+        :meth:`mccusker_structural`'s order.  Staging is cumulative, so the
+        moments stay free in every later stage and the closing stage.  The
+        precedent for each part:
+
+        - **the nuclear order** is McCusker, Von Dreele, Cox, Louër & Scardi
+          (1999), *J. Appl. Cryst.* **32**, 36, as in
+          :meth:`mccusker_structural` (no program ships it as a default);
+        - **the moduli before the angles** is the order
+          ``strategy.magnetic.SOLVE_STAGE_PATHS`` refines a trial in, for
+          WP-1938 D12's measurement there: an angle's column scales with its
+          modulus, and freed together from a small modulus LM stopped at χ²
+          454 660 against 2556.06.  Measured for this preset on that two-site
+          P n m a set (WP-1418, macOS arm64): from moduli 20 % high the stage
+          changes no value beyond 1e-6 μ_B; from 0.1 μ_B with the directions
+          0.4 rad off, this preset and the same plan without the
+          ``moment_moduli`` stage (every moment DOF freed together) both
+          converge.  That is start dependence, not an effect of the order:
+          from this cold start the fit can reach either of two minima tied in
+          χ² (planted 3.50 / 0.70 μ_B, or 3.34 / 1.25 at a χ² 0.07 lower),
+          and the moduli stage reached the planted one here.  Freeing every
+          moment DOF together reaches the planted values from another start
+          (``docs/skill/rietx/references/magnetic.md``, WP-1938 and WP-1953).
+          The tie itself is an identifiability finding about the model, not
+          the plan (WP-1418's follow-ups);
+        - **the moments before the coordinates** is the solve's order too
+          (moment, scale and background before anything nuclear).  The reason
+          is the confound the solve leaves coordinates out for: with the
+          moment held, a coordinate or a Biso freed later absorbs the
+          magnetic intensity the held moment misplaces.  Measured on a
+          synthetic k = (0, 0, ½) child, moment started 20 % high and every
+          Biso 0.3 Å² high: under :meth:`mccusker_structural` the moment
+          stays at 3.6 μ_B and the O Biso falls to 0.33 Å² (planted 0.6, esd
+          770); under this plan the moment returns 2.997 ± 0.005 μ_B
+          (planted 3.0) and each Biso is within 1.0 esd of its planted
+          value.
+
+        The last two are rietx's own order.  A refiner may dissent on it,
+        refining the structure first and the moments after; that sequence was
+        not measured, so nothing above is evidence for or against it.  This is
+        a preset a caller chooses and never a default.  The two moment stages
+        free nothing on a phase without a moment.
+        """
+        first, *rest = cls.mccusker_structural().stages
+        return cls(stages=[
+            first,
+            Stage("moment_moduli", ["phases.*.atoms.*.moment.dof0"]),
+            Stage("moments", ["phases.*.atoms.*.moment.dof*"]),
+            *rest,
+        ])
+
+    @classmethod
     def lab_bragg_brentano(cls) -> "RefinementPlan":
         """Lab flat-plate plan: adds sample displacement (with zero), then the
         Kα2/Kα1 intensity ratio and FCJ axial-divergence parameters last —
@@ -708,6 +766,7 @@ PLAN_PRESETS = {
     name: _PlanFactory(build) for name, build in {
         "mccusker_default": RefinementPlan.mccusker_default,
         "mccusker_structural": RefinementPlan.mccusker_structural,
+        "magnetic_structural": RefinementPlan.magnetic_structural,
         "lab_bragg_brentano": RefinementPlan.lab_bragg_brentano,
         "lab_calibrate": RefinementPlan.lab_calibrate,
         "lab_sample_refine": RefinementPlan.lab_sample_refine,
@@ -810,6 +869,26 @@ PLAN_INFO: dict[str, PlanInfo] = {
         when_to_use=(
             "A structure worth refining against data good enough to carry it. "
             "Run the profile-only plan first if the fit is not already close."),
+    ),
+    "magnetic_structural": PlanInfo(
+        title="Standard + structure + magnetic moments",
+        description=(
+            "The structural order with the magnetic moments refined from the "
+            "start. After the scale and background, the moment moduli refine "
+            "alone, then every moment degree of freedom, moduli and "
+            "directions. The zero shift, lattice parameters, widths, "
+            "coordinates and displacement parameters follow as in "
+            "`mccusker_structural`. The moments keep refining in every later "
+            "stage, because staging is cumulative."),
+        modes=("rietveld",),
+        when_to_use=(
+            "A magnetic phase refined together with its nuclear structure: "
+            "the final joint fit of a stated magnetic structure, or a nuclear "
+            "model that has not converged with the moment present. Freeing "
+            "the moments before the coordinates keeps a coordinate or a "
+            "displacement parameter from absorbing magnetic intensity a held "
+            "moment leaves unexplained. Declare the moments and their symmetry "
+            "first; a supercell statement needs its anti-translation ties."),
     ),
     "lab_bragg_brentano": PlanInfo(
         title="Lab diffractometer (one pass)",
@@ -1654,12 +1733,20 @@ def check_biso_plausible(table, model) -> list[GuardFinding]:
     those multiplicities feed is weighted by occupancy, since the bound is per
     atom rather than per site.
     """
+    return [GuardFinding.large_biso(p, b, bound)
+            for p, b, bound in biso_over_bound(table, model)]
+
+
+def biso_over_bound(table, model) -> list[tuple[str, float, float]]:
+    """``(path, B, bound)`` for each isotropic B past its cell's Lindemann
+    bound: the numbers :func:`check_biso_plausible` words, kept apart so a
+    joint fit can set one B against several cells' bounds (WP-2028)."""
     from ..crystallography.lattice import cell_volume
 
     if model is None:
         return []
     values = {e.path: e.value for e in table.entries}
-    out: list[GuardFinding] = []
+    out: list[tuple[str, float, float]] = []
     for ip, cp in enumerate(model.phases):
         base = f"phases.{ip}"
         try:
@@ -1684,7 +1771,7 @@ def check_biso_plausible(table, model) -> list[GuardFinding]:
             path = f"{base}.atoms.{j}.biso"
             biso = values.get(path)
             if biso is not None and biso > bound:
-                out.append(GuardFinding.large_biso(path, biso, bound))
+                out.append((path, float(biso), bound))
     return out
 
 
@@ -2054,6 +2141,34 @@ def check_discarded_directions(jac, free: list[str],
     return [GuardFinding.discarded_direction(paths, n)]
 
 
+def _correlation_findings(corr, free: list[str], threshold: float
+                          ) -> tuple[list["GuardFinding"], list["GuardFinding"]]:
+    """``high_correlations`` and ``flat_directions`` off one correlation matrix.
+
+    One loop for both runners, :func:`check_guards` and the joint fit's
+    ``_top_diagnostics`` (WP-2028 task 7): every pair above ``threshold`` is a
+    correlation, and one at or above ``FLAT_DIRECTION_RHO`` is a flat
+    direction as well.
+    """
+    high: list[GuardFinding] = []
+    flat: list[GuardFinding] = []
+    for i in range(len(free)):
+        for j in range(i + 1, len(free)):
+            if abs(corr[i, j]) > threshold:
+                high.append(GuardFinding.correlation(free[i], free[j], corr[i, j]))
+                # |ρ| = 1.000 is a rank statement, not a strong
+                # correlation, and saying so in the same vocabulary as
+                # ρ = 0.96 undersells it.  Reported *beside* the
+                # correlation rather than instead of it: the
+                # SEQUENTIAL_PERSISTENT_FINDING precedent, where the
+                # sharper finding rides alongside the ones it sharpens,
+                # so no existing consumer loses a row it counts on.
+                if abs(corr[i, j]) >= FLAT_DIRECTION_RHO:
+                    flat.append(GuardFinding.flat_direction(
+                        free[i], free[j], corr[i, j]))
+    return high, flat
+
+
 def check_guards(table, outcome, threshold: float,
                  background_threshold: float = BACKGROUND_ABSORPTION_GUARD,
                  roughness_threshold: float = ROUGHNESS_ABSORPTION_GUARD,
@@ -2087,22 +2202,8 @@ def check_guards(table, outcome, threshold: float,
 
     if outcome.correlation is not None and len(free) > 1:
         corr = np.asarray(outcome.correlation)
-        for i in range(len(free)):
-            for j in range(i + 1, len(free)):
-                if abs(corr[i, j]) > threshold:
-                    report.high_correlations.append(
-                        GuardFinding.correlation(free[i], free[j], corr[i, j]))
-                    # |ρ| = 1.000 is a rank statement, not a strong
-                    # correlation, and saying so in the same vocabulary as
-                    # ρ = 0.96 undersells it.  Reported *beside* the
-                    # correlation rather than instead of it: the
-                    # SEQUENTIAL_PERSISTENT_FINDING precedent, where the
-                    # sharper finding rides alongside the ones it sharpens,
-                    # so no existing consumer loses a row it counts on.
-                    if abs(corr[i, j]) >= FLAT_DIRECTION_RHO:
-                        report.flat_directions.append(
-                            GuardFinding.flat_direction(
-                                free[i], free[j], corr[i, j]))
+        report.high_correlations, report.flat_directions = (
+            _correlation_findings(corr, free, threshold))
         # measured once (WP-1056): the same matrix the loop above thresholds
         report.measured_top_correlations = top_correlations(corr, free)
 

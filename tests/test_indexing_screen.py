@@ -22,6 +22,7 @@ from rietx.indexing.consensus import caveats_for, grade
 from rietx.indexing.engines import absence_window, engine_names, match_window
 from rietx.indexing.fom import RESOLUTION_FWHM, fom_panel
 from rietx.indexing.pick import pick_peaks
+from rietx.model import compiled
 from rietx.schemas.indexing import (
     INDEX_REFUTING_CAVEATS,
     BravaisOpinion,
@@ -408,6 +409,134 @@ def test_the_verdict_has_three_bands():
     assert _evidence(0, 2, 0.3).verdict() == "undecided"           # no power
 
 
+def test_a_child_seen_more_often_than_its_parent_is_never_refuted():
+    """#1230: the refuted band needs the child's own lines seen no more often
+    than the parent's.  The aP1 truth against the 2 % larger wrong cell that
+    ranked above it on ``main`` had 112 of 183 extras seen at p₀ 0.628, which is
+    in the refuted band.  Its own seen fraction was 0.625 against the parent's
+    0.372, so it reads undecided.  An equal fraction is still refuted, and
+    support is untouched."""
+    from dataclasses import replace
+
+    truth = replace(_evidence(112, 183, 0.628, index=0), relation="containment")
+    assert truth.verdict() == "refuted"          # what main read
+    seen = replace(truth, child_seen_fraction=0.625, parent_seen_fraction=0.372)
+    assert seen.child_seen_more and seen.verdict() == "undecided"
+    tie = replace(truth, child_seen_fraction=0.5, parent_seen_fraction=0.5)
+    assert not tie.child_seen_more and tie.verdict() == "refuted"
+    assert replace(_evidence(8, 14, 0.21), child_seen_fraction=0.9,
+                   parent_seen_fraction=0.1).verdict() == "supported"
+    # not measured (the sublattice route) leaves the verdict as it was
+    assert not _evidence(0, 12, 0.02).child_seen_more
+
+
+def test_the_seen_guard_keeps_every_refutation_of_941(si, tet):
+    """The positive arm of #1230's guard: every child #941's Acceptance table
+    refutes is seen less often than its truth, so each stays refuted.  The Si
+    children read 0.08–0.31 against the truth's 0.73, and the tetragonal set's
+    resolved split and c × 2 cell read 0.54–0.57 against 1.0."""
+    from rietx.indexing.screen import containment_evidence
+
+    for data, cells, truth_name, children in (
+            (si, SI_CELLS, "truth cF",
+             ("cI sqrt2 a0", "cP a0", "cP 2a0", "hR rank-1 of #916", "tI rank-3 of #916")),
+            (tet, TET_CELLS, "truth tP", ("oP resolved split", "tP c x2"))):
+        pattern, s = _screens(*data, cells)
+        truth = s[truth_name]
+        for name in children:
+            ev = containment_evidence(pattern, s[name], truth)
+            assert ev is not None and not ev.child_seen_more, name
+            assert ev.child_seen_fraction < ev.parent_seen_fraction - 0.2, name
+            assert ev.verdict() == "refuted", name
+
+
+#: #1230's dense case, regenerated: a triclinic P -1 cell with six random
+#: atoms, Cu Kα1 Bragg-Brentano from 5 to 90°, 291 picked lines.
+_AP = ("data_aP\n_cell_length_a 8.90\n_cell_length_b 10.40\n_cell_length_c 12.60\n"
+       "_cell_angle_alpha 97.3\n_cell_angle_beta 101.9\n_cell_angle_gamma 106.6\n"
+       "_space_group_IT_number 2\n_symmetry_space_group_name_H-M 'P -1'\n"
+       "loop_\n_atom_site_label\n_atom_site_type_symbol\n_atom_site_fract_x\n"
+       "_atom_site_fract_y\n_atom_site_fract_z\n_atom_site_occupancy\n_atom_site_B_iso_or_equiv\n"
+       "Ba1 Ba 0.82112 0.62901 0.16214 1.0 0.8\nZr2 Zr 0.25773 0.26863 0.64348 1.0 0.8\n"
+       "Fe3 Fe 0.65139 0.00581 0.60516 1.0 0.8\nS4 S 0.87556 0.22759 0.84248 1.0 0.8\n"
+       "O5 O 0.49404 0.99393 0.72217 1.0 0.8\nO6 O 0.17744 0.08554 0.79221 1.0 0.8\n")
+AP_TRUTH = (8.90, 10.40, 12.60, 97.3, 101.9, 106.6)
+#: a monoclinic P cell six times the truth's volume that ranked above it in a
+#: ``preset="full"`` search of this pattern on ``main``
+AP_RIVAL = (24.82003914, 8.46150771, 31.15817502, 90.0, 100.59625625, 90.0)
+
+
+@pytest.fixture(scope="module")
+def dense_ap():
+    from rietx.indexing.engines import DEFAULT_UNKNOWN_SHIFT_DEG
+    from rietx.indexing.fom import MATCH_SIGMA
+    from rietx.indexing.screen import PatternScreen
+
+    with tempfile.NamedTemporaryFile("w", suffix=".cif", delete=False) as f:
+        f.write(_AP)
+    try:
+        s = rx.Structure.from_cif(f.name)
+    finally:
+        os.unlink(f.name)
+    ins = rx.Instrument.bragg_brentano(radiation="CuKa1")
+    # declare the two defaults the margins would otherwise ride on
+    ins.source.dispersion = None
+    tt = np.round(np.arange(5.0, 90.0 + 1e-9, 0.01), 4)
+    was = compiled.set_enabled(False)
+    try:
+        y = np.asarray(rx.Refinement(s, ins, history=False).predict(tt), float)
+    finally:
+        compiled.set_enabled(was)
+    obs = np.random.default_rng(35).poisson(y / y.max() * 2e4 + 100.0).astype(float)
+    data = rx.PatternData(two_theta=tt, intensity=obs, sigma=np.sqrt(np.maximum(obs, 1.0)))
+    peaks = pick_peaks(data, ins, two_theta_range=(5.0, 90.0))
+    # the run's own screen: the assumed shift bound floors p0 (#951)
+    pattern = PatternScreen.from_peaks(peaks, q_match=absence_window(peaks), data=data,
+                                       instrument=ins,
+                                       p0_floor_deg=MATCH_SIGMA * DEFAULT_UNKNOWN_SHIFT_DEG)
+    return peaks, pattern
+
+
+def test_a_dense_triclinic_truth_is_not_refuted_by_a_cell_six_times_its_volume(dense_ap):
+    """#1230, the aP2 kind.  On 291 dense lines the rival's predicted lines
+    merge into fewer resolved positions than the truth's, so containment's
+    density order makes the **truth** the child of a cell six times its
+    primitive volume.  The truth indexes every line the rival does, and p₀ is
+    0.64, near the truth's own seen fraction, so its extras sit well inside the
+    refuted band: about 130 of 360 seen against n·p₀ ≈ 230.  ``main`` refuted
+    it and ranked it below the rival.  The truth's own lines are seen far more
+    often than the rival's (0.43 against 0.27), which no oversized
+    description can do, so the pair is undecided and the truth stays first.
+    """
+    from rietx.indexing.ambiguity import SUPERCELL_CHANCE_ALPHA
+    from rietx.indexing.consensus import below_refuting_parents, supercell_checks
+    from rietx.indexing.screen import (
+        _primitive_volume,
+        containment_evidence,
+        contains,
+        screen_candidate,
+    )
+
+    peaks, pattern = dense_ap
+    assert len(peaks.usable()) > 250
+    truth = screen_candidate(pattern, AP_TRUTH, "triclinic", "P")
+    rival = screen_candidate(pattern, AP_RIVAL, "monoclinic", "P")
+    assert contains(truth, rival) and truth.n_lines > rival.n_lines
+    assert _primitive_volume(rival) > 5.0 * _primitive_volume(truth)
+    ev = containment_evidence(pattern, truth, rival)
+    # main's rule alone would refute it, by a wide margin
+    assert ev.p_floor < SUPERCELL_CHANCE_ALPHA
+    assert ev.n_seen < 0.75 * ev.n_extra * ev.p0, (ev.n_seen, ev.n_extra, ev.p0)
+    assert ev.child_seen_fraction > ev.parent_seen_fraction + 0.1
+    assert ev.child_seen_more and ev.verdict() == "undecided"
+    # and the order: nothing moves the truth below the rival
+    cands = [_candidate("triclinic", "P", AP_TRUTH), _candidate("monoclinic", "P", AP_RIVAL)]
+    supercell_checks(cands, peaks, q_match=absence_window(peaks), k_sigma=3.0, screen=pattern)
+    (check,) = cands[0].supercell_checks
+    assert check.relation == "containment" and check.verdict == "undecided"
+    assert below_refuting_parents(cands)[0] is cands[0]
+
+
 # ----------------------------------------------------------------------
 # consensus and validation read the screen
 # ----------------------------------------------------------------------
@@ -467,6 +596,12 @@ def test_validation_reads_the_screen_and_freezes_the_profile(si):
     assert doubled.predicted_but_absent > 0.5 * doubled.n_lines_screened
     assert doubled.n_lines_screened < doubled.n_reflections
     assert v.n_lines_screened == 15
+    # the density: the windowed count over the window's screened lines
+    assert v.predicted_but_absent_density_in_window == 0.0
+    assert 0 < doubled.n_lines_screened_in_window <= doubled.n_lines_screened
+    assert doubled.predicted_but_absent_density_in_window == pytest.approx(
+        doubled.predicted_but_absent_uncancellable_in_window
+        / doubled.n_lines_screened_in_window)
     legacy = validate_by_lebail(truth, data, ins)
     assert legacy.absent_source == "fitted_background"
     assert legacy.predicted_but_absent_uncancellable_in_window is None
@@ -514,3 +649,167 @@ def test_the_screens_pseudo_voigt_is_the_models():
     for eta in (0.0, 0.4, 1.0):
         assert np.allclose(_pseudo_voigt(x, 0.05, eta), pseudo_voigt(x, 0.05, eta),
                            rtol=1e-12, atol=0.0)
+
+
+# ----------------------------------------------------------------------
+# #941's round-1 follow-ups
+# ----------------------------------------------------------------------
+def test_the_panel_and_the_screen_share_one_definition_of_seen(tet):
+    """Given the screen's positions and common shift, the panel's member reads
+    the screen's seen fraction, on every control cell; and both read the width
+    law at the **shifted** merged line.  Where the widths change fast across a
+    shift, the old reading (the unshifted group's mean width) called a line
+    unseen that the screen saw."""
+    from rietx.indexing.fom import (
+        LINE_COINCIDENCE_RTOL,
+        lattice_reflections,
+        predicted_seen_fraction_at_resolution,
+        two_theta_of_q,
+    )
+
+    data, ins, peaks = tet
+    pattern, screens = _screens(data, ins, peaks, TET_CELLS)
+    for name, (system, centring, cell) in TET_CELLS.items():
+        s = screens[name]
+        _h, q, _m = lattice_reflections(cell, system, centring, pattern.wavelength,
+                                        pattern.two_theta_max,
+                                        two_theta_min=pattern.two_theta_min)
+        keep = np.ones(len(q), dtype=bool)
+        keep[1:] = np.diff(q) > LINE_COINCIDENCE_RTOL * q[1:]
+        tt = two_theta_of_q(q[keep], pattern.wavelength)
+        member = predicted_seen_fraction_at_resolution(
+            pattern.obs_tt, pattern.obs_esd, pattern.obs_fwhm, tt,
+            shift=s.shift_deg, k_sigma=pattern.k_sigma)
+        assert member.value == pytest.approx(s.seen_fraction, abs=1e-12), name
+        assert member.n_possible == s.n_lines, name
+    # widths 0.02° at 30° and 0.20° at 31°; one line predicted at 30.5° and
+    # shifted +0.33° to 30.83°, 0.17° from the 31° component: at the shifted
+    # line the law reads 0.169° and the half-width 0.185° (seen); the
+    # unshifted 0.11° gave 0.155° (unseen)
+    obs = np.array([30.0, 31.0])
+    member = predicted_seen_fraction_at_resolution(
+        obs, np.full(2, 1e-4), np.array([0.02, 0.20]), np.array([30.5]),
+        shift=0.33)
+    assert member.value == 1.0
+
+
+def test_absences_are_paired_with_their_lines_by_index():
+    """``absent_mask`` answers per position in the order given (the root
+    rulebook's tick rule: a position is not a key); a position in a gap of the
+    scan is not absent, its ratio NaN; ``absent_reflections`` is its selection."""
+    from rietx.indexing.workflow import absent_mask, absent_reflections
+
+    tt = np.concatenate([np.arange(20.0, 30.0, 0.01), np.arange(40.0, 50.0, 0.01)])
+    y = np.full(len(tt), 100.0)
+    y[np.abs(tt - 25.0) < 0.05] += 400.0
+    bkg = np.full(len(tt), 100.0)
+    sigma = np.full(len(tt), 10.0)
+    pos = np.array([25.0, 27.0, 35.0, 27.0, 45.0])
+    bad, ratio = absent_mask(tt, y, bkg, sigma, pos, np.full(len(pos), 0.05))
+    assert bad.tolist() == [False, True, False, True, True]
+    assert np.isnan(ratio[2]) and not np.isnan(ratio).any(where=bad)
+    listed, ratios = absent_reflections(tt, y, bkg, sigma, pos, np.full(len(pos), 0.05))
+    assert listed == [27.0, 27.0, 45.0]
+    assert ratios == pytest.approx(list(ratio[bad]))
+
+
+def test_a_candidate_is_screened_once_per_run_and_the_refuter_skips_the_grid(
+        si, monkeypatch):
+    """``supercell_checks`` reads only seen / indexed / uncancellable, so it
+    asks no absence question of the pattern; the validation's request for the
+    absences then recomputes once, and every later request is the memo's."""
+    from rietx.indexing import workflow
+    from rietx.indexing.consensus import supercell_checks
+    from rietx.indexing.screen import PatternScreen, screen_for
+
+    data, ins, peaks = si
+    pattern = PatternScreen.from_peaks(peaks, q_match=absence_window(peaks),
+                                       data=data, instrument=ins)
+    calls = []
+    real = workflow.absent_mask
+
+    def spy(*a, **kw):
+        calls.append(1)
+        return real(*a, **kw)
+
+    monkeypatch.setattr(workflow, "absent_mask", spy)
+    cands = [_candidate(*SI_CELLS[n]) for n in ("truth cF", "cI sqrt2 a0", "cP 2a0")]
+    supercell_checks(cands, peaks, q_match=absence_window(peaks), k_sigma=3.0,
+                     screen=pattern)
+    supercell_checks(cands, peaks, q_match=absence_window(peaks), k_sigma=3.0,
+                     screen=pattern)
+    assert calls == []
+    assert len(pattern._memo) == 3
+    full = screen_for(pattern, cands[1], peaks)
+    assert full.absent is not None and len(calls) == 1
+    assert screen_for(pattern, cands[1], peaks) is full
+    assert screen_for(pattern, cands[1], peaks, absence=False) is full
+    assert len(calls) == 1
+    assert any(k.verdict == "refuted" for k in cands[1].supercell_checks)
+
+
+def test_the_absent_code_reads_the_counts_not_the_caveat():
+    """INDEX_PREDICTED_BUT_ABSENT fires from the validation's counts: before
+    the gate has run (no caveats yet), at warning inside de Wolff's window;
+    at info, capping nothing, when every uncancellable absence is above it;
+    silent at zero and on a failed or diverged fit."""
+    from rietx.indexing.diagnostics import candidate_diagnostics
+
+    def code(lebail):
+        cand = _candidate("cubic", "F", SI_CELLS["truth cF"][2], lebail=lebail)
+        assert cand.confidence_caveats == []
+        found = [d for d in candidate_diagnostics(cand)
+                 if d.code == "INDEX_PREDICTED_BUT_ABSENT"]
+        return found[0] if found else None
+
+    base = LeBailValidation(
+        rwp=0.3, gof=2.0, space_group="F m -3 m", n_reflections=15,
+        predicted_but_absent=6, predicted_but_absent_uncancellable=2,
+        predicted_but_absent_uncancellable_in_window=2, absent_source="line_screen",
+        predicted_but_absent_two_theta=[40.1, 49.7])
+    assert code(base).level == "warning"
+    above = base.model_copy(update={"predicted_but_absent_uncancellable_in_window": 0})
+    d = code(above)
+    assert d.level == "info" and "caps nothing" in d.message
+    assert code(above.model_copy(update={"predicted_but_absent_uncancellable": 0})) is None
+    assert code(base.model_copy(update={"status": "failed"})) is None
+    # a diverged fit is unread too, as consensus.caveats_for reads it
+    assert code(base.model_copy(update={"status": "diverged"})) is None
+
+
+def test_the_excess_reads_the_density_against_the_cleanest_candidate():
+    """The windowed count compared across candidates (#941's follow-up),
+    on the counts the acceptance sweep measured: magnetite's true F cell and
+    its P rival (2 of 36 window lines, 28 of 88), and the synthetic LaB₆ run's
+    truth and a√2 I cell (0 of 19, 2 of 20).  The raw count reads 2 for the
+    true F cell and for the wrong I cell alike; the excess reads 0 and 2."""
+    from rietx.indexing.consensus import absence_excess
+
+    def screened(system, centring, cell, a, n):
+        lebail = LeBailValidation(
+            rwp=0.3, gof=2.0, space_group="P 1", n_reflections=n,
+            predicted_but_absent=a, predicted_but_absent_uncancellable=a,
+            predicted_but_absent_uncancellable_in_window=a,
+            absent_source="line_screen", n_lines_screened=n,
+            n_lines_screened_in_window=n,
+            predicted_but_absent_density_in_window=a / n)
+        return _candidate(system, centring, cell, lebail=lebail)
+
+    a_m = (8.3913,) * 3 + (90.0, 90.0, 90.0)
+    truth, rival = screened("cubic", "F", a_m, 2, 36), screened("cubic", "P", a_m, 28, 88)
+    absence_excess([truth, rival])
+    assert truth.lebail.predicted_but_absent_excess_in_window == 0.0
+    assert rival.lebail.predicted_but_absent_excess_in_window == pytest.approx(
+        28 - 88 * 2 / 36)
+    a_l = (4.1568,) * 3 + (90.0, 90.0, 90.0)
+    a_i = (4.1568 * R2,) * 3 + (90.0, 90.0, 90.0)
+    lab6, root2 = screened("cubic", "P", a_l, 0, 19), screened("cubic", "I", a_i, 2, 20)
+    unscreened = _candidate("cubic", "P", a_l)
+    absence_excess([lab6, root2, unscreened])
+    assert lab6.lebail.predicted_but_absent_excess_in_window == 0.0
+    assert root2.lebail.predicted_but_absent_excess_in_window == 2.0
+    assert unscreened.lebail is None
+    # a lone candidate is its own cleanest: the excess cannot stand in for the cap
+    alone = screened("cubic", "I", a_i, 2, 20)
+    absence_excess([alone])
+    assert alone.lebail.predicted_but_absent_excess_in_window == 0.0

@@ -253,6 +253,15 @@ What an operator must know, all measured:
   form, whose `results_` holds them.  `sr = rx.SequentialRefinement(structure,
   instrument)`, `series = sr.fit(patterns, ...)`, then
   `rx.build_report(sr.results_[i]).background.worst_absorption`.
+- **A step in a `qpa_trajectory` curve may be a change of basis, not of the
+  specimen: check `basis_changes` before reading it.**  A phase with no line in
+  a pattern's range quotes no fraction there, so the other phases' points in
+  that pattern are fractions of fewer phases.  `qpa_trajectory(phase).unmeasured`
+  lists, per point, the phases left out, and `basis_changes` says whether the
+  points differ in that set.  *(Measured: WP-1958, synthetic four-phase series
+  of 25-50°, 25-33°, 25-33° and 25-50° scans with iron out of range in the
+  middle two: corundum read 71.55, 72.94, 72.94, 71.55 % with no change in the
+  specimen.)*
 
 Driving one: **`fit()` is all-or-nothing, so wire `on_result=` before starting
 anything long.**  The per-pattern loop catches `RefinementCancelled` and nothing

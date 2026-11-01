@@ -1147,3 +1147,28 @@ def test_a_wrong_triclinic_le_bail_fit_raises_no_degenerate_cell_error(tmp_path)
     assert findings, "no CELL_RUNAWAY fired: the fit no longer reaches the guard"
     assert all("restored to this stage's starting values" in d.message
                for d in findings), [d.message for d in findings]
+
+
+def test_two_solves_driven_escapes_merge_by_driver_once():
+    """A stage that solves twice names each driving coefficient once.
+
+    ``refine._merge_unresolved`` is the one rule both runners call after the
+    second solve (WP-2028 task 7): a driver that escapes in both solves is one
+    entry, its dependents the sorted union; a driver from one solve alone is
+    kept, in first-seen order.  No fit in the suite reaches a second-solve
+    escape on either runner, so the rule is pinned here directly.
+    """
+    import sys
+
+    refine = sys.modules["rietx.refine"]
+    multi = sys.modules["rietx.multi"]
+    assert multi._merge_unresolved is refine._merge_unresolved
+    first = [("vars.a_0", ["phases.0.cell.a"]), ("vars.c_1", ["phases.0.cell.c"])]
+    second = [("vars.a_0", ["hist.1.phases.0.cell.a"]),
+              ("vars.b_0", ["phases.0.cell.b"])]
+    assert refine._merge_unresolved(first, second) == [
+        ("vars.a_0", ["hist.1.phases.0.cell.a", "phases.0.cell.a"]),
+        ("vars.c_1", ["phases.0.cell.c"]),
+        ("vars.b_0", ["phases.0.cell.b"])]
+    assert refine._merge_unresolved(first, []) == first
+    assert refine._merge_unresolved([], second) == second

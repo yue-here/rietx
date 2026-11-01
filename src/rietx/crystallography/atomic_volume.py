@@ -50,7 +50,11 @@ V_obs/V_est from 0.8 to 1.25 (Table 3's caption defines the lower edge).
 1746 of the 182 239 structures lie beyond it.  737 of those are off by more
 than 75 %, mainly because the database's Z was wrong.  A search window must not
 exclude the true cell, so it takes this wide boundary rather than the 4 %
-scatter.
+scatter, and only its **upper** edge: an inorganic cell lies under 0.8 (15 of
+the 16 measured), so the lower edge would exclude the truth.  The search
+(``SearchSpec.from_formula``) and ``Composition.check`` use the ceiling alone;
+the lower edge is quoted by ``Composition.volume_window`` for a caller who
+knows the specimen is organic.
 """
 
 from __future__ import annotations
@@ -153,7 +157,7 @@ def _element(symbol: str, formula: str) -> str:
     raise ValueError(f"{formula!r}: {symbol!r} is not an element symbol")
 
 
-def _parse_part(part: str, formula: str) -> dict[str, float]:
+def _parse_part(part: str, formula: str, element=None) -> dict[str, float]:
     stack: list[dict[str, float]] = [{}]
     last: dict[str, float] | None = None
     pos = 0
@@ -164,7 +168,7 @@ def _parse_part(part: str, formula: str) -> dict[str, float]:
         pos = m.end()
         symbol, opening, closing, count, _space = m.groups()
         if symbol:
-            el = _element(symbol, formula)
+            el = (element or _element)(symbol, formula)
             stack[-1][el] = stack[-1].get(el, 0.0) + 1.0
             last = {el: 1.0}
         elif opening:
@@ -188,9 +192,10 @@ def _parse_part(part: str, formula: str) -> dict[str, float]:
     return stack[0]
 
 
-def _parse_formula(formula: str) -> dict[str, float]:
+def _parse_formula(formula: str, element=None) -> dict[str, float]:
     """Element counts of a chemical formula; the grammar is in
-    :func:`formula_unit_volume`."""
+    :func:`formula_unit_volume`.  ``element`` checks each symbol (default: an
+    element Hofmann's table has a volume for)."""
     for m in _DOT_TWO_WAYS.finditer(formula):
         if int(m.group(1)) != 0:
             raise ValueError(
@@ -204,12 +209,31 @@ def _parse_formula(formula: str) -> dict[str, float]:
         body = part[m.end():] if m else part
         if not body.strip():
             raise ValueError(f"{formula!r}: an empty part")
-        for el, n in _parse_part(body, formula).items():
+        for el, n in _parse_part(body, formula, element).items():
             counts[el] = counts.get(el, 0.0) + factor * n
     counts = {el: n for el, n in counts.items() if n != 0.0}
     if not counts or any(n < 0.0 for n in counts.values()):
         raise ValueError(f"{formula!r} holds no positive element count")
     return counts
+
+
+def _any_element(symbol: str, formula: str) -> str:
+    import gemmi
+
+    if gemmi.Element(symbol).atomic_number > 0 and gemmi.Element(symbol).name == symbol:
+        return symbol
+    raise ValueError(f"{formula!r}: {symbol!r} is not an element symbol")
+
+
+def formula_counts(formula: str) -> dict[str, float]:
+    """Element counts of a chemical formula, for any element gemmi knows.
+
+    The grammar of :func:`formula_unit_volume` (brackets, ``·`` adducts,
+    decimal counts, spaces ignored), without its restriction to the elements
+    Hofmann (2002) gives a volume for: a count needs no volume.  A symbol that
+    is not an element raises naming it.
+    """
+    return _parse_formula(formula, _any_element)
 
 
 def formula_unit_volume(formula: str,
@@ -258,4 +282,4 @@ def formula_unit_volume(formula: str,
 
 __all__ = ["HOFMANN_VOLUMES", "TABLE_TEMPERATURE", "THERMAL_EXPANSION",
            "THERMAL_EXPANSION_ESD", "VOLUME_RATIO_BOUNDS", "VOLUME_SCATTER",
-           "formula_unit_volume"]
+           "formula_counts", "formula_unit_volume"]

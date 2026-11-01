@@ -85,13 +85,16 @@ a `.dif` peak list is not a profile. One field rather than a side table, so
 `capabilities()` stays honest without `reader_formats` meaning two things.
 
 **A refusal claims only what its evidence allows, and its registry position is
-part of the claim** (WP-1407). Three tiers: matched on **content** (`dif`'s hkl
+part of the claim** (WP-1407). Four cases: matched on **content** (`dif`'s hkl
 triple) asserts what the file is; matched on the **suffix** (`peak_list`, no
 sample of `.pks`/`.udi` obtainable) says in the message that it matched the name
 and not the columns, and gates *negatively* — refuse unless the file reads as a
-plain two-column profile, which keeps `.dif`'s escape for a misnamed scan; and
-claiming **nothing** (`raw_unclaimed`) names `.raw`'s six vendors and picks
-none, since the likeliest one is Stoe and no description of Stoe exists in any
+plain two-column profile, which keeps `.dif`'s escape for a misnamed scan; a
+**fourth**, a format whose content cannot be told from a profile (a bare G(r)
+export is two plain columns), may be refused on its **name** alone, the message
+saying only that the name matched and that renaming the file gets past it
+(`total_scattering`'s `_SUFFIXES`); and claiming **nothing** (`raw_unclaimed`)
+names `.raw`'s six vendors and picks none, since the likeliest one is Stoe and no description of Stoe exists in any
 licence anywhere. A claims-nothing entry goes **below the ASCII catch-all**, so
 it can shadow no reader — asserted as a property (`xy` last *of the readers*,
 everything after it a refusal), never as an index.
@@ -286,6 +289,7 @@ a convention, which is the one repair a reader may never make.
 | `chi` | four-line header whose declared count matches the rows | third column when written | the count gate is the one O(N) sniff |
 | `dif_peaklist` | `.dif` **and** peak-list content | — | refused; matched on evidence not suffix, so a real profile misnamed `.dif` still reaches `xy` |
 | `peak_list` | the `.pks` (Stoe) or `.udi` (PANalytical) suffix, **unless** the file reads as a plain two-column profile | — | refused; matched on the *name*, because no sample of either format could be obtained — and the message says so rather than implying a content test. The negative gate keeps `.dif`'s escape |
+| `total_scattering` | an `#L` line labelling r against G/g or Q against S/F, or a PDFgetX2 (`History written` + `Get_XPDF` banner) or PDFgetX3 (`[DEFAULT]`, bare in 2.1.0 or behind `#` in 1.0, + `qmaxinst`/a version) header, **whatever the suffix**; with neither, the `.gr`/`.sq`/`.fq` suffix alone — directly above `xy`, the one entry these files fell to (#1240) | — | refused with `PATTERN_TOTAL_SCATTERING` at `error`, appended to `diagnostics=` and carried on `TotalScatteringRefused.diagnostic`: the one refusal with a code, so a caller branches on what the file *is*. PDFgetX2's `#L` line sits ~6 kB in, past the window, so its **banner** is the content evidence rather than a bounded escalation; and its lines end `\r\n`, which `$` under `re.M` does not match. A suffix-only match says so and offers the rename escape; an `#L` labelling I against Q is a diffraction pattern and not claimed. Reading these files is #192, fenced. No fixture in `test_readers_robust.py` (§ Adding a format, step 4): a refusal parses nothing, as for `dif_peaklist` and `peak_list` |
 | `xy` | text, not binary — **last of the readers** | third column when written | a NUL in the first 4 kB is refused by name unless behind a BOM: ASCII-range UTF-16LE is valid UTF-8 with interleaved NULs, and Windows vendor software exports it. **A row is data only at the file's most common column count** (a tie goes to the last row's), and the rest are dropped and reported by line (`PATTERN_ROWS_DROPPED`): a numeric header row parsed on its first three tokens was a point at (0, 1) (#266), and a count taken as the *minimum* let one row cut short strip σ from every row. **A comment stating the x-axis unit is read** (Mantid's `' The X-axis unit is: Time-of-flight` → a TOF pattern; `dSpacing`, `MomentumTransfer`, `Wavelength`, `Energy` → refused by name; anything else stated → `PATTERN_X_AXIS_ASSUMED` quoting it). The pattern requires the word `axis` or `unit` and an `x` starting a word, so a comment that merely ends in a colon (`# Max: 90`) does not read as a stated unit of "90". **A FullProf `XYDATA` file's five heading lines are a heading** (manual p. 74): `TEMP tsamp` becomes `temperature_k`, and an `INTER` multiplier other than 1 or `Interpol = 1` is refused by name, since FullProf would scale or interpolate what this reader reads as written |
 | `raw_unclaimed` | a binary `.raw` every reader above declined — **last of everything**, so it can shadow nothing | — | refused, **claiming nothing**: it names the six vendors who write `.raw`, says this build reads Bruker v2 (single-range)/v3/v4 and Philips PC-APD, and picks none. This is where a Stoe reader hangs if files ever arrive — the cheap ask is a few `.raw` files paired with the WinXPOW ASCII export of the *same* scans, which is an exact oracle |
 

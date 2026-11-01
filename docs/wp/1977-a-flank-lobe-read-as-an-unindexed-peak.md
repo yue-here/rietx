@@ -61,6 +61,31 @@ companion field.
   candidate rule for this WP's task 3. Points 1-2 (an asymmetry column with FCJ off) are
   WP-2054's.
 
+- 2026-10-31, from the issue triage (issue #1217): a second way an
+  `unmatched_obs` sits on something the model already draws. With a measured
+  blank declared (`BackgroundFixedPlusChebyshev.from_pattern(blank, n_terms=3,
+  vary_scale=True)`) and the model otherwise exact, the blank's noise biases
+  its refined scale low (0.518-0.531 against a truth of 0.60, synthetic cubic
+  perovskite capillary family, three seeds), which is WP-1309's regression
+  dilution, here −12 % against 1309's −2.2 %. The under-scaled blank leaves
+  part of its own sharp line in the residual, a coherent +6.5 to +8.0σ over
+  0.3° at ≈ 42.1°, and Layer 0 lists it as `unmatched_obs` on 2 of 3 seeds. A
+  noise-free blank gives 0 of 3. The issue proposes a label and no action: an
+  `unmatched_obs` within the validity radius of a sharp line of a fixed
+  background component says "on a line of the measured background" (a field on
+  `UnmatchedPeak`, a distinct `kind`, or a summary note). This WP's Goal (a
+  residual peak is unindexed only when no modelled component explains it)
+  covers it. Checked against the tree at d87c8cc91: `UnmatchedPeak`
+  (`report/schemas.py:599`) carries only `two_theta`, `height_over_sigma`,
+  `kind`, and `report/layer0.py` does not read the fixed background component;
+  `EXTRA_PEAK_ON_REFLECTION` asks the converse question for a declared extra
+  peak against the ticks. Not reproduced: the issue's script runs on the
+  reporter's harness and is not in the issue. The issue's own open questions:
+  whether "sharp line" is read off the stored curve minus a running minimum or
+  off a blank declared as a phase, and whether the blank scale's row should
+  print the blank's own σ/I over its sharp lines, the number that predicts the
+  dilution.
+
 ## Non-goals
 
 - Tick placement. WP-1908 settled it.

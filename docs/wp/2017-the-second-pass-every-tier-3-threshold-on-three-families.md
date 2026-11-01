@@ -89,6 +89,18 @@ LaMnO₃). A family is a specimen type with its own instrument, not a pattern.
 
 - Decided 2026-10-26 (maintainer, #1052): all three offered families are adopted as held-out beside Nd₂Ru₂O₇ (`docs/milestones/generality.md` § Acceptance). So none of them is audit evidence in this pass, nor in any pass before the milestone's close, when they are spent into development data (ruled 2026-10-27, replacing the 2026-10-26 "for good").
 
+- 2026-10-31, from the issue triage (issue #1052): the reporter answered the
+  maintainer's two asks of 2026-10-31 on the thread. They posted the SHA-256
+  of the open result table, of the recipe and of each per-case result file, so
+  the close run can be checked against what was fixed before it. They also
+  declared one added arm, run on both the open and the close tree: HfIn with
+  each co-sited pair's occupancies freed and tied to sum to 1, its refined Hf
+  fraction reported beside the EDX value Hf 0.51(2) with the fit's esd. The
+  milestone record (`docs/milestones/generality.md` § Acceptance) does not
+  carry either yet; the close session should quote the hashes from the thread.
+  Checked against the tree at d87c8cc91: nothing to run; the thread is the
+  record.
+
 ## Non-goals
 
 - New actions or new thresholds. A measurement that suggests one goes to the maintainer.

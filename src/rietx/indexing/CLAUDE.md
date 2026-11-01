@@ -271,23 +271,23 @@ roughly the shift (+1400 ppm).
   skipped that and put a pseudo-cubic trigonal R description of the certified LaB6
   lattice above the cubic truth with **115 fast indexing tests green** — so run
   `tests/test_acceptance_indexing.py` before closing anything that touches an engine.
-- Read a `predicted_but_absent` firing as "this cell predicts lines the pattern
-  lacks", **never** "this cell is too big", and since C3 **it caps; the lattice
-  statement that refutes is the generalised superset check**. The full-range
-  count shows a space-group extinction (corundum's R-3c c-glide); the caveat
-  reads only the uncancellable lines inside de Wolff's window, so a glide never
-  raises it and the extinction screen separates glide from oversized cell.
-  Choose acceptance datasets **by space group** — SRM 660c (P m -3 m) is the
-  control that proved it. **So the reversed members cannot order two fitted
-  candidates either**: asked pairwise the question demotes SRM 676a's own cell
-  as readily as brucite's supercell, the two populations interleaving
-  (WP-1446). Asked of the extras no extinction can cancel and judged against
-  **chance** it separates (`screen.containment_evidence`: indexed-set
-  containment with the denser line set as the child, generalising
-  `supercell_chance`'s index 2–4; never the screen's class, which moves with
-  2θ range), *refuted* meaning seen no more often than chance (k ≤ n·p₀), and
-  a refuted child sits below its parent **across corroboration tiers**, being
-  refuted, not outscored (1449).
+- Read a `predicted_but_absent` firing as "this cell predicts lines the pattern lacks",
+  **never** "this cell is too big", and since C3 **it caps; the lattice statement that
+  refutes is the generalised superset check**. The full-range count shows a space-group
+  extinction (corundum's R-3c c-glide); the caveat reads only the uncancellable lines
+  inside de Wolff's window, so a glide never raises it and the extinction screen
+  separates glide from oversized cell. Choose acceptance datasets **by space group** —
+  SRM 660c (P m -3 m) is the control that proved it. **So the reversed members cannot
+  order two fitted candidates either**: asked pairwise the question demotes SRM 676a's
+  own cell as readily as brucite's supercell, the two populations interleaving
+  (WP-1446). Asked of the extras no extinction can cancel and judged against **chance**
+  it separates (`screen.containment_evidence`: indexed-set containment with the denser
+  line set as the child, generalising `supercell_chance`'s index 2–4; never the
+  screen's class, which moves with 2θ range), *refuted* meaning seen no more often than
+  chance (k ≤ n·p₀), and a refuted child sits below its parent **across corroboration
+  tiers**, being refuted, not outscored (1449). **Never refuted: a child seen more often
+  than its parent** (#1230: on dense patterns p₀ ≥ a truth's own seen fraction, and
+  density made the truth the child).
 - The known-cell scoreboard is *never wrong, and silent more often than right* —
   **never round it up**, and **keep the found-but-not-first bucket** (collapsing it
   into right-or-wrong is how the old board named nine datasets under a total of

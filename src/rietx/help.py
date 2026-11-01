@@ -1744,6 +1744,19 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "claims, and the phase needs a space group that leaves this angle free."
         ),
     ),
+    "CIF_EMPTY_BLOCK_SKIPPED": HelpEntry(
+        title="Data blocks that state nothing were skipped",
+        description=(
+            "The file holds more than one data block, and the structure was read "
+            "from the only one with atom sites. Every other block has no tags, or "
+            "only _audit_ tags, which record how the file was made and state no "
+            "cell, site or symmetry, such as an empty block a writer puts "
+            "ahead of the structure. The message names each "
+            "block skipped. Nothing is to be done. A file with two blocks holding "
+            "atom sites, or one beside a block stating anything else, is refused, "
+            "naming the blocks."
+        ),
+    ),
     "CIF_MAGNETIC_CENTERING_ASSUMED": HelpEntry(
         title="Magnetic centring loop missing",
         description=(
@@ -2014,13 +2027,25 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "EXTINCTION_PRIOR_APPLIED": HelpEntry(
         title="Declared facts removed space groups from the extinction classes",
         description=(
-            "You declared facts about the specimen (chirality, centrosymmetry or "
-            "polarity), and they removed space groups from some classes. The declaration "
-            "only filters the members of each class. Every class was still fitted, and no "
-            "ΔBIC moved. It is a warning when the class the data rank first was emptied: "
-            "either the chemistry is doing what a powder cannot, or the declaration is "
-            "wrong. `best_or_none()` abstains when the data prefer an emptied class by "
-            "the decisive margin. Check the declaration before you read the answer."
+            "You declared facts about the specimen (chirality, centrosymmetry, "
+            "polarity, or the formula units per cell as a Z or a density), and they "
+            "removed space groups from some classes. Each removed group is named with "
+            "the fact it fails. A declared Z tests whether some element's atoms "
+            "per cell can sit on whole orbits of a group (a position with no free parameter "
+            "is one orbit, used once), the test of an ordered model. A group that fails "
+            "the count is kept and named, since a disordered alloy written with whole counts "
+            "fails it on its true group, and is removed only when you declare the model "
+            "`ordered`. "
+            "Where Z is not a whole multiple of a kept group's general multiplicity "
+            "(Z′ below one), the group stays and the message names the special "
+            "positions a formula unit then needs, since a molecule there must carry "
+            "that symmetry. The declaration only filters the members of each class. "
+            "Every class was still fitted, and no ΔBIC moved. It is a warning when the "
+            "class the data rank first was emptied: either the chemistry is doing what a "
+            "powder cannot, or the declaration is wrong. It is also a warning when a "
+            "declared density does not give the declared Z on this cell; nothing is then "
+            "filtered by Z. `best_or_none()` abstains in both cases. Check the "
+            "declaration before you read the answer."
         ),
     ),
     "EXTINCTION_SCREEN_FAILED": HelpEntry(
@@ -2046,12 +2071,25 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "model, weak data (for a perfect fit the quantity is about √(N/(N+S)), N the "
             "channels and S the weighted net Bragg power, so it passes the bound whenever "
             "S < N; counting longer helps and re-indexing does not), the range, the "
-            "wavelength and the width law. The bound, 1/√2 (at most half "
-            "of the net weighted power unexplained), sits between every right or nearly "
-            "right cell (≤ 0.36) and every cell outside the refinable basin (≥ 1.6) on "
+            "wavelength and the width law. `ExtinctionScreen.perfect_fit_rwp_net` is that "
+            "perfect-fit value, and the message says from the pair which failed: past the "
+            "bound too, either the data are weak or the envelope sits inside the lines "
+            "over that range (the pair cannot tell which; counting longer helps only the "
+            "first); below it, the reference misfits them. The bound, "
+            "1/√2 (at most half of the net weighted power unexplained), was measured on "
             "synthetic Si and P 2₁/c, 11-BM NAC, the GSAS-II fluorapatite and PbSO₄ "
-            "patterns and SRM 676a corundum; untested beyond them, and a second phase "
-            "carrying half the net weighted power trips it at a right cell. The gate does "
+            "patterns and SRM 676a corundum; every right cell of the four real patterns reads 0.12-0.19 on the default path "
+            "(cell refined; ≤ 0.36 was measured with the cell held), "
+            "and cells outside the refinable basin read 1.0-2.3 (corundum at ×1.02, "
+            "fluorapatite at ×0.99, NAC at ×0.99 and ×1.02, PbSO₄ at ×1.02, Si at ×1.01) "
+            "but one: PbSO₄ X-ray at ×0.99 reads 0.45, passes, and returns a wrong class. "
+            "Untested beyond them, and a second phase carrying half the net weighted power "
+            "trips it at a right cell. The net is taken against the peak picker's rolling "
+            "low-quantile envelope, which rides up into the lines where they form a "
+            "continuum (low symmetry, high angle), so a good reference fit over such a "
+            "range can read above the bound: GSAS-II's own fit of the PbSO₄ X-ray pattern "
+            "reads 0.436 against the envelope and 0.245 against its fitted background over "
+            "110-160°. The gate does "
             "not reach a local misfit: on certified SRM 676a corundum "
             "(`R -3 c`) the shared profile fit's `profile_rwp` is 0.149 over 20–90°, where "
             "`R - c -` wins, and 0.227 over 5–150° with declared widths, where `R - - -` "
@@ -2132,6 +2170,17 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "past the windows it was solved on, so the solve may have stopped short of the "
             "minimum that windows sized at the answer give. Run one more stage with nothing "
             "new freed and compare. A plan's closing stage does this already."
+        ),
+    ),
+    "FULLPROF_LIMITS_NOT_APPLIED": HelpEntry(
+        title="A FullProf file's parameter limits were not applied",
+        description=(
+            "The FullProf file holds hard limits on some refined parameters, one line "
+            "each after the phases, counted by its `Nre` flag. A limit names a FullProf "
+            "parameter number, which can drive several values at once. The reader keeps "
+            "every limit on the model it read and sets no bound from it, so the built "
+            "structure's parameters are free to leave those intervals. Set a "
+            "parameter's min and max where it should stay inside its limit."
         ),
     ),
     "FULLPROF_MAGNETIC_PHASE_OMITTED": HelpEntry(
@@ -2861,7 +2910,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Rwp: a converged fit of a cell that predicts every reflection of another "
             "fits at least as well (0.164 against 0.164 for a doubled cell on rietx's "
             "synthetic LaB6 pattern). Without a peak list the "
-            "count is the fitted background's, over the whole range. Compare the "
+            "count is the fitted background's, over the whole range. Absences that "
+            "sit only above the window are reported at info level and cap nothing. "
+            "Compare the "
             "smaller cell that indexes the same lines, and run the extinction screen "
             "before you reject this one."
         ),
@@ -2946,7 +2997,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "Measured: it refutes Si's cubic I √2·a₀ (0 of 12 extra lines seen) and "
             "kept every truth tested as a child, the lowest at p = 0.0072; on the "
             "finished acceptance searches it put brucite's and 11-BM NAC's truths "
-            "first. Untested beyond those patterns."
+            "first. Untested beyond those patterns. A cell whose own lines are seen more "
+            "often than the smaller cell's is never refuted: an oversized cell cannot "
+            "do that. On dense low-symmetry patterns chance alone covers most of the "
+            "range, and three synthetic truths were refuted before this rule."
         ),
     ),
     "INDEX_SYSTEMS_NOT_COVERED": HelpEntry(
@@ -2975,17 +3029,6 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "first is an artefact of the search and describes no lattice. The second is "
             "a cell larger than the lines can justify. Narrow the maximum volume, or "
             "measure more lines."
-        ),
-    ),
-    "INDEX_Z_NOT_INTEGER": HelpEntry(
-        title="Cell holds a fractional number of formula units",
-        description=(
-            "With the formula you gave and typical atomic volumes, the cell holds a "
-            "number of formula units far from a whole number. A sub- or supercell of the "
-            "true cell does this. So does a formula that misses a solvent or "
-            "counter-ion, and so does an ionic specimen, where volumes run large. A "
-            "correct cell can fire occasionally. Check the formula first and weigh the "
-            "result beside the figures of merit."
         ),
     ),
     "K_VECTOR_UNSEPARATED": HelpEntry(
@@ -3320,6 +3363,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "point has that error. A placeholder in the error field is the usual cause."
         ),
     ),
+    "PATTERN_TOTAL_SCATTERING": HelpEntry(
+        title="The file holds a total-scattering function, not a pattern",
+        description=(
+            "The file holds a reduced total-scattering function: G(r), the pair "
+            "distribution function on a real-space axis r in Å, or S(Q) or F(Q) on "
+            "a scattering-vector axis Q in Å⁻¹. Neither axis is 2θ. rietx does not "
+            "read total-scattering data yet (issue #192), so the file is refused "
+            "rather than read as a powder pattern, which would fit a Bragg model to "
+            "it and report a plausible Rwp. The file is recognised by its own "
+            "column labels (an #L line naming r and G, or Q and S or F), by a "
+            "PDFgetX2 or PDFgetX3 header, or, with neither, by a .gr, .sq or .fq "
+            "suffix alone; the message says which. Refine the diffraction pattern "
+            "the reduction started from instead. A 2θ scan that only carries one of "
+            "those suffixes opens under any other name."
+        ),
+    ),
     "PATTERN_UNDERSAMPLED": HelpEntry(
         title="Too few steps across each peak",
         description=(
@@ -3584,6 +3643,22 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "reflection of it. With no reflection in range, the scale is held too, the "
             "phase has no weight fraction, and the other fractions are relative to the "
             "phases seen in range."
+        ),
+    ),
+    "PLAN_FREES_NO_MOMENT": HelpEntry(
+        title="The plan never refines the magnetic moment",
+        description=(
+            "The structure carries a magnetic moment and no stage of the plan frees "
+            "it. Every moment stays at the value you supplied, with no esd, and is "
+            "not a result. The nuclear parameters can absorb part of what a wrong "
+            "moment misplaces, so read them with that in mind too. Its `where` lists the "
+            "modulus path of each held site, then the phase's `scale`, which is not a "
+            "site: the moment and the nuclear values share that scale, and its presence "
+            "keeps the level at warning under every purpose the scale reaches "
+            "(`structure`, `qpa`). The presets "
+            "`mccusker_default` and `mccusker_structural` free no moment. Use "
+            "`magnetic_structural`, or name `phases.*.atoms.*.moment.dof*` in a "
+            "stage. A moment you hold with `hold` is left out of this check."
         ),
     ),
     "QPA_ESD_UNAVAILABLE": HelpEntry(
@@ -3909,6 +3984,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "In some patterns the refined moment lies within the noise of its own esd. "
             "That reads as a moment the data do not support, and says nothing about a "
             "small moment. Patterns where the modulus has no esd give no verdict at all. "
+            "When the plan frees no moment, every pattern is one of these and the "
+            "modulus is the start value; `PLAN_FREES_NO_MOMENT` fires on each, and "
+            "the message says so. "
             "The value shown is the modulus the fit reached. Quote these points as held."
         ),
     ),
@@ -5199,6 +5277,33 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "esd that cannot be measured is absent rather than zero. `None` outside "
             "Rietveld mode and when the result did not come from a fit."
         ),
+    ),
+    "RefinementResult.distortion_totals": HelpEntry(
+        title="Irrep blocks of a child on mode amplitudes",
+        description=(
+            "One `DistortionTotal` per irrep block, every mode sharing one irrep, k and "
+            "isotropy group, of each phase stated on mode amplitudes: A_τ, the norm of the "
+            "block's amplitudes in Å, with its esd from the block's own covariance, "
+            "labelled 'linearised; undefined at A_τ = 0 and Rice-biased below about 2 "
+            "esd'; Hotelling's T² with the mode count m and no p, because χ² is even in "
+            "an amplitude that breaks the parent's symmetry, so where the block's truth "
+            "may be zero T² is about 4 × the likelihood ratio and a χ²_m p is wrong "
+            "exactly there; whether the block alone has the child's group; the sign "
+            "convention; and the largest displacement. A correlation inside one irrep "
+            "block is a basis artefact; A_τ, its esd, T² and the block comparison are "
+            "basis-invariant. `Refinement.distortion_block_tests` refits with any blocks "
+            "held at 0 and reports ΔBIC at N/f² and Λ = Δχ²/(χ²_red·f²) with its p. Λ is "
+            "Hamilton's F form on rietx's esd scale; it holds its size on white-noise "
+            "nulls; under model misfit it can call a block that absorbs misfit, so it is "
+            "not a test of zero. With a bar it adds `A_det`, measured +2 % (five-mode Γ "
+            "block), +9 to +12 % (ten-mode zone-boundary block) and +48 % (one mode of a "
+            "57-mode P1 child) off the 50 % point at bar 6 on LaMnO₃ white noise, and "
+            "uncalibrated on misfit; a bar needs the caller's `detectability_probe` (Å), "
+            "which has no default. `None` when no phase carries `distortion_modes`, and on "
+            "a joint fit's result, whose builder writes none of the per-phase technique "
+            "fields (geometry, cell volumes and this one alike)."
+        ),
+        anchor="reference/parameter-table.html#what-the-fit-reports-about-the-blocks",
     ),
     "RefinementResult.cell_volumes": HelpEntry(
         title="Cell volumes",

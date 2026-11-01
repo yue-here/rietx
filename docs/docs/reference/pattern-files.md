@@ -42,7 +42,7 @@ It refuses a format that holds one measurement per file.
 
 The readers are tried in a fixed order, and the first whose test matches reads the file.
 Magic bytes and archive manifests come first, then a required first line or XML root, then a suffix, then a looser text test.
-The two peak-list refusals come next, then the ASCII reader, and the refusal of an unrecognised `.raw` comes last, so it can shadow no reader.
+The two peak-list refusals and the total-scattering refusal come next, then the ASCII reader, and the refusal of an unrecognised `.raw` comes last, so it can shadow no reader.
 `ReaderCapability.sniff` gives each format's test in words, `ReaderCapability.sigma` says where its esds come from, and `ReaderCapability.refuses` says why a refused format is declined.
 
 | Format | `name` | Suffixes | Option | Esds |
@@ -64,9 +64,11 @@ The two peak-list refusals come next, then the ASCII reader, and the refusal of 
 |---|---|---|---|
 | Peak list from DIFFRAC-AT or RRUFF | `dif_peaklist` | `.dif` | a table of reflections, recognised by its hkl columns |
 | Peak list from Stoe or PANalytical | `peak_list` | `.pks`, `.udi` | a table of reflections, recognised by the suffix alone because no sample file was available |
+| Total-scattering function, G(r), S(Q) or F(Q), from PDFgetX2, PDFgetX3 or a bare export | `total_scattering` | `.gr`, `.sq`, `.fq` | not a powder pattern: an r or Q axis, recognised by an `#L` line labelling r and G or Q and S/F, or a PDFgetX2 or PDFgetX3 header, whatever the suffix; with neither, by the suffix alone. Refused with [`PATTERN_TOTAL_SCATTERING`](diagnostics-files.md#pattern_total_scattering) until rietx reads total scattering (#192) |
 | Unrecognised binary `.raw` | `raw_unclaimed` | `.raw` | six vendors write `.raw`, and this file matched none of the readers |
 
 A file misnamed `.dif`, `.pks` or `.udi` that reads as a plain profile still reaches the ASCII reader.
+A 2θ scan that only carries a `.gr`, `.sq` or `.fq` suffix opens under any other name.
 `capabilities()` lists the formats in the order they are tried:
 
 ```python
@@ -75,7 +77,8 @@ from rietx import capabilities
 caps = capabilities()
 assert [fmt.name for fmt in caps.reader_formats] == [
     "bruker_raw", "philips_rd", "rasx", "brml", "ras", "uxd", "xrdml", "udf",
-    "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "xy", "raw_unclaimed"]
+    "pdcif", "gsas", "chi", "dif_peaklist", "peak_list", "total_scattering", "xy",
+    "raw_unclaimed"]
 assert [opt.name for opt in caps.reader_options] == ["bank", "block", "scan"]
 ```
 

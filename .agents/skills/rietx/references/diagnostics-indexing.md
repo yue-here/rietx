@@ -94,12 +94,11 @@ result.
 
 | Code | What it means you must not do |
 |---|---|
-| `INDEX_PREDICTED_BUT_ABSENT` | Keep this candidate; it caps, never refutes. Inside the first twenty lines the lattice predicts lines no extinction could remove where the picker's envelope shows nothing: an oversized cell, which M₂₀ cannot see. `supercell_refuted` is what refutes. **Do not check this with Rwp**; the explanation gives the counts and the case |
+| `INDEX_PREDICTED_BUT_ABSENT` | Keep this candidate; it caps, never refutes, and at `info` (every such line above the first twenty) it caps nothing. Inside the first twenty lines the lattice predicts lines no extinction could remove where the picker's envelope shows nothing: an oversized cell, which M₂₀ cannot see. `supercell_refuted` is what refutes. **Do not check this with Rwp**; the explanation gives the counts and the case |
 | `INDEX_IMPURITY_LINES` | Read it as one thing. The count says which (Measured: 23 unmatched lines on LaB6 with the metric 1 % off, the table in `indexing/workflow.py`). A multi-phase pattern is not indexed: a second phase means subtracting the solved one first. |
 | `INDEX_BRAVAIS_AMBIGUOUS` | Refine in the higher symmetry because it was reported. Refine in the stated system and *test* the higher one, never the reverse. A disagreement between gemmi and spglib is information, not a bug. |
 | `INDEX_VOLUME_UNPHYSICAL` | Quote the cell. |
-| `INDEX_SUPERCELL_REFUTED` | Quote the larger cell, or read its old rank as evidence for it. A sparser reported cell indexes the same lines (`relation`: a sublattice, or containment only), and the extra lines this one needs that no extinction could remove are seen no more often than chance at the resolution, so it sits below that cell (`supercell_refuted`, refuting). The counts are on `supercell_checks`. Only a real superstructure too weak to pick escapes, so look at `absent_two_theta` if the chemistry predicts one |
-| `INDEX_Z_NOT_INTEGER` | (warning, with `formula=`) Drop the candidate for it: a correct cell can fire. `value` is that Z. It is silent above Z = 6.25 by arithmetic, so silence there checks nothing. Check the formula (solvent, a counter-ion), then suspect a sub- or supercell. |
+| `INDEX_SUPERCELL_REFUTED` | Quote the larger cell, or read its old rank as evidence for it. A sparser reported cell indexes the same lines (`relation`: a sublattice, or containment only), and the extra lines this one needs that no extinction could remove are seen no more often than chance at the resolution **and** the child's own lines are seen no more often than its parent's, so it sits below that cell (`supercell_refuted`, refuting). A child seen more often than its parent cannot be refuted by containment (the verdict is `undecided`, #1230) The counts are on `supercell_checks`. Only a real superstructure too weak to pick escapes, so look at `absent_two_theta` if the chemistry predicts one |
 | `INDEX_NOT_VALIDATED` | Read a `medium` as a near-`high`. Pass `data=` and `instrument=`. |
 | `INDEX_VALIDATION_FAILED` | (warning — on the candidate's `lebail.diagnostics`) Read this candidate's validation numbers as a judgement, in either direction: `lebail.rwp` is inf and its `status` is `failed`. A run whose validations all fail this way is telling you about the setup, not the cells. |
 | `INDEX_BUDGET_EXHAUSTED` | Read the answer as covering the requested search. `systems_searched` + `search_complete` distinguish three states: searched (present, `True`), truncated (present, `False`) and not reached (absent; the diagnostic's `where` names them). Candidates whose validation never ran read `not_validated` (capping), never `validation_failed` (refuting). Units run system-major (WP-1042), so a binding ceiling cuts trailing low-symmetry *systems* for every engine equally, and a candidate from a completed system keeps all its finders. A user cancellation never writes this code |
@@ -115,8 +114,14 @@ This section closes the loop between `index_pattern` and `refine`.
 **Before the first search, ask for the cell or infer it** (Measured: solution
 case 1: the blind search never found the person's cell).
 Ask for a cell range or candidate cells. When the person has given
-the chemistry (formula, Z or density, solvent), infer a volume window with
-`SearchSpec.from_formula(formula, z=…)`, say so, and pass `formula=` too. Declare a candidate cell in
+the chemistry (formula, Z or density, solvent), infer a volume ceiling with
+`SearchSpec.from_formula(formula, z=…)` and say so; it has no floor, and
+`z=None` narrows nothing. `formula=` records `formula_units` per candidate;
+an inorganic true cell reads 0.4-0.9 of its Z, so never drop a cell for it
+(Measured: WP-2030, 16 inorganic standards at 0.38-0.87).
+A framework written without its pore contents sits above the ceiling
+(Measured: HKUST-1 2.28; `SiO2` meets it at FAU's framework density, 13.3 T/1000 Å³,
+IZA database, and a less dense one lies above). Declare a candidate cell in
 `prior_cells` with `max_d_axis` above its longest axis.
 
 **These names are provisional, and the answers they return are versioned.**
