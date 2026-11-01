@@ -161,6 +161,16 @@ the transposed rotation set is a group too and passes any dimension count.
 
 ### Inherited
 
+- **2026-11-01, from WP-2067: the purpose table reads every `distortion_modes`
+  path as one that moves atoms.** `purposes._ATOM_DRIVERS` lists
+  `phases.*.distortion_modes.*` whole. So a warning naming an amplitude keeps
+  its level under `structure`, `qpa` and `magnetic`, the purposes that list the
+  coordinates. If the metric-subspace task puts a cell-driving path under
+  `distortion_modes`, narrow the glob to `…modes.*.amplitude`. Otherwise a
+  warning on a strain parameter reads as a warning under `magnetic`, which does
+  not list the cell. `tests/test_summary_levels.py::test_a_path_that_moves_an_atom_bears_where_a_coordinate_does`
+  checks only the paths `structural_free_paths` counts, so it cannot catch that
+  case.
 - **2026-10-16, from the issue triage (#1002): `IrrepModes.primary` compares
   operation counts only.** `_isotropy`
   (`crystallography/representation/distortion.py`, checked at `138d55dc`)
