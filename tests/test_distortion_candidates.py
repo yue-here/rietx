@@ -381,12 +381,15 @@ def test_driving_is_the_built_from_irrep_and_primary_is_the_isotropy_test(at_r):
 K_X = (Fraction(0), Fraction(0), Fraction(1, 2))
 K_M = (Fraction(1, 2), Fraction(1, 2), Fraction(0))
 #: Seeds whose *first* draw keeps an accidental operation of S6(a,b) at R on
-#: the O site (4 of seeds 0-199 do; at Γ on Mn none): a single-draw probe
-#: refused that child as ``DISTORTION_CHILD_LARGER``.
-UNLUCKY_SEEDS = (142, 194)
-#: The one seed of 0-79 whose first draw keeps an accidental operation at X
-#: or M (S10(a,b) at M, all sites; review round 3).
-UNLUCKY_SEED_AT_M = 41
+#: the O site (5 of seeds 0-199 do, 55, 83, 111, 167 and 198; at Γ on Mn
+#: none): a single-draw probe refused that child as ``DISTORTION_CHILD_LARGER``.
+#: The draws are in the magnetic cell, which #1197 made right-handed; in the
+#: left-handed one the seeds were 142 and 194 (4 of 0-199).
+UNLUCKY_SEEDS = (55, 83)
+#: The one seed of 0-379 whose first draw keeps an accidental operation at M
+#: (S10(a,b), all sites; review round 3 found 41 of 0-79 in the left-handed
+#: cell before #1197, and in the right-handed one none of 0-79 does).
+UNLUCKY_SEED_AT_M = 291
 
 
 def _setting(cands):
@@ -532,8 +535,8 @@ def test_fewer_operations_than_the_group_is_not_reported_as_more(at_gamma, monke
 def test_one_refused_candidate_leaves_the_others(at_r, monkeypatch):
     """A refused child comes back as a refusal beside the others, not as an abort.
 
-    One draw at seed 142 refuses S6(a,b) at R on O (review round 2's unlucky
-    seed).  On main that raised, and the call lost its 15 other candidates.
+    One draw at seed 55 refuses S6(a,b) at R on O (review round 2's unlucky
+    seed was 142, before #1197 made the magnetic cell right-handed).  On main that raised, and the call lost its 15 other candidates.
     """
     parent, expected = at_r
     monkeypatch.setattr(I, "_PROBE_SEED", UNLUCKY_SEEDS[0])
