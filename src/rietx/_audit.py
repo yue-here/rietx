@@ -1212,12 +1212,15 @@ ROWS: tuple[Row, ...] = (
                   "column reaching the pattern only through phase peaks is held too, "
                   "free a blank frame's zero shift read -0.0129 +/- 0.0015 deg (8.7 "
                   "sigma, truth 0.006)"),
-        grounds=("No competent refiner lets a phase the data cannot see refine its cell, and the "
-                 "hold touches only what the data cannot determine; on by default, which no "
-                 "program does (B1, ruled 2026-10-19). The lineless branch, which holds the "
+        grounds=("No competent refiner lets a phase the data cannot see refine its cell, nor "
+                 "lets a frame no phase is seen in refine the instrument terms that reach the "
+                 "pattern only through phase peaks (zero shift, displacement, U..Y, the axial "
+                 "terms); the hold touches only what the data cannot determine; on by default, "
+                 "which no program does (B1, ruled 2026-10-19; the instrument widening, "
+                 "WP-2049, ruled 2026-11-01). The lineless branch, which holds the "
                  "scale, is tier-1 arithmetic (a zero column) inside a row tiered on its "
                  "contested part."),
-        approved="2026-10-23"),
+        approved="2026-11-01"),
     Row("rietx.schemas.results.StageResult.scale_b_held", "action", tier=1, ambiguity=1,
         evidence=("numerical floor: under 2*sqrt(PINV_RCOND) the covariance's pinv cut cannot see "
                   "scale and B as two directions (WP-1534 derivation); measured cases read 1e-12 or"

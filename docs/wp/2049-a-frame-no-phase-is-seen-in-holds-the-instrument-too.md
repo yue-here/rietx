@@ -1,6 +1,6 @@
 # WP-2049 — a frame no phase is seen in holds the instrument's peak terms too
 
-Milestone: unscheduled · Status: ✅ 2026-11-01 — a frame no phase is seen in holds its peak-only instrument columns, single and joint; PR #1305 awaits the maintainer on the widened tier-3 hold
+Milestone: unscheduled · Status: ✅ 2026-11-01 — a frame no phase is seen in holds its peak-only instrument columns, single and joint; PR #1305's widened tier-3 hold re-approved 2026-11-01
 Track: What fires, and what stays silent
 Depends on: —
 
@@ -178,6 +178,10 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
   row, then merges #1305. The reader-output change on a blank frame comes
   with it: instrument rows leave `result.parameters`, and one sentence joins
   `PHASE_UNCONSTRAINED`.
+  *Ruled* 2026-11-01, Yue in chat, "1305: 1." (option 1: "Re-approve the
+  widened entry and merge."). It approves the widened tier-3
+  `StageResult.held` audit row, now `approved="2026-11-01"` with grounds naming
+  the instrument terms, and the reader-output change on a blank frame.
 - **2026-10-25** — filed by WP-2036's session after a measurement lane
   reproduced the nightly's planted-series red on an arm64 Mac. No open WP owns
   the hold: WP-1301 is closed, and what its fix did not cover is a new WP.
