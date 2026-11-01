@@ -1,9 +1,8 @@
 # WP-1919 — maximal subgroups, their conjugacy classes, (P, p) and Wyckoff splittings, generated from the group's own operators
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — both PRs merged from outside: PR 1 (the generator) as #1189 (`20e33524`), PR 2 (Wyckoff positions and `wyckoff_splitting`) as #1239 (`66e9a7ac`); the declared scope is built, close owed
+Milestone: unscheduled · Status: ✅ 2026-11-01 — both PRs merged from outside: PR 1 (the generator) as #1189 (`20e33524`), PR 2 (Wyckoff positions and `wyckoff_splitting`) as #1239 (`66e9a7ac`); closed after the tree check in the handover log
 Track: Data and metadata in, a structure out
 Depends on: — (1419 soft: the symmetry package its front half creates)
-Priority: P3 2026-10-08 — a workaround covers it: MAXSUB and WYCKSPLIT by hand; its three consumers (1515, 1418, 1419) are queued or have a narrower stand-in
 
 ## Goal
 
@@ -83,57 +82,6 @@ an automated oracle; a published A1 entry may be quoted in a test as a
 literature value. moyo (#426, WP-1452) would replace only the
 identification call.
 
-### Inherited
-
-- **2026-10-31, from [WP-2065](2065-a-hung-fast-job-names-its-test.md) (issue
-  #1249): a full k-series at P −1 costs p(p² + p + 1) subgroups, so its
-  P −1 rows are now `slow`.** `maximal("P -1", index=53, kind="k")` returns
-  151 739 subgroups, and with the test's `is_maximal` per result it took
-  629-812 s of a CI runner. Alone it could outrun the fast job's 40-min cap,
-  and it did, 8 times between 30 and 31 Oct. `2c2e23666` (PR #1254) marked
-  both P −1 rows `slow`; the hexagonal p = 29 rows keep the bound covered per
-  push, raising in seconds under the old floor of 48. A new row asking a
-  per-subgroup question at a large p uses `supercell=`, p subgroups rather than
-  p³. Measured and declined: `_maximal_invariant`'s pairwise row reductions
-  cost 1.45 s at p = 29, so a faster exact rule (a line is maximal unless an
-  invariant plane holds it) buys about 1 s there.
-
-- **2026-10-11, from the issue triage (#806): the placement question has a
-  partial answer.** PR #842 (WP-1419 C0a, merged 2026-10-08) created
-  `crystallography/representation/` with `irreps.py` and `modes.py`, and
-  WP-1419's handover says C0b and this WP's generator land beside them. So
-  the "symmetry package WP-1419 creates" is `representation`. Checked against
-  the tree at 7d9be3cb: no subgroup code there; the only maximal-subgroup code
-  is `strategy/magnetic.py:1106` `_maximal_subgroups`, maximal among the
-  classes at the winner's k.
-- **2026-10-26, from the issue triage (#806): the reporter proposed answers to
-  the three decisions and offered to build the WP from the prototype.** Their
-  last comment (13:59) supersedes the two before it, which are one text posted
-  twice. (1) Placement: `crystallography/representation/subgroups.py`. (2) The
-  (P, p) rule: the one `distortion_candidates` already uses, so one group never
-  gets two (P, p) in the package: r_parent = P·r_child + p, the standard setting
-  spglib returns, each operation checked against the group. Tests compare up to
-  the affine normaliser, and Wyckoff labels are stated as belonging to that
-  (P, p). (3) Exact `Fraction` arithmetic first, with the 230-group sweep as a
-  `slow` test. A fourth consumer: the active-modes work on #286 wants to rank a
-  parent's subgroups down to the child cell, which means walking down from the
-  maximal ones. Checked against the tree at `6eb010a0f`. `representation/` holds
-  `distortion.py` (#950), `irreps.py`, `modes.py` and `order_parameter.py`, and
-  no subgroup code. The (P, p) rule is `magnetic/isotropy.py`'s
-  `_standard_child`, which `distortion_candidates` calls, not a function in
-  `representation/`. Its operation check is in floats: P and p are
-  rationalised with `limit_denominator(48)` and compared to 1e-6. It is not
-  the exact check this WP's Goal names. `Fraction` is the arithmetic of
-  `wyckoff._nullspace_int` and of `magnetic/isotropy.py`. The prototype's
-  13 CPU-minutes and 23 s are the reporter's and were not re-run. The decisions
-  stay open until the maintainer answers. Read against `docs/DESIGN.md`
-  § Rules, the proposals leave three gaps. Rule 4 (a new output) wants the
-  splitting result to carry the (P, p) its labels belong to, and the sketch's
-  `{"4a": ["2a", "2d"]}` drops it. Rule 2 wants the method and its source
-  stated: the (P, p) is spglib's standardisation and can move with spglib or
-  moyo. Rule 4 (a new topic) wants the reference named before the code: the
-  Tests task's "stated set of named maximal subgroups" is not yet stated.
-
 ## Non-goals
 
 - Magnetic subgroups (time reversal): M-7's isotropy subgroups, WP-1418.
@@ -169,17 +117,18 @@ identification call.
       over F_p, conjugacy classes
 - [x] (P, p) to the standard setting, verified exactly against the
       Hall-database group
-- [ ] Wyckoff positions from operators, and `wyckoff_splitting`
+- [x] Wyckoff positions from operators, and `wyckoff_splitting`
 - [x] Isomorphic subgroups on demand (`index=`, `supercell=`)
-- [ ] Tests: the closed-form series counts; a stated set of named maximal
+- [x] Tests: the closed-form series counts; a stated set of named maximal
       subgroups each present with its (P, p); the non-maximal controls;
       multiplicity conservation; the setting-invariance multisets; the 1731
       total. The full 230-group index ≤ 9 sweep as a `slow` test or a
       benchmark, as its cost decides
 - [x] Manual Part 2: the t/k construction and the F_p reduction with
       *Source* lines (ITA A1)
-- [ ] Skill: none at first, since no fit reaches it until a consumer WP
-      calls it; a row in the consumer's reference file when one does
+- [x] Skill: none at first, since no fit reaches it until a consumer WP
+      calls it; a row in the consumer's reference file when one does (none
+      written: no consumer reaches a fit yet, see the 2026-11-01 close entry)
 
 ## Acceptance
 
