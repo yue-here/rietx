@@ -223,8 +223,11 @@ def reduce_cell(cell: tuple[float, ...], centring: str = "P", *,
     66°, 65°) a normalisation flipped ζ and kept η = −1.26e-5, a Křivý-Gruber
     step then moved ξ by that wrongly signed η, and a second normalisation put
     η's sign back.  Every sign agreed at the end, and ξ was 2|η| = 2.5e-5 off
-    the image (1.1e-7 of max|G|).  The image differs from gemmi's vector by
-    under ε, which is all the reduction promised.
+    the image (1.1e-7 of max|G|).  The image can sit up to about 2 ε from
+    gemmi's vector: 1.65 ε on P and 1.99 ε on I near a right angle (issue
+    #1252).  The reduction promises the Niggli conditions at ε, and the
+    image meets them (``tests/test_indexing_reduce.py``'s
+    ``_niggli_violation``).
     """
     import gemmi
 
