@@ -1,6 +1,6 @@
 # WP-2028 — a joint fit's guards see every histogram
 
-Milestone: unscheduled · Status: 🔄 2026-10-28 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`); 4 measured, not wired; 7's census closed 2026-10-31 (#1205; two follow-on items open); 8 measured on #1124
+Milestone: unscheduled · Status: 🔄 2026-10-31 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`) and 7's census as PR #1205 (`d0d4831d`); 4 measured, not wired; 8 measured on #1124; the two follow-on items 7's census opened are listed as tasks
 Track: What fires, and what stays silent
 Depends on: — (1341 closed: it built the joint report this WP completes; 1325
 soft: its parametric codes and per-pattern holds are what tasks 3 and 6
@@ -129,6 +129,31 @@ The joint fit's curves come from the last stage's compile, not a compile at
 the answer, which is WP-1421's; a Layer 0 reading after a width stage carries
 that caveat until 1421 lands.
 
+### Inherited
+
+- 2026-10-31, from the issue triage (issue #1124): task 8's measurement,
+  posted by the claimant 2026-10-28. Nothing wired. No source they read
+  defines observations per parameter over several patterns: McCusker 1999 §9
+  is one pattern, pdCIF keeps `_reflns_number_observed` per block, the GSAS
+  manual's joint χ² counts points; GSAS-II, FullProf and TOPAS manuals not
+  surveyed beyond their notes. Three candidates on seven public fits (LaB6
+  pair and three variants, corundum X-ray + neutron, MnF₂ three patterns,
+  `mg090`): (a) per pattern fires on a pattern short on its own while the
+  joint fit is supported (1.0 beside a joint 6.0) and charges a column to a
+  pattern that cannot see it; (b) #1128's candidate counts a per-pattern
+  column once per pattern, so it reads 3.6 and 3.0 where each pattern carries
+  5.0 and 6.0 and would fall as 1/N on a series; (c) the sum over-counts
+  repeats of one radiation. With every structural column shared no candidate
+  fires. Their recommendation: none; record "no agreed joint definition;
+  WP-2028 task 8 measured three candidates on #1124" in the
+  `_data_support_diagnostics` scope reason, leave `support=None`, and re-point
+  the four comments naming WP-1341 (`multi.py:249`, `:441`, `:2095`, `:2098`
+  on their tree) to this WP, in task 7's PR #1205 or a follow-up. A narrowed
+  (b), asked only when every free structural column is shared, is defined in
+  the comment if a number is wanted; it reads 6.0–25.3 on the shared fits and
+  fires on none. Checked against the tree at d87c8cc91: task 8 is still
+  unticked; PR #1205 (task 7) is open and leaves task 8 to #1124.
+
 ## Non-goals
 
 - The joint fit's compile at the answer (the #272 sibling): WP-1421.
@@ -219,6 +244,8 @@ shows the findings that name histogram h.
   WP-2001 and WP-2004 (the tier rule).
 
 ## Handover log
+
+- **2026-10-31** (`/pr-review`) — task 7's census merged from outside as PR #1205 (`d0d4831d`) after two rounds. The contributor's 2026-10-28 and 2026-10-31 entries, ticks and `Status:` edit stand as written, as WP-2030's did (ruled 2026-10-29), so this entry adds the merge record. Round 2 built the three rulings: a shared B is tested against the loosest bound among the histograms that hold it and the message names that histogram (`_large_biso_once`), a per-histogram B keeps its own cell's bound, and the identifiability screens and a read-only joint `parameters()` became their own tasks. Gated in a stack of seven on `main` `d87c8cc9` (tree `21beeca9`, Mac arm64, Python 3.12, `[dev,jax]`): full suite 13 427 passed, 230 skipped, 48 xfailed, 0 failed; GUI, ruff and the `-W` manual build clean. #1257 stayed out on a hung CI job, and `main` after the six merges equals the checked six-PR tree `86997f50`. Gap, not blocking: `docs/releases/1.11.0.md` does not say that a shared B over per-histogram cells now fires only past the loosest bound, where 1.10.0 read histogram 0 alone.
 
 - **2026-10-31** — review round on #1205 (task 7's census closed). The
   maintainer ruled on the three open questions. (1) *Lindemann bound for a

@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-10-26 — merged from outside as PR #1136 (`6823e532`); the close is owed (the v1.11 record's narrative and ✅)
 Track: What fires, and what stays silent
 Depends on: — (1923, closed: the exact change of basis; 1932, closed: the boundary-free comparison that reads it)
-Priority: P3 2026-10-23 — a property test fails on a reachable F-centred cell at 1.1e-7 of the metric's scale, and replays only from one machine's local hypothesis database, so CI cannot see it
+Priority: P2 2026-10-31 — was P3: issue #1252 shows the property test drawing a failing case fresh in about 1 run in 40 (CI sets no derandomize and keeps no database), so the fast check goes red on main at random; the defect is in the test's gemmi-at-ε reference, not in `reduce_cell`
 
 ## Goal
 
@@ -51,6 +51,30 @@ CI runs pins the case.
   holds none of that session's solver change, so it is this WP's defect.
   The example lives in that worktree's local hypothesis database only; CI
   cannot replay it until the test pins it with `@example`.
+
+- 2026-10-31, from the issue triage (issue #1252):
+  `test_the_exact_image_holds_with_one_angle_within_epsilon_of_90[P]` fails on
+  hypothesis's example P (3.0, 3.0, 21.0, 89.99999°, 65°, 65°), and the
+  reporter measured 5 failures in 200 seeds on an empty example database (2.5
+  %, Wilson 95 % interval 1.1-5.6 %). CI keeps no database and sets no
+  `derandomize`, so CI draws a fresh sample each run. Checked against the tree
+  at d87c8cc91 (`lane-A/r1252.py`, `r1252b.py`): the helper's first assertion
+  holds, since `reduce_cell`'s metric equals M·G·Mᵀ to 4e-17 of max|G|. What
+  fails is the last assertion, the comparison with gemmi's `niggli_reduce` +
+  `normalize` at ε = `NIGGLI_EPS_RELATIVE`·V^(1/3) (5.33e-5 Å²): 1.65 ε here.
+  gemmi at ε differs from gemmi at 1e-12 by the same 1.65 ε, and `reduce_cell`
+  agrees with gemmi at 1e-12 to 6e-14. So gemmi's ε run moves, and
+  `reduce_cell` does not. The 2026-10-28 entry above (offset 6.905e-6, 6.07e-5
+  against a bar of 5.33e-5) is this same failure: its "347.14333602 for
+  M·G·Mᵀ" is gemmi's ε-vector, not the exact image. Re-measured, that case
+  reads 1.6e-16 from the image and 1.14 ε from gemmi at ε. The fix is in the
+  test, not in `reduce_cell`: compare against gemmi at a tight ε where gemmi
+  picks the same setting, or bound the comparison at about 2 ε, and pin the
+  issue's example with `@example`. One of the reporter's five cases, (21, 3,
+  3, 90.00001°, 65°, 111°), has gemmi at 1e-12 choosing a different setting
+  8.8 Å² away, so a tight-ε reference alone is not enough there. A test that
+  runs the reduction against a reference whose own ε-dependence exceeds the
+  bar is the class to look for in `tests/test_indexing_reduce*.py`.
 
 ## Non-goals
 

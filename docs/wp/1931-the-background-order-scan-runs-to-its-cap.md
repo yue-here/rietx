@@ -124,6 +124,26 @@ claim the proposal makes and has not measured.
   document for the smoothing strength must not be readable as a wavelength.
   `lambda_smooth` (WP-1454) is the existing case.
 
+- 2026-10-31, from the issue triage (issue #833): a case for the parked
+  selector's acceptance, with no profile misfit at all (reporter, 2026-10-29,
+  synthetic, no code proposed). Two families come from rietx's own forward
+  model, with the truth's profile equal to the model's. One is a cubic
+  perovskite on a capillary with a 4-term Chebyshev background. The other is
+  rutile in Bragg-Brentano with Kα1+Kα2. Each has 20 seeds.
+  `auto_background(data, seed=True)` leaves an edge error of a few tenths of a
+  percent of the background. It alternates in sign within the first 15° and
+  returns at the top end. A truth-form Chebyshev control shows none. A
+  coherent-residual scan (#1215) fires on 17/20 and 20/20 with the auto
+  P-spline, and on 0/20 with the control. `AIR_SCATTER_UNDECLARED` fires on
+  clean rutile on 20/20 with the P-spline and 0/20 with the control. The
+  error's significance grows with counts (9.0σ to 25.5σ at 10× counts), while
+  its size stays near +0.8 %. The reporter suggests that the selector's
+  acceptance include the error in the first and last ~15° against a truth-form
+  control, read with `worst_absorption`. No threshold is proposed. Checked
+  against the tree at d87c8cc91: `auto_background` exists
+  (`background/auto.py:92`) and the REML tasks are unticked. The figures were
+  not re-run. They come from one source, the same forward model.
+
 ## Non-goals
 
 - The seed default (#725, #833 item 3): WP-1542.
