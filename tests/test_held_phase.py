@@ -1694,6 +1694,23 @@ def test_one_seen_phase_leaves_the_instrument_free(held_fit):
     assert not [d for d in result.diagnostics if "No phase was seen" in d.message]
 
 
+def test_the_clause_reports_what_the_answer_holds():
+    """A zero shift held in an early stage and released once a phase was seen
+    is a measurement at the answer, so no clause tells a reader to drop it
+    (WP-2049, review finding 4)."""
+    from rietx.refine import _instrument_held
+    from rietx.schemas.results import StageResult
+
+    def stage(name, held):
+        return StageResult(name=name, status="converged", n_iterations=1,
+                           cost_initial=1.0, cost_final=1.0, held=held)
+
+    zero = "instrument.zero_shift"
+    assert _instrument_held([stage("a", [zero]), stage("b", [])]) == ([], [])
+    assert _instrument_held([stage("a", [zero]), stage("b", ["phases.0.cell.a"]),
+                             stage("c", [zero])]) == ([zero], ["a", "c"])
+
+
 def test_what_reaches_the_pattern_without_a_phase_is_never_peak_only():
     """The background and every extra component add to the pattern on their
     own.  A declared sharp peak reads the polarisation and the line weights

@@ -1489,7 +1489,8 @@ def _only_moves(reached: list[str], prefixes: tuple[str, ...],
     ``peak_only`` is :func:`_peak_only_instrument_path` bound to the model,
     passed only when **every** phase is unseen (WP-2049).  An instrument entry
     the pattern reads through phase peaks alone is then as flat as the cells:
-    a zero shift fitted to a blank frame read −0.0229 ± 0.0048° (4.8σ).
+    a zero shift fitted to a blank frame read −0.0129 ± 0.0015° (8.7σ,
+    truth 0.006°).
     """
     moved = [p for p in reached if not is_variable_path(p)]
     return bool(moved) and all(
@@ -10352,19 +10353,30 @@ def _instrument_held(stage_results: list[StageResult]
     moving none, so such a column in ``held`` is this hold's, bar the
     instrument widths the width-twin test held (:attr:`~StageResult.
     width_twins_held`), which are left out.
+
+    **What the answer holds, never what some stage did.**  The columns are
+    the last stage's, because a phase seen in a later stage releases them and
+    they are then measured.  Reported from every stage, the clause told a
+    reader to drop a zero shift that a seen phase had set.  The stages are
+    those that held one of them.
     """
-    paths: dict[str, None] = {}
-    stages: dict[str, None] = {}
-    for sr in stage_results:
+    def taken(sr: StageResult) -> list[str]:
         twins = set(sr.width_twins_held or ())
+        out = []
         for path in sr.held:
             names = (path, *sr.held_reach.get(path, ()))
             if path in twins or any("phases." in n for n in names):
                 continue
             if any(_unscoped(n).startswith("instrument.") for n in names):
-                paths[path] = None
-                stages[sr.name] = None
-    return list(paths), list(stages)
+                out.append(path)
+        return out
+
+    if not stage_results:
+        return [], []
+    paths = taken(stage_results[-1])
+    wanted = set(paths)
+    stages = [sr.name for sr in stage_results if wanted & set(taken(sr))]
+    return paths, stages
 
 
 def _phase_support_diagnostics(support_by_phase: np.ndarray,
