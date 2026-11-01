@@ -27,11 +27,13 @@ import numpy as np
 
 from . import runs
 from .backend.api import backend_dtype_note
+from .crystallography.structure_factor import phase_orbit_split
 from .crystallography.twins import merge_site_twins
 from .history.events import _attach_progress, as_event_stream
 from .model.forward import (
     PHASE_SUPPORT_SIGMA,
     compile_model,
+    orbit_split_of,
     recorded_window_tol,
     window_loss,
 )
@@ -103,6 +105,7 @@ from .refine import (
     _low_angle_diagnostics,
     _max_iter_diagnostics,
     _merge_unresolved,
+    _multiplicity_kept_diagnostics,
     _non_finite_diagnostic,
     _occupancy_flag_diagnostics,
     _onto_flat_meridian,
@@ -1541,6 +1544,11 @@ class MultiHistogramRefinement:
             + _symmetry_silence_diagnostics(self.mtable.structures[0], mode)
             + _joint_fixed_literals(plan.stages, self.mtable))
         self.mtable.set_vary(["*"], False)
+        # each histogram's orbit split, decided once from the coordinates the
+        # fit starts at and handed to every compile below, the single runner's
+        # rule (``Refinement._decide_orbit_split``, WP-2052)
+        orbit_splits = [[phase_orbit_split(p) for p in s.phases]
+                        for s in self.mtable.structures]
         stage_results: list[StageResult] = []
         # one CELL_RUNAWAY diagnostic per stage that fired, exactly as the
         # single-histogram runner builds one per _run_stage call (review of
@@ -1592,10 +1600,11 @@ class MultiHistogramRefinement:
                 models = [
                     compile_model(s, ins, d, mode="rietveld", two_theta_limits=lim,
                                   moving_paths=set(tab.moving_paths),
-                                  window_area_tol=recorded_window_tol(window_tol))
-                    for s, ins, d, lim, tab in zip(
+                                  window_area_tol=recorded_window_tol(window_tol),
+                                  orbit_split=split)
+                    for s, ins, d, lim, tab, split in zip(
                         self.mtable.structures, self.mtable.instruments, data, limits,
-                        self.mtable.tables, strict=True)]
+                        self.mtable.tables, orbit_splits, strict=True)]
                 self.mtable.push_moment_frames(models)
                 stage_ftol = {} if ftol is None else {"ftol": ftol}
                 # A phase the data cannot see is flat here too (WP-1301), and
@@ -1861,13 +1870,15 @@ class MultiHistogramRefinement:
         """
         values = [t.decode(th) for t, th in zip(
             self.mtable.tables, self.mtable.split(outcome.theta), strict=True)]
+        # each at the solve's orbit split, as the single runner's (WP-2052)
         fresh = [
             compile_model(s, ins, d, mode="rietveld", two_theta_limits=lim,
                           moving_paths=set(tab.moving_paths),
-                          window_area_tol=recorded_window_tol(window_tol))
-            for s, ins, d, lim, tab in zip(
+                          window_area_tol=recorded_window_tol(window_tol),
+                          orbit_split=orbit_split_of(old))
+            for s, ins, d, lim, tab, old in zip(
                 self.mtable.structures, self.mtable.instruments, data, limits,
-                self.mtable.tables, strict=True)]
+                self.mtable.tables, models, strict=True)]
         # the solve's moment frames, never the fresh compiles' (#598)
         self.mtable.push_moment_frames(fresh)
         pairs = []
@@ -1882,7 +1893,12 @@ class MultiHistogramRefinement:
         # are fitted by its χ² alone; one finding, naming the worst
         rel = [abs(b - a) / a if a > 0 else 0.0 for a, b in pairs]
         worst = int(np.argmax(rel))
-        return fresh, _frozen_compile_diagnostics(*pairs[worst], histogram=worst)
+        # the histograms share one set of coordinates, so the shared
+        # structure's sites are asked once, as the opening findings are
+        kept = _multiplicity_kept_diagnostics(self.mtable.structures[0],
+                                              orbit_split_of(models[0]))
+        return fresh, kept + _frozen_compile_diagnostics(*pairs[worst],
+                                                         histogram=worst)
 
     def _emit_stage_start(self, stream, stage, index, n_stages, models, *,
                           freed, held, unknown_paths, unreached, **extra) -> None:

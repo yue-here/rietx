@@ -152,9 +152,23 @@ def select_orbit_ops(sg, xyz: np.ndarray, *,
     return orbit.rot, orbit.tran
 
 
+def phase_orbit_split(phase: Phase) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Each atom's orbit split, decided from its current coordinates.
+
+    One ``(R, t)`` pair per atom, from :func:`select_orbit_ops`.  The value
+    :func:`compile_phase_sites` decides when it is handed none, and what a fit
+    decides once at its start and hands to every compile it makes (WP-2052).
+    """
+    sg = resolve_group(phase.space_group, phase.symmetry_operations)
+    return [select_orbit_ops(sg, np.array([a.x.value, a.y.value, a.z.value]))
+            for a in phase.atoms]
+
+
 def compile_phase_sites(phase: Phase,
                         f_anom: dict[str, complex] | None = None,
-                        *, neutron: bool = False) -> PhaseSites:
+                        *, neutron: bool = False,
+                        ops: list[tuple[np.ndarray, np.ndarray]] | None = None,
+                        ) -> PhaseSites:
     """Freeze the per-atom symmetry and species data for one stage.
 
     ``f_anom`` maps a **raw** ``Atom.species`` string (``"Zn2+"``, not the
@@ -171,14 +185,22 @@ def compile_phase_sites(phase: Phase,
     f′/f″ because that is a core-level effect, while for b a **mass number is
     kept**, because the isotope is the scatterer (see
     :mod:`rietx.crystallography.neutron`).
+
+    ``ops`` is an orbit split decided earlier, one ``(R, t)`` pair per atom,
+    reused instead of deciding it again from the current coordinates.  A fit
+    passes the split it decided at its start, so no stage and no closing
+    compile changes a site's multiplicity (WP-2052).  ``None`` decides it here.
     """
-    sg = resolve_group(phase.space_group, phase.symmetry_operations)
-    ops: list[tuple[np.ndarray, np.ndarray]] = []
+    if ops is None:
+        ops = phase_orbit_split(phase)
+    elif len(ops) != len(phase.atoms):
+        raise ValueError(
+            f"phase {phase.name!r}: an orbit split for {len(ops)} atoms was "
+            f"handed to a phase of {len(phase.atoms)}")
+    ops = list(ops)
     species: list[str] = []
     aniso: list[bool] = []
     for atom in phase.atoms:
-        xyz = np.array([atom.x.value, atom.y.value, atom.z.value])
-        ops.append(select_orbit_ops(sg, xyz))
         # The species convention follows the RADIATION.  The X-ray normaliser
         # validates against Waasmaier-Kirfel coefficients, which no isotope
         # has and a neutron phase never needs: it resolves ``b_coh`` below and

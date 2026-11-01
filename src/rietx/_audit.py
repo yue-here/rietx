@@ -1087,6 +1087,18 @@ ROWS: tuple[Row, ...] = (
                   "it under a tie. The direction of a "
                   "DOF is the nullspace of the site group, so the map is derived, never "
                   "chosen (#1014, rounds 5-6)")),
+    Row("SITE_MULTIPLICITY_KEPT", "code", tier=2, ambiguity=1,
+        response="warning",
+        responds=("decide whether the site is one atom on the special position or a split "
+                  "pair before quoting a weight fraction, a density or the site's occupancy "
+                  "from a later compile or the next fit"),
+        evidence=("practice: GSAS-II reads a site's multiplicity once, at setup "
+                  "(GSASIIstrIO.py:1762, Amul from the stored atom record) and weights every "
+                  "operation by Mult*frac/nOps (GSASIIstrMath.py:1279), so a fit keeps the "
+                  "orbit split it started with for every stage and its closing compile "
+                  "(WP-2052, #1088). The report is arithmetic with no threshold: it fires "
+                  "exactly when a returned site's fresh split has another image count, and "
+                  "gives the atoms per cell both ways")),
     Row("SITE_TWINS_KEPT", "code", tier=1, ambiguity=3,
         response="warning",
         responds=("decide which reading of the site the file meant before quoting a weight "
@@ -4468,6 +4480,10 @@ ROWS: tuple[Row, ...] = (
         evidence=("arithmetic: points at parameters() for the site, where the renumbered "
                   "paths are listed; it states no value")),
     Row("SITE_SNAPPED_TO_SPECIAL_POSITION.suggestion", "suggestion", value=2),
+    Row("SITE_MULTIPLICITY_KEPT.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the occupancy that keeps the fitted content on the "
+                  "special position (occ x fitted / fresh multiplicity) and TWIN_COORD_TOL, "
+                  "read from the constant, as the distance that keeps the site split")),
     Row("SITE_TWINS_KEPT.suggestion", "suggestion", tier=1, ambiguity=1, value=2,
         evidence=("arithmetic: names the special-position occupancy each reading implies "
                   "(occ for one atom off its position, occ x before/after for a split pair) "

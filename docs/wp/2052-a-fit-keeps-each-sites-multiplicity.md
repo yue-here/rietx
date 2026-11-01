@@ -112,12 +112,12 @@ maintainer under the reader-output rule before merge.
 ## Tasks
 
 - [x] Take the decision above and record it.
-- [ ] Find every compile inside one fit that re-decides an orbit split: stage compiles, the
+- [x] Find every compile inside one fit that re-decides an orbit split: stage compiles, the
   closing stage, `_final_compile`, the joint fit in `multi.py`, a series pattern's fits in
   `sequential.py`, and rigid-body atoms (#1005).
-- [ ] Decide each site's split once per `fit()`/`run_stage()` and pass it to every compile in
+- [x] Decide each site's split once per `fit()`/`run_stage()` and pass it to every compile in
   that call (option 1), or carry the multiplicity on the compiled phase.
-- [ ] A finding at the end naming each site whose fresh split differs, with atoms per cell both
+- [x] A finding at the end naming each site whose fresh split differs, with atoms per cell both
   ways; and `FROZEN_COMPILE_STALE`'s text stops advising another stage when the gap is a
   multiplicity change.
 - [ ] The coordinate walk: a coordinate DOF whose column is zero at a special position walked

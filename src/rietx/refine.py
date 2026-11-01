@@ -44,7 +44,12 @@ from .crystallography.magnetic.moments import (
     MOMENT_DOF_PATH as _MOMENT_DOF,
 )
 from .crystallography.magnetic.scattering import check_group_is_structure_symmetry
-from .crystallography.symmetry import reflection_label, reflection_label_row
+from .crystallography.structure_factor import phase_orbit_split
+from .crystallography.symmetry import (
+    TWIN_COORD_TOL,
+    reflection_label,
+    reflection_label_row,
+)
 from .crystallography.twins import (
     NumberingMoves,
     carry_constraints,
@@ -70,6 +75,7 @@ from .model.forward import (
     CompiledModel,
     Mode,
     compile_model,
+    orbit_split_of,
     recorded_window_tol,
     window_loss,
 )
@@ -2456,6 +2462,12 @@ class Refinement:
         #: to what the caller asked to refine.
         self._held: list[str] = []
         self._pending_reflections: list[ReflectionState] = []
+        #: each phase's orbit split, decided once at the start of a ``fit()``
+        #: or ``run_stage()`` and handed to every compile that call makes, so
+        #: no stage and no closing compile changes a site's multiplicity
+        #: (WP-2052).  ``None`` outside a call: a compile then decides it from
+        #: the coordinates, as a fresh ``Refinement`` does.
+        self._orbit_split: list | None = None
         #: user constraints (WP-1070), path → the affine dependence declared for
         #: it.  The one authority for *which* ties are the user's: the symmetry
         #: ties are rederived by every ``ParameterTable`` build and are absent
@@ -4624,7 +4636,10 @@ class Refinement:
             # and the area its windows may drop: the closing stage's own, None
             # for every declared stage (WP-2002, the sixth round's Q1 and Q2),
             # which compiles at the declared 2 % by name
-            window_area_tol=recorded_window_tol(window_area_tol))
+            window_area_tol=recorded_window_tol(window_area_tol),
+            # the split this call decided at its start, so a stage that drove
+            # a half-occupied atom onto a mirror keeps its multiplicity
+            orbit_split=self._orbit_split)
         table.push_moment_frames(new_model)
         carried = False
         if model is not None and mode in ("lebail", "pawley") and model.mode == mode:
@@ -5169,15 +5184,35 @@ class Refinement:
         reproduced stage 1's report to three decimals.)
         """
         plan = resolve_plan(plan, mode)
-        if mode == "lebail" and plan.lebail_passes > 1 and plan.stages:
-            return self._fit_lebail_alternation(
-                data, plan=plan, two_theta_limits=two_theta_limits,
+        owns_split = self._decide_orbit_split()
+        try:
+            if mode == "lebail" and plan.lebail_passes > 1 and plan.stages:
+                return self._fit_lebail_alternation(
+                    data, plan=plan, two_theta_limits=two_theta_limits,
+                    events=events, cancel=cancel, telemetry=telemetry,
+                    label=label, stage_reports=stage_reports,
+                    progress=progress)
+            return self._fit_pass(
+                data, mode=mode, plan=plan, two_theta_limits=two_theta_limits,
                 events=events, cancel=cancel, telemetry=telemetry, label=label,
                 stage_reports=stage_reports, progress=progress)
-        return self._fit_pass(
-            data, mode=mode, plan=plan, two_theta_limits=two_theta_limits,
-            events=events, cancel=cancel, telemetry=telemetry, label=label,
-            stage_reports=stage_reports, progress=progress)
+        finally:
+            if owns_split:
+                self._orbit_split = None
+
+    def _decide_orbit_split(self) -> bool:
+        """Decide each site's orbit split for the call starting now (WP-2052).
+
+        Returns whether this call decided it, and so must clear it at its end.
+        A call made inside another one, such as a profile-interval refit inside
+        ``fit``, reuses the outer call's split, which is the split its answer
+        was solved at.  GSAS-II reads a site's multiplicity once, at setup
+        (``GSASIIstrIO.py``), and this is that rule for one call.
+        """
+        if self._orbit_split is not None:
+            return False
+        self._orbit_split = [phase_orbit_split(p) for p in self.structure.phases]
+        return True
 
     def _fit_lebail_alternation(self, data: PatternData, *,
                                 plan: RefinementPlan, **kw) -> RefinementResult:
@@ -5820,8 +5855,15 @@ class Refinement:
 
         Returns the model to report from and a ``FROZEN_COMPILE_STALE`` finding
         when the two χ² differ by more than :data:`FROZEN_COMPILE_CHI2_REL`,
-        so a caller can see when the frozen windows mattered.
+        so a caller can see when the frozen windows mattered.  Beside it, a
+        ``SITE_MULTIPLICITY_KEPT`` finding for each site whose returned
+        coordinates a fresh compile would count at another multiplicity: this
+        compile keeps the solve's orbit split, so the gap is never one of
+        composition (WP-2052).
         """
+        kept = (_multiplicity_kept_diagnostics(self.structure,
+                                               orbit_split_of(model))
+                if mode == "rietveld" else [])
         if mode == "pawley":
             return model, []
         fresh = compile_model(
@@ -5830,7 +5872,11 @@ class Refinement:
             moving_paths=set(table.moving_paths),
             restraint_weight_scale=stage.restraint_weight_scale,
             window_slack_deg=stage.window_slack_deg,
-            window_area_tol=recorded_window_tol(window_area_tol))
+            window_area_tol=recorded_window_tol(window_area_tol),
+            # and the solve's orbit split: the fit's own compiles all used it,
+            # and a fresh one would halve a site the last stage left on a
+            # mirror (WP-2052).  Its fresh reading is reported, never used.
+            orbit_split=orbit_split_of(model))
         # and the solve's moment frames, never the fresh compile's: this one is
         # built at the fitted cell, so a last stage that moved an angle would
         # otherwise read the refined moment DOFs in a frame they were never
@@ -5852,7 +5898,7 @@ class Refinement:
             ((model.y_obs - model.evaluate(values)) / model.sigma) ** 2))
         chi2_fresh = float(np.sum(
             ((fresh.y_obs - fresh.evaluate(values)) / fresh.sigma) ** 2))
-        return fresh, _frozen_compile_diagnostics(chi2_frozen, chi2_fresh)
+        return fresh, kept + _frozen_compile_diagnostics(chi2_frozen, chi2_fresh)
 
     def _stage_report(self, name, plan, data, mode, table, model, outcome,
                       guard, stage_diagnostics, *, significance=None
@@ -5962,7 +6008,9 @@ class Refinement:
         cancel = runs.attach_cancel(runs.recorder_of(stream), cancel)   # WP-1405
         sinks = _snapshot_sinks(stream, events, recorder)
 
+        owns_split = False
         try:
+            owns_split = self._decide_orbit_split()
             table = self._prepare_table(restore=True)
             stale_since = _anti_bump_start_phases(self.structure, mode)
             # the constructed (or last-edited) λ, not the value the previous stage
@@ -6130,6 +6178,8 @@ class Refinement:
                 recorder.close("failed")
             raise
         finally:
+            if owns_split:
+                self._orbit_split = None
             if recorder is not None:
                 recorder.close()
 
@@ -8881,6 +8931,64 @@ def _frozen_compile_diagnostics(chi2_frozen: float, chi2_fresh: float, *,
             f"{100 * rel:.2g} % apart. The result reports the fresh "
             f"figure and {kept}."),
         value=rel)]
+
+
+def _multiplicity_kept_diagnostics(structure: Structure, split: list,
+                                   ) -> list[Diagnostic]:
+    """``SITE_MULTIPLICITY_KEPT`` for each site a fresh compile would recount.
+
+    ``split`` is the orbit split the fit solved with, decided once at its
+    start (``Refinement._decide_orbit_split``).  A site whose returned
+    coordinates give another split at a fresh compile is one the fit carried
+    across ``SITE_TOL`` of a special position.  The usual case is a
+    half-occupied general atom, a split pair across a mirror, that the data
+    do not resolve: its cost is even in the distance off the mirror, so the
+    solver stops on it (WP-2052, issue #1088).  The fit counted the site at the
+    multiplicity it started with, as GSAS-II does for a whole refinement.
+    Every later compile decides from the coordinates, so the message gives the
+    atoms per cell both ways and says which one the result used.
+
+    The test is arithmetic and has no threshold: any change of a site's
+    image count is reported.
+    """
+    out: list[Diagnostic] = []
+    for i, (phase, ops) in enumerate(zip(structure.phases, split, strict=True)):
+        fresh = phase_orbit_split(phase)
+        for j, (atom, (rot, _), (rot_now, _)) in enumerate(
+                zip(phase.atoms, ops, fresh, strict=True)):
+            m_fit, m_now = len(rot), len(rot_now)
+            if m_fit == m_now:
+                continue
+            occ = atom.occ.value
+            on_position = occ * m_fit / m_now
+            out.append(Diagnostic(
+                level="warning", code="SITE_MULTIPLICITY_KEPT",
+                where=[f"phases.{i}.atoms.{j}"],
+                value=occ * (m_fit - m_now),
+                message=(
+                    f"site {atom.label!r} of phase {phase.name!r} was fitted at "
+                    f"{m_fit} positions in the cell, the orbit it started the "
+                    f"fit with: {m_fit} × {occ:g} = {m_fit * occ:g} atoms per "
+                    f"cell. At the coordinates the fit returns, "
+                    f"{[round(a.value, 6) for a in (atom.x, atom.y, atom.z)]}, "
+                    f"a fresh compile counts {m_now} positions: {m_now} × "
+                    f"{occ:g} = {m_now * occ:g} atoms per cell. The result, "
+                    f"its statistics and its weight fractions use the fitted "
+                    f"count. Later compiles decide from the coordinates and use "
+                    f"the fresh count. They include predict() on a new grid, "
+                    f"suggest(), a new Refinement and the next fit."),
+                suggestion=(
+                    f"if the site is one atom on the special position, state "
+                    f"it there at occupancy {on_position:g}, which keeps the "
+                    f"fitted content; if it is a split pair the data do not "
+                    f"resolve, state it more than {TWIN_COORD_TOL:g} "
+                    f"(fractional) from the special position, or the next fit "
+                    f"counts it at {m_now} positions." if m_now < m_fit else
+                    f"state the site on the special position to keep the "
+                    f"fitted count, or more than {TWIN_COORD_TOL:g} "
+                    f"(fractional) from it to have it counted at {m_now} "
+                    f"positions.")))
+    return out
 
 
 #: a Pawley overlap group is reported unresolved when *any* member carries a
