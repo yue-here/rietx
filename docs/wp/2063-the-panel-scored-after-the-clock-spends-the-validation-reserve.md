@@ -142,6 +142,10 @@ fit is bounded, so the validation reserve reaches validation and
     run searched only cubic, hexagonal and trigonal, so its merge was 37
     panels against WP-2011's 80.
   - Reader output (`python -m tests.reader_output`): exit 0, unchanged.
+  - Main merged last at 7e4b82ed6. WP-2048's `_drive_single` took the LM
+    call, and `cancel` now goes through it. Not re-run as a fast
+    selection. The solver and cancel files passed (102, then 160),
+    and probe 2 returned 0.00 s past its clock on the idle machine.
   - Gates: fast selection on the final tree before a two-line CLAUDE.md
     rewrap: 13177 passed, 310 skipped, 32 xfailed, 3 failed (30 min, load
     ~150). The three: `test_display`'s kernel case (the known stale Jupyter
