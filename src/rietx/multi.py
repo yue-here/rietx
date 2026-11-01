@@ -2675,12 +2675,15 @@ def _parametric_unseen(models, mtable, sigma: float = PHASE_SUPPORT_SIGMA
     Empty when nothing was declared (WP-1325).  ``sigma`` is the threshold
     ``PHASE_UNCONSTRAINED`` reads (``refine._reported_support_sigma``,
     WP-2002 B1): a report, so it speaks with the hold switched off.
+    ``models`` goes to :func:`_unseen` as the hold passes it, so an
+    instrument target on a pattern that sees no phase is unseen (WP-2049).
     """
     if not mtable.parametric:
         return {}
     absent = _joint_unsupported_phases(models, mtable, sigma)
     return {r.name: frozenset(k for k in r.patterns
-                              if _unseen(mtable, f"hist.{k}.{r.target}", absent))
+                              if _unseen(mtable, f"hist.{k}.{r.target}", absent,
+                                         models=models))
             for r in mtable.parametric}
 
 
