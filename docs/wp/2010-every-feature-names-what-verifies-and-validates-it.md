@@ -3,7 +3,7 @@
 Milestone: generality · Status: 🔄 2026-10-31 — ruled, reworded and read for consistency; the reporter (#1051) builds it
 Track: The audits
 Depends on: —
-Priority: P3 2026-10-18 — outside the gate after 2004, so it waits on nothing; the magnetic report wording moves with it
+Priority: P3 2026-10-18 — outside the gate after 2004, so it waits on nothing
 
 ## Goal
 
@@ -11,8 +11,7 @@ Every feature rietx refines or corrects for names what verifies its code and, wh
 exists, the independent measurement that validates its physics, in DESIGN.md § Rules,
 2's sense as narrowed on 2026-10-27. A feature no test verifies is verified or fenced. A
 feature with no independent measurement is recorded as *not yet validated* in the validation
-matrix and its generated page, for the developers, and a result that reports a number
-from such a feature says so once in its report, naming each such number. A test holds the feature
+matrix and its generated page, for the developers. A test holds the feature
 list to the help vocabulary and the Theory headings, partitioned both ways, and joins
 each feature to its claims, so a new feature cannot land without saying which state it
 is in. That test is the tripwire Rule 4's test for a new topic lacks.
@@ -46,7 +45,12 @@ recorded not yet validated. That state is separate from *provisional*, which
   at the close. Wording of 2026-10-31: "independent measurement" and "reference value"
   replace "referent". DESIGN.md § Rules, 2 carries the text; `generality.md`
   § Acceptance's two rows follow it.
-- *A number with no independent measurement says so in the report.* Chosen over a diagnostic on every
+- *A number with no independent measurement says so in the report.* **Reversed 2026-11-01 by
+  the maintainer:** the validation record stays out of the fit report. The report is read
+  by an agent between stages, while it still chooses what to free; the sentence depends only
+  on which parameters are free, so the one thing it can prompt that differs between fits is
+  changing them, which is the steering the 2026-10-27 ruling forbids. The record stays in
+  `tests/validation_matrix.py` and `docs/VALIDATION.md`. As first decided: chosen over a diagnostic on every
   such fit (a new code on every magnetic fit; the reporter's objection, #1051) and over
   the manual alone. One FitReport sentence, present only when the result reports such a
   quantity, read from the registry: the one place the fact reaches a reader of results.
@@ -86,14 +90,14 @@ only the count is.
 independently measured moment would validate. The magnetic milestone is open (1327,
 1329, 1343, 1418, 1419 and 2034 in flight) and its WPs edit the help entries and manual
 chapters this WP touches. Merge main before the registry commit. 1327's `### Inherited`
-carries a note from 2001 (2026-10-19) on what the label would say; it now says what the
-report says instead.
+carries a note from 2001 (2026-10-19) on what the label would say; it now says the
+state lives only in `docs/VALIDATION.md` (the report sentence was removed 2026-11-01).
 
 **The seat.** The reporter proposed `capabilities()` primary with a derived
 `HelpEntry.validation` field (8 files, the GUI's TypeScript, vitest table and dist). Under
 the 2026-10-27 ruling neither: the help field waits, and `capabilities()` carries no
 per-feature state. The feature registry (`rietx.features`, the reporter's key) ships,
-because the report sentence reads it.
+as the key the matrix's join uses.
 
 **The grain.** A feature is what a user switches on or refines, so the key is the help
 vocabulary: every `PARAMETER_HELP` family and every correction field in
@@ -170,19 +174,19 @@ symbols, joint fits) and get one or a declared exception.
       (start dependence as "a validation axis", "would validate a configuration", the
       anode wavelength tables, the multi-phase CIF round trip), `docs/VALIDATION.md`
       regenerated.
-- [x] The report sentence: a result that reports a quantity from a feature with no
-      independent measurement lists it once, read from the registry; absent otherwise.
+- [x] ~~The report sentence~~ built, then removed 2026-11-01 (reversed by the maintainer, see
+      Decided).
 - [x] The meta-test: the feature list partitions the help vocabulary and the Theory
       headings both ways; every claim and test a feature names exists; every
       `prediction` claim names its reference value's kind.
 - [x] Root CLAUDE.md § Invariants: the clause "Every physics function cites its
       reference" names the meta-test.
-- [x] 1327's `### Inherited` note updated: the report sentence's wording for the moment.
+- [x] 1327's `### Inherited` note updated: the moment's state now lives only in `docs/VALIDATION.md`.
 - [ ] Follow-ups filed: the ceria round robin as a microstructure measurement; references
       for data already in the tree (a Le Bail cell against the SRM 660c and 676a
       certificates, published space groups for the extinction symbols, LaMnO₃'s Pn′ma′).
 - [x] Tests; the fast count moved by exactly the tests added.
-- [ ] Skill: none. The report sentence is the package's own output (DESIGN.md § Rules, 3).
+- [ ] Skill: none.
 
 ## Acceptance
 
@@ -211,7 +215,7 @@ confirm the new test goes red naming it.
 ## Handover log
 
 - **2026-10-31 (build, the reporter's PR)** — the registry, the join, the retier by rule
-  and the report sentence, as ruled on #1051.
+  and (since removed) the report sentence, as ruled on #1051.
 
   *Done.* The first commit carries the list: 17 features no acceptance claim references
   on main at 8b9c0a3ae, the 15 of #1051 plus distortion modes and subgroup enumeration,
@@ -224,8 +228,10 @@ confirm the new test goes red naming it.
   `prediction` row and `validates()` apply the rule: 8 of 9 predictions verify (the
   seven of the ruling and the bethanechol zeroshift row, checked against the package's
   own collinearity), 11 features are validated, all on development data.
-  `FitReport.not_independently_measured` is the report sentence. One new test checks
-  the Whittaker baseline against its defining system.
+  One new test checks the Whittaker baseline against its defining system. *(2026-11-01:
+  the report sentence this entry first listed, `FitReport.not_independently_measured`,
+  was removed on the maintainer's ruling; so were `Feature.independently_measured` and
+  `tests/test_features_report.py`.)*
 
   *Measured.* Fast suite, Linux x86-64, Python 3.12, `[dev]`, `-n 8`, on 8443d05e0:
   13246 passed, 163 skipped, 32 xfailed, 0 failed, 5:51. Tests added: 300 in the fast

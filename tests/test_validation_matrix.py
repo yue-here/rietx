@@ -528,20 +528,6 @@ def test_the_predictions_that_verify_rather_than_validate() -> None:
     assert validating == {"test_sample1_fractions_beat_the_dispersion_free_fit"}
 
 
-def test_the_registry_bit_is_the_matrix_derivation() -> None:
-    """``Feature.independently_measured`` is a copy the report reads at run
-    time; this is what keeps it the matrix's answer."""
-    from rietx.features import FEATURES
-
-    validated = {f for c in CLAIMS if validates(c) for f in c.features}
-    wrong = sorted(n for n, f in FEATURES.items()
-                   if f.independently_measured != (n in validated))
-    assert not wrong, (
-        f"rietx.features disagrees with the matrix on {wrong}: set "
-        "independently_measured to whether a validating claim names it")
-    assert len(validated) == 11
-
-
 def test_every_dataset_state_is_one_of_rule_twos_three() -> None:
     for key, ds in DATASETS.items():
         assert ds.state in DATASET_STATES, f"{key}: state {ds.state!r}"

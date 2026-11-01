@@ -19,12 +19,8 @@ The validation record is the developers' (DESIGN.md § Rules, 2): what verifies
 each feature and what validates it live in ``tests/validation_matrix.py`` and its
 generated page ``docs/VALIDATION.md``, joined to this registry by each claim's
 ``features``.  No surface an agent reads to choose a feature carries that record
-(:func:`rietx.capabilities`, the help entries, the skill).  This module keeps one
-bit of it, :attr:`Feature.independently_measured`, because a fit report names the
-numbers it reports from a feature with no independent measurement, once
-(:attr:`rietx.report.schemas.FitReport.not_independently_measured`), and the
-package cannot read ``tests/``.  The same test file holds the bit equal to the
-matrix's derivation, so it cannot drift from the record it copies.
+(:func:`rietx.capabilities`, the help entries, the skill, the fit report), so
+this module holds no validation state: the matrix derives it.
 """
 
 from __future__ import annotations
@@ -34,7 +30,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Feature:
-    """One feature: its help keys, its Theory headings and one validation bit."""
+    """One feature: its help keys and its Theory headings."""
 
     #: what the feature is, in words
     title: str
@@ -47,11 +43,6 @@ class Feature:
     #: why it has no Theory heading, when it has none (WP-2010's declared
     #: exception); empty when ``theory`` is not
     no_theory: str = ""
-    #: whether a claim in the validation matrix compares it with an
-    #: independent measurement (a certificate, a weighed composition), copied
-    #: from the matrix and held to it by ``tests/test_validation_matrix.py``.  ``False``
-    #: is "not yet validated", which is not "wrong"
-    independently_measured: bool = False
 
 
 FEATURES: dict[str, Feature] = {
@@ -68,7 +59,6 @@ FEATURES: dict[str, Feature] = {
         theory=(
             "peak-positions § Lattice metric and Bragg's law",
         ),
-        independently_measured=True,
     ),
     "wavelength": Feature(
         "Emission lines, wavelength scales, harmonics, wavelength-cell degeneracy",
@@ -86,7 +76,6 @@ FEATURES: dict[str, Feature] = {
             "peak-positions § The wavelength–cell degeneracy",
             "peak-positions § Monochromator harmonics",
         ),
-        independently_measured=True,
     ),
     "position_aberrations": Feature(
         "Zero, specimen displacement and transparency",
@@ -105,7 +94,6 @@ FEATURES: dict[str, Feature] = {
             "peak-positions § Sample transparency",
             "peak-positions § Decorrelating the flat-plate trio",
         ),
-        independently_measured=True,
     ),
     "capillary_offsets": Feature(
         "Capillary offsets along and across the beam",
@@ -191,7 +179,6 @@ FEATURES: dict[str, Feature] = {
             "forward-model § Three intensity models",
             "forward-model § Rietveld mode",
         ),
-        independently_measured=True,
     ),
     "neutron_scattering": Feature(
         "Neutron scattering lengths",
@@ -204,7 +191,6 @@ FEATURES: dict[str, Feature] = {
         theory=(
             "intensities § Anomalous scattering and the powder average",
         ),
-        independently_measured=True,
     ),
     "displacement_parameters": Feature(
         "Isotropic and anisotropic displacement parameters",
@@ -273,7 +259,6 @@ FEATURES: dict[str, Feature] = {
         theory=(
             "corrections § Preferred orientation (March-Dollase)",
         ),
-        independently_measured=True,
     ),
     "spherical_harmonics_texture": Feature(
         "Preferred orientation, spherical harmonics",
@@ -283,7 +268,6 @@ FEATURES: dict[str, Feature] = {
         theory=(
             "corrections § Preferred orientation (spherical harmonics)",
         ),
-        independently_measured=True,
     ),
     "qpa": Feature(
         "Quantitative phase analysis and microabsorption",
@@ -293,7 +277,6 @@ FEATURES: dict[str, Feature] = {
         theory=(
             "corrections § Quantitative phase analysis and microabsorption",
         ),
-        independently_measured=True,
     ),
     "attenuation_estimate": Feature(
         "Attenuation coefficients from composition",
@@ -476,14 +459,12 @@ FEATURES: dict[str, Feature] = {
             "engines § The obliquity bound",
             "engines § The reflection ceiling",
         ),
-        independently_measured=True,
     ),
     "peak_shift_screen": Feature(
         "A systematic 2theta shift measured before the cell",
         theory=(
             "indexing § Measuring the shift before the cell",
         ),
-        independently_measured=True,
     ),
     "peak_picking_and_fitting": Feature(
         "pick_peaks, fit_peaks and their flags",
@@ -517,7 +498,6 @@ FEATURES: dict[str, Feature] = {
         theory=(
             "estimation § Staged strategy and series",
         ),
-        independently_measured=True,
     ),
     "joint_refinement": Feature(
         "Joint multi-histogram refinement (refine_multi)",
@@ -575,37 +555,3 @@ NOT_FEATURES: dict[str, str] = {
     "superspace § The group of an irrep at an incommensurate k": "group mathematics",
 }
 
-
-def feature_of(path: str) -> str | None:
-    """The feature that owns a parameter dot-path, or ``None``.
-
-    Read through the path's help family (:func:`rietx.help.help_key_for`, the
-    match ``ParameterRow.help_key`` carries); a path no family claims, or one
-    whose family is in :data:`NOT_FEATURES` (``vars.*``), has no feature.
-    """
-    from rietx.help import help_key_for
-
-    key = help_key_for(path)
-    if key is None:
-        return None
-    for name, feature in FEATURES.items():
-        if key in feature.parameters:
-            return name
-    return None
-
-
-def parameters_without_independent_measurement(paths) -> dict[str, list[str]]:
-    """``{feature: [path, ...]}`` for the paths whose feature has none.
-
-    In the order the paths came, each path once.  The fit report's one
-    sentence is built from this (WP-2010); a path with no feature is left out,
-    since nothing is known about it either way.
-    """
-    out: dict[str, list[str]] = {}
-    for path in paths:
-        name = feature_of(path)
-        if name is None or FEATURES[name].independently_measured:
-            continue
-        if path not in out.setdefault(name, []):
-            out[name].append(path)
-    return out
