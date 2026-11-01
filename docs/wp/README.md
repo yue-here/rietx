@@ -30,6 +30,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [1806](1806-first-public-case-acridine-form-ix.md) | First public case: acridine form IX | 2026-10-25 | P3 | [rigid-bodies](#rigid-bodies) |
 | [1807](1807-a-body-on-a-special-position.md) | A body on a special position | 2026-10-29 | P2 | [rigid-bodies](#rigid-bodies) |
 | [1809](1809-tether-planarity-and-anti-bump-restraints.md) | Tether, planarity and anti-bump restraints, pairs frozen per plan | 2026-10-30 | P3 | [rigid-bodies](#rigid-bodies) |
+| [1815](1815-derived-geometry-torsions-and-a-request-form.md) | Derived geometry: torsions, a request form, one table every writer reads | 2026-11-01 | P3 | [rigid-bodies](#rigid-bodies) |
 | [1909](1909-a-line-on-a-falling-flank.md) | A line on a falling flank, at a third of its own esd | 2026-10-12 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1910](1910-the-extinction-screen-at-a-small-cell-error.md) | The extinction screen at a small cell error, and the other centring | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [1911](1911-the-foreign-writers-state-what-the-other-program-reads.md) | The foreign writers state what the other program reads: the setting, the scale, the free set | 2026-10-12 | P3 | [Unscheduled](#unscheduled-coming-from-another-code) |
@@ -446,7 +447,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1812](1812-gui-textdoc-skill-and-manual-for-bodies.md) | GUI, textdoc, skill and manual for bodies | ⬜ | P4 | [1805](1805-the-rigid-body.md) |
 | [1813](1813-fragment-io.md) | Fragment I/O: XYZ, Z-matrix write, SMILES behind an extra | ⬜ | P4 | [1802](1802-the-fragment-type.md) |
 | [1814](1814-refinable-z-matrix-internals.md) | Refinable internal geometry: Z-matrix lengths, angles and dihedrals | ⬜ | P3 | [1815](1815-derived-geometry-torsions-and-a-request-form.md), [1805](1805-the-rigid-body.md) |
-| [1815](1815-derived-geometry-torsions-and-a-request-form.md) | Derived geometry: torsions, a request form, one table every writer reads | ⬜ | P3 | [1804](1804-the-derived-block.md) |
+| [1815](1815-derived-geometry-torsions-and-a-request-form.md) | Derived geometry: torsions, a request form, one table every writer reads | 🔄 2026-11-01 | P3 | [1804](1804-the-derived-block.md) |
 
 ## <a id="structure-solution"></a>structure-solution — a map, a cost and a search
 
