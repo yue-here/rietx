@@ -210,6 +210,12 @@ maintainer under the reader-output rule before merge.
   so the next edit or new `Refinement` would merge it and halve the site under
   `SITE_TWINS_MERGED`. That is WP-1991's documented gate, noted here only.
 
+  *Ruled* 2026-11-01, Yue in chat, "option 1". It approves the reader-output change: a
+  split-pair model that lands on its mirror now returns its full composition, and the new
+  warning `SITE_MULTIPLICITY_KEPT` joins its result. The lead also settled, with no objection
+  from Yue, that the freeze needs no audit seat or record field of its own beyond the warning's
+  tier-1 row. A record field belongs with WP-2053, which inherits the between-call gap.
+
 - **2026-10-26** — created, from the 2026-10-26 issue triage (issue #1088). Checked against
   the tree at c0e32ab29: the issue's own script no longer lands inside the snap radius (its
   fit stops 1.1e-3 off the mirror), but the mechanism reproduces on noise-free data and on
