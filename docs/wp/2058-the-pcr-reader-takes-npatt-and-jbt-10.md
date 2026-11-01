@@ -1,6 +1,6 @@
 # WP-2058 — the FullProf `.pcr` reader takes three control flags, `Jbt ±10` and `NPATT`
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-01 — F1 and F2 merged from outside as PR #1199 (`8326bc3d`); F3 (`NPATT`) remains
 Track: Coming from another code
 Depends on: — (F3 waits on two maintainer decisions; #193 for TOF patterns, fenced)
 Priority: P3 2026-10-26 — a reader with a workaround (rebuild the model by hand); none of FullProf's 94 example `.pcr` files reads today, and a contributor's dataset needs F2 and F3
@@ -132,5 +132,7 @@ outside the new scope still refuses by name.
 - Issue #1066; companions #1063 (mCIF), #1068 (single crystal), #193 (TOF).
 
 ## Handover log
+
+- **2026-11-01** (`/pr-review`) — F1 and F2 merged from outside as PR #1199 (`8326bc3d`). The `.pcr` reader now takes `Nor`, `Dum`, `Opt`, `Nre`, the analytic background types and `Jbt` ±10. With the analytic backgrounds in, the census's block on `Nba` that the Context describes no longer applies to F1. A new info code, `FULLPROF_LIMITS_NOT_APPLIED` (tier 1, with its `_audit` row, `help.py` entry and skill row), records that a file's `Nre` hard limits are not carried. A limit names a FullProf parameter number that can drive several values, so the caller sets bounds by hand. That settles the third open decision in the Context (`Nre` as a report only). The other two decisions and F3 are untouched. The PR ticked nothing. Its diff covers the F1 and F2 items, their tests and the audit and `help.py` entries, and the boxes stay for the maintainer. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
 
 - **2026-10-26** — created, from the 2026-10-26 issue triage (issue #1066). Checked against the tree at c0e32ab29: `NPATT` refused at `io/projects/fullprof.py:1368`, `Nor`/`Dum`/`Nre` in `_MUST_BE_ZERO` (`:268-280`), `Jbt` beyond 0 and ±1 refused at `:1556`; none of FullProf's 94 example `.pcr` files reads, and with `Dum` and `Nor` lifted the background type `Nba` blocks 41. No open WP owns it: WP-1118 and WP-1328 (which read `.pcr` and its `Jbt ±1`) are ✅, WP-1911 (🔄) is the writers, WP-1918 (⬜) is magCIF. Next: the three decisions, then F1.

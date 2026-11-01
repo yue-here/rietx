@@ -264,6 +264,7 @@
   "diagnostics:STAGE_FREED_NOTHING",
   "diagnostics:STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT",
   "diagnostics:STAGE_MAX_ITER",
+  "diagnostics:STAGE_NOT_FINITE",
   "diagnostics:STAGE_PATH_NOT_FREE",
   "diagnostics:STAGE_PATH_UNKNOWN",
   "diagnostics:STAGE_WINDOWS_STALE",

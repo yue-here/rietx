@@ -3666,7 +3666,10 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "the specimen and belongs out of the model, or the range must cover a "
             "reflection of it. With no reflection in range, the scale is held too, the "
             "phase has no weight fraction, and the other fractions are relative to the "
-            "phases seen in range."
+            "phases seen in range. When no phase is seen at all, the instrument terms "
+            "that act only through the peaks are held as well, for example the zero "
+            "shift, the specimen displacement and the profile widths. The message "
+            "names every one."
         ),
     ),
     "PLAN_FREES_NO_MOMENT": HelpEntry(
@@ -4259,6 +4262,16 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "stage did not. The parameters freed in that stage are probably degenerate. "
             "Free fewer at once, or look for a correlation or a bound hit in the same "
             "stage. More iterations do not find a different minimum."
+        ),
+    ),
+    "STAGE_NOT_FINITE": HelpEntry(
+        title="A stage stopped on a model that is not finite",
+        description=(
+            "The model held a NaN or an infinity at a point the solver reached, so the "
+            "solver had no step left to take. The stage ended at the values it started "
+            "from and changed nothing. The column that went non-finite is often not the "
+            "parameter that ran away. Hold some of the parameters the stage frees, or "
+            "start it nearer its answer."
         ),
     ),
     "STAGE_PATH_NOT_FREE": HelpEntry(

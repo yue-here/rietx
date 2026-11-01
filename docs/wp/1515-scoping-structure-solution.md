@@ -82,6 +82,15 @@ the whole surface with real agents.
 
 ### Inherited
 
+- **2026-11-01, from [WP-1919](1919-maximal-subgroups-generated-from-the-operators.md)'s close: #677 step 7 can start from the generator.** `subgroups.maximal(group)` gives each maximal subgroup of the leading group with its (P, p) to the standard setting, in exact arithmetic (PR #1189, `crystallography/representation/subgroups.py`). Nothing is read from a printed table.
+
+- **2026-11-01, from WP-1809 (closed, PR #1287): a radii-backed default for the
+  anti-bump pair-list builder is a later convenience, and this WP is its home.** The
+  maintainer ruled on 2026-11-01 that `anti_bump_restraints` keeps the caller-stated
+  minimum as the settled design. Reading Shannon, Pyykkö and Pauling radii
+  (`crystallography/radii.py`) for an r₀, and saying which species pairs got no row,
+  stays open here beside the clash floor this WP already names them for (#677).
+
 - **2026-10-16, from the issue triage (#998): `solve_seed` checkpoint,
   resume and progress.** The reporter's blind kit (36 atoms, 4 species, lab
   X-ray) ran single seeds at `budget=3` past 1 h and then 8 h timeouts, and

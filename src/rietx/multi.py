@@ -90,6 +90,7 @@ from .refine import (
     _dispersion_diagnostics,
     _displacement_columns,
     _escaped_cell_paths,
+    _every_phase_unseen,
     _extra_peak_diagnostics,
     _far_from_data_diagnostics,
     _fixed_literal_diagnostics,
@@ -103,10 +104,12 @@ from .refine import (
     _low_angle_diagnostics,
     _max_iter_diagnostics,
     _merge_unresolved,
+    _non_finite_diagnostic,
     _occupancy_flag_diagnostics,
     _onto_flat_meridian,
     _origin_diagnostics,
     _parent_strain_held_diagnostics,
+    _peak_only_instrument_path,
     _phase_agreement,
     _phase_support_diagnostics,
     _quantify_phases,
@@ -546,7 +549,8 @@ def _scale_measured_elsewhere(mtable, reach: list[set[str]],
 
 
 def _unseen(mtable, name: str, absent: list[set[int]],
-            lineless: list[set[int]] | None = None) -> bool:
+            lineless: list[set[int]] | None = None, models=None,
+            instrument_absent: list[set[int]] | None = None) -> bool:
     """Whether ``name``, a reached entry as the joint table spells it, is
     structure of a phase below support wherever the entry lives.
 
@@ -555,11 +559,21 @@ def _unseen(mtable, name: str, absent: list[set[int]],
     phase out of range wherever the scale lives (WP-1958); otherwise never,
     for :func:`~rietx.refine._only_moves`' reason: it is the one direction
     that is not flat.
+
+    With ``models`` given, an instrument entry the pattern reads through phase
+    peaks alone (``refine._peak_only_instrument_path``) is unseen where every
+    phase of every histogram it lives in is (WP-2049).
     """
     bare = _unscoped(name)
     m = _PHASE_PREFIX.match(bare)
     if m is None:
-        return False
+        if models is None or not bare.startswith("instrument."):
+            return False
+        owner = mtable._owner(name)
+        hists = range(len(models)) if owner is None else [owner]
+        unseen = absent if instrument_absent is None else instrument_absent
+        return all(_peak_only_instrument_path(models[h], bare)
+                   and _every_phase_unseen(models[h], unseen[h]) for h in hists)
     if bare.endswith(".scale"):
         if lineless is None:
             return False
@@ -570,13 +584,14 @@ def _unseen(mtable, name: str, absent: list[set[int]],
 
 
 def _only_unseen(mtable, reached: list[str], absent: list[set[int]],
-                 lineless: list[set[int]] | None = None) -> bool:
+                 lineless: list[set[int]] | None = None, models=None,
+                 instrument_absent: list[set[int]] | None = None) -> bool:
     """:func:`~rietx.refine._only_moves` for joint entries: every model entry
     the column reaches is :func:`_unseen`.  All, never any; a variable is
     dropped before the test; a column reaching no model entry is not held."""
     moved = [q for q in reached if not is_variable_path(_unscoped(q))]
-    return bool(moved) and all(_unseen(mtable, q, absent, lineless)
-                               for q in moved)
+    return bool(moved) and all(_unseen(mtable, q, absent, lineless, models,
+                                       instrument_absent) for q in moved)
 
 
 def _joint_column_reach(mtable) -> dict[str, list[str]]:
@@ -623,7 +638,10 @@ def _joint_phases_reached(columns: list[str], reach: dict[str, list[str]]) -> se
 
 def _unsupported_paths_multi(mtable, absent: list[set[int]],
                              reach: dict[str, list[str]] | None = None,
-                             lineless: list[set[int]] | None = None) -> list[str]:
+                             lineless: list[set[int]] | None = None,
+                             models=None,
+                             instrument_absent: list[set[int]] | None = None
+                             ) -> list[str]:
     """The joint columns that move nothing the data can see.
 
     ``absent`` is :func:`_joint_unsupported_phases`' answer, one set per
@@ -636,13 +654,17 @@ def _unsupported_paths_multi(mtable, absent: list[set[int]],
     where it lives: all, never any, the variable itself dropped first, and the
     phase's scale only where ``lineless`` (one set per histogram) puts the
     phase out of range wherever the scale lives (WP-1958).  ``absent``
-    already holds every ``lineless`` phase.
+    already holds every ``lineless`` phase.  ``models`` lets an instrument
+    column be held where no histogram it reaches sees a phase (WP-2049).
+    ``instrument_absent`` replaces ``absent`` for that question alone: the
+    stage-start hold passes ``lineless``, the collapse leaves it ``None``.
     """
     if not any(absent):
         return []
     reach = _joint_column_reach(mtable) if reach is None else reach
     return [p for p in mtable.free_paths
-            if _only_unseen(mtable, reach.get(p, [p]), absent, lineless)]
+            if _only_unseen(mtable, reach.get(p, [p]), absent, lineless, models,
+                            instrument_absent)]
 
 
 def _hold_unsupported_phases_multi(models, mtable,
@@ -663,8 +685,12 @@ def _hold_unsupported_phases_multi(models, mtable,
     lineless = _joint_lineless_phases(models)
     absent = [a | n for a, n in zip(_joint_unsupported_phases(models, mtable, sigma),
                                     lineless, strict=True)]
+    # the instrument's peak-only columns only where every phase is out of
+    # range: a significance hold of them waits for the answer (WP-2049,
+    # ``refine._unsupported_phase_paths``)
     held = _unsupported_paths_multi(mtable, absent, reach,
-                                    _joint_flat_scales(models, mtable, lineless))
+                                    _joint_flat_scales(models, mtable, lineless),
+                                    models, instrument_absent=lineless)
     if held:
         mtable.set_vary(held, False)
     return held, absent
@@ -820,9 +846,9 @@ def _rehold_multi(models, mtable, held: list[str],
     held_reach = held_reach or {}
     released = [p for p in held
                 if not _only_unseen(mtable, [p, *held_reach.get(p, ())], absent,
-                                    flat_scales)]
+                                    flat_scales, models)]
     collapsed = [p for p in _unsupported_paths_multi(mtable, absent, reach,
-                                                     flat_scales)
+                                                     flat_scales, models)
                  if p not in held_set]
     if collapsed:
         for h, table in enumerate(mtable.tables):
@@ -1031,6 +1057,20 @@ def _rehold_flat_moments_multi(models, mtable, moment_held: list[str],
     if released:
         mtable.set_vary(released, True)
     return released, collapsed, found, turned_now
+
+
+def _restore_stage_start(mtable, start_values: list[dict[str, float]]) -> None:
+    """Every histogram's table back at the values its stage started from
+    (WP-2048), the collapse's restore applied to every path: each table's own
+    entries, its body anchors and its ties, then the combined columns."""
+    for h, table in enumerate(mtable.tables):
+        by_path = {e.path: e for e in table.entries}
+        paths = [p for p in start_values[h] if p in by_path]
+        for path in paths:
+            by_path[path].value = start_values[h][path]
+        table.restore_body_anchors(paths)
+        table.refresh_ties()
+    mtable._rebuild_columns()
 
 
 def _reset_cell_runaway_multi(mtable, start_values: list[dict[str, float]]
@@ -1660,41 +1700,47 @@ class MultiHistogramRefinement:
                 if cell_runaway:
                     self.mtable._rebuild_columns()
                     outcome = dataclasses.replace(outcome, theta=self.mtable.x0())
-                moment_set = set(moment_hold)
-                # the free columns as the solve left them, read before the
-                # collapse takes any out of θ, so a collapsed column's reach is
-                # on the record beside the stage-start hold's
-                reach = _joint_column_reach(self.mtable)
-                released, collapsed = _rehold_multi(
-                    models, self.mtable, list(support_hold), start_values,
-                    held_reach=held_reach, reach=reach, sigma=phase_support_sigma)
-                held_reach.update(_joint_reach_beyond_self(collapsed, reach))
-                # ``StageResult.collapsed``: the restored columns alone, taken
-                # before the late scale-B hold joins ``collapsed`` below, since
-                # that one holds a released phase's B where it stands
-                restored = list(collapsed)
-                if released:
-                    # a phase the support hold released is asked before its second
-                    # solve, or that solve runs on the ridge unflagged (the single
-                    # runner's ``late_hold``); read off what each released
-                    # column moves, since a parametric coefficient's own name
-                    # carries no phase (WP-1342)
-                    back = _joint_phases_reached(released, held_reach)
-                    late, late_sep = _hold_scale_b_ridges_multi(
-                        models, self.mtable, back, weights)
-                    if late:
-                        late_set = set(late)
-                        released = [p for p in released if p not in late_set]
-                        collapsed = collapsed + late
-                        scale_b_held.update(late_sep)
-                m_released, m_collapsed, m_axes, m_turned = _rehold_flat_moments_multi(
-                    models, self.mtable, [p for p in held if p in moment_set],
-                    start_values, moment_turned)
-                released, collapsed = released + m_released, collapsed + m_collapsed
-                restored = restored + m_collapsed
-                for site, axis in m_axes.items():
-                    flat_axes.setdefault(site, axis)
-                moment_turned = moment_turned + m_turned
+                # a solve stopped on a non-finite model handed back the
+                # stage's start (WP-2048): the stage ends there, so there is no
+                # answer to re-measure and no second solve
+                stopped = outcome.non_finite is not None
+                released, collapsed, restored, m_turned = [], [], [], []
+                if not stopped:
+                    moment_set = set(moment_hold)
+                    # the free columns as the solve left them, read before the
+                    # collapse takes any out of θ, so a collapsed column's reach is
+                    # on the record beside the stage-start hold's
+                    reach = _joint_column_reach(self.mtable)
+                    released, collapsed = _rehold_multi(
+                        models, self.mtable, list(support_hold), start_values,
+                        held_reach=held_reach, reach=reach, sigma=phase_support_sigma)
+                    held_reach.update(_joint_reach_beyond_self(collapsed, reach))
+                    # ``StageResult.collapsed``: the restored columns alone, taken
+                    # before the late scale-B hold joins ``collapsed`` below, since
+                    # that one holds a released phase's B where it stands
+                    restored = list(collapsed)
+                    if released:
+                        # a phase the support hold released is asked before its second
+                        # solve, or that solve runs on the ridge unflagged (the single
+                        # runner's ``late_hold``); read off what each released
+                        # column moves, since a parametric coefficient's own name
+                        # carries no phase (WP-1342)
+                        back = _joint_phases_reached(released, held_reach)
+                        late, late_sep = _hold_scale_b_ridges_multi(
+                            models, self.mtable, back, weights)
+                        if late:
+                            late_set = set(late)
+                            released = [p for p in released if p not in late_set]
+                            collapsed = collapsed + late
+                            scale_b_held.update(late_sep)
+                    m_released, m_collapsed, m_axes, m_turned = _rehold_flat_moments_multi(
+                        models, self.mtable, [p for p in held if p in moment_set],
+                        start_values, moment_turned)
+                    released, collapsed = released + m_released, collapsed + m_collapsed
+                    restored = restored + m_collapsed
+                    for site, axis in m_axes.items():
+                        flat_axes.setdefault(site, axis)
+                    moment_turned = moment_turned + m_turned
                 # the reset's hold takes what the collapse left, the single
                 # runner's rule: a path both reach is the collapse's, in ``held``
                 collapsed_set = set(collapsed)
@@ -1723,11 +1769,19 @@ class MultiHistogramRefinement:
                         solver=self._solver, events=stream, stage=stage.name,
                         cancel=cancel, phase_support_sigma=phase_support_sigma,
                         **stage_ftol)
-                    signs = self.mtable.commit(second.theta)
-                    if signs is not None:
-                        self.mtable._rebuild_columns()
-                        second = rechart_outcome(second, self.mtable.x0(), signs,
-                                                 self.mtable.free_paths)
+                    if second.non_finite is not None:
+                        # the single runner's rule (WP-2048): every value back
+                        # where the stage found it, with nothing committed
+                        _restore_stage_start(self.mtable, start_values)
+                        second = dataclasses.replace(
+                            second, theta=self.mtable.x0(),
+                            cost_final=outcome.cost_initial)
+                    else:
+                        signs = self.mtable.commit(second.theta)
+                        if signs is not None:
+                            self.mtable._rebuild_columns()
+                            second = rechart_outcome(second, self.mtable.x0(), signs,
+                                                     self.mtable.free_paths)
                     # asked again, and with no third solve the cell goes back and
                     # stays a free column of this answer, its esd withheld (the
                     # single runner's rule)
@@ -1759,6 +1813,11 @@ class MultiHistogramRefinement:
                 answer_runaway = [] if runaway_diag is None else [runaway_diag]
                 if runaway_diag is not None:
                     cell_runaway_diags.append(runaway_diag)
+                # per stage, like the reset's: the list is every stage's own
+                # finding the joint result carries (WP-2048)
+                stop_diag = _non_finite_diagnostic(stage.name, outcome)
+                if stop_diag is not None:
+                    cell_runaway_diags.append(stop_diag)
                 self.mtable.apply_to_models()
                 # the reset's hold is lifted by the next stage with the others
                 carried_hold = list(held) + reset_hold
@@ -2635,12 +2694,15 @@ def _parametric_unseen(models, mtable, sigma: float = PHASE_SUPPORT_SIGMA
     Empty when nothing was declared (WP-1325).  ``sigma`` is the threshold
     ``PHASE_UNCONSTRAINED`` reads (``refine._reported_support_sigma``,
     WP-2002 B1): a report, so it speaks with the hold switched off.
+    ``models`` goes to :func:`_unseen` as the hold passes it, so an
+    instrument target on a pattern that sees no phase is unseen (WP-2049).
     """
     if not mtable.parametric:
         return {}
     absent = _joint_unsupported_phases(models, mtable, sigma)
     return {r.name: frozenset(k for k in r.patterns
-                              if _unseen(mtable, f"hist.{k}.{r.target}", absent))
+                              if _unseen(mtable, f"hist.{k}.{r.target}", absent,
+                                         models=models))
             for r in mtable.parametric}
 
 
