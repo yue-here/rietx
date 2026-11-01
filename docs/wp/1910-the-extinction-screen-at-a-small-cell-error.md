@@ -1,6 +1,6 @@
 # WP-1910 — the extinction screen at a small cell error, and the other centring
 
-Milestone: unscheduled · Status: 🔄 2026-10-26 — the default flip and the gate (PR #939), the margin scan's rows and the PNGs (PR #1178) merged; open: the second screen ruled for the default's confident misses, the contract's prose, point 2, the skill recipe
+Milestone: unscheduled · Status: 🔄 2026-11-01 — the default flip and the gate (PR #939), the margin scan's rows and the PNGs (PR #1178) and the gate's texts and real-family assertions (PR #1170, `3defa3b6`, #939's follow-ups) merged; open: the second screen ruled for the default's confident misses, the contract's prose, point 2, the skill recipe
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-26 — a silent wrong answer on a path few fits run: with the default cell refinement, certified corundum's class hangs on one forbidden position read at 2.8-3.1 σ against a 3 σ bar (#1172), and the margin scan, point 2 and the skill recipe remain
@@ -461,3 +461,5 @@ are out of its reach.
   rulebook's own device. (b) changes a default and stays one screen. Posted
   on #1178; the task above carries the detail. *Next:* that task, then the
   contract's prose after #1170 and #1140, point 2, and the skill recipe.
+
+- **2026-11-01** (`/pr-review`) — #939's follow-ups merged from outside as PR #1170 (`3defa3b6`). The extinction gate's texts now give both causes of a failed gate, weak data or misfit, and say that the pair cannot tell them apart. The gate is asserted firing on real families: SRM 676a at ×1.02 and FAP at ×0.99. A PbSO4 silent miss at ×0.99 is pinned as a strict xfail. The tier-3 approval of `REFERENCE_NET_RWP_MAX` (2026-10-21) was kept standing, since the value is unchanged and the PR adds evidence. The first task's note "the contract's prose waits for #1170 and #1140" is now unblocked on both: #1140 merged as WP-2033's PR on 2026-10-31. No task is ticked by this PR. Follow-up, not blocking: the 1.11.0 release note's headline still reads "whether weak data or misfit failed the gate", which the new texts no longer say. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.

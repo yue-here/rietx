@@ -1,6 +1,6 @@
 # WP-2028 — a joint fit's guards see every histogram
 
-Milestone: unscheduled · Status: 🔄 2026-10-31 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`) and 7's census as PR #1205 (`d0d4831d`); 4 measured, not wired; 8 measured on #1124; the two follow-on items 7's census opened are listed as tasks
+Milestone: unscheduled · Status: 🔄 2026-11-01 — tasks 1-3, 5, 6 merged from outside as PR #1128 (`1ba6c216`) and 7's census as PR #1205 (`d0d4831d`); 4 measured, not wired; 8 measured on #1124, its two wording edits merged as PR #1277 (`e0cb41ea`); the two follow-on items 7's census opened are listed as tasks and each has a PR open (#1270, #1272)
 Track: What fires, and what stays silent
 Depends on: — (1341 closed: it built the joint report this WP completes; 1325
 soft: its parametric codes and per-pattern holds are what tasks 3 and 6
@@ -244,6 +244,8 @@ shows the findings that name histogram h.
   WP-2001 and WP-2004 (the tier rule).
 
 ## Handover log
+
+- **2026-11-01** (`/pr-review`) — task 8's two wording edits, asked on #1124, merged from outside as PR #1277 (`e0cb41ea`). The `_data_support_diagnostics` scope reason now says there is no agreed joint definition of observations per parameter, and points to task 8's measurement on #1124. Three comments in `multi.py` that named WP-1341 as owner of the joint report now name this WP. No number moves. This is the re-pointing and the written reason that task 8 asks for, so the PR looks to complete it. The box stays unticked for the maintainer. Gap, not blocking: the reason string now says "no agreed joint definition" twice. Open for this WP: PR #1270 (a read-only joint `parameters()`) and PR #1272 (the joint identifiability screens). Both were reviewed today with items to settle before merge. Both add a handover entry to this file, so the second to merge will conflict on this log. What ran: the PR was replayed in a stack of nine with the other round's merges onto `main` `276fe91d` and run at `635d25e3` (Mac arm64, Python 3.12, `[dev,jax]`). Full suite 14 161 passed, 235 skipped, 50 xfailed, 0 failed. The manual `-W` build was green.
 
 - **2026-10-31** (`/pr-review`) — task 7's census merged from outside as PR #1205 (`d0d4831d`) after two rounds. The contributor's 2026-10-28 and 2026-10-31 entries, ticks and `Status:` edit stand as written, as WP-2030's did (ruled 2026-10-29), so this entry adds the merge record. Round 2 built the three rulings: a shared B is tested against the loosest bound among the histograms that hold it and the message names that histogram (`_large_biso_once`), a per-histogram B keeps its own cell's bound, and the identifiability screens and a read-only joint `parameters()` became their own tasks. Gated in a stack of seven on `main` `d87c8cc9` (tree `21beeca9`, Mac arm64, Python 3.12, `[dev,jax]`): full suite 13 427 passed, 230 skipped, 48 xfailed, 0 failed; GUI, ruff and the `-W` manual build clean. #1257 stayed out on a hung CI job, and `main` after the six merges equals the checked six-PR tree `86997f50`. Gap, not blocking: `docs/releases/1.11.0.md` does not say that a shared B over per-histogram cells now fires only past the loosest bound, where 1.10.0 read histogram 0 alone.
 
