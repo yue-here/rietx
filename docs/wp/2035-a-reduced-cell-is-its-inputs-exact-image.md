@@ -1,9 +1,8 @@
 # WP-2035 — a reduced cell is its input's exact image, near a right angle too
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here (ghostshift runner): the #1252 test fix, then the close
+Milestone: unscheduled · Status: ✅ 2026-11-01 — a reduced cell is its input's exact image (PR #1136); the near-90° property judges it by the Niggli conditions at ε, closing issue #1252 (PR #1300)
 Track: What fires, and what stays silent
 Depends on: — (1923, closed: the exact change of basis; 1932, closed: the boundary-free comparison that reads it)
-Priority: P2 2026-10-31 — was P3: issue #1252 shows the property test drawing a failing case fresh in about 1 run in 40 (CI sets no derandomize and keeps no database), so the fast check goes red on main at random; the defect is in the test's gemmi-at-ε reference, not in `reduce_cell`
 
 ## Goal
 
@@ -37,44 +36,6 @@ CI runs pins the case.
   `reduce._equal_across_boundaries`, which assumes the reduced cell is an
   exact image of the candidate. #949's bethanechol run moved no grade
   (WP-1932's close), so no measured answer depends on this case yet.
-
-### Inherited
-
-- **From WP-2011, 2026-10-28: a second failing case after the merge.**
-  `test_the_exact_image_holds_with_one_angle_within_epsilon_of_90[P]` fails
-  on hypothesis's example centring P, a = b = 3.0, c = 21.0 Å, α = β = γ =
-  65°, `which=0`, `offset=(6.90495131727726e-06, -1.0)`. The worst entry is
-  G₃₃: 347.14339676 against 347.14333602 for M·G·Mᵀ, 6.07e-5 absolute
-  against a bar of 5.33e-5. Found by the fast selection on macOS arm64,
-  `[dev]`, on `origin/main` (`1fae8887`) merged into WP-2011's branch. It
-  also fails against a snapshot of WP-2011's base (`6f0f65fa6`), which
-  holds none of that session's solver change, so it is this WP's defect.
-  The example lives in that worktree's local hypothesis database only; CI
-  cannot replay it until the test pins it with `@example`.
-
-- 2026-10-31, from the issue triage (issue #1252):
-  `test_the_exact_image_holds_with_one_angle_within_epsilon_of_90[P]` fails on
-  hypothesis's example P (3.0, 3.0, 21.0, 89.99999°, 65°, 65°), and the
-  reporter measured 5 failures in 200 seeds on an empty example database (2.5
-  %, Wilson 95 % interval 1.1-5.6 %). CI keeps no database and sets no
-  `derandomize`, so CI draws a fresh sample each run. Checked against the tree
-  at d87c8cc91 (`lane-A/r1252.py`, `r1252b.py`): the helper's first assertion
-  holds, since `reduce_cell`'s metric equals M·G·Mᵀ to 4e-17 of max|G|. What
-  fails is the last assertion, the comparison with gemmi's `niggli_reduce` +
-  `normalize` at ε = `NIGGLI_EPS_RELATIVE`·V^(1/3) (5.33e-5 Å²): 1.65 ε here.
-  gemmi at ε differs from gemmi at 1e-12 by the same 1.65 ε, and `reduce_cell`
-  agrees with gemmi at 1e-12 to 6e-14. So gemmi's ε run moves, and
-  `reduce_cell` does not. The 2026-10-28 entry above (offset 6.905e-6, 6.07e-5
-  against a bar of 5.33e-5) is this same failure: its "347.14333602 for
-  M·G·Mᵀ" is gemmi's ε-vector, not the exact image. Re-measured, that case
-  reads 1.6e-16 from the image and 1.14 ε from gemmi at ε. The fix is in the
-  test, not in `reduce_cell`: compare against gemmi at a tight ε where gemmi
-  picks the same setting, or bound the comparison at about 2 ε, and pin the
-  issue's example with `@example`. One of the reporter's five cases, (21, 3,
-  3, 90.00001°, 65°, 111°), has gemmi at 1e-12 choosing a different setting
-  8.8 Å² away, so a tight-ε reference alone is not enough there. A test that
-  runs the reduction against a reference whose own ε-dependence exceeds the
-  bar is the class to look for in `tests/test_indexing_reduce*.py`.
 
 ## Non-goals
 
@@ -114,6 +75,13 @@ CI runs pins the case.
   (the ε every comparison in it uses).
 
 ## Handover log
+
+- **2026-11-01** (ghostshift runner, PR #1300, closed) — the flaky property test is fixed, and the WP closes. The test that a reduced cell is its input's exact image used to end by comparing the cell with gemmi's own reduced vector to within ε. That vector is not exact: near a right angle gemmi fixes the sign of a near-zero parameter without recording it, and the error grows through the later steps to as much as 2 ε. So the test failed about one CI run in 40 while `reduce_cell` was right. The test now asks whether the cell meets the Niggli conditions at ε, which is what the comparison was meant to ask. No package code changed apart from one docstring.
+  *Done*: (1) `_assert_exact_image` ends with `_niggli_violation(got, ε) <= 0`, a helper in `tests/test_indexing_reduce.py` that encodes Gruber (1973) eq. 3 and Křivý & Gruber (1976) steps 5-8 with ε placed as gemmi's `normalize`/`niggli_step` place it (read from gemmi 0.7.5's `cellred.hpp`). gemmi's `is_niggli` cannot serve: its normalisation test has no ε, and it rejects gemmi's own C and F output at any ε. (2) Four `@example`s on the near-90° property: the issue's (3, 3, 21, 89.99999°, 65°, 65°) and (21, 3, 3, 90.00001°, 65°, 111°), WP-2011's offset 6.905e-6 case, and an I-centred draw where gemmi's vector sat 1.99 ε off. Each fails the old reference on at least one centring (1.65, 1.14, 1.05 and 1.99 ε) and passes the new one. (3) The review pass (`/code-review high --fix`) corrected `reduce_cell`'s docstring, which claimed the image sits under ε from gemmi's vector, regenerated the index and fixed the release record's count of pinned issue cells. It also suggested a helper in `src` for ε so the test cannot drift from `reduce_cell`'s formula; declined, as a new name in `src` for a test-only fix.
+  *Measured* (macOS arm64, worktree `.venv` `[dev]`, Python 3.12, gemmi 0.7.5; scripts in `~/.cache/ghostshift/rietx/wp-2035/`). gemmi's ε-vector against the image over 40 000 near-right cells a centring (one angle 90° or 90° ± 1e-7 to 1e-5°): worst 1.27 ε (P), 0.62 (C), 1.99 (I), 0.00 (F), 0.33 (R). `_niggli_violation` on `reduce_cell`'s output over 40 000 a centring of mixed near-right and generic cells: no violation, closest margin 0.012 ε (P, the shared-sign condition), at least 0.35 ε on the other centrings. The deliberate failure: an unreduced input and an image under a transposed change of basis break the conditions by 1e5 to 1e8 ε on every pinned cell. Seed stress as the reporter ran it, the near-90° property alone on an empty example database: SEEDS_RESULT. *Siblings* (the class: a test whose reference moves with ε by more than its bar): the only gemmi-at-ε comparison in `tests/` was this one. The idempotence (bar 1e-6) and unimodular-invariance (bar 1e-4) properties on 20 000 near-right cells: worst 1.4e-14 and 5.6e-7, so neither is exposed. `tests/test_restraints.py`'s `_reduced` builds inputs and compares nothing.
+  *Gates*: `test_indexing_reduce.py` + `_boundaries.py` 137 passed (`-n 4`); FAST_RESULT. `python -m tests.reader_output` exit 0, unchanged. `test_acceptance_indexing.py` not run: the only `src` change is a docstring.
+  *Generality*: no judge dispatched; no `_audit` row moved and the package gains no heuristic (the helper is a test oracle).
+  *Next*: none. Issue #1252 closes with the PR.
 
 - **2026-10-31** (ghostshift close-batch, PR #1287, not closed) — the code is finished and the test is not. A reduced cell is the exact image of its input on main, as PR #1136 shipped. But issue #1252, a fast-suite property test that fails on main about 1 run in 40, is still open and unfixed, and it is this WP's own Inherited task. So the WP stays open.
   *Checked against main `1314c69ea`*: `tests/test_indexing_reduce.py` still ends the exact-image property by comparing `reduce_cell` with gemmi's `niggli_reduce` at ε = `NIGGLI_EPS_RELATIVE`·V^(1/3) (lines 442-452). No `@example` pins the issue's case P (3.0, 3.0, 21.0, 89.99999°, 65°, 65°), and the one commit to that file after the WP's own (`7de1da3dc`, 37 added lines) is a `bravais_screen` case, not this property. The Inherited entry of 2026-10-31 stands as written: the defect is in the test's reference, not in `reduce_cell`, and the fix is a tighter reference or a bar near 2 ε plus the `@example`. #1252 is open.
