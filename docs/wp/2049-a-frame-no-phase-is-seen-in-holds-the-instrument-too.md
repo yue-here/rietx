@@ -103,9 +103,11 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
 
 - **2026-11-01** — closed by a ghostshift runner. PR #1305. A blank frame no
   longer quotes a zero shift or a peak width fitted to noise. When no phase is
-  seen, the stage holds every instrument term the pattern reads only through
-  phase peaks, beside the phase's own cell. It releases them as soon as any
-  phase is seen. A joint fit does this per histogram, and a series carries the
+  seen at a stage's answer, the stage puts every instrument term the pattern
+  reads only through phase peaks back where it found them and holds them. The
+  next stage holds them from its start. A weak real phase still gets its zero
+  shift. A hold taken at the start on a reading under 3σ hid the fast suite's
+  weak LaB₆, so the start waits for an answer. A joint fit does this per histogram, and a series carries the
   last measured value across the blank frame. The nightly route the WP was
   filed for no longer reproduces on main, but the class did, by a direct fit.
   One question is the maintainer's: the tier-3 `StageResult.held` audit row was
@@ -113,14 +115,20 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
 
   *Done.* `refine._peak_only_instrument_path` asks
   `CompiledModel.scalar_chain_supported`, plus the two FCJ axial ratios.
-  `refine._every_phase_unseen` gates it. `_only_moves`, `_unsupported_phase_paths`
-  (hold and collapse), `_released_phases` and `_answer_significance` read it.
+  `refine._every_phase_unseen` gates it. `_unsupported_phase_paths` takes the
+  instrument at the answer (`at_answer=True`, the collapse), and at a stage's
+  start only for a column the previous answer held (`tried`) or where every
+  phase is lineless. `_released_phases` and `_answer_significance` read it
+  too.
   `multi._unseen` / `_only_unseen` / `_unsupported_paths_multi` / `_rehold_multi`
   and `_parametric_unseen` take `models`. `refine._instrument_held` reads the
   last stage's record, and the `PHASE_UNCONSTRAINED` clause quotes it once.
   `where` is unchanged. The skill row, `help.py` and the audit row's evidence
   are updated, and v1.11's record has the paragraph. Seven tests are in
-  `tests/test_held_phase.py`. Against main's source, the two blank-frame rows,
+  `tests/test_held_phase.py`. Two tests whose premise moved now read the
+  record: `test_phase_significance._assert_prior_holds` allows a second solve
+  when a stage collapsed something, and `test_joint_xray_neutron`'s flat data
+  finds its per-histogram widths in `StageResult.held`. Against main's source, the two blank-frame rows,
   the series carry and the joint row fail (measured). Two rows import the new
   helpers. The all-never-any row passes on both, as it should.
 
@@ -131,7 +139,12 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
   86 and 88 land within 4 esd of truth. Series signals equal the committed
   record at k = 0 and k = +1. A misregistered start (frame 86, zero shift
   started 0.03-0.4° off) is bit-identical to main at 0.03-0.1°. At 0.2-0.4°
-  both branches fail at Rwp 0.4332, so the hold closed no recovery route.
+  both branches fail at Rwp 0.4332. Cost on frame 87 alone: 56 iterations in
+  9 solves, against main's 111 in 6. Held from the start on a significance,
+  which was the first version, the weak LaB₆ of
+  `test_a_weak_real_phase_is_still_refined[unfitted]` was never seen: 2.53σ
+  after `scale_bkg`, and it needs the zero shift to reach 4.05σ. Holding only
+  at the answer, with no prior, cost 511 iterations in 11 solves.
   `tests.reader_output` exit 0. Acceptance files before the new tests: 105
   passed, 2 xfailed. FAST_COUNTS
 
@@ -142,13 +155,16 @@ qualify is read off C (`column_reach`), never off a path's name (WP-1342).
   rows), which went to WP-2028's Inherited as reader output. 3 (the clause
   infers the hold from the record, and a field would be reader output). 6
   (instrument paths kept out of `where`, so `sequential`'s aggregation key
-  holds). 7 (a misregistered start), answered by the measurement above.
+  holds). 7 (a misregistered start): the measurement above found no route
+  closed, but the fast suite then found a weak real phase that needs its zero
+  shift from the start, and the hold moved to the answer.
 
   *Generality* (the judge's verdicts, condensed; full report in the session).
   Item 1, `StageResult.held`: **weak**. The flatness argument is sound and
   has one measured cost, but `grounds` and `approved` (2026-10-23) cover only
   the phase hold. The judge also named an unmeasured misregistered start;
-  author's answer: measured since, as above, no route closed. Item 2, the
+  author's answer: measured since. A strong phase lost nothing. A weak one
+  did, under the first version, and the hold now waits for an answer. Item 2, the
   predicate and gate: **holds**. Item 3, the clause and the help sentence:
   **weak**. The help list read as complete, so it now says "for example". The
   instrument paths stay out of `where`; that is latent until the code gets a
