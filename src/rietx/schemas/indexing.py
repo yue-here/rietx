@@ -2526,6 +2526,13 @@ class ExtinctionScreen(Base):
     #: signal unexplained than any absence test can be read against, so
     #: :meth:`best_or_none` abstains); ``"cancelled"``
     status: str = "converged"
+    #: the second screen, at :attr:`cell` **held** (``refine_cell=False``) from
+    #: the declared instrument, with its own ranking.  Run when the cell-free
+    #: prefit ran and this screen names a class; ``None`` otherwise (the cell
+    #: was held, or there was no class to check).  When both name a class and
+    #: the two differ, :meth:`screens_disagree` is True and :meth:`best_or_none`
+    #: abstains; a held screen naming no class is recorded and changes nothing
+    held_screen: ExtinctionScreen | None = None
     thresholds_version: str = INDEXING_THRESHOLDS_VERSION
     diagnostics: list[Diagnostic] = Field(default_factory=list)
 
@@ -2567,7 +2574,37 @@ class ExtinctionScreen(Base):
         A returned class still lists every space group it admits.  There is no
         accessor anywhere in this module that yields one space group from the
         data alone.
+
+        It also abstains when :meth:`screens_disagree`: the second screen at the
+        same cell, held, from the declared instrument, names another class, and
+        at most one of two disjoint classes can be right (WP-1910, ruled on
+        #1178).  Both rankings stay readable, :attr:`candidates` and
+        :attr:`held_screen`'s.
         """
+        top = self._own_best()
+        if top is None or self.held_screen is None:
+            return top
+        if self.held_screen.status == "cancelled":
+            return None                 # the check was stopped: an unasked question
+        if self.screens_disagree():
+            return None                 # two screens, two classes: pick neither
+        return top
+
+    def screens_disagree(self) -> bool:
+        """Do this screen and :attr:`held_screen` name **different** classes?
+
+        Both must name one (``best_or_none()`` not None on each).  A held screen
+        that names none is a record, not a contradiction: on the GSAS-II PbSO₄
+        X-ray pattern the default names the true ``P c - n`` on eleven offsets
+        where the held screen, with the all-zero background, names nothing.
+        """
+        if self.held_screen is None:
+            return False
+        own, held = self._own_best(), self.held_screen.best_or_none()
+        return own is not None and held is not None and own.symbol != held.symbol
+
+    def _own_best(self) -> ExtinctionCandidate | None:
+        """:meth:`best_or_none` from this screen's own ranking alone."""
         from ..indexing.extinction import DECISIVE_DELTA_BIC
 
         if self.status == "unreliable":

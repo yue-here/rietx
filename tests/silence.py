@@ -394,6 +394,42 @@ def _screen_unreliable_silent() -> list:
             + _screen_diagnostics("cancelled", None))
 
 
+def _two_screens(default: str, held: str | None) -> list:
+    """extinction_diagnostics for a default screen naming ``default`` beside a
+    held screen naming ``held`` (None: a held screen whose two leaders sit
+    within the decisive margin, so it names nothing).  Real schema objects
+    carrying only ranked classes, so no fit runs."""
+    from rietx.indexing.diagnostics import extinction_diagnostics
+    from rietx.schemas.indexing import ExtinctionCandidate, ExtinctionScreen
+
+    members = {"R - - -": ["R 3:H", "R -3:H"], "R - c -": ["R 3 c:H", "R -3 c:H"]}
+
+    def screen(first: str, margin: float) -> ExtinctionScreen:
+        other = next(s for s in members if s != first)
+        ranked = [ExtinctionCandidate(symbol=s, representative=members[s][0],
+                                      space_groups=members[s], screened=True,
+                                      n_absent=0 if s == "R - - -" else 6,
+                                      n_testable=0 if s == "R - - -" else 6,
+                                      delta_bic=d)
+                  for s, d in ((first, -margin), (other, 0.0))]
+        return ExtinctionScreen(candidates=ranked, lattice_group="R -3 m:H",
+                                system="trigonal", centring="R")
+
+    out = screen(default, 50.0)
+    out.held_screen = screen(held or default, 50.0 if held else 1.0)
+    return extinction_diagnostics(out)
+
+
+def _screens_disagree_fires() -> list:
+    """The default names R - - -, the held screen R - c -."""
+    return _two_screens("R - - -", "R - c -")
+
+
+def _screens_disagree_silent() -> list:
+    """Both name R - c -; and a held screen that names nothing (PbSO₄'s rows)."""
+    return _two_screens("R - c -", "R - c -") + _two_screens("R - c -", None)
+
+
 def _net_read(offset: float) -> list:
     """A pdCIF net column read through ``rx.read_pattern``, a 2000-count peak
     on a baseline of ``offset`` counts that the file calls background-subtracted."""
@@ -679,6 +715,9 @@ SILENCE: dict[str, Pair] = {
         _multiplicity_fires, _multiplicity_silent, "tests/test_cif_stated_columns.py"),
     "CIF_SITE_TWINS_MERGED": Pair(
         _twins_fires, _twins_silent, "tests/test_cif_sites_coincide.py"),
+    "EXTINCTION_SCREENS_DISAGREE": Pair(
+        _screens_disagree_fires, _screens_disagree_silent,
+        "tests/test_extinction_margin.py (stub screens: the real rows fit for seconds)"),
     "EXTINCTION_SCREEN_UNRELIABLE": Pair(
         _screen_unreliable_fires, _screen_unreliable_silent,
         "tests/test_extinction_gate.py (stub screens: the gate's fits are 20 s each)"),

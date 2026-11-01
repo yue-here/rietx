@@ -2058,6 +2058,29 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "wavelength and the 2θ range."
         ),
     ),
+    "EXTINCTION_SCREENS_DISAGREE": HelpEntry(
+        title="Two extinction screens of the same cell name different classes",
+        description=(
+            "With the default `refine_cell=True` the screen compares every class at "
+            "the profile its cell-free Le Bail prefit left: that prefit's cell, widths, "
+            "zero and seeded background. When it names a class, the screen runs again "
+            "at the same cell, held, from the instrument you declared "
+            "(`ExtinctionScreen.held_screen`). The two fail differently, so they are a "
+            "check on each other. When both name a class and the classes differ, the two "
+            "share no space group and at most one is right, so `best_or_none()` "
+            "abstains and both rankings are kept: `candidates` and "
+            "`held_screen.candidates`. A held screen that names no class changes "
+            "nothing. What differs between the two is the profile each class is fitted "
+            "at, not the cell, so the refuting positions each class names "
+            "(`refuted_reason`) are where to look. Measured on SRM 676a corundum, the "
+            "GSAS-II fluorapatite tutorial pattern, a synthetic P 2₁/c, the GSAS-II "
+            "PbSO₄ X-ray pattern and 11-BM NAC, with each cell scaled by ×0.97 to ×1.03: "
+            "it fired on six offsets where the default named a wrong class (corundum, "
+            "fluorapatite, the P 2₁/c) and on none where the default was right. Where "
+            "the prefit's own cell is off, both screens can name the same wrong class "
+            "and this check cannot see it."
+        ),
+    ),
     "EXTINCTION_SCREEN_UNRELIABLE": HelpEntry(
         title="The extinction screen's reference fit is too poor to read absences against",
         description=(
