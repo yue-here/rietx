@@ -34,12 +34,15 @@ from . import lapack
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from ..model.forward import CompiledModel
+    from ..params.vector import ParameterTable
 
-#: Which free parameters McCusker §9's ratio is about.  fnmatch, so ``*``
-#: crosses dots — the glob reaches every atom entry (``…dof.k``, ``…occ``,
-#: ``…biso``, ``…adp.k``) and nothing else, since ``atoms.`` appears in no
-#: other path.  See :class:`~rietx.schemas.results.DataSupport` for why the
-#: cell, profile, background and scale are outside it.
+#: Which **entries** are atomic: the test :func:`structural_free_paths` reads
+#: what a free column reaches against, never the free path itself (WP-2067).
+#: fnmatch, so ``*`` crosses dots — the glob reaches every atom entry
+#: (``…dof.k``, ``…x``, ``…occ``, ``…biso``, ``…adp.k``) and nothing else,
+#: since ``atoms.`` appears in no other path.  See
+#: :class:`~rietx.schemas.results.DataSupport` for why the cell, profile,
+#: background and scale are outside it.
 STRUCTURAL_PARAMETER_GLOB = "phases.*.atoms.*"
 
 #: The relative cut :func:`normal_factors` hands :func:`_psd_pinv`: every
@@ -1319,19 +1322,72 @@ def _peak_sum(model: "CompiledModel", x: np.ndarray, peaks) -> np.ndarray:
     return out
 
 
+def structural_free_paths(table: "ParameterTable") -> list[str]:
+    """The free columns McCusker §9's count is about: each one that moves an atom.
+
+    McCusker, Von Dreele, Cox, Louër & Scardi (1999), *J. Appl. Cryst.* **32**,
+    36-50, §9, count the structural parameters, the ones the integrated
+    intensities pay for.  A column is one when it **is** an atom entry or
+    **reaches** one, whatever its own name (WP-2067, issue #1250): a mode
+    amplitude (``…distortion_modes.modes.K.amplitude``) reaches x, y, z through
+    affine rows of C; a named variable ``vars.X`` reaches the coordinate DOF or
+    Biso it is tied to, which is then not free itself; a rigid body's origin,
+    rotation and twists reach its atoms through the derived block that writes
+    them.  A test on the free path's *name* saw none of the three — the rule
+    "a freeze resting on flatness needs the other reading of C" (WP-1342)
+    applied to a count.
+
+    The reach is :meth:`~rietx.params.vector.ParameterTable.column_reach`, one
+    read of the constraint map that already carries each derived row's
+    declared reach.  What that read cannot say is *which input* of a block
+    carried it, and a block's :attr:`~rietx.params.derived.DerivedBlock.
+    frame_inputs` are the exception: a body reads its phase's cell only to
+    turn Å into fractions, so through C the cell reaches every body atom, while
+    §9 excludes it because peak positions pay for it.  So an atom row a block
+    writes is not tested directly; a column reaches it through the block's
+    other inputs instead, each counted where the block's
+    :meth:`~rietx.params.derived.DerivedBlock.reach_pattern` says it moves an
+    atom.  Blocks are walked last to first, since a later block may read an
+    earlier one's output (a rider on a body atom).
+
+    **A superset of the name test**: every free atom entry reaches itself, so a
+    fit with no tie onto an atom, no variable and no block counts exactly what
+    the glob counted.  In :attr:`~rietx.params.vector.ParameterTable.
+    free_paths` order.
+    """
+    written = table.derived_paths()
+    moves_atom = {e.path for e in table.entries
+                  if fnmatch.fnmatch(e.path, STRUCTURAL_PARAMETER_GLOB)
+                  and e.path not in written}
+    for block in reversed(table.derived):
+        pattern = np.asarray(block.reach_pattern(), dtype=bool)
+        frame = set(block.frame_inputs)
+        out_moves = np.array(
+            [q in moves_atom or fnmatch.fnmatch(q, STRUCTURAL_PARAMETER_GLOB)
+             for q in block.outputs], dtype=bool)
+        for k, q in enumerate(block.inputs):
+            if q not in frame and bool((pattern[:, k] & out_moves).any()):
+                moves_atom.add(q)
+    reach = table.column_reach()
+    return [p for p in table.free_paths
+            if any(q in moves_atom for q in reach[p])]
+
+
 def data_support(model: "CompiledModel", values: dict[str, float],
-                 free_paths: list[str]) -> DataSupport:
+                 table: "ParameterTable") -> DataSupport:
     """Assemble :class:`~rietx.schemas.results.DataSupport` for a finished fit.
 
     Evidence, not a gate: nothing here refuses anything, and the band it is
     read against (three, preferably five — McCusker et al. 1999 §9) lives in
-    the report rather than in this function.
+    the report rather than in this function.  The structural count is
+    :func:`structural_free_paths` of ``table``, the fit's own table, since
+    what a column moves is a fact about the constraint map and not about its
+    name (WP-2067).
     """
     census = _reflection_peaks(model, values)
     n_refl = len(census)
     m_ind = _effective_from_census(model, census)
-    n_struct = sum(1 for p in free_paths
-                   if fnmatch.fnmatch(p, STRUCTURAL_PARAMETER_GLOB))
+    n_struct = len(structural_free_paths(table))
     return DataSupport(
         n_unique_reflections=n_refl,
         n_effective_observations=m_ind,

@@ -8328,7 +8328,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # Does the data support it (WP-1071): the observation/parameter ratio and
     # the step size, both reported and neither gating.  Built before the
     # result so the diagnostic and the record quote one measurement.
-    support = data_support(model, values, list(table.free_paths))
+    support = data_support(model, values, table)
     diagnostics = diagnostics + _data_support_diagnostics(support, model)
 
     # The region below the first reflection (Q3): read off the fit's own
