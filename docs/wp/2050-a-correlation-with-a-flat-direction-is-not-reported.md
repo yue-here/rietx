@@ -103,10 +103,16 @@ none of their reported pairs involves it.
       n·FD_STEP² on the unit-diagonal matrix (the Frobenius bound on n
       columns' forward-difference error), after corundum's triple sat at
       1.2-1.9e-12 of |λ|max, above the relative FD_STEP².
-- [ ] Tests: brucite's count is the same at the nudges in
+- [x] Tests: brucite's count is the same at the nudges in
       `docs/wp/2050-batch/`; re-pin `tests/data/suite_alarms.json`.
-- [ ] Skill: `HIGH_CORRELATION`'s row in `references/diagnostics.md`, if the
-      message changes.
+      `test_suite_alarms.py::test_brucites_correlation_findings_do_not_move_under_a_rounding_nudge`
+      (k = 0, ±4; slow) and `tests/test_resolved_correlation.py`. The re-pin
+      moves every purpose's warnings per result down by exactly 1/8: the one
+      warning brucite lost is `lor_size ~ lor_strain`, whose determined ρ is
+      −0.896, under the 0.98 guard.
+- [x] Skill: `HIGH_CORRELATION`'s row in `references/diagnostics.md`, if the
+      message changes. The `FLAT_DIRECTION` row carries it, since that is the
+      message that changed.
 
 ## Acceptance
 
