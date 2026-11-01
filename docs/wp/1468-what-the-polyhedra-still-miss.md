@@ -1,6 +1,6 @@
 # WP-1468 — what the polyhedra still miss, and the controls a chemist would reach for
 
-Milestone: unscheduled · Status: 🔄 2026-10-03 — eleven of twelve original tasks landed; WP-1533's dark-theme C colour and two figure controls remain
+Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here (ghostshift runner, issue #1056 task only) — eleven of twelve original tasks landed; WP-1533's dark-theme C colour and two figure controls remain
 Track: Render what the fit already knows
 Depends on: 1466
 Priority: P3 2026-10-23 — was P4: 1504's close forwarded WP-1957's readings, and one misleads (all three reviewers read `DIM_BOUNDARY`'s shade as a second species); also left are WP-1533's C colour and two figure controls
