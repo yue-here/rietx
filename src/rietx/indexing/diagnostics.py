@@ -1039,9 +1039,29 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
         from .extinction import REFERENCE_NET_RWP_MAX
 
         net = screen.reference_rwp_net
+        perfect = screen.perfect_fit_rwp_net
         prefit = ("" if screen.prefit_rwp is None else
                   f" (after a cell-free Le Bail prefit at Rwp "
                   f"{screen.prefit_rwp:.3f})")
+        # which of the two failed, by arithmetic on the screen's own numbers:
+        # a fit leaving only the noise reads √(N/(N+S)), past the bound when
+        # S < N, so no model of these data could pass it
+        if net is None or perfect is None:
+            which = ""
+        elif perfect > REFERENCE_NET_RWP_MAX:
+            which = (f". A fit that left only the counting noise would read "
+                     f"{perfect:.3f} (√(N/(N+S)), N channels, S the weighted net "
+                     "Bragg power), past the bound too, so no cell or model passes it. "
+                     "Two causes give that, and these numbers cannot tell them "
+                     "apart: the data are weak (S < N), or the peak picker's "
+                     "envelope sits inside the lines over this range (a "
+                     "continuum, as at high angle in a low-symmetry pattern), "
+                     "which raises both readings with strong data")
+        else:
+            which = (f". A fit that left only the counting noise would read "
+                     f"{perfect:.3f} (√(N/(N+S)), N channels, S the weighted net "
+                     "Bragg power), so the data could pass and the reference "
+                     f"misfits them, by {net / perfect:.1f}× that (√(χ²/N))")
         out.append(Diagnostic(
             level="warning", code="EXTINCTION_SCREEN_UNRELIABLE",
             message=(f"the reference fit of the lattice group "
@@ -1052,7 +1072,7 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
                         "are modelled well enough to read an absence against")
                      + ", so every refutation and ΔBIC below may measure that "
                      "misfit; the classes are ranked but best_or_none() "
-                     "abstains"),
+                     "abstains" + which),
             where=[f"{screen.system} {screen.centring}, cell "
                    f"{_cell_str(screen.cell)}"],
             suggestion=("any of these, in no order: the cell (a few tenths of a "
