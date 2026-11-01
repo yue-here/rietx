@@ -1,6 +1,6 @@
 # WP-1956 — a cell pays for the lines it predicts and the pattern lacks
 
-Milestone: unscheduled · Status: 🔄 2026-10-31 — C3 merged (PR #941) and #941's follow-ups (PR #1177, `8260c78b`); open: the `fom_panel_disagrees` revisit, and tutorial 03's absence count (WP-2041)
+Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here for #1263 (the containment refuter's null window); C3 merged (PR #941) and #941's follow-ups (PR #1177, `8260c78b`); open: the `fom_panel_disagrees` revisit, and tutorial 03's absence count (WP-2041)
 Track: What fires, and what stays silent
 Depends on: 1449 soft (the index 2–4 refutation it widens); 1511 soft (one Le Bail protocol per cell)
 Priority: P2 2026-10-13 — the absent-line detector fires on the truth and is blind on every wrong cell, and a distorted cell ranks first; no grade is confident today only because the run-level `fom_panel_disagrees` fires, which the reporter measured quiet on arms where a wrong cell reached `medium`
