@@ -69,6 +69,10 @@ Printing a list gives one row per component, with its position, esd, intensity, 
 
 The list checks on construction that every `ObservedPeak.q` agrees with its own 2θ at the list's wavelength, to a relative 1e-9.
 A peak built by hand with a stale Q raises `ValueError` there, rather than mis-indexing a pattern later.
+It checks `ObservedPeak.q_esd` against `ObservedPeak.two_theta_esd` the same way, to a relative 1e-9 with no absolute floor.
+A pair where both esds are non-finite agrees, since both then mean "unmeasured".
+The engines weight lines by σ(Q), so an edit to σ(2θ) alone would otherwise never reach the search.
+To change a line's esd, set both fields, deriving `q_esd` with `rietx.schemas.indexing.q_esd_of_two_theta`.
 
 ### What one line holds
 

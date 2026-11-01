@@ -58,10 +58,10 @@ to load; the message must say how to rebuild it.
 
 - [x] The `q_esd` check in `_q_matches_two_theta` (or a sibling validator), relative
       tolerance, non-finite pairs agree, message naming the remedy.
-- [ ] Tests: the issue's reproduction now raises; both constructors' lists pass; a JSON
+- [x] Tests: the issue's reproduction now raises; both constructors' lists pass; a JSON
       round trip of a picked list passes; a non-finite pair passes. Make it fail once on
       purpose and read the message.
-- [ ] Skill: none. The refusal names its own remedy, the package's own output.
+- [x] Skill: none. The refusal names its own remedy, the package's own output.
 
 ## Acceptance
 
