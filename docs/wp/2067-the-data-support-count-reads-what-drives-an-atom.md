@@ -43,11 +43,13 @@ Tier: physics (McCusker et al. 1999 §9 defines the count as structural paramete
 
 ## Tasks
 
-- [ ] Define "structural" as a free column that is an atom entry or reaches one, through C (`column_reach`) or through a derived block's `outputs`; `data_support` reads it from the table. Retire `STRUCTURAL_PARAMETER_GLOB` or keep it as the atom-entry test only, saying which.
-- [ ] `DataSupport`'s docstring and the manual's description of the count.
-- [ ] Tests: one state per family (plain atoms, mode amplitudes, rigid body, a `vars.X` tied to a coordinate DOF) asserting the hand counts above; a positive arm that a plain-atoms fit is bit-identical.
-- [ ] `_audit` row for the count if it has one (check `tests/audit_delta.py`).
-- [ ] Skill: none; the count is the package's own output.
+- [x] Define "structural" as a free column that is an atom entry or reaches one, through C (`column_reach`) or through a derived block's `outputs`; `data_support` reads it from the table. Retire `STRUCTURAL_PARAMETER_GLOB` or keep it as the atom-entry test only, saying which. (PR #1276: `optimize.statistics.structural_free_paths`; the glob is kept as the atom-entry test.)
+- [x] `DataSupport`'s docstring and the manual's description of the count. (PR #1276: `schemas/results.py:241`, `reference/result.md:137`, `theory/estimation.md:116`.)
+- [x] Tests: one state per family (plain atoms, mode amplitudes, rigid body, a `vars.X` tied to a coordinate DOF) asserting the hand counts above; a positive arm that a plain-atoms fit is bit-identical. (PR #1276: `tests/test_data_support.py`; the positive arm asserts the count path for path equal to the name test's.)
+- [x] `_audit` row for the count if it has one (check `tests/audit_delta.py`). (None: `DATA_SUPPORT_LOW` has its row, and the count is not a heuristic.)
+- [x] Skill: none; the count is the package's own output.
+- [x] `add_derived` refuses a `frame_inputs` name that is not an input (the follow-up PR #1276's merge entry left).
+- [x] The purpose table's sibling: a warning naming a mode amplitude or a rigid body keeps its level wherever a coordinate's does (`purposes._ATOM_DRIVERS`), held to `structural_free_paths` by `tests/test_summary_levels.py`.
 
 ## Acceptance
 
