@@ -1,6 +1,6 @@
 # WP-2052 — a fit keeps each site's multiplicity from start to answer
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-01 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: 1991 soft (the verb-boundary merge, PR #1014)
 Priority: P2 2026-10-26 — a silent wrong composition (10 O for 12, Biso −1.6) on 10 of 16 fits of an unresolved split pair under the default plan; P2 rather than P1 because only split-pair models across a special position meet it, and χ²_red ≈ 24 shows the user something is wrong
