@@ -1,6 +1,6 @@
 # WP-1956 — a cell pays for the lines it predicts and the pattern lacks
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — #1263 (the containment refuter's null window) in PR #1302, its rule the maintainer's at merge; C3 merged (PR #941) and #941's follow-ups (PR #1177, `8260c78b`); open: the `fom_panel_disagrees` revisit, and tutorial 03's absence count (WP-2041)
+Milestone: unscheduled · Status: 🔄 2026-11-01 — #1263 (the containment refuter's null window) in PR #1302, `split` on top of #1251's `g` decided 2026-11-01; C3 merged (PR #941) and #941's follow-ups (PR #1177, `8260c78b`); open: the `fom_panel_disagrees` revisit, and tutorial 03's absence count (WP-2041)
 Track: What fires, and what stays silent
 Depends on: 1449 soft (the index 2–4 refutation it widens); 1511 soft (one Le Bail protocol per cell)
 Priority: P2 2026-10-13 — the absent-line detector fires on the truth and is blind on every wrong cell, and a distorted cell ranks first; no grade is confident today only because the run-level `fom_panel_disagrees` fires, which the reporter measured quiet on arms where a wrong cell reached `medium`
@@ -232,7 +232,8 @@ engine or the ranking. Indexing is provisional by declaration
       the tree and record the moves.
 - [x] #1263: the containment refuter's null counted in the seen test's own
       windows, the assumed shift bound flooring only the power check (`split`).
-      *Built 2026-11-01 (PR #1302); which rule lands is the maintainer's.*
+      *Built 2026-11-01 (PR #1302). Decided 2026-11-01 (maintainer): `split`
+      lands on top of #1251's `g`.*
 - [ ] Revisit `fom_panel_disagrees` only on the same arms, after the repair.
 - [x] Tests, and `tests/test_acceptance_indexing.py` green.
 - [x] Skill: the indexing reference row for any changed caveat or grade rule.
@@ -257,7 +258,8 @@ absences; Si, corundum and magnetite keep their correct cells.
 ## Handover log
 
 - **2026-11-01** — #1263, built as the reporter's `split` rule (ghostshift runner,
-  PR #1302). The containment refuter compared how many of a cell's extra lines sit
+  PR #1302). Decided 2026-11-01 (maintainer): `split` lands on top of #1251's
+  `g` (PR #1302). The containment refuter compared how many of a cell's extra lines sit
   on an observed line with a chance count taken in wider windows, floored at the
   assumed shift bound (0.15° 2θ when nothing is measured). The seen count itself
   is taken at the resolution after the cell's own common shift. So "expected by
@@ -383,8 +385,7 @@ absences; Si, corundum and magnetite keep their correct cells.
   the reporter's runs read #1 for `split + g`, and `g` alone already holds them
   at #1 on main.
 
-  *Next.* The maintainer rules on `split` at PR #1302's merge. If it lands,
-  the next refinement of the null is the declined review finding (1): count p₀
+  *Next.* With `split` decided, the next refinement of the null is the declined review finding (1): count p₀
   only over the range farther than the resolution from every parent line, per
   pair, and re-run the 244-pair log (`gs_split_log.py`'s method) on it. Then task 5
   (`fom_panel_disagrees`), under `preset="full"` or a ceiling no arm binds, per
