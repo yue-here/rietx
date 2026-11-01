@@ -589,7 +589,7 @@ def test_q_must_not_drift_from_two_theta():
                  two_theta_max=40.0)
 
 
-def _with_esd(pl: PeakList, k: int, **update) -> PeakList:
+def _reloaded_with(pl: PeakList, k: int, **update) -> PeakList:
     """``pl`` with peak ``k``'s fields replaced, revalidated as a reload would."""
     peaks = [p.model_copy(update=update) if i == k else p
              for i, p in enumerate(pl.peaks)]
@@ -606,9 +606,9 @@ def test_q_esd_must_not_drift_from_two_theta_esd():
                                  two_theta_esd=0.002)
     with pytest.raises(ValueError, match=r"peak 1 at 2θ = 28\.0000° carries "
                        r"q_esd = .*PeakList\.from_positions"):
-        _with_esd(pl, 1, two_theta_esd=3 * pl.peaks[1].two_theta_esd)
+        _reloaded_with(pl, 1, two_theta_esd=3 * pl.peaks[1].two_theta_esd)
     with pytest.raises(ValueError, match="carries q_esd ="):
-        _with_esd(pl, 2, q_esd=2 * pl.peaks[2].q_esd)
+        _reloaded_with(pl, 2, q_esd=2 * pl.peaks[2].q_esd)
     # the remedy the message names: rebuild, and both σ move together
     tt = [p.two_theta for p in pl.peaks]
     esd = np.array([0.002, 0.006, 0.002, 0.002])
@@ -622,11 +622,11 @@ def test_a_non_finite_esd_pair_agrees_and_a_half_finite_one_does_not():
     and the other is not is a drift."""
     pl = PeakList.from_positions([20.0, 28.0, 33.0], wavelength=1.5406)
     inf = float("inf")
-    assert _with_esd(pl, 0, two_theta_esd=inf, q_esd=inf).peaks[0].q_esd == inf
+    assert _reloaded_with(pl, 0, two_theta_esd=inf, q_esd=inf).peaks[0].q_esd == inf
     nan = float("nan")
-    assert np.isnan(_with_esd(pl, 0, two_theta_esd=nan, q_esd=nan).peaks[0].q_esd)
+    assert np.isnan(_reloaded_with(pl, 0, two_theta_esd=nan, q_esd=nan).peaks[0].q_esd)
     with pytest.raises(ValueError, match="carries q_esd ="):
-        _with_esd(pl, 0, two_theta_esd=inf)
+        _reloaded_with(pl, 0, two_theta_esd=inf)
 
 
 def test_a_picked_list_survives_its_own_json_round_trip():

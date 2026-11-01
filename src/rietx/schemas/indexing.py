@@ -1038,9 +1038,10 @@ class PeakList(Base):
                 f"peak {k} at 2θ = {tt[k]:.4f}° carries q_esd = "
                 f"{float(got_esd[k])!r} but two_theta_esd = {float(esd[k])!r}° gives "
                 f"σ(1/d²) = {float(want_esd[k])!r} at λ = {self.wavelength} Å; "
-                "build peaks with PeakList.from_positions or "
-                "indexing.pick_peaks rather than setting two_theta_esd or "
-                "q_esd by hand")
+                "set both fields together, deriving q_esd with "
+                "rietx.schemas.indexing.q_esd_of_two_theta, or rebuild the "
+                "list with indexing.pick_peaks or PeakList.from_positions "
+                "(which marks every σ assumed)")
         return self
 
     def usable(self) -> list[ObservedPeak]:
