@@ -63,6 +63,6 @@ Preferred orientation, extinction and surface roughness rescale intensities as a
 Freed early, a correction takes intensity that belongs to the structure.
 
 Anisotropic strain is freed in the same stage as the isotropic size and strain widths, never after it.
-A Stephens block locks `Phase.lor_strain`, because the block's isotropic direction is that same column ([Anisotropic strain](../reference/data.md#anisotropic-strain)).
+A Stephens block locks `Phase.lor_strain` and replaces it, because the block's isotropic direction is that same column ([Anisotropic strain](../reference/data.md#anisotropic-strain)).
 `lab_sample_refine` frees `phases.*.microstrain.dof.*` beside the size and strain widths for that reason.
 A stage after it would leave the isotropic width unrefined until the block's correlated coefficients, up to fifteen of them, turned on at once.
