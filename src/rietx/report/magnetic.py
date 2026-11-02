@@ -298,20 +298,13 @@ def moment_angle_stationary_diagnostics(stage, parameters=None) -> list[Diagnost
     # the moduli beside them (WP-2060): their esds are read with these angle
     # columns out, so they hold only if the angles sit on the direction, and
     # a weak one covered 0.83 at a nominal 0.95 (#1075).  None is computed
-    # unasked: a modulus profile cost 54-58 s on a 4-8 s two-site fit.
+    # unasked: a modulus profile cost 7-58 s on 1-8 s two-site fits.
     moduli = [m for m in dict.fromkeys(p.rsplit(".dof", 1)[0] + ".dof0"
                                        for p in passed.paths)
               if m in rows and rows[m].stderr is not None]
     if moduli:
         message += (f" The esd of {', '.join(moduli)} assumes the angles sit on "
                     f"the direction.")
-        for path in moduli:
-            interval = rows[path].interval
-            if (interval is not None and interval.lower is not None
-                    and interval.upper is not None):
-                message += (f" {path}'s {100 * interval.level:g} % profile "
-                            f"interval is {interval.lower:.4g} to "
-                            f"{interval.upper:.4g} μ_B.")
     if without:
         message += (f" No profile interval was computed for "
                     f"{', '.join(without)}. On a single fit, "
@@ -380,12 +373,13 @@ def moment_unsupported_diagnostics(parameters) -> list[Diagnostic]:
         message=(f"{'; '.join(parts)}. The data do not support "
                  f"{'this moment' if len(rows) == 1 else 'these moments'}: under "
                  f"{MOMENT_SUPPORT_SIGMA:g} esd or at the floor. The magnetic "
-                 f"intensity goes as m², so near m = 0 the modulus's column "
-                 f"vanishes and its esd is no interval."),
-        suggestion=("Read the moment as unsupported, not as a small moment, and "
-                    "do not quote value ± esd. For an upper limit, "
-                    "Refinement.profile_interval(data, path) gives the "
-                    "modulus's likelihood interval, which keeps m ≥ 0."))]
+                 f"intensity goes as m², so where the moment's sign changes no "
+                 f"intensity its column vanishes at m = 0, and near it the esd "
+                 f"is no interval."),
+        suggestion=("Read the moment as unsupported, not as a small moment. For "
+                    "a limit, Refinement.profile_interval(data, path) gives the "
+                    "modulus's likelihood interval, which stays at m ≥ 0 where "
+                    "the data cannot see the moment's sign."))]
 
 
 def _rad(x: float) -> str:

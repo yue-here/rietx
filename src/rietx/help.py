@@ -3201,8 +3201,9 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "size, so near zero the size has almost no effect on the pattern, and "
             "its error estimate is no interval: a fit that ends on zero can report an "
             "estimate of 10 000 Bohr magnetons. Read the moment as unsupported. For "
-            "an upper limit, `Refinement.profile_interval` gives the size's "
-            "likelihood interval, which never goes below zero. The FitReport's "
+            "a limit, `Refinement.profile_interval` gives the size's likelihood "
+            "interval, which stays at or above zero where the data cannot see the "
+            "moment's sign. The FitReport's "
             "moment rows give the same verdict as `supported`."
         ),
     ),
