@@ -1562,7 +1562,8 @@ def test_parallel_basis_vectors_are_equal_so_every_dof_scale_is_one():
     assert scales == {1.0}
 
 
-def test_a_hook_tie_on_a_renumbered_sites_dof_is_reanchored_not_added_twice(pbso4):
+def test_a_hook_tie_on_a_renumbered_sites_dof_is_reanchored_not_added_twice(pbso4,
+                                                                             monkeypatch):
     """Round 1 of #1223.  ``displaced`` is the carry's, read in the declared numbering;
     the hook's tie is in the built one, and the two differ wherever a warm start
     renumbers the site.  Declared on the y = 1/4 mirror, O5's z is ``dof.1``; a warm
@@ -1570,6 +1571,7 @@ def test_a_hook_tie_on_a_renumbered_sites_dof_is_reanchored_not_added_twice(pbso
     so the re-anchor missed the tie and the warmed variable added the fitted
     displacement to a coordinate that already held it, once per pattern.  The second
     pattern must start z where the first fit left it."""
+    from rietx import sequential
     from rietx.sequential import SequentialRefinement
     from rietx.strategy.staged import RefinementPlan
     j = _o5(pbso4)
@@ -1594,9 +1596,17 @@ def test_a_hook_tie_on_a_renumbered_sites_dof_is_reanchored_not_added_twice(pbso
             return inner(*args, **kwargs)
         ref.fit = fit
 
+    # The toy pattern fits to Rwp 0.999 under this plan, so MODEL_FAR_FROM_DATA
+    # (error) makes the chain quarantine pattern 0 and start pattern 1 cold
+    # (WP-2003 C2 q5).  What is pinned here is the re-anchor through a warm
+    # start, which the quarantine is orthogonal to, so the chain reads only
+    # divergence as a rejection in this test.
+    monkeypatch.setattr(sequential, "_rejected",
+                        lambda fit: fit.status == "diverged")
     plan = RefinementPlan(stages=[Stage("dz", ["vars.*"], max_iter=8)])
     series = SequentialRefinement(start, INSTRUMENT).fit(
         [data, data], plan=plan, prepare=prepare, constrain=constrain)
+    assert series[1].seeded_from == 0
     fitted = {p.path: p.value for p in series[0].parameters}[f"{site}.z"]
     assert abs(fitted - start.phases[0].atoms[j].z.value) > 1e-3      # the fit moved it
     assert started[1] == pytest.approx(fitted, abs=1e-9)

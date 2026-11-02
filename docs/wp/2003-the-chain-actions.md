@@ -1,6 +1,6 @@
 # WP-2003 — The chain actions: what a series decides between patterns
 
-Milestone: generality · Status: 🔄 2026-11-02 — claimed by @yue-here
+Milestone: generality · Status: 🔄 2026-11-02 — C1, C2 q5 and C3 landed (no default Rwp fence or first-rung budget; an error-level fit is quarantined); next C2 q2-3, the GUI's quarantine mark, C5-C10
 Track: The audits
 Depends on: 2002, 2037
 Priority: P2 2026-10-24 — 2037 closed, so its clause 1 and the response column this WP's first demotion takes are in place; the maintainer's next after 2037; the seam the maintainer's own example (a series discontinuity) lives in
@@ -260,7 +260,10 @@ opt-in switch, so it is tiered in the batch before it lands (the judge's item 5,
       caller's *k*) in place of `verify_discontinuities`, schema 0.60 annotated, release note
       staged. The GUI's series panel still reads the route's `discontinuous` key, now true
       only for a verified step (`gui/src/lib/series.ts:65`, `Series.svelte:613`): plotting
-      `steps` there is owed. C1, C3, C5, C6, C9, C10 owed.
+      `steps` there is owed. C1, C2 q5 and C3 landed 2026-11-02 (fifth session, three lanes;
+      the handover entry): no default Rwp fence (`SeriesEntry.rwp_over_median`), an
+      `error`-level kept attempt escalates and is quarantined (`schemas.sequential._rejected`),
+      no default first-rung budget. C2's questions 2-3 (the ranking), C5, C6, C9, C10 owed.
 - [ ] Goldens re-pinned only if no further from reference. A series golden's first
       reference is the cold-fit chain, rietx's own result on the same data, so it
       verifies and does not validate (DESIGN.md § Rules, 2). Where a series member has a
