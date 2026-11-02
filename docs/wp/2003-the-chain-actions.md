@@ -296,6 +296,153 @@ summary).
 
 ## Handover log
 
+### 2026-11-02 (fifth session) — C1, C2 q5 and C3 landed: no default Rwp fence or first-rung budget, an error-level fit is quarantined
+
+A series no longer second-guesses a fit by its Rwp, and no longer cuts a first attempt short to
+save time. Both defaults are gone and are now a caller's to ask for. What sends a pattern up the
+ladder, and keeps it from seeding the next one, is now one test: the fit diverged, or the
+package itself marked it "do not read" at error level. Removing the fence cost two real rescues,
+and that test brought both back: the path guide's 800 K jump and the magnetic blank frame beside
+the onset. It cost one signal that nothing replaces yet. On the planted series the unmodelled
+phase from pattern 124 is now marked by no code, only by the per-pattern ratio the entry records.
+Separately, tutorial 05's 2 % jump has been wrong on main since PR #1305 (WP-2049, closed), which
+is not this branch's and needs its own fix.
+
+*Done.*
+- Claimed (`6600efb`, draft PR #1310). `### Inherited` was empty. One Context finding was already
+  fixed on main and is marked superseded (`0d5e888`): the joint fit's vars-driven cell escape,
+  `multi._vars_driven_cell_escapes_multi`.
+- WP-2010's missed handover was repaired on this branch (`d568e0b`, `02cad1b`): #1288's reversal
+  of the report sentence was recorded and marked superseded in place.
+- **C1** (`21edac4`, a lane). `RESEED_FACTOR` and `SEQUENTIAL_RWP_OUTLIER` are gone.
+  `reseed_factor=None` is the caller's opt-in fence, refused unless finite and positive.
+  `SeriesEntry.rwp_over_median` replaces `rwp_fence`, a record with no threshold; an old
+  document's key is dropped at read. The step exclusion beside an outlier went too.
+- **C2 q5** (`a8d8c30`, a lane). `schemas.sequential._rejected` (diverged, or any `error`-level
+  diagnostic) is asked by the ladder, by the quarantine and by every reader that steps over a
+  quarantined pattern. `SEQUENTIAL_UNRECOVERED` names the code. Its two rows are tiered.
+- **C3** (`81cc505`, a lane). `FIRST_RUNG_FACTOR` is gone: `first_rung_factor=None`, with both
+  defects fixed (truncation read off the rung's own stages, X1; the cap and the sample are one
+  quantity, a stage's evaluations) and no budget under `reseed=False` (X2). `FIRST_RUNG_SAMPLES`
+  is tier 3 inside the opt-in. The path guide's ladder section is rewritten: its 700 K and 800 K
+  warm rungs, which the 3.0 bound had cut, now converge warm. Root CLAUDE.md § Series and
+  `docs/practice.md`'s rietx rows follow.
+- Code review (`/code-review high --fix`): five findings, two fixed (`16c2a64`).
+  - Fixed: `_better` ranked only divergence below the rest, so a lower-Rwp attempt under an
+    error-level code beat a clean later rung and the pattern was quarantined with a usable fit
+    discarded. It now asks `_rejected`.
+  - Fixed: the two factor checks are folded into `_check_factor`.
+  - Skipped: the GUI's quarantine mark still reads `status === "diverged"`
+    (`gui/src/lib/series.ts:325`, `Series.svelte:667,673`); it needs a vitest change and a dist
+    rebuild (Next 2).
+  - Skipped: the WP-1301 collapse-restore merges two solves into one `StageResult`, so a first
+    solve the opt-in cap stopped is invisible to `_cut_by_bound` (`refine.py` ~5110-5135); this
+    needs a field. Measured harmless on T087 under 3.0, at most 4.8e-7 esd.
+  - Skipped: a `first_rung_factor` given with `reseed=False` is ignored without a record; the
+    `reseed` docstring says so.
+- The full suite found one of this branch's (`e5b2067`):
+  `test_site_twins_merged.py::test_a_hook_tie_on_a_renumbered_sites_dof_is_reanchored_not_added_twice`.
+  Its toy pattern fits to Rwp 0.999 under `MODEL_FAR_FROM_DATA`, so q5 quarantined pattern 0.
+  Freeing the scale and the background still left Rwp 0.92 (the pattern is undersampled). The
+  test pins the re-anchor and not the quarantine, so it now monkeypatches the predicate and
+  asserts the second pattern was seeded from the first.
+
+*Measured* (darwin arm64, worktree venv `[dev]`; the lanes' measurements are against the same
+tree with the old setting, because the committed JSONs are Linux, from 2026-10-26, and drifted).
+- C1's two lost rescues, both a converged warm fit under `MODEL_FAR_FROM_DATA`. The path guide's
+  p005 (800 K) kept `warm_staged` at Rwp 0.917 and seeded p006 into Rwp 0.937; the fence had sent
+  it cold, to 0.040. The magnetic blank frame's p004 (75 K) converged at Rwp 0.9997, and the
+  onset bracket widened from 55→75 to 55→95 K. Q5 restores both exactly.
+- Planted (248 patterns) after C1: `surfaced["second_phase"]` is `None`; it was
+  "SEQUENTIAL_RWP_OUTLIER run from 134". No series or per-pattern code fires in T124-T185, and no
+  large step lands there. `rwp_over_median` is 1.00 at T124, 1.29 at T134, 1.83 at T150 and 2.52
+  at T185, with GoF rising 1.01 → 2.95 at Rexp 0.042. The 24-pattern transition planted alone
+  lost its mark too. Both tests are strict xfails naming this.
+- The q5 arm, against the old predicate:
+
+  | family | escalated | quarantined | evaluations, new / old | values moved |
+  |---|---|---|---|---|
+  | tut05-broken | 1 (scan12) | 1 (scan12) | 140 / 138 | scan13 8.6e-7 esd |
+  | CPD, closing off | 0 | 0 | 712 / 712 | bit-identical |
+  | CPD | 0 | 0 | 653 / 653 | bit-identical |
+  | planted | 0 | 0 | 3094 / 3094 | bit-identical |
+
+  scan13 now starts from scan11 (17 evaluations against 35). No pattern a weighed or planted
+  reference accepts is quarantined.
+- C3, `None` against 3.0: CPD bit-identical, 653 evaluations each. Planted 3111 against 3082,
+  161 patterns differing by at most 4.8e-7 esd. T087 is identical in both arms (scale on its
+  floor, zero shift held). The batch's unbounded −0.0231(48) does not occur on this tree: the
+  bound no longer bites T087 (its peak is 6.88× the running maximum, but the bounded stage's
+  restore re-solve converges).
+- Tutorial 05's 2 % jump, bisected over origin/main's 54 first-parent commits touching `src`
+  since `0eee941c9` (the 2026-10-26 JSONs' tree). Each probe ran that commit's own
+  `measure_reseed.py`, `tut05-jump`, arm `on`, on darwin. Up to `b0e0e4b71` the 700 K pattern
+  ends at Rwp 0.03899 (71 evaluations). From `e5d2d0350` (PR #1305, WP-2049) it ends at 0.96626
+  `converged` (607 evaluations). `0eee941c9` on darwin gives 0.039 too, so this is not the
+  platform. The tutorial's "Here the 700 K fit found the larger cell" (`05_sequential_fits.py`,
+  around line 306) has been false in the committed notebook since then.
+- Full suite on main merged in (`cf58fef`, alone on the machine, `OPENBLAS_NUM_THREADS=1`,
+  51:54): 16 failed, 14151 passed, 328 skipped, 51 xfailed, 1 xpassed, 4 errors.
+  - Mine: the twins test, fixed above.
+  - On main's nightly of 2026-11-01 (run 41305369905): `test_the_axial_sizing_floor_does_not_change_the_answer[lab6]`
+    (8.820 esd).
+  - Darwin-only golden, failing on main's src too: `test_numpy_path_bit_identical_to_golden[srm660c]`
+    (max |Δ| 2.27e-13). Its golden is pinned to darwin, so no nightly sees it.
+  - Main drift: `test_magnetic_isotropy.py::test_weights_move_d_and_not_what_is_proved`. It fails
+    on that merge's tree and passes on current main's src (WP-1418's #1296 changed `isotropy.py`).
+  - Environment: 11 git-driven hook tests and the GUI-boot test (`/usr/bin/git` 2.33 rejects the
+    user's global `merge.conflictstyle=zdiff3`, exit 128), and the 4 wheel-build errors (`uv`
+    not on PATH).
+- Fast selection on the final tree (main merged again, `b931d91`, alone): 11 failed, 13274 passed,
+  317 skipped, 34 xfailed, 4 errors, 14:48. All 15 are the environment's (the 11 hook tests, the 4
+  wheel builds). 16 tests were added. Their cost on the local junit: 10.83 s over 16, all but
+  0.01 s in `test_sequential.py`, the dearest 2.82 s (the cut-warm-stage chain); none joins the
+  slow tail.
+- Lanes (`session_usage.py lanes 7d134759-…`): main 137 requests, peak 356K, $10.56; three lanes
+  $31.55.
+
+  | lane | est | requests | main at dispatch | re-read | lane $ | saved $ |
+  |---|---|---|---|---|---|---|
+  | C1 | 40 | 180 | 246K | 0K | 13.29 | +8.74 |
+  | C2-q5 | 35 | 132 | 272K | 0K | 10.45 | +3.18 |
+  | C3 | 35 | 117 | 304K | 0K | 7.82 | +5.26 |
+
+  The trial row is appended. Baseline replay, selective policy (u = 0K): 300K-450K −3 % (one
+  session).
+
+*Gotchas.*
+- `/usr/bin/git` on this machine is 2.33 and cannot merge under the user's global
+  `merge.conflictstyle=zdiff3`; `/opt/homebrew/bin/git` can. `uv` and `gh` live in
+  `/opt/homebrew/bin`, which the shell's PATH lacks.
+- The worktree guard refuses `PYTHONPATH=` and computed arguments in Bash. An A/B against
+  another commit's src runs through a wrapper that `git archive`s it into the scratchpad and puts
+  it first on `sys.path` (rebuild it from this description; the scratchpad does not survive).
+- The committed `reseed/*.json` are Linux 2026-10-26 numbers. On darwin today the tree has
+  drifted, so compare an arm against the same tree with the old setting, never against the files.
+
+*Generality.* The judge's verdicts and the author's answers are in
+`2003-batch/generality-2026-11-02.md`. Fourteen items, none `fails`.
+- `rwp_over_median` is weak: § Demotion's ranked summary line is missing (Next 1).
+- `SEQUENTIAL_RWP_OUTLIER`'s removal is weak: it alone marked planted's phase.
+- `FIRST_RUNG_SAMPLES` is weak: its evidence was measured on the summed rung C3 replaced.
+- `_rejected` holds on judgement and is weak on the record: today it is `MODEL_FAR_FROM_DATA`'s
+  absolute Rwp > 0.8 gate, so a low-count series under a right model would be quarantined
+  (unmeasured), and the threshold's row does not name the chain (forwarded to WP-2005).
+- The other ten hold.
+
+*Next*, in order:
+1. § Demotion's other half for `rwp_over_median`: `SeriesResult.summary` names the largest
+   ratios, as it names `series.steps`, and the row moves to `OTHER_RECORD_FIELDS`. This decides
+   whether planted's phase is findable again, so measure it with the agent harness after.
+2. The GUI's quarantine mark: `unrecoveredFlags` and `Series.svelte` read the predicate's two
+   facts (the route already sends `diagnostics`), vitest, and a rebuilt dist.
+3. C2's questions 2-3: diverged ranks below truncated in `_prefer`, and the full cost S, not Rwp,
+   ranks the rest. Then C2's remaining rows (`rung`, `rungs_tried`, `rungs_raised` at unaudited).
+4. C5, C6, C9's carry-invariance test and C10's joint hold row (read against WP-2028's merged
+   loops), each its own commit with its `_audit.py` row. Then goldens, tests and the skill list.
+5. Not this WP: tutorial 05's 2 % jump since PR #1305. It is proposed as its own session, because
+   WP-2049 is closed.
+
 - **2026-10-30** (`/pr-review`) — family B's data merged from outside as PR #1163 (`c1214688`), after a rebase that kept #1162's README section first. `tests/data/seqrefine_cucr2o4/` holds 20 files, byte-identical to `SeqRefine/data/SeqTut.zip` in the GSAS-II tutorials repo at `924e9eb8`, under the GSAS-II licence: 17 CuCr₂O₄ + CuO patterns from APS 11-BM (λ = 0.413263 Å, 12 799 points each, header temperatures 6.778 to 288.7 K, seven patterns below the transition near 130 K and ten above), the tutorial's instrument `.prm` and its two starting CIFs. The set is 7.1 MB, and the contributor offered a ten-pattern subset at 4.2 MB. The reference values come from Suchomel et al. (2012, Phys. Rev. B 86, 054406), read as the preprint, and none from rietx or the tutorial. Gotchas: the tutorial cites no paper, so the link to the paper rests on composition, source and λ. The files' 0.002° step differs from the paper's 0.001°, so these are ramp scans of the same specimen and not necessarily Table I's scans. The CIF cells are GSAS-II values and not references. The new test (40 cases, about 1 s) runs no fit and plants no bad pattern, since family D carries those. No task is ticked. Gate (a stack of eleven PRs on main `b40bc994`, tree `307eff83`; macOS arm64, `[dev,jax]`, Python 3.12): 13 217 passed, 216 skipped, 48 xfailed, 0 failed, with ruff, the `-W` manual build and the GUI ladder green.
 
 - **2026-10-29** (`/pr-review`) — family D's data merged from outside as PR #1162 (`843e27bf`): the Co₃O₄ D1B quench series under `tests/data/d1b_co3o4_quench/`, with its provenance, licence, errata and the planted known-bad patterns, which the test builds in memory. Review established two things for this WP. `read_pattern` passes a NaN block through with only `PATTERN_DEAD_CHANNELS` on two channels, so nothing names the NaNs (#1187 owns that, and the planted file is its fixture). And no code path sets `"diverged"` today, so the quarantine cannot fire on this family yet. Family B (#1163) waits on a rebase over this one's README section. No task here is ticked by it.
