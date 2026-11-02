@@ -104,6 +104,12 @@ Tier: no heuristic enters `rietx._audit`; this is workflow tooling under `.claud
   sequence it cost 1.86-2.41 s. The create hook's refusal adds 0.52-0.55 s with no claim on
   the WP and 1.07-1.19 s with a claim naming a PR (one `gh pr view`). The SessionStart hook
   is unchanged, 0.41-0.43 s, and stays off the network.
+  Fast selection, `[dev]` venv, darwin/arm64, beside other sessions: 13233 passed, 310
+  skipped, 32 xfailed, 1 failed in 10:15. The failure is
+  `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`, which
+  reads this machine's Jupyter kernel spec; the spec points at a deleted venv, and the test
+  fails alone too. `test_workflow_hooks.py` went 103 -> 111, the eight cases added; they cost
+  3.47 s in all, the slowest 1.54 s.
   *Review* (`/code-review high --fix`): fixed three. An unreadable claim record raised and
   would have refused every WP tree; `status NNNN` left other WPs' runner trees dormant; the
   refusal's text said the table reads dormant. Skipped two: a PR past `open_prs`' 100-PR
