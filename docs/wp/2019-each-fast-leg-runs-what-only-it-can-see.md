@@ -1,6 +1,6 @@
 # WP-2019 — each fast leg runs what only it can see, and the tail is cut again
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — four shards on a per-leg record, projected median 12.9 min; the ten-run read is owed
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @mustachefeeling (ghostshift runner): the ten-run read on four shards
 Track: The repo's own process
 Depends on: —
 Priority: P2 2026-10-23 — was P3: three of the five latest main runs have a slowest fast job over 20 min on the refreshed shard record; the wait 1547 was P2 for is back
