@@ -1022,7 +1022,7 @@ def _run_series(setup: Setup, config: Config = CONFIGS[0]) -> Run:
     status = "converged" if statuses == {"converged"} else "/".join(sorted(statuses))
     # ``free`` is -1, printed "-": a series entry carries no per-stage freed
     # list, and ``SeriesEntry.parameters`` is not the same quantity — a row
-    # appears there iff the entry varied *or was tied*.  The count is the
+    # appears there iff the fit could move it, tied followers included.  The count is the
     # ``trigger`` row's, one line up, because the plan is the same one.
     return Run(wall, last.statistics.rwp if last else float("nan"),
                counts.nfev, counts.njev, -1, [], status, per,
