@@ -1,6 +1,6 @@
 # WP-2030 — A formula's volume window fits inorganic cells, and a hydrate parses
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — parts 1 and 2 merged from outside (PRs #1123, #1253, #1237); the stale `duplicate_line` marks are fixed on branch `wp2030-indexing-gui-finish`; the GUI formula field waits on the maintainer's choice of where the formula is stored (2026-11-02 entry), and #1121 stays open for it
+Milestone: unscheduled · Status: 🔄 2026-11-02 — parts 1 and 2 merged from outside (PRs #1123, #1253, #1237); the stale `duplicate_line` marks are fixed in PR #1344; the GUI formula field waits on the maintainer's choice of where the formula is stored (2026-11-02 entry), and #1121 stays open for it
 Track: Data and metadata in, a structure out
 Depends on: — (1510 soft, closed 2026-10-23: the window, the Z check and the review findings this carries)
 Priority: P2 2026-10-23 — a defect that fires wrongly: the skill sends an agent through `SearchSpec.from_formula` before its first search, and the window excludes the true cell of 7 of 8 inorganic solids measured (fluorapatite abstained where the unwindowed search ranked the truth first); indexing is a path few fits run
@@ -207,7 +207,7 @@ unwindowed one does, and `CuSO4.5H2O` never reads as 4.5 O.
 
 ## Handover log
 
-- **2026-11-02** (ghostshift runner) — The GUI's peak editor no longer leaves a
+- **2026-11-02** (ghostshift runner, PR #1344) — The GUI's peak editor no longer leaves a
   line marked unusable after the line it was judged against moves. Two marks
   are judged against another group's line: a copy (`duplicate_line`) against
   the better-measured fit of the same peak, and a Kβ or tungsten ghost against
