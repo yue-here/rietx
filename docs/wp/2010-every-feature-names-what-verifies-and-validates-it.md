@@ -185,6 +185,11 @@ confirm the new test goes red naming it.
 
 ## Handover log
 
+- **2026-11-02** — a repair session, no code. It wrote the reconstructed entry below for
+  the 2026-11-01 ruling, which had left none, and moved the Status line to match. Its
+  own commit is dated today, so the session-start scan's date rule needs this entry too.
+  Nothing else in the WP moved. Next: as below.
+
 - **2026-11-01 (reconstructed post hoc)** — a ruling session, no code. Written on
   2026-11-02 by a repair session from the commit alone.
 
