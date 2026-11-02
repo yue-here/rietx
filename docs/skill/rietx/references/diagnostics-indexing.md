@@ -127,7 +127,7 @@ IZA database, and a less dense one lies above). Declare a candidate cell in
 **These names are provisional, and the answers they return are versioned.**
 Indexing is under active development, so everything under `rietx.indexing` and
 every answer type in `rietx.schemas.indexing` may change in any release — the
-[compatibility promise](https://rietx.org/using/compatibility.html)
+[compatibility promise](https://rietx.org/docs/stable/reference/compatibility.html#provisional-by-declaration)
 has the detail, § Provisional by declaration. Two things do not move with them:
 `capabilities().indexing_thresholds_version`, which is what the gates below are
 versioned by, and the serialized shape of an `IndexingResult`. So a tool loop

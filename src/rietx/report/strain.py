@@ -181,7 +181,8 @@ def _magnetic_curve(model: CompiledModel, values: dict[str, float], ip: int,
 
 
 def _strain_errors(model: CompiledModel, values: dict[str, float], ip: int,
-                   n_iter: int = _GAUSS_NEWTON_ITERATIONS
+                   n_iter: int = _GAUSS_NEWTON_ITERATIONS, *,
+                   min_reflections: int = 0
                    ) -> tuple[np.ndarray, np.ndarray]:
     """(ΔΛ, weight) per reflection of phase ``ip``, by damped Gauss-Newton.
 
@@ -209,12 +210,29 @@ def _strain_errors(model: CompiledModel, values: dict[str, float], ip: int,
     ``weight`` is the group's width-column squared norm, shared out over its
     members — the leverage that reflection has on the residual, which is what
     the downstream fit should trust in proportion to.
+
+    ``min_reflections`` is :func:`analyse_strain`'s floor, and the reason it
+    is here (WP-1335).  The weights are re-formed every iteration at the
+    updated Λ, so the count the floor tests is the *last* iteration's and
+    cannot be known before the solves.  What can is an upper bound on it: a
+    reflection with no leverage at the start has none at any iteration,
+    since the amplitude factor never reaches zero and ∂Ω/∂Λ vanishes only
+    where tanθ does.  So when fewer than ``min_reflections`` reflections
+    have leverage and a positive tanθ before the first solve, no iteration
+    can lift the count over the floor, and the first iteration's weights
+    are returned with no solve.  ``n_reflections_used`` on such a phase is
+    then counted at the fitted widths rather than four steps on; the two
+    differ only where a reflection's leverage crosses the relative cut
+    between them.  The saving is small by construction, because the solve
+    costs npts × (2·n_group)² and a phase under the floor has few groups.
     """
     cp = model.phases[ip]
     sl = values["instrument.geometry.axial_sl"]
     hl = values["instrument.geometry.axial_hl"]
     peaks = model.phase_peaks(ip, values)
     _d, gam_g, gam_l, tan_theta, _tot = _components(model, values, ip)
+    # analyse_strain's own test, so the bound below counts what it counts
+    tan_ok = np.isfinite(tan_theta[0]) & (tan_theta[0] > 0.0)
     n = len(cp.reflections)
     npts = len(model.tt)
     sw = 1.0 / model.sigma
@@ -263,6 +281,10 @@ def _strain_errors(model: CompiledModel, values: dict[str, float], ip: int,
         live = weight > 0.0
         if not live.any():
             return np.zeros(n), np.zeros(n)
+        if not done and min_reflections and int(
+                (live[group] & tan_ok).sum()) < min_reflections:
+            counts = np.bincount(group, minlength=n_group)
+            return np.zeros(n), weight[group] / counts[group]
         delta = (model.y_obs - y) * sw
         design = np.hstack([col_a[:, live], col_w[:, live]])
         # rcond, not the machine-precision default: peaks that merely *overlap*
@@ -302,7 +324,13 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
 
     Runs whether or not the phase already carries a ``microstrain`` block: with
     one, the question becomes "is there anisotropy *left*", which is how the
-    result gets checked after refining it.  Rietveld mode only — Le Bail and
+    result gets checked after refining it.  It also runs on a phase with no
+    free structural parameter, a scale-only impurity or a phase whose widths
+    are held from an instrument profile (WP-1335, #250).  The question is
+    about the specimen's widths, and a held width model is where a
+    directional misfit has nowhere else to show.  Whether the strategy
+    should act on the finding is the Layer-2 veto's call, as for a refined
+    block.  Rietveld mode only — Le Bail and
     Pawley widths are shared with empirical intensities, so a width error there
     is not separable from an intensity one.
     """
@@ -310,7 +338,13 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
         return []
     out: list[StrainAnalysis] = []
     for ip, cp in enumerate(model.phases):
-        d_lambda, weight = _strain_errors(model, values, ip)
+        basis = stephens_basis(resolve_group(
+            cp.reflections.spacegroup,
+            cp.reflections.operations)).astype(np.float64)
+        min_refl = max(STRAIN_MIN_REFLECTIONS, len(basis) + 1)
+        # the floor goes in, so a phase that cannot reach it pays no solve
+        d_lambda, weight = _strain_errors(model, values, ip,
+                                          min_reflections=min_refl)
         d, _gam_g, _gam_l, tan_theta, current = _components(model, values, ip)
         # ``live`` only excludes reflections with no leverage at all — the
         # solve is already weighted by leverage, so a weak one costs nothing
@@ -323,10 +357,7 @@ def analyse_strain(model: CompiledModel, values: dict[str, float], *,
                 * max(float(np.sqrt(weight.max(initial=0.0))), 1e-300)) \
             & np.isfinite(tan_theta[0]) & (tan_theta[0] > 0.0)
         n_used = int(live.sum())
-        basis = stephens_basis(resolve_group(
-            cp.reflections.spacegroup,
-            cp.reflections.operations)).astype(np.float64)
-        if n_used < max(STRAIN_MIN_REFLECTIONS, len(basis) + 1):
+        if n_used < min_refl:
             out.append(StrainAnalysis(phase_index=ip, n_reflections_used=n_used,
                                       n_patterns=len(basis)))
             continue

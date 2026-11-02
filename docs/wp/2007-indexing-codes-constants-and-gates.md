@@ -40,6 +40,12 @@ ranking over one population and is the regression gate, not a family.
 
 ### Inherited
 
+- **2026-11-02, from [2033](2033-a-declared-z-filters-the-extinction-class.md) (closed):
+  a stale comment on `DENSITY_Z_TOLERANCE`'s consequence.** The `z_candidates` field
+  comment on `ExtinctionScreen` (`schemas/indexing.py`, about line 2547) says two whole Z
+  fit a measured density at Z ≳ 50. The cited 1.5 % tolerance gives two from Z ≈ 33 up
+  (WP-2033's 2026-10-31 entry). Correct the number when this WP tiers that constant.
+
 - **2026-10-27, from WP-2011: the indexer's validation fit is Pawley, and no row
   records its mode.** `rietx.indexing.workflow.VALIDATION_MODE` (`"pawley"`) is a
   module string, so the walk cannot see it; `LeBailValidation.mode` records it per
