@@ -1,9 +1,8 @@
 # WP-2046 — The claim check sees a contributor's PR on the WP it runs for
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — all six tasks landed; PR #1318 in review
+Milestone: unscheduled · Status: ✅ 2026-11-02 — the claim check lists a contributor's PR on the WP it runs for; a body mention no longer counts as a PR's claim (PR #1318)
 Track: The repo's own process
 Depends on: —
-Priority: P3 2026-10-24 — a check that returned a false all-clear on a 1 764-line contributor PR; reading the PR list by hand is the workaround, and `/wp-start` step 2 already asks for it
 
 ## Goal
 
@@ -87,10 +86,6 @@ GitHub's (`closingIssuesReferences`), which excludes PRs by construction.
 The tier of each rule this WP adds: none in `rietx._audit`'s scope. This is a repo hook, and the
 package makes no decision here.
 
-### Inherited
-
-(none)
-
 ## Non-goals
 
 - Refusing on an overlap. This tier reports (root `CLAUDE.md`).
@@ -128,6 +123,14 @@ python3 .claude/hooks/wp_claim.py status
 
 ## Handover log
 
+- **2026-11-02** — closed (PR PRNUM). PR #1318 merged on 2026-11-02 as `472c302e0`. From a
+  WP's own tree, `/wp-start`'s claim check now lists a contributor's open PR on that WP. Every
+  task was already ticked, and this entry closes the file without re-measuring anything.
+  *Done*: Status ✅, the Priority line and the empty `### Inherited` section deleted, the
+  narrative moved to the v1.11 record, the index regenerated. The conflict with PR #1312
+  (WP-2077) that the entry below foresaw was resolved in #1312's merge of main (`184435602`).
+  `status` passes the tree's branch to `overlaps` there. No release note: the change is a
+  repo hook, and the package is untouched. *Next*: none here. No open WP depends on this one.
 - **2026-11-02** — all six tasks landed, PR #1318 (a ghostshift runner's session). `/wp-start`'s
   claim check now shows a contributor's PR on the WP it runs for. It no longer takes a WP that
   a PR's body mentions in passing as the PR's claim. Run from a WP's own tree, it hides only
