@@ -276,7 +276,7 @@ seed.
 The seed stays at a fixed microstrain (1000 ppm in `lab_sample_refine`) rather
 than at the `lor_strain` a phase carried before the block was declared. WP-1467
 compared the two starts. On the brucite acceptance pattern under the default LM
-driver the χ² agreed to 4 in 10⁴ (7.8943 against 7.8939). On one operando
+driver the χ² agreed to 5 in 10⁵ (7.8943 against 7.8939). On one operando
 pattern with two phases the start at the carried strain reached a lower χ² under
 LM (1.112 against 1.170) with the two phase fractions swapped, and a higher one
 under TRF (1.476 against 1.156). The measurements disagree, so the default is

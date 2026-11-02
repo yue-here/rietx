@@ -409,6 +409,25 @@ def test_a_locked_lor_strain_is_no_microstructure_reading():
     assert "phases.0.lor_strain" in {t.path for t in block.terms}
 
 
+def test_a_locked_lor_strain_is_not_exported_as_a_width():
+    """The CIF profile text and the GSAS-II peak-list widths read the width
+    law, so a block's locked lor_strain states no width there either."""
+    from rietx.io.exporters import _profile_description
+    from rietx.io.recipe import _gsas_widths
+
+    inst = Instrument.debye_scherrer(wavelength=1.5406)
+    strain = _strain_from_coef(_brucite_coef(600.0), vary=False)
+    _, _, over = _compiled_over(0.3, strain)
+    _, _, zero = _compiled_over(0.0, strain)
+    assert "Lorentzian strain" not in _profile_description(inst, over)
+    assert _gsas_widths(inst, over.phases[0], 40.0) == \
+        _gsas_widths(inst, zero.phases[0], 40.0)
+    _, _, iso = _compiled_over(0.3, None)
+    assert "Lorentzian strain" in _profile_description(inst, iso)
+    assert _gsas_widths(inst, iso.phases[0], 40.0)[1] > \
+        _gsas_widths(inst, zero.phases[0], 40.0)[1]
+
+
 def test_widths_become_direction_dependent():
     """(00l) broadens on its own when only s004 is raised — the whole point:
     two reflections at nearly the same 2θ get different widths."""

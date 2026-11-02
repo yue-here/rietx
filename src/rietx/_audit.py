@@ -3767,7 +3767,7 @@ ROWS: tuple[Row, ...] = (
                   "equal to 2e-10; suggest.SUGGEST_SEED_STEPHENS and viz.compare's Stephens "
                   "variant take it by reference since the B14 lift. WP-1467 (2026-11-02, the "
                   "lor_strain floor removed), 1000 ppm against the carried lor_strain on the "
-                  "ray: brucite LM chi2 7.8943 against 7.8939 (29 ppm), TRF 7.9267 against "
+                  "ray (29 ppm on brucite): LM chi2 7.8943 against 7.8939, TRF 7.9267 against "
                   "7.7965; operando pattern 41 LM 1.170 against 1.112 with the two phase "
                   "fractions swapped, TRF 1.156 against 1.476. The starts disagree by driver, "
                   "so the fixed seed stands"),

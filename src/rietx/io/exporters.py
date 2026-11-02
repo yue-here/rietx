@@ -358,9 +358,13 @@ def _profile_description(instrument: Instrument, structure: Structure | None = N
         f"Axial divergence: S/L={_value(geom.axial_sl)}, H/L={_value(geom.axial_hl)}.",
     ]
     for phase in (structure.phases if structure is not None else []):
+        # a Stephens block replaces lor_strain (WP-1467,
+        # CompiledModel.lor_strain_term): its stored value is no width the
+        # fit drew, so stating it would describe a broadening that is not there
         terms = [f"{label}={_value(getattr(phase, name))} {getattr(phase, name).unit}"
                  for name, label in _SAMPLE_BROADENING
-                 if getattr(phase, name).vary or getattr(phase, name).value != 0.0]
+                 if not (name == "lor_strain" and phase.microstrain is not None)
+                 and (getattr(phase, name).vary or getattr(phase, name).value != 0.0)]
         if terms:
             lines.append(f"Phase {phase.name}, sample broadening: "
                          + ", ".join(terms) + ".")
