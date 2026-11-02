@@ -129,7 +129,7 @@ none of their reported pairs involves it.
 
 ## Handover log
 
-- **2026-11-02** — closed (PR PRNUM). PR #1306 merged on 2026-11-02, so a fit
+- **2026-11-02** — closed (PR #1313). PR #1306 merged on 2026-11-02, so a fit
   no longer reports a correlation whose value is set by rounding. Every task
   here was already ticked. This entry closes the file and re-measures nothing.
   *Done*: Status ✅, the Priority line deleted, the narrative moved to the
