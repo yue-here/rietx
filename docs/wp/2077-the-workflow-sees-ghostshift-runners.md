@@ -1,6 +1,6 @@
 # WP-2077 — The WP workflow sees ghostshift's runners
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here
 Track: The repo's own process
 Depends on: —
 Priority: P3 2026-11-02 — `/wp-start` offers a live runner's tree to resume as dormant; reading `claim.py list` by hand is the workaround
