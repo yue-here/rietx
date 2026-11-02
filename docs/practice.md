@@ -296,8 +296,8 @@ Order and flags:
 Anything else a series mode decides by itself:
 
 - rietx: stage seeds are zeroed on a warm start, so a neighbour's answer sitting on a floor is
-  not lifted; the collapsed first rung gets an evaluation budget of `first_rung_factor` (3.0) ×
-  the dearest converged first rung, once `FIRST_RUNG_SAMPLES` (3) have converged; a magnetic
+  not lifted; the collapsed first rung gets no evaluation budget unless the caller passes
+  `first_rung_factor` (none by default since WP-2003's C3, 2026-11-02); a magnetic
   moment the pattern does not support is floored before it seeds the next
   (`SEQUENTIAL_MOMENT_HOLD`); the wavelength-calibration diagnostic measures from the series
   root's declared λ, not the carried one; a cancelled
@@ -337,8 +337,8 @@ the step between neighbours. The rietx behaviours with a program default behind 
 rietx carries every entry where GSAS-II and EasyDiffraction carry the varied ones. A fixed
 entry holds the same value either way, so the two differ only where a fixed value changes
 during the chain. The behaviours with no program default behind them are rietx's own: the
-restart ladder with its Rwp fence (`RESEED_FACTOR`, the median, `_prefer`) and the first-rung
-budget; the quarantine's exclusion from the median; `direction="both"` and
+restart ladder (its Rwp fence and first-rung budget the caller's opt-ins since WP-2003, the
+median, `_prefer`); the quarantine's exclusion from the median; `direction="both"` and
 `SEQUENTIAL_PATH_DEPENDENT`; the discontinuity scan and its cold verification; and the moment
 floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the persistent-finding
 summary and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).

@@ -31,7 +31,6 @@ from rietx.schemas.results import RefinedParameter, Statistics
 from rietx.schemas.sequential import SeriesEntry, SeriesResult, SeriesStep, _rejected
 from rietx.schemas.structure import Atom
 from rietx.sequential import (
-    FIRST_RUNG_FACTOR,
     SequentialRefinement,
     _better,
     _carry_into,
@@ -896,14 +895,17 @@ def test_a_warm_rung_seeds_nothing_and_the_cold_one_keeps_the_plans_seeds():
     assert _unseeded(unseeded) is unseeded
 
 
-def _dictate(runner, script):
+def _dictate(runner, script, stages=None):
     """Force what each attempt *reports*, leaving the fits themselves real.
 
     ``script`` maps a pattern label to the ``(status, rwp)`` its successive
     rungs will come back with, or ``(status, rwp, code)`` to have the rung
     also carry ``code`` at level ``error``; the last entry repeats if the
-    ladder climbs further.  A dictated rung's own error-level diagnostics are
-    dropped: since WP-2003 C2 q5 they are part of the verdict too.  Every model, tree and node in the series is still the real one —
+    ladder climbs further.  ``stages`` maps a label to one ``{stage name:
+    status}`` per rung, the same way, for a verdict read off a rung's own
+    stages (the first-rung bound's, WP-2003 C3).  A dictated rung's own
+    error-level diagnostics are dropped: since WP-2003 C2 q5 they are part of
+    the verdict too.  Every model, tree and node in the series is still the real one —
     what is stubbed is the verdict the chain reasons about, which is the only
     way to make "which rung ran" a deterministic assertion: with real Rwps two
     patterns of the same material differ by Poisson noise, so whether the fence
@@ -911,15 +913,20 @@ def _dictate(runner, script):
     """
     real = runner._fit_one
     seen: dict[str, int] = {}
+    stages = stages or {}
 
     def dictated(*args, **kw):
         ref, result = real(*args, **kw)
         label = args[1]
+        n = seen.get(label, 0)
+        seen[label] = n + 1
+        if label in stages:
+            told = stages[label][min(n, len(stages[label]) - 1)]
+            for stage in result.stages:
+                stage.status = told.get(stage.name, stage.status)
         if label in script:
             attempts = script[label]
-            k = min(seen.get(label, 0), len(attempts) - 1)
-            seen[label] = seen.get(label, 0) + 1
-            status, rwp, *code = attempts[k]
+            status, rwp, *code = attempts[min(n, len(attempts) - 1)]
             result.status, result.statistics.rwp = status, rwp
             result.diagnostics = [d for d in result.diagnostics
                                   if d.level != "error"]
@@ -1052,46 +1059,176 @@ def test_the_bound_caps_evaluations_and_never_raises_a_stage():
     assert _bounded_plan(plan, 1).stages[0].max_iter == 1
 
 
+#: the bound's default before WP-2003 C3 made it the caller's; every test
+#: that bounds a first rung names its factor, this one
+_FACTOR = 3.0
+
+#: ``_CHEAP`` with room for the bound to cut: at ``max_iter=5`` a budget of
+#: 3 × a converged rung's dearest stage is already wider than the stage, so
+#: ``_bounded_plan`` lowers nothing and no ``max_iter`` is the bound's
+_CHEAP_WIDE = staged.RefinementPlan(stages=[
+    staged.Stage("quick", ["phases.*.scale", "phases.*.cell.*"], max_iter=100)])
+
+#: five patterns, because the bound needs `FIRST_RUNG_SAMPLES` converged
+#: first rungs before it exists at all: p001-p003 supply them, p004 is cut
+_SAMPLED = {"p000": [("converged", 0.10)], "p001": [("converged", 0.10)],
+            "p002": [("converged", 0.10)], "p003": [("converged", 0.10)]}
+
+
+def _record_plans(runner):
+    """Each ``_fit_one`` call's plan, by label: the plans the ladder ran."""
+    real, plans = runner._fit_one, {}
+
+    def recording(*args, **kw):
+        plans.setdefault(args[1], []).append(args[4])
+        return real(*args, **kw)
+
+    runner._fit_one = recording
+    return plans
+
+
 def test_a_bounded_first_rung_that_spends_its_bound_escalates(thermal_patterns):
     """The clause the bound makes necessary, and the default that does not.
 
-    A rung that hits its evaluation cap comes back ``"max_iter"``, which
-    :func:`_better` reads as merely not-diverged and :func:`_reseed_needed`
-    does not test at all — so the fence, asked about a *good* Rwp, would keep
-    it. Without forcing the escalation the bound would not make a failing rung
-    cheap, it would make a **truncated fit acceptable**, which is the one way
-    this could reach an answer.
+    A rung the cap stopped has a stage at ``"max_iter"``, which ``_rejected``
+    leaves out — so without forcing the escalation the bound would not make a
+    failing rung cheap, it would make a **truncated fit acceptable**, which
+    is the one way this could reach an answer.
 
-    The second half is what pins the escalation to the bound rather than to a
-    change of policy on ``max_iter``: the identical script with the bound
-    switched off keeps the truncated rung, because a rung that spends the
-    *plan's* own budget is not this WP's business and the ladder's behaviour
-    there is what it always was.  ``first_rung_factor=None`` is that way back,
-    and what a test pinning a pre-WP-1127 number declares.
-
-    Five patterns, because the bound needs `FIRST_RUNG_SAMPLES` converged first
-    rungs before it exists at all: p001-p003 supply them and p004 is the one
-    that hits it.
+    The second half pins the escalation to the bound rather than to a change
+    of policy on ``max_iter``: the identical script with no factor (the
+    default since WP-2003 C3) keeps the rung, because a rung that spends the
+    *plan's* own budget is not this WP's business.
     """
-    script = {"p000": [("converged", 0.10)],
-              "p001": [("converged", 0.10)],
-              "p002": [("converged", 0.10)],
-              "p003": [("converged", 0.10)],
-              "p004": [("max_iter", 0.10), ("converged", 0.10)]}
+    script = {**_SAMPLED, "p004": [("max_iter", 0.10), ("converged", 0.10)]}
+    cut = {"p004": [{"warm_refit": "max_iter", "closing": "max_iter"}, {}]}
 
     structure, ins = _start_models()
-    runner = _dictate(SequentialRefinement(structure, ins), dict(script))
-    bounded = runner.fit(thermal_patterns[:5], plan=_CHEAP,
-                         first_rung_factor=FIRST_RUNG_FACTOR)
+    runner = _dictate(SequentialRefinement(structure, ins), dict(script), cut)
+    bounded = runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE,
+                         first_rung_factor=_FACTOR)
     assert bounded[4].rungs_tried == ["warm", "warm_staged"]
     assert bounded[4].status == "converged"
 
     structure, ins = _start_models()
-    runner = _dictate(SequentialRefinement(structure, ins), dict(script))
-    unbounded = runner.fit(thermal_patterns[:5], plan=_CHEAP,
-                           first_rung_factor=None)
+    runner = _dictate(SequentialRefinement(structure, ins), dict(script), cut)
+    unbounded = runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE)
     assert unbounded[4].rungs_tried == ["warm"]
     assert unbounded[4].status == "max_iter"
+
+
+def test_a_cut_warm_stage_under_a_converged_closing_stage_is_truncated(
+        thermal_patterns):
+    """WP-2003 C3's first defect: the truncation is read off the rung's stages.
+
+    ``RefinementResult.status`` is the closing stage's verdict, so a warm stage
+    the cap stopped and a closing stage that then converged read
+    ``"converged"`` and the bitten rung was kept unescalated (clash X1, outcome
+    1: three patterns at a factor of 0.5 on the thermal ramp).  Here p004's
+    first rung reports ``"converged"`` with its warm stage at ``max_iter``, and
+    it escalates; with the warm stage converged too it is kept.
+    """
+    def run(warm_status):
+        structure, ins = _start_models()
+        runner = _dictate(
+            SequentialRefinement(structure, ins), dict(_SAMPLED),
+            {"p004": [{"warm_refit": warm_status, "closing": "converged"}, {}]})
+        return runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE,
+                          first_rung_factor=_FACTOR)
+
+    cut = run("max_iter")
+    assert cut[4].rungs_tried == ["warm", "warm_staged"]
+    assert cut[4].rung == "warm_staged"
+    assert run("converged")[4].rungs_tried == ["warm"]
+
+
+def test_the_truncation_counts_only_a_stage_the_bound_capped():
+    """``_cut_by_bound``'s cases, on stage records alone.
+
+    The closing stage takes the last declared stage's ``max_iter``, so it is
+    capped with it; a stage the bound left at its own declaration ran out of
+    the *plan's* budget, which is no truncation of the ladder's.
+    """
+    from rietx.schemas.results import StageResult
+    from rietx.sequential import _bounded_plan, _cut_by_bound
+
+    def result(**statuses):
+        fit = _fake_result(0.10)
+        fit.stages = [StageResult(name=n, status=v, n_iterations=8,
+                                  cost_initial=1.0, cost_final=1.0)
+                      for n, v in statuses.items()]
+        return fit
+
+    plan = staged.RefinementPlan(stages=[
+        staged.Stage("warm_refit", ["phases.*.scale"], max_iter=100)])
+    bounded = _bounded_plan(plan, 32)
+    # the whole rung reads converged, its warm stage was cut: truncated
+    assert _cut_by_bound(result(warm_refit="max_iter", closing="converged"),
+                         plan, bounded)
+    # the closing stage carries the cap too
+    assert _cut_by_bound(result(warm_refit="converged", closing="max_iter"),
+                         plan, bounded)
+    assert not _cut_by_bound(result(warm_refit="converged", closing="converged"),
+                             plan, bounded)
+    # nothing was lowered, so a max_iter is the plan's own
+    assert not _cut_by_bound(result(warm_refit="max_iter"), plan, plan)
+    two = staged.RefinementPlan(stages=[
+        staged.Stage("tight", ["phases.*.scale"], max_iter=2),
+        staged.Stage("wide", ["phases.*.cell.*"], max_iter=100)])
+    two_bounded = _bounded_plan(two, 32)
+    assert two_bounded.stages[0].max_iter == 2
+    assert not _cut_by_bound(result(tight="max_iter", wide="converged"),
+                             two, two_bounded)
+    assert _cut_by_bound(result(tight="converged", wide="max_iter"),
+                         two, two_bounded)
+
+
+def test_no_first_rung_is_capped_unless_a_factor_is_asked_for(thermal_patterns):
+    """WP-2003 C3: ``first_rung_factor=None`` is the default and bounds nothing.
+
+    Read off the plans the ladder hands each fit: by default every warm first
+    rung runs at the plan's own ``max_iter``; with a factor, the first rung of
+    the pattern past the sample runs capped.
+    """
+    def plans(**kw):
+        structure, ins = _start_models()
+        runner = SequentialRefinement(structure, ins)
+        seen = _record_plans(runner)
+        runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE, **kw)
+        return seen
+
+    default = plans()
+    assert all(p.stages[0].max_iter == 100
+               for label in default for p in default[label])
+    bounded = plans(first_rung_factor=_FACTOR)
+    assert bounded["p004"][0].stages[0].max_iter < 100
+
+
+def test_reseed_false_bounds_no_first_rung(thermal_patterns):
+    """WP-2003 clash X2: with the ladder off, a factor is inert.
+
+    A bitten first rung could then only escalate against the switch or be kept
+    truncated, so no budget is computed: p004's first rung runs uncapped, and
+    a ``max_iter`` warm stage forces nothing.
+    """
+    structure, ins = _start_models()
+    runner = _dictate(
+        SequentialRefinement(structure, ins), dict(_SAMPLED),
+        {"p004": [{"warm_refit": "max_iter", "closing": "converged"}]})
+    seen = _record_plans(runner)
+    series = runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE, reseed=False,
+                        first_rung_factor=_FACTOR)
+    assert all(p.stages[0].max_iter == 100
+               for label in seen for p in seen[label])
+    assert series[4].rungs_tried == ["warm"]
+
+
+@pytest.mark.parametrize("bad", [True, 0.0, -1.0, float("inf"), float("nan")])
+def test_a_first_rung_factor_is_finite_and_positive(thermal_patterns, bad):
+    structure, ins = _start_models()
+    with pytest.raises(ValueError, match="first_rung_factor"):
+        SequentialRefinement(structure, ins).fit(
+            thermal_patterns[:2], plan=_CHEAP, first_rung_factor=bad)
 
 
 def test_a_truncated_attempt_loses_to_one_that_ran_to_completion():
@@ -1127,13 +1264,11 @@ def test_the_bound_is_inert_under_refit_stages(thermal_patterns):
     """
     structure, ins = _start_models()
     runner = _dictate(SequentialRefinement(structure, ins),
-                      {"p000": [("converged", 0.10)],
-                       "p001": [("converged", 0.10)],
-                       "p002": [("converged", 0.10)],
-                       "p003": [("converged", 0.10)],
-                       "p004": [("max_iter", 0.10), ("converged", 0.10)]})
-    series = runner.fit(thermal_patterns[:5], plan=_CHEAP, refit="stages",
-                        first_rung_factor=FIRST_RUNG_FACTOR)
+                      {**_SAMPLED,
+                       "p004": [("max_iter", 0.10), ("converged", 0.10)]},
+                      {"p004": [{"quick": "max_iter"}, {}]})
+    series = runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE, refit="stages",
+                        first_rung_factor=_FACTOR)
     assert series[4].rungs_tried == ["warm_staged"]
 
 
@@ -1156,9 +1291,10 @@ def test_only_a_converged_first_rung_becomes_evidence(thermal_patterns):
                            "p001": [("converged", 0.10)],
                            "p002": [("converged", 0.10)],
                            "p003": [(p003_status, 0.10), ("converged", 0.10)],
-                           "p004": [("max_iter", 0.10), ("converged", 0.10)]})
-        return runner.fit(thermal_patterns[:5], plan=_CHEAP,
-                          first_rung_factor=FIRST_RUNG_FACTOR)
+                           "p004": [("max_iter", 0.10), ("converged", 0.10)]},
+                          {"p004": [{"warm_refit": "max_iter"}, {}]})
+        return runner.fit(thermal_patterns[:5], plan=_CHEAP_WIDE,
+                          first_rung_factor=_FACTOR)
 
     # p003 converged on its first rung, so the sample is complete and p004's
     # truncated rung escalates
@@ -1188,25 +1324,28 @@ def chain_answer(series):
     return entries, [d.code for d in series.diagnostics], series.steps
 
 
-def first_rung_ratios(series):
-    """Each kept first rung's cost over the most expensive one before it.
+def first_rung_ratios(series, results):
+    """Each kept first rung's dearest stage over the dearest one before it.
 
     Replays :func:`~rietx.sequential._first_rung_budget`'s sample from the
-    record: a warm pattern that kept its first rung reports that rung's
-    evaluations as ``n_iterations``, and only a *converged* one joins the
-    sample.  Once the sample holds :data:`~rietx.sequential.FIRST_RUNG_SAMPLES`
-    (the point the bound arms) every kept first rung gets a ratio, a
-    ``max_iter`` one included: that is the rung a bound would cut.
+    chain's own results (``results``, series index → the kept fit, as
+    ``on_result`` hands them): the quantity is a rung's dearest *stage*, what
+    the cap bounds (WP-2003 C3), and only a warm pattern that kept a first rung
+    whose every stage converged joins the sample.  Once the sample holds
+    :data:`~rietx.sequential.FIRST_RUNG_SAMPLES` (the point the bound arms)
+    every kept first rung gets a ratio, a ``max_iter`` one included: that is
+    the rung a bound would cut.
     """
-    from rietx.sequential import FIRST_RUNG_SAMPLES
+    from rietx.sequential import FIRST_RUNG_SAMPLES, _stage_peak
 
     sample, ratios = [], []
     for e in series.entries[1:]:
         if e.rungs_tried == ["warm"]:
+            fit = results[e.index]
             if len(sample) >= FIRST_RUNG_SAMPLES:
-                ratios.append(e.n_iterations / max(sample))
-            if e.status == "converged":
-                sample.append(e.n_iterations)
+                ratios.append(_stage_peak(fit) / max(sample))
+            if all(s.status == "converged" for s in fit.stages):
+                sample.append(_stage_peak(fit))
     return ratios
 
 
@@ -1219,28 +1358,34 @@ def _thermal_series(patterns, **kw):
 
 
 @pytest.fixture(scope="module")
-def thermal_series_unbounded(thermal_patterns):
-    return _thermal_series(thermal_patterns, first_rung_factor=None)
+def thermal_series_bounded(thermal_patterns):
+    """``thermal_series`` with the first-rung bound at ``_FACTOR``, and the
+    kept fits by series index."""
+    results = {}
+    series = _thermal_series(thermal_patterns, first_rung_factor=_FACTOR,
+                             on_result=results.__setitem__)
+    return series, results
 
 
 def test_the_first_rung_bound_moves_no_accepted_value(thermal_series,
-                                                      thermal_series_unbounded):
-    """`FIRST_RUNG_FACTOR` is answer-invariant here, and by how much (WP-2003).
+                                                      thermal_series_bounded):
+    """A bound at 3.0 is answer-invariant here, and by how much (WP-2003).
 
     Invariance is a measured margin, not a construction: a bound that cut a
-    *winning* first rung would keep the next rung's answer instead.  So two
-    things are asserted on the default plan's chain, the bound on and off:
-    every accepted value, esd, rung and code is equal, and every first rung
-    the unbounded chain kept cost less than the budget the bound would have
-    set at that point.  Measured 2026-10-24: three armed patterns, each at
-    1.0× the running maximum (15 evaluations against 15), so the bound sits
-    3× above every rung it could have cut.  The CPD chain's twin is in
-    `test_acceptance_sequential.py`.
+    *winning* first rung would keep the next rung's answer instead, which is
+    why the bound is the caller's since WP-2003 C3 (planted T087 moved 6.06
+    esd).  So two things are asserted on the default plan's chain, the bound
+    on and off (the default): every accepted value, esd, rung and code is
+    equal, and every first rung kept cost less than the budget the bound set
+    at that point.  The equality makes the two chains' kept first rungs the
+    same fits, so the margin is read off the bounded one's.  The CPD chain's
+    twin is in `test_acceptance_sequential.py`.
     """
-    assert chain_answer(thermal_series) == chain_answer(thermal_series_unbounded)
-    ratios = first_rung_ratios(thermal_series_unbounded)
+    series, results = thermal_series_bounded
+    assert chain_answer(series) == chain_answer(thermal_series)
+    ratios = first_rung_ratios(series, results)
     assert ratios, "the bound armed on no pattern, so nothing was tested"
-    assert max(ratios) < FIRST_RUNG_FACTOR
+    assert max(ratios) < _FACTOR
 
 
 def test_an_unrecovered_pattern_seeds_nothing_and_joins_no_median(

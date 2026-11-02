@@ -1216,18 +1216,20 @@ CLAIMS: tuple[Claim, ...] = (
         "test_acceptance_sequential",
         "test_the_first_rung_bound_moves_no_accepted_value", "qarr",
         ("identity",),
-        "FIRST_RUNG_FACTOR is answer-invariant on the hostile series: the "
-        "chain with WP-1127's first-rung bound and the chain without it "
-        "report the same values, esds, rungs, fences and codes, and no kept "
-        "first rung reaches the budget the bound would set",
-        reference="the same chain with first_rung_factor=None, to the bit; "
-                  "the margin against FIRST_RUNG_FACTOR itself (WP-2003). "
+        "A first-rung bound at 3.0 (WP-1127's factor, the default until "
+        "WP-2003 C3 made it the caller's) is answer-invariant on the hostile "
+        "series: the chain with it and the default chain without it report "
+        "the same values, esds, rungs, fences and codes, and no kept first "
+        "rung reaches the budget the bound sets",
+        reference="the default chain, first_rung_factor=None, to the bit; "
+                  "the margin against the factor itself (WP-2003). "
                   "It verifies the bound and validates nothing, the "
                   "reference being rietx's own unbounded chain",
         measured="bit-identical; kept first rungs past the armed point "
-                 "0.064-0.080x the running maximum against a factor of 3.0 "
-                 "(2026-10-25, macOS arm64, after WP-2045; 0.34-0.39x on "
-                 "2026-10-24, Linux x86-64, with cpd-1b's runaway in the chain)",
+                 "0.045-0.062x the running maximum of a converged rung's "
+                 "dearest stage, the quantity capped since C3, against a "
+                 "factor of 3.0 (2026-11-02, macOS arm64; 0.064-0.080x of the "
+                 "rung's summed stages on 2026-10-25)",
     ),
     Claim(
         "test_acceptance_sequential",

@@ -3587,8 +3587,19 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.suggest.SUGGEST_ABSORPTION_MAX", "constant", value=0.95),
     Row("rietx.schemas.suggest.SUGGEST_GROUP_R2", "constant", value=0.95),
     Row("rietx.schemas.suggest.SUGGEST_MIN_GAIN", "constant", value=9.0),
-    Row("rietx.sequential.FIRST_RUNG_FACTOR", "constant", value=3.0),
-    Row("rietx.sequential.FIRST_RUNG_SAMPLES", "constant", value=3),
+    Row("rietx.sequential.FIRST_RUNG_SAMPLES", "constant", tier=3, value=3,
+        evidence=("read only once a caller passes first_rung_factor (off by default since "
+                  "WP-2003 C3), so a number with a default inside the opt-in, tiered on its "
+                  "own; WP-1127, its comment: at one sample the bound went 2 x 8 = 16 "
+                  "evaluations on the thermal-ramp chain and its third pattern legitimately "
+                  "wanted 17, a one-evaluation margin darwin cleared and Linux did not; one "
+                  "sample is no spread, the running maximum of a short one is set by the "
+                  "cheapest pattern"),
+        grounds=("Inside the caller's opt-in bound and on no default path; three is the "
+                 "smallest sample past the one-sample failure measured, and the budget it "
+                 "arms is reported per pattern by STAGE_MAX_ITER and the rungs tried; ruled "
+                 "2026-10-26, the batch's pick (a) approved (2003-batch/batch.md, C3)."),
+        approved="2026-10-26"),
     Row("rietx.sequential.MIN_POINTS_FOR_PERSISTENCE", "constant", value=5),
     Row("rietx.sequential.NOISE_FLOOR_REL", "constant", tier=1, value=1e-09,
         evidence=("numerical floor: a step or a between-chain gap under 1e-9 of the parameter's "
@@ -4243,11 +4254,13 @@ ROWS: tuple[Row, ...] = (
         evidence=("switches on the ladder's escalation, which since WP-2003 fires on a "
                   "rejected (diverged, or an error-level code: C2 q5, ruled 2026-10-26) or "
                   "raised warm rung and on the caller's reseed_factor only; under "
-                  "False each pattern keeps its first rung except where WP-1127's budget "
-                  "truncated it (forced, sequential.py _chain); on main with the status-only "
-                  "trigger planted escalates once, T087, forced by the first-rung bound, 3 165 "
-                  "evaluations against the removed fence's 13 034, and every other family "
-                  "not at all (2003-batch/batch.md, C1; clashes.md X16)"),
+                  "False each pattern keeps its first rung, uncut, no first-rung budget "
+                  "applying there since C3 (clashes.md X2); on main with the status-only "
+                  "trigger planted escalated once, T087, forced by the first-rung bound C3 "
+                  "made the caller's, 3 165 evaluations against the removed fence's 13 034, "
+                  "and every other family not at all (2003-batch/batch.md, C1; clashes.md "
+                  "X16); on this tree with no bound, the default since C3, planted escalates "
+                  "nothing in 3 111 evaluations (2026-11-02, macOS arm64)"),
         grounds=("Trying a colder start on a diverged or unfinished fit and keeping the "
                  "better is what a refiner does by hand; the escalation never keeps a worse "
                  "attempt (_prefer); approved with C2's ladder, ruled 2026-10-26, the "
@@ -4263,7 +4276,17 @@ ROWS: tuple[Row, ...] = (
                   "evaluations for nothing, and an Rwp comparison is no default action's "
                   "evidence (DESIGN.md § Rules, 4; 2003-batch/batch.md, C1, ruled "
                   "2026-10-26)")),
-    Row("rietx.sequential.SequentialRefinement.fit:first_rung_factor", "default", value=3.0),
+    Row("rietx.sequential.SequentialRefinement.fit:first_rung_factor", "default", tier="caller",
+        ambiguity=1, value=None,
+        evidence=("opt-in: first_rung_factor=None bounds no first rung, and a factor is asked "
+                  "by name, refused unless finite and positive (_check_first_rung_factor), "
+                  "and inert under reseed=False; no default path passes one, the GUI included "
+                  "(searched 2026-11-02). The 3.0 default it carried from WP-1127 "
+                  "(FIRST_RUNG_FACTOR) was removed: an efficiency bet that moved an accepted "
+                  "value (planted T087, 6.06 esd, its winning first rung 9.8x the running "
+                  "maximum), no program truncates a first rung, and its saving on main was 49 "
+                  "evaluations of 13 083 on planted and none on CPD, the null twin or trigger "
+                  "(2003-batch/batch.md, C3, ruled 2026-10-26)")),
     Row("rietx.sequential.SequentialRefinement.fit:verify_steps", "default", tier="caller", ambiguity=1,
         value=0,
         evidence=("opt-in: verify_steps=0 refits nothing, and a count is asked by name; no "
@@ -5488,11 +5511,8 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.schemas.suggest.SUGGEST_ABSORPTION_MAX",
     "rietx.schemas.suggest.SUGGEST_GROUP_R2",
     "rietx.schemas.suggest.SUGGEST_MIN_GAIN",
-    "rietx.sequential.FIRST_RUNG_FACTOR",
-    "rietx.sequential.FIRST_RUNG_SAMPLES",
     "rietx.sequential.MIN_POINTS_FOR_PERSISTENCE",
     "rietx.sequential.PATH_DEPENDENCE_SIGMA",
-    "rietx.sequential.SequentialRefinement.fit:first_rung_factor",
     "rietx.sequential.SequentialRefinement.fit:labels",
     "rietx.sequential.SequentialRefinement.fit:on_error",
     "rietx.sequential.SequentialRefinement.fit:plan",

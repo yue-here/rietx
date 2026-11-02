@@ -180,7 +180,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tests"))
 import rietx as rx  # noqa: E402
 from rietx import _about, runs  # noqa: E402
 from rietx.model.forward import compile_model  # noqa: E402
-from rietx.sequential import FIRST_RUNG_FACTOR  # noqa: E402
+
+#: WP-1127's first-rung factor, the package default until WP-2003 C3 made the
+#: bound the caller's (``first_rung_factor=None`` by default since)
+FIRST_RUNG_FACTOR = 3.0
 
 # -- the counting scaffold -------------------------------------------------
 
@@ -467,8 +470,9 @@ class Setup:
     refit: str = "single"
     #: series cases only — WP-1127's first-rung bound, **declared** rather than
     #: inherited so a row says which ladder produced its number (the dispersion
-    #: rule, root CLAUDE.md).  ``None`` is the pre-WP-1127 ladder; the default
-    #: here is the shipped one.
+    #: rule, root CLAUDE.md).  ``None`` is the pre-WP-1127 ladder and, since
+    #: WP-2003 C3, the package default; the default here is WP-1127's 3.0,
+    #: the bound this harness's rows were measured with.
     first_rung_factor: float | None = FIRST_RUNG_FACTOR
 
 

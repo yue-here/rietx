@@ -64,8 +64,8 @@ def _rejected(fit) -> bool:
     reason: an error-level code written later counts the day it lands.  It is
     not ``not usable``: ``"max_iter"`` is left out, since an attempt the
     *plan's* own budget stopped can be the closing stage's last iterations at
-    a good answer (C2 question 3), and a first rung the WP-1127 bound cut short
-    escalates at its own site in ``SequentialRefinement._chain``.
+    a good answer (C2 question 3), and a first rung a caller's WP-1127 bound
+    cut short escalates at its own site in ``SequentialRefinement._chain``.
     """
     return (fit.status == "diverged"
             or any(d.level == "error" for d in fit.diagnostics))

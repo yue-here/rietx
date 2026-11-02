@@ -73,7 +73,11 @@ from bench_series_predictor import (  # noqa: E402
 )
 
 from rietx import _about  # noqa: E402
-from rietx.sequential import FIRST_RUNG_FACTOR  # noqa: E402
+
+#: WP-1127's factor, the package default until WP-2003 C3 made the bound the
+#: caller's (``first_rung_factor=None`` by default since); this benchmark
+#: measures it by name
+FIRST_RUNG_FACTOR = 3.0
 
 #: ``(key, setup builder, refit)`` — the two harness series cases, each in the
 #: mode its own baseline won in (WP-1127 § Findings 1), plus the trigger case in

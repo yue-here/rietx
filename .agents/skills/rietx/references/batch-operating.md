@@ -69,12 +69,12 @@ each closed by its tag; `tests/test_skill.py` refuses a row without one, and
 
 **9c.5 Budget a job from what a converged job costs on this batch, and read a
 job past its budget as a diagnosis.** §8.13: a stage that takes minutes is
-telling you it is degenerate. On a chain the rung budget is a factor times the
-dearest *converged* first rung, never a fixed wall (WP-1127); a job several
-times the median converged job is a flat direction or a degeneracy to read in
-its trajectory, not a fit to wait for. *(Hypothesis: the mechanism is measured
-on a chain, WP-1127, and on the ramp run's 27 %; the factor for independent
-jobs is not.)*
+telling you it is degenerate. On a chain `first_rung_factor` (yours, off by
+default) is a factor times the dearest *converged* first rung, never a fixed
+wall (WP-1127); a job several times the median converged job is a flat
+direction or a degeneracy to read in its trajectory, not a fit to wait for.
+*(Hypothesis: measured on a chain, WP-1127, and the ramp run's 27 %; not for
+independent jobs.)*
 
 **9c.6 Cost tracks solver iteration count and almost nothing else, so predict
 a batch from iterations rather than from the model.** Stratified by pattern

@@ -44,18 +44,17 @@ assert [s.path for s in top] == [
     "phases.0.cell.a", "phases.0.cell.b", "phases.0.cell.c", "phases.0.cell.a"]
 assert [s.indices for s in top] == [(3, 4)] * 3 + [(4, 5)]
 assert [round(s.step, 5) for s in top] == [0.06454] * 3 + [-0.0604]
-assert [round(s.size_esd) for s in top] == [15790] * 3 + [-14110], [s.size_esd for s in top]
+assert [round(s.size_esd) for s in top] == [15810] * 3 + [-14062], [s.size_esd for s in top]
 assert [round(s.cold_ratio, 2) for s in top[:3]] == [1.00] * 3 and top[3].cold_ratio is None
 assert sum(s.cold_ratio is not None for s in series.steps) == 3
-assert [e.rung for e in series] == [
-    "cold", "warm", "warm", "warm", "warm_staged", "cold", "warm"]
+assert [e.rung for e in series] == ["cold"] + ["warm"] * 6
 # a 1.5 % jump, because 2 % and 3 % left which warm start broke to rounding (WP-2002,
-# 2026-10-23).  Since the last declared stage converges (WP-2045) the 800 K warm start,
-# the step back down, fails at Rwp 0.941 in all of ten starts nudged by 1e-14, while the
-# 700 K one's first attempt read anywhere from 0.04 to 0.95 (Accelerate, 2026-10-25), so
-# the page quotes a bound for the 800 K attempt alone
-assert series.entries[4].rwp_warm is not None and series.entries[5].rwp_warm > 0.9
-# the rescued 700 K fit ends at 0.039494, 6e-6 from where a third decimal flips, so the
+# 2026-10-23).  Until WP-2003 C3 the first-rung bound (3.0 by default then) cut both
+# warm starts beside the step, the 700 K one rescued warm_staged and the 800 K one
+# cold; with no bound, the default since, both converge warm (86 and 188 evaluations,
+# darwin arm64, 2026-11-02), so nothing escalates and no rwp_warm is kept
+assert all(e.rwp_warm is None for e in series)
+# the 700 K fit ends at 0.039494, 6e-6 from where a third decimal flips, so the
 # page quotes two
 assert all(abs(r - 0.040) < 0.001 for r in series.rwp[4:6]), series.rwp[4:6]
 assert gap < 0.005

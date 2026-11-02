@@ -106,7 +106,7 @@ The temperature also appears in its `label`, since the scans of a reel are other
 | `two_theta_limits` | `None` | one fit range, applied to every pattern |
 | `direction` | `"forward"` | `"forward"`, `"backward"` or `"both"` ([Forward and backward chains](#forward-and-backward-chains)) |
 | `reseed`, `reseed_factor` | `True`, `None` | whether a rejected or raised warm start climbs the ladder, and your own Rwp fence as a multiple of the accepted median, none by default ([Restart ladder](#restart-ladder)) |
-| `first_rung_factor` | 3.0 | how much the first attempt may spend, as a multiple of the dearest first attempt this chain has converged; `None` removes the bound |
+| `first_rung_factor` | `None` | your own bound on the first attempt, a multiple of the dearest one this chain has converged; none by default |
 | `verify_steps` | 0 | how many of the largest steps to re-measure, each by refitting its two patterns cold and independently ([Steps between patterns](#steps-between-patterns)) |
 | `prepare` | `None` | `(index, data, structure, instrument) -> None`, called on the warmed models before each pattern's fit |
 | `constrain` | `None` | `(index, ref) -> None`, called on each pattern's `Refinement` before its fit, where a tie, a named variable or a hold is declared |
@@ -529,13 +529,11 @@ On a series where an unmodelled phase appears part-way, it refitted every later 
 A guard finding such as `HIGH_CORRELATION` is neither, since it fires on converged patterns and no attempt changes the model or data behind it.
 A step's size is a property of the finished trajectory, so making it a trigger would mean walking a finished chain again.
 
-The first attempt is bounded, because it is a bet rather than the answer.
-Its budget is `first_rung_factor` times the dearest first attempt this chain has already converged, and it applies once three have.
-Under `refit="stages"` the bound does nothing.
-A first attempt that spends its budget escalates, and the next attempt starts from the same warm state, so a bounded chain reports the values it would have reported without the bound.
-On the benchmark's ten-pattern series, the solver made 1603 evaluations without the bound and 1395 with it, both converging to Rwp 0.01943 with every accepted value identical.
-On the eight-mixture round-robin series the two runs are identical to the evaluation.
-`first_rung_factor=None` reproduces a pre-1.1 run.
+The first attempt is unbounded unless you pass `first_rung_factor`.
+Each stage of it, the closing one included, may then spend that multiple of the dearest stage of the first attempts this chain has converged, once three have.
+An attempt with any stage stopped there escalates, even if its closing stage converged, and never beats one that finished.
+The bound does nothing under `refit="stages"` or `reseed=False`.
+It is not the default because it can move an answer: at 3.0 on the planted ramp it cut a winning first attempt, 9.8 times the dearest before it, moving a zero shift 6.06 esd, to save 49 evaluations of 13 083.
 
 An attempt whose fit raises has lost in the same sense as a diverged one, and the ladder escalates past it the same way.
 `SeriesEntry.rungs_raised` records what each such attempt raised, and `SeriesEntry.rwp_warm` is `None` when the warm attempt was one of them.

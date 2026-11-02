@@ -50,16 +50,16 @@ This replaces the 700 K pattern with one whose cell is 1.5 % larger:
 
 <!-- output of examples/guides/path.py -->
 ```text
-phases.0.cell.a p003->p004  +0.06454  15,790 esd  cold pair 1.00x
-phases.0.cell.b p003->p004  +0.06454  15,790 esd  cold pair 1.00x
-phases.0.cell.c p003->p004  +0.06454  15,790 esd  cold pair 1.00x
-phases.0.cell.a p004->p005  -0.06040  -14,110 esd  not refitted
+phases.0.cell.a p003->p004  +0.06454  15,810 esd  cold pair 1.00x
+phases.0.cell.b p003->p004  +0.06454  15,810 esd  cold pair 1.00x
+phases.0.cell.c p003->p004  +0.06454  15,810 esd  cold pair 1.00x
+phases.0.cell.a p004->p005  -0.06040  -14,062 esd  not refitted
 p000  cold
 p001  warm
 p002  warm
 p003  warm
-p004  warm_staged
-p005  cold
+p004  warm
+p005  warm
 p006  warm
 ```
 
@@ -75,13 +75,10 @@ Here `cell.b` and `cell.c` step with `cell.a`, because the cubic cell ties them 
 
 ## Read where each fit started
 
-The jump also broke two warm starts, one on each side of the step.
-The 700 K fit, started from the 600 K answer, was rejected and fitted again with the whole plan, still from the 600 K answer, and reached 0.04.
-The 800 K fit, started from the 700 K answer, met the step back down and reached an Rwp over 0.9 on both warm attempts.
-`entry.rwp_warm` keeps the Rwp the first attempt reached.
-
-The 800 K entry is `cold`: no warm start could be rescued, so the pattern was fitted from your starting model, and it reached 0.04 too.
-Its values do not continue the chain, so read them as a separate measurement.
+`entry.rung` says which attempt each fit kept.
+Here every warm start held, on both sides of the step: the 700 K fit started from the 600 K answer and the 800 K fit from the 700 K answer, and each reached 0.04.
+A warm start that diverged or carried an `error` diagnostic would have been fitted again, with the whole plan and then from your starting model, and `entry.rwp_warm` would keep the Rwp its first attempt reached.
+A `cold` entry's values do not continue the chain, so read them as a separate measurement.
 
 The full script is `examples/guides/path.py`.
 

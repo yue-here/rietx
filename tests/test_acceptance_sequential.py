@@ -396,29 +396,32 @@ def test_the_hostile_series_exercises_the_reseed_fence(chained_all):
 
 
 @pytest.fixture(scope="module")
-def chained_all_unbounded():
-    """``chained_all`` with WP-1127's first-rung bound switched off."""
-    return _chained_all(first_rung_factor=None)
+def chained_all_bounded():
+    """``chained_all`` with WP-1127's first-rung bound at 3.0, its default
+    until WP-2003 C3 made it the caller's, and the kept fits by index."""
+    results = {}
+    series = _chained_all(first_rung_factor=3.0, on_result=results.__setitem__)
+    return series, results
 
 
 @pytest.mark.slow
 def test_the_first_rung_bound_moves_no_accepted_value(chained_all,
-                                                      chained_all_unbounded):
-    """`FIRST_RUNG_FACTOR`'s invariance on a real chain (WP-2003).
+                                                      chained_all_bounded):
+    """A first-rung bound at 3.0 is answer-invariant on a real chain (WP-2003).
 
     The thermal ramp's twin in `test_sequential.py`, on the hostile series:
     every accepted value, esd, rung and code is equal with the bound on and
-    off, and every first rung the unbounded chain kept cost less than the
-    budget the bound would have set there.
+    off (the default), and every first rung kept cost less than the budget
+    the bound set there.
     """
-    from rietx.sequential import FIRST_RUNG_FACTOR
     from tests.test_sequential import chain_answer, first_rung_ratios
 
-    assert chain_answer(chained_all) == chain_answer(chained_all_unbounded)
-    ratios = first_rung_ratios(chained_all_unbounded)
+    series, results = chained_all_bounded
+    assert chain_answer(series) == chain_answer(chained_all)
+    ratios = first_rung_ratios(series, results)
     print(f"\nfirst-rung ratios: {[round(r, 3) for r in ratios]}")
     assert ratios, "the bound armed on no pattern, so nothing was tested"
-    assert max(ratios) < FIRST_RUNG_FACTOR
+    assert max(ratios) < 3.0
 
 
 @pytest.mark.slow
