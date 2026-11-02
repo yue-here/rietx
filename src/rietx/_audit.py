@@ -569,6 +569,17 @@ ROWS: tuple[Row, ...] = (
                  "paths it put back (B8, ruled 2026-10-19)."),
         approved="2026-10-19"),
     Row("CHILD_GROUP_UNNAMED", "code"),
+    Row("CIF_ANISO_COLLAPSED", "code", tier=1, ambiguity=1,
+        evidence=("a count of the sites whose _atom_site_aniso_U_ij row has a non-zero "
+                  "tensor while the reader was told aniso=False, the default that keeps "
+                  "U_eq alone; fires exactly when that count is above zero and decides "
+                  "nothing (issue #1056: COD 2104364 paracetamol, 11 of 20 sites, the nine "
+                  "hydrogens being Uiso in the file)"),
+        grounds=("Arithmetic: the reader drops a tensor the file states and says how many, "
+                 "so an ellipsoid figure of the structure is not read as the file's."),
+        response="info",
+        responds=("note that the sites' tensors were read as U_eq, and pass aniso=True if "
+                  "the anisotropy is wanted")),
     Row("CIF_CELL_ANGLE_CORRECTED", "code"),
     Row("CIF_EMPTY_BLOCK_SKIPPED", "code", tier=1, ambiguity=1,
         evidence=("a reading rule from the format's definition: cif_core.dic 3.3.0 files the "
