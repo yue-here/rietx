@@ -16,6 +16,7 @@ import datetime
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -1040,7 +1041,7 @@ def test_a_pr_that_names_no_wp_is_still_reached_through_its_issue(
         ]),
     )
     (pr,) = claim.open_prs(repo)
-    assert (pr.wp, pr.issues, pr.author) == (None, (283,), "someone")
+    assert (pr.wps, pr.issues, pr.chain, pr.author) == ((), (283,), (283,), "someone")
 
     (o,) = claim.overlaps([pr], claim.wp_issue_citations(repo))
     assert (o.wp, o.via) == ("9301", "issue #283")
@@ -1049,8 +1050,8 @@ def test_a_pr_that_names_no_wp_is_still_reached_through_its_issue(
 def test_a_pr_that_names_a_wp_outright_does_not_go_through_an_issue(
     repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Title, body or an edited WP file: the direct claim, which beats the
-    issue chain and must not also produce issue rows."""
+    """Title, an edited WP file or the branch: the direct claim, which beats
+    the issue chain and must not also produce issue rows."""
     (repo / "docs" / "wp").mkdir(parents=True, exist_ok=True)
     (repo / "docs" / "wp" / "9301-bounds.md").write_text("Closes #283.\n", encoding="utf-8")
     citations = claim.wp_issue_citations(repo)
@@ -1059,7 +1060,7 @@ def test_a_pr_that_names_a_wp_outright_does_not_go_through_an_issue(
         _pr(330, "WP-9302: something", body="see #283"),
     ]))
     (pr,) = claim.open_prs(repo)
-    assert pr.wp == "9302"
+    assert pr.wps == ("9302",)
     (o,) = claim.overlaps([pr], citations)
     assert (o.wp, o.via) == ("9302", "names it")
 
@@ -1067,7 +1068,7 @@ def test_a_pr_that_names_a_wp_outright_does_not_go_through_an_issue(
         _pr(331, "no wp here", files=["docs/wp/9303-thing.md", "src/x.py"]),
     ]))
     (pr,) = claim.open_prs(repo)
-    assert pr.wp == "9303"  # the WP file it edits
+    assert pr.wps == ("9303",)  # the WP file it edits
 
 
 def test_this_session_s_own_pr_is_not_reported_back_to_it(
@@ -1075,11 +1076,12 @@ def test_this_session_s_own_pr_is_not_reported_back_to_it(
 ) -> None:
     (repo / "docs" / "wp").mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(claim, "_gh", lambda root, *a, **k: json.dumps([
-        _pr(330, "WP-9302: mine"), _pr(331, "WP-9304: someone else's"),
+        _pr(330, "WP-9302: mine", branch="wp9302-mine"),
+        _pr(331, "WP-9304: someone else's", branch="wp9304-theirs"),
     ]))
     prs = claim.open_prs(repo)
     assert [o.wp for o in claim.overlaps(prs, {})] == ["9302", "9304"]
-    assert [o.wp for o in claim.overlaps(prs, {}, mine="9302")] == ["9304"]
+    assert [o.wp for o in claim.overlaps(prs, {}, branch="wp9302-mine")] == ["9304"]
 
 
 def test_gh_declining_is_not_an_empty_table(
@@ -1146,7 +1148,7 @@ def test_a_claim_pr_is_recognised_before_it_says_anything(
         _pr(400, "", body="", branch="wp9601-the-thing"),
     ]))
     (pr,) = claim.open_prs(repo)
-    assert pr.wp == "9601"
+    assert pr.wps == ("9601",)
     (o,) = claim.overlaps([pr], {})
     assert (o.wp, o.via) == ("9601", "names it")
 
@@ -1162,8 +1164,8 @@ def test_the_stronger_sources_still_outrank_the_branch(
         _pr(402, "untitled", branch="wp9601-stale", files=["docs/wp/9603-x.md"]),
     ]))
     titled, filed = claim.open_prs(repo)
-    assert titled.wp == "9602"  # title beats the branch
-    assert filed.wp == "9603"  # the WP file beats the branch
+    assert titled.wps == ("9602",)  # title beats the branch
+    assert filed.wps == ("9603",)  # the WP file beats the branch
 
 
 def test_a_branch_naming_no_wp_claims_nothing(
@@ -1176,7 +1178,7 @@ def test_a_branch_naming_no_wp_claims_nothing(
         _pr(403, "lattice: a degenerate cell (#283)", branch="pr/cell-degenerate-guard"),
     ]))
     (pr,) = claim.open_prs(repo)
-    assert pr.wp is None and pr.issues == (283,)
+    assert pr.wps == () and pr.issues == (283,)
     assert [o.via for o in claim.overlaps([pr], {"9604": {283}})] == ["issue #283"]
 
 
@@ -1193,6 +1195,159 @@ def test_a_draft_claim_reads_as_a_draft(
     assert pr.draft is True
     line = claim.describe_pull_request(pr, [("9605", "names it")])
     assert "(draft)" in line
+
+
+# WP-2046: the check printed "none touching WP-1956" while PR #941 built all of
+# it.  Its body named WP-1325 first, in passing, which was read as the claim and
+# stopped the issue chain; and run from WP-1956's own tree, the own-PR filter
+# dropped every row on WP-1956.
+
+
+def _gh_answering(prs: list, pull_requests: tuple = ()):
+    """A ``gh`` that lists *prs* and says which numbers are pull requests."""
+
+    def gh(root, *args, **kw):
+        if args[:2] == ("api", "graphql"):
+            query = next(a for a in args if a.startswith("query="))
+            asked = [int(n) for n in re.findall(r"issueOrPullRequest\(number: (\d+)\)", query)]
+            kind = {n: "PullRequest" if n in pull_requests else "Issue" for n in asked}
+            return json.dumps({"data": {"repository": {
+                f"n{n}": {"__typename": t} for n, t in kind.items()
+            }}})
+        return json.dumps(prs)
+
+    return gh
+
+
+def test_a_body_mention_is_a_reference_and_the_issue_chain_still_runs(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#941's shape: a body naming another WP first, the issue in the title.
+
+    The issue reaches the WP citing it, and the body's WP stays a row of its
+    own, marked as a mention rather than a claim.
+    """
+    wpdir = repo / "docs" / "wp"
+    (wpdir / "9701-null-window.md").write_text("# WP-9701\n\nFrom #916.\n", encoding="utf-8")
+    (wpdir / "9702-other.md").write_text("# WP-9702\n\nCites #941.\n", encoding="utf-8")
+    monkeypatch.setattr(claim, "_gh", _gh_answering([
+        _pr(941, "containment: the null window (#916)", author="contributor",
+            body="Builds on WP-9325's fixture. Closes the gap.", branch="null-window"),
+    ]))
+    (pr,) = claim.open_prs(repo)
+    assert (pr.wps, pr.mentions, pr.chain) == ((), ("9325",), (916,))
+    found = claim.overlaps([pr], claim.wp_issue_citations(repo))
+    assert [(o.wp, o.via) for o in found] == [("9325", "mentions it"), ("9701", "issue #916")]
+
+
+def test_from_the_wp_s_own_tree_a_contributor_s_pr_still_shows(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The own-PR filter takes the tree's PR by head branch, never its WP.
+
+    A fork may reuse the branch name, so a cross-repository PR is never the
+    session's own.
+    """
+    (repo / "docs" / "wp" / "9701-x.md").write_text("From #916.\n", encoding="utf-8")
+    fork = _pr(941, "containment (#916)", author="contributor", branch="wp9701-x")
+    fork["isCrossRepository"] = True
+    monkeypatch.setattr(claim, "_gh", _gh_answering([
+        _pr(950, "WP-9701: the null window", author="me", branch="wp9701-x"), fork,
+    ]))
+    prs = claim.open_prs(repo)
+    found = claim.overlaps(prs, claim.wp_issue_citations(repo), branch="wp9701-x")
+    assert [(o.wp, o.pr.number) for o in found] == [("9701", 941)]
+
+
+def test_status_from_the_wp_s_tree_lists_the_contributor_s_pr(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    """The acceptance, end to end: `status NNNN` from WP-NNNN's own worktree."""
+    (repo / "docs" / "wp" / "9701-x.md").write_text("From #916.\n", encoding="utf-8")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "init")
+    tree = tmp_path / "wp9701-x"
+    _git(repo, "worktree", "add", "-q", "-b", "wp9701-x", str(tree))
+    monkeypatch.setattr(claim, "_gh", _gh_answering([
+        _pr(950, "WP-9701: the null window", author="me", branch="wp9701-x"),
+        _pr(941, "containment (#916)", author="contributor", body="See WP-9325.",
+            branch="null-window"),
+    ]))
+    claim._status(tree, tree, "9701")
+    out = capsys.readouterr().out.split("Open pull requests")[1]
+    assert "PR #941 by contributor" in out and "WP-9701 (issue #916)" in out
+    assert "#950" not in out
+
+
+def test_the_chain_follows_title_and_closing_issues_never_a_pull_request(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """WP files cite PR numbers too, so a PR followed as an issue linked one
+    contributor PR to five WPs, one of them real (#1284, 2026-11-02).  A body's
+    other numbers are context; a closing keyword is GitHub's own parse."""
+    wpdir = repo / "docs" / "wp"
+    (wpdir / "9801-a.md").write_text("Landed as PR #1257.\n", encoding="utf-8")
+    (wpdir / "9802-b.md").write_text("See #1153.\n", encoding="utf-8")
+    (wpdir / "9803-c.md").write_text("From #998.\n", encoding="utf-8")
+    raw = _pr(1284, "magCIF follow-ups to #1257", body="see #1153; closes #998")
+    raw["closingIssuesReferences"] = [{"number": 998}]
+    monkeypatch.setattr(claim, "_gh", _gh_answering([raw], pull_requests=(1257,)))
+    (pr,) = claim.open_prs(repo)
+    assert pr.chain == (998,) and pr.issues == (998, 1153, 1257)
+    assert [o.wp for o in claim.overlaps([pr], claim.wp_issue_citations(repo))] == ["9803"]
+
+    # gh cannot classify: the title's number stays, an extra row and never a lost one.
+    monkeypatch.setattr(claim, "_gh", lambda root, *a, **k: json.dumps([raw]))
+    (pr,) = claim.open_prs(repo)
+    assert pr.chain == (998, 1257)
+
+
+def test_a_pr_naming_wps_only_by_their_files_names_every_one(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A rulings PR edits seven WP files and its title names none; the first
+    file alone would hide the other six."""
+    monkeypatch.setattr(claim, "_gh", _gh_answering([
+        _pr(1317, "Record the rulings", branch="rulings",
+            files=["docs/wp/9901-a.md", "docs/wp/9902-b.md", "docs/wp/README.md"]),
+    ]))
+    (pr,) = claim.open_prs(repo)
+    assert pr.wps == ("9901", "9902")
+    assert [o.wp for o in claim.overlaps([pr], {})] == ["9901", "9902"]
+
+
+def test_one_unresolvable_number_does_not_void_the_classification(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``gh api graphql`` exits 1 when one alias resolves to nothing (a
+    discussion, a typo), and still prints the others' data."""
+    raw = _pr(1284, "follow-ups to #1257 (see discussion #99999)")
+
+    def gh(root, *args, partial=False, **kw):
+        if args[:2] == ("api", "graphql"):
+            return json.dumps({"data": {"repository": {
+                "n1257": {"__typename": "PullRequest"}, "n99999": None,
+            }}, "errors": [{"type": "NOT_FOUND"}]}) if partial else None
+        return json.dumps([raw])
+
+    monkeypatch.setattr(claim, "_gh", gh)
+    (pr,) = claim.open_prs(repo)
+    assert pr.chain == (99999,)
+
+
+def test_a_closing_reference_to_another_repository_is_not_followed(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw = _pr(1300, "a fix")
+    raw["url"] = "https://github.com/o/r/pull/1300"
+    raw["closingIssuesReferences"] = [
+        {"number": 998, "url": "https://github.com/o/r/issues/998"},
+        {"number": 5, "url": "https://github.com/elsewhere/lib/issues/5"},
+    ]
+    monkeypatch.setattr(claim, "_gh", _gh_answering([raw]))
+    (pr,) = claim.open_prs(repo)
+    assert pr.chain == (998,)
 
 
 # --------------------------------------------------------------------------- #
@@ -1264,8 +1419,8 @@ def test_the_row_separates_placements_from_landings_and_names_the_untriaged() ->
     text = backlog.table(rows, today=backlog.date(2026, 9, 21))
     assert text.count(backlog.UNTRIAGED) == 1 and "ROADMAP" in text
     pr = backlog.wp_claim.PullRequest
-    prs = (pr(385, "", "them", "", "", False, None, (374,)),
-           pr(386, "", "mustachefeeling", "", "", False, None, ()))
+    prs = (pr(385, "", "them", "", "", False, (), (374,), (), (374,), True),
+           pr(386, "", "mustachefeeling", "", "", False, (), (), (), (), True))
     assert backlog.summary(rows, prs).splitlines() == [
         "4 open; 1 untriaged; 1 with a landed reference; 1 cited by an open PR",
         "untriaged: #407",

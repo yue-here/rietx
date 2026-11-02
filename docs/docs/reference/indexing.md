@@ -415,13 +415,13 @@ So every pair of reported candidates in which one is a superlattice of the other
 
 Missing lines alone cannot answer that, since a correct cell's symmetry can extinguish lines.
 But an extinction only ever acts on a line that sits on a mirror plane or a rotation axis of the lattice, so only the extra lines lying on neither are counted.
-A line is seen when it falls inside an observed line's matching window, and the count is compared with chance: the share of the measured range those windows cover, which is how often a position with no line at all would still read as seen {eq}`idx-supercell-chance`.
+A line is seen when it falls inside an observed line's window, one FWHM after the cell's own shift, never the search's window, and the count is compared with chance: the share of the measured range those windows cover, which is how often a position with no line at all would still read as seen {eq}`idx-supercell-chance`.
 
 The verdict is one of three, at a significance level of 0.01:
 
 - refuted: the extras are seen no more often than chance, and the test had the power to say otherwise. The larger cell moves to directly below the lowest-ranked smaller cell that refutes it, stays in the list, and carries the `supercell_refuted` caveat and [`INDEX_SUPERCELL_REFUTED`](diagnostics-indexing.md#index_supercell_refuted).
 - supported: the extras seen on observed lines the smaller cell cannot index are more than chance gives. The larger cell moves to directly above the highest-ranked smaller cell that supports it, unless another check refutes it.
-- undecided: even seeing every extra could not have reached the level, or the extras are seen beyond chance only on lines the smaller cell already explains, as on a pseudo-symmetric description of the smaller cell's own lattice. Nothing moves.
+- undecided: even seeing every extra could not have reached the level (at `p0_power`), or the extras are seen beyond chance only on lines the smaller cell already explains, as on a pseudo-symmetric description of the smaller cell's own lattice. Nothing moves.
 
 Nothing else in the order changes, and a refuted cell is never moved up.
 *Refuted* means seen no more often than chance, since a non-significant test does not establish the null, so extras seen above chance but not significantly leave the verdict `"undecided"`.
@@ -431,7 +431,6 @@ Which pairs are asked is a question about the lines, not the volumes (indexing t
 A cell is asked as the larger one whenever every observed line the smaller cell indexes it indexes too, and its own line set is the denser.
 That reaches a sublattice pair, and it reaches pairs that are not: a cubic I cell at √2 the edge of a cubic F truth, whose primitive volume is 5.66 times the truth's, and a trigonal description with the truth's own volume, which outranked it on a synthetic silicon pattern.
 `SupercellCheck.relation` says which kind of pair it was.
-The extras are counted at the measured resolution, one FWHM, after the common shift the cell's own matches imply, never in the window the search matched with.
 
 | Field | Holds |
 |---|---|
@@ -441,6 +440,7 @@ The extras are counted at the measured resolution, one FWHM, after the common sh
 | `SupercellCheck.n_extra`, `SupercellCheck.n_seen` | the extra lines in range no extinction could remove, and how many sit on an observed line |
 | `SupercellCheck.n_seen_unexplained` | of those seen, the ones on an observed line the parent cannot index; `None` in a record from before thresholds version 1.7 |
 | `SupercellCheck.p0` | the chance that a position with no line reads as seen |
+| `SupercellCheck.p0_power` | the power check's chance rate, at the assumed shift bound |
 | `SupercellCheck.p_value` | the binomial chance of seeing at least `n_seen` of `n_extra`, had the extra lines not existed |
 | `SupercellCheck.verdict` | `"refuted"`, `"supported"` or `"undecided"` |
 | `SupercellCheck.absent_two_theta` | where the extras nothing was seen at would be, on the pattern's own 2θ axis, lowest first and at most six |

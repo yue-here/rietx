@@ -230,6 +230,7 @@ def supercell_checks(candidates: Sequence[CellCandidate], peaks: PeakList, *,
                 parent_centring=parent.centring, index=ev.index,
                 relation=ev.relation,
                 n_extra=ev.n_extra, n_seen=ev.n_seen, p0=ev.p0,
+                p0_power=ev.p0_power,
                 p_value=ev.p_value, verdict=ev.verdict(),
                 n_seen_unexplained=ev.n_seen_unexplained,
                 absent_two_theta=[float(t) for t in tt]))

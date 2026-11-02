@@ -33,6 +33,16 @@ class Purpose:
     why: str
 
 
+#: Families that move an atom's coordinates without an ``atoms.`` path: a
+#: rigid body writes its atoms through a derived block, a mode amplitude
+#: through affine rows of C.  Every purpose that lists the coordinates lists
+#: these too, since a warning naming one is about the coordinates it moves
+#: (WP-2067; ``tests/test_data_support.py`` holds the list to
+#: ``optimize.statistics.structural_free_paths``).  A ``vars.`` name bears on
+#: every purpose already (``schemas.results._bears_on``).
+_ATOM_DRIVERS: tuple[str, ...] = ("phases.*.rigid_bodies.*", "phases.*.distortion_modes.*")
+
+
 PURPOSES: dict[str, Purpose] = {
     "phase_id": Purpose(
         depends=("phases.*.scale", "phases.*.cell.*", "instrument.zero_shift",
@@ -48,7 +58,7 @@ PURPOSES: dict[str, Purpose] = {
         depends=("phases.*.scale", "phases.*.cell.*", "phases.*.atoms.*.x",
                  "phases.*.atoms.*.y", "phases.*.atoms.*.z", "phases.*.atoms.*.dof.*",
                  "phases.*.atoms.*.occ", "phases.*.atoms.*.biso", "phases.*.atoms.*.u*",
-                 "phases.*.atoms.*.adp.*",
+                 "phases.*.atoms.*.adp.*", *_ATOM_DRIVERS,
                  "phases.*.extinction", "phases.*.preferred_orientation.*",
                  "phases.*.texture.*", "instrument.background.*", "instrument.polarization",
                  "instrument.geometry.surface_roughness.*"),
@@ -64,7 +74,7 @@ PURPOSES: dict[str, Purpose] = {
         depends=("phases.*.atoms.*.x", "phases.*.atoms.*.y", "phases.*.atoms.*.z",
                  "phases.*.atoms.*.dof.*", "phases.*.atoms.*.occ",
                  "phases.*.atoms.*.biso", "phases.*.atoms.*.u*",
-                 "phases.*.atoms.*.adp.*", "phases.*.rigid_bodies.*", "phases.*.scale",
+                 "phases.*.atoms.*.adp.*", *_ATOM_DRIVERS, "phases.*.scale",
                  "phases.*.cell.*",
                  "phases.*.extinction", "phases.*.preferred_orientation.*",
                  "phases.*.texture.*", "instrument.background.*", "instrument.polarization",
@@ -122,7 +132,7 @@ PURPOSES: dict[str, Purpose] = {
                  "phases.*.atoms.*.x", "phases.*.atoms.*.y", "phases.*.atoms.*.z",
                  "phases.*.atoms.*.dof.*", "phases.*.atoms.*.occ",
                  "phases.*.atoms.*.biso", "phases.*.atoms.*.u*",
-                 "phases.*.atoms.*.adp.*",
+                 "phases.*.atoms.*.adp.*", *_ATOM_DRIVERS,
                  "phases.*.extinction", "phases.*.preferred_orientation.*",
                  "phases.*.texture.*", "instrument.background.*", "instrument.polarization",
                  "instrument.geometry.surface_roughness.*"),
