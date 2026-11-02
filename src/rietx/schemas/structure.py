@@ -1395,7 +1395,9 @@ class Phase(_InheritsDeclaredDefaults):
     # too, so it is opt-in and never perturbs a phase that does not use it.
     # The isotropic direction of the S subspace *is* the lor_strain column
     # (identically, not merely correlated), so declaring a block locks
-    # lor_strain — the same bargain Atom.aniso strikes with biso.
+    # lor_strain and the width law reads zero for it, whatever value it
+    # stores (CompiledModel.lor_strain_term, WP-1467) — the same bargain
+    # Atom.aniso strikes with biso.
     microstrain: StephensStrain | None = None
     # Physical particle radius in micrometres, used only by the Brindley
     # microabsorption correction of QPA weight fractions (Brindley 1945).

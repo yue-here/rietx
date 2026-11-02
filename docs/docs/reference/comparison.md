@@ -193,11 +193,11 @@ The Δχ² is then shared among the windows of split families, the windows of th
 | `SplitLocalisation.split_point_share` | the fraction of channels in a split window | what `split_share` is read against |
 | `SplitLocalisation.unsplit_share`, `SplitLocalisation.unsplit_point_share` | the same for the windows of families that do not split | |
 | `SplitLocalisation.elsewhere_share`, `SplitLocalisation.elsewhere_point_share` | the same for the channels in no window | the three shares sum to one |
-| `SplitLocalisation.n_unmatched` | `lower` ticks with no `higher` reflection within two widths | superstructure reflections, counted and not windowed |
+| `SplitLocalisation.n_unmatched` | `lower` ticks in range with no `higher` reflection within two widths | superstructure reflections, counted and not windowed |
 | `SplitLocalisation.families` | one `SplitFamily` per `higher` position and emission line | |
-| `SplitFamily.hkls`, `SplitFamily.emission_line`, `SplitFamily.two_theta` | the reflections at that position, which line's image, and the position | emission line 0 is the shortest wavelength |
+| `SplitFamily.hkls`, `SplitFamily.emission_line`, `SplitFamily.two_theta` | the reflections at that position, which line's image, and the position | emission line 0 is the shortest wavelength; the position may lie beyond an end of the range when a child lies inside it |
 | `SplitFamily.n_assigned`, `SplitFamily.spread`, `SplitFamily.splits` | how many of `lower`'s ticks were assigned, their spread in degrees, and whether they split | |
-| `SplitFamily.window`, `SplitFamily.n_points` | the 2θ interval its Δχ² is summed over, and its channel count | |
+| `SplitFamily.window`, `SplitFamily.n_points` | the 2θ interval its Δχ² is summed over, and its channel count | anchored on the in-range children (on the position when none is), so it may reach past an end of the range; `n_points` counts only the channels inside it |
 | `SplitFamily.delta_chi2`, `SplitFamily.share` | the window's Δχ² and its share of `total` | |
 
 A distortion the data hold puts its gain where it splits reflections, so `split_share` runs well above `split_point_share`.

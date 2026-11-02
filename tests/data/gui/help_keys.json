@@ -167,6 +167,7 @@
   "diagnostics:MODEL_FAR_FROM_DATA",
   "diagnostics:MOMENT_ANGLE_STATIONARY",
   "diagnostics:MOMENT_PAIR_DEGENERATE",
+  "diagnostics:MOMENT_UNSUPPORTED",
   "diagnostics:NEUTRON_RESONANT_ABSORBER",
   "diagnostics:OCCUPANCY_ABOVE_ONE",
   "diagnostics:ORIGIN_FIXED_ON_POLAR_AXIS",

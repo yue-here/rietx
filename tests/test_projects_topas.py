@@ -4710,6 +4710,10 @@ def test_the_written_width_lines_are_the_ones_topas_ran(tmp_path):
         # 1500 ppm isotropic strain, as `lor_strain` alone
         (_rutile_with(lor_strain=rx.Parameter(value=0.08594366926962348, min=0.0)),
          ["  lor_fwhm = 0.08594366926962348*Tan(Th);"]),
+        # a block replaces the lor_strain it locks (WP-1467): Λ alone
+        (_rutile_with(microstrain=block,
+                      lor_strain=rx.Parameter(value=0.3, min=0.0)),
+         [f"  lor_fwhm = {_LAMBDA}*Tan(Th);"]),
     ]
     for structure, expected in cases:
         diags: list = []

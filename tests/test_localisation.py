@@ -362,3 +362,53 @@ def test_coincident_parent_reflections_are_one_family(genuine):
     (fam,) = loc.families
     assert sorted(map(tuple, fam.hkls)) == [(3, 3, 3), (5, 1, 1)]
     assert fam.n_assigned == 2 and fam.splits and loc.n_split_families == 1
+
+
+def test_a_family_straddling_the_range_end_keeps_its_in_range_child(genuine):
+    """A parent just below the first channel still owns the child above it.
+    Skipping every out-of-range parent counted that child nowhere: neither in
+    a family nor in ``n_unmatched`` (#904's review)."""
+    (_, cubic), (_, tetra) = genuine
+    lo = cubic.two_theta[0]
+    t0 = _two_theta(2, 0, 0)        # a real peak, so the local width is measured
+    # distinct child labels: a repeated hkl is read as a second emission line
+    parent = _with_ticks(cubic, [lo - 0.004, t0], [[2, 0, 0], [2, 2, 0]])
+    child = _with_ticks(tetra, [lo - 0.012, lo + 0.004, t0],
+                        [[2, 0, 0], [0, 0, 2], [2, 2, 0]])
+    loc = split_localisation(parent, child)
+    fam, whole = loc.families
+    assert not whole.splits
+    assert fam.n_assigned == 2 and fam.splits and fam.spread == pytest.approx(0.016)
+    assert fam.window[0] < lo and fam.n_points >= 1
+    assert loc.n_split_families == 1 and loc.n_unmatched == 0
+    assert loc.split_point_share > 0.0
+
+
+def test_a_family_wholly_outside_the_range_is_not_reported(genuine):
+    """The other half of the rule above: no child in range, no row.  Nor is a
+    parentless child past the range an unmatched one: the data cannot show it."""
+    (_, cubic), (_, tetra) = genuine
+    lo = cubic.two_theta[0]
+    t0 = _two_theta(2, 0, 0)
+    parent = _with_ticks(cubic, [lo - 0.05, t0], [[2, 0, 0], [2, 2, 0]])
+    child = _with_ticks(tetra, [lo - 1.0, lo - 0.06, lo - 0.04, t0],
+                        [[1, 0, 1], [2, 0, 0], [0, 0, 2], [2, 2, 0]])
+    loc = split_localisation(parent, child)
+    assert [f.hkls for f in loc.families] == [[[2, 2, 0]]]
+    assert loc.n_unmatched == 0 and loc.split_share is None
+
+
+def test_a_family_whose_children_all_lie_past_the_range_is_windowed_on_its_parent(genuine):
+    """The mirror case: the parent in range, both children past its end.  The
+    split is still read off the children, and the window stays on data."""
+    (_, cubic), (_, tetra) = genuine
+    hi = cubic.two_theta[-1]
+    t0 = _two_theta(2, 0, 0)
+    parent = _with_ticks(cubic, [t0, hi - 0.001], [[2, 2, 0], [2, 0, 0]])
+    child = _with_ticks(tetra, [t0, hi + 0.012, hi + 0.03],
+                        [[2, 2, 0], [2, 0, 0], [0, 0, 2]])
+    loc = split_localisation(parent, child, half_width=0.005)
+    whole, fam = loc.families
+    assert fam.splits and fam.n_assigned == 2 and fam.n_points >= 1
+    assert fam.window == pytest.approx((hi - 0.006, hi + 0.004))
+    assert loc.split_share is not None and loc.split_point_share > 0.0

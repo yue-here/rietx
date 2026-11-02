@@ -1369,7 +1369,8 @@ class ParameterTable:
             self._add(f"{base}.lor_size", phase.lor_size)
             # a Stephens block owns the tanθ Lorentzian channel outright: its
             # isotropic direction is the same column, so lor_strain is locked
-            # (the Atom.aniso ⇒ biso bargain, one level up)
+            # and the width law reads zero for it (the Atom.aniso ⇒ biso
+            # bargain, one level up; CompiledModel.lor_strain_term, WP-1467)
             self._add(f"{base}.lor_strain", phase.lor_strain,
                       force_fixed=phase.microstrain is not None)
             self._add(f"{base}.gauss_size", phase.gauss_size)
