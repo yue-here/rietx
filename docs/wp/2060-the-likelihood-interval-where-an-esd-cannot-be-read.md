@@ -1,6 +1,6 @@
 # WP-2060 — the likelihood interval where an esd cannot be read as one
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here (ghostshift runner)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-26 — two wrong statements with nothing fired: a weak modulus beside a zeroed angle covers 0.83 at a nominal 0.95, and a modulus on a dead column reads ± 10⁴ μ_B while `profile_interval` returns a zero-width interval; both on the magnetic path few fits run
