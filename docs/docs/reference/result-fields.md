@@ -1,10 +1,10 @@
 # Result fields
 
-This page says what each field of a `RefinementResult`, a `StageResult`, a `SeriesResult` and a `SeriesEntry` holds, and what it means when it is empty.
+This page says what each field of a `RefinementResult`, a `StageResult`, a `SeriesResult`, a `SeriesEntry`, and the report's `UnmatchedPeak` and `FlankEvidence` holds, and what it means when it is empty.
 
 A number in a field costs nothing until you read it, so a statistic that does not tell one fit from another is kept in a field and explained here, rather than raised as a diagnostic on every run.
 The entries are generated from `rietx.help.RESULT_FIELD_HELP`, the one place each is written.
-[The refinement result](result.md) and [Sequential refinement](series.md) show the same types in use.
+[The refinement result](result.md), [Sequential refinement](series.md) and the [report reference](report.md) show the same types in use.
 
 ## Looking one up in code
 
