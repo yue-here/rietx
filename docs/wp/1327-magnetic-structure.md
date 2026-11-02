@@ -173,6 +173,13 @@ rule above applies to the form factors.
   (PR #1073), and the bracket-folding rule changed after they landed (#589); then drop
   the prose sentence.
 
+- **From WP-2010 (2026-11-02, repair of its 2026-11-01 work): the report sentence below
+  is reversed.** The maintainer ruled on 2026-11-01 (#1288) that the fit report carries
+  no validation verdict either, since an agent reads it between stages while choosing
+  what to free. So nothing a caller reads says the moment has no independent
+  measurement, and there is no wording for this WP to adopt; the record stays in the
+  validation matrix and `docs/VALIDATION.md`. The verify/validate half of the note below
+  still holds.
 - **From WP-2010 (2026-10-27): the magnetic "not yet validated" label became a report
   sentence, and a published moment would verify, not validate.** The maintainer ruled
   that the validation record is for the developers (DESIGN.md § Rules, 2, narrowed that

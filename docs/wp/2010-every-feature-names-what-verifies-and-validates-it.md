@@ -1,6 +1,6 @@
 # WP-2010 — Every feature names what verifies it and what validates it
 
-Milestone: generality · Status: 🔄 2026-10-31 — ruled, reworded and read for consistency; the reporter (#1051) builds it
+Milestone: generality · Status: 🔄 2026-11-01 — the report sentence reversed (#1288); the reporter (#1051, #1266) builds the rest
 Track: The audits
 Depends on: —
 Priority: P3 2026-10-18 — outside the gate after 2004, so it waits on nothing; the magnetic report wording moves with it
@@ -11,8 +11,8 @@ Every feature rietx refines or corrects for names what verifies its code and, wh
 exists, the independent measurement that validates its physics, in DESIGN.md § Rules,
 2's sense as narrowed on 2026-10-27. A feature no test verifies is verified or fenced. A
 feature with no independent measurement is recorded as *not yet validated* in the validation
-matrix and its generated page, for the developers, and a result that reports a number
-from such a feature says so once in its report, naming each such number. A test holds the feature
+matrix and its generated page, for the developers (a report sentence naming such numbers
+was ruled 2026-10-27 and reversed 2026-11-01: § Context, third bullet). A test holds the feature
 list to the help vocabulary and the Theory headings, partitioned both ways, and joins
 each feature to its claims, so a new feature cannot land without saying which state it
 is in. That test is the tripwire Rule 4's test for a new topic lacks.
@@ -50,6 +50,10 @@ recorded not yet validated. That state is separate from *provisional*, which
   such fit (a new code on every magnetic fit; the reporter's objection, #1051) and over
   the manual alone. One FitReport sentence, present only when the result reports such a
   quantity, read from the registry: the one place the fact reaches a reader of results.
+  *Superseded 2026-11-01* (the maintainer, #1288): reversed, because an agent reads the
+  report between stages and the sentence could only prompt changing what is free. No
+  report sentence; the record stays in the matrix and `docs/VALIDATION.md`
+  (`generality.md` § Decisions carries the reversal and its measurement).
 - *Development-data risk, measured* by a hand reading of the audit table's evidence
   text. Of 1240 audit rows, 66 cite an acceptance dataset. 55 are sensitivity or
   invariance checks where the reference played no part. 11 were selected on
@@ -93,7 +97,8 @@ report says instead.
 `HelpEntry.validation` field (8 files, the GUI's TypeScript, vitest table and dist). Under
 the 2026-10-27 ruling neither: the help field waits, and `capabilities()` carries no
 per-feature state. The feature registry (`rietx.features`, the reporter's key) ships,
-because the report sentence reads it.
+because the report sentence reads it. (Superseded in part 2026-11-01: the sentence is
+reversed, so the matrix join and `docs/VALIDATION.md` are its readers.)
 
 **The grain.** A feature is what a user switches on or refines, so the key is the help
 vocabulary: every `PARAMETER_HELP` family and every correction field in
@@ -145,19 +150,23 @@ symbols, joint fits) and get one or a declared exception.
       (start dependence as "a validation axis", "would validate a configuration", the
       anode wavelength tables, the multi-phase CIF round trip), `docs/VALIDATION.md`
       regenerated.
-- [ ] The report sentence: a result that reports a quantity from a feature with no
-      independent measurement lists it once, read from the registry; absent otherwise.
+- [ ] ~~The report sentence: a result that reports a quantity from a feature with no
+      independent measurement lists it once, read from the registry; absent otherwise.~~
+      Withdrawn 2026-11-01 (#1288): the ruling reversed. What remains is #1266 dropping
+      the code it built for it.
 - [ ] The meta-test: the feature list partitions the help vocabulary and the Theory
       headings both ways; every claim and test a feature names exists; every
       `prediction` claim names its reference value's kind.
 - [ ] Root CLAUDE.md § Invariants: the clause "Every physics function cites its
       reference" names the meta-test.
-- [ ] 1327's `### Inherited` note updated: the report sentence's wording for the moment.
+- [x] 1327's `### Inherited` note updated: the report sentence's wording for the moment.
+      Done 2026-11-02 as the reversal's note (no sentence, so no wording).
 - [ ] Follow-ups filed: the ceria round robin as a microstructure measurement; references
       for data already in the tree (a Le Bail cell against the SRM 660c and 676a
       certificates, published space groups for the extinction symbols, LaMnO₃'s Pn′ma′).
 - [ ] Tests; the fast count moved by exactly the tests added.
-- [ ] Skill: none. The report sentence is the package's own output (DESIGN.md § Rules, 3).
+- [ ] Skill: none. No surface an agent reads carries the state (ruled 2026-10-27; the
+      report sentence that was the exception reversed 2026-11-01).
 
 ## Acceptance
 
@@ -185,6 +194,34 @@ confirm the new test goes red naming it.
 
 ## Handover log
 
+- **2026-11-01** (reconstructed post hoc, 2026-11-02, from b03365dcb / #1288, by WP-2003's
+  session under this WP's `repair first` flag) — a ruling reversed, no code.
+
+  The fit report will not say which of its numbers lack an independent measurement. The
+  maintainer reversed the 2026-10-27 choice on a new ground: the report is read by an
+  agent between stages while it still chooses what to free, and a sentence that depends
+  only on which parameters are free can prompt one thing, changing them, which the same
+  ruling forbids. The validation record stays where the developers read it, in the
+  matrix and its generated page. So this WP loses its report-sentence task, and the code
+  #1266 built for it is asked back out of that PR in review.
+
+  *Done* (what the commit shows). b03365dcb, merged as #1288 on 2026-11-01:
+  `docs/DESIGN.md` § Rules, 2 drops the two sentences putting the fact in the report and
+  lists the report among the surfaces carrying no validation verdict;
+  `docs/milestones/generality.md` § Decisions gains a dated reversal note with its
+  ground and the measurement on `examples/srm660c_lab.py` (20 of 26 reported parameters
+  named in 930 characters, macOS arm64; #1266 measured 21 and 970 on Linux). Docs only.
+  *What it does not show.* This file was not touched, so its Goal, the third
+  2026-10-27 bullet, the report-sentence task, the 1327 task and the skill task still
+  described the reversed choice; nor was `generality.md` § Acceptance's 2010 row. The
+  repair marks each superseded in place and pushes a note to 1327's `### Inherited`.
+  The PR body says the code side (the `FitReport` field, its writer, the validation flag
+  in `rietx.features`, its test file and doc lines) is asked of #1266 in review; whether
+  that review comment was posted the commit does not show. No count was measured.
+
+  *Next*, in order: #1266 drops its report-sentence code; then the list of the 15
+  unclaimed features as before, which sizes the verification work; then the ceria round
+  robin filed as the microstructure measurement.
 - **2026-10-31** — a wording ruling and a consistency read of the rule set, no code.
 
   The rules now use two plain terms where they used one awkward one. An *independent
