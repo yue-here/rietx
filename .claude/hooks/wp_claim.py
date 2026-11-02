@@ -416,7 +416,7 @@ class PullRequest(NamedTuple):
     wps: tuple  # WPs this PR names outright: its title, else the WP files it edits, else its branch
     issues: tuple  # int numbers cited anywhere in the title or body (backlog.py's column)
     mentions: tuple  # WPs its body mentions; a reference, never a claim
-    chain: tuple  # issues the overlap match follows: the title's and the closing ones
+    chain: tuple  # issues the overlap match follows (title's and closing); empty when wps is not
     fork: bool  # the head branch lives on someone else's repository
 
 
@@ -425,13 +425,16 @@ _WP_TEXT_RE = re.compile(r"\bWP-(\d{4})\b")
 _WP_FILE_RE = re.compile(r"docs/wp/(\d{4})-")
 
 
-def _gh(root: Path, *args: str, timeout: int = 20) -> Optional[str]:
+def _gh(root: Path, *args: str, timeout: int = 20, partial: bool = False) -> Optional[str]:
     """``gh`` from the repo root, so it resolves this repository from the remote.
 
     ``None`` on every way it can decline — not installed, not logged in,
     offline, rate-limited, slow.  The caller turns that into a sentence rather
     than an empty table, because "no PRs" and "could not look" must not read
     alike.
+
+    *partial* keeps stdout on a non-zero exit.  ``gh api graphql`` exits 1 when
+    any one alias fails to resolve, and still prints the other aliases' data.
     """
     try:
         proc = subprocess.run(
@@ -439,7 +442,7 @@ def _gh(root: Path, *args: str, timeout: int = 20) -> Optional[str]:
         )
     except (OSError, subprocess.TimeoutExpired):
         return None
-    return proc.stdout if proc.returncode == 0 else None
+    return proc.stdout if proc.returncode == 0 or (partial and proc.stdout) else None
 
 
 def open_prs(root: Path) -> Optional[list[PullRequest]]:
@@ -453,7 +456,7 @@ def open_prs(root: Path) -> Optional[list[PullRequest]]:
     proc = _gh(
         root, "pr", "list", "--state", "open", "--limit", "100", "--json",
         "number,title,body,author,headRefName,updatedAt,isDraft,files,"
-        "closingIssuesReferences,isCrossRepository",
+        "closingIssuesReferences,isCrossRepository,url",
     )
     if proc is None:
         return None
@@ -466,7 +469,9 @@ def open_prs(root: Path) -> Optional[list[PullRequest]]:
     # links the PR to every WP that ever named the earlier PR (WP-2046: #1257
     # reached five WPs, one of them real).  GitHub numbers issues and PRs in one
     # sequence, so only GitHub can say which is which.
-    titled = {int(n) for item in raw for n in _ISSUE_RE.findall(item.get("title", ""))}
+    # Only a title naming no WP is read for its issues, so only its numbers are asked.
+    titled = {int(n) for item in raw if not _WP_TEXT_RE.search(item.get("title", ""))
+              for n in _ISSUE_RE.findall(item.get("title", ""))}
     pull_requests = {int(item["number"]) for item in raw}
     pull_requests |= _pull_requests_among(root, titled - pull_requests)
     prs = []
@@ -490,9 +495,14 @@ def open_prs(root: Path) -> Optional[list[PullRequest]]:
         # The issues the overlap match follows: the title's, and the ones
         # GitHub itself parsed from a closing keyword.  A body's other numbers
         # are context ("see #1153"), and following them gave #941 eighteen WPs.
+        # A closing reference may name another repository's issue ("closes
+        # owner/repo#5"), whose number means nothing here.
+        here = (item.get("url") or "").rpartition("/pull/")[0]
         closing = {int(c["number"]) for c in item.get("closingIssuesReferences") or []
-                   if c.get("number") is not None}
-        chain = {int(n) for n in _ISSUE_RE.findall(title)} - pull_requests | closing
+                   if c.get("number") is not None
+                   and not (here and c.get("url") and c["url"].rpartition("/issues/")[0] != here)}
+        # A PR that names its WP is linked to that WP alone, so it follows none.
+        chain = set() if wps else {int(n) for n in _ISSUE_RE.findall(title)} - pull_requests | closing
         prs.append(
             PullRequest(
                 number=int(item["number"]),
@@ -521,7 +531,10 @@ def _pull_requests_among(root: Path, numbers: set) -> set:
         return set()
     fields = " ".join(f"n{n}: issueOrPullRequest(number: {n}) {{ __typename }}" for n in sorted(numbers))
     query = f"query($owner: String!, $name: String!) {{ repository(owner: $owner, name: $name) {{ {fields} }} }}"
-    proc = _gh(root, "api", "graphql", "-F", "owner={owner}", "-F", "name={repo}", "-f", f"query={query}")
+    # A number resolving to nothing (a discussion, a typo, #0) nulls its own
+    # alias and fails the whole call; it must not void the other answers.
+    proc = _gh(root, "api", "graphql", "-F", "owner={owner}", "-F", "name={repo}", "-f", f"query={query}",
+               partial=True)
     try:
         found = json.loads(proc or "")["data"]["repository"]
         return {int(key[1:]) for key, kind in found.items()
@@ -552,7 +565,7 @@ class Overlap(NamedTuple):
 
     wp: str
     pr: PullRequest
-    via: str  # "names it" or "issue #N"
+    via: str  # "names it", or "mentions it" and/or "issue #N, ...", joined by " and "
 
 
 def overlaps(

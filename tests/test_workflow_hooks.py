@@ -1317,6 +1317,39 @@ def test_a_pr_naming_wps_only_by_their_files_names_every_one(
     assert [o.wp for o in claim.overlaps([pr], {})] == ["9901", "9902"]
 
 
+def test_one_unresolvable_number_does_not_void_the_classification(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``gh api graphql`` exits 1 when one alias resolves to nothing (a
+    discussion, a typo), and still prints the others' data."""
+    raw = _pr(1284, "follow-ups to #1257 (see discussion #99999)")
+
+    def gh(root, *args, partial=False, **kw):
+        if args[:2] == ("api", "graphql"):
+            return json.dumps({"data": {"repository": {
+                "n1257": {"__typename": "PullRequest"}, "n99999": None,
+            }}, "errors": [{"type": "NOT_FOUND"}]}) if partial else None
+        return json.dumps([raw])
+
+    monkeypatch.setattr(claim, "_gh", gh)
+    (pr,) = claim.open_prs(repo)
+    assert pr.chain == (99999,)
+
+
+def test_a_closing_reference_to_another_repository_is_not_followed(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    raw = _pr(1300, "a fix")
+    raw["url"] = "https://github.com/o/r/pull/1300"
+    raw["closingIssuesReferences"] = [
+        {"number": 998, "url": "https://github.com/o/r/issues/998"},
+        {"number": 5, "url": "https://github.com/elsewhere/lib/issues/5"},
+    ]
+    monkeypatch.setattr(claim, "_gh", _gh_answering([raw]))
+    (pr,) = claim.open_prs(repo)
+    assert pr.chain == (998,)
+
+
 # --------------------------------------------------------------------------- #
 # The issue backlog (.claude/skills/issue-review/backlog.py): /issue-review's
 # table, one row an open issue, cross-referenced against the planning record
