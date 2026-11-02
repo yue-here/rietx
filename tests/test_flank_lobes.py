@@ -168,6 +168,37 @@ def test_asymmetry_lobes_with_the_apertures_at_zero_carry_their_peak():
     _plot_state(structure, flat, data, "wp1977_axial_lobes")
 
 
+def test_a_lone_shoulder_counts_one_lobe():
+    """A foreign line 1 FWHM below the third-strongest LaB₆ line, at 15 % of
+    its height: the data do not resolve it, so the row is on the flank, and
+    no other line as strong carries a lobe on that side.  The asymmetry case
+    above counts 1 of 14 too, its other lobes being under the detection level
+    (measured), so the count can say "most lines" and cannot say "one line
+    only"; the help entry says so."""
+    from scipy.signal import find_peaks, peak_widths
+
+    structure, ins, data = _truth()
+    clean = _result_for(structure, ins, data)[0]
+    tt = np.asarray(clean.two_theta)
+    yc = np.asarray(clean.y_calc)
+    apex, props = find_peaks(yc, prominence=1.0)
+    j = np.argsort(props["prominences"])[::-1][2]
+    fwhm = peak_widths(yc, apex[[j]], rel_height=0.5)[0][0] * (tt[1] - tt[0])
+    centre = tt[apex[j]] - fwhm
+    y = np.asarray(data.intensity) + 0.15 * props["prominences"][j] * _gauss(
+        tt, centre, fwhm)
+    doped = rx.PatternData(two_theta=data.two_theta, intensity=y.tolist(),
+                           sigma=data.sigma)
+
+    report = _report_for(structure, ins, doped)
+    _every_row_measured(report)
+    (u,) = [u for u in _obs(report) if abs(u.two_theta - centre) < fwhm / 2]
+    assert u.flank.on_flank, u
+    assert -1.5 < u.flank.offset_fwhm < -0.5, u
+    assert (u.flank.lines_with_lobe, u.flank.lines_as_strong) == (1, 3), u
+    assert _active(report, "add_impurity_phase") == []
+
+
 def _si() -> rx.Phase:
     return rx.Phase(
         name="Si", space_group="F d -3 m", cell=rx.Cell.cubic(5.4309),

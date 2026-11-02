@@ -5979,10 +5979,13 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "Where an `unmatched_obs` peak sits against the peaks the model draws. "
             "`on_flank` says the observed curve rises from it into a drawn peak with "
-            "no valley of 5σ, so the data do not resolve the two. Four causes leave "
+            "no valley as deep as `build_report`'s `min_peak_sigma` (default 5σ), so "
+            "the data do not resolve the two. Four causes leave "
             "such a shoulder. A shape or asymmetry misfit leaves one on most strong "
             "lines, on one side, at a similar offset in FWHM: compare "
-            "`lines_with_lobe` with `lines_as_strong`. An unmodelled Kα2 sits above "
+            "`lines_with_lobe` with `lines_as_strong`. A lobe under the detection "
+            "level is not counted, so a low count does not rule a shape misfit out. "
+            "An unmodelled Kα2 sits above "
             "each line at the Kα1-Kα2 separation for its angle. A symmetry lower "
             "than the model's splits the lines of some hkl classes and not others, "
             "the split growing with tanθ. A foreign line is a lone shoulder that "
@@ -5997,7 +6000,8 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         title="Unresolved from a drawn peak",
         description=(
             "Whether the observed curve rises from the residual peak into a drawn "
-            "peak without falling 5σ below its running maximum on the way. False "
+            "peak without falling `min_peak_sigma` (default 5σ) below its running "
+            "maximum on the way. False "
             "where the data resolve the two, or where no drawn peak lies uphill."
         ),
     ),
@@ -6006,7 +6010,7 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The apex of the drawn peak reached by walking uphill along the "
             "calculated curve. `None` where the walk reaches the pattern edge or an "
-            "apex less than 5σ prominent."
+            "apex less prominent than `min_peak_sigma` (default 5σ)."
         ),
         unit="deg",
     ),
@@ -6033,8 +6037,8 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         title="Deepest valley",
         description=(
             "The deepest fall of the observed curve between the residual and the "
-            "apex, below the highest point it had reached, in esd. Under 5 is "
-            "`on_flank`."
+            "apex, below the highest point it had reached, in esd. Under "
+            "`min_peak_sigma` (default 5) is `on_flank`."
         ),
     ),
     "FlankEvidence.lines_as_strong": HelpEntry(
@@ -6048,7 +6052,8 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         title="Lines with a lobe",
         description=(
             "How many of those carry an `on_flank` row on the same side, this one "
-            "included. A lobe within 0.08° of a tick is no row and is not counted. "
+            "included. A lobe within 0.08° of a tick, or under the detection level, "
+            "is no row and is not counted. "
             "`None` where `on_flank` is False."
         ),
     ),
