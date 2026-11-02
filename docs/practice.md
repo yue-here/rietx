@@ -563,6 +563,28 @@ What it adds up to. Halving is established practice under a fixed budget. Under 
 loss, practice is racing: drop only past the measured noise. Ruled 2026-10-31 (WP-1997): halving
 ships, and racing is the next solver PR's first task.
 
+## Correlations against a parameter the data does not determine
+
+Read 2026-11-01 for WP-2050. When the normal matrix carries a direction the data does not
+move, how does a program report the correlations of the parameters in it? rietx kept such a
+direction at an eigenvalue rounding set, and its correlation guard then reported pairs
+against the direction's members, or not, as a 1e-14 change to a start value moved them.
+
+| Program | What it does | Mark |
+|---|---|---|
+| GSAS-II 5.8.4 | Scales the Hessian to unit diagonal, then takes a pseudo-inverse that zeroes every singular value under `SVDtol` × the largest (`GSASIImath.setHcorr`, `GSASIImath.py:131-148`; `pinv`, `:64`). The default is 1e-6 (`GSASIIobj.py:20`; the GUI allows 1e-9 to 0.01, `GSASIIdataGUI.py:8261`). Correlations come off that truncated inverse. Pairs above `max(0.95, 0.99 × the largest)` are listed, or above `min(0.99, …)` once a singular value was zeroed (`GSASIImath.py:143-147`). The count of zeroed values is reported as "soft (SVD) Hessian singularities", with the parameters most involved (`setSVDwarn`, `GSASIImath.py:150-162`; `GSASIIstrMain.ReportProblems`, `:54-139`) | checked |
+| TOPAS v9 | Errors and the correlation matrix (`C_matrix_normalized`) come from an SVD by default; `use_LU_for_errors` switches to LU, which "results in very large errors" for fully correlated intensities (Technical Reference §5.10, "Errors - SVD and bootstrap errors"). The SVD cut is not stated. Nothing in the reference suppresses or flags a correlation against an undetermined parameter | checked; cut not stated |
+| FullProf 8.20 | Writes the correlation matrix on request (`Mat=1`, manual "Common flags"). The manual advises refining separately any pair above about 50 % (p. 14). No treatment of a singular direction beyond advice to start with the scale alone (Trouble shooting) | checked |
+| RIETAN-FP, BGMN, MAUD, EasyDiffraction | not checked | |
+
+**The practice.** The two programs whose solve is documented take the correlations off a
+pseudo-inverse truncated at a relative cut, so a direction below the cut contributes nothing
+to any ρ. GSAS-II's cut, 1e-6 on the eigenvalues of the unit-diagonal normal matrix, is a
+user setting with no stated derivation. No program found reports a correlation as
+undetermined. rietx takes GSAS-II's mechanism at a cut derived from its own Jacobian's
+accuracy (`statistics.resolved_correlation`): GSAS-II's 1e-6 would also have removed
+brucite's zero-shift/displacement direction at 1.4e-10, whose correlations hold to 2e-5.
+
 ## Sources
 
 Line numbers are at the versions above. RIETAN-FP's and FullProf's manuals are cited by
