@@ -46,7 +46,7 @@ import numpy as np
 import pytest
 
 from rietx.crystallography.symmetry import generate_reflections
-from rietx.indexing.engines import SearchSpec, get_engine
+from rietx.indexing.engines import SearchSpec, corroborated, get_engine
 from rietx.schemas.indexing import PeakList
 
 LAM = 1.5405929
@@ -239,7 +239,7 @@ def test_a_list_without_intensities_is_not_searched_twice():
     res = index_pattern(flat, spec=_spec(), preset="full")
     # the trigger held — no lattice two engines agree on — so the silence of
     # the retry is the anchor rule's, not the trigger's
-    assert not any(len(c.found_by) >= 2 for c in res.candidates)
+    assert not any(corroborated(c) for c in res.candidates)
     assert not any(d.code == "INDEX_INLIER_RETRY" for d in res.diagnostics)
 
 
