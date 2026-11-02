@@ -1,6 +1,6 @@
 # WP-2080 — A warm fit that stopped in a wrong basin is kept, and nothing escalates it
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — reproduced and measured; the trigger waits on the maintainer's ruling and on PR #1310
+Milestone: unscheduled · Status: 🔄 2026-11-02 — option B ruled (settled by Claude under Yue's delegation); the trigger waits on PR #1310
 Track: What fires, and what stays silent
 Depends on: 2003 (C1's ruling removes the Rwp fence this case slips under; PR #1310 lands `_rejected`, the predicate a trigger would join)
 Priority: P2 2026-11-02 — a silent wrong answer on a path every warm series runs: 2 of 20 noise draws of the reporter's synthetic chain keep a cell 0.34 Å and 0.072 Å off its true value, with no warning that separates it from a good fit; the workaround (`refit="stages"`) is cheap once known
@@ -110,8 +110,10 @@ this session).
 
 - [x] Reproduce on main and name the mechanism; measure the triggers on the issue's
       family and, retrospectively, on WP-2003's nine (Context).
-- [ ] The maintainer's ruling (Handover log, 2026-11-02): option A, B or C, and the
-      factor if B.
+- [x] The maintainer's ruling (Handover log, 2026-11-02): option A, B or C, and the
+      factor if B. Option B at 1.25, settled by Claude under Yue's delegation,
+      2026-11-02 (handover entry of that date). The tier-3 audit row task 3 lands is
+      approved under the same delegation.
 - [ ] After PR #1310 merges: land the ruled option on `schemas.sequential._rejected`'s
       seam. Under B: the trigger joins the ladder's escalation test only (never the
       quarantine), escalates to `warm_staged` and not to `cold`, names the fact in a
@@ -141,6 +143,35 @@ this session).
 - Root CLAUDE.md § Series; DESIGN.md § Rules, 1 and 4.
 
 ## Handover log
+
+### 2026-11-02 (2nd session) — the ruling: option B
+
+Option B is the ruling. A warm pattern whose first try ends
+with a GoF above 1.25 times the GoF of the pattern it started from climbs one rung, to
+the staged plan from the same warm state, and the better of the two fits is kept.
+Settled by Claude under Yue's delegation, 2026-11-02. Yue's words: "use your best
+judgement on on 2080". The lead session picked B, and a ghostshift runner recorded it.
+
+*Grounds.* B can only lower each pattern's χ², because the better attempt is kept. It
+fires only where the reversal condition of WP-2003's C1 ruling (2026-10-26) holds: a
+kept warm fit that a validating reference rejects, separated from the accepted fits by
+a fact other than Rwp. Option A loses because a ratio in one row of hundreds is easy to
+miss. Option C fires on 115 of 247 patterns of the planted family, the cost C1 removed
+the Rwp fence for.
+
+*What would reopen it.* The margin for the factor is thin. The largest ratio kept
+without need is 1.126 and the smallest rescued is 1.279. A second family with kept fits
+near 1.2 reopens the factor.
+
+*What it does not touch.* B escalates to `warm_staged` and never to `cold`, so it sends
+no extra pattern to the rung that restarts from the initial models. That rung is where a
+series loses a held setup parameter's value (WP-2081 measures it), so B does not
+interact with how a series holds what the setup fixes.
+
+*Approval.* The tier-3 `_audit` row that task 3 adds is approved under the same
+delegation, and task 3 records that approval in the row.
+
+*Next:* task 3 once PR #1310 merges. Filed alongside this entry in PR #PRNUM.
 
 - **2026-11-02** — created, from issue #1214 (a ghostshift runner, one session).
   The report holds on today's main: a series can keep a converged fit that sits in a
