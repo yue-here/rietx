@@ -59,6 +59,11 @@ one without is *dormant*.  Dormant is not a problem and is not reported at
 session start — it is the ordinary state of a tree whose session has ended with
 the work unfinished, and it is what ``/wp-start`` reads to find that work again.
 Only *held* bears on a clash.
+
+**A ghostshift runner is the one live tree with no session in it** (WP-2077).
+Its process is the shift lead's, in the main checkout, so ``status`` and the
+create hook also read the shift's own claims, refs on origin.  The section
+above the CLI says how, and why it stays out of the SessionStart hook.
 """
 
 from __future__ import annotations
@@ -71,6 +76,8 @@ import os
 import re
 import subprocess
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from pathlib import Path
 from typing import Iterable, NamedTuple, Optional
@@ -572,6 +579,122 @@ def describe_pull_request(pr: PullRequest, touched: list) -> str:
 
 
 # --------------------------------------------------------------------------
+# The third source: a ghostshift runner, which has no session of its own.
+#
+# Ghostshift (claude-config's maintenance skill) runs WPs as background
+# subagents.  Each sits in an Agent-isolation tree named ``agent-<id>``, but its
+# process is the shift lead's, whose cwd is the main checkout.  So the local
+# half above finds no session in a runner's tree and calls it dormant, and
+# ``/wp-start`` offers dormant work to resume (WP-2077, measured 2026-11-02 on
+# WP-1977 and WP-2067).
+#
+# The shift writes its own claims, as refs on origin: ``refs/ghostshift/claims/
+# <item>``, each a parentless commit whose message is JSON {owner, item, taken,
+# pr, at}.  Read here with git into the namespace ghostshift's ``claim.py``
+# itself fetches into, never by importing that script: it lives outside this
+# repository.  A claim is free once its PR has merged or closed, or with no PR
+# 24 h after ``taken`` (``claim.py``'s rule, restated).  The fetch needs the
+# network, so this source stays out of the SessionStart hook, like the PR half.
+
+GHOST_NS = "refs/ghostshift/claims"
+GHOST_STALE_SECONDS = 24 * 3600
+
+
+class GhostClaim(NamedTuple):
+    item: str  # wp-<N>, issue-<N>, pr-<N>, or a free-form name
+    wp: Optional[str]  # the four-digit WP, when the item is one
+    owner: str  # <machine id>-<account hash>
+    taken: float  # epoch seconds of the owner's last take
+    pr: Optional[int]
+
+
+def fetch_ghost_claims(root: Path, remote: str = "origin") -> bool:
+    """Refresh the local copy of origin's claims.  False when the fetch failed.
+
+    ``--prune`` so a released claim leaves the local copy too.  A failure is not
+    fatal: the local refs are as fresh as the last fetch on this clone, and
+    ghostshift's own ``claim.py`` fetches before every take.
+    """
+    return _git(
+        root, "fetch", "--quiet", "--prune", remote, f"+{GHOST_NS}/*:{GHOST_NS}/*"
+    ) is not None
+
+
+def read_ghost_claims(root: Path) -> list[GhostClaim]:
+    """Every claim in this clone's copy of the namespace.  Local, no network."""
+    out = _git(root, "for-each-ref", "--format=%(refname)%00%(contents)%00", GHOST_NS) or ""
+    found = []
+    for chunk in out.split("\0\n"):
+        ref, _, body = chunk.partition("\0")
+        if not ref.startswith(GHOST_NS + "/"):
+            continue
+        item = ref[len(GHOST_NS) + 1:]
+        m = re.fullmatch(r"wp-(\d{4})", item)
+        # A record this cannot read is skipped, never raised: the create hook
+        # calls this, and a raise there refuses every WP tree.
+        try:
+            rec = json.loads(body.strip("\0\n"))
+            pr = rec.get("pr")
+            found.append(GhostClaim(
+                item, m.group(1) if m else None, str(rec.get("owner", "?")),
+                float(rec.get("taken") or 0), int(pr) if pr else None,
+            ))
+        except (ValueError, TypeError, AttributeError):
+            continue
+    return found
+
+
+def ghost_live(claim: GhostClaim, pr_open, now: float) -> Optional[bool]:
+    """Whether *claim* still holds its item.  ``None`` when that cannot be told.
+
+    *pr_open* maps a PR number to True, False or None (gh could not answer).
+    ``None`` is its own answer, as in the PR half: a claim whose PR state is
+    unknown is neither reported free nor allowed to refuse a tree.
+    """
+    if claim.pr is not None:
+        return pr_open(claim.pr)
+    return now - claim.taken <= GHOST_STALE_SECONDS
+
+
+def describe_ghost(claim: GhostClaim, now: float) -> str:
+    age = max(0.0, now - claim.taken) / 3600
+    pr = f", PR #{claim.pr}" if claim.pr is not None else ""
+    return f"ghostshift {claim.owner} for {age:.1f} h{pr}"
+
+
+def ghost_refusal(root: Path, wp: str) -> str:
+    """The create hook's refusal for a WP a live ghostshift claim holds, or "".
+
+    Fetches first, so the answer is origin's.  Pays one ``gh`` call, only when a
+    claim on *wp* exists and names a PR.  Refuses only on a claim known to be
+    live: an unknown PR state passes, because a refusal that fires whenever gh is
+    offline would teach the reader to clear it unread.
+    """
+    fetch_ghost_claims(root)
+    claim = next((c for c in read_ghost_claims(root) if c.wp == wp), None)
+    if claim is None:
+        return ""
+
+    def pr_open(n: int) -> Optional[bool]:
+        state = _gh(root, "pr", "view", str(n), "--json", "state", "-q", ".state")
+        return None if state is None else state.strip() == "OPEN"
+
+    now = time.time()
+    if not ghost_live(claim, pr_open, now):
+        return ""
+    return (
+        f"WP-{wp} is claimed by a ghostshift runner: {describe_ghost(claim, now)}.\n"
+        "A runner has no session in its agent-<id> tree, so the process scan finds\n"
+        "nobody there; the claim on origin is what says it is live. Pick another\n"
+        "WP. The claim frees itself once its PR merges or closes, or 24 h after its\n"
+        "last take when it names no PR. Its owner releases it sooner with\n"
+        f"  python3 ~/Code/claude-config/skills/ghostshift/bin/claim.py release {claim.item}\n"
+        "and a claim whose shift has gone is dropped by hand with\n"
+        f"  git push origin :{GHOST_NS}/{claim.item}"
+    )
+
+
+# --------------------------------------------------------------------------
 # CLI — ``/wp-start`` step 2 reads ``status``; the other two verbs are the
 # override the refusal in ``worktree_create.py`` names.
 
@@ -619,24 +742,69 @@ def _status(root: Path, here: Path, wp: Optional[str] = None) -> int:
     # session's own row is the one marked, never the one hidden.
     holders = occupancy(trees, sibling("session_start").live_sessions(), set(),
                         read_claims(root), main)
-    rows = bears_on_a_clash(holders, glyphs_for(root, holders))
     here = here.resolve()
+    mine = next((h.wp for h in holders if h.worktree == here), None)
+    # Both network reads first: a ghostshift claim naming a PR is live only
+    # while that PR is open, and the local table needs the answer.  Side by
+    # side, so the fetch (0.54-0.64 s) hides behind gh's slower list.
+    with ThreadPoolExecutor(1) as pool:
+        fetch = pool.submit(fetch_ghost_claims, root)
+        prs = open_prs(root)
+        fetched = fetch.result()
+    open_numbers = None if prs is None else {p.number for p in prs}
+    now = time.time()
+    ghosts = []
+    for c in read_ghost_claims(root):
+        if c.wp is None:
+            continue
+        live = ghost_live(c, lambda n: None if open_numbers is None else n in open_numbers, now)
+        if live is not False:
+            ghosts.append((c, live))
+    # Every claim marks the table, which ``status NNNN`` still prints whole;
+    # the WP argument narrows only the list below it.
+    ghost_held = {c.wp: c for c, live in ghosts if live}
+    if wp is not None:
+        ghosts = [(c, live) for c, live in ghosts if c.wp == wp]
+
+    shown = bears_on_a_clash(holders, glyphs_for(root, holders))
+    rows = [h for h in holders if h in shown or h.wp in ghost_held]
     print("This machine's worktrees:")
     if not rows:
         print("  none is working an open WP")
     for h in rows:
         mark = "→" if h.worktree == here else " "
         who = ", ".join(f"pid {s.pid} up {s.age}" for s in h.sessions)
-        state = f"held by {who}" if h.held else "dormant"
+        if h.held:
+            state = f"held by {who}"
+        elif h.wp in ghost_held:
+            state = f"held by ghostshift {ghost_held[h.wp].owner}"
+        else:
+            state = "dormant"
         branch = h.branch or "detached"
         print(f"{mark} WP-{h.wp}  {state}  in {where(h, main)} ({branch}, {h.provenance})")
-    for wp in clashes(holders):
-        print(f"⚠ WP-{wp} is live in more than one tree — that is the clash")
+    for clash in clashes(holders):
+        print(f"⚠ WP-{clash} is live in more than one tree — that is the clash")
+    for clash in sorted({h.wp for h in holders if h.held} & set(ghost_held)):
+        print(f"⚠ WP-{clash} is held here and by a ghostshift runner — that is the clash")
+
+    # A runner on any machine, which only the shift's own claims can show.
+    print("\nGhostshift claims on origin (runners, any machine):")
+    if not fetched:
+        print("  could not fetch them; this is the clone's copy from its last fetch")
+    if not ghosts:
+        print("  none holds " + (f"WP-{wp}" if wp else "a WP"))
+    for c, live in ghosts:
+        own = (
+            "  (this tree's WP: a runner's own claim; anyone else's session clashes)"
+            if c.wp == mine else ""
+        )
+        if live:
+            print(f"⚠ WP-{c.wp} held by {describe_ghost(c, now)}{own}")
+        else:
+            print(f"? WP-{c.wp} claimed by {describe_ghost(c, now)}, PR state unknown{own}")
 
     # The other machines, which this repo can only see through GitHub.
-    mine = next((h.wp for h in holders if h.worktree == here), None)
     print("\nOpen pull requests, including contributors' forks:")
-    prs = open_prs(root)
     if prs is None:
         print("  gh could not answer (offline, not installed, or not logged in)")
         print("  — the table above is this machine only, so ask before starting")

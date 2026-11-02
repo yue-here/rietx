@@ -895,6 +895,12 @@ check and not truth, and which carries a weighed composition.  A claim
 referenced to the wrong one is green and worth nothing, and nothing in
 this file said so.
 
+302 -> 307 for WP-2077 (2026-11-02): the look-first check before a full
+suite counts `ps` lines naming `python -m pytest`, and a ghostshift runner's
+suite waiting on `serial.py`'s lock is one of them.  Without the clause a
+queued waiter reads as a running suite, and every session that runs the
+check meets it.
+
 ### `src/rietx/indexing/CLAUDE.md`
 
 250 at the WP-1060 split; raised once, for WP-1046's two standing rules

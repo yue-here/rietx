@@ -140,7 +140,10 @@ bookkeeping syncs, and nothing beyond them.
 - `DIRTY` → rebase request; out of the queue. On step 4's bookkeeping files
   alone (rank 3's `merge-tree`) → stays in the queue, and step 4 syncs it or,
   finding an edit in a hunk, asks for the rebase then.
-- Maintainer's own → one line (gated by `/wp-handover`); out.
+- Maintainer's own → one line (gated by `/wp-handover`); out. A ghostshift
+  shift lead may also merge one its checks find clear-cut, under the user's
+  standing permission of 2026-10-31
+  (`~/Code/claude-config/skills/ghostshift/SKILL.md` §4).
 - Touches an in-flight WP → **batch, do not review** (a live session's files
   are that person's call). The batch item carries the evidence: what the 🔄
   records (a session's claim, or only work that "landed from outside") and the

@@ -63,6 +63,13 @@ Run the session-start ritual. The SessionStart hook's report
    is the opposite and is often what you want — unfinished work with a branch
    to continue, resumed by giving `EnterWorktree` that tree's name.
 
+   **A row reading `held by ghostshift <owner>` is a runner** of ghostshift,
+   the claude-config skill that works WPs unattended. A runner has no session
+   in its `agent-<id>` tree, so only the shift's claim on origin shows it is
+   live; it is taken like any held row (WP-2077). The output's ghostshift
+   section lists every WP a shift holds, on any machine. A runner doing this
+   step sees its own WP there, marked as this tree's.
+
    **Open pull requests, contributors' forks included.** The second part, and
    the only one that can see a person on another machine. Contributors here
    work from *issues* rather than WPs — measured 2026-09-15, all three open
