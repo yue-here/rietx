@@ -69,7 +69,12 @@ package makes no decision here.
 
 ### Inherited
 
-(none)
+- **2026-11-02, from WP-2077.** `_status` in `.claude/hooks/wp_claim.py` now calls
+  `open_prs` before it prints the local table, beside a fetch of ghostshift's claim refs, and
+  computes `mine` (this tree's WP) first. A ghostshift claim naming a PR is live while that PR
+  appears in `open_prs`' list. So the own-PR fix here (match this session's PR by head branch,
+  never by WP) changes `mine`'s only other reader: the ghostshift section's "this tree's WP"
+  marker. Keep that marker keyed on the WP; it says which claim may be a runner's own.
 
 ## Non-goals
 

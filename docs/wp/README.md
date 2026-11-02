@@ -59,7 +59,6 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2059](2059-a-bruker-raw-v2-file-reads.md) | A Bruker RAW v2 file reads, checked against two descriptions and one real file | 2026-10-30 | P3 | [Unscheduled](#unscheduled-the-formats-a-lab-still-has) |
 | [2066](2066-a-complete-dichotomy-search-holds-every-centred-lattice.md) | A complete dichotomy search holds every centred lattice and polishes its truth leaf | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
 | [2067](2067-the-data-support-count-reads-what-drives-an-atom.md) | The data-support count reads what drives an atom, not its name | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2077](2077-the-workflow-sees-ghostshift-runners.md) | The WP workflow sees ghostshift's runners | 2026-11-02 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 
 ## Next, by priority
 
@@ -782,7 +781,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [2046](2046-the-claim-check-sees-a-contributors-pr.md) | The claim check sees a contributor's PR on the WP it runs for | ⬜ | P3 | — |
 | [2064](2064-an-approval-belongs-to-the-value-it-approved.md) | An approval belongs to the value it approved | ⬜ | P4 | — |
 | [2065](2065-a-hung-fast-job-names-its-test.md) | A hung fast job names its test, and the hang is fixed | ✅ 2026-11-01 | — | — |
-| [2077](2077-the-workflow-sees-ghostshift-runners.md) | The WP workflow sees ghostshift's runners | 🔄 2026-11-02 | P3 | — |
+| [2077](2077-the-workflow-sees-ghostshift-runners.md) | The WP workflow sees ghostshift's runners | ✅ 2026-11-02 | — | — |
 
 ### <a id="unscheduled-candidates-named-on-a-use-case-not-yet-on-a-measurement"></a>Candidates — named on a use case, not yet on a measurement
 
