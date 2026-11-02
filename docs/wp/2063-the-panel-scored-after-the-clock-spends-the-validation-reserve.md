@@ -1,9 +1,8 @@
 # WP-2063 — the FoM panel scored after the clock spends the validation reserve
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — ready for review (PR #1221): the cancel reaches a long Pawley step, the panel is cheaper and exact; the reserve swept, stays at 15 % pending the maintainer
+Milestone: unscheduled · Status: ✅ 2026-11-02 — the cancel reaches a long Pawley step, the panel is cheaper and exact, the reserve swept and kept at 15 % (PR #1221)
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-31 — was P3: issue #1231 shows a `full` run overrunning its declared `total_budget_seconds` by minutes, every candidate left unvalidated (a defect that fires wrongly, as WP-1924 rates a ceiling overrun)
 
 ## Goal
 
@@ -78,10 +77,9 @@ fit is bounded, so the validation reserve reaches validation and
       an idle machine (probe 16, `RESERVE=0.08,0.10,0.15`, three runs each,
       NAC both specs and the four lab sets), with its row's evidence. The
       value trades validated fits for searched systems on the wall clock, so
-      no count can choose it. Swept 2026-11-02 (handover). Stays at 15 % for
-      now. NAC's true cell validated at 8 % on every run, but no arm searched
-      a system, a candidate or a ranking the others did not. The value is
-      the maintainer's call.
+      no count can choose it. Swept 2026-11-02 (handover). Stays at 15 %.
+      NAC's true cell validated at 8 % on every run, but no arm searched a
+      system, a candidate or a ranking the others did not.
 - [x] Unit replay digests (`python -m tests.unit_replay`) and
       `tests/test_acceptance_indexing.py` unchanged, or each move named.
       Replay: 22 of 22 digests unchanged. Acceptance: 44 passed (macOS
@@ -111,8 +109,7 @@ fit is bounded, so the validation reserve reaches validation and
   same systems, flagged the same ones incomplete, returned the same
   candidate count and ranked the same top three at all three arms. The
   reserve therefore bought validated fits here and cost nothing visible in
-  the search. The constant stays at 15 %, and its value goes to the
-  maintainer (see *Decision owed*).
+  the search. The constant stays at 15 % (settled below).
 
   *Measured* (macOS arm64, `[dev]` venv built for this session from
   `cpython-3.12-macos-aarch64-none`, compiled tier loaded, on 010fbbcdd).
@@ -148,7 +145,8 @@ fit is bounded, so the validation reserve reaches validation and
 
   *Done.* Ticked the sweep task. Recorded the outcome in the constant's
   comment and its `_audit` row evidence. The value and the row's
-  `approved` date are unchanged.
+  `approved` date are unchanged. Closed the WP, with no task left open,
+  and moved its narrative to the v1.11 record.
 
 - **2026-11-01** — 2nd session (ghostshift runner, PR #1221). An indexing
   run now stops at its declared ceiling. That was issue #1231: a Pawley

@@ -2368,8 +2368,7 @@ DEFAULT_SEARCH_PRESET = "quick"
 #: run at every value, and no value changed the systems searched, the
 #: candidates or their ranking on NAC or the four lab sets.  What 8 % lost is
 #: NAC's top-ranked candidate's fit, cancelled on every run, and the true
-#: cell's fit kept a 2 s margin.  So the value stays, pending the maintainer
-#: (``docs/wp/2063-*.md``).
+#: cell's fit kept a 2 s margin.  So the value stays (``docs/wp/2063-*.md``).
 VALIDATION_RESERVE_FRACTION = 0.15
 
 #: name → the whole-run ceiling it fills in (``None`` = unbounded, today's
