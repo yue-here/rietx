@@ -163,6 +163,8 @@ and alert lists are in 1319's Context.
 
 ### Inherited
 
+- **2026-11-02, from [1815](1815-derived-geometry-torsions-and-a-request-form.md): the torsion loop this WP waited on has landed, and two geometry-loop gaps stay open.** `write_refinement_cif` now writes `_geom_torsion` (publ_flag `no`), so #756 § 6's geometry rules have an owner here. Gap one: `GeometryTable.notes` never reaches the file, so a torsion list cut at 36 per atom, or a contact list cut at its cap, reads as complete in the CIF (`io/exporters.py`, `_write_geometry_loops`). Gap two: the no-su sentence in `_geom_special_details` ("depends on nothing refined, or is fixed by symmetry") omits two of the schema's reasons for a `None` esd, a rigid-body template and no covariance (a CIF written after a replay). Both change text in every CIF written, so they go to the maintainer before merge.
+
 - **2026-10-20, from [1986](1986-guides-and-theory-move-over-and-the-old-tree-retires.md), found while moving the manual's reference pages: the two-block refusal names the wrong cause.** `structure_from_cif` refuses a valid two-block CIF with "this file does not read as a CIF (an empty, truncated or non-CIF file reaches here)" (`crystallography/cif.py:206-209`). Task C-e's `block=` is the fix; until it lands, the message could name the blocks it found.
 
 - **2026-10-11, from the issue triage (#756): the superspace-number rule of

@@ -39,7 +39,7 @@ assert "FLOOR_HIT" in {d.code for d in result.diagnostics}
 assert f"{row.value:.3f} ± {row.stderr:.3f}" == "0.000 ± 1.973"
 assert interval.at_bound and interval.lower == 0.0
 assert interval.lower_stop == "bound" and interval.upper_stop == "threshold"
-assert f"{interval.upper:.3f}" == "0.749"
+assert f"{interval.upper:.3f}" == "0.748"
 # the 1.645-esd reach a symmetric reading would give is 3.2, "more than four times as far"
 assert f"{1.645 * row.stderr:.1f}" == "3.2"
 assert 0.2 < interval.upper / (1.645 * row.stderr) < 0.25

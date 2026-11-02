@@ -113,12 +113,12 @@ def _components(model: CompiledModel, values: dict[str, float], ip: int
     aniso = np.asarray(model.strain_width(ip, values, d)) \
         if cp.strain_monomials is not None else np.zeros(len(d))
     # the whole tanθ coefficient, isotropic part included: a Stephens block
-    # *subsumes* lor_strain (its isotropic direction is the same column, which
-    # is why declaring one locks it), so the quantity to fit and to report the
-    # anisotropy of is the total, not the anisotropic remainder.  Fitting the
-    # remainder alone would call a specimen infinitely anisotropic the moment
-    # lor_strain had absorbed the narrow direction entirely.
-    strain_total = aniso + values[f"phases.{ip}.lor_strain"]
+    # *replaces* lor_strain (its isotropic direction is the same column, which
+    # is why declaring one locks it, and the width law then reads 0 for it —
+    # CompiledModel.lor_strain_term, WP-1467), so the quantity to fit and to
+    # report the anisotropy of is the total the model draws.
+    iso = model.lor_strain_term(ip, values)
+    strain_total = aniso + iso
     gam_g, gam_l, tan_theta = [], [], []
     for lam in model.line_wavelengths:
         with np.errstate(invalid="ignore"):
@@ -129,7 +129,7 @@ def _components(model: CompiledModel, values: dict[str, float], ip: int
             values[f"phases.{ip}.gauss_strain"])))
         gam_l.append(np.asarray(lorentzian_fwhm(
             theta, values["instrument.profile.x"] + values[f"phases.{ip}.lor_size"],
-            values["instrument.profile.y"] + values[f"phases.{ip}.lor_strain"], aniso)))
+            values["instrument.profile.y"] + iso, aniso)))
         tan_theta.append(np.tan(np.radians(theta)))
     return d, np.array(gam_g), np.array(gam_l), np.array(tan_theta), strain_total
 
