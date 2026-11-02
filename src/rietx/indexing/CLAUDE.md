@@ -106,12 +106,11 @@ template. On real data with no measured shift, `high` is *unreachable* by design
   **after** the ranked list, never in the Borda ranking (IIA — what makes "a
   wrong prior changes no rank" structural); absent from `engines_run`, so the
   agreement caveat grades it with no new vocabulary. **A prior corroborates
-  but does not confirm**: every count of engines behind a lattice is
-  `engines._engines_behind` (or `agreement`/`corroborated` over it), prior
-  excluded, never `len(found_by)` — the ranking key and `grade`'s floor both
-  read it, and counted, a prior lifted its own lattice above the truth (WP-2079,
-  #1308). A superset test against `engines_run` needs no exclusion. svd's
-  seeded start counts as svd's own finding (1045's rule one; WP-2079).
+  but does not confirm**: an engine count is `engines._engines_behind` (or
+  `agreement`/`corroborated`), prior excluded, never `len(found_by)` — the
+  ranking key and `grade`'s floor both read it; counted, a prior outgraded the
+  truth (WP-2079, #1308). A superset test against `engines_run` needs no
+  exclusion; svd's seeded start is svd's own finding (1045 rule one).
   Traps met: `PRIOR_DRIFT_MAX`, `same_lattice`-never-cell-tuples (WP-1045).
 
 ## Engines and the FoM panel
