@@ -1,9 +1,9 @@
 # WP-1468 — what the polyhedra still miss, and the controls a chemist would reach for
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — the two figure controls landed (PR #1342); the dark-theme C colour waits on the maintainer's ruling, its swap built and left off
+Milestone: unscheduled · Status: 🔄 2026-11-02 — the two figure controls and the dark-theme C colour landed (PR #1342); left are cluster polyhedra on request and the Inherited readings from WP-1504 and #1057
 Track: Render what the fit already knows
 Depends on: 1466
-Priority: P3 2026-10-23 — was P4: 1504's close forwarded WP-1957's readings, and one misleads (all three reviewers read `DIM_BOUNDARY`'s shade as a second species); also left is WP-1533's C colour, waiting on a ruling
+Priority: P3 2026-10-23 — was P4: 1504's close forwarded WP-1957's readings, and one misleads (all three reviewers read `DIM_BOUNDARY`'s shade as a second species), waiting on a ruling
 
 ## Goal
 
@@ -203,7 +203,7 @@ Independent; take any.
 - [x] One authority for "bonded" on the server and one for "drawn" on the client (2026-09-28: `structure3d.bonded`, `drawnWith` and its twin `drawn_with`)
 - [x] A source for the Te, At, Kr and Xe electronegativities (2026-10-03: three handbooks agree, read second-hand, Context; the `ELECTRONEGATIVITY` comment says so)
 - [x] An ellipsoid figure from a CIF read with defaults says it drew spheres (#1056; 2026-11-01: `CIF_ANISO_COLLAPSED` info from the reader counts the collapsed sites, `FigureReport.warnings` counts the sites an ellipsoid figure drew as spheres, one skill sentence. #1057, the two figure controls, stays open)
-- [ ] A theme-dependent C colour (from WP-1533): C's `#383838` reads at 1.56:1 on the dark `#151515`, as H's `#d8d8d8` does at 1.38:1 on the light `#fbfbfa`; a plain 3:1 rule would repaint 11 of 20 CPK colours on light. It changes the dark default picture, so re-run `measure.py` and name the rows that moved. Until then the skill tells an agent to recolour C on a dark background (2026-11-02: the swap is built in `render_structure` and left empty, `structure3d.DARK_GROUND`; **Decision (maintainer), asked 2026-11-02**: whether the default dark picture draws C at `#666666`, handover entry)
+- [x] A theme-dependent C colour (from WP-1533): C's `#383838` reads at 1.56:1 on the dark `#151515`, as H's `#d8d8d8` does at 1.38:1 on the light `#fbfbfa`; a plain 3:1 rule would repaint 11 of 20 CPK colours on light. It changes the dark default picture, so re-run `measure.py` and name the rows that moved. Until then the skill tells an agent to recolour C on a dark background (2026-11-02: **ruled by the maintainer 2026-11-02, in chat**: C draws `#666666` on a dark ground and keeps `#383838` on a light one. `structure3d.DARK_GROUND`, in `render_structure` and the GUI's dark theme. `measure.py` reads no colour, so no row moved)
 - [x] Two figure controls the promo scripts did by hand (from WP-1533): `fig.image` cropped to its ink, and a polyhedron colour on the figure, where all six take-2 scripts read `g["sites"]` instead (2026-11-02: `render_structure(pad=0)` and `StructureFigure.polyhedron_palette`)
 
 ## Acceptance
@@ -231,6 +231,46 @@ npm --prefix gui test && npm --prefix gui run check
 - Allred, A. L. (1961). *J. Inorg. Nucl. Chem.* 17, 215.
 
 ## Handover log
+
+### 2026-11-02 (2nd session) — carbon is lighter on a dark ground, as the maintainer ruled
+
+**On a dark screen, carbon is now visible.** The maintainer ruled on the
+question the first entry below put: carbon draws `#666666` on a dark ground and
+keeps `#383838` on a light one (option 2). It was ruled 2026-11-02, in chat, by
+the maintainer: "666666 looks better on dark". Shown the light pair, the
+maintainer said the two pictures "look 100% identical", which is the point of
+the dark-only change. The change reaches the GUI's dark theme, a
+`render_structure` call on a dark background, and the notebook's dark copy. The
+maintainer also approved the PR's reader output for merge. PR #1342.
+
+*Done.*
+- `structure3d.DARK_GROUND = {"C": "#666666"}` and `dark_ground_colours(sites)`,
+  the one authority for which sites take it: a site still in its CPK colour,
+  never one `recolour` marked, never a colour within `MIN_SEPARATION` of another
+  in the phase. `build` writes its answer into the payload as each site's
+  `dark_color`. `render_structure` asks again of the dict it is handed, so an
+  edited colour is judged as it stands. `recolour` drops a copied `dark_color`.
+- GUI: `Site.dark_color`, `onDarkGround` in `lib/structure3d.ts`, and
+  `Structure3D.svelte` draws the scene, the species legend and the polyhedron
+  swatches from that one geometry on the dark theme. Dist rebuilt. The scene
+  corpus rewrote itself for the new field.
+- Manual (`reference/figures.md`), the skill's sentence, which had told an agent
+  to recolour C on a dark ground, and both skill copies. One pytest rewritten
+  (`test_carbon_is_lighter_on_a_dark_ground_only`) and one vitest added.
+
+*Measured* (`[dev]` venv, darwin/arm64, node v24.22.1). The touched files (14,
+render, structure3d, gui server, dist, figure cut and boundary, the four skill
+suites, docs consistency, manual api, gui manual, gui palette): 789 passed,
+1 skipped. vitest 592 passed over 24 files, svelte-check 392 files with 0
+errors. ruff clean. `python -m tests.reader_output`: exit 0, unchanged, because
+its standard fit prints no figure. No committed figure or screenshot moved:
+`make_figures.py` draws no structure, and `make_screenshots.py` photographs the
+FAP example, which has no carbon. `measure.py` reads shells, never colours. The
+GUI was not driven in a browser. The vitest asserts the scene and the legend
+colours from `onDarkGround`.
+
+*Next.* #1057's controls, or the Inherited readings from WP-1504. Cluster
+polyhedra wait for a request.
 
 - **2026-11-02** — **A structure figure can now be cropped to its ink, and it says
   what colour each polyhedron was drawn in.** All six scripts of the second promo
@@ -284,6 +324,7 @@ npm --prefix gui test && npm --prefix gui run check
   is empty.
 
   *Decision (maintainer): should the default dark picture draw carbon lighter?*
+  Ruled the same day: option 2 (the second-session entry above).
   Trigger: it changes the default picture on the main user surface, a value
   judgement about the CPK convention ("carbon black"), and WP-1533 sent it here as
   such. **Why it matters.** C is `#383838`, a near-black grey. On the GUI's dark
