@@ -788,13 +788,14 @@ RAMP_RUN_GRID = np.arange(15.0, 60.0 + 1e-9, 0.02)
 #: (WP-1420), so 300 s keeps the margin over the runaway's 13+ minutes.
 RAMP_RUNAWAY_GUARD_S = 300.0
 
-#: iterations the same 13 patterns took on ``main`` **with** the ±2.5 % cell
-#: bounds the agent added after the fact — the bounded baseline this replaces.
+#: residual evaluations (``SeriesEntry.n_iterations``' unit, #538) the same 13
+#: patterns took on ``main`` **with** the ±2.5 % cell bounds the agent added
+#: after the fact — the bounded baseline this replaces.
 #: Measured 2026-08-27 at 1638; re-measured on this tree's machine at 1342
 #: bounded and 2164 unbounded, which is the honest comparison (the same chain,
 #: the same commit, one flag apart).  The assertion is against the *unbounded*
 #: number, because the point is that no bound is needed.
-RAMP_MAIN_UNBOUNDED_ITERATIONS = 2164
+RAMP_MAIN_UNBOUNDED_EVALUATIONS = 2164
 
 
 @pytest.mark.slow
@@ -809,8 +810,8 @@ def test_the_ramp_reproduction_no_longer_runs_away():
     every pattern reports.
 
     Three properties, none of them an Rwp comparison: the chain finishes inside
-    a runaway guard, it costs fewer iterations than the unbounded baseline, and
-    no pattern reports a CaF₂ cell at all.
+    a runaway guard, it costs fewer residual evaluations than the unbounded
+    baseline, and no pattern reports a CaF₂ cell at all.
     """
     import time
 
@@ -830,8 +831,8 @@ def test_the_ramp_reproduction_no_longer_runs_away():
     elapsed = time.perf_counter() - started
 
     assert elapsed < RAMP_RUNAWAY_GUARD_S, f"{elapsed:.1f}s"
-    iterations = sum(e.n_iterations for e in series.entries)
-    assert iterations < RAMP_MAIN_UNBOUNDED_ITERATIONS, iterations
+    evaluations = sum(e.n_iterations for e in series.entries)
+    assert evaluations < RAMP_MAIN_UNBOUNDED_EVALUATIONS, evaluations
     for entry in series.entries:
         paths = {p.path for p in entry.parameters}
         assert "phases.1.cell.a" not in paths, entry.label

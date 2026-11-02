@@ -104,12 +104,13 @@ durations taken from rietx's own event log:
 **3.9 % of stages consume 46.6 % of stage time.** A `max_nfev` stage costs
 **72×** the median `ftol` stage and returns a **median cost reduction of
 1.23 %** for it. p90 is 92 %, so a minority genuinely rescue a fit — the
-median one does not. They run a median of **201 iterations against 34**, and
-concentrate in `warm_refit` (153) and `biso` (74); the worst individual
-stages are `biso` at 15.98 s / 400 iterations and `phase_strain` at 8.51 s /
-400, both `max_nfev`.
+median one does not. They run a median of **201 residual evaluations against
+34**, and concentrate in `warm_refit` (153) and `biso` (74); the worst
+individual stages are `biso` at 15.98 s / 400 evaluations and `phase_strain`
+at 8.51 s / 400, both `max_nfev`. (#222 wrote "iterations"; the log's
+`n_iterations` is an evaluation count, #538, so every count here is one.)
 
-The ask is a per-stage rule of the shape *"if a stage exhausts its iteration
+The ask is a per-stage rule of the shape *"if a stage exhausts its evaluation
 budget while improving cost by less than ε, stop rather than escalate"* —
 **reported, not silent**. Everything it needs is already emitted.
 
@@ -150,12 +151,12 @@ correlations point at reflection count (r = +0.398); stratifying into 12
 | peak width | −0.147 | −0.486 … +0.190 | **no** |
 | min phase fraction | +0.258 | −0.439 … +0.773 | **no** |
 | n reflections | +0.052 | −0.573 … +0.636 | **no** |
-| **n iterations** | **+0.859** | +0.142 … +0.961 | **yes** |
+| **n evaluations** | **+0.859** | +0.142 … +0.961 | **yes** |
 
-Cost tracks **iteration count** at a per-iteration price linear in pattern
-size: `s/iter = 4.4 µs × n_points + 2.9 ms`, r(n_points, s/iter) = **+0.972**.
-Broadening moves neither the number of steps nor the price of one. So the
-lever this WP pulls (fewer iterations) is the only one measured to work.
+Cost tracks **evaluation count** at a per-evaluation price linear in pattern
+size: `s/eval = 4.4 µs × n_points + 2.9 ms`, r(n_points, s/eval) = **+0.972**.
+Broadening moves neither the number of evaluations nor the price of one. So the
+lever this WP pulls (fewer evaluations) is the only one measured to work.
 
 One result belongs in the record: the one
 repeatable phase-fraction signal has the **opposite** sign to the naive
@@ -173,10 +174,25 @@ pattern, so a rule that stops a stage going nowhere is what bounds the cost;
 it must not be read as making the plan right. **The rule is a judgement, not
 a threshold to invent.** Root CLAUDE.md's rule stands: a wall-clock budget in a test is a runaway guard, never a timer.
 Here the budget is in the *library*, so the criterion must be stated in the
-quantity the solver owns (relative cost decrease over the last k iterations),
+quantity the solver owns (relative cost decrease over the last k evaluations),
 never in seconds, and its default must be justified against the p90 = 92 %
 tail — the point of the rule is to stop the median case without abandoning the
 minority that rescues a fit.
+
+**The rule in the unit the field holds** (#538, decided 2026-09-30). Every
+count in the rule is residual evaluations. `StageResult.n_iterations` is
+scipy's `nfev` on both drivers, the start included, and a stage's budget is
+`Stage.max_iter × NFEV_PER_ITERATION` evaluations (4 per iteration, WP-1937),
+so a default 100-iteration stage stops at 400. The rule therefore reads: a
+stage whose `n_iterations` reaches `max_iter × NFEV_PER_ITERATION` and whose
+relative cost decrease is below ε stops rather than escalating, and says so.
+#222's 1.23 % median and 92 % p90 are whole-stage decreases,
+(`cost_initial` − `cost_final`) / `cost_initial`, over stages that spent that
+budget, so ε is placed against that distribution. A trailing window, if the
+rule uses one, is k evaluations and never k solver steps: one LM step costs
+one or more evaluations, so a window counted in steps would not match the
+budget it is cut from. Which of the two forms the rule takes, and ε, are the
+stop-rule task's.
 
 ## Non-goals
 
@@ -189,8 +205,8 @@ minority that rescues a fit.
 
 ## Tasks
 
-- [ ] #538: `n_iterations` documented as evaluations, `_stage_lines` prints "N ev", the ε / p90 rule stated in that unit (decided 2026-09-30)
-- [ ] `StageResult.rwp` — the number `stage_end` already emits, on the object
+- [x] #538: `n_iterations` documented as evaluations, `_stage_lines` prints "N ev", the ε / p90 rule stated in that unit (decided 2026-09-30). The first two landed in WP-1937 (`614f24a8`, which prints "N evals"); the rule is § Context's "The rule in the unit the field holds"; `RAMP_MAIN_UNBOUNDED_ITERATIONS` is now `RAMP_MAIN_UNBOUNDED_EVALUATIONS`.
+- [x] `StageResult.rwp` — the number `stage_end` already emits, on the object
       that was standing next to it. Name its writer at review (WP-1076: a
       declared field with no writer fails no test).
 - [ ] The finer termination reason on `StageResult`, or a written statement
