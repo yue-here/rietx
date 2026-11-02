@@ -124,13 +124,19 @@ def trial_hkl(max_index: int, centring: str = "P") -> np.ndarray:
     the engines' trial set and — through :func:`~rietx.indexing.fom.predicted_lines`
     — the figures of merit's denominator population, and it is evaluated once per
     candidate cell in a ranking loop.
+
+    The half is built directly rather than cut from the whole box, in the order
+    the cut left it: 00l (l > 0), then 0kl (k > 0), then hkl (h > 0), each
+    lexicographic.  Rows tie in Q and position breaks the tie downstream, so
+    the order is part of the answer (WP-1509).  Building half the box measured
+    5× cheaper than cutting it, byte for byte the same rows (WP-2063).
     """
-    rng = np.arange(-int(max_index), int(max_index) + 1)
-    h, k, ll = np.meshgrid(rng, rng, rng, indexing="ij")
-    hkl = np.column_stack([h.ravel(), k.ravel(), ll.ravel()]).astype(np.int64)
-    hkl = hkl[~np.all(hkl == 0, axis=1)]
-    lead = hkl[np.arange(len(hkl)), np.argmax(hkl != 0, axis=1)]
-    hkl = hkl[lead > 0]
+    n = int(max_index)
+    full, pos, zero = np.arange(-n, n + 1), np.arange(1, n + 1), np.zeros(1, dtype=int)
+    blocks = [np.meshgrid(*axes, indexing="ij")
+              for axes in ((zero, zero, pos), (zero, pos, full), (pos, full, full))]
+    hkl = np.concatenate([np.column_stack([g.ravel() for g in grid])
+                          for grid in blocks]).astype(np.int64)
     return hkl[centring_allows(hkl, centring)]
 
 

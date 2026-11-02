@@ -51,6 +51,7 @@ is also what makes the Levenberg-Marquardt λ of :mod:`.lm` dimensionless.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -312,7 +313,9 @@ def _cauchy_point(H: np.ndarray, g: np.ndarray, lo: np.ndarray,
 
 
 def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
-                 budget: int | None = None) -> tuple[np.ndarray, np.ndarray]:
+                 budget: int | None = None,
+                 check: Callable[[], None] | None = None
+                 ) -> tuple[np.ndarray, np.ndarray]:
     """Minimise ``½yᵀHy − gᵀy`` over ``lo ≤ y ≤ hi`` by projected conjugate
     gradients, the step :mod:`.lm` takes above its BVLS cut (WP-1953).
 
@@ -373,6 +376,13 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
     monoclinic C test candidate (944 columns) went from Rwp 0.07715 to
     0.07755 that way.  The measurement is :func:`.lm._solve_step`'s.
 
+    **``check`` is called before every factorisation attempt and every CG
+    product**, on the sparse and the dense path, and abandons the step by
+    raising.  One step can be long: on a Pawley
+    candidate with 4552 reflections it refactorised 1099 times in 27 s, and
+    a cancel read only between residual evaluations landed 20 s late
+    (WP-2063, issue #1231).  The call changes no arithmetic.
+
     Returns the step and which bound each variable was fixed on (−1 lower,
     +1 upper, 0 neither), the convention :func:`.lm._solve_step` lands
     variables exactly on.
@@ -387,6 +397,8 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
     # where it failed, and the direction is then r)
     factored, ilu = None, None
     while spent < budget:
+        if check is not None:
+            check()
         grad = H @ y - g
         spent += 1
         r = np.where(fixed, 0.0, -grad)
@@ -400,10 +412,11 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
         free = ~fixed
         if _PRECONDITION_DENSE or sparse.issparse(H):
             if factored is None or not np.array_equal(free, factored):
-                factored, ilu = free, _factor(H, free)
+                factored, ilu = free, _factor(H, free, check)
         if isinstance(ilu, _Cholesky):
             # the face's Newton step, then a projected search along it
-            w, used, stalled = _face_cg(H, r, rr, ilu, free, floor, budget - spent)
+            w, used, stalled = _face_cg(H, r, rr, ilu, free, floor, budget - spent,
+                                        check)
             spent += used
             if not np.any(w):
                 break
@@ -418,6 +431,8 @@ def projected_cg(H, g: np.ndarray, lo: np.ndarray, hi: np.ndarray, *,
         p = z
         stalled = False
         while spent < budget:
+            if check is not None:
+                check()
             q = H @ p
             spent += 1
             pq = float(p @ q)
@@ -473,7 +488,8 @@ _CHOLESKY_SHIFTS = 40
 
 
 def _face_cg(H, r: np.ndarray, rr: float, ilu, free: np.ndarray, floor: float,
-             budget: int) -> tuple[np.ndarray, int, bool]:
+             budget: int, check: Callable[[], None] | None = None
+             ) -> tuple[np.ndarray, int, bool]:
     """Preconditioned CG on the free face from w = 0, ignoring the bounds: the
     direction of Lin & Moré's subspace step.  It runs until the face's
     residual falls to ``floor``, ``budget`` products are spent, or H is flat
@@ -485,6 +501,8 @@ def _face_cg(H, r: np.ndarray, rr: float, ilu, free: np.ndarray, floor: float,
     p = z
     spent = 0
     while spent < budget:
+        if check is not None:
+            check()
         q = H @ p
         spent += 1
         pq = float(p @ q)
@@ -547,7 +565,7 @@ class _Cholesky:
         return cho_solve(self.factor, r, check_finite=False)
 
 
-def _factor(H, free: np.ndarray):
+def _factor(H, free: np.ndarray, check: Callable[[], None] | None = None):
     """The preconditioner on H's free block, or ``None`` where it fails: a
     sparse H's incomplete LU at scipy's defaults (an exactly singular pivot
     fails it), a dense H's Cholesky factor.  A dense block that is not
@@ -568,6 +586,8 @@ def _factor(H, free: np.ndarray):
     on_diag = np.diag_indices_from(block)
     alpha = 0.0
     for _ in range(_CHOLESKY_SHIFTS):
+        if check is not None:
+            check()
         # one working copy an attempt, factored in place: a failed attempt
         # leaves it partly overwritten, so the next starts from block again
         work = block.copy()
