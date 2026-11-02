@@ -1,6 +1,6 @@
 # WP-2019 — each fast leg runs what only it can see, and the tail is cut again
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — three shards read: median slowest fast job 18.2 min against 15; counts hold
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here (ghostshift runner: record refresh and a per-leg record)
 Track: The repo's own process
 Depends on: —
 Priority: P2 2026-10-23 — was P3: three of the five latest main runs have a slowest fast job over 20 min on the refreshed shard record; the wait 1547 was P2 for is back
