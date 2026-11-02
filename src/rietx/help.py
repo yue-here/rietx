@@ -1734,6 +1734,18 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "check the cell transform before you compare it with a published symbol."
         ),
     ),
+    "CIF_ANISO_COLLAPSED": HelpEntry(
+        title="Anisotropic displacement read as isotropic",
+        description=(
+            "The file carries anisotropic displacement parameters (`U^ij`) for some "
+            "sites, and the reader keeps only each site's equivalent isotropic value "
+            "unless asked, because reading a file must not change which parameters a "
+            "refinement plan frees. The message counts the sites. Nothing is wrong "
+            "for a refinement of the isotropic model. An ellipsoid figure of the "
+            "structure draws these sites as spheres. Read the file again with "
+            "aniso=True to keep the tensors."
+        ),
+    ),
     "CIF_CELL_ANGLE_CORRECTED": HelpEntry(
         title="Lattice angle set to its symmetry value",
         description=(
