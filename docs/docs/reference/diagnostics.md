@@ -14,6 +14,7 @@ The codes are filed by the part of the package that raises them:
 - [Corrections](diagnostics-corrections.md): absorption, roughness, extinction, dispersion, harmonics, texture and declared peaks.
 - [Series and joint fits](diagnostics-series.md): a chain of fits, or one fit over several patterns.
 - [Background selection](diagnostics-background.md): the scans that choose a background's flexibility.
+- [Time-of-flight banks](diagnostics-tof.md): what a fit on a neutron time-of-flight bank applied, and the checks that did not run on one.
 - [Peaks and indexing](diagnostics-indexing.md): peak picking, the indexing search and the extinction screen.
 - [Reading files](diagnostics-files.md): patterns, instrument files and recipes.
 - [Other programs' projects](diagnostics-projects.md): GSAS-II, GSAS, FullProf and TOPAS files.
@@ -27,6 +28,7 @@ diagnostics-stages
 diagnostics-corrections
 diagnostics-series
 diagnostics-background
+diagnostics-tof
 diagnostics-indexing
 diagnostics-files
 diagnostics-projects
