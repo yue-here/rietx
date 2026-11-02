@@ -1060,6 +1060,13 @@ def structure_from_cif(path: str | os.PathLike[str], *, phase_name: str | None =
                 {a.label: (j, a) for j, a in enumerate(atoms)}, cell6,
                 assumed_ions=assumed_ions, assumed_g=assumed_g))
 
+    if aniso:
+        # after the last site is merged, dropped or snapped: the stabiliser
+        # that sets the allowed tensors is the final position's
+        projected = _project_printed_adps(sg, atoms, _aniso_statements(source))
+        if projected and diagnostics is not None:
+            diagnostics.append(_adp_projected_diagnostic(path, projected))
+
     if diagnostics is not None:
         # after the last site is merged or dropped, so every path below names
         # the site it is about
@@ -1231,6 +1238,186 @@ def _within_printed_rounding(position, printed) -> bool:
         if abs(diff) > half:
             return False
     return True
+
+
+def _aniso_statements(block) -> dict[str, tuple[Decimal, ...]]:
+    """Each aniso row's six U^ij as the file prints them, esd dropped.
+
+    Keyed by ``_atom_site_aniso_label`` in (U11, U22, U33, U12, U13, U23)
+    order; a row with any component null or not a plain decimal is left out,
+    since its precision is not a box on the six components.  Only the U form
+    is read: gemmi carries no ``_atom_site_aniso_B_ij`` tensor onto a site, so
+    a B loop never reaches :func:`_project_printed_adps`.
+    """
+    table = block.find("_atom_site_aniso_", [
+        "label", "U_11", "U_22", "U_33", "U_12", "U_13", "U_23"])
+    out: dict[str, tuple[Decimal, ...]] = {}
+    for row in table:
+        printed = tuple(
+            None if gemmi.cif.is_null(row[k])
+            else _printed_decimal(gemmi.cif.as_string(row[k]))
+            for k in range(1, 7))
+        if None not in printed:
+            out.setdefault(gemmi.cif.as_string(row[0]), printed)
+    return out
+
+
+def _adp_within_print(basis: np.ndarray, u: np.ndarray,
+                      printed: tuple[Decimal, ...]) -> np.ndarray | None:
+    """The allowed tensor nearest the printed one inside the file's rounding.
+
+    Each component printed to d decimals stands for any value within
+    :data:`CIF_PRINTED_ROUNDING` of its last digit, so the tensor the file
+    rounded lies in that box around the print.  Returns the point of the
+    allowed subspace (rows of ``basis``) nearest the print in the box's own
+    units, a Chebyshev fit solved as a linear programme like
+    :func:`~rietx.crystallography.magcif.moment_within_print`, or ``None``
+    where no allowed tensor lies inside the box.
+
+    A component printed as a whole number (the ``0`` many writers give a
+    component the symmetry zeroes) is held **exact** rather than read as
+    ±0.5 Å²: rounding a displacement to a whole Å² is no precision any
+    crystal's U^ij is quoted at, so such a token is the writer's exact value.
+    That keeps the hexagonal writer's error, U12 written ``0`` where the site
+    needs U12 = U11/2, a refusal rather than a repair.
+    """
+    b = np.asarray(basis, dtype=np.float64)
+    half = np.array([float(Decimal(repr(CIF_PRINTED_ROUNDING))
+                           .scaleb(token.as_tuple().exponent))
+                     if token.as_tuple().exponent < 0 else 0.0
+                     for token in printed])
+    return nearest_allowed_within_print(b.T, u, half)
+
+
+def nearest_allowed_within_print(span: np.ndarray, value: np.ndarray,
+                                 half: np.ndarray, *, cap: float = math.inf,
+                                 ) -> np.ndarray | None:
+    """The point ``span @ c`` nearest ``value`` inside the box ``±half``, or ``None``.
+
+    ``value`` is a printed quantity a symmetry confines to the column span of
+    ``span`` (n × k), and ``half`` the half-width of each component's rounding;
+    a zero half-width holds that component exact, and ``cap`` bounds every
+    component's move absolutely without changing the units the box is measured
+    in (``magcif.moment_within_print``'s bare ``0``).  Two linear programmes.  The
+    first finds the smallest box, in the box's own units, that reaches the
+    span (a Chebyshev fit); past 1 no allowed point is inside the print and
+    the answer is ``None``.  The second keeps that box and minimises the summed
+    moves, which is what leaves a component the symmetry does not tie to the
+    others exactly as printed: a Chebyshev fit alone is degenerate there, and
+    the solver's vertex moved ZnO's free U33 by a third of its rounding for
+    nothing (WP-2016).
+    """
+    from scipy.optimize import linprog
+
+    a = np.asarray(span, dtype=np.float64)
+    v = np.asarray(value, dtype=np.float64)
+    n, k = a.shape
+    boxed, exact = half > 0.0, half == 0.0
+    if not boxed.any():
+        return None
+    eq = {"A_eq": None, "b_eq": None}
+    m = int(boxed.sum())
+    # stage 1: minimise t subject to |(Ac − v)_i| <= t·half_i, exact rows equal
+    if exact.any():
+        eq = {"A_eq": np.hstack([a[exact], np.zeros((int(exact.sum()), 1))]),
+              "b_eq": v[exact]}
+    h = half[boxed, None]
+    capped = math.isfinite(cap)
+
+    def cap_rows(width):
+        if not capped:
+            return np.zeros((0, k + width)), np.zeros(0)
+        pad = np.zeros((n, width))
+        return (np.vstack([np.hstack([a, pad]), np.hstack([-a, pad])]),
+                np.r_[v + cap, cap - v])
+
+    rows, rhs = cap_rows(1)
+    fit = linprog(np.r_[np.zeros(k), 1.0],
+                  A_ub=np.vstack([np.hstack([a[boxed], -h]),
+                                  np.hstack([-a[boxed], -h]), rows]),
+                  b_ub=np.r_[v[boxed], -v[boxed], rhs], **eq,
+                  bounds=[(None, None)] * k + [(0.0, None)], method="highs")
+    if not fit.success or fit.x[-1] > 1.0 + 1e-9:
+        return None
+    t = float(fit.x[-1])
+    first = fit.x[:k]
+    # stage 2: inside that box, minimise Σ s_i with |(Ac − v)_i| <= s_i·half_i
+    if exact.any():
+        eq = {"A_eq": np.hstack([a[exact], np.zeros((int(exact.sum()), m))]),
+              "b_eq": v[exact]}
+    d = np.diag(half[boxed])
+    rows, rhs = cap_rows(m)
+    fit = linprog(np.r_[np.zeros(k), np.ones(m)],
+                  A_ub=np.vstack([np.hstack([a[boxed], -d]),
+                                  np.hstack([-a[boxed], -d]), rows]),
+                  b_ub=np.r_[v[boxed], -v[boxed], rhs], **eq,
+                  bounds=[(None, None)] * k + [(0.0, t)] * m, method="highs")
+    # the second box is the first's own optimum, so a solver that calls it
+    # infeasible by its tolerance keeps the Chebyshev point
+    target = a @ (fit.x[:k] if fit.success else first)
+    target[exact] = v[exact]          # the equality's own value, bit for bit
+    unmoved = np.abs(target - v) <= 1e-12 * np.maximum(np.abs(v), 1e-300)
+    target[unmoved] = v[unmoved]      # a component left alone keeps its print
+    return target
+
+
+def _project_printed_adps(sg, atoms: list[Atom],
+                          printed: dict[str, tuple[Decimal, ...]],
+                          ) -> list[tuple[int, str, list[str], float]]:
+    """Put a printed U^ij on its site's allowed subspace where the print admits it.
+
+    ``ParameterTable`` refuses a tensor off the subspace
+    (:func:`~rietx.crystallography.wyckoff.adp_projection`), and rightly, since
+    it has no channel to say it moved one.  But a file printing U11 = 0.0123
+    and U12 = 0.0062 on ZnO's 3m site, which needs U12 = U11/2, is that
+    relation rounded to four decimals, not a contradiction of it (WP-2016).
+    So a tensor with an allowed point inside the box of its own rounding
+    (:func:`_adp_within_print`) is stored at that point, in place; one without
+    is left as printed, for the table to refuse.  Returns
+    ``(index, label, components moved, largest move in Å²)`` per site moved.
+    """
+    from .adp import U_NAMES
+    from .wyckoff import adp_basis, adp_projection, stabilizer_rotations
+
+    moved: list[tuple[int, str, list[str], float]] = []
+    for j, atom in enumerate(atoms):
+        if atom.aniso is None or atom.label not in printed:
+            continue
+        u = np.array(atom.aniso.values(), dtype=np.float64)
+        try:
+            basis = adp_basis(stabilizer_rotations(
+                sg, (atom.x.value, atom.y.value, atom.z.value)))
+        except ValueError:
+            continue                      # the table names an unbuildable orbit
+        if adp_projection(basis, u)[2]:
+            continue
+        target = _adp_within_print(basis, u, printed[atom.label])
+        if target is None:
+            continue
+        names = [n for n, a, t in zip(U_NAMES, u, target, strict=True) if a != t]
+        atoms[j] = atom.model_copy(update={"aniso": atom.aniso.model_copy(update={
+            n: getattr(atom.aniso, n).model_copy(update={"value": float(t)})
+            for n, t in zip(U_NAMES, target, strict=True)})})
+        moved.append((j, atom.label, names, float(np.max(np.abs(target - u)))))
+    return moved
+
+
+def _adp_projected_diagnostic(path: str, moved: list[tuple[int, str, list[str], float]]
+                              ) -> Diagnostic:
+    named = ", ".join(f"{label} ({', '.join(n.upper() for n in names)})"
+                      for _, label, names, _ in moved[:4])
+    if len(moved) > 4:
+        named += f", and {len(moved) - 4} more"
+    largest = max(shift for *_, shift in moved)
+    return Diagnostic(
+        level="info", code="CIF_ADP_SYMMETRY_PROJECTED",
+        where=[f"phases.0.atoms.{j}.{n}" for j, _, names, _ in moved for n in names],
+        value=largest,
+        message=(f"{path}: {len(moved)} site(s) print U^ij that miss the form "
+                 f"their site symmetry allows by no more than the file's own "
+                 f"rounding, and were read on it: {named}. The largest "
+                 f"component moved {largest:.2g} A^2, inside half a unit of its "
+                 f"last printed digit."))
 
 
 def _read_rounded_sites_on_position(sg, atoms: list[Atom], stated: dict[str, dict]) -> None:

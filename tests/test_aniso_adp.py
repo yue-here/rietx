@@ -565,3 +565,94 @@ def test_positive_definiteness_sign_is_representation_independent():
     # the physical tensor agrees with the cell-free test in both directions
     assert np.min(adp.principal_values(good, cell)) > 0
     assert np.min(adp.principal_values(bad, cell)) < 0
+
+
+# -- a printed tensor off its site symmetry by rounding (WP-2016) ------------
+
+#: ZnO (P6₃mc), both sites on 3m (2b): U11 = U22 = 2·U12, U13 = U23 = 0.  The
+#: Zn row is formatted in, so each test states the digits it is about.
+_ZNO = """data_ZnO
+_cell_length_a 3.2498
+_cell_length_b 3.2498
+_cell_length_c 5.2066
+_cell_angle_alpha 90
+_cell_angle_beta 90
+_cell_angle_gamma 120
+_symmetry_space_group_name_H-M 'P 63 m c'
+loop_
+_atom_site_label
+_atom_site_type_symbol
+_atom_site_fract_x
+_atom_site_fract_y
+_atom_site_fract_z
+_atom_site_U_iso_or_equiv
+Zn1 Zn 0.333333 0.666667 0.0 0.0120
+O1 O 0.333333 0.666667 0.3819 0.0110
+loop_
+_atom_site_aniso_label
+_atom_site_aniso_U_11
+_atom_site_aniso_U_22
+_atom_site_aniso_U_33
+_atom_site_aniso_U_12
+_atom_site_aniso_U_13
+_atom_site_aniso_U_23
+Zn1 {zn}
+O1 0.0110 0.0110 0.0101 0.0055 0 0
+"""
+
+
+def _read_zno(tmp_path, zn: str):
+    path = tmp_path / "zno.cif"
+    path.write_text(_ZNO.format(zn=zn), encoding="utf-8")
+    diagnostics: list = []
+    structure = structure_from_cif(path, aniso=True, diagnostics=diagnostics)
+    return structure, [d for d in diagnostics if d.code == "CIF_ADP_SYMMETRY_PROJECTED"]
+
+
+def test_a_tensor_off_its_site_symmetry_by_rounding_is_projected(tmp_path):
+    """U11 = 0.0123 and U12 = 0.0062 are U12 = U11/2 rounded to four decimals
+    (each ±5e-5).  The point of the allowed line nearest the print in those
+    units is where U11 and U12 move by the same fraction of their rounding:
+    2a − 0.0123 = 0.0062 − a, a = 0.0185/3.  U33 is tied to nothing and stays
+    as printed, and the table that refused the file now builds."""
+    structure, hits = _read_zno(tmp_path, "0.0123(2) 0.0123(2) 0.0108(3) 0.0062(1) 0 0")
+    zn = structure.phases[0].atoms[0].aniso.values()
+    a = 0.0185 / 3
+    assert zn == pytest.approx((2 * a, 2 * a, 0.0108, a, 0.0, 0.0), abs=1e-15)
+    assert zn[2] == 0.0108 and zn[4:] == (0.0, 0.0)
+    (hit,) = hits
+    assert hit.level == "info"
+    assert hit.where == ["phases.0.atoms.0.u11", "phases.0.atoms.0.u22",
+                         "phases.0.atoms.0.u12"]
+    assert hit.value == pytest.approx(2 * a - 0.0123, abs=1e-15)
+    assert "Zn1 (U11, U22, U12)" in hit.message
+    assert "3.3e-05 A^2" in hit.message
+    ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+
+
+def test_a_tensor_off_its_site_symmetry_past_its_print_is_still_refused(tmp_path):
+    """U12 = 0.0072 is ten units of the fourth decimal past U11/2: no allowed
+    tensor lies inside the print, so it is left as written, and the table's
+    refusal names the site, the component and the residual."""
+    structure, hits = _read_zno(tmp_path, "0.0123 0.0123 0.0108 0.0072 0 0")
+    assert hits == []
+    assert structure.phases[0].atoms[0].aniso.values()[3] == 0.0072
+    with pytest.raises(ValueError, match=r"'Zn1'.*not compatible with the site "
+                                         r"symmetry.*u12 furthest from it by 0\.000"):
+        ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+
+
+def test_a_whole_number_component_is_held_exact(tmp_path):
+    """U12 written ``0`` where the site needs U12 = U11/2 is the hexagonal
+    writer's error, not a rounding of 0.00615 to ±0.5 Å², and stays refused."""
+    structure, hits = _read_zno(tmp_path, "0.0123 0.0123 0.0108 0 0 0")
+    assert hits == []
+    with pytest.raises(ValueError, match="not compatible with the site symmetry"):
+        ParameterTable(structure, Instrument.debye_scherrer(wavelength=1.5406))
+
+
+def test_a_tensor_already_on_its_site_symmetry_is_read_silently(tmp_path):
+    structure, hits = _read_zno(tmp_path, "0.0124 0.0124 0.0108 0.0062 0 0")
+    assert hits == []
+    assert structure.phases[0].atoms[0].aniso.values() == (
+        0.0124, 0.0124, 0.0108, 0.0062, 0.0, 0.0)

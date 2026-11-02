@@ -57,6 +57,7 @@ from ..crystallography.symmetry import (
 )
 from ..crystallography.wyckoff import (
     adp_basis,
+    adp_projection,
     axial_basis,
     coordinate_basis,
     floating_origin_basis,
@@ -2091,15 +2092,16 @@ class ParameterTable:
         xyz = np.array([atom.x.value, atom.y.value, atom.z.value])
         basis = adp_basis(stabilizer_rotations(sg, xyz))  # (n_free, 6)
         u0 = np.array(atom.aniso.values(), dtype=np.float64)
-        coef, *_ = lapack.lstsq(basis.T.astype(np.float64), u0, rcond=None)
-        residual = basis.T @ coef - u0
-        scale = max(float(np.abs(u0).max()), 1e-6)
-        if float(np.abs(residual).max()) > 1e-6 * scale:
+        coef, nearest, compatible = adp_projection(basis, u0)
+        if not compatible:
+            worst = int(np.argmax(np.abs(nearest - u0)))
             raise ValueError(
-                f"{base}: the anisotropic tensor {u0.tolist()} is not "
-                f"compatible with the site symmetry, which allows only "
+                f"{base} ({atom.label!r}): the anisotropic tensor {u0.tolist()} "
+                f"is not compatible with the site symmetry, which allows only "
                 f"{basis.tolist()} in (U11, U22, U33, U12, U13, U23); the "
-                f"nearest allowed tensor is {(basis.T @ coef).tolist()}")
+                f"nearest allowed tensor is {nearest.tolist()}, "
+                f"{U_NAMES[worst]} furthest from it by "
+                f"{abs(float(nearest[worst] - u0[worst])):.3g} A^2")
         dof_paths = [f"{base}.adp.{k}" for k in range(len(basis))]
         want_vary = any(getattr(atom.aniso, n).vary for n in U_NAMES)
         for v, name in enumerate(U_NAMES):

@@ -236,6 +236,29 @@ def adp_basis(rotations: list[np.ndarray]) -> np.ndarray:
     return _nullspace_int(rows, 6)
 
 
+def adp_projection(basis: np.ndarray, u: np.ndarray
+                   ) -> tuple[np.ndarray, np.ndarray, bool]:
+    """A tensor's least-squares coefficients on :func:`adp_basis`, the nearest
+    allowed tensor, and whether the tensor already lies in the allowed subspace.
+
+    The one test of "this U^ij satisfies its site symmetry": the residual of
+    the projection within 1e-6 of the tensor's largest component (floored at
+    1e-6 Å²), which is float round-off on a tensor the algebra allows, never a
+    tolerance for one it does not.  ``ParameterTable`` refuses a tensor that
+    fails it, and the CIF reader asks it before deciding whether a printed
+    tensor needs moving (:func:`~rietx.crystallography.cif.structure_from_cif`),
+    so the two cannot disagree about which tensors are already exact.
+    """
+    from ..optimize import lapack
+
+    b = np.asarray(basis, dtype=np.float64)
+    u0 = np.asarray(u, dtype=np.float64)
+    coef, *_ = lapack.lstsq(b.T, u0, rcond=None)
+    nearest = b.T @ coef
+    scale = max(float(np.abs(u0).max()), 1e-6)
+    return coef, nearest, float(np.abs(nearest - u0).max()) <= 1e-6 * scale
+
+
 def _compatible_lattice(sg: gemmi.SpaceGroup) -> np.ndarray:
     """Row-vector lattice whose metric is invariant under the group.
 

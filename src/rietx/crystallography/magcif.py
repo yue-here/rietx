@@ -1455,16 +1455,16 @@ def moment_within_print(moment, row: dict[str, str], basis
     group disagree and the refusal stands.
 
     Returns ``(components, largest shift)`` for the point of the allowed
-    subspace nearest the printed moment in the box's own units (a Chebyshev
-    fit, solved exactly as a linear programme), or ``None`` where nothing is
+    subspace nearest the printed moment in the box's own units
+    (:func:`~rietx.crystallography.cif.nearest_allowed_within_print`, which
+    also leaves a component the symmetry does not tie to the others where the
+    file printed it), or ``None`` where nothing is
     to be moved — the moment already lies in the subspace, the row states no
     crystal-axis components (a spherical or Cartesian row's precision is not
     a box on these components), or no point of the subspace lies inside the
     box and the cap, which leaves the refusal to the phase's own check
     (:class:`~rietx.schemas.structure.Phase`, rule 2) exactly as before.
     """
-    from scipy.optimize import linprog
-
     from .magnetic.operators import in_span
 
     m = np.asarray(moment.values(), dtype=np.float64)
@@ -1485,22 +1485,13 @@ def moment_within_print(moment, row: dict[str, str], basis
         if float(np.max(np.abs(m))) > MOMENT_FORM_AGREEMENT_MU_B:
             return None
     else:
-        # minimise t subject to |(Bᵀc − m)_i| <= t·half_i and <= the cap
-        cap = MOMENT_FORM_AGREEMENT_MU_B
-        a_ub = np.vstack([np.hstack([b.T, -half[:, None]]),
-                          np.hstack([-b.T, -half[:, None]]),
-                          np.hstack([b.T, np.zeros((3, 1))]),
-                          np.hstack([-b.T, np.zeros((3, 1))])])
-        b_ub = np.concatenate([m, -m, m + cap, cap - m])
-        cost = np.zeros(k + 1)
-        cost[-1] = 1.0
-        fit = linprog(cost, A_ub=a_ub, b_ub=b_ub,
-                      bounds=[(None, None)] * k + [(0.0, None)],
-                      method="highs")
-        if not fit.success:
+        from .cif import nearest_allowed_within_print
+
+        target = nearest_allowed_within_print(
+            b.T, m, half, cap=MOMENT_FORM_AGREEMENT_MU_B)
+        if target is None:
             return None
-        target = b.T @ fit.x[:k]
-        ratio = float(fit.x[-1])
+        ratio = 0.0
     if ratio > 1.0 + 1e-9:
         return None
     return (tuple(float(v) for v in target),
