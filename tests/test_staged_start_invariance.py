@@ -26,6 +26,13 @@ intermediate tolerance.  Since WP-2045 the last declared stage converges as the
 closing stage does, and the tolerance row reads 0.000, 0.000, 0.000 and 8.82, zircon
 0.009 (2026-10-25, same machine and venv).  NAC is a synchrotron pattern and refines no axial ratio.
 
+LaB6's 8.82 in the tolerance row, and the same 8.82 in its axial-floor row on
+Linux, is one answer read under two labels.  The Finger-Cox-Jephcoat profile
+is symmetric in S/L and H/L, and rounding picks which way round an arm reports
+the pair.  Every comparison here orders the pair first (``_axial_pair_ordered``),
+after which both rows read 0.0068 plain esd or less at every one of 49 nudged
+start pairs (2026-11-02).
+
 The axial sizing floor (``forward.AXIAL_SIZING_FLOOR``) sizes the windows and
 FCJ nodes of a stage that frees S/L or H/L from zero.  At 0.02 a stage reaching
 0.05 leaves 0.27 of the peak maximum and drops 19.5 % of a peak's area.  The
@@ -44,9 +51,9 @@ keeps.  Fluorite's ``lor_strain`` (phases.2) reads 0.0088 from one start and 0.0
 other, at Rwp 0.1631 and 0.1634.  Before the hold the closing stage re-refined
 the split, and the Y floor settled it.  No shipped plan frees an instrument width
 with its specimen twin, so only a plan written this way meets it.  LaB6's
-intermediate tolerance is the floor removal's: without the Y floor its axial
-ratios reach the two mirrored minima, S/L and H/L exchanged (WP-2012), that
-its Biso start already reached, now 1.16 esd on ``u``.
+Biso starts reach two distinct minima that are nearly mirror images under the
+S/L and H/L exchange (WP-2012), 1.156 plain esd apart on ``u`` with the pair
+ordered.
 
 The harmonic weight seed is measured on a synthetic constant-wavelength neutron
 corundum with a known λ/2 line, the one family a harmonic has (the held-out
@@ -122,8 +129,32 @@ def _fit(family: str, *, biso: float | None = None, ftol="shipped", tag: str = "
     return _plotted(result, f"{family}_biso{biso}_ftol{ftol}{tag}")
 
 
+SL = "instrument.geometry.axial_sl"
+HL = "instrument.geometry.axial_hl"
+
+
+def _axial_pair_ordered(rows: dict) -> dict:
+    """The rows with the axial pair reported smaller first, each with its esd.
+
+    The Finger-Cox-Jephcoat profile is symmetric in S/L and H/L, so one answer
+    can come back with the two values either way round, and rounding picks
+    which (``test_seed_invariance._answer`` orders them for the same reason).
+    Measured on LaB6 at 1e-14 nudges of the w start (2026-11-02, macOS arm64,
+    ``[dev]``): each arm landed in either labelling, 3 or 4 starts of 7, at one
+    Rwp to seven digits.  Unordered, a crossed pair read 8.82 plain esd on
+    ``axial_sl``, which turned the axial-floor row red on five of the seven
+    Linux nightlies that ran it from 2026-10-24 to 11-01.  Ordered, it reads
+    0.0068, the same as an uncrossed pair.
+    """
+    if SL in rows and HL in rows and rows[SL][0] > rows[HL][0]:
+        rows = dict(rows)
+        rows[SL], rows[HL] = rows[HL], rows[SL]
+    return rows
+
+
 def _assert_within_bar(a: dict, b: dict, what: str):
-    worst, path = w._shift(a, b, background=False)
+    worst, path = w._shift(_axial_pair_ordered(a), _axial_pair_ordered(b),
+                           background=False)
     assert worst <= ESD_BAR, f"{what}: {worst:.3f} plain esd on {path} (bar {ESD_BAR})"
 
 
@@ -140,16 +171,10 @@ def test_the_biso_start_does_not_change_the_answer(family):
                        f"{family}, Biso 0.5 against 1.5")
 
 
-@pytest.mark.parametrize("family", [
-    "fap", "cpd1a", "nac",
-    # not strict: the two minima are an exact S/L <-> H/L swap at equal Rwp,
-    # and rounding picks each arm's.  Under 1e-14 start nudges on an arm64 Mac
-    # 23 of 49 arm pairs crossed (8.82 esd) and 26 agreed (7.4e-6), and Linux
-    # took an agreeing pair on deff4c301 (XPASS; WP-2036, 2026-10-25)
-    pytest.param("lab6", marks=pytest.mark.xfail(strict=False, reason=(
-        "without the Y floor LaB6's axial ratios reach the mirrored S/L and H/L "
-        "minima (WP-2012): 8.82 esd on axial_sl when the two arms take opposite "
-        "minima, which rounding picks (WP-2002, 2026-10-23; WP-2036)")))])
+# lab6 was a non-strict xfail here (WP-2036): its two arms took opposite
+# labellings of one S/L <-> H/L answer in 23 of 49 nudged pairs.  The pair is
+# compared ordered since 2026-11-02 (``_axial_pair_ordered``), and passes.
+@pytest.mark.parametrize("family", ["fap", "cpd1a", "nac", "lab6"])
 def test_the_intermediate_tolerance_does_not_change_the_answer(family):
     """``intermediate_ftol`` 1e-6 against every stage at the solver's 1e-9."""
     _assert_within_bar(_fit(family), _fit(family, ftol=None),

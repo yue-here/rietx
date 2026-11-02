@@ -246,6 +246,25 @@ and 2045 on 2026-10-25):
       cross-platform spread (`tests/CLAUDE.md` § Budgets in tests). The crawl
       behind it went to WP-1334's Inherited.*
 
+**Added 2026-11-02** (the ghostshift main-health runner), from the 2026-11-01
+nightly (run 41305369905, `f4db7763`): 3 failed, 14 146 passed, in 1:35:05.
+
+- [x] The Le Bail NaN raise, red again on 11-01. *Nothing to do: WP-2048's
+      PR #1292 merged at 16:12 UTC, four hours after that nightly started.*
+- [x] `test_the_axial_sizing_floor_does_not_change_the_answer[lab6]` at 8.820
+      plain esd, red on five of the seven Linux nightlies that ran it since
+      2026-10-24. *The two arms report one answer under swapped S/L and H/L
+      labels, which the Finger-Cox-Jephcoat profile cannot tell apart, so the
+      comparison now orders the pair first, as `test_seed_invariance._answer`
+      already did. Same fix for the intermediate-tolerance row, whose
+      non-strict xfail is removed. Both rows pass at all 49 nudged start
+      pairs.*
+- [ ] `test_magnetic_solve_acceptance.py::test_the_150k_pattern_has_nothing_to_solve`:
+      class 3's trial stopped on `max_iter` on Linux after
+      `SOLVE_MAX_CONTINUATIONS` (10) continuations.
+- [ ] The two cancelled nights (10-30, 10-31): read the job-time table and
+      decide the `full` job's `timeout-minutes`.
+
 ## Acceptance
 
 One `nightly.yml` run on `main` with all six jobs `success`, and the full suite green on
