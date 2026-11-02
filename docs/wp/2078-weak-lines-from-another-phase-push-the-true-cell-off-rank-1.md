@@ -222,5 +222,5 @@ position-only list returns the same candidates as on `main`.
   rule as default) is measured here as a rival rather than folded, because
   it waits on WP-1956 and this does not. WP-1039, which set the driven
   twenty, is closed. The reporter's numbers are quoted from the issue and
-  not reproduced; their data is private. *Next:* tasks 1 and 2, which need
-  no decision.
+  not reproduced; their data is private. Filed in PR #1315. *Next:* tasks 1
+  and 2, which need no decision.
