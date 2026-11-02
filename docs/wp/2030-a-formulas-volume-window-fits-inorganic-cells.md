@@ -1,6 +1,6 @@
 # WP-2030 — A formula's volume window fits inorganic cells, and a hydrate parses
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — part 1 merged from outside as PR #1123 (`a1ce786c`), its follow-ups as PR #1253 (`349ec37b`) and part 2 (the ceiling-only window) as PR #1237 (`4505cbaf`); the GUI formula field and the stale `duplicate_line` marks remain, and #1121 stays open for them
+Milestone: unscheduled · Status: 🔄 2026-11-02 — parts 1 and 2 merged from outside (PRs #1123, #1253, #1237); the stale `duplicate_line` marks are fixed on branch `wp2030-indexing-gui-finish`; the GUI formula field waits on the maintainer's choice of where the formula is stored (2026-11-02 entry), and #1121 stays open for it
 Track: Data and metadata in, a structure out
 Depends on: — (1510 soft, closed 2026-10-23: the window, the Z check and the review findings this carries)
 Priority: P2 2026-10-23 — a defect that fires wrongly: the skill sends an agent through `SearchSpec.from_formula` before its first search, and the window excludes the true cell of 7 of 8 inorganic solids measured (fluorapatite abstained where the unwindowed search ranked the truth first); indexing is a path few fits run
@@ -126,10 +126,6 @@ source. `VOLUME_RATIO_BOUNDS` (WP-2006's walk) and `Z_INTEGER_TOLERANCE` and
 `src/rietx/_audit.py`. A value changed here updates its row, and a name new
 to the table arrives tiered (CI's `tests/audit_delta.py`).
 
-### Inherited
-
-- 2026-10-26 issue triage: #1121 is the outside contributor's (mustachefeeling) claim on this WP; part 1 is in PR #1123. The issue thread holds the measured three-option table (ceiling only, Jenkins 1999 ion volumes, keep with a warning) against 21 known cells and the maintainer's 2026-10-24 reply rejecting Jenkins and the carbon-only floor. Checked against the tree at c0e32ab29: status ⬜, nothing merged.
-
 ## Non-goals
 
 - Replacing Hofmann's table for organic and metal-organic formulas, where the
@@ -162,15 +158,18 @@ to the table arrives tiered (CI's `tests/audit_delta.py`).
       three.
 - [ ] `formula` and `temperature` recorded on `IndexingResult`, with the
       writer named (root CLAUDE.md: a declared name is a claim). `formula`
-      reaches the CLI and the GUI's indexing call.
+      reaches the CLI and the GUI's indexing call. (The result fields and the
+      CLI landed in part 1; the GUI half waits on the maintainer's choice of
+      where the formula is stored, set out in the 2026-11-02 entry.)
 - [x] The instrument-first lead fires only on a lab source. Decide whether
       `PeakList` records its instrument so `index_pattern(peaks)` sees the
       lead. Test both.
 - [x] Supercell (superseded by #941, dropped from this PR; see item 6 of the 2026-10-23 entry): judge the parent's lines with the parent's own shift. Replay
       the captured searches and run the indexing acceptance. Then write or
       decline the supported-promotion rule in `src/rietx/indexing/CLAUDE.md`.
-- [ ] GUI: fix the stale `duplicate_line` marks or decline them, with the
-      reason in the handover.
+- [x] GUI: fix the stale `duplicate_line` marks or decline them, with the
+      reason in the handover. (Fixed, with the two ghost marks, by a change
+      rule that keeps a user's cleared mark; see the 2026-11-02 entry.)
 - [x] Audit rows for every value changed or name added (tiers above).
 - [x] Manual: `docs/docs/theory/indexing.md` and `reference/indexing.md`
       state the window's scope; a staged release note.
