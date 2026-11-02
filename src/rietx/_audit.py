@@ -1185,17 +1185,17 @@ ROWS: tuple[Row, ...] = (
     Row("TOPAS_SPECIES_WRITTEN_NEUTRAL", "code"),
     Row("WAVELENGTH_CALIBRATION", "code"),
     Row("XRDML_ATTENUATOR_APPLIED", "code"),
-    Row("XYDATA_INTER_APPLIED", "code", tier=1, ambiguity=1,
-        evidence=("info; a record of an act the file's own heading asks for: the FullProf "
-                  "manual (Rodriguez-Carvajal, An Introduction to the Program FullProf 2000, "
-                  "LLB, July 2001, PDF p. 74, Ins = 10) defines INTER fac_x as the internal "
-                  "multiplier of the x values and fac_y as that of y and sigma, so the "
-                  "numbers the file means are the written ones times the factors; that "
-                  "a file with no sigma column takes sqrt(fac_y*y), which equals fac_y*sqrt(y) "
-                  "of the written column, the counting statistics every file with no sigma "
-                  "column already assumes, and was also measured on fp2k 8.20 run as a "
-                  "black box on synthetic files (#1064); fires exactly when a "
-                  "factor is not 1"),
+    Row("XYDATA_INTER_APPLIED", "code", tier=2, ambiguity=1,
+        evidence=("info; a record of an act the file's own heading asks for. Two claims, "
+                  "each at its own tier. Multiplying x by fac_x and y and sigma by fac_y "
+                  "is the format's own definition (Rodriguez-Carvajal, An Introduction to "
+                  "the Program FullProf 2000, LLB, July 2001, PDF p. 74, Ins = 10), so the "
+                  "numbers the file means are the written ones times the factors: tier 1. "
+                  "Taking sigma = sqrt(fac_y*w) for w the intensity as written, when the "
+                  "file has no sigma column, is the Poisson sigma of the multiplied "
+                  "intensity and rests on one program's measured behaviour, FullProf 8.20 "
+                  "run as a black box on synthetic files (#1064): tier 2, the tier of the "
+                  "row. Fires exactly when a factor is not 1"),
         response="info",
         responds=("nothing: compare the pattern with the file's own columns only after "
                   "multiplying them by the factors the message names")),
