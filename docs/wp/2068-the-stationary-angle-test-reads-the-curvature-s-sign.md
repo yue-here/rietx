@@ -1,6 +1,6 @@
 # WP-2068 — The stationary-angle test builds its angle block analytically
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — task 1 done: the maximum does not reproduce on main, so P3; the cost half (tasks 2-4) is unstarted
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here (ghostshift runner): tasks 2-4, the analytic angle block
 Track: What fires, and what stays silent
 Depends on: — (1327 soft: the moment derivative `d_magnetic_f2_d_dofs` from #1206, merged 2026-10-31)
 Priority: P3 2026-11-02 — task 1 found no fit on main that stops on a maximum the test then passes wrongly, so only the cost half is left: 85-93 % of a moment-only fit at k ≥ 8, about 3 % of MAGNDATA structures
