@@ -140,17 +140,34 @@ def strain_basis(rotations) -> np.ndarray:
     Rᵀ is taken here, matching ``symmetry.reflection_orbits``.  Rows are
     smallest-integer and RREF-deterministic, so tests may compare them exactly:
     S(θ) = Σₖ θₖ·row_k.
+
+    The basis is a function of the distinct rotations alone, in the order
+    met, so it is computed once per such list and a copy handed out.  The
+    exact-rational elimination costs ~50 ms on a cubic group, and a report
+    asks for it once per phase per stage (WP-1335).
     """
-    rows: list[list[Fraction]] = []
+    keys: list[tuple[int, ...]] = []
     seen: set[tuple[int, ...]] = set()
     for r in np.asarray(rotations, dtype=np.float64):
-        rot_t = np.rint(r.T).astype(np.int64)
-        key = tuple(rot_t.ravel().tolist())
+        key = tuple(np.rint(r.T).astype(np.int64).ravel().tolist())
         if key in seen:  # centring translations repeat the rotation parts
             continue
         seen.add(key)
-        rows.extend(_invariance_rows(rot_t))
-    return _nullspace_int(rows, len(S_EXPONENTS))
+        keys.append(key)
+    basis = _BASIS_CACHE.get(tuple(keys))
+    if basis is None:
+        rows: list[list[Fraction]] = []
+        for key in keys:
+            rows.extend(_invariance_rows(np.array(key, dtype=np.int64).reshape(3, 3)))
+        basis = _nullspace_int(rows, len(S_EXPONENTS))
+        basis.flags.writeable = False
+        _BASIS_CACHE[tuple(keys)] = basis
+    return basis.copy()
+
+
+#: :func:`strain_basis` per distinct rotation list.  At most one entry per
+#: space-group setting a process meets, so it is never evicted.
+_BASIS_CACHE: dict[tuple[tuple[int, ...], ...], np.ndarray] = {}
 
 
 def stephens_basis(space_group) -> np.ndarray:

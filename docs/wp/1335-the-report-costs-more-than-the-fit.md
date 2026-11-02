@@ -171,13 +171,29 @@ choice.
 
 ## Tasks
 
-- [ ] Separate the leverage weights from the Gauss-Newton solve in
+- [x] Separate the leverage weights from the Gauss-Newton solve in
       `_strain_errors` so the reflection-count guard runs before any `lstsq`,
       if the weights admit it; measure the recovered fraction on the #250
       shape either way.
-- [ ] Decide, and write down, whether a phase with no free structural
+      **Done 2026-11-02, in the bound form.** The weights are re-formed every
+      iteration at the updated Λ, so the exact count is not known before the
+      solves. An upper bound is: a reflection with no leverage at the start
+      has none later. `_strain_errors(min_reflections=)` returns the first
+      iteration's weights with no solve when that bound is under the floor.
+      Recovered fraction on the #250 shape: about zero, by construction. A
+      solve costs npts × (2·n_group)², and a phase under the floor has fewer
+      than 16 groups. The phases that cost the 120 s pass the floor. Zero-row
+      trimming of the design was measured too and dropped: the windows cover
+      75-100 % of the rows on LaB6+cBN and NAC, and trimming moved Λ by up to
+      1.8e-7 relative.
+- [x] Decide, and write down, whether a phase with no free structural
       parameter is analysed at all — the docstring argument covers refined
       microstrain and does not obviously extend.
+      **Decided 2026-11-02: analysed.** Settled by Claude under the module's
+      written rule (`report/strain.py`'s docstring: the subject is the
+      specimen, not the residual). A held width model is where a
+      directional misfit has nowhere else to show, and acting on it is the
+      Layer-2 veto's call. Written into `analyse_strain`'s docstring.
 - [x] `summary()` accepts a precomputed report, or returns one; the doubling
       goes away by a documented route rather than by a caller's workaround.
       **Landed in PR #259**: `summary(report=)`, refusing `plan=` beside it;

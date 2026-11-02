@@ -6043,7 +6043,7 @@ class Refinement:
             mu_r_skipped=self._mu_r_skipped, guard=guard,
             max_shift_over_esd=outcome.max_shift_over_esd,
             significance=significance,
-            phase_support_sigma=plan.phase_support_sigma)
+            phase_support_sigma=plan.phase_support_sigma, with_geometry=False)
         report = build_report(result, model=model,
                               values=table.decode(outcome.theta), plan=plan,
                               structure=self.structure, instrument=self.instrument,
@@ -8555,6 +8555,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                   significance: np.ndarray | None = None,
                   phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
                   held_scales: set[int] | None = None,
+                  with_geometry: bool = True,
                   ) -> RefinementResult:
     values = table.decode(theta)
     y_calc = model.evaluate(values)
@@ -8646,9 +8647,13 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # McCusker §10) — built here because that covariance is read off the final
     # Jacobian and never serialized, the Identifiability carrier argument.  The
     # table judges nothing; §11's "chemical sense" is the reader's call.
-    geometry = geometry_table(model, table, theta, structure,
-                              stderr_internal=stderr_internal,
-                              correlation=correlation)
+    # ``with_geometry=False`` is a trajectory rung's: its report is projected
+    # onto a StageReport that carries no geometry, and the search was a third
+    # of a rung's result build (WP-1335)
+    geometry = (geometry_table(model, table, theta, structure,
+                               stderr_internal=stderr_internal,
+                               correlation=correlation)
+                if with_geometry else None)
     volumes = cell_volumes(table, theta, structure,
                            stderr_internal=stderr_internal, correlation=correlation)
 
