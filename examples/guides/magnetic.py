@@ -24,14 +24,14 @@ print(f"nuclear only: Rwp {before.statistics.rwp:.3f}")
 model = nuclear.fitted_structure.model_copy(deep=True)
 phase = model.phases[0]
 phase.magnetic_symmetry = "62.448"   # BNS number of Pn'ma'
-mn = next(atom for atom in phase.atoms if atom.label == "Mn2")
-mn.moment = rx.Moment.from_values((1.0, 0.0, 1.0), "Mn3+", vary=True)
+site = next(i for i, atom in enumerate(phase.atoms) if atom.label == "Mn2")
+phase.atoms[site].moment = rx.Moment.from_values((1.0, 0.0, 1.0), "Mn3+", vary=True)
 model = rx.Structure.model_validate(model.model_dump())   # re-runs the whole structure's checks
 # guide: moment end
 
 # guide: fit start
 # the modulus and the polar angle; the azimuth stays at 0, which keeps the moment in the a-c plane
-moment = ["phases.0.atoms.1.moment.dof0", "phases.0.atoms.1.moment.dof1"]
+moment = [f"phases.0.atoms.{site}.moment.dof0", f"phases.0.atoms.{site}.moment.dof1"]
 plan = rx.RefinementPlan(stages=[
     rx.Stage("moment", [SCALE, *BACKGROUND, *moment], max_iter=200),
     rx.Stage("everything", [SCALE, *BACKGROUND, *moment, *REST], max_iter=200)],
@@ -47,7 +47,7 @@ row = ref.report().magnetic[0]
 print(f"{row.atom} ({row.ion}): |m| = {row.magnitude:.2f} ± {row.magnitude_esd:.2f} μB,",
       "supported" if row.supported else "not supported")
 
-polar = next(p for p in result.parameters if p.path == "phases.0.atoms.1.moment.dof1")
+polar = next(p for p in result.parameters if p.path == moment[1])
 inside = polar.interval.lower <= math.pi / 2 <= polar.interval.upper
 print(f"polar angle: esd {polar.stderr}, 95 % interval includes 90°: {inside}")
 print([d.code for d in result.diagnostics if d.code.startswith("MOMENT")])
@@ -62,7 +62,7 @@ assert row.supported and row.magnitude / row.magnitude_esd > 50
 assert abs(row.magnitude - 3.56) < 0.005 and abs(row.magnitude_esd - 0.04) < 0.005
 assert row.magnitude + 3 * row.magnitude_esd < 4.0
 mx, my, mz = row.crystalaxis
-assert my == 0.0 or abs(my) < 1e-12, row.crystalaxis   # the held azimuth
+assert abs(my) < 1e-12, row.crystalaxis   # the held azimuth
 # "about 5° short of 90°": 5.1° on an arm64 Mac, unmoved by 1e-14 nudges to the seeds
 tilt = 90.0 - math.degrees(polar.value)
 assert 4.5 < tilt < 5.7, tilt
@@ -74,6 +74,12 @@ assert row.free_directions == ["polar", "azimuth"] and row.unmeasured_directions
 nuclear_hkl = {tuple(abs(i) for i in h) for rows in before.tick_hkl.values() for h in rows}
 assert (0, 2, 0) in nuclear_hkl and (0, 1, 0) not in nuclear_hkl
 assert polar.stderr is None and inside
+assert polar.interval.level == 0.95, polar.interval.level   # "95 % profile interval"
+# what the page says the diagnostic's message gives
+stationary = next(d for d in result.diagnostics if d.code == "MOMENT_ANGLE_STATIONARY")
+assert "deg) from the direction" in stationary.message, stationary.message
+assert "profile interval," in stationary.message and "includes the direction" in stationary.message
+assert "assumes the angles sit on the direction" in stationary.message
 # "the interval runs about 10° either side of 90°"
 assert 8.0 < 90.0 - math.degrees(polar.interval.lower) < 12.0, polar.interval
 assert 8.0 < math.degrees(polar.interval.upper) - 90.0 < 12.0, polar.interval

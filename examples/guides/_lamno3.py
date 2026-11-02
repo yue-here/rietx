@@ -26,9 +26,16 @@ N_BACKGROUND = 6
 
 SCALE = "phases.0.scale"
 BACKGROUND = [f"instrument.background.c{i}" for i in range(N_BACKGROUND)]
-REST = ["instrument.zero_shift", "phases.0.cell.*",
-        *(f"instrument.profile.{k}" for k in "uvwx"),
-        "phases.0.atoms.*.dof.*", "phases.0.atoms.*.biso"]
+#: each nuclear stage's name and what it adds to the stages before it
+NUCLEAR_STEPS = [
+    ("scale_bkg", []),
+    ("zero", ["instrument.zero_shift"]),
+    ("cell", ["phases.0.cell.*"]),
+    ("widths", [f"instrument.profile.{k}" for k in "uvwx"]),
+    ("coords", ["phases.0.atoms.*.dof.*"]),
+    ("biso", ["phases.0.atoms.*.biso"]),
+]
+REST = [path for _, added in NUCLEAR_STEPS for path in added]
 
 
 def _record(key: str) -> list[float]:
@@ -59,7 +66,7 @@ def nuclear_plan() -> rx.RefinementPlan:
     """Scale and background, then zero, cell, widths, coordinates and Biso, cumulative."""
     free = [SCALE, *BACKGROUND]
     stages = []
-    for n, name in enumerate(["scale_bkg", "zero", "cell", "widths", "coords", "biso"]):
-        more = REST[:[0, 1, 2, 6, 7, 8][n]]
-        stages.append(rx.Stage(name=name, turn_on=free + more, max_iter=200))
+    for name, added in NUCLEAR_STEPS:
+        free = free + added
+        stages.append(rx.Stage(name=name, turn_on=free, max_iter=200))
     return rx.RefinementPlan(stages=stages, intermediate_ftol=1e-6)

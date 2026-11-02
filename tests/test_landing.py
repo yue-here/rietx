@@ -347,7 +347,7 @@ def test_no_link_means_the_manual_and_lands_on_this_page(any_page):
 
 
 def test_every_link_into_the_manual_lands_on_a_page(any_page):
-    """A chapter link is a page of the manual under `/docs/<version>/`.  Until the
+    """A chapter link is a page of the manual under `/docs/stable/`.  Until the
     1.10 cut it could be an old-tree address `docs_versions.RETIRED` stubs, but a
     stub lands on a chapter's successor, which for a feature whose section moved
     is not the page holding it (WP-1986).  Whether an anchor is on its page is
@@ -363,7 +363,7 @@ def test_every_link_into_the_manual_lands_on_a_page(any_page):
         if path.startswith("lite/"):
             continue
         target = path.partition("#")[0].removesuffix(".html")
-        version = re.match(r"docs/[^/]+/", target)
+        version = re.match(r"docs/stable/", target)
         if version:
             rel = target[version.end():]
             source = tree / rel
@@ -376,7 +376,7 @@ def test_every_link_into_the_manual_lands_on_a_page(any_page):
         else:
             assert target not in retired, (
                 f"{name}: {link} is a retired address; name its page under /docs/stable/")
-            raise AssertionError(f"{name}: {link} is not a page of the manual")
+            raise AssertionError(f"{name}: {link} names no page under /docs/stable/")
 
 
 def test_the_landing_page_alone_is_written_at_the_site_root():

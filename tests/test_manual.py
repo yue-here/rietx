@@ -283,8 +283,10 @@ def test_every_link_from_outside_the_manual_is_on_its_page(built_docs_tree):
 
     Until 1.10 they linked the retired tree's addresses, whose stubs land on a
     chapter's successor, so a feature whose section moved to another page opened
-    the wrong one with every test green (WP-1986).  The stable tree is the last
-    release's, so a page `main` adds fails here until the release that ships it.
+    the wrong one with every test green (WP-1986).  The build is `main`'s, while
+    the stable tree is the last release's, so a page or heading `main` adds
+    passes here and is missing on the published site until the release that
+    ships it.  Link one only once it is released.
     """
     out, result = built_docs_tree
     assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
