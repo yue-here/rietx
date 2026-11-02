@@ -23,7 +23,8 @@ decomposes a given child into amplitudes A_τ per (k, irrep, direction).
 
 ``displacive_statement`` is WP-1419 chunk 3 (2026-10-21): the child as its
 parent plus absolute, refinable mode amplitudes (``Phase.distortion_modes``),
-from a stated child or from a ``distortion_candidates`` entry.
+its cell derived from the parent's (``Phase.parent_cell``), from a stated
+child or from a ``distortion_candidates`` entry.
 
 ``parent`` and ``child`` are :class:`~rietx.schemas.structure.Phase` objects.
 ``transform`` is (P, p) with r_parent = P·r_child + p: the columns of P are the
@@ -907,7 +908,9 @@ class DisplaciveStatement:
 
     ``phase`` is the child with ``Phase.distortion_modes`` set and the
     coordinates of every moved atom written as ``base + Σ A·v``; it refines on
-    the amplitudes (``phases.*.distortion_modes.modes.*.amplitude``).
+    the amplitudes (``phases.*.distortion_modes.modes.*.amplitude``).  Its cell
+    is derived through ``Phase.parent_cell`` (the parent's cell plus held Γ
+    strains) unless the parent is stated by an operator list.
     ``basis`` is the :class:`ModeBasis` the modes come from and ``transform``
     the (P, p) it was built with.  ``site_map[j]`` is the index in
     ``parent.atoms`` of the parent atom child atom j is an image of, and
@@ -1227,6 +1230,75 @@ def _from_candidate(parent, candidate, reference: str):
     return candidate.child, (big, small), basis, ref, index
 
 
+def _parent_cell_of(parent, child, big, small):
+    """The child's cell as its parent's plus Γ strains: (``ParentCell``, child cell) (WP-1419).
+
+    The parent's cell is the parent-symmetric part of the child's metric
+    carried into the parent's basis (the Reynolds average ⟨Rᵀ·G·R⟩ over the
+    parent point group, ``reference="average"``'s metric), with the parent
+    group's ties and fixed angles imposed; the strains are what is left,
+    G′ = Pᵀ·(G_parent + 2·L·E·L)·P (``crystallography.metric``), read off in the
+    orthonormal strain basis and held.  A child stated at its parent's metric
+    (a candidate's child, a ``magnetic_supercell`` child) has every strain at
+    exactly zero; a strained child keeps its own cell, now as strains.  The
+    child cell returned is the derived one, which the parameter table then
+    reproduces to the bit.  ``None`` for a parent stated by an operator list,
+    which ``ParentCell`` cannot name: that child keeps its own cell.
+    """
+    if parent.symmetry_operations is not None:
+        return None, None
+    from ...schemas.common import Parameter
+    from ...schemas.structure import Cell, ParentCell
+    from .. import metric
+    from ..lattice import direct_metric_tensor
+    from ..symmetry import cell_constraints, get_spacegroup
+
+    names = ("a", "b", "c", "alpha", "beta", "gamma")
+    parent_sg = get_spacegroup(parent.space_group)
+    cons = cell_constraints(parent_sg)
+    values = dict(zip(names, metric.cell_from_metric(
+        _parent_metric(parent, child, big, "average")), strict=True))
+    for name, src in cons.ties.items():
+        values[name] = values[src]
+    values.update({n: float(v) for n, v in cons.fixed_angles.items()})
+    exact = [[Fraction(float(v)).limit_denominator(96) for v in row] for row in big]
+    basis = metric.strain_basis(
+        metric.rotations_of(parent_sg),
+        metric.in_parent_basis(exact, metric.rotations_of(_group(child))),
+        cons.fixed_angles)
+    inv = np.linalg.inv(big)
+    g_parent = np.asarray(direct_metric_tensor(*(values[n] for n in names)), dtype=np.float64)
+    lengths = np.sqrt(np.diag(g_parent))
+    strain = (inv.T @ _cell_metric(child.cell) @ inv - g_parent) / (2.0 * np.outer(lengths, lengths))
+    frame = np.linalg.inv(metric._normalised_frame(cons.fixed_angles))
+    amps = np.array([metric._inner(frame, strain, e) for e in basis])
+    left = strain - (np.tensordot(amps, basis, axes=1) if len(basis) else 0.0)
+    if float(np.abs(left).max()) > _RANK_TOL:
+        raise ValueError(
+            f"the child's cell, carried into the parent's basis, is not the parent's "
+            f"metric plus a strain its group {child.space_group!r} allows (residual "
+            f"{float(np.abs(left).max()):.3g}): the cell does not have the symmetry its "
+            "group states")
+    amps[np.abs(amps) < _RANK_TOL] = 0.0
+    for n in names:
+        bound = getattr(parent.cell, n)
+        if not bound.min <= values[n] <= bound.max:
+            raise ValueError(
+                f"the child's cell gives the parent {n} = {values[n]!r}, outside the "
+                f"parent's bounds [{bound.min}, {bound.max}]: widen them or restate the child")
+    record = ParentCell(
+        space_group=str(parent.space_group), transform=_format_transform(big, small),
+        cell=Cell(**{n: Parameter(value=float(values[n]), min=getattr(parent.cell, n).min,
+                                  max=getattr(parent.cell, n).max) for n in names}),
+        strain=[Parameter(value=float(s)) for s in amps])
+    derived = metric.cell_from_metric(metric.child_metric(
+        [values[n] for n in names], big, amps, basis))
+    cell = child.cell.model_copy(update={
+        n: getattr(child.cell, n).model_copy(update={"value": float(v)})
+        for n, v in zip(names, derived, strict=True)})
+    return record, cell
+
+
 def displacive_statement(parent, child=None, transform=None, *, candidate=None,
                          seed: float = DISTORTION_SEED, reference: str = "average",
                          tolerance: float = 1.5) -> DisplaciveStatement:
@@ -1279,10 +1351,29 @@ def displacive_statement(parent, child=None, transform=None, *, candidate=None,
     refused, or one whose isotropy group failed verification, is refused with
     its reason.
 
+    **The cell is derived** (``Phase.parent_cell``, WP-1419 C2): the parent's
+    cell, refined under the parent's own constraints, plus the Γ strains the
+    child's group allows, held (the TOPAS/ISODISTORT convention #746 settled
+    on).  The parent's cell is the parent-symmetric part of the child's metric
+    and the strains the rest, so a child at its parent's metric (a candidate's)
+    holds every strain at exactly zero and a strained stated child keeps its
+    own cell, now as held strains; ``phases.*.cell.*`` frees the parent's
+    edges, and a strain is freed only by naming it
+    (``phases.*.parent_cell.strain.*``).  At a parent sitting exactly at its
+    parent (every amplitude outside the identity irrep zero, every strain
+    zero) a strain has an exactly zero gradient too, since its subspace is the
+    kernel of the parent's average; the seeded amplitudes lift that, and the
+    parameter table refuses a stage that frees the block while all of it is
+    zero.  No strain is seeded here: a held strain moved off zero would bias
+    every fit that keeps it held.  A parent stated by an operator list has no
+    symbol for ``ParentCell``, so its child keeps its own cell under its own
+    group's constraints.  Drop the record (``phase.model_copy(update=
+    {"parent_cell": None})``) to refine the child's six cell parameters
+    instead.
+
     A mixed-occupancy parent site is refused (two parent atoms on one site,
     ``_reference``), as are atoms that do not pair one to one
-    (``CHILD_ATOMS_UNPAIRED``).  The cell is the child's own, under its own
-    group's constraints.
+    (``CHILD_ATOMS_UNPAIRED``).
     """
     from ...schemas.common import Parameter
     from ...schemas.structure import DistortionMode, DistortionModes
@@ -1406,7 +1497,11 @@ def displacive_statement(parent, child=None, transform=None, *, candidate=None,
                      for j in range(len(child.atoms))],
             amplitude=Parameter(value=float(a), unit="A"))
             for (comp, index, label, invariant, v), a in zip(modes, amps, strict=True)])
-    phase = child.model_copy(update={"atoms": atoms, "distortion_modes": record})
+    update = {"atoms": atoms, "distortion_modes": record}
+    parent_cell, cell = _parent_cell_of(parent, child, big, small)
+    if parent_cell is not None:
+        update.update(parent_cell=parent_cell, cell=cell)
+    phase = child.model_copy(update=update)
     return DisplaciveStatement(
         phase=phase, basis=basis, transform=(big, small), site_map=site_map,
         biso_ties=parent_site_ties(site_map), seed=seeded)

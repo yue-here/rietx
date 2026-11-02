@@ -461,7 +461,10 @@ def test_with_every_amplitude_zero_the_child_is_the_parent_times_det_p_squared(c
     labels = [parent.atoms[s].label for s in statement.site_map]
     atoms = [a.model_copy(update={"biso": P_(value=biso[lab])})
              for a, lab in zip(statement.phase.atoms, labels, strict=True)]
-    phase = statement.phase.model_copy(update={"atoms": atoms,
+    # the parent's own cell, unstrained, through the derived cell (C3b)
+    held = statement.phase.parent_cell.model_copy(update={
+        "cell": parent.cell, "strain": [P_(value=0.0) for _ in statement.phase.parent_cell.strain]})
+    phase = statement.phase.model_copy(update={"atoms": atoms, "parent_cell": held,
                                                "cell": _child_cell(parent, transform)})
     tt = np.arange(10.0, 120.0, 0.02)
     y_child = np.asarray(rx.Refinement(Structure(phases=[phase]), neutron()).predict(tt))
@@ -665,11 +668,17 @@ def bt1():
     final = _B + [ZERO, CELL, *WIDTHS, "phases.0.atoms.*.biso"]
     runs = {}
     statement = D.displacive_statement(lamno3_parent(), start.structure.phases[0], LAMNO3_T)
+    # the statement's cell is the parent's edge plus two held Γ strains (C3b):
+    # freed, they are the coordinate arm's a, b, c in another chart.  CELL names
+    # phase 0, and ``phases.0.cell.*`` reaches only the child's locked six (it is
+    # ``phases.*.cell.*`` whose ``*`` spans ``0.parent_cell``), so the parent's
+    # edge is named
     for label, structure, free in (
-            ("coordinates", start.structure.model_copy(deep=True), "phases.0.atoms.*.dof.*"),
-            ("modes", Structure(phases=[statement.phase]), AMPS)):
+            ("coordinates", start.structure.model_copy(deep=True), ["phases.0.atoms.*.dof.*"]),
+            ("modes", Structure(phases=[statement.phase]),
+             [AMPS, "phases.0.parent_cell.cell.*", "phases.0.parent_cell.strain.*"])):
         ref = rx.Refinement(structure, start.instrument.model_copy(deep=True), history=False)
-        result = ref.fit(data, plan=plan([("final", final + [free])]), two_theta_limits=LIMITS)
+        result = ref.fit(data, plan=plan([("final", final + free)]), two_theta_limits=LIMITS)
         runs[label] = (ref, result)
     return statement, runs
 
@@ -680,7 +689,9 @@ def test_the_shipped_bt1_pattern_refines_alike_on_coordinates_and_on_modes(bt1):
 
     The real BT-1 LaMnO₃ pattern with the GSAS-II tutorial's nuclear model
     (``test_acceptance_magnetic_lamno3``'s protocol to its widths stage), then
-    one final stage freeing either.  The two are one linear reparametrisation,
+    one final stage freeing either.  The mode arm's cell is derived (C3b): the
+    parent's edge and the two Γ strains, freed, are the same freedom as the
+    coordinate arm's a, b, c.  The two are one linear reparametrisation,
     so the answers agree to the solver's stopping point (measured 2026-10-21:
     Rwp 6e-12 relative, coordinates 1.6e-9, esds 3e-7 relative), and the
     statement of the converged coordinate fit computes its pattern to
