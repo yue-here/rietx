@@ -1981,8 +1981,9 @@ class HumpComponent(_InheritsDeclaredDefaults):
     bit-identical to no peak at all.
     """
 
-    #: apparent position of the hump in °2θ.  Required — there is no default
-    #: place for a background feature, and a defaulted one would be a claim.
+    #: apparent position of the hump in °2θ.  It defaults to 0.0, a placeholder
+    #: below any measured range rather than a place for a feature; with the
+    #: default ``height = 0`` the hump adds nothing until a caller places it.
     position: Parameter = Field(
         default_factory=lambda: Parameter(value=0.0, unit="deg"))
     height: Parameter = Field(
