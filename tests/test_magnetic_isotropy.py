@@ -33,8 +33,10 @@ from rietx.crystallography.magnetic import isotropy
 from rietx.crystallography.magnetic.operators import (
     MagneticGroup,
     MagneticOperator,
+    _rational_determinant,
     allowed_displacement_basis,
     allowed_moment_basis,
+    format_transform,
     identify,
     in_span,
 )
@@ -519,13 +521,14 @@ def test_the_g_type_perovskite_cell_is_one_class():
 
     The ± arrangement of a G-type antiferromagnet has cubic configurational
     symmetry, so the powder intensity does not depend on the moment direction
-    at all (Shirane, 1959, p. 284).  The child cell is left-handed, which is
-    why it is here.  About 6-8 s, most of it the six candidates' construction,
-    so it is marked slow.
+    at all (Shirane, 1959, p. 284).  The child cell was left-handed until
+    #1197, which is why it is here; it is right-handed now, and the mirrored
+    frame of ``RIGID_MAPS`` keeps a left-handed lattice under test.  About
+    6-8 s, most of it the six candidates' construction, so it is marked slow.
     """
     found = isotropy.candidates("P m -3 m", (0, 0, 0), HALF)
     lattice = np.asarray(found.lattice, dtype=np.float64)
-    assert np.linalg.det(lattice) < 0
+    assert np.linalg.det(lattice) > 0
     classes = isotropy.equivalence_classes(found, isotropy.reflections(lattice, 2.0))
     assert classes == (tuple(range(len(found))),)
 
@@ -1038,6 +1041,98 @@ def test_the_magnetic_cell_has_the_right_lattice_cosets(case):
         assert cell.doubled
         assert len(cell.translations) == 2
         assert [eps for _, eps in cell.translations] == [1, -1]
+
+
+#: Parents at k = (0, 0, ½) whose reduced cell came out left-handed before
+#: #1197, the enantiomorphic screws among them (4₂ → 4₁/4₃ in 2c, 3₁ → 3₁/3₂,
+#: 6₁ → 3₁/3₂), with P c c n at k = (½, ½, 0) as the case whose types have no
+#: enantiomorph and so showed nothing.
+HANDED_CASES = [
+    ("P 42 c m", (0, 0, 0), (0, 0, Fraction(1, 2))),
+    ("P 41", (0.1, 0.2, 0.3), (0, 0, Fraction(1, 2))),
+    ("P 31", (0.1, 0.2, 0.3), (0, 0, Fraction(1, 2))),
+    ("P 61", (0.1, 0.2, 0.3), (0, 0, Fraction(1, 2))),
+    ("P 41 21 2", (0.1, 0.2, 0.3), (0, 0, Fraction(1, 2))),
+    ("P c c n", (0, 0, 0), (Fraction(1, 2), Fraction(1, 2), 0)),
+]
+
+
+@pytest.mark.parametrize("case", CELL_CASES + [(g, k) for g, _, k in HANDED_CASES],
+                         ids=[c[0] for c in CELL_CASES] + [c[0] for c in HANDED_CASES])
+def test_the_magnetic_cell_is_right_handed(case):
+    """det P > 0 for every magnetic cell, the precondition of every label read in it (#1197)."""
+    group, k = case
+    cell = isotropy.magnetic_cell(group, k)
+    assert _rational_determinant(cell.basis) > 0, cell.transform
+
+
+@pytest.mark.parametrize("case", HANDED_CASES, ids=[c[0] for c in HANDED_CASES])
+def test_a_candidate_label_is_the_type_of_its_operators_in_the_parents_handedness(case):
+    """Every candidate's BNS number is what its operators identify as in the unreduced child cell.
+
+    The oracle is a second route: ``supercell.child_basis`` builds the child
+    cell by doubling one primitive vector and never reduces it, and both cells
+    here are right-handed, so the label cannot depend on which one spglib read
+    (#1197, where the reduced cell was left-handed and named the mirror type).
+    """
+    group, xyz, k = case
+    found = isotropy.candidates(group, xyz, k)
+    for candidate in found.candidates:
+        child = _in_the_unreduced_child_cell(candidate)
+        assert candidate.bns_number == identify(child).bns_number, candidate.label
+
+
+def _in_the_unreduced_child_cell(candidate):
+    """A candidate's group carried to ``supercell.child_basis``, which is never reduced."""
+    from rietx.crystallography.magnetic.supercell import _mat_mul, child_basis
+    from rietx.crystallography.symmetry import resolve_group
+
+    basis = child_basis(resolve_group(candidate.space_group.xhm(), None), candidate.cell.k)
+    assert _rational_determinant(basis) > 0
+    step = _mat_mul(isotropy._exact_inverse(candidate.cell.basis),
+                    [[Fraction(v) for v in row] for row in basis])
+    return candidate.group.transformed(
+        format_transform(isotropy._exact_inverse(step), (Fraction(0),) * 3))
+
+
+@pytest.mark.parametrize("group, xyz, label, bns", [
+    # 4₂ with c/2 along c is 4₁ in 2c (BNS 76; 78 is the 4₃ mirror)
+    ("P 42 c m", (0, 0, 0), "S5(rank 1)#1", "76.10"),
+    # 3₁ with c/3 along c: the unprimed threefold is the one at 2c'/3, a 3₂
+    # in 2c (BNS 145; 144 is the 3₁ mirror); P 6₁'s square is a 3₁ and goes
+    # the same way
+    ("P 31", (0.1, 0.2, 0.3), "S1(a)", "145.9"),
+    ("P 61", (0.1, 0.2, 0.3), "S3(a,b)", "145.9"),
+])
+def test_an_enantiomorphic_candidate_carries_its_own_handedness(group, xyz, label, bns):
+    """The three swaps #1197 and its triage measured, pinned at the right-handed number."""
+    found = isotropy.candidates(group, xyz, (0, 0, Fraction(1, 2)))
+    (candidate,) = [c for c in found.candidates if c.label == label]
+    assert candidate.bns_number == bns
+
+
+@pytest.mark.parametrize("columns", [
+    [[1, 1, 0], [-1, 1, 0], [0, 0, 1]],     # a-b, a+b, c
+    [[1, 0, 0], [0, 1, 0], [0, 0, 2]],      # a, b, 2c
+    [[1, 1, 0], [1, -1, 0], [0, 0, -1]],    # a+b, a-b, -c
+], ids=["C-centred", "doubled-c", "C-centred-flipped"])
+def test_the_reduced_cell_retry_keeps_the_handedness(columns):
+    """``_identify_in_a_reduced_cell`` names the type the operators have where they stand.
+
+    It shortens a primitive basis of the unprimed lattice and identifies the
+    group there, so it reads the same ``_reduce_basis`` #1197 was about: a
+    reduction landing on a left-handed basis named 78.22 for this 76.10 group
+    in the doubled-c setting.  Each setting is right-handed, so the retry must
+    agree with spglib asked directly.
+    """
+    found = isotropy.candidates("P 42 c m", (0, 0, 0), (0, 0, Fraction(1, 2)))
+    (candidate,) = [c for c in found.candidates if c.label == "S5(rank 1)#1"]
+    child = _in_the_unreduced_child_cell(candidate)              # a, b, 2c of the parent
+    p = [[Fraction(v) for v in row] for row in columns]
+    group = child.transformed(format_transform(isotropy._exact_inverse(p), (Fraction(0),) * 3))
+    lattice = np.array(columns, dtype=np.float64).T @ np.diag([4.0, 4.0, 8.4])  # rows, Å
+    assert identify(group).bns_number == "76.10"
+    assert isotropy._identify_in_a_reduced_cell(group, lattice).bns_number == "76.10"
 
 
 def test_moment_cartesian_is_the_row_vector_lattice_transpose():
@@ -2213,16 +2308,18 @@ def test_every_sampled_edge_prints_the_draws_it_actually_made(monkeypatch):
 def test_a_carried_proof_keeps_the_draws_of_the_direction_it_replaces(monkeypatch):
     """With the higher-index copy first in line for the proof, the lower-index copy's drawn direction is replaced and still counts its draws.
 
-    The set is the draw-count test's, ordered ``[S1(rank 1)#2, S1(rank 1)#1,
-    S1(a,b)... ]`` reduced to the case that matters: S1(rank 1)#2 → S2(a,b)
-    is drawn first and ends without a proof, S1(rank 1)#1 → S2(a,b) is
-    later proved by Farkas and carried to it.  The log of draws each family
+    The known answer reduced to the case that matters, ordered
+    ``[S4(rank 1)#2, S4(rank 1)#1, S3(a,b)]``: S4(rank 1)#2 → S3(a,b) is
+    drawn first and ends without a proof after 4 draws, S4(rank 1)#1 →
+    S3(a,b) is proved by Farkas at draw 2 and carried to it.  Until #1197
+    made the cell right-handed the case was S1 → S2(a,b); in (a, b, 2c)
+    S1(rank 1)#2 → S2(a,b) certifies on its own draws.  The log of draws each family
     actually consumed must equal the sum of the printed ``draws``.
     """
     from dataclasses import replace
 
     found = isotropy.candidates(*KNOWN_ANSWER)
-    labels = ["S1(rank 1)#2", "S1(rank 1)#1", "S2(a,b)"]
+    labels = ["S4(rank 1)#2", "S4(rank 1)#1", "S3(a,b)"]
     pick = {c.label: c for c in found}
     subset = replace(found, candidates=tuple(pick[name] for name in labels))
     log = []
@@ -2237,7 +2334,7 @@ def test_a_carried_proof_keeps_the_draws_of_the_direction_it_replaces(monkeypatc
     assert sum(v.draws for v in result.relations) == len(log)
     replaced = [v for v in result.relations
                 if v.certificate == "propagated" and v.draws > 0]
-    assert [(labels[v.a], labels[v.b]) for v in replaced] == [("S1(rank 1)#2", "S2(a,b)")]
+    assert [(labels[v.a], labels[v.b]) for v in replaced] == [("S4(rank 1)#2", "S3(a,b)")]
     assert replaced[0].status == "proved-not" and replaced[0].via == (1, 2)
 
 
@@ -2284,13 +2381,17 @@ def test_the_cubic_known_answer_has_four_classes_at_the_default_draws():
     the 54 cross-irrep pairs, 36 by absence (S1/S2 against S3/S4) and 18
     by a Farkas witness, found on the pair or carried to it from an
     isometric copy (part 3: the rank-1 copies of each irrep are proved
-    equal, so a witness against one is a witness against the other), each
-    re-verified here from its t and y against the pair's own stack.  Before
-    part 3 the 18th, S1(rank 1)#2 → S2(a,b), was ``sampled-not`` with a
-    negative dual (no certificate exists for *its* draw); the proof it
-    carries now is S1(rank 1)#1 → S2(a,b)'s.  The witnesses' d_lo run from
-    0.0013 to 0.032.  50-200 s on one core by machine load and tree, hence
-    slow.
+    equal, so a witness against one is a witness against the other) or
+    along a proved containment (part 4), each re-verified here from its t
+    and y against the stack it was issued on.  Before part 3 the 18th,
+    S1(rank 1)#2 → S2(a,b), was ``sampled-not`` with a negative dual (no
+    certificate exists for *its* draw).  Since #1197 the draws are the
+    right-handed cell's (a, b, 2c), and the pair whose own draws certify
+    nothing is S3(a,b) → S4(a,b): S3(rank 1)#1 ⊆ S3(a,b) by span, so
+    S3(rank 1)#1 → S4(a,b)'s witness proves it (``containment``).  The
+    witnesses' d_lo run from 0.0036 to 0.057 (0.0013 to 0.032 in the
+    left-handed cell).  50-200 s on one core by machine load and tree,
+    hence slow.
     """
     found = isotropy.analyse(isotropy.candidates(*KNOWN_ANSWER), d_min=1.5)
     by_irrep = {}
@@ -2308,16 +2409,24 @@ def test_the_cubic_known_answer_has_four_classes_at_the_default_draws():
     for pair in cross:
         proof = next((v.certificate for v in pair if v.status == "proved-not"), None)
         by[proof] = by.get(proof, 0) + 1
-    assert by["absence"] == 36 and by["farkas"] + by["propagated"] == 18 and None not in by
+    assert by["absence"] == 36 and None not in by
+    assert by["farkas"] + by["propagated"] + by["containment"] == 18
     assert by["farkas"] >= 4             # one found draw per (S1 family, S2 family-or-copy class) at least
     assert not [v for v in found.relations if v.status == "sampled-not"]
-    # part 4: each rank-1 copy is proved inside its (a,b) plane (8 directions), and no
-    # transfer has anything left to carry, every cross-irrep direction being proved already
+    # part 4: each rank-1 copy is proved inside its (a,b) plane (8 directions); one
+    # containment carries a found witness to the one pair its own draws left open,
+    # and no transfer has anything left to carry
     spans = [v for v in found.relations if v.certificate == "span"]
     assert len(spans) == 8 and all(v.containment.residual <= 1e-12 for v in spans)
     assert {(label[v.a].split("(")[0], "(rank 1)" in label[v.a], label[v.b].endswith("(a,b)"))
             for v in spans} == {(s, True, True) for s in ("S1", "S2", "S3", "S4")}
-    assert not [v for v in found.relations if v.certificate in ("containment", "transfer")]
+    assert not [v for v in found.relations if v.certificate == "transfer"]
+    (carried,) = [v for v in found.relations if v.certificate == "containment"]
+    assert (label[carried.a], label[carried.b]) == ("S3(a,b)", "S4(a,b)")
+    assert carried.status == "proved-not"
+    source = next(v for v in found.relations if (v.a, v.b) == carried.via)
+    assert source.certificate == "farkas" and carried.witness is source.witness
+    assert label[source.a] == "S3(rank 1)#1" and source.b == carried.b
     copies = [v for v in found.relations if v.certificate == "isometry"]
     assert {(label[v.a], label[v.b]) for v in copies} == {
         (f"{s}(rank 1)#{p}", f"{s}(rank 1)#{q}") for s in ("S1", "S2", "S3", "S4")
@@ -2337,7 +2446,7 @@ def test_the_cubic_known_answer_has_four_classes_at_the_default_draws():
             source = next(s for s in proved if (s.a, s.b) == v.via)
             assert source.certificate == "farkas" and v.witness is source.witness
             assert irrep[source.a] == irrep[v.a] and irrep[source.b] == irrep[v.b]
-    assert 1e-3 < min(v.d[0] for v in proved) and max(v.d[0] for v in proved) < 0.05
+    assert 1e-3 < min(v.d[0] for v in proved) and max(v.d[0] for v in proved) < 0.1
 
 
 def test_the_certificates_run_on_a_pair_union_find_has_already_joined(monkeypatch):
@@ -2772,8 +2881,10 @@ def test_a_kernel_family_is_certified_only_once_its_kernel_is_projected_out(pm3m
     The first draw of the pair's stream.  S5(a)'s stack has a common kernel
     of dimension 1, so every Σ y_s G_s has a zero eigenvalue and the raw
     dual's ratio is round-off (2e-17 here), below the floor; with the kernel
-    projected out the optimum is 1.1e-6 and the certificate gives
-    d_lo = 0.0055, above the gate (2.3e-4 at ``rtol`` 1e-4).  The unit test
+    projected out the optimum is 4.3e-6 and the certificate gives
+    d_lo = 0.024, above the gate (2.2e-4 at ``rtol`` 1e-4).  The draw is in
+    the right-handed cell (a, b, 2c) since #1197; in the left-handed one it
+    gave 1.1e-6 and 0.0055.  The unit test
     of :func:`isotropy._live_projection` holds the guard that refuses a
     kernel whose residual is above :data:`isotropy.INTENSITY_RTOL`.
     """
@@ -2790,7 +2901,7 @@ def test_a_kernel_family_is_certified_only_once_its_kernel_is_projected_out(pm3m
     assert dual >= 1e-7 and parts is not None and parts["kernel_dim"] == 1
     assert parts["kernel_residual"] <= 1e-12
     d_lo = 1.0 / float(np.linalg.norm(parts["y"]))
-    assert d_lo == pytest.approx(0.0055, rel=0.05)
+    assert d_lo == pytest.approx(0.0238, rel=0.05)
     assert d_lo >= isotropy._gate(1e-4, t, live)
 
 
@@ -2803,7 +2914,7 @@ def test_the_gate_reads_rtol_with_the_root_s_factor(monkeypatch, pm3mx_stack):
     draw, after exactly one restart call; at an ``rtol`` between
     d_lo·‖t‖/(√S·max|t|) and d_lo it does not (a gate without the √S factor
     would), the witness rides along and the remaining restarts run.  Here
-    √S·max|t|/‖t‖ = 2.3.
+    √S·max|t|/‖t‖ = 2.2.
     """
     found, reflections, canonical, grams, dark, labels = pm3mx_stack
     a, b = labels.index("S1(a)"), labels.index("S5(a)")
@@ -2922,7 +3033,9 @@ def test_a_separation_proved_on_one_copy_appears_on_the_other(known_answer_stack
     which the congruence makes valid), sits at ratio ≥
     :data:`isotropy.FARKAS_QUOTE`, passes the exact check, has
     d_lo ≤ d_up and clears the gate.  No physical floor: the smallest d_lo
-    is 0.0071, below the 1e-2 a floor might be tempted to set.  Part 2
+    is 0.0036, below the 1e-2 a floor might be tempted to set.  The draws
+    are the right-handed cell's (a, b, 2c) since #1197; in the left-handed
+    (b, a, 2c) S1(a,b) → S2(rank 1)#1 stopped at draw 4, not 2.  Part 2
     drew all nine directions here (56.7 s at review); this draws four.
     """
     from dataclasses import replace
@@ -2937,7 +3050,7 @@ def test_a_separation_proved_on_one_copy_appears_on_the_other(known_answer_stack
     farkas = {(names[v.a], names[v.b]): v for v in result.relations if v.certificate == "farkas"}
     assert {key: v.draws for key, v in farkas.items()} == {
         ("S1(rank 1)#1", "S2(rank 1)#1"): 4, ("S1(rank 1)#1", "S2(a,b)"): 3,
-        ("S1(a,b)", "S2(rank 1)#1"): 4, ("S1(a,b)", "S2(a,b)"): 3}
+        ("S1(a,b)", "S2(rank 1)#1"): 2, ("S1(a,b)", "S2(a,b)"): 3}
     carried = {(names[v.a], names[v.b]): v for v in result.relations
                if v.certificate == "propagated"}
     assert {key: (names[v.via[0]], names[v.via[1]]) for key, v in carried.items()} == {
@@ -2989,8 +3102,8 @@ def test_the_exact_check_is_called_once_per_witness_and_refuses_on_false(monkeyp
                                                                          known_answer_stack):
     """The exact LDLᵀ is the arbiter: it runs on every quoted certificate, and a False issues no witness.
 
-    S1(rank 1)#2 → S2(rank 1)#1, which certifies at draw 2 (seed 20260906,
-    restarts 4).  A spy counts one exact call per witness issued.  With the
+    S1(rank 1)#2 → S2(rank 1)#1, which certifies at draw 3 (seed 20260906,
+    restarts 4; draw 2 in the left-handed cell before #1197).  A spy counts one exact call per witness issued.  With the
     exact check forced False the same draw is not certified: no witness,
     no ``farkas``, and the draws decide (here the draw is not reproduced in
     4 restarts, so ``sampled-not`` with the dual's positive optimum, a
@@ -3010,12 +3123,12 @@ def test_the_exact_check_is_called_once_per_witness_and_refuses_on_false(monkeyp
     relations = isotropy.powder_relations(subset, reflections, restarts=4)
     witnesses = [v.witness for v in relations if v.witness is not None]
     assert len(witnesses) == len(calls) == 1
-    assert relations[0].certificate == "farkas" and relations[0].draws == 2
+    assert relations[0].certificate == "farkas" and relations[0].draws == 3
 
     monkeypatch.setattr(isotropy, "_exact_psd", lambda *args: False)
     refused = isotropy.powder_relations(subset, reflections, restarts=4)
     assert all(v.witness is None and v.certificate is None for v in refused)
-    assert (refused[0].status, refused[0].draws) == ("sampled-not", 2)
+    assert (refused[0].status, refused[0].draws) == ("sampled-not", 3)
     assert refused[0].dual >= isotropy.FARKAS_FLOOR
 
 
