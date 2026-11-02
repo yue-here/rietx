@@ -2463,13 +2463,14 @@ CLAIMS: tuple[Claim, ...] = (
                   "22.5 C.  Held, not refined: holding a certified cell is what "
                   "turns a free lambda into a calibration measurement.  The "
                   "answer lists no cell row, since a result carries only what "
-                  "the fit could move (WP-1999); the parameter table holds a "
-                  "never freed and b, c tied to it, so this is an identity bar "
-                  "(exact) and the absent esd shows nothing was refined.  XND "
-                  "held 5.4311948, 0.4 ppm above, negligible against every "
-                  "band here and stated in the docstring",
-        measured="no cell row in the answer; cell.a, cell.b and cell.c in the "
-                 "parameter table all exactly 5.4311946 A, esd None",
+                  "the fit could move (WP-1999); no stage's free set holds a "
+                  "cell path, and the parameter table ties b and c to a, so "
+                  "this is an identity bar (exact).  XND held 5.4311948, 0.4 "
+                  "ppm above, negligible against every band here and stated "
+                  "in the docstring",
+        measured="no cell row in the answer and none in any stage's free "
+                 "set; cell.a, cell.b and cell.c in the parameter table all "
+                 "exactly 5.4311946 A, b and c tied to a",
     ),
     Claim(
         "test_acceptance_si640c",

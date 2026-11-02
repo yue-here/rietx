@@ -439,22 +439,25 @@ def test_the_held_cell_is_the_certificate(full_fit):
     measurement.  So the answer lists no cell row: a result carries only what
     the fit could move, and a cubic b and c tied to a held a cannot move
     (WP-1999).  The held lengths live in the model, where the parameter table
-    shows a never freed, b and c tied to it, all three the certificate to the
-    bit and none carrying an esd.
+    shows b and c tied to a and all three the certificate to the bit.  That a
+    was never freed is read off every stage's free set, since the final
+    ``vary`` flag says only what the last stage freed, and a row's esd is
+    merged from the answer and so is absent once the row is.
     """
     ref, result = full_fit
     cell_rows = [p.path for p in result.parameters if ".cell." in p.path]
     assert not cell_rows, f"the held cell came back as answer rows {cell_rows}"
+    freed = {(s.name, p) for s in result.stages for p in s.freed if ".cell." in p}
+    assert not freed, f"a stage freed the certified cell: {sorted(freed)}"
     rows = {r.path: r for r in ref.parameters()}
     for axis in ("a", "b", "c"):
         row = rows[f"phases.0.cell.{axis}"]
         assert row.value == A_CERT, (
             f"held cell.{axis} = {row.value!r}, not the certificate {A_CERT}")
-        assert row.esd is None, f"the held cell.{axis} came back with an esd"
-    assert not rows["phases.0.cell.a"].vary, "the certified a was freed"
     for axis in ("b", "c"):
-        assert rows[f"phases.0.cell.{axis}"].tie is not None, (
-            f"cubic cell.{axis} is not tied to a")
+        tie = rows[f"phases.0.cell.{axis}"].tie
+        assert tie is not None and tie.sources == ["phases.0.cell.a"], (
+            f"cubic cell.{axis} is not tied to a: {tie}")
 
 
 def test_the_sample_broadening_is_positive_and_finite(full):
