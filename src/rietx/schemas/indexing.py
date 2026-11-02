@@ -1380,7 +1380,9 @@ class CellCandidate(Base):
     Deliberately *not* named "solution" and deliberately carrying no "is correct"
     field.  ``found_by`` is the engines that produced it — agreement between
     independent engines is the confidence, the same device as the cross-backend
-    Jacobian matrix and ``direction="both"`` — and ``ambiguity`` is populated
+    Jacobian matrix and ``direction="both"`` — plus ``"prior"`` for a checked
+    prior cell, which is not an engine and counts toward no agreement
+    (WP-2079); ``ambiguity`` is populated
     whenever a geometrically indistinguishable partner exists.
 
     ``cell`` is a bare (a, b, c, α, β, γ) tuple in Å and degrees, kept so for

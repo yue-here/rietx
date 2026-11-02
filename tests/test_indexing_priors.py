@@ -122,12 +122,16 @@ def test_a_stated_lattice_one_engine_found_does_not_outgrade_the_truth():
 
     def grades(spec):
         res = index_pattern(peaks, spec=spec, preset="full", engines=("svd",))
-        return {(c.centring, c.system, round(c.cell[0], 3)):
-                (c.confidence, c.found_by) for c in res.candidates}
+        # the whole cell in the key: two tetragonal candidates sharing ``a``
+        # must not overwrite each other's grade
+        out = {(c.centring, c.system, tuple(round(x, 3) for x in c.cell)):
+               (c.confidence, c.found_by) for c in res.candidates}
+        assert len(out) == len(res.candidates)
+        return out
 
     plain = grades(SearchSpec(**base))
     steered = grades(SearchSpec(**base, prior_cells=(prior,)))
-    truth, stated = ("F", "cubic", a), ("P", "cubic", a)
+    truth, stated = ("F", "cubic", prior), ("P", "cubic", prior)
     assert truth in steered and stated in steered
     assert PRIOR_FINDER in steered[stated][1], (
         "the fixture no longer merges the prior into svd's own P candidate")

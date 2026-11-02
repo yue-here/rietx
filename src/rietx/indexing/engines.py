@@ -2014,7 +2014,7 @@ def rank_candidates(cands: Sequence[EngineCandidate], peaks: PeakList, *,
     **Whether two engines found a lattice outranks every figure of merit**
     (WP-1046, :func:`corroborated`), and this is the package's own doctrine
     applied to the order rather than only to the verdict: ``grade`` floors a
-    candidate below :data:`MIN_AGREEMENT` finders at ``low`` before a single
+    candidate below :data:`MIN_AGREEMENT` engines at ``low`` before a single
     caveat is consulted, so a list ranked on the panel alone routinely put
     candidates the gate refuses to promote above the one it could.  Measured:
     on the GSAS-II fluorapatite pattern over all seven systems, the six
