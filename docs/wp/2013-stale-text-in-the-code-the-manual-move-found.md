@@ -103,6 +103,14 @@ finding goes stale (memory `queued-wp-findings-go-stale`).
   reproduced from the WP's 2026-10-20 list: pore-proxy ratio 2.89 (now 2.36), fraction-control
   excess 0.22 (now 0.47), fixture 99.3 (now 118), LaB₆ 0.0768/0.0138 (now 0.0766/0.0137).
 
+  *Gates* (a second runner, on the tree with origin/main 1a648d3a9 merged): the fast selection gave
+  13517 passed, 319 skipped, 34 xfailed (`[dev]` venv, macOS arm64). `tests/test_docs_consistency.py`
+  first failed: the `reports_at` correction put `src/rietx/io/CLAUDE.md` at 566 lines against its
+  565 cap. The bullet was reworded into one line fewer, with no fact dropped, and the file now
+  passes 25 of 25. Ruff is clean, `session_start.py` exits 0, and `tests.reader_output` exits 0,
+  unchanged against the merge-base. `/code-review high --fix` found eight issues in this branch's
+  own rewrites or their siblings; seven were fixed in one commit, and the eighth is owed item 2.
+
   *Owed to the maintainer* (each would change behaviour, a public name or a default, so the text
   now describes the code and the question waits):
   1. `HumpComponent.position` defaults to 0.0. Should it be required, as the old comment claimed?
