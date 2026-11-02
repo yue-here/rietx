@@ -975,6 +975,25 @@ def test_the_count_reads_what_a_column_reaches(state, expected):
     assert ds.observations_per_parameter == pytest.approx(
         ds.n_unique_reflections / expected)
 
+    # The purpose table's half, asserted here so the state is built once.  A
+    # warning naming a path that moves an atom is about the coordinates it
+    # moves, so it keeps its level under every purpose a coordinate's does
+    # (``rietx.purposes._ATOM_DRIVERS``; under qpa and magnetic a body and a
+    # mode amplitude each read as info before).  A new family that drives atoms
+    # fails here, once its state joins the list above, until the table lists it.
+    from rietx.purposes import PURPOSES
+    from rietx.schemas.common import Diagnostic
+    from rietx.schemas.results import level_under
+
+    def warned(path):
+        d = Diagnostic(level="warning", code="FLOOR_HIT", message="m", where=[path])
+        return {p for p in PURPOSES if level_under(d, p) == "warning"}
+
+    coordinate = warned("phases.0.atoms.0.x")
+    paths = [p for p in structural_free_paths(table) if ".atoms." not in p]
+    assert paths
+    assert {p: sorted(coordinate - warned(p)) for p in paths} == {p: [] for p in paths}
+
 
 def test_a_variable_on_a_coordinate_dof_is_the_parameter_counted():
     """``vars.D`` tied to ``atoms.1.dof.0`` is the free column, and the DOF it
