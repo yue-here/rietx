@@ -230,6 +230,51 @@ def test_a_prefit_cell_that_is_off_is_not_caught(patterns, name, factor):
     assert best is None or TRUE[name][0] in best.space_groups, _says(screen)
 
 
+def _zero_background(patterns, name):
+    """``patterns`` with the instrument's background declared all-zero, the
+    preset's own start and what the GUI hands the screen (round 1 of #1286)."""
+    data, cell, system, centring, ins, limits = patterns[name]
+    zero = ins.model_copy(deep=True)
+    for c in zero.background.coefficients:
+        c.value = 0.0
+    return {name: (data, cell, system, centring, zero, limits)}
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "#1286 round 1: from the preset's all-zero declared background the held "
+    "reference fit is poor and the class forbidding nothing wins by elimination, "
+    "so the check fires needlessly (synthetic P 2_1/c at x1.0005 and x1.001). "
+    "Seeding the held background removes it and fires on eleven right PbSO4 rows "
+    "instead; a gate on the held fit's chi2 does not separate them (measured)"))
+def test_a_held_screen_with_a_poor_reference_fit_does_not_veto_a_right_default(
+        patterns):
+    """Round 1 of #1286 (Yue's zero-background sweep), pinned as a known failure.
+    From the all-zero declared background the held reference fit is poor and the
+    class forbidding nothing wins it by elimination: here it names ``P 1 - 1`` at
+    ×1.001 where the default names the true ``P 1 21/c 1``, and the screens
+    disagree.  A pass here is a fix."""
+    zero = _zero_background(patterns, "mono")
+    screen, _ = _screen(zero, "mono", 1.001)
+    held = screen.held_screen
+    assert held is not None and held.best_or_none() is not None, _says(held)
+    assert TRUE["mono"][0] not in held.best_or_none().space_groups
+    assert held.reference_chi2 > screen.reference_chi2 + 10.0
+    assert not screen.screens_disagree()
+    best = screen.best_or_none()
+    assert best is not None and TRUE["mono"][0] in best.space_groups, _says(screen)
+    assert "EXTINCTION_SCREENS_DISAGREE" not in {d.code for d in screen.diagnostics}
+
+
+def test_a_better_fitting_held_screen_still_flags_from_a_zero_background(patterns):
+    """The positive arm: at ×0.999 the default names ``P 1 - 1`` and the held
+    screen, whose reference fit is *better* than the default's, names another
+    class from the same all-zero background, so the check still fires."""
+    zero = _zero_background(patterns, "mono")
+    screen, _ = _screen(zero, "mono", 0.999)
+    assert screen.held_screen.reference_chi2 < screen.reference_chi2
+    assert screen.screens_disagree() and screen.best_or_none() is None, _says(screen)
+
+
 def test_a_held_cell_runs_no_second_screen(patterns):
     """``refine_cell=False`` has no prefit to check, so ``held_screen`` stays
     None and the answer is the held screen's own."""
