@@ -315,7 +315,15 @@ grep -rn "not quotable" docs/docs src/rietx/help.py CLAUDE.md docs/skill/rietx
   pattern 41 "keep" equals "zero" after the fix (TRF 1.156, LM 1.170); the
   guard's shares against the review's probe 50.3/34.9/51.5/19.4 % against
   50.5/34.6/51.6/19.6 %; the brucite seed comparison and the Γ_G² sibling are
-  in the task notes. Gates: FAST_COUNTS. Acceptance selection
+  in the task notes. Gates: fast suite on the final tree with main merged (`d07426026` plus
+  the two cap trims), 13302 passed, 315 skipped, 32 xfailed, 2 failed, in
+  21:32 beside another session's suite. The failures: `test_display`'s
+  kernel test (a Jupyter kernel spec pointing at a deleted venv, the same
+  on the pre-merge run), and `test_manual`'s twin cap, which this WP's text
+  pushed 178 and 63 characters over on `reference/refinement` and
+  `reference/parameters`; both trimmed, the test and `test_help` then
+  27 passed. The pre-merge run (1 failed, 13294 passed, 315 skipped) is not
+  comparable, since main moved between the two. Acceptance selection
   (`test_stephens`, `test_capabilities`, `test_acceptance_stephens`,
   `test_cross_backend`): 266 passed, 158 skipped (the jax/torch rows of a
   `[dev]` venv), 2 xfailed. `sphinx -W` exit 0; ruff clean;
@@ -323,7 +331,10 @@ grep -rn "not quotable" docs/docs src/rietx/help.py CLAUDE.md docs/skill/rietx
   full suite did not run: no golden or acceptance fixture declares a block
   over a nonzero `lor_strain` (the brucite fixture declares an all-zero
   block on a fresh phase, whose `lor_strain` defaults to 0).
-  ADDED_TIMES
+  Added tests (local junit, the run above): six new functions,
+  0.52 s together, the slowest 0.11 s; `test_stephens.py` +5 (0.51 s),
+  `test_strain_cap.py` +1 (0.01 s). The cross-backend config and the TOPAS
+  case are rows inside existing tests. None joins the slow tail.
 
   *Reader-output changes* (Yue's approval before merge): the
   `STEPHENS_STRAIN_NOT_POSITIVE` message gains the share sentence and its

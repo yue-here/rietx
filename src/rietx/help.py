@@ -1262,9 +1262,7 @@ PARAMETER_HELP: dict[str, HelpEntry] = {
             "default Levenberg-Marquardt solver holds it as a linear inequality. Under "
             "`solver=\"trf\"` and in a joint fit, `STEPHENS_STRAIN_NOT_POSITIVE` reports "
             "it instead. Read that flag as 'these coefficients are not quotable, and the "
-            "fit leaned on the clamp': the reflections outside the cone got no strain "
-            "width, so the fit's other numbers leaned on them too. It is no evidence of "
-            "anisotropy."
+            "fit leaned on the clamp'. It is no evidence of anisotropy."
         ),
         unit=None, default=None,
         typical="the isotropic seed is ε²·[M²] for a strain ε of 1e-4 to 1e-3",
