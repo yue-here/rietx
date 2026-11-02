@@ -360,7 +360,6 @@ A row the current mode fixes is the exception to the matching rule: `set_vary` f
 
 A literal path the model lacks raises `ValueError` and names the nearest real path, as `Refinement.hold`, `Refinement.tie`, `Refinement.untie` and `Refinement.set_values` do.
 `set_vary` checks every literal in the call before it changes anything, so a list with one wrong name leaves the model and the history as they were.
-`set_vary("instrument.zero")` raises `unknown parameter path: 'instrument.zero'; did you mean 'instrument.zero_shift'?`.
 A pattern that matches nothing returns `[]` in silence, since plans reach components that some models lack.
 
 `set_vary` warns with a `UserWarning` when it frees nothing for a row that exists.
