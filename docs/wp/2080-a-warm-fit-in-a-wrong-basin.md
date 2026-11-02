@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: 🔄 2026-11-02 — reproduced and measured; the trigger waits on the maintainer's ruling and on PR #1310
 Track: What fires, and what stays silent
 Depends on: 2003 (C1's ruling removes the Rwp fence this case slips under; PR #1310 lands `_rejected`, the predicate a trigger would join)
-Priority: P2 2026-11-02 — a silent wrong answer on a path every warm series runs: 2 of 20 noise draws of the reporter's synthetic chain keep a cell 0.34 Å and 0.072 Å off its true value, with nothing at warning level naming it; the workaround (`refit="stages"`) is cheap once known
+Priority: P2 2026-11-02 — a silent wrong answer on a path every warm series runs: 2 of 20 noise draws of the reporter's synthetic chain keep a cell 0.34 Å and 0.072 Å off its true value, with no warning that separates it from a good fit; the workaround (`refit="stages"`) is cheap once known
 
 ## Goal
 
@@ -48,14 +48,15 @@ a validating reference rejects and a fact other than Rwp separates it from the f
 it accepts" (`2003-batch/batch.md` § C1). This family is one. The validating
 reference is the synthetic truth, and the separating fact is the kept fit's GoF over
 the GoF of the pattern it started from: 2.01 here, at most 1.126 on every fit kept
-in the nine families WP-2003 measured.
+in the nine families WP-2003 measured, bar the three the retrospective below names
+(1.279, 1.861 and 26.0).
 
 **The measurement** (`2080-batch/`, both scripts committed).
 - `measure_trigger.py` runs the issue's chain over pattern-1 noise seeds 2-21 under
   four triggers, each patched into `_reseed_needed` with the ladder and `_prefer`
   left as on main (macOS arm64, `[dev]`, compiled tier on):
 
-  | trigger | seeds escalated | kept GoF > 1.5 | worst kept hex c error | iterations, 20 chains |
+  | trigger | seeds escalated | kept GoF > 1.5 | worst kept hex c error | pattern-1 iterations, 20 chains |
   |---|---|---|---|---|
   | main (Rwp fence) | 0 | 2 (seeds 2, 18) | −0.340 Å | 666 |
   | status only (PR #1310's C1) | 0 | 2 | −0.340 Å | 666 |
@@ -65,9 +66,12 @@ in the nine families WP-2003 measured.
   Both GoF arms take seeds 2 and 18 to `warm_staged` (GoF 1.049 and 1.026, hex c
   within 1e-4 Å of the truth). The 18 seeds that do not fire keep their first rung,
   at a GoF ratio of 0.994-1.034. The extra 217 iterations are all on the two
-  firing seeds.
+  firing seeds. The two GoF arms cannot differ on this family: a two-pattern chain
+  has one accepted pattern, so its median is the seed. The retrospective below is
+  what separates them.
 - `retro_ratio.py` reads WP-2003's committed reseed JSONs (the `off` arm: the fence
-  off, so every kept warm fit is the first rung; Linux x86-64, `[dev]`, measured
+  off, so every kept warm fit is the first rung but planted T087, whose bounded
+  first rung was forced to `warm_staged`; Linux x86-64, `[dev]`, measured
   2026-10-26) and counts where each GoF trigger at 1.25 would fire:
 
   | family | warm patterns | over seed GoF | over median GoF | what the firing pattern is |
@@ -100,7 +104,7 @@ this session).
   issue says so; the protection is the ladder, never a solver switch.
 - The Rwp fence itself: WP-2003 C1 owns it.
 - The absent-phase test calling a 6.3e-5 scale seen: a single-fit question for a
-  WP on WP-1301's seam, filed only if task 1's ruling leaves it the last guard.
+  WP on WP-1301's seam, filed only if task 2's ruling leaves it the last guard.
 
 ## Tasks
 
@@ -174,17 +178,22 @@ this session).
     in WP-2003's nine families, and the reporter's private in-situ series.
   - *Aim.* A series answer as good as fitting each pattern carefully by hand, for a
     user who runs hundreds of patterns and reads only the summary.
-  - *Options.* (A) Keep C1 as ruled: no trigger, add the GoF ratio to each series
-    entry and a paragraph in the series guide. Nothing extra runs; the reader has to
-    spot it. (B) Escalate the first try to the staged plan when its GoF exceeds 1.25×
-    the GoF of the pattern it started from, and keep whichever fits better. Measured:
-    rescues both bad draws to within 1e-4 Å, fires on 3 of 537 kept warm fits across
-    WP-2003's families (one rescue, one with nothing to rescue at +148 iterations, one
-    broken pattern #1310 already catches), +33 % iterations over the 20 chains, all on
-    the two that fired. Undoable by one line. (C) The same test against the median
-    GoF of all accepted patterns, the issue's option 1: same rescues, but fires on
-    115 of 247 planted patterns, the cost C1 removed the Rwp fence for. Dropped: the
-    issue's option 2 (fire on `FLOOR_HIT`), since seed 18 carries none.
+  - *Options.* (A) Keep C1 as ruled (the approved 2026-10-26 rule for the chain:
+    escalate a first try only when it diverged or carries an error-level code): no
+    trigger, add the GoF ratio to each series entry and a paragraph in the series guide.
+    Nothing extra runs; the reader has to spot it. (B) Escalate the first try to the
+    staged plan when its GoF exceeds 1.25× the GoF of the pattern it started from,
+    and keep whichever fits better. Measured: rescues both bad draws to within
+    1e-4 Å. It fires on 3 of 537 warm fits across the nine test series WP-2003
+    measured (the series tests for C1). One fire is a rescue. One has nothing to
+    rescue; the Rwp limit's three-rung climb cost it +148 iterations, and B's single
+    rung would cost less (not measured). One is a broken pattern #1310 already
+    catches. On the reporter's chain B costs +33 % of the second pattern's
+    iterations, all on the two draws that fired. Undoable by one line. (C) The same
+    test against the median GoF of all accepted patterns, the issue's option 1:
+    same rescues, but fires on 115 of 247 patterns of "planted" (WP-2003's
+    248-pattern series with an unmodelled phase from pattern 124), the cost C1
+    removed the Rwp fence for. Dropped: the issue's option 2 (fire on `FLOOR_HIT`), since seed 18 carries none.
   - *Practice.* No program restarts a pattern by itself (`docs/practice.md`, checked);
     GSAS-II's results table leaves the judgement to the user (recall). So B departs
     from practice as the ladder already does; A matches it.

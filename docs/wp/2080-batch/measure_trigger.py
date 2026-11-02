@@ -15,13 +15,14 @@ import sys
 import time
 
 sys.path.insert(0, sys.argv[1])
-import numpy as np
 import repro as R
 import rietx as rx
 import rietx.sequential as S
 
 ARM = sys.argv[2]
-F = float(sys.argv[3]) if len(sys.argv) > 3 else 1.25
+if ARM not in ("main", "status", "gof_seed", "gof_med"):
+    raise SystemExit(f"unknown arm {ARM!r}")
+F =float(sys.argv[3]) if len(sys.argv) > 3 else 1.25
 SEEDS = range(2, 22)
 GOF = {}
 _orig_entry = S._entry_from_result
@@ -45,9 +46,7 @@ def _need(result, accepted_rwp, factor):
     g = result.statistics.gof
     if ARM == "gof_seed":
         return g > F * GOF[accepted_rwp[-1]]
-    if ARM == "gof_med":
-        return g > F * statistics.median(GOF[r] for r in accepted_rwp)
-    raise SystemExit(ARM)
+    return g > F * statistics.median(GOF[r] for r in accepted_rwp)
 
 
 S._entry_from_result = _entry
