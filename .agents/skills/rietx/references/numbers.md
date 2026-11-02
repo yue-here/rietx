@@ -147,5 +147,8 @@ the table left out, call `ref.geometry({"torsions": [["C1", "C2", "C3",
 "C4"]], "distances": [["O1", ("N2", "2_555")]]})`: a label alone takes the
 image nearest the atom before it, and `(label, "n_klm")` names one. Its esds
 come from the last fit's covariance, which an edit or a checkout drops, after
-which every esd is `None`. (Measured: WP-1815, the published torsion loops of a
-TOPAS-6 and a SHELXL refinement reproduced to their printed digits.)
+which every esd is `None`. A result saved before schema 0.60 reopens with
+`torsions` set to `None`, meaning "not listed", where `[]` means none were
+found; `ref.geometry()` lists them, without esds. (Measured: WP-1815, the
+published torsion loops of a TOPAS-6 and a SHELXL refinement reproduced to
+their printed digits.)

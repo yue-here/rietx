@@ -60,7 +60,7 @@ Three rules the reporter measured, to keep:
 - [x] `TorsionRestraint` on the shared partials. (PR #1261)
 - [x] The CIF torsion loop (with WP-1933, which waits on it).
 - [x] Tests: J·Cov·Jᵀ against Monte Carlo (circular difference) within 5 %; a template-fixed bond reports `None`; a torsion at exactly 180° has a finite esd (these three PR #1261); the CIF torsion loop round-trips
-- [ ] Skill: the reference row for `Refinement.geometry`
+- [x] Skill: the reference row for `Refinement.geometry` (PR #1261 wrote it in `references/numbers.md`; this WP added the pre-0.60 `None` reading)
 
 ## Acceptance
 
