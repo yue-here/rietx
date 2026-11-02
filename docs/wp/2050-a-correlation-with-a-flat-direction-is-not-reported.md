@@ -1,9 +1,8 @@
 # WP-2050 — a correlation with a flat direction is not reported as one
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — all four tasks landed (PR #1306); ruled by Yue 2026-11-01 (the cut approved, no FLAT_DIRECTION clause)
+Milestone: unscheduled · Status: ✅ 2026-11-02 — `HIGH_CORRELATION` reports no pair against a direction the data does not determine; brucite's count holds at 35 under rounding nudges (PR #1306)
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P3 2026-10-25 — a warning whose count is rounding: brucite carries 35 to 42 by a 1e-14 start nudge, and the alarm pin cannot hold it on any platform
 
 ## Goal
 
@@ -130,6 +129,13 @@ none of their reported pairs involves it.
 
 ## Handover log
 
+- **2026-11-02** — closed (PR PRNUM). PR #1306 merged on 2026-11-02, so a fit
+  no longer reports a correlation whose value is set by rounding. Every task
+  here was already ticked. This entry closes the file and re-measures nothing.
+  *Done*: Status ✅, the Priority line deleted, the narrative moved to the
+  v1.11 record, a line staged in the 1.11.0 notes under "Numbers that move"
+  (the merge had not staged one), the index regenerated. *Next*: none here.
+  WP-2036's nightly waited on this WP (its `Depends on:` line).
 - **2026-11-01** — ruling applied, PR #1306.
 
   *Ruled* (Yue, in chat, 2026-11-01: "as you recommend"). (1) Drop the
