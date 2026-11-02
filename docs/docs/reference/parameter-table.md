@@ -358,8 +358,12 @@ A held row is skipped by a wildcard name, as a locked one is.
 A literal path to a row you held raises `ValueError`, saying to `Refinement.unhold` it first.
 A row the current mode fixes is the exception to the matching rule: `set_vary` frees it, and the next stage drops it again and reports it as `mode_fixed`.
 
-`set_vary` warns with a `UserWarning` when a call changes nothing it named.
-A literal path the model lacks gets the nearest real path.
+A literal path the model lacks raises `ValueError` and names the nearest real path, as `Refinement.hold`, `Refinement.tie`, `Refinement.untie` and `Refinement.set_values` do.
+`set_vary` checks every literal in the call before it changes anything, so a list with one wrong name leaves the model and the history as they were.
+`set_vary("instrument.zero")` raises `unknown parameter path: 'instrument.zero'; did you mean 'instrument.zero_shift'?`.
+A pattern that matches nothing returns `[]` in silence, since plans reach components that some models lack.
+
+`set_vary` warns with a `UserWarning` when it frees nothing for a row that exists.
 When freeing, a phase path or a pattern naming one atom site gets the reason a stage gives under `STAGE_PATH_NOT_FREE`.
 On LaB6, `set_vary("phases.0.atoms.0.dof.*")` returns `[]` and warns that every coordinate of La on 1a is fixed by its site symmetry.
 A wildcard pattern such as `phases.*.atoms.*.x` declines rows without a warning, since a sweep declining rows is how plans work.

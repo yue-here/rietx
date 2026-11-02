@@ -1146,9 +1146,6 @@ def test_no_preset_names_one_site():
 
 
 @pytest.mark.parametrize("args, says", [
-    (("instrument.zero",), "set_vary freed nothing for 'instrument.zero', which "
-     "names no parameter of this model. Did you mean 'instrument.zero_shift'?"),
-    (("instrument.zero", False), "set_vary fixed nothing for 'instrument.zero'"),
     (("instrument.background_peaks.*",), "It is a spelling retired after v1.2, "
      "now spelled 'instrument.extra_components.*'."),
     (("phases.0.atoms.0.dof.*",), "A set_vary call asked for "
@@ -1156,7 +1153,7 @@ def test_no_preset_names_one_site():
     (("phases.0.cell.b",), "A set_vary call asked for phases.0.cell.b, which "
      "follows phases.0.cell.a, so nothing was freed for it. Free phases.0.cell.a "
      "instead."),
-], ids=["unknown", "unknown-fixing", "retired", "site-glob", "tied-literal"])
+], ids=["retired", "site-glob", "tied-literal"])
 def test_set_vary_warns_on_a_request_that_changes_nothing(args, says):
     """The verb half (WP-1951): a stage's two findings, as a warning."""
     ref = rx.Refinement(*perturbed_models(), history=False)
@@ -1192,7 +1189,30 @@ def test_set_vary_commits_before_it_warns():
     assert {r.path for r in ref.parameters() if r.vary} >= {"phases.0.cell.a"}
 
 
+@pytest.mark.parametrize("vary", [True, False], ids=["freeing", "fixing"])
+def test_set_vary_refuses_an_unknown_literal_before_changing_anything(
+        ref, pattern, vary):
+    """Settled under delegation (WP-1951, 2026-11-02): a literal path the model
+    lacks raises, as the sibling verbs do, and every literal is checked before
+    anything applies, so a list with one typo leaves model and history as
+    they were.  A pattern matching nothing stays silent (WP-1414)."""
+    ref.fit(pattern, plan=SHORT)
+    before = [(r.path, r.vary) for r in ref.parameters()]
+    n_nodes, head = len(ref.history), ref._head_id
+    with pytest.raises(ValueError) as caught:
+        ref.set_vary(["phases.0.cell.a", "instrument.profile.w",
+                      "instrument.zero", "phases.0.cel.a", "instrument.zero"], vary)
+    assert str(caught.value) == (
+        "unknown parameter paths: 'instrument.zero', 'phases.0.cel.a'; for "
+        "'instrument.zero', did you mean 'instrument.zero_shift'?; for "
+        "'phases.0.cel.a', did you mean 'phases.0.cell.a'?"), "each typo once"
+    assert [(r.path, r.vary) for r in ref.parameters()] == before
+    assert (len(ref.history), ref._head_id) == (n_nodes, head)
+    assert ref.set_vary("phases.*.nothing.*", vary) == []
+
+
 @pytest.mark.parametrize("verb, arg", [
+    ("set_vary", "instrument.zero"),
     ("hold", "instrument.zero"), ("unhold", "instrument.zero"),
     ("untie", "instrument.zero"), ("set_values", {"instrument.zero": 0.0}),
 ])

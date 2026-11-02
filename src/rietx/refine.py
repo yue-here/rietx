@@ -3207,16 +3207,28 @@ class Refinement:
         pattern by a fingerprint and no pattern has been seen before then.  The
         working state changes either way.
 
-        A request that changes nothing it named **warns** (WP-1951, issue
-        #896), with the text a stage's ``STAGE_PATH_UNKNOWN`` and
-        ``STAGE_PATH_NOT_FREE`` give: a literal no row has, with the nearest
-        path, and, when freeing, a phase literal or a glob naming one site
-        (``phases.0.atoms.0.dof.*``) that frees nothing there.  A warning
-        rather than a refusal, because the return value already says what
-        changed and a glob that declines rows is how plans work.
+        A literal path the model lacks **raises** ``ValueError`` naming the
+        nearest real path, as :meth:`hold`, :meth:`tie`, :meth:`untie` and
+        :meth:`set_values` do (WP-1951).  Every literal is checked before
+        anything is applied, so a list with one typo leaves the model and the
+        history as they were.  An agent reads an exception every time, where a
+        warning can scroll past or show once per call site.  A pattern that
+        matches nothing stays silent (WP-1414), since that is how plans reach
+        a component a model may not declare.
+
+        A request that frees nothing it named **warns** (issue #896), with the
+        text a stage's ``STAGE_PATH_UNKNOWN`` and ``STAGE_PATH_NOT_FREE`` give:
+        a retired spelling that matches nothing, with its current one, and,
+        when freeing, a phase literal or a glob naming one site
+        (``phases.0.atoms.0.dof.*``) that the model declines.  Those rows
+        exist, so the return value already says what changed.
         """
         globs = [path_globs] if isinstance(path_globs, str) else list(path_globs)
         table = self._working_table()
+        known = {e.path for e in table.entries}
+        if unknown := [g for g in dict.fromkeys(globs)
+                       if is_literal_path(g) and g not in known]:
+            raise _unknown_paths_error(unknown, known)
         if vary:
             # A literal path is a claim about one parameter, and a held one
             # contradicts a declaration this same caller made, so it is
@@ -7889,6 +7901,18 @@ def _unknown_path_error(path: str, known) -> ValueError:
     hint = _path_hint(path, known)
     return ValueError(f"unknown parameter path: {path!r}"
                       + (f"; {hint}" if hint else ""))
+
+
+def _unknown_paths_error(paths: list[str], known) -> ValueError:
+    """:func:`_unknown_path_error` for one path; for several, every one named.
+
+    ``set_vary`` takes a list, and naming each typo saves a rerun per typo.
+    """
+    if len(paths) == 1:
+        return _unknown_path_error(paths[0], known)
+    return ValueError(f"unknown parameter paths: {', '.join(map(repr, paths))}"
+                      + "".join(f"; for {p!r}, {h}" for p in paths
+                                if (h := _path_hint(p, known))))
 
 
 def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
