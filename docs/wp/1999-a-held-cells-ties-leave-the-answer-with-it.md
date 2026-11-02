@@ -83,6 +83,36 @@ so measure how many goldens and tests move before choosing.
 
 ## Handover log
 
+- **2026-11-02** — a ghostshift runner chased the Kernels workflow's
+  intermittent macOS x86_64 failure on this PR. *Cause:* the gate, not this
+  PR. The PR reaches Kernels only through a comment in
+  `examples/bench_refinement.py`. The step "Agreement with the numpy path
+  inside two real fits" compares a fit on the twins (the bench's numpy copies
+  of the kernels) with a numpy-path fit. It gates that only when a second
+  numpy-path fit agrees bit for bit. On that runner the numpy path differs
+  from itself between some fits and not others (WP-1940's handover, up to
+  7.1e-1 esd), so one agreeing pair proves nothing. *Evidence:* the same
+  verdict ("the twins left the numpy path in: trigger") on three other
+  branches: runs 38603684026, 38896527839 and 38924988380. Here, cpd-1a's
+  twins sat 1.4e-06 esd away in run 41367944436 (attempt 1). The numpy path's
+  own pair on cpd-1a differed by 1.1e-06 in run 41378211395. Trigger's twins
+  sat 3.0e-06 away in 41378211395, and its numpy pair differed by 1.7e-07 in
+  41367944436. The rows "with the same value and another esd" (7 on trigger,
+  9 on cpd-1a) are exactly each fit's free rows sitting on a bound of 0
+  (`gauss_size`, `gauss_strain`, `lor_strain`, one `biso`), with esds from
+  8.8e-02 to 1.4e+02. This PR neither adds nor removes them. Under Rosetta 2
+  the numpy path reproduced itself (four trigger fits, three cpd-1a fits),
+  so the noise is the runner's. *Fix:* `bench_aot_kernels.NONDETERMINISTIC`
+  names macOS x86_64, and `twins_verdict` reports rather than gates the
+  twins' gap there whatever the numpy pair did. Every kernel call still meets
+  its bar on that platform, and the four deterministic platforms still gate
+  the twins. New test
+  `test_one_agreeing_numpy_pair_does_not_make_a_noisy_platform_checkable`
+  (red on the old verdict). *Not done:* whether one Accelerate thread
+  (`VECLIB_MAXIMUM_THREADS=1`) makes that runner deterministic. That is
+  WP-1940's hypothesis and would let the gate return there. It needs a run
+  on the Intel runner, which Rosetta cannot stand in for.
+
 - **2026-11-01** — closed, PR #1046 (a ghostshift runner continued the
   2026-10-18 claim branch, main merged in). A result now lists a parameter
   only when the fit could move it. Before, a tied parameter was listed
