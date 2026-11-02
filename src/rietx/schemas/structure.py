@@ -1210,8 +1210,10 @@ class DistortionModes(Base):
     normalised in, so the Å reading is reproducible.
 
     The modes come with the driving irrep first.  Build the record with
-    ``rietx.crystallography.representation.distortion.displacive_statement``;
-    the parameter table refuses one whose stored coordinates disagree with it
+    ``rietx.crystallography.representation.distortion.displacive_statement``,
+    which also states the cell through ``Phase.parent_cell``; the two records
+    must name one parent group and one (P, p), or the phase is refused.  The
+    parameter table refuses one whose stored coordinates disagree with it
     (``DISTORTION_DRIFT_TOL``) or whose mode vector leaves its site's allowed
     subspace.
     """
@@ -1261,13 +1263,54 @@ class ParentCell(Base):
     amplitude per strain the child's group allows, in the order
     ``crystallography.metric.strain_basis`` gives them; the parameter table
     refuses a list of the wrong length and says how long it must be.  Built by
-    ``magnetic_supercell`` with every strain at zero and held.
+    ``magnetic_supercell`` with every strain at zero and held, and by
+    ``displacive_statement`` with the child's own strains held (zero for a
+    child at its parent's metric).
     """
 
     space_group: str
     transform: str
     cell: Cell
     strain: list[Parameter] = Field(default_factory=list)
+
+
+def _parent_records_disagree(modes: DistortionModes | None,
+                            parent_cell: ParentCell | None) -> str | None:
+    """Why ``Phase.distortion_modes`` and ``Phase.parent_cell`` disagree, or ``None``.
+
+    Both name the parent group and the parent → child transform (WP-1419 C3).
+    The groups are compared as settings (gemmi's extended Hermann–Mauguin
+    symbol, so ``"Pm-3m"`` and ``"P m -3 m"`` agree), the transforms as exact
+    (P, p), with p compared modulo the parent lattice.  ``None`` when either
+    record is absent.  The ``Phase`` validator and the parameter table both ask
+    it, since ``model_copy`` does not re-run validators.
+    """
+    if modes is None or parent_cell is None:
+        return None
+    from ..crystallography.magnetic.operators import parse_transform
+    from ..crystallography.symmetry import get_spacegroup
+
+    def setting(symbol: str) -> str:
+        try:
+            return get_spacegroup(symbol).xhm()
+        except ValueError:
+            return symbol.replace(" ", "")
+
+    if setting(modes.parent_space_group) != setting(parent_cell.space_group):
+        return (f"distortion_modes.parent_space_group {modes.parent_space_group!r} and "
+                f"parent_cell.space_group {parent_cell.space_group!r} name different "
+                "parents; restate the child with displacive_statement, which writes both")
+    try:
+        p_modes, o_modes = parse_transform(modes.transform)
+        p_cell, o_cell = parse_transform(parent_cell.transform)
+    except ValueError as exc:
+        return f"a parent → child transform cannot be read ({exc})"
+    if p_modes != p_cell or any((a - b).denominator != 1 for a, b in zip(o_modes, o_cell)):
+        return (f"distortion_modes.transform {modes.transform!r} and parent_cell.transform "
+                f"{parent_cell.transform!r} are different (P, p), so the modes and the cell "
+                "describe different children; restate the child with displacive_statement, "
+                "which writes both")
+    return None
 
 
 class Phase(_InheritsDeclaredDefaults):
@@ -1514,6 +1557,19 @@ class Phase(_InheritsDeclaredDefaults):
     # default) is exactly off: the cell refines as its own six parameters under
     # ``cell_constraints``, as every earlier version built it.
     parent_cell: ParentCell | None = None
+
+    @model_validator(mode="after")
+    def _one_parent_in_both_records(self) -> "Phase":
+        """``distortion_modes`` and ``parent_cell`` state one parent and one (P, p).
+
+        The two records are two statements of one fact (the parent group and
+        the parent → child transform), so they must agree, or the cell and
+        the modes would describe different children (WP-1419).
+        """
+        reason = _parent_records_disagree(self.distortion_modes, self.parent_cell)
+        if reason is not None:
+            raise ValueError(f"phase {self.name!r}: {reason}")
+        return self
 
     @model_validator(mode="after")
     def _bodies_name_their_atoms(self) -> "Phase":
