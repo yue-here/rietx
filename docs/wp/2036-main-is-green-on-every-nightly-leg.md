@@ -262,8 +262,14 @@ nightly (run 41305369905, `f4db7763`): 3 failed, 14 146 passed, in 1:35:05.
 - [ ] `test_magnetic_solve_acceptance.py::test_the_150k_pattern_has_nothing_to_solve`:
       class 3's trial stopped on `max_iter` on Linux after
       `SOLVE_MAX_CONTINUATIONS` (10) continuations.
-- [ ] The two cancelled nights (10-30, 10-31): read the job-time table and
-      decide the `full` job's `timeout-minutes`.
+- [x] The two cancelled nights (10-30, 10-31): read the job-time table and
+      decide the `full` job's `timeout-minutes`. *Both hit the 150-min cap at
+      90 % of the suite, about 1.55× slower than 11-01 at every 10 % mark. Two
+      causes stacked: slow runners, and #1189's 10-13 min P −1 subgroup case,
+      which #1239 made fast before 11-01. Every job that completed from 10-16
+      to 11-01 took 84-131 min, so 150 was 1.15× the slowest pass, a load
+      sensor by `tests/CLAUDE.md` § Budgets in tests. Raised to 300, 2.3× the
+      slowest pass, on the Windows job's precedent above.*
 
 ## Acceptance
 
