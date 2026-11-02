@@ -63,6 +63,13 @@ Run the session-start ritual. The SessionStart hook's report
    is the opposite and is often what you want — unfinished work with a branch
    to continue, resumed by giving `EnterWorktree` that tree's name.
 
+   **A row reading `held by ghostshift <owner>` is a runner** of ghostshift,
+   the claude-config skill that works WPs unattended. A runner has no session
+   in its `agent-<id>` tree, so only the shift's claim on origin shows it is
+   live; it is taken like any held row (WP-2077). The output's ghostshift
+   section lists every WP a shift holds, on any machine. A runner doing this
+   step sees its own WP there, marked as this tree's.
+
    **Open pull requests, contributors' forks included.** The second part, and
    the only one that can see a person on another machine. Contributors here
    work from *issues* rather than WPs — measured 2026-09-15, all three open
@@ -73,9 +80,15 @@ Run the session-start ritual. The SessionStart hook's report
 
    **An issue link is evidence of overlap, not proof of a clash.** One issue
    can be cited by several WPs, so read the PR before dropping a WP over it.
-   A PR that names a WP outright is the strong form. If `gh` cannot answer the
-   command says so rather than printing an empty list, and a session that
-   cannot look should ask the user before starting.
+   A PR that names a WP outright is the strong form: its title, else the WP
+   files it edits, else its branch. A PR naming none is linked through the
+   issues in its title and its closing keywords, never a number that is
+   itself a PR, and to each WP its body mentions ("mentions it"). A body
+   mention is never read as the claim: #941 built all of WP-1956 and was
+   filed under the WP its body named in passing (WP-2046). Your own PR is
+   left out by its branch, so a contributor's PR on your WP still shows. If
+   `gh` cannot answer the command says so rather than printing an empty
+   list, and a session that cannot look should ask the user before starting.
 
    The WP a tree is on comes from its branch, so a tree you resume for a
    *different* WP is telling the next session the wrong thing. Say so once:

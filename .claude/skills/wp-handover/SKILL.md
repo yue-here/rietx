@@ -285,7 +285,10 @@ re-reading its own diff.
       `gh pr view N --json closingIssuesReferences`, and clear a stray link by
       taking the **number** out, since editing the words around it does not.
     - **Never merge, and never wait on CI to decide.** Whether green is
-      enough, and when to merge, is the maintainer's call.
+      enough, and when to merge, is the maintainer's call. A ghostshift
+      shift lead may also merge a PR its checks find clear-cut, under the
+      user's standing permission of 2026-10-31
+      (`~/Code/claude-config/skills/ghostshift/SKILL.md` §4).
     - **Then subscribe to it**, where `subscribe_pr_activity` exists (a cloud
       session; `ToolSearch` loads it). `.claude/hooks/pr_subscribe.py` puts
       the call, number filled in, in front of you after `gh pr ready`. From

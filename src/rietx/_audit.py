@@ -1405,15 +1405,19 @@ ROWS: tuple[Row, ...] = (
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
                   "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), a strict xfail (tests/test_staged_start_invariance.py, "
-                  "2026-10-25); 1.00-2.15x fewer evaluations (WP-1113/1123), of which "
+                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
+                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "1.00-2.15x fewer evaluations (WP-1113/1123), of which "
                   "converging the last declared stage hands back 1.04-1.07x (WP-2045)"),
-        grounds=("A schedule rietx chose (WP-1123); kept on four families with its failing case "
-                 "stated, where the alternative is the arm that runs out of budget (the sixth "
-                 "round's Q2, bar 0.1 plain esd, ruled 2026-10-21). The last declared stage "
+        grounds=("Cost only (ruled 2026-11-01): 1.00-2.15x fewer evaluations for answers "
+                 "within 0.1 plain esd of every stage at 1e-9 on FAP, cpd-1a and 11-BM NAC. "
+                 "The failing case the 2026-10-21 approval was weighed against, an absent "
+                 "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
+                 "esd since WP-2045. LaB6's 8.82 esd is the S/L and H/L mirror (WP-2012), "
+                 "not an accuracy loss from the tolerance. The last declared stage "
                  "converges when a closing stage follows it (WP-2045 option 5, ruled "
                  "2026-10-24)."),
-        approved="2026-10-21"),
+        approved="2026-11-01"),
     Row("rietx.schemas.results.StageResult.window_area_tol", "action", tier=2, ambiguity=1,
         evidence=("the record of the closing stage PlanSpec:closing_window_tol runs (that "
                   "row's evidence: BGMN's closing run by default), written by both stage "
@@ -3460,13 +3464,17 @@ ROWS: tuple[Row, ...] = (
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
                   "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), a strict xfail (tests/test_staged_start_invariance.py, "
-                  "2026-10-25); 1.00-2.15x fewer evaluations (WP-1113/1123), of which "
+                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
+                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "1.00-2.15x fewer evaluations (WP-1113/1123), of which "
                   "converging the last declared stage hands back 1.04-1.07x (WP-2045)"),
-        grounds=("A schedule rietx chose (WP-1123); kept on four families with its failing case "
-                 "stated, where the alternative is the arm that runs out of budget (the sixth "
-                 "round's Q2, bar 0.1 plain esd, ruled 2026-10-21)."),
-        approved="2026-10-21"),
+        grounds=("Cost only (ruled 2026-11-01): 1.00-2.15x fewer evaluations for answers "
+                 "within 0.1 plain esd of every stage at 1e-9 on FAP, cpd-1a and 11-BM NAC. "
+                 "The failing case the 2026-10-21 approval was weighed against, an absent "
+                 "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
+                 "esd since WP-2045. LaB6's 8.82 esd is the S/L and H/L mirror (WP-2012), "
+                 "not an accuracy loss from the tolerance."),
+        approved="2026-11-01"),
     Row("rietx.schemas.plan.PHASE_SUPPORT_SIGMA", "constant", tier=3, value=3.0,
         evidence=("WP-1523: 3 sigma, = indexing ABSENT_SIGMA by test; 20 blank fits read 1 phase "
                   "seen, 9 at the old 1 sigma; fails on a real phase at ~1/16 000 of a strong "
@@ -3879,13 +3887,17 @@ ROWS: tuple[Row, ...] = (
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
                   "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), a strict xfail (tests/test_staged_start_invariance.py, "
-                  "2026-10-25); 1.00-2.15x fewer evaluations (WP-1113/1123), of which "
+                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
+                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "1.00-2.15x fewer evaluations (WP-1113/1123), of which "
                   "converging the last declared stage hands back 1.04-1.07x (WP-2045)"),
-        grounds=("A schedule rietx chose (WP-1123); kept on four families with its failing case "
-                 "stated, where the alternative is the arm that runs out of budget (the sixth "
-                 "round's Q2, bar 0.1 plain esd, ruled 2026-10-21)."),
-        approved="2026-10-21"),
+        grounds=("Cost only (ruled 2026-11-01): 1.00-2.15x fewer evaluations for answers "
+                 "within 0.1 plain esd of every stage at 1e-9 on FAP, cpd-1a and 11-BM NAC. "
+                 "The failing case the 2026-10-21 approval was weighed against, an absent "
+                 "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
+                 "esd since WP-2045. LaB6's 8.82 esd is the S/L and H/L mirror (WP-2012), "
+                 "not an accuracy loss from the tolerance."),
+        approved="2026-11-01"),
     Row("rietx.schemas.plan.PlanSpec:closing_window_tol", "default", tier=2, ambiguity=1, value=0.001,
         evidence=("BGMN ends every refinement ladder with a closing run, all free and restarted "
                   "from the answer, by default (manual A.4; Doebelin & Kleeberg 2015 J. Appl. "
@@ -3935,13 +3947,17 @@ ROWS: tuple[Row, ...] = (
                   "11-BM NAC (0.000, 0.000, 0.000) and on cpd-1a with an absent zircon declared "
                   "(0.009, from 0.185 before WP-2002's width twin hold and 0.035 before "
                   "WP-2045); fails on SRM 660c, 8.82 esd on axial_sl, its mirrored S/L and H/L "
-                  "minima (WP-2012), a strict xfail (tests/test_staged_start_invariance.py, "
-                  "2026-10-25); 1.00-2.15x fewer evaluations (WP-1113/1123), of which "
+                  "minima (WP-2012), an xfail made non-strict because rounding picks the "
+                  "minimum (tests/test_staged_start_invariance.py, WP-2036, 2026-10-25); "
+                  "1.00-2.15x fewer evaluations (WP-1113/1123), of which "
                   "converging the last declared stage hands back 1.04-1.07x (WP-2045)"),
-        grounds=("A schedule rietx chose (WP-1123); kept on four families with its failing case "
-                 "stated, where the alternative is the arm that runs out of budget (the sixth "
-                 "round's Q2, bar 0.1 plain esd, ruled 2026-10-21)."),
-        approved="2026-10-21"),
+        grounds=("Cost only (ruled 2026-11-01): 1.00-2.15x fewer evaluations for answers "
+                 "within 0.1 plain esd of every stage at 1e-9 on FAP, cpd-1a and 11-BM NAC. "
+                 "The failing case the 2026-10-21 approval was weighed against, an absent "
+                 "zircon run to the iteration limit at the tight tolerance, passes at 0.009 "
+                 "esd since WP-2045. LaB6's 8.82 esd is the S/L and H/L mirror (WP-2012), "
+                 "not an accuracy loss from the tolerance."),
+        approved="2026-11-01"),
     Row("rietx.schemas.plan.StageSpec:lebail_cycles", "default", tier=3, ambiguity=1, value=3,
         evidence=("no stated source; issue #740 (synthetic LaMnO3-like neutron, cell and profile "
                   "at truth): Rwp 4.56 % at 3 cycles, 1.62 % at 100-400, 1.09 % for the true "

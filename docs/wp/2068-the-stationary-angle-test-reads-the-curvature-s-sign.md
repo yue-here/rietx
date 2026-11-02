@@ -81,8 +81,6 @@ difference. The FD path stays as the fallback and is kept exercised.
 
 ### Inherited
 
-- **From WP-2060 (2026-11-02): a profile interval on a magnetic fit pays this test on every refit.** On the two-site Pnma set (`_fit(0.0, seed=s)`, s = 0-19, macOS arm64, `[dev]`), one modulus profile took 7-58 s, 24-38 refits, against fits of 1-8 s. That cost is why WP-2060 left the moduli beside zeroed angles without an automatic interval; the analytic block here would lower it. On seed 15 the refits at the fitted modulus ended 5.1 χ² above the fit itself (cut 5.0), and on 8 of the 20 seeds a refit found χ² below the fit (`fit_is_minimum=False`): a refit of a fit whose angles the test zeroed does not reproduce that fit's χ². Not diagnosed; probes in the maintainer-local `~/.cache/ghostshift/rietx/wp-2060/probe/` (`coverage.py`, `seed15.py`).
-
 ## Non-goals
 
 - Seeding a moment angle off a maximum before the stage: proposed separately on #1206.
