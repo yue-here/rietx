@@ -400,3 +400,38 @@ def test_a_singular_dense_block_is_factored_shifted(monkeypatch):
     assert _Counting.products < n // 2
     monkeypatch.setattr(bccg, "_CHOLESKY_SHIFTS", 1)
     assert bccg._factor(H, free) is None
+
+
+class _Stop(Exception):
+    pass
+
+
+@pytest.mark.parametrize("layout", ["sparse", "dense"])
+def test_a_cancel_read_mid_solve_abandons_the_step_on_either_path(layout):
+    """WP-2063, issue #1231: one Pawley step refactorised 1099 times in 27 s,
+    so ``check`` is read before every factorisation attempt and CG product,
+    on the incomplete-LU (sparse) and the Cholesky (dense) path alike.  A
+    check that fires on its fifth read stops the solve there; a check that
+    never fires changes nothing."""
+    H, g, lo, hi = _banded_box_qp()
+    if layout == "dense":
+        H = H.toarray()
+    reads = {"n": 0}
+
+    def check():
+        reads["n"] += 1
+        if reads["n"] == 5:
+            raise _Stop
+
+    with pytest.raises(_Stop):
+        bccg.projected_cg(H, g, lo, hi, check=check)
+    assert reads["n"] == 5
+    quiet = {"n": 0}
+
+    def count():
+        quiet["n"] += 1
+
+    y, side = bccg.projected_cg(H, g, lo, hi, check=count)
+    y_plain, side_plain = bccg.projected_cg(H, g, lo, hi)
+    assert quiet["n"] > 5, "the solve reads the check more than five times"
+    assert np.array_equal(y, y_plain) and np.array_equal(side, side_plain)
