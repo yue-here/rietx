@@ -1187,7 +1187,8 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
     answer's class kept at a Z′ that is not whole with the special positions it
     needs, and each kept member whose orbits cannot hold the declared count with
     that statement.  A density that fits several whole Z is said to, and only
-    declares nothing.
+    declares nothing; a ``z`` with no formula says it filters nothing and why,
+    rather than counting the groups it removed, none.
     """
     prior = screen.prior
     declared = ", ".join(f"{k}={v}" for k, v in prior.declared().items())
@@ -1198,6 +1199,14 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
     n_removed = sum(len(c.excluded_groups) for c in removed)
     message = (f"the declared prior ({declared}) removed {n_removed} space "
                f"group(s) from {len(removed)} class(es)")
+    if prior.z is not None and prior.formula is None:
+        # a z alone has no atoms per cell to count against a member's orbits
+        why = ("with no formula there are no atoms per cell to count against "
+               "a member's orbits, so it names only the special positions a "
+               "Z′ that is not whole needs (declare the formula to count them)")
+        message = (f"the declared z={prior.z} filters no group: {why}"
+                   if set(prior.declared()) == {"z"}
+                   else f"{message}; z={prior.z} filtered none of them: {why}")
     if contradicted:
         message = (f"the declared density and formula put "
                    f"{screen.z_from_density:.2f} formula units in this cell, "
@@ -1233,7 +1242,8 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
         message=message + ".  A filter on the members, never evidence: no ΔBIC "
                           "moved and every class was fitted",
         where=[f"{c.symbol}: excluded {_named(c)}" for c in removed]
-        + _special_lines(top, screen.z) + _count_lines(top),
+        + _special_lines(top, screen.z) + _count_lines(top)
+        + _uncounted_lines(prior, screen.z),
         suggestion=("check the declaration before the answer: a class it "
                     "emptied that leads on the data is either chemistry doing "
                     "what a powder cannot, or a wrong declaration (a racemate "
@@ -1244,16 +1254,40 @@ def _prior_diagnostic(screen, alive, top) -> Diagnostic:
 
 
 def _special_lines(top, z) -> list[str]:
-    """The Z′ statements of the answer's class, one per member — or one line
-    when every member needs special positions, as an ionic solid's do, since
-    the statement then tells no member from another."""
+    """The Z′ statements of the answer's class, one per member — or, when
+    every member carries one, one line per kind of note, as an ionic solid's
+    all need special positions, since the statement then tells no member of
+    that kind from another.  The two kinds say different things: a member
+    holds Z with formula units on special positions, or Z is no sum of its
+    orbit multiplicities and no member of the formula unit sits whole
+    (:func:`~rietx.indexing.extinction.special_site_note`).  A kind held by one
+    member keeps that member's own note."""
+    from .extinction import _places_no_whole_unit
+
     notes = top.special_positions
     if not notes:
         return []
-    if len(top.space_groups) > 1 and len(notes) == len(top.space_groups):
-        return [f"{top.symbol}: every member holds Z = {z} only with formula "
-                "units on special positions (special_positions names them)"]
-    return [f"{top.symbol}: {note}" for note in notes.values()]
+    if len(top.space_groups) < 2 or len(notes) != len(top.space_groups):
+        return [f"{top.symbol}: {note}" for note in notes.values()]
+    no_sum = [g for g, note in notes.items() if _places_no_whole_unit(note)]
+    special = [g for g in notes if g not in no_sum]
+    every = not no_sum or not special
+    out = []
+    if len(special) > 1:
+        who = ("every member holds" if every
+               else f"{', '.join(special)} hold")
+        out.append(f"{top.symbol}: {who} Z = {z} only with formula units on "
+                   "special positions (special_positions names them)")
+    elif special:
+        out.append(f"{top.symbol}: {notes[special[0]]}")
+    if len(no_sum) > 1:
+        who = ("no member" if every else f"none of {', '.join(no_sum)}")
+        out.append(f"{top.symbol}: {who} holds Z = {z} as whole formula units, "
+                   "Z being no sum of its orbit multiplicities, so the formula "
+                   "unit is not one molecule (special_positions gives them)")
+    elif no_sum:
+        out.append(f"{top.symbol}: {notes[no_sum[0]]}")
+    return out
 
 
 def _count_lines(top) -> list[str]:
@@ -1262,6 +1296,20 @@ def _count_lines(top) -> list[str]:
     return [f"{top.symbol}: {g} kept though {why} (a disordered model shares "
             "a site; ExtinctionPrior(ordered=True) removes it)"
             for g, why in top.count_notes.items()]
+
+
+def _uncounted_lines(prior, z) -> list[str]:
+    """The elements an ordered count could not test: their atoms per cell are
+    not whole, so no group was removed for them and none was counted."""
+    if not (prior.ordered and prior.formula and z is not None):
+        return []
+    from ..crystallography.atomic_volume import formula_counts
+    from .extinction import uncounted_elements
+
+    skipped = uncounted_elements(z, formula_counts(prior.formula))
+    return [f"ordered: {el} not counted, {per_cell:g} atoms per cell at z={z} "
+            "is not whole, so no ordered model holds it (the other elements "
+            "were counted)" for el, per_cell in skipped.items()]
 
 
 def _cell_str(cell) -> str:
