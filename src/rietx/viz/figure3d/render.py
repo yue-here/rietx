@@ -16,6 +16,7 @@ has lines three times as wide as a 1000 px one and the same proportions.
 from __future__ import annotations
 
 import copy
+import functools
 import struct
 import zlib
 from collections.abc import Mapping
@@ -88,8 +89,8 @@ class StructureFigure:
     drawn beside the figure.  A site recoloured in part
     (:func:`~rietx.viz.recolour`) appears again as ``"<label> (recoloured)"``.
     ``polyhedron_palette`` is the same for each polyhedron formula drawn
-    (``"SiO₄"``): its centre's colour, which its faces are drawn in at
-    :data:`.scene.POLY_ALPHA` opacity and its edges darker.  A formula drawn
+    (``"SiO₄"``): its centre's colour before any dimming, which its faces are
+    drawn in at :data:`.scene.POLY_ALPHA` opacity and its edges darker.  A formula drawn
     in two colours appears again as ``"<formula> (recoloured)"``.
 
     ``report`` is the numbers a look would give (:class:`~.report.FigureReport`).
@@ -281,13 +282,21 @@ def _named(pairs) -> dict[str, str]:
 
 def _on_dark_ground(geometry: Mapping) -> Mapping:
     """The geometry with each site still in its element's CPK colour given
-    that element's dark-ground colour (``structure3d.DARK_GROUND``), so a
-    colour the caller chose stays theirs."""
+    that element's dark-ground colour (``structure3d.DARK_GROUND``).  A site
+    :func:`~rietx.viz.recolour` marked keeps the caller's colour, and a
+    dark-ground colour within ``MIN_SEPARATION`` of another colour the phase
+    draws is not used, since ``phase_palette`` separated the colours it was
+    given and not this one."""
     from ...gui import structure3d as s3
 
-    swap = {k: s3.DARK_GROUND[s["element"]] for k, s in enumerate(geometry["sites"])
-            if s["element"] in s3.DARK_GROUND
+    sites = geometry["sites"]
+    swap = {k: s3.DARK_GROUND[s["element"]] for k, s in enumerate(sites)
+            if s["element"] in s3.DARK_GROUND and not s.get("recoloured")
             and s["color"] == s3._CPK.get(s["element"])}
+    others = {s["color"] for s in sites} - {sites[k]["color"] for k in swap}
+    swap = {k: c for k, c in swap.items()
+            if all(s3._oklab_distance(s3._oklab(c), s3._oklab(o)) >= s3.MIN_SEPARATION
+                   for o in others if sc._HEX.match(o))}
     if not swap:
         return geometry
     return {**geometry, "sites": [{**s, "color": swap[k]} if k in swap else s
@@ -409,7 +418,7 @@ def _fit(extent, size, margin_css: float, pad: float = FIT_PAD) -> raster.Frame:
         other = max(1, round((min(bw, bh) * ppa + 2 * m) / keep))
         width, height = (long, other) if bw >= bh else (other, long)
     if not ppa > 0:
-        raise ValueError(f"size {size!r} leaves no room for the structure")
+        raise ValueError(f"size {size!r} at pad {pad!r} leaves no room for the structure")
     cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
     return raster.Frame(width=width, height=height, x0=cx - width / (2 * ppa),
                         y0=cy + height / (2 * ppa), ppa=ppa, px_scale=scale)
@@ -776,7 +785,7 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     ``supersample`` the antialiasing, 1 to 4 samples a side.  ``pad`` is the
     share of the frame's width and height left empty on each side, 0.05 as in
     ChimeraX's ``view``; ``pad=0`` crops the picture to its ink, keeping only
-    the room a line's half-width and the a, b, c need.  ``background``
+    the room a line's half-width, the a, b, c and any atom labels need.  ``background``
     is ``"white"``, ``"black"``, ``"#rrggbb"``, three channels in 0..1, or
     ``None`` for transparent.  ``outline=True`` inks silhouettes, off by
     default because the GUI draws none.  ``atom_labels=True`` writes each site
@@ -860,7 +869,8 @@ def render_structure(structure, phase: int = 0, *, mode: str = "ball", view="ope
     margin = max([0.5 * line["width"] for line in scene["lines"]] + [0.0])
     if axis_labels:
         margin = max(margin, 0.6 * LETTER_EM_CSS)
-    probe = rp.probe(scene, geometry, size, margin + 1.0, _fit, axis_labels)
+    probe = rp.probe(scene, geometry, size, margin + 1.0,
+                     functools.partial(_fit, pad=float(pad)), axis_labels)
     candidates: list[dict] = []
     if isinstance(view, str) and view == "auto":
         view, candidates = rp.choose_view(geometry, probe, up, turn)

@@ -874,12 +874,12 @@ def test_a_label_in_any_place_is_inside_the_frame(anchor, monkeypatch):
     labels = render._labels
     monkeypatch.setattr(render, "_labels", spy)
     monkeypatch.setattr(render, "LABEL_ANCHORS", render.LABEL_ANCHORS[anchor:anchor + 1])
-    monkeypatch.setattr(render, "FIT_PAD", 0.0)
     molecule = _paracetamol()
     letters = {**molecule, "sites": [dict(s, label=s["element"]) for s in molecule["sites"]]}
     for geometry in (molecule, letters):
         placed.clear()
-        fig = render_structure(geometry, atom_labels=True, axis_labels=False, size=300)
+        fig = render_structure(geometry, atom_labels=True, axis_labels=False, size=300,
+                               pad=0)
         height, width = fig.image.shape[:2]
         em = render.LETTER_EM_CSS * 300 / render.CANVAS_CSS_PX
         assert len(placed) == 20
@@ -1355,6 +1355,11 @@ def test_the_dark_ground_table_swaps_only_a_default_colour(monkeypatch):
     assert {dark.palette[k] for k in dark.palette if k.startswith("C")} == {"#666666"}
     assert not np.array_equal(dark.image, plain.image)
     assert {light.palette[k] for k in light.palette if k.startswith("C")} == {s3._CPK["C"]}
-    chosen = recolour(molecule, select(molecule, element="C"), "#383839")
-    kept = render_structure(chosen, size=200, background="#151515")
-    assert {kept.palette[k] for k in kept.palette if k.startswith("C")} == {"#383839"}
+    for colour in ("#383839", s3._CPK["C"]):  # a recolour to CPK's own hex included
+        chosen = recolour(molecule, select(molecule, element="C"), colour)
+        kept = render_structure(chosen, size=200, background="#151515")
+        assert {kept.palette[k] for k in kept.palette if k.startswith("C")} == {colour}
+    # a dark-ground colour that would collide with another in the phase is not used
+    monkeypatch.setattr(s3, "DARK_GROUND", {"C": s3._CPK["N"]})
+    clash = render_structure(molecule, size=200, background="#151515")
+    assert {clash.palette[k] for k in clash.palette if k.startswith("C")} == {s3._CPK["C"]}
