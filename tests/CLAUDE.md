@@ -273,7 +273,7 @@ CI leg by 3-4×**, so it reads CI's `junit-*` file when the branch has one (WP-1
 ## CI
 
 CI runs the same commands (`.github/`). Per push and per ready PR (`ci.yml`):
-ruff + the fast suite on 3.11 and 3.14, Linux, in two shards each that keep
+ruff + the fast suite on 3.11 and 3.14, Linux, in three shards each that keep
 every file and `xdist_group` whole (`shards.py`), plus a `[dev,jax]` job of the
 cases reaching jax (`jax_cases.py`, whose guard names the fix for a case it
 misses). A stale `shard_times.json` costs balance, never a test. **A PR changing
