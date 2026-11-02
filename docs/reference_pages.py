@@ -214,10 +214,21 @@ def _parameter_definitions(members: list[dict]) -> list[str]:
     return lines
 
 
-def parameter_map() -> str:
-    """The body of `reference/parameters.md`: one table per group, then its definitions."""
+#: The parameter map's pages, as page stem -> the group headings it takes; every
+#: other group is on `parameters`.  The map passed the page contract's 50 000
+#: characters with #1108's strain row, so the time-of-flight group, which one
+#: kind of instrument reads, has a page of its own.
+PARAMETER_PAGES = {"parameters-tof": ("Time of flight",)}
+
+
+def parameter_map(stem: str = "parameters") -> str:
+    """The body of `reference/<stem>.md`: one table per group, then its definitions."""
     out = [_BANNER.format(source="rietx.help"), ""]
     for heading, lead, leaves in parameter_groups():
+        page = next((s for s, headings in PARAMETER_PAGES.items() if heading in headings),
+                    "parameters")
+        if page != stem:
+            continue
         out += [f"## {heading}", "", lead, ""]
         for subheading, sublead, members in leaves:
             if subheading:
@@ -964,6 +975,7 @@ def api_everything_else() -> str:
 #: Generated body file name -> the function that writes it.
 BODIES = {
     "parameters.md": parameter_map,
+    "parameters-tof.md": _functools.partial(parameter_map, "parameters-tof"),
     "settings.md": vocabularies,
     "result-fields.md": result_field_page,
     "plans.md": plan_ladder,
