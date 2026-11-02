@@ -513,6 +513,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.StageResult.held_reach",
     "rietx.schemas.results.StageResult.n_iterations",
     "rietx.schemas.results.StageResult.name",
+    "rietx.schemas.results.StageResult.rwp",
     "rietx.schemas.results.StageResult.status",
     "rietx.schemas.results.StageResult.unknown_paths",
     "rietx.schemas.results.StageResult.unreached_histograms",
