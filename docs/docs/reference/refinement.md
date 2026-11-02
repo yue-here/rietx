@@ -238,25 +238,34 @@ Each stage frees its parameters on top of everything already free.
 A parameter an early stage left short of convergence keeps refining in every later stage, and the last stage converges all of them together at 1e-9.
 So stopping the earlier stages sooner moves the answer little, on any plan.
 
-Measured on the single-fit cases of `examples/bench_refinement.py` against the same plans with `intermediate_ftol=None`, three interleaved repeats each, on macOS arm64 with the `[dev]` install, 2026-10-20:
+Measured on five single fits from the acceptance suites, each run as shipped and with `intermediate_ftol=None`, the closing stage in both.
+Each arm ran three interleaved rounds on macOS arm64 with the `[dev]` install and the compiled tier, 2026-11-02.
+Evaluations were identical across the rounds, and the wall clock is the range over them.
 
-| Case | Evaluations | Wall clock in s | Largest shift | Largest phase-fraction change |
-|---|---|---|---|---|
-| `nac` | 44 → 39 (1.13×) | 0.36-0.38 → 0.35-0.36 | 0.000 esd | 0.0000 wt % |
-| `cpd-1a` | 265 → 162 (1.64×) | 1.22-1.29 → 1.01-1.05 | 1.23 esd, inside a degenerate pair | 0.0055 wt % |
-| `cpd-2` | 395 → 256 (1.54×) | 3.14-3.24 → 2.29-2.34 | 0.001 esd | 0.0003 wt % |
-| `trigger` | 89 → 73 (1.22×) | 2.04-2.18 → 1.75-1.88 | 0.001 esd | 0.0000 wt % |
+| Fit | Evaluations, shipped against all at 1e-9 | Wall clock in s, shipped against all at 1e-9 | Largest shift |
+|---|---|---|---|
+| fluorapatite | 49 against 52 (1.06×) | 1.30-1.35 against 1.34-1.62 | 0.000 esd |
+| 11-BM NAC | 46 against 51 (1.11×) | 0.50-0.60 against 0.52-0.55 | 0.000 esd |
+| cpd-1a | 175 against 277 (1.58×) | 1.89-1.97 against 2.18-2.28 | 0.0004 esd |
+| SRM 660c LaB6 | 90 against 116 (1.29×) | 0.48-1.26 against 0.55-0.57 | 8.82 esd, between two equivalent minima |
+| cpd-1a with an absent zircon phase | 311 against 1221 (3.93×) | 9.6-11.0 against 21.5-22.4 | 0.0092 esd |
 
-Rwp agreed to five decimal places or better in every case.
-The 1.23 esd on `cpd-1a` is the instrument's Lorentzian `x` against the phases' `lor_size`.
-Lorentzian widths add, and both terms widen peaks as 1/cos θ, so the data fix their sum and not the split.
-`x` fell by 0.00286 while the `lor_size` of phases 1 and 2 each rose by 0.00286, so the width they add up to stayed put.
-Every other parameter moved by less than 0.1 esd.
+Rwp agreed to 1e-6 in every case.
+Background terms moved by at most 0.0005 esd.
+The 1.26 s in the LaB6 row is the first fit in the process, which pays the warm-up.
+
+The 8.82 esd on LaB6 is `Geometry.axial_sl` against `Geometry.axial_hl`.
+The two axial ratios can trade places for an equally good fit, so this pattern has two minima.
+Each schedule lands in a different one.
+
+The absent-phase fit is where the loose schedule pays most.
+Its zircon phase has nothing to fit in the pattern.
+At 1e-9, two of its stages run to the iteration limit of 400 evaluations each.
 
 A series is the case to measure rather than assume.
 Each warm start begins from its predecessor's answer, so a small difference in one answer can change how many recovery rungs the next pattern needs.
 The per-fit bound above therefore does not carry over to a chain, and the difference can go either way.
-On the ten-pattern simulated `trigger` series, the loose schedule took 201 evaluations against 213 (8.6-8.7 s against 8.7-8.8 s), with no pattern escalating.
+A chain on this schedule has not been measured.
 
 ### Converging every stage
 

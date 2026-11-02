@@ -292,9 +292,12 @@ reason is 8.13's mechanism seen from the other side: those long stages are
 walking a near-degenerate direction at ≈0.93 per iteration, and 99.99 % of the
 cost decrease is banked by evaluation 55 of 93 — the rest is digits the next
 stage refines again anyway, because stages are cumulative and the last one
-polishes everything at `1e-9`. Measured over the three lab-shaped benchmark
-cases: 1.51×, 1.62× and 1.55× fewer evaluations, every non-degenerate parameter
-within 0.03 esd of the fully converged plan, QPA within 0.0014 wt %.
+polishes everything at `1e-9`. Measured behind the closing stage on the
+fluorapatite, 11-BM NAC and cpd-1a protocols: 1.06-1.58× fewer evaluations and
+1.02-1.14× in wall clock, every parameter within 0.0004 esd of the fully
+converged plan. With an absent zircon phase the saving is 3.9×, because two
+stages at `1e-9` run to their iteration limit. On SRM 660c the two schedules
+land in the two mirrored minima of `axial_sl` and `axial_hl` (8.82 esd apart).
 **Corollary for the agent, in three parts.** Do not read a small parameter
 difference between a 1.0.x number and a 1.1 number as a physics change; check
 `StageResult.ftol` first. Set `intermediate_ftol = None` when a number is going
