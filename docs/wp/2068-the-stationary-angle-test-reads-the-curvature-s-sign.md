@@ -1,6 +1,6 @@
 # WP-2068 — The stationary-angle test reads the curvature's sign, analytically
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here
 Track: What fires, and what stays silent
 Depends on: — (1327 soft: the moment derivative `d_magnetic_f2_d_dofs` from #1206, merged 2026-10-31)
 Priority: P2 2026-10-31 — a fit stopped on a maximum along a moment angle passes the test with no flag, on a path few fits run; unreproduced, so task 1 reproduces it, and a non-reproduction leaves only the cost half, P3
