@@ -221,6 +221,10 @@ from .structure import Cell
 #: than its parent's (``SupercellEvidence.child_seen_more``) is never
 #: ``refuted``, so a dense low-symmetry truth no longer sits below a wrong cell
 #: that p₀ near the truth's own seen fraction let refute it.
+#: Also 1.12 (#1263): the containment refuter's null is the seen test's own
+#: chance rate (``PatternScreen.p0``), so ``n_seen ≤ n_extra·p0``, both
+#: p-values and ``SupercellCheck.p0`` read the windows the count is taken in.
+#: The assumed shift bound floors only the power check (``p0_power``, #951).
 INDEXING_THRESHOLDS_VERSION = "1.12"
 
 #: Position esd, in ° 2θ, past which a fitted line locates nothing and is
@@ -1200,9 +1204,11 @@ class SupercellCheck(Base):
     extras are this lattice's lines that the parent's lattice does not predict,
     counted only where no space-group extinction could remove them
     (:func:`rietx.indexing.ambiguity.uncancellable`), and each is *seen* when it
-    falls inside an observed line's matching window.  ``p0`` is the chance of
-    that for a position no line is at, and ``p_value`` the one-sided binomial
-    chance of at least ``n_seen`` of ``n_extra``.
+    falls inside an observed line's window: the matching window on the
+    sublattice route, the reversed window at the resolution on containment's.
+    ``p0`` is the chance of that for a position no line is at, in the same
+    windows (#1263), and ``p_value`` the one-sided binomial chance of at least
+    ``n_seen`` of ``n_extra``.
 
     ``verdict`` is ``"refuted"`` when the extras are seen no more often than
     chance and the test had the power to say otherwise, and the candidate then
@@ -1212,7 +1218,8 @@ class SupercellCheck(Base):
     is a lattice statement the data make, and the candidate then sits directly
     above this parent unless another check refutes it (WP-1510).
     ``"undecided"`` means not even every extra seen could have reached the
-    significance level, which includes a parent whose lines this one only
+    significance level at ``p0_power`` (``p0`` where that is ``None``), which
+    includes a parent whose lines this one only
     repeats, or that the extras are seen beyond chance only on lines the parent
     explains.  An undecided check moves nothing.
     """
@@ -1239,6 +1246,12 @@ class SupercellCheck(Base):
     #: this many falling below α at the same ``p0``.  ``None`` in a record
     #: written before thresholds version 1.7, which did not count them
     n_seen_unexplained: int | None = None
+    #: the chance rate the power check read, counted in windows floored at the
+    #: assumed shift bound: refuted needs ``p0_power ** n_extra`` below α.
+    #: ``None`` where no floor was declared (the check then reads ``p0``), and
+    #: in a record written before #1263, whose ``p0`` was itself the floored
+    #: rate
+    p0_power: float | None = None
     verdict: Literal["supported", "refuted", "undecided"]
     #: ° 2θ of the extras nothing was seen at, lowest first and at most six:
     #: where to look in the pattern for the lines the larger cell needs

@@ -148,8 +148,13 @@ class PatternScreen:
     #: Q of the N-th usable line: de Wolff's window for the capping count
     q_window: float
     #: the chance rate at the resolution: the share of the range inside some
-    #: line's reversed window
+    #: line's reversed window, the window ``seen`` is asked in.  The null of
+    #: every seen count (#1263).
     p0: float
+    #: the chance rate with each window floored at ``p0_floor_deg``, the
+    #: assumed shift bound.  Only the power check p₀ⁿ < α reads it (#951);
+    #: ``None`` means no floor was declared, and the check reads ``p0``.
+    p0_power: float | None = None
     #: the pattern side; ``None`` without a pattern
     grid_tt: np.ndarray | None = None
     grid_y: np.ndarray | None = None
@@ -177,11 +182,16 @@ class PatternScreen:
         the fit that follows covers less (``validate_by_lebail``'s own): a line
         the fit never reached is not one the pattern can be said to lack.
 
-        ``p0_floor_deg`` floors the half-width the chance rate p₀ is counted
-        in: an absence test reads the assumed bound, never a window the
-        unmeasured shift does not justify (#951), so a list at 0.010° FWHM
-        with a weak-line filter cannot refute a superstructure through a p₀ of
-        0.03.  Default 0 is the resolution alone."""
+        ``p0_floor_deg`` floors the half-width of a second chance rate,
+        ``p0_power``, which only the power check reads: whether the test could
+        have said anything at all is bounded by the assumed shift, never by a
+        window the unmeasured shift does not justify (#951).  So a list at
+        0.010° FWHM with a weak-line filter cannot refute a superstructure
+        through a p₀ of 0.03.  ``p0`` itself stays the chance rate of the seen
+        test, which is asked at the resolution after each candidate's own
+        common shift.  The null is that test's chance rate, so the count is
+        compared with the chance count of its own windows (#1263).  Default 0
+        declares no floor."""
         usable = peaks.usable()
         tt = np.array([p.two_theta for p in usable], dtype=np.float64)
         esd = np.array([p.two_theta_esd for p in usable], dtype=np.float64)
@@ -196,14 +206,15 @@ class PatternScreen:
             lo, hi = max(lo, float(two_theta_limits[0])), min(hi, float(two_theta_limits[1]))
         n = min(window_lines, len(q))
         q_window = float(np.sort(q)[n - 1]) if n else 0.0
-        half = np.maximum(np.maximum(resolution * fwhm, k_sigma * esd),
-                          p0_floor_deg)
+        half = np.maximum(resolution * fwhm, k_sigma * esd)
         p0 = _union_fraction(tt, half, lo, hi)
+        p0_power = (_union_fraction(tt, np.maximum(half, p0_floor_deg), lo, hi)
+                    if p0_floor_deg > 0.0 else None)
         out = cls(wavelength=float(peaks.wavelength), two_theta_min=lo,
                   two_theta_max=hi, k_sigma=k_sigma, resolution=resolution,
                   obs_tt=tt, obs_esd=esd, obs_fwhm=fwhm, obs_eta=eta,
                   obs_intensity=area, obs_q=q, q_match=match,
-                  q_window=q_window, p0=p0)
+                  q_window=q_window, p0=p0, p0_power=p0_power)
         if data is not None and instrument is not None:
             out._add_pattern(data, instrument)
         return out
@@ -514,7 +525,10 @@ def containment_evidence(pattern: PatternScreen, child: LineScreen,
     **uncancellable** merged lines farther than the resolution from every
     parent line; *seen* is the screen's; *unexplained* means the observed line
     the extra sits on is one the parent does not index; p₀ is the pattern's
-    chance rate at the resolution.  The verdict is
+    chance rate at the resolution, the seen test's own windows, and the null
+    of both counts and both p-values.  The power check reads ``p0_power``, the
+    rate in the windows the assumed shift bound floors (#951, #1263).  The
+    verdict is
     :meth:`~rietx.indexing.ambiguity.SupercellEvidence.verdict`'s three bands.
     ``index`` is the sublattice index where the parent is a true sublattice
     of the child (index 2–4), else 0 with ``relation="containment"``.
@@ -546,6 +560,8 @@ def containment_evidence(pattern: PatternScreen, child: LineScreen,
     n = int(extra.sum())
     k, k_un = int(seen.sum()), int(alone.sum())
     p0 = min(max(pattern.p0, 0.0), 1.0)
+    p0_power = (None if pattern.p0_power is None
+                else min(max(pattern.p0_power, 0.0), 1.0))
 
     def tail(count: int) -> float:
         return 1.0 if n == 0 else float(binom.sf(count - 1, n, p0))
@@ -559,7 +575,7 @@ def containment_evidence(pattern: PatternScreen, child: LineScreen,
         extra_hkl=tuple(tuple(int(v) for v in row) for row in child.hkl[extra]),
         extra_q=tuple(float(v) for v in q_extra),
         extra_seen=tuple(bool(v) for v in seen[extra]),
-        p0=p0, p_value=tail(k),
+        p0=p0, p_value=tail(k), p0_power=p0_power,
         extra_seen_unexplained=tuple(bool(v) for v in alone[extra]),
         p_value_unexplained=tail(k_un),
         relation="containment" if index == 0 else "sublattice",

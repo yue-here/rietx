@@ -423,8 +423,9 @@ runs over those alone. The lattice's point symmetries are found from its metric,
 as the integer matrices on the reduced basis that preserve it, $WGW^\top = G$.
 
 Of the $n$ such lines the larger cell adds inside the measured range, $k$ fall
-inside an observed line's matching window. A position with no line at all falls
-inside one with probability $p_0$, the share of the range those windows cover.
+inside an observed line's window at the measured resolution, after the cell's
+own common shift. A position with no line at all falls inside one with
+probability $p_0$, the share of the range those windows cover.
 The chance of seeing at least $k$, had the added lines not existed, is the
 binomial tail
 
@@ -436,10 +437,18 @@ p \;=\; \sum_{j=k}^{n} \binom{n}{j}\, p_0^{\,j}\,(1-p_0)^{\,n-j},
 
 {source}`rietx.indexing.ambiguity.supercell_chance`
 
-and at $p \ge \alpha$ = {{ SUPERCELL_CHANCE_ALPHA }} the larger cell is ranked
-directly below the smaller. The test cannot refute where it could not have
-confirmed. When even $k = n$ gives $p_0^{\,n} \ge \alpha$, too few lines or
-too many windows, the verdict is undecided and the order stays as it was.
+and when the added lines are seen no more often than chance, $k \le n p_0$, and
+the larger cell's own lines are seen no more often than the smaller's, the
+larger cell is ranked directly below the smaller. Seen above chance but with
+$p \ge \alpha$ = {{ SUPERCELL_CHANCE_ALPHA }}, the verdict is undecided, since a
+test that is not significant does not establish its null. The test cannot refute
+where it could not have confirmed. When even $k = n$ gives $p_1^{\,n} \ge
+\alpha$, too few lines or too many windows, the verdict is undecided and the
+order stays as it was. Here $p_1 \ge p_0$ is the share of the range covered when
+each window is widened to the assumed bound on the 2θ shift. The count itself is
+taken after the cell's own shift and needs no such widening, so $p_0$ is its
+null. Whether the test could have said anything at all is bounded by the shift
+the data have not measured, so the power check reads $p_1$.
 
 The other direction asks a narrower count. Of the $k$, let $k'$ fall on an
 observed line that no line of the smaller cell's own lattice explains. When the

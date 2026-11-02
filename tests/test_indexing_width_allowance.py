@@ -141,14 +141,14 @@ def test_a_synchrotron_twin_is_indexed_in_its_own_window(tmp_path,
 
 
 def test_a_narrow_window_does_not_refute_a_superstructure_the_list_cannot_see():
-    """The supercell check's chance rate is the search's assumed bound, never
-    the widths' window (#951's baseline).  An F-centred cubic list a
-    superstructure leaves after a weak-line filter: six all-even lines and one
-    all-odd (331), FWHM 0.010°.  Its a/2 P cell indexes six of seven; the true
+    """The supercell check's power reads the search's assumed bound, never the
+    widths' window (#951's baseline; its null reads the seen test's own windows
+    since #1263).  An F-centred cubic list a superstructure leaves after a
+    weak-line filter: six all-even lines and one all-odd (331), FWHM 0.010°.  Its a/2 P cell indexes six of seven; the true
     a cell's two uncancellable extras over it, (531) and (731), are below the
     filter.  At the widths' window p₀ ≈ 0.03 and "0 of 2 seen" read *refuted*,
     which sank the true cell under its subcell; at the assumed 0.05° the test
-    has no power (p₀² ≥ α) and the pair stays *undecided*, as on main."""
+    has no power (``p0_power``² ≥ α) and the pair stays *undecided*, as on main."""
     from rietx.indexing import index_pattern
 
     lam, a = 0.40, 10.0
