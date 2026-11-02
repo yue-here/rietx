@@ -18,7 +18,7 @@ The models differ from each other because the formats do, and each one changes a
 | `TopasModel.r_wp`, `TopasModel.gof` | the run's own figures, stated at top level above every block. `None` where the file states none there or several, since `Tr_wp` can hang off each dataset as well |
 | `TopasModel.r_wp_all`, `TopasModel.gof_all` | every such value in file order, since a multi-dataset file states one per dataset |
 | `TopasModel.n_datasets` | how many `xdd`-family blocks the file opens, a data-file macro (`RAW(…)`, `XYE(…)`, `TOF_XYE(…)`) counting as one. More than one means the phases belong to different patterns |
-| `TopasModel.data_files` | the pattern files it points at |
+| `TopasModel.data_files` | the pattern file each dataset opener names, in file order. A data-file macro contributes its first argument as written, so `RAW(a)` gives `a`: the macro supplies the extension |
 | `TopasModel.emission_lines`, `TopasModel.emission_macro`, `TopasModel.anode` | every emission line in file order, and the macro that named the profile (`CuKa5`, read as anode `CuKa`) |
 | `TopasModel.wavelength` | the profile's reference wavelength: the `lo` of the `lo_ref` line, else of the line with the largest `la`, and `None` where the file states no profile |
 | `TopasModel.geometry` | `"debye_scherrer"` only where the file states a capillary construct, `None` where every dataset is time of flight, and otherwise `"bragg_brentano"`. That last value is the reader's default, so read this field only as "a capillary was declared, or not" |
