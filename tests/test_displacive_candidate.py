@@ -531,3 +531,63 @@ def test_the_all_zero_refusal_covers_the_strains_and_a_held_strain_narrows_it():
     with pytest.raises(ValueError, match="exactly zero"):
         _free(p4mm, [AMPS])
     assert len(_free(p4mm, [AMPS], {"phases.0.parent_cell.strain.0": 1e-3})) == 3
+
+
+# --------------------------------------------------------------------------
+# B3: row D over candidates
+# --------------------------------------------------------------------------
+
+#: C3a's row-D sweep rows (``test_distortion_row_d``), one atom on each of its
+#: two sites; the fast three, then all fifteen under ``slow``
+def _sweep_rows(settings=None):
+    from tests.test_distortion_row_d import SITES, SWEEP_ROWS
+
+    names = ("a", "b", "c", "alpha", "beta", "gamma")
+    for setting, k, values in SWEEP_ROWS:
+        if settings is not None and setting not in settings:
+            continue
+        cell = rx.Cell(**{n: P_(value=v) for n, v in zip(names, values, strict=True)})
+        for site in SITES:
+            x, y, z = (float(c) for c in site)
+            parent = rx.Phase(name=setting, space_group=setting, cell=cell, atoms=[rx.Atom(
+                label="A", species="Fe", x=P_(value=x), y=P_(value=y), z=P_(value=z))])
+            yield parent, tuple(Fraction(c) for c in k)
+
+
+def _sweep(rows) -> dict[str, int]:
+    counts = {"candidates": 0, "refused": 0, "stated": 0, "modes": 0}
+    for parent, k in rows:
+        for cand in I.distortion_candidates(parent, k):
+            counts["candidates"] += 1
+            if cand.refusal is not None:
+                counts["refused"] += 1
+                continue
+            # the statement checks row D per mode (every operation of the
+            # child's group carries the mode onto itself) and raises if not
+            phase = D.displacive_statement(parent, candidate=cand).phase
+            ParameterTable(Structure(phases=[phase]), neutron())
+            counts["stated"] += 1
+            counts["modes"] += len(phase.distortion_modes.modes)
+    return counts
+
+
+def test_every_stated_candidate_passes_row_d_on_three_sweep_rows():
+    """Three of C3a's sweep settings, both sites: every stated child's statement builds.
+
+    Measured 2026-11-02: 47 candidates, 7 refused by the probe (the atoms
+    cannot realise the direction's group), 40 statements, 486 modes.
+    """
+    counts = _sweep(_sweep_rows({"P c c n", "P 42/m c m", "P 6 m m"}))
+    assert counts == {"candidates": 47, "refused": 7, "stated": 40, "modes": 486}
+
+
+@pytest.mark.slow
+def test_every_stated_candidate_passes_row_d_over_the_sweep():
+    """All fifteen settings × two sites, and the cubic perovskite at Γ, X, M and R.
+
+    Measured 2026-11-02 (about 50 s): 270 candidates, 41 refused by the
+    probe, 229 statements, 2421 modes; no statement failed its row-D check.
+    """
+    rows = list(_sweep_rows()) + [(perovskite(3.9), k) for k in (
+        K_GAMMA, (Fraction(0), Fraction(0), Fraction(1, 2)), K_M, K_R)]
+    assert _sweep(rows) == {"candidates": 270, "refused": 41, "stated": 229, "modes": 2421}
