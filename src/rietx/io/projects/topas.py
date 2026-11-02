@@ -505,7 +505,8 @@ class TopasModel:
     #: belong to different patterns.
     n_datasets: int = 0
     #: The pattern file each dataset opener names, in file order, as the file
-    #: writes it (:func:`_data_file`): ``RAW(a)`` gives ``a``.
+    #: writes it (:func:`_data_file`): ``RAW(a)`` gives ``a``. An opener naming
+    #: none (``xdd_sum``) adds nothing, so this is not indexed by dataset.
     data_files: list = field(default_factory=list)
     #: How many coefficients the ``bkg`` list states, refined or held.
     background_terms: int | None = None
@@ -2510,8 +2511,7 @@ _BLOCK = re.compile(
 #: opening two datasets with ``RAW(a)`` and ``RAW(b)`` read as none, and
 #: ``to_structure`` built both specimens' phases into one ``Structure``. A
 #: phase above a single such macro is dataset 0 now, not ``None``.
-_DATASET_OPENERS = ("xdd", "xdd_scr", "xdd_sum", *_TOF_DATA_MACROS,
-                   *_DATASET_MACROS)
+_DATASET_OPENERS = ("xdd", "xdd_scr", "xdd_sum", *_DATA_FILE_MACROS)
 
 #: What says a dataset is **time of flight**. Each is the reference's: the
 #: macros of §19.3.11 ("Neutron TOF" — the data-file macros, the emission
@@ -2529,9 +2529,15 @@ _TOF_CONSTRUCT = re.compile(
 
 
 #: The file a dataset opener names: ``xdd``/``xdd_scr`` take it as the next
-#: token, quoted or bare, and a data-file macro as its first argument.
-_KEYWORD_FILE = re.compile(r'\s+(?:"(?P<q>[^"\n]*)"|(?P<bare>[^\s"{};]+))')
-_MACRO_FILE = re.compile(r'[ \t]*\(\s*(?:"(?P<q>[^"\n]*)"|(?P<bare>[^,()\n]*?))\s*[,)]')
+#: token, quoted or bare, and a data-file macro as its first argument. A bare
+#: argument may hold one level of balanced parentheses (``RAW(C:\d (old)\a)``).
+#: A bare ``xdd`` path is taken on the opener's own line only, so an ``xdd``
+#: naming no file does not record the next line's keyword as one.
+_KEYWORD_FILE = re.compile(
+    r'(?:\s+"(?P<q>[^"\n]*)"|[ \t]+(?P<bare>[^\s"{};]+))')
+_MACRO_FILE = re.compile(
+    r'[ \t]*\(\s*(?:"(?P<q>[^"\n]*)"'
+    r'|(?P<bare>(?:[^,()\n]|\([^,()\n]*\))*?))\s*[,)]')
 
 
 def _data_file(active: str, opener: re.Match) -> str | None:

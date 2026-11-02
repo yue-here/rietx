@@ -4468,6 +4468,19 @@ def test_a_macro_opened_dataset_names_its_file(tmp_path):
     assert [ph.dataset for ph in model.phases] == [0, 1, 2, 3, 4]
 
 
+def test_a_bare_macro_path_may_hold_parentheses(tmp_path):
+    model = read_topas_inp(_inp(tmp_path, "paren.inp",
+                                'RAW(C:\\d (old)\\a, 1)\n' + _ONE_PHASE))
+    assert model.data_files == ["C:\\d (old)\\a"]
+
+
+def test_an_xdd_naming_no_file_records_none(tmp_path):
+    """A bare path is the opener's own line: the next line's `bkg` is no file."""
+    model = read_topas_inp(_inp(tmp_path, "nofile.inp",
+                                'xdd\n  bkg @ 1 2\n' + _ONE_PHASE))
+    assert model.n_datasets == 1 and model.data_files == []
+
+
 def test_a_time_of_flight_macro_names_its_file(tmp_path):
     model = read_topas_inp(_inp(tmp_path, "tof.inp",
                                 'TOF_XYE(bank1.xye, 0.5)\n' + _ONE_PHASE))
