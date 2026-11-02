@@ -1,6 +1,6 @@
 # WP-1468 — what the polyhedra still miss, and the controls a chemist would reach for
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — the two figure controls landed (PR #PRNUM); the dark-theme C colour waits on the maintainer's ruling, its swap built and left off
+Milestone: unscheduled · Status: 🔄 2026-11-02 — the two figure controls landed (PR #1342); the dark-theme C colour waits on the maintainer's ruling, its swap built and left off
 Track: Render what the fit already knows
 Depends on: 1466
 Priority: P3 2026-10-23 — was P4: 1504's close forwarded WP-1957's readings, and one misleads (all three reviewers read `DIM_BOUNDARY`'s shade as a second species); also left is WP-1533's C colour, waiting on a ruling
@@ -240,7 +240,7 @@ npm --prefix gui test && npm --prefix gui run check
   recipe stay right, and the figure lists each drawn polyhedron formula with its
   colour. The third open task, a lighter carbon on a dark background, changes the
   default dark picture, so it is built and switched off and waits on the
-  maintainer's ruling, below. PR #PRNUM, from a ghostshift runner. Issue #1057
+  maintainer's ruling, below. PR #1342, from a ghostshift runner. Issue #1057
   (per-atom draw style, bond colour, outline on thin sticks) is untouched.
 
   *Done.*
@@ -267,7 +267,7 @@ npm --prefix gui test && npm --prefix gui run check
   either pad. `python -m tests.reader_output`: exit 0, unchanged; the new field is
   on the figure object, which no fit returns. `measure.py` was not re-run: no
   colour enters its rows, and with the table empty no picture moved
-  (`test_the_default_picture_on_the_measured_phases` passes). Fast suite: FASTCOUNTS.
+  (`test_the_default_picture_on_the_measured_phases` passes). Fast suite: whole selection `-m "not slow"` on the branch before its last test-only commit, through ghostshift's suite lock with other runners queued: 13514 passed, 314 skipped, 34 xfailed, 2 failed, 42 min. Both failures are this machine's, not the change's. `test_site_classes.py::test_an_unplaceable_species_does_not_enumerate_the_others` is a 15 s wall-clock guard that read 24 s under load and passes alone. `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone` reached a Jupyter kernel spec pointing at a deleted venv. No baseline count was measured, so the eight added cases are not checked as a delta; CI's fast matrix is the gate. Added-test cost (`tests.added_test_times`, that run, loaded): 7.7 s over the four, 4.2 s of it the polyhedron-palette test, then cut to 0.35 s alone by drawing at 200 px.
 
   *Review.* `/code-review high` (report mode, since the fast suite was queued on
   the tree) found eight; seven fixed in one commit. A label test patched

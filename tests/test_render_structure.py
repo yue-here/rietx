@@ -1318,7 +1318,7 @@ def test_the_polyhedron_palette_is_what_the_faces_were_drawn_in(nac):
     """The take-2 scripts drew a polyhedron's legend swatch from
     ``g["sites"]`` by element, guessing which site centred which formula."""
     g = s3.build(nac)
-    fig = render_structure(g)
+    fig = render_structure(g, size=200)
     drawn = {sc.polyhedron_formula(g, g["polyhedra"][f["index"]])
              for f in sc.build_scene(g, polyhedra=sc.shown_polyhedra(g, True))["faces"]}
     assert set(fig.polyhedron_palette) == drawn and drawn
@@ -1326,15 +1326,15 @@ def test_the_polyhedron_palette_is_what_the_faces_were_drawn_in(nac):
         centres = {g["sites"][p["site"]]["color"] for p in g["polyhedra"]
                    if sc.polyhedron_formula(g, p) == formula}
         assert centres == {colour}
-    assert render_structure(g, polyhedra=False).polyhedron_palette == {}
+    assert render_structure(g, size=200, polyhedra=False).polyhedron_palette == {}
     off = next(iter(fig.polyhedron_palette))
-    assert off not in render_structure(g, polyhedra={off: False}).polyhedron_palette
+    assert off not in render_structure(g, size=200, polyhedra={off: False}).polyhedron_palette
     # one polyhedron recoloured: its formula appears a second time
     centre = next(p["center"] for p in g["polyhedra"]
                   if sc.polyhedron_formula(g, p) == off)
     mask = np.zeros(len(g["atoms"]), dtype=bool)
     mask[centre] = True
-    part = render_structure(recolour(g, mask, "#ff0000"))
+    part = render_structure(recolour(g, mask, "#ff0000"), size=200)
     assert part.polyhedron_palette[f"{off} (recoloured)"] == "#ff0000"
     assert part.polyhedron_palette[off] == fig.polyhedron_palette[off]
 
