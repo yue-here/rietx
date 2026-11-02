@@ -409,6 +409,11 @@ for rung in ref.stage_reports_:
 ```
 
 The flag is off by default, because `fit` is called in loops.
+Each rung is a whole report build, so the cost is per rung and does not shrink with the fit.
+On the 11-BM NAC example, with seven rungs, a fit with rungs took 4.7 to 5.7 times as long as the same fit without them.
+Turn it on for the fits you will read: the first of a batch, the last, one you will plot.
+The fit's `fit_end` event carries the rungs' wall time as `stage_report_seconds` ([Events](refinement.md#events)), on a cancelled run too.
+No stage span holds that time, because each rung is built after one `stage_end` and before the next `stage_start`.
 The rungs are read off states the plan already visits, so the fitted values are bit-identical to a run without them.
 A cancelled run keeps the rungs of the stages that completed.
 Each rung's veto reads the whole plan, so a rung answers "what will this plan still not fix?".
