@@ -1,6 +1,6 @@
 # WP-1334 — the stage that ran out of budget
 
-Milestone: unscheduled · Status: ⬜
+Milestone: unscheduled · Status: 🔄 2026-11-02 — tasks 1-2 landed (PR #PRNUM); the termination split, the stop rule and its measurement next
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-09-23 — cost only: 46.6 % of stage time for a 1.23 % median gain
@@ -250,6 +250,89 @@ repo.
   it, in anything reporting a duration.
 
 ## Handover log
+
+- **2026-11-02** — ghostshift runner, PR #PRNUM. A caller holding a stage's
+  record can now read that stage's Rwp from it, so keeping the best stage of a
+  run no longer means parsing the event log. The record and the event carry
+  one number, computed once, and it is written whether or not anyone asked for
+  events. The WP's stop rule is now stated in the unit the solver's count
+  actually holds, residual evaluations, so the threshold work has no unit left
+  to argue about. Nothing about when a stage stops has changed yet.
+
+  *Done.* Task 1: the rule is § Context's "The rule in the unit the field
+  holds", the Context's counts say evaluations, and the ramp guard's constant
+  is `RAMP_MAIN_UNBOUNDED_EVALUATIONS`. The field's documentation and the
+  "N evals" print were already on main from WP-1937. Task 2:
+  `StageResult.rwp`, `float | None`, `None` meaning a result stored before the
+  field. Writers: `Refinement._run_stage` (both single-histogram runners read
+  it off `_StageHold.rwp`) and the joint runner through `_stage_end_rows`,
+  pooled. Schema changelog line under 0.60; manual table row and a line in
+  `reference/refinement.md` § Stage results; `help.py` entry; audit
+  `OTHER_RECORD_FIELDS` row. The skill sentence in `references/series.md`
+  that said `StageResult` has no `rwp` is rewritten, and
+  `test_every_negative_field_claim_is_still_true` now pins "`SeriesEntry`
+  carries no `stages`", which is true and still the claim's phrasing.
+  `/code-review high --fix` found the audit and help rows missing (both red
+  tests) and a wrong "only through the events" sentence; it also added
+  `CompiledModel.evaluate_with_background`, one background pass for
+  `evaluate()`'s curve plus the background, bit-identical to `evaluate()` on
+  both arms. Declined from it: reusing the stage's statistics for the history
+  node, because the node's `n_free` is read after code that may change the
+  free set, and proving it never does was out of scope.
+
+  *Measured* (arm64 Mac, worktree `[dev]` venv, compiled tier on). Cost: the
+  stage Rwp is one forward evaluation a stage, which every recorded fit
+  already paid; the new charge falls on `telemetry=False` trials. NAC Le Bail
+  (6 stages, 46 evaluations) with telemetry off: median 0.315 s before and
+  0.320 s after, one 7-run batch each with the machine quiet. Interleaved A/B
+  against an origin/main snapshot under heavy load from other sessions' suites
+  (5 batches of 3): base medians 3.38-3.88 s, branch 3.31-4.24 s, so no
+  difference the load lets one see. Fast suite: FASTCOUNT.
+
+  *Generality* (the `generality-review` judge; its table condensed to one line a question, verdicts verbatim):
+
+  > **rietx.schemas.results.StageResult.rwp (added to `OTHER_RECORD_FIELDS`). Verdict: holds.**
+  > It is the stage's Rwp, a measurement. Nothing in the package reads it to
+  > decide anything, and nothing in the diff argues the other way.
+  > 1. Decides nothing: no reader of a stage's `.rwp` in `src/rietx`; written by
+  >    `_run_stage` (copied by `_run_plan` and `run_stage`) and the joint runner,
+  >    pooled. Now computed on every stage; one forward evaluation, no answer
+  >    changes. — holds
+  > 2. No action, so no kind of ambiguity applies. — holds
+  > 3. Case against: none found. Picking the best stage by Rwp would be the
+  >    caller's choice; the field comment guards misuse (ranges, modes, frozen
+  >    windows). Task 7's keep-the-best skill row would be a heuristic in skill
+  >    prose the table cannot see, to be reviewed when it lands. — n/a
+  > 4. Case for: no action removed or demoted. — n/a
+  > 5. Tier: plain arithmetic under a cited definition (Toby 2006); measuring on
+  >    the stage's frozen compile is stated in the comment, help entry and
+  >    manual, and decides nothing. — holds
+  > 6. No threshold, so no dataset families needed. The `run_stage` path had no
+  >    test of its own in the diff. — n/a
+  > 7. The field is the record; `None` (stored before the field) cannot pass
+  >    for a measured value. — holds
+  >
+  > Second trigger: none (no inline literal, ordering or fallback chain, skill
+  > rule or correction; `evaluate_with_background` is a refactor).
+  > Would change the verdict: package code reading `StageResult.rwp` to pick,
+  > stop, escalate or keep a stage (tasks 4 and 7).
+
+  Author: the `run_stage` path is now covered by the new test, after this review.
+
+  *Gotchas.* The last stage's `rwp` is not `result.statistics.rwp`: the
+  result is measured on a compile at the answer, so the two differ by the
+  frozen windows alone. The negative-claim regex needs the class and the
+  field on one line.
+
+  *Not settled here.* "N ev" in the 2026-09-30 decision is printed as
+  "N evals" (WP-1937's spelling, on main since 2026-10-10); kept, since the
+  ruling's substance is the unit and renaming the print is a reader-output
+  change with nothing gained.
+
+  Next: task 3 (the termination split, or the statement that `max_iter` is the
+  whole answer), which decides what the stop rule's finding can name; then
+  the stop rule against #222's p90, then its fixture measurement. The skill's
+  keep-the-best row (task 7) can now cite `StageResult.rwp`.
 
 - **2026-09-03** — created, from the 2026-09-03 issue triage (issue #222).
   Two of the issue's asks were checked against the tree first: `max_iter` is
