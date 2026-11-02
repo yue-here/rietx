@@ -1,6 +1,6 @@
 # WP-2019 — each fast leg runs what only it can see, and the tail is cut again
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @claude (ghostshift runner): the ten-run read of three shards
+Milestone: unscheduled · Status: 🔄 2026-11-02 — three shards read: median slowest fast job 18.2 min against 15; counts hold
 Track: The repo's own process
 Depends on: —
 Priority: P2 2026-10-23 — was P3: three of the five latest main runs have a slowest fast job over 20 min on the refreshed shard record; the wait 1547 was P2 for is back
@@ -243,10 +243,13 @@ cutting it.
       the 1.6× runner variance. Option (c), restating the written bar, is a
       change to the WP's acceptance and stays the maintainer's; it was not
       taken.*
-- [ ] **Restart the ten-run read.** Read the ten consecutive successful
+- [x] **Restart the ten-run read.** Read the ten consecutive successful
       `ci.yml` push runs on main whose fast jobs are named `fast py3.x K/3`,
       that is the runs from this change's merge onwards (Acceptance). Runs
       before the merge measure the two-shard split and do not count.
+      *Read 2026-11-02: counts hold, the wall does not (median slowest fast
+      job 18.2 min against 15, down from 25.0 on two shards); see the newest
+      entry.*
 
 ## Acceptance
 
@@ -275,6 +278,103 @@ gh run view <id> --json jobs   # each "fast …" job's startedAt to completedAt;
   (10-21).
 
 ## Handover log
+
+### 2026-11-02 (2nd session) — three shards cut the wait to 18 minutes; the bar is 15, so the WP stays open
+
+Ten per-push runs on main since three shards landed were timed. The median run
+now waits 18.2 min for its slowest fast job, down from 25.0 on two shards and
+close to the 17 min the last entry predicted. That is still over the 15 min
+bar, and only one run in ten met it. The counts criterion holds. Most of the
+gap is imbalance between shards, not total work: with each leg's work split
+perfectly three ways, the same ten runs would have waited a median 14.7 min.
+That figure sits on the bar, so balance alone may not be enough. Nothing here
+changes code, and the WP does not close.
+
+- **Done** (PR #1328). The last open task, *Restart the ten-run read*, is read and ticked.
+  Its acceptance is not met, so Status stays 🔄. `tests/shard_times.json` is
+  not touched: the WP asks the read for a verdict, not a record refresh.
+- **Measured: the wall clock.** The ten successful `ci.yml` push runs on main
+  from 41381693690 (8a1c08b22, 11-02 03:11 UTC), the first with
+  `fast py3.x K/3` jobs, to 41407136163 (f8559dee6, 11-02 07:34). Three
+  cancelled runs in that span are left out. The run before it, 41373839001,
+  ran two shards (slowest job 27.0 min). A job is `startedAt` to
+  `completedAt` from `gh run view --json jobs`, setup included.
+
+  | Run (head) | Slowest fast job | Min |
+  |---|---|---|
+  | 41407136163 (f8559dee6) | py3.14 1/3 | 18.3 |
+  | 41403242484 (0d735f5e5) | py3.14 1/3 | 18.1 |
+  | 41399122502 (da8fc28f0) | py3.14 3/3 | 17.9 |
+  | 41395499952 (816fe35ea) | py3.14 1/3 | 18.2 |
+  | 41391632638 (a8f679858) | py3.14 1/3 | 18.5 |
+  | 41389308744 (fa7ec8599) | py3.14 3/3 | 18.1 |
+  | 41387860456 (ca06c8c86) | py3.14 2/3 | 13.7 |
+  | 41385877200 (6eeb89b1f) | py3.11 2/3 | 16.7 |
+  | 41383656100 (3d2020db4) | py3.14 1/3 | 18.5 |
+  | 41381693690 (8a1c08b22) | py3.14 3/3 | 19.0 |
+
+  Median 18.2, range 13.7 to 19.0. The spread is much narrower than the
+  two-shard read's 15.9 to 27.4. Per job over the ten runs (min / median /
+  max):
+
+  | Job | py3.11 | py3.14 |
+  |---|---|---|
+  | 1/3 | 8.8 / 11.0 / 12.4 | 11.1 / 16.0 / 18.5 |
+  | 2/3 | 9.2 / 11.1 / 18.0 | 7.8 / 13.4 / 15.1 |
+  | 3/3 | 10.6 / 17.0 / 17.9 | 10.8 / 15.7 / 19.0 |
+
+  `fast jax` was 5.9 / 7.9 / 9.1.
+- **Measured: where the gap is.** Two imbalances, read off the table and the
+  newest run's pytest summaries (41407136163).
+  - Shard 3 is heavy on both legs. It holds 5 674 and 5 702 cases against
+    3 658-3 899 in the others, and its median job is 17.0 min on py3.11,
+    where no documentation runs. So the record under-weighs shard 3's files on
+    both legs. The record is from run 39687915804 (10-21) and lacks eleven
+    collected files (the previous entry).
+  - Shard 1 carries the documentation on py3.14. py3.11 1/3 skips 24 more
+    cases than py3.14 1/3 (40 against 16), and its *Fast suite* step took
+    696 s against 1 080 s. This is the per-leg imbalance the previous entry
+    named.
+  - **A perfect split.** Each leg's job walls summed per run, divided by
+    three, and the slower leg taken: median 14.7 min, range 12.6 to 16.3. The
+    leg totals themselves were py3.14 44.1 min (37.9-49.0) and py3.11 40.4 min
+    (33.0-43.4). Files and `xdist_group`s stay whole, so no record reaches
+    this figure exactly.
+- **Measured: counts.** Held. On run 41407136163 both legs sum to 13 605
+  passed+skipped and 32 xfailed over their three shards: py3.14
+  3 682 + 3 899 + 5 702 passed and 16 + 154 + 152 skipped; py3.11
+  3 658 + 3 899 + 5 674 passed and 40 + 154 + 180 skipped. The unsharded
+  fast run at the same code (f8559dee6; `[dev]`, no jax, macOS arm64,
+  Python 3.12.10, other runners' suites on the machine) gave 13 294 passed,
+  1 failed, 310 skipped and 32 xfailed, the same 13 605 once the failure is
+  counted. The failure is the known environment fault of the 2026-11-01
+  entry, `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone`
+  (a Jupyter kernel spec pointing at a deleted venv). The jax job ran 100 passed and 8 skipped. Its equality with a full-tier jax
+  leg at one commit is still unchecked, as in the previous read: no nightly
+  `full` was read here.
+- **Review.** `/code-review` skipped: the branch changes this WP file and the
+  index, with no code.
+- **Full suite.** Not run. The branch is prose-only.
+  `tests/test_docs_consistency.py` ran instead (step 10).
+- **Gotchas.** The ghostshift scratch directory `~/.cache/ghostshift/rietx/wp-2019/`
+  carries the previous runners' scripts under the same names (`counts.py`
+  holds a hard-coded run id). A new runner names its own files.
+- **Next**, in this order. The first two are cheap and may reach the bar
+  together; the third is near-certain to reach it.
+  1. **Refresh the shard record** from run 41407136163's `junit-py3.*-*`
+     artifacts (`python -m tests.shards DIR`), the first record measured on
+     three shards. This targets shard 3's heaviness on both legs.
+  2. **A per-leg record** (`tests/shards.py` `record` and `assign`), so
+     py3.11's split stops carrying py3.14's documentation cost. Together with
+     item 1 the best case is the perfect-split figure, a median about 14.7 min.
+     After both, read ten runs again.
+  3. **If that still misses**, four shards per leg: the same leg totals give
+     about 11 min a job under a perfect split. The cost is concurrency. The
+     `ci.yml` header counts seven fast jobs a run, so two runs take 14 of the
+     free plan's 20 slots. At four shards that becomes 18, and two runs'
+     lint and changes jobs no longer all fit beside them. Cutting the tier's work, the 2026-11-01
+     entry's (b), stays behind it. Restating the bar, (c), is Yue's.
+  4. The nightly's triclinic case still waits on WP-2048.
 
 ### 2026-11-02 — each fast leg runs as three shards; the ten-run read restarts at the merge
 
