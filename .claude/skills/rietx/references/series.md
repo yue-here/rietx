@@ -323,8 +323,9 @@ passed to it raises `TypeError` rather than being recorded.  A cancelled
 series **returns** what completed, with `SEQUENTIAL_CANCELLED`.  Note that
 `stage_reports=True` does *not* exist here; it is a `Refinement.fit()` argument
 and raises `TypeError`, and per-stage Rwp lives on the `stage_end` events of the
-shared `EventStream` instead (present on **637 of 637** payloads in one run,
-where `StageResult` carries no `rwp` field at all).
+shared `EventStream` instead (present on **637 of 637** payloads in one run).
+`SeriesEntry` carries no `stages`; `SequentialRefinement.results_` holds each
+fit's `StageResult.rwp`.
 
 Where `stage_reports=True` *does* apply — the single `Refinement.fit()` calls of a batch — it
 is expensive.  On the bundled NAC fixture it cost **4.7-5.7×** the same fit without it, with

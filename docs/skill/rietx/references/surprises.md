@@ -292,9 +292,9 @@ reason is 8.13's mechanism seen from the other side: those long stages are
 walking a near-degenerate direction at ≈0.93 per iteration, and 99.99 % of the
 cost decrease is banked by evaluation 55 of 93 — the rest is digits the next
 stage refines again anyway, because stages are cumulative and the last one
-polishes everything at `1e-9`. Measured over the three lab-shaped benchmark
-cases: 1.51×, 1.62× and 1.55× fewer evaluations, every non-degenerate parameter
-within 0.03 esd of the fully converged plan, QPA within 0.0014 wt %.
+polishes everything at `1e-9`. Measured behind the closing stage on fluorapatite,
+NAC and cpd-1a: 1.06-1.58× fewer evaluations, every parameter within 0.0004 esd
+of the fully converged plan. With an absent phase it is 3.9×.
 **Corollary for the agent, in three parts.** Do not read a small parameter
 difference between a 1.0.x number and a 1.1 number as a physics change; check
 `StageResult.ftol` first. Set `intermediate_ftol = None` when a number is going
@@ -476,15 +476,15 @@ tube sits at 0.14 (Hölzer et al. 1997), which is the case worth catching.
 (Measured: WP-1442.)
 
 **8.28 A glob that matches nothing is normal, and a literal path that matches
-nothing is a typo.** Plans reach components a model may not declare, so a
-stage carrying `phases.*.microstrain.dof.*` on a model without a Stephens block
-frees nothing and is healthy. A path with no `*`, `?` or `[` names one
-parameter, though, and when the model has no such row the stage frees nothing,
-converges, and until v1.6 said nothing: `instrument.source.wavelength` for
-`instrument.source.lines.0.wavelength` is the measured case. That now fires
-§7 `STAGE_PATH_UNKNOWN` with the nearest real path. **A typo inside a glob
-(`phases.*.cel.*`) still cannot be told from a healthy miss, so read
-`StageResult.freed` for every stage you wrote yourself.** On a joint fit the
+nothing is a typo.** A plan's `phases.*.microstrain.dof.*` on a model without
+a Stephens block frees nothing and is healthy. A path with no `*`, `?` or `[`
+names one parameter, so a missing row (`instrument.source.wavelength` for
+`…lines.0.wavelength`) fires §7 `STAGE_PATH_UNKNOWN` with the nearest real
+path, and `set_vary` raises instead, changing nothing. A glob naming one site
+is a claim: `phases.0.atoms.0.dof.*` on rutile's fixed Ti fires §7
+`STAGE_PATH_NOT_FREE` (WP-1951). **A typo inside a glob (`phases.*.cel.*`)
+still cannot be told from a healthy miss, so read `StageResult.freed` for each
+stage you wrote.** On a joint fit the
 same miss can hit one histogram only: `instrument.profile.*` freed the
 constant-wavelength histogram and nothing on the fork's time-of-flight banks,
 and the fit converged at Rwp 0.115 against 0.066 with the right globs. That is

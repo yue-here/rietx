@@ -1,9 +1,9 @@
 # WP-1468 — what the polyhedra still miss, and the controls a chemist would reach for
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — eleven of twelve original tasks and the #1056 one landed (PR #1298); WP-1533's dark-theme C colour and two figure controls remain
+Milestone: unscheduled · Status: 🔄 2026-11-02 — the two figure controls and the dark-theme C colour landed (PR #1342); left are cluster polyhedra on request and the Inherited readings from WP-1504 and #1057
 Track: Render what the fit already knows
 Depends on: 1466
-Priority: P3 2026-10-23 — was P4: 1504's close forwarded WP-1957's readings, and one misleads (all three reviewers read `DIM_BOUNDARY`'s shade as a second species); also left are WP-1533's C colour and two figure controls
+Priority: P3 2026-10-23 — was P4: 1504's close forwarded WP-1957's readings, and one misleads (all three reviewers read `DIM_BOUNDARY`'s shade as a second species), waiting on a ruling
 
 ## Goal
 
@@ -203,8 +203,8 @@ Independent; take any.
 - [x] One authority for "bonded" on the server and one for "drawn" on the client (2026-09-28: `structure3d.bonded`, `drawnWith` and its twin `drawn_with`)
 - [x] A source for the Te, At, Kr and Xe electronegativities (2026-10-03: three handbooks agree, read second-hand, Context; the `ELECTRONEGATIVITY` comment says so)
 - [x] An ellipsoid figure from a CIF read with defaults says it drew spheres (#1056; 2026-11-01: `CIF_ANISO_COLLAPSED` info from the reader counts the collapsed sites, `FigureReport.warnings` counts the sites an ellipsoid figure drew as spheres, one skill sentence. #1057, the two figure controls, stays open)
-- [ ] A theme-dependent C colour (from WP-1533): C's `#383838` reads at 1.56:1 on the dark `#151515`, as H's `#d8d8d8` does at 1.38:1 on the light `#fbfbfa`; a plain 3:1 rule would repaint 11 of 20 CPK colours on light. It changes the dark default picture, so re-run `measure.py` and name the rows that moved. Until then the skill tells an agent to recolour C on a dark background
-- [ ] Two figure controls the promo scripts did by hand (from WP-1533): `fig.image` cropped to its ink, and a polyhedron colour on the figure, where all six take-2 scripts read `g["sites"]` instead
+- [x] A theme-dependent C colour (from WP-1533): C's `#383838` reads at 1.56:1 on the dark `#151515`, as H's `#d8d8d8` does at 1.38:1 on the light `#fbfbfa`; a plain 3:1 rule would repaint 11 of 20 CPK colours on light. It changes the dark default picture, so re-run `measure.py` and name the rows that moved. Until then the skill tells an agent to recolour C on a dark background (2026-11-02: **ruled by the maintainer 2026-11-02, in chat**: C draws `#666666` on a dark ground and keeps `#383838` on a light one. `structure3d.DARK_GROUND`, in `render_structure` and the GUI's dark theme. `measure.py` reads no colour, so no row moved)
+- [x] Two figure controls the promo scripts did by hand (from WP-1533): `fig.image` cropped to its ink, and a polyhedron colour on the figure, where all six take-2 scripts read `g["sites"]` instead (2026-11-02: `render_structure(pad=0)` and `StructureFigure.polyhedron_palette`)
 
 ## Acceptance
 
@@ -231,6 +231,133 @@ npm --prefix gui test && npm --prefix gui run check
 - Allred, A. L. (1961). *J. Inorg. Nucl. Chem.* 17, 215.
 
 ## Handover log
+
+### 2026-11-02 (2nd session) — carbon is lighter on a dark ground, as the maintainer ruled
+
+**On a dark screen, carbon is now visible.** The maintainer ruled on the
+question the first entry below put: carbon draws `#666666` on a dark ground and
+keeps `#383838` on a light one (option 2). It was ruled 2026-11-02, in chat, by
+the maintainer: "666666 looks better on dark". Shown the light pair, the
+maintainer said the two pictures "look 100% identical", which is the point of
+the dark-only change. The change reaches the GUI's dark theme, a
+`render_structure` call on a dark background, and the notebook's dark copy. The
+maintainer also approved the PR's reader output for merge. PR #1342.
+
+*Done.*
+- `structure3d.DARK_GROUND = {"C": "#666666"}` and `dark_ground_colours(sites)`,
+  the one authority for which sites take it: a site still in its CPK colour,
+  never one `recolour` marked, never a colour within `MIN_SEPARATION` of another
+  in the phase. `build` writes its answer into the payload as each site's
+  `dark_color`. `render_structure` asks again of the dict it is handed, so an
+  edited colour is judged as it stands. `recolour` drops a copied `dark_color`.
+- GUI: `Site.dark_color`, `onDarkGround` in `lib/structure3d.ts`, and
+  `Structure3D.svelte` draws the scene, the species legend and the polyhedron
+  swatches from that one geometry on the dark theme. Dist rebuilt. The scene
+  corpus rewrote itself for the new field.
+- Manual (`reference/figures.md`), the skill's sentence, which had told an agent
+  to recolour C on a dark ground, and both skill copies. One pytest rewritten
+  (`test_carbon_is_lighter_on_a_dark_ground_only`) and one vitest added.
+
+*Measured* (`[dev]` venv, darwin/arm64, node v24.22.1). The touched files (14,
+render, structure3d, gui server, dist, figure cut and boundary, the four skill
+suites, docs consistency, manual api, gui manual, gui palette): 789 passed,
+1 skipped. vitest 592 passed over 24 files, svelte-check 392 files with 0
+errors. ruff clean. `python -m tests.reader_output`: exit 0, unchanged, because
+its standard fit prints no figure. No committed figure or screenshot moved:
+`make_figures.py` draws no structure, and `make_screenshots.py` photographs the
+FAP example, which has no carbon. `measure.py` reads shells, never colours. The
+GUI was not driven in a browser. The vitest asserts the scene and the legend
+colours from `onDarkGround`.
+
+*Next.* #1057's controls, or the Inherited readings from WP-1504. Cluster
+polyhedra wait for a request.
+
+- **2026-11-02** — **A structure figure can now be cropped to its ink, and it says
+  what colour each polyhedron was drawn in.** All six scripts of the second promo
+  take cut the picture down by hand and then shifted every pixel position they
+  read, and each guessed a polyhedron's legend colour from the site list. Now
+  `pad=0` fits the frame to the ink, so the positions, the Å-to-pixel map and the
+  recipe stay right, and the figure lists each drawn polyhedron formula with its
+  colour. The third open task, a lighter carbon on a dark background, changes the
+  default dark picture, so it is built and switched off and waits on the
+  maintainer's ruling, below. PR #1342, from a ghostshift runner. Issue #1057
+  (per-atom draw style, bond colour, outline on thin sticks) is untouched.
+
+  *Done.*
+  - `render_structure(pad=...)`: the share of each side left empty, default
+    `FIT_PAD` (0.05, ChimeraX `view`'s pad), refused outside 0 ≤ pad < 0.5, in
+    `fig.recipe`. The `view="auto"` search reads the frame at the same pad.
+  - `StructureFigure.polyhedron_palette`: formula → the centre's colour before
+    any dimming, read off the faces the scene drew, a second colour for one
+    formula kept as `"<formula> (recoloured)"` by the rule `palette` already had
+    (now one helper, `_named`, for both).
+  - `structure3d.DARK_GROUND`, **empty**: on a background darker than mid-grey
+    `render_structure` gives a site still in its CPK colour that element's
+    dark-ground colour, never a site `recolour` marked, and never a colour within
+    `MIN_SEPARATION` (0.13 in OKLab) of another colour the phase draws. The GUI
+    does not read it.
+  - Manual (`reference/figures.md`), the skill's figure row in
+    `make_api_index.py`, both committed skill copies. Four test functions, eight cases.
+
+  *Measured* (`[dev]` venv, darwin/arm64). Blank margin round the ink at 1000 px,
+  default pad against `pad=0`: fluorapatite down c 49-65 against 15 px (the a,
+  b, c's room), YBa₂Cu₃O₇ without its cell 35-53 against 3, paracetamol 49-63
+  against 9-13, HKUST-1 down a 65 against 15. The scripts cropped to the ink plus
+  1 % of the width, 24-30 px at their 2400-3000 px. NAC's `view="auto"` picks [0 1 2] at
+  either pad. `python -m tests.reader_output`: exit 0, unchanged; the new field is
+  on the figure object, which no fit returns. `measure.py` was not re-run: no
+  colour enters its rows, and with the table empty no picture moved
+  (`test_the_default_picture_on_the_measured_phases` passes). Fast suite: whole selection `-m "not slow"` on the branch before its last test-only commit, through ghostshift's suite lock with other runners queued: 13514 passed, 314 skipped, 34 xfailed, 2 failed, 42 min. Both failures are this machine's, not the change's. `test_site_classes.py::test_an_unplaceable_species_does_not_enumerate_the_others` is a 15 s wall-clock guard that read 24 s under load and passes alone. `test_display.py::test_a_plot_in_a_kernel_shows_once_and_leaves_the_backend_alone` reached a Jupyter kernel spec pointing at a deleted venv. No baseline count was measured, so the eight added cases are not checked as a delta; CI's fast matrix is the gate. Added-test cost (`tests.added_test_times`, that run, loaded): 7.7 s over the four, 4.2 s of it the polyhedron-palette test, then cut to 0.35 s alone by drawing at 200 px.
+
+  *Review.* `/code-review high` (report mode, since the fast suite was queued on
+  the tree) found eight; seven fixed in one commit. A label test patched
+  `FIT_PAD`, which the new default argument had made a no-op, so it now passes
+  `pad=0`. The view search read the frame at the default pad. A pad near 0.5 blamed
+  `size`. The swap ignored the `recoloured` flag, and never checked separation
+  after `phase_palette`. The polyhedron palette's undimmed colour and the label
+  room at `pad=0` were undocumented. Declined: "the empty table is scaffolding".
+  The runner brief asked for the swap built and left off, so the ruling below has
+  a one-line change behind it.
+
+  *Generality.* No judge dispatched: `_audit.py` is untouched, and the branch adds
+  no heuristic in force. `pad`'s default is the existing `FIT_PAD`, and the table
+  is empty.
+
+  *Decision (maintainer): should the default dark picture draw carbon lighter?*
+  Ruled the same day: option 2 (the second-session entry above).
+  Trigger: it changes the default picture on the main user surface, a value
+  judgement about the CPK convention ("carbon black"), and WP-1533 sent it here as
+  such. **Why it matters.** C is `#383838`, a near-black grey. On the GUI's dark
+  page `#151515` it reads at 1.56:1, and on the notebook's dark copy `#1d1813` at
+  1.50:1, so every organic or MOF linker is barely visible on a dark screen. On
+  the light page it is 11.3:1. Moderate. **Options.** (1) Nothing: the skill
+  already tells an agent to `recolour` C on a dark background, and a person in the
+  GUI has no such control. (2) A theme-dependent C, `#666666` on dark only: 3.18:1
+  on `#151515`, 3.07:1 on `#1d1813`, 0.143 in OKLab from Ti's `#909090` (the
+  separation floor is 0.13); the light picture is untouched (checked bit for bit).
+  Cost: one line here for `render_structure` and the notebook, and a twin in the
+  GUI client (`Structure3D.svelte` applies it before `buildScene`, a dist rebuild),
+  undoable. (3) One C on both grounds, `#666666`: 5.55:1 on light, simpler, but
+  the light picture moves too and C stops reading as black. **Practice.** From
+  recall, not checked: Jmol draws C `#909090` on both grounds; VESTA a dark grey;
+  Mercury a mid grey. **Recommendation:** option 2, a lean. The crux is whether
+  "carbon black" is a convention to keep on light pages. Option 2 keeps it there
+  and fixes only the case where it fails. It loses to option 3 if you would rather
+  have one colour per element across themes. Pictures, before left and after
+  right: `~/.cache/ghostshift/rietx/wp-1468/png/C_paracetamol_gui_dark_pair.png`,
+  `C_paracetamol_notebook_dark_pair.png`, `C_hkust1_sphere_gui_dark_pair.png`,
+  and `C_paracetamol_light_pair.png` (identical halves). Not generalised: Br
+  (`#a02020`) and I (`#8020c0`) also sit under 3:1 on `#151515` but read by hue.
+
+  *Gotchas.* The worktree guard refuses heredoc edits chained with other commands;
+  write the edit script to the scratch dir and run it by path. Patching
+  `render.FIT_PAD` no longer reaches a draw, because `pad=FIT_PAD` binds at
+  definition: pass `pad=`.
+
+  *Next.* 1. The maintainer rules on the dark-ground C. If option 2: set
+  `DARK_GROUND = {"C": "#666666"}`, mirror it in the GUI client, rebuild the dist,
+  and move the skill's "recolour C" sentence. If option 1: delete `DARK_GROUND` and
+  `_on_dark_ground`, and close the task as declined. 2. Then #1057.
 
 - **2026-11-01** — **An ellipsoid figure of a CIF read with the defaults now says
   it drew spheres, and the reader says why.** Reading a CIF drops each site's

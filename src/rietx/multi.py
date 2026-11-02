@@ -347,6 +347,11 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (FIT,), "a parent-cell phase's strains are shared model parameters, "
                 "so the held-strain record is the fit's, read off the plan's "
                 "freed paths (WP-1419)"),
+    "_site_glob_diagnostics": (
+        (ABSENT,), "not called from multi.py yet: a single fit reports a glob "
+                   "naming one site that frees nothing (WP-1951), and wiring it "
+                   "beside _joint_fixed_literals waits on PR #1270 reshaping "
+                   "that wrapper; the follow-up is in WP-2028's Inherited"),
     "_hold_diagnostics": (
         (ABSENT,), "a joint fit has no hold verb: the one hold its tables "
                    "carry is the floating origin's, which HOLD_BLOCKED_PLAN "
@@ -1627,8 +1632,10 @@ class MultiHistogramRefinement:
         start.
         """
         per = self.mtable.decode(theta)
-        y_calc = [m.evaluate(v) for m, v in zip(models, per, strict=True)]
-        y_bkg = [m.background(v) for m, v in zip(models, per, strict=True)]
+        # one background pass a histogram: paid on every stage since
+        # ``StageResult.rwp`` (WP-1334), not only when a stream listens
+        y_calc, y_bkg = (list(c) for c in zip(*(
+            m.evaluate_with_background(v) for m, v in zip(models, per, strict=True))))
         rows = [{"histogram_index": h,
                  "rwp": compute_statistics(m.y_obs, yc, m.sigma, n_free=0,
                                            y_background=yb).rwp}
@@ -1926,6 +1933,9 @@ class MultiHistogramRefinement:
                 losses = [x for x in (window_loss(m, v) for m, v in zip(
                     models, self.mtable.decode(outcome.theta), strict=True))
                     if x is not None]
+                # the pooled Rwp at the answer, on the stage's own compile: the
+                # record's and the ``stage_end`` event's one number (WP-1334)
+                rwp, rows = self._stage_end_rows(models, outcome.theta)
                 stage_results.append(StageResult(
                     name=stage.name, status=outcome.status,
                     n_iterations=outcome.n_iterations,
@@ -1945,9 +1955,8 @@ class MultiHistogramRefinement:
                     seeded=seeded, blocked_by_hold=blocked_by_hold,
                     moment_angle_tests=outcome.moment_angle_tests,
                     cell_reset=cell_reset, collapsed=restored,
-                    window_loss=max(losses) if losses else None))
+                    window_loss=max(losses) if losses else None, rwp=rwp))
                 if stream is not None:
-                    rwp, rows = self._stage_end_rows(models, outcome.theta)
                     stream.emit("stage_end", stage=stage.name, status=outcome.status,
                                 n_iterations=outcome.n_iterations,
                                 termination=outcome.termination,
