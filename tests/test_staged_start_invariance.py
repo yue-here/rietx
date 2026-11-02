@@ -94,9 +94,9 @@ OUT = Path(__file__).parent / "output"
 #: the ruled bar for a staged plan's start test, in plain esd
 ESD_BAR = 0.1
 
-_MIRRORED = ("LaB6's two starts land in its mirrored S/L and H/L axial minima under "
-             "every window setting (WP-2012): 1.16 esd on u since WP-2002 (9.36 on "
-             "axial_sl before)")
+_MIRRORED = ("LaB6's two Biso starts reach two distinct minima, nearly mirror images "
+             "under the S/L and H/L exchange (WP-2012): 1.156 esd on u with the axial "
+             "pair ordered (WP-2036, 2026-11-02; 9.36 on axial_sl before WP-2002)")
 
 
 def _plotted(result, tag: str) -> dict:

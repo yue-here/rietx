@@ -27,7 +27,8 @@ _trial = mag._fit
 def traced(*a, **kw):
     LOG.clear()
     ref, result = _trial(*a, **kw)
-    print(f"  trial: {len(LOG) - 1} continuations, {result.status}, Rwp {result.statistics.rwp:.7f}")
+    # every strategy.magnetic._fit call: nuclear references and start legs too
+    print(f"  _fit: {len(LOG) - 1} continuations, {result.status}, Rwp {result.statistics.rwp:.7f}")
     for i, call in enumerate(LOG):
         print(f"    fit {i}: {call if i == 0 else call[-1]}")
     return ref, result

@@ -95,8 +95,9 @@ def test_the_150k_pattern_has_nothing_to_solve(solved_150k):
     """No class wins, none improves on the nuclear model, and the verdict says so.
 
     The few unexplained peaks match k = (0, ½, ½) at about chance, and two
-    classes refine there, both converged against a converged nuclear
-    reference.  Measured on ``0ba8df81`` (macOS arm64, numpy 2.5.4 with
+    classes refine there against a converged nuclear reference.  Both trials
+    converged in the two runs below; class 3's need not (the last paragraph).
+    Measured on ``0ba8df81`` (macOS arm64, numpy 2.5.4 with
     Accelerate, three runs bit-identical) and on ``c3d03673`` (Linux x86-64,
     after #918 and #923):
 
@@ -111,8 +112,8 @@ def test_the_150k_pattern_has_nothing_to_solve(solved_150k):
     **What is asserted, and what is not (#820, WP-1418, option (a)).**  The
     verdict, ΔBIC ≤ 0 for every refined class (both sit 40-45 below zero), the
     nuclear reference's convergence, the caveat on any trial stopped short, and
-    that class 3 carries the pair.  The pair is held to **bands, not to the gate**: sum 0.3-0.8 μ_B, esd
-    0.1-0.5 μ_B.  Each edge sits ≥ 0.1 μ_B from every value measured here and
+    that class 3 carries the pair.  The pair is held to **bands, not to the
+    gate**: sum 0.3-0.8 μ_B, esd 0.1-0.5 μ_B.  Each edge sits ≥ 0.1 μ_B from every value measured here and
     from the lead pair before #918 and #923 (0.606 ± 0.202, Linux and macOS
     alike), because the pair has already moved 0.09 μ_B across solver changes
     on this one pattern; the 0.5-0.7 sum band WP-1418 first named sits 0.018
@@ -137,8 +138,9 @@ def test_the_150k_pattern_has_nothing_to_solve(solved_150k):
     nudges of the reference's w on macOS arm64 it took 3, 4, 4, 5 and 10 of
     ``SOLVE_MAX_CONTINUATIONS``' 10, and 6 with the moment columns taken by
     forward difference.  At the sixth nudge it ran out at 10 and stopped on
-    ``max_iter``, as the Linux nightly of 2026-11-01 did when it failed here.  Stopped after 2, the pair reads 0.519 ± 0.247 μ_B against
-    0.518 ± 0.250 converged, so the bands hold either way, and a stopped trial
+    ``max_iter``, as the Linux nightly of 2026-11-01 did when it failed here.
+    Stopped after 2, the pair reads 0.519 ± 0.247 μ_B against 0.518 ± 0.250
+    converged, so the bands hold either way, and a stopped trial
     must carry its caveat (above).  The crawl is WP-1334's.
     """
     s = solved_150k
