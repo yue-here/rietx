@@ -1,6 +1,6 @@
 # WP-1955 — a column at a zero aperture, and a column the agreement matrix cannot see
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — tasks 1-4 landed (PR #1321, draft); blocked on a ruling: the exact column strands a zero aperture (see the 2026-11-02 entry)
+Milestone: unscheduled · Status: 🔄 2026-11-02 — tasks 1, 3 and 4 landed (PR #1321); task 2 reverted by ruling, it returns with task 5
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-26 — two measurements the same day: WP-2003's double-zero aperture collapsing a warm-started CPD fit (Rwp 0.79-10.7 against 0.109), and #1075's LM ending converged at S/L = H/L = 0 on lab_bragg_brentano from defaults while one TRF stage drops χ² by ~1 200 χ²_red·f²; the single-zero column is still off its difference with no test
@@ -101,9 +101,16 @@ when U and V are both zero beside W on its floor. It is the only other
       zero aperture against the one-sided difference, and find the line in
       `model/forward.py` where the node differencing departs from it. A test
       that fails on `main`.
-- [x] Fix it, and re-measure the fits that free one aperture from 0:
+- [ ] Fix it, and re-measure the fits that free one aperture from 0:
       `test_e8`, QPA cpd-1a's `lines_axial` stage, the Stephens brucite
       protocol. Record the esds of S/L before and after.
+      Reverted in PR #1321. The fix (a second-order node difference, measured
+      in the first 2026-11-02 entry) strands a fit at a zero aperture, so it
+      returns with task 5. Ruled by Yue 2026-11-02: split. The exact column
+      lands later together with a lift off a zero aperture (task 5), as one
+      reader-output change with numbers. Until then the numpy rows of the
+      zero-aperture test are a strict xfail naming task 5, and the matrix
+      leaves out that one column (`KNOWN_DEFECT_COLUMNS`).
 - [x] The dead-column cut: count the configs whose columns fall under
       `DEAD_COL_FRAC`, and decide whether the matrix checks such a column
       against its own difference at its own scale, as the zero-aperture test
@@ -124,6 +131,10 @@ when U and V are both zero beside W on its floor. It is the only other
 - [ ] Both apertures at 0: reproduce WP-2003's warm CPD collapse (X17) and
       #1075's LM stop on `lab_bragg_brentano`, and say whether one remedy (a
       floor or a lift where the column is live, WP-1938's rule) serves both.
+      Land task 2's exact column with that remedy, in one change: the
+      calibrate guide's second calibration (S/L freed from 0, H/L held) is
+      the case the column alone breaks. Remove the strict xfail and the
+      `KNOWN_DEFECT_COLUMNS` entry in `tests/test_cross_backend.py` then.
 
 ## Acceptance
 
@@ -144,6 +155,45 @@ alone.
   **27**, 892-900.
 
 ## Handover log
+
+- **2026-11-02 (second)** — Yue ruled the open question: split. PR #1321
+  now carries only the test and traced-backend half, and changes no default
+  output. Ruled by Yue 2026-11-02: split. The exact column lands later
+  together with a lift off a zero aperture (task 5), as one reader-output
+  change with numbers.
+
+  *What the PR contains now.* Task 3: the agreement matrix checks every column
+  at its own scale and skips only an exactly zero one. Task 4: the Caglioti
+  floor is a select, so jax and torch return the full width column at
+  U = V = 0 with W on its floor. Task 1's test: the zero-aperture test has
+  numpy, jax and torch rows for both apertures; the numpy rows are a strict
+  xfail whose reason names task 5.
+
+  *Reverted.* Task 2, by `git revert` of 976318b07 (node difference and the
+  golden re-captures), 851bb6b9f (gap test) and 29724e63b (batched-bases
+  oracle), and of the `forward.py` half of e1c225bca (mirrored stencil),
+  whose test half (the width-floor test's `importorskip` moved ahead of the
+  state build) belongs to task 4 and stays. `forward.py`, both goldens,
+  `tests/data/README.md` and `test_derivative_bases_batched.py` are now
+  identical to `origin/main`.
+
+  *Departure from task 3's Decided line.* The matrix's reference is numpy's
+  analytic column, so with the defect back every backend row of
+  `axial_one_zero` failed on `axial_hl` (fd row: rel-L2 0.2316). The matrix
+  leaves out that one (config, path) pair, listed in `KNOWN_DEFECT_COLUMNS`
+  beside the strict xfail that still holds it; every other column of that
+  config is checked. Settled by Claude under the ruling (a green suite must
+  not hide the known defect, and the xfail keeps it visible).
+
+  *Measured* (macOS arm64, Python 3.12, `[dev,jax,torch]`, merged with
+  `origin/main` at 37e85ae9d). `tests/test_cross_backend.py`: 230 passed,
+  35 skipped, 4 xfailed (the two numpy zero-aperture rows and two older
+  ones). `test_examples[calibrate]` passes at main's quoted numbers.
+  `python -m tests.reader_output`: unchanged against the merge-base, exit 0.
+  Fast-suite counts: see the PR body.
+
+  Next: task 5, with task 2's column. The first 2026-11-02 entry holds the
+  column's measurements and the calibrate failure that the lift must cure.
 
 - **2026-11-02** — The numpy Jacobian now gives the right axial-divergence
   column when one aperture (S/L or H/L) sits on zero, and the esd of the other
@@ -240,7 +290,7 @@ alone.
   pointing at a deleted venv (an environment fault on this Mac). The full
   selection was stopped before it ran.
 
-  *Question for Yue (open).* Ship the exact column only together with a lift
+  *Question for Yue (ruled 2026-11-02: split, see the entry above).* Ship the exact column only together with a lift
   off a zero aperture (a stage that frees an aperture seeds it off 0, WP-1938's
   "a floor or a lift where the column is live"), which also covers task 5 and
   moves every fit that frees an aperture from 0; or revert the column fix
