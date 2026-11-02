@@ -121,9 +121,12 @@ def assign(parts: Iterable[frozenset[str]], seconds: Mapping[str, float],
            n: int) -> list[tuple[frozenset[str], float]]:
     """Each shard's files and estimated seconds, units placed longest first.
 
-    Ties break on the unit's sorted file names and then on the lowest shard
-    index, so every process given the same units gets the same shards.  The
-    largest shard exceeds an even split by at most the largest unit."""
+    Ties break on the unit's sorted file names and then on the shard holding
+    the fewest units, then the lowest index, so every process given the same
+    units gets the same shards.  A unit the record weighs at zero therefore
+    goes to an empty shard while one is left, rather than onto the first
+    shard at zero.  The largest shard exceeds an even split by at most the
+    largest unit."""
     default = statistics.median(seconds.values()) if seconds else 1.0
 
     def weight(unit: frozenset[str]) -> float:
@@ -132,10 +135,12 @@ def assign(parts: Iterable[frozenset[str]], seconds: Mapping[str, float],
     order = sorted(((weight(u), sorted(u)) for u in parts), key=lambda wu: (-wu[0], wu[1]))
     files: list[set[str]] = [set() for _ in range(n)]
     loads = [0.0] * n
+    held = [0] * n
     for w, unit in order:
-        i = min(range(n), key=lambda j: (loads[j], j))
+        i = min(range(n), key=lambda j: (loads[j], held[j], j))
         files[i].update(unit)
         loads[i] += w
+        held[i] += 1
     return [(frozenset(f), load) for f, load in zip(files, loads, strict=True)]
 
 
@@ -197,9 +202,8 @@ def record(directory: Path, source: str) -> dict:
     if not python:
         raise SystemExit(f"no junit-py* leg under {directory}")
     every = set().union(*(seconds[name] for name in python))
-    common = {f for f in every
-              if len({ran[name].get(f, 0) for name in python}) == 1
-              and all(seconds[name].get(f, 0.0) > 0.0 for name in python)}
+    alike = {f for f in every if len({ran[name].get(f, 0) for name in python}) == 1}
+    common = {f for f in alike if all(seconds[name].get(f, 0.0) > 0.0 for name in python)}
     speed = {name: math.fsum(seconds[name][f] for f in sorted(common)) for name in python}
     median = statistics.median(speed.values())
     factor = {name: (s / median if s and median else 1.0) for name, s in speed.items()}
@@ -207,17 +211,20 @@ def record(directory: Path, source: str) -> dict:
     def profile(kind: list[str]) -> dict[str, float]:
         out = {}
         for f in every:
-            alike = len({ran[name].get(f, 0) for name in python}) == 1
-            pool = python if alike or not kind else kind
+            pool = python if f in alike or not kind else kind
             most = max(ran[name].get(f, 0) for name in pool)
             legs = [seconds[name][f] / factor[name] for name in pool
                     if most and ran[name].get(f, 0) == most]
             out[f] = round(statistics.median(legs), 1) if legs else 0.0
         return out
 
-    return {"source": source,
-            DOCS_RUN: profile([name for name in python if name not in skips_docs]),
-            DOCS_SKIPPED: profile([name for name in python if name in skips_docs])}
+    kinds = {DOCS_RUN: [name for name in python if name not in skips_docs],
+             DOCS_SKIPPED: [name for name in python if name in skips_docs]}
+    for name, kind in kinds.items():
+        if not kind:
+            print(f"warning: no leg under {directory} ran as {name}, so that profile "
+                  "holds every leg's figures", file=sys.stderr)
+    return {"source": source, **{name: profile(kind) for name, kind in kinds.items()}}
 
 
 def main(argv: list[str]) -> int:

@@ -107,8 +107,10 @@ name: CI
 # Nine fast jobs a run, eight Python shards and the jax job.  Two runs at
 # once take 18 of the free plan's 20 concurrent jobs.  `changes` ends before
 # the fast jobs start and `ci-ok` starts after they end, and `lint` overlaps
-# them by under a minute (38 s on main run 41407136163).  So two runs fit
-# beside each other, and a third run at once queues a job or more until a
+# them by under a minute (38 s on main run 41407136163).  So two pull-request
+# runs fit beside each other.  A push to main also starts pages.yml's `build`
+# job beside its fast jobs, so two main runs at once take all 20, and either
+# a third run or a gui.yml or kernels.yml job queues a job or more until a
 # slot frees.  A queued job is visible in `gh run list`.
 
 on:
