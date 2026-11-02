@@ -208,9 +208,9 @@ def test_scale_or_instrument_without_free_keeps_the_stored_flags(kwargs):
 
 
 def test_a_result_keeps_its_tied_copies_free():
-    """Review item 2: a result lists a row iff it varied *or was tied*, so a
-    ``vary=False`` row is a tied copy, which the note says 'refines as its own
-    parameter'."""
+    """Review item 2: a result lists a row iff the fit could move it (it varied,
+    or follows one that did, WP-1999), so a ``vary=False`` row is a tied copy,
+    which the note says 'refines as its own parameter'."""
     from rietx.schemas.results import RefinedParameter
 
     class _Result:

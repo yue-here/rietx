@@ -1192,8 +1192,8 @@ def test_the_joint_runner_withholds_an_esd_by_the_single_histogram_rule(
 
     "end": ``cell`` is the answer stage and its reset puts the shared
     ``phases.1.cell.a`` back and holds it, so the row leaves ``parameters``,
-    phase 1's tied ``b``/``c`` report the start with no esd, and phase 0's
-    keep theirs.  "early": the reset fires in ``cell``, ``zero`` returns the
+    phase 1's tied ``b``/``c`` leave with it (WP-1999: no column moves them),
+    and phase 0's keep theirs.  "early": the reset fires in ``cell``, ``zero`` returns the
     cell to the value ``cell``'s solve found and ``bkg`` refines it from
     there, so every cell row reports an esd."""
     from tests.test_cell_runaway_safety import CUBIC_TWIN, ESCAPED
@@ -1202,15 +1202,22 @@ def test_the_joint_runner_withholds_an_esd_by_the_single_histogram_rule(
     zero = Stage("zero", ["instrument.zero_shift"])
     bkg = Stage("bkg", ["instrument.background.*"])
 
-    end = _joint_cubic_pair_fit(monkeypatch, [zero, cell], {1: "escape"})
+    ref, end, _ = _joint_cubic_pair_fit(monkeypatch, [zero, cell], {1: "escape"},
+                                        full=True)
     fired = [d for d in end.diagnostics if d.code == "CELL_RUNAWAY"]
     assert len(fired) == 1 and fired[0].where == [ESCAPED]
     with pytest.raises(KeyError):
         end.parameter(ESCAPED)                  # held, so not a refined row
     for n in "bc":
-        row = end.parameter(f"phases.1.cell.{n}")
-        assert row.value == pytest.approx(TRUE_A * CUBIC_TWIN, rel=1e-14), n
-        assert row.stderr is None, n
+        with pytest.raises(KeyError):
+            end.parameter(f"phases.1.cell.{n}")
+    # no row reports the value the reset held, so it is read off each
+    # histogram's working model, as the single-histogram test reads it
+    for structure in ref.fitted_structures:
+        held = structure.phases[1].cell
+        for n in "abc":
+            assert getattr(held, n).value == pytest.approx(
+                TRUE_A * CUBIC_TWIN, rel=1e-14), n
     for n in "abc":
         assert end.parameter(f"phases.0.cell.{n}").stderr is not None, n
 

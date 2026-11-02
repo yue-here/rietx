@@ -366,8 +366,8 @@ def parameter_cells(row) -> tuple[str, str, str]:
 def refined_parameter_text(p) -> str:
     """A ``RefinedParameter`` on one line, as a ``ParameterRow`` prints:
     ``path  value(esd)  state``.  The state is ``vary``, or ``tied`` for a row
-    that did not vary, since a result lists only rows that varied or were
-    tied.  ``at_bound`` follows when the bound guard found the row there, the
+    that did not vary, since a result lists only rows that varied or follow
+    one that did (WP-1999).  ``at_bound`` follows when the bound guard found the row there, the
     equations that set it when any did, and the profile interval's ends when
     the row carries one (WP-2002), ``?`` for an end its side did not find."""
     cells = [p.path, _number(p.value, p.stderr), "vary" if p.vary else "tied"]
