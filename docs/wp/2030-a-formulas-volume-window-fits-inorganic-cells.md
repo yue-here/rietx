@@ -1,6 +1,6 @@
 # WP-2030 — A formula's volume window fits inorganic cells, and a hydrate parses
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — parts 1 and 2 merged from outside (PRs #1123, #1253, #1237); the stale `duplicate_line` marks are fixed in PR #1344; the GUI formula field waits on the maintainer's choice of where the formula is stored (2026-11-02 entry), and #1121 stays open for it
+Milestone: unscheduled · Status: 🔄 2026-11-02 — parts 1 and 2 merged from outside (PRs #1123, #1253, #1237) and the stale `duplicate_line` marks fixed (PR #1344); the GUI formula is settled as two optional `IndexingControls` fields (2026-11-02 rulings entry) and not built yet; #1121 stays open for it
 Track: Data and metadata in, a structure out
 Depends on: — (1510 soft, closed 2026-10-23: the window, the Z check and the review findings this carries)
 Priority: P2 2026-10-23 — a defect that fires wrongly: the skill sends an agent through `SearchSpec.from_formula` before its first search, and the window excludes the true cell of 7 of 8 inorganic solids measured (fluorapatite abstained where the unwindowed search ranked the truth first); indexing is a path few fits run
@@ -159,8 +159,9 @@ to the table arrives tiered (CI's `tests/audit_delta.py`).
 - [ ] `formula` and `temperature` recorded on `IndexingResult`, with the
       writer named (root CLAUDE.md: a declared name is a claim). `formula`
       reaches the CLI and the GUI's indexing call. (The result fields and the
-      CLI landed in part 1; the GUI half waits on the maintainer's choice of
-      where the formula is stored, set out in the 2026-11-02 entry.)
+      CLI landed in part 1. Where the GUI stores the formula is settled:
+      optional `formula`/`temperature` fields on `IndexingControls`, see the
+      2026-11-02 rulings entry. The build is the next step.)
 - [x] The instrument-first lead fires only on a lab source. Decide whether
       `PeakList` records its instrument so `index_pattern(peaks)` sees the
       lead. Test both.
@@ -206,6 +207,40 @@ unwindowed one does, and `CuSO4.5H2O` never reads as 4.5 O.
   that need no ruling, then the window rule once it is chosen).
 
 ## Handover log
+
+- **2026-11-02** (rulings, PR #1349) — Where the GUI stores the
+  specimen's formula is settled: two optional fields, `formula` and
+  `temperature`, on the search-controls block of the project file
+  (`IndexingControls`), shown in the indexing form beside the volume limits.
+  Nothing is built yet. The maintainer delegated the choice in chat on
+  2026-11-02: "whatever is more consistent with our design ethos. don't worry
+  about sunk cost, I don't think that many people are using indexing at the
+  moment and we're doing a big rework anyway."
+
+  *Settled by Claude under that delegation: option A* of the 2026-11-02
+  brief below. Grounds. Root CLAUDE.md § Project: `project.json` holds
+  settings (selected plan, mode, limits), and the formula is a search setting
+  that sits beside the volume limits. The package already treats the formula
+  as a run input (`index_pattern(formula=)`, `rietx index --formula`). The
+  global rule to build the smallest thing, with no scaffolding for later,
+  rules out option B's specimen block, whose other consumers do not exist.
+  Option C loses the formula on every reopen. The maintainer waived the sunk
+  cost and the forward-compatibility cost, which is that a 1.11 project file
+  carrying a formula is refused by 1.10 (`extra="forbid"`).
+
+  *Next* (the build, not done in this batch). (1) `IndexingControls` gains
+  `formula: str | None` and `temperature: float | None`, each `None` when
+  unset, with the CLI's validation (an unreadable formula and a temperature
+  that is not a positive finite number of kelvin are refused, and a
+  temperature without a formula is refused). (2) `gui/session.py`'s index run
+  passes both to `index_pattern`. (3) `tests/test_search_controls.py` moves
+  `formula` and `temperature` from `CALL_TIME_INPUTS` to the controls side of
+  the bijection. (4) The form fields in `gui/src/lib/controls.ts` with their
+  labels and titles, the committed corpus
+  `tests/data/gui/index_controls.json`, a Z (`formula_units`) column in the
+  candidate table, and a rebuilt dist (node >= 20.12). (5) The manual's GUI
+  indexing chapter and a staged note. Then #1121 can close, which is the
+  maintainer's act.
 
 - **2026-11-02** (ghostshift runner, PR #1344) — The GUI's peak editor no longer leaves a
   line marked unusable after the line it was judged against moves. Two marks

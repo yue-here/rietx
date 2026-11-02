@@ -8,6 +8,7 @@ import math
 import os
 import re
 import subprocess
+import time
 import tomllib
 import warnings
 from collections.abc import Callable, Iterable, Sequence
@@ -2516,6 +2517,9 @@ class Refinement:
         #: inside it (the arrow's direction is why ``schemas/results.py``
         #: cannot import the report contract at all).
         self.stage_reports_: list[StageReport] = []
+        #: wall seconds those rungs took to build, which the fit's ``fit_end``
+        #: event carries as ``stage_report_seconds`` (WP-1335)
+        self._stage_report_seconds = 0.0
         self._model: CompiledModel | None = None
         #: whether ``fit`` and ``run_stage`` compute the profile interval of
         #: each moment angle the stationary-angle test left out of the answer
@@ -5283,12 +5287,15 @@ class Refinement:
         the stages that *did* complete and the node the working state stands at.
 
         ``stage_reports`` — build the report at every stage boundary and leave
-        the rungs on :attr:`stage_reports_` (WP-1058).  **Off by default here
-        and on at the agent surface**, and the asymmetry is the measurement:
-        a report build is ~0.33 s on 59.5k channels against a ~1.0 s five-stage
-        fit, so a trajectory costs ≈2.5× the fit — nothing to a consumer that
-        calls once and reads, a tax on a library primitive that suites and
-        series call in loops.  It changes **no** number the fit produces: the
+        the rungs on :attr:`stage_reports_` (WP-1058).  **Off by default**,
+        because each rung is a whole report build and the charge is per rung,
+        so it is a tax on a fit called in a loop.  On 11-BM NAC (22 003
+        channels, seven rungs) a fit with rungs took 4.7-5.7× the fit without
+        them (WP-1335, 2026-11-02), and the multiple grows as fits get
+        faster.  Sample it: the first fit of a batch, the last, one you will
+        plot.  The time the rungs took is ``fit_end``'s
+        ``stage_report_seconds``, since no stage span holds it.  It changes
+        **no** number the fit produces: the
         rungs are read off states the plan already passes through, never
         states it is made to visit, so a fit run with them lands exactly where
         the same fit run without them does.  (That is also why this is not the
@@ -5590,6 +5597,13 @@ class Refinement:
                 + _fixed_literal_diagnostics(plan.stages, table, self._ties))
             stage_results: list[StageResult] = []
             self.stage_reports_ = []
+            self._stage_report_seconds = 0.0
+            # the rungs' cost, on fit_end: a rung is built between one
+            # stage's stage_end and the next stage_start, so no stage span
+            # holds it (WP-1335).  Absent when no rung was asked for.
+            def report_cost() -> dict:
+                return ({"stage_report_seconds": self._stage_report_seconds}
+                        if stage_reports else {})
             outcome = None
             model = None
 
@@ -5603,7 +5617,7 @@ class Refinement:
                 if stream is not None:
                     stream.emit("fit_end", status="cancelled", stage=exc.stage,
                                 completed=[s.name for s in exc.completed_stages],
-                                node_id=exc.node_id, **stamp)
+                                node_id=exc.node_id, **report_cost(), **stamp)
                     if stream is not events:
                         stream.close()
                 raise
@@ -5682,7 +5696,8 @@ class Refinement:
                 stream.emit("fit_end", status=self.result_.status,
                             rwp=self.result_.statistics.rwp,
                             gof=self.result_.statistics.gof,
-                            node_id=self.result_.node_id, **stamp)
+                            node_id=self.result_.node_id, **report_cost(),
+                            **stamp)
                 if stream is not events:  # we created it from a path/callable
                     stream.close()
             if recorder is not None:
@@ -5894,9 +5909,11 @@ class Refinement:
                 moment_angle_tests=outcome.moment_angle_tests,
             ))
             if stage_reports:
+                t_report = time.perf_counter()
                 self.stage_reports_.append(self._stage_report(
                     stage.name, plan, data, mode, table, model, outcome, guard,
                     stage_diagnostics, significance=hold.significance))
+                self._stage_report_seconds += time.perf_counter() - t_report
             for sink in sinks:
                 # live monitoring (viz.live.LiveSession): rewrite the snapshot
                 sink.write_snapshot(model, table, outcome, stage.name)
@@ -6048,7 +6065,7 @@ class Refinement:
             mu_r_skipped=self._mu_r_skipped, guard=guard,
             max_shift_over_esd=outcome.max_shift_over_esd,
             significance=significance,
-            phase_support_sigma=plan.phase_support_sigma)
+            phase_support_sigma=plan.phase_support_sigma, with_geometry=False)
         report = build_report(result, model=model,
                               values=table.decode(outcome.theta), plan=plan,
                               structure=self.structure, instrument=self.instrument,
@@ -8560,6 +8577,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                   significance: np.ndarray | None = None,
                   phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
                   held_scales: set[int] | None = None,
+                  with_geometry: bool = True,
                   ) -> RefinementResult:
     values = table.decode(theta)
     y_calc = model.evaluate(values)
@@ -8651,9 +8669,13 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # McCusker §10) — built here because that covariance is read off the final
     # Jacobian and never serialized, the Identifiability carrier argument.  The
     # table judges nothing; §11's "chemical sense" is the reader's call.
-    geometry = geometry_table(model, table, theta, structure,
-                              stderr_internal=stderr_internal,
-                              correlation=correlation)
+    # ``with_geometry=False`` is a trajectory rung's: its report is projected
+    # onto a StageReport that carries no geometry, and the search was a third
+    # of a rung's result build (WP-1335)
+    geometry = (geometry_table(model, table, theta, structure,
+                               stderr_internal=stderr_internal,
+                               correlation=correlation)
+                if with_geometry else None)
     volumes = cell_volumes(table, theta, structure,
                            stderr_internal=stderr_internal, correlation=correlation)
 
