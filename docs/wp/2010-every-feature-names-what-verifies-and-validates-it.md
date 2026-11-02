@@ -194,6 +194,11 @@ confirm the new test goes red naming it.
 
 ## Handover log
 
+- **2026-11-02** — the repair itself: WP-2003's session, started under this WP's
+  `repair first` flag, wrote the reconstructed entry below (d568e0bf3, on WP-2003's
+  branch) and marked the reversed choice superseded where it still read as live: this
+  file's Goal, Context and three tasks, `generality.md` § Acceptance's row, and a note
+  in 1327's `### Inherited`. No work on this WP's tasks, and Next is unchanged.
 - **2026-11-01** (reconstructed post hoc, 2026-11-02, from b03365dcb / #1288, by WP-2003's
   session under this WP's `repair first` flag) — a ruling reversed, no code.
 
