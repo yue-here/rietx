@@ -227,6 +227,12 @@ Every shipped preset fires nothing new on the acceptance fixtures.
   *Next:* none on this WP. The maintainer reads the new `ValueError` text in
   the PR body (reader-output rule).
 
+  *CI (steward, 2026-11-02):* `lint` was red on `b4ee0d36f` and `d41c3d0f9`
+  for one cause. Vale's `Vale.Terms` rule raised two errors on the generated
+  refinement-diagnostics page, because the `STAGE_PATH_NOT_FREE` help text
+  in `src/rietx/help.py` spelled `phases.0.atoms.0.dof.*` and `dof.*` as bare
+  prose. Both are now in backticks, as the rest of `help.py` writes a path.
+
 - **2026-11-02** — PR #1304. A stage that asks to refine one atom's position
   by a pattern, where the atom sits on a fully fixed special position (Ti on
   rutile's 2a), now says so, where it used to freeze the atom without a word.
