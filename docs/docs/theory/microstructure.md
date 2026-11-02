@@ -239,7 +239,7 @@ the sample-broadening stage itself.
 
 $\Lambda$ is purely Lorentzian here. Stephens splits it with a mixing
 parameter $\zeta$: $(1-\zeta)\,\Gamma_A$ joins the Gaussian width in
-quadrature and $\zeta\,\Gamma_A$ the Lorentzian one (his eq. 6). His two
+quadrature and $\zeta\,\Gamma_A$ the Lorentzian one (his equation 6). His two
 examples refined $\zeta$ to 0.40 and 0.56. TOPAS's Stephens macros carry the
 same split as `eta`, and GSAS-II as `Mustrain;mx`. rietx fixes $\zeta = 1$,
 so a protocol that refines the split cannot be mirrored here.

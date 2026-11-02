@@ -468,6 +468,10 @@ grep -rn "not quotable" docs/docs src/rietx/help.py CLAUDE.md docs/skill/rietx
   Next: none in this WP. Yue's call on the reader-output changes above, then
   merge. WP-1955 and WP-1946 hold the two follow-ups.
 
+  Steward (2026-11-02): CI's lint job failed on Vale's spelling rule at
+  "his eq. 6" in the microstructure theory page. It now reads "his
+  equation 6".
+
 - **2026-09-25** — created by a review of the second agent session on
   `in-situ series 1`, asked whether rietx presents Stephens correctly. Every
   number above is the review's own re-run, not the session's pickles. The
