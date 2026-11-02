@@ -139,6 +139,7 @@ from .report.distortion import distortion_totals as _distortion_totals
 from .report.magnetic import (
     magnetic_width_findings,
     moment_angle_stationary_diagnostics,
+    moment_unsupported_diagnostics,
 )
 from .report.schemas import (
     MAGNETIC_WIDTH_MOMENT_SHIFT_SIGMA,
@@ -377,6 +378,35 @@ def mode_fixed_path(path: str, mode: Mode) -> bool:
             or (path.startswith("phases.") and path.endswith(".scale"))
             or (path.startswith("phases.") and ".texture." in path)
             or _MAGNETIC_WIDTH_PATH.match(path) is not None)
+
+
+def _parameter_row(e, *, tie: "TieSpec | None", esd: float | None, mode: Mode,
+                   blocked, reach, owned, origin, path: str | None = None,
+                   lo: float | None = None, hi: float | None = None) -> ParameterRow:
+    """The one place an ``Entry`` becomes a :class:`ParameterRow` (WP-2028).
+
+    ``Refinement.parameters`` and ``MultiHistogramRefinement.parameters`` both
+    call it, so the two listings cannot drift.  Every ``Entry`` field not named
+    in the keywords is copied by name from ``dataclasses.fields(Entry)``: a
+    field added to ``Entry`` and ``ParameterRow`` reaches both surfaces, and one
+    added to ``Entry`` alone fails ``ParameterRow`` (``extra="forbid"``) in the
+    first call rather than reading as an empty answer.  The keywords are what a
+    joint fit respells: ``path``, ``tie`` (its sources under the joint result's
+    paths), and ``lo``/``hi`` (a shared row's intersected window).
+    """
+    kw = {f.name: getattr(e, f.name) for f in dataclasses.fields(e)}
+    kw.update(
+        path=e.path if path is None else path,
+        lo=e.lo if lo is None else lo, hi=e.hi if hi is None else hi,
+        tie=tie, esd=esd,
+        mode_fixed=(mode_fixed_column(reach[e.path], mode)
+                    if e.path in reach else mode_fixed_path(e.path, mode)),
+        needs_held_cell=e.path in blocked,
+        body=owned.get(e.path),
+        origin_axis=origin[e.path][1] if e.path in origin else None,
+        help_key=help_key_for(e.path),
+    )
+    return ParameterRow(**kw)
 
 
 def mode_fixed_column(reached: list[str], mode: Mode) -> bool:
@@ -3152,24 +3182,11 @@ class Refinement:
         reach = table.entry_reach()
         owned = table.body_rows()
         origin = table.origin_holds
-        rows = []
-        for e in table.entries:
-            rows.append(ParameterRow(
-                path=e.path, value=e.value, vary=e.vary, lo=e.lo, hi=e.hi,
-                tie=(TieSpec._from_tie(e.tie, user=e.path in self._applied_ties)
-                     if e.tie is not None else None),
-                locked=e.locked,
-                held=e.held,
-                esd=esd.get(e.path),
-                mode_fixed=(mode_fixed_column(reach[e.path], mode)
-                            if e.path in reach
-                            else mode_fixed_path(e.path, mode)),
-                needs_held_cell=e.path in blocked,
-                body=owned.get(e.path),
-                origin_axis=origin[e.path][1] if e.path in origin else None,
-                help_key=help_key_for(e.path),
-            ))
-        return rows
+        return [_parameter_row(
+            e, tie=(TieSpec._from_tie(e.tie, user=e.path in self._applied_ties)
+                    if e.tie is not None else None),
+            esd=esd.get(e.path), mode=mode, blocked=blocked, reach=reach,
+            owned=owned, origin=origin) for e in table.entries]
 
     def set_vary(self, path_globs: list[str] | str, vary: bool = True) -> list[str]:
         """Free (or hold) every parameter matching ``path_globs``.
@@ -7073,11 +7090,19 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
             level="warning", code="STEPHENS_STRAIN_NOT_POSITIVE",
             where=list(finding.paths), value=finding.value,
             message=f"The Stephens strain coefficients of {msg} lie outside "
-                    "the physical cone.",
-            suggestion="Restart from the isotropic limit "
-                       "(StephensStrain.isotropic), refine fewer patterns "
-                       "(a higher-symmetry Laue class has fewer), or extend "
-                       "the fit range. Do not report the S_HKL as measured.",
+                    f"the physical cone.{finding.detail}",
+            suggestion="Under solver='trf', refit with the default LM "
+                       "driver, which holds σ²(M) ≥ 0 at every reflection; "
+                       "a joint fit holds it under neither driver, so fit "
+                       "each histogram alone or drop the block from the "
+                       "joint fit. That makes the coefficients "
+                       "admissible, not measured, so compare a few starts "
+                       "(StephensStrain.isotropic at different "
+                       "microstrains). Do not report the S_HKL as measured. "
+                       "This fit's other numbers (χ², cells, phase "
+                       "fractions) also leaned on the reflections left with "
+                       "no strain width; the share says how much of the "
+                       "phase's m·|F|² they carry.",
         ))
     for finding in guard.nonpositive_texture:
         msg = str(finding)
@@ -7878,11 +7903,10 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
             fix = None      # every coordinate of the site is fixed by symmetry
         elif sources:
             fix = f"Free {', '.join(sources)} instead."
-        elif canonical is None:
-            fix = "Read held_because for this row in ref.parameters()."
         else:
-            # a joint fit has no parameters() to point at
-            fix = None
+            # a joint fit's ``parameters()`` spells the row as ``where`` does
+            # (WP-2028)
+            fix = "Read held_because for this row in ref.parameters()."
         out.append(Diagnostic(
             level="warning", code="STAGE_PATH_NOT_FREE",
             message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
@@ -7946,9 +7970,7 @@ def _window_loss_diagnostics(stage_results: list[StageResult]) -> list[Diagnosti
 
 
 def _unknown_path_diagnostics(stage_results: list[StageResult],
-                              known: list[str], *,
-                              listing: str = "ref.parameters()"
-                              ) -> list[Diagnostic]:
+                              known: list[str]) -> list[Diagnostic]:
     """``STAGE_PATH_UNKNOWN`` — a stage asked for a parameter by a name no row has.
 
     Issue #265: ``turn_on=["instrument.source.wavelength"]`` freed nothing,
@@ -7985,8 +8007,8 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
     paths the second and third are usually siblings of the first: for the
     issue's typo they were ``lines.0.weight`` and ``profile.w``.
 
-    ``listing`` is the call the suggestion names for seeing every path, which
-    is the caller's: a joint fit has no ``parameters()``.
+    The suggestion names ``ref.parameters()`` for seeing every path, which a
+    joint fit has too (WP-2028), spelling its rows as ``known`` does.
     """
     by_path: dict[str, list[str]] = {}
     for sr in stage_results:
@@ -8014,7 +8036,7 @@ def _unknown_path_diagnostics(stage_results: list[StageResult],
                      "for it."
                      + (f" {hint[:1].upper()}{hint[1:]}" if hint else "")),
             where=[path],
-            suggestion=(f"Correct the path ({listing} lists every path this "
+            suggestion=("Correct the path (ref.parameters() lists every path this "
                         "model has), or write a glob if the stage should "
                         "reach a component that only some models declare."),
         ))
@@ -8669,6 +8691,9 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     if stage_results:
         diagnostics = diagnostics + moment_angle_stationary_diagnostics(
             stage_results[-1], params)
+    # WP-2060: a modulus the data do not support, the FitReport's verdict on
+    # the result, where its esd would otherwise read as an interval
+    diagnostics = diagnostics + moment_unsupported_diagnostics(params)
 
     # Specimen absorption: report what was applied and, crucially, the Biso
     # bias it removed — for a capillary Rwp is provably unchanged by it, so
@@ -10892,15 +10917,18 @@ def _strain_flag_diagnostics(model: CompiledModel, values: dict[str, float],
 
     ``microstrain`` blocks are deliberately **not** covered; see the module's
     ``STRAIN_FLAG_WIDTH`` note and the PR that added it.  A declared Stephens
-    block *locks* ``lor_strain`` — its isotropic direction is identically that
-    column — so this cannot contradict it: a locked term keeps whatever value
-    it was given, and the block's own Λ(hkl) is not an entry with a width.
+    block *replaces* ``lor_strain`` — its isotropic direction is identically
+    that column, so the path is locked and the width law reads zero for it
+    (``CompiledModel.lor_strain_term``, WP-1467) — so its stored value is no
+    width and is not tested; the block's own Λ(hkl) is not an entry with a
+    width.
     """
     out: list[Diagnostic] = []
     for ip in range(len(model.phases)):
         name = structure.phases[ip].name
         for term, width in (
-                ("lor_strain", values.get(f"phases.{ip}.lor_strain")),
+                ("lor_strain", None if structure.phases[ip].microstrain is not None
+                 else values.get(f"phases.{ip}.lor_strain")),
                 ("gauss_strain", _sqrt_or_none(values.get(f"phases.{ip}.gauss_strain")))):
             if width is None or not width > STRAIN_FLAG_WIDTH:
                 continue

@@ -169,7 +169,7 @@ The types live in `rietx.io.projects.coverage`.
 | `Hit.feature`, `Hit.keywords`, `Hit.phases` | one construct met in a file, the keywords and macros the file actually wrote, and the phases that stated it |
 | `Coverage.reported`, `Coverage.refused` | the hits of each kind |
 | `Coverage.partial` | whether the file states anything about the model this import does not carry: a reported or refused hit, or an unread call |
-| `Coverage.unread_calls` | names the file calls as `name(…)` without defining them, for which the reader has no row: a macro from an include the reader has not seen, or one spelt wrongly |
+| `Coverage.unread_calls` | names the file calls as `name(…)` without defining them, for which the reader has no row and which the TOPAS Technical Reference does not list as an equation function or a standard macro: a macro from an include the reader has not seen, or one spelt wrongly |
 | `Coverage.summary`, `Coverage.summary_of` | the reported and refused hits in one line, and the same line for any list of hits |
 
 A bare keyword spelt wrongly, such as `lor_fwhmm 0.1`, is not caught by `Coverage.unread_calls`.

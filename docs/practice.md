@@ -376,6 +376,28 @@ budget; the quarantine's exclusion from the median; `direction="both"` and
 floor and onset (`SEQUENTIAL_MOMENT_HOLD`, `SEQUENTIAL_MOMENT_ONSET`), the persistent-finding
 summary and the width-growth screen (`SEQUENTIAL_WIDTH_GROWTH`).
 
+Parameters the setup fixes. Surveyed 2026-11-02 for WP-2081, one session. GSAS-II 5.8.4 is
+read in its source (`GSASIIstrMain.SeqRefine`, `GSASIIstrIO.ReadConstraints`,
+`GSASIIpwdGUI.OnInstFlagCopy`). FullProf rests on its manual (`FullProf_Manual.pdf` shipped
+with 8.20, the cyclic-mode and codeword passages) and TOPAS on the Technical Reference
+(version 9, topas-academic.com, sections 2.1, 2.7 and 2.26). Neither closed program was run.
+MAUD, BGMN with Profex and RIETAN-FP were not surveyed for this topic.
+
+| Program | How a parameter stays fixed down a series | What can free it anyway | One refined value shared by every pattern | "Refine on the first pattern, then freeze" |
+|---|---|---|---|---|
+| rietx | `ref.hold(glob)` inside the `constrain` hook, which runs on every rung and every `verify_steps` refit (checked) | `vary=False` on the models: any plan stage whose `turn_on` matches frees it (WP-1208), and `load_instrument_profile`'s frozen instrument comes back `vary=False` only (checked). A hold blocks the plan and raises `HOLD_BLOCKED_PLAN` (checked) | not in a chain. The joint fit (`multi.py`, `SharingMap`) shares a path across histograms; `instrument.*` is per histogram by default and a `shared=` glob overrides it (checked) | no declaration. Three hooks spell it: `on_result` keeps pattern 0's value, `prepare` writes it in, `constrain` holds it. A hold alone fixes whatever value reaches the rung, and the cold rung starts from the initial models (measured, WP-2081) |
+| GSAS-II | each histogram's own refine flags build its vary list, histogram by histogram (`SeqRefine` calls `GetHistogramData` per histogram); "Copy flags" copies one histogram's instrument flags to the others (checked) | nothing: there is no plan. With `Copy2Next` on, only parameters in the vary list pass to the next histogram, so a fixed one keeps the value stored in its own histogram (checked). Hold constraints exist; a sequential run applies only constraints whose histogram is the wildcard by default (`_seqmode` `wildcards-only`, checked) | not in a sequential run, which fits one histogram at a time and refuses lattice parameters (use Dij). A plain refinement over several histograms shares phase parameters (recall). Equations can be fitted to the sequential results table afterwards (`SeqParFitEqList`, checked) | by hand: refine, copy the values to the other histograms, turn the flags off (inferred from the menu commands) |
+| FullProf | cyclic mode (`CYC`) runs one PCR and rewrites it after each file, so every file uses the same codewords; a zero codeword fixes a parameter at the value the PCR holds (checked in the manual). An instrumental resolution file (`Res` ≠ 0) supplies the resolution function (checked) | nothing beyond the codewords (inferred) | the multi-pattern PCR (`NPATT`) refines several patterns at once (checked); which parameters it shares was not read | by hand: set the codeword to 0 in the PCR after a first run (inferred) |
+| TOPAS | a parameter is refined when named and fixed when its name carries `!` (§ 2.1, checked). A series is the user's batch file or `num_runs`, passing values through `out` and `#include` (§ 2.26, checked) | nothing: the flag is on the parameter (checked) | a parameter named at the top level of one INP is one parameter in every `xdd` (§ 2.7, checked). Parametric refinement builds on this (Stinton & Evans 2007, recall) | by hand: write the refined value into an include file and mark it `!` (inferred) |
+| EasyDiffraction | a fixed parameter keeps the template's value on every file (row above, checked) | not established | not established | not established |
+
+Every program surveyed keeps the fixed flag on the parameter itself, and its series honours
+it on every pattern. None of them has a plan that frees a parameter the user fixed. rietx
+departs in two ways. A plan replaces the vary flags, so a hold in a hook is the only flag a
+series honours. And the cold rung restarts a pattern from the initial models, which no
+other program does (the restart table above), so what a held value is on that rung is a
+question only rietx has.
+
 ## A pdCIF weight column with bad entries
 
 Surveyed 2026-10-26 for PR #1173, by the lead. The question: a `_pd_proc_ls_weight` column with
@@ -615,6 +637,25 @@ user setting with no stated derivation. No program found reports a correlation a
 undetermined. rietx takes GSAS-II's mechanism at a cut derived from its own Jacobian's
 accuracy (`statistics.resolved_correlation`): GSAS-II's 1e-6 would also have removed
 brucite's zero-shift/displacement direction at 1.4e-10, whose correlations hold to 2e-5.
+
+## Stephens anisotropic strain: the width's shape and its clamp
+
+Collected 2026-11-02 for WP-1467 from three sources. Stephens' paper was read by the lead. GSAS-II
+5.8.4's source was read by the lead. The TOPAS macros were read by the 2026-09-25 review behind the
+WP, and that reading was not repeated. Stephens (1999, eq. 6) splits the anisotropic width
+Γ_A with a mixing parameter ζ. (1−ζ)·Γ_A joins the Gaussian width in quadrature, and ζ·Γ_A
+joins the Lorentzian one. His two examples refined ζ to 0.404 and 0.558, and holding his
+first at ζ = 0 raised Rwp from 8.22 % to 10.81 % (his Table 2).
+
+| Program | Gaussian/Lorentzian split | σ²(M) < 0 |
+|---|---|---|
+| rietx | none: Λ is wholly Lorentzian (ζ = 1) | clamped to zero width; the default LM driver holds σ² ≥ 0, and `STEPHENS_STRAIN_NOT_POSITIVE` reports the clamped intensity share under TRF or a joint fit |
+| GSAS-II 5.8.4 | `Mustrain;mx`, Stephens' form: γ += Mγ·mx, σ² += (Mγ·(1−mx))² (`GSASIIstrMath.py:3330-3331`; checked) | no clamp at the width: `np.sqrt(Sum)` (`GSASIIstrMath.py:3265`; checked); what follows a negative sum was not traced |
+| TOPAS (shipped macros) | `eta`: `gauss_fwhm = 1.8/π·pp·(1−eta)·Tan(Th)`, `lor_fwhm = 1.8/π·pp·eta·Tan(Th)` | `Sqrt(Max(mhkl, 0))`, the same clamp, reported nowhere; `Stephens_tetragonal` takes `Abs()` first, folding a negative σ² back into a positive width (TOPAS wiki, read 2026-09-25 by the review) |
+
+So no program reports a fit that leaned on the clamp, and a TOPAS Stephens fit carries no
+evidence that σ²(M) stayed positive. A protocol that refines ζ cannot be mirrored in rietx
+(WP-0503's fence).
 
 ## Sources
 
