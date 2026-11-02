@@ -187,7 +187,7 @@ MOO3_CIF = _cif("MoO3", 62, "P b n m", (3.9616, 13.856, 3.6978, 90.0, 90.0, 90.0
                  ("O1", "O", 0.544, 0.426, 0.25, 1.0, 2.0),
                  ("O2", "O", 0.615, 0.091, 0.25, 1.0, 2.1),
                  ("O3", "O", 0.053, 0.223, 0.25, 1.0, 0.9)])
-HOST_RANGE = (12.1, 60.0)
+HOST_RANGE = (12.1, 45.0)
 
 
 def weak_second_phase(trace: float = 0.006, seed: int = 3,
@@ -198,8 +198,10 @@ def weak_second_phase(trace: float = 0.006, seed: int = 3,
     Both phases are drawn by ``predict`` with one instrument and summed, each
     normalised to its own strongest line, so ``trace`` is the ratio of the two
     phases' strongest peak heights: 0.006 puts every oxide line under a 1 %
-    floor.  The host owns seven lines in the range, so with the trace at the
-    default the foreign lines outnumber the host's on the picked list.  Counts
+    floor.  The range is 12.1-45°, narrowed from 12.1-60° so a search finishes
+    well inside the whole-run ceiling.  The host owns four lines in it, so with
+    the trace at the default the foreign lines outnumber the host's on the
+    picked list.  Counts
     and background as :func:`planted_silicon`.
     """
     ins = _instrument()

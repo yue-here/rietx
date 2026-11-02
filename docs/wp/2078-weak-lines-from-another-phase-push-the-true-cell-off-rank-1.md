@@ -229,21 +229,24 @@ position-only list returns the same candidates as on `main`.
   only. Builders in `tests/_synthetic_weak_lines.py`, rows in
   `tests/test_indexing_weak_lines.py`. (a) is molybdenum with an α-MoO₃
   trace (Sitepu, O'Connor & Li 2005) whose strongest line is 0.6 % of the
-  host's: 41 lines picked, 7 the host's and 29 at the oxide's positions. (b)
+  host's, over 12.1-45° (12.1-60° took 51 s alone and 122 s in a full-suite
+  run, cut by the ceiling, so its rows skipped; 45° takes about 13 s): 36 lines
+  picked, 4 the host's and 29 at the oxide's positions. (b)
   is an idealised ordered double perovskite, F m -3 m at 2·a_p, with 10 %
   antisite disorder, so its twelve ordering lines run 0.1-2.3 % of the
   strongest. (c) is #933's Si with twelve planted lines. Today's picker finds
   29 usable lines where #933 had 53. The truth's rank on `main` at the
   default with `systems=("cubic",)` declared, as picked / 0.5 / 1 / 2 %:
-  - (a): absent / 1 / 1 / 1;
+  - (a): absent / 1 / 1 / absent (the 2 % list is the host's four lines,
+    `INDEX_DATA_INSUFFICIENT`);
   - (b): 1 / 1 / 2 / 3, the cubic subcell first from 1 %;
   - (c): absent at all four.
 
   Si with nothing planted ranks first. Undeclared, the default binds its
   120 s ceiling on every as-picked list (`INDEX_BUDGET_EXHAUSTED`, lower
   systems cut), so its rank there is a load reading (WP-1449); that is why
-  the rows declare the system. Read undeclared on one laptop: (a) absent /
-  1 / 1 / 1, (b) 1 / 1 / 1 / 12, (c) absent at all four. (a) reproduces the
+  the rows declare the system. Read undeclared on one laptop, (a) over the
+  original 12.1-60° range: absent / 1 / 1 / 1, (b) 1 / 1 / 1 / 12, (c) absent at all four. (a) reproduces the
   failure and the 1 % floor fixes it; with the system declared, the same
   floor loses (b)'s supercell. (a)'s acceptance row is
   `xfail(strict=True)`. *Next:* task 1 (free), task 3, then task 4 on these
