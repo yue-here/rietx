@@ -1012,7 +1012,15 @@ def _plan_changes(parsed: ParsedDocument, doc: ProjectDoc, delta: Delta,
                         phase_support_sigma=(parsed.support if parsed.support_set
                                              else PlanSpec().phase_support_sigma),
                         closing_window_tol=(parsed.closing if parsed.closing_set
-                                            else PlanSpec().closing_window_tol))
+                                            else PlanSpec().closing_window_tol),
+                        # no document line carries it, so it is the plan's own
+                        # rather than the default: rebuilt from the default, a
+                        # project that set it would lose it on every save and
+                        # every untouched render would read as a plan edit
+                        intermediate_lorentz_window_tol=(
+                            PlanSpec().intermediate_lorentz_window_tol
+                            if current is None
+                            else current.intermediate_lorentz_window_tol))
     stages_changed = spec is not None and spec != current
 
     if name_changed and stages_changed:

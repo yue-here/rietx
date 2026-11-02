@@ -92,6 +92,15 @@ class NodeAction(Base):
     closing stage's fraction, so a reader passes this through
     ``forward.recorded_window_tol`` (the seventh round's Q1).
 
+    ``lorentz_window_tol`` (issue #193) is ``ftol``'s rule for a bank's
+    Lorentzian window tolerance: the value the plan's schedule handed the
+    stage (``RefinementPlan.stage_lorentz_window_tols``), so a cherry-pick of
+    a coarse stage compiles the windows it compiled and ``replay`` re-measures
+    it on them.  A ``Stage`` field, so ``api_call`` prints it inside the
+    ``Stage``.  ``None`` is the answer tolerance,
+    ``forward_tof.TOF_WINDOW_AREA_TOL``, and what every node off a bank and
+    every node written before the field carries.
+
     ``ties``/``untied`` (WP-1070) are the ``"set_tie"`` action's own arguments,
     additive under the same rule.  They record what the action *did*, not the
     state it left: the whole tie register lives on
@@ -129,6 +138,10 @@ class NodeAction(Base):
     phase_support_sigma: float | None = 3.0
     #: the |ρ| the stage's correlation guard reported above, written beside it
     correlation_guard: float = 0.98
+    #: the Lorentzian window tolerance the stage compiled a bank at, as the
+    #: *input* that ran (``None`` = the answer tolerance), so a cherry-pick of
+    #: a coarse stage compiles the windows it compiled.  ``None`` off a bank.
+    lorentz_window_tol: float | None = None
     ties: dict[str, TieSpec] = Field(default_factory=dict)
     untied: list[str] = Field(default_factory=list)
     #: ``"set_variable"``'s own arguments (WP-1119), by the same rule as
@@ -166,6 +179,7 @@ class NodeAction(Base):
                  ("restraint_weight_scale", self.restraint_weight_scale, 1.0),
                  ("ftol", self.ftol, None),
                  ("window_slack_deg", self.window_slack_deg, None),
+                 ("lorentz_window_tol", self.lorentz_window_tol, None),
                  # the stage's fixes (WP-2208), a stage's own as of that WP
                  ("turn_off", list(self.turn_off), []))
                 if v != off)

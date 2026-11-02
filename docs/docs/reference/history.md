@@ -118,6 +118,7 @@ These are the fields of `Stage`, and [stage settings](settings.md#stage-settings
 | `NodeAction.restraint_weight_scale` | `1.0` | the weight on the geometric restraints |
 | `NodeAction.ftol` | `None` | the tolerance the stage stopped at; `None` is the solver's 1e-9 |
 | `NodeAction.window_slack_deg` | `None` | the extra 2θ on each side of a reflection's window, in degrees |
+| `NodeAction.lorentz_window_tol` | `None` | a bank's Lorentzian window tolerance the plan handed the stage; `None` is the answer's 1e-4, and every stage off a bank |
 
 `NodeAction.ftol` records the tolerance the stage ran at, which can differ from the one it declared.
 A stage that takes the plan's schedule (`RefinementPlan.intermediate_ftol`) declares nothing and stops at 1e-6.
@@ -154,7 +155,7 @@ names the 2 % to repeat the stage that ran.
 
 The line is computed from the fields, so it cannot disagree with them.
 A stage's line always carries `max_iter`.
-It carries `seed`, `strain_seed`, `restraint_weight_scale`, `ftol` and `window_slack_deg` where they differ from the `Stage` default, and it never carries `lebail_cycles`.
+It carries `seed`, `strain_seed`, `restraint_weight_scale`, `ftol`, `window_slack_deg` and `lorentz_window_tol` where they differ from the `Stage` default, and it never carries `lebail_cycles`.
 Two kinds render a line that does not run.
 An `edit_model` node renders a comment naming the edit, because the models it installed are in its state and in no argument.
 A `merge` renders `ref.merge(...)` followed by its name as a comment.

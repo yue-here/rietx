@@ -12,6 +12,8 @@ Load it when the pattern is a neutron time-of-flight bank (`pattern.tof` is set,
 
 **What one channel holds is a declaration.** `pattern.intensity_basis` is `"counts"`, `"density"` or `None`. The readers set it only where the file says so, and the two answers differ by the channel width W(T), which is a slope in flight time that a displacement parameter pays for, not a scale. Set it by hand when the reader could not.
 
+**A coarse stage is not the answer.** On a pseudo-Voigt bank every declared stage but the last sizes the Lorentzian tail at `RefinementPlan.intermediate_lorentz_window_tol` (1e-2), and the last and the closing stage at 1e-4; `StageResult.lorentz_window_tol` says what each ran at. Quote only the answer's numbers, which is what `RefinementResult` carries.
+
 **Refused on a bank, by name:** Le Bail and Pawley extraction, several banks as one joint fit (`MultiHistogramRefinement`), `refine_sequential`, the project container, peak picking and indexing, March-Dollase and Stephens (both written in deg 2θ), a spherical-harmonic texture, soft restraints, a magnetic moment, a scalar `Geometry.mu_r` or `Geometry.mu_t`, an all-zero `ProfileTOF`, a σ²(d) or γ(d) polynomial that goes negative over the fitted range, and a P-spline air term. Absorption and extinction are **not** refused: they are applied per reflection at λ_hkl = 2·d·sin θ_bank, from `capillary_radius_mm` and the composition.
 
 ## Codes

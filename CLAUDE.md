@@ -292,14 +292,14 @@ projects: `gui/CLAUDE.md`, loaded under `gui/`.
 - **A staged plan does not converge its intermediate stages; the last declared one does** (a stage
   stopped short hands on a frozen-window plateau, WP-2045), and so does the closing stage
   `run_stages()` appends (WP-2002), recompiled at the answer on windows dropping 1e-3 of each peak. `intermediate_ftol` (1e-6 vs the
-  solver's 1e-9, WP-1123) is the schedule; `stage_ftols()` and `stage_window_tols()`, parallel to
-  `run_stages()`, are the one authority, since the plan alone knows which stage is last — no runner
+  solver's 1e-9, WP-1123) is the schedule; `stage_ftols()`, `stage_window_tols()` and a bank's
+  `stage_lorentz_window_tols()` (#193), parallel to `run_stages()`, are the one authority, since the plan alone knows which stage is last — no runner
   reads `Stage.ftol` or `plan.stages`. **Cumulative staging bounds the cost**: every later stage
   refines an intermediate stage's parameters again, so 1.06-1.58× fewer evaluations cost ≤ 0.0004
   esd on **one fit** (FAP, NAC, cpd-1a behind the closing stage; WP-2045 probe 7), and along a *chain* the effect is unbounded and of either sign (1.12× better,
   1.04× worse): a series is measured, never assumed. `None` for either is the bit-identical way
-  back and what a golden declares; the record says what a stage **ran** at (`StageResult.ftol` and
-  `.window_area_tol`, `NodeAction`'s twins), or a cherry-pick replays what never happened.
+  back and what a golden declares; the record says what a stage **ran** at (`StageResult.ftol`,
+  `.window_area_tol`, `.lorentz_window_tol`, `NodeAction`'s twins), or a cherry-pick replays what never happened.
 - **An unconstrained linear block is already solved jointly; profiling it out cannot buy an
   evaluation** — VarPro's win is over alternation, never done here (measured 1.00× on 34 of 34
   pure-Gauss-Newton stages, 0.79× overall). What survives: *correctness* (esds marginalised over

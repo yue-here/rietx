@@ -196,9 +196,14 @@ INCIDENT_SPECTRUM_HOOK = "rietx.model.forward_tof.CompiledTOFModel.incident_spec
 #: and the type-3 branch is 12-24× slower.  It is shipped that way because the
 #: tolerance is the *statement*, and every real bank measured for this track
 #: (the SNS NOMAD and ISIS GEM standards among them) declares γ = 0 and
-#: compiles the Gaussian branch.  If a γ-carrying bank ever makes this the bottleneck, the thing to
-#: change is a **separate, stated** tolerance for the Lorentzian component —
-#: not a quiet cap on this one, which is the unstated bias WP-1112 removed.
+#: compiles the Gaussian branch.  The remedy is a **separate, stated**
+#: tolerance for the Lorentzian component — not a quiet cap on this one, which
+#: is the unstated bias WP-1112 removed — and it exists as a *schedule*:
+#: ``compile_tof_model``'s ``lorentz_window_tol``, set per stage by
+#: ``RefinementPlan.stage_lorentz_window_tols`` (coarse in every declared
+#: stage but the last, this constant in the last and in the closing stage,
+#: recorded on ``StageResult``).  The number and its measurement are
+#: :data:`rietx.schemas.plan.INTERMEDIATE_LORENTZ_WINDOW_TOL`'s.
 TOF_WINDOW_AREA_TOL = 1e-4
 
 #: How many e-foldings of each exponential wing a frozen window must hold —
@@ -410,6 +415,14 @@ class CompiledTOFModel:
     #: :class:`~rietx.model.forward.BatchLayout`, and it holds no value that
     #: can move.
     flat_windows: list[tuple[np.ndarray, np.ndarray]] = field(default_factory=list)
+
+    #: The per-side area fraction the **Lorentzian component** of every window
+    #: was sized to leave outside, as compiled: :data:`TOF_WINDOW_AREA_TOL` under
+    #: the one-rule default, the stage's ``lorentz_window_tol`` when one was
+    #: passed, and ``None`` on the Gaussian branch, which has no Lorentzian
+    #: component to size.  What ``StageResult.lorentz_window_tol`` reports: the
+    #: tolerance a stage **ran** at, read off the model it ran on.
+    lorentz_window_tol: float | None = None
 
     restraints: object | None = None
     restraint_weight_scale: float = 1.0
@@ -1056,7 +1069,8 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
                       moving_paths: set[str] | None = None,
                       restraint_weight_scale: float = 1.0,
                       window_slack_us: float | None = None,
-                      orbit_split: list | None = None
+                      orbit_split: list | None = None,
+                      lorentz_window_tol: float | None = None
                       ) -> CompiledTOFModel:
     """Freeze reflection lists and evaluation windows for one TOF stage.
 
@@ -1076,6 +1090,16 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
     :func:`~rietx.model.forward.compile_model`'s, with the same meaning: the
     split a fit decided at its start (WP-2052), so a stage that drives a
     half-occupied atom onto a mirror keeps its multiplicity on a bank too.
+
+    ``lorentz_window_tol`` is the per-side area fraction of each peak's
+    **Lorentzian component** the windows may leave outside, or ``None`` for
+    the one rule :data:`TOF_WINDOW_AREA_TOL` states for every component.  Given
+    a number, the resolution extent holds the Gaussian component to
+    :data:`TOF_WINDOW_AREA_TOL` and the Lorentzian to this, each separately
+    (:func:`window_fwhm_mult_split`); the exponential wings are never
+    loosened.  It has no effect on the Gaussian branch, whose windows are the
+    one-rule windows bit for bit.  A staged plan passes a coarse value in every
+    declared stage but the last (``RefinementPlan.stage_lorentz_window_tols``).
 
     What this refuses, by name
     --------------------------
@@ -1241,6 +1265,10 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
     lam_gen = 2.0 * d_lo
     tt_gen_min = 2.0 * math.degrees(math.asin(min(d_lo / d_hi, 1.0)))
 
+    lorentz_tol = None if lorentz_window_tol is None else float(lorentz_window_tol)
+    _require(lorentz_tol is None or 0.0 < lorentz_tol < 0.5,
+             f"compile_tof_model(): lorentz_window_tol = {lorentz_window_tol!r} "
+             f"is a per-side fraction of a peak's area and must lie in (0, 0.5).")
     phases: list[CompiledPhase] = []
     flat_windows: list[tuple[np.ndarray, np.ndarray]] = []
     for ip, phase in enumerate(structure.phases):
@@ -1327,9 +1355,16 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
         # ``window_fwhm_mult``'s tolerance is the **two-sided** discard and
         # this extent is added to each side, so the per-side fraction wanted
         # is half of what is passed.
-        resolution = np.asarray(
-            window_fwhm_mult(np.asarray(eta), tol=2.0 * TOF_WINDOW_AREA_TOL)
-            * np.asarray(fwhm_pv), dtype=np.float64)
+        if lorentz_tol is None or profile_kind == "gaussian":
+            resolution = np.asarray(
+                window_fwhm_mult(np.asarray(eta), tol=2.0 * TOF_WINDOW_AREA_TOL)
+                * np.asarray(fwhm_pv), dtype=np.float64)
+        else:
+            resolution = np.asarray(
+                window_fwhm_mult_split(np.asarray(eta),
+                                       2.0 * TOF_WINDOW_AREA_TOL,
+                                       2.0 * lorentz_tol)
+                * np.asarray(fwhm_pv), dtype=np.float64)
         slack = (WINDOW_MIN_US + WINDOW_SLACK_FRAC * np.abs(pos)
                  if window_slack_us is None
                  else np.full(n, float(window_slack_us)))
@@ -1433,7 +1468,40 @@ def compile_tof_model(structure: Structure, instrument: Instrument,
         absorption_terms=absorption_terms, mu_r_range=mu_r_range,
         d_range=(d_lo, d_hi), difc_stage=float(src.difc.value),
         restraint_weight_scale=float(restraint_weight_scale),
+        lorentz_window_tol=(None if profile_kind == "gaussian"
+                            else TOF_WINDOW_AREA_TOL if lorentz_tol is None
+                            else lorentz_tol),
     )
+
+
+def window_fwhm_mult_split(eta, tol_gauss: float, tol_lorentz: float) -> np.ndarray:
+    """k(η): FWHM multiples holding each pseudo-Voigt component to its own bar.
+
+    :func:`~rietx.model.forward.window_fwhm_mult` bounds the *sum* of the two
+    components' discards, D(k) = η·(2/π)·arctan(1/2k) + (1−η)·erfc(2√ln2·k) ≤
+    tol.  This bounds each term separately — (1−η)·erfc(2√ln2·k) ≤
+    ``tol_gauss`` and η·(2/π)·arctan(1/2k) ≤ ``tol_lorentz`` (the Gaussian and
+    Lorentzian tail masses beyond ±k·Γ, both components sharing Γ by the TCH
+    construction; Thompson, Cox & Hastings 1987, *J. Appl. Cryst.* **20**, 79)
+    — and returns the larger of the two roots, both closed-form.  Both
+    tolerances are **two-sided**, as ``window_fwhm_mult``'s is.  It exists so
+    the Lorentzian tail, the one that is ~η/(π·tol) FWHM long, can be given a
+    stated tolerance of its own without the Gaussian one moving.
+    """
+    from scipy.special import erfcinv
+
+    eta = np.clip(np.asarray(eta, dtype=np.float64), 0.0, 1.0)
+    c = 2.0 * math.sqrt(math.log(2.0))
+    gauss_w = 1.0 - eta
+    with np.errstate(divide="ignore", invalid="ignore"):
+        k_g = np.where(gauss_w > tol_gauss,
+                       erfcinv(np.minimum(tol_gauss / np.maximum(gauss_w, 1e-300),
+                                          1.0)) / c, 0.0)
+        # (2/π)·arctan(1/2k) = t/η  ⇔  k = 1 / (2·tan(π·t / 2η))
+        k_l = np.where(eta > tol_lorentz,
+                       0.5 / np.tan(0.5 * np.pi * tol_lorentz
+                                    / np.maximum(eta, 1e-300)), 0.0)
+    return np.maximum(k_g, k_l)
 
 
 def _absorption_terms(structure: Structure, instrument: Instrument,

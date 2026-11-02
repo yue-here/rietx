@@ -385,9 +385,11 @@ def test_the_schema_version_moved_with_the_field():
     shipped 0.60 and ``main`` has moved to 0.61 since): the
     result's abscissa, the intensity basis, the corrections that follow λ
     across a bank, the four sample widths becoming refinable there, and the
-    γ-polynomial refusal.  The number is pinned rather than relaxed on
-    purpose: what this asserts is that somebody *noticed*, and a test that
-    accepted any version would assert nothing."""
+    γ-polynomial refusal; and a second "Also in 0.60" line for the staged
+    Lorentzian window tolerance recorded on ``StageResult``/``NodeAction``.
+    The number is pinned rather than relaxed on purpose: what this asserts is
+    that somebody *noticed*, and a test that accepted any version would assert
+    nothing."""
     from rietx.schemas.common import SCHEMA_VERSION
 
     assert SCHEMA_VERSION == "0.61"
