@@ -251,9 +251,10 @@ Every shipped preset fires nothing new on the acceptance fixtures.
   a breaking change for mixed lists.
 
   *Measured* (`[dev]` venv, macOS arm64, Python 3.12, alone on the machine
-  via `serial.py`): fast suite 13 224 passed, 310 skipped, 32 xfailed, none
-  failed, 12:07 wall, on this branch merged with origin/main at
-  `e5d2d035`. passed+skipped is 13 534, one more than the run before the
+  via `serial.py`): fast suite 13 237 passed, 310 skipped, 32 xfailed, none
+  failed, 15:26 wall, on this branch merged with origin/main at
+  `985da7ef`. On the previous merge (main at `e5d2d035`) it read 13 224
+  passed and 310 skipped: 13 534, one more than the run before the
   silence pair (13 533, that one test red), the one case it adds. The
   27 cases in `test_params_surface.py` cost 2.82 s over 8 functions,
   1.51 s the most (7 cases, each a five-iteration fit); none joins the
