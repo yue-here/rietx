@@ -264,6 +264,44 @@ def test_every_anchor_a_tutorial_links_is_on_its_page(built_docs_tree):
                         + "\n".join(broken))
 
 
+#: What links into the manual from outside it: the README, the landing page's
+#: sources and the agent skill.  Each names its page under `/docs/stable/`
+#: since the 1.10 cut (WP-1986).
+OUTSIDE_LINKERS = sorted(
+    [REPO_ROOT / "README.md", *(REPO_ROOT / "docs" / "landing" / "src").glob("*.html"),
+     *(REPO_ROOT / "docs" / "skill" / "rietx").rglob("*.md")])
+#: Any link into the published manual's stable tree, anchor or not.
+_STABLE_PAGE = re.compile(re.escape(DOCS_URL) + r"/docs/stable/([^\s#)>\]\"'`]+\.html)")
+#: An address of the retired old tree (`/using/<x>.html`, `/<theory>.html`).
+_OLD_TREE_LINK = re.compile(re.escape(DOCS_URL) + r"/(?!docs/|lite/)[^\s#)>\]\"'`]+\.html")
+
+
+@pytest.mark.xdist_group("manual-build")
+def test_every_link_from_outside_the_manual_is_on_its_page(built_docs_tree):
+    """The README, the landing page and the skill link a page of the built manual,
+    and an anchor they carry is an id on that page.
+
+    Until 1.10 they linked the retired tree's addresses, whose stubs land on a
+    chapter's successor, so a feature whose section moved to another page opened
+    the wrong one with every test green (WP-1986).  The stable tree is the last
+    release's, so a page `main` adds fails here until the release that ships it.
+    """
+    out, result = built_docs_tree
+    assert result.returncode == 0, "manual did not build — see test_manual_builds_warning_free"
+    texts = {p.relative_to(REPO_ROOT).as_posix(): p.read_text(encoding="utf-8")
+             for p in OUTSIDE_LINKERS}
+    old = [f"{name}: {link}" for name, text in texts.items()
+           for link in _OLD_TREE_LINK.findall(text)]
+    assert not old, ("links to the retired tree's addresses; name the page under "
+                     f"{DOCS_URL}/docs/stable/ instead:\n" + "\n".join(old))
+    pages = [(name, page) for name, text in texts.items() for page in _STABLE_PAGE.findall(text)]
+    assert len(pages) > 20, "almost nothing links the manual, so this test checks little"
+    missing = [f"{name}: {page}" for name, page in pages if not (out / page).is_file()]
+    broken = _broken_anchors(texts, out)
+    assert not missing + broken, ("links to no page, or to no id on that page, of the "
+                                  "built manual:\n" + "\n".join(missing + broken))
+
+
 #: A link into the published manual with an anchor, its page and anchor apart.
 _ANCHOR_LINK = re.compile(re.escape(DOCS_URL)
                           + r"/docs/stable/([^\s#)>\]\"'`]+)#([^\s)>\]\"'`]+)")
