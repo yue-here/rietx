@@ -63,12 +63,14 @@ def test_a_free_row_is_measured_and_a_tied_row_is_not(lebail):
     """Three states, and the split is free-vs-tied, not fit-vs-no-fit.
 
     ``ParameterTable._free_idx`` is ``e.vary and e.tie is None`` while the row
-    filter is ``e.vary or e.tie is not None``, so a tied row is *in*
-    ``parameters`` and was never in the free vector the guard tested.  Its
+    filter is ``moving_paths`` (WP-1999), so a tied row whose source is free is
+    *in* ``parameters`` and was never in the free vector the guard tested.  Its
     value follows its sources and can sit on its own declared bound while every
     source is interior, so ``False`` there would be the original defect wearing
-    a different cause.  Measured on this fit: 31 rows, 13 free and 13 measured,
-    18 symmetry-tied and 18 unmeasured.
+    a different cause.  Measured on this fit: 15 rows, 13 free and 13 measured,
+    2 symmetry-tied (the cubic ``b`` and ``c``) and 2 unmeasured.  Before
+    WP-1999 the filter was "varied or tied", and 16 more tied rows were
+    reported: the coordinates of sites whose DOFs no Le Bail stage frees.
 
     A free row on its floor of 0 is measured like any other (WP-1938).  From
     WP-1463 until then it read ``None``, a softplus floor having no finite
@@ -87,7 +89,7 @@ def test_a_free_row_is_measured_and_a_tied_row_is_not(lebail):
     assert unmeasured == tied & rows
     assert measured == free & rows
     # not a vacuous partition in either direction
-    assert len(tied & rows) == 18 and len(free & rows) == 13
+    assert len(tied & rows) == 2 and len(free & rows) == 13
 
 
 def test_at_bound_names_exactly_the_paths_bound_hit_names():
