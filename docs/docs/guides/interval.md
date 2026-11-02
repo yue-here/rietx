@@ -36,11 +36,11 @@ The same rows appear in the `FLOOR_HIT` diagnostic for a floor at 0, and in `BOU
 
 <!-- output of examples/guides/interval.py -->
 ```text
-one-sided True: 0.000 to 0.749
+one-sided True: 0.000 to 0.748
 ```
 
 A row on its bound gets a one-sided interval: the bound is one end, and the other is where χ² has risen by 2.71 × χ²<sub>red</sub> × f², with f the fit's `Statistics.esd_inflation`.
-At 95 %, read this one as "extinction is below 0.749 µm²", mosaic blocks no larger than about 0.9 µm.
+At 95 %, read this one as "extinction is below 0.748 µm²", mosaic blocks no larger than about 0.9 µm.
 A one-sided bound read from the esd would reach 1.645 × 1.973 = 3.2 µm², more than four times as far.
 The data push extinction below 0, so χ² rises from the floor faster than the esd assumes.
 
