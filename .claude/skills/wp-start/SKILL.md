@@ -73,9 +73,15 @@ Run the session-start ritual. The SessionStart hook's report
 
    **An issue link is evidence of overlap, not proof of a clash.** One issue
    can be cited by several WPs, so read the PR before dropping a WP over it.
-   A PR that names a WP outright is the strong form. If `gh` cannot answer the
-   command says so rather than printing an empty list, and a session that
-   cannot look should ask the user before starting.
+   A PR that names a WP outright is the strong form: its title, else the WP
+   files it edits, else its branch. A PR naming none is linked through the
+   issues in its title and its closing keywords, never a number that is
+   itself a PR, and to each WP its body mentions ("mentions it"). A body
+   mention is never read as the claim: #941 built all of WP-1956 and was
+   filed under the WP its body named in passing (WP-2046). Your own PR is
+   left out by its branch, so a contributor's PR on your WP still shows. If
+   `gh` cannot answer the command says so rather than printing an empty
+   list, and a session that cannot look should ask the user before starting.
 
    The WP a tree is on comes from its branch, so a tree you resume for a
    *different* WP is telling the next session the wrong thing. Say so once:
