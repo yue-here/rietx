@@ -138,14 +138,28 @@ this session).
 
 ## Handover log
 
-- **2026-11-02** — created, from issue #1214 (a ghostshift runner, one session). No
-  open WP owns a trigger for a converged warm fit in a wrong basin: WP-2003 tiers the
-  existing fence and ladder, and its C1 ruling removes the fence. A new trigger is a
-  new tier-3 action with its own approval, and WP-2003's Non-goals send new chain
-  classifiers to a follow-up WP. WP-2003 is in flight on PR #1310, so this WP depends
-  on it rather than editing its file. Reproduced on `0d735f5e5` to the issue's digits;
-  measured as in Context. No code changed. Filed in PR #PR. *Next:* the ruling below,
-  then task 3 once PR #1310 merges.
+- **2026-11-02** — created, from issue #1214 (a ghostshift runner, one session).
+  The report holds on today's main: a series can keep a converged fit that sits in a
+  wrong minimum, twice the noise of its neighbour, and say nothing. Removing the Rwp
+  limit (PR #1310) does not change that. One cheap test separates these fits from
+  every fit kept in WP-2003's nine series: the fit's GoF against the GoF of the
+  pattern it started from. Escalating on it rescued both bad cases measured. No code
+  changed; whether to add the test is the maintainer's call.
+
+  *Done.* Filed: no open WP owns a trigger for a converged warm fit in a wrong
+  basin. WP-2003 tiers the existing fence and ladder, its C1 ruling removes the
+  fence, and its Non-goals send new chain classifiers to a follow-up WP. A new
+  trigger is a new tier-3 action with its own approval. WP-2003 is in flight on
+  PR #1310, so this WP depends on it, and WP-2003 got one `### Inherited` line.
+  Reproduced on `0d735f5e5` to the issue's digits. Measured as in Context, scripts in
+  `2080-batch/`. Filed in PR #PR.
+
+  *Gotchas.* `measure_trigger.py` patches `_reseed_needed` on main's signature; after
+  PR #1310 that seam is `schemas.sequential._rejected`, so the script needs porting
+  before task 5. The retrospective reads `off` arms measured on Linux x86-64 with the
+  compiled tier off.
+
+  *Next:* the ruling below, then task 3 once PR #1310 merges.
 
   **The question for the maintainer.** Should a warm pattern climb one rung when its
   fit is much worse, against the noise, than the fit it started from?
