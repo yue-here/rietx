@@ -111,8 +111,8 @@ synthetic zincite under `mccusker_structural`, O at 0.38231(57) held, each z
 ±0.00039 under the centroid, against ±0.00029 on each z unheld; WP-1912.)
 
 **A symmetry-lowering can win ΔBIC and gain nothing where it splits.** Two fits
-of one pattern, a model and its lowering (cubic, tetragonal): ΔBIC (judging.md
-§4) and a nested F-test say it paid for itself, not where, so neither settles
+of one pattern, a model and its lowering (cubic, tetragonal): ΔBIC (judging.md §
+adding a parameter) and a nested F-test say it paid for itself, not where, so neither settles
 which space group. `rx.report.split_localisation(higher, lower)` shares the
 Δχ² among the windows of the reflections the lowering splits, the unsplit ones
 and the rest; read `split_share` against `split_point_share`. (Measured:

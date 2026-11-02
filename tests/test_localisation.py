@@ -385,13 +385,14 @@ def test_a_family_straddling_the_range_end_keeps_its_in_range_child(genuine):
 
 
 def test_a_family_wholly_outside_the_range_is_not_reported(genuine):
-    """The other half of the rule above: no child in range, no row."""
+    """The other half of the rule above: no child in range, no row.  Nor is a
+    parentless child past the range an unmatched one: the data cannot show it."""
     (_, cubic), (_, tetra) = genuine
     lo = cubic.two_theta[0]
     t0 = _two_theta(2, 0, 0)
     parent = _with_ticks(cubic, [lo - 0.05, t0], [[2, 0, 0], [2, 2, 0]])
-    child = _with_ticks(tetra, [lo - 0.06, lo - 0.04, t0],
-                        [[2, 0, 0], [0, 0, 2], [2, 2, 0]])
+    child = _with_ticks(tetra, [lo - 1.0, lo - 0.06, lo - 0.04, t0],
+                        [[1, 0, 1], [2, 0, 0], [0, 0, 2], [2, 2, 0]])
     loc = split_localisation(parent, child)
     assert [f.hkls for f in loc.families] == [[[2, 2, 0]]]
     assert loc.n_unmatched == 0 and loc.split_share is None
