@@ -405,6 +405,34 @@ def _cached_fcj_nodes(cp: "CompiledPhase", il: int, k: int, variant: int,
     return phi, omega
 
 
+def _aperture_node_derivs(nodes, two_theta_deg, sl: float, hl: float, n: int,
+                          h: float, which: int) -> tuple[np.ndarray, np.ndarray]:
+    """∂(2φ_q, ω_q)/∂(S/L or H/L) for the FCJ nodes, by a forward
+    second-order difference (``which`` 0 is S/L, 1 is H/L).
+
+    (−3f(0) + 4f(h) − f(2h)) / 2h steps only into the feasible side, so it is
+    the same rule at an aperture on its bound of zero as above it.  A forward
+    difference was not good enough there (WP-1955): at one zero aperture the
+    column is the residue of node terms about 1e5 times its size, which cancel
+    because the profile is quadratic in that aperture, and the difference's
+    O(h) error, 0.013 in norm, was 23 % of a column of 0.047.  The O(h²) form
+    costs one more node evaluation per aperture.
+
+    The caller's step, 3e-6, is from a scan against jax's exact column: below
+    it rounding grows as 1/h, above it the h² term.  At one zero aperture
+    1e-7 sat 8.9e-3 rel-L2 off and 3e-6 sits 5.3e-4; at interior apertures
+    every step from 3e-7 to 1e-5 is under 2e-7.
+    """
+    def at(step):
+        return fcj_offsets_weights_batch(
+            two_theta_deg, sl + (step if which == 0 else 0.0),
+            hl + (step if which == 1 else 0.0), n)
+
+    f1, f2 = at(h), at(2.0 * h)
+    return tuple((4.0 * b - 3.0 * a - c) / (2.0 * h)
+                 for a, b, c in zip(nodes, f1, f2, strict=True))
+
+
 @dataclass
 class BatchLayout:
     """Compile-frozen index planes for the batched derivative bases (WP-1112).
@@ -2913,7 +2941,7 @@ class CompiledModel:
             axial_derivs = False
         sl = values["instrument.geometry.axial_sl"]
         hl = values["instrument.geometry.axial_hl"]
-        h_pos, h_ax = 1e-5, 1e-7
+        h_pos, h_ax = 1e-5, 3e-6
         # d_sl/d_hl exist only while the aberration acts; at both apertures
         # zero the axial columns fall back to FD (``axial_ok``)
         build_axial = axial_derivs and fcj_live(sl, hl)
@@ -2994,19 +3022,16 @@ class CompiledModel:
                     pos[rows_b] + h_pos, sl, hl, n)
                 axl = axh = None
                 if d_sl is not None:
-                    axl = fcj_offsets_weights_batch(
-                        pos[rows_b], sl + h_ax, hl, n)
-                    axh = fcj_offsets_weights_batch(
-                        pos[rows_b], sl, hl + h_ax, n)
+                    axl = _aperture_node_derivs(nodes, pos[rows_b], sl, hl,
+                                                n, h_ax, 0)
+                    axh = _aperture_node_derivs(nodes, pos[rows_b], sl, hl,
+                                                n, h_ax, 1)
                 if fast and compiled.bases_fcj(
                         omega, d_pos, d_gamma, d_eta, d_sl, d_hl, lay.x,
                         rows_b, w1, w2, lay.width, nodes[0], nodes[1],
                         (shift[0] - nodes[0]) / h_pos,
                         (shift[1] - nodes[1]) / h_pos,
-                        None if axl is None else
-                        ((axl[0] - nodes[0]) / h_ax, (axl[1] - nodes[1]) / h_ax,
-                         (axh[0] - nodes[0]) / h_ax,
-                         (axh[1] - nodes[1]) / h_ax)):
+                        None if axl is None else (*axl, *axh)):
                     continue
                 for a in range(0, len(rows_b), _BASES_CHUNK_ROWS):
                     rs = rows_b[a:a + _BASES_CHUNK_ROWS]
@@ -3027,8 +3052,7 @@ class CompiledModel:
                     for planes, var in ((d_sl, axl), (d_hl, axh)):
                         if planes is None:
                             continue
-                        dphi = (var[0][s] - phi) / h_ax
-                        dom = (var[1][s] - om) / h_ax
+                        dphi, dom = var[0][s], var[1][s]
                         planes[rs] = (_node_mix(dom, pv)
                                       - _node_mix(om * dphi, ddx))
             # Make the planes scatter-safe for the batched accumulators
