@@ -421,6 +421,37 @@ No program surveyed uses a pdCIF weight column at all. rietx's whole-column fall
 therefore never trusts the file less than practice does. GSAS-II's unused code shows one
 intent: a null weight means an excluded point.
 
+## A magCIF in a non-standard orientation
+
+Surveyed 2026-11-01 for WP-1918's decision on the 91 untabulated orientations, by a research
+agent for the lead. The question: a magCIF whose nuclear group has its axes in an orientation
+no tabulated setting has. An example is an orthorhombic subgroup written in its hexagonal
+parent's axes. Does a reader keep the file's axes, or restate the structure in the magnetic
+space group's standard setting?
+
+MAGNDATA writes the parent-related setting on purpose. Gallego et al. (2016, *J. Appl.
+Cryst.* 49, 1750, §2.2) say most entries keep "the origin and orientation of the
+crystallographic axes of the paramagnetic phase". They call the listed operations sufficient,
+and the BNS label and the transformation to standard "complementary information". Their §2.3
+keeps the parent's metric unless a strain is observed. The symmetry-allowed strain is stated
+in the parent's axes. The IUCr guidelines (Perez-Mato et al. 2024, *Acta Cryst.* B80) accept
+either setting, call the non-standard one "in most cases more convenient", and require the
+transformation to standard beside the label (checked through the real-case companion,
+§2.1.1).
+
+| Program | What it does |
+|---|---|
+| rietx | Refuses the file: `OperatorGroup` takes its cell ties from a tabulated closest type, and there is none (`magcif._unnamed_nuclear_group`, checked) |
+| GSAS-II 5.8.4 | Keeps the file's axes and operators. The group is built from the parent symbol, its operators are replaced by the file's (`SGFixed`), and the cell refines under the parent's Laue class (`G2phase_CIF.py:238-262, 311-318`; `GSASIIstrIO.py:1000-1027`; checked). For a nuclear CIF whose operators disagree with GSAS-II's setting, it asks before sending the file to Bilbao's standard-setting service (`G2phase_CIF.py:729-779`, checked) |
+| FullProf 8.20 | Uses explicit operators in the PCR's own setting. "Transform to standard" carries the standard operators to that setting only when none are given (FullProf News, 6 Feb 2018; checked). The cell ties for such operators were not checked |
+| Jana2020 | Supports non-standard settings. "Transform to the standard setting" is a command the user runs (changelog, checked). That its import keeps the file's setting is inferred |
+| TOPAS v9 | `#inp_from_cif` reads an mCIF only in its BNS standard setting. "A file in any other setting stops with a message" (Technical Reference, magnetic section; checked) |
+| Bilbao MVISUALIZE, STRCONVERT, ISOCIF | Change the setting on request. ISODISTORT needs the standard setting, which ISOCIF produces first (Gallego et al. 2016, §3-4; checked) |
+
+No program surveyed restates a magCIF on read. Those that read the file keep its axes. Moving
+to the standard setting is a step the user takes. GSAS-II's cell rule, the parent's Laue
+class in the file's axes, is the parent-metric model of MAGNDATA §2.3 with no strain freed.
+
 ## Structure-free fitting: Le Bail or Pawley
 
 Surveyed 2026-10-27 for WP-2062, one agent across the seven programs, with the GSAS-II lines
