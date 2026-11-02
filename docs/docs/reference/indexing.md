@@ -506,9 +506,12 @@ A nonzero count raises [`INDEX_PREDICTED_BUT_ABSENT`](diagnostics-indexing.md#in
 
 `CellCandidate.confidence` is `high`, `medium` or `low`, written by one rule:
 
-- `low` when fewer than two finders stand behind the candidate, or when any refuting caveat applies;
+- `low` when fewer than two engines found the candidate, or when any refuting caveat applies;
 - `high` when every engine that ran found it and no caveat applies at all;
-- `medium` otherwise: at least two finders, and only capping caveats.
+- `medium` otherwise: at least two engines, and only capping caveats.
+
+A checked prior cell in `found_by` is not an engine and does not count toward the two.
+It corroborates a lattice the engines found, and it never lifts that lattice's grade.
 
 Every reason a candidate falls short is a member of a closed vocabulary in `CellCandidate.confidence_caveats`.
 Six of the fourteen refute the candidate, each being evidence against the cell or evidence that the data cannot choose.

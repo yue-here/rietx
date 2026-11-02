@@ -105,9 +105,13 @@ template. On real data with no measured shift, `high` is *unreachable* by design
   finder `"prior"` — merged when an engine found the lattice, else appended
   **after** the ranked list, never in the Borda ranking (IIA — what makes "a
   wrong prior changes no rank" structural); absent from `engines_run`, so the
-  agreement caveat grades it with no new vocabulary — though `grade` still
-  counts it toward `MIN_AGREEMENT`: **a prior corroborates but does not
-  confirm**; fix deferred post-1003, stated in `consensus.grade` (1046 §4).
+  agreement caveat grades it with no new vocabulary. **A prior corroborates
+  but does not confirm**: every count of finders is `engines._engines_behind`,
+  prior excluded, read by both the ranking key and `grade`'s floor (WP-2079,
+  #1308 — counted, a stated P cell reached `medium` above the planted F at
+  `low` under one engine). A superset test against `engines_run` needs no
+  exclusion. svd's seeded start still counts as svd's own finding (1045's rule
+  one; measured to buy nothing on #1308's fixture, open in WP-2079).
   Traps met: `PRIOR_DRIFT_MAX`, `same_lattice`-never-cell-tuples (WP-1045).
 
 ## Engines and the FoM panel

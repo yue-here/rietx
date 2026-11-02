@@ -2131,7 +2131,20 @@ def agreement(cand: EngineCandidate) -> int:
     reached — "a wrong prior changes no rank" has to survive the ranking key
     changing under it.
     """
-    return len({f for f in cand.found_by if f != PRIOR_FINDER}) or 1
+    return _engines_behind(cand.found_by) or 1
+
+
+def _engines_behind(found_by: Sequence[str]) -> int:
+    """Distinct engines in a ``found_by`` list, :data:`PRIOR_FINDER` excluded.
+
+    The one count both agreement readers take: :func:`agreement` (the
+    ranking's first key) and :func:`~rietx.indexing.consensus.grade` (the
+    gate's ``MIN_AGREEMENT`` floor).  A stated cell is not an independent
+    search, so it corroborates a lattice and never lifts it (WP-1003 § E;
+    WP-2079, #1308, where it lifted a prior's primitive lattice to
+    ``medium`` above the planted F lattice at ``low``).
+    """
+    return len({f for f in found_by if f != PRIOR_FINDER})
 
 
 def _peak_fwhm(peaks: PeakList) -> np.ndarray:
