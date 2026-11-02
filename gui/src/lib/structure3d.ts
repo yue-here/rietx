@@ -40,6 +40,9 @@ export interface Site {
   /** the CIF's disorder assembly and group, `null` for an ordered site */
   disorder_assembly?: string | null;
   disorder_group?: string | null;
+  /** the site's colour on a dark ground, where the server chose one
+   *  (`structure3d.dark_ground_colours`: C at #666666, WP-1468) */
+  dark_color?: string;
 }
 
 export interface DrawnAtom {
@@ -163,6 +166,19 @@ export function dim(color: string, factor = 0.62): string {
     Math.round(parseInt(color.slice(at, at + 2), 16) * factor)
       .toString(16).padStart(2, "0");
   return `#${channel(1)}${channel(3)}${channel(5)}`;
+}
+
+/**
+ * The geometry as the dark theme draws it: each site the server gave a
+ * `dark_color` wears it.  Which sites qualify is the server's question, since
+ * it needs the phase palette's OKLab distance, so this only reads the answer.
+ * The same object back when no site has one.
+ */
+export function onDarkGround(geometry: Geometry): Geometry {
+  if (!geometry.sites.some((site) => site.dark_color)) return geometry;
+  return { ...geometry,
+           sites: geometry.sites.map((site) =>
+             site.dark_color ? { ...site, color: site.dark_color } : site) };
 }
 
 /** `#rrggbb` as three channels in 0..1; anything else is mid-grey. */

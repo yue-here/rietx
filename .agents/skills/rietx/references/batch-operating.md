@@ -134,7 +134,9 @@ durations.** Inter-stage bookkeeping belongs to no stage, so stage-level
 totals are **systematically** low: fit-level agreed with an independent wall
 clock to **0.62 %** while stage-level undercounted by **19.9 %** on one batch
 and **~27 %** on another. Anyone budgeting a batch from summed stage durations
-is 20–27 % low before any other error. *(Measured: archive screening campaign
+is 20–27 % low before any other error. A fit run with `stage_reports=True`
+also carries `stage_report_seconds` on its `fit_end`, the rungs' share, which
+no stage span holds. *(Measured: archive screening campaign
 R3 — YBaCo₄O₇ at −19.9 % and the CuO/Cu₂O tranche at ~27 %, both audited
 against an external clock, fit-level agreeing to 0.62 %.)*
 

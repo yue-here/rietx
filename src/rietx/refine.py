@@ -8,6 +8,7 @@ import math
 import os
 import re
 import subprocess
+import time
 import tomllib
 import warnings
 from collections.abc import Callable, Iterable, Sequence
@@ -513,6 +514,8 @@ class _StageHold:
     #: ``StageResult.window_loss`` (WP-2047): measured on the stage's own
     #: frozen model at its answer, which only ``_run_stage`` still holds
     window_loss: float | None = None
+    #: ``StageResult.rwp`` (WP-1334), the same frozen model at the same answer
+    rwp: float | None = None
 
 
 def _tie_terms(source: "str | dict[str, float] | Sequence[tuple[str, float]]",
@@ -2519,6 +2522,9 @@ class Refinement:
         #: inside it (the arrow's direction is why ``schemas/results.py``
         #: cannot import the report contract at all).
         self.stage_reports_: list[StageReport] = []
+        #: wall seconds those rungs took to build, which the fit's ``fit_end``
+        #: event carries as ``stage_report_seconds`` (WP-1335)
+        self._stage_report_seconds = 0.0
         self._model: CompiledModel | None = None
         #: whether ``fit`` and ``run_stage`` compute the profile interval of
         #: each moment angle the stationary-angle test left out of the answer
@@ -2729,11 +2735,10 @@ class Refinement:
                 table: ParameterTable, outcome, diagnostics,
                 held_scales: set[int] | None = None,
                 window_loss: float | None = None) -> str:
-        values = table.decode(outcome.theta)
-        y_calc = model.evaluate(values)
+        y_calc, y_bkg = model.evaluate_with_background(table.decode(outcome.theta))
         stats = compute_statistics(model.y_obs, y_calc, model.sigma,
                                    n_free=len(table.free_paths) + _pawley_n(model),
-                                   y_background=model.background(values))
+                                   y_background=y_bkg)
         stats.max_shift_over_esd = outcome.max_shift_over_esd  # copied, never derived
         stderr = (table.stderr_physical(outcome.theta, outcome.stderr_internal,
                                         outcome.correlation)
@@ -5180,29 +5185,23 @@ class Refinement:
         # there (WP-2047): after the collapse and the Le Bail update, so it
         # reads the answer the stage hands on
         loss = window_loss(model, table.decode(outcome.theta))
+        # a real number, not the raw least-squares cost, measured on the
+        # stage's own frozen model at its answer: ``StageResult.rwp`` and the
+        # ``stage_end`` event's ``rwp`` are this one number (WP-1334).  One
+        # forward evaluation, not a fit, the same pattern _record uses for a
+        # history node's metrics.  Paid on every stage since the field, where
+        # it was paid only when a caller asked for events: a recorded fit
+        # always did, so the new charge falls on ``telemetry=False`` trials.
+        # A declared peak is in the model the stage fitted, and
+        # leaving it out made every stage Rwp that of a model with the peaks
+        # deleted (#441); evaluate_with_background keeps evaluate()'s sum.
+        y_stage, y_bkg = model.evaluate_with_background(table.decode(outcome.theta))
+        stage_rwp = compute_statistics(
+            model.y_obs, y_stage, model.sigma,
+            n_free=len(table.free_paths) + _pawley_n(model),
+            y_background=y_bkg).rwp
         if events is not None:
-            # a real number, not the raw least-squares cost: additive on the
-            # existing kind (history/events.py's rule), paid only when a
-            # caller asked for events at all — one forward evaluation, not a
-            # fit, the same pattern _record uses for a history node's metrics.
-            # background(values) computed once and reused, never twice —
-            # evaluate() is background [+ extra_peak_curve] + bragg_component
-            # internally, so calling both would price this at two background
-            # passes.  The sum is therefore evaluate()'s, restated in its own
-            # association order: a declared peak is in the model the stage
-            # fitted but not in background(), and leaving it out made every
-            # stage Rwp that of a model with the peaks deleted (#441); a model
-            # declaring none keeps the two-term sum, bit for bit.
-            values = table.decode(outcome.theta)
-            y_bkg = model.background(values)
-            y_stage = (y_bkg + model.bragg_component(values)
-                       if not model.peak_components else
-                       y_bkg + model.extra_peak_curve(values)
-                       + model.bragg_component(values))
-            stage_rwp = compute_statistics(
-                model.y_obs, y_stage, model.sigma,
-                n_free=len(table.free_paths) + _pawley_n(model),
-                y_background=y_bkg).rwp
+            # additive on the existing kind (history/events.py's rule)
             events.emit("stage_end", stage=stage.name, status=outcome.status,
                         n_iterations=outcome.n_iterations,
                         termination=outcome.termination,
@@ -5229,7 +5228,7 @@ class Refinement:
             # Le Bail and Pawley read the screen alone, which the result
             # measures on its own compile as it always has
             significance=support if mode == "rietveld" else None,
-            window_loss=loss)
+            window_loss=loss, rwp=stage_rwp)
 
     def fit(self, data: PatternData, *, mode: Mode = "rietveld",
             plan: RefinementPlan | str = "mccusker_default",
@@ -5279,12 +5278,15 @@ class Refinement:
         the stages that *did* complete and the node the working state stands at.
 
         ``stage_reports`` — build the report at every stage boundary and leave
-        the rungs on :attr:`stage_reports_` (WP-1058).  **Off by default here
-        and on at the agent surface**, and the asymmetry is the measurement:
-        a report build is ~0.33 s on 59.5k channels against a ~1.0 s five-stage
-        fit, so a trajectory costs ≈2.5× the fit — nothing to a consumer that
-        calls once and reads, a tax on a library primitive that suites and
-        series call in loops.  It changes **no** number the fit produces: the
+        the rungs on :attr:`stage_reports_` (WP-1058).  **Off by default**,
+        because each rung is a whole report build and the charge is per rung,
+        so it is a tax on a fit called in a loop.  On 11-BM NAC (22 003
+        channels, seven rungs) a fit with rungs took 4.7-5.7× the fit without
+        them (WP-1335, 2026-11-02), and the multiple grows as fits get
+        faster.  Sample it: the first fit of a batch, the last, one you will
+        plot.  The time the rungs took is ``fit_end``'s
+        ``stage_report_seconds``, since no stage span holds it.  It changes
+        **no** number the fit produces: the
         rungs are read off states the plan already passes through, never
         states it is made to visit, so a fit run with them lands exactly where
         the same fit run without them does.  (That is also why this is not the
@@ -5585,6 +5587,13 @@ class Refinement:
                 + _fixed_literal_diagnostics(plan.stages, table, self._ties))
             stage_results: list[StageResult] = []
             self.stage_reports_ = []
+            self._stage_report_seconds = 0.0
+            # the rungs' cost, on fit_end: a rung is built between one
+            # stage's stage_end and the next stage_start, so no stage span
+            # holds it (WP-1335).  Absent when no rung was asked for.
+            def report_cost() -> dict:
+                return ({"stage_report_seconds": self._stage_report_seconds}
+                        if stage_reports else {})
             outcome = None
             model = None
 
@@ -5598,7 +5607,7 @@ class Refinement:
                 if stream is not None:
                     stream.emit("fit_end", status="cancelled", stage=exc.stage,
                                 completed=[s.name for s in exc.completed_stages],
-                                node_id=exc.node_id, **stamp)
+                                node_id=exc.node_id, **report_cost(), **stamp)
                     if stream is not events:
                         stream.close()
                 raise
@@ -5677,7 +5686,8 @@ class Refinement:
                 stream.emit("fit_end", status=self.result_.status,
                             rwp=self.result_.statistics.rwp,
                             gof=self.result_.statistics.gof,
-                            node_id=self.result_.node_id, **stamp)
+                            node_id=self.result_.node_id, **report_cost(),
+                            **stamp)
                 if stream is not events:  # we created it from a path/callable
                     stream.close()
             if recorder is not None:
@@ -5881,7 +5891,7 @@ class Refinement:
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths,
-                window_loss=hold.window_loss,
+                window_loss=hold.window_loss, rwp=hold.rwp,
                 seeded=hold.seeded,
                 cell_reset=hold.cell_reset, collapsed=hold.collapsed,
                 # checked, trivially: one histogram has no elsewhere
@@ -5889,9 +5899,11 @@ class Refinement:
                 moment_angle_tests=outcome.moment_angle_tests,
             ))
             if stage_reports:
+                t_report = time.perf_counter()
                 self.stage_reports_.append(self._stage_report(
                     stage.name, plan, data, mode, table, model, outcome, guard,
                     stage_diagnostics, significance=hold.significance))
+                self._stage_report_seconds += time.perf_counter() - t_report
             for sink in sinks:
                 # live monitoring (viz.live.LiveSession): rewrite the snapshot
                 sink.write_snapshot(model, table, outcome, stage.name)
@@ -6043,7 +6055,7 @@ class Refinement:
             mu_r_skipped=self._mu_r_skipped, guard=guard,
             max_shift_over_esd=outcome.max_shift_over_esd,
             significance=significance,
-            phase_support_sigma=plan.phase_support_sigma)
+            phase_support_sigma=plan.phase_support_sigma, with_geometry=False)
         report = build_report(result, model=model,
                               values=table.decode(outcome.theta), plan=plan,
                               structure=self.structure, instrument=self.instrument,
@@ -6198,7 +6210,7 @@ class Refinement:
                 moment_turned=hold.moment_turned,
                 blocked_by_hold=hold.blocked_by_hold,
                 unknown_paths=hold.unknown_paths, unreached_histograms={},
-                window_loss=hold.window_loss,
+                window_loss=hold.window_loss, rwp=hold.rwp,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
                 moment_angle_tests=outcome.moment_angle_tests)
@@ -8555,6 +8567,7 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
                   significance: np.ndarray | None = None,
                   phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
                   held_scales: set[int] | None = None,
+                  with_geometry: bool = True,
                   ) -> RefinementResult:
     values = table.decode(theta)
     y_calc = model.evaluate(values)
@@ -8646,9 +8659,13 @@ def _build_result(model: CompiledModel, table: ParameterTable, theta: np.ndarray
     # McCusker §10) — built here because that covariance is read off the final
     # Jacobian and never serialized, the Identifiability carrier argument.  The
     # table judges nothing; §11's "chemical sense" is the reader's call.
-    geometry = geometry_table(model, table, theta, structure,
-                              stderr_internal=stderr_internal,
-                              correlation=correlation)
+    # ``with_geometry=False`` is a trajectory rung's: its report is projected
+    # onto a StageReport that carries no geometry, and the search was a third
+    # of a rung's result build (WP-1335)
+    geometry = (geometry_table(model, table, theta, structure,
+                               stderr_internal=stderr_internal,
+                               correlation=correlation)
+                if with_geometry else None)
     volumes = cell_volumes(table, theta, structure,
                            stderr_internal=stderr_internal, correlation=correlation)
 

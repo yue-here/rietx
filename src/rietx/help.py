@@ -1735,6 +1735,21 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "check the cell transform before you compare it with a published symbol."
         ),
     ),
+    "CIF_ADP_SYMMETRY_PROJECTED": HelpEntry(
+        title="Anisotropic displacement moved onto its symmetry-allowed form",
+        description=(
+            "The file prints a site's anisotropic displacement parameters (`U^ij`) "
+            "to fewer decimals than the symmetry relation between them needs, such "
+            "as U12 = U11/2 on a hexagonal three-fold axis. The printed values then "
+            "sit slightly off the form the site symmetry allows. The reader moved "
+            "the tensor to the nearest allowed one within half a unit in the last "
+            "printed digit of each component. The message names the sites and the "
+            "components moved, and the change is no larger than the rounding in the "
+            "file. A larger disagreement, or one that needs a component the file "
+            "prints as zero, is left as written and refused when the parameter "
+            "table is built."
+        ),
+    ),
     "CIF_ANISO_COLLAPSED": HelpEntry(
         title="Anisotropic displacement read as isotropic",
         description=(
@@ -5549,6 +5564,17 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "after it refit its answer. Magnetic windows and extra peaks are not "
             "measured. `None` means nobody looked. A joint fit records its worst "
             "histogram."
+        ),
+    ),
+    "StageResult.rwp": HelpEntry(
+        title="Stage Rwp",
+        description=(
+            "The stage's Rwp at the values it ended on, measured on the stage's own "
+            "frozen windows. It is the number the `stage_end` event carries. A joint "
+            "fit pools it over its histograms. The last stage's differs from "
+            "`statistics.rwp`, which is measured on a compile at the answer. Stages "
+            "that fit different ranges or modes cannot be compared by it. `None` "
+            "means a result stored before the field."
         ),
     ),
     "StageResult.n_constraint_truncations": HelpEntry(

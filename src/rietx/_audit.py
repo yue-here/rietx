@@ -513,6 +513,7 @@ OTHER_RECORD_FIELDS: frozenset[str] = frozenset({
     "rietx.schemas.results.StageResult.held_reach",
     "rietx.schemas.results.StageResult.n_iterations",
     "rietx.schemas.results.StageResult.name",
+    "rietx.schemas.results.StageResult.rwp",
     "rietx.schemas.results.StageResult.status",
     "rietx.schemas.results.StageResult.unknown_paths",
     "rietx.schemas.results.StageResult.unreached_histograms",
@@ -569,6 +570,22 @@ ROWS: tuple[Row, ...] = (
                  "paths it put back (B8, ruled 2026-10-19)."),
         approved="2026-10-19"),
     Row("CHILD_GROUP_UNNAMED", "code"),
+    Row("CIF_ADP_SYMMETRY_PROJECTED", "code", tier=1, ambiguity=1,
+        evidence=("arithmetic on the file's own digits, CIF_PRINTED_ROUNDING's rule: a U^ij "
+                  "printed to d decimals stands for every value within half its last "
+                  "digit, so a tensor with a point of its site's allowed subspace inside "
+                  "that box is the symmetric tensor rounded; fires exactly when such a "
+                  "point exists and the print is off the subspace by more than float "
+                  "round-off (wyckoff.adp_projection); a printed zero or whole number "
+                  "is held exact (WP-2016, a constructed ZnO tensor on 3m: U11 0.0123 "
+                  "against U12 0.0062 moves 3.3e-5 A^2, the box edge sits where the "
+                  "arithmetic puts it, and ten units past the print is still refused)"),
+        grounds=("Arithmetic: the move is no larger than the file's own rounding, so the "
+                 "tensor stored is one the file printed; past it the table refuses, "
+                 "naming the site and component."),
+        response="info",
+        responds=("note which sites' U^ij were read on their symmetry-allowed form and "
+                  "the largest move; nothing to do")),
     Row("CIF_ANISO_COLLAPSED", "code", tier=1, ambiguity=1,
         evidence=("a count of the sites whose _atom_site_aniso_U_ij row has a non-zero "
                   "tensor while the reader was told aniso=False, the default that keeps "
@@ -3242,6 +3259,12 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.report.strain._C", "constant", value=5.729577951308232e-05),
     Row("rietx.report.strain._GAUSS_NEWTON_ITERATIONS", "constant", value=4),
     Row("rietx.report.strain._QUOTABLE_WEIGHT_FRAC", "constant", value=0.01),
+    Row("rietx.report.texture._BLOCK_ELEMENTS", "constant", tier="invariant",
+        evidence="Answer-invariant by construction: a memory bound that only partitions "
+                 "the r grid (WP-1335); "
+                 "tests/test_report_cost.py::test_the_blocked_texture_grid_scores_bit_identically "
+                 "holds blocks of one r and of 50 to the one-r-at-a-time loop's scores, to the bit.",
+        value=2097152),
     Row("rietx.report.texture._EQUIV_REF_R", "constant", value=0.5),
     Row("rietx.schemas.fraction.FRACTION_PROFILE_DCHI2", "constant", tier=2, value=3.84,
         evidence=("Venzon & Moolgavkar (1988) Appl. Statist. 37, 87: profile-likelihood cut at the "
