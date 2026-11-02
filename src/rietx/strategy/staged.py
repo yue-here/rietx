@@ -1108,14 +1108,14 @@ class GuardFinding:
     def nonpositive_strain(cls, path: str, n_bad: int, n_total: int,
                            worst: float, hkl: str,
                            share: float | None = None) -> "GuardFinding":
-        """``share`` is the fraction of the phase's intensity on the fitted
-        data that sits in the reflections the clamp left with no strain width
+        """``share`` is the fraction of the phase's m·|F|² (no Lp, absorption
+        or texture) over the reflections in the fitted range that sits in the reflections the clamp left with no strain width
         (:func:`stephens_clamp_share`, WP-1467).  It rides in ``detail``, so
         the rendered finding is the pre-v1.0 text byte for byte."""
         detail = ("" if share is None else
                   f" The width law gives those reflections no strain width, "
                   f"and they carry {100.0 * share:.3g} % of the phase's "
-                  f"intensity on the fitted data.")
+                  f"m·|F|² over the reflections in the fitted range.")
         return cls("STEPHENS_STRAIN_NOT_POSITIVE", (path,), float(worst),
                    f"{path} ({n_bad} of {n_total} reflections, "
                    f"worst σ²(M) {worst:+.2e} at {hkl})", detail=detail)

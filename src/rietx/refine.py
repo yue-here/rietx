@@ -7077,14 +7077,15 @@ def _guard_diagnostics(guard) -> list[Diagnostic]:
             suggestion="Under solver='trf', refit with the default LM "
                        "driver, which holds σ²(M) ≥ 0 at every reflection; "
                        "a joint fit holds it under neither driver, so fit "
-                       "each histogram alone. That makes the coefficients "
+                       "each histogram alone or drop the block from the "
+                       "joint fit. That makes the coefficients "
                        "admissible, not measured, so compare a few starts "
                        "(StephensStrain.isotropic at different "
                        "microstrains). Do not report the S_HKL as measured. "
                        "This fit's other numbers (χ², cells, phase "
                        "fractions) also leaned on the reflections left with "
-                       "no strain width, in proportion to the intensity "
-                       "share they carry.",
+                       "no strain width; the share says how much of the "
+                       "phase's m·|F|² they carry.",
         ))
     for finding in guard.nonpositive_texture:
         msg = str(finding)

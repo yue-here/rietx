@@ -619,7 +619,7 @@ Each kind has one constructor, so each format string is written once:
 
 Read a guard as evidence about what the data could support, and not as a verdict on the model.
 A `nonpositive_strain` finding means those coefficients are not quotable, and that the fit leaned on the clamp giving the reflections outside the cone no strain width.
-Its `detail` states the share of the phase's intensity those reflections carry, and the fit's other numbers leaned on them in that proportion.
+Its `detail` states the share of the phase's m·|F|² those reflections carry, and the fit's other numbers leaned on them too.
 It is no measurement of anisotropy.
 
 ## Events

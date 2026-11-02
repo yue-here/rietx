@@ -256,8 +256,9 @@ width, so a fit outside the cone has leaned on the clamp. The reflections past
 it lost all strain width, and the solver can use that set as a free hinge. Read
 a firing as "these coefficients are not quotable, and the fit leaned on the
 clamp". Its χ², cells and phase fractions carry the hinge as well as its
-$S_{HKL}$. The finding states the share of the phase's intensity on the fitted
-data that sits in the clamped reflections, which says how far. A firing is
+$S_{HKL}$. The finding states the share of the phase's m·|F|² over the reflections
+in the fitted range that sits in the clamped ones, with no Lorentz-polarisation,
+absorption or texture factor. A firing is
 never evidence of anisotropy. The guard's test is one-sided, because zero lies
 on the cone itself. An earlier ≤ 0 form that flagged the inert all-zero block
 produced a since-withdrawn claim about isotropic specimens.

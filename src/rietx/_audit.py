@@ -3769,8 +3769,10 @@ ROWS: tuple[Row, ...] = (
                   "lor_strain floor removed), 1000 ppm against the carried lor_strain on the "
                   "ray (29 ppm on brucite): LM chi2 7.8943 against 7.8939, TRF 7.9267 against "
                   "7.7965; operando pattern 41 LM 1.170 against 1.112 with the two phase "
-                  "fractions swapped, TRF 1.156 against 1.476. The starts disagree by driver, "
-                  "so the fixed seed stands"),
+                  "fractions swapped, TRF 1.156 against 1.476. Fold has no start where the phase "
+                  "carries no lor_strain (patterns 0 and 16, and any phase given its block at "
+                  "the outset, since the block replaces lor_strain), and where it has one LM "
+                  "favoured it twice and TRF once each way, so the fixed seed stands"),
         grounds=("Some start is forced, since the width's square root has unbounded slope at "
                  "zero; kept at 1000 ppm until a second dataset compares the starts (B3, ruled "
                  "2026-10-19); the second compared them on 2026-10-20 and favoured 1000 ppm."),
