@@ -147,9 +147,12 @@ def _refined_row(refinement, result, path: str):
     row = next((p for p in result.parameters if p.path == path), None)
     if row is not None and row.vary:
         return row
-    current = next((r for r in refinement.parameters() if r.path == path), None)
+    rows = refinement.parameters()
+    current = next((r for r in rows if r.path == path), None)
     if current is None:
-        raise ValueError(f"unknown parameter path {path!r}")
+        from ..refine import _path_hint  # lazy: refine imports strategy
+        hint = _path_hint(path, [r.path for r in rows])
+        raise ValueError(f"unknown parameter path {path!r}" + (f"; {hint}" if hint else ""))
     why = current.held_because
     if why:
         raise ValueError(f"{path!r} cannot be pinned and profiled on its own "

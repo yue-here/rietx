@@ -750,9 +750,13 @@ def test_the_reasons_a_caller_cannot_lift_outrank_a_hold(ref):
     assert rows[CELL].held_because.startswith("held by this refinement")
     # …and the refusal reads the table too, so it never gives advice that
     # would not work: `unhold` gives a tied or locked row back no freer than
-    # it was, so those keep set_vary's older answer of declining in silence
-    assert ref.set_vary("phases.0.cell.b", True) == []
-    assert ref.set_vary("phases.0.cell.alpha", True) == []
+    # it was, so those are declined with the symmetry's reason, never the
+    # hold's (the warning is WP-1951's; before it they declined in silence)
+    with pytest.warns(UserWarning, match="follows phases.0.cell.a") as caught:
+        assert ref.set_vary("phases.0.cell.b", True) == []
+    with pytest.warns(UserWarning, match="fixed by symmetry") as more:
+        assert ref.set_vary("phases.0.cell.alpha", True) == []
+    assert not any("unhold" in str(w.message) for w in [*caught, *more])
     with pytest.raises(ValueError, match="held by this refinement"):
         ref.set_vary(CELL, True)
 
@@ -1048,6 +1052,155 @@ def test_a_path_that_is_free_or_not_a_phase_literal_stays_silent(pattern, turn_o
     assert "STAGE_PATH_NOT_FREE" not in {d.code for d in result.diagnostics}
     if turn_on == ["phases.0.atoms.1.dof.*"]:
         assert "phases.0.atoms.1.dof.0" in result.stages[0].freed
+
+
+#: LaB6 (``perturbed_models``): La on 1a has no ``dof`` rows, and B on 6f has
+#: one, which ``x`` follows while ``y`` and ``z`` are fixed
+SITE_GLOBS = [
+    ("phases.0.atoms.0.dof.*", "which matches no parameter, so nothing was freed "
+     "for it. Every coordinate of phases.0.atoms.0 is fixed by its site "
+     "symmetry, so the site has no dof rows.", None),
+    ("phases.0.atoms.1.?", "which matches only rows the model fixes or ties "
+     "(phases.0.atoms.1.x, phases.0.atoms.1.y, phases.0.atoms.1.z), so nothing "
+     "was freed for it.", "Free phases.0.atoms.1.dof.* (phases.0.atoms.1.dof.0) "
+     "instead."),
+    ("phases.0.atoms.0.adp.*", "which matches no parameter, so nothing was "
+     "freed for it.", "ref.parameters() lists every path this site has."),
+]
+
+
+@pytest.mark.parametrize("glob, says, fix", SITE_GLOBS,
+                         ids=["no-dof-site", "declined-rows", "no-such-family"])
+def test_a_glob_naming_one_site_that_frees_nothing_says_why(pattern, glob, says, fix):
+    """Issue #896 (WP-1951): Ti's ``dof.*`` on rutile froze the site in silence.
+
+    A concrete site index is the caller's claim about that site, so it cannot
+    be a shipped plan's healthy miss: no preset names one.
+    """
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    result = ref.fit(pattern, plan=rx.RefinementPlan(stages=[
+        rx.Stage("only", ["phases.*.scale", glob], max_iter=5)]))
+    assert result.stages[0].freed == ["phases.0.scale"]
+    found = [d for d in result.diagnostics if d.code == "STAGE_PATH_NOT_FREE"]
+    assert len(found) == 1 and found[0].level == "warning"
+    assert found[0].where == [glob]
+    assert found[0].message == f"Stage 'only' asked for {glob}, {says}"
+    assert found[0].suggestion == fix
+    assert "STAGE_PATH_UNKNOWN" not in {d.code for d in result.diagnostics}
+
+    single = ref.run_stage(pattern, rx.Stage("again", [glob], max_iter=5))
+    assert [d.where for d in single.diagnostics
+            if d.code == "STAGE_PATH_NOT_FREE"] == [[glob]]
+
+
+@pytest.mark.parametrize("turn_on", [
+    # WP-1414's decision: a wildcard index matching nothing is a healthy miss
+    ["phases.*.atoms.*.dof.*"],
+    ["phases.0.atoms.*.adp.*"],
+    # a site glob that frees one row of the site has done what it said
+    ["phases.0.atoms.0.*"],
+    ["phases.0.atoms.1.dof.*"],
+    # a symmetry tie whose source the same stage frees
+    ["phases.0.atoms.1.x", "phases.0.atoms.1.dof.*"],
+    # a site the model does not have is a typo of the index, not this rule's
+    ["phases.0.atoms.7.dof.*"],
+    # the displacement stages' pair, copied for one isotropic atom: the
+    # biso it freed answers the adp.* that matched nothing
+    ["phases.0.atoms.0.biso", "phases.0.atoms.0.adp.*"],
+], ids=["wildcard-index", "wildcard-atom", "site-frees-biso", "site-dof",
+        "tie-and-source", "no-such-site", "biso-or-adp"])
+def test_a_site_glob_that_frees_something_or_names_no_site_stays_silent(
+        pattern, turn_on):
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    result = ref.fit(pattern, plan=rx.RefinementPlan(stages=[
+        rx.Stage("only", ["phases.*.scale", *turn_on], max_iter=5)]))
+    assert "STAGE_PATH_NOT_FREE" not in {d.code for d in result.diagnostics}
+
+
+def test_ti_on_rutile_reports_its_site_symmetry():
+    """The issue's own model: Ti on 2a of P4₂/mnm, O on 4f with one direction."""
+    from tests.test_coordinates import make_rutile, synthesize_rutile
+
+    ins = rx.Instrument.debye_scherrer(wavelength=1.5406)
+    structure = make_rutile()
+    structure.phases[0].scale.value = 8.0e-3
+    ref = rx.Refinement(structure, ins, history=False)
+    result = ref.fit(synthesize_rutile(), plan=rx.RefinementPlan(stages=[
+        rx.Stage("xyz", ["phases.*.scale", "phases.0.atoms.0.dof.*"], max_iter=5),
+        rx.Stage("all", ["phases.*.scale", "phases.*.atoms.*.dof.*"], max_iter=5)]))
+    found = [d for d in result.diagnostics if d.code == "STAGE_PATH_NOT_FREE"]
+    assert [d.where for d in found] == [["phases.0.atoms.0.dof.*"]]
+    assert "Stage 'xyz' asked" in found[0].message
+    assert "fixed by its site symmetry" in found[0].message
+    assert "phases.0.atoms.1.dof.0" in result.stages[1].freed
+
+
+def test_no_preset_names_one_site():
+    """Why the site rule cannot fire on a shipped plan: none names an index."""
+    from rietx.refine import _SITE_GLOB
+
+    named = [g for name, build in PLAN_PRESETS.items()
+             for stage in build().stages for g in stage.turn_on
+             if _SITE_GLOB.match(g)]
+    assert named == []
+
+
+@pytest.mark.parametrize("args, says", [
+    (("instrument.zero",), "set_vary freed nothing for 'instrument.zero', which "
+     "names no parameter of this model. Did you mean 'instrument.zero_shift'?"),
+    (("instrument.zero", False), "set_vary fixed nothing for 'instrument.zero'"),
+    (("instrument.background_peaks.*",), "It is a spelling retired after v1.2, "
+     "now spelled 'instrument.extra_components.*'."),
+    (("phases.0.atoms.0.dof.*",), "A set_vary call asked for "
+     "phases.0.atoms.0.dof.*, which matches no parameter"),
+    (("phases.0.cell.b",), "A set_vary call asked for phases.0.cell.b, which "
+     "follows phases.0.cell.a, so nothing was freed for it. Free phases.0.cell.a "
+     "instead."),
+], ids=["unknown", "unknown-fixing", "retired", "site-glob", "tied-literal"])
+def test_set_vary_warns_on_a_request_that_changes_nothing(args, says):
+    """The verb half (WP-1951): a stage's two findings, as a warning."""
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    with pytest.warns(UserWarning) as caught:
+        assert ref.set_vary(*args) == []
+    assert any(says in str(w.message) for w in caught), [
+        str(w.message) for w in caught]
+
+
+@pytest.mark.parametrize("args", [
+    ("phases.*.atoms.*.dof.*",), ("phases.*.cell.*",),
+    (["phases.0.cell.a", "phases.0.cell.b"],), ("phases.0.atoms.0.x", False),
+    ("instrument.extra_components.*",),
+])
+def test_set_vary_is_silent_on_a_sweep_or_a_request_it_honoured(args):
+    import warnings
+
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        ref.set_vary(*args)
+
+
+def test_set_vary_commits_before_it_warns():
+    """A caller turning warnings into errors keeps the half the call did."""
+    import warnings
+
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(UserWarning, match="phases.0.atoms.0.dof"):
+            ref.set_vary(["phases.*.cell.*", "phases.0.atoms.0.dof.*"])
+    assert {r.path for r in ref.parameters() if r.vary} >= {"phases.0.cell.a"}
+
+
+@pytest.mark.parametrize("verb, arg", [
+    ("hold", "instrument.zero"), ("unhold", "instrument.zero"),
+    ("untie", "instrument.zero"), ("set_values", {"instrument.zero": 0.0}),
+])
+def test_a_verb_refusing_an_unknown_path_names_the_nearest(verb, arg):
+    ref = rx.Refinement(*perturbed_models(), history=False)
+    with pytest.raises(ValueError, match=r"unknown parameter path.*"
+                       r"did you mean 'instrument\.zero_shift'\?"):
+        getattr(ref, verb)(arg)
 
 
 def test_a_tied_path_beside_its_own_source_stays_silent(pattern):

@@ -3189,6 +3189,14 @@ class Refinement:
         on the first ``fit``/``run_stage``, because a tree is pinned to its
         pattern by a fingerprint and no pattern has been seen before then.  The
         working state changes either way.
+
+        A request that changes nothing it named **warns** (WP-1951, issue
+        #896), with the text a stage's ``STAGE_PATH_UNKNOWN`` and
+        ``STAGE_PATH_NOT_FREE`` give: a literal no row has, with the nearest
+        path, and, when freeing, a phase literal or a glob naming one site
+        (``phases.0.atoms.0.dof.*``) that frees nothing there.  A warning
+        rather than a refusal, because the return value already says what
+        changed and a glob that declines rows is how plans work.
         """
         globs = [path_globs] if isinstance(path_globs, str) else list(path_globs)
         table = self._working_table()
@@ -3227,6 +3235,9 @@ class Refinement:
                     f"{blocked[0]!r} is held by this refinement and cannot be "
                     "freed; unhold it first if you mean to refine it")
         hits = table.set_vary(globs, vary)
+        # warned once the call has committed, so a caller turning warnings
+        # into errors loses nothing the call did
+        findings = self._set_vary_findings(table, globs, vary)
         # A carried hold (WP-1301) is lifted at the start of the next stage, so
         # a path the caller has just declared on must leave it: otherwise the
         # lift re-frees a parameter the caller explicitly fixed, and the
@@ -3236,16 +3247,42 @@ class Refinement:
             self._held = [p for p in self._held if p not in declared]
         self._free_paths = list(table.free_paths)
         self._free_set_declared = True
-        if self.history is None:
-            return hits
-        node = self.history.add(
-            parents=[self._head_id] if self._head_id else [],
-            action=NodeAction(kind="set_vary",
-                              turn_on=hits if vary else [],
-                              turn_off=[] if vary else hits),
-            state=self.snapshot())
-        self._head_id = node.id
+        if self.history is not None:
+            node = self.history.add(
+                parents=[self._head_id] if self._head_id else [],
+                action=NodeAction(kind="set_vary",
+                                  turn_on=hits if vary else [],
+                                  turn_off=[] if vary else hits),
+                state=self.snapshot())
+            self._head_id = node.id
+        for message in findings:
+            warnings.warn(message, UserWarning, stacklevel=2)
         return hits
+
+    def _set_vary_findings(self, table: ParameterTable, globs: list[str],
+                           vary: bool) -> list[str]:
+        """What :meth:`set_vary` warns, one sentence pair per path it names.
+
+        The stage's own builders asked of the call as if it were a stage, so
+        the two surfaces cannot disagree about which requests are claims.
+        """
+        known = [e.path for e in table.entries]
+        verb = "freed" if vary else "fixed"
+        out = []
+        for path in table.unknown_paths(globs):
+            hint = _path_hint(path, known)
+            out.append(f"set_vary {verb} nothing for {path!r}, which names no "
+                       "parameter of this model."
+                       + (f" {hint[:1].upper()}{hint[1:]}" if hint else ""))
+        if vary:
+            request = [Stage("set_vary", globs)]
+            subject = "a set_vary call"
+            for d in (_fixed_literal_diagnostics(request, table, self._ties,
+                                                 subject=subject)
+                      + _site_glob_diagnostics(request, table, self._ties,
+                                               subject=subject)):
+                out.append(d.message + (f" {d.suggestion}" if d.suggestion else ""))
+        return out
 
     def set_values(self, values: dict[str, float]) -> None:
         """Set parameter values by dot-path, recording a ``set_value`` node.
@@ -3270,7 +3307,9 @@ class Refinement:
         by_path = {e.path: e for e in table.entries}
         unknown = [p for p in values if p not in by_path]
         if unknown:
-            raise ValueError(f"unknown parameter path(s): {sorted(unknown)}")
+            raise ValueError(f"unknown parameter path(s): {sorted(unknown)}" + "".join(
+                f"; for {p!r}, {h}" for p in sorted(unknown)
+                if (h := _path_hint(p, by_path))))
         for path, value in values.items():
             e = by_path[path]
             if e.locked:
@@ -3476,7 +3515,7 @@ class Refinement:
         by_path = {e.path: e for e in table.entries}
         entry = by_path.get(path)
         if entry is None:
-            raise ValueError(f"unknown parameter path: {path!r}")
+            raise _unknown_path_error(path, by_path)
         if entry.locked:
             raise ValueError(
                 f"{path!r} is structurally fixed (symmetry, or a representation "
@@ -3740,7 +3779,7 @@ class Refinement:
                 continue
             entry = known.get(glob)
             if entry is None:
-                raise ValueError(f"unknown parameter path: {glob!r}")
+                raise _unknown_path_error(glob, known)
             if entry.tie is not None:
                 raise ValueError(
                     f"{glob!r} is tied by symmetry, not by this refinement, and "
@@ -3805,7 +3844,7 @@ class Refinement:
         for glob in globs:
             if not is_literal_path(glob) or glob in known:
                 continue
-            raise ValueError(f"unknown parameter path: {glob!r}")
+            raise _unknown_path_error(glob, known)
         hits = sorted(p for p in known
                       if any(fnmatch.fnmatchcase(p, g) for g in globs))
         # a body owns its atoms' coordinates as symmetry owns a special
@@ -3949,10 +3988,10 @@ class Refinement:
                     and g not in origin_hits]
         if literals:
             glob = literals[0]
-            raise ValueError(
-                f"{glob!r} is not held by this refinement"
-                if any(e.path == glob for e in table.entries)
-                else f"unknown parameter path: {glob!r}")
+            known = [e.path for e in table.entries]
+            if glob not in known:
+                raise _unknown_path_error(glob, known)
+            raise ValueError(f"{glob!r} is not held by this refinement")
         if not hits and not origin_hits:
             return []
         if hits:
@@ -5565,7 +5604,8 @@ class Refinement:
                 + _held_moment_diagnostics(plan, table, self.structure, mode)
                 # a plan read too, and here for the same reason: a literal a
                 # stage cannot free is decided by the model before any stage
-                + _fixed_literal_diagnostics(plan.stages, table, self._ties))
+                + _fixed_literal_diagnostics(plan.stages, table, self._ties)
+                + _site_glob_diagnostics(plan.stages, table, self._ties))
             stage_results: list[StageResult] = []
             self.stage_reports_ = []
             outcome = None
@@ -6121,6 +6161,7 @@ class Refinement:
             order = _stage_order_diagnostics(
                 RefinementPlan(stages=[stage]), table, mode)
             order += _fixed_literal_diagnostics([stage], table, self._ties)
+            order += _site_glob_diagnostics([stage], table, self._ties)
             try:
                 with self._abandon_on_cancel(cancel, stage.name, [], stream):
                     model, outcome, guard, freed, hold = self._run_stage(
@@ -7802,8 +7843,32 @@ def _stage_list(names: list[str]) -> str:
             f"stages {', '.join(repr(s) for s in names)}")
 
 
+def _path_hint(path: str, known) -> str:
+    """The spelling a caller most likely meant by an unknown ``path``, or ``""``.
+
+    ``STAGE_PATH_UNKNOWN``'s two answers, for the verbs that take a path
+    (WP-1951): a spelling a release retired is named with its current one
+    (:func:`~rietx.params.vector.retired_spelling`), and anything else gets
+    the nearest real path (:mod:`rietx._nearmiss`).  Before this the verbs
+    answered ``instrument.zero`` with the bare refusal, and ``set_vary`` with
+    nothing at all.
+    """
+    current = retired_spelling(path)
+    if current is not None:
+        return f"it is a spelling retired after v1.2, now spelled {current!r}."
+    return did_you_mean(path, known, n=1)
+
+
+def _unknown_path_error(path: str, known) -> ValueError:
+    """``unknown parameter path: 'p'``, with :func:`_path_hint` when it has one."""
+    hint = _path_hint(path, known)
+    return ValueError(f"unknown parameter path: {path!r}"
+                      + (f"; {hint}" if hint else ""))
+
+
 def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
-                               canonical=None) -> list[Diagnostic]:
+                               canonical=None,
+                               subject: str | None = None) -> list[Diagnostic]:
     """``STAGE_PATH_NOT_FREE`` — a literal phase path the model will not free.
 
     ``STAGE_PATH_UNKNOWN``'s other half.  A literal names one parameter, and
@@ -7835,6 +7900,10 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
     row exactly when ``MultiParameterTable.set_vary`` would match it, and
     ``where`` and the suggestion name rows as the joint result spells them.
     A single fit's row has one name and passes nothing.
+
+    ``subject`` replaces the stage list at the head of the message, for a
+    caller that is not a stage: :meth:`Refinement.set_vary` passes ``"a
+    set_vary call"`` (WP-1951).
     """
     name_of = canonical or (lambda p: p)
     by_path = {e.path: e for e in table.entries}
@@ -7862,7 +7931,7 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
                 names.append(stage.name)
     out = []
     for row, (path, names) in asked.items():
-        which = _stage_list(names)
+        which = subject or _stage_list(names)
         entry = by_path[row]
         sources = ([] if entry.tie is None else
                    [name_of(src) for src, _ in entry.tie.terms])
@@ -7888,6 +7957,127 @@ def _fixed_literal_diagnostics(stages, table: ParameterTable, user_ties, *,
             message=(f"{which[:1].upper()}{which[1:]} asked for {path}, which "
                      f"{why}, so nothing was freed for it."),
             where=[name_of(row)], suggestion=fix))
+    return out
+
+
+#: the fixed leading segments of a glob that names one site
+_SITE_GLOB = re.compile(r"^(phases\.\d+\.atoms\.\d+)\.")
+
+
+def _frees_for_request(entry, turn_on, user_ties) -> bool:
+    """Whether a request naming ``entry`` gets a parameter that can move.
+
+    The other side of :func:`_fixed_literal_diagnostics`' test, asked of one
+    row: a locked row never does, a free or held row does (a hold has its own
+    report, ``HOLD_BLOCKED_PLAN``), and so does a row the caller tied.  A
+    symmetry tie does only when the same request frees every source it follows.
+    """
+    if entry.locked:
+        return False
+    if entry.tie is None or entry.path in user_ties:
+        return True
+    return all(any(fnmatch.fnmatchcase(src, g) for g in turn_on)
+               for src, _ in entry.tie.terms)
+
+
+def _reaches_displacement(glob: str, site: str) -> bool:
+    """Does ``glob`` reach the site's displacement, as ``biso`` or ``adp.k``?"""
+    return any(fnmatch.fnmatchcase(f"{site}.{tail}", glob)
+               for tail in ("biso", "adp.0"))
+
+
+def _site_glob_diagnostics(stages, table: ParameterTable, user_ties, *,
+                           subject: str | None = None) -> list[Diagnostic]:
+    """``STAGE_PATH_NOT_FREE`` — a glob that names one site and frees nothing.
+
+    Issue #896: an application frees Ti's position on rutile (P4₂/mnm, Ti on
+    2a) as ``phases.0.atoms.0.dof.*``.  A fully fixed special position has no
+    ``dof`` rows at all, so the glob matched nothing, the stage froze the site
+    where it started, and nothing said so.  The literal ``phases.0.atoms.0.x``
+    was already reported by :func:`_fixed_literal_diagnostics`.
+
+    **Only a glob whose fixed leading segments name one existing site**
+    (``phases.<i>.atoms.<j>.``).  WP-1414 kept every other pattern that matches
+    nothing silent, because the shipped plans free families some models lack
+    (``phases.*.microstrain.dof.*``), and no preset names a concrete index.
+    A glob with a concrete site is the caller's claim about that site, so it
+    cannot be a healthy plan's miss.  A site the model does not have stays
+    silent here; that is a typo of the index, not a site the model holds.
+
+    It fires when no row the glob matches can move, by
+    :func:`_frees_for_request`: it matched nothing, or only locked rows and
+    symmetry ties whose sources the request does not free.  The message then
+    says why when the glob reached the coordinates: the site's symmetry fixes
+    them all, a rigid body places them, or they move through the site's
+    ``dof`` rows, which the suggestion names.  One family is asked two ways:
+    the shipped displacement stages free ``…biso`` beside ``…adp.*``, so a
+    request copying that pair for one isotropic atom has its ``adp.*`` answered
+    by the ``biso`` it freed, and stays silent.
+
+    A plan read, like :func:`_fixed_literal_diagnostics`, and one diagnostic
+    per glob naming its stages.  ``where`` is the glob, as
+    ``STAGE_PATH_UNKNOWN``'s is the missing path, since no row carries it.
+    ``subject`` is that function's, for :meth:`Refinement.set_vary`.
+    """
+    entries = table.entries
+    asked: dict[str, list[str]] = {}
+    for stage in stages:
+        for glob in stage.turn_on:
+            m = _SITE_GLOB.match(glob)
+            if m is None or is_literal_path(glob):
+                continue
+            site = m.group(1)
+            rows = [e for e in entries if e.path.startswith(f"{site}.")]
+            if not rows or any(fnmatch.fnmatchcase(e.path, glob)
+                               and _frees_for_request(e, stage.turn_on, user_ties)
+                               for e in rows):
+                continue
+            if (_reaches_displacement(glob, site) and any(
+                    _reaches_displacement(e.path, site)
+                    and any(fnmatch.fnmatchcase(e.path, g) for g in stage.turn_on)
+                    and _frees_for_request(e, stage.turn_on, user_ties)
+                    for e in rows)):
+                # ``biso`` and ``adp.*`` are one displacement asked two ways:
+                # the shipped stages name both, so either answers it
+                continue
+            names = asked.setdefault(glob, [])
+            if stage.name not in names:
+                names.append(stage.name)
+    by_path = {e.path: e for e in entries}
+    owned = table.body_rows()
+    out = []
+    for glob, names in asked.items():
+        which = subject or _stage_list(names)
+        site = _SITE_GLOB.match(glob).group(1)
+        matched = [e.path for e in entries if fnmatch.fnmatchcase(e.path, glob)]
+        dofs = [e.path for e in entries if e.path.startswith(f"{site}.dof.")]
+        coords = [by_path.get(f"{site}.{axis}") for axis in "xyz"]
+        reaches = any(fnmatch.fnmatchcase(f"{site}.{tail}", glob)
+                      for tail in ("x", "y", "z", "dof.0"))
+        what = (f"matches only rows the model fixes or ties ({', '.join(matched)})"
+                if matched else "matches no parameter")
+        why, fix = "", None
+        if reaches and f"{site}.x" in owned:
+            why = f" Rigid body {owned[f'{site}.x']!r} places {site}."
+            fix = ("Free the body's own origin, rotation and torsions instead "
+                   "(phases.*.rigid_bodies.*.origin.dof.*, "
+                   "phases.*.rigid_bodies.*.rotation.*, "
+                   "phases.*.rigid_bodies.*.torsions.*.twist).")
+        elif (reaches and not dofs
+              and all(e is not None and e.locked for e in coords)):
+            why = (f" Every coordinate of {site} is fixed by its site symmetry, "
+                   "so the site has no dof rows.")
+        elif reaches and dofs:
+            fix = f"Free {site}.dof.* ({', '.join(dofs)}) instead."
+        elif matched:
+            fix = "Read held_because for these rows in ref.parameters()."
+        else:
+            fix = "ref.parameters() lists every path this site has."
+        out.append(Diagnostic(
+            level="warning", code="STAGE_PATH_NOT_FREE",
+            message=(f"{which[:1].upper()}{which[1:]} asked for {glob}, which "
+                     f"{what}, so nothing was freed for it.{why}"),
+            where=[glob], suggestion=fix))
     return out
 
 

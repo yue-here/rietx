@@ -339,6 +339,11 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
                 "never both on one histogram, and a shared row fixed in "
                 "several tables is one finding"),
     # -- deliberately not computed ---------------------------------------------
+    "_site_glob_diagnostics": (
+        (ABSENT,), "not called from multi.py yet: a single fit reports a glob "
+                   "naming one site that frees nothing (WP-1951), and wiring it "
+                   "beside _joint_fixed_literals waits on PR #1270 reshaping "
+                   "that wrapper; the follow-up is in WP-2028's Inherited"),
     "_hold_diagnostics": (
         (ABSENT,), "a joint fit has no hold verb: the one hold its tables "
                    "carry is the floating origin's, which HOLD_BLOCKED_PLAN "

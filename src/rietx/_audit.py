@@ -1169,7 +1169,23 @@ ROWS: tuple[Row, ...] = (
         responds=("read the stage it names as not run, since its values are its start, and "
                   "hold some of its free parameters or start it nearer its answer before "
                   "quoting what the stage was meant to refine")),
-    Row("STAGE_PATH_NOT_FREE", "code"),
+    Row("STAGE_PATH_NOT_FREE", "code", tier=1, ambiguity=1,
+        response="warning",
+        responds=("read the parameters it names as not refined by that stage, and free "
+                  "the path the suggestion names, or none where the site symmetry "
+                  "fixes every coordinate, before quoting them"),
+        evidence=("arithmetic: fires when a phase literal names a locked or "
+                  "symmetry-tied row whose sources the same stage does not free "
+                  "(refine._fixed_literal_diagnostics, WP-1414), or a glob whose fixed "
+                  "leading segments name one existing site (phases.<i>.atoms.<j>.) "
+                  "matches no row the stage can free (refine._site_glob_diagnostics, "
+                  "issue #896, WP-1951; single fits, the joint fit asking the literal "
+                  "branch alone until WP-2028); no threshold, and no shipped preset "
+                  "names a phase literal or a concrete site; the package builds one "
+                  "only from a caller's own model or flags (report/body_misfit's "
+                  "released arm, an internal trial whose findings are not surfaced; "
+                  "io/recipe's flagged coordinates); a user tie, a hold, and an adp.* "
+                  "glob answered by the same request's biso are excluded")),
     Row("STAGE_PATH_UNKNOWN", "code"),
     Row("STAGE_WINDOWS_STALE", "code", tier=3, ambiguity=3,
         evidence=("warning; fires when StageResult.window_loss, the Bragg intensity a "
@@ -4523,7 +4539,7 @@ ROWS: tuple[Row, ...] = (
                   "driver's Gaussian and Lorentzian width floors "
                   "(gaussian_width_inequalities, lorentzian_width_inequalities) that TRF "
                   "has no vocabulary for")),
-    Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=1),
+    Row("STAGE_PATH_NOT_FREE.suggestion", "suggestion", value=2),
     Row("STAGE_PATH_UNKNOWN.suggestion", "suggestion", value=2),
     Row("STAGE_WINDOWS_STALE.suggestion", "suggestion", value=1, tier=3, ambiguity=3,
         evidence=("WP-2045's re-solve from the runaway went from axial_sl 558 to 4114, "
@@ -4934,7 +4950,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT.suggestion",
     "STAGE_MAX_ITER",
     "STAGE_MAX_ITER.suggestion",
-    "STAGE_PATH_NOT_FREE",
     "STAGE_PATH_NOT_FREE.suggestion",
     "STAGE_PATH_UNKNOWN",
     "STAGE_PATH_UNKNOWN.suggestion",
@@ -5653,7 +5668,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "SPECIES_FALLBACK_NEUTRAL",
     "STAGE_FREES_MAGNETIC_WIDTH_WITH_MOMENT",
     "STAGE_MAX_ITER",
-    "STAGE_PATH_NOT_FREE",
     "STAGE_PATH_UNKNOWN",
     "STEPHENS_STRAIN_NOT_POSITIVE",
     "STRAIN_UNUSUALLY_LARGE",
