@@ -281,10 +281,10 @@ roughly the shift (+1400 ppm).
   it separates (`screen.containment_evidence`: indexed-set containment with the denser
   line set as the child, generalising `supercell_chance`'s index 2–4; never the
   screen's class, which moves with 2θ range), *refuted* meaning seen no more often than
-  chance (k ≤ n·p₀), and a refuted child sits below its parent **across corroboration
-  tiers**, being refuted, not outscored (1449). **Never refuted: a child seen more often
-  than its parent** (#1230: on dense patterns p₀ ≥ a truth's own seen fraction, and
-  density made the truth the child).
+  chance (k ≤ n·p₀, **p₀ the seen test's own windows**; the shift bound floors only the
+  power check p₀ⁿ < α, `p0_power`, #951/#1263), and a refuted child sits below its parent
+  **across corroboration tiers**, being refuted, not outscored (1449). **Never refuted: a
+  child seen more often than its parent** (#1230: density made the truth the child).
 - The known-cell scoreboard is *never wrong, and silent more often than right* —
   **never round it up**, and **keep the found-but-not-first bucket** (collapsing it
   into right-or-wrong is how the old board named nine datasets under a total of
