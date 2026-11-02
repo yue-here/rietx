@@ -281,14 +281,16 @@ def _reading_models(model, structure, instrument):
 
 def _twin(model, structure, instrument, window_area_tol):
     """``model`` compiled again at ``window_area_tol`` on its own grid: the
-    same channels, σ and moment frames, and its Le Bail intensities."""
-    from ..model.forward import compile_model
+    same channels, σ, moment frames and orbit split (WP-2052), and its Le Bail
+    intensities."""
+    from ..model.forward import compile_model, orbit_split_of
     from ..refine import _carry_lebail
 
     grid = PatternData(two_theta=model.tt.tolist(), intensity=model.y_obs.tolist(),
                        sigma=model.sigma.tolist())
     twin = compile_model(structure, instrument, grid, mode=model.mode,
-                         window_area_tol=window_area_tol)
+                         window_area_tol=window_area_tol,
+                         orbit_split=orbit_split_of(model))
     # the model's σ, which a measured background widened once already
     twin.sigma = model.sigma
     for cp, twin_cp in zip(model.phases, twin.phases, strict=True):
