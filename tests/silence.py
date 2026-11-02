@@ -530,6 +530,43 @@ def _reseed_silent() -> list:
                       rungs_tried=["warm", "warm_staged"]))
 
 
+def _unrecovered(status: str, *codes: str) -> list:
+    """``SEQUENTIAL_UNRECOVERED``'s builder on one synthetic entry kept after
+    every rung, ending ``status`` and carrying each of ``codes`` at the level
+    ``MODEL_FAR_FROM_DATA`` really has (``error``) or, for a ``code`` spelled
+    ``warning:CODE``, at warning."""
+    from rietx.schemas.common import Diagnostic
+    from rietx.schemas.results import Statistics
+    from rietx.schemas.sequential import SeriesEntry
+    from rietx.sequential import _unrecovered_diagnostics
+
+    rows = []
+    for code in codes:
+        level, _, name = code.rpartition(":")
+        rows.append(Diagnostic(level=level or "error", code=name, where=[],
+                               message=""))
+    entry = SeriesEntry(
+        index=3, label="p3", x=3.0, status=status, rung="warm",
+        rungs_tried=["warm", "warm_staged", "cold"], diagnostics=rows,
+        statistics=Statistics(rwp=0.97, rp=0.9, rexp=0.04, chi2=1.2, gof=24.0,
+                              n_points=100, n_free_parameters=5))
+    return _unrecovered_diagnostics(entry)
+
+
+def _unrecovered_fires() -> list:
+    """Kept after every rung: diverged, or converged under an error-level
+    code (WP-2003, C2 q5)."""
+    return (_unrecovered("diverged")
+            + _unrecovered("converged", "MODEL_FAR_FROM_DATA"))
+
+
+def _unrecovered_silent() -> list:
+    """Converged after the ladder with only warnings, and ``max_iter`` with
+    none: neither is a rejected fit."""
+    return (_unrecovered("converged", "warning:FLOOR_HIT")
+            + _unrecovered("max_iter"))
+
+
 def _short_series(*, cancel_after_first: bool) -> list:
     """Two cheap patterns of ``tests/test_sequential.py``'s ramp, the chain
     cancelled once the first pattern's fit ends where ``cancel_after_first``,
@@ -793,6 +830,8 @@ SILENCE: dict[str, Pair] = {
         _cancelled_fires, _cancelled_silent, "tests/test_sequential.py"),
     "SEQUENTIAL_RESEED": Pair(
         _reseed_fires, _reseed_silent, "tests/test_sequential.py"),
+    "SEQUENTIAL_UNRECOVERED": Pair(
+        _unrecovered_fires, _unrecovered_silent, "tests/test_sequential.py"),
     "SERIES_PATTERN_FAILED": Pair(
         _pattern_failed_fires, _pattern_failed_silent, "tests/test_series_error_policy.py"),
     "RESTRAINT_PAIRS_STALE": Pair(

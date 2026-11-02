@@ -38,6 +38,39 @@ from .results import (
 )
 
 
+def _rejected(fit) -> bool:
+    """Whether ``fit`` is a fit the chain reads no value from (WP-2003, C2 q5).
+
+    ``fit`` is anything with ``status`` and ``diagnostics``: a
+    :class:`~rietx.schemas.results.RefinementResult` while the ladder is asking
+    about its best attempt so far, a :class:`SeriesEntry` everywhere after,
+    whose diagnostics are the kept result's copied whole, so a series reloaded
+    from JSON derives the same answer as the run that wrote it.  ``True`` is
+    two facts, either of them: the solver ``"diverged"``, or a diagnostic
+    carries level ``"error"``.  The second is how the package already reads an
+    error-level code, "do not read the values, for any purpose"
+    (``docs/milestones/generality.md`` § Attention is a cost, clause 2;
+    :attr:`~rietx.schemas.results.RefinementResult.usable` is ``False``
+    there), and warm-starting a successor reads them: on the path guide's
+    jumped ramp (``examples/guides/path.py``) the 800 K pattern kept a
+    ``converged`` warm fit at Rwp 0.917 under ``MODEL_FAR_FROM_DATA`` once the
+    Rwp fence had gone (C1), and seeded the 900 K pattern into the same
+    collapse.
+    Ruled 2026-10-26: the ladder climbs past such an attempt, and one still
+    rejected after its last rung is quarantined, by this one test in both
+    places.
+
+    An expression over the level, never a list of codes, for ``usable``'s
+    reason: an error-level code written later counts the day it lands.  It is
+    not ``not usable``: ``"max_iter"`` is left out, since an attempt the
+    *plan's* own budget stopped can be the closing stage's last iterations at
+    a good answer (C2 question 3), and a first rung the WP-1127 bound cut short
+    escalates at its own site in ``SequentialRefinement._chain``.
+    """
+    return (fit.status == "diverged"
+            or any(d.level == "error" for d in fit.diagnostics))
+
+
 class SeriesEntry(Base):
     """One pattern's place in the series: what was fitted and how it went.
 
@@ -432,11 +465,11 @@ class SeriesFailure(Base):
     of :meth:`~rietx.refine.Refinement.fit` on **every** rung of the ladder
     (WP-1333: a rung that raises escalates, so a pattern a later rung rescued
     is an entry with ``rungs_raised`` instead), not a converged-but-bad result
-    (that is ``SeriesEntry.status == "diverged"``, a different thing: a
-    fit that ran to completion and landed somewhere the ladder
-    rejected).  This is the fit never finishing — ``LinAlgError: SVD did not
-    converge``, and anything else a solver can raise on a genuinely
-    near-singular Jacobian.
+    (that is an entry :func:`_rejected` holds for — diverged, or carrying
+    an ``error``-level code — a different thing: a fit that ran to
+    completion and landed somewhere the ladder rejected).  This is the fit
+    never finishing — ``LinAlgError: SVD did not converge``, and anything
+    else a solver can raise on a genuinely near-singular Jacobian.
 
     ``index``/``label`` place it in the series exactly as
     :class:`SeriesEntry` does; ``exception`` is ``repr(exc)`` (the type and
@@ -582,7 +615,8 @@ class MagneticTrajectory(Trajectory):
     #: the row has no esd to take the ratio against — the modulus was stated
     #: and held, or the pattern did not see the phase and WP-1301 held its
     #: structural paths for the stage, a closed-shutter frame being the plain
-    #: case — and where the fit ``"diverged"`` and was quarantined.  **Not**
+    #: case — and where the fit was quarantined (diverged, or carrying an
+    #: ``error``-level code: :func:`_rejected`, WP-2003 C2 q5).  **Not**
     #: where the kept fit's Rwp sat high over the chain's accepted median
     #: (:attr:`SeriesEntry.rwp_over_median`): that ratio is a record and not a
     #: verdict (WP-1469, WP-2003), and on the starved-chain ramp of
@@ -789,7 +823,7 @@ class SeriesResult(Base):
     #: :class:`SeriesStep`, largest :attr:`SeriesStep.size_esd` in magnitude
     #: first and the rows with no size last (WP-2003).  No threshold and no
     #: diagnostic: the help entry carries the reading.  A step into or out of
-    #: a quarantined (``"diverged"``) pattern is not a row, and neither is a
+    #: a quarantined pattern (:func:`_rejected`) is not a row, and neither is a
     #: relative path (:attr:`relative_paths`).
     #: Written by ``SequentialRefinement.fit`` on the reported chain and on
     #: :attr:`backward`; ``None`` in a document written before the field —
@@ -1032,7 +1066,7 @@ class SeriesResult(Base):
             traj.atom, traj.ion = row.atom, row.ion
             traj.x.append(xv)
             traj.value.append(float(row.magnitude))
-            measured = row.supported is not None and e.status != "diverged"
+            measured = row.supported is not None and not _rejected(e)
             traj.stderr.append(row.magnitude_esd
                                if measured and row.supported else None)
             traj.supported.append(bool(row.supported) and measured)
@@ -1127,8 +1161,9 @@ class SeriesResult(Base):
 
         **Movement** is a path's peak-to-peak spread over the series divided by
         the median of its esds, both over the points that are measurements: a
-        point with an esd, on a pattern that did not diverge (a quarantined fit,
-        ``SEQUENTIAL_UNRECOVERED``, is not a measurement).  Measured in its own
+        point with an esd, on a pattern the chain did not quarantine (a fit
+        that diverged or carries an ``error``-level code, ``_rejected``, named
+        by ``SEQUENTIAL_UNRECOVERED``, is not a measurement).  Measured in its own
         esd, a cell edge moving 0.002 Å on 1e-4 Å (20σ) ranks above a scale
         moving 2 % on an esd of 0.2 % (10σ), whatever their units.  A path
         ranks only if it moved at least ``min_sigma`` esds.
@@ -1176,7 +1211,7 @@ class SeriesResult(Base):
                                                  traj.positions, strict=True)
                       if s is not None and math.isfinite(s) and s > 0.0
                       and math.isfinite(v)
-                      and self.entries[i].status != "diverged"]
+                      and not _rejected(self.entries[i])]
             if not points:
                 continue
             curve = tuple(points)

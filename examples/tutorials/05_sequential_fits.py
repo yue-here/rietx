@@ -341,9 +341,10 @@ series_broken = rx.refine_sequential(
 series_broken
 
 # %% [markdown]
-# The 700 K row reads Rwp 0.97 against 0.04 for its neighbours, and no series diagnostic names it.
-# Its fit converged, and a series sets no Rwp threshold of its own, so it kept that fit and moved on.
-# The entry records how far the Rwp sits above the median of the patterns accepted before it ([Quarantine](https://rietx.org/docs/stable/reference/series.html#quarantine)).
+# The 700 K row reads Rwp 0.97 against 0.04 for its neighbours, and [`SEQUENTIAL_UNRECOVERED`](https://rietx.org/docs/stable/reference/diagnostics-series.html#sequential-unrecovered) names it.
+# Its fit converged, but every attempt the ladder made carries an error-level finding, which says not to read the values for any purpose.
+# So the pattern is [quarantined](https://rietx.org/docs/stable/reference/series.html#quarantine): it seeds no successor, and its Rwp stays out of the median.
+# The entry still records how far the Rwp sits above the median of the patterns accepted before it.
 
 # %%
 series_broken[4].rwp_over_median
@@ -367,9 +368,13 @@ series_broken.trajectory("phases.0.cell.a")
 # %% [markdown]
 # The other six points match the clean series to every printed digit.
 #
-# A fit that diverges on every attempt goes one step further.
-# [`SEQUENTIAL_UNRECOVERED`](https://rietx.org/docs/stable/reference/diagnostics-series.html#sequential-unrecovered) names it, and the pattern is [quarantined](https://rietx.org/docs/stable/reference/series.html#quarantine): it seeds no successor, and its Rwp stays out of the median that sets the fence.
-# The 700 K fit here converged, so it still seeded the 800 K fit.
+# The 800 K fit started from the 600 K answer, the last pattern the chain accepted, and `seeded_from` records it.
+
+# %%
+series_broken[5].seeded_from
+
+# %% [markdown]
+# A fit that diverges on every attempt is quarantined the same way.
 #
 # A hold or a tie belongs to one refinement, so a series declares it per pattern.
 # [Keep a parameter fixed or tied on every pattern](https://rietx.org/docs/stable/guides/series.html#keep-a-parameter-fixed-or-tied-on-every-pattern) shows how.

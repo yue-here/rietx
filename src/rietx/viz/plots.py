@@ -61,6 +61,7 @@ import numpy as np
 
 from .._about import DIST_NAME
 from ..schemas.results import RefinementResult
+from ..schemas.sequential import _rejected
 from .theme import PHASE_COLOURS
 
 #: One type size for the whole figure, in points, sized for the ~7.6 in wide
@@ -1517,7 +1518,9 @@ def plot_trajectory(series, paths, *, path: str | None = None,
     unstable = {d.where[0] for d in series.diagnostics
                 if d.code == "SEQUENTIAL_PATH_DEPENDENT" and d.where}
     reseeded = {e.label for e in series.entries if e.reseeded}
-    unrecovered = {e.label for e in series.entries if e.status == "diverged"}
+    # the quarantine's own test (WP-2003, C2 q5), so the cross marks exactly
+    # the points SEQUENTIAL_UNRECOVERED names
+    unrecovered = {e.label for e in series.entries if _rejected(e)}
 
     with _ground_context(plt, style):
         fig, axes = plt.subplots(len(paths), 1, figsize=(8, 2.4 * len(paths)),

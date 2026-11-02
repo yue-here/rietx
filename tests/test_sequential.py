@@ -25,10 +25,10 @@ import rietx as rx
 from rietx.model.forward import compile_model
 from rietx.optimize.cancel import CancelToken
 from rietx.params.vector import AffineTie, ParameterTable
-from rietx.schemas.common import Parameter
+from rietx.schemas.common import Diagnostic, Parameter
 from rietx.schemas.instrument import BackgroundChebyshev
 from rietx.schemas.results import RefinedParameter, Statistics
-from rietx.schemas.sequential import SeriesEntry, SeriesResult, SeriesStep
+from rietx.schemas.sequential import SeriesEntry, SeriesResult, SeriesStep, _rejected
 from rietx.schemas.structure import Atom
 from rietx.sequential import (
     FIRST_RUNG_FACTOR,
@@ -39,8 +39,10 @@ from rietx.sequential import (
     _entry_from_result,
     _labels_for,
     _path_dependence_diagnostics,
+    _reseed_diagnostics,
     _reseed_needed,
     _series_steps,
+    _unrecovered_diagnostics,
     _width_growth_diagnostics,
     refine_sequential,
 )
@@ -898,8 +900,10 @@ def _dictate(runner, script):
     """Force what each attempt *reports*, leaving the fits themselves real.
 
     ``script`` maps a pattern label to the ``(status, rwp)`` its successive
-    rungs will come back with; the last pair repeats if the ladder climbs
-    further.  Every model, tree and node in the series is still the real one —
+    rungs will come back with, or ``(status, rwp, code)`` to have the rung
+    also carry ``code`` at level ``error``; the last entry repeats if the
+    ladder climbs further.  A dictated rung's own error-level diagnostics are
+    dropped: since WP-2003 C2 q5 they are part of the verdict too.  Every model, tree and node in the series is still the real one —
     what is stubbed is the verdict the chain reasons about, which is the only
     way to make "which rung ran" a deterministic assertion: with real Rwps two
     patterns of the same material differ by Poisson noise, so whether the fence
@@ -915,7 +919,13 @@ def _dictate(runner, script):
             attempts = script[label]
             k = min(seen.get(label, 0), len(attempts) - 1)
             seen[label] = seen.get(label, 0) + 1
-            result.status, result.statistics.rwp = attempts[k]
+            status, rwp, *code = attempts[k]
+            result.status, result.statistics.rwp = status, rwp
+            result.diagnostics = [d for d in result.diagnostics
+                                  if d.level != "error"]
+            result.diagnostics += [Diagnostic(
+                level="error", code=c, where=[], message=f"dictated {c}")
+                for c in code]
         return ref, result
 
     runner._fit_one = dictated
@@ -1277,6 +1287,102 @@ def test_an_unrecovered_pattern_seeds_nothing_and_joins_no_median(
     # the failure is still reported in full — it was measured, and dropping it
     # would make the trajectory look like a shorter series
     assert len(series) == 3 and failed.statistics is not None
+
+
+# -- an error-level code rejects a fit like a divergence (WP-2003, C2 q5) ---
+
+def test_an_error_level_kept_attempt_climbs_and_is_quarantined(
+        thermal_patterns, tmp_path):
+    """Pattern 1 converges on every rung, at an Rwp *below* the series, under
+    an error-level ``MODEL_FAR_FROM_DATA``: the path guide's 800 K warm fit
+    once C1 removed the Rwp fence.  The code says not to read the values for
+    any purpose, and a warm start reads them, so the ladder climbs at the
+    default (no ``reseed_factor``) and the kept attempt is quarantined exactly
+    as a diverged one: it seeds no successor, joins no median and no step
+    starts or ends on it, and ``SEQUENTIAL_UNRECOVERED`` says it converged
+    and names the code.  The low Rwp makes the median half testable, as in
+    the divergence case above: joined, the median would fall to 0.075."""
+    structure, ins = _start_models()
+    runner = _dictate(
+        SequentialRefinement(structure, ins, history=tmp_path / "h"),
+        {"p000": [("converged", 0.10)],
+         "p001": [("converged", 0.05, "MODEL_FAR_FROM_DATA")],
+         "p002": [("converged", 0.10)],
+         "p003": [("converged", 0.10)]})
+    series = runner.fit(thermal_patterns[:4], plan=_CHEAP)
+
+    rejected = series[1]
+    assert rejected.status == "converged"
+    assert rejected.rungs_tried == ["warm", "warm_staged", "cold"]
+    assert _rejected(rejected) and not _rejected(series[0])
+    unrecovered = [d for d in series.diagnostics
+                   if d.code == "SEQUENTIAL_UNRECOVERED"]
+    assert [d.where for d in unrecovered] == [["p001"]]
+    message = unrecovered[0].message
+    assert "after every rung of the ladder (warm, warm_staged, cold)" in message
+    assert "converged but carries MODEL_FAR_FROM_DATA at level error" in message
+    assert "Pattern 2 (p002) warm-started from pattern 0 (p000) instead." in message
+
+    # seeds no successor ...
+    assert [e.seeded_from for e in series] == [None, 0, 0, 2]
+    roots = [t.root for t in runner.trees_]
+    assert roots[2].notes["series_warm_start_node"] == series[0].node_id
+    # ... joins no median ...
+    assert series[2].rwp_over_median == pytest.approx(1.0)
+    assert series[2].rungs_tried == ["warm"]
+    # ... and no step starts or ends on it: p002 → p003 is the only pair left
+    assert series.steps
+    assert {tuple(s.labels) for s in series.steps} == {("p002", "p003")}
+
+    # derived from the entry, so a series read back reports the same
+    back = SeriesResult.model_validate_json(series.model_dump_json())
+    assert _rejected(back[1])
+    walk = sorted(back.entries, key=lambda e: e.index)
+    assert [d.message for d in _unrecovered_diagnostics(back[1], walk)] == [message]
+    assert _series_steps(back, frozenset(back.relative_paths),
+                         frozenset(back.angle_paths)) == series.steps
+
+
+def test_a_rung_that_clears_the_error_is_kept_and_seeds(thermal_patterns):
+    """The ladder stops at the first rung with no error-level code, and that
+    rung is an ordinary accepted pattern.  ``max_iter`` is not a rejection
+    (C2 question 3): a plan's own budget can stop a closing stage at a good
+    answer, so pattern 2 keeps its warm rung."""
+    structure, ins = _start_models()
+    runner = _dictate(
+        SequentialRefinement(structure, ins),
+        {"p000": [("converged", 0.10)],
+         "p001": [("converged", 0.95, "MODEL_FAR_FROM_DATA"), ("converged", 0.10)],
+         "p002": [("max_iter", 0.10)]})
+    series = runner.fit(thermal_patterns[:3], plan=_CHEAP)
+
+    assert series[1].rungs_tried == ["warm", "warm_staged"]
+    assert series[1].rung == "warm_staged" and not series[1].reseeded
+    assert not any(d.level == "error" for d in series[1].diagnostics)
+    assert series[2].seeded_from == 1
+    assert series[2].rungs_tried == ["warm"] and series[2].status == "max_iter"
+    assert "SEQUENTIAL_UNRECOVERED" not in [d.code for d in series.diagnostics]
+
+
+def test_both_series_codes_say_why_a_kept_cold_rung_was_rejected():
+    """A cold rung kept as the least bad of three rejected attempts is called
+    a failed fit, and each code's clause names the error code it carries."""
+    entry = SeriesEntry(index=3, label="p3", status="converged", reseeded=True,
+                        rung="cold", rungs_tried=["warm", "warm_staged", "cold"],
+                        rwp_warm=0.97,
+                        statistics=Statistics(rwp=0.96, rp=0.96, rexp=0.04, chi2=1.0,
+                                              gof=24.0, n_points=100,
+                                              n_free_parameters=3),
+                        diagnostics=[Diagnostic(level="error",
+                                                code="MODEL_FAR_FROM_DATA",
+                                                where=[], message="")])
+    (reseed,) = _reseed_diagnostics(entry)
+    assert ("rejected too (converged but carries MODEL_FAR_FROM_DATA"
+            in reseed.message)
+    assert "SEQUENTIAL_UNRECOVERED" in reseed.suggestion
+    (unrecovered,) = _unrecovered_diagnostics(entry)
+    assert ("the attempt kept, the cold rung, converged but carries "
+            "MODEL_FAR_FROM_DATA" in unrecovered.message)
 
 
 # -- a high Rwp is a recorded ratio, never a trigger (WP-2003, C1) ----------
@@ -2426,11 +2532,15 @@ def test_series_entry_lookup_helpers():
 # ----------------------------------------------------------------------
 # telemetry and cancellation (WP-1016)
 # ----------------------------------------------------------------------
-#: A one-stage plan freeing the one parameter these tests care about.  The
+#: A one-stage plan freeing the parameters these tests care about.  The
 #: chain's *answers* are the tests above; what is under test here is the stream
-#: and the token, so the fits are as cheap as they can be.
+#: and the token, so the fits are as cheap as they can be — but no cheaper
+#: than reaching the data: a scale alone came back at Rwp 0.85-0.99 under an
+#: error-level ``MODEL_FAR_FROM_DATA``, which the chain quarantines (WP-2003,
+#: C2 q5), so every pattern started cold.  The cell with it lands near 0.54
+#: in the same evaluations, the forward-pass suite's choice.
 _CHEAP = staged.RefinementPlan(stages=[
-    staged.Stage("quick", ["phases.*.scale"], max_iter=5)])
+    staged.Stage("quick", ["phases.*.scale", "phases.*.cell.*"], max_iter=5)])
 
 
 def test_unique_labels_disambiguates_by_position():

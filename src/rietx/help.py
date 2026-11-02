@@ -4052,11 +4052,12 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
     "SEQUENTIAL_UNRECOVERED": HelpEntry(
         title="A pattern failed every restart",
         description=(
-            "The fit diverged on this pattern and stayed diverged after every restart "
-            "the chain tried. Its values are not a measurement, so do not interpolate "
-            "across it. It seeded no later pattern and was left out of the series "
-            "median, so its neighbours are unaffected. Fit the pattern on its own to "
-            "find out why."
+            "The fit on this pattern was still rejected after every restart the chain "
+            "tried: it diverged, or it carries an error-level finding such as "
+            "`MODEL_FAR_FROM_DATA`, and the message names which. Its values are not a "
+            "measurement, so do not interpolate across it. It seeded no later pattern "
+            "and was left out of the series median, so its neighbours are unaffected. "
+            "Fit the pattern on its own to find out why."
         ),
     ),
     "SEQUENTIAL_WIDTH_GROWTH": HelpEntry(
@@ -5685,7 +5686,9 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
         description=(
             "The solver's exit for the attempt kept on this pattern. `diverged` after "
             "the last rung of the ladder means the pattern is quarantined: it seeds no "
-            "successor and joins no median, and `SEQUENTIAL_UNRECOVERED` says so."
+            "successor and joins no median, and `SEQUENTIAL_UNRECOVERED` says so. A "
+            "`converged` or `max_iter` attempt carrying an error-level finding is "
+            "quarantined the same way."
         ),
     ),
     "SeriesEntry.statistics": HelpEntry(

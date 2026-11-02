@@ -1060,7 +1060,8 @@ ROWS: tuple[Row, ...] = (
     Row("SEQUENTIAL_RESEED", "code", tier=3, ambiguity=1,
         evidence=("warning at its one site (sequential.py _reseed_diagnostics, where = the "
                   "label); fires when the kept rung is cold on a warm-startable pattern, its "
-                  "trigger _reseed_needed (a diverged best attempt, or the caller's own "
+                  "trigger _reseed_needed (a rejected best attempt: diverged, or an "
+                  "error-level diagnostic since C2 q5, ruled 2026-10-26; or the caller's own "
                   "reseed_factor) or a raised warm rung; on main under the removed 1.25 fence "
                   "it fired on planted 35 and tut05-broken 1, none on the other six families "
                   "(2003-batch/batch.md, C1)"),
@@ -1070,7 +1071,22 @@ ROWS: tuple[Row, ...] = (
         approved="2026-10-26", response="warning",
         responds=("read the named pattern's step from its neighbour as a cold fit's, not the "
                   "chain's, before quoting a trajectory's cell or fraction across it")),
-    Row("SEQUENTIAL_UNRECOVERED", "code"),
+    Row("SEQUENTIAL_UNRECOVERED", "code", tier=3, ambiguity=1,
+        evidence=("warning at one site (sequential.py _unrecovered_diagnostics, where = the "
+                  "label); fires when the kept attempt is still rejected after the rungs the "
+                  "chain tried (schemas/sequential.py _rejected: diverged, or an error-level "
+                  "diagnostic, since C2 q5, ruled 2026-10-26), so it reports the quarantine, "
+                  "names the error codes and the successor's start (seeded_from). Before q5 it "
+                  "never fired on the eight measured families; under it, on the status arm, "
+                  "tut05-broken scan12 (MODEL_FAR_FROM_DATA, Rwp 0.969 on every rung) and "
+                  "none of CPD, CPD closing off or planted (2003-batch/batch.md, C2)"),
+        grounds=("Says out loud the quarantine, the package's own protective act (as "
+                 "CELL_RUNAWAY, B8); ruled 2026-10-26, the batch's pick approved "
+                 "(2003-batch/batch.md, C2)."),
+        approved="2026-10-26", response="warning",
+        responds=("quote no cell, fraction or width from the named pattern: its kept fit "
+                  "diverged or carries an error-level code after every rung, seeded no "
+                  "successor and joins no median")),
     Row("SEQUENTIAL_WIDTH_GROWTH", "code"),
     Row("SERIES_PATTERN_FAILED", "code", tier=1, ambiguity=1,
         response="warning",
@@ -1412,7 +1428,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.sequential.SeriesEntry.reseeded", "action", tier=3, ambiguity=1,
         evidence=("records that the kept attempt is the cold rung on a warm-startable pattern "
                   "(sequential.py _chain); since WP-2003 the escalation it records fires on a "
-                  "diverged or raised warm rung, and on Rwp only under the caller's "
+                  "rejected (diverged, or an error-level code: C2 q5, ruled 2026-10-26) or "
+                  "raised warm rung, and on Rwp only under the caller's "
                   "reseed_factor; on "
                   "main under the removed 1.25 fence planted 35 and tut05-broken 1, none under "
                   "the status-only trigger, CPD 0 (2003-batch/batch.md, C1)"),
@@ -1431,10 +1448,12 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_raised", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.seeded_from", "action", tier=3, ambiguity=1,
-        evidence=("WP-1051's quarantine (sequential.py _chain): a diverged kept attempt seeds no "
+        evidence=("WP-1051's quarantine (sequential.py _chain): a rejected kept attempt "
+                  "(diverged, or an error-level code since C2 q5, ruled 2026-10-26) seeds no "
                   "successor, joins no median and supplies no first-rung sample, so the next "
-                  "pattern warm-starts from the last accepted one; fires in no measured "
-                  "family (WP-2003 2003-batch/reseed.md), shown on the injected divergence "
+                  "pattern warm-starts from the last accepted one; on the measured families "
+                  "it fires once, tut05-broken scan12 under q5, so scan13 starts from scan11 "
+                  "(WP-2003 2003-batch/reseed.md), and on the injected divergence "
                   "(tests/test_sequential.py). Practice: EasyDiffraction moves the start values "
                   "only on a successful fit; GSAS-II and MAUD end the chain (docs/practice.md). "
                   "This field records where each warm start came from (WP-2003 task 3)"),
@@ -4222,7 +4241,8 @@ ROWS: tuple[Row, ...] = (
     Row("rietx.sequential.SequentialRefinement.fit:reseed", "default", tier=3, ambiguity=1,
         value=True,
         evidence=("switches on the ladder's escalation, which since WP-2003 fires on a "
-                  "diverged or raised warm rung and on the caller's reseed_factor only; under "
+                  "rejected (diverged, or an error-level code: C2 q5, ruled 2026-10-26) or "
+                  "raised warm rung and on the caller's reseed_factor only; under "
                   "False each pattern keeps its first rung except where WP-1127's budget "
                   "truncated it (forced, sequential.py _chain); on main with the status-only "
                   "trigger planted escalates once, T087, forced by the first-rung bound, 3 165 "
@@ -4552,10 +4572,13 @@ ROWS: tuple[Row, ...] = (
     Row("SEQUENTIAL_PERSISTENT_FINDING.suggestion", "suggestion", value=1),
     Row("SEQUENTIAL_RESEED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: points at the code that already says why "
-                  "(SEQUENTIAL_UNRECOVERED on a diverged cold fit) or at a specimen or model "
+                  "(SEQUENTIAL_UNRECOVERED on a rejected cold fit) or at a specimen or model "
                   "change at that pattern (sequential.py _reseed_diagnostics); "
                   "ruled 2026-10-26, the batch's pick approved (2003-batch/batch.md, C1)")),
-    Row("SEQUENTIAL_UNRECOVERED.suggestion", "suggestion", value=1),
+    Row("SEQUENTIAL_UNRECOVERED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: names the one step that separates the pattern from its chain, "
+                  "fitting it alone (sequential.py _unrecovered_diagnostics); ruled "
+                  "2026-10-26, the batch's pick approved (2003-batch/batch.md, C2)")),
     Row("SEQUENTIAL_WIDTH_GROWTH.suggestion", "suggestion", value=1),
     Row("SERIES_PATTERN_FAILED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
         evidence=("arithmetic: names the one step that reads the exception, the pattern fitted "
@@ -4989,8 +5012,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "SEQUENTIAL_PATH_DEPENDENT.suggestion",
     "SEQUENTIAL_PERSISTENT_FINDING",
     "SEQUENTIAL_PERSISTENT_FINDING.suggestion",
-    "SEQUENTIAL_UNRECOVERED",
-    "SEQUENTIAL_UNRECOVERED.suggestion",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SEQUENTIAL_WIDTH_GROWTH.suggestion",
     "SITE_SNAPPED_TO_SPECIAL_POSITION",
@@ -5709,7 +5730,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "SEQUENTIAL_PATH_CHECK_INCOMPLETE",
     "SEQUENTIAL_PATH_DEPENDENT",
     "SEQUENTIAL_PERSISTENT_FINDING",
-    "SEQUENTIAL_UNRECOVERED",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",
     "SOLVE_B_TIED_PER_PARENT_SITE",

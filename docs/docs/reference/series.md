@@ -105,7 +105,7 @@ The temperature also appears in its `label`, since the scans of a reel are other
 | `refit` | `"single"` | `"single"` collapses the plan into one stage for a warm-started pattern; `"stages"` walks it again |
 | `two_theta_limits` | `None` | one fit range, applied to every pattern |
 | `direction` | `"forward"` | `"forward"`, `"backward"` or `"both"` ([Forward and backward chains](#forward-and-backward-chains)) |
-| `reseed`, `reseed_factor` | `True`, `None` | whether a diverged or raised warm start climbs the ladder, and your own Rwp fence as a multiple of the accepted median, none by default ([Restart ladder](#restart-ladder)) |
+| `reseed`, `reseed_factor` | `True`, `None` | whether a rejected or raised warm start climbs the ladder, and your own Rwp fence as a multiple of the accepted median, none by default ([Restart ladder](#restart-ladder)) |
 | `first_rung_factor` | 3.0 | how much the first attempt may spend, as a multiple of the dearest first attempt this chain has converged; `None` removes the bound |
 | `verify_steps` | 0 | how many of the largest steps to re-measure, each by refitting its two patterns cold and independently ([Steps between patterns](#steps-between-patterns)) |
 | `prepare` | `None` | `(index, data, structure, instrument) -> None`, called on the warmed models before each pattern's fit |
@@ -322,7 +322,7 @@ The list goes straight to `SeriesResult.plot`:
 result.plot(result.moved_paths(), path="moved.png")
 ```
 
-The spread is taken over measured points: a point with an esd, on a pattern that did not diverge.
+The spread is taken over measured points: a point with an esd, on a pattern that was not [quarantined](#quarantine).
 Three kinds of path are never ranked.
 A path with no esd, which includes every agreement index, has no scale to rank on.
 A path whose value is a step from where each fit began, a coordinate degree of freedom or a rigid body's rotation, gives way to the coordinate rows it drives.
@@ -372,7 +372,7 @@ It returns a `MagneticTrajectory`, which is a `Trajectory` with more columns, so
 | `MagneticTrajectory.stderr` | its esd, `None` on every unsupported point |
 | `MagneticTrajectory.supported` | per point, whether \|m\| cleared three of its own esds |
 | `MagneticTrajectory.held` | the complement of `supported` |
-| `MagneticTrajectory.measured` | per point, whether the pattern gave a verdict at all; `False` where the modulus has no esd (it was stated and held, or the pattern could not see the phase) or the fit diverged |
+| `MagneticTrajectory.measured` | per point, whether the pattern gave a verdict at all; `False` where the modulus has no esd (it was stated and held, or the pattern could not see the phase) or the pattern was [quarantined](#quarantine) |
 | `MagneticTrajectory.status` | that pattern's fit status, because `supported` is a ratio against a covariance |
 | `MagneticTrajectory.labels`, `MagneticTrajectory.positions` | the pattern label at each point, and its index in the series |
 | `MagneticTrajectory.atom`, `MagneticTrajectory.ion` | the site and its form-factor key |
@@ -452,7 +452,7 @@ These diagnostics fence that, and none of them alters a fitted value.
 | Code | Says |
 |---|---|
 | `SEQUENTIAL_RESEED` | the warm start was rejected and the pattern was refitted cold |
-| `SEQUENTIAL_UNRECOVERED` | the pattern diverged on every attempt; it seeded no successor and joined no median |
+| `SEQUENTIAL_UNRECOVERED` | the pattern's fit was rejected on every attempt; it seeded no successor and joined no median |
 | `SEQUENTIAL_PATH_DEPENDENT` | under `direction="both"`, forward and backward disagree by more than their esds allow |
 | `SEQUENTIAL_PATH_CHECK_INCOMPLETE` | under `direction="both"`, the comparison did not run, or ran on fewer patterns or paths than the series has |
 | `SEQUENTIAL_WIDTH_GROWTH` | a phase width reached 3× the first value the series measured above three esds, by more than three combined esds, while GoF reached 2× its own at the same pattern; a width that grows at a flat GoF is real broadening and fires nothing |
@@ -519,7 +519,8 @@ Each attempt runs only when the trigger still fires on the best attempt so far, 
 The middle attempt matters most.
 Throwing a warm start away roughly triples the work, and before the middle attempt existed that work went on a start not shown to be the problem.
 
-What triggers the ladder is a warm attempt that diverged or raised.
+What triggers the ladder is a warm attempt that raised or was rejected: it diverged, or carries an `error` diagnostic such as `MODEL_FAR_FROM_DATA`.
+A `max_iter` attempt is not rejected.
 Each trigger is a property of this pattern's own fit, readable the moment it finishes, and something a different start could plausibly fix.
 An Rwp comparison is not a default trigger.
 `reseed_factor` sets one if you want it: a warm attempt above that multiple of the median Rwp of the accepted patterns climbs the ladder.
@@ -551,11 +552,12 @@ Your own `prepare` and `constrain` are never guarded: a raise there ends the ser
 
 ### Quarantine
 
-A fit still `"diverged"` after the last attempt is quarantined, and [`SEQUENTIAL_UNRECOVERED`](diagnostics-series.md#sequential_unrecovered) names it.
+A fit still rejected after the last attempt is quarantined, and [`SEQUENTIAL_UNRECOVERED`](diagnostics-series.md#sequential_unrecovered) names it and its `error` code.
+On the path guide's jumped ramp, an 800 K warm fit at Rwp 0.917 under `MODEL_FAR_FROM_DATA` had collapsed the 900 K fit too.
 Its successor warm-starts from the last accepted pattern, and the accepted median never sees the failure.
 Otherwise one failure would seed its neighbour with a bad start and drag the median that `rwp_over_median` and your `reseed_factor` read.
 
-A pattern that converged at a high Rwp is not quarantined, and nothing calls it an outlier.
+A pattern that converged at a high Rwp with no `error` code is not quarantined, and nothing calls it an outlier.
 `SeriesEntry.rwp_over_median` records how far its Rwp sits above the median of the patterns accepted before it, and it seeds its successor and joins the median like any accepted pattern.
 Rwp cannot say why it rose.
 Near a converged fit Rwp is GoF times R<sub>exp</sub>, and three measured causes divide between the two factors:
