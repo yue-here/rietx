@@ -123,7 +123,7 @@ python3 .claude/hooks/wp_claim.py status
 
 ## Handover log
 
-- **2026-11-02** — closed (PR PRNUM). PR #1318 merged on 2026-11-02 as `472c302e0`. From a
+- **2026-11-02** — closed (PR #1336). PR #1318 merged on 2026-11-02 as `472c302e0`. From a
   WP's own tree, `/wp-start`'s claim check now lists a contributor's open PR on that WP. Every
   task was already ticked, and this entry closes the file without re-measuring anything.
   *Done*: Status ✅, the Priority line and the empty `### Inherited` section deleted, the
