@@ -110,7 +110,7 @@ def notebook_rows(ref: str, books: tuple[Notebook, ...]) -> str:
         stem = nb.name.removesuffix(".ipynb")
         rows.append(
             f'<li><span class="nb-title">{_html.escape(nb.title)}</span><span class="nb-links">'
-            f'<a href="{ABOUT.DOCS_URL}/using/tutorials/{stem}.html">Read</a>'
+            f'<a href="{ABOUT.DOCS_URL}/docs/stable/start/tutorials/{stem}.html">Read</a>'
             f'<a href="{LITE}{nb.name}">JupyterLite</a>'
             f'<a href="{COLAB}{repo}/blob/{ref}/{nb.path}">Colab</a>'
             f'<a href="notebooks/{nb.name}" download>Download</a></span></li>')
