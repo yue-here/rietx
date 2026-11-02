@@ -1119,6 +1119,13 @@ Their numbers are as reported and were not re-measured here.
 
 ### Inherited
 
+- **2026-11-01, from [1999](1999-a-held-cells-ties-leave-the-answer-with-it.md): a held
+  coefficient's target rows leave `parameters`.** A result now lists only the rows the fit
+  could move (`ParameterTable.moving_paths`). When the support hold takes `vars.b_0`, the
+  `hist.h.phases.1.cell.*` rows it drives are absent, so their `RefinedParameter.equations`
+  is no longer readable there. `PARAMETRIC_TARGET_UNSEEN` and `result.parametric` still name
+  both. `test_a_joint_fit_holds_a_coefficient_whose_phase_no_pattern_sees` was re-pinned to
+  that.
 - **2026-10-23, from [1341](1341-a-joint-fit-has-no-report.md) (closed): joint-report items now go
   to [2028](2028-a-joint-fits-guards-see-every-histogram.md).** The four joint items and the
   three `PARAMETRIC_*` rendering notes this WP sent 1341 on 2026-10-14 are 2028's Context items

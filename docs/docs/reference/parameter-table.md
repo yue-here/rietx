@@ -382,8 +382,10 @@ Setting a value also clears the fitted curve and its statistics, which described
 ## Refined rows
 
 A result carries its own view of the table.
-`RefinementResult.parameters` is a list of `RefinedParameter`, and a row appears if its parameter varied or was tied.
+`RefinementResult.parameters` is a list of `RefinedParameter`, and a row appears if the fit could move its parameter.
+That is a parameter that varied, or one tied to a parameter that varied.
 A fixed parameter is absent rather than present with `vary=False`.
+So is a parameter tied only to fixed ones: a cubic `b` leaves with a fixed `a`, and a coordinate leaves while no stage frees its site's DOFs.
 `RefinementResult.parameter` returns the row for one path.
 
 | Field | Holds |
