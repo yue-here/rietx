@@ -1461,8 +1461,8 @@ class SplitLocalisation(Base):
     unsplit_point_share: float
     elsewhere_share: float | None = None
     elsewhere_point_share: float
-    #: the lower fit's ticks with no higher-fit reflection within two local
-    #: widths (superstructure reflections): counted, never windowed
+    #: the lower fit's ticks in range with no higher-fit reflection within two
+    #: local widths (superstructure reflections): counted, never windowed
     n_unmatched: int = 0
     families: list[SplitFamily] = Field(default_factory=list)
 

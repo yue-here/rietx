@@ -219,8 +219,10 @@ def split_localisation(higher: RefinementResult, lower: RefinementResult, *,
     A ``lower`` tick farther than two local widths from every ``higher``
     one has no parent here (a superstructure reflection) and is counted in
     ``n_unmatched``, not windowed.  A family straddling an end of the range
-    is reported whichever side its parent falls: its split is read off every
-    child, and its window is clipped to the data.
+    is reported whichever side its parent falls.  Its split is read off every
+    child, and its window is anchored on the children inside the range (on
+    the parent when none is), so it always covers data; a padded window may
+    still reach past the range, and ``n_points`` counts only channels in it.
 
     Each family's window runs from its lowest assigned tick to its highest,
     widened by ``half_width`` degrees each side, or, by default, by the full
@@ -266,13 +268,16 @@ def split_localisation(higher: RefinementResult, lower: RefinementResult, *,
     fallback = float(np.nanmedian(widths)) if np.isfinite(widths).any() else 0.0
     widths = np.where(np.isfinite(widths), widths, fallback)
 
+    def in_data(x: float) -> bool:
+        return bool(tt[0] <= x <= tt[-1])
+
     assigned: dict[int, list[float]] = {}
     n_unmatched = 0
     for c, line in zip(child_tt, child_line):
         # every child is assigned, in range or not, because a split is a fact
         # about the two models: a family straddling an end of the range keeps
-        # both its children, and its window is clipped to the data below
-        in_range = bool(tt[0] <= c <= tt[-1])
+        # both its children; only an in-range one anchors its window
+        in_range = in_data(c)
         # one emission line against the same line: a Kα2 child belongs to a
         # Kα2 parent, never to the Kα1 tick 0.1° away
         same = np.flatnonzero(g_line == line)
@@ -290,15 +295,19 @@ def split_localisation(higher: RefinementResult, lower: RefinementResult, *,
     families = []
     for j in np.argsort(g_tt, kind="stable"):
         kids = sorted(assigned.get(int(j), []))
+        seen = [k for k in kids if in_data(k)]
         # a parent just past an end of the range still owns its in-range
         # children; skipping it counted them nowhere (#904's review)
-        if not inside[j] and not any(tt[0] <= k <= tt[-1] for k in kids):
+        if not inside[j] and not seen:
             continue
         spread = (kids[-1] - kids[0]) if kids else 0.0
         splits = spread > SPLIT_TOLERANCE_DEG
         pad = widths[j] if half_width is None else float(half_width)
-        lo = (kids[0] if kids else g_tt[j]) - pad
-        hi = (kids[-1] if kids else g_tt[j]) + pad
+        # anchored on what the data can show: the in-range children, else the
+        # parent, so no family is windowed wholly past the range
+        anchors = seen or [float(g_tt[j])]
+        lo = anchors[0] - pad
+        hi = anchors[-1] + pad
         w = (tt >= lo) & (tt <= hi)
         (split_mask if splits else unsplit_mask)[w] = True
         d = float(step[w].sum())
