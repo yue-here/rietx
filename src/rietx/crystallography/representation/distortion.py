@@ -17,10 +17,13 @@ decomposes a given child into amplitudes A_τ per (k, irrep, direction).
                                                                       -> ModeDecomposition
     displacive_statement(parent, child, transform, *, seed=DISTORTION_SEED,
                          reference="average", tolerance=1.5)        -> DisplaciveStatement
+    displacive_statement(parent, candidate=DistortionCandidate, *, seed=DISTORTION_SEED)
+                                                                      -> DisplaciveStatement
     parent_site_ties(site_map, *, phase_index=0)                     -> tuple of Biso ties
 
 ``displacive_statement`` is WP-1419 chunk 3 (2026-10-21): the child as its
-parent plus absolute, refinable mode amplitudes (``Phase.distortion_modes``).
+parent plus absolute, refinable mode amplitudes (``Phase.distortion_modes``),
+from a stated child or from a ``distortion_candidates`` entry.
 
 ``parent`` and ``child`` are :class:`~rietx.schemas.structure.Phase` objects.
 ``transform`` is (P, p) with r_parent = P·r_child + p: the columns of P are the
@@ -1184,8 +1187,48 @@ def _generic_seed(n: int) -> list[np.ndarray]:
     return out
 
 
-def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_SEED,
-                         reference: str = "average",
+def _from_candidate(parent, candidate, reference: str):
+    """A ``DistortionCandidate``'s child, (P, p), basis and driving component, checked.
+
+    Read by duck type (``.child``, ``.transform``, ``.basis``, ``.driving``,
+    ``.refusal``, ``.candidate``), so this module imports nothing from
+    ``magnetic/`` (#418's layering).  A candidate the probe refused has no
+    child, and one whose isotropy group failed verification is not a child of
+    its direction; both are refused, naming why.  The basis is the
+    candidate's own, built in the ``"average"`` reference, and it must have
+    been built from this parent.
+    """
+    name = getattr(candidate, "label", repr(candidate))
+    refusal = getattr(candidate, "refusal", None)
+    if refusal is not None:
+        raise ValueError(f"candidate {name} has no child to state: {refusal.message}")
+    inner = getattr(candidate, "candidate", None)
+    if inner is not None and getattr(inner, "verified", None) is False:
+        raise ValueError(
+            f"candidate {name} failed verification ({inner.verification_reason}): its "
+            "isotropy group is not the stabiliser of its direction, so its child is not "
+            "this candidate's to state")
+    if reference != "average":
+        raise ValueError(
+            f"a candidate's basis is built in the 'average' reference, not {reference!r}; "
+            "pass its child and transform instead to state it in another")
+    big, small = _transform(candidate.transform)
+    ref = _reference(parent, big, small)
+    basis = candidate.basis
+    if (len(ref.site) != len(basis.parent_atoms)
+            or not np.array_equal(ref.site, basis.parent_atoms)
+            or tuple(ref.species) != tuple(basis.species)
+            or not np.array_equal(ref.child_frac, basis.positions)):
+        raise ValueError(
+            f"candidate {name}'s basis was not built from this parent ({parent.name!r}): "
+            "its atoms are not this parent's images in the child cell")
+    driving = candidate.driving
+    index = next(i for i, c in enumerate(basis.components) if c is driving)
+    return candidate.child, (big, small), basis, ref, index
+
+
+def displacive_statement(parent, child=None, transform=None, *, candidate=None,
+                         seed: float = DISTORTION_SEED, reference: str = "average",
                          tolerance: float = 1.5) -> DisplaciveStatement:
     """State ``child`` as ``parent`` plus refinable mode amplitudes (WP-1419).
 
@@ -1226,6 +1269,16 @@ def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_S
     re-seeded.  ``seed=0`` states the child at the parent unseeded, which a fit
     then refuses to free (``ParameterTable``).
 
+    **From a candidate** (``candidate=``, a
+    :func:`~rietx.crystallography.magnetic.isotropy.distortion_candidates`
+    entry, read by duck type in place of ``child, transform``): the
+    candidate's child, (P, p) and mode basis are used as they come, the
+    driving irrep's modes come first, and the seed lies in the driving irrep
+    alone, whose isotropy group is the child's by definition, so the
+    secondary modes start at zero and move once it has.  A candidate the probe
+    refused, or one whose isotropy group failed verification, is refused with
+    its reason.
+
     A mixed-occupancy parent site is refused (two parent atoms on one site,
     ``_reference``), as are atoms that do not pair one to one
     (``CHILD_ATOMS_UNPAIRED``).  The cell is the child's own, under its own
@@ -1234,14 +1287,24 @@ def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_S
     from ...schemas.common import Parameter
     from ...schemas.structure import DistortionMode, DistortionModes
 
-    basis, ref = _distortion_basis(parent, child, transform, reference)
+    if candidate is not None:
+        if child is not None or transform is not None:
+            raise ValueError("displacive_statement(): pass child and transform, or "
+                             "candidate=, not both")
+        child, _, basis, ref, driving = _from_candidate(parent, candidate, reference)
+    elif child is None or transform is None:
+        raise ValueError("displacive_statement() needs child and transform, or candidate=")
+    else:
+        basis, ref = _distortion_basis(parent, child, transform, reference)
+        driving = None
     big, small = basis.transform
     labels = [a.label for a in parent.atoms]
     whiten = _whitener(basis)
 
-    # the modes, per parent orbit, primary irreps first
+    # the modes, per parent orbit: a candidate's driving irrep first, then the
+    # primary irreps
     order = sorted(range(len(basis.components)),
-                   key=lambda i: basis.components[i].primary is not True)
+                   key=lambda i: (i != driving, basis.components[i].primary is not True))
     actions = _parent_actions(parent, ref, big, small)
     modes: list[tuple[IrrepModes, int, str, bool, np.ndarray]] = []
     for i in order:
@@ -1286,22 +1349,26 @@ def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_S
                         "an operation of the child's group; the phase's operator list and "
                         "the mode field's stabiliser differ, which is a bug")
 
-    # the seed
+    # the seed: every non-identity mode jointly, or a candidate's driving irrep
     broken = [i for i, (*_, inv_, _v) in enumerate(modes) if not inv_]
+    lead = broken if driving is None else [
+        i for i in broken if modes[i][0] is basis.components[driving]]
     seeded: dict[str, float] = {}
-    if seed > 0.0 and broken and not np.any(amps[broken]):
+    if seed > 0.0 and lead and not np.any(amps[broken]):
         n_h = len(rot_h)
-        for direction in _generic_seed(len(broken)):
+        for direction in _generic_seed(len(lead)):
             trial = amps.copy()
-            trial[broken] = seed * direction
+            trial[lead] = seed * direction
             if _stabiliser_order(np.tensordot(trial, fields, axes=1), actions) == n_h:
                 amps = trial
                 seeded = {f"phases.0.distortion_modes.modes.{i}.amplitude": float(amps[i])
-                          for i in broken}
+                          for i in lead}
                 break
         else:
+            where = "the child's modes" if driving is None else (
+                f"the driving irrep {basis.components[driving].irrep}'s modes")
             raise ValueError(
-                f"no seed direction in the child's modes has exactly the child's group "
+                f"no seed direction in {where} has exactly the child's group "
                 f"{child.space_group!r} as its stabiliser in the parent group: a generic "
                 "distortion of the parent in this cell has more symmetry than the stated "
                 "child, so the child is not an isotropy subgroup of its displacements; "
@@ -1326,7 +1393,7 @@ def displacive_statement(parent, child, transform, *, seed: float = DISTORTION_S
         atoms.append(atom.model_copy(update={
             c: getattr(atom, c).model_copy(update={"value": float(new[k]), "vary": False})
             for k, c in enumerate("xyz")}))
-    site_map = tuple(int(ref.site[partner[reps[j]]]) for j in range(len(child.atoms)))
+    site_map = tuple(int(basis.parent_atoms[partner[reps[j]]]) for j in range(len(child.atoms)))
     record = DistortionModes(
         parent_space_group=str(parent.space_group),
         transform=_format_transform(big, small),
