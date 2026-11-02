@@ -316,7 +316,13 @@ class PeakEditor:
         g = peak.group
         comps = [(p, c) for p, c in self._components(doc, g) if p is not peak]
         if not comps:
-            doc.peaks = _spliced(doc.peaks, g, [], self.det, windows=doc.groups)
+            # the declared source, as a refit passes it: the cross-group ghost
+            # marks are re-judged here too, and a neutron or monochromated
+            # source must skip that search (WP-1445)
+            doc.peaks = _spliced(doc.peaks, g, [], self.det,
+                                 self.instrument.source.lines,
+                                 source=self.instrument.source,
+                                 windows=doc.groups)
             doc.groups.pop(g, None)
             return doc
         return self._refit_with(doc, g, [p.two_theta for p, _ in comps],

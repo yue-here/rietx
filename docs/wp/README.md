@@ -45,7 +45,7 @@ names hard dependencies, and *soft* marks a preferred order.
 | [2010](2010-every-feature-names-what-verifies-and-validates-it.md) | Every feature names what verifies it and what validates it | 2026-11-01 | P3 | [generality](#generality-the-audits) |
 | [2019](2019-each-fast-leg-runs-what-only-it-can-see.md) | Each fast leg runs what only it can see, and the tail is cut again | 2026-11-02 | P2 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2028](2028-a-joint-fits-guards-see-every-histogram.md) | A joint fit's guards see every histogram | 2026-11-01 | P2 | [Unscheduled](#unscheduled-what-fires-and-what-stays-silent) |
-| [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 2026-11-01 | P2 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
+| [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 2026-11-02 | P2 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [2033](2033-a-declared-z-filters-the-extinction-class.md) | A declared Z or density filters an extinction class's members | 2026-10-31 | P3 | [Unscheduled](#unscheduled-data-and-metadata-in-a-structure-out) |
 | [2036](2036-main-is-green-on-every-nightly-leg.md) | Main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform | 2026-10-25 | P3 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
 | [2041](2041-a-tutorial-shows-the-indexer-abstain.md) | A tutorial shows the indexer abstain | 2026-10-24 | P4 | [Unscheduled](#unscheduled-the-repo-s-own-process) |
@@ -711,7 +711,7 @@ Not started and rated P1 or P2. The rest are in the tables below.
 | [1967](1967-what-the-chemist-declares-reaches-the-extinction-screen.md) | What the chemist declares reaches the extinction screen | ✅ 2026-10-23 | — | — ([1910](1910-the-extinction-screen-at-a-small-cell-error.md) soft) |
 | [1992](1992-nw2-magnetic-superspace-groups.md) | N-W2 (group half): magnetic superspace groups generated from the operators | ✅ 2026-11-01 | — | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md) soft) |
 | [1993](1993-nw3-satellites-at-a-real-q.md) | N-W3: satellites at a real q, to order m, with (h k l m) rows | ⬜ | P3 | — ([1992](1992-nw2-magnetic-superspace-groups.md) soft) |
-| [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 🔄 2026-11-01 | P2 | — ([1510](1510-what-the-chemist-knows-reaches-the-search.md) soft) |
+| [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) | A formula's volume window fits inorganic cells, and a hydrate parses | 🔄 2026-11-02 | P2 | — ([1510](1510-what-the-chemist-knows-reaches-the-search.md) soft) |
 | [2033](2033-a-declared-z-filters-the-extinction-class.md) | A declared Z or density filters an extinction class's members | 🔄 2026-10-31 | P3 | — ([1967](1967-what-the-chemist-declares-reaches-the-extinction-screen.md), [2030](2030-a-formulas-volume-window-fits-inorganic-cells.md) soft) |
 | [2069](2069-every-displacive-child-of-a-parent-in-a-stated-cell.md) | Every displacive child of a parent in a stated cell, several irreps included | ⬜ | P3 | — ([1419](1419-a-child-structure-refined-on-its-mode-amplitudes.md), [1919](1919-maximal-subgroups-generated-from-the-operators.md) soft) |
 

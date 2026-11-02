@@ -159,3 +159,47 @@ def test_a_ghost_is_unmarked_when_its_parent_moves_away():
     out = _spliced(pl, parent.group, _moved(pl, parent.group, 1.5), det,
                    ins.source.lines, source=ins.source)
     assert round(ghost.two_theta, 3) not in _flagged(out, "ghost_kbeta")
+    # the joint screen survives the move: the other ghosts keep their marks,
+    # so the follow is per peak and not a wipe of the finding
+    assert len(_flagged(out, "ghost_kbeta")) == len(ghosts) - 1
+
+
+def test_a_ghost_mark_the_user_cleared_stays_cleared_across_another_edit():
+    ins = rx.Instrument.debye_scherrer(wavelength=LAM)
+    pl, det, _ = pick_peaks_with_state(_pattern(kbeta=0.15), ins)
+    image = 2 * np.degrees(np.arcsin(LAM_KB / LAM * np.sin(np.radians(22.0))))
+    ghost = _at(pl, image)
+    ghost.flags = [f for f in ghost.flags if f != "ghost_kbeta"]
+    other = _at(pl, 14.0).group
+    out = _spliced(pl, other, [p.model_copy() for p in pl.peaks
+                               if p.group == other], det,
+                   ins.source.lines, source=ins.source)
+    assert "ghost_kbeta" not in ghost.flags
+    assert round(ghost.two_theta, 3) not in _flagged(out, "ghost_kbeta")
+
+
+def test_a_deleted_group_rejudges_ghosts_under_the_declared_source(
+        monkeypatch):
+    # deleting a group's last component re-judges the cross-group ghost marks,
+    # so it must pass the declared beam as a refit does: with no source the
+    # Kβ search runs on a monochromated pattern the picker skipped (WP-1445)
+    from rietx.gui import peaks as gp
+    ins = rx.Instrument.debye_scherrer(wavelength=LAM)
+    ins = ins.model_copy(update={
+        "source": ins.source.model_copy(update={"kbeta": "monochromator"})})
+    editor = gp.PeakEditor(_pattern(kbeta=0.15), ins)
+    doc = editor.pick()
+    assert _flagged(doc.peaks, "ghost_kbeta") == []
+    seen = []
+    real = gp.flag_ghosts
+
+    def spy(*a, **k):
+        seen.append(k.get("source"))
+        return real(*a, **k)
+
+    monkeypatch.setattr(gp, "flag_ghosts", spy)
+    groups = [p.group for p in doc.peaks.peaks]
+    index = next(i for i, g in enumerate(groups) if groups.count(g) == 1)
+    out = editor.remove(doc, index)
+    assert seen and all(s is ins.source for s in seen)
+    assert _flagged(out.peaks, "ghost_kbeta") == []
