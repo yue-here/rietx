@@ -262,32 +262,39 @@ def _walk(refinement, data, path: str, start: float, sign: int, limit: float,
 
     if start == limit:
         return limit, "bound"            # already on this side's limit
-    trial = refinement._trial(record=record)
-    # The fit's own free set, along the whole path.  Each refit is a stage,
-    # and a stage re-decides WP-1301's hold from the values it starts at: a
-    # weak phase's scale pinned above the support threshold would free the
-    # cell the fit held, and the profile would then measure a different model
-    # from the fit it is quoted for (#1075).  A refit may still hold more,
-    # since a lower pinned scale can hide a phase the fit saw.
-    trial.set_vary([path, *frozen], False)
-    # where every refit stepping back in starts from (the docstring has why)
-    fitted = {r.path: r.value for r in trial.parameters()
-              if r.vary and not r.held_because}
+    def fresh():
+        # The fit's own free set, along the whole path.  Each refit is a
+        # stage, and a stage re-decides WP-1301's hold from the values it
+        # starts at: a weak phase's scale pinned above the support threshold
+        # would free the cell the fit held, and the profile would then measure
+        # a different model from the fit it is quoted for (#1075).  A refit
+        # may still hold more, since a lower pinned scale can hide a phase the
+        # fit saw.
+        t = refinement._trial(record=record)
+        t.set_vary([path, *frozen], False)
+        return t
+
+    trial = fresh()
     measured = {start: 0.0}             # the fit itself, by definition
     settled = PARAMETER_INTERVAL_CHI2_TOL * cut
     spent = 0
 
     def delta(v: float, restart: bool = False) -> float:
-        nonlocal spent
+        nonlocal spent, trial
         if v in measured:
             return measured[v]
         if spent >= budget:
             raise _SideStopped("refits")
+        if restart:
+            # start the refit from the fit rather than from the previous
+            # probe, which past the threshold can be a state no refit finds
+            # its way back from.  A new trial and never a set_values of the
+            # fitted rows: a coordinate DOF is a displacement rederived to
+            # zero on every build, so writing its fitted value back would
+            # leave the atom where the last probe moved it.
+            trial = fresh()
         try:
-            # ``restart`` starts the refit from the fit rather than from the
-            # previous probe, which past the threshold can be a state no
-            # refit finds its way back from
-            trial.set_values({**fitted, path: v} if restart else {path: v})
+            trial.set_values({path: v})
         except Exception as exc:  # a value the model refuses ends the side too
             points.append(ParameterIntervalPoint(value=v, runs=0, error=str(exc)))
             raise _SideStopped("error") from exc
@@ -414,8 +421,8 @@ def profile_interval(refinement, data, path: str, *,
             f"{path!r} has no esd from the last fit, so there is no scale to step "
             "the profile in: the residual does not move along it, and a "
             "direction the data does not see has no interval")
-    entry = next((e for e in refinement._working_table().entries
-                  if e.path == path), None)
+    table = refinement._working_table()
+    entry = next((e for e in table.entries if e.path == path), None)
     if entry is None:
         raise ValueError(f"{path!r} was in the last fit and is not in the model "
                          "now; fit again before profiling it")
@@ -444,8 +451,7 @@ def profile_interval(refinement, data, path: str, *,
     # (``canonical_dofs``).
     on_floor = False
     if row.at_bound is not True and _sign_is_unseen(
-            refinement._working_table(), path,
-            {p.path for p in result.parameters if p.vary}):
+            table, path, {p.path for p in result.parameters if p.vary}):
         on_floor = abs(row.value) <= BOUND_HIT_ESD_FRAC * row.stderr
         if on_floor or row.value > 0.0:
             lo = max(lo, 0.0)

@@ -52,9 +52,10 @@ PARAMETER_INTERVAL_SETTLE_RUNS = 4
 
 #: The tolerance an interval's end is solved to, in units of the fit's esd for
 #: the row, or as a fraction of the end's distance from the value where the
-#: first probe already passed the threshold (WP-2060, ``_walk``).  An end is quoted to two significant figures of the esd at most,
-#: so a thousandth of it is below anything a reader can see, and it moves the
-#: Δχ² at the end by about 0.1 % of the threshold.
+#: first probe already passed the threshold (WP-2060, ``_walk``).  An end is
+#: quoted to two significant figures of the esd at most, so a thousandth of it
+#: is below anything a reader can see, and it moves the Δχ² at the end by
+#: about 0.1 % of the threshold.
 PARAMETER_INTERVAL_XTOL = 1e-3
 
 #: The factor each probe's distance from the fit grows by while one side looks

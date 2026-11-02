@@ -323,8 +323,9 @@ def moment_angle_stationary_diagnostics(stage, parameters=None) -> list[Diagnost
                     "lands here, because it passed the test below the interval's "
                     "cut. Where an interval excludes "
                     "the direction, the data measure that tilt, so quote the "
-                    "angle with its interval. For a modulus of these sites, "
-                    "Refinement.profile_interval(data, path) gives the interval "
+                    "angle with its interval. For a modulus of these sites on a "
+                    "single fit, Refinement.profile_interval(data, path) gives the "
+                    "interval "
                     "that does not assume the angles sit on the direction."))]
 
 

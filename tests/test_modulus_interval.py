@@ -21,6 +21,9 @@ phase), so the profile keeps m ≥ 0, sits on that bound and is one-sided.
 
 from __future__ import annotations
 
+import functools
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -32,7 +35,7 @@ from rietx.strategy.parameter_interval import _sign_is_unseen
 
 pytestmark = pytest.mark.xdist_group("modulus-interval")
 
-OUT = __import__("pathlib").Path(__file__).parent / "output"
+OUT = Path(__file__).parent / "output"
 GRID = np.arange(8.0, 130.0, 0.05)
 SITE = (0.0, 0.0, 0.5)
 MOD = "phases.0.atoms.1.moment.dof0"
@@ -63,8 +66,13 @@ def _instrument() -> rx.Instrument:
     return rx.Instrument.constant_wavelength_neutron(2.4, fwhm_deg=0.35)
 
 
+@functools.cache
 def _fitted(seed: int):
-    """Repro 2 for one seed: the fit, its data and the modulus row."""
+    """Repro 2 for one seed: the fit and its data, built once a worker.
+
+    Seed 4 is read by two tests, and neither changes the refinement: the
+    profile's refits run on a copy of the models (``history=False``).
+    """
     ins = _instrument()
     ins.background.coefficients[0].value = 40.0
     unit = np.asarray(rx.Refinement(Structure(phases=[_phase()]), ins,
@@ -136,7 +144,6 @@ def test_the_sign_is_kept_only_where_the_data_cannot_see_it():
     assert not _sign_is_unseen(table, f"{mn2}.dof0", set())
     assert _sign_is_unseen(table, f"{mn2}.dof0", {f"{mn2}.dof1", f"{mn2}.dof2"})
     assert not _sign_is_unseen(table, "phases.0.scale", set())
-
 
 
 def test_a_modulus_the_data_do_not_support_says_so_on_the_result():
