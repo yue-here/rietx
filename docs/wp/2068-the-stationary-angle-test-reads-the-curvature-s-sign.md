@@ -1,6 +1,6 @@
 # WP-2068 — The stationary-angle test builds its angle block analytically
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here
+Milestone: unscheduled · Status: 🔄 2026-11-02 — task 1 done: the maximum does not reproduce on main, so P3; the cost half (tasks 2-4) is unstarted
 Track: What fires, and what stays silent
 Depends on: — (1327 soft: the moment derivative `d_magnetic_f2_d_dofs` from #1206, merged 2026-10-31)
 Priority: P3 2026-11-02 — task 1 found no fit on main that stops on a maximum the test then passes wrongly, so only the cost half is left: 85-93 % of a moment-only fit at k ≥ 8, about 3 % of MAGNDATA structures
@@ -121,4 +121,33 @@ evaluations than at the WP's start.
 
 ## Handover log
 
+- **2026-11-02** — task 1 (reproduce), PR #1320. The reported defect does not happen on main.
+  The stationary-angle test cannot tell a maximum from a minimum, as the issue says. But no
+  fit on main ever stops on a maximum along a moment angle. The solver's angle columns are
+  forward differences, and those push it off such a point. The one stall that could be
+  forced, with the analytic angle column #1206 declined, passes the test correctly: the
+  maximum there is shallower than the data can resolve. So the correctness half is gone, the
+  WP is P3, and what is left is the cost half: about 85-93 % of a moment-only fit once eight
+  or more angles are free. *Done:* Context's correctness bullet carries the measurement as a
+  dated "superseded in part" note. The Goal, Tasks and Acceptance lose the sign check. The
+  sign check becomes a non-goal with its condition. The title follows the narrower goal; the
+  filename is kept so links stay live. *Measured* (macOS arm64, `[dev]`, tree `a8f679858`;
+  probes in the maintainer-local `~/.cache/ghostshift/rietx/wp-2068/probe/`): six one-site
+  starts exactly on a direction that is a maximum (truth tilt or azimuth 0.05-0.8 rad, Pnma
+  fixture, seed 2) all converge to χ²_red 1.031-1.033, about 1 s a fit. The frame fixture's
+  PLAN_2 and PLAN_3 reach φ = 0.0470 under LM and TRF. Under the analytic angle column
+  (`_moment_reach_ok` patched to accept a lone angle), PLAN_3 from β₀ = 101.0° and 100.9°
+  stops at φ = −5e-17, χ²_red 0.97951 against 0.97821, and the test passes it at 0.000. From
+  the minimum it reads 0.137, cut 2.71. The two acceptance files pass on the tree (27 passed,
+  2:14). Under the patch, 2 fail and 25 pass: `test_the_written_back_moment_is_the_fitted_one_after_the_angle_moved`
+  `[101.1]` and `[103.0]`, the pinned |m| 3.1772. Those two rows are the existing guard
+  against a change that lets a fit reach the stall, so no new test was added. *Not done:*
+  tasks 2-4, the analytic second-derivative block and its evaluation counts. *Settled by
+  Claude* under the WP's own written branch for a non-reproduction (re-rate P3, cost half
+  only): dropping the sign check from the goal. The alternative was keeping it as cheap
+  insurance; it was dropped because no measured fit reaches it and a guard nothing fires is a
+  declared claim with no writer. *Forward:* WP-1327's `### Inherited` has the measurement and
+  the condition, for its angle-seed PR. *Next:* nothing urgent. Whoever takes the cost half
+  starts at task 2. The reporter's k = 2, 4, 8, 16 table in Context is the baseline to beat,
+  re-measured first on the then-current tree.
 - **2026-10-31** — created, from the 2026-10-31 issue triage (issue #1207). Checked against the tree at d87c8cc91: `stationary_angle_test`, `_joint_newton`, `_half_widths` and `STATIONARY_ANGLE_MAX_ITER` = 8 exist as the issue describes, and #1206 is merged; the maximum-passes case and the cost table were not re-run. No open WP owns it: WP-1929 built the test and is closed; WP-1327's Jacobian work covers first-derivative columns only.
