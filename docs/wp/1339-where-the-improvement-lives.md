@@ -178,6 +178,11 @@ are in that WP, and this one's localisation does not answer it: coexistence
       reached by the body's §5 routing row ("quoting or comparing a number"),
       so a new shape file is not warranted. 2026-11-02 added the nested F-test
       and the pointer to `judging.md` §4 that WP-1417 asked for.
+- [x] The two follow-ups from #904's review (added 2026-11-02 from the
+      2026-10-12 entry's *Not done*): `SplitFamily.emission_line` has no
+      default, since its one writer always sets it; and a family whose parent
+      lies just past an end of the range is reported when a child lies inside,
+      its split read off every child.
 
 ## Acceptance
 

@@ -1410,7 +1410,7 @@ class SplitFamily(Base):
     hkls: list[list[int]]
     #: which emission line's image, 0 the shortest wavelength; children are
     #: assigned within one line
-    emission_line: int = 0
+    emission_line: int
     #: its tick in the higher-symmetry fit, deg 2θ
     two_theta: float
     #: how many of the lower fit's ticks were assigned to it

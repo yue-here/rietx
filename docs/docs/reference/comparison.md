@@ -195,7 +195,7 @@ The Δχ² is then shared among the windows of split families, the windows of th
 | `SplitLocalisation.elsewhere_share`, `SplitLocalisation.elsewhere_point_share` | the same for the channels in no window | the three shares sum to one |
 | `SplitLocalisation.n_unmatched` | `lower` ticks with no `higher` reflection within two widths | superstructure reflections, counted and not windowed |
 | `SplitLocalisation.families` | one `SplitFamily` per `higher` position and emission line | |
-| `SplitFamily.hkls`, `SplitFamily.emission_line`, `SplitFamily.two_theta` | the reflections at that position, which line's image, and the position | emission line 0 is the shortest wavelength |
+| `SplitFamily.hkls`, `SplitFamily.emission_line`, `SplitFamily.two_theta` | the reflections at that position, which line's image, and the position | emission line 0 is the shortest wavelength; the position may lie just past an end of the range when a child lies inside it |
 | `SplitFamily.n_assigned`, `SplitFamily.spread`, `SplitFamily.splits` | how many of `lower`'s ticks were assigned, their spread in degrees, and whether they split | |
 | `SplitFamily.window`, `SplitFamily.n_points` | the 2θ interval its Δχ² is summed over, and its channel count | |
 | `SplitFamily.delta_chi2`, `SplitFamily.share` | the window's Δχ² and its share of `total` | |

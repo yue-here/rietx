@@ -218,7 +218,9 @@ def split_localisation(higher: RefinementResult, lower: RefinementResult, *,
     the distortion moves a reflection by less than the gap to its neighbour.
     A ``lower`` tick farther than two local widths from every ``higher``
     one has no parent here (a superstructure reflection) and is counted in
-    ``n_unmatched``, not windowed.
+    ``n_unmatched``, not windowed.  A family straddling an end of the range
+    is reported whichever side its parent falls: its split is read off every
+    child, and its window is clipped to the data.
 
     Each family's window runs from its lowest assigned tick to its highest,
     widened by ``half_width`` degrees each side, or, by default, by the full
@@ -267,17 +269,19 @@ def split_localisation(higher: RefinementResult, lower: RefinementResult, *,
     assigned: dict[int, list[float]] = {}
     n_unmatched = 0
     for c, line in zip(child_tt, child_line):
-        if c < tt[0] or c > tt[-1]:
-            continue
+        # every child is assigned, in range or not, because a split is a fact
+        # about the two models: a family straddling an end of the range keeps
+        # both its children, and its window is clipped to the data below
+        in_range = bool(tt[0] <= c <= tt[-1])
         # one emission line against the same line: a Kα2 child belongs to a
         # Kα2 parent, never to the Kα1 tick 0.1° away
         same = np.flatnonzero(g_line == line)
         if not len(same):
-            n_unmatched += 1
+            n_unmatched += in_range
             continue
         j = int(same[np.argmin(np.abs(g_tt[same] - c))])
         if abs(c - g_tt[j]) > 2.0 * max(widths[j], SPLIT_TOLERANCE_DEG):
-            n_unmatched += 1
+            n_unmatched += in_range
             continue
         assigned.setdefault(j, []).append(float(c))
 
@@ -285,9 +289,11 @@ def split_localisation(higher: RefinementResult, lower: RefinementResult, *,
     unsplit_mask = np.zeros(len(tt), dtype=bool)
     families = []
     for j in np.argsort(g_tt, kind="stable"):
-        if not inside[j]:
-            continue
         kids = sorted(assigned.get(int(j), []))
+        # a parent just past an end of the range still owns its in-range
+        # children; skipping it counted them nowhere (#904's review)
+        if not inside[j] and not any(tt[0] <= k <= tt[-1] for k in kids):
+            continue
         spread = (kids[-1] - kids[0]) if kids else 0.0
         splits = spread > SPLIT_TOLERANCE_DEG
         pad = widths[j] if half_width is None else float(half_width)
