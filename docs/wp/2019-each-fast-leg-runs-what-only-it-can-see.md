@@ -1,6 +1,6 @@
 # WP-2019 — each fast leg runs what only it can see, and the tail is cut again
 
-Milestone: unscheduled · Status: 🔄 2026-11-01 — all seven tasks done; the ten-run acceptance read 25.0 min median against 15 and is not met (PR #1293), waiting on a ruling
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here (ghostshift runner); three shards per leg, the ten-run read restarted
 Track: The repo's own process
 Depends on: —
 Priority: P2 2026-10-23 — was P3: three of the five latest main runs have a slowest fast job over 20 min on the refreshed shard record; the wait 1547 was P2 for is back
