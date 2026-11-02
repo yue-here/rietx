@@ -5003,6 +5003,21 @@ STAGE_FIELD_HELP: dict[str, HelpEntry] = {
         unit="deg 2θ", default="null",
         typical="leave empty outside indexing validation",
     ),
+    "lorentz_window_tol": HelpEntry(
+        title="Lorentzian window tolerance",
+        description=(
+            "Time-of-flight only. The fraction of each peak's Lorentzian "
+            "component, per side, this stage's frozen windows may leave "
+            "outside, overriding the plan's schedule. Empty takes it from the "
+            "plan, which runs every declared stage but the last at "
+            "`intermediate_lorentz_window_tol`, and the last and the closing "
+            "stage at 1e-4. The exponential wings and the Gaussian part are "
+            "never loosened, and a Gaussian-branch bank or a 2θ pattern "
+            "ignores it."
+        ),
+        default="null",
+        typical="leave empty; 1e-4 to force a stage to the answer tolerance",
+    ),
 }
 
 #: One entry per ``io.formats.base.READER_OPTIONS`` key.  ``ReaderOption.help``
@@ -5926,6 +5941,17 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "takes, and the closing stage runs at the plan's `closing_window_tol`. "
             "`model.forward.recorded_window_tol` turns this into what `compile_model` "
             "needs to reproduce the result's curves."
+        ),
+    ),
+    "StageResult.lorentz_window_tol": HelpEntry(
+        title="Lorentzian window tolerance",
+        description=(
+            "Time-of-flight only. The fraction of each peak's Lorentzian component, "
+            "per side, this stage's windows were sized to leave outside, read off "
+            "the model it ran on: the plan's `intermediate_lorentz_window_tol` on "
+            "an intermediate stage, 1e-4 on the last declared stage and the closing "
+            "stage. `None` where no Lorentzian window was sized, on a 2θ pattern or "
+            "a Gaussian-branch bank."
         ),
     ),
     "StageResult.window_loss": HelpEntry(

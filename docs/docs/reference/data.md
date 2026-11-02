@@ -210,6 +210,42 @@ The readers set the field where the file says so and leave it `None` where nothi
 `None` is refined as a density, with a warning that names the two values in question.
 The constant-wavelength arm ignores the field: a 2θ step is constant, or nearly so, and folds into the scale.
 
+### The Lorentzian window on a bank
+
+On a time-of-flight bank whose profile has a Lorentzian part, a plan loosens one component of the peak windows in every declared stage but the last.
+Each peak on a bank is evaluated inside a window fixed for the stage, sized so that each side leaves out at most 1e-4 of the peak's area (`rietx.model.forward_tof.TOF_WINDOW_AREA_TOL`).
+The Lorentzian tail is the expensive part of that rule: its length is close to η/(π·tol) FWHM, which on a bank with γ ≠ 0 can be most of the pattern.
+`RefinementPlan.intermediate_lorentz_window_tol` sets the tolerance for that one component:
+
+```python
+import rietx as rx
+
+plan = rx.RefinementPlan(stages=[
+    rx.Stage("scale_bkg", ["phases.*.scale", "instrument.background.c*"]),
+    rx.Stage("cell", ["phases.*.cell.a"]),
+    rx.Stage("displacement", ["phases.*.atoms.*.biso"]),
+])
+assert plan.intermediate_lorentz_window_tol == 1e-2
+assert len(plan.run_stages()) == 4
+assert plan.stage_lorentz_window_tols() == [1e-2, 1e-2, None, None]
+```
+
+`RefinementPlan.stage_lorentz_window_tols` is parallel to `RefinementPlan.run_stages` and applies the rule `RefinementPlan.stage_ftols` applies ([Stage tolerances](refinement.md#stage-tolerances)).
+`Stage.lorentz_window_tol` overrides the schedule for one stage.
+The last declared stage and the closing stage take `None`, the one 1e-4 rule for every component, because they produce the answer.
+The closing stage never takes a coarse value from the stage before it.
+The exponential wings and the Gaussian part keep 1e-4 in every stage, so a bank whose profile is Gaussian compiles the same windows either way, to the bit.
+
+`StageResult.lorentz_window_tol` reports the tolerance each stage ran at, so a coarse stage can be told apart from the answer.
+It is `None` on a constant-wavelength stage and on a Gaussian bank, where no Lorentzian window was sized.
+`NodeAction.lorentz_window_tol` records the value the schedule handed the stage, so `Refinement.cherry_pick` compiles the windows the stage compiled.
+`PlanSpec.intermediate_lorentz_window_tol` and `StageSpec.lorentz_window_tol` carry both settings into a project file.
+The GUI's text document has no line for the plan's setting, so applying a document keeps the project's own value, and a stage line takes `lorentz_window_tol` like any other stage field.
+
+On synthetic Si banks the schedule moved no final parameter by more than 0.006 esd and cut the whole fit's cost by 1.2 to 3.6 times, measured before the closing stage existed.
+The cut is not larger because the answer stage, which frees everything at 1e-4, is most of what remains.
+The default is `rietx.schemas.plan.INTERMEDIATE_LORENTZ_WINDOW_TOL`, and `None` restores 1e-4 in every stage.
+
 ### Checking a pattern before a fit
 
 `diagnose(data, wavelength=...)` reads the pattern before any model exists and returns a `PatternDiagnostics`.

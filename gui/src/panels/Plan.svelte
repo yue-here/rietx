@@ -97,6 +97,7 @@
     strain_seed: "strain",
     restraint_weight_scale: "restraint",
     window_slack_deg: "slack",
+    lorentz_window_tol: "lorentz tol",
   };
 
   /** The plan the project holds, as `GET /api/plan` last answered. */

@@ -626,7 +626,8 @@ def _compile_for(structure: Structure, instrument: Instrument,
                  restraint_weight_scale: float = 1.0,
                  window_slack: float | None = None,
                  window_area_tol: float | None = None,
-                 orbit_split: list | None = None) -> AnyCompiledModel:
+                 orbit_split: list | None = None,
+                 lorentz_window_tol: float | None = None) -> AnyCompiledModel:
     """Compile against whichever forward model this **pair** names.
 
     The one routing point, so the four call sites in this module read alike and
@@ -651,13 +652,19 @@ def _compile_for(structure: Structure, instrument: Instrument,
     in FWHM multiples, and a bank's windows are sized per side by
     ``forward_tof.TOF_WINDOW_AREA_TOL`` in every stage, a closing one
     included, so there is nothing on a bank for it to set.
+    ``lorentz_window_tol`` is the converse: it reaches the flight-time
+    compiler only, where it loosens a bank's Lorentzian component alone (issue
+    #193).  The constant-wavelength windows have their own rule and no such
+    schedule, so a plan's schedule is dropped here for a 2θ pattern rather
+    than at each caller.
     """
     if data.axis == "tof" or instrument.source.kind == "neutron_tof":
         return compile_tof_model(
             structure, instrument, data, mode=mode, tof_limits=limits,
             moving_paths=moving_paths,
             restraint_weight_scale=restraint_weight_scale,
-            window_slack_us=window_slack, orbit_split=orbit_split)
+            window_slack_us=window_slack, orbit_split=orbit_split,
+            lorentz_window_tol=lorentz_window_tol)
     return compile_model(
         structure, instrument, data, mode=mode, two_theta_limits=limits,
         moving_paths=moving_paths,
@@ -4989,7 +4996,10 @@ class Refinement:
                       seed=node.action.seed, strain_seed=node.action.strain_seed,
                       restraint_weight_scale=node.action.restraint_weight_scale,
                       ftol=node.action.ftol,
-                      window_slack_deg=node.action.window_slack_deg)
+                      window_slack_deg=node.action.window_slack_deg,
+                      # the Lorentzian window tolerance the stage was handed,
+                      # a Stage field, so a coarse stage compiles its windows
+                      lorentz_window_tol=node.action.lorentz_window_tol)
         # and the plan settings the stage ran under, which are run_stage's
         # keywords rather than the Stage's (WP-2002, B1): the 3σ and 0.98 for
         # a node written before the fields
@@ -5100,7 +5110,8 @@ class Refinement:
                    ftol: float | None = None,
                    prior_significance: np.ndarray | None = None,
                    phase_support_sigma: float | None = PHASE_SUPPORT_SIGMA,
-                   window_area_tol: float | None = None):
+                   window_area_tol: float | None = None,
+                   lorentz_window_tol: float | None = None):
         """One stage: free params, recompile, solve, commit, guard.
 
         The recompile is what keeps the residual smooth *within* the stage —
@@ -5239,7 +5250,12 @@ class Refinement:
             window_area_tol=recorded_window_tol(window_area_tol),
             # the split this call decided at its start, so a stage that drove
             # a half-occupied atom onto a mirror keeps its multiplicity
-            orbit_split=self._orbit_split)
+            orbit_split=self._orbit_split,
+            # the Lorentzian window tolerance the *plan* scheduled for this
+            # stage (RefinementPlan.stage_lorentz_window_tols), passed in like
+            # ftol because only the plan knows which stage is last; a bank's
+            # alone, _compile_for dropping it on a 2θ pattern (issue #193)
+            lorentz_window_tol=lorentz_window_tol)
         table.push_moment_frames(new_model)
         carried = False
         if model is not None and mode in ("lebail", "pawley") and model.mode == mode:
@@ -6298,6 +6314,9 @@ class Refinement:
         stages = plan.run_stages(paths=[e.path for e in table.entries])
         ftols = plan.stage_ftols()
         window_tols = plan.stage_window_tols()
+        # and a bank's Lorentzian window tolerance, coarse in every declared
+        # stage but the last (issue #193); _compile_for drops it on a 2θ scan
+        lorentz_tols = plan.stage_lorentz_window_tols()
         # a dataclass validates nothing, so the plan's threshold is checked
         # where it is read, in the words its mirror uses (WP-2002, B1)
         phase_support_sigma = check_phase_support_sigma(plan.phase_support_sigma)
@@ -6321,8 +6340,9 @@ class Refinement:
         #: the closing stage does for every finding the last declared stage
         #: made (WP-2002).  Each stage's own list stays on its report and node.
         restated: dict[tuple, Diagnostic] = {}
-        for k, (stage, ftol, window_tol) in enumerate(
-                zip(stages, ftols, window_tols, strict=True), start=1):
+        for k, (stage, ftol, window_tol, lorentz_tol) in enumerate(
+                zip(stages, ftols, window_tols, lorentz_tols, strict=True),
+                start=1):
             with self._abandon_on_cancel(cancel, stage.name, stage_results, stream):
                 model, outcome, guard, freed, hold = self._run_stage(
                     stage, data, mode, table, model, two_theta_limits,
@@ -6332,7 +6352,8 @@ class Refinement:
                     # starts from that answer as well as the screen (WP-1523)
                     prior_significance=answer_significance,
                     phase_support_sigma=phase_support_sigma,
-                    window_area_tol=window_tol)
+                    window_area_tol=window_tol,
+                    lorentz_window_tol=lorentz_tol)
             # WP-1343: the moment's rung at this boundary, and the shift the
             # moment took when the widths were released.  Gated on what the
             # stage actually freed, so an ordinary fit never pays for the
@@ -6412,6 +6433,8 @@ class Refinement:
                 # checked, trivially: one histogram has no elsewhere
                 unreached_histograms={},
                 moment_angle_tests=outcome.moment_angle_tests,
+                # read off the model the stage ran on, never off the schedule
+                lorentz_window_tol=getattr(model, "lorentz_window_tol", None),
             ))
             if stage_reports:
                 t_report = time.perf_counter()
@@ -6441,6 +6464,11 @@ class Refinement:
                     # (WP-2002, B1)
                     phase_support_sigma=phase_support_sigma,
                     correlation_guard=plan.correlation_guard,
+                    # the Lorentzian window tolerance the schedule handed the
+                    # stage, so a cherry-pick compiles the same windows; None
+                    # off a bank, where no schedule applies and a
+                    # constant-wavelength node's api_call keeps its text
+                    lorentz_window_tol=lorentz_tol if _is_tof(model) else None,
                 ), model, table, outcome, stage_diagnostics,
                     held_scales=_held_scale_phases(stage_results[-1]),
                     window_loss=stage_results[-1].window_loss)
@@ -6512,7 +6540,11 @@ class Refinement:
             # and the solve's orbit split: the fit's own compiles all used it,
             # and a fresh one would halve a site the last stage left on a
             # mirror (WP-2052).  Its fresh reading is reported, never used.
-            orbit_split=orbit_split_of(model))
+            orbit_split=orbit_split_of(model),
+            # a bank's Lorentzian windows at the answer tolerance whatever the
+            # stage ran at: a result is never measured on coarse windows
+            # (issue #193, the diagnostic-tense condition)
+            lorentz_window_tol=None)
         # and the solve's moment frames, never the fresh compile's: this one is
         # built at the fitted cell, so a last stage that moved an angle would
         # otherwise read the refined moment DOFs in a frame they were never
@@ -6617,6 +6649,12 @@ class Refinement:
         seventh round's Q1).  Pass ``forward.WINDOW_AREA_TOL`` for the declared
         stages' faster windows.  :meth:`cherry_pick` passes a recorded node's.
         The stage's ``window_area_tol`` records the fraction it ran at.
+
+        On a time-of-flight bank the stage's own ``Stage.lorentz_window_tol``
+        sizes the Lorentzian component of its windows; ``None`` is the answer
+        tolerance, ``forward_tof.TOF_WINDOW_AREA_TOL``, for the same reason
+        (issue #193).  ``StageResult.lorentz_window_tol`` records what it ran
+        at.
         """
         _refuse_without_phases(self.structure, "run_stage")
         phase_support_sigma = check_phase_support_sigma(phase_support_sigma)
@@ -6678,7 +6716,10 @@ class Refinement:
                         # for, and it takes its own ftol or the solver default
                         ftol=stage.ftol,
                         phase_support_sigma=phase_support_sigma,
-                        window_area_tol=window_area_tol)
+                        window_area_tol=window_area_tol,
+                        # — and a bank's own Lorentzian window tolerance, or
+                        # the answer tolerance (issue #193)
+                        lorentz_window_tol=stage.lorentz_window_tol)
             finally:
                 if (stream is not None and stream is not events
                         and stream is not recorder):
@@ -6734,7 +6775,9 @@ class Refinement:
                 termination=outcome.termination or None,
                 seeded=hold.seeded, cell_reset=hold.cell_reset,
                 collapsed=hold.collapsed,
-                moment_angle_tests=outcome.moment_angle_tests)
+                moment_angle_tests=outcome.moment_angle_tests,
+                # read off the model the stage ran on, never off the stage
+                lorentz_window_tol=getattr(model, "lorentz_window_tol", None))
             # after the StageResult rather than beside the other two extends
             # above, because this one reads the record it has just built; and
             # before the node, so the node carries what the result carries
@@ -6771,6 +6814,8 @@ class Refinement:
                     window_area_tol=window_area_tol,
                     phase_support_sigma=phase_support_sigma,
                     correlation_guard=correlation_guard,
+                    lorentz_window_tol=(stage.lorentz_window_tol
+                                        if _is_tof(model) else None),
                 ), model, table, outcome, diagnostics,
                     held_scales=_held_scale_phases(stage_result),
                     window_loss=stage_result.window_loss)
@@ -12615,7 +12660,10 @@ def replay(tree: RefinementTree, node_id: str, data: PatternData) -> RefinementR
                          moving_paths=set(table.moving_paths),
                          restraint_weight_scale=action.restraint_weight_scale,
                          window_slack=action.window_slack_deg,
-                         window_area_tol=recorded_window_tol(action.window_area_tol))
+                         window_area_tol=recorded_window_tol(action.window_area_tol),
+                         # a coarse stage's node is re-measured on the windows
+                         # it ran on, not on the answer tolerance's (issue #193)
+                         lorentz_window_tol=action.lorentz_window_tol)
     if state.mode in ("lebail", "pawley"):
         _restore_lebail(state.reflections, model)
 

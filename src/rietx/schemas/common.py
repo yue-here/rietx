@@ -743,6 +743,21 @@ from .._nearmiss import did_you_mean
 #: by name — the twin of the σ²(d) check.
 #: **No constant-wavelength number moves**: every new field is read by the
 #: flight-time forward model and by nothing else.
+#: Also in 0.61 (issue #193, the staged Lorentzian window tolerance):
+#: ``PlanSpec.intermediate_lorentz_window_tol``, defaulting to 1e-2, and
+#: ``StageSpec.lorentz_window_tol``, defaulting to ``None`` ("take the plan's"):
+#: the per-side area fraction a bank's pseudo-Voigt windows may leave outside
+#: in the Lorentzian component, in every declared stage but the last, the last
+#: and the closing stage staying at ``forward_tof.TOF_WINDOW_AREA_TOL``; and
+#: ``StageResult.lorentz_window_tol`` and ``NodeAction.lorentz_window_tol``,
+#: what a stage ran at and was handed, defaulting to ``None`` ("no Lorentzian
+#: window sized", and on the node the answer tolerance).  Additive: a record
+#: written before reads ``None``, and a plan document without the key takes
+#: the 1e-2 schedule, as one without ``intermediate_ftol`` took 1e-6 at
+#: 0.4 → 0.5.  That default moves a bank's pseudo-Voigt answer by at most
+#: 0.006 esd, ``None`` restores its windows bit for bit, and no
+#: constant-wavelength or Gaussian-branch number moves.  ``Refinement.fit``
+#: and ``run_stage`` write both records on every stage.
 SCHEMA_VERSION = "0.61"
 
 #: Intensity model.  ``rietveld`` computes |F|² from the structure; ``lebail``

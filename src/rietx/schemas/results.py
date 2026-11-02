@@ -1225,6 +1225,19 @@ class StageResult(Base):
     #: fraction: the 2 % and 0.1 % windows of one answer differ by up to 0.6 %
     #: in χ².
     window_area_tol: float | None = None
+    #: the per-side area fraction of each peak's **Lorentzian component** this
+    #: stage's frozen windows were sized to leave outside on a time-of-flight
+    #: bank (issue #193), read off the model the stage ran on — ``1e-2`` for an
+    #: intermediate stage under the default schedule
+    #: (``RefinementPlan.intermediate_lorentz_window_tol``), ``1e-4``
+    #: (``forward_tof.TOF_WINDOW_AREA_TOL``) for the last declared stage and
+    #: the closing stage.  ``None`` where no Lorentzian window was sized at
+    #: all: a constant-wavelength stage, a Gaussian-branch bank, and a stage
+    #: recorded by a runner that does not write it (``multi.py``, which
+    #: refuses a bank).  Recorded for ``ftol``'s reason: a coarse stage's
+    #: numbers are never the reported ones, and a reader comparing two fits'
+    #: stage trajectories must be able to see which stages were coarse.
+    lorentz_window_tol: float | None = None
     #: the share of the Bragg intensity this stage's frozen windows dropped at
     #: its answer, against windows sized there (``forward.window_loss``,
     #: WP-2047).  Windows are sized when a stage compiles, so a peak that moves
