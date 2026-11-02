@@ -153,6 +153,7 @@ Per phase it writes the agreement indices of [The refinement result](result.md):
 It writes the bond distances, contacts and angles as `_geom_bond_`, `_geom_contact_` and `_geom_angle_` loops, with esds in value(esd) form.
 The loops list each bond once, where `GeometryTable` lists it from each end so that the rows naming an atom count its neighbours ([Derived quantities](derived.md#bonding-geometry)).
 The torsion angles go in a `_geom_torsion_` loop, one row for each row of `GeometryTable.torsions`, in Klyne and Prelog's sign and the range (−180°, 180°].
+A torsion whose image needs a symmetry code the one-digit form cannot write is left out, as a bond or an angle is, and counted in `_geom_special_details`.
 A result saved before schema 0.60 holds no torsions, so its CIF has no torsion loop.
 
 Each `_geom_*_site_symmetry_*` code indexes the `_space_group_symop_` loop written into the same block.

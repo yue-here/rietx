@@ -646,8 +646,10 @@ def _write_geometry_loops(block, result: RefinementResult, ip: int) -> None:
     :attr:`~rietx.schemas.results.GeometryTable.torsions` as the table holds
     them: each torsion once, over a bonded chain, in Klyne and Prelog's sign
     and the dictionary's own range (``_enumeration.range -180.0:180.0``).
-    A torsion is a shape of bonded atoms, as an angle is, so it carries
-    ``publ_flag yes`` too.  Its value tag is the bare ``_geom_torsion``, the
+    A torsion carries ``publ_flag no``, the dictionary's default: the table
+    lists every bonded chain up to a cap, coordination contacts of an ionic
+    solid included, and a paper tabulates the few torsions its argument
+    needs (SHELXL lists torsions only on request, ``CONF``).  Its value tag is the bare ``_geom_torsion``, the
     alias of ``_geom_torsion.angle``, for the reason the angle's is.  A table
     from before schema 0.60 holds ``None`` there and writes no loop.
 
@@ -688,11 +690,14 @@ def _write_geometry_loops(block, result: RefinementResult, ip: int) -> None:
     torsions = [t for t in geometry.torsions or () if t.phase_index == ip]
     if not distances and not angles and not torsions:
         return
-    codable = [d for d in distances if d.symmetry_1 and d.symmetry_2]
-    angles_codable = [a for a in angles
-                      if a.symmetry_1 and a.symmetry_2 and a.symmetry_3]
-    torsions_codable = [t for t in torsions if t.symmetry_1 and t.symmetry_2
-                        and t.symmetry_3 and t.symmetry_4]
+
+    def coded(rows, n: int):
+        return [r for r in rows
+                if all(getattr(r, f"symmetry_{k}") for k in range(1, n + 1))]
+
+    codable = coded(distances, 2)
+    angles_codable = coded(angles, 3)
+    torsions_codable = coded(torsions, 4)
     dropped = (len(distances) - len(codable) + len(angles) - len(angles_codable)
                + len(torsions) - len(torsions_codable))
     loops = []
@@ -706,42 +711,37 @@ def _write_geometry_loops(block, result: RefinementResult, ip: int) -> None:
                             text(f"{tag}atom_site_label_2", d.atom_2),
                             number(f"{tag}distance", d.distance, d.stderr),
                             d.symmetry_1, d.symmetry_2, flag] for d in rows]))
-    if angles_codable:
-        # the angle *value* is the one tag here whose flat DDL1 alias is not
-        # ``<category>_<object>``: ``_geom_angle.value`` aliases to a bare
-        # ``_geom_angle``, so this loop cannot share a prefix with its columns
-        loops.append(("", [
-            "_geom_angle_atom_site_label_1", "_geom_angle_atom_site_label_2",
-            "_geom_angle_atom_site_label_3", "_geom_angle",
-            "_geom_angle_site_symmetry_1", "_geom_angle_site_symmetry_2",
-            "_geom_angle_site_symmetry_3", "_geom_angle_publ_flag"],
-            [[*(text(f"_geom_angle_atom_site_label_{k}", label)
-                for k, label in enumerate((a.atom_1, a.atom_2, a.atom_3), start=1)),
-              number("_geom_angle", a.angle, a.stderr),
-              a.symmetry_1, a.symmetry_2, a.symmetry_3, "yes"] for a in angles_codable]))
-    if torsions_codable:
-        # ``_geom_torsion.angle`` aliases to a bare ``_geom_torsion``, as above
-        loops.append(("", [
-            *(f"_geom_torsion_atom_site_label_{k}" for k in range(1, 5)),
-            "_geom_torsion",
-            *(f"_geom_torsion_site_symmetry_{k}" for k in range(1, 5)),
-            "_geom_torsion_publ_flag"],
-            [[*(text(f"_geom_torsion_atom_site_label_{k}", label)
-                for k, label in enumerate((t.atom_1, t.atom_2, t.atom_3, t.atom_4),
-                                          start=1)),
-              number("_geom_torsion", t.angle, t.stderr),
-              t.symmetry_1, t.symmetry_2, t.symmetry_3, t.symmetry_4, "yes"]
-             for t in torsions_codable]))
+    # the angle *value* is the one tag here whose flat DDL1 alias is not
+    # ``<category>_<object>``: ``_geom_angle.value`` aliases to a bare
+    # ``_geom_angle`` and ``_geom_torsion.angle`` to a bare ``_geom_torsion``,
+    # so neither loop can share a prefix with its columns
+    for cat, n, rows, flag in (("_geom_angle", 3, angles_codable, "yes"),
+                               ("_geom_torsion", 4, torsions_codable, "no")):
+        if rows:
+            loops.append(("", [
+                *(f"{cat}_atom_site_label_{k}" for k in range(1, n + 1)), cat,
+                *(f"{cat}_site_symmetry_{k}" for k in range(1, n + 1)),
+                f"{cat}_publ_flag"],
+                [[*(text(f"{cat}_atom_site_label_{k}", getattr(r, f"atom_{k}"))
+                    for k in range(1, n + 1)),
+                  number(cat, r.angle, r.stderr),
+                  *(getattr(r, f"symmetry_{k}") for k in range(1, n + 1)), flag]
+                 for r in rows]))
     # each sentence only where a written row is what it describes: stating
-    # a method no row used is a claim (_special_details' rule)
-    sus = ([r.stderr for r in codable] + [a.stderr for a in angles_codable]
-           + [t.stderr for t in torsions_codable])
+    # a method no row used is a claim (_special_details' rule), so the su
+    # sentence names only the kinds a written su belongs to
+    kinds = [(name, [r.stderr for r in rows]) for name, rows in (
+        ("distances", codable), ("angles", angles_codable),
+        ("torsion angles", torsions_codable))]
+    sus = [su for _, column in kinds for su in column]
+    with_su = [name for name, column in kinds
+               if any(su is not None for su in column)]
     details = []
-    if any(su is not None for su in sus):
+    if with_su:
+        named = (with_su[0] if len(with_su) == 1
+                 else ", ".join(with_su[:-1]) + " and " + with_su[-1])
         details.append(
-            "Standard uncertainties of distances"
-            + (", angles and torsion angles" if torsions_codable else " and angles")
-            + " are propagated "
+            f"Standard uncertainties of {named} are propagated "
             "through the full covariance of the refined parameters, cell "
             "included (McCusker et al. 1999, J. Appl. Cryst. 32, 36, section 10)"
             + (", with the Berar-Lelann factor" if result.statistics.esd_inflation

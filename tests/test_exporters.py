@@ -700,10 +700,10 @@ def test_the_cif_torsion_loop_round_trips_the_table(fitted_lab6, tmp_path):
 
     Each row the table holds comes back from the file with its four labels,
     four symmetry codes, its value and its su, in the table's order, under the
-    bare ``_geom_torsion`` value tag the dictionary aliases.  A table from
-    before schema 0.60 (``torsions=None``) writes no loop, and a written loop
-    says in ``_geom_special_details`` that torsions are among the propagated
-    quantities, which the same result without them does not.
+    bare ``_geom_torsion`` value tag the dictionary aliases, flagged ``no``
+    for publication.  ``_geom_special_details`` names torsion angles among the
+    propagated quantities only where a written torsion carries an su.  A table
+    from before schema 0.60 (``torsions=None``) writes no loop.
     """
     import re
 
@@ -720,8 +720,22 @@ def test_the_cif_torsion_loop_round_trips_the_table(fitted_lab6, tmp_path):
     ref, result, _data = fitted_lab6
     torsions = [t for t in result.geometry.torsions if t.phase_index == 0]
     assert torsions, "LaB6's B6 octahedra and their links form bonded chains"
-    out = tmp_path / "torsions.cif"
+    # every LaB6 torsion is symmetry-fixed (no su), so the su branch and the
+    # su sentence need rows that carry one: give every other row an esd
+    assert all(t.stderr is None for t in torsions)
+    out = tmp_path / "plain.cif"
     ref.write_cif(out)
+    plain = " ".join(gemmi.cif.read(str(out)).sole_block()
+                     .find_value("_geom_special_details").split())
+    assert "torsion" not in plain, "no written torsion carries an su"
+    torsions = [t.model_copy(update={"stderr": 0.0137 * (k + 1)}) if k % 2 else t
+                for k, t in enumerate(torsions)]
+    result = result.model_copy(update={"geometry": result.geometry.model_copy(
+        update={"torsions": torsions})})
+    out = tmp_path / "torsions.cif"
+    out.write_text(refinement_cif_doc(result, ref.fitted_structure,
+                                      ref.fitted_instrument).as_string(),
+                   encoding="utf-8")
     block = gemmi.cif.read(str(out)).sole_block()
     rows = list(block.find([
         *(f"_geom_torsion_atom_site_label_{k}" for k in range(1, 5)),
@@ -733,7 +747,7 @@ def test_the_cif_torsion_loop_round_trips_the_table(fitted_lab6, tmp_path):
         assert [row[k] for k in range(4)] == [t.atom_1, t.atom_2, t.atom_3, t.atom_4]
         assert [row[k] for k in range(5, 9)] == [
             t.symmetry_1, t.symmetry_2, t.symmetry_3, t.symmetry_4]
-        assert row[9] == "yes"
+        assert row[9] == "no"
         value, su = parse_su(row[4])
         assert -180.0 < value <= 180.0
         assert value == pytest.approx(t.angle, abs=su or 1e-9)
