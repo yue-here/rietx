@@ -117,7 +117,8 @@ class _Row:
 def _result_rows(parameters: Any, structure) -> dict[str, _Row]:
     """The rows a ``RefinementResult`` states, with the symmetry ties restored.
 
-    A result lists a row iff it varied *or was tied* (``RefinedParameter``) and
+    A result lists a row iff the fit could move it — it varied, or is tied to a
+    row that did (``RefinedParameter``, WP-1999) — and
     carries no equation, so its ``vary=False`` rows are two things: a **user**
     tie's copy (``Refinement.tie``), whose equation the result does not keep and
     which is written as its own refined parameter, and a **symmetry** tie (a
