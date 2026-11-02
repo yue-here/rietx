@@ -1,9 +1,9 @@
 # WP-2045 — A runaway fit ends without an expensive closing stage
 
-Milestone: unscheduled · Status: 🔄 2026-10-25 — built and measured (PR #1161); open for the first nightly `full` job after merge and the maintainer's call on four audit rows' grounds
+Milestone: unscheduled · Status: 🔄 2026-11-02 — built and measured, merged as PR #1161 on 2026-10-25; the four audit rows re-approved on cost-only grounds (2026-11-01); open for a nightly `full` job that completes on `main`, red every night since 2026-10-24 for reasons WP-2036 owns
 Track: A long run is not one fit
 Depends on: —
-Priority: P2 2026-10-25 — the fix is built in #1161 and 1.10.1 waits on its merge; what stays open is one nightly reading and a ruling on four rows' grounds
+Priority: P2 2026-11-02 — the fix shipped to `main` in #1161; what stays open is one nightly reading, and the `full` job's other failures are WP-2036's
 
 ## Goal
 
@@ -334,6 +334,26 @@ committed) ran `SequentialRefinement(...).fit` on cpd-1a and cpd-1b under
 `stage_start`/`stage_end` events.
 
 ## Handover log
+
+- **2026-11-02** — the four audit rows for the intermediate tolerance now
+  rest on cost alone. **Decided 2026-11-01 (maintainer), by consent:**
+  `INTERMEDIATE_FTOL`, `PlanSpec:intermediate_ftol`, `StageSpec:ftol` and
+  `StageResult.ftol` carry cost-only grounds and `approved="2026-11-01"` in
+  `src/rietx/_audit.py`. The 2026-10-21 approval was weighed against an
+  absent zircon running to the iteration limit at the tight tolerance, and
+  that case passes at 0.009 esd since this WP. What remains is 1.00-2.15×
+  fewer evaluations for answers within 0.1 plain esd on FAP, cpd-1a and
+  11-BM NAC. LaB6's 8.82 esd is WP-2012's S/L and H/L mirror, not the
+  tolerance. The rows' shared evidence also called the LaB6 row a strict
+  xfail. WP-2036 made it non-strict on 2026-10-25, and the evidence now says
+  so. The 2026-11-01 brief's other item on this WP needs no action: the
+  calibration path guide's extra cold fit after the planted jump is
+  answer-neutral (Rwp 0.0395 against 0.0402, the jump still flagged) and the
+  guide already says so. The Status line was stale: #1161 merged on
+  2026-10-25, and the nightly `full` job has failed or been cancelled every
+  night from 2026-10-24 to 2026-11-01 while every other leg passed. Those
+  failures are WP-2036's (PR #1309). *Next:* the first nightly `full` job
+  that completes on `main` closes this WP.
 
 ### 2026-10-25 — option 5 measured and built: the last declared stage converges, and the hostile series finishes in 92 s
 
