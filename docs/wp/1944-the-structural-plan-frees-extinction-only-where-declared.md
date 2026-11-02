@@ -113,6 +113,19 @@ with one phase declared and one not.
 
 ## Handover log
 
+- **2026-11-02** — no decision changes. The 2026-11-01 decision briefs
+  re-read this WP and confirmed that the maintainer's ruling of 2026-10-11
+  stands: measure first, and let the count decide. So the next step is
+  task 1, the measurement. One strong hint exists already (§ Inherited, from
+  WP-2044): on the QPA guide's fit, freeing extinction moves CaF₂ to
+  3.58 ± 3.53 wt% against 1.37 ± 0.07 wt% held. No surveyed program refines
+  powder extinction unasked: TOPAS has no keyword for it, RIETAN-FP has
+  none, and FullProf has one empirical parameter (`docs/practice.md`
+  § Extinction). If the count favours the opt-in, making `Phase.extinction`
+  optional is a stored-format change, and it goes back to the maintainer as
+  one consent line. Recorded by a ghostshift runner in PR #1317; nothing
+  was run. *Next:* task 1.
+
 - **2026-10-11** — created, from the 2026-10-11 issue triage (issue #877).
   Checked against the tree at `f11e22d3`: the extinction stage's glob
   matches every phase, and PO and roughness are the only opt-in blocks among
