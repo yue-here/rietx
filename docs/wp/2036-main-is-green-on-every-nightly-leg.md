@@ -1,6 +1,6 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: 🔄 2026-10-25 — every task done (PR #1165); a green nightly waits on WP-2048, 2049 and 2050
+Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here (ghostshift runner, main-health): three rows red on the 11-01 nightly, two nights cancelled at the cap
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
 Priority: P3 2026-11-01 — every task here is done; a green nightly waits on WP-2049 and 2050, and on WP-2048's PR #1292 merging
