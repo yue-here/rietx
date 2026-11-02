@@ -45,13 +45,14 @@ thing with no secret. The one fetch is the release tags, which the Jupyter
 quickstart reads (below).
 
 - A link meaning "the manual" is `https://rietx.org/docs/`, which sends the
-  reader to the newest release's tree, or to `dev/` before a release carries
-  one. A chapter link uses the retired old tree's address (`/using/<x>.html`,
-  `/<theory>.html`), whose redirect stub (`docs_versions.RETIRED`) resolves the
-  same way per page, so the page needs no edit at a release. A stub carries a
-  `#fragment` over by script, but a chapter's sections took new heading ids on
-  their new pages, so a stub link carries none. A page the old tree never had
-  links `/docs/<version>/` directly.
+  reader to the newest release's tree. A chapter link names its page under
+  `/docs/stable/`, which is that same tree, so the page needs no edit at a
+  release. It may carry a `#fragment`. The stable tree is the last release's,
+  so a page or heading that `main` added is missing there until the next one.
+  Since 1.10, the first release built from the new tree, no link uses the
+  retired old tree's addresses (`/using/<x>.html`). Their stubs still work,
+  but each lands on the chapter's successor, which is often not the page that
+  now holds the section.
 - `dist/`, `site/` and `preview.html` are gitignored — one page built three ways.
   `data/` is **not**, and § The payload says why.
 - The fluorapatite example is the first fit in
