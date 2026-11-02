@@ -39,6 +39,12 @@ narrower accident is blocked while the broader one is waved through.
 A refusal names the release verb, because a refusal with no way past it is a
 trap: a session parked idle in a tree it has finished with would block the next
 one for ever.
+
+**A WP a live ghostshift claim holds is refused too** (WP-2077).  A ghostshift
+runner works in an ``agent-<id>`` tree, but its process is the shift lead's, in
+the main checkout, so the process scan finds nobody there.  The shift's own
+claim, a ref on origin, is the observable fact instead; ``wp_claim.ghost_refusal``
+fetches it, refuses only on a claim known live, and names how it frees.
 """
 
 from __future__ import annotations
@@ -109,7 +115,9 @@ def main() -> int:
     # Before the tree exists, so a refusal leaves nothing half-made.
     wp = wp_claim.wp_from_name(name)
     if wp is not None:
-        refusal = clash_refusal(root, wp)
+        # A ghostshift runner has no session in its tree, so the local scan
+        # misses it; the shift's claim on origin is the only record (WP-2077).
+        refusal = clash_refusal(root, wp) or wp_claim.ghost_refusal(root, wp)
         if refusal:
             raise RuntimeError(refusal)
 

@@ -60,7 +60,7 @@ Tier: no heuristic enters `rietx._audit`; this is workflow tooling under `.claud
 
 ## Tasks
 
-- [ ] `wp_claim.py`: read ghostshift claim refs; `status` reports a WP a live claim holds as
+- [x] `wp_claim.py`: read ghostshift claim refs; `status` reports a WP a live claim holds as
       held, naming the owner; `worktree_create.py`'s refusal fires on one. Test with a fake
       claim ref in a scratch repo. Measure the added cost on session start.
 - [ ] `tests/CLAUDE.md`: the `serial.py` sentence.

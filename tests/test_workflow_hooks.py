@@ -18,6 +18,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -1002,6 +1003,114 @@ def test_a_dormant_row_says_dormant_rather_than_held_by_no_session(
     (holder,) = [h for h in claim.occupancy(trees, [], set(), {}, main) if h.wp == "9101"]
     line = claim.describe(holder, main)
     assert line.startswith("WP-9101 dormant in") and "no session" not in line
+
+
+# --------------------------------------------------------------------------- #
+# The ghostshift half (WP-2077): a runner works in an ``agent-<id>`` tree whose
+# only process is the shift lead's, in the main checkout, so the process scan
+# reads its tree as dormant.  The shift's claim, a ref on origin, says otherwise.
+# --------------------------------------------------------------------------- #
+
+
+def _out(cwd: Path, *args: str, stdin: str | None = None) -> str:
+    return subprocess.run(
+        ["git", "-c", "user.email=wp@test", "-c", "user.name=wp", *args],
+        cwd=cwd, input=stdin, check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+
+def _ghost_claim(repo: Path, item: str, taken: float, pr: int | None = None) -> None:
+    """Push a claim shaped as ghostshift's ``claim.py`` writes one."""
+    record = {"owner": "laptop-ab12-c0ffee", "item": item, "taken": taken, "pr": pr,
+              "at": "2026-11-02T00:00:00+00:00"}
+    empty = _out(repo, "mktree", stdin="")
+    sha = _out(repo, "commit-tree", empty, stdin=json.dumps(record))
+    _out(repo, "push", "-q", "origin", f"{sha}:{claim.GHOST_NS}/{item}")
+
+
+@pytest.fixture
+def ghost_origin(two_trees: tuple[Path, Path, Path], tmp_path: Path):
+    """The two-tree checkout plus a runner's tree and a bare origin to hold claims."""
+    main, _outer, _inner = two_trees
+    origin = tmp_path / "origin.git"
+    _git(tmp_path, "init", "-q", "--bare", str(origin))
+    _git(main, "remote", "add", "origin", str(origin))
+    runner = main / ".claude" / "worktrees" / "agent-a1b2c3"
+    _git(main, "worktree", "add", "-q", "-b", "wp9103-runner", str(runner))
+    return main, runner
+
+
+def test_a_ghostshift_claim_is_read_off_origin(ghost_origin) -> None:
+    main, _runner = ghost_origin
+    _ghost_claim(main, "wp-9103", 1_000.0, pr=77)
+    _ghost_claim(main, "issue-55", 1_000.0)
+    assert claim.read_ghost_claims(main) == []  # nothing until fetched
+    assert claim.fetch_ghost_claims(main)
+    claims = {c.item: c for c in claim.read_ghost_claims(main)}
+    assert claims["wp-9103"] == claim.GhostClaim(
+        "wp-9103", "9103", "laptop-ab12-c0ffee", 1_000.0, 77)
+    assert claims["issue-55"].wp is None  # not a WP, so no WP row
+    # A released claim leaves the local copy on the next fetch.
+    _out(main, "push", "-q", "origin", f":{claim.GHOST_NS}/issue-55")
+    assert claim.fetch_ghost_claims(main)
+    assert [c.item for c in claim.read_ghost_claims(main)] == ["wp-9103"]
+
+
+@pytest.mark.parametrize(
+    "pr,age_h,pr_state,live",
+    [
+        (None, 1, None, True),  # no PR, inside 24 h
+        (None, 25, None, False),  # no PR, past 24 h: free
+        (77, 99, True, True),  # a PR still open holds it however old
+        (77, 1, False, False),  # merged or closed: free
+        (77, 1, None, None),  # gh could not say
+    ],
+)
+def test_a_ghostshift_claim_frees_as_claim_py_says(pr, age_h, pr_state, live) -> None:
+    c = claim.GhostClaim("wp-9103", "9103", "o", 0.0, pr)
+    assert claim.ghost_live(c, lambda n: pr_state, age_h * 3600.0) is live
+
+
+def test_the_refusal_fires_on_a_live_ghostshift_claim_only(
+    ghost_origin, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    main, _runner = ghost_origin
+    _ghost_claim(main, "wp-9103", time.time(), pr=77)
+    state = {"value": "OPEN\n"}
+    monkeypatch.setattr(claim, "_gh", lambda root, *a, **k: state["value"])
+
+    message = claim.ghost_refusal(main, "9103")
+    assert "laptop-ab12-c0ffee" in message and "PR #77" in message
+    assert "claim.py release wp-9103" in message  # the way past it
+    assert f"git push origin :{claim.GHOST_NS}/wp-9103" in message
+    assert claim.ghost_refusal(main, "9101") == ""  # no claim on that WP
+
+    state["value"] = "MERGED\n"
+    assert claim.ghost_refusal(main, "9103") == ""
+    state["value"] = None  # gh offline: an unknown state never refuses
+    assert claim.ghost_refusal(main, "9103") == ""
+
+
+def test_status_calls_a_runner_tree_held_rather_than_dormant(
+    ghost_origin, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+) -> None:
+    """The measured miss: /wp-start offered a live runner's tree to resume."""
+    main, runner = ghost_origin
+    _ghost_claim(main, "wp-9103", time.time())
+    monkeypatch.setattr(claim.sibling("session_start"), "live_sessions", lambda: [])
+    monkeypatch.setattr(claim, "_gh", lambda root, *a, **k: "[]")
+
+    claim._status(main, main)
+    out = capsys.readouterr().out
+    (row,) = [line for line in out.splitlines() if "agent-a1b2c3" in line]
+    assert "held by ghostshift laptop-ab12-c0ffee" in row and "dormant" not in row
+    assert "⚠ WP-9103 held by ghostshift laptop-ab12-c0ffee" in out
+    (outer_row,) = [line for line in out.splitlines() if "WP-9101 " in line]
+    assert "dormant" in outer_row  # an unclaimed tree is untouched
+
+    # From the runner's own tree, its claim is named as possibly its own.
+    claim._status(main, runner, "9103")
+    assert "a runner's own claim" in capsys.readouterr().out
 
 
 # --------------------------------------------------------------------------- #
