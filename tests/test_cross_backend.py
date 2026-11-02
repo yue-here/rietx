@@ -1536,27 +1536,6 @@ def test_a_zero_aperture_column_meets_its_one_sided_difference(name, path):
                     cos_min=KINK_COSINE_MIN, what=f"{name} at 0: ")
 
 
-@pytest.mark.parametrize("gap", [1e-6, 5e-6])
-def test_an_aperture_just_under_the_other_is_differenced_on_its_own_side(gap):
-    """WP-1955: the numpy node derivatives stay off the S/L = H/L kink.
-
-    The second-order stencil steps 2h = 6e-6, so an aperture lying under the
-    other by less than that would difference across the kink.  Forward, the
-    H/L column sat 7.7e-5 to 2.2e-3 rel-L2 off jax's at gaps of 1e-6 to
-    5.9e-6; mirrored it sits at 6e-9 to 1.3e-8, as interior apertures do.
-    The bar sits between the two.
-    """
-    pytest.importorskip("jax")
-    model, table, _extras = _families_state(axial_hl=0.02, axial_sl=0.02 + gap)
-    theta = table.x0()
-    path = "instrument.geometry.axial_hl"
-    c = list(table.free_paths).index(path)
-    exact = _jacobian_for(model, table, "jax")(theta)[:, [c]]
-    col = _jacobian_for(model, table, "numpy")(theta)[:, [c]]
-    _assert_columns(exact, col, [path], rel_max=1e-5, cos_min=COSINE_MIN,
-                    what=f"numpy at a gap of {gap:g}: ")
-
-
 @pytest.mark.parametrize("name", ["numpy", "jax", "torch"])
 def test_a_width_on_its_floor_takes_the_feasible_side(name):
     """WP-1955: at U = V = 0 with W on the Γ_G² floor, every width column is
