@@ -105,9 +105,12 @@ template. On real data with no measured shift, `high` is *unreachable* by design
   finder `"prior"` — merged when an engine found the lattice, else appended
   **after** the ranked list, never in the Borda ranking (IIA — what makes "a
   wrong prior changes no rank" structural); absent from `engines_run`, so the
-  agreement caveat grades it with no new vocabulary — though `grade` still
-  counts it toward `MIN_AGREEMENT`: **a prior corroborates but does not
-  confirm**; fix deferred post-1003, stated in `consensus.grade` (1046 §4).
+  agreement caveat grades it with no new vocabulary. **A prior corroborates
+  but does not confirm**: an engine count is `engines._engines_behind` (or
+  `agreement`/`corroborated`), prior excluded, never `len(found_by)` — the
+  ranking key and `grade`'s floor both read it; counted, a prior outgraded the
+  truth (WP-2082, #1308). A superset test against `engines_run` needs no
+  exclusion; svd's seeded start is svd's own finding (1045 rule one).
   Traps met: `PRIOR_DRIFT_MAX`, `same_lattice`-never-cell-tuples (WP-1045).
 
 ## Engines and the FoM panel
@@ -145,7 +148,7 @@ low-symmetry sets.
 
 **Corroboration outranks every figure of merit — and it is binary, not a count**
 (`engines.corroborated`, WP-1046). The doctrine above applied to the *order*:
-`grade` floors a candidate below `MIN_AGREEMENT` finders at `low` before a caveat
+`grade` floors a candidate below `MIN_AGREEMENT` engines at `low` before a caveat
 is read, so a panel-only ranking put candidates the gate refuses to promote above
 the one it could. Not an aggregation artefact — the displacing candidate *wins*
 the panel on the members, and no re-weighting reaches it (WP-1041 stands).
