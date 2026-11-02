@@ -1517,7 +1517,6 @@ def _moment_reach_ok(path: str, extra: list[str]) -> bool:
                and q.startswith(prefix) for q in extra)
 
 
-
 def _analytic_angle_block(model: CompiledModel, table: ParameterTable):
     """The stationary-angle test's analytic block, or ``None`` (WP-2068).
 
@@ -1535,75 +1534,82 @@ def _analytic_angle_block(model: CompiledModel, table: ParameterTable):
     Within that reach the chain is linear: y is affine in |F|², so
     ∂²y/∂a∂b is ∂²|F_⊥|²/∂a∂b through the same per-reflection factor and
     the same frozen profile Ω as the first derivative.  Neither depends on
-    an angle, so both are built once, at the first ``th``, and every later
-    call moves only the angles.  The coefficients are C's, so a tie or a
-    variable driving several sites' angles is carried exactly, the DOFs being
-    affine in θ.
+    an angle, so both are built once per phase, at the first ``th`` any set
+    is evaluated at, and shared by every round's set.  The coefficients are
+    C's, so a tie or a variable driving several sites' angles is carried
+    exactly, the DOFs being affine in θ.  The reach is read off
+    :meth:`~rietx.params.vector.ParameterTable.column_reach`, never C's
+    sparsity: a derived row a column moves carries no coefficient in C, and
+    the branch declines it rather than reading it as unmoved.
     """
-    if model.mode != "rietveld" or model.pawley is not None:
+    if (model.mode != "rietveld" or model.pawley is not None
+            or all(cp.magnetic is None for cp in model.phases)):
         return None
     coef = table.constraint_block()[0].tocsc()
-    by_row = {row: path for path, row in table._paths.items()}
+    reach = list(table.column_reach().values())
     n_table = len(table.free_paths)
     sqrt_w = 1.0 / model.sigma
     n_pts = len(model.tt)
+    frozen: dict[int, list] = {}
+
+    def freeze(values: dict[str, float], phases) -> None:
+        """Per phase and drawn component, ∂y/∂(p²⟨|F_⊥|²⟩) as a sparse
+        (points × reflections) operator: Ω scattered by its window
+        indices, times the per-reflection factor the first-derivative
+        chain applies (:meth:`CompiledModel.moment_intensity_grad`)."""
+        from scipy import sparse
+
+        todo = [ip for ip in phases if ip not in frozen]
+        if not todo:
+            return
+        bases = model.derivative_bases(values, None, axial_derivs=False,
+                                       profile_derivs=False)
+        for ip in todo:
+            n_refl = len(model.phases[ip].reflections)
+            ops = []
+            for pp, fac in zip(bases.components(ip),
+                               model.moment_intensity_grad(
+                                   ip, np.ones(n_refl), values),
+                               strict=True):
+                lay = pp.layout
+                if not len(lay.i0):
+                    continue
+                row_fac = np.where(pp.finite, _gather_per_line(lay, fac), 0.0)
+                data = (np.asarray(pp.omega) * row_fac[:, None]).ravel()
+                rows = np.asarray(lay.idx).ravel()
+                refl = np.broadcast_to(np.asarray(lay.k)[:, None],
+                                       lay.idx.shape).ravel()
+                ops.append(sparse.csr_matrix((data, (rows, refl)),
+                                             shape=(n_pts, n_refl)))
+            frozen[ip] = ops
 
     def make(idx: list[int]):
         weights: dict[int, list[dict[tuple[int, int], float]]] = {}
         for a, c in enumerate(idx):
             if c >= n_table:
                 return None
-            col = coef[:, c]
-            for row, w in zip(col.indices, col.data, strict=True):
-                path = by_row[int(row)]
-                if is_variable_path(path) or w == 0.0:
+            for path in reach[c]:
+                if is_variable_path(path):
                     continue
+                w = float(coef[table._paths[path], c])
                 m = _MOMENT_PATH.match(path)
-                if m is None or m.group(3) == "0":
+                if w == 0.0 or m is None or m.group(3) == "0":
+                    # a derived row (no coefficient in C), a modulus or
+                    # anything that is not a moment angle
                     return None
                 ip = int(m.group(1))
                 if not model.moment_angle_block_supported(ip):
                     return None
                 per = weights.setdefault(ip, [{} for _ in idx])
-                per[a][int(m.group(2)), int(m.group(3))] = float(w)
+                per[a][int(m.group(2)), int(m.group(3))] = w
         if not weights:
             return None
         k = len(idx)
         upper = np.triu_indices(k)
-        frozen: dict[int, list] = {}
-
-        def freeze(values: dict[str, float]) -> None:
-            """Per phase and drawn component, ∂y/∂(p²⟨|F_⊥|²⟩) as a sparse
-            (points × reflections) operator: Ω scattered by its window
-            indices, times the per-reflection factor the first-derivative
-            chain applies (:meth:`CompiledModel.moment_intensity_grad`)."""
-            from scipy import sparse
-
-            bases = model.derivative_bases(values, None, axial_derivs=False,
-                                           profile_derivs=False)
-            for ip in weights:
-                n_refl = len(model.phases[ip].reflections)
-                ops = []
-                for pp, fac in zip(bases.components(ip),
-                                   model.moment_intensity_grad(
-                                       ip, np.ones(n_refl), values),
-                                   strict=True):
-                    lay = pp.layout
-                    if not len(lay.i0):
-                        continue
-                    row_fac = np.where(pp.finite, _gather_per_line(lay, fac), 0.0)
-                    data = (np.asarray(pp.omega) * row_fac[:, None]).ravel()
-                    rows = np.asarray(lay.idx).ravel()
-                    refl = np.broadcast_to(np.asarray(lay.k)[:, None],
-                                           lay.idx.shape).ravel()
-                    ops.append(sparse.csr_matrix((data, (rows, refl)),
-                                                 shape=(n_pts, n_refl)))
-                frozen[ip] = ops
 
         def block(th: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
             values = table.decode(th[:n_table])
-            if not frozen:
-                freeze(values)
+            freeze(values, weights)
             dy = np.zeros((n_pts, k + len(upper[0])))
             for ip, w in weights.items():
                 g, h = model.moment_f2_angle_block(ip, values, w)

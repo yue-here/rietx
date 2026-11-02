@@ -223,8 +223,12 @@ def _run_test(model, table, r, x, idx, analytic: bool):
 
 
 @pytest.mark.parametrize("n_sites", [1, 2, 4])
-def test_the_analytic_block_reaches_the_differences_verdict_for_a_tenth(n_sites):
-    """k = 2, 4, 8: the same rounds and verdicts, at a tenth of the evaluations.
+def test_the_analytic_block_reaches_the_differences_verdict_for_fewer_evaluations(n_sites):
+    """k = 2, 4, 8: the same rounds and verdicts, for far fewer evaluations.
+
+    Measured 2026-11-02 (darwin/arm64): 40 against 6 at k = 2, 287 against 14
+    at k = 4 and 2999 against 53 at k = 8, so the bar is a quarter at k = 2
+    and a tenth from k = 4.
 
     The start sits 0.03 rad off the simulated angles, so every round has
     somewhere to drive.  The statistic and the stationary point carry the
@@ -247,4 +251,4 @@ def test_the_analytic_block_reaches_the_differences_verdict_for_a_tenth(n_sites)
             assert an.stationary_at[p] == pytest.approx(v, abs=1e-6)
     k = len(idx)
     print(f"k={k}: {fd_calls} residual evaluations by differences, {an_calls} analytic")
-    assert an_calls * (10 if k >= 8 else 2) <= fd_calls
+    assert an_calls * (10 if k >= 4 else 4) <= fd_calls

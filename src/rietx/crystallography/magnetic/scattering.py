@@ -708,7 +708,7 @@ def d_magnetic_f2_d_dofs(members, seg, counts, stol, msites: MagneticSites,
     """
     from .moments import d_moment_d_dofs
 
-    seg_i, n, cart, per_atom, perp, norm = _projected_orbit_sum(
+    seg_i, n, cart, per_atom, _qhat, perp, norm = _projected_orbit_sum(
         members, seg, counts, stol, msites, cell, xyz, occ, biso, dofs)
     perp_conj = np.conj(perp)
     out: dict[tuple[int, int], np.ndarray] = {}
@@ -729,10 +729,11 @@ def _projected_orbit_sum(members, seg, counts, stol, msites: MagneticSites,
                          cell, xyz, occ, biso, dofs: list[np.ndarray]):
     """The half every moment derivative shares: F_⊥ and each atom's orbit terms.
 
-    Returns ``(seg_i, n, cart, per_atom, perp, norm)``: the member segment
-    index, the reflection count, the crystal-axis→Cartesian matrix,
+    Returns ``(seg_i, n, cart, per_atom, qhat, perp, norm)``: the member
+    segment index, the reflection count, the crystal-axis→Cartesian matrix,
     ``{j: (axial matrices, phases, amplitude)}`` for every carrying atom, the
-    projected total P·F per member (M_total, 3), and p²/counts.  The
+    unit scattering vector Q̂ per member (M_total, 3), the projected total P·F
+    per member (M_total, 3), and p²/counts.  The
     arithmetic is :func:`magnetic_f2`'s, in its order.
     """
     m_hkl = np.asarray(members, dtype=np.float64)
@@ -762,7 +763,7 @@ def _projected_orbit_sum(members, seg, counts, stol, msites: MagneticSites,
     qhat = q / np.sqrt((q * q).sum(axis=1))[:, None]
     perp = total - qhat * (qhat.astype(np.complex128) * total).sum(axis=1)[:, None]
     norm = (P_MAGNETIC_FM ** 2) / np.asarray(counts, dtype=np.float64)
-    return seg_i, n, cart, per_atom, perp, norm
+    return seg_i, n, cart, per_atom, qhat, perp, norm
 
 
 def magnetic_f2_angle_block(members, seg, counts, stol, msites: MagneticSites,
@@ -792,17 +793,21 @@ def magnetic_f2_angle_block(members, seg, counts, stol, msites: MagneticSites,
     """
     from .moments import d2_moment_d_dofs, d_moment_d_dofs
 
-    seg_i, n, cart, per_atom, perp, norm = _projected_orbit_sum(
+    seg_i, n, cart, per_atom, qhat, perp, norm = _projected_orbit_sum(
         members, seg, counts, stol, msites, cell, xyz, occ, biso, dofs)
     k = len(weights)
     n_mem = len(seg_i)
+    perp_conj = np.conj(perp)
     g_f = np.zeros((n_mem, k, 3), dtype=np.complex128)           # G_a per member
-    h_f = np.zeros((n_mem, k, k, 3), dtype=np.complex128)        # H_ab per member
+    # (P·F)ᴴ·H_ab per member, contracted with (P·F)ᴴ inside the orbit sum so
+    # no (M, k, k, 3) array of H itself is ever held
+    pf_h = np.zeros((n_mem, k * k), dtype=np.complex128)
     for j, (mats, phase, amp) in per_atom.items():
         w = np.array([[wa.get((j, q), 0.0) for q in range(len(dofs[j]))]
                       for wa in weights], dtype=np.float64)       # (k, n_j)
         if not np.any(w):
             continue
+        n_img = len(mats)
         dm = w @ d_moment_d_dofs(msites.frames[j], dofs[j])        # (k, 3)
         d2m = np.einsum("aq,bp,qpc->abc", w, w,
                         d2_moment_d_dofs(msites.frames[j], dofs[j]))  # (k, k, 3)
@@ -810,18 +815,16 @@ def magnetic_f2_angle_block(members, seg, counts, stol, msites: MagneticSites,
         d2m_cart = np.einsum("kxy,aby->kabx", mats, d2m) @ cart.T      # (m, k, k, 3)
         # the orbit sums as one matmul each over the site's m images
         pt = phase.T                                                   # (M, m)
-        g_f += amp[:, None, None] * (pt @ dm_cart.reshape(len(mats), -1)
+        g_f += amp[:, None, None] * (pt @ dm_cart.reshape(n_img, -1)
                                      ).reshape(n_mem, k, 3)
-        h_f += amp[:, None, None, None] * (pt @ d2m_cart.reshape(len(mats), -1)
-                                           ).reshape(n_mem, k, k, 3)
-    m_hkl = np.asarray(members, dtype=np.float64)
-    q = m_hkl @ reciprocal_cartesian_basis(cell).T
-    qhat = (q / np.sqrt((q * q).sum(axis=1))[:, None]).astype(np.complex128)
+        lhs = (pt[:, :, None] * perp_conj[:, None, :]).reshape(n_mem, n_img * 3)
+        pf_h += amp[:, None] * (lhs @ d2m_cart.transpose(0, 3, 1, 2)
+                                .reshape(n_img * 3, k * k))
+    qhat = qhat.astype(np.complex128)
     g_perp = g_f - qhat[:, None, :] * np.einsum("mc,mac->ma", qhat, g_f)[:, :, None]
-    perp_conj = np.conj(perp)
     d1 = 2.0 * np.real(np.einsum("mc,mac->ma", perp_conj, g_f))
     d2 = 2.0 * np.real(np.conj(g_perp) @ g_perp.transpose(0, 2, 1)
-                       + (h_f.reshape(n_mem, k * k, 3) @ perp_conj[:, :, None]).reshape(n_mem, k, k))
+                       + pf_h.reshape(n_mem, k, k))
     g = np.zeros((n, k), dtype=np.float64)
     h = np.zeros((n, k, k), dtype=np.float64)
     np.add.at(g, seg_i, d1)
