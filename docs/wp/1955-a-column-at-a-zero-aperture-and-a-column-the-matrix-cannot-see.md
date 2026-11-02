@@ -1,6 +1,6 @@
 # WP-1955 — a column at a zero aperture, and a column the agreement matrix cannot see
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — tasks 1-4 landed (PR #1321); task 5, both apertures at zero, open
+Milestone: unscheduled · Status: 🔄 2026-11-02 — tasks 1-4 landed (PR #1321, draft); blocked on a ruling: the exact column strands a zero aperture (see the 2026-11-02 entry)
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-26 — two measurements the same day: WP-2003's double-zero aperture collapsing a warm-started CPD fit (Rwp 0.79-10.7 against 0.109), and #1075's LM ending converged at S/L = H/L = 0 on lab_bragg_brentano from defaults while one TRF stage drops χ² by ~1 200 χ²_red·f²; the single-zero column is still off its difference with no test
@@ -221,7 +221,33 @@ alone.
   more kinks a stencil can straddle: the ξ cap (`_tan_cap`) at low angle,
   rare and not handled.
 
-  Next: task 5. Reproduce WP-2003's X17 (`docs/wp/2003-batch/clashes.md`)
+  *Blocking finding, after the fast suite.* The fast run (13 506 passed,
+  128 skipped, 32 xfailed, 3 failed) failed `test_examples[calibrate]`, and
+  the cause is this change. The calibrate guide's second calibration frees
+  S/L from its default of 0 with H/L held at 0.015. On main LM leaves 0 and
+  lands S/L 0.02464 (truth 0.025), W 0.00595 and X 0.0305 (truth 0.006 and
+  0.030), Rwp 0.0596. On this branch S/L stays at 0, and W 0.00887 and X
+  0.0324 absorb the asymmetry, Rwp 0.0642, every stage `converged`. The
+  profile is quadratic in a zero aperture, so the exact column there is
+  nearly zero, and Gauss-Newton sees no way off the bound. The old
+  first-order column carried a spurious O(h) term (0.013 in norm), and that
+  error was what pushed LM off zero. This is #1075's mechanism with one
+  aperture held. The guide's quotes were left as main's, so that test stays
+  red on this branch. The other two failures are not this change's: the
+  scalar oracle in `test_derivative_bases_batched.py` still used the
+  first-order rule (fixed, commit 29724e63b), and
+  `test_display.py::test_a_plot_in_a_kernel…` fails on a Jupyter kernel spec
+  pointing at a deleted venv (an environment fault on this Mac). The full
+  selection was stopped before it ran.
+
+  *Question for Yue (open).* Ship the exact column only together with a lift
+  off a zero aperture (a stage that frees an aperture seeds it off 0, WP-1938's
+  "a floor or a lift where the column is live"), which also covers task 5 and
+  moves every fit that frees an aperture from 0; or revert the column fix
+  until that lift exists, keeping the matrix and Caglioti changes. The PR
+  stays a draft until this is ruled.
+
+  Next: the ruling above. Then task 5. Reproduce WP-2003's X17 (`docs/wp/2003-batch/clashes.md`)
   and #1075 repro 1 at this branch, since neither path touches the columns
   fixed here (both apertures at zero take whole-model FD). Then decide
   between a floor and a lift for the apertures (WP-1938's rule); either moves
