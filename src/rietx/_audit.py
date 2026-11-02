@@ -618,6 +618,34 @@ ROWS: tuple[Row, ...] = (
     Row("EXTINCTION_FORBIDDEN_INTENSITY", "code"),
     Row("EXTINCTION_GROUPS_NOT_SEPARABLE", "code"),
     Row("EXTINCTION_PRIOR_APPLIED", "code"),
+    Row("EXTINCTION_SCREENS_DISAGREE", "code", tier=3, ambiguity=2,
+        evidence=("warning; statistic: whether the default screen (after the cell-free "
+                  "prefit) and a second screen at the prefit's cell, held, from the declared "
+                  "instrument both name a class and name different ones (arithmetic on two "
+                  "existing answers; the choice of second screen is rietx's own); no "
+                  "threshold; action: best_or_none() abstains and both rankings are kept. "
+                  "Measured on SRM 676a corundum, GSAS-II FAP, synthetic P 2_1/c, GSAS-II "
+                  "PbSO4 X-ray and 11-BM NAC at 24 cell scales each (x0.97-1.03): fires on "
+                  "the six offsets where the default names a wrong class and the held screen "
+                  "the true one, on none where the default is right; fails where the prefit's "
+                  "own cell is off (corundum x0.985, P 2_1/c x0.9975: both screens name the "
+                  "same wrong class) and where the held screen names nothing (PbSO4 x0.99, "
+                  "x1.0125: the default names P c - -). The six firing rows are corundum "
+                  "x0.995, FAP x1.0075 and the synthetic P 2_1/c at x0.998, x0.999, x1.002 "
+                  "and x1.0025 (three families, one synthetic). From the preset's all-zero "
+                  "declared background (the GUI's) it also fires needlessly at two synthetic "
+                  "P 2_1/c offsets (x1.0005, x1.001), because the held reference fit is then "
+                  "poor and the class forbidding nothing wins by elimination (#1286 round 1)"),
+        grounds=("Mechanical: four unrelated real families plus a synthetic, silent on every "
+                 "row the default gets right when the declared background is the true one "
+                 "(not from the all-zero preset: see the evidence). The five patterns were "
+                 "also WP-1910's development data on #1178, so this is not out-of-sample. Judgement: two answers naming disjoint classes "
+                 "cannot both be right, so no competent refiner quotes either; ruled for this "
+                 "action by the maintainer on #1178, 2026-10-26 (approval to be dated by him)."),
+        response="warning",
+        responds=("hold back the extinction class: read both rankings (candidates and "
+                  "held_screen.candidates) and the refuting positions each names, and fit the "
+                  "zero and the width law on a standard before screening again")),
     Row("EXTINCTION_SCREEN_FAILED", "code"),
     Row("EXTINCTION_SCREEN_UNRELIABLE", "code", tier=3, ambiguity=2,
         evidence=("warning; fires when the absence-free reference fit leaves more than "

@@ -1081,6 +1081,22 @@ def extinction_diagnostics(screen) -> list[Diagnostic]:
                         "better start), a phase the reference does not model, "
                         "weak data (counting longer helps; re-indexing does "
                         "not), the range, the wavelength, the width law")))
+    held = getattr(screen, "held_screen", None)
+    if held is not None and screen.screens_disagree():
+        mine, theirs = screen._own_best(), held.best_or_none()
+        out.append(Diagnostic(
+            level="warning", code="EXTINCTION_SCREENS_DISAGREE",
+            message=(f"the screen after the cell-free prefit names {mine.symbol}, and "
+                     f"a second screen at the same cell, held, from the declared "
+                     f"instrument names {theirs.symbol}; the two classes share no "
+                     "space group, so at most one is right, and best_or_none() "
+                     "abstains.  What differs between them is the profile every "
+                     "class is compared at (the prefit's widths, zero and "
+                     "background, or the declared ones), not the cell.  Both "
+                     "rankings are kept: candidates, and held_screen.candidates"),
+            where=[f"after the prefit: {mine.symbol} ({', '.join(mine.space_groups)})",
+                   f"held, declared instrument: {theirs.symbol} "
+                   f"({', '.join(theirs.space_groups)})"]))
     alive = [c for c in screen.candidates if not c.refuted and c.screened]
     # the classes a declared prior leaves a member in; every class without one
     admissible = [c for c in alive if c.space_groups]
