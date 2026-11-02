@@ -63,7 +63,7 @@ Tier: no heuristic enters `rietx._audit`; this is workflow tooling under `.claud
 - [x] `wp_claim.py`: read ghostshift claim refs; `status` reports a WP a live claim holds as
       held, naming the owner; `worktree_create.py`'s refusal fires on one. Test with a fake
       claim ref in a scratch repo. Measure the added cost on session start.
-- [ ] `tests/CLAUDE.md`: the `serial.py` sentence.
+- [x] `tests/CLAUDE.md`: the `serial.py` sentence.
 - [ ] `docs/RELEASING.md`: the post-release steps as numbered steps after step 8; ROADMAP's
       release rule points there.
 - [ ] The four skills: one line each on a shift lead's merges.
