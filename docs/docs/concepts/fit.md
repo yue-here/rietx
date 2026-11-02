@@ -116,6 +116,9 @@ The refined values are written back into the structure and instrument, and the s
 `fit` returns a `RefinementResult`.
 It holds the status (`converged`, or `max_iter` when the last stage ran out of iterations), the agreement statistics, every refined parameter with its esd, a record of each stage, the diagnostics, and the observed, calculated and background curves.
 The esds come from the last stage, where every freed parameter refines together.
+`RefinementResult.stages` holds one `StageResult` a stage, and `StageResult.rwp` is that stage's Rwp at the values it ended on.
+It is measured on the stage's own frozen peak windows, so the last stage's can differ slightly from the result's own Rwp.
+It is `None` on a result stored before the field existed.
 [About correlations and esds](correlations.md) explains what an esd here does and does not measure.
 
 `Refinement.report()` builds a `FitReport` from the last fit.

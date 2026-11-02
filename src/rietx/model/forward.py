@@ -2281,6 +2281,21 @@ class CompiledModel:
         return (self.background(values) + self.extra_peak_curve(values)
                 + self.bragg_component(values, intensities))
 
+    def evaluate_with_background(self, values: dict[str, float]
+                                 ) -> tuple[np.ndarray, np.ndarray]:
+        """``(evaluate(values), background(values))`` for one background pass.
+
+        For an at-rest reader that needs both curves, such as an Rwp with its
+        background-subtracted twin.  The sum is :meth:`evaluate`'s in its own
+        association order, so the curve is bit-identical to it, declared
+        peaks included (#441).
+        """
+        y_bkg = self.background(values)
+        if not self.peak_components:
+            return y_bkg + self.bragg_component(values), y_bkg
+        return (y_bkg + self.extra_peak_curve(values)
+                + self.bragg_component(values)), y_bkg
+
     def phase_support(self, values: dict[str, float]) -> np.ndarray:
         """Each phase's integrated contribution ‖y_p/σ‖₂ over the fitted range.
 
