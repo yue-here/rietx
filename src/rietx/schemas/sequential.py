@@ -138,7 +138,7 @@ class SeriesEntry(Base):
     #: Rwp the **first** (warm) attempt reached, set whenever the ladder
     #: escalated at all.  With ``reseeded`` it says how the escalation ended:
     #: both set means a cold restart rescued the pattern, ``rwp_warm`` alone
-    #: means the fence fired but a warm attempt was still the best of the
+    #: means the ladder escalated but a warm attempt was still the best of the
     #: ones tried — worth seeing, since it marks a pattern the series found
     #: hard for a reason no restart could fix.  ``None`` when that first
     #: attempt raised rather than returned: it reached no Rwp, and
@@ -172,18 +172,20 @@ class SeriesEntry(Base):
     #: ``SequentialRefinement._chain``; empty — which is true — wherever no
     #: rung raised.
     rungs_raised: dict[str, str] = Field(default_factory=dict)
-    #: The Rwp limit the chain's fence set at this pattern: ``reseed_factor`` ×
-    #: the median Rwp of the patterns accepted before it (WP-1469).  Recorded
-    #: rather than re-derived because the median is the *chain's* state, and
-    #: every fence here is read off the entry so a reloaded
-    #: :class:`SeriesResult` reports what the run did; :attr:`above_fence` is
-    #: the verdict.  Recorded whatever ``reseed`` says, as the quarantine is:
-    #: the limit is a fact about the pattern, not about how hard the chain
-    #: tried.  ``None`` where no median existed — the first pattern walked, or
-    #: every pattern before it quarantined — and in a document written before
-    #: the field: no fence judged it.  Written by
-    #: ``SequentialRefinement._chain``.
-    rwp_fence: float | None = None
+    #: The kept attempt's Rwp over the median Rwp of the patterns accepted
+    #: before it **in walk order** (WP-2003, batch C1), quarantined patterns
+    #: never joining that median.  A record with no threshold: the package
+    #: escalates on no Rwp comparison by default, and a caller's own
+    #: ``reseed_factor`` is a fence on exactly this ratio.  Two readings keep
+    #: it from being a verdict.  The first patterns walked are compared
+    #: against a median of one or two values, so an early high ratio can be
+    #: its neighbour's low Rwp rather than its own high one.  And Rwp tracks
+    #: Rexp, so a ratio above 1 can be falling counts under a right model;
+    #: :attr:`statistics`' GoF and Rexp against the neighbours' tell them
+    #: apart (WP-1469).  ``None`` for the first pattern walked, while nothing
+    #: had been accepted, and in a document written before the field.
+    #: Written by ``SequentialRefinement._chain``.
+    rwp_over_median: float | None = None
     #: The series index of the pattern whose fitted state seeded this
     #: pattern's warm rungs (WP-2003): the last pattern accepted before it in
     #: the walk.  That is not the pattern walked just before it when that one
@@ -211,23 +213,21 @@ class SeriesEntry(Base):
     node_id: str | None = None
     tree_id: str | None = None
 
-    @property
-    def above_fence(self) -> bool:
-        """The kept attempt is still above :attr:`rwp_fence` (WP-1469).
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_rwp_fence(cls, data: object) -> object:
+        """Drop the ``rwp_fence`` key an entry written before WP-2003 carries.
 
-        Every rung the chain tried came back above the limit, so the best of
-        them is kept but is not like its neighbours: a specimen change the
-        model lacks, a bad frame, or fewer counts (a blank frame is the last,
-        its Rwp risen with its Rexp).  ``SEQUENTIAL_RWP_OUTLIER`` says so and
-        quotes the GoF and Rexp that tell them apart.  The pattern is not
-        quarantined — it seeds its successor and joins the median, since a
-        lasting change must be able to become the new normal.  False on a
-        ``"diverged"`` entry, which ``SEQUENTIAL_UNRECOVERED`` already covers,
-        and wherever no fence applied.
+        It held ``reseed_factor`` × the accepted median, the limit of a
+        default fence that no longer exists, and the factor that scaled it is
+        not on the entry, so nothing maps onto :attr:`rwp_over_median`: that
+        entry opens with it ``None``, "not recorded", and its old diagnostics
+        stay as written.  Without this the schema's ``extra="forbid"`` refuses
+        every series saved before.
         """
-        return (self.status != "diverged" and self.rwp_fence is not None
-                and self.statistics is not None
-                and self.statistics.rwp > self.rwp_fence)
+        if isinstance(data, dict) and "rwp_fence" in data:
+            data = {k: v for k, v in data.items() if k != "rwp_fence"}
+        return data
 
     def value(self, path: str) -> float | None:
         for p in self.parameters:
@@ -433,7 +433,7 @@ class SeriesFailure(Base):
     (WP-1333: a rung that raises escalates, so a pattern a later rung rescued
     is an entry with ``rungs_raised`` instead), not a converged-but-bad result
     (that is ``SeriesEntry.status == "diverged"``, a different thing: a
-    fit that ran to completion and landed somewhere the reseed fence
+    fit that ran to completion and landed somewhere the ladder
     rejected).  This is the fit never finishing — ``LinAlgError: SVD did not
     converge``, and anything else a solver can raise on a genuinely
     near-singular Jacobian.
@@ -530,7 +530,7 @@ class MagneticOnset(Base):
     #: * And the failure this catches is real: with ``max_iter=1`` on every
     #:   stage, the modulus above the transition came back **supported** and
     #:   the onset moved to a confident, wrong bracket — while neither the
-    #:   reseed fence nor the floor carry fired, because Rwp was fine and no
+    #:   ladder nor the floor carry fired, because Rwp was fine and no
     #:   pattern ever came back unsupported
     #:   (``test_a_starved_chain_reports_a_supported_moment_above_the_``
     #:   ``transition_and_is_flagged``).
@@ -583,16 +583,15 @@ class MagneticTrajectory(Trajectory):
     #: and held, or the pattern did not see the phase and WP-1301 held its
     #: structural paths for the stage, a closed-shutter frame being the plain
     #: case — and where the fit ``"diverged"`` and was quarantined.  **Not**
-    #: where the kept fit stayed above the chain's Rwp fence
-    #: (:attr:`SeriesEntry.above_fence`): that fence reports and does not
-    #: judge (WP-1469), and on the starved-chain ramp of
-    #: ``tests/test_magnetic_series.py``, fed 20 iterations, it fires on a
+    #: where the kept fit's Rwp sat high over the chain's accepted median
+    #: (:attr:`SeriesEntry.rwp_over_median`): that ratio is a record and not a
+    #: verdict (WP-1469, WP-2003), and on the starved-chain ramp of
+    #: ``tests/test_magnetic_series.py``, fed 20 iterations, it is high on a
     #: converged, correct pattern — the first above the transition, Rwp 0.0166
-    #: against a limit of 0.0151 set by the one ordered pattern before it.
+    #: against 0.0121 on the one ordered pattern before it, a ratio of 1.37.
     #: Withholding that verdict widened the right bracket, 10 → 70 K, to
     #: 10 → 80 K.  A bad frame that still sees its phase keeps a verdict
-    #: against its own covariance, and ``SEQUENTIAL_RWP_OUTLIER`` names it on
-    #: the same series.  Such a
+    #: against its own covariance.  Such a
     #: point is neither released nor held by the data: it is plotted, its
     #: ``supported`` is False and its esd ``None``, and :func:`locate_onset`
     #: leaves it out.  Counting it as held put a confident bracket one
@@ -790,8 +789,8 @@ class SeriesResult(Base):
     #: :class:`SeriesStep`, largest :attr:`SeriesStep.size_esd` in magnitude
     #: first and the rows with no size last (WP-2003).  No threshold and no
     #: diagnostic: the help entry carries the reading.  A step into or out of
-    #: a pattern the fence rejected (``"diverged"``, or above the Rwp fence) is
-    #: not a row, and neither is a relative path (:attr:`relative_paths`).
+    #: a quarantined (``"diverged"``) pattern is not a row, and neither is a
+    #: relative path (:attr:`relative_paths`).
     #: Written by ``SequentialRefinement.fit`` on the reported chain and on
     #: :attr:`backward`; ``None`` in a document written before the field —
     #: "not recorded", never "no step"; ``[]`` on a series of one pattern.

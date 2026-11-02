@@ -1193,24 +1193,24 @@ CLAIMS: tuple[Claim, ...] = (
         "test_acceptance_sequential",
         "test_the_hostile_series_exercises_the_reseed_fence", "qarr",
         ("identity", "characterisation"),
-        "the reseed fence's accounting is exact, the escalation ladder is "
+        "the reseed ladder's accounting is exact, the escalation ladder is "
         "only ever climbed as a prefix, and a reseed never leaves the fit "
         "worse than the warm start it rejected",
         reference="internal consistency: the SEQUENTIAL_RESEED diagnostic "
                   "count must equal the number of entries flagged reseeded, "
                   "exactly; every entry's rungs_tried must be a prefix of the "
-                  "ladder and contain the rung it kept.  The fence never fired "
+                  "ladder and contain the rung it kept.  The ladder never climbed "
                   "on the hostile series — the collapsed refit recovers a bad "
                   "warm start within the fit — so it is insurance, pinned by "
                   "unit tests rather than by this suite",
         measured="exact accounting; zero reseeds on the hostile series, "
                  "every pattern after the first kept on its warm rung, and no "
-                 "kept rung above the Rwp fence (2026-10-25, macOS arm64, "
-                 "after WP-2045; 1.9.0 the same).  1.10.0's hostile series did "
+                 "kept rung above the 1.25× Rwp fence the default then carried "
+                 "(2026-10-25, macOS arm64, after WP-2045; 1.9.0 the same; the "
+                 "fence left the default in WP-2003).  1.10.0's hostile series did "
                  "not finish, spending over 50 CPU minutes in the closing "
                  "stage that follows cpd-1b's warm rung (Rwp 0.760)",
-        diagnostics=("SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED",
-                     "SEQUENTIAL_RWP_OUTLIER"),
+        diagnostics=("SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED"),
     ),
     Claim(
         "test_acceptance_sequential",

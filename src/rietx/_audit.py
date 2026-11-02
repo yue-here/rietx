@@ -1068,8 +1068,19 @@ ROWS: tuple[Row, ...] = (
                   "less), two consequences in one code (WP-2003 batch)")),
     Row("SEQUENTIAL_PATH_DEPENDENT", "code"),
     Row("SEQUENTIAL_PERSISTENT_FINDING", "code"),
-    Row("SEQUENTIAL_RESEED", "code"),
-    Row("SEQUENTIAL_RWP_OUTLIER", "code"),
+    Row("SEQUENTIAL_RESEED", "code", tier=3, ambiguity=1,
+        evidence=("warning at its one site (sequential.py _reseed_diagnostics, where = the "
+                  "label); fires when the kept rung is cold on a warm-startable pattern, its "
+                  "trigger _reseed_needed (a diverged best attempt, or the caller's own "
+                  "reseed_factor) or a raised warm rung; on main under the removed 1.25 fence "
+                  "it fired on planted 35 and tut05-broken 1, none on the other six families "
+                  "(2003-batch/batch.md, C1)"),
+        grounds=("Says out loud that the chain restarted, the package's own act, as "
+                 "CELL_RUNAWAY does (B8); the ladder's trigger is tiered with C2's ladder, "
+                 "ruled 2026-10-26, the batch's pick approved (2003-batch/batch.md, C1)."),
+        approved="2026-10-26", response="warning",
+        responds=("read the named pattern's step from its neighbour as a cold fit's, not the "
+                  "chain's, before quoting a trajectory's cell or fraction across it")),
     Row("SEQUENTIAL_UNRECOVERED", "code"),
     Row("SEQUENTIAL_WIDTH_GROWTH", "code"),
     Row("SERIES_PATTERN_FAILED", "code", tier=1, ambiguity=1,
@@ -1409,8 +1420,25 @@ ROWS: tuple[Row, ...] = (
                  "ruled 2026-10-21)."),
         approved="2026-10-21"),
     Row("rietx.schemas.sequential.SeriesEntry.rung", "action"),
-    Row("rietx.schemas.sequential.SeriesEntry.reseeded", "action"),
-    Row("rietx.schemas.sequential.SeriesEntry.rwp_fence", "action"),
+    Row("rietx.schemas.sequential.SeriesEntry.reseeded", "action", tier=3, ambiguity=1,
+        evidence=("records that the kept attempt is the cold rung on a warm-startable pattern "
+                  "(sequential.py _chain); since WP-2003 the escalation it records fires on a "
+                  "diverged or raised warm rung, and on Rwp only under the caller's "
+                  "reseed_factor; on "
+                  "main under the removed 1.25 fence planted 35 and tut05-broken 1, none under "
+                  "the status-only trigger, CPD 0 (2003-batch/batch.md, C1)"),
+        grounds=("The record of the escalation, tiered with it: trying a colder start on a "
+                 "diverged fit and keeping the better is what a refiner does by hand; "
+                 "ruled 2026-10-26, the batch's pick approved (2003-batch/batch.md, C1)."),
+        approved="2026-10-26"),
+    Row("rietx.schemas.sequential.SeriesEntry.rwp_over_median", "action", tier=1, ambiguity=3,
+        evidence=("arithmetic: the kept attempt's Rwp over the median Rwp of the patterns "
+                  "accepted before it in walk order (sequential.py _rwp_over_median), a record "
+                  "with no threshold; it replaces SeriesEntry.rwp_fence, reseed_factor x the "
+                  "same median, whose default fence was removed (WP-2003, 2003-batch/batch.md, "
+                  "C1, ruled 2026-10-26). Its help entry says the first patterns are compared "
+                  "against a median of one or two values (X8) and that Rwp tracks Rexp "
+                  "(WP-1469's GoF and Rexp readings)")),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_tried", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.rungs_raised", "action"),
     Row("rietx.schemas.sequential.SeriesEntry.seeded_from", "action", tier=3, ambiguity=1,
@@ -3564,7 +3592,6 @@ ROWS: tuple[Row, ...] = (
                   "own: PATH_DEPENDENCE_SIGMA, and SeriesStep.size_esd, which it sets to 0 under "
                   "the floor (WP-2003)")),
     Row("rietx.sequential.PATH_DEPENDENCE_SIGMA", "constant", value=3.0),
-    Row("rietx.sequential.RESEED_FACTOR", "constant", value=1.25),
     Row("rietx.sequential.WIDTH_GROWTH_FACTOR", "constant", value=3.0),
     Row("rietx.sequential.WIDTH_GROWTH_GOF_FACTOR", "constant", value=2.0),
     Row("rietx.sequential.WIDTH_GROWTH_SIGMA", "constant", value=3.0),
@@ -4203,8 +4230,30 @@ ROWS: tuple[Row, ...] = (
                   "and the summary's 'ordering artefact: NOT measured' line. What 'both' turns on "
                   "is tiered on its own: PATH_DEPENDENCE_SIGMA, NOISE_FLOOR_REL and "
                   "SEQUENTIAL_PATH_DEPENDENT (WP-2003)")),
-    Row("rietx.sequential.SequentialRefinement.fit:reseed", "default", value=True),
-    Row("rietx.sequential.SequentialRefinement.fit:reseed_factor", "default", value=1.25),
+    Row("rietx.sequential.SequentialRefinement.fit:reseed", "default", tier=3, ambiguity=1,
+        value=True,
+        evidence=("switches on the ladder's escalation, which since WP-2003 fires on a "
+                  "diverged or raised warm rung and on the caller's reseed_factor only; under "
+                  "False each pattern keeps its first rung except where WP-1127's budget "
+                  "truncated it (forced, sequential.py _chain); on main with the status-only "
+                  "trigger planted escalates once, T087, forced by the first-rung bound, 3 165 "
+                  "evaluations against the removed fence's 13 034, and every other family "
+                  "not at all (2003-batch/batch.md, C1; clashes.md X16)"),
+        grounds=("Trying a colder start on a diverged or unfinished fit and keeping the "
+                 "better is what a refiner does by hand; the escalation never keeps a worse "
+                 "attempt (_prefer); approved with C2's ladder, ruled 2026-10-26, the "
+                 "batch's pick approved (2003-batch/batch.md, C1)."),
+        approved="2026-10-26"),
+    Row("rietx.sequential.SequentialRefinement.fit:reseed_factor", "default", tier="caller",
+        ambiguity=1, value=None,
+        evidence=("opt-in: reseed_factor=None sets no Rwp fence, and a factor is asked by "
+                  "name, refused unless finite and positive (_check_reseed_factor); no default "
+                  "path passes one, the GUI included (searched 2026-11-02). The 1.25 default "
+                  "it carried until WP-2003 (RESEED_FACTOR) was removed: its 116 escalations "
+                  "on main moved no value past 7.2e-4 esd, planted from T134 paid 4.1x the "
+                  "evaluations for nothing, and an Rwp comparison is no default action's "
+                  "evidence (DESIGN.md § Rules, 4; 2003-batch/batch.md, C1, ruled "
+                  "2026-10-26)")),
     Row("rietx.sequential.SequentialRefinement.fit:first_rung_factor", "default", value=3.0),
     Row("rietx.sequential.SequentialRefinement.fit:verify_steps", "default", tier="caller", ambiguity=1,
         value=0,
@@ -4512,8 +4561,11 @@ ROWS: tuple[Row, ...] = (
                   "undone")),
     Row("SEQUENTIAL_PATH_DEPENDENT.suggestion", "suggestion", value=1),
     Row("SEQUENTIAL_PERSISTENT_FINDING.suggestion", "suggestion", value=1),
-    Row("SEQUENTIAL_RESEED.suggestion", "suggestion", value=1),
-    Row("SEQUENTIAL_RWP_OUTLIER.suggestion", "suggestion", value=1),
+    Row("SEQUENTIAL_RESEED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
+        evidence=("arithmetic: points at the code that already says why "
+                  "(SEQUENTIAL_UNRECOVERED on a diverged cold fit) or at a specimen or model "
+                  "change at that pattern (sequential.py _reseed_diagnostics); "
+                  "ruled 2026-10-26, the batch's pick approved (2003-batch/batch.md, C1)")),
     Row("SEQUENTIAL_UNRECOVERED.suggestion", "suggestion", value=1),
     Row("SEQUENTIAL_WIDTH_GROWTH.suggestion", "suggestion", value=1),
     Row("SERIES_PATTERN_FAILED.suggestion", "suggestion", tier=1, ambiguity=1, value=1,
@@ -4948,10 +5000,6 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "SEQUENTIAL_PATH_DEPENDENT.suggestion",
     "SEQUENTIAL_PERSISTENT_FINDING",
     "SEQUENTIAL_PERSISTENT_FINDING.suggestion",
-    "SEQUENTIAL_RESEED",
-    "SEQUENTIAL_RESEED.suggestion",
-    "SEQUENTIAL_RWP_OUTLIER",
-    "SEQUENTIAL_RWP_OUTLIER.suggestion",
     "SEQUENTIAL_UNRECOVERED",
     "SEQUENTIAL_UNRECOVERED.suggestion",
     "SEQUENTIAL_WIDTH_GROWTH",
@@ -5424,11 +5472,9 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.schemas.plan.PlanSpec:correlation_guard",
     "rietx.schemas.results.HIGH_CORRELATION_MAX",
     "rietx.schemas.results._cap_one_code.suggestion",
-    "rietx.schemas.sequential.SeriesEntry.reseeded",
     "rietx.schemas.sequential.SeriesEntry.rung",
     "rietx.schemas.sequential.SeriesEntry.rungs_raised",
     "rietx.schemas.sequential.SeriesEntry.rungs_tried",
-    "rietx.schemas.sequential.SeriesEntry.rwp_fence",
     "rietx.schemas.suggest.SUGGEST_ABSORPTION_MAX",
     "rietx.schemas.suggest.SUGGEST_GROUP_R2",
     "rietx.schemas.suggest.SUGGEST_MIN_GAIN",
@@ -5436,14 +5482,11 @@ UNAUDITED_BASELINE: tuple[str, ...] = (
     "rietx.sequential.FIRST_RUNG_SAMPLES",
     "rietx.sequential.MIN_POINTS_FOR_PERSISTENCE",
     "rietx.sequential.PATH_DEPENDENCE_SIGMA",
-    "rietx.sequential.RESEED_FACTOR",
     "rietx.sequential.SequentialRefinement.fit:first_rung_factor",
     "rietx.sequential.SequentialRefinement.fit:labels",
     "rietx.sequential.SequentialRefinement.fit:on_error",
     "rietx.sequential.SequentialRefinement.fit:plan",
     "rietx.sequential.SequentialRefinement.fit:refit",
-    "rietx.sequential.SequentialRefinement.fit:reseed",
-    "rietx.sequential.SequentialRefinement.fit:reseed_factor",
     "rietx.sequential.SequentialRefinement.fit:x",
     "rietx.sequential.SequentialRefinement.fit:x_label",
     "rietx.sequential.WIDTH_GROWTH_FACTOR",
@@ -5677,8 +5720,6 @@ RESPONSE_BASELINE: tuple[str, ...] = (
     "SEQUENTIAL_PATH_CHECK_INCOMPLETE",
     "SEQUENTIAL_PATH_DEPENDENT",
     "SEQUENTIAL_PERSISTENT_FINDING",
-    "SEQUENTIAL_RESEED",
-    "SEQUENTIAL_RWP_OUTLIER",
     "SEQUENTIAL_UNRECOVERED",
     "SEQUENTIAL_WIDTH_GROWTH",
     "SIZE_UNUSUALLY_SMALL",

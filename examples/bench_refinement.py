@@ -878,9 +878,9 @@ class PerPattern:
     ``wall`` sums every rung the pattern ran and ``rung_walls`` breaks it out in
     ladder order, so a discarded first rung is visible rather than averaged
     away.  ``rwp_warm`` and ``status`` are what say *why* a pattern escalated:
-    the ladder climbs when the fit diverged or when the best attempt so far sits
-    above ``RESEED_FACTOR`` × the accepted median, and those are different
-    failures with different fixes.  ``rwp_warm`` is ``None`` on a pattern that
+    the ladder climbs when the fit diverged or raised, or when the best attempt
+    so far sits above a caller's ``reseed_factor`` × the accepted median, and
+    those are different failures with different fixes.  ``rwp_warm`` is ``None`` on a pattern that
     never escalated — the library records it only then.
     """
 

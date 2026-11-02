@@ -1,19 +1,23 @@
 """WP-2003 task 2, the measurement half: the reseed fence on, status-only and off.
 
-What it measures.  :data:`rietx.sequential.RESEED_FACTOR` sets the Rwp fence of
+What it measures.  ``RESEED_FACTOR`` (1.25) was the default Rwp fence of
 :meth:`rietx.SequentialRefinement.fit`: a warm fit above ``reseed_factor`` × the
 median Rwp of the accepted patterns climbs the rung ladder (``_ladder``), and a
-kept fit above it is an outlier (``SEQUENTIAL_RWP_OUTLIER``) whose steps the
-discontinuity scan drops.  Each chain family is run under three arms, every
-other setting at the family's own protocol:
+kept fit above it was an outlier (``SEQUENTIAL_RWP_OUTLIER``) whose steps the
+discontinuity scan dropped.  WP-2003's C1 removed that default (``reseed_factor``
+is ``None`` since), the code and the field, so the constant is this script's
+own and the record's ``rwp_fence``/``above_fence`` columns are derived from
+``SeriesEntry.rwp_over_median`` against it, in every arm.  Each chain family is
+run under three arms, every other setting at the family's own protocol:
 
 ``on``
-    the default, ``reseed=True, reseed_factor=RESEED_FACTOR`` (1.25).
+    the pre-C1 default, ``reseed=True, reseed_factor=RESEED_FACTOR`` (1.25).
 ``status``
-    ``reseed=True, reseed_factor=float("inf")``: the ladder escalates only on a
-    diverged or raised rung, never on Rwp.  ``fit`` does not validate the
-    factor, so ``inf`` is accepted as given; every ``rwp_fence`` is then
-    ``inf`` and no entry is ever ``above_fence``.
+    ``reseed=True, reseed_factor=None``: the ladder escalates only on a
+    diverged or raised rung, never on Rwp, which is the default since C1.
+    Before C1 this arm passed ``float("inf")``, which ``fit`` now refuses, and
+    its records wrote ``rwp_fence`` ``inf`` where they now write the 1.25
+    limit the entry sat under.
 ``off``
     ``reseed=False``: no fence- or status-driven escalation.  Not "no ladder":
     a first rung WP-1127's budget truncated still escalates one rung
@@ -149,17 +153,19 @@ import numpy as np  # noqa: E402
 
 import rietx as rx  # noqa: E402
 from rietx.model import compiled  # noqa: E402
-from rietx.sequential import RESEED_FACTOR  # noqa: E402
+
+#: the default fence WP-2003's C1 removed; the ``on`` arms pass it by name
+RESEED_FACTOR = 1.25
 
 OUT = Path(__file__).resolve().parent / "reseed"
 
 #: the chain arms (module docstring), as ``SequentialRefinement.fit`` kwargs
 ARMS = {
     "on": {"reseed": True, "reseed_factor": RESEED_FACTOR},
-    "status": {"reseed": True, "reseed_factor": float("inf")},
+    "status": {"reseed": True, "reseed_factor": None},
     "off": {"reseed": False},
-    "status_maxiter": {"reseed": True, "reseed_factor": float("inf")},
-    "status_runaway": {"reseed": True, "reseed_factor": float("inf")},
+    "status_maxiter": {"reseed": True, "reseed_factor": None},
+    "status_runaway": {"reseed": True, "reseed_factor": None},
     "on_nobound": {"reseed": True, "reseed_factor": RESEED_FACTOR,
                    "first_rung_factor": None},
     "off_nobound": {"reseed": False, "first_rung_factor": None},
@@ -652,6 +658,16 @@ def _values_sha(entry) -> str:
     return hashlib.sha256(repr(rows).encode()).hexdigest()[:16]
 
 
+def _fence_record(entry) -> dict:
+    """The 1.25 fence's limit at this entry and whether the kept fit sat above
+    it, read off ``rwp_over_median`` (module docstring)."""
+    ratio, stats = entry.rwp_over_median, entry.statistics
+    if ratio is None or stats is None or not ratio > 0:
+        return {"rwp_fence": None, "above_fence": False}
+    return {"rwp_fence": _num(RESEED_FACTOR * stats.rwp / ratio),
+            "above_fence": entry.status != "diverged" and ratio > RESEED_FACTOR}
+
+
 def _entry_record(entry, result, wall, delta, warned) -> dict:
     stats = entry.statistics
     qpa = {}
@@ -667,7 +683,8 @@ def _entry_record(entry, result, wall, delta, warned) -> dict:
         "rwp": _num(stats.rwp) if stats else None,
         "gof": _num(stats.gof) if stats else None,
         "rexp": _num(stats.rexp) if stats else None,
-        "rwp_fence": _num(entry.rwp_fence), "above_fence": entry.above_fence,
+        "rwp_over_median": _num(entry.rwp_over_median),
+        **_fence_record(entry),
         "n_iterations": entry.n_iterations,
         "kept_nfev": int(sum(s.n_iterations for s in result.stages)),
         "kept_status": result.status,

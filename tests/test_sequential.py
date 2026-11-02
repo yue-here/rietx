@@ -779,6 +779,21 @@ def test_reseed_decision_uses_the_median_not_the_previous():
     assert _reseed_needed(_fake_result(0.30), [0.09, 0.10, 0.11, 0.90], 1.25)
     # divergence always reseeds, whatever the Rwp
     assert _reseed_needed(_fake_result(0.01, status="diverged"), [0.10], 1.25)
+    # …and is the only default trigger: no factor, no Rwp fence (WP-2003, C1)
+    assert not _reseed_needed(_fake_result(0.90), [0.10], None)
+    assert _reseed_needed(_fake_result(0.01, status="diverged"), [0.10], None)
+
+
+@pytest.mark.parametrize("factor", [True, 0.0, -1.25, float("inf"), float("nan")])
+def test_a_reseed_factor_is_finite_and_positive_or_refused(factor):
+    """The caller's own fence (WP-2003, C1): ``None`` is none, and a bool, a
+    non-finite or a non-positive factor is refused by name before any fit."""
+    with pytest.raises(ValueError, match="reseed_factor"):
+        SequentialRefinement(*_start_models()).fit(
+            [_simulate(A0, seed=1)], reseed_factor=factor)
+    with pytest.raises(TypeError, match="reseed_factor"):
+        SequentialRefinement(*_start_models()).fit(
+            [_simulate(A0, seed=1)], reseed_factor="1.25")
 
 
 def test_better_prefers_convergence_then_rwp():
@@ -813,12 +828,10 @@ def test_a_well_behaved_series_reseeds_nothing(thermal_series):
     assert not any(e.reseeded for e in thermal_series)
     codes = [d.code for d in thermal_series.diagnostics]
     assert "SEQUENTIAL_RESEED" not in codes
-    # WP-1469's new half fires nothing on it: every fence recorded, none left
-    # a pattern above it, and the steps are written, none re-measured cold
-    assert "SEQUENTIAL_RWP_OUTLIER" not in codes
-    assert thermal_series[0].rwp_fence is None
-    assert all(e.rwp_fence is not None and not e.above_fence
-               for e in thermal_series.entries[1:])
+    # every ratio recorded but the first walked, which has no median, all near
+    # 1 on a clean ramp; and the steps are written, none re-measured cold
+    assert thermal_series[0].rwp_over_median is None
+    assert all(0.5 < e.rwp_over_median < 2.0 for e in thermal_series.entries[1:])
     assert thermal_series.steps
     assert all(s.cold_ratio is None for s in thermal_series.steps)
     # ... and no pattern climbed past its first rung: the first is cold because
@@ -1158,7 +1171,7 @@ def chain_answer(series):
     codes and steps.  The tree and node ids a history writes are names, not
     answers, and are left out."""
     entries = [(e.label, e.status, e.rung, tuple(e.rungs_tried), e.reseeded,
-                e.rwp_warm, e.rwp_fence, e.statistics.rwp,
+                e.rwp_warm, e.rwp_over_median, e.statistics.rwp,
                 [(p.path, p.value, p.stderr) for p in e.parameters],
                 [d.code for d in e.diagnostics])
                for e in series.entries]
@@ -1266,50 +1279,41 @@ def test_an_unrecovered_pattern_seeds_nothing_and_joins_no_median(
     assert len(series) == 3 and failed.statistics is not None
 
 
-# -- a kept rung still above the fence (WP-1469, issue #481) ---------------
+# -- a high Rwp is a recorded ratio, never a trigger (WP-2003, C1) ----------
 
-def test_a_pattern_every_rung_left_above_the_fence_says_so(thermal_patterns,
-                                                           tmp_path):
-    """Gap 1: the Rwp leg of the fence was a trigger and never a verdict.
-
-    Pattern 1 is dictated above the fence on every rung, the cold one least
-    so, which is issue #481's blank frame: kept cold, reseeded, and until
-    WP-1469 reported only by a ``SEQUENTIAL_RESEED`` calling it a good fit.
-    """
+def test_a_high_rwp_is_recorded_and_climbs_no_rung(thermal_patterns, tmp_path):
+    """Pattern 1 is dictated at three times the median on every rung, issue
+    #481's blank frame.  Under the default it keeps its warm rung, fires no
+    code and says how high it sat; only a caller's factor climbs the ladder."""
     structure, ins = _start_models()
-    runner = _dictate(
-        SequentialRefinement(structure, ins, history=tmp_path / "h"),
-        {"p000": [("converged", 0.10)],
-         "p001": [("converged", 0.30), ("converged", 0.29), ("converged", 0.28)],
-         "p002": [("converged", 0.10)]})
+    script = {"p000": [("converged", 0.10)],
+              "p001": [("converged", 0.30), ("converged", 0.29), ("converged", 0.28)],
+              "p002": [("converged", 0.10)]}
+    runner = _dictate(SequentialRefinement(structure, ins, history=tmp_path / "h"),
+                      script)
     series = runner.fit(thermal_patterns[:3], plan=_CHEAP)
 
     kept = series[1]
-    assert kept.rungs_tried == ["warm", "warm_staged", "cold"]
-    assert kept.rung == "cold" and kept.reseeded
-    assert series[0].rwp_fence is None               # no median yet
-    assert kept.rwp_fence == pytest.approx(1.25 * 0.10)
-    assert kept.above_fence
-    (outlier,) = [d for d in series.diagnostics
-                  if d.code == "SEQUENTIAL_RWP_OUTLIER"]
-    assert outlier.level == "warning" and outlier.where == ["p001"]
-    assert outlier.value == pytest.approx(0.28 / 0.125)
-    # the evidence that separates the causes, against the pattern before it
-    assert "Against p000, the last pattern before it inside the fence: GoF " in \
-        outlier.message
-    assert "Rexp" in outlier.message
-    # …and the reseed text stops calling it a good fit
-    (reseed,) = [d for d in series.diagnostics if d.code == "SEQUENTIAL_RESEED"]
-    assert "good fit" not in reseed.suggestion
-    assert "SEQUENTIAL_RWP_OUTLIER" in reseed.suggestion
-    assert "SEQUENTIAL_UNRECOVERED" not in [d.code for d in series.diagnostics]
-
+    assert kept.rungs_tried == ["warm"] and not kept.reseeded
+    assert series[0].rwp_over_median is None               # no median yet
+    assert kept.rwp_over_median == pytest.approx(0.30 / 0.10)
+    assert {d.code for d in series.diagnostics}.isdisjoint(
+        {"SEQUENTIAL_RESEED", "SEQUENTIAL_UNRECOVERED"})
     # not quarantined: it seeds its successor and joins the median, so a
-    # lasting change can become the chain's new normal (the WP's measurement)
+    # lasting change can become the chain's new normal (WP-1469's measurement)
     roots = [t.root for t in runner.trees_]
     assert roots[2].notes["series_warm_start_node"] == kept.node_id
-    assert series[2].rwp_fence == pytest.approx(1.25 * np.median([0.10, 0.28]))
-    assert not series[2].above_fence
+    assert series[2].rwp_over_median == pytest.approx(
+        0.10 / np.median([0.10, 0.30]))
+
+    # the caller's own fence climbs it, on the same ratio
+    fenced = _dictate(SequentialRefinement(structure, ins), script).fit(
+        thermal_patterns[:3], plan=_CHEAP, reseed_factor=1.25)
+    assert fenced[1].rungs_tried == ["warm", "warm_staged", "cold"]
+    assert fenced[1].rung == "cold" and fenced[1].reseeded
+    assert fenced[1].rwp_over_median == pytest.approx(0.28 / 0.10)
+    (reseed,) = [d for d in fenced.diagnostics if d.code == "SEQUENTIAL_RESEED"]
+    assert "specimen or the model changed" in reseed.suggestion
 
 
 @pytest.mark.slow
@@ -1335,60 +1339,51 @@ def test_a_blank_frame_no_longer_reads_as_a_point_or_hides_a_step():
         plan="mccusker_default", refit="stages", on_error="carry",
         verify_steps=3)
 
-    # gap 1: the blank carries a warning that does not call it a good fit,
-    # and it is the only pattern that does
-    outliers = [d for d in series.diagnostics
-                if d.code == "SEQUENTIAL_RWP_OUTLIER"]
-    assert [d.where for d in outliers] == [["ramp_007"]]
-    assert outliers[0].level == "warning"
+    # gap 1: the blank's Rwp is the chain's highest over its median, a record
+    # with no threshold and no code (WP-2003, C1), and it climbed no rung
+    blank_entry = series[blank]
+    assert blank_entry.rwp_over_median == max(
+        e.rwp_over_median for e in series.entries[1:])
+    assert blank_entry.rungs_tried == ["warm_staged"]
     assert all("good fit" not in d.suggestion for d in series.diagnostics
                if d.where == ["ramp_007"])
     # gap 2: the planted step is the cell's largest, re-measured cold, and no
-    # step touches the blank (WP-2003: a row of SeriesResult.steps, no flag)
+    # cell step touches the blank, whose unseen phase held its cell
+    # (WP-1301; WP-2003: a row of SeriesResult.steps, no flag)
     cell = [s for s in series.steps if s.path == "phases.0.cell.a"]
     assert cell[0].labels == ("ramp_011", "ramp_012")
     assert cell[0].cold_ratio == pytest.approx(1.0, abs=0.05)
     # gap 3: …and the pair is read from a field
-    assert not [s for s in series.steps if "ramp_007" in s.labels]
+    assert not [s for s in cell if "ramp_007" in s.labels]
 
 
-def test_the_outlier_verdict_is_read_off_the_entry():
-    """Derived, like every fence here, so a reloaded series says the same."""
-    from rietx.sequential import _inside_before, _rwp_outlier_diagnostics
+def test_the_rwp_ratio_is_over_the_accepted_median():
+    """``rwp_over_median`` against the patterns accepted before it, ``None``
+    until one was; a document written before WP-2003 carries ``rwp_fence`` on
+    each entry and still opens, the old limit dropped as "not recorded"."""
+    from rietx.sequential import _rwp_over_median
 
-    def entry(k, rwp, fence, status="converged"):
-        return SeriesEntry(index=k, label=f"p{k}", status=status, rwp_fence=fence,
-                           statistics=Statistics(rwp=rwp, rp=rwp, rexp=0.04,
-                                                 chi2=1.0, gof=rwp / 0.04,
-                                                 n_points=100,
-                                                 n_free_parameters=3))
+    assert _rwp_over_median(_fake_result(0.30), []) is None
+    assert _rwp_over_median(_fake_result(0.30), [0.10]) == pytest.approx(3.0)
+    # a median of one or two for the first patterns (batch X8)
+    assert _rwp_over_median(_fake_result(0.30), [0.30, 0.10]) == pytest.approx(1.5)
+    assert _rwp_over_median(_fake_result(0.30), [0.09, 0.10, 0.11, 0.90]) == \
+        pytest.approx(0.30 / 0.105)
 
-    assert not entry(0, 0.30, None).above_fence          # no fence applied
-    assert not entry(0, 0.05, 0.0625).above_fence        # inside it
-    assert not entry(0, 0.30, 0.0625, "diverged").above_fence   # UNRECOVERED's
-    assert entry(0, 0.30, 0.0625).above_fence
-    assert _rwp_outlier_diagnostics(entry(0, 0.05, 0.0625), None) == []
-
-    # "before" is in walk order: a backward chain reached p1 from p2
-    chain = [entry(0, 0.04, None), entry(1, 0.30, 0.05), entry(2, 0.04, 0.05)]
-    assert _inside_before(chain, "forward")[1].label == "p0"
-    assert _inside_before(chain, "backward")[1].label == "p2"
-    reloaded = SeriesEntry.model_validate_json(chain[1].model_dump_json())
-    assert reloaded.above_fence and reloaded.rwp_fence == 0.05
-
-    # a ladder stopped short of its cold rung (reseed=False, or a cancel)
-    # does not claim every start was tried
-    climbed = entry(1, 0.30, 0.05)
-    climbed.rungs_tried, climbed.rung = ["warm", "warm_staged", "cold"], "cold"
-    (d,) = _rwp_outlier_diagnostics(climbed, None)
-    assert "every rung the chain tried" in d.message
-    assert "No starting point" in d.message
-    short = entry(1, 0.30, 0.05)
-    short.rungs_tried, short.rung = ["warm"], "warm"
-    (d,) = _rwp_outlier_diagnostics(short, None)
-    assert "every rung" not in d.message and "cold rung" in d.message
-    assert "No starting point" not in d.message
-    assert d.value == pytest.approx(6.0) and "6.00× the fence" in d.message
+    entry = SeriesEntry(index=1, label="p1", rwp_over_median=3.0,
+                        statistics=Statistics(rwp=0.30, rp=0.30, rexp=0.04, chi2=1.0,
+                                              gof=7.5, n_points=100,
+                                              n_free_parameters=3))
+    assert SeriesEntry.model_validate_json(
+        entry.model_dump_json()).rwp_over_median == 3.0
+    old = json.loads(entry.model_dump_json())
+    del old["rwp_over_median"]
+    old["rwp_fence"] = 0.125
+    opened = SeriesEntry.model_validate(old)
+    assert opened.rwp_over_median is None
+    assert "rwp_fence" not in opened.model_dump()
+    reloaded = SeriesResult.model_validate({"entries": [old]})
+    assert reloaded.entries[0].rwp_over_median is None
 
 
 def test_a_diverged_cold_rung_is_not_called_a_good_fit():
@@ -1399,7 +1394,7 @@ def test_a_diverged_cold_rung_is_not_called_a_good_fit():
 
     e = SeriesEntry(index=1, label="p1", status="diverged", reseeded=True,
                     rung="cold", rungs_tried=["warm", "warm_staged", "cold"],
-                    rwp_warm=0.5, rwp_fence=0.05,
+                    rwp_warm=0.5,
                     statistics=Statistics(rwp=0.3, rp=0.3, rexp=0.04, chi2=1.0,
                                           gof=7.5, n_points=100,
                                           n_free_parameters=3))
@@ -1764,8 +1759,8 @@ def test_steps_sort_largest_first_and_an_unmeasured_size_last():
 
 
 def _fenced_series(path: str, values, stderr, *, above=(), diverged=()):
-    """A hand-built chain whose ``above`` patterns sit over a fence of 0.05
-    and whose ``diverged`` ones diverged; every other one is inside it."""
+    """A hand-built chain whose ``above`` patterns sit at four times the median
+    Rwp and whose ``diverged`` ones diverged; every other one is at it."""
     def stats(rwp):
         return Statistics(rwp=rwp, rp=rwp, rexp=0.04, chi2=1.0, gof=rwp / 0.04,
                           n_points=100, n_free_parameters=3)
@@ -1773,7 +1768,7 @@ def _fenced_series(path: str, values, stderr, *, above=(), diverged=()):
     return SeriesResult(entries=[
         SeriesEntry(index=k, label=f"p{k}",
                     status="diverged" if k in diverged else "converged",
-                    rwp_fence=None if k == 0 else 0.05,
+                    rwp_over_median=None if k == 0 else (4.0 if k in above else 1.0),
                     statistics=stats(0.16 if k in above else 0.04),
                     parameters=[RefinedParameter(path=path, value=v, stderr=s)])
         for k, (v, s) in enumerate(zip(values, stderr, strict=True))])
@@ -1787,20 +1782,21 @@ _RAMP_SD = [6.6e-6] * 10
 _RAMP_SD[3] = 1.6e-3
 
 
-def test_a_rejected_frame_has_no_step():
-    """Gap 2: the blank's steps were the largest, so the argmax kept them and
-    the planted step behind it went unreported.  Above the fence or diverged,
-    its two steps are not rows, and the planted one ranks first."""
+def test_a_quarantined_frame_has_no_step():
+    """A diverged pattern's two steps are not rows, and the planted one behind
+    it ranks first.  A high Rwp alone drops nothing since WP-2003 removed the
+    fence it was keyed on: the blank's steps lead, to be read beside its GoF
+    and Rexp."""
     path = "phases.0.cell.a"
-    # as a measurement (the pre-WP-1469 reading), the blank's steps lead
-    assert "p3" in _series_steps(_fenced_series(path, _RAMP_A, _RAMP_SD))[0].labels
-    for rejected in ({"above": {3}}, {"diverged": {3}}):
-        steps = _series_steps(_fenced_series(path, _RAMP_A, _RAMP_SD, **rejected))
-        assert not [s for s in steps if "p3" in s.labels]
-        assert len(steps) == 7
-        assert steps[0].labels == ("p5", "p6")
-        assert steps[0].indices == (5, 6)
-        assert steps[0].step == pytest.approx(2.27e-3)
+    for kept in ({}, {"above": {3}}):
+        steps = _series_steps(_fenced_series(path, _RAMP_A, _RAMP_SD, **kept))
+        assert "p3" in steps[0].labels
+    steps = _series_steps(_fenced_series(path, _RAMP_A, _RAMP_SD, diverged={3}))
+    assert not [s for s in steps if "p3" in s.labels]
+    assert len(steps) == 7
+    assert steps[0].labels == ("p5", "p6")
+    assert steps[0].indices == (5, 6)
+    assert steps[0].step == pytest.approx(2.27e-3)
 
 
 def test_a_non_finite_rejected_value_has_no_step():
@@ -1814,13 +1810,13 @@ def test_a_non_finite_rejected_value_has_no_step():
     assert all(np.isfinite(s.step) for s in steps)
 
 
-def test_a_run_of_rejected_patterns_is_never_bridged():
-    """A clean ramp whose counts fell for four patterns: those four sit over
-    the fence with good values.  Bridged, the step from p1 to p6 spans five of
-    the ramp's steps; dropped, only the pairs either side remain."""
+def test_a_run_of_quarantined_patterns_is_never_bridged():
+    """A clean ramp with four diverged patterns in a row.  Bridged, the step
+    from p1 to p6 spans five of the ramp's steps; dropped, only the pairs
+    either side remain."""
     ramp = [4.1566 + 2.7e-4 * k for k in range(10)]
     steps = _series_steps(_fenced_series(
-        "phases.0.cell.a", ramp, [6.6e-6] * 10, above={2, 3, 4, 5}))
+        "phases.0.cell.a", ramp, [6.6e-6] * 10, diverged={2, 3, 4, 5}))
     assert sorted(s.indices for s in steps) == [(0, 1), (6, 7), (7, 8), (8, 9)]
 
 
@@ -1828,8 +1824,8 @@ def test_a_run_of_rejected_patterns_is_never_bridged():
 def test_a_pattern_the_path_is_absent_from_is_not_bridged(above):
     """A pattern whose phase was held carries no row for its cell, so the
     trajectory skips it; the pair either side of it is two steps apart and is
-    not a row, whether the pattern sits above the fence (tutorial 05's 5 %
-    jump read 600 K → 800 K before) or inside it (the planted blank frame)."""
+    not a row, whether the pattern's Rwp sits high (tutorial 05's 5 % jump
+    read 600 K → 800 K before) or at the median (the planted blank frame)."""
     series = _fenced_series("phases.0.cell.a", _RAMP_A, _RAMP_SD, above=above)
     series.entries[3].parameters = []
     steps = _series_steps(series)
@@ -1840,7 +1836,7 @@ def test_a_pattern_the_path_is_absent_from_is_not_bridged(above):
 def test_the_steps_are_a_field_that_survives_json():
     """Gap 3: the pair is fields, not prose, and survives JSON; a document
     written before WP-2003 carries ``discontinuities`` and still opens."""
-    series = _fenced_series("phases.0.cell.a", _RAMP_A, _RAMP_SD, above={3})
+    series = _fenced_series("phases.0.cell.a", _RAMP_A, _RAMP_SD, diverged={3})
     series.steps = _series_steps(series)
     series.steps[0].cold_ratio = 0.98
     reloaded = SeriesResult.model_validate_json(series.model_dump_json())
@@ -1866,7 +1862,7 @@ def test_the_plot_shades_only_a_step_re_measured_cold():
     from rietx.viz.plots import plot_trajectory
 
     path = "phases.0.cell.a"
-    series = _fenced_series(path, _RAMP_A, _RAMP_SD, above={3})
+    series = _fenced_series(path, _RAMP_A, _RAMP_SD, above={1}, diverged={3})
     series.steps = _series_steps(series)
     fig = plot_trajectory(series, [path])
     (ax,) = fig.get_axes()
@@ -1880,9 +1876,11 @@ def test_the_plot_shades_only_a_step_re_measured_cold():
     xs = ax.transData.inverted().transform(
         span.get_transform().transform(span.get_path().vertices))[:, 0]
     assert (xs.min(), xs.max()) == pytest.approx((5.0, 6.0))
-    # …and the pattern above the fence is boxed, the one mark it carries
-    boxed = [line for line in ax.get_lines() if line.get_marker() == "s"]
-    assert [tuple(line.get_xdata()) for line in boxed] == [(3.0,)]
+    # …and a high Rwp is not marked, there being no threshold to draw
+    # (WP-2003), while the diverged pattern is crossed out
+    assert not [line for line in ax.get_lines() if line.get_marker() == "s"]
+    crossed = [line for line in ax.get_lines() if line.get_marker() == "x"]
+    assert [tuple(line.get_xdata()) for line in crossed] == [(3.0,)]
     plt.close(fig)
 
 
@@ -2297,17 +2295,17 @@ def test_plot_trajectory_draws_every_mark_in_its_styles_role(style):
 
     series = SeriesResult(entries=[
         entry(0, 4.00), entry(1, 4.01, reseeded=True, rung="cold"),
-        entry(2, 4.02, status="diverged"), entry(3, 4.03, rwp_fence=0.05)])
+        entry(2, 4.02, status="diverged"), entry(3, 4.03, rwp_over_median=4.0)])
     hue = PALETTES[style]
     fig = series.plot(["phases.0.cell.a"], style=style)
     lines = fig.axes[0].lines
     by_marker = {line.get_marker(): line for line in lines if line.get_marker() in "xs"}
+    assert "s" not in by_marker   # a high Rwp carries no mark (WP-2003)
     rings = [line for line in lines
              if line.get_marker() == "o" and line.get_markerfacecolor() == "none"]
     assert lines[0].get_color() == hue["series"]
     assert [ring.get_markeredgecolor() for ring in rings] == [hue["reseeded"]]
     assert by_marker["x"].get_color() == hue["unrecovered"]
-    assert by_marker["s"].get_markeredgecolor() == hue["outlier"]
     from matplotlib.colors import to_hex
     assert to_hex(fig.get_facecolor()) == hue["ground"]
     plt.close("all")
@@ -2915,16 +2913,16 @@ def test_a_quarantined_pattern_neither_references_nor_fires():
     assert "from p1 to p3" in d.message
 
 
-def test_a_pattern_above_the_rwp_fence_is_still_read():
-    """WP-1465's handover asked for such a pattern to join the quarantine skip.
-    Declined, measured: every soaked pattern of the chain below is over the
-    fence, since a phase standing in for a missing one is what lifts it there,
-    so the skip would leave the finding nothing to fire on (WP-1469)."""
+def test_a_pattern_at_a_high_rwp_is_still_read():
+    """WP-1465's handover asked for a pattern over the old Rwp fence to join
+    the quarantine skip.  Declined, measured: every soaked pattern of the chain
+    below sat over it, since a phase standing in for a missing one is what
+    lifts the Rwp, so the skip would leave the finding nothing to fire on
+    (WP-1469).  WP-2003 removed the fence; the ratio is recorded and read."""
     series = _width_series("phases.0.lor_strain", _GROWING, [1e-3] * 5,
                            _WORSENING)
     for entry in series.entries[1:]:
-        entry.rwp_fence = 0.0125
-    assert [e.above_fence for e in series.entries][2:] == [True] * 3
+        entry.rwp_over_median = 4.0
     (d,) = _width_growth_diagnostics(series)
     assert "from p0 to p2" in d.message
 

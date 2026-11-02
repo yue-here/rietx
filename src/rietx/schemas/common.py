@@ -583,6 +583,12 @@ from .._nearmiss import did_you_mean
 #: cannot be rebuilt as every step, so a document's ``discontinuities`` key is
 #: dropped at read (``SeriesResult``'s ``mode="before"`` validator) and its
 #: ``steps`` reads ``None``, "not recorded".
+#: Also in 0.60 (WP-2003, C1): ``SeriesEntry.rwp_fence`` replaced by
+#: ``SeriesEntry.rwp_over_median``, the kept attempt's Rwp over the accepted
+#: median with no threshold.  Not additive: the factor that scaled the old
+#: limit is not on the entry, so an entry's ``rwp_fence`` key is dropped at
+#: read (``SeriesEntry``'s ``mode="before"`` validator) and its
+#: ``rwp_over_median`` reads ``None``, "not recorded".
 #: Also in 0.60 (WP-2030): ``IndexingResult.formula`` and ``.temperature``, the
 #: formula and temperature read, and ``PeakList.instrument_undeclared``,
 #: the instrument blocks the picker found at default on a lab source.  Additive

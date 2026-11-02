@@ -965,22 +965,21 @@ def test_an_interleaved_forward_row_keeps_its_own_advice(backward_flags):
     assert row.suggestion == forward_row.suggestion
 
 
-def test_a_pattern_above_the_rwp_fence_keeps_its_verdict():
-    """WP-1469's fence is read, and deliberately not obeyed, by the onset.
+def test_a_pattern_at_a_high_rwp_keeps_its_verdict():
+    """A high Rwp over the accepted median is a record, and the onset does not
+    read it as a verdict (WP-1469, WP-2003).
 
-    The fence reports and does not judge: it cannot tell a blank frame from a
-    lasting change or a sound fit to fewer counts, and on the starved-chain
-    ramp below it fires on a converged, correct pattern (see
-    :attr:`MagneticTrajectory.measured`).  So an above-fence pattern that still
-    gives a verdict gives it here too; a blank frame gives none for its own
-    reason, the phase going unseen.
+    Rwp cannot tell a blank frame from a lasting change or a sound fit to
+    fewer counts, and on the starved-chain ramp below it sits high on a
+    converged, correct pattern (see :attr:`MagneticTrajectory.measured`).  So
+    a high-Rwp pattern that still gives a verdict gives it here too; a blank
+    frame gives none for its own reason, the phase going unseen.
     """
     series = _verdicts(_BRACKETED)
     series.entries[3] = series.entries[3].model_copy(update={
-        "rwp_fence": 0.0151, "statistics": Statistics(
+        "rwp_over_median": 0.0166 / 0.0121, "statistics": Statistics(
             rwp=0.0166, rp=0.01, rexp=0.015, chi2=1.2, gof=1.1, n_points=100,
             n_free_parameters=5)})
-    assert series.entries[3].above_fence
 
     traj = series.magnetic_trajectory()
     assert traj.measured == [True] * 5

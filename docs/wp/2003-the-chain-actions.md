@@ -1,6 +1,6 @@
 # WP-2003 — The chain actions: what a series decides between patterns
 
-Milestone: generality · Status: 🔄 2026-10-26 — X16 fixed (an LM-driver tolerance), task 3 and C4 landed, X17 handed to WP-1955; next C1 and C3 (unblocked), C2 question 5, C5-C10
+Milestone: generality · Status: 🔄 2026-11-02 — claimed by @yue-here
 Track: The audits
 Depends on: 2002, 2037
 Priority: P2 2026-10-24 — 2037 closed, so its clause 1 and the response column this WP's first demotion takes are in place; the maintainer's next after 2037; the seam the maintainer's own example (a series discontinuity) lives in
@@ -133,6 +133,10 @@ so it has no action row yet; `SeriesEntry.rungs_raised` and `rungs_tried` do.
   `_cell_runaway_diagnostic(cell_runaway)` (~line 1632) never passes
   `refine._vars_driven_cell_escapes`, which the single runner folds into `CELL_RUNAWAY`, so a
   `vars.X`-driven escape goes unnamed in a joint fit (WP-2002, PR #1050; checked 2026-10-24).
+  Superseded 2026-11-02: fixed on main since, `multi._vars_driven_cell_escapes_multi`
+  (`multi.py:1110`, read at `:1702` and `:1804`). WP-2028's task 7 (2026-10-31) also merged
+  the joint runner's correlation, flat-direction and merge-by-driver loops into the single
+  runner's, so C10's joint-hold alignment is read against that tree when it starts.
 
 **A chain is measured, never assumed.** Root CLAUDE.md: cumulative staging's bound holds
 for one fit and is unbounded in a chain, both signs measured. So every family here is a

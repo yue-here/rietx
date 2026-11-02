@@ -4057,19 +4057,8 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "refitted from the initial model. Its starting values did not come from its "
             "neighbour, so it is no evidence that the trajectory is continuous at this "
             "point. Check whether the specimen or the model changed there. If the same "
-            "pattern also carries an outlier or a finding the chain did not recover "
-            "from, read that first."
-        ),
-    ),
-    "SEQUENTIAL_RWP_OUTLIER": HelpEntry(
-        title="A pattern fits much worse than its neighbours",
-        description=(
-            "Even its best attempt left this pattern's Rwp well above that of the "
-            "patterns accepted before it. Compare its GoF and expected Rwp with an "
-            "accepted neighbour. A higher GoF means the model has been outgrown, by a "
-            "missing phase or a bad frame. A similar GoF with a higher expected Rwp "
-            "means fewer counts, and the fit may be sound. If restarts were switched "
-            "off, a cold start may still help."
+            "pattern also carries a finding the chain did not recover from, read that "
+            "first."
         ),
     ),
     "SEQUENTIAL_UNRECOVERED": HelpEntry(
@@ -5813,13 +5802,20 @@ RESULT_FIELD_HELP: dict[str, HelpEntry] = {
             "as past a diverged one. Empty wherever no rung raised."
         ),
     ),
-    "SeriesEntry.rwp_fence": HelpEntry(
-        title="Rwp fence",
+    "SeriesEntry.rwp_over_median": HelpEntry(
+        title="Rwp over the median",
         description=(
-            "The Rwp limit the chain set at this pattern, from `reseed_factor` and the "
-            "Rwp of the patterns accepted before it (`sequential._rwp_fence`). An "
-            "attempt above it climbs the ladder. `None` where no earlier pattern had "
-            "been accepted, so no fence judged it."
+            "This pattern's Rwp divided by the median Rwp of the patterns accepted "
+            "before it in the walk. A record, not a verdict: no threshold reads it "
+            "unless you pass `reseed_factor`, which escalates a warm fit above that "
+            "ratio. The first patterns are compared against a median of one or two "
+            "values, so an early ratio says as much about its neighbours: accepted Rwp "
+            "0.30 and 0.10 give a median of 0.20, against 0.10 for 0.10 and 0.10. Rwp "
+            "tracks the expected Rwp, so a ratio above 1 can be falling counts under a "
+            "right model. Compare GoF and the expected Rwp with an accepted neighbour "
+            "to tell them apart. A blank frame read GoF 1.00 against 1.06 with expected "
+            "Rwp 0.159 against 0.040, a right model over counts fallen 4x a similar GoF, "
+            "and an unmodelled phase GoF 16.7. `None` for the first pattern walked."
         ),
     ),
     "SeriesEntry.seeded_from": HelpEntry(
