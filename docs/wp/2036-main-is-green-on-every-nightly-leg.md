@@ -1,9 +1,9 @@
 # WP-2036 — main is green on every nightly leg: a full suite that finishes, two Windows tooling tests, and answers that move with the platform
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — the 11-01 nightly's three red rows and two cancelled nights answered (PR #1309); a green nightly waits on WP-2050
+Milestone: unscheduled · Status: 🔄 2026-11-02 — the 11-01 nightly's three red rows and two cancelled nights answered (PR #1309); WP-2050 merged, so a green nightly waits on #1309 alone
 Track: The repo's own process
 Depends on: 2045 (the `full` job cannot finish before it); 2048, 2049 and 2050 (three slow rows red by rounding until each lands); 2002 soft, the closing stage that moved most of these; 2012 soft, the LaB6 axial mirror
-Priority: P3 2026-11-02 — every task here is done; a green nightly waits on PR #1309 and on WP-2050's PR #1306 merging
+Priority: P3 2026-11-02 — every task here is done; a green nightly waits on PR #1309 merging
 
 ## Goal
 
@@ -352,9 +352,20 @@ gh run list --workflow nightly.yml --branch main --limit 1
 
   *Gotchas.* The Biso row's strict xfail may XPASS once WP-2012 holds H/L.
 
-  Next: merge #1309, then WP-2050's #1306; the first nightly after both is
-  this WP's acceptance. If the 150 K row or the axial rows go red again, the
-  probes in `docs/wp/2036-batch/` reproduce the split on a Mac.
+  *Resumed* (a second runner, same day, after the first filled its
+  context). WP-2050's #1306 merged at 00:34, and `origin/main` (`ca06c8c86`)
+  merged in cleanly. The Le Bail row's fix (#1292) was already in this
+  branch's base, nudged case included, so nothing about it is new here.
+  Ordering the axial pair agrees with the 2026-11-01 WP-2012 ruling to free
+  S/L alone with H/L held: with H/L held the pair cannot swap, and the ordered
+  difference is never larger than the unordered one. Merged tree, macOS
+  arm64, worktree venv `[dev]`: fast selection 13 278 passed, 310 skipped, 32 xfailed, 0 failed (main moved, so no delta is claimed); the three red
+  rows' files plus the lab6 start rows 52 passed, 2 xfailed;
+  `python -m tests.reader_output` exit 0, unchanged.
+
+  Next: merge #1309; the first nightly after it is this WP's acceptance. If
+  the 150 K row or the axial rows go red again, the probes in
+  `docs/wp/2036-batch/` reproduce the split on a Mac.
 
 - **2026-10-25** — The Linux full suite finishes again: the first nightly after
   #1161 ran it in about two hours, and none of the hostile series' old hang is
