@@ -1,9 +1,8 @@
 # WP-2033 — a declared Z or density filters an extinction class's members
 
-Milestone: unscheduled · Status: 🔄 2026-10-31 — all five tasks merged from outside as PR #1140 (`e4ddbcda`); the close is owed
+Milestone: unscheduled · Status: ✅ 2026-11-02 — built from outside as PR #1140 (`e4ddbcda`), the review's three follow-ups as PR #1271 (`a73183c3`); closed by PR #1336
 Track: Data and metadata in, a structure out
 Depends on: — (1967 soft, closed: the `ExtinctionPrior` filter this extends; 2030 soft: the formula's Z check in the search)
-Priority: P3 2026-10-23 — a workaround covers it: the user drops the groups by hand after the screen, as #935 describes
 
 ## Goal
 
@@ -77,10 +76,6 @@ Nothing changes for a caller who declares nothing.
   answer can move. A new diagnostic code needs its skill row and its
   `rietx._audit` row with a tier.
 
-### Inherited
-
-- 2026-10-26 issue triage: #1129 is the outside contributor's (mustachefeeling) claim on this WP, in PR #1140. Its plan proposes a hard exclusion only for the exact atom-count test, with the molecular Z′ < 1 case reported and left in. Checked against the tree at c0e32ab29: status ⬜, nothing merged.
-
 ## Non-goals
 
 - The search's volume window and its Z check (WP-2030).
@@ -124,6 +119,8 @@ extinction screen answers as on `main`.
   (the multiplicities the derived orbits are checked against).
 
 ## Handover log
+
+- **2026-11-02** (ghostshift close batch; closed) — a caller who knows Z, or a density and a formula, can declare it to the extinction screen. The screen removes each space group whose orbits cannot hold the declared atoms per cell, and names every group it removed. A Z′ that is not whole stays a statement and never removes a group. The three follow-ups from #1140's review merged from outside as PR #1271 (`a73183c3`, head `8208d88f`), and nothing in the WP's goal is left unbuilt. *Done*: under `ordered=True` a fractional formula count is now counted wherever count × Z is whole. `CaSO4·0.5H2O` at Z = 2 gives 9 O per cell, so P 2₁ is removed. Where count × Z is not whole (`Fe0.95O` at Z = 4), the element is still skipped, and a `where` line on `EXTINCTION_PRIOR_APPLIED` names it. Without `ordered`, a fractional count still declares a shared site and is not counted. The PR offered the uniform rule as a one-line change, and the merge took the rule keyed on `ordered`. A `z` with no formula now says it filters nothing and why. A collapsed special-position line is written once per note kind. `INDEXING_THRESHOLDS_VERSION` stays 1.12 with a second `Also 1.12` line naming the four observable changes. The maintainer approved the texts on the PR. *Gate*: #1270 and #1271 stacked on `main` `b54c27b28`, `[dev]` venv, macOS arm64. Fast selection 13 318 passed, 310 skipped, 32 xfailed, 0 failed. Slow selection 912 passed, 21 skipped, 18 xfailed, 0 failed. `python -m tests.reader_output` exited 0. A targeted re-run on `main` `ed8c75808` gave 169 passed. *Close*: `### Inherited` (the 2026-10-26 triage note, consumed by #1140) and `Priority:` deleted; the narrative is in `docs/milestones/v1.11.md`. The 2026-10-31 gap, the `z_candidates` field comment that says Z ≳ 50 where 1.5 % gives two whole numbers from Z ≈ 33, is still on `main` and moved to WP-2007's `### Inherited`. Prose-only close, so `/code-review` did not run. Closed by PR #1336. Next: none for this WP. Issue #935 stays open for `/issue-review` to place. Its declared-fact half is built by WP-1967 and this WP, and its Laue-class fork inside a class is outside both.
 
 - **2026-10-23** — created by WP-1967's close, on the maintainer's decision to
   close 1967 and file this half on its own. No open WP owns a declared Z for
