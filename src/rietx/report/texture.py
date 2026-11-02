@@ -48,6 +48,11 @@ from .schemas import (
 #: dense is as good as a solver and stays deterministic.
 _R_GRID = np.geomspace(0.25, 4.0, 121)
 
+#: orbit members × r values evaluated in one block by :func:`_score_axis`:
+#: 2²¹ elements, 16 MB per array of that shape (a block holds a few), which
+#: holds the whole grid for a pattern of up to ~17 000 orbit members
+_BLOCK_ELEMENTS = 1 << 21
+
 
 def _candidate_axes(max_index: int) -> list[tuple[int, int, int]]:
     """Distinct low-index reciprocal directions (gcd-reduced, sign-canonical).
@@ -140,21 +145,39 @@ def _score_axis(f: np.ndarray, w: np.ndarray, cos2: np.ndarray,
     if base_ss <= 0.0:
         return 1.0, 0.0
     best_r, best_ss = 1.0, base_ss
-    for r in _R_GRID:
-        term = march_term(cos2, r)
-        p = np.bincount(seg, weights=term, minlength=len(counts)) / counts
-        denom = float((w * p * p).sum())
-        if denom <= 0.0:
-            continue
-        s = float((w * f * p).sum() / denom)   # optimal free scale for this r
-        if s <= 0.0:
-            # a negative scale would fit the anti-pattern (the wrong r's mirror
-            # image) equally well — that is unphysical (the phase scale is
-            # positive), so those r are not admissible fits
-            continue
-        ss = float((w * (f - s * p) ** 2).sum())
-        if ss < best_ss:
-            best_ss, best_r = ss, float(r)
+    n_bins = len(counts)
+    # The grid is evaluated a block of r at a time, one row per r.  Every
+    # element is the same arithmetic the one-r-at-a-time loop did, each bin
+    # sums its members in the same order, and a row reduction is the same
+    # pairwise sum as a 1-D one, so the scores are bit-identical to it; the
+    # loop was 121 numpy calls per axis per phase, a third of a stage report
+    # (WP-1335).  The block bounds the memory to _BLOCK_ELEMENTS doubles.
+    # The March factor is evaluated once per *distinct* cos²α and indexed
+    # back, which is the same number per member: an orbit repeats few angles
+    # to an axis (a Friedel mate always repeats its partner's), and the
+    # power is what the grid's cost is.
+    distinct, member_of = np.unique(cos2, return_inverse=True)
+    step = max(1, _BLOCK_ELEMENTS // max(len(cos2), 1))
+    for lo in range(0, len(_R_GRID), step):
+        rs = _R_GRID[lo:lo + step]
+        term = march_term(distinct[None, :], rs[:, None])[:, member_of]
+        bins = (seg[None, :] + n_bins * np.arange(len(rs))[:, None]).ravel()
+        p = (np.bincount(bins, weights=term.ravel(), minlength=len(rs) * n_bins)
+             .reshape(len(rs), n_bins) / counts)
+        denom = (w * p * p).sum(axis=1)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            s = (w * f * p).sum(axis=1) / denom   # optimal free scale per r
+            ss = (w * (f - s[:, None] * p) ** 2).sum(axis=1)
+        for i, r in enumerate(rs):
+            if denom[i] <= 0.0:
+                continue
+            if s[i] <= 0.0:
+                # a negative scale would fit the anti-pattern (the wrong r's
+                # mirror image) equally well — that is unphysical (the phase
+                # scale is positive), so those r are not admissible fits
+                continue
+            if float(ss[i]) < best_ss:
+                best_ss, best_r = float(ss[i]), float(r)
     return best_r, 1.0 - best_ss / base_ss
 
 
