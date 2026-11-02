@@ -141,17 +141,10 @@ fit is bounded, so the validation reserve reaches validation and
   eat. WP-2011's cost at 15 % has gone: NAC's default spec reaches
   orthorhombic again, because the panel no longer spends the reserve.
 
-  *Decision owed* (maintainer). The decision rule in this WP's last *Next*
-  was "lower it if NAC's true cell validates at a lower value on every
-  run". That condition held at 8 %. The rule was not applied, because its
-  premise did not hold. The task says the value trades validated fits for
-  searched systems. At these three values on these six sets, it traded
-  validated fits for nothing. A lower reserve leaves NAC's top-ranked
-  candidate unvalidated on every run and keeps a 2 s margin on the true
-  cell's fit. A heavier pattern than these six might gain a system from
-  the 8.4 s that 15 % holds back. None of these did. Lowering is a
-  one-line change: the constant, its comment, and the `_audit` row's value
-  and evidence.
+  Settled by Claude (lead, 2026-11-02) under the sweep: stays at 15 %. A
+  lower reserve bought nothing on any set and cost NAC's leading candidate
+  its validation on every run; the WP's lower-if-true-cell-validates rule
+  rested on a trade the measurement did not find.
 
   *Done.* Ticked the sweep task. Recorded the outcome in the constant's
   comment and its `_audit` row evidence. The value and the row's
