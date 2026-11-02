@@ -4322,8 +4322,7 @@ DIAGNOSTIC_HELP: dict[str, HelpEntry] = {
             "was freed, yet the fit converged. A wildcard pattern that matches nothing "
             "stays silent, because some models lack a component. Correct the name, or "
             "use a wildcard if the stage should reach a component that only some models "
-            "declare. Refinement.set_vary refuses such a name with a ValueError, before "
-            "it changes anything."
+            "declare."
         ),
     ),
     "STAGE_WINDOWS_STALE": HelpEntry(
