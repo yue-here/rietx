@@ -210,7 +210,10 @@ posted with their URLs, the decisions taken, the checks, and the footer. No
 closing keyword before a `#N` anywhere in it (`/wp-handover` step 11's trap:
 prose about a keyword is a keyword), since the round closes issues with
 `gh issue close` and the PR must close none on merge. Check with
-`gh pr view --json closingIssuesReferences`. Merging is the maintainer's.
+`gh pr view --json closingIssuesReferences`. Merging is the maintainer's. A
+ghostshift shift lead may also merge a PR its checks find clear-cut, under the
+user's standing permission of 2026-10-31
+(`~/Code/claude-config/skills/ghostshift/SKILL.md` §4).
 
 **Report**: the plain-language paragraph first, what the backlog now holds
 and what moved; then `#N (<what it reports, in plain words>): <decision>`

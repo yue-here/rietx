@@ -66,8 +66,8 @@ Tier: no heuristic enters `rietx._audit`; this is workflow tooling under `.claud
 - [x] `tests/CLAUDE.md`: the `serial.py` sentence.
 - [x] `docs/RELEASING.md`: the post-release steps as numbered steps after step 8; ROADMAP's
       release rule points there.
-- [ ] The four skills: one line each on a shift lead's merges.
-- [ ] Skill: none. Nothing here reaches an agent driving rietx.
+- [x] The four skills: one line each on a shift lead's merges.
+- [x] Skill: none. Nothing here reaches an agent driving rietx.
 
 ## Acceptance
 
