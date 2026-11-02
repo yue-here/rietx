@@ -84,7 +84,7 @@ so measure how many goldens and tests move before choosing.
 ## Handover log
 
 - **2026-11-02** — a ghostshift runner took main's red slow test to PR
-  #PRNUM. `test_acceptance_si640c.py::test_the_held_cell_is_the_certificate`
+  #1334. `test_acceptance_si640c.py::test_the_held_cell_is_the_certificate`
   raised KeyError on `phases.0.cell.b` after PR #1046 merged. The test was
   wrong and the behaviour is the ruled one. The si640c fit holds the
   certified cell and never frees it, so its cubic `b` and `c` are exactly the
