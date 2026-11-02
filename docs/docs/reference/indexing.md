@@ -195,7 +195,7 @@ Under every rule, what a cell leaves is reported rather than hidden: `CellCandid
 A prior steers the search and never gates it.
 Each crystal system a prior names moves to the front of the queue, and a prior cell's metric seeds the `svd` engine's starting basin.
 The cell is then checked against the peak list the engines' own way, and if it indexes the driven lines it joins the answer as finder `"prior"`: added to `CellCandidate.found_by` when an engine also found the lattice, and otherwise appended after the ranked list, never ranked among the engines' candidates.
-`"prior"` never appears in `IndexingResult.engines_run`, so the agreement caveat grades a prior-only candidate down.
+`"prior"` is not an engine: it never appears in `IndexingResult.engines_run`, and the confidence gate counts only engines.
 
 No system is dropped and no range changes, so a wrong prior costs time rather than truth.
 A prior cell outside the declared axis range is reported as unusable rather than widening the box, and the check refutes a cell it would have to move more than 10 % in volume to fit.
@@ -506,9 +506,9 @@ A nonzero count raises [`INDEX_PREDICTED_BUT_ABSENT`](diagnostics-indexing.md#in
 
 `CellCandidate.confidence` is `high`, `medium` or `low`, written by one rule:
 
-- `low` when fewer than two finders stand behind the candidate, or when any refuting caveat applies;
+- `low` when fewer than two engines found the candidate, or when any refuting caveat applies;
 - `high` when every engine that ran found it and no caveat applies at all;
-- `medium` otherwise: at least two finders, and only capping caveats.
+- `medium` otherwise: at least two engines, and only capping caveats.
 
 Every reason a candidate falls short is a member of a closed vocabulary in `CellCandidate.confidence_caveats`.
 Six of the fourteen refute the candidate, each being evidence against the cell or evidence that the data cannot choose.

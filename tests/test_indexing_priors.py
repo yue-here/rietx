@@ -104,6 +104,44 @@ def test_a_wrong_prior_changes_no_rank_and_no_grade():
 
 
 @pytest.mark.xdist_group("indexing-priors")
+def test_a_stated_lattice_one_engine_found_does_not_outgrade_the_truth():
+    """#1308 (WP-2082): a prior merged into one engine's candidate is still
+    one engine.  The planted lattice is F cubic; the stated prior is the
+    primitive cell at the same metric, which predicts mixed-parity lines the
+    data lack.  Under ``svd`` alone, counting the prior lifted the P lattice
+    to ``medium`` while the planted F stayed ``low``.  Stating the prior must
+    change no grade, and the truth is never graded below the prior's
+    lattice."""
+    a = 4.5
+    peaks, _ = synthetic_peaks("cubic", sg="F m -3 m",
+                               cell=(a, a, a, 90.0, 90.0, 90.0))
+    base = dict(systems=("cubic", "tetragonal"), min_d_axis=2.0,
+                max_d_axis=12.0, max_volume=1500.0, shift_allowance_deg=1e-9,
+                budget_seconds=120.0)
+    prior = (a, a, a, 90.0, 90.0, 90.0)
+
+    def grades(spec):
+        res = index_pattern(peaks, spec=spec, preset="full", engines=("svd",))
+        # the whole cell in the key: two tetragonal candidates sharing ``a``
+        # must not overwrite each other's grade
+        out = {(c.centring, c.system, tuple(round(x, 3) for x in c.cell)):
+               (c.confidence, c.found_by) for c in res.candidates}
+        assert len(out) == len(res.candidates)
+        return out
+
+    plain = grades(SearchSpec(**base))
+    steered = grades(SearchSpec(**base, prior_cells=(prior,)))
+    truth, stated = ("F", "cubic", prior), ("P", "cubic", prior)
+    assert truth in steered and stated in steered
+    assert PRIOR_FINDER in steered[stated][1], (
+        "the fixture no longer merges the prior into svd's own P candidate")
+    order = ["low", "medium", "high"]
+    assert order.index(steered[truth][0]) >= order.index(steered[stated][0])
+    assert {k: g for k, (g, _) in plain.items()} == \
+        {k: g for k, (g, _) in steered.items() if k in plain}
+
+
+@pytest.mark.xdist_group("indexing-priors")
 def test_a_correct_prior_surfaces_truth_in_the_first_streamed_shortlist():
     """The other half of the acceptance: a correct analogue prior (the true
     cell perturbed by a few hundred ppm) jumps its system to the front, so
