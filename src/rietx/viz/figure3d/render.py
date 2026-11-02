@@ -281,22 +281,12 @@ def _named(pairs) -> dict[str, str]:
 
 
 def _on_dark_ground(geometry: Mapping) -> Mapping:
-    """The geometry with each site still in its element's CPK colour given
-    that element's dark-ground colour (``structure3d.DARK_GROUND``).  A site
-    :func:`~rietx.viz.recolour` marked keeps the caller's colour, and a
-    dark-ground colour within ``MIN_SEPARATION`` of another colour the phase
-    draws is not used, since ``phase_palette`` separated the colours it was
-    given and not this one."""
+    """The geometry in its dark-ground colours
+    (``structure3d.dark_ground_colours``), asked of the dict as handed in, so
+    a colour edited after ``build`` is judged as it now stands."""
     from ...gui import structure3d as s3
 
-    sites = geometry["sites"]
-    swap = {k: s3.DARK_GROUND[s["element"]] for k, s in enumerate(sites)
-            if s["element"] in s3.DARK_GROUND and not s.get("recoloured")
-            and s["color"] == s3._CPK.get(s["element"])}
-    others = {s["color"] for s in sites} - {sites[k]["color"] for k in swap}
-    swap = {k: c for k, c in swap.items()
-            if all(s3._oklab_distance(s3._oklab(c), s3._oklab(o)) >= s3.MIN_SEPARATION
-                   for o in others if sc._HEX.match(o))}
+    swap = s3.dark_ground_colours(geometry["sites"])
     if not swap:
         return geometry
     return {**geometry, "sites": [{**s, "color": swap[k]} if k in swap else s

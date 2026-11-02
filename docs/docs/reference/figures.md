@@ -184,6 +184,9 @@ HKUST-1's cell holds 648, so it needs `max_atoms=648` or more.
 The bonded neighbours and polyhedron vertices drawn outside the cell do not count against the cap.
 
 For a site's colour or radius, edit the dict `rietx.gui.structure3d.build` returns and pass the dict in place of the structure.
+On a background darker than mid-grey, and in the GUI's dark theme, carbon is drawn `#666666` in place of its `#383838`.
+That reads at 3.18:1 against the GUI's dark `#151515`, where `#383838` read at 1.56:1.
+A light background keeps `#383838`, and a site given a colour of its own keeps that colour.
 `build` trims the cell to its own `max_atoms` instead of raising, because that default serves the GUI's viewer.
 The dict's `cut` counts what the trim left out, and so does the figure's report.
 A dict says what was built, so `probability`, `bond_tolerance` and `max_atoms` are refused beside one.

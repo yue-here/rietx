@@ -332,8 +332,9 @@ TECHNIQUES: dict[str, tuple[str, str, tuple[tuple[str, str, tuple[str, ...]], ..
                 "`max_atoms`; each atom's `image` says which atom of the cell it "
                 "is, and `periodicity(g, mask)` reads 0 to 3 for a motif "
                 "(Measured: WP-1502, NAC 3x3x3 in 44-62 ms). On a dark "
-                "`background`, `recolour` C, whose default #383838 reads at "
-                "1.56:1 against #151515 (Measured: WP-1533).",
+                "`background` C draws #666666, 3.18:1 against #151515, and a "
+                "light one keeps #383838; a `recolour` stays yours (Measured: "
+                "WP-1468).",
                 ("rx.viz.keep", "rx.viz.select", "rx.viz.plane", "rx.viz.sphere",
                  "rx.viz.component", "rx.viz.periodicity", "rx.viz.recolour"),
             ),

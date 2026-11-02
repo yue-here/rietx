@@ -1339,27 +1339,36 @@ def test_the_polyhedron_palette_is_what_the_faces_were_drawn_in(nac):
     assert part.polyhedron_palette[off] == fig.polyhedron_palette[off]
 
 
-def test_the_dark_ground_table_swaps_only_a_default_colour(monkeypatch):
-    """``structure3d.DARK_GROUND`` is empty until the maintainer rules on a
-    lighter C for the dark picture (WP-1468), so a dark render is unchanged;
-    filled, it repaints a site in its CPK colour on a dark ground only, and
-    never one the caller recoloured."""
-    assert s3.DARK_GROUND == {}
+def test_carbon_is_lighter_on_a_dark_ground_only(monkeypatch):
+    """Ruled by the maintainer 2026-11-02 (WP-1468): C draws #666666 on a dark
+    ground, 3.18:1 against the GUI's #151515 where #383838 read at 1.56:1,
+    and the light picture is untouched.  Only a site still in its CPK colour
+    moves; a colour the caller chose, even CPK's own hex, stays theirs."""
+    def carbon(fig):
+        return {fig.palette[k] for k in fig.palette if k.startswith("C")}
+
+    assert s3.DARK_GROUND == {"C": "#666666"}
     molecule = _paracetamol()
-    plain = render_structure(molecule, size=200, background="#151515")
-    assert {plain.palette[k] for k in plain.palette if k.startswith("C")} == {s3._CPK["C"]}
-    monkeypatch.setattr(s3, "DARK_GROUND", {"C": "#666666"})
+    # the payload carries the server's answer, which the GUI's dark theme reads
+    assert {s.get("dark_color") for s in molecule["sites"] if s["element"] == "C"} == {"#666666"}
+    assert all("dark_color" not in s for s in molecule["sites"] if s["element"] != "C")
     dark = render_structure(molecule, size=200, background="#151515")
     light = render_structure(molecule, size=200)
     _save(dark, "dark_ground_paracetamol_C")
-    assert {dark.palette[k] for k in dark.palette if k.startswith("C")} == {"#666666"}
-    assert not np.array_equal(dark.image, plain.image)
-    assert {light.palette[k] for k in light.palette if k.startswith("C")} == {s3._CPK["C"]}
+    assert carbon(dark) == {"#666666"} and carbon(light) == {s3._CPK["C"]}
+    assert carbon(render_structure(molecule, size=200, background="black")) == {"#666666"}
+    monkeypatch.setattr(s3, "DARK_GROUND", {})
+    assert np.array_equal(render_structure(molecule, size=200).image, light.image)
+    assert not np.array_equal(
+        render_structure(molecule, size=200, background="#151515").image, dark.image)
+    monkeypatch.undo()
     for colour in ("#383839", s3._CPK["C"]):  # a recolour to CPK's own hex included
         chosen = recolour(molecule, select(molecule, element="C"), colour)
+        assert all("dark_color" not in s for s in chosen["sites"] if s.get("recoloured"))
         kept = render_structure(chosen, size=200, background="#151515")
-        assert {kept.palette[k] for k in kept.palette if k.startswith("C")} == {colour}
+        assert carbon(kept) == {colour}
     # a dark-ground colour that would collide with another in the phase is not used
     monkeypatch.setattr(s3, "DARK_GROUND", {"C": s3._CPK["N"]})
+    assert s3.dark_ground_colours(molecule["sites"]) == {}
     clash = render_structure(molecule, size=200, background="#151515")
-    assert {clash.palette[k] for k in clash.palette if k.startswith("C")} == {s3._CPK["C"]}
+    assert carbon(clash) == {s3._CPK["C"]}
