@@ -250,6 +250,16 @@ cutting it.
       *Read 2026-11-02: counts hold, the wall does not (median slowest fast
       job 18.2 min against 15, down from 25.0 on two shards); see the newest
       entry.*
+- [x] **Refresh the shard record** from main run 41407136163's
+      `junit-py3.*-*` artifacts (`python -m tests.shards DIR SOURCE`), the
+      first record measured on three shards (the 2026-11-02 2nd-session
+      entry's Next 1). *Done 2026-11-02: 317 files, 5414 s, the thirteen
+      collected files the old record lacked now in it.*
+- [ ] **A per-leg record** (Next 2 of the same entry). `tests/shards.py`
+      `record` writes one profile per state of the documentation switch, and
+      `conftest`'s `--shard` reads the one its leg runs under, so py3.11's
+      split stops carrying py3.14's documentation cost.
+- [ ] **Read ten runs again** after both land, by the Acceptance method.
 
 ## Acceptance
 
