@@ -1,6 +1,6 @@
 # WP-1955 — a column at a zero aperture, and a column the agreement matrix cannot see
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by @yue-here
+Milestone: unscheduled · Status: 🔄 2026-11-02 — tasks 1-4 landed (PR #1321); task 5, both apertures at zero, open
 Track: What fires, and what stays silent
 Depends on: —
 Priority: P2 2026-10-26 — two measurements the same day: WP-2003's double-zero aperture collapsing a warm-started CPD fit (Rwp 0.79-10.7 against 0.109), and #1075's LM ending converged at S/L = H/L = 0 on lab_bragg_brentano from defaults while one TRF stage drops χ² by ~1 200 χ²_red·f²; the single-zero column is still off its difference with no test
@@ -144,6 +144,90 @@ alone.
   **27**, 892-900.
 
 ## Handover log
+
+- **2026-11-02** — The numpy Jacobian now gives the right axial-divergence
+  column when one aperture (S/L or H/L) sits on zero, and the esd of the other
+  aperture there is now right too. On the `test_e8` report-loop fit, the
+  nonzero aperture's esd was 50 times too large (0.00903 against an exact
+  0.000181 from jax's column). The cause was a first-order difference of the
+  FCJ quadrature nodes. At a zero aperture the column is a small residue of
+  much larger terms, so the difference's small error was 23 % of it. The
+  cross-backend test no longer skips columns that are tiny beside the
+  largest. It now checks every column at its own scale, and nine such columns
+  were checked for the first time, all correct. The Gaussian-width floor also
+  gave jax and torch half of each width column where U = V = 0 and W sits on
+  its floor; that is fixed. Task 5, both apertures at zero (the warm CPD
+  collapse and #1075), is not started. This entry is a ghostshift runner's,
+  ended early because its context passed 300K.
+
+  *Done.* Task 1: the zero-aperture test gained a numpy row and an S/L-at-zero
+  mirror; on main the numpy rows fail at rel-L2 0.2316 for both apertures, and
+  jax and torch pass. Task 2: `_aperture_node_derivs` (`model/forward.py`)
+  takes (−3f(0) + 4f(h) − f(2h))/2h at h = 3e-6, from a scan against jax's
+  column (1e-7: 8.9e-3 off at zero; 3e-6: 5.3e-4; interior under 2e-7 for
+  3e-7 to 1e-5). `/code-review high --fix` found that this stencil crosses
+  the S/L = H/L kink when one aperture is under the other by at most 2h, and
+  mirrored it there (backward second-order); a test at gaps of 1e-6 and 5e-6
+  holds it to 1e-5 against jax (a mutant without the mirror fails at 2.2e-3
+  and 7.6e-4). Goldens `srm660c` and `toy_rich` re-captured: only their two
+  aperture columns moved, by 3e-6 to 1.1e-5 of their norm
+  (`tests/data/README.md`). Task 3: `_assert_columns` skips only a column that
+  is exactly zero on both sides (Decided line under the task). Task 4:
+  `caglioti.gaussian_fwhm`'s floor is `where(g2 < floor, floor, g2)`; numpy
+  values are unchanged, and jax and torch now take g2's side of the tie
+  (was rel-L2 0.500 on U, V and W; now 7e-7, 8e-6 and 3e-4 against the
+  one-sided difference, the last being the difference's own truncation).
+
+  *Measured* (macOS 26.7.2 arm64, Python 3.12.10, `[dev,jax,torch]`; fits
+  through probes on an `origin/main` snapshot at 816fe35ea and on this
+  branch). S/L and H/L as value ± esd; Rwp unchanged unless stated.
+  - QPA cpd-1a (`qpa_plan`, frees S/L with H/L held at 0): S/L 0.036439 ±
+    0.002867 → 0.036439 ± 0.002852. Rwp 0.163072 both; fractions move under
+    1e-9.
+  - Stephens brucite iso (LM): S/L 0 ± 363.7 both, bit-identical. Both
+    apertures sit at zero, where the axial columns take whole-model FD.
+  - Stephens brucite aniso (TRF): S/L 2.6e-26 ± 3915 → 2.9e-10 ± 874 714.
+    Rwp 0.180419 → 0.180479. TRF parks next to the double zero, where the
+    column is nearly flat and either esd means "unmeasured".
+  - `test_e8_collinear_window_applies_no_position_action` (report loop,
+    `refine_axial_asymmetry` accepted): before S/L 0.041320 ± 0.0161, H/L 0 ±
+    13 232; after S/L 0 ± 41 350, H/L 0.041320 ± 0.000307. The FCJ profile is
+    symmetric in S/L and H/L, so the fit now lands on the mirror answer. At
+    that answer, on one free set, the nonzero aperture's esd is 0.00903 from
+    the old column, 0.000181 from the new and 0.000181 from jax.
+  - Dead-column count: 2 of 30 configs had columns under `DEAD_COL_FRAC`
+    (`axial_one_zero`'s H/L at 2.6e-8 of the largest; `nac`'s two Biso and
+    six background columns at 1.3e-9 to 1.3e-7). Every backend and fp32 row
+    met each at its own scale: worst 1.8e-3 at the aperture, 2.4e-7
+    elsewhere.
+  - Tests added: +9 in the fast selection (zero-aperture test 2 → 6 rows,
+    width floor 3, gap 2). Fast and full counts: see the PR body, measured
+    on this branch merged with `origin/main` at 62bc2ac2b.
+
+  *Reader output.* This moves fitted numbers and esds of every fit that frees
+  an aperture (above, and the e8 mirror answer). It goes to Yue before merge
+  (the reader-output rule).
+
+  *Generality* (judge's verdicts, unedited summary): 1, the node step: weak,
+  for want of tests at a gap under 2h and at synchrotron-scale apertures, and
+  for the unrecorded task-2 esds. 2, the mirrored stencil: weak, no test. 3,
+  the Caglioti select: holds. 4, the matrix cut: holds. Author's answer: the
+  task-2 esds are recorded above, and the gap test now exists (commit after
+  the review). Synchrotron-scale apertures (0.001-0.005) are not yet tested.
+
+  *Gotchas.* A forward difference against a column that is a cancellation
+  residue fails at any step that is fine elsewhere; check a small column
+  against an exact one (jax), never against its size. `fcj` nodes have two
+  more kinks a stencil can straddle: the ξ cap (`_tan_cap`) at low angle,
+  rare and not handled.
+
+  Next: task 5. Reproduce WP-2003's X17 (`docs/wp/2003-batch/clashes.md`)
+  and #1075 repro 1 at this branch, since neither path touches the columns
+  fixed here (both apertures at zero take whole-model FD). Then decide
+  between a floor and a lift for the apertures (WP-1938's rule); either moves
+  every fit that frees an aperture from 0, so it comes to Yue with the
+  numbers. Also worth a row: the aperture columns at synchrotron-scale
+  apertures.
 
 - **2026-10-13** — Filed from WP-1953's close. No open WP owns it: 1467 is a
   Stephens clamp, and the WPs citing the agreement matrix are magnetic,
