@@ -1,9 +1,8 @@
 # WP-2079 — A stated prior is not an engine in the grade
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — filed from #1308
+Milestone: unscheduled · Status: ✅ 2026-11-02 — the grade's two-engine floor counts engines, a stated prior excluded (PR #PRNUM)
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-11-02 — a wrong grade on a wrong cell under a restricted engine set, where a stated prior lifts its own lattice to `medium` above the true lattice at `low`; nothing fires
 
 ## Goal
 
@@ -82,13 +81,13 @@ returns, so it goes to the maintainer before merge.
 
 ## Tasks
 
-- [ ] `grade` counts engines through the same authority as
+- [x] `grade` counts engines through the same authority as
   `engines.agreement`, prior excluded; docstrings, the indexing CLAUDE.md and
   the manual's confidence-gate rule say so
-- [ ] Tests: the issue's repro as a regression (the planted lattice is never
+- [x] Tests: the issue's repro as a regression (the planted lattice is never
   graded below the prior's lattice, and the P lattice's grade is the same with
   and without the prior); a unit test of `grade` on `["prior", "svd"]`
-- [ ] Skill: none. The skill already says a real prior is found by the
+- [x] Skill: none. The skill already says a real prior is found by the
   engines and that `found_by == ["prior"]` alone is the caller's hypothesis;
   the fix makes the grade agree with that text.
 
@@ -107,6 +106,57 @@ returns, so it goes to the maintainer before merge.
   the ranking's first key).
 
 ## Handover log
+
+### 2026-11-02 — closed: a prior corroborates and no longer counts as an engine
+
+A stated prior cell can no longer lift its own lattice's grade. Before,
+a lattice that one engine found and the caller also stated counted as two
+finders and could reach `medium`, while the true lattice found by the same
+engine stayed `low`. Now the grade's two-engine floor counts engines only,
+through the same count the ranking already used. Stating a prior changes
+no grade in any measured case. A grade moves only where one engine and a
+prior stood behind a lattice: it was `medium` and is now `low`. That is a
+reader-output change, and it waits for the maintainer before merge.
+
+- *Done.* `consensus.grade` reads `engines._engines_behind(found_by)`, the
+  count `engines.agreement` now reads too. Docstrings (grade, rank_candidates,
+  `CellCandidate.found_by`), the indexing rulebook and the manual's priors
+  paragraph say a prior is not an engine. Two tests that counted
+  `len(found_by)` call `engines.corroborated` (no fixture there states a
+  prior, so no assertion moves).
+- *Siblings checked.* Every reader of `found_by`: the `high` clause,
+  `engines_disagree`, `checked_indices` and the inlier retry's trigger ask a
+  superset question against `engines_run`, which never holds `"prior"`, or
+  merge without priors. Only the floor miscounted.
+- *Not generalised: svd's seeded start.* A prior's metric seeds svd outside
+  its volume gate (WP-1045 rule 1), so a lattice svd reaches only from the
+  seed counts as svd's finding. WP-1045 states that on purpose. Measured on
+  #1308's fixture, svd alone, seeds 0-3, with and without the P 4.5 prior:
+  the seed bought svd no lattice it missed unseeded (0 of 4); the 9.0 prior
+  bought none either. Changing it would rewrite WP-1045's contract, and no
+  measured case bites, so it is reported to the maintainer and not filed.
+- *Measured* (darwin/arm64, worktree `[dev]` venv). The repro after the fix:
+  svd alone, the P lattice is `low` with `found_by` `['prior', 'svd']`, the
+  same grade as unstated; all three engines, every grade identical with and
+  without the prior. `tests/test_acceptance_indexing.py`: 45 passed (21:09,
+  alone on the machine), before the review commit, which changed one of its
+  assertions to an equivalent form. Fast suite on main `0d735f5e5`+ merged:
+  13298 passed, 310 skipped, 32 xfailed, 3 failed. Two failures were this
+  branch's (the indexing rulebook one line over its cap, the manual's
+  indexing page 163 characters over its twin cap) and are fixed, those files
+  re-run green. The third, `test_display`'s kernel test, fails on a stale
+  Jupyter kernel spec on this machine. A second pytest was running beside it.
+  Added tests: 6 cases, 6.96 s total under that load (the end-to-end repro;
+  the grade table is 0.00 s).
+- *Review.* `/code-review high --fix`: no correctness bug. It fixed the
+  test's key (whole cell, no collisions), "finders" → "engines" wording in
+  two places and the `found_by` schema docstring. I took its two skipped
+  findings too (the two `len(found_by)` tests, the rulebook clause trimmed to
+  a rule). Declined: the #1308 story written in two docstrings, cosmetic.
+- *Generality.* No row added, changed or removed in `_audit.py`; no new
+  constant, ordering or fallback. Not dispatched.
+- *Next.* The maintainer approves the grade change (PR body, Reader-output
+  changes), then merges. Optional: rule on the svd seed's independence.
 
 - **2026-11-02** — created. No open WP owns the prior's place in the grade:
   WP-1956 owns the absence screen and WP-2078 the ranking under foreign
