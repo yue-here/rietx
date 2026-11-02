@@ -438,7 +438,16 @@ FAP_INDEXING_PPM = 5.0e-4
 
 
 @pytest.fixture(scope="module")
-def fap_index():
+def fap_peaks():
+    """The GSAS-II tutorial fluorapatite pattern, its instrument and its picked lines."""
+    from rietx.indexing.pick import pick_peaks
+    from tests.test_acceptance_fap import build_fap_inputs
+    data, _structure, ins = build_fap_inputs()
+    return data, ins, pick_peaks(data, ins)
+
+
+@pytest.fixture(scope="module")
+def fap_index(fap_peaks):
     """The GSAS-II tutorial fluorapatite, indexed. ~95 s.
 
     Hexagonal and trigonal only — a declared restriction, and ``systems_searched``
@@ -447,10 +456,7 @@ def fap_index():
     """
     from rietx.indexing import index_pattern
     from rietx.indexing.engines import SearchSpec
-    from rietx.indexing.pick import pick_peaks
-    from tests.test_acceptance_fap import build_fap_inputs
-    data, _structure, ins = build_fap_inputs()
-    peaks = pick_peaks(data, ins)
+    data, ins, peaks = fap_peaks
     spec = SearchSpec(systems=("hexagonal", "trigonal"), max_volume=600.0,
                       budget_seconds=REAL_DATA_BUDGET_SECONDS, n_unindexed=REAL_DATA_N_UNINDEXED)
     res = index_pattern(peaks, data=data, instrument=ins, spec=spec,
@@ -1846,7 +1852,8 @@ def test_short_wavelength_data_is_indexed_by_the_engines_that_enumerate_nothing(
 
 @pytest.mark.slow
 @pytest.mark.xdist_group("indexing-acceptance-fap")
-def test_the_cross_code_cell_leads_because_the_engines_agree_on_it(fap_index):
+def test_the_cross_code_cell_leads_because_the_engines_agree_on_it(fap_index,
+                                                                 fap_peaks):
     """Fluorapatite: the right cell leads the list — and the gate still refuses it.
 
     This is the one dataset here whose reference is **another code's converged
@@ -1854,8 +1861,15 @@ def test_the_cross_code_cell_leads_because_the_engines_agree_on_it(fap_index):
     agreement rather than accuracy, at ``FAP_INDEXING_PPM`` — which is *not* the
     refinement suite's ±300 ppm, for the reason that constant records.
 
-    The candidate that meets that band indexes 131 of 136 lines at a = +123 ppm,
-    c = +414 ppm, and is the one **every engine that ran found**.  Until WP-1046
+    The candidate that meets that band indexes 128 of 135 lines at a = +288 ppm,
+    c = +226 ppm, and is the one **every engine that ran found**.  The seven
+    lines it leaves out are the doublet's Kα2 residue, not a phase: each sits at
+    the Kα2 position of a reference reflection, (130), (240), (052), (342),
+    (343), (170) and (173), and at no Kα1 one (WP-2066).  The row asserts that,
+    rather than a share of lines indexed: ``main`` before WP-2066 indexed 130 by
+    giving two of those Kα2 lines a wrong hkl, and the 95 % bar it then met was
+    Claude-written with no recorded grounds (7969c08ab).  Settled by Claude under
+    Yue's V3 ruling and the line-by-line measurement.  Until WP-1046
     it was **ranked fourth**, below three cells 966-1396 ppm out that index
     *fewer* lines (152) but score a higher M₂₀ — the ordering M₂₀ produces when a
     slightly wrong metric matches a subset of lines more tightly than the right
@@ -1901,7 +1915,7 @@ def test_the_cross_code_cell_leads_because_the_engines_agree_on_it(fap_index):
     best_in_band = agreed[0]
     assert best_in_band.system in ("hexagonal", "trigonal")
     assert best_in_band.centring == "P"
-    assert best_in_band.n_indexed >= 0.95 * best_in_band.n_lines
+    _the_unindexed_lines_are_kalpha2(best_in_band, *fap_peaks[1:])
 
     # …and it leads, because every engine found it (WP-1046)
     _skip_unless_finished(res)
@@ -1925,6 +1939,40 @@ def test_the_cross_code_cell_leads_because_the_engines_agree_on_it(fap_index):
     assert res.best_or_none() is None
     for cand in res.candidates:
         assert cand.confidence != "high"
+
+
+def _the_unindexed_lines_are_kalpha2(cand, ins, peaks):
+    """Every line ``cand`` leaves out sits at a reference reflection's Kα2, not its Kα1.
+
+    Positions are compared after the pattern's common shift, the median offset of
+    every picked line from its nearest Kα1 reference position (−0.036° here), and
+    within the line's own FWHM, the width under which two positions are one line.
+    Measured (WP-2066): six sit within 0.012° of a Kα2 position; the seventh,
+    40.155°, whose fitted position is at its bound, sits 0.068° from one against
+    its 0.075° FWHM. All seven are 0.16-0.34° from any Kα1 position.
+    """
+    lam1, lam2 = (line.wavelength.value for line in ins.source.lines)
+    inv_d2 = np.array(sorted({4 / 3 * (h * h + h * k + k * k) / A_FAP ** 2
+                              + ell * ell / C_FAP ** 2
+                              for h in range(13) for k in range(13) for ell in range(11)
+                              if h or k or ell}))
+
+    def positions(lam):
+        s = lam * np.sqrt(inv_d2) / 2
+        return np.degrees(2 * np.arcsin(s[s < 1]))
+
+    k1, k2 = positions(lam1), positions(lam2)
+    tt = np.array([p.two_theta for p in peaks.peaks])
+    shift = float(np.median([t - k1[np.argmin(abs(k1 - t))] for t in tt]))
+    assert cand.unindexed_two_theta, "the in-band cell indexes every line"
+    assert cand.n_indexed == cand.n_lines - len(cand.unindexed_two_theta)
+    for t in cand.unindexed_two_theta:
+        fwhm = peaks.peaks[int(np.argmin(abs(tt - t)))].fwhm
+        off2 = float(np.min(abs(t - shift - k2)))
+        off1 = float(np.min(abs(t - shift - k1)))
+        assert off2 <= fwhm < off1, (
+            f"unindexed line at {t:.4f}° is not a Kα2 copy of a reference "
+            f"reflection: Kα2 {off2:.4f}°, Kα1 {off1:.4f}°, FWHM {fwhm:.4f}°")
 
 
 @pytest.mark.slow
