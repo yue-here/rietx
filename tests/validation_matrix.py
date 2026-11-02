@@ -988,11 +988,12 @@ CLAIMS: tuple[Claim, ...] = (
         diagnostics=("BRINDLEY_OUTSIDE_REGIME",),
     ),
     Claim(
-        "test_acceptance_qpa_roundrobin", "test_no_flank_lobe_reads_as_unindexed",
+        "test_acceptance_qpa_roundrobin",
+        "test_flank_lobes_name_their_peak_and_buy_no_impurity",
         "qarr", ("characterisation",),
-        "on each of the eight weighed three-phase mixtures, the misfit lobe "
-        "beside each strong line is read as part of that line: Layer 0 lists "
-        "no unindexed peak within 0.5° of a strong reflection and Layer 2 "
+        "on each of the eight weighed three-phase mixtures, every unmatched "
+        "observed peak within 0.5° of a strong reflection says it sits "
+        "unresolved on a drawn peak (UnmatchedPeak.flank), and Layer 2 "
         "suggests no impurity phase",
         reference="**no accuracy band is claimed**.  The reference is the "
                   "weighing: each mixture holds exactly the three modelled "

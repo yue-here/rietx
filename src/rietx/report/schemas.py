@@ -277,14 +277,15 @@ from ..strategy.staged import BACKGROUND_ABSORPTION_GUARD
 #   z moves little there; where the width is the misfit, z grows by the ratio
 #   of the two scatters.  A consumer comparing z against a number sees the
 #   change, on 1.10 → 1.11's precedent.
-# 1.13 → 1.14 (WP-1977, #1106, #1217): no number moved, but which residual
-#   peaks ``unmatched_obs`` lists did.  A peak the observed curve joins to a
-#   peak ``y_calc`` draws, with no valley of ``min_peak_sigma`` σ on the way,
-#   is explained (``layer0.on_drawn_flank``), where only a tick within
-#   ``LAYER0_MATCH_TOL_DEG`` explained one before.  It removed 66 rows across
-#   twelve QPA round-robin fits and SRM 660c, 65 of them flank lobes, and with them
-#   ``add_impurity_phase`` on two.  A consumer comparing the count against a
-#   number sees the change, on 1.12 → 1.13's precedent.
+# 1.13 → 1.14 (WP-1977, #1106, #1217): no number moved and no row left
+#   ``unmatched``, but what Layer 2 does with one did.  Every ``unmatched_obs``
+#   row now carries ``UnmatchedPeak.flank`` (``FlankEvidence``): whether the
+#   observed curve joins it to a peak ``y_calc`` draws with no valley of
+#   ``min_peak_sigma`` σ, that peak's position, prominence and width, the
+#   offset in its FWHM, and how many lines as strong carry a lobe on the same
+#   side.  ``add_impurity_phase`` no longer counts a row on a flank.  A new
+#   type a consumer reads, on 1.11 → 1.12's precedent, and an action a
+#   consumer may count, on 1.12 → 1.13's.
 THRESHOLDS_VERSION = "1.14"
 
 #: WP-1343.  How far the moment must move when a magnetic width is released
@@ -605,17 +606,65 @@ class Region(Base):
     n_reflections: int
 
 
+class FlankEvidence(Base):
+    """Where an ``unmatched_obs`` peak sits against the peaks the model draws
+    (WP-1977, #1106, #1217).  Built by :func:`.layer0.build_layer0` for every
+    ``unmatched_obs`` row, by the walk :func:`.layer0.on_drawn_flank` makes.
+
+    From the residual peak the walk goes uphill along ``y_calc`` to the apex
+    of the drawn peak it sits under.  That apex counts only when its
+    prominence in ``y_calc`` is at least ``min_peak_sigma`` times σ there and
+    it is not the pattern's edge.  ``on_flank`` says the observed curve rises
+    from the residual into that peak with no valley of ``min_peak_sigma`` σ.
+    The data then do not resolve the residual from the peak.  A shape or
+    asymmetry misfit, an unmodelled Kα2, a split of the line by lower symmetry
+    and a foreign line all look like that, and the evidence here is what
+    separates them (``rietx.help.explain("UnmatchedPeak.flank")``).  Layer 2
+    suggests no impurity phase for such a row.
+
+    ``peak_two_theta`` and the four fields after it are ``None`` where no
+    drawn peak lies uphill of the residual, and ``on_flank`` is then False.
+    ``peak_fwhm_deg`` is the drawn curve's width at half its prominence, and
+    ``offset_fwhm`` is (residual − apex)/that width, negative below the apex.
+    ``valley_over_sigma`` is the deepest fall of ``y_obs`` on the way, below
+    the highest point it had reached, in σ.
+
+    ``lines_as_strong`` counts the drawn peaks whose prominence is at least
+    this one's, this one included.  ``lines_with_lobe`` counts those carrying
+    an ``on_flank`` row on the same side, this one included.  A shape misfit
+    leaves a lobe on every line strong enough to show it, so 6 of 6 reads
+    differently from 1 of 20.  Both counts are ``None`` where ``on_flank`` is
+    False.  A lobe within ``LAYER0_MATCH_TOL_DEG`` of a tick is no row, so it
+    is not counted.  "Same side" is the whole test of similarity: each row's
+    ``offset_fwhm`` is there to compare.
+    """
+
+    on_flank: bool
+    peak_two_theta: float | None
+    peak_prominence_over_sigma: float | None
+    peak_fwhm_deg: float | None
+    offset_fwhm: float | None
+    valley_over_sigma: float | None
+    lines_as_strong: int | None
+    lines_with_lobe: int | None
+
+
 class UnmatchedPeak(Base):
     """One Layer-0 peak-accounting row; the list is ``FitReport.unmatched``,
     and its counts alone (no positions) ride on
     :class:`StageReport` as ``n_unmatched_obs``/``n_unmatched_calc``.
+
+    ``flank`` is ``None`` where it was not measured: every ``unmatched_calc``
+    row, and a row built outside :func:`.layer0.build_layer0`.  Its absence
+    never means "not on a flank".
     """
 
     two_theta: float
     height_over_sigma: float
-    # "unmatched_obs" (no calc tick nearby, and not on the flank of a peak the
-    # model draws: layer0.on_drawn_flank) | "unmatched_calc"
+    # "unmatched_obs" (no calc tick within LAYER0_MATCH_TOL_DEG) |
+    # "unmatched_calc"
     kind: str
+    flank: FlankEvidence | None = None
 
 
 class SatelliteCandidate(Base):

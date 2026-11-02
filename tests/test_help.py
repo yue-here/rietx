@@ -541,14 +541,17 @@ def _result_types() -> dict[str, type[BaseModel]]:
     reaches the crossing below with no second list to edit, and a name that
     resolves to nothing fails rather than dropping out of coverage.
     """
+    from rietx.report import schemas as report
     from rietx.schemas import results, sequential
 
     out = {}
     for name in RESULT_FIELD_TYPES:
-        cls = getattr(sequential, name, None) or getattr(results, name, None)
+        cls = (getattr(sequential, name, None) or getattr(results, name, None)
+               or getattr(report, name, None))
         assert isinstance(cls, type) and issubclass(cls, BaseModel), (
             f"RESULT_FIELD_TYPES names {name!r}, which is no schema in "
-            "rietx.schemas.results or rietx.schemas.sequential")
+            "rietx.schemas.results, rietx.schemas.sequential or "
+            "rietx.report.schemas")
         out[name] = cls
     return out
 

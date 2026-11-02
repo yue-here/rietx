@@ -330,14 +330,15 @@ def test_sample1_fractions_within_participant_spread(sample1_results, sample):
 @pytest.mark.slow
 @pytest.mark.xdist_group("qpa-sample1")
 @pytest.mark.parametrize("sample", SAMPLE1)
-def test_no_flank_lobe_reads_as_unindexed(sample1_results, sample):
+def test_flank_lobes_name_their_peak_and_buy_no_impurity(sample1_results, sample):
     """WP-1977's acceptance.  Each strong line leaves a misfit lobe on its
     flank, 0.15-0.29° below it on cpd-1c and cpd-1f, and with the ticks on the
-    peaks (WP-1908) the 0.08° window put them outside.  They are part of the
-    drawn peak, so Layer 0 lists none within 0.5° of a strong line (drawn
-    height above a tenth of the pattern's tallest).  On the tree before the
-    rule, cpd-1c listed six, at up to 12σ.  Nor does Layer 2 suggest an
-    impurity phase: the mixtures were weighed from three known phases."""
+    peaks (WP-1908) the 0.08° window lists them.  Each such row within 0.5°
+    of a strong line (drawn height above a tenth of the pattern's tallest)
+    now says it sits unresolved on a drawn peak (``UnmatchedPeak.flank``),
+    and Layer 2 suggests no impurity phase: the mixtures were weighed from
+    three known phases.  On the tree before, cpd-1b got ``add_impurity_phase``
+    at 0.50 from such rows."""
     result = sample1_results[sample]
     tt = np.asarray(result.two_theta)
     bragg = np.asarray(result.y_calc) - np.asarray(result.y_background)
@@ -345,10 +346,11 @@ def test_no_flank_lobe_reads_as_unindexed(sample1_results, sample):
     height = bragg[np.clip(np.searchsorted(tt, ticks), 0, len(tt) - 1)]
     strong = ticks[height > 0.1 * bragg.max()]
     report = rx.build_report(result)
-    near = [(round(u.two_theta, 2), round(u.height_over_sigma, 1))
-            for u in report.unmatched if u.kind == "unmatched_obs"
+    near = [u for u in report.unmatched if u.kind == "unmatched_obs"
             and np.min(np.abs(strong - u.two_theta)) < 0.5]
-    assert near == [], f"{sample}: {near}"
+    loose = [(round(u.two_theta, 2), round(u.height_over_sigma, 1))
+             for u in near if not u.flank.on_flank]
+    assert loose == [], f"{sample}: {loose}"
     impurity = [a.confidence for a in report.suggested_actions
                 if a.kind == "add_impurity_phase" and a.active]
     assert impurity == [], f"{sample}: add_impurity_phase {impurity}"

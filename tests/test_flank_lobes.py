@@ -1,16 +1,20 @@
-"""WP-1977: a residual lobe on the flank of a drawn peak is not an unindexed line.
+"""WP-1977: a residual peak on the flank of a drawn peak carries that evidence.
 
-Layer 0 lists a positive residual peak as ``unmatched_obs`` only when no peak
-the model draws explains it.  A tick within ``LAYER0_MATCH_TOL_DEG`` explains
-one, as before.  Since WP-1977 so does the observed flank of a drawn peak, when
-the observed curve rises into that peak with no resolved valley
-(:func:`rietx.report.layer0.on_drawn_flank`).  The drawn curve is ``y_calc``
-whole, so a line of a measured blank counts (#1217).
+Layer 0 lists a positive residual peak as ``unmatched_obs`` when no tick lies
+within ``LAYER0_MATCH_TOL_DEG``, as before.  Since WP-1977 each such row also
+says whether the observed curve rises from it into a peak the model draws with
+no resolved valley (:func:`rietx.report.layer0.on_drawn_flank`), and against
+which peak (``UnmatchedPeak.flank``).  The data do not decide such a shoulder:
+a shape misfit, an unmodelled Kα2, a lower-symmetry split and a foreign line
+all leave one.  So the row stays listed and Layer 2 names no single cause for
+it.  The drawn curve is ``y_calc`` whole, so a line of a measured blank counts
+(#1217).
 
 The cases: the unit behaviour on hand-built curves; the asymmetry lobes of
 #1106, rebuilt on the synthetic LaB₆ truth with the model's apertures at 0; an
-unmodelled second phase, whose isolated lines must still be listed; and an
-under-scaled blank, whose line must not be.
+unmodelled second phase, whose isolated lines keep the impurity call; a
+tetragonal specimen modelled cubic, whose split lines keep the re-index
+pointer; and an under-scaled blank.
 """
 
 import numpy as np
@@ -40,7 +44,7 @@ def drawn():
     return x, y_calc, np.sqrt(y_calc)
 
 
-def test_a_lobe_on_the_flank_is_explained(drawn):
+def test_a_lobe_on_the_flank_is_unresolved(drawn):
     """1.5 FWHM below the apex, the observed curve still rises into the peak."""
     x, y_calc, sigma = drawn
     y_obs = y_calc + 40.0 * _gauss(x, 4.85, 0.1)
@@ -69,7 +73,7 @@ def test_a_line_resolved_on_a_strong_tail_is_not():
     assert not on_drawn_flank(y_obs, y_calc, sigma, i, min_sigma=K)
 
 
-def test_a_peak_the_noise_hides_explains_nothing():
+def test_a_peak_the_noise_hides_is_no_apex():
     """A drawn peak below the detection level is no apex to belong to."""
     x = np.arange(0.0, 10.0, 0.01)
     y_calc = 50.0 + 10.0 * _gauss(x, 5.0, 0.1)
@@ -90,7 +94,7 @@ def test_the_pattern_edge_is_no_apex():
 
 
 def _window_only(result):
-    """The residual peaks the 0.08° window alone would list (the pre-1977 rule)."""
+    """The residual peaks the 0.08° window lists, as ``(2θ, height in σ)``."""
     tt = np.asarray(result.two_theta)
     resid = (np.asarray(result.y_obs) - np.asarray(result.y_calc)) / result.sig()
     ticks = np.concatenate([np.asarray(v) for v in result.ticks.values()])
@@ -103,13 +107,35 @@ def _obs(report):
     return [u for u in report.unmatched if u.kind == "unmatched_obs"]
 
 
-def test_asymmetry_lobes_with_the_apertures_at_zero_are_explained():
+def _every_row_measured(report):
+    """The writer of ``UnmatchedPeak.flank`` is ``build_layer0``, one per
+    ``unmatched_obs`` row; an ``unmatched_calc`` row is not measured."""
+    for u in report.unmatched:
+        assert (u.flank is not None) is (u.kind == "unmatched_obs"), u
+        f = u.flank
+        if f is None:
+            continue
+        drawn = f.peak_two_theta is not None
+        assert drawn or not f.on_flank, f
+        assert (f.offset_fwhm is not None) is drawn, f
+        if f.on_flank:
+            assert 1 <= f.lines_with_lobe <= f.lines_as_strong, f
+        else:
+            assert f.lines_as_strong is None and f.lines_with_lobe is None, f
+
+
+def _active(report, kind):
+    return [a for a in report.suggested_actions if a.kind == kind and a.active]
+
+
+def test_asymmetry_lobes_with_the_apertures_at_zero_carry_their_peak():
     """#1106's signature: the data carry axial divergence (S/L = H/L = 0.03),
     the model declares none.  The lines leave lobes on their flanks outside
-    the 0.08° window (here at 116-121°, up to 11.5σ), and before WP-1977 each
-    read as an unindexed line.  Now none does, and no impurity phase is
-    suggested.  The real-data case, SRM 660c fitted with the apertures at 0,
-    is measured in WP-1977's Task 4 (11 rows to 0); WP-2054 owns its test."""
+    the 0.08° window (here at 116-121°, up to 11.5σ).  Before WP-1977 each
+    read as an unindexed line and bought ``add_impurity_phase``.  Now each is
+    still listed, names the drawn peak it sits unresolved on, and buys no
+    impurity call.  The real-data case, SRM 660c fitted with the apertures at
+    0, is measured in WP-1977's handover; WP-2054 owns its test."""
     from rietx.model.forward import compile_model
     from rietx.params.vector import ParameterTable
 
@@ -129,11 +155,16 @@ def test_asymmetry_lobes_with_the_apertures_at_zero_are_explained():
     flat.geometry.axial_sl.value = flat.geometry.axial_hl.value = 0.0
 
     result, _, _ = _result_for(structure, flat, data)
-    lobes = _window_only(result)
-    assert [t for t, s in lobes if s > IMPURITY_SIGMA], lobes
+    lobes = [t for t, s in _window_only(result) if s > IMPURITY_SIGMA]
+    assert lobes, _window_only(result)
     report = _report_for(structure, flat, data)
-    assert _obs(report) == [], _obs(report)
-    assert "add_impurity_phase" not in [a.kind for a in report.suggested_actions]
+    _every_row_measured(report)
+    rows = {round(u.two_theta, 4): u for u in _obs(report)}
+    for t in lobes:
+        u = rows[round(t, 4)]
+        assert u.flank.on_flank, u
+        assert abs(u.two_theta - u.flank.peak_two_theta) < 0.5, u
+    assert _active(report, "add_impurity_phase") == []
     _plot_state(structure, flat, data, "wp1977_axial_lobes")
 
 
@@ -149,9 +180,8 @@ def _si() -> rx.Phase:
 def test_an_unmodelled_phase_still_reads_as_unmatched():
     """The guard on the other side: silicon in the data, LaB₆ alone in the
     model.  Every silicon line that stands clear of LaB₆ (no LaB₆ tick within
-    0.5°) and reaches the impurity level is listed, and the impurity call is
-    made.  A silicon line on a LaB₆ flank that the data do not resolve is
-    explained, which no positions test could avoid."""
+    0.5°) and reaches the impurity level is listed, the data resolve it from
+    every drawn peak, and the impurity call is made."""
     from rietx.model.forward import compile_model
     from rietx.params.vector import ParameterTable
 
@@ -175,12 +205,61 @@ def test_an_unmodelled_phase_still_reads_as_unmatched():
     assert len(clear) >= 4, clear
 
     report = _report_for(structure, ins, doped)
-    listed = np.asarray([u.two_theta for u in _obs(report)])
-    missing = [p for p in clear
-               if not len(listed) or np.min(np.abs(listed - p)) > LAYER0_MATCH_TOL_DEG]
-    assert missing == [], (missing, listed)
-    assert "add_impurity_phase" in [a.kind for a in report.suggested_actions]
+    _every_row_measured(report)
+    rows = _obs(report)
+    for p in clear:
+        near = [u for u in rows if abs(u.two_theta - p) <= LAYER0_MATCH_TOL_DEG]
+        assert near and not any(u.flank.on_flank for u in near), (p, near)
+    assert _active(report, "add_impurity_phase")
     _plot_state(structure, ins, doped, "wp1977_unmodelled_si")
+
+
+def test_a_lower_symmetry_split_keeps_the_reindex_pointer():
+    """The case WP-1977's generality review named: a tetragonal specimen
+    (c/a = 1.004) modelled cubic.  Each line with an l component splits.  At
+    low angle the data do not resolve the split, and the row says so; higher
+    up they do.  Before WP-1977 this fit got ``reindex_or_recheck_cell`` at
+    0.4 and a capped ``add_impurity_phase`` with re-indexing first among its
+    alternatives, from the resolved components.  It still gets both: the
+    unresolved rows are left out of the impurity count, the resolved ones are
+    not."""
+    from rietx.model.forward import compile_model
+    from rietx.params.vector import ParameterTable
+
+    structure, ins, data = _truth()
+    a = structure.phases[0].cell.a.value
+    p = rx.Parameter
+    tetragonal = rx.Structure(phases=[rx.Phase(
+        name="LaB6t", space_group="P 4/m m m",
+        cell=rx.Cell(a=p(value=a), b=p(value=a), c=p(value=a * 1.004),
+                     alpha=p(value=90.0), beta=p(value=90.0), gamma=p(value=90.0)),
+        atoms=[rx.Atom(label="La", species="La", x=p(value=0.0), y=p(value=0.0),
+                       z=p(value=0.0)),
+               rx.Atom(label="B1", species="B", x=p(value=0.1993), y=p(value=0.5),
+                       z=p(value=0.5)),
+               rx.Atom(label="B2", species="B", x=p(value=0.5), y=p(value=0.5),
+                       z=p(value=0.1993))],
+        scale=structure.phases[0].scale.model_copy())])
+    table = ParameterTable(tetragonal, ins)
+    y = compile_model(tetragonal, ins, data, mode="rietveld").evaluate(
+        table.decode(table.x0()))
+    rng = np.random.default_rng(41)
+    split = rx.PatternData(two_theta=data.two_theta,
+                           intensity=rng.poisson(np.maximum(y, 1.0)).tolist(),
+                           sigma=np.sqrt(np.maximum(y, 1.0)).tolist())
+
+    report = _report_for(structure, ins, split)
+    _every_row_measured(report)
+    rows = _obs(report)
+    assert any(u.flank.on_flank for u in rows), rows
+    assert any(not u.flank.on_flank and u.height_over_sigma > IMPURITY_SIGMA
+               for u in rows), rows
+    # the longer c puts every split component below its cubic line
+    assert all(u.flank.offset_fwhm < 0 for u in rows if u.flank.on_flank), rows
+    assert _active(report, "reindex_or_recheck_cell")
+    impurity = _active(report, "add_impurity_phase")
+    assert impurity and impurity[0].alternatives[0] == "reindex_or_recheck_cell"
+    _plot_state(structure, ins, split, "wp1977_tetragonal_split")
 
 
 def _blank(tt, lines):
@@ -190,16 +269,18 @@ def _blank(tt, lines):
     return y
 
 
-@pytest.mark.parametrize("model_lines, listed", [
-    ((42.1, 65.0), False),   # the blank the model holds has the line: explained
-    ((65.0,), True),         # it has not: the line is the specimen's, listed
+@pytest.mark.parametrize("model_lines, on_flank", [
+    ((42.1, 65.0), True),    # the blank the model holds has the line
+    ((65.0,), False),        # it has not: nothing drawn to sit under
 ])
-def test_a_line_of_an_under_scaled_blank_is_explained(model_lines, listed):
+def test_a_line_of_an_under_scaled_blank_sits_on_its_drawn_line(model_lines,
+                                                                 on_flank):
     """#1217: a measured blank declared as a fixed background, refined low
     (here 0.45 against a truth of 0.60, the regression dilution WP-1309
-    measured).  What is left of the blank's own line at 42.1° lies on a line
-    the model draws, so it is not an unindexed line.  The control removes that
-    line from the blank the model holds, and the same residual is listed."""
+    measured).  What is left of the blank's own line at 42.1° is listed, and
+    its row says it sits on a line the model draws: the blank's.  The control
+    removes that line from the blank the model holds, and the same residual
+    sits under no drawn peak."""
     from rietx.schemas.instrument import BackgroundFixedPlusChebyshev
 
     structure, ins, data = _truth()
@@ -220,6 +301,8 @@ def test_a_line_of_an_under_scaled_blank_is_explained(model_lines, listed):
     result, _, _ = _result_for(structure, held, doped)
     assert [t for t, s in _window_only(result) if abs(t - 42.1) < 0.1]
     report = _report_for(structure, held, doped)
+    _every_row_measured(report)
     near = [u for u in _obs(report) if abs(u.two_theta - 42.1) < 0.1]
-    assert bool(near) is listed, _obs(report)
+    assert near, _obs(report)
+    assert all(u.flank.on_flank is on_flank for u in near), near
     _plot_state(structure, held, doped, f"wp1977_blank_line_{len(model_lines)}")
