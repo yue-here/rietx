@@ -79,6 +79,7 @@ from .fom import (
     RESOLUTION_FWHM,
     common_shift,
     lattice_reflections,
+    line_means,
     match_lines,
     merge_at_resolution,
     resolution_half_width,
@@ -412,7 +413,7 @@ def screen_candidate(pattern: PatternScreen, cell: tuple[float, ...],
     # merge at the resolution, then shift
     fw = pattern.fwhm_at(tt)
     groups = merge_at_resolution(tt, fw, resolution=pattern.resolution)
-    m_tt = np.array([float(np.mean(tt[g])) for g in groups]) + shift
+    m_tt = line_means(tt, np.array([g[0] for g in groups], dtype=np.intp)) + shift
     m_hkl = np.array([hkl[g[0]] for g in groups], dtype=np.int64)
     m_free = np.array([bool(np.any(free[g])) for g in groups])
     m_q = np.array([float(np.min(q[g])) for g in groups])
