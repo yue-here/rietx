@@ -363,6 +363,19 @@ gh run list --workflow nightly.yml --branch main --limit 1
   rows' files plus the lab6 start rows 52 passed, 2 xfailed;
   `python -m tests.reader_output` exit 0, unchanged.
 
+  *Approved* (Yue, 2026-11-02): option A, merge PR #1309 as is. The approval
+  covers both test changes and the 300-minute limit. A ghostshift steward
+  runner then merged `origin/main` (`1a648d3a9`) in without a conflict
+  needing a hand. WP-2012's build task, added on `main` by #1317, still asked
+  for "the two start-invariance xfails" to be made strict or dropped. Only the
+  Biso row's strict mark is left, so the task now names that row. Four rows
+  in `src/rietx/_audit.py` still describe the lab6 intermediate-tolerance row
+  as a non-strict xfail in their evidence (`StageResult.ftol` at line 1408,
+  and lines 3467, 3897 and 3957). Since this PR the row carries no mark and
+  passes. They were left as they are, because an evidence edit goes through
+  the `generality-review` judge. The next change to those rows should correct
+  the sentence.
+
   Next: merge #1309; the first nightly after it is this WP's acceptance. If
   the 150 K row or the axial rows go red again, the probes in
   `docs/wp/2036-batch/` reproduce the split on a Mac.

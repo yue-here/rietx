@@ -76,8 +76,9 @@ choosing a fix.
       `instrument.geometry.axial_hl` (`strategy/staged.py:628-630`). A sibling found while
       recording the decision: `lab_bragg_brentano`'s `lines_axial` stage frees both ratios
       too (`:599-601`), so the same symmetry reaches it. Apply the same change there, and
-      say so in the handover, since the ruling named `lab_calibrate` alone. Then make the
-      two start-invariance xfails strict again or drop them (§ Inherited, WP-2036).
+      say so in the handover, since the ruling named `lab_calibrate` alone. Then drop the
+      Biso start row's strict xfail if it XPASSes; the other lab6 start rows carry no mark
+      since WP-2036 ordered the pair (§ Inherited, WP-2036).
 - [ ] Rewrite the two `help.py` entries to say the pair is interchangeable, and follow a
       changed preset into the skill's `lab_calibrate` row (`docs/skill/rietx/SKILL.md`, the
       presets table) and the calibration guide's axial paragraph.
