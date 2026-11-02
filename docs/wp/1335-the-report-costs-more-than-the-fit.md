@@ -1,6 +1,6 @@
 # WP-1335 — the report costs more than the fit
 
-Milestone: unscheduled · Status: 🔄 2026-11-02 — claimed by ghostshift runner
+Milestone: unscheduled · Status: 🔄 2026-11-02 — PR #1346 cut a stage report's cost by a third, bit-identically; a joint fit's `stage_reports=` remains
 Track: A long run is not one fit
 Depends on: —
 Priority: P3 2026-09-23 — cost only: a report at 26× the fit it reports on
@@ -231,6 +231,88 @@ with Rwp bit-identical; a `summary()` + `report()` pair builds one report.
   platform, never as a figure.
 
 ## Handover log
+
+- **2026-11-02** — a stage report costs about a third less, with every
+  report number unchanged, and its cost is now in the event log. Measured on
+  this machine against `main`, a NAC fit with its seven stage reports went
+  from 7.1-8.3× the bare fit to 4.7-5.7×. On the 49 000-point LaB6+cBN fit,
+  the shape #250 reported, one report went from 2.85-3.13 s to 2.41-2.85 s of
+  CPU, so there the cut is about a sixth. What remains is arithmetic the
+  answers are made of: the Stephens strain arm's four Gauss-Newton solves,
+  each a dense least-squares problem over the whole pattern, and the
+  March-Dollase grid's 121 powers per angle. Cutting either further would move
+  rung numbers, and that is a reader-output change for the maintainer. A
+  `fit_end` now carries `stage_report_seconds`, so a caller summing events
+  sees the rungs' share instead of inferring it. PR #1346.
+
+  *Done.* Task 1 in its bound form: `_strain_errors(min_reflections=)` returns
+  the first iteration's leverage, with no solve, when fewer reflections than
+  the floor have leverage and tanθ > 0. The weights are re-formed every
+  iteration, so only that bound is known before the solves. Task 2: a phase
+  with no free structural parameter is analysed, settled by Claude under
+  `report/strain.py`'s own rule that the subject is the specimen; written into
+  `analyse_strain`'s docstring. Task 4: a field, not a kind, settled by
+  Claude under `history/events.py`'s written rule (a key on an existing kind
+  does not bump `EVENT_SCHEMA_VERSION`); `rietx events` prints it on the fit
+  line. The savings beyond the task list, each bit-identical:
+  `strain_basis` and `zone_boundary_candidates` are cached per group (both
+  are exact-rational eliminations repeated per phase per stage); the texture
+  grid is scored a block of r at a time and raises each distinct cos²α to
+  its power once; a rung's `_build_result(with_geometry=False)` skips the
+  bond search, which no `StageReport` field reads. Docs: `fit`'s docstring
+  lost its "≈2.5×", the manual's report and event pages and the skill's
+  `series.md` row and § 9c.11 carry the re-measured cost and the field.
+
+  *Measured.* `[dev]` venv, darwin arm64, CPU seconds (`time.process_time`)
+  with BLAS and kernel threads pinned to 1, on a machine at load average
+  30-110 from other runners' suites, so wall clock was unusable and every
+  figure is a range. Bit-identity: every field of the seven NAC rungs, the
+  NAC final report and the LaB6+cBN report, dumped as JSON, is byte-identical
+  to an `origin/main` snapshot (`cmp`). Recovered by the floor guard on the
+  #250 shape: about zero, by construction, since a solve costs
+  npts × (2·n_group)² and a phase under the floor has under 16 groups.
+  Trimming the design's all-zero rows was measured and dropped: the windows
+  cover 75-100 % of the rows, and trimming moved Λ by up to 1.8e-7 relative.
+  The fast suite did not run locally: the machine's suite lock had six
+  waiters ahead of it, so CI's fast matrix is the gate. A targeted selection
+  of 23 files reaching the changed modules, on the tree merged with
+  `origin/main` (e4d4f044c), gave 830 passed, 2 xfailed and 3 failed. The
+  three (an audit row, the events page over its size cap) were fixed and
+  their files rerun green, 124 passed. This session added 17 cases from 9
+  test functions, all in `tests/test_report_cost.py`: 1.25 s together
+  locally, the slowest 0.52 s. The full selection did not run: the change
+  claims bit-identity, checked directly on two real-data fits.
+  `reader_output`: unchanged.
+
+  *Review.* `/code-review high --fix` found seven. Fixed four: the two floors
+  shared a name, the cache docstrings quoted single figures, the manual's
+  cancelled `fit_end` omitted the key, the skill claimed bit-identity
+  everywhere rather than where measured. Declined three: the floor guard's
+  saving is near zero (kept, because the task and its test ask for it and
+  it costs one comparison); `_stage_report_seconds` is instance state that a
+  kept Le Bail pass does not restore (no reader); the blocked texture grid's
+  bit-identity rests on numpy summing a row as it sums a 1-D array (the
+  oracle test runs on every CI platform, which is the check). The
+  generality judge passed the audit row's `invariant` tier and found the
+  oracle test never cut the grid into blocks of more than one r; it now
+  does, at 50.
+
+  *Gotchas.* `n_reflections_used` on a phase under the floor is now counted
+  at the fitted widths rather than four steps on; the two differ only where
+  a reflection's leverage crosses the 1e-6 relative cut between them, and
+  were equal on the brucite fixture. The events page
+  (`reference/refinement.md`) sits 11 characters under its 50 000 cap, so
+  `stage_report_seconds` is named on the report page, not in the events
+  table's `fit_end` row. Symmetry-equivalent texture axes cannot
+  be merged without changing which of them the report names, since their
+  scores tie to the last bit only by accident.
+
+  *Next.* (1) Offer `stage_reports=` on a joint fit (Inherited, from 1341):
+  the cut is a third, so the per-histogram multiple the docstring warns of
+  is smaller but not gone; decide whether that is enough. (2) If the
+  maintainer wants rungs cheaper still, the levers move rung numbers: fewer
+  Gauss-Newton steps on intermediate rungs, or a coarser r grid there. Each
+  is a reader-output change and goes to the maintainer first.
 
 - **2026-09-03** — created, from the 2026-09-03 issue triage (issues #245,
   #250, #251). Verified on the tree that `analyse_strain` calls
