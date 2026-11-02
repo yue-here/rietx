@@ -3,7 +3,7 @@
 Milestone: unscheduled · Status: ⬜
 Track: What fires, and what stays silent
 Depends on: —
-Priority: P2 2026-10-19 — a silent wrong pair of numbers on `lab_calibrate`, the one preset that frees both ratios; the profile it fits is right, so only a reader of S/L and H/L is misled
+Priority: P2 2026-11-01 — a silent wrong pair of numbers on `lab_calibrate` and `lab_bragg_brentano`, the presets that free both ratios; the profile it fits is right, so only a reader of S/L and H/L is misled; the fix is decided
 
 ## Goal
 
@@ -64,9 +64,19 @@ choosing a fix.
 
 - [ ] Read Finger, Cox and Jephcoat (1994) on the S ↔ H symmetry, and check `profiles/fcj.py`
       against it.
-- [ ] Decide the fix with the maintainer: `lab_calibrate` frees S/L alone with H/L held at
+- [x] Decide the fix with the maintainer: `lab_calibrate` frees S/L alone with H/L held at
       its declared value; or one combined parameter, as GSAS-II has; or a finding when both
-      are free.
+      are free. **Decided 2026-11-01 (maintainer): option 1.** `lab_calibrate` frees S/L
+      alone and holds H/L at its declared value, the receiving slit's height over the
+      goniometer radius (the calibration guide's 3 mm / 200 mm). H/L left at its default 0
+      gives a one-ratio model, close to GSAS-II's single SH/L. Its fit-quality cost on a
+      real instrument is not measured.
+- [ ] Build option 1: the `lines_axial` stage of `lab_calibrate` drops
+      `instrument.geometry.axial_hl` (`strategy/staged.py:628-630`). A sibling found while
+      recording the decision: `lab_bragg_brentano`'s `lines_axial` stage frees both ratios
+      too (`:599-601`), so the same symmetry reaches it. Apply the same change there, and
+      say so in the handover, since the ruling named `lab_calibrate` alone. Then make the
+      two start-invariance xfails strict again or drop them (§ Inherited, WP-2036).
 - [ ] Rewrite the two `help.py` entries to say the pair is interchangeable, and follow a
       changed preset into the skill's `lab_calibrate` row (`docs/skill/rietx/SKILL.md`, the
       presets table) and the calibration guide's axial paragraph.
@@ -82,6 +92,13 @@ choosing a fix.
 ```
 
 ## Handover log
+
+- **2026-11-02** — the fix is decided. The maintainer chose option 1 on 2026-11-01:
+  `lab_calibrate` frees S/L alone, with H/L held at its declared value. A calibration then
+  reports S/L as a measurement whenever the user declares the slit height, and the two
+  mirrored minima disappear. Recorded only; nothing is built or run. While recording it,
+  `lab_bragg_brentano` turned out to free both ratios as well, so the build task covers
+  both presets. *Next:* task 1 (FCJ 1994 on the symmetry), then the build.
 
 - **2026-10-19, filed by WP-1986's sixth session.** No open WP owns the axial ratios: a
   `git grep` for `axial_sl`/`axial_hl` over `docs/wp/` on `origin/main` finds only closed WPs
