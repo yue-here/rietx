@@ -1,9 +1,8 @@
 # WP-2011 — a candidate is judged on a fit that converged
 
-Milestone: unscheduled · Status: 🔄 2026-10-28 — go decided under the maintainer's delegation: Pawley validation, cheapest first, a 15 % reserve; NAC's true cell now validates under `quick`; ready for review (PR #1191)
+Milestone: unscheduled · Status: ✅ 2026-10-29 — the indexer validates by Pawley, cheapest first, with a 15 % `quick` reserve; NAC's true cell validates under `quick` (PR #1191, merged 2026-10-29)
 Track: What fires, and what stays silent
 Depends on: 1956 (PR #941 takes the missing count off this fit and edits the same two functions)
-Priority: P2 2026-10-27 — `INDEX_IMPURITY_LINES` fires on a true cell's stalled fit, and notebook 03 works around it; #941 landed for WP-1956 on 2026-10-25, the condition the P3 rung waited on
 
 ## Goal
 
@@ -663,6 +662,19 @@ validates no fewer candidates than on `main`.
   claim), WP-1323 (the alternation), WP-1956 and PR #941.
 
 ## Handover log
+
+### 2026-11-02 — closed (PR PRNUM)
+
+PR #1191 merged on 2026-10-29, so the indexer has checked its shortlist with a
+Pawley fit since then. Every task here was already ticked. This entry only
+closes the file. Nothing in it was re-measured.
+
+*Done*: Status ✅ dated the merge, the Priority line deleted, the narrative
+moved to the v1.11 record, the index regenerated. The 1.11.0 notes already
+carried the change. No `### Inherited` section was left to consume.
+
+*Next*: none here. WP-2062 waited on this WP (its `Depends on:` line). WP-2063
+can lower the reserve once the panel's cost is bounded.
 
 ### 2026-10-29 — the go, decided: Pawley validates NAC's true cell under `quick` (3rd session, begun 2026-10-28)
 
