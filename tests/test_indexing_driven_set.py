@@ -32,7 +32,8 @@ the flagged lines are still scored    the truth leaves 0 driven lines and    --
 
 Synthetic data only: positions from the C4 fixture, and silicon through the
 package's own forward model with Poisson noise (#916's flat reproducer,
-seed 1, 12.1–60°).
+seed 1, 12.1–60°).  Measured silicon (11-BM SRM 640c) flags no weak line, so
+it gives this control nothing to show (the last test's comment, WP-1968).
 """
 
 from __future__ import annotations
@@ -141,6 +142,18 @@ def test_916s_flat_silicon_is_driven_by_its_own_lines(tmp_path):
     # pattern has full tails, the picker finds three fewer weak components, and
     # the stripped set (15 lines) indexes: 4 candidates, so the control would
     # no longer show the rule is needed on this pattern.
+    #
+    # A documented limit, measured 2026-11-01 (WP-1968).  The control's
+    # evidence is synthetic.  The tree's one measured silicon pattern,
+    # ``11BM_Si640c.xy``, flags no ``weak_line`` component, either over this
+    # pattern's d-range (6.03-28.92° at 0.412359 Å: 11 usable components on
+    # 11 lines) or over the whole scan (2-50°: 30 on 30).  With or without
+    # the flags it drives the same set and ranks the truth first, so it
+    # cannot show the exclusion is needed.  Its usable components in this
+    # d-range sit at I/σ_I 22 or more, and its peak-to-background ratio is
+    # about 2600.
+    # This draw's is about 170, and its weak re-seeds sit at I/σ_I 1.3-2.3.
+    # A measured pattern at this draw's counting level would decide it.
     peaks = rx.pick_peaks(_silicon(tmp_path, steep=False, hi=62.0,
                                    window_area_tol=WINDOW_AREA_TOL), ins,
                           two_theta_range=RANGE)
