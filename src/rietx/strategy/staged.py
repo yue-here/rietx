@@ -1504,7 +1504,7 @@ def check_hump_width(table, model) -> list[GuardFinding]:
     ``AttributeError`` from inside a guard scan, on any bank that declared a
     background peak.  ``[]`` here is not the guard passing: the two
     ``_build_result`` paths pair it with a ``BACKGROUND_PEAK_WIDTH_UNAVAILABLE``
-    line (``refine._tof_background_peak_diagnostics``) so an unrun check cannot
+    line (``report.tof._tof_background_peak_diagnostics``) so an unrun check cannot
     read as a clean one.
 
     **Abstains where the resolution is not evaluable.**  Γ_instrument is only a

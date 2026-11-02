@@ -398,15 +398,6 @@ DIAGNOSTIC_SCOPES: dict[str, tuple[tuple[str, ...], str]] = {
         (ABSENT,), "not called from multi.py: the moment's shift between the "
                    "width preset's rungs (WP-1343) is read by "
                    "Refinement._run_plan, which a joint fit does not run"),
-    "_tof_absorption_diagnostics": (
-        (ABSENT,), "a time-of-flight bank's µ(λ) record; a joint fit refuses "
-                   "a bank by name, so there is no bank to report"),
-    "_tof_intensity_basis_diagnostics": (
-        (ABSENT,), "a time-of-flight bank's channel-width basis; a joint fit "
-                   "refuses a bank by name, so there is no bank to report"),
-    "_tof_background_peak_diagnostics": (
-        (ABSENT,), "says the hump-width guard abstained on a bank; a joint fit "
-                   "refuses a bank by name, so it never abstains there"),
 }
 
 #: The same rule one rank down, over :class:`~rietx.strategy.staged.GuardReport`'s
