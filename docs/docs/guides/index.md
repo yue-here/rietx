@@ -52,6 +52,7 @@ Each guide's fits are a script in `examples/guides/`, run by the test suite, and
 
 ## Magnetic structures
 
+- [How to refine a magnetic moment on a known magnetic structure](magnetic.md) declares the magnetic space group and a moment, refines it, and reads `FitReport.magnetic`.
 - [How to refit the nuclear model with the moment present](moment.md) takes the nuclear model from a pattern above the ordering temperature, or refits it with the moment in, and reads the moment after.
 
 ## Several radiations
@@ -84,5 +85,6 @@ Fit a temperature series <series>
 Check a series for path dependence <path>
 Refine a cell edge as a function of temperature <equation>
 Fit an X-ray and a neutron pattern together <joint>
+Refine a magnetic moment on a known magnetic structure <magnetic>
 Refit the nuclear model with the moment present <moment>
 ```
