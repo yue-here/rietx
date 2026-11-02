@@ -60,8 +60,9 @@ esd of 0 on a symmetry-fixed 90° angle would be a claim about precision rather
 than a statement about constraint.
 
 `write_refinement_cif` writes the whole table as `_geom_bond_*`,
-`_geom_contact_*` and `_geom_angle_*` loops, with the symmetry codes resolvable
-against the `_space_group_symop_operation_xyz` loop it writes beside them.
+`_geom_contact_*`, `_geom_angle_*` and `_geom_torsion_*` loops, with the
+symmetry codes resolvable against the `_space_group_symop_operation_xyz` loop
+it writes beside them.
 
 ## §2 rules 4-5 — the two Le Bail measurements
 
@@ -250,8 +251,8 @@ gave Rwp 16 % and a +390 ppm cell, while mirroring the converged `.EXP` gave
 ## §4b — Phase ID: the unmatched list and the Le Bail-gap read
 
 `report.unmatched`'s `kind="unmatched_obs"` entries are the strong lines your
-phase set does not produce — an unmodelled phase's signature, distinct from
-resolution-limited noise. `report.lebail_gap` is the structural-against-profile
+phase set does not produce. One with `flank.on_flank` may be a profile misfit
+instead (abstention.md). `report.lebail_gap` is the structural-against-profile
 triage: it re-partitions the per-hkl intensities at the frozen converged state
 and reports both Rwp. A `ratio` ≫ 1 means positions and profile alone account for the pattern, so every line is indexed and phase identification is safe **at any absolute Rwp**.
 

@@ -102,6 +102,13 @@ entries at the time):
   N_clump, `space_group_confidence`, an extraction retry, a four-outcome
   acceptance table) is not part of this WP. The radii half of #677 lands in
   #1016.
+- **2026-11-01, from WP-1991 (PR #1274): a site-assignment test's wall-clock
+  budget is a load sensor.** `tests/test_site_classes.py::
+  test_an_unplaceable_species_does_not_enumerate_the_others` asserts the call
+  returns within 15 s. It took 12.2 s alone and 18.0 s in the fast suite under
+  `-n auto` (macOS arm64, `[dev]`), where it failed once on a branch that does
+  not touch site classes. `tests/CLAUDE.md` § Budgets in tests asks for a
+  budget several times the serial cost, or a count-based assertion.
 
 ## Non-goals
 

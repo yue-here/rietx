@@ -140,6 +140,17 @@ rule above applies to the form factors.
 
 ### Inherited
 
+- **From WP-2068 (2026-11-02), for the PR that returns the angle seed with the analytic angle
+  columns.** That PR owes "a comparison with the curvature-sign step #1207 would allow". WP-2068's
+  task 1 measured what such a step would change, on macOS arm64 at `a8f679858`. With the
+  analytic angle column let through `_moment_reach_ok`, the frame fixture's PLAN_3 stall at
+  φ = −5e-17 passes `stationary_angle_test` at statistic 0.000. From the minimum at φ = 0.047 the
+  same test reads 0.137, against a cut of 2.71. So a sign check would not change that verdict,
+  and WP-2068 dropped the sign check. Six one-site starts placed exactly on a deeper maximum
+  (`test_stationary_moment_angle`'s Pnma fixture, truth tilt or azimuth 0.05-0.8 rad) did not
+  stall under either column. When this PR turns the angle columns on, re-run those six
+  (WP-2068 § Non-goals, the condition). A stall on a maximum deeper than the cut would bring the
+  sign check back, read at the stop and never at the stationary point.
 - **From WP-1329 (closed 2026-11-01), three notes it could not finish, folded here
   because this WP owns the moment and its hold.** Each was read against main
   `4a93e8587` before the move (the code, not a run); none was run.

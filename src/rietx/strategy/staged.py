@@ -226,7 +226,12 @@ _ROUGHNESS_STAGE = (
 #: The microstrain, in ppm of ΔM/M, that ``lab_sample_refine`` puts an all-zero
 #: Stephens block at before solving (``Stage.strain_seed``): the width's square
 #: root has unbounded slope at zero, so some start is forced.  1000 ppm is
-#: GSAS-II's isotropic microstrain default, on the isotropic ray (WP-1467).
+#: GSAS-II's isotropic microstrain default, on the isotropic ray.  WP-1467
+#: compared it with a start at the ``lor_strain`` the phase carried, folded onto
+#: the ray: equal on brucite under LM (χ² 7.8943 against 7.8939), and on one
+#: two-phase operando pattern lower under LM (1.112 against 1.170, the phase
+#: fractions swapped) and higher under TRF (1.476 against 1.156).  The
+#: measurements disagree, so the fixed seed stands.
 STRAIN_SEED_PPM = 1000.0
 
 
@@ -1036,9 +1041,11 @@ class GuardFinding:
     #: rendered form, identical to the pre-v1.0 list entry
     message: str
     #: a clause a *diagnostic* appends to its own sentence, already rendered.
-    #: Written only by :meth:`at_bound` and read only where ``BOUND_HIT`` and
-    #: ``FLOOR_HIT`` build their ``Diagnostic`` (WP-1434 gives that finding
-    #: evidence to carry; WP-1076 wants both ends of a new field named).  It
+    #: Two writers, each read only where its own code builds the
+    #: ``Diagnostic`` (WP-1076 wants both ends of a field named):
+    #: :meth:`at_bound`, read by ``BOUND_HIT`` and ``FLOOR_HIT`` (WP-1434 gives
+    #: that finding evidence to carry), and :meth:`nonpositive_strain`, read by
+    #: ``STEPHENS_STRAIN_NOT_POSITIVE`` (the intensity share, WP-1467).  It
     #: is deliberately not part of :meth:`__str__`, which is the pre-v1.0 text
     #: byte for byte and is what the other diagnostics are built from.
     detail: str = ""
@@ -1099,10 +1106,19 @@ class GuardFinding:
 
     @classmethod
     def nonpositive_strain(cls, path: str, n_bad: int, n_total: int,
-                           worst: float, hkl: str) -> "GuardFinding":
+                           worst: float, hkl: str,
+                           share: float | None = None) -> "GuardFinding":
+        """``share`` is the fraction of the phase's m·|F|² (no Lp, absorption
+        or texture) over the reflections in the fitted range that sits in the reflections the clamp left with no strain width
+        (:func:`stephens_clamp_share`, WP-1467).  It rides in ``detail``, so
+        the rendered finding is the pre-v1.0 text byte for byte."""
+        detail = ("" if share is None else
+                  f" The width law gives those reflections no strain width, "
+                  f"and they carry {100.0 * share:.3g} % of the phase's "
+                  f"m·|F|² over the reflections in the fitted range.")
         return cls("STEPHENS_STRAIN_NOT_POSITIVE", (path,), float(worst),
                    f"{path} ({n_bad} of {n_total} reflections, "
-                   f"worst σ²(M) {worst:+.2e} at {hkl})")
+                   f"worst σ²(M) {worst:+.2e} at {hkl})", detail=detail)
 
     @classmethod
     def nonpositive_texture(cls, path: str, n_bad: int, n_total: int,
@@ -1495,6 +1511,14 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
     cone condition off the measured directions is unobservable, and flagging it
     would be a claim the data cannot support.  Needs the compiled model for
     that list, so it returns ``[]`` when none is supplied.
+
+    **The finding carries the share of intensity the clamp zeroed** (WP-1467),
+    in ``detail``: the reflections outside the cone get no strain width at all,
+    so a solver can lean on that set as a free hinge, and the count alone
+    cannot say whether it did.  29 of 96 and 1 of 463 fired at one level on
+    one pattern, carrying 25 % and 0.5 % of their phases' intensity.  The share
+    is :func:`stephens_clamp_share`'s, over the reflections whose frozen window
+    reaches the fitted data.  ``str(finding)`` is unchanged.
     """
     import numpy as np
 
@@ -1517,8 +1541,45 @@ def check_stephens_positive(table, model) -> list[GuardFinding]:
             k = int(np.argmin(sigma2))
             hkl = reflection_label(cp.reflections.hklm[k])
             out.append(GuardFinding.nonpositive_strain(
-                base, int(bad.sum()), len(sigma2), float(sigma2[k]), hkl))
+                base, int(bad.sum()), len(sigma2), float(sigma2[k]), hkl,
+                share=stephens_clamp_share(model, ip, table, bad)))
     return out
+
+
+def stephens_clamp_share(model, ip: int, table, bad) -> float | None:
+    """Phase ip's share of intensity in the reflections ``bad`` marks (WP-1467).
+
+    The weight of a reflection is its own integrated intensity with the scale
+    and every angle-dependent correction left out: m·|F|² in Rietveld mode,
+    the same I_calc :meth:`~rietx.model.forward.CompiledModel.structure_intensity_partition`
+    returns, and the extracted per-hkl intensity (``hkl_intensity``) under Le
+    Bail and Pawley, where no structure factor exists.  Summed over the
+    reflections whose frozen window reaches the fitted data, so a reflection
+    the pattern does not show weighs nothing.
+
+    ``None`` where the phase carries no intensity on the data at all, since a
+    share of nothing is not zero.
+    """
+    import numpy as np
+
+    from ..crystallography.lattice import d_spacings
+
+    cp = model.phases[ip]
+    on = (np.asarray(cp.win[..., 1]) > np.asarray(cp.win[..., 0])).any(axis=0)
+    if model.mode == "rietveld":
+        values = table.decode(table.x0())
+        cell = tuple(values[f"phases.{ip}.cell.{k}"]
+                     for k in ("a", "b", "c", "alpha", "beta", "gamma"))
+        d = d_spacings(cp.reflections.index, *cell)
+        f2 = np.asarray(model._total_f2(ip, d, values, cell), dtype=np.float64)
+        weight = np.asarray(cp.reflections.multiplicity, dtype=np.float64) * f2
+    else:
+        weight = np.asarray(cp.hkl_intensity, dtype=np.float64)
+    weight = np.where(on, np.abs(weight), 0.0)
+    total = float(weight.sum())
+    if not total > 0.0:
+        return None
+    return float(weight[np.asarray(bad, dtype=bool)].sum()) / total
 
 
 def check_texture_positive(table, model) -> list[GuardFinding]:
@@ -2202,6 +2263,21 @@ def check_guards(table, outcome, threshold: float,
 
     if outcome.correlation is not None and len(free) > 1:
         corr = np.asarray(outcome.correlation)
+        if outcome.jac is not None and not outcome.n_aux:
+            # a ρ against a direction the Jacobian cannot resolve is rounding
+            # (WP-2050): such a pair is nan here and never crosses a threshold.
+            # It is not shown to a user; the unresolved mask is the developer's
+            # signal, asserted by a nightly test (ruled 2026-11-01)
+            from ..optimize.least_squares import covariance_jacobian
+            from ..optimize.statistics import resolved_correlation
+
+            try:
+                corr, _ = resolved_correlation(
+                    corr, covariance_jacobian(outcome, free))
+            except np.linalg.LinAlgError:
+                # ``soft_modes``' rule below: the stage already said so
+                if getattr(outcome, "covariance_error", None) is None:
+                    raise
         report.high_correlations, report.flat_directions = (
             _correlation_findings(corr, free, threshold))
         # measured once (WP-1056): the same matrix the loop above thresholds

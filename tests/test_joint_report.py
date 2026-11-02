@@ -870,3 +870,161 @@ def test_the_scale_rows_count_toward_the_patterns_a_phase_was_held_in(
     assert bool(found) is fires
     if fires and held[-1].startswith("hist.1"):
         assert found[0].value == 2.0 and len(found) == 1
+
+
+# ----------------------------- WP-2028, a joint parameters() (#1205, 3) -----
+# The maintainer's ruling: read-only, the single fit's ``ParameterRow``, paths
+# as the joint table spells them.  The per-histogram cell ``a`` makes ``b``
+# and ``c`` tied rows whose source is per histogram, the one case where the
+# result's spelling (``row_path``) and ``_canonical`` part.
+
+PER_A = SharingMap(per_histogram=["phases.0.cell.a"])
+
+
+def _joint(sharing=None):
+    structure, instruments = perturbed_inputs()
+    return MultiHistogramRefinement(structure, instruments, sharing=sharing)
+
+
+@pytest.mark.parametrize("sharing", [None, PER_A], ids=["default", "per-a"])
+def test_every_joint_parameter_row_round_trips_through_the_joint_names(sharing):
+    ref = _joint(sharing)
+    mt = ref.mtable
+    rows = ref.parameters()
+    paths = [r.path for r in rows]
+    assert len(paths) == len(set(paths))
+    # one row per name the joint result gives a table entry, none missing
+    assert set(paths) == {mt.row_path(h, e) for h, t in enumerate(mt.tables)
+                          for e in t.entries}
+    known = mt.known_paths()
+    for r in rows:
+        assert r.path in known and not mt.unknown_paths([r.path]), r.path
+        owner = mt._owner(r.path)
+        if owner is None:   # shared: every table's copy answers to it
+            for h, t in enumerate(mt.tables):
+                (e,) = [e for e in t.entries if e.path == r.path]
+                assert mt.row_path(h, e) == r.path
+        else:               # one histogram's: its own table, and no other
+            bare = mt._unscope(owner, r.path)
+            (e,) = [e for e in mt.tables[owner].entries if e.path == bare]
+            assert mt.row_path(owner, e) == r.path
+            assert all(mt._unscope(h, r.path) is None
+                       for h in range(mt.n_histograms) if h != owner)
+        if r.tie is not None:
+            assert set(r.tie.sources) <= set(paths), r.path
+        assert r.esd is None            # no fit yet
+    # shared once, per-histogram once per histogram
+    assert paths.count("phases.0.atoms.0.biso") == 1
+    assert "instrument.zero_shift" not in paths
+    assert {"hist.0.instrument.zero_shift", "hist.1.instrument.zero_shift"} <= set(paths)
+    if sharing is PER_A:
+        assert "phases.0.cell.b" not in paths
+        (b1,) = [r for r in rows if r.path == "hist.1.phases.0.cell.b"]
+        assert b1.tie.sources == ["hist.1.phases.0.cell.a"]
+        assert b1.held_because == "tied: = 1·hist.1.phases.0.cell.a"
+    else:
+        assert paths.count("phases.0.cell.b") == 1
+
+
+@pytest.mark.parametrize("sharing", [None, PER_A], ids=["default", "per-a"])
+def test_joint_parameters_carry_the_fits_values_and_esds(two_patterns, sharing):
+    ref = _joint(sharing)
+    result = ref.fit(two_patterns, plan=RefinementPlan(stages=[
+        Stage("only", TURN_ON, max_iter=8)]))
+    rows = {r.path: r for r in ref.parameters()}
+    assert result.parameters
+    for p in result.parameters:
+        assert rows[p.path].value == p.value, p.path
+        assert rows[p.path].esd == p.stderr, p.path
+    measured = {p.path for p in result.parameters if p.stderr is not None}
+    assert measured and {p for p, r in rows.items() if r.esd is not None} == measured
+    # the per-histogram rows hold each histogram's own value
+    if sharing is PER_A:
+        a = [rows[f"hist.{h}.phases.0.cell.{x}"].value
+             for h in (0, 1) for x in "ab"]
+        assert a[0] == a[1] and a[2] == a[3]
+
+
+def test_a_shared_row_reports_the_window_the_solver_enforces():
+    """Two histograms that disagree about a shared bound: the row is the tighter.
+
+    Per-pattern starts may declare different windows for one shared path, and
+    the solver holds their intersection (``params/multi.py``'s column build),
+    so reading histogram 0's ``lo``/``hi`` would show a window the fit never
+    allows (Yue's review of #1270, item 1).  The wavelengths differ too, so
+    the case also runs through ``size_value_scales``, which scales a stored cap
+    with its histogram's value: the row must be in the shared column's units.
+    Pinned against the solver's own column: free the size, and the row equals
+    ``mtable.bounds()`` at it.
+    """
+    path = "phases.0.lor_size"
+    structures = [_width_start(lam)[0] for lam in LAMS]
+    structures[0].phases[0].lor_size.max = 10.0
+    structures[1].phases[0].lor_size.max = 7.0
+    instruments = [_width_start(lam)[1] for lam in LAMS]
+    ref = MultiHistogramRefinement(structures, instruments)
+    mt = ref.mtable
+    assert mt.value_scales[1][path] != 1.0       # two wavelengths, as in WP-1131
+    (row,) = [r for r in ref.parameters() if r.path == path]
+    assert row.hi == pytest.approx(7.0)          # histogram 0's 10.0 is not the answer
+    mt.set_vary([path], True)
+    lo, hi = mt.bounds()
+    k = mt.free_paths.index(path)
+    assert (row.lo, row.hi) == (lo[k], hi[k])
+
+
+def test_both_parameters_listings_build_a_row_in_one_place(monkeypatch):
+    """``Refinement`` and the joint fit make every row through ``_parameter_row``.
+
+    Yue's review of #1270, item 2: a second copy of the field list is where the
+    next ``Entry`` field gets wired in one fit and left at its default in the
+    other.  The builder copies ``dataclasses.fields(Entry)`` by name, so a row
+    built there cannot miss one; this pins that no listing builds a row beside it.
+    """
+    import sys
+    multi_mod = sys.modules["rietx.multi"]
+    refine_mod = sys.modules["rietx.refine"]   # ``rietx.refine`` the name is the function
+    built: list[str] = []
+    real = refine_mod._parameter_row
+
+    def spy(e, **kw):
+        built.append(e.path)
+        return real(e, **kw)
+
+    monkeypatch.setattr(refine_mod, "_parameter_row", spy)
+    monkeypatch.setattr(multi_mod, "_parameter_row", spy)
+    structure, ins = perturbed_inputs()[0], perturbed_inputs()[1][0]
+    single = Refinement(structure, ins).parameters()
+    assert len(built) == len(single) > 0
+    built.clear()
+    joint = _joint().parameters()
+    assert len(built) == len(joint) > 0
+
+
+def test_stage_path_unknown_names_the_joint_parameters(two_patterns):
+    result = _one_stage(two_patterns, ["phases.0.cell.aa"])
+    (found,) = _codes(result, "STAGE_PATH_UNKNOWN")
+    assert "ref.parameters() lists every path" in found.suggestion
+    assert "mtable" not in found.suggestion
+
+
+def test_a_tied_row_copied_from_the_listing_is_answered(two_patterns):
+    """``hist.1.phases.0.cell.b`` is a row ``parameters()`` prints.  Named in
+    a stage it is a tied row, so ``STAGE_PATH_NOT_FREE`` answers it with its
+    histogram's source.  On main it was ``STAGE_PATH_UNKNOWN``, a typo report
+    for a path the result itself spells."""
+    result = _one_stage(two_patterns, ["hist.1.phases.0.cell.b"], sharing=PER_A)
+    assert not _codes(result, "STAGE_PATH_UNKNOWN")
+    (found,) = _codes(result, "STAGE_PATH_NOT_FREE")
+    assert found.where == ["hist.1.phases.0.cell.b"]
+    assert found.message.endswith("in histogram 1.")
+    assert found.suggestion.startswith("Free hist.1.phases.0.cell.a instead")
+
+
+def test_a_locked_joint_literal_points_at_held_because(two_patterns):
+    """The joint branch of ``STAGE_PATH_NOT_FREE`` had no listing to name."""
+    result = _one_stage(two_patterns, ["phases.0.cell.alpha"])
+    (found,) = _codes(result, "STAGE_PATH_NOT_FREE")
+    assert found.suggestion == "Read held_because for this row in ref.parameters()."
+    (row,) = [r for r in _joint().parameters() if r.path == "phases.0.cell.alpha"]
+    assert row.held_because

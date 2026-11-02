@@ -2014,7 +2014,7 @@ def rank_candidates(cands: Sequence[EngineCandidate], peaks: PeakList, *,
     **Whether two engines found a lattice outranks every figure of merit**
     (WP-1046, :func:`corroborated`), and this is the package's own doctrine
     applied to the order rather than only to the verdict: ``grade`` floors a
-    candidate below :data:`MIN_AGREEMENT` finders at ``low`` before a single
+    candidate below :data:`MIN_AGREEMENT` engines at ``low`` before a single
     caveat is consulted, so a list ranked on the panel alone routinely put
     candidates the gate refuses to promote above the one it could.  Measured:
     on the GSAS-II fluorapatite pattern over all seven systems, the six
@@ -2131,7 +2131,20 @@ def agreement(cand: EngineCandidate) -> int:
     reached — "a wrong prior changes no rank" has to survive the ranking key
     changing under it.
     """
-    return len({f for f in cand.found_by if f != PRIOR_FINDER}) or 1
+    return _engines_behind(cand.found_by) or 1
+
+
+def _engines_behind(found_by: Sequence[str]) -> int:
+    """Distinct engines in a ``found_by`` list, :data:`PRIOR_FINDER` excluded.
+
+    The one count both agreement readers take: :func:`agreement` (the
+    ranking's first key) and :func:`~rietx.indexing.consensus.grade` (the
+    gate's ``MIN_AGREEMENT`` floor).  A stated cell is not an independent
+    search, so it corroborates a lattice and never lifts it (WP-1003 § E;
+    WP-2082, #1308, where it lifted a prior's primitive lattice to
+    ``medium`` above the planted F lattice at ``low``).
+    """
+    return len({f for f in found_by if f != PRIOR_FINDER})
 
 
 def _peak_fwhm(peaks: PeakList) -> np.ndarray:
@@ -2358,6 +2371,17 @@ DEFAULT_SEARCH_PRESET = "quick"
 #: specs measured, cheapest first; at 8, 15 and 20 % the lab patterns (zircon, FAP,
 #: corundum, LaB6) validated every checked cell either way, searching the same
 #: systems.  What 15 % cost: NAC's default spec no longer reached orthorhombic.
+#:
+#: **WP-2063 cut what spends it, and left the value.**  The panel scores the
+#: same answer 5.3× cheaper in consensus and 3.3-8.8× in a unit (thread CPU,
+#: NAC's captured calls replayed on both trees, digests equal), so on NAC's
+#: 80-panel merge about 1-2 s of the 18 s goes before the first fit, where
+#: 10.5 s did.  Swept at 8, 10 and 15 %, three interleaved ``quick`` runs
+#: each (2026-11-02, load 4-9 of 10 cores): NAC's true cell validated on every
+#: run at every value, and no value changed the systems searched, the
+#: candidates or their ranking on NAC or the four lab sets.  What 8 % lost is
+#: NAC's top-ranked candidate's fit, cancelled on every run, and the true
+#: cell's fit kept a 2 s margin.  So the value stays (``docs/wp/2063-*.md``).
 VALIDATION_RESERVE_FRACTION = 0.15
 
 #: name → the whole-run ceiling it fills in (``None`` = unbounded, today's

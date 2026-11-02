@@ -258,16 +258,88 @@ class NumberingMoves(dict):
     The keys read the *old* structure's atom numbering, the diagnostics a caller
     reports read the new one's, and the two differ whenever an atom was inserted
     or removed ahead of the site (#1014 round 7, item 2).  ``sites`` maps each
-    old site path (``phases.i.atoms.j``) to its path in the new structure.
+    renumbered site's old path (``phases.i.atoms.j``) to its path in the new
+    structure.  ``atoms`` is :func:`atom_moves` of the same pair: every atom
+    whose path changes, renumbered or not, which is what a path on an atom
+    whose DOFs did not move needs (#1264).
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sites: dict[str, str] = {}
+        self.atoms: dict[str, str | None] = {}
 
     def new_site(self, old_site: str) -> str:
         """The new structure's path of the site that was ``old_site``."""
-        return self.sites.get(old_site, old_site)
+        return self.sites.get(old_site) or self.atoms.get(old_site) or old_site
+
+    def renumber(self, path: str) -> str | None:
+        """``path`` in the new structure's atom numbering (:func:`renumber_path`)."""
+        return renumber_path(path, self.atoms)
+
+    def in_new_numbering(self) -> NumberingMoves:
+        """These DOF moves keyed by the *new* structure's atom numbering.
+
+        A caller that has already put its paths in the new numbering
+        (:func:`renumber_path`) carries them through this; the targets were
+        always the new structure's.
+        """
+        out = NumberingMoves({
+            f"{self.new_site(site)}.dof.{k}": m
+            for path, m in self.items()
+            for site, k in [path.rsplit(".dof.", 1)]})
+        out.sites = {new: new for new in self.sites.values()}
+        return out
+
+
+#: An atom's own path at the start of a dot-path: ``phases.i.atoms.j``.
+_ATOM_PATH = re.compile(r"^(phases\.\d+\.atoms\.\d+)(?=\.|$)")
+
+
+def renumber_path(path: str, atoms: dict[str, str | None]) -> str | None:
+    """``path`` with its atom (``phases.i.atoms.j``) read through ``atoms``.
+
+    ``atoms`` is what :func:`atom_moves` returns.  A path on an atom it does
+    not name, a glob, and a path on no atom pass unchanged; a path on an atom
+    the new structure no longer has is ``None``.
+    """
+    m = _ATOM_PATH.match(path)
+    if m is None or m.group(1) not in atoms:
+        return path
+    new = atoms[m.group(1)]
+    return None if new is None else new + path[m.end(1):]
+
+
+def atom_moves(old: Structure | CoordinateSnapshot,
+               new: Structure | CoordinateSnapshot) -> dict[str, str | None]:
+    """``{old atom path: new atom path, or None}`` for every atom whose path changes.
+
+    An atom's dot-path is its index, so a structure with an atom removed,
+    inserted or reordered ahead of it names it by another number, and a path
+    read across the two by index names the wrong atom in silence (#1264).
+    Atoms are matched as :func:`_matched_atoms` matches them.  An atom with no
+    partner maps to ``None`` where another atom now has its number, and is left
+    out where its number names no atom: its paths then name nothing, as they
+    always did, so a hold on it is kept as ``Refinement.edit`` keeps one
+    (WP-1435).  Phases are matched by position.  Empty when every atom keeps
+    its number, which is the common case.
+    """
+    old = old if isinstance(old, CoordinateSnapshot) else coordinate_snapshot(old)
+    new = new if isinstance(new, CoordinateSnapshot) else coordinate_snapshot(new)
+    out: dict[str, str | None] = {}
+    for i, (po, pn) in enumerate(zip(old.phases, new.phases, strict=False)):
+        lo, ln = po[2], pn[2]
+        if list(lo) == list(ln):
+            continue
+        partner = dict(_matched_atoms(lo, ln))
+        for jo in range(len(lo)):
+            jn = partner.get(jo)
+            if jn is None and jo >= len(ln):
+                continue                      # its number names no atom here
+            if jn != jo:
+                out[f"phases.{i}.atoms.{jo}"] = (None if jn is None
+                                                 else f"phases.{i}.atoms.{jn}")
+    return out
 
 
 def coordinate_snapshot(structure: Structure) -> CoordinateSnapshot:
@@ -304,6 +376,7 @@ def numbering_moves(old: Structure | CoordinateSnapshot,
     old = old if isinstance(old, CoordinateSnapshot) else coordinate_snapshot(old)
     new = new if isinstance(new, CoordinateSnapshot) else coordinate_snapshot(new)
     moves = NumberingMoves()
+    moves.atoms = atom_moves(old, new)
     for i, (po, pn) in enumerate(zip(old.phases, new.phases, strict=False)):
         (go, _, lo, xo_all), (gn, ops_n, ln, xn_all) = po, pn
         if go != gn:
@@ -338,14 +411,52 @@ def _matched_atoms(lo: Sequence[str], ln: Sequence[str]) -> list[tuple[int, int]
 
     The same list in the same order matches by position.  Otherwise (an atom
     appended, one renamed, one removed: the GUI's add-atom path) an atom is
-    matched by its label where that label is unique in both phases; an atom
-    with no such partner is a different atom and is left alone (#1014 round 6,
-    item 2).
+    matched by its label (#1014 round 6, item 2).  A label both phases hold
+    equally often pairs its occurrences in order, so a model built with
+    repeated labels keeps them.  Where no atom was added or removed, an atom
+    renamed where it stands is matched by position: one whose label the new
+    phase does not hold, at an index whose new label the old phase does not
+    hold.  Any other atom has no partner and is a different atom (#1264):
+    :func:`atom_moves` maps it to ``None``, where passing its index through
+    would name whichever atom now has that number.  A rename beside a removal
+    is one of those, since nothing in the labels says which atom went.
+
+    One block of atoms inserted or removed at a single place the labels fix
+    is matched by position on either side of it, first: appending an ``O``
+    to a phase already holding one changes that label's count, and the label
+    rule alone would then lose both.  Where the block could sit at more than
+    one place (``O O S`` to ``O S``) the labels do not say which atoms went,
+    and the label rule decides.
     """
-    if list(lo) == list(ln):
+    lo, ln = list(lo), list(ln)
+    if lo == ln:
         return [(j, j) for j in range(len(lo))]
-    return [(lo.index(label), ln.index(label)) for label in lo
-            if lo.count(label) == 1 and ln.count(label) == 1]
+    if len(lo) != len(ln):
+        short, long_ = (lo, ln) if len(lo) < len(ln) else (ln, lo)
+        k = len(long_) - len(short)
+        head = 0
+        while head < len(short) and short[head] == long_[head]:
+            head += 1
+        tail = 0
+        while tail < len(short) and short[-1 - tail] == long_[-1 - tail]:
+            tail += 1
+        if head == len(short) - tail:        # the block fits at one place only
+            kept = [*range(head), *range(head + k, len(long_))]
+            return (list(enumerate(kept)) if short is lo
+                    else [(jo, jn) for jn, jo in enumerate(kept)])
+    old_at: dict[str, list[int]] = {}
+    new_at: dict[str, list[int]] = {}
+    for j, x in enumerate(lo):
+        old_at.setdefault(x, []).append(j)
+    for j, x in enumerate(ln):
+        new_at.setdefault(x, []).append(j)
+    pairs = [pair for label, old in old_at.items()
+             if len(old) == len(new_at.get(label, ()))
+             for pair in zip(old, new_at[label], strict=True)]
+    if len(lo) == len(ln):
+        pairs.extend((j, j) for j in range(len(lo))
+                     if lo[j] not in new_at and ln[j] not in old_at)
+    return sorted(pairs)
 
 
 def _move(m) -> DofMove:

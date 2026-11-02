@@ -451,7 +451,7 @@ def test_the_seen_guard_keeps_every_refutation_of_941(si, tet):
 
 
 #: #1230's dense case, regenerated: a triclinic P -1 cell with six random
-#: atoms, Cu Kα1 Bragg-Brentano from 5 to 90°, 291 picked lines.
+#: atoms, Cu Kα1 Bragg-Brentano from 5 to 90°, 289 usable picked lines.
 _AP = ("data_aP\n_cell_length_a 8.90\n_cell_length_b 10.40\n_cell_length_c 12.60\n"
        "_cell_angle_alpha 97.3\n_cell_angle_beta 101.9\n_cell_angle_gamma 106.6\n"
        "_space_group_IT_number 2\n_symmetry_space_group_name_H-M 'P -1'\n"
@@ -498,16 +498,25 @@ def dense_ap():
 
 
 def test_a_dense_triclinic_truth_is_not_refuted_by_a_cell_six_times_its_volume(dense_ap):
-    """#1230, the aP2 kind.  On 291 dense lines the rival's predicted lines
+    """#1230, the aP2 kind.  On 289 dense lines the rival's predicted lines
     merge into fewer resolved positions than the truth's, so containment's
     density order makes the **truth** the child of a cell six times its
-    primitive volume.  The truth indexes every line the rival does, and p₀ is
-    0.64, near the truth's own seen fraction, so its extras sit well inside the
-    refuted band: about 130 of 360 seen against n·p₀ ≈ 230.  ``main`` refuted
-    it and ranked it below the rival.  The truth's own lines are seen far more
-    often than the rival's (0.43 against 0.27), which no oversized
-    description can do, so the pair is undecided and the truth stays first.
+    primitive volume.  The truth indexes every line the rival does.  Two rules
+    each keep it, and the test asserts both.
+
+    #1263: the null is the seen test's own chance rate, p₀ 0.23 here.  Until
+    then it read the rate in windows floored at the assumed shift bound, 0.67,
+    near the truth's own seen fraction, and 128 of 373 extras seen against
+    n·p₀ ≈ 249 read *refuted*.  Against the 85 the seen test gives by chance
+    they are seen beyond chance (p 2.5e-7).  None sits on a line the rival
+    leaves unexplained, so the pair is undecided, never supported.
+
+    #1230: the truth's own lines are seen far more often than the rival's
+    (0.42 against 0.27), which no oversized description can do, so the pair
+    is undecided even at the floored null.  The truth stays first.
     """
+    from dataclasses import replace
+
     from rietx.indexing.ambiguity import SUPERCELL_CHANCE_ALPHA
     from rietx.indexing.consensus import below_refuting_parents, supercell_checks
     from rietx.indexing.screen import (
@@ -524,9 +533,15 @@ def test_a_dense_triclinic_truth_is_not_refuted_by_a_cell_six_times_its_volume(d
     assert contains(truth, rival) and truth.n_lines > rival.n_lines
     assert _primitive_volume(rival) > 5.0 * _primitive_volume(truth)
     ev = containment_evidence(pattern, truth, rival)
-    # main's rule alone would refute it, by a wide margin
     assert ev.p_floor < SUPERCELL_CHANCE_ALPHA
-    assert ev.n_seen < 0.75 * ev.n_extra * ev.p0, (ev.n_seen, ev.n_extra, ev.p0)
+    # #1263: the floored rate would have read it as seen no more than chance,
+    # by a wide margin; the seen test's own rate reads it as beyond chance
+    assert ev.p0_power > 2.5 * ev.p0, (ev.p0, ev.p0_power)
+    assert ev.n_seen < 0.75 * ev.n_extra * ev.p0_power, (ev.n_seen, ev.n_extra, ev.p0_power)
+    assert ev.n_seen > 1.3 * ev.n_extra * ev.p0, (ev.n_seen, ev.n_extra, ev.p0)
+    assert ev.p_value < 1e-4 and ev.n_seen_unexplained == 0
+    assert replace(ev, child_seen_fraction=None).verdict() == "undecided"
+    # #1230: the truth's own lines are seen more often than the rival's
     assert ev.child_seen_fraction > ev.parent_seen_fraction + 0.1
     assert ev.child_seen_more and ev.verdict() == "undecided"
     # and the order: nothing moves the truth below the rival
@@ -534,7 +549,34 @@ def test_a_dense_triclinic_truth_is_not_refuted_by_a_cell_six_times_its_volume(d
     supercell_checks(cands, peaks, q_match=absence_window(peaks), k_sigma=3.0, screen=pattern)
     (check,) = cands[0].supercell_checks
     assert check.relation == "containment" and check.verdict == "undecided"
+    # the record carries both rates, so its verdict can be reproduced from it
+    assert check.p0 == pytest.approx(ev.p0) and check.p0_power == pytest.approx(ev.p0_power)
     assert below_refuting_parents(cands)[0] is cands[0]
+
+
+def test_the_null_is_the_chance_rate_of_the_seen_test_itself(dense_ap):
+    """#1263: p₀ is the share of the range a position with no line reads as
+    *seen* by the screen's own test, so ``n_extra·p₀`` is the chance count of
+    the count it is compared with.  A Monte Carlo of ``seen_at_resolution``
+    over uniform positions reads 0.228 against p₀ 0.228 here.  The floored
+    rate, 0.67, is the power check's alone (#951), and an undeclared floor
+    leaves no second rate."""
+    from rietx.indexing.fom import seen_at_resolution
+    from rietx.indexing.screen import PatternScreen
+
+    peaks, pattern = dense_ap
+    rng = np.random.default_rng(1263)
+    pos = rng.uniform(pattern.two_theta_min, pattern.two_theta_max, 20_000)
+    seen = np.concatenate([
+        seen_at_resolution(chunk, pattern.fwhm_at(chunk), pattern.obs_tt,
+                           pattern.obs_fwhm, pattern.obs_esd,
+                           k_sigma=pattern.k_sigma, resolution=pattern.resolution)[0]
+        for chunk in np.array_split(pos, 10)])
+    rate = float(np.mean(seen))
+    assert abs(rate - pattern.p0) < 0.015, (rate, pattern.p0)
+    assert pattern.p0_power - rate > 0.3, (rate, pattern.p0_power)
+    bare = PatternScreen.from_peaks(peaks, q_match=absence_window(peaks))
+    assert bare.p0_power is None and bare.p0 == pytest.approx(pattern.p0, abs=1e-12)
 
 
 # ----------------------------------------------------------------------

@@ -1,9 +1,8 @@
 # WP-2059 — a Bruker RAW v2 file reads, checked against two descriptions and one real file
 
-Milestone: unscheduled · Status: 🔄 2026-10-30 — the v2 reader, its writer and the local-only real-file test merged from outside as PR #1202 (`efb1d466`); the maintainer's decision on a Durham licence line is open
+Milestone: unscheduled · Status: ✅ 2026-11-02 — the v2 reader, its writer and the local-only real-file test merged from outside as PR #1202 (`efb1d466`); the test-data decision settled as no licence request
 Track: The formats a lab still has
 Depends on: —
-Priority: P3 2026-10-26 — a reader with a workaround (convert elsewhere); the refusal's stated reason, one uncorroborated description, no longer holds
 
 ## Goal
 
@@ -79,8 +78,6 @@ count. That pin is a published file's numbers, so it may be committed.
 **Tier.** None new: a reader of a format's own fields. Any new diagnostic code
 takes its `_audit` row at tier 1.
 
-### Inherited
-
 ## Non-goals
 
 - RAW v1 (no description at all).
@@ -89,7 +86,7 @@ takes its `_audit` row at tier 1.
 
 ## Tasks
 
-- [ ] Decision (maintainer): test data by the literal-offset writer plus the local-only real file (default), or also ask Durham for a licence line.
+- [x] Decision (maintainer): test data by the literal-offset writer plus the local-only real file (default), or also ask Durham for a licence line. **Settled 2026-11-01 by Claude under the data-licence rule** (root CLAUDE.md § Licensing): no licence request. The default shipped and meets the rule: a synthetic writer runs in CI, and the real Durham file is pinned by hash and never vendored. The maintainer may still email Durham for a licence line. That would let CI run the one real-file test, and only the maintainer can send it.
 - [x] The v2 arm of the Bruker reader with the gates above; the refusal text for v1 and multi-range v2.
 - [x] `tests/writers_xrd.py`: a v2 writer from a literal table; tests for the positive arm and each gate failing (wrong size, block count 2, n = 0).
 - [x] `tests/local_data.py`: the `durham-topas/pbso4` entry; a test pinned to the real file's SHA-256 and counts, skipped where absent.
@@ -116,6 +113,14 @@ pinned counts.
 - Issue #1164.
 
 ## Handover log
+
+- **2026-11-02** — closed. The last open task was the test-data decision,
+  and a Claude session settled it on 2026-11-01 as no licence request: the
+  shipped arrangement already meets the data-licence rule. A Bruker RAW v2
+  file holding one range reads, and its notes are staged in
+  `releases/1.11.0.md`. The narrative moved to the v1.11 record. Nothing was
+  run. Closed in PR #1317. *Next:* none here. If the maintainer obtains a licence line from
+  Durham, a new WP can vendor the file and run the real-file test in CI.
 
 - **2026-10-30** (`/pr-review`) — merged from outside as PR #1202 (`efb1d466`) after three rounds. `read_pattern` reads a single-range Bruker RAW v2 file, each field at its named offset, with gates for one block, n > 0, 0x100 + header length + 4n equal to the file size, and a finite non-zero step. Counts are returned as stored, with no clamp to 1. `write_raw2` in `tests/writers_xrd.py` packs v2 from a literal offset table and fills unnamed bytes with `0xA5`, so a field read at the wrong offset fails a gate. Eight mutants of the reader each turn their own test red. The real-file test (`Pbso4.raw`, 6001 points, every count pinned) skips where the file is not fetched, and the file is never vendored. Round 3 corrected the unclaimed-`.raw` message and the `raw_unclaimed` row to say that single-range v2 is read and only v1 is refused, with a test on the wording. It also wrote the v2 axis policy into the `bruker_raw` row with its evidence as it is: one real file and two descriptions, thinner than the `.udf` row's 56. `io/CLAUDE.md` stays at its 561-line cap beside #1138. The collection grew by 11 (`test_readers.py` 202 to 212, `test_readers_robust.py` 87 to 88). Open: the maintainer's choice on asking Durham for a licence line. Gate (a stack of eleven PRs on main `b40bc994`, tree `307eff83`; macOS arm64, `[dev,jax]`, Python 3.12): 13 217 passed, 216 skipped, 48 xfailed, 0 failed, with ruff, the `-W` manual build and the GUI ladder green.
 

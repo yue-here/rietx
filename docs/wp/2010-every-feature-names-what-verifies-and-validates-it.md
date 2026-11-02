@@ -1,6 +1,6 @@
 # WP-2010 — Every feature names what verifies it and what validates it
 
-Milestone: generality · Status: 🔄 2026-10-31 — ruled, reworded and read for consistency; the reporter (#1051) builds it
+Milestone: generality · Status: 🔄 2026-11-01 — the report sentence ruled out; the build, with the reversal's edits to this file, is in #1266
 Track: The audits
 Depends on: —
 Priority: P3 2026-10-18 — outside the gate after 2004, so it waits on nothing
@@ -259,6 +259,44 @@ confirm the new test goes red naming it.
   every Rietveld report under the literal reading; `test_the_held_cell_is_the_certificate`
   keeps its tier, joined to no feature. All three are in the PR body. The ceria round
   robin is not filed (yours, per the entry below).
+
+- **2026-11-02** — a repair session, no code. It wrote the reconstructed entry below for
+  the 2026-11-01 ruling, which had left none, and moved the Status line to match. Its
+  own commit is dated today, so the session-start scan's date rule needs this entry too.
+  Nothing else in the WP moved. Next: as below.
+
+- **2026-11-01 (reconstructed post hoc)** — a ruling session, no code. Written on
+  2026-11-02 by a repair session from the commit alone.
+
+  The fit report will not say which reported numbers lack an independent measurement.
+  The maintainer reversed the 2026-10-27 decision that put that sentence there. The
+  validation record now lives only in the matrix and its generated page. An agent reads
+  the report between stages, while it still chooses what to free. The sentence depended
+  only on which parameters were free, so all it could prompt was a change to them, and
+  the 2026-10-27 ruling forbids a validation verdict steering that choice. This drops
+  one checklist item and part of the Goal; the registry, the join and the retier stand.
+
+  *Done.* b03365dcb (merged as #1288): DESIGN.md § Rules, 2 loses the paragraph that
+  required the report sentence and adds the fit report to the surfaces that carry no
+  validation verdict, with the reason. `docs/milestones/generality.md` § Decisions marks
+  the 2026-10-27 report-sentence decision *Reversed 2026-11-01*, with its ground.
+
+  *Measured* (quoted from the commit's `generality.md` text, not re-run here). Built in
+  #1266, the sentence named 20 of the 26 reported parameters on
+  `examples/srm660c_lab.py`, in 930 characters (macOS arm64). The PR measured 21 and 970
+  on Linux. The commit does not say what the maintainer weighed beyond that.
+
+  *Not done in the commit.* This file's Goal, the 2026-10-27 decision bullet, the
+  report-sentence task, the `Priority:` clause about the magnetic report wording and
+  WP-1327's `### Inherited` note still describe the sentence. #1266 (the reporter's open
+  PR) rewrites all five and removes the code it had built. The repair leaves them to it
+  rather than racing it for the same lines.
+
+  *Gotchas.* #1266 also prepends entries here. Merging it after this entry conflicts in
+  this log, and keeping both entries resolves it.
+
+  Next: the maintainer reviews #1266, which carries the checklist, the reversal's edits
+  to this file and the matching edit to WP-1327. Its merge closes the gap above.
 
 - **2026-10-31** — a wording ruling and a consistency read of the rule set, no code.
 

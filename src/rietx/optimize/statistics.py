@@ -62,6 +62,14 @@ PINV_RCOND = 1e-15
 #: and 1/d² stays below 1e+241 (WP-1463).
 COLUMN_SAFE_EXPONENT = 400
 
+#: The forward-difference error :func:`resolved_correlation` assumes in each
+#: Jacobian column, relative to the column and in units of
+#: :data:`~rietx.optimize.least_squares.FD_STEP`.  It is the one free factor of
+#: that function's cut, n·(this × FD_STEP)² on the unit-diagonal normal matrix
+#: (WP-2050; the cut ruled 2026-11-01).  1 is what was measured on the width
+#: columns, 5e-7 against jax on lab brucite.
+FD_COLUMN_ERROR = 1.0
+
 
 def _is_blocked(jac) -> bool:
     """Whether ``jac`` is a joint fit's :class:`~.blocked.BlockJacobian`, read
@@ -277,6 +285,108 @@ def discarded_directions(jac: np.ndarray) -> tuple[int, np.ndarray]:
     lost_var = (vec[:, gone] ** 2).sum(axis=1) / cut
     touched = np.flatnonzero(live & (lost_var >= kept_var))
     return (n_gone, touched) if len(touched) >= 1 else none
+
+
+def resolved_correlation(corr: np.ndarray, jac: np.ndarray
+                         ) -> tuple[np.ndarray, np.ndarray]:
+    """The correlation matrix with every direction the Jacobian cannot resolve
+    projected out, and the columns those directions dominate (WP-2050).
+
+    Returns ``(rho, unresolved)``.  ``rho`` is ``corr`` where nothing is
+    unresolved.  Otherwise a pair of resolved columns carries the correlation
+    of the covariance with the unresolved subspace removed, a pair with one
+    unresolved column is ``nan`` (its ρ is not determined), and a pair of
+    unresolved columns keeps ``corr``'s value, which is ±1 to rounding.
+    ``unresolved`` is a boolean mask over the columns of ``jac``.
+
+    **The cut is the Jacobian's own accuracy, not a tolerance.**  The forward
+    differences of the peak chain carry a relative error of order
+    :data:`~rietx.optimize.least_squares.FD_STEP` per column (5e-7 measured
+    against jax on lab brucite, :func:`~.least_squares._fd_typicals`).  With
+    every column scaled to unit norm, an error of at most ``FD_STEP`` in each
+    of *n* columns has a spectral norm of at most ``√n·FD_STEP`` (it is bounded
+    by the Frobenius norm), and by Weyl's inequality a singular value moves by
+    no more.  So an eigenvalue of the unit-diagonal normal matrix at or below
+    ``n·FD_STEP²`` is a direction the data has not been shown to move (the
+    per-column error is :data:`FD_COLUMN_ERROR` × ``FD_STEP``, a tier-3 row
+    approved 2026-11-01).  The covariance still inverts it, and rounding then sets it: on brucite's
+    Gaussian-size, Gaussian-strain and W triple it sat between 2.7e-15 and
+    4.9e-14 of |λ|max under 1e-14 nudges to one start value, while the next
+    direction stayed at 1.3-1.4e-10.  On corundum the same triple reached
+    1.2-1.9e-12 of |λ|max in its later stages, above ``FD_STEP²·|λ|max`` and
+    still under ``n·FD_STEP²``.  Every column carries a rounding-level
+    loading on such a direction, divided by that eigenvalue, so a ρ against
+    one of its members, and between two columns that load on it weakly, is
+    rounding too: ``lor_size ~ lor_strain`` read −0.995 or −0.9975 or fell
+    under the guard as the nudge moved, and −0.896 ± 0.003 projected.
+
+    GSAS-II computes its correlations off a pseudo-inverse truncated the same
+    way, at a relative cut of 1e-6 on the normal matrix's singular values
+    (``SVDtol``, ``GSASIImath.setHcorr``).  That cut would also remove
+    brucite's 1.4e-10 zero-shift/displacement direction, whose correlations
+    hold to 2e-5 under the same nudges and which a refiner wants reported.
+
+    **Which columns it dominates** is :func:`discarded_directions`' *touched*
+    test with this cut: the subspace adds at least ``Σ_gone v_i²/cut`` to
+    column *i*'s equilibrated variance, and the column is unresolved when that
+    is at least the variance the resolved directions give it.  A dead column
+    and a joint fit's :class:`~.blocked.BlockJacobian` are left as they are.
+
+    **Limits, measured or by construction.**  The error premise holds for the
+    width columns it was measured on; ``FD_STEP``'s audit row records other
+    columns up to 2.5e-4 from a Richardson oracle, and a direction set by such
+    an error sits above this cut and is left alone, as it was before.  The cut
+    grows with *n*: at 60 free columns it is 6e-11, 12× under brucite's
+    zero-shift/displacement direction.  On brucite's seventh stage the triple
+    reached 2.3× the cut under one nudge, so that stage reads it as resolved.
+    Two unresolved directions leave a ρ between members of different ones set
+    by two rounding eigenvalues.
+
+    **No message says which pairs were withheld** (ruled 2026-11-01): a
+    correlation whose value is rounding is not shown to a user.  The signal
+    for a developer is this function's ``unresolved`` mask, which a nightly
+    test asserts on the round-robin standards
+    (``tests/test_suite_alarms.py``).
+    """
+    from .least_squares import FD_STEP
+
+    corr = np.asarray(corr, dtype=float)
+    n = corr.shape[0]
+    unresolved = np.zeros(n, dtype=bool)
+    if _is_blocked(jac):
+        return corr, unresolved
+    jac = to_host_fp64(jac)
+    if jac.ndim != 2 or jac.shape[1] != n:
+        return corr, unresolved
+    s = column_rescale(jac)
+    if s is not None:
+        jac = jac * s
+    JTJ = jac.T @ jac
+    JTJ = 0.5 * (JTJ + JTJ.T)
+    d = np.sqrt(np.diag(JTJ))
+    live = np.flatnonzero(d > 0.0)
+    if len(live) < 2:
+        return corr, unresolved
+    sub = JTJ[np.ix_(live, live)] / np.outer(d[live], d[live])
+    lam, vec = lapack.eigh(sub)
+    cut = len(live) * (FD_COLUMN_ERROR * FD_STEP) ** 2
+    gone = np.abs(lam) <= cut
+    if not gone.any():
+        return corr, unresolved
+    kept_var = (vec[:, ~gone] ** 2 / np.abs(lam[~gone])).sum(axis=1)
+    lost_var = (vec[:, gone] ** 2).sum(axis=1) / cut
+    member = lost_var >= kept_var
+    unresolved[live[member]] = True
+    k = (vec[:, ~gone] / np.abs(lam[~gone])) @ vec[:, ~gone].T
+    sd = np.sqrt(np.diag(k))
+    rho = np.array(corr, copy=True)
+    res = live[~member]
+    rho[np.ix_(res, res)] = (k / np.outer(sd, sd))[np.ix_(~member, ~member)]
+    un = live[member]
+    rho[np.ix_(un, res)] = np.nan
+    rho[np.ix_(res, un)] = np.nan
+    rho[res, res] = 1.0
+    return rho, unresolved
 
 
 def normal_covariance(jac: np.ndarray, resid: np.ndarray, n_free: int, *,
